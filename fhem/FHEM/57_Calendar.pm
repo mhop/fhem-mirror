@@ -382,8 +382,11 @@ sub ts0 {
 sub fromVEvent {
   my ($self,$vevent)= @_;
 
-  $self->{uid}= $vevent->value("UID");
+  $self->{uid_orig}= $vevent->value("UID");
+  $self->{sequence}= defined($vevent->value("SEQUENCE")) ? $vevent->value("SEQUENCE") : 0;
+  $self->{uid}= $self->{uid_orig};
   $self->{uid}=~ s/\W//g; # remove all non-alphanumeric characters, this makes life easier for perl specials
+  $self->{uid}.= $self->{sequence}; # UID is not unique, e.g. in the case of series with out-of-series events
   $self->{start}= tm($vevent->value("DTSTART"));
   if(defined($vevent->value("DTEND"))) {
     $self->{end}= tm($vevent->value("DTEND"));
@@ -591,9 +594,10 @@ sub advanceToNextOccurance {
     } elsif($self->{freq} eq "WEEKLY") {
       # special handling for WEEKLY and BYDAY
       if(exists($self->{byday})) {
-        # this fails for intervals > 1
         # BYDAY with prefix (e.g. -1SU or 2MO) is not recognized
         # BYDAY with list (e.g. SU,TU,TH) is not recognized
+        # we skip interval-1 weeks
+        $nextstart = plusNSeconds($nextstart, 7*24*60*60, $self->{interval}-1);
         my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
         my $preventloop = 0;        
         do {
@@ -814,6 +818,8 @@ sub Calendar_Initialize($) {
   $hash->{UndefFn} = "Calendar_Undef";
   $hash->{GetFn}   = "Calendar_Get";
   $hash->{SetFn}   = "Calendar_Set";
+  $hash->{NOTIFYDEV} = "global";
+  $hash->{NotifyFn}= "Calendar_Notify";
   $hash->{AttrList}=  $readingFnAttributes;
 }
 
@@ -823,16 +829,12 @@ sub Calendar_Wakeup($$) {
 
   my ($hash,$removeall) = @_;
 
-  my $t= time();
   Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Wakeup";
 
-  Calendar_GetUpdate($hash,$removeall) if($t>= $hash->{fhem}{nxtUpdtTs});
-
-  $hash->{fhem}{lastChkTs}= $t;
-  $hash->{fhem}{lastCheck}= FmtDateTime($t);
-  Calendar_CheckTimes($hash);
+  Calendar_GetUpdate($hash,$removeall);
 
   # find next event
+  my $t= $hash->{fhem}{lstUpdtTs};
   my $nt= $hash->{fhem}{nxtUpdtTs};
   foreach my $event ($hash->{fhem}{events}->events()) {
     next if $event->isDeleted();
@@ -867,7 +869,6 @@ sub Calendar_CheckTimes($) {
   my @startedevents= grep { $_->isStarted($t) } @allevents;
 
   my $event;
-  #main::Debug "Updating modes...";
   foreach $event (@upcomingevents) { $event->setMode("upcoming"); }
   foreach $event (@alarmedevents) { $event->setMode("alarm"); }
   foreach $event (@startedevents) { $event->setMode("start"); }
@@ -933,7 +934,7 @@ sub Calendar_GetUpdate($$) {
       hash => $hash,
       type => 'caldata',
       removeall => $removeall,
-      callback => \&Calendar_ParseUpdate,
+      callback => \&Calendar_ProcessUpdate,
     });
     Log3 $hash, 4, "Calendar: Getting data from $url"; 
 
@@ -945,9 +946,10 @@ sub Calendar_GetUpdate($$) {
       close(ICSFILE);
       
       my $paramhash;
-      $paramhash->{type} = 'caldata';
+      $paramhash->{hash} = $hash;
       $paramhash->{removeall} = $removeall;
-      Calendar_ParseUpdate($paramhash,'',$ics);
+      $paramhash->{type} = 'caldata';
+      Calendar_ProcessUpdate($paramhash,'',$ics);
       return undef;
       
     } else {
@@ -958,6 +960,38 @@ sub Calendar_GetUpdate($$) {
     # this case never happens by virtue of _Define, so just
     die "Software Error";
   }
+  
+}
+
+
+###################################
+sub Calendar_ProcessUpdate($$$) {
+
+  my ($param, $errmsg, $ics) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+  my $removeall = $param->{removeall};
+  
+  if( $errmsg ) 
+  {
+    Log3 $name, 1, "$name: URL error: ".$errmsg;
+    $hash->{STATE} = "error";
+    return undef;
+  } else {
+    $hash->{STATE} = "updated";
+  }
+  
+  if(!defined($ics) or ("$ics" eq "") or ($errmsg ne "")) {
+    Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL. $errmsg";
+    return 0;
+  }
+  
+  Calendar_ParseUpdate($hash, $ics, $removeall);
+
+  my $t= time();
+  $hash->{fhem}{lastChkTs}= $t;
+  $hash->{fhem}{lastCheck}= FmtDateTime($t);
+  Calendar_CheckTimes($hash);
 
   
 }
@@ -965,28 +999,14 @@ sub Calendar_GetUpdate($$) {
 ###################################
 sub Calendar_ParseUpdate($$$) {
 
-  my ($param, $errmsg, $data) = @_;
-  my $hash = $param->{hash};
-  my $name = $hash->{NAME};
-  my $removeall = $param->{removeall};
-  my $ics = $data;
-  if( $errmsg ) 
-  {
-    Log3 $name, 1, "$name: URL error: ".$errmsg;
-    $hash->{STATE} = "error";
-    return undef;
-  } 
-  
-  if(!defined($ics) or ("$ics" eq "") or ($errmsg ne "")) {
-    Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL. $errmsg";
-    return 0;
-  }
+  my ($hash, $ics, $removeall) = @_;
+
   Log3 $hash, 4, "Calendar: Parsing data"; 
   
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
   $ical->parse(split("\n",$ics));
-  #main::Debug "*** Result:\n";
+  #main::Debug "*** Result:";
   #main::Debug $ical->asString();
 
   my @entries= @{$ical->{entries}};
@@ -1016,7 +1036,6 @@ sub Calendar_ParseUpdate($$$) {
   } else {
     $calname= $root->value("X-WR-CALNAME");
   }
-  
     
   $hash->{STATE}= "Active";
   
@@ -1049,6 +1068,25 @@ sub Calendar_ParseUpdate($$$) {
   return 1;
 }
 
+
+#####################################
+sub Calendar_Notify($$)
+{
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
+
+  return if($attr{$name} && $attr{$name}{disable});
+
+  # update calendar after initialization or change of configuration
+  Calendar_Wakeup($hash,0);
+
+  return undef;
+}
+
 ###################################
 sub Calendar_Set($@) {
   my ($hash, @a) = @_;
@@ -1058,11 +1096,9 @@ sub Calendar_Set($@) {
 
   # usage check
   if((@a == 2) && ($a[1] eq "update")) {
-     $hash->{fhem}{nxtUpdtTs}= 0; # force update
      Calendar_Wakeup($hash,0);
      return undef;
   } elsif((@a == 2) && ($a[1] eq "reload")) {
-     $hash->{fhem}{nxtUpdtTs}= 0; # force update
      Calendar_Wakeup($hash,1); # remove all events before update
      return undef;   
   } else {
@@ -1166,8 +1202,8 @@ sub Calendar_Define($$) {
   $hash->{fhem}{events}= Calendar::Events->new();
 
   #main::Debug "Interval: ${interval}s";
-  $hash->{fhem}{nxtUpdtTs}= 0;
-  Calendar_Wakeup($hash,0);
+  # we do not wake up at this point already to avoid the following race condition:
+  # events are loaded from fhem.save and data are updated asynchronousy from non-blocking Http get
 
   return undef;
 }
@@ -1287,13 +1323,13 @@ sub Calendar_Undef($$) {
   
   Recurring calendar events are currently supported to an extent: 
   FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYMONTH WKST 
-  are recognized but not interpreted. BYDAY is only correctly interpreted for weekly events.
+  are recognized but not interpreted. 
   The module will get it most likely wrong
   if you have recurring calendar events with unrecognized or uninterpreted keywords.
   <p>
 
-  A calendar event is identified by its UID. The UID is taken from the source calendar. All non-alphanumerical characters
-  are stripped off the UID to make your life easier.<p>
+  A calendar event is identified by its unique id (uid). The uid is taken from the source calendar's UID concatenated with the SEQUENCE number of the calendar event to cater for out-of-series events with event series. All non-alphanumerical characters
+  are stripped off the uid to make your life easier.<p>
 
   A calendar event can be in one of the following states:
   <table border="1">
@@ -1499,10 +1535,9 @@ sub Calendar_Undef($$) {
   Ein Kalender ist eine Menge von Kalender-Ereignissen. Ein Kalender-Ereignis hat eine Zusammenfassung (normalerweise der Titel, welcher im Quell-Kalender angezeigt wird), eine Startzeit, eine Endzeit und keine, eine oder mehrere Alarmzeiten. Die Kalender-Ereignisse werden
   aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r ein Kalender-Ereignis existieren, wird nur der fr&uuml;heste Alarmzeitpunkt behalten. Wiederkehrende Kalendereinträge werden in einem gewissen Umfang unterst&uuml;tzt: 
   FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYMONTH WKST 
-  werden erkannt aber nicht ausgewertet. BYDAY wird nur für wöchentliche Kalender-Ereignisse
-  korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Kalender-Ereignisse mit unerkannten oder nicht ausgewerteten Schlüsselworten hast.<p>
+  werden erkannt aber nicht ausgewertet. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Kalender-Ereignisse mit unerkannten oder nicht ausgewerteten Schlüsselworten hast.<p>
 
-  Ein Kalender-Ereignis wird durch seine UID identifiziert. Die UID wird vom Quellkalender bezogen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der UID entfernt.<p>
+  Ein Kalender-Ereignis wird durch seine uid (unique id, eindeutige id) identifiziert. Die uid wird vom Quellkalender bezogen, erg&auml;nzt um die SEQUENCE-Nummer, um Ereignisse au&szlig; der Reihe verarbeiten zu k&ouml;nnen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der uid entfernt.<p>
 
   Ein Kalender-Ereignis kann sich in einem der folgenden Zustände befinden:
   <table border="1">
