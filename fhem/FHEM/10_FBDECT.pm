@@ -168,7 +168,7 @@ FBDECT_Parse($$@)
   my $hash = $modules{FBDECT}{defptr}{"$ioName:$id"};
   $hash = $modules{FBDECT}{defptr}{$id} if(!$hash);
   if(!$hash) {
-    my $ret = "UNDEFINED FBDECT_$id FBDECT $ioName:$id switch";
+    my $ret = "UNDEFINED FBDECT_${ioName}_$id FBDECT $ioName:$id switch";
     Log3 $ioName, 3, "$ret, please define it";
     DoTrigger("global", $ret);
     return "";
