@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 04/2015
-my $thzversion = "0.142";
+my $thzversion = "0.143";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -297,8 +297,8 @@ my %sets439 = (
   "p03RoomTempStandbyHC1SummerMode"	=> {cmd2=>"0B056A", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
   "p13GradientHC1"			=> {cmd2=>"0B010E", argMin => "0.1", argMax =>    "5", 	type =>"6gradient",  unit =>""}, # 0..5 rappresentato/100
   "p14LowEndHC1"			=> {cmd2=>"0B059E", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},   #in °K 0..20°K rappresentato/10
-  "p15RoomInfluenceHC1"			=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean",  unit =>" %"},
-  "p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin =>   "0", argMax =>  "100",	type =>"1clean",  unit =>" %"}, #in % 0..100%
+  "p15RoomInfluenceHC1"			=> {cmd2=>"0B010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"},
+  "p19FlowProportionHC1"		=> {cmd2=>"0B059D", argMin =>   "0", argMax =>  "100",	type =>"1clean", unit =>" %"}, #in % 0..100%
   "p01RoomTempDayHC2"			=> {cmd2=>"0C0005", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
   "p02RoomTempNightHC2"			=> {cmd2=>"0C0008", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
   "p03RoomTempStandbyHC2"		=> {cmd2=>"0C013D", argMin =>  "12", argMax =>   "27", 	type =>"5temp",  unit =>" °C"},
@@ -308,8 +308,8 @@ my %sets439 = (
   "p16GradientHC2"			=> {cmd2=>"0C010E", argMin => "0.1", argMax =>    "5",	type =>"6gradient",  unit =>""}, # /100
   "p17LowEndHC2"			=> {cmd2=>"0C059E", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p18RoomInfluenceHC2"			=> {cmd2=>"0C010F", argMin =>   "0", argMax =>  "100",	type =>"0clean", unit =>" %"}, 
-  "p04DHWsetDayTemp"			=> {cmd2=>"0A0013", argMin =>  "14", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
-  "p05DHWsetNightTemp"			=> {cmd2=>"0A05BF", argMin =>  "14", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
+  "p04DHWsetDayTemp"			=> {cmd2=>"0A0013", argMin =>  "14", argMax =>   "50",	type =>"5temp",  unit =>" °C"},
+  "p05DHWsetNightTemp"			=> {cmd2=>"0A05BF", argMin =>  "14", argMax =>   "50",	type =>"5temp",  unit =>" °C"},
   "p83DHWsetSolarTemp"			=> {cmd2=>"0A05BE", argMin =>  "14", argMax =>   "75",	type =>"5temp",  unit =>" °C"},
   "p06DHWsetStandbyTemp"		=> {cmd2=>"0A0581", argMin =>  "14", argMax =>   "49",	type =>"5temp",  unit =>" °C"},
   "p11DHWsetManualTemp"			=> {cmd2=>"0A0580", argMin =>  "14", argMax =>   "54",	type =>"5temp",  unit =>" °C"},
@@ -346,6 +346,7 @@ my %sets439 = (
   "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "1",  argMax =>   "20",	type =>"5temp",  unit =>" °C"},
   "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "1",  argMax =>   "25",	type =>"5temp",  unit =>" °C"},
   "p76RoomThermCorrection"		=> {cmd2=>"0A0109", argMin =>  "-5", argMax =>    "5", 	type =>"4temp",  unit =>" K"},
+  "p77OutThermFilterTime"		=> {cmd2=>"0A010C", argMin =>  "1",  argMax =>   "24", 	type =>"0clean",  unit =>" h"},
   "p35PasteurisationInterval"		=> {cmd2=>"0A0586", argMin =>  "1",  argMax =>   "30", 	type =>"1clean",  unit =>""},
   "p35PasteurisationTemp"		=> {cmd2=>"0A0587", argMin =>  "10", argMax =>   "65", 	type =>"5temp",  unit =>" °C"},
   "p34BoosterDHWTempAct"		=> {cmd2=>"0A0589", argMin => "-10", argMax =>  "10",	type =>"5temp",  unit =>" °C"},
@@ -631,7 +632,8 @@ sub THZ_Initialize($)
   $hash->{UndefFn} = "THZ_Undef";
   $hash->{GetFn}   = "THZ_Get";
   $hash->{SetFn}   = "THZ_Set";
-  $hash->{AttrFn}  = "THZ_Attr"; 
+  $hash->{AttrFn}  = "THZ_Attr";
+  $hash->{FW_detailFn}  ="THZ_detailFn";
   $hash->{AttrList}= "IODev do_not_notify:1,0  ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 "
 		    ."interval_sGlobal:0,60,120,180,300,600,3600,7200,43200,86400 "
 		    ."interval_sSol:0,60,120,180,300,600,3600,7200,43200,86400 "
@@ -734,9 +736,7 @@ sub THZ_GetRefresh($) {
 			  $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
 			  InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
 	}
-	if (!($hash->{STATE} eq "disconnected")) {
-	  $replyc = THZ_Get($hash, $hash->{NAME}, $command);
-	}
+	$replyc = THZ_Get($hash, $hash->{NAME}, $command) if ($hash->{STATE} ne "disconnected");
 	return ($replyc);
 }
 
@@ -797,7 +797,7 @@ sub THZ_Ready($)
   my ($hash) = @_;
   if($hash->{STATE} eq "disconnected")
   { THZ_RemoveInternalTimer("THZ_GetRefresh");
-  select(undef, undef, undef, 0.25); #equivalent to sleep 1000ms
+  select(undef, undef, undef, 0.25); #equivalent to sleep 250ms
   return DevIo_OpenDev($hash, 1, "THZ_Refresh_all_gets")
   }	
     # This is relevant for windows/USB only
@@ -882,23 +882,24 @@ sub THZ_Set($@){
   my $argMax = $cmdhash->{argMax};
   my $argMin = $cmdhash->{argMin};
   
-  # check the parameter range
-  given ($cmdhash->{type}) {
-    when (["7prog", "8party"]) {          
-      ($arg, $arg1)=split('--', $arg);
-      return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg1 gt $argMax) or ($arg1 lt $argMin) or ($arg gt $argMax) or ($arg lt $argMin)) ) ;
+  #-- check the parameter range
+  if	($cmdhash->{type} =~ /7prog|8party/) {          
+    ($arg, $arg1)=split('--', $arg);
+    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if (($arg ne "n.a.") and ($arg1 ne "n.a.") and (($arg1 gt $argMax) or ($arg1 lt $argMin) or ($arg gt $argMax) or ($arg lt $argMin)) ) ;
     }
-    when ("2opmode") {
-     $arg1=undef;
-     $arg=$Rev_OpMode{$arg};
-     return "Unknown argument $arg1: $cmd supports  " . join(" ", sort values %OpMode) 	if(!defined($arg));
+  elsif ($cmdhash->{type} eq "2opmode") {
+    $arg1=undef;
+    $arg=$Rev_OpMode{$arg};
+    return "Unknown argument $arg1: $cmd supports  " . join(" ", sort values %OpMode) 	if(!defined($arg));
     }
-    default {$arg1=undef;
-     return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
+  else {
+    $arg1=undef;
+    return "Argument does not match the allowed inerval Min $argMin ...... Max $argMax " if(($arg > $argMax) or ($arg < $argMin));
     }
-  }  
+  #--
   my $i=0;  my $parsingrule;
-  my $parent = $cmdhash->{parent};	#if I have a father read from it
+  my $parent = $cmdhash->{parent};
+  #if I have a father read from it: important for older firmwares
   if(defined($parent) ) {
       my $parenthash=$gets{$parent};
       $cmdHex2 = $parenthash->{cmd2};	#overwrite $cmdHex2 with the parent
@@ -949,16 +950,15 @@ sub THZ_Set($@){
 	select(undef, undef, undef, 0.25);
 	$msg=THZ_Get($hash, $name, $cmd);
 	#take care of program of the week
-	given ($a[1]) {
-	 when (/Mo-So/){
+	if ($a[1] =~ /Mo-So/){
 	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/Mo-So/Mo-Fr/;	$msg.= "\n" . THZ_Set($hash, @a);
 	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/Mo-Fr/Sa-So/;	$msg.="\n" . THZ_Set($hash, @a);
 	  }
-	 when (/Mo-Fr/)  	{
+	elsif ($a[1] =~ /Mo-Fr/)  	{
 	    select(undef, undef, undef, 0.05);
-		$a[1] =~ s/_Mo-Fr_/_Mo_/;	$msg.="\n" . THZ_Set($hash, @a);
+	    $a[1] =~ s/_Mo-Fr_/_Mo_/;	$msg.="\n" . THZ_Set($hash, @a);
 	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Mo_/_Tu_/ ;	$msg.="\n" . THZ_Set($hash, @a);
 	    select(undef, undef, undef, 0.05);
@@ -968,14 +968,12 @@ sub THZ_Set($@){
 	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Th_/_Fr_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
 	  }
-	 when (/Sa-So/){
+	 elsif ($a[1] =~ /Sa-So/){
 	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Sa-So_/_Sa_/; 	$msg.="\n" . THZ_Set($hash, @a);
 	    select(undef, undef, undef, 0.05);
 	    $a[1] =~ s/_Sa_/_So_/ ;  	$msg.="\n" . THZ_Set($hash, @a);
 	  }
-	  default 	{}
-	} 
 	#split _ mo-fr when [3] undefined do nothing, when mo-fr  chiama gli altri
         return ($msg);
   }
@@ -1421,34 +1419,32 @@ sub THZ_Parse1($$) {
       	#Log3 $hash->{NAME},3, "after: '$message'"; 
       }
       my $value = substr($message, $positionInMsg, $lengthInMsg);
-      given ($Type) {
-        when ("hex")		{$value= hex($value);}
-	when ("year")		{$value= hex($value)+2000;}
-        when ("hex2int")	{$value= hex2int($value);}
-	when ("turnhexdate")	{$value= hex(substr($value, 2,2) . substr($value, 0,2));}
-	when ("hexdate")	{$value= hex(substr($value, 0,2) . substr($value, 2,2));}
-       #when ("turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
-       #when ("hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
-	when ("turnhex2time")	{$value= sprintf("%02u:%02u", hex($value)%100, hex($value)/100) ;}
-	when ("hex2time")	{$value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100) ;}
-	when ("swver")		{$value= sprintf("%01u.%02u", hex(substr($value, 0,2)), hex(substr($value, 2,2)));}
-	when ("hex2ascii")	{$value= uc(pack('H*', $value));}
-	when ("opmode")		{$value= $OpMode{hex($value)};}
-	when ("opmodehc")	{$value= $OpModeHC{hex($value)};}
-	when ("esp_mant") 	{$value= sprintf("%.3f", unpack('f', pack( 'L',  reverse(hex($value)))));}
-	when ("somwinmode")	{$value= $SomWinMode{($value)};}	
-      	when ("hex2wday")	{$value= unpack('b7', pack('H*',$value));};
-	when ("weekday")	{$value= $weekday{($value)};}
-	when ("faultmap")	{$value= $faultmap{(hex($value))};}
-	when ("quater")		{$value= quaters2time($value);}
-	when ("bit0")		{$value= (hex($value) &  0b0001) / 0b0001;}
-	when ("bit1")		{$value= (hex($value) &  0b0010) / 0b0010;}
-	when ("bit2")		{$value= (hex($value) &  0b0100) / 0b0100;}
-	when ("bit3")		{$value= (hex($value) &  0b1000) / 0b1000;}
-	when ("nbit0")		{$value= 1-((hex($value) &  0b0001) / 0b0001);}
-	when ("nbit1")		{$value= 1-((hex($value) &  0b0010) / 0b0010);}
-	when ("n.a.")		{$value= "n.a.";}
-      }
+      if    ($Type eq "hex")		{$value= hex($value);}
+      elsif ($Type eq "year")		{$value= hex($value)+2000;}
+      elsif ($Type eq "hex2int")	{$value= hex2int($value);}
+      elsif ($Type eq "turnhexdate")	{$value= hex(substr($value, 2,2) . substr($value, 0,2));}
+      elsif ($Type eq "hexdate")	{$value= hex(substr($value, 0,2) . substr($value, 2,2));}
+      #elsif ($Type eq "turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
+      #elsif ($Type eq "hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
+      elsif ($Type eq "turnhex2time")	{$value= sprintf("%02u:%02u", hex($value)%100, hex($value)/100) ;}
+      elsif ($Type eq "hex2time")	{$value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100) ;}
+      elsif ($Type eq "swver")		{$value= sprintf("%01u.%02u", hex(substr($value, 0,2)), hex(substr($value, 2,2)));}
+      elsif ($Type eq "hex2ascii")	{$value= uc(pack('H*', $value));}
+      elsif ($Type eq "opmode")		{$value= $OpMode{hex($value)};}
+      elsif ($Type eq "opmodehc")	{$value= $OpModeHC{hex($value)};}
+      elsif ($Type eq "esp_mant") 	{$value= sprintf("%.3f", unpack('f', pack( 'L',  reverse(hex($value)))));}
+      elsif ($Type eq "somwinmode")	{$value= $SomWinMode{($value)};}	
+      elsif ($Type eq "hex2wday")	{$value= unpack('b7', pack('H*',$value));}
+      elsif ($Type eq "weekday")	{$value= $weekday{($value)};}
+      elsif ($Type eq "faultmap")	{$value= $faultmap{(hex($value))};}
+      elsif ($Type eq "quater")		{$value= quaters2time($value);}
+      elsif ($Type eq "bit0")		{$value= (hex($value) &  0b0001) / 0b0001;}
+      elsif ($Type eq "bit1")		{$value= (hex($value) &  0b0010) / 0b0010;}
+      elsif ($Type eq "bit2")		{$value= (hex($value) &  0b0100) / 0b0100;}
+      elsif ($Type eq "bit3")		{$value= (hex($value) &  0b1000) / 0b1000;}
+      elsif ($Type eq "nbit0")		{$value= 1-((hex($value) &  0b0001) / 0b0001);}
+      elsif ($Type eq "nbit1")		{$value= 1-((hex($value) &  0b0010) / 0b0010);}
+      elsif ($Type eq "n.a.")		{$value= "n.a.";}
       $value = $value/$divisor if ($divisor != 1); 
       $ParsedMsg .= $parsingtitle . $value; 
     }
@@ -1596,6 +1592,35 @@ sub THZ_Undef($$) {
 }
 
 
+
+
+##########################################
+# nearest rounds to the nearrest value multiple of the first argumen
+# nearest_ceil(10, 44); --> 40
+# nearest_floor(10, 44); --> 50
+# modified takes as an argument the function to be called, not the argument
+########################################################################################
+
+sub nearest_ceil {
+    my $targ = abs(shift);
+    my @res  = map { $targ * POSIX::floor(($_ + $Math::Round::half * $targ) / $targ) } @_;
+
+    return wantarray ? @res : $res[0];
+}
+
+
+sub nearest_floor {
+    my $targ = abs(shift);
+    my @res  = map { $targ * POSIX::ceil(($_ - $Math::Round::half * $targ) / $targ) } @_;
+
+    return wantarray ? @res : $res[0];
+}
+
+
+
+
+
+
 ##########################################
 # THZ_RemoveInternalTimer($) 
 # modified takes as an argument the function to be called, not the argument
@@ -1613,6 +1638,7 @@ sub THZ_RemoveInternalTimer($){
 sub function_heatSetTemp($$) {
   my ($start, $stop) = @_;
   my ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1);
+  my $pOpMode = " ";
 
   my $devname; #normally Mythz but could be defined differently
   foreach   (keys %defs) { 
@@ -1623,29 +1649,35 @@ sub function_heatSetTemp($$) {
   if (AttrVal($devname, "firmware" , "4.39")  =~ /^2/ )  {
     ($p13GradientHC1, $p14LowEndHC1, $p15RoomInfluenceHC1) = (split ' ',ReadingsVal($devname,"pHeat1",0))[1,3,5];
   }  
-  else {  
+  else {
+  $pOpMode = ReadingsVal($devname,"pOpMode"," ");
   $p13GradientHC1 	  = ReadingsVal($devname,"p13GradientHC1",0.4);
   $p15RoomInfluenceHC1 = (split ' ',ReadingsVal($devname,"p15RoomInfluenceHC1",0))[0];
   $p14LowEndHC1 	  = (split ' ',ReadingsVal($devname,"p14LowEndHC1",0))[0];
   }
   my ($heatSetTemp, $roomSetTemp, $insideTemp) = (split ' ',ReadingsVal($devname,"sHC1",0))[11,21,27];
   my $outside_tempFiltered =(split ' ',ReadingsVal($devname,"sGlobal",0))[65];
-  $roomSetTemp ="1" if ($roomSetTemp == 0); #division by 0 is bad
-  #########$insideTemp=23.8 ; $roomSetTemp = 20.5; $p13GradientHC1 = 0.31; $heatSetTemp = 25.4; $p15RoomInfluenceHC1 = 80; #$outside_tempFiltered = 4.9; $p14LowEndHC1 =1.5; $p99RoomThermCorrection = -2.8;
+  if (!defined($roomSetTemp)) {
+  $insideTemp=23.8 ; $roomSetTemp = 19.5; $p13GradientHC1 = 0.31; $heatSetTemp = 15; $p15RoomInfluenceHC1 = 80;
+  $pOpMode ="DEMO: no data";
+  $outside_tempFiltered = 0; $p14LowEndHC1 =0.5;  
+  }
   
   my $a= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
   my $a1= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1;
   my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
   my $c= -1 * $p13GradientHC1 /75;
+  
   my $Simul_heatSetTemp; my $Simul_heatSetTemp_simplified;  my @ret; 
   foreach ($start..$stop) {
    my $tmp =$_ * $_ * $c + $_ * $b;
    $Simul_heatSetTemp 		 = sprintf("%.1f", ( $tmp + $a));
+   #$Simul_heatSetTemp 		 =  8 if ($pOpMode eq "DHWmode"); # DHWmode is always at 8 grad C 
    $Simul_heatSetTemp_simplified = sprintf("%.1f", ($tmp + $a1));
    push(@ret, [$_, $Simul_heatSetTemp, $Simul_heatSetTemp_simplified]);
   }
-  my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . "% insideTemp=" . $insideTemp .'°C' ;
-  return (\@ret, $titlestring, $heatSetTemp, $outside_tempFiltered);
+  my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . "% insideTemp=" . $insideTemp .'°C';
+  return (\@ret, $titlestring, $heatSetTemp, $outside_tempFiltered, $pOpMode);
 }
 
 #####################################
@@ -1657,9 +1689,9 @@ sub function_heatSetTemp($$) {
 #####################################
 
 sub THZ_PrintcurveSVG {
-my ($ycurvevalues, $titlestring, $heatSetTemp, $outside_tempFiltered) = function_heatSetTemp(-15,20);
-my $v0min= 15;
-$v0min= 10 if ((($ycurvevalues->[33][1]) < $v0min ) or (($ycurvevalues->[33][2]) < $v0min)); #lower offset, if out of scale
+my ($ycurvevalues, $titlestring, $heatSetTemp, $outside_tempFiltered, $pOpMode) = function_heatSetTemp(-15,20);
+my $v0min = minNum(15, ($ycurvevalues->[33][1]), ($ycurvevalues->[33][2]), $heatSetTemp);	#lower offset than 15, if out of scale
+$v0min = maxNum(5, nearest_ceil(5, $v0min));					#start only from a multiple of 5, but do not go below 5
 my $vstep= 5;
 $vstep= 10 if ((($ycurvevalues->[0][1])>($v0min+4*$vstep)) or (($ycurvevalues->[0][2])>($v0min+4*$vstep))); #increase step, if out of scale
 my $v1=$v0min+$vstep; my $v2=$v1+$vstep; my $v3=$v2+$vstep; my $v4=$v3+$vstep;
@@ -1667,7 +1699,7 @@ my $ret =  <<'END';
 <?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE svg> <svg width="800" height="164" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" >
 <style type="text/css"><![CDATA[
 text       { font-family:Times; font-size:12px; }
-text.title { font-size:14	px; }
+text.title { font-size:14px; }
 text.copy  { text-decoration:underline; stroke:none; fill:blue;    }
 text.paste { text-decoration:underline; stroke:none; fill:blue;    }
 polyline { stroke:black; fill:none; }
@@ -1730,14 +1762,15 @@ $ret .= '<polyline points="751,110 756,110"/> <text x="760" y="114" class="ylabe
 $ret .= '<polyline points="751,80 756,80"/>   <text x="760" y="84" class="ylabel">' . $v2    .'</text>';
 $ret .= '<polyline points="751,49 756,49"/>   <text x="760" y="53" class="ylabel">' . $v3    .'</text>';
 $ret .= '<polyline points="751,19 756,19"/>   <text x="760" y="23" class="ylabel">' . $v4    .'</text>';
-$ret .= '</g>';
+$ret .= '</g>' ."\n";
 
 
 #labels ######################
 $ret .= '<text line_id="line_1" x="70" y="100" class="l1"> --- heat curve with insideTemp correction</text>' ;
 $ret .= '<text line_id="line_3" x="70" y="115" class="l3"> --- heat curve simplified</text>' ;
-$ret .= '<text  line_id="line_0" x="70" y="130"  class="l0"> --- working point: ';
+$ret .= '<text  line_id="line_0" x="70" y="130"  class="l0"> --- working point: '; 
 $ret .= 'outside_tempFiltered=' . $outside_tempFiltered . '°C heatSetTemp=' . $heatSetTemp . '°C </text>';
+$ret .= '<text line_id="line_3" x="650" y="50" class="title"> -'. $pOpMode . '- </text>' ." \n" ;
 
 #title ######################
 $ret .= '<text id="svg_title" x="400" y="14.4" class="title" text-anchor="middle">';
@@ -1767,6 +1800,17 @@ my $FW_RETTYPE = "image/svg+xml";
 return ($FW_RETTYPE, $ret);
 }
 
+
+
+
+
+
+sub THZ_detailFn(@)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+  my $hash = $defs{$d}; #$d is the name of the defined device 
+  return '<div class="SVGplot"><embed src="/fhem/THZ_PrintcurveSVG/" type="image/svg+xml"  name="wl_hr22"/></div> <br>';
+}
 
 #####################################
 
