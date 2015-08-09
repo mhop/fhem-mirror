@@ -932,11 +932,12 @@ sub Calendar_GetUpdate($$) {
       url => $url,
       noshutdown => 1,
       hash => $hash,
+      timeout => 30, 
       type => 'caldata',
       removeall => $removeall,
       callback => \&Calendar_ProcessUpdate,
     });
-    Log3 $hash, 4, "Calendar: Getting data from $url"; 
+    Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Getting data from $url"; 
 
   } elsif($type eq "file") {
     if(open(ICSFILE, $url)) {
@@ -1001,7 +1002,7 @@ sub Calendar_ParseUpdate($$$) {
 
   my ($hash, $ics, $removeall) = @_;
 
-  Log3 $hash, 4, "Calendar: Parsing data"; 
+  Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Parsing data"; 
   
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
@@ -1082,7 +1083,10 @@ sub Calendar_Notify($$)
   return if($attr{$name} && $attr{$name}{disable});
 
   # update calendar after initialization or change of configuration
-  Calendar_Wakeup($hash,0);
+  # wait 10 to 29 seconds to avoid congestion due to concurrent activities
+  my $delay= 10+int(rand(20));
+  Log3 $hash, 5, "Calendar " . $hash->{NAME} . ": FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
+  InternalTimer(time()+$delay, "Calendar_Wakeup", $hash, 0) ;
 
   return undef;
 }
