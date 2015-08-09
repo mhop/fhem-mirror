@@ -45,6 +45,10 @@ FileLog_Initialize($)
   $hash->{SVG_sampleDataFn} = "FileLog_sampleDataFn";
   $data{FWEXT}{"/FileLog_toSVG"}{CONTENTFUNC} = "FileLog_toSVG";
   $data{FWEXT}{"/FileLog_logWrapper"}{CONTENTFUNC} = "FileLog_logWrapper";
+  
+  InternalTimer(time()+0.1, sub() {      # Forum #39792
+    map { HandleArchiving($defs{$_}) } devspec2array("TYPE=FileLog");
+  }, $hash, 0);
 }
 
 
