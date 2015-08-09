@@ -402,7 +402,7 @@ sub PHTV_Set($@) {
                 $hash->{helper}{wakeup} = 1;
                 PHTV_wake($hash);
                 RemoveInternalTimer($hash);
-                InternalTimer( gettimeofday() + 20, "PHTV_GetStatus", $hash,
+                InternalTimer( gettimeofday() + 35, "PHTV_GetStatus", $hash,
                     0 );
             }
             else {
