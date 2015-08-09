@@ -721,9 +721,10 @@ FW_answerCall($)
     FW_pO '<link rel="shortcut-icon"    href="'.$icon.'"/>';
   }
 
-  # meta refresh in rooms only
-  my $rf = AttrVal($FW_wname, "refresh", "");
-  FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
+  if(!$FW_detail) {
+    my $rf = AttrVal($FW_wname, "refresh", "");
+    FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
+  }
 
   ########################
   # CSS
