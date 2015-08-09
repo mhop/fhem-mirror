@@ -364,6 +364,7 @@ sub ENIGMA2_Set($@) {
               )
             {
                 $result = ENIGMA2_wake($hash);
+                return "wake-up command sent";
             }
             else {
                 return

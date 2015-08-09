@@ -404,6 +404,7 @@ sub PHTV_Set($@) {
                 RemoveInternalTimer($hash);
                 InternalTimer( gettimeofday() + 35, "PHTV_GetStatus", $hash,
                     0 );
+                return "wake-up command sent";
             }
             else {
                 return
