@@ -92,7 +92,7 @@ weblink_FwFn($$$$)
 
   my $attr = AttrVal($d, "htmlattr", "");
   if($wltype eq "htmlCode") {
-    $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/);
+    $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
     $ret = $link;
 
   } elsif($wltype eq "link") {
