@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 57_Calendar: make BYDAY work with INTERVAL>1; make out-of-series
+             calendar events with recurring calendar events series work; format
+             change of UID
   - bugfix:  95_Dashboard: fixed issue with disappearing menu and command input in
                room "Everything"
   - feature: 57_Calendar: made download from URL non-blocking
