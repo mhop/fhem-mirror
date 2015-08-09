@@ -417,7 +417,7 @@ ZWave_Initialize($)
   $hash->{DefFn}     = "ZWave_Define";
   $hash->{UndefFn}   = "ZWave_Undef";
   $hash->{ParseFn}   = "ZWave_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ".
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 noExplorerFrames:1,0 ".
     "ignore:1,0 dummy:1,0 showtime:1,0 classes $readingFnAttributes";
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 
@@ -588,6 +588,8 @@ ZWave_Cmd($$@)
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
   my $cmdFmt = $cmdList{$cmd}{fmt};
   my $cmdId  = $cmdList{$cmd}{id};
+  # 0x05=AUTO_ROUTE+ACK, 0x20: ExplorerFrames
+  my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
 
 
   my $nArg = 0;
@@ -648,7 +650,7 @@ ZWave_Cmd($$@)
 
   } else {
     my $len = sprintf("%02x", length($cmdFmt)/2+1);
-    $data = "13$id$len$cmdId${cmdFmt}05"; # 13==SEND_DATA, 05=AUTO_ROUTE+ACK
+    $data = "13$id$len$cmdId${cmdFmt}$cmdEf"; # 13==SEND_DATA
 
   }
 
@@ -2412,6 +2414,9 @@ s2Hex($)
       This attribute is needed by the ZWave module, as the list of the possible
       set/get commands depends on it. It contains a space separated list of
       class names (capital letters).
+      </li>
+    <li><a href="#noExplorerFrames">noExplorerFrames</a>
+      turn off the use of Explorer Frames
       </li>
   </ul>
   <br>
