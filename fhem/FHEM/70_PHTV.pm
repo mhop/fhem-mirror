@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.7
+# Version: 1.3.0
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -399,20 +399,23 @@ sub PHTV_Set($@) {
                 && $attr{$name}{macaddr} ne "" )
             {
                 Log3 $name, 3, "PHTV set $name " . $a[1] . " (wakeup)";
+                $hash->{helper}{wakeup} = 1;
                 PHTV_wake($hash);
                 RemoveInternalTimer($hash);
-                InternalTimer( gettimeofday() + 2, "PHTV_GetStatus", $hash, 0 );
+                InternalTimer( gettimeofday() + 20, "PHTV_GetStatus", $hash,
+                    0 );
             }
             else {
                 return
 "Attribute macaddr not set. Device needs to be reachable to turn it on.";
             }
         }
-        else {
+        elsif ( $hash->{READINGS}{state}{VAL} eq "off" ) {
             Log3 $name, 3, "PHTV set $name " . $a[1];
 
             $cmd = PHTV_GetRemotecontrolCommand("STANDBY");
-            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
+            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"',
+                "on" );
         }
     }
 
@@ -420,12 +423,10 @@ sub PHTV_Set($@) {
     elsif ( lc( $a[1] ) eq "off" ) {
         Log3 $name, 3, "PHTV set $name " . $a[1];
 
-        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = PHTV_GetRemotecontrolCommand("STANDBY");
-            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"' );
-        }
-        else {
-            return "Device needs to be reachable to turn it off.";
+            PHTV_SendCommand( $hash, "input/key", '"key": "' . $cmd . '"',
+                "off" );
         }
     }
 
@@ -1490,7 +1491,9 @@ sub PHTV_ReceiveCommand($$$) {
 
         # device is not reachable or
         # does not even support master command for audio
-        if ( $service eq "audio/volume" ) {
+        if ( $service eq "audio/volume"
+            || ( $service eq "input/key" && $type eq "off" ) )
+        {
             $newstate = "absent";
 
             if (
@@ -1511,7 +1514,7 @@ sub PHTV_ReceiveCommand($$$) {
             # because it does not seem to support the command
             if ( !defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
                 $hash->{helper}{supportedAPIcmds}{$service} = 0;
-                Log3 $name, 3,
+                Log3 $name, 4,
                     "PHTV $name: API command '"
                   . $service
                   . "' not supported by device.";
@@ -1590,7 +1593,7 @@ sub PHTV_ReceiveCommand($$$) {
 
                 if ( !defined( $hash->{helper}{supportedAPIcmds}{$service} ) ) {
                     $hash->{helper}{supportedAPIcmds}{$service} = 0;
-                    Log3 $name, 3,
+                    Log3 $name, 4,
                         "PHTV $name: API command '"
                       . $service
                       . "' not supported by device.";
@@ -1603,12 +1606,7 @@ sub PHTV_ReceiveCommand($$$) {
         #######################
         # process return data
         #
-        if ( $type eq "off" ) {
-            $newstate = "off";
-        }
-        else {
-            $newstate = "on";
-        }
+        $newstate = "on";
 
         # audio/volume
         if ( $service eq "audio/volume" ) {
@@ -1669,10 +1667,14 @@ sub PHTV_ReceiveCommand($$$) {
                 # macaddr attribute is set
                 if (   $newstate eq "on"
                     && $newstate ne $state
-                    && defined( $attr{$name}{macaddr} )
-                    && $attr{$name}{macaddr} ne "" )
+                    && defined( $hash->{helper}{wakeup} ) )
                 {
-                    PHTV_Set( $hash, $name, "on" );
+                    Log3 $name, 4,
+                      "PHTV $name: Wakeup successful, turning device on";
+                    delete $hash->{helper}{wakeup};
+                    $cmd = PHTV_GetRemotecontrolCommand("STANDBY");
+                    PHTV_SendCommand( $hash, "input/key",
+                        '"key": "' . $cmd . '"', "on" );
                 }
 
                 # trigger query cascade in case the device
@@ -1680,6 +1682,10 @@ sub PHTV_ReceiveCommand($$$) {
                 if ( $sequential
                     || ( $newstate eq "on" && $newstate ne $state ) )
                 {
+                    # reset API command monitoring
+                    delete $hash->{helper}{supportedAPIcmds}
+                      if ( defined( $hash->{helper}{supportedAPIcmds} ) );
+
                     # add some delay if the device just came up
                     # and user set attribut for lazy devices
                     if (   $newstate eq "on"
@@ -2994,13 +3000,10 @@ sub PHTV_wake ($) {
       ( defined( $attr{$name}{macaddr} ) )
       ? $attr{$name}{macaddr}
       : "-";
-    my $address;
-    my $port;
+    my $address = '255.255.255.255';
+    my $port    = 9;
 
     if ( $mac_addr ne "-" ) {
-        if ( !defined $address ) { $address = '255.255.255.255' }
-        if ( !defined $port || $port !~ /^\d+$/ ) { $port = 9 }
-
         my $sock = new IO::Socket::INET( Proto => 'udp' )
           or die "socket : $!";
         die "Can't create WOL socket" if ( !$sock );
@@ -3015,8 +3018,12 @@ sub PHTV_wake ($) {
           or die "setsockopt : $!";
 
         Log3 $name, 4,
-          "PHTV $name: Waking up by sending Wake-On-Lan magic package to "
-          . $mac_addr;
+            "PHTV $name: Waking up by sending Wake-On-Lan magic package to "
+          . $mac_addr
+          . " at IP "
+          . $address
+          . " port "
+          . $port;
         send( $sock, $packet, 0, $sock_addr ) or die "send : $!";
         close($sock);
     }
