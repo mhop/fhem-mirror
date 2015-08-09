@@ -56,23 +56,6 @@ FW_jqueryReadyFn()
   if(document.body.getAttribute("longpoll"))
     setTimeout("FW_longpoll()", 100);
 
-  $("div.devSpecHelp a").each(function(){       // Help on detail window
-    var dev = $(this).attr("href").split("#").pop();
-    $(this).attr("href", "#");
-    $(this).click(function(evt){
-      if($("#devSpecHelp").length) {
-        $("#devSpecHelp").remove();
-        return;
-      }
-      $("#content").append('<div id="devSpecHelp"></div>');
-      FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
-        $("#devSpecHelp").html(data);
-        var off = $("#devSpecHelp").position().top-20;
-        $('body, html').animate({scrollTop:off}, 500);
-      });
-    });
-  });
-
   $("a").each(function() { FW_replaceLink(this); })
   $("head script").each(function() {
     var sname = $(this).attr("src"),
@@ -170,6 +153,26 @@ FW_jqueryReadyFn()
         return false;
       }
       return true;
+    });
+  });
+
+  $("div.devSpecHelp a").each(function(){       // Help on detail window
+    var dev = FW_getLink(this).split("#").pop();
+    $(this).unbind("click");
+    $(this).attr("href", "#"); // Desktop: show underlined Text
+    $(this).removeAttr("onclick");
+
+    $(this).click(function(evt){
+      if($("#devSpecHelp").length) {
+        $("#devSpecHelp").remove();
+        return;
+      }
+      $("#content").append('<div id="devSpecHelp"></div>');
+      FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
+        $("#devSpecHelp").html(data);
+        var off = $("#devSpecHelp").position().top-20;
+        $('body, html').animate({scrollTop:off}, 500);
+      });
     });
   });
 
@@ -337,18 +340,26 @@ FW_menu(evt, el, arr, dis, fn, embedEl)
   $('html').bind('click.fwmenu', function() { delfwmenu(); });
 }
 
-
 function
-FW_replaceLink(el)
+FW_getLink(el)
 {
   var attr = $(el).attr("href");
   if(!attr) {
     attr = $(el).attr("onclick");   // Tablet/smallScreen version
     if(!attr)
-      return;
+      return "";
     attr = attr.replace(/^location.href='/,'');
     attr = attr.replace(/'$/,'');
   }
+  return attr;
+}
+
+function
+FW_replaceLink(el)
+{
+  var attr = FW_getLink(el);
+  if(!attr)
+    return;
 
   var ma = attr.match(/^(.*\?)(cmd[^=]*=.*)$/);
   if(ma == null || ma.length == 0 || !ma[2].match(/=(save|set)/)) {
