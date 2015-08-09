@@ -25,7 +25,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.1.1
+# Version: 1.1.2
 #
 # Major Version History:
 # - 1.1.0 - 2014-02-06
@@ -209,43 +209,107 @@ sub GEOFANCY_CGI() {
             $webArgs->{$p} = $v;
         }
 
-        if (
-               !defined( $webArgs->{device} )
-            || !defined( $webArgs->{id} )
-            || (
-                !(
-                    defined( $webArgs->{trigger} && $webArgs->{trigger} ne "" )
-                )
-                && !( defined( $webArgs->{entry} ) && $webArgs->{entry} ne "" )
-            )
-            || $webArgs->{device} eq ""
-            || $webArgs->{id} eq ""
+        # validate id
+        return ( "text/plain; charset=utf-8",
+            "NOK Expected value for 'id' cannot be empty" )
+          if ( !defined( $webArgs->{id} ) || $webArgs->{id} eq "" );
+
+        return ( "text/plain; charset=utf-8",
+            "NOK No whitespace allowed in id '" . $webArgs->{id} . "'" )
+          if ( defined( $webArgs->{id} ) && $webArgs->{id} =~ m/(?:\s)/ );
+
+        # validate locName
+        return ( "text/plain; charset=utf-8",
+            "NOK No whitespace allowed in id '" . $webArgs->{locName} . "'" )
+          if ( defined( $webArgs->{locName} )
+            && $webArgs->{locName} =~ m/(?:\s)/ );
+
+        # require entry or trigger
+        return ( "text/plain; charset=utf-8",
+            "NOK Neither 'entry' nor 'trigger' was specified" )
+          if ( !defined( $webArgs->{entry} )
+            && !defined( $webArgs->{trigger} ) );
+
+        # validate entry
+        return ( "text/plain; charset=utf-8",
+            "NOK Expected value for 'entry' cannot be empty" )
+          if ( defined( $webArgs->{entry} ) && $webArgs->{entry} eq "" );
+
+        return ( "text/plain; charset=utf-8",
+            "NOK Value for 'entry' can only be: 1 0" )
+          if ( defined( $webArgs->{entry} )
+            && $webArgs->{entry} ne 0
+            && $webArgs->{entry} ne 1 );
+
+        # validate trigger
+        return ( "text/plain; charset=utf-8",
+            "NOK Expected value for 'trigger' cannot be empty" )
+          if ( defined( $webArgs->{trigger} ) && $webArgs->{trigger} eq "" );
+
+        return ( "text/plain; charset=utf-8",
+            "NOK Value for 'trigger' can only be: enter|test exit" )
+          if ( defined( $webArgs->{trigger} )
+            && $webArgs->{trigger} ne "enter"
+            && $webArgs->{trigger} ne "test"
+            && $webArgs->{trigger} ne "exit" );
+
+        # validate date
+        return (
+            "text/plain; charset=utf-8",
+            "NOK Specified date '"
+              . $webArgs->{date} . "'"
+              . " does not match ISO8601 UTC format (1970-01-01T00:00:00Z)"
           )
-        {
-            $msg = " id=";
-            $msg .= $webArgs->{id}        if ( $webArgs->{id} );
-            $msg .= " name=";
-            $msg .= $webArgs->{name}      if ( $webArgs->{name} );
-            $msg .= " entry=";
-            $msg .= $webArgs->{entry}     if ( $webArgs->{entry} );
-            $msg .= " trigger=";
-            $msg .= $webArgs->{trigger}   if ( $webArgs->{trigger} );
-            $msg .= " date=";
-            $msg .= $webArgs->{date}      if ( $webArgs->{date} );
-            $msg .= " latitude=";
-            $msg .= $webArgs->{latitude}  if ( $webArgs->{latitude} );
-            $msg .= " longitude=";
-            $msg .= $webArgs->{longitude} if ( $webArgs->{longitude} );
-            $msg .= " device=";
-            $msg .= $webArgs->{device}    if ( $webArgs->{device} );
+          if ( defined( $webArgs->{date} )
+            && $webArgs->{date} !~
+m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-2][0-3]):([0-5][0-9]):([0-5][0-9])Z/
+          );
 
-            Log3 $name, 3,
-              "GEOFANCY: Insufficient data received for webhook $link:\n"
-              . $msg;
+        # validate locName
+        return ( "text/plain; charset=utf-8",
+            "NOK No whitespace allowed in id '" . $webArgs->{locName} . "'" )
+          if ( defined( $webArgs->{locName} )
+            && $webArgs->{locName} =~ m/(?:\s)/ );
 
-            return ( "text/plain; charset=utf-8",
-                "NOK\nInsufficient data received for webhook $link:\n" . $msg );
-        }
+        # validate LAT
+        return (
+            "text/plain; charset=utf-8",
+            "NOK Specified latitude '"
+              . $webArgs->{latitude}
+              . "' has unexpected format"
+          )
+          if (
+            defined $webArgs->{latitude}
+            && (   $webArgs->{latitude} !~ m/^[0-9]+([.][0-9]+)?$/
+                || $webArgs->{latitude} < -90
+                || $webArgs->{latitude} > 90 )
+          );
+
+        # validate LONG
+        return (
+            "text/plain; charset=utf-8",
+            "NOK Specified longitude '"
+              . $webArgs->{longitude}
+              . "' has unexpected format"
+          )
+          if (
+            defined $webArgs->{longitude}
+            && (   $webArgs->{longitude} !~ m/^[0-9]+([.][0-9]+)?$/
+                || $webArgs->{longitude} < -180
+                || $webArgs->{longitude} > 180 )
+          );
+
+        # validate device
+        return ( "text/plain; charset=utf-8",
+            "NOK Expected value for 'device' cannot be empty" )
+          if ( !defined( $webArgs->{device} ) || $webArgs->{device} eq "" );
+
+        return (
+            "text/plain; charset=utf-8",
+            "NOK No whitespace allowed in device '" . $webArgs->{device} . "'"
+          )
+          if ( defined( $webArgs->{device} )
+            && $webArgs->{device} =~ m/(?:\s)/ );
 
         # Geofancy.app
         if ( defined $webArgs->{trigger} ) {
@@ -317,8 +381,8 @@ sub GEOFANCY_CGI() {
 
     readingsBeginUpdate($hash);
 
-    # use time from device
-    if ( defined $date && $date ne "" ) {
+    # validate date
+    if ( $date != "" ) {
         $hash->{".updateTime"}      = GEOFANCY_ISO8601UTCtoLocal($date);
         $hash->{".updateTimestamp"} = FmtDateTime( $hash->{".updateTime"} );
         $time                       = $hash->{".updateTimestamp"};
@@ -350,7 +414,7 @@ sub GEOFANCY_CGI() {
         readingsBulkUpdate( $hash, "currLocLong_" . $device, $long );
         readingsBulkUpdate( $hash, "currLocTime_" . $device, $time );
     }
-    if ( $entry eq "exit" || $entry eq "0" ) {
+    elsif ( $entry eq "exit" || $entry eq "0" ) {
         my $currReading;
         my $lastReading;
 
@@ -387,7 +451,7 @@ sub GEOFANCY_CGI() {
     readingsEndUpdate( $hash, 1 );
 
     $msg = "$entry OK";
-    $msg .= "\ndevice=$device id=$id lat=$lat long=$long trigger=$entry"
+    $msg .= "\ndevice=$device id=$id lat=$lat long=$long trig=$entry"
       if ( $entry eq "test" );
 
     return ( "text/plain; charset=utf-8", $msg );
