@@ -436,6 +436,28 @@ sub PHTV_Set($@) {
 
         return "No argument given" if ( !defined( $a[2] ) );
 
+        return "Device does not seem to support Ambilight"
+          if (
+            (
+                   !defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+            )
+            || (
+                (
+                    defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                    && $hash->{READINGS}{ambiLEDBottom}{VAL} == 0
+                )
+                && ( defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                    && $hash->{READINGS}{ambiLEDLeft}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                    && $hash->{READINGS}{ambiLEDRight}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+                    && $hash->{READINGS}{ambiLEDTop}{VAL} == 0 )
+            )
+          );
+
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( lc( $a[2] ) eq "on" ) {
                 return
@@ -471,6 +493,28 @@ sub PHTV_Set($@) {
 
         return "No argument given" if ( !defined( $a[2] ) );
 
+        return "Device does not seem to support Ambilight"
+          if (
+            (
+                   !defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+            )
+            || (
+                (
+                    defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                    && $hash->{READINGS}{ambiLEDBottom}{VAL} == 0
+                )
+                && ( defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                    && $hash->{READINGS}{ambiLEDLeft}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                    && $hash->{READINGS}{ambiLEDRight}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+                    && $hash->{READINGS}{ambiLEDTop}{VAL} == 0 )
+            )
+          );
+
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
             if (   lc( $a[2] ) eq "internal"
                 || lc( $a[2] ) eq "manual"
@@ -497,6 +541,28 @@ sub PHTV_Set($@) {
         Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
+
+        return "Device does not seem to support Ambilight"
+          if (
+            (
+                   !defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+            )
+            || (
+                (
+                    defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                    && $hash->{READINGS}{ambiLEDBottom}{VAL} == 0
+                )
+                && ( defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                    && $hash->{READINGS}{ambiLEDLeft}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                    && $hash->{READINGS}{ambiLEDRight}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+                    && $hash->{READINGS}{ambiLEDTop}{VAL} == 0 )
+            )
+          );
 
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
 
@@ -526,7 +592,8 @@ sub PHTV_Set($@) {
                                 && $hash->{READINGS}{$ambiLED}{VAL} > 0 )
                             {
                                 $rgb = { "r" => 255, "g" => 0, "b" => 0 }
-                                  if ( $side eq "left" || $side eq "right" );
+                                  if ( $side eq "left"
+                                    || $side eq "right" );
 
                                 # run clockwise for left and top
                                 if ( $side eq "left" || $side eq "top" ) {
@@ -534,9 +601,12 @@ sub PHTV_Set($@) {
                                     while ( $led <=
                                         $hash->{READINGS}{$ambiLED}{VAL} - 1 )
                                     {
-                                        $json->{$l}{$side}{$led}{r} = $rgb->{r};
-                                        $json->{$l}{$side}{$led}{g} = $rgb->{g};
-                                        $json->{$l}{$side}{$led}{b} = $rgb->{b};
+                                        $json->{$l}{$side}{$led}{r} =
+                                          $rgb->{r};
+                                        $json->{$l}{$side}{$led}{g} =
+                                          $rgb->{g};
+                                        $json->{$l}{$side}{$led}{b} =
+                                          $rgb->{b};
 
                                         if ( $rgb->{r} == 255 ) {
                                             $rgb = {
@@ -565,14 +635,18 @@ sub PHTV_Set($@) {
                                 }
 
                                 # run anti-clockwise for right and bottom
-                                elsif ( $side eq "right" || $side eq "bottom" )
+                                elsif ($side eq "right"
+                                    || $side eq "bottom" )
                                 {
                                     my $led =
                                       $hash->{READINGS}{$ambiLED}{VAL} - 1;
                                     while ( $led >= 0 ) {
-                                        $json->{$l}{$side}{$led}{r} = $rgb->{r};
-                                        $json->{$l}{$side}{$led}{g} = $rgb->{g};
-                                        $json->{$l}{$side}{$led}{b} = $rgb->{b};
+                                        $json->{$l}{$side}{$led}{r} =
+                                          $rgb->{r};
+                                        $json->{$l}{$side}{$led}{g} =
+                                          $rgb->{g};
+                                        $json->{$l}{$side}{$led}{b} =
+                                          $rgb->{b};
 
                                         if ( $rgb->{r} == 255 ) {
                                             $rgb = {
@@ -655,6 +729,28 @@ sub PHTV_Set($@) {
 
         return "No argument given" if ( !defined( $a[2] ) );
 
+        return "Device does not seem to support Ambilight"
+          if (
+            (
+                   !defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+            )
+            || (
+                (
+                    defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                    && $hash->{READINGS}{ambiLEDBottom}{VAL} == 0
+                )
+                && ( defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                    && $hash->{READINGS}{ambiLEDLeft}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                    && $hash->{READINGS}{ambiLEDRight}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+                    && $hash->{READINGS}{ambiLEDTop}{VAL} == 0 )
+            )
+          );
+
         if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
 
             # set all LEDs at once
@@ -722,10 +818,11 @@ sub PHTV_Set($@) {
                       if ( length($addr) > 1
                         && PHTV_isinteger( substr( $addr, 1, 1 ) ) );
                     if ( length($addr) > 2 ) {
-                        $side = "left"   if ( substr( $addr, 2, 1 ) eq "L" );
-                        $side = "top"    if ( substr( $addr, 2, 1 ) eq "T" );
-                        $side = "right"  if ( substr( $addr, 2, 1 ) eq "R" );
-                        $side = "bottom" if ( substr( $addr, 2, 1 ) eq "B" );
+                        $side = "left"  if ( substr( $addr, 2, 1 ) eq "L" );
+                        $side = "top"   if ( substr( $addr, 2, 1 ) eq "T" );
+                        $side = "right" if ( substr( $addr, 2, 1 ) eq "R" );
+                        $side = "bottom"
+                          if ( substr( $addr, 2, 1 ) eq "B" );
                     }
                     $led = substr( $addr, 3 )
                       if ( length($addr) > 3
@@ -806,6 +903,28 @@ sub PHTV_Set($@) {
 
         return "No argument given" if ( !defined( $a[2] ) );
 
+        return "Device does not seem to support Ambilight"
+          if (
+            (
+                   !defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+            )
+            || (
+                (
+                    defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                    && $hash->{READINGS}{ambiLEDBottom}{VAL} == 0
+                )
+                && ( defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                    && $hash->{READINGS}{ambiLEDLeft}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                    && $hash->{READINGS}{ambiLEDRight}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+                    && $hash->{READINGS}{ambiLEDTop}{VAL} == 0 )
+            )
+          );
+
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( defined( $hash->{READINGS}{rgb}{VAL} )
                 && $hash->{READINGS}{rgb}{VAL} ne "" )
@@ -842,6 +961,28 @@ sub PHTV_Set($@) {
         Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
+
+        return "Device does not seem to support Ambilight"
+          if (
+            (
+                   !defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+            )
+            || (
+                (
+                    defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                    && $hash->{READINGS}{ambiLEDBottom}{VAL} == 0
+                )
+                && ( defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                    && $hash->{READINGS}{ambiLEDLeft}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                    && $hash->{READINGS}{ambiLEDRight}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+                    && $hash->{READINGS}{ambiLEDTop}{VAL} == 0 )
+            )
+          );
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( defined( $hash->{READINGS}{rgb}{VAL} )
@@ -881,6 +1022,28 @@ sub PHTV_Set($@) {
 
         return "No argument given" if ( !defined( $a[2] ) );
 
+        return "Device does not seem to support Ambilight"
+          if (
+            (
+                   !defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+            )
+            || (
+                (
+                    defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                    && $hash->{READINGS}{ambiLEDBottom}{VAL} == 0
+                )
+                && ( defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                    && $hash->{READINGS}{ambiLEDLeft}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                    && $hash->{READINGS}{ambiLEDRight}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+                    && $hash->{READINGS}{ambiLEDTop}{VAL} == 0 )
+            )
+          );
+
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( defined( $hash->{READINGS}{rgb}{VAL} )
                 && $hash->{READINGS}{rgb}{VAL} ne "" )
@@ -918,6 +1081,28 @@ sub PHTV_Set($@) {
         Log3 $name, 3, "PHTV set $name " . $a[1] . " " . $a[2];
 
         return "No argument given" if ( !defined( $a[2] ) );
+
+        return "Device does not seem to support Ambilight"
+          if (
+            (
+                   !defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                && !defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+            )
+            || (
+                (
+                    defined( $hash->{READINGS}{ambiLEDBottom}{VAL} )
+                    && $hash->{READINGS}{ambiLEDBottom}{VAL} == 0
+                )
+                && ( defined( $hash->{READINGS}{ambiLEDLeft}{VAL} )
+                    && $hash->{READINGS}{ambiLEDLeft}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDRight}{VAL} )
+                    && $hash->{READINGS}{ambiLEDRight}{VAL} == 0 )
+                && ( defined( $hash->{READINGS}{ambiLEDTop}{VAL} )
+                    && $hash->{READINGS}{ambiLEDTop}{VAL} == 0 )
+            )
+          );
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( defined( $hash->{READINGS}{rgb}{VAL} )
@@ -1377,15 +1562,22 @@ sub PHTV_SendCommand($$;$$$) {
     my $name    = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     my $port    = $hash->{helper}{PORT};
-    my $protoV =
-      ( defined( $attr{$name}{jsversion} ) ? $attr{$name}{jsversion} : "1" );
+    my $protoV  = (
+        defined( $attr{$name}{jsversion} )
+        ? $attr{$name}{jsversion}
+        : "1"
+    );
     my $timestamp = gettimeofday();
     my $data;
     my $timeout;
 
     if ( defined($delay) && $delay > 0 ) {
-        my %par =
-          ( hash => $hash, service => $service, cmd => $cmd, type => $type );
+        my %par = (
+            hash    => $hash,
+            service => $service,
+            cmd     => $cmd,
+            type    => $type
+        );
         InternalTimer( gettimeofday() + $delay,
             "PHTV_SendCommandDelayed", \%par, 0 );
         return;
@@ -1926,13 +2118,15 @@ sub PHTV_ReceiveCommand($$$) {
                 # read channel details if type is known
                 if ( defined( $return->{id} ) && $return->{id} ne "" ) {
                     PHTV_SendCommand( $hash, "channels/" . $return->{id} );
-                    $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+                    $hash->{helper}{sequentialQueryCounter}++
+                      if $sequential;
                 }
 
                 # read all channellists if not existing
                 elsif ( !defined( $hash->{helper}{device}{channellists} ) ) {
                     PHTV_SendCommand( $hash, "channellists" );
-                    $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+                    $hash->{helper}{sequentialQueryCounter}++
+                      if $sequential;
                 }
             }
             elsif ( $return eq "ok" ) {
@@ -1950,13 +2144,15 @@ sub PHTV_ReceiveCommand($$$) {
                 # read channel details if type is known
                 if ( defined($type) && $type ne "" ) {
                     PHTV_SendCommand( $hash, "channels/" . $type );
-                    $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+                    $hash->{helper}{sequentialQueryCounter}++
+                      if $sequential;
                 }
 
                 # read all channellists if not existing
                 elsif ( !defined( $hash->{helper}{device}{channellists} ) ) {
                     PHTV_SendCommand( $hash, "channellists" );
-                    $hash->{helper}{sequentialQueryCounter}++ if $sequential;
+                    $hash->{helper}{sequentialQueryCounter}++
+                      if $sequential;
                 }
             }
         }
@@ -2479,9 +2675,12 @@ sub PHTV_ReceiveCommand($$$) {
 
                                 my $logtext =
 "PHTV $name: processing $ambiHue -> $devled -> dev=$dev";
-                                $logtext .= " led=$led" if ( defined($led) );
-                                $logtext .= " sat=$sat" if ( defined($sat) );
-                                $logtext .= " bri=$bri" if ( defined($bri) );
+                                $logtext .= " led=$led"
+                                  if ( defined($led) );
+                                $logtext .= " sat=$sat"
+                                  if ( defined($sat) );
+                                $logtext .= " bri=$bri"
+                                  if ( defined($bri) );
                                 Log3 $name, 5, $logtext;
 
                                 # next for if HUE device is not ready
@@ -2516,7 +2715,8 @@ sub PHTV_ReceiveCommand($$$) {
 
                                 # user named reference LED(s)
                                 else {
-                                    my ( $ledB, $ledE ) = split( /-/, $led );
+                                    my ( $ledB, $ledE ) =
+                                      split( /-/, $led );
                                     $ledB -= 1;
                                     $ledE -= 1
                                       if ( defined($ledE) && $ledE ne "" );
