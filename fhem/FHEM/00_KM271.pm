@@ -228,7 +228,7 @@ my @km271_bitarrays = (
         "Abgasfuehler", "Abgas ueber Grenzwert", "Sicherungskette ausgeloest", "Externe Stoerung" ],
   # 7 - Alarmstatus
   [ "-", "Abgasfuehler", "02", "Kesselvorlauffuehler", "08",
-        "10", "20", "HK2-Vorlauffuehler", "80" ]
+        "Brenner", "20", "HK2-Vorlauffuehler", "80" ]
 );
 
 my @km271_arrays = (
