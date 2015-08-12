@@ -581,6 +581,7 @@ sub advanceToNextOccurance {
   #There are no leap seconds in epoch time
   #Valid values for freq: SECONDLY, MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
   my  $nextstart = $self->{start};
+  #main::Debug  "Current time of $self->{summary} is: start " . ts($nextstart). ", interval " . $self->{interval} . ", frequency " . $self->{freq};
   do
   {
     if($self->{freq} eq "SECONDLY") {
@@ -595,16 +596,19 @@ sub advanceToNextOccurance {
       # special handling for WEEKLY and BYDAY
       if(exists($self->{byday})) {
         # BYDAY with prefix (e.g. -1SU or 2MO) is not recognized
-        # BYDAY with list (e.g. SU,TU,TH) is not recognized
+        #main::Debug "weekdays: " . $self->{byday};
+        my @bydays= split(',', $self->{byday});
         # we skip interval-1 weeks
         $nextstart = plusNSeconds($nextstart, 7*24*60*60, $self->{interval}-1);
+        #main::Debug "Fast forward to: start " . ts($nextstart);
         my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
         my $preventloop = 0;        
         do {
-          $nextstart = plusNSeconds($nextstart, 24*60*60, $self->{interval});
+          $nextstart = plusNSeconds($nextstart, 24*60*60, 1); # forward day by day
           ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) = gmtime($nextstart);
+          #main::Debug "Skip to: start " . ts($nextstart) . " = " . $weekdays[$mwday];
           $preventloop ++;        
-        } while(index($self->{byday}, $weekdays[$mwday]) == -1 and $preventloop < 10);
+        } until(($weekdays[$mwday] ~~ @bydays) or ($preventloop > 7));
       }
       else {
         # default WEEKLY handling
@@ -666,9 +670,30 @@ sub isStarted {
   return 1;
 }
 
+sub isSeries {
+  my ($self)= @_;
+  #main::Debug "      freq=  " . $self->{freq};
+  return exists($self->{freq}) ? 1 : 0;
+}
+
+sub isAfterSeriesEnded {
+  my ($self,$t) = @_;
+  #main::Debug "    isSeries? " . $self->isSeries();
+  return 0 unless($self->isSeries()); 
+  #main::Debug "    until= " . $self->{until};
+  return 0 unless(exists($self->{until}));
+  #main::Debug "    has until!";
+  return $self->{until}< $t ? 1 : 0;
+}
+
 sub isEnded {
   my ($self,$t) = @_;
+  #main::Debug "isEnded for " . $self->asFull();
+  #main::Debug "  isDeleted? " . $self->isDeleted();
   return 0 if($self->isDeleted());
+  #main::Debug "  isAfterSeriesEnded? " . $self->isAfterSeriesEnded($t);
+  #return 1 if($self->isAfterSeriesEnded($t));
+  #main::Debug "   has end? " . (defined($self->{end}) ? 1 : 0);
   return 0 unless(defined($self->{end}));
   return $self->{end}<= $t ? 1 : 0;
 }
@@ -786,9 +811,12 @@ sub updateFromCalendar {
       }   
     };
     # new events that have ended are omitted 
-    if($event->state() ne "new" || !$event->isEnded($t)) {
+    if($event->state() ne "new" || !$event->isEnded($t) ) {
       $event->touch($t);
       $self->setEvent($event);
+      #main::Debug "#### EVENT: " . $event->asFull();
+    } else {
+      #main::Debug "#### NONE : " . $event->asFull();
     }
   }
 
@@ -1084,7 +1112,7 @@ sub Calendar_Notify($$)
 
   # update calendar after initialization or change of configuration
   # wait 10 to 29 seconds to avoid congestion due to concurrent activities
-  my $delay= 10+int(rand(20));
+  my $delay= 1;#10+int(rand(20));
   Log3 $hash, 5, "Calendar " . $hash->{NAME} . ": FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
   InternalTimer(time()+$delay, "Calendar_Wakeup", $hash, 0) ;
 
