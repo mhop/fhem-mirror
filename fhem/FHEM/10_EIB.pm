@@ -8,6 +8,7 @@
 # ABU 20150617 added dpt1, removed special handling of dpt5, added default-values for messages without dpt, changed retVal of EIB_ParseByDatapointType
 # MH 20150622 added getGx/setGx Readings and Attr EIBreadingX
 # ABU 20150617 cleanup unused lines, finalized dpt-handling, cleanup logging, added debug-par
+# ABU 20150729 removed special handling DPT7 in write, fixed DPT7 encoding
 package main;
 
 use strict;
@@ -193,9 +194,11 @@ EIB_Get($@)
 {
   my ($hash, @a) = @_;
 
+  return "No get for dummies" if(IsDummy($hash->{NAME}));
   return "" if($a[1] && $a[1] eq "?");  # Temporary hack for FHEMWEB
 
   IOWrite($hash, "B", "r" . $hash->{GROUP});
+  
   return "Current value for $hash->{NAME} ($hash->{GROUP}) requested.";	  
 }
 
@@ -255,12 +258,14 @@ EIB_Set($@)
   $model = "" unless defined($model); ##MH avoid uninit msg
 
   my $code = $eib_dpttypes{"$model"}{"CODE"};
-  if (defined($code) && $code eq 'dpt7') { #MH avoid uninit msg
-    IOWrite($hash, "B", "b" . $groupcode . $c);
-  }
-  else {
+  
+  #ABU removed due to incorrect DPT7-sending
+  #if (defined($code) && $code eq 'dpt7') { #MH avoid uninit msg
+  #  IOWrite($hash, "B", "b" . $groupcode . $c);
+  #}
+  #else {
     IOWrite($hash, "B", "w" . $groupcode . $c);
-  }
+  #}
 
   ###########################################
   # Delete any timer for on-for_timer
@@ -442,14 +447,17 @@ EIB_EncodeByDatapointType($$$$) #MH added  groupnr
 		
 	} elsif ($code eq "dpt7") 
 	{
-		my $fullval = sprintf("00%.2x",$value);
-		$transval = $fullval;
-		if($adjustment eq "255") {
-			$transval = ($fullval / 2.55);
-			$transval = sprintf("%.0f",$transval);
-		} else {
-			$transval = $fullval;
+		my $fullval = "";
+		
+		if($adjustment eq "255") 
+		{
+			$fullval = sprintf("00%.4x",($value/2.55));			
+		} else 
+		{
+			$fullval = sprintf("00%.4x",$value);
 		}
+		
+		$transval = $fullval;
 				
 		Log3 $hash, 5,"EIB $code encode $value = $fullval translated: $transval";
 		
