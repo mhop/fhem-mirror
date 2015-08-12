@@ -9,6 +9,7 @@
 # MH 20150622 added getGx/setGx Readings and Attr EIBreadingX
 # ABU 20150617 cleanup unused lines, finalized dpt-handling, cleanup logging, added debug-par
 # ABU 20150729 removed special handling DPT7 in write, fixed DPT7 encoding
+# ABU 20150812 renamed return-value for autocreate; added attribute for reading containing sender; fixed HTML-Doku
 package main;
 
 use strict;
@@ -117,6 +118,7 @@ EIB_Initialize($)
   $hash->{ParseFn}   = "EIB_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 " .
 						"EIBreadingX:1,0 " .
+						"EIBreadingSender:1,0 " .
 						"$readingFnAttributes " .
 						"model:".join(",", keys %eib_dpttypes);
 }
@@ -376,8 +378,17 @@ EIB_Parse($$)
 			      $lh->{LASTGROUP} = $dev;
 				  
 				  readingsSingleUpdate($lh,"state",$v,1);
+
 				  readingsSingleUpdate($lh,'getG' . $gnr,$v,1) if (defined($attr{$n}{"EIBreadingX"}) && $attr{$n}{"EIBreadingX"} == 1); #MH get readingsvalue
-				  print "GETG = $n , group= $gnr , attr = " . $attr{$n}{"EIBreadingX"} .  " \n"  if ($debug eq 1);
+				  print "getg = $n , group= $gnr , attr = " . $attr{$n}{"EIBreadingX"} .  " \n"  if ($debug eq 1);
+
+				  if (defined($attr{$n}{"EIBreadingSender"}) && $attr{$n}{"EIBreadingSender"} == 1)
+				  {
+				    my $srcName = eib_hex2name($src);
+					readingsSingleUpdate($lh,'sender',$srcName,1);
+					print "sender = $srcName, group= $gnr, attr = " . $attr{$n}{"EIBreadingSender"} .  " \n"  if ($debug eq 1);
+				  }
+				  
 				  
 				  Log3 $n, 5, "EIB $n $v";
 				  
@@ -395,7 +406,7 @@ EIB_Parse($$)
    	{
 	    my $dev_name = eib_hex2name($dev);
    		Log3 $dev, 3, "EIB Unknown device $dev ($dev_name), Value $val, please define it";
-   		return "UNDEFINED EIB_$dev EIB $dev";
+   		return "UNDEFINED EIB_$dev EIB $dev_name";
    	}
   }
 }
@@ -875,7 +886,9 @@ sub encode_dpt14 {
  
   <p><a name="EIBget"></a> <b>Get</b></p>
   <div style="margin-left: 2em">  
-  <p>not implemented</p>
+  <p>If you execute get for a EIB/KNX-Element there will be requested a state from the device. The device has to be able to respond to a read - this is not given for all devices.<br>
+	This function is not available for dummies.<br>
+	The answer from the bus-device is not shown in the toolbox, but is treated like a regular telegram.</p>
   </div>
     
   <p><a name="EIBattr"></a> <b>Attributes</b></p>
@@ -950,8 +963,7 @@ sub encode_dpt14 {
       	<li>dpt12</li>
       	<li>dpt14</li>
       	<li>dpt16</li>
-      </ul>
-      <p>If the EIBreadingX is set, you can specify multiple blank separated models to cope with multiple groups in the define statement. The setting cannot be done thru the pulldown-menu, you have to specify them with <code>attr &lt;device&gt; model &lt;dpt1&gt; &lt;dpt2&gt; &lt;dpt3&gt;</code></p> 
+      </ul>      
     </li>
 
     <li><b>EIBreadingX</b> - 
@@ -971,6 +983,21 @@ sub encode_dpt14 {
       attr myDimmer stateFormat getG2 % # copies actual dim-level (as sent/received to/from dimmer) into STATE 
       </pre>    
      </li>
+	 <p>If the EIBreadingX is set, you can specify multiple blank separated models to cope with multiple groups in the define statement. The setting cannot be done thru the pulldown-menu, you have to specify them with <code>attr &lt;device&gt; model &lt;dpt1&gt; &lt;dpt2&gt; &lt;dpt3&gt;</code></p> 
+
+    <li><b>EIBreadingSender</b> - 
+    Enable an additional reading for this EIB-device. With this Attribute set, a reading sender will be updated any time a new telegram arrives.
+    <p>If set to 1, the following additional reading will be available:</p>
+      <pre>
+      sender will be updated any time a new telegram arrives at this group-adress
+      </pre>
+      <p>Example:</p>
+      <pre>
+      define myDimmer EIB 0/1/1 0/1/2
+      attr myDimmer EIBreadingSender 1
+      </pre>    
+     </li>
+
   </ul>   
   </div>
 </div>
