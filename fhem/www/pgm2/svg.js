@@ -314,7 +314,7 @@ svg_init(par)    // also called directly from perl, in race condition
     var ed = e.getSVGDocument();
     if(src.indexOf("SVG_showLog") < 0 || !ed)
       return;
-    var sTag = $("svg", ed)[0];
+    var sTag = $("svg", ed)[0]; // "not well-formed" warning in FireFox
     if((par && $(sTag).attr("id") != par))
       return;
     svg_init_one(e, sTag);
