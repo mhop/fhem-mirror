@@ -3378,7 +3378,8 @@ ReplaceEventMap($$$)
   my $em = $attr{$dev}{eventMap};
 
   return $str    if($dir && !$em);
-  return @{$str} if(!$dir && (!$em || int(@{$str}) < 2 || $str->[1] eq "?"));
+  return @{$str} if(!$dir && (!$em || int(@{$str}) < 2 ||
+                    !$str->[1] || $str->[1] eq "?"));
 
   return ReplaceEventMap2($dev, $str, $dir, $em) if($em =~ m/^{.*}$/);
   my @emList = attrSplit($em);
@@ -4307,6 +4308,7 @@ fhemFork()
   my $pid = fork;
   if(!defined($pid)) {
     Log 1, "Cannot fork: $!";
+    stacktrace() if($attr{global}{stacktrace});
     return undef;
   }
 
