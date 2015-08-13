@@ -47,7 +47,7 @@ FileLog_Initialize($)
   $data{FWEXT}{"/FileLog_logWrapper"}{CONTENTFUNC} = "FileLog_logWrapper";
   
   InternalTimer(time()+0.1, sub() {      # Forum #39792
-    map { HandleArchiving($defs{$_}) } devspec2array("TYPE=FileLog");
+    map { HandleArchiving($defs{$_},1) } devspec2array("TYPE=FileLog");
   }, $hash, 0);
 }
 

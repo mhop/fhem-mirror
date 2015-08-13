@@ -61,7 +61,7 @@ sub FmtTime($);
 sub GetLogLevel(@);
 sub GetTimeSpec($);
 sub GlobalAttr($$$$);
-sub HandleArchiving($);
+sub HandleArchiving($;$);
 sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$$);
@@ -3104,9 +3104,9 @@ myrename($$)
 #####################################
 # Make a directory and its parent directories if needed.
 sub
-HandleArchiving($)
+HandleArchiving($;$)
 {
-  my ($log) = @_;
+  my ($log,$diff) = @_;
   my $ln = $log->{NAME};
   return if(!$attr{$ln});
 
@@ -3139,6 +3139,7 @@ HandleArchiving($)
   closedir(DH);
 
   my $max = int(@files)-$nra;
+  $max -= $diff if($diff);
   for(my $i = 0; $i < $max; $i++) {
     if($ard) {
       Log 2, "Moving $files[$i] to $ard";
