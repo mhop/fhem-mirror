@@ -1653,6 +1653,7 @@ $culHmChanSets{"ROTO_ZEL-STG-RM-FWT00"} = $culHmChanSets{"HM-CC-TC00"};
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
 
 #$culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
+$culHmChanSets{"HM-LC-Sw1PBU-FM00"}     = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 
 %culHmFunctSets = (# command depending on function

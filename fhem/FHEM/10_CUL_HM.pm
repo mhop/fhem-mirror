@@ -987,7 +987,7 @@ sub CUL_HM_setupHMLAN(@){#################################
                   
     my %disColor=(white=>0,red=>1,orange=>2,yellow=>3,green=>4,blue=>5);
     my %disIcon=( off =>0, on=>1, open=>2, closed=>3, error=>4, ok=>5
-                 ,info=>6, newMsg=>7, serviceMsg=>8
+                 ,info=>6, newMsg=>7, serviceMsg=>8 
                  ,sigGreen=>9, sigYellow=>10, sigRed=>11
                  ,ic12=>12, ic13=>13
                  ,noIcon=>99
@@ -997,140 +997,144 @@ sub CUL_HM_setupHMLAN(@){#################################
                 , txt06_1=>10,txt06_2=>11,txt07_1=>12,txt07_2=>13,txt08_1=>14
                 , txt08_2=>15,txt09_1=>16,txt09_2=>17,txt10_1=>18,txt10_2=>19
                 );
-                 
+
 sub CUL_HM_Parse($$) {#########################################################
   my ($iohash, $msgIn) = @_;
   
-  my ($msg,$msgStat,$myRSSI,$msgIO) = split(":",$msgIn,4);
+  my %mh; # hash for data of this message
+  
+  ($mh{msg},$mh{msgStat},$mh{myRSSI},$mh{msgIO}) = split(":",$msgIn,4);
+  ($mh{t},$mh{len},$mh{mNo},$mh{mFlg},$mh{mTp},$mh{src},$mh{dst},$mh{p}) = unpack 'A1A2A2A2A2A6A6A*',$mh{msg};
+  $mh{mFlgH} = hex($mh{mFlg});
+
   # Msg format: Allnnffttssssssddddddpp...
-  my ($t,$len,$mNo,$mFlg,$mTp,$src,$dst,$p) = unpack 'A1A2A2A2A2A6A6A*',$msg;
-  my $mFlgH = hex($mFlg);
+
   return if (!$iohash ||
              ref($iohash) ne 'HASH'  ||
-             $t ne 'A'  || 
-             length($msg)<20);
+             $mh{t} ne 'A'  || 
+             length($mh{msg})<20);
 
   if ($modules{CUL_HM}{helper}{updating}){
-    if ("done" eq CUL_HM_FWupdateSteps($msg)){
-      my $shash = CUL_HM_id2Hash($src);
+    if ("done" eq CUL_HM_FWupdateSteps($mh{msg})){
+      my $sH = CUL_HM_id2Hash($mh{t});
       my @e = CUL_HM_pushEvnts();
-      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$shash->{NAME}$/,@e);
-      return (@e,$shash->{NAME}); #return something to please dispatcher
+      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$sH->{NAME}$/,@e);
+      return (@e,$sH->{NAME}); #return something to please dispatcher
     }
     else{
       return "";
     }
   }
  
-  return "" if($msgStat && $msgStat eq 'NACK');# lowlevel error
+  return "" if($mh{msgStat} && $mh{msgStat} eq 'NACK');# lowlevel error
 
-  $p = "" if(!defined($p)); # generate some abreviations 
-  my @mI = unpack '(A2)*',$p; # split message info to bytes
-  my $mStp = $mI[0] ? $mI[0] : ""; #message subtype
-  my $mTyp = $mTp.$mStp;           #message type/subtype
+  $mh{p} = "" if(!defined($mh{p})); # generate some abreviations 
+  my @mI = unpack '(A2)*',$mh{p}; # split message info to bytes
+  $mh{mStp} = $mI[0] ? $mI[0] : ""; #message subtype
+  $mh{mTyp} = $mh{mTp}.$mh{mStp};           #message type/subtype
   
   # $shash will be replaced for multichannel commands
-  my $shash  = CUL_HM_id2Hash($src); #sourcehash - will be modified to channel entity
-  my $devH   = $shash;               # source device hash
-  my $dstH   = CUL_HM_id2Hash($dst); # destination device hash
-  my $id     = CUL_HM_h2IoId($iohash);
-  my $ioName = $iohash->{NAME};
-  $evtDly    = 1;# switch delay trigger on
-  CUL_HM_statCnt($ioName,"r");
-  my $dname = ($dst eq "000000") ? "broadcast" :
-                         ($dstH ? $dstH->{NAME} :
-                    ($dst eq $id ? $ioName :
-                                   $dst));
-  if(!$shash && $mTp eq "00") { # generate device
-    my $sname = "HM_$src";
+  $mh{devH}   = CUL_HM_id2Hash($mh{src}); #sourcehash - will be modified to channel entity
+  $mh{devN}   = $mh{devH}->{NAME};        #sourcehash - will be modified to channel entity
+  $mh{shash}  = $mh{devH};                # source device hash
+  $mh{dstH}   = CUL_HM_id2Hash($mh{dst}); # destination device hash
+  $mh{id}     = CUL_HM_h2IoId($iohash);
+  $mh{ioName} = $iohash->{NAME};
+  $evtDly     = 1;# switch delay trigger on
+  CUL_HM_statCnt($mh{ioName},"r");
+  $mh{dstN}   = ($mh{dst} eq "000000") ? "broadcast" :
+                         ($mh{dstH} ? $mh{dstH}->{NAME} :
+                    ($mh{dst} eq $mh{id} ? $mh{ioName} :
+                                   $mh{dst}));
+  if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
+    my $sname = "HM_$mh{src}";
     Log3 undef, 2, "CUL_HM Unknown device $sname is now defined";
-    DoTrigger("global","UNDEFINED $sname CUL_HM $src");
-    # CommandDefine(undef,"$sname CUL_HM $src");
-    $shash = CUL_HM_id2Hash($src); #sourcehash - changed to channel entity
-    $devH = $shash;
-    $devH->{IODev} = $iohash;
-    $shash->{helper}{io}{nextSend} = gettimeofday()+0.09;# io couldn't set
+    DoTrigger("global","UNDEFINED $sname CUL_HM $mh{src}");
+    $mh{devH}  = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
+    $mh{shash} = $mh{devH};
+    $mh{devH}->{IODev} = $iohash;
+    $mh{devH}->{helper}{io}{nextSend} = gettimeofday()+0.09;# io couldn't set
   }
 
   my @entities = ("global"); #additional entities with events to be notifies
   ####################  attack alarm detection#####################
-  if (   $dstH && $dst ne "000000"
-      && !CUL_HM_getAttrInt($dname,"ignore")
-      && ($mTp eq '01' || $mTp eq '11'
+  if (   $mh{dstH} && $mh{dst} ne "000000"
+      && !CUL_HM_getAttrInt($mh{dstN},"ignore")
+      && ($mh{mTp} eq '01' || $mh{mTp} eq '11'
       )){
-    my $ioId = AttrVal($dstH->{IODev}{NAME},"hmId","-");
-    if($ioId ne $src){
-      if (   !defined $dstH->{"prot"."ErrIoId_$src"} 
-          && ReadingsVal($dname,"sabotageAttackId_ErrIoId_$src:",undef)){
-        (undef,$dstH->{"prot"."ErrIoId_$src"}) =
-          split(":",ReadingsVal($dname,"sabotageAttackId_ErrIoId_$src:",undef));
+    my $ioId = AttrVal($mh{dstH}->{IODev}{NAME},"hmId","-");
+    if($ioId ne $mh{src}){
+      if (   !defined $mh{dstH}->{"prot"."ErrIoId_$mh{src}"} 
+          && ReadingsVal($mh{dstN},"sabotageAttackId_ErrIoId_$mh{src}:",undef)){
+        (undef,$mh{dstH}->{"prot"."ErrIoId_$mh{src}"}) =
+          split(":",ReadingsVal($mh{dstN},"sabotageAttackId_ErrIoId_$mh{src}:",undef));
       }
-      CUL_HM_eventP($dstH,"ErrIoId_$src");
-      my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoId_$src"},2);
-      push @evtEt,[$dstH,1,"sabotageAttackId_ErrIoId_$src: cnt:$evntCnt"];
+      CUL_HM_eventP($mh{dstH},"ErrIoId_$mh{src}");
+      my ($evntCnt,undef) = split(' last_at:',$mh{dstH}->{"prot"."ErrIoId_$mh{src}"},2);
+      push @evtEt,[$mh{dstH},1,"sabotageAttackId_ErrIoId_$mh{src}: cnt:$evntCnt"];
     }
-    my $tm = substr($msg,8);
-    if( defined $dstH->{helper}{cSnd} && 
-          $dstH->{helper}{cSnd} !~ m/$tm/){
-      if (   !defined $dstH->{"prot"."ErrIoAttack"} 
-          && ReadingsVal($dname,"sabotageAttack_ErrIoAttack cnt:",undef)){
-        $dstH->{"prot"."ErrIoAttack"} =
-          ReadingsVal($dname,"sabotageAttack_ErrIoAttack cnt:",undef);
+    my $tm = substr($mh{msg},8);
+    if( defined $mh{dstH}->{helper}{cSnd} && 
+          $mh{dstH}->{helper}{cSnd} !~ m/$tm/){
+      if (   !defined $mh{dstH}->{"prot"."ErrIoAttack"} 
+          && ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack cnt:",undef)){
+        $mh{dstH}->{"prot"."ErrIoAttack"} =
+          ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack cnt:",undef);
       }
-      Log3 $dname,2,"CUL_HM $dname attack:$dstH->{helper}{cSnd}:".$tm;
-      CUL_HM_eventP($dstH,"ErrIoAttack");
-      my ($evntCnt,undef) = split(' last_at:',$dstH->{"prot"."ErrIoAttack"},2);
-      push @evtEt,[$dstH,1,"sabotageAttack_ErrIoAttack cnt:$evntCnt"];
+      Log3 $mh{dstN},2,"CUL_HM $mh{dstN} attack:$mh{dstH}->{helper}{cSnd}:".$tm;
+      CUL_HM_eventP($mh{dstH},"ErrIoAttack");
+      my ($evntCnt,undef) = split(' last_at:',$mh{dstH}->{"prot"."ErrIoAttack"},2);
+      push @evtEt,[$mh{dstH},1,"sabotageAttack_ErrIoAttack cnt:$evntCnt"];
     }
   }
   ###########
 
-  #  return "" if($src eq $id);# mirrored messages - covered by !$shash
-  if(!$shash){    # Unknown source
+  #  return "" if($mh{src} eq $mh{id});# mirrored messages - covered by !$shash
+  if(!$mh{devH}){    # Unknown source
     $evtDly    = 0;# switch delay trigger off
-    return "" if ($msg =~ m/998112......000001/);# HMLAN internal message, consum 
-    my $ccu =InternalVal($ioName,"owner_CCU","");
-    CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
+    return "" if ($mh{msg} =~ m/998112......000001/);# HMLAN internal message, consum 
+    my $ccu =InternalVal($mh{ioName},"owner_CCU","");
+    CUL_HM_DumpProtocol("RCV",$iohash,$mh{len},$mh{mNo},$mh{mFlg},$mh{mTp},$mh{src},$mh{dst},$mh{p});
 
     if ($defs{$ccu}){#
-      push @evtEt,[$defs{$ccu},0,"unknown_$src:received"];# do not trigger
+      push @evtEt,[$defs{$ccu},0,"unknown_$mh{src}:received"];# do not trigger
       return CUL_HM_pushEvnts();
     }
     return;
   }
   $respRemoved = 0;  #set to 'no response in this message' at start
-  my $name = $shash->{NAME};
-  my $ioId = CUL_HM_h2IoId($devH->{IODev});
-  $ioId = $id if(!$ioId);
-  if (CUL_HM_getAttrInt($name,"ignore")){
-    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
-    return (CUL_HM_pushEvnts(),$name,@entities);
+  my $name = $mh{devH}->{NAME};
+  my $ioId = CUL_HM_h2IoId($mh{devH}->{IODev});
+  $ioId = $mh{id} if(!$ioId);
+  if (CUL_HM_getAttrInt($mh{devN},"ignore")){
+    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
+    return (CUL_HM_pushEvnts(),$mh{devN},@entities);
   }
 
   #----------CUL aesCommReq handling---------
-  if (   $devH->{IODev}->{TYPE} eq "CUL"
+  if (   $mh{devH}->{IODev}->{TYPE} eq "CUL"
       && $cryptFunc == 1 
-      && $ioId eq $dst
-      && AttrVal($name,"aesCommReq",0)) { #aesCommReq enabled for device
+      && $ioId eq $mh{dst}
+      && AttrVal($mh{devN},"aesCommReq",0)) { #aesCommReq enabled for device
 
-    if ($devH->{helper}{aesCommRq}{msgStat}) {
+    if ($mh{devH}->{helper}{aesCommRq}{msgStat}) {
       #----------Message was already handled, pass on result---------
-      $msgStat = $devH->{helper}{aesCommRq}{msgStat};
-      delete($devH->{helper}{aesCommRq});
+      $mh{msgStat} = $mh{devH}->{helper}{aesCommRq}{msgStat};
+      delete($mh{devH}->{helper}{aesCommRq});
 
     } 
-    elsif (   $devH->{helper}{aesCommRq}{msg} 
-             && $mTp eq "03") {
+    elsif (   $mh{devH}->{helper}{aesCommRq}{msg} 
+             && $mh{mTp} eq "03") {
 
       #----------Check AES response from device (CUL)---------
-      my $aesM = $devH->{helper}{aesCommRq}{msg};
-      my (undef, %keys) = CUL_HM_getKeys($devH);
-      my $key = $keys{$devH->{helper}{aesCommRq}{kNo}};
-      $key = $key ^ pack("H12", $devH->{helper}{aesCommRq}{challenge});
+      my $aesM = $mh{devH}->{helper}{aesCommRq}{msg};
+      my (undef, %keys) = CUL_HM_getKeys($mh{devH});
+      my $key = $keys{$mh{devH}->{helper}{aesCommRq}{kNo}};
+      $key = $key ^ pack("H12", $mh{devH}->{helper}{aesCommRq}{challenge});
 
       my $cipher = Crypt::Rijndael->new($key, Crypt::Rijndael::MODE_ECB());
       my $iv = pack("H*", substr($aesM, 23));
-      my $response =  $cipher->decrypt(pack("H32", $p)) ^ $iv;
+      my $response =  $cipher->decrypt(pack("H32", $mh{p})) ^ $iv;
       my $authbytes = unpack("H8", $response);
       $response = $cipher->decrypt(substr($response, 0, 16));
 
@@ -1142,196 +1146,197 @@ sub CUL_HM_Parse($$) {#########################################################
                     sprintf("%02X", (hex(substr($aesM, 5, 2)) & 0xbf)) . #~RPTED
                     substr($aesM, 7, 16);
  
-      Log3 $devH,5,"CUL_HM ${dname} iv: ".unpack("H*", $iv)
+      Log3 $mh{devH},5,"CUL_HM $mh{dstN} iv: ".unpack("H*", $iv)
                   ."\n             decrypted cmd: $cmd"
                   ."\n             original  cmd: $origcmd";
  
       if ($cmd eq $origcmd) {
-        Log3 $devH,4,"CUL_HM ${dname} signature: good, authbytes: ${authbytes}";
-        $devH->{helper}{aesAuthBytes} = $authbytes;
-        $devH->{helper}{aesCommRq}{msgStat} = "AESCom-ok";
+        Log3 $mh{devH},4,"CUL_HM $mh{dstN} signature: good, authbytes: $mh{authbytes}";
+        $mh{devH}->{helper}{aesAuthBytes} = $authbytes;
+        $mh{devH}->{helper}{aesCommRq}{msgStat} = "AESCom-ok";
       } 
       else {
-        Log3 $devH,4,"CUL_HM ${dname} signature: bad";
-        $devH->{helper}{aesCommRq}{msgStat} = "AESCom-fail";
+        Log3 $mh{devH},4,"CUL_HM $mh{dstN} signature: bad";
+        $mh{devH}->{helper}{aesCommRq}{msgStat} = "AESCom-fail";
       }
  
       #continue with old message
-      return CUL_HM_Parse($iohash, $devH->{helper}{aesCommRq}{msgIn});
+      return CUL_HM_Parse($iohash, $mh{devH}->{helper}{aesCommRq}{msgIn});
     } 
     else {
       my $doAES = 1;
       my $chn = 0;
-      if($mTp =~ m /^4[01]/){ #someone is triggered##########
+      if($mh{mTp} =~ m /^4[01]/){ #someone is triggered##########
+        CUL_HM_m_setCh(\%mh,$mI[0]);
         $chn = hex($mI[0]) & 0x3f;
       } 
-      elsif ($mTp eq "10") {
-        if ($mStp eq "06") {
-          $chn = $mI[1];
+      elsif ($mh{mTp} eq "10") {
+        if ($mh{mStp} =~ m/0[46]/) {
+          CUL_HM_m_setCh(\%mh,$mI[1]);
         } 
-        elsif ($mStp eq "01") {
+        elsif ($mh{mStp} eq "01") {
           $doAES = 0;
         }
       } 
-      elsif ($mTp =~ m/^0[23]/) {
+      elsif ($mh{mTp} =~ m/^0[23]/) {
         $doAES = 0;
       }
       #FIXME: Extract channel from more messages
 
-      if ($doAES && $chn && defined(CUL_HM_id2Hash($src.sprintf("%02X",$chn)))) {
-        $shash = CUL_HM_id2Hash($src.sprintf("%02X",$chn));
+      if ($doAES && $chn && defined(CUL_HM_id2Hash($mh{src}.sprintf("%02X",$chn)))) {
+        $mh{shash} = CUL_HM_id2Hash($mh{src}.sprintf("%02X",$chn));
       }
     
       if (   $doAES
-          && AttrVal($shash->{NAME},"aesCommReq",0)) { #aesCommReq enabled for channel
+          && AttrVal($mh{shash}->{NAME},"aesCommReq",0)) { #aesCommReq enabled for channel
 
         #----------Generate AES challenge for device (CUL)---------
-        my ($kNo, %keys) = CUL_HM_getKeys($devH);
-        $kNo = AttrVal(CUL_HM_id2Hash($src)->{NAME},"aesKey",$kNo);
+        my ($kNo, %keys) = CUL_HM_getKeys($mh{devH});
+        $kNo = AttrVal($mh{devN},"aesKey",$kNo);
         if (defined($keys{$kNo})) {
-          my $challenge = (defined($devH->{helper}{aesCommRq}{challenge}))
-                            ? $devH->{helper}{aesCommRq}{challenge}
+          my $challenge = (defined($mh{devH}->{helper}{aesCommRq}{challenge}))
+                            ? $mh{devH}->{helper}{aesCommRq}{challenge}
                             : sprintf("%08X%04X",rand(0xffffffff), rand(0xffff));
 
-          Log3 $shash,5,"CUL_HM ${name} requesting signature with challenge $challenge for key $kNo";
+          Log3 $mh{shash},5,"CUL_HM $mh{devN} requesting signature with challenge $challenge for key $kNo";
 
-          $devH->{helper}{aesCommRq}{msg} = $msg;
-          $devH->{helper}{aesCommRq}{msgIn} = $msgIn;
-          $devH->{helper}{aesCommRq}{challenge} = $challenge;
-          $devH->{helper}{aesCommRq}{kNo} = $kNo;
+          $mh{devH}->{helper}{aesCommRq}{msg} = $mh{msg};
+          $mh{devH}->{helper}{aesCommRq}{msgIn} = $msgIn;
+          $mh{devH}->{helper}{aesCommRq}{challenge} = $challenge;
+          $mh{devH}->{helper}{aesCommRq}{kNo} = $kNo;
 
-          my $cmd = "${mNo}A002${dst}${src}04${challenge}".sprintf("%02X", $kNo*2);
+          my $cmd = "$mh{mNo}A002$mh{dst}$mh{src}04$mh{challenge}".sprintf("%02X", $kNo*2);
           $cmd = sprintf("As%02X%s", length($cmd)/2, $cmd);
-          IOWrite($devH, "", $cmd);
-          $msgStat="AESpending";
+          IOWrite($mh{devH}, "", $cmd);
+          $mh{msgStat}="AESpending";
         } 
         else {
-          $devH->{helper}{aesCommRq}{msg} = "";
-          Log3 $shash,1,"CUL_HM ${name} required key ${kNo} not defined in VCCU!";
+          $mh{devH}->{helper}{aesCommRq}{msg} = "";
+          Log3 $mh{shash},1,"CUL_HM $mh{devN} required key $mh{kNo} not defined in VCCU!";
         }
       } 
       else {
-        delete($devH->{helper}{aesCommRq});
+        delete($mh{devH}->{helper}{aesCommRq});
       }
     }
   }
 
- if ($msgStat){
-    if   ($msgStat =~ m/AESKey/){
-      push @evtEt,[$shash,1,"aesKeyNbr:".substr($msgStat,7)];
-      $msgStat = ""; # already processed
+ if ($mh{msgStat}){
+    if   ($mh{msgStat} =~ m/AESKey/){
+      push @evtEt,[$mh{devH},1,"aesKeyNbr:".substr($mh{msgStat},7)];
+      $mh{msgStat} = ""; # already processed
     }
-    elsif($msgStat =~ m/AESpending/){# AES communication pending
-      push @evtEt,[$shash,1,"aesCommToDev:pending"];
-      if ($mTyp eq "0204") {
-        my (undef,undef,$aesKeyNbr) = unpack'A2A12A2',$p;
-        push @evtEt,[$shash,1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);
+    elsif($mh{msgStat} =~ m/AESpending/){# AES communication pending
+      push @evtEt,[$mh{devH},1,"aesCommToDev:pending"];
+      if ($mh{mTyp} eq "0204") {
+        my (undef,undef,$aesKeyNbr) = unpack'A2A12A2',$mh{p};
+        push @evtEt,[$mh{devH},1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);
       }
       #Do not process message further, as it may be faked
-      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
-      return (CUL_HM_pushEvnts(),$name);
+      $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
+      return (CUL_HM_pushEvnts(),$mh{devN});
     }
-    elsif($msgStat =~ m/AESCom/){# AES communication to central
-      my $aesStat = substr($msgStat,7);
-      push @evtEt,[$shash,1,"aesCommToDev:".$aesStat];
+    elsif($mh{msgStat} =~ m/AESCom/){# AES communication to central
+      my $aesStat = substr($mh{msgStat},7);
+      push @evtEt,[$mh{devH},1,"aesCommToDev:".$aesStat];
       ### General may need substential rework
       # activate AES only for dedicated channels?
-      if($mTp =~ m /^4[01]/){ #someone is triggered##########
+      if($mh{mTp} =~ m /^4[01]/){ #someone is triggered##########
         my $chn = hex($mI[0])& 0x3f;
-        my $cName = CUL_HM_id2Name($src.sprintf("%02X",$chn));
-        $cName = CUL_HM_id2Name($src) if (!defined($defs{$cName}));
+        my $cName = CUL_HM_id2Name($mh{src}.sprintf("%02X",$chn));
+        $cName = CUL_HM_id2Name($mh{src}) if (!defined($defs{$cName}));
         my $bCnt = hex($mI[1]);
-        push @evtEt,[$defs{$cName},1,"trig_aes_$dname:$aesStat:$bCnt"] 
+        push @evtEt,[$defs{$cName},1,"trig_aes_$mh{dstN}:$aesStat:$bCnt"] 
               if (defined $defs{$cName});
 
         if($aesStat eq "ok"                     #aes ok
-           && defined $devH->{cmdStacAESPend}   #commands waiting
-           && $ioId eq $dst){                   #aes from IO device
-          foreach (@{$devH->{cmdStacAESPend}}) {
+           && defined $mh{devH}->{cmdStacAESPend}   #commands waiting
+           && $ioId eq $mh{dst}){                   #aes from IO device
+          foreach (@{$mh{devH}->{cmdStacAESPend}}) {
             my ($h,$c) = split(";",$_);
             CUL_HM_PushCmdStack(CUL_HM_id2Hash($h),$c);
           }
-          CUL_HM_ProcessCmdStack($shash);
+          CUL_HM_ProcessCmdStack($mh{devH});
         }
-        delete $devH->{cmdStacAESPend};          
+        delete $mh{devH}->{cmdStacAESPend};          
 
         my @peers = grep !/00000000/,split(",",AttrVal($cName,"peerIDs",""));
-        foreach my $peer (grep /$dst/,@peers){
+        foreach my $peer (grep /$mh{dst}/,@peers){
           my $pName = CUL_HM_id2Name($peer);
           $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
-          next if (!$defs{$pName});#||substr($peer,0,6) ne $dst
+          next if (!$defs{$pName});#||substr($peer,0,6) ne $mh{dst}
           push @evtEt,[$defs{$pName},1,"trig_aes_$cName:$aesStat:$bCnt"];
         }
       }
       if ($aesStat ne "ok") { #unauthenticated message, abort
-        $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
-        return (CUL_HM_pushEvnts(),$name);
+        $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devH}->{NAME}$/,@entities);
+        return (CUL_HM_pushEvnts(),$mh{devN});
       }
     }
   }
-  CUL_HM_eventP($shash,"Evt_$msgStat")if ($msgStat);#log io-events
-  CUL_HM_eventP($shash,"Rcv");
-  my $target = " (to $dname)";
-  my $st = AttrVal($name, "subType", "");
-  my $md = AttrVal($name, "model"  , "");
+  CUL_HM_eventP($mh{devH},"Evt_$mh{msgStat}")if ($mh{msgStat});#log io-events
+  CUL_HM_eventP($mh{devH},"Rcv");
+  my $target = " (to $mh{dstN})";
+  $mh{st} = AttrVal($mh{devN}, "subType", "");
+  $mh{md} = AttrVal($mh{devN}, "model"  , "");
   my $tn = TimeNow();
-  CUL_HM_storeRssi($name
-                  ,"at_".(($mFlgH&0x40)?"rpt_":"").$ioName # repeater?
-                  ,$myRSSI
-                  ,$mNo);
+  CUL_HM_storeRssi($mh{devN}
+                  ,"at_".(($mh{mFlgH}&0x40)?"rpt_":"").$mh{ioName} # repeater?
+                  ,$mh{myRSSI}
+                  ,$mh{mNo});
 
   # +++++ check for duplicate or repeat ++++
-  my $msgX = "No:$mNo - t:$mTp s:$src d:$dst ".($p?$p:"");
-  if($devH->{lastMsg} && $devH->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
+  my $msgX = "No:$mh{mNo} - t:$mh{mTp} s:$mh{src} d:$mh{dst} ".($mh{p}?$mh{p}:"");
+  if($mh{devH}->{lastMsg} && $mh{devH}->{lastMsg} eq $msgX) { #duplicate -lost 'ack'?
            
-    if(   $devH->{helper}{rpt}                           #was responded
-       && $devH->{helper}{rpt}{IO}  eq $ioName           #from same IO
-       && $devH->{helper}{rpt}{flg} eq substr($msg,5,1)  #not from repeater
-       && $devH->{helper}{rpt}{ts}  < gettimeofday()-0.24 # again if older then 240ms (typ repeat time)
+    if(   $mh{devH}->{helper}{rpt}                           #was responded
+       && $mh{devH}->{helper}{rpt}{IO}  eq $mh{ioName}           #from same IO
+       && $mh{devH}->{helper}{rpt}{flg} eq substr($mh{msg},5,1)  #not from repeater
+       && $mh{devH}->{helper}{rpt}{ts}  < gettimeofday()-0.24 # again if older then 240ms (typ repeat time)
                                                           #todo: hack since HMLAN sends duplicate status messages
        ){
-      my $ack = $devH->{helper}{rpt}{ack};#shorthand
+      my $ack = $mh{devH}->{helper}{rpt}{ack};#shorthand
       my $i=0;
-      $devH->{helper}{rpt}{ts} = gettimeofday();
-      CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]) while ($i<@{$ack});
-      Log3 $name,4,"CUL_HM $name dupe: repeat ".scalar(@{$ack})." ack, dont process";
+      $mh{devH}->{helper}{rpt}{ts} = gettimeofday();
+      CUL_HM_SndCmd($mh{$ack}[$i++],$mh{$ack}[$i++]) while ($i<@{$ack});
+      Log3 $mh{devN},4,"CUL_HM $mh{devN} dupe: repeat ".scalar(@{$ack})." ack, dont process";
     }
     else{
-      Log3 $name,4,"CUL_HM $name dupe: dont process";
+      Log3 $mh{devN},4,"CUL_HM $mh{devN} dupe: dont process";
     }
     CUL_HM_pushEvnts();
-    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
-    CUL_HM_sndIfOpen("x:$ioName");
-    return (CUL_HM_pushEvnts(),$name,@entities); #return something to please dispatcher
+    $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devH}->{NAME}$/,@entities);
+    CUL_HM_sndIfOpen("x:$mh{ioName}");
+    return (CUL_HM_pushEvnts(),$mh{devN},@entities); #return something to please dispatcher
   }
-  $shash->{lastMsg} = $msgX;
-  delete $shash->{helper}{rpt};# new message, rm recent ack
+  $mh{devH}->{lastMsg} = $msgX;
+  delete $mh{devH}->{helper}{rpt};# new message, rm recent ack
   my @ack; # ack and responses, might be repeated
   
-  CUL_HM_DumpProtocol("RCV",$iohash,$len,$mNo,$mFlg,$mTp,$src,$dst,$p);
+  CUL_HM_DumpProtocol("RCV",$iohash,$mh{len},$mh{mNo},$mh{mFlg},$mh{mTp},$mh{src},$mh{dst},$mh{p});
 
   #----------start valid messages parsing ---------
-  my $parse = CUL_HM_parseCommon($iohash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md,$dname);
-  push @evtEt,[$shash,1,"powerOn:$tn"] if($parse eq "powerOn");
-  push @evtEt,[$shash,1,""]            if($parse eq "parsed"); # msg is parsed but may
+  my $parse = CUL_HM_parseCommon($iohash,\%mh);
+  push @evtEt,[$mh{devH},1,"powerOn:$tn"] if($parse eq "powerOn");
+  push @evtEt,[$mh{devH},1,""]            if($parse eq "parsed"); # msg is parsed but may
                                                              # be processed further
-  $devH->{helper}{HM_CMDNR} = hex($mNo);
+  $mh{devH}->{helper}{HM_CMDNR} = hex($mh{mNo});
   if   ($parse eq "ACK" ||
         $parse eq "done"   ){# remember - ACKinfo will be passed on
-    push @evtEt,[$shash,1,""];
+    push @evtEt,[$mh{devH},1,""];
   }
   elsif($parse eq "NACK"){
-    push @evtEt,[$shash,1,"state:NACK"];
+    push @evtEt,[$mh{shash},1,"state:NACK"];
   }
   elsif($parse eq "AES"){
     return CUL_HM_pushEvnts();# exit now, don't send ACK
   }
-  elsif($mTp eq "12") {#$lcm eq "09A112" Another fhem request (HAVE_DATA)
+  elsif($mh{mTp} eq "12") {#$lcm eq "09A112" Another fhem request (HAVE_DATA)
     ;
   }
-  elsif($md =~ m/^(KS550|KS888|HM-WDS100-C6-O)/) { ############################
-    if($mTp eq "70") {
-      my ($t,$h,$r,$w,$wd,$s,$b) = map{hex($_)} unpack 'A4A2A4A4(A2)*',$p;
+  elsif($mh{md} =~ m/^(KS550|KS888|HM-WDS100-C6-O)/) { ########################
+    if($mh{mTp} eq "70") {
+      my ($t,$h,$r,$w,$wd,$s,$b) = map{hex($_)} unpack 'A4A2A4A4(A2)*',$mh{p};
       my $tsgn = ($t & 0x4000);
       $t = ($t & 0x3fff)/10;
       $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
@@ -1341,57 +1346,57 @@ sub CUL_HM_Parse($$) {#########################################################
       $w = ($w & 0x3fff)/10;
       $wd = $wd * 5;
       my $sM = "state:";
-      if(defined $t)  {$sM .= "T: $t "    ;push @evtEt,[$shash,1,"temperature:$t"    ];}
-      if(defined $h)  {$sM .= "H: $h "    ;push @evtEt,[$shash,1,"humidity:$h"       ];}
-      if(defined $w)  {$sM .= "W: $w "    ;push @evtEt,[$shash,1,"windSpeed:$w"      ];}
-      if(defined $r)  {$sM .= "R: $r "    ;push @evtEt,[$shash,1,"rain:$r"           ];}
-      if(defined $ir) {$sM .= "IR: $ir "  ;push @evtEt,[$shash,1,"isRaining:$ir"     ];}
-      if(defined $wd) {$sM .= "WD: $wd "  ;push @evtEt,[$shash,1,"windDirection:$wd" ];}
-      if(defined $wdr){$sM .= "WDR: $wdr ";push @evtEt,[$shash,1,"windDirRange:$wdr" ];}
-      if(defined $s)  {$sM .= "S: $s "    ;push @evtEt,[$shash,1,"sunshine:$s"       ];}
-      if(defined $b)  {$sM .= "B: $b "    ;push @evtEt,[$shash,1,"brightness:$b"     ];}
-      push @evtEt,[$shash,1,$sM];
+      if(defined $t)  {$sM .= "T: $t "    ;push @evtEt,[$mh{shash},1,"temperature:$t"    ];}
+      if(defined $h)  {$sM .= "H: $h "    ;push @evtEt,[$mh{shash},1,"humidity:$h"       ];}
+      if(defined $w)  {$sM .= "W: $w "    ;push @evtEt,[$mh{shash},1,"windSpeed:$w"      ];}
+      if(defined $r)  {$sM .= "R: $r "    ;push @evtEt,[$mh{shash},1,"rain:$r"           ];}
+      if(defined $ir) {$sM .= "IR: $ir "  ;push @evtEt,[$mh{shash},1,"isRaining:$ir"     ];}
+      if(defined $wd) {$sM .= "WD: $wd "  ;push @evtEt,[$mh{shash},1,"windDirection:$wd" ];}
+      if(defined $wdr){$sM .= "WDR: $wdr ";push @evtEt,[$mh{shash},1,"windDirRange:$wdr" ];}
+      if(defined $s)  {$sM .= "S: $s "    ;push @evtEt,[$mh{shash},1,"sunshine:$s"       ];}
+      if(defined $b)  {$sM .= "B: $b "    ;push @evtEt,[$mh{shash},1,"brightness:$b"     ];}
+      push @evtEt,[$mh{shash},1,$sM];
     }
-    elsif ($mTp eq "41"){
-      my ($chn,$cnt,$state)=(hex($1),hex($2),$3) if($p =~ m/^(..)(..)(..)/);
+    elsif ($mh{mTp} eq "41"){
+      my ($chn,$cnt,$state)=(hex($1),hex($2),$3) if($mh{p} =~ m/^(..)(..)(..)/);
       $chn = sprintf("%02X",$chn & 0x3f);
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
       my $txt;
-      if    ($shash->{helper}{lm} && $shash->{helper}{lm}{hex($state)}){$txt = $shash->{helper}{lm}{hex($state)}}
-      elsif ($lvlStr{md}{$md})                                         {$txt = $lvlStr{md}{$md}{$state}}
-      elsif ($lvlStr{st}{$st})                                         {$txt = $lvlStr{st}{$st}{$state}}
+      if    ($mh{shash}->{helper}{lm} && $mh{shash}->{helper}{lm}{hex($state)}){$txt = $mh{shash}->{helper}{lm}{hex($state)}}
+      elsif ($lvlStr{md}{$mh{md}})                                         {$txt = $lvlStr{md}{$mh{md}}{$state}}
+      elsif ($lvlStr{st}{$mh{st}})                                         {$txt = $lvlStr{st}{$mh{st}}{$state}}
       else                                                             {$txt = "unknown:$state"}
-      push @evtEt,[$shash,1,"storm:$txt"];
-      push @evtEt,[$devH,1,"trig_$chn:$dname"];
-      #push @evtEt,[$devH,1,"battery:". ($err?"low"  :"ok"  )]; has no battery
+      push @evtEt,[$mh{shash},1,"storm:$txt"];
+      push @evtEt,[$mh{devH},1,"trig_$chn:$mh{dstN}"];
+      #push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )]; has no battery
     }
     else {
-      push @evtEt,[$shash,1,"unknown:$p"];
+      push @evtEt,[$mh{shash},1,"unknown:$mh{p}"];
     }
   }
-  elsif($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/) { ###########################
+  elsif($mh{md} =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/) { #######################
     my ($sType,$chn) = ($mI[0],$mI[1]);
-    if($mTp eq "70") { # weather event
+    if($mh{mTp} eq "70") { # weather event
       $chn = '01'; # fix definition
       my (    $t,      $h) =  (hex($mI[0].$mI[1]), hex($mI[2]));# temp is 15 bit signed
       $t = sprintf("%2.1f",($t & 0x3fff)/10*(($t & 0x4000)?-1:1));
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+      my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}.$chn};
       if ($chnHash){
         push @evtEt,[$chnHash,1,"state:T: $t H: $h"];
         push @evtEt,[$chnHash,1,"measured-temp:$t"];
         push @evtEt,[$chnHash,1,"humidity:$h"];
       }
-      push @evtEt,[$shash,1,"state:T: $t H: $h"];
-      push @evtEt,[$shash,1,"measured-temp:$t"];
-      push @evtEt,[$shash,1,"humidity:$h"];
+      push @evtEt,[$mh{shash},1,"state:T: $t H: $h"];
+      push @evtEt,[$mh{shash},1,"measured-temp:$t"];
+      push @evtEt,[$mh{shash},1,"humidity:$h"];
     }
-    elsif($mTp eq "58") {# climate event
+    elsif($mh{mTp} eq "58") {# climate event
       $chn = '02'; # fix definition
       my (   $d1,     $vp) = # adjust_command[0..4] adj_data[0..250]
          (    $mI[0], hex($mI[1]));
       $vp = int($vp/2.56+0.5);   # valve position in %
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+      my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}.$chn};
       if($chnHash){
         push @evtEt,[$chnHash,1,"state:$vp"];
         if ($chnHash->{helper}{needUpdate}){
@@ -1404,37 +1409,37 @@ sub CUL_HM_Parse($$) {#########################################################
           }
         }
       }
-      push @evtEt,[$shash,1,"actuator:$vp"];
+      push @evtEt,[$mh{devH},1,"actuator:$vp"];
 
       # Set the valve state too, without an extra trigger
-      if($dstH){
-        push @evtEt,[$dstH,1,"state:set_$vp"   ];
-        push @evtEt,[$dstH,1,"ValveDesired:$vp"];
+      if($mh{dstH}){
+        push @evtEt,[$mh{dstH},1,"state:set_$vp"   ];
+        push @evtEt,[$mh{dstH},1,"ValveDesired:$vp"];
       }
     }
-    elsif(($mTp eq '02' &&$sType eq '01')||    # ackStatus
-          ($mTp eq '10' &&$sType eq '06')){    # infoStatus
+    elsif(($mh{mTp} eq '02' &&$sType eq '01')||    # ackStatus
+          ($mh{mTp} eq '10' &&$sType eq '06')){    # infoStatus
       my $dTemp = hex($mI[2])/2;
       $dTemp = ($dTemp < 6 )?'off':
                ($dTemp >30 )?'on' :sprintf("%0.1f", $dTemp);
       my $err = hex($mI[3]);
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+      my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}.$chn};
       if($chnHash){
         my $chnName = $chnHash->{NAME};
         my $mode = ReadingsVal($chnName,"R-controlMode","");
         push @evtEt,[$chnHash,1,"desired-temp:$dTemp"];
-        push @evtEt,[$chnHash,1,"desired-temp-manu:$dTemp"] if($mode =~ m /manual/  && $mTp eq '10');
-#       readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode =~ m /central/ && $mTp eq '02');
+        push @evtEt,[$chnHash,1,"desired-temp-manu:$dTemp"] if($mode =~ m /manual/  && $mh{mTp} eq '10');
+#       readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode =~ m /central/ && $mh{mTp} eq '02');
 #       removed - shall not be changed automatically - change is  only temporary
-#       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode =~ m /central/ && $mTp eq '10');
-        $chnHash->{helper}{needUpdate} = 1                          if($mode =~ m /central/ && $mTp eq '10');
+#       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode =~ m /central/ && $mh{mTp} eq '10');
+        $chnHash->{helper}{needUpdate} = 1                          if($mode =~ m /central/ && $mh{mTp} eq '10');
        }
-      push @evtEt,[$shash,1,"desired-temp:$dTemp"];
-      push @evtEt,[$shash,1,"battery:".($err&0x80?"low":"ok")];
+      push @evtEt,[$mh{shash},1,"desired-temp:$dTemp"];
+      push @evtEt,[$mh{shash},1,"battery:".($err&0x80?"low":"ok")];
     }
-    elsif($mTp eq "10" &&                   # Config change report
-          ($p =~ m/^0402000000000501/)) {   # paramchanged L5
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+    elsif($mh{mTp} eq "10" &&                   # Config change report
+          ($mh{p} =~ m/^0402000000000501/)) {   # paramchanged L5
+      my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}.$chn};
       my $dTemp;
       if($chnHash){
         my $chnName = $chnHash->{NAME};
@@ -1447,94 +1452,94 @@ sub CUL_HM_Parse($$) {#########################################################
         }
         push @evtEt,[$chnHash,1,"desired-temp:$dTemp"];
       }
-      push @evtEt,[$shash,1,"desired-temp:$dTemp"]
+      push @evtEt,[$mh{shash},1,"desired-temp:$dTemp"]
     }
-    elsif($mTp eq "01"){                       # status reports
-      if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
+    elsif($mh{mTp} eq "01"){                       # status reports
+      if($mh{p} =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
         my (   $of,     $vep) = (hex($1), hex($2));
-        push @evtEt,[$shash,1,"ValveErrorPosition_for_$dname: $vep"];
-        push @evtEt,[$shash,1,"ValveOffset_for_$dname: $of"];
-        push @evtEt,[$dstH,1,"ValveErrorPosition:set_$vep"];
-        push @evtEt,[$dstH,1,"ValveOffset:set_$of"];
+        push @evtEt,[$mh{devH},1,"ValveErrorPosition_for_$mh{dstN}: $vep"];
+        push @evtEt,[$mh{devH},1,"ValveOffset_for_$mh{dstN}: $of"];
+        push @evtEt,[$mh{dstH},1,"ValveErrorPosition:set_$vep"];
+        push @evtEt,[$mh{dstH},1,"ValveOffset:set_$of"];
       }
-      elsif($p =~ m/^010[56]/){ # 'prepare to set' or 'end set'
-        push @evtEt,[$shash,1,""]; #
+      elsif($mh{p} =~ m/^010[56]/){ # 'prepare to set' or 'end set'
+        push @evtEt,[$mh{shash},1,""]; #
       }
     }
-    elsif($mTp eq "3F" && $ioId eq $dst) {     # Timestamp request
+    elsif($mh{mTp} eq "3F" && $ioId eq $mh{dst}) {     # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      push @ack,$shash,"${mNo}803F$ioId${src}0204$s2000";
-      push @evtEt,[$shash,1,"time-request"];
+      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0204$s2000";
+      push @evtEt,[$mh{shash},1,"time-request"];
     }
   }
-  elsif($md =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/) { ###########################
-    if($mTp eq "02" && @mI > 2) {#subtype+chn+value+err
+  elsif($mh{md} =~ m/(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/) { #######################
+    if($mh{mTp} eq "02" && @mI > 2) {#subtype+chn+value+err
       my ($chn,$vp, $err) = map{hex($_)} @mI[1..3];
       $chn = sprintf("%02X",$chn&0x3f);
       $vp = int($vp)/2;   # valve position in %
-      push @evtEt,[$shash,1,"ValvePosition:$vp"];
-      push @evtEt,[$shash,1,"state:$vp"];
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
+      push @evtEt,[$mh{shash},1,"ValvePosition:$vp"];
+      push @evtEt,[$mh{shash},1,"state:$vp"];
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
 
       my $stErr = ($err >>1) & 0x7;    # Status-Byte Evaluation
-      push @evtEt,[$shash,1,"battery:".(($stErr == 4)?"critical":($err&0x80?"low":"ok"))];
+      push @evtEt,[$mh{shash},1,"battery:".(($stErr == 4)?"critical":($err&0x80?"low":"ok"))];
       if (!$stErr){#remove both conditions
-        push @evtEt,[$shash,1,"motorErr:ok"];
+        push @evtEt,[$mh{shash},1,"motorErr:ok"];
       }
       else{
-        push @evtEt,[$shash,1,"motorErr:blocked"                  ]if($stErr == 1);
-        push @evtEt,[$shash,1,"motorErr:loose"                    ]if($stErr == 2);
-        push @evtEt,[$shash,1,"motorErr:adjusting range too small"]if($stErr == 3);
-#       push @evtEt,[$shash,1,"battery:critical"                  ]if($stErr == 4);
+        push @evtEt,[$mh{shash},1,"motorErr:blocked"                  ]if($stErr == 1);
+        push @evtEt,[$mh{shash},1,"motorErr:loose"                    ]if($stErr == 2);
+        push @evtEt,[$mh{shash},1,"motorErr:adjusting range too small"]if($stErr == 3);
+#       push @evtEt,[$mh{shash},1,"battery:critical"                  ]if($stErr == 4);
       }
-      push @evtEt,[$shash,1,"motor:opening"] if(($err&0x30) == 0x10);
-      push @evtEt,[$shash,1,"motor:closing"] if(($err&0x30) == 0x20);
-      push @evtEt,[$shash,1,"motor:stop"   ] if(($err&0x30) == 0x00);
+      push @evtEt,[$mh{shash},1,"motor:opening"] if(($err&0x30) == 0x10);
+      push @evtEt,[$mh{shash},1,"motor:closing"] if(($err&0x30) == 0x20);
+      push @evtEt,[$mh{shash},1,"motor:stop"   ] if(($err&0x30) == 0x00);
 
       #VD hang detection
-      my $des = ReadingsVal($name, "ValveDesired", $vp);
+      my $des = ReadingsVal($mh{devN}, "ValveDesired", $vp);
       $des =~ s/ .*//; # remove unit     
       if (($des < $vp-1 || $des > $vp+1) && ($err&0x30) == 0x00){ 
-        if ($shash->{helper}{oldDes} eq $des){#desired valve position stable
-          push @evtEt,[$shash,1,"operState:errorTargetNotMet"];
-          push @evtEt,[$shash,1,"operStateErrCnt:".(ReadingsVal($name,"operStateErrCnt","0")+1)];
+        if ($mh{shash}->{helper}{oldDes} eq $des){#desired valve position stable
+          push @evtEt,[$mh{shash},1,"operState:errorTargetNotMet"];
+          push @evtEt,[$mh{shash},1,"operStateErrCnt:".(ReadingsVal($mh{devN},"operStateErrCnt","0")+1)];
         }
         else{
-          push @evtEt,[$shash,1,"operState:changed"];
+          push @evtEt,[$mh{shash},1,"operState:changed"];
         }
       }
       else{
-        push @evtEt,[$shash,1,"operState:".((($err&0x30) == 0x00)?"onTarget":"adjusting")];
+        push @evtEt,[$mh{shash},1,"operState:".((($err&0x30) == 0x00)?"onTarget":"adjusting")];
       }
-      $shash->{helper}{oldDes} = $des;
+      $mh{shash}->{helper}{oldDes} = $des;
     }
   }
-  elsif($md =~ m/HM-CC-RT-DN/) { ##############################################
+  elsif($mh{md} =~ m/HM-CC-RT-DN/) { ##########################################
     my %ctlTbl=( 0=>"auto", 1=>"manual", 2=>"party",3=>"boost");
 
-    if   (  ($mTyp eq "100A") #info-level/
-          ||($mTyp eq "0201")){#ackInfo
+    if   (  ($mh{mTyp} eq "100A") #info-level/
+          ||($mh{mTyp} eq "0201")){#ackInfo
 
       my ($err       ,$ctrlMode  ,$setTemp          ,$bTime,$pTemp,$pStart,$pEnd,$chn,$uk0,$lBat,$actTemp,$vp) = 
          (hex($mI[3]),hex($mI[5]),hex($mI[1].$mI[2]),"-"    ,"-"   ,"-"    ,"-"                             );
       
-      if($mTp eq "10"){
+      if($mh{mTp} eq "10"){
         $chn = "04";#fixed
         my $bat  =(($err            ) & 0x1f)/10+1.5;
         $actTemp =sprintf("%2.1f",((($setTemp        ) & 0x3ff)/10));
         $vp      = (hex($mI[4])     ) & 0x7f ;
         $setTemp = ($setTemp    >>10);
         $err     = ($err        >> 5);
-        $shash = $modules{CUL_HM}{defptr}{"$src$chn"} if($modules{CUL_HM}{defptr}{"$src$chn"});
-        push @evtEt,[$shash,1,"measured-temp:$actTemp" ];
-        push @evtEt,[$shash,1,"ValvePosition:$vp"    ];
+        $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"} if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+        push @evtEt,[$mh{shash},1,"measured-temp:$actTemp" ];
+        push @evtEt,[$mh{shash},1,"ValvePosition:$vp"    ];
         #device---
-        push @evtEt,[$devH,1,"measured-temp:$actTemp"];
-        push @evtEt,[$devH,1,"batteryLevel:$bat"];
-        push @evtEt,[$devH,1,"actuator:$vp"];
+        push @evtEt,[$mh{devH},1,"measured-temp:$actTemp"];
+        push @evtEt,[$mh{devH},1,"batteryLevel:$bat"];
+        push @evtEt,[$mh{devH},1,"actuator:$vp"];
         #weather Chan
-        my $wHash = $modules{CUL_HM}{defptr}{$src."01"}; 
+        my $wHash = $modules{CUL_HM}{defptr}{$mh{src}."01"}; 
         if ($wHash){
           push @evtEt,[$wHash,1,"measured-temp:$actTemp"];
           push @evtEt,[$wHash,1,"state:$actTemp"];
@@ -1545,11 +1550,11 @@ sub CUL_HM_Parse($$) {#########################################################
         $setTemp    = ($setTemp        );
         $lBat       = $err&0x80?"low":"ok"; # prior to changes of $err!
         $err        = ($err        >> 1);
-        $shash = $modules{CUL_HM}{defptr}{"$src$chn"} if($modules{CUL_HM}{defptr}{"$src$chn"});
-        $actTemp = ReadingsVal($name,"measured-temp","");
-        $vp      = ReadingsVal($name,"actuator","");
+        $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"} if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+        $actTemp = ReadingsVal($mh{devN},"measured-temp","");
+        $vp      = ReadingsVal($mh{devN},"actuator","");
       }
-      delete $devH->{helper}{getBatState};
+      delete $mh{devH}->{helper}{getBatState};
       $setTemp    =(($setTemp        ) & 0x3f )/2;
       $err        = ($err            ) & 0x7  ;
       $uk0        = ($ctrlMode       ) & 0x3f ;#unknown
@@ -1560,12 +1565,12 @@ sub CUL_HM_Parse($$) {#########################################################
       if (defined $mI[6]){# message with party mode
         my @pt =  map{hex($_)} @mI[5..$#mI];
         $pTemp =(($pt[7]     )& 0x3f)/2 if (defined $pt[7]) ;
-        my $st  = (    ($pt[0]      )& 0x3f)/2;
+        my $sta = (    ($pt[0]      )& 0x3f)/2;
         $pStart =     (($pt[2]      )& 0x7f)   # year
                  ."-".(($pt[6]  >> 4)& 0x0f)   # month
                  ."-".(($pt[1]      )& 0x1f)   # day
-                 ." ".int($st)                 # Time h
-                 .":".(int($st)!=$st?"30":"00")# Time min
+                 ." ".int($sta)                 # Time h
+                 .":".(int($sta)!=$sta?"30":"00")# Time min
                  ;
         my $et  = (    ($pt[3]      )& 0x3f)/2;
         $pEnd   =     (($pt[5]      )& 0x7f)   # year
@@ -1583,59 +1588,59 @@ sub CUL_HM_Parse($$) {#########################################################
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
                   ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
 
-      push @evtEt,[$shash,1,"motorErr:$errTbl{$err}" ];
-      push @evtEt,[$shash,1,"desired-temp:$setTemp"  ];
-      push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
-      push @evtEt,[$shash,1,"boostTime:$bTime"];
-      push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp valve: $vp"];
-      push @evtEt,[$shash,1,"partyStart:$pStart"];
-      push @evtEt,[$shash,1,"partyEnd:$pEnd"];
-      push @evtEt,[$shash,1,"partyTemp:$pTemp"];
-      #push @evtEt,[$shash,1,"unknown0:$uk0"];
-      #push @evtEt,[$shash,1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
-      push @evtEt,[$devH,1,"battery:$lBat"] if ($lBat);
-      push @evtEt,[$devH,1,"desired-temp:$setTemp"];
+      push @evtEt,[$mh{shash},1,"motorErr:$errTbl{$err}" ];
+      push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"  ];
+      push @evtEt,[$mh{shash},1,"controlMode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$mh{shash},1,"boostTime:$bTime"];
+      push @evtEt,[$mh{shash},1,"state:T: $actTemp desired: $setTemp valve: $vp"];
+      push @evtEt,[$mh{shash},1,"partyStart:$pStart"];
+      push @evtEt,[$mh{shash},1,"partyEnd:$pEnd"];
+      push @evtEt,[$mh{shash},1,"partyTemp:$pTemp"];
+      #push @evtEt,[$mh{shash},1,"unknown0:$uk0"];
+      #push @evtEt,[$mh{shash},1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
+      push @evtEt,[$mh{devH},1,"battery:$lBat"] if ($lBat);
+      push @evtEt,[$mh{devH},1,"desired-temp:$setTemp"];
     }
-    elsif($mTp eq "59" && defined $mI[0]) {#inform team about new value
+    elsif($mh{mTp} eq "59" && defined $mI[0]) {#inform team about new value
       my $setTemp = sprintf("%.1f",int(hex($mI[0])/4)/2);
       my $ctrlMode = hex($mI[0])&0x3;
-      push @evtEt,[$shash,1,"desired-temp:$setTemp"];
-      push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"];
+      push @evtEt,[$mh{shash},1,"controlMode:$ctlTbl{$ctrlMode}"];
 
-      my $tHash = $modules{CUL_HM}{defptr}{$dst."04"};
+      my $tHash = $modules{CUL_HM}{defptr}{$mh{dst}."04"};
       if ($tHash){
         push @evtEt,[$tHash,1,"desired-temp:$setTemp"];
         push @evtEt,[$tHash,1,"controlMode:$ctlTbl{$ctrlMode}"];
       }
     }
-    elsif($mTp eq "3F" && $ioId eq $dst) { # Timestamp request
+    elsif($mh{mTp} eq "3F" && $ioId eq $mh{dst}) { # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      push @ack,$shash,"${mNo}803F$ioId${src}0204$s2000";
-      push @evtEt,[$shash,1,"time-request"];
+      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0204$s2000";
+      push @evtEt,[$mh{shash},1,"time-request"];
       # schedule desired-temp just to get an AckInfo for battery state
-      $shash->{helper}{getBatState} = 1;
+      $mh{shash}->{helper}{getBatState} = 1;
     }
   }
-  elsif($md eq "HM-TC-IT-WM-W-EU") { ##########################################
+  elsif($mh{md} eq "HM-TC-IT-WM-W-EU") { ######################################
     my %ctlTbl=( 0=>"auto", 1=>"manual", 2=>"party",3=>"boost");
-    if( ( $mTp eq "10" && $mI[0] eq '0B')  #info-level
-      ||( $mTp eq "02" && $mI[0] eq '01')) {#ack-status
-      my @d = map{hex($_)} unpack 'A2A4(A2)*',$p;
+    if( ( $mh{mTp} eq "10" && $mI[0] eq '0B')  #info-level
+      ||( $mh{mTp} eq "02" && $mI[0] eq '01')) {#ack-status
+      my @d = map{hex($_)} unpack 'A2A4(A2)*',$mh{p};
       my ($chn,$setTemp,$actTemp, $cRep,$wRep,$bat ,$lbat,$ctrlMode,$bTime,$pTemp,$pStart,$pEnd) =
           ("02",$d[1],$d[1],      $d[2],$d[2],$d[2],$d[2],""       ,"-"   ,"-"   ,"-"    ,"-");
       
       $lbat       = ($lbat           ) & 0x80;
-      my $dHash = $shash;
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
-      if ($mTp eq "10"){
+      my $dHash = $mh{shash};
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+      if ($mh{mTp} eq "10"){
         $ctrlMode   = $d[3];
         $bat        =(($bat            ) & 0x1f)/10+1.5;
         $setTemp    =(($setTemp    >>10) & 0x3f )/2;
         $actTemp    =(($actTemp        ) & 0x3ff)/10;
         $actTemp    = -1 * $actTemp if ($d[1] & 0x200 );# obey signed
         $actTemp = sprintf("%2.1f",$actTemp);
-        push @evtEt,[$shash,1,"measured-temp:$actTemp"];
+        push @evtEt,[$mh{shash},1,"measured-temp:$actTemp"];
         push @evtEt,[$dHash,1,"measured-temp:$actTemp"];
         push @evtEt,[$dHash,1,"batteryLevel:$bat"];
         $cRep = (($cRep    >>6) & 0x01 )?"on":"off";
@@ -1643,7 +1648,7 @@ sub CUL_HM_Parse($$) {#########################################################
       }
       else{#actTemp is not provided in ack message - use old value
         $ctrlMode   = $d[4];
-        $actTemp = ReadingsVal($name,"measured-temp",0);
+        $actTemp = ReadingsVal($mh{devN},"measured-temp",0);
         $setTemp  =(hex($mI[2]) & 0x3f )/2;
         $cRep = (($cRep    >>2) & 0x01 )?"on":"off";
         $wRep = (($wRep    >>1) & 0x01 )?"on":"off";        
@@ -1655,14 +1660,14 @@ sub CUL_HM_Parse($$) {#########################################################
       if (defined $d[11]){# message with party mode
         $pTemp =(($d[11]     )& 0x3f)/2 if (defined $d[11]) ;
         my @p;
-        if ($mTp eq "10") {@p = @d[3..9]}
+        if ($mh{mTp} eq "10") {@p = @d[3..9]}
         else              {@p = @d[4..10]}
-        my $st = (($p[0]      )& 0x3f)/2;
+        my $sta = (($p[0]      )& 0x3f)/2;
         $pStart =     (($p[2]      )& 0x7f)    # year
                  ."-".(($p[6]  >> 4)& 0x0f)    # month
                  ."-".(($p[1]      )& 0x1f)    # day
-                 ." ".int($st)                 # Time h
-                 .":".(int($st)!=$st?"30":"00")# Time min
+                 ." ".int($sta)                 # Time h
+                 .":".(int($sta)!=$sta?"30":"00")# Time min
                  ;
         my $et = (($p[3]      )& 0x3f)/2;
         $pEnd   =     (($p[5]      )& 0x7f)    # year
@@ -1671,248 +1676,244 @@ sub CUL_HM_Parse($$) {#########################################################
                  ." ".int($et)                 # Time h
                  .":".(int($et)!=$et?"30":"00")# Time min
                  ;
-        push @evtEt,[$shash,1,"partyStart:$pStart"];
-        push @evtEt,[$shash,1,"partyEnd:$pEnd"];
-        push @evtEt,[$shash,1,"partyTemp:$pTemp"];
+        push @evtEt,[$mh{shash},1,"partyStart:$pStart"];
+        push @evtEt,[$mh{shash},1,"partyEnd:$pEnd"];
+        push @evtEt,[$mh{shash},1,"partyTemp:$pTemp"];
       }
       elsif(defined $d[3] && $ctrlMode == 3 ){#message with boost
         $bTime     = (($d[3]       ) & 0x3f)." min";
       }
 
-      push @evtEt,[$shash,1,"desired-temp:$setTemp"];
-      push @evtEt,[$shash,1,"controlMode:$ctlTbl{$ctrlMode}"];
-      push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp"];
-      push @evtEt,[$shash,1,"battery:".($lbat?"low":"ok")];
-      push @evtEt,[$shash,1,"commReporting:$cRep"];
-      push @evtEt,[$shash,1,"winOpenReporting:$wRep"];
-      push @evtEt,[$shash,1,"boostTime:$bTime"];
+      push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"];
+      push @evtEt,[$mh{shash},1,"controlMode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$mh{shash},1,"state:T: $actTemp desired: $setTemp"];
+      push @evtEt,[$mh{shash},1,"battery:".($lbat?"low":"ok")];
+      push @evtEt,[$mh{shash},1,"commReporting:$cRep"];
+      push @evtEt,[$mh{shash},1,"winOpenReporting:$wRep"];
+      push @evtEt,[$mh{shash},1,"boostTime:$bTime"];
       push @evtEt,[$dHash,1,"desired-temp:$setTemp"];
     }
-    elsif($mTp eq "70"){
+    elsif($mh{mTp} eq "70"){
       my $chn = "01";
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
-      my ($t,$h) =  map{hex($_)} unpack 'A4A2',$p;
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+      my ($t,$h) =  map{hex($_)} unpack 'A4A2',$mh{p};
       $t -= 0x8000 if($t > 1638.4);
       $t = sprintf("%0.1f", $t/10);
-      push @evtEt,[$shash,1,"temperature:$t"];
-      push @evtEt,[$shash,1,"humidity:$h"];
-      push @evtEt,[$shash,1,"state:T: $t H: $h"];
+      push @evtEt,[$mh{shash},1,"temperature:$t"];
+      push @evtEt,[$mh{shash},1,"humidity:$h"];
+      push @evtEt,[$mh{shash},1,"state:T: $t H: $h"];
     }
-    elsif($mTp eq "5A"){# thermal control - might work with broadcast
+    elsif($mh{mTp} eq "5A"){# thermal control - might work with broadcast
       my $chn = "02";
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
-      my ($t,$h) =  map{hex($_)} unpack 'A4A2',$p;
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+      my ($t,$h) =  map{hex($_)} unpack 'A4A2',$mh{p};
       my $setTemp    =(($t    >>10) & 0x3f )/2;
       my $actTemp    =(($t        ) & 0x3ff)/10;
       $actTemp = sprintf("%2.1f",$actTemp);
       $setTemp = ($setTemp < 5 )?'off':
                  ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
-      push @evtEt,[$shash,1,"measured-temp:$actTemp"];
-      push @evtEt,[$shash,1,"desired-temp:$setTemp"];
-      push @evtEt,[$shash,1,"humidity:$h"];
-      push @evtEt,[$shash,1,"state:T: $actTemp desired: $setTemp"];
+      push @evtEt,[$mh{shash},1,"measured-temp:$actTemp"];
+      push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"];
+      push @evtEt,[$mh{shash},1,"humidity:$h"];
+      push @evtEt,[$mh{shash},1,"state:T: $actTemp desired: $setTemp"];
     }
-    elsif($mTp =~ m/^4./) {
+    elsif($mh{mTp} =~ m/^4./) {
       my ($chn,$lvl) = ($mI[0],hex($mI[2])/2);
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+      my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}.$chn};
       if ($chnHash){
         push @evtEt,[$chnHash,1,"level:$lvl"];
       }
     }
-    elsif($mTp eq "3F" && $ioId eq $dst) { # Timestamp request
+    elsif($mh{mTp} eq "3F" && $ioId eq $mh{dst}) { # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      push @ack,$shash,"${mNo}803F$ioId${src}0204$s2000";
-      push @evtEt,[$shash,1,"time-request"];
+      push @ack,$mh{shash},"$mh{mNo}803F$ioId$mh{src}0204$s2000";
+      push @evtEt,[$mh{shash},1,"time-request"];
     }
   }
-  elsif($md =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ################################
-    if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
-        ($mTp eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
-        ($mTp eq "41"))                {
-      my $lvl = substr($p,4,2);
-      my $err = hex(substr($p,6,2));
-      if    ($lvlStr{md}{$md}){$lvl = $lvlStr{md}{$md}{$lvl}}
-      elsif ($lvlStr{st}{$st}){$lvl = $lvlStr{st}{$st}{$lvl} }
+  elsif($mh{md} =~ m/^(HM-Sen-Wa-Od|HM-CC-SCD)$/){ ############################
+    if (($mh{mTp} eq "02" && $mh{p} =~ m/^01/) ||  # handle Ack_Status
+        ($mh{mTp} eq "10" && $mh{p} =~ m/^06/) ||  #or Info_Status message here
+        ($mh{mTp} eq "41"))                {
+      my $lvl = substr($mh{p},4,2);
+      my $err = hex(substr($mh{p},6,2));
+      if    ($lvlStr{md}{$mh{md}}){$lvl = $lvlStr{md}{$mh{md}}{$lvl}}
+      elsif ($lvlStr{st}{$mh{st}}){$lvl = $lvlStr{st}{$mh{st}}{$lvl} }
       else                    {$lvl = hex($lvl)/2}
 
-      push @evtEt,[$shash,1,"level:$lvl"] if($md eq "HM-Sen-Wa-Od");
-      push @evtEt,[$shash,1,"state:$lvl"];
-      push @evtEt,[$shash,1,"battery:".($err&0x80?"low":"ok")] if (defined $err);
+      push @evtEt,[$mh{shash},1,"level:$lvl"] if($mh{md} eq "HM-Sen-Wa-Od");
+      push @evtEt,[$mh{shash},1,"state:$lvl"];
+      push @evtEt,[$mh{shash},1,"battery:".($err&0x80?"low":"ok")] if (defined $err);
     }
   }
-  elsif($md eq "KFM-Sensor") { ################################################
-    if ($mTp eq "53"){
-      if($p =~ m/(..)4(.)0200(..)(..)(..)/) {
+  elsif($mh{md} eq "KFM-Sensor") { ############################################
+    if ($mh{mTp} eq "53"){
+      if($mh{p} =~ m/(..)4(.)0200(..)(..)(..)/) {
         my ($chn,$seq, $k_v1, $k_v2, $k_v3) = (hex($1),hex($2),$3,hex($4),hex($5));
-        push @evtEt,[$shash,1,"battery:".($chn & 0x80?"low":"ok")];
+        push @evtEt,[$mh{shash},1,"battery:".($chn & 0x80?"low":"ok")];
         my $v = 1408 - ((($k_v3 & 0x07)<<8) + $k_v2);
-        push @evtEt,[$shash,1,"rawValue:$v"];
-        my $nextSeq = ReadingsVal($name,"Sequence","");
+        push @evtEt,[$mh{shash},1,"rawValue:$v"];
+        my $nextSeq = ReadingsVal($mh{devN},"Sequence","");
         $nextSeq =~ s/_.*//;
         $nextSeq = ($nextSeq %15)+1;      
-        push @evtEt,[$shash,1,"Sequence:$seq".($nextSeq ne $seq?"_seqMiss":"")];
+        push @evtEt,[$mh{shash},1,"Sequence:$seq".($nextSeq ne $seq?"_seqMiss":"")];
 
-        my $r2r = AttrVal($name, "rawToReadable", undef);
+        my $r2r = AttrVal($mh{devN}, "rawToReadable", undef);
         if($r2r) {
           my @r2r = split("[ :]", $r2r);
           foreach(my $idx = 0; $idx < @r2r-2; $idx+=2) {
             if($v >= $r2r[$idx] && $v <= $r2r[$idx+2]) {
               my $f = (($v-$r2r[$idx])/($r2r[$idx+2]-$r2r[$idx]));
               my $cv = ($r2r[$idx+3]-$r2r[$idx+1])*$f + $r2r[$idx+1];
-              my $unit = AttrVal($name, "unit", "");
-              push @evtEt,[$shash,1,sprintf("state:%.1f %s",$cv,$unit)];
-              push @evtEt,[$shash,1,sprintf("content:%.1f %s",$cv,$unit)];
+              my $unit = AttrVal($mh{devN}, "unit", "");
+              push @evtEt,[$mh{shash},1,sprintf("state:%.1f %s",$cv,$unit)];
+              push @evtEt,[$mh{shash},1,sprintf("content:%.1f %s",$cv,$unit)];
               last;
             }
           }
         } 
         else {
-          push @evtEt,[$shash,1,"state:$v"];
+          push @evtEt,[$mh{shash},1,"state:$v"];
         }
       }
     }
   }
-  elsif($st eq "THSensor") { ##################################################
-    if    ($mTp eq "70"){
+  elsif($mh{st} eq "THSensor") { ##############################################
+    if    ($mh{mTp} eq "70"){
       my $chn;
-      my ($d1,$h,$ap) = map{hex($_)} unpack 'A4A2A4',$p;
-      if    ($md =~  m/^(WS550|WS888|HM-WDC7000)/){$chn = "10"}
-      elsif ($md eq "HM-WDS30-OT2-SM")            {$chn = "05";$h=""}
-      elsif ($md =~  m/^(S550IA|HM-WDS30-T-O)/)   {$chn = "01";$h=""}
+      my ($d1,$h,$ap) = map{hex($_)} unpack 'A4A2A4',$mh{p};
+      if    ($mh{md} =~  m/^(WS550|WS888|HM-WDC7000)/){$chn = "10"}
+      elsif ($mh{md} eq "HM-WDS30-OT2-SM")            {$chn = "05";$h=""}
+      elsif ($mh{md} =~  m/^(S550IA|HM-WDS30-T-O)/)   {$chn = "01";$h=""}
       else                                        {$chn = "01"}
 
       my $t =  $d1 & 0x7fff;
       $t -= 0x8000 if($t &0x4000);
       $t = sprintf("%0.1f", $t/10);
       my $statemsg = "state:T: $t";
-      push @evtEt,[$shash,1,"temperature:$t"];#temp is always there
-      push @evtEt,[$devH,1,"battery:".($d1 & 0x8000?"low":"ok")];
-      if($modules{CUL_HM}{defptr}{$src.$chn}){
-        my $ch = $modules{CUL_HM}{defptr}{$src.$chn};
+      push @evtEt,[$mh{shash},1,"temperature:$t"];#temp is always there
+      push @evtEt,[$mh{devH},1,"battery:".($d1 & 0x8000?"low":"ok")];
+      if($modules{CUL_HM}{defptr}{$mh{src}.$chn}){
+        my $ch = $modules{CUL_HM}{defptr}{$mh{src}.$chn};
         push @evtEt,[$ch,1,$statemsg];
         push @evtEt,[$ch,1,"temperature:$t"];
       }
-      if ($h) {$statemsg .= " H: $h"  ; push @evtEt,[$shash,1,"humidity:$h"]; }
-      if ($ap){$statemsg .= " AP: $ap"; push @evtEt,[$shash,1,"airpress:$ap"];}
-      push @evtEt,[$shash,1,$statemsg];
+      if ($h) {$statemsg .= " H: $h"  ; push @evtEt,[$mh{shash},1,"humidity:$h"]; }
+      if ($ap){$statemsg .= " AP: $ap"; push @evtEt,[$mh{shash},1,"airpress:$ap"];}
+      push @evtEt,[$mh{shash},1,$statemsg];
     }
-    elsif ($mTp eq "53"){
-      my ($chn,@dat) = unpack 'A2(A6)*',$p;
-      push @evtEt,[$devH,1,"battery:".(hex($chn)&0x80?"low":"ok")];
+    elsif ($mh{mTp} eq "53"){
+      my ($chn,@dat) = unpack 'A2(A6)*',$mh{p};
+      push @evtEt,[$mh{devH},1,"battery:".(hex($chn)&0x80?"low":"ok")];
       foreach (@dat){
         my ($a,$d) = unpack 'A2A4',$_;
         $d = hex($d);
         $d -= 0x10000 if($d & 0xC000);
         $d = sprintf("%0.1f",$d/10);
         my $chId = sprintf("%02X",hex($a) & 0x3f);
-        my $chnHash = $modules{CUL_HM}{defptr}{$src.$chId};
+        my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}.$chId};
         if ($chnHash){
           push @evtEt,[$chnHash,1,"state:T: $d"];
           push @evtEt,[$chnHash,1,"temperature:$d"];
         }
         else{
-          push @evtEt,[$shash,1,"Chan_$chId:T: $d"];
+          push @evtEt,[$mh{shash},1,"Chan_$chId:T: $d"];
         }
       }
     }
   }
-  elsif($st eq "sensRain") {###################################################
-    my $hHash = CUL_HM_id2Hash($src."02");# hash for heating
+  elsif($mh{st} eq "sensRain") {###############################################
+    my $hHash = CUL_HM_id2Hash($mh{src}."02");# hash for heating
     my $pon = 0;# power on if mNo == 0 and heating status plus second msg
                 # status or trigger from rain channel
-    if (($mTp eq "02" && $p =~ m/^01/) || #Ack_Status
-        ($mTp eq "10" && $p =~ m/^06/)) { #Info_Status
+    if (($mh{mTp} eq "02" && $mh{p} =~ m/^01/) || #Ack_Status
+        ($mh{mTp} eq "10" && $mh{p} =~ m/^06/)) { #Info_Status
 
       my ($subType,$chn,$val,$err) = ($mI[0],hex($mI[1]),$mI[2],hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
-      my $chId = $src.$chn;
-      $shash = $modules{CUL_HM}{defptr}{$chId}
+      my $chId = $mh{src}.$chn;
+      $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
 
-      push @evtEt,[$shash,1,"timedOn:".(($err&0x40 && $chn eq "02")?"running":"off")];
+      push @evtEt,[$mh{shash},1,"timedOn:".(($err&0x40 && $chn eq "02")?"running":"off")];
 
-      my $mdCh = $md.$chn;
+      my $mdCh = $mh{md}.$chn;
       if($lvlStr{mdCh}{$mdCh} && $lvlStr{mdCh}{$mdCh}{$val}){
         $val = $lvlStr{mdCh}{$mdCh}{$val};
       }
       else{
         $val = hex($val)/2;
       }
-      push @evtEt,[$shash,1,"state:$val"];
+      push @evtEt,[$mh{shash},1,"state:$val"];
 
       if ($val eq "rain"){#--- handle lastRain---
-        $shash->{helper}{lastRain} = $tn;
+        $mh{shash}->{helper}{lastRain} = $tn;
       }
-      elsif ($val eq "dry" && $shash->{helper}{lastRain}){
-        push @evtEt,[$shash,0,"lastRain:$shash->{helper}{lastRain}"];
-        delete $shash->{helper}{lastRain};
+      elsif ($val eq "dry" && $mh{shash}->{helper}{lastRain}){
+        push @evtEt,[$mh{shash},0,"lastRain:$mh{shash}->{helper}{lastRain}"];
+        delete $mh{shash}->{helper}{lastRain};
       }
 
-      push @evtEt,[$shash,0,'.level:'.($val eq "off"?"0":"100")];
+      push @evtEt,[$mh{shash},0,'.level:'.($val eq "off"?"0":"100")];
 
-      if    ($mNo eq "00" && $chn eq "02" && $val eq "on"){
+      if    ($mh{mNo} eq "00" && $chn eq "02" && $val eq "on"){
         $hHash->{helper}{pOn} = 1;
       }
-      elsif ($mNo eq "01" && $chn eq "01" &&
+      elsif ($mh{mNo} eq "01" && $chn eq "01" &&
              $hHash->{helper}{pOn} && $hHash->{helper}{pOn} == 1){
         $pon = 1;
       }
       else{
         delete $hHash->{helper}{pOn};
-        my $hHash = CUL_HM_id2Hash($src."02");# hash for heating
+        my $hHash = CUL_HM_id2Hash($mh{src}."02");# hash for heating
         if ($chn eq "01" &&
             $hHash->{helper}{param} && $hHash->{helper}{param}{onAtRain}){
           CUL_HM_Set($hHash,$hHash->{NAME},$val eq "rain"?"on":"off");
         }
       }
     }
-    elsif ($mTp eq "41")   { #eventonAtRain
+    elsif ($mh{mTp} eq "41")   { #eventonAtRain
       my ($chn,$bno,$val) = @mI;
       $chn = sprintf("%02X",hex($chn)&0x3f);
-      $shash = $modules{CUL_HM}{defptr}{$src.$chn}
-                             if($modules{CUL_HM}{defptr}{$src.$chn});
-      push @evtEt,[$shash,1,"trigger:".hex($bno).":".$lvlStr{mdCh}{$md.$chn}{$val}.$target];
-      if ($mNo eq "01" && $bno eq "01" &&
+      $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}.$chn}
+                             if($modules{CUL_HM}{defptr}{$mh{src}.$chn});
+      push @evtEt,[$mh{shash},1,"trigger:".hex($bno).":".$lvlStr{mdCh}{$mh{md}.$chn}{$val}.$target];
+      if ($mh{mNo} eq "01" && $bno eq "01" &&
           $hHash->{helper}{pOn} && $hHash->{helper}{pOn} == 1){
         $pon = 1;
       }
-      delete $shash->{helper}{pOn};
+      delete $mh{shash}->{helper}{pOn};
     }
     if ($pon){# we have power ON, perform action
-      if($devH->{helper}{PONtest}){
-        push @evtEt,[$devH,1,"powerOn:$tn",] ;
-        $devH->{helper}{PONtest} = 0;
+      if($mh{devH}->{helper}{PONtest}){
+        push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+        $mh{devH}->{helper}{PONtest} = 0;
       }
       CUL_HM_Set($hHash,$hHash->{NAME},"off")
                  if ($hHash && $hHash->{helper}{param}{offAtPon});
     }
   }
-  elsif($st =~ m /^(switch|dimmer|blindActuator)$/) {##########################
-    if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
-        ($mTp eq "10" && $p =~ m/^06/)) { #    or Info_Status message here
+  elsif($mh{st} =~ m /^(switch|dimmer|blindActuator)$/) {######################
+    if (($mh{mTp} eq "02" && $mh{p} =~ m/^01/) ||  # handle Ack_Status
+        ($mh{mTp} eq "10" && $mh{p} =~ m/^06/)) { #    or Info_Status message here
 
       my $rSUpdt = 0;# require status update
       my ($subType,$chn,$val,$err) = ($mI[0],hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
-      $chn = sprintf("%02X",$chn&0x3f);
-      my $chId = $src.$chn;
-      $shash = $modules{CUL_HM}{defptr}{$chId}
-                             if($modules{CUL_HM}{defptr}{$chId});
-      $name = $shash->{NAME};
-      my($lvlMin,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
+      CUL_HM_m_setCh(\%mh,$mI[1]);
+      my($lvlMin,$lvlMax)=split",",AttrVal($mh{cName}, "levelRange", "0,100");
       my $physLvl;                             #store phys level if available
       if(   defined $mI[5]                     #message with physical level?
-         && $st eq "dimmer"){
+         && $mh{st} eq "dimmer"){
         my $pl = hex($mI[5])/2;
-        my $vDim = $shash->{helper}{vDim};     #shortcut
+        my $vDim = $mh{cHash}->{helper}{vDim};     #shortcut
         if ($vDim->{idPhy} &&
             CUL_HM_id2Hash($vDim->{idPhy})){   #has virt chan
-          RemoveInternalTimer("sUpdt:".$chId);
-          if ($mTp eq "10"){                   #valid PhysLevel
+          RemoveInternalTimer("sUpdt:".$mh{src}.$mh{chnM});
+          if ($mh{mTp} eq "10"){                   #valid PhysLevel
             foreach my $tmpKey ("idPhy","idV2","idV3",){#update all virtuals
               my $vh = CUL_HM_id2Hash($vDim->{$tmpKey}) if ($vDim->{$tmpKey});
-              next if (!$vh || $vDim->{$tmpKey} eq $chId);
+              next if (!$vh || $vDim->{$tmpKey} eq $mh{src}.$mh{chnM});
               my $vl = ReadingsVal($vh->{NAME},"level","???");
               my $vs = ($vl eq "100"?"on":($vl eq "0"?"off":"$vl"));
               my($clvlMin,$clvlMax)=split",",AttrVal($vh->{NAME}, "levelRange", "0,100");
@@ -1925,12 +1926,12 @@ sub CUL_HM_Parse($$) {#########################################################
             $pl = (($pl-$lvlMin)<=0 && $pl)
                      ? 1
                      : int(($pl-$lvlMin)/($lvlMax - $lvlMin)*200)/2;
-            push @evtEt,[$shash,1,"phyLevel:$pl"];      #phys level
+            push @evtEt,[$mh{cHash},1,"phyLevel:$pl"];      #phys level
             $physLvl = $pl;
           }
           else{                                #invalid PhysLevel
             $rSUpdt = 1;
-            CUL_HM_stateUpdatDly($name,5) if ($shash->{helper}{dlvl});# update to get level
+            CUL_HM_stateUpdatDly($mh{cName},5) if ($mh{cHash}->{helper}{dlvl});# update to get level
           }
         }
       }
@@ -1940,285 +1941,282 @@ sub CUL_HM_Parse($$) {#########################################################
                   : int((($val-$lvlMin)/($lvlMax - $lvlMin))*200)/2;
 
       # blind option: reverse Level Meaning 0 = open, 100 = closed
-      if ("levelInverse" eq AttrVal($name, "param", "")){;
+      if ("levelInverse" eq AttrVal($mh{cName}, "param", "")){;
         $pVal = $val = 100-$val;
       }
-      $physLvl = ReadingsVal($name,"phyLevel",$val)
+      $physLvl = ReadingsVal($mh{cName},"phyLevel",$val)
             if(!defined $physLvl);             #not updated? use old or ignore
 
-      my $vs = ($shash->{helper}{lm} && $shash->{helper}{lm}{$val})?$shash->{helper}{lm}{$val}
+      my $vs = ($mh{cHash}->{helper}{lm} && $mh{cHash}->{helper}{lm}{$val})?$mh{cHash}->{helper}{lm}{$val}
                      :($val==100 ? "on":($pVal==0 ? "off":"$val")); # user string...
-      push @evtEt,[$shash,1,"level:$val"];
-      push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
-      push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
-      push @evtEt,[$shash,1,"state:".(($physLvl ne $val)?"chn:$vs phys:$physLvl":$vs)];
+      push @evtEt,[$mh{cHash},1,"level:$val"];
+      push @evtEt,[$mh{cHash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
+      push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
+      push @evtEt,[$mh{cHash},1,"state:".(($physLvl ne $val)?"chn:$vs phys:$physLvl":$vs)];
       my $eventName = "unknown"; # different names for events
-      if   ($st eq "switch")       {$eventName = "switch";}  
-      elsif($st eq "blindActuator"){$eventName = "motor" ;}  
-      elsif($st eq "dimmer")       {$eventName = "dim"   ;}
+      if   ($mh{st} eq "switch")       {$eventName = "switch";}  
+      elsif($mh{st} eq "blindActuator"){$eventName = "motor" ;}  
+      elsif($mh{st} eq "dimmer")       {$eventName = "dim"   ;}
       
       my $action; #determine action
-      push @evtEt,[$shash,1,"timedOn:".(($err&0x40)?"running":"off")];
-      if ($shash->{helper}{dlvl} && defined $err){#are we waiting?
-        if ($mI[2] ne $shash->{helper}{dlvl} #level not met?
+      push @evtEt,[$mh{cHash},1,"timedOn:".(($err&0x40)?"running":"off")];
+      if ($mh{cHash}->{helper}{dlvl} && defined $err){#are we waiting?
+        if ($mI[2] ne $mh{cHash}->{helper}{dlvl} #level not met?
             && !($err&0x70)){                #and already stopped not timedOn
           #level not met, repeat
-          Log3 $name,3,"CUL_HM $name repeat, level $mI[2] instead of $shash->{helper}{dlvl}";
-          if ($shash->{helper}{dlvlCmd}){# first try
-            CUL_HM_PushCmdStack($shash,$shash->{helper}{dlvlCmd});
-            CUL_HM_ProcessCmdStack($shash);
-            delete $shash->{helper}{dlvlCmd};# will prevent second try
+          Log3 $mh{cName},3,"CUL_HM $mh{cName} repeat, level $mI[2] instead of $mh{cHash}->{helper}{dlvl}";
+          if ($mh{cHash}->{helper}{dlvlCmd}){# first try
+            CUL_HM_PushCmdStack($mh{cHash},$mh{cHash}->{helper}{dlvlCmd});
+            CUL_HM_ProcessCmdStack($mh{cHash});
+            delete $mh{cHash}->{helper}{dlvlCmd};# will prevent second try
           }
           else{# no second try - alarm and stop
-            push @evtEt,[$shash,1,"levelMissed:desired:".hex($shash->{helper}{dlvl})/2];
-            delete $shash->{helper}{dlvl};# we only make one attempt
+            push @evtEt,[$mh{cHash},1,"levelMissed:desired:".hex($mh{cHash}->{helper}{dlvl})/2];
+            delete $mh{cHash}->{helper}{dlvl};# we only make one attempt
           }
         }
         else{# either level met, timed on or we are driving...
-          delete $shash->{helper}{dlvl};
+          delete $mh{cHash}->{helper}{dlvl};
         }
       }
-      if ($st ne "switch"){
+      if ($mh{st} ne "switch"){
         my $dir = ($err >> 4) & 3;
         my %dirName = ( 0=>"stop" ,1=>"up" ,2=>"down" ,3=>"err" );
-        push @evtEt,[$shash,1,"$eventName:$dirName{$dir}:$vs"  ];
-        $shash->{helper}{dir}{rct} = $shash->{helper}{dir}{cur} 
-                  if($shash->{helper}{dir}{cur} &&
-                     $shash->{helper}{dir}{cur} ne $dirName{$dir});
-        $shash->{helper}{dir}{cur} = $dirName{$dir};
+        push @evtEt,[$mh{cHash},1,"$eventName:$dirName{$dir}:$vs"  ];
+        $mh{cHash}->{helper}{dir}{rct} = $mh{cHash}->{helper}{dir}{cur} 
+                  if($mh{cHash}->{helper}{dir}{cur} &&
+                     $mh{cHash}->{helper}{dir}{cur} ne $dirName{$dir});
+        $mh{cHash}->{helper}{dir}{cur} = $dirName{$dir};
       }
       if (!$rSUpdt){#dont touch if necessary for dimmer
         if(($err&0x70) == 0x10 || ($err&0x70) == 0x20){
-          my $wt = $shash->{helper}{stateUpdatDly}
-                         ?$shash->{helper}{stateUpdatDly}
+          my $wt = $mh{cHash}->{helper}{stateUpdatDly}
+                         ?$mh{cHash}->{helper}{stateUpdatDly}
                          :120;
-          CUL_HM_stateUpdatDly($name,$wt);
+          CUL_HM_stateUpdatDly($mh{cName},$wt);
         }
         else {
-          CUL_HM_unQEntity($name,"qReqStat");
+          CUL_HM_unQEntity($mh{cName},"qReqStat");
         }
-        delete $shash->{helper}{stateUpdatDly};
+        delete $mh{cHash}->{helper}{stateUpdatDly};
       }
  
-      if ($st eq "dimmer"){
-        push @evtEt,[$shash,1,"overload:".(($err&0x02)?"on":"off")];
-        push @evtEt,[$shash,1,"overheat:".(($err&0x04)?"on":"off")];
-        push @evtEt,[$shash,1,"reduced:" .(($err&0x08)?"on":"off")];
+      if ($mh{st} eq "dimmer"){
+        push @evtEt,[$mh{cHash},1,"overload:".(($err&0x02)?"on":"off")];
+        push @evtEt,[$mh{cHash},1,"overheat:".(($err&0x04)?"on":"off")];
+        push @evtEt,[$mh{cHash},1,"reduced:" .(($err&0x08)?"on":"off")];
          #hack for blind  - other then behaved devices blind does not send
          #        a status info for chan 0 at power on
          #        chn3 (virtual chan) and not used up to now
          #        info from it is likely a power on!
-        if($devH->{helper}{PONtest} && $chn eq "03"){
-          push @evtEt,[$devH,1,"powerOn:$tn",] ;
-          $devH->{helper}{PONtest} = 0;
+        if($mh{devH}->{helper}{PONtest} && $mh{chn} == 3){
+          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          $mh{devH}->{helper}{PONtest} = 0;
         }
       }
-      elsif ($md eq "HM-SEC-SFA-SM"){ # && $chn eq "00")
-        my $h = CUL_HM_getDeviceHash($shash);
+      elsif ($mh{md} eq "HM-SEC-SFA-SM"){ 
+        my $h = CUL_HM_getDeviceHash($mh{cHash});
         push @evtEt,[$h,1,"powerError:"   .(($err&0x02) ? "on":"off")];
         push @evtEt,[$h,1,"sabotageError:".(($err&0x04) ? "on":"off")];
         push @evtEt,[$h,1,"battery:".(($err&0x08)?"critical":($err&0x80?"low":"ok"))];
       }
-      elsif ($md =~ m /HM-LC-SW.-BA-PCB/){
-        my $h = CUL_HM_getDeviceHash($shash);
+      elsif ($mh{md} =~ m /HM-LC-SW.-BA-PCB/){
+        my $h = CUL_HM_getDeviceHash($mh{cHash});
         push @evtEt,[$h,1,"battery:" . (($err&0x80) ? "low" : "ok" )];
       }
     }
   }
-  elsif($st =~ m /^(remote|pushButton|swi)$/
-      ||$md eq "HM-SEN-EP") { #################################################
-    if($mTp eq "40") {
-      my ($chn) = map{hex($_)} ($mI[0]);# button/event count 
-      my $bat   = ($chn&0x80)?"low":"ok";
-      my $type  = ($chn & 0x40)?"l":"s";
-      my $state = ($chn & 0x40)?"Long":"Short";
-      $chn = $chn & 0x3f;
-      
-      my $chId = $src.sprintf("%02X",$chn);
-      $shash = $modules{CUL_HM}{defptr}{$chId}
+  elsif($mh{st} =~ m /^(remote|pushButton|swi)$/
+      ||$mh{md} eq "HM-SEN-EP") { #############################################
+    if($mh{mTp} eq "40") { 
+      my $bat   = ($mh{chnraw} & 0x80)?"low":"ok";
+      my $type  = ($mh{chnraw} & 0x40)?"l":"s";
+      my $state = ($mh{chnraw} & 0x40)?"Long":"Short";     
+      my $chId = $mh{src}.$mh{chnHx};
+      $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
-      $name = $shash->{NAME};
+      $name = $mh{shash}->{NAME};
 
-      my $btnName = $shash->{helper}{role}{chn} 
+      my $btnName = $mh{shash}->{helper}{role}{chn} 
                          ? $name
-                         : "Btn$chn";
+                         : "Btn$mh{chn}";
 
       if($type eq "l"){# long press
-        $state .= ($mFlgH & 0x20 ? "Release" : "");
+        $state .= ($mh{mFlgH} & 0x20 ? "Release" : "");
       }
 
-      push @evtEt,[$devH,1,"battery:$bat"];
-      push @evtEt,[$devH,1,"state:$btnName $state"];
-      if($md eq "HM-Dis-WM55"){
-        if ($devH->{cmdStack}){# there are pending commands. we only send new ones
-          delete $devH->{cmdStack};
-          delete $devH->{cmdStacAESPend};
-          delete $devH->{helper}{prt}{rspWait};
-          delete $devH->{helper}{prt}{rspWaitSec};
-          delete $devH->{helper}{prt}{mmcA};
-          delete $devH->{helper}{prt}{mmcS};
-          delete $devH->{lastMsg};
+      push @evtEt,[$mh{devH},1,"battery:$bat"];
+      push @evtEt,[$mh{devH},1,"state:$btnName $state"];
+      if($mh{md} eq "HM-Dis-WM55"){
+        if ($mh{devH}->{cmdStack}){# there are pending commands. we only send new ones
+          delete $mh{devH}->{cmdStack};
+          delete $mh{devH}->{cmdStacAESPend};
+          delete $mh{devH}->{helper}{prt}{rspWait};
+          delete $mh{devH}->{helper}{prt}{rspWaitSec};
+          delete $mh{devH}->{helper}{prt}{mmcA};
+          delete $mh{devH}->{helper}{prt}{mmcS};
+          delete $mh{devH}->{lastMsg};
         }
 
-        CUL_HM_calcDisWm($shash,$devH->{NAME},$type);
+        CUL_HM_calcDisWm($mh{shash},$mh{devH}->{NAME},$type);
         if (AttrVal($btnName,"aesCommReq",0)){
           my @arr = ();
-          $devH->{cmdStacAESPend} = \@arr;
-          push (@{$devH->{cmdStacAESPend} },"$src;++A011$id$src$_")
-                foreach (@{$shash->{helper}{disp}{$type}});
+          $mh{devH}->{cmdStacAESPend} = \@arr;
+          push (@{$mh{devH}->{cmdStacAESPend} },"$mh{src};++A011$mh{id}$mh{src}$_")
+                foreach (@{$mh{shash}->{helper}{disp}{$type}});
        }
         else{
-          CUL_HM_PushCmdStack($devH,"++A011$id$src$_")
-                foreach (@{$shash->{helper}{disp}{$type}});
+          CUL_HM_PushCmdStack($mh{devH},"++A011$mh{id}$mh{src}$_")
+                foreach (@{$mh{shash}->{helper}{disp}{$type}});
         }
       }
     }
     else{# could be an Em8
       my($chn,$cnt,$state,$err);
-      if($mTp eq "41"){
+      if($mh{mTp} eq "41"){
         ($chn,$cnt,$state)=(hex($mI[0]),$mI[1],$mI[2]);
         my $err = $chn & 0x80;
         $chn = sprintf("%02X",$chn & 0x3f);
-        $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                               if($modules{CUL_HM}{defptr}{"$src$chn"});
-        push @evtEt,[$devH,1,"battery:". ($err?"low"  :"ok"  )];
+        $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                               if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+        push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )];
       }
-      elsif(($mTp eq "10" && $mI[0] eq "06") ||
-            ($mTp eq "02" && $mI[0] eq "01")) {
+      elsif(($mh{mTp} eq "10" && $mI[0] eq "06") ||
+            ($mh{mTp} eq "02" && $mI[0] eq "01")) {
         ($chn,$state,$err) = (hex($mI[1]), $mI[2], hex($mI[3]));
         $chn = sprintf("%02X",$chn&0x3f);
-        $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                               if($modules{CUL_HM}{defptr}{"$src$chn"});
-        push @evtEt,[$devH,1,"alive:yes"];
-        push @evtEt,[$devH,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
+        $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                               if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+        push @evtEt,[$mh{devH},1,"alive:yes"];
+        push @evtEt,[$mh{devH},1,"battery:". (($err&0x80)?"low"  :"ok"  )];
       }
       if (defined($state) && $chn ne "00"){# if state was detected post events
         my $txt;
-        if    ($shash->{helper}{lm} && $shash->{helper}{lm}{hex($state)}){$txt = $shash->{helper}{lm}{hex($state)}}
-        elsif ($lvlStr{md}{$md}){$txt = $lvlStr{md}{$md}{$state}}
-        elsif ($lvlStr{st}{$st}){$txt = $lvlStr{st}{$st}{$state}}
+        if    ($mh{shash}->{helper}{lm} && $mh{shash}->{helper}{lm}{hex($state)}){$txt = $mh{shash}->{helper}{lm}{hex($state)}}
+        elsif ($lvlStr{md}{$mh{md}}){$txt = $lvlStr{md}{$mh{md}}{$state}}
+        elsif ($lvlStr{st}{$mh{st}}){$txt = $lvlStr{st}{$mh{st}}{$state}}
         else                    {$txt = "unknown:$state"}
       
-        push @evtEt,[$shash,1,"state:$txt"];
-        push @evtEt,[$shash,1,"contact:$txt$target"];
+        push @evtEt,[$mh{shash},1,"state:$txt"];
+        push @evtEt,[$mh{shash},1,"contact:$txt$target"];
       }
     }
 
   }
-  elsif($st eq "powerSensor") {################################################
-    if (($mTyp eq "0201") ||  # handle Ack_Status
-        ($mTyp eq "1006")) {  #    or Info_Status message here
+  elsif($mh{st} eq "powerSensor") {############################################
+    if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
+        ($mh{mTyp} eq "1006")) {  #    or Info_Status message here
 
       my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
-      my $chId = $src.$chn;
-      $shash = $modules{CUL_HM}{defptr}{$chId}
+      my $chId = $mh{src}.$chn;
+      $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
                              
-      push @evtEt,[$devH,1,"battery:".(($err&0x80)?"low"  :"ok"  )];
+      push @evtEt,[$mh{devH},1,"battery:".(($err&0x80)?"low"  :"ok"  )];
 
-      push @evtEt,[$shash,1,"state:$val"];
+      push @evtEt,[$mh{shash},1,"state:$val"];
     }
-    elsif ($mTp eq "53" ||$mTp eq "54" ) {  #    Gas_EVENT_CYCLIC
-      $shash = $modules{CUL_HM}{defptr}{$src."01"}
-                             if($modules{CUL_HM}{defptr}{$src."01"});
-      my ($eCnt,$P) = map{hex($_)} unpack 'A8A6',$p;
+    elsif ($mh{mTp} eq "53" ||$mh{mTp} eq "54" ) {  #    Gas_EVENT_CYCLIC
+      $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}."01"}
+                             if($modules{CUL_HM}{defptr}{$mh{src}."01"});
+      my ($eCnt,$P) = map{hex($_)} unpack 'A8A6',$mh{p};
       $eCnt = ($eCnt&0x7fffffff)/1000;       #0.0  ..2147483.647 m3
       $P = $P   /1000;                       #0.0  ..16777.215 m3
-      push @evtEt,[$shash,1,"gasCnt:"   .$eCnt];
-      push @evtEt,[$shash,1,"gasPower:"    .$P];    
+      push @evtEt,[$mh{shash},1,"gasCnt:"   .$eCnt];
+      push @evtEt,[$mh{shash},1,"gasPower:"    .$P];    
       my $sumState = "eState:E: $eCnt P: $P";
-      push @evtEt,[$shash,1,$sumState];    
-      push @evtEt,[$shash,1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
-      if($eCnt == 0 && hex($mNo) < 3 ){
-        if($devH->{helper}{PONtest}){
-          push @evtEt,[$devH,1,"powerOn:$tn",] ;
-          $devH->{helper}{PONtest} = 0;
+      push @evtEt,[$mh{shash},1,$sumState];    
+      push @evtEt,[$mh{shash},1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
+      if($eCnt == 0 && hex($mh{mNo}) < 3 ){
+        if($mh{devH}->{helper}{PONtest}){
+          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          $mh{devH}->{helper}{PONtest} = 0;
         }
-        my $eo = ReadingsVal($shash->{NAME},"gasCnt",0)+
-                 ReadingsVal($shash->{NAME},"gasCntOffset",0);
-        push @evtEt,[$shash,1,"gasCntOffset:".$eo];
+        my $eo = ReadingsVal($mh{shash}->{NAME},"gasCnt",0)+
+                 ReadingsVal($mh{shash}->{NAME},"gasCntOffset",0);
+        push @evtEt,[$mh{shash},1,"gasCntOffset:".$eo];
       }
     }
-    elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
-      $shash = $modules{CUL_HM}{defptr}{$src."02"}
-                             if($modules{CUL_HM}{defptr}{$src."02"});
-      my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$p;
+    elsif ($mh{mTp} eq "5E" ||$mh{mTp} eq "5F" ) {  #    POWER_EVENT_CYCLIC
+      $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}."02"}
+                             if($modules{CUL_HM}{defptr}{$mh{src}."02"});
+      my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$mh{p};
       $eCnt = ($eCnt&0x7fffff)/10;          #0.0  ..838860.7  Wh
       $P = $P   /100;                       #0.0  ..167772.15 W
       
-      push @evtEt,[$shash,1,"energy:"   .$eCnt];
-      push @evtEt,[$shash,1,"power:"    .$P];    
+      push @evtEt,[$mh{shash},1,"energy:"   .$eCnt];
+      push @evtEt,[$mh{shash},1,"power:"    .$P];    
 
       my $sumState = "eState:E: $eCnt P: $P";
       if (defined $I){
         $I = $I   /1;                         #0.0  ..65535.0   mA
-        push @evtEt,[$shash,1,"current:"  .$I];   
-        push @evtEt,[$defs{$devH->{channel_04}},1,"state:$I"   ] if ($devH->{channel_04});
+        push @evtEt,[$mh{shash},1,"current:"  .$I];   
+        push @evtEt,[$defs{$mh{devH}->{channel_04}},1,"state:$I"   ] if ($mh{devH}->{channel_04});
         $sumState .= " I: $I";        
       }
       if (defined $U){
         $U = $U   /10;                        #0.0  ..6553.5    mV
-        push @evtEt,[$shash,1,"voltage:"  .$U];    
-        push @evtEt,[$defs{$devH->{channel_05}},1,"state:$U"   ] if ($devH->{channel_05});
+        push @evtEt,[$mh{shash},1,"voltage:"  .$U];    
+        push @evtEt,[$defs{$mh{devH}->{channel_05}},1,"state:$U"   ] if ($mh{devH}->{channel_05});
         $sumState .= " U: $U";        
       }
       if (defined $F){
         $F -= 256 if ($F > 127);
         $F = $F/100+50;                      # 48.72..51.27     Hz
-        push @evtEt,[$shash,1,"frequency:".$F];
-        push @evtEt,[$defs{$devH->{channel_06}},1,"state:$F"   ] if ($devH->{channel_06});
+        push @evtEt,[$mh{shash},1,"frequency:".$F];
+        push @evtEt,[$defs{$mh{devH}->{channel_06}},1,"state:$F"   ] if ($mh{devH}->{channel_06});
         $sumState .= " f: $F";        
       }
       
-      push @evtEt,[$shash,1,$sumState];    
-      push @evtEt,[$shash,1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
+      push @evtEt,[$mh{shash},1,$sumState];    
+      push @evtEt,[$mh{shash},1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
       
-      push @evtEt,[$defs{$devH->{channel_02}},1,"state:$eCnt"] if ($devH->{channel_02});
-      push @evtEt,[$defs{$devH->{channel_03}},1,"state:$P"   ] if ($devH->{channel_03});
+      push @evtEt,[$defs{$mh{devH}->{channel_02}},1,"state:$eCnt"] if ($mh{devH}->{channel_02});
+      push @evtEt,[$defs{$mh{devH}->{channel_03}},1,"state:$P"   ] if ($mh{devH}->{channel_03});
 
-      my $el = ReadingsVal($shash->{NAME},"energy",0);# get Energy last
-      my $eo = ReadingsVal($shash->{NAME},"energyOffset",0);
-      if($eCnt == 0 && hex($mNo) < 3 && !$shash->{helper}{pon}){
-        if($devH->{helper}{PONtest}){
-          push @evtEt,[$devH,1,"powerOn:$tn",] ;
-          $devH->{helper}{PONtest} = 0;
+      my $el = ReadingsVal($mh{shash}->{NAME},"energy",0);# get Energy last
+      my $eo = ReadingsVal($mh{shash}->{NAME},"energyOffset",0);
+      if($eCnt == 0 && hex($mh{mNo}) < 3 && !$mh{shash}->{helper}{pon}){
+        if($mh{devH}->{helper}{PONtest}){
+          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          $mh{devH}->{helper}{PONtest} = 0;
         }
         $eo += $el;
-        push @evtEt,[$shash,1,"energyOffset:".$eo];
-        $shash->{helper}{pon} = 1;# power on is detected - only ssend once
+        push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
+        $mh{shash}->{helper}{pon} = 1;# power on is detected - only ssend once
       }
       elsif($el > 800000 && $el < $eCnt ){# handle overflow
         $eo += 838860.7;
-        push @evtEt,[$shash,1,"energyOffset:".$eo];
+        push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
       }
       else{
-        delete $shash->{helper}{pon};
+        delete $mh{shash}->{helper}{pon};
       }
-      push @evtEt,[$shash,1,"energyCalc:".($eo + $eCnt)];
+      push @evtEt,[$mh{shash},1,"energyCalc:".($eo + $eCnt)];
     }
   }
-  elsif($st eq "powerMeter") {#################################################
-    if (($mTyp eq "0201") ||  # handle Ack_Status
-        ($mTyp eq "1006")) {  #    or Info_Status message here
+  elsif($mh{st} eq "powerMeter") {#############################################
+    if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
+        ($mh{mTyp} eq "1006")) {  #    or Info_Status message here
 
       my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
       $chn = sprintf("%02X",$chn&0x3f);
-      my $chId = $src.$chn;
-      $shash = $modules{CUL_HM}{defptr}{$chId}
+      my $chId = $mh{src}.$chn;
+      $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
       my $vs = ($val==100 ? "on":($val==0 ? "off":"$val %")); # user string...
 
-      push @evtEt,[$shash,1,"level:$val"];
-      push @evtEt,[$shash,1,"pct:$val"]; # duplicate to level - necessary for "slider"
-      push @evtEt,[$shash,1,"deviceMsg:$vs$target"] if($chn ne "00");
-      push @evtEt,[$shash,1,"state:$vs"];
-      push @evtEt,[$shash,1,"timedOn:".(($err&0x40)?"running":"off")];
+      push @evtEt,[$mh{shash},1,"level:$val"];
+      push @evtEt,[$mh{shash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
+      push @evtEt,[$mh{shash},1,"deviceMsg:$vs$target"] if($chn ne "00");
+      push @evtEt,[$mh{shash},1,"state:$vs"];
+      push @evtEt,[$mh{shash},1,"timedOn:".(($err&0x40)?"running":"off")];
     }
-    elsif ($mTp eq "5E" ||$mTp eq "5F" ) {  #    POWER_EVENT_CYCLIC
-      $shash = $modules{CUL_HM}{defptr}{$src."02"}
-                             if($modules{CUL_HM}{defptr}{$src."02"});
-      my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$p;
+    elsif ($mh{mTp} eq "5E" ||$mh{mTp} eq "5F" ) {  #    POWER_EVENT_CYCLIC
+      $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}."02"}
+                             if($modules{CUL_HM}{defptr}{$mh{src}."02"});
+      my ($eCnt,$P,$I,$U,$F) = map{hex($_)} unpack 'A6A6A4A4A2',$mh{p};
       $eCnt = ($eCnt&0x7fffff)/10;          #0.0  ..838860.7  Wh
       $P = $P   /100;                       #0.0  ..167772.15 W
       $I = $I   /1;                         #0.0  ..65535.0   mA
@@ -2226,86 +2224,86 @@ sub CUL_HM_Parse($$) {#########################################################
       $F -= 256 if ($F > 127);
       $F = $F/100+50;                      # 48.72..51.27     Hz
       
-      push @evtEt,[$shash,1,"energy:"   .$eCnt];
-      push @evtEt,[$shash,1,"power:"    .$P];    
-      push @evtEt,[$shash,1,"current:"  .$I];    
-      push @evtEt,[$shash,1,"voltage:"  .$U];    
-      push @evtEt,[$shash,1,"frequency:".$F];
-      push @evtEt,[$shash,1,"eState:E: $eCnt P: $P I: $I U: $U f: $F"];    
-      push @evtEt,[$shash,1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
+      push @evtEt,[$mh{shash},1,"energy:"   .$eCnt];
+      push @evtEt,[$mh{shash},1,"power:"    .$P];    
+      push @evtEt,[$mh{shash},1,"current:"  .$I];    
+      push @evtEt,[$mh{shash},1,"voltage:"  .$U];    
+      push @evtEt,[$mh{shash},1,"frequency:".$F];
+      push @evtEt,[$mh{shash},1,"eState:E: $eCnt P: $P I: $I U: $U f: $F"];    
+      push @evtEt,[$mh{shash},1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
       
-      push @evtEt,[$defs{$devH->{channel_02}},1,"state:$eCnt"] if ($devH->{channel_02});
-      push @evtEt,[$defs{$devH->{channel_03}},1,"state:$P"   ] if ($devH->{channel_03});
-      push @evtEt,[$defs{$devH->{channel_04}},1,"state:$I"   ] if ($devH->{channel_04});
-      push @evtEt,[$defs{$devH->{channel_05}},1,"state:$U"   ] if ($devH->{channel_05});
-      push @evtEt,[$defs{$devH->{channel_06}},1,"state:$F"   ] if ($devH->{channel_06});
+      push @evtEt,[$defs{$mh{devH}->{channel_02}},1,"state:$eCnt"] if ($mh{devH}->{channel_02});
+      push @evtEt,[$defs{$mh{devH}->{channel_03}},1,"state:$P"   ] if ($mh{devH}->{channel_03});
+      push @evtEt,[$defs{$mh{devH}->{channel_04}},1,"state:$I"   ] if ($mh{devH}->{channel_04});
+      push @evtEt,[$defs{$mh{devH}->{channel_05}},1,"state:$U"   ] if ($mh{devH}->{channel_05});
+      push @evtEt,[$defs{$mh{devH}->{channel_06}},1,"state:$F"   ] if ($mh{devH}->{channel_06});
       
-      my $el = ReadingsVal($shash->{NAME},"energy",0);# get Energy last
-      my $eo = ReadingsVal($shash->{NAME},"energyOffset",0);
-      if($eCnt == 0 && hex($mNo) < 3 && !$shash->{helper}{pon}){
-        if($devH->{helper}{PONtest}){
-          push @evtEt,[$devH,1,"powerOn:$tn",] ;
-          $devH->{helper}{PONtest} = 0;
+      my $el = ReadingsVal($mh{shash}->{NAME},"energy",0);# get Energy last
+      my $eo = ReadingsVal($mh{shash}->{NAME},"energyOffset",0);
+      if($eCnt == 0 && hex($mh{mNo}) < 3 && !$mh{shash}->{helper}{pon}){
+        if($mh{devH}->{helper}{PONtest}){
+          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          $mh{devH}->{helper}{PONtest} = 0;
         }
         $eo += $el;
-        push @evtEt,[$shash,1,"energyOffset:".$eo];
-        $shash->{helper}{pon} = 1;# power on is detected - only ssend once
+        push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
+        $mh{shash}->{helper}{pon} = 1;# power on is detected - only ssend once
       }
       elsif($el > 800000 && $el < $eCnt ){# handle overflow
         $eo += 838860.7;
-        push @evtEt,[$shash,1,"energyOffset:".$eo];
+        push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
       }
       else{
-        delete $shash->{helper}{pon};
+        delete $mh{shash}->{helper}{pon};
       }
-      push @evtEt,[$shash,1,"energyCalc:".($eo + $eCnt)];
-      CUL_HM_unQEntity($shash->{NAME},"qReqStat");
+      push @evtEt,[$mh{shash},1,"energyCalc:".($eo + $eCnt)];
+      CUL_HM_unQEntity($mh{shash}->{NAME},"qReqStat");
     }
   }
-  elsif($st eq "repeater"){ ###################################################
-    if (($mTp eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
-        ($mTp eq "10" && $p =~ m/^06/)) {  #or Info_Status message here
-      my ($state,$err) = ($1,hex($2)) if ($p =~ m/^....(..)(..)/);
+  elsif($mh{st} eq "repeater"){ ###############################################
+    if (($mh{mTp} eq "02" && $mh{p} =~ m/^01/) ||  # handle Ack_Status
+        ($mh{mTp} eq "10" && $mh{p} =~ m/^06/)) {  #or Info_Status message here
+      my ($state,$err) = ($1,hex($2)) if ($mh{p} =~ m/^....(..)(..)/);
       # not sure what level are possible
-      push @evtEt,[$shash,1,"state:".($state eq '00'?"ok":"level:".$state)];
-      push @evtEt,[$shash,1,"battery:".   (($err&0x80)?"low"  :"ok"  )];
+      push @evtEt,[$mh{shash},1,"state:".($state eq '00'?"ok":"level:".$state)];
+      push @evtEt,[$mh{shash},1,"battery:".   (($err&0x80)?"low"  :"ok"  )];
       my $flag = ($err>>4) &0x7;
-      push @evtEt,[$shash,1,"flags:".     (($flag)?"none"     :$flag  )];
+      push @evtEt,[$mh{shash},1,"flags:".     (($flag)?"none"     :$flag  )];
     }
   }
-  elsif($st eq "virtual" && $md =~ m/^virtual_/){ #############################
+  elsif($mh{st} eq "virtual" && $mh{md} =~ m/^virtual_/){ #####################
     # possibly add code to count all acks that are paired.
-    if($mTp eq "02") {# this must be a reflection from what we sent, ignore
-      push @evtEt,[$shash,1,""];
+    if($mh{mTp} eq "02") {# this must be a reflection from what we sent, ignore
+      push @evtEt,[$mh{shash},1,""];
     }
-    elsif ($mTp =~ m /^4[01]/){# if channel is SD team we have to act
-      CUL_HM_parseSDteam($mTp,$src,$dst,$p);
+    elsif ($mh{mTp} =~ m /^4[01]/){# if channel is SD team we have to act
+      CUL_HM_parseSDteam($mh{mTp},$mh{src},$mh{dst},$mh{p});
     }
   }
-  elsif($st eq "outputUnit"){ #################################################
-    if($mTp eq "40" && @mI == 2){
+  elsif($mh{st} eq "outputUnit"){ #############################################
+    if($mh{mTp} eq "40" && @mI == 2){
       my ($button, $bno) = (hex($mI[0]), hex($mI[1]));
-      if(!(exists($shash->{BNO})) || $shash->{BNO} ne $bno){
-        $shash->{BNO}=$bno;
-          $shash->{BNOCNT}=1;
+      if(!(exists($mh{shash}->{BNO})) || $mh{shash}->{BNO} ne $bno){
+        $mh{shash}->{BNO}=$bno;
+          $mh{shash}->{BNOCNT}=1;
       }
       else{
-        $shash->{BNOCNT}+=1;
+        $mh{shash}->{BNOCNT}+=1;
       }
       my $btn = int($button&0x3f);
-      push @evtEt,[$shash,1,"state:Btn$btn on$target"];
+      push @evtEt,[$mh{shash},1,"state:Btn$btn on$target"];
     }
-    elsif(($mTp eq "02" && $mI[0] eq "01") ||   # handle Ack_Status
-          ($mTp eq "10" && $mI[0] eq "06")){    #    or Info_Status message
+    elsif(($mh{mTp} eq "02" && $mI[0] eq "01") ||   # handle Ack_Status
+          ($mh{mTp} eq "10" && $mI[0] eq "06")){    #    or Info_Status message
       my ($msgChn,$msgState) = ((hex($mI[1])&0x1f),$mI[2]) if (@mI > 2);
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$msgChn)};
-      $chnHash = $shash if(!$chnHash && $msgChn && $msgChn == 1);
-      if ($md eq "HM-OU-LED16") {
+      my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}.sprintf("%02X",$msgChn)};
+      $chnHash = $mh{devH} if(!$chnHash && $msgChn && $msgChn == 1);
+      if ($mh{md} eq "HM-OU-LED16") {
         #special: all LEDs map to device state
-        my $devState = ReadingsVal($name,"color","00000000");
+        my $devState = ReadingsVal($mh{devN},"color","00000000");
         if($parse eq "powerOn"){# reset LEDs after power on
-          CUL_HM_PushCmdStack($shash,'++A011'.$ioId.$src."8100".$devState);
-          CUL_HM_ProcessCmdStack($shash);
+          CUL_HM_PushCmdStack($mh{shash},'++A011'.$ioId.$mh{src}."8100".$devState);
+          CUL_HM_ProcessCmdStack($mh{shash});
           # no event necessary, all the same as before
         }
         else {# just update datafields in storage
@@ -2316,207 +2314,197 @@ sub CUL_HM_Parse($$) {#########################################################
             my @leds = reverse(unpack('(A2)*',sprintf("%032b",hex($lStat))));
             $_ = $colTbl{$_} foreach (@leds);
             for(my $cCnt = 0;$cCnt<16;$cCnt++){# go for all channels
-              my $cH = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$cCnt+1)};
+              my $cH = $modules{CUL_HM}{defptr}{$mh{src}.sprintf("%02X",$cCnt+1)};
               next if (!$cH);
               if (ReadingsVal($cH->{NAME},"state","") ne $leds[$cCnt]) {
                 push @evtEt,[$cH,1,"color:$leds[$cCnt]"];
                 push @evtEt,[$cH,1,"state:$leds[$cCnt]"];
               }
             }
-            push @evtEt,[$shash,1,"color:$lStat"];
-            push @evtEt,[$shash,1,"state:$lStat"];
+            push @evtEt,[$mh{shash},1,"color:$lStat"];
+            push @evtEt,[$mh{shash},1,"state:$lStat"];
           }
           else{# branch can be removed if message is always that long
             my $bitLoc = ($msgChn-1)*2;#calculate bit location
             my $mask = 3<<$bitLoc;
             my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
-            push @evtEt,[$shash,1,,"color:$value"];
-            push @evtEt,[$shash,1, "state:$value"];
+            push @evtEt,[$mh{shash},1,,"color:$value"];
+            push @evtEt,[$mh{shash},1, "state:$value"];
             if ($chnHash){
-               $shash = $chnHash;
+               $mh{shash} = $chnHash;
                my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
                my $actColor = $colorTable{$msgState};
                $actColor = "unknown" if(!$actColor);
-              push @evtEt,[$shash,1,"color:$actColor"];
-              push @evtEt,[$shash,1,"state:$actColor"];
+              push @evtEt,[$mh{shash},1,"color:$actColor"];
+              push @evtEt,[$mh{shash},1,"state:$actColor"];
             }
            }
         }
       }
-#      elsif ($md eq "HM-OU-CFM-PL"){
+#      elsif ($mh{md} eq "HM-OU-CFM-PL"){
       else{
         if ($chnHash){
-          $shash = $chnHash;
+          $mh{shash} = $chnHash;
           my $val = hex($mI[2])/2;
           $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
-          push @evtEt,[$shash,1,"state:$val"];
+          push @evtEt,[$mh{shash},1,"state:$val"];
         }
       }
     }
   }
-  elsif($st =~ m /^(motionDetector|motionAndBtn)$/) { #########################
+  elsif($mh{st} =~ m /^(motionDetector|motionAndBtn)$/) { #####################
     my $state = $mI[2];
-    if(($mTp eq "10" ||$mTp eq "02") && $p =~ m/^06....../) {
+    if(($mh{mTp} eq "10" ||$mh{mTp} eq "02") && $mh{p} =~ m/^06....../) {
       my ($chn,$err,$bright)=(hex($mI[1]),hex($mI[3]),hex($mI[2]));
-      my $chId = $src.sprintf("%02X",$chn&0x3f);
-      $shash = $modules{CUL_HM}{defptr}{$chId}
+      my $chId = $mh{src}.sprintf("%02X",$chn&0x3f);
+      $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
-      push @evtEt,[$shash,1,"brightness:".$bright];
-      if ($md eq "HM-Sec-MDIR"){
-        push @evtEt,[$shash,1,"sabotageError:".(($err&0x0E)?"on":"off")];
+      push @evtEt,[$mh{shash},1,"brightness:".$bright];
+      if ($mh{md} eq "HM-Sec-MDIR"){
+        push @evtEt,[$mh{shash},1,"sabotageError:".(($err&0x0E)?"on":"off")];
       }
       else{
-        push @evtEt,[$shash,1,"cover:".        (($err&0x0E)?"open" :"closed")];
+        push @evtEt,[$mh{shash},1,"cover:".        (($err&0x0E)?"open" :"closed")];
       }
-      push @evtEt,[$shash,1,"battery:".   (($err&0x80)?"low"  :"ok"  )];
+      push @evtEt,[$mh{shash},1,"battery:".   (($err&0x80)?"low"  :"ok"  )];
     }
-    elsif($mTp eq "41") {#01 is channel
+    elsif($mh{mTp} eq "41") {#01 is channel
       my($chn,$cnt,$bright) = (hex($mI[0]),hex($mI[1]),hex($mI[2]));
       my $nextTr = (@mI >3)? (int((1<<((hex($mI[3])>>4)-1))/1.1)."s")
                            : "-";
-      my $chId = $src.sprintf("%02X",$chn&0x3f);
-      $shash = $modules{CUL_HM}{defptr}{$chId}
+      my $chId = $mh{src}.sprintf("%02X",$chn&0x3f);
+      $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
                              
-      push @evtEt,[$shash,1,"state:motion"];
-      push @evtEt,[$shash,1,"motion:on$target"];
-      push @evtEt,[$shash,1,"motionCount:$cnt"."_next:$nextTr"];
-      push @evtEt,[$shash,1,"brightness:$bright"];
+      push @evtEt,[$mh{shash},1,"state:motion"];
+      push @evtEt,[$mh{shash},1,"motion:on$target"];
+      push @evtEt,[$mh{shash},1,"motionCount:$cnt"."_next:$nextTr"];
+      push @evtEt,[$mh{shash},1,"brightness:$bright"];
     }
-    elsif($mTp eq "70" && $p =~ m/^7F(..)(.*)/) {
+    elsif($mh{mTp} eq "70" && $mh{p} =~ m/^7F(..)(.*)/) {
       my($d1, $d2) = ($1, $2);
-      push @evtEt,[$shash,1,"devState_raw$d1:$d2"];
+      push @evtEt,[$mh{shash},1,"devState_raw$d1:$d2"];
       $state = 0;
     }
 
-    if($ioId eq $dst && $mFlgH&0x20 && $state){
-      push @ack,$shash,$mNo."8002".$ioId.$src."0101${state}00";
+    if($ioId eq $mh{dst} && $mh{mFlgH}&0x20 && $state){
+      push @ack,$mh{shash},$mh{mNo}."8002".$ioId.$mh{src}."0101$mh{state}00";
     }
   }
-  elsif($st eq "smokeDetector") { #############################################
+  elsif($mh{st} eq "smokeDetector") { #########################################
     #Info Level: mTp=0x10 p(..)(..)(..) subtype=06, channel, state (1 byte)
     #Event:      mTp=0x41 p(..)(..)(..) channel   , unknown, state (1 byte)
 
-    if ($mTp eq "10" && $p =~ m/^06..(..)(..)/) {
+    if ($mh{mTp} eq "10" && $mh{p} =~ m/^06..(..)(..)/) {
        # m:A0 A010 233FCE 1743BF 0601 01  00 31
       my ($state,$err) = (hex($1),hex($2));
-      push @evtEt,[$devH ,1,"battery:"     .(($err&0x80)?"low"     :"ok")];
-      push @evtEt,[$shash,1,"level:"  .hex($state)];
+      
+      push @evtEt,[$mh{devH} ,1,"battery:"     .(($err&0x80)?"low"     :"ok")];
+      push @evtEt,[$mh{cHash},1,"level:"  .hex($state)];
       $state = (($state < 2)?"off":"smoke-Alarm");
-      push @evtEt,[$shash,1,"state:$state"];
-      if($devH->{helper}{PONtest} &&(length($p) == 8 && $mNo eq "00")){
-        push @evtEt,[$devH,1,"powerOn:$tn",] ;
-        $devH->{helper}{PONtest} = 0;
+      push @evtEt,[$mh{cHash},1,"state:$state"];
+      if($mh{devH}->{helper}{PONtest} &&(length($mh{p}) == 8 && $mh{mNo} eq "00")){
+        push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+        $mh{devH}->{helper}{PONtest} = 0;
       }
-      if ($md eq "HM-SEC-SD-2"){
-        push @evtEt,[$shash,1,"alarmTest:"   .(($err&0x02)?"failed"  :"ok")];
-        push @evtEt,[$shash,1,"smokeChamber:".(($err&0x04)?"degraded":"ok")];
+      if ($mh{md} eq "HM-SEC-SD-2"){
+        push @evtEt,[$mh{cHash},1,"alarmTest:"   .(($err&0x02)?"failed"  :"ok")];
+        push @evtEt,[$mh{cHash},1,"smokeChamber:".(($err&0x04)?"degraded":"ok")];
       }
-      my $tName = ReadingsVal($name,"peerList","");#inform team
+      my $tName = ReadingsVal($mh{cName},"peerList","");#inform team
       $tName =~ s/,.*//;
-      CUL_HM_updtSDTeam($tName,$name,$state);
+      CUL_HM_updtSDTeam($tName,$mh{cName},$state);
     }
-    elsif ($mTp =~ m /^4[01]/){ #autonomous event
-      CUL_HM_parseSDteam($mTp,$src,$dst,$p);
+    elsif ($mh{mTp} =~ m /^4[01]/){ #autonomous event
+      CUL_HM_parseSDteam($mh{mTp},$mh{src},$mh{dst},$mh{p});
     }
-    elsif ($mTp eq "01"){ #Configs
-      my $sType = substr($p,0,2);
+    elsif ($mh{mTp} eq "01"){ #Configs
+      my $sType = substr($mh{p},0,2);
       if   ($sType eq "01"){# add peer to group
-        push @evtEt,[$shash,1,"SDteam:add_$dname"];
+        push @evtEt,[$mh{shash},1,"SDteam:add_$mh{dstN}"];
       }
       elsif($sType eq "02"){# remove from group
-        push @evtEt,[$shash,1,"SDteam:remove_".$dname];
+        push @evtEt,[$mh{shash},1,"SDteam:remove_".$mh{dstN}];
       }
       elsif($sType eq "05"){# set param List 3 and 4
-        push @evtEt,[$shash,1,""];
+        push @evtEt,[$mh{shash},1,""];
       }
     }
     else{
-      push @evtEt,[$shash,1,"SDunknownMsg:$p"] if(!@evtEt);
+      push @evtEt,[$mh{shash},1,"SDunknownMsg:$mh{p}"] if(!@evtEt);
     }
 
-    if($ioId eq $dst && ($mFlgH&0x20)){  # Send Ack/Nack
-      push @ack,$shash,$mNo."8002".$ioId.$src.($mFlg.$mTp eq "A001" ? "80":"00");
+    if($ioId eq $mh{dst} && ($mh{mFlgH}&0x20)){  # Send Ack/Nack
+      push @ack,$mh{shash},$mh{mNo}."8002".$ioId.$mh{src}.($mh{mFlg}.$mh{mTp} eq "A001" ? "80":"00");
     }
   }
-  elsif($st eq "threeStateSensor") { ##########################################
+  elsif($mh{st} eq "threeStateSensor") { ######################################
     #Event:      mTp=0x41 p(..)(..)(..)     channel   , unknown, state
     #Info Level: mTp=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
     #AckStatus:  mTp=0x02 p(..)(..)(..)(..) subty=01, chn, state,err (3bit)
     my ($chn,$state,$err,$cnt); #define locals
-    if(($mTp eq "10" && $p =~ m/^06/) ||
-       ($mTp eq "02" && $p =~ m/^01/)) {
-      $p =~ m/^..(..)(..)(..)?$/;
+    if(($mh{mTp} eq "10" && $mh{p} =~ m/^06/) ||
+       ($mh{mTp} eq "02" && $mh{p} =~ m/^01/)) {
+      $mh{p} =~ m/^..(..)(..)(..)?$/;
       ($chn,$state,$err) = (hex($1), $2, hex($3));
       $chn = sprintf("%02X",$chn&0x3f);
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
-      push @evtEt,[$devH,1,"alive:yes"];
-      push @evtEt,[$devH,1,"battery:". (($err&0x80)?"low"  :"ok"  )];
-      if (  $md =~ m/^(HM-SEC-SC.*|HM-Sec-RHS|Roto_ZEL-STG-RM-F.K)$/){
-                                 push @evtEt,[$devH,1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
-      elsif($md ne "HM-SEC-WDS"){push @evtEt,[$devH,1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+      push @evtEt,[$mh{devH},1,"alive:yes"];
+      push @evtEt,[$mh{devH},1,"battery:". (($err&0x80)?"low"  :"ok"  )];
+      if (  $mh{md} =~ m/^(HM-SEC-SC.*|HM-Sec-RHS|Roto_ZEL-STG-RM-F.K)$/){
+                                 push @evtEt,[$mh{devH},1,"sabotageError:".(($err&0x0E)?"on"   :"off")];}
+      elsif($mh{md} ne "HM-SEC-WDS"){push @evtEt,[$mh{devH},1,"cover:"        .(($err&0x0E)?"open" :"closed")];}
     }
-    elsif($mTp eq "41"){
-      ($chn,$cnt,$state)=(hex($1),$2,$3) if($p =~ m/^(..)(..)(..)/);
+    elsif($mh{mTp} eq "41"){
+      ($chn,$cnt,$state)=(hex($1),$2,$3) if($mh{p} =~ m/^(..)(..)(..)/);
       my $err = $chn & 0x80;
       $chn = sprintf("%02X",$chn & 0x3f);
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
-      push @evtEt,[$devH,1,"battery:". ($err?"low"  :"ok"  )];
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
+      push @evtEt,[$mh{devH},1,"battery:". ($err?"low"  :"ok"  )];
     }
     if (defined($state)){# if state was detected post events
       my $txt;
-      if    ($shash->{helper}{lm} && $shash->{helper}{lm}{hex($state)}){$txt = $shash->{helper}{lm}{hex($state)}}
-      elsif ($lvlStr{md}{$md}){$txt = $lvlStr{md}{$md}{$state}}
-      elsif ($lvlStr{st}{$st}){$txt = $lvlStr{st}{$st}{$state}}
+      if    ($mh{shash}->{helper}{lm} && $mh{shash}->{helper}{lm}{hex($state)}){$txt = $mh{shash}->{helper}{lm}{hex($state)}}
+      elsif ($lvlStr{md}{$mh{md}}){$txt = $lvlStr{md}{$mh{md}}{$state}}
+      elsif ($lvlStr{st}{$mh{st}}){$txt = $lvlStr{st}{$mh{st}}{$state}}
       else                    {$txt = "unknown:$state"}
 
-      push @evtEt,[$shash,1,"state:$txt"];
-      push @evtEt,[$shash,1,"contact:$txt$target"];
+      push @evtEt,[$mh{shash},1,"state:$txt"];
+      push @evtEt,[$mh{shash},1,"contact:$txt$target"];
     }
-    elsif(!@evtEt){push @evtEt,[$devH,1,"3SSunknownMsg:$p"];}
+    elsif(!@evtEt){push @evtEt,[$mh{devH},1,"3SSunknownMsg:$mh{p}"];}
   }
-  elsif($st eq "winMatic") {  #################################################
+  elsif($mh{st} eq "winMatic") {  #############################################
     my($sType,$chn,$lvl,$stat) = @mI;
-    if(($mTp eq "10" && $sType eq "06") ||
-       ($mTp eq "02" && $sType eq "01")){
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
+    if(($mh{mTp} eq "10" && $sType eq "06") ||
+       ($mh{mTp} eq "02" && $sType eq "01")){
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
       # stateflag meaning unknown
-      push @evtEt,[$shash,1,"state:".(($lvl eq "FF")?"locked":((hex($lvl)/2)))];
+      push @evtEt,[$mh{shash},1,"state:".(($lvl eq "FF")?"locked":((hex($lvl)/2)))];
       if ($chn eq "01"){
         my %err = (0=>"ok",1=>"TurnError",2=>"TiltError");
         my %dir = (0=>"no",1=>"up",2=>"down",3=>"undefined");
-        push @evtEt,[$shash,1,"motorErr:"  .$err{(hex($stat)>>1)&0x03}];
-        push @evtEt,[$shash,1,"direction:" .$dir{(hex($stat)>>4)&0x03}];
+        push @evtEt,[$mh{shash},1,"motorErr:"  .$err{(hex($stat)>>1)&0x03}];
+        push @evtEt,[$mh{shash},1,"direction:" .$dir{(hex($stat)>>4)&0x03}];
       }
       else{ #should be akku
         my %statF = (0=>"trickleCharge",1=>"charge",2=>"dischange",3=>"unknown");
-        push @evtEt,[$shash,1,"charge:".$statF{(hex($stat)>>4)&0x03}];
+        push @evtEt,[$mh{shash},1,"charge:".$statF{(hex($stat)>>4)&0x03}];
       }
     }
-#    if ($p =~ m/^0287(..)89(..)8B(..)/) {
-#      my ($air, $course) = ($1, $3);
-#      push @evtEt,[$shash,1,"airing:".($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air))];
-#      push @evtEt,[$shash,1,"course:".($course eq "FF" ? "tilt" : "close")];
-#    }
-#    elsif($p =~ m/^0201(..)03(..)04(..)05(..)07(..)09(..)0B(..)0D(..)/) {
-#      my ($flg1, $flg2, $flg3, $flg4, $flg5, $flg6, $flg7, $flg8) =
-#         ($1, $2, $3, $4, $5, $6, $7, $8);
-#      push @evtEt,[$shash,1,"airing:".($flg5 eq "FF" ? "inactiv" : CUL_HM_decodeTime8($flg5))];
-#      push @evtEt,[$shash,1,"contact:tesed"];
-#    }
   }
-  elsif($st eq "keyMatic") {  #################################################
+  elsif($mh{st} eq "keyMatic") {  #############################################
     #Info Level: mTp=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
     #AckStatus:  mTp=0x02 p(..)(..)(..)(..) subty=01, chn, state,err (3bit)
 
-    if(($mTyp eq "1006") ||
-       ($mTyp eq "0201")) {
+    if(($mh{mTyp} eq "1006") ||
+       ($mh{mTyp} eq "0201")) {
       my ($chn,$val, $err) = ($mI[1],hex($mI[2]), hex($mI[3]));
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"}
-                             if($modules{CUL_HM}{defptr}{"$src$chn"});
+      $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"}
+                             if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
 
       my $stErr = ($err >>1) & 0x7;
       my $error = 'unknown_'.$stErr;
@@ -2525,28 +2513,28 @@ sub CUL_HM_Parse($$) {#########################################################
       $error = 'none'           if ($stErr == 0);
       my %dir = (0=>"none",1=>"up",2=>"down",3=>"undef");
       my $state = "";
-      RemoveInternalTimer ($name."uncertain:permanent");
-      CUL_HM_unQEntity($name,"qReqStat");
+      RemoveInternalTimer ($mh{devN}."uncertain:permanent");
+      CUL_HM_unQEntity($mh{devN},"qReqStat");
       if ($err & 0x30) { # uncertain - we have to check
-        CUL_HM_stateUpdatDly($name,13) if(ReadingsVal($name,"uncertain","no") eq "no");
-        InternalTimer(gettimeofday()+20,"CUL_HM_readValIfTO", $name.":uncertain:permanent", 0);
+        CUL_HM_stateUpdatDly($mh{devN},13) if(ReadingsVal($mh{devN},"uncertain","no") eq "no");
+        InternalTimer(gettimeofday()+20,"CUL_HM_readValIfTO", $mh{devN}.":uncertain:permanent", 0);
         $state = " (uncertain)";
       }
-      push @evtEt,[$shash,1,"unknown:40"] if($err&0x40);
-      push @evtEt,[$shash,1,"battery:"   .(($err&0x80) ? "low":"ok")];
-      push @evtEt,[$shash,1,"uncertain:" .(($err&0x30) ? "yes":"no")];
-      push @evtEt,[$shash,1,"direction:" .$dir{($err>>4)&3}];
-      push @evtEt,[$shash,1,"error:" .    ($error)];
-      push @evtEt,[$shash,1,"lock:"  .   (($val == 1) ? "unlocked" : "locked")];
-      push @evtEt,[$shash,1,"state:" .   (($val == 1) ? "unlocked" : "locked") . $state];
+      push @evtEt,[$mh{shash},1,"unknown:40"] if($err&0x40);
+      push @evtEt,[$mh{shash},1,"battery:"   .(($err&0x80) ? "low":"ok")];
+      push @evtEt,[$mh{shash},1,"uncertain:" .(($err&0x30) ? "yes":"no")];
+      push @evtEt,[$mh{shash},1,"direction:" .$dir{($err>>4)&3}];
+      push @evtEt,[$mh{shash},1,"error:" .    ($error)];
+      push @evtEt,[$mh{shash},1,"lock:"  .   (($val == 1) ? "unlocked" : "locked")];
+      push @evtEt,[$mh{shash},1,"state:" .   (($val == 1) ? "unlocked" : "locked") . $state];
     }
   }
-  elsif($md eq "CCU-FHEM") {  #################################################
-    push @evtEt,[$shash,1,""];
+  elsif($mh{md} eq "CCU-FHEM") {  #############################################
+    push @evtEt,[$mh{shash},1,""];
   }
-  elsif (eval "defined(&CUL_HM_Parse$st)"){####################################
+  elsif (eval "defined(&CUL_HM_Parse$mh{st})"){################################
     no strict "refs";
-    my @ret = &{"CUL_HM_Parse$st"}($mFlg,$mTp,$src,$dst,$p,$target);
+    my @ret = &{"CUL_HM_Parse$mh{st}"}($mh{mFlg},$mh{mTp},$mh{src},$mh{dst},$mh{p},$target);
     use strict "refs";
     push @evtEt,@ret;
   }
@@ -2556,14 +2544,14 @@ sub CUL_HM_Parse($$) {#########################################################
 
   #------------ parse if FHEM or virtual actor is destination   ---------------
 
-  if(   AttrVal($dname, "subType", "none") eq "virtual"
-     && AttrVal($dname, "model", "none") =~ m/^virtual_/){# see if need for answer
+  if(   AttrVal($mh{dstN}, "subType", "none") eq "virtual"
+     && AttrVal($mh{dstN}, "model", "none") =~ m/^virtual_/){# see if need for answer
     my $sendAck = 0;
-    if($mTp =~ m/^4/ && @mI > 1) { #Push Button event
+    if($mh{mTp} =~ m/^4/ && @mI > 1) { #Push Button event
       my ($recChn,$trigNo) = (hex($mI[0]),hex($mI[1]));# button number/event count
       my $longPress = ($recChn & 0x40)?"long":"short";
-      my $recId = $src.sprintf("%02X",($recChn&0x3f));
-      foreach my $dChId (CUL_HM_getAssChnIds($dname)){# need to check all chan
+      my $recId = $mh{src}.sprintf("%02X",($recChn&0x3f));
+      foreach my $dChId (CUL_HM_getAssChnIds($mh{dstN})){# need to check all chan
         next if (!$modules{CUL_HM}{defptr}{$dChId});
         my $dChNo = substr($dChId,6,2);
         my $dChName = CUL_HM_id2Name($dChId);
@@ -2583,10 +2571,10 @@ sub CUL_HM_Parse($$) {#########################################################
             $stAck = '01'.$dChNo.(($stT eq "ON")?"C8":"00")."00"
           }
           
-          if ($mFlgH & 0x20){
+          if ($mh{mFlgH} & 0x20){
             $longPress .= "_Release";
             $dChHash->{helper}{trgLgRpt}=0;
-            push @ack,$shash,$mNo."8002".$dst.$src.$stAck;
+            push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}.$stAck;
           }
           push @evtEt,[$dChHash,1,"state:$stT"];
           push @evtEt,[$dChHash,1,"virtActState:$stT"];
@@ -2597,190 +2585,158 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
     }
-    elsif($mTp eq "58" && $p =~ m/^(..)(..)/) {# climate event
+    elsif($mh{mTp} eq "58" && $mh{p} =~ m/^(..)(..)/) {# climate event
       my ($d1,$vp) =($1,hex($2)); # adjust_command[0..4] adj_data[0..250]
       $vp = int($vp/2.56+0.5);    # valve position in %
-      my $chnHash = $modules{CUL_HM}{defptr}{$dst."01"};
-      $chnHash = $dstH if (!$chnHash);
+      my $chnHash = $modules{CUL_HM}{defptr}{$mh{dst}."01"};
+      $chnHash = $mh{dstH} if (!$chnHash);
       push @evtEt,[$chnHash,1,"ValvePosition:$vp %"];
       push @evtEt,[$chnHash,1,"ValveAdjCmd:".$d1];
-      push @ack,$chnHash,$mNo."8002".$dst.$src.'0101'.
+      push @ack,$chnHash,$mh{mNo}."8002".$mh{dst}.$mh{src}.'0101'.
                          sprintf("%02X",$vp*2)."0000";
     }
-    elsif($mTp eq "02"){
-      if ($dstH->{helper}{prt}{rspWait}{mNo}             &&
-          $dstH->{helper}{prt}{rspWait}{mNo} eq $mNo ){
+    elsif($mh{mTp} eq "02"){
+      if ($mh{dstH}->{helper}{prt}{rspWait}{mNo}             &&
+          $mh{dstH}->{helper}{prt}{rspWait}{mNo} eq $mh{mNo} ){
         #ack we waited for - stop Waiting
-        CUL_HM_respPendRm($dstH);
+        CUL_HM_respPendRm($mh{dstH});
       }
     }
     else{
       $sendAck = 1;
     }
-    push @ack,$dstH,$mNo."8002".$dst.$src."00" if ($mFlgH & 0x20 && (!@ack) && $sendAck);
+    push @ack,$mh{dstH},$mh{mNo}."8002".$mh{dst}.$mh{src}."00" if ($mh{mFlgH} & 0x20 && (!@ack) && $sendAck);
   }
-  elsif($ioId eq $dst){# if fhem is destination check if we need to react
-    if($mTp =~ m/^4./ &&  #Push Button event
-       ($mFlgH & 0x20)){  #response required Flag
+  elsif($ioId eq $mh{dst}){# if fhem is destination check if we need to react
+    if($mh{mTp} =~ m/^4./ &&  #Push Button event
+       ($mh{mFlgH} & 0x20)){  #response required Flag
                 # fhem CUL shall ack a button press
-      if ($md =~ m/^(HM-SEC-SC.*|Roto_ZEL-STG-RM-FFK)$/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
-        push @ack,$shash,$mNo."8002".$dst.$src."0101".((hex($mI[0])&1)?"C8":"00")."00";
+      if ($mh{md} =~ m/^(HM-SEC-SC.*|Roto_ZEL-STG-RM-FFK)$/){# SCs - depending on FW version - do not accept ACK only. Especially if peered
+        push @ack,$mh{shash},$mh{mNo}."8002".$mh{dst}.$mh{src}."0101".((hex($mI[0])&1)?"C8":"00")."00";
       }
       else{
-        push @ack,$shash,$mNo."8002$dst$src"."00";
+        push @ack,$mh{shash},$mh{mNo}."8002$mh{dst}$mh{src}"."00";
       }
-      Log3 $name,5,"CUL_HM $name prep ACK for $mI[0]";
+      Log3 $mh{devN},5,"CUL_HM $mh{devN} prep ACK for $mI[0]";
     }
   }
 
   #------------ send default ACK if not applicable------------------
   #    ack if we are destination, anyone did accept the message (@evtEt)
   #        parser did not supress
-  push @ack,$shash, $mNo."8002".$ioId.$src."00"
-      if(   ($ioId eq $dst)   #are we adressee
-         && ($mFlgH & 0x20)   #response required Flag
+  push @ack,$mh{shash}, $mh{mNo}."8002".$ioId.$mh{src}."00"
+      if(   ($ioId eq $mh{dst})   #are we adressee
+         && ($mh{mFlgH} & 0x20)   #response required Flag
          && @evtEt            #only ack if we identified it
          && (!@ack)           #sender requested ACK
          );
 
-#  #----------Generate AES challenge for device (CUL)---------
-#  if (   $devH->{IODev}->{TYPE} eq "CUL" 
-#      && $cryptFunc == 1 
-#      && $ioId eq $dst
-#      && AttrVal($name,"aesCommReq",0) 
-#      && $mTp !~ m/^0[23]/ 
-#      && $mTyp ne "1001" ) {
-#
-#    my ($kNo, %keys) = CUL_HM_getKeys($devH);
-#    $kNo = AttrVal($dname,"aesKey",$kNo);
-#    if (defined($keys{$kNo})) {
-#      my $challenge = sprintf("%08X%04X",rand(0xffffffff), rand(0xffff));
-#
-#      Log3 $shash,4,"CUL_HM $name requesting signature with challenge $challenge for key $kNo";
-#
-#      @{$devH->{helper}{aesCommRq}{acksPend}} = @ack if (@ack);
-#      $devH->{helper}{aesCommRq}{msg} = $msg;
-#      $devH->{helper}{aesCommRq}{challenge} = $challenge;
-#      $devH->{helper}{aesCommRq}{kNo} = $kNo;
-#      $devH->{helper}{aesCommRq}{rr} = $respRemoved;
-#      $devH->{helper}{aesCommRq}{rspWait}{$_} = $devH->{helper}{prt}{rspWait}{$_}
-#            foreach (keys%{$devH->{helper}{prt}{rspWait}});
-#
-#      @ack = ($devH,"${mNo}A002${ioId}${src}04${challenge}".sprintf("%02X", $kNo*2));
-#      $respRemoved = 0;
-#    } 
-#    else {
-#      $devH->{helper}{aesCommRq}{msg} = "";
-#      Log3 $shash,1,"CUL_HM ".$shash->{NAME}." required key ${kNo} not defined in VCCU!";
-#    }
-#  }
-
   if (@ack) {# send acks and store for repeat
-    $devH->{helper}{rpt}{IO}  = $ioName;
-    $devH->{helper}{rpt}{flg} = substr($msg,5,1);
-    $devH->{helper}{rpt}{ack} = \@ack;
-    $devH->{helper}{rpt}{ts}  = gettimeofday();
+    $mh{devH}->{helper}{rpt}{IO}  = $mh{ioName};
+    $mh{devH}->{helper}{rpt}{flg} = substr($mh{msg},5,1);
+    $mh{devH}->{helper}{rpt}{ack} = \@ack;
+    $mh{devH}->{helper}{rpt}{ts}  = gettimeofday();
     my $i=0;
     my $rr = $respRemoved;
     CUL_HM_SndCmd($ack[$i++],$ack[$i++]
-                              .($devH->{helper}{aesAuthBytes}
-                                       ?$devH->{helper}{aesAuthBytes}
+                              .($mh{devH}->{helper}{aesAuthBytes}
+                                       ?$mh{devH}->{helper}{aesAuthBytes}
                                        :"")
                   )while ($i<@ack);
     $respRemoved = $rr;
-    Log3 $name,5,"CUL_HM $name sent ACK:".(int(@ack));
-    delete($devH->{helper}{aesAuthBytes});
+    Log3 $mh{devN},5,"CUL_HM $mh{devN} sent ACK:".(int(@ack));
+    delete($mh{devH}->{helper}{aesAuthBytes});
   }
-  CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont if complete
-  CUL_HM_sndIfOpen("x:".$ioName);
+  CUL_HM_ProcessCmdStack($mh{devH}) if ($respRemoved); # cont if complete
+  CUL_HM_sndIfOpen("x:".$mh{ioName});
   
   #------------ process events ------------------
-  push @evtEt,[$shash,1,"noReceiver:src:$src ".$mFlg.$mTp." $p"] 
+  push @evtEt,[$mh{devH},1,"noReceiver:src:$mh{src} ".$mh{mFlg}.$mh{mTp}." $mh{p}"] 
         if(!@entities && !@evtEt);
   push @entities,CUL_HM_pushEvnts();
-  @entities = CUL_HM_noDup(@entities,$shash->{NAME});
-  $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$devH->{NAME}$/,@entities);
+  @entities = CUL_HM_noDup(@entities,$mh{devN});
+  $defs{$_}{".noDispatchVars"} = 1 foreach (grep !/^$mh{devN}$/,@entities);
   return @entities;
 }
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independent
-  my ($ioHash,$mNo,$mFlg,$mTp,$src,$dst,$p,$st,$md,$dname) = @_;
-  my $shash = $modules{CUL_HM}{defptr}{$src};
-  my $dstH = $modules{CUL_HM}{defptr}{$dst} if (defined $modules{CUL_HM}{defptr}{$dst});
-  return "" if(!$shash->{DEF});# this should be from ourself
+  my ($ioHash,$mhp) = @_;
+  
+  my ($p) =$mhp->{p};
+     
+  return "" if(!$mhp->{shash}{DEF});# this should be from ourself
   my $ret = "";
-  my $rspWait = $shash->{helper}{prt}{rspWait};
+  my $rspWait = $mhp->{shash}{helper}{prt}{rspWait};
   my $pendType = $rspWait->{Pending} ? $rspWait->{Pending} : "";
   #------------ parse message flag for start processing command Stack
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202
   #                  9610
-  my $rxt = CUL_HM_getRxType($shash);
-  my $mFlgH = hex($mFlg);
+  my $rxt = CUL_HM_getRxType($mhp->{shash});
   if($rxt & 0x08){ #wakeup device
-    if(($mFlgH & 0xA2) == 0x82){ #wakeup signal
-      CUL_HM_appFromQ($shash->{NAME},"wu");# stack cmds if waiting
-      if ($shash->{cmdStack}){
-        CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IoId($shash).$src);
-        CUL_HM_ProcessCmdStack($shash);
+    if(($mhp->{mFlgH} & 0xA2) == 0x82){ #wakeup signal
+      CUL_HM_appFromQ($mhp->{devN},"wu");# stack cmds if waiting
+      if ($mhp->{devH}{cmdStack}){
+        CUL_HM_SndCmd($mhp->{devH}, '++A112'.CUL_HM_IoId($mhp->{devH}).$mhp->{src});
+        CUL_HM_ProcessCmdStack($mhp->{devH});
       }
     }
-    elsif($shash->{helper}{prt}{sProc} != 1){ # no wakeup signal, 
+    elsif($mhp->{devH}{helper}{prt}{sProc} != 1){ # no wakeup signal, 
       # this is an autonom message send ACK but dont process further
-      $shash->{helper}{prt}{sleeping} = 1 if($mFlgH & 0x20) ;
+      $mhp->{devH}{helper}{prt}{sleeping} = 1 if($mhp->{mFlgH} & 0x20) ;
     }
   }
-  if($rxt & 0x10 && $shash->{helper}{prt}{sleeping}){ # lazy config
-    if($mFlgH & 0x02                  #wakeup device
-       && $defs{$shash->{IODev}{NAME}}{TYPE} eq "HMLAN"){
-      $shash->{helper}{io}{newCh} = 1 if ($shash->{helper}{prt}{sProc} == 2);
-      CUL_HM_appFromQ($shash->{NAME},"cf");# stack cmds if waiting
-      $shash->{helper}{prt}{sleeping} = 0;
-      CUL_HM_ProcessCmdStack($shash);
+  if($rxt & 0x10 && $mhp->{devH}{helper}{prt}{sleeping}){ # lazy config
+    if($mhp->{mFlgH} & 0x02                  #wakeup device
+       && $defs{$mhp->{devH}{IODev}{NAME}}{TYPE} eq "HMLAN"){
+      $mhp->{devH}{helper}{io}{newCh} = 1 if ($mhp->{devH}{helper}{prt}{sProc} == 2);
+      CUL_HM_appFromQ($mhp->{devN},"cf");# stack cmds if waiting
+      $mhp->{devH}{helper}{prt}{sleeping} = 0;
+      CUL_HM_ProcessCmdStack($mhp->{devH});
     }
     else{
-      $shash->{helper}{prt}{sleeping} = 1;
+      $mhp->{devH}{helper}{prt}{sleeping} = 1;
     }
   }  
   
-  $shash->{helper}{PONtest} = 1 if($mNo eq "00");
+  $mhp->{devH}{helper}{PONtest} = 1 if($mhp->{mNo} eq "00");
   my $repeat;
-  if   ($mTp eq "02"){# Ack/Nack/aesReq ####################
-    my $subType = substr($p,0,2);
+  if   ($mhp->{mTp} eq "02"){# Ack/Nack/aesReq ####################
+    my $subType = substr($mhp->{p},0,2);
     my $reply;
     my $success;
 
-    if ($shash->{helper}{prt}{rspWait}{brstWu}){
-      if ($shash->{helper}{prt}{rspWait}{mNo} eq $mNo &&
+    if ($mhp->{devH}{helper}{prt}{rspWait}{brstWu}){
+      if ($mhp->{devH}{helper}{prt}{rspWait}{mNo} eq $mhp->{mNo} &&
           $subType eq "00"){
-        if ($shash->{helper}{prt}{awake} && $shash->{helper}{prt}{awake}==4){#re-burstWakeup
-          delete $shash->{helper}{prt}{rspWait};#clear burst-wakeup values
-          $shash->{helper}{prt}{rspWait}{$_} = $shash->{helper}{prt}{rspWaitSec}{$_}
-                  foreach (keys%{$shash->{helper}{prt}{rspWaitSec}});   #back to original message
-          delete $shash->{helper}{prt}{rspWaitSec};
-          IOWrite($shash, "", $shash->{helper}{prt}{rspWait}{cmd});     # and send
-          CUL_HM_statCnt($shash->{IODev}{NAME},"s");
+        if ($mhp->{devH}{helper}{prt}{awake} && $mhp->{devH}{helper}{prt}{awake}==4){#re-burstWakeup
+          delete $mhp->{devH}{helper}{prt}{rspWait};#clear burst-wakeup values
+          $mhp->{devH}{helper}{prt}{rspWait}{$_} = $mhp->{devH}{helper}{prt}{rspWaitSec}{$_}
+                  foreach (keys%{$mhp->{devH}{helper}{prt}{rspWaitSec}});   #back to original message
+          delete $mhp->{devH}{helper}{prt}{rspWaitSec};
+          IOWrite($mhp->{devH}, "", $mhp->{devH}{helper}{prt}{rspWait}{cmd});     # and send
+          CUL_HM_statCnt($mhp->{devH}{IODev}{NAME},"s");
           #General set timer
           return "done";
         }
-        $shash->{protCondBurst} = "on" if (   $shash->{protCondBurst}
-                                           && $shash->{protCondBurst} !~ m/forced/);
-        $shash->{helper}{prt}{awake}=2;#awake
+        $mhp->{devH}{protCondBurst} = "on" if (   $mhp->{devH}{protCondBurst}
+                                               && $mhp->{devH}{protCondBurst} !~ m/forced/);
+        $mhp->{devH}{helper}{prt}{awake}=2;#awake
       }
       else{
-        $shash->{protCondBurst} = "off" if ($shash->{protCondBurst} !~ m/forced/);
-        $shash->{helper}{prt}{awake}=3;#reject
+        $mhp->{devH}{protCondBurst} = "off" if ($mhp->{devH}{protCondBurst} !~ m/forced/);
+        $mhp->{devH}{helper}{prt}{awake}=3;#reject
         return "done";
       }
     }
-    if (defined($shash->{helper}{AESreqAck})) {
-      if ($shash->{helper}{AESreqAck} eq substr($p, -1 * length($shash->{helper}{AESreqAck}))) {
-        push @evtEt,[$shash,1,"aesCommToDev:ok"];
+    if (defined($mhp->{devH}{helper}{AESreqAck})) {
+      if ($mhp->{devH}{helper}{AESreqAck} eq substr($mhp->{p}, -1 * length($mhp->{devH}{helper}{AESreqAck}))) {
+        push @evtEt,[$mhp->{devH},1,"aesCommToDev:ok"];
       } 
       else {
-        push @evtEt,[$shash,1,"aesCommToDev:fail"];
+        push @evtEt,[$mhp->{devH},1,"aesCommToDev:fail"];
       }
-      delete $shash->{helper}{AESreqAck};
+      delete $mhp->{devH}{helper}{AESreqAck};
     }
 
     if   ($subType =~ m/^8/){#NACK
@@ -2788,27 +2744,27 @@ sub CUL_HM_parseCommon(@){#####################################################
       #84 : request undefined register
       #85 : peer not accepted - why? unknown
       $success = "no";
-      CUL_HM_eventP($shash,"Nack");
+      CUL_HM_eventP($mhp->{devH},"Nack");
       $reply = "NACK";
     }
     elsif($subType eq "01"){ #ACKinfo#################
       $success = "yes";
-      my (undef,$chn,undef,undef,$rssi) = unpack '(A2)*',$p;
-      my $chnHash = CUL_HM_id2Hash($src.$chn);
+      my (undef,$chn,undef,undef,$rssi) = unpack '(A2)*',$mhp->{p};
+      my $chnHash = CUL_HM_id2Hash($mhp->{src}.$chn);
       push @evtEt,[$chnHash,0,"recentStateType:ack"];
-      CUL_HM_storeRssi( $shash->{NAME}
-                       ,($dstH?$dstH->{NAME}:$shash->{IODev}{NAME})
+      CUL_HM_storeRssi( $mhp->{devH}{NAME}
+                       ,($mhp->{dstH}?$mhp->{dstH}{NAME}:$mhp->{devH}{IODev}{NAME})
                        ,(-1)*(hex($rssi))
-                       ,$mNo)
+                       ,$mhp->{mNo})
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       $reply = "ACKStatus";
-      if ($shash->{helper}{tmdOn}){
-        if ((not hex(substr($p,6,2))&0x40) && # not timedOn, we have to repeat
-            $shash->{helper}{tmdOn} eq substr($p,2,2) ){# virtual channels for dimmer may be incorrect
-          my ($pre,$nbr,$msg) = unpack 'A4A2A*',$shash->{helper}{prt}{rspWait}{cmd};
-          $shash->{helper}{prt}{rspWait}{cmd} = sprintf("%s%02X%s",
+      if ($mhp->{devH}{helper}{tmdOn}){
+        if ((not hex(substr($mhp->{p},6,2))&0x40) && # not timedOn, we have to repeat
+            $mhp->{devH}{helper}{tmdOn} eq substr($mhp->{p},2,2) ){# virtual channels for dimmer may be incorrect
+          my ($pre,$nbr,$msg) = unpack 'A4A2A*',$mhp->{devH}{helper}{prt}{rspWait}{cmd};
+          $mhp->{devH}{helper}{prt}{rspWait}{cmd} = sprintf("%s%02X%s",
                                                     $pre,hex($nbr)+1,$msg);
-          CUL_HM_eventP($shash,"TimedOn");
+          CUL_HM_eventP($mhp->{devH},"TimedOn");
           $success = "no";
           $repeat = 1;
           $reply = "NACK";
@@ -2816,42 +2772,42 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
     elsif($subType eq "04"){ #ACK-AES, ###############
-      my (undef,$challenge,$aesKeyNbr) = unpack'A2A12A2',$p;
-      push @evtEt,[$shash,1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);# if   ($msgStat =~ m/AESKey/)
+      my (undef,$challenge,$aesKeyNbr) = unpack'A2A12A2',$mhp->{p};
+      push @evtEt,[$mhp->{devH},1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);# if   ($mh{msgStat} =~ m/AESKey/)
 
-      if ($shash->{IODev}->{TYPE} eq "CUL" &&    #IO is CUL
+      if ($mhp->{devH}{IODev}->{TYPE} eq "CUL" &&    #IO is CUL
           defined($aesKeyNbr)) {
         if ($cryptFunc == 1 &&                    #AES is available
-	    $shash->{helper}{prt}{rspWait}{cmd}){ #There is a previously executed command
-          my (undef, %keys) = CUL_HM_getKeys($shash);
+	    $mhp->{devH}{helper}{prt}{rspWait}{cmd}){ #There is a previously executed command
+          my (undef, %keys) = CUL_HM_getKeys($mhp->{devH});
         
           my $kNo = hex($aesKeyNbr) / 2;
-          Log3 $shash,5,"CUL_HM $shash->{NAME} signing request for $shash->{helper}{prt}{rspWait}{cmd} challenge: "
+          Log3 $mhp->{devH},5,"CUL_HM $mhp->{devN} signing request for $mhp->{devH}{helper}{prt}{rspWait}{cmd} challenge: "
                         .$challenge." kNo: ".$kNo;
         
           if (!defined($keys{$kNo})) {
-            Log3 $shash,1,"CUL_HM $shash->{NAME} unknown key for index $kNo, define it in the VCCU!";
+            Log3 $mhp->{devH},1,"CUL_HM $mhp->{devN} unknown key for index $kNo, define it in the VCCU!";
             $reply = "done";
           } 
           else {
             my $key = $keys{$kNo} ^ pack("H12", $challenge);
             my $cipher = Crypt::Rijndael->new($key, Crypt::Rijndael::MODE_ECB());
             my($s,$us) = gettimeofday();
-            my $respRaw = pack("NnH20", $s, $us, substr($shash->{helper}{prt}{rspWait}{cmd}, 4, 20));
+            my $respRaw = pack("NnH20", $s, $us, substr($mhp->{devH}{helper}{prt}{rspWait}{cmd}, 4, 20));
             my $response = $cipher->encrypt($respRaw);
-            $shash->{helper}{AESreqAck} = uc(unpack("H*", substr($response,0,4)));
-            Log3 $shash,5,"CUL_HM $shash->{NAME} signing response: ".unpack("H*", $respRaw)
-                           ." should send $shash->{helper}{AESreqAck} to authenticate";
-            $response = $response ^ pack("H*", substr($shash->{helper}{prt}{rspWait}{cmd}, 24));
+            $mhp->{devH}{helper}{AESreqAck} = uc(unpack("H*", substr($response,0,4)));
+            Log3 $mhp->{devH},5,"CUL_HM $mhp->{devN} signing response: ".unpack("H*", $respRaw)
+                           ." should send $mhp->{devH}{helper}{AESreqAck} to authenticate";
+            $response = $response ^ pack("H*", substr($mhp->{devH}{helper}{prt}{rspWait}{cmd}, 24));
             $response = $cipher->encrypt(substr($response, 0, 16));
         
-            CUL_HM_SndCmd($shash, $mNo.$mFlg.'03'.CUL_HM_IoId($shash).$src.unpack("H*", $response));
+            CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.$mhp->{mFlg}.'03'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.unpack("H*", $response));
         
             $reply = "AES";
           }
         } 
         elsif ($cryptFunc != 1){                     #AES is not available
-          Log3 $shash,1,"CUL_HM ".$shash->{NAME}." need Crypt::Rijndael to answer signing request with CUL";
+          Log3 $mhp->{devH},1,"CUL_HM $mhp->{devN} need Crypt::Rijndael to answer signing request with CUL";
           $reply = "done";
         } 
       }
@@ -2864,41 +2820,41 @@ sub CUL_HM_parseCommon(@){#####################################################
       $reply = "ACK";
     }
 
-    if (   $shash->{helper}{prt}{mmcS}
-        && $shash->{helper}{prt}{mmcS} == 3){
+    if (   $mhp->{devH}{helper}{prt}{mmcS}
+        && $mhp->{devH}{helper}{prt}{mmcS} == 3){
       # after write device might need a break
       # allow for wake types only - and if commands are pending
-      $shash->{helper}{prt}{try} = 1 if(CUL_HM_getRxType($shash) & 0x08 #wakeup
-                                         && $shash->{cmdStack});
+      $mhp->{devH}{helper}{prt}{try} = 1 if(CUL_HM_getRxType($mhp->{devH}) & 0x08 #wakeup
+                                         && $mhp->{devH}{cmdStack});
       if ($success eq 'yes'){
-        delete $shash->{helper}{prt}{mmcA};
-        delete $shash->{helper}{prt}{mmcS};
+        delete $mhp->{devH}{helper}{prt}{mmcA};
+        delete $mhp->{devH}{helper}{prt}{mmcS};
       }
     };
 
     if($success){#do we have a final ack?
       #mark timing on the channel, not the device
-      my $chn = sprintf("%02X",hex(substr($p,2,2))&0x3f);
-      my $chnhash = $modules{CUL_HM}{defptr}{$chn?$src.$chn:$src};
-      $chnhash = $shash if(!$chnhash);
+      my $chn = sprintf("%02X",hex(substr($mhp->{p},2,2))&0x3f);
+      my $chnhash = $modules{CUL_HM}{defptr}{$chn?$mhp->{src}.$chn:$mhp->{src}};
+      $chnhash = $mhp->{devH} if(!$chnhash);
       push @evtEt,[$chnhash,0,"CommandAccepted:$success"];
-      CUL_HM_ProcessCmdStack($shash) if(CUL_HM_IoId($shash) eq $dst);
-      delete $shash->{helper}{prt}{wuReSent}
-              if (!$shash->{helper}{prt}{mmcS});
+      CUL_HM_ProcessCmdStack($mhp->{devH}) if(CUL_HM_IoId($mhp->{devH}) eq $mhp->{dst});
+      delete $mhp->{devH}{helper}{prt}{wuReSent}
+              if (!$mhp->{devH}{helper}{prt}{mmcS});
     }
     $ret = $reply;
   }
-  elsif($mTp eq "03"){# AESack #############################
+  elsif($mhp->{mTp} eq "03"){# AESack #############################
     #Reply to AESreq - only visible with CUL or in monitoring mode
     #not with HMLAN/USB
     #my $aesKey = $p;
-    push @evtEt,[$shash,1,"aesReqTo:".$dstH->{NAME}] if (defined $dstH);
+    push @evtEt,[$mhp->{devH},1,"aesReqTo:".$mhp->{dstH}{NAME}] if (defined $mhp->{dstH});
     $ret = "done";    
   }
 
-  elsif($mTp eq "00"){######################################
+  elsif($mhp->{mTp} eq "00"){######################################
     my $paired = 0; #internal flag
-    CUL_HM_infoUpdtDevData($shash->{NAME}, $shash,$p)
+    CUL_HM_infoUpdtDevData($mhp->{devN}, $mhp->{devH},$mhp->{p})
                   if (!$modules{CUL_HM}{helper}{hmManualOper});
     my $ioN = $ioHash->{NAME};
     # hmPair set in IOdev or  eventually in ccu!
@@ -2906,80 +2862,81 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $hmPair = InternalVal($ioN,"hmPair"      ,InternalVal($ioOwn,"hmPair"      ,0 ));
     my $hmPser = InternalVal($ioN,"hmPairSerial",InternalVal($ioOwn,"hmPairSerial",""));
     if ( $hmPair ){# pairing is active
-      if (!$hmPser || $hmPser eq ReadingsVal($shash->{NAME},"D-serialNr","")){
+      if (!$hmPser || $hmPser eq ReadingsVal($mhp->{devN},"D-serialNr","")){
 
         # pairing requested - shall we?      
         my $ioId = CUL_HM_h2IoId($ioHash);
         # pair now
-        Log3 $shash,3, "CUL_HM pair: $shash->{NAME} "
-                      ."$attr{$shash->{NAME}}{subType}, "
-                      ."model $attr{$shash->{NAME}}{model} "
-                      ."serialNr ".ReadingsVal($shash->{NAME},"D-serialNr","");
+        Log3 $mhp->{devH},3, "CUL_HM pair: $mhp->{devN} "
+                      ."$attr{$mhp->{devN}}{subType}, "
+                      ."model $attr{$mhp->{devN}}{model} "
+                      ."serialNr ".ReadingsVal($mhp->{devN},"D-serialNr","");
         CUL_HM_RemoveHMPair("hmPairForSec:$ioOwn");# just in case...
         delete $ioHash->{hmPair};
         delete $ioHash->{hmPairSerial};
-        CUL_HM_respPendRm($shash); # remove all pending messages
-        delete $shash->{cmdStack};
-        delete $shash->{helper}{prt}{rspWait};
-        delete $shash->{helper}{prt}{rspWaitSec};
-        delete $shash->{READINGS}{"RegL_00:"};
-        delete $shash->{READINGS}{".RegL_00:"};
+        CUL_HM_respPendRm($mhp->{devH}); # remove all pending messages
+        delete $mhp->{devH}{cmdStack};
+        delete $mhp->{devH}{helper}{prt}{rspWait};
+        delete $mhp->{devH}{helper}{prt}{rspWaitSec};
+        delete $mhp->{devH}{READINGS}{"RegL_00:"};
+        delete $mhp->{devH}{READINGS}{".RegL_00:"};
         
         if (!$modules{CUL_HM}{helper}{hmManualOper}){
-          $attr{$shash->{NAME}}{IODev} = $ioN;
-          $attr{$shash->{NAME}}{IOgrp} = "$ioOwn:$ioHash->{NAME}" if($ioOwn);
-          CUL_HM_assignIO($shash) ;
+          $attr{$mhp->{devN}}{IODev} = $ioN;
+          $attr{$mhp->{devN}}{IOgrp} = "$ioOwn:$ioHash->{NAME}" if($ioOwn);
+          CUL_HM_assignIO($mhp->{devH}) ;
         }
         
         my ($idstr, $s) = ($ioId, 0xA);
         $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
-        CUL_HM_pushConfig($shash, $ioId, $src,0,0,0,0, "0201$idstr");
+        CUL_HM_pushConfig($mhp->{devH}, $ioId, $mhp->{src},0,0,0,0, "0201$idstr");
         
-        $attr{$shash->{NAME}}{autoReadReg}= 
-              AttrVal($shash->{NAME},"autoReadReg","4_reqStatus");
-        CUL_HM_qAutoRead($shash->{NAME},0);
+        $attr{$mhp->{devN}}{autoReadReg}= 
+              AttrVal($mhp->{devN},"autoReadReg","4_reqStatus");
+        CUL_HM_qAutoRead($mhp->{devN},0);
           # stack cmds if waiting. Do noch start if we have a burst device
           # it may not paire
-        CUL_HM_appFromQ($shash->{NAME},"cf") if ($rxt == 0x04);
+        CUL_HM_appFromQ($mhp->{devN},"cf") if ($rxt == 0x04);
         
         $respRemoved = 1;#force command stack processing
         $paired = 1;
       }
     }
 
-    if($paired == 0 && CUL_HM_getRxType($shash) & 0x04){#no pair -send config?
-      CUL_HM_appFromQ($shash->{NAME},"cf");   # stack cmds if waiting
-      my $ioId = CUL_HM_h2IoId($shash->{IODev});
+    if($paired == 0 && CUL_HM_getRxType($mhp->{devH}) & 0x04){#no pair -send config?
+      CUL_HM_appFromQ($mhp->{devN},"cf");   # stack cmds if waiting
+      my $ioId = CUL_HM_h2IoId($mhp->{devH}{IODev});
       $respRemoved = 1;#force command stack processing
     }
     $ret = "done";
   }
-  elsif($mTp eq "10"){######################################
-    my $subType = substr($p,0,2);
+  elsif($mhp->{mTp} eq "10"){######################################
+    CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
+    my $subType = substr($mhp->{p},0,2);
     if   ($subType eq "00"){ #SerialRead====================================
-      my $sn = pack("H*",substr($p,2,20));
-      push @evtEt,[$shash,0,"D-serialNr:$sn"];
-      $attr{$shash->{NAME}}{serialNr} = $sn;
-      CUL_HM_respPendRm($shash) if ($pendType eq "SerialRead");
+      my $sn = pack("H*",substr($mhp->{p},2,20));
+      push @evtEt,[$mhp->{devH},0,"D-serialNr:$sn"];
+      $attr{$mhp->{devN}}{serialNr} = $sn;
+      CUL_HM_respPendRm($mhp->{devH}) if ($pendType eq "SerialRead");
       $ret = "done";
     }
     elsif($subType eq "01"){ #storePeerList=================================
-      my $mNoInt = hex($mNo); 
+      my $mNoInt = hex($mhp->{mNo}); 
       if ($pendType eq "PeerList"  && 
           ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
         $rspWait->{mNo} = $mNoInt;
 
-        my $chn = $shash->{helper}{prt}{rspWait}{forChn};
-        my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn};
-        $chnhash = $shash if (!$chnhash);
+        my $chn = $mhp->{devH}{helper}{prt}{rspWait}{forChn};
+        my $chnhash = $modules{CUL_HM}{defptr}{$mhp->{src}.$chn};
+        $chnhash = $mhp->{devH} if (!$chnhash);
         my $chnName = $chnhash->{NAME};
         my @peers;
-        if($attr{$shash->{NAME}}{model} eq "HM-Dis-WM55"){
+        if($mhp->{md} eq "HM-Dis-WM55"){
           #how ugly - this device adds one byte at begin - remove it. 
-          (undef,@peers) = unpack 'A4(A8)*',$p;
+          (undef,@peers) = unpack 'A4(A8)*',$mhp->{p};
         }
         else{
-          (undef,@peers) = unpack 'A2(A8)*',$p;
+          (undef,@peers) = unpack 'A2(A8)*',$mhp->{p};
         }
 
         $_ = '00000000' foreach (grep /^000000/,@peers);#correct bad term(6 chars) from rain sens)
@@ -2990,8 +2947,8 @@ sub CUL_HM_parseCommon(@){#####################################################
           # check for request to get List3 data
           my $reqPeer = $chnhash->{helper}{getCfgList};
           if ($reqPeer){
-            my $flag = CUL_HM_getFlag($shash);
-            my $ioId = CUL_HM_IoId($shash);
+            my $flag = CUL_HM_getFlag($mhp->{devH});
+            my $ioId = CUL_HM_IoId($mhp->{devH});
             my @peerID = split(",",(AttrVal($chnName,"peerIDs","")));
             foreach my $l (split ",",$chnhash->{helper}{getCfgListNo}){
               next if (!$l);
@@ -2999,19 +2956,19 @@ sub CUL_HM_parseCommon(@){#####################################################
               foreach my $peer (grep (!/00000000/,@peerID)){
                 $peer .="01" if (length($peer) == 6); # add the default
                 if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
-                  CUL_HM_PushCmdStack($shash,sprintf("++%s01%s%s%s04%s%s",
-                          $flag,$ioId,$src,$chn,$peer,$listNo));# List3 or 4
+                  CUL_HM_PushCmdStack($mhp->{devH},sprintf("++%s01%s%s%s04%s%s",
+                          $flag,$ioId,$mhp->{src},$chn,$peer,$listNo));# List3 or 4
                 }
               }
             }
           }
-          CUL_HM_respPendRm($shash);
+          CUL_HM_respPendRm($mhp->{devH});
           delete $chnhash->{helper}{getCfgList};
           delete $chnhash->{helper}{getCfgListNo};
           CUL_HM_rmOldRegs($chnName);
         }
         else{
-          CUL_HM_respPendToutProlong($shash);#wasn't last - reschedule timer
+          CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
         }
         $ret = "done";
       }
@@ -3020,17 +2977,13 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
     elsif($subType eq "02" ||$subType eq "03"){ #ParamResp==================
-      my $mNoInt = hex($mNo); 
+      my $mNoInt = hex($mhp->{mNo}); 
       if ( $pendType eq "RegisterRead" && 
           ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
         $repeat = 1;#prevent stop for messagenumber match
         $rspWait->{mNo} = $mNoInt;  # next message will be numbered same or one plus.       
-        
-        my $chnSrc = $src.$rspWait->{forChn};
-        my $chnHash = $modules{CUL_HM}{defptr}{$chnSrc};
-        $chnHash = $shash if (!$chnHash);
-        my $chnName = $chnHash->{NAME};
-        my ($format,$data) = ($1,$2) if ($p =~ m/^(..)(.*)/);
+        CUL_HM_m_setCh($mhp,$rspWait->{forChn});
+        my ($format,$data) = ($1,$2) if ($mhp->{p} =~ m/^(..)(.*)/);
         my $list = $rspWait->{forList};
         $list = "00" if (!$list); #use the default
         if ($format eq "02"){ # list 2: format aa:dd aa:dd ...
@@ -3055,29 +3008,28 @@ sub CUL_HM_parseCommon(@){#####################################################
         my $lastAddr = hex($1) if ($data =~ m/.*(..):..$/);
         my $peer = $rspWait->{forPeer};
         my $regLNp = "RegL_$list:$peer";# pure, no expert
-        my $regLN = ((CUL_HM_getAttrInt($chnName,"expert") == 2)?"":".").$regLNp;
+        my $regLN = ((CUL_HM_getAttrInt($mhp->{cName},"expert") == 2)?"":".").$regLNp;
         if (   defined $lastAddr 
             && (    $lastAddr > $rspWait->{nAddr}
                  || $lastAddr == 0)){
-          CUL_HM_UpdtReadSingle($chnHash,$regLN,ReadingsVal($chnName,$regLN,"")." $data",0);
+          CUL_HM_UpdtReadSingle($mhp->{cHash},$regLN,ReadingsVal($mhp->{cName},$regLN,"")." $data",0);
           $rspWait->{nAddr} = $lastAddr;
         }
 
         if ($data =~ m/00:00$/){ # this was the last message in the block
           if($list eq "00"){
-            my $name = CUL_HM_id2Name($src);
-            push @evtEt,[$shash,0,"PairedTo:".CUL_HM_getRegFromStore($name,"pairCentral",0,"")];
+            push @evtEt,[$mhp->{devH},0,"PairedTo:".CUL_HM_getRegFromStore($mhp->{devN},"pairCentral",0,"")];
           }
-          CUL_HM_respPendRm($shash);
-          delete $chnHash->{helper}{shadowReg}{$regLNp};   #rm shadow
+          CUL_HM_respPendRm($mhp->{devH});
+          delete $mhp->{cHash}{helper}{shadowReg}{$regLNp};   #rm shadow
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
-          CUL_HM_updtRegDisp($chnHash,$list,
+          CUL_HM_updtRegDisp($mhp->{cHash},$list,
                 CUL_HM_peerChId($peer,
-                        substr($chnHash->{DEF},0,6)));
+                        substr($mhp->{cHash}{DEF},0,6)));
           $ret = "done";
         }
         else{
-          CUL_HM_respPendToutProlong($shash);#wasn't last - reschedule timer
+          CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
           $ret = "done";
         }
       }
@@ -3086,18 +3038,17 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
     elsif($subType eq "04"){ #ParamChange===================================
-      my($chn,$peerID,$list,$data) = ($1,$2,$3,$4) if($p =~ m/^04(..)(........)(..)(.*)/);
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-      $chnHash = $shash if(!$chnHash); # will add param to dev if no chan
+      my($peerID,$list,$data) = ($1,$2,$3,$4) if($mhp->{p} =~ m/^04..(........)(..)(.*)/);
+      CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
       my $regLNp = "RegL_$list:".CUL_HM_id2Name($peerID);
       $regLNp =~ s/broadcast//;
       $regLNp =~ s/ /_/g; #remove blanks
-      my $regLN = ((CUL_HM_getAttrInt($chnHash->{NAME},"expert") == 2)?"":".").$regLNp;
+      my $regLN = ((CUL_HM_getAttrInt($mhp->{cHash}{NAME},"expert") == 2)?"":".").$regLNp;
 
       $data =~ s/(..)(..)/ $1:$2/g;
 
-      my $lN = ReadingsVal($chnHash->{NAME},$regLN,"");
-      my $sdH = CUL_HM_shH($chnHash,$list,$dst);
+      my $lN = ReadingsVal($mhp->{cHash}{NAME},$regLN,"");
+      my $sdH = CUL_HM_shH($mhp->{cHash},$list,$mhp->{dst});
       my $shdwReg = $sdH->{helper}{shadowReg}{$regLNp};
       foreach my $entry(split(' ',$data)){
         my ($a,$d) = split(":",$entry);
@@ -3109,108 +3060,114 @@ sub CUL_HM_parseCommon(@){#####################################################
       $sdH->{helper}{shadowReg}{$regLNp} = $shdwReg; # todo possibley needs change
       $lN = join(' ',sort(split(' ',$lN)));# re-order
       if ($lN =~ s/00:00//){$lN .= " 00:00"};
-      CUL_HM_UpdtReadSingle($chnHash,$regLN,$lN,0);
-      CUL_HM_updtRegDisp($chnHash,$list,$peerID);
+      CUL_HM_UpdtReadSingle($mhp->{cHash},$regLN,$lN,0);
+      CUL_HM_updtRegDisp($mhp->{cHash},$list,$peerID);
       $ret= "parsed";
     }
     elsif($subType eq "06"){ #reply to status request=======================
-      my (undef,$chn,undef,undef,$rssi) = unpack '(A2)*',$p;
-      my $chnHash = CUL_HM_id2Hash($src.$chn);
+      my (undef,$chn,undef,undef,$rssi) = unpack '(A2)*',$mhp->{p};
+      my $chnHash = CUL_HM_id2Hash($mhp->{src}.$chn);
       push @evtEt,[$chnHash,0,"recentStateType:info"];
-      CUL_HM_storeRssi( $shash->{NAME}
-                       ,($dstH?$dstH->{NAME}:$shash->{IODev}{NAME})
+      CUL_HM_storeRssi( $mhp->{devN}
+                       ,($mhp->{dstH}?$mhp->{dstH}{NAME}:$mhp->{devH}{IODev}{NAME})
                        ,(-1)*(hex($rssi))
-                       ,$mNo)
+                       ,$mhp->{mNo})
             if ($rssi && $rssi ne '00' && $rssi ne'80');
       CUL_HM_unQEntity($chnHash->{NAME},"qReqStat");
       if ($pendType eq "StatusReq"){#it is the answer to our request
-        my $chnSrc = $src.$shash->{helper}{prt}{rspWait}{forChn};
+        my $chnSrc = $mhp->{src}.$mhp->{devH}{helper}{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc};
-        $chnhash = $shash if (!$chnhash);
-        CUL_HM_respPendRm($shash);
+        $chnhash = $mhp->{devH} if (!$chnhash);
+        CUL_HM_respPendRm($mhp->{devH});
         $ret = "STATresp";
       }
       else{
         if ($chn eq "00"
-            || (   $mNo eq "00" 
+            || (   $mhp->{mNo} eq "00" 
                 && $chn eq "01" 
-                && $shash->{helper}{HM_CMDNR} < 250)){# this is power on
-          my $name = $shash->{NAME};
-          CUL_HM_qStateUpdatIfEnab($name);
-          CUL_HM_qAutoRead($name,2);
+                && $mhp->{devH}{helper}{HM_CMDNR} < 250)){# this is power on
+          CUL_HM_qStateUpdatIfEnab($mhp->{devN});
+          CUL_HM_qAutoRead($mhp->{devN},2);
           $ret = "powerOn" ;# check dst eq "000000" as well?
-          $shash->{helper}{PONtest} = 0;
+          $mhp->{devH}{helper}{PONtest} = 0;
         }
       }
     }
   }
-  elsif($mTp eq "12"){ #wakeup received - ignore############
+  elsif($mhp->{mTp} eq "12"){ #wakeup received - ignore############
     $ret = "done";
   }
-  elsif($mTp =~ m /^4[01]/){ #someone is triggered##########
-    my $chn = hex(substr($p,0,2));
-    my $cnt = hex(substr($p,2,2));
-    my $long = ($chn & 0x40)?"long":"short";
-    $chn = $chn & 0x3f;
-    my $cHash = CUL_HM_id2Hash($src.sprintf("%02X",$chn));
-    my $cName = $cHash->{NAME};
+  elsif($mhp->{mTp} =~ m /^4[01]/){ #someone is triggered##########
+    CUL_HM_m_setCh($mhp,substr($mhp->{p},0,2));
+    my $cnt = hex(substr($mhp->{p},2,2));
+    my $long = ($mhp->{chnraw} & 0x40)?"long":"short";
     my $level = "-";
-    if (length($p)>5){
-      my $l = substr($p,4,2);
-      if    ($cHash->{helper}{lm} && $cHash->{helper}{lm}{hex($l)}){$level = $cHash->{helper}{lm}{hex($l)}}
-      elsif ($lvlStr{md}{$md}     && $lvlStr{md}{$md}{$l}    ){$level = $lvlStr{md}{$md}{$l}}
-      elsif ($lvlStr{st}{$st}     && $lvlStr{st}{$st}{$l}    ){$level = $lvlStr{st}{$st}{$l}}
+    if (length($mhp->{p})>5){
+      my $l = substr($mhp->{p},4,2);
+      if    ($mhp->{cHash}{helper}{lm} && $mhp->{cHash}{helper}{lm}{hex($l)}){$level = $mhp->{cHash}{helper}{lm}{hex($l)}}
+      elsif ($lvlStr{md}{$mhp->{md}}     && $lvlStr{md}{$mhp->{md}}{$l}    ){$level = $lvlStr{md}{$mhp->{md}}{$l}}
+      elsif ($lvlStr{st}{$mhp->{st}}     && $lvlStr{st}{$mhp->{st}}{$l}    ){$level = $lvlStr{st}{$mhp->{st}}{$l}}
       else                                                    {$level = hex($l)};
     }
-    elsif($mTp eq "40"){
+    elsif($mhp->{mTp} eq "40"){
       $level = $long;
       my $state = ucfirst($long);
       if($long eq "long"){# long press
-        if(!$cHash->{BNO} || $cHash->{BNO} ne $cnt){#cnt = event counter
-          $cHash->{BNO}=$cnt;
-          $cHash->{BNOCNT}=0; # message counter reset
+        if(!$mhp->{cHash}{BNO} || $mhp->{cHash}{BNO} ne $cnt){#cnt = event counter
+          $mhp->{cHash}{BNO}=$cnt;
+          $mhp->{cHash}{BNOCNT}=0; # message counter reset
         }
-        $cHash->{BNOCNT}+=1;
-        $state .= ($mFlgH & 0x20 ? "Release" : "")." $cHash->{BNOCNT}_$cnt";
+        $mhp->{cHash}{BNOCNT}+=1;
+        $state .= ($mhp->{mFlgH} & 0x20 ? "Release" : "")." $mhp->{cHash}{BNOCNT}_$cnt";
       }
 
-      push @evtEt,[$cHash,1,"trigger:".(ucfirst($long))."_$cnt"];
-      push @evtEt,[$cHash,1,"state:".$state." (to $dname)"] if ($shash ne $cHash);
+      push @evtEt,[$mhp->{cHash},1,"trigger:".(ucfirst($long))."_$cnt"];
+      push @evtEt,[$mhp->{cHash},1,"state:".$state." (to $mhp->{dname})"] if ($mhp->{devH} ne $mhp->{cHash});
     }
-    push @evtEt,[$cHash,1,"trigger_cnt:$cnt"];
+    push @evtEt,[$mhp->{cHash},1,"trigger_cnt:$cnt"];
 
-    my $peerIDs = AttrVal($cName,"peerIDs","");
-    if ($peerIDs =~ m/$dst/){# dst is available in the ID list
-      foreach my $peer (grep /^$dst/,split(",",$peerIDs)){
+    my $peerIDs = AttrVal($mhp->{cName},"peerIDs","");
+    if ($peerIDs =~ m/$mhp->{dst}/){# dst is available in the ID list
+      foreach my $peer (grep /^$mhp->{dst}/,split(",",$peerIDs)){
         my $pName = CUL_HM_id2Name($peer);
-        $pName = CUL_HM_id2Name($dst) if (!$pName || !$defs{$pName}); #$dst - device-id of $peer
+        $pName = CUL_HM_id2Name($mhp->{dst}) if (!$pName || !$defs{$pName}); #$dst - device-id of $peer
         next if (!$pName || !$defs{$pName});
-        push @evtEt,[$defs{$pName},1,"trig_$cName:$level"];
-        push @evtEt,[$defs{$pName},1,"trigLast:$cName".(($level ne "-")?":$level":"")];
+        push @evtEt,[$defs{$pName},1,"trig_$mhp->{cName}:$level"];
+        push @evtEt,[$defs{$pName},1,"trigLast:$mhp->{cName}".(($level ne "-")?":$level":"")];
         
-        CUL_HM_stateUpdatDly($pName,10) if ($mTp eq "40");#conditional request may not deliver state-req
+        CUL_HM_stateUpdatDly($pName,10) if ($mhp->{mTp} eq "40");#conditional request may not deliver state-req
       }
     }
-    elsif($mFlgH & 2 # dst can be garbage - but not if answer request
-          && (   !$dstH 
-              || $dstH->{NAME} ne InternalVal($shash->{NAME},"IODev",""))
+    elsif($mhp->{mFlgH} & 2 # dst can be garbage - but not if answer request
+          && (   !$mhp->{dstH} 
+              || $mhp->{dstH}{NAME} ne InternalVal($mhp->{devN},"IODev",""))
           ){
-      my $pName = CUL_HM_id2Name($dst);
-      push @evtEt,[$cHash,1,"trigDst_$pName:noConfig"];
+      my $pName = CUL_HM_id2Name($mhp->{dst});
+      push @evtEt,[$mhp->{cHash},1,"trigDst_$pName:noConfig"];
     }
     return "";
   }
-  elsif($mTp eq "70"){ #Time to trigger TC##################
+  elsif($mhp->{mTp} eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
   }
   if ($rspWait->{mNo}             &&
-      $rspWait->{mNo} eq $mNo     &&
+      $rspWait->{mNo} eq $mhp->{mNo}     &&
       !$repeat){
     #response we waited for - stop Waiting
-    CUL_HM_respPendRm($shash);
+    CUL_HM_respPendRm($mhp->{devH});
   }
 
   return $ret;
+}
+sub CUL_HM_m_setCh($$){### add channel identification to Message Hash
+  my ($mhp,$chn) = @_;
+  $mhp->{chnM}  = $chn;
+  $mhp->{chnraw}= hex($mhp->{chnM});
+  $mhp->{chn}   = $mhp->{chnraw} & 0x3f;
+  $mhp->{chnHx} = sprintf("%02X",$mhp->{chn});
+  $mhp->{cHash} = CUL_HM_id2Hash($mhp->{src}.$mhp->{chnHx});
+  $mhp->{cHash} = $mhp->{shash} if (!$mhp->{cHash});
+  $mhp->{cName} = $mhp->{cHash}{NAME};
 }
 
 sub CUL_HM_queueUpdtCfg($){
@@ -7448,7 +7405,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
     my $oldState = AttrVal($devName,"actStatus","unset");
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
     if ($tSec == 0){# detection switched off
-      $cnt_Off++; $state = "switchedOff";
+      $state = "switchedOff";
     }
     else{
       my $tLast = ReadingsVal($devName,".protLastRcv",0);
@@ -7470,19 +7427,19 @@ sub CUL_HM_ActCheck($) {# perform supervision
                 CUL_HM_Set($defs{$devName},$devName,
                            ($cmds =~ m/statusRequest/?"statusRequest"
                                                      :"getSerial" ));
-                $cntUnkn++; $state = "unknown";
+                $state = $oldState eq "unset" ? "unknown" : $oldState;
               }
               else{
                 $actHash->{helper}{$devId}{try} = 99;
-                $cntDead++; $state = "dead";
+                $state = "dead";
               }
             }
             else{
-              $cntDead++; $state = "dead";
+              $state = "dead";
             }
           }
           else{
-            $cntDead++; $state = "dead";
+            $state = "dead";
           }
         }
         else{
@@ -7490,7 +7447,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
         }
       }
       else{                         #message in time
-        $cntAliv++; $state = "alive";
+        $state = "alive";
         delete $actHash->{helper}{$devId}{try};
       }
     }
@@ -7499,6 +7456,10 @@ sub CUL_HM_ActCheck($) {# perform supervision
       $attr{$devName}{actStatus} = $state;
       Log3 $actHash,4,"Device ".$devName." is ".$state;
     }
+    if    ($state eq "unknown")    {$cntUnkn++;} 
+    elsif ($state eq "alive")      {$cntAliv++;} 
+    elsif ($state eq "dead")       {$cntDead++;}
+    elsif ($state eq "switchedOff"){$cnt_Off++;}
     push @event, "status_".$devName.":".$state;
   }
   push @event, "state:"."alive:".$cntAliv
@@ -7761,8 +7722,9 @@ sub CUL_HM_UpdtCentralState($){
 sub CUL_HM_assignIO($){ #check and assign IO
   # assign IO device
   my $hash = shift;
-  if (   $hash->{helper}{prt}{sProc} == 1
-      && defined $hash->{IODev} ){#don't change while send in process
+  if (!defined $hash->{helper}{prt}{sProc}
+      || (   $hash->{helper}{prt}{sProc} == 1
+          && defined $hash->{IODev})){#don't change while send in process
     return; 
   }
     
