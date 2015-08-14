@@ -30,7 +30,7 @@ sub LaCrosse_Initialize($) {
                        ." resolution"
                        ." $readingFnAttributes";
                        
-  $hash->{AutoCreate} = { "LaCrosse.*" => { autocreateThreshold => "2:120" } };                     
+  ###$hash->{AutoCreate} = { "LaCrosse.*" => { autocreateThreshold => "2:120" } };                     
 }
 
 sub LaCrosse_Define($$) {
