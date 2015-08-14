@@ -1165,16 +1165,19 @@ sub CUL_HM_Parse($$) {#########################################################
     } 
     else {
       my $doAES = 1;
-      my $chn = 0;
+      my $chn ;
       if($mh{mTp} =~ m /^4[01]/){ #someone is triggered##########
         CUL_HM_m_setCh(\%mh,$mI[0]);
-        $chn = hex($mI[0]) & 0x3f;
+        $chn = $mI[0];
       } 
       elsif ($mh{mTp} eq "10") {
         if ($mh{mStp} =~ m/0[46]/) {
           CUL_HM_m_setCh(\%mh,$mI[1]);
         } 
         elsif ($mh{mStp} eq "01") {
+          $doAES = 0;
+        }
+        elsif (!($mh{mFlgH} & 0x20)) { #response required Flag
           $doAES = 0;
         }
       } 
@@ -1184,11 +1187,11 @@ sub CUL_HM_Parse($$) {#########################################################
       #FIXME: Extract channel from more messages
 
       if ($doAES && $chn && defined(CUL_HM_id2Hash($mh{src}.sprintf("%02X",$chn)))) {
-        $mh{shash} = CUL_HM_id2Hash($mh{src}.sprintf("%02X",$chn));
+        CUL_HM_m_setCh(\%mh,$mI[0]);
       }
     
       if (   $doAES
-          && AttrVal($mh{shash}->{NAME},"aesCommReq",0)) { #aesCommReq enabled for channel
+          && AttrVal($mh{cName},"aesCommReq",0)) { #aesCommReq enabled for channel
 
         #----------Generate AES challenge for device (CUL)---------
         my ($kNo, %keys) = CUL_HM_getKeys($mh{devH});
@@ -1198,7 +1201,7 @@ sub CUL_HM_Parse($$) {#########################################################
                             ? $mh{devH}->{helper}{aesCommRq}{challenge}
                             : sprintf("%08X%04X",rand(0xffffffff), rand(0xffff));
 
-          Log3 $mh{shash},5,"CUL_HM $mh{devN} requesting signature with challenge $challenge for key $kNo";
+          Log3 $mh{cHash},5,"CUL_HM $mh{devN} requesting signature with challenge $challenge for key $kNo";
 
           $mh{devH}->{helper}{aesCommRq}{msg} = $mh{msg};
           $mh{devH}->{helper}{aesCommRq}{msgIn} = $msgIn;
@@ -1212,7 +1215,7 @@ sub CUL_HM_Parse($$) {#########################################################
         } 
         else {
           $mh{devH}->{helper}{aesCommRq}{msg} = "";
-          Log3 $mh{shash},1,"CUL_HM $mh{devN} required key $mh{kNo} not defined in VCCU!";
+          Log3 $mh{cHash},1,"CUL_HM $mh{devN} required key $mh{kNo} not defined in VCCU!";
         }
       } 
       else {
@@ -6283,6 +6286,10 @@ sub CUL_HM_eventP($$) {#handle protocol events
 }
 sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
+  if (!$hash || !$hash->{NAME}){#General remove when fixed
+    Log 2,"CUL_HM protstate undeviced hash to set $state";
+    return;
+  }
   my $name = $hash->{NAME};
 
   my $sProcIn = $hash->{helper}{prt}{sProc};
