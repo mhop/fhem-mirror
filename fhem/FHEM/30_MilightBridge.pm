@@ -47,7 +47,7 @@ sub MilightBridge_Initialize($)
   $hash->{UndefFn}  = "MilightBridge_Undefine";
   $hash->{NotifyFn} = "MilightBridge_Notify";
   $hash->{AttrFn}   = "MilightBridge_Attr";
-  $hash->{AttrList} = "port sendInterval disable:0,1 checkInterval ".$readingFnAttributes;
+  $hash->{AttrList} = "port sendInterval disable:0,1 tcpPing:1 checkInterval ".$readingFnAttributes;
 
   return undef;
 }
@@ -205,6 +205,10 @@ sub MilightBridge_State(@)
   # check via ping
   my $pingstatus = "unreachable";
   my $p = Net::Ping->new('udp');
+  if(defined($attr{$hash->{NAME}}{tcpPing}))
+  {
+    $p = Net::Ping->new('tcp');
+  }
   my $alive = $p->ping($hash->{HOST}, 2);
   $p->close();
   $pingstatus = "ok" if $alive;
@@ -395,6 +399,10 @@ sub MilightBridge_CmdQueue_Send(@)
     <li>
       <b>port</b><br/>
          Default: 8899. Older bridges (V2) used port 50000 so change this value if you have an old bridge.
+    </li>
+    <li>
+      <b>tcpPing</b><br/>
+         If this attribute is defined, ping will use TCP instead of UDP.
     </li>
   </ul>
 </ul>
