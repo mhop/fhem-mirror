@@ -1035,8 +1035,6 @@ sub CUL_HM_Parse($$) {#########################################################
   
   # $shash will be replaced for multichannel commands
   $mh{devH}   = CUL_HM_id2Hash($mh{src}); #sourcehash - will be modified to channel entity
-  $mh{devN}   = $mh{devH}->{NAME};        #sourcehash - will be modified to channel entity
-  $mh{shash}  = $mh{devH};                # source device hash
   $mh{dstH}   = CUL_HM_id2Hash($mh{dst}); # destination device hash
   $mh{id}     = CUL_HM_h2IoId($iohash);
   $mh{ioName} = $iohash->{NAME};
@@ -1051,7 +1049,6 @@ sub CUL_HM_Parse($$) {#########################################################
     Log3 undef, 2, "CUL_HM Unknown device $sname is now defined";
     DoTrigger("global","UNDEFINED $sname CUL_HM $mh{src}");
     $mh{devH}  = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
-    $mh{shash} = $mh{devH};
     $mh{devH}->{IODev} = $iohash;
     $mh{devH}->{helper}{io}{nextSend} = gettimeofday()+0.09;# io couldn't set
   }
@@ -1103,7 +1100,8 @@ sub CUL_HM_Parse($$) {#########################################################
     return;
   }
   $respRemoved = 0;  #set to 'no response in this message' at start
-  my $name = $mh{devH}->{NAME};
+  $mh{devN}   = $mh{devH}->{NAME};        #sourcehash - will be modified to channel entity
+  $mh{shash}  = $mh{devH};                # source device hash
   my $ioId = CUL_HM_h2IoId($mh{devH}->{IODev});
   $ioId = $mh{id} if(!$ioId);
   if (CUL_HM_getAttrInt($mh{devN},"ignore")){
@@ -2036,12 +2034,9 @@ sub CUL_HM_Parse($$) {#########################################################
       my $type  = ($mh{chnraw} & 0x40)?"l":"s";
       my $state = ($mh{chnraw} & 0x40)?"Long":"Short";     
       my $chId = $mh{src}.$mh{chnHx};
-      $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
-                             if($modules{CUL_HM}{defptr}{$chId});
-      $name = $mh{shash}->{NAME};
 
-      my $btnName = $mh{shash}->{helper}{role}{chn} 
-                         ? $name
+      my $btnName = $mh{cHash}->{helper}{role}{chn} 
+                         ? $mh{cName}
                          : "Btn$mh{chn}";
 
       if($type eq "l"){# long press
@@ -2061,16 +2056,16 @@ sub CUL_HM_Parse($$) {#########################################################
           delete $mh{devH}->{lastMsg};
         }
 
-        CUL_HM_calcDisWm($mh{shash},$mh{devH}->{NAME},$type);
+        CUL_HM_calcDisWm($mh{cHash},$mh{devN},$type);
         if (AttrVal($btnName,"aesCommReq",0)){
           my @arr = ();
           $mh{devH}->{cmdStacAESPend} = \@arr;
           push (@{$mh{devH}->{cmdStacAESPend} },"$mh{src};++A011$mh{id}$mh{src}$_")
-                foreach (@{$mh{shash}->{helper}{disp}{$type}});
+                foreach (@{$mh{cHash}->{helper}{disp}{$type}});
        }
         else{
           CUL_HM_PushCmdStack($mh{devH},"++A011$mh{id}$mh{src}$_")
-                foreach (@{$mh{shash}->{helper}{disp}{$type}});
+                foreach (@{$mh{cHash}->{helper}{disp}{$type}});
         }
       }
     }
