@@ -190,7 +190,9 @@ CO20_Connect($)
       Log3 $name, 3, "$name: CO20 device opened";
 
       my $interval = AttrVal($name, "interval", 300);
-      $interval = 60*5 if( !$interval );
+      $hash->{retries} = AttrVal($name,"retries",3);
+      $hash->{timeout} = AttrVal($name,"timeout",10);
+
       $hash->{INTERVAL} = $interval;
 
       RemoveInternalTimer($hash);
@@ -204,7 +206,7 @@ CO20_Connect($)
       CO20_Disconnect($hash);
     }
   } else {
-    Log3 $name, 3, "$name: filed to find CO20 device";
+    Log3 $name, 3, "$name: failed to find CO20 device";
   }
 }
 
@@ -442,8 +444,8 @@ CO20_flashread($)
   my $name = $hash->{NAME};
 
 
-# 40 30 30 31 31 52 45 43 4F 52 44 53 3F 0A 40 40   @0011RECORDS?.@@ 
-# 
+# 40 30 30 31 31 52 45 43 4F 52 44 53 3F 0A 40 40   @0011RECORDS?.@@
+#
 # 40 30 30 31 32 4C 42 53 49 5A 45 3F 0A 40 40 40   @0012LBSIZE?.@@@
 #
 # 40 30 30 31 33 46 4C 53 54 4F 50 0A 40 40 40 40   @0013FLSTOP.@@@@
