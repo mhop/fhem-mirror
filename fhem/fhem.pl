@@ -4196,13 +4196,15 @@ sub
 FileWrite($@)
 {
   my ($param, @rows) = @_;
-  my ($err, @ret, $fileName, $forceType);
+  my ($err, @ret, $fileName, $forceType, $nl);
 
   if(ref($param) eq "HASH") {
     $fileName = $param->{FileName};
     $forceType = $param->{ForceType};
+    $nl = $param->{NoNL} ? "" : "\n";
   } else {
     $fileName = $param;
+    $nl = "\n";
   }
   $forceType = "" if(!defined($forceType));
 
@@ -4213,7 +4215,7 @@ FileWrite($@)
     if(open(FH, ">$fileName")) {
       binmode (FH);
       foreach my $l (@rows) {
-        print FH $l,"\n";
+        print FH $l,$nl;
       }
       close(FH);
       return undef;

@@ -1846,12 +1846,19 @@ FW_style($$)
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
     $fileName =~ s,.*/,,g;        # Little bit of security
     my $filePath = FW_fileNameToPath($fileName);
-    my $isImg = ($fileName =~ m,\.(svg|png)$,);
+    my $isImg = ($fileName =~ m,\.(svg|png)$,i);
     my $forceType = ($cfgDB eq 'configDB' && !$isImg) ? $cfgDB : "file";
 
     $FW_data =~ s/\r//g if(!$isImg);
-    my $err = FileWrite({FileName=>$filePath, ForceType=>$forceType},
+    my $err;
+    if($fileName =~ m,\.png$,) {
+      $err = FileWrite({FileName=>$filePath,ForceType=>$forceType,NoNL=>1},
+                       $FW_data);
+    } else {
+      $err = FileWrite({ FileName=>$filePath, ForceType=>$forceType },
                         split("\n", $FW_data));
+    }
+
     if($err) {
       FW_pO "<div id=\"content\">$filePath: $!</div>";
       return;
