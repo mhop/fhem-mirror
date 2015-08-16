@@ -2290,10 +2290,10 @@ sub CUL_HM_Parse($$) {#########################################################
           # no event necessary, all the same as before
         }
         else {# just update datafields in storage
+          my %colTbl=("00"=>"off","01"=>"red","10"=>"green","11"=>"orange");
           if (@mI > 8){#status for all channel included
             # open to decode byte $mI[4] - related to backlight? seen 20 and 21
             my $lStat = join("",@mI[5..8]); # all LED status in one long
-            my %colTbl=("00"=>"off","01"=>"red","10"=>"green","11"=>"orange");
             my @leds = reverse(unpack('(A2)*',sprintf("%032b",hex($lStat))));
             $_ = $colTbl{$_} foreach (@leds);
             for(my $cCnt = 0;$cCnt<16;$cCnt++){# go for all channels
@@ -2304,19 +2304,18 @@ sub CUL_HM_Parse($$) {#########################################################
                 push @evtEt,[$cH,1,"state:$leds[$cCnt]"];
               }
             }
-            push @evtEt,[$mh{cHash},1,"color:$lStat"];
-            push @evtEt,[$mh{cHash},1,"state:$lStat"];
+            push @evtEt,[$mh{devH},1,"color:$lStat"];
+            push @evtEt,[$mh{devH},1,"state:$lStat"];
           }
           else{# branch can be removed if message is always that long
             my $bitLoc = ($mh{chn}-1)*2;#calculate bit location
             my $mask = 3<<$bitLoc;
             my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
-            push @evtEt,[$mh{devH},1,,"color:$value"];
-            push @evtEt,[$mh{devH},1, "state:$value"];
+            push @evtEt,[$mh{devH},1,"color:$value"];
+            push @evtEt,[$mh{devH},1,"state:$value"];
             if (!$mh{cHash}{helper}{role}{dev}){
-               my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
-               my $actColor = $colorTable{$msgState};
-               $actColor = "unknown" if(!$actColor);
+              my $actColor = $colTbl{$msgState};
+              $actColor = "unknown" if(!$actColor);
               push @evtEt,[$mh{cHash},1,"color:$actColor"];
               push @evtEt,[$mh{cHash},1,"state:$actColor"];
             }

@@ -972,6 +972,13 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
   );
 
 #clones - - - - - - - - - - - - - - -
+$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R1"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
+$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R2"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
+$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R3"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
+$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R4"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
+$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R5"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
+$culHmRegModel{"HM-ES-PMSw1-DR"}             = $culHmRegModel{"HM-ES-PMSw1-Pl"};
+
 $culHmRegModel{"HM-LC-SW1-PL2"}       = $culHmRegModel{"HM-LC-Sw1-Pl"};#rf_s , rf_s_644
 $culHmRegModel{"HM-LC-SW1-SM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
 $culHmRegModel{"HM-LC-SW2-SM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
@@ -1166,6 +1173,45 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
   );
 
 #clones - - - - - - - - - - - - - - -
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R101"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R201"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R301"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R401"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R501"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
+$culHmRegChan{"HM-ES-PMSw1-DR01"}         = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R102"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R202"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R302"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R402"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R502"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
+$culHmRegChan{"HM-ES-PMSw1-DR02"}         = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R103"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R203"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R303"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R403"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R503"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
+$culHmRegChan{"HM-ES-PMSw1-DR03"}         = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R104"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R204"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R304"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R404"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R504"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
+$culHmRegChan{"HM-ES-PMSw1-DR04"}         = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R105"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R205"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R305"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R405"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R505"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
+$culHmRegChan{"HM-ES-PMSw1-DR05"}         = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R106"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R206"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R306"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R406"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
+$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R506"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
+$culHmRegChan{"HM-ES-PMSw1-DR06"}         = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
+
+
+
 $culHmRegChan{"HM-Sen-MDIR-WM5502"}   = $culHmRegChan{"HM-Sen-MDIR-WM5501"};
 $culHmRegChan{"HM-Sen-MDIR-WM5503"}   = $culHmRegType{motionDetector};
 
