@@ -54,6 +54,7 @@ sub DoSet(@);
 sub Dispatch($$$);
 sub DoTrigger($$@);
 sub EvalSpecials($%);
+sub Each($$;$);
 sub FileRead($);
 sub FileWrite($@);
 sub FmtDateTime($);
@@ -4328,6 +4329,21 @@ fhemFork()
     }
   }
   return 0;
+}
+
+sub
+Each($$;$)      # can be used e.g. in at, Forum #40022
+{
+  my ($dev, $string, $sep) = @_;
+  return "" if(!$defs{$dev});
+  my $idx = ($defs{$dev}{EACH_INDEX} ? $defs{$dev}{EACH_INDEX} : 0);
+  $sep = "," if(!$sep);
+  my @arr = split($sep, $string);
+
+  $idx = 0 if(@arr <= $idx);
+  $defs{$dev}{EACH_INDEX} = $idx+1;
+
+  return $arr[$idx];
 }
 
 1;
