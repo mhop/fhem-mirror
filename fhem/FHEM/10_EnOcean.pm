@@ -1115,7 +1115,7 @@ sub EnOcean_Set($@)
           Log3 $name, $logLevel, "EnOcean $name Error: $err";
           return $err;
         } else {
-          CommandSave(undef, undef);
+          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
           Log3 $name, $logLevel, "EnOcean $name $response";
           readingsSingleUpdate($hash, "state", "teachInSec", 1);
           return(undef);
@@ -3685,7 +3685,7 @@ sub EnOcean_Set($@)
           shift @a;
           $updateState = 3;
           $channelType = 255;
-          CommandSave(undef, undef);
+          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
         } else {
           return "Wrong parameter, channel $setChannel not defined.";
         }
@@ -3783,7 +3783,7 @@ sub EnOcean_Set($@)
           $data .= 0 x (8 - length($data) % 8);
         }
         $channelType = 0;
-        CommandSave(undef, undef);
+        CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
         $data = sprintf '%04X%s', $header, EnOcean_convBitToHex($data);
         my $teachInState = $comMode == 1 ? "teach-in sent, response requested" : "teach-in sent";
         readingsSingleUpdate($hash, "teach", "Generic Profile $teachInState", 1);
@@ -4544,17 +4544,17 @@ sub EnOcean_Parse($$)
               EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, "00000000", "00", $hash->{DEF});
               Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
               
-            } else {
+            #} else {
               # EEP not supported
               # teach-in response
-              $data = sprintf "%06X90", (hex($fn) << 7 | hex($tp)) << 11 | 0x7FF;
-              EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, "00000000", "00", $hash->{DEF});
-              Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};            
+            #  $data = sprintf "%06X90", (hex($fn) << 7 | hex($tp)) << 11 | 0x7FF;
+            #  EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, "00000000", "00", $hash->{DEF});
+            #  Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};            
             }
 
           }
           # store attr subType, manufID ...
-          CommandSave(undef, undef);
+          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
           # delete standard readings
           CommandDeleteReading(undef, "$name sensor[0-9]");
           CommandDeleteReading(undef, "$name D[0-9]");
@@ -5280,6 +5280,7 @@ sub EnOcean_Parse($$)
           push @event, "3:sensorType:wall";
         }
       }
+      push @event, "3:button:" . (($db[0] & 4) ? "released" : "pressed") if ($manufID eq "7FF");
       push @event, "3:motion:$motion";
       push @event, "3:state:$motion";
 
@@ -6026,10 +6027,10 @@ sub EnOcean_Parse($$)
       push @event, "3:sensor1:$db[3]";
       push @event, "3:sensor2:$db[2]";
       push @event, "3:sensor3:$db[1]";
-      push @event, "3:D3:".(($db[0] & 8) ? 1:0);
-      push @event, "3:D2:".(($db[0] & 4) ? 1:0);
-      push @event, "3:D1:".(($db[0] & 2) ? 1:0);
-      push @event, "3:D0:".(($db[0] & 1) ? 1:0);
+      push @event, "3:D3:" . (($db[0] & 8) ? 1 : 0);
+      push @event, "3:D2:" . (($db[0] & 4) ? 1 : 0);
+      push @event, "3:D1:" . (($db[0] & 2) ? 1 : 0);
+      push @event, "3:D0:" . (($db[0] & 1) ? 1 : 0);
     }
 
   } elsif ($rorg eq "D1") {
@@ -6498,7 +6499,7 @@ sub EnOcean_Parse($$)
             } elsif ($timeNotation == 3) {
               $attr{$name}{timeNotation} = 12;
             }
-            CommandSave(undef, undef);
+            CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
 
           } elsif ($mid == 3) {
             # room control setup
@@ -6563,7 +6564,7 @@ sub EnOcean_Parse($$)
 
           #Log3 $name, 2, "EnOcean $name EnOcean_Parse write 4 MID $mid DATA $data to $timeProgram VAL: $attr{$name}{$timeProgram}";
 
-            CommandSave(undef, undef);
+            CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
           }
         }
         ($err, $response) = EnOcean_roomCtrlPanel_00Snd(undef, $hash, $packetType, $mid, $mcf, $irc, $fbc, $gmt);
@@ -6867,7 +6868,7 @@ sub EnOcean_Parse($$)
       push @event, "3:teach:Generic Profile teach-in accepted";
       Log3 $name, 2, "EnOcean $name Generic Profile teach-in Manufacturer: " . $attr{$name}{manufID};
       # store attr subType, manufID, gpDef ...
-      CommandSave(undef, undef);
+      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
 
     } elsif ($purpose == 1 || ($purpose == 2 && AttrVal($name, "subType", "") eq "genericProfile")) {
       # teach-in deletion request
@@ -6924,12 +6925,13 @@ sub EnOcean_Parse($$)
         $hash->{IODev}{helper}{gpRespWaitDel}{$destinationName} = 1;
 
       } elsif ($purpose == 2) {
-        # teach-out
+        # teach-out accepted
         if ($hash->{IODev}{helper}{gpRespWait}{$destinationID}{teachInReq} eq "out") {
           if (defined $attr{$name}{subDef}) {
             $hash->{DEF} = $attr{$name}{subDef};
+            $modules{EnOcean}{defptr}{$hash->{DEF}} = $hash;
             delete $attr{$name}{subDef};
-            CommandSave(undef, undef);
+            CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
           }      
           #push @event, "3:teach:Generic Profile teach-out accepted";
           readingsSingleUpdate($destinationHash, "teach", "Generic Profile teach-out accepted", 1);
@@ -7003,7 +7005,7 @@ sub EnOcean_Parse($$)
           }
           Log3 $name, 2, "EnOcean $name UTE teach-in EEP $rorg-$func-$type Manufacturer: $mid";
           # store attr subType, manufID ...
-          CommandSave(undef, undef);
+          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
         } else {
           # EEP type not supported
           $attr{$name}{subType} = "raw";
@@ -7021,7 +7023,7 @@ sub EnOcean_Parse($$)
           }
           Log3 $name, 2, "EnOcean $name EEP $rorg-$func-$type not supported";
           # store attr subType, manufID ...
-          CommandSave(undef, undef);
+          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
         }
       } elsif ($teachInReq == 1) {
         # Teach-In Deletion Request
@@ -7086,8 +7088,9 @@ sub EnOcean_Parse($$)
               $teachInAccepted = "teach-out accepted";
               if (defined $attr{$destinationName}{subDef}) {
                 $destinationHash->{DEF} = $attr{$destinationName}{subDef};
+                $modules{EnOcean}{defptr}{$destinationHash->{DEF}} = $destinationHash;
                 delete $attr{$destinationName}{subDef};
-                CommandSave(undef, undef);
+                CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
               }
             } else {
               $teachInAccepted = "EEP not supported";
@@ -7115,7 +7118,7 @@ sub EnOcean_Parse($$)
       return "";
     }
     Log3 $name, 3, "EnOcean $name secure teach-in $msg";
-    CommandSave(undef, undef);
+    CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
     return "";
 
   } elsif ($rorg eq "C5" && $packetType == 1) {
@@ -7170,7 +7173,7 @@ sub EnOcean_Parse($$)
         }
         push @event, "3:teach:RMCC teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
         Log3 $name, 2, "EnOcean $name RMCC teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
-        CommandSave(undef, undef);
+        CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
 
       } elsif ($hash->{helper}{sysEx}{$seq}{fnNumber} == 0x607) {
         # functions list answer
@@ -7248,7 +7251,7 @@ sub EnOcean_Parse($$)
       }
       push @event, "3:teach:RMCC teach-in accepted EEP $rorg-$func-$type Manufacturer: $manufID";
       Log3 $name, 2, "EnOcean $name RMCC teach-in accepted EEP $rorg-$func-$type Manufacturer: $manufID";
-      CommandSave(undef, undef);
+      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
 
     } else {
       Log3 $name, 2, "EnOcean $name RMCC/RPC Function Number " . sprintf("%04X", $fnNumber) . " not supported.";
@@ -7274,12 +7277,18 @@ sub EnOcean_Parse($$)
     if (defined $oldDevice) {
       Log3 $name, 2, "EnOcean $name renamed $oldDevice to $deleteDevice";
       CommandRename(undef, "$oldDevice $deleteDevice");
-      CommandSave(undef, undef);
+      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
       return $deleteDevice;
     } else {
-      CommandSave(undef, undef);
+      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+      CommandRereadCfg(undef, undef);
       return '';
     }
+    #####
+    #my %functionHash = (hash => $hash, function => "delete", deleteDevice => $deleteDevice, oldDevice => $oldDevice);
+    #RemoveInternalTimer(\%functionHash);
+    #InternalTimer(gettimeofday() + 0.1, "EnOcean_CommandDelete", \%functionHash, 0);
+    #return '';
   }
   return $name;
 }
@@ -7419,7 +7428,7 @@ sub EnOcean_Attr(@)
       # convert old format
       #$attr{$name}{$attrName} = hex $attrVal;
       CommandAttr(undef, "$name $attrName " .  hex $attrVal);
-      CommandSave(undef, undef);
+      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
 
     } elsif ($attrVal =~ m/^\d+$/ && $attrVal >= 0 && $attrVal <= 255) {
 
@@ -7750,7 +7759,7 @@ sub EnOcean_Attr(@)
     } elsif ($attrVal eq "getNextID") {
       $attr{$name}{$attrName} = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000");
       #CommandAttr(undef, "$name $attrName " . EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000"));
-      CommandSave(undef, undef);
+      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
       #CommandRereadCfg(undef, "");
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{8}$/) {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
@@ -7901,14 +7910,28 @@ sub EnOcean_Notify(@)
         if (defined $hash->{IODev}{helper}{UTERespWaitDel}{$name} && $rorgName eq "UTE") {
           CommandDelete(undef, substr($definedName, 8));
           delete $hash->{IODev}{helper}{UTERespWaitDel}{$name};
-          CommandSave(undef, undef);
           Log3 $name, 2, "EnOcean $name UTE temporary teach-in response device " . substr($definedName, 8) . " deleted";
+          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+          CommandRereadCfg(undef, undef);
+          #####
+          #delete $hash->{IODev}{helper}{UTERespWaitDel}{$name};
+          #Log3 $name, 2, "EnOcean $name UTE temporary teach-in response device " . substr($definedName, 8) . " deleted";
+          #my %functionHash = (hash => $hash, function => "delete", deleteDevice => substr($definedName, 8), oldDevice => undef);
+          #RemoveInternalTimer(\%functionHash);
+          #InternalTimer(gettimeofday() + 0.1, "EnOcean_CommandDelete", \%functionHash, 0);
         }
         if (defined $hash->{IODev}{helper}{gpRespWaitDel}{$name} && $rorgName eq "GPTR") {
           CommandDelete(undef, substr($definedName, 8));
           delete $hash->{IODev}{helper}{gpRespWaitDel}{$name};
-          CommandSave(undef, undef);
           Log3 $name, 2, "EnOcean $name Generic Profile temporary teach-in response device " . substr($definedName, 8) . " deleted";
+          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+          CommandRereadCfg(undef, undef);
+          #####
+          #delete $hash->{IODev}{helper}{gpRespWaitDel}{$name};
+          #Log3 $name, 2, "EnOcean $name Generic Profile temporary teach-in response device " . substr($definedName, 8) . " deleted";
+          #my %functionHash = (hash => $hash, function => "delete", deleteDevice => substr($definedName, 8), oldDevice => undef);
+          #RemoveInternalTimer(\%functionHash);
+          #InternalTimer(gettimeofday() + 0.1, "EnOcean_CommandDelete", \%functionHash, 0);
         }
       }
       #Log3($name, 5, "EnOcean $name <notify> DEFINED $definedName");
@@ -9346,6 +9369,30 @@ sub EnOcean_cdmClear($) {
 }
 
 #
+sub EnOcean_CommandDelete($) {
+  my ($functionHash) = @_;
+  my $deleteDevice = $functionHash->{deleteDevice};
+  my $function = $functionHash->{function};
+  my $hash = $functionHash->{hash};
+  my $name = $hash->{NAME};
+  my $oldDevice = $functionHash->{oldDevice};
+  CommandDelete(undef, $deleteDevice);
+  CommandDelete(undef, "FileLog_" . $deleteDevice);
+  delete $defs{$deleteDevice};
+  delete $modules{EnOcean}{defptr}{$hash->{DEF}};
+  if (defined $oldDevice) {
+    Log3 $name, 2, "EnOcean $name: $oldDevice renamed to $deleteDevice";
+    CommandRename(undef, "$oldDevice $deleteDevice");
+    CommandSave(undef, undef);
+  } else {
+    Log3 $name, 2, "EnOcean $name: $deleteDevice deleted";
+    CommandSave(undef, undef);
+    #CommandRereadCfg(undef, undef);
+  }
+  return;
+}
+
+#
 sub EnOcean_convBitToHex($) {
   # convert bit string to hex string
   my ($bitStr) = @_;
@@ -9769,7 +9816,7 @@ sub EnOcean_sec_getRLC($$) {
 			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
 			$new_rlc = 0;
 		        $attr{$name}{$rlcVar} = "0000";
-                        CommandSave(undef, undef);
+                        CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
 		}
 		readingsSingleUpdate($hash, "." . $rlcVar, uc(unpack('H4',pack('n', $new_rlc))), 0);
 		$attr{$name}{$rlcVar} = uc(unpack('H4',pack('n', $new_rlc)));
@@ -9779,7 +9826,7 @@ sub EnOcean_sec_getRLC($$) {
 			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
 			$new_rlc = 0;
 		        $attr{$name}{$rlcVar} = "000000";
-                        CommandSave(undef, undef);
+                        CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
 		}
                 readingsSingleUpdate($hash, "." . $rlcVar, uc(unpack('H6',pack('N', $new_rlc))), 0);
 		$attr{$name}{$rlcVar} = uc(unpack('H6',pack('N', $new_rlc)));
@@ -12044,6 +12091,7 @@ EnOcean_Undef($$)
          [EnOcean EOSW]<br>
      <ul>
        <li>on|off</li>
+       <li>button: pressed|released</li>
        <li>current: I/&#181;A (Sensor Range: I = 0 V ... 127.0 &#181;A)</li>
        <li>errorCode: 251 ... 255</li>
        <li>motion: on|off</li>
