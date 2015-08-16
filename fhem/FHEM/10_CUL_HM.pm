@@ -2367,7 +2367,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
 
     if($ioId eq $mh{dst} && $mh{mFlgH}&0x20 && $state){
-      push @ack,$mh{shash},$mh{mNo}."8002".$ioId.$mh{src}."0101$mh{state}00";
+      push @ack,$mh{shash},$mh{mNo}."8002".$ioId.$mh{src}."0101".$state."00";
     }
   }
   elsif($mh{st} eq "smokeDetector") { #########################################
@@ -2681,13 +2681,12 @@ sub CUL_HM_parseCommon(@){#####################################################
   $mhp->{devH}{helper}{PONtest} = 1 if($mhp->{mNo} eq "00");
   my $repeat;
   if   ($mhp->{mTp} eq "02"){# Ack/Nack/aesReq ####################
-    my $subType = substr($mhp->{p},0,2);
     my $reply;
     my $success;
 
     if ($mhp->{devH}{helper}{prt}{rspWait}{brstWu}){
       if ($mhp->{devH}{helper}{prt}{rspWait}{mNo} eq $mhp->{mNo} &&
-          $subType eq "00"){
+          $mhp->{mStp} eq "00"){
         if ($mhp->{devH}{helper}{prt}{awake} && $mhp->{devH}{helper}{prt}{awake}==4){#re-burstWakeup
           delete $mhp->{devH}{helper}{prt}{rspWait};#clear burst-wakeup values
           $mhp->{devH}{helper}{prt}{rspWait}{$_} = $mhp->{devH}{helper}{prt}{rspWaitSec}{$_}
@@ -2718,7 +2717,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       delete $mhp->{devH}{helper}{AESreqAck};
     }
 
-    if   ($subType =~ m/^8/){#NACK
+    if   ($mhp->{mStp} =~ m/^8/){#NACK
       #82 : peer not accepted - list full (VD)
       #84 : request undefined register
       #85 : peer not accepted - why? unknown
@@ -2726,16 +2725,18 @@ sub CUL_HM_parseCommon(@){#####################################################
       CUL_HM_eventP($mhp->{devH},"Nack");
       $reply = "NACK";
     }
-    elsif($subType eq "01"){ #ACKinfo#################
+    elsif($mhp->{mStp} eq "01"){ #ACKinfo#################
       $success = "yes";
       CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
-      my $rssi = substr($mhp->{p},8,2);
       push @evtEt,[$mhp->{cHash},0,"recentStateType:ack"];
-      CUL_HM_storeRssi( $mhp->{devN}
-                       ,$mhp->{dstN}
-                       ,(-1)*(hex($rssi))
-                       ,$mhp->{mNo})
-            if ($rssi && $rssi ne '00' && $rssi ne'80');
+      if (length($mhp->{p})>9){
+        my $rssi = substr($mhp->{p},8,2);
+        CUL_HM_storeRssi( $mhp->{devN}
+                         ,$mhp->{dstN}
+                         ,(-1)*(hex($rssi))
+                         ,$mhp->{mNo})
+              if ($rssi && $rssi ne '00' && $rssi ne'80');
+      }
       $reply = "ACKStatus";
       if ($mhp->{devH}{helper}{tmdOn}){
         if ((not hex(substr($mhp->{p},6,2))&0x40) && # not timedOn, we have to repeat
@@ -2750,7 +2751,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         }
       }
     }
-    elsif($subType eq "04"){ #ACK-AES, ###############
+    elsif($mhp->{mStp} eq "04"){ #ACK-AES, ###############
       my (undef,$challenge,$aesKeyNbr) = unpack'A2A12A2',$mhp->{p};
       push @evtEt,[$mhp->{devH},1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);# if   ($mh{msgStat} =~ m/AESKey/)
 
