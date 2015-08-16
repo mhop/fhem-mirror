@@ -950,7 +950,7 @@ sub TCM_Notify(@) {
         $hash->{LastID} = "00000000";
       }
     }
-    CommandSave(undef, undef);
+    #CommandSave(undef, undef);
     readingsSingleUpdate($hash, "state", "initialized", 1);
     Log3 $name, 2, "TCM $name initialized";
   }
