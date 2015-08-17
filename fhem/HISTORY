@@ -630,3 +630,6 @@
 
 - Sat Apr 25 2015 (risiko)
   - added new modules to support pilight (sending and receiving): switch, dimmer, temperature and humidity
+
+- Mon Aug 17 2015 (rapster)
+  - added new module 70_VolumeLink to link the volume-level and mute-state of a physical-device with a fhem-device
