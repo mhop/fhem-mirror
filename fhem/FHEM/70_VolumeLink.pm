@@ -1,5 +1,5 @@
 ###############################################################################
-# $Id: 70_VolumeLink.pm 2015-08-17 08:00 - rapster - rapster at x0e.de $
+# $Id: 70_VolumeLink.pm 2015-08-17 23:00 - rapster - rapster at x0e.de $
 
 package main;
 use strict;
@@ -34,6 +34,11 @@ sub VolumeLink_Define($$) {
     my ($hash, $def) = @_;
     my @a = split("[ \t][ \t]*", $def);
     return "Wrong syntax: use define <name> VolumeLink <interval> <url> <ampDevice> [<timeout> [<httpErrorLoglevel> [<httpLoglevel>]]]" if(int(@a) < 5);
+    return "Wrong syntax: <interval> is not a number!"                    if(!looks_like_number($a[2]));
+    return "Wrong syntax: <interval> too small, must be at least 0.01"    if($a[2] < 0.01);
+    return "Wrong syntax: <timeout> is not a number!"                     if($a[5] && !looks_like_number($a[5]));
+    return "Wrong syntax: <timeout> too small, must be at least 0.01"     if($a[5] && $a[5] < 0.01);
+    return "Wrong syntax: <ampDevice> not defined! Define '$a[4]' first." if(!defined$defs{$a[4]});
     
     my $name = $a[0];
 
