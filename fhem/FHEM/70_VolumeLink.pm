@@ -56,14 +56,16 @@ sub VolumeLink_Define($$) {
         ampMuteCommand          => $attr{$name}{ampMuteCommand} || 'Mute'
     );
     $hash->{httpParams} = {
-        hash            => $hash,
-        url             => $hash->{url},
-        timeout         => $hash->{timeout},
-        noshutdown      => 1,
-        loglevel        => $hash->{httpLoglevel},
-        errorLoglevel   => $hash->{httpErrorLoglevel},
-        method          => 'GET',
-        callback        => \&VolumeLink_ReceiveCommand
+        HTTP_ERROR_COUNT  => 0,
+        fastRetryInterval => 0.1,
+        hash              => $hash,
+        url               => $hash->{url},
+        timeout           => $hash->{timeout},
+        noshutdown        => 1,
+        loglevel          => $hash->{httpLoglevel},
+        errorLoglevel     => $hash->{httpErrorLoglevel},
+        method            => 'GET',
+        callback          => \&VolumeLink_ReceiveCommand
     };
     
     readingsSingleUpdate($hash,'state','off',1) if($hash->{STARTED} == 0 && ReadingsVal($name,'state','') ne 'off');
@@ -175,16 +177,27 @@ sub VolumeLink_SendCommand($) {
 sub VolumeLink_ReceiveCommand($) {
     my ($param, $err, $data) = @_;
     my $name = $param->{hash}->{NAME};
+    my $interval = $param->{hash}->{interval};
     
     Log3 $name, 5, "$name: ReceiveCommand - executed";
     
-    if($err ne "") {
-        Log3 $name, $param->{errorLoglevel}, "$name: Error while requesting ".$param->{url}." - $err";
-        
-        readingsSingleUpdate($param->{hash},'lastHttpError',$err,0);
+    if($err ne "") {        
+        if($interval > $param->{fastRetryInterval} && $err =~ /timed.out/ && $param->{HTTP_ERROR_COUNT} < 3) {
+        	$interval = $param->{fastRetryInterval};
+        	$param->{HTTP_ERROR_COUNT}++;
+            
+            readingsSingleUpdate($param->{hash},'lastHttpError',"$err #$param->{HTTP_ERROR_COUNT} of 3, do fast-retry in $interval sec.",0);
+            Log3 $name, $param->{errorLoglevel}, "$name: Error while requesting ".$param->{url}." - $err - Fast-retry #$param->{HTTP_ERROR_COUNT} of 3 in $interval seconds.";
+        }
+        else {
+            readingsSingleUpdate($param->{hash},'lastHttpError',"$err, retry in $interval sec.",0);
+            Log3 $name, $param->{errorLoglevel}, "$name: Error while requesting ".$param->{url}." - $err - Retry in $interval seconds.";
+        }
     }
     elsif($data ne "") {
         Log3 $name, $param->{loglevel}, "$name: url ".$param->{url}." returned: $data";
+        
+        $param->{HTTP_ERROR_COUNT} = 0;
         
         my($vol,$mute) = $data =~ /$param->{hash}->{volumeRegexPattern}/m;
         $vol = int($vol);
@@ -230,7 +243,7 @@ sub VolumeLink_ReceiveCommand($) {
     }
     
     if($param->{hash}->{STARTED} == 1) {
-        InternalTimer(time()+$param->{hash}->{interval}, 'VolumeLink_SendCommand', $param->{hash}, 0);
+        InternalTimer(time()+$interval, 'VolumeLink_SendCommand', $param->{hash}, 0);
     }
     return undef;
 }
