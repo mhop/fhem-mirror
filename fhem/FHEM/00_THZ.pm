@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 04/2015
-my $thzversion = "0.143";
+my $thzversion = "0.144";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -1596,22 +1596,25 @@ sub THZ_Undef($$) {
 
 ##########################################
 # nearest rounds to the nearrest value multiple of the first argumen
-# nearest_ceil(10, 44); --> 40
-# nearest_floor(10, 44); --> 50
+# nearest_ceil(10, 45); --> 50
+# nearest_floor(10, 45); --> 40
+# for all other values outside the middlevalues they take he nearest
 # modified takes as an argument the function to be called, not the argument
 ########################################################################################
 
-sub nearest_ceil {
+sub nearest_ceil($$) {
     my $targ = abs(shift);
-    my @res  = map { $targ * POSIX::floor(($_ + $Math::Round::half * $targ) / $targ) } @_;
+    my $Math1 = 0.5000000000003;
+    my @res  = map { $targ * POSIX::floor(($_ + $Math1 * $targ) / $targ) } @_;
 
     return wantarray ? @res : $res[0];
 }
 
 
-sub nearest_floor {
+sub nearest_floor($$) {
     my $targ = abs(shift);
-    my @res  = map { $targ * POSIX::ceil(($_ - $Math::Round::half * $targ) / $targ) } @_;
+    my $Math1 = 0.5000000000003;
+    my @res  = map { $targ * POSIX::ceil(($_ - $Math1 * $targ) / $targ) } @_;
 
     return wantarray ? @res : $res[0];
 }
@@ -1660,9 +1663,9 @@ sub function_heatSetTemp($$) {
   if (!defined($roomSetTemp)) {
   $insideTemp=23.8 ; $roomSetTemp = 19.5; $p13GradientHC1 = 0.31; $heatSetTemp = 15; $p15RoomInfluenceHC1 = 80;
   $pOpMode ="DEMO: no data";
-  $outside_tempFiltered = 0; $p14LowEndHC1 =0.5;  
+  $outside_tempFiltered = 0; $p14LowEndHC1 =0.5; 
   }
-  
+
   my $a= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1 + ($p15RoomInfluenceHC1 * $p13GradientHC1 * ($roomSetTemp - $insideTemp) /10); 
   my $a1= 0.7 + ($roomSetTemp * (1 + $p13GradientHC1 * 0.87)) + $p14LowEndHC1;
   my $b= -14 * $p13GradientHC1 / $roomSetTemp; 
