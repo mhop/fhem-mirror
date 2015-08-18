@@ -3382,7 +3382,7 @@ ReplaceEventMap($$$)
 
   return $str    if($dir && !$em);
   return @{$str} if(!$dir && (!$em || int(@{$str}) < 2 ||
-                    !$str->[1] || $str->[1] eq "?"));
+                    !defined($str->[1]) || $str->[1] eq "?"));
 
   return ReplaceEventMap2($dev, $str, $dir, $em) if($em =~ m/^{.*}$/);
   my @emList = attrSplit($em);
