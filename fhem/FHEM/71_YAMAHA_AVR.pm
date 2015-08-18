@@ -99,7 +99,6 @@ YAMAHA_AVR_GetStatus($;$)
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Update><YAMAHA_Network_Site><Status>GetParam</Status></YAMAHA_Network_Site></Update></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", 1);
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Update><Status>GetParam</Status></Update></Network></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", 1);
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Party_Mode><Mode>GetParam</Mode></Party_Mode></System></YAMAHA_AV>", "statusRequest", "partyMode");
     
     YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
 }
