@@ -635,6 +635,7 @@ while (1) {
   # reported by select, but is used by unix too, to check if the device is
   # attached again.
   foreach my $p (keys %selectlist) {
+    next if(!$p);       # Deleted in the loop
     my $hash = $selectlist{$p};
     my $isDev = ($hash && $hash->{NAME} && $defs{$hash->{NAME}});
     my $isDirect = ($hash && ($hash->{directReadFn} || $hash->{directWriteFn}));
@@ -2661,6 +2662,7 @@ HandleTimeout()
   # Check the internal list.
   foreach my $i (sort { $intAt{$a}{TRIGGERTIME} <=>
                         $intAt{$b}{TRIGGERTIME} } keys %intAt) {
+    next if(!$i || !$intAt{$i}); # deleted in the loop
     my $tim = $intAt{$i}{TRIGGERTIME};
     my $fn = $intAt{$i}{FN};
     if(!defined($tim) || !defined($fn)) {
