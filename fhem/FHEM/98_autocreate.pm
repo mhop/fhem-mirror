@@ -353,6 +353,34 @@ CommandCreateLog($$)
   $attr{$ac}{disable} = 1 if($disabled);
 }
 
+my %ac_links=();
+
+
+# Optimized for linux /dev/serial/by-path/... links
+sub
+resolveSymLink($)
+{
+  my ($name) = @_;
+  return $ac_links{$name} if($ac_links{$name});
+  return $name if($^O =~ m/Win/ || !-l $name);
+
+  my $link = readlink($name);
+  return $name if(!$link);
+  my @p = split("/", $name);
+  pop(@p);
+  foreach my $l (split("/", $link)) {
+    next if($l eq ".");
+    if($l ne "..") {
+       push(@p, $l); next;
+    }
+    pop(@p);
+    push(@p,"") if(@p == 0); # root directory
+  }
+
+  $link = resolveSymLink(join("/", @p));
+  $ac_links{$name} = $link;
+  return $link;
+}
 
 ##########################
 # Table for automatically creating IO devices
@@ -480,18 +508,12 @@ CommandUsb($$)
 
           # Check if it already used
           foreach my $d (keys %defs) {
-            if($defs{$d}{DeviceName} &&
-               $defs{$d}{FD}) {
+            if($defs{$d}{DeviceName}) {
 
               my $dn = $defs{$d}{DeviceName};
-              my $match = ($dn =~ m/$dev/);
-              if(!$match) {
-                $dn =~ s/@.*//;
-                $match = (readlink($dn) =~ m/$dev/) if(-l $dn);
-              }
-
-              if($match) {
-                $msg = "already used by the fhem device $d";
+              $dn =~ s/@.*//;
+              if(resolveSymLink($dn) eq resolveSymLink("/dev/$dev")) {
+                $msg = "$dev is already used by the fhem device $d";
                 Log3 undef, 4, $msg; $ret .= $msg . "\n";
                 goto NEXTDEVICE;
               }
@@ -537,7 +559,9 @@ CommandUsb($$)
 
           if(!$scan) {
             Log3 undef, 1, "define $define";
-            CommandDefine($cl, $define);
+            my $lret = CommandDefine($cl, $define);
+            CommandSave(undef, undef)
+                if(!$lret && AttrVal("autocreate","autosave",1));
           }
 
           goto NEXTDEVICE;
