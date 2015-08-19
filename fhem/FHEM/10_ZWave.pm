@@ -1610,7 +1610,7 @@ ZWave_sendWakeup($)
     IOWrite($hash, "00", "13${nodeId}02840805");
 
   } else { # Wait for commands via notify
-    InternalTimer(gettimeofday()+0.1, sub($) {
+    InternalTimer(gettimeofday()+1, sub($) {
       my $nodeId = $hash->{id};
       IOWrite($hash, "00", "13${nodeId}02840805");
     }, $hash, 0);
