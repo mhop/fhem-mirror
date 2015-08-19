@@ -189,11 +189,10 @@ CO20_Connect($)
       $hash->{STATE} = "opened";
       Log3 $name, 3, "$name: CO20 device opened";
 
-      my $interval = AttrVal($name, "interval", 300);
+      $hash->{INTERVAL} = AttrVal($name, "interval", 300);
       $hash->{retries} = AttrVal($name,"retries",3);
-      $hash->{timeout} = AttrVal($name,"timeout",10);
+      $hash->{timeout} = AttrVal($name,"timeout",1000);
 
-      $hash->{INTERVAL} = $interval;
 
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+10, "CO20_poll", $hash, 0);
@@ -271,8 +270,6 @@ CO20_poll($)
 
   if( $hash->{manufacturer} && $hash->{product} ) {
 
-
-
     my $buf = "@".sprintf("%c",$hash->{seq2})."TRF?\n@@@@@@@@@";
 
     Log3 $name, 5, "$name: sent $buf / ".ord(substr($buf,0,1));
@@ -294,15 +291,15 @@ CO20_poll($)
     }
     if ($hash->{seq2} < 0xFF){ $hash->{seq2}++} else {$hash->{seq2} = 0x67};
 
-my $data="";
-for( $a = 1; $a <= 3; $a = $a + 1 ){
-    $ret=$hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{timeout});
-    if( $ret != 16 and $ret != 0 ) {
-      Log3 $name, 4, "$name: read error $ret";
+    my $data="";
+    for( $a = 1; $a <= 3; $a = $a + 1 ) {
+      $ret=$hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{timeout});
+      if( $ret != 16 and $ret != 0 ) {
+        Log3 $name, 4, "$name: read error $ret";
+      }
+      $data.=$buf;
     }
-    $data.=$buf;
-}
-Log3 $name, 4, "$name got $data / ".length($data)." / ".ord(substr($data,0,1));
+    Log3 $name, 4, "$name got $data / ".length($data)." / ".ord(substr($data,0,1));
 
     if( $ret != 16 and $ret != 0 and length($data) < 16 ) {
       $hash->{fail} = $hash->{fail}+1;
@@ -339,19 +336,18 @@ Log3 $name, 4, "$name got $data / ".length($data)." / ".ord(substr($data,0,1));
         readingsEndUpdate($hash,1);
       }
 
-#my $bufdec = ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1))." ".ord(substr($buf,16,1));
-#      Log3 $name, 5, "$name: read 1 success\n$bufdec";
-
+      #my $bufdec = ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1))." ".ord(substr($buf,16,1));
+      #      Log3 $name, 5, "$name: read 1 success\n$bufdec";
 
     } else {
       $hash->{fail} = $hash->{fail}+1;
       Log3 $name, 2, "$name: read failed $ret ($hash->{fail})";
       if($hash->{fail} >= $hash->{retries}) {
         $hash->{fail} = 0;
-      CO20_Disconnect($hash);
+        CO20_Disconnect($hash);
         $hash->{RECONNECT} = 1;
-      CO20_Connect($hash);
-    }
+        CO20_Connect($hash);
+      }
     }
 
     $hash->{LAST_POLL} = FmtDateTime( gettimeofday() );
@@ -387,12 +383,10 @@ CO20_dataread($$)
     return undef;
   }
 
-    RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CO20_poll", $hash, 1);
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CO20_poll", $hash, 1);
 
   if( $hash->{manufacturer} && $hash->{product} ) {
-
-
 
     my $seq = sprintf("%04X",$hash->{seq4});
     my $seqstr = sprintf("%c",hex substr($seq,2,2)).sprintf("%c",hex substr($seq,0,2));
@@ -400,40 +394,36 @@ CO20_dataread($$)
 
     my $buf = substr("@".$seq.$reqstr."\n@@@@@@@@@@@@@@@@",0,16);
     my $ret = $hash->{DEV}->interrupt_write(0x00000002, $buf, 0x0000010, $hash->{timeout});
-Log3 $name, 4, "getdata write $ret" if($ret != 16);
+    Log3 $name, 4, "getdata write $ret" if($ret != 16);
 
 
-my $data = "";
-my $intdata = "";
-if($ret == 16) {
-for( $a = 1; $a <= $retcount; $a = $a + 1 ){
-    $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{timeout});
-    $data.=$buf;
-Log3 $name, 4, "getdata read $ret" if($ret != 16);
-      $intdata = ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1));
-Log3 $name, 5, "$intdata\n$buf";
-}
-Log3 $name, 5, length($data);
-
-}
-
-
-  if($readingstype eq "knobdata") {
-    CO20_SetStickData($hash,$data);
-  } elsif ($readingstype eq "flagdata") {
-    CO20_SetStickData($hash,$data);
-  } elsif ($readingstype eq "stickdata") {
-    if ($data =~ /\bStick\b(.*?)\bMCU\b/) {
-      $hash->{FIRMWARE} = $1;
+    my $data = "";
+    my $intdata = "";
+    if($ret == 16) {
+      for( $a = 1; $a <= $retcount; $a = $a + 1 ){
+        $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{timeout});
+        $data.=$buf;
+        Log3 $name, 4, "getdata read $ret" if($ret != 16);
+        $intdata = ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1));
+        Log3 $name, 5, "$intdata\n$buf";
+      }
+      Log3 $name, 5, length($data);
     }
-    if ($data =~ /\bS\/N:\b(.*?)\b;bI\b/) {
-      $hash->{SERIALNUMBER} = $1;
+
+
+    if($readingstype eq "knobdata") {
+      CO20_SetStickData($hash,$data);
+    } elsif ($readingstype eq "flagdata") {
+      CO20_SetStickData($hash,$data);
+    } elsif ($readingstype eq "stickdata") {
+      if ($data =~ /\bStick\b(.*?)\bMCU\b/) {
+        $hash->{FIRMWARE} = $1;
+      }
+      if ($data =~ /\bS\/N:\b(.*?)\b;bI\b/) {
+        $hash->{SERIALNUMBER} = $1;
+      }
     }
   }
-
-
-  }
-
 }
 
 
@@ -442,31 +432,24 @@ CO20_flashread($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-
-
-# 40 30 30 31 31 52 45 43 4F 52 44 53 3F 0A 40 40   @0011RECORDS?.@@
-#
-# 40 30 30 31 32 4C 42 53 49 5A 45 3F 0A 40 40 40   @0012LBSIZE?.@@@
-#
-# 40 30 30 31 33 46 4C 53 54 4F 50 0A 40 40 40 40   @0013FLSTOP.@@@@
-#
-# 40 30 30 31 34 4C 42 53 49 5A 45 3F 0A 40 40 40   @0014LBSIZE?.@@@
-#
-# 40 30 30 31 35 2A 49 44 4E 3F 0A 40 40 40 40 40   @0015*IDN?.@@@@@
-#
-# 40 30 30 31 36 4C 42 41 56 47 3B 31 30 30 0A 40   @0016LBAVG;100.@
-#
-# 40 6A 4C 42 52 0A 40 40 40 40 40 40 40 40 40 40   @jLBR.@@@@@@@@@@ n times ?
-#
-# 40 30 30 31 37 46 4C 53 54 41 52 54 0A 40 40 40   @0017FLSTART.@@@ n times ?
-#
-# 2 reads each
-
-
-
-
-
-
+  return undef;
+  # 40 30 30 31 31 52 45 43 4F 52 44 53 3F 0A 40 40   @0011RECORDS?.@@
+  #
+  # 40 30 30 31 32 4C 42 53 49 5A 45 3F 0A 40 40 40   @0012LBSIZE?.@@@
+  #
+  # 40 30 30 31 33 46 4C 53 54 4F 50 0A 40 40 40 40   @0013FLSTOP.@@@@
+  #
+  # 40 30 30 31 34 4C 42 53 49 5A 45 3F 0A 40 40 40   @0014LBSIZE?.@@@
+  #
+  # 40 30 30 31 35 2A 49 44 4E 3F 0A 40 40 40 40 40   @0015*IDN?.@@@@@
+  #
+  # 40 30 30 31 36 4C 42 41 56 47 3B 31 30 30 0A 40   @0016LBAVG;100.@
+  #
+  # 40 6A 4C 42 52 0A 40 40 40 40 40 40 40 40 40 40   @jLBR.@@@@@@@@@@ n times ?
+  #
+  # 40 30 30 31 37 46 4C 53 54 41 52 54 0A 40 40 40   @0017FLSTART.@@@ n times ?
+  #
+  # 2 reads each
 }
 
 sub
@@ -510,8 +493,8 @@ CO20_dataset($$$)
     $reqstr = "*RST";
   }
 
-    RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CO20_poll", $hash, 1);
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "CO20_poll", $hash, 1);
 
   if( $hash->{manufacturer} && $hash->{product} ) {
 
@@ -526,7 +509,7 @@ CO20_dataset($$$)
       } else {
         my $h = sprintf("%04X",$val & 0xFFFF);
         $buf .= sprintf("%c",hex substr($h,2,2)).sprintf("%c",hex substr($h,0,2));
-Log3 $name, 5, "$val $h \n";
+        Log3 $name, 5, "$val $h \n";
       }
     }
     if (index($reqstr, "KNOBSET") != -1) {
@@ -563,17 +546,8 @@ Log3 $name, 5, "$val $h \n";
       return undef;
     }
 
-
-
-
-
   }
-
-
-
-
-     return undef;
-
+  return undef;
 
 }
 
@@ -586,25 +560,25 @@ CO20_Get($$@)
   $list = "update:noArg air_data:noArg knob_data:noArg flag_data:noArg stick_data:noArg" if( AttrVal($name, "advanced", 0 ) == 1 );
 
   if( $cmd eq "air_data" or $cmd eq "update" ) {
-      $hash->{LOCAL} = 1;
-      CO20_poll($hash);
-      delete $hash->{LOCAL};
-      return undef;
+    $hash->{LOCAL} = 1;
+    CO20_poll($hash);
+    delete $hash->{LOCAL};
+    return undef;
   } elsif( $cmd eq "knob_data" ) {
-      $hash->{BLOCKED} = 1;
-      CO20_dataread($hash,"knobdata");
-      delete $hash->{BLOCKED};
-      return undef;
+    $hash->{BLOCKED} = 1;
+    CO20_dataread($hash,"knobdata");
+    delete $hash->{BLOCKED};
+    return undef;
   } elsif( $cmd eq "flag_data" ) {
-      $hash->{BLOCKED} = 1;
-      CO20_dataread($hash,"flagdata");
-      delete $hash->{BLOCKED};
-      return undef;
+    $hash->{BLOCKED} = 1;
+    CO20_dataread($hash,"flagdata");
+    delete $hash->{BLOCKED};
+    return undef;
   } elsif( $cmd eq "stick_data" ) {
-      $hash->{BLOCKED} = 1;
-      CO20_dataread($hash,"stickdata");
-      delete $hash->{BLOCKED};
-      return undef;
+    $hash->{BLOCKED} = 1;
+    CO20_dataread($hash,"stickdata");
+    delete $hash->{BLOCKED};
+    return undef;
   }
 
   return "Unknown argument $cmd, choose one of $list";
@@ -616,12 +590,12 @@ CO20_Set($$$$)
   my ($hash, $name, $cmd, $val) = @_;
 
   my $list = "";
- $list = "flag_WARMUP flag_BURN-IN flag_RESET_BASELINE flag_CALIBRATE_HEATER flag_LOGGING knob_CO2/VOC_level_warn1 knob_CO2/VOC_level_warn2 knob_Reg_Set knob_Reg_P knob_Reg_I knob_Reg_D knob_LogInterval knob_ui16StartupBits recalibrate_heater:noArg reset_baseline:noArg reset_device:noArg" if( AttrVal($name, "advanced", 0 ) == 1 );
+  $list = "flag_WARMUP flag_BURN-IN flag_RESET_BASELINE flag_CALIBRATE_HEATER flag_LOGGING knob_CO2/VOC_level_warn1 knob_CO2/VOC_level_warn2 knob_Reg_Set knob_Reg_P knob_Reg_I knob_Reg_D knob_LogInterval knob_ui16StartupBits recalibrate_heater:noArg reset_baseline:noArg reset_device:noArg" if( AttrVal($name, "advanced", 0 ) == 1 );
   if (index($list, $cmd) != -1) {
-      $hash->{BLOCKED} = 1;
-      CO20_dataset($hash,$cmd,$val);
-      delete $hash->{BLOCKED};
-      return undef;
+    $hash->{BLOCKED} = 1;
+    CO20_dataset($hash,$cmd,$val);
+    delete $hash->{BLOCKED};
+    return undef;
   }
 
   return "Unknown argument $cmd, choose one of $list";
@@ -634,9 +608,11 @@ CO20_Attr($$$)
 
   my $orig = $attrVal;
   $attrVal = int($attrVal) if($attrName eq "interval" || $attrName eq "retries" || $attrName eq "timeout");
-  $attrVal = 30 if($attrName eq "interval" && $attrVal < 30 && $attrVal != 0);
-  $attrVal = 3 if($attrName eq "retries" && ($attrVal < 0 || $attrVal > 60));
-  $attrVal = 1000 if($attrName eq "timeout" && ($attrVal < 500 || $attrVal > 10000));
+  $attrVal = 10 if($attrName eq "interval" && $attrVal < 10 && $attrVal != 0);
+  $attrVal = 20 if($attrName eq "retries" && ($attrVal < 0));
+  $attrVal = 20 if($attrName eq "retries" && ($attrVal > 20));
+  $attrVal = 250 if($attrName eq "timeout" && ($attrVal != 0 && $attrVal < 250));
+  $attrVal = 10000 if($attrName eq "timeout" && ($attrVal != 0 && $attrVal > 10000));
 
   if( $attrName eq "disable" ) {
     my $hash = $defs{$name};
@@ -772,7 +748,11 @@ usb-sensors-linux</a></li>
   <b>Attributes</b>
   <ul>
     <li>interval<br>
-      the interval in seconds used to read updates. the minimum and default ist 60.</li>
+      the interval in seconds used to read updates [10..]. the default ist 300.</li>
+    <li>retries<br>
+      number of retries on USB read/write failures [0..20]. the default is 3.</li>
+    <li>timeout<br>
+      the USB connection timeout in milliseconds [250..10000]. the default is 1000.</li>
     <li>advanced<br>
       1 -> enables most of the advanced settings and readings described here</li>
     <li>disable<br>
