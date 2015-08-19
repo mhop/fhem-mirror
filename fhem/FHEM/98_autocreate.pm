@@ -4,6 +4,7 @@ package main;
 
 use strict;
 use warnings;
+sub resolveSymLink($);
 
 # Problems:
 # - Not all CUL_EM devices return a power
