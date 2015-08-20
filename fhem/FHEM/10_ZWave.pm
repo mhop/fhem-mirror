@@ -7,6 +7,7 @@ use strict;
 use warnings;
 use SetExtensions;
 use Compress::Zlib;
+use Time::HiRes qw( gettimeofday );
 
 sub ZWave_Parse($$@);
 sub ZWave_Set($@);
@@ -309,8 +310,9 @@ my %zwave_class = (
     parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"'},
     init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
+    set   => { versionClassRequest => 'ZWave_versionClassRequest($hash,"%s")'},
     get   => { version      => "11",
-               versionClass => "13%02x" },
+               versionClass => 'ZWave_versionClassGet("%s")' },
     parse => { "078612(..........)" => 'sprintf("version:Lib %d Prot '.
                 '%d.%d App %d.%d", unpack("C*",pack("H*","$1")))',
                "098612(..............)" => 'sprintf("version:Lib %d Prot '.
@@ -418,7 +420,7 @@ ZWave_Initialize($)
   $hash->{UndefFn}   = "ZWave_Undef";
   $hash->{ParseFn}   = "ZWave_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 noExplorerFrames:1,0 ".
-    "ignore:1,0 dummy:1,0 showtime:1,0 classes $readingFnAttributes";
+    "ignore:1,0 dummy:1,0 showtime:1,0 classes vclasses $readingFnAttributes";
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 
   $hash->{FW_detailFn} = "ZWave_fhemwebFn";
@@ -453,7 +455,7 @@ ZWave_Define($$)
   AssignIoPort($hash);  # FIXME: should take homeId into account
 
   if(@a) {      # Autocreate: set the classes, execute the init calls
-    $hash->{lastMsgTimestamp} = time(); # device is awake.
+    $hash->{lastMsgTimestamp} = gettimeofday(); # device is awake.
     ZWave_SetClasses($homeId, $id, undef, $a[0]);
   }
   return undef;
@@ -631,7 +633,7 @@ ZWave_Cmd($$@)
     $cmdFmt = $ncmd if(defined($ncmd));
   }
 
-  Log3 $name, 2, "ZWave $type $name $cmd";
+  Log3 $name, 2, "ZWave $type $name $cmd ".join(" ", @a);
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
   if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
@@ -660,7 +662,7 @@ ZWave_Cmd($$@)
       $baseHash->{WakeUp} = \@arr;
     }
     my $awake = ($baseHash->{lastMsgTimestamp} &&
-                  time() - $baseHash->{lastMsgTimestamp} < 3);
+                  gettimeofday() - $baseHash->{lastMsgTimestamp} < 3);
 
     if(!$awake) {
       push @{$baseHash->{WakeUp}}, $data.$id;
@@ -839,6 +841,62 @@ ZWave_meterSupportedParse($$)
   
   return "meterSupported: type: $meter_type_text scales: $unit_text resetable:".
             " $meter_reset_text";
+}
+
+sub
+ZWave_versionClassRequest($$)
+{
+  my ($hash, $answer) = @_;
+  my $name = $hash->{NAME};
+
+  if($answer =~ m/^048614(..)(..)$/i) { # Parse part
+    my $v = $hash->{versionhash};
+    $v->{$zwave_id2class{lc($1)}} = $2;
+    foreach my $class (keys %{$v}) {
+      next if($v->{$class} ne "");
+      my $r = ZWave_Set($hash, $name, "versionClassRequest", $class);
+      return;
+    }
+    $attr{$hash->{NAME}}{vclasses} =
+        join(" ", map { "$_:$v->{$_}" } sort keys %{$v});
+    delete($hash->{versionhash});
+  }
+
+  if($answer ne "%s" && $hash->{versionhash}) { # get next
+    return("", sprintf('13%02x', hex($zwave_class{$answer}{id})))
+          if($zwave_class{$answer});
+    return("versionClassRequest needs no parameter", "");
+  }
+
+  return("versionClassRequest needs no parameter", "")
+        if($answer ne "%s" && !$hash->{versionhash});
+
+  return("another versionClassRequest is already running", "")
+        if(defined($hash->{versionhash}));
+
+  # User part: called with no parameters
+  my %h = map { $_ => "" }
+          grep { $_ !~ m/^MARK$/ && $_ !~ m/^UNKNOWN/ }
+          split(" ", AttrVal($name, "classes", ""));
+  $hash->{versionhash} = \%h;
+  foreach my $class (keys %h) {
+    next if($h{$class} ne "");
+    return("", sprintf('13%02x', hex($zwave_class{$class}{id})));
+  }
+  return("Should not happen", "");
+}
+
+sub
+ZWave_versionClassGet($)
+{
+  my ($class) = @_;
+   
+  return("", sprintf('13%02x', $class))
+        if($class =~ m/\d+/);
+  return("", sprintf('13%02x', hex($zwave_class{$class}{id})))
+        if($zwave_class{$class});
+  return ("versionClass needs a class as parameter", "") if($class eq "%s");
+  return ("Unknown class $class", "");
 }
 
 sub
@@ -1593,6 +1651,21 @@ ZWave_getHash($$$)
 }
 
 sub
+ZWave_wakeupTimer($)
+{
+  my ($hash) = @_;
+  my $now = gettimeofday();
+  if($now - $hash->{lastMsgTimestamp} > 1) { # wakeupNoMoreInformation 
+    if($hash->{STATE} ne "TRANSMIT_NO_ACK") {
+      my $nodeId = $hash->{id};
+      IOWrite($hash, "00", "13${nodeId}02840805");
+    }
+  } else {
+    InternalTimer($now+0.1, "ZWave_wakeupTimer", $hash, 0);
+  }
+}
+
+sub
 ZWave_sendWakeup($)
 {
   my ($hash) = @_;
@@ -1604,17 +1677,9 @@ ZWave_sendWakeup($)
       Log3 $hash, 4, "Sending stored command: $wuCmd";
     }
     @{$hash->{WakeUp}}=();
-    #send a final wakeupNoMoreInformation
-    my $nodeId = $hash->{id};
-    Log3 $hash, 4, "Sending wakeupNoMoreInformation to node: $nodeId";
-    IOWrite($hash, "00", "13${nodeId}02840805");
-
-  } else { # Wait for commands via notify
-    InternalTimer(gettimeofday()+1, sub($) {
-      my $nodeId = $hash->{id};
-      IOWrite($hash, "00", "13${nodeId}02840805");
-    }, $hash, 0);
   }
+
+  InternalTimer(gettimeofday()+01, "ZWave_wakeupTimer", $hash, 0);
 }
 
 ###################################
@@ -1682,7 +1747,7 @@ ZWave_Parse($$@)
       my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
       return "" if(!$dh);
 
-      $dh->{lastMsgTimestamp} = time();
+      $dh->{lastMsgTimestamp} = gettimeofday();
 
       if($iodev->{addSecure}) {
         my $classes = AttrVal($dh->{NAME}, "classes", "");
@@ -1707,7 +1772,7 @@ ZWave_Parse($$@)
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash) {
       ZWave_sendWakeup($hash) if($hash);
-      $hash->{lastMsgTimestamp} = time();
+      $hash->{lastMsgTimestamp} = gettimeofday();
       if(!$ret) {
         readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
         return $hash->{NAME};
@@ -1799,6 +1864,7 @@ ZWave_Parse($$@)
   }
 
 
+  $baseHash->{lastMsgTimestamp} = gettimeofday();
   my $name = $hash->{NAME};
   my @event;
   my @args = ($arg); # MULTI_CMD handling
@@ -1821,6 +1887,11 @@ ZWave_Parse($$@)
        next;
     }
 
+    if($className eq "VERSION" && defined($hash->{versionhash})) {
+      ZWave_versionClassRequest($hash, $arg);
+      return "";
+    }
+
     my $ptr = ZWave_getHash($hash, $className, "parse");
     if(!$ptr) {
       push @event, "UNPARSED:$className $arg";
@@ -1840,7 +1911,6 @@ ZWave_Parse($$@)
   }
 
   ZWave_sendWakeup($baseHash) if($arg =~ m/^028407/);
-  $baseHash->{lastMsgTimestamp} = time();
 
   return "" if(!@event);
 
@@ -2174,6 +2244,14 @@ s2Hex($)
     available (deleted) and 1 for set (occupied). code is a hexadecimal string.
     </li>
 
+  <br><br><b>Class VERSION</b>
+  <li>versionClassRequest<br>
+    executes "get devicename versionClass class" for each class from the
+    classes attribute in the background without generating events, and sets the
+    vclasses attribute at the end.
+    </li>
+
+
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value nodeId<br>
     Set the wakeup interval of battery operated devices to the given value in
@@ -2378,7 +2456,7 @@ s2Hex($)
     return the version information of this node in the form:<br>
     Lib A Prot x.y App a.b
     </li>
-  <li>versionClass classId<br>
+  <li>versionClass classId or className<br>
      return the supported command version for the requested class
   </li>
 
@@ -2414,6 +2492,10 @@ s2Hex($)
       This attribute is needed by the ZWave module, as the list of the possible
       set/get commands depends on it. It contains a space separated list of
       class names (capital letters).
+      </li>
+    <li><a href="#vclasses">vclasses</a>
+      This is the result of the "set DEVICE versionClassRequest" command, and
+      contains the version information for each of the supported classes.
       </li>
     <li><a href="#noExplorerFrames">noExplorerFrames</a>
       turn off the use of Explorer Frames
