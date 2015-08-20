@@ -22,6 +22,8 @@ my %ext2MIMEType= qw{
 
 };
 
+my $HU_use_zlib;
+
 sub
 ext2MIMEType($) {
   my ($ext)= @_;
@@ -52,6 +54,19 @@ urlDecode($) {
   $_= $_[0];
   s/%([0-9A-F][0-9A-F])/chr(hex($1))/egi;
   return $_;
+}
+
+sub
+HttpUtils_Close($)
+{
+  my ($hash) = @_;
+  delete($hash->{FD});
+  delete($selectlist{$hash});
+  $hash->{conn}->close();
+  delete($hash->{conn});
+  delete($hash->{hu_sslAdded});
+  delete($hash->{hu_filecount});
+  delete($hash->{hu_blocking});
 }
 
 sub
@@ -126,6 +141,8 @@ HttpUtils_Connect($)
   $hash->{addr} = "$hash->{protocol}://$host:$port";
   $hash->{auth} = encode_base64("$user:$pwd","") if($authstring);
 
+  return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
+
   if($hash->{callback}) { # Nonblocking staff
     $hash->{conn} = IO::Socket::INET->new(Proto=>'tcp', Blocking=>0);
     if($hash->{conn}) {
@@ -171,6 +188,16 @@ HttpUtils_Connect($)
     return "$hash->{displayurl}: Can't connect(1) to $hash->{addr}: $@"
       if(!$hash->{conn});
   }
+
+  if($hash->{compress}) {
+    if(!defined($HU_use_zlib)) {
+      $HU_use_zlib = 1;
+      eval { require Compress::Zlib; };
+      $HU_use_zlib = 0 if($@);
+    }
+    $hash->{compress} = $HU_use_zlib;
+  }
+
   return HttpUtils_Connect2($hash);
 }
 
@@ -179,7 +206,7 @@ HttpUtils_Connect2($)
 {
   my ($hash) = @_;
 
-  if($hash->{protocol} eq "https" && $hash->{conn}) {
+  if($hash->{protocol} eq "https" && $hash->{conn} && !$hash->{hu_sslAdded}) {
     eval "use IO::Socket::SSL";
     if($@) {
       Log3 $hash, $hash->{loglevel}, $@;
@@ -191,6 +218,7 @@ HttpUtils_Connect2($)
           Timeout     => $hash->{timeout},
           SSL_version => $sslVersion
         }) || undef $hash->{conn};
+      $hash->{hu_sslAdded} = 1 if($hash->{keepalive});
     }
   }
 
@@ -223,7 +251,11 @@ HttpUtils_Connect2($)
   my $httpVersion = $hash->{httpversion} ? $hash->{httpversion} : "1.0";
   my $hdr = "$method $hash->{path} HTTP/$httpVersion\r\n";
   $hdr .= "Host: $hash->{host}\r\n";
-  $hdr .= "Connection: Close\r\n" if($httpVersion ne "1.0");
+  $hdr .= "User-Agent: fhem\r\n";
+  $hdr .= "Accept-Encoding: gzip,deflate\r\n" if($hash->{compress});
+  $hdr .= "Connection: keep-alive\r\n" if($hash->{keepalive});
+  $hdr .= "Connection: Close\r\n"
+                              if($httpVersion ne "1.0" && !$hash->{keepalive});
   $hdr .= "Authorization: Basic $hash->{auth}\r\n" if(defined($hash->{auth}));
   $hdr .= $hash->{header}."\r\n" if(defined($hash->{header}));
   if(defined($data)) {
@@ -285,12 +317,28 @@ HttpUtils_ParseAnswer($$)
 {
   my ($hash, $ret) = @_;
 
-  $hash->{conn}->close();
-  undef $hash->{conn};
+  if(!$hash->{keepalive}) {
+    $hash->{conn}->close();
+    undef $hash->{conn};
+  }
 
   if(!$ret) {
+    # Server answer: Keep-Alive: timeout=2, max=200
+    if($hash->{keepalive} && $hash->{hu_filecount}) {
+      my $bc = $hash->{hu_blocking};
+      HttpUtils_Close($hash);
+      if($bc) {
+        return HttpUtils_BlockingGet($hash);
+      } else {
+        return HttpUtils_NonblockingGet($hash);
+      }
+    }
+
     return ("$hash->{displayurl}: empty answer received", "");
   }
+
+  $hash->{hu_filecount} = 0 if(!$hash->{hu_filecount});
+  $hash->{hu_filecount}++;
 
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
   return ("", $ret) if(!defined($1));
@@ -355,6 +403,7 @@ sub
 HttpUtils_NonblockingGet($)
 {
   my ($hash) = @_;
+  $hash->{hu_blocking} = 0;
   my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
   return $hash->{callback}($hash, $fErr, $fContent) if($isFile);
   my $err = HttpUtils_Connect($hash);
@@ -368,6 +417,7 @@ sub
 HttpUtils_BlockingGet($)
 {
   my ($hash) = @_;
+  $hash->{hu_blocking} = 1;
   my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
   return ($fErr, $fContent) if($isFile);
   my $err = HttpUtils_Connect($hash);
