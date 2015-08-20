@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  70_VolumeLink: - Changed vol/mute-RegexPattern modifier to /si
+                - Changed default timeout to 0.5
+                - Fixed bug while storing RegEx from Attr to hash
+                - Added Attribute for separate muteRegexPattern
+                - Added Attribute httpNoShutdown
+                - Added possibility to disable ampInput check
   - feature: YAMAHA_AVR: new reading "newFirmware" for indicating firmware 
              update. new argument "direct" for volume commands to avoid
              volume smoothing (if activated)
