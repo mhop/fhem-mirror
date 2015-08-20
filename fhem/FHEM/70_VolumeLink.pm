@@ -1,17 +1,5 @@
 ###############################################################################
-# $Id: 70_VolumeLink.pm 2015-08-17 23:00 - rapster - rapster at x0e dot de $
-
-### TODO'S ###
-# Harmony hub support
-
-### LAST CHANGES ###
-# Changed Vol/Mute-RegexPattern modifier to /si
-# Fixed failure while storing RegEx from Attr to hash
-# Extend logging
-# Added seperate muteRegexPattern Attr
-# Added httpNoShutdown Attr
-# Added possibility to disable ampInput check
-# Added runtime check if <ampDevice> still exists 
+# $Id: 70_VolumeLink.pm 2015-08-20 09:00 - rapster - rapster at x0e dot de $ 
 
 package main;
 use strict;
@@ -61,7 +49,7 @@ sub VolumeLink_Define($$) {
         interval                => $a[2],
         url                     => $a[3],
         ampDevice               => $a[4],
-        timeout                 => $a[5] || 1,
+        timeout                 => $a[5] || 0.5,
         httpErrorLoglevel       => $a[6] || 4,
         httpLoglevel            => $a[7] || 5,
         httpNoShutdown          => ( defined($attr{$name}->{httpNoShutdown}) ) ? $attr{$name}->{httpNoShutdown} : 1,
@@ -231,12 +219,6 @@ sub VolumeLink_ReceiveCommand($) {
         
         $param->{HTTP_ERROR_COUNT} = 0;
         
-        if(!defined($defs{$param->{hash}->{ampDevice}})) {
-                Log3 $name, 1, "$name: FAILURE, configured <ampDevice> '$param->{hash}->{ampDevice}' is not defined. End now...";
-                CommandSet(undef, $name.' off');
-                return;
-        }
-        
         my ($vol) = $data =~ /$param->{hash}->{volumeRegexPattern}/si;
         my ($mute) = $data =~ /$param->{hash}->{muteRegexPattern}/si;
         if (!defined($vol)) {$vol = '';}
@@ -253,6 +235,12 @@ sub VolumeLink_ReceiveCommand($) {
                 readingsBulkUpdate($param->{hash}, 'volume', $vol );
                 readingsBulkUpdate($param->{hash}, 'mute', $mute );
                 readingsEndUpdate($param->{hash}, 0);
+                
+                if( !defined($defs{$param->{hash}->{ampDevice}}) ) {
+                    Log3 $name, 1, "$name: FAILURE, configured <ampDevice> '$param->{hash}->{ampDevice}' is not defined. End now...";
+                    CommandSet(undef, $name.' off');
+                    return;
+                }
                 
                 my $ampMute = ReadingsVal($param->{hash}->{ampDevice},$param->{hash}->{ampMuteReading},'N/A');
                 my $ampVol = ReadingsVal($param->{hash}->{ampDevice},$param->{hash}->{ampVolumeReading},'N/A');
@@ -312,7 +300,7 @@ sub VolumeLink_ReceiveCommand($) {
 <h3>VolumeLink</h3>
 <ul>
 
-VolumeLink links the volume &amp; mute from a physical device (e.g. a Philips-TV) with the volume &amp; mute control of a fhem device (e.g. a SONOS-Playbar, Onkyo, Yamaha or Denon Receiver, etc.).
+VolumeLink links the volume-level &amp; mute-state from a physical device (e.g. a Philips-TV) with the volume &amp; mute control of a fhem device (e.g. a SONOS-Playbar, Onkyo, Yamaha or Denon Receiver, etc.).
 <br><br>
 
 <h4>Define</h4>
@@ -330,11 +318,11 @@ VolumeLink links the volume &amp; mute from a physical device (e.g. a Philips-TV
     </ul>
     &lt;ampDevice&gt;:
     <ul>
-    <code>the amplifier fhem-device.</code><br>
+    <code>the target fhem-device.</code><br>
     </ul>
     [&lt;timeout&gt;]:
     <ul>
-    <code>optional: timeout of a http-get. default: 1 second</code><br>
+    <code>optional: timeout of a http-get. default: 0.5 seconds</code><br>
     </ul>
     [&lt;httpErrorLoglevel&gt;]:
     <ul>
@@ -349,9 +337,12 @@ VolumeLink links the volume &amp; mute from a physical device (e.g. a Philips-TV
 
 <h4>Example</h4>
 <ul>
-	Note: This example will work out of the box with many Philips TV's and a SONOS-Playbar as fhem-device.<br><br>
     <code>define tvVolume_LivingRoom VolumeLink 0.2 http://192.168.1.156:1925/5/audio/volume Sonos_LivingRoom</code><br>
     <code>set tvVolume_LivingRoom on</code><br>
+    <br>
+	Note:<br>
+    - This example will work out of the box with many Philips TV's and a SONOS-Playbar as fhem-device.<br>
+    - Pre 2014 Philips TV's use another protocoll, which can be accessed on http://&lt;ip&gt;/1/audio/volume
     </ul>
 <br>
 
@@ -365,19 +356,26 @@ VolumeLink links the volume &amp; mute from a physical device (e.g. a Philips-TV
 
 <h4>Get</h4> <ul>N/A</ul><br>
 
+
 <h4>Attributes</h4>
 <ul>
 	Note:<br>
     - All Attributes takes effect immediately.<br>
-    - The default value of volumeRegexPattern applies to many Philips-TV's, otherwise it must be configured.<br>
+    - The default value of volumeRegexPattern &amp; muteRegexPattern applies to many Philips-TV's, otherwise it must be configured.<br>
     - The default values of amp* applies to a SONOS-Playbar, otherwise it must be configured.<br>
+    - If you don't receive a result from url, or the lastHttpErrorMessage shows every time 'timed out', try setting attribute 'httpNoShutdown' to 0.<br>
     <br>
     <li>disable &lt;1|0&gt;<br>
     With this attribute you can disable the whole module. <br>
     If set to 1 the module will be stopped and no volume will be fetched from physical-device or transfer to the amplifier-device. <br>
     If set to 0 you can start the module again with: set &lt;name&gt; on.</li>
+    <li>httpNoShutdown &lt;1|0&gt;<br>
+    If set to 0 the module will tell the http-server to explicit close the connection.<br>
+    <i>Default: 1</i>
+    </li>
     <li>ampInputReading &lt;value&gt;<br>
     Name of the Input-Reading on amplifier-device<br>
+    To disable the InputCheck if your amplifier-device does not support this, set this attribute to 0.<br>
     <i>Default (which applies to SONOS-Player's): currentTitle</i></li>
     <li>ampInputReadingVal &lt;RegEx&gt;<br>
     RegEx for the Reading value of the corresponding Input-Channel on amplifier-device<br>
@@ -401,9 +399,11 @@ VolumeLink links the volume &amp; mute from a physical device (e.g. a Philips-TV
     Command to mute the amplifier device<br>
     <i>Default: Mute</i></li>
     <li>volumeRegexPattern &lt;RegEx&gt;<br>
-    RegEx which is applied to url return data.<br>
-    Must return a number in $1 for volume-level and true, false, 1 or 0 as mute-state in $2. <br>
-    <i>Default (which applies to many Phlips-TV's): current&quot;:(&#92;d+).*muted&quot;:(&#92;w+|&#92;d+)</i></li>
+    RegEx which is applied to url return data. Must return a number for volume-level. <br>
+    <i>Default (which applies to many Phlips-TV's): current&quot;:&#92;s*(&#92;d+)</i></li>
+    <li>muteRegexPattern &lt;RegEx&gt;<br>
+    RegEx which is applied to url return data. Must return true, false, 1 or 0 as mute-state. <br>
+    <i>Default (which applies to many Phlips-TV's): muted&quot;:&#92;s*(&#92;w+|&#92;d+)</i></li>
 </ul><br>
 
 <h4>Readings</h4>
