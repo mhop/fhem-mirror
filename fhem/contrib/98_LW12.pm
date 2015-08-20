@@ -434,6 +434,7 @@ sub LW12_Write( $$ ) {
     }
 	else {
 		Log3 $name, 4, "LW12: Can't connect to LW12!";
+		return 0;
 	}
 }
 
@@ -474,24 +475,26 @@ sub LW12_updateStatus( $ ) {
 	return if IsDisabled($name);
 	
 	my $res = LW12_Write( $hash, "\x{EF}\x{01}\x{77}" );	
-	$res = uc($res);
-	my @colors = ( $res =~ m/..?/g );
-
-    readingsBeginUpdate( $hash );
-        readingsBulkUpdate( $hash, "mode", hex( $colors[ 3 ] ) - $offset );	
-        readingsBulkUpdate( $hash, "speed", 255 - hex(  $colors[ 5 ] ) );
-		if($colors[2] eq "23"){
-			readingsBulkUpdate( $hash, "state", "on");
-		}else{ 
-			readingsBulkUpdate( $hash, "state", "off",);
-		}		
-    readingsEndUpdate( $hash,1 );
-	  
-	@{$hash->{".bri"}->{channels}}[0] = hex( $colors[ 6 ] );
-	@{$hash->{".bri"}->{channels}}[1] = hex( $colors[ 7 ] );
-	@{$hash->{".bri"}->{channels}}[2] = hex( $colors[ 8 ] );
-	  
-	LW12_UpdateRGB( $hash );
+	if ($res != 0){
+    	$res = uc($res);
+    	my @colors = ( $res =~ m/..?/g );
+    
+        readingsBeginUpdate( $hash );
+            readingsBulkUpdate( $hash, "mode", hex( $colors[ 3 ] ) - $offset );	
+            readingsBulkUpdate( $hash, "speed", 255 - hex(  $colors[ 5 ] ) );
+    		if($colors[2] eq "23"){
+    			readingsBulkUpdate( $hash, "state", "on");
+    		}else{ 
+    			readingsBulkUpdate( $hash, "state", "off",);
+    		}		
+        readingsEndUpdate( $hash,1 );
+    	  
+    	@{$hash->{".bri"}->{channels}}[0] = hex( $colors[ 6 ] );
+    	@{$hash->{".bri"}->{channels}}[1] = hex( $colors[ 7 ] );
+    	@{$hash->{".bri"}->{channels}}[2] = hex( $colors[ 8 ] );
+    	  
+    	LW12_UpdateRGB( $hash );
+	}
 }
 
 
