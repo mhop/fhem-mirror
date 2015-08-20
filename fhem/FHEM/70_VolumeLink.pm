@@ -1,5 +1,17 @@
 ###############################################################################
-# $Id: 70_VolumeLink.pm 2015-08-17 23:00 - rapster - rapster at x0e.de $
+# $Id: 70_VolumeLink.pm 2015-08-17 23:00 - rapster - rapster at x0e dot de $
+
+### TODO'S ###
+# Harmony hub support
+
+### LAST CHANGES ###
+# Changed Vol/Mute-RegexPattern modifier to /si
+# Fixed failure while storing RegEx from Attr to hash
+# Extend logging
+# Added seperate muteRegexPattern Attr
+# Added httpNoShutdown Attr
+# Added possibility to disable ampInput check
+# Added runtime check if <ampDevice> still exists 
 
 package main;
 use strict;
@@ -26,6 +38,8 @@ sub VolumeLink_Initialize($$) {
                         ."ampMuteReadingOffVal "
                         ."ampMuteCommand "
                         ."volumeRegexPattern "
+                        ."muteRegexPattern "
+                        ."httpNoShutdown:1,0 "
                         .$readingFnAttributes;
 }
 ###############################################################################
@@ -50,15 +64,17 @@ sub VolumeLink_Define($$) {
         timeout                 => $a[5] || 1,
         httpErrorLoglevel       => $a[6] || 4,
         httpLoglevel            => $a[7] || 5,
-        volumeRegexPattern      => $attr{$name}{volumeRegexPattern} || qr/current":(\d+).*muted":(\w+|\d+)/,
-        ampInputReading         => $attr{$name}{ampInputReading} || 'currentTitle',
-        ampInputReadingVal      => $attr{$name}{ampInputReadingVal} || qr/SPDIF-Wiedergabe|^$/,
-        ampVolumeReading        => $attr{$name}{ampVolumeReading} || 'Volume',
-        ampVolumeCommand        => $attr{$name}{ampVolumeCommand} || 'Volume',
-        ampMuteReading          => $attr{$name}{ampMuteReading} || 'Mute',
-        ampMuteReadingOnVal     => $attr{$name}{ampMuteReadingOnVal} || 1,
-        ampMuteReadingOffVal    => $attr{$name}{ampMuteReadingOffVal} || 0,
-        ampMuteCommand          => $attr{$name}{ampMuteCommand} || 'Mute'
+        httpNoShutdown          => ( defined($attr{$name}->{httpNoShutdown}) ) ? $attr{$name}->{httpNoShutdown} : 1,
+        volumeRegexPattern      => $attr{$name}->{volumeRegexPattern} || 'current":\s*(\d+)',
+        muteRegexPattern        => $attr{$name}->{muteRegexPattern} || 'muted":\s*(\w+|\d+)',
+        ampInputReading         => ( defined($attr{$name}->{ampInputReading}) ) ? $attr{$name}->{ampInputReading} : 'currentTitle',
+        ampInputReadingVal      => ( defined($attr{$name}->{ampInputReadingVal}) ) ? $attr{$name}->{ampInputReadingVal} : 'SPDIF-Wiedergabe|^$',
+        ampVolumeReading        => $attr{$name}->{ampVolumeReading} || 'Volume',
+        ampVolumeCommand        => $attr{$name}->{ampVolumeCommand} || 'Volume',
+        ampMuteReading          => $attr{$name}->{ampMuteReading} || 'Mute',
+        ampMuteReadingOnVal     => ( defined($attr{$name}->{ampMuteReadingOnVal}) ) ? $attr{$name}->{ampMuteReadingOnVal} : 1,
+        ampMuteReadingOffVal    => ( defined($attr{$name}->{ampMuteReadingOffVal}) ) ? $attr{$name}->{ampMuteReadingOffVal} : 0,
+        ampMuteCommand          => $attr{$name}->{ampMuteCommand} || 'Mute'
     );
     $hash->{httpParams} = {
         HTTP_ERROR_COUNT  => 0,
@@ -66,7 +82,7 @@ sub VolumeLink_Define($$) {
         hash              => $hash,
         url               => $hash->{url},
         timeout           => $hash->{timeout},
-        noshutdown        => 1,
+        noshutdown        => $hash->{httpNoShutdown},
         loglevel          => $hash->{httpLoglevel},
         errorLoglevel     => $hash->{httpErrorLoglevel},
         method            => 'GET',
@@ -143,26 +159,37 @@ sub VolumeLink_Attr(@) {
         if($attr_name eq "disable" && $attr_value == 1) {
             CommandSet(undef, $name.' off');
         }
-        $defs{$name}{ampInputReading} 		= $attr_value      if($attr_name eq 'ampInputReading');
-        $defs{$name}{ampInputReadingVal} 	= qr/$attr_value/  if($attr_name eq 'ampInputReadingVal');
-        $defs{$name}{ampVolumeReading} 		= $attr_value      if($attr_name eq 'ampVolumeReading');
-        $defs{$name}{ampVolumeCommand} 		= $attr_value      if($attr_name eq 'ampVolumeCommand');
-        $defs{$name}{ampMuteReading} 		= $attr_value      if($attr_name eq 'ampMuteReading');
-        $defs{$name}{ampMuteReadingOnVal} 	= $attr_value      if($attr_name eq 'ampMuteReadingOnVal');
-        $defs{$name}{ampMuteReadingOffVal}	= $attr_value      if($attr_name eq 'ampMuteReadingOffVal');
-        $defs{$name}{ampMuteCommand} 		= $attr_value      if($attr_name eq 'ampMuteCommand');
-        $defs{$name}{volumeRegexPattern} 	= qr/$attr_value/  if($attr_name eq 'volumeRegexPattern');
+        $defs{$name}->{ampInputReading}      = $attr_value      if($attr_name eq 'ampInputReading');
+        $defs{$name}->{ampInputReadingVal} 	 = $attr_value      if($attr_name eq 'ampInputReadingVal');
+        $defs{$name}->{ampVolumeReading}     = $attr_value      if($attr_name eq 'ampVolumeReading');
+        $defs{$name}->{ampVolumeCommand}     = $attr_value      if($attr_name eq 'ampVolumeCommand');
+        $defs{$name}->{ampMuteReading}       = $attr_value      if($attr_name eq 'ampMuteReading');
+        $defs{$name}->{ampMuteReadingOnVal}  = $attr_value      if($attr_name eq 'ampMuteReadingOnVal');
+        $defs{$name}->{ampMuteReadingOffVal} = $attr_value      if($attr_name eq 'ampMuteReadingOffVal');
+        $defs{$name}->{ampMuteCommand}       = $attr_value      if($attr_name eq 'ampMuteCommand');
+        $defs{$name}->{volumeRegexPattern}   = $attr_value      if($attr_name eq 'volumeRegexPattern');
+        $defs{$name}->{muteRegexPattern}     = $attr_value      if($attr_name eq 'muteRegexPattern');
+        $defs{$name}->{httpNoShutdown}       = $attr_value      if($attr_name eq 'httpNoShutdown');
+        if($attr_name eq 'httpNoShutdown') {
+            $defs{$name}->{httpNoShutdown} = $attr_value;
+            $defs{$name}->{httpParams}->{noshutdown} = $defs{$name}->{httpNoShutdown};
+        }
     }
     elsif($cmd eq "del") {
-        $defs{$name}{ampInputReading} 	    = 'currentTitle'          if($attr_name eq 'ampInputReading');
-        $defs{$name}{ampInputReadingVal}    = qr/SPDIF-Wiedergabe|^$/ if($attr_name eq 'ampInputReadingVal');
-        $defs{$name}{ampVolumeReading} 	    = 'Volume'                if($attr_name eq 'ampVolumeReading');
-        $defs{$name}{ampVolumeCommand} 	    = 'Volume'                if($attr_name eq 'ampVolumeCommand');
-        $defs{$name}{ampMuteReading} 	    = 'Mute'                  if($attr_name eq 'ampMuteReading');
-        $defs{$name}{ampMuteReadingOnVal}   = '1'                     if($attr_name eq 'ampMuteReadingOnVal');
-        $defs{$name}{ampMuteReadingOffVal}  = '0'                     if($attr_name eq 'ampMuteReadingOffVal');
-        $defs{$name}{ampMuteCommand} 	    = 'Mute'                  if($attr_name eq 'ampMuteCommand');
-        $defs{$name}{volumeRegexPattern}    = qr/current":(\d+).*muted":(\w+|\d+)/	if($attr_name eq 'volumeRegexPattern');
+        $defs{$name}->{ampInputReading}      = 'currentTitle'          if($attr_name eq 'ampInputReading');
+        $defs{$name}->{ampInputReadingVal}   = 'SPDIF-Wiedergabe|^$'   if($attr_name eq 'ampInputReadingVal');
+        $defs{$name}->{ampVolumeReading}     = 'Volume'                if($attr_name eq 'ampVolumeReading');
+        $defs{$name}->{ampVolumeCommand}     = 'Volume'                if($attr_name eq 'ampVolumeCommand');
+        $defs{$name}->{ampMuteReading}       = 'Mute'                  if($attr_name eq 'ampMuteReading');
+        $defs{$name}->{ampMuteReadingOnVal}  = 1                       if($attr_name eq 'ampMuteReadingOnVal');
+        $defs{$name}->{ampMuteReadingOffVal} = 0                       if($attr_name eq 'ampMuteReadingOffVal');
+        $defs{$name}->{ampMuteCommand}       = 'Mute'                  if($attr_name eq 'ampMuteCommand');
+        $defs{$name}->{volumeRegexPattern}   = 'current":\s*(\d+)'     if($attr_name eq 'volumeRegexPattern');
+        $defs{$name}->{muteRegexPattern}     = 'muted":\s*(\w+|\d+)'   if($attr_name eq 'muteRegexPattern');
+        if($attr_name eq 'httpNoShutdown') {
+            $defs{$name}->{httpNoShutdown} = 1;
+            $defs{$name}->{httpParams}->{noshutdown} = $defs{$name}->{httpNoShutdown};
+        }
     }
     return undef;
 }
@@ -171,7 +198,7 @@ sub VolumeLink_Attr(@) {
 sub VolumeLink_SendCommand($) {
     my ($hash) = @_;
     
-    Log3 $hash->{NAME}, 5, "$hash->{NAME}: SendCommand - executed";
+    Log3 $hash->{NAME}, 5, "$hash->{NAME}: SendCommand - executed with params: $hash->{httpParams}->{noshutdown}";
     
     HttpUtils_NonblockingGet($hash->{httpParams});
     
@@ -204,45 +231,66 @@ sub VolumeLink_ReceiveCommand($) {
         
         $param->{HTTP_ERROR_COUNT} = 0;
         
-        my($vol,$mute) = $data =~ /$param->{hash}->{volumeRegexPattern}/m;
-        $vol = int($vol);
+        if(!defined($defs{$param->{hash}->{ampDevice}})) {
+                Log3 $name, 1, "$name: FAILURE, configured <ampDevice> '$param->{hash}->{ampDevice}' is not defined. End now...";
+                CommandSet(undef, $name.' off');
+                return;
+        }
         
-        if(looks_like_number($vol) && $mute =~ /true|false|0|1/i) {
-            Log3 $name, 5, "$name: currentVolume: '$vol' - muted: '$mute' - Set it now...";
-            readingsBeginUpdate($param->{hash});
-            readingsBulkUpdate($param->{hash}, 'volume', $vol );
-            readingsBulkUpdate($param->{hash}, 'mute', $mute );
-            readingsEndUpdate($param->{hash}, 0);
-            
-            my $ampMute = ReadingsVal($param->{hash}->{ampDevice},$param->{hash}->{ampMuteReading},'N/A');
-            my $ampVol = ReadingsVal($param->{hash}->{ampDevice},$param->{hash}->{ampVolumeReading},'N/A');
-            my $ampTitle = ReadingsVal($param->{hash}->{ampDevice},$param->{hash}->{ampInputReading},'N/A');
-            
-            if($ampMute eq 'N/A' || $ampVol eq 'N/A' || $ampTitle eq 'N/A') {
-                Log3 $name, 1, "$name: FAILURE, can not fetch an amp-reading! End now... - ampMute:'$ampMute' - ampVol:'$ampVol' - ampInput:'$ampTitle' ";
+        my ($vol) = $data =~ /$param->{hash}->{volumeRegexPattern}/si;
+        my ($mute) = $data =~ /$param->{hash}->{muteRegexPattern}/si;
+        if (!defined($vol)) {$vol = '';}
+        if (!defined($mute)) {$mute = '';}
+        
+        Log3 $name, 5, "$name - volumeRegexPattern: m/$param->{hash}->{volumeRegexPattern}/si - returned:'$vol'";
+        Log3 $name, 5, "$name - muteRegexPattern: m/$param->{hash}->{muteRegexPattern}/si - returned:'$mute'";
+        
+        if(looks_like_number($vol)) {
+            if($mute =~ /true|false|0|1/i) {
+                $vol = int($vol);
+                Log3 $name, 5, "$name: Values O.K. - currentVolume:'$vol' - muted:'$mute' - Set it now...";
+                readingsBeginUpdate($param->{hash});
+                readingsBulkUpdate($param->{hash}, 'volume', $vol );
+                readingsBulkUpdate($param->{hash}, 'mute', $mute );
+                readingsEndUpdate($param->{hash}, 0);
+                
+                my $ampMute = ReadingsVal($param->{hash}->{ampDevice},$param->{hash}->{ampMuteReading},'N/A');
+                my $ampVol = ReadingsVal($param->{hash}->{ampDevice},$param->{hash}->{ampVolumeReading},'N/A');
+                my $ampTitle = ( $param->{hash}->{ampInputReading} ) ? ReadingsVal($param->{hash}->{ampDevice},$param->{hash}->{ampInputReading},'N/A') : 0;
+                Log3 $name, 5, "$name: Fetched amp-readings - ampMute:'$ampMute' - ampVol:'$ampVol' - ampInput:'$ampTitle'";
+                
+                if($ampMute eq 'N/A' || $ampVol eq 'N/A' || $ampTitle eq 'N/A') {
+                    Log3 $name, 1, "$name: FAILURE, can not fetch an amp-reading! End now... - ampMute:'$ampMute' - ampVol:'$ampVol' - ampInput:'$ampTitle' ";
+                    CommandSet(undef, $name.' off');
+                    return;
+                }
+                
+                if($ampTitle =~ /$param->{hash}->{ampInputReadingVal}/i || $param->{hash}->{ampInputReading} == 0) {
+                    if($vol ne $ampVol) {
+                        Log3 $name, 5, "$name: Set Volume on ampDevice '$param->{hash}->{ampDevice}' - newVolume:'$vol' - oldVolume:'$ampVol'.";
+                        CommandSet(undef, $param->{hash}->{ampDevice}.' '.$param->{hash}->{ampVolumeCommand}.' '.$vol);
+                    }
+                    if($mute =~ /true|1/i && $ampMute eq $param->{hash}->{ampMuteReadingOffVal}) {
+                        Log3 $name, 5, "$name: Set MuteOn on ampDevice '$param->{hash}->{ampDevice}'.";
+                        CommandSet(undef, $param->{hash}->{ampDevice}.' '.$param->{hash}->{ampMuteCommand}.' '.$param->{hash}->{ampMuteReadingOnVal});
+                    }
+                    if($mute =~ /false|0/i && $ampMute eq $param->{hash}->{ampMuteReadingOnVal}) {
+                        Log3 $name, 5, "$name: Set MuteOff on ampDevice '$param->{hash}->{ampDevice}'.";
+                        CommandSet(undef, $param->{hash}->{ampDevice}.' '.$param->{hash}->{ampMuteCommand}.' '.$param->{hash}->{ampMuteReadingOffVal});
+                    }
+                }else {
+                    Log3 $name, 5, "$name: current amp-input: '$ampTitle' not match configured input.' - Skip setting volume in this turn...";
+                }
+            }
+            else {
+                Log3 $name, 1, "$name: FAILURE, muteRegexPattern 'm/$param->{hash}->{muteRegexPattern}/si' delivers bad mute-state! Must be 0, 1, true, or false. End now... - returned:'$mute'";
                 CommandSet(undef, $name.' off');
                 return;
             }
-            
-            if($ampTitle =~ /$param->{hash}->{ampInputReadingVal}/i) {
-                if($vol ne $ampVol) {
-                    CommandSet(undef, $param->{hash}->{ampDevice}.' '.$param->{hash}->{ampVolumeCommand}.' '.$vol);
-                }
-                if($mute =~ /true|1/i && $ampMute eq $param->{hash}->{ampMuteReadingOffVal}) {
-                    CommandSet(undef, $param->{hash}->{ampDevice}.' '.$param->{hash}->{ampMuteCommand}.' '.$param->{hash}->{ampMuteReadingOnVal});
-                }
-                if($mute =~ /false|0/i && $ampMute eq $param->{hash}->{ampMuteReadingOnVal}) {
-                    CommandSet(undef, $param->{hash}->{ampDevice}.' '.$param->{hash}->{ampMuteCommand}.' '.$param->{hash}->{ampMuteReadingOffVal});
-                }
-            }else {
-                Log3 $name, 5, "$name: current amp-input: '$ampTitle' not match configured input.' - Skip setting volume in this turn...";
-            }
         }
         else {
-            Log3 $name, 1, "$name: FAILURE, volumeRegexPattern delivers bad volume or mute state! End now... - volume/\$1:'$vol' - mute/\$2:'$mute'";
-            
+            Log3 $name, 1, "$name: FAILURE, volumeRegexPattern 'm/$param->{hash}->{volumeRegexPattern}/si' delivers bad volume-level (Not a number)! End now... - returned:'$vol'";
             CommandSet(undef, $name.' off');
-            
             return;
         }
     }
