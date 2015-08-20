@@ -21,6 +21,7 @@ my $updRet;
 my %updDirs;
 my $updArg;
 my $mainPgm = "/fhem.pl\$";
+my %upd_connecthash;
 
 
 ########################################
@@ -59,6 +60,7 @@ CommandUpdate($$)
 
   } else {
     doUpdate($src, $arg);
+    HttpUtils_Close(\%upd_connecthash);
     my $ret = $updRet; $updRet = "";
     return $ret;
 
@@ -101,6 +103,7 @@ doUpdateInBackground($)
   *Log = \&update_Log2Event;
   sleep(2); # Give time for ActivateInform / FHEMWEB / JavaScript
   doUpdate($h->{src}, $h->{arg});
+  HttpUtils_Close(\%upd_connecthash);
 }
 
 
@@ -372,7 +375,10 @@ upd_getUrl($)
 {
   my ($url) = @_;
   $url =~ s/%/%25/g;
-  my ($err, $data) = HttpUtils_BlockingGet({ url=>$url });
+  $upd_connecthash{url} = $url;
+  $upd_connecthash{keepalive} = 1;
+  # $upd_connecthash{compress} = 1; # fhem.de does not support compression
+  my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
   if($err) {
     uLog 1, $err;
     return "";
