@@ -1,5 +1,5 @@
 ###############################################################
-# $Id: $
+# $Id$Date: $
 #
 #  72_FRITZBOX.pm 
 #
@@ -44,11 +44,12 @@ my $missingModulTR064;
 our $FRITZBOX_TR064pwd;
 our $FRITZBOX_TR064user;
 
-eval "use Net::Telnet;1" or $missingModulTelnet .= "Net::Telnet ";
 eval "use URI::Escape;1" or $missingModul .= "URI::Escape ";
 eval "use MIME::Base64;1" or $missingModul .= "MIME::Base64 ";
 
 use FritzBoxUtils; ## only for web access login
+
+eval "use Net::Telnet;1" or $missingModulTelnet .= "Net::Telnet ";
 #sudo apt-get install libjson-perl
 # eval "use JSON::XS;1" or $missingModulWeb .= "JSON::XS ";
 eval "use JSON;1" or $missingModulWeb .= "JSON ";
@@ -130,7 +131,7 @@ my $cmdBufferTimeout=0;
 
 my $ttsCmdTemplate = 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&client=t&prev=input&tl=[SPRACHE]&q=[TEXT]"';
 my $ttsLinkTemplate = 'http://translate.google.com/translate_tts?ie=UTF-8&client=t&prev=input&tl=[SPRACHE]&q=[TEXT]';
-
+   
 my $mohUpload = '/var/tmp/fhem_moh_upload';
 my $mohOld = '/var/tmp/fhem_fx_moh_old';
 my $mohNew = '/var/tmp/fhem_fx_moh_new';
@@ -185,16 +186,19 @@ sub FRITZBOX_Define($$)
    my ($hash, $def) = @_;
    my @args = split("[ \t][ \t]*", $def);
 
-   return "Usage: define <name> FRITZBOX" if(@args <2 || @args >2);  
+   return "Usage: define <name> FRITZBOX [IP address]" if(@args <2 || @args >3);  
 
    my $name = $args[0];
 
    $hash->{NAME} = $name;
    
+   $hash->{HOST} = "undefined";
+   $hash->{HOST} = $args[2]     if defined $args[2];
+   $hash->{fhem}{definedHost} = $hash->{HOST}; # to cope with old attribute definitions
 
    my $msg;
-   if ( $missingModul ) 
-   {
+# stop if certain perl moduls are missing
+   if ( $missingModul ) {
       $msg = "Cannot define a FRITZBOX device. Perl modul $missingModul is missing.";
       FRITZBOX_Log $hash, 1, $msg;
       return $msg;
@@ -202,7 +206,7 @@ sub FRITZBOX_Define($$)
 
    $hash->{STATE}              = "Initializing";
    $hash->{INTERVAL}           = 300; 
-   $hash->{fhem}{modulVersion} = '$Date: $';
+   $hash->{fhem}{modulVersion} = '$Date$';
    $hash->{fhem}{lastHour}     = 0;
    $hash->{fhem}{LOCAL}        = 0;
 
@@ -217,10 +221,11 @@ sub FRITZBOX_Define($$)
    RemoveInternalTimer($hash->{helper}{TimerReadout});
    InternalTimer(gettimeofday()+1 , "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
 
-   if ($missingModulTelnet || $missingModulWeb || $missingModulTR064) {
+# Inform about missing PERL modules
+   if ( $missingModulTelnet || $missingModulWeb || $missingModulTR064 ) {
       my $msg = "Modul functionality limited because of missing perl modules: ".$missingModulTelnet . $missingModulWeb . $missingModulTR064;
+      FRITZBOX_Log $hash, 2, $msg;
       $hash->{PERL} = $msg;
-      return $msg;
    }
    
    return undef;
@@ -251,6 +256,15 @@ sub FRITZBOX_Attr($@)
       # $name is device name
       # aName and aVal are Attribute name and value
    my $hash = $defs{$name};
+
+   if ($aName eq "fritzBoxIP") {
+      if ($cmd eq "set") {
+         $hash->{HOST} = $aVal;
+      }
+      else {
+         $hash->{HOST} = $hash->{fhem}{definedHost};
+      }
+   }
 
    if ($aName =~ /fritzBoxIP|m3uFileLocal|m3uFileURL/ && $hash->{APICHECKED} == 1) {
       $hash->{APICHECKED} = 0;
@@ -621,10 +635,14 @@ sub FRITZBOX_API_Check_Run($)
    my @roReadings;
    my $response;
    my $startTime = time();
+   
+   my $host = $hash->{HOST};
 
 # if no FritzBoxIP is set, check if FHEM runs on a FritzBox under root user
     # unless (qx ( [ -f /usr/bin/ctlmgr_ctl ] && echo 1 || echo 0 ))
-   if ( AttrVal( $name, "fritzBoxIP", "" ) eq "" ) {
+   if ( $host =~ /undefined|local/ ) {
+      # set default host
+      $host = "fritz.box";  
       if ( -X "/usr/bin/ctlmgr_ctl" ) {
          if ( $< != 0 ) {
             FRITZBOX_Log $hash, 3, "FHEM is running on a Fritz!Box but not as 'root' user (currently " .
@@ -632,10 +650,14 @@ sub FRITZBOX_API_Check_Run($)
          }
          else {
             $fritzShell = 1;
+            $host = "local"; # mark as local host
             FRITZBOX_Log $hash, 5, "FHEM is running on a Fritz!Box as 'root' user.";
          }
       }
    }
+
+# change host name if necessary
+   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "->HOST", $host)      if $host ne $hash->{HOST};
 
 # Determine local or remote mode
    if ($fritzShell) {
@@ -647,8 +669,6 @@ sub FRITZBOX_API_Check_Run($)
       FRITZBOX_Log $hash, 4, "FRITZBOX modul runs in remote mode.";
    }
 
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
-   
 # Check if perl modules for remote APIs exists
    if ($missingModulWeb) {
       FRITZBOX_Log $hash, 3, "Cannot check for APIs webcm, luaQuery and TR064 because perl modul $missingModulWeb is missing on this system.";
@@ -4443,7 +4463,9 @@ sub FRITZBOX_fritztris($)
    <b>Define</b>
    <ul>
       <br>
-      <code>define &lt;name&gt; FRITZBOX</code>
+      <code>define &lt;name&gt; FRITZBOX  [host]</code>
+      <br/>
+         The attribute <i>host</i> is the web address (name or IP) of the Fritz!Box. If it is missing, the modul switches in local mode or uses the default host address "fritz.box".
       <br/><br/>
       Example: <code>define Fritzbox FRITZBOX</code>
       <br/><br/>
@@ -4650,7 +4672,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>fritzBoxIP &lt;IP Address&gt;</code>
          <br>
-         IP address or URL of the Fritz!Box for remote telnet access. Default is "fritz.box".
+         Depreciated.
       </li><br>
 
      <li><code>INTERVAL &lt;seconds&gt;</code>
@@ -4779,7 +4801,9 @@ sub FRITZBOX_fritztris($)
    <b>Define</b>
    <ul>
       <br>
-      <code>define &lt;name&gt; FRITZBOX</code>
+      <code>define &lt;name&gt; FRITZBOX [host]</code>
+      <br/>
+      Das Attribut <i>host</i> ist die Web-Adresse (Name oder IP) der Fritz!Box. Fehlt es, so schaltet das Modul in den lokalen Modus oder nutzt die Standardadresse "fritz.box".
       <br/><br/>
       Beispiel: <code>define Fritzbox FRITZBOX</code>
       <br/><br/>
@@ -4984,7 +5008,7 @@ sub FRITZBOX_fritztris($)
 
       <li><code>fritzBoxIP &lt;IP-Adresse&gt;</code>
          <br>
-         IP Adresse oder ULR der Fritz!Box f&uuml;r Fernzugriff per Telnet. Standard ist "fritz.box".
+         Veraltet.
       </li><br>
      
       <li><code>INTERVAL &lt;Sekunden&gt;</code>
