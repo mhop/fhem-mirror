@@ -737,6 +737,7 @@ sub HMLAN_Parse($$) {##########################################################
     Dispatch($hash, $dmsg, \%addvals) if($mFld[5] !~ m/99.112999999000000/);#ignore overload test
   }
   elsif($mFld[0] =~ m /HHM-(LAN|USB)-IF/){#HMLAN version info
+    $hash->{IFmodel} = $1;
     $hash->{uptime} = HMLAN_uptime($mFld[5],$hash);
     
     $hash->{helper}{assIdRep} = hex($mFld[6]);
