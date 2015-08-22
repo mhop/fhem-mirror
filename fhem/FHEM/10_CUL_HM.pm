@@ -1149,7 +1149,7 @@ sub CUL_HM_Parse($$) {#########################################################
                   ."\n             original  cmd: $origcmd";
  
       if ($cmd eq $origcmd) {
-        Log3 $mh{devH},4,"CUL_HM $mh{dstN} signature: good, authbytes: $mh{authbytes}";
+        Log3 $mh{devH},4,"CUL_HM $mh{dstN} signature: good, authbytes: ${authbytes}";
         $mh{devH}->{helper}{aesAuthBytes} = $authbytes;
         $mh{devH}->{helper}{aesCommRq}{msgStat} = "AESCom-ok";
       } 
@@ -1206,7 +1206,7 @@ sub CUL_HM_Parse($$) {#########################################################
           $mh{devH}->{helper}{aesCommRq}{challenge} = $challenge;
           $mh{devH}->{helper}{aesCommRq}{kNo} = $kNo;
 
-          my $cmd = "$mh{mNo}A002$mh{dst}$mh{src}04$mh{challenge}".sprintf("%02X", $kNo*2);
+          my $cmd = "$mh{mNo}A002$mh{dst}$mh{src}04${challenge}".sprintf("%02X", $kNo*2);
           $cmd = sprintf("As%02X%s", length($cmd)/2, $cmd);
           IOWrite($mh{devH}, "", $cmd);
           $mh{msgStat}="AESpending";
