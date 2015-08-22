@@ -119,6 +119,7 @@ HttpUtils_Connect($)
   $hash->{loglevel}   = 4 if(!$hash->{loglevel});
   $hash->{redirects}  = 0 if(!$hash->{redirects});
   $hash->{displayurl} = $hash->{hideurl} ? "<hidden>" : $hash->{url};
+  $hash->{sslargs}    = {} if(!defined($hash->{sslargs}));
 
   Log3 $hash, $hash->{loglevel}, "HttpUtils url=$hash->{displayurl}";
 
@@ -216,7 +217,8 @@ HttpUtils_Connect2($)
                        AttrVal("global", "sslVersion", "SSLv23:!SSLv3:!SSLv2"));
       IO::Socket::SSL->start_SSL($hash->{conn}, {
           Timeout     => $hash->{timeout},
-          SSL_version => $sslVersion
+          SSL_version => $sslVersion,
+          %{$hash->{sslargs}}
         }) || undef $hash->{conn};
       $hash->{hu_sslAdded} = 1 if($hash->{keepalive});
     }
@@ -392,7 +394,7 @@ HttpUtils_ParseAnswer($$)
 #  optional(default):
 #    hideurl(0),timeout(4),data(""),loglevel(4),header(""),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
-#    method($data ? "POST" : "GET")
+#    method($data ? "POST" : "GET"),keepalive(0),sslargs({})
 # Example:
 #   HttpUtils_NonblockingGet({
 #     url=>"http://192.168.178.112:8888/fhem",
