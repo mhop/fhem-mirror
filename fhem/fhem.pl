@@ -256,6 +256,7 @@ my @globalAttrList = qw(
   archivecmd
   archivedir
   autoload_undefined_devices:1,0
+  autosave:1,0
   backup_before_update
   backupcmd
   backupdir

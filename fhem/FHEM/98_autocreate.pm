@@ -322,7 +322,9 @@ autocreate_Notify($$)
 
   }
 
-  CommandSave(undef, undef) if(!$ret && $nrcreated && AttrVal($me,"autosave",1));
+  CommandSave(undef, undef) if(!$ret && $nrcreated && 
+                                AttrVal($me,"autosave",
+                                AttrVal("global","autosave",1)));
   return $ret;
 }
 
@@ -562,7 +564,7 @@ CommandUsb($$)
             Log3 undef, 1, "define $define";
             my $lret = CommandDefine($cl, $define);
             CommandSave(undef, undef)
-                if(!$lret && AttrVal("autocreate","autosave",1));
+                if(!$lret && AttrVal("global","autosave",1));
           }
 
           goto NEXTDEVICE;
@@ -659,7 +661,10 @@ autocreate_Attr(@)
     <li>autosave<br>
         After creating a device, automatically save the config file with the
         command <a href="#save">save</a> command. Default is 1 (i.e. on), set
-        it to 0 to switch it off.</li><br>
+        it to 0 to switch it off.<br>
+        <b>Note</b>: this attribute is deprecated, use the global autosave
+        attribute instead.
+        </li><br>
 
     <a name="device_room"></a>
     <li>device_room<br>
@@ -812,7 +817,10 @@ autocreate_Attr(@)
         Nach der Erzeugung eines neuen Ger&auml;tes wird automatisch die
         Konfigurationsdatei mit dem Befehl <a href="#save">save</a>
         gespeichert. Der Standardwert ist 1 (d.h. aktiviert), eine 0 schaltet
-        die automatische Speicherung aus.</li><br>
+        die automatische Speicherung aus.<br>
+        <b>Achtung:</b> Dieses Attribut ist unerw&uuml;nscht, bitte stattdessen
+        das global autosave Attribut verwenden.
+        </li><br>
 
     <a name="device_room"></a>
     <li>device_room<br>
