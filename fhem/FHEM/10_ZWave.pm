@@ -977,6 +977,7 @@ sub
 ZWave_mcCapability($$)
 {
   my ($hash, $caps) = @_;
+  #Caps:= channelId,genericDeviceClass,specificDeviceClass,Class1,Class2,...
 
   my $name = $hash->{NAME};
   my $iodev = $hash->{IODev};
@@ -988,6 +989,7 @@ ZWave_mcCapability($$)
   my $id = $hash->{id};
 
   my @classes;
+  shift(@l); shift(@l); # Skip generic and specific class
   for my $classId (@l) {
     push @classes, $zwave_id2class{lc($classId)} ? 
         $zwave_id2class{lc($classId)} : "UNKNOWN_".uc($classId);
@@ -996,10 +998,10 @@ ZWave_mcCapability($$)
 
   if(!$modules{ZWave}{defptr}{"$homeId $id$chid"}) {
     my $lid = hex("$id$chid");
-    my $lcaps = substr($caps, 2);
+    my $lcaps = substr($caps, 6);
     $id = hex($id);
     DoTrigger("global",
-              "UNDEFINED ZWave_$classes[0]_$id.$chid ZWave $homeId $lid $caps",
+              "UNDEFINED ZWave_$classes[0]_$id.$chid ZWave $homeId $lid $lcaps",
               1);
   }
 
