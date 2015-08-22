@@ -550,6 +550,18 @@ sub PRESENCE_StartLocalScan($;$)
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
         }
         
+        if(!$hash->{helper}{RUNNING_PID})
+        {
+              delete($hash->{helper}{RUNNING_PID});
+              
+              my $seconds = (ReadingsVal($name, "state", "absent") eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL});
+              
+              Log3 $hash->{NAME}, 4, "PRESENCE ($name) - fork failed, rescheduling next check in $seconds seconds";
+              
+              RemoveInternalTimer($hash);
+              InternalTimer(gettimeofday()+$seconds, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+        }
+        
         return undef;
     }
     else
