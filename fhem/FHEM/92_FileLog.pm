@@ -43,6 +43,7 @@ FileLog_Initialize($)
   $hash->{FW_summaryFn}     = "FileLog_fhemwebFn";
   $hash->{FW_detailFn}      = "FileLog_fhemwebFn";
   $hash->{SVG_sampleDataFn} = "FileLog_sampleDataFn";
+  $hash->{SVG_regexpFn}     = "FileLog_regexpFn";
   $data{FWEXT}{"/FileLog_toSVG"}{CONTENTFUNC} = "FileLog_toSVG";
   $data{FWEXT}{"/FileLog_logWrapper"}{CONTENTFUNC} = "FileLog_logWrapper";
   
@@ -987,6 +988,18 @@ FileLog_sampleDataFn($$$$$)
   }
 
   return ($desc, \@htmlArr, $example);
+}
+
+sub
+FileLog_regexpFn($$)
+{
+  my ($name, $filter) = @_;
+  $filter = " $filter ";
+  $filter =~ s/ [^: ]*:/ /g;
+  $filter =~ s/:[^ ]* / /g;
+  $filter =~ s/(^ | $)//g;
+  $filter =~ s/ /|/g;
+  return $filter;
 }
 
 1;

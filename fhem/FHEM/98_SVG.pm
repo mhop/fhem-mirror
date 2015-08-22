@@ -1285,11 +1285,12 @@ SVG_render($$$$$$$$$$)
   my $w = $ow-$nr_left_axis*$axis_width-$nr_right_axis*$axis_width;
   my $h = $oh-2*$y;   # Rect size
 
-  my $filter = $srcDesc->{all}." ";
-  $filter =~ s/ [^: ]*:/ /g;
-  $filter =~ s/:[^ ]* / /g;
-  $filter =~ s/(^ | $)//g;
-  $filter =~ s/ /|/g;
+  my @filter;
+  foreach my $src (keys $srcDesc->{src}) {
+    my $f = CallFn($src, "SVG_regexpFn", $src, $srcDesc->{src}{$src}{arg});
+    push(@filter, $f) if($f);
+  }
+  my $filter = join("|", @filter);
   $filter =~ s/"/./g;
   $filter = AttrVal($parent_name, "longpollSVG", 0) ? "flog=\"$filter\"" : "";
 
