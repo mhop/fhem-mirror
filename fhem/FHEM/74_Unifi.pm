@@ -309,7 +309,13 @@ This module is very new, therefore it supports only a limited function selection
 At the moment you can use the 'PRESENCE' function, which will tell you if a device is connected to your WLAN (even in PowerSave Mode!) and get some informations.<br>
 Immediately after connecting to your WLAN it will set the device-reading to 'connected' and about 5 minutes after leaving your WLAN it will set the reading to 'disconnected'.<br>
 The device will be still connected, even it is in PowerSave-Mode. (In this mode the devices are not pingable, but the connection to the unifi-controller does not break off.)
-<br><br>
+<br>
+<h4>Prerequisites</h4>
+  <ul>
+      The Perl module JSON is required. <br>
+      On Debian/Raspbian: <code>apt-get install libjson-perl </code><br>
+      Via CPAN: <code>cpan install JSON</code>
+  </ul>
 
 <h4>Define</h4>
 <ul>
