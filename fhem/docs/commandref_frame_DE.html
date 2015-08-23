@@ -760,7 +760,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="define"></a>
 <h3>define</h3>
 <ul>
-  <code>define &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
+  <code>define [option] &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
   <br>
 
   Definiert ein Ger&auml;t. Sie m&uuml;ssen Ger&auml;te einrichten um sie zu
@@ -773,7 +773,19 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
   Je nach Typ ben&ouml;tigt man unterscheidliche Argumente, lesen Sie sich
   bitte die zu dem jeweiligen Ger&auml;t geh&ouml;renden Abschnitte durch.
-  <br>
+  <br><br>
+  Optionen:<br>
+  <ul>
+    <li>-temporary<br>
+      Setzt den TEMPORARY Marker, was das Abspeichern dieser Definition in
+      fhem.cfg verhindert.
+      </li><br>
+    <li>-ignoreErr<br>
+      Reduziert die Anzahl der Fehlermeldungen, falls ein FHEM-Modul nicht
+      geladen werden kann. Wird in fhem.cfg.demo verwendet, da das RSS Beispiel
+      etliche, normalerweise nicht installierte perl-Module ben&ouml;tigt.
+      </li><br>
+  </ul>
 </ul>
 
 <a name="defmod"></a>

@@ -732,7 +732,7 @@ The following local attributes are used by a wider range of devices:
 <a name="define"></a>
 <h3>define</h3>
 <ul>
-  <code>define &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
+  <code>define [option] &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
   <br>
   Define a device. You need devices if you want to manipulate them (e.g.
   set on/off), and the logfile is also more readable if it contains e.g.
@@ -744,6 +744,19 @@ The following local attributes are used by a wider range of devices:
   Each device takes different additional arguments at definition, see the
   corresponding device section for details.<br>
   <br>
+  Options:<br>
+  <ul>
+    <li>-temporary<br>
+      Add the TEMPORARY flag to the definition, which will prevent saving the
+      device to fhem.cfg.
+      </li><br>
+    <li>-ignoreErr<br>
+      Reduce the number of errors displayed when a certain FHEM-module cannot
+      be loaded. Used by fhem.cfg.demo, as using the RSS example requires the
+      installation of several uncommon perl modules. 
+      </li><br>
+  </ul>
+
 </ul>
 
 <a name="defmod"></a>
