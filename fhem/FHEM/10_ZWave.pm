@@ -1161,12 +1161,13 @@ ZWave_userCodeSet($)
 }
 
 sub
-ZWave_clockAdjust($)
+ZWave_clockAdjust($$)
 {
-  my $d = shift;
-  return $d if($d !~ m/^13(..)048104....05$/);
+  my ($hash, $d) = @_;
+  return $d if($d !~ m/^13(..)048104....$/);
   my ($err, $nd) = ZWave_clockSet();
-  return "13${1}0481${nd}05";
+  my $cmdEf  = (AttrVal($hash->{NAME}, "noExplorerFrames", 0) == 0 ? "25" : "05");
+  return "13${1}0481${nd}${cmdEf}${1}";
 }
 
 sub
@@ -1660,7 +1661,8 @@ ZWave_wakeupTimer($)
   if($now - $hash->{lastMsgTimestamp} > 1) { # wakeupNoMoreInformation 
     if($hash->{STATE} ne "TRANSMIT_NO_ACK") {
       my $nodeId = $hash->{id};
-      IOWrite($hash, "00", "13${nodeId}02840805");
+      my $cmdEf  = (AttrVal($hash->{NAME}, "noExplorerFrames", 0) == 0 ? "25" : "05");
+      IOWrite($hash, "00", "13${nodeId}028408${cmdEf}$nodeId");
     }
   } else {
     InternalTimer($now+0.1, "ZWave_wakeupTimer", $hash, 0);
@@ -1675,7 +1677,7 @@ ZWave_sendWakeup($)
   my $wu = $hash->{WakeUp};
   if($wu && @{$wu}) {
     foreach my $wuCmd (@{$wu}) {
-      IOWrite($hash, "00", ZWave_clockAdjust($wuCmd));
+      IOWrite($hash, "00", ZWave_clockAdjust($hash, $wuCmd));
       Log3 $hash, 4, "Sending stored command: $wuCmd";
     }
     @{$hash->{WakeUp}}=();
