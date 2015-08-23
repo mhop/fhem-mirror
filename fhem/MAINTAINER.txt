@@ -223,6 +223,7 @@ FHEM/72_FRITZBOX.pm          tupol                http://forum.fhem.de FRITZBOX 
 FHEM/73_km200.pm             sailor               http://forum.fhem.de Heizungssteuerung/Raumklima
 FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstuetzende Dienste
 FHEM/73_MPD.pm               Wzut                 http://forum.fhem.de Multimedia
+FHEM/74_Unifi.pm             rapster              http://forum.fhem.de Automatisierung
 FHEM/75_MSG.pm               gandy                http://forum.fhem.de Automatisierung
 FHEM/76_MSGFile.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           gandy                http://forum.fhem.de Automatisierung

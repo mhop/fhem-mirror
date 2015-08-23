@@ -633,3 +633,6 @@
 
 - Mon Aug 17 2015 (rapster)
   - added new module 70_VolumeLink to link the volume-level and mute-state of a physical-device with a fhem-device
+  
+- Mon Aug 23 2015 (rapster)
+  - added new module 74_Unifi for the Ubiquiti Networks (UBNT) - Unifi Controller.

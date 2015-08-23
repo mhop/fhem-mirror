@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   74_Unifi.pm for the Ubiquiti Networks (UBNT) - Unifi Controller.
   - change:  70_VolumeLink: - Changed vol/mute-RegexPattern modifier to /si
                 - Changed default timeout to 0.5
                 - Fixed bug while storing RegEx from Attr to hash
