@@ -745,6 +745,7 @@ sub FB_CALLLIST_saveList($)
         
         my $dumper = Data::Dumper->new([$hash->{helper}{DATA}], [qw($hash->{helper}{DATA})] );
         $dumper->Purity(1);
+        $dumper->Terse(0);
 
         my $dump = $dumper->Dump;
 
@@ -816,7 +817,7 @@ sub FB_CALLLIST_loadList($)
             $dump = decode_base64($dump);
         }
         
-        Log3 $name, 5, "FB_CALLLIST ($name) - importing list...";
+        Log3 $name, 5, "FB_CALLLIST ($name) - importing list...\n$dump";
       
         eval($dump);
         
