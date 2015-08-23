@@ -1,5 +1,5 @@
 ###############################################################################
-# $Id: 74_Unifi.pm 2015-08-23 18:00 - rapster - rapster at x0e dot de $ 
+# $Id: 74_Unifi.pm 2015-08-23 23:00 - rapster - rapster at x0e dot de $ 
 
 package main;
 use strict;
@@ -19,7 +19,7 @@ sub Unifi_Initialize($$) {
     $hash->{NOTIFYDEV} = "global";
     $hash->{NotifyFn}  = "Unifi_Notify";
     $hash->{AttrList}  = "disable:1,0 "
-                        .$readingFnAttributes;
+                         .$readingFnAttributes;
 }
 ###############################################################################
 
@@ -345,7 +345,7 @@ sub Unifi_GetClients_Receive($) {
                 for my $h (@{$data->{data}}) {
                     $hash->{clients}->{$h->{user_id}} = $h;
                     $connectedClientIDs->{$h->{user_id}} = 1;
-                    readingsBulkUpdate($hash,$h->{user_id}."_hostname",$h->{hostname});
+                    readingsBulkUpdate($hash,$h->{user_id}."_hostname",($h->{hostname}) ? $h->{hostname} : ($h->{ip}) ? $h->{ip} : 'Unknown');
                     readingsBulkUpdate($hash,$h->{user_id}."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($h->{last_seen}));
                     readingsBulkUpdate($hash,$h->{user_id}."_uptime",$h->{uptime});
                     readingsBulkUpdate($hash,$h->{user_id},'connected');
@@ -490,13 +490,14 @@ The device will be still connected, even it is in PowerSave-Mode. (In this mode 
     If set to 0 the automatic updating will performed.</li>
     <li>attr <a href="#verbose">verbose</a> 5<br>
     This attribute will help you if something does not work as espected.</li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
 
 <h4>Readings</h4>
 <ul>
     Note: All readings generate events. You can control this with <a href="#readingFnAttributes">these global attributes</a>.
     <li>Each device has multiple readings.<br></li>
-    <li>The unifi-device reading 'state' represents the connections-state to the unifi-controller.<br>
+    <li>The unifi-device reading 'state' represents the connection-state to the unifi-controller.<br>
     Possible states are 'connected', 'disconnected', 'initialized' and 'disabled'</li>
 </ul>
 <br>
