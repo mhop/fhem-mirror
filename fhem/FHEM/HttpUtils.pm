@@ -350,6 +350,9 @@ HttpUtils_ParseAnswer($$)
   my @header0= split(" ", shift @header);
   my $code= $header0[1];
 
+  # Close if server doesn't support keepalive
+  HttpUtils_Close($hash) if($hash->{keepalive} and $hash->{httpheader} =~ m/^Connection:\s*close\s*$/mi);
+  
   if(!defined($code) || $code eq "") {
     return ("$hash->{displayurl}: empty answer received", "");
   }
