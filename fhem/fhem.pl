@@ -1627,7 +1627,7 @@ CommandDefine($$)
 {
   my ($cl, $def) = @_;
   my @a = split("[ \t]+", $def, 3);
-  my $ignoreErr;
+  my ($ignoreErr, $temporary);
 
   # used by RSS in fhem.cfg.demo, with no GD installed
   if($a[0] && $a[0] eq "-ignoreErr") {
@@ -1635,6 +1635,12 @@ CommandDefine($$)
     @a = split("[ \t][ \t]*", $def, 3);
     $ignoreErr = 1;
   }
+  if($a[0] && $a[0] eq "-temporary") { # Forum #39610
+    $def =~ s/\s*-temporary\s*//;
+    @a = split("[ \t][ \t]*", $def, 3);
+    $temporary = 1;
+  }
+
   my $name = $a[0];
   return "Usage: define <name> <type> <type dependent arguments>"
                 if(int(@a) < 2);
@@ -1679,6 +1685,7 @@ CommandDefine($$)
     delete $attr{$name};
 
   } else {
+    $hash{TEMPORARY} = 1 if($temporary);
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
       CommandAttr($cl, "$name $da $defaultattr{$da}");
     }
