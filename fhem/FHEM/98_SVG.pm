@@ -1286,7 +1286,7 @@ SVG_render($$$$$$$$$$)
   my $h = $oh-2*$y;   # Rect size
 
   my @filter;
-  foreach my $src (keys $srcDesc->{src}) {
+  foreach my $src (keys %{$srcDesc->{src}}) {
     my $f = CallFn($src, "SVG_regexpFn", $src, $srcDesc->{src}{$src}{arg});
     push(@filter, $f) if($f);
   }
