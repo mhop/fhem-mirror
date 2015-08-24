@@ -23,7 +23,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.2.1
+# Version: 1.2.2
 #
 # Major Version History:
 # - 1.2.0 - 2015-03-11
@@ -210,8 +210,9 @@ sub RESIDENTS_Notify($$) {
 
                     # update statistics
                     readingsBeginUpdate($hash);
-                    readingsBulkUpdate( $hash, "lastActivity",   $change );
-                    readingsBulkUpdate( $hash, "lastActivityBy", $realname );
+                    readingsBulkUpdate( $hash, "lastActivity",      $change );
+                    readingsBulkUpdate( $hash, "lastActivityBy",    $realname );
+                    readingsBulkUpdate( $hash, "lastActivityByDev", $devName );
                     readingsEndUpdate( $hash, 1 );
                 }
             }
