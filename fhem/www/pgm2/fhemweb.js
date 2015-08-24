@@ -366,7 +366,8 @@ FW_replaceLink(el)
     ma = attr.match(new RegExp("^"+FW_root)); // Avoid "Connection lost" @iOS
     if(ma) {
       $(el).click(function(e) {
-        if(e.shiftKey || e.ctrlKey || e.metaKey) // Open link in window/tab
+        // Open link in window/tab, Forum #39154
+        if(e.shiftKey || e.ctrlKey || e.metaKey || e.button == 1)
           return;
         FW_leaving = 1;
         if($(el).attr("target") == "_blank") {
