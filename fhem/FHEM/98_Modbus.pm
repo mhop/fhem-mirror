@@ -54,6 +54,7 @@
 #   2015-07-05  added revRegs / defRevRegs attributes
 #   2015-07-17  added bswapRegs to reverse Byte-order on arbitrary length string (thanks to Marco)
 #   2015-07-22  added encode and decode
+#   2015-08-17  allow register 0, delete unused variable assignments
 #
 #               TODO: revRegs und bswapRegs for writing values 
 #
@@ -291,7 +292,7 @@ ModbusLD_ObjKey($$) {
     my $parseInfo = $modHash->{parseInfo};
 
     foreach my $a (keys %{$attr{$name}}) {
-        if ($a =~ /obj-([cdih][1-9][0-9]*)-reading/ && $attr{$name}{$a} eq $reading) {
+        if ($a =~ /obj-([cdih][0-9]+)-reading/ && $attr{$name}{$a} eq $reading) {
             return $1;
         }
     }
@@ -378,13 +379,9 @@ Modbus_ParseObj($$$;$) {
             Log3 $name, 5, "$name: ParseObj ObjInfo: reading=$reading, unpack=$unpack, expr=$expr, format=$format, map=$map";
             
             my $val = unpack ($unpack, $rest);      # verarbeite so viele register wie passend (ggf. über mehrere Register)
-            
-            if ($decode) {
-                $val = decode($decode, $val);
-            }
-            if ($encode) {
-                $val = encode($encode, $val);
-            }
+  
+            $val = decode($decode, $val) if ($decode);
+            $val = encode($encode, $val) if ($encode);
             
             # Exp zur Nachbearbeitung der Werte?
             if ($expr) {
@@ -949,25 +946,25 @@ ModbusLD_Initialize($ )
         $readingFnAttributes;
 
     $modHash->{ObjAttrList} = 
-        "obj-[cdih][1-9][0-9]*-reading " .
-        "obj-[cdih][1-9][0-9]*-name " .
-        "obj-[cdih][1-9][0-9]*-min " .
-        "obj-[cdih][1-9][0-9]*-max " .
-        "obj-[cdih][1-9][0-9]*-hint " .
-        "obj-[cdih][1-9][0-9]*-map " .
-        "obj-[cdih][1-9][0-9]*-set " .
-        "obj-[cdih][1-9][0-9]*-setexpr " .
-        "obj-[cdih][1-9][0-9]*-revRegs " .
-        "obj-[cdih][1-9][0-9]*-bswapRegs " .
-        "obj-[cdih][1-9][0-9]*-len " .
-        "obj-[cdih][1-9][0-9]*-unpack " .
-        "obj-[cdih][1-9][0-9]*-decode " .
-        "obj-[cdih][1-9][0-9]*-encode " .
-        "obj-[cdih][1-9][0-9]*-expr " .
-        "obj-[cdih][1-9][0-9]*-format " .
-        "obj-[cdih][1-9][0-9]*-showget " .
-        "obj-[cdih][1-9][0-9]*-poll " .
-        "obj-[cdih][1-9][0-9]*-polldelay ";
+        "obj-[cdih][0-9]+-reading " .
+        "obj-[cdih][0-9]+-name " .
+        "obj-[cdih][0-9]+-min " .
+        "obj-[cdih][0-9]+-max " .
+        "obj-[cdih][0-9]+-hint " .
+        "obj-[cdih][0-9]+-map " .
+        "obj-[cdih][0-9]+-set " .
+        "obj-[cdih][0-9]+-setexpr " .
+        "obj-[cdih][0-9]+-revRegs " .
+        "obj-[cdih][0-9]+-bswapRegs " .
+        "obj-[cdih][0-9]+-len " .
+        "obj-[cdih][0-9]+-unpack " .
+        "obj-[cdih][0-9]+-decode " .
+        "obj-[cdih][0-9]+-encode " .
+        "obj-[cdih][0-9]+-expr " .
+        "obj-[cdih][0-9]+-format " .
+        "obj-[cdih][0-9]+-showget " .
+        "obj-[cdih][0-9]+-poll " .
+        "obj-[cdih][0-9]+-polldelay ";
         
     $modHash->{DevAttrList} = 
         "dev-([cdih]-)*read " .
@@ -1156,8 +1153,8 @@ ModbusLD_UpdateGetSetList($)
         my $set     = ModbusLD_ObjInfo($hash, $objCombi, "set", 0);                     # default to 0
         my $map     = ModbusLD_ObjInfo($hash, $objCombi, "map", "defMap");
         my $hint    = ModbusLD_ObjInfo($hash, $objCombi, "hint");
-        my $type    = substr($objCombi, 0, 1);
-        my $adr     = substr($objCombi, 1);
+        #my $type    = substr($objCombi, 0, 1);
+        #my $adr     = substr($objCombi, 1);
         my $setopt;
         $hash->{getList} .= "$reading " if ($showget); # sichtbares get
 
@@ -1204,9 +1201,9 @@ ModbusLD_Get($@)
     
     if ($objCombi) {
         my ($err, $result);
-        my $type = substr($objCombi, 0, 1);
-        my $adr  = substr($objCombi, 1);
-        Log3 $name, 5, "$name: Get: Requesting $getName ($type $adr)";
+        #my $type = substr($objCombi, 0, 1);
+        #my $adr  = substr($objCombi, 1);
+        Log3 $name, 5, "$name: Get: Requesting $getName ($objCombi)";
         
         if ($ioHash->{BUSY}) {
             Log3 $name, 5, "$name: Get: Queue is stil busy - taking over the read with ReadAnswer";
@@ -1256,13 +1253,13 @@ ModbusLD_Set($@)
 
     if ($objCombi) {
         my $type = substr($objCombi, 0, 1);
-        my $adr  = substr($objCombi, 1);
+        #my $adr  = substr($objCombi, 1);
         my ($err,$result);
         if (!defined($setVal)) {
             Log3 $name, 3, "$name: No Value given to set $setName";
             return "No Value given to set $setName";
         }
-        Log3 $name, 5, "$name: Set: found option $setName ($type $adr), setVal = $setVal";
+        Log3 $name, 5, "$name: Set: found option $setName ($objCombi), setVal = $setVal";
 
         if ($ioHash->{BUSY}) {
             Log3 $name, 5, "$name: Set: Queue still busy - taking over the read with ReadAnswer";
@@ -1484,11 +1481,11 @@ ModbusLD_GetUpdate($ ) {
     Log3 $name, 5, "$name: GetUpdate full object list: " . join (" ",  sort @ObjList);
     
     foreach my $objCombi (sort @ObjList) {
-        my $type       = substr($objCombi, 0, 1);
-        my $adr        = substr($objCombi, 1);
+        #my $type       = substr($objCombi, 0, 1);
+        #my $adr        = substr($objCombi, 1);
         my $reading    = ModbusLD_ObjInfo($hash, $objCombi, "reading");
         my $objHashRef = $parseInfo->{$objCombi};
-        my $devTypeRef = $devInfo->{$type};
+        #my $devTypeRef = $devInfo->{$type};
         my $poll       = ModbusLD_ObjInfo($hash, $objCombi, "poll", "defPoll", 0);
         my $lastRead   = ($hash->{lastRead}{$objCombi} ? $hash->{lastRead}{$objCombi} : 0);
         Log3 $name, 5, "$name: GetUpdate check $objCombi => $reading, poll = $poll, last = $lastRead";
@@ -1514,7 +1511,7 @@ ModbusLD_GetUpdate($ ) {
     my ($obj,     $type,     $adr,     $reading,     $len,     $span);
     my ($nextObj, $nextType, $nextAdr, $nextReading, $nextLen, $nextSpan);
     my $maxLen;
-    $adr  = 0; $span = 0; $nextSpan = 0;
+    $adr  = 0; $type = ""; $span = 0; $nextSpan = 0;
     foreach $nextObj (sort keys %readList) {
         $nextType    = substr($nextObj, 0, 1);
         $nextAdr     = substr($nextObj, 1);
@@ -1573,11 +1570,11 @@ ModbusLD_GetIOHash($){
 sub
 ModbusLD_Send($$$;$$$){
     my ($hash, $objCombi, $op, $v1, $force, $span) = @_;
-    # $hash  : the logival Device hash
-    # $obj   : the hash ref to the object in ParseInfo -> ändern zu type+adr (objCombi)
-    # $op    : read, write
-    # $v1    : value for writing
-    # $force : put in front of queue and don't reschedule but wait if necessary
+    # $hash     : the logival Device hash
+    # $objCombi : type+adr 
+    # $op       : read, write
+    # $v1       : value for writing
+    # $force    : put in front of queue and don't reschedule but wait if necessary
     
     my $name    = $hash->{NAME};                # name of logical device
     my $modHash = $modules{$hash->{TYPE}};      # hash of logical module
