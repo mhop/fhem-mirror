@@ -3685,7 +3685,7 @@ sub EnOcean_Set($@)
           shift @a;
           $updateState = 3;
           $channelType = 255;
-          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+          EnOcean_CommandSave(undef, undef);
         } else {
           return "Wrong parameter, channel $setChannel not defined.";
         }
@@ -3783,7 +3783,7 @@ sub EnOcean_Set($@)
           $data .= 0 x (8 - length($data) % 8);
         }
         $channelType = 0;
-        CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+        EnOcean_CommandSave(undef, undef);
         $data = sprintf '%04X%s', $header, EnOcean_convBitToHex($data);
         my $teachInState = $comMode == 1 ? "teach-in sent, response requested" : "teach-in sent";
         readingsSingleUpdate($hash, "teach", "Generic Profile $teachInState", 1);
@@ -4554,7 +4554,7 @@ sub EnOcean_Parse($$)
 
           }
           # store attr subType, manufID ...
-          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+          EnOcean_CommandSave(undef, undef);
           # delete standard readings
           CommandDeleteReading(undef, "$name sensor[0-9]");
           CommandDeleteReading(undef, "$name D[0-9]");
@@ -6499,7 +6499,7 @@ sub EnOcean_Parse($$)
             } elsif ($timeNotation == 3) {
               $attr{$name}{timeNotation} = 12;
             }
-            CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+            EnOcean_CommandSave(undef, undef);
 
           } elsif ($mid == 3) {
             # room control setup
@@ -6564,7 +6564,7 @@ sub EnOcean_Parse($$)
 
           #Log3 $name, 2, "EnOcean $name EnOcean_Parse write 4 MID $mid DATA $data to $timeProgram VAL: $attr{$name}{$timeProgram}";
 
-            CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+            EnOcean_CommandSave(undef, undef);
           }
         }
         ($err, $response) = EnOcean_roomCtrlPanel_00Snd(undef, $hash, $packetType, $mid, $mcf, $irc, $fbc, $gmt);
@@ -6868,7 +6868,7 @@ sub EnOcean_Parse($$)
       push @event, "3:teach:Generic Profile teach-in accepted";
       Log3 $name, 2, "EnOcean $name Generic Profile teach-in Manufacturer: " . $attr{$name}{manufID};
       # store attr subType, manufID, gpDef ...
-      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+      EnOcean_CommandSave(undef, undef);
 
     } elsif ($purpose == 1 || ($purpose == 2 && AttrVal($name, "subType", "") eq "genericProfile")) {
       # teach-in deletion request
@@ -6931,7 +6931,7 @@ sub EnOcean_Parse($$)
             $hash->{DEF} = $attr{$name}{subDef};
             $modules{EnOcean}{defptr}{$hash->{DEF}} = $hash;
             delete $attr{$name}{subDef};
-            CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+            EnOcean_CommandSave(undef, undef);
           }      
           #push @event, "3:teach:Generic Profile teach-out accepted";
           readingsSingleUpdate($destinationHash, "teach", "Generic Profile teach-out accepted", 1);
@@ -7005,7 +7005,7 @@ sub EnOcean_Parse($$)
           }
           Log3 $name, 2, "EnOcean $name UTE teach-in EEP $rorg-$func-$type Manufacturer: $mid";
           # store attr subType, manufID ...
-          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+          EnOcean_CommandSave(undef, undef);
         } else {
           # EEP type not supported
           $attr{$name}{subType} = "raw";
@@ -7023,7 +7023,7 @@ sub EnOcean_Parse($$)
           }
           Log3 $name, 2, "EnOcean $name EEP $rorg-$func-$type not supported";
           # store attr subType, manufID ...
-          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+          EnOcean_CommandSave(undef, undef);
         }
       } elsif ($teachInReq == 1) {
         # Teach-In Deletion Request
@@ -7090,7 +7090,7 @@ sub EnOcean_Parse($$)
                 $destinationHash->{DEF} = $attr{$destinationName}{subDef};
                 $modules{EnOcean}{defptr}{$destinationHash->{DEF}} = $destinationHash;
                 delete $attr{$destinationName}{subDef};
-                CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+                EnOcean_CommandSave(undef, undef);
               }
             } else {
               $teachInAccepted = "EEP not supported";
@@ -7118,7 +7118,7 @@ sub EnOcean_Parse($$)
       return "";
     }
     Log3 $name, 3, "EnOcean $name secure teach-in $msg";
-    CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+    EnOcean_CommandSave(undef, undef);
     return "";
 
   } elsif ($rorg eq "C5" && $packetType == 1) {
@@ -7173,7 +7173,7 @@ sub EnOcean_Parse($$)
         }
         push @event, "3:teach:RMCC teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
         Log3 $name, 2, "EnOcean $name RMCC teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
-        CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+        EnOcean_CommandSave(undef, undef);
 
       } elsif ($hash->{helper}{sysEx}{$seq}{fnNumber} == 0x607) {
         # functions list answer
@@ -7251,7 +7251,7 @@ sub EnOcean_Parse($$)
       }
       push @event, "3:teach:RMCC teach-in accepted EEP $rorg-$func-$type Manufacturer: $manufID";
       Log3 $name, 2, "EnOcean $name RMCC teach-in accepted EEP $rorg-$func-$type Manufacturer: $manufID";
-      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+      EnOcean_CommandSave(undef, undef);
 
     } else {
       Log3 $name, 2, "EnOcean $name RMCC/RPC Function Number " . sprintf("%04X", $fnNumber) . " not supported.";
@@ -7277,10 +7277,10 @@ sub EnOcean_Parse($$)
     if (defined $oldDevice) {
       Log3 $name, 2, "EnOcean $name renamed $oldDevice to $deleteDevice";
       CommandRename(undef, "$oldDevice $deleteDevice");
-      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+      EnOcean_CommandSave(undef, undef);
       return $deleteDevice;
     } else {
-      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+      EnOcean_CommandSave(undef, undef);
       CommandRereadCfg(undef, undef);
       return '';
     }
@@ -7428,7 +7428,7 @@ sub EnOcean_Attr(@)
       # convert old format
       #$attr{$name}{$attrName} = hex $attrVal;
       CommandAttr(undef, "$name $attrName " .  hex $attrVal);
-      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+      EnOcean_CommandSave(undef, undef);
 
     } elsif ($attrVal =~ m/^\d+$/ && $attrVal >= 0 && $attrVal <= 255) {
 
@@ -7759,7 +7759,7 @@ sub EnOcean_Attr(@)
     } elsif ($attrVal eq "getNextID") {
       $attr{$name}{$attrName} = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000");
       #CommandAttr(undef, "$name $attrName " . EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000"));
-      CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+      EnOcean_CommandSave(undef, undef);
       #CommandRereadCfg(undef, "");
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{8}$/) {
       Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
@@ -7911,7 +7911,7 @@ sub EnOcean_Notify(@)
           CommandDelete(undef, substr($definedName, 8));
           delete $hash->{IODev}{helper}{UTERespWaitDel}{$name};
           Log3 $name, 2, "EnOcean $name UTE temporary teach-in response device " . substr($definedName, 8) . " deleted";
-          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+          EnOcean_CommandSave(undef, undef);
           CommandRereadCfg(undef, undef);
           #####
           #delete $hash->{IODev}{helper}{UTERespWaitDel}{$name};
@@ -7924,7 +7924,7 @@ sub EnOcean_Notify(@)
           CommandDelete(undef, substr($definedName, 8));
           delete $hash->{IODev}{helper}{gpRespWaitDel}{$name};
           Log3 $name, 2, "EnOcean $name Generic Profile temporary teach-in response device " . substr($definedName, 8) . " deleted";
-          CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+          EnOcean_CommandSave(undef, undef);
           CommandRereadCfg(undef, undef);
           #####
           #delete $hash->{IODev}{helper}{gpRespWaitDel}{$name};
@@ -8641,6 +8641,19 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
   }
 
   return ($err, $response, $data, $logLevel);
+}
+
+#CommandSave
+sub EnOcean_CommandSave($$)
+{
+  my ($ctrl, $param) = @_;
+  my $autosave = AttrVal("autocreate", "autosave", undef);
+  if (!defined $autosave) {
+    CommandSave($ctrl, $param) if (AttrVal("global", "autosave", 1));
+  } elsif ($autosave) {
+    CommandSave($ctrl, $param);
+  }
+  return;
 }
 
 # Check SenderIDs
@@ -9816,7 +9829,7 @@ sub EnOcean_sec_getRLC($$) {
 			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
 			$new_rlc = 0;
 		        $attr{$name}{$rlcVar} = "0000";
-                        CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+                        EnOcean_CommandSave(undef, undef);
 		}
 		readingsSingleUpdate($hash, "." . $rlcVar, uc(unpack('H4',pack('n', $new_rlc))), 0);
 		$attr{$name}{$rlcVar} = uc(unpack('H4',pack('n', $new_rlc)));
@@ -9826,7 +9839,7 @@ sub EnOcean_sec_getRLC($$) {
 			Log3 $name, 5, "EnOcean $name EnOcean_sec_getRLC RLC rollover";
 			$new_rlc = 0;
 		        $attr{$name}{$rlcVar} = "000000";
-                        CommandSave(undef, undef) if (AttrVal("autocreate", "autosave", 1));
+                        EnOcean_CommandSave(undef, undef);
 		}
                 readingsSingleUpdate($hash, "." . $rlcVar, uc(unpack('H6',pack('N', $new_rlc))), 0);
 		$attr{$name}{$rlcVar} = uc(unpack('H6',pack('N', $new_rlc)));
@@ -10216,14 +10229,24 @@ EnOcean_Undef($$)
 <h3>EnOcean</h3>
 <ul>
   EnOcean devices are sold by numerous hardware vendors (e.g. Eltako, Peha, etc),
-  using the RF Protocol provided by the EnOcean Alliance. Depending on the
-  function of the device an specific device profile is used, called EnOcean
-  Equipment Profile (EEP). Basically three profiles will be differed, e. g.
+  using the RF Protocol provided by the EnOcean Alliance.<br><br>
+  Depending on the function of the device an specific device profile is used, called
+  EnOcean Equipment Profile (EEP). The specific definition of a device is referenced by
+  the EEP number (RORG, FUNC, TYPE). Basically three profiles will be differed, e. g.
   switches, contacts, sensors. Some manufacturers use additional proprietary
   extensions. Further technical information can be found at the
   <a href="http://www.enocean-alliance.org/de/enocean_standard/">EnOcean Alliance</a>,
   see in particular the
   <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a>
+  <br><br>
+  The supplementary Generic Profiles approach instead defines a language to communicate the 
+  transmitted data types and ranges. The devices becomes self describing on their data
+  structures in communication. The Generic Profiles include a language definition with
+  a parameter selection that covers every possible measured value to be transmitted.
+  Therefore, the approach does not only define parameters for the value recalculation algorithm
+  but also includes specific signal definition. (e.g. physical units). Further technical
+  information can be found at the
+  <a href="https://www.enocean-alliance.org/fileadmin/redaktion/enocean_alliance/pdf/GenericProfiles_V1_Extract.pdf/">Generic Profiles 1.0 Abstract (PDF)</a>
   <br><br>
   Fhem recognizes a number of devices automatically. In order to teach-in, for
   some devices the sending of confirmation telegrams has to be turned on.
