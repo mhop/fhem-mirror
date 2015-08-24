@@ -1,5 +1,5 @@
 ###############################################################################
-# $Id: 74_Unifi.pm 2015-08-23 23:00 - rapster - rapster at x0e dot de $ 
+# $Id: 74_Unifi.pm 2015-08-24 07:10 - rapster - rapster at x0e dot de $ 
 
 package main;
 use strict;
@@ -362,8 +362,13 @@ sub Unifi_GetClients_Receive($) {
                 if (defined($data->{meta}->{msg})) {
                     Log3 $name, 5, "$name: GetClients_Receive - Failed! - state:'$data->{meta}->{rc}' - msg:'$data->{meta}->{msg}'";
                     if($data->{meta}->{msg} eq 'api.err.LoginRequired') {
-                        Log3 $name, 5, "$name: GetClients_Receive - LoginRequired detected. Set state to disconnected...";
-                        readingsSingleUpdate($hash,"state","disconnected",1) if($hash->{READINGS}->{state}->{VAL} ne "disconnected");
+                        Log3 $name, 5, "$name: GetClients_Receive - LoginRequired detected...";
+                        if($hash->{STATE} ne 'disconnected') {
+                            Log3 $name, 5, "$name: GetClients_Receive - I am the first who detected LoginRequired. Do re-login...";
+                            readingsSingleUpdate($hash,"state","disconnected",1);
+                            RemoveInternalTimer($hash);
+                            Unifi_DoUpdate($hash);
+                        }
                     }
                 } else {
                     Log3 $name, 5, "$name: GetClients_Receive - Failed (without message)! - state:'$data->{meta}->{rc}'";
@@ -453,7 +458,6 @@ The device will be still connected, even it is in PowerSave-Mode. (In this mode 
     </ul> <br>
     <br>
     Notes:<br>
-    <li>If the login-cookie gets invalid (timeout or change of user-credentials / url), 'update with login' will be executed in next interval. </li>
     <li>If you change &lt;interval&gt; while Unifi is running, the interval is changed only after the next automatic-update. <br>
         To change it immediately, disable Unifi with "attr disable 1" and enable it again.</li>
 
