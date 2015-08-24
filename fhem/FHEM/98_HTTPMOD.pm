@@ -49,9 +49,13 @@
 #               also the attribute disabled will not touch the internal timer.
 #   2015-05-10  Integrated xpath extension as suggested in the forum
 #   2015-06-22  added set[0-9]*NoArg and get[0-9]*URLExpr, get[0-9]*HeaderExpr and get[0-9]*DataExpr
-#	Todo:		set[0-9]*TextArg
-#				response-encoding
-#				multi page log extraction
+#   2015-07-30  added set[0-9]*TextArg, Encode and Decode
+#   2015-08-03  added get[0-9]*PullToFile (not fully implemented yet and not yet documented)
+#   2015-08-24  corrected bug when handling sidIdRegex for step <> 1
+#
+#   Todo:       
+#               multi page log extraction
+#               generic cookie handling?
 #
 #
                     
@@ -60,6 +64,7 @@ package main;
 use strict;                          
 use warnings;                        
 use Time::HiRes qw(gettimeofday);    
+use Encode qw(decode encode);
 use HttpUtils;
 
 sub HTTPMOD_Initialize($);
@@ -91,6 +96,8 @@ sub HTTPMOD_Initialize($)
       "reading[0-9]*Expr " .
       "reading[0-9]*Map " .     # new feature
       "reading[0-9]*Format " .  # new feature
+      "reading[0-9]*Decode " .  # new feature
+      "reading[0-9]*Encode " .  # new feature
       
       "readingsName.* " .       # old syntax
       "readingsRegex.* " .
@@ -124,6 +131,7 @@ sub HTTPMOD_Initialize($)
       "set[0-9]+Expr " .
       "set[0-9]*ReAuthRegex " .
       "set[0-9]*NoArg " .       # don't expect a value - for set on / off and similar.
+      "set[0-9]*TextArg " .     # just pass on a raw text value without validation / further conversion
       
       "get[0-9]+Name " .
       "get[0-9]*URL " .
@@ -140,7 +148,13 @@ sub HTTPMOD_Initialize($)
       "get[0-9]*Expr " .
       "get[0-9]*Map " .
       "get[0-9]*Format " .
+      "get[0-9]*Decode " .
+      "get[0-9]*Encode " .
       "get[0-9]*CheckAllReadings " .
+      
+      "get[0-9]*PullToFile " .
+      "get[0-9]*PullIterate " .
+      "get[0-9]*RecombineExpr " .
       
       "do_not_notify:1,0 " . 
       "disable:0,1 " .
@@ -225,6 +239,8 @@ sub
 HTTPMOD_Attr(@)
 {
     my ($cmd,$name,$aName,$aVal) = @_;
+    my $hash = $defs{$name};        # might be needed inside a URLExpr
+    my ($sid, $old);                # might be needed inside a URLExpr
     # $cmd can be "del" or "set"
     # $name is device name
     # aName and aVal are Attribute name and value
@@ -241,6 +257,7 @@ HTTPMOD_Attr(@)
             }
         } elsif ($aName =~ "Expr") { # validate all Expressions
             my $val = 1;
+            no warnings qw(uninitialized);
             eval $aVal;
             if ($@) {
                 Log3 $name, 3, "$name: Attr with invalid Expression in attr $name $aName $aVal: $@";
@@ -472,26 +489,30 @@ sub HTTPMOD_Set($@)
                 return "set value $setVal did not match defined map";
             }
         } else {
-          # wenn keine map, dann wenigstens sicherstellen, dass Wert numerisch.
-          if ($setVal !~ /^-?\d+\.?\d*$/) {
-            Log3 $name, 3, "$name: set - value $setVal is not numeric";
-            return "set value $setVal is not numeric";
-          }
-          $rawVal = $setVal;
+            # wenn keine map, dann wenigstens sicherstellen, dass Wert numerisch - falls nicht TextArg.
+            if (!AttrVal($name, "set${setNum}TextArg", undef)) {     
+                if ($setVal !~ /^-?\d+\.?\d*$/) {
+                    Log3 $name, 3, "$name: set - value $setVal is not numeric";
+                    return "set value $setVal is not numeric";
+                }
+            }
+            $rawVal = $setVal;
         }
         
-        # 2. Schritt: falls definiert Min- und Max-Werte prüfen
-        if (AttrVal($name, "set${setNum}Min", undef)) {
-            my $min = AttrVal($name, "set${setNum}Min", undef);
-            Log3 $name, 5, "$name: is checking value $rawVal against min $min";
-            return "set value $rawVal is smaller than Min ($min)"
-                if ($rawVal < $min);
-        }
-        if (AttrVal($name, "set${setNum}Max", undef)) {
-            my $max = AttrVal($name, "set${setNum}Max", undef);
-            Log3 $name, 5, "$name: set is checking value $rawVal against max $max";
-            return "set value $rawVal is bigger than Max ($max)"
-                if ($rawVal > $max);
+        if (!AttrVal($name, "set${setNum}TextArg", undef)) {     
+            # 2. Schritt: falls definiert Min- und Max-Werte prüfen - falls kein TextArg
+            if (AttrVal($name, "set${setNum}Min", undef)) {
+                my $min = AttrVal($name, "set${setNum}Min", undef);
+                Log3 $name, 5, "$name: is checking value $rawVal against min $min";
+                return "set value $rawVal is smaller than Min ($min)"
+                    if ($rawVal < $min);
+            }
+            if (AttrVal($name, "set${setNum}Max", undef)) {
+                my $max = AttrVal($name, "set${setNum}Max", undef);
+                Log3 $name, 5, "$name: set is checking value $rawVal against max $max";
+                return "set value $rawVal is bigger than Max ($max)"
+                    if ($rawVal > $max);
+            }
         }
 
         # 3. Schritt: Konvertiere mit setexpr falls definiert
@@ -523,6 +544,7 @@ sub HTTPMOD_DoGet($$)
     my ($hash, $getNum) = @_;
     my $name = $hash->{NAME};
     my ($url, $header, $data, $type, $count);
+    my $seq = $hash->{GetSeq};
     
     # hole alle Header bzw. generischen Header ohne Nummer 
     $header = join ("\r\n", map ($attr{$name}{$_}, sort grep (/get${getNum}Header/, keys %{$attr{$name}})));
@@ -586,6 +608,7 @@ sub HTTPMOD_Get($@)
     # @a is an array with DeviceName, getName
     my ($name, $getName) = @a;
     my ($getNum, $getList);
+    $hash->{GetSeq} = 0;
     $getList = "";
 
     if (AttrVal($name, "disable", undef)) {
@@ -718,11 +741,11 @@ sub HTTPMOD_GetUpdate($)
 # extract one reading for a buffer
 # and apply Expr, Map and Format
 ###################################
-sub HTTPMOD_ExtractReading($$$$$$$)
+sub HTTPMOD_ExtractReading($$$$$$$$$)
 {
-    my ($hash, $buffer, $reading, $regex, $expr, $map, $format) = @_;
+    my ($hash, $buffer, $reading, $regex, $expr, $map, $format, $decode, $encode) = @_;
     my $name = $hash->{NAME};
-    my $val;
+    my $val  = "";
     my $match;
 
     if (AttrVal($name, "enableXPath", undef) && $regex =~ /^xpath:(.*)/) {
@@ -768,6 +791,10 @@ sub HTTPMOD_ExtractReading($$$$$$$)
     }
     
     if ($match) {
+
+        $val = decode($decode, $val) if ($decode);
+        $val = encode($encode, $val) if ($encode);
+        
         if ($expr) {
             $val = eval $expr;
             Log3 $name, 5, "$name: ExtractReading changed $reading with Expr $expr from $1 to $val";
@@ -858,13 +885,13 @@ sub HTTPMOD_Read($$$)
     
     if ($type =~ "Auth") {
         # Doing Authentication step -> extract sid
-        if (AttrVal($name, "sid${num}IDRegex", undef)) {
-            if ($buffer =~ AttrVal($name, "sid1IDRegex", undef)) {
+        my $idRegex = HTTPMOD_GetFAttr($name, "sid", $num, "IDRegex");
+        if ($idRegex) {
+            if ($buffer =~ $idRegex) {
                 $hash->{sid} = $1;
                 Log3 $name, 5, "$name: Read set sid to $hash->{sid}";
             } else {
-                Log3 $name, 5, "$name: Read could not match buffer to IDRegex " .
-                     AttrVal($name, "sid${num}IDRegex", undef);
+                Log3 $name, 5, "$name: Read could not match buffer to IDRegex $idRegex";
             }
         }
         return undef;
@@ -899,21 +926,50 @@ sub HTTPMOD_Read($$$)
     my $checkAll  = 0;  
     my $unmatched = "";
     my $matched   = "";
-    my ($reading, $regex, $expr, $map, $format);
+    my ($reading, $regex, $expr, $map, $format, $encode, $decode, $pull);
     readingsBeginUpdate($hash);
     
     if ($type =~ "Get") {
         $checkAll = AttrVal($name, "get" . $num . "CheckAllReadings", 0);
         $reading  = $attr{$name}{"get" . $num . "Name"};
         $regex    = HTTPMOD_GetFAttr($name, "get", $num, "Regex");
-        Log3 $name, 5, "$name: Read is extracting Reading with $regex from HTTP Response to $type";
+        #Log3 $name, 5, "$name: Read is extracting Reading with $regex from HTTP Response to $type";
         if (!$regex) {
             $checkAll = 1;
         } else {
             $expr    = HTTPMOD_GetFAttr($name, "get", $num, "Expr");
             $map     = HTTPMOD_GetFAttr($name, "get", $num, "Map");
             $format  = HTTPMOD_GetFAttr($name, "get", $num, "Format");
-            if (HTTPMOD_ExtractReading($hash, $buffer, $reading, $regex, $expr, $map, $format)) {
+            $decode  = HTTPMOD_GetFAttr($name, "get", $num, "Decode");
+            $encode  = HTTPMOD_GetFAttr($name, "get", $num, "Encode");
+            $pull    = HTTPMOD_GetFAttr($name, "get", $num, "PullToFile");
+
+            if ($pull) {
+                Log3 $name, 5, "$name: Read is pulling to file, sequence is $hash->{GetSeq}";
+                my $iterate   = HTTPMOD_GetFAttr($name, "get", $num, "PullIterate");
+                my $matches = 0;
+                while ($buffer =~ /$regex/g) {
+                    my $recombine = HTTPMOD_GetFAttr($name, "get", $num, "RecombineExpr");
+                    no warnings qw(uninitialized);
+                    $recombine = '$1' if not ($recombine);
+                    my $val = eval($recombine);
+                    Log3 $name, 3, "$name: Read pulled line $val";
+                    $matched = $reading;
+                    $matches++;                 
+                }
+                Log3 $name, 3, "$name: Read pulled $matches lines";
+                if ($matches) {
+                    if ($iterate && $hash->{GetSeq} < $iterate) {
+                        $hash->{GetSeq}++;                  
+                        Log3 $name, 5, "$name: Read is iterating pull until $iterate, next is $hash->{GetSeq}";
+                        HTTPMOD_DoGet($hash, $num);
+                    } else {
+                        Log3 $name, 5, "$name: Read is done with pull after $hash->{GetSeq}.";
+                    }
+                } else {
+                    Log3 $name, 5, "$name: Read is done with pull, no more lines matched";
+                }
+            } elsif (HTTPMOD_ExtractReading($hash, $buffer, $reading, $regex, $expr, $map, $format, $decode, $encode)) {
                 $matched = ($matched ? "$matched $reading" : "$reading");
             } else {
                 $unmatched = ($unmatched ? "$unmatched $reading" : "$reading");
@@ -938,11 +994,13 @@ sub HTTPMOD_Read($$$)
                 $expr    = HTTPMOD_GetFAttr($name, "reading", $1, "Expr");
                 $map     = HTTPMOD_GetFAttr($name, "reading", $1, "Map");
                 $format  = HTTPMOD_GetFAttr($name, "reading", $1, "Format");
+                $decode  = HTTPMOD_GetFAttr($name, "reading", $1, "Decode");
+                $encode  = HTTPMOD_GetFAttr($name, "reading", $1, "Encode");
             } else {
                 Log3 $name, 3, "$name: Read found inconsistant attributes for $a";
                 next;
             }
-            if (HTTPMOD_ExtractReading($hash, $buffer, $reading, $regex, $expr, $map, $format)) {
+            if (HTTPMOD_ExtractReading($hash, $buffer, $reading, $regex, $expr, $map, $format, $decode, $encode)) {
                 $matched = ($matched ne "" ? "$matched $reading" : "$reading");
             } else {
                 $unmatched = ($unmatched ne "" ? "$unmatched $reading" : "$reading");
@@ -1225,8 +1283,8 @@ HTTPMOD_AddToQueue($$$$$;$$$){
         Using this feature, HTTPMOD can perform a forms based authentication and send user name, password or other necessary data to the device and save the session id for further requests. <br><br>
         
         To determine when this login procedure is necessary, HTTPMOD will first try to do a set without 
-        doing the login procedure. If the Attribute ReAuthRegex is defined, it will then compare the HTTP Response to the set request with the regular expression from ReAuthRegex. If it matches, then a 
-        login is performed. The ReAuthRegex is meant to match the error page a device returns if authentication or reauthentication is required e.g. because a session timeout has expired. <br><br>
+        doing the login procedure. If the Attribute reAuthRegex is defined, it will then compare the HTTP Response to the set request with the regular expression from reAuthRegex. If it matches, then a 
+        login is performed. The reAuthRegex is meant to match the error page a device returns if authentication or reauthentication is required e.g. because a session timeout has expired. <br><br>
         
         If for one step not all of the URL, Data or Header Attributes are set, then HTTPMOD tries to use a 
         <code>sidURL</code>, <code>sidData.*</code> or <code>sidHeader.*</code> Attribue (without the step number after sid). This way parts that are the same for all steps don't need to be defined redundantly. <br><br>
@@ -1297,6 +1355,12 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             Defines a format string that will be used in sprintf to format a reading value.<br>
             If specified as readingFormat then the attribute value is a default for all other readings that don't specify 
             an explicit reading[0-9]*Format.
+
+        <li><b>reading[0-9]*Decode</b></li> 
+            defines an encoding to be used in a call to the perl function decode to convert the raw data string read from the device to a reading. This can be used if the device delivers strings in an encoding like cp850 instead of utf8.
+        <li><b>reading[0-9]*Encode</b></li> 
+            defines an encoding to be used in a call to the perl function encode to convert the raw data string read from the device to a reading. This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.
+
         <li><b>noShutdown</b></li>
             pass the noshutdown flag to HTTPUtils for webservers that need it (some embedded webservers only deliver empty pages otherwise)
         <li><b>disable</b></li>
@@ -1314,7 +1378,7 @@ HTTPMOD_AddToQueue($$$$$;$$$){
     <b> advanced attributes </b>
     <br>
     <ul>
-        <li><b>ReAuthRegex</b></li>
+        <li><b>reAuthRegex</b></li>
             regular Expression to match an error page indicating that a session has expired and a new authentication for read access needs to be done. This attribute only makes sense if you need a forms based authentication for reading data and if you specify a multi step login procedure based on the sid.. attributes.
         <br><br>
         <li><b>sid[0-9]*URL</b></li>
@@ -1352,6 +1416,9 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             Regex that will detect when a session has expired an a new login needs to be performed.         
         <li><b>set[0-9]*NoArg</b></li>
             Defines that this set option doesn't require arguments. It allows sets like "on" or "off" without further values.
+        <li><b>set[0-9]*TextArg</b></li>
+            Defines that this set option doesn't require any validation / conversion. 
+            The raw value is passed on as text to the device.
         <br>
         <br>
         <li><b>get[0-9]+Name</b></li>
@@ -1392,7 +1459,13 @@ HTTPMOD_AddToQueue($$$$$;$$$){
             this attribute behaves just like Reading[0-9]*Map but is applied to a get value.
         <li><b>get[0-9]*Format</b></li>
             this attribute behaves just like Reading[0-9]*Format but is applied to a get value.
-        <li><b>get[0-9]*CheckAllReadings</b></li>
+            
+        <li><b>get[0-9]*Decode</b></li> 
+            defines an encoding to be used in a call to the perl function decode to convert the raw data string read from the device to a reading. This can be used if the device delivers strings in an encoding like cp850 instead of utf8.
+        <li><b>get[0-9]*Encode</b></li> 
+            defines an encoding to be used in a call to the perl function encode to convert the raw data string read from the device to a reading. This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.
+
+            <li><b>get[0-9]*CheckAllReadings</b></li>
             this attribute modifies the behavior of HTTPMOD when the HTTP Response of a get command is parsed. <br>
             If this attribute is set to 1, then additionally to any matching of get specific regexes (get[0-9]*Regex), 
             also all the Regex / Reading pairs defined in Reading[0-9]+Name and Reading[0-9]+Regex attributes are checked and if they match, the coresponding Readings are assigned as well.
