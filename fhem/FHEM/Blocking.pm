@@ -106,7 +106,10 @@ BlockingInformParent($;$$)
   if(!$telnetClient) {
     my $addr = "localhost:$defs{$telnetDevice}{PORT}";
     $telnetClient = IO::Socket::INET->new(PeerAddr => $addr);
-    Log 1, "CallBlockingFn: Can't connect to $addr: $@" if(!$telnetClient);
+    if(!$telnetClient) {
+      Log 1, "CallBlockingFn: Can't connect to $addr: $@";
+      return;
+    }
   }
 
   if(defined($param)) {
@@ -138,6 +141,11 @@ sub
 BlockingKill($)
 {
   my $h = shift;
+
+  # MaxNr of concurrent forked processes @Win is 64, and must use wait as
+  # $SIG{CHLD} = 'IGNORE' does not work.
+  wait if($^O =~ m/Win/);
+
   if($^O !~ m/Win/) {
     if($h->{pid} && kill(9, $h->{pid})) {
       Log 1, "Timeout for $h->{fn} reached, terminated process $h->{pid}";
