@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  95_Dashboard: support for alias attribute, which if set, is shown
+               instead of the device name in the left navigation
   - feature: 70_Pushover: Rewrite for Non-Blocking HttpUtils
                - much more readings
                - Support for emergency callback via push
