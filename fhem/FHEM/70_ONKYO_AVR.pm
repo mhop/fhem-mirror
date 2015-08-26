@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.0.4
+# Version: 1.0.5
 #
 # Major Version History:
 # - 1.0.0 - 2013-12-16
@@ -68,7 +68,7 @@ sub ONKYO_AVR_Initialize($) {
     $hash->{UndefFn} = "ONKYO_AVR_Undefine";
 
     $hash->{AttrList} =
-"volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs disable:0,1 model "
+"volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs disable:0,1 model wakeupCmd:textField "
       . $readingFnAttributes;
 
     #    $data{RC_layout}{ONKYO_AVR_SVG} = "ONKYO_AVR_RClayout_SVG";
@@ -729,13 +729,32 @@ sub ONKYO_AVR_Set($@) {
 
     # on
     elsif ( lc( $a[1] ) eq "on" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
-
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
-            $return =
-              "Device is offline and cannot be controlled at that stage.";
+            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " (wakeup)";
+            my $wakeupCmd = AttrVal( $name, "wakeupCmd", "" );
+
+            if ( $wakeupCmd ne "" ) {
+                $wakeupCmd =~ s/\$DEVICE/$name/g;
+
+                if ( $wakeupCmd =~ s/^[ \t]*\{|\}[ \t]*$//g ) {
+                    Log3 $name, 4,
+                      "ONKYO_AVR executing wake-up command (Perl): $wakeupCmd";
+                    $result = eval $wakeupCmd;
+                }
+                else {
+                    Log3 $name, 4,
+                      "ONKYO_AVR executing wake-up command (fhem): $wakeupCmd";
+                    $result = fhem $wakeupCmd;
+                }
+            }
+            else {
+                $return =
+                  "Device is offline and cannot be controlled at that stage.";
+            }
         }
         else {
+            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
+
             $result = ONKYO_AVR_SendCommand( $hash, "power", "on" );
             if ( defined($result) ) {
                 if ( !defined( $hash->{READINGS}{power}{VAL} )
