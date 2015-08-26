@@ -1,5 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 70_Pushover: Rewrite for Non-Blocking HttpUtils
+               - much more readings
+               - Support for emergency callback via push
+               - Support for supplementary URLs incl. push callback
+			     (e.g. for priority < 2)
+               - Added readingFnAttributes to AttrList
+               - Added support for HTML formatted text
+               - Added user/group token validation
   - feature: 74_Unifi: - Added Attribute 'devAlias' to rename device names (ID)
                        - bugfix: Module not started without restart after def
   - feature: 74_Unifi: - Added support for Controller v3 (v4 already supported)
