@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.4.4
+# Version: 1.4.5
 #
 # Major Version History:
 # - 1.4.0 - 2014-11-27
@@ -83,7 +83,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 macaddr:textField "
+"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 macaddr:textField wakeupCmd:textField "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -123,7 +123,7 @@ sub ENIGMA2_GetStatus($;$) {
     InternalTimer( gettimeofday() + $interval, "ENIGMA2_GetStatus", $hash, 0 );
 
     return
-      if ( defined( $attr{$name}{disable} ) && $attr{$name}{disable} == 1 );
+      if ( AttrVal( $name, "disable", 0 ) == 1 );
 
     if ( !$update ) {
         ENIGMA2_SendCommand( $hash, "powerstate" );
@@ -353,17 +353,27 @@ sub ENIGMA2_Set($@) {
     elsif ( lc( $a[1] ) eq "on" ) {
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " (wakeup)";
+            my $wakeupCmd = AttrVal( $name, "wakeupCmd", "" );
+            my $macAddr =
+              AttrVal( $name, "macaddr", ReadingsVal( $name, "lanmac", "" ) );
 
-            if (
-                (
-                    defined( $hash->{READINGS}{lanmac}{VAL} )
-                    && $hash->{READINGS}{lanmac}{VAL} ne "-"
-                )
-                || ( defined( $attr{$name}{macaddr} )
-                    && $attr{$name}{macaddr} ne "" )
-              )
-            {
-                $result = ENIGMA2_wake($hash);
+            if ( $wakeupCmd ne "" ) {
+                $wakeupCmd =~ s/\$DEVICE/$name/g;
+                $wakeupCmd =~ s/\$MACADDR/$macAddr/g;
+
+                if ( $wakeupCmd =~ s/^[ \t]*\{|\}[ \t]*$//g ) {
+                    Log3 $name, 4,
+                      "ENIGMA2 executing wake-up command (Perl): $wakeupCmd";
+                    $result = eval $wakeupCmd;
+                }
+                else {
+                    Log3 $name, 4,
+                      "ENIGMA2 executing wake-up command (fhem): $wakeupCmd";
+                    $result = fhem $wakeupCmd;
+                }
+            }
+            elsif ( $macAddr ne "" && $macAddr ne "-" ) {
+                $result = ENIGMA2_wake( $name, $macAddr );
                 return "wake-up command sent";
             }
             else {
@@ -2313,45 +2323,34 @@ sub ENIGMA2_Undefine($$) {
 }
 
 ###################################
-sub ENIGMA2_wake ($) {
-    my ($hash) = @_;
-    my $name = $hash->{NAME};
-    my $mac_addr =
-      ( defined( $attr{$name}{macaddr} ) )
-      ? $attr{$name}{macaddr}
-      : $hash->{READINGS}{lanmac}{VAL};
+sub ENIGMA2_wake ($$) {
+    my ( $name, $mac_addr ) = @_;
     my $address;
     my $port;
 
-    if ( $mac_addr ne "-" ) {
-        if ( !defined $address ) { $address = '255.255.255.255' }
-        if ( !defined $port || $port !~ /^\d+$/ ) { $port = 9 }
+    if ( !defined $address ) { $address = '255.255.255.255' }
+    if ( !defined $port || $port !~ /^\d+$/ ) { $port = 9 }
 
-        my $sock = new IO::Socket::INET( Proto => 'udp' )
-          or die "socket : $!";
-        die "Can't create WOL socket" if ( !$sock );
+    my $sock = new IO::Socket::INET( Proto => 'udp' )
+      or die "socket : $!";
+    die "Can't create WOL socket" if ( !$sock );
 
-        my $ip_addr = inet_aton($address);
-        my $sock_addr = sockaddr_in( $port, $ip_addr );
-        $mac_addr =~ s/://g;
-        my $packet =
-          pack( 'C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16 );
+    my $ip_addr = inet_aton($address);
+    my $sock_addr = sockaddr_in( $port, $ip_addr );
+    $mac_addr =~ s/://g;
+    my $packet =
+      pack( 'C6H*', 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, $mac_addr x 16 );
 
-        setsockopt( $sock, SOL_SOCKET, SO_BROADCAST, 1 )
-          or die "setsockopt : $!";
+    setsockopt( $sock, SOL_SOCKET, SO_BROADCAST, 1 )
+      or die "setsockopt : $!";
 
-        Log3 $name, 4,
-          "ENIGMA2 $name: Waking up by sending Wake-On-Lan magic package to "
-          . $mac_addr;
-        send( $sock, $packet, 0, $sock_addr ) or die "send : $!";
-        close($sock);
-    }
-    else {
-        Log3 $name, 3,
-"ENIGMA2 $name: Unknown MAC address. Please turn on device manually once.";
-    }
+    Log3 $name, 4,
+      "ENIGMA2 $name: Waking up by sending Wake-On-Lan magic package to "
+      . $mac_addr;
+    send( $sock, $packet, 0, $sock_addr ) or die "send : $!";
+    close($sock);
 
-    return 1;
+    return;
 }
 
 #####################################
@@ -3140,6 +3139,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           </li>
           <li>
             <b>timeout</b> - Set different polling timeout in seconds (default=6)
+          </li>
+          <li>
+            <b>wakeupCmd</b> - Set a command to be executed when turning on an absent device. Can be an FHEM command or Perl command in {}. Available variables: ENIGMA2 device name -> $DEVICE, ENIGMA2 device MAC address -> $MACADDR  (default=Wake-on-LAN)
           </li>
         </ul>
       </div><br>
