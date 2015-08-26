@@ -24,7 +24,7 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 #
-# Version: 1.3.0
+# Version: 1.3.1
 #
 # Major Version History:
 # - 1.2.0 - 2014-03-12
@@ -76,7 +76,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5 macaddr:textField "
+"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5 macaddr:textField wakeupCmd:textField "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -395,10 +395,26 @@ sub PHTV_Set($@) {
     # on
     elsif ( lc( $a[1] ) eq "on" ) {
         if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
-            if ( defined( $attr{$name}{macaddr} )
-                && $attr{$name}{macaddr} ne "" )
-            {
-                Log3 $name, 3, "PHTV set $name " . $a[1] . " (wakeup)";
+            Log3 $name, 3, "PHTV set $name " . $a[1] . " (wakeup)";
+            my $wakeupCmd = AttrVal( $name, "wakeupCmd", "" );
+            my $macAddr   = AttrVal( $name, "macaddr",   "" );
+
+            if ( $wakeupCmd ne "" ) {
+                $wakeupCmd =~ s/\$DEVICE/$name/g;
+                $wakeupCmd =~ s/\$MACADDR/$macAddr/g;
+
+                if ( $wakeupCmd =~ s/^[ \t]*\{|\}[ \t]*$//g ) {
+                    Log3 $name, 4,
+                      "PHTV executing wake-up command (Perl): $wakeupCmd";
+                    $result = eval $wakeupCmd;
+                }
+                else {
+                    Log3 $name, 4,
+                      "PHTV executing wake-up command (fhem): $wakeupCmd";
+                    $result = fhem $wakeupCmd;
+                }
+            }
+            elsif ( $macAddr ne "" && $macAddr ne "-" ) {
                 $hash->{helper}{wakeup} = 1;
                 PHTV_wake($hash);
                 RemoveInternalTimer($hash);
