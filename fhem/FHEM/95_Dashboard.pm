@@ -339,6 +339,17 @@ sub Dashboard_attr($$$) {
         addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "backgroundimage");
   }
 
+  # if an alias is set to the dashboard, replace the name shown in the left navigation
+  # by this alias
+  if (
+       $cmd eq "set"
+    && $attrName =~ m/alias/
+  ) {
+    my $url = '/dashboard/' . $name;
+
+    $data{FWEXT}{$url}{NAME} = $attrVal;
+  }
+
   return;  
 }
 
