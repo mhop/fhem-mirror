@@ -1,5 +1,5 @@
 ###############################################################################
-# $Id: 74_Unifi.pm 2015-08-25 20:00 - rapster - rapster at x0e dot de $ 
+# $Id: 74_Unifi.pm 2015-08-27 22:00 - rapster - rapster at x0e dot de $ 
 
 package main;
 use strict;
@@ -30,7 +30,7 @@ sub Unifi_Define($$) {
     return "Wrong syntax: use define <name> Unifi <ip> <port> <username> <password> [<interval> [<siteID> [<version>]]]" if(int(@a) < 6);
     return "Wrong syntax: <port> is not a number!"                           if(!looks_like_number($a[3]));
     return "Wrong syntax: <interval> is not a number!"                       if($a[6] && !looks_like_number($a[6]));
-    return "Wrong syntax: <interval> too small, must be at least 10"         if($a[6] && $a[6] < 10);
+    return "Wrong syntax: <interval> too small, must be at least 5"          if($a[6] && $a[6] < 5);
     return "Wrong syntax: <version> is not a valid number! Must be 3 or 4."  if($a[8] && (!looks_like_number($a[8]) || $a[8] !~ /3|4/));
     
     my $name = $a[0];
@@ -154,20 +154,33 @@ sub Unifi_Get($@) {
     
     my $clients = '';
     my $devAliases = AttrVal($name,"devAlias",0);
-    if($devAliases) {   # Replace ID's with Aliases
-        for (keys %{$hash->{clients}}) {
-            $_ = $1 if($devAliases && $devAliases =~ /$_:(.+?)(\s|$)/);
-            $clients .= ','.$_;
+    for (keys %{$hash->{clients}}) {  # Replace ID's with Aliases
+        if (   $devAliases && $devAliases =~ /$_:(.+?)(\s|$)/
+            || ($devAliases && defined $hash->{clients}->{$_}->{name} && $devAliases =~ /$hash->{clients}->{$_}->{name}:(.+?)(\s|$)/)
+            || ($devAliases && defined $hash->{clients}->{$_}->{hostname} && $devAliases =~ /$hash->{clients}->{$_}->{hostname}:(.+?)(\s|$)/)
+            || (defined $hash->{clients}->{$_}->{name} && $hash->{clients}->{$_}->{name} =~ /^([\w\.\-]+)$/) 
+            || (defined $hash->{clients}->{$_}->{hostname} && $hash->{clients}->{$_}->{hostname} =~ /^([\w\.\-]+)$/)
+           ) { 
+            $_ = $1; 
         }
+        $clients .= ','.$_;
     }
     
     if($getName !~ /clientData/) {
         return "Unknown argument $getName, choose one of ".(($clients) ? "clientData:all$clients" : "");
     } 
     elsif ($getName eq 'clientData' && $clients) {
-        if($getVal && $devAliases) {   # Make ID from Alias
+        if($getVal && $getVal ne 'all') {   # Make ID from Alias
             for (keys %{$hash->{clients}}) {
-                $getVal = $_ if($devAliases =~ /$_:$getVal/);
+                if (   $devAliases && $devAliases =~ /$_:$getVal/
+                    || ($devAliases && defined $hash->{clients}->{$_}->{name} && $devAliases =~ /$hash->{clients}->{$_}->{name}:$getVal/)
+                    || ($devAliases && defined $hash->{clients}->{$_}->{hostname} && $devAliases =~ /$hash->{clients}->{$_}->{hostname}:$getVal/)
+                    || (defined $hash->{clients}->{$_}->{name} && $hash->{clients}->{$_}->{name} eq $getVal) 
+                    || (defined $hash->{clients}->{$_}->{hostname} && $hash->{clients}->{$_}->{hostname} eq $getVal)
+                   ) { 
+                    $getVal = $_;
+                    last;
+                }
             }
         }
         my $clientData = '';
@@ -209,6 +222,16 @@ sub Unifi_Attr(@) {
             elsif($attr_value == 0 && Unifi_CONNECTED($hash) eq "disabled") {
                 Unifi_CONNECTED($hash,'initialized');
                 Unifi_DoUpdate($hash);
+            }
+        }
+        elsif($attr_name eq "devAlias") {
+            if (!$attr_value) {
+                CommandDeleteAttr(undef, $name.' '.$attr_name);
+                return 1;
+            }
+            elsif ($attr_value !~ /^([\w\.\-]+:[\w\.\-]+\s?)+$/) {
+                return "$name: Value \"$attr_value\" is not allowed for devAlias!\n"
+                       ."Must be \"<ID>:<ALIAS> <ID2>:<ALIAS2>\", e.g. 123abc:MyIphone";
             }
         }
     }
@@ -316,7 +339,7 @@ sub Unifi_Login_Receive($) {
                         Log3 $name, 5, "$name ($self) - Login Failed! - state:'$data->{meta}->{rc}' - msg:'$data->{meta}->{msg}'";
                     }
                 } else {
-                    Log3 $name, 5, "$name ($self) - Login Failed (without message)! - state:'$data->{meta}->{rc}'";
+                    Log3 $name, 5, "$name ($self) - Login Failed (without msg)! - state:'$data->{meta}->{rc}'";
                 }
                 $param->{cookies} = '';
             }
@@ -375,10 +398,18 @@ sub Unifi_GetClients_Receive($) {
                 my $clientName;
                 for my $h (@{$data->{data}}) {
                     $clientName = $h->{user_id};
-                    $clientName = $1 if $devAliases =~ /$clientName:(.+?)(\s|$)/;
+                    if (   $devAliases && $devAliases =~ /$clientName:(.+?)(\s|$)/
+                        || ($devAliases && defined $h->{name} && $devAliases =~ /$h->{name}:(.+?)(\s|$)/)
+                        || ($devAliases && defined $h->{hostname} && $devAliases =~ /$h->{hostname}:(.+?)(\s|$)/)
+                        || (defined $h->{name} && $h->{name} =~ /^([\w\.\-]+)$/) 
+                        || (defined $h->{hostname} && $h->{hostname} =~ /^([\w\.\-]+)$/)
+                       ) {
+                        $clientName = $1;
+                    }
+                    
                     $hash->{clients}->{$h->{user_id}} = $h;
                     $connectedClientIDs->{$h->{user_id}} = 1;
-                    readingsBulkUpdate($hash,$clientName."_hostname",($h->{hostname}) ? $h->{hostname} : ($h->{ip}) ? $h->{ip} : 'Unknown');
+                    readingsBulkUpdate($hash,$clientName."_hostname",(defined $h->{hostname}) ? $h->{hostname} : (defined $h->{ip}) ? $h->{ip} : 'Unknown');
                     readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($h->{last_seen}));
                     readingsBulkUpdate($hash,$clientName."_uptime",$h->{uptime});
                     readingsBulkUpdate($hash,$clientName,'connected');
@@ -386,7 +417,14 @@ sub Unifi_GetClients_Receive($) {
                 for my $clientID (keys %{$hash->{clients}}) {
                     if (!defined($connectedClientIDs->{$clientID}) && $hash->{READINGS}->{$clientID}->{VAL} ne 'disconnected') {
                         Log3 $name, 5, "$name ($self) - Client '$clientID' previously connected is now disconnected.";
-                        $clientID = $1 if $devAliases =~ /$clientID:(.+?)(\s|$)/;
+                        if (   $devAliases && $devAliases =~ /$clientID:(.+?)(\s|$)/
+                            || ($devAliases && defined $hash->{clients}->{$clientID}->{name} && $devAliases =~ /$hash->{clients}->{$clientID}->{name}:(.+?)(\s|$)/)
+                            || ($devAliases && defined $hash->{clients}->{$clientID}->{hostname} && $devAliases =~ /$hash->{clients}->{$clientID}->{hostname}:(.+?)(\s|$)/)
+                            || (defined $hash->{clients}->{$clientID}->{name} && $hash->{clients}->{$clientID}->{name} =~ /^([\w\.\-]+)$/) 
+                            || (defined $hash->{clients}->{$clientID}->{hostname} && $hash->{clients}->{$clientID}->{hostname} =~ /^([\w\.\-]+)$/)
+                           ) {
+                            $clientID = $1;
+                        }
                         readingsBulkUpdate($hash,$clientID,'disconnected') if($hash->{READINGS}->{$clientID}->{VAL} ne 'disconnected');
                     }
                 }
@@ -520,7 +558,7 @@ sub Unifi_Whoami()  { return (split('::',(caller(1))[3]))[1] || ''; }
 # { "data" : [ ] , "meta" : { "rc" : "ok"}}
 # { "data" : [ ] , "meta" : { "msg" : "api.err.InvalidObject" , "rc" : "error"}}   //Wrong siteID in v3
 # { "data" : [ ] , "meta" : { "msg" : "api.err.NoSiteContext" , "rc" : "error"}}   //Wrong siteID in v4
-# { "data" : [ ] , "meta" : { "msg" : "api.err.LoginRequired" , "rc" : "error"}}   //Login Required / cookie is invalid / Unifi v4 is used wiith controller v3
+# { "data" : [ ] , "meta" : { "msg" : "api.err.LoginRequired" , "rc" : "error"}}   //Login Required / cookie is invalid / While Login: Unifi v4 is used wiith controller v3
 ###############################################################################
 
 
@@ -615,7 +653,7 @@ The device will be still connected, even it is in PowerSave-Mode. (In this mode 
 
 <h4>Get</h4>
 <ul>
-    <li><code>get &lt;name&gt; clientData &lt;all|devAlias|clientID&gt</code><br>
+    <li><code>get &lt;name&gt; clientData &lt;all|user_id|controllerAlias|hostname|devAlias|clientID&gt;</code><br>
     Show more details about clients.</li>
 </ul>
 
@@ -623,9 +661,11 @@ The device will be still connected, even it is in PowerSave-Mode. (In this mode 
 <h4>Attributes</h4>
 <ul>
     <li>attr devAlias<br>
-    Can be used to rename device names in the format DEVICEUUID:Aliasname.<br>
+    Can be used to rename device names in the format <code>&lt;user_id|controllerAlias|hostname&gt;:Aliasname.</code><br>
     Separate using blank to rename multiple devices.<br>
-    Example:<code> attr unifi devAlias 5537d138e4b033c1832c5c84:iPhone-Claudiu</code></li>
+    Example (user_id):<code> attr unifi devAlias 5537d138e4b033c1832c5c84:iPhone-Claudiu</code><br>
+    Example (controllerAlias):<code> attr unifi devAlias iPhoneControllerAlias:iPhone-Claudiu</code><br>
+    Example (hostname):<code> attr unifi devAlias iphone:iPhone-Claudiu</code><br></li>
     <br>
     <li>attr disable &lt;1|0&gt;<br>
     With this attribute you can disable the whole module. <br>
