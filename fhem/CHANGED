@@ -4,6 +4,8 @@
                          Attr 'devAlias' > controllerAlias > hostname > user_id
                        - Attr 'devAlias' now can rename:
                          controllerAlias, hostname, user_id
+                       - Command 'get clientData' can now called with these
+                         parameters: devAlias,controllerAlias,hostname,user_id
   - Attr 'devAlias' now can rename <
   - bugfix:  70_Jabber: Fixed broken callback registration in Net::XMPP >= 1.04
   - bugfix:  95_Dashboard: support for alias attribute, which if set, is shown
