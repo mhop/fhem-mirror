@@ -212,8 +212,10 @@ sub ENIGMA2_Set($@) {
 
     # depending on current FHEMWEB instance's allowedCommands,
     # restrict set commands if there is "set-user" in it
-    my $adminMode = 1;
-    my $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 );
+    my $adminMode         = 1;
+    my $FWallowedCommands = 0;
+    $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 )
+      if ( defined($FW_wname) );
     if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ ) {
         $adminMode = 0;
         return "Forbidden command: set " . $a[1]
