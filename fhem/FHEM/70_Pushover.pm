@@ -116,7 +116,7 @@ sub Pushover_Define($$) {
     my ( $name, $type, $token, $user, $infix ) = @args;
 
     return "$user does not seem to be a valid user or group token"
-      if ( $user !~ /^(u|g)([a-zA-Z0-9]{29})$/ );
+      if ( $user !~ /^([a-zA-Z0-9]{30})$/ );
 
     if ( defined($token) && defined($user) ) {
 
