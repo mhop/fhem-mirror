@@ -22,9 +22,10 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Version: 1.1 - 2014-07-28
+# Version: 1.4 - 2015-08-27
 #
 # Changelog:
+# v1.4 2015-08-27 Fixed broken callback registration in Net::XMPP >= 1.04
 # v1.3 2015-01-10 Fixed DNS SRV resolving and resulting wrong to: address
 # v1.2 2015-01-09 hardening XML::Stream Process() call and fix of ssl_verify
 # v1.1 2014-07-28 Added UTF8 encoding / decoding to Messages
@@ -350,6 +351,10 @@ sub Jabber_CheckConnection($)
 
     #Default to to SRV lookups, ugly hack because older versions of XMPP::Connection dont call the respective value in XML::Stream..
     $hash->{JabberDevice}->{STREAM}->{SIDS}->{default}->{srv} = "_xmpp-client._tcp";
+
+    #fix for weak callbacks, since Net::XMPP v.1.05 they "weaken" the reference to prevent *possible* memory problems,
+    #but that causes the callbacks to not work anymore, so we unweaken it here by initializing the callbacks again :)
+    $hash->{JabberDevice}->InitCallbacks();
 
     #Needed for Message handling:
     $hash->{JabberDevice}->SetMessageCallBacks(normal => sub { \&Jabber_INC_Message($hash,@_) }, chat => sub { \&Jabber_INC_Message($hash,@_) } );
