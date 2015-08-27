@@ -2670,7 +2670,7 @@ HandleTimeout()
   # Check the internal list.
   foreach my $i (sort { $intAt{$a}{TRIGGERTIME} <=>
                         $intAt{$b}{TRIGGERTIME} } keys %intAt) {
-    next if(!$i || !$intAt{$i}); # deleted in the loop
+    next if(!$intAt{$i}); # deleted in the loop
     my $tim = $intAt{$i}{TRIGGERTIME};
     my $fn = $intAt{$i}{FN};
     if(!defined($tim) || !defined($fn)) {
