@@ -7528,7 +7528,7 @@ sub CUL_HM_ActInfo() {# print detailed status information
 #+++++++++++++++++ helper +++++++++++++++++++++++++++++++++++++++++++++++++++++
 sub CUL_HM_UpdtReadBulk(@) { #update a bunch of readings and trigger the events
   my ($hash,$doTrg,@readings) = @_;
-  return if (!@readings);
+  return if (!@readings  ||!defined $hash|| !defined $hash->{NAME} );
   if($evtDly && $doTrg){#delay trigger if in parser and trigger ist requested
     push @evtEt,[$hash,1,"$_"] foreach(@readings);
   }
