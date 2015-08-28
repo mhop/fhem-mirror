@@ -5982,10 +5982,9 @@ sub CUL_HM_statCntRfresh($) {# update statistic once a day
 
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   my ($hash) =  @_;
-  if (!defined($hash->{DEF})){ 
-    Log 1,"CUL_HM error removing pending commands";#General remove once found
-    return;
-  }
+
+  return if (!defined($hash->{DEF}));
+
   $modules{CUL_HM}{prot}{rspPend}-- if($hash->{helper}{prt}{rspWait}{cmd});
   delete $hash->{helper}{prt}{rspWait};
   delete $hash->{helper}{prt}{wuReSent};
@@ -6000,10 +5999,6 @@ sub CUL_HM_respPendTout($) {
   my ($HMidIn) =  @_;
   my(undef,$HMid) = split(":",$HMidIn,2);
   my $hash = $modules{CUL_HM}{defptr}{$HMid};
-  if (!defined($hash)){ 
-    Log 1,"CUL_HM error removing timer for $HMidIn";#General remove once found
-    return;
-  }
  
   my $pHash = $hash->{helper}{prt};#shortcut
   if ($hash && $hash->{DEF} ne '000000'){# we know the device
