@@ -87,7 +87,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0004" => {name=>"HM-LC-SW1-FM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"0005" => {name=>"HM-LC-BL1-FM"            ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"0006" => {name=>"HM-LC-BL1-SM"            ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"0007" => {name=>"KS550"                   ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",}
+ ,"0007" => {name=>"KS550"                   ,alias=>"HM-WDS100-C6-O"}
  ,"0008" => {name=>"HM-RC-4"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"0009" => {name=>"HM-LC-SW2-FM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
  ,"000A" => {name=>"HM-LC-SW2-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
@@ -108,29 +108,28 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"001C" => {name=>"HM-RC-SEC3-B"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:3",}
  ,"001D" => {name=>"HM-RC-KEY3"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:3",}
  ,"001E" => {name=>"HM-RC-KEY3-B"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:3",}
- ,"001F" => {name=>"KS888"                   ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",}
+ ,"001F" => {name=>"KS888"                   ,alias=>"HM-WDS100-C6-O"}
  ,"0022" => {name=>"WS888"                   ,st=>''                  ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"0026" => {name=>"HM-SEC-KEY-S"            ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"",}
  ,"0027" => {name=>"HM-SEC-KEY-O"            ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"",}
  ,"0028" => {name=>"HM-SEC-WIN"              ,st=>'winMatic'          ,cyc=>''      ,rxt=>'b'      ,lst=>'1:1,3:1p'     ,chn=>"Win:1:1,Akku:2:2",}
  ,"0029" => {name=>"HM-RC-12"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",}
- ,"002A" => {name=>"HM-RC-12-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",}
+ ,"002A" => {name=>"HM-RC-12-B"              ,alias=>"HM-RC-12"}
  ,"002B" => {name=>"HM-WS550Tech"            ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",}
- ,"002C" => {name=>"KS550TECH"               ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",}
+ ,"002C" => {name=>"KS550TECH"               ,alias=>"HM-WDS100-C6-O"}
  ,"002D" => {name=>"HM-LC-SW4-PCB"           ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"002E" => {name=>"HM-LC-DIM2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
  ,"002F" => {name=>"HM-SEC-SC"               ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",} # remove wakeup - need retest
  ,"0030" => {name=>"HM-SEC-RHS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",} # remove wakeup - need retest
  ,"0031" => {name=>"HM-WS550LCB"             ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",} 
  ,"0032" => {name=>"HM-WS550LCW"             ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'p'            ,chn=>"",} 
- ,"0033" => {name=>"KS550LC"                 ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'p,1'          ,chn=>"",} 
+ ,"0033" => {name=>"KS550LC"                 ,alias=>"HM-WDS100-C6-O"}
  ,"0034" => {name=>"HM-PBI-4-FM"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",} # HM Push Button Interface
  ,"0035" => {name=>"HM-PB-4-WM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"0036" => {name=>"HM-PB-2-WM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",} # RC file - see also 0BF  
  ,"0037" => {name=>"HM-RC-19"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
                                                                                                                         ,chn=>"Btn:1:17,Disp:18:18",}
- ,"0038" => {name=>"HM-RC-19-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
-                                                                                                                        ,chn=>"Btn:1:17,Disp:18:18",}
+ ,"0038" => {name=>"HM-RC-19-B"              ,alias=>"HM-RC-19"}
  ,"0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",}
  ,"003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'p,5'          ,chn=>"",}
  ,"003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",}
@@ -151,9 +150,8 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0049" => {name=>"KFM-Display"             ,st=>'KFM100'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"004B" => {name=>"HM-Sec-Cen"              ,st=>'AlarmControl'      ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"004C" => {name=>"HM-RC-12-SW"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:12",},
- ,"004D" => {name=>"HM-RC-19-SW"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
-                                                                                                                        ,chn=>"Btn:1:17,Disp:18:18",}
+ ,"004C" => {name=>"HM-RC-12-SW"             ,alias=>"HM-RC-12"}
+ ,"004D" => {name=>"HM-RC-19-SW"             ,alias=>"HM-RC-19"}
  ,"004E" => {name=>"HM-LC-DDC1-PCB"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",} # door drive controller 1-channel (PCB)
  ,"004F" => {name=>"HM-SEN-MDIR-SM"          ,st=>'motionDetector'    ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"0050" => {name=>"HM-SEC-SFA-SM"           ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Siren:1:1,Flash:2:2",}
@@ -208,7 +206,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0087" => {name=>"Schueco_263-147"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled blind actuator 1-channel (flush-mount)
  ,"0088" => {name=>"Schueco_263-132"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # 1 channel dimmer L (ceiling voids)
  ,"0089" => {name=>"Schueco_263-134"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # 1 channel dimmer T (ceiling voids)
- ,"008A" => {name=>"Schueco_263-133"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # 1 channel dimmer TPBU (flush mount)
+ ,"008A" => {name=>"Schueco_263-133"         ,alias=>"HM-LC-Dim1TPBU-FM"}                                                            # 1 channel dimmer TPBU (flush mount)
  ,"008B" => {name=>"Schueco_263-130"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled switch actuator 1-channel (flush-mount)
  ,"008C" => {name=>"Schueco_263-131"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled switch actuator 1-channel (flush-mount)
  ,"008D" => {name=>"Schueco_263-135"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,3'          ,chn=>"",}  # HM Push Button 2
@@ -246,15 +244,14 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00B3" => {name=>"HM-LC-Dim1L-Pl-3"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00B4" => {name=>"HM-LC-Dim1T-Pl-3"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00B5" => {name=>"HM-LC-Dim1PWM-CV-2"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"00B6" => {name=>"HM-LC-Dim1TPBU-FM-2"     ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
+ ,"00B6" => {name=>"HM-LC-Dim1TPBU-FM-2"     ,alias=>"HM-LC-Dim1TPBU-FM"}
  ,"00B7" => {name=>"HM-LC-Dim1L-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00B8" => {name=>"HM-LC-Dim2L-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",}#
  ,"00B9" => {name=>"HM-LC-Dim1T-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",}#
  ,"00BC" => {name=>"HM-WDS40-TH-I-2"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
- ,"00BD" => {name=>"HM-CC-RT-DN-BoM"         ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p.4p.5p.6p,3:3p.6p,1,7:3p.4'
-                                                                                                                        ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,Clima:4:4,ClimaTeam:5:5,remote:6:6"} #
+ ,"00BD" => {name=>"HM-CC-RT-DN-BoM"         ,alias=>"HM-CC-RT-DN"}
  ,"00BE" => {name=>"HM-MOD-Re-8"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:8",}
  ,"00BF" => {name=>"HM-PB-2-FM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2",}
  ,"004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:20' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
@@ -278,8 +275,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00D4" => {name=>"HM-RC-4-3"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"00D5" => {name=>"HM-RC-Sec4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"armInt:1:1,armExt:2:2,light:3:3,disarm:4:4",}
  ,"00D6" => {name=>"HM-RC-Key4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"unlock:1:1,lock:2:2,light:3:3,open:4:4",}
- ,"00D7" => {name=>"HM-ES-PMSw1-Pl-DN-R1"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
-                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
+ ,"00D7" => {name=>"HM-ES-PMSw1-Pl-DN-R1"    ,alias=>"HM-ES-PMSw1-Pl"}
  ,"00D8" => {name=>"HM-LC-Sw1-Pl-DN-R1"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00D9" => {name=>"HM-MOD-Em-8"             ,st=>'remote'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DA" => {name=>"HM-RC-8"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:8",}
@@ -289,20 +285,17 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00DE" => {name=>"HM-ES-TX-WM"             ,st=>'powerSensor'       ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>"",}         # strom/gassensor
  ,"00E0" => {name=>"HM-RC-2-PBU-FM"          ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:2",}  # HM Wireless Sender 2-channel for brand switch systems, flush mount
  ,"00E1" => {name=>"HM-RC-Dis-H-x-EU"        ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:20",} #"HM Remote Control with Displays"
- ,"00E2" => {name=>"HM-ES-PMSw1-Pl-DN-R2"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
-                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
- ,"00E3" => {name=>"HM-ES-PMSw1-Pl-DN-R3"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
-                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
- ,"00E4" => {name=>"HM-ES-PMSw1-Pl-DN-R4"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
-                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
- ,"00E5" => {name=>"HM-ES-PMSw1-Pl-DN-R5"    ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
-                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
+ ,"00E2" => {name=>"HM-ES-PMSw1-Pl-DN-R2"    ,alias=>"HM-ES-PMSw1-Pl"}
+ ,"00E3" => {name=>"HM-ES-PMSw1-Pl-DN-R3"    ,alias=>"HM-ES-PMSw1-Pl"}
+ ,"00E4" => {name=>"HM-ES-PMSw1-Pl-DN-R4"    ,alias=>"HM-ES-PMSw1-Pl"}
+ ,"00E5" => {name=>"HM-ES-PMSw1-Pl-DN-R5"    ,alias=>"HM-ES-PMSw1-Pl"}
  ,"00E6" => {name=>"HM-LC-Sw1-Pl-DN-R2"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00E7" => {name=>"HM-LC-Sw1-Pl-DN-R3"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00E8" => {name=>"HM-LC-Sw1-Pl-DN-R4"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00E9" => {name=>"HM-LC-Sw1-Pl-DN-R5"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00EA" => {name=>"HM-ES-PMSw1-DR"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
-                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
+ ,"00EA" => {name=>"HM-ES-PMSw1-DR"          ,alias=>"HM-ES-PMSw1-Pl"}
+# ,"00EA" => {name=>"HM-ES-PMSw1-DR"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
+#                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00EB" => {name=>"HM-LC-Sw1-Pl-CT-R1"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00EC" => {name=>"HM-LC-Sw1-Pl-CT-R2"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00ED" => {name=>"HM-LC-Sw1-Pl-CT-R3"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
@@ -312,10 +305,24 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
  ,"FFF0" => {name=>"CCU-FHEM"                ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",}
-  
+ 
   #  "HM-LGW-O-TW-W-EU" #Funk LAN Gateway
 #################open:---------------------------
 );
+
+foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
+  next if (!defined $culHmModel{$al}{alias});
+
+  foreach my $mt (keys %culHmModel){
+    if (($culHmModel{$al}{alias}) eq $culHmModel{$mt}{name}){
+      foreach(grep !/name/, keys %{$culHmModel{$mt}}){
+        $culHmModel{$al}{$_} = $culHmModel{$mt}{$_};
+      }
+      last;
+    }
+  }
+  delete $culHmModel{$al} if (!defined$culHmModel{$al}{st}); # not found - remove entry
+}
 
 ##----------definitions for register settings-----------------
     # definition of Register for all devices
@@ -822,7 +829,9 @@ my $K_actDetID = '000000'; # id of actionDetector
                          }
  ,sensRain            =>{ transmDevTryMax =>1,localResDis     =>1}
  ,tipTronic           =>{ cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1}
- ,powerMeter          =>{ intKeyVisib     =>1,localResDis     =>1}
+ ,powerMeter          =>{ intKeyVisib     =>1,localResDis     =>1
+                         ,sign            =>1
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1}
  ,outputUnit          =>{ intKeyVisib     =>1,sign            =>1}
  ,powerSensor         =>{ transmitTryMax  =>1,transmDevTryMax =>1
                          ,mtrType         =>1,mtrConstIr      =>1,mtrConstGas     =>1,mtrConstLed     =>1  
@@ -882,7 +891,6 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1}
  ,"HM-Dis-WM55"       =>{ stbyTime        =>1}
  ,"HM-WDS100-C6-O"    =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1}
- ,"KS550"             =>{ stormUpThresh   =>1,stormLowThresh  =>1}
  ,"HM-OU-LED16"       =>{ brightness      =>1,energyOpt       =>1,localResDis     =>1}
  ,"HM-OU-CFM-PL"      =>{ localResetDis   =>1
                          ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
@@ -928,7 +936,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-RC-Dis-H-x-EU"  =>{ localResetDis   =>1,stbyTime2       =>1,language        =>1
                          ,wakeupDefChan   =>1,wakeupBehavior  =>1}
 
- ,"HM-LC-Sw1-Pl"      =>{ confBtnTime     =>1,localResDis     =>1
+ ,"HM-LC-Sw1-PL"      =>{ confBtnTime     =>1,localResDis     =>1
                          ,transmitTryMax  =>1,powerUpAction   =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                         }
  ,"HM-LC-Sw1PBU-FM"   =>{                     localResDis     =>1
@@ -940,8 +948,6 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-MOD-Re-8"       =>{ lowBatLimitBA3  =>1,ledMode         =>1
                          ,sign            =>1
                         },
- ,"HM-ES-PMSw1-Pl"    =>{ sign            =>1
-                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1}
  ,"HM-Sys-sRP-Pl"     =>{ compMode        =>1}
  ,"KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
@@ -972,55 +978,38 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
   );
 
 #clones - - - - - - - - - - - - - - -
-$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R1"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
-$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R2"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
-$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R3"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
-$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R4"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
-$culHmRegModel{"HM-ES-PMSw1-Pl-DN-R5"}       = $culHmRegModel{"HM-ES-PMSw1-Pl"};
-$culHmRegModel{"HM-ES-PMSw1-DR"}             = $culHmRegModel{"HM-ES-PMSw1-Pl"};
 
-$culHmRegModel{"HM-LC-SW1-PL2"}       = $culHmRegModel{"HM-LC-Sw1-Pl"};#rf_s , rf_s_644
-$culHmRegModel{"HM-LC-SW1-SM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW2-SM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW4-SM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW4-PCB"}       = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW4-WM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW1-FM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"Schueco_263-130"}     = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW2-FM"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW1-PB-FM"}     = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW2-PB-FM"}     = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW4-DR"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-SW2-DR"}        = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"ROTO_ZEL-STG-RM-FZS"} = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"ROTO_ZEL-STG-RM-FZS-2"} = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw1-Pl-3"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw1-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw4-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw4-PCB-2"}     = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw4-WM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw1-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw2-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw4-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
-$culHmRegModel{"HM-LC-Sw2-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-Pl"};
+$culHmRegModel{"HM-LC-SW1-PL2"}       = $culHmRegModel{"HM-LC-Sw1-PL"};#rf_s , rf_s_644
+$culHmRegModel{"HM-LC-SW1-SM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW2-SM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW4-SM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW4-PCB"}       = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW4-WM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW1-FM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"Schueco_263-130"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW2-FM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW1-PB-FM"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW2-PB-FM"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW4-DR"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-SW2-DR"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"ROTO_ZEL-STG-RM-FZS"} = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"ROTO_ZEL-STG-RM-FZS-2"} = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw1-Pl-3"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw1-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw4-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw4-PCB-2"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw4-WM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw1-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw2-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw4-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw2-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
 
 $culHmRegModel{"Schueco_263-131"}     = $culHmRegModel{"HM-LC-Sw1PBU-FM"};#rf_s_1conf_644
 
-
-$culHmRegModel{"HM-RC-12-B"}          = $culHmRegModel{"HM-RC-12"};
-$culHmRegModel{"HM-RC-12-SW"}         = $culHmRegModel{"HM-RC-12"};
-$culHmRegModel{"HM-RC-19-B"}          = $culHmRegModel{"HM-RC-19"};
-$culHmRegModel{"HM-RC-19-SW"}         = $culHmRegModel{"HM-RC-19"};
-
-$culHmRegModel{"KS550"}               = $culHmRegModel{"HM-WDS100-C6-O"};
-$culHmRegModel{"KS550TECH"}           = $culHmRegModel{"HM-WDS100-C6-O"};
-$culHmRegModel{"KS550LC"}             = $culHmRegModel{"HM-WDS100-C6-O"};
-$culHmRegModel{"KS888"}               = $culHmRegModel{"HM-WDS100-C6-O"};
 $culHmRegModel{"HM-SEC-SC-2"}         = $culHmRegModel{"HM-SEC-SC"};
 $culHmRegModel{"Roto_ZEL-STG-RM-FFK"} = $culHmRegModel{"HM-SEC-SC"};
 $culHmRegModel{"HM-SEC-WDS-2"}        = $culHmRegModel{"HM-SEC-WDS"};
 $culHmRegModel{"Roto_ZEL-STG-RM-FDK"} = $culHmRegModel{"HM-SEC-RHS"};
-
 
 $culHmRegModel{"HM-LC-Dim1L-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1L-Pl"};#rf_d
 $culHmRegModel{"HM-LC-DIM1L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
@@ -1035,9 +1024,6 @@ $culHmRegModel{"HM-LC-Dim1L-Pl-3"}    = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
 $culHmRegModel{"HM-LC-Dim1PWM-CV-2"}  = $culHmRegModel{"HM-LC-Dim1PWM-CV"};#rf_dim_1pwm_644
 
 #rf_dim_1t_644
-
-$culHmRegModel{"HM-LC-Dim1TPBU-FM-2"} = $culHmRegModel{"HM-LC-Dim1TPBU-FM"};#rf_dim_1tconf_644
-$culHmRegModel{"Schueco-263-133"}     = $culHmRegModel{"HM-LC-Dim1TPBU-FM"};
 
 #rf_dim_2l_644
 
@@ -1060,7 +1046,6 @@ $culHmRegModel{"HM-LC-Sw1PBU-FM"}     = $culHmRegModel{"HM-LC-Bl1PBU-FM"};
 $culHmRegModel{"HM-RC-Sec4-2"}        = $culHmRegModel{"HM-RC-4-2"};
 $culHmRegModel{"HM-RC-Key4-2"}        = $culHmRegModel{"HM-RC-4-2"};
 
-$culHmRegModel{"HM-CC-RT-DN-BoM"}     = $culHmRegModel{"HM-CC-RT-DN"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"} = $culHmRegModel{"HM-CC-TC"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
 
@@ -1173,63 +1158,11 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
   );
 
 #clones - - - - - - - - - - - - - - -
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R101"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R201"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R301"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R401"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R501"}   = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
-$culHmRegChan{"HM-ES-PMSw1-DR01"}         = $culHmRegChan{"HM-ES-PMSw1-Pl01"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R102"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R202"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R302"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R402"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R502"}   = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
-$culHmRegChan{"HM-ES-PMSw1-DR02"}         = $culHmRegChan{"HM-ES-PMSw1-Pl02"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R103"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R203"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R303"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R403"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R503"}   = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
-$culHmRegChan{"HM-ES-PMSw1-DR03"}         = $culHmRegChan{"HM-ES-PMSw1-Pl03"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R104"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R204"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R304"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R404"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R504"}   = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
-$culHmRegChan{"HM-ES-PMSw1-DR04"}         = $culHmRegChan{"HM-ES-PMSw1-Pl04"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R105"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R205"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R305"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R405"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R505"}   = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
-$culHmRegChan{"HM-ES-PMSw1-DR05"}         = $culHmRegChan{"HM-ES-PMSw1-Pl05"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R106"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R206"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R306"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R406"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
-$culHmRegChan{"HM-ES-PMSw1-Pl-DN-R506"}   = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
-$culHmRegChan{"HM-ES-PMSw1-DR06"}         = $culHmRegChan{"HM-ES-PMSw1-Pl06"};
-
-
 
 $culHmRegChan{"HM-Sen-MDIR-WM5502"}   = $culHmRegChan{"HM-Sen-MDIR-WM5501"};
 $culHmRegChan{"HM-Sen-MDIR-WM5503"}   = $culHmRegType{motionDetector};
 
-
-$culHmRegChan{"HM-RC-19-B12"}         = $culHmRegChan{"HM-RC-1912"};
-$culHmRegChan{"HM-RC-19-SW12"}        = $culHmRegChan{"HM-RC-1912"};
-foreach (2..16){
-  my $c = sprintf("%02X",$_);
-  $culHmRegChan{"HM-RC-19$c"}           = $culHmRegChan{"HM-RC-1901"};
-  $culHmRegChan{"HM-RC-19-B$c"}         = $culHmRegChan{"HM-RC-1901"};
-  $culHmRegChan{"HM-RC-19-SW$c"}        = $culHmRegChan{"HM-RC-1901"};
-}
-
 $culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};      # type hash
-
-$culHmRegChan{"HM-CC-RT-DN-BoM03"}    = $culHmRegChan{"HM-CC-RT-DN03"};
-$culHmRegChan{"HM-CC-RT-DN-BoM04"}    = $culHmRegChan{"HM-CC-RT-DN04"};
-$culHmRegChan{"HM-CC-RT-DN-BoM06"}    = $culHmRegChan{"HM-CC-RT-DN06"};
 
 $culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegChan{"HM-CC-RT-DN03"};
 $culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegChan{"HM-CC-RT-DN06"};
@@ -1564,10 +1497,6 @@ $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
                                            }
 );
 # clones- - - - - - - - - - - - - - - - -
-$culHmModelSets{"HM-CC-RT-DN-BoM"}    = $culHmModelSets{"HM-CC-RT-DN"};
-
-$culHmModelSets{"HM-RC-19-B"}          = $culHmModelSets{"HM-RC-19"};
-$culHmModelSets{"HM-RC-19-SW"}         = $culHmModelSets{"HM-RC-19"};
 
 $culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"HM-OU-CF-PL"}         = $culHmModelSets{"HM-OU-CFM-PL"};
@@ -1578,7 +1507,7 @@ $culHmModelSets{"HM-Dis-WM55"}         = $culHmModelSets{"HM-PB-4DIS-WM"};
 $culHmModelSets{"HM-RC-Dis-H-x-EU"}    = $culHmModelSets{"HM-PB-4DIS-WM"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
 
-#%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
+
 
 %culHmChanSets = (
                       "HM-CC-TC00"        =>{ "desired-temp" =>"[on|off|6.0..30.0]"
@@ -1693,11 +1622,7 @@ $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
 $culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
 
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
-$culHmChanSets{"HM-CC-RT-DN-BoM00"}     = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-TC-IT-WM-W-EU00"}    = $culHmChanSets{"HM-CC-RT-DN00"};
-$culHmChanSets{"HM-CC-RT-DN-BoM02"}     = $culHmChanSets{"HM-CC-RT-DN02"};
-$culHmChanSets{"HM-CC-RT-DN-BoM04"}     = $culHmChanSets{"HM-CC-RT-DN04"};
-$culHmChanSets{"HM-CC-RT-DN-BoM05"}     = $culHmChanSets{"HM-CC-RT-DN05"};
 
 $culHmChanSets{"HM-ES-PMSw1-Pl04"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl05"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
@@ -1983,4 +1908,26 @@ $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
     }
   }
 
+  foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
+    next if (!defined $culHmModel{$al}{alias});
+  
+    foreach my $mt (keys %culHmModel){
+      if (($culHmModel{$al}{alias}) eq $culHmModel{$mt}{name}){
+        my $md = $culHmModel{$mt}{name};
+        my $ds = $culHmModel{$al}{name};
+        $culHmModelSets{$ds}    = $culHmModelSets{$md} if($culHmModelSets{$md});
+        $culHmModelGets{$ds}    = $culHmModelGets{$md} if($culHmModelSets{$md});
+        foreach (grep /^$md/,keys %culHmChanSets){
+          $culHmChanSets{$ds.substr($_,-2,2)}    = $culHmChanSets{$_};
+        }
+        $culHmRegModel{$ds}       = $culHmRegModel{$ds} if ($culHmRegModel{$ds});
+        foreach(grep  /^$md/,keys %culHmRegChan){
+          $culHmChanSets{$ds.substr($_,-2,2)}    = $culHmChanSets{$_};
+        }
+        last;
+      }
+    }
+    delete $culHmModel{$al} if (!defined$culHmModel{$al}{st}); # not found - remove entry
+  }
+  
 1;
