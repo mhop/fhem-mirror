@@ -1,5 +1,5 @@
 ###############################################################################
-# $Id: 74_Unifi.pm 2015-08-27 22:00 - rapster - rapster at x0e dot de $ 
+# $Id: 74_Unifi.pm 2015-08-27 06:00 - rapster - rapster at x0e dot de $ 
 
 package main;
 use strict;
@@ -44,7 +44,7 @@ sub Unifi_Define($$) {
     );
     $hash->{httpParams} = {
         hash            => $hash,
-        timeout         => 5,
+        timeout         => 4,
         method          => "POST",
         noshutdown      => 0,
         ignoreredirects => 1,
@@ -106,23 +106,17 @@ sub Unifi_Notify($$) {
 sub Unifi_Set($@) {
     my ($hash,@a) = @_;
     return "\"set $hash->{NAME}\" needs at least an argument" if ( @a < 2 );
-
     my ($name,$setName,$setVal) = @a;
 
-    if (AttrVal($name, "disable", 0) && $setName !~ /clear/) {
-        if($setName eq "?") {
-            return "Unknown argument $setName, choose one of clear:all,readings,clientData";
-        } else {
-            Log3 $name, 5, "$name: set called with $setName but device is disabled!";
-        }
-        return undef;
-    }
     Log3 $name, 5, "$name: set called with $setName " . ($setVal ? $setVal : "") if ($setName ne "?");
 
-    if(!Unifi_CONNECTED($hash) && $setName !~ /clear/) {
+    if(Unifi_CONNECTED($hash) eq 'disabled' && $setName !~ /clear/) {
         return "Unknown argument $setName, choose one of clear:all,readings,clientData";
+        Log3 $name, 5, "$name: set called with $setName but device is disabled!" if($setName ne "?");
+        return undef;
     }
-    elsif($setName !~ /update|clear/) {
+    
+    if($setName !~ /update|clear/) {
         return "Unknown argument $setName, choose one of update:noArg clear:all,readings,clientData";
     }
     else {
@@ -203,7 +197,7 @@ sub Unifi_Get($@) {
             return $clientData;
         } 
         else {
-            return "$hash->{NAME}: Unknown client '$getVal' in command '$getName', choose one of: $clients";
+            return "$hash->{NAME}: Unknown client '$getVal' in command '$getName', choose one of: all$clients";
         }
     }
     return undef;
@@ -231,7 +225,8 @@ sub Unifi_Attr(@) {
             }
             elsif ($attr_value !~ /^([\w\.\-]+:[\w\.\-]+\s?)+$/) {
                 return "$name: Value \"$attr_value\" is not allowed for devAlias!\n"
-                       ."Must be \"<ID>:<ALIAS> <ID2>:<ALIAS2>\", e.g. 123abc:MyIphone";
+                       ."Must be \"<ID>:<ALIAS> <ID2>:<ALIAS2>\", e.g. 123abc:MyIphone\n"
+                       ."Only these characters are allowed: [alphanumeric - _ .]";
             }
         }
     }
@@ -653,7 +648,7 @@ The device will be still connected, even it is in PowerSave-Mode. (In this mode 
 
 <h4>Get</h4>
 <ul>
-    <li><code>get &lt;name&gt; clientData &lt;all|user_id|controllerAlias|hostname|devAlias|clientID&gt;</code><br>
+    <li><code>get &lt;name&gt; clientData &lt;all|user_id|controllerAlias|hostname|devAlias&gt;</code><br>
     Show more details about clients.</li>
 </ul>
 
