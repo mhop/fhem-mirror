@@ -376,70 +376,68 @@ sub Pushover_ReceiveCommand($$$) {
             if ( ref($return) eq "HASH" ) {
 
                 if ( $return->{status} ne "1" && defined $return->{errors} ) {
-                    $values->{result} =
+                    $values{result} =
                       "Error: " . Dumper( $return->{errors} );
                     $state = "error";
                 }
                 elsif ( $return->{status} ne "1" ) {
-                    $values->{result} = "Unspecified error";
+                    $values{result} = "Unspecified error";
                     $state = "error";
                 }
                 else {
 
-                    $values->{result} = "ok";
+                    $values{result} = "ok";
 
-                    readingsBulkUpdate( $hash, "lastTitle", $values->{title} );
+                    readingsBulkUpdate( $hash, "lastTitle", $values{title} );
                     readingsBulkUpdate( $hash, "lastMessage",
-                        $values->{message} );
+                        $values{message} );
                     readingsBulkUpdate( $hash, "lastPriority",
-                        $values->{priority} );
-                    readingsBulkUpdate( $hash, "lastAction", $values->{action} )
-                      if ( $values->{action} ne "" );
+                        $values{priority} );
+                    readingsBulkUpdate( $hash, "lastAction", $values{action} )
+                      if ( $values{action} ne "" );
                     readingsBulkUpdate( $hash, "lastAction", "-" )
-                      if ( $values->{action} eq "" );
-                    readingsBulkUpdate( $hash, "lastDevice", $values->{device} )
-                      if ( $values->{device} ne "" );
+                      if ( $values{action} eq "" );
+                    readingsBulkUpdate( $hash, "lastDevice", $values{device} )
+                      if ( $values{device} ne "" );
                     readingsBulkUpdate( $hash, "lastDevice", $hash->{DEVICES} )
-                      if ( $values->{device} eq "" );
+                      if ( $values{device} eq "" );
 
                     if ( defined $return->{request} ) {
                         readingsBulkUpdate( $hash, "lastRequest",
                             $return->{request} );
                     }
 
-                    if ( $values->{expire} ne "" ) {
-                        readingsBulkUpdate( $hash, "cbTitle_" . $values->{cbNr},
-                            $values->{title} );
-                        readingsBulkUpdate( $hash, "cbMsg_" . $values->{cbNr},
-                            $values->{message} );
-                        readingsBulkUpdate( $hash, "cbPrio_" . $values->{cbNr},
-                            $values->{priority} );
-                        readingsBulkUpdate( $hash, "cbAck_" . $values->{cbNr},
+                    if ( $values{expire} ne "" ) {
+                        readingsBulkUpdate( $hash, "cbTitle_" . $values{cbNr},
+                            $values{title} );
+                        readingsBulkUpdate( $hash, "cbMsg_" . $values{cbNr},
+                            $values{message} );
+                        readingsBulkUpdate( $hash, "cbPrio_" . $values{cbNr},
+                            $values{priority} );
+                        readingsBulkUpdate( $hash, "cbAck_" . $values{cbNr},
                             "0" );
 
-                        if ( $values->{device} ne "" ) {
-                            readingsBulkUpdate( $hash,
-                                "cbDev_" . $values->{cbNr},
-                                $values->{device} );
+                        if ( $values{device} ne "" ) {
+                            readingsBulkUpdate( $hash, "cbDev_" . $values{cbNr},
+                                $values{device} );
                         }
                         else {
                             readingsBulkUpdate( $hash,
-                                "cbDev_" . $values->{cbNr}, "all" );
+                                "cbDev_" . $values{cbNr}, "all" );
                         }
 
                         if ( defined $return->{receipt} ) {
-                            readingsBulkUpdate( $hash, "cb_" . $values->{cbNr},
+                            readingsBulkUpdate( $hash, "cb_" . $values{cbNr},
                                 $return->{receipt} );
                         }
                         else {
-                            readingsBulkUpdate( $hash, "cb_" . $values->{cbNr},
-                                $values->{cbNr} );
+                            readingsBulkUpdate( $hash, "cb_" . $values{cbNr},
+                                $values{cbNr} );
                         }
 
-                        if ( $values->{action} ne "" ) {
-                            readingsBulkUpdate( $hash,
-                                "cbAct_" . $values->{cbNr},
-                                $values->{action} );
+                        if ( $values{action} ne "" ) {
+                            readingsBulkUpdate( $hash, "cbAct_" . $values{cbNr},
+                                $values{action} );
                         }
                     }
                 }
@@ -451,23 +449,23 @@ sub Pushover_ReceiveCommand($$$) {
             if ( ref($return) eq "HASH" ) {
 
                 if ( $return->{status} ne "1" && defined $return->{errors} ) {
-                    $values->{result} =
+                    $values{result} =
                       "Error: " . Dumper( $return->{errors} );
                     $state = "unauthorized";
                 }
                 elsif ( $return->{status} ne "1" ) {
-                    $values->{result} = "Unspecified error";
+                    $values{result} = "Unspecified error";
                     $state = "unauthorized";
                 }
                 else {
-                    $values->{result} = "ok";
+                    $values{result} = "ok";
                     $hash->{DEVICES} = join( ",", @{ $return->{devices} } );
                 }
 
             }
         }
 
-        readingsBulkUpdate( $hash, "lastResult", $values->{result} );
+        readingsBulkUpdate( $hash, "lastResult", $values{result} );
     }
 
     # Set reading for state
@@ -490,15 +488,15 @@ sub Pushover_SetMessage {
     my %values = ();
 
     #Set defaults
-    my $values->{title}     = AttrVal( $hash->{NAME}, "title", "" );
-    my $values->{message}   = "";
-    my $values->{device}    = AttrVal( $hash->{NAME}, "device", "" );
-    my $values->{priority}  = AttrVal( $hash->{NAME}, "priority", 0 );
-    my $values->{sound}     = AttrVal( $hash->{NAME}, "sound", "" );
-    my $values->{retry}     = "";
-    my $values->{expire}    = "";
-    my $values->{url_title} = "";
-    my $values->{action}    = "";
+    $values{title}     = AttrVal( $hash->{NAME}, "title", "Information" );
+    $values{message}   = "";
+    $values{device}    = AttrVal( $hash->{NAME}, "device", "" );
+    $values{priority}  = AttrVal( $hash->{NAME}, "priority", 0 );
+    $values{sound}     = AttrVal( $hash->{NAME}, "sound", "" );
+    $values{retry}     = "";
+    $values{expire}    = "";
+    $values{url_title} = "";
+    $values{action}    = "";
 
     my $callback = (
         defined( $attr{$name}{callbackUrl} )
@@ -535,116 +533,116 @@ sub Pushover_SetMessage {
     }
 
     if ( $argc > 1 ) {
-        $values->{title}   = $1;
-        $values->{message} = $2;
+        $values{title}   = $1 if ( $1 ne "" );
+        $values{message} = $2 if ( $2 ne "" );
 
         if ( $argc > 2 ) {
-            $values->{device}   = $3;
-            $values->{priority} = $4;
-            $values->{sound}    = $5;
+            $values{device}   = $3 if ( $3 ne "" );
+            $values{priority} = $4 if ( $4 ne "" );
+            $values{sound}    = $5 if ( $5 ne "" );
 
             if ( $argc > 5 ) {
-                $values->{retry}  = $6;
-                $values->{expire} = $7;
+                $values{retry}  = $6 if ( $6 ne "" );
+                $values{expire} = $7 if ( $7 ne "" );
 
                 if ( $argc > 7 ) {
-                    $values->{url_title} = $8;
-                    $values->{action}    = $9;
+                    $values{url_title} = $8 if ( $8 ne "" );
+                    $values{action}    = $9 if ( $9 ne "" );
                 }
             }
         }
     }
     elsif ( $argc == 1 ) {
-        $values->{message} = $1;
+        $values{message} = $1 if ( $1 ne "" );
     }
 
     #Remove quotation marks
-    if ( $values->{title} =~ /^['"](.*)['"]$/s ) {
-        $values->{title} = $1;
+    if ( $values{title} =~ /^['"](.*)['"]$/s ) {
+        $values{title} = $1;
     }
-    if ( $values->{message} =~ /^['"](.*)['"]$/s ) {
-        $values->{message} = $1;
+    if ( $values{message} =~ /^['"](.*)['"]$/s ) {
+        $values{message} = $1;
     }
-    if ( $values->{device} =~ /^['"](.*)['"]$/s ) {
-        $values->{device} = $1;
+    if ( $values{device} =~ /^['"](.*)['"]$/s ) {
+        $values{device} = $1;
     }
-    if ( $values->{priority} =~ /^['"](.*)['"]$/s ) {
-        $values->{priority} = $1;
+    if ( $values{priority} =~ /^['"](.*)['"]$/s ) {
+        $values{priority} = $1;
     }
-    if ( $values->{sound} =~ /^['"](.*)['"]$/s ) {
-        $values->{sound} = $1;
+    if ( $values{sound} =~ /^['"](.*)['"]$/s ) {
+        $values{sound} = $1;
     }
-    if ( $values->{retry} =~ /^['"](.*)['"]$/s ) {
-        $values->{retry} = $1;
+    if ( $values{retry} =~ /^['"](.*)['"]$/s ) {
+        $values{retry} = $1;
     }
-    if ( $values->{expire} =~ /^['"](.*)['"]$/s ) {
-        $values->{expire} = $1;
+    if ( $values{expire} =~ /^['"](.*)['"]$/s ) {
+        $values{expire} = $1;
     }
-    if ( $values->{url_title} =~ /^['"](.*)['"]$/s ) {
-        $values->{url_title} = $1;
+    if ( $values{url_title} =~ /^['"](.*)['"]$/s ) {
+        $values{url_title} = $1;
     }
-    if ( $values->{action} =~ /^['"](.*)['"]$/s ) {
-        $values->{action} = $1;
+    if ( $values{action} =~ /^['"](.*)['"]$/s ) {
+        $values{action} = $1;
     }
 
 #Check if all mandatory arguments are filled
 #"title" and "message" can not be empty and if "priority" is set to "2" "retry" and "expire" must also be set
 #"url_title" and "action" need to be set together and require "expire" to be set as well
     if (
-        ( $values->{title} ne "" && $values->{message} ne "" )
-        && ( ( $values->{retry} ne "" && $values->{expire} ne "" )
-            || $values->{priority} < 2 )
+        ( $values{title} ne "" && $values{message} ne "" )
+        && ( ( $values{retry} ne "" && $values{expire} ne "" )
+            || $values{priority} < 2 )
         && (
             (
-                   $values->{url_title} ne ""
-                && $values->{action} ne ""
-                && $values->{expire} ne ""
+                   $values{url_title} ne ""
+                && $values{action} ne ""
+                && $values{expire} ne ""
             )
-            || ( $values->{url_title} eq "" && $values->{action} eq "" )
+            || ( $values{url_title} eq "" && $values{action} eq "" )
         )
       )
     {
-        my $body = "title=" . $values->{title};
+        my $body = "title=" . $values{title};
 
-        if ( $values->{message} =~
+        if ( $values{message} =~
             /\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>/
-            && $values->{message} !~ /^nohtml:.*/ )
+            && $values{message} !~ /^nohtml:.*/ )
         {
             Log3 $name, 4, "handling message with HTML content";
             $body = $body . "&html=1";
         }
 
-        if ( $values->{message} =~ /^nohtml:.*/ ) {
+        if ( $values{message} =~ /^nohtml:.*/ ) {
             Log3 $name, 4, "explicitly ignoring HTML tags in message";
-            $values->{message} =~ s/^(nohtml:).*//;
-            $body = $body . "&message=" . $values->{message};
+            $values{message} =~ s/^(nohtml:).*//;
+            $body = $body . "&message=" . $values{message};
         }
         else {
-            $body = $body . "&message=" . $values->{message};
+            $body = $body . "&message=" . $values{message};
         }
 
-        if ( $values->{device} ne "" ) {
-            $body = $body . "&" . "device=" . $values->{device};
+        if ( $values{device} ne "" ) {
+            $body = $body . "&" . "device=" . $values{device};
         }
 
-        if ( $values->{priority} ne "" ) {
-            $body = $body . "&" . "priority=" . $values->{priority};
+        if ( $values{priority} ne "" ) {
+            $body = $body . "&" . "priority=" . $values{priority};
         }
 
-        if ( $values->{sound} ne "" ) {
-            $body = $body . "&" . "sound=" . $values->{sound};
+        if ( $values{sound} ne "" ) {
+            $body = $body . "&" . "sound=" . $values{sound};
         }
 
-        if ( $values->{retry} ne "" ) {
-            $body = $body . "&" . "retry=" . $values->{retry};
+        if ( $values{retry} ne "" ) {
+            $body = $body . "&" . "retry=" . $values{retry};
         }
 
-        if ( $values->{expire} ne "" ) {
-            $body = $body . "&" . "expire=" . $values->{expire};
+        if ( $values{expire} ne "" ) {
+            $body = $body . "&" . "expire=" . $values{expire};
 
-            $values->{cbNr} = int( time() ) + $values->{expire};
-            my $cbReading = "cb_" . $values->{cbNr};
-            $values->{cbNr}++
+            $values{cbNr} = int( time() ) + $values{expire};
+            my $cbReading = "cb_" . $values{cbNr};
+            $values{cbNr}++
               until ( !defined( $hash->{READINGS}{$cbReading}{VAL} ) );
         }
 
@@ -654,23 +652,23 @@ sub Pushover_SetMessage {
             $body = $body . "&" . "timestamp=" . int( time() );
         }
 
-        if ( $callback ne "" && $values->{priority} > 1 ) {
+        if ( $callback ne "" && $values{priority} > 1 ) {
             Log3 $name, 5, "Adding emergency callback URL $callback";
             $body = $body . "&callback=" . $callback;
         }
 
-        if (   $values->{url_title} ne ""
-            && $values->{action} ne ""
-            && $values->{expire} ne "" )
+        if (   $values{url_title} ne ""
+            && $values{action} ne ""
+            && $values{expire} ne "" )
         {
             my $url;
 
             if (   $callback eq ""
-                || $values->{action} !~
+                || $values{action} !~
                 /(?:https?:\/\/)(?:[\w]+\.)([a-zA-Z\.]{2,63})([\/\w\.-]*)*\/?/ )
             {
-                $url = $values->{action};
-                $values->{expire} = "";
+                $url = $values{action};
+                $values{expire} = "";
             }
             else {
                 $url =
@@ -678,15 +676,15 @@ sub Pushover_SetMessage {
                   . "?acknowledged=1&acknowledged_by="
                   . $hash->{USER_KEY}
                   . "&FhemCallbackId="
-                  . $values->{cbNr};
+                  . $values{cbNr};
             }
 
             Log3 $name, 5,
-"Adding supplementary URL '$values->{url_title}' ($url) with action '$values->{action}' (expires after $values->{expire} => $values->{cbNr})";
+"Adding supplementary URL '$values{url_title}' ($url) with action '$values{action}' (expires after $values{expire} => $values{cbNr})";
             $body =
                 $body
               . "&url_title="
-              . urlEncode( $values->{url_title} ) . "&url="
+              . urlEncode( $values{url_title} ) . "&url="
               . urlEncode($url);
         }
 
@@ -743,7 +741,7 @@ sub Pushover_SetMessage {
     }
     else {
 #There was a problem with the arguments, so tell the user the correct usage of the 'set msg' command
-        if ( ( 1 == $argc ) && ( $values->{title} eq "" ) ) {
+        if ( 1 == $argc && $values{title} eq "" ) {
             return
 "Please define the default title in the pushover device arguments.";
         }
