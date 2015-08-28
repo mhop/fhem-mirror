@@ -52,7 +52,6 @@ package main;
 use HttpUtils;
 use utf8;
 use Data::Dumper;
-use JSON;
 use HttpUtils;
 use SetExtensions;
 use Encode;
@@ -347,7 +346,11 @@ sub Pushover_ReceiveCommand($$$) {
                       . $data;
                 }
 
-                $return = decode_json( Encode::encode_utf8($data) );
+                # Use JSON module if possible
+                eval { use JSON };
+                if ( !$@ ) {
+                    $return = decode_json( Encode::encode_utf8($data) );
+                }
             }
             else {
                 if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
@@ -373,6 +376,22 @@ sub Pushover_ReceiveCommand($$$) {
 
         # messages.json
         if ( $service eq "messages.json" ) {
+            $values{result} = "ok";
+
+            readingsBulkUpdate( $hash, "lastTitle",    $values->{title} );
+            readingsBulkUpdate( $hash, "lastMessage",  $values->{message} );
+            readingsBulkUpdate( $hash, "lastPriority", $values->{priority} );
+            readingsBulkUpdate( $hash, "lastAction",   $values->{action} )
+              if ( $values->{action} ne "" );
+            readingsBulkUpdate( $hash, "lastAction", "-" )
+              if ( $values->{action} eq "" );
+            readingsBulkUpdate( $hash, "lastDevice", $values->{device} )
+              if ( $values->{device} ne "" );
+            readingsBulkUpdate( $hash, "lastDevice", $hash->{DEVICES} )
+              if ( $values->{device} eq "" && defined( $hash->{DEVICES} ) );
+            readingsBulkUpdate( $hash, "lastDevice", "all" )
+              if ( $values->{device} eq "" && !defined( $hash->{DEVICES} ) );
+
             if ( ref($return) eq "HASH" ) {
 
                 if ( $return->{status} ne "1" && defined $return->{errors} ) {
@@ -384,68 +403,64 @@ sub Pushover_ReceiveCommand($$$) {
                     $values{result} = "Unspecified error";
                     $state = "error";
                 }
-                else {
 
-                    $values{result} = "ok";
+                readingsBulkUpdate( $hash, "lastRequest", $return->{request} )
+                  if ( defined $return->{request} );
 
-                    readingsBulkUpdate( $hash, "lastTitle", $values{title} );
-                    readingsBulkUpdate( $hash, "lastMessage",
-                        $values{message} );
-                    readingsBulkUpdate( $hash, "lastPriority",
-                        $values{priority} );
-                    readingsBulkUpdate( $hash, "lastAction", $values{action} )
-                      if ( $values{action} ne "" );
-                    readingsBulkUpdate( $hash, "lastAction", "-" )
-                      if ( $values{action} eq "" );
-                    readingsBulkUpdate( $hash, "lastDevice", $values{device} )
-                      if ( $values{device} ne "" );
-                    readingsBulkUpdate( $hash, "lastDevice", $hash->{DEVICES} )
-                      if ( $values{device} eq "" );
+                if ( $values->{expire} ne "" ) {
+                    readingsBulkUpdate( $hash, "cbTitle_" . $values->{cbNr},
+                        $values->{title} );
+                    readingsBulkUpdate( $hash, "cbMsg_" . $values->{cbNr},
+                        $values->{message} );
+                    readingsBulkUpdate( $hash, "cbPrio_" . $values->{cbNr},
+                        $values->{priority} );
+                    readingsBulkUpdate( $hash, "cbAck_" . $values->{cbNr}, "0" );
 
-                    if ( defined $return->{request} ) {
-                        readingsBulkUpdate( $hash, "lastRequest",
-                            $return->{request} );
+                    if ( $values->{device} ne "" ) {
+                        readingsBulkUpdate( $hash, "cbDev_" . $values->{cbNr},
+                            $values->{device} );
+                    }
+                    else {
+                        readingsBulkUpdate( $hash, "cbDev_" . $values->{cbNr},
+                            $hash->{DEVICES} );
                     }
 
-                    if ( $values{expire} ne "" ) {
-                        readingsBulkUpdate( $hash, "cbTitle_" . $values{cbNr},
-                            $values{title} );
-                        readingsBulkUpdate( $hash, "cbMsg_" . $values{cbNr},
-                            $values{message} );
-                        readingsBulkUpdate( $hash, "cbPrio_" . $values{cbNr},
-                            $values{priority} );
-                        readingsBulkUpdate( $hash, "cbAck_" . $values{cbNr},
-                            "0" );
+                    if ( defined $return->{receipt} ) {
+                        readingsBulkUpdate( $hash, "cb_" . $values->{cbNr},
+                            $return->{receipt} );
+                    }
+                    else {
+                        readingsBulkUpdate( $hash, "cb_" . $values->{cbNr},
+                            $values->{cbNr} );
+                    }
 
-                        if ( $values{device} ne "" ) {
-                            readingsBulkUpdate( $hash, "cbDev_" . $values{cbNr},
-                                $values{device} );
-                        }
-                        else {
-                            readingsBulkUpdate( $hash,
-                                "cbDev_" . $values{cbNr}, "all" );
-                        }
-
-                        if ( defined $return->{receipt} ) {
-                            readingsBulkUpdate( $hash, "cb_" . $values{cbNr},
-                                $return->{receipt} );
-                        }
-                        else {
-                            readingsBulkUpdate( $hash, "cb_" . $values{cbNr},
-                                $values{cbNr} );
-                        }
-
-                        if ( $values{action} ne "" ) {
-                            readingsBulkUpdate( $hash, "cbAct_" . $values{cbNr},
-                                $values{action} );
-                        }
+                    if ( $values->{action} ne "" ) {
+                        readingsBulkUpdate( $hash, "cbAct_" . $values->{cbNr},
+                            $values->{action} );
                     }
                 }
+            }
+
+            # simple error handling if no JSON module was loaded
+            elsif ( $return !~ m/"status":1,/ ) {
+                $state = "error";
+                if ( $return =~ m/"errors":\[(.*)\]/ ) {
+                    $values{result} = "Error: " . $1;
+                }
+                else {
+                    $values{result} = "Unspecified error";
+                }
+            }
+            elsif ( $values{expire} ne "" ) {
+                $values{result} =
+                  "SoftFail: Callback not supported. Please install Perl::JSON";
             }
         }
 
         # users/validate.json
         elsif ( $service eq "users/validate.json" ) {
+            $values{result} = "ok";
+
             if ( ref($return) eq "HASH" ) {
 
                 if ( $return->{status} ne "1" && defined $return->{errors} ) {
@@ -458,14 +473,14 @@ sub Pushover_ReceiveCommand($$$) {
                     $state = "unauthorized";
                 }
                 else {
-                    $values{result} = "ok";
                     $hash->{DEVICES} = join( ",", @{ $return->{devices} } );
+                    $hash->{GROUP} = $return->{group};
                 }
 
             }
         }
 
-        readingsBulkUpdate( $hash, "lastResult", $values{result} );
+        readingsBulkUpdate( $hash, "lastResult", $values->{result} );
     }
 
     # Set reading for state
@@ -532,28 +547,39 @@ sub Pushover_SetMessage {
         $argc = 1;
     }
 
+    Log3 $name, 4, "Pushover $name: Found $argc argument(s)";
+
     if ( $argc > 1 ) {
-        $values{title}   = $1 if ( $1 ne "" );
-        $values{message} = $2 if ( $2 ne "" );
+        $values{title}   = $1;
+        $values{message} = $2;
+        Log3 $name, 4,
+          "Pushover $name:		title=$values{title} message=$values{message}";
 
         if ( $argc > 2 ) {
-            $values{device}   = $3 if ( $3 ne "" );
-            $values{priority} = $4 if ( $4 ne "" );
-            $values{sound}    = $5 if ( $5 ne "" );
+            $values{device}   = $3;
+            $values{priority} = $4;
+            $values{sound}    = $5;
+            Log3 $name, 4,
+"Pushover $name:		device=$values{device} priority=$values{priority} sound=$values{sound}";
 
             if ( $argc > 5 ) {
-                $values{retry}  = $6 if ( $6 ne "" );
-                $values{expire} = $7 if ( $7 ne "" );
+                $values{retry}  = $6;
+                $values{expire} = $7;
+                Log3 $name, 4,
+"Pushover $name:		retry=$values{retry} expire=$values{expire}";
 
                 if ( $argc > 7 ) {
-                    $values{url_title} = $8 if ( $8 ne "" );
-                    $values{action}    = $9 if ( $9 ne "" );
+                    $values{url_title} = $8;
+                    $values{action}    = $9;
+                    Log3 $name, 4,
+"Pushover $name:		url_title=$values{url_title} action=$values{action}";
                 }
             }
         }
     }
     elsif ( $argc == 1 ) {
-        $values{message} = $1 if ( $1 ne "" );
+        $values{message} = $1;
+        Log3 $name, 4, "Pushover $name:		message=$values{message}";
     }
 
     #Remove quotation marks
@@ -602,7 +628,7 @@ sub Pushover_SetMessage {
         )
       )
     {
-        my $body = "title=" . $values{title};
+        my $body = "title=" . urlEncode( $values{title} );
 
         if ( $values{message} =~
             /\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>/
@@ -615,30 +641,30 @@ sub Pushover_SetMessage {
         if ( $values{message} =~ /^nohtml:.*/ ) {
             Log3 $name, 4, "explicitly ignoring HTML tags in message";
             $values{message} =~ s/^(nohtml:).*//;
-            $body = $body . "&message=" . $values{message};
+            $body = $body . "&message=" . urlEncode( $values{message} );
         }
         else {
-            $body = $body . "&message=" . $values{message};
+            $body = $body . "&message=" . urlEncode( $values{message} );
         }
 
         if ( $values{device} ne "" ) {
-            $body = $body . "&" . "device=" . $values{device};
+            $body = $body . "&device=" . $values{device};
         }
 
         if ( $values{priority} ne "" ) {
-            $body = $body . "&" . "priority=" . $values{priority};
+            $body = $body . "&priority=" . $values{priority};
         }
 
         if ( $values{sound} ne "" ) {
-            $body = $body . "&" . "sound=" . $values{sound};
+            $body = $body . "&sound=" . $values{sound};
         }
 
         if ( $values{retry} ne "" ) {
-            $body = $body . "&" . "retry=" . $values{retry};
+            $body = $body . "&retry=" . $values{retry};
         }
 
         if ( $values{expire} ne "" ) {
-            $body = $body . "&" . "expire=" . $values{expire};
+            $body = $body . "&expire=" . $values{expire};
 
             $values{cbNr} = int( time() ) + $values{expire};
             my $cbReading = "cb_" . $values{cbNr};
@@ -646,10 +672,8 @@ sub Pushover_SetMessage {
               until ( !defined( $hash->{READINGS}{$cbReading}{VAL} ) );
         }
 
-        my $timestamp = AttrVal( $hash->{NAME}, "timestamp", 0 );
-
-        if ( 1 == $timestamp ) {
-            $body = $body . "&" . "timestamp=" . int( time() );
+        if ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
+            $body = $body . "&timestamp=" . int( time() );
         }
 
         if ( $callback ne "" && $values{priority} > 1 ) {
@@ -735,7 +759,7 @@ sub Pushover_SetMessage {
             }
         }
 
-        Pushover_SendCommand( $hash, "messages.json", $body, %{$values} );
+        Pushover_SendCommand( $hash, "messages.json", $body, %values );
 
         return;
     }
@@ -747,7 +771,7 @@ sub Pushover_SetMessage {
         }
         else {
             return
-"Syntax: <Pushover_device> msg [title] <msg> [<device> <priority> <sound> [<retry> <expire> ['<url_title>' '<action>']]]";
+"Syntax: $name msg ['<title>'] '<msg>' ['<device>' <priority> '<sound>' [<retry> <expire> ['<url_title>' '<action>']]]";
         }
     }
 }
