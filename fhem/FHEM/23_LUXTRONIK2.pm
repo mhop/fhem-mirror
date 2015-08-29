@@ -147,47 +147,47 @@ LUXTRONIK2_Notify(@) {
   my ($hash,$dev) = @_;
   my $name = $hash->{NAME};
   
-  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
+  # if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
     # housekeeping
-      my %cleanUp = ( 
-            delayDeviceTime => "delayDeviceTimeCalc",
-            deviceTimeStartReadings => "deviceTimeCalc",
-            heatingSummerMode => "heatingLimit",
-            thresholdTemperatureSummerMode => "thresholdHeatingLimit",
-            lastDeviceClockSynch => "deviceTimeLastSync",
-            operatingHoursHeatPump => "counterHoursHeatPump",
-            operatingHoursSecondHeatSource1 => "counterHours2ndHeatSource1",
-            operatingHoursSecondHeatSource2 => "counterHours2ndHeatSource2",
-            operatingHoursSecondHeatSource3 => "counterHours2ndHeatSource3",
-            operatingHoursHeating => "counterHoursHeating",
-            operatingHoursHotWater => "counterHoursHotWater",
-            heatQuantityHeating => "counterHeatQHeating",
-            heatQuantityHotWater => "counterHeatQHotWater",
-            heatQuantityTotal => "counterHeatQTotal", 
-            currentOperatingStatus1 => "opStateHeatPump1",
-            currentOperatingState1 => "opStateHeatPump1",
-            currentOperatingStatus2 => "opStateHeatPump3",
-            currentOperatingState2 => "opStateHeatPump2",
-            currentOperatingState3 => "opStateHeatPump3",
-            heatingOperatingMode => "opModeHeating",
-            heatingOperatingState => "opStateHeating",
-            hotWaterOperatingMode => "opModeHotWater",
-            hotWaterStatus => "opStateHotWater",
-            hotWaterState => "opStateHotWater",
-            heatingSystemCirculationPump => "heatingSystemCircPump",
-            hotWaterCirculationPumpExtern => "hotWaterCircPumpExtern",
-            currentThermalOutput => "thermalPower",
-            returnTemperaturSetBack => "returnTemperatureSetBack",
-            statGradientBoilerTempLoss => "statBoilerGradientHeatUp' and 'statBoilerGradientCoolDown" ); 
-      my $oldReading;
-      my $newReading;
-      while (($oldReading, $newReading) = each(%cleanUp)) {
-         if ( exists( $hash->{READINGS}{$oldReading} ) ) {
-            delete($hash->{READINGS}{$oldReading});
-            LUXTRONIK2_Log $name,2,"!!! Change/fix in LUXTRONIK2-Modul: '$oldReading' is now '$newReading'";
-         }
-      }
-   }
+      # my %cleanUp = ( 
+            # delayDeviceTime => "delayDeviceTimeCalc",
+            # deviceTimeStartReadings => "deviceTimeCalc",
+            # heatingSummerMode => "heatingLimit",
+            # thresholdTemperatureSummerMode => "thresholdHeatingLimit",
+            # lastDeviceClockSynch => "deviceTimeLastSync",
+            # operatingHoursHeatPump => "counterHoursHeatPump",
+            # operatingHoursSecondHeatSource1 => "counterHours2ndHeatSource1",
+            # operatingHoursSecondHeatSource2 => "counterHours2ndHeatSource2",
+            # operatingHoursSecondHeatSource3 => "counterHours2ndHeatSource3",
+            # operatingHoursHeating => "counterHoursHeating",
+            # operatingHoursHotWater => "counterHoursHotWater",
+            # heatQuantityHeating => "counterHeatQHeating",
+            # heatQuantityHotWater => "counterHeatQHotWater",
+            # heatQuantityTotal => "counterHeatQTotal", 
+            # currentOperatingStatus1 => "opStateHeatPump1",
+            # currentOperatingState1 => "opStateHeatPump1",
+            # currentOperatingStatus2 => "opStateHeatPump3",
+            # currentOperatingState2 => "opStateHeatPump2",
+            # currentOperatingState3 => "opStateHeatPump3",
+            # heatingOperatingMode => "opModeHeating",
+            # heatingOperatingState => "opStateHeating",
+            # hotWaterOperatingMode => "opModeHotWater",
+            # hotWaterStatus => "opStateHotWater",
+            # hotWaterState => "opStateHotWater",
+            # heatingSystemCirculationPump => "heatingSystemCircPump",
+            # hotWaterCirculationPumpExtern => "hotWaterCircPumpExtern",
+            # currentThermalOutput => "thermalPower",
+            # returnTemperaturSetBack => "returnTemperatureSetBack",
+            # statGradientBoilerTempLoss => "statBoilerGradientHeatUp' and 'statBoilerGradientCoolDown" ); 
+      # my $oldReading;
+      # my $newReading;
+      # while (($oldReading, $newReading) = each(%cleanUp)) {
+         # if ( exists( $hash->{READINGS}{$oldReading} ) ) {
+            # delete($hash->{READINGS}{$oldReading});
+            # LUXTRONIK2_Log $name,2,"!!! Change/fix in LUXTRONIK2-Modul: '$oldReading' is now '$newReading'";
+         # }
+      # }
+   # }
    return;
 }
 
@@ -296,7 +296,8 @@ LUXTRONIK2_Set($$@)
       LUXTRONIK2_Log $name, 3, $resultStr;
       return $resultStr;
       
-   } elsif(int(@_)==4 &&
+   } 
+   elsif(int(@_)==4 &&
          ($cmd eq 'hotWaterTemperatureTarget'
             || $cmd eq 'opModeHotWater'
             || $cmd eq 'returnTemperatureSetBack')) {
@@ -306,11 +307,23 @@ LUXTRONIK2_Set($$@)
       $hash->{LOCAL} = 0;
       return $resultStr;
    }
+   elsif( int(@_)==4 && $cmd eq 'hotWaterCircPumpExtern' ) { # Einstellung->Entlüftung
+      Log3 $name, 3, "LUXTRONIK2: set $name $cmd $val";
+      return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
+         if $val !~ /on|off/;
+      $hash->{LOCAL} = 1;
+      $resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
+      if ($val eq "on" ) {    $resultStr .= LUXTRONIK2_SetParameter ($hash, "confirmDegasing", 1);    } 
+      else {   $resultStr .= LUXTRONIK2_SetParameter ($hash, "confirmDegasing", 0);   } # only send if no degasing checkbox is selected at all.
+      $hash->{LOCAL} = 0;
+      return $resultStr;
+   }
 
   my $list = "statusRequest:noArg"
           ." activeTariff:0,1,2,3,4,5,6,7,8,9"
-          ." resetStatistics:all,statBoilerGradientCoolDownMin,statAmbientTemp...,statElectricity...,statHours...,statHeatQ..."
+          ." hotWaterCircPumpExtern:on,off"
           ." hotWaterTemperatureTarget "
+          ." resetStatistics:all,statBoilerGradientCoolDownMin,statAmbientTemp...,statElectricity...,statHours...,statHeatQ..."
           ." returnTemperatureSetBack "
           ." opModeHotWater:Auto,Party,Off"
           ." synchronizeClockHeatPump:noArg"
@@ -594,7 +607,7 @@ LUXTRONIK2_DoUpdate($)
   # 27 - heatingSystemCircPump
   $return_str .= "|".$heatpump_values[39];
   # 28 - hotWaterCircPumpExtern
-  $return_str .= "|".$heatpump_values[46];
+  $return_str .= "|". ($heatpump_visibility[57]==1 ? $heatpump_values[46] : "no");
   # 29 - readingFhemStartTime
   $return_str .= "|".$readingStartTime;
   # 30 - readingFhemEndTime
@@ -661,7 +674,6 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|". ($heatpump_visibility[211]==1 ? $heatpump_values[136] : "no");
   return $return_str;
 }
-
 
 sub ########################################
 LUXTRONIK2_UpdateDone($)
@@ -746,10 +758,12 @@ LUXTRONIK2_UpdateDone($)
 
   my $doStatistic = AttrVal($name,"doStatistics",0);
 
+# Error
   if ($a[1]==0 ) {
      readingsSingleUpdate($hash,"state","Error: ".$a[2],1);
     $counterRetry = 0;
   }
+# Busy, restart update
   elsif ($a[1]==2 )  {
      if ($counterRetry <=3) {
       InternalTimer(gettimeofday() + 5, "LUXTRONIK2_GetUpdate", $hash, 0);
@@ -759,6 +773,7 @@ LUXTRONIK2_UpdateDone($)
       LUXTRONIK2_Log $hash, 2, "Device reading skipped after $counterRetry tries with parameter change on target";
     }
   }
+# Update readings
   elsif ($a[1]==1 )  {
     $counterRetry = 0;  
 
@@ -1048,7 +1063,6 @@ LUXTRONIK2_UpdateAborted($)
   LUXTRONIK2_Log $hash, 1, "Timeout when connecting to host $host";
 }
 
-
 sub ########################################
 LUXTRONIK2_CalcTemp($)
 {
@@ -1084,15 +1098,14 @@ LUXTRONIK2_SetParameter($$$)
   my $name = $hash->{NAME};
   
    my %opMode = ( "Auto" => 0,
-               "Party" => 2,
-               "Off" => 4);
+                 "Party" => 2,
+                   "Off" => 4);
    
   if(AttrVal($name, "allowSetParameter", 0) != 1) {
    return $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 1";
   }
   
-  if ($parameterName eq "hotWaterTemperatureTarget") 
-  {
+  if ($parameterName eq "hotWaterTemperatureTarget") {
      #parameter number
     $setParameter = 2;
     #limit temperature range
@@ -1103,8 +1116,7 @@ LUXTRONIK2_SetParameter($$$)
     $realValue = $setValue / 10;
   }
   
-  elsif ($parameterName eq "opModeHotWater") 
-  {
+  elsif ($parameterName eq "opModeHotWater") {
     if (! exists($opMode{$realValue})) {
       return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
      }
@@ -1112,8 +1124,7 @@ LUXTRONIK2_SetParameter($$$)
      $setValue = $opMode{$realValue};
   }
   
-  elsif ($parameterName eq "returnTemperatureSetBack") 
-  {
+  elsif ($parameterName eq "returnTemperatureSetBack") {
      #parameter number
     $setParameter = 1;
     #limit temperature range
@@ -1123,8 +1134,17 @@ LUXTRONIK2_SetParameter($$$)
     $setValue = int($realValue * 2) * 5;
     $realValue = $setValue / 10;
   }
-  else 
-  {
+
+   elsif ($parameterName eq "hotWaterCircPumpExtern") { #isVisible(167) 
+     $setParameter = 684;
+     $setValue = $realValue eq "on" ? 1 : 0;
+   }
+   elsif ($parameterName eq "confirmDegasing") {
+     $setParameter = 158;
+     $setValue = $realValue;
+   }
+
+   else {
     return "$name LUXTRONIK2_SetParameter-Error: unknown parameter $parameterName";
   }
 
@@ -1137,11 +1157,12 @@ LUXTRONIK2_SetParameter($$$)
                      PeerPort => 8888,
                      Proto => 'tcp'
        );
-     if (!$socket) {
+      # Socket error
+      if (!$socket) {
         LUXTRONIK2_Log $name, 1, "Could not open connection to host ".$host;
         return "$name Error: Could not open connection to host ".$host;
      }
-     $socket->autoflush(1);
+      $socket->autoflush(1);
      
      LUXTRONIK2_Log $name, 5, "Set parameter $parameterName ($setParameter) = $realValue ($setValue)";
      $socket->send(pack("N", 3002));
@@ -1170,13 +1191,12 @@ LUXTRONIK2_SetParameter($$$)
      
      $socket->close();
      
-     readingsSingleUpdate($hash,$parameterName,$realValue,1);
+     readingsSingleUpdate($hash,$parameterName,$realValue,1)   unless $parameterName eq "confirmDegasing";
      
      return undef;
    }
   
 }
-
 
 sub ########################################
 LUXTRONIK2_synchronizeClock (@)
@@ -1779,11 +1799,14 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
        <li><code>INTERVAL &lt;polling interval&gt;</code><br>
          Polling interval in seconds
        </li><br>
-       <li><code>opModeHotWater &lt;Mode&gt;</code><br>
-         Operating Mode of domestic hot water boiler (Auto | Party | Off)
-         </li><br>
       <li><code>hotWaterTemperatureTarget &lt;temperature&gt;</code><br>
          Target temperature of domestic hot water boiler in &deg;C
+         </li><br>
+      <li><code>hotWaterCirculationPumpExtern &lt;on | off&gt;</code><br>
+         Switches the external circulation pump for the hot water on or off. The circulation prevents a cool down of the hot water in the pipes but increases the heat consumption drastically.
+         </li><br>
+       <li><code>opModeHotWater &lt;Mode&gt;</code><br>
+         Operating Mode of domestic hot water boiler (Auto | Party | Off)
          </li><br>
      <li><code>resetStatistics &lt;statReadings&gt;</code>
          <br>
@@ -1898,13 +1921,16 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
          0 = tariflos 
       </li><br>
-      <li><code>opModeHotWater &lt;Betriebsmodus&gt;</code>
-         <br>
-         Betriebsmodus des Hei&szlig;wasserboilers ( Auto | Party | Off )
+      <li><code>hotWaterCirculationPumpExtern &lt;on | off&gt;</code><br>
+         Schaltet die externe Warmwasser-Zirkulationspumpe an oder aus. Durch die Zirkulation wird ein Abk&uuml;hlen des Warmwassers in den Hausleitungen verhindert. Der W&auml;rmeverbrauch steigt jedoch drastisch.
          </li><br>
      <li><code>hotWaterTemperatureTarget &lt;Temperatur&gt;</code>
          <br>
          Soll-Temperatur des Hei&szlig;wasserboilers in &deg;C
+         </li><br>
+      <li><code>opModeHotWater &lt;Betriebsmodus&gt;</code>
+         <br>
+         Betriebsmodus des Hei&szlig;wasserboilers ( Auto | Party | Off )
          </li><br>
      <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>
