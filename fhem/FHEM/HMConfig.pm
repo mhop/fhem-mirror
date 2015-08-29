@@ -294,8 +294,6 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00E8" => {name=>"HM-LC-Sw1-Pl-DN-R4"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00E9" => {name=>"HM-LC-Sw1-Pl-DN-R5"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00EA" => {name=>"HM-ES-PMSw1-DR"          ,alias=>"HM-ES-PMSw1-Pl"}
-# ,"00EA" => {name=>"HM-ES-PMSw1-DR"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1:2.3.4.5.6,3:1p,4:3p.4p.5p.6p'
-#                                                                                                                        ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
  ,"00EB" => {name=>"HM-LC-Sw1-Pl-CT-R1"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00EC" => {name=>"HM-LC-Sw1-Pl-CT-R2"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00ED" => {name=>"HM-LC-Sw1-Pl-CT-R3"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
@@ -1922,7 +1920,7 @@ $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
         }
         $culHmRegModel{$ds}       = $culHmRegModel{$ds} if ($culHmRegModel{$ds});
         foreach(grep  /^$md/,keys %culHmRegChan){
-          $culHmChanSets{$ds.substr($_,-2,2)}    = $culHmChanSets{$_};
+          $culHmRegChan{$ds.substr($_,-2,2)}    = $culHmRegChan{$_};
         }
         last;
       }

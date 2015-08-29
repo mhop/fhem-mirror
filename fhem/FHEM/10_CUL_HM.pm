@@ -176,6 +176,7 @@ sub CUL_HM_Initialize($) {
                        .$readingFnAttributes
                        ;
                        
+  CUL_HM_initRegHash();
   my @modellist;
   foreach my $model (keys %{$culHmModel}){
     push @modellist,$culHmModel->{$model}{name};
@@ -204,7 +205,6 @@ sub CUL_HM_Initialize($) {
   RemoveInternalTimer("StatCntRfresh");
   InternalTimer(gettimeofday()+3600*20,"CUL_HM_statCntRfresh","StatCntRfresh", 0);
 
-  CUL_HM_initRegHash();
   $hash->{hmIoMaxDly}     = 60;# poll timeout - stop poll and discard
   $hash->{hmAutoReadScan} = 4; # delay autoConf readings
   $hash->{helper}{hmManualOper} = 0;# default automode
