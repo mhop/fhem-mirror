@@ -402,7 +402,7 @@ use vars qw(%zwave_deviceSpecial);
                  positionBlinds=>"010f260102%02x00"},
       get   => { position=>"010f2602020000", },
       parse => { "0891010f260303(..)(..)" =>
-                  'sprintf("position:Blinds %d Slat %d",hex($1),hex($2))',
+                  'sprintf("position:Blind %d Slat %d",hex($1),hex($2))',
                  "0891010f260302(..)00" =>'"position:".hex($1)' } } },
    ZME_KFOB => {
      ZWAVEPLUS_INFO => {
@@ -926,6 +926,40 @@ ZWave_multilevelParse($$$)
    '13' => { n => 'tankCapacity',         st => ['l', 'cbm', 'usgal'] },
    '14' => { n => 'distance',             st => ['m', 'cm', 'feet'] },
    '15' => { n => 'anglePosition',        st => ['%', 'relN', 'relS'] },
+   '16' => { n => 'rotation',             st => ['rpm', 'Hz'] },
+   '17' => { n => 'waterTemperature',     st => ['C', 'F'] },
+   '18' => { n => 'soilTemperature',      st => ['C', 'F'] },
+   '19' => { n => 'seismicIntensity',     st => ['mercalli', 'EU macroseismic',
+                                                 'liedu', 'shindo'] },
+   '1a' => { n => 'seismicMagnitude',     st => ['local', 'moment',
+                                                 'surface wave', 'body wave'] },
+   '1b' => { n => 'ultraviolet',          st => ['UV'] },
+   '1c' => { n => 'electricalResistivity',st => ['ohm'] },
+   '1d' => { n => 'electricalConductivity',st => ['siemens/m'] },
+   '1e' => { n => 'loudness',             st => ['dB', 'dBA'] },
+   '1f' => { n => 'moisture',             st => ['%', 'content', 'k ohms',
+                                                 'water activity'] },
+   '20' => { n => 'frequency',            st => ['Hz', 'kHz'] },
+   '21' => { n => 'time',                 st => ['seconds'] },
+   '22' => { n => 'targetTemperature',    st => ['C', 'F'] },
+   '23' => { n => 'particulateMatter',    st => ['mol/m3', 'micro-g/m3'] },
+   '24' => { n => 'formaldehydeLevel',    st => ['mol/m3'] },
+   '25' => { n => 'radonConcentration',   st => ['bq/m3', 'pCi/L'] },
+   '26' => { n => 'methaneDensity',       st => ['mol/m3'] },
+   '27' => { n => 'volatileOrganicCompound',st => ['mol/m3'] },
+   '28' => { n => 'carbonMonoxide',       st => ['mol/m3'] },
+   '29' => { n => 'soilHumidity',         st => ['%'] },
+   '2a' => { n => 'soilReactivity',       st => ['pH'] },
+   '2b' => { n => 'soilSalinity',         st => ['mol/m3'] },
+   '2c' => { n => 'heartRate',            st => ['Bpm'] },
+   '2d' => { n => 'bloodPressure',        st => ['Systolic mmHg', 
+                                                 'Diastolic mmHg'] },
+   '2e' => { n => 'muscleMass',           st => ['Kg'] },
+   '2f' => { n => 'fatMass',              st => ['Kg'] },
+   '30' => { n => 'boneMass',             st => ['Kg'] },
+   '31' => { n => 'totalBodyWater',       st => ['Kg'] },
+   '32' => { n => 'basicMetabolicRate',   st => ['J'] },
+   '33' => { n => 'bodyMassIndex',        st => ['BMI'] },
   );
 
   my $pr = (hex($fl)>>5)&0x07; # precision
@@ -2573,7 +2607,7 @@ s2Hex($)
 
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
   <li>Fibaro FGRM-222 with ReportsType Fibar CC only:</li>
-  <li>position:Blinds [%] Slat [%]<br>
+  <li>position:Blind [%] Slat [%]<br>
     (VenetianBlindMode)</li>
   <li>position:[%]<br>
     (RollerBlindMode)</li>
@@ -2665,6 +2699,37 @@ s2Hex($)
   <li>tankCapacity $val [l|cbm|usgal]</li>
   <li>distance $val [m|cm|feet]</li>
   <li>anglePosition $val [%|relN|relS]</li>
+  <li>rotation $val [rpm|Hz]</li>
+  <li>waterTemperature $val [C|F]</li>
+  <li>soilTemperature $val [C|F]</li>
+  <li>seismicIntensity $val [mercalli|EU macroseismic|liedu|shindo]</li>
+  <li>seismicMagnitude $val [local|moment|surface wave|body wave]</li>
+  <li>ultraviolet $val [UV]</li>
+  <li>electricalResistivity $val [ohm]</li>
+  <li>electricalConductivity $val [siemens/m]</li>
+  <li>loudness $val [dB|dBA]</li>
+  <li>moisture $val [%|content|k ohms|water activity]</li>
+  <li>frequency $val [Hz|kHz]</li>
+  <li>time $val [seconds]</li>
+  <li>targetTemperature $val [C|F]</li>
+  <li>particulateMatter $val [mol/m3|micro-g/m3]</li>
+  <li>formaldehydeLevel $val [mol/m3]</li>
+  <li>radonConcentration $val [bq/m3|pCi/L]</li>
+  <li>methaneDensity $val [mol/m3]</li>
+  <li>volatileOrganicCompound $val [mol/m3]</li>
+  <li>carbonMonoxide $val [mol/m3]</li>
+  <li>soilHumidity $val [%]</li>
+  <li>soilReactivity $val [pH]</li>
+  <li>soilSalinity $val [mol/m3]</li>
+  <li>heartRate $val [Bpm]</li>
+  <li>bloodPressure $val [Systolic mmHg|Diastolic mmHg]</li>
+  <li>muscleMass $val [Kg]</li>
+  <li>fatMass $val [Kg]</li>
+  <li>boneMass $val [Kg]</li>
+  <li>totalBodyWater $val [Kg]</li>
+  <li>basicMetabolicRate $val [J]</li>
+  <li>bodyMassIndex $val [BMI]</li>
+
 
   <br><br><b>Class SWITCH_ALL</b>
   <li>swa:[none|on|off|on off]</li>
