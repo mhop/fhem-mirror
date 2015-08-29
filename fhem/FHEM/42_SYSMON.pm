@@ -173,18 +173,20 @@ SYSMON_Define($$)
         delete($hash->{HOST});
         delete($hash->{USER});
         # erkennen, wenn User angegeben ist
-        my($user,$th) = split(/@/,$host);
-        if(defined($th)) {
-          $hash->{USER} = lc($user);
-          $host = $th;
+        if($host) {
+          my($user,$th) = split(/@/,$host);
+          if(defined($th)) {
+            $hash->{USER} = lc($user);
+            $host = $th;
+          }
+          $hash->{HOST} = lc($host) if(defined($host));
+          # DefaultPort je nach Protokol
+          if(!defined($port)) {
+            $port = '23' if($mode eq 'telnet');
+            $port = '22' if($mode eq 'ssh');
+          }
+          $hash->{PORT} = lc($port);
         }
-        $hash->{HOST} = lc($host) if(defined($host));
-        # DefaultPort je nach Protokol
-        if(!defined($port)) {
-          $port = '23' if($mode eq 'telnet');
-          $port = '22' if($mode eq 'ssh');
-        }
-        $hash->{PORT} = lc($port);
       } else {
         return "unexpected mode. use local or telnet only."; # TODO: SSH
       }
