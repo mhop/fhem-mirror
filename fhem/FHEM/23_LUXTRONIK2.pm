@@ -307,21 +307,21 @@ LUXTRONIK2_Set($$@)
       $hash->{LOCAL} = 0;
       return $resultStr;
    }
-   elsif( int(@_)==4 && $cmd eq 'hotWaterCircPumpExtern' ) { # Einstellung->Entlüftung
+   elsif( int(@_)==4 && $cmd eq 'hotWaterCircPumpDeaerate' ) { # Einstellung->Entlüftung
       Log3 $name, 3, "LUXTRONIK2: set $name $cmd $val";
       return "$name Error: Wrong parameter given for opModeHotWater, use Automatik,Party,Off"
          if $val !~ /on|off/;
       $hash->{LOCAL} = 1;
       $resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
-      if ($val eq "on" ) {    $resultStr .= LUXTRONIK2_SetParameter ($hash, "confirmDegasing", 1);    } 
-      else {   $resultStr .= LUXTRONIK2_SetParameter ($hash, "confirmDegasing", 0);   } # only send if no degasing checkbox is selected at all.
+      if ($val eq "on" ) {    $resultStr .= LUXTRONIK2_SetParameter ($hash, "runDeaerate", 1);    } 
+      else {   $resultStr .= LUXTRONIK2_SetParameter ($hash, "runDeaerate", 0);   } # only send if no Deaerate checkbox is selected at all.
       $hash->{LOCAL} = 0;
       return $resultStr;
    }
 
   my $list = "statusRequest:noArg"
           ." activeTariff:0,1,2,3,4,5,6,7,8,9"
-          ." hotWaterCircPumpExtern:on,off"
+          ." hotWaterCircPumpDeaerate:on,off"
           ." hotWaterTemperatureTarget "
           ." resetStatistics:all,statBoilerGradientCoolDownMin,statAmbientTemp...,statElectricity...,statHours...,statHeatQ..."
           ." returnTemperatureSetBack "
@@ -1135,11 +1135,11 @@ LUXTRONIK2_SetParameter($$$)
     $realValue = $setValue / 10;
   }
 
-   elsif ($parameterName eq "hotWaterCircPumpExtern") { #isVisible(167) 
+   elsif ($parameterName eq "hotWaterCircPumpDeaerate") { #isVisible(167) 
      $setParameter = 684;
      $setValue = $realValue eq "on" ? 1 : 0;
    }
-   elsif ($parameterName eq "confirmDegasing") {
+   elsif ($parameterName eq "runDeaerate") {
      $setParameter = 158;
      $setValue = $realValue;
    }
@@ -1191,7 +1191,7 @@ LUXTRONIK2_SetParameter($$$)
      
      $socket->close();
      
-     readingsSingleUpdate($hash,$parameterName,$realValue,1)   unless $parameterName eq "confirmDegasing";
+     readingsSingleUpdate($hash,$parameterName,$realValue,1)   unless $parameterName eq "runDeaerate";
      
      return undef;
    }
@@ -1802,8 +1802,10 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       <li><code>hotWaterTemperatureTarget &lt;temperature&gt;</code><br>
          Target temperature of domestic hot water boiler in &deg;C
          </li><br>
-      <li><code>hotWaterCirculationPumpExtern &lt;on | off&gt;</code><br>
+      <li><code>hotWaterCircPumpDeaerate &lt;on | off&gt;</code><br>
          Switches the external circulation pump for the hot water on or off. The circulation prevents a cool down of the hot water in the pipes but increases the heat consumption drastically.
+         <br>
+         NOTE! It uses the deaerate function of the controller. So, the pump alternates always 5 minutes on and 5 minutes off.
          </li><br>
        <li><code>opModeHotWater &lt;Mode&gt;</code><br>
          Operating Mode of domestic hot water boiler (Auto | Party | Off)
@@ -1921,8 +1923,10 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
          Dieser Wert muss entsprechend des vorhandenen oder geplanten Tarifes zum jeweiligen Zeitpunkt z.B. durch den FHEM-Befehl "at" gesetzt werden.<br>
          0 = tariflos 
       </li><br>
-      <li><code>hotWaterCirculationPumpExtern &lt;on | off&gt;</code><br>
-         Schaltet die externe Warmwasser-Zirkulationspumpe an oder aus. Durch die Zirkulation wird ein Abk&uuml;hlen des Warmwassers in den Hausleitungen verhindert. Der W&auml;rmeverbrauch steigt jedoch drastisch.
+      <li><code>hotWaterCircPumpDeaerate &lt;on | off&gt;</code><br>
+         Schaltet die externe Warmwasser-Zirkulationspumpe an oder aus. Durch die Zirkulation wird das Abk&uuml;hlen des Warmwassers in den Hausleitungen verhindert. Der W&auml;rmeverbrauch steigt jedoch drastisch.
+         <br>
+         Achtung! Es wird die Entl&uuml;ftungsfunktion der Steuerung genutzt. Dadurch taktet die Pumpe jeweils 5 Minuten ein und 5 Minuten aus.
          </li><br>
      <li><code>hotWaterTemperatureTarget &lt;Temperatur&gt;</code>
          <br>
