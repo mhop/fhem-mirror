@@ -44,10 +44,16 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 # modeStarted triggered on calendar update
 # http://forum.fhem.de/index.php?topic=28516
 #
+# take care of unitialized value warnings
+# http://forum.fhem.de/index.php?topic=28409
+#
 # *** Potential future extensions: 
 # 
 # add support for EXDATE
 # http://forum.fhem.de/index.php?topic=24485
+#
+# nonblocking retrieval
+# http://forum.fhem.de/index.php?topic=29622
 #
 # sequence of events fired sorted by time
 # http://forum.fhem.de/index.php?topic=29112
@@ -270,11 +276,6 @@ sub isDeleted {
   return $self->isState("deleted");
 }
 
-sub isExpired {
-  my ($self)= @_;
-  return $self->isState("expired");
-}
-
 
 sub stateChanged {
   my ($self)= @_;
@@ -382,11 +383,8 @@ sub ts0 {
 sub fromVEvent {
   my ($self,$vevent)= @_;
 
-  $self->{uid_orig}= $vevent->value("UID");
-  $self->{sequence}= defined($vevent->value("SEQUENCE")) ? $vevent->value("SEQUENCE") : 0;
-  $self->{uid}= $self->{uid_orig};
+  $self->{uid}= $vevent->value("UID");
   $self->{uid}=~ s/\W//g; # remove all non-alphanumeric characters, this makes life easier for perl specials
-  $self->{uid}.= $self->{sequence}; # UID is not unique, e.g. in the case of series with out-of-series events
   $self->{start}= tm($vevent->value("DTSTART"));
   if(defined($vevent->value("DTEND"))) {
     $self->{end}= tm($vevent->value("DTEND"));
@@ -401,9 +399,8 @@ sub fromVEvent {
     $self->{lastModified}= tm($vevent->value("DTSTAMP"));
     #main::Debug "DTSTAMP: $self->{lastModified} ";
   }  
-  $self->{summary}= defined($vevent->value("SUMMARY")) ? $vevent->value("SUMMARY") : "";
-  $self->{location}= defined($vevent->value("LOCATION")) ? $vevent->value("LOCATION") : "";
-  
+  $self->{summary}= $vevent->value("SUMMARY");
+  $self->{location}= $vevent->value("LOCATION");
 
   #Dates to exclude in reoccuring rule
   my @exdate;
@@ -498,14 +495,6 @@ sub asText {
 
 sub asFull {
   my ($self)= @_;
-  #main::Log3 undef,1,$self->uid();
-  #main::Log3 undef,1,$self->state();
-  #main::Log3 undef,1,$self->mode();
-  #main::Log3 undef,1,ts($self->{alarm});
-  #main::Log3 undef,1,ts($self->{start});
-  #main::Log3 undef,1,ts($self->{end});
-  #main::Log3 undef,1,$self->{summary};
-  #main::Log3 undef,1,$self->{location};
   return sprintf("%s %7s %8s %s %s-%s %s %s",
     $self->uid(),
     $self->state(),
@@ -581,7 +570,6 @@ sub advanceToNextOccurance {
   #There are no leap seconds in epoch time
   #Valid values for freq: SECONDLY, MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
   my  $nextstart = $self->{start};
-  #main::Debug  "Current time of $self->{summary} is: start " . ts($nextstart). ", interval " . $self->{interval} . ", frequency " . $self->{freq};
   do
   {
     if($self->{freq} eq "SECONDLY") {
@@ -595,20 +583,16 @@ sub advanceToNextOccurance {
     } elsif($self->{freq} eq "WEEKLY") {
       # special handling for WEEKLY and BYDAY
       if(exists($self->{byday})) {
+        # this fails for intervals > 1
         # BYDAY with prefix (e.g. -1SU or 2MO) is not recognized
-        #main::Debug "weekdays: " . $self->{byday};
-        my @bydays= split(',', $self->{byday});
-        # we skip interval-1 weeks
-        $nextstart = plusNSeconds($nextstart, 7*24*60*60, $self->{interval}-1);
-        #main::Debug "Fast forward to: start " . ts($nextstart);
+        # BYDAY with list (e.g. SU,TU,TH) is not recognized
         my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
         my $preventloop = 0;        
         do {
-          $nextstart = plusNSeconds($nextstart, 24*60*60, 1); # forward day by day
+          $nextstart = plusNSeconds($nextstart, 24*60*60, $self->{interval});
           ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) = gmtime($nextstart);
-          #main::Debug "Skip to: start " . ts($nextstart) . " = " . $weekdays[$mwday];
           $preventloop ++;        
-        } until(($weekdays[$mwday] ~~ @bydays) or ($preventloop > 7));
+        } while(index($self->{byday}, $weekdays[$mwday]) == -1 and $preventloop < 10);
       }
       else {
         # default WEEKLY handling
@@ -670,30 +654,9 @@ sub isStarted {
   return 1;
 }
 
-sub isSeries {
-  my ($self)= @_;
-  #main::Debug "      freq=  " . $self->{freq};
-  return exists($self->{freq}) ? 1 : 0;
-}
-
-sub isAfterSeriesEnded {
-  my ($self,$t) = @_;
-  #main::Debug "    isSeries? " . $self->isSeries();
-  return 0 unless($self->isSeries()); 
-  #main::Debug "    until= " . $self->{until};
-  return 0 unless(exists($self->{until}));
-  #main::Debug "    has until!";
-  return $self->{until}< $t ? 1 : 0;
-}
-
 sub isEnded {
   my ($self,$t) = @_;
-  #main::Debug "isEnded for " . $self->asFull();
-  #main::Debug "  isDeleted? " . $self->isDeleted();
   return 0 if($self->isDeleted());
-  #main::Debug "  isAfterSeriesEnded? " . $self->isAfterSeriesEnded($t);
-  #return 1 if($self->isAfterSeriesEnded($t));
-  #main::Debug "   has end? " . (defined($self->{end}) ? 1 : 0);
   return 0 unless(defined($self->{end}));
   return $self->{end}<= $t ? 1 : 0;
 }
@@ -773,13 +736,13 @@ sub updateFromCalendar {
   my $uid;
   my $event;
 
-  # we first remove all elements which were previously marked for deletion or are expired
+  # we first remove all elements which were previously marked for deletion
   foreach $event ($self->events()) {
-    if($event->isDeleted() || $event->isExpired() || $removeall) {
+    if($event->isDeleted() || $removeall) {
       $self->deleteEvent($event->uid());
     }
   }
-  
+
   # we iterate over the VEVENTs in the calendar
   my @vevents= grep { $_->{type} eq "VEVENT" } @{$calendar->{entries}};
   foreach my $vevent (@vevents) {
@@ -811,25 +774,18 @@ sub updateFromCalendar {
       }   
     };
     # new events that have ended are omitted 
-    if($event->state() ne "new" || !$event->isEnded($t) ) {
+    if($event->state() ne "new" || !$event->isEnded($t)) {
       $event->touch($t);
       $self->setEvent($event);
-      #main::Debug "#### EVENT: " . $event->asFull();
-    } else {
-      #main::Debug "#### NONE : " . $event->asFull();
     }
   }
 
-  # untouched elements get marked as deleted, expired elements as expired
+  # untouched elements get marked as deleted
   foreach $event ($self->events()) {
     if($event->lastSeen() != $t) {
       $event->setState("deleted");
-    } elsif($event->mode() eq "end") {
-      $event->setState("expired");
     }
   }
- 
-  
 }
 
 #####################################
@@ -846,8 +802,6 @@ sub Calendar_Initialize($) {
   $hash->{UndefFn} = "Calendar_Undef";
   $hash->{GetFn}   = "Calendar_Get";
   $hash->{SetFn}   = "Calendar_Set";
-  $hash->{NOTIFYDEV} = "global";
-  $hash->{NotifyFn}= "Calendar_Notify";
   $hash->{AttrList}=  $readingFnAttributes;
 }
 
@@ -857,12 +811,16 @@ sub Calendar_Wakeup($$) {
 
   my ($hash,$removeall) = @_;
 
+  my $t= time();
   Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Wakeup";
 
-  Calendar_GetUpdate($hash,$removeall);
+  Calendar_GetUpdate($hash,$removeall) if($t>= $hash->{fhem}{nxtUpdtTs});
+
+  $hash->{fhem}{lastChkTs}= $t;
+  $hash->{fhem}{lastCheck}= FmtDateTime($t);
+  Calendar_CheckTimes($hash);
 
   # find next event
-  my $t= $hash->{fhem}{lstUpdtTs};
   my $nt= $hash->{fhem}{nxtUpdtTs};
   foreach my $event ($hash->{fhem}{events}->events()) {
     next if $event->isDeleted();
@@ -897,6 +855,7 @@ sub Calendar_CheckTimes($) {
   my @startedevents= grep { $_->isStarted($t) } @allevents;
 
   my $event;
+  #main::Debug "Updating modes...";
   foreach $event (@upcomingevents) { $event->setMode("upcoming"); }
   foreach $event (@alarmedevents) { $event->setMode("alarm"); }
   foreach $event (@startedevents) { $event->setMode("start"); }
@@ -955,32 +914,14 @@ sub Calendar_GetUpdate($$) {
   my $ics;
   
   if($type eq "url"){ 
-
-  HttpUtils_NonblockingGet({
-      url => $url,
-      noshutdown => 1,
-      hash => $hash,
-      timeout => 30, 
-      type => 'caldata',
-      removeall => $removeall,
-      callback => \&Calendar_ProcessUpdate,
-    });
-    Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Getting data from $url"; 
-
+    #$ics= GetFileFromURLQuiet($url,10,undef,0,5) if($type eq "url");
+    ($errmsg, $ics)= HttpUtils_BlockingGet( { url => $url, hideurl => 1, timeout => 10, } );
   } elsif($type eq "file") {
     if(open(ICSFILE, $url)) {
       while(<ICSFILE>) { 
         $ics .= $_; 
       }
       close(ICSFILE);
-      
-      my $paramhash;
-      $paramhash->{hash} = $hash;
-      $paramhash->{removeall} = $removeall;
-      $paramhash->{type} = 'caldata';
-      Calendar_ProcessUpdate($paramhash,'',$ics);
-      return undef;
-      
     } else {
       Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not open file $url"; 
       return 0;
@@ -989,53 +930,17 @@ sub Calendar_GetUpdate($$) {
     # this case never happens by virtue of _Define, so just
     die "Software Error";
   }
-  
-}
-
-
-###################################
-sub Calendar_ProcessUpdate($$$) {
-
-  my ($param, $errmsg, $ics) = @_;
-  my $hash = $param->{hash};
-  my $name = $hash->{NAME};
-  my $removeall = $param->{removeall};
-  
-  if( $errmsg ) 
-  {
-    Log3 $name, 1, "$name: URL error: ".$errmsg;
-    $hash->{STATE} = "error";
-    return undef;
-  } else {
-    $hash->{STATE} = "updated";
-  }
+    
   
   if(!defined($ics) or ("$ics" eq "") or ($errmsg ne "")) {
     Log3 $hash, 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL. $errmsg";
     return 0;
   }
   
-  Calendar_ParseUpdate($hash, $ics, $removeall);
-
-  my $t= time();
-  $hash->{fhem}{lastChkTs}= $t;
-  $hash->{fhem}{lastCheck}= FmtDateTime($t);
-  Calendar_CheckTimes($hash);
-
-  
-}
-
-###################################
-sub Calendar_ParseUpdate($$$) {
-
-  my ($hash, $ics, $removeall) = @_;
-
-  Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Parsing data"; 
-  
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
   $ical->parse(split("\n",$ics));
-  #main::Debug "*** Result:";
+  #main::Debug "*** Result:\n";
   #main::Debug $ical->asString();
 
   my @entries= @{$ical->{entries}};
@@ -1065,6 +970,7 @@ sub Calendar_ParseUpdate($$$) {
   } else {
     $calname= $root->value("X-WR-CALNAME");
   }
+  
     
   $hash->{STATE}= "Active";
   
@@ -1097,28 +1003,6 @@ sub Calendar_ParseUpdate($$$) {
   return 1;
 }
 
-
-#####################################
-sub Calendar_Notify($$)
-{
-  my ($hash,$dev) = @_;
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
-
-  return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
-
-  return if($attr{$name} && $attr{$name}{disable});
-
-  # update calendar after initialization or change of configuration
-  # wait 10 to 29 seconds to avoid congestion due to concurrent activities
-  my $delay= 1;#10+int(rand(20));
-  Log3 $hash, 5, "Calendar " . $hash->{NAME} . ": FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
-  InternalTimer(time()+$delay, "Calendar_Wakeup", $hash, 0) ;
-
-  return undef;
-}
-
 ###################################
 sub Calendar_Set($@) {
   my ($hash, @a) = @_;
@@ -1128,9 +1012,11 @@ sub Calendar_Set($@) {
 
   # usage check
   if((@a == 2) && ($a[1] eq "update")) {
+     $hash->{fhem}{nxtUpdtTs}= 0; # force update
      Calendar_Wakeup($hash,0);
      return undef;
   } elsif((@a == 2) && ($a[1] eq "reload")) {
+     $hash->{fhem}{nxtUpdtTs}= 0; # force update
      Calendar_Wakeup($hash,1); # remove all events before update
      return undef;   
   } else {
@@ -1234,8 +1120,8 @@ sub Calendar_Define($$) {
   $hash->{fhem}{events}= Calendar::Events->new();
 
   #main::Debug "Interval: ${interval}s";
-  # we do not wake up at this point already to avoid the following race condition:
-  # events are loaded from fhem.save and data are updated asynchronousy from non-blocking Http get
+  $hash->{fhem}{nxtUpdtTs}= 0;
+  Calendar_Wakeup($hash,0);
 
   return undef;
 }
@@ -1355,13 +1241,13 @@ sub Calendar_Undef($$) {
   
   Recurring calendar events are currently supported to an extent: 
   FREQ INTERVAL UNTIL COUNT are interpreted, BYMONTHDAY BYMONTH WKST 
-  are recognized but not interpreted. 
+  are recognized but not interpreted. BYDAY is only correctly interpreted for weekly events.
   The module will get it most likely wrong
   if you have recurring calendar events with unrecognized or uninterpreted keywords.
   <p>
 
-  A calendar event is identified by its unique id (uid). The uid is taken from the source calendar's UID concatenated with the SEQUENCE number of the calendar event to cater for out-of-series events with event series. All non-alphanumerical characters
-  are stripped off the uid to make your life easier.<p>
+  A calendar event is identified by its UID. The UID is taken from the source calendar. All non-alphanumerical characters
+  are stripped off the UID to make your life easier.<p>
 
   A calendar event can be in one of the following states:
   <table border="1">
@@ -1370,7 +1256,6 @@ sub Calendar_Undef($$) {
   <tr><td>known</td><td>The calendar event was already there before the most recent update.</td></tr>
   <tr><td>updated</td><td>The calendar event was already there before the most recent update but it has changed since it
   was last retrieved.</td></tr>
-  <tr><td>expired</td><td>The calendar event was already there before the most recent update and has ended. The calendar event will be removed from all lists at the next update.</td></tr>
   <tr><td>deleted</td><td>The calendar event was there before the most recent update but is no longer. You removed it from the source calendar. The calendar event will be removed from all lists at the next update.</td></tr>
   </table><br>
   Calendar events that lie completely in the past (current time on wall clock is later than the calendar event's end time)
@@ -1567,16 +1452,16 @@ sub Calendar_Undef($$) {
   Ein Kalender ist eine Menge von Kalender-Ereignissen. Ein Kalender-Ereignis hat eine Zusammenfassung (normalerweise der Titel, welcher im Quell-Kalender angezeigt wird), eine Startzeit, eine Endzeit und keine, eine oder mehrere Alarmzeiten. Die Kalender-Ereignisse werden
   aus dem Quellkalender ermittelt, welcher &uuml;ber die URL angegeben wird. Sollten mehrere Alarmzeiten f&uuml;r ein Kalender-Ereignis existieren, wird nur der fr&uuml;heste Alarmzeitpunkt behalten. Wiederkehrende Kalendereinträge werden in einem gewissen Umfang unterst&uuml;tzt: 
   FREQ INTERVAL UNTIL COUNT werden ausgewertet, BYMONTHDAY BYMONTH WKST 
-  werden erkannt aber nicht ausgewertet. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Kalender-Ereignisse mit unerkannten oder nicht ausgewerteten Schlüsselworten hast.<p>
+  werden erkannt aber nicht ausgewertet. BYDAY wird nur für wöchentliche Kalender-Ereignisse
+  korrekt behandelt. Das Modul wird es sehr wahrscheinlich falsch machen, wenn Du wiederkehrende Kalender-Ereignisse mit unerkannten oder nicht ausgewerteten Schlüsselworten hast.<p>
 
-  Ein Kalender-Ereignis wird durch seine uid (unique id, eindeutige id) identifiziert. Die uid wird vom Quellkalender bezogen, erg&auml;nzt um die SEQUENCE-Nummer, um Ereignisse au&szlig; der Reihe verarbeiten zu k&ouml;nnen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der uid entfernt.<p>
+  Ein Kalender-Ereignis wird durch seine UID identifiziert. Die UID wird vom Quellkalender bezogen. Um das Leben leichter zu machen, werden alle nicht-alphanumerischen Zeichen automatisch aus der UID entfernt.<p>
 
   Ein Kalender-Ereignis kann sich in einem der folgenden Zustände befinden:
   <table border="1">
   <tr><td>new</td><td>Das Kalender-Ereignis wurde das erste Mal beim letzten Update gefunden. Entweder war dies das erste Mal des Kalenderzugriffs oder Du hast einen neuen Kalendereintrag zum Quellkalender hinzugef&uuml;gt.</td></tr>
   <tr><td>known</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update.</td></tr>
   <tr><td>updated</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update, wurde aber ge&auml;ndert.</td></tr>
-  <tr><td>expired</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update und ist beendet. Das Kalender-Ereignis wird beim n&auml;chsten Update von allen Listen entfernt.</td></tr>
   <tr><td>deleted</td><td>Das Kalender-Ereignis existierte bereits vor dem letzten Update, wurde aber seitdem gel&ouml;scht. Das Kalender-Ereignis wird beim n&auml;chsten Update von allen Listen entfernt.</td></tr>
   </table><br>
   Kalender-Ereignisse, welche vollst&auml;ndig in der Vergangenheit liegen (aktuelle Zeit liegt nach dem Ende-Termin des Kalendereintrags) werden nicht bezogen und sind daher nicht im Kalender verf&uuml;gbar.
