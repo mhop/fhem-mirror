@@ -43,12 +43,8 @@
   - feature: 70_PHTV: added support for WoWifi/WoLAN to wake device up
   - change:  98_GEOFANCY: improved/tightened input validation. 3rd party mobile
                apps need to ensure using correct API data format.
-  - feature: 57_Calendar: make BYDAY work with INTERVAL>1; make out-of-series
-               calendar events with recurring calendar events series work; format
-               change of UID
   - bugfix:  95_Dashboard: fixed issue with disappearing menu and command input in
                room "Everything"
-  - feature: 57_Calendar: made download from URL non-blocking
   - bugfix:  95_Dashboard: fixed problem with smallscreen styles that caused devices
                to be shown in wrong tabs
   - bugfix:  34_NUT: versucht bei disabled=1 nicht mehr, eine Verbindung aufzubauen
