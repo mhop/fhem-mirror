@@ -3351,6 +3351,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   }
   elsif($cmd =~ m /^(reg|regVal)$/) {  ########################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
+    return if(!$regReq);
     if ($regReq eq 'all'){
       my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
 
@@ -5646,7 +5647,7 @@ sub CUL_HM_PushCmdStack($$) {
 sub CUL_HM_ProcessCmdStack($) {
   my ($chnhash) = @_;
   my $hash = CUL_HM_getDeviceHash($chnhash);
-
+  
   if (!$hash->{helper}{prt}{rspWait}{cmd}){
     if($hash->{cmdStack} && @{$hash->{cmdStack}}){
      CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
@@ -6226,22 +6227,22 @@ sub CUL_HM_eventP($$) {#handle protocol events
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
   my ($hash, $evntType) = @_;
-  my $nAttr = $hash;
+  return if (!defined $hash);
   if ($evntType eq "Rcv"){
     $nAttr->{"protLastRcv"} = TimeNow();
     CUL_HM_UpdtReadSingle($hash,".protLastRcv",$nAttr->{"protLastRcv"},0);
     return;
   }
 
-  my $evnt = $nAttr->{"prot".$evntType}?$nAttr->{"prot".$evntType}:"0 > x";
+  my $evnt = $hash->{"prot".$evntType}?$hash->{"prot".$evntType}:"0 > x";
   my ($evntCnt,undef) = split(' last_at:',$evnt);
-  $nAttr->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
+  $hash->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
 
   if ($evntType =~ m/(Nack|ResndFail|IOerr|dummy)/){# unrecoverable Error
     CUL_HM_UpdtReadSingle($hash,"state",$evntType,1);
     $hash->{helper}{prt}{bErr}++;
-    $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
-    $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} + 1
+    $hash->{protCmdDel} = 0 if(!$hash->{protCmdDel});
+    $hash->{protCmdDel} += scalar @{$hash->{cmdStack}} + 1
             if ($hash->{cmdStack});
     CUL_HM_protState($hash,"CMDs_done");
     CUL_HM_respPendRm($hash);
