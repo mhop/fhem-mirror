@@ -672,6 +672,8 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|". ($heatpump_visibility[210]==1 ? $heatpump_values[137] : "no");
   # 60 - mixer3TargetTemperature
   $return_str .= "|". ($heatpump_visibility[211]==1 ? $heatpump_values[136] : "no");
+  # 61 - hotWaterCircPumpDeaerate
+  $return_str .= "|". ($heatpump_visibility[167]==1 ? $heatpump_values[684] : "no");
   return $return_str;
 }
 
@@ -973,6 +975,9 @@ LUXTRONIK2_UpdateDone($)
      readingsBulkUpdate($hash,"heatingSystemCircPump",$a[27]?"on":"off");
      readingsBulkUpdate($hash,"hotWaterCircPumpExtern",$a[28]?"on":"off");
      readingsBulkUpdate($hash,"hotWaterSwitchingValve",$a[9]?"on":"off");
+     
+   # Deaerate Function
+     readingsBulkUpdate( $hash, "hotWaterCircPumpDeaerate",$a[61]?"on":"off")    unless $a[61] eq "no";
 
    # bivalentLevel
      readingsBulkUpdate($hash,"bivalentLevel",$a[43]);
