@@ -3057,9 +3057,9 @@ sub CUL_HM_parseCommon(@){#####################################################
         $ret = "STATresp";
       }
       else{
-        if ($mhp->{chn} eq "00"
+        if ($mhp->{chn} == 0
             || (   $mhp->{mNo} eq "00" 
-                && $mhp->{chn} eq "01" 
+                && $mhp->{chn} == 1 
                 && $mhp->{devH}{helper}{HM_CMDNR} < 250)){# this is power on
           CUL_HM_qStateUpdatIfEnab($mhp->{devN});
           CUL_HM_qAutoRead($mhp->{devN},2);
