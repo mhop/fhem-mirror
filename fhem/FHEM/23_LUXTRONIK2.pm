@@ -673,7 +673,7 @@ LUXTRONIK2_DoUpdate($)
   # 60 - mixer3TargetTemperature
   $return_str .= "|". ($heatpump_visibility[211]==1 ? $heatpump_values[136] : "no");
   # 61 - hotWaterCircPumpDeaerate
-  $return_str .= "|". ($heatpump_visibility[167]==1 ? $heatpump_values[684] : "no");
+  $return_str .= "|". ($heatpump_visibility[167]==1 ? $heatpump_parameters[684] : "no");
   return $return_str;
 }
 
