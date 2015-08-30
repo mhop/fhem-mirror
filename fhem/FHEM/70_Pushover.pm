@@ -298,7 +298,7 @@ sub Pushover_ReceiveCommand($$$) {
     my $name    = $hash->{NAME};
     my $service = $param->{service};
     my $cmd     = $param->{cmd};
-    my $state   = ReadingsVal( $name, "state", "" );
+    my $state   = ReadingsVal( $name, "state", "initialized" );
     my $values  = $param->{type};
     my $return;
 
@@ -369,9 +369,10 @@ sub Pushover_ReceiveCommand($$$) {
         # process return data
         #
 
+        $values{result} = "ok";
+
         # messages.json
         if ( $service eq "messages.json" ) {
-            $values{result} = "ok";
 
             readingsBulkUpdate( $hash, "lastTitle",    $values->{title} );
             readingsBulkUpdate( $hash, "lastMessage",  $values->{message} );
@@ -455,13 +456,12 @@ sub Pushover_ReceiveCommand($$$) {
 
         # users/validate.json
         elsif ( $service eq "users/validate.json" ) {
-            $values{result} = "ok";
 
             if ( ref($return) eq "HASH" ) {
 
                 if ( $return->{status} ne "1" && defined $return->{errors} ) {
                     $values{result} =
-                      "Error: " . Dumper( $return->{errors} );
+                      "Error: " . join( ". ", @{ $return->{errors} } ) . ".";
                     $state = "unauthorized";
                 }
                 elsif ( $return->{status} ne "1" ) {
@@ -486,10 +486,19 @@ sub Pushover_ReceiveCommand($$$) {
                 }
             }
 
-            Pushover_SendCommand( $hash, "users/validate.json", $cmd );
         }
 
-        readingsBulkUpdate( $hash, "lastResult", $values->{result} );
+        readingsBulkUpdate( $hash, "lastResult", $values{result} );
+    }
+
+    # Set reading for availability
+    #
+    my $available = 0;
+    $available = 1 if ( $state eq "connected" );
+    if ( !defined( $hash->{READINGS}{available}{VAL} )
+        || $hash->{READINGS}{available}{VAL} ne $available )
+    {
+        readingsBulkUpdate( $hash, "available", $available );
     }
 
     # Set reading for state
@@ -508,7 +517,10 @@ sub Pushover_ReceiveCommand($$$) {
 #------------------------------------------------------------------------------
 sub Pushover_ValidateUser ($;$) {
     my ( $hash, $update ) = @_;
-    my $name = $hash->{NAME};
+    my $name   = $hash->{NAME};
+    my $token  = $hash->{APP_TOKEN};
+    my $user   = $hash->{USER_KEY};
+    my $device = AttrVal( $name, "device", "" );
 
     Log3 $name, 5, "Pushover $name: called function Pushover_ValidateUser()";
 
@@ -518,11 +530,12 @@ sub Pushover_ValidateUser ($;$) {
     return
       if ( AttrVal( $name, "disable", 0 ) == 1 );
 
-    my $cmd = "token=" . $token . "&user=" . $user;
-    $cmd .= "&" . AttrVal( $hash, "device", "" )
-      if ( AttrVal( $hash, "device", "" ) ne "" );
-
-    Pushover_SendCommand( $hash, "users/validate.json", $cmd );
+    if ( $device ne "" ) {
+        Pushover_SendCommand( $hash, "users/validate.json", "device=$device" );
+    }
+    else {
+        Pushover_SendCommand( $hash, "users/validate.json" );
+    }
 
     return;
 }
