@@ -369,7 +369,7 @@ sub statistics_DoStatisticsAll($$)
       }
    }
    
-   if ($periodSwitch != 0 ) { WriteStatefile(); }
+   if ($periodSwitch < -1 || $periodSwitch > 1 ) { WriteStatefile(); }
 }
 
 ##########################
