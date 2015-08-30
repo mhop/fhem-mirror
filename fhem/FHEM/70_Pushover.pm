@@ -199,7 +199,8 @@ sub Pushover_SendCommand($$;$\%) {
         $http_proto = "http";
     }
 
-    $cmd .= "&token=" . $hash->{APP_TOKEN} . "&user=" . $hash->{USER_KEY};
+    $cmd .= "&" if ( $cmd ne "" );
+    $cmd .= "token=" . $hash->{APP_TOKEN} . "&user=" . $hash->{USER_KEY};
 
     my $URL;
     my $response;
@@ -517,9 +518,7 @@ sub Pushover_ReceiveCommand($$$) {
 #------------------------------------------------------------------------------
 sub Pushover_ValidateUser ($;$) {
     my ( $hash, $update ) = @_;
-    my $name   = $hash->{NAME};
-    my $token  = $hash->{APP_TOKEN};
-    my $user   = $hash->{USER_KEY};
+    my $name = $hash->{NAME};
     my $device = AttrVal( $name, "device", "" );
 
     Log3 $name, 5, "Pushover $name: called function Pushover_ValidateUser()";
