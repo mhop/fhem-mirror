@@ -129,13 +129,9 @@ sub Pushover_Define($$) {
               if ( !Pushover_addExtension( $name, "Pushover_CGI", $infix ) );
         }
 
-        readingsSingleUpdate( $hash, "state", "initialized", 0 );
-
-        my $cmd = "token=" . $token . "&user=" . $user;
-        $cmd .= "&" . AttrVal( $hash, "device", "" )
-          if ( AttrVal( $hash, "device", "" ) ne "" );
-
-        Pushover_SendCommand( $hash, "users/validate.json", $cmd );
+        # start Validation Timer
+        RemoveInternalTimer($hash);
+        InternalTimer( gettimeofday() + 5, "Pushover_ValidateUser", $hash, 0 );
 
         return undef;
     }
@@ -478,6 +474,19 @@ sub Pushover_ReceiveCommand($$$) {
                 }
 
             }
+
+            # simple error handling if no JSON module was loaded
+            elsif ( $return !~ m/"status":1,/ ) {
+                $state = "unauthorized";
+                if ( $return =~ m/"errors":\[(.*)\]/ ) {
+                    $values{result} = "Error: " . $1;
+                }
+                else {
+                    $values{result} = "Unspecified error";
+                }
+            }
+
+            Pushover_SendCommand( $hash, "users/validate.json", $cmd );
         }
 
         readingsBulkUpdate( $hash, "lastResult", $values->{result} );
@@ -492,6 +501,28 @@ sub Pushover_ReceiveCommand($$$) {
     }
 
     readingsEndUpdate( $hash, 1 );
+
+    return;
+}
+
+#------------------------------------------------------------------------------
+sub Pushover_ValidateUser ($;$) {
+    my ( $hash, $update ) = @_;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "Pushover $name: called function Pushover_ValidateUser()";
+
+    RemoveInternalTimer($hash);
+    InternalTimer( gettimeofday() + 600, "Pushover_ValidateUser", $hash, 0 );
+
+    return
+      if ( AttrVal( $name, "disable", 0 ) == 1 );
+
+    my $cmd = "token=" . $token . "&user=" . $user;
+    $cmd .= "&" . AttrVal( $hash, "device", "" )
+      if ( AttrVal( $hash, "device", "" ) ne "" );
+
+    Pushover_SendCommand( $hash, "users/validate.json", $cmd );
 
     return;
 }
