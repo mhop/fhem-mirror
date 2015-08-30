@@ -3351,7 +3351,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   }
   elsif($cmd =~ m /^(reg|regVal)$/) {  ########################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
-    return if(!$regReq);
+    return if(!defined $regReq);
     if ($regReq eq 'all'){
       my @regArr = CUL_HM_getRegN($st,$md,($roleD?"00":""),($roleC?$chn:""));
 
@@ -3395,7 +3395,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     else{
       my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
 	  $regVal =~ s/ .*// if ($cmd eq "regVal");
-      return ($regVal =~ m /^invalid/)? "Value not captured"
+      return ($regVal =~ m /^invalid/)? "Value not captured:$name - $regReq"
                                      : $regVal;
     }
   }
@@ -6229,8 +6229,8 @@ sub CUL_HM_eventP($$) {#handle protocol events
   my ($hash, $evntType) = @_;
   return if (!defined $hash);
   if ($evntType eq "Rcv"){
-    $nAttr->{"protLastRcv"} = TimeNow();
-    CUL_HM_UpdtReadSingle($hash,".protLastRcv",$nAttr->{"protLastRcv"},0);
+    $hash->{"protLastRcv"} = TimeNow();
+    CUL_HM_UpdtReadSingle($hash,".protLastRcv",$hash->{"protLastRcv"},0);
     return;
   }
 
