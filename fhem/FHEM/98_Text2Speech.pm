@@ -15,6 +15,8 @@
 # ALL     ALL = NOPASSWD: /usr/bin/mplayer
 ##############################################
 
+# VoiceRSS: http://www.voicerss.org/api/documentation.aspx
+
 package main;
 use strict;
 use warnings;
@@ -43,19 +45,56 @@ my $mplayerOpts     = '-nolirc -noconsolecontrols';
 my $mplayerNoDebug  = '-really-quiet';
 my $mplayerAudioOpts 	= '-ao alsa:device=';
 #my $ttsAddr 			= 'http://translate.google.com/translate_tts?tl=de&q=';
-my $ttsHost         = 'translate.google.com';
-my $ttsLang         = 'tl=';
-my $ttsQuery        = 'q=';
-my $ttsPath         = '/translate_tts?';
-my %language        = ("Deutsch"        => "de",
-                       "English-US"     => "en-us",
-                       "Schwedisch"     => "sv",
-                       "Indian-Hindi"   => "hi",
-                       "Arabic"         => "ar",
-                       "France"         => "fr",
-                       "Spain"          => "es",
-                       "Italian"        => "it",
-                       "Chinese"        => "cn"
+my %ttsHost         = ("Google"     => "translate.google.com",
+                       "VoiceRSS"   => "api.voicerss.org"
+                       );
+my %ttsLang         = ("Google"     => "tl=",
+                       "VoiceRSS"   => "hl="
+                       );
+my %ttsQuery        = ("Google"     => "q=",
+                       "VoiceRSS"   => "src="
+                       );
+my %ttsPath         = ("Google"     => "/translate_tts?",
+                       "VoiceRSS"   => "/?"
+                       );
+my %ttsAddon        = ("Google"     => "client=t&prev=input", 
+                       "VoiceRSS"   => ""
+                       );
+my %ttsAPIKey       = ("Google"     => "", # kein APIKey nötig
+                       "VoiceRSS"   => "key="
+                       );
+my %ttsUser         = ("Google"     => "", # kein Username nötig
+                       "VoiceRSS"   => ""  # kein Username nötig
+                       );
+my %ttsSpeed        = ("Google"     => "", 
+                       "VoiceRSS"   => "r="
+                       );
+my %ttsQuality       = ("Google"     => "", 
+                       "VoiceRSS"   => "f="
+                       );
+my %ttsMaxChar      = ("Google"     => 100,
+                       "VoiceRSS"   => 300
+                       );
+my %language        = ("Google"     =>  {"Deutsch"        => "de",
+                                         "English-US"     => "en-us",
+                                         "Schwedisch"     => "sv",
+                                         "Indian-Hindi"   => "hi",
+                                         "Arabic"         => "ar",
+                                         "France"         => "fr",
+                                         "Spain"          => "es",
+                                         "Italian"        => "it",
+                                         "Chinese"        => "cn"
+                                         },
+                       "VoiceRSS"   =>  {"Deutsch"        => "de-de",
+                                         "English-US"     => "en-us",
+                                         "Schwedisch"     => "sv-se",
+                                         "Indian-Hindi"   => "en-in", # gibts nicht
+                                         "Arabic"         => "en-us", # gibts nicht
+                                         "France"         => "fr-fr",
+                                         "Spain"          => "es-es",
+                                         "Italian"        => "it-it",
+                                         "Chinese"        => "zh-cn"
+                                         }
                       );
 
 ##########################
@@ -70,7 +109,40 @@ sub Text2Speech_Initialize($)
   $hash->{AttrFn}    = "Text2Speech_Attr";
   $hash->{AttrList}  = "disable:0,1".
                        " TTS_Delemiter".
-                       " TTS_Ressource:Google,ESpeak".
+                       " TTS_Ressource:ESpeak,". join(",", sort keys %ttsHost).
+                       " TTS_APIKey".
+                       " TTS_User".
+                       " TTS_Quality:".
+                                        "48khz_16bit_stereo,".
+                                        "48khz_16bit_mono,".
+                                        "48khz_8bit_stereo,".
+                                        "48khz_8bit_mono".
+                                        "44khz_16bit_stereo,".
+                                        "44khz_16bit_mono,".
+                                        "44khz_8bit_stereo,".
+                                        "44khz_8bit_mono".
+                                        "32khz_16bit_stereo,".
+                                        "32khz_16bit_mono,".
+                                        "32khz_8bit_stereo,".
+                                        "32khz_8bit_mono".
+                                        "24khz_16bit_stereo,".
+                                        "24khz_16bit_mono,".
+                                        "24khz_8bit_stereo,".
+                                        "24khz_8bit_mono".
+                                        "22khz_16bit_stereo,".
+                                        "22khz_16bit_mono,".
+                                        "22khz_8bit_stereo,".
+                                        "22khz_8bit_mono".
+                                        "16khz_16bit_stereo,".
+                                        "16khz_16bit_mono,".
+                                        "16khz_8bit_stereo,".
+                                        "16khz_8bit_mono".
+                                        "8khz_16bit_stereo,".
+                                        "8khz_16bit_mono,".
+                                        "8khz_8bit_stereo,".
+                                        "8khz_8bit_mono".
+                       " TTS_Speed:-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9,10".
+                       " TTS_TimeOut".
                        " TTS_CacheFileDir".
                        " TTS_UseMP3Wrap:0,1".
                        " TTS_MplayerCall".
@@ -78,7 +150,7 @@ sub Text2Speech_Initialize($)
                        " TTS_FileMapping".
                        " TTS_FileTemplateDir".
 		                   " TTS_VolumeAdjust".
-                       " TTS_Language:".join(",", sort keys %language).
+                       " TTS_Language:".join(",", sort keys %{$language{"Google"}}).
                        " ".$readingFnAttributes;
 }
 
@@ -191,19 +263,27 @@ sub Text2Speech_Attr(@) {
     return "File <".$file."> does not exists in CacheFileDir" if(! -e $file);
   
   } elsif ($a[2] eq "TTS_FileTemplateDir") {
-    unless(-e ($TTS_CacheFileDir ."/". $value) or mkdir ($TTS_CacheFileDir ."/". $value)) {
+    # Verzeichnis beginnt mit /, dann absoluter Pfad, sonst Unterpfad von $TTS_CacheFileDir
+    my $newDir;
+    if($value =~ m/^\/.*/) { $newDir = $value; } else { $newDir = $TTS_CacheFileDir ."/". $value;}
+    unless(-e ($newDir) or mkdir ($newDir)) {
       #Verzeichnis anlegen gescheitert
       return "Could not create directory: <$value>";
     }
-  
+
+  } elsif ($a[2] eq "TTS_TimeOut") {
+    return "Only Numbers allowed" if ($value !~ m/[0-9]+/);
+
   } elsif ($a[2] eq "TTS_FileMapping") {
     #Bsp: silence:silence.mp3 pling:mypling,mp3
     #ueberpruefen, ob mp3 Template existiert
     my @FileTpl = split(" ", $TTS_FileMapping);
+    my $newDir;
     for(my $j=0; $j<(@FileTpl); $j++) {
       my @FileTplPc = split(/:/, $FileTpl[$j]);
-      return "file does not exist: <".$TTS_CacheFileDir ."/". $TTS_FileTemplateDir ."/". $FileTplPc[1] .">"
-        unless (-e $TTS_CacheFileDir ."/". $TTS_FileTemplateDir ."/". $FileTplPc[1]);
+      if($TTS_FileTemplateDir =~ m/^\/.*/) { $newDir = $TTS_FileTemplateDir; } else { $newDir = $TTS_CacheFileDir ."/". $TTS_FileTemplateDir;}
+      return "file does not exist: <".$newDir ."/". $FileTplPc[1] .">"
+        unless (-e $newDir ."/". $FileTplPc[1]);
     }
   }
 
@@ -305,8 +385,16 @@ sub Text2Speech_Set($@)
 {
   my ($hash, @a) = @_;
   my $me = $hash->{NAME};
+  my $TTS_APIKey    = AttrVal($hash->{NAME}, "TTS_APIKey", undef);
+  my $TTS_User      = AttrVal($hash->{NAME}, "TTS_User", undef);
+  my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
+  my $TTS_TimeOut   = AttrVal($hash->{NAME}, "TTS_TimeOut", 60);
+  
 
   return "no set argument specified" if(int(@a) < 2);
+
+  return "No APIKey specified"                  if (length($ttsAPIKey{$TTS_Ressource})>0 && !defined($TTS_APIKey)); 
+  return "No Username for TTS Access specified" if (length($ttsUser{$TTS_Ressource})>0 && !defined($TTS_User));
 
   my $cmd = shift(@a); # Dummy
      $cmd = shift(@a); # DevName
@@ -326,7 +414,7 @@ sub Text2Speech_Set($@)
   if($cmd eq "tts") {
     if($hash->{MODE} eq "DIRECT") {
       Text2Speech_PrepareSpeech($hash, join(" ", @a));
-      $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", 60, "Text2Speech_AbortFn", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+      $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", $TTS_TimeOut, "Text2Speech_AbortFn", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
     } elsif ($hash->{MODE} eq "REMOTE") {
       Text2Speech_Write($hash, "tts " . join(" ", @a));
     } else {return undef;}
@@ -382,17 +470,19 @@ sub Text2Speech_PrepareSpeech($$) {
     $TTS_AddDelemiter = "";
   }
 
-  if($TTS_Ressource eq "Google") {
+  if($TTS_Ressource ne "ESpeak") {
     my @text; 
 
     # ersetze Sonderzeichen die Google nicht auflösen kann
-    $t =~ s/ä/ae/g;
-    $t =~ s/ö/oe/g;
-    $t =~ s/ü/ue/g;
-    $t =~ s/Ä/Ae/g;
-    $t =~ s/Ö/Oe/g;
-    $t =~ s/Ü/Ue/g;
-    $t =~ s/ß/ss/g;
+    if($TTS_Ressource eq "Google") {
+      $t =~ s/ä/ae/g;
+      $t =~ s/ö/oe/g;
+      $t =~ s/ü/ue/g;
+      $t =~ s/Ä/Ae/g;
+      $t =~ s/Ö/Oe/g;
+      $t =~ s/Ü/Ue/g;
+      $t =~ s/ß/ss/g;
+    }
 
     @text = $hash->{helper}{Text2Speech} if($hash->{helper}{Text2Speech}[0]); #vorhandene Queue, neuen Sprachbaustein hinten anfuegen
     push(@text, $t);
@@ -424,11 +514,11 @@ sub Text2Speech_PrepareSpeech($$) {
       @text = Text2Speech_SplitString(\@text, 0, $cutter, 1, ""); 
     }
 
-    @text = Text2Speech_SplitString(\@text, 100, $TTS_Delemiter, $TTS_ForceSplit, $TTS_AddDelemiter);
-    @text = Text2Speech_SplitString(\@text, 100, "(?<=[\\.!?])\\s*", 0, "");
-    @text = Text2Speech_SplitString(\@text, 100, ",", 0, "al");
-    @text = Text2Speech_SplitString(\@text, 100, ";", 0, "al");
-    @text = Text2Speech_SplitString(\@text, 100, "und", 0, "af");
+    @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, $TTS_Delemiter, $TTS_ForceSplit, $TTS_AddDelemiter);
+    @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, "(?<=[\\.!?])\\s*", 0, "");
+    @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, ",", 0, "al");
+    @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, ";", 0, "al");
+    @text = Text2Speech_SplitString(\@text, $ttsMaxChar{$TTS_Ressource}, "und", 0, "af");
 
     Log3 $hash, 4, "$me: Auflistung der Textbausteine nach Aufbereitung:"; 
     for(my $i=0; $i<(@text); $i++) {
@@ -471,7 +561,7 @@ sub Text2Speech_SplitString(@$$$$){
   my @newText;
 
   for(my $i=0; $i<(@text); $i++) {
-    if((length($text[$i]) <= 100) && (!$ForceSplit)) { #Google kann nur 100zeichen
+    if((length($text[$i]) <= $MaxChar) && (!$ForceSplit)) { #Google kann nur 100zeichen
       push(@newText, $text[$i]);
       next;
     }
@@ -525,7 +615,7 @@ sub Text2Speech_BuildMplayerCmdString($$) {
 sub Text2Speech_readingsSingleUpdateByName($$$) {
   my ($devName, $readingName, $readingVal) = @_;
   my $hash = $defs{$devName};
-  Log3 $hash, 4, "Text2Speech_readingsSingleUpdateByName: Dev:$devName Reading:$readingName Val:$readingVal";
+  #Log3 $hash, 4, "Text2Speech_readingsSingleUpdateByName: Dev:$devName Reading:$readingName Val:$readingVal";
   readingsSingleUpdate($defs{$devName}, $readingName, $readingVal, 1);
 }
 
@@ -541,7 +631,7 @@ sub Text2Speech_CalcMP3Duration($$) {
   eval {
     use MP3::Info;    
     my $tag = get_mp3info($file);
-    if ($tag) {
+    if ($tag && defined($tag->{SECS})) {
 	  $time = int($tag->{SECS}+0.5);
       Log3 $hash, 4, "Text2Speech_CalcMP3Duration: $file hat eine Länge von $time Sekunden.";
     }
@@ -565,12 +655,46 @@ sub Text2Speech_CalcMP3Duration($$) {
 sub Text2Speech_Download($$$) {
   my ($hash, $file, $text) = @_;
 
-  my $HttpResponse;
-  my $fh;
-  my $TTS_Language = AttrVal($hash->{NAME}, "TTS_Language", "Deutsch");
+  my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
+  my $TTS_User      = AttrVal($hash->{NAME}, "TTS_User", "");
+  my $TTS_APIKey    = AttrVal($hash->{NAME}, "TTS_APIKey", "");
+  my $TTS_Language  = AttrVal($hash->{NAME}, "TTS_Language", "Deutsch");
+  my $TTS_Quality   = AttrVal($hash->{NAME}, "TTS_Quality", "");
+  my $TTS_Speed     = AttrVal($hash->{NAME}, "TTS_Speed", "");
 
-  Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". "http://" . $ttsHost . $ttsPath . $ttsLang . $language{$TTS_Language} . "&client=t&prev=input&" . $ttsQuery . uri_escape($text);
-  $HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $language{$TTS_Language} . "&client=t&prev=input&" . $ttsQuery . uri_escape($text));
+
+  my $HttpResponse;
+  my $HttpResponseErr;
+  my $fh;
+
+  my $url  = "http://" . $ttsHost{$TTS_Ressource} . $ttsPath{$TTS_Ressource};
+     $url .= $ttsLang{$TTS_Ressource};
+     $url .= $language{$TTS_Ressource}{$TTS_Language};
+     $url .= "&" . $ttsAddon{$TTS_Ressource}              if(length($ttsAddon{$TTS_Ressource})>0);
+     $url .= "&" . $ttsUser{$TTS_Ressource} . $TTS_User     if(length($ttsUser{$TTS_Ressource})>0);
+     $url .= "&" . $ttsAPIKey{$TTS_Ressource} . $TTS_APIKey if(length($ttsAPIKey{$TTS_Ressource})>0);
+     $url .= "&" . $ttsQuality{$TTS_Ressource} . $TTS_Quality if(length($ttsQuality{$TTS_Ressource})>0);
+     $url .= "&" . $ttsSpeed{$TTS_Ressource} . $TTS_Speed if(length($ttsSpeed{$TTS_Ressource})>0);
+     $url .= "&" . $ttsQuery{$TTS_Ressource} . uri_escape($text);
+  
+  Log3 $hash->{NAME}, 4, "Text2Speech: Verwende ".$TTS_Ressource." OnlineResource zum Download";
+  Log3 $hash->{NAME}, 4, "Text2Speech: Hole URL: ". $url;
+  #$HttpResponse = GetHttpFile($ttsHost, $ttsPath . $ttsLang . $language{$TTS_Ressource}{$TTS_Language} . "&" . $ttsQuery . uri_escape($text));
+  my $param = {
+                    url         => $url,
+                    timeout     => 5,
+                    hash        => $hash,                                                                                  # Muss gesetzt werden, damit die Callback funktion wieder $hash hat
+                    method      => "GET"                                                                                  # Lesen von Inhalten
+                    #httpversion => "1.1",
+                    #header      => "User-Agent:Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.22 (KHTML, like Gecko) Chrome/25.0.1364.172 Safari/537.22m"              # Den Header gemäss abzufragender Daten ändern
+                    #header     => "agent: Mozilla/1.22\r\nUser-Agent: Mozilla/1.22"
+                };
+  ($HttpResponseErr, $HttpResponse) = HttpUtils_BlockingGet($param);
+  
+  if(length($HttpResponseErr) > 0) {
+    Log3 $hash->{NAME}, 3, "Text2Speech: Fehler beim abrufen der Daten von " .$TTS_Ressource. " Translator";
+    Log3 $hash->{NAME}, 3, "Text2Speech: " . $HttpResponseErr; 
+  }
 
   $fh = new IO::File ">$file";
   if(!defined($fh)) {
@@ -590,12 +714,18 @@ sub Text2Speech_DoIt($) {
   my $TTS_CacheFileDir = AttrVal($hash->{NAME}, "TTS_CacheFileDir", "cache");
   my $TTS_Ressource = AttrVal($hash->{NAME}, "TTS_Ressource", "Google");
   my $TTS_Language = AttrVal($hash->{NAME}, "TTS_Language", "Deutsch");
+  my $TTS_SentenceAppendix = AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef); #muss eine mp3-Datei sein, ohne Pfadangabe
+  my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
+
+  my $myFileTemplateDir;
+  if($TTS_FileTemplateDir =~ m/^\/.*/) { $myFileTemplateDir = $TTS_FileTemplateDir; } else { $myFileTemplateDir = $TTS_CacheFileDir ."/". $TTS_FileTemplateDir;}
+
   my $verbose = AttrVal($hash->{NAME}, "verbose", 3);
   my $cmd;
 
   Log3 $hash->{NAME}, 4, "Verwende TTS Spracheinstellung: ".$TTS_Language;
 
-  if($TTS_Ressource eq "Google") {
+  if($TTS_Ressource =~ m/(Google|VoiceRSS)/) {
 
     my $filename;
     my $file;
@@ -612,15 +742,13 @@ sub Text2Speech_DoIt($) {
       # zusammenzuführen. Ziel: sauberer Sprachfluss
       my @Mp3WrapFiles;
       my @Mp3WrapText;
-      my $TTS_SentenceAppendix = AttrVal($hash->{NAME}, "TTS_SentenceAppendix", undef); #muss eine mp3-Datei sein, ohne Pfadangabe
-      my $TTS_FileTemplateDir = AttrVal($hash->{NAME}, "TTS_FileTemplateDir", "templates");
       
-      $TTS_SentenceAppendix = $TTS_CacheFileDir ."/". $TTS_FileTemplateDir ."/". $TTS_SentenceAppendix if($TTS_SentenceAppendix);
+      $TTS_SentenceAppendix = $myFileTemplateDir ."/". $TTS_SentenceAppendix if($TTS_SentenceAppendix);
       undef($TTS_SentenceAppendix) if($TTS_SentenceAppendix && (! -e $TTS_SentenceAppendix));
 
       #Abspielliste erstellen
       foreach my $t (@{$hash->{helper}{Text2Speech}}) {
-        if(-e $TTS_CacheFileDir."/".$t) { $filename = $t;} else {$filename = md5_hex($language{$TTS_Language} ."|". $t) . ".mp3";} # falls eine bestimmte mp3-Datei gespielt werden soll
+        if(-e $TTS_CacheFileDir."/".$t) { $filename = $t;} else {$filename = md5_hex($language{$TTS_Ressource}{$TTS_Language} ."|". $t) . ".mp3";} # falls eine bestimmte mp3-Datei gespielt werden soll
         $file = $TTS_CacheFileDir."/".$filename;
         if(-e $file) {
           push(@Mp3WrapFiles, $file);
@@ -661,16 +789,21 @@ sub Text2Speech_DoIt($) {
 
     Log3 $hash->{NAME}, 4, "Text2Speech: Bearbeite jetzt den Text: ". $hash->{helper}{Text2Speech}[0];
 
-    if(-e $TTS_CacheFileDir."/".$hash->{helper}{Text2Speech}[0]) { 
-      # falls eine bestimmte mp3-Datei gespielt werden soll
+    if(-e $hash->{helper}{Text2Speech}[0]) {
+      # falls eine bestimmte mp3-Datei mit absolutem Pfad gespielt werden soll
       $filename = $hash->{helper}{Text2Speech}[0];
+      $file = $filename;
+      Log3 $hash->{NAME}, 4, "Text2Speech: $filename als direkte MP3 Datei erkannt!";
+    } elsif(-e $TTS_CacheFileDir."/".$hash->{helper}{Text2Speech}[0]) { 
+      # falls eine bestimmte mp3-Datei mit relativem Pfad gespielt werden soll
+      $filename = $hash->{helper}{Text2Speech}[0];
+      $file = $TTS_CacheFileDir."/".$filename;
       Log3 $hash->{NAME}, 4, "Text2Speech: $filename als direkte MP3 Datei erkannt!";
     } else {
-      $filename = md5_hex($language{$TTS_Language} ."|". $hash->{helper}{Text2Speech}[0]) . ".mp3";
+      $filename = md5_hex($language{$TTS_Ressource}{$TTS_Language} ."|". $hash->{helper}{Text2Speech}[0]) . ".mp3";
+      $file = $TTS_CacheFileDir."/".$filename;
       Log3 $hash->{NAME}, 4, "Text2Speech: Textbaustein ist keine direkte MP3 Datei, ermittle MD5 CacheNamen: $filename";
     } 
-    $file = $TTS_CacheFileDir."/".$filename;
-
     
     if(! -e $file) { # Datei existiert noch nicht im Cache
       Text2Speech_Download($hash, $file, $hash->{helper}{Text2Speech}[0]);
@@ -714,6 +847,8 @@ sub Text2Speech_Done($) {
   my $tts_done = shift(@a);
   my $filename = shift(@a);
   
+  my $TTS_TimeOut   = AttrVal($hash->{NAME}, "TTS_TimeOut", 60);
+
   if($filename) {
     my @text;
     for(my $i=0; $i<$tts_done; $i++) { 
@@ -727,7 +862,7 @@ sub Text2Speech_Done($) {
 
   # erneutes aufrufen da ev. weiterer Text in der Warteschlange steht
   if(@{$hash->{helper}{Text2Speech}} > 0) {
-    $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", 60, "Text2Speech_AbortFn", $hash);
+    $hash->{helper}{RUNNING_PID} = BlockingCall("Text2Speech_DoIt", $hash, "Text2Speech_Done", $TTS_TimeOut, "Text2Speech_AbortFn", $hash);
   }
 }
 
@@ -871,11 +1006,26 @@ sub Text2Speech_WriteStats($$$$){
         Using the Google Engine. It´s nessessary to have internet access. This engine is the recommend engine
         because the quality is fantastic. This engine is using by default.
       </li>
+      <li>VoiceRSS<br>
+        Using the VoiceRSS Engine. Its a free engine till 350 requests per day. If you need more, you have to pay. 
+        It´s nessessary to have internet access. This engine is the 2nd recommend engine
+        because the quality is also fantastic. To use this engine you need an APIKey (see TTS_APIKey)
+      </li>
       <li>ESpeak<br>
         Using the ESpeak Engine. Installation of the espeak sourcen is required.<br>
         <code>apt-get install espeak</code>
       </li>
     </ul>
+  </li>
+
+  <li>TTS_APIKey<br>
+    An APIKey its needed if you want to use VoiceRSS. You have to register at the following page:<br>
+    http://www.voicerss.org/registration.aspx <br>
+    After this, you will get your personal APIKey.
+  </li>
+
+  <li>TTS_User<br>
+    Actual without any usage. Needed in case if a TTS Engine need an username and an apikey for each request.
   </li>
 
   <li>TTS_CacheFileDir<br>
@@ -1038,8 +1188,14 @@ sub Text2Speech_WriteStats($$$$){
     Achtung: Nur bei einem lokal definierter Text2Speech Instanz m&ouml;glich!
     <ul>
       <li>Google<br>
-        Nutzung der GoogleSprachengine. Ein Internetzugriff ist notwendig! Aufgrund der Qualit&auml;t ist der 
+        Nutzung der Google Sprachengine. Ein Internetzugriff ist notwendig! Aufgrund der Qualit&auml;t ist der 
         Einsatz diese Engine zu empfehlen und der Standard.
+      </li>
+      <li>VoiceRSS<br>
+        Nutzung der VoiceRSS Sprachengine. Die Nutzung ist frei bis zu 350 Anfragen pro Tag. 
+        Wenn mehr benötigt werden ist ein Bezahlmodell wählbar. Ein Internetzugriff ist notwendig! 
+        Aufgrund der Qualit&auml;t ist der Einsatz diese Engine ebenfalls zu empfehlen.
+        Wenn diese Engine benutzt wird, ist ein APIKey notwendig (siehe TTXS_APIKey)
       </li>
       <li>ESpeak<br>
         Nutzung der ESpeak Offline Sprachengine. Die Qualit&auml; ist schlechter als die Google Engine.
@@ -1047,6 +1203,16 @@ sub Text2Speech_WriteStats($$$$){
         <code>apt-get install espeak</code>
       </li>
     </ul>
+  </li>
+  
+  <li>TTS_APIKey<br>
+    Wenn VoiceRSS genutzt wird, ist ein APIKey notwendig. Um diesen zu erhalten ist eine vorherige
+    Registrierung notwendig. Anschließend erhält man den APIKey <br>
+    http://www.voicerss.org/registration.aspx <br>
+  </li>
+
+  <li>TTS_User<br>
+    Bisher ohne Benutzung. Falls eine Sprachengine zusätzlich zum APIKey einen Usernamen im Request verlangt.
   </li>
 
   <li>TTS_CacheFileDir<br>
