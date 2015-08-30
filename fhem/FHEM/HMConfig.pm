@@ -1379,7 +1379,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                                           ,pair          => ""
                                           ,getVersion    => ""
                                          }
-                     ,winMatic         =>{ statusRequest => ""}
+#                     ,winMatic         =>{ statusRequest => ""} not working at least for FW 1.6
                      ,keyMatic         =>{ statusRequest => ""}
                      ,repeater         =>{ statusRequest => ""
                                           ,getSerial     => ""
@@ -1440,7 +1440,6 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
                                           ,postEvent      =>"<condition>"
                                          }
                      ,smokeDetector    =>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] actor"}
-                     ,winMatic         =>{ statusRequest  =>""}
                      ,keyMatic         =>{ lock           =>""
                                           ,unlock         =>"[<sec>] ..."
                                           ,open           =>"[<sec>] ..."
