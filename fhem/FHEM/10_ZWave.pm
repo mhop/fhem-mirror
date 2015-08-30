@@ -238,7 +238,8 @@ my %zwave_class = (
     set   => { configDefault=>"04%02x80",
                configByte  => "04%02x01%02x",
                configWord  => "04%02x02%04x",
-               configLong  => "04%02x04%08x" },
+               configLong  => "04%02x04%08x",
+               configRequestAll => 'ZWave_configRequestAll($hash)' },
     get   => { config      => "05%02x" },
     parse => { "^..70..(..)(..)(.*)" => 'ZWave_configParse($hash,$1,$2,$3)'} },
   ALARM                    => { id => '71', 
@@ -306,9 +307,13 @@ my %zwave_class = (
              } },
   ASSOCIATION              => { id => '85', 
     set   => { associationAdd => "01%02x%02x*",
-               associationDel => "04%02x%02x*" },
-    get   => { association => "02%02x",      },
-    parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"'},
+               associationDel => "04%02x%02x*",
+               associationRequest => "02%02x",
+               associationRequestAll => 'ZWave_associationRequest($hash,"")' },
+    get   => { association          => "02%02x",
+               associationGroups    => "05" },
+    parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"',
+               "..8506(..)"           => '"assocGroups:".hex($1)' },
     init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
     set   => { versionClassRequest => 'ZWave_versionClassRequest($hash,"%s")'},
@@ -389,6 +394,7 @@ my %zwave_cmdArgs = (
   }
 );
 
+my %zwave_parseHook; # nodeId:regexp => fn, used by assocRequest
 my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
                            "0115-0100-0102" => "ZME_KFOB" );
@@ -623,7 +629,7 @@ ZWave_Cmd($$@)
     }
   }
 
-  if($cmd =~ m/^config/) {
+  if($cmd =~ m/^config/ && $cmd ne "configRequestAll") {
     my ($err, $cmd) = ZWave_configCheckParam($hash, $type, $cmd, $cmdFmt, @a);
     return $err if($err);
     $cmdFmt = $cmd;
@@ -632,6 +638,7 @@ ZWave_Cmd($$@)
     my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
     return $err if($err);
     $cmdFmt = $ncmd if(defined($ncmd));
+    return "" if($ncmd && $ncmd eq "EMPTY"); # e.g. configRequestAll
   }
 
   Log3 $name, 2, "ZWave $type $name $cmd ".join(" ", @a);
@@ -1335,7 +1342,9 @@ ZWave_configCheckParam($$$$@)
   my $h = $mc->{config}{$cmd};
   return ("", sprintf($fmt, @arg)) if(!$h);
 
-  return ("", sprintf("05%02x", $h->{index})) if($type eq "get");
+  # Support "set XX configYY request" for configRequestAll
+  return ("", sprintf("05%02x", $h->{index}))
+        if($type eq "get" || ($type eq "set" && $arg[0] eq "request"));
 
   my $t = $h->{type};
   if($t eq "list") {
@@ -1555,6 +1564,42 @@ ZWave_configParse($$$$)
   }
   return "config_$cmdId:$val";
 }
+
+sub
+ZWave_configRequestAll($)
+{
+  my ($hash) = @_;
+  my $mc = ZWave_configGetHash($hash);
+  return ("configRequestAll: no model specific configs found", undef)
+        if(!$mc || !$mc->{config});
+  #use Data::Dumper;
+  #Log 1, Dumper $mc;
+  foreach my $c (sort keys %{$mc->{config}}) {
+    my $r = ZWave_Cmd("set", $hash, $hash->{NAME}, $c, "request");
+    Log 1, "$c: $r" if($r);
+  }
+  return ("","EMPTY");
+}
+
+sub
+ZWave_associationRequest($$)
+{
+  my ($hash, $data) = @_;
+
+  if(!$data) { # called by the user
+    $zwave_parseHook{"$hash->{id}:..85"} = \&ZWave_associationRequest;
+    return("", "05");
+  }
+
+  my $nGrp = ($data =~ m/..8506(..)/ ? $1 :
+                ReadingsVal($hash->{NAME}, "assocGroups", 0));
+  my $grp = 0;
+  $grp = $1 if($data =~ m/..8503(..)/);
+  return if($grp >= $nGrp);
+  $zwave_parseHook{"$hash->{id}:..85"} = \&ZWave_associationRequest;
+  ZWave_Cmd("set", $hash, $hash->{NAME}, "associationRequest", $grp+1);
+}
+
 
 my %zwave_roleType = (
   "00"=>"CentralStaticController",
@@ -1946,6 +1991,15 @@ ZWave_Parse($$@)
         $matched++;
       }
     }
+
+    foreach my $h (keys %zwave_parseHook) {
+      if("$id:$arg" =~ m/$h/) {
+        my $fn = $zwave_parseHook{$h};
+        delete $zwave_parseHook{$h};
+        $fn->($hash, $arg);
+      }
+    }
+
     push @event, "UNPARSED:$className $arg" if(!$matched);
   }
 
@@ -2086,6 +2140,10 @@ s2Hex($)
   controllerNodeId"</li>
   <li>associationDel groupId nodeId ...<br>
   Remove the specified list of nodeIds from the assotion group groupId.</li>
+  <li>associationRequest groupId<br>
+  corresponds to "get association", used by associationRequestAll</li>
+  <li>associationRequestAll<br>
+  request association info for all possibe groups.</li>
 
   <br><br><b>Class BASIC</b>
   <li>basicValue value<br>
@@ -2145,6 +2203,10 @@ s2Hex($)
   <li>configDefault cfgAddress<br>
     Reset the configuration parameter for the cfgAddress parameter to its
     default value.  See the device documentation to determine this value.</li>
+  <li>configRequestAll<br>
+    If the model of a device is set, and configuration descriptions are
+    available from the database for this device, then request the value of all
+    known configuration parameters.</li>
 
   <br><br><b>Class INDICATOR</b>
   <li>indicatorOn<br>
@@ -2314,6 +2376,9 @@ s2Hex($)
   <li>association groupId<br>
     return the list of nodeIds in the association group groupId in the form:<br>
     assocGroup_X:Max Y, Nodes id,id...
+    </li>
+  <li>associationGroups<br>
+    return the number of association groups<br>
     </li>
 
   <br><b>Class BASIC</b>
@@ -2553,6 +2618,7 @@ s2Hex($)
 
   <br><br><b>Class ASSOCIATION</b>
   <li>assocGroup_X:Max Y Nodes A,B,...</li>
+  <li>assocGroups:X</li>
 
   <br><br><b>Class BASIC</b>
   <li>basicReport:XY</li>

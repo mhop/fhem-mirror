@@ -644,6 +644,7 @@ ZWDongle_Read($@)
       $hash->{SendRetries}++;
       $hash->{MaxSendRetries}++ if($hash->{MaxSendRetries}<7);
       $data = substr($data, 2);
+      select(undef, undef, undef, 0.1); # configRequestAll: 0.05 is not enough
       next;
     }
 
@@ -704,10 +705,10 @@ sub
 ZWDongle_ReadAnswer($$$)
 {
   my ($hash, $arg, $regexp) = @_;
+  Log3 $hash, 4, "ZWDongle_ReadAnswer arg:$arg regexp:".($regexp ? $regexp:"");
   return ("No FD (dummy device?)", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
   my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
-  Log3 $hash, 4, "ZWDongle_ReadAnswer arg:$arg regexp:".($regexp ? $regexp:"");
 
   for(;;) {
 
