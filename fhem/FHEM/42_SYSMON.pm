@@ -3031,7 +3031,7 @@ sub SYSMON_FBVersionInfo($$) {
   if($hash->{helper}->{excludes}{'fbversion'}) {return $map;}
   
   my @ar = SYSMON_execute($hash, "/etc/version --version --date");
-  my $data = @ar[0];
+  my $data = $ar[0];
   
   my($v, $d, $t) = split(/\s+/, $data);
   
