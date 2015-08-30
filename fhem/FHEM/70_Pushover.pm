@@ -414,7 +414,8 @@ sub Pushover_ReceiveCommand($$$) {
                         $values->{message} );
                     readingsBulkUpdate( $hash, "cbPrio_" . $values->{cbNr},
                         $values->{priority} );
-                    readingsBulkUpdate( $hash, "cbAck_" . $values->{cbNr}, "0" );
+                    readingsBulkUpdate( $hash, "cbAck_" . $values->{cbNr},
+                        "0" );
 
                     if ( $values->{device} ne "" ) {
                         readingsBulkUpdate( $hash, "cbDev_" . $values->{cbNr},
@@ -688,8 +689,7 @@ sub Pushover_SetMessage {
             my $url;
 
             if (   $callback eq ""
-                || $values{action} !~
-                /(?:https?:\/\/)(?:[\w]+\.)([a-zA-Z\.]{2,63})([\/\w\.-]*)*\/?/ )
+                || $values{action} !~ /^http[s]?:\/\/.*$/ )
             {
                 $url = $values{action};
                 $values{expire} = "";
