@@ -1680,7 +1680,7 @@ CommandDefine($$)
 
   my $ret = CallFn($name, "DefFn", \%hash, $def);
   if($ret) {
-    Log 1, "define $name $def: $ret";
+    Log 1, "define $def: $ret";
     delete $defs{$name};                            # Veto
     delete $attr{$name};
 
@@ -2670,7 +2670,7 @@ HandleTimeout()
   # Check the internal list.
   foreach my $i (sort { $intAt{$a}{TRIGGERTIME} <=>
                         $intAt{$b}{TRIGGERTIME} } keys %intAt) {
-    next if(!$intAt{$i}); # deleted in the loop
+    next if(!defined($i) || !$intAt{$i}); # deleted in the loop
     my $tim = $intAt{$i}{TRIGGERTIME};
     my $fn = $intAt{$i}{FN};
     if(!defined($tim) || !defined($fn)) {
