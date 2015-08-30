@@ -347,10 +347,9 @@ sub Pushover_ReceiveCommand($$$) {
                 }
 
                 # Use JSON module if possible
-                eval { use JSON };
-                if ( !$@ ) {
-                    $return = decode_json( Encode::encode_utf8($data) );
-                }
+                eval 'use JSON qw( decode_json ); 1';
+                $return = decode_json( Encode::encode_utf8($data) )
+                  if ( !$@ );
             }
             else {
                 if ( !defined($cmd) || ref($cmd) eq "HASH" || $cmd eq "" ) {
