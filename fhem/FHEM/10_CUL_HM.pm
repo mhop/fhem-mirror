@@ -2314,7 +2314,7 @@ sub CUL_HM_Parse($$) {#########################################################
             push @evtEt,[$mh{devH},1,"color:$value"];
             push @evtEt,[$mh{devH},1,"state:$value"];
             if (!$mh{cHash}{helper}{role}{dev}){
-              my $actColor = $colTbl{$msgState};
+              my $actColor = $colTbl{sprintf("%02b",hex($msgState))};
               $actColor = "unknown" if(!$actColor);
               push @evtEt,[$mh{cHash},1,"color:$actColor"];
               push @evtEt,[$mh{cHash},1,"state:$actColor"];
