@@ -6264,7 +6264,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
 sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
   if (!$hash || !$hash->{NAME}){#General remove when fixed
-    Log 2,"CUL_HM protstate undeviced hash to set $state";
+    Log 4,"CUL_HM protstate undeviced hash to set $state";
     return;
   }
   my $name = $hash->{NAME};
