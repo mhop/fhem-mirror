@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_temp.pm 0.14 2015-05-30 Risiko $
+# $Id: 30_pilight_temp.pm 0.15 2015-08-30 Risiko $
 #
 # Usage
 # 
@@ -13,6 +13,7 @@
 # V 0.12 2015-05-16 - NEW:  attribut corrTemp, a factor to modify temperatur 
 # V 0.13 2015-05-17 - NEW:  attribut corrHumidity, a factor to modify humidity
 # V 0.14 2015-05-30 - FIX:  StateFn 
+# V 0.15 2015-08-30 - NEW:  support pressure, windavg, winddir, windgust
 ############################################## 
 
 package main;
@@ -112,6 +113,12 @@ sub pilight_temp_Parse($$)
   }
   
   readingsBulkUpdate($chash,"battery",$battery)   if (defined($battery)   && $battery   ne "");
+  
+  foreach my $arg (@args){
+    #pressure, windavg, winddir, windgust
+    my($feature,$value) = split(":",$arg);
+    readingsBulkUpdate($chash,$feature,$value);
+  }
   readingsEndUpdate($chash, 1); 
   
   return $chash->{NAME};
@@ -127,7 +134,7 @@ sub pilight_temp_Parse($$)
 <h3>pilight_temp</h3>
 <ul>
 
-  pilight_temp represents a temperature and humidity sensor receiving dat from pilight<br>
+  pilight_temp represents a temperature and humidity sensor receiving data from pilight<br>
   You have to define the base device pilight_ctrl first.<br>
   Further information to pilight: <a href="http://www.pilight.org/">http://www.pilight.org/</a><br>
   Supported Sensors: <a href="http://wiki.pilight.org/doku.php/protocols#switches">http://wiki.pilight.org/doku.php/protocols#weather_stations</a><br>     
@@ -162,6 +169,22 @@ sub pilight_temp_Parse($$)
     <li>
       battery<br>
       present the battery state of the senor (if sensor support it)
+    </li>
+    <li>
+      pressure<br>
+      present the pressure state of the senor (if sensor support it)
+    </li>
+    <li>
+      windavg<br>
+      present the average wind speed state of the senor (if sensor support it)
+    </li>
+    <li>
+      winddir<br>
+      present the wind direction state of the senor (if sensor support it)
+    </li>
+    <li>
+      windgust<br>
+      present the wind gust state of the senor (if sensor support it)
     </li>
   </ul>
   <br>

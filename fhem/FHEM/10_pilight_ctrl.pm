@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.09 2015-07-21 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.10 2015-08-30 Risiko $
 #
 # Usage
 # 
@@ -34,6 +34,7 @@
 # V 1.08 2015-06-23 - FIX:  clear send queue by reset
 # V 1.08 2015-06-23 - NEW:  attribute SendTimeout for abort sending command non blocking
 # V 1.09 2015-07-21 - NEW:  support submodule pilight_raw to send raw codes
+# V 1.10 2015-08-30 - NEW:  support pressure, windavg, winddir, windgust from weather stations and GPIO sensors
 ############################################## 
 package main;
 
@@ -844,7 +845,13 @@ sub pilight_ctrl_Parse($$)
         my $humidity = (defined($data->{$s}{humidity})) ? $data->{$s}{humidity} : "";
         my $battery = (defined($data->{$s}{battery})) ? $data->{$s}{battery} : "";
         
-        my $msg = "PITEMP,$proto,$id,$temp,$humidity,$battery";
+        my $more = "";
+        $more .= ",pressure:$data->{$s}{pressure}" if (defined($data->{$s}{pressure}));
+        $more .= ",windavg:$data->{$s}{windavg}"   if (defined($data->{$s}{windavg}));
+        $more .= ",winddir:$data->{$s}{winddir}"   if (defined($data->{$s}{winddir}));
+        $more .= ",windgust:$data->{$s}{windgust}" if (defined($data->{$s}{windgust}));
+        
+        my $msg = "PITEMP,$proto,$id,$temp,$humidity,$battery$more";
         return Dispatch($hash, $msg,undef);
     }
     case 5 { return Dispatch($hash, "PISCREEN,$proto,$id,$unit,$state",undef); }
