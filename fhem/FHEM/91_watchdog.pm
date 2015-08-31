@@ -14,6 +14,7 @@ watchdog_Initialize($)
 
   $hash->{DefFn} = "watchdog_Define";
   $hash->{UndefFn} = "watchdog_Undef";
+  $hash->{AttrFn}   = "watchdog_Attr";
   $hash->{NotifyFn} = "watchdog_Notify";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals execOnReactivate ".
                         "regexp1WontReactivate:0,1 addStateEvent:0,1";
@@ -172,6 +173,23 @@ watchdog_Undef($$)
 {
   my ($hash, $name) = @_;
   RemoveInternalTimer($hash);
+  return undef;
+}
+
+sub
+watchdog_Attr(@)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my $do = 0;
+
+  my $hash = $defs{$name};
+
+  if($cmd eq "set" && $attrName eq "disable") {
+    $do = (!defined($attrVal) || $attrVal) ? 1 : 2;
+  }
+  $do = 2 if($cmd eq "del" && (!$attrName || $attrName eq "disable"));
+  return if(!$do);
+  $hash->{STATE} = ($do == 1 ?  "disabled" : "defined");
   return undef;
 }
 
