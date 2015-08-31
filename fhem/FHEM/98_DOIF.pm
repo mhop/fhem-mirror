@@ -22,19 +22,53 @@ package main;
 use strict;
 use warnings;
 
+sub DOIF_cmd ($$$$);
 
+sub
+DOIF_delTimer($)
+{
+  my ($hash) = @_;
+  RemoveInternalTimer($hash);
+  my $max_timer=keys %{$hash->{timerfunc}};
+  for (my $i=0; $i<$max_timer;$i++) 
+  {
+    RemoveInternalTimer ($hash->{timerfunc}{$i});
+  }
+  return undef;
+}
 
-##########################
+sub
+DOIF_delAll($)
+{
+  my ($hash) = @_;
+  delete ($hash->{helper});
+  delete ($hash->{condition});
+  delete ($hash->{do});
+  delete ($hash->{devices});
+  delete ($hash->{time});
+  delete ($hash->{timer});
+  delete ($hash->{timers});
+  delete ($hash->{itimer});
+  delete ($hash->{timeCond});
+  delete ($hash->{realtime});
+  delete ($hash->{days});
+  delete ($hash->{readings});
+  delete ($hash->{internals});
+  delete ($hash->{trigger});
+  delete ($defs{$hash->{NAME}}{READINGS});
+}   
+
+#########################
 sub
 DOIF_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn}   = "DOIF_Define";
-  #$hash->{SetFn}   = "DOIF_Set";
+  $hash->{SetFn}   = "DOIF_Set";
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame waitsame waitdel cmdpause ".$readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame waitsame waitdel cmdpause timerWithWait ".$readingFnAttributes;
 }
 
 
@@ -460,18 +494,26 @@ DOIF_CheckTimers($$$$$)
     $hash->{timerfunc}{$nr}=\${$timerarray}[$nr];
   }
   if ($i == 2) {
-    $block='DOIF_time($hash->{realtime}{'.$nrs[0].'},$hash->{realtime}{'.$nrs[1].'},$wday,$hms,"'.$days.'")';
+    $block='DOIF_time($hash,$hash->{realtime}{'.$nrs[0].'},$hash->{realtime}{'.$nrs[1].'},$wday,$hms,"'.$days.'")';
   } else {
-    $block='DOIF_time_once($hash->{timer}{'.$nrs[0].'},$wday,"'.$days.'")';
+    $block='DOIF_time_once($hash,$hash->{timer}{'.$nrs[0].'},$wday,"'.$days.'")';
   }
   return ($block,"");
 }
 
 sub
-DOIF_time($$$$$)
+DOIF_time($$$$$$)
 {
   my $ret=0;
-  my ($begin,$end,$wday,$hms,$days)=@_;
+  my ($hash,$begin,$end,$wday,$hms,$days)=@_;
+  my $err;
+  ($days,$err)=ReplaceAllReadingsDoIf($hash,$days,-1,1);
+  if ($err) {
+    my $errmsg="error in days: $err";
+    Log3 ($hash->{NAME},2 , "$hash->{NAME}: $errmsg");
+    readingsSingleUpdate ($hash, "error", $errmsg,1);
+    return 0;
+  }
   my $we=DOIF_we($wday);
   if ($end gt $begin) {
     if ($hms ge $begin and $hms lt $end) {
@@ -493,10 +535,17 @@ DOIF_time($$$$$)
 }  
 
 sub
-DOIF_time_once($$$)
+DOIF_time_once($$$$)
 {
-  my $ret;
-  my ($flag,$wday,$days)=@_;
+  my ($hash,$flag,$wday,$days)=@_;
+  my $err;
+  ($days,$err)=ReplaceAllReadingsDoIf($hash,$days,-1,1);
+  if ($err) {
+    my $errmsg="error in days: $err";
+    Log3 ($hash->{NAME},2 , "$hash->{NAME}: $errmsg");
+    readingsSingleUpdate ($hash, "error", $errmsg,1);
+    return 0;
+  }
   my $we=DOIF_we($wday);
   if ($flag) {
     return 1 if ($days eq "" or $days =~ /$wday/ or ($days =~ /7/ and $we) or ($days =~ /8/ and !$we));
@@ -506,9 +555,9 @@ DOIF_time_once($$$)
 
 ############################
 sub
-DOIF_SetState($$$$)
+DOIF_SetState($$$$$)
 {
-  my ($hash,$nr,$event,$last_error)=@_;
+  my ($hash,$nr,$subnr,$event,$last_error)=@_;
   my $pn=$hash->{NAME};
   my $cmdNr="";
   my $cmd="";
@@ -517,17 +566,28 @@ DOIF_SetState($$$$)
   my $state=AttrVal($hash->{NAME},"state","");
   my @cmdState=split(/\|/,$attr);
   $nr=ReadingsVal($pn,"cmd_nr",0)-1 if (!$event);
+  
   if ($nr!=-1) {
     $cmdNr=$nr+1;
-    if ($attr) {
-      $cmd=$cmdState[$nr] if (defined ($cmdState[$nr]));
+    if (defined $hash->{do}{$nr}{$subnr+1}) {
+      $cmd="cmd_".$cmdNr."_".($subnr+1);
     } else {
-      $cmd="cmd_$cmdNr";
+      if ($attr) {
+        $cmd=$cmdState[$nr] if (defined ($cmdState[$nr]));
+      } else {
+        $cmd="cmd_$cmdNr";
+      }
     }
   }
   readingsBeginUpdate  ($hash);
   if ($event) {
     readingsBulkUpdate($hash,"cmd_nr",$cmdNr);
+    if (defined $hash->{do}{$nr}{1}) {
+      readingsBulkUpdate($hash,"cmd_seqnr",$subnr+1)
+      
+    } else {
+      delete ($defs{$hash->{NAME}}{READINGS}{cmd_seqnr});
+    }
     readingsBulkUpdate($hash,"cmd_event",$event);
     if ($last_error) {
       readingsBulkUpdate($hash,"error",$last_error);
@@ -535,7 +595,8 @@ DOIF_SetState($$$$)
       delete ($defs{$hash->{NAME}}{READINGS}{error});
     }
   }
-  if ($state) {
+  
+  if ($state and !defined $hash->{do}{$nr}{$subnr+1}) {
     my $stateblock='\['.$pn.'\]';
     $state =~ s/$stateblock/$cmd/g; 
     ($state,$err)=ReplaceAllReadingsDoIf($hash,$state,-1,1);
@@ -580,7 +641,7 @@ DOIF_CheckCond($$)
   my $reading;
   my $internal;
   my $we=DOIF_we($wday);
-
+  
   $month++;
   $year+=1900;
   if (defined ($hash->{readings}{$condition})) {
@@ -604,9 +665,9 @@ DOIF_CheckCond($$)
 }
 
 sub
-DOIF_cmd ($$$)
+DOIF_cmd ($$$$)
 {
-  my ($hash,$nr,$event)=@_;
+  my ($hash,$nr,$subnr,$event)=@_;
   my $pn = $hash->{NAME};
   my $ret;
   my $cmd;
@@ -617,46 +678,56 @@ DOIF_cmd ($$$)
   my @cmdpause=split(/:/,AttrVal($pn,"cmdpause",""));
   my @waitsame=split(/:/,AttrVal($pn,"waitsame",""));
   my ($seconds, $microseconds) = gettimeofday();
-  if ($cmdpause[$nr]) {
+  if ($cmdpause[$nr] and $subnr==0) {
     return undef if ($seconds - time_str2num(ReadingsTimestamp($pn, "state", "1970-01-01 01:00:00")) < $cmdpause[$nr]);
   }
   if (AttrVal($pn,"repeatsame","")) {
-    if ($repeatsame[$nr]) {
-      $repeatnr=ReadingsVal($pn,"cmd_count",0);
-      if ($last_cmd == $nr) {
-        if ($repeatnr < $repeatsame[$nr]) {
-          $repeatnr++;
+    if ($subnr == 0) {
+      if ($repeatsame[$nr]) {
+        $repeatnr=ReadingsVal($pn,"cmd_count",0);
+        if ($last_cmd == $nr) {
+          if ($repeatnr < $repeatsame[$nr]) {
+            $repeatnr++;
+          } else {
+            return undef;
+          }
         } else {
-          return undef;
+          $repeatnr=1;
         }
+        readingsSingleUpdate ($hash, "cmd_count", $repeatnr,1);
       } else {
-        $repeatnr=1;
+        return undef if ($last_cmd == $nr and $subnr==0 and (AttrVal($pn,"do","") ne "always" and AttrVal($pn,"do","") ne "resetwait"));
+        delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
       }
-      readingsSingleUpdate ($hash, "cmd_count", $repeatnr,1);
-    } else {
-      return undef if ($last_cmd == $nr and (AttrVal($pn,"do","") ne "always" and AttrVal($pn,"do","") ne "resetwait"));
-      delete ($defs{$hash->{NAME}}{READINGS}{cmd_count});
     }
   }
   if (AttrVal($pn,"waitsame","")) {
-    if ($waitsame[$nr]) {
-      my $cmd_nr="cmd_".($nr+1);
-      if (ReadingsVal($pn,"waitsame","") eq $cmd_nr) {
-        if ($seconds - time_str2num(ReadingsTimestamp($pn, "waitsame", "1970-01-01 01:00:00"))  > $waitsame[$nr]) {
+    if ($subnr == 0) {
+      if ($waitsame[$nr]) {
+        my $cmd_nr="cmd_".($nr+1);
+        if (ReadingsVal($pn,"waitsame","") eq $cmd_nr) {
+          if ($seconds - time_str2num(ReadingsTimestamp($pn, "waitsame", "1970-01-01 01:00:00"))  > $waitsame[$nr]) {
+            readingsSingleUpdate ($hash, "waitsame", $cmd_nr,1);
+            return undef;
+          }
+        } else {
           readingsSingleUpdate ($hash, "waitsame", $cmd_nr,1);
           return undef;
         }
-      } else {
-        readingsSingleUpdate ($hash, "waitsame", $cmd_nr,1);
-        return undef;
-      }
-    } 
-    delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
+      } 
+      delete ($defs{$hash->{NAME}}{READINGS}{waitsame});
+    }
   }
-  if ($hash->{do}{$nr}) { 
-    ($cmd,$err)=ParseCommandsDoIf($hash,$hash->{do}{$nr},1);
+  if ($hash->{do}{$nr}{$subnr}) { 
+    ($cmd,$err)=ParseCommandsDoIf($hash,$hash->{do}{$nr}{$subnr},1);
   }
-  DOIF_SetState ($hash,$nr,$event,$err);
+  DOIF_SetState ($hash,$nr,$subnr,$event,$err);
+  if (defined $hash->{do}{$nr}{++$subnr}) {
+    my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
+    if (DOIF_SetSleepTimer($hash,$last_cond,$nr,$subnr,$event,-1)) {
+      DOIF_cmd ($hash,$nr,$subnr,$event);
+    }
+  }
   return undef;
 }
 
@@ -689,8 +760,8 @@ DOIF_Trigger ($$$)
         return undef;
       }
       if ($ret) {
-        if (DOIF_SetSleepTimer($hash,$last_cond,$i,$device,$timerNr)) {
-          DOIF_cmd ($hash,$i,$event);
+        if (DOIF_SetSleepTimer($hash,$last_cond,$i,0,$device,$timerNr)) {
+          DOIF_cmd ($hash,$i,0,$event);
           return 1;
         } else {
           return undef;
@@ -701,9 +772,9 @@ DOIF_Trigger ($$$)
     }
   }
   if ($doelse) {  #DOELSE
-    if (defined ($hash->{do}{$max_cond}) or ($max_cond == 1 and !(AttrVal($pn,"do","") or AttrVal($pn,"repeatsame","")))) {  #DOELSE
-      if (DOIF_SetSleepTimer($hash,$last_cond,$max_cond,$device,$timerNr)) {
-        DOIF_cmd ($hash,$max_cond,$event) ;
+    if (defined ($hash->{do}{$max_cond}{0}) or ($max_cond == 1 and !(AttrVal($pn,"do","") or AttrVal($pn,"repeatsame","")))) {  #DOELSE
+      if (DOIF_SetSleepTimer($hash,$last_cond,$max_cond,0,$device,$timerNr)) {
+        DOIF_cmd ($hash,$max_cond,0,$event) ;
         return 1;
       }
     }
@@ -726,13 +797,13 @@ DOIF_Notify($$)
   
   if ($dev->{NAME} eq "global" and ((EventDoIf("global","global",deviceEvents($dev, AttrVal("global", "addStateEvent", 0)),"INITIALIZED")) or EventDoIf("global","global",deviceEvents($dev, AttrVal("global", "addStateEvent", 0)),"REREADCFG")))
   {
+    $hash->{helper}{globalinit}=1;
     if ($hash->{helper}{last_timer} > 0){
       for (my $j=0; $j<$hash->{helper}{last_timer};$j++)
       {
         DOIF_SetTimer("DOIF_TimerTrigger",$hash->{timerfunc}{$j});
       }
     }
-  #  return undef;      
   }
   
   if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
@@ -744,9 +815,15 @@ DOIF_Notify($$)
     }
   }
   
-  return "" if (!$hash->{devices}{all} and !$hash->{state}{device}) ;
-  
+  return "" if (!$hash->{devices}{all} and !$hash->{state}{device});
+  return "" if (!$hash->{helper}{globalinit});
+  return "" if (ReadingsVal($pn,"mode","") eq "disabled");
+
   if (($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) {
+    readingsSingleUpdate ($hash, "Device",$dev->{NAME},0);
+    #my $events = deviceEvents($dev, AttrVal($dev->{NAME}, "addStateEvent", 0));
+    #readingsSingleUpdate ($hash, "Event","@{$events}",0);
+    
     if ($hash->{readings}{all}) {
       foreach my $item (split(/ /,$hash->{readings}{all})) {
         ($device,$reading)=(split(":",$item));
@@ -776,7 +853,7 @@ DOIF_Notify($$)
     $ret=DOIF_Trigger($hash,$dev->{NAME},-1);
   }
   if (($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / and !$ret) {
-    DOIF_SetState($hash,"","","");
+    DOIF_SetState($hash,"",0,"","");
   }
   return undef;
 } 
@@ -787,8 +864,10 @@ DOIF_TimerTrigger ($)
   my ($timer)=@_;
   my $nr=${$timer}->{nr};
   my $hash=${$timer}->{hash};
+  my $pn = $hash->{NAME};
   my $ret;
-  if (!AttrVal($hash->{NAME},"disable","")) {
+# if (!AttrVal($hash->{NAME},"disable","")) {
+  if (ReadingsVal($pn,"mode","") ne "disabled") {
     $hash->{timer}{$nr}=1;
     $ret=DOIF_Trigger ($hash,"",$nr);
     $hash->{timer}{$nr}=0;
@@ -821,7 +900,7 @@ DOIF_DetTime($)
     $align=$2;
   } elsif ($timeStr =~ m/^:([0-5][0-9])$/) {
     $align=$1;
-  } elsif ($timeStr =~ m/^([0-9]+)$/) {
+  } elsif ($timeStr =~ m/^(\-?([0-9]+))$/) {
     $s=$1;
   } else {
     if ($timeStr =~ m/^\$hms$/) {
@@ -973,53 +1052,85 @@ DOIF_SetTimer($$)
       $next_time-=3600 if ($isdst == 1); 
     }
   }
-  my $next_time_str=strftime("%d.%m.%Y %H:%M:%S",localtime($next_time));
-  $next_time_str.="\|".$hash->{days}{$nr} if (defined ($hash->{days}{$nr}));
-  readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),$next_time_str,0);
-  $hash->{realtime}{$nr}=strftime("%H:%M:%S",localtime($next_time));
-  RemoveInternalTimer($timer);
-  InternalTimer($next_time, $func, $timer, 0);
+  if ($next_time < $now) {
+    readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"back to the past ist not allowed",0);
+    return("timer_".($nr+1)."_c".($cond+1),"back to the past ist not allowed");
+  } else {
+    my $next_time_str=strftime("%d.%m.%Y %H:%M:%S",localtime($next_time));
+    $next_time_str.="\|".$hash->{days}{$nr} if (defined ($hash->{days}{$nr}));
+    readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),$next_time_str,0);
+    $hash->{realtime}{$nr}=strftime("%H:%M:%S",localtime($next_time));
+    RemoveInternalTimer($timer);
+    InternalTimer($next_time, $func, $timer, 0);
+  }
   return undef;
 }
 
 sub
-DOIF_SetSleepTimer($$$$$)
+DOIF_SetSleepTimer($$$$$$)
 {
-  my ($hash,$last_cond,$nr,$device,$timerNr)=@_;
+  my ($hash,$last_cond,$nr,$subnr,$device,$timerNr)=@_;
   my $pn = $hash->{NAME};
   my $sleeptimer=$hash->{helper}{sleeptimer};
-  return 1 if ($timerNr == -2); #Sleeptrigger
   my @waitdel=split(/:/,AttrVal($pn,"waitdel",""));
-  if ($sleeptimer != -1 and (($sleeptimer != $nr or AttrVal($pn,"do","") eq "resetwait") or ($sleeptimer == $nr and $waitdel[$sleeptimer]))) {
+  my @waitdelsubnr=split(/,/,defined $waitdel[$sleeptimer] ? $waitdel[$sleeptimer] : "");
+  my $err;
+  
+  if ($sleeptimer != -1 and (($sleeptimer != $nr or AttrVal($pn,"do","") eq "resetwait") or ($sleeptimer == $nr and $waitdelsubnr[$subnr]))) {
     RemoveInternalTimer($hash);
     #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
     readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
     $hash->{helper}{sleeptimer}=-1;
-    return 0 if ($sleeptimer == $nr and $waitdel[$sleeptimer]);
+    $subnr=$hash->{helper}{sleepsubtimer} if ($hash->{helper}{sleepsubtimer}!=-1);
+    return 0 if ($sleeptimer == $nr and $waitdelsubnr[$subnr]);
   }
     
-  if ($timerNr >= 0) {#Timer
+  if ($timerNr >= 0 and !AttrVal($pn,"timerWithWait","")) {#Timer
     if ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"repeatsame","")) {
       return 1;
     } else {
       return 0;
     }
   } 
-  if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"do","") eq "resetwait" or AttrVal($pn,"repeatsame",""))) {
+ 
+  if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or $subnr > 0 or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"do","") eq "resetwait" or AttrVal($pn,"repeatsame",""))) {
     my @sleeptimer=split(/:/,AttrVal($pn,"wait",""));
     my $sleeptime=0;
-    if ($waitdel[$nr]) { 
-      $sleeptime = $waitdel[$nr];
-    } elsif ($sleeptimer[$nr]) {
-      $sleeptime=$sleeptimer[$nr]
+    if ($waitdelsubnr[$subnr]) { 
+      $sleeptime = $waitdelsubnr[$subnr];
+    } else {
+      my @sleepsubtimer=split(/,/,defined $sleeptimer[$nr]? $sleeptimer[$nr]: "");
+      if ($sleepsubtimer[$subnr]) {
+        $sleeptime=$sleepsubtimer[$subnr];
+      }
     }
+    ($sleeptime,$err)=ReplaceAllReadingsDoIf($hash,$sleeptime,-1,1);
+    if ($err) {
+      Log3 $pn,2 , "$pn: error in wait: $err" if ($err);
+      $sleeptime=0;
+    } else {
+       my $ret = eval $sleeptime;
+       if ($@) {
+         Log3 ($pn,2 , "$pn: error in wait: $sleeptimer: $@");
+         $sleeptime=0;
+       } else {
+         $sleeptime=$ret;
+       }
+    } 
     if ($sleeptime) {
       my ($seconds, $microseconds) = gettimeofday();
       my $next_time = $seconds+$sleeptime;
       $hash->{helper}{sleeptimer}=$nr;
+      $hash->{helper}{sleepsubtimer}=$subnr;
+      $device="timer_".($timerNr+1) if ($timerNr >= 0);
       $hash->{helper}{sleepdevice}=$device;
       my $cmd_nr=$nr+1;
-      readingsSingleUpdate ($hash,"wait_timer",strftime("%d.%m.%Y %H:%M:%S cmd_$cmd_nr $device",localtime($next_time)),1);
+      if (defined $hash->{do}{$nr}{1}) {
+        my $cmd_subnr=$subnr+1;
+        readingsSingleUpdate ($hash,"wait_timer",strftime("%d.%m.%Y %H:%M:%S cmd_$cmd_nr"."_$cmd_subnr $device",localtime($next_time)),1);
+      } else {
+        readingsSingleUpdate ($hash,"wait_timer",strftime("%d.%m.%Y %H:%M:%S cmd_$cmd_nr $device",localtime($next_time)),1);
+      }
       InternalTimer($next_time, "DOIF_SleepTrigger",$hash, 0);
       return 0;
     } else {
@@ -1034,11 +1145,17 @@ sub
 DOIF_SleepTrigger ($)
 {
   my ($hash)=@_;
+  my $sleeptimer=$hash->{helper}{sleeptimer};
+  my $sleepsubtimer=$hash->{helper}{sleepsubtimer};
   $hash->{helper}{sleeptimer}=-1;
+  $hash->{helper}{sleepsubtimer}=-1;
+  my $pn = $hash->{NAME};
   readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
-  if (!AttrVal($hash->{NAME},"disable","")) {
-    DOIF_Trigger($hash,$hash->{helper}{sleepdevice},-2);
+# if (!AttrVal($hash->{NAME},"disable","")) {
+  if (ReadingsVal($pn,"mode","") ne "disable") {
+    DOIF_cmd ($hash,$sleeptimer,$sleepsubtimer,$hash->{helper}{sleepdevice});
   }
+  
   return undef;
 }
 
@@ -1057,41 +1174,30 @@ CmdDoIf($$)
   my $eval="";
   my $beginning;
   my $i=0;
+  my $j=0;
   my $last_do;
-  
+
   if (!$tail) {
     $tail="";
   } else {
-    $tail =~ s/\n//g;
+    $tail =~ s/(##.*\n)|(##.*$)|\n//g;;
   }
-  if (defined $hash->{helper}) #def modify
+  
+#  if (defined $hash->{helper}) #def modify
+  if ($init_done)
   {
-    RemoveInternalTimer($hash);
-    my $max_timer=keys %{$hash->{timerfunc}};
-    for (my $i=0; $i<$max_timer;$i++) 
-    {
-      RemoveInternalTimer ($hash->{timerfunc}{$i});
-    }
-    delete ($hash->{helper});
-    delete ($hash->{condition});
-    delete ($hash->{do});
-    delete ($hash->{devices});
-    delete ($hash->{time});
-    delete ($hash->{timer});
-    delete ($hash->{timers});
-    delete ($hash->{itimer});
-    delete ($hash->{timeCond});
-    delete ($hash->{realtime});
-    delete ($hash->{days});
-    delete ($hash->{readings});
-    delete ($hash->{internals});
-    delete ($hash->{trigger});
-    delete ($defs{$hash->{NAME}}{READINGS});
+    DOIF_delTimer($hash);
+    DOIF_delAll ($hash);
     readingsSingleUpdate ($hash,"state","initialized",1);
+    $hash->{helper}{globalinit}=1;
   }
   #$hash->{STATE} = 'initialized';
   $hash->{helper}{last_timer}=0;
   $hash->{helper}{sleeptimer}=-1;
+#  if ($init_done) {  
+#    $hash->{helper}{globalinit}=1;
+#  }
+  
   while ($tail ne "") {
     return($tail, "no left bracket of condition") if ($tail !~ /^ *\(/);
     #condition
@@ -1103,14 +1209,16 @@ CmdDoIf($$)
     $hash->{condition}{$i}=$cond;
     #DOIF
     $if_cmd_ori="";
-    if ($tail =~ /^\s*\(/) {
+    $j=0;
+    while ($tail =~ /^\s*\(/) {
       ($beginning,$if_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
       return ($if_cmd_ori,$err) if ($err);
       ($if_cmd,$err)=ParseCommandsDoIf($hash,$if_cmd_ori,0);
       return ($if_cmd,$err) if ($err);
       #return ($tail,"no commands") if ($if_cmd eq "");
+      $hash->{do}{$i}{$j++}=$if_cmd_ori;
     } 
-    $hash->{do}{$i}=$if_cmd_ori;
+    $hash->{do}{$i}{0}=$if_cmd_ori if ($j==0); #do without brackets 
     $last_do=$i;
     if (length($tail)) {
       $tail =~ /^\s*DOELSEIF/g;
@@ -1134,13 +1242,15 @@ CmdDoIf($$)
     } else {
       return ($tail,"expected DOELSE");
     }
-    if ($tail =~ /^\s*\(/) {
+    $j=0;
+    while ($tail =~ /^\s*\(/) {
       ($beginning,$else_cmd_ori,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
        return ($else_cmd_ori,$err) if ($err);
        ($else_cmd,$err)=ParseCommandsDoIf($hash,$else_cmd_ori,0);
        return ($else_cmd,$err) if ($err);
+       $hash->{do}{$last_do+1}{$j++}=$else_cmd_ori;
     }
-    $hash->{do}{$last_do+1}=$else_cmd_ori;
+    $hash->{do}{$last_do+1}{0}=$else_cmd_ori if ($j==0); #doelse without brackets
   }
   return("","")
 }
@@ -1150,6 +1260,7 @@ DOIF_Define($$$)
 {
   my ($hash, $def) = @_;
   my ($name, $type, $cmd) = split(/[\s]+/, $def, 3);
+  return undef if (AttrVal($hash->{NAME},"disable",""));
   my ($msg,$err)=CmdDoIf($hash,$cmd);
   if ($err ne "") {
     $msg=$cmd if (!$msg);
@@ -1167,19 +1278,19 @@ DOIF_Attr(@)
 {
   my @a = @_;
   my $hash = $defs{$a[1]};
-  if($a[0] eq "set" && $a[2] eq "disable")
+  my $ret="";
+  if (($a[0] eq "set" and $a[2] eq "disable" and ($a[3] eq "0")) or (($a[0] eq "del" and $a[2] eq "disable")))
   {
-    if($a[3] eq "0") {
-      readingsSingleUpdate ($hash,"state","initialized",1);
-      delete ($defs{$hash->{NAME}}{READINGS}{cmd_nr});
-      delete ($defs{$hash->{NAME}}{READINGS}{cmd_event});
-    } elsif($a[3] eq "1") {
-      readingsSingleUpdate ($hash,"state","disabled",1);
+    my $cmd = $defs{$hash->{NAME}}{DEF};
+    my ($msg,$err)=CmdDoIf($hash,$cmd);
+    if ($err ne "") {
+      $msg=$cmd if (!$msg);
+      return ("$err: $msg");
     }
-  } elsif($a[0] eq "del" && $a[2] eq "disable") {
-      readingsSingleUpdate ($hash,"state","initialized",1);
-      delete ($defs{$hash->{NAME}}{READINGS}{cmd_nr});
-      delete ($defs{$hash->{NAME}}{READINGS}{cmd_event});
+  } elsif($a[0] eq "set" and $a[2] eq "disable" and $a[3] eq "1") {
+    DOIF_delTimer($hash);
+    DOIF_delAll ($hash);
+    readingsSingleUpdate ($hash,"state","deactivated",1);
   } elsif($a[0] eq "set" && $a[2] eq "state") {
       delete ($hash->{state}{device});
       my ($block,$err)=ReplaceAllReadingsDoIf($hash,$a[3],-2,0);
@@ -1205,12 +1316,7 @@ DOIF_Undef
 {
   my ($hash, $name) = @_;
   $hash->{DELETED} = 1;
-  RemoveInternalTimer($hash);
-  my $max_timer=keys %{$hash->{timerfunc}};
-  for (my $i=0; $i<$max_timer;$i++) 
-  {
-    RemoveInternalTimer ($hash->{timerfunc}{$i});
-  }
+  DOIF_delTimer($hash);
   return undef;
 }
 
@@ -1221,7 +1327,27 @@ DOIF_Set($@)
 {
   my ($hash, @a) = @_;
   my $pn = $hash->{NAME};
+  my $arg = $a[1];
+  my $value = (defined $a[2]) ? $a[2] : "";
   my $ret="";
+  if ($arg eq "disable" or  $arg eq "initialize") {
+    if (AttrVal($hash->{NAME},"disable","")) {
+      return ("modul ist deactivated by disable attribut, delete disable attribut first");
+    }
+  }
+  if ($arg eq "disable") {
+      readingsBeginUpdate  ($hash);
+      readingsBulkUpdate($hash, "state", "disabled");
+      readingsBulkUpdate($hash, "mode", "disabled");
+      readingsEndUpdate    ($hash, 1);
+  } elsif ($arg eq "initialize" ) {
+      delete ($defs{$hash->{NAME}}{READINGS}{mode});
+      delete ($defs{$hash->{NAME}}{READINGS}{cmd_nr});
+      delete ($defs{$hash->{NAME}}{READINGS}{cmd_event});
+      readingsSingleUpdate($hash, "state","initialize",1);
+  } else {
+    return "$pn: unknown argument $a[1], choose one of disable initialize"
+  } 
   return $ret;
 }
 
@@ -1296,13 +1422,16 @@ Syntax:<br>
 <br>
 <ol><code>define &lt;name&gt; DOIF (&lt;Bedingung&gt;) (&lt;Befehle&gt;) DOELSEIF (&lt;Bedingung&gt;) (&lt;Befehle&gt;) DOELSEIF ... DOELSE (&lt;Befehle&gt;)</code></ol>
 <br>
-Die Angaben werden immer von links nach rechts abgearbeitet. Es wird immer nur ein Kommando ausgeführt, und zwar das erste, für das die dazugehörige Bedingung in der abgearbeiteten Reihenfolge wahr ist. Hinzu kommt, dass nur die Bedingungen überprüft werden, die zum ausgelösten Event auch das Device beinhalten.<br>
+Die Angaben werden immer von links nach rechts abgearbeitet. Zu beachten ist, dass nur die Bedingungen überprüft werden,
+die zum ausgelösten Event das dazughörige Device bzw. die dazugehörige Triggerzeit beinhalten.
+Kommt ein Device in mehreren Bedingungen vor, so wird immer nur ein Kommando ausgeführt, und zwar das erste,
+für das die dazugehörige Bedingung in der abgearbeiteten Reihenfolge wahr ist.<br>
 <br>
-Einfache Anwendungsbeispiele:<ol>
+<u>Einfache Anwendungsbeispiele:</u><ol>
 <br>
-Ereignissteuerung: <code>define di_rc_tv DOIF ([remotecontol] eq "on") (set tv on) DOELSE (set tv off)</code><br>
+Fernbedienung (Ereignissteuerung): <code>define di_rc_tv DOIF ([remotecontol] eq "on") (set tv on) DOELSE (set tv off)</code><br>
 <br>
-Zeitsteuerung: <code>define di_clock_radio DOIF ([06:30]) (set radio on) DOELSEIF ([08:00]) (set radio off)</code><br>
+Zeitschaltuhr (Zeitsteuerung): <code>define di_clock_radio DOIF ([06:30]) (set radio on) DOELSEIF ([08:00]) (set radio off)</code><br>
 <br>
 Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
 </ol><br>
@@ -1315,6 +1444,24 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
 + Verzögerungsangaben mit Zurückstellung sind möglich (watchdog-Funktionalität)<br>
 + Der Ausführungsteil kann jeweils ausgelassen werden. Damit kann das Modul für reine Statusanzeige genutzt werden<br>
 </ol><br>
+<b>Lesbarkeit der Definitionen</b><br>
+<br>
+Da die Definitionen im Laufe der Zeit recht umfangreich werden können, sollten die gleichen Regeln beachtet werde, wie auch beim Programmieren in höheren Sprachen. Dazu zählt das Einrücken von Befehlen, Zeilenumbrüche, 
+sowie das Kommentieren seiner Definition, damit man auch später noch die Funktionalität seines Moduls nachvollziehen kann.<br>
+<br>
+Das Modul unterstützt dazu Einrückungen, Zeilenumbrüche an beliebiger Stelle und Kommentierungen beginnend mit ## bis zum Ende der Zeile.
+Die Formatierungen lassen sich im DEF-Editor der Web-Oberfläche vornehmen.<br>
+<br>
+So könnte eine Definition aussehen:<br>
+<br>
+<code>define di_Modul DOIF ([Switch1] eq "on" and [Switch2] eq "on")  ## wenn Schalter 1 und Schalter 2 on ist<br>
+<br>
+<ol>(set lamp on) ## wird Lampe eingeschaltet</ol>
+<br>
+DOELSE ## im sonst-Fall, also wenn einer der Schalter off ist<br>
+<br>
+<ol>(set lamp off) ## wird die Lampe ausgeschaltet</ol></code>
+<br>
 Im Folgenden wird die Funktionalität des Moduls im Einzelnen an vielen praktischen Beispielen erklärt.<br>
 <br>
 <b>Ereignissteuerung</b><br>
@@ -1372,7 +1519,7 @@ Die logische Verknüpfung "and" mehrerer Ereignisse ist nicht sinnvoll, da zu ei
 <br>
 <b>Angaben im Ausführungsteil</b>:<br>
 <br>
-Der Ausführungsteil wird immer wie die Bedingung in runden Klammern angegeben. Es werden standardmäßig FHEM-Befehle angegeben, wie z. B.: <code>...(set lamp on)</code><br>
+Der Ausführungsteil wird immer, wie die Bedingung, in runden Klammern angegeben. Es werden standardmäßig FHEM-Befehle angegeben, wie z. B.: <code>...(set lamp on)</code><br>
 <br>
 Sollen mehrere FHEM-Befehle ausgeführt werden, so werden sie mit Komma statt mit Semikolon angegeben <code>... (set lamp1 on, set lamp2 off)</code><br>
 <br>
@@ -1452,11 +1599,20 @@ attr di_gong do always</code><br>
 <br>
 Hinter der Zeitangabe kann ein oder mehrere Wochentage als Ziffer getrennt mit einem Pipezeichen | angegeben werden. Die Syntax lautet:<br>
 <br>
-<ol><code>[&lt;time&gt;|012345678]</code> 0-8 entspricht: 0-Sonntag, 1-Montag, ... bis 6-Samstag sowie 7 für Wochende und Feiertage (entspricht $we) und 8 für Arbeitstage (entspricht !$we)<br></ol>
+<code>[&lt;time&gt;|012345678]</code> 0-8 entspricht: 0-Sonntag, 1-Montag, ... bis 6-Samstag sowie 7 für Wochenende und Feiertage (entspricht $we) und 8 für Arbeitstage (entspricht !$we)<br>
 <br>
 <u>Anwendungsbeispiel</u>: Radio soll am Wochenende und an Feiertagen um 08:30 Uhr eingeschaltet und um 09:30 Uhr ausgeschaltet werden. An Arbeitstagen soll das Radio um 06:30 Uhr eingeschaltet und um 07:30 Uhr ausgeschaltet werden.<br>
 <br>
 <code>define di_radio DOIF ([06:30|8] or [08:30|7]) (set radio on) DOELSEIF ([07:30|8] or [09:30|7]) (set radio off)</code><br>
+<br>
+Anstatt einer Zifferkombination kann ein Status oder Reading in eckigen Klammern angegeben werden. Dieser muss zum Triggerzeitpunkt mit der gewünschten Ziffernkombination für Wochentage, wie oben definiert, belegt sein.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Der Wochentag soll über einen Dummy bestimmt werden.<br>
+<br>
+<code>define dummy Wochentag<br>
+set Wochentag 135<br>
+<br>
+define di_radio DOIF ([06:30|[Wochentag]] (set radio on) DOELSEIF ([07:30|[Wochentag]]) (set radio off)</code><br>
 <br>
 <b>Zeitsteuerung mit Zeitintervallen</b><br>
 <br>
@@ -1504,7 +1660,7 @@ Einschalten am Freitag ausschalten am Montag:<br>
 <br>
 Schalten mit Zeitfunktionen, hier: bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
-<code>define di_light DOIF ([{sunrise_abs()}-{sunset(1800,"17:00","21:00")}])(set outdoorlight off) DOELSE (set outdoorlight on)</code><br>
+<code>define di_light DOIF ([+{sunrise_rel(900,"06:00","08:00")}]) (set outdoorlight off) DOELSEIF ([+{sunset_rel(900,"17:00","21:00")}]) (set outdoorlight on)</code><br>
 <br>
 <b>Indirekten Zeitangaben</b><br>
 <br>
@@ -1637,11 +1793,46 @@ Es soll aus einem Reading, das z. B. ein Prozentzeichen beinhaltet, nur der Zahl
 <br>
 <b>Verzögerungen</b><br>
 <br>
-Verzögerungen für die Ausführung von Kommandos werden pro Kommando über das Attribut "wait" definiert. Syntax:<br>
+Verzögerungen für die Ausführung von Kommandos werden pro Befehlsfolge über das Attribut "wait" definiert. Syntax:<br>
 <br>
-<code>attr &lt;Modulname&gt; wait &lt;Sekunden für das erste Kommando&gt;:&lt;Sekunden für das zweite Kommando&gt;:...<br></code>
+<code>attr &lt;Modulname&gt; wait &lt;Sekunden für Befehlsfolge des ersten DO-Falls&gt;:&lt;Sekunden für Befehlsfolge des zweiten DO-Falls&gt;:...<br></code>
 <br>
-Für Kommandos ohne Verzögerung werden Sekundenangaben ausgelassen oder auf Null gesetzt. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein anders Kommando, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
+Statt Sekundenangaben können ebenfalls Stati in eckigen Klammen oder Perlbefehle angegeben werden.<br>
+<br>
+Beispiel: <code>attr &lt;Modulname&gt; wait 1:[Verzoegerung]:rand(600)</code><br>
+<br>
+Hier wird der erste DO-Fall um eine Sekunde verzögert, der zweite wird durch die Angabe des Dummys "Verzoegerung" bestimmt, der dritte wird durch eine zufällige Sekundenzahl bis 600 Sekunden bestimmt.<br>
+<br>
+Sollen Verzögerungen innerhalb von Befehlsfolgen stattfinden, so müssen diese Komandos in eigene Klammern gesetzt werden, das Modul arbeitet dann mit Zwischenzuständen.<br>
+<br>
+Bespiel: Bei einer Befehlssequenz, hier: <code>(set lamp1 on, set lamp2 on)</code>, soll vor dem Schalten von <code>lamp2</code> eine Verzögerung von einer Sekunde stattfinden.
+Die Befehlsfolge muss zunächst mit Hilfe von Klammerblöcke aufgespaltet werden: <code>(set lamp1 on)(set lamp2 on)</code>.
+Nun kann mit dem wait-Attribut nicht nur für den Beginn der Sequenz, sondern für jeden Klammerblock eine Verzögerung, getrennt mit Komma, definieren werden,
+ hier also: <code>wait 0,1</code>. Damit wird <code>lamp1</code> sofort, <code>lamp2</code> nach einer Sekunden geschaltet.<br>
+<br> 
+Beispieldefinition bei mehreren DO-Blöcken mit mehreren Sequenzen:<br>
+<br>
+<code>DOIF (Bedingung1)<br>
+(set ...) #erster Befehl der ersten Sequenz soll um eine Sekunde verzögert werden<br>
+(set ...) #zweiter Befehl der ersten Sequenz soll um 2 Sekunden verzögert werden<br>
+DOELSE (Bedingung2)<br>
+(set ...) #erster Befehl der zweiten Sequenz soll um 3 Sekunden verzögert werden<br>
+(set ...) #zweiter Befehl der zweiten Sequenz soll um 0,5 Sekunden verzögert werden<br>
+<br>
+attr &lt;Modulname&gt; wait 1,2:3,0.5</code><br>
+<br>
+Für Kommandos ohne Verzögerung werden Sekundenangaben ausgelassen oder auf Null gesetzt. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein Kommando eines anderen DO-Falls, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
+<br>
+<b>Verzögerungen auf Timer</b><br>
+<br>
+Verzögerungen können mit Hilfe des Attributs <code>timerwithWait</code> auf Timer ausgeweitet werden.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Lampe soll zufällig nach Sonnenuntergang verzögert werden.<br>
+<br>
+<code>define di_rand_sunset([{sunset()}])(set lamp on)<br>
+attr di_rand_sunset wait rand(1200)<br>
+attr di_rand_sunset timerWithWait<br>
+attr di_rand_sunset do always</code><br>
 <br>
 <u>Anwendungsbeispiel</u>: Benachrichtung "Waschmaschine fertig", wenn Verbrauch mindestens 5 Minuten unter 2 Watt (Perl-Code wird in geschweifte Klammern gesetzt):<br>
 <br>
@@ -1811,6 +2002,19 @@ Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwer
 <br>
 Das ist insb. dann sinnvoll, wenn das System ohne Sicherung der Konfiguration (unvorhergesehen) beendet wurde und nach dem Neustart die zuletzt gespeicherten Zustände des Moduls nicht mit den tatsächlichen übereinstimmen.<br>
 <br>
+<b>Deaktivieren des Moduls</b><br>
+<br>
+Ein DOIF-Modul kann mit Hilfe des Attributes disable, deaktiviert werden. Dabei werden alle Timer und Readings des Moduls gelöscht.
+Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>set &lt;Modulname&gt; disable</code> geschehen. 
+Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerding werden keine Befehle ausgeführt.
+Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut deaktiviert wird. In beiden Fällen bleibt der Zustand nach dem Neustart erhalten, das Modul bleibt deaktiviert.<br>
+<br>
+<b>Initialisieren des Moduls</b><br>
+<br>
+Mit <code>set &lt;Modulname&gt; initialize</code> wird ein mit <code>set &lt;Modulname&gt; disable</code> deaktiviertes Modul wieder aktiviert.
+Das Kommando <code>set &lt;Modulname&gt; initialize</code> kann auch dazu genutzt werden ein aktives Modul zu initialisiert,
+in diesem Falle wird der letzte Zustand des Moduls gelöscht, damit wird ein Zustandswechsel herbeigeführt, der nächste Trigger führt zur Ausführung.<br>
+<br>
 <b>Weitere Anwendungsbeispiele</b><br>
 <br>
 Zweipunktregler a la THRESHOLD<br>
@@ -1824,17 +2028,15 @@ Eleganter lässt sich ein Zweipunktregler (Thermostat) mit Hilfe des, für solch
 <br>
 on-for-timer<br>
 <br>
-Die Nachbildung eines on-for-timers lässt sich mit zwei DOIF´s und einem Dummy realisieren:<br>
+Die Nachbildung eines on-for-timers lässt sich wie folgt realisieren:<br>
 <br>
-<code>define switch_d dummy<br>
+<code>define di_on_for_timer ([detector:?motion])<br>
+  (set light on)<br>
+  (set light off)<br>
+attr di_on_for_timer do resetwait<br>
+attr di_on_for_timer wait 0,30</code><br>
 <br>
-define di_switch DOIF ([detector:?motion]) (set switch_d on, set switch_d off)<br>
-attr di_switch do always<br>
-<br>
-define di_light DOIF ([switch_d] eq "on") (set light on) DOELSE (set light off)<br>
-attr di_light wait 0:300</code><br>
-<br>
-Hiermit wird das Licht bei Bewegung eingeschaltet. Dabei wird, solange es brennt, bei jeder Bewegung die Ausschaltzeit auf 5 Minuten neugesetzt, "set light on" wird dabei nicht unnötig wiederholt.<br>
+Hiermit wird das Licht bei Bewegung eingeschaltet. Dabei wird, solange es brennt, bei jeder Bewegung die Ausschaltzeit neu auf 30 Sekunden gesetzt, "set light on" wird dabei nicht unnötig wiederholt.<br>
 <br>
 Die Beispiele stellen nur eine kleine Auswahl von möglichen Problemlösungen dar. Da sowohl in der Bedingung (hier ist die komplette Perl-Syntax möglich), als auch im Ausführungsteil, keine Einschränkungen gegeben sind, sind die Möglichkeiten zur Lösung eigener Probleme mit Hilfe des Moduls sehr vielfältig.<br>
 <br>
