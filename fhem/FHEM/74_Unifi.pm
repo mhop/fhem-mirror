@@ -1,5 +1,5 @@
-###############################################################################
-# $Id: 74_Unifi.pm 2015-08-29 21:00 - rapster - rapster at x0e dot de $ 
+##############################################################################
+# $Id: 74_Unifi.pm 2015-08-31 23:00 - rapster - rapster at x0e dot de $ 
 
 package main;
 use strict;
@@ -7,7 +7,50 @@ use warnings;
 use HttpUtils;
 use POSIX;
 use JSON qw(decode_json);
-###############################################################################
+##############################################################################}
+
+###  Forward declarations ####################################################{
+sub Unifi_Initialize($$);
+sub Unifi_Define($$);
+sub Unifi_Undef($$);
+sub Unifi_Notify($$);
+sub Unifi_Set($@);
+sub Unifi_Get($@);
+sub Unifi_Attr(@);
+sub Unifi_DoUpdate($@);
+sub Unifi_Login_Send($);
+sub Unifi_Login_Receive($);
+sub Unifi_GetClients_Send($);
+sub Unifi_GetClients_Receive($);
+sub Unifi_GetWlans_Send($);
+sub Unifi_GetWlans_Receive($);
+sub Unifi_GetHealth_Send($);
+sub Unifi_GetHealth_Receive($);
+sub Unifi_GetWlanGroups_Send($);
+sub Unifi_GetWlanGroups_Receive($);
+sub Unifi_GetUnarchivedAlerts_Send($);
+sub Unifi_GetUnarchivedAlerts_Receive($);
+sub Unifi_GetEvents_Send($);
+sub Unifi_GetEvents_Receive($);
+sub Unifi_GetAccesspoints_Send($);
+sub Unifi_GetAccesspoints_Receive($);
+sub Unifi_ProcessUpdate($);
+sub Unifi_SetClientReadings($);
+sub Unifi_SetAccesspointReadings($);
+sub Unifi_DisconnectClient_Send($@);
+sub Unifi_DisconnectClient_Receive($);
+sub Unifi_ApCmd_Send($$@);
+sub Unifi_ApCmd_Receive($);
+sub Unifi_ArchiveAlerts_Send($);
+sub Unifi_Cmd_Receive($);
+sub Unifi_ClientNames($@);
+sub Unifi_ApNames($@);
+sub Unifi_NextUpdateFn($$);
+sub Unifi_ReceiveFailure($$);
+sub Unifi_CONNECTED($@);
+sub Unifi_Whoami();
+sub Unifi_Whowasi();
+##############################################################################}
 
 sub Unifi_Initialize($$) { 
     my ($hash) = @_; 
@@ -19,6 +62,8 @@ sub Unifi_Initialize($$) {
     $hash->{NotifyFn}  = "Unifi_Notify";
     $hash->{AttrList}  = "disable:1,0 "
                          ."devAlias "
+                         ."httpLoglevel:1,2,3,4,5 "
+                         ."eventPeriod "
                          .$readingFnAttributes;
 }
 ###############################################################################
@@ -36,20 +81,21 @@ sub Unifi_Define($$) {
     %$hash = (   %$hash,
         NOTIFYDEV => 'global',
         unifi     => { 
-            CONNECTED => 0,
-            interval  => $a[6] || 30,
-            version   => $a[8] || 4,
-            url       => "https://".$a[2].(($a[3] == 443) ? '' : ':'.$a[3]).'/api/s/'.(($a[7]) ? $a[7] : 'default').'/',
+            CONNECTED   => 0,
+            eventPeriod => int(AttrVal($name,"eventPeriod",24)),
+            interval    => $a[6] || 30,
+            version     => $a[8] || 4,
+            url         => "https://".$a[2].(($a[3] == 443) ? '' : ':'.$a[3]).'/api/s/'.(($a[7]) ? $a[7] : 'default').'/',
         },
     );
     $hash->{httpParams} = {
         hash            => $hash,
-        timeout         => 4,
+        timeout         => 5,
         method          => "POST",
         noshutdown      => 0,
         ignoreredirects => 1,
-        loglevel        => 5,
-        sslargs         => { SSL_verify_mode => 'SSL_VERIFY_NONE' },
+        loglevel        => AttrVal($name,"httpLoglevel",5),
+        sslargs         => { SSL_version => 'SSLv23', SSL_verify_mode => 'SSL_VERIFY_NONE' },
     };
     if($hash->{unifi}->{version} == 3) {
         ( $hash->{httpParams}->{loginUrl} = $hash->{unifi}->{url} ) =~ s/api\/s.+/login/;
@@ -80,10 +126,10 @@ sub Unifi_Notify($$) {
     return if(!grep(m/^DEFINED|MODIFIED|INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
     if(AttrVal($name, "disable", 0)) {
-        Log3 $name, 5, "$name ($self) - DEFINED|MODIFIED|INITIALIZED|REREADCFG - Device '$name' is disabled, do nothing...";
+        Log3 $name, 5, "$name ($self) - executed. - Device '$name' is disabled, do nothing...";
         Unifi_CONNECTED($hash,'disabled');
     } else {
-        Log3 $name, 5, "$name ($self) - DEFINED|MODIFIED|INITIALIZED|REREADCFG - Remove all Timers & Call DoUpdate...";
+        Log3 $name, 5, "$name ($self) - executed. - Remove all Timers & Call DoUpdate...";
         Unifi_CONNECTED($hash,'initialized');
         Unifi_DoUpdate($hash);
     }
@@ -104,12 +150,81 @@ sub Unifi_Set($@) {
         return undef;
     }
     
-    if($setName !~ /update|clear/) {
-        return "Unknown argument $setName, choose one of update:noArg clear:all,readings,clientData";
+    my $clientNames = Unifi_ClientNames($hash);
+    my $apNames = Unifi_ApNames($hash);
+    
+    if($setName !~ /archiveAlerts|restartAP|setLocateAP|unsetLocateAP|disconnectClient|update|clear/) {
+        return "Unknown argument $setName, choose one of update:noArg "
+               ." clear:all,readings,clientData "
+               .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "archiveAlerts:noArg " : "")
+               .(($apNames && Unifi_CONNECTED($hash)) ? "restartAP:all,$apNames setLocateAP:all,$apNames unsetLocateAP:all,$apNames " : "")
+               .(($clientNames && Unifi_CONNECTED($hash)) ? "disconnectClient:all,$clientNames" : "");
     }
     else {
         Log3 $name, 4, "$name: set $setName";
         
+        if (Unifi_CONNECTED($hash)) {
+            if ($setName eq 'disconnectClient') {
+                if ($setVal && $setVal ne 'all') {
+                    $setVal = Unifi_ClientNames($hash,$setVal,'makeID');
+                    if (defined $hash->{clients}->{$setVal}) {
+                        Unifi_DisconnectClient_Send($hash,$setVal);
+                    }
+                    else {
+                        return "$hash->{NAME}: Unknown client '$setVal' in command '$setName', choose one of: all,$clientNames";
+                    }
+                }
+                elsif (!$setVal || $setVal eq 'all') {
+                    Unifi_DisconnectClient_Send($hash,keys(%{$hash->{clients}}));
+                }
+            }
+            elsif ($setName eq 'archiveAlerts' && defined $hash->{alerts_unarchived}[0]) {
+                Unifi_ArchiveAlerts_Send($hash);
+                undef @{$hash->{alerts_unarchived}};
+            }
+            elsif ($setName eq 'restartAP') {
+                if ($setVal && $setVal ne 'all') {
+                    $setVal = Unifi_ApNames($hash,$setVal,'makeID');
+                    if (defined $hash->{accespoints}->{$setVal}) {
+                        Unifi_ApCmd_Send($hash,'restart',$setVal);
+                    }
+                    else {
+                        return "$hash->{NAME}: Unknown accesspoint '$setVal' in command '$setName', choose one of: all,$apNames";
+                    }
+                }
+                elsif (!$setVal || $setVal eq 'all') {
+                    Unifi_ApCmd_Send($hash,'restart',keys(%{$hash->{accespoints}}));
+                }
+            }
+            elsif ($setName eq 'setLocateAP') {
+                if ($setVal && $setVal ne 'all') {
+                    $setVal = Unifi_ApNames($hash,$setVal,'makeID');
+                    if (defined $hash->{accespoints}->{$setVal}) {
+                        Unifi_ApCmd_Send($hash,'set-locate',$setVal);
+                    }
+                    else {
+                        return "$hash->{NAME}: Unknown accesspoint '$setVal' in command '$setName', choose one of: all,$apNames";
+                    }
+                }
+                elsif (!$setVal || $setVal eq 'all') {
+                    Unifi_ApCmd_Send($hash,'set-locate',keys(%{$hash->{accespoints}}));
+                }
+            }
+            elsif ($setName eq 'unsetLocateAP') {
+                if ($setVal && $setVal ne 'all') {
+                    $setVal = Unifi_ApNames($hash,$setVal,'makeID');
+                    if (defined $hash->{accespoints}->{$setVal}) {
+                        Unifi_ApCmd_Send($hash,'unset-locate',$setVal);
+                    }
+                    else {
+                        return "$hash->{NAME}: Unknown accesspoint '$setVal' in command '$setName', choose one of: all,$apNames";
+                    }
+                }
+                elsif (!$setVal || $setVal eq 'all') {
+                    Unifi_ApCmd_Send($hash,'unset-locate',keys(%{$hash->{accespoints}}));
+                }
+            }
+        } 
         if ($setName eq 'update') {
             RemoveInternalTimer($hash);
             Unifi_DoUpdate($hash,1);
@@ -134,39 +249,46 @@ sub Unifi_Get($@) {
 	return "\"get $hash->{NAME}\" needs at least one argument" if ( @a < 2 );
     my ($name,$getName,$getVal) = @a;
     
-    my $clients = '';
-    my $devAliases = AttrVal($name,"devAlias",0);
-    for (keys %{$hash->{clients}}) {  # Replace ID's with Aliases
-        if (   ($devAliases && $devAliases =~ /$_:(.+?)(\s|$)/)
-            || ($devAliases && defined $hash->{clients}->{$_}->{name} && $devAliases =~ /$hash->{clients}->{$_}->{name}:(.+?)(\s|$)/)
-            || ($devAliases && defined $hash->{clients}->{$_}->{hostname} && $devAliases =~ /$hash->{clients}->{$_}->{hostname}:(.+?)(\s|$)/)
-            || (defined $hash->{clients}->{$_}->{name} && $hash->{clients}->{$_}->{name} =~ /^([\w\.\-]+)$/) 
-            || (defined $hash->{clients}->{$_}->{hostname} && $hash->{clients}->{$_}->{hostname} =~ /^([\w\.\-]+)$/)
-           ) { 
-            $_ = $1; 
-        }
-        $clients .= ','.$_;
-    }
+    my $clientNames = Unifi_ClientNames($hash);
     
-    if($getName !~ /clientData/) {
-        return "Unknown argument $getName, choose one of ".(($clients) ? "clientData:all$clients" : "");
-    } 
-    elsif ($getName eq 'clientData' && $clients) {
-        if($getVal && $getVal ne 'all') {   # Make ID from Alias
-            for (keys %{$hash->{clients}}) {
-                if (   ($devAliases && $devAliases =~ /$_:$getVal/)
-                    || ($devAliases && defined $hash->{clients}->{$_}->{name} && $devAliases =~ /$hash->{clients}->{$_}->{name}:$getVal/)
-                    || ($devAliases && defined $hash->{clients}->{$_}->{hostname} && $devAliases =~ /$hash->{clients}->{$_}->{hostname}:$getVal/)
-                    || (defined $hash->{clients}->{$_}->{name} && $hash->{clients}->{$_}->{name} eq $getVal) 
-                    || (defined $hash->{clients}->{$_}->{hostname} && $hash->{clients}->{$_}->{hostname} eq $getVal)
-                   ) { 
-                    $getVal = $_;
-                    last;
+    if($getName !~ /events|clientData|unarchivedAlerts/) {
+        return "Unknown argument $getName, choose one of "
+               .((defined $hash->{events}[0] && scalar @{$hash->{events}}) ? "events:noArg " : "")
+               .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "unarchivedAlerts:noArg " : "")
+               .(($clientNames) ? "clientData:all,$clientNames" : "");
+    }
+    elsif ($getName eq 'unarchivedAlerts' && defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) {
+        my $alerts = "====================================================\n";
+        for my $alert (@{$hash->{alerts_unarchived}}) {
+            for (sort keys %{$alert}) {
+                if ($_ !~ /^(archived|_id|handled_admin_id|site_id|datetime|handled_time)$/) {
+                    $alert->{$_} = strftime "%Y-%m-%d %H:%M:%S",localtime($alert->{$_} / 1000) if($_ eq 'time');
+                    $alerts .= "$_ = ".((defined $alert->{$_}) ? $alert->{$_} : '')."\n";
                 }
             }
+            $alerts .= "====================================================\n";
         }
+        return $alerts;
+    }
+    elsif ($getName eq 'events' && defined $hash->{events}[0] && scalar @{$hash->{events}}) {
+        my $events = "==================================================================\n";
+        for my $event (@{$hash->{events}}) {
+            for (sort keys %{$event}) {
+                if ($_ !~ /^(_id|site_id|subsystem|datetime|is_admin)$/) {
+                    $event->{$_} = strftime "%Y-%m-%d %H:%M:%S",localtime($event->{$_} / 1000) if($_ eq 'time');
+                    $events .= "$_ = ".((defined $event->{$_}) ? $event->{$_} : '')."\n";
+                }
+            }
+            $events .= "==================================================================\n";
+        }
+        return $events;
+    }
+    elsif ($getName eq 'clientData' && $clientNames) {
         my $clientData = '';
-        if(!$getVal || $getVal eq 'all') {
+        if ($getVal && $getVal ne 'all') {
+            $getVal = Unifi_ClientNames($hash,$getVal,'makeID');
+        } 
+        if (!$getVal || $getVal eq 'all') {
             $clientData .= "======================================\n";
             for my $client (sort keys %{$hash->{clients}}) {
                 for (sort keys %{$hash->{clients}->{$client}}) {
@@ -185,7 +307,7 @@ sub Unifi_Get($@) {
             return $clientData;
         } 
         else {
-            return "$hash->{NAME}: Unknown client '$getVal' in command '$getName', choose one of: all$clients";
+            return "$hash->{NAME}: Unknown client '$getVal' in command '$getName', choose one of: all,$clientNames";
         }
     }
     return undef;
@@ -217,11 +339,27 @@ sub Unifi_Attr(@) {
                        ."Only these characters are allowed: [alphanumeric - _ .]";
             }
         }
+        elsif($attr_name eq "httpLoglevel") {
+            $hash->{httpParams}->{loglevel} = $attr_value;
+        }
+        elsif($attr_name eq "eventPeriod") {
+            if (!looks_like_number($attr_value) || int($attr_value) < 1 || int($attr_value) > 168) {
+                return "$name: Value \"$attr_value\" is not allowed.\n"
+                       ."eventPeriod must be a number between 1 and 168."
+            }
+            $hash->{unifi}->{eventPeriod} = int($attr_value);
+        }
     }
     elsif($cmd eq "del") {
         if($attr_name eq "disable" && Unifi_CONNECTED($hash) eq "disabled") {
             Unifi_CONNECTED($hash,'initialized');
             Unifi_DoUpdate($hash);
+        }
+        elsif($attr_name eq "httpLoglevel") {
+            $hash->{httpParams}->{loglevel} = 5;
+        }
+        elsif($attr_name eq "eventPeriod") {
+            $hash->{unifi}->{eventPeriod} = 24;
         }
     }
     return undef;
@@ -246,7 +384,8 @@ sub Unifi_DoUpdate($@) {
             Unifi_GetWlans_Send => [\&Unifi_GetWlans_Send,'Unifi_GetWlans_Receive',\&Unifi_GetWlans_Receive],
             Unifi_GetUnarchivedAlerts_Send => [\&Unifi_GetUnarchivedAlerts_Send,'Unifi_GetUnarchivedAlerts_Receive',\&Unifi_GetUnarchivedAlerts_Receive],
             Unifi_GetEvents_Send => [\&Unifi_GetEvents_Send,'Unifi_GetEvents_Receive',\&Unifi_GetEvents_Receive],
-            Unifi_GetWlanGroups_Send => [\&Unifi_GetWlanGroups_Send,'Unifi_GetWlanGroups_Receive',\&Unifi_GetWlanGroups_Receive],
+            # Unifi_GetWlanGroups_Send => [\&Unifi_GetWlanGroups_Send,'Unifi_GetWlanGroups_Receive',\&Unifi_GetWlanGroups_Receive],
+            Unifi_GetHealth_Send => [\&Unifi_GetHealth_Send,'Unifi_GetHealth_Receive',\&Unifi_GetHealth_Receive],
             Unifi_ProcessUpdate   => [\&Unifi_ProcessUpdate,''],
         };
         Unifi_NextUpdateFn($hash,$self);
@@ -425,6 +564,49 @@ sub Unifi_GetWlans_Receive($) {
     return undef;
 }
 ###############################################################################
+sub Unifi_GetHealth_Send($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        url      => $hash->{unifi}->{url}."stat/health",
+        callback => $hash->{updateDispatch}->{$self}[2],
+    } );
+    return undef;
+}
+sub Unifi_GetHealth_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+            
+            if ($data->{meta}->{rc} eq "ok") {
+                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+                
+                for my $h (@{$data->{data}}) {
+                    if (defined($h->{subsystem}) && $h->{subsystem} eq 'wlan') {
+                        $hash->{wlan_health} = $h;
+                    }
+                }
+            }
+            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
+    
+    Unifi_NextUpdateFn($hash,$self);
+    return undef;
+}
+###############################################################################
 sub Unifi_GetWlanGroups_Send($) {
     my ($hash) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
@@ -453,7 +635,7 @@ sub Unifi_GetWlanGroups_Receive($) {
                 Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
                 
                 for my $h (@{$data->{data}}) {
-                    $hash->{wlangroups}->{$h->{_id}} = $h;
+                    $hash->{wlangroup}->{$h->{_id}} = $h;
                 }
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
@@ -475,7 +657,7 @@ sub Unifi_GetUnarchivedAlerts_Send($) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."list/alarm",
         callback => $hash->{updateDispatch}->{$self}[2],
-        data     => "{'_sort': '-time', 'archived': False}",
+        data     => "{'_sort': '-time', 'archived': false}",
     } );
     return undef;
 }
@@ -494,9 +676,7 @@ sub Unifi_GetUnarchivedAlerts_Receive($) {
             if ($data->{meta}->{rc} eq "ok") {
                 Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
                 
-                for my $h (@{$data->{data}}) {
-                    $hash->{alerts_unarchived}->{$h->{_id}} = $h;
-                }
+                $hash->{alerts_unarchived} = $data->{data}; #array
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
         } else {
@@ -517,7 +697,7 @@ sub Unifi_GetEvents_Send($) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."stat/event",
         callback => $hash->{updateDispatch}->{$self}[2],
-        data     => "{'within': 24}",    # last 24 hours
+        data     => "{'_sort': '-time', 'within': ".$hash->{unifi}->{eventPeriod}."}",    # last 24 hours
     } );
     return undef;
 }
@@ -536,9 +716,7 @@ sub Unifi_GetEvents_Receive($) {
             if ($data->{meta}->{rc} eq "ok") {
                 Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
                 
-                for my $h (@{$data->{data}}) {
-                    $hash->{events}->{$h->{_id}} = $h;
-                }
+                $hash->{events} = $data->{data}; #array
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
         } else {
@@ -600,35 +778,10 @@ sub Unifi_ProcessUpdate($) {
     
     readingsBeginUpdate($hash);
     #'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''#
-    
-    ### WLAN Client Readings
-    my ($clientName,$clientRef);
-    my $devAliases = AttrVal($name,"devAlias",0);
-    for my $clientID (keys %{$hash->{clients}}) {
-        $clientRef = $hash->{clients}->{$clientID};
-        
-        if (   ($devAliases && $devAliases =~ /$clientID:(.+?)(\s|$)/)
-            || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$clientRef->{name}:(.+?)(\s|$)/)
-            || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$clientRef->{hostname}:(.+?)(\s|$)/)
-            || (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/) 
-            || (defined $clientRef->{hostname} && $clientRef->{hostname} =~ /^([\w\.\-]+)$/)
-           ) {
-            $clientName = $1;
-        } else { $clientName = $clientID; }
-        
-        if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {
-            readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
-            readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
-            readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
-            readingsBulkUpdate($hash,$clientName,'connected');
-        }
-        elsif (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName}->{VAL} ne 'disconnected') {
-            Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
-            readingsBulkUpdate($hash,$clientName,'disconnected');
-        }
-    }
-    ### Other...
-    
+    Unifi_SetHealthReadings($hash);
+    Unifi_SetClientReadings($hash);
+    Unifi_SetAccesspointReadings($hash);
+    ## WLANGROUPS ???
     #'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''#
     readingsEndUpdate($hash,1);
     
@@ -636,6 +789,303 @@ sub Unifi_ProcessUpdate($) {
     InternalTimer(time()+$hash->{unifi}->{interval}, 'Unifi_DoUpdate', $hash, 0);
     
     return undef;
+}
+###############################################################################
+
+sub Unifi_SetClientReadings($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    my ($apName,$clientName,$apRef,$clientRef);
+    
+    for my $clientID (keys %{$hash->{clients}}) {
+        $clientRef = $hash->{clients}->{$clientID};
+        $clientName = Unifi_ClientNames($hash,$clientID,'makeAlias');
+        
+        for my $apID (keys %{$hash->{accespoints}}) {
+            $apRef = $hash->{accespoints}->{$apID};
+            if ($apRef->{mac} eq $clientRef->{ap_mac}) {
+                $apName = ($apRef->{name}) ? $apRef->{name} : $apRef->{ip};
+                last;
+            }
+        }
+        
+        if (defined $hash->{unifi}->{connectedClients}->{$clientID}) {
+            readingsBulkUpdate($hash,$clientName."_hostname",(defined $clientRef->{hostname}) ? $clientRef->{hostname} : (defined $clientRef->{ip}) ? $clientRef->{ip} : 'Unknown');
+            readingsBulkUpdate($hash,$clientName."_last_seen",strftime "%Y-%m-%d %H:%M:%S",localtime($clientRef->{last_seen}));
+            readingsBulkUpdate($hash,$clientName."_uptime",$clientRef->{uptime});
+            readingsBulkUpdate($hash,$clientName."_snr",$clientRef->{rssi});
+            readingsBulkUpdate($hash,$clientName."_accesspoint",$apName);
+            readingsBulkUpdate($hash,$clientName,'connected');
+        }
+        elsif (defined($hash->{READINGS}->{$clientName}) && $hash->{READINGS}->{$clientName}->{VAL} ne 'disconnected') {
+            Log3 $name, 5, "$name ($self) - Client '$clientName' previously connected is now disconnected.";
+            readingsBulkUpdate($hash,$clientName,'disconnected');
+        }
+    }
+    
+    return undef;
+}
+###############################################################################
+sub Unifi_SetHealthReadings($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    readingsBulkUpdate($hash,'#UC_wlan_state',$hash->{wlan_health}->{status});
+    readingsBulkUpdate($hash,'#UC_wlan_users',$hash->{wlan_health}->{num_user});
+    readingsBulkUpdate($hash,'#UC_wlan_accesspoints',$hash->{wlan_health}->{num_ap});
+    readingsBulkUpdate($hash,'#UC_wlan_guests',$hash->{wlan_health}->{num_guest});
+    readingsBulkUpdate($hash,'#UC_unarchived_alerts',scalar @{$hash->{alerts_unarchived}});
+    readingsBulkUpdate($hash,'#UC_events',scalar(@{$hash->{events}}).' (last '.$hash->{unifi}->{eventPeriod}.'h)');
+    
+    return undef;
+}
+###############################################################################
+sub Unifi_SetAccesspointReadings($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    my ($apName,$apRef,$essid);
+    for my $apID (keys %{$hash->{accespoints}}) {
+        $essid = '';
+        $apRef = $hash->{accespoints}->{$apID};
+        $apName = ($apRef->{name}) ? $apRef->{name} : $apRef->{ip};
+        
+        if (defined $apRef->{vap_table} && scalar @{$apRef->{vap_table}}) {
+            for my $vap (@{$apRef->{vap_table}}) {
+                $essid .= $vap->{essid}.',';
+            }
+            $essid =~ s/.$//;
+        } else {
+            my $essid = 'none';
+        }
+        
+        readingsBulkUpdate($hash,'#AP_'.$apName.'_state',($apRef->{state} == 1) ? 'ok' : 'error');
+        readingsBulkUpdate($hash,'#AP_'.$apName.'_clients',$apRef->{'num_sta'});
+        readingsBulkUpdate($hash,'#AP_'.$apName.'_essid',$essid);
+        # readingsBulkUpdate($hash,'#AP_'.$apName.'_guests',$apRef->{'guest-num_sta'});
+        # readingsBulkUpdate($hash,'#AP_'.$apName.'_users',$apRef->{'user-num_sta'});
+        # readingsBulkUpdate($hash,'#AP_'.$apName.'_last_seen',$apRef->{'last_seen'});
+    }
+    
+    return undef;
+}
+###############################################################################
+
+sub Unifi_DisconnectClient_Send($@) {
+    my ($hash,@clients) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed with count:'".scalar(@clients)."', ID:'".$clients[0]."'";
+    
+    my $id = shift @clients;
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        url      => $hash->{unifi}->{url}."cmd/stamgr",
+        callback => \&Unifi_DisconnectClient_Receive,
+        clients  => [@clients],
+        data     => "{'mac': '".$hash->{clients}->{$id}->{mac}."', 'cmd': 'kick-sta'}",
+    } );
+    
+    return undef;
+}
+###############################################################################
+sub Unifi_DisconnectClient_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+            
+            if ($data->{meta}->{rc} eq "ok") {
+                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+            }
+            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
+    
+    if (scalar @{$param->{clients}}) {
+        Unifi_DisconnectClient_Send($hash,@{$param->{clients}});
+    }
+    
+    return undef;
+}
+###############################################################################
+
+sub Unifi_ApCmd_Send($$@) {     #cmd: 'set-locate', 'unset-locate', 'restart'
+    my ($hash,$cmd,@aps) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed with cmd:'".$cmd."', count:'".scalar(@aps)."', ID:'".$aps[0]."'";
+    
+    my $id = shift @aps;
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        url      => $hash->{unifi}->{url}."cmd/devmgr",
+        callback => \&Unifi_ApCmd_Receive,
+        aps      => [@aps],
+        cmd      => $cmd,
+        data     => "{'mac': '".$hash->{accespoints}->{$id}->{mac}."', 'cmd': '".$cmd."'}",
+    } );
+    return undef;
+}
+###############################################################################
+sub Unifi_ApCmd_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+            
+            if ($data->{meta}->{rc} eq "ok") {
+                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+            }
+            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
+    
+    if (scalar @{$param->{aps}}) {
+        Unifi_ApCmd_Send($hash,$param->{cmd},@{$param->{aps}});
+    }
+    
+    return undef;
+}
+###############################################################################
+
+sub Unifi_ArchiveAlerts_Send($) {
+    my ($hash) = @_;
+    my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    HttpUtils_NonblockingGet( {
+                 %{$hash->{httpParams}},
+        url      => $hash->{unifi}->{url}."cmd/evtmgr",
+        callback => \&Unifi_Cmd_Receive,
+        data     => "{'cmd': 'archive-all-alarms'}",
+    } );
+    return undef;
+}
+###############################################################################
+
+sub Unifi_Cmd_Receive($) {
+    my ($param, $err, $data) = @_;
+    my ($name,$self,$hash) = ($param->{hash}->{NAME},Unifi_Whoami(),$param->{hash});
+    Log3 $name, 5, "$name ($self) - executed.";
+    
+    if ($err ne "") {
+        Unifi_ReceiveFailure($hash,{rc => 'Error while requesting', msg => $param->{url}." - $err"});
+    }
+    elsif ($data ne "") {
+        if ($param->{code} == 200 || $param->{code} == 400  || $param->{code} == 401) {
+            eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
+            
+            if ($data->{meta}->{rc} eq "ok") {
+                Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
+            }
+            else { Unifi_ReceiveFailure($hash,$data->{meta}); }
+        } else {
+            Unifi_ReceiveFailure($hash,{rc => $param->{code}, msg => "Failed with HTTP Code $param->{code}."});
+        }
+    }
+    
+    return undef;
+}
+###############################################################################
+
+sub Unifi_ClientNames($@) {
+    my ($hash,$ID,$W) = @_;
+    
+    my $clientRef;
+    my $devAliases = AttrVal($hash->{NAME},"devAlias",0);
+    
+    if(defined $ID && defined $W && $W eq 'makeAlias') {   # Return Alias from ID
+        $clientRef = $hash->{clients}->{$ID};
+        if (   ($devAliases && $devAliases =~ /$ID:(.+?)(\s|$)/)
+            || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$clientRef->{name}:(.+?)(\s|$)/)
+            || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$clientRef->{hostname}:(.+?)(\s|$)/)
+            || (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/) 
+            || (defined $clientRef->{hostname} && $clientRef->{hostname} =~ /^([\w\.\-]+)$/)
+           ) {
+            $ID = $1;
+        }
+        return $ID;
+    }
+    elsif (defined $ID && defined $W && $W eq 'makeID') {   # Return ID from Alias
+        for my $clientID (keys %{$hash->{clients}}) {
+            $clientRef = $hash->{clients}->{$clientID};
+            if (   ($devAliases && $devAliases =~ /$clientID:$ID/)
+                || ($devAliases && defined $clientRef->{name} && $devAliases =~ /$clientRef->{name}:$ID/)
+                || ($devAliases && defined $clientRef->{hostname} && $devAliases =~ /$clientRef->{hostname}:$ID/)
+                || (defined $clientRef->{name} && $clientRef->{name} eq $ID) 
+                || (defined $clientRef->{hostname} && $clientRef->{hostname} eq $ID)
+               ) {
+                $ID = $clientID;
+                last;
+            }
+        }
+        return $ID;
+    }
+    else {  # Return all clients in a scalar
+        my $clients = '';
+        for my $clientID (keys %{$hash->{clients}}) {
+            $clients .= Unifi_ClientNames($hash,$clientID,'makeAlias').',';
+        }
+        $clients =~ s/.$//;
+        
+        return $clients;
+    }
+}
+###############################################################################
+sub Unifi_ApNames($@) {
+    my ($hash,$ID,$W) = @_;
+    
+    my $clientRef;
+    
+    if(defined $ID && defined $W && $W eq 'makeName') {   # Return Name or IP from ID
+        $clientRef = $hash->{accespoints}->{$ID};
+        if (   (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/) 
+            || (defined $clientRef->{ip} && $clientRef->{ip} =~ /^([\w\.\-]+)$/)
+           ) {
+            $ID = $1;
+        }
+        return $ID;
+    }
+    elsif (defined $ID && defined $W && $W eq 'makeID') {   # Return ID from Name or IP
+        for (keys %{$hash->{accespoints}}) {
+            $clientRef = $hash->{accespoints}->{$_};
+            if (   (defined $clientRef->{name} && $clientRef->{name} eq $ID) 
+                || (defined $clientRef->{ip} && $clientRef->{ip} eq $ID)
+               ) {
+                $ID = $_;
+                last;
+            }
+        }
+        return $ID;
+    }
+    else {  # Return all aps in a scalar
+        my $aps = '';
+        for my $apID (keys %{$hash->{accespoints}}) {
+            $aps .= Unifi_ApNames($hash,$apID,'makeName').',';
+        }
+        $aps =~ s/.$//;
+        
+        return $aps;
+    }
 }
 ###############################################################################
 
@@ -659,7 +1109,7 @@ sub Unifi_NextUpdateFn($$) {
 }
 ###############################################################################
 
-sub Unifi_ReceiveFailure($$$) {
+sub Unifi_ReceiveFailure($$) {
     my ($hash,$meta) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whowasi());
     
@@ -716,16 +1166,6 @@ sub Unifi_Whoami()  { return (split('::',(caller(1))[3]))[1] || ''; }
 sub Unifi_Whowasi() { return (split('::',(caller(2))[3]))[1] || ''; }
 ###############################################################################
 
-### KNOWN RESPONSES ###
-# { "data" : [ ] , "meta" : { "msg" : "api.err.Invalid" , "rc" : "error"}}         //Invalid Login credentials in v4, in v3 the login-html-page is returned
-# { "data" : [ ] , "meta" : { "rc" : "ok"}}
-# "api.err.NoPermission"
-# { "data" : [ ] , "meta" : { "msg" : "api.err.InvalidArgs" , "rc" : "error"}}     //posted data is not ok
-# { "data" : [ ] , "meta" : { "msg" : "api.err.InvalidObject" , "rc" : "error"}}   //Wrong siteID in v3
-# { "data" : [ ] , "meta" : { "msg" : "api.err.NoSiteContext" , "rc" : "error"}}   //Wrong siteID in v4
-# { "data" : [ ] , "meta" : { "msg" : "api.err.LoginRequired" , "rc" : "error"}}   //Login Required / cookie is invalid / While Login: Unifi v4 is used wiith controller v3
-###############################################################################
-
 
 1;
 
@@ -737,11 +1177,13 @@ sub Unifi_Whowasi() { return (split('::',(caller(2))[3]))[1] || ''; }
 <h3>Unifi</h3>
 <ul>
 
-Unifi is the fhem module for the Ubiquiti Networks (UBNT) - Unifi Controller.<br><br>
-This module is very new, therefore it supports only a limited function selection of the unifi-controller.<br><br>
-At the moment you can use the 'PRESENCE' function, which will tell you if a device is connected to your WLAN (even in PowerSave Mode!) and get some informations.<br>
+Unifi is the FHEM module for the Ubiquiti Networks (UBNT) - Unifi Controller.<br>
+<br>
+e.g. you can use the 'presence' function, which will tell you if a device is connected to your WLAN (even in PowerSave Mode!).<br>
 Immediately after connecting to your WLAN it will set the device-reading to 'connected' and about 5 minutes after leaving your WLAN it will set the reading to 'disconnected'.<br>
-The device will be still connected, even it is in PowerSave-Mode. (In this mode the devices are not pingable, but the connection to the unifi-controller does not break off.)
+The device will be still connected, even it is in PowerSave-Mode. (In this mode the devices are not pingable, but the connection to the unifi-controller does not break off.)<br>
+<br>
+Or you can use the other readings or set and get features to control your unifi-controller, accesspoints and wlan-clients.
 <br>
 <h4>Prerequisites</h4>
   <ul>
@@ -807,19 +1249,43 @@ The device will be still connected, even it is in PowerSave-Mode. (In this mode 
 
 <h4>Set</h4>
 <ul>
+    <code>Note: Some setters are not available if controller is not connected, or no data is available for them.</code><br>
+    <br>
     <li><code>set &lt;name&gt; update</code><br>
     Makes immediately a manual update. </li>
-</ul><br>
-<ul>
-    <li><code>set &lt;name&gt; clear &lt;readings|clientData|all&gt</code><br>
+    <br>
+    <li><code>set &lt;name&gt; clear &lt;readings|clientData|all&gt;</code><br>
     Clears the readings, clientData or all. </li>
+    <br>
+    <li><code>set &lt;name&gt; archiveAlerts</code><br>
+    Archive all unarchived Alerts. </li>
+    <br>
+    <li><code>set &lt;name&gt; disconnectClient &lt;all|_id|controllerAlias|hostname|devAlias&gt;</code><br>
+    Disconnect one ore all clients. </li>
+    <br>
+    <li><code>set &lt;name&gt; restartAP &lt;all|_id|name|ip&gt;</code><br>
+    Restart one ore all accesspoints. </li>
+    <br>
+    <li><code>set &lt;name&gt; setLocateAP &lt;all|_id|name|ip&gt;</code><br>
+    Start 'locate' on one or all accesspoints. </li>
+    <br>
+    <li><code>set &lt;name&gt; unsetLocateAP &lt;all|_id|name|ip&gt;</code><br>
+    Stop 'locate' on one or all accesspoints. </li>
 </ul>
 
 
 <h4>Get</h4>
 <ul>
+    <code>Note: Some getters are not available if no data is available for them.</code><br>
+    <br>
     <li><code>get &lt;name&gt; clientData &lt;all|_id|controllerAlias|hostname|devAlias&gt;</code><br>
     Show more details about clients.</li>
+    <br>
+    <li><code>get &lt;name&gt; events</code><br>
+    Show events in specified 'timePeriod'.</li>
+    <br>
+    <li><code>get &lt;name&gt; unarchivedAlerts</code><br>
+    Show all unarchived Alerts.</li>
 </ul>
 
 
@@ -832,6 +1298,10 @@ The device will be still connected, even it is in PowerSave-Mode. (In this mode 
     Example (controllerAlias):<code> attr unifi devAlias iPhoneControllerAlias:iPhone-Claudiu</code><br>
     Example (hostname):<code> attr unifi devAlias iphone:iPhone-Claudiu</code><br></li>
     <br>
+    <li>attr eventPeriod  &lt;1...168&gt;<br>
+    Can be used to configure the time-period (hours) of fetched events from controller.<br>
+    <code>default: 24</code></li>
+    <br>
     <li>attr disable &lt;1|0&gt;<br>
     With this attribute you can disable the whole module. <br>
     If set to 1 the module will be stopped and no updates are performed.<br>
@@ -840,15 +1310,20 @@ The device will be still connected, even it is in PowerSave-Mode. (In this mode 
     <li>attr <a href="#verbose">verbose</a> 5<br>
     This attribute will help you if something does not work as espected.</li>
     <br>
+    <li>attr httpLoglevel <1,2,3,4,5><br>
+    Can be used to debug the HttpUtils-Module. Set it smaller or equal as your 'global verbose level'.<br>
+    <code>default: 5</code></li>
+    <br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
 
 <h4>Readings</h4>
 <ul>
     Note: All readings generate events. You can control this with <a href="#readingFnAttributes">these global attributes</a>.
-    <li>Each device has multiple readings.<br></li>
-    <li>The unifi-device reading 'state' represents the connection-state to the unifi-controller.<br>
-    Possible states are 'connected', 'disconnected', 'initialized' and 'disabled'</li>
+    <li>Each client has 6 readings for connection-state, SNR, uptime, last_seen-time, connected-AP and hostname.</li>
+    <li>Each AP has 3 readings for state (can be 'ok' or 'error'), essid's and count of connected-clients.</li>
+    <li>The unifi-controller has 6 readings for event-count in configured 'timePeriod', unarchived-alert count, accesspoint count, overall wlan-state (can be 'ok', 'warning', or other?), connected user count and connected guest count. </li>
+    <li>The Unifi-device reading 'state' represents the connection-state to the unifi-controller (can be 'connected', 'disconnected', 'initialized' and 'disabled').</li>
 </ul>
 <br>
 
