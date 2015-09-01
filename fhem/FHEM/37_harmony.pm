@@ -33,7 +33,6 @@ harmony_Initialize($)
   $hash->{ReadFn}   = "harmony_Read";
 
   $hash->{DefFn}    = "harmony_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "harmony_Notify";
   $hash->{UndefFn}  = "harmony_Undefine";
   $hash->{SetFn}    = "harmony_Set";
@@ -91,6 +90,8 @@ harmony_Define($$)
   $hash->{ConnectionState} = "Initialized";
 
   #$attr{$name}{nossl} = 1 if( !$init_done && harmony_isFritzBox() );
+
+  $hash->{NOTIFYDEV} = "global";
 
   if( $init_done ) {
     harmony_connect($hash) if( !defined($hash->{id}) );

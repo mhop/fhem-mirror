@@ -16,7 +16,6 @@ CO20_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "CO20_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "CO20_Notify";
   $hash->{UndefFn}  = "CO20_Undefine";
   $hash->{SetFn} = "CO20_Set";
@@ -53,6 +52,8 @@ CO20_Define($$)
   $hash->{fail} = 0;
   $hash->{seq2} = 0x67;
   $hash->{seq4} = 0x0001;
+
+  $hash->{NOTIFYDEV} = "global";
 
   if( $init_done ) {
     CO20_Disconnect($hash);

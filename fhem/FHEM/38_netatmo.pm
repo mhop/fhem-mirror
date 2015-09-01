@@ -26,7 +26,6 @@ netatmo_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "netatmo_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "netatmo_Notify";
   $hash->{UndefFn}  = "netatmo_Undefine";
   $hash->{SetFn}    = "netatmo_Set";
@@ -169,6 +168,8 @@ netatmo_Define($$)
   $hash->{SUBTYPE} = $subtype;
 
   $hash->{STATE} = "Initialized";
+
+  $hash->{NOTIFYDEV} = "global";
 
   if( $init_done ) {
     netatmo_connect($hash) if( $hash->{SUBTYPE} eq "ACCOUNT" );

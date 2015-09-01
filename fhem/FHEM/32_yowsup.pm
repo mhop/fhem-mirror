@@ -17,7 +17,6 @@ yowsup_Initialize($)
   $hash->{ReadFn}   = "yowsup_Read";
 
   $hash->{DefFn}    = "yowsup_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "yowsup_Notify";
   $hash->{UndefFn}  = "yowsup_Undefine";
   $hash->{ShutdownFn}  = "yowsup_Shutdown";
@@ -67,6 +66,8 @@ yowsup_Define($$)
   }
 
   $hash->{NAME} = $name;
+
+  $hash->{NOTIFYDEV} = "global";
 
   if( $init_done ) {
     yowsup_Disconnect($hash);
