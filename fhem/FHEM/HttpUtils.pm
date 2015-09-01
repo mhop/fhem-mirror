@@ -77,7 +77,7 @@ HttpUtils_ConnErr($)
   if(defined($hash->{FD})) {
     delete($hash->{FD});
     delete($selectlist{$hash});
-    $hash->{conn}->close();
+    $hash->{conn}->close() if($hash->{conn});
     $hash->{callback}($hash, "connect to $hash->{addr} timed out", "");
   }
 }
