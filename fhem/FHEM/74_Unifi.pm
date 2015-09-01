@@ -1,5 +1,5 @@
 ##############################################################################
-# $Id: 74_Unifi.pm 2015-08-31 23:00 - rapster - rapster at x0e dot de $ 
+# $Id$
 
 package main;
 use strict;
@@ -36,6 +36,7 @@ sub Unifi_GetAccesspoints_Send($);
 sub Unifi_GetAccesspoints_Receive($);
 sub Unifi_ProcessUpdate($);
 sub Unifi_SetClientReadings($);
+sub Unifi_SetHealthReadings($);
 sub Unifi_SetAccesspointReadings($);
 sub Unifi_DisconnectClient_Send($@);
 sub Unifi_DisconnectClient_Receive($);
@@ -95,7 +96,7 @@ sub Unifi_Define($$) {
         noshutdown      => 0,
         ignoreredirects => 1,
         loglevel        => AttrVal($name,"httpLoglevel",5),
-        sslargs         => { SSL_version => 'SSLv23', SSL_verify_mode => 'SSL_VERIFY_NONE' },
+        sslargs         => { SSL_verify_mode => 'SSL_VERIFY_NONE' },
     };
     if($hash->{unifi}->{version} == 3) {
         ( $hash->{httpParams}->{loginUrl} = $hash->{unifi}->{url} ) =~ s/api\/s.+/login/;
@@ -1282,7 +1283,7 @@ Or you can use the other readings or set and get features to control your unifi-
     Show more details about clients.</li>
     <br>
     <li><code>get &lt;name&gt; events</code><br>
-    Show events in specified 'timePeriod'.</li>
+    Show events in specified 'eventPeriod'.</li>
     <br>
     <li><code>get &lt;name&gt; unarchivedAlerts</code><br>
     Show all unarchived Alerts.</li>
