@@ -1560,7 +1560,8 @@ sub CUL_HM_Parse($$) {#########################################################
       
       $setTemp = ($setTemp < 5 )?'off':
                  ($setTemp >30 )?'on' :sprintf("%.1f",$setTemp);
-      if (defined $mI[6]){# message with party mode
+      
+      if (defined $mI[12]){# message with party mode
         my @pt =  map{hex($_)} @mI[5..$#mI];
         $pTemp =(($pt[7]     )& 0x3f)/2 if (defined $pt[7]) ;
         my $sta = (    ($pt[0]      )& 0x3f)/2;
@@ -7480,7 +7481,7 @@ sub CUL_HM_ActInfo() {# print detailed status information
 
     my $state;
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
-    if ($state ne "switchedOff"){
+    if ($tSec != 0){
       my $tLast = ReadingsVal($devName,".protLastRcv",0);
       $tLast =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
       my $x =  $2*30*24*3600 + $3*24*3600 + $4*3600 + $5*60 +$6;
@@ -7507,12 +7508,12 @@ sub CUL_HM_ActInfo() {# print detailed status information
                               ,$tLast,$sign,$c[1],$c[0],$y
                               ,$devName);
    }
-   else{
-     $state = sprintf ("%-8s :%30s : "
+    else{
+      $state = sprintf ("%-8s :%30s : "
                                       ,ReadingsVal($devName,"Activity","")
                                       ,$devName);
-   }
-   push @info,$state;
+    }
+    push @info,$state;
   }
   return sprintf ("%-8s %-19s %s %s\n\n","state"
                                               ,"last"
@@ -7857,6 +7858,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         }
         my $dId = CUL_HM_name2Id($devN);
         my $eN=($chns[0] && $chns[0]ne "00")?CUL_HM_id2Name($dId.$chns[0]):$devN;
+        next if(!defined $defs{$eN});
         if ($q eq "qReqConf"){
           $mq->{autoRdActive} = $devN;
           CUL_HM_Set($defs{$eN},$eN,"getConfig");
