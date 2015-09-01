@@ -35,7 +35,6 @@ sub HUEBridge_Initialize($)
 
   #Consumer
   $hash->{DefFn}    = "HUEBridge_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "HUEBridge_Notify";
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
@@ -128,6 +127,8 @@ HUEBridge_Define($$)
     $modules{$hash->{TYPE}}{helper}{count} = 0 if( !defined($modules{$hash->{TYPE}}{helper}{count}) );
     $hash->{helper}{count} =  $modules{$hash->{TYPE}}{helper}{count}++;
   }
+
+  $hash->{NOTIFYDEV} = "global";
 
   if( $init_done ) {
     HUEBridge_OpenDev( $hash ) if( !AttrVal($name, "disable", 0) );

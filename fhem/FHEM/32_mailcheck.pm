@@ -32,7 +32,6 @@ mailcheck_Initialize($)
   $hash->{ReadFn}   = "mailcheck_Read";
 
   $hash->{DefFn}    = "mailcheck_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "mailcheck_Notify";
   $hash->{UndefFn}  = "mailcheck_Undefine";
   #$hash->{SetFn}    = "mailcheck_Set";
@@ -100,6 +99,8 @@ mailcheck_Define($$)
 
   $hash->{HAS_GPG} = $mailcheck_hasGPG;
   $hash->{HAS_MIME} = $mailcheck_hasMIME;
+
+  $hash->{NOTIFYDEV} = "global";
 
   if( $init_done ) {
     mailcheck_Disconnect($hash);
