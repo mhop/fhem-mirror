@@ -565,6 +565,7 @@ DOIF_SetState($$$$$)
   my $attr=AttrVal($hash->{NAME},"cmdState","");
   my $state=AttrVal($hash->{NAME},"state","");
   my @cmdState=split(/\|/,$attr);
+  return undef if (AttrVal($hash->{NAME},"disable",""));
   $nr=ReadingsVal($pn,"cmd_nr",0)-1 if (!$event);
   
   if ($nr!=-1) {
@@ -872,7 +873,7 @@ DOIF_TimerTrigger ($)
     $ret=DOIF_Trigger ($hash,"",$nr);
     $hash->{timer}{$nr}=0;
   }
-  DOIF_SetTimer("DOIF_TimerTrigger",$timer); 
+  DOIF_SetTimer("DOIF_TimerTrigger",$timer) if (!AttrVal($hash->{NAME},"disable",""));
   return($ret);
 }
 
@@ -1446,8 +1447,8 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
 </ol><br>
 <b>Lesbarkeit der Definitionen</b><br>
 <br>
-Da die Definitionen im Laufe der Zeit recht umfangreich werden können, sollten die gleichen Regeln beachtet werde, wie auch beim Programmieren in höheren Sprachen. Dazu zählt das Einrücken von Befehlen, Zeilenumbrüche, 
-sowie das Kommentieren seiner Definition, damit man auch später noch die Funktionalität seines Moduls nachvollziehen kann.<br>
+Da die Definitionen im Laufe der Zeit recht umfangreich werden können, sollten die gleichen Regeln, wie auch beim Programmieren in höheren Sprachen, beachtet werden.
+Dazu zählen: das Einrücken von Befehlen, Zeilenumbrüche sowie das Kommentieren seiner Definition, damit man auch später noch die Funktionalität seines Moduls nachvollziehen kann.<br>
 <br>
 Das Modul unterstützt dazu Einrückungen, Zeilenumbrüche an beliebiger Stelle und Kommentierungen beginnend mit ## bis zum Ende der Zeile.
 Die Formatierungen lassen sich im DEF-Editor der Web-Oberfläche vornehmen.<br>
@@ -1795,17 +1796,21 @@ Es soll aus einem Reading, das z. B. ein Prozentzeichen beinhaltet, nur der Zahl
 <br>
 Verzögerungen für die Ausführung von Kommandos werden pro Befehlsfolge über das Attribut "wait" definiert. Syntax:<br>
 <br>
-<code>attr &lt;Modulname&gt; wait &lt;Sekunden für Befehlsfolge des ersten DO-Falls&gt;:&lt;Sekunden für Befehlsfolge des zweiten DO-Falls&gt;:...<br></code>
+<code>attr &lt;DOIF-modul&gt; wait &lt;Sekunden für Befehlsfolge des ersten DO-Falls&gt;:&lt;Sekunden für Befehlsfolge des zweiten DO-Falls&gt;:...<br></code>
 <br>
 Statt Sekundenangaben können ebenfalls Stati in eckigen Klammen oder Perlbefehle angegeben werden.<br>
 <br>
-Beispiel: <code>attr &lt;Modulname&gt; wait 1:[Verzoegerung]:rand(600)</code><br>
+Beispiel:<br>
 <br>
-Hier wird der erste DO-Fall um eine Sekunde verzögert, der zweite wird durch die Angabe des Dummys "Verzoegerung" bestimmt, der dritte wird durch eine zufällige Sekundenzahl bis 600 Sekunden bestimmt.<br>
+<code>define delay dummy<br>
+set delay 400<br>
+attr &lt;DOIF-modul&gt; wait 1:[delay]:rand(600)</code><br>
+<br>
+Hier wird der erste DO-Fall um eine Sekunde verzögert, der zweite wird durch die Angabe des Dummys "delay" bestimmt, der dritte wird durch eine zufällige Sekundenzahl bis 600 Sekunden bestimmt.<br>
 <br>
 Sollen Verzögerungen innerhalb von Befehlsfolgen stattfinden, so müssen diese Komandos in eigene Klammern gesetzt werden, das Modul arbeitet dann mit Zwischenzuständen.<br>
 <br>
-Bespiel: Bei einer Befehlssequenz, hier: <code>(set lamp1 on, set lamp2 on)</code>, soll vor dem Schalten von <code>lamp2</code> eine Verzögerung von einer Sekunde stattfinden.
+Beispiel: Bei einer Befehlssequenz, hier: <code>(set lamp1 on, set lamp2 on)</code>, soll vor dem Schalten von <code>lamp2</code> eine Verzögerung von einer Sekunde stattfinden.
 Die Befehlsfolge muss zunächst mit Hilfe von Klammerblöcke aufgespaltet werden: <code>(set lamp1 on)(set lamp2 on)</code>.
 Nun kann mit dem wait-Attribut nicht nur für den Beginn der Sequenz, sondern für jeden Klammerblock eine Verzögerung, getrennt mit Komma, definieren werden,
  hier also: <code>wait 0,1</code>. Damit wird <code>lamp1</code> sofort, <code>lamp2</code> nach einer Sekunden geschaltet.<br>
@@ -1813,19 +1818,19 @@ Nun kann mit dem wait-Attribut nicht nur für den Beginn der Sequenz, sondern f�
 Beispieldefinition bei mehreren DO-Blöcken mit mehreren Sequenzen:<br>
 <br>
 <code>DOIF (Bedingung1)<br>
-(set ...) #erster Befehl der ersten Sequenz soll um eine Sekunde verzögert werden<br>
-(set ...) #zweiter Befehl der ersten Sequenz soll um 2 Sekunden verzögert werden<br>
+(set ...) ## erster Befehl der ersten Sequenz soll um eine Sekunde verzögert werden<br>
+(set ...) ## zweiter Befehl der ersten Sequenz soll um 2 Sekunden verzögert werden<br>
 DOELSE (Bedingung2)<br>
-(set ...) #erster Befehl der zweiten Sequenz soll um 3 Sekunden verzögert werden<br>
-(set ...) #zweiter Befehl der zweiten Sequenz soll um 0,5 Sekunden verzögert werden<br>
+(set ...) ## erster Befehl der zweiten Sequenz soll um 3 Sekunden verzögert werden<br>
+(set ...) ## zweiter Befehl der zweiten Sequenz soll um 0,5 Sekunden verzögert werden<br>
 <br>
-attr &lt;Modulname&gt; wait 1,2:3,0.5</code><br>
+attr &lt;DOIF-modul&gt; wait 1,2:3,0.5</code><br>
 <br>
 Für Kommandos ohne Verzögerung werden Sekundenangaben ausgelassen oder auf Null gesetzt. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein Kommando eines anderen DO-Falls, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
 <br>
-<b>Verzögerungen auf Timer</b><br>
+<b>Verzögerungen von Timern</b><br>
 <br>
-Verzögerungen können mit Hilfe des Attributs <code>timerwithWait</code> auf Timer ausgeweitet werden.<br>
+Verzögerungen können mit Hilfe des Attributs <code>timerWithWait</code> auf Timer ausgeweitet werden.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Lampe soll zufällig nach Sonnenuntergang verzögert werden.<br>
 <br>
@@ -1956,7 +1961,7 @@ Der Status bleibt dabei auf "motion". Mit der obigen Abfrage lässt sich festste
 <br>
 Der Status des Moduls wird standardmäßig mit cmd_1, cmd_2, usw. belegt. Dieser lässt sich über das Attribut "cmdState" mit | getrennt umdefinieren:<br>
 <br>
-attr &lt;Modulname&gt; cmdState  &lt;Status für das erste Kommando&gt;|&lt;Status für das zweite Kommando&gt;|...<br>
+attr &lt;DOIF-modul&gt; cmdState  &lt;Status für das erste Kommando&gt;|&lt;Status für das zweite Kommando&gt;|...<br>
 <br>
 z. B.<br>
 <br>
@@ -2005,14 +2010,14 @@ Das ist insb. dann sinnvoll, wenn das System ohne Sicherung der Konfiguration (u
 <b>Deaktivieren des Moduls</b><br>
 <br>
 Ein DOIF-Modul kann mit Hilfe des Attributes disable, deaktiviert werden. Dabei werden alle Timer und Readings des Moduls gelöscht.
-Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>set &lt;Modulname&gt; disable</code> geschehen. 
+Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>set &lt;DOIF-modul&gt; disable</code> geschehen. 
 Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerding werden keine Befehle ausgeführt.
 Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut deaktiviert wird. In beiden Fällen bleibt der Zustand nach dem Neustart erhalten, das Modul bleibt deaktiviert.<br>
 <br>
 <b>Initialisieren des Moduls</b><br>
 <br>
-Mit <code>set &lt;Modulname&gt; initialize</code> wird ein mit <code>set &lt;Modulname&gt; disable</code> deaktiviertes Modul wieder aktiviert.
-Das Kommando <code>set &lt;Modulname&gt; initialize</code> kann auch dazu genutzt werden ein aktives Modul zu initialisiert,
+Mit <code>set &lt;DOIF-modul&gt; initialize</code> wird ein mit <code>set &lt;DOIF-modul&gt; disable</code> deaktiviertes Modul wieder aktiviert.
+Das Kommando <code>set &lt;DOIF-modul&gt; initialize</code> kann auch dazu genutzt werden ein aktives Modul zu initialisiert,
 in diesem Falle wird der letzte Zustand des Moduls gelöscht, damit wird ein Zustandswechsel herbeigeführt, der nächste Trigger führt zur Ausführung.<br>
 <br>
 <b>Weitere Anwendungsbeispiele</b><br>
