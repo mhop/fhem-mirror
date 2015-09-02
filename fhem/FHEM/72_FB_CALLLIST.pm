@@ -318,6 +318,11 @@ sub FB_CALLLIST_Notify($$)
         Log3 $name, 4, "FB_CALLLIST ($name) - already processed event $event for Call-ID $call_id, skipping...";
         return undef
     }
+    else
+    {
+        $hash->{helper}{LAST_EVENT} = $event;
+        $hash->{helper}{LAST_CALL_ID} = $call_id;
+    }
     
     if(exists($hash->{helper}{INTERNAL_FILTER}))
     {
