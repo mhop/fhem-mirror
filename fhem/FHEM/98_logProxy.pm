@@ -36,6 +36,7 @@ sub logProxy_Initialize($)
   #$hash->{AttrList} = "disable:1 ";
 
   $hash->{SVG_sampleDataFn} = "logProxy_sampleDataFn";
+  $hash->{SVG_regexpFn}     = "logProxy_regexpFn";
 }
 
 
@@ -106,6 +107,28 @@ logProxy_sampleDataFn($$$$$)
 #Log 3, Dumper $example;
 
   return ($desc, \@htmlArr, join("<br>", @example));
+}
+sub
+logProxy_regexpFn($$)
+{
+  my ($name, $filter) = @_;
+
+  my $ret;
+
+  my @a = split( ' ', $filter );
+  for(my $i = 0; $i < int(@a); $i++) {
+    my @fld = split(":", $a[$i]);
+    if( $a[$i] =~ m/^(FileLog|DbLog):([^:]*):(.*)/ ) {
+      my @options = split( ',', $fld[1] );
+      my $log_dev = shift(@options);
+      my $column_specs = $3;
+
+      $ret .= '|' if( $ret );
+      $ret .=  CallFn($log_dev, "SVG_regexpFn", $log_dev, $column_specs);
+    }
+  }
+
+  return $ret;
 }
 
 sub
