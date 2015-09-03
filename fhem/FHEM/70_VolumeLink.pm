@@ -1,5 +1,5 @@
 ###############################################################################
-# $Id: 70_VolumeLink.pm 2015-08-20 09:00 - rapster - rapster at x0e dot de $ 
+# $Id$ 
 
 package main;
 use strict;
@@ -89,7 +89,7 @@ sub VolumeLink_Undef($$) {
     my ($hash,$arg) = @_;
     
     $hash->{STARTED} = 0;
-    RemoveInternalTimer ($hash);
+    RemoveInternalTimer($hash);
     
     Log3 $hash->{NAME}, 3, "$hash->{NAME}: STOPPED";
     
@@ -186,7 +186,7 @@ sub VolumeLink_Attr(@) {
 sub VolumeLink_SendCommand($) {
     my ($hash) = @_;
     
-    Log3 $hash->{NAME}, 5, "$hash->{NAME}: SendCommand - executed with params: $hash->{httpParams}->{noshutdown}";
+    Log3 $hash->{NAME}, 5, "$hash->{NAME}: SendCommand - executed";
     
     HttpUtils_NonblockingGet($hash->{httpParams});
     
@@ -253,7 +253,7 @@ sub VolumeLink_ReceiveCommand($) {
                     return;
                 }
                 
-                if($ampTitle =~ /$param->{hash}->{ampInputReadingVal}/i || $param->{hash}->{ampInputReading} == 0) {
+                if($ampTitle =~ /$param->{hash}->{ampInputReadingVal}/i || !$param->{hash}->{ampInputReading}) {
                     if($vol ne $ampVol) {
                         Log3 $name, 5, "$name: Set Volume on ampDevice '$param->{hash}->{ampDevice}' - newVolume:'$vol' - oldVolume:'$ampVol'.";
                         CommandSet(undef, $param->{hash}->{ampDevice}.' '.$param->{hash}->{ampVolumeCommand}.' '.$vol);
@@ -370,7 +370,7 @@ VolumeLink links the volume-level &amp; mute-state from a physical device (e.g. 
     If set to 1 the module will be stopped and no volume will be fetched from physical-device or transfer to the amplifier-device. <br>
     If set to 0 you can start the module again with: set &lt;name&gt; on.</li>
     <li>httpNoShutdown &lt;1|0&gt;<br>
-    If set to 0 the module will tell the http-server to explicit close the connection.<br>
+    If set to 0 VolumeLink will tell the http-server to explicit close the connection.<br>
     <i>Default: 1</i>
     </li>
     <li>ampInputReading &lt;value&gt;<br>
