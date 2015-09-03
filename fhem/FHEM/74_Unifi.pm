@@ -510,8 +510,8 @@ sub Unifi_GetClients_Receive($) {
                 
                 $hash->{unifi}->{connectedClients} = undef;
                 for my $h (@{$data->{data}}) {
-                    $hash->{unifi}->{connectedClients}->{$h->{_id}} = 1;
-                    $hash->{clients}->{$h->{_id}} = $h;
+                    $hash->{unifi}->{connectedClients}->{$h->{user_id}} = 1;
+                    $hash->{clients}->{$h->{user_id}} = $h;
                 }
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
@@ -1261,7 +1261,7 @@ Or you can use the other readings or set and get features to control your unifi-
     <li><code>set &lt;name&gt; archiveAlerts</code><br>
     Archive all unarchived Alerts. </li>
     <br>
-    <li><code>set &lt;name&gt; disconnectClient &lt;all|_id|controllerAlias|hostname|devAlias&gt;</code><br>
+    <li><code>set &lt;name&gt; disconnectClient &lt;all|user_id|controllerAlias|hostname|devAlias&gt;</code><br>
     Disconnect one ore all clients. </li>
     <br>
     <li><code>set &lt;name&gt; restartAP &lt;all|_id|name|ip&gt;</code><br>
@@ -1279,7 +1279,7 @@ Or you can use the other readings or set and get features to control your unifi-
 <ul>
     <code>Note: Some getters are not available if no data is available for them.</code><br>
     <br>
-    <li><code>get &lt;name&gt; clientData &lt;all|_id|controllerAlias|hostname|devAlias&gt;</code><br>
+    <li><code>get &lt;name&gt; clientData &lt;all|user_id|controllerAlias|hostname|devAlias&gt;</code><br>
     Show more details about clients.</li>
     <br>
     <li><code>get &lt;name&gt; events</code><br>
@@ -1293,9 +1293,9 @@ Or you can use the other readings or set and get features to control your unifi-
 <h4>Attributes</h4>
 <ul>
     <li>attr devAlias<br>
-    Can be used to rename device names in the format <code>&lt;_id|controllerAlias|hostname&gt;:Aliasname.</code><br>
+    Can be used to rename device names in the format <code>&lt;user_id|controllerAlias|hostname&gt;:Aliasname.</code><br>
     Separate using blank to rename multiple devices.<br>
-    Example (_id):<code> attr unifi devAlias 5537d138e4b033c1832c5c84:iPhone-Claudiu</code><br>
+    Example (user_id):<code> attr unifi devAlias 5537d138e4b033c1832c5c84:iPhone-Claudiu</code><br>
     Example (controllerAlias):<code> attr unifi devAlias iPhoneControllerAlias:iPhone-Claudiu</code><br>
     Example (hostname):<code> attr unifi devAlias iphone:iPhone-Claudiu</code><br></li>
     <br>
