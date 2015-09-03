@@ -170,9 +170,11 @@ HttpUtils_Connect($)
             return $hash->{callback}($hash, "$host: ".strerror($errno), "")
                 if($errno);
 
-            return HttpUtils_Connect2($hash);
+            my $err = HttpUtils_Connect2($hash);
+            $hash->{callback}($hash, $err, "") if($err);
+            return $err;
           };
-          $hash->{NAME} = "" if(!defined($hash->{NAME})); #Delete might check it
+          $hash->{NAME}="" if(!defined($hash->{NAME}));# Delete might check this
           $selectlist{$hash} = $hash;
           InternalTimer(gettimeofday()+$hash->{timeout},
                         "HttpUtils_ConnErr", \%timerHash, 0);
