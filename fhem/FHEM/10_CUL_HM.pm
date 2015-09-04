@@ -7428,7 +7428,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
           }
         }
         else{
-          $cntUnkn++; $state = "unknown";
+          $state = "unknown";
         }
       }
       else{                         #message in time
