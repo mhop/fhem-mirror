@@ -16,7 +16,7 @@ sub ZWDongle_Read($@);
 sub ZWDongle_ReadAnswer($$$);
 sub ZWDongle_Ready($);
 sub ZWDongle_Write($$$);
-sub ZWave_ProcessSendStack($);
+sub ZWDongle_ProcessSendStack($);
 
 
 # See also:
@@ -193,8 +193,8 @@ ZWDongle_Initialize($)
   $hash->{GetFn}   = "ZWDongle_Get";
   $hash->{AttrFn}  = "ZWDongle_Attr";
   $hash->{UndefFn} = "ZWDongle_Undef";
-  $hash->{AttrList}=
-    "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 homeId networkKey";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 ".
+                     "homeId networkKey delayNeeded:1,0";
 }
 
 #####################################
@@ -513,32 +513,9 @@ ZWDongle_Write($$$)
   $msg = sprintf("%02x%s", length($msg)/2+1, $msg);
 
   $msg = "01$msg" . ZWDongle_CheckSum($msg);
- 
-  # push message on stack
-  my $ss = $hash->{SendStack};
+  push @{$hash->{SendStack}}, $msg;
 
-  my $wNMIre = '01....13..028408';
-  if(@{$ss} && $ss->[0] =~ m/$wNMIre/) {
-    Log3 $hash, 2,
-      "ZWDongle_Write: command after wakeupNoMoreInformation dropped";
-    return;
-  }
-
-  push @{$ss}, $msg;
-
-  # assure that wakeupNoMoreInformation is the last message on the sendStack
-  if($msg =~ m/^01....13(..)/) {
-    my $wNMI;
-    my @s = grep { /^$wNMIre/ ? ($wNMI=$_,0):1 } @{$ss};
-    if($wNMI) {
-      Log3 $hash, 5, "ZWDongle_Write wakeupNoMoreInformation moved to the end"
-        if($wNMI ne $msg);
-      push @s, $wNMI;       
-      $hash->{SendStack} = \@s;
-    }
-  }
-
-  ZWave_ProcessSendStack($hash);
+  ZWDongle_ProcessSendStack($hash);
 }
 
 sub
@@ -547,7 +524,8 @@ ZWDongle_shiftSendStack($$$)
   my ($hash, $level, $txt) = @_;
   my $ss = $hash->{SendStack};
   my $cmd = shift @{$ss};
-  Log3 $hash, $level, "$txt, removing $cmd from sendstack" if($txt && $cmd);
+  Log3 $hash, $level, "$txt, removing $cmd from dongle sendstack"
+        if($txt && $cmd);
 
   $hash->{WaitForAck}=0;
   $hash->{SendRetries}=0;
@@ -555,11 +533,11 @@ ZWDongle_shiftSendStack($$$)
 }
 
 sub
-ZWave_ProcessSendStack($)
+ZWDongle_ProcessSendStack($)
 {
   my ($hash) = @_;
     
-  #Log3 $hash, 1, "ZWave_ProcessSendStack: ".@{$hash->{SendStack}}.
+  #Log3 $hash, 1, "ZWDongle_ProcessSendStack: ".@{$hash->{SendStack}}.
   #                      " items on stack, waitForAck ".$hash->{WaitForAck};
   
   RemoveInternalTimer($hash); 
@@ -568,12 +546,12 @@ ZWave_ProcessSendStack($)
 
   if($hash->{WaitForAck}){
     if($ts-$hash->{SendTime} >= 1){
-      Log3 $hash, 2, "ZWave_ProcessSendStack: no ACK, resending message";
+      Log3 $hash, 2, "ZWDongle_ProcessSendStack: no ACK, resending message";
       $hash->{SendRetries}++;
       $hash->{WaitForAck} = 0;
 
     } else {
-      InternalTimer($ts+1, "ZWave_ProcessSendStack", $hash, 0);
+      InternalTimer($ts+1, "ZWDongle_ProcessSendStack", $hash, 0);
       return;
 
     }
@@ -593,7 +571,7 @@ ZWave_ProcessSendStack($)
   $hash->{WaitForAck} = 1;
   $hash->{SendTime} = $ts;
 
-  InternalTimer($ts+1, "ZWave_ProcessSendStack", $hash, 0);
+  InternalTimer($ts+1, "ZWDongle_ProcessSendStack", $hash, 0);
 }
 
 #####################################
@@ -693,7 +671,7 @@ ZWDongle_Read($@)
   $hash->{PARTIAL} = $data;
   
   # trigger sending of next message
-  ZWave_ProcessSendStack($hash) if(length($data) == 0);
+  ZWDongle_ProcessSendStack($hash) if(length($data) == 0);
   
   return $msg if(defined($local));
   return undef;
@@ -944,6 +922,13 @@ ZWDongle_Ready($)
     <li><a href="#homeId">homeId</a><br>
       Stores the homeId of the dongle. Is a workaround for some buggy dongles,
       wich sometimes report a wrong/nonexisten homeId (Forum #35126)</li>
+    <li><a href="#networkKey">networkKey</a><br>
+      Needed for secure inclusion, hex string with length of 32
+      </li>
+    <li><a href="#delayNeeded">delayNeeded</a><br>
+      If set to 0, no delay is needed between sending consecutive commands to
+      the same receiver. Default is 1 (delay is needed).
+      </li>
   </ul>
   <br>
 
