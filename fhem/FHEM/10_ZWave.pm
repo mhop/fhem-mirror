@@ -2404,7 +2404,7 @@ ZWave_processSendStack($$$)
   if($withDelay && AttrVal($hash->{IODev}{NAME}, "delayNeeded",1)) {
     InternalTimer(gettimeofday()+0.3, sub {
       ZWave_processSendStack($hash, $now, 0);
-    }, undef, 0);
+    }, {}, 0);
     return;
   }
   
