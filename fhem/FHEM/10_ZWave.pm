@@ -224,7 +224,11 @@ my %zwave_class = (
                                  '(hex($1)&0x40 ? ", identical":", different")',
                "^..600a(.*)"=> 'ZWave_mcCapability($hash, $1)' } },
   ZIP_PORTAL               => { id => '61' },
-  DOOR_LOCK                => { id => '62' },
+  DOOR_LOCK                => { id => '62',
+    get   => { doorLockOperation => '02',
+               doorLockConfiguration => '05'},
+    parse => { "..6203(.*)" => 'ZWave_DoorLockOperationReport($hash, $1)',
+               "..6206(.*)" => 'ZWave_DoorLockConfigReport($hash, $1)'} },
   USER_CODE                => { id => '63',
     set   => { userCode => 'ZWave_userCodeSet("%s")' },
     get   => { userCode => "02%02x" },
@@ -361,13 +365,18 @@ my %zwave_class = (
   AV_RENDERER_STATUS       => { id => '96' },
   AV_CONTENT_SEARCH_MD     => { id => '97' },
   SECURITY                 => { id => '98',
-    set   => { "secKey"    => '(undef, "06%s")',
-               "secScheme" => "0400",
-               "secNonce"  => "40" },
-    get   => { "secSupported" => "02" },
-    parse => { "..9803(.*)" => '"secSupported:$1"',
+    set   => { "secScheme"    => 'ZWave_sec($hash, "0400")',
+               "sendNonce"    => 'ZWave_secCreateNonce($hash)',
+               "secEncap"     => 'ZWave_sec($hash, "%s")' },
+    get   => { "secSupported" => 'ZWave_sec($hash, "02")' ,
+               "secNonce"     => 'ZWave_sec($hash, "40")'},
+    parse => { "..9803(.*)" => 'ZWave_secSupported($hash, $1)',
                "..9805(.*)" => 'ZWave_secureInit($hash, $1)', # secScheme
-               "..9880(.*)" => 'ZWave_secureInit($hash, $1)' } },
+               "..9807"     => 'ZWave_secNetWorkKeyVerify($hash)',
+               "..9840"     => 'ZWave_secNonceRequestReceived($hash)',
+               "..9880(.*)" => 'ZWave_secNonceReceived($hash, $1)',
+               "..9881(.*)" => 'ZWave_secDecrypt($hash, $1, 0)',
+               "..98c1(.*)" => 'ZWave_secDecrypt($hash, $1, 1)' } },
   AV_TAGGING_MD            => { id => '99' },
   IP_CONFIGURATION         => { id => '9a' },
   ASSOCIATION_COMMAND_CONFIGURATION
@@ -416,6 +425,8 @@ use vars qw(%zwave_deviceSpecial);
       init => { ORDER=>50, CMD => '"get $NAME zwavePlusInfo"' } } }
 );
 
+my $crypt_Rijndael = 0;
+
 sub
 ZWave_Initialize($)
 {
@@ -427,10 +438,18 @@ ZWave_Initialize($)
   $hash->{UndefFn}   = "ZWave_Undef";
   $hash->{ParseFn}   = "ZWave_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 noExplorerFrames:1,0 ".
-    "ignore:1,0 dummy:1,0 showtime:1,0 classes vclasses $readingFnAttributes";
+    "ignore:1,0 dummy:1,0 showtime:1,0 classes vclasses ".
+    "secure_classes $readingFnAttributes";
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 
   $hash->{FW_detailFn} = "ZWave_fhemwebFn";
+
+  eval { require Crypt::Rijndael; };
+  if($@) {
+    Log 3, "ZWave: cannot load Crypt::Rijndael, SECURITY class disabled";
+  } else {
+    $crypt_Rijndael = 1;
+  }
 }
 
 
@@ -661,7 +680,21 @@ ZWave_Cmd($$@)
   } else {
     my $len = sprintf("%02x", length($cmdFmt)/2+1);
     $data = "13$id$len$cmdId${cmdFmt}$cmdEf"; # 13==SEND_DATA
+  }
 
+  $data .= $id; # callback=>id
+
+  if ($data =~ m/(......)(....)(.*)(....)/) {
+    my $cc_cmd=$2;
+    my $payload=$3;
+
+    #check message here for needed encryption (SECURITY)
+    if (ZWave_isSecureClass($hash, $cc_cmd)) {
+      my $interceptedMSG = $cc_cmd . $payload;
+      # message stored in reading, will be processed when nonce arrives
+      ZWave_putSecMsg($hash, $interceptedMSG);
+      return ZWave_Get($hash, $name, "secNonce");
+    }
   }
 
   if($baseClasses =~ m/WAKE_UP/) {
@@ -669,19 +702,18 @@ ZWave_Cmd($$@)
       my @arr = ();
       $baseHash->{WakeUp} = \@arr;
     }
-    my $awake = ($baseHash->{lastMsgTimestamp} &&
-                  gettimeofday() - $baseHash->{lastMsgTimestamp} < 3);
+    my $tdiff = gettimeofday() - $baseHash->{lastMsgTimestamp};
+    my $awake = ($baseHash->{lastMsgTimestamp} && $tdiff < 3);
 
-    if(!$awake) {
-      push @{$baseHash->{WakeUp}}, $data.$id;
+    if(!$awake && ($data !~ m/......9880.*/) ) {
+      Log3 $name, 5, "Device not awake (tdiff= $tdiff),".
+                        " command ($data) stored in sendstack";
+      push @{$baseHash->{WakeUp}}, $data;
       return (AttrVal($name,"verbose",3) > 2 ?
                   "Scheduled for sending after WAKEUP" : undef);
     }
-
-  } else {
-    $data .= $id; # callback=>id
-
   }
+
   IOWrite($hash, "00", $data);
 
   my $val;
@@ -979,6 +1011,111 @@ ZWave_multilevelParse($$$)
   return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
   return sprintf("%s:%.*f %s", $ml->{n}, $pr, $val/(10**$pr),
        int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "");
+}
+
+sub
+ZWave_DoorLockOperationReport($$)
+{
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 0, "$name: DoorLockOperationReport received: $arg";
+
+  if ($arg !~ m/(..)(..)(..)(..)(..)/) {
+    Log3 $name, 0, "$name: DoorLockOperationReport wrong format received";
+  }
+  my $DoorLockMode           = $1;
+  my $DoorLockHandleModes    = hex($2);
+  my $DoorCondition          = hex($3);
+  my $DoorLockTimeoutMinutes = hex($4);
+  my $DoorLockTimeoutSeconds = hex($5);
+
+  my $dlm ="Door is ";
+  if ($DoorLockMode eq '00') {
+    $dlm .= "unsecured";
+  } elsif ($DoorLockMode eq '01') {
+    $dlm .= "unsecured with timeout";
+  } elsif ($DoorLockMode eq '10') {
+    $dlm .= "unsecured for inside door handles";
+  } elsif ($DoorLockMode eq '11') {
+    $dlm .= "unsecured for inside door handles with timeout";
+  } elsif ($DoorLockMode eq '20') {
+    $dlm .= "unsecured for outside door handles";
+  } elsif ($DoorLockMode eq '21') {
+    $dlm .= "unsecured for outside door handles with timeout";
+  } elsif ($DoorLockMode eq 'ff') {
+    $dlm .= "secured";
+  }
+  Log3 $name, 0, "$name: DoorLockOperationReport DoorLockMode = $dlm";
+
+  my $odlhm = sprintf ("%04b",  ($DoorLockHandleModes & 0xf0)>>4);
+  my $idlhm = sprintf ("%04b",  ($DoorLockHandleModes & 0x0f));
+  Log3 $name, 0, "$name: DoorLockOperationReport OutsideDoorHandles: $odlhm,".
+    " InsideDoorHandles: $idlhm";
+
+  my $dc_door  = 'Door '  . ($DoorCondition & 0x01) ? 'open' : 'closed';
+  my $dc_bolt  = 'Bolt '  . ($DoorCondition & 0x02) ? 'locked' : 'unlocked';
+  my $dc_latch = 'Latch ' . ($DoorCondition & 0x04) ? 'open' : 'closed';
+  Log3 $name, 0, "$name: DoorLockOperationReport Door Conditions: $dc_door ".
+    "$dc_bolt $dc_latch";
+
+  if ($DoorLockTimeoutMinutes == 254) {
+    $DoorLockTimeoutMinutes = 'not_supported';
+  }
+  if ($DoorLockTimeoutSeconds == 254) {
+    $DoorLockTimeoutSeconds = 'not_supported';
+  }
+
+  my $to = 'Timeout ' . ' min=' . $DoorLockTimeoutMinutes . ' sec=' .
+    $DoorLockTimeoutSeconds;
+  Log3 $name, 0, "$name: DoorLockOperationReport $to";
+
+  return "DoorLockOperation: $arg $dlm outsidehandles $odlhm insidehandles ".
+    "$idlhm $dc_door $dc_bolt $dc_latch $to";
+}
+
+sub
+ZWave_DoorLockConfigReport($$)
+{
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 5, "$name: DoorLockConfigurationReport received: $arg";
+
+  if ($arg !~ m/(..)(..)(..)(..)/) {
+    Log3 $name, 0, "$name: DoorLockOperationReport wrong format received";
+  }
+  my $OperationMode          = $1;
+  my $DoorLockHandleStates   = hex($2);
+  my $DoorLockTimeoutMinutes = hex($3);
+  my $DoorLockTimeoutSeconds = hex($4);
+
+  my $ot ='';
+  if ($OperationMode eq '01') {
+    $ot = "Constant ";
+  } elsif ($OperationMode eq '02') {
+    $ot = "Timed";
+  }
+  $ot .= ' operation';
+  Log3 $name, 0, "$name: DoorLockConfigurationReport $ot";
+
+  my $odlhs = sprintf ("%04b",  ($DoorLockHandleStates & 0xf0)>>4);
+  my $idlhs = sprintf ("%04b",  ($DoorLockHandleStates & 0x0f));
+  Log3 $name, 0, "$name: DoorLockOperationReport OutsideDoorHandles: $odlhs, ".
+    "InsideDoorHandles: $idlhs";
+
+  if ($DoorLockTimeoutMinutes == 254) {
+    $DoorLockTimeoutMinutes = 'not_supported';
+  }
+  if ($DoorLockTimeoutSeconds == 254) {
+    $DoorLockTimeoutSeconds = 'not_supported';
+  }
+
+  my $to = 'Timeout ' . ' min=' . $DoorLockTimeoutMinutes . ' sec=' .
+    $DoorLockTimeoutSeconds;
+
+  Log3 $name, 0, "$name: DoorLockOperationReport $to";
+
+  return "DoorLockConfiguration: $arg $ot outsidehandles $odlhs ".
+    "insidehandles $idlhs $to";
 }
 
 sub
@@ -1660,43 +1797,554 @@ ZWave_sensorbinaryV2Parse($$)
           ":".$value;
 }
 
+##############################################
+#  SECURITY (start)
+##############################################
+
 sub
 ZWave_secureInit(@)
 {
   my ($hash, $param) = @_;
   my $iodev = $hash->{IODev};
   my $name = $hash->{NAME};
+  if (!ZWave_secIsEnabled($hash)) {
+    return;
+  }
 
   $hash->{secStatus} = 0 if(!$hash->{secStatus});
   my $status = ++$hash->{secStatus};
-
-  my @stTxt = ( "secScheme", "secKey", "secNonce", "done");
+  my @stTxt = ( "secScheme", "secNonceRequest");
   my $stTxt = ($status > int(@stTxt) ? "ERR" : $stTxt[$status-1]);
-  Log3 $iodev, 4, "*** $hash->{NAME}: secureInit status $status/$stTxt";
 
   if($status == 1) {
     ZWave_Set($hash, $name, "secScheme");
     return ""; # not evaluated
-
   } elsif($status == 2) {
-    Log3 $iodev, 4, "secScheme report: $param";
-    my $key = AttrVal($iodev->{NAME}, "networkKey", "");
-    ZWave_Set($hash, $name, ("secKey", $key));
-    return undef;       # No Event/Reading
-
-  } elsif($status == 3) {
-    #IOWrite($hash, "secKey ACK", "");
-    ZWave_Set($hash, $name, "secNonce");
-    return undef;       # No Event/Reading
-
+    ZWave_Get($hash, $name, "secNonce");
+    return undef;
   } else {
-    Log3 $iodev, 4, "secNonce report: $param";
+    Log3 $name, 5, "$name: secureInit called with invalid status";
+    return undef;
+  }
+}
+
+sub
+ZWave_isSecureClass($$)
+{
+  my ($hash, $cc_cmd) = @_;
+  my $name = $hash->{NAME};
+
+  if ($cc_cmd =~m/(..)(..)/) {
+    my ($cc, $cmd) = ($1, $2);
+    my $cc_name = $zwave_id2class{lc($cc)};
+    my $sec_classes = AttrVal($name, "secure_classes", "");
+
+    if ($sec_classes =~ m/$cc_name/) {
+      Log3 $name, 5, "$name: $cc_name is a secured class!";
+      return (1);
+    }
+
+    # some SECURITY commands need to be encrypted allways
+    if ($cc eq '98') {
+      if ($cmd eq '02' || # SupportedGet
+          $cmd eq '06' || # NetworkKeySet
+          $cmd eq '08' ){ # SchemeInherit
+        Log3 $name, 5, "$name: Security commands will be encrypted!";
+        return (1);
+        }
+    }
+    # these SECURITY commands should not be encrypted
+    # SchemeGet = 0x04, NonceGet = 0x40, NonceReport = 0x80
+    # MessageEncap = 0x81 is already encrypted
+    # MessageEncapNonceGet = 0xc1 is already encrypted
+  }
+  return (0);
+}
+
+
+sub
+ZWave_secSupported($$)
+{
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  my $iodev = $hash->{IODev};
+  my $id = $hash->{id};
+
+  if (!ZWave_secIsEnabled($hash)) {
+    return;
+  };
+
+  Log3 $name, 5, "$name: Secured Classes Supported: $arg";
+
+  if ($arg =~ m/(..)(.*)/) {
+    if ($1 ne '00') {
+      Log3 $name, 1, "$name: Multi part message report for secure classes ".
+        "can not be handled!";
+    }
+    my @sec_classes;
+    my $sec_classes = $2;
+    for my $sec_classId (grep /../, split(/(..)/, lc($sec_classes))) {
+      push @sec_classes, $zwave_id2class{lc($sec_classId)} ?
+        $zwave_id2class{lc($sec_classId)} : "UNKNOWN_".lc($sec_classId);
+    }
+    $attr{$name}{secure_classes} = join(" ", @sec_classes)
+      if (@sec_classes && !$attr{$name}{secure_classes});
+  }
+
+  if ($iodev->{secInitName} && $hash->{secStatus}) {
+    # Secure inclusion is finished, remove readings and execute "normal" init
     delete $iodev->{secInitName};
     delete $hash->{secStatus};
     return ZWave_execInits($hash, 0);
   }
 }
 
+sub
+ZWave_secNonceReceived($$)
+{
+  my ($hash, $r_nonce_hex) = @_;
+  my $iodev = $hash->{IODev};
+  my $name = $hash->{NAME};
+
+  if (!ZWave_secIsEnabled($hash))
+  {
+    return;
+  }
+  setReadingsVal($hash, "received_nonce", $r_nonce_hex, TimeNow());
+
+  # If a nonce is received during secure_Include, send the networkkey...
+  if ($hash->{secStatus} && ($hash->{secStatus} == 2)) {
+    my $key_hex = AttrVal($iodev->{NAME}, "networkKey", "");
+    my $mynonce_hex = substr (ZWave_secCreateNonce($hash), 2, 16);
+    my $cryptedNetworkKeyMsg = ZWave_secNetworkkeySet($r_nonce_hex,
+      $mynonce_hex, $key_hex, $hash->{id});
+    ZWave_Set($hash, $name, ("secEncap", $cryptedNetworkKeyMsg));
+    $hash->{secStatus}++;
+    readingsSingleUpdate($hash, "SECURITY", 'INITIALIZING (Networkkey sent)',0);
+    Log3 $name, 5, "$name: SECURITY initializing, networkkey sent";
+
+    # start timer here to check state if networkkey was not verified
+    InternalTimer(gettimeofday()+25, "ZWave_secTestNetworkkeyVerify", $hash, 0);
+    return undef;
+  }
+
+  # if nonce is received, we should have stored a message for encryption
+  my $secMsg = ZWave_getSecMsg($hash);
+  if (!$secMsg) {
+    Log3 $name, 1, "$name: Error, nonce reveived but no stored command for ".
+      "encryption found";
+    return undef;
+  }
+
+  my $enc = ZWave_secEncrypt($hash, $r_nonce_hex, $secMsg);
+  ZWave_Set($hash, $name, ("secEncap", $enc));
+
+  return undef;
+}
+
+
+sub
+ZWave_putSecMsg_old ($$)
+{
+  my ($hash, $s) = @_;
+  my $name = $hash->{NAME};
+  my $secMsg = ReadingsVal($name, "secMsg", undef);
+  if ($secMsg) {
+    my @secMsg = split (' ', $secMsg);
+    push(@secMsg, $s);
+    $secMsg = join(" ",@secMsg);
+  } else {
+    $secMsg = $s;
+  }
+  setReadingsVal($hash, "secMsg", $secMsg, TimeNow());
+  Log3 $name, 3, "$name SECURITY: $s stored for encryption";
+}
+
+sub
+ZWave_putSecMsg ($$)
+{
+  my ($hash, $s) = @_;
+  my $name = $hash->{NAME};
+
+  if (!$hash->{secMsg}) {
+    my @arr = ();
+    $hash->{secMsg} = \@arr;
+  }
+  push @{$hash->{secMsg}}, $s;
+  Log3 $name, 3, "$name SECURITY: $s stored for encryption";
+}
+
+sub
+ZWave_getSecMsg ($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $secMsg = $hash->{secMsg};
+  if ($secMsg && @{$secMsg}) {
+    my $ret = shift(@{$secMsg});
+    if ($ret) {
+      Log3 $name, 3, "$name SECURITY: $ret retrieved for encryption";
+      return $ret;
+    }
+  }
+  Log3 $name, 1, "$name: no stored commands in Internal secMsg found";
+  return undef;
+}
+
+sub
+ZWave_secNonceRequestReceived ($)
+{
+  my ($hash) = @_;
+  if (!ZWave_secIsEnabled($hash)) {
+    return;
+  }
+  return ZWave_Set($hash, $hash->{NAME}, "sendNonce");
+}
+
+sub
+ZWave_secIsEnabled ($)
+{
+  my ($hash) = @_;
+  my $secStatus = ReadingsVal($hash->{NAME}, "SECURITY", "DISABLED");
+  if ($secStatus =~ m/DISABLED/) {
+    Log3 $hash->{NAME}, 1, "$hash->{NAME} SECURITY $secStatus (command dropped)";
+    return (0);
+  }
+  return (1);
+}
+
+sub
+ZWave_sec ($$)
+{
+  my ($hash, $arg) = @_;
+  return (ZWave_secIsEnabled($hash) ? ("", $arg) : ("",'00'));
+}
+
+sub
+ZWave_secCreateNonce($)
+{
+  my ($hash) = @_;
+  if (ZWave_secIsEnabled($hash)) {
+    my $nonce = ZWave_getNonce();
+    setReadingsVal($hash, "send_nonce", $nonce, TimeNow());
+    return ("",'80'.$nonce);
+  } else {
+    return ("", '00');
+  }
+}
+
+sub
+ZWave_getNonce()
+{
+  my $nonce='';
+  for (my $i = 0; $i <8; $i++) {
+    $nonce .= sprintf "%02x",int(rand(256));
+  }
+  return $nonce;
+}
+
+sub
+ZWave_secNetWorkKeyVerify ($)
+{
+  my($hash) = @_;
+  my $name = $hash->{NAME};
+  my $iodev = $hash->{IODev};
+
+  if (!ZWave_secIsEnabled($hash)) {
+    return;
+  }
+
+  #Log3 $iodev, 4, "$name: NetworkKeyVerify received, SECURITY is enabled";
+  readingsSingleUpdate($hash, "SECURITY", 'ENABLED', 0);
+  Log3 $name, 2, "$name: SECURITY enabled, networkkey was verified";
+  ZWave_Get($hash, $name, ("secSupported"));
+}
+
+sub
+ZWave_secTestNetworkkeyVerify ($)
+{
+  my($hash) = @_;
+  my $name = $hash->{NAME};
+  my $sec_status = ReadingsVal($name, "SECURITY", undef);
+  if ($sec_status !~ m/ENABLED/) {
+    readingsSingleUpdate($hash, "SECURITY",
+        'DISABLED (networkkey not verified and timer expired)', 0);
+    Log3 $name, 1, "$name: SECURITY disabled, networkkey was not verified ".
+      "and timer expired";
+  }
+}
+
+sub
+ZWave_secEncrypt($$$)
+{
+  my ($hash, $r_nonce_hex, $plain) = @_;
+  my $name = $hash->{NAME};
+  my $iodev = $hash->{IODev};
+  my $id = $hash->{id};
+
+  my $init_enc_key     = pack 'H*', 'a' x 32;
+  my $init_auth_key    = pack 'H*', '5' x 32;
+
+  my $s_nonce_hex = ZWave_getNonce();
+  my $iv = pack 'H*', $s_nonce_hex . $r_nonce_hex;
+  my $key = pack 'H*', AttrVal($iodev->{NAME}, "networkKey", "");
+  my $enc_key  = ZWave_secEncryptECB($key, $init_enc_key);
+  my $auth_key = ZWave_secEncryptECB($key, $init_auth_key);
+
+  my $seq = '00'; # Sequencebyte -> need to be calculated for longer messages
+  my $msg_hex = $seq . $plain;
+  my $out_hex = ZWave_secEncryptOFB ($enc_key, $iv, $msg_hex);
+
+  my $auth_msg_hex = '8101';
+  $auth_msg_hex   .= sprintf "%02x", hex($hash->{id});
+  $auth_msg_hex   .= sprintf "%02x", (length ($out_hex))/2;
+  $auth_msg_hex   .= $out_hex;
+
+  Log3 $name, 5, "$name: secEncrypt plain:$msg_hex enc:$out_hex";
+
+  my $auth_code_hex = ZWave_secGenerateAuth($auth_key, $iv, $auth_msg_hex);
+  my $enc_msg_hex = '81' . $s_nonce_hex . $out_hex . substr($r_nonce_hex, 0, 2)
+    . $auth_code_hex;
+  return $enc_msg_hex;
+}
+
+sub
+ZWave_secDecrypt($$$)
+{
+  my ($hash, $data, $newnonce) = @_;
+  my $name = $hash->{NAME};
+  my $iodev = $hash->{IODev};
+
+  if (!ZWave_secIsEnabled($hash)) {
+    return;
+  }
+
+  my $init_enc_key     = pack 'H*', 'a' x 32;
+  my $init_auth_key    = pack 'H*', '5' x 32;
+
+  my $key = pack 'H*', AttrVal($iodev->{NAME}, "networkKey", "");
+  my $enc_key  = ZWave_secEncryptECB($key, $init_enc_key);
+  my $auth_key = ZWave_secEncryptECB($key, $init_auth_key);
+
+  my $s_nonce_hex = ReadingsVal($name, "send_nonce", undef);
+  if (!$s_nonce_hex) {
+    Log3 $name, 1, "$name: Error, no send_nonce to decrypt message available";
+    return "";
+  }
+
+  readingsSingleUpdate($hash, "send_nonce", undef, 0);
+
+  # encrypted message format:
+  # data=  bcb328fe5d924a402b2901fc2699cc3bcacd30e0
+  # bcb328fe5d924a40 = 8 byte r_nonce
+  # 2b2901           = encrypted message, variable length
+  # fc               = s_nonce-Id (= first byte of s_nonce)
+  # 2699cc3bcacd30e0 = 8 byte authentification code
+  if ($data !~ m/^(................)(.*)(..)(................)$/) {
+    Log3 $name, 1, "$name: Error, wrong format of encrypted msg";
+    #return (undef, undef);
+    return "";
+  }
+  my ($r_nonce_hex, $msg_hex, $s_nonce_id_hex, $auth_code_hex) = ($1, $2, $3, $4);
+
+  my $iv = pack 'H*', $r_nonce_hex . $s_nonce_hex;
+  my $out_hex = ZWave_secEncryptOFB ($enc_key, $iv, $msg_hex);
+
+  Log3 $name, 5, "$name: secDecrypt: decrypted cmd $out_hex";
+
+  # decoding sequence information
+  # bit 76       reseved
+  # bit   5      second frame (0x20)
+  # bit    4     sequenced (0x10)
+  # bit     3210 sequenceCounter (0x0f)
+  my $seq = hex(substr ($out_hex, 0,2));
+  my $sequenced = (($seq & 0x10) ? 1 : 0);
+  my $secondFrame = (($seq & 0x20) ? 1 : 0);
+  my $sequenceCounter = sprintf "%02x", ($seq & 0x0f);
+
+  Log3 $name, 5, "$name: secDecrypt: Sequencebyte $seq, sequenced ".
+    "$sequenced, secondFrame $secondFrame, sequenceCounter $sequenceCounter";
+
+  # Rebuild message for authentification check
+  # 81280103 '81' . <from-id> . <to-id> . <len> . <encrMsg>
+  my $my_msg_hex = ($newnonce ? 'c1' : '81');
+  $my_msg_hex .= sprintf "%02x", hex($hash->{id});
+  $my_msg_hex .= '01';
+  $my_msg_hex .= sprintf "%02x", (length ($msg_hex))/2;
+  $my_msg_hex .= $msg_hex;
+
+  my $my_auth_code_hex = ZWave_secGenerateAuth($auth_key, $iv, $my_msg_hex);
+  Log3 $name, 5, "$name: secDecrypt: calculated Authentication code ".
+    "$my_auth_code_hex";
+
+  $out_hex = substr($out_hex, 2,length($out_hex)-2);
+
+  if ($auth_code_hex eq $my_auth_code_hex) {
+    if ($sequenced && !$secondFrame){ # first frame of sequence message
+      ZWave_secStoreFirstFrame($hash, $sequenceCounter, $out_hex);
+    } else { # not first frame or not sequenced
+      if ($sequenced && $secondFrame){
+        my $firstFrame = ZWave_secRetrieveFirstFrame ($hash, $sequenceCounter);
+        if ($firstFrame) {
+          $out_hex = $firstFrame . $out_hex;
+        } else {
+        Log3 $name, 1, "$name: secDecrypt: first frame of message (sequence ".
+          "$sequenceCounter) for decryption not found!";
+        }
+      }
+      my $decryptedCmd = '000400';
+      $decryptedCmd .= sprintf "%02x", hex($hash->{id});
+      $decryptedCmd .= sprintf "%02x", (length ($out_hex))/2;
+      $decryptedCmd .= $out_hex;
+
+      Log3 $name, 5, "$name: secDecrypt: parsing $decryptedCmd";
+      ZWave_Parse($iodev, $decryptedCmd, undef);
+    }
+  } else {
+    Log3 $name, 1, "$name: secDecrypt: Authentification code not verified, "
+      ."command $out_hex will be dropped!";
+    if ($sequenced && $secondFrame){
+      ZWave_secRetrieveFirstFrame ($hash, $sequenceCounter);
+    }
+  }
+
+  if ($newnonce == 1) {
+    ZWave_Set($hash, $hash->{NAME}, "sendNonce");
+  }
+
+  return "";
+}
+
+sub
+ZWave_secStoreFirstFrame ($$$) {
+  my ($hash, $seqcnt, $framedata) = @_;
+  my $framename = "Frame_$seqcnt";
+  $hash->{$framename} = $framedata;
+}
+
+sub
+ZWave_secRetrieveFirstFrame ($$) {
+  my ($hash, $seqcnt) = @_;
+  my $framename = "Frame_$seqcnt";
+  if ($hash->{$framename}) {
+    my $ret = $hash->{$framename};
+    if ($ret) {
+      $hash->{$framename} = undef;
+      return $ret;
+    }
+  }
+  Log3 $hash->{NAME}, 1, "$hash->{NAME}: first frame of message (sequence ".
+    "$seqcnt) for decryption not found!";
+  return undef;
+}
+
+sub
+ZWave_secEncryptECB ($$)
+{
+  my ($key, $iv) = @_;
+  # $key and $iv as 'packed' hex-strings
+  my $cipher_ecb = Crypt::Rijndael->new ($key, Crypt::Rijndael::MODE_ECB() );
+  return $cipher_ecb->encrypt($iv);
+}
+
+sub
+ZWave_secEncryptOFB ($$$)
+{
+  my ($key, $iv, $in_hex) = @_;
+  # $key and $iv as 'packed' hex-strings, $in_hex as hex-string
+  my $cipher_ofb = Crypt::Rijndael->new($key,
+                      Crypt::Rijndael::MODE_OFB() );
+  $cipher_ofb->set_iv($iv);
+
+  # make sure that the blocksize is 16 bytes / 32 characters
+  my $in_len = length($in_hex);
+  if ($in_len % 32) {
+    $in_hex .= '0' x (32 - ($in_len % 32));
+  }
+  my $out_hex = unpack 'H*', $cipher_ofb->encrypt(pack 'H*', $in_hex);
+  return (substr ($out_hex, 0, $in_len));
+}
+
+sub
+ZWave_secGenerateAuth ($$$)
+{
+  my ($key, $iv, $msg_hex) = @_;
+
+  my $cipher_ecb = Crypt::Rijndael->new ($key, Crypt::Rijndael::MODE_ECB() );
+  my $enc_iv = ZWave_secEncryptECB($key, $iv);
+
+  # make sure that the blocksize is 16 bytes / 32 characters
+  my $msg_len = length($msg_hex);
+  if ($msg_len % 32) {
+    $msg_hex .= '0' x (32 - ($msg_len % 32));
+  }
+
+  my $temp=0;
+  my $buff=0;
+  my $buff_hex="";
+  # xOR first block with encrypted iv
+  # encrypt the result, repeat for all blocks using encrypted output
+  # as input for xOR of next block
+  for (my $i = 0; $i < (length($msg_hex)/32); $i++) {
+    $buff_hex = substr($msg_hex, $i*32, 32);
+    $buff = pack 'H*', $buff_hex;
+    $temp = $buff ^ $enc_iv;
+    $enc_iv = $cipher_ecb->encrypt($temp);
+  };
+  # only 8 byte used for message authentification code
+  return unpack 'H16', $enc_iv;
+}
+
+sub
+ZWave_secNetworkkeySet ($$$$)
+{
+  my ($nonce_hex, $mynonce_hex, $key_plain_hex, $id_hex) = @_;
+  my $name ="ZWave_secNetworkkeySet";
+
+  # The NetworkKeySet command message will be encrcpted and authentificated
+  # with temporary keys that are created with the networkkey and default
+  # keys for encryption and authentification as given below.
+  my $init_enc_key     = pack 'H*', 'a' x 32;
+  my $init_auth_key    = pack 'H*', '5' x 32;
+  my $key_zero         = pack 'H*', '0' x 32;
+  my $nonce            = pack 'H*', $nonce_hex;
+  my $mynonce          = pack 'H*', $mynonce_hex;
+
+  my $enc_key  = ZWave_secEncryptECB($key_zero, $init_enc_key);
+  my $auth_key = ZWave_secEncryptECB($key_zero, $init_auth_key);
+
+  my $iv = pack 'H*', $mynonce_hex . $nonce_hex;
+
+  # build 'plain-text' message to be encrypted
+  # 0x00 = sequence byte -> only one frame
+  # 0x98 = Security Class
+  # 0x06 = NetworkKeySet
+  $key_plain_hex = '009806'.$key_plain_hex;
+  my $out_hex = ZWave_secEncryptOFB($enc_key, $iv, $key_plain_hex);
+
+  ############ MAC generation ############################
+  # build message for encryption
+  # command, source-id, target-id
+  # 0x81="Security_Message_Encapsulation" 0x01=Souce-ID (Controller = 0x01)
+  my $in_hex = '8101' . $id_hex;
+  $in_hex .= sprintf "%02x", length($out_hex)/2; # length of command
+  $in_hex .= $out_hex; # encrypted network key
+
+  my $auth_hex = ZWave_secGenerateAuth ($auth_key, $iv, $in_hex);
+
+  # build encrypted message
+  # Command Class will be added during sending -> do not prepend
+  # 0x81 = Security_Message_Encapsulation
+  $out_hex = '81' . $mynonce_hex . $out_hex . substr($nonce_hex, 0, 2) .
+    $auth_hex;
+
+  return $out_hex;
+}
+
+##############################################
+#AH:   SECURITY (end)
+##############################################
 
 sub
 ZWave_getHash($$$)
@@ -1741,11 +2389,13 @@ ZWave_wakeupTimer($)
   if($now - $hash->{lastMsgTimestamp} > 1) { # wakeupNoMoreInformation
     if($hash->{STATE} ne "TRANSMIT_NO_ACK") {
       my $nodeId = $hash->{id};
-      my $cmdEf  = (AttrVal($hash->{NAME}, "noExplorerFrames", 0) == 0 ? "25" : "05");
+      my $cmdEf  = (AttrVal($hash->{NAME},"noExplorerFrames",0)==0 ? "25":"05");
       IOWrite($hash, "00", "13${nodeId}028408${cmdEf}$nodeId");
     }
+
   } else {
     InternalTimer($now+0.1, "ZWave_wakeupTimer", $hash, 0);
+
   }
 }
 
@@ -1761,10 +2411,10 @@ ZWave_sendWakeup($)
       Log3 $hash, 4, "Sending stored command: $wuCmd";
     }
     @{$hash->{WakeUp}}=();
+    InternalTimer(gettimeofday()+0.1, "ZWave_wakeupTimer", $hash, 0);
   }
-
-  InternalTimer(gettimeofday()+01, "ZWave_wakeupTimer", $hash, 0);
 }
+
 
 ###################################
 # 0004000a03250300 (sensor binary off for id 11)
@@ -1787,10 +2437,6 @@ ZWave_Parse($$@)
     $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
     if($cmd eq "ZW_SEND_DATA") {
       Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
-      my $si = $iodev->{secInitName};
-      ZWave_secureInit($defs{$si}) # No extra response for set networkKey
-        if($si && $defs{$si} && $defs{$si}{secStatus} &&
-           $defs{$si}{secStatus} == 2);
       return "";
     }
     if($cmd eq "SERIAL_API_SET_TIMEOUTS" && $arg =~ m/(..)(..)/) {
@@ -1827,22 +2473,40 @@ ZWave_Parse($$@)
     }
 
     if($evt eq "protocolDone" && $arg =~ m/(..)../) {# done comes at addNode off
-      delete $iodev->{secInitName};
       my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
       return "" if(!$dh);
 
       $dh->{lastMsgTimestamp} = gettimeofday();
 
       if($iodev->{addSecure}) {
+        readingsSingleUpdate($dh, "SECURITY", 
+                                "INITIALIZING (starting secure inclusion)", 0);
         my $classes = AttrVal($dh->{NAME}, "classes", "");
         if($classes =~ m/SECURITY/) {
-          my $key = AttrVal($ioName, "networkKey", "");
-          if($key) {
-            $iodev->{secInitName} = $dh->{NAME};
-            return ZWave_secureInit($dh);
+          if ($crypt_Rijndael == 1) {
+            my $key = AttrVal($ioName, "networkKey", "");
+            if($key) {
+              $iodev->{secInitName} = $dh->{NAME};
+              Log3 $ioName, 2, "ZWAVE Starting secure init";
+              return ZWave_secureInit($dh);
+            } else {
+              Log3 $ioName,1,"No secure inclusion as $ioName has no networkKey";
+              readingsSingleUpdate($dh, "SECURITY",
+                                      'DISABLED (Networkkey not found)', 0);
+              Log3 $dh->{NAME}, 1, "$dh->{NAME}: SECURITY disabled, ".
+                "networkkey not found";
+            }
           } else {
-            Log3 $ioName, 2, "No secure inclusion as $ioName has no networkKey";
+            readingsSingleUpdate($dh, "SECURITY",
+                              'DISABLED (Module Crypt_Rijndael not found)', 0);
+            Log3 $dh->{NAME}, 1, "$dh->{NAME}: SECURITY disabled, module ".
+              "Crypt_Rijndael not found";
           }
+        } else {
+          readingsSingleUpdate($dh, "SECURITY",
+                              'DISABLED (SECURITY not supported by device)', 0);
+          Log3 $dh->{NAME}, 1, "$dh->{NAME}: secure inclusion failed, ".
+            "SECURITY disabled, device does not support SECURITY command class";
         }
       }
       return ZWave_execInits($dh, 0);
@@ -2093,6 +2757,7 @@ s2Hex($)
   href="http://www.z-wave.com">www.z-wave.com</a> on details for this device family.
   This module is a client of the <a href="#ZWDongle">ZWDongle</a> module, which
   is directly attached to the controller via USB or TCP/IP.
+  To use the SECURITY features, the Crypt-Rijndael perl module is needed.
   <br><br>
   <a name="ZWavedefine"></a>
   <b>Define</b>
@@ -2156,11 +2821,11 @@ s2Hex($)
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
   <li>coveringClose<br>
     Starts closing the window cover. Moving stops if blinds are fully closed or
-    a coveringStop command was issued.
+    a coveringStop command was issued. 
     </li>
   <li>coveringOpen<br>
     Starts opening the window cover.  Moving stops if blinds are fully open or
-    a coveringStop command was issued.
+    a coveringStop command was issued. 
     </li>
   <li>coveringStop<br>
     Stop moving the window cover. Blinds are partially open (closed).
@@ -2230,7 +2895,7 @@ s2Hex($)
     value is supported by the device.<br>
     The command will reset ALL accumulated values, it is not possible to
     choose a single value.</li>
-
+  
   <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
   <li>mcaAdd groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
     Add a list of node or node:endpoint associations. The latter can be used to
@@ -2262,7 +2927,7 @@ s2Hex($)
     level 0=normal, level 1=-1dBm, .., level 9=-9dBm.</li>
   <li>powerlevelTest nodeId level frames <br>
     send number of frames [1-65535] to nodeId with level [0-9].</li>
-
+  
   <br><br><b>Class PROTECTION</b>
   <li>protectionOff<br>
     device is unprotected</li>
@@ -2289,7 +2954,26 @@ s2Hex($)
   <li>groupConfig<br>
     set configuration for a specific scene.
 	Parameters are: groupId, sceneId, dimmingDuration.
-    </li>	
+    </li>
+
+  <br><br><b>Class SECURITY</b>
+  <li>secScheme<br>
+    (internaly used to) set the security scheme '00'
+    </li>
+  <li>sendNonce<br>
+    (internaly used to) send a security NONCE to the device
+    </li>
+  <li>secEncap<br>
+    (internaly used to) send an encrypted message to the device
+    </li>
+  <li>Notes:<br>
+    This class needs the installation of the perl module Crypt::Rijndael
+    and a defined networkkey in the attributes of the ZWDongle device<br>
+    Currently a secure inclusion can only be started from the command input
+    with "set &lt;ZWDongle_device_name&gt; addNode &lt;On|nwOn&gt; sec"<br>
+    These commands are only described here for completeness of the
+    documentation, but are not intended for manual usage. These commands
+    will be removed from the interface in future version.</li>
 
   <br><br><b>Class SWITCH_ALL</b>
   <li>swaIncludeNone<br>
@@ -2413,6 +3097,11 @@ s2Hex($)
     specific config commands are available.
     </li>
 
+  <br><br><b>Class DOOR_LOCK</b>
+  <li>doorLockConfiguration cfgAddress<br>
+    return the configuration of the door lock.<br>
+    </li>
+
   <br><br><b>Class HRV_STATUS</b>
   <li>hrvStatus<br>
     report the current status (temperature, etc)
@@ -2426,7 +3115,7 @@ s2Hex($)
     return the indicator status of the node, as indState:on, indState:off or
     indState:dim value.
     </li>
-
+  
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
   <li>position<br>
     Fibaro FGRM-222 only: return the blinds position and slat angle.
@@ -2487,7 +3176,7 @@ s2Hex($)
     Get the name from the EEPROM. Note: only ASCII is supported.</li>
   <li>location<br>
     Get the location from the EEPROM. Note: only ASCII is supported.</li>
-
+  
   <br><br><b>Class POWERLEVEL</b>
   <li>powerlevel<br>
     Get the current powerlevel and remaining time in this level.</li>
@@ -2508,11 +3197,31 @@ s2Hex($)
     returns the settings for a given group. Parameter is groupId
     </li>
 
+  <br><br><b>Class SECURITY</b>
+  <li>secSupported<br>
+    (internaly used to) request the command classes that are supported
+    with SECURITY
+    </li>
+  <li>secNonce<br>
+    (internaly used to) request a security NONCE from the device
+    </li>
+  <li>secEncap<br>
+    (internaly used to) send an encrypted message to the device
+    </li>
+  <li>Notes:<br>
+    This class needs the installation of the perl module Crypt::Rijndael and
+    a defined networkkey in the attributes of the ZWDongle device<br>
+    Currently a secure inclusion can only be started from the command input
+    with "set &lt;ZWDongle_device_name&gt; addNode &lt;On|nwOn&gt; sec"<br>
+    These commands are only described here for completeness of the
+    documentation, but are not intended for manual usage. These commands
+    will be removed from the interface in future version.</li>
+
   <br><br><b>Class SENSOR_ALARM</b>
   <li>alarm alarmType<br>
     return the nodes alarm status of the requested alarmType. 00 = GENERIC,
     01 = SMOKE, 02 = CO, 03 = CO2, 04 = HEAT, 05 = WATER, ff = returns the
-    nodes first supported alarm type.
+    nodes first supported alarm type.    
     </li>
 
   <br><br><b>Class SENSOR_BINARY</b>
@@ -2579,7 +3288,7 @@ s2Hex($)
   <li>zwavePlusInfo<br>
     request the zwavePlusInfo
     </li>
-
+  
   </ul>
   <br>
 
@@ -2596,6 +3305,11 @@ s2Hex($)
       This attribute is needed by the ZWave module, as the list of the possible
       set/get commands depends on it. It contains a space separated list of
       class names (capital letters).
+      </li>
+    <li><a href="#secure_classes">secure_classes</a>
+      This attribute is the result of the "get DEVICE secSupported" command. It
+      contains a space seperated list of the the command classes that
+      supported with SECURITY.
       </li>
     <li><a href="#vclasses">vclasses</a>
       This is the result of the "set DEVICE versionClassRequest" command, and
@@ -2651,7 +3365,7 @@ s2Hex($)
   <li>config_X:Y<br>
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config messages are available.</li>
-
+  
   <br><br><b>Class DEVICE_RESET_LOCALLY</b>
   <li>deviceResetLocally:yes<br></li>
 
@@ -2677,7 +3391,7 @@ s2Hex($)
     (VenetianBlindMode)</li>
   <li>position:[%]<br>
     (RollerBlindMode)</li>
-
+  
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
   <li>modelId:hexValue hexValue hexValue</li>
   <li>model:manufacturerName productName</li>
@@ -2706,22 +3420,26 @@ s2Hex($)
     NOTE: "current 0 remain 0" means normal mode without timeout</li>
   <li>powerlvlTest:node x status y frameAck z<br>
     NOTE: status 0=failed, 1=success (at least one ACK), 2=in progress</li>
-
+  
   <br><br><b>Class PROTECTION</b>
   <li>protection:[on|off|seq]</li>
 
   <br><br><b>Class SCENE_ACTIVATION</b>
   <li>scene_Id:level finalValue</li>
-
+    
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
   <li>scene_Id:level dimmingDuration finalValue</li>
-
+  
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
   <li>group_Id:scene dimmingDuration</li>
 
+  <br><br><b>Class SECURITY</b>
+  <li>none<br>
+  Note: the class security should work transparent to the sytem and is not
+  intended to generate event</li>
 
   <br><br><b>Class SENSOR_ALARM</b>
-  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li>
+  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li> 
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>SENSORY_BINARY V1:</li>
@@ -2813,7 +3531,7 @@ s2Hex($)
   <li>state:swmBeginUp</li>
   <li>state:swmBeginDown</li>
   <li>state:swmEnd</li>
-
+    
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>off</li>
   <li>cooling</li>
@@ -2842,7 +3560,7 @@ s2Hex($)
   <li>wakeup:notification</li>
   <li>wakeupReport:interval:X target:Y</li>
   <li>wakeupIntervalCapabilitiesReport:min W max X default Y step Z</li>
-
+  
   <br><br><b>Class ZWAVEPLUS_INFO</b>
   <li>zwavePlusInfo:version: V role: W node: X installerIcon: Y userIcon: Z</li>
 
