@@ -9,11 +9,12 @@ use SetExtensions;
 use Compress::Zlib;
 use Time::HiRes qw( gettimeofday );
 
+sub ZWave_Cmd($$@);
+sub ZWave_Get($@);
 sub ZWave_Parse($$@);
 sub ZWave_Set($@);
-sub ZWave_Get($@);
-sub ZWave_Cmd($$@);
 sub ZWave_SetClasses($$$$);
+sub ZWave_addToSendStack($$);
 
 use vars qw(%zw_func_id);
 use vars qw(%zw_type6);
@@ -425,7 +426,8 @@ use vars qw(%zwave_deviceSpecial);
       init => { ORDER=>50, CMD => '"get $NAME zwavePlusInfo"' } } }
 );
 
-my $crypt_Rijndael = 0;
+my $zwave_cryptRijndael = 0;
+my $zwave_lastHashSent;
 
 sub
 ZWave_Initialize($)
@@ -448,7 +450,7 @@ ZWave_Initialize($)
   if($@) {
     Log 3, "ZWave: cannot load Crypt::Rijndael, SECURITY class disabled";
   } else {
-    $crypt_Rijndael = 1;
+    $zwave_cryptRijndael = 1;
   }
 }
 
@@ -481,7 +483,6 @@ ZWave_Define($$)
   AssignIoPort($hash);  # FIXME: should take homeId into account
 
   if(@a) {      # Autocreate: set the classes, execute the init calls
-    $hash->{lastMsgTimestamp} = gettimeofday(); # device is awake.
     ZWave_SetClasses($homeId, $id, undef, $a[0]);
   }
   return undef;
@@ -617,8 +618,6 @@ ZWave_Cmd($$@)
   my $cmdFmt = $cmdList{$cmd}{fmt};
   my $cmdId  = $cmdList{$cmd}{id};
   # 0x05=AUTO_ROUTE+ACK, 0x20: ExplorerFrames
-  my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
-
 
   my $nArg = 0;
   if($cmdFmt =~ m/%/) {
@@ -679,7 +678,9 @@ ZWave_Cmd($$@)
 
   } else {
     my $len = sprintf("%02x", length($cmdFmt)/2+1);
+    my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
     $data = "13$id$len$cmdId${cmdFmt}$cmdEf"; # 13==SEND_DATA
+
   }
 
   $data .= $id; # callback=>id
@@ -697,24 +698,10 @@ ZWave_Cmd($$@)
     }
   }
 
-  if($baseClasses =~ m/WAKE_UP/) {
-    if(!$baseHash->{WakeUp}) {
-      my @arr = ();
-      $baseHash->{WakeUp} = \@arr;
-    }
-    my $tdiff = gettimeofday() - $baseHash->{lastMsgTimestamp};
-    my $awake = ($baseHash->{lastMsgTimestamp} && $tdiff < 3);
-
-    if(!$awake && ($data !~ m/......9880.*/) ) {
-      Log3 $name, 5, "Device not awake (tdiff= $tdiff),".
-                        " command ($data) stored in sendstack";
-      push @{$baseHash->{WakeUp}}, $data;
-      return (AttrVal($name,"verbose",3) > 2 ?
-                  "Scheduled for sending after WAKEUP" : undef);
-    }
+  my $r = ZWave_addToSendStack($baseHash, $data);
+  if($r) {
+    return (AttrVal($name,"verbose",3) > 2 ? $r : undef);
   }
-
-  IOWrite($hash, "00", $data);
 
   my $val;
   if($type eq "get") {
@@ -1345,7 +1332,7 @@ ZWave_clockAdjust($$)
   my ($hash, $d) = @_;
   return $d if($d !~ m/^13(..)048104....$/);
   my ($err, $nd) = ZWave_clockSet();
-  my $cmdEf  = (AttrVal($hash->{NAME}, "noExplorerFrames", 0) == 0 ? "25" : "05");
+  my $cmdEf = (AttrVal($hash->{NAME},"noExplorerFrames",0) == 0 ? "25" : "05");
   return "13${1}0481${nd}${cmdEf}${1}";
 }
 
@@ -2386,12 +2373,20 @@ ZWave_wakeupTimer($)
 {
   my ($hash) = @_;
   my $now = gettimeofday();
-  if($now - $hash->{lastMsgTimestamp} > 1) { # wakeupNoMoreInformation
-    if($hash->{STATE} ne "TRANSMIT_NO_ACK") {
+
+  if(!$hash->{wakeupAlive}) {
+    $hash->{wakeupAlive} = 1;
+    $hash->{lastMsgSent} = $now;
+    InternalTimer($now+0.1, "ZWave_wakeupTimer", $hash, 0);
+
+  } elsif($now - $hash->{lastMsgSent} > 1) {
+    if(!$hash->{SendStack}) {
       my $nodeId = $hash->{id};
       my $cmdEf  = (AttrVal($hash->{NAME},"noExplorerFrames",0)==0 ? "25":"05");
+      # wakeupNoMoreInformation
       IOWrite($hash, "00", "13${nodeId}028408${cmdEf}$nodeId");
     }
+    delete $hash->{wakeupAlive};
 
   } else {
     InternalTimer($now+0.1, "ZWave_wakeupTimer", $hash, 0);
@@ -2400,19 +2395,58 @@ ZWave_wakeupTimer($)
 }
 
 sub
-ZWave_sendWakeup($)
+ZWave_processSendStack($$$)
 {
-  my ($hash) = @_;
+  my ($hash, $now, $withDelay) = @_;
+  my $ss = $hash->{SendStack};
+  return if(!$ss);
 
-  my $wu = $hash->{WakeUp};
-  if($wu && @{$wu}) {
-    foreach my $wuCmd (@{$wu}) {
-      IOWrite($hash, "00", ZWave_clockAdjust($hash, $wuCmd));
-      Log3 $hash, 4, "Sending stored command: $wuCmd";
-    }
-    @{$hash->{WakeUp}}=();
-    InternalTimer(gettimeofday()+0.1, "ZWave_wakeupTimer", $hash, 0);
+  if($withDelay && AttrVal($hash->{IODev}{NAME}, "delayNeeded",1)) {
+    InternalTimer(gettimeofday()+0.3, sub {
+      ZWave_processSendStack($hash, $now, 0);
+    }, undef, 0);
+    return;
   }
+  
+  shift @{$ss} if(index($ss->[0],"sent") == 0);
+  if(@{$ss} == 0) {
+    delete $hash->{SendStack};
+    return;
+  }
+
+  IOWrite($hash, "00", $ss->[0]);
+  $ss->[0] = "sent:".$ss->[0];
+  
+  $hash->{lastMsgSent} = ($now ? $now : gettimeofday());
+  $zwave_lastHashSent = $hash;
+}
+
+sub
+ZWave_addToSendStack($$)
+{
+  my ($hash, $cmd) = @_;
+  if(!$hash->{SendStack}) {
+    my @empty;
+    $hash->{SendStack} = \@empty;
+  }
+  my $ss = $hash->{SendStack};
+  push @{$ss}, $cmd;
+
+  my $now;
+  if(index(AttrVal($hash->{NAME}, "classes", ""), "WAKE_UP") >= 0) {
+    return "Scheduled for sending after WAKEUP" if(!$hash->{wakeupAlive});
+
+  } else { # clear commands without 0113 and 0013
+    $now = gettimeofday();
+    if(@{$ss} > 1 && $now-$hash->{lastMsgSent} > 10) {
+      Log3 $hash, 2,
+        "ERROR: $hash->{NAME}: cleaning commands without ack after 10s";
+      delete $hash->{SendStack};
+      return ZWave_addToSendStack($hash, $cmd);
+    }
+  }
+  ZWave_processSendStack($hash, $now, 0) if(@{$ss} == 1);
+  return undef;
 }
 
 
@@ -2432,11 +2466,21 @@ ZWave_Parse($$@)
     return "";
   }
 
-  if($msg =~ m/^01(..)(..*)/) { # 01==ANSWER
+  if($msg =~ m/^01(..)(..*)/) { # 01==ANSWER from the ZWDongle
     my ($cmd, $arg) = ($1, $2);
     $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
-    if($cmd eq "ZW_SEND_DATA") {
-      Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg" if($arg != 1);
+    if($cmd eq "ZW_SEND_DATA") { # 011301: data was sent.
+      if($arg != 1) {
+        if($zwave_lastHashSent) {
+          my $hash = $zwave_lastHashSent;
+          readingsSingleUpdate($hash, "SEND_DATA", "failed:$arg", 1);
+          Log3 $ioName, 2, "ERROR: cannot SEND_DATA to $hash->{NAME}: $arg";
+          ZWave_processSendStack($hash, undef, 1);
+
+        } else {
+          Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg (unknown device)";
+        }
+      }
       return "";
     }
     if($cmd eq "SERIAL_API_SET_TIMEOUTS" && $arg =~ m/(..)(..)/) {
@@ -2476,14 +2520,12 @@ ZWave_Parse($$@)
       my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
       return "" if(!$dh);
 
-      $dh->{lastMsgTimestamp} = gettimeofday();
-
       if($iodev->{addSecure}) {
         readingsSingleUpdate($dh, "SECURITY", 
                                 "INITIALIZING (starting secure inclusion)", 0);
         my $classes = AttrVal($dh->{NAME}, "classes", "");
         if($classes =~ m/SECURITY/) {
-          if ($crypt_Rijndael == 1) {
+          if ($zwave_cryptRijndael == 1) {
             my $key = AttrVal($ioName, "networkKey", "");
             if($key) {
               $iodev->{secInitName} = $dh->{NAME};
@@ -2498,9 +2540,9 @@ ZWave_Parse($$@)
             }
           } else {
             readingsSingleUpdate($dh, "SECURITY",
-                              'DISABLED (Module Crypt_Rijndael not found)', 0);
+                              'DISABLED (Module Crypt::Rijndael not found)', 0);
             Log3 $dh->{NAME}, 1, "$dh->{NAME}: SECURITY disabled, module ".
-              "Crypt_Rijndael not found";
+              "Crypt::Rijndael not found";
           }
         } else {
           readingsSingleUpdate($dh, "SECURITY",
@@ -2519,8 +2561,11 @@ ZWave_Parse($$@)
 
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash) {
-      ZWave_sendWakeup($hash) if($hash);
-      $hash->{lastMsgTimestamp} = gettimeofday();
+      if(index(AttrVal($hash->{NAME}, "classes", ""), "WAKE_UP") >= 0) {
+        ZWave_wakeupTimer($hash);
+        ZWave_processSendStack($hash, undef, 0);
+      }
+
       if(!$ret) {
         readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
         return $hash->{NAME};
@@ -2528,14 +2573,18 @@ ZWave_Parse($$@)
     }
     return $ret;
 
-  } elsif($cmd eq "ZW_SEND_DATA") {
+  } elsif($cmd eq "ZW_SEND_DATA") { # 0013cb00....
     my $hash = $modules{ZWave}{defptr}{"$homeId $callbackid"};
     my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
                '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
     my $msg = ($msg{$id} ? $msg{$id} : "UNKNOWN_ERROR");
-    if ($id eq "00") {
+
+    if($id eq "00") {
       Log3 $ioName, 4, "$ioName transmit $msg for $callbackid";
-      readingsSingleUpdate($hash, "transmit", $msg, 0) if($hash);
+      if($hash) {
+        readingsSingleUpdate($hash, "transmit", $msg, 0);
+        ZWave_processSendStack($hash, undef, 1);
+      }
       return "";
 
     } else {
@@ -2612,7 +2661,6 @@ ZWave_Parse($$@)
   }
 
 
-  $baseHash->{lastMsgTimestamp} = gettimeofday();
   my $name = $hash->{NAME};
   my @event;
   my @args = ($arg); # MULTI_CMD handling
@@ -2667,7 +2715,10 @@ ZWave_Parse($$@)
     push @event, "UNPARSED:$className $arg" if(!$matched);
   }
 
-  ZWave_sendWakeup($baseHash) if($arg =~ m/^028407/);
+  if($arg =~ m/^028407/) { # wakeup:notification
+    ZWave_wakeupTimer($hash);
+    ZWave_processSendStack($hash, undef, 0);
+  }
 
   return "" if(!@event);
 
