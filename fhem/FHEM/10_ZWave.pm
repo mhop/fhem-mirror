@@ -24,7 +24,7 @@ my %zwave_class = (
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x",
                basicSet    => "01%02x"  }, # Alias, Forum #38200
-    get   => { basicStatus => "02",     }, 
+    get   => { basicStatus => "02",     },
     parse => { "..2001(.*)"=> '"basicSet:$1"', # Forum #36980
                "..2002"    => "basicGet:request", # sent by the remote
                "..2003(.*)"=> '"basicReport:$1"' }},
@@ -37,17 +37,17 @@ my %zwave_class = (
                on          => "01FF" },
     get   => { swbStatus   => "02",       },
     parse => { "03250300"  => "state:off",
-               "032503ff"  => "state:on", 
+               "032503ff"  => "state:on",
                "03250100"  => "state:setOff",
                "032501ff"  => "state:setOn"  } } ,
-  SWITCH_MULTILEVEL        => { id => '26', 
+  SWITCH_MULTILEVEL        => { id => '26',
     set   => { off         => "0100",
                on          => "01FF",
                dim         => "01%02x",
                stop        => "05" },
-    get   => { swmStatus   => "02",     }, 
-    parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" : 
-                               ($1 eq "ff" ? "state:on" : 
+    get   => { swmStatus   => "02",     },
+    parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" :
+                               ($1 eq "ff" ? "state:on" :
                                              "state:dim ".hex($1)))',
                "..260420"  => "state:swmBeginUp",
                "..260460"  => "state:swmBeginDown",
@@ -68,25 +68,25 @@ my %zwave_class = (
   SWITCH_TOGGLE_MULTILEVEL => { id => '29' },
   CHIMNEY_FAN              => { id => '2a' },
   SCENE_ACTIVATION         => { id => '2b',
-    set   => { sceneActivate => "01%02x%02x" }, 
+    set   => { sceneActivate => "01%02x%02x" },
     parse => { "042b01(..)(..)"  => '"scene_$1:$2"',
                "042b01(..)ff" => 'ZWave_sceneParse($1)'} },
   SCENE_ACTUATOR_CONF      => { id => '2c',
     set   => { sceneConfig => "01%02x%02x80%02x" },
     get   => { sceneConfig => "02%02x",          },
     parse => { "052c03(..)(..)(..)"   => '"scene_$1:level $2 duration $3"' } },
-  SCENE_CONTROLLER_CONF    => { id => '2d',   
+  SCENE_CONTROLLER_CONF    => { id => '2d',
     set   => { sceneConfig => "01%02x%02x%02x" },
     get   => { sceneConfig => "02%02x",          },
     parse => { "052d03(..)(..)(..)"   => '"group_$1:scene $2 duration $3"' } },
   ZIP_CLIENT               => { id => '2e' },
   ZIP_ADV_SERVICES         => { id => '2f' },
-  SENSOR_BINARY            => { id => '30', 
+  SENSOR_BINARY            => { id => '30',
     get   => { sbStatus    => "02",       },
     parse => { "03300300"  => "state:closed",
                "033003ff"  => "state:open",
                "043003(..)(..)"=> 'ZWave_sensorbinaryV2Parse($1,$2)' } },
-  SENSOR_MULTILEVEL        => { id => '31', 
+  SENSOR_MULTILEVEL        => { id => '31',
     get   => { smStatus    => "04" },
     parse => { "..3105(..)(..)(.*)" => 'ZWave_multilevelParse($1,$2,$3)'} },
   METER                    => { id => '32',
@@ -107,7 +107,7 @@ my %zwave_class = (
   ZIP_ADV_CLIENT           => { id => '34' },
   METER_PULSE              => { id => '35' },
   BASIC_TARIFF_INFO        => { id => '36' },
-  HRV_STATUS               => { id => '37', 
+  HRV_STATUS               => { id => '37',
     get   => { hrvStatus   => "01%02x",
                hrvStatusSupported => "03" },
     parse => { "0637020042(....)" =>
@@ -128,12 +128,12 @@ my %zwave_class = (
                    'sprintf("supportedStatus: %s", ZWave_HrvStatus($1))',
             } },
   THERMOSTAT_HEATING       => { id => '38' },
-  HRV_CONTROL              => { id => '39', 
+  HRV_CONTROL              => { id => '39',
     set   => { bypassOff => "0400",
                bypassOn  => "04FF",
                ventilationRate => "07%02x" },
-    get   => { bypass          => "05", 
-                ventilationRate => "08" },  
+    get   => { bypass          => "05",
+                ventilationRate => "08" },
     parse => { "033906(..)"=> '($1 eq "00" ? "bypass:off" : '.
                               '($1 eq "ff" ? "bypass:on"  : '.
                                             '"bypass:dim ".hex($1)))',
@@ -234,7 +234,7 @@ my %zwave_class = (
   APPLIANCE                => { id => '64' },
   DMX                      => { id => '65' },
   BARRIER_OPERATOR         => { id => '66' },
-  CONFIGURATION            => { id => '70', 
+  CONFIGURATION            => { id => '70',
     set   => { configDefault=>"04%02x80",
                configByte  => "04%02x01%02x",
                configWord  => "04%02x02%04x",
@@ -242,7 +242,7 @@ my %zwave_class = (
                configRequestAll => 'ZWave_configRequestAll($hash)' },
     get   => { config      => "05%02x" },
     parse => { "^..70..(..)(..)(.*)" => 'ZWave_configParse($hash,$1,$2,$3)'} },
-  ALARM                    => { id => '71', 
+  ALARM                    => { id => '71',
     get   => { alarm       => "04%02x" },
     parse => { "..7105(..)(..)(.*)" => 'ZWave_alarmParse($1,$2,$3)'} },
   MANUFACTURER_SPECIFIC    => { id => '72',
@@ -256,7 +256,7 @@ my %zwave_class = (
                powerlevelTest => "04%02x%02x%04x" },
     get   => { powerlevel     => "02",
                powerlevelTest => "05" },
-    parse => { "047303(..)(..)" => 
+    parse => { "047303(..)(..)" =>
                    '"powerlvl:current ".hex($1)." remain ".hex($2)',
                "067306(..)(..)(....)" =>
                    '"powerlvlTest:node ".hex($1)." status ".hex($2).
@@ -293,10 +293,10 @@ my %zwave_class = (
                "048106(..)(..)"=> 'ZWave_clockParse($1,$2)' }},
   HAIL                     => { id => '82',
     parse => { "028201"    => "hail:01"}},
-  WAKE_UP                  => { id => '84', 
+  WAKE_UP                  => { id => '84',
     set   => { wakeupInterval => "04%06x%02x",
                wakeupNoMoreInformation => "08" },
-    get   => { wakeupInterval => "05", 
+    get   => { wakeupInterval => "05",
                wakeupIntervalCapabilities => "09" },
     parse => { "028407"    => 'wakeup:notification',
                "..8406(......)(..)" =>
@@ -305,7 +305,7 @@ my %zwave_class = (
                          '"wakeupIntervalCapabilitiesReport:min ".hex($1).'.
                          '" max ".hex($2)." default ".hex($3)." step ".hex($4)'
              } },
-  ASSOCIATION              => { id => '85', 
+  ASSOCIATION              => { id => '85',
     set   => { associationAdd => "01%02x%02x*",
                associationDel => "04%02x%02x*",
                associationRequest => "02%02x",
@@ -332,9 +332,9 @@ my %zwave_class = (
     set   => { indicatorOff    => "0100",
                indicatorOn     => "01FF",
                indicatorDim    => "01%02x" },
-    get   => { indicatorStatus => "02",     }, 
-    parse => { "038703(..)"    => '($1 eq "00" ? "indState:off" : 
-                               ($1 eq "ff" ? "indState:on" : 
+    get   => { indicatorStatus => "02",     },
+    parse => { "038703(..)"    => '($1 eq "00" ? "indState:off" :
+                               ($1 eq "ff" ? "indState:on" :
                                              "indState:dim ".hex($1)))'} },
   PROPRIETARY              => { id => '88' },
   LANGUAGE                 => { id => '89' },
@@ -350,7 +350,7 @@ my %zwave_class = (
     parse => { "..8e03(..)(..)(.*)"
                            => '"mca_$1:max:$2 param:$3"',
                "..8e06(.*)"=> '"mcaSupportedGroupings:".hex($1)' } },
-                                
+
   MULTI_CMD                => { id => '8f' }, # Handled in Parse
   ENERGY_PRODUCTION        => { id => '90' },
   MANUFACTURER_PROPRIETARY => { id => '91' }, # see also zwave_deviceSpecial
@@ -375,7 +375,7 @@ my %zwave_class = (
   SENSOR_ALARM             => { id => '9c',
     get   => { alarm       => "01%02x" },
     parse => { "..9c02(..)(..)(..)(....)" =>
-                '"alarm_type_$2:level $3 node $1 seconds ".hex($4)'} },  
+                '"alarm_type_$2:level $3 node $1 seconds ".hex($4)'} },
   SILENCE_ALARM            => { id => '9d' },
   SENSOR_CONFIGURATION     => { id => '9e' },
   MARK                     => { id => 'ef' },
@@ -404,7 +404,7 @@ use vars qw(%zwave_deviceSpecial);
 %zwave_deviceSpecial = (
    Fibaro_FGRM222 => {
      MANUFACTURER_PROPRIETARY => {
-      set   => { positionSlat=>"010f26010100%02x", 
+      set   => { positionSlat=>"010f26010100%02x",
                  positionBlinds=>"010f260102%02x00"},
       get   => { position=>"010f2602020000", },
       parse => { "0891010f260303(..)(..)" =>
@@ -606,8 +606,8 @@ ZWave_Cmd($$@)
     my @ca = split("%", $cmdFmt);
     $nArg = int(@ca)-1;
   }
-  my $parTxt = ($nArg == 0 ? "no parameter" : 
-               ($nArg == 1 ? "one parameter" : 
+  my $parTxt = ($nArg == 0 ? "no parameter" :
+               ($nArg == 1 ? "one parameter" :
                              "$nArg parameters"));
   if($cmdFmt =~ m/^(.*)\*$/) {
     $cmdFmt = $1;
@@ -718,7 +718,7 @@ ZWave_HrvStatus($)
                      "exhaustAirTemperature", "dischargeAirTemperature",
                      "indoorTemperature", "indoorHumidity",
                      "remainingFilterLife" );
-  my @l; 
+  my @l;
   for(my $i=0; $i < 7; $i++) {
     push @l, "$i = $hrv_status[$i]" if($p & (1<<$i));
   }
@@ -737,20 +737,20 @@ ZWave_meterParse($$)
   my ($hash,$val) = @_;
   return if($val !~ m/^(..)(..)(.*)$/);
   my ($v1, $v2, $v3) = (hex($1), hex($2), $3);
-  
+
   my $name = $hash->{NAME};
 
   # rate_type currently not used / not reported
   my $rate_type = ($v1 >> 5) & 0x3;
   my @rate_type_text =("undef","consumed", "produced");
-  my $rate_type_text = ($rate_type > $#rate_type_text ? 
+  my $rate_type_text = ($rate_type > $#rate_type_text ?
                         "undef" : $rate_type_text[$rate_type]);
 
   my $meter_type = ($v1 & 0x1f);
   my @meter_type_text =("undef", "energy", "gas", "water", "undef");
-  my $meter_type_text = ($meter_type > $#meter_type_text ? 
-                        "undef" : $meter_type_text[$meter_type]); 
-    
+  my $meter_type_text = ($meter_type > $#meter_type_text ?
+                        "undef" : $meter_type_text[$meter_type]);
+
   my $precision = ($v2 >>5) & 0x7;
   # no definition for text or numbers, used as -> (10 ** hex($precision))
 
@@ -758,28 +758,28 @@ ZWave_meterParse($$)
   # V3 use bit 7 of first byte as bit 3 of scale
   my $scale = ($v2 >> 3) & 0x3;
   $scale |= (($v1 & 0x80) >> 5);
-  
-  my $unit_text = ($meter_type_text eq "undef" ? 
+
+  my $unit_text = ($meter_type_text eq "undef" ?
                         "undef" : $zwm_unit{$meter_type_text}[$scale]);
-  
-  my $size = $v2 & 0x7; 
+
+  my $size = $v2 & 0x7;
 
   $meter_type_text = "power" if ($unit_text eq "W");
   $meter_type_text = "voltage" if ($unit_text eq "V");
   $meter_type_text = "current" if ($unit_text eq "A");
-  
+
   my $mv = hex(substr($v3, 0, 2*$size));
   $mv = $mv / (10 ** $precision);
   $mv -= (2 ** ($size*8)) if $mv >= (2 ** ($size*8-1));
   $v3 = substr($v3, 2*$size, length($v3)-(2*$size));
 
   if (length($v3) < 4) { # V1 report
-    return "$meter_type_text: $mv $unit_text";  
+    return "$meter_type_text: $mv $unit_text";
 
   } else { # V2 or greater report
     my $delta_time = hex(substr($v3, 0, 4));
     $v3 = substr($v3, 4, length($v3)-4);
-    
+
     if ($delta_time == 0) { # no previous meter value
       return "$meter_type_text: $mv $unit_text";
 
@@ -804,11 +804,11 @@ sub
 Zwave_meterGet($)
 {
   my ($scale) = @_;
-   
+
   if ($scale eq "%s") { # no parameter specified, use V1 get without scale
     return("", "01");
   };
-  
+
   if (($scale < 0) || ($scale > 6)) {
     return("argument must be one of: 0 to 6","");
   } else {
@@ -826,27 +826,27 @@ ZWave_meterSupportedParse($$)
   my ($hash,$val) = @_;
   return if($val !~ m/^(..)(..)$/);
   my ($v1, $v2) = (hex($1), hex($2));
-  
+
   my $name = $hash->{NAME};
-  
+
   my $meter_reset = $v1 & 0x80;
   my $meter_reset_text = $meter_reset ? "yes" : "no";
 
   my $meter_type = ($v1 & 0x1f);
   my @meter_type_text =("undef", "energy", "gas", "water", "undef");
-  my $meter_type_text = ($meter_type > $#meter_type_text ? 
-                            "undef" : $meter_type_text[$meter_type]); 
- 
+  my $meter_type_text = ($meter_type > $#meter_type_text ?
+                            "undef" : $meter_type_text[$meter_type]);
+
   my $scale = $v2 & 0x7f;
   my $unit_text="";
- 
+
   for (my $i=0; $i <= 6; $i++) {
     if ($scale & 2**$i) {
         $unit_text .= ", " if (length($unit_text)>0);
         $unit_text .= $i.":".$zwm_unit{$meter_type_text}[$i];
     };
   };
-  
+
   return "meterSupported: type: $meter_type_text scales: $unit_text resetable:".
             " $meter_reset_text";
 }
@@ -898,7 +898,7 @@ sub
 ZWave_versionClassGet($)
 {
   my ($class) = @_;
-   
+
   return("", sprintf('13%02x', $class))
         if($class =~ m/\d+/);
   return("", sprintf('13%02x', hex($zwave_class{$class}{id})))
@@ -910,7 +910,7 @@ ZWave_versionClassGet($)
 sub
 ZWave_multilevelParse($$$)
 {
-  my ($type,$fl,$arg) = @_; 
+  my ($type,$fl,$arg) = @_;
   my %ml_tbl = (
    '01' => { n => 'temperature',          st => ['C', 'F'] },
    '02' => { n => 'generalPurpose',       st => ['%', ''] },
@@ -959,7 +959,7 @@ ZWave_multilevelParse($$$)
    '2a' => { n => 'soilReactivity',       st => ['pH'] },
    '2b' => { n => 'soilSalinity',         st => ['mol/m3'] },
    '2c' => { n => 'heartRate',            st => ['Bpm'] },
-   '2d' => { n => 'bloodPressure',        st => ['Systolic mmHg', 
+   '2d' => { n => 'bloodPressure',        st => ['Systolic mmHg',
                                                  'Diastolic mmHg'] },
    '2e' => { n => 'muscleMass',           st => ['Kg'] },
    '2f' => { n => 'fatMass',              st => ['Kg'] },
@@ -974,7 +974,7 @@ ZWave_multilevelParse($$$)
   my $bc = (hex($fl)>>0)&0x07; # bytecount
   $arg = substr($arg, 0, 2*$bc);
   my $msb = (hex($arg)>>8*$bc-1); # most significant bit  ( 0 = pos, 1 = neg )
-  my $val = $msb ? -( 2 ** (8 * $bc) - hex($arg) ) : hex($arg); # 2's complement   
+  my $val = $msb ? -( 2 ** (8 * $bc) - hex($arg) ) : hex($arg); # 2's complement
   my $ml = $ml_tbl{$type};
   return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
   return sprintf("%s:%.*f %s", $ml->{n}, $pr, $val/(10**$pr),
@@ -995,7 +995,7 @@ ZWave_SetClasses($$$$)
 
   my @classes;
   for my $classId (grep /../, split(/(..)/, lc($classes))) {
-    push @classes, $zwave_id2class{lc($classId)} ? 
+    push @classes, $zwave_id2class{lc($classId)} ?
         $zwave_id2class{lc($classId)} : "UNKNOWN_".lc($classId);
   }
   my $name = $def->{NAME};
@@ -1009,10 +1009,10 @@ sub
 ZWave_sceneParse($)
 {
   my ($p)=@_;
-  my @arg = ("unknown", "on", "off", 
+  my @arg = ("unknown", "on", "off",
              "dim up start", "dim down start", "dim up end", "dim down end");
   return sprintf("sceneEvent%s:%s", int(hex($p)/10), $arg[hex($p)%10]);
-} 
+}
 
 
 sub
@@ -1033,7 +1033,7 @@ ZWave_mcCapability($$)
   my @classes;
   shift(@l); shift(@l); # Skip generic and specific class
   for my $classId (@l) {
-    push @classes, $zwave_id2class{lc($classId)} ? 
+    push @classes, $zwave_id2class{lc($classId)} ?
         $zwave_id2class{lc($classId)} : "UNKNOWN_".uc($classId);
   }
   return "mcCapability_$chid:no classes" if(!@classes);
@@ -1169,7 +1169,7 @@ ZWave_ccsParse($$)
 
   if($t == "08" && $p =~ m/^(..)(..)$/) {
     my $ret = ($1 eq "00" ? "no" : ($1 eq "01" ? "temporary" : "permanent"));
-    $ret .= ", ". ($2 eq "79" ? "frost protection" : 
+    $ret .= ", ". ($2 eq "79" ? "frost protection" :
                   ($2 eq "7a" ? "energy saving" : "unused"));
     return "ccsOverride:$ret";
   }
@@ -1197,7 +1197,7 @@ ZWave_userCodeSet($)
 {
   my ($spec) = @_;
   my @arg = split(" ", $spec);
-  return ("wrong arg, need: id status usercode","") 
+  return ("wrong arg, need: id status usercode","")
                         if(@arg != 3 || $spec !~ m/^[A-F0-9 ]*$/i);
   return ("", sprintf("01%02x%02x%s", $arg[0],$arg[1],$arg[2]));
 }
@@ -1620,17 +1620,17 @@ my %zwave_nodeType = (
   "04"=>"Z-Wave+IpClientAndZwaveNode"
 );
 
-sub 
+sub
 ZWave_plusInfoParse($$$$$)
 {
   my ($version, $roleType, $nodeType, $installerIconType, $userIconType) = @_;
   return "zwavePlusInfo: " .
-    "version:" . $version . 
+    "version:" . $version .
     " role:" .
       ($zwave_roleType{"$roleType"} ? $zwave_roleType{"$roleType"} :"unknown") .
     " node:" .
       ($zwave_nodeType{"$nodeType"} ? $zwave_nodeType{"$nodeType"} :"unknown") .
-    " installerIcon:". $installerIconType . 
+    " installerIcon:". $installerIconType .
     " userIcon:". $userIconType;
 }
 
@@ -1655,8 +1655,8 @@ sub
 ZWave_sensorbinaryV2Parse($$)
 {
   my ($value, $sensorType) = @_;
-  return ($zwave_sensorBinaryTypeV2{"$sensorType"} ? 
-          $zwave_sensorBinaryTypeV2{"$sensorType"} :"unknown") . 
+  return ($zwave_sensorBinaryTypeV2{"$sensorType"} ?
+          $zwave_sensorBinaryTypeV2{"$sensorType"} :"unknown") .
           ":".$value;
 }
 
@@ -1738,7 +1738,7 @@ ZWave_wakeupTimer($)
 {
   my ($hash) = @_;
   my $now = gettimeofday();
-  if($now - $hash->{lastMsgTimestamp} > 1) { # wakeupNoMoreInformation 
+  if($now - $hash->{lastMsgTimestamp} > 1) { # wakeupNoMoreInformation
     if($hash->{STATE} ne "TRANSMIT_NO_ACK") {
       my $nodeId = $hash->{id};
       my $cmdEf  = (AttrVal($hash->{NAME}, "noExplorerFrames", 0) == 0 ? "25" : "05");
@@ -1907,7 +1907,7 @@ ZWave_Parse($$@)
   # device messages
   if($cmd ne "APPLICATION_COMMAND_HANDLER") {
     Log3 $ioName, 4, "$ioName unhandled command $cmd";
-    return "" 
+    return ""
   }
 
   if($arg =~ m/^(..)(..)(.*)/ && $2 eq "c6") { # Danfoss Living Strangeness
@@ -2156,11 +2156,11 @@ s2Hex($)
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
   <li>coveringClose<br>
     Starts closing the window cover. Moving stops if blinds are fully closed or
-    a coveringStop command was issued. 
+    a coveringStop command was issued.
     </li>
   <li>coveringOpen<br>
     Starts opening the window cover.  Moving stops if blinds are fully open or
-    a coveringStop command was issued. 
+    a coveringStop command was issued.
     </li>
   <li>coveringStop<br>
     Stop moving the window cover. Blinds are partially open (closed).
@@ -2230,7 +2230,7 @@ s2Hex($)
     value is supported by the device.<br>
     The command will reset ALL accumulated values, it is not possible to
     choose a single value.</li>
-  
+
   <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
   <li>mcaAdd groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
     Add a list of node or node:endpoint associations. The latter can be used to
@@ -2262,7 +2262,7 @@ s2Hex($)
     level 0=normal, level 1=-1dBm, .., level 9=-9dBm.</li>
   <li>powerlevelTest nodeId level frames <br>
     send number of frames [1-65535] to nodeId with level [0-9].</li>
-  
+
   <br><br><b>Class PROTECTION</b>
   <li>protectionOff<br>
     device is unprotected</li>
@@ -2426,7 +2426,7 @@ s2Hex($)
     return the indicator status of the node, as indState:on, indState:off or
     indState:dim value.
     </li>
-  
+
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
   <li>position<br>
     Fibaro FGRM-222 only: return the blinds position and slat angle.
@@ -2487,7 +2487,7 @@ s2Hex($)
     Get the name from the EEPROM. Note: only ASCII is supported.</li>
   <li>location<br>
     Get the location from the EEPROM. Note: only ASCII is supported.</li>
-  
+
   <br><br><b>Class POWERLEVEL</b>
   <li>powerlevel<br>
     Get the current powerlevel and remaining time in this level.</li>
@@ -2512,7 +2512,7 @@ s2Hex($)
   <li>alarm alarmType<br>
     return the nodes alarm status of the requested alarmType. 00 = GENERIC,
     01 = SMOKE, 02 = CO, 03 = CO2, 04 = HEAT, 05 = WATER, ff = returns the
-    nodes first supported alarm type.    
+    nodes first supported alarm type.
     </li>
 
   <br><br><b>Class SENSOR_BINARY</b>
@@ -2579,7 +2579,7 @@ s2Hex($)
   <li>zwavePlusInfo<br>
     request the zwavePlusInfo
     </li>
-  
+
   </ul>
   <br>
 
@@ -2651,7 +2651,7 @@ s2Hex($)
   <li>config_X:Y<br>
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config messages are available.</li>
-  
+
   <br><br><b>Class DEVICE_RESET_LOCALLY</b>
   <li>deviceResetLocally:yes<br></li>
 
@@ -2677,7 +2677,7 @@ s2Hex($)
     (VenetianBlindMode)</li>
   <li>position:[%]<br>
     (RollerBlindMode)</li>
-  
+
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
   <li>modelId:hexValue hexValue hexValue</li>
   <li>model:manufacturerName productName</li>
@@ -2706,22 +2706,22 @@ s2Hex($)
     NOTE: "current 0 remain 0" means normal mode without timeout</li>
   <li>powerlvlTest:node x status y frameAck z<br>
     NOTE: status 0=failed, 1=success (at least one ACK), 2=in progress</li>
-  
+
   <br><br><b>Class PROTECTION</b>
   <li>protection:[on|off|seq]</li>
 
   <br><br><b>Class SCENE_ACTIVATION</b>
   <li>scene_Id:level finalValue</li>
-    
+
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
   <li>scene_Id:level dimmingDuration finalValue</li>
-  
+
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
   <li>group_Id:scene dimmingDuration</li>
- 
- 
+
+
   <br><br><b>Class SENSOR_ALARM</b>
-  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li> 
+  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li>
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>SENSORY_BINARY V1:</li>
@@ -2813,7 +2813,7 @@ s2Hex($)
   <li>state:swmBeginUp</li>
   <li>state:swmBeginDown</li>
   <li>state:swmEnd</li>
-    
+
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>off</li>
   <li>cooling</li>
@@ -2842,7 +2842,7 @@ s2Hex($)
   <li>wakeup:notification</li>
   <li>wakeupReport:interval:X target:Y</li>
   <li>wakeupIntervalCapabilitiesReport:min W max X default Y step Z</li>
-  
+
   <br><br><b>Class ZWAVEPLUS_INFO</b>
   <li>zwavePlusInfo:version: V role: W node: X installerIcon: Y userIcon: Z</li>
 
