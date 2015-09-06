@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  30_pilight_temp: pressure, windavg, winddir, windgust from weather stations without temperature 
   - feature: 74_Unifi: - new readings for controller, accesspoints and clients
                        - new Setter: archiveAlerts, disconnectClient, restartAP
                          setLocateAP, unsetLocateAP

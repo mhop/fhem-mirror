@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_temp.pm 0.15 2015-08-30 Risiko $
+# $Id: 30_pilight_temp.pm 0.16 2015-09-06 Risiko $
 #
 # Usage
 # 
@@ -14,6 +14,7 @@
 # V 0.13 2015-05-17 - NEW:  attribut corrHumidity, a factor to modify humidity
 # V 0.14 2015-05-30 - FIX:  StateFn 
 # V 0.15 2015-08-30 - NEW:  support pressure, windavg, winddir, windgust
+# V 0.16 2015-09-06 - FIX:  pressure, windavg, winddir, windgust from weather stations without temperature 
 ############################################## 
 
 package main;
@@ -22,6 +23,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use JSON;
+use Switch;  #libswitch-perl
 
 sub pilight_temp_Parse($$);
 sub pilight_temp_Define($$);
@@ -84,7 +86,7 @@ sub pilight_temp_Parse($$)
 
   Log3 $backend, 4, "pilight_temp_Parse: RCV -> $rmsg";
   
-  my ($dev,$protocol,$id,$temp,$humidity,$battery,@args) = split(",",$rmsg);
+  my ($dev,$protocol,$id,@args) = split(",",$rmsg);
   return () if($dev ne "PITEMP");
   
   my $chash;
@@ -100,23 +102,21 @@ sub pilight_temp_Parse($$)
   return () if (!defined($chash->{NAME}));
   
   my $corrTemp = AttrVal($chash->{NAME}, "corrTemp",1);  
-  $temp = $temp * $corrTemp;
+  my $corrHumidity = AttrVal($chash->{NAME}, "corrHumidity",1);
   
   readingsBeginUpdate($chash);
-  readingsBulkUpdate($chash,"state",$temp);
-  readingsBulkUpdate($chash,"temperature",$temp);
-  
-  if (defined($humidity)  && $humidity  ne "") {
-    my $corrHumidity = AttrVal($chash->{NAME}, "corrHumidity",1);
-    $humidity = $humidity * $corrHumidity;
-    readingsBulkUpdate($chash,"humidity",$humidity);
-  }
-  
-  readingsBulkUpdate($chash,"battery",$battery)   if (defined($battery)   && $battery   ne "");
   
   foreach my $arg (@args){
+    #temperature, humidity, battery    
     #pressure, windavg, winddir, windgust
     my($feature,$value) = split(":",$arg);
+    switch($feature) {
+      case m/temperature/ {
+          $value = $value * $corrTemp;
+          readingsBulkUpdate($chash,"state",$value);
+        }
+      case m/humidity/    { $value = $value * $corrHumidity;}
+    }
     readingsBulkUpdate($chash,$feature,$value);
   }
   readingsEndUpdate($chash, 1); 
