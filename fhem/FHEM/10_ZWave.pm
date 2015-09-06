@@ -2369,9 +2369,9 @@ ZWave_getHash($$$)
 }
 
 sub
-ZWave_wakeupTimer($)
+ZWave_wakeupTimer($$)
 {
-  my ($hash) = @_;
+  my ($hash, $direct) = @_;
   my $now = gettimeofday();
 
   if(!$hash->{wakeupAlive}) {
@@ -2379,7 +2379,7 @@ ZWave_wakeupTimer($)
     $hash->{lastMsgSent} = $now;
     InternalTimer($now+0.1, "ZWave_wakeupTimer", $hash, 0);
 
-  } elsif($now - $hash->{lastMsgSent} > 1) {
+  } elsif(!$direct && $now - $hash->{lastMsgSent} > 2) {
     if(!$hash->{SendStack}) {
       my $nodeId = $hash->{id};
       my $cmdEf  = (AttrVal($hash->{NAME},"noExplorerFrames",0)==0 ? "25":"05");
@@ -2389,6 +2389,7 @@ ZWave_wakeupTimer($)
     delete $hash->{wakeupAlive};
 
   } else {
+    return if($direct);
     InternalTimer($now+0.1, "ZWave_wakeupTimer", $hash, 0);
 
   }
@@ -2551,6 +2552,8 @@ ZWave_Parse($$@)
             "SECURITY disabled, device does not support SECURITY command class";
         }
       }
+      ZWave_wakeupTimer($dh, 1)
+        if(index(AttrVal($dh->{NAME}, "classes", ""), "WAKE_UP") >= 0);
       return ZWave_execInits($dh, 0);
     }
 
@@ -2562,7 +2565,7 @@ ZWave_Parse($$@)
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash) {
       if(index(AttrVal($hash->{NAME}, "classes", ""), "WAKE_UP") >= 0) {
-        ZWave_wakeupTimer($hash);
+        ZWave_wakeupTimer($hash, 1);
         ZWave_processSendStack($hash, undef, 0);
       }
 
@@ -2716,7 +2719,7 @@ ZWave_Parse($$@)
   }
 
   if($arg =~ m/^028407/) { # wakeup:notification
-    ZWave_wakeupTimer($hash);
+    ZWave_wakeupTimer($hash, 1);
     ZWave_processSendStack($hash, undef, 0);
   }
 

@@ -36,6 +36,7 @@ my %sets = (
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
                                               # SERIAL_API_APPL_NODE_INFORMATION
+  "timeouts"         => { cmd => "06%02x%02x" }, # SERIAL_API_SET_TIMEOUTS
   "reopen"           => { cmd => "" },
 );
 
@@ -50,8 +51,8 @@ my %gets = (
   "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
   "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
   "random"          => "1c%02x",  # ZW_GET_RANDOM
-  "timeouts"        => "06%02x%02x", # SERIAL_API_SET_TIMEOUTS
   "version"         => "15",      # ZW_GET_VERSION
+  "timeouts"        => "06",      # SERIAL_API_SET_TIMEOUTS
 
   "raw"             => "%s",            # hex
 );
@@ -291,7 +292,7 @@ ZWDongle_Set($@)
   my $par = $sets{$type}{param};
   if($par && !$par->{noArg}) {
     return "Unknown argument for $type, choose one of ".join(" ",keys %{$par})
-      if(!defined($par->{$a[0]}));
+      if(!$a[0] || !defined($par->{$a[0]}));
     $a[0] = $par->{$a[0]};
   }
 
@@ -620,6 +621,11 @@ ZWDongle_Read($@)
       Log3 $name, 4, "ZWDongle_Read $name: CAN received";
       $hash->{MaxSendRetries}++ if($hash->{MaxSendRetries}<7);
       $data = substr($data, 2);
+      if(!$init_done) { # InternalTimer wont work
+        $hash->{WaitForAck} = 0;
+        $hash->{SendRetries}++;
+        select(undef, undef, undef, 0.1);
+      }
       next;
     }
 
