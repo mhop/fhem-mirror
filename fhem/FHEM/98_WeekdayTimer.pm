@@ -492,7 +492,7 @@ sub WeekdayTimer_SetTimer($) {
      
      my $isActiveTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $para);
      readingsSingleUpdate ($hash,  "state",      "active",    1) 
-        if (!defined $hash->{SETTIMERATMIDNIGHT} && $isActiveTimer);
+     if (!defined $hash->{SETTIMERATMIDNIGHT} && $isActiveTimer);
      
      if ($secondsToSwitch>-5) {
         Log3 $hash, 4, "[$name] setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$para" if($isActiveTimer);
@@ -599,11 +599,11 @@ sub WeekdayTimer_Update($) {
   my ($indx, $aktTime,  $aktParameter, $nextTime, $nextParameter) =
      WeekdayTimer_searchAktNext($hash, time()+5);
 
-  if ($newParam ne $aktParameter ) {
-    #Log3 $hash, 3, "[$name]*Update   - $newParam overwritten by $aktParameter (" . FmtDateTime($aktTime). ")"; 
-     Log3 $hash, 3, "[$name] Update   - $newParam overwritten by $aktParameter (" . FmtDateTime($aktTime). ")" if($activeTimer); 
-     $newParam = $aktParameter;
-  }   
+  #if ($newParam ne $aktParameter ) {
+  #  #Log3 $hash, 3, "[$name]*Update   - $newParam overwritten by $aktParameter (" . FmtDateTime($aktTime). ")"; 
+  #   Log3 $hash, 3, "[$name] Update   - $newParam overwritten by $aktParameter (" . FmtDateTime($aktTime). ")" if($activeTimer); 
+  #   $newParam = $aktParameter;
+  #}   
 
   # ggf. Device schalten
   WeekdayTimer_Device_Schalten($hash, $newParam, $tage)   if($activeTimer);
