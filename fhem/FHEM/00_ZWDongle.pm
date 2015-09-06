@@ -618,11 +618,8 @@ ZWDongle_Read($@)
 
     if($fb eq "18") {   # CAN
       Log3 $name, 4, "ZWDongle_Read $name: CAN received";
-      $hash->{WaitForAck} = 0;
-      $hash->{SendRetries}++;
       $hash->{MaxSendRetries}++ if($hash->{MaxSendRetries}<7);
       $data = substr($data, 2);
-      select(undef, undef, undef, 0.1); # configRequestAll: 0.05 is not enough
       next;
     }
 
