@@ -2435,7 +2435,11 @@ ZWave_addToSendStack($$)
 
   my $now;
   if(index(AttrVal($hash->{NAME}, "classes", ""), "WAKE_UP") >= 0) {
-    return "Scheduled for sending after WAKEUP" if(!$hash->{wakeupAlive});
+    if ($cmd =~ m/^......988[01].*/) {
+      Log3 $hash->{NAME}, 5, "$hash->{NAME}: Sendstack bypassed for $cmd";
+    } else {
+      return "Scheduled for sending after WAKEUP" if(!$hash->{wakeupAlive});
+    }
 
   } else { # clear commands without 0113 and 0013
     $now = gettimeofday();
