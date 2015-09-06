@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.10 2015-08-30 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.11 2015-09-06 Risiko $
 #
 # Usage
 # 
@@ -35,6 +35,7 @@
 # V 1.08 2015-06-23 - NEW:  attribute SendTimeout for abort sending command non blocking
 # V 1.09 2015-07-21 - NEW:  support submodule pilight_raw to send raw codes
 # V 1.10 2015-08-30 - NEW:  support pressure, windavg, winddir, windgust from weather stations and GPIO sensors
+# V 1.11 2015-09-06 - FIX:  pressure, windavg, winddir, windgust from weather stations without temperature 
 ############################################## 
 package main;
 
@@ -689,7 +690,7 @@ sub pilight_ctrl_Parse($$)
 {
   my ($hash, $rmsg) = @_;
   my $me = $hash->{NAME};
-
+  
   Log3 $me, 5, "$me(Parse): RCV -> $rmsg";
 
   next if(!$rmsg || length($rmsg) < 1);
@@ -838,20 +839,17 @@ sub pilight_ctrl_Parse($$)
       }
       return;
     }
-    case 4 {
-        my $temp = (defined($data->{$s}{temperature})) ? $data->{$s}{temperature} : "";
-        return if ($temp eq "");
+    case 4 {      
+        my $piTempData = "";
+        $piTempData .= ",temperature:$data->{$s}{temperature}"  if (defined($data->{$s}{temperature}));
+        $piTempData .= ",humidity:$data->{$s}{humidity}"        if (defined($data->{$s}{humidity}));
+        $piTempData .= ",battery:$data->{$s}{battery}"          if (defined($data->{$s}{battery}));
+        $piTempData .= ",pressure:$data->{$s}{pressure}"        if (defined($data->{$s}{pressure}));
+        $piTempData .= ",windavg:$data->{$s}{windavg}"          if (defined($data->{$s}{windavg}));
+        $piTempData .= ",winddir:$data->{$s}{winddir}"          if (defined($data->{$s}{winddir}));
+        $piTempData .= ",windgust:$data->{$s}{windgust}"        if (defined($data->{$s}{windgust}));
         
-        my $humidity = (defined($data->{$s}{humidity})) ? $data->{$s}{humidity} : "";
-        my $battery = (defined($data->{$s}{battery})) ? $data->{$s}{battery} : "";
-        
-        my $more = "";
-        $more .= ",pressure:$data->{$s}{pressure}" if (defined($data->{$s}{pressure}));
-        $more .= ",windavg:$data->{$s}{windavg}"   if (defined($data->{$s}{windavg}));
-        $more .= ",winddir:$data->{$s}{winddir}"   if (defined($data->{$s}{winddir}));
-        $more .= ",windgust:$data->{$s}{windgust}" if (defined($data->{$s}{windgust}));
-        
-        my $msg = "PITEMP,$proto,$id,$temp,$humidity,$battery$more";
+        my $msg = "PITEMP,$proto,$id$piTempData";
         return Dispatch($hash, $msg,undef);
     }
     case 5 { return Dispatch($hash, "PISCREEN,$proto,$id,$unit,$state",undef); }
