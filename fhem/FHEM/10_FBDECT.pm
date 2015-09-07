@@ -133,21 +133,29 @@ FBDECT_Get($@)
   if($cmd eq "devInfo") {
     my @answ = FBAHA_getDevList($hash->{IODev}, $hash->{id});
     return $answ[0] if(@answ == 1);
+   
+    readingsBeginUpdate($hash);
+
+    if($answ[0] && 
+       $answ[0] =~ m/NAME:(.*), ID:(.*), (.*), TYPE:(.*) PROP:(.*)/) {
+      readingsBulkUpdate($hash, "FBNAME", $1, 1);
+      readingsBulkUpdate($hash, "FBTYPE", $4, 1);
+      readingsBulkUpdate($hash, "FBPROP", $5, 1);
+    }
+
     my $d = pop @answ;
-    my $state = "inactive" if($answ[0] =~ m/ inactive,/);
     while($d) {
       my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d, $hash, 0);
       Log3 $hash, 4, "Payload: $d -> $ptyp: $pyld";
       last if($ptyp eq "");
-      if($ptyp eq "state" && 
-         ReadingsVal($hash->{NAME}, $ptyp, "") ne $pyld) {
-        readingsSingleUpdate($hash, $ptyp, ($state ? $state : $pyld), 1);
-      }
+      readingsBulkUpdate($hash, $ptyp, $pyld, 1);
       push @answ, "  $ptyp: $pyld";
       $d = substr($d, 16+$plen*2);
     }
+    readingsEndUpdate($hash, 1);
     return join("\n", @answ);
   }
+
   return undef;
 }
 
