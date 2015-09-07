@@ -28,6 +28,7 @@ FBAHA_Initialize($)
   $hash->{UndefFn}      = "FBAHA_Undef";
   $hash->{ShutdownFn}   = "FBAHA_Undef";
   $hash->{ReadAnswerFn} = "FBAHA_ReadAnswer";
+  $hash->{NotifyFn}     = "FBAHA_Notify";
 
 # Normal devices
   $hash->{DefFn}   = "FBAHA_Define";
@@ -62,6 +63,17 @@ FBAHA_Define($$)
   return $ret;
 }
 
+#####################################
+sub
+FBAHA_Notify($$)
+{
+  my ($ntfy, $dev) = @_;
+  return if($dev->{NAME} ne "global" ||
+            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
+  delete $modules{telnet}{NotifyFn};
+  FBAHA_reassign($ntfy);
+  return;
+}
 
 #####################################
 sub
@@ -162,6 +174,7 @@ FBAHA_getDevList($$)
   my $data = "";
   for(;;) {
     my ($err, $buf) = FBAHA_ReadAnswer($hash, "CONFIG_RSP", "^06");
+    last if($err && $err =~ m/Timeout/);
     return ($err) if($err);
     $data .= substr($buf, 32);
     last if($buf =~ m/^060[23]/);
@@ -214,6 +227,45 @@ FBAHA_configInd($$)
 }
 
 #####################################
+# Check all FBDECTs, reorg them if the id has changed and FBNAME is set.
+sub
+FBAHA_reassign($)
+{
+  my ($me) = @_;
+  my $myname = $me->{NAME};
+
+  my $devList = FBAHA_Get($me, ($myname, "devList"));
+  my %fbdata;
+  foreach my $l (split("\n", $devList)) {
+    next if($l !~ m/NAME:(.*), ID:(.*), (.*), TYPE:(.*) PROP:(.*)/);
+    if($fbdata{$1}) {
+      Log 1, "FBAHA: multiple devices are using the same name, wont reorder";
+      return;
+    }
+    $fbdata{$1} = $2;
+  }
+
+  foreach my $sdev (devspec2array("TYPE=FBDECT")) {
+    my $hash = $defs{$sdev};
+    my $name = $hash->{NAME};
+    my $fbname = ReadingsVal($name, "FBNAME", "");
+    my $fbid = $fbdata{$fbname};
+    my $oldid = $hash->{id};
+
+    next if(!$fbid || $oldid eq $fbid || $hash->{IODev}{NAME} ne $myname);
+    Log 2, "FBAHA: changing the id of $name/$fbname from $oldid to $fbid";
+
+    delete $modules{FBDECT}{defptr}{"$myname:$oldid"};
+    $modules{FBDECT}{defptr}{"$myname:$fbid"} = $hash;
+    $hash->{DEF} =~ s/^$myname:$oldid /$myname:$fbid /; # New syntax
+    $hash->{DEF} =~ s/^$oldid /$myname:$fbid /;         # Old Syntax
+    $hash->{id} = $fbid;
+  }
+
+  return;
+}
+
+#####################################
 sub
 FBAHA_DoInit($)
 {
@@ -221,6 +273,7 @@ FBAHA_DoInit($)
   my $name = $hash->{NAME};
   delete $hash->{HANDLE}; # else reregister fails / RELEASE is deadly
   my $ret = FBAHA_Set($hash, ($name, "reregister"));
+  FBAHA_reassign($hash) if(!$ret && $init_done);
   return $ret;
 }
 
@@ -314,8 +367,8 @@ FBAHA_ReadAnswer($$$)
     if($nfound <= 0) {
       next if ($! == EAGAIN() || $! == EINTR());
       my $err = ($! ? $! : "Timeout");
-      $hash->{TIMEOUT} = 1;
-      DevIo_Disconnected($hash);
+      #$hash->{TIMEOUT} = 1;
+      #DevIo_Disconnected($hash);
       return("FBAHA_ReadAnswer $arg: $err", undef);
     }
     my $buf = DevIo_SimpleRead($hash);
@@ -361,8 +414,8 @@ FBAHA_Ready($)
   (fritz.box or localhost), and &lt;port&gt; 2002, or
   UNIX:SEQPACKET:/var/tmp/me_avm_home_external.ctl, the latter only works on
   the fritz.box. With FRITZ!OS 5.50 the network port is available, on some
-  Labor variants only the UNIX socket is available.
-  <br>
+  Labor variants only the UNIX socket is available.<br>
+
   Example:
   <ul>
     <code>define fb1 FBAHA fritz.box:2002</code><br>
@@ -410,6 +463,13 @@ FBAHA_Ready($)
     </li>
   </ul>
 
+  <br>
+  As sometimes the FRITZ!Box reassigns the internal id's of the FBDECT devices,
+  the FBAHA module compares upon connect/reconnect the stored names (FBNAME)
+  with the current value. This feature will only work, if you assign each
+  FBDECT device a unique Name in the FRITZ!Box, and excecute the FHEM "get
+  FBDECTDEVICE devInfo" command, which saves the FBNAME reading.<br>
+
 </ul>
 
 
@@ -439,8 +499,9 @@ FBAHA_Ready($)
   FRITZ.BOX) und &lt;port&gt; 2002 ist, oder
   UNIX:SEQPACKET:/var/tmp/me_avm_home_external.ctl, wobei das nur fuer
   FHEM@FRITZ!BOX zur Verf&uuml;gung steht. Mit FRITZ!OS 5.50 steht auch der
-  Netzwerkport zur Verf&uuml;gung, auf manchen Laborvarianten nur das UNIX socket.
-  <br>
+  Netzwerkport zur Verf&uuml;gung, auf manchen Laborvarianten nur das UNIX
+  socket.<br>
+  
   Beispiel:
   <ul>
     <code>define fb1 FBAHA fritz.box:2002</code><br>
@@ -490,6 +551,14 @@ FBAHA_Ready($)
   <li>UNDEFINED FBDECT_$ahaName_${NR} FBDECT $id"
     </li>
   </ul>
+
+  <br>
+  Da manchmal die FRITZ!Box die interne Nummer der FBDECT Ger&auml;te
+  neu vergibt, werden beim Verbindungsaufbau zum AHA Server die gespeicherten
+  Namen (FBNAME) mit dem aktuellen Wert verglichen. Damit das funktioniert,
+  m&uuml;ssen alle FBDECT Ger&auml;te auf dem FRITZ!Box einen eindeutigen Namen
+  bekommen, und in FHEM muss f&uuml;r alle Ger&auml;te "get FBDECTDEVICE
+  devInfo" ausgef&uuml;hrt werden, um FBNAME als Reading zu speichern.<br>
 
 </ul>
 =end html_DE
