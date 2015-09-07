@@ -1,5 +1,5 @@
 ###############################################
-#$Id: 70_PushNotifier.pm 2014-12-16 17:00:00 xusader
+#$Id: 70_PushNotifier.pm 2015-09-07 12:24:00 xusader
 #
 #	download client-app http://pushnotifier.de/apps/
 #	create account http://pushnotifier.de/login/
@@ -57,18 +57,11 @@ PushNotifier_Define($$)
 	['apiToken' => $apiToken,
 	'appToken' => $appToken]);
   my $strg_chkID = $responseID->as_string;
-  $strg_chkID =~ s/[-"{}_]//g;
 
-  $re1='.*?';
-  $re2='(\\[.*?\\])';
-
-  $re=$re1.$re2;
-  if ($strg_chkID =~ m/$re/is)
-  {
-    $sbraces1=$1;
-    my $devices = $sbraces1;
-    $hash->{devices} = $devices;
-  }
+  $strg_chkID =~ /\[(.*),(.*)\]/;
+  my $devIDs = $1;
+  $devIDs =~ s/[-"{}_]//g;
+  $hash->{devices} = $devIDs;
 
   return undef; 
   }
@@ -93,23 +86,34 @@ PushNotifier_Send_Message
   my $msg = join(" ", @_);
   $msg =~ s/\_/\n/g;
 
-  my $response = LWP::UserAgent->new()->post('http://a.pushnotifier.de/1/sendToDevice', 
-	['apiToken' => $hash->{apiToken},
-	'appToken' => $hash->{appToken},
-	'app' => $hash->{app},
-	'deviceID' => $hash->{deviceID},
-	'type' => 'MESSAGE',
-	'content' => "$msg"]);
+  my $result="";
 
-    my $error_chk = $response->as_string; 
+  while ($hash->{devices} =~ /title:([^,.]+),id:(\d+),model:([^,^\].]+)/g) {
+      my ($nd_title, $nd_id, $nd_model) = ("$1", "$2", "$3");
 
-    if($error_chk =~ m/"status":"ok"/) {
-	return "OK!\n\n$msg";
-	}
-	else 
-	{
-	return $error_chk; 
-    }   
+      # Log3 (undef, 3, "PushNotifier: Send Message $msg to device title: $nd_title, id: $nd_id, model: $nd_model");
+
+      if ( $nd_id =~ m/$hash->{deviceID}/ || $nd_title =~ m/$hash->{deviceID}/ || $nd_model =~ m/$hash->{deviceID}/ ) {
+        my $response = LWP::UserAgent->new()->post('http://a.pushnotifier.de/1/sendToDevice',
+          ['apiToken' => $hash->{apiToken},
+           'appToken' => $hash->{appToken},
+           'app' => $hash->{app},
+           'deviceID' => $nd_id,
+           'type' => 'MESSAGE',
+           'content' => "$msg"]);
+
+        my $error_chk = $response->as_string;
+
+        if($error_chk =~ m/"status":"ok"/) {
+          $result.="OK! Message sent to $nd_title (id: $nd_id)\n\n$msg\n\n";
+        }
+        else
+        {
+          $result.="ERROR sending message to $nd_title (id: $nd_id)\n\nResponse:\n$error_chk\n\n";
+        }
+      }
+    }
+  return $result;
 }
 
 1;
@@ -176,7 +180,7 @@ PushNotifier_Send_Message
   PushNotifier ist ein Dienst, um Benachrichtigungen von einer vielzahl
   von Quellen auf Deinem Smartphone oder Tablet zu empfangen.<br>
   Du brauchst einen Account um dieses Modul zu verwenden.<br>
-  Für weitere Informationen besuche <a href="http://www.fhemwiki.de/wiki/PushNotifier">FhemWiki PushNotifier</a>.<br>
+  F��r weitere Informationen besuche <a href="http://www.fhemwiki.de/wiki/PushNotifier">FhemWiki PushNotifier</a>.<br>
   <br>
   Diskutiere das Modul <a href="http://forum.fhem.de/index.php/topic,25440.0.html">hier</a>.<br>
   <br>
