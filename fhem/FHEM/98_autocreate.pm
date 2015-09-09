@@ -118,8 +118,14 @@ autocreate_Notify($$)
 
     my $s = $dev->{CHANGED}[$i];
     $s = "" if(!defined($s));
+    my $temporary;
 
     ################
+    if($s =~ m/^UNDEFINED -temporary/) { # Special for EnOcean. DO NOT use it elsewhere
+      $temporary = 1;
+      $s =~ s/ -temporary//;
+    }
+
     if($s =~ m/^UNDEFINED ([^ ]*) ([^ ]*) (.*)$/) {
       my ($name, $type, $arg) = ($1, $2, $3);
       next if(AttrVal($me, "disable", undef));
@@ -213,6 +219,7 @@ autocreate_Notify($$)
       ####################
       if(!$hash) {
         $cmd = "$name $type $arg";
+        $cmd = "-temporary $name $type $arg" if($temporary);
         Log3 $me, 2, "autocreate: define $cmd";
         $ret = CommandDefine(undef, $cmd);
         if($ret) {
@@ -227,7 +234,8 @@ autocreate_Notify($$)
       $room = $attr{$name}{room} if($attr{$name} && $attr{$name}{room}); 
       $attr{$name}{room} = $room if($room);
 
-      next if($modules{$hash->{TYPE}}{noAutocreatedFilelog});
+      $nrcreated = 0 if($temporary); # do not save
+      next if($modules{$hash->{TYPE}}{noAutocreatedFilelog} || $temporary);
 
       ####################
       my $fl = replace_wildcards($hash, AttrVal($me, "filelog", ""));
