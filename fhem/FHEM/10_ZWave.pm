@@ -480,7 +480,13 @@ ZWave_Define($$)
   $hash->{id}     = $id;
 
   $modules{ZWave}{defptr}{"$homeId $id"} = $hash;
-  AssignIoPort($hash);  # FIXME: should take homeId into account
+  my $proposed;
+  if($init_done) { # Use the right device while inclusion is running
+    for my $p (devspec2array("TYPE=ZWDongle|FHEM2FHEM")) {
+      $proposed = $p if($defs{$p}{homeId} && $defs{$p}{homeId} eq $homeId);
+    }
+  }
+  AssignIoPort($hash, $proposed); 
 
   if(@a) {      # Autocreate: set the classes, execute the init calls
     ZWave_SetClasses($homeId, $id, undef, $a[0]);
