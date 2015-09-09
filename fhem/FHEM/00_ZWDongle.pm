@@ -547,7 +547,8 @@ ZWDongle_ProcessSendStack($)
 
   if($hash->{WaitForAck}){
     if($ts-$hash->{SendTime} >= 1){
-      Log3 $hash, 2, "ZWDongle_ProcessSendStack: no ACK, resending message";
+      Log3 $hash, 2, "ZWDongle_ProcessSendStack: no ACK, resending message ".
+                      $hash->{SendStack}->[0];
       $hash->{SendRetries}++;
       $hash->{WaitForAck} = 0;
 
