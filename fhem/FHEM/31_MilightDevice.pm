@@ -103,7 +103,7 @@ sub MilightDevice_devStateIcon($)
   my $name = $hash->{NAME};
 
   my $percent = ReadingsVal($name,"brightness","100");
-  my $s = $dim_values{roundfunc($percent/10)};
+  my $s = $dim_values{MilightDevice_roundfunc($percent/10)};
 
   # Return SVG coloured icon with toggle as default action
   return ".*:light_light_$s@#".ReadingsVal($name, "rgb", "FFFFFF").":toggle"
@@ -175,7 +175,7 @@ sub MilightDevice_Define($$)
         if ($hash->{LEDTYPE} eq 'White');
   
   my $defaultcommandset = $hash->{helper}->{COMMANDSET};
-  $hash->{helper}->{COMMANDSET} .= " dim:slider,0,".roundfunc(100/MilightDevice_DimSteps($hash)).",100 brightness:slider,0,".roundfunc(100/MilightDevice_DimSteps($hash)).",100";
+  $hash->{helper}->{COMMANDSET} .= " dim:slider,0,".MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)).",100 brightness:slider,0,".MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)).",100";
 
   # webCmds
   if (!defined($attr{$name}{webCmd}))
@@ -216,7 +216,7 @@ sub MilightDevice_Init($)
 
   if( AttrVal($hash->{NAME}, "gamma", "1.0") eq "1.0")
   {
-    Log3 $name, 5, $name." dimstep ".roundfunc(100/MilightDevice_DimSteps($hash))." / gamma 1.0";
+    Log3 $name, 5, $name." dimstep ".MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash))." / gamma 1.0";
   } else {
     $hash->{helper}->{COMMANDSET} =~ s/dim:slider,0,.*,100/dim:slider,0,1,100/g;
     $hash->{helper}->{COMMANDSET} =~ s/brightness:slider,0,.*,100/brightness:slider,0,1,100/g;
@@ -430,9 +430,9 @@ sub MilightDevice_Set(@)
     return $usage if ($args[0] !~ /^([0-9A-Fa-f]{1,2})([0-9A-Fa-f]{1,2})([0-9A-Fa-f]{1,2})$/);
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
     my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
-    $h = roundfunc($h * 360); 
-    $s = roundfunc($s * 100); 
-    $v = roundfunc($v * 100);
+    $h = MilightDevice_roundfunc($h * 360);
+    $s = MilightDevice_roundfunc($s * 100);
+    $v = MilightDevice_roundfunc($v * 100);
     if (defined($args[1]))
     {
       return $usage if (($args[1] !~ /^\d+$/) && ($args[1] > 0)); # Decimal value for ramp > 0
@@ -450,7 +450,7 @@ sub MilightDevice_Set(@)
   elsif ($cmd eq 'dimup')
   {
     $usage = "Usage: set $name dimup [percent change(0..100)] [seconds(0..x)]";
-    my $percentChange = roundfunc(100 / MilightDevice_DimSteps($hash)); # Default one dimStep
+    my $percentChange = MilightDevice_roundfunc(100 / MilightDevice_DimSteps($hash)); # Default one dimStep
     if (defined($args[0]))
     { # Percent change (0..100%)
       return $usage if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [0..100]))); # Decimal value for percent between 0..100
@@ -481,7 +481,7 @@ sub MilightDevice_Set(@)
   elsif ($cmd eq 'dimdown')
   { 
     $usage = "Usage: set $name dimdown [percent change(0..100)] [seconds(0..x)]";
-    my $percentChange = roundfunc(100 / MilightDevice_DimSteps($hash)); # Default one dimStep
+    my $percentChange = MilightDevice_roundfunc(100 / MilightDevice_DimSteps($hash)); # Default one dimStep
     if (defined($args[0]))
     { # Percent change (0..100%)
       return $usage if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [0..100]))); # Decimal value for percent between 0..100
@@ -707,7 +707,7 @@ sub MilightDevice_Attr(@)
   }
   elsif ($cmd eq 'set' && $attribName eq 'defaultBrightness')
   {
-    return "defaultBrighness: has to be between ".roundfunc(100/MilightDevice_DimSteps($hash))." and 100" unless ($attribVal ~~ [roundfunc(100/MilightDevice_DimSteps($hash))..100]);
+    return "defaultBrighness: has to be between ".MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash))." and 100" unless ($attribVal ~~ [MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash))..100]);
   }
 
   return undef;
@@ -803,9 +803,9 @@ sub MilightDevice_RGB_On(@)
   }
 
   # When turning on, make sure we request at least minimum dim step.
-  if ($v < roundfunc(100/MilightDevice_DimSteps($hash)))
+  if ($v < MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)))
   {
-    $v = roundfunc(100/MilightDevice_DimSteps($hash));
+    $v = MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash));
   }
 
   return MilightDevice_RGB_Dim($hash, $v, $ramp, $flags); 
@@ -825,7 +825,7 @@ sub MilightDevice_RGB_Off(@)
     MilightDevice_BridgeDevices_Update($hash, "brightness_on") if ($hash->{SLOT} eq 'A' && AttrVal($hash->{NAME}, "updateGroupDevices", 0) == 1);   
 
     # Dim down to min brightness then send off command (avoid flicker on turn on)
-    MilightDevice_RGB_Dim($hash, roundfunc(100/MilightDevice_DimSteps($hash)), $ramp, $flags);
+    MilightDevice_RGB_Dim($hash, MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)), $ramp, $flags);
     return MilightDevice_RGB_Dim($hash, 0, 0, 'q');
   }
   else
@@ -916,8 +916,8 @@ sub MilightDevice_RGB_ColorConverter(@)
   my $color = $hash->{helper}->{COLORMAP}[$h % 360];
   
   # there are 0..9 dim level, setup correction
-  my $valueSpread = roundfunc(100/MilightDevice_DimSteps($hash));
-  my $totalVal = roundfunc($v / $valueSpread);
+  my $valueSpread = MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash));
+  my $totalVal = MilightDevice_roundfunc($v / $valueSpread);
   # saturation 100..50: color full, white increase. 50..0 white full, color decrease
   my $colorVal = ($s >= 50) ? $totalVal : int(($s / 50 * $totalVal) +0.5);
   my $whiteVal = ($s >= 50) ? int(((100-$s) / 50 * $totalVal) +0.5) : $totalVal;
@@ -981,9 +981,9 @@ sub MilightDevice_RGBW_On(@)
     $v = ReadingsVal($hash->{NAME}, "brightness", AttrVal($hash->{NAME}, "defaultBrightness", 36));
   }
   # When turning on, make sure we request at least minimum dim step.
-  if ($v < roundfunc(100/MilightDevice_DimSteps($hash)))
+  if ($v < MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)))
   {
-    $v = roundfunc(100/MilightDevice_DimSteps($hash));
+    $v = MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash));
   }
 
   return MilightDevice_RGBW_Dim($hash, $v, $ramp, $flags); 
@@ -1003,7 +1003,7 @@ sub MilightDevice_RGBW_Off(@)
     MilightDevice_BridgeDevices_Update($hash, "brightness_on") if ($hash->{SLOT} eq 'A' && AttrVal($hash->{NAME}, "updateGroupDevices", 0) == 1);  
  
     # Dim down to min brightness then send off command (avoid flicker on turn on)
-    MilightDevice_RGBW_Dim($hash, roundfunc(100/MilightDevice_DimSteps($hash)), $ramp, $flags);
+    MilightDevice_RGBW_Dim($hash, MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)), $ramp, $flags);
     return MilightDevice_RGBW_Dim($hash, 0, 0, 'q');
   }
   else
@@ -1059,7 +1059,7 @@ sub MilightDevice_RGBW_SetHSV(@)
 
   # brightness 2..27 (x02..x1b) | 25 dim levels
   
-  my $cf = roundfunc((($gammaVal / 100) * MilightDevice_DimSteps($hash)) + 1);
+  my $cf = MilightDevice_roundfunc((($gammaVal / 100) * MilightDevice_DimSteps($hash)) + 1);
   if ($sat < 20) 
   {
     $wl = $cf;
@@ -1242,9 +1242,9 @@ sub MilightDevice_White_On(@)
     $v = ReadingsVal($hash->{NAME}, "brightness", AttrVal($hash->{NAME}, "defaultBrightness", 36));
   }
   # When turning on, make sure we request at least minimum dim step.
-  if ($v < roundfunc(100/MilightDevice_DimSteps($hash)))
+  if ($v < MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)))
   {
-    $v = roundfunc(100/MilightDevice_DimSteps($hash));
+    $v = MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash));
   }
   return MilightDevice_White_Dim($hash, $v, $ramp, $flags); 
 }
@@ -1265,7 +1265,7 @@ sub MilightDevice_White_Off(@)
       MilightDevice_BridgeDevices_Update($hash, "brightness_on") if ($hash->{SLOT} eq 'A' && AttrVal($hash->{NAME}, "updateGroupDevices", 0) == 1); 
     }
     # Dim down to min brightness then send off command (avoid flicker on turn on)
-    MilightDevice_White_Dim($hash, roundfunc(100/MilightDevice_DimSteps($hash)), $ramp, $flags);
+    MilightDevice_White_Dim($hash, MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)), $ramp, $flags);
     return MilightDevice_White_Dim($hash, 0, 0, 'q');
   }
   else
@@ -1314,9 +1314,9 @@ sub MilightDevice_White_DimOn(@)
     $v = ReadingsVal($hash->{NAME}, "brightness", AttrVal($hash->{NAME}, "defaultBrightness", 36));
   }
   # When turning on, make sure we request at least minimum dim step.
-  if ($v < roundfunc(100/MilightDevice_DimSteps($hash)))
+  if ($v < MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)))
   {
-    $v = roundfunc(100/MilightDevice_DimSteps($hash));
+    $v = MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash));
   }
 
   MilightDevice_White_Dim($hash, $v, $ramp, $flags);
@@ -1377,7 +1377,7 @@ sub MilightDevice_White_SetHSV(@)
   
   # Calculate brightness hardware value (11 steps for white)
   my $maxWl = (100 / MilightDevice_DimSteps($hash));
-  my $wl = roundfunc($gammaVal / $maxWl);
+  my $wl = MilightDevice_roundfunc($gammaVal / $maxWl);
 
   # On first load, whiteLevel won't be defined, define it.
   $hash->{helper}->{whiteLevel} = $wl if (!defined($hash->{helper}->{whiteLevel}));
@@ -1738,7 +1738,7 @@ sub MilightDevice_HSV_Transition(@)
     $satToSet += $satStep; # Increment new saturation by step (negative step decrements)
     $valToSet += $valStep; # Increment new brightness by step (negative step decrements)
     Log3 ($hash, 4, "$hash->{NAME}_HSV_Transition: Add to Queue: h:".($hueToSet).", s:".($satToSet).", v:".($valToSet)." ($i/$steps)");  
-    MilightDevice_CmdQueue_Add($hash, roundfunc($hueToSet), roundfunc($satToSet), roundfunc($valToSet), undef, $stepWidth, $timeFrom + (($i-1) * $stepWidth / 1000) );
+    MilightDevice_CmdQueue_Add($hash, MilightDevice_roundfunc($hueToSet), MilightDevice_roundfunc($satToSet), MilightDevice_roundfunc($valToSet), undef, $stepWidth, $timeFrom + (($i-1) * $stepWidth / 1000) );
   }
   # Set target time for completion of sequence. 
   # This may be slightly higher than what was requested since $stepWidth > minDelay (($steps * $stepWidth) > $ramp)
@@ -1915,7 +1915,7 @@ sub MilightDevice_CreateGammaMapping(@)
   {
     my $correction = ($i / 100) ** (1 / $gamma); 
     $gammaMap[$i] = $correction * 100;
-    $gammaMap[$i] = roundfunc(100/MilightDevice_DimSteps($hash)) if($gammaMap[$i] < roundfunc(100/MilightDevice_DimSteps($hash)));
+    $gammaMap[$i] = MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)) if($gammaMap[$i] < MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)));
     Log3 ($hash, 5, "$hash->{NAME} create gammamap v-in: ".$i.", v-out: $gammaMap[$i]");
   } 
 
@@ -1953,6 +1953,7 @@ sub MilightDevice_CmdQueue_Add(@)
   # sender busy ?
   if(defined($actualCmd))
   {
+    return undef if (ref($actualCmd) ne 'HASH');
     return undef if (!defined($actualCmd->{inProgess}));
     return undef if (($actualCmd->{inProgess} || 0) == 1);
   }
@@ -2090,7 +2091,7 @@ sub MilightDevice_BridgeDevices_Update(@)
   return undef;
 }
 
-sub roundfunc($) {
+sub MilightDevice_roundfunc($) {
   my ($number) = @_;
   return sprintf("%.0f", $number);
   #return Math::Round::round($number);

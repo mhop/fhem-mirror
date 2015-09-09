@@ -405,7 +405,7 @@ CO20_dataread($$)
         $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{timeout});
         $data.=$buf;
         Log3 $name, 4, "getdata read $ret" if($ret != 16);
-        $intdata = ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1));
+        $intdata = ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1)) if(length($buf) > 15);
         Log3 $name, 5, "$intdata\n$buf";
       }
       Log3 $name, 5, length($data);
@@ -537,7 +537,7 @@ CO20_dataset($$$)
     }
 
 
-    if($ret == 16) {
+    if($ret == 16 and $buflen > 15) {
       $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{timeout});
       Log3 $name, 5, "getdata read $ret";
       my $intdata .= ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1));
