@@ -110,20 +110,20 @@ FHEM/23_WEBIO_12DIGITAL.pm   sachag               http://forum.fhem.de Sonstiges
 FHEM/24_NetIO230B.pm         rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/30_HUEBridge.pm         justme1968           http://forum.fhem.de Beleuchtung
 FHEM/30_LIGHTIFY.pm          justme1968           http://forum.fhem.de Beleuchtung
-FHEM/30_MilightBridge.pm     mattwire             http://forum.fhem.de Beleuchtung
+FHEM/30_MilightBridge.pm     mattwire/markus-m    http://forum.fhem.de Beleuchtung
 FHEM/30_ENECSYSGW.pm         akw                  http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_dimmer.pm    risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_switch.pm    risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_temp.pm      risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_raw.pm       risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Beleuchtung
-FHEM/31_MilightDevice.pm     mattwire             http://forum.fhem.de Beleuchtung
+FHEM/31_MilightDevice.pm     mattwire/markus-m    http://forum.fhem.de Beleuchtung
 FHEM/31_ENECSYSINV.pm        akw                  http://forum.fhem.de Sonstige Systeme
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/32_mailcheck.pm         justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_yowsup.pm            justme1968           http://forum.fhem.de Unterstuetzende Dienste
-FHEM/32_withings.pm          justme1968           http://forum.fhem.de Sonstiges
+FHEM/32_withings.pm          markus-m             http://forum.fhem.de Sonstiges
 FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends
 FHEM/33_readingsHistory.pm   justme1968           http://forum.fhem.de Frontends
 FHEM/33_readingsProxy.pm     justme1968           http://forum.fhem.de Automatisierung
@@ -143,7 +143,7 @@ FHEM/36_WMBUS.pm             kaihs                http://forum.fhem.de Sonstige 
 FHEM/37_SHC.pm               rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/37_SHCdev.pm            rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/38_harmony.pm           justme1968           http://forum.fhem.de Multimedia
-FHEM/38_CO20.pm              justme1968           http://forum.fhem.de Sonstiges
+FHEM/38_CO20.pm              markus-m             http://forum.fhem.de Sonstiges
 FHEM/38_JawboneUp.pm         domschl              http://forum.fhem.de Sonstiges
 FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
 FHEM/41_OREGON.pm            wherzig              http://forum.fhem.de Sonstiges
