@@ -11298,7 +11298,7 @@ EnOcean_Undef($$)
     <a href="#setExtensions">set extensions</a> are supported, if the corresponding
     <a href="#eventMap">eventMap</a> specifies the <code>on</code> and <code>off</code>
     mappings, for example <code>attr <name> eventMap on-till:on-till AI:on A0:off</code>.<br>
-    If <a href="#comMode">comMode</a> is set to biDir the device can be controlled bidirectionally.<br>
+    If <a href="#EnOcean_comMode">comMode</a> is set to biDir the device can be controlled bidirectionally.<br>
     With the help of additional <a href="#EnOceanattr">attributes</a>, the behavior of the devices can be adapt.<br>
     The attr subType must be switch.00. This is done if the device was created by autocreate.
     <br><br>
@@ -12074,14 +12074,39 @@ EnOcean_Undef($$)
          <li>teachOut<br>
           initiate UTE teach-out (slave)</li>
     </ul><br>
-       The valve controller is configured using the following attributes:<br>
+       The generic profile device is configured using the following attributes:<br>
        <ul>
+       <li><a href="#EnOcean_comMode">comMode</a></li>
        <li><a href="#EnOcean_devMode">devMode</a></li>
+       <li><a href="#EnOcean_gpDef">gpDef</a></li>
+       <li><a href="#EnOcean_manufID">manufID</a></li>
        </ul>
-       The attr subType must be valveCtrl.00. This is done if the device was
-       created by autocreate. To control the device, it must be bidirectional paired,
-       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>. The profile
-       behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.
+       The attr subType must be genericProfile. This is done if the device was
+       created by autocreate. If the profile in slave mode is operated, especially the channel
+       definition in the gpDef attributes must be entered manually.
+       </li>
+    <br><br>
+
+    <li>Generic Profiles<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>&lt;00 ... 64&gt;-&lt;channel name&gt; &lt;value&gt;<br>
+        set channel value</li>
+      <li>channelName &lt;channel number&gt;-&lt;channel name&gt;<br>
+        rename channel</li>
+      <li>teachIn<br>
+        sent teach-in telegram</li>
+      <li>teachOut<br>
+        sent teach-out telegram</li>
+    </ul><br>
+    [data] = &lt;1-byte hex ... 512-byte hex&gt;<br>
+    [status] = 0x00 ... 0xFF<br>
+    With the help of this command data messages in hexadecimal format can be sent.
+    Telegram types (RORG) 1BS, 4BS, RPS, MSC, UTE, VLD, GPCD, GPSD, GPTI and GPTR are supported.
+    For further information, see <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a> and
+    Generic Profiles.
     </li>
     <br><br>
 
@@ -12273,7 +12298,7 @@ EnOcean_Undef($$)
       If the structure of the MSC telegrams can not interpret the raw data to be output. Setting this attribute to yes,
       the output can be suppressed.
     </li>
-    <li><a name="comMode">comMode</a> biDir|confirm|uniDir, [comMode] = uniDir is default.<br>
+    <li><a name="EnOcean_comMode">comMode</a> biDir|confirm|uniDir, [comMode] = uniDir is default.<br>
       Communication Mode between an enabled EnOcean device and Fhem.<br>
       Unidirectional communication means a point-to-multipoint communication
       relationship. The EnOcean device e. g. sensors does not know the unique
@@ -12368,12 +12393,24 @@ EnOcean_Undef($$)
     </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#eventMap">eventMap</a></li>
-    <li><a name="EnOcean_eep">eep</a> [00...FF].[00...3F].[00...7F]<br>
+    <li><a name="EnOcean_eep">eep</a> &lt;00...FF&gt;-&lt;00...3F&gt;-&lt;00...7F&gt;<br>
       EnOcean Equipment Profile (EEP)
-      </li>
+    </li>
+    <li><a name="EnOcean_gpDef">gpDef</a> &lt;name of channel 00&gt;:&lt;O|I&gt;:&lt;channel type&gt;:
+                                          &lt;signal type&gt;:&lt;value type&gt;[[:&lt;resolution&gt;]
+                                         [:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]] ...
+                                         &lt;name of channel 64&gt;:&lt;O|I&gt;:&lt;channel type&gt;:
+                                          &lt;signal type&gt;:&lt;value type&gt;[[:&lt;resolution&gt;]
+                                         [:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]]
+                                         <br>
+      Generic Profiles channel definitions are set automatically in master mode. If the profile in slave mode is operated, the channel
+      definition must be entered manually. For each channel, the channel definitions are to be given in ascending order. The channel
+      parameters to be specified in decimal. First, the outgoing channels (direction = O) are to be defined, then the incoming channels
+      (direction = I) should be described. The channel numbers are assigned automatically starting with 00th.
+    </li>
     <li><a name="gwCmd">gwCmd</a> switching|dimming|setpointShift|setpointBasic|controlVar|fanStage|blindCmd<br>
       Gateway Command Type, see <a href="#Gateway">Gateway</a> profile
-      </li>
+    </li>
     <li><a name="EnOcean_humidity">humidity</a> t/&#176C<br>
       The value of the actual humidity, used by a Room Sensor and Control Unit. Should by
       filled via a notify from a distinct humidity sensor.
@@ -12392,6 +12429,9 @@ EnOcean_Undef($$)
     </li>
     <li><a name="EnOcean_macAlgo">macAlgo</a> no|3|4<br>
       MAC Algorithm
+    </li>
+    <li><a name="EnOcean_manufID">manufID</a> &lt;000 ... 7FF&gt;<br>
+      Manufacturer ID number
     </li>
     <li><a href="#model">model</a></li>
     <li><a name="EnOcean_observe">observe</a> off|on, [observe] = off is default.<br>
@@ -14025,6 +14065,20 @@ EnOcean_Undef($$)
        The attr subType must be valveCtrl.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+     </li>
+     <br><br>
+
+     <li>Generic Profiles<br>
+     <ul>
+       <li>&lt;00...64&gt;-&lt;channel name&gt; &lt;value&gt;</li>
+       <li>&lt;00...64&gt;-&lt;channel name&gt;Unit &lt;value&gt;</li>
+       <li>&lt;00...64&gt;-&lt;channel name&gt;ValueType value|setpointAbs|setpointRel</li>
+       <li>&lt;00...64&gt;-&lt;channel name&gt;ChannelType teachIn|data|flag|enum</li>
+       <li>teach &lt;value&gt;</li>
+     </ul><br>
+       The attr subType must be genericProfile. This is done if the device was
+       created by autocreate. If the profile in slave mode is operated, especially the channel
+       definition in the gpDef attributes must be entered manually.
      </li>
      <br><br>
 
