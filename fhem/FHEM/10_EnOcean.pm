@@ -205,6 +205,8 @@ my %EnO_eepConfig = (
   "A5.09.07" => {attr => {subType => "particlesSensor.01"}},
   "A5.09.08" => {attr => {subType => "CO2Sensor.01"}},
   "A5.09.09" => {attr => {subType => "CO2Sensor.01"}},
+  "A5.09.0A" => {attr => {subType => "HSensor.01"}},
+  "A5.09.0B" => {attr => {subType => "radiationSensor.01"}},
   "A5.10.01" => {attr => {subType => "roomSensorControl.05"}},
   "A5.10.02" => {attr => {subType => "roomSensorControl.05"}},
   "A5.10.03" => {attr => {subType => "roomSensorControl.05", comMode => "confirm", subDef => "getNextID"}},
@@ -246,6 +248,7 @@ my %EnO_eepConfig = (
   "A5.12.03" => {attr => {subType => "autoMeterReading.03"}},
   "A5.12.04" => {attr => {subType => "autoMeterReading.04"}},
   "A5.12.05" => {attr => {subType => "autoMeterReading.05"}},
+  "A5.12.10" => {attr => {subType => "autoMeterReading.10"}},
   "A5.13.01" => {attr => {subType => "environmentApp"}},
   "A5.13.02" => {attr => {subType => "environmentApp"}},
   "A5.13.03" => {attr => {subType => "environmentApp"}},
@@ -269,6 +272,7 @@ my %EnO_eepConfig = (
   "A5.30.02" => {attr => {subType => "digitalInput.02"}},
   "A5.30.03" => {attr => {subType => "digitalInput.03"}},
   "A5.30.04" => {attr => {subType => "digitalInput.04"}},
+  "A5.30.05" => {attr => {subType => "digitalInput.05"}},
   "A5.37.01" => {attr => {subType => "energyManagement.01", webCmd => "level:max"}},
   "A5.38.08" => {attr => {subType => "gateway"}},
   "A5.38.09" => {attr => {subType => "lightCtrl.01"}},
@@ -294,6 +298,11 @@ my %EnO_eepConfig = (
   "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}},
   "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}},
   "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}},
+  "D2.32.00" => {attr => {subType => "currentClamp.00"}},
+  "D2.32.01" => {attr => {subType => "currentClamp.01"}},
+  "D2.32.02" => {attr => {subType => "currentClamp.02"}},
+  "D2.40.00" => {attr => {subType => "ledCtrlState.00"}},
+  "D2.40.01" => {attr => {subType => "ledCtrlState.01"}},
   "D2.A0.01" => {attr => {subType => "valveCtrl.00", defaultChannel => 0, webCmd => "opens:closes"}},
   "D5.00.01" => {attr => {subType => "contact"}},
   "F6.02.01" => {attr => {subType => "switch"}},
@@ -4466,9 +4475,8 @@ sub EnOcean_Parse($$)
       if (exists($iohash->{helper}{gpRespWait}{$destinationID}) ||
           exists($iohash->{helper}{UTERespWait}{$destinationID}) ||
           exists($iohash->{helper}{"4BSRespWait"}{$destinationID})) {
-        #$ret = "UNDEFINED -temporary EnO_${rorgname}_$senderID EnOcean $senderID $msg";
         $ret = "UNDEFINED EnO_${rorgname}_$senderID EnOcean $senderID $msg";
-        Log3 undef, 2, "EnOcean $rorgname response telegram received, create temporary device with SenderID $senderID.";
+        #$ret = "UNDEFINED -temporary EnO_${rorgname}_$senderID EnOcean $senderID $msg";
       } else {
         $ret = "UNDEFINED EnO_${rorgname}_$senderID EnOcean $senderID $msg";
       }
@@ -4810,6 +4818,8 @@ sub EnOcean_Parse($$)
               }            
               # clear teach-in request
               delete $hash->{IODev}{helper}{"4BSRespWait"}{$destinationID};
+              #$deleteDevice = $destinationName;
+              #Log3 $name, 2, "EnOcean $name 4BS temporary teach-in response device $destinationName deleted";
               # set flag for delete the temporary teach-in device, see EnOcean_Notify()
               $hash->{IODev}{helper}{"4BSRespWaitDel"}{$destinationName} = 1;
             }
@@ -5185,16 +5195,6 @@ sub EnOcean_Parse($$)
       push @event, "3:concentration:$vocConc";
       push @event, "3:state:$vocConc";
 
-    } elsif ($st eq "CO2Sensor.01") {
-      # CO2 Sensor (EEP A5-09-08, A5-09-09)
-      # [untested]
-      # $db[1] is the CO2 concentration where 0x00 = 0 ppm ... 0xFF = 2000 ppm
-      # $db[0]_bit_2 is power failure detection
-      my $co2 = $db[1] / 255 * 2000;
-      push @event, "3:powerFailureDetection:" . ($db[0] & 4 ? "detected" : "not_detected");
-      push @event, "3:CO2:$co2";
-      push @event, "3:state:$co2";
-
     } elsif ($st eq "particlesSensor.01") {
       # Gas Sensor, Particles Sensor (EEP A5-09-07)
       # [untested]
@@ -5217,6 +5217,63 @@ sub EnOcean_Parse($$)
       push @event, "3:particles_2_5:$pm_2_5";
       push @event, "3:particles_1:$pm_1";
       push @event, "3:state:PM10: $pm_10 PM2_5: $pm_2_5 PM1: $pm_1";
+
+    } elsif ($st eq "CO2Sensor.01") {
+      # CO2 Sensor (EEP A5-09-08, A5-09-09)
+      # [untested]
+      # $db[1] is the CO2 concentration where 0x00 = 0 ppm ... 0xFF = 2000 ppm
+      # $db[0]_bit_2 is power failure detection
+      my $co2 = $db[1] / 255 * 2000;
+      push @event, "3:powerFailureDetection:" . ($db[0] & 4 ? "detected" : "not_detected");
+      push @event, "3:CO2:$co2";
+      push @event, "3:state:$co2";
+
+    } elsif ($st eq "HSensor.01") {
+      # H Sensor (EEP A5-09-0A)
+      # [untested]
+      # $db[3]_$db[2] is the H concentration where 0x00 = 0 ppm ... 0xFFFF = 2000 ppm
+      my $hydro = ($db[3] << 8 | $db[2]) / 65535 * 2000;
+      push @event, "3:battery:" . sprintf("%0.1f", (($db[0] & 0xF0) >> 4) / 15 * 3 + 2)  if ($db[0] & 1);
+      push @event, "3:temperature:" . sprintf("%0.1f", $db[1] / 255 * 80 - 20) if ($db[0] & 2);
+      push @event, "3:H:" . sprintf "%0.2f", $hydro;
+      push @event, "3:state:" . sprintf "%0.2f", $hydro;
+
+    } elsif ($st eq "radiationSensor.01") {
+      # Radiation Sensor (EEP A5-09-0B)
+      # [untested]
+      # $db[2]_$db[1] is the radioactivity where 0x00 = 0 ... 0xFFFF = 65535
+      my %scaleMulti = (
+        0 => 0.001,
+        1 => 0.01,
+        2 => 0.1,
+        3 => 1,
+        4 => 10,
+        5 => 100,
+        6 => 1000,
+        7 => 10000,
+        8 => 100000
+      );
+      my $scaleMulti = ($db[0] & 0xF0) >> 4;
+      my $scaleDecimals;
+      if ($scaleMulti <= 2) {
+        $scaleDecimals = "%0." . (3 - $scaleMulti) . "f";
+      } else {
+        $scaleDecimals = "%d"
+      }
+      $scaleMulti = $scaleMulti{$scaleMulti} if (exists $scaleMulti{$scaleMulti}); 
+      my %unit = (
+        0 => "uSv/h",
+        1 => "cpm",
+        2 => "Bq/L",
+        3 => "Bq/kg"
+      );
+      my $unit = ($db[0] & 6) >> 1;
+      $unit = $unit{$unit};
+      my $radioactivity = $db[2] << 8 | $db[1];
+      push @event, "3:battery:" . sprintf("%0.1f", (($db[3] & 0xF0) >> 4) / 15 * 3 + 2)  if ($db[0] & 1);
+      push @event, "3:radioactivity:" . sprintf "$scaleDecimals", $radioactivity * $scaleMulti;
+      push @event, "3:radioactivityUnit:$unit";
+      push @event, "3:state:" . sprintf "$scaleDecimals", $radioactivity * $scaleMulti;
 
     } elsif ($st eq "roomSensorControl.05") {
       # Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)
@@ -6107,6 +6164,21 @@ sub EnOcean_Parse($$)
                         " " . $sp[4] . $sp[5] . " " . $sp[6] . $sp[7] . " " . $sp[8] . $sp[9] . " B: $battery";
       }
 
+    } elsif ($st eq "autoMeterReading.10") {
+      # Automated meter reading (AMR), current meter 16 channels (EEP A5-12-10)
+      my $meterReading = hex(substr($data, 0, 6)) / 10 ** ($db[0] & 3);
+      my $channel = sprintf '%02d', $db[0] & 0xF0 >> 4;
+      my $scaleDecimals = "%0." . ($db[0] & 3) . "f";
+      push @event, "3:currentTariff:$channel";
+      if ($db[0] & 4) {
+        # current
+        push @event, "3:current$channel:" . sprintf "$scaleDecimals", $meterReading;
+        push @event, "3:state:" . sprintf "$scaleDecimals", $meterReading;
+      } else {
+        # electric charge
+        push @event, "3:electricChange$channel:" . sprintf "$scaleDecimals", $meterReading;        
+      }
+
     } elsif ($st eq "environmentApp") {
       # Environmental Applications (EEP A5-13-01 ... EEP A5-13-06, EEP A5-13-10)
       # [Eltako FWS61]
@@ -6224,6 +6296,24 @@ sub EnOcean_Parse($$)
       push @event, "3:in2:$in2";
       push @event, "3:in3:$in3";
       push @event, "3:state:" . $in0 . $in1 . $in2 . " " . $in3;
+
+    } elsif ($st eq "digitalInput.05") {
+      # single input contact, retransmission, battery monitor (EEP A5-30-05)
+      my $signalIdx = $db[1] & 0x7F;
+      my $signalIdxLast = ReadingsVal($name, "signalIdx", undef);
+      my $signalType = $db[1] & 0x80 ? "heartbeat" : "event";
+      push @event, "3:battery:" . sprintf "%0.1f", $db[2] / 255 * 3.3;
+      push @event, "3:signalIdx:$signalIdx";
+      push @event, "3:telegramType:$signalType";
+      if (defined $signalIdxLast) {
+        if ($signalIdx == $signalIdxLast + 1) {
+          push @event, "3:state:$signalType";
+        } else {
+          push @event, "3:state:error";
+        }
+      } else {
+        push @event, "3:state:$signalType";
+      }
 
     } elsif ($st eq "gateway") {
       # Gateway (EEP A5-38-08)
@@ -7086,6 +7176,159 @@ sub EnOcean_Parse($$)
         }
       }
 
+    } elsif ($st eq "currentClamp.00") {
+      # AC current clamp (EEP D2-32-00)
+      if ($db[2] & 0x80) {
+        # power fail
+        push @event, "3:current1:0";
+        push @event, "3:state:I1: 0";
+      } else {
+        my $current1 = hex(substr($data, 2, 3));
+        if ($db[2] & 0x40) {
+          # divisor = 1/10
+          $current1 = $current1 / 10;
+          push @event, "3:current1:" . sprintf "%0.1f", $current1;
+          push @event, "3:state:I1: " . sprintf "%0.1f", $current1;
+        } else {
+          push @event, "3:current1:" . $current1;
+          push @event, "3:state:I1: " . $current1;        
+        }
+      }
+
+    } elsif ($st eq "currentClamp.01") {
+      # AC current clamp (EEP D2-32-01)
+      if ($db[3] & 0x80) {
+        # power fail
+        push @event, "3:current1:0";
+        push @event, "3:current2:0";
+        push @event, "3:state:I1: 0 I2: 0";
+      } else {
+        my $current1 = hex(substr($data, 2, 3));
+        my $current2 = hex(substr($data, 5, 3));
+        if ($db[3] & 0x40) {
+          # divisor = 1/10
+          $current1 = $current1 / 10;
+          $current2 = $current2 / 10;
+          push @event, "3:current1:" . sprintf "%0.1f", $current1;
+          push @event, "3:current2:" . sprintf "%0.1f", $current2;
+          push @event, "3:state:I1: " . sprintf("%0.1f", $current1) . " I2: " . sprintf("%0.1f", $current2);
+        } else {
+          push @event, "3:current1:" . $current1;
+          push @event, "3:current2:" . $current2;
+          push @event, "3:state:I1: $current1 I2: $current2";
+        }
+      }
+
+    } elsif ($st eq "currentClamp.02") {
+      # AC current clamp (EEP D2-32-02)
+      if ($db[5] & 0x80) {
+        # power fail
+        push @event, "3:current1:0";
+        push @event, "3:current2:0";
+        push @event, "3:current3:0";
+        push @event, "3:state:I1: 0 I2: 0 I3: 0";
+      } else {
+        my $current1 = hex(substr($data, 2, 3));
+        my $current2 = hex(substr($data, 5, 3));
+        my $current3 = hex(substr($data, 8, 3));
+        if ($db[5] & 0x40) {
+          # divisor = 1/10
+          $current1 = $current1 / 10;
+          $current2 = $current2 / 10;
+          $current3 = $current3 / 10;
+          push @event, "3:current1:" . sprintf "%0.1f", $current1;
+          push @event, "3:current2:" . sprintf "%0.1f", $current2;
+          push @event, "3:current3:" . sprintf "%0.1f", $current3;
+          push @event, "3:state:I1: " . sprintf("%0.1f", $current1) . " I2: " . sprintf("%0.1f", $current2) . " I3: " . sprintf("%0.1f", $current3);
+        } else {
+          push @event, "3:current1:" . $current1;
+          push @event, "3:current2:" . $current2;
+          push @event, "3:current3:" . $current3;
+          push @event, "3:state:I1: $current1 I2: $current2 I3: $current3";
+        }
+      }
+
+    } elsif ($st eq "ledCtrlState.00") {
+      # LED Controller Status (EEP D2-40-00)
+      if ($db[1] & 0x80) {
+        # powerSwitch
+        push @event, "3:powerSwitch:on";
+        push @event, "3:state:on";
+      } else {
+        push @event, "3:powerSwitch:off";
+        push @event, "3:state:off";
+      }
+      if ($db[1] & 0x40) {
+        # Demand Response Mode
+        push @event, "3:demandResp:on";
+      } else {
+        push @event, "3:demandResp:off";
+      }
+      if ($db[1] & 0x20) {
+        # Daylight Harvesting
+        push @event, "3:daylightHarvesting:on";
+      } else {
+        push @event, "3:daylightHarvesting:off";
+      }
+      my $occupancy = ($db[1] & 0x18) >> 3;
+      if ($occupancy == 0) {
+        push @event, "3:occupany:not_occupied";
+      } elsif ($occupancy == 1) {
+        push @event, "3:occupany:occupied";
+      } else {
+        push @event, "3:occupany:unknown";
+      }
+      push @event, "3:telegramType:" . ($db[1] & 4 ? "event" : "heartbeat");
+      if ($db[0] >= 0 && $db[0] <= 200) {
+        push @event, "3:dim:" . sprintf "%0.1f", $db[0] / 2;
+      }
+
+    } elsif ($st eq "ledCtrlState.01") {
+      # LED Controller Status (EEP D2-40-01)
+      if ($db[3] & 0x80) {
+        # powerSwitch
+        push @event, "3:powerSwitch:on";
+        push @event, "3:state:on";
+      } else {
+        push @event, "3:powerSwitch:off";
+        push @event, "3:state:off";
+      }
+      if ($db[3] & 0x40) {
+        # Demand Response Mode
+        push @event, "3:demandResp:on";
+      } else {
+        push @event, "3:demandResp:off";
+      }
+      if ($db[3] & 0x20) {
+        # Daylight Harvesting
+        push @event, "3:daylightHarvesting:on";
+      } else {
+        push @event, "3:daylightHarvesting:off";
+      }
+      my $occupancy = ($db[3] & 0x18) >> 3;
+      if ($occupancy == 0) {
+        push @event, "3:occupany:not_occupied";
+      } elsif ($occupancy == 1) {
+        push @event, "3:occupany:occupied";
+      } else {
+        push @event, "3:occupany:unknown";
+      }
+      push @event, "3:telegramType:" . ($db[3] & 4 ? "event" : "heartbeat");
+      my ($red, $green, $blue) = ('00', '00', '00');
+      if ($db[2] >= 0 && $db[2] <= 200) {
+        push @event, "3:red:" . sprintf "%0.1f", $db[2] / 2;
+        $red = sprintf "%02X", abs($db[2] / 200 * 255);
+      }
+      if ($db[1] >= 0 && $db[1] <= 200) {
+        push @event, "3:green:" . sprintf "%0.1f", $db[1] / 2;
+        $green = sprintf "%02X", abs($db[1] / 200 * 255);
+      }
+      if ($db[0] >= 0 && $db[0] <= 200) {
+        push @event, "3:blue:" . sprintf "%0.1f", $db[0] / 2;
+        $blue = sprintf "%02X", abs($db[0] / 200 * 255);
+      }
+      push @event, "3:rgb:" . $red . $green . $blue;
+
     } elsif ($st eq "valveCtrl.00") {
       # Valve Control
       # (D2-A0-01)
@@ -7329,6 +7572,7 @@ sub EnOcean_Parse($$)
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{gpRespWait}{$destinationID};
+        #$deleteDevice = $name;
         # set flag for delete the temporary teach-in device, see EnOcean_Notify()
         $hash->{IODev}{helper}{gpRespWaitDel}{$name} = 1;
 
@@ -7346,6 +7590,8 @@ sub EnOcean_Parse($$)
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{gpRespWait}{$destinationID};
+        #$deleteDevice = $destinationName;
+        #Log3 $name, 2, "EnOcean $name GP temporary teach-in response device $destinationName deleted";
         # set flag for delete the temporary teach-in device, see EnOcean_Notify()
         $hash->{IODev}{helper}{gpRespWaitDel}{$destinationName} = 1;
 
@@ -7376,6 +7622,7 @@ sub EnOcean_Parse($$)
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{gpRespWait}{$destinationID};
+        #$deleteDevice = $name;
         # set flag for delete the temporary teach-in device, see EnOcean_Notify()
         $hash->{IODev}{helper}{gpRespWaitDel}{$name} = 1;
 
@@ -7383,6 +7630,7 @@ sub EnOcean_Parse($$)
 
     } else {
       # teach-in request unknown, delete response device, see EnOcean_Notify(), no action
+      #$deleteDevice = $name;
       $hash->{IODev}{helper}{gpRespWaitDel}{$name} = 1;
       Log3 $name, 2, "EnOcean $name GP teach-in response from $senderID received, teach-in request unknown";
     }
@@ -7526,12 +7774,15 @@ sub EnOcean_Parse($$)
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{UTERespWait}{$destinationID};
+        #$deleteDevice = $destinationName;
+        #Log3 $name, 2, "EnOcean $name UTE temporary teach-in response device $destinationName deleted";
         # set flag for delete the temporary teach-in device, see EnOcean_Notify()
         $hash->{IODev}{helper}{UTERespWaitDel}{$destinationName} = 1;
 
       } else {
         # teach-in request unknown, delete response device, no action
-        #$deleteDevice = $name;
+        $deleteDevice = $name;
+        Log3 $name, 2, "EnOcean $name UTE teach-in request unknown, device $name deleted";
       }
     }
 
@@ -7699,6 +7950,7 @@ sub EnOcean_Parse($$)
     CommandDelete(undef, "FileLog_" . $deleteDevice);
     delete $defs{$deleteDevice};
     delete $modules{EnOcean}{defptr}{$hash->{DEF}};
+    Log3 $name, 2, "EnOcean $name device $deleteDevice deleted";
     if (defined $oldDevice) {
       Log3 $name, 2, "EnOcean $name renamed $oldDevice to $deleteDevice";
       CommandRename(undef, "$oldDevice $deleteDevice");
@@ -12788,6 +13040,33 @@ EnOcean_Undef($$)
      </li>
      <br><br>
 
+     <li>H Sensor (EEP A5-09-0A)<br>
+         [untested]<br>
+     <ul>
+       <li>battery: U/V (Sensor Range: U = 2 V ... 5 V)</li>
+       <li>H: c/ppm (Sensor Range: c = 0 ppm ... 2000 ppm)</li>
+       <li>temperature: t/&#176C (Sensor Range: t = -20 &#176C ... 60 &#176C)</li>
+       <li>state: c/ppm</li>
+     </ul><br>
+        The attr subType must be HSensor.01. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
+
+     <li>Radiation Sensor (EEP A5-09-0B)<br>
+         [untested]<br>
+     <ul>
+       <li>battery: U/V (Sensor Range: U = 2 V ... 5 V)</li>
+       <li>radioactivity: 1/[unit] (Sensor Range: c = 0 [unit] ... 65535 [unit])</li>
+       <li>unit: uSv/h|cpm|Bq/L|Bq/kg</li>
+       <li>state: 1/[unit]</li>
+     </ul><br>
+        The attr subType must be radiationSensor.01. This is done if the device was
+        created by autocreate.
+     </li>
+     <br><br>
+
     <li>Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)<br>
          [Eltako FTR55*, Thermokon SR04 *, Thanos SR *]<br>
      <ul>
@@ -13191,6 +13470,19 @@ EnOcean_Undef($$)
      </ul><br>
         The attr subType must be autoMeterReading.05.
         This is done if the device was created by autocreate.
+     </li>
+     <br><br>
+
+     <li>Automated meter reading (AMR), Current Meter 16 Channels (EEP A5-12-10)<br>
+         [untested]<br>
+     <ul>
+       <li>I/mA</li>
+       <li>current<00 ... 15>: I/mA (Sensor Range: I = 0 mA ... 16777215 mA)</li>
+       <li>electricChange<00 ... 15>: Q/Ah (Sensor Range: Q = 0 Ah ... 16777215 Ah)</li>
+       <li>currentTariff: 00 ... 15</li>
+      <li>state: I/mA</li>
+     </ul><br>
+        The attr subType must be autoMeterReading.10. This is done if the device was created by autocreate.
      </li>
      <br><br>
 
@@ -13653,6 +13945,54 @@ EnOcean_Undef($$)
        The attr subType must be fanCtrl.00. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+     </li>
+
+     <li>Digital Input, single input contact, retransmission, battery monitor (EEP A5-30-05)<br>
+        [untested]<br>
+     <ul>
+       <li>error|event|heartbeat</li>
+       <li>battery: U/V (Range: U = 0 V ... 3.3 V</li>
+       <li>signalIdx: 0 ... 127</li>
+       <li>telegramType: event|heartbeat</li>
+       <li>state: error|event|heartbeat</li>
+     </ul><br>
+       The attr subType must be digitalInput.05. This is done if the device was
+       created by autocreate.
+     </li>
+
+     <br><br>
+     <li>AC Current Clamp (D2-32-00 - D2-32-02)<br>
+        [untested]<br>
+     <ul>
+       <li>I1: I/A I2: I/A I3: I/A</li>
+       <li>current1: I/A (Range: I = 0 A ... 4095 A)</li>
+       <li>current2: I/A (Range: I = 0 A ... 4095 A)</li>
+       <li>current3: I/A (Range: I = 0 A ... 4095 A)</li>
+       <li>state: I1: I/A I2: I/A I3: I/A</li>
+     </ul><br>
+       The attr subType must be currentClamp.00|currentClamp.01|currentClamp.02. This is done if the device was
+       created by autocreate.
+     </li>
+     <br><br>
+
+     <li>LED Controller Status (EEP D2-40-00 - D2-40-01)<br>
+         [untested]<br>
+     <ul>
+       <li>on|off</li>
+       <li>blue: 0 % ... 100 %</li>
+       <li>daylightHarvesting: on|off</li>
+       <li>demandResp: on|off</li>
+       <li>dim: 0 % ... 100 %</li>
+       <li>green: 0 % ... 100 %</li>
+       <li>occupany: not_occupied|occupied|unknown</li>
+       <li>powerSwitch: on|off</li>
+       <li>red: 0 % ... 100 %</li>
+       <li>rgb: RRGGBB (red (R), green (G) or blue (B) color component values: 00 ... FF)</li>
+       <li>telegramType: event|heartbeat</li>
+       <li>state: on|off</li>
+     </ul><br>
+        The attr subType must be ledCtrlState.00|ledCtrlState.01 This is done if the device was
+        created by autocreate.
      </li>
      <br><br>
 
