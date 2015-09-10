@@ -11002,7 +11002,7 @@ EnOcean_Undef($$)
     of the acknowledgment telegrams of the actuator. If within one second no acknowledgment
     telegram is received, the last set command is sent again.
     The set command is repeated a maximum of 5 times. The maximum number can be specified in the attribute
-    <a href="#EnOcean_observeCmdRepetition">observeCmdRepetition</a><br>.
+    <a href="#EnOcean_observeCmdRepetition">observeCmdRepetition</a>.<br>
     The function can only be used if the actuator immediately after the reception of
     the set command sends an acknowledgment message.<br>
     The observing function is turned on by the Attribute <a href="#EnOcean_observe">observe.</a>
@@ -11179,19 +11179,19 @@ EnOcean_Undef($$)
       Example:
       <ul><code>set TCM_0 teach 600</code></ul>
       <br>
-      <li>Teach-in RPS profiles (switches)</li>
+      <li>RPS profiles Teach-in (switches)</li>
       <br>
       <code>set &lt;name&gt; A0|AI|B0|BI|C0|CI|D0|DI</code>
       <br><br>
       Send teach-in telegram to remote device.
       <br><br>
-      <li>Teach-in 1BS profiles (contact)</li>
+      <li>1BS profiles Teach-in (contact)</li>
       <br>
       <code>set &lt;name&gt; teach</code>
       <br><br>
       Send teach-in telegram to remote device.
       <br><br>
-      <li>Teach-in 4BS profiles (sensors, dimmer, room controller etc.)</li>
+      <li>4BS profiles Teach-in (sensors, dimmer, room controller etc.)</li>
       <br>
       <code>set &lt;name&gt; teach</code>
       <br><br>
@@ -11199,7 +11199,23 @@ EnOcean_Undef($$)
       If no SenderID (attr subDef) was assigned before a learning telegram is sent for the first time, a free SenderID
       is assigned automatically.
       <br><br>
-    </ul>
+      <li>UTE - Universal Uni- and Bidirectional Teach-In</li>
+      <br>
+      <code>set &lt;name&gt; teachIn|teachOut</code>
+      <br><br>
+      Send teach-in telegram to remote device.<br>
+      If no SenderID (attr subDef) was assigned before a learning telegram is sent for the first time, a free SenderID
+      is assigned automatically.
+      <br><br>
+      <li>Generic Profiles Teach-In</li>
+      <br>
+      <code>set &lt;name&gt; teachIn|teachOut</code>
+      <br><br>
+      Send teach-in telegram to remote device.<br>
+      If no SenderID (attr subDef) was assigned before a learning telegram is sent for the first time, a free SenderID
+      is assigned automatically.
+      <br><br>
+   </ul>
     </li>
 
     <li>Switch, Pushbutton Switch (EEP F6-02-01 ... F6-03-02)<br>
