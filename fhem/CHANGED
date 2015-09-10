@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  70_PushNotifier.pm: regex error handling
   - bugfix:  31_MilightDevice.pm: fixed bug that lead to crash on lost bridge connection, added module name prefix to round function
   - bugfix:  38_CO20.pm: removed unneccesary error messages due to USB timeout
   - feature: 70_PushNotifier: use regexe for deviceID
