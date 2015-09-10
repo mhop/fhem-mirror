@@ -6,6 +6,7 @@
 # 21.07.2015 : A.Goebel : start implementation for "set .. write"
 # 23.07.2015 : A.Goebel : event-on-change-reading added to attributes
 # 08.09.2015 : A.Goebel : limit number of socket-open retries in GetUpdates loop
+# 10.09.2015 : A.Goebel : fix html code of commandref
 package main;
 
 use strict;
@@ -791,6 +792,7 @@ GAEBUS_GetUpdates($)
         [r]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt<br>
         Valid combinations are read from the .csv files in directory "ebusd" and are selectable<br>
         Values from the attributes will be used as the name for the reading which are read from ebusd in the interval specified.<br>
+        </li><br>
   </ul>
 
   <a name="GAEBUS"></a>
@@ -803,6 +805,7 @@ GAEBUS_GetUpdates($)
     <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment from csv&gt;<br>
         Will read this variable from the ebusd and show the result as a popup.<br>
         Valid combinations are read from the .csv files in directory "ebusd" and are selectable<br>
+        </li><br>
 
   </ul>
   <br>
@@ -820,6 +823,7 @@ GAEBUS_GetUpdates($)
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
         The name of the reading can be suffixed by "&lt;number&gt;" which is a multiplicator for the evaluation within the specified interal. (eg. OutsideTemp:3 will evaluate this reading every 3-th cycle)<br>
+        </li><br>
   </ul>
   <br>
 </ul>
