@@ -2189,14 +2189,28 @@ SYSMON_getCPUProcStat_intern($$$)
     # Diff. ausrechnen, falls vorherigen Werte vorhanden sind.
     my($altCPUuser, $altCPUnice, $altCPUsystem, $altCPUidle, $altCPUiowait, $altCPUirq, $altCPUsoftirq) = split(/\s+/, $lastVal);
     
-    my $CPUuser    = $neuCPUuser    - $altCPUuser;
-    my $CPUnice    = $neuCPUnice    - $altCPUnice;
-    my $CPUsystem  = $neuCPUsystem  - $altCPUsystem;
-    my $CPUidle    = $neuCPUidle    - $altCPUidle;
-    my $CPUiowait  = $neuCPUiowait  - $altCPUiowait;
-    my $CPUirq     = $neuCPUirq     - $altCPUirq;
-    my $CPUsoftirq = $neuCPUsoftirq - $altCPUsoftirq;
-    $map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
+    my ($CPUuser, $CPUnice, $CPUsystem, $CPUidle, $CPUiowait, $CPUirq, $CPUsoftirq);
+
+  	if($neuCPUuser < $altCPUuser) {
+        $CPUuser    = $neuCPUuser;
+        $CPUnice    = $neuCPUnice;
+        $CPUsystem  = $neuCPUsystem;
+        $CPUidle    = $neuCPUidle;
+        $CPUiowait  = $neuCPUiowait;
+        $CPUirq     = $neuCPUirq;
+        $CPUsoftirq = $neuCPUsoftirq;
+  	}
+  	else {
+        $CPUuser    = $neuCPUuser    - $altCPUuser;
+        $CPUnice    = $neuCPUnice    - $altCPUnice;
+        $CPUsystem  = $neuCPUsystem  - $altCPUsystem;
+        $CPUidle    = $neuCPUidle    - $altCPUidle;
+        $CPUiowait  = $neuCPUiowait  - $altCPUiowait;
+        $CPUirq     = $neuCPUirq     - $altCPUirq;
+        $CPUsoftirq = $neuCPUsoftirq - $altCPUsoftirq;
+  	}
+    
+    #$map->{$pName."_diff"}=$CPUuser." ".$CPUnice." ".$CPUsystem." ".$CPUidle." ".$CPUiowait." ".$CPUirq." ".$CPUsoftirq;
     
     my $GesammtCPU = $CPUuser + $CPUnice + $CPUsystem + $CPUidle + $CPUiowait + $CPUirq + $CPUsoftirq;
     my $PercentCPUuser    = ($CPUuser    / $GesammtCPU) * 100;
