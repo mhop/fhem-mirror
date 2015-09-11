@@ -7,6 +7,10 @@
 # 23.07.2015 : A.Goebel : event-on-change-reading added to attributes
 # 08.09.2015 : A.Goebel : limit number of socket-open retries in GetUpdates loop
 # 10.09.2015 : A.Goebel : fix html code of commandref
+# 11.09.2015 : A.Goebel : add attribute "ebusWritesEnable:0,1"
+# 11.09.2015 : A.Goebel : add set w~ commands to set attributes for writing 
+# 11.09.2015 : A.Goebel : add set <write-reading> command to write to ebusd
+
 package main;
 
 use strict;
@@ -23,7 +27,7 @@ sub GAEBUS_SimpleWrite(@);
 sub GAEBUS_Disconnected($);
 sub GAEBUS_Shutdown($);
 
-sub GAEBUS_doEbusCmd($$$$);
+sub GAEBUS_doEbusCmd($$$$$);
 sub GAEBUS_GetUpdates($);
 
 my %gets = (    # Name, Data to send to the GAEBUS, Regexp for the answer
@@ -37,11 +41,14 @@ my %sets = (
   "reopen"    => []
 );
 
-my $allSetParams = "";
-my $allGetParams = "";
-my $delimiter    = "~";
+my %setsForWriting = ();
 
-my $attrsDefault = "do_not_notify:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading";
+my $allSetParams           = "";
+my $allSetParamsForWriting = "";
+my $allGetParams           = "";
+my $delimiter              = "~";
+
+my $attrsDefault = "do_not_notify:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading ebusWritesEnabled:0,1";
 my %ebusCmd  = ();
 
 sub
@@ -74,6 +81,21 @@ GAEBUS_Initialize($)
           $allSetParams .= $setval." ";
 	}
 	#Log3 ($hash, 2, "GAEBUS Initialize: $setval:$allSetParams");
+  }
+
+  $allSetParamsForWriting = "";
+  foreach my $setval (sort keys %setsForWriting) 
+  {
+	Log3 ($hash, 4, "GAEBUS Initialize params for setsForWriting: $setval");
+	if ( (@{$setsForWriting{$setval}}) > 0)
+	{
+          $allSetParamsForWriting .= $setval.":".join (",", @{$setsForWriting{$setval}})." ";
+	}
+	else
+	{
+          $allSetParamsForWriting .= $setval." ";
+	}
+	#Log3 ($hash, 2, "GAEBUS Initialize: $setval:$allSetParamsForWriting");
   }
 
   $allGetParams = "";
@@ -150,9 +172,6 @@ GAEBUS_Set($@)
 
   return "\"set GAEBUS\" needs at least one parameter" if(@a < 2);
 
-  return "Unknown argument $a[1], choose one of " . $allSetParams
-  	if(!defined($sets{$a[1]}));
-
   my $name = shift @a;
   my $type = shift @a;
   my $arg = join("", @a);
@@ -168,6 +187,8 @@ GAEBUS_Set($@)
     return undef;
   }
 
+  # handle commands defined in %sets
+
   if (defined ($sets{$type}))
   {
 	unless (grep {$_ eq $arg} @{$sets{$type}})
@@ -181,7 +202,85 @@ GAEBUS_Set($@)
 	Log3 ($hash, 3, "$name: set $attrname");
         addToDevAttrList($name, $attrname);
 	$attr{$name}{$attrname} = "" unless (defined $attr{$name}{$attrname});
+
+        return undef;
   }
+
+  #
+  # extend possible parameters by the readings defined for writing in attributes
+  #
+
+
+  my %writings = ();
+
+  my $actSetParams = "$allSetParams ";
+
+  my $ebusWritesEnabled = (defined($attr{$name}{"ebusWritesEnabled"})) ? $attr{$name}{"ebusWritesEnabled"} : 0;
+
+  if ($ebusWritesEnabled) {
+    $actSetParams .= "$allSetParams$allSetParamsForWriting " if ($ebusWritesEnabled);
+
+    foreach my $oneattr (sort keys %{$attr{$name}})
+    {
+      my $readingname    = $attr{$name}{$oneattr};
+      my $readingcmdname = $oneattr;
+      $readingname       =~ s/:.*//;
+  
+      # only for "w" commands
+      if ($oneattr =~ /^w.*$delimiter.*$delimiter.*$delimiter.*$/)
+      {
+        unless ($readingname =~ /^\s*$/ or $readingname eq "1")
+        {
+          $writings{$readingname} = $readingcmdname;
+          #Log3 ($name, 2, "$name SetParams $readingname");
+        }
+      }
+  
+      #Log3 ($name, 4, "$name Set attr name $readingname");
+      #Log3 ($name, 4, "$name Set attr cmd  $readingcmdname");
+    }
+    $actSetParams .= join (" ", sort keys %writings);
+  
+
+    # handle write commands (which were defined above)
+
+    if (defined ($setsForWriting{$type}))
+    {
+  	unless (grep {$_ eq $arg} @{$setsForWriting{$type}})
+	{
+		return "invalid parameter";
+	}
+
+        my $attrname = $type.$delimiter.$arg;
+        $attrname =~ s/\#install/install/;
+
+	Log3 ($hash, 3, "$name: set $attrname");
+        addToDevAttrList($name, $attrname);
+	$attr{$name}{$attrname} = "" unless (defined $attr{$name}{$attrname});
+
+        return undef;
+    }
+
+    if (defined ($writings{$type}))
+    {
+      # HERE
+      foreach my $oneattr (sort keys %{$attr{$name}})
+      {
+        next unless ($oneattr =~ /^w.*$delimiter.*$delimiter.*$delimiter.*$/);
+     
+        my $readingname    = $attr{$name}{$oneattr};
+        next if ($readingname ne $type);
+
+        my $answer = GAEBUS_doEbusCmd ($hash, "w", $readingname, $oneattr, $arg);
+        return "$answer";
+      }
+    }
+
+  }
+
+
+  return "Unknown argument $type, choose one of " . $actSetParams
+  	if(!defined($sets{$type}));
 
 
   #if($type eq "raw") {
@@ -224,13 +323,10 @@ GAEBUS_Get($@)
     {
       unless ($readingname =~ /^\s*$/ or $readingname eq "1")
       {
-        #$actGetParams .= $readingname.",";
         $readings{$readingname} = $readingcmdname;
         #Log3 ($name, 2, "$name GetParams $readingname");
       }
     }
-
-    #$readings{$readingname} = $readingcmdname;
 
     #Log3 ($name, 4, "$name Get attr name $readingname");
     #Log3 ($name, 4, "$name Get attr cmd  $readingcmdname");
@@ -248,7 +344,7 @@ GAEBUS_Get($@)
     Log3 ($name, 4, "$name Get name $readingname");
     Log3 ($name, 4, "$name Get cmd r $readingcmdname");
 
-    my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $readingcmdname);
+    my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $readingcmdname, "");
 
     #return (defined($answer ? $answer : ""));
     return "$answer";
@@ -264,7 +360,7 @@ GAEBUS_Get($@)
 
     Log3 ($name, 3, "$name get cmd v $readingcmdname");
 
-    my $answer = GAEBUS_doEbusCmd ($hash, "v", $readingname, $readingcmdname);
+    my $answer = GAEBUS_doEbusCmd ($hash, "v", $readingname, $readingcmdname, "");
     #return (defined($answer ? $answer : ""));
     return "$answer";
 
@@ -605,6 +701,7 @@ GAEBUS_ReadCSV($)
 
     %sets = ( "reopen" => [] );
     %gets = ( );
+    %setsForWriting = ( );
 
     my $comment;
     foreach my $key (sort keys %ebusCmd)
@@ -613,7 +710,10 @@ GAEBUS_ReadCSV($)
 
       my ($io,$class,$var) = split (";", $key, 3);
 
-      push @{$sets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "w"); 
+      push @{$sets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r");
+
+      push @{$setsForWriting{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "w");
+
       push @{$gets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "u");
       
       Log3 ($hash, 5, "GAEBUS: add attr $key $comment");
@@ -627,12 +727,13 @@ GAEBUS_ReadCSV($)
 }
 
 sub 
-GAEBUS_doEbusCmd($$$$)
+GAEBUS_doEbusCmd($$$$$)
 {
   my $hash           = shift;
-  my $action         = shift; # "r" = set reading, "v" = verbose mode
+  my $action         = shift; # "r" = set reading, "v" = verbose mode, "w" = write to ebus
   my $readingname    = shift;
   my $readingcmdname = shift;
+  my $writeValues    = shift;
   my $actMessage;
   my $name = $hash->{NAME};
 
@@ -647,13 +748,24 @@ GAEBUS_doEbusCmd($$$$)
 
   my $timeout = 1.8;
   $timeout = 10 if ($action eq "v");
+  $timeout = 10 if ($action eq "w");
 
 
   my ($io,$class,$var,$comment) = split ($delimiter, $readingcmdname, 4);
 
-  my $cmd = "$io -f ";
-  $cmd .= "-v " if ($action eq "v");
-  $cmd .= "-c $class $var";
+  my $cmd = "";
+
+  if ($action eq "w") {
+    $cmd = "$io ";
+    $cmd .= "-c $class $var ";
+    $cmd .= "$writeValues";
+
+  } else {
+
+    $cmd = "$io -f ";
+    $cmd .= "-v " if ($action eq "v");
+    $cmd .= "-c $class $var";
+  }
 
   Log3 ($name, 3, "$name execute $cmd");
 
@@ -674,19 +786,25 @@ GAEBUS_doEbusCmd($$$$)
 
     Log3 ($name, 3, "$name answer $action $readingname $actMessage");
 
-    unless ($actMessage =~ "Usage:") 
+    unless ($actMessage =~ "Usage:") # pass Usage: directly
     {
-      unless ($actMessage =~ /^ERR:/)
+      # no Usage: message
+      unless ($actMessage =~ /^ERR:/) # pass ERR: message directly
       {
+        # no ERR: message
+        # = normal answer
+
         if ($action eq "r") {
           if (defined ($readingname)) {
             readingsSingleUpdate ($hash,  $readingname, "$actMessage", 1);
           }
         }
-      }
-    }
 
-    ($action eq "r") ? return undef : return $actMessage;
+      }
+    } 
+
+    return undef if ($action eq "r");
+    return $actMessage;
   }
   else
   {
@@ -723,7 +841,7 @@ GAEBUS_GetUpdates($)
       #Log3 ($name, 2, "$name check modulo ".$hash->{UpdateCnt}." mod $doCntNo -> ".($hash->{UpdateCnt} % $doCntNo));
       if (($hash->{UpdateCnt} % $doCntNo) == 0)
       {
-        my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $oneattr);
+        my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $oneattr, "");
       }
 
       # limit number of reopens if ebusd cannot be reached
@@ -793,6 +911,14 @@ GAEBUS_GetUpdates($)
         Valid combinations are read from the .csv files in directory "ebusd" and are selectable<br>
         Values from the attributes will be used as the name for the reading which are read from ebusd in the interval specified.<br>
         </li><br>
+    <li>[w]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment from csv&gt;<br>
+        Will define a attribute with the following syntax:<br>
+        [w]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt<br>
+        They will only appear if the attribute "ebusWritesEnabled" is set to "1"<br>
+        Valid combinations are read from the .csv files in directory "ebusd" and are selectable<br>
+        Values from the attributes will be used for set commands to modify parameters for ebus devices<br>
+        Hint: if the values for the attributes are prefixed by "set-" then all possible parameters will be listed in one block<br>
+        </li><br>
   </ul>
 
   <a name="GAEBUS"></a>
@@ -817,12 +943,23 @@ GAEBUS_GetUpdates($)
     <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
+    <li>ebusWritesEnabled 0,1<br>
+        disable (0) or enable (1) that commands can be send to ebus devices<br>
+        See also description for Set and Get<br>
+        </li><br>
     <li>Attributes of the format<br>
         <code>[r]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt;</code><br>
         define variables that can be retrieved from the ebusd.
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
-        The name of the reading can be suffixed by "&lt;number&gt;" which is a multiplicator for the evaluation within the specified interal. (eg. OutsideTemp:3 will evaluate this reading every 3-th cycle)<br>
+        The name of the reading can be suffixed by "&lt;number&gt;" which is a multiplicator for 
+        the evaluation within the specified interval. (eg. OutsideTemp:3 will evaluate this reading every 3-th cycle)<br>
+        </li><br>
+    <li>Attributes of the format<br>
+        <code>[w]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt;</code><br>
+        define parameters that can be changed on ebus devices (using the write command from ebusctl)
+        They will appear when they are defined by a "set" command as described above.<br>
+        The value assigned to an attribute specifies the name that will be used in set to change a parameter for a ebus device.<br>
         </li><br>
   </ul>
   <br>
