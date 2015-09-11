@@ -141,6 +141,11 @@ CUL_MAX_Check($@)
 
   my $version = $hash->{IODev}{VERSION};
 
+  if($version =~ m/.*a-culfw.*/) {
+      #a-culfw is compatibel to culfw 154
+      return 154;
+  }
+
   #Looks like "V 1.49 CUL868"
   if($version =~ m/V (.*)\.(.*) .*/) {
     my ($major_version,$minorversion) = ($1, $2);
