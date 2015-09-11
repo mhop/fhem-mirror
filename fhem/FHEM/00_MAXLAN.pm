@@ -173,7 +173,7 @@ MAXLAN_Connect($)
   #At the end, the cube sends a "L:"
   
   #Handle deferred setting of time
-  if(AttrVal($hash->{NAME},"set-clock-on-init","1") && $hash->{cubeTimeDifference} > 1) {
+  if(AttrVal($hash->{NAME},"set-clock-on-init","1") && ($hash->{cubeTimeDifference} > 1 || !$hash->{clockset})) {
     MAXLAN_Set($hash,$hash->{NAME},"clock");
   }
 
