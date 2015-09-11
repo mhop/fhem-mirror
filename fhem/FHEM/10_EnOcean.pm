@@ -12074,17 +12074,15 @@ EnOcean_Undef($$)
          <li>teachOut<br>
           initiate UTE teach-out (slave)</li>
     </ul><br>
-       The generic profile device is configured using the following attributes:<br>
+       The valve controller is configured using the following attributes:<br>
        <ul>
-       <li><a href="#EnOcean_comMode">comMode</a></li>
        <li><a href="#EnOcean_devMode">devMode</a></li>
-       <li><a href="#EnOcean_gpDef">gpDef</a></li>
-       <li><a href="#EnOcean_manufID">manufID</a></li>
        </ul>
-       The attr subType must be genericProfile. This is done if the device was
-       created by autocreate. If the profile in slave mode is operated, especially the channel
-       definition in the gpDef attributes must be entered manually.
-       </li>
+       The attr subType must be valveCtrl.00. This is done if the device was
+       created by autocreate. To control the device, it must be bidirectional paired,
+       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>. The profile
+       behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.
+     </li>
     <br><br>
 
     <li>Generic Profiles<br>
@@ -12101,12 +12099,16 @@ EnOcean_Undef($$)
       <li>teachOut<br>
         sent teach-out telegram</li>
     </ul><br>
-    [data] = &lt;1-byte hex ... 512-byte hex&gt;<br>
-    [status] = 0x00 ... 0xFF<br>
-    With the help of this command data messages in hexadecimal format can be sent.
-    Telegram types (RORG) 1BS, 4BS, RPS, MSC, UTE, VLD, GPCD, GPSD, GPTI and GPTR are supported.
-    For further information, see <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a> and
-    Generic Profiles.
+       The generic profile device is configured using the following attributes:<br>
+       <ul>
+       <li><a href="#EnOcean_comMode">comMode</a></li>
+       <li><a href="#EnOcean_devMode">devMode</a></li>
+       <li><a href="#EnOcean_gpDef">gpDef</a></li>
+       <li><a href="#EnOcean_manufID">manufID</a></li>
+       </ul>
+       The attr subType must be genericProfile. This is done if the device was
+       created by autocreate. If the profile in slave mode is operated, especially the channel
+       definition in the gpDef attributes must be entered manually.
     </li>
     <br><br>
 
@@ -12397,10 +12399,10 @@ EnOcean_Undef($$)
       EnOcean Equipment Profile (EEP)
     </li>
     <li><a name="EnOcean_gpDef">gpDef</a> &lt;name of channel 00&gt;:&lt;O|I&gt;:&lt;channel type&gt;:
-                                          &lt;signal type&gt;:&lt;value type&gt;[[:&lt;resolution&gt;]
+                                          &lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;
                                          [:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]] ...
                                          &lt;name of channel 64&gt;:&lt;O|I&gt;:&lt;channel type&gt;:
-                                          &lt;signal type&gt;:&lt;value type&gt;[[:&lt;resolution&gt;]
+                                          &lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;
                                          [:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]]
                                          <br>
       Generic Profiles channel definitions are set automatically in master mode. If the profile in slave mode is operated, the channel
@@ -14074,7 +14076,7 @@ EnOcean_Undef($$)
        <li>&lt;00...64&gt;-&lt;channel name&gt;Unit &lt;value&gt;</li>
        <li>&lt;00...64&gt;-&lt;channel name&gt;ValueType value|setpointAbs|setpointRel</li>
        <li>&lt;00...64&gt;-&lt;channel name&gt;ChannelType teachIn|data|flag|enum</li>
-       <li>teach &lt;value&gt;</li>
+       <li>teach &lt;result of teach procedure&gt;</li>
      </ul><br>
        The attr subType must be genericProfile. This is done if the device was
        created by autocreate. If the profile in slave mode is operated, especially the channel
