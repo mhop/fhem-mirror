@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.11 2015-09-06 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.12 2015-09-11 Risiko $
 #
 # Usage
 # 
@@ -27,15 +27,16 @@
 # V 1.01 2015-05-09 - NEW: add quigg_gt* protocol (e.q quigg_gt7000)
 # V 1.02 2015-05-16 - NEW: battery state for temperature sensors
 # V 1.03 2015-05-20 - NEW: handle screen messages (up,down)
-# V 1.04 2015-05-30 - FIX:  StateFn  
-# V 1.05 2015-06-07 - FIX:  Reset 
-# V 1.06 2015-06-20 - NEW:  set <ctrl> disconnect, checking reading state
-# V 1.07 2015-06-23 - FIX:  reading state always contains a valid value, checking reading state removed
-# V 1.08 2015-06-23 - FIX:  clear send queue by reset
-# V 1.08 2015-06-23 - NEW:  attribute SendTimeout for abort sending command non blocking
-# V 1.09 2015-07-21 - NEW:  support submodule pilight_raw to send raw codes
-# V 1.10 2015-08-30 - NEW:  support pressure, windavg, winddir, windgust from weather stations and GPIO sensors
-# V 1.11 2015-09-06 - FIX:  pressure, windavg, winddir, windgust from weather stations without temperature 
+# V 1.04 2015-05-30 - FIX: StateFn  
+# V 1.05 2015-06-07 - FIX: Reset 
+# V 1.06 2015-06-20 - NEW: set <ctrl> disconnect, checking reading state
+# V 1.07 2015-06-23 - FIX: reading state always contains a valid value, checking reading state removed
+# V 1.08 2015-06-23 - FIX: clear send queue by reset
+# V 1.08 2015-06-23 - NEW: attribute SendTimeout for abort sending command non blocking
+# V 1.09 2015-07-21 - NEW: support submodule pilight_raw to send raw codes
+# V 1.10 2015-08-30 - NEW: support pressure, windavg, winddir, windgust from weather stations and GPIO sensors
+# V 1.11 2015-09-06 - FIX: pressure, windavg, winddir, windgust from weather stations without temperature 
+# V 1.12 2015-09-11 - FIX: handling ContactAsSwitch befor white list check
 ############################################## 
 package main;
 
@@ -752,6 +753,15 @@ sub pilight_ctrl_Parse($$)
     last if ($unit ne "");
   }
 
+  # handling ContactAsSwitch befor white list check
+  my $asSwitch = $attr{$me}{ContactAsSwitch};
+  if ( defined($asSwitch) && $proto =~ /contact/ && $asSwitch =~ /$id/) {
+    $proto =~ s/contact/switch/g;
+    $state =~ s/opened/on/g;
+    $state =~ s/closed/off/g;
+    Log3 $me, 5, "$me(Parse): contact as switch for $id";
+  }
+        
   my @ignoreIDs = split(",",AttrVal($me, "ignoreProtocol","")); 
   
   # white or ignore list
@@ -828,17 +838,7 @@ sub pilight_ctrl_Parse($$)
       $msg.= ",$dimlevel" if ($dimlevel ne "");
       return Dispatch($hash, $msg ,undef);
     }
-    case 3 {
-      my $asSwitch = $attr{$me}{ContactAsSwitch};
-      if ( defined($asSwitch) && $asSwitch =~ /$id/) {
-        $proto =~ s/contact/switch/g;
-        $state =~ s/opened/on/g;
-        $state =~ s/closed/off/g;
-        Log3 $me, 5, "$me(Parse): contact as switch for $id";
-        return Dispatch($hash, "PISWITCH,$proto,$id,$unit,$state",undef);
-      }
-      return;
-    }
+    case 3 {return;}
     case 4 {      
         my $piTempData = "";
         $piTempData .= ",temperature:$data->{$s}{temperature}"  if (defined($data->{$s}{temperature}));
