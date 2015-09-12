@@ -514,16 +514,44 @@ EnOcean_Define($$)
       $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
       $hash->{DEF} = $def;
       $modules{EnOcean}{defptr}{$def} = $hash;
+      $attr{$name}{manufID} = "7FF";
+      $attr{$name}{room} = "EnOcean";
     } elsif ($a[2] =~ m/^[A-Fa-f0-9]{8}$/i) {
       $def = uc($a[2]);
       $hash->{DEF} = $def;
       $modules{EnOcean}{defptr}{$def} = $hash;
       AssignIoPort($hash);
+      $attr{$name}{manufID} = "7FF";
+      $attr{$name}{room} = "EnOcean";
+    } elsif ($a[2] =~ m/^([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})$/i) {
+      AssignIoPort($hash);
+      $defs{$name}{DEF} = $def;
+      $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
+      $hash->{DEF} = $def;
+      $modules{EnOcean}{defptr}{$def} = $hash;
+      my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
+      $rorg = "F6" if ($rorg eq "05");
+      $rorg = "D5" if ($rorg eq "06");
+      $rorg = "A5" if ($rorg eq "07");
+      my $eep = "$rorg.$func.$type";
+      if (exists $EnO_eepConfig{$eep}) {
+        foreach my $attrCntr (keys %{$EnO_eepConfig{$eep}{attr}}) {
+          if ($attrCntr ne "subDef") {
+            $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
+          }
+        }
+        $attr{$name}{eep} = "$rorg-$func-$type";
+        $attr{$name}{manufID} = "7FF";
+        $attr{$name}{room} = "EnOcean";
+        return undef;
+      } else {
+        return "EEP $rorg-$func-$type not supported";
+      }      
     } else {
-      return "wrong syntax: define <name> EnOcean 8-digit-hex-code";
+      return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
     }
   } else {
-    return "wrong syntax: define <name> EnOcean 8-digit-hex-code";
+    return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
   }
   # Help FHEMWEB split up devices
   $attr{$name}{subType} = $1 if($name =~ m/EnO_(.*)_$def/);
@@ -10943,9 +10971,10 @@ EnOcean_Undef($$)
   using the RF Protocol provided by the EnOcean Alliance.<br><br>
   Depending on the function of the device an specific device profile is used, called
   EnOcean Equipment Profile (EEP). The specific definition of a device is referenced by
-  the EEP number (RORG, FUNC, TYPE). Basically three profiles will be differed, e. g.
-  switches, contacts, sensors. Some manufacturers use additional proprietary
-  extensions. Further technical information can be found at the
+  the EEP (RORG-FUNC-TYPE). Basically four groups (RORG) will be differed, e. g.
+  RPS (switches), 1BS (contacts), 4BS, VLD (sensors and controller). Some manufacturers use
+  additional proprietary extensions. RORG MSC is not supported except for few exceptions.
+  Further technical information can be found at the
   <a href="http://www.enocean-alliance.org/de/enocean_standard/">EnOcean Alliance</a>,
   see in particular the
   <a href="http://www.enocean-alliance.org/eep/">EnOcean Equipment Profiles (EEP)</a>
@@ -11105,7 +11134,7 @@ EnOcean_Undef($$)
   <a name="EnOceandefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; EnOcean &lt;DEF&gt;|getNextID</code>
+    <code>define &lt;name&gt; EnOcean &lt;DEF&gt;|getNextID|&lt;EEP&gt;</code>
     <br><br>
 
     Define an EnOcean device, connected via a <a href="#TCM">TCM</a> modul. The
@@ -11124,6 +11153,10 @@ EnOcean_Undef($$)
     FHEM can assign a free SenderID alternatively, for example
     <ul><br>
       <code>define switch1 EnOcean getNextID</code><br>
+    </ul><br>
+    If the EEP is known, the appropriate device can be created with the basic parameters, for example
+    <ul><br>
+      <code>define sensor1 EnOcean A5-02-05</code><br>
     </ul><br>
     The <a href="#autocreate">autocreate</a> module may help you if the actor or sensor send
     acknowledge messages or teach-in telegrams. In order to control this devices e. g. switches with
