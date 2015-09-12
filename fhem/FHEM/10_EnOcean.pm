@@ -1,5 +1,6 @@
 ##############################################
 # $Id$
+# 2015-09-12
 
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
 # Copyright: Jan Schneider (timberwolf at tec-observer dot de)
@@ -516,6 +517,7 @@ EnOcean_Define($$)
       $modules{EnOcean}{defptr}{$def} = $hash;
       $attr{$name}{manufID} = "7FF";
       $attr{$name}{room} = "EnOcean";
+      $attr{$name}{subType} = "raw";
     } elsif ($a[2] =~ m/^[A-Fa-f0-9]{8}$/i) {
       $def = uc($a[2]);
       $hash->{DEF} = $def;
@@ -523,6 +525,24 @@ EnOcean_Define($$)
       AssignIoPort($hash);
       $attr{$name}{manufID} = "7FF";
       $attr{$name}{room} = "EnOcean";
+      if (defined($a[3]) && $a[3] =~ m/^([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})$/i) {
+        my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
+        $rorg = "F6" if ($rorg eq "05");
+        $rorg = "D5" if ($rorg eq "06");
+        $rorg = "A5" if ($rorg eq "07");
+        my $eep = "$rorg.$func.$type";
+        if (exists $EnO_eepConfig{$eep}) {
+          foreach my $attrCntr (keys %{$EnO_eepConfig{$eep}{attr}}) {
+            if ($attrCntr ne "subDef") {
+              $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
+            }
+          }
+          $attr{$name}{eep} = "$rorg-$func-$type";
+          return undef;
+        } else {
+          return "EEP $rorg-$func-$type not supported";
+        }
+      }
     } elsif ($a[2] =~ m/^([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})$/i) {
       AssignIoPort($hash);
       $defs{$name}{DEF} = $def;
@@ -11155,6 +11175,10 @@ EnOcean_Undef($$)
       <code>define switch1 EnOcean getNextID</code><br>
     </ul><br>
     If the EEP is known, the appropriate device can be created with the basic parameters, for example
+    <ul><br>
+      <code>define sensor1 EnOcean FFC54500 A5-02-05</code><br>
+    </ul><br>
+    or
     <ul><br>
       <code>define sensor1 EnOcean A5-02-05</code><br>
     </ul><br>
