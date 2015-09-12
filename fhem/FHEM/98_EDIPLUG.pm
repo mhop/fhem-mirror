@@ -28,6 +28,8 @@
 #	2015-02-21	V1.00 first svn version (Wzut)
 #	2015-02-22	V1.01 add attr read-only, fix attr interval, update command.ref
 #	2015-03-07	V1.02 fix schedule
+#       2015-09-12	V1.03 fix errorcount and interval
+#
 ################################################################
 
 package main;
@@ -117,6 +119,8 @@ sub EDIPLUG_Define($$) {
     if( !defined( $attr{$a[0]}{model} ) ) { $attr{$a[0]}{model} = "unknow"}
     $hash->{MODEL}      = $attr{$a[0]}{model};
 
+    if( !defined($attr{$a[0]}{'read-only'} ) ) { $attr{$a[0]}{'read-only'} = "0"}
+
     $hash->{POWER}           = "?";
     $hash->{LASTCMD}         = "";
     $hash->{helper}{current} = "";
@@ -128,7 +132,10 @@ sub EDIPLUG_Define($$) {
     $hash->{url}	= "http://$hash->{user}:$hash->{pwd}\@$hash->{host}:$hash->{port}/smartplug.cgi";
     $hash->{callback}   = \&EDIPLUG_Read;
     $hash->{timeout}    = 2;
-
+    $hash->{code}       = "";
+    $hash->{httpheader} = "";
+    $hash->{conn}       = "";
+    $hash->{data}       = "";
     readingsSingleUpdate($hash, "state", "defined",0);
 
     for (my $i=0; $i<8; $i++) { $hash->{helper}{"list"}[$i] = ""; } # einer mehr als Tage :)
@@ -153,7 +160,7 @@ sub EDIPLUG_GetUpdate($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    $hash->{INTERVAL}  = AttrVal($name, "interval", $hash->{INTERVAL} );
+    $hash->{INTERVAL}  = AttrVal($name, "interval", $hash->{INTERVAL}) if ($hash->{INTERVAL} != 3600);
 
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "EDIPLUG_GetUpdate", $hash, 1) if ($hash->{INTERVAL});
     Log3 $name, 5, "EDIPLUG: GetUpdate";
@@ -173,25 +180,34 @@ sub EDIPLUG_Read($$$)
     if ($err) 
     {
         my $error = "error";
-        $error .=  " ".$hash->{code} if (defined($hash->{code}) ne "200"); 
-        $hash->{ERROR} = $err;
+        $error .=  " ".$hash->{code} if ($hash->{code} && ($hash->{code} ne "")); 
+        $hash->{ERROR}     = $err;
         $hash->{ERRORTIME} = TimeNow();
-        Log3 $name, 3, "$name: return $error -> $err";
-        $hash->{ERRORCOUNT} ++;
-        if ($hash->{ERRORCOUNT} > 5) {$hash->{INTERVAL} = 3600;}
+        $hash->{ERRORCOUNT}++;
+        Log3 $name, 3, "$name: return ".$error."[".$hash->{ERRORCOUNT}."] -> ".$err;
+        if ($hash->{ERRORCOUNT} > 5)
+        {
+           Log3 $name, 3, "$name: too many errors, setting interval from ".$hash->{INTERVAL}." to 3600 seconds" if($hash->{INTERVAL} != 3600);
+           $hash->{INTERVAL} = 3600;
+        }
         readingsSingleUpdate($hash, "state", $error, 0);
         return;
     }
 
-    if ($hash->{INTERVAL} == 3600) { $hash->{INTERVAL} = AttrVal($name, "interval", 60); }
+    if ($hash->{INTERVAL} == 3600) 
+    { 
+      my $interval = AttrVal($name, "interval", 60);
+      Log3 $name, 3, "$name: set interval back to $interval seconds";
+      $hash->{INTERVAL} = $interval;
+    }
 
     # auswerten der Rueckgabe
     if (!$buffer)
     {
       # sollte eigentlich gar nicht vorkommen bzw. nur bei fehlerhaften uebergebenen XML String  
-      Log3 $name, 3, "$name: empty return buffer";
-      $hash->{ERRORCOUNT} ++;
-      $hash->{ERROR} = "empty return buffer";
+      $hash->{ERRORCOUNT}++;
+      Log3 $name, 3, "$name: empty return buffer [".$hash->{ERRORCOUNT}."]";
+      $hash->{ERROR}     = "empty return buffer";
       $hash->{ERRORTIME} = TimeNow();
       return;
     }
@@ -479,6 +495,7 @@ sub EDIPLUG_Set($@) {
    if ($hash->{LASTCMD}) 
    { 
       #return $hash->{data}; # Debug nur anzeigem
+      $hash->{code}       = "";
       HttpUtils_NonblockingGet($hash);
       return undef;
    }
@@ -508,8 +525,13 @@ sub EDIPLUG_Get($@) {
 
     if($hash->{data})
     {
-     $hash->{LASTCMD}   = $cmd;
-     $hash->{timeout}   = AttrVal($name, "timeout", 2);
+     $hash->{LASTCMD}    = $cmd;
+     $hash->{timeout}    = AttrVal($name, "timeout", 2);
+     #$hash->{buf}        = "";
+     $hash->{code}       = "";
+     #$hash->{httpheader} = "";
+     #$hash->{conn}       = "";
+     #$hash->{data}       = "";
      HttpUtils_NonblockingGet($hash);
      return ;
     }
