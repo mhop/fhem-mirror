@@ -130,7 +130,7 @@ doUpdate($$)
 
   my $remCtrlFile = upd_getUrl($src);
   return if(!$remCtrlFile);
-  my @remList = split("\n", $remCtrlFile);
+  my @remList = split(/\R/, $remCtrlFile);
   uLog 4, "Got remote controlfile with ".int(@remList)." entries.";
 
   ###########################
