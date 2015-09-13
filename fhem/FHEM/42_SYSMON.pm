@@ -3084,7 +3084,7 @@ sub SYSMON_getFBStreamRate($$) {
   my $us_rate = SYSMON_execute($hash, "ctlmgr_ctl r sar status/dsl_us_rate");
   
   if($ds_rate ne "" && $us_rate ne "") {
-    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
+    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." kBit/s, up: ".int($us_rate)." kBit/s";
   }
   
   return $map;
@@ -3102,7 +3102,7 @@ sub SYSMON_getFBStreamRate2($$) {
   if(defined($ds_rate) && defined($us_rate) && $ds_rate ne "" && $us_rate ne "") {
     $ds_rate = $ds_rate/1000;
     $us_rate = $us_rate/1000;
-    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." KBit/s, up: ".int($us_rate)." KBit/s";
+    $map->{+FB_DSL_RATE}="down: ".int($ds_rate)." kBit/s, up: ".int($us_rate)." kBit/s";
   }
   
   return $map;
