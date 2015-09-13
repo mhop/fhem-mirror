@@ -319,8 +319,10 @@ my %EnO_eepConfig = (
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
   "B0.00.00" => {attr => {subType => "genericProfile"}},
  # special profiles
-  "FF.FF.FD" => {attr => {subType => "FRW"}},
-  "FF.FF.FE" => {attr => {subType => "PM101"}},
+  "FF.FF.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}},
+  "FF.FF.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
+  "FF.FF.FD" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
+  "FF.FF.FE" => {attr => {subType => "PM101", manufID => "005"}},
   "FF.FF.FF" => {attr => {subType => "raw"}},
 );
 
@@ -532,12 +534,12 @@ EnOcean_Define($$)
         $rorg = "A5" if ($rorg eq "07");
         my $eep = "$rorg.$func.$type";
         if (exists $EnO_eepConfig{$eep}) {
+          $attr{$name}{eep} = "$rorg-$func-$type";
           foreach my $attrCntr (keys %{$EnO_eepConfig{$eep}{attr}}) {
             if ($attrCntr ne "subDef") {
               $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
             }
           }
-          $attr{$name}{eep} = "$rorg-$func-$type";
           return undef;
         } else {
           return "EEP $rorg-$func-$type not supported";
@@ -555,14 +557,14 @@ EnOcean_Define($$)
       $rorg = "A5" if ($rorg eq "07");
       my $eep = "$rorg.$func.$type";
       if (exists $EnO_eepConfig{$eep}) {
+        $attr{$name}{eep} = "$rorg-$func-$type";
+        $attr{$name}{manufID} = "7FF";
+        $attr{$name}{room} = "EnOcean";
         foreach my $attrCntr (keys %{$EnO_eepConfig{$eep}{attr}}) {
           if ($attrCntr ne "subDef") {
             $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
           }
         }
-        $attr{$name}{eep} = "$rorg-$func-$type";
-        $attr{$name}{manufID} = "7FF";
-        $attr{$name}{room} = "EnOcean";
         return undef;
       } else {
         return "EEP $rorg-$func-$type not supported";
@@ -11185,6 +11187,8 @@ EnOcean_Undef($$)
 
    Inofficial EEP for special devices
    <ul>
+     <li>FF-FF-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
+     <li>FF-FF-7F Shutter [Eltako FSB]<br></li>
      <li>FF-FF-FE Smoke Detector [Eltako FRW]<br></li>
      <li>FF-FF-FD Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
      <li>FF-FF-FF EnOcean RAW profile<br></li>
