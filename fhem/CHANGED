@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  95_Dashboard: the sort order in columns is now correctly read
+               from the sorting attribute.
   - bugfix:  00_MAXLAN: set time on cube if it has none (by Tom_S)
   - bugfix:  14_CUL_MAX: work together with a-culfw
   - bugfix:  70_PushNotifier: bugfix regex deviceID
