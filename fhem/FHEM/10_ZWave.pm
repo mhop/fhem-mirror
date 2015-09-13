@@ -570,8 +570,10 @@ ZWave_Cmd($$@)
   # Collect the commands from the distinct classes
   my %cmdList;
   my $classes = AttrVal($name, "classes", "");
+  my $cfgReq = ($type eq "set" && $cmd =~ m/^config/ && @a&&$a[0] eq "request");
+  shift(@a) if($cfgReq);
   foreach my $cl (split(" ", $classes)) {
-    my $ptr = ZWave_getHash($hash, $cl, $type);
+    my $ptr = ZWave_getHash($hash, $cl, $cfgReq ? "get" : $type);
     next if(!$ptr);
 
     foreach my $k (keys %{$ptr}) {
@@ -654,7 +656,8 @@ ZWave_Cmd($$@)
   }
 
   if($cmd =~ m/^config/ && $cmd ne "configRequestAll") {
-    my ($err, $cmd) = ZWave_configCheckParam($hash, $type, $cmd, $cmdFmt, @a);
+    my ($err, $cmd) =
+        ZWave_configCheckParam($hash, $cfgReq, $type, $cmd, $cmdFmt, @a);
     return $err if($err);
     $cmdFmt = $cmd;
   } else {
@@ -1464,17 +1467,16 @@ ZWave_configGetHash($)
 }
 
 sub
-ZWave_configCheckParam($$$$@)
+ZWave_configCheckParam($$$$$@)
 {
-  my ($hash, $type, $cmd, $fmt, @arg) = @_;
+  my ($hash, $cfgReq, $type, $cmd, $fmt, @arg) = @_;
   my $mc = ZWave_configGetHash($hash);
   return ("", sprintf($fmt, @arg)) if(!$mc);
   my $h = $mc->{config}{$cmd};
   return ("", sprintf($fmt, @arg)) if(!$h);
 
   # Support "set XX configYY request" for configRequestAll
-  return ("", sprintf("05%02x", $h->{index}))
-        if($type eq "get" || ($type eq "set" && $arg[0] eq "request"));
+  return ("", sprintf("05%02x", $h->{index})) if($type eq "get" || $cfgReq);
 
   my $t = $h->{type};
   if($t eq "list") {
@@ -1704,7 +1706,7 @@ ZWave_configRequestAll($)
         if(!$mc || !$mc->{config});
   #use Data::Dumper;
   #Log 1, Dumper $mc;
-  foreach my $c (sort keys %{$mc->{config}}) {
+  foreach my $c (sort keys %{$mc->{get}}) {
     my $r = ZWave_Cmd("set", $hash, $hash->{NAME}, $c, "request");
     Log 1, "$c: $r" if($r);
   }
