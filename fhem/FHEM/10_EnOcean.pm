@@ -1,6 +1,5 @@
 ##############################################
 # $Id$
-# 2015-09-12
 
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
 # Copyright: Jan Schneider (timberwolf at tec-observer dot de)
@@ -319,9 +318,10 @@ my %EnO_eepConfig = (
  #"F6.10.01" => {attr => {subType => "windowHandle.01"}},
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
   "B0.00.00" => {attr => {subType => "genericProfile"}},
-  1          => {attr => {subType => "FRW"}},
-  2          => {attr => {subType => "PM101"}},
-  3          => {attr => {subType => "raw"}},
+ # special profiles
+  "FF.FF.FD" => {attr => {subType => "FRW"}},
+  "FF.FF.FE" => {attr => {subType => "PM101"}},
+  "FF.FF.FF" => {attr => {subType => "raw"}},
 );
 
 my %EnO_getRemoteFunctionCode = (
@@ -11182,6 +11182,15 @@ EnOcean_Undef($$)
     <ul><br>
       <code>define sensor1 EnOcean A5-02-05</code><br>
     </ul><br>
+
+   Inofficial EEP for special devices
+   <ul>
+     <li>FF-FF-FE Smoke Detector [Eltako FRW]<br></li>
+     <li>FF-FF-FD Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
+     <li>FF-FF-FF EnOcean RAW profile<br></li>
+     <br><br>
+   </ul>
+ 
     The <a href="#autocreate">autocreate</a> module may help you if the actor or sensor send
     acknowledge messages or teach-in telegrams. In order to control this devices e. g. switches with
     additional SenderIDs you can use the attributes <a href="#subDef">subDef</a>,
@@ -12455,8 +12464,8 @@ EnOcean_Undef($$)
     <li><a name="EnOcean_eep">eep</a> &lt;00...FF&gt;-&lt;00...3F&gt;-&lt;00...7F&gt;<br>
       EnOcean Equipment Profile (EEP)
     </li>
-    <li><a name="EnOcean_gpDef">gpDef</a> &lt;name of channel 00&gt;:&lt;O|I&gt;:&lt;channel type&gt;:[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]] ...
-                                         &lt;name of channel 64&gt;:&lt;O|I&gt;:&lt;channel type&gt;:&lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]]
+    <li><a name="EnOcean_gpDef">gpDef</a> &lt;name of channel 00&gt;:&lt;O|I&gt;:&lt;channel type&gt;:&lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]] ...
+                                          &lt;name of channel 64&gt;:&lt;O|I&gt;:&lt;channel type&gt;:&lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]]
                                          <br>
       Generic Profiles channel definitions are set automatically in master mode. If the profile in slave mode is operated, the channel
       definition must be entered manually. For each channel, the channel definitions are to be given in ascending order. The channel
