@@ -323,7 +323,7 @@ FW_Read($$)
     return if($hash->{BUF} !~ m/^(.*?)(\n\n|\r\n\r\n)(.*)$/s);
     $hash->{HDR} = $1;
     $hash->{BUF} = $3;
-    if($hash->{HDR} =~ m/Content-Length: ([^\r\n]*)/s) {
+    if($hash->{HDR} =~ m/Content-Length:\s*([^\r\n]*)/si) {
       $hash->{CONTENT_LENGTH} = $1;
     }
   }
