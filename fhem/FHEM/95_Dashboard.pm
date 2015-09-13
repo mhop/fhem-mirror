@@ -697,19 +697,33 @@ sub BuildGroupWidgets($$$$$) {
 
  	my $counter = 0;
         my %sorting = ();
+        my %groups = ();
+        my @groupnames = ();
 
         foreach (split(":", $groupsorting)) {
           my @parts = split (',', $_);
           $sorting{$parts[1]} = $_;
+          # add group names to a list to have the correct order afterwards in the foreach loop
+          # store the group names in the right order to use them in the foreach loop
+          push(@groupnames, $parts[1]);
         }
-	my $groupicon = ''; 
 
         my @devicegroups = split('§§§', $devicegroups);
 
+        # sort the devices into a hash to be able to access them via group name
         foreach my $singlegroup (@devicegroups) {
           # make sure that splitting with colon is not destroying the devspec that might
 	  # also contain a colon followed by a filter
           my ($groupname, $groupdevices, $groupicon) = split(/:(?!FILTER=)/, $singlegroup);
+
+          my @values = ($groupdevices, $groupicon);
+          $groups{$groupname} = \@values;
+        }
+
+	my $groupicon = ''; 
+
+        foreach my $groupname (@groupnames) {
+          my ($groupdevices, $groupicon) = @{$groups{$groupname}};
 
           # if the device is not stored in the current column, skip it
           next if (index($sorting{$groupname}, 't'.$tab.'c'.$column) < 0);
