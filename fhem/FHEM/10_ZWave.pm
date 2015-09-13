@@ -2404,20 +2404,33 @@ ZWave_wakeupTimer($$)
 }
 
 sub
-ZWave_processSendStack($$$)
+ZWave_isWakeUp($)
 {
-  my ($hash, $now, $withDelay) = @_;
+  my ($h) = @_;
+  $h->{isWakeUp} = (index(AttrVal($h->{NAME}, "classes", ""), "WAKE_UP") >= 0)
+    if(!defined($h->{isWakeUp}));
+  return $h->{isWakeUp};
+}
+
+sub
+ZWave_processSendStack($$)
+{
+  my ($hash, $withDelay) = @_;
   my $ss = $hash->{SendStack};
   return if(!$ss);
 
   if($withDelay && AttrVal($hash->{IODev}{NAME}, "delayNeeded",1)) {
     InternalTimer(gettimeofday()+0.3, sub {
-      ZWave_processSendStack($hash, $now, 0);
+      ZWave_processSendStack($hash, 0);
     }, {}, 0);
     return;
   }
   
-  shift @{$ss} if(index($ss->[0],"sent") == 0);
+  if(index($ss->[0],"sent") == 0) {
+    shift @{$ss};
+    RemoveInternalTimer($hash) if(!ZWave_isWakeUp($hash));
+  }
+
   if(@{$ss} == 0) {
     delete $hash->{SendStack};
     return;
@@ -2425,9 +2438,16 @@ ZWave_processSendStack($$$)
 
   IOWrite($hash, "00", $ss->[0]);
   $ss->[0] = "sent:".$ss->[0];
-  
-  $hash->{lastMsgSent} = ($now ? $now : gettimeofday());
+
+  $hash->{lastMsgSent} = gettimeofday();
   $zwave_lastHashSent = $hash;
+
+  if(!ZWave_isWakeUp($hash)) {
+    InternalTimer($hash->{lastMsgSent}+10, sub {
+      Log 2, "ZWave: No ACK from $hash->{NAME} after 10s for $ss->[0]";
+      ZWave_processSendStack($hash, 0);
+    }, $hash, 0);
+  }
 }
 
 sub
@@ -2441,8 +2461,7 @@ ZWave_addToSendStack($$)
   my $ss = $hash->{SendStack};
   push @{$ss}, $cmd;
 
-  my $now;
-  if(index(AttrVal($hash->{NAME}, "classes", ""), "WAKE_UP") >= 0) {
+  if(ZWave_isWakeUp($hash)) {
     if ($cmd =~ m/^......988[01].*/) {
       Log3 $hash->{NAME}, 5, "$hash->{NAME}: Sendstack bypassed for $cmd";
     } else {
@@ -2450,7 +2469,7 @@ ZWave_addToSendStack($$)
     }
 
   } else { # clear commands without 0113 and 0013
-    $now = gettimeofday();
+    my $now = gettimeofday();
     if(@{$ss} > 1 && $now-$hash->{lastMsgSent} > 10) {
       Log3 $hash, 2,
         "ERROR: $hash->{NAME}: cleaning commands without ack after 10s";
@@ -2458,7 +2477,7 @@ ZWave_addToSendStack($$)
       return ZWave_addToSendStack($hash, $cmd);
     }
   }
-  ZWave_processSendStack($hash, $now, 0) if(@{$ss} == 1);
+  ZWave_processSendStack($hash, 0) if(@{$ss} == 1);
   return undef;
 }
 
@@ -2488,7 +2507,7 @@ ZWave_Parse($$@)
           my $hash = $zwave_lastHashSent;
           readingsSingleUpdate($hash, "SEND_DATA", "failed:$arg", 1);
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA to $hash->{NAME}: $arg";
-          ZWave_processSendStack($hash, undef, 1);
+          ZWave_processSendStack($hash, 1);
 
         } else {
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg (unknown device)";
@@ -2564,8 +2583,7 @@ ZWave_Parse($$@)
             "SECURITY disabled, device does not support SECURITY command class";
         }
       }
-      ZWave_wakeupTimer($dh, 1)
-        if(index(AttrVal($dh->{NAME}, "classes", ""), "WAKE_UP") >= 0);
+      ZWave_wakeupTimer($dh, 1) if(ZWave_isWakeUp($dh));
       return ZWave_execInits($dh, 0);
     }
 
@@ -2576,9 +2594,9 @@ ZWave_Parse($$@)
 
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash) {
-      if(index(AttrVal($hash->{NAME}, "classes", ""), "WAKE_UP") >= 0) {
+      if(ZWave_isWakeUp($hash)) {
         ZWave_wakeupTimer($hash, 1);
-        ZWave_processSendStack($hash, undef, 0);
+        ZWave_processSendStack($hash, 0);
       }
 
       if(!$ret) {
@@ -2592,21 +2610,21 @@ ZWave_Parse($$@)
     my $hash = $modules{ZWave}{defptr}{"$homeId $callbackid"};
     my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
                '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
-    my $msg = ($msg{$id} ? $msg{$id} : "UNKNOWN_ERROR");
+    my $lmsg = ($msg{$id} ? $msg{$id} : "UNKNOWN_ERROR");
 
     if($id eq "00") {
-      Log3 $ioName, 4, "$ioName transmit $msg for $callbackid";
+      Log3 $ioName, 4, "$ioName transmit $lmsg for $callbackid";
       if($hash) {
-        readingsSingleUpdate($hash, "transmit", $msg, 0);
-        ZWave_processSendStack($hash, undef, 1);
+        readingsSingleUpdate($hash, "transmit", $lmsg, 0);
+        ZWave_processSendStack($hash, 1);
       }
       return "";
 
     } else {
-      Log3 $ioName, 2, "$ioName transmit $msg for $callbackid";
+      Log3 $ioName, 2, "$ioName transmit $lmsg for $callbackid";
       return "" if(!$hash);
-      readingsSingleUpdate($hash, "state", "TRANSMIT_$msg", 1);
-      readingsSingleUpdate($hash, "transmit", $msg, 1);
+      readingsSingleUpdate($hash, "state", "TRANSMIT_$lmsg", 1);
+      readingsSingleUpdate($hash, "transmit", $lmsg, 1);
       return $hash->{NAME};
     }
 
@@ -2732,7 +2750,7 @@ ZWave_Parse($$@)
 
   if($arg =~ m/^028407/) { # wakeup:notification
     ZWave_wakeupTimer($hash, 1);
-    ZWave_processSendStack($hash, undef, 0);
+    ZWave_processSendStack($hash, 0);
   }
 
   return "" if(!@event);
