@@ -10,6 +10,8 @@
 # 11.09.2015 : A.Goebel : add attribute "ebusWritesEnable:0,1"
 # 11.09.2015 : A.Goebel : add set w~ commands to set attributes for writing 
 # 11.09.2015 : A.Goebel : add set <write-reading> command to write to ebusd
+# 13.09.2015 : A.Goebel : increase timeout for reads from ebusd from 1.8 to 5.0
+# 13.09.2015 : A.Goebel : use html entities to display values from ".csv" files
 
 package main;
 
@@ -622,6 +624,15 @@ GAEBUS_ProcessCSV($$)
       next if /^#/;
       next if /^\s$/;
       s/\r//;
+
+      s/ä/\&auml;/g;
+      s/Ä/\&Auml;/g;
+      s/ü/\&uuml;/g;
+      s/Ü/\&Uuml;/g;
+      s/ö/\&ouml;/g;
+      s/Ö/\&Ouml;/g;
+      s/ß/\&szlig;/g;
+      #s/"/\&quot;/g;
     
       chomp;
 
@@ -746,9 +757,10 @@ GAEBUS_doEbusCmd($$$$$)
     return undef unless ($hash->{STATE} eq "Connected");
   }
 
-  my $timeout = 1.8;
-  $timeout = 10 if ($action eq "v");
-  $timeout = 10 if ($action eq "w");
+  #my $timeout = 1.8;
+  my $timeout = 5.0;
+  $timeout = 10.0 if ($action eq "v");
+  $timeout = 10.0 if ($action eq "w");
 
 
   my ($io,$class,$var,$comment) = split ($delimiter, $readingcmdname, 4);
