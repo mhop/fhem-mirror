@@ -712,8 +712,10 @@ sub Pushover_SetMessage {
 
             $values{cbNr} = int( time() ) + $values{expire};
             my $cbReading = "cb_" . $values{cbNr};
-            $values{cbNr}++
-              until ( !defined( $hash->{READINGS}{$cbReading}{VAL} ) );
+            until ( !defined( $hash->{READINGS}{$cbReading}{VAL} ) ) {
+                $values{cbNr}++;
+                $cbReading = "cb_" . $values{cbNr};
+            }
         }
 
         if ( 1 == AttrVal( $hash->{NAME}, "timestamp", 0 ) ) {
@@ -731,10 +733,13 @@ sub Pushover_SetMessage {
         {
             my $url;
 
-            if (   $callback eq ""
-                || $values{action} !~ /^http[s]?:\/\/.*$/ )
+            if (
+                $callback eq ""
+                || (   $values{action} !~ /^http[s]?:\/\/.*$/
+                    && $values{action} =~ /^[\w-]+:\/\/.*$/ )
+              )
             {
-                $url = $values{action};
+                $url = urlEncode( $values{action} );
                 $values{expire} = "";
             }
             else {
@@ -771,10 +776,11 @@ sub Pushover_SetMessage {
 
                 Log3 $name, 5,
                     "checking to clean up "
-                  . $rBase[1]
-                  . ": ack="
-                  . $hash->{READINGS}{$rAck}
-                  . " time="
+                  . $hash->{NAME}
+                  . " $key: time="
+                  . $rBase[1] . " ack="
+                  . $hash->{READINGS}{$rAck}{VAL}
+                  . " curTime="
                   . int( time() );
 
                 if (   $hash->{READINGS}{$rAck}{VAL} == 1
@@ -919,7 +925,7 @@ sub Pushover_CGI() {
 
                 # run FHEM command if desired
                 if ( defined( $hash->{READINGS}{$rAct}{VAL} )
-                    && $hash->{READINGS}{$rAct}{VAL} !~ /^\w.*:\/\/\w.*$/ )
+                    && $hash->{READINGS}{$rAct}{VAL} !~ /^[\w-]+:\/\/.*$/ )
                 {
                     $redirect = "pushover://";
 
@@ -930,7 +936,7 @@ sub Pushover_CGI() {
 
                 # redirect to presented URL
                 if ( defined( $hash->{READINGS}{$rAct}{VAL} )
-                    && $hash->{READINGS}{$rAct}{VAL} =~ /^\w.*:\/\/\w.*$/ )
+                    && $hash->{READINGS}{$rAct}{VAL} =~ /^[\w-]+:\/\/.*$/ )
                 {
                     $redirect = $hash->{READINGS}{$rAct}{VAL};
                 }
@@ -1028,7 +1034,8 @@ sub Pushover_CGI() {
       <code>set Pushover1 msg 'Title' 'This is a text.'</code><br>
       <code>set Pushover1 msg 'Title' 'This is a text.' '' 0 ''</code><br>
       <code>set Pushover1 msg 'Emergency' 'Security issue in living room.' '' 2 'siren' 30 3600</code><br>
-      <code>set Pushover1 msg 'Hint' 'This is a reminder to do something' '' 0 '' '' 3600 'Click here for action' 'set device something'</code><br>
+      <code>set Pushover1 msg 'Hint' 'This is a reminder to do something' '' 0 '' 0 3600 'Click here for action' 'set device something'</code><br>
+      <code>set Pushover1 msg 'Emergency' 'Security issue in living room.' '' 2 'siren' 30 3600 'Click here for action' 'set device something'</code><br>
     </ul>
     <br>
     Notes:
@@ -1130,7 +1137,8 @@ sub Pushover_CGI() {
       <code>set Pushover1 msg 'Titel' 'Dies ist ein Text.'</code><br>
       <code>set Pushover1 msg 'Titel' 'Dies ist ein Text.' '' 0 ''</code><br>
       <code>set Pushover1 msg 'Notfall' 'Sicherheitsproblem im Wohnzimmer.' '' 2 'siren' 30 3600</code><br>
-      <code>set Pushover1 msg 'Erinnerung' 'Dies ist eine Erinnerung an etwas' '' 0 '' '' 3600 'Hier klicken, um Aktion auszuführen' 'set device irgendwas'</code><br>
+      <code>set Pushover1 msg 'Erinnerung' 'Dies ist eine Erinnerung an etwas' '' 0 '' 0 3600 'Hier klicken, um Aktion auszuführen' 'set device irgendwas'</code><br>
+      <code>set Pushover1 msg 'Notfall' 'Sicherheitsproblem im Wohnzimmer.' '' 2 'siren' 30 3600 'Hier klicken, um Aktion auszuführen' 'set device something'</code><br>
     </ul>
     <br>
     Anmerkungen:
