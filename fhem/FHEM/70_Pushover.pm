@@ -83,7 +83,8 @@ sub Pushover_addExtension($$$) {
       if ( defined( $data{FWEXT}{$url} )
         && $data{FWEXT}{$url}{deviceName} ne $name );
 
-    Log3 $name, 2, "Registering Pushover for webhook URI $url ...";
+    Log3 $name, 2,
+      "Pushover $name: Registering Pushover for webhook URI $url ...";
     $data{FWEXT}{$url}{deviceName} = $name;
     $data{FWEXT}{$url}{FUNC}       = $func;
     $data{FWEXT}{$url}{LINK}       = $link;
@@ -98,7 +99,8 @@ sub Pushover_removeExtension($) {
 
     my $url  = "/$link";
     my $name = $data{FWEXT}{$url}{deviceName};
-    Log3 $name, 2, "Unregistering Pushover for webhook URL $url...";
+    Log3 $name, 2,
+      "Pushover $name: Unregistering Pushover for webhook URL $url...";
     delete $data{FWEXT}{$url};
     delete $name->{HASH}{FHEMWEB_URI};
 }
@@ -678,12 +680,13 @@ sub Pushover_SetMessage {
             /\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>/
             && $values{message} !~ /^nohtml:.*/ )
         {
-            Log3 $name, 4, "handling message with HTML content";
+            Log3 $name, 4, "Pushover $name: handling message with HTML content";
             $body = $body . "&html=1";
         }
 
         if ( $values{message} =~ /^nohtml:.*/ ) {
-            Log3 $name, 4, "explicitly ignoring HTML tags in message";
+            Log3 $name, 4,
+              "Pushover $name: explicitly ignoring HTML tags in message";
             $values{message} =~ s/^(nohtml:).*//;
             $body = $body . "&message=" . urlEncode( $values{message} );
         }
@@ -723,7 +726,8 @@ sub Pushover_SetMessage {
         }
 
         if ( $callback ne "" && $values{priority} > 1 ) {
-            Log3 $name, 5, "Adding emergency callback URL $callback";
+            Log3 $name, 5,
+              "Pushover $name: Adding emergency callback URL $callback";
             $body = $body . "&callback=" . $callback;
         }
 
@@ -739,7 +743,7 @@ sub Pushover_SetMessage {
                     && $values{action} =~ /^[\w-]+:\/\/.*$/ )
               )
             {
-                $url = urlEncode( $values{action} );
+                $url = $values{action};
                 $values{expire} = "";
             }
             else {
@@ -752,7 +756,7 @@ sub Pushover_SetMessage {
             }
 
             Log3 $name, 5,
-"Adding supplementary URL '$values{url_title}' ($url) with action '$values{action}' (expires after $values{expire} => $values{cbNr})";
+"Pushover $name: Adding supplementary URL '$values{url_title}' ($url) with action '$values{action}' (expires after $values{expire} => $values{cbNr})";
             $body =
                 $body
               . "&url_title="
@@ -775,7 +779,7 @@ sub Pushover_SetMessage {
                 my $rDev   = "cbDev_" . $rBase[1];
 
                 Log3 $name, 5,
-                    "checking to clean up "
+                    "Pushover $name: checking to clean up "
                   . $hash->{NAME}
                   . " $key: time="
                   . $rBase[1] . " ack="
@@ -803,7 +807,8 @@ sub Pushover_SetMessage {
                         delete $hash->{READINGS}{$rAckBy};
                     }
 
-                    Log3 $name, 4, "cleaned up expired receipt " . $rBase[1];
+                    Log3 $name, 4,
+                      "Pushover $name: cleaned up expired receipt " . $rBase[1];
                 }
             }
         }
