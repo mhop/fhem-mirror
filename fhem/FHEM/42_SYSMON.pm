@@ -135,7 +135,7 @@ SYSMON_Initialize($)
   $hash->{AttrList} = "filesystems network-interfaces user-defined disable:0,1 nonblocking:0,1 ".
                       "telnet-time-out ".
                       "user-fn2 user-fn ".
-                      "telnet-prompt-regx telnet-login-prompt-regx ".
+                      "telnet-prompt-regx telnet-login-prompt-regx telnet-login-none:0,1 ".
                       "exclude ".
                        $readingFnAttributes;
 }
@@ -3814,7 +3814,9 @@ sub SYSMON_Open_Connection($)
    #  }
    #}
    
-   if(!defined($pwd)) {
+   my $tlogin_none=AttrVal($name,'telnet-login-none','0');
+   
+   if(!$tlogin_none && !defined($pwd)) {
      $msg="Error: no passwort provided";
      SYSMON_Log($hash, 3, $msg);
      return $msg unless defined $pwd;
@@ -3833,46 +3835,48 @@ sub SYSMON_Open_Connection($)
       return $msg;
    }
    $hash->{".telnet"}=$telnet;
-
-   SYSMON_Log($hash, 5, "Wait for user or password prompt.");
-   unless ( ($before,$match) = $telnet->waitfor('/(user|login|password): $/i') )
-   {
-      $msg = "Telnet error while waiting for user or password prompt: ".$telnet->errmsg;
-      SYSMON_Log($hash, 2, $msg);
-      $telnet->close;
-      $telnet = undef;
-      return $msg;
+   
+   if(!$tlogin_none) {
+     SYSMON_Log($hash, 5, "Wait for user or password prompt.");
+     unless ( ($before,$match) = $telnet->waitfor('/(user|login|password): $/i') )
+     {
+        $msg = "Telnet error while waiting for user or password prompt: ".$telnet->errmsg;
+        SYSMON_Log($hash, 2, $msg);
+        $telnet->close;
+        $telnet = undef;
+        return $msg;
+     }
+     if ( $match =~ /(user|login): / && $user eq "")
+     {
+        $msg = "Telnet login requires user name but attribute 'telnetUser' not defined";
+        SYSMON_Log($hash, 2, $msg);
+        $telnet->close;
+        $telnet = undef;
+        return $msg;
+     }
+     elsif ( $match =~ /(user|login): /)
+     {
+        SYSMON_Log($hash, 5, "Entering user name");
+        $telnet->print( $user );
+  
+        SYSMON_Log($hash, 5, "Wait for password prompt");
+        unless ($telnet->waitfor( '/password: $/i' ))
+        {
+           $msg = "Telnet error while waiting for password prompt: ".$telnet->errmsg;
+           SYSMON_Log($hash, 2, $msg);
+           $telnet->close;
+           $telnet = undef;
+           return $msg;
+        }
+     }
+     elsif ( $match eq "password: " && $user ne "")
+     {
+        SYSMON_Log($hash, 3, "remote user was defined but telnet login did not prompt for user name.");
+     }
+  
+     SYSMON_Log($hash, 5, "Entering password");
+     $telnet->print( $pwd );
    }
-   if ( $match =~ /(user|login): / && $user eq "")
-   {
-      $msg = "Telnet login requires user name but attribute 'telnetUser' not defined";
-      SYSMON_Log($hash, 2, $msg);
-      $telnet->close;
-      $telnet = undef;
-      return $msg;
-   }
-   elsif ( $match =~ /(user|login): /)
-   {
-      SYSMON_Log($hash, 5, "Entering user name");
-      $telnet->print( $user );
-
-      SYSMON_Log($hash, 5, "Wait for password prompt");
-      unless ($telnet->waitfor( '/password: $/i' ))
-      {
-         $msg = "Telnet error while waiting for password prompt: ".$telnet->errmsg;
-         SYSMON_Log($hash, 2, $msg);
-         $telnet->close;
-         $telnet = undef;
-         return $msg;
-      }
-   }
-   elsif ( $match eq "password: " && $user ne "")
-   {
-      SYSMON_Log($hash, 3, "remote user was defined but telnet login did not prompt for user name.");
-   }
-
-   SYSMON_Log($hash, 5, "Entering password");
-   $telnet->print( $pwd );
 
    SYSMON_Log($hash, 5, "Wait for command prompt");
    my $tlogin_prompt=AttrVal($name,'telnet-login-prompt-regx','(#|\$|>)\s*$|Login failed.');
@@ -5169,6 +5173,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     RegExp to detect login and command line prompt. (Only for access via Telnet.)
     </li>
     <br>
+    <li>telnet-login-none<br>
+    set it to 1 when no user and password are required
+    </li>
+    <br>
     <li>exclude<br>
     Allows to suppress reading certain information. <br>
     supported values: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
@@ -5836,6 +5844,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     <br>
     <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
     RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur f&uuml;r Zugriffe &uuml;ber Telnet relevant.)
+    </li>
+    <br>
+    <li>telnet-login-none<br>
+    soll auf 1 gesetzt werden, wenn kein User und Passwort zum Login notwendig sind.
     </li>
     <br>
     <li>exclude<br>
