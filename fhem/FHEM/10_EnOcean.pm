@@ -319,11 +319,11 @@ my %EnO_eepConfig = (
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
   "B0.00.00" => {attr => {subType => "genericProfile"}},
  # special profiles
-  "FF.FF.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}},
-  "FF.FF.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
-  "FF.FF.FD" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
-  "FF.FF.FE" => {attr => {subType => "PM101", manufID => "005"}},
-  "FF.FF.FF" => {attr => {subType => "raw"}},
+  "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}},
+  "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
+  "L6.02.01" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
+  "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}},
+  "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}},
 );
 
 my %EnO_getRemoteFunctionCode = (
@@ -527,7 +527,7 @@ EnOcean_Define($$)
       AssignIoPort($hash);
       $attr{$name}{manufID} = "7FF";
       $attr{$name}{room} = "EnOcean";
-      if (defined($a[3]) && $a[3] =~ m/^([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})$/i) {
+      if (defined($a[3]) && $a[3] =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
         my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
         $rorg = "F6" if ($rorg eq "05");
         $rorg = "D5" if ($rorg eq "06");
@@ -545,7 +545,7 @@ EnOcean_Define($$)
           return "EEP $rorg-$func-$type not supported";
         }
       }
-    } elsif ($a[2] =~ m/^([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})$/i) {
+    } elsif ($a[2] =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
       AssignIoPort($hash);
       $defs{$name}{DEF} = $def;
       $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
@@ -11187,11 +11187,11 @@ EnOcean_Undef($$)
 
    Inofficial EEP for special devices
    <ul>
-     <li>FF-FF-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
-     <li>FF-FF-7F Shutter [Eltako FSB]<br></li>
-     <li>FF-FF-FE Smoke Detector [Eltako FRW]<br></li>
-     <li>FF-FF-FD Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
-     <li>FF-FF-FF EnOcean RAW profile<br></li>
+     <li>G5-38-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
+     <li>G5-3F-7F Shutter [Eltako FSB]<br></li>
+     <li>L6-02-01 Smoke Detector [Eltako FRW]<br></li>
+     <li>G5-ZZ-ZZ Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
+     <li>ZZ-ZZ-ZZ EnOcean RAW profile<br></li>
      <br><br>
    </ul>
  
@@ -11238,9 +11238,7 @@ EnOcean_Undef($$)
       A device, which is then also put in this state is to paired with
       Fhem. Bidirectional Teach-In / Teach-Out is used for some 4BS, VLD and MSC devices,
       e. g. EEP 4BS, RORG A5-20-01 (Battery Powered Actuator).<br>
-      Bidirectional 4BS Teach-In and UTE - Universal Uni- and Bidirectional
-      Teach-In are supported.
-      <br>
+      Bidirectional Teach-In for 4BS, UTE and Generic Profiles are supported.<br>
       <code>IODev</code> is the name of the TCM Module.<br>
       <code>t/s</code> is the time for the learning period.
       <br><br>
