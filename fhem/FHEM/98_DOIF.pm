@@ -1181,9 +1181,9 @@ CmdDoIf($$)
   if (!$tail) {
     $tail="";
   } else {
-    $tail =~ s/(##.*\n)|(##.*$)|\n//g;;
+    $tail =~ s/(##.*\n)|(##.*$)|\n//g;
   }
-  
+   
 #  if (defined $hash->{helper}) #def modify
   if ($init_done)
   {
@@ -1221,6 +1221,7 @@ CmdDoIf($$)
     } 
     $hash->{do}{$i}{0}=$if_cmd_ori if ($j==0); #do without brackets 
     $last_do=$i;
+    $tail =~ s/^\s*$//g;
     if (length($tail)) {
       $tail =~ /^\s*DOELSEIF/g;
       if (pos($tail)) {
