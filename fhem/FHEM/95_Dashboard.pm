@@ -723,6 +723,8 @@ sub BuildGroupWidgets($$$$$) {
 	my $groupicon = ''; 
 
         foreach my $groupname (@groupnames) {
+          next if (!defined($groups{$groupname}));
+
           my ($groupdevices, $groupicon) = @{$groups{$groupname}};
 
           # if the device is not stored in the current column, skip it
