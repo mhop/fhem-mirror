@@ -12,6 +12,7 @@
 # 11.09.2015 : A.Goebel : add set <write-reading> command to write to ebusd
 # 13.09.2015 : A.Goebel : increase timeout for reads from ebusd from 1.8 to 5.0
 # 14.09.2015 : A.Goebel : use utf-8 coding to display values from ".csv" files
+# 14.09.2015 : A.Goebel : add optional parameter [FIELD[.N]] of read from ebusd to reading name
 
 package main;
 
@@ -30,7 +31,7 @@ sub GAEBUS_SimpleWrite(@);
 sub GAEBUS_Disconnected($);
 sub GAEBUS_Shutdown($);
 
-sub GAEBUS_doEbusCmd($$$$$);
+sub GAEBUS_doEbusCmd($$$$$$);
 sub GAEBUS_GetUpdates($);
 
 my %gets = (    # Name, Data to send to the GAEBUS, Regexp for the answer
@@ -229,6 +230,7 @@ GAEBUS_Set($@)
     {
       my $readingname    = $attr{$name}{$oneattr};
       my $readingcmdname = $oneattr;
+      $readingname       =~ s/ .*//;
       $readingname       =~ s/:.*//;
   
       # only for "w" commands
@@ -276,7 +278,7 @@ GAEBUS_Set($@)
         my $readingname    = $attr{$name}{$oneattr};
         next if ($readingname ne $type);
 
-        my $answer = GAEBUS_doEbusCmd ($hash, "w", $readingname, $oneattr, $arg);
+        my $answer = GAEBUS_doEbusCmd ($hash, "w", $readingname, $oneattr, $arg, "");
         return "$answer";
       }
     }
@@ -316,11 +318,20 @@ GAEBUS_Get($@)
   # extend possible parameters by the readings defined in attributes
 
   my %readings = ();
+  my %readingsCmdaddon = ();
   my $actGetParams .= "$allGetParams reading:";
   foreach my $oneattr (sort keys %{$attr{$name}})
   {
-    my $readingname    = $attr{$name}{$oneattr};
+    my ($readingnameX, $cmdaddon) = split (" ", $attr{$name}{$oneattr}, 2);
+    $cmdaddon = "" unless (defined ($cmdaddon));
+
+    my ($readingname, $doCntNo) = split (":", $readingnameX, 2); # split name from cycle number
+    $doCntNo = 1 unless (defined ($doCntNo));
+Log3 ($name, 2, "$name <$readingnameX>");
+
+    #my $readingname    = $attr{$name}{$oneattr};
     my $readingcmdname = $oneattr;
+    $readingname       =~ s/ .*//;
     $readingname       =~ s/:.*//;
 
     # only for "r" commands
@@ -329,6 +340,8 @@ GAEBUS_Get($@)
       unless ($readingname =~ /^\s*$/ or $readingname eq "1")
       {
         $readings{$readingname} = $readingcmdname;
+        $readingsCmdaddon{$readingname} = $cmdaddon;
+        
         #Log3 ($name, 2, "$name GetParams $readingname");
       }
     }
@@ -345,11 +358,12 @@ GAEBUS_Get($@)
   {
     my $readingname = $a[2];
     my $readingcmdname = $readings{$readingname};
+    my $cmdaddon = $readingsCmdaddon{$readingname};
 
     Log3 ($name, 4, "$name Get name $readingname");
     Log3 ($name, 4, "$name Get cmd r $readingcmdname");
 
-    my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $readingcmdname, "");
+    my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $readingcmdname, "", $cmdaddon);
 
     #return (defined($answer ? $answer : ""));
     return "$answer";
@@ -365,7 +379,7 @@ GAEBUS_Get($@)
 
     Log3 ($name, 3, "$name get cmd v $readingcmdname");
 
-    my $answer = GAEBUS_doEbusCmd ($hash, "v", $readingname, $readingcmdname, "");
+    my $answer = GAEBUS_doEbusCmd ($hash, "v", $readingname, $readingcmdname, "", "");
     #return (defined($answer ? $answer : ""));
     return "$answer";
 
@@ -555,6 +569,7 @@ GAEBUS_Attr(@)
 
     if ($attrname =~ /^.*$delimiter/) {
       my $reading = $attr{$name}{$attrname};
+      $reading    =~ s/ .*//;
       $reading    =~ s/:.*//;
 
       Log3 ($name, 3, "$name: delete reading: $reading");
@@ -569,8 +584,10 @@ GAEBUS_Attr(@)
     if (defined $attr{$name}{$attrname}) 
     {
       my $oldreading = $attr{$name}{$attrname};
+      $oldreading    =~ s/ .*//;
       $oldreading    =~ s/:.*//;
       my $newreading = $attrval;
+      $newreading    =~ s/ .*//;
       $newreading    =~ s/:.*//;
  
       if ($oldreading ne $newreading)
@@ -743,13 +760,14 @@ GAEBUS_ReadCSV($)
 }
 
 sub 
-GAEBUS_doEbusCmd($$$$$)
+GAEBUS_doEbusCmd($$$$$$)
 {
   my $hash           = shift;
   my $action         = shift; # "r" = set reading, "v" = verbose mode, "w" = write to ebus
   my $readingname    = shift;
   my $readingcmdname = shift;
   my $writeValues    = shift;
+  my $cmdaddon       = shift;
   my $actMessage;
   my $name = $hash->{NAME};
 
@@ -782,6 +800,7 @@ GAEBUS_doEbusCmd($$$$$)
     $cmd = "$io -f ";
     $cmd .= "-v " if ($action eq "v");
     $cmd .= "-c $class $var";
+    $cmd .= " $cmdaddon" if ($action eq "r");
   }
 
   Log3 ($name, 3, "$name execute $cmd");
@@ -847,7 +866,10 @@ GAEBUS_GetUpdates($)
     if ($oneattr =~ /^r.*$delimiter.*$delimiter.*$delimiter.*$/)
     {
 
-      my ($readingname, $doCntNo) = split (":", $attr{$name}{$oneattr}, 2); # split name from cycle number
+      my ($readingnameX, $cmdaddon) = split (" ", $attr{$name}{$oneattr}, 2);
+      $cmdaddon = "" unless (defined ($cmdaddon));
+
+      my ($readingname, $doCntNo) = split (":", $readingnameX, 2); # split name from cycle number
       $doCntNo = 1 unless (defined ($doCntNo));
 
       Log3 ($name, 5, "$name GetUpdates: $readingname:$doCntNo");
@@ -858,7 +880,7 @@ GAEBUS_GetUpdates($)
       #Log3 ($name, 2, "$name check modulo ".$hash->{UpdateCnt}." mod $doCntNo -> ".($hash->{UpdateCnt} % $doCntNo));
       if (($hash->{UpdateCnt} % $doCntNo) == 0)
       {
-        my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $oneattr, "");
+        my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $oneattr, "", $cmdaddon);
       }
 
       # limit number of reopens if ebusd cannot be reached
