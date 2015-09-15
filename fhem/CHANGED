@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  95_Dashboard: fixed access to uninitialized value
   - change:  74_AMAD: change set of STATE has been replaced by Readingsupdate
                       'state'
   - feature: 74_AMAD: commandref english translation, default $Id$ line
