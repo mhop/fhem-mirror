@@ -46,7 +46,7 @@ sub I2C_PCA9532_Initialize($) {
 	$hash->{SetFn}    = "I2C_PCA9532_Set";
 	$hash->{GetFn}    = "I2C_PCA9532_Get";
 	$hash->{I2CRecFn} = "I2C_PCA9532_I2CRec";
-	$hash->{AttrList} = "IODev do_not_notify:1,0 ignore:1,0 showtime:1,0".
+	$hash->{AttrList} = "IODev do_not_notify:1,0 ignore:1,0 showtime:1,0 ".
 											"poll_interval T0:slider,0,1,255 T1:slider,0,1,255 OnStartup InputPorts ".
 											"OutputPorts:multiple-strict,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 ".
 											"$readingFnAttributes";

@@ -57,7 +57,7 @@ sub I2C_MCP23008_Initialize($) {
 	$hash->{SetFn}    = "I2C_MCP23008_Set";
 	$hash->{GetFn}    = "I2C_MCP23008_Get";
 	$hash->{I2CRecFn} = "I2C_MCP23008_I2CRec";
-	$hash->{AttrList} = "IODev do_not_notify:1,0 ignore:1,0 showtime:1,0".
+	$hash->{AttrList} = "IODev do_not_notify:1,0 ignore:1,0 showtime:1,0 ".
                       "poll_interval OnStartup ".
                       "OutputPorts:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7 ".
                       "Pullup:multiple-strict,A0,A1,A2,A3,A4,A5,A6,A7 ".

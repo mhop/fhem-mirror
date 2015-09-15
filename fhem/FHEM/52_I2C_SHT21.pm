@@ -178,13 +178,24 @@ sub I2C_SHT21_I2CRec ($$) {
   while ( my ( $k, $v ) = each %$clientmsg ) { 																#erzeugen von Internals fuer alle Keys in $clientmsg die mit dem physical Namen beginnen
     $hash->{$k} = $v if $k =~ /^$pname/ ;
   } 
-	if ($clientmsg->{direction} && $clientmsg->{type} && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok") {
-		if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) {
-			Log3 $hash, 5, "empfangen: $clientmsg->{received}";
-			I2C_SHT21_GetTemp  ($hash, $clientmsg->{received}) if $clientmsg->{type} eq "temp" && $clientmsg->{nbyte} == 2;
-			I2C_SHT21_GetHum ($hash, $clientmsg->{received}) if $clientmsg->{type} eq "hum" && $clientmsg->{nbyte} == 2;
-		}
-	}
+	#alte Variante zur Temp Hum Unterscheidung
+    #if ( $clientmsg->{direction} && $clientmsg->{type} && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok" ) {
+	#	if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) {
+	#		Log3 $hash, 5, "empfangen: $clientmsg->{received}";
+	#		I2C_SHT21_GetTemp  ($hash, $clientmsg->{received}) if $clientmsg->{type} eq "temp" && $clientmsg->{nbyte} == 2;
+	#		I2C_SHT21_GetHum ($hash, $clientmsg->{received}) if $clientmsg->{type} eq "hum" && $clientmsg->{nbyte} == 2;
+	#	}
+	#}
+    
+    # Bit 1 of the two LSBs indicates the measurement type (‘0’: temperature, ‘1’ humidity)
+    if ( $clientmsg->{direction} && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok" ) {
+    	if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) {
+	    	Log3 $hash, 5, "empfangen: $clientmsg->{received}";    
+        	my @raw = split(" ",$clientmsg->{received});
+        	I2C_SHT21_GetTemp ($hash, $clientmsg->{received}) if !($raw[1] & 2) && $clientmsg->{nbyte} == 2;
+        	I2C_SHT21_GetHum  ($hash, $clientmsg->{received}) if  ($raw[1] & 2) && $clientmsg->{nbyte} == 2;
+        }
+    }
 }
 
 sub I2C_SHT21_GetTemp ($$) {
