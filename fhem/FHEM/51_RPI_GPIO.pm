@@ -80,7 +80,7 @@ sub RPI_GPIO_Define($$) {
 	#nix tun...ist ja schon da
  } elsif (-w "$gpiodir/export") {																																																					#gpio export Datei mit schreibrechten?
 	Log3 $hash, 4, "$name: write access to file $gpiodir/export, use it to export GPIO";
-	my $exp = IO::File->new("> $gpiodir/export");																																														#gpio ueber export anlegen 
+	my $exp = IO::File->new("> $gpiodir/export");																						#gpio ueber export anlegen 
 	print $exp "$hash->{RPI_pin}";
 	$exp->close;
  } else {
@@ -93,28 +93,42 @@ sub RPI_GPIO_Define($$) {
 		}
  }
  
-	# wait for Pin export (max 5s)
-	my $checkpath = qq($gpiodir/gpio$hash->{RPI_pin}/value);
-	my $counter = 100;
-	while( $counter ){
-		last if( -e $checkpath && -w $checkpath );
-		Time::HiRes::sleep( 0.05 );
-		$counter --;
-	}
-	unless( $counter ) {																												#abbrechen wenn export fehlgeschlagen
-		#nochmal probieren wenn keine Schreibrechte##########
-		if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {							#Abbbruch da kein gpio utility vorhanden
-			Log3 $hash, 1, "$name: can't export gpio$hash->{RPI_pin}, no write access to $gpiodir/export and " . $ret;
-			Log3 $hash, 1, "$name: failed to export pin gpio$hash->{RPI_pin}";
-        	return "$name: failed to export pin gpio$hash->{RPI_pin}";
-		} else {														#nutze GPIO Utility?
-			Log3 $hash, 4, "$name: using gpio utility to export pin (first export failed)";
-			RPI_GPIO_exuexpin($hash, "in");
+ # wait for Pin export (max 5s)
+ my $checkpath = qq($gpiodir/gpio$hash->{RPI_pin}/value);
+ my $counter = 100;
+ while( $counter ){
+ 	last if( -e $checkpath && -w $checkpath );
+ 	Time::HiRes::sleep( 0.05 );
+ 	$counter --;
+ }
+ unless( $counter ) {																												#abbrechen wenn export fehlgeschlagen
+ 	# nochmal probieren wenn keine Schreibrechte auf GPIO Dateien ##########
+ 	if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {							#Abbbruch da kein gpio utility vorhanden
+ 		if ( -e "$gpiodir/export") {
+  			Log3 $hash, 1, "$name: \"$gpiodir/export\" exists and is " . ( ( -w "$gpiodir/export") ? "" : "NOT " ) . "writable";
+		} else {
+ 			Log3 $hash, 1, "$name: gpio$hash->{RPI_pin}/value doesnt exist";
 		}
-		#####################################################
-#		Log3 $hash, 1, "$name: failed to export pin gpio$hash->{RPI_pin}";
-#       return "$name: failed to export pin gpio$hash->{RPI_pin}";
+		if(-e "$gpiodir/gpio$hash->{RPI_pin}") {
+			Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}\" exported but define aborted:";
+			if ( -e "$gpiodir/gpio$hash->{RPI_pin}/value") {
+				Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}/value\" exists and is " . ( ( -w "$gpiodir/gpio$hash->{RPI_pin}/value") ? "" : "NOT " ) . "writable";
+			} else {
+				Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}/value\" doesnt exist";
+			}
+			if ( -e "$gpiodir/gpio$hash->{RPI_pin}/direction") {
+				Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}/direction\" exists and is " . ( ( -w "$gpiodir/gpio$hash->{RPI_pin}/direction") ? "" : "NOT " ) . "writable";
+			} else {
+				Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}/direction\" doesnt exist";
+			}
+			Log3 $hash, 1, "$name: second attempt to export gpio$hash->{RPI_pin} failed: " . $ret;
+		}
+       	return "$name: failed to export pin gpio$hash->{RPI_pin}, see logfile";
+	} else {																				#nutze GPIO Utility fuer zweiten Exportversuch
+		Log3 $hash, 4, "$name: using gpio utility to export pin (first export via $gpiodir/export failed)";
+		RPI_GPIO_exuexpin($hash, "in");
 	}
+ }
 
  $hash->{fhem}{interfaces} = "switch";
  return undef;
