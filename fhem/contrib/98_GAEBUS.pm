@@ -11,7 +11,7 @@
 # 11.09.2015 : A.Goebel : add set w~ commands to set attributes for writing 
 # 11.09.2015 : A.Goebel : add set <write-reading> command to write to ebusd
 # 13.09.2015 : A.Goebel : increase timeout for reads from ebusd from 1.8 to 5.0
-# 13.09.2015 : A.Goebel : use html entities to display values from ".csv" files
+# 14.09.2015 : A.Goebel : use utf-8 coding to display values from ".csv" files
 
 package main;
 
@@ -20,6 +20,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use IO::Socket;
 use IO::Select;
+use Encode;
 
 sub GAEBUS_Attr(@);
 
@@ -181,6 +182,8 @@ GAEBUS_Set($@)
   #return "No $a[1] for dummies" if(IsDummy($name));
 
   #Log3 ($hash, 3, "ebus1: reopen $name");
+
+  #Log3 ($hash, 2, "$name: set $arg  $type invalid parameter");
 
   if ($type eq "reopen") {
     Log3 ($hash, 3, "ebus1: reopen");
@@ -608,7 +611,6 @@ GAEBUS_ProcessCSV($$)
   }
   else
   {
-
     my $line;
     my $buffer = "";
 
@@ -619,27 +621,30 @@ GAEBUS_ProcessCSV($$)
     $defCircuit =~  s,^.*/,,;
     $defCircuit =~  s/\.csv$//;
 
+    binmode(CSV, ':encoding(utf-8)');
     while (<CSV>)
     {
       next if /^#/;
       next if /^\s$/;
       s/\r//;
 
-      s/ä/\&auml;/g;
-      s/Ä/\&Auml;/g;
-      s/ü/\&uuml;/g;
-      s/Ü/\&Uuml;/g;
-      s/ö/\&ouml;/g;
-      s/Ö/\&Ouml;/g;
-      s/ß/\&szlig;/g;
+      #s/ä/\&auml;/g;
+      #s/Ä/\&Auml;/g;
+      #s/ü/\&Auml;/g;
+      #s/Ü/\&Uuml;/g;
+      #s/ö/\&ouml;/g;
+      #s/Ö/\&Ouml;/g;
+      #s/ß/\&szlig;/g;
       #s/"/\&quot;/g;
     
       chomp;
 
-      $line = $_;
+      $line = encode("UTF-8", $_);
       $line =~ s/ /_/g; # no blanks in names and comments
       $line =~ s/$delimiter/_/g; # clean up the delimiter within the text
       #$line =~ s/\|/_/g; # later used as delimiter in arguments
+
+      #Log3 ($hash, 2, "READ $file $line");
 
       my ($io, $circuit, $vname, $comment, @params) = split (",", $line, 5);
 
