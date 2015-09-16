@@ -139,6 +139,7 @@ SYSSTAT_InitSNMP($)
   } elsif ( !defined($session) ) {
     Log3 $name, 2, "$name: can't connect to host $host";
   } else {
+    $session->timeout(3);
     $hash->{session} = $session;
   }
 }
