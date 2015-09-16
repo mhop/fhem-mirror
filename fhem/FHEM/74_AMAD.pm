@@ -34,7 +34,7 @@ use Time::HiRes qw(gettimeofday);
 
 use HttpUtils;
 
-my $version = "0.6.1";
+my $version = "0.6.2";
 
 
 
@@ -771,25 +771,25 @@ sub AMAD_SelectSetCmd($$@) {
 <ul>
   <u><b>AMAD - Auto Magic Android Device</b></u>
   <br>
-  This module provides, <b><u>in cooperation with the Android APP Auto Magic</u></b>, a variety of information from Android devices.
-  The AndroidAPP Auto Magic (this 3rd party app  and costs 2.90Euro) works better than Tasker and is user-friendly.
-  The following states can be displayed:
+  This module provides, <b><u>combination with the Android APP Auto Magic</u></b>, a variety of information from Android devices.
+  The AndroidAPP Auto Magic (this 3rd party app costs 2.90Euro) works better than Tasker and is more user-friendly.<br>
+  The following information can be displayed:
   <ul>
     <li>State of Automagic on the device</li>
-    <li>Bluetooth On / Off</li>
-    <li>Bluetooth devices connected</li>
-    <li>Current music album played Media Player</li>
-    <li>Current music artist played Media Player</li>
-    <li>Current music title played Media Player</li>
-    <li>State of Android device - Online / Offline</li>
-    <li>Next alarm day</li>
-    <li>Next alarm time</li>
-    <li>Battery state %</li>
-    <li>Charging State - Charger connected / disconnected</li>
-    <li>Screen State On / Off</li>
-    <li>Screen Brightness</li>
-    <li>Full Screen Mode On / Off</li>
-    <li>Screen Orientation Auto / Landscape / Portrait</li>
+    <li>Bluetooth on / off</li>
+    <li>Connected Bluetooth devices </li>
+    <li>Current music album that is played my the media player</li>
+    <li>Current music artist that is played my the media player</li>
+    <li>Current music title that is played my the media player</li>
+    <li>State of the Android device - Online / Offline</li>
+    <li>Next alarm (day)</li>
+    <li>Next alarm (time)</li>
+    <li>Battery state in %</li>
+    <li>Charging state - charger connected / disconnected</li>
+    <li>Screen state on / off</li>
+    <li>Screen brightness</li>
+    <li>Full screen mode on / off</li>
+    <li>Screen orientation auto / landscape / portrait</li>
     <li>Default volume</li>
     <li>Media volume device speaker</li>
     <li>Media volume Bluetooth speaker</li>
@@ -797,10 +797,10 @@ sub AMAD_SelectSetCmd($$@) {
   <br>
   With some experience lots of information from the Android device can be shown in FHEM. This requires only small adjustments of the "Informations" flow
   <br><br>
-  With this module it is possible to control an Android device as follows.
+  With this module it is also possible to control an Android device as follows.
   <ul>
-    <li>State of the device (Online, Offline)</li>
-    <li>Media Player control (play, stop, next track, previous track)</li>
+    <li>State of the device (nnline, offline)</li>
+    <li>Media Player control ( play / stop / next track / previous track)</li>
     <li>Set next alarm time</li>
     <li>Open an app on the device</li>
     <li>Open a URL in the browser on the device</li>
@@ -808,23 +808,23 @@ sub AMAD_SelectSetCmd($$@) {
     <li>Adjust the screen brightness</li>
     <li>Switch to fullscreen mode</li>
     <li>Send a message which appears on the screen</li>
-    <li>Set screen orientation (Auto / Landscape / Portrait)</li>
+    <li>Set screen orientation (auto / landscape / portrait)</li>
     <li>Request new status report of the device</li>
-    <li>Set system commands (Reboot)</li>
+    <li>Set system commands (reboot)</li>
     <li>Send a message which will be announced (TTS)</li>
     <li>Default media volume</li>
   </ul>
   <br><br>
-  To perform actions and to obtain information you need the Android App Automagic and a matching Flow. The App you need to get from the app store (google play), 
+  To trigger actions and to obtain information you need the Android App Automagic and a matching Flow. The App you need to get from the app store (google play), 
   but the modul and the corresponding flow you get from me.
   <br><br>
-  <b>How used AMAD?</b>
+  <b>How to use AMAD?</b>
   <ul>
     <li>installed the app "Auto Magic Premium" from the App Store or the trial version from <a href="https://automagic4android.com/de/testversion">here</a></li>
     <li>installed the Flowset 74_AMADautomagicFlows$VERSION.xml from the folder $INSTALLFHEM/FHEM/lib/ to your Android device and first activates only the "information" flow.</li>
   </ul>
   <br>
-  Now you must define a FHEM device.
+  Next you need to define a FHEM device.
   <br><br>
   <a name="AMADdefine"></a>
   <b>Define</b>
@@ -837,8 +837,10 @@ sub AMAD_SelectSetCmd($$@) {
     </ul>
     <br>
     This statement creates a new AMAD device. The parameter &lt;IP-ADRESSE&lt; specifies the ip-address of the Android device.
-    The default interval is 180 seconds and can be changed via the Interval attribute. If you want to change the port, you can do this via the port attribute. 
-    <b>You should know what you're doing, because the TCP port is set into the 2 flows as HTTP Response trigger. Consequently, this must also be changed there.</b><br>
+    The default communication interval is set to 180 seconds and can be changed via attribute "interval". If you want to change the port, 
+    you can do this via the attribute "port". 
+    <b>You should know what you are doing, because this port is set in the HTTP response trigger of the 2 flows. Consequently, 
+    this must also be changed there.</b><br>
   </ul>
   <br><br>
   <b><u>Done! After connecting the device instance should already come in the first Readings within 3 minutes.</u></b>
@@ -847,12 +849,12 @@ sub AMAD_SelectSetCmd($$@) {
   <b>Readings</b>
   <ul>
     <li>automagic state - status messages from the AutomagicApp</li>
-    <li>bluetooth on / off - is on the device Bluetooth on or off</li>
+    <li>bluetooth on / off - is Bluetooth switched on or off on the device</li>
     <li>connectedBTdevices - a list of the connected devices</li>
     <li>current Music Album - currently abgespieltes Music Album of the media player used</li>
     <li>current music artist - currently played music artist of the media player used</li>
     <li>current Music Track - currently played music title of the media player used</li>
-    <li>deviceState - State of Android device, must itself be set with setreading e.g. about the attendance check. When offline is set, the interval is set off for information retrieval.</li>
+    <li>deviceState - State of the Android device, must itself be set with setreading e.g. about the attendance check. When offline is set, the interval is set off for information retrieval.</li>
     <li>flow_SetCommands active / inactive - indicates the status of SetCommands flow again</li>
     <li>flow_informations active / inactive - indicates the status of the information flow again</li>
     <li>lastSetCommandError - last error message from the set command successfully / not sent last status from the set command, command is successful - lastSetCommandState</li>
@@ -898,7 +900,7 @@ sub AMAD_SelectSetCmd($$@) {
     <li>screen fullscreen - Switches to full screen mode on / off. <b>Attribute SetFullscreen </b></li>
     <li>screenOrientation - Switches the screen orientation Auto / Landscape / Portrait. <b>Attribute setScreenOrientation</b></li>
     <li>system - set system commands from (only rooted devices). Reboot <b>Attribut root</b>, in the Auto Magic Settings "root function" must be set</li>
-    Must be separated as an attribute, or a comma, several app names are set in order to use openapp. The app name is arbitrary and only required for recognition. The same app name must flow in SetCommands on the left below the hash expression: "openapp" be in one of the 5 strands (one app per strand) entered in both diamonds. Thereafter, in the quadrangle selected the app which app through the attribute names should be started.
+    In order to use openApp you need an attribute where separated by a comma, several app names are set in order to use openapp. The app name is arbitrary and only required for recognition. The same app name must be used in the flow in SetCommands on the left below the hash expression: "openapp" be in one of the 5 paths (one app per path) entered in both diamonds. Thereafter, in the quadrangle selected the app which app through the attribute names should be started.
   </ul>
   <br><br>
   <a name="AMADstate"></a>
@@ -911,14 +913,14 @@ sub AMAD_SelectSetCmd($$@) {
   <br><br><br>
   <u><b>Application examples:</b></u>
   <ul><br>
-    I have the chargers for my Android devices on wireless switch sockets. a DOIF switches less than 30% the power outlet and more than 90% again. In the morning I'll wake up with music from my tablet in the bedroom. This involves the use of the wakeuptimer the RESIDENTS Modules. I stop the music manually. After that the weather forecast will be told (through TTS).<br>
+    I have the chargers for my Android devices on wireless switch sockets. a DOIF switches the charger on if the battery is below 30% and switches it off than the battery is charged 90% again. In the morning I'll wake up with music from my tablet in the bedroom. This involves the use of the wakeuptimer the RESIDENTS Modules. I stop the music manually. After that the weather forecast will be told (through TTS).<br>
     My 10 "Tablet in the living room is media player for the living room with Bluetooth speakers. The volume is automatically set down when the Fritzbox signals a incoming call on the living room handset.
   </ul>
   <br><br><br>
   <b><u>And finally I would like to say thank you.</u><br>
-  The biggest thank goes to my mentor Andre (justme1968), he told me with useful hints that helped me to understandPerl code and made programming a real fun.<br>
+  The biggest thank is for my mentor Andre (justme1968), who told me lots of useful hints that helped me to understandPerl code and made programming a real fun.<br>
   I would also like to thank Jens (jensb) who has supported me when I made my first steps in Perl code.<br>
-  And lastbut not least a special thank to PAH (Prof. Dr. Peter Henning), without his statement "We had all times of 'I do not know', that's no excuse," I would not have started to get interested in module development :-)<br><br>
+  And lastbut not least a special thank to PAH (Prof. Dr. Peter Henning), without his statement "Keine Ahnung hatten wir alle mal, das ist keine Ausrede" (We had all times of 'I do not know', that's no excuse), - I would not have started to get interested in module development of FHEM :-)<br><br>
   Thanks to J&uuml;rgen (ujaudio) for the english translation</b>
 </ul>
 

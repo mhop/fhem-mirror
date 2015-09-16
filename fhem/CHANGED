@@ -1,9 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  74_AMAD: improved translation englisch
   - bugfix:  95_Dashboard: fixed access to uninitialized value
   - change:  74_AMAD: change set of STATE has been replaced by Readingsupdate
                       'state'
-  - feature: 74_AMAD: commandref english translation, default $Id$ line
+  - feature: 74_AMAD: commandref english translation, insert default version ID
   - feature: SYSMON: telnet login with no user/pass required
   - bugfix:  95_Dashboard: the sort order in columns is now correctly read
                from the sorting attribute.
