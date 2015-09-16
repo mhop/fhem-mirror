@@ -13,6 +13,7 @@
 # 13.09.2015 : A.Goebel : increase timeout for reads from ebusd from 1.8 to 5.0
 # 14.09.2015 : A.Goebel : use utf-8 coding to display values from ".csv" files
 # 14.09.2015 : A.Goebel : add optional parameter [FIELD[.N]] of read from ebusd to reading name
+# 15.09.2015 : A.Goebel : get rid of perl warnings when attribute value is empty
 
 package main;
 
@@ -325,9 +326,12 @@ GAEBUS_Get($@)
     my ($readingnameX, $cmdaddon) = split (" ", $attr{$name}{$oneattr}, 2);
     $cmdaddon = "" unless (defined ($cmdaddon));
 
+    next unless defined ($readingnameX);
+    next if ($readingnameX =~ /^\s*$/);
+    next if ($readingnameX eq "1");
+
     my ($readingname, $doCntNo) = split (":", $readingnameX, 2); # split name from cycle number
     $doCntNo = 1 unless (defined ($doCntNo));
-Log3 ($name, 2, "$name <$readingnameX>");
 
     #my $readingname    = $attr{$name}{$oneattr};
     my $readingcmdname = $oneattr;
@@ -337,13 +341,10 @@ Log3 ($name, 2, "$name <$readingnameX>");
     # only for "r" commands
     if ($oneattr =~ /^r.*$delimiter.*$delimiter.*$delimiter.*$/)
     {
-      unless ($readingname =~ /^\s*$/ or $readingname eq "1")
-      {
-        $readings{$readingname} = $readingcmdname;
-        $readingsCmdaddon{$readingname} = $cmdaddon;
+      $readings{$readingname} = $readingcmdname;
+      $readingsCmdaddon{$readingname} = $cmdaddon;
         
-        #Log3 ($name, 2, "$name GetParams $readingname");
-      }
+      #Log3 ($name, 2, "$name GetParams $readingname");
     }
 
     #Log3 ($name, 4, "$name Get attr name $readingname");
@@ -869,13 +870,14 @@ GAEBUS_GetUpdates($)
       my ($readingnameX, $cmdaddon) = split (" ", $attr{$name}{$oneattr}, 2);
       $cmdaddon = "" unless (defined ($cmdaddon));
 
+      next unless defined ($readingnameX);
+      next if ($readingnameX =~ /^\s*$/);
+      next if ($readingnameX eq "1");
+
       my ($readingname, $doCntNo) = split (":", $readingnameX, 2); # split name from cycle number
       $doCntNo = 1 unless (defined ($doCntNo));
 
       Log3 ($name, 5, "$name GetUpdates: $readingname:$doCntNo");
-
-      next if ($readingname =~ /^\s*$/);
-      next if ($readingname eq "1");
 
       #Log3 ($name, 2, "$name check modulo ".$hash->{UpdateCnt}." mod $doCntNo -> ".($hash->{UpdateCnt} % $doCntNo));
       if (($hash->{UpdateCnt} % $doCntNo) == 0)
