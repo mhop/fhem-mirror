@@ -77,20 +77,22 @@ sub FB_CALLLIST_Define($$)
 
     if(!defined($a[2]))
     {
-        $retval = "FB_CALLLIST_define: you must specify a FB_CALLMONITOR object for using FB_CALLLIST";
-        return $retval;
+        return "FB_CALLLIST_define: you must specify a device name for using FB_CALLLIST";
     }
     
     if(@a != 3) 
     {
-        $retval = "wrong define syntax: define <name> FB_CALLLIST <FB_CALLMONITOR name>";
-        return $retval;
+        return "wrong define syntax: define <name> FB_CALLLIST <name>";
     }
-
-    unless(defined($defs{$a[2]}) and $defs{$a[2]}->{TYPE} eq "FB_CALLMONITOR")
+    
+    unless(defined($defs{$a[2]}))
     {
-        $retval = "FB_CALLLIST_Define: $a[2] does not exists or ist not of type FB_CALLMONITOR";
-        return $retval;
+        return "FB_CALLLIST_define: the selected device ".$a[2]." does not exist.";
+    }
+    
+    unless($defs{$a[2]}->{TYPE} eq "FB_CALLMONITOR")
+    {
+        Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device ".$a[2]." ist not of type FB_CALLMONITOR";
     }
 
     $hash->{FB} = $a[2];
