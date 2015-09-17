@@ -475,7 +475,7 @@ sub LW12_updateStatus( $ ) {
 	return if IsDisabled($name);
 	
 	my $res = LW12_Write( $hash, "\x{EF}\x{01}\x{77}" );	
-	if ($res != 0){
+	if (hex($res) != 0){
     	$res = uc($res);
     	my @colors = ( $res =~ m/..?/g );
     
