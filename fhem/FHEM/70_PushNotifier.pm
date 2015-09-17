@@ -52,6 +52,10 @@ PushNotifier_Define($$)
     return "$deviceID is not a valid regex for <deviceID>";
   }
   
+  if (!eval { require Try::Tiny }) {
+    return "Perl module Try::Tiny not installed but is needed by this module. Please install it first (e.g. \"cpan -i Try::Tiny\")";
+  }
+  
   $hash->{STATE} = 'Initialized';
 
  if(defined($apiToken) && defined($app)&& defined($user)&& defined($passwd)&& defined($deviceID)) {
