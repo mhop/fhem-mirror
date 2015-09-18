@@ -34,7 +34,7 @@ use Time::HiRes qw(gettimeofday);
 
 use HttpUtils;
 
-my $version = "0.6.2";
+my $version = "0.6.3";
 
 
 
@@ -85,7 +85,7 @@ my ( $hash, $def ) = @_;
     $hash->{helper}{infoErrorCounter} = 0;
     $hash->{helper}{setCmdErrorCounter} = 0;
 
-    Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{HOST} and interval $hash->{INTERVAL} (sec)";
+    Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and interval $hash->{INTERVAL} (sec)";
 
     AMAD_GetUpdateLocal( $hash );
 
