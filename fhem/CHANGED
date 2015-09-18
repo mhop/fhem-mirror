@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_AMAD: fixed hash->{PORT} in log output
   - bugfix:  70_PushNotifier: - require Try::Tiny
   - feature: 70_Jabber: - Added OTR (Off the Record) end to end encryption
                         - Added MUC (Multi-User-Channel) joining and handling
