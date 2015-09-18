@@ -132,12 +132,20 @@ sub I2C_BMP180_Init($$) {
 	$hash->{I2C_Address} = hex(BMP180_I2C_ADDRESS);
 	my $msg = '';
 	# create default attributes
-	$msg = CommandAttr(undef, $name . ' poll_interval 5');
-	$msg = CommandAttr(undef, $name . ' oversampling_settings 3');
-	if ($msg) {
-		Log3 ($hash, 1, $msg);
-		return $msg;
-	}
+	if (AttrVal($name, 'poll_interval', '?') eq '?') {  
+    	$msg = CommandAttr(undef, $name . ' poll_interval 5');
+    	if ($msg) {
+      		Log3 ($hash, 1, $msg);
+      		return $msg;
+    	}
+  }
+  if (AttrVal($name, '', '?') eq '?') {  
+    	$msg = CommandAttr(undef, $name . ' oversampling_settings 3');
+    	if ($msg) {
+      		Log3 ($hash, 1, $msg);
+      		return $msg;
+    	}
+  }
 	
 	if ($hash->{HiPi_used}) {
 		my $dev = shift @$args;

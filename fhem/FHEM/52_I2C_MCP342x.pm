@@ -113,11 +113,13 @@ sub I2C_MCP342x_Init($$) {
 
 	my $msg = '';
 	# create default attributes
-	#$msg = CommandAttr(undef, $name . ' poll_interval 5');
-	if ($msg) {
-		Log3 ($hash, 1, $msg);
-		return $msg;
-	}
+	if (AttrVal($name, 'poll_interval', '?') eq '?') {  
+    	$msg = CommandAttr(undef, $name . ' poll_interval 5');
+    	if ($msg) {
+      		Log3 ($hash, 1, $msg);
+      		return $msg;
+    	}
+  }
 	AssignIoPort($hash);	
 	$hash->{STATE} = 'Initialized';
 
@@ -158,7 +160,7 @@ sub I2C_MCP342x_Attr (@) {# hier noch Werteueberpruefung einfuegen
 			RemoveInternalTimer($hash);
 		} elsif ($val > 0) {
 			RemoveInternalTimer($hash);
-			InternalTimer(1, 'I2C_MCP23017_Poll', $hash, 0);
+			InternalTimer(1, 'I2C_MCP342x_Poll', $hash, 0);
 		} else {
 			$msg = 'Wrong poll intervall defined. poll_interval must be a number > 0';
 		} 
