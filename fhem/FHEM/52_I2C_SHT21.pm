@@ -78,11 +78,13 @@ sub I2C_SHT21_Init($$) {
 
 	my $msg = '';
 	# create default attributes
-	$msg = CommandAttr(undef, $name . ' poll_interval 5');
-	if ($msg) {
-		Log3 ($hash, 1, $msg);
-		return $msg;
-	}
+	if (AttrVal($name, 'poll_interval', '?') eq '?') {  
+    	$msg = CommandAttr(undef, $name . ' poll_interval 5');
+    	if ($msg) {
+      		Log3 ($hash, 1, $msg);
+      		return $msg;
+    	}
+  }
 	AssignIoPort($hash);	
 	$hash->{STATE} = 'Initialized';
 
