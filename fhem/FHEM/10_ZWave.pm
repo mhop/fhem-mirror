@@ -202,7 +202,11 @@ my %zwave_class = (
   CRC_16_ENCAP             => { id => '56' }, # Parse is handled in the code
   APPLICATION_CAPABILITY   => { id => '57' },
   ZIP_ND                   => { id => '58' },
-  ASSOCIATION_GRP_INFO     => { id => '59' },
+  ASSOCIATION_GRP_INFO     => { id => '59',
+    get   => { associationGroupName => "01%02x",
+               associationGroupCmdList => "0500%02x" },
+    parse => { "..5902(..)(.*)"=> '"assocGroupName_$1:".pack("H*", $2)',
+               "..5906(..)..(.*)"=> '"assocGroupCmdList_$1:".$2' } },
   DEVICE_RESET_LOCALLY     => { id => '5a',
     parse => { "025a01"    => "deviceResetLocally:yes" } },
   CENTRAL_SCENE            => { id => '5b',
@@ -3149,6 +3153,15 @@ s2Hex($)
     return the number of association groups<br>
     </li>
 
+  <br><br><b>Class ASSOCIATION_GRP_INFO</b>
+  <li>associationGroupName groupId<br>
+    return the name of association groups
+    </li>
+  <li>associationGroupCmdList groupId<br>
+    return Command Classes and Commands that will be sent to associated
+    devices in this group<br>
+    </li>
+
   <br><b>Class BASIC</b>
   <li>basicStatus<br>
     return the status of the node as basicReport:XY. The value (XY) depends on
@@ -3417,6 +3430,10 @@ s2Hex($)
   <br><br><b>Class ASSOCIATION</b>
   <li>assocGroup_X:Max Y Nodes A,B,...</li>
   <li>assocGroups:X</li>
+
+  <br><br><b>Class ASSOCIATION_GRP_INFO</b>
+  <li>assocGroupName_X:name</li>
+  <li>assocGroupCmdList_X:AABBCCDD...</li>
 
   <br><br><b>Class BASIC</b>
   <li>basicReport:XY</li>
