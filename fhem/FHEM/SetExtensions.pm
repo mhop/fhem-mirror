@@ -25,8 +25,8 @@ SetExtensions($$@)
     "toggle"        => 0
   );
 
-  my $hasOn  = ($list =~ m/\bon\b/);
-  my $hasOff = ($list =~ m/\boff\b/);
+  my $hasOn  = ($list =~ m/(^| )on\b/);
+  my $hasOff = ($list =~ m/(^| )off\b/);
   my $value = Value($name);
   my $em = AttrVal($name, "eventMap", undef);
   if($em) {
