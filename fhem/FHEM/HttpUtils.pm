@@ -62,7 +62,7 @@ HttpUtils_Close($)
   my ($hash) = @_;
   delete($hash->{FD});
   delete($selectlist{$hash});
-  $hash->{conn}->close() if($hash->{conn});
+  $hash->{conn}->close() if(defined($hash->{conn}));
   delete($hash->{conn});
   delete($hash->{hu_sslAdded});
   delete($hash->{hu_filecount});
