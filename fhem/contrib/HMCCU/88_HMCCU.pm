@@ -2,7 +2,7 @@
 #
 #  88_HMCCU.pm
 #
-#  $Id:$
+#  $Id$
 #
 #  Version 1.7
 #
