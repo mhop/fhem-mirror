@@ -272,12 +272,16 @@ RSS_getScript() {
 
 sub
 RSS_HTMLHead($$) {
-  my ($title,$refresh) = @_;
+  my ($name,$refresh) = @_;
+  
+  my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
+  
   
   my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
   my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
   my $scripts= RSS_getScript();
-  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$scripts</head>\n";
+  my $viewport= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0\"/>";
+  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$name</title>\n$viewport\n$scripts</head>\n";
 }
 
 
