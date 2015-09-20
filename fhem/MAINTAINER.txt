@@ -134,6 +134,8 @@ FHEM/34_SWAP.pm              justme1968           http://forum.fhem.de Sonstige 
 FHEM/35_SWAP_0000002200000003.pm     justme1968   http://forum.fhem.de Sonstige Systeme
 FHEM/35_SWAP_0000002200000008.pm     justme1968   http://forum.fhem.de Sonstige Systeme
 FHEM/36_EC3000.pm            justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/36_EleroDrive.pm        HCS                  http://forum.fhem.de Sonstige Systeme
+FHEM/36_EleroStick.pm        HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_JeeLink.pm           justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/36_PCA301.pm            justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/36_LaCrosse.pm          HCS                  http://forum.fhem.de Sonstige Systeme
