@@ -221,7 +221,7 @@ hsb2rgb ($$$) {
     my $g   = int( $rgb[1] * 255 );
     my $b   = int( $rgb[2] * 255 );
 
-    return ( $h, $s, $bri );
+    return ( $r, $g, $b );
 }
 
 sub
