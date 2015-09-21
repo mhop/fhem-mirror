@@ -208,7 +208,7 @@ sub I2C_MCP342x_Get($@) {
 	my $cmd =  $a[1];
     
 	my $rex = "^[1-" . $hash->{channels} . "]\$";
-	if ($cmd =~ m/$rex/i) {
+	if (defined $cmd && $cmd =~ m/$rex/i) {
     	my $resol   = defined $a[2] ? $a[2] : AttrVal($hash->{NAME},("ch" . $cmd . "resolution"),"12");
 		return "Wrong resolution, use 12, 14, 16 or 18" unless $resol =~ m/^1(2|4|6|8)$/i;
 		my $gain    = defined $a[3] ? $a[3] : AttrVal($hash->{NAME},("ch" . $cmd . "gain"),"1");
@@ -228,8 +228,8 @@ sub I2C_MCP342x_Get($@) {
 			I2C_MCP342x_readvoltage($hash,$_,$resol,$gain); 
         }
     	my @gets = ('1', '2');
-        push(@gets,('3', '4')) if $hash->{channels} == 4; 
-		return 'Unknown argument ' . $cmd . ', choose one of ' . join(' ', @gets)
+      push(@gets,('3', '4')) if $hash->{channels} == 4; 
+		  return 'Unknown argument' . (defined $cmd ? (" " . $cmd) : "" ) . ', choose one of ' . join(' ', @gets)
 	}
 }
 
