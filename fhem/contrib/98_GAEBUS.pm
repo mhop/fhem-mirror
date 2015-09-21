@@ -14,6 +14,9 @@
 # 14.09.2015 : A.Goebel : use utf-8 coding to display values from ".csv" files
 # 14.09.2015 : A.Goebel : add optional parameter [FIELD[.N]] of read from ebusd to reading name
 # 15.09.2015 : A.Goebel : get rid of perl warnings when attribute value is empty
+# 16.09.2015 : A.Goebel : allow write to parameters protected by #install
+# 21.09.2015 : A.Goebel : implement BlockingCall Interface
+
 
 package main;
 
@@ -23,6 +26,7 @@ use Time::HiRes qw(gettimeofday);
 use IO::Socket;
 use IO::Select;
 use Encode;
+use Blocking;
 
 sub GAEBUS_Attr(@);
 
@@ -34,6 +38,10 @@ sub GAEBUS_Shutdown($);
 
 sub GAEBUS_doEbusCmd($$$$$$);
 sub GAEBUS_GetUpdates($);
+
+sub GAEBUS_GetUpdatesDoit($);
+sub GAEBUS_GetUpdatesDone($);
+sub GAEBUS_GetUpdatesAborted($);
 
 my %gets = (    # Name, Data to send to the GAEBUS, Regexp for the answer
 #  "raw"      => ["r", '.*'],
@@ -146,7 +154,7 @@ GAEBUS_Define($$)
   my $ret = GAEBUS_OpenDev($hash, 0);
 
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
+  InternalTimer(gettimeofday()+10, "GAEBUS_GetUpdates", $hash, 0);
 
   return undef;
 }
@@ -158,6 +166,9 @@ GAEBUS_Undef($$)
 {
   my ($hash, $arg) = @_;
   GAEBUS_CloseDev($hash); 
+
+  BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
+
   return undef;
 }
 
@@ -271,7 +282,6 @@ GAEBUS_Set($@)
 
     if (defined ($writings{$type}))
     {
-      # HERE
       foreach my $oneattr (sort keys %{$attr{$name}})
       {
         next unless ($oneattr =~ /^w.*$delimiter.*$delimiter.*$delimiter.*$/);
@@ -366,8 +376,8 @@ GAEBUS_Get($@)
 
     my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $readingcmdname, "", $cmdaddon);
 
-    #return (defined($answer ? $answer : ""));
-    return "$answer";
+    #return "$answer";
+    return undef;
 
   }
 
@@ -399,8 +409,6 @@ GAEBUS_Get($@)
 
   #GAEBUS_SimpleWrite($hash, "B".$gets{$a[1]}[0] . $arg);
 
-# HERE READ
-#  $rsp = GAEBUS_SimpleRead($hash);
 
   if(!defined($rsp)) {
     GAEBUS_Disconnected($hash);
@@ -792,6 +800,9 @@ GAEBUS_doEbusCmd($$$$$$)
   my $cmd = "";
 
   if ($action eq "w") {
+
+    $class =~ s/install/#install/;
+
     $cmd = "$io ";
     $cmd .= "-c $class $var ";
     $cmd .= "$writeValues";
@@ -833,14 +844,16 @@ GAEBUS_doEbusCmd($$$$$$)
 
         if ($action eq "r") {
           if (defined ($readingname)) {
+            #  BlockingCall changes
             readingsSingleUpdate ($hash,  $readingname, "$actMessage", 1);
+            return $readingname."|".$actMessage;
           }
         }
 
       }
     } 
 
-    return undef if ($action eq "r");
+    #return undef if ($action eq "r");
     return $actMessage;
   }
   else
@@ -854,12 +867,39 @@ sub
 GAEBUS_GetUpdates($)
 {
   my ($hash) = @_;
+
   my $name = $hash->{NAME};
+
+  Log3 $hash, 4, "$hash->{NAME} start GetUpdates2";
+
+  $hash->{UpdateCnt} = $hash->{UpdateCnt} + 1;
+
+  $hash->{helper}{RUNNING_PID} = BlockingCall("GAEBUS_GetUpdatesDoit", $name, "GAEBUS_GetUpdatesDone", 120, "GAEBUS_GetUpdatesAborted", $hash) 
+    unless(exists($hash->{helper}{RUNNING_PID}));
+
+}
+
+sub 
+GAEBUS_GetUpdatesDoit($)
+{
+  my ($string) = (@_);
+  #my ($name, $nochwas)  = split ("|", $string);
+  my ($name)   = $string;
+  my ($hash) = $defs{$name};
 
   my $readingname = "";
   my $tryOpenCnt  = 2; # no of tries to open the device, before giving up
 
-  $hash->{UpdateCnt} = $hash->{UpdateCnt} + 1;
+  my $readingsToUpdate = "";
+
+  # don't use socket inherited from fhem by BlockingCall.pm
+  delete($hash->{TCPDev});
+  $hash->{STATE} = "pleaseReconnect";
+  my $ret = GAEBUS_OpenDev($hash, 0);
+  if (($hash->{STATE} ne "Connected") or (!$hash->{TCPDev}->connected()) )
+  {
+    return "$name";
+  }
 
   foreach my $oneattr (keys %{$attr{$name}})
   {
@@ -882,7 +922,7 @@ GAEBUS_GetUpdates($)
       #Log3 ($name, 2, "$name check modulo ".$hash->{UpdateCnt}." mod $doCntNo -> ".($hash->{UpdateCnt} % $doCntNo));
       if (($hash->{UpdateCnt} % $doCntNo) == 0)
       {
-        my $answer = GAEBUS_doEbusCmd ($hash, "r", $readingname, $oneattr, "", $cmdaddon);
+        $readingsToUpdate .= "|".GAEBUS_doEbusCmd ($hash, "r", $readingname, $oneattr, "", $cmdaddon);
       }
 
       # limit number of reopens if ebusd cannot be reached
@@ -898,9 +938,52 @@ GAEBUS_GetUpdates($)
     }
   }
 
-  InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 1);
+  # returnvalue for BlockingCall ... done routine
+  return "$name".$readingsToUpdate;
+
 
 }
+
+sub 
+GAEBUS_GetUpdatesDone($)
+{
+  my ($string) = @_;
+
+  return unless(defined($string));
+
+  my @a = split("\\|",$string);
+  my ($hash) = $defs{$a[0]};
+  my $name = $hash->{NAME};
+
+  delete($hash->{helper}{RUNNING_PID});
+
+  #Log3 ($name, 2, "$name: GetUpdatesDoit returned $string");
+ 
+  readingsBeginUpdate ($hash);
+  for (my $i = 1; $i < $#a; $i = $i + 2) 
+  {
+    readingsBulkUpdate ($hash, $a[$i], $a[$i+1]);
+  }
+  readingsEndUpdate($hash, 1);
+  
+  InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
+
+}
+
+
+sub 
+GAEBUS_GetUpdatesAborted($)
+{
+  my ($hash) = @_;
+
+  delete($hash->{helper}{RUNNING_PID});
+
+  Log3 $hash->{NAME}, 3, "BlockingCall for ".$hash->{NAME}." was aborted";
+
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
+}
+
 
 1;
 
