@@ -139,7 +139,7 @@ sub I2C_BMP180_Init($$) {
       		return $msg;
     	}
   }
-  if (AttrVal($name, '', '?') eq '?') {  
+  if (AttrVal($name, 'oversampling_settings', '?') eq '?') {  
     	$msg = CommandAttr(undef, $name . ' oversampling_settings 3');
     	if ($msg) {
       		Log3 ($hash, 1, $msg);
