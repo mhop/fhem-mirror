@@ -97,14 +97,14 @@ my %zwave_class = (
     parse => { "..3202(.*)" => 'ZWave_meterParse($hash, $1)',
                "..3204(.*)" => 'ZWave_meterSupportedParse($hash, $1)' } },
   COLOR_CONTROL            => { id => '33',
-    get   => { ccCapabilityGet  => '01', # no more args
-               ccStatus    => '03', # no more args
+    get   => { ccCapability=> '01', # no more args
+               ccStatus    => '03%02x',
              },
     set   => { # Forum #36050
                rgb         => '050a0000010002%02x03%02x04%02x',
                wcrgb       => '050a00%02x01%02x02%02x03%02x04%02x' },
-    parse => { "043302(.*)"=> 'ccCapabilityGetResponse:$1',
-               "043304(.*)"=> 'ccStatusResponse:$1' } },
+    parse => { "043302(.*)"=> '"ccCapability:$1"',
+               "043304(..)(.*)"=> '"ccStatus_$1:$2"' } },
   ZIP_ADV_CLIENT           => { id => '34' },
   METER_PULSE              => { id => '35' },
   BASIC_TARIFF_INFO        => { id => '36' },
@@ -3186,6 +3186,13 @@ s2Hex($)
     request the clock data
     </li>
 
+  <br><br><b>Class COLOR_CONTROL</b>
+  <li>ccCapabilities<br>
+    return capabilities.</li>
+  <li>ccStatus channelId<br>
+    return status of channel ChannelId.
+    </li>
+
   <br><br><b>Class CONFIGURATION</b>
   <li>config cfgAddress<br>
     return the value of the configuration parameter cfgAddress. The value is
@@ -3461,6 +3468,10 @@ s2Hex($)
   <br><br><b>Class CLOCK</b>
   <li>clock:get</li>
   <li>clock:[mon|tue|wed|thu|fri|sat|sun] HH:MM</li>
+
+  <br><br><b>Class COLOR_CONTROL</b>
+  <li>ccCapabilities:XY</li>
+  <li>ccStatus_X:Y</li>
 
   <br><br><b>Class CONFIGURATION</b>
   <li>config_X:Y<br>
