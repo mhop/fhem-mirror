@@ -3865,9 +3865,9 @@ readingsBulkUpdate($$$@)
     my $attreour = $hash->{".attreour"};
 
     # determine whether the reading is listed in any of the attributes
-    my $eocr = $attreocr && (my @eocrv=grep { my $l = $_;
-                                            $l =~ s/:.*//;
-                                            ($reading=~ m/^$l$/) ? $_ : undef} @{$attreocr});
+    my $eocr = $attreocr &&
+               ( my @eocrv = grep { my $l = $_; $l =~ s/:.*//;
+                   ($reading=~ m/^$l$/) ? $_ : undef} @{$attreocr});
     my $eour = $attreour && grep($reading =~ m/^$_$/, @{$attreour});
 
     # check if threshold is given
@@ -3875,15 +3875,26 @@ readingsBulkUpdate($$$@)
     if( $eocr
         && $eocrv[0] =~ m/.*:(.*)/ ) {
       my $threshold = $1;
+      my $ov = $value;
 
-      $value =~ s/[^\d\.\-]//g; # We expect only numbers here.
-      my $last_value = $hash->{".attreocr-threshold$reading"};
-      if( !defined($last_value) ) {
-        $hash->{".attreocr-threshold$reading"} = $value;
-      } elsif( abs($value-$last_value) < $threshold ) {
-        $eocr = 0;
+      $value =~ s/[^\d\.\-eE]//g; # We expect only numbers here.
+      my $isNum = looks_like_number($value);
+      if(!$isNum) {   # Forum #41083
+        $value = $ov;
+        $value =~ s/[^\d\.\-]//g;
+        $isNum = looks_like_number($value);
+      }
+      if($isNum) {
+        my $last_value = $hash->{".attreocr-threshold$reading"};
+        if( !defined($last_value) ) {
+          $hash->{".attreocr-threshold$reading"} = $value;
+        } elsif( abs($value-$last_value) < $threshold ) {
+          $eocr = 0;
+        } else {
+          $hash->{".attreocr-threshold$reading"} = $value;
+        }
       } else {
-        $hash->{".attreocr-threshold$reading"} = $value;
+        $value = $ov;
       }
     }
 
