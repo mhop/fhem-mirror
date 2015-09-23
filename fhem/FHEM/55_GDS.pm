@@ -1,4 +1,4 @@
-# $Id: 55_GDS.pm 8080 2015-02-24 14:36:53Z betateilchen $
+# $Id: 55_GDS.pm 8677 2015-06-01 17:11:36Z betateilchen $
 ####################################################################################################
 #
 #	55_GDS.pm
@@ -1024,7 +1024,11 @@ sub getListStationsDropdown($){
 	my $name = $hash->{NAME};
 	my ($line, $liste, @a);
 
-	open WXDATA, $tempDir.$name."_conditions";
+my $filename = $tempDir.$name."_conditions";
+my $filesize = -s $filename;
+return unless $filesize != 0;
+
+	open WXDATA, $filename;
 	while (chomp($line = <WXDATA>)) {
 		push @a, trim(substr(latin1ToUtf8($line),0,19));
 	}
