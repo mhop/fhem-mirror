@@ -338,9 +338,11 @@ sub FRITZBOX_Set($$@)
       # }
    } 
    elsif ( lc $cmd eq 'checkapis') {
-      Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
+      Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
       $hash->{APICHECKED} = 0;
+      $hash->{fhem}{LOCAL} = 1;
       FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
+      $hash->{fhem}{LOCAL} = 0;
       return undef;
    } 
    elsif ( lc $cmd eq 'customerringtone') {
@@ -4491,6 +4493,11 @@ sub FRITZBOX_fritztris($)
          Calls for 'duration' seconds (default 60) the given number from an internal port (default 1 or attribute 'ringWithIntern'). If the call is taken a text or sound can be played as music on hold (moh). The internal port will also ring.
       </li><br>
 
+      <li><code>set &lt;name&gt; checkAPIs</code>
+         <br>
+         Restarts the initial check of the programming interfaces of the FRITZ!BOX.
+      </li><br>
+
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;fullFilePath&gt;</code>
          <br>
          Uploads the file fullFilePath on the given handset. Only mp3 or G722 format is allowed.
@@ -4828,13 +4835,20 @@ sub FRITZBOX_fritztris($)
          <br>
          Ruf f&uuml;r 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1 oder das Attribut 'ringWithIntern'). Wenn der Angerufene abnimmt, h&ouml;rt er die Wartemusik oder den angegebenen Text oder Klang.
          Der interne Telefonanschluss klingelt ebenfalls.
+         <br>
+         Ben&ouml;tigt die API: Telnet oder webcm.
+      </li><br>
+
+      <li><code>set &lt;name&gt; checkAPIs</code>
+         <br>
+         Startet eine erneute Abfrage der exitierenden Programmierschnittstellen der FRITZ!BOX.
       </li><br>
 
       <li><code>set &lt;name&gt; customerRingTone &lt;internalNumber&gt; &lt;MP3DateiInklusivePfad&gt;</code>
          <br>
          L&auml;dt die MP3-Datei als Klingelton auf das angegebene Telefon. Die Datei muss im Dateisystem der Fritzbox liegen.
          <br>
-         Das Hochladen dauert etwa eine Minute bis der Klingelton verf&uuml;gbar ist.
+         Das Hochladen dauert etwa eine Minute bis der Klingelton verf&uuml;gbar ist. (API: Telnet)
       </li><br>
 
       <li><code>set &lt;name&gt; dect &lt;on|off&gt;</code>
@@ -4851,6 +4865,8 @@ sub FRITZBOX_fritztris($)
          Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden. Ben&ouml;tigt die API: Telnet oder webcm.
          <br>
          Achtung! Die Fritz!Box erm&ouml;glicht auch eine Weiterleitung in Abh&auml;ngigkeit von der anrufenden Nummer. Diese Art der Weiterleitung kann hiermit nicht geschaltet werden. 
+         <br>
+         Ben&ouml;tigt die API: Telnet oder webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
