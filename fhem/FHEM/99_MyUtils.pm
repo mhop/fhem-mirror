@@ -190,7 +190,7 @@ sub RollRunterSchlitz($;$) {
 
     Dbg("RollChg: $roll - runter schlitz($delay)\n");
     myfhem("define r".$i." at +".$t." set ".$roll." closes");
-    myfhem("define ru".$i." at +".$t2." set ".$roll." up 7");
+    myfhem("define ru".$i." at +".$t2." set ".$roll." up 6");
 }
 
 sub RollHoch($;$) {
@@ -236,6 +236,9 @@ sub IsLater($) {
     return(0);
 }
 
+
+
+# Nach dem Wechsel auf !sonne noch 2Std warten
 sub IsWetterSonneWait($)  {
     my ($wett)=@_;
 
@@ -283,12 +286,14 @@ sub RollCheck() {
     my $wett=ReadingsVal("wetter", "code", 99);
     my $sr=Value("sonnenrichtung");
 
-    my $sonneblock=IsWetterSonneWait($wett);
+    # Nach wechsel von sonne auf !sonne blockert ? 
+    my $sonneblock=IsWetterSonneWait($wett); 
 
     for $r ( @rolls ) {
 
 	my $fen="Closed";
 	my $tempH=0;
+        my $tempL=0;
 	my $sonne=0;
         my $skipRunter=0;
         my $skipHoch=0;
@@ -297,8 +302,11 @@ sub RollCheck() {
 
         # Raum zu warm und aussentemp hoch ?
         $temp=ReadingsVal($r->{temp},"measured-temp", 99);
-	if($temp > $r->{tempS} && $tempOut > ($r->{tempS}-3)) {
+	if( ($temp>$r->{tempS} && $tempOut>($r->{tempS}-3)) || $temp>($r->{tempS}+2) ) {
 	    $tempH=1;
+	}
+	if( $temp<$r->{tempS}-1 ) {
+	    $tempL=1;
 	}
 
 	# Sonne scheint ins Fenster ?
@@ -345,7 +353,7 @@ sub RollCheck() {
 	    }
 	}
 	
-	if($tag && !$sonne) {
+	if(($tag && !$sonne)||($tag && $tempL)) {
             if($r->{state}!=STATE_HOCH) {
                 if(!$skipHoch) {
                     RollHoch($r->{roll}, $ndelay); 
