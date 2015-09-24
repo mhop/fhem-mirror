@@ -549,6 +549,17 @@ sub MilightDevice_Set(@)
   {
     # Restore the previous state (as store in previous* readings)
     my ($h, $s, $v) = MilightDevice_HSVFromStr($hash, ReadingsVal($hash->{NAME}, "previousState", MilightDevice_HSVToStr($hash, 0, 0, 0)));
+    if($v eq 0)
+    {
+      if (defined($attr{$name}{defaultRampOff}))
+      {
+        $ramp = $attr{$name}{defaultRampOff};
+      }
+      return MilightDevice_RGBW_Off($hash, $ramp, $flags) if ($hash->{LEDTYPE} eq 'RGBW');
+      return MilightDevice_White_DimOff($hash, $ramp, $flags) if ($hash->{LEDTYPE} eq 'White' && AttrVal($hash->{NAME}, "dimOffWhite", 0) == 1);
+      return MilightDevice_White_Off($hash, $ramp, $flags) if ($hash->{LEDTYPE} eq 'White');
+      return MilightDevice_RGB_Off($hash, $ramp, $flags) if ($hash->{LEDTYPE} eq 'RGB');
+    }
     MilightDevice_HSV_Transition($hash, $h, $s, $v, 0, '');
     return undef;
   }
@@ -826,12 +837,12 @@ sub MilightDevice_RGB_Off(@)
 
     # Dim down to min brightness then send off command (avoid flicker on turn on)
     MilightDevice_RGB_Dim($hash, MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)), $ramp, $flags);
-    return MilightDevice_RGB_Dim($hash, 0, 0, 'q');
+    return MilightDevice_RGB_Dim($hash, 0, 0, 'qP');
   }
   else
   {
     # If we are already off just send the off command again
-    return MilightDevice_RGB_Dim($hash, 0, 0, '');
+    return MilightDevice_RGB_Dim($hash, 0, 0, 'P');
   }
 }
 
@@ -1004,12 +1015,12 @@ sub MilightDevice_RGBW_Off(@)
  
     # Dim down to min brightness then send off command (avoid flicker on turn on)
     MilightDevice_RGBW_Dim($hash, MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)), $ramp, $flags);
-    return MilightDevice_RGBW_Dim($hash, 0, 0, 'q');
+    return MilightDevice_RGBW_Dim($hash, 0, 0, 'qP');
   }
   else
   {
     # If we are already off just send the off command again
-    return MilightDevice_RGBW_Dim($hash, 0, 0, '');
+    return MilightDevice_RGBW_Dim($hash, 0, 0, 'P');
   }
 }
 
@@ -1053,6 +1064,7 @@ sub MilightDevice_RGBW_SetHSV(@)
 
   my $cv = 0;
   $cv = $hash->{helper}->{COLORMAP}[$hue % 360];
+  $cv = 0 if(!defined($cv));
 
   # apply gamma correction
   my $gammaVal = $hash->{helper}->{GAMMAMAP}[$val];
@@ -1271,7 +1283,7 @@ sub MilightDevice_White_Off(@)
   else
   {
     # If we are already off just send the off command again
-    return MilightDevice_White_Dim($hash, 0, 0, '');
+    return MilightDevice_White_Dim($hash, 0, 0, 'P');
   }
 }
 
@@ -1633,6 +1645,10 @@ sub MilightDevice_HSV_Transition(@)
     $satFrom = $hash->{helper}->{targetSat};
     $valFrom = $hash->{helper}->{targetVal};
     $timeFrom = $hash->{helper}->{targetTime};
+    $hueFrom = 0 if(!defined($hueFrom));
+    $satFrom = 100 if(!defined($satFrom));
+    $valFrom = 0 if(!defined($valFrom));
+    $timeFrom = 0 if(!defined($timeFrom));
     Log3 ($hash, 5, "$hash->{NAME}_HSV_Transition: Prepare Start (cached): $hueFrom,$satFrom,$valFrom@".$timeFrom);
   }
   else
@@ -1642,6 +1658,16 @@ sub MilightDevice_HSV_Transition(@)
     $valFrom = ReadingsVal($hash->{NAME}, "brightness", 0);
     $timeFrom = gettimeofday();
     Log3 ($hash, 5, "$hash->{NAME}_HSV_Transition: Prepare Start (actual): $hueFrom,$satFrom,$valFrom@".$timeFrom);
+
+
+    if ($flags !~ m/.*[pP].*/ and ($hash->{LEDTYPE} eq 'RGB') || ($hash->{LEDTYPE} eq 'RGBW'))
+    {
+      # Store previous state if different to requested state
+      if (($hueFrom != $hue) || ($satFrom != $sat) || ($valFrom != $val))
+      {
+        readingsSingleUpdate($hash, "previousState", MilightDevice_HSVToStr($hash, $hueFrom, $satFrom, $valFrom),1);
+      }
+    }
   }
 
   Log3 ($hash, 4, "$hash->{NAME}_HSV_Transition: Current: $hueFrom,$satFrom,$valFrom");
@@ -1767,7 +1793,7 @@ sub MilightDevice_SetHSV_Readings(@)
     my $prevVal = ReadingsVal($hash->{NAME}, "brightness", 0);
     if (($prevHue != $hue) || ($prevSat != $sat) || ($prevVal != $val))
     {
-      readingsBulkUpdate($hash, "previousState", MilightDevice_HSVToStr($hash, $prevHue, $prevSat, $prevVal)); 
+      readingsBulkUpdate($hash, "previousState", MilightDevice_HSVToStr($hash, $prevHue, $prevSat, $prevVal)) if ReadingsVal($hash->{NAME}, "transitionInProgress", 1) eq 0;
     }
 
     readingsBulkUpdate($hash, "saturation", $sat);
@@ -2070,7 +2096,7 @@ sub MilightDevice_BridgeDevices_Update(@)
     my $devname = $hash->{IODev}->{$sl+$i}->{NAME};
     next if (!defined($defs{$devname}));
     my $device = $defs{$devname};
-
+    $devname = "?" if(!defined($devname));
     readingsSingleUpdate($device, "transitionInProgress", 1, 1);
 
     
