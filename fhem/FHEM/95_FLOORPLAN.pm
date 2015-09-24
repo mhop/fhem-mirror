@@ -50,6 +50,7 @@
 #       added processing of global userattr fp_<name> and their value per device for rename, copy, delete (Jan 31, 2015)
 # 0039: added style 8 for commands-popup provided by André (justme68) (Feb 17, 2015)
 # 0040: fixed "no commands for IT devices", drag&drop won't switch device-status anymore (June 15, 2015)
+# 0041: fixed eventmap, excess "delete"-messages during rereadconfig (Sept 24, 2015)
 #
 ################################################################
 #
@@ -208,7 +209,7 @@ FP_define(){
 sub 
 FP_undefine($$) {
   my ($hash,$arg) = @_;
-  FP_copy_rename_delete('delete',$hash->{NAME},undef);
+  FP_copy_rename_delete('delete',$hash->{NAME},undef) if ($reread_active != 1); # do not execute during rereadcfg
   return undef;
 }
 
@@ -585,8 +586,8 @@ FP_show(){
         FW_pO "\n<div fp_style=\"$style\" fp_text=\"$text\" fp_text2=\"$t2\" fp_name=\"$FP_name\" class=\"fp_device_div\" style=\"position:absolute; top:".$top."px; left:".$left."px;\" id=\"div-$d\">"; 
 		FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name/$d\" autocomplete=\"off\">";
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"table-$d\" align=\"center\">";         # Main table per device
-		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
-                $allSets = FW_widgetOverride($d, $allSets);
+		my ($allSets, $cmdlist, $txt) = FW_devState($d, '');
+        $allSets = FW_widgetOverride($d, $allSets);
 		$txt = ReadingsVal($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
 		my $cols = ($cmdlist ? (split(":", $cmdlist)) : 0);                                    # Need command-count for colspan of devicename+state
 		
@@ -654,14 +655,14 @@ FP_show(){
     ########################
     # Commands per device		  
         if($cmdlist && ( $style == 2 || $style == 5 || $style == 7 || $style == 8) ) {
-          my @cList = split(":", $cmdlist);
-          my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
+		  my @a = split("[: ]", AttrVal($d, "cmdIcon", ""));          #new
+          Log 1, "ERROR: bad cmdIcon definition for $d" if(@a % 2);   #new
+          my %cmdIcon = @a;                                           #new
           my $firstIdx = 0;
 	      FW_pO "  <tr class=\"devicecommands\" id=\"$d-devicecommands\">";
-
           my $oldMe = $FW_ME;
 		  my $h = "";
-	      foreach my $cmd (sort @cList) {
+          foreach my $cmd (split(":", $cmdlist)) {
             # Special handling (slider, dropdown, timepicker, ...)
             my $htmlTxt;
             my @c = split(' ', $cmd);
@@ -688,15 +689,16 @@ FP_show(){
                 $h .= "<p><a href='$FW_ME$FW_subdir?$link$FW_CSRF'>$cmd</a></p>";
               }
             } else {
-			  if(defined($htmlTxt && $htmlTxt ne '')) {
-		        $htmlTxt =~ s/>desired-temp/>/;        #for FHT
-			    $htmlTxt =~ s/>desiredTemperature/>/;  #for MAX!
-                FW_pO $htmlTxt;
+			    if ($htmlTxt ne '') {
+				   $htmlTxt =~ s/>desired-temp/>/;        #for FHT
+				   $htmlTxt =~ s/>desiredTemperature/>/;  #for MAX!
+				   FW_pO $htmlTxt;		
+				 } else {
+					my $nCmd = $cmdIcon{$cmd} ? 
+                    FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
+			        FW_pH "cmd.$d=set $d $cmd", $nCmd, 1, "col3";    
+				}
 		    # END # Special handling (slider, dropdown, timepicker, ...)
-              } else {
-                FW_pH "cmd.$d=set $d $cmd",
-                ReplaceEventMap($d,$cmd,1),1,"devicecommands";
-              }
             }
           }
           $FW_ME = $oldMe;
