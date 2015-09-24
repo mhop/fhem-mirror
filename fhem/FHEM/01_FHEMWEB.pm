@@ -307,6 +307,11 @@ FW_Read($$)
       CommandDelete(undef, $name);
       Log3 $FW_wname, 4, "Connection closed for $name: ".
                   (defined($ret) ? 'EOF' : $!);
+      if($hash->{BUF}) {
+        Log3 $FW_wname, 5, "BUF:>".$hash->{BUF}."< L:".length($hash->{BUF});
+      } else {
+        Log3 $FW_wname, 5, "BUF: EMPTY";
+      }
       return;
     }
     $hash->{BUF} .= $buf;
