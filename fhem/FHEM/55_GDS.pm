@@ -1,4 +1,4 @@
-# $Id: 55_GDS.pm 8677 2015-06-01 17:11:36Z betateilchen $
+# $Id: 55_GDS.pm 9289 2015-09-23 05:07:02Z betateilchen $
 ####################################################################################################
 #
 #	55_GDS.pm
@@ -1024,9 +1024,9 @@ sub getListStationsDropdown($){
 	my $name = $hash->{NAME};
 	my ($line, $liste, @a);
 
-my $filename = $tempDir.$name."_conditions";
-my $filesize = -s $filename;
-return unless $filesize != 0;
+    my $filename = $tempDir.$name."_conditions";
+    my $filesize = -s $filename;
+    return unless $filesize != 0;
 
 	open WXDATA, $filename;
 	while (chomp($line = <WXDATA>)) {
@@ -1331,6 +1331,8 @@ sub gdsHeadlines($;$) {
 #   2015-01-30  changed use own FWEXT instead of HTTPSRV
 #
 #   2015-04-07  fixed   a_X_valid calculation: use onset, too
+#
+#   2015-09-24  fixed   prevent fhem crash on empty conditions file
 #
 ####################################################################################################
 #
