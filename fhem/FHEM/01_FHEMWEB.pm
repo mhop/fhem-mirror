@@ -307,11 +307,6 @@ FW_Read($$)
       CommandDelete(undef, $name);
       Log3 $FW_wname, 4, "Connection closed for $name: ".
                   (defined($ret) ? 'EOF' : $!);
-      if($hash->{BUF}) {
-        Log3 $FW_wname, 5, "BUF:>".$hash->{BUF}."< L:".length($hash->{BUF});
-      } else {
-        Log3 $FW_wname, 5, "BUF: EMPTY";
-      }
       return;
     }
     $hash->{BUF} .= $buf;
@@ -460,7 +455,7 @@ FW_Read($$)
 
   my $length = length($FW_RET);
   my $expires = ($cacheable?
-                        ("Expires: ".localtime($now+900)." GMT\r\n") : "");
+                ("Expires: ".FmtDateTimeRFC1123($now+900)."\r\n") : "");
   Log3 $FW_wname, 4,
         "$$:$name: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
   if( ! addToWritebuffer($hash,
@@ -469,12 +464,12 @@ FW_Read($$)
            $expires . $compressed . $FW_headercors .
            "Content-Type: $FW_RETTYPE\r\n\r\n" .
            $FW_RET, "FW_closeConn") ){
-    Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read";
+    Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
+      if(!$hash->{isChild});
     TcpServer_Close( $hash );
+    FW_closeConn($hash);
     delete($defs{$name});
-  }
-
-  FW_closeConn($hash);
+  } 
 }
 
 sub
@@ -1578,9 +1573,12 @@ FW_returnFileAsStream($$$$$)
     $if_none_match =~ s/"(.*)"/$1/ if($if_none_match);
     $etag = (stat($path))[9]; #mtime
     if(defined($etag) && defined($if_none_match) && $etag eq $if_none_match) {
+      my $now = time();
+      my $rsp = "Date: ".FmtDateTimeRFC1123($now)."\r\n".
+                "ETag: $etag\r\n".
+                "Expires: ".FmtDateTimeRFC1123($now+900)."\r\n";
       TcpServer_WriteBlocking($FW_chash,"HTTP/1.1 304 Not Modified\r\n".
-                    $FW_headercors . "\r\n");
-      FW_closeConn($FW_chash);
+                    $rsp . $FW_headercors . "\r\n");
       return -1;
     }
   }
