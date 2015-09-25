@@ -3827,6 +3827,37 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       delete $hash->{READINGS}{"unknown_$_"};
     }
   }
+  elsif($cmd eq "deviceRename") { #############################################
+    $state = "";
+    my $newName = $a[2];
+    my @chLst = {"device"};# entry 00 is unsed
+    if ($roleV){
+      foreach(1..50){
+        push @chLst,$newName."_Btn".$_;
+      }
+    }
+    else{
+      my $mId = CUL_HM_getMId($hash);# set helper valiable and use result
+      foreach my $chantype (split(',',$culHmModel->{$mId}{chn})){
+        my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
+        my $chnNoTyp = 1;
+        for (my $chnNoAbs = $chnStart; $chnNoAbs <= $chnEnd;$chnNoAbs++){
+          my $chnId = $hash->{DEF}.sprintf("%02X",$chnNoAbs);
+          push @chLst,$newName."_".$chnTpName.(($chnStart == $chnEnd)
+                                                ? ''
+                                                : '_'.sprintf("%02d",$chnNoTyp));
+          $chnNoTyp++;
+        }
+      }
+    }
+
+    foreach my $cd (grep /^channel_/,keys %{$hash}){
+      my $cName = InternalVal($name,$cd,"");
+      my $no = hex(substr($cd,8));
+      CommandRename(undef,$cName.' '.$chLst[$no]);
+    }
+    CommandRename(undef,$name.' '.$newName);#and the device itself
+  }
 
   elsif($cmd eq "statusRequest") { ############################################
     my @chnIdList = CUL_HM_getAssChnIds($name);
@@ -5936,7 +5967,7 @@ sub CUL_HM_SndCmd($$) {
 }
 sub CUL_HM_statCnt($$) {# set msg statistics for (r)ecive (s)end or (u)pdate
   my ($ioName,$dir) = @_;
-  my $stat   = $modules{CUL_HM}{stat};
+  my $stat = $modules{CUL_HM}{stat};
   if (!$stat->{$ioName}){
     $stat->{r}{$ioName}{h}{$_} = 0 foreach(0..23);
     $stat->{r}{$ioName}{d}{$_} = 0 foreach(0..6);
@@ -5947,21 +5978,17 @@ sub CUL_HM_statCnt($$) {# set msg statistics for (r)ecive (s)end or (u)pdate
   my @l = localtime(gettimeofday());
 
   if ($l[2] != $stat->{$ioName}{last}){#next field
-    my $end = $l[2];
     if ($l[2] < $stat->{$ioName}{last}){#next day
-      $end += 24;
-      my $recentD = ($l[6]+6)%7;
+      my $recentD = ($l[6]+5)%7;
       foreach my $ud ("r","s"){
         $stat->{$ud}{$ioName}{d}{$recentD} = 0;
         $stat->{$ud}{$ioName}{d}{$recentD} += $stat->{$ud}{$ioName}{h}{$_}
                     foreach (0..23);
       }
-     }
-    foreach (($stat->{$ioName}{last}+1)..$end){
-      $stat->{r}{$ioName}{h}{$_%24} = 0;
-      $stat->{s}{$ioName}{h}{$_%24} = 0;
     }
-    $stat->{$ioName}{last} = $l[2];
+    $stat->{r}{$ioName}{h}{$l[2]} = 0;
+    $stat->{s}{$ioName}{h}{$l[2]} = 0;
+    $stat->{$ioName}{last}        = $l[2];
   }
   $stat->{$dir}{$ioName}{h}{$l[2]}++ if ($dir ne "u");
 }
@@ -5970,10 +5997,8 @@ sub CUL_HM_statCntRfresh($) {# update statistic once a day
   foreach (keys %{$modules{CUL_HM}{stat}{r}}){
     if (!$defs{$ioName}){#IO device is deleted, clear counts
       delete $modules{CUL_HM}{stat}{$ioName};
-      delete $modules{CUL_HM}{stat}{r}{$ioName}{h};
-      delete $modules{CUL_HM}{stat}{r}{$ioName}{d};
-      delete $modules{CUL_HM}{stat}{s}{$ioName}{h};
-      delete $modules{CUL_HM}{stat}{s}{$ioName}{d};
+      delete $modules{CUL_HM}{stat}{r}{$ioName};
+      delete $modules{CUL_HM}{stat}{s}{$ioName};
       next;
     }
     CUL_HM_statCnt($_,"u") if ($_ ne "dummy");
@@ -8537,6 +8562,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           </code></ul>
           see also <a href="#CUL_HMpress">press</a>
         </li>
+        <li><B>deviceRename &lt;newName&gt;</B><a name="CUL_HMdeviceRename"></a><br>
+          rename the device and all its channels.
+        </li>
       </ul>
   
       <br>
@@ -9864,6 +9892,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           </code></ul>
           siehe auch <a href="#CUL_HMpress">press</a>
         </li>
+        <li><B>deviceRename &lt;newName&gt;</B><a name="CUL_HMdeviceRename"></a><br>
+          benennt das Device und alle seine Kanäle um.
+        </li>
+
       </ul>
       <br>
 
