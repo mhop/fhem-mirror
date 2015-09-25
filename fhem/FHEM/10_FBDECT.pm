@@ -15,7 +15,7 @@ sub FBDECT_Cmd($$@);
 
 sub FBDECT_decodePayload($$$);
 
-my @fbdect_models = qw(Powerline546E Dect200);
+my @fbdect_models = qw(Powerline546E Dect200 CometDECT);
 
 my %fbdect_payload = (
    7 => { n=>"connected" },
