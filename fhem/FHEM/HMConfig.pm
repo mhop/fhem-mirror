@@ -277,7 +277,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00D6" => {name=>"HM-RC-Key4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"unlock:1:1,lock:2:2,light:3:3,open:4:4",}
  ,"00D7" => {name=>"HM-ES-PMSw1-Pl-DN-R1"    ,alias=>"HM-ES-PMSw1-Pl"}
  ,"00D8" => {name=>"HM-LC-Sw1-Pl-DN-R1"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00D9" => {name=>"HM-MOD-Em-8"             ,st=>'remote'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,4'          ,chn=>"Btn:1:8",}
+ ,"00D9" => {name=>"HM-MOD-Em-8"             ,st=>'remote'            ,cyc=>''      ,rxt=>'l'      ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DA" => {name=>"HM-RC-8"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DB" => {name=>"HM-Sen-MDIR-WM55"        ,st=>'motionAndBtn'      ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Motion:3:3",}
  ,"00DC" => {name=>"HM-Sen-DB-PCB"           ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}
@@ -1366,12 +1366,14 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                        raw           => "data ..."
                       ,virtual       => "<noButtons>"
                       ,clear         => "[readings|rssi|msgEvents|unknownDev]"
+                      ,deviceRename  => "newName"
 );
 %culHmGlobalSetsDevice = (# all devices but virtuals
                        raw           => "data ..."
                       ,reset         => ""
                       ,unpair        => ""
                       ,assignHmKey   => ""
+                      ,deviceRename  => "newName"
 );
 
 %culHmSubTypeDevSets = (# device of this subtype
