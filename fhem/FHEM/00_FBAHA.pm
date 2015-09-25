@@ -200,7 +200,9 @@ FBAHA_configInd($$)
 
     $act = ($act == 2 ? "active" : ($act == 1 ? "inactive" : "removed"));
 
-    my %tl = ( 2=>"AVM FRITZ!Dect Powerline 546E", 9=>"AVM FRITZ!Dect 200");
+    my %tl = ( 2=>"AVM FRITZ!Dect Powerline 546E",
+               3=>"Comet DECT");
+               9=>"AVM FRITZ!Dect 200");
     $typ = $tl{$typ} ? $tl{$typ} : "unknown($typ)";
 
     my %ll = (7=>"powerMeter",9=>"switch");
