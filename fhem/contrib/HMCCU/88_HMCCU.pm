@@ -52,7 +52,6 @@ sub HMCCU_Initialize ($)
 {
 	my ($hash) = @_;
 
-	# Consumer
 	$hash->{DefFn} = "HMCCU_Define";
 	$hash->{SetFn} = "HMCCU_Set";
 	$hash->{GetFn} = "HMCCU_Get";
@@ -68,7 +67,7 @@ sub HMCCU_Define ($$)
 	my $name = $hash->{NAME};
 	my @a = split("[ \t][ \t]*", $def);
 
-	return "Define the host as a parameter i.e. MyCCU" if(@a < 3);
+	return "Define the CCU hostname or IP address as a parameter i.e. MyCCU" if(@a < 3);
 
 	my $host = $a[2];
 
@@ -79,7 +78,6 @@ sub HMCCU_Define ($$)
 	$attr{$name}{units} = 0;
   
 	$hash->{host} = $host;
-#	$hash->{STATE} = "Initialized";
 	readingsSingleUpdate ($hash, "state", "Initialized", 1);
 
 	return undef;
@@ -118,7 +116,6 @@ sub HMCCU_Set ($@)
 			return HMCCU_SetError ($hash, "Error during CCU communication");
 		}
 
-#		$hash->{STATE} = "OK";
 		readingsSingleUpdate ($hash, "state", "OK", 1);
 
 		return $retcode;
@@ -146,7 +143,6 @@ sub HMCCU_Set ($@)
 			return HMCCU_SetError ($hash, "Error during CCU communication");
 		}
 
-#		$hash->{STATE} = "OK";
 		readingsSingleUpdate ($hash, "state", "OK", 1);
 
 		return $retcode;
@@ -163,6 +159,7 @@ sub HMCCU_Set ($@)
 			return HMCCU_SetError ($hash, "Usage: set <device> execute <program>");
 		}
 
+		# Query program ID
 		$response = GetFileFromURL ($url);
 		my $xmlin = XMLin ($response, ForceArray => 0, KeyAttr => ['name']);
 
@@ -174,8 +171,6 @@ sub HMCCU_Set ($@)
 		}
 
 		$response = GetFileFromURL ($runurl . $programid);
-
-#		$hash->{STATE} = "OK";
 		readingsSingleUpdate ($hash, "state", "OK", 1);
 
 		return $response;
@@ -185,11 +180,9 @@ sub HMCCU_Set ($@)
 		my $response;
 
 		$response = GetFileFromURL ($url);
-
-#		$hash->{STATE} = "OK";
 		readingsSingleUpdate ($hash, "state", "OK", 1);
 
-		return $response;
+		return '';
 	}
 	else {
 		return "HMCCU: Unknown argument $opt, choose one of devstate datapoint execute clearmsg";
@@ -228,7 +221,6 @@ my $host = $hash->{host};
 		$retcode = $1;
 
 		if (defined ($retcode) && $retcode ne '' && $retcode ne 'null') {
-#			$hash->{STATE} = "OK";
 			readingsSingleUpdate ($hash, "state", "OK", 1);
 			if ($readings) {
 				readingsSingleUpdate ($hash, $reading, $retcode, 1);
@@ -264,7 +256,6 @@ my $host = $hash->{host};
 		$retcode = $1;
 
 		if (defined ($retcode) && $retcode ne '' && $retcode ne 'null') {
-#			$hash->{STATE} = "OK";
 			readingsSingleUpdate ($hash, "state", "OK", 1);
 			if ($readings) {
 				readingsSingleUpdate ($hash, $reading, $retcode, 1);
@@ -359,7 +350,6 @@ my $host = $hash->{host};
 			}
 		}
 
-#		$hash->{STATE} = "OK";
 		readingsSingleUpdate ($hash, "state", "OK", 1);
 
 		if ($readings) {
@@ -444,7 +434,6 @@ my $host = $hash->{host};
 			}
 		}
 
-#		$hash->{STATE} = "OK";
 		readingsSingleUpdate ($hash, "state", "OK", 1);
 
 		if ($readings) {
@@ -504,7 +493,6 @@ sub HMCCU_SetError ($$)
 	my ($hash, $text) = @_;
 
 	$text = "HMCCU: " . $text;
-#	$hash->{STATE} = "Error";
 	readingsSingleUpdate ($hash, "state", "Error", 1);
 	Log 1, $text;
 	return $text;
