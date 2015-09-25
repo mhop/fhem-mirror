@@ -53,6 +53,8 @@
 #                     changed: limit refresh to at least 60 secs
 #                              to prevent performance issues
 # 2015-03-29 - 8334 - changed: commandref updated
+# 2015-09-25 -      - changed: support ReadingsVal() in ticker
+#                              with \n in text
 #
 ##############################################
 # $Id$
@@ -692,6 +694,7 @@ sub btIP_itemTicker {
   $id = ($id eq '-') ? createUniqueId() : $id;
   my $pause = 2 * $speed;
   my $color = substr($params{rgb},0,6);
+  $arg =~ s/\\n/\n/g; # support ReadingsVal() with \n in text
   my @a = split("\n",$arg);
   my $liTemplate = '<li>%s</li>'."\n";
 
