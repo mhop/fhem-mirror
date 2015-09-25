@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  55_InfoPanel.pm: support ReadingsVal in ticker #35228
   - bugfix:  31_MilightDevice.pm: improved previousState, fixed log errors
   - bugfix:  30_MilightBridge.pm: fixed ping definition
   - bugfix:  95_FLOORPLAN. fixed device-commands and excess logmessages
