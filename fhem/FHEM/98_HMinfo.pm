@@ -926,8 +926,8 @@ sub HMinfo_getMsgStat() { #####################################################
   $ds  =  sprintf("\n  %-14s:","send    day");
   $hr .=  sprintf("| %02d",$_) foreach (0..23);
   $hs .=  sprintf("| %02d",$_) foreach (0..23);
-  $dr .=  sprintf("|%4s",$_) foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# tdy");
-  $ds .=  sprintf("|%4s",$_) foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# tdy");
+  $dr .=  sprintf("|%4s",$_) foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# 24h");
+  $ds .=  sprintf("|%4s",$_) foreach ("Mon","Tue","Wed","Thu","Fri","Sat","Sun","# 24h");
   foreach my $ioD(keys %{$modules{CUL_HM}{stat}{r}}){
     next if ($ioD eq "dummy");
     $hr .=  sprintf("\n      %-10s:",$ioD);
