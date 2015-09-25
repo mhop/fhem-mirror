@@ -2797,6 +2797,17 @@ FmtTime($)
   return sprintf("%02d:%02d:%02d", $t[2], $t[1], $t[0]);
 }
 
+sub
+FmtDateTimeRFC1123($)
+{
+  my $t = gmtime(shift);
+  if($t =~ m/^(...) (...) (..) (..:..:..) (....)$/) {
+    return sprintf("$1, %02d $2 $5 $4 GMT", $3);
+  }
+  return $t;
+}
+
+
 #####################################
 sub
 ResolveDateWildcards($@)
