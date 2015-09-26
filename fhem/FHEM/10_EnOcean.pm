@@ -4815,8 +4815,12 @@ sub EnOcean_Parse($$)
     push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
     if (!($db[0] & 8)) {
       $attr{$name}{eep} = "D5-00-01";
+      $attr{$name}{manufID} = "7FF";
+      $attr{$name}{subType} = "contact";
       push @event, "3:teach:1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID";
       Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
+      # store attr subType, manufID ...
+      EnOcean_CommandSave(undef, undef);
     }
 
   } elsif ($rorg eq "A5") {
@@ -12840,7 +12844,7 @@ EnOcean_Undef($$)
              one of the above, e.g. A0,BI</li>
          <li>pressed</li>
          <li>released</li>
-         <li>teach &lt;result of teach procedure&gt;</li>
+         <li>teach: &lt;result of teach procedure&gt;</li>
          <li>energyBow: pressed|released</li>
          <li>state: &lt;BtnX&gt;|&lt;BtnX&gt;,&lt;BtnY&gt;|released|pressed|teachIn|teachOut</li>
      </ul><br>
@@ -12915,10 +12919,11 @@ EnOcean_Undef($$)
 
      <li>Single Input Contact, Door/Window Contact<br>
          1BS Telegram (EEP D5-00-01)<br>
-         [EnOcean STM 320, STM 329, STM 250, Eltako FTK, Peha D 450 FU, STM-250, BSC ?]
+         [EnOcean STM 320, STM 329, STM 250, Eltako FTK, Peha D 450 FU]
      <ul>
          <li>closed</li>
          <li>open</li>
+         <li>teach: &lt;result of teach procedure&gt;</li>
          <li>state: open|closed</li>
      </ul></li>
         The device should be created by autocreate.
@@ -13690,7 +13695,7 @@ EnOcean_Undef($$)
        <li>setpointTemp: t/&#176C</li>
        <li>temperature: t/&#176C</li>
        <li>tempSensor: failed|ok</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>window: open|closed</li>
        <li>state: setpoint/%</li>
      </ul><br>
@@ -13703,14 +13708,13 @@ EnOcean_Undef($$)
          [IntesisBox PA-AC-ENO-1i]<br>
      <ul>
        <li>on|off</li>
-       <li>ctrl auto|0...100</li>
-       <li>fanSpeed auto|1...14</li>
-       <li>occupancy occupied|off|standby|unoccupied</li>
-       <li>mode auto|heat|morning_warmup|cool|night_purge|precool|off|test|emergency_heat|fan_only|free_cool|ice|max_heat|eco|dehumidification|calibration|emergency_cool|emergency_stream|max_cool|hvc_load|no_load|auto_heat|auto_cool</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
-       <li>vanePosition auto|horizontal|position_2|position_3|position_4|vertical|swing|vertical_swing|horizontal_swing|hor_vert_swing|stop_swing</li>
+       <li>ctrl: auto|0...100</li>
+       <li>fanSpeed: auto|1...14</li>
+       <li>occupancy: occupied|off|standby|unoccupied</li>
+       <li>mode: auto|heat|morning_warmup|cool|night_purge|precool|off|test|emergency_heat|fan_only|free_cool|ice|max_heat|eco|dehumidification|calibration|emergency_cool|emergency_stream|max_cool|hvc_load|no_load|auto_heat|auto_cool</li>
+       <li>vanePosition: auto|horizontal|position_2|position_3|position_4|vertical|swing|vertical_swing|horizontal_swing|hor_vert_swing|stop_swing</li>
        <li>powerSwitch: on|off</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: on|off</li>
      </ul><br>
         The attr subType must be hvac.10. This is done if the device was created by
@@ -13722,16 +13726,16 @@ EnOcean_Undef($$)
          [IntesisBox PA-AC-ENO-1i]<br>
      <ul>
        <li>error|ok</li>
-       <li>alarm error|ok</li>
-       <li>errorCode 0...65535</li>
-       <li>externalDisable disable|enable</li>
-       <li>keyCardDisable disable|enable</li>
-       <li>otherDisable disable|enable</li>
+       <li>alarm: error|ok</li>
+       <li>errorCode: 0...65535</li>
+       <li>externalDisable: disable|enable</li>
+       <li>keyCardDisable: disable|enable</li>
+       <li>otherDisable: disable|enable</li>
        <li>powerSwitch: on|off</li>
-       <li>remoteCtrl disable|enable</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
-       <li>window closed|opened</li>
-       <li>windowDisable disable|enable</li>
+       <li>remoteCtrl: disable|enable</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
+       <li>window: closed|opened</li>
+       <li>windowDisable: disable|enable</li>
        <li>state: error|ok</li>
      </ul><br>
         The attr subType must be hvac.11. This is done if the device was created by
@@ -13745,7 +13749,7 @@ EnOcean_Undef($$)
        <li>open|closed</li>
        <li>battery: ok|low (only EEP A5-30-01)</li>
        <li>contact: open|closed</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: open|closed</li>
      </ul><br>
         The attr subType must be digitalInput.01 or digitalInput.02. This is done if the device was
@@ -13761,7 +13765,7 @@ EnOcean_Undef($$)
        <li>in1: 0|1</li>
        <li>in2: 0|1</li>
        <li>in3: 0|1</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>wake: 0|1</li>
        <li>state: T: t/&#176C I: 0|1 0|1 0|1 0|1 W: 0|1</li>
@@ -13779,7 +13783,7 @@ EnOcean_Undef($$)
        <li>in1: 0|1</li>
        <li>in2: 0|1</li>
        <li>in3: 0...255</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: 0|1 0|1 0|1 0...255</li>
      </ul><br>
         The attr subType must be digitalInput.04. This is done if the device was
@@ -13793,7 +13797,7 @@ EnOcean_Undef($$)
        <li>error|event|heartbeat</li>
        <li>battery: U/V (Range: U = 0 V ... 3.3 V</li>
        <li>signalIdx: 0 ... 127</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>telegramType: event|heartbeat</li>
        <li>state: error|event|heartbeat</li>
      </ul><br>
@@ -13812,7 +13816,7 @@ EnOcean_Undef($$)
        <li>randomEnd: yes|no</li>
        <li>randomStart: yes|no</li>
        <li>setpoint: 0...255</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>timeout: yyyy-mm-dd hh:mm:ss</li>
        <li>state: on|off|waiting_for_start|waiting_for_stop</li>
      </ul><br>
@@ -13830,7 +13834,7 @@ EnOcean_Undef($$)
        <li>executeTime: t/s (Sensor Range: t = 0.1 s ... 6553.5 s or 0 if no time specified)</li>
        <li>executeType: duration|delay</li>
        <li>block: lock|unlock</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: on|off</li>
      </ul><br>
         The attr subType must be gateway and gwCmd must be switching. This is done if the device was
@@ -13853,7 +13857,7 @@ EnOcean_Undef($$)
            Last value saved by <code>set &lt;name&gt; dim &lt;value&gt;</code>.</li>
        <li>rampTime: t/s (Sensor Range: t = 1 s ... 255 s or 0 if no time specified,
            for Eltako: t = 1 = fast dimming ... 255 = slow dimming or 0 = dimming speed on the dimmer used)</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: on|off</li>
      </ul><br>
         The attr subType must be gateway, gwCmd must be dimming and attr manufID must be 00D
@@ -13868,7 +13872,7 @@ EnOcean_Undef($$)
      <ul>
        <li>1/K</li>
        <li>setpointShift: 1/K (Sensor Range: T = -12.7 K ... 12.8 K)</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: 1/K</li>
      </ul><br>
         The attr subType must be gateway, gwCmd must be setpointShift.
@@ -13882,7 +13886,7 @@ EnOcean_Undef($$)
      <ul>
        <li>t/&#176C</li>
        <li>setpoint: t/&#176C (Sensor Range: t = 0 &#176C ... 51.2 &#176C)</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: t/&#176C</li>
      </ul><br>
         The attr subType must be gateway, gwCmd must be setpointBasic.
@@ -13900,7 +13904,7 @@ EnOcean_Undef($$)
        <li>controllerState: auto|override</li>
        <li>energyHoldOff: normal|holdoff</li>
        <li>presence: present|absent|standby</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: auto|heating|cooling|off</li>
      </ul><br>
         The attr subType must be gateway, gwCmd must be controlVar.
@@ -13913,7 +13917,7 @@ EnOcean_Undef($$)
          [untested]<br>
      <ul>
        <li>0 ... 3|auto</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: 0 ... 3|auto</li>
      </ul><br>
         The attr subType must be gateway, gwCmd must be fanStage.
@@ -13930,8 +13934,8 @@ EnOcean_Undef($$)
        <li>dimMax: &lt;maximum dimming value&gt; (Range: dim = 0  ... 255)</li>
        <li>dimMin: &lt;minimum dimming value&gt; (Range: dim = 0  ... 255)</li>
        <li>rampTime: t/s (Range: t = 0 s ... 65535 s)</li>
-       <li>rgb RRGGBB (red (R), green (G) or blue (B) color component values: 00 ... FF)</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>rgb: RRGGBB (red (R), green (G) or blue (B) color component values: 00 ... FF)</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: on|off</li>
      </ul><br>
         Another readings, see subtype lightCtrlState.02.<br>
@@ -13948,7 +13952,7 @@ EnOcean_Undef($$)
        <li>input1: U/V (Sensor Range: U = 0 V ... 10 V)</li>
        <li>input2: U/V (Sensor Range: U = 0 V ... 10 V)</li>
        <li>input3: U/V (Sensor Range: U = 0 V ... 10 V)</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: I1: U/V I2: U/V I3: U/V</li>
      </ul><br>
         The attr subType must be manufProfile and attr manufID must be 002
@@ -13965,7 +13969,7 @@ EnOcean_Undef($$)
        <li>emergencyMode&lt;channel&gt;: on|off</li>
        <li>nightReduction&lt;channel&gt;: on|off</li>
        <li>setpointTemp&lt;channel&gt;: t/&#176C</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>temperature&lt;channel&gt;: t/&#176C</li>
        <li>window&lt;channel&gt;: on|off</li>
        <li>state: on|off</li>
@@ -13992,8 +13996,8 @@ EnOcean_Undef($$)
         <li>anglePos: &alpha;/&#176 (Sensor Range: &alpha; = -180 &#176 ... 180 &#176)</li>
         <li>endPosition: open|open_ack|closed|not_reached|not_available</li>
         <li>position: pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
-        <li>teach &lt;result of teach procedure&gt;</li>
-        <li>state : open|open_ack|closed|not_reached|stop|teach</li>
+        <li>teach: &lt;result of teach procedure&gt;</li>
+        <li>state: open|open_ack|closed|not_reached|stop|teach</li>
      </ul><br>
         The values of the reading position and anglePos are updated automatically,
         if the command position is sent or the reading state was changed
@@ -14038,7 +14042,7 @@ EnOcean_Undef($$)
         <li>responseTimeMax: 1/s</li>
         <li>responseTimeMin: 1/s</li>
         <li>serialNumber: [00000000 ... FFFFFFFF]</li>
-        <li>teach &lt;result of teach procedure&gt;</li>
+        <li>teach: &lt;result of teach procedure&gt;</li>
         <li>teachInDev: enabled|disabled</li>
         <li>state: on|off</li>
      </ul>
@@ -14067,7 +14071,7 @@ EnOcean_Undef($$)
         <li>block: unlock|lock|alarm</li>
         <li>endPosition: open|closed|not_reached|unknown</li>
         <li>position: unknown|pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
-        <li>teach &lt;result of teach procedure&gt;</li>
+        <li>teach: &lt;result of teach procedure&gt;</li>
         <li>state: open|closed|in_motion|stoped|pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
      </ul>
         <br>
@@ -14088,7 +14092,7 @@ EnOcean_Undef($$)
        <li>roomSize: 0...350/m<sup>2</sup>|max</li>
        <li>roomSizeRef: unsed|not_used|not_supported</li>
        <li>setpointTemp: t/&#176C (Range: t = 0 &#176C ... 40 &#176C)</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>state: on|off|not_supported</li>
      </ul><br>
@@ -14105,7 +14109,7 @@ EnOcean_Undef($$)
        <li>current1: I/A (Range: I = 0 A ... 4095 A)</li>
        <li>current2: I/A (Range: I = 0 A ... 4095 A)</li>
        <li>current3: I/A (Range: I = 0 A ... 4095 A)</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: I1: I/A I2: I/A I3: I/A</li>
      </ul><br>
        The attr subType must be currentClamp.00|currentClamp.01|currentClamp.02. This is done if the device was
@@ -14126,7 +14130,7 @@ EnOcean_Undef($$)
        <li>powerSwitch: on|off</li>
        <li>red: 0 % ... 100 %</li>
        <li>rgb: RRGGBB (red (R), green (G) or blue (B) color component values: 00 ... FF)</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>telegramType: event|heartbeat</li>
        <li>state: on|off</li>
      </ul><br>
@@ -14141,7 +14145,7 @@ EnOcean_Undef($$)
        <li>open</li>
        <li>closes</li>
        <li>closed</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: opens|open|closes|closed|teachIn|teachOut</li>
      </ul><br>
        The attr subType must be valveCtrl.00. This is done if the device was
@@ -14152,11 +14156,11 @@ EnOcean_Undef($$)
 
      <li>Generic Profiles<br>
      <ul>
-       <li>&lt;00...64&gt;-&lt;channel name&gt; &lt;value&gt;</li>
-       <li>&lt;00...64&gt;-&lt;channel name&gt;Unit &lt;value&gt;</li>
-       <li>&lt;00...64&gt;-&lt;channel name&gt;ValueType value|setpointAbs|setpointRel</li>
-       <li>&lt;00...64&gt;-&lt;channel name&gt;ChannelType teachIn|data|flag|enum</li>
-       <li>teach &lt;result of teach procedure&gt;</li>
+       <li>&lt;00...64&gt;-&lt;channel name&gt;: &lt;value&gt;</li>
+       <li>&lt;00...64&gt;-&lt;channel name&gt;Unit: &lt;value&gt;</li>
+       <li>&lt;00...64&gt;-&lt;channel name&gt;ValueType: value|setpointAbs|setpointRel</li>
+       <li>&lt;00...64&gt;-&lt;channel name&gt;ChannelType: teachIn|data|flag|enum</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
      </ul><br>
        The attr subType must be genericProfile. This is done if the device was
        created by autocreate. If the profile in slave mode is operated, especially the channel
