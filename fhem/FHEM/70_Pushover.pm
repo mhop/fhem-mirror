@@ -1003,6 +1003,8 @@ sub Pushover_CGI() {
   You need an account to use this module.<br>
   For further information about the service see <a href="https://pushover.net">pushover.net</a>.<br>
   <br>
+  Installation of Perl module IO::Socket::SSL is mandatory to use this module (i.e. via 'cpan -i IO::Socket::SSL').
+  <br>
   Discuss the module <a href="http://forum.fhem.de/index.php/topic,16215.0.html">here</a>.<br>
   <br>
   <br>
@@ -1105,6 +1107,8 @@ sub Pushover_CGI() {
   von Quellen auf Deinem Smartphone oder Tablet zu empfangen.<br>
   Du brauchst einen Account um dieses Modul zu verwenden.<br>
   Für weitere Informationen über den Dienst besuche <a href="https://pushover.net">pushover.net</a>.<br>
+  <br>
+  Die Installation des Perl Moduls IO::Socket::SSL ist Voraussetzung zur Nutzung dieses Moduls (z.B. via 'cpan -i IO::Socket::SSL').
   <br>
   Diskutiere das Modul <a href="http://forum.fhem.de/index.php/topic,16215.0.html">hier</a>.<br>
   <br>
