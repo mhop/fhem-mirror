@@ -711,7 +711,7 @@ FW_answerCall($)
     my $icon = $FW_ME."/images/default/fhemicon_ios.png";
     if($FW_ss) {
        FW_pO '<meta name="viewport" '.
-                   'content="initial-scale=1.0,user-scalable=1"/>';
+               'content="initial-scale=1.0,user-scalable=1,shrink-to-fit=no"/>';
     } elsif($FW_tp) {
       FW_pO '<meta name="viewport" content="width=768"/>';
     }
