@@ -140,6 +140,7 @@ FHEMWEB_Initialize($)
     allowfrom
     basicAuth
     basicAuthMsg
+    closeConn:1,0
     column
     defaultRoom
     editConfig:1,0
@@ -318,7 +319,6 @@ FW_Read($$)
     }
   }
 
-
   if(!$hash->{HDR}) {
     return if($hash->{BUF} !~ m/^(.*?)(\n\n|\r\n\r\n)(.*)$/s);
     $hash->{HDR} = $1;
@@ -402,7 +402,7 @@ FW_Read($$)
   $hash->{LASTACCESS} = $now;
 
   $arg = "" if(!defined($arg));
-  Log3 $FW_wname, 4, "HTTP $name GET $arg";
+  Log3 $FW_wname, 4, "$name $method $arg; BUFLEN:".length($hash->{BUF});
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   my $pf = AttrVal($FW_wname, "plotfork", undef);
   if($pf) {   # 0 disables
@@ -457,7 +457,7 @@ FW_Read($$)
   my $expires = ($cacheable?
                 ("Expires: ".FmtDateTimeRFC1123($now+900)."\r\n") : "");
   Log3 $FW_wname, 4,
-        "$$:$name: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
+        "name: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
   if( ! addToWritebuffer($hash,
            "HTTP/1.1 200 OK\r\n" .
            "Content-Length: $length\r\n" .
@@ -476,6 +476,14 @@ sub
 FW_closeConn($)
 {
   my ($hash) = @_;
+  if(!$hash->{inform} && !$hash->{BUF}) { # Forum #41125
+    my $cc = AttrVal($hash->{SNAME}, "closeConn",
+                                        $FW_userAgent=~m/(iPhone|iPad|iPod)/);
+    if(!$FW_httpheader{Connection} || $cc) {
+      TcpServer_Close($hash);
+      delete($defs{$hash->{NAME}});
+    }
+  }
   POSIX::exit(0) if($hash->{isChild});
   FW_Read($hash, 1) if($hash->{BUF});
 }
@@ -1578,6 +1586,7 @@ FW_returnFileAsStream($$$$$)
       my $rsp = "Date: ".FmtDateTimeRFC1123($now)."\r\n".
                 "ETag: $etag\r\n".
                 "Expires: ".FmtDateTimeRFC1123($now+900)."\r\n";
+      Log3 $FW_wname, 4, "$FW_chash->{NAME} => 304 Not Modified";
       TcpServer_WriteBlocking($FW_chash,"HTTP/1.1 304 Not Modified\r\n".
                     $rsp . $FW_headercors . "\r\n");
       return -1;
@@ -3381,6 +3390,13 @@ FW_widgetOverride($$)
        attribute.
        </li>
 
+     <a name="closeConn"></a>
+     <li>closeConn<br>
+       If set, a TCP Connection will only serve one HTTP request. Seems to
+       solve problems on iOS9 for WebApp startup.
+       </li><br>
+
+
      <a name="CssFiles"></a>
      <li>CssFiles<br>
         Space separated list of .css files to be included. The filenames
@@ -4086,6 +4102,12 @@ FW_widgetOverride($$)
         der Gruppen auch dann verwenden, wenn man nur eine Spalte hat.
         Leerzeichen im Raum- und Gruppennamen sind f&uuml;r dieses Attribut als
         %20 zu schreiben.
+        </li><br>
+
+     <a name="closeConn"></a>
+     <li>closeConn<br>
+        Falls gesetzt, wird pro TCP Verbindung nur ein HTTP Request
+        durchgef&uuml;hrt. F&uuml;r iOS9 WebApp startups scheint es zu helfen.
         </li><br>
 
      <a name="CssFiles"></a>
