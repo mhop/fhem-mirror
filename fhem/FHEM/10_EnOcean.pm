@@ -304,7 +304,7 @@ my %EnO_eepConfig = (
   "D2.40.00" => {attr => {subType => "ledCtrlState.00"}},
   "D2.40.01" => {attr => {subType => "ledCtrlState.01"}},
   "D2.A0.01" => {attr => {subType => "valveCtrl.00", defaultChannel => 0, webCmd => "opens:closes"}},
-  "D5.00.01" => {attr => {subType => "contact"}},
+  "D5.00.01" => {attr => {subType => "contact", manufID => "7FF"}},
   "F6.02.01" => {attr => {subType => "switch"}},
   "F6.02.02" => {attr => {subType => "switch"}},
   "F6.02.03" => {attr => {subType => "switch"}},
@@ -575,11 +575,49 @@ EnOcean_Define($$)
   } else {
     return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
   }
-  # Help FHEMWEB split up devices
+  # autocreate subType from RORG
   $attr{$name}{subType} = $1 if($name =~ m/EnO_(.*)_$def/);
   if (@a == 4) {
     # parse received device data
     $hash->{DEF} = $def;
+    if (exists $attr{$name}{subType}) {
+      my ($data, $status);
+     (undef, undef, undef, $data, undef, $status, undef) = split(':', $a[3]);     
+      if ($attr{$name}{subType} eq "switch") {
+        my $nu = (hex($status) & 0x10) >> 4;
+        my $t21 = (hex($status) & 0x20) >> 5;
+        $attr{$name}{manufID} = "7FF";
+        if ($t21 && $nu) {
+          $attr{$name}{eep} = "F6-02-01";
+          readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-02-01 Manufacturer: no ID", 1);
+          Log3 $name, 2, "EnOcean $name teach-in EEP F6-02-01 Manufacturer: no ID";
+        } elsif (!$t21 && $nu) {
+          $attr{$name}{eep} = "F6-03-01";
+          readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-03-01 Manufacturer: no ID", 1);
+          Log3 $name, 2, "EnOcean $name teach-in EEP F6-03-01 Manufacturer: no ID";
+        }      
+      } elsif ($attr{$name}{subType} eq "contact" && hex($data) & 8) {
+        $attr{$name}{eep} = "D5-00-01";
+        $attr{$name}{manufID} = "7FF";
+        readingsSingleUpdate($hash, "teach", "1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID", 1);
+        Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
+      } elsif ($attr{$name}{subType} eq "4BS" && hex(substr($data, 6, 2)) & 8) {
+        readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
+        Log3 $name, 2, "EnOcean $name teach-in is missing";
+      } elsif ($attr{$name}{subType} eq "VLD") {
+        readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
+        Log3 $name, 2, "EnOcean $name teach-in is missing";
+      } elsif ($attr{$name}{subType} eq "MSC") {
+        readingsSingleUpdate($hash, "teach", "MSC teach-in not supported", 1);
+        Log3 $name, 2, "EnOcean $name MSC not supported";
+      } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
+        readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
+        Log3 $name, 2, "EnOcean $name secure teach-in is missing";
+      } elsif ($attr{$name}{subType} =~ m/^GPCD|GPSD$/) {
+        readingsSingleUpdate($hash, "teach", "GP teach-in is missing", 1);
+        Log3 $name, 2, "EnOcean $name teach-in is missing";
+      }
+    }
     EnOcean_Parse($hash, $a[3]);
   }
   #$hash->{NOTIFYDEV} = "global";
@@ -4658,7 +4696,7 @@ sub EnOcean_Parse($$)
     # Position Switch, Home and Office Application (EEP F6-04-01)
     # Mechanical Handle (EEP F6-10-00)
     my $event = "state";
-    my $nu =  ((hex($status) & 0x10) >> 4);
+    my $nu =  (hex($status) & 0x10) >> 4;
     # unused flags (AFAIK)
     #push @event, "1:T21:".((hex($status) & 0x20) >> 5);
     #push @event, "1:NU:$nu";
@@ -4814,6 +4852,7 @@ sub EnOcean_Parse($$)
   # [Eltako FTK, STM-250]
     push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
     if (!($db[0] & 8)) {
+      # teach-in
       $attr{$name}{eep} = "D5-00-01";
       $attr{$name}{manufID} = "7FF";
       $attr{$name}{subType} = "contact";
@@ -10343,7 +10382,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
 
 	  # Decode teach in type
 	  if ($type == 0) {
-	    # UTE teach-in expected
+	    # 1BS, 4BS, UTE or GP teach-in expected
             if ($info == 0) {
               $attr{$name}{comMode} = "uniDir";
     	      $attr{$name}{secMode} = "rcv";
