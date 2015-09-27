@@ -1443,6 +1443,7 @@ SVG_render($$$$$$$$$$)
       } else {
         ($d, $v) = split(" ", $l);
         $d =  ($tmul ? int((SVG_time_to_sec($d)-$fromsec)*$tmul) : $d);
+        $d = 0 if($tmul && $d < 0); # Forum #40358
         if($ld ne $d || $lv ne $v) {            # Saves a lot on year zoomlevel
           $ld = $d; $lv = $v;
           push @{$dxp}, $d;
