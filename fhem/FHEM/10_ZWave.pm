@@ -1236,10 +1236,11 @@ ZWave_mfsParse($$$$$)
         next;
       }
 
-      if($l =~ m/<Product type="([^"]*)".*id="([^"]*)".*name="([^"]*)"/) {
+      if($l =~ m/<Product type\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)"/) {
         if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
           if($config) {
-            $ret = "modelConfig:".(($l =~ m/config="([^"]*)"/) ? $1:"unknown");
+            $ret = "modelConfig:".
+                (($l =~ m/config\s*=\s*"([^"]*)"/) ? $1 : "unknown");
             ZWave_mfsAddClasses($hash, $1);
             return $ret;
           } else {
