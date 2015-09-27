@@ -710,8 +710,9 @@ FW_answerCall($)
   if($FW_tp || $FW_ss) {
     my $icon = $FW_ME."/images/default/fhemicon_ios.png";
     if($FW_ss) {
-       FW_pO '<meta name="viewport" '.
-               'content="initial-scale=1.0,user-scalable=1,shrink-to-fit=no"/>';
+       my $stf = $FW_userAgent =~ m/iPad|iPhone|iPod/ ? ",shrink-to-fit=no" :"";
+       FW_pO "<meta name='viewport' ".
+                        "content='initial-scale=1.0,user-scalable=1$stf'/>";
     } elsif($FW_tp) {
       FW_pO '<meta name="viewport" content="width=768"/>';
     }
