@@ -243,7 +243,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00B2" => {name=>"HM-SEC-WDS-2"            ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",}
  ,"00B3" => {name=>"HM-LC-Dim1L-Pl-3"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00B4" => {name=>"HM-LC-Dim1T-Pl-3"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
- ,"00B5" => {name=>"HM-LC-Dim1PWM-CV-2"      ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
+ ,"00B5" => {name=>"HM-LC-Dim1PWM-CV-2"      ,alias=>"HM-LC-Dim1PWM-CV"}
  ,"00B6" => {name=>"HM-LC-Dim1TPBU-FM-2"     ,alias=>"HM-LC-Dim1TPBU-FM"}
  ,"00B7" => {name=>"HM-LC-Dim1L-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00B8" => {name=>"HM-LC-Dim2L-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",}#
@@ -260,14 +260,14 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",}
  ,"00C7" => {name=>"HM-SEC-SCo"              ,st=>'threeStateSensor'  ,cyc=>'00:50' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"00C8" => {name=>"HM-LC-Sw1-Pl-3"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00C9" => {name=>"HM-LC-Sw1-SM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00CA" => {name=>"HM-LC-Sw1-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+ ,"00C9" => {name=>"HM-LC-Sw1-SM-2"          ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00CA" => {name=>"HM-LC-Sw1-FM-2"          ,alias=>"HM-LC-Sw1-Pl-3"}
  ,"00CB" => {name=>"HM-LC-Sw2-FM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
- ,"00CC" => {name=>"HM-LC-Sw2-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2",}
+ ,"00CC" => {name=>"HM-LC-Sw2-DR-2"          ,alias=>"HM-LC-Sw2-FM-2"}
  ,"00CD" => {name=>"HM-LC-Sw4-SM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
- ,"00CE" => {name=>"HM-LC-Sw4-PCB-2"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
- ,"00CF" => {name=>"HM-LC-Sw4-WM-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
- ,"00D0" => {name=>"HM-LC-Sw4-DR-2"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
+ ,"00CE" => {name=>"HM-LC-Sw4-PCB-2"         ,alias=>"HM-LC-Sw4-SM-2"}
+ ,"00CF" => {name=>"HM-LC-Sw4-WM-2"          ,alias=>"HM-LC-Sw4-SM-2"}
+ ,"00D0" => {name=>"HM-LC-Sw4-DR-2"          ,alias=>"HM-LC-Sw4-SM-2"}
  ,"00D1" => {name=>"HM-LC-Bl1-SM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",} # radio-controlled blind actuator 1-channel (flush-mount)
  ,"00D2" => {name=>"HM-LC-Bl1-FM-2"          ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",} # radio-controlled blind actuator 1-channel (flush-mount)
  # check config modess,"00D3" => {name=>"HM-Dis-WM55"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1'            ,chn=>"Dis:1:10",}
@@ -276,7 +276,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00D5" => {name=>"HM-RC-Sec4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"armInt:1:1,armExt:2:2,light:3:3,disarm:4:4",}
  ,"00D6" => {name=>"HM-RC-Key4-3"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"unlock:1:1,lock:2:2,light:3:3,open:4:4",}
  ,"00D7" => {name=>"HM-ES-PMSw1-Pl-DN-R1"    ,alias=>"HM-ES-PMSw1-Pl"}
- ,"00D8" => {name=>"HM-LC-Sw1-Pl-DN-R1"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+ ,"00D8" => {name=>"HM-LC-Sw1-Pl-DN-R1"      ,alias=>"HM-LC-Sw1-Pl-3"}
  ,"00D9" => {name=>"HM-MOD-Em-8"             ,st=>'remote'            ,cyc=>''      ,rxt=>'l'      ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DA" => {name=>"HM-RC-8"                 ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:8",}
  ,"00DB" => {name=>"HM-Sen-MDIR-WM55"        ,st=>'motionAndBtn'      ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2,Motion:3:3",}
@@ -289,17 +289,24 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00E3" => {name=>"HM-ES-PMSw1-Pl-DN-R3"    ,alias=>"HM-ES-PMSw1-Pl"}
  ,"00E4" => {name=>"HM-ES-PMSw1-Pl-DN-R4"    ,alias=>"HM-ES-PMSw1-Pl"}
  ,"00E5" => {name=>"HM-ES-PMSw1-Pl-DN-R5"    ,alias=>"HM-ES-PMSw1-Pl"}
- ,"00E6" => {name=>"HM-LC-Sw1-Pl-DN-R2"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00E7" => {name=>"HM-LC-Sw1-Pl-DN-R3"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00E8" => {name=>"HM-LC-Sw1-Pl-DN-R4"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00E9" => {name=>"HM-LC-Sw1-Pl-DN-R5"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+ ,"00E6" => {name=>"HM-LC-Sw1-Pl-DN-R2"      ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00E7" => {name=>"HM-LC-Sw1-Pl-DN-R3"      ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00E8" => {name=>"HM-LC-Sw1-Pl-DN-R4"      ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00E9" => {name=>"HM-LC-Sw1-Pl-DN-R5"      ,alias=>"HM-LC-Sw1-Pl-3"}
  ,"00EA" => {name=>"HM-ES-PMSw1-DR"          ,alias=>"HM-ES-PMSw1-Pl"}
- ,"00EB" => {name=>"HM-LC-Sw1-Pl-CT-R1"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00EC" => {name=>"HM-LC-Sw1-Pl-CT-R2"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00ED" => {name=>"HM-LC-Sw1-Pl-CT-R3"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00EE" => {name=>"HM-LC-Sw1-Pl-CT-R4"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00EF" => {name=>"HM-LC-Sw1-Pl-CT-R5"      ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
- ,"00F0" => {name=>"HM-LC-Sw1-DR"            ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+ ,"00EB" => {name=>"HM-LC-Sw1-Pl-CT-R1"      ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00EC" => {name=>"HM-LC-Sw1-Pl-CT-R2"      ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00ED" => {name=>"HM-LC-Sw1-Pl-CT-R3"      ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00EE" => {name=>"HM-LC-Sw1-Pl-CT-R4"      ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00EF" => {name=>"HM-LC-Sw1-Pl-CT-R5"      ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00F0" => {name=>"HM-LC-Sw1-DR"            ,alias=>"HM-LC-Sw1-Pl-3"}
+ ,"00F4" => {name=>"HM-LC-RGBW-WM"           ,st=>'rgb'               ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:1,Color:2:2,Auto:3:3",}
+ ,"00F5" => {name=>"HM-LC-Dim1T-FM-LF"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
+ ,"00F6" => {name=>"HM-ES-PMSw1-SM"          ,alias=>"HM-ES-PMSw1-Pl"}
+ ,"00F8" => {name=>"HM-RC-4-3-D"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
+
+
+
  ,"8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
  ,"FFF0" => {name=>"CCU-FHEM"                ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",}
@@ -433,8 +440,12 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   CtRefOn         =>{a=> 28.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOn"          ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
   CtRefOff        =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"         ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
 
-  CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"set mode and/or temperature"          ,lit=>{no=>0,tempOnly=>1,auto=>2,autoAndTemp=>3,manuAndTemp=>4,boost=>5,toggle=>6}},
   TempRC          =>{a=> 45  ,s=>0.6,l=>3,min=>5  ,max=>30      ,c=>''         ,f=>2       ,u=>'C'   ,d=>0,t=>"temperature if required by CtrlRc reg"},
+  CtrlRc          =>{a=> 46  ,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"set mode and/or temperature"          ,lit=>{no=>0,tempOnly=>1,auto=>2,autoAndTemp=>3,manuAndTemp=>4,boost=>5,toggle=>6}},
+  ActHsvCol       =>{a=> 47  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"activate color value"},
+  ActColPrgm      =>{a=> 48  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"activate color program"},
+  ActMinBoarder   =>{a=> 49  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"activate minimal boarder"},
+  ActMaxBoarder   =>{a=> 50  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"activate maximal boarder"},
 );
 
 %culHmRegDefine = (
@@ -455,7 +466,6 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   stbyTime2       =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>120     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
   backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},
   btnLock         =>{a=> 15.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"                          ,lit=>{off=>0,on=>1}},#1 is proofen
-
 # keymatic/winmatic secific register
   keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"                        ,lit=>{off=>0,on=>1}},
   signal          =>{a=>  3.4,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"                    ,lit=>{off=>0,on=>1}},
@@ -483,6 +493,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   modusBtnLock    =>{a=> 26.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"mode button lock"                     ,lit=>{off=>0,on=>200}},
   paramSel        =>{a=> 27.0,s=>1.0,l=>0,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"data transfered to peer"              ,lit=>{off=>0,T1=>1,T2=>2,T1_T2=>3,T2_T1=>4}},
   RS485IdleTime   =>{a=> 29.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Idle Time"},
+  speedMultiply   =>{a=> 30.0,s=>1.0,l=>0,min=>1  ,max=>5       ,c=>''         ,f=>''      ,u=>'x200Hz',d=>0,t=>"speed multiply"},
   wakeupDefChan   =>{a=> 32.0,s=>1.0,l=>0,min=>0  ,max=>20      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"wakeup default channel"},
   wakeupBehavior  =>{a=> 33.0,s=>0.1,l=>0,min=>0  ,max=>20      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior"                      ,lit=>{off=>0,on=>1}},
 #un-identified List0
@@ -854,7 +865,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                         }
  ,"HM-LC-Dim1PWM-CV"  =>{ confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1
                          ,characteristic  =>1,localResDis     =>1
-                         ,logicCombination=>1
+                         ,logicCombination=>1,speedMultiply   =>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
                          ,DimElsActionType=>1
                          ,DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1
@@ -973,7 +984,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,seqPulse5       =>1,seqTolerance    =>1
                          ,peerNeedsBurst  =>1
                         }
-  );
+ );
 
 #clones - - - - - - - - - - - - - - -
 
@@ -992,15 +1003,12 @@ $culHmRegModel{"HM-LC-SW4-DR"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
 $culHmRegModel{"HM-LC-SW2-DR"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FZS"} = $culHmRegModel{"HM-LC-Sw1-PL"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FZS-2"} = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw1-Pl-3"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw1-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw4-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw1-Pl-3"}      = $culHmRegModel{"HM-LC-Sw1-PL"}; # master
+$culHmRegModel{"HM-LC-Sw4-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"}; # master
 $culHmRegModel{"HM-LC-Sw4-PCB-2"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
 $culHmRegModel{"HM-LC-Sw4-WM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw1-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw2-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-LC-Sw2-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"}; # master
 $culHmRegModel{"HM-LC-Sw4-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw2-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
 
 $culHmRegModel{"Schueco_263-131"}     = $culHmRegModel{"HM-LC-Sw1PBU-FM"};#rf_s_1conf_644
 
@@ -1019,16 +1027,13 @@ $culHmRegModel{"HM-LC-Dim1L-Pl-644"}  = $culHmRegModel{"HM-LC-Dim1L-CV-2"};#RF_D
 $culHmRegModel{"HM-LC-Dim1L-CV-644"}  = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
 $culHmRegModel{"HM-LC-Dim1L-Pl-3"}    = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
 
-$culHmRegModel{"HM-LC-Dim1PWM-CV-2"}  = $culHmRegModel{"HM-LC-Dim1PWM-CV"};#rf_dim_1pwm_644
-
-#rf_dim_1t_644
-
 #rf_dim_2l_644
 
 $culHmRegModel{"HM-LC-Dim1T-CV"}      = $culHmRegModel{"HM-LC-Dim1T-Pl"};#rf_dim_t
 $culHmRegModel{"HM-LC-Dim1T-FM"}      = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 $culHmRegModel{"HM-LC-Dim2T-SM"}      = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 $culHmRegModel{"HM-LC-Dim1T-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+$culHmRegModel{"HM-LC-Dim1T-FM-LF"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};#unchecked!!!
 $culHmRegModel{"Schueco-263-134"}     = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 
 $culHmRegModel{"ASH550I"}             = $culHmRegModel{"HM-WDS10-TH-O"};
@@ -1153,7 +1158,23 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,sign            =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,localResDis     =>1
                         }
-  );
+ ,"HM-LC-RGBW-WM01"   =>{ OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
+                         ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
+                         ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+                         ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         ,DimJtOn         =>1,DimJtDlyOn      =>1,DimJtRampOff    =>1
+                         ,DimJtOff        =>1,DimJtDlyOff     =>1,DimJtRampOn     =>1
+                         ,CtValLo         =>1,CtValHi         =>1
+                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         ,lgMultiExec     =>1
+                        }
+ ,"HM-LC-RGBW-WM02"   =>{ ActHsvCol       =>1}
+ ,"HM-LC-RGBW-WM03"   =>{ ActColPrgm      =>1,ActMinBoarder   =>1,ActMaxBoarder   =>1}
+ );
 
 #clones - - - - - - - - - - - - - - -
 
@@ -1380,7 +1401,8 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       switch           =>{ getSerial     => ""
                                           ,pair          => ""
                                           ,getVersion    => ""
-                                         }
+                                          ,getDevInfo    => ""
+                                         }        
 #                     ,winMatic         =>{ statusRequest => ""} not working at least for FW 1.6
                      ,keyMatic         =>{ statusRequest => ""}
                      ,repeater         =>{ statusRequest => ""
@@ -1548,8 +1570,10 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                              ,toggle         =>""
                                             }
                      ,"HM-Sen-RD-O00"     =>{ fwUpdate       =>"<filename> <bootTime> ..."}
+                     ,"HM-MOD-Re-800"     =>{ fwUpdate       =>"<filename> <bootTime> ..."}
                      ,"HM-CC-RT-DN00"     =>{ sysTime        =>""
-                                             ,fwUpdate       =>"<filename> <bootTime> ..."}
+                                             ,fwUpdate       =>"<filename> <bootTime> ..."
+                                            }
                      ,"HM-LC-Bl1PBU-FM00" =>{ fwUpdate       =>"<filename> <bootTime> ..."}
                      ,"HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manual|boost|day|night]"
                                              ,controlManu    =>"[on|off|5.0..30.0]"
@@ -1565,6 +1589,11 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                              ,"desired-temp" =>"[on|off|5.0..30.0]"
                                              ,sysTime        =>""
                                             }
+                     ,"HM-TC-IT-WM-W-EU00"=>{ sysTime        =>""
+                                             ,getSerial      => ""
+                                             ,fwUpdate       =>"<filename> <bootTime> ..."
+                                            }
+                     ,"HM-TC-IT-WM-W-EU01"=>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"}
                      ,"HM-TC-IT-WM-W-EU02"=>{ controlMode    =>"[auto|manual|boost|day|night]"
                                              ,controlManu    =>"[on|off|5.0..30.0]"
                                              ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
@@ -1579,7 +1608,6 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                              ,tempListTmpl   =>"[verify|restore] [[<file>:]templateName] ..."
                                              ,peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"
                                             }
-                     ,"HM-TC-IT-WM-W-EU01"=>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"}
                      ,"HM-TC-IT-WM-W-EU07"=>{ peerChan       =>"<btnNumber> <actChn> ... single [set|unset] [actor|remote|both]"}
                      ,"HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"<sec>"
                                              ,"on-till"      =>"<time>"
@@ -1592,17 +1620,37 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                             }
                      ,"HM-ES-PMSw1-Pl00"  =>{ fwUpdate       =>"<filename> <bootTime> ..."
                                              ,getSerial      => ""
+                                             ,getDevInfo     => ""
                                             }
                      ,"HM-CC-RT-DN06"     =>{ press          =>"[long|short] [<peer>] [<repCount(long only)>] [<repDelay>] ..."}
                      ,"HM-Dis-WM5501"     =>{ displayWM      =>"[long|short|help] <lineX> <textNo1> <color1> <icon1> [<textNo2> <color2> <icon2>] ...[<textNo6> <color6> <icon6>] "}
                      ,"CCU-FHEM00"        =>{ update         =>""
-                                             ,hmPairForSec   =>"<sec>"
+                                             ,hmPairForSec   =>"<sec> ..."
                                              ,hmPairSerial   =>"<serial>"
                                              ,defIgnUnknown  =>""
                                              ,virtual        =>"<noButtons>"
                                              ,assignIO       =>"<IO> [set|unset]..."
                                             }
-);
+                     ,"HM-LC-RGBW-WM01"   =>{ "on-for-timer" =>"<ontime> [<ramptime>]..."
+                                             ,"on-till"      =>"<time> [<ramptime>]..."
+                                             ,on             =>""
+                                             ,off            =>""
+                                             ,toggle         =>""
+                                             ,pct            =>"<value> ... [<ontime>] [<ramptime>]"
+                                             ,stop           =>""
+                                             ,press          =>"[long|short] [on|off|<peer>] [<repCount(long only)>] [<repDelay>] ..."
+                                             ,up             =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                                             ,down           =>"[<changeValue>] [<ontime>] [<ramptime>] ..."
+                                             ,inhibit        =>"[on|off]"
+                                             ,statusRequest  =>""
+                                             ,peerIODev      =>"[IO] <btn> [set|unset]... not for future use"
+                                            }
+                     ,"HM-LC-RGBW-WM02"   =>{ brightCol      =>"" #General work 2 do!!!
+                                             ,brightAuto     =>""
+                                            }
+
+                                            
+ );
 # clones- - - - - - - - - - - - - - - - -
 $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
 
@@ -1621,7 +1669,6 @@ $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
 $culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
 
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
-$culHmChanSets{"HM-TC-IT-WM-W-EU00"}    = $culHmChanSets{"HM-CC-RT-DN00"};
 
 $culHmChanSets{"HM-ES-PMSw1-Pl04"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl05"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
@@ -1872,7 +1919,7 @@ $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
     %{$culHmRegDefine{"lg".$reg}} = %{$culHmRegDefShLg{$reg}};
     $culHmRegDefine{"lg".$reg}{a} +=0x80;
   }
-  foreach my $rN  (keys %culHmRegDefine){#create literal inverse for fast search
+  foreach my $rN  (keys %culHmRegDefine){ #create literal inverse for fast search
     if ($culHmRegDefine{$rN}{lit}){# literal assigned => create inverse
       foreach my $lit (keys %{$culHmRegDefine{$rN}{lit}}){
         $culHmRegDefine{$rN}{litInv}{$culHmRegDefine{$rN}{lit}{$lit}}=$lit;

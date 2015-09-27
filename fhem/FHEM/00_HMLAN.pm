@@ -402,8 +402,7 @@ sub HMLAN_Set($@) {############################################################
   my $cmd = shift @a;
   my $arg = join("", @a);
   if($cmd eq "hmPairForSec") { ####################################
-    return "Usage: set $name hmPairForSec <seconds_active>"
-        if(!$arg || $arg !~ m/^\d+$/);
+    $arg = 60    if(!$arg || $arg !~ m/^\d+$/);
     HMLAN_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
     InternalTimer(gettimeofday()+$arg, "HMLAN_RemoveHMPair", "hmPairForSec:$name", 1);
