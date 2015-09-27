@@ -2559,7 +2559,8 @@ FW_devState($$@)
       }
       $link .= "&room=$room";
     }
-    $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>";
+    $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>"
+       if($link !~ m/ noFhemwebLink$/);
   }
 
   my $style = AttrVal($d, "devStateStyle", "");
@@ -3199,8 +3200,11 @@ FW_widgetOverride($$)
         Note: if the image is referencing an SVG icon, then you can use the
         @colorname suffix to color the image. E.g.:<br>
         <ul>
-        attr Fax devStateIcon on:control_building_empty@red off:control_building_filled:278727
+        attr Fax devStateIcon on:control_building_empty@red
+                              off:control_building_filled:278727
         </ul>
+        If the cmd is noFhemwebLink, then no HTML-link will be generated, i.e.
+        nothing will happen when clicking on the icon or text.
 
         </ul>
         Second form:<br>
@@ -3877,7 +3881,8 @@ FW_widgetOverride($$)
           attr Fax devStateIcon on:control_building_empty@red
           off:control_building_filled:278727
         </ul>
-
+        Falls cmd noFhemwebLink ist, dann wird kein HTML-Link generiert, d.h.
+        es passiert nichts, wenn man auf das Icon/Text klickt.
         </ul>
         Zweite Variante:<br>
         <ul>
