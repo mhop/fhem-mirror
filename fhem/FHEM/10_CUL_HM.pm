@@ -2883,7 +2883,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
 
-    if($paired == 0 && CUL_HM_getRxType($mhp->{devH}) & 0x04){#no pair -send config?
+    if($paired == 0 && CUL_HM_getRxType($mhp->{devH}) & 0x14){#no pair -send config?
       CUL_HM_appFromQ($mhp->{devN},"cf");   # stack cmds if waiting
       my $ioId = CUL_HM_h2IoId($mhp->{devH}{IODev});
       $respRemoved = 1;#force command stack processing
@@ -3830,7 +3830,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "deviceRename") { #############################################
     $state = "";
     my $newName = $a[2];
-    my @chLst = {"device"};# entry 00 is unsed
+    my @chLst = ("device");# entry 00 is unsed
     if ($roleV){
       foreach(1..50){
         push @chLst,$newName."_Btn".$_;
@@ -3870,6 +3870,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "getSerial") { ################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'0009');
     $state = "";
+  }
+  elsif($cmd eq "getDevInfo") { ###############################################
+    $state = "";
+    my $sn = ReadingsVal($name,"D-serialNr","");
+    return "serial number unknown"  if (! $sn);
+    CUL_HM_PushCmdStack($hash,'++8401'.$id.'000000010A'.uc(unpack('H*', $sn)));
   }
   elsif($cmd eq "getConfig") { ################################################
     CUL_HM_unQEntity($name,"qReqConf");
@@ -5176,8 +5182,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "hmPairForSec") { #############################################
     $state = "";
     my $arg = $a[2]?$a[2]:"";
-    return "Usage: set $name hmPairForSec <seconds_active>"
-        if( $arg !~ m/^\d+$/);
+    $arg = 60 if( $arg !~ m/^\d+$/);
     CUL_HM_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
     InternalTimer(gettimeofday()+$arg, "CUL_HM_RemoveHMPair", "hmPairForSec:$name", 1);
@@ -5679,7 +5684,6 @@ sub CUL_HM_PushCmdStack($$) {
 sub CUL_HM_ProcessCmdStack($) {
   my ($chnhash) = @_;
   my $hash = CUL_HM_getDeviceHash($chnhash);
-  
   if (!$hash->{helper}{prt}{rspWait}{cmd}){
     if($hash->{cmdStack} && @{$hash->{cmdStack}}){
      CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
@@ -5904,7 +5908,6 @@ sub CUL_HM_SndCmd($$) {
     CUL_HM_UpdtReadSingle($hash,"state","ERR_IOdev_undefined",1);
     return;
   }
-  
   my $io = $hash->{IODev};
   my $ioName = $io->{NAME};
   
@@ -5945,7 +5948,6 @@ sub CUL_HM_SndCmd($$) {
 
   $cmd =~ m/^(..)(.*)$/;
   my ($mn, $cmd2) =  unpack 'A2A*',$cmd;
-
   if($mn eq "++") {
     $mn = ($hash->{helper}{HM_CMDNR} + 1) & 0xff;
     $hash->{helper}{HM_CMDNR} = $mn;
