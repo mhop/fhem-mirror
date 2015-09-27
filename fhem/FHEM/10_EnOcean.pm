@@ -576,47 +576,45 @@ EnOcean_Define($$)
     return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
   }
   # autocreate subType from RORG
-  $attr{$name}{subType} = $1 if($name =~ m/EnO_(.*)_$def/);
-  if (@a == 4) {
+  if (@a == 4 && $name =~ m/EnO_$def/) {
     # parse received device data
     $hash->{DEF} = $def;
-    if (exists $attr{$name}{subType}) {
-      my ($data, $status);
-     (undef, undef, undef, $data, undef, $status, undef) = split(':', $a[3]);     
-      if ($attr{$name}{subType} eq "switch") {
-        my $nu = (hex($status) & 0x10) >> 4;
-        my $t21 = (hex($status) & 0x20) >> 5;
-        $attr{$name}{manufID} = "7FF";
-        if ($t21 && $nu) {
-          $attr{$name}{eep} = "F6-02-01";
-          readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-02-01 Manufacturer: no ID", 1);
-          Log3 $name, 2, "EnOcean $name teach-in EEP F6-02-01 Manufacturer: no ID";
-        } elsif (!$t21 && $nu) {
-          $attr{$name}{eep} = "F6-03-01";
-          readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-03-01 Manufacturer: no ID", 1);
-          Log3 $name, 2, "EnOcean $name teach-in EEP F6-03-01 Manufacturer: no ID";
-        }      
-      } elsif ($attr{$name}{subType} eq "contact" && hex($data) & 8) {
-        $attr{$name}{eep} = "D5-00-01";
-        $attr{$name}{manufID} = "7FF";
-        readingsSingleUpdate($hash, "teach", "1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID", 1);
-        Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
-      } elsif ($attr{$name}{subType} eq "4BS" && hex(substr($data, 6, 2)) & 8) {
-        readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
-        Log3 $name, 2, "EnOcean $name teach-in is missing";
-      } elsif ($attr{$name}{subType} eq "VLD") {
-        readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
-        Log3 $name, 2, "EnOcean $name teach-in is missing";
-      } elsif ($attr{$name}{subType} eq "MSC") {
-        readingsSingleUpdate($hash, "teach", "MSC teach-in not supported", 1);
-        Log3 $name, 2, "EnOcean $name MSC not supported";
-      } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
-        readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
-        Log3 $name, 2, "EnOcean $name secure teach-in is missing";
-      } elsif ($attr{$name}{subType} =~ m/^GPCD|GPSD$/) {
-        readingsSingleUpdate($hash, "teach", "GP teach-in is missing", 1);
-        Log3 $name, 2, "EnOcean $name teach-in is missing";
-      }
+    my ($data, $rorg, $status);
+    (undef, undef, $rorg, $data, undef, $status, undef) = split(':', $a[3]);     
+    $attr{$name}{subType} = $EnO_rorgname{$rorg};
+    if ($attr{$name}{subType} eq "switch") {
+      my $nu = (hex($status) & 0x10) >> 4;
+      my $t21 = (hex($status) & 0x20) >> 5;
+      $attr{$name}{manufID} = "7FF";
+      if ($t21 && $nu) {
+        $attr{$name}{eep} = "F6-02-01";
+        readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-02-01 Manufacturer: no ID", 1);
+        Log3 $name, 2, "EnOcean $name teach-in EEP F6-02-01 Manufacturer: no ID";
+      } elsif (!$t21 && $nu) {
+        $attr{$name}{eep} = "F6-03-01";
+        readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-03-01 Manufacturer: no ID", 1);
+        Log3 $name, 2, "EnOcean $name teach-in EEP F6-03-01 Manufacturer: no ID";
+      }      
+    } elsif ($attr{$name}{subType} eq "contact" && hex($data) & 8) {
+      $attr{$name}{eep} = "D5-00-01";
+      $attr{$name}{manufID} = "7FF";
+      readingsSingleUpdate($hash, "teach", "1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID", 1);
+      Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
+    } elsif ($attr{$name}{subType} eq "4BS" && hex(substr($data, 6, 2)) & 8) {
+      readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
+      Log3 $name, 2, "EnOcean $name teach-in is missing";
+    } elsif ($attr{$name}{subType} eq "VLD") {
+      readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
+      Log3 $name, 2, "EnOcean $name teach-in is missing";
+    } elsif ($attr{$name}{subType} eq "MSC") {
+      readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
+      Log3 $name, 2, "EnOcean $name MSC not supported";
+    } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
+      readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
+      Log3 $name, 2, "EnOcean $name secure teach-in is missing";
+    } elsif ($attr{$name}{subType} =~ m/^GPCD|GPSD$/) {
+      readingsSingleUpdate($hash, "teach", "GP teach-in is missing", 1);
+      Log3 $name, 2, "EnOcean $name teach-in is missing";
     }
     EnOcean_Parse($hash, $a[3]);
   }
@@ -4563,10 +4561,10 @@ sub EnOcean_Parse($$)
       if (exists($iohash->{helper}{gpRespWait}{$destinationID}) ||
           exists($iohash->{helper}{UTERespWait}{$destinationID}) ||
           exists($iohash->{helper}{"4BSRespWait"}{$destinationID})) {
-        $ret = "UNDEFINED EnO_${rorgname}_$senderID EnOcean $senderID $msg";
-        #$ret = "UNDEFINED -temporary EnO_${rorgname}_$senderID EnOcean $senderID $msg";
+        $ret = "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
+        #$ret = "UNDEFINED -temporary EnO_$senderID EnOcean $senderID $msg";
       } else {
-        $ret = "UNDEFINED EnO_${rorgname}_$senderID EnOcean $senderID $msg";
+        $ret = "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
       }
       if ($rorgname =~ m/^GPCD|GPSD$/) {        
         Log3 undef, 4, "EnOcean Unknown GP device with SenderID $senderID and $rorgname telegram, please define it.";
@@ -5394,7 +5392,7 @@ sub EnOcean_Parse($$)
         $fspeed = 1      if ($db[3] >= 165);
         $fspeed = 0      if ($db[3] >= 190);
         $fspeed = "auto" if ($db[3] >= 210);
-        my $switch = $db[0] & 1;
+        my $switch = $db[0] & 1 ? "on" : "off";
         push @event, "3:state:T: $temp SP: $db[2] F: $fspeed SW: $switch";
         push @event, "3:fanStage:$fspeed";
         push @event, "3:switch:$switch";
@@ -13239,11 +13237,11 @@ EnOcean_Undef($$)
      <ul>
        <li>T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|auto SW: 0|1</li>
        <li>fanStage: 0|1|2|3|auto</li>
-       <li>switch: 0|1</li>
+       <li>switch: on|off</li>
        <li>setpoint: 0 ... 255</li>
        <li>setpointScaled: &lt;floating-point number&gt;</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
-       <li>state: T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|auto SW: 0|1</li><br>
+       <li>state: T: t/&#176C SP: 0 ... 255 F: 0|1|2|3|auto SW: on|off</li><br>
        Alternatively for Eltako devices
        <li>T: t/&#176C SPT: t/&#176C NR: t/&#176C</li>
        <li>block: lock|unlock</li>
