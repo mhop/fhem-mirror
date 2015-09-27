@@ -2523,6 +2523,27 @@ ZWave_Parse($$@)
       Log3 $ioName, 2, "SERIAL_API_SET_TIMEOUTS: ACK:$1 BYTES:$2";
       return "";
     }
+    if($cmd eq "ZW_REMOVE_FAILED_NODE_ID") {
+      my $retval;
+      if ($arg eq "00") {
+        $retval = 'failedNodeRemoveStarted';
+      } elsif ($arg eq "02") {
+        $retval = 'notPrimaryController';
+      } elsif ($arg eq "04") {
+        $retval = 'noCallbackFunction';
+      } elsif ($arg eq "08") {
+        $retval = 'failedNodeNotFound';
+      } elsif ($arg eq "10") {
+        $retval = 'failedNodeRemoveProcessBusy';
+      } elsif ($arg eq "20") {
+        $retval = 'failedNodeRemoveFail';
+      } else {
+        $retval = 'unknown_'.$arg; # should never happen
+      }
+      DoTrigger($ioName, "$cmd $retval");
+      return "";
+    }
+
     Log3 $ioName, 4, "$ioName unhandled ANSWER: $cmd $arg";
     return "";
   }
@@ -2641,6 +2662,17 @@ ZWave_Parse($$@)
       $evt = 'failed';
     } else {
       $evt = 'unknown'; # should never happen
+    }
+
+  } elsif($cmd eq "ZW_REMOVE_FAILED_NODE_ID") {
+    if ($id eq "00") {
+      $evt = 'nodeOk';
+    } elsif ($id eq "01") {
+      $evt = 'failedNodeRemoved';
+    } elsif ($id eq "02") {
+      $evt = 'failedNodeNotRemoved';
+    } else {
+      $evt = 'unknown_'.$id; # should never happen
     }
 
   }
@@ -3187,7 +3219,7 @@ s2Hex($)
     </li>
 
   <br><br><b>Class COLOR_CONTROL</b>
-  <li>ccCapabilities<br>
+  <li>ccCapability<br>
     return capabilities.</li>
   <li>ccStatus channelId<br>
     return status of channel ChannelId.
@@ -3470,7 +3502,7 @@ s2Hex($)
   <li>clock:[mon|tue|wed|thu|fri|sat|sun] HH:MM</li>
 
   <br><br><b>Class COLOR_CONTROL</b>
-  <li>ccCapabilities:XY</li>
+  <li>ccCapability:XY</li>
   <li>ccStatus_X:Y</li>
 
   <br><br><b>Class CONFIGURATION</b>

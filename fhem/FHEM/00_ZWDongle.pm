@@ -30,7 +30,7 @@ my %sets = (
   "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
                           param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
-  "removeFailedNode" => { cmd => "61%02x" },   # ZW_REMOVE_FAILED_NODE_ID
+  "removeFailedNode" => { cmd => "61%02x@" },   # ZW_REMOVE_FAILED_NODE_ID
   "replaceFailedNode"=> { cmd => "63%02x" },   # ZW_REPLACE_FAILED_NODE
   "neighborUpdate"   => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
@@ -442,6 +442,9 @@ ZWDongle_Get($@)
   } elsif($type eq "random") {                  ############################
     return "$name: Cannot generate" if($ret !~ m/^011c01(..)(.*)$/);
     $msg = $2; @a = ();
+
+  } elsif($type eq "isFailedNode") {                  ############################
+    $msg = ($r[2]==1)?"yes":"no";
 
   }
 
@@ -878,6 +881,11 @@ ZWDongle_Ready($)
     update process.  To read node's neighbor list see neighborList get
     below.</li>
 
+  <li>removeFailedNode<br>
+    Remove a non-responding node that must be on the failed Node list from 
+    the node list in controller. Instead, always use removeNode if possible.
+    Note: the corresponding fhem device have to be deleted manually.</li>
+
   <li>reopen<br>
     First close and then open the device. Used for debugging purposes.
     </li>
@@ -894,6 +902,9 @@ ZWDongle_Ready($)
 
   <li>homeId<br>
     return the six hex-digit homeId of the controller.</li>
+
+  <li>isFailedNode<br>
+    return if a node is stored in the failed node List.</li>
 
   <li>caps, ctrlCaps, version<br>
     return different controller specific information. Needed by developers
@@ -940,6 +951,11 @@ ZWDongle_Ready($)
   <b>Generated events:</b>
   <ul>
   <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|controller|done|failed]
+    </li>
+  <li>ZW_REMOVE_FAILED_NODE_ID 
+           [notPrimaryController|noCallbackFunction|failedNodeNotFound|
+            failedNodeProcessBusy|failedNodeRemoveFail|nodeOk|nodeRemoved|
+            nodeNotRemoved]
     </li>
   <li>ZW_REMOVE_NODE_FROM_NETWORK 
                         [learnReady|nodeFound|slave|controller|done|failed]
