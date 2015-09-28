@@ -145,7 +145,7 @@ sub ROOMMATE_Define($$) {
         $attr{$name}{devStateIcon} =
 ".*home:user_available:absent .*absent:user_away:home .*gone:user_ext_away:home .*gotosleep:scene_toilet:asleep .*asleep:scene_sleeping:awoken .*awoken:scene_sleeping_alternat:home .*:user_unknown:home";
         $attr{$name}{icon}        = "people_sensor";
-        $attr{$name}{rr_realname} = "alias";
+        $attr{$name}{rr_realname} = "group";
         $attr{$name}{sortby}      = "1";
         $attr{$name}{webCmd}      = "state";
 
