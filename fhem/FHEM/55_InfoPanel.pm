@@ -141,7 +141,8 @@ sub InfoPanel_Initialize($) {
     $hash->{SetFn}     = "btIP_Set";
     $hash->{GetFn}     = "btIP_Get";
     $hash->{NotifyFn}  = "btIP_Notify";
-    $hash->{AttrList}  = "autoreread:1,0 bgcolor refresh size title noscript showTime:1,0 ";
+    $hash->{AttrList}  = "autoreread:1,0 useViewPort:1,0 bgcolor refresh size ";
+    $hash->{AttrList} .= "title noscript showTime:1,0 ";
     $hash->{AttrList} .= " bgcenter:1,0 bgdir bgopacity tmin" if $useImgTools;
 
     return undef;
@@ -1366,8 +1367,6 @@ sub btIP_splitRequest {
 # HTML Stuff
 #
 
-#  my $viewport= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0\"/>";
-
 sub btIP_returnHTML {
   my ($name) = @_;
 
@@ -1375,6 +1374,7 @@ sub btIP_returnHTML {
      $refresh = ($refresh && $refresh < 59) ? 60 : $refresh; 
   my $title   = AttrVal($name, 'title', $name);
   my $viewport= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0\"/>";  
+  $viewport = AttrVal($name,"useViewPort",1) ? $viewport : "";
   my $gen     = 'generated="'.(time()-1).'"';  
   my $code    = btIP_HTMLHead($name,$title,$viewport,$refresh);
 
@@ -1556,6 +1556,7 @@ Please read <a href="http://forum.fhem.de/index.php/topic,32828.0.html" target="
 		<li><b>showTime</b> - disables generation timestamp in state if set to 0</li>
 		<li><b>size</b> - The dimensions of the picture in the format
             <code>&lt;width&gt;x&lt;height&gt;</code></li>
+		<li><b>useViewPort</b> - add viewport meta tag to fit mobile displays</li>
 		<li><b>title</b> - webpage title to be shown in Browser</li>
 		<br/>
 		<li><b>bgcenter</b> - background images will not be centered if attribute set to 0. Default: show centered</li>
