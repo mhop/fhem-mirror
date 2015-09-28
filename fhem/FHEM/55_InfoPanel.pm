@@ -57,7 +57,7 @@
 #                              with \n in text
 #
 ##############################################
-# $Id$
+# $Id: 55_InfoPanel.pm 9301 2015-09-25 12:25:49Z betateilchen $
 
 package main;
 use strict;
@@ -1366,14 +1366,17 @@ sub btIP_splitRequest {
 # HTML Stuff
 #
 
+#  my $viewport= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0\"/>";
+
 sub btIP_returnHTML {
   my ($name) = @_;
 
   my $refresh = AttrVal($name, 'refresh', 60);
      $refresh = ($refresh && $refresh < 59) ? 60 : $refresh; 
   my $title   = AttrVal($name, 'title', $name);
+  my $viewport= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0\"/>";  
   my $gen     = 'generated="'.(time()-1).'"';  
-  my $code    = btIP_HTMLHead($name,$title,$refresh);
+  my $code    = btIP_HTMLHead($name,$title,$viewport,$refresh);
 
   $code .=  "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\" ".
             "$gen longpoll=\"1\" longpollfilter=\"room=all\" >\n".
@@ -1386,16 +1389,16 @@ sub btIP_returnHTML {
 }
 
 sub btIP_HTMLHead {
-  my ($name,$title,$refresh) = @_;
+  my ($name,$title,$viewport,$refresh) = @_;
   my $doctype = '<?xml version="1.0" encoding="utf-8" standalone="no"?> '."\n".
                 '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '.
                 '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">'."\n";
   my $xmlns   = "";
 
-  my $r       = (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>\n" : "";
+  my $r       = (defined($refresh) && $refresh) ? "<meta http-equiv=\"refresh\" content=\"$refresh\"/>" : "";
   my $scripts = btIP_getScript($name);
-  my $meta    = "<meta charset=\"UTF-8\">\n";
-  my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta$r$scripts</head>\n";
+  my $meta    = "<meta charset=\"UTF-8\">";
+  my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n$meta\n$r\n$viewport\n$scripts</head>\n";
   return $code;
 }
 
