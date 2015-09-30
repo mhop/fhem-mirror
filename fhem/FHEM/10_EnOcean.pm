@@ -321,8 +321,9 @@ my %EnO_eepConfig = (
  # special profiles
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
-  "L6.02.01" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
+  "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}},
+  "L6.02.01" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
   "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}},
 );
 
@@ -575,9 +576,8 @@ EnOcean_Define($$)
   } else {
     return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
   }
-  # autocreate subType from RORG
+  # autocreate: parse received device telegram
   if (@a == 4 && $name =~ m/EnO_$def/) {
-    # parse received device data
     $hash->{DEF} = $def;
     my ($data, $rorg, $status);
     (undef, undef, $rorg, $data, undef, $status, undef) = split(':', $a[3]);     
@@ -11230,6 +11230,7 @@ EnOcean_Undef($$)
    Inofficial EEP for special devices
    <ul>
      <li>G5-38-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
+     <li>M5-38-08 Gateway, Switching [Eltako FSR14]<br></li>
      <li>G5-3F-7F Shutter [Eltako FSB]<br></li>
      <li>L6-02-01 Smoke Detector [Eltako FRW]<br></li>
      <li>G5-ZZ-ZZ Light and Presence Sensor [Omnio Ratio eagle-PM101]<br></li>
