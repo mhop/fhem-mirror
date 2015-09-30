@@ -153,8 +153,9 @@ sub WeekdayTimer_Define($$) {
   $hash->{TYPE}           = $type;  
   $hash->{NAME}           = $name;
   $hash->{DEVICE}         = $device;
+  $hash->{STILLDONETIME}  = 0;
   $hash->{SWITCHINGTIMES} = \@switchingtimes;
-  $attr{$name}{verbose}   = 4 if (!defined $attr{$name}{verbose} && $name =~ m/^tst.*/ );
+  $attr{$name}{verbose}   = 5 if (!defined $attr{$name}{verbose} && $name =~ m/^tst.*/ );
  #$attr{$name}{verbose}   = 4;  
 
   $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}} = $hash;
@@ -585,8 +586,15 @@ sub WeekdayTimer_Update($) {
   # Schaltparameter ermitteln
   my $tage        = $hash->{profil}{$idx}{TAGE};
   my $time        = $hash->{profil}{$idx}{TIME};
+  my $epoch       = $hash->{profil}{$idx}{EPOCH};
   my $newParam    = $hash->{profil}{$idx}{PARA};
-
+  
+  if ($hash->{STILLDONETIME} > $epoch  ) {
+     Log3 $hash, 3, "[$name] Timer $time overwritten by " . FmtDateTime($hash->{STILLDONETIME});
+     return;
+  }
+  $hash->{STILLDONETIME} = $epoch;
+  
   # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
   if (WeekdayTimer_FensterOffen($hash, $newParam, $idx)) {
      readingsSingleUpdate ($hash,  "state", "open window", 1);
@@ -598,12 +606,6 @@ sub WeekdayTimer_Update($) {
   
   my ($indx, $aktTime,  $aktParameter, $nextTime, $nextParameter) =
      WeekdayTimer_searchAktNext($hash, time()+5);
-
-  #if ($newParam ne $aktParameter ) {
-  #  #Log3 $hash, 3, "[$name]*Update   - $newParam overwritten by $aktParameter (" . FmtDateTime($aktTime). ")"; 
-  #   Log3 $hash, 3, "[$name] Update   - $newParam overwritten by $aktParameter (" . FmtDateTime($aktTime). ")" if($activeTimer); 
-  #   $newParam = $aktParameter;
-  #}   
 
   # ggf. Device schalten
   WeekdayTimer_Device_Schalten($hash, $newParam, $tage)   if($activeTimer);
