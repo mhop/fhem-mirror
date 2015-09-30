@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 04/2015
-my $thzversion = "0.144";
+my $thzversion = "0.145";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -604,7 +604,7 @@ my %Rev_OpMode = reverse %OpMode;
 my %OpModeHC = ("1" =>"normal", "2" => "setback", "3" =>"standby", "4" =>"restart", "5" =>"restart");
 my %SomWinMode = ( "01" =>"winter", "02" => "summer");
 my %weekday = ( "0" =>"Monday", "1" => "Tuesday", "2" =>"Wednesday", "3" => "Thursday", "4" => "Friday", "5" =>"Saturday", "6" => "Sunday" );
-my %faultmap = ( "0" =>"n.a.", "1" => "F01_AnodeFault", "2" => "F02_SafetyTempDelimiterEngaged", "3" => "F03_HighPreasureGuardFault", "4" => "F04_LowPreasureGuardFault", "5" => "F05_OutletFanFault", "6" => "F06_InletFanFault", "7" => "F07_MainOutputFanFault", "11" => "F11_LowPreasureSensorFault", "12"=> "F12_HighPreasureSensorFault", "15" => "F15_DHW_TemperatureFault",  "17" => "F17_DefrostingDurationExceeded", "20" => "F20_SolarSensorFault", "21" => "F21_OutsideTemperatureSensorFault", "22" => "F22_HotGasTemperatureFault", "23" => "F23_CondenserTemperatureSensorFault", "24" => "F24_EvaporatorTemperatureSensorFault", "26" => "F26_ReturnTemperatureSensorFault", "28" => "F28_FlowTemperatureSensorFault", "29" => "F29_DHW_TemperatureSensorFault", "30" => "F30_SoftwareVersionFault" );
+my %faultmap = ( "0" =>"n.a.", "1" => "F01_AnodeFault", "2" => "F02_SafetyTempDelimiterEngaged", "3" => "F03_HighPreasureGuardFault", "4" => "F04_LowPreasureGuardFault", "5" => "F05_OutletFanFault", "6" => "F06_InletFanFault", "7" => "F07_MainOutputFanFault", "11" => "F11_LowPreasureSensorFault", "12"=> "F12_HighPreasureSensorFault", "15" => "F15_DHW_TemperatureFault",  "17" => "F17_DefrostingDurationExceeded", "20" => "F20_SolarSensorFault", "21" => "F21_OutsideTemperatureSensorFault", "22" => "F22_HotGasTemperatureFault", "23" => "F23_CondenserTemperatureSensorFault", "24" => "F24_EvaporatorTemperatureSensorFault", "26" => "F26_ReturnTemperatureSensorFault", "28" => "F28_FlowTemperatureSensorFault", "29" => "F29_DHW_TemperatureSensorFault", "30" => "F30_SoftwareVersionFault", "31" => "F31_RAMfault", "32" => "F32_EEPromFault", "33" => "F33_ExtractAirHumiditySensor", "34" => "F34_FlowSensor", "35" => "F35_minFlowCooling", "36" => "F36_MinFlowRate", "37" => "F37_MinWaterPressure", "40" => "F40_FloatSwitch", "50" => "F50_SensorHeatPumpReturn", "51" => "F51_SensorHeatPumpFlow",  "52" => "F52_SensorCondenserOutlet" );
 my $firstLoadAll = 0;
 my $noanswerreceived = 0;
 my $internalHash;
@@ -1375,7 +1375,7 @@ local $SIG{__WARN__} = sub
 
 #######################################
 #THZ_Parse1($) could be used in order to test an external config file; I do not know if I want it
-#e.g. {THZ_Parse1("","F70B000500E6")}
+#e.g. {THZ_Parse1(undef,"F70B000500E6")}
 #######################################
 
 sub THZ_Parse1($$) {
@@ -1426,7 +1426,7 @@ sub THZ_Parse1($$) {
       elsif ($Type eq "hexdate")	{$value= hex(substr($value, 0,2) . substr($value, 2,2));}
       #elsif ($Type eq "turnhex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 2,2) . substr($value, 0,2))/100))) ;}
       #elsif ($Type eq "hex2time")	{$value= sprintf(join(':', split("\\.", hex(substr($value, 0,2) . substr($value, 2,2))/100))) ;}
-      elsif ($Type eq "turnhex2time")	{$value= sprintf("%02u:%02u", hex($value)%100, hex($value)/100) ;}
+      elsif ($Type eq "turnhex2time")	{$value= substr($value, 2,2) . substr($value, 0,2); $value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100); }
       elsif ($Type eq "hex2time")	{$value= sprintf("%02u:%02u", hex($value)/100, hex($value)%100) ;}
       elsif ($Type eq "swver")		{$value= sprintf("%01u.%02u", hex(substr($value, 0,2)), hex(substr($value, 2,2)));}
       elsif ($Type eq "hex2ascii")	{$value= uc(pack('H*', $value));}
