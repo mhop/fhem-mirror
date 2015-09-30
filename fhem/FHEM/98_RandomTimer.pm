@@ -524,7 +524,7 @@ sub RandomTimer_Wakeup() {  # {RandomTimer_Wakeup()}
         </pre>
     </li>
 
-    <li><a name="disableCond">disableCond</a><br>
+    <li><a name="keepDeviceAlive">keepDeviceAlive</a><br>
         The default behavior of a RandomTimer is, that it shuts down the device after stoptime is reached.
         The <b>keepDeviceAlive</b> attribute  changes the behavior. If set, the device status is not changed when the stoptime is reached.
         <br>
