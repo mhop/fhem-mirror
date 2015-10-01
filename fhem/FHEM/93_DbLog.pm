@@ -1924,7 +1924,7 @@ DbLog_sampleDataFn($$$$$)
     for(my $r=0; $r < $max; $r++) {
       my @f = split(":", ($dlog->[$r] ? $dlog->[$r] : ":::"), 4);
       my $ret = "";
-      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]:$f[4]", 20);
+      $ret .= SVG_txt("par_${r}_0", "", "$f[0]:$f[1]:$f[2]:$f[3]", 20);
 #      $ret .= SVG_txt("par_${r}_2", "", $f[2], 1); # Default not yet implemented
 #      $ret .= SVG_txt("par_${r}_3", "", $f[3], 3); # Function
 #      $ret .= SVG_txt("par_${r}_4", "", $f[4], 3); # RegExp
