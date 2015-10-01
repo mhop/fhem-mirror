@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  93_DbLog: fixed ploteditor bug when DbLogType=History.
   - feature: 93_DbLog: added new setter 'reduceLog' to clean up database.
   - feature: new Modules 36_EleroStick.pm and 36_EleroDrive.pm for Elero shutters
   - change:  55_InfoPanel.pm: support ReadingsVal in ticker #35228
