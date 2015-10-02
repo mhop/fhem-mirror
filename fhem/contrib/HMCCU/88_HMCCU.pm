@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 1.7
+#  Version 1.8
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -13,21 +13,22 @@
 #  define <name> HMCCU <host_or_ip>
 #
 #  set <name> devstate <ccu_object> <value>
-#  set <name> datapoint <channel>.<datapoint> <value>
+#  set <name> datapoint <device>:<channel>.<datapoint> <value>
+#  set <name> var <value>
 #  set <name> execute <ccu_program>
 #  set <name> clearmsg
 #
 #  get <name> devstate <ccu_object> [<reading>]
 #  get <name> vars <regexp>[,...]
-#  get <name> channel <channel>[.<datapoint>]
+#  get <name> channel <device>:<channel>[.<datapoint_exp>]
 #  get <name> datapoint <channel>.<datapoint> [<reading>]
 #  get <name> parfile [<parfile>]
 #
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> stripchar <character>
 #  attr <name> parfile <parfile>
-#  attr <name> substitute <regexp>:<text>[,...]
-#  attr <name> units { 0 | 1 }
+#  attr <name> stateval <text1>:<subtext1>[,...]
+#  attr <name> substitute <regexp1>:<subtext1>[,...]
 #
 ################################################################
 
@@ -40,12 +41,18 @@ use XML::Simple qw(:strict);
 # use Data::Dumper;
 
 sub HMCCU_Define ($$);
+sub HMCCU_Undef ($$);
 sub HMCCU_Set ($@);
 sub HMCCU_Get ($@);
+sub HMCCU_Attr ($@);
 sub HMCCU_ParseCCUDev ($);
 sub HMCCU_SetError ($$);
+sub HMCCU_SetState ($$);
 sub HMCCU_Substitute ($$);
+sub HMCCU_UpdateClientReading ($$$);
 
+#####################################
+# Initialize module
 #####################################
 
 sub HMCCU_Initialize ($)
@@ -53,12 +60,16 @@ sub HMCCU_Initialize ($)
 	my ($hash) = @_;
 
 	$hash->{DefFn} = "HMCCU_Define";
+	$hash->{UndefFn} = "HMCCU_Undef";
 	$hash->{SetFn} = "HMCCU_Set";
 	$hash->{GetFn} = "HMCCU_Get";
+	$hash->{AttrFn} = "HMCCU_Attr";
 
-	$hash->{AttrList} = "model:HMCCU stripchar ccureadings:0,1 parfile substitute units:0,1 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "stripchar ccureadings:0,1 parfile stateval substitute units:0,1 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
+#####################################
+# Define device
 #####################################
 
 sub HMCCU_Define ($$)
@@ -67,22 +78,51 @@ sub HMCCU_Define ($$)
 	my $name = $hash->{NAME};
 	my @a = split("[ \t][ \t]*", $def);
 
-	return "Define the CCU hostname or IP address as a parameter i.e. MyCCU" if(@a < 3);
+	return "Define CCU hostname or IP address as a parameter" if(@a < 3);
 
 	my $host = $a[2];
 
-	$attr{$name}{stripchar} = '';
-	$attr{$name}{ccureadings} = 1;
-	$attr{$name}{parfile} = '';
-	$attr{$name}{substitute} = '';
-	$attr{$name}{units} = 0;
-  
 	$hash->{host} = $host;
-	readingsSingleUpdate ($hash, "state", "Initialized", 1);
+	$hash->{Clients} = ':HMCCUDEV:';
+
+	HMCCU_SetState ($hash, "Initialized");
 
 	return undef;
 }
 
+#####################################
+# Set attribute
+#####################################
+
+sub HMCCU_Attr ($@)
+{
+	my ($cmd, $name, $attrname, $attrval) = @_;
+
+	return undef;
+}
+
+#####################################
+# Delete device
+#####################################
+
+sub HMCCU_Undef ($$)
+{
+	my ($hash, $arg) = @_;
+	my $name = $hash->{NAME};
+
+	# Delete reference to IO module in client devices
+	foreach my $d (sort keys %defs) {
+		if (defined ($defs{$d}) && defined($defs{$d}{IODev}) &&
+		    $defs{$d}{IODev} == $hash) {
+        		delete $defs{$d}{IODev};
+		}
+	}
+
+	return undef;
+}
+
+#####################################
+# Set commands
 #####################################
 
 sub HMCCU_Set ($@)
@@ -90,62 +130,49 @@ sub HMCCU_Set ($@)
 	my ($hash, @a) = @_;
 	my $name = shift @a;
 	my $opt = shift @a;
-	my $stripchar = AttrVal ($name, "stripchar", '');
+	my $options = "devstate datapoint var execute clearmsg";
 	my $host = $hash->{host};
+
+	my $stripchar = AttrVal ($name, "stripchar", '');
+	my $stateval = AttrVal ($name, "stateval", '');
 
 	# process set <name> command par1 par2 ...
 	# if more than one parameter is specified parameters
 	# are concatenated by blanks
-	if ($opt eq "state" || $opt eq "devstate") {
+	if ($opt eq 'state' || $opt eq 'devstate' || $opt eq 'datapoint' || $opt eq 'var') {
 		my $objname = shift @a;
 		my $objvalue = join ('%20', @a);
+		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("';
 
 		if (!defined ($objname) || !defined ($objvalue)) {
-			return HMCCU_SetError ($hash, "Usage: set <device> devstate <objname> <objvalue>");
+			return HMCCU_SetError ($hash, "Usage: set <device> $opt <objname> <objvalue>");
 		}
 
 		$objname =~ s/$stripchar$// if ($stripchar ne '');
+		$objvalue = HMCCU_Substitute ($objvalue, $stateval);
 
-		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("'.$objname.'").State("'.$objvalue.'")';
+		my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($objname);
+		if ($opt eq 'devstate' || $opt eq 'state' || $opt eq 'var') {
+			if ($flags > 3) {
+				return HMCCU_SetError ($hash, "Specify varname or device:channel");
+			}
+			$url = $url.$objname.'").State("'.$objvalue.'")';
+		}
+		else {
+			if ($flags != 7) {
+				return HMCCU_SetError ($hash, "Specify device:channel.datapoint");
+			}
+			$url = $url.$dev.':'.$chn.'").DPByHssDP("'.$dpt.'").State("'.$objvalue.'")';
+		}
 
-		my $response;
-		my $retcode = '';
-
-		$response = GetFileFromURL ($url);
+		my $response = GetFileFromURL ($url);
 		if ($response =~ /<r1>null</) {
 			return HMCCU_SetError ($hash, "Error during CCU communication");
 		}
 
-		readingsSingleUpdate ($hash, "state", "OK", 1);
+		HMCCU_SetState ($hash, "OK");
 
-		return $retcode;
-	}
-	elsif ($opt eq "datapoint") {
-		my $objname = shift @a;
-		my $objvalue = join ('%20', @a);
-
-		if (!defined ($objname) || !defined ($objvalue)) {
-			return HMCCU_SetError ($hash, "Usage: set <device> datapoint <objname> <objvalue>");
-		}
-
-		my ($device, $channel, $datapoint) = HMCCU_ParseCCUDev ($objname);
-		if ($device eq '?' || $channel eq '?' || $datapoint eq '.*') {
-			return HMCCU_SetError ($hash, "Format for objname is device:channel.datapoint");
-		}
-
-		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("'.$channel.'").DPByHssDP("'.$datapoint.'").State("'.$objvalue.'")';
-
-		my $response;
-		my $retcode = '';
-
-		$response = GetFileFromURL ($url);
-		if ($response =~ /<r1>null</) {
-			return HMCCU_SetError ($hash, "Error during CCU communication");
-		}
-
-		readingsSingleUpdate ($hash, "state", "OK", 1);
-
-		return $retcode;
+		return undef;
 	}
 	elsif ($opt eq "execute") {
 		my $program = shift @a;
@@ -162,7 +189,6 @@ sub HMCCU_Set ($@)
 		# Query program ID
 		$response = GetFileFromURL ($url);
 		my $xmlin = XMLin ($response, ForceArray => 0, KeyAttr => ['name']);
-
 		if (!defined ($xmlin->{program}->{$program}->{id})) {
 			return HMCCU_SetError ($hash, "Program not found");
 		}
@@ -170,25 +196,28 @@ sub HMCCU_Set ($@)
 			$programid = $xmlin->{program}->{$program}->{id};
 		}
 
-		$response = GetFileFromURL ($runurl . $programid);
-		readingsSingleUpdate ($hash, "state", "OK", 1);
+		GetFileFromURL ($runurl . $programid);
 
-		return $response;
+		HMCCU_SetState ($hash, "OK");
+
+		return undef;
 	}
 	elsif ($opt eq 'clearmsg') {
 		my $url = 'http://'.$host.'/config/xmlapi/systemNotificationClear.cgi';
-		my $response;
 
-		$response = GetFileFromURL ($url);
-		readingsSingleUpdate ($hash, "state", "OK", 1);
+		GetFileFromURL ($url);
 
-		return '';
+		HMCCU_SetState ($hash, "OK");
+
+		return undef;
 	}
 	else {
-		return "HMCCU: Unknown argument $opt, choose one of devstate datapoint execute clearmsg";
+		return "HMCCU: Unknown argument $opt, choose one of ".$options;
 	}
 }
 
+#####################################
+# Get commands
 #####################################
 
 sub HMCCU_Get ($@)
@@ -196,12 +225,11 @@ sub HMCCU_Get ($@)
 	my ($hash, @a) = @_;
 	my $name = shift @a;
 	my $opt = shift @a;
-my $host = $hash->{host};
+	my $options = "devstate datapoint vars channel parfile";
+	my $host = $hash->{host};
 
 	my $readings = AttrVal ($name, "ccureadings", 1);
 	my $parfile = AttrVal ($name, "parfile", '');
-	my $substitute = AttrVal ($name, "substitute", '');
-	my $units = AttrVal ($name, "units", 0);
 
 	if ($opt eq 'state' || $opt eq 'devstate') {
 		my $ccuobj = shift @a;
@@ -210,25 +238,26 @@ my $host = $hash->{host};
 		my $retcode;
 
 		if (!defined ($ccuobj)) {
-			return HMCCU_SetError ($hash, "Usage: get <device> devstate <objname> [<reading>]");
+			return HMCCU_SetError ($hash,
+			   "Usage: get <device> devstate <device>:<channel> [<reading>]");
+		}
+
+		my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($ccuobj);
+		if ($flags != 3) {
+			return HMCCU_SetError ($hash, "Specify <device>:<channel>");
 		}
 
 		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("'.$ccuobj.'").State()';
-		$reading = $ccuobj if (!defined ($reading));
+		$reading = $ccuobj.".STATE" if (!defined ($reading));
 
 		$response = GetFileFromURL ($url);
 		$response =~ m/<r1>(.*)<\/r1>/;
 		$retcode = $1;
 
 		if (defined ($retcode) && $retcode ne '' && $retcode ne 'null') {
-			readingsSingleUpdate ($hash, "state", "OK", 1);
-			if ($readings) {
-				readingsSingleUpdate ($hash, $reading, $retcode, 1);
-				return '';
-			}
-			else {
-				return $retcode;
-			}
+			HMCCU_SetState ($hash, "OK");
+			$retcode = HMCCU_UpdateClientReading ($hash, $reading, $retcode);
+			return $readings ? undef : $retcode;
 		}
 		else {
 			return HMCCU_SetError ($hash, "Error during CCU request");
@@ -241,14 +270,15 @@ my $host = $hash->{host};
 		my $retcode;
 
 		if (!defined ($ccuobj)) {
-			return HMCCU_SetError ($hash, "Usage: get <device> datapoint <objname> [<reading>]");
+			return HMCCU_SetError ($hash,
+			   "Usage: get <device> datapoint <device>:<channel>.<datapoint> [<reading>]");
 		}
-		my ($device, $channel, $datapoint) = HMCCU_ParseCCUDev ($ccuobj);
-		if ($device eq '?' || $channel eq '?' || $datapoint eq '.*') {
-			return HMCCU_SetError ($hash, "Format for objname is device:channel.datapoint");
+		my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($ccuobj);
+		if ($flags != 7) {
+			return HMCCU_SetError ($hash, "Specify device:channel.datapoint");
 		}
 
-		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("'.$channel.'").DPByHssDP("'.$datapoint.'").Value()';
+		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("'.$dev.':'.$chn.'").DPByHssDP("'.$dpt.'").Value()';
 		$reading = $ccuobj if (!defined ($reading));
 
 		$response = GetFileFromURL ($url);
@@ -256,14 +286,9 @@ my $host = $hash->{host};
 		$retcode = $1;
 
 		if (defined ($retcode) && $retcode ne '' && $retcode ne 'null') {
-			readingsSingleUpdate ($hash, "state", "OK", 1);
-			if ($readings) {
-				readingsSingleUpdate ($hash, $reading, $retcode, 1);
-				return '';
-			}
-			else {
-				return $retcode;
-			}
+			HMCCU_SetState ($hash, "OK");
+			$retcode = HMCCU_UpdateClientReading ($hash, $ccuobj, $retcode);
+			return $readings ? undef : $retcode;
 		}
 		else {
 			return HMCCU_SetError ($hash, "Error during CCU request");
@@ -276,7 +301,7 @@ my $host = $hash->{host};
 		my $result = '';
 
 		if (!defined ($varname)) {
-			return HMCCU_SetError ($hash, "Usage: get <device> vars <regexp>");
+			return HMCCU_SetError ($hash, "Usage: get <device> vars <regexp>[,...]");
 		}
 
 		my @varlist = split /,/, $varname;
@@ -291,7 +316,7 @@ my $host = $hash->{host};
 		foreach my $variable (@{$xmlin->{systemVariable}}) {
 			foreach my $varexp (@varlist) {
 				if ($variable->{name} =~ /$varexp/) {
-					$result = $result . $variable->{name} . "=" . $variable->{value} . "\n";
+					$result .= $variable->{name}."=".$variable->{value}."\n";
 					if ($readings) {
 						readingsBulkUpdate ($hash, $variable->{name}, $variable->{value}); 
 					}
@@ -300,8 +325,8 @@ my $host = $hash->{host};
 		}
 
 		if ($readings) {
-			readingsEndUpdate ($hash, defined ($hash->{LOCAL} ? 0 : 1));
-			return '';
+			readingsEndUpdate ($hash, 1);
+			return undef;
 		}
 		else {
 			return $result;
@@ -314,51 +339,40 @@ my $host = $hash->{host};
 		my $result = '';
 		my $rname;
 
-		my ($device, $channel, $datapoint) = HMCCU_ParseCCUDev ($param);
-		if ($device eq '?' || $channel eq '?') {
-			return HMCCU_SetError ($hash, "Usage: get <device> channel <ccudev>:<channel>[.<datapoint>]");
+		my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($param);
+		if (($flags & 3 ) != 3) {
+			return HMCCU_SetError ($hash,
+			   "Usage: get <device> channel <ccudev>:<channel>[.<datapoint>]");
 		}
 
+		my $devch = $dev.':'.$chn;
 		$response = GetFileFromURL ($url);
-		my $xmlin = XMLin ($response, ForceArray => ['device', 'channel', 'datapoint'], KeyAttr => { device => 'name', channel => 'name' });
-
-		if (!defined (@{$xmlin->{device}->{$device}->{channel}->{$channel}->{datapoint}})) {
+		my $xmlin = XMLin ($response,
+		   ForceArray => ['device', 'channel', 'datapoint'],
+		   KeyAttr => { device => 'name', channel => 'name' }
+		);
+		if (!defined (@{$xmlin->{device}->{$dev}->{channel}->{$devch}->{datapoint}})) {
 			return HMCCU_SetError ($hash, "Device or channel not defined");
 		}
 
-		my @dps = @{$xmlin->{device}->{$device}->{channel}->{$channel}->{datapoint}};
-		if ($readings) {
-			readingsBeginUpdate ($hash);
-		}
+		my @dps = @{$xmlin->{device}->{$dev}->{channel}->{$devch}->{datapoint}};
 
 		foreach my $dp (@dps) {
-			if ($dp->{name} =~ /$datapoint/) {
+			if ($dp->{name} =~ /$dpt/) {
 				my $dpname = $dp->{name};
 				my $v = $dp->{value};
 
 				$dpname =~ /.*\.(.*)$/;
-				$rname = $channel . ".$1";
+				$rname = $devch.".$1";
 
-				$v = HMCCU_Substitute ($v, $substitute);
-				if ($units == 1) {
-					$v .= ' ' . $dp->{valueunit};
-				}
-				$result = $result . $rname . "=" . $v . "\n";
-				if ($readings) {
-					readingsBulkUpdate ($hash, $rname, $v); 
-				}
+				$v = HMCCU_UpdateClientReading ($hash, $rname, $v);
+				$result .= $rname."=".$v."\n";
 			}
 		}
 
-		readingsSingleUpdate ($hash, "state", "OK", 1);
+		HMCCU_SetState ($hash, "OK");
 
-		if ($readings) {
-			readingsEndUpdate ($hash, defined ($hash->{LOCAL} ? 0 : 1));
-			return '';
-		}
-		else {
-			return $result;
-		}
+		return $readings ? undef : $result;
 	}
 	elsif ($opt eq 'parfile') {
 		my $par_parfile = shift @a;
@@ -394,11 +408,11 @@ my $host = $hash->{host};
 		}
 
 		$response = GetFileFromURL ($url);
-		my $xmlin = XMLin ($response, ForceArray => ['device', 'channel', 'datapoint'], KeyAttr => { device => 'name', channel => 'name' });
-
-		if ($readings) {
-			readingsBeginUpdate ($hash);
-		}
+		my $xmlin = XMLin (
+		   $response,
+		   ForceArray => ['device', 'channel', 'datapoint'],
+		   KeyAttr => { device => 'name', channel => 'name' }
+		);
 
 		foreach my $param (@parameters) {
 			my @partoks = split /\s+/, $param;
@@ -407,54 +421,46 @@ my $host = $hash->{host};
 			next if (scalar @partoks == 0);
 			next if ($partoks[0] =~ /^#/);
 
-			my ($device, $channel, $datapoint) = HMCCU_ParseCCUDev ($partoks[0]);
-
 			# Ignore wrong CCU device specifications
-			next if ($device eq '?' || $channel eq '?');
+			my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($partoks[0]);
+			next if (($flags & 3) != 3);
+			my $devch = $dev.':'.$chn;
 
 			# Ignore not existing devices/channels/datapoints
-			next if (!defined (@{$xmlin->{device}->{$device}->{channel}->{$channel}->{datapoint}}));
-			my @dps = @{$xmlin->{device}->{$device}->{channel}->{$channel}->{datapoint}};
+			next if (!defined (@{$xmlin->{device}->{$dev}->{channel}->{$devch}->{datapoint}}));
+			my @dps = @{$xmlin->{device}->{$dev}->{channel}->{$devch}->{datapoint}};
 
 			foreach my $dp (@dps) {
-				if ($dp->{name} =~ /$datapoint/) {
+				if ($dp->{name} =~ /$dpt/) {
 					my $dpname = $dp->{name};
 					my $v = $dp->{value};
 
-					if (@partoks > 1) {
-						$v = HMCCU_Substitute ($v, $partoks[1]);
-					}
+					$v = HMCCU_Substitute ($v, $partoks[1]) if (@partoks > 1);
 					$dpname =~ /.*\.(.*)$/;
-					$rname = $channel . ".$1";
-					$result = $result . $rname . "=" . $v . ' ' . $dp->{valueunit} . "\n";
-					if ($readings) {
-						readingsBulkUpdate ($hash, $rname, $v); 
-					}
+					$rname = $devch.".$1";
+					$v = HMCCU_UpdateClientReading ($hash, $rname, $v);
+					$result .= $rname."=".$v.' '.$dp->{valueunit}."\n";
 				}
 			}
 		}
 
-		readingsSingleUpdate ($hash, "state", "OK", 1);
+		HMCCU_SetState ($hash, "OK");
 
-		if ($readings) {
-			readingsEndUpdate ($hash, defined ($hash->{LOCAL} ? 0 : 1));
-			return '';
-		}
-		else {
-			return $result;
-		}
+		return $readings ? undef : $result;
 	}
 	else {
-		return "HMCCU: Unknown argument $opt, choose one of devstate datapoint vars channel parfile";
+		return "HMCCU: Unknown argument $opt, choose one of ".$options;
 	}
 }
 
-#####################################
-# Parse CCU object name
+##################################################################
+# Parse CCU object name.
 #
 # Input: object name in format device:channel.datapoint
-# Output: array with ( device, device:channel, datapoint )
-#####################################
+#
+# Output: array with ( device, channel, datapoint, flags )
+#   flag bits: 0=Device 1=Channel 2=Datapoint
+##################################################################
 
 sub HMCCU_ParseCCUDev ($)
 {
@@ -462,47 +468,56 @@ sub HMCCU_ParseCCUDev ($)
 	my $p1 = '?';
 	my $p2 = '?';
 	my $p3 = '.*';
+	my $p4 = 0;
 
-	#
 	# Syntax of CCU device specification is:
-	#
 	# devicename:channelno[.datapoint]
-	#
-	# Parameter datapoint is optional. 
-	#
 	if ($param =~ /^.+:/) {
 		$param =~ /^(.*):/;
 		$p1 = $1;
+		$p4 = 1;
 
 		if ($param =~ /^.+:[0-9]+/) {
 			$param =~ /^.*:([0-9]+)/;
-			$p2 = $p1 . ":" . $1;
+			$p2 = $1;
+			$p4 |= 2;
 
 			if ($param =~ /\..*$/) {
 				$param =~ /\.(.*)$/;
 				$p3 = $1;
+				$p4 |= 4;
 			}
 		}
 	}
 
-	return ($p1, $p2, $p3);
+	return ($p1, $p2, $p3, $p4);
 }
 
 sub HMCCU_SetError ($$)
 {
 	my ($hash, $text) = @_;
+	my $name = $hash->{NAME};
 
-	$text = "HMCCU: " . $text;
-	readingsSingleUpdate ($hash, "state", "Error", 1);
+	$text = "HMCCU: ".$name." ". $text;
+	HMCCU_SetState ($hash, "Error");
 	Log 1, $text;
 	return $text;
+}
+
+sub HMCCU_SetState ($$)
+{
+	my ($hash, $text) = @_;
+
+	if (defined ($hash) && defined ($text)) {
+		readingsSingleUpdate ($hash, "state", $text, 1);
+	}
 }
 
 sub HMCCU_Substitute ($$)
 {
 	my ($value, $substitutes) = @_;
 
-	return $value if (!defined ($substitutes));
+	return $value if (!defined ($substitutes) || $substitutes eq '');
 
 	my @sub_list = split /,/,$substitutes;
 
@@ -516,6 +531,64 @@ sub HMCCU_Substitute ($$)
 	}
 
 	return $value;
+}
+
+####################################################
+# Update HMCCU readings and client readings.
+# Reading values are substituted with client priority
+####################################################
+
+sub HMCCU_UpdateClientReading ($$$)
+{
+	my ($hash, $reading, $value) = @_;
+	my $name = $hash->{NAME};
+
+	my $hmccu_substitute = AttrVal ($name, 'substitute', '');
+	my $hmccu_updreadings = AttrVal ($name, 'ccureadings', 1);
+
+	# Check syntax
+	return 0 if (!defined ($hash) || !defined ($reading) || !defined ($value));
+
+	# Get CCU device name from reading name
+	my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($reading);
+	return 0 if ($flags == 0);
+
+	# Update HMCCU reading
+	my $hmccu_value = HMCCU_Substitute ($value, $hmccu_substitute);
+	if ($hmccu_updreadings) {
+		readingsSingleUpdate ($hash, $reading, $hmccu_value, 1);
+	}
+
+	# Update client readings
+	foreach my $d (keys %defs) {
+		# Get hash of device
+		my $ch = $defs{$d};
+
+		if (defined ($ch->{IODev}) && $ch->{IODev} == $hash &&
+		    defined ($ch->{ccudev}) && $ch->{ccudev} eq $dev) {
+			my $upd = AttrVal ($ch->{NAME}, 'ccureadings', 1);
+			my $substitute = AttrVal ($ch->{NAME}, 'substitute', '');
+
+			# Client substitute attribute has priority
+			if ($substitute ne '') {
+				$value = HMCCU_Substitute ($value, $substitute);
+			}
+			else {
+				$value = $hmccu_value;
+			}
+
+			if ($upd == 1) {
+				readingsSingleUpdate ($ch, $reading, $value, 1);
+				if ($dpt eq 'STATE') {
+					HMCCU_SetState ($ch, $value);
+				}
+			}
+
+			last;
+		}
+	}
+
+	return $hmccu_value;
 }
 
 1;
@@ -562,6 +635,10 @@ sub HMCCU_Substitute ($$)
         <br/><br/>
         Example:<br/>
         <code> set d_ccu datapoint THERMOSTAT_WOHNEN:2.SET_TEMPERATURE 21</code>
+      </li><br/>
+      <li>set &lt;<i>Name</i>&gt; var &lt;<i>variable</i>&gt; &lt;<i>Value</i>&gt;
+        <br/>
+        Set CCU variable value.
       </li><br/>
       <li>set &lt;<i>Name</i>&gt; clearmsg
         <br/>
@@ -621,6 +698,10 @@ sub HMCCU_Substitute ($$)
       <li>parfile &lt;<i>Filename</i>&gt;
          <br/>
             Define parameter file for command get parfile.
+      </li><br/>
+      <li>stateval &lt;<i>text</i>:<i>text</i>[,...]</i>&gt;
+         <br/>
+            Define substitions for values in set devstate/datapoint command.
       </li><br/>
       <li>substitude &lt;<i>expression</i>:<i>string</i>[,...]</i>&gt;
          <br/>
