@@ -342,7 +342,7 @@ sub onInternalMsg($$) {
         }
         last;
       };
-      $type == I_STARTUP_COMPLETE and do {
+      $type == I_GATEWAY_READY and do {
         readingsSingleUpdate($hash,'connection','startup complete',1);
         GP_ForallClients($hash,sub {
           my $client = shift;

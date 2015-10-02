@@ -83,47 +83,59 @@ BEGIN {
 };
 
 my %static_types = (
-  S_DOOR                  => { receives => [], sends => [V_TRIPPED] }, # BinarySwitchSensor
-  S_MOTION                => { receives => [], sends => [V_TRIPPED] }, # MotionSensor
-  S_SMOKE                 => { receives => [], sends => [] }, # Not used so far
-  S_LIGHT                 => { receives => [V_LIGHT], sends => [V_LIGHT] }, # BinarySwitchSensor
-  S_DIMMER                => { receives => [V_LIGHT,V_DIMMER], sends => [V_LIGHT,V_DIMMER] }, # DimmableLEDActuator
-  S_COVER                 => { receives => [V_DIMMER,V_UP,V_DOWN,V_STOP], sends => [V_DIMMER] }, # ServoActuator
-  S_TEMP                  => { receives => [], sends => [V_TEMP] }, # DallasTemperatureSensor
-  S_HUM                   => { receives => [], sends => [V_HUM] }, # HumiditySensor
-  S_BARO                  => { receives => [], sends => [V_PRESSURE,V_FORECAST] },
-  S_WIND                  => { receives => [], sends => [V_WIND,V_GUST,V_DIRECTION] }, # Not used so far
-  S_RAIN                  => { receives => [], sends => [V_RAIN,V_RAINRATE] }, # Not used so far
-  S_UV                    => { receives => [], sends => [V_UV] }, # UVSensor
-  S_WEIGHT                => { receives => [], sends => [V_WEIGHT] }, # Not used so far
-  S_POWER                 => { receives => [V_VAR1], sends => [V_WATT,V_KWH,V_VAR1] }, # EnergyMeterPulseSensor
-  S_HEATER                => { receives => [], sends => [V_HEATER,V_HEATER_SW] }, # Not used so far
-  S_DISTANCE              => { receives => [], sends => [V_DISTANCE] }, # DistanceSensor
-  S_LIGHT_LEVEL           => { receives => [], sends => [V_LIGHT_LEVEL] }, # LightSensor
-  S_ARDUINO_NODE          => { receives => [], sends => [] }, # Not used so far
-  S_ARDUINO_REPEATER_NODE => { receives => [], sends => [] }, # Not used so far
-  S_LOCK                  => { receives => [V_LOCK_STATUS], sends => [V_LOCK_STATUS] }, #R FIDLockSensor
-  S_IR                    => { receives => [V_IR_SEND], sends => [V_IR_RECEIVE] }, # Not used so far
-  S_WATER                 => { receives => [V_VAR1], sends => [V_FLOW,V_VOLUME,V_VAR1] }, # WaterMeterPulseSensor
-  S_AIR_QUALITY           => { receives => [], sends => [V_VAR1] }, # AirQualitySensor
-  S_CUSTOM                => { receives => [], sends => [V_VAR1,V_VAR2,V_VAR3] }, # Not used so far
-  S_DUST                  => { receives => [], sends => [V_DUST_LEVEL] }, # Not used so far
-  S_SCENE_CONTROLLER      => { receives => [], sends => [V_SCENE_ON,V_SCENE_OFF] }, # TouchDisplaySceneControllerDisplaySensor
+  S_DOOR                  => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # Door and window sensors
+  S_MOTION                => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # MotionSensor
+  S_SMOKE                 => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # Smoke sensor
+  S_LIGHT                 => { receives => [V_STATUS,V_WATT], sends => [V_STATUS,V_WATT] }, # Light Actuator (on/off)
+  S_BINARY                => { receives => [V_STATUS,V_WATT], sends => [V_STATUS,V_WATT] }, # Binary device (on/off), Alias for S_LIGHT
+  S_DIMMER                => { receives => [V_STATUS,V_PERCENTAGE,V_WATT], sends => [V_STATUS,V_PERCENTAGE,V_WATT] }, # Dimmable device of some kind
+  S_COVER                 => { receives => [V_UP,V_DOWN,V_STOP,V_PERCENTAGE], sends => [V_PERCENTAGE] }, # Window covers or shades
+  S_TEMP                  => { receives => [], sends => [V_TEMP,V_ID] }, # Temperature sensor
+  S_HUM                   => { receives => [], sends => [V_HUM] }, # Humidity sensor
+  S_BARO                  => { receives => [], sends => [V_PRESSURE,V_FORECAST] }, # Barometer sensor (Pressure)
+  S_WIND                  => { receives => [], sends => [V_WIND,V_GUST] }, # Wind sensor
+  S_RAIN                  => { receives => [], sends => [V_RAIN,V_RAINRATE] }, # Rain sensor
+  S_UV                    => { receives => [], sends => [V_UV] }, # UV Sensor
+  S_WEIGHT                => { receives => [], sends => [V_WEIGHT,V_IMPEDANCE] }, # Weight sensor for scales etc.
+  S_POWER                 => { receives => [], sends => [V_WATT,V_KWH] }, # Power measuring device, like power meters
+  S_HEATER                => { receives => [], sends => [V_HVAC_SETPOINT_HEAT,V_HVAC_FLOW_STATE,V_TEMP] }, # Heater device
+  S_DISTANCE              => { receives => [], sends => [V_DISTANCE,V_UNIT_PREFIX] }, # Distance sensor
+  S_LIGHT_LEVEL           => { receives => [], sends => [V_LIGHT_LEVEL,V_LEVEL] }, # Light sensor
+  S_ARDUINO_NODE          => { receives => [], sends => [] }, # Arduino node device
+  S_ARDUINO_REPEATER_NODE => { receives => [], sends => [] }, # Arduino repeating node device
+  S_LOCK                  => { receives => [V_LOCK_STATUS], sends => [V_LOCK_STATUS] }, # Lock device
+  S_IR                    => { receives => [V_IR_SEND], sends => [V_IR_RECEIVE] }, # Ir sender/receiver device
+  S_WATER                 => { receives => [], sends => [V_FLOW,V_VOLUME,] }, # Water meter
+  S_AIR_QUALITY           => { receives => [], sends => [V_LEVEL,V_UNIT_PREFIX] }, # Air quality sensor e.g. MQ-2
+  S_CUSTOM                => { receives => [], sends => [V_VAR1,V_VAR2,V_VAR3,V_VAR4,V_VAR5] }, # Use this for custom sensors where no other fits.
+  S_DUST                  => { receives => [], sends => [V_LEVEL,V_UNIT_PREFIX] }, # Dust level sensor
+  S_SCENE_CONTROLLER      => { receives => [], sends => [V_SCENE_ON,V_SCENE_OFF] }, # Scene controller device
+  S_RGB_LIGHT             => { receives => [V_RGB,V_WATT], sends => [V_RGB,V_WATT] }, # RGB light
+  S_RGBW_LIGHT            => { receives => [V_RGBW,V_WATT], sends => [V_RGBW,V_WATT] }, # RGBW light (with separate white component)
+  S_COLOR_SENSOR          => { receives => [V_RGB], sends => [V_RGB] }, # Color sensor
+  S_HVAC                  => { receives => [], sends => [V_HVAC_SETPOINT_HEAT,V_HVAC_SETPOINT_COOL,V_HVAC_FLOW_STATE,V_HVAC_FLOW_MODE,V_HVAC_SPEED] }, # Thermostat/HVAC device
+  S_MULTIMETER            => { receives => [], sends => [V_VOLTAGE,V_CURRENT,V_IMPEDANCE] }, # Multimeter device
+  S_SPRINKLER             => { receives => [], sends => [V_STATUS,V_TRIPPED] }, # Sprinkler device
+  S_WATER_LEAK            => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # Water leak sensor
+  S_SOUND                 => { receives => [], sends => [V_LEVEL,V_TRIPPED,V_ARMED] }, # Sound sensor
+  S_VIBRATION             => { receives => [], sends => [V_LEVEL,V_TRIPPED,V_ARMED] }, # Vibration sensor
+  S_MOISTURE              => { receives => [], sends => [V_LEVEL,V_TRIPPED,V_ARMED] }, # Moisture sensor
 );
 
 my %static_mappings = (
   V_TEMP        => { type => "temperature" },
   V_HUM         => { type => "humidity" },
+  V_STATUS      => { type => "status", val => { 0 => 'off', 1 => 'on' }},
+  #V_LIGHT       => { type => "switch", val => { 0 => 'off', 1 => 'on' }}, # Deprecated
+  V_PERCENTAGE  => { type => "percentage", range => { min => 0, step => 1, max => 100 }},
+  #V_DIMMER      => { type => "dimmer", range => { min => 0, step => 1, max => 100 }}, # Deprecated
   V_PRESSURE    => { type => "pressure" },
-  V_LIGHT_LEVEL => { type => "brightness" },
-  V_LIGHT       => { type => "switch", val => { 0 => 'off', 1 => 'on' }},
-  V_DIMMER      => { type => "dimmer", range => { min => 0, step => 1, max => 100 }},
   V_FORECAST    => { type => "forecast", val => { # PressureSensor, DP/Dt explanation
                                                   0 => 'stable',       # 0 = "Stable Weather Pattern"
-                                                  1 => 'slow rising',  # 1 = "Slowly rising Good Weather", "Clear/Sunny "
-                                                  2 => 'slow falling', # 2 = "Slowly falling L-Pressure ", "Cloudy/Rain "
-                                                  3 => 'quick rising', # 3 = "Quickly rising H-Press",     "Not Stable"
-                                                  4 => 'quick falling',# 4 = "Quickly falling L-Press",    "Thunderstorm"
+                                                  1 => 'sunny',  # 1 = "Slowly rising Good Weather", "Clear/Sunny "
+                                                  2 => 'cloudy', # 2 = "Slowly falling L-Pressure ", "Cloudy/Rain "
+                                                  3 => 'unstable', # 3 = "Quickly rising H-Press",     "Not Stable"
+                                                  4 => 'thunderstorm',# 4 = "Quickly falling L-Press",    "Thunderstorm"
                                                   5 => 'unknown' }},   # 5 = "Unknown (More Time needed) 
   V_RAIN        => { type => "rain" },
   V_RAINRATE    => { type => "rainrate" },
@@ -134,14 +146,15 @@ my %static_mappings = (
   V_WEIGHT      => { type => "weight" },
   V_DISTANCE    => { type => "distance" },
   V_IMPEDANCE   => { type => "impedance" },
-  V_ARMED       => { type => "armed" },
+  V_ARMED       => { type => "armed", val => { 0 => 'off', 1 => 'on' }},
   V_TRIPPED     => { type => "tripped", val => { 0 => 'off', 1 => 'on' }},
   V_WATT        => { type => "power" },
   V_KWH         => { type => "energy" },
   V_SCENE_ON    => { type => "button_on" },
   V_SCENE_OFF   => { type => "button_off" },
-  V_HEATER      => { type => "heater" },
-  V_HEATER_SW   => { type => "heater_sw" },
+  V_HVAC_FLOW_STATE => { type => "hvacflowstate" },
+  V_HVAC_SPEED  => { type => "hvacspeed" },
+  V_LIGHT_LEVEL => { type => "brightness", range => { min => 0, step => 1, max => 100 }},
   V_VAR1        => { type => "value1" },
   V_VAR2        => { type => "value2" },
   V_VAR3        => { type => "value3" },
@@ -155,9 +168,16 @@ my %static_mappings = (
   V_FLOW        => { type => "flow" },
   V_VOLUME      => { type => "volume" },
   V_LOCK_STATUS => { type => "lockstatus", val => { 0 => 'off', 1 => 'on' }},
-  V_DUST_LEVEL  => { type => "dustlevel" },
+  V_LEVEL       => { type => "level" },
   V_VOLTAGE     => { type => "voltage" },
   V_CURRENT     => { type => "current" },
+  V_RGB         => { type => "rgb" },
+  V_RGBW        => { type => "rgbw" },
+  V_ID          => { type => "id" },
+  V_UNIT_PREFIX => { type => "unitprefix" },
+  V_HVAC_SETPOINT_COOL => { type => "hvacsetpointcool" },
+  V_HVAC_SETPOINT_HEAT => { type => "hvacsetpointheat" },
+  V_HVAC_FLOW_MODE => { type => "hvacflowmode" },
 );
 
 sub Define($$) {
@@ -484,11 +504,11 @@ sub onInternalMessage($$) {
       }
       last;
     };
-    $type == I_PING and do {
+    $type == I_FIND_PARENT and do {
       $hash->{$typeStr} = $msg->{payload};
       last;
     };
-    $type == I_PING_ACK and do {
+    $type == I_FIND_PARENT_RESPONSE and do {
       $hash->{$typeStr} = $msg->{payload};
       last;
     };
@@ -510,6 +530,22 @@ sub onInternalMessage($$) {
       last;
     };
     $type == I_REBOOT and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_GATEWAY_READY and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_REQUEST_SIGNING and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_GET_NONCE and do {
+      $hash->{$typeStr} = $msg->{payload};
+      last;
+    };
+    $type == I_GET_NONCE_RESPONSE and do {
       $hash->{$typeStr} = $msg->{payload};
       last;
     };
