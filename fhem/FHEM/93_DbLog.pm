@@ -439,14 +439,16 @@ sub DbLog_Push(@) {
   my ($hash, $DbLogType, $timestamp, $device, $type, $event, $reading, $value, $unit) = @_;
   my $dbh= $hash->{DBH};
   
-  # Daten auf maximale laenge beschneiden
-  $device   = substr($device,0, $columns{DEVICE});
-  $type     = substr($type,0, $columns{TYPE});
-  $event    = substr($event,0, $columns{EVENT});
-  $reading  = substr($reading,0, $columns{READING});
-  $value    = substr($value,0, $columns{VALUE});
-  $unit     = substr($unit,0, $columns{UNIT});
-
+    if ($hash->{DBMODEL} ne 'SQLITE') {
+        # Daten auf maximale laenge beschneiden
+        $device   = substr($device,0, $columns{DEVICE});
+        $type     = substr($type,0, $columns{TYPE});
+        $event    = substr($event,0, $columns{EVENT});
+        $reading  = substr($reading,0, $columns{READING});
+        $value    = substr($value,0, $columns{VALUE});
+        $unit     = substr($unit,0, $columns{UNIT});
+    }
+    
   $dbh->{RaiseError} = 1;
   $dbh->{PrintError} = 0;  
 
@@ -1280,7 +1282,7 @@ DbLog_Get($@)
 }
 
 
-### DBLog - Historische Werte ausdünnen > Forum #41089
+### DBLog - Historische Werte ausduennen > Forum #41089
 sub DbLog_reduceLog($@) {
 	my ($hash,@a) = @_;
     my ($ret,$cmd,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
@@ -1295,9 +1297,9 @@ sub DbLog_reduceLog($@) {
     }
     Log3($name, 3, "DbLog $name: reduceLog requested with DAYS=$a[2]".(($average || $filter) ? ', ' : '').(($average) ? "$average" : '').(($average && $filter) ? ", " : '').(($filter) ? "EXCLUDE=$filter" : ''));
     
-    if (InternalVal($name,'DBMODEL','') eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
-    elsif (InternalVal($name,'DBMODEL','') eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-    elsif (InternalVal($name,'DBMODEL','') eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2] DAY"; }
+    if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
+    elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
+    elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2] DAY"; }
     else { $ret = 'Unknown database type.'; }
     
     if ($cmd) {
