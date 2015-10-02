@@ -1,5 +1,16 @@
 // $Id$
 
+// WORKAROUND - should be removed if a more suitable solution is found
+// remove all similar informid's in all parent elements to ensure further updates.
+//
+// neccessary if general attribute "group" is set.
+$(function () {
+    $("div[arg=fbcalllist][informid]").each(function (index, obj) {
+        name = $(obj).attr("dev");
+        $(obj).parents('[informid="'+name+'"]').removeAttr("informid");
+    });
+});
+
 function FW_processCallListUpdate(data)
 {
     var table = $(this).find("table.fbcalllist").first();
@@ -73,7 +84,7 @@ function FW_FbCalllistCreate(elName, devName, vArr, currVal, set, params, cmd)
 {
     if(vArr[0] == "fbcalllist")
     {
-        var newEl = $('div[informid='+devName+']').get(0);
+        var newEl = $('div[informid="'+devName+'"]').get(0);
 
         newEl.setValueFn = FW_processCallListUpdate;
 
