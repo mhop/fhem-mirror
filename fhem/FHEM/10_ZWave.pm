@@ -2716,12 +2716,7 @@ ZWave_Parse($$@)
 
 
   if(!$hash) {
-    $id=hex($id); $baseId=hex($baseId); $ep=hex($ep);
-    # $ep eq "0": Msg from a device known to the ZWDongle, but not to FHEM.
-    my $nn = "ZWave_Node_$baseId".($ep eq "0" ? "" : ".$ep");
-    my $ret = "UNDEFINED $nn ZWave $homeId $id";
-    Log3 $ioName, 3, "$ret, please define it";
-    DoTrigger("global", $ret);
+    Log3 $ioName, 1, "ZWave: unknown message $msg, please report";
     return "";
   }
 
