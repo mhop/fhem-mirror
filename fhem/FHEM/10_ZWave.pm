@@ -1495,13 +1495,14 @@ ZWave_configCheckParam($$$$$@)
     return ("", sprintf("04%02x01%02x", $h->{index}, $h->{value}));
   }
 
-  return ("Parameter is not decimal", "") if($arg[0] !~ m/^[0-9]+$/);
+  return ("Parameter is not decimal", "") if($arg[0] !~ m/^-?[0-9]+$/);
 
   if($h->{size}) { # override type by size
     $t = ($h->{size} eq "1" ? "byte" : ($h->{size} eq "2" ? "short" : "int"));
   }
 
   my $len = ($t eq "int" ? 8 : ($t eq "short" ? 4 : 2));
+  $arg[0] += 2**($len==8 ? 32 : ($len==4 ? 16 : 8)) if($arg[0] < 0); #F:41709
   return ("", sprintf("04%02x%02x%0*x", $h->{index}, $len/2, $len, $arg[0]));
 }
 
