@@ -143,14 +143,14 @@ sub HMCCUDEV_Set ($@)
 
 		return undef;
 	}
-	elsif ($opt eq 'devstate') {
-		my $objvalue = join ('%20', @a);
+	elsif ($opt eq 'devstate' || $opt eq 'on' || $opt eq 'off') {
+		my $objvalue = ($opt eq 'on' || $opt eq 'off') ? $opt : join ('%20', @a);
 
 		if ($statechannel eq '') {
 			return HMCCUDEV_SetError ($hash, "No STATE channel specified");
 		}
 		if (!defined ($objvalue)) {
-			return HMCCUDEV_SetError ($hash, "Usage: set <device> devstate <channel> <value>");
+			return HMCCUDEV_SetError ($hash, "Usage: set <device> devstate <value>");
 		}
 
 		my $objname = $ccudev.':'.$statechannel.'.STATE';
@@ -162,18 +162,22 @@ sub HMCCUDEV_Set ($@)
 		return undef;
 	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint";
+		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint on:noArg off:noArg";
 		if ($stateval ne '') {
 			my @valpairs = split /,/, $stateval;
 			my $sep = " devstate:";
 			foreach my $vp (@valpairs) {
 				my @sv = split /:/, $vp;
 				if (@sv == 2) {
-					$retmsg = $retmsg . $sep . $sv[0];
+					$retmsg .= $sep . $sv[0];
 					$sep = "," if ($sep ne ',');
 				}
 			}
 		}
+		else {
+			$retmsg .= " devstate";
+		}
+
 		return $retmsg;
 	}
 }
@@ -260,11 +264,17 @@ sub HMCCUDEV_SetError ($$)
       <br/>
       <li>set &lt;<i>Name</i>&gt; devstate &lt;<i>Value</i>&gt;
          <br/>
-         Set state of a CCU device channel. Channel must be defined in attribute
+         Set state of a CCU device channel. Channel must be defined as attribute
          statechannel.
          <br/><br/>
          Example:<br/>
          <code>set light_entrance devstate on</code>
+      </li><br/>
+      <li>set &lt;<i>Name</i>&gt; { on | off }
+         <br/>
+         Set state of a CCU device channel is set to 'on' or 'off'. Channel must
+         be defined as attribute statechannel. State values 'on' and 'off' can 
+         be replaced by setting attribute stateval.
       </li><br/>
       <li>set &lt;<i>Name</i>&gt; datapoint &lt;<i>channel</i>.<i>datapoint</i>&gt; &lt;<i>Value</i>&gt;
         <br/>
