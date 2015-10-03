@@ -448,11 +448,15 @@ upd_rmTree($)
       upd_rmTree("$dir/$f");
     } else {
       uLog 4, "rm $dir/$f";
-      unlink("$dir/$f");
+      if(!unlink("$dir/$f")) {
+        uLog 1, "rm $dir/$f failed: $!";
+      }
     }
   }
   uLog 4, "rmdir $dir";
-  rmdir($dir);
+  if(!rmdir($dir)) {
+    uLog 1, "rmdir $dir failed: $!";
+  }
 }
 
 sub
