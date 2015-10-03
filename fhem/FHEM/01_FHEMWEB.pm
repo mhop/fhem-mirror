@@ -159,6 +159,7 @@ FHEMWEB_Initialize($)
     plotmode:gnuplot,gnuplot-scroll,SVG
     plotEmbed:0,1
     plotsize
+    plotWeekStartDay:0,1,2,3,4,5,6
     nrAxis
     redirectCmds:0,1
     refresh
@@ -2885,8 +2886,8 @@ FW_widgetOverride($$)
     <a name="endPlotToday"></a>
     <li>endPlotToday<br>
         If this FHEMWEB attribute is set to 1, then week and month plots will
-        end today. Else the current week (starting at Sunday) or the current
-        month will be shown.<br>
+        end today. Else the current week or the current month will be shown.
+        <br>
         </li><br>
 
     <a name="endPlotNow"></a>
@@ -2926,6 +2927,11 @@ FW_widgetOverride($$)
         makes the plotfork attribute meaningless.<br>
     </li><br>
 
+    <a name="plotWeekStartDay"></a>
+    <li>plotWeekStartDay<br>
+        Start the week-zoom of the SVG plots with this day.
+        0 is Sunday, 1 is Monday, etc.<br>
+    </li><br>
 
     <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>
@@ -3613,6 +3619,11 @@ FW_widgetOverride($$)
         wirkungslos macht.
     </li><br>
 
+    <a name="plotWeekStartDay"></a>
+    <li>plotWeekStartDay<br>
+        Starte das Plot in der Wochen-Ansicht mit diesem Tag.
+        0 ist Sonntag, 1 ist Montag, usw.
+    </li><br>
 
     <a name="basicAuth"></a>
     <li>basicAuth, basicAuthMsg<br>

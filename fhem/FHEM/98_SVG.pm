@@ -56,9 +56,23 @@ SVG_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "SVG_Define";
-  $hash->{AttrList} = "fixedoffset fixedrange startDate plotsize nrAxis ".
-                      "endPlotNow endPlotToday ".
-                      "label title plotfunction captionLeft:1,0";
+  no warnings 'qw';
+  my @attrList = qw(
+    captionLeft:1,0"
+    endPlotNow
+    endPlotToday
+    fixedoffset
+    fixedrange
+    label
+    nrAxis
+    plotWeekStartDay:0,1,2,3,4,5,6
+    plotfunction
+    plotsize
+    startDate
+    title
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
   $hash->{SetFn}    = "SVG_Set";
   $hash->{FW_summaryFn} = "SVG_FwFn";
   $hash->{FW_detailFn}  = "SVG_FwFn";
@@ -913,7 +927,9 @@ SVG_calcOffsets($$)
 
   } elsif($zoom eq "week") {
     my @l = localtime($now);
-    my $start = (SVG_Attr($FW_wname, $wl, "endPlotToday", undef) ? 6 : $l[6]);
+    my $start = (SVG_Attr($FW_wname, $wl, "endPlotToday", undef) ? 
+        6 : $l[6] - SVG_Attr($FW_wname, $wl, "plotWeekStartDay", 0));
+    $start += 7 if($start < 0);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
     $SVG_devs{$d}{from} = SVG_tspec(3,0,@l);
@@ -2322,8 +2338,11 @@ plotAsPng(@)
         </li><br>
 
     <li><a href="#plotsize">plotsize</a></li><br>
-
     <li><a href="#plotmode">plotmode</a></li><br>
+    <li><a href="#endPlotNow">endPlotNow</a></li><br>
+    <li><a href="#endPlotToday">endPlotToday</a></li><br>
+    <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
+
 
     <a name="label"></a>
     <li>label<br>
@@ -2519,10 +2538,10 @@ plotAsPng(@)
       </li><br>
 
     <li><a href="#plotsize">plotsize</a></li><br>
-
     <li><a href="#plotmode">plotmode</a></li><br>
     <li><a href="#endPlotNow">endPlotNow</a></li><br>
     <li><a href="#endPlotToday">endPlotToday</a></li><br>
+    <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
 
     <a name="label"></a>
     <li>label<br>
