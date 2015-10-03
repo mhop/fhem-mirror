@@ -31,7 +31,7 @@ my %sets = (
                           param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
   "removeFailedNode" => { cmd => "61%02x@" },   # ZW_REMOVE_FAILED_NODE_ID
-  "replaceFailedNode"=> { cmd => "63%02x" },   # ZW_REPLACE_FAILED_NODE
+  "replaceFailedNode"=> { cmd => "63%02x@" },   # ZW_REPLACE_FAILED_NODE
   "neighborUpdate"   => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
@@ -882,9 +882,13 @@ ZWDongle_Ready($)
     below.</li>
 
   <li>removeFailedNode<br>
-    Remove a non-responding node that must be on the failed Node list from 
-    the node list in controller. Instead, always use removeNode if possible.
+    Remove a non-responding node -that must be on the failed Node list- from 
+    the routing table in controller. Instead,always use removeNode if possible.
     Note: the corresponding fhem device have to be deleted manually.</li>
+
+  <li>replaceFailedNode<br>
+    Replace a non-responding node with a new one. The non-responding node
+    must be on the failed Node list.</li>
 
   <li>reopen<br>
     First close and then open the device. Used for debugging purposes.
@@ -953,12 +957,18 @@ ZWDongle_Ready($)
   <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|controller|done|failed]
     </li>
   <li>ZW_REMOVE_FAILED_NODE_ID 
-           [notPrimaryController|noCallbackFunction|failedNodeNotFound|
-            failedNodeProcessBusy|failedNodeRemoveFail|nodeOk|nodeRemoved|
-            nodeNotRemoved]
+           [failedNodeRemoveStarted|notPrimaryController|noCallbackFunction|
+            failedNodeNotFound|failedNodeRemoveProcessBusy|
+            failedNodeRemoveFail|nodeOk|nodeRemoved|nodeNotRemoved]
     </li>
   <li>ZW_REMOVE_NODE_FROM_NETWORK 
                         [learnReady|nodeFound|slave|controller|done|failed]
+    </li>
+  <li>ZW_REPLACE_FAILED_NODE 
+           [failedNodeRemoveStarted|notPrimaryController|noCallbackFunction|
+            failedNodeNotFound|failedNodeRemoveProcessBusy|
+            failedNodeRemoveFail|nodeOk|failedNodeReplace|
+            failedNodeReplaceDone|failedNodeRemoveFailed]
     </li>
   <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
     </li>
