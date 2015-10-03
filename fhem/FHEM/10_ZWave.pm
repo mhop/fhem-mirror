@@ -481,7 +481,7 @@ ZWave_Define($$)
 
   $id = sprintf("%0*x", ($id > 255 ? 4 : 2), $id);
   $hash->{homeId} = $homeId;
-  $hash->{id}     = $id;
+  $hash->{nodeIdHex} = $id;
 
   $modules{ZWave}{defptr}{"$homeId $id"} = $hash;
   my $proposed;
@@ -588,7 +588,7 @@ ZWave_Cmd($$@)
     }
   }
 
-  my $id = $hash->{id};
+  my $id = $hash->{nodeIdHex};
   my $isMc = ($id =~ m/(....)/);
   if($type eq "set" && !$isMc) {
     $cmdList{neighborUpdate}{fmt} = "48$id";
@@ -1165,7 +1165,7 @@ ZWave_mcCapability($$)
   my $homeId = $iodev->{homeId};
   my @l = grep /../, split(/(..)/, lc($caps));
   my $chid = shift(@l);
-  my $id = $hash->{id};
+  my $id = $hash->{nodeIdHex};
 
   my @classes;
   shift(@l); shift(@l); # Skip generic and specific class
@@ -1725,7 +1725,7 @@ ZWave_associationRequest($$)
   my ($hash, $data) = @_;
 
   if(!$data) { # called by the user
-    $zwave_parseHook{"$hash->{id}:..85"} = \&ZWave_associationRequest;
+    $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationRequest;
     return("", "05");
   }
 
@@ -1734,7 +1734,7 @@ ZWave_associationRequest($$)
   my $grp = 0;
   $grp = $1 if($data =~ m/..8503(..)/);
   return if($grp >= $nGrp);
-  $zwave_parseHook{"$hash->{id}:..85"} = \&ZWave_associationRequest;
+  $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationRequest;
   ZWave_Cmd("set", $hash, $hash->{NAME}, "associationRequest", $grp+1);
 }
 
@@ -1869,7 +1869,7 @@ ZWave_secSupported($$)
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   my $iodev = $hash->{IODev};
-  my $id = $hash->{id};
+  my $id = $hash->{nodeIdHex};
 
   if (!ZWave_secIsEnabled($hash)) {
     return;
@@ -1918,7 +1918,7 @@ ZWave_secNonceReceived($$)
     my $key_hex = AttrVal($iodev->{NAME}, "networkKey", "");
     my $mynonce_hex = substr (ZWave_secCreateNonce($hash), 2, 16);
     my $cryptedNetworkKeyMsg = ZWave_secNetworkkeySet($r_nonce_hex,
-      $mynonce_hex, $key_hex, $hash->{id});
+      $mynonce_hex, $key_hex, $hash->{nodeIdHex});
     ZWave_Set($hash, $name, ("secEncap", $cryptedNetworkKeyMsg));
     $hash->{secStatus}++;
     readingsSingleUpdate($hash, "SECURITY", 'INITIALIZING (Networkkey sent)',0);
@@ -2082,7 +2082,7 @@ ZWave_secEncrypt($$$)
   my ($hash, $r_nonce_hex, $plain) = @_;
   my $name = $hash->{NAME};
   my $iodev = $hash->{IODev};
-  my $id = $hash->{id};
+  my $id = $hash->{nodeIdHex};
 
   my $init_enc_key     = pack 'H*', 'a' x 32;
   my $init_auth_key    = pack 'H*', '5' x 32;
@@ -2098,7 +2098,7 @@ ZWave_secEncrypt($$$)
   my $out_hex = ZWave_secEncryptOFB ($enc_key, $iv, $msg_hex);
 
   my $auth_msg_hex = '8101';
-  $auth_msg_hex   .= sprintf "%02x", hex($hash->{id});
+  $auth_msg_hex   .= sprintf "%02x", hex($hash->{nodeIdHex});
   $auth_msg_hex   .= sprintf "%02x", (length ($out_hex))/2;
   $auth_msg_hex   .= $out_hex;
 
@@ -2170,7 +2170,7 @@ ZWave_secDecrypt($$$)
   # Rebuild message for authentification check
   # 81280103 '81' . <from-id> . <to-id> . <len> . <encrMsg>
   my $my_msg_hex = ($newnonce ? 'c1' : '81');
-  $my_msg_hex .= sprintf "%02x", hex($hash->{id});
+  $my_msg_hex .= sprintf "%02x", hex($hash->{nodeIdHex});
   $my_msg_hex .= '01';
   $my_msg_hex .= sprintf "%02x", (length ($msg_hex))/2;
   $my_msg_hex .= $msg_hex;
@@ -2195,7 +2195,7 @@ ZWave_secDecrypt($$$)
         }
       }
       my $decryptedCmd = '000400';
-      $decryptedCmd .= sprintf "%02x", hex($hash->{id});
+      $decryptedCmd .= sprintf "%02x", hex($hash->{nodeIdHex});
       $decryptedCmd .= sprintf "%02x", (length ($out_hex))/2;
       $decryptedCmd .= $out_hex;
 
@@ -2395,7 +2395,7 @@ ZWave_wakeupTimer($$)
 
   } elsif(!$direct && $now - $hash->{lastMsgSent} > 2) {
     if(!$hash->{SendStack}) {
-      my $nodeId = $hash->{id};
+      my $nodeId = $hash->{nodeIdHex};
       my $cmdEf  = (AttrVal($hash->{NAME},"noExplorerFrames",0)==0 ? "25":"05");
       # wakeupNoMoreInformation
       IOWrite($hash, "00", "13${nodeId}028408${cmdEf}$nodeId");
@@ -2808,7 +2808,7 @@ ZWave_Undef($$)
 {
   my ($hash, $arg) = @_;
   my $homeId = $hash->{homeId};
-  my $id = $hash->{id};
+  my $id = $hash->{nodeIdHex};
   delete $modules{ZWave}{defptr}{"$homeId $id"};
   return undef;
 }
