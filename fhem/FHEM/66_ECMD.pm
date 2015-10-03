@@ -84,6 +84,8 @@ ECMD_Define($$)
     return $msg;
   }
   
+  $attr{$name}{"requestSeparator"}= "\000";
+  
   DevIo_CloseDev($hash);
 
   $hash->{Protocol}= $protocol;
@@ -550,9 +552,14 @@ ECMD_Write($$$)
   my $name= $hash->{NAME};
   my $answer;
   my $ret= "";
-  my $requestSeparator= AttrVal($hash, "requestSeparator", "\000");
+  my $requestSeparator= AttrVal($hash, "requestSeparator", undef);
   my $responseSeparator= AttrVal($hash, "responseSeparator", "");
-  my @ecmds= split $requestSeparator, $msg;
+  my @ecmds;
+  if(defined($requestSeparator)) {
+    @ecmds= split $requestSeparator, $msg;
+  } else {
+    push @ecmds, $msg;
+  }
   ECMD_Log $hash, 5, "command split into " . ($#ecmds+1) . " parts." if($#ecmds>0);
   foreach my $ecmd (@ecmds) {
         ECMD_Log $hash, 5, "sending command " . dq($ecmd);
@@ -691,8 +698,9 @@ ECMD_Write($$$)
     <li>requestSeparator<br>
     A single request from FHEM to the device might need to be split in several datagrams. A command string is split at all
     occurrences of the requestSeparator. The requestSeparator itself is removed from the command string and thus 
-    not part of the request. It defaults to the
-    value \000 (octal representation of control char with code zero).
+    not part of the request. 
+    This attribute is set by default. It defaults to the value \000 (octal representation of control char with code zero).
+    To disable this feature, delete the attribute from the device's attribute list.
     </li>
     <li>responseSeparator<br>
     In order to identify the single responses from the device to FHEM for each part of a split command, a responseSeparator
