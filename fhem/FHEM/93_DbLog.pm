@@ -17,7 +17,6 @@ use strict;
 use warnings;
 use DBI;
 use Data::Dumper;
-use feature qw/say switch/;
 
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
@@ -1497,78 +1496,63 @@ sub DbLog_Set($@) {
 	my $dbh = $hash->{DBH};
 	my $ret;
 
-	given ($a[1]) {
-
-        when ('reduceLog') {
-            if (defined $a[2] && $a[2] =~ /^\d+$/) {
-                $ret = DbLog_reduceLog($hash,@a);
-            } else {
-                Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
-                $ret = "reduceLog error, no <days> given.";
-            }
+    if ($a[1] eq 'reduceLog') {
+        if (defined $a[2] && $a[2] =~ /^\d+$/) {
+            $ret = DbLog_reduceLog($hash,@a);
+        } else {
+            Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
+            $ret = "reduceLog error, no <days> given.";
         }
-              
-		when ('reopen') {
-			Log3($name, 4, "DbLog $name: Reopen requested.");
-			$dbh->commit() if(! $dbh->{AutoCommit});
-			$dbh->disconnect();
-			DbLog_Connect($hash);
-			$ret = "Reopen executed.";
-		}
+    }
+    elsif ($a[1] eq 'reopen') {
+        Log3($name, 4, "DbLog $name: Reopen requested.");
+        $dbh->commit() if(! $dbh->{AutoCommit});
+        $dbh->disconnect();
+        DbLog_Connect($hash);
+        $ret = "Reopen executed.";
+    }
+    elsif ($a[1] eq 'rereadcfg') {
+        Log3($name, 4, "DbLog $name: Rereadcfg requested.");
+        $dbh->commit() if(! $dbh->{AutoCommit});
+        $dbh->disconnect();
+        $ret = _DbLog_readCfg($hash);
+        return $ret if $ret;
+        DbLog_Connect($hash);
+        $ret = "Rereadcfg executed.";
+    }
+    elsif ($a[1] eq 'count') {
+        Log3($name, 4, "DbLog $name: Records count requested.");
+        my $c = $dbh->selectrow_array('SELECT count(*) FROM history');
+        readingsSingleUpdate($hash, 'countHistory', $c ,1);
+        $c = $dbh->selectrow_array('SELECT count(*) FROM current');
+        readingsSingleUpdate($hash, 'countCurrent', $c ,1);
+    }
+    elsif ($a[1] eq 'deleteOldDays') {
+        Log3($name, 4, "DbLog $name: Deletion of old records requested.");
+        my ($c, $cmd);
+        $cmd = "delete from history where TIMESTAMP < ";
+        
+        if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
+        elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
+        elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd = "NOW() - INTERVAL '$a[2] DAY"; }
+        else { $cmd = undef; $ret = 'Unknown database type. Maybe you can try userCommand anyway.'; }
 
-		when ('rereadcfg') {
-			Log3($name, 4, "DbLog $name: Rereadcfg requested.");
-			$dbh->commit() if(! $dbh->{AutoCommit});
-			$dbh->disconnect();
-			$ret = _DbLog_readCfg($hash);
-			return $ret if $ret;
-			DbLog_Connect($hash);
-			$ret = "Rereadcfg executed.";
-		}
-
-		when ('count') {
-			Log3($name, 4, "DbLog $name: Records count requested.");
-			my $c = $dbh->selectrow_array('SELECT count(*) FROM history');
-			readingsSingleUpdate($hash, 'countHistory', $c ,1);
-			$c = $dbh->selectrow_array('SELECT count(*) FROM current');
-			readingsSingleUpdate($hash, 'countCurrent', $c ,1);
-		}
-
-		when ('deleteOldDays') {
-			Log3($name, 4, "DbLog $name: Deletion of old records requested.");
-			my ($c, $cmd);
-			my $dbModel = InternalVal($name, 'DBMODEL', 'unknown');
-			$cmd = "delete from history where TIMESTAMP < ";
-			given ($dbModel) {
-				when ('SQLITE')			{ $cmd .= "datetime('now', '-$a[2] days')"; }
-				when ('MYSQL')			{ $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-				when ('POSTGRESQL')	{ $cmd .= "NOW() - INTERVAL '$a[2] DAY"; }
-				default {
-					$cmd = undef;
-					$ret = 'Unkwon database type. Maybe you can try userCommand anyway.';
-				}
-			}
-
-			if(defined($cmd)) {
-				$c = $dbh->do($cmd);
-				readingsSingleUpdate($hash, 'lastRowsDeleted', $c ,1);
-			}
-		}
-
-		when ('userCommand') {
-			Log3($name, 4, "DbLog $name: userCommand execution requested.");
-			my ($c, @cmd, $sql);
-			@cmd = @a;
-			shift(@cmd); shift(@cmd);
-			$sql = join(" ",@cmd);
-			readingsSingleUpdate($hash, 'userCommand', $sql, 1);
-			$c = $dbh->selectrow_array($sql);
-			readingsSingleUpdate($hash, 'userCommandResult', $c ,1);
-		}
-
-		default { $ret = $usage; }
-
-	}
+        if(defined($cmd)) {
+            $c = $dbh->do($cmd);
+            readingsSingleUpdate($hash, 'lastRowsDeleted', $c ,1);
+        }
+    }
+    elsif ($a[1] eq 'userCommand') {
+        Log3($name, 4, "DbLog $name: userCommand execution requested.");
+        my ($c, @cmd, $sql);
+        @cmd = @a;
+        shift(@cmd); shift(@cmd);
+        $sql = join(" ",@cmd);
+        readingsSingleUpdate($hash, 'userCommand', $sql, 1);
+        $c = $dbh->selectrow_array($sql);
+        readingsSingleUpdate($hash, 'userCommandResult', $c ,1);
+    }
+    else { $ret = $usage; }
 
 	return $ret;
 

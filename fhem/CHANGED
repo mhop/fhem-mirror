@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  93_DbLog: removed use of perl's 'switch' feature.
   - change:  93_DbLog: removed string length limitation for SQLITE.
   - bugfix:  93_DbLog: fixed ploteditor bug when DbLogType=History.
   - feature: 93_DbLog: added new setter 'reduceLog' to clean up database.
