@@ -56,7 +56,7 @@ RSS_Initialize($) {
     $hash->{DefFn}    = "RSS_Define";
     $hash->{UndefFn}  = "RSS_Undefine";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList} = "size bg bgcolor tmin refresh areas autoreread:1,0";
+    $hash->{AttrList} = "size bg bgcolor tmin refresh areas autoreread:1,0 viewport";
     $hash->{SetFn}    = "RSS_Set";
     $hash->{NotifyFn} = "RSS_Notify";
 
@@ -275,13 +275,14 @@ RSS_HTMLHead($$) {
   my ($name,$refresh) = @_;
   
   my ($width,$height)= split(/x/, AttrVal($name,"size","800x600"));
+  my $viewportContent= AttrVal($name, "viewport", "");
   
   
   my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
   my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
   my $scripts= RSS_getScript();
-  my $viewport= "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0\"/>";
-  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$name</title>\n$viewport\n$scripts</head>\n";
+  my $viewport= $viewportContent eq "" ? "" : "<meta name=\"viewport\" content=\"$viewportContent\"/>\n";
+  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$name</title>\n$viewport$scripts</head>\n";
 }
 
 
@@ -1001,6 +1002,10 @@ plotFromUrl(@)
     no matter how frequently the RSS feed consumer accesses the page.</li><br>
     <li>refresh &lt;interval&gt;<br>Time in seconds after which the HTML page is automatically reloaded. Defaults to 60.
     Set &lt;interval&gt; to 0 to disable reloading.</li><br>
+    <li>viewport<br>Adds a viewport directive to the HTML header.<br>
+        Example: <code>attr FrameRSS viewport width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0</code><br>
+        This scales the image to fit to the browser's viewport and inhibits zooming in or out on tablets.
+    </li><br>
     <li>areas<br>HTML code that goes into the image map.<br>
         Example: <code>attr FrameRSS areas &lt;area shape="rect" coords="0,0,200,200" href="http://fhem.de"/&gt;&lt;area shape="rect" coords="600,400,799,599" href="http://has:8083/fhem" target="_top"/&gt;</code>
     </li><br>
