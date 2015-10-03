@@ -128,7 +128,7 @@ function
 FW_sortableUpdateLinks()
 {
     $("ul.sortable-dest li.sortable-item").each(function () {   
-        $(this).html(($(this).index() + 1)+'. '+$(this).attr("value")+($(this).attr("deletable") == "false" ? '' : '<span class="sort-item-delete-link"><a href="#" class="sort-item-delete"><span class="ui-icon ui-icon-closethick" style="display:inline-block;vertical-align:middle;"></span></a></span>'));
+        $(this).html(($(this).index() + 1)+'. '+$(this).attr("value")+($(this).attr("deletable") == "false" ? '' : '<span class="sort-item-delete-link"><a href="#" class="sort-item-delete"><span class="ui-icon ui-icon-closethick" style="display:table-cell;"></span></a></span>'));
     });
 }
 
