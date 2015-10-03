@@ -2632,10 +2632,16 @@ CommandVersion($$)
 
   my @ret = ("# $cvsid");
   push @ret, cfgDB_svnId if(configDBUsed());
-  foreach my $m (sort keys %modules) {
-    next if(!$modules{$m}{LOADED} || $modules{$m}{ORDER} < 0);
+  my $max = 7 ; # length("fhem.pl") = 7
+  
+  foreach my $m (sort {uc($a) cmp uc($b)} keys %modules) {
+    next if(!$modules{$m}{LOADED} ||
+             $modules{$m}{ORDER} < 0 ||
+             ($param && $m !~ /$param/));
     Log 4, "Looking for SVN Id in module $m";
-    my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm";
+    my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm"; 
+    if($max < length($modules{$m}{ORDER}."_$m.pm"))
+    { $max = length($modules{$m}{ORDER}."_$m.pm") }
     if(!open(FH, $fn)) {
       my $ret = "$fn: $!";
       if(configDBUsed()){
@@ -2644,14 +2650,14 @@ CommandVersion($$)
       }
       push @ret, $ret;
     } else {
-      push @ret, map { chomp; $_ } grep(/# \$Id:/, <FH>);
+      push @ret, grep(/\$Id. [^\$\n\r].+\$/, <FH>);
     }
   }
-  if($param) {
-    return join("\n", grep /$param/, @ret);
-  } else {
-    return join("\n", @ret);
-  }
+  @ret = map {/\$Id. (\S+) (.+?)\$/ ? sprintf("%-".$max."s %s",$1,$2) : $_}
+        @ret; 
+  
+  return sprintf("%-".$max."s %s","File","Rev  Last Change\n\n").
+         join("\n", grep((defined($param) ? ($_ =~ /$param/) : 1), @ret));
 }
 
 #####################################
