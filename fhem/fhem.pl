@@ -2640,8 +2640,9 @@ CommandVersion($$)
              ($param && $m !~ /$param/));
     Log 4, "Looking for SVN Id in module $m";
     my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm"; 
-    if($max < length($modules{$m}{ORDER}."_$m.pm"))
-    { $max = length($modules{$m}{ORDER}."_$m.pm") }
+    if($max < length($modules{$m}{ORDER}."_$m.pm")) {
+      $max = length($modules{$m}{ORDER}."_$m.pm")
+    }
     if(!open(FH, $fn)) {
       my $ret = "$fn: $!";
       if(configDBUsed()){
