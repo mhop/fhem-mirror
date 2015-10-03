@@ -716,7 +716,8 @@ FW_answerCall($)
 
   # Enable WebApps
   if($FW_tp || $FW_ss) {
-    my $icon = $FW_ME."/images/default/fhemicon_ios.png";
+    my $icon = FW_iconPath("fhemicon_ios.png");
+    $icon = $FW_ME."/images/".($icon ? $icon : "default/fhemicon_ios.png");
     if($FW_ss) {
        my $stf = $FW_userAgent =~ m/iPad|iPhone|iPod/ ? ",shrink-to-fit=no" :"";
        FW_pO "<meta name='viewport' ".
