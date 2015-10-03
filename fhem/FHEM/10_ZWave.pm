@@ -2525,22 +2525,16 @@ ZWave_Parse($$@)
       Log3 $ioName, 2, "SERIAL_API_SET_TIMEOUTS: ACK:$1 BYTES:$2";
       return "";
     }
-    if($cmd eq "ZW_REMOVE_FAILED_NODE_ID") {
+    if($cmd eq "ZW_REMOVE_FAILED_NODE_ID" ||
+       $cmd eq "ZW_REPLACE_FAILED_NODE") {
       my $retval;
-      if ($arg eq "00") {
-        $retval = 'failedNodeRemoveStarted';
-      } elsif ($arg eq "02") {
-        $retval = 'notPrimaryController';
-      } elsif ($arg eq "04") {
-        $retval = 'noCallbackFunction';
-      } elsif ($arg eq "08") {
-        $retval = 'failedNodeNotFound';
-      } elsif ($arg eq "10") {
-        $retval = 'failedNodeRemoveProcessBusy';
-      } elsif ($arg eq "20") {
-        $retval = 'failedNodeRemoveFail';
-      } else {
-        $retval = 'unknown_'.$arg; # should never happen
+           if($arg eq "00") { $retval = 'failedNodeRemoveStarted';
+      } elsif($arg eq "02") { $retval = 'notPrimaryController';
+      } elsif($arg eq "04") { $retval = 'noCallbackFunction';
+      } elsif($arg eq "08") { $retval = 'failedNodeNotFound';
+      } elsif($arg eq "10") { $retval = 'failedNodeRemoveProcessBusy';
+      } elsif($arg eq "20") { $retval = 'failedNodeRemoveFail';
+      } else                { $retval = 'unknown_'.$arg; # should never happen
       }
       DoTrigger($ioName, "$cmd $retval");
       return "";
@@ -2656,25 +2650,25 @@ ZWave_Parse($$@)
     }
 
   } elsif($cmd eq "ZW_REQUEST_NODE_NEIGHBOR_UPDATE") {
-    if ($id eq "21") {
-      $evt = 'started';
-    } elsif ($id eq "22") {
-      $evt = 'done';
-    } elsif ($id eq "23") {
-      $evt = 'failed';
-    } else {
-      $evt = 'unknown'; # should never happen
+         if($id eq "21") { $evt = 'started';
+    } elsif($id eq "22") { $evt = 'done';
+    } elsif($id eq "23") { $evt = 'failed';
+    } else               { $evt = 'unknown'; # should never happen
     }
 
   } elsif($cmd eq "ZW_REMOVE_FAILED_NODE_ID") {
-    if ($id eq "00") {
-      $evt = 'nodeOk';
-    } elsif ($id eq "01") {
-      $evt = 'failedNodeRemoved';
-    } elsif ($id eq "02") {
-      $evt = 'failedNodeNotRemoved';
-    } else {
-      $evt = 'unknown_'.$id; # should never happen
+         if($id eq "00") { $evt = 'nodeOk';
+    } elsif($id eq "01") { $evt = 'failedNodeRemoved';
+    } elsif($id eq "02") { $evt = 'failedNodeNotRemoved';
+    } else               { $evt = 'unknown_'.$id; # should never happen
+    }
+
+  } elsif($cmd eq "ZW_REPLACE_FAILED_NODE") {
+         if($id eq "00") { $evt = 'nodeOk';
+    } elsif($id eq "03") { $evt = 'failedNodeReplace';
+    } elsif($id eq "04") { $evt = 'failedNodeReplaceDone';
+    } elsif($id eq "05") { $evt = 'failedNodeRemoveFailed';
+    } else               { $evt = 'unknown_'.$id; # should never happen
     }
 
   }
