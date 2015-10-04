@@ -917,16 +917,16 @@ DbLog_Get($@)
   for(my $i=0; $i<int(@readings); $i++) {
     # ueber alle Readings
     # Variablen initialisieren
-    $min[$i]   =  999999;
-    $max[$i]   = -999999;
+    $min[$i]   =  (~0 >> 1);
+    $max[$i]   = -(~0 >> 1);
     $sum[$i]   = 0;
     $cnt[$i]   = 0;
     $lastv[$i] = 0;
     $lastd[$i] = "undef";
     $mind[$i]  = "undef";
     $maxd[$i]  = "undef";
-    $minval    =  999999;
-    $maxval    = -999999;
+    $minval    =  (~0 >> 1);
+    $maxval    = -(~0 >> 1);
     $deltacalc = 0;
 
     if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
@@ -1131,9 +1131,9 @@ DbLog_Get($@)
             $sum[$i] += $out_value;
             $cnt[$i]++;
             $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
-            #$minval =  999999;
+            #$minval =  (~0 >> 1);
             $minval = $maxval;
-#            $maxval = -999999;
+#            $maxval = -(~0 >> 1);
             $writeout=1;
           }
         } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {
@@ -1150,9 +1150,9 @@ DbLog_Get($@)
             $sum[$i] += $out_value;
             $cnt[$i]++;
             $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "12", "00", "00");
-#            $minval =  999999;
+#            $minval =  (~0 >> 1);
             $minval = $maxval;
-#            $maxval = -999999;
+#            $maxval = -(~0 >> 1);
             $writeout=1;
           }
         } else {
@@ -1254,8 +1254,8 @@ DbLog_Get($@)
   #Ueberfuehren der gesammelten Werte in die globale Variable %data
   for(my $j=0; $j<int(@readings); $j++) {
     my $k = $j+1;
-    $data{"min$k"} = $min[$j] == 999999 ? "undef" : $min[$j];
-    $data{"max$k"} = $max[$j] == -999999 ? "undef" : $max[$j];
+    $data{"min$k"} = $min[$j] == (~0 >> 1) ? "undef" : $min[$j];
+    $data{"max$k"} = $max[$j] == -(~0 >> 1) ? "undef" : $max[$j];
     $data{"avg$k"} = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : "undef";
     $data{"sum$k"} = $sum[$j];
     $data{"cnt$k"} = $cnt[$j] ? $cnt[$j] : "undef";
