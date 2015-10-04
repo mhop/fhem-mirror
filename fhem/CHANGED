@@ -1,6 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - feature: HUEbridge: added et touchlink
+  - feature: HUEbridge: added get touchlink
                         added get whitelist, set deletewhitelist
                         new and extendet internals
   - feature: HUEDevice: dimUp&dimDown: use bri_inc if bridge firmware >= 1.7
