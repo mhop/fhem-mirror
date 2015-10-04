@@ -217,7 +217,7 @@ sub HUEBridge_Pair($)
       return undef;
     }
 
-  $attr{$name}{key} = $result->{success}{username} if( $result->{success}{username} ); 
+  $attr{$name}{key} = $result->{success}{username} if( $result->{success}{username} );
 
   $hash->{STATE} = 'Paired';
 
@@ -578,9 +578,34 @@ sub HUEBridge_ProcessResponse($$)
           my $error = $obj->[0]->{error}->{'description'};
 
           $hash->{STATE} = $error;
-
-          Log3 $name, 3, $error;
         }
+
+if( 0 ) {
+      my %json = ();
+      foreach my $item (@{$obj}) {
+        if( my $success = $item->{success} ) {
+          foreach my $key ( keys %{$success} ) {
+            my @l = split( '/', $key );
+            if( $l[1] eq 'lights' && $l[3] eq 'state' ) {
+              $json{$l[2]}->{state}->{$l[4]} = $success->{$key};
+            }
+          }
+
+        } elsif( my $error = $item->{error} ) {
+          my $msg = $error->{'description'};
+          Log3 $name, 3, $msg;
+        }
+      }
+#Log 3, Dumper \%json;
+
+      foreach my $id ( keys %json ) {
+        my $code = $name ."-". $id;
+        if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+          $json{$id}->{state}->{reachable} = 1;
+          HUEDevice_Parse( $chash, $json{$id} );
+        }
+      }
+}
 
       return ($obj->[0]);
     }
