@@ -10,13 +10,14 @@
 #
 ################################################################
 #
-#  define <name> HMCCUDEV <hmccu> <ccudev> [ { readonly | <statevals> } ]
+#  define <name> HMCCUDEV <hmccu> <ccudev> [ readonly ]
 #
 #  set <name> datapoint <channel>.<datapoint> <value>
 #  set <name> devstate <value>
 #  set <name> <stateval_cmds>
 #
 #  get <name> datapoint <channel>.<datapoint>
+#  get <name> update
 #
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> statechannel <channel>
@@ -129,6 +130,9 @@ sub HMCCUDEV_Set ($@)
 	if (!defined ($hash->{IODev})) {
 		return HMCCUDEV_SetError ($hash, "No IO device defined");
 	}
+	if ($hash->{statevals} eq 'readonly') {
+		return undef;
+	}
 
 	my $statechannel = AttrVal ($name, "statechannel", '');
 	my $stateval = AttrVal ($name, "stateval", '');
@@ -232,8 +236,15 @@ sub HMCCUDEV_Get ($@)
 
 		return undef;
 	}
+	elsif ($opt eq 'update') {
+		foreach my $r (keys %{$hash->{READINGS}}) {
+			if ($r =~ /^$ccudev:[0-9]\..+/) {
+				HMCCU_Get ($hmccu_hash, $hmccu_name, 'datapoint', $r);
+			}
+		}
+	}
 	else {
-		return "HMCCUDEV: Unknown argument $opt, choose one of datapoint";
+		return "HMCCUDEV: Unknown argument $opt, choose one of datapoint update:noArg";
 	}
 }
 
@@ -312,6 +323,10 @@ sub HMCCUDEV_SetError ($$)
       <li>get &lt;<i>Name</i>&gt; datapoint &lt;<i>Device</i>:<i>Channel</i>.<i>datapoint</i>&gt;
          <br/>
          Get state of a CCU device datapoint.
+      </li><br/>
+      <li>get &lt;<i>Name</i>&gt; update
+         <br/>
+         Update current readings matching CCU device name.
       </li><br/>
    </ul>
    <br/>
