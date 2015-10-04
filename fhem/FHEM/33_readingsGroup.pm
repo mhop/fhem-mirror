@@ -164,7 +164,7 @@ readingsGroup_updateDevices($;$)
       my $regex = $list[$i];
       while ($regex
              && ( ($regex =~ m/^</ && $regex !~ m/>$/)           #handle , in <...>
-                  || ($regex =~ m/@\{/ && $regex !~ m/}$/)       #handle , in reading@{...}
+                  || ($regex =~ m/@\{/ && $regex !~ m/\}$/)      #handle , in reading@{...}
                   || ($regex =~ m/^\$.*\(/ && $regex !~ m/\)/) ) #handle , in $<calc>(...)
              && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
@@ -748,14 +748,13 @@ readingsGroup_2html($;$)
     my $first = 1;
     my $multi = @list;
     my $cell_column = 1;
-    #foreach my $regex (@list) {
     for( my $i = 0; $i <= $#list; ++$i ) {
       my $name = $name;
       my $name2 = $name2;
       my $regex = $list[$i];
       while ($regex
              && ( ($regex =~ m/^</ && $regex !~ m/>$/)            #handle , in <...>
-                  || ($regex =~ m/@\{/ && $regex !~ m/}$/)        #handle , in reading@{...}
+                  || ($regex =~ m/@\{/ && $regex !~ m/\}$/)       #handle , in reading@{...}
                   || ($regex =~ m/^\$.*\(/ && $regex !~ m/\)/) )  #handle , in $<calc>(...)
              && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
@@ -1097,8 +1096,7 @@ readingsGroup_Notify($$)
     readingsGroup_updateDevices($hash);
     readingsGroup_inithtml($hash);
     return undef;
-  }
-  elsif( grep(m/^REREADCFG$/, @{$events}) ) {
+  } elsif( grep(m/^REREADCFG$/, @{$events}) ) {
     readingsGroup_updateDevices($hash);
     readingsGroup_inithtml($hash);
     return undef;
@@ -1175,12 +1173,12 @@ readingsGroup_Notify($$)
         my $regex = @{$device}[1];
         my @list = (undef);
         @list = split(",",$regex) if( $regex );
-        #foreach my $regex (@list) {
         for( my $i = 0; $i <= $#list; ++$i ) {
         my $regex = $list[$i];
           while ($regex
-                 && ( ($regex =~ m/^</ && $regex !~ m/>$/)          #handle , in <...>
-                      || ($regex =~ m/@\{/ && $regex !~ m/}$/) )    #handle , in reading@{...}
+                 && ( ($regex =~ m/^</ && $regex !~ m/>$/)            #handle , in <...>
+                      || ($regex =~ m/@\{/ && $regex !~ m/\}$/)       #handle , in reading@{...}
+                      || ($regex =~ m/^\$.*\(/ && $regex !~ m/\)/) )  #handle , in $<calc>(...)
                  && defined($list[++$i]) ) {
             $regex .= ",". $list[$i];
           }
@@ -1334,65 +1332,65 @@ readingsGroup_Notify($$)
         }
       }
     }
-
-    readingsBeginUpdate($hash) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
-    foreach my $trigger (keys %triggers) {
-      DoTrigger( $name, "$trigger: $triggers{$trigger}" );
-
-      our $count = 0;
-      sub updateRefs($$);
-      sub
-      updateRefs($$)
-      {
-        my( $hash, $refs ) = @_;
-        my $name  = $hash->{NAME};
-
-        if( ++$count > 20 ) {
-          Log3 $name, 2, "$name: recursionDetected: $refs";
-          return;
-        }
-
-        foreach my $ref ( split( ',', $refs ) ) {
-          my ($row,$col) = split( ':', $ref );
-
-          my $calc = $hash->{helper}{values}{calc}[$col][$row];
-
-          my $func = $calc;
-          if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
-            $func = $7;
-            $func = $1 if( !defined($func) );
-          }
-          my($informid,$v,$devStateIcon) = readingsGroup_value2html($hash,$calc,$name,$name,$func,$func,$row,$col,undef);
-          $v = "" if( !defined($v) );
-
-          #FIXME: use FW_directNotify
-          DoTrigger( $name, "calc:$row:$col: $v" ) if( $hash->{mayBeVisible} );
-
-          if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 ) {
-            #DoTrigger( $name, "$func: $hash->{helper}{values}{formated}[$col][$row]" );
-            readingsBulkUpdate($hash, $func, $hash->{helper}{values}{formated}[$col][$row]);
-          }
-
-          if( my $refs = $hash->{helper}{recalc}[$col][$row] ) {
-            updateRefs( $hash, $refs );
-          }
-        }
-
-        --$count;
-      }
-
-      if( my $cells = $hash->{helper}{positions}{$trigger} ) {
-        foreach my $cell ( split( ',', $cells ) ) {
-          my ($cell_row,$cell_column) = split( ':', $cell );
-          if( my $refs = $hash->{helper}{recalc}[$cell_column][$cell_row] ) {
-            updateRefs( $hash, $refs );
-          }
-        }
-      }
-
-    }
-    readingsEndUpdate($hash,1) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
   }
+
+  readingsBeginUpdate($hash) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
+  foreach my $trigger (keys %triggers) {
+    DoTrigger( $name, "$trigger: $triggers{$trigger}" );
+
+    our $count = 0;
+    sub updateRefs($$);
+    sub
+    updateRefs($$)
+    {
+      my( $hash, $refs ) = @_;
+      my $name  = $hash->{NAME};
+
+      if( ++$count > 20 ) {
+        Log3 $name, 2, "$name: recursionDetected: $refs";
+        return;
+      }
+
+      foreach my $ref ( split( ',', $refs ) ) {
+        my ($row,$col) = split( ':', $ref );
+
+        my $calc = $hash->{helper}{values}{calc}[$col][$row];
+
+        my $func = $calc;
+        if( $calc =~ m/([^@\(]*)(\(([^\(]*)\))?(\(([^\(]*)\))?(@(.*))?/ ) {
+          $func = $7;
+          $func = $1 if( !defined($func) );
+        }
+        my($informid,$v,$devStateIcon) = readingsGroup_value2html($hash,$calc,$name,$name,$func,$func,$row,$col,undef);
+        $v = "" if( !defined($v) );
+
+        #FIXME: use FW_directNotify
+        DoTrigger( $name, "calc:$row:$col: $v" ) if( $hash->{mayBeVisible} );
+
+        if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 ) {
+          #DoTrigger( $name, "$func: $hash->{helper}{values}{formated}[$col][$row]" );
+          readingsBulkUpdate($hash, $func, $hash->{helper}{values}{formated}[$col][$row]);
+        }
+
+        if( my $refs = $hash->{helper}{recalc}[$col][$row] ) {
+          updateRefs( $hash, $refs );
+        }
+      }
+
+      --$count;
+    }
+
+    if( my $cells = $hash->{helper}{positions}{$trigger} ) {
+      foreach my $cell ( split( ',', $cells ) ) {
+        my ($cell_row,$cell_column) = split( ':', $cell );
+        if( my $refs = $hash->{helper}{recalc}[$cell_column][$cell_row] ) {
+          updateRefs( $hash, $refs );
+        }
+      }
+    }
+
+  }
+  readingsEndUpdate($hash,1) if( $hash->{alwaysTrigger} && $hash->{alwaysTrigger} > 1 );
 
   return undef;
 }
