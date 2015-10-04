@@ -77,9 +77,11 @@ my $LAN_HW = 0;
 
 ######################################################################################
 sub VCONTROL_1ByteUParse($$);
+sub VCONTROL_1ByteU2Parse($$);
 sub VCONTROL_1ByteSParse($$);
 sub VCONTROL_2ByteSParse($$);
 sub VCONTROL_2ByteUParse($$);
+sub VCONTROL_2ByteHexParse($);
 sub VCONTROL_2BytePercentParse($$);
 sub VCONTROL_4ByteParse($$);
 sub VCONTROL_timerParse($);
@@ -382,7 +384,7 @@ VCONTROL_Read($)
   if(!defined($mybuf) || length($mybuf) == 0) {
     my $dev = $hash->{DeviceName};
     Log3 $name, 3,"VCONTROL: USB device $dev disconnected, waiting to reappear";
-    $hash->{USBDev}->close();
+    #$hash->{USBDev}->close();
     DoTrigger($name, "DISCONNECTED");
     DevIo_Disconnected($hash);
     delete($hash->{USBDev});
@@ -421,6 +423,12 @@ VCONTROL_Read($)
      if ( length($hexline) < $receive_len ){
         Log3 $name, 5,"VCONTROL: VCONTROL_Read receive_len < $receive_len, $hexline";
         $hash->{PARTIAL} = $hexline;
+        return"";
+    }
+    if  ( length($hexline) > $receive_len ){
+        Log3 $name, 5,"VCONTROL: VCONTROL_Read receive_len > $receive_len, $hexline : Repeat Command";
+        $hash->{PARTIAL} = "";
+        $read_now = READ_UNDEF;
         return"";
     }
   }
@@ -559,13 +567,17 @@ VCONTROL_Parse($$$$)
 
   if ($answer == 0){
      if      ($cmd_list[$cmd][2] eq "1ByteU"){
-        $value = VCONTROL_1ByteUParse(substr($hexline, 0, 2),$cmd_list[$cmd][3]) if (length($hexline) > 1);
+        $value = VCONTROL_1ByteUParse(substr($hexline, 0, 2),$cmd_list[$cmd][3]) if (length($hexline) > 1);  
+     } elsif ($cmd_list[$cmd][2] eq "1ByteU2"){
+        $value = VCONTROL_1ByteU2Parse(substr($hexline, 0, 2),$cmd_list[$cmd][3]) if (length($hexline) > 1);
      } elsif ($cmd_list[$cmd][2] eq "1ByteS"){
         $value = VCONTROL_1ByteSParse(substr($hexline, 0, 2),$cmd_list[$cmd][3]) if (length($hexline) > 1);
      } elsif ($cmd_list[$cmd][2] eq "2ByteS"){
         $value = VCONTROL_2ByteSParse($hexline,$cmd_list[$cmd][3]) if (length($hexline) > 3);
      } elsif ($cmd_list[$cmd][2] eq "2ByteU"){
         $value = VCONTROL_2ByteUParse($hexline,$cmd_list[$cmd][3]) if (length($hexline) > 3);   
+     } elsif ($cmd_list[$cmd][2] eq "2ByteH"){
+        $value = VCONTROL_2ByteHexParse($hexline) if (length($hexline) > 3);   
      } elsif ($cmd_list[$cmd][2] eq "2BytePercent"){
         $value = VCONTROL_2BytePercentParse($hexline,$cmd_list[$cmd][3]) if (length($hexline) > 1);
      } elsif ($cmd_list[$cmd][2] eq "4Byte"){
@@ -726,6 +738,7 @@ VCONTROL_Ready($)
         $hash->{PARTIAL} = "";
         VCONTROL_DoInit($hash, $po);
         DoTrigger($name, "CONNECTED");
+        $hash->{STATE} = "connected";
         return undef;
      }
   } else {
@@ -951,10 +964,12 @@ sub VCONTROL_CmdConfig($)
 
            #TODO: CHECK IF CONFIG PARAMS are allowed!!!  
            if ($cfgarray[0] eq "POLL"){
-              if (  $cfgarray[2] ne "1ByteU" 
+              if (  $cfgarray[2] ne "1ByteU"
+                 && $cfgarray[2] ne "1ByteU2"
                  && $cfgarray[2] ne "1ByteS" 
                  && $cfgarray[2] ne "2ByteS" 
                  && $cfgarray[2] ne "2ByteU" 
+                 && $cfgarray[2] ne "2ByteH" 
                  && $cfgarray[2] ne "2BytePercent" 
                  && $cfgarray[2] ne "4Byte" 
                  && $cfgarray[2] ne "mode" 
@@ -1042,6 +1057,16 @@ sub VCONTROL_1ByteUParse($$)
   }
   return $retstr;
 }
+
+#####################################
+sub VCONTROL_1ByteU2Parse($$)
+{
+  my $hexvalue = shift;
+  my $divisor = shift;
+
+  return hex(substr($hexvalue,0,2))/$divisor;
+}
+
 #####################################
 sub VCONTROL_1ByteSParse($$)
 {
@@ -1073,6 +1098,13 @@ sub VCONTROL_2BytePercentParse($$)
   my $divisor = shift;
 
   return hex(substr($hexvalue,2,2))/$divisor;
+}
+#####################################
+sub VCONTROL_2ByteHexParse($)
+{
+  my $hexvalue = shift;
+  
+  return (substr($hexvalue,0,2).substr($hexvalue,2,2));
 }
 #####################################
 sub VCONTROL_4ByteParse($$)
@@ -1583,10 +1615,12 @@ sub VCONTROL_RegisterConv($)
         Bisher m&ouml;gliche Parsemethoden:<br>
         <ul>
           <li>1ByteU        :<br> Empfangener Wert in 1 Byte ohne Vorzeichen (wenn Spalte Divisor state ist -> nur 0 / 1 also off / on)<br></li>
+          <li>1ByteU2       :<br> Empfangener Wert in 1 Byte ohne Vorzeichen (wenn Spalte Divisor state ist -> nur 0 / 1 also off / on)<br></li>
           <li>1ByteS        :<br> Empfangener Wert in 1 Byte mit Vorzeichen (wenn Spalte Divisor state ist -> nur 0 / 1 also off / on)<br></li>
           <li>2ByteS        :<br> Empfangener Wert in 2 Byte mit Vorzeichen<br></li>
           <li>2ByteU        :<br> Empfangener Wert in 2 Byte ohne Vorzeichen<br></li>
           <li>2BytePercent  :<br> Empfangener Wert in 2 Byte als Prozent Wert<br></li>
+          <li>2ByteH        :<br> Empfangener Wert in 2 Byte als Hex Wert<br></li>
           <li>4Byte         :<br> Empfangener Wert in 4 Byte<br></li>
           <li>mode          :<br> Empfangener Wert ist der Betriebsstatus<br></li>
           <li>timer         :<br> Empfangener Wert ist ein 8 Byte Timer Werte<br></li>
