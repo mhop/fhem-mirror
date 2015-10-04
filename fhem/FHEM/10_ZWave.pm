@@ -590,9 +590,17 @@ ZWave_Cmd($$@)
 
   my $id = $hash->{nodeIdHex};
   my $isMc = ($id =~ m/(....)/);
-  if($type eq "set" && !$isMc) {
-    $cmdList{neighborUpdate}{fmt} = "48$id";
-    $cmdList{neighborUpdate}{id} = "";
+  if(!$isMc) {
+    if($type eq "set") {
+      $cmdList{neighborUpdate}{fmt} = "48$id";
+      $cmdList{neighborUpdate}{id} = "";
+    }
+    if($type eq "get") {
+      # GET_ROUTING_TABLE_LINE, include dead links, non-routing neigbors
+      $cmdList{neighborList}{fmt} = "80${id}0101";
+      $cmdList{neighborList}{id} = "";
+      $cmdList{neighborList}{regexp} = "^0180";
+    }
   }
 
   if($type eq "set" && $cmd eq "rgb") {
@@ -686,17 +694,18 @@ ZWave_Cmd($$@)
 
 
   my $data;
-  if($cmd eq "neighborUpdate") {
+  if($cmd eq "neighborUpdate" || 
+     $cmd eq "neighborList") {
     $data = $cmdFmt;
 
   } else {
     my $len = sprintf("%02x", length($cmdFmt)/2+1);
     my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
     $data = "13$id$len$cmdId${cmdFmt}$cmdEf"; # 13==SEND_DATA
+    $data .= $id; # callback=>id
 
   }
 
-  $data .= $id; # callback=>id
 
   if ($data =~ m/(......)(....)(.*)(....)/) {
     my $cc_cmd=$2;
@@ -721,10 +730,14 @@ ZWave_Cmd($$@)
     no strict "refs";
     my $iohash = $hash->{IODev};
     my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
-    my ($err, $data) = &{$fn}($iohash, $cmd, "^000400${id}..$cmdId") if($fn);
+    my $re = $cmdList{$cmd}{regexp};
+    my ($err, $data) = &{$fn}($iohash, $cmd, $re ? $re : "^000400${id}..$cmdId")
+                        if($fn);
     use strict "refs";
 
     return $err if($err);
+    $data = "$cmd $id $data" if($re);
+
     $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
 
   } else {
@@ -2468,7 +2481,8 @@ ZWave_addToSendStack($$)
   push @{$ss}, $cmd;
 
   if(ZWave_isWakeUp($hash)) {
-    if ($cmd =~ m/^......988[01].*/) {
+    # SECURITY XXX and neighborList
+    if ($cmd =~ m/^......988[01].*/ || $cmd =~ m/^80..0101$/) { 
       Log3 $hash->{NAME}, 5, "$hash->{NAME}: Sendstack bypassed for $cmd";
     } else {
       return "Scheduled for sending after WAKEUP" if(!$hash->{wakeupAlive});
@@ -2501,6 +2515,35 @@ ZWave_Parse($$@)
     Log3 $ioName, 1, "ERROR: $ioName homeId is not set!"
         if(!$iodev->{errReported});
     $iodev->{errReported} = 1;
+    return "";
+  }
+
+  if($msg =~ m/^neighborList (..) 0180(.*)$/) {
+    my ($id, $data) = ($1, $2);
+    my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+    my $name = ($hash ? $hash->{NAME} : "unknown");
+
+    my @r = map { ord($_) } split("", pack('H*', $data));
+    return "Bogus answer: $msg" if(int(@r) != 29);
+
+    my @list;
+    my $ioId = ReadingsVal($ioName, "homeId", "");
+    $ioId = $1 if($ioId =~ m/CtrlNodeId:(..)/);
+    for my $byte (0..28) {
+      my $bits = $r[$byte];
+      for my $bit (0..7) {
+        if($bits & (1<<$bit)) {
+          my $dec = $byte*8+$bit+1;
+          my $hex = sprintf("%02x", $dec);
+          my $h = $modules{ZWave}{defptr}{"$homeId $hex"};
+          push @list, ($hex eq $ioId ? $ioName :
+                      ($h ? $h->{NAME} : "UNKNOWN_$dec"));
+        }
+      }
+    }
+    $msg = @list ? join(",", @list) : "empty";
+    readingsSingleUpdate($hash, "neighborList", $msg, 1) if($hash);
+    return $msg if($srcCmd);
     return "";
   }
 
@@ -2907,6 +2950,14 @@ s2Hex($)
   <b>Note</b>: devices with on/off functionality support the <a
       href="#setExtensions"> set extensions</a>.
 
+  <br><br><b>All</b>
+  <li>neighborUpdate<br>
+    Requests controller to update his routing table which is based on
+    slave's neighbor list. The update may take significant time to complete.
+    With the event "done" or "failed" ZWDongle will notify the end of the
+    update process.  To read node's neighbor list see neighborList get
+    below.</li>
+
   <br><br><b>Class ASSOCIATION</b>
   <li>associationAdd groupId nodeId ...<br>
   Add the specified list of nodeIds to the assotion group groupId.<br> Note:
@@ -3161,6 +3212,12 @@ s2Hex($)
   <a name="ZWaveget"></a>
   <b>Get</b>
   <ul>
+  <br><br><b>All</b>
+  <li>neighborList<br>
+    returns the list of neighbors.  Provides insights to actual network
+    topology.  List includes dead links and non-routing neighbors.
+    Since this information is stored in the dongle, the information will be
+    returned directly even for WAKE_UP devices.</li>
 
   <br><br><b>Class ALARM</b>
   <li>alarm alarmId<br>
