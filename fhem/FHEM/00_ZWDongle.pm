@@ -32,7 +32,6 @@ my %sets = (
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
   "removeFailedNode" => { cmd => "61%02x@" },   # ZW_REMOVE_FAILED_NODE_ID
   "replaceFailedNode"=> { cmd => "63%02x@" },   # ZW_REPLACE_FAILED_NODE
-  "neighborUpdate"   => { cmd => "48%02x" },   # ZW_REQUEST_NODE_NEIGHBOR_UPDATE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
                                               # SERIAL_API_APPL_NODE_INFORMATION
@@ -46,8 +45,6 @@ my %gets = (
   "getVirtualNodes" => "a5",      # ZW_GET_VIRTUAL_NODES
   "homeId"          => "20",      # MEMORY_GET_ID
   "isFailedNode"    => "62%02x",  # ZW_IS_FAILED_NODE
-  "neighborList" => "80%02x0101", # GET_ROUTING_TABLE_LINE include dead links,
-                                  #              include non-routing neigbors
   "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
   "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
   "random"          => "1c%02x",  # ZW_GET_RANDOM
@@ -427,17 +424,6 @@ ZWDongle_Get($@)
       push @list, "Security:" . ($r[3]&0x1);
       $msg = join(" ", @list);
     }
-
-  } elsif($type eq "neighborList") {            ############################
-    return "$name: Bogus data received" if(int(@r) != 31);
-    my @list;
-    for my $byte (0..28) {
-      my $bits = $r[2+$byte];
-      for my $bit (0..7) {
-        push @list, $byte*8+$bit+1 if($bits & (1<<$bit));
-      }
-    }
-    $msg = join(",", @list);
 
   } elsif($type eq "random") {                  ############################
     return "$name: Cannot generate" if($ret !~ m/^011c01(..)(.*)$/);
@@ -874,13 +860,6 @@ ZWDongle_Ready($)
     device upon reception of the answer. Used for previously included nodes,
     see the nodeList get command below.</li>
 
-  <li>neighborUpdate<br>
-    Requests controller to update his routing table which is based on
-    slave's neighbor list. The update may take significant time to complete.
-    With the event "done" or "failed" ZWDongle will notify the end of the
-    update process.  To read node's neighbor list see neighborList get
-    below.</li>
-
   <li>removeFailedNode<br>
     Remove a non-responding node -that must be on the failed Node list- from 
     the routing table in controller. Instead,always use removeNode if possible.
@@ -916,11 +895,6 @@ ZWDongle_Ready($)
 
   <li>nodeInfo<br>
     return node specific information. Needed by developers only.</li>
-
-  <li>neighborList id<br>
-    returns the list of neighbor nodeIds of specified node.
-    Provides insights to actual network topology.
-    List includes dead links and non-routing neighbors</li>
 
   <li>random N<br>
     request N random bytes from the controller.
