@@ -282,6 +282,9 @@ sub FB_CALLLIST_Set($@)
         # Inform all FHEMWEB clients
         FB_CALLLIST_updateFhemWebClients($hash);
         
+        # Delete stored list
+        FB_CALLLIST_saveList($hash);
+        
         return undef;
     }
     else
@@ -774,6 +777,12 @@ sub FB_CALLLIST_saveList($)
         Log3 $name, 5, "FB_CALLLIST ($name) - saving list dump: ".$dump;
 
         my $err = setKeyValue("FB_CALLLIST-$name", $dump);
+
+        Log3 $name, 3, "FB_CALLLIST ($name) - error while saving the current call list: $err" if(defined($err));
+    }
+    else
+    {
+        my $err = setKeyValue("FB_CALLLIST-$name", undef);
 
         Log3 $name, 3, "FB_CALLLIST ($name) - error while saving the current call list: $err" if(defined($err));
     }
