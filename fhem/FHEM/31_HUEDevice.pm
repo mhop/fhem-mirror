@@ -984,16 +984,16 @@ HUEDevice_Parse($$)
 
   $s = 'unreachable' if( !$reachable );
 
-  $hash->{helper}{on} = $on;
-  $hash->{helper}{reachable} = $reachable;
-  $hash->{helper}{colormode} = $colormode;
-  $hash->{helper}{bri} = $bri;
-  $hash->{helper}{ct} = $ct;
-  $hash->{helper}{hue} = $hue;
-  $hash->{helper}{sat} = $sat;
-  $hash->{helper}{xy} = $xy;
-  $hash->{helper}{alert} = $alert;
-  $hash->{helper}{effect} = $effect;
+  $hash->{helper}{on} = $on if( defined($on) );
+  $hash->{helper}{reachable} = $reachable if( defined($reachable) );
+  $hash->{helper}{colormode} = $colormode if( defined($colormode) );
+  $hash->{helper}{bri} = $bri if( defined($bri) );
+  $hash->{helper}{ct} = $ct if( defined($ct) );
+  $hash->{helper}{hue} = $hue if( defined($hue) );
+  $hash->{helper}{sat} = $sat if( defined($sat) );
+  $hash->{helper}{xy} = $xy if( defined($xy) );
+  $hash->{helper}{alert} = $alert if( defined($alert) );
+  $hash->{helper}{effect} = $effect if( defined($effect) );
 
   $hash->{helper}{percent} = $percent;
 
