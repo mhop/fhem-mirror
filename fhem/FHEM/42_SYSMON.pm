@@ -4319,7 +4319,7 @@ sub SYSMON_ShowBarChartHtml($;$) {
   my $sysmon = {};
   my $html='';
   if(defined($main::defs{$dev}{READINGS})) {
-    foreach my $r (keys($main::defs{$dev}{READINGS})){
+    foreach my $r (keys %{$main::defs{$dev}->{READINGS}}){
       $sysmon->{$r} = $main::defs{$dev}{READINGS}{$r}{VAL};
     }
   } else {
@@ -4597,7 +4597,7 @@ sub SYSMON_ShowBarChartHtml_alt($;$$){
   # access sysmon data..
   #my $sysmon = SYSMON_getValues($dev);
   my $sysmon = {};  
-  foreach my $r (keys($main::defs{$dev}{READINGS})){
+  foreach my $r (keys %{$main::defs{$dev}->{READINGS}}){
     $sysmon->{$r} = $main::defs{$dev}{READINGS}{$r}{VAL};
   }
   
