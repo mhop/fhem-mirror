@@ -825,17 +825,22 @@ my %validDeviceTypes = (
  0x1d => 'Reserved for sensors',
  0x1e => 'Reserved for sensors',
  0x1f => 'Reserved for sensors',
- 0x20 => 'Breaker (electrcity',
+ 0x20 => 'Breaker (electricity)',
  0x21 => 'Valve (gas)',
  0x22 => 'Reserved for switching devices',
  0x23 => 'Reserved for switching devices',
  0x24 => 'Reserved for switching devices',
- 0x25 => 'Customer unit (Display device',
+ 0x25 => 'Customer unit (Display device)',
  0x26 => 'Reserved for customer units',
  0x27 => 'Reserved for customer units',
  0x28 => 'Waste water',
  0x29 => 'Garbage',
  0x2a => 'Carbon dioxide',
+ 0x2b => 'Environmental meter',
+ 0x2c => 'Environmental meter',
+ 0x2d => 'Environmental meter',
+ 0x2e => 'Environmental meter',
+ 0x2f => 'Environmental meter',
  0x31 => 'OMS MUC',
  0x32 => 'OMS unidirectional repeater',
  0x33 => 'OMS bidirectional repeater',
@@ -985,13 +990,19 @@ sub _initialize {
 sub decodeConfigword($) {
   my $self = shift;
   
+  #if ($self->{cw_parts}{mode} == 5) {
   $self->{cw_parts}{bidirectional}    = $self->{cw} & 0b1000000000000000 >> 15;
   $self->{cw_parts}{accessability}    = $self->{cw} & 0b0100000000000000 >> 14;
   $self->{cw_parts}{synchronous}      = $self->{cw} & 0b0010000000000000 >> 13;
   $self->{cw_parts}{mode}             = $self->{cw} & 0b0000111100000000 >> 8;
   $self->{cw_parts}{encrypted_blocks} = $self->{cw} & 0b0000000011110000 >> 4;
   $self->{cw_parts}{content}          = $self->{cw} & 0b0000000000001100 >> 2;
-  $self->{cw_parts}{hops}             = $self->{cw} & 0b0000000000000011;
+  $self->{cw_parts}{repeated_access}  = $self->{cw} & 0b0000000000000010 >> 1;
+  $self->{cw_parts}{hops}             = $self->{cw} & 0b0000000000000001;
+  #} elsif ($self->{cw_parts}{mode} == 7) {
+    # ToDo: wo kommt das dritte Byte her?
+  #  $self->{cw_parts}{mode}             = $self->{cw} & 0b0000111100000000 >> 8;
+  #}
 }
 
 sub decodeBCD($$$) {
@@ -1474,7 +1485,7 @@ sub decodeApplicationLayer($) {
 
   } else {
     # error, encryption mode not implemented
-    $self->{errormsg} = sprintf('Encryption %x mode not implemented', $self->{cw_parts}{mode});
+    $self->{errormsg} = sprintf('Encryption mode %x not implemented', $self->{cw_parts}{mode});
     $self->{errorcode} = ERR_UNKNOWN_ENCRYPTION;
     $self->{decrypted} = 0;
     return 0;
