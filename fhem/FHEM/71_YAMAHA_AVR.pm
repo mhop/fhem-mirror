@@ -98,9 +98,32 @@ YAMAHA_AVR_GetStatus($;$)
     
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Update><YAMAHA_Network_Site><Status>GetParam</Status></YAMAHA_Network_Site></Update></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", 1);
+
+    if (YAMAHA_AVR_isModel_DSP($hash))
+    {
+        #Log3 $name, 5, "ZONE: " . $zone;
+        if ($zone eq "Main_Zone")
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Bass>GetParam</Bass></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Treble>GetParam</Treble></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
+        }
+        else
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Bass>GetParam</Bass></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Treble>GetParam</Treble></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
+        }
+    }
+    else
+    {
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Bass>GetParam</Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Treble>GetParam</Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
+    }
+    
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Update><Status>GetParam</Status></Update></Network></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", 1);
     
     YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
+    
+    return undef;
 }
 
 ###################################
@@ -188,6 +211,9 @@ YAMAHA_AVR_Set($@)
                                                           (exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone" ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".(exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").(exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")."enhancer:on,off " : "").
                                                           (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "play:noArg pause:noArg stop:noArg skip:reverse,forward ".(exists($hash->{helper}{PLAY_CONTROL}) ? "shuffle:on,off repeat:off,one,all " : "") : "").
                                                           "sleep:off,30min,60min,90min,120min,last ".
+                                                          (exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
+                                                          (exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and (YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
+                                                          (exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and (not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
                                                           "statusRequest:noArg";
 
     Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a);
@@ -376,6 +402,94 @@ YAMAHA_AVR_Set($@)
             else
             {
                 return "volume can only be used when device is powered on";
+            }
+        }
+    }
+    elsif($what eq "bass")
+    {
+        if(defined($a[2]))
+        {
+            if($hash->{READINGS}{power}{VAL} eq "on")
+            {
+                my $bassVal = $a[2];
+                if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
+                {
+                    $bassVal = int($a[2]) if not (($a[2] =~ /^\d$/ ) || ($a[2] =~ /\.5/) || ($a[2] =~ /\.0/));
+                    $bassVal = -6 if($bassVal < -6);
+                    $bassVal = 6 if($bassVal > 6);
+                    if (YAMAHA_AVR_isModel_DSP($hash))
+                    {
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Speaker><Bass><Cross_Over><Val>" . ReadingsVal($name,".bass_crossover","125") . "</Val><Exp>0</Exp><Unit>Hz</Unit></Cross_Over><Lvl><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Bass></Speaker></Tone></$zone></YAMAHA_AV>", $what, $bassVal);
+                    }
+                    else
+                    {
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $bassVal);
+                    }
+                }
+                else # !main_zone
+                {
+                    $bassVal = int($a[2]);
+                    $bassVal = -10 if($bassVal < -10);
+                    $bassVal = 10 if($bassVal > 10);
+                    if (YAMAHA_AVR_isModel_DSP($hash))
+                    {
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></$zone></YAMAHA_AV>", $what, $bassVal);
+                    }
+                    else
+                    {
+                        $bassVal-- if (($bassVal % 2 != 0) && ($bassVal > 0));
+                        $bassVal++ if (($bassVal % 2 != 0) && ($bassVal < 0));
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $bassVal);
+                    }
+                }
+            }
+            else
+            {
+                return "bass can only used when device is powered on";
+            }
+        }
+    }
+    elsif($what eq "treble")
+    {
+        if(defined($a[2]))
+        {
+            if($hash->{READINGS}{power}{VAL} eq "on")
+            {
+                my $trebleVal = $a[2];
+                if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
+                {
+                    $trebleVal = int($a[2]) if not (($a[2] =~ /^\d$/ ) || ($a[2] =~ /\.5/) || ($a[2] =~ /\.0/));
+                    $trebleVal = -6 if($trebleVal < -6);
+                    $trebleVal = 6 if($trebleVal > 6);
+                    if (YAMAHA_AVR_isModel_DSP($hash))
+                    {
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Speaker><Treble><Cross_Over><Val>" . ReadingsVal($name,".treble_crossover","35") . "</Val><Exp>1</Exp><Unit>kHz</Unit></Cross_Over><Lvl><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Treble></Speaker></Tone></$zone></YAMAHA_AV>", $what, $trebleVal);
+                    }
+                    else
+                    {
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $trebleVal);
+                    }
+                }
+                else # !main_zone
+                {
+                    $trebleVal = int($trebleVal);
+                    $trebleVal = -10 if($trebleVal < -10);
+                    $trebleVal = 10 if($trebleVal > 10);
+                    if (YAMAHA_AVR_isModel_DSP($hash))
+                    {
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></$zone></YAMAHA_AV>", $what, $trebleVal);
+                    }
+                    else
+                    {
+                        $trebleVal-- if (($trebleVal % 2 != 0) && ($trebleVal > 0));
+                        $trebleVal++ if (($trebleVal % 2 != 0) && ($trebleVal < 0));
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $trebleVal);
+                    }
+                }
+            }
+            else
+            {
+                return "treble can only used when device is powered on";
             }
         }
     }
@@ -976,6 +1090,59 @@ YAMAHA_AVR_ParseResponse ($$$)
                     }
                 }
             }
+            elsif($arg eq "toneStatus")
+            {
+                # Response DSP-Z7: <Main_Zone><Tone><Speaker><Bass><Cross_Over><Val>125</Val><Exp>0</Exp><Unit>Hz</Unit></Cross_Over><Lvl><Val>35</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Bass></Speaker></Tone></Main_Zone>
+                # Response DSP-Z7: <Zone_2><Tone><Bass><Val>0</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Zone_2>
+                # Response other models ???: <Sound_Video><Tone><Bass><Val>0</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Sound_Video>
+                if (($data =~ /<Tone><Speaker><Bass><Cross_Over><Val>(.+?)<\/Val><Exp>.*?<\/Exp><Unit>.*?<\/Unit><\/Cross_Over><Lvl><Val>(.+?)<\/Val>.*?<\/Lvl><\/Bass><\/Speaker><\/Tone>/) ||
+                    ($data =~ /<Tone><Bass><Val>(.+?)<\/Val><Exp>1<\/Exp><Unit>dB<\/Unit><\/Bass><\/Tone>/))
+                {
+                    Log3 $name, 5, "YAMAHA_AVR ($name) - toneStatus Bass: " . $data;
+                    if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
+                    {
+                    
+                        if($2)
+                        {
+                            readingsBulkUpdate($hash, "bass", int($2)/10);
+                            readingsBulkUpdate($hash, "bassCrossover", lc($1));
+                        }
+                        else
+                        {
+                            readingsBulkUpdate($hash, "bass", int($1)/10);
+                        }
+                    }
+                    else #!main_zone
+                    {
+                        readingsBulkUpdate($hash, "bass", int($1)/10);
+                    }
+                }
+
+                # Response DSP-Z7: <Main_Zone><Tone><Speaker><Treble><Cross_Over><Val>35</Val><Exp>1</Exp><Unit>kHz</Unit></Cross_Over><Lvl><Val>10</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Treble></Speaker></Tone></Main_Zone>
+                # Response DSP-Z7: <Zone_2><Tone><Treble><Val>0</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Zone_2>
+                # Response other models ???: <Sound_Video><Tone><Treble><Val>0</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Sound_Video>
+                elsif (($data =~ /<Tone><Speaker><Treble><Cross_Over><Val>(.+?)<\/Val><Exp>.*?<\/Exp><Unit>.*?<\/Unit><\/Cross_Over><Lvl><Val>(.+?)<\/Val>.*?<\/Lvl><\/Treble><\/Speaker><\/Tone>/) ||
+                       ($data =~ /<Tone><Treble><Val>(.+?)<\/Val><Exp>1<\/Exp><Unit>dB<\/Unit><\/Treble><\/Tone>/))
+                {
+                    Log3 $name, 5, "YAMAHA_AVR ($name) - toneStatus Treble: " . $data;
+                    if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
+                    {
+                       if($2)
+                        {
+                            readingsBulkUpdate($hash, "treble", int($2)/10);
+                            readingsBulkUpdate($hash, "trebleCrossover", lc($1));
+                        }
+                        else
+                        {
+                            readingsBulkUpdate($hash, "treble", int($1)/10);
+                        }
+                    }
+                    else #!main_zone
+                    {
+                        readingsBulkUpdate($hash, "treble", int($1)/10);
+                    }
+                }
+            }
             elsif($arg eq "basicStatus")
             {
                 if($data =~ /<Power>(.+?)<\/Power>/)
@@ -1484,6 +1651,27 @@ sub YAMAHA_AVR_html2txt($)
 
     return $string;
 }
+
+
+# ########################################################################################
+# ### DSP-Z7 / 3900 specific functions ###################################################
+# ########################################################################################
+
+
+#############################
+# Check if amp is one of these models: DSP-Z7, DSP-Z9, DSP-Z11, RX-Z7, RX-Z9, RX-Z11, RX-V3900, DSP-AX3900
+# Tested models: DSP-Z7
+sub
+YAMAHA_AVR_isModel_DSP($)
+{
+    my($hash) = @_;
+    if (exists($hash->{MODEL}) && (($hash->{MODEL} =~ /DSP-Z/) || ($hash->{MODEL} =~ /RX-Z/) || ($hash->{MODEL} =~ /RX-V3900/) || ($hash->{MODEL} =~ /DSP-AX3900/)))
+    {
+        return 1;
+    }
+    return 0;
+}
+
 1;
 
 =pod
@@ -1579,6 +1767,8 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>volumeUp</b> [0-100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; increases the volume level by 5% or the value of attribute volumeSteps (optional the increasing level can be given as argument, which will be used instead). If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
 <li><b>volumeDown</b> [0-100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level by 5% or the value of attribute volumeSteps (optional the decreasing level can be given as argument, which will be used instead). If you use "direct" as second argument, no volume smoothing is used (if activated) for this volume change. In this case, the volume will be set immediatly.</li>
 <li><b>mute</b> on|off|toggle &nbsp;&nbsp;-&nbsp;&nbsp; activates volume mute</li>
+<li><b>bass</b> [-6...6] step 0.5 (main zone), [-10...10] step 2 (other zones), [-10...10] step 1 (other zones, DSP models) &nbsp;&nbsp;-&nbsp;&nbsp; set bass tone level in decibel</li>
+<li><b>treble</b> [-6...6] step 0.5 (main zone), [-10...10] step 2 (other zones), [-10...10] step 1 (other zones, DSP models) &nbsp;&nbsp;-&nbsp;&nbsp; set treble tone level in decibel</li>
 <li><b>dsp</b> hallinmunich,hallinvienna,... &nbsp;&nbsp;-&nbsp;&nbsp; sets the DSP mode to the given preset</li>
 <li><b>enhancer</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the internal sound enhancer</li>
 <li><b>3dCinemaDsp</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the CINEMA DSP 3D mode</li>
@@ -1696,6 +1886,7 @@ sub YAMAHA_AVR_html2txt($)
   <ul>
   <li><b>3dCinemaDsp</b> - The status of the CINEMA DSP 3D mode (can be "auto" or "off")</li>
   <li><b>adaptiveDrc</b> - The status of the Adaptive DRC (can be "auto" or "off")</li>
+  <li><b>bass</b> Reports the current bass tone level of the receiver or zone in decibel values (between -6 and 6 dB (mainzone) and -10 and 10 dB (other zones)</li>
   <li><b>dsp</b> - The current selected DSP mode for sound output</li>
   <li><b>direct</b> - indicates if all sound enhancement features are bypassed or not ("on" =&gt; all features are bypassed, "off" =&gt; sound enhancement features are used).</li>
   <li><b>enhancer</b> - The status of the internal sound enhancer (can be "on" or "off")</li>
@@ -1710,6 +1901,7 @@ sub YAMAHA_AVR_html2txt($)
   <li><b>sleep</b> - indicates if the internal sleep timer is activated or not.</li>
   <li><b>straight</b> - indicates if the internal sound codec converter is bypassed or not (can be "on" or "off")</li>
   <li><b>state</b> - Reports the current power state and an absence of the device (can be "on", "off" or "absent")</li>
+  <li><b>treble</b> Reports the current treble tone level of the receiver or zone in decibel values (between -6 and 6 dB (mainzone) and -10 and 10 dB (other zones)</li>
   <br><br><u>Input dependent Readings/Events:</u><br>
   <li><b>currentChannel</b> - Number of the input channel (SIRIUS only)</li>
   <li><b>currentStation</b> - Station name of the current radio station (available on NET RADIO, PANDORA</li>
@@ -1822,6 +2014,8 @@ sub YAMAHA_AVR_html2txt($)
 <li><b>volumeUp</b> [0...100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; Erh&ouml;ht die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang). Wenn als zweites Argument "direct" gesetzt ist, wird keine weiche Lautst&auml;rkenanpassung durchgef&uuml;hrt (sofern aktiviert). Die Lautst&auml;rke wird in diesem Fall sofort gesetzt.</li>
 <li><b>volumeDown</b> [0...100] [direct] &nbsp;&nbsp;-&nbsp;&nbsp; Veringert die Lautst&auml;rke um 5% oder entsprechend dem Attribut volumeSteps (optional kann der Wert auch als Argument angehangen werden, dieser hat dann Vorang). Wenn als zweites Argument "direct" gesetzt ist, wird keine weiche Lautst&auml;rkenanpassung durchgef&uuml;hrt (sofern aktiviert). Die Lautst&auml;rke wird in diesem Fall sofort gesetzt.</li>
 <li><b>mute</b> on,off,toggle &nbsp;&nbsp;-&nbsp;&nbsp; Schaltet den Receiver stumm</li>
+<li><b>bass</b> [-6...6] Schrittweite 0.5 (main zone), [-10...10] Schrittweite 2 (andere Zonen), [-10...10] Schrittweite 1 (andere Zonen, DSP Modelle) &nbsp;&nbsp;-&nbsp;&nbsp; Stellt die Tiefen in decibel ein</li>
+<li><b>treble</b> [-6...6] Schrittweite 0.5 (main zone), [-10...10] Schrittweite 2 (andere Zonen), [-10...10] Schrittweite 1 (andere Zonen, DSP Modelle) &nbsp;&nbsp;-&nbsp;&nbsp; Stellt die H&ouml;hen in decibel ein</li>
 <li><b>straight</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht die interne Codec-Umwandlung und gibt den Original-Codec wieder.</li>
 <li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den internen Sleep-Timer zum automatischen Abschalten</li>
 <li><b>shuffle</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert die Zufallswiedergabe des aktuellen Eingangs (ist nur eingangsabh&auml;ngig verf&uuml;gbar)</li>
@@ -1930,6 +2124,7 @@ sub YAMAHA_AVR_html2txt($)
   <ul>
   <li><b>3dCinemaDsp</b> - Der Status des CINEMA DSP 3D-Modus ("auto" =&gt; an, "off" =&gt; aus)</li>
   <li><b>adaptiveDrc</b> - Der Status des Adaptive DRC ("auto" =&gt; an, "off" =&gt; aus)</li>
+  <li><b>bass</b> Der aktuelle Basspegel, zwischen -6 and 6 dB (main zone) and -10 and 10 dB (andere Zonen)</li>
   <li><b>dsp</b> - Das aktuell aktive DSP Preset</li>
   <li><b>enhancer</b> - Der Status des Enhancers ("on" =&gt; an, "off" =&gt; aus)</li>
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
@@ -1944,6 +2139,7 @@ sub YAMAHA_AVR_html2txt($)
   <li><b>straight</b> - Zeigt an, ob die interne Codec Umwandlung umgangen wird oder nicht ("on" =&gt; Codec Umwandlung wird umgangen, "off" =&gt; Codec Umwandlung wird benutzt)</li>
   <li><b>sleep</b> - Zeigt den Status des internen Sleep-Timers an</li>
   <li><b>state</b> - Der aktuelle Schaltzustand (power-Reading) oder die Abwesenheit des Ger&auml;tes (m&ouml;gliche Werte: "on", "off" oder "absent")</li>
+  <li><b>treble</b> Der aktuelle H&ouml;henpegel, zwischen -6 and 6 dB (main zone) and -10 and 10 dB (andere Zonen)</li>
   <br><br><u>Eingangsabh&auml;ngige Readings/Events:</u><br>
   <li><b>currentChannel</b> - Nummer des Eingangskanals (nur bei SIRIUS)</li>
   <li><b>currentStation</b> - Name des Radiosenders (nur bei TUNER, NET RADIO und PANDORA)</li>
