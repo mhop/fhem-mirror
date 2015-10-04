@@ -164,8 +164,22 @@ sub HUEBridge_Undefine($$)
 sub HUEBridge_OpenDev($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   HUEBridge_Detect($hash) if( defined($hash->{NUPNP}) );
+
+  my ($err,$ret) = HttpUtils_BlockingGet({
+    url => "http://$hash->{Host}/description.xml",
+    method => "GET",
+    timeout => 3,
+  });
+
+  if( defined($err) && $err ) {
+    Log3 $name, 3, "HUEBridge_Detect: error reading description: ".$err;
+  } else {
+    $ret =~ m/<modelName>([^<]*)/;
+    $hash->{modelName} = $1;
+  }
 
   my $result = HUEBridge_Call($hash, undef, 'config', undef);
   if( !defined($result) ) {
@@ -237,6 +251,7 @@ HUEBridge_Set($@)
     }
 
     $hash->{updatestate} = 3;
+    $hash->{helper}{updatestate} = $hash->{updatestate};
     $hash->{STATE} = "updating";
     return "starting update";
 
@@ -308,9 +323,27 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'deletewhitelist') {
+
+    my $result = HUEBridge_Call($hash, undef, "config/whitelist/$arg", undef, 'DELETE');
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef;
+
+  } elsif($cmd eq 'touchlink') {
+    my $obj = { 'touchlink' => JSON::true };
+
+    my $result = HUEBridge_Call($hash, undef, 'config', $obj, 'PUT');
+
+    return undef if( $result->{success} );
+
+    return $result->{error}{description} if( $result->{error} );
+    return undef;
+
+
   } else {
-    my $list = "delete creategroup deletegroup autocreate:noArg statusRequest:noArg";
-    $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} == 2 );
+    my $list = "delete creategroup deletegroup deletewhitlist touchlink autocreate:noArg statusRequest:noArg";
+    $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
 }
@@ -360,8 +393,18 @@ HUEBridge_Get($@)
     $ret = sprintf( "%2s  %-15s %-15s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE", "LIGHTS" ) .$ret if( $ret );
     return $ret;
 
+  } elsif($cmd eq 'whitelist') {
+    my $result =  HUEBridge_Call($hash, undef, 'config', undef);
+    my $ret = "";
+    my $whitelist = $result->{whitelist};
+    foreach my $key ( sort {$whitelist->{$a}{'last use date'} cmp $whitelist->{$b}{'last use date'}} keys %{$whitelist} ) {
+      $ret .= sprintf( "%-20s %-20s %-30s %s\n", $whitelist->{$key}{'create date'}, , $whitelist->{$key}{'last use date'}, $whitelist->{$key}{name}, $key );
+    }
+    $ret = sprintf( "%-20s %-20s %-30s %s\n", "CREATE", "LAST USE", "NAME", "KEY" ) .$ret if( $ret );
+    return $ret;
+
   } else {
-    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg sensors:noArg";
+    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg sensors:noArg whitelist:noArg";
   }
 }
 
@@ -415,19 +458,32 @@ HUEBridge_Parse($$)
 
   $hash->{name} = $result->{name};
   $hash->{swversion} = $result->{swversion};
+  my @l = split( '\.', $result->{apiversion} );
+  $hash->{helper}{apiversion} = ($l[0] << 16) + ($l[1] << 8) + $l[2];
   $hash->{apiversion} = $result->{apiversion};
+  $hash->{zigbeechannel} = $result->{zigbeechannel};
 
   if( defined( $result->{swupdate} ) ) {
     my $txt = $result->{swupdate}->{text};
     readingsSingleUpdate($hash, "swupdate", $txt, 1) if( $txt && $txt ne ReadingsVal($name,"swupdate","") );
     if( defined($hash->{updatestate}) ){
-      $hash->{STATE} = "update done" if( $result->{swupdate}->{updatestate} == 0 &&  $hash->{updatestate} >= 2 );
-      $hash->{STATE} = "update failed" if( $result->{swupdate}->{updatestate} == 2 &&  $hash->{updatestate} == 3 );
+      $hash->{STATE} = "update done" if( $result->{swupdate}->{updatestate} == 0 &&  $hash->{helper}{updatestate} >= 2 );
+      $hash->{STATE} = "update failed" if( $result->{swupdate}->{updatestate} == 2 &&  $hash->{helper}{updatestate} == 3 );
     }
 
     $hash->{updatestate} = $result->{swupdate}->{updatestate};
+    $hash->{helper}{updatestate} = $hash->{updatestate};
+    if( $result->{swupdate}->{devicetypes} ) {
+      my $devicetypes;
+      $devicetypes .= 'bridge' if( $result->{swupdate}->{devicetypes}->{bridge} );
+      $devicetypes .= ',' if( $devicetypes && scalar(@{$result->{swupdate}->{devicetypes}->{lights}}) );
+      $devicetypes .= join( ",", @{$result->{swupdate}->{devicetypes}->{lights}} ) if( $result->{swupdate}->{devicetypes}->{lights} );
+
+      $hash->{updatestate} .= " [$devicetypes]";
+    }
   } elsif ( defined(  $hash->{swupdate} ) ) {
     delete( $hash->{updatestate} );
+    delete( $hash->{helper}{updatestate} );
   }
 }
 
@@ -575,7 +631,7 @@ HUEBridge_Call($$$$;$)
     return $res if( !$blocking || defined($res) );
 
     Log3 $name, 3, "HUEBridge_Call: failed, retrying";
-    HUEBridge_Detect($hash);
+    HUEBridge_Detect($hash) if( defined($hash->{NUPNP}) );
   }
 
   Log3 $name, 3, "HUEBridge_Call: failed";
@@ -973,11 +1029,13 @@ HUEBridge_HTTP_Request($$$@)
   <b>Get</b>
   <ul>
     <li>devices<br>
-    list the devices known to the bridge.</li>
+      list the devices known to the bridge.</li>
     <li>groups<br>
-    list the groups known to the bridge.</li>
+      list the groups known to the bridge.</li>
     <li>sensors<br>
-    list the sensors known to the bridge.</li>
+      list the sensors known to the bridge.</li>
+    <li>whitelist<br>
+      list the whitlist of the bridge.</li>
   </ul><br>
 
   <a name="HUEBridge_Set"></a>
@@ -996,6 +1054,10 @@ HUEBridge_HTTP_Request($$$@)
       The lights can be given as fhem device names or bridge device numbers.</li>
     <li>deletegroup &lt;name&gt;|&lt;id&gt;<br>
       Deletes the given group in the bridge and deletes the associated fhem device.</li>
+    <li>deletwhitelist &lt;key&gt;<br>
+      Deletes the given key from the whitelist in the bridge.</li>
+    <li>touchlink<br>
+      perform touchlink action</li>
     <li>statusRequest<br>
       Update bridge status.</li>
     <li>swupdate<br>

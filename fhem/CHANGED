@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: HUEbridge: added et touchlink
+                        added get whitelist, set deletewhitelist
+                        new and extendet internals
+  - feature: HUEDevice: dimUp&dimDown: use bri_inc if bridge firmware >= 1.7
+                        don't send on with dimUp & dimDown if already on
+                        new and extendet internals
   - feature: 71_YAMAHA_AVR: new set commands/readings for controlling
              bass and treble (by dev0)
   - feature: 66_ECMD: requestSeparator can be turned off
