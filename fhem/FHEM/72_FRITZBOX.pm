@@ -2930,15 +2930,14 @@ sub FRITZBOX_Ring_Run_Web($)
          my $getCmdStr = "&ring_tone_radio_test=1&idx=".$_."&start_ringtest=1&ringtone=".$value;
             FRITZBOX_Log $hash, 4, "Reset ring tone of dect$_ to $value";
          # Reset internet station for the Fritz!Fons
-         if ($ttsLink)
-         {
+         if ($ttsLink) {
             $value = $startValue->{dectUser}->[$_]->{RadioRingID};
             push @webCmdArray, "telcfg:settings/Foncontrol/User".$_."/RadioRingID" => $value
                unless $useGuiHack;
             $getCmdStr .= "&ring_tone_radio_test=".$value;
             FRITZBOX_Log $hash, 4, "Reset radio station of dect$_ to $value";
          }
-         push @getCmdArray, [ "fon_devices/edit_dect_ring_tone.lua" => $getCmdStr] 
+         push @getCmdArray, [ "fon_devices/edit_dect_ring_tone.lua" => $getCmdStr ] 
                if $useGuiHack ;
       }
    }
@@ -4280,11 +4279,15 @@ sub FRITZBOX_Web_Query($$@)
    # FRITZBOX_Log $hash, 3, "Response: ".$response->content;
 #################
 
+   my $jsonText = $response->content;
+   # Remove illegal excape sequences
+   $jsonText =~ s/\\'/'/g;
+   
    my $jsonResult ;
    if ($charSet eq "UTF-8") {
-      $jsonResult = JSON->new->utf8->decode ($response->content);
+      $jsonResult = JSON->new->utf8->decode( $jsonText );
    } else {
-      $jsonResult = JSON   ->new->latin1->decode ($response->content);
+      $jsonResult = JSON->new->latin1->decode( $jsonText );
    }
    $jsonResult->{sid} = $sid;
    return $jsonResult;
