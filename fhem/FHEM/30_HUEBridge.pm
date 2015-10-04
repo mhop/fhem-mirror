@@ -479,7 +479,7 @@ HUEBridge_Parse($$)
       $devicetypes .= ',' if( $devicetypes && scalar(@{$result->{swupdate}->{devicetypes}->{lights}}) );
       $devicetypes .= join( ",", @{$result->{swupdate}->{devicetypes}->{lights}} ) if( $result->{swupdate}->{devicetypes}->{lights} );
 
-      $hash->{updatestate} .= " [$devicetypes]";
+      $hash->{updatestate} .= " [$devicetypes]" if( $devicetypes );
     }
   } elsif ( defined(  $hash->{swupdate} ) ) {
     delete( $hash->{updatestate} );
