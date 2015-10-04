@@ -10,10 +10,11 @@
 #
 ################################################################
 #
-#  define <name> HMCCUDEV <hmccu> <ccudev>
+#  define <name> HMCCUDEV <hmccu> <ccudev> [ { readonly | <statevals> } ]
 #
 #  set <name> datapoint <channel>.<datapoint> <value>
-#  set <name> devstate <channel> <value>
+#  set <name> devstate <value>
+#  set <name> <stateval_cmds>
 #
 #  get <name> datapoint <channel>.<datapoint>
 #
@@ -72,6 +73,14 @@ sub HMCCUDEV_Define ($$)
 	# Keep name of CCU device
 	$hash->{ccudev} = $a[2];
 
+	# Set commands / values
+	if (defined ($a[3]) && $a[3] eq 'readonly') {
+		$hash->{statevals} = $a[3];
+	}
+	else {
+		$hash->{statevals} = 'devstate';
+	}
+
 	# Inform HMCCU device about client device
 	Log 1, "HMCCUDEV: Assigning IO Port";
 	AssignIoPort ($hash);
@@ -89,9 +98,18 @@ sub HMCCUDEV_Attr ($@)
 {
 	my ($cmd, $name, $attrname, $attrval) = @_;
 
-	if (defined ($attrval)) {
-		if ($cmd eq "set" && $attrname eq "IODev") {
+	if (defined ($attrval) && $cmd eq "set") {
+		if ($attrname eq "IODev") {
 			$defs{$name}{IODev} = $defs{$attrval};
+		}
+		elsif ($attrname eq "stateval") {
+			$defs{$name}{statevals} = "devstate";
+			my @states = split /,/,$attrval;
+			foreach my $st (@states) {
+				my @statesubs = split /:/,$st;
+				next if (@statesubs != 2);
+				$defs{$name}{statevals} .= '|'.$statesubs[0];
+			}
 		}
 	}
 
@@ -143,11 +161,13 @@ sub HMCCUDEV_Set ($@)
 
 		return undef;
 	}
-	elsif ($opt eq 'devstate' || $opt eq 'on' || $opt eq 'off') {
-		my $objvalue = ($opt eq 'on' || $opt eq 'off') ? $opt : join ('%20', @a);
+	elsif ($opt =~ /($hash->{statevals})/) {
+		my $cmd = $1;
+		my $objvalue = ($cmd ne 'devstate') ? $cmd : join ('%20', @a);
 
 		if ($statechannel eq '') {
-			return HMCCUDEV_SetError ($hash, "No STATE channel specified");
+			return undef;
+#			return HMCCUDEV_SetError ($hash, "No STATE channel specified");
 		}
 		if (!defined ($objvalue)) {
 			return HMCCUDEV_SetError ($hash, "Usage: set <device> devstate <value>");
@@ -162,20 +182,16 @@ sub HMCCUDEV_Set ($@)
 		return undef;
 	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint on:noArg off:noArg";
+		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint devstate";
+		return undef if ($hash->{statevals} eq 'readonly');
+
 		if ($stateval ne '') {
-			my @valpairs = split /,/, $stateval;
-			my $sep = " devstate:";
-			foreach my $vp (@valpairs) {
-				my @sv = split /:/, $vp;
-				if (@sv == 2) {
-					$retmsg .= $sep . $sv[0];
-					$sep = "," if ($sep ne ',');
-				}
+			my @cmdlist = split /\|/,$hash->{statevals};
+			shift @cmdlist;
+			$retmsg .= ':'.join(',',@cmdlist);
+			foreach my $sv (@cmdlist) {
+				$retmsg .= ' '.$sv.':noArg';
 			}
-		}
-		else {
-			$retmsg .= " devstate";
 		}
 
 		return $retmsg;
@@ -247,11 +263,14 @@ sub HMCCUDEV_SetError ($$)
    <b>Define</b>
    <ul>
       <br/>
-      <code>define &lt;name&gt; HMCCUDEV &lt;<i>CCU_Device</i>&gt;</code>
+      <code>define &lt;name&gt; HMCCUDEV &lt;<i>CCU_Device</i>&gt; [readonly]</code>
       <br/><br/>
-      Example:
+      If <i>readonly</i> parameter is specified no set command will be available.
       <br/>
-      <code>define window_living HMCCUDEV WIN-LIV-1</code>
+      Examples:
+      <br/>
+      <code>define window_living HMCCUDEV WIN-LIV-1 readonly</code>
+      <code>define temp_control HMCCUDEV TEMP-CONTROL</code>
       <br/><br/>
       <i>CCU_Device</i> - Name of device in CCU without channel or datapoint.
       <br/>
@@ -270,10 +289,10 @@ sub HMCCUDEV_SetError ($$)
          Example:<br/>
          <code>set light_entrance devstate on</code>
       </li><br/>
-      <li>set &lt;<i>Name</i>&gt; { on | off }
+      <li>set &lt;<i>Name</i>&gt; &lt;<i>StateValue</i>&gt;
          <br/>
-         Set state of a CCU device channel is set to 'on' or 'off'. Channel must
-         be defined as attribute statechannel. State values 'on' and 'off' can 
+         State of a CCU device channel is set to state value. Channel must
+         be defined as attribute statechannel. State values can 
          be replaced by setting attribute stateval.
       </li><br/>
       <li>set &lt;<i>Name</i>&gt; datapoint &lt;<i>channel</i>.<i>datapoint</i>&gt; &lt;<i>Value</i>&gt;
