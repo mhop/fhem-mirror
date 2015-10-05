@@ -37,6 +37,8 @@ use strict;
 use warnings;
 use Time::HiRes qw(time);
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 sub CommandMsg($$;$$);
 
 ########################################

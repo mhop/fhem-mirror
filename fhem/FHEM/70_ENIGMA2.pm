@@ -58,6 +58,8 @@ use IO::Socket;
 use HttpUtils;
 use Encode;
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 no warnings "all";
 
 sub ENIGMA2_Set($@);
