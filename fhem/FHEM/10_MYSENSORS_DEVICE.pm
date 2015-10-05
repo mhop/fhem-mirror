@@ -86,7 +86,6 @@ my %static_types = (
   S_DOOR                  => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # Door and window sensors
   S_MOTION                => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # MotionSensor
   S_SMOKE                 => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # Smoke sensor
-  S_LIGHT                 => { receives => [V_STATUS,V_WATT], sends => [V_STATUS,V_WATT] }, # Light Actuator (on/off)
   S_BINARY                => { receives => [V_STATUS,V_WATT], sends => [V_STATUS,V_WATT] }, # Binary device (on/off), Alias for S_LIGHT
   S_DIMMER                => { receives => [V_STATUS,V_PERCENTAGE,V_WATT], sends => [V_STATUS,V_PERCENTAGE,V_WATT] }, # Dimmable device of some kind
   S_COVER                 => { receives => [V_UP,V_DOWN,V_STOP,V_PERCENTAGE], sends => [V_PERCENTAGE] }, # Window covers or shades
@@ -126,17 +125,15 @@ my %static_mappings = (
   V_TEMP        => { type => "temperature" },
   V_HUM         => { type => "humidity" },
   V_STATUS      => { type => "status", val => { 0 => 'off', 1 => 'on' }},
-  #V_LIGHT       => { type => "switch", val => { 0 => 'off', 1 => 'on' }}, # Deprecated
   V_PERCENTAGE  => { type => "percentage", range => { min => 0, step => 1, max => 100 }},
-  #V_DIMMER      => { type => "dimmer", range => { min => 0, step => 1, max => 100 }}, # Deprecated
   V_PRESSURE    => { type => "pressure" },
   V_FORECAST    => { type => "forecast", val => { # PressureSensor, DP/Dt explanation
-                                                  0 => 'stable',       # 0 = "Stable Weather Pattern"
-                                                  1 => 'sunny',  # 1 = "Slowly rising Good Weather", "Clear/Sunny "
-                                                  2 => 'cloudy', # 2 = "Slowly falling L-Pressure ", "Cloudy/Rain "
-                                                  3 => 'unstable', # 3 = "Quickly rising H-Press",     "Not Stable"
+                                                  0 => 'stable',      # 0 = "Stable Weather Pattern"
+                                                  1 => 'sunny',       # 1 = "Slowly rising Good Weather", "Clear/Sunny"
+                                                  2 => 'cloudy',      # 2 = "Slowly falling L-Pressure ", "Cloudy/Rain"
+                                                  3 => 'unstable',    # 3 = "Quickly rising H-Press",     "Not Stable"
                                                   4 => 'thunderstorm',# 4 = "Quickly falling L-Press",    "Thunderstorm"
-                                                  5 => 'unknown' }},   # 5 = "Unknown (More Time needed) 
+                                                  5 => 'unknown' }},  # 5 = "Unknown (More Time needed)
   V_RAIN        => { type => "rain" },
   V_RAINRATE    => { type => "rainrate" },
   V_WIND        => { type => "wind" },
