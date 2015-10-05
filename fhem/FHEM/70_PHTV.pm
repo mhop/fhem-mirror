@@ -53,6 +53,8 @@ use Color;
 use SetExtensions;
 use Encode;
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 sub PHTV_Set($@);
 sub PHTV_Get($@);
 sub PHTV_GetStatus($;$);

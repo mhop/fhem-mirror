@@ -45,6 +45,8 @@ use Time::HiRes qw(usleep);
 use Symbol qw<qualify_to_ref>;
 use Data::Dumper;
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 sub ONKYO_AVR_Set($@);
 sub ONKYO_AVR_Get($@);
 sub ONKYO_AVR_GetStatus($;$);

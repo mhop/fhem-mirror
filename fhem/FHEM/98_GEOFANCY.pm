@@ -45,6 +45,8 @@ use HttpUtils;
 use Time::Local;
 use Data::Dumper;
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 sub GEOFANCY_Set($@);
 sub GEOFANCY_Define($$);
 sub GEOFANCY_Undefine($$);
@@ -491,14 +493,17 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
       GEOFANCY
     </h3>
     <ul>
-      <li>Provides webhook receiver for geofencing via the following iOS apps:<br>
+      <li>Provides webhook receiver for geofencing, e.g. via the following apps:<br>
         <br>
       </li>
       <li>
-        <a href="https://itunes.apple.com/de/app/geofency-time-tracking-automatic/id615538630?l=en&amp;mt=8">Geofency</a>
+        <a href="https://itunes.apple.com/de/app/geofency-time-tracking-automatic/id615538630?l=en&amp;mt=8">Geofency (iOS - the original app)</a>
       </li>
       <li>
-        <a href="https://itunes.apple.com/de/app/geofancy/id725198453?l=en&amp;mt=8">Geofancy</a>
+        <a href="https://itunes.apple.com/de/app/geofancy/id725198453?l=en&amp;mt=8">Geofancy (iOS)</a>
+      </li>
+      <li>
+        <a href="http://www.egigeozone.de">EgiGeoZone (Android)</a>
       </li>
       <li>
         <p>
