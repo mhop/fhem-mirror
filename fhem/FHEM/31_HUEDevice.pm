@@ -846,8 +846,8 @@ HUEDevice_Parse($$)
   if( $hash->{helper}->{devtype} eq 'S' ) {
 
     if( $result->{state} ) {
-      substr( $result->{state}{lastupdated}, 10, 1, ' ' );
       if( $result->{state}{lastupdated} ne 'none' ) {
+        substr( $result->{state}{lastupdated}, 10, 1, ' ' );
         if( $result->{state}{buttonevent}
             && ReadingsTimestamp($name,"state","") ne $result->{state}{lastupdated} ) {
           readingsBeginUpdate($hash);
