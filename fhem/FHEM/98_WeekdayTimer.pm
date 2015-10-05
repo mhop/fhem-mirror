@@ -465,6 +465,7 @@ sub WeekdayTimer_SetTimer($) {
   my $name = $hash->{NAME};
   
   my $now  = time();  
+ #Log3 $hash, 3, "WeekdayTimer_SetTimer------------>WeekdayTimer_SetTimer";
   
   my $isHeating         = WeekdayTimer_isHeizung($hash);
   my $swip              = AttrVal($name, "switchInThePast", 0);
@@ -505,7 +506,7 @@ sub WeekdayTimer_SetTimer($) {
      return;
   }
   
-  my ($idx, $aktTime,$aktParameter,$nextTime,$nextParameter) = 
+  my ($idx,$aktTime,$aktParameter,$nextTime,$nextParameter) = 
      WeekdayTimer_searchAktNext($hash, time()+5);
   readingsSingleUpdate ($hash,  "nextUpdate", FmtDateTime($nextTime), 1);
   readingsSingleUpdate ($hash,  "nextValue",  $nextParameter,         1);  
@@ -515,7 +516,10 @@ sub WeekdayTimer_SetTimer($) {
      if (WeekdayTimer_FensterOffen($hash, $aktParameter, $idx)) {
         return;
      }
-     WeekdayTimer_Device_Schalten($hash,    $aktParameter, [7,8]);
+     
+    #Log3 $hash, 3, "$hash->{NAME} idx-past----------->$idx $aktParameter " .  FmtDateTime($aktTime);
+    
+     myInternalTimer ("$idx", $aktTime, "$hash->{TYPE}_Update", $hash, 0);
      my $active = 1;
      if (defined $hash->{CONDITION}) {
         $active = AnalyzeCommandChain(undef, "{".$hash->{CONDITION}."}");
@@ -538,16 +542,18 @@ sub WeekdayTimer_searchAktNext($$) {
   
   my @realativeWdays  = ($wday..6,0..$wday-1,$wday..6,0..6);  
  #Log3 $hash, 3, "[$name] wdays @realativeWdays";
+  my $oldIdx = 0;
   for (my $i=0;$i<=$#realativeWdays;$i++) {
      
      my $relativeDay = $i-7;
      my $relWday     = $realativeWdays[$i];
      
     #Log3 $hash, 3, "[$name] $i relWday  $relWday $relativeDay";
-     my $idx=0;
+     my $idx = 0;
      foreach my $time (sort keys %{$hash->{helper}{SWITCHINGTIME}{$relWday}}) {
         
         $idx++;
+       #Log3 $hash, 3, "$idx------------>$relativeDay $idx $oldIdx $time";
         my ($stunde, $minute, $sekunde)   = split (":",$time);              
         my $epoch = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, $relativeDay);
 
@@ -559,8 +565,9 @@ sub WeekdayTimer_searchAktNext($$) {
            $nextParameter = $hash->{helper}{SWITCHINGTIME}{$relWday}{$time};
            Log3 $hash, 4, "[$name] akt:  ".FmtDateTime($aktTime) ."(".$hash->{shortDays}{$language}[$aktTag]. ") -->> $aktParameter";
            Log3 $hash, 4, "[$name] next: ".FmtDateTime($nextTime)."(".$hash->{shortDays}{$language}[$nextTag].") -->> $nextParameter";
-           return ($idx, $aktTime,  $aktParameter, $nextTime, $nextParameter);
+           return ($oldIdx, $aktTime,  $aktParameter, $nextTime, $nextParameter);
         }
+        $oldIdx       = $idx;
         $aktTag       = $relWday;
         $aktTime      = $epoch;
         $aktParameter = $hash->{helper}{SWITCHINGTIME}{$relWday}{$time};        
@@ -582,12 +589,16 @@ sub WeekdayTimer_Update($) {
   my $name     = $hash->{NAME};
   my $idx      = $myHash->{MODIFIER};
   my $now      = time();
+  
+ #Log3 $hash, 3, "WeekdayTimer_Update-->[$name] $idx ";
 
   # Schaltparameter ermitteln
   my $tage        = $hash->{profil}{$idx}{TAGE};
   my $time        = $hash->{profil}{$idx}{TIME};
   my $epoch       = $hash->{profil}{$idx}{EPOCH};
   my $newParam    = $hash->{profil}{$idx}{PARA};
+  
+ #Log3 $hash, 3, "[$name] $idx ".FmtDateTime($epoch) . " " . $newParam . " " . join("",@$tage);
   
   if ($hash->{STILLDONETIME} > $epoch  ) {
      Log3 $hash, 3, "[$name] Timer $time overwritten by " . FmtDateTime($hash->{STILLDONETIME});
@@ -781,8 +792,6 @@ sub WeekdayTimer_Device_Schalten($$$) {
   $command = "set @ " . $setModifier . " %";
   $command = $hash->{COMMAND}   if (defined $hash->{COMMAND});
 
-#ort!!! vorverlegt
- #my $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam); 
   my $activeTimer = 1;
   
   my $isHeating = $setModifier gt "";
