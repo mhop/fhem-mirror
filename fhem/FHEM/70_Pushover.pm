@@ -701,6 +701,8 @@ sub Pushover_SetMessage {
         }
 
         if ( $values{priority} ne "" ) {
+            $values{priority} =  2 if ($values{priority} >  2);
+            $values{priority} = -2 if ($values{priority} < -2);
             $body = $body . "&priority=" . $values{priority};
         }
 
