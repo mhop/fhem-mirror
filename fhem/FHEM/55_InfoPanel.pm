@@ -57,7 +57,7 @@
 #                              with \n in text
 #
 ##############################################
-# $Id: 55_InfoPanel.pm 9301 2015-09-25 12:25:49Z betateilchen $
+# $Id$
 
 package main;
 use strict;
@@ -1430,7 +1430,7 @@ sub btIP_HTMLTail {
 
 sub btIP_Overview {
   my ($name, $url);
-  my $html= btIP_HTMLHead(undef, "InfoPanel Overview", undef) . "<body>\n";
+  my $html= btIP_HTMLHead(undef, "InfoPanel Overview", undef, undef) . "<body>\n";
   foreach my $def (sort keys %defs) {
     if($defs{$def}{TYPE} eq "InfoPanel") {
         $name= $defs{$def}{NAME};
