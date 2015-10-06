@@ -518,16 +518,17 @@ EnOcean_Define($$)
       $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
       $hash->{DEF} = $def;
       $modules{EnOcean}{defptr}{$def} = $hash;
-      $attr{$name}{manufID} = "7FF";
-      $attr{$name}{room} = "EnOcean";
-      $attr{$name}{subType} = "raw";
+      $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
+      $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
+      $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
     } elsif ($a[2] =~ m/^[A-Fa-f0-9]{8}$/i) {
       $def = uc($a[2]);
       $hash->{DEF} = $def;
       $modules{EnOcean}{defptr}{$def} = $hash;
       AssignIoPort($hash);
-      $attr{$name}{manufID} = "7FF";
-      $attr{$name}{room} = "EnOcean";
+      $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
+      $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
+      $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
       if (defined($a[3]) && $a[3] =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
         my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
         $rorg = "F6" if ($rorg eq "05");
@@ -602,21 +603,22 @@ EnOcean_Define($$)
       Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
     } elsif ($attr{$name}{subType} eq "4BS" && hex(substr($data, 6, 2)) & 8) {
       readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
-      Log3 $name, 2, "EnOcean $name teach-in is missing";
+      Log3 $name, 2, "EnOcean $name 4BS teach-in is missing";
     } elsif ($attr{$name}{subType} eq "VLD") {
       readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
-      Log3 $name, 2, "EnOcean $name teach-in is missing";
+      Log3 $name, 2, "EnOcean $name UTE teach-in is missing";
     } elsif ($attr{$name}{subType} eq "MSC") {
       readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
       Log3 $name, 2, "EnOcean $name MSC not supported";
     } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
       readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
-      Log3 $name, 2, "EnOcean $name secure teach-in is missing";
+      Log3 $name, 2, "EnOcean $name STE teach-in is missing";
     } elsif ($attr{$name}{subType} =~ m/^GPCD|GPSD$/) {
       readingsSingleUpdate($hash, "teach", "GP teach-in is missing", 1);
-      Log3 $name, 2, "EnOcean $name teach-in is missing";
+      Log3 $name, 2, "EnOcean $name GP teach-in is missing";
     }
     EnOcean_Parse($hash, $a[3]);
+
   }
   #$hash->{NOTIFYDEV} = "global";
   # polling
@@ -2453,7 +2455,6 @@ sub EnOcean_Set($@)
           $updateState = 0;
         } else {
         }
-        ####
         $setCmd |= 4 if (AttrVal($name, "sendDevStatus", "no") eq "yes");
         $setCmd |= 1 if (AttrVal($name, "serviceOn", "no") eq "yes");
         $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $blindParam1, $blindParam2, $setCmd;
@@ -2789,7 +2790,6 @@ sub EnOcean_Set($@)
           }
           $updateState = 0;
       }
-      ####
       $setCmd |= 4 if (AttrVal($name, "sendDevStatus", "yes") eq "no");
       $setCmd |= 1 if (AttrVal($name, "serviceOn", "no") eq "yes");
       $data = sprintf "%02X%02X%02X%02X", $ctrlParam1, $ctrlParam2, $ctrlParam3, $setCmd;
@@ -4088,8 +4088,8 @@ sub EnOcean_Set($@)
           ($channelName, $channelDir, $channelType, $signalType, $valueType, $resolution, $engMin, $scalingMin, $engMax, $scalingMax) =
           split(':', $gpDef[$channel]);
           if ($channelDir eq "O") {
-            Log3 $name, 3, "EnOcean set $name channel: $channel channelDir: $channelDir seq: $channelDirSeq";
-            Log3 $name, 3, "EnOcean set $name channel: $channel channelType: $channelType signalType: $signalType valueType: $valueType";
+            #Log3 $name, 3, "EnOcean set $name channel: $channel channelDir: $channelDir seq: $channelDirSeq";
+            #Log3 $name, 3, "EnOcean set $name channel: $channel channelType: $channelType signalType: $signalType valueType: $valueType";
             return "Usage: attr $name gpDef: O/I sequence error" if $channelDirSeq =~ m/.I$/;
             $channelDirSeq = "O-";
             # add channel-, signal- and valuetype
@@ -4108,7 +4108,7 @@ sub EnOcean_Set($@)
                          substr(unpack('B8', pack('C', $scalingMax)), 4);
             }
           } elsif ($channelDir eq "I") {
-            Log3 $name, 3, "EnOcean set $name channel: $channel channelDir: $channelDir seq: $channelDirSeq";
+            #Log3 $name, 3, "EnOcean set $name channel: $channel channelDir: $channelDir seq: $channelDirSeq";
             return "Usage: attr $name gpDef: O/I sequence error" if $channelDirSeq !~ m/^O./;
             $channelDirSeq = "OI";
             $gpDefI .= substr(unpack('B8', pack('C', $channelType)), 6) .
@@ -4152,7 +4152,7 @@ sub EnOcean_Set($@)
           }
           $teachInInfo = '0000000001' . unpack('B8', pack('C', length($gpDefI) / 4));
         }
-        Log3 $name, 3, "EnOcean set $name header: $header O: $gpDefO Info: $teachInInfo I: $gpDefI";
+        #Log3 $name, 3, "EnOcean set $name header: $header O: $gpDefO Info: $teachInInfo I: $gpDefI";
         # DophinView GP profile error if Product ID sent
         $data = $productID . $gpDefO . $teachInInfo . $gpDefI;
         #$data = $gpDefO . $teachInInfo . $gpDefI;
@@ -4239,7 +4239,7 @@ sub EnOcean_Set($@)
           return "Unknown argument $cmd, choose one of " . $cmdList . 'channelName';
         }
       }
-      Log3 $name, 3, "EnOcean set $name header: $header channel: $channel";
+      #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel";
 
       if ($channelType == 1) {
         # data
@@ -4250,10 +4250,10 @@ sub EnOcean_Set($@)
               $a[1] <= $engMin * $EnO_scaling[$scalingMin]) {
             $data = int(2**$EnO_resolution[$resolution] * ($a[1] - $engMin * $EnO_scaling[$scalingMin]) /
                                           ($engMax * $EnO_scaling[$scalingMax] - $engMin * $EnO_scaling[$scalingMin]));
-            Log3 $name, 3, "EnOcean set $name header: $header channel: $channel resolution: " . $EnO_resolution[$resolution] . " data: $data";
+            #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel resolution: " . $EnO_resolution[$resolution] . " data: $data";
             if ($data >= 2**$EnO_resolution[$resolution]) {
               $data = 2**$EnO_resolution[$resolution] - 1;
-              Log3 $name, 3, "EnOcean set $name header: $header channel: $channel resolution: " . $EnO_resolution[$resolution] . " data: $data";
+              #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel resolution: " . $EnO_resolution[$resolution] . " data: $data";
             }
             shift @a;
           } else {
@@ -4266,10 +4266,10 @@ sub EnOcean_Set($@)
               $a[1] <= $engMax * $EnO_scaling[$scalingMax]) {
             $data = int(2**$EnO_resolution[$resolution] * ($a[1] - $engMin * $EnO_scaling[$scalingMin]) /
                     ($engMax * $EnO_scaling[$scalingMax] - $engMin * $EnO_scaling[$scalingMin]));
-            Log3 $name, 3, "EnOcean set $name header: $header channel: $channel resolution: " . $EnO_resolution[$resolution] . " data: $data";
+            #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel resolution: " . $EnO_resolution[$resolution] . " data: $data";
             if ($data >= 2**$EnO_resolution[$resolution]) {
               $data = 2**$EnO_resolution[$resolution] - 1;
-              Log3 $name, 3, "EnOcean set $name header: $header channel: $channel resolution: " . $EnO_resolution[$resolution] . " data: $data";
+              #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel resolution: " . $EnO_resolution[$resolution] . " data: $data";
             }
             shift @a;
           } else {
@@ -4290,13 +4290,12 @@ sub EnOcean_Set($@)
         # flag
         if (defined $EnO_gpValueFlag{$signalType}{flagInv}{$a[1]}) {
           $data = $EnO_gpValueFlag{$signalType}{flagInv}{$a[1]};
-          Log3 $name, 3, "EnOcean set $name header: $header channel: $channel data: " .
-                         $EnO_gpValueFlag{$signalType}{flagInv}{$a[1]};
+          #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel data: " . $EnO_gpValueFlag{$signalType}{flagInv}{$a[1]};
           shift @a;
         } else {
           return "Usage: $a[1] is unknown";
         }
-        Log3 $name, 3, "EnOcean set $name header: $header channel: $channel data: $data";
+        #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel data: $data";
         ($err, $logLevel, $response, $readingFormat, $readingName, $readingType, $readingUnit, $readingValue, $valueType)=
           EnOcean_gpConvDataToValue (undef, $hash, $channel, $data, $gpDef[$channel]);
         readingsBeginUpdate($hash);
@@ -4311,7 +4310,7 @@ sub EnOcean_Set($@)
         # enumeration
         if (defined $EnO_gpValueEnum{$signalType}{enumInv}{$a[1]}) {
           $data = $EnO_gpValueEnum{$signalType}{enumInv}{$a[1]};
-          Log3 $name, 3, "EnOcean set $name header: $header channel: $channel data: $data";
+          #Log3 $name, 3, "EnOcean set $name header: $header channel: $channel data: $data";
           shift @a;
         } else {
           return "Usage: $a[1] is unknown";
@@ -4484,9 +4483,13 @@ sub EnOcean_Parse($$)
   if ($packetType == 1) {
     # packet type RADIO
     (undef, undef, $rorg, $data, $senderID, $status, $odata) = @msg;
-    $hash = $modules{EnOcean}{defptr}{$senderID};
     $odata =~ m/^(..)(........)(..)(..)$/;
     ($subTelNum, $destinationID, $RSSI) = (hex($1), $2, hex($3));
+    if (exists $modules{EnOcean}{defptr}{$senderID}) {
+      $hash = $modules{EnOcean}{defptr}{$senderID};
+    } elsif ($destinationID ne 'FFFFFFFF') {
+      $hash = $modules{EnOcean}{defptr}{$destinationID};
+    }
     $rorgname = $EnO_rorgname{$rorg};
     if (!$rorgname) {
       Log3 undef, 2, "EnOcean RORG $rorg received from $senderID unknown.";
@@ -4510,7 +4513,7 @@ sub EnOcean_Parse($$)
         my %functionHash = (hash => $iohash, function => "cdm");
         RemoveInternalTimer(\%functionHash);
         InternalTimer(gettimeofday() + 1, "EnOcean_cdmClear", \%functionHash, 0);
-        Log3 $IODev, 3, "EnOcean $IODev CDM timer started";
+        #Log3 $IODev, 3, "EnOcean $IODev CDM timer started";
       } else {
         $iohash->{helper}{cdm}{data}{$idx} = $data;
         $iohash->{helper}{cdm}{lenCounter} += length($data) / 2;
@@ -4535,7 +4538,7 @@ sub EnOcean_Parse($$)
         delete $iohash->{helper}{cdm};
         my %functionHash = (hash => $iohash, function => "cdm");
         RemoveInternalTimer(\%functionHash);
-        Log3 $IODev, 3, "EnOcean $IODev CDM concatenated DATA $data";
+        #Log3 $IODev, 3, "EnOcean $IODev CDM concatenated DATA $data";
       } else {
         # wait for next data message part
         return $IODev;
@@ -4556,16 +4559,7 @@ sub EnOcean_Parse($$)
       # SenderID unknown, created new device
       Log3 undef, 5, "EnOcean received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status";
       my $learningMode = AttrVal($IODev, "learningMode", "demand");
-      #####
-      my $ret = '';
-      if (exists($iohash->{helper}{gpRespWait}{$destinationID}) ||
-          exists($iohash->{helper}{UTERespWait}{$destinationID}) ||
-          exists($iohash->{helper}{"4BSRespWait"}{$destinationID})) {
-        $ret = "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
-        #$ret = "UNDEFINED -temporary EnO_$senderID EnOcean $senderID $msg";
-      } else {
-        $ret = "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
-      }
+      my $ret = "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
       if ($rorgname =~ m/^GPCD|GPSD$/) {        
         Log3 undef, 4, "EnOcean Unknown GP device with SenderID $senderID and $rorgname telegram, please define it.";
       } elsif ($learningMode eq "demand" && $iohash->{Teach}) {
@@ -4597,7 +4591,11 @@ sub EnOcean_Parse($$)
     # packet type REMOTE_MAN_COMMAND
     #EnOcean:PacketType:RORG:MessageData:SourceID:DestinationID:FunctionNumber:ManufacturerID:RSSI:Delay
     (undef, undef, $rorg, $data, $senderID, $destinationID, $funcNumber, $manufID, $RSSI, $delay) = @msg;
-    $hash = $modules{EnOcean}{defptr}{$senderID};
+    if (exists $modules{EnOcean}{defptr}{$senderID}) {
+      $hash = $modules{EnOcean}{defptr}{$senderID};
+    } elsif ($destinationID ne 'FFFFFFFF') {
+      $hash = $modules{EnOcean}{defptr}{$destinationID};
+    }
     $rorgname = $EnO_rorgname{$rorg};
     if($hash) {
       $name = $hash->{NAME};
@@ -4620,7 +4618,6 @@ sub EnOcean_Parse($$)
   }
 
   my $eep = AttrVal($name, "eep", undef);
-  #my $teach = $defs{$name}{IODev}{Teach};
   my $teach = $hash->{IODev}{Teach};
   my ($deleteDevice, $oldDevice);
 
@@ -4879,40 +4876,38 @@ sub EnOcean_Parse($$)
           
           if ($db[0] & 0x10) {
             # 4BS teach-in bidirectional response received
-            Log3 $name, 2, "EnOcean $name 4BS teach-in response message from $senderID to $destinationID received";
+            Log3 $name, 5, "EnOcean $name 4BS teach-in response message from $senderID received";
             if ($teach && exists($hash->{IODev}{helper}{"4BSRespWait"}{$destinationID})) {
-              my $destinationHash = $hash->{IODev}{helper}{"4BSRespWait"}{$destinationID}{hash};
-              my $destinationName = $destinationHash->{NAME};
               if ($db[0] & 0x40) {
                 # EEP supported
                 if ($db[0] & 0x20) {
                   # SenderID stored
-                  Log3 $destinationName, 2, "EnOcean $destinationName 4BS teach-in accepted from $senderID";
-                  readingsSingleUpdate($destinationHash, "teach", "4BS teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid", 1);
-                  $attr{$destinationName}{comMode} = "biDir";
-                  $attr{$destinationName}{destinationID} = "unicast";
-                  $attr{$destinationName}{manufID} = $attr{$name}{manufID};
-                  $attr{$destinationName}{subDef} = $destinationHash->{DEF};
-                  ($destinationHash->{DEF}, $hash->{DEF}) = ($hash->{DEF}, $destinationHash->{DEF});
-                  $modules{EnOcean}{defptr}{$hash->{DEF}} = $hash;
-                  $modules{EnOcean}{defptr}{$destinationHash->{DEF}} = $destinationHash;                  
+                  Log3 $name, 2, "EnOcean $name 4BS teach-in accepted by $senderID";
+                  push @event, "3:teach:4BS teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
+                  $attr{$name}{comMode} = "biDir";
+                  $attr{$name}{destinationID} = "unicast";
+                  # substitute subDef with DEF
+                  $attr{$name}{subDef} = $hash->{DEF};
+                  $hash->{DEF} = $senderID;
+                  $modules{EnOcean}{defptr}{$senderID} = $hash;
+                  delete $modules{EnOcean}{defptr}{$destinationID};
+                  # clear teach-in request
+                  delete $hash->{IODev}{helper}{"4BSRespWait"}{$destinationID};
+                  # store attr subType, manufID ...
+                  EnOcean_CommandSave(undef, undef);
                   
                 } else {
                   # SenderID not stored / deleted
-                  Log3 $destinationName, 2, "EnOcean $destinationName 4BS request not accepted from $senderID";
-                  readingsSingleUpdate($destinationHash, "teach", "4BS request not accepted EEP $rorg-$func-$type Manufacturer: $mid", 1);
+                  Log3 $name, 2, "EnOcean $name 4BS request not accepted by $senderID";
+                  push @event, "3:teach:4BS request not accepted EEP $rorg-$func-$type Manufacturer: $mid";
                 }               
               } else {
                 # EEP not suppported
-                Log3 $destinationName, 2, "EnOcean $destinationName 4BS EEP not supported from $senderID";
-                readingsSingleUpdate($destinationHash, "teach", "4BS EEP not supported EEP $rorg-$func-$type Manufacturer: $mid", 1);
+                Log3 $name, 2, "EnOcean $name 4BS EEP not supported by $senderID";
+                push @event, "3:teach:4BS EEP not supported EEP $rorg-$func-$type Manufacturer: $mid";
               }            
-              # clear teach-in request
-              delete $hash->{IODev}{helper}{"4BSRespWait"}{$destinationID};
-              #$deleteDevice = $destinationName;
-              #Log3 $name, 2, "EnOcean $name 4BS temporary teach-in response device $destinationName deleted";
-              # set flag for delete the temporary teach-in device, see EnOcean_Notify()
-              $hash->{IODev}{helper}{"4BSRespWaitDel"}{$destinationName} = 1;
+            } else {
+              Log3 $name, 2, "EnOcean $name 4BS teach-in response message from $senderID ignored";
             }
             
           } else {
@@ -7495,23 +7490,23 @@ sub EnOcean_Parse($$)
     my @gpDef = split("[ \t][ \t]*", $gpDef);
     my ($channel, $channelName, $resolution, $value);
     my ($readingFormat, $readingName, $readingType, $readingUnit, $readingValue, $valueType);
-    Log3 $name, 2, "EnOcean $name parse GPSD data: $data start";
+    #Log3 $name, 2, "EnOcean $name parse GPSD data: $data start";
     $data =~ m/^(.)(.*)$/;
     my $header = hex $1;
     $data = substr(EnOcean_convHexToBit($data), 4);
-    Log3 $name, 2, "EnOcean $name parse GPSD header: $header data: $data start";
+    #Log3 $name, 2, "EnOcean $name parse GPSD header: $header data: $data start";
       
     for (my $cntr = 1; $cntr <= $header; $cntr ++) {
       $data =~ m/^(.{6})(.*)$/;
       ($channel, $data) = (unpack('C', pack('B8', '00' . $1)), $2);      
-      Log3 $name, 2, "EnOcean $name parse GPSD channel: $channel data: $data";
+      #Log3 $name, 2, "EnOcean $name parse GPSD channel: $channel data: $data";
       if (defined $gpDef[$channel]) {
         ($channelName, undef, undef, undef, undef, $resolution, undef, undef, undef, undef) = split(':', $gpDef[$channel]);
         $resolution = 0 if (!defined $resolution || $resolution eq '');
         $data =~ m/^(.{$EnO_resolution[$resolution]})(.*)$/;
         $value = hex(unpack('H8', pack('B32', '0' x (32 - $EnO_resolution[$resolution]) . $1)));
         $data = $2;
-        Log3 $name, 2, "EnOcean $name parse GPSD channel: $channel value: " . $value . " data: $data";
+        #Log3 $name, 2, "EnOcean $name parse GPSD channel: $channel value: " . $value . " data: $data";
         ($err, $logLevel, $response, $readingFormat, $readingName, $readingType, $readingUnit, $readingValue, $valueType) =
           EnOcean_gpConvDataToValue(undef, $hash, $channel, $value, $gpDef[$channel]);
         push @event, "3:$readingName:" . sprintf("$readingFormat", $readingValue);
@@ -7542,9 +7537,9 @@ sub EnOcean_Parse($$)
       my $dataOutboundDefLen = 0;
       my @gpDef;
       my $signalType;
-      Log3 $name, 2, "EnOcean $name parse GPTI header: $header data: $data start";
+      #Log3 $name, 2, "EnOcean $name parse GPTI header: $header data: $data start";
       $data = EnOcean_convHexToBit($data);
-      Log3 $name, 2, "EnOcean $name parse GPTI data: $data start";
+      #Log3 $name, 2, "EnOcean $name parse GPTI data: $data start";
       while (length($data) >= 12) {
         last if ($cntr > 64);
         $cntr ++;
@@ -7552,7 +7547,7 @@ sub EnOcean_Parse($$)
         $channelType = unpack('C', pack('B8', '000000' . $1));
         $signalType = unpack('C', pack('B8', $2));
         $data = $3;
-        Log3 $name, 2, "EnOcean $name parse GPTI channel: $channel channelType: $channelType signalType: $signalType data: $data";
+        #Log3 $name, 2, "EnOcean $name parse GPTI channel: $channel channelType: $channelType signalType: $signalType data: $data";
         
         if ($channelType == 0) {
           # teach-in information
@@ -7624,8 +7619,10 @@ sub EnOcean_Parse($$)
         EnOcean_SndCdm(undef, $hash, $packetType, "B1", $data, $subDef, "00", $senderID);
         Log3 $name, 2, "EnOcean $name GP teach-in response sent to $senderID";
       }
-      push @event, "3:teach:GP teach-in accepted";
-      Log3 $name, 2, "EnOcean $name GP teach-in Manufacturer: " . $attr{$name}{manufID};
+      my $mid = $attr{$name}{manufID};
+      $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
+      push @event, "3:teach:GP teach-in accepted Manufacturer: $mid";
+      Log3 $name, 2, "EnOcean $name GP teach-in accepted Manufacturer: $mid";
       # store attr subType, manufID, gpDef ...
       EnOcean_CommandSave(undef, undef);
 
@@ -7651,53 +7648,45 @@ sub EnOcean_Parse($$)
     my $purpose = ($header & 24) >> 3;
     
     if (exists $hash->{IODev}{helper}{gpRespWait}{$destinationID}) {
-      my $destinationHash = $hash->{IODev}{helper}{gpRespWait}{$destinationID}{hash};
-      my $destinationName = $destinationHash->{NAME};
     
       if ($purpose == 0) {
         # teach-in rejected generally
         if ($hash->{IODev}{helper}{gpRespWait}{$destinationID}{teachInReq} eq "in") {      
-          #push @event, "3:teach:GP teach-in rejected";
-          readingsSingleUpdate($destinationHash, "teach", "GP teach-in rejected", 1);
-          Log3 $destinationName, 2, "EnOcean $name GP teach-in rejected by $senderID";
+          push @event, "3:teach:GP teach-in rejected";
+          Log3 $name, 2, "EnOcean $name GP teach-in rejected by $senderID";
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{gpRespWait}{$destinationID};
-        #$deleteDevice = $name;
-        # set flag for delete the temporary teach-in device, see EnOcean_Notify()
-        $hash->{IODev}{helper}{gpRespWaitDel}{$name} = 1;
 
       } elsif ($purpose == 1) {
         # teach-in accepted
         if ($hash->{IODev}{helper}{gpRespWait}{$destinationID}{teachInReq} eq "in") {
-          $attr{$destinationName}{manufID} = $mid;
-          $attr{$destinationName}{subDef} = $destinationHash->{DEF};
-          ($destinationHash->{DEF}, $hash->{DEF}) = ($hash->{DEF}, $destinationHash->{DEF});
-          $modules{EnOcean}{defptr}{$hash->{DEF}} = $hash;
-          $modules{EnOcean}{defptr}{$destinationHash->{DEF}} = $destinationHash;
+          $attr{$name}{manufID} = $mid;
+          # substitute subDef with DEF
+          $attr{$name}{subDef} = $hash->{DEF};
+          $hash->{DEF} = $senderID;
+          $modules{EnOcean}{defptr}{$senderID} = $hash;
+          delete $modules{EnOcean}{defptr}{$destinationID};
+          EnOcean_CommandSave(undef, undef);          
           $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
-          readingsSingleUpdate($destinationHash, "teach", "GP teach-in accepted Manufacturer: $mid", 1);
-          Log3 $destinationName, 2, "EnOcean $destinationName GP teach-in accepted to $senderID";
+          push @event, "3:teach:GP teach-in accepted Manufacturer: $mid";
+          Log3 $name, 2, "EnOcean $name GP teach-in accepted by $senderID";
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{gpRespWait}{$destinationID};
-        #$deleteDevice = $destinationName;
-        #Log3 $name, 2, "EnOcean $name GP temporary teach-in response device $destinationName deleted";
-        # set flag for delete the temporary teach-in device, see EnOcean_Notify()
-        $hash->{IODev}{helper}{gpRespWaitDel}{$destinationName} = 1;
 
       } elsif ($purpose == 2) {
         # teach-out accepted
         if ($hash->{IODev}{helper}{gpRespWait}{$destinationID}{teachInReq} eq "out") {
           if (defined $attr{$name}{subDef}) {
+            delete $modules{EnOcean}{defptr}{$hash->{DEF}};
             $hash->{DEF} = $attr{$name}{subDef};
             $modules{EnOcean}{defptr}{$hash->{DEF}} = $hash;
             delete $attr{$name}{subDef};
             EnOcean_CommandSave(undef, undef);
           }      
-          #push @event, "3:teach:GP teach-out accepted";
-          readingsSingleUpdate($destinationHash, "teach", "GP teach-out accepted", 1);
-          Log3 $destinationName, 2, "EnOcean $name GP teach-out accepted";
+          push @event, "3:teach:GP teach-out accepted";
+          Log3 $name, 2, "EnOcean $name GP teach-out accepted";
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{gpRespWait}{$destinationID};
@@ -7706,30 +7695,23 @@ sub EnOcean_Parse($$)
         if ($hash->{IODev}{helper}{gpRespWait}{$destinationID}{teachInReq} eq "in") {
           # rejected channels outbound or inbound, sent teach-in response with teach-out
           $data = sprintf "%04X", (hex(AttrVal($name, "manufID", "7FF")) << 5) | 16;
-          EnOcean_SndCdm(undef, $destinationHash, $packetType, "B1", $data, $destinationID, "00", $hash->{DEF});
-          #push @event, "3teach:GP teach-out accepted";
-          readingsSingleUpdate($destinationHash, "teach", "GP teach-in channels rejected, sent teach-out", 1);
-          Log3 $destinationName, 2, "EnOcean $name GP teach-in channels rejected, sent teach-out to $senderID";
+          EnOcean_SndCdm(undef, $hash, $packetType, "B1", $data, $destinationID, "00", $senderID);
+          push @event, "3:teach:GP teach-in channels rejected, sent teach-out";
+          Log3 $name, 2, "EnOcean $name GP teach-in channels rejected, sent teach-out to $senderID";
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{gpRespWait}{$destinationID};
-        #$deleteDevice = $name;
-        # set flag for delete the temporary teach-in device, see EnOcean_Notify()
-        $hash->{IODev}{helper}{gpRespWaitDel}{$name} = 1;
 
       }
 
     } else {
-      # teach-in request unknown, delete response device, see EnOcean_Notify(), no action
-      #$deleteDevice = $name;
-      $hash->{IODev}{helper}{gpRespWaitDel}{$name} = 1;
       Log3 $name, 2, "EnOcean $name GP teach-in response from $senderID received, teach-in request unknown";
     }
 
   } elsif ($rorg eq "D4" && $teach) {
     # UTE - Universal Uni- and Bidirectional Teach-In / Teach-Out
     #
-    Log3 $name, 2, "EnOcean $name UTE teach-in received from $senderID";
+    Log3 $name, 5, "EnOcean $name UTE teach-in received from $senderID";
     my $rorg = sprintf "%02X", $db[0];
     my $func = sprintf "%02X", $db[1];
     my $type = sprintf "%02X", $db[2];
@@ -7767,9 +7749,7 @@ sub EnOcean_Parse($$)
             EnOcean_SndRadio(undef, $hash, $packetType, "D4", $data, $subDef, "00", $senderID);
             Log3 $name, 2, "EnOcean $name UTE teach-in response send to $senderID";
           }
-          Log3 $name, 2, "EnOcean $name UTE teach-in EEP $rorg-$func-$type Manufacturer: $mid";
-          # store attr subType, manufID ...
-          EnOcean_CommandSave(undef, undef);
+          Log3 $name, 2, "EnOcean $name UTE teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
         } else {
           # EEP type not supported
           $attr{$name}{subType} = "raw";
@@ -7784,11 +7764,13 @@ sub EnOcean_Parse($$)
 	    # send UTE Teach-In Response message
             $data = (sprintf "%02X", $db[6] & 0x80 | 0x31) . substr($data, 2, 12);
             EnOcean_SndRadio(undef, $hash, $packetType, "D4", $data, "00000000", "00", $senderID);
+            Log3 $name, 2, "EnOcean $name UTE teach-in response send to $senderID";
           }
-          Log3 $name, 2, "EnOcean $name EEP $rorg-$func-$type not supported";
-          # store attr subType, manufID ...
-          EnOcean_CommandSave(undef, undef);
+          Log3 $name, 2, "EnOcean $name UTE teach-in accepted EEP $rorg-$func-$type not supported Manufacturer: $mid";
         }
+        # store attr subType, manufID ...
+        EnOcean_CommandSave(undef, undef);
+        
       } elsif ($teachInReq == 1) {
         # Teach-In Deletion Request
         $deleteDevice = $name;
@@ -7804,13 +7786,11 @@ sub EnOcean_Parse($$)
     } else {
       # Teach-In Respose telegram received
       my $teachInAccepted = ($db[6] & 0x30) >> 4;
-      Log3 $name, 2, "EnOcean $name UTE teach-in response message from $senderID to $destinationID received";
+      Log3 $name, 5, "EnOcean $name UTE teach-in response message from $senderID received";
 
       if (exists $hash->{IODev}{helper}{UTERespWait}{$destinationID}) {
-        my $destinationHash = $hash->{IODev}{helper}{UTERespWait}{$destinationID}{hash};
-        my $destinationName = $destinationHash->{NAME};
         if ($comMode eq "uniDir") {
-          $attr{$destinationName}{manufID} = $mid;
+          $attr{$name}{manufID} = $mid;
           if ($teachInAccepted == 0) {
             $teachInAccepted = "request not accepted";
           } elsif ($teachInAccepted == 1){
@@ -7821,7 +7801,8 @@ sub EnOcean_Parse($$)
             $teachInAccepted = "EEP not supported";
           }
           $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
-          readingsSingleUpdate($destinationHash, "teach", "UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid", 1);
+          push @event, "3:teach:UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid";
+          Log3 $name, 2, "EnOcean $name UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid";
         } else {
           if ($hash->{IODev}{helper}{UTERespWait}{$destinationID}{teachInReq} eq "in") {
             # Teach-In Request
@@ -7829,18 +7810,22 @@ sub EnOcean_Parse($$)
               $teachInAccepted = "request not accepted";
             } elsif ($teachInAccepted == 1){
               $teachInAccepted = "teach-in accepted";
-              $attr{$destinationName}{subDef} = $destinationHash->{DEF};
-              $attr{$destinationName}{manufID} = $mid;
-              ($destinationHash->{DEF}, $hash->{DEF}) = ($hash->{DEF}, $destinationHash->{DEF});
-              $modules{EnOcean}{defptr}{$hash->{DEF}} = $hash;
-              $modules{EnOcean}{defptr}{$destinationHash->{DEF}} = $destinationHash;
+              $attr{$name}{subDef} = $hash->{DEF};
+              $hash->{DEF} = $senderID;
+              $modules{EnOcean}{defptr}{$senderID} = $hash;
+              delete $modules{EnOcean}{defptr}{$destinationID};
+              $attr{$name}{manufID} = $mid;
+              # store attr subType, manufID ...
+              EnOcean_CommandSave(undef, undef);
+
             } elsif ($teachInAccepted == 2){
               $teachInAccepted = "teach-out accepted";
             } else {
               $teachInAccepted = "EEP not supported";
             }
             $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
-            readingsSingleUpdate($destinationHash, "teach", "UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid", 1);
+            push @event, "3:teach:UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid";
+            Log3 $name, 2, "EnOcean $name UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid";
 
           } elsif ($hash->{IODev}{helper}{UTERespWait}{$destinationID}{teachInReq} eq "out") {
             # Teach-In Deletion Request
@@ -7850,25 +7835,23 @@ sub EnOcean_Parse($$)
               $teachInAccepted = "teach-in accepted";
             } elsif ($teachInAccepted == 2){
               $teachInAccepted = "teach-out accepted";
-              if (defined $attr{$destinationName}{subDef}) {
-                $destinationHash->{DEF} = $attr{$destinationName}{subDef};
-                $modules{EnOcean}{defptr}{$destinationHash->{DEF}} = $destinationHash;
-                delete $attr{$destinationName}{subDef};
+              if (defined $attr{$name}{subDef}) {
+                delete $modules{EnOcean}{defptr}{$hash->{DEF}};
+                $hash->{DEF} = $attr{$name}{subDef};
+                $modules{EnOcean}{defptr}{$hash->{DEF}} = $hash;
+                delete $attr{$name}{subDef};            
                 EnOcean_CommandSave(undef, undef);
               }
             } else {
               $teachInAccepted = "EEP not supported";
             }
             $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
-            readingsSingleUpdate($destinationHash, "teach", "UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid", 1);
+            push @event, "3:teach:UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid";
+            Log3 $name, 2, "EnOcean $name UTE $teachInAccepted EEP $rorg-$func-$type Manufacturer: $mid";
           }
         }
         # clear teach-in request
         delete $hash->{IODev}{helper}{UTERespWait}{$destinationID};
-        #$deleteDevice = $destinationName;
-        #Log3 $name, 2, "EnOcean $name UTE temporary teach-in response device $destinationName deleted";
-        # set flag for delete the temporary teach-in device, see EnOcean_Notify()
-        $hash->{IODev}{helper}{UTERespWaitDel}{$destinationName} = 1;
 
       } else {
         # teach-in request unknown, delete response device, no action
@@ -8039,8 +8022,6 @@ sub EnOcean_Parse($$)
     # delete device and save config
     CommandDelete(undef, $deleteDevice);
     CommandDelete(undef, "FileLog_" . $deleteDevice);
-    delete $defs{$deleteDevice};
-    delete $modules{EnOcean}{defptr}{$hash->{DEF}};
     Log3 $name, 2, "EnOcean $name device $deleteDevice deleted";
     if (defined $oldDevice) {
       Log3 $name, 2, "EnOcean $name renamed $oldDevice to $deleteDevice";
@@ -8049,14 +8030,8 @@ sub EnOcean_Parse($$)
       return $deleteDevice;
     } else {
       EnOcean_CommandSave(undef, undef);
-      CommandRereadCfg(undef, undef);
       return '';
     }
-    #####
-    #my %functionHash = (hash => $hash, function => "delete", deleteDevice => $deleteDevice, oldDevice => $oldDevice);
-    #RemoveInternalTimer(\%functionHash);
-    #InternalTimer(gettimeofday() + 0.1, "EnOcean_CommandDelete", \%functionHash, 0);
-    #return '';
   }
   return $name;
 }
@@ -8670,59 +8645,15 @@ sub EnOcean_Notify(@)
       #Log3($name, 5, "EnOcean $name <notify> DELETED $1");
 
     } elsif ($devName eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
-      my $definedName = $1;
-      if ($definedName =~ m/FileLog_(EnO_.*)/) {
-        # teach-in response actions
-        # delete temporary teach-in response device
-        $definedName = $1;
-        my $rorgName = AttrVal($definedName, "subType", '');
-        if (defined $hash->{IODev}{helper}{UTERespWaitDel}{$name} && $rorgName eq "UTE") {
-          CommandDelete(undef, $definedName);
-          delete $hash->{IODev}{helper}{UTERespWaitDel}{$name};
-          Log3 $name, 2, "EnOcean $name UTE temporary teach-in response device " . $definedName . " deleted";
-          EnOcean_CommandSave(undef, undef);
-          #CommandRereadCfg(undef, undef);
-          #####
-          #delete $hash->{IODev}{helper}{UTERespWaitDel}{$name};
-          #Log3 $name, 2, "EnOcean $name UTE temporary teach-in response device " . $definedName . " deleted";
-          #my %functionHash = (hash => $hash, function => "delete", deleteDevice => $definedName, oldDevice => undef);
-          #RemoveInternalTimer(\%functionHash);
-          #InternalTimer(gettimeofday() + 0.1, "EnOcean_CommandDelete", \%functionHash, 0);
-        }
-        if (defined $hash->{IODev}{helper}{"4BSRespWaitDel"}{$name} && $rorgName eq "4BS") {
-          CommandDelete(undef, $definedName);
-          delete $hash->{IODev}{helper}{"4BSRespWaitDel"}{$name};
-          Log3 $name, 2, "EnOcean $name 4BS temporary teach-in response device " . $definedName . " deleted";
-          EnOcean_CommandSave(undef, undef);
-          #CommandRereadCfg(undef, undef);
-          #####
-          #delete $hash->{IODev}{helper}{"4BSRespWaitDel"}{$name};
-          #Log3 $name, 2, "EnOcean $name 4BS temporary teach-in response device " . $definedName . " deleted";
-          #my %functionHash = (hash => $hash, function => "delete", deleteDevice => $definedName, oldDevice => undef);
-          #RemoveInternalTimer(\%functionHash);
-          #InternalTimer(gettimeofday() + 0.1, "EnOcean_CommandDelete", \%functionHash, 0);
-        }
-        if (defined $hash->{IODev}{helper}{gpRespWaitDel}{$name} && $rorgName eq "GPTR") {
-          CommandDelete(undef, $definedName);
-          delete $hash->{IODev}{helper}{gpRespWaitDel}{$name};
-          Log3 $name, 2, "EnOcean $name GP temporary teach-in response device " . $definedName . " deleted";
-          EnOcean_CommandSave(undef, undef);
-          #CommandRereadCfg(undef, undef);
-          #####
-          #delete $hash->{IODev}{helper}{gpRespWaitDel}{$name};
-          #Log3 $name, 2, "EnOcean $name GP temporary teach-in response device " . $definedName . " deleted";
-          #my %functionHash = (hash => $hash, function => "delete", deleteDevice => $definedName, oldDevice => undef);
-          #RemoveInternalTimer(\%functionHash);
-          #InternalTimer(gettimeofday() + 0.1, "EnOcean_CommandDelete", \%functionHash, 0);
-        }
-      }
+      # teach-in response actions
+      # delete temporary teach-in response device, see V9333_02
       #Log3($name, 5, "EnOcean $name <notify> DEFINED $definedName");
 
     } elsif ($devName eq "global" && $s =~ m/^INITIALIZED$/) {
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
         CommandDeleteReading(undef, "$name waitingCmds");
       }
-      Log3($name, 5, "EnOcean $name <notify> INITIALIZED");
+      #Log3($name, 5, "EnOcean $name <notify> INITIALIZED");
 
     } elsif ($devName eq "global" && $s =~ m/^REREADCFG$/) {
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
@@ -8737,8 +8668,23 @@ sub EnOcean_Notify(@)
       #Log3($name, 5, "EnOcean $name <notify> DELETEATTR $1");
 
     } elsif ($devName eq "global" && $s =~ m/^MODIFIED ([^ ]*)$/) {
-      #Log3($name, 5, "EnOcean $name <notify> MODIFIED $1");
-
+      # delete old und update DEF pointer in %modules
+      $hash->{DEF} = uc($hash->{DEF});
+      my ($key, $modified, $val);
+      my $defNew = $hash->{DEF};
+      my $modulesPointer = \%modules;
+      while (($key, $val) = each(%{$modulesPointer->{EnOcean}{defptr}})) {
+        if ($val == $hash && $key ne $defNew) {
+          delete $modules{EnOcean}{defptr}{$key};
+          $modified = 1;
+          #Log3 $name, 2, "EnOcean $name <notify> MODIFIED $1: modules DEF $key deleted";
+        }
+      }
+      if ($modified) {
+        $modules{EnOcean}{defptr}{$defNew} = $hash;
+        #Log3 $name, 2, "EnOcean $name <notify> MODIFIED $1: modules DEF $defNew updated";
+      }
+      
     } elsif ($devName eq "global" && $s =~ m/^SAVE$/) {
       #Log3($name, 5, "EnOcean $name <notify> SAVE");
 
@@ -9598,7 +9544,7 @@ sub EnOcean_AssignSenderID($$$$)
     }
     $senderID = EnOcean_CheckSenderID("getNextID", $IODev, "00000000");
   }
-  Log3 $name, 2, "EnOcean $name SenderID: $senderID assigned";
+  #Log3 $name, 2, "EnOcean $name SenderID: $senderID assigned";
   #CommandAttr(undef, "$name $attrName $senderID");
   $attr{$name}{$attrName} = $senderID;
   return ($err, $senderID);
@@ -10269,9 +10215,9 @@ sub EnOcean_gpConvSelDataToSndData($$$$) {
     # fill with trailing zeroes to x bytes
     $data = $data . '0' x (8 - (10 + $resolution) % 8);
   }
-  Log3 undef, 3, "EnOcean EnOcean_gpConvSelDataToSndData header: $header channel: $channel data: $data";
+  #Log3 undef, 3, "EnOcean EnOcean_gpConvSelDataToSndData header: $header channel: $channel data: $data";
   $data = EnOcean_convBitToHex($data);
-  Log3 undef, 3, "EnOcean EnOcean_gpConvSelDataToSndData header: $header channel: $channel data: $data";
+  #Log3 undef, 3, "EnOcean EnOcean_gpConvSelDataToSndData header: $header channel: $channel data: $data";
   return $data;
 }
 
@@ -11018,7 +10964,7 @@ EnOcean_NumericSort
 sub
 EnOcean_Undef($$)
 {
-  my ($hash, $arg) = @_;
+  my ($hash, $name) = @_;
   delete $modules{EnOcean}{defptr}{uc($hash->{DEF})};
   return undef;
 }
