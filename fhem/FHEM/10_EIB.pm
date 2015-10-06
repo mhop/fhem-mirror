@@ -10,6 +10,13 @@
 # ABU 20150617 cleanup unused lines, finalized dpt-handling, cleanup logging, added debug-par
 # ABU 20150729 removed special handling DPT7 in write, fixed DPT7 encoding
 # ABU 20150812 renamed return-value for autocreate; added attribute for reading containing sender; fixed HTML-Doku
+# ABU 20150917 cleaned up, implemented DPT16 for sending, implemented DPT6, added EIBanswerOnRead, changed time/date-handling, fixed DPT14-sending, removed Root-Causes for several warnings
+# ABU 20150919 fixed set string containing letter g
+# ABU 20150920 removed ne-warning, added attribute eventMarker, fixed behaviour if no model defined
+# ABU 20150922 fixed DPT14, restructured DPT9, fixed datum and time
+# ABU 20150923 improved failure-tolerance for none / wrong model
+# ABU 20150924 fixed date/time again
+# ABU 20150926 removed eventMarker, removed no get for dummies
 package main;
 
 use strict;
@@ -27,17 +34,18 @@ my %eib_c2b = (
 	"on-for-timer" => "01",
 	"on-till" => "01",
 	"raw" => "",
-	"value" => "" #value must be last.. because of slider functionality in Set
+	"value" => "",#value must be last.. because of slider functionality in Set
+	"string" => "" #value must be last.. because of slider functionality in Set
 );
 
 my %codes = (
-  "00" => "off",
-  "01" => "on",
-  "" => "value",
+	"00" => "off",
+	"01" => "on",
+	"" => "value",
 );
 
 my %readonly = (
-  "dummy" => 1,
+	"dummy" => 1,
 );
 
 my $eib_simple ="off on value on-for-timer on-till";
@@ -45,7 +53,6 @@ my %models = (
 );
 
 my %eib_dpttypes = (
-
   #Binary value
   "dpt1" 		=> {"CODE"=>"dpt1", "UNIT"=>"",  "factor"=>1},
 
@@ -57,6 +64,11 @@ my %eib_dpttypes = (
   "dpt5.004" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1},
   "percent255" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1 , "slider"=>"0,1,255"}, #alias for dpt5.004
   "dpt5.Slider"	=> {"CODE"=>"dpt5", "UNIT"=>"",  "factor"=>100/255, "slider"=>"0,1,100"}, ##MH same as percent w.o. unit
+	
+  # 1-Octet signed value
+  "dpt6" 		=> {"CODE"=>"dpt6", "UNIT"=>"",  "factor"=>1},
+  "dpt6.001" 		=> {"CODE"=>"dpt6", "UNIT"=>"%",  "factor"=>1},
+  "dpt6.010" 		=> {"CODE"=>"dpt6", "UNIT"=>"",  "factor"=>1},
 
   # 2-Octet unsigned Value (current, length, brightness)
   "dpt7" 		=> {"CODE"=>"dpt7", "UNIT"=>""},
@@ -87,11 +99,11 @@ my %eib_dpttypes = (
   # Time of Day
   "dpt10"		=> {"CODE"=>"dpt10", "UNIT"=>""},
   "dpt10_no_seconds" => {"CODE"=>"dpt10_ns", "UNIT"=>""},
-  "time"		=> {"CODE"=>"dpt10", "UNIT"=>""},
+  "time"		=> {"CODE"=>"time", "UNIT"=>""},
   
   # Date
   "dpt11"		=> {"CODE"=>"dpt11", "UNIT"=>""},
-  "date"		=> {"CODE"=>"dpt11", "UNIT"=>""},
+  "date"		=> {"CODE"=>"date", "UNIT"=>""},
   
   # 4-Octet unsigned value (handled as dpt7)
   "dpt12" 		=> {"CODE"=>"dpt12", "UNIT"=>""},
@@ -103,535 +115,721 @@ my %eib_dpttypes = (
   "dpt16"         => {"CODE"=>"dpt16", "UNIT"=>""},
 );
 
-
 sub
-EIB_Initialize($)
-{
-  my ($hash) = @_;
+EIB_Initialize($) {
+	my ($hash) = @_;
 
-  $hash->{Match}     = "^B.*";
-  $hash->{GetFn}     = "EIB_Get";
-  $hash->{SetFn}     = "EIB_Set";
-  $hash->{StateFn}   = "EIB_SetState";
-  $hash->{DefFn}     = "EIB_Define";
-  $hash->{UndefFn}   = "EIB_Undef";
-  $hash->{ParseFn}   = "EIB_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 " .
-						"EIBreadingX:1,0 " .
-						"EIBreadingSender:1,0 " .
-						"$readingFnAttributes " .
-						"model:".join(",", keys %eib_dpttypes);
+	$hash->{Match}     = "^B.*";
+	$hash->{GetFn}     = "EIB_Get";
+	$hash->{SetFn}     = "EIB_Set";
+	$hash->{StateFn}   = "EIB_SetState";
+	$hash->{DefFn}     = "EIB_Define";
+	$hash->{UndefFn}   = "EIB_Undef";
+	$hash->{ParseFn}   = "EIB_Parse";
+	$hash->{AttrFn}   = "EIB_Attr";
+	$hash->{AttrList}  = 	"IODev do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 " .
+							"EIBreadingX:1,0 " .
+							"EIBreadingSender:1,0 " .
+							"EIBanswerReading:1,0 " .
+							"$readingFnAttributes " .
+							"model:".join(",", keys %eib_dpttypes);
 }
-
 
 #############################
 sub
-EIB_Define($$)
+EIB_Define($$) {
+	my ($hash, $def) = @_;
+	my @a = split("[ \t][ \t]*", $def);
+
+	my $u = "wrong syntax: define <name> EIB <group name> [<read group names>*]";
+
+	return $u if(int(@a) < 3);
+	return "Define $a[0]: wrong group name format: specify as 0-15/0-15/0-255 or as hex" if( ($a[2] !~ m/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/i)  && (lc($a[2]) !~ m/^[0-9a-f]{4}$/i));
+
+	my $groupname = eib_name2hex(lc($a[2]));
+
+	$hash->{GROUP} = lc($groupname);
+
+	my $code = "$groupname";
+	my $ncode = 1;
+	my $name = $a[0];
+
+	$hash->{CODE}{$ncode++} = $code;
+	
+	# add read group names
+	if(int(@a)>3) {
+		for (my $count = 3; $count < int(@a); $count++) {
+			$hash->{CODE}{$ncode++} = eib_name2hex(lc($a[$count]));;
+		}
+	}
+	$modules{EIB}{defptr}{$code}{$name}   = $hash;
+	AssignIoPort($hash);
+}
+
+#############################
+sub
+EIB_Undef($$) {
+	my ($hash, $name) = @_;
+
+	foreach my $c (keys %{ $hash->{CODE} } ) 
+	{
+		$c = $hash->{CODE}{$c};
+
+		# As after a rename the $name may be different from the $defptr{$c}{$n}
+		# we look for the hash.
+		foreach my $dname (keys %{ $modules{EIB}{defptr}{$c} }) 
+		{
+			delete($modules{EIB}{defptr}{$c}{$dname}) if($modules{EIB}{defptr}{$c}{$dname} == $hash);
+		}
+	}
+	
+	return undef;
+}
+
+#####################################
+sub
+EIB_Attr(@)
 {
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
-
-  my $u = "wrong syntax: define <name> EIB <group name> [<read group names>*]";
-
-  return $u if(int(@a) < 3);
-  return "Define $a[0]: wrong group name format: specify as 0-15/0-15/0-255 or as hex"
-  		if( ($a[2] !~ m/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/i)  && (lc($a[2]) !~ m/^[0-9a-f]{4}$/i));
-
-  my $groupname = eib_name2hex(lc($a[2]));
-
-  $hash->{GROUP} = lc($groupname);
-
-  my $code = "$groupname";
-  my $ncode = 1;
-  my $name = $a[0];
-
-  $hash->{CODE}{$ncode++} = $code;
-  # add read group names
-  if(int(@a)>3) 
+  my ($cmd,$name,$aName,$aVal) = @_;
+  
+  #debug
+  print "Name: $name, Attribut: $aName, Wert: $aVal\n" if ($debug eq 1);
+  
+  # $cmd can be "del" or "set"
+  # $name is device name
+  # aName and aVal are Attribute name and value
+  if ($cmd eq "set") 
   {
-  	for (my $count = 3; $count < int(@a); $count++) 
-  	{
- 	   $hash->{CODE}{$ncode++} = eib_name2hex(lc($a[$count]));;
- 	}
-  }
-  $modules{EIB}{defptr}{$code}{$name}   = $hash;
-  AssignIoPort($hash);
-}
-
-#############################
-sub
-EIB_Undef($$)
-{
-  my ($hash, $name) = @_;
-
-  foreach my $c (keys %{ $hash->{CODE} } ) {
-    $c = $hash->{CODE}{$c};
-
-    # As after a rename the $name may be different from the $defptr{$c}{$n}
-    # we look for the hash.
-    foreach my $dname (keys %{ $modules{EIB}{defptr}{$c} }) {
-      delete($modules{EIB}{defptr}{$c}{$dname})
-        if($modules{EIB}{defptr}{$c}{$dname} == $hash);
-    }
-  }
+  } 
+  elsif ($cmd eq "del") 
+  {
+  } 
   return undef;
 }
 
 #####################################
 sub
-EIB_SetState($$$$)
-{
-  my ($hash, $tim, $vt, $val) = @_;
-  Log3 $hash, 5,"EIB setState for $hash->{NAME} tim: $tim vt: $vt val: $val";
+EIB_SetState($$$$) {
+	my ($hash, $tim, $vt, $val) = @_;
+	Log3 $hash, 5,"EIB setState for $hash->{NAME} tim: $tim vt: $vt  $val";
 
-  $val = $1 if($val =~ m/^(.*) \d+$/);
-  #return "Undefined value from EIBsetstate $val" if(!defined($eib_c2b{$val}));
-  #return undef;
-  return undef if(!defined($eib_c2b{$val}));
+	$val = $1 if($val =~ m/^(.*) \d+$/);
+
+	return undef if(!defined($eib_c2b{$val}));
 }
 
 ###################################
 sub
-EIB_Get($@)
-{
-  my ($hash, @a) = @_;
+EIB_Get($@) {
+	my ($hash, @a) = @_;
 
-  return "No get for dummies" if(IsDummy($hash->{NAME}));
-  return "" if($a[1] && $a[1] eq "?");  # Temporary hack for FHEMWEB
+	#return "No get for dummies" if(IsDummy($hash->{NAME}));
+	return "" if($a[1] && $a[1] eq "?");  # Temporary hack for FHEMWEB
 
-  IOWrite($hash, "B", "r" . $hash->{GROUP});
+	#send read-request to the bus
+	IOWrite($hash, "B", "r" . $hash->{GROUP});
   
-  return "Current value for $hash->{NAME} ($hash->{GROUP}) requested.";	  
+	return "Current value for $hash->{NAME} ($hash->{GROUP}) requested.";	  
 }
 
 ###################################
 sub
-EIB_Set($@)
-{
-  my ($hash, @a) = @_;
-  my $ret = undef;
-  my $na = int(@a);
+EIB_Set($@) {
+	my ($hash, @a, $str) = @_;
+	my $ret = undef;
+	my $na = int(@a);
 
-  return "no set value specified" if($na < 2 || $na > 4);
-  return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
-  return "No $a[1] for dummies" if(IsDummy($hash->{NAME}));
+	#return, if no set value specified
+	return "no set value specified" if($na < 2 || $na > 4);
+	#return, if this is a readonly-device
+	return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
+	#return, if this is a dummy device
+	return "No $a[1] for dummies" if(IsDummy($hash->{NAME}));
 
-  my $name  = $a[0];
-  my $value = $a[1];
-  my $arg1  = undef;
-  my $arg2  = undef;
+	my $name  = $a[0];
+	my $value = $a[1];
+	my $arg1  = undef;
+	my $arg2  = undef;
   
-  $arg1 = $a[2] if($na>2);
-  $arg2 = $a[3] if($na>3);
-  my $model = $attr{$name}{"model"};
-  my $sliderdef = !defined($model)?undef:$eib_dpttypes{"$model"}{"slider"};
+	$arg1 = $a[2] if($na>2);
+	$arg2 = $a[3] if($na>3);
+	my $model = $attr{$name}{"model"};
+	my $sliderdef = !defined($model)?undef:$eib_dpttypes{"$model"}{"slider"};
 
-  my $c = $eib_c2b{$value};
-  if(!defined($c)) {
-  	my $resp = "Unknown argument $value, choose one of " . join(" ", sort keys %eib_c2b);
-  	$resp = $resp . ":slider,$sliderdef" if(defined $sliderdef);
-  	return $resp;
-  }
+	my $c = $eib_c2b{$value};
+	if(!defined($c)) 
+	{
+		my $resp = "Unknown argument $value, choose one of " . join(" ", sort keys %eib_c2b);
+		$resp = $resp . ":slider,$sliderdef" if(defined $sliderdef);
+		return $resp;
+	}
   
-  # the command can be send to any of the defined groups indexed starting by 1
-  # optional last argument starting with g indicates the group
-  my $groupnr = 1;
-  $groupnr = $1 if($na>2 && $a[$na-1]=~ m/g([0-9]*)/);
-  return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
+  	my $groupnr = 1;
+	
+	# the command can be send to any of the defined groups indexed starting by 1
+	# optional last argument starting with g indicates the group
+	# execute only for non-strings. Otherwise a "g" is interpreted to execute this group-send-mechanism...
+	if ($value ne "string")
+	{
+		$groupnr = $1 if($na>2 && $a[$na-1]=~ m/g([0-9]*)/);
+		#return, if unknown group
+		return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
+	}
+	
+	my $v = join(" ", @a);
+	Log3 $name, 5, "EIB set $v";
+	(undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
-  my $v = join(" ", @a);
-  Log3 $name, 5, "EIB set $v";
-  (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
-  if($value eq "raw" && defined($arg1)) {                                
-  	# complex value command.
-  	# the additional argument is transfered alone.
-    $c = $arg1;
-  } elsif ($value eq "value" && defined($arg1)) {
-  	# value to be translated according to datapoint type
-  	$c = EIB_EncodeByDatapointType($hash,$name,$arg1,$groupnr); #MH add group in call
+	if($value eq "raw" && defined($arg1)) 
+	{ 
+		# complex value command.
+		# the additional argument is transfered alone.
+		$c = $arg1;
+	} 
+	elsif ($value eq "value" && defined($arg1)) 
+	{
+		# value to be translated according to datapoint type
+		$c = EIB_EncodeByDatapointType($hash,$name,$arg1,$groupnr); #MH add group in call
   	
-  	# set the value to the back translated value
-  	$v = EIB_ParseByDatapointType($hash,$name,$c,$groupnr); # MH probably stupid - but required!!!!
-  }
+		# set the value to the back translated value
+		$v = EIB_ParseByDatapointType($hash,$name,$c,$groupnr); # MH probably stupid - but required!!!!
+	}
+	elsif ($value eq "string" && ($na>2)) 
+	{
+		my $str = "";
+		
+		#append all following args
+		for (my $i=2;$i<$na;$i++)
+		{
+		  $str.= $a[$i]." ";		  
+		}
+		
+		#trim whitespaces at the end
+		$str =~ s/^\s+|\s+$//g;
 
-  my $groupcode = $hash->{CODE}{$groupnr};
-  $model = $attr{$name}{"model"}; ##MH 
-  $model = "" unless defined($model); ##MH avoid uninit msg
+		# value to be translated according to datapoint type
+		$c = EIB_EncodeByDatapointType($hash,$name,$str,$groupnr);
+  	
+		# set the value to the back translated value
+		$v = EIB_ParseByDatapointType($hash,$name,$c,$groupnr);
+	}
 
-  my $code = $eib_dpttypes{"$model"}{"CODE"};
+	my $groupcode = $hash->{CODE}{$groupnr};
+	$model = $attr{$name}{"model"}; ##MH 
+	$model = "" unless defined($model); ##MH avoid uninit msg
+
+	my $code = $eib_dpttypes{"$model"}{"CODE"};
   
-  #ABU removed due to incorrect DPT7-sending
-  #if (defined($code) && $code eq 'dpt7') { #MH avoid uninit msg
-  #  IOWrite($hash, "B", "b" . $groupcode . $c);
-  #}
-  #else {
-    IOWrite($hash, "B", "w" . $groupcode . $c);
-  #}
-
-  ###########################################
-  # Delete any timer for on-for_timer
-  if($modules{EIB}{ldata}{$name}) {
-    CommandDelete(undef, $name . "_timer");
-    delete $modules{EIB}{ldata}{$name};
-  }
+	#send new value
+	IOWrite($hash, "B", "w" . $groupcode . $c);
+  
+	###########################################
+	# Delete any timer for on-for_timer
+	if($modules{EIB}{ldata}{$name}) 
+	{
+		CommandDelete(undef, $name . "_timer");
+		delete $modules{EIB}{ldata}{$name};
+	}
    
-  ###########################################
-  # Add a timer if any for-timer command has been chosen
-  if($value =~ m/for-timer/ && defined($arg1)) {
-    my $dur = $arg1;
-    my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
-    $modules{EIB}{ldata}{$name} = $to;
-    Log3 $name, 4, "Follow: +$to set $name off g$groupnr"; 
-    CommandDefine(undef, $name . "_timer at +$to set $name off g$groupnr");
-  }
+	###########################################
+	# Add a timer if any for-timer command has been chosen
+	if($value =~ m/for-timer/ && defined($arg1)) 
+	{
+		my $dur = $arg1;
+		my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
+		$modules{EIB}{ldata}{$name} = $to;
+		Log3 $name, 4, "Follow: +$to set $name off g$groupnr"; 
+		CommandDefine(undef, $name . "_timer at +$to set $name off g$groupnr");
+	}
 
-  ###########################################
-  # Delete any timer for on-till
-  if($modules{EIB}{till}{$name}) {
-    CommandDelete(undef, $name . "_till");
-    delete $modules{EIB}{till}{$name};
-  }
+	###########################################
+	# Delete any timer for on-till
+	if($modules{EIB}{till}{$name}) 
+	{
+		CommandDelete(undef, $name . "_till");
+		delete $modules{EIB}{till}{$name};
+	}
   
-  ###########################################
-  # Add a timer if on-till command has been chosen
-  if($value =~ m/on-till/ && defined($arg1)) {
-	  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($arg1);
-	  if($err) {
-	  	Log3 $name, 2, "Error trying to parse timespec for $a[0] $a[1] $a[2] : $err";
-	  }
-	  else {
-		  my @lt = localtime;
-		  my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
-		  my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
-		  if($hms_now ge $hms_till) {
-		    Log3 $name, 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
-		  }
-		  else {
-		    $modules{EIB}{till}{$name} = $hms_till;
-		    Log3 $name, 4, "Follow: $hms_till set $name off g$groupnr";
-		    CommandDefine(undef, $name . "_till at $hms_till set $name off g$groupnr");
-		  }
-	  }
-  }
+	###########################################
+	# Add a timer if on-till command has been chosen
+	if($value =~ m/on-till/ && defined($arg1)) 
+	{
+		my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($arg1);
+		if($err) 
+		{
+			Log3 $name, 2, "Error trying to parse timespec for $a[0] $a[1] $a[2] : $err";
+		}
+		else 
+		{
+			my @lt = localtime;
+			my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
+			my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+			if($hms_now ge $hms_till) 
+			{
+				Log3 $name, 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
+			}
+			else 
+			{
+				$modules{EIB}{till}{$name} = $hms_till;
+				Log3 $name, 4, "Follow: $hms_till set $name off g$groupnr";
+				CommandDefine(undef, $name . "_till at $hms_till set $name off g$groupnr");
+			}
+		}
+	}
   
+	##########################
+	# Look for all devices with the same code, and set state, timestamp
+	$code = "$hash->{GROUP}"; ##MH reuse variable
+	my $tn = TimeNow();
 
-  ##########################
-  # Look for all devices with the same code, and set state, timestamp
-  $code = "$hash->{GROUP}"; ##MH reuse variable
-  my $tn = TimeNow();
-
-  my $defptr = $modules{EIB}{defptr}{$code};
-  foreach my $n (keys %{ $defptr }) {
-    readingsSingleUpdate($defptr->{$n}, "state", $v, 1);
-    readingsSingleUpdate($defptr->{$n},"setG" . $groupnr,$v,1) if (AttrVal($defptr->{$n}{NAME},'EIBreadingX',0) == 1); #MH reading setGroup
-    print "setg = $defptr->{$n}{NAME} , $groupnr , attr = " . AttrVal($defptr->{$n}{NAME},'EIBreadingX',0) .  " \n" if ($debug eq 1);
-  }
-  return $ret;
+	my $defptr = $modules{EIB}{defptr}{$code};
+	foreach my $n (keys %{ $defptr })
+	{
+		#debug
+		print "setg = $defptr->{$n}{NAME} , $groupnr , attr = AttrVal($defptr->{$n}{NAME},'EIBreadingX',0)n" if ($debug eq 1);
+		#process regular reading
+		readingsSingleUpdate($defptr->{$n}, "state", $v, 1);
+		#process extended reading - mark as set
+		readingsSingleUpdate($defptr->{$n},"setG" . $groupnr,$v,1) if (AttrVal($defptr->{$n}{NAME},'EIBreadingX',0) == 1);    
+	}
+	
+	return $ret;
 }
 
-
+###################################
 sub
-EIB_Parse($$)
-{
-  my ($hash, $msg) = @_;
-
-  # Msg format: 
-  # B(w/r/p)<group><value> i.e. Bw00000101
-  # we will also take reply telegrams into account, 
-  # as they will be sent if the status is asked from bus 
-  if($msg =~ m/^B(.{4})[w|p](.{4})(.*)$/)
-  {
-  	# only interested in write / reply group messages
-  	my $src = $1;
-  	my $dev = $2;
-  	my $val = $3;
+EIB_Parse($$) {
+	my ($hash, $msg) = @_;
+  
+	# Msg format: 
+	# B(w/r/p)<group><value> i.e. Bw00000101
+	# we will also take reply telegrams into account, 
+	# as they will be sent if the status is asked from bus 	
+	#split message into parts
+	$msg =~ m/^B(.{4})(.{1})(.{4})(.*)$/;
+	my $src = $1;
+	my $cmd = $2;
+	my $dev = $3;
+	my $val = $4;
 
 	my $v = $codes{$val};
-    $v = "$val" if(!defined($v));
-    my $rawv = $v;
+	$v = "$val" if(!defined($v));
+	my $rawv = $v;
 
 	my @list;
 	my $found = 0;
 	
-   	# check if the code is within the read groups
-    # we will inform all definitions subsribed to this code	
-   	foreach my $mod (keys %{$modules{EIB}{defptr}})
-   	{
-   		my $def = $modules{EIB}{defptr}{"$mod"};
-	    if($def) {
-		    foreach my $n (keys %{ $def }) {
-		      my $lh = $def->{$n};
-			  foreach my $gnr (keys %{ $lh->{CODE} } ) #MH
-		      {
-	    	    my $c = $lh->{CODE}{$gnr}; #MH
-	    	    if($c eq $dev)
-	    	    {
-			      $n = $lh->{NAME};        # It may be renamed
+	# check if the code is within the read groups
+	# we will inform all definitions subsribed to this code	
+	foreach my $mod (keys %{$modules{EIB}{defptr}})
+	{
+		my $def = $modules{EIB}{defptr}{"$mod"};
+		if($def) 
+		{
+			foreach my $n (keys %{ $def }) 
+			{
+				my $lh = $def->{$n};
+				foreach my $gnr (keys %{ $lh->{CODE} })
+				{
+					my $c = $lh->{CODE}{$gnr};
+					if($c eq $dev)
+					{
+						$n = $lh->{NAME};        # It may be renamed
+						next if(IsIgnored($n));   # Little strange.
 			
-			      next if(IsIgnored($n));   # Little strange.
-			
-				  # parse/translate by datapoint type
-			      $v = EIB_ParseByDatapointType($lh,$n,$rawv,$gnr); # MH added optional groupnr
-			
-			      $lh->{RAWSTATE} = $rawv;
-			      $lh->{LASTGROUP} = $dev;
-				  
-				  readingsSingleUpdate($lh,"state",$v,1);
+						push(@list, $n);
+						$found = 1;
 
-				  readingsSingleUpdate($lh,'getG' . $gnr,$v,1) if (defined($attr{$n}{"EIBreadingX"}) && $attr{$n}{"EIBreadingX"} == 1); #MH get readingsvalue
-				  print "getg = $n , group= $gnr , attr = " . $attr{$n}{"EIBreadingX"} .  " \n"  if ($debug eq 1);
+						# handle write and reply messages		
+						if($cmd =~ /[w|p]/)
+						{
+							# parse/translate by datapoint type
+							$v = EIB_ParseByDatapointType($lh,$n,$rawv,$gnr); # MH added optional groupnr
+							$lh->{RAWSTATE} = $rawv;
+							$lh->{LASTGROUP} = $dev;
+				  
+							#process regular reading
+							readingsSingleUpdate($lh,"state",$v,1);
 
-				  if (defined($attr{$n}{"EIBreadingSender"}) && $attr{$n}{"EIBreadingSender"} == 1)
-				  {
-				    my $srcName = eib_hex2name($src);
-					readingsSingleUpdate($lh,'sender',$srcName,1);
-					print "sender = $srcName, group= $gnr, attr = " . $attr{$n}{"EIBreadingSender"} .  " \n"  if ($debug eq 1);
-				  }
-				  
-				  
-				  Log3 $n, 5, "EIB $n $v";
-				  
-			      push(@list, $n);
-			      $found = 1;
-	    	    }
-		    }}
-	    }
-   	}
-   		
-    	
-  	return @list if $found>0;
+							#debug
+							print "getg = $n , group= $gnr , EIBreadingX = AttrVal($def->{$n}{NAME},'EIBreadingX',0)\n"  if ($debug eq 1);
+							#process extended reading - mark as "get"
+							readingsSingleUpdate($lh,'getG' . $gnr,$v,1) if (AttrVal($def->{$n}{NAME},'EIBreadingX',0) == 1);
+
+							#process output of sender
+							if (AttrVal($def->{$n}{NAME},'EIBreadingSender',0) == 1)
+							{
+								my $srcName = eib_hex2name($src);
+								#debug
+								print "sender = $srcName, group= $gnr, EIBreadingSender = AttrVal($def->{$n}{NAME},'EIBreadingSender',0)\n"  if ($debug eq 1);
+								readingsSingleUpdate($lh,'sender',$srcName,1);
+							}
+				    
+							Log3 $n, 5, "EIB parse write message $n $v";
+						}
+						# handle read messages, if Attribute is set				  			  
+						elsif (($cmd =~ /[r]/) && (AttrVal($def->{$n}{NAME},'EIBanswerReading',0) == 1))
+						{
+							#debug
+							print "group= $c, EIBanswerReading = AttrVal($def->{$n}{NAME},'EIBanswerReading',0)\n"  if ($debug eq 1);
+							#convert value from state
+							my $tmp = EIB_EncodeByDatapointType($hash, $n, $lh->{STATE}, $gnr);
+							#write answer
+							TUL_Write($hash, "B", "p" . $c . $tmp);
+
+							Log3 $n, 5, "EIB parse read message $n $v";			  
+						}
+					}
+				}
+			}
+		}
+	} 
+
+	return @list if $found>0;
     		
-   	if($found==0)
-   	{
-	    my $dev_name = eib_hex2name($dev);
-   		Log3 $dev, 3, "EIB Unknown device $dev ($dev_name), Value $val, please define it";
-   		return "UNDEFINED EIB_$dev EIB $dev_name";
-   	}
-  }
+	if($found==0)
+	{
+		my $dev_name = eib_hex2name($dev);
+		Log3 $dev, 3, "EIB Unknown device $dev ($dev_name), Value $val, please define it";
+		return "UNDEFINED EIB_$dev EIB $dev_name";
+	}	
 }
 
+###################################
 sub
-EIB_EncodeByDatapointType($$$$) #MH added  groupnr
-{
+EIB_EncodeByDatapointType($$$$) {
 	my ($hash, $name, $value, $gnr) = @_;
-		my @model_array = split(" ",$attr{$name}{"model"}) if (defined($attr{$name}{"model"}));
-		my $model = $model_array[0];
+	my @model_array = split(" ",$attr{$name}{"model"}) if (defined($attr{$name}{"model"}));
+	my $model = $model_array[0];
+	my $transval = undef;
 
-	if (!defined($model)) {
-		Log3 $hash, 4,"EIB encode $value for $name";
-		return $value;
+	#no model defined
+	if (!defined($model)) 
+	{
+		$model = "dpt1";
+		Log3 $hash, 3,"EIB encode: no model defined for $name. Replaced with DPT1.";
+	}
+	
+	my $code = $eib_dpttypes{"$model"}{"CODE"};
+	
+	#invalid model defined
+	if (!defined($code)) 
+	{
+		Log3 $hash, 1,"EIB encode: invalid model defined for $name. Breaking up...";
+		return undef;	
 	}
 
-	if (defined($gnr)) {
+	if (defined($gnr)) 
+	{
 		$model = $model_array[$gnr-1] if (defined($model_array[$gnr-1]));
 	}
-
+	else
+	{
+		Log3 $hash, 2,"EIB encode no gnr defined";
+		return undef;
+	}
+	
+	if (!defined($value)) 
+	{
+		Log3 $hash, 2,"EIB encode no value defined";
+		return undef;
+	}
+	
 	Log3 $hash, 5,"EIB_EncodeByDatapointType: $name, Value= $value, model= $model";
 	
 	my $dpt = $eib_dpttypes{"$model"};
-
-	if (!defined($dpt)) {
-		Log3 $hash, 4,"EIB encode $value for $name model: $model";
-		return $value;
-	}
-
-	my $code = $eib_dpttypes{"$model"}{"CODE"};
 	my $unit = $eib_dpttypes{"$model"}{"UNIT"};
-	my $transval = undef;
 	my $adjustment = $eib_dpttypes{"$model"}{"ADJUSTMENT"};
 	
-	Log3 $hash, 4,"EIB encode $value for $name model: $model dpt: $code unit: $unit";
+	if (defined ($adjustment) && defined ($unit))
+	{
+		Log3 $hash, 4,"EIB encode $value for $name model: $model dpt: $code unit: $unit";
+	}
 	
+	#start with model-selection. Go through DPT's
 	if ($code eq "dpt1") 
 	{
-		$transval = $value;
+		my $fullval = "";
+		
+		#replace on/off
+		$fullval = "00" if ($value eq "off"); 
+		$fullval = "01" if ($value eq "on"); 
+		
+		#return value, if encode was successful
+		if ($fullval ne "")
+		{
+			$transval = $fullval;
+		}
+		#if not return hex-data
+		else
+		{
+			$transval = sprintf("%x", $value);
+		}
+				
 		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
 	}
 	elsif ($code eq "dpt5") 
 	{
+		#1-byte unsigned
 		my $dpt5factor = $eib_dpttypes{"$model"}{"factor"};
 		my $fullval = sprintf("00%.2x",($value/$dpt5factor));
+	  
 		$transval = $fullval;
-				
 		Log3 $hash, 5,"EIB $code encode $value = $fullval factor = $dpt5factor translated: $transval";
-		
-	} elsif ($code eq "dpt7") 
+	}
+	elsif ($code eq "dpt6") 
 	{
+	  #1-byte signed
+	  my $dpt6factor = $eib_dpttypes{"$model"}{"factor"};
+	  my $fullval = int($value/$dpt6factor);
+      $fullval += 256 if ($fullval < 0);
+      $fullval = 0 if ($fullval < 0);
+      $fullval = 0xFF if ($fullval > 0xFF);
+	  $transval = sprintf("00%.2x",$fullval);
+
+	  Log3 $hash, 5,"EIB $code encode $value = $fullval factor = $dpt6factor translated: $transval";
+	}
+	elsif ($code eq "dpt7") 
+	{
+		#2-byte unsigned
 		my $fullval = "";
 		
 		if($adjustment eq "255") 
 		{
 			$fullval = sprintf("00%.4x",($value/2.55));			
-		} else 
+		} 
+		else 
 		{
 			$fullval = sprintf("00%.4x",$value);
 		}
 		
-		$transval = $fullval;
-				
+		$transval = $fullval;		
 		Log3 $hash, 5,"EIB $code encode $value = $fullval translated: $transval";
-		
-	} elsif($code eq "dpt9") 
+	} 
+	elsif($code eq "dpt9") 
 	{
-		$transval = encode_dpt9($value);		
+		#2-byte float
+		my $fullval;
+
+		my $sign = ($value <0 ? 0x8000 : 0);
+		my $exp  = 0;
+		my $mant = 0;
+
+		$mant = int($value * 100.0);
+		while (abs($mant) > 2047) {
+			$mant /= 2;
+			$exp++;
+		}
+		$fullval = $sign | ($exp << 11) | ($mant & 0x07ff);
+	
+		$transval = sprintf("00%.4x",$fullval);
 		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
-		
-	} elsif ($code eq "dpt10") 
+	} 
+	elsif ($code eq "dpt10") 
 	{
-		# set current Time
+		# Time
+		my $fullval = 0;
+		my ($hh, $mm, $ss) = split /:/, $value;
+		
+		$fullval = $ss + ($mm<<8) + (($hh)<<16);
+	
+		$transval = sprintf("00%.6x",$fullval);
+		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
+	} 
+	elsif ($code eq "dpt10_ns") 
+	{
+		# Time, seconds = zero
+		my $fullval = 0;
+		my ($hh, $mm, $ss) = split /:/, $value;
+		$ss = 0;
+		
+		$fullval = $ss + ($mm<<8) + (($hh)<<16);
+	
+		$transval = sprintf("00%.6x",$fullval);
+		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
+	} 
+	elsif ($code eq "time")
+	{
+		# current Time
 		my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
 		$year+=1900;
 		$mon++;
+
+		my $fullval = 0;
+		
+		# calculate offset for weekday
+		$wday = 7 if ($wday eq "0");
+		my $hoffset = 32*$wday;
+		
+		$fullval = $secs + ($mins<<8) + (($hoffset + $hours)<<16);
+		
 		$value =  sprintf("%02d:%02d:%02d",$hours,$mins,$secs); # value for log
-		
-        # calculate offset for weekday
-		if ($wday eq "0") {
-			$wday = 7;
-		}
-		my $hoffset = 32*$wday;
- 		
-		my $fullval = $secs + ($mins<<8) + (($hoffset + $hours)<<16);
-
+			
 		$transval = sprintf("00%.6x",$fullval);
-				
-		Log3 $hash, 5,"EIB $code encode $value = $fullval hours: $hours mins: $mins secs: $secs translated: $transval";
-		
-	} elsif ($code eq "dpt10_ns") 
+		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
+	}
+	elsif ($code eq "dpt11")
 	{
-		# set current Time
-		my ($secs,$mins,$hours,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-		my $secZero = 0;
-		$year+=1900;
-		$mon++;
-
-        # calculate offset for weekday
-		if ($wday eq "0") {
-			$wday = 7;
-		}
-		my $hoffset = 32*$wday;
- 		
-		#my $fullval = $secs + ($mins<<8) + ($hours<<16);		
-		my $fullval = $secZero + ($mins<<8) + (($hoffset + $hours)<<16);
-
+		# Date
+		my $fullval = 0;
+		my ($dd, $mm, $yyyy) = split /\./, $value;
+		
+		$fullval = ($yyyy - 2000) + ($mm<<8) + ($dd<<16);
+	
 		$transval = sprintf("00%.6x",$fullval);
-				
-		Log3 $hash, 5,"EIB $code encode $value = $fullval hours: $hours mins: $mins secs: $secs translated: $transval";
-		
-	} elsif ($code eq "dpt11") 
+		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
+	}
+	elsif ($code eq "date") 
 	{
-		# set current Date
+		# current Date
 		my ($secs,$mins,$hours,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
 		$year+=1900;
 		$month++;
 		
-		my $fullval = ($year-2000) + ($month<<8) + ($day<<16);
-		$transval = sprintf("00%.6x",$fullval);
-
-		Log3 $hash, 5,"EIB $code encode $value = $fullval day: $day month: $month year: $year translated: $transval";
+		my $fullval = 0;
 		
-	} elsif ($code eq "dpt12") 
+		#encode current date
+		$fullval = ($year-2000) + ($month<<8) + ($day<<16);
+		$transval = sprintf("00%.6x",$fullval);
+		Log3 $hash, 5,"EIB $code encode $value = $fullval day: $day month: $month year: $year translated: $transval";
+	} 
+	elsif ($code eq "dpt12") 
 	{
+		#4-byte unsigned
 		my $fullval = sprintf("00%.8x",$value);
 		$transval = $fullval;
-				
 		Log3 $hash, 5,"EIB $code encode $value" . '=' . " $fullval translated: $transval";
-		
-	} elsif($code eq "dpt14") 
+	} 
+	elsif($code eq "dpt14") 
 	{
-		$transval = encode_dpt14($value);		
+		#4-byte float
+		my $fullval;
+		$fullval = unpack("L",  pack("f", $value));
+		
+		$transval = sprintf("00%.8x", $fullval); 
+		Log3 $hash, 5,"EIB $code encode $value translated: $transval";		
+	}
+	elsif ($code eq "dpt16") 
+	{
+		#text
+		my $dat = $value;
+
+		#convert to hex-string
+		$dat =~ s/(.)/sprintf("%x",ord($1))/eg;
+		#format for 14-byte-length
+		$dat = sprintf("%-028s",$dat);
+		#append leading zeros
+		$dat = "00" . $dat;
+		
+		$transval = $dat;
 		Log3 $hash, 5,"EIB $code encode $value translated: $transval";	
-		
-	} elsif ($code eq "dptxx") {
-		
+	} 
+	elsif ($code eq "dptxx") 
+	{
 	}
 	
 	# set state to translated value
 	if(defined($transval))
 	{
-		Log3 $hash, 4,"EIB $name translated $value $unit to $transval";
+		Log3 $hash, 4,"EIB $name translated $value to $transval";
 		$value = "$transval";
 	}
-	else
-	{
-		Log3 $hash, 4,"EIB $name model $model value $value could not be translated/encoded. Just do a dec2hex translation";
-		$value = sprintf("00%.2x",$value);		
-	}
-	
+
 	return $value;
 }
 
 sub
-EIB_ParseByDatapointType($$$$) #MH added groupnr
+EIB_ParseByDatapointType($$$$)
 {
 	my ($hash, $name, $value, $gnr) = @_; #MH
 	my @model_array = split(" ",$attr{$name}{"model"}) if (defined($attr{$name}{"model"}));
 	my $model = $model_array[0];
 	
 	# nothing to do if no model is given
-	return $value if(!defined($model));
+	#return $value if(!defined($model));
 	
-	if (defined($gnr)) {
+	if (defined($gnr)) 
+	{
 		$model = $model_array[$gnr-1] if defined ($model_array[$gnr-1]);
 	}
 	
+	#debug
 	print "EIB_ParseByDatapointType: $name, val= $value, Group= $gnr, Model= $model \n" if ($debug eq 1);
 	
-	my $dpt = $eib_dpttypes{"$model"};
+	#no model defined
+	if (!defined($model)) 
+	{
+		$model = "dpt1";
+		Log3 $hash, 3,"EIB encode: no model defined for $name. Replaced with DPT1.";
+	}
+
+	my $code = $eib_dpttypes{"$model"}{"CODE"};
 	
-	#nothing to do if no dpt is given
-	if (!defined($dpt)) {
-	    Log3 $hash, 4,"EIB parse $value for $name model: $model" if (defined($model));
-		Log3 $hash, 4,"EIB parse $value for $name" if (!defined($model));
-		return $value;
+	#invalid model defined
+	if (!defined($code)) 
+	{
+		Log3 $hash, 1,"EIB encode: invalid model defined for $name. Breaking up....";	
+		return undef;
 	}
 	
-	my $code = $eib_dpttypes{"$model"}{"CODE"};
+	my $dpt = $eib_dpttypes{"$model"};
 	my $unit = $eib_dpttypes{"$model"}{"UNIT"};
 	my $transval = undef;
 	
 	Log3 $hash, 5,"EIB parse $value for $name model: $model dpt: $code unit: $unit";
+	#debug
 	print "EIB_ParseByDatapointType: $name, val= $value, Group= $gnr, Model= $model, code= $code, unit= $unit \n"  if ($debug eq 1);
 	
-	#ABU aus Übersichtlichkeitsgründen voran gestellt
+	#moved to the front... - execute if DPT is NOT 1
 	if ($code ne "dpt1")
 	{
 	    $value = 0 if ($value eq "off"); 
 		$value = 1 if ($value eq "on"); 
 	}
 	
-	#Je nach DPT ist was zu tun...
+	#correct value in realtion to potential non-compatible states
 	if ($code eq "dpt1") 
 	{
+		#1-bit
 		$value = "off" if ($value eq 0); 
 		$value = "on" if ($value eq 1); 
-
-		$transval = $value;				
+		$transval = $value;	
 	}
 	elsif ($code eq "dpt5") 
 	{
+		#1-byte unsigned
 		my $dpt5factor = $eib_dpttypes{"$model"}{"factor"};
 		my $fullval = hex($value);
 		$transval = $fullval;
 		$transval = sprintf("%.0f",$transval * $dpt5factor) if($dpt5factor != 0);		
-		
-	} elsif ($code eq "dpt7") 
+	}
+	elsif ($code eq "dpt6") 
 	{
+		my $dpt6factor = $eib_dpttypes{"$model"}{"factor"};
+		my $fullval = hex($value);
+		$transval = $fullval;
+		$transval -= 256 if $transval >= 0x80;
+		$transval = sprintf("%.0f",$transval * $dpt6factor) if($dpt6factor != 0);
+	}
+	elsif ($code eq "dpt7") 
+	{
+		#2-byte unsigned
 		my $fullval = hex($value);
 		$transval = $fullval;		
-		
-	} elsif($code eq "dpt9") 
+	} 
+	elsif($code eq "dpt9") 
 	{
+		#2-bate float
 		my $fullval = hex($value);
 		my $sign = 1;
 		$sign = -1 if(($fullval & 0x8000)>0);
 		my $exp = ($fullval & 0x7800)>>11;
 		my $mant = ($fullval & 0x07FF);
 		$mant = -(~($mant-1)&0x07FF) if($sign==-1);
-		
 		$transval = (1<<$exp)*0.01*$mant;
-		
-	} elsif ($code eq "dpt10") 
+	} 
+	elsif ($code eq "dpt10") 
 	{
 		# Time
 		my $fullval = hex($value);
@@ -639,17 +837,26 @@ EIB_ParseByDatapointType($$$$) #MH added groupnr
 		my $mins  = ($fullval & 0x3F00)>>8;
 		my $secs  = ($fullval & 0x3F);
 		$transval = sprintf("%02d:%02d:%02d",$hours,$mins,$secs);
-				
-	} elsif ($code eq "dpt10_ns") 
+	} 
+	elsif ($code eq "dpt10_ns") 
+	{
+		# Time without seconds
+		my $fullval = hex($value);
+		my $hours = ($fullval & 0x1F0000)>>16;
+		my $mins  = ($fullval & 0x3F00)>>8;
+		my $secs  = ($fullval & 0x3F);
+		$transval = sprintf("%02d:%02d",$hours,$mins);
+	} 
+	elsif ($code eq "time") 
 	{
 		# Time
 		my $fullval = hex($value);
 		my $hours = ($fullval & 0x1F0000)>>16;
 		my $mins  = ($fullval & 0x3F00)>>8;
 		my $secs  = ($fullval & 0x3F);
-		$transval = sprintf("%02d:%02d",$hours,$mins);
-				
-	} elsif ($code eq "dpt11") 
+		$transval = sprintf("%02d:%02d:%02d",$hours,$mins,$secs);
+	} 
+	elsif ($code eq "dpt11") 
 	{
 		# Date
 		my $fullval = hex($value);
@@ -660,32 +867,52 @@ EIB_ParseByDatapointType($$$$) #MH added groupnr
 		$year += 1900 if($year>=90);
 		$year += 2000 if($year<90);
 		$transval = sprintf("%02d.%02d.%04d",$day,$month,$year);
-				
-	} elsif ($code eq "dpt12") 
+	} 
+	elsif ($code eq "date") 
 	{
+		# Date
+		my $fullval = hex($value);
+		my $day = ($fullval & 0x1F0000)>>16;
+		my $month  = ($fullval & 0x0F00)>>8;
+		my $year  = ($fullval & 0x7F);
+		#translate year (21st cent if <90 / else 20th century)
+		$year += 1900 if($year>=90);
+		$year += 2000 if($year<90);
+		$transval = sprintf("%02d.%02d.%04d",$day,$month,$year);
+	} 
+	elsif ($code eq "dpt12") 
+	{
+		#4-bate unsigned
 		my $fullval = hex($value);
 		$transval = $fullval;		
-				
-	} elsif ($code eq "dpt14") # contributed by Olaf
-    	{
-        	# 4 byte single precision float
-       	 	my $byte0 = hex(substr($value,0,2));
-        	my $sign = ($byte0 & 0x80) ? -1 : 1;
-
-        	my $bytee = hex(substr($value,0,4));
-        	my $expo = (($bytee & 0x7F80) >> 7) - 127;
-
-        	my $bytem = hex(substr($value,2,6));
-        	my $mant = ($bytem & 0x7FFFFF | 0x800000);
-
-        	$transval = $sign * (2 ** $expo) * ($mant / (1 <<23));
-                
-	} elsif ($code eq "dpt16") {
-
-		$transval= decode_dpt16($value);
-
-	} elsif ($code eq "dptxx") {
+	} 
+	elsif ($code eq "dpt14")
+    {
+        # 4-byte float
+		my $fullval;
+		$fullval = unpack "f", pack "L", hex $value;		
+		$transval = sprintf ("%f","$fullval");
+	} 
+	elsif ($code eq "dpt16") 
+	{
+		#text
+		$transval = "";
+		for (my $i=0;$i<14;$i++) 
+		{
+			my $c = hex(substr($value,$i*2,2));
 		
+			if ($c eq 0) 
+			{
+				$i = 14;
+			} 
+			else 
+			{
+				$transval .=  sprintf("%c", $c);
+			}
+		}
+	} 
+	elsif ($code eq "dptxx") 
+	{	
 	}
 	
 	# set state to translated value
@@ -702,24 +929,6 @@ EIB_ParseByDatapointType($$$$) #MH added groupnr
 	}
 	
 	return $value;
-}
-
-#############################
-sub decode_dpt16($)
-{ 
-  # 14byte char
-  my $val = shift;
-  my $res = "";  
-
-  for (my $i=0;$i<14;$i++) {
-    my $c = hex(substr($val,$i*2,2));
-    if ($c eq 0) {
-      $i = 14;
-    } else {
-      $res .=  sprintf("%c", $c);
-    }
-  }
-  return sprintf("%s","$res");
 }
 
 #############################
@@ -751,40 +960,6 @@ eib_name2hex($)
   }  
     
   return $r;
-}
-
-#############################
-# 2byte signed float
-sub encode_dpt9($) {
-    my $state = shift;
-    my $data;
-	my $retVal;
-
-    my $sign = ($state <0 ? 0x8000 : 0);
-    my $exp  = 0;
-    my $mant = 0;
-
-    $mant = int($state * 100.0);
-    while (abs($mant) > 2047) {
-        $mant /= 2;
-        $exp++;
-    }
-    $data = $sign | ($exp << 11) | ($mant & 0x07ff);
-	
-	$retVal = sprintf("00%.4x",$data);
-	
-    return $retVal;
-}
-
-#############################
-# 4byte signed float
-sub encode_dpt14 {
-
-	my $real = shift; 
-	my $packed_float = pack "f", $real; 
-	my $data  = sprintf("%04X", unpack("L",  pack("f", $real))); 
-
-    return $data
 }
 
 1;
@@ -923,15 +1098,18 @@ sub encode_dpt14 {
     <li><a href="#webCmd">webCmd</a></li>
     <li><a href="#widgetOverride">widgetOverride</a></li>
     <li><b>model</b> - 
-      set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>). The device state in FHEM is interpreted and shown according to the specification.
+      set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>). The device state in FHEM is interpreted and shown according to the specification. 
       <ul>
-        <li>dpt1   will be interpreted as on/off</li>
+        <li>dpt1   -> will be interpreted as on/off</li>
       	<li>dpt5</li>
       	<li>dpt5.003</li>
       	<li>angle</li>
       	<li>percent</li>
       	<li>dpt5.004</li>
       	<li>percent255</li>
+      	<li>dpt6</li>
+      	<li>dpt6.001</li>
+      	<li>dpt6.010</li>		
       	<li>dpt7</li>
       	<li>length-mm</li>
       	<li>current-mA</li>
@@ -955,14 +1133,14 @@ sub encode_dpt14 {
       	<li>current-mA2</li>
       	<li>power</li>
       	<li>powerdensity</li>
-      	<li>dpt10</li>
-		<li>dpt10_ns</li>
-      	<li>time</li>
-      	<li>dpt11</li>
-      	<li>date</li>
+      	<li>dpt10  -> transferred from and to state, format hh:mm:ss</li>
+		<li>dpt10_ns  -> same as DPT10, seconds always 0</li>
+      	<li>time  -> receiving has no effect, sending any value contains actual system time</li>
+      	<li>dpt11  -> transferred from and to state, format hh:mm:ss</li>
+      	<li>date  -> receiving has no effect, sending any value contains actual system date</li>
       	<li>dpt12</li>
       	<li>dpt14</li>
-      	<li>dpt16</li>
+      	<li>dpt16  -> has to be used with "set string"</li>
       </ul>      
     </li>
 
@@ -996,8 +1174,21 @@ sub encode_dpt14 {
       define myDimmer EIB 0/1/1 0/1/2
       attr myDimmer EIBreadingSender 1
       </pre>    
+     </li>	 
+	 
+    <li><b>EIBreadOnStart</b> - 
+    If enabled, FHEM answers on read requests. The content of state is send to the bus as answer.
+    <p>If set to 1, read-requests are answered</p>
+      <pre>
+      FHEM will respond
+      </pre>
+      <p>Example:</p>
+      <pre>
+      define myDimmer EIB 0/1/1 0/1/2
+      attr myDimmer EIBanswerReading 1
+      </pre>    
      </li>
-
+	 
   </ul>   
   </div>
 </div>
