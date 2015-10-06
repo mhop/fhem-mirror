@@ -1674,12 +1674,19 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             {
                                 $routeStatus = "USER_ABSENT";
                             }
+                            elsif ($type[$i] ne "push"
+                                && $type[$i] ne "mail"
+                                && $residentDevState eq "asleep" )
+                            {
+                                $routeStatus = "USER_ASLEEP";
+                            }
 
                             # enforce by user request
                             if (
                                 (
                                        $routeStatus eq "USER_DISABLED"
                                     || $routeStatus eq "USER_ABSENT"
+                                    || $routeStatus eq "USER_ASLEEP"
                                 )
                                 && ( $forceType == 1 || $forceDevice == 1 )
                               )
@@ -1692,6 +1699,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 (
                                        $routeStatus eq "USER_DISABLED"
                                     || $routeStatus eq "USER_ABSENT"
+                                    || $routeStatus eq "USER_ASLEEP"
                                 )
                                 && $loopPriority >= $prioThresGwEmg
                               )
