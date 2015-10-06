@@ -87,6 +87,13 @@ sub msg_Initialize($$) {
       msgPriorityText:-2,-1,0,1,2
       msgResidentsDev
       msgSwitcherDev
+      msgThPrioHigh:-2,-1,0,1,2
+      msgThPrioNormal:-2,-1,0,1,2
+      msgThPrioAudioEmergency:-2,-1,0,1,2
+      msgThPrioAudioHigh:-2,-1,0,1,2
+      msgThPrioTextEmergency:-2,-1,0,1,2
+      msgThPrioTextNormal:-2,-1,0,1,2
+      msgThPrioGwEmergency:-2,-1,0,1,2
       msgTitleAudio
       msgTitleAudioShort
       msgTitleAudioShortPrio
@@ -869,8 +876,100 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     ###
                     if ( $type[$i] eq "text" ) {
 
+                      # user selected emergency priority text threshold
+                      my $prioThresTextEmg = 
+                          # look for direct
+                          AttrVal(
+                              $device, "msgThPrioTextEmergency",
+
+                              #look for indirect audio
+                              AttrVal(
+                                  AttrVal( $device, "msgRecipient$typeUc", "" ),
+                                  "msgThPrioTextEmergency",
+
+                                  #look for indirect general
+                                  AttrVal(
+                                      AttrVal( $device, "msgRecipient", "" ),
+                                      "msgThPrioTextEmergency",
+
+                                      # look for global direct
+                                      AttrVal(
+                                          "global", "msgThPrioTextEmergency",
+
+                                          #look for global indirect type
+                                          AttrVal(
+                                              AttrVal(
+                                                  "global",
+                                                  "msgRecipient$typeUc", ""
+                                              ),
+                                              "msgThPrioTextEmergency",
+
+                                              #look for global indirect general
+                                              AttrVal(
+                                                  AttrVal(
+                                                      "global", "msgRecipient",
+                                                      ""
+                                                  ),
+                                                  "msgThPrioTextEmergency",
+
+                                                  # default
+                                                  "2"
+                                              )
+                                          )
+                                      )
+                                  )
+                              )
+                          )
+                      ;
+
+                      # user selected low priority text threshold
+                      my $prioThresTextNormal = 
+                          # look for direct
+                          AttrVal(
+                              $device, "msgThPrioTextNormal",
+
+                              #look for indirect audio
+                              AttrVal(
+                                  AttrVal( $device, "msgRecipient$typeUc", "" ),
+                                  "msgThPrioTextNormal",
+
+                                  #look for indirect general
+                                  AttrVal(
+                                      AttrVal( $device, "msgRecipient", "" ),
+                                      "msgThPrioTextNormal",
+
+                                      # look for global direct
+                                      AttrVal(
+                                          "global", "msgThPrioTextNormal",
+
+                                          #look for global indirect type
+                                          AttrVal(
+                                              AttrVal(
+                                                  "global",
+                                                  "msgRecipient$typeUc", ""
+                                              ),
+                                              "msgThPrioTextNormal",
+
+                                              #look for global indirect general
+                                              AttrVal(
+                                                  AttrVal(
+                                                      "global", "msgRecipient",
+                                                      ""
+                                                  ),
+                                                  "msgThPrioTextNormal",
+
+                                                  # default
+                                                  "-2"
+                                              )
+                                          )
+                                      )
+                                  )
+                              )
+                          )
+                      ;
+
                      # Decide push and/or e-mail destination based on priorities
-                        if (   $loopPriority >= 2
+                        if (   $loopPriority >= $prioThresTextEmg
                             && $routes{push} == 1
                             && $routes{mail} == 1 )
                         {
@@ -882,7 +981,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             push @type, "push" if !( "push" ~~ @type );
                             push @type, "mail" if !( "mail" ~~ @type );
                         }
-                        elsif ($loopPriority >= 2
+                        elsif ($loopPriority >= $prioThresTextEmg
                             && $routes{push} == 1
                             && $routes{mail} == 0 )
                         {
@@ -893,7 +992,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             $forwarded .= "text>push";
                             push @type, "push" if !( "push" ~~ @type );
                         }
-                        elsif ($loopPriority >= 2
+                        elsif ($loopPriority >= $prioThresTextEmg
                             && $routes{push} == 0
                             && $routes{mail} == 1 )
                         {
@@ -904,7 +1003,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             $forwarded .= "text>mail";
                             push @type, "mail" if !( "mail" ~~ @type );
                         }
-                        elsif ( $loopPriority >= -2 && $routes{push} == 1 ) {
+                        elsif ( $loopPriority >= $prioThresTextNormal && $routes{push} == 1 ) {
                             Log3 $logDevice, 4,
                               "msg $device: Text routing decision: push(4)";
                             $forwarded .= ","
@@ -912,7 +1011,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             $forwarded .= "text>push";
                             push @type, "push" if !( "push" ~~ @type );
                         }
-                        elsif ( $loopPriority >= -2 && $routes{mail} == 1 ) {
+                        elsif ( $loopPriority >= $prioThresTextNormal && $routes{mail} == 1 ) {
                             Log3 $logDevice, 4,
                               "msg $device: Text routing decision: mail(5)";
                             $forwarded .= ","
@@ -981,7 +1080,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         return "ROUTE_UNAVAILABLE" if ( $return ne "" );
                     }
 
-                    # user selected announcement state
+                    # user selected audio-visual announcement state
                     my $annState = ReadingsVal(
 
                         # look for direct
@@ -1002,7 +1101,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                     AttrVal(
                                         "global", "msgSwitcherDev",
 
-                                        #look for global indirect audio
+                                        #look for global indirect type
                                         AttrVal(
                                             AttrVal(
                                                 "global",
@@ -1030,15 +1129,199 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         "long"
                     );
 
+                    # user selected emergency priority audio threshold
+                    my $prioThresAudioEmg = 
+                        # look for direct
+                        AttrVal(
+                            $device, "msgThPrioAudioEmergency",
+
+                            #look for indirect audio
+                            AttrVal(
+                                AttrVal( $device, "msgRecipient$typeUc", "" ),
+                                "msgThPrioAudioEmergency",
+
+                                #look for indirect general
+                                AttrVal(
+                                    AttrVal( $device, "msgRecipient", "" ),
+                                    "msgThPrioAudioEmergency",
+
+                                    # look for global direct
+                                    AttrVal(
+                                        "global", "msgThPrioAudioEmergency",
+
+                                        #look for global indirect type
+                                        AttrVal(
+                                            AttrVal(
+                                                "global",
+                                                "msgRecipient$typeUc", ""
+                                            ),
+                                            "msgThPrioAudioEmergency",
+
+                                            #look for global indirect general
+                                            AttrVal(
+                                                AttrVal(
+                                                    "global", "msgRecipient",
+                                                    ""
+                                                ),
+                                                "msgThPrioAudioEmergency",
+
+                                                # default
+                                                "2"
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ;
+
+                    # user selected high priority audio threshold
+                    my $prioThresAudioHigh = 
+                        # look for direct
+                        AttrVal(
+                            $device, "msgThPrioAudioHigh",
+
+                            #look for indirect audio
+                            AttrVal(
+                                AttrVal( $device, "msgRecipient$typeUc", "" ),
+                                "msgThPrioAudioHigh",
+
+                                #look for indirect general
+                                AttrVal(
+                                    AttrVal( $device, "msgRecipient", "" ),
+                                    "msgThPrioAudioHigh",
+
+                                    # look for global direct
+                                    AttrVal(
+                                        "global", "msgThPrioAudioHigh",
+
+                                        #look for global indirect type
+                                        AttrVal(
+                                            AttrVal(
+                                                "global",
+                                                "msgRecipient$typeUc", ""
+                                            ),
+                                            "msgThPrioAudioHigh",
+
+                                            #look for global indirect general
+                                            AttrVal(
+                                                AttrVal(
+                                                    "global", "msgRecipient",
+                                                    ""
+                                                ),
+                                                "msgThPrioAudioHigh",
+
+                                                # default
+                                                "1"
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ;
+
+                    # user selected high priority threshold
+                    my $prioThresHigh = 
+                        # look for direct
+                        AttrVal(
+                            $device, "msgThPrioHigh",
+
+                            #look for indirect audio
+                            AttrVal(
+                                AttrVal( $device, "msgRecipient$typeUc", "" ),
+                                "msgThPrioHigh",
+
+                                #look for indirect general
+                                AttrVal(
+                                    AttrVal( $device, "msgRecipient", "" ),
+                                    "msgThPrioHigh",
+
+                                    # look for global direct
+                                    AttrVal(
+                                        "global", "msgThPrioHigh",
+
+                                        #look for global indirect type
+                                        AttrVal(
+                                            AttrVal(
+                                                "global",
+                                                "msgRecipient$typeUc", ""
+                                            ),
+                                            "msgThPrioHigh",
+
+                                            #look for global indirect general
+                                            AttrVal(
+                                                AttrVal(
+                                                    "global", "msgRecipient",
+                                                    ""
+                                                ),
+                                                "msgThPrioHigh",
+
+                                                # default
+                                                "2"
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ;
+
+                    # user selected normal priority threshold
+                    my $prioThresNormal = 
+                        # look for direct
+                        AttrVal(
+                            $device, "msgThPrioNormal",
+
+                            #look for indirect audio
+                            AttrVal(
+                                AttrVal( $device, "msgRecipient$typeUc", "" ),
+                                "msgThPrioNormal",
+
+                                #look for indirect general
+                                AttrVal(
+                                    AttrVal( $device, "msgRecipient", "" ),
+                                    "msgThPrioNormal",
+
+                                    # look for global direct
+                                    AttrVal(
+                                        "global", "msgThPrioNormal",
+
+                                        #look for global indirect type
+                                        AttrVal(
+                                            AttrVal(
+                                                "global",
+                                                "msgRecipient$typeUc", ""
+                                            ),
+                                            "msgThPrioNormal",
+
+                                            #look for global indirect general
+                                            AttrVal(
+                                                AttrVal(
+                                                    "global", "msgRecipient",
+                                                    ""
+                                                ),
+                                                "msgThPrioNormal",
+
+                                                # default
+                                                "0"
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ;
+
                     if ( $type[$i] eq "audio" ) {
                         if (   $annState eq "long"
                             || $forceType == 1
                             || $forceDevice == 1
-                            || $loopPriority >= 2 )
+                            || $loopPriority >= $prioThresAudioEmg )
                         {
                             $priorityCat = "";
                         }
-                        elsif ( $loopPriority >= 1 ) {
+                        elsif ( $loopPriority >= $prioThresAudioHigh ) {
                             $priorityCat = "ShortPrio";
                         }
                         else {
@@ -1046,10 +1329,10 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         }
                     }
                     else {
-                        if ( $loopPriority >= 2 ) {
+                        if ( $loopPriority >= $prioThresHigh ) {
                             $priorityCat = "High";
                         }
-                        elsif ( $loopPriority >= 0 ) {
+                        elsif ( $loopPriority >= $prioThresNormal ) {
                             $priorityCat = "";
                         }
                         else {
@@ -1280,22 +1563,58 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     ### Send message
                     ###
 
+                    # user selected emergency priority text threshold
+                    my $prioThresGwEmg = 
+                        # look for direct
+                        AttrVal(
+                            $device, "msgThPrioGwEmergency",
+
+                            #look for indirect type
+                            AttrVal(
+                                AttrVal( $device, "msgRecipient$typeUc", "" ),
+                                "msgThPrioGwEmergency",
+
+                                #look for indirect general
+                                AttrVal(
+                                    AttrVal( $device, "msgRecipient", "" ),
+                                    "msgThPrioGwEmergency",
+
+                                    # look for global direct
+                                    AttrVal(
+                                        "global", "msgThPrioGwEmergency",
+
+                                        #look for global indirect type
+                                        AttrVal(
+                                            AttrVal(
+                                                "global",
+                                                "msgRecipient$typeUc", ""
+                                            ),
+                                            "msgThPrioGwEmergency",
+
+                                            #look for global indirect general
+                                            AttrVal(
+                                                AttrVal(
+                                                    "global", "msgRecipient",
+                                                    ""
+                                                ),
+                                                "msgThPrioGwEmergency",
+
+                                                # default
+                                                "2"
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    ;
+
                     my %gatewaysStatus;
 
                     foreach my $gatewayDevOr ( split /\|/, $gatewayDevs ) {
                         foreach my $gatewayDev ( split /,/, $gatewayDevOr ) {
                             Log3 $logDevice, 5,
 "msg $device: Trying to send message via gateway $gatewayDev";
-
-                            # restricted priority scope for Pushover
-                            if (   $type[$i] eq "push"
-                                && $defs{$gatewayDev}{TYPE} eq "Pushover" )
-                            {
-                                $loopPriority = 2
-                                  if ( $loopPriority > 2 );
-                                $loopPriority = -2
-                                  if ( $loopPriority < -2 );
-                            }
 
                             ##############
                            # check for gateway availability and set route status
@@ -1374,7 +1693,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                        $routeStatus eq "USER_DISABLED"
                                     || $routeStatus eq "USER_ABSENT"
                                 )
-                                && $loopPriority >= 2
+                                && $loopPriority >= $prioThresGwEmg
                               )
                             {
                                 $routeStatus = "OK_EMERGENCY";
