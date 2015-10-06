@@ -1147,7 +1147,7 @@ sub FRITZBOX_Readout_Run_Web($)
          FRITZBOX_Log $hash, 4, "Start update of slow changing device readings.";
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->lastHour", int(time/3600);
    # Box model
-      my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+      my $host = $hash->{HOST};
       my $url = "http://$host/cgi-bin/system_status";
       
       my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
@@ -3737,7 +3737,7 @@ sub FRITZBOX_Telnet_OpenCon($)
       return $msg;
    }
       
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $host = $hash->{HOST};
 
    my $pwd = FRITZBOX_readPassword($hash);
    my $msg;
@@ -3878,7 +3878,7 @@ sub FRITZBOX_TR064_Cmd($$$)
    $FRITZBOX_TR064pwd = FRITZBOX_readPassword($hash);
    $FRITZBOX_TR064user = AttrVal( $name, "boxUser", "dslf-config" );   
    
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $host = $hash->{HOST};
    
    my @retArray;
    
@@ -3947,7 +3947,7 @@ sub FRITZBOX_TR064_Get_ServiceList($)
       return $msg;
    }
 
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $host = $hash->{HOST};
    my $url = 'http://'.$host.":49000/tr64desc.xml";
 
    my $returnStr = "_" x 130 ."\n\n";
@@ -4063,7 +4063,7 @@ sub FRITZBOX_TR064_Init ($)
       return undef;
    }
 
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $host = $hash->{HOST};
 
       FRITZBOX_Log $hash, 4, "Check if TR-064 description 'http://".$host.":49000/tr64desc.xml' exists.";
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
@@ -4118,7 +4118,7 @@ sub FRITZBOX_Web_OpenCon ($)
    return $sid
       if defined $sid && $hash->{fhem}{sidTime}>time()-9.5*60;
    
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $host = $hash->{HOST};
 
    my $pwd = FRITZBOX_readPassword($hash);
 
@@ -4174,7 +4174,7 @@ sub FRITZBOX_Web_CmdPost($$@)
    }
    push @{$webCmdArray}, "sid" => $sid;
    
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $host = $hash->{HOST};
    my $url = 'http://'.$host.$page;
 
    FRITZBOX_Log $hash, 5, "Posting ".(@{$webCmdArray} /2) ." parameters to '$url'";
@@ -4216,7 +4216,7 @@ sub FRITZBOX_Web_CmdGet($$)
    
    my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
 
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $host = $hash->{HOST};
    foreach ( @{$getCmdArray} ) {
       my ($page,$getCmdStr) = @{$_};
       my $url =  'http://'.$host."/".$page."?sid=".$sid.$getCmdStr;
@@ -4253,7 +4253,7 @@ sub FRITZBOX_Web_Query($$@)
       return \%retHash;
    }
 
-   my $host = AttrVal( $name, "fritzBoxIP", "fritz.box" );
+   my $host = $hash->{HOST};
    my $url = 'http://' . $host . '/query.lua?sid=' . $sid . $queryStr;
    
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
@@ -4280,8 +4280,9 @@ sub FRITZBOX_Web_Query($$@)
 #################
 
    my $jsonText = $response->content;
-   # Remove illegal excape sequences
-   $jsonText =~ s/\\'/'/g;
+   # Remove illegal escape sequences
+   $jsonText =~ s/\\'/'/g; #Hochkomma
+   $jsonText =~ s/\\x{[1-9a-f]}//g; #Hex nummer
    
    my $jsonResult ;
    if ($charSet eq "UTF-8") {
