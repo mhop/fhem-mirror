@@ -1,5 +1,8 @@
 ##############################################
 # $Id$
+# ABU 20150916 removed print: simpleWriteDate, cleaned init
+# ABU 20150918 fixed deprecated warning, fixed warning related to hex-conversion in simple-write
+
 package main;
 
 use strict;
@@ -51,9 +54,17 @@ TUL_Initialize($)
   $hash->{SetFn}   = "TUL_Set";
   $hash->{StateFn} = "TUL_SetState";
   $hash->{AttrFn}  = "TUL_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 model:TUL loglevel:0,1,2,3,4,5,6 ";
+  #$hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
+  #                   "showtime:1,0 model:TUL loglevel:0,1,2,3,4,5,6 ";
+					 
+  $hash->{AttrList}= "do_not_notify:1,0 "
+								."dummy:1,0 "
+								."showtime:1,0 "
+								."model:TUL "
+								."loglevel:0,1,2,3,4,5,6";
+							   
   $hash->{ShutdownFn} = "TUL_Shutdown";
+  
 }
 
 #####################################
@@ -226,7 +237,8 @@ TUL_DoInit($)
 sub
 TUL_Write($$$)
 {
-  my ($hash,$fn,$msg) = @_;
+
+  my ($hash,$fn,$msg) = @_;  
   return if(!defined($fn));
 
   Log 5, "$hash->{NAME} sending $fn$msg";
@@ -335,13 +347,26 @@ TUL_SimpleWrite(@)
 
     $eibmsg->{'dst'} = $2;
     my $hexvalues = $3;
-    my @data =  map hex($_), $hexvalues =~ /(..)/g;
     
+	#The array has to have a given length. During Hex-conversion Trailing
+	#0 are recognizes for warnings.
+	#Therefore we backup the length, trim, and reappend the 0
+	#
+	#save length and trim right side
+	my $strLen = length ($hexvalues) / 2;
+	$hexvalues =~ s/\s+$//;
+	#convert hex-string to array with dezimal values
+	my @data =  map hex($_), $hexvalues =~ /(..)/g;
+	#re-append 0x00
+	for (my $i=0; $strLen - scalar @data; $i++)
+	{
+		push (@data, 0);
+	}
+	
     # check: first byte is only allowed to contain data in the lower 6bits
     #        to make sure all is fine, we mask the first byte
     $data[0] = $data[0] & 0x3f if(defined($data[0]));
     
-    print "SimpleWrite data: @data \n";
     $eibmsg->{'data'} = \@data;
     
     sendGroup($hash, $eibmsg);
@@ -586,6 +611,7 @@ sub
 TUL_Attr(@)
 {
   my @a = @_;
+
   Log 2, "Unsupported method TUL_Attr($a[0],$a[1],$a[2],$a[3])";
  
   return undef;
@@ -701,7 +727,9 @@ sub encode_eibd($)
 		return;
     }
     @data = @{$mref->{'data'}};
-    @data = (0x0) if(!(defined @data) || !(defined $data[0])); #make sure data has at least one element
+	
+    @data = (0x0) if(!@data || !defined($data[0])); #make sure data has at least one element
+	#@data = (0x0) if(!(defined @data) || !(defined $data[0])); #make sure data has at least one element
     my $datalen = @data;
     Log(5,"encode_eibd dst: $mref->{'dst'} apci: $APCI datalen: $datalen data: @data");
     @msg = (
