@@ -2654,10 +2654,10 @@ CommandVersion($$)
       push @ret, grep(/\$Id. [^\$\n\r].+\$/, <FH>);
     }
   }
-  @ret = map {/\$Id. (\S+) (.+?)\$/ ? sprintf("%-".$max."s %s",$1,$2) : $_}
+  @ret = map {/\$Id. (\S+) (\d+) (.+?)\$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_}
         @ret; 
   
-  return sprintf("%-".$max."s %s","File","Rev  Last Change\n\n").
+  return sprintf("%-".$max."s %s","File","Rev   Last Change\n\n").
          join("\n", grep((defined($param) ? ($_ =~ /$param/) : 1), @ret));
 }
 
