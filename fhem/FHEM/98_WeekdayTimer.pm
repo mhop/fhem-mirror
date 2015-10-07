@@ -590,21 +590,21 @@ sub WeekdayTimer_Update($) {
   my $idx      = $myHash->{MODIFIER};
   my $now      = time();
   
- #Log3 $hash, 3, "WeekdayTimer_Update-->[$name] $idx ";
+  my $sollZeit    = $myHash->{TIME};
 
   # Schaltparameter ermitteln
   my $tage        = $hash->{profil}{$idx}{TAGE};
   my $time        = $hash->{profil}{$idx}{TIME};
-  my $epoch       = $hash->{profil}{$idx}{EPOCH};
   my $newParam    = $hash->{profil}{$idx}{PARA};
   
  #Log3 $hash, 3, "[$name] $idx ".FmtDateTime($epoch) . " " . $newParam . " " . join("",@$tage);
   
-  if ($hash->{STILLDONETIME} > $epoch  ) {
+  if ($hash->{STILLDONETIME} <= $sollZeit  ) {
+      $hash->{STILLDONETIME}  = $sollZeit;
+  } else {
      Log3 $hash, 3, "[$name] Timer $time overwritten by " . FmtDateTime($hash->{STILLDONETIME});
      return;
   }
-  $hash->{STILLDONETIME} = $epoch;
   
   # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
   if (WeekdayTimer_FensterOffen($hash, $newParam, $idx)) {
