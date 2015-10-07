@@ -479,7 +479,7 @@ FW_closeConn($)
   my ($hash) = @_;
   if(!$hash->{inform} && !$hash->{BUF}) { # Forum #41125
     my $cc = AttrVal($hash->{SNAME}, "closeConn",
-                                        $FW_userAgent=~m/(iPhone|iPad|iPod)/);
+                        $FW_userAgent && $FW_userAgent=~m/(iPhone|iPad|iPod)/);
     if(!$FW_httpheader{Connection} || $cc) {
       TcpServer_Close($hash);
       delete($defs{$hash->{NAME}});
