@@ -8,6 +8,7 @@ package main;
 use strict;
 use warnings;
 use HMConfig;
+use Digest::MD5 qw(md5);
 
 eval "use Crypt::Rijndael";
 my $cryptFunc = ($@)?0:1;
