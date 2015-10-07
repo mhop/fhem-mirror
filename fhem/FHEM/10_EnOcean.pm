@@ -8668,21 +8668,14 @@ sub EnOcean_Notify(@)
       #Log3($name, 5, "EnOcean $name <notify> DELETEATTR $1");
 
     } elsif ($devName eq "global" && $s =~ m/^MODIFIED ([^ ]*)$/) {
-      # delete old und update DEF pointer in %modules
-      $hash->{DEF} = uc($hash->{DEF});
-      my ($key, $modified, $val);
-      my $defNew = $hash->{DEF};
+      # delete old DEF pointer in %modules
+      my ($key, $val);
       my $modulesPointer = \%modules;
       while (($key, $val) = each(%{$modulesPointer->{EnOcean}{defptr}})) {
-        if ($val == $hash && $key ne $defNew) {
+        if ($val == $hash && $key ne $hash->{DEF}) {
           delete $modules{EnOcean}{defptr}{$key};
-          $modified = 1;
           #Log3 $name, 2, "EnOcean $name <notify> MODIFIED $1: modules DEF $key deleted";
         }
-      }
-      if ($modified) {
-        $modules{EnOcean}{defptr}{$defNew} = $hash;
-        #Log3 $name, 2, "EnOcean $name <notify> MODIFIED $1: modules DEF $defNew updated";
       }
       
     } elsif ($devName eq "global" && $s =~ m/^SAVE$/) {
