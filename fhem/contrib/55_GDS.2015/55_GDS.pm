@@ -1,4 +1,4 @@
-# $Id: 55_GDS.pm 9298 2015-09-24 20:57:33Z betateilchen $
+# $Id: 55_GDS.pm 2015 2015-10-07 00:00:00Z betateilchen $
 ####################################################################################################
 #
 #	55_GDS.pm
@@ -30,14 +30,14 @@ use strict;
 use warnings;
 use feature qw/say switch/;
 use Time::HiRes qw(gettimeofday);
-use Data::Dumper;
-use Archive::Zip;
 use Text::CSV;
 use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
-#require LWP::UserAgent;
-require LWP::Parallel::UserAgent;
+use Archive::Zip;
+
+#use POE qw( Component::Client::SimpleFTP );
+#use Data::Dumper;
 
 no if $] >= 5.017011, warnings => 'experimental';
 
@@ -52,7 +52,7 @@ my $tempDir = "/tmp/";
 #
 ####################################################################################################
 
-sub unzipCapFile;
+#sub unzipCapFile;
 
 sub GDS_Initialize($) {
 	my ($hash) = @_;
@@ -335,11 +335,12 @@ sub GDS_Get($@) {
 
 		when("rereadcfg"){
 			eval {
+				retrieveFile($hash,"alerts");
+			};
+			eval {
 				retrieveFile($hash,"conditions");
 			}; 
-			eval {
-				retrieveFile($hash,"alerts");
-			}; 
+			sleep(5); 
 			initDropdownLists($hash);
 			break;
 			}
@@ -661,6 +662,7 @@ sub buildCAPList(@){
 
     # write the big XML file
     my $cF = $destinationDirectory."/gds_alerts";
+    unlink $cF if -e $cF;
     my $err = FileWrite({ FileName=>$cF,ForceType=>"file" },@alertsArray);
 
     # make XML array
@@ -1109,18 +1111,6 @@ sub retrieveFile($$;$$){
 	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
 	
 	my $urlString =	"ftp://$user:$pass\@ftp-outgoing2.dwd.de/";
-	my $ua;
-	eval { $ua = LWP::Parallel::UserAgent->new; };
-
-	if(!defined($ua)) {
-		Log3($name, 1, "GDS $name: LWP not available!");
-		readingsSingleUpdate($hash, 'LWP error', 'LWP not available!',1);
-		return;
-	}
-
-	$ua->timeout(10);
-	$ua->env_proxy;
-	$ua->nonblock("true");
 
 	given($request){
 
@@ -1214,7 +1204,7 @@ sub retrieveFile($$;$$){
 				$dataFile = $files[-1];
 				$urlString .= $dataFile;
 				Log3($name, 4, "GDS $name: retrieving $dataFile");
-				$ua->get($urlString,':content_file' => $targetFile);
+				$ftp->get($dataFile,$targetFile);
 			} else { 
 				Log3($name, 4, "GDS $name: filelist not found.");
 				$found = 0;
@@ -1229,6 +1219,32 @@ sub retrieveFile($$;$$){
 	};
 	return ($dataFile, $found);
 }
+
+sub gdsFtp_authenticated {
+Debug "authenticated";
+return;
+}
+
+sub gdsFtp_getconnected  {
+Debug "getconnected";
+return;
+}
+
+sub gdsFtp_getdata       {
+Debug "getdata";
+return;
+}
+
+sub gdsFtp_getdone       {
+Debug "getdone";
+return;
+}
+
+sub gdsFtp_size          {
+Debug "size";
+return;
+}
+
 
 sub getListStationsDropdown($){
 	my ($hash) = @_;
