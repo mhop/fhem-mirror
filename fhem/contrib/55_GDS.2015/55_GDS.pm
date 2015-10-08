@@ -6,6 +6,9 @@
 #	An FHEM Perl module to retrieve data from "Deutscher Wetterdienst"
 #
 #	Copyright: betateilchen ®
+#              some patches provided by jensb@FHEM_Forum 
+#                           - forecasts as readings or text
+#                           - weather weblinks
 #
 #	This file is part of fhem.
 #
@@ -36,9 +39,6 @@ use List::MoreUtils 'first_index';
 use XML::Simple;
 use Archive::Zip;
 
-#use POE qw( Component::Client::SimpleFTP );
-#use Data::Dumper;
-
 no if $] >= 5.017011, warnings => 'experimental';
 
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
@@ -51,8 +51,6 @@ my $tempDir = "/tmp/";
 # Main routines
 #
 ####################################################################################################
-
-#sub unzipCapFile;
 
 sub GDS_Initialize($) {
 	my ($hash) = @_;
@@ -76,21 +74,22 @@ sub GDS_Initialize($) {
 	fillMappingTables($hash);
 	initDropdownLists($hash);
 
-	if($name){
-		(undef, $found) = retrieveFile($hash,"conditions");
-		if($found){
-			$sList = getListStationsDropdown($hash)
-		} else {
-			Log3($name, 2, "GDS $name: No datafile (conditions) found");
-		}
+# 	if($name){
+# 		(undef, $found) = retrieveFile($hash,"conditions");
+# 		if($found){
+# 			$sList = getListStationsDropdown($hash)
+# 		} else {
+# 			Log3($name, 2, "GDS $name: No datafile (conditions) found");
+# 		}
+# 
+# 		(undef, $found) = retrieveFile($hash,"alerts");
+# 		if($found){
+# 			($aList, undef) = buildCAPList($hash);
+# 		} else {
+# 			Log3($name, 2, "GDS $name: No datafile (alerts) found");
+# 		}
+# 	}
 
-		(undef, $found) = retrieveFile($hash,"alerts");
-		if($found){
-			($aList, undef) = buildCAPList($hash);
-		} else {
-			Log3($name, 2, "GDS $name: No datafile (alerts) found");
-		}
-	}
 }
 
 sub GDS_Define($$$) {
@@ -340,7 +339,6 @@ sub GDS_Get($@) {
 			eval {
 				retrieveFile($hash,"conditions");
 			}; 
-			sleep(5); 
 			initDropdownLists($hash);
 			break;
 			}
@@ -361,16 +359,16 @@ sub GDS_Get($@) {
 			break;
 			}
 
-#		when("forecasts"){
-#			$parameter = ucfirst($parameter);
-#			$result = sepLine(67)."\n";
-#			(undef, $found) = retrieveFile($hash,$command,$parameter);
-#			if($found){
-#					$result .= retrieveText($hash, $command, "\n");
-#			}
-#			$result .= "\n".sepLine(67)."\n";
-#			break;
-#			}
+		when("forecasts"){
+			$parameter = ucfirst($parameter);
+			$result = sepLine(67)."\n";
+			(undef, $found) = retrieveFile($hash,$command,$parameter);
+			if($found){
+					$result .= retrieveText($hash, $command, "\n");
+			}
+			$result .= "\n".sepLine(67)."\n";
+			break;
+			}
 
 		default { return $usage; };
 	}
@@ -530,6 +528,7 @@ sub getHelp(){
 			sepLine(35)."\n".
 			"get <name> alerts <region>\n".
 			"get <name> conditions <stationName>\n".
+			"get <name> forecasts <regionName>\n".
 			"get <name> help\n".
 			"get <name> list capstations|stations|data\n".
 			"get <name> rereadcfg\n".
@@ -611,61 +610,34 @@ sub setHelp(){
 			sepLine(35)."\n".
 			"set <name> clear alerts|all\n".
 			"set <name> conditions <stationName>\n".
+			"set <name> forecasts <regionName>/<stationName>\n".
+			"set <name> help\n".
 			"set <name> rereadcfg\n".
-			"set <name> update\n".
-			"set <name> help\n";
+			"set <name> update\n";
 }
 
 sub buildCAPList(@){
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
-    my $destinationDirectory = $tempDir.$name."_alerts.dir";
-    my @capFiles = _readDir($destinationDirectory);
+	%capCityHash	= ();
+	%capCellHash	= ();
+	$alertsXml		= undef;
+	$aList			= undef;
 
 	my $xml			= new XML::Simple;
-	$alertsXml		= undef;
-
 	my $area		= 0;
 	my $record		= 0;
 	my $n			= 0;
 	my ($capCity, $capCell, $capEvent, $capEvt, $list, @a);
-
-	%capCityHash	= ();
-	%capCellHash	= ();
-	$aList			= undef;
+    my $destinationDirectory = $tempDir.$name."_alerts.dir";
     
-    my @alertsArray;
-    my $xmlHeader   = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>';
-    push (@alertsArray,$xmlHeader);
-    push (@alertsArray,"<alert>");
-    my $countInfo   = 0;
-	
-    foreach my $cF (@capFiles){
-       # merge all capFiles
-       $cF = $destinationDirectory."/".$cF;
-       next if -d $cF;
-       Log3($name, 4, "GDS $name: analyzing $cF"); 
-
-       my ($err,@a) = FileRead({FileName=>$cF,ForceType=>"file" });
-       foreach my $l (@a) {
-          next unless length($l);
-          next if($l =~ m/^\<\?xml version.*/);
-          next if($l =~ m/^\<alert.*/);
-          next if($l =~ m/^\<\/alert.*/);
-          next if($l =~ m/^\<sender\>.*/);
-          $countInfo++ if($l =~ m/^\<info\>/);
-          push (@alertsArray,$l);
-       }
+    # make XML array and analyze data
+    my ($err,$cF,$countInfo) = mergeCapFile($hash);
+    if (defined($err) && $err) {
+       Log3($name,1,"GDS: merge error: $err - aborting...");
+       return(undef,undef);
     }
-    push (@alertsArray,"</alert>");
-
-    # write the big XML file
-    my $cF = $destinationDirectory."/gds_alerts";
-    unlink $cF if -e $cF;
-    my $err = FileWrite({ FileName=>$cF,ForceType=>"file" },@alertsArray);
-
-    # make XML array
     eval	{	
 	  $alertsXml = $xml->XMLin($cF, KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
     };
@@ -799,20 +771,6 @@ sub decodeCAPData($$$){
 	return;
 }
 
-# sub
-# _calctz($@)
-# {
-  # my ($nt,@lt) = @_;
-
-  # my $off = $lt[2]*3600+$lt[1]*60+$lt[0];
-  # $off = 12*3600-$off;
-  # $nt += $off;  # This is noon, localtime
-
-  # my @gt = gmtime($nt);
-
-  # return (12-$gt[2]);
-# }
-
 sub checkCAPValid($$){
 	my ($onset,$expires) = @_;
 	my $valid = 0;
@@ -857,16 +815,20 @@ sub findCAPWarnCellId($$){
 	}
 }
 
-sub retrieveTextWarn($){
-	my ($hash) = @_;
+sub retrieveText($$$) {
+	my ($hash, $fileName, $separator) = @_;
 	my $name = $hash->{NAME};
-	
 	my ($line, @a);
-	open WXDATA, $tempDir.$name."_warnings";
+	open WXDATA, $tempDir.$name."_".$fileName;
 	while (chomp($line = <WXDATA>)) { 
 		push @a, latin1ToUtf8($line); }
 	close WXDATA;
-	return join("", @a);
+	return join($separator, @a);
+}
+
+sub retrieveTextWarn($){
+   my ($hash) = @_;
+   return retrieveText($hash, "warnings", "");
 }
 
 sub retrieveConditions($$@){
@@ -946,153 +908,6 @@ sub retrieveConditions($$@){
 	return ;
 }
 
-# sub retrieveFile($$;$$$){
-# #
-# # request = type, e.g. alerts, conditions, warnings
-# # parameter = additional selector, e.g. Bundesland
-# #
-# 	my ($hash, $request, $parameter, $parameter2, $useFtp) = @_;
-# 	my $name		= $hash->{NAME};
-# 	my $user		= $hash->{helper}{USER};
-# 	my $pass		= $hash->{helper}{PASS};
-# 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
-# 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
-# 	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
-# 	my $debug		= AttrVal($name, "gdsDebug",0);
-# 
-# 	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
-# 	
-# 	my $urlString =	"ftp://$user:$pass\@ftp-outgoing2.dwd.de/";
-# 	my $ua;
-# 	eval { $ua = LWP::UserAgent->new; };
-# 
-# 	if(!defined($ua)) {
-# 		Log3($name, 1, "GDS $name: LWP not available!");
-# 		readingsSingleUpdate($hash, 'LWP error', 'LWP not available!',1);
-# 		return;
-# 	}
-# 
-# 	$ua->timeout(10);
-# 	$ua->env_proxy;
-# 
-# 	given($request){
-# 
-# 		when("capstations"){
-# 			$dir = "gds/help/";
-# 			$dwd = "legend_warnings_CAP_WarnCellsID.csv";
-# 			$targetFile = $tempDir.$request.".csv";
-# 			break;
-# 		}
-# 
-# 		when("conditionsmap"){
-# 			$dir = "gds/specials/observations/maps/germany/";
-# 			$dwd = $parameter."*";
-# 			$targetFile = $tempDir.$name."_".$request.".jpg";
-# 			break;
-# 		}
-# 
-# 		when("forecastsmap"){
-# 			$dir = "gds/specials/forecasts/maps/germany/";
-# 			$dwd = $parameter."*";
-# 			$targetFile = $tempDir.$name."_".$request.".jpg";
-# 			break;
-# 		}
-# 
-# 		when("warningsmap"){
-# 			if(length($parameter) != 2){
-# 				$parameter = $bula2bulaShort{lc($parameter)};
-# 			}
-# 			$dwd = "Schilder".$dwd2Dir{$bulaShort2dwd{lc($parameter)}}.".jpg";
-# #			$dir = "gds/specials/warnings/maps/";
-# 			$dir = "gds/specials/alerts/maps/";
-# 			$targetFile = $tempDir.$name."_".$request.".jpg";
-# 			break;
-# 		}
-# 
-# 		when("radarmap"){
-# 			$dir = "gds/specials/radar/".$parameter2;
-# 			$dwd = "Webradar_".$parameter."*";
-# 			$targetFile = $tempDir.$name."_".$request.".jpg";
-# 			break;
-# 		}
-# 
-# 		when("alerts"){
-# #			$dir = "gds/specials/warnings/xml/PVW/";
-# 			$dir = "gds/specials/alerts/cap/GER/status/";
-# 			$dwd = "Z_CAP*";
-# 			$targetFile = $tempDir.$name."_".$request.".zip";
-# 			break;
-# 			}
-# 
-# 		when("conditions"){
-# 			$useFtp = 1;
-# 			$dir = "gds/specials/observations/tables/germany/";
-# 			$dwd = "*";
-# 			$targetFile = $tempDir.$name."_".$request;
-# 			break;
-# 			}
-# 
-# 		when("warnings"){
-# 			$useFtp = 1;
-# 			if(length($parameter) != 2){
-# 				$parameter = $bula2bulaShort{lc($parameter)};
-# 			}
-# 			$dwd = $bulaShort2dwd{lc($parameter)};
-# 			$dir = $dwd2Dir{$dwd};
-# 			$dwd = "VHDL".$parameter2."_".$dwd."*";
-# 			$dir = "gds/specials/warnings/".$dir."/";
-# #			$dir = "gds/specials/alerts/".$dir."/";
-# 			$targetFile = $tempDir.$name."_".$request;
-# 			break;
-# 			}
-# 	}
-# 
-# 	Log3($name, 4, "GDS $name: searching for $dir".$dwd." on DWD server");
-# 	$urlString .= $dir;
-# 
-# 	$found = 0;
-# 	eval {
-# 		$ftp = Net::FTP->new(	"ftp-outgoing2.dwd.de",
-# 								Debug => 0,
-# 								Timeout => 10,
-# 								Passive => $passive,
-# 								FirewallType => $proxyType,
-# 								Firewall => $proxyName);
-# 		Log3($name, 4, "GDS $name: ftp connection established.");
-# 		if(defined($ftp)){
-# 			$ftp->login($user, $pass);
-# 			$ftp->cwd("$dir");
-# 			@files = undef;
-# 			@files = $ftp->ls($dwd);
-# 			if(@files){
-# 				Log3($name, 4, "GDS $name: filelist found.");
-# 				@files = sort(@files);
-# 				$dataFile = $files[-1];
-# 				$urlString .= $dataFile;
-# 				Log3($name, 4, "GDS $name: retrieving $dataFile");
-# 				if($useFtp){
-# 					Log3($name, 4, "GDS $name: using FTP for retrieval");
-# 					$ftp->get($files[-1], $targetFile);
-# 				} else {
-# 					Log3($name, 4, "GDS $name: using HTTP for retrieval");
-# 					$ua->get($urlString,':content_file' => $targetFile);
-# 				}
-# 				$found = 1;
-# 			} else { 
-# 				Log3($name, 4, "GDS $name: filelist not found.");
-# 				$found = 0;
-# 			}
-# 			$ftp->quit;
-# 		}
-# 		Log3($name, 4, "GDS $name: updating readings.");
-# 		readingsBeginUpdate($hash);
-# 		readingsBulkUpdate($hash, "_dataSource",		"Quelle: Deutscher Wetterdienst");
-# 		readingsBulkUpdate($hash, "_dF_".$request, $dataFile) if(AttrVal($name, "gdsDebug", 0));
-# 		readingsEndUpdate($hash, 1);
-# 	};
-# 	return ($dataFile, $found);
-# }
-
 sub retrieveFile($$;$$){
 #
 # request = type, e.g. alerts, conditions, warnings
@@ -1153,16 +968,22 @@ sub retrieveFile($$;$$){
 		}
 
 		when("alerts"){
-#			$dir = "gds/specials/warnings/xml/PVW/";
 			$dir = "gds/specials/alerts/cap/GER/status/";
 			$dwd = "Z_CAP*";
-			$targetFile = $tempDir.$name."_".$request.".zip";
+			$targetFile = $tempDir.$name."_$request.dir/$name"."_$request.zip";
 			break;
 			}
 
 		when("conditions"){
 			$dir = "gds/specials/observations/tables/germany/";
 			$dwd = "*";
+			$targetFile = $tempDir.$name."_".$request;
+			break;
+			}
+
+		when("forecasts"){
+			$dir = "gds/specials/forecasts/tables/germany/";
+			$dwd = "Daten_".$parameter;
 			$targetFile = $tempDir.$name."_".$request;
 			break;
 			}
@@ -1203,8 +1024,10 @@ sub retrieveFile($$;$$){
 				@files = sort(@files);
 				$dataFile = $files[-1];
 				$urlString .= $dataFile;
-				Log3($name, 4, "GDS $name: retrieving $dataFile");
+				Log3($name, 5, "GDS $name: retrieving $dataFile");
 				$ftp->get($dataFile,$targetFile);
+				my $s = -s $targetFile;
+                Log3($name, 5, "GDS: ftp transferred $s bytes");
 			} else { 
 				Log3($name, 4, "GDS $name: filelist not found.");
 				$found = 0;
@@ -1219,32 +1042,6 @@ sub retrieveFile($$;$$){
 	};
 	return ($dataFile, $found);
 }
-
-sub gdsFtp_authenticated {
-Debug "authenticated";
-return;
-}
-
-sub gdsFtp_getconnected  {
-Debug "getconnected";
-return;
-}
-
-sub gdsFtp_getdata       {
-Debug "getdata";
-return;
-}
-
-sub gdsFtp_getdone       {
-Debug "getdone";
-return;
-}
-
-sub gdsFtp_size          {
-Debug "size";
-return;
-}
-
 
 sub getListStationsDropdown($){
 	my ($hash) = @_;
@@ -1373,6 +1170,39 @@ sub fillMappingTables($){
 				"West_ueberm_frueh,West_ueberm_spaet,".
 				"West_tag4_frueh,West_tag4_spaet";
 
+	$fcmapList =	"Deutschland_frueh,Deutschland_mittag,Deutschland_spaet,Deutschland_nacht,".
+				"Deutschland_morgen_frueh,Deutschland_morgen_spaet,".
+				"Deutschland_uebermorgen_frueh,Deutschland_uebermorgen_spaet,".
+				"Deutschland_Tag4_frueh,Deutschland_Tag4_spaet,".
+				"Mitte_frueh,Mitte_mittag,Mitte_spaet,Mitte_nacht,".
+				"Mitte_morgen_frueh,Mitte_morgen_spaet,".
+				"Mitte_uebermorgen_frueh,Mitte_uebermorgen_spaet,".
+				"Mitte_Tag4_frueh,Mitte_Tag4_spaet,".
+				"Nordost_frueh,Nordost_mittag,Nordost_spaet,Nordost_nacht,".
+				"Nordost_morgen_frueh,Nordost_morgen_spaet,".
+				"Nordost_uebermorgen_frueh,Nordost_uebermorgen_spaet,".
+				"Nordost_Tag4_frueh,Nordost_Tag4_spaet,".
+				"Nordwest_frueh,Nordwest_mittag,Nordwest_spaet,Nordwest_nacht,".
+				"Nordwest_morgen_frueh,Nordwest_morgen_spaet,".
+				"Nordwest_uebermorgen_frueh,Nordwest_uebermorgen_spaet,".
+				"Nordwest_Tag4_frueh,Nordwest_Tag4_spaet,".
+				"Ost_frueh,Ost_mittag,Ost_spaet,Ost_nacht,".
+				"Ost_morgen_frueh,Ost_morgen_spaet,".
+				"Ost_uebermorgen_frueh,Ost_uebermorgen_spaet,".
+				"Ost_Tag4_frueh,Ost_Tag4_spaet,".
+				"Suedost_frueh,Suedost_mittag,Suedost_spaet,Suedost_nacht,".
+				"Suedost_morgen_frueh,Suedost_morgen_spaet,".
+				"Suedost_uebermorgen_frueh,Suedost_uebermorgen_spaet,".
+				"Suedost_Tag4_frueh,Suedost_Tag4_spaet,".
+				"Suedwest_frueh,Suedwest_mittag,Suedwest_spaet,Suedwest_nacht,".
+				"Suedwest_morgen_frueh,Suedwest_morgen_spaet,".
+				"Suedwest_uebermorgen_frueh,Suedwest_uebermorgen_spaet,".
+				"Suedwest_Tag4_frueh,Suedwest_Tag4_spaet,".
+				"West_frueh,West_mittag,West_spaet,West_nacht,".
+				"West_morgen_frueh,West_morgen_spaet,".
+				"West_uebermorgen_frueh,West_uebermorgen_spaet,".
+				"West_Tag4_frueh,West_Tag4_spaet";
+
 #
 # Bundesländer den entsprechenden Dienststellen zuordnen
 #
@@ -1459,32 +1289,39 @@ sub fillMappingTables($){
 	PD => "Potsdam",
 	SU => "Stuttgart");
 
-return;
+  
+# German weekdays  
+    @weekdays = ("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa");  
+ 
+    return;
 }
 
 sub initDropdownLists($){
 	my($hash) = @_;
 	my $name = $hash->{NAME};
 
-	if ($name){
-		if(-e $tempDir.$name."_conditions"){
-			$sList = getListStationsDropdown($hash);
-		} else {
-			Log3($name, 3, "GDS $name: no datafile (conditions) found"); 
-			$sList = "please_use_rereadcfg_first";
-		}
-
-		if (-e $tempDir.$name."_alerts.zip"){
-            unzipCapFile($hash);
-			($aList, undef) = buildCAPList($hash);
-		} else {
-			Log3($name, 3, "GDS $name: no datafile (alerts) found"); 
-			$aList = "please_use_rereadcfg_first";
-		}
-	} else {
-		$aList = "please_use_rereadcfg_first";
-		$sList = $aList;
-	}
+ 	if ($name){
+ 		if(-e $tempDir.$name."_conditions"){
+ 			$sList = getListStationsDropdown($hash);
+ 		} else {
+ 			Log3($name, 3, "GDS $name: no datafile (conditions) found"); 
+ 			$sList = "please_use_rereadcfg_first";
+ 		}
+ 
+ 		if (-e $tempDir.$name."_alerts.dir/$name"."_alerts.zip"){
+             unzipCapFile($hash);
+ 			($aList, undef) = buildCAPList($hash);
+ 		} else {
+ 			Log3($name, 3, "GDS $name: no datafile (alerts) found"); 
+ 			$aList = "please_use_rereadcfg_first";
+ 		}
+ 
+ 		$fList = "please_use_rereadcfg_first";
+ 	} else {
+ 		$aList = "please_use_rereadcfg_first";
+ 		$sList = $aList;
+ 		$fList = $aList;
+ 	}
 	return;
 }
 
@@ -1512,14 +1349,17 @@ sub unzipCapFile($) {
 	my($hash) = @_;
 	my $name = $hash->{NAME};
 
-   my $zipname = $tempDir.$name."_alerts.zip";
+#   my $zipname = $tempDir.$name."_alerts.zip";
    my $destinationDirectory = $tempDir.$name."_alerts.dir";
-   
+#   my $zipname = $tempDir.$name."_alerts.zip";
+   my $zipname = "$destinationDirectory/$name"."_alerts.zip";
+  
    if (-d $destinationDirectory) {
 #     delete old files in directory
       my @remove = _readDir($destinationDirectory); 
       foreach my $f (@remove){
          next if -d $f;
+         next if $zipname =~ m/$f$/;
    	     Log3($name, 4, "GDS $name: deleting $destinationDirectory/$f"); 
          unlink("$destinationDirectory/$f"); 
       }
@@ -1538,8 +1378,48 @@ sub unzipCapFile($) {
    Log3($name, 4, "GDS $name: deleting $zipname"); 
 
 #  delete archive file
-   unlink $zipname;
+   unlink $zipname unless AttrVal($name,"gdsDebug",0);
    return;
+}
+
+sub mergeCapFile($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    
+    my $destinationDirectory = $tempDir.$name."_alerts.dir";
+    my @capFiles = _readDir($destinationDirectory);
+
+    my @alertsArray;
+    my $xmlHeader   = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>';
+    push (@alertsArray,$xmlHeader);
+    push (@alertsArray,"<alert>");
+    my $countInfo   = 0;
+	
+    foreach my $cF (@capFiles){
+       # merge all capFiles
+       $cF = $destinationDirectory."/".$cF;
+       next if -d $cF;
+       next unless $cF =~ m/\.xml$/; # read xml files only!
+       Log3($name, 4, "GDS $name: analyzing $cF"); 
+
+       my ($err,@a) = FileRead({FileName=>$cF,ForceType=>"file" });
+       foreach my $l (@a) {
+          next unless length($l);
+          next if($l =~ m/^\<\?xml version.*/);
+          next if($l =~ m/^\<alert.*/);
+          next if($l =~ m/^\<\/alert.*/);
+          next if($l =~ m/^\<sender\>.*/);
+          $countInfo++ if($l =~ m/^\<info\>/);
+          push (@alertsArray,$l);
+       }
+    }
+    push (@alertsArray,"</alert>");
+
+    # write the big XML file
+    my $cF = $destinationDirectory."/gds_alerts";
+    unlink $cF if -e $cF;
+    my $err = FileWrite({ FileName=>$cF,ForceType=>"file" },@alertsArray);
+    return ($err,$cF,$countInfo);
 }
 
 1;
@@ -1613,6 +1493,16 @@ sub unzipCapFile($) {
 #                       add    Archive::ZIP for alert files transfer and unzip
 #                              apt-get install libarchive-zip-perl
 #
+#   2015-10-07  changed remove LWP - we will only use ftp for transfers
+#                       added first solution for filemerge
+#                       added reliable counter for XML analyzes instead of while(1) loops 
+#                       added (implementation started) forecast retrieval by jensb
+#                       make text file retrieval more generic
+#               public  first publication in ./contrib/55_GDS.2015 for testing
+#
+#   2015-10-08  changed added mergeCapFile()
+#                       code cleanup in buildCAPList()
+#
 ####################################################################################################
 #
 # Further informations
@@ -1644,6 +1534,22 @@ sub unzipCapFile($) {
 # FF    : Windgeschwindigkeit letztes 10-Minutenmittel in km/h
 # FX    : höchste Windspitze im Bezugszeitraum in km/h
 # ---   : Wert nicht vorhanden
+#
+####################################################################################################
+#
+# sub
+# _calctz($@)
+# {
+  # my ($nt,@lt) = @_;
+
+  # my $off = $lt[2]*3600+$lt[1]*60+$lt[0];
+  # $off = 12*3600-$off;
+  # $nt += $off;  # This is noon, localtime
+
+  # my @gt = gmtime($nt);
+
+  # return (12-$gt[2]);
+# }
 #
 ####################################################################################################
 
