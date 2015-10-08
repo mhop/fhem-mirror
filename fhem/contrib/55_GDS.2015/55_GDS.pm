@@ -32,20 +32,15 @@ package main;
 use strict;
 use warnings;
 use feature qw/say switch/;
-use Time::HiRes qw(gettimeofday);
 use Text::CSV;
 use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
-use Archive::Extract;
-
 
 no if $] >= 5.017011, warnings => 'experimental';
 
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
-	$alertsXml, %capCityHash, %capCellHash, $sList, $aList, $fList, $fcmapList, @weekdays);
-
-my $tempDir = "/tmp/";
+	$alertsXml, %capCityHash, %capCellHash, $sList, $aList, $fList, $fcmapList, $tempDir, @weekdays);
 
 ####################################################################################################
 #
@@ -56,13 +51,16 @@ my $tempDir = "/tmp/";
 sub GDS_Initialize($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my $found;
+
+	return "This module must not be used on micro... platforms!" if($^O eq "MSWin32");
 
 	$hash->{DefFn}		=	"GDS_Define";
 	$hash->{UndefFn}	=	"GDS_Undef";
 	$hash->{GetFn}		=	"GDS_Get";
 	$hash->{SetFn}		=	"GDS_Set";
 	$hash->{ShutdownFn}	=	"GDS_Shutdown";
+	$hash->{NotifyFn}   =   "GDS_Notify";
+	$hash->{NOTIFYDEV}  =   "global";
 	$hash->{AttrFn}		=	"GDS_Attr";
 	$hash->{AttrList}	=	"disable:0,1 ".
 							"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 gdsAll:0,1 ".
@@ -70,26 +68,10 @@ sub GDS_Initialize($) {
 							"gdsSetCond gdsSetForecast gdsPassiveFtp:0,1 ".
 							$readingFnAttributes;
 
-	$tempDir = "c:\\temp\\" if($^O eq "MSWin32");
-
-	fillMappingTables($hash);
-	initDropdownLists($hash);
-
-# 	if($name){
-# 		(undef, $found) = retrieveFile($hash,"conditions");
-# 		if($found){
-# 			$sList = getListStationsDropdown($hash)
-# 		} else {
-# 			Log3($name, 2, "GDS $name: No datafile (conditions) found");
-# 		}
-# 
-# 		(undef, $found) = retrieveFile($hash,"alerts");
-# 		if($found){
-# 			($aList, undef) = buildCAPList($hash);
-# 		} else {
-# 			Log3($name, 2, "GDS $name: No datafile (alerts) found");
-# 		}
-# 	}
+    $tempDir  = "/tmp/";
+    $aList    = "please_use_rereadcfg_first";
+	$sList    = $aList;
+ 	$fList    = $aList;
 
 }
 
@@ -104,7 +86,7 @@ sub GDS_Define($$$) {
 	$hash->{helper}{USER}		= $a[2];
 	$hash->{helper}{PASS}		= $a[3];
 	$hash->{helper}{URL}		= "ftp-outgoing2.dwd.de";
-	$hash->{helper}{INTERVAL} = 1200;
+	$hash->{helper}{INTERVAL}   = 1200;
 
 	Log3($name, 4, "GDS $name: created");
 	Log3($name, 4, "GDS $name: tempDir=".$tempDir);
@@ -114,18 +96,6 @@ sub GDS_Define($$$) {
 	fillMappingTables($hash);
 	initDropdownLists($hash);
 
-	(undef, $found) = retrieveFile($hash,"conditions");
-	if($found){
-		$sList = getListStationsDropdown($hash)
-	} else {
-		Log3($name, 2, "GDS $name: No datafile (conditions) found");
-	}
-	retrieveFile($hash,"alerts");
-	if($found){
-		($aList, undef) = buildCAPList($hash);
-	} else {
-		Log3($name, 3, "GDS $name: No datafile (alerts) found");
-	}
 	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
 	readingsSingleUpdate($hash, 'state', 'active',1);
 
@@ -196,7 +166,8 @@ sub GDS_Set($@) {
 			}; 
 #			eval {
 #				$fList = getListForecastStationsDropdown($hash);
-#			}; 			break;
+#			};
+ 			break;
 			}
 
 		when("update"){
@@ -341,6 +312,10 @@ sub GDS_Get($@) {
 				retrieveFile($hash,"conditions");
 			}; 
 			initDropdownLists($hash);
+#			eval {
+#				$fList = getListForecastStationsDropdown($hash);
+#			};
+
 			break;
 			}
 
@@ -379,26 +354,21 @@ sub GDS_Get($@) {
 sub GDS_Attr(@){
 	my @a = @_;
 	my $hash = $defs{$a[1]};
-	my (undef, $name, $attrName, $attrValue) = @a;
+	my ($cmd, $name, $attrName, $attrValue) = @a;
+
 	given($attrName){
 		when("gdsDebug"){
-			CommandDeleteReading(undef, "$name _dF.*") if($attrValue != 1);
+			CommandDeleteReading(undef, "$name _dF.*") if($attrValue != 1 || $cmd eq 'delete');
 			break;
 			}
-		when("gdsSetCond"){
-			my $dummy = "gdsDummy_$name";
-			CommandDefine(undef, "$dummy at +00:00:30 set $name conditions $attrValue");
-			$defs{$dummy}{TEMPORARY} = 1;
-			$attr{$dummy}{room} = 'hidden';
-			break;
-			}
-		when("gdsSetForecast"){
-			my $dummy = "gdsDummy_$name";
-			CommandDefine(undef, "$dummy at +00:00:30 set $name forecasts $attrValue");
-			$defs{$dummy}{TEMPORARY} = 1;
-			$attr{$dummy}{room} = 'hidden';
-			break;
-			}
+ 		when("gdsSetCond"){
+            GDS_Set($hash,undef,'conditions',$attrValue) if($init_done && $cmd eq 'set');
+            break;
+            }
+ 		when("gdsSetForecast"){
+            GDS_Set($hash,undef,'forecasts',$attrValue) if($init_done && $cmd eq 'set');
+            break;
+ 			}
 		default {$attr{$name}{$attrName} = $attrValue;}
 	}
 	if(IsDisabled($name)) {
@@ -406,7 +376,26 @@ sub GDS_Attr(@){
 	} else {
 		readingsSingleUpdate($hash, 'state', 'active', 0);
 	}
-	return "";
+	return;
+}
+
+sub GDS_Notify ($$) {
+  my ($hash,$dev) = @_;
+  my $name = $hash->{NAME};
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED/, @{$dev->{CHANGED}}));
+
+  my $d;
+  
+  GDS_Get($hash,undef,'rereadcfg');
+
+  $d = AttrVal($name,'gdsSetCond',undef);
+  GDS_Set($hash,undef,'conditions',$d) if(defined($d));
+
+  $d = AttrVal($name,'gdsSetForecast',undef);
+#  GDS_Set($hash,undef,'forecasts',$d) if(defined($d);
+
+  return undef;
 }
 
 sub GDS_GetUpdate($) {
@@ -523,7 +512,6 @@ sub GDS_getURL {
 #
 ####################################################################################################
 
-
 sub getHelp(){
 	return	"Use one of the following commands:\n".
 			sepLine(35)."\n".
@@ -617,20 +605,20 @@ sub setHelp(){
 			"set <name> update\n";
 }
 
-sub buildCAPList(@){
+sub buildCAPList($){
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 
 	%capCityHash	= ();
 	%capCellHash	= ();
 	$alertsXml		= undef;
-	$aList			= undef;
+    $aList    = "please_use_rereadcfg_first";
 
 	my $xml			= new XML::Simple;
 	my $area		= 0;
 	my $record		= 0;
 	my $n			= 0;
-	my ($capCity, $capCell, $capEvent, $capEvt, $list, @a);
+	my ($capCity, $capCell, $capEvent, $capEvt, @a);
     my $destinationDirectory = $tempDir.$name."_alerts.dir";
     
     # make XML array and analyze data
@@ -670,10 +658,11 @@ sub buildCAPList(@){
     }
 
 	@a = sort(@a);
-	$list = join(",", @a);
-	$list =~ s/\s/_/g;
-	$list = "No_alerts_published!" if !$record;
-	return ($list, $record);
+    $aList = undef;
+	$aList = join(",", @a);
+	$aList =~ s/\s/_/g;
+	$aList = "No_alerts_published!" if !$record;
+    return;
 }
 
 sub decodeCAPData($$$){
@@ -1067,10 +1056,10 @@ sub getListStationsDropdown($){
 	splice(@a,-1);
 	@a = sort(@a);
 
-	$liste = join(",", @a);
-	$liste =~ s/\s+,/,/g; # replace multiple spaces followed by comma with comma
-	$liste =~ s/\s/_/g;   # replace spaces in stationName with underscore for list in frontende
-	return $liste;
+	$sList = join(",", @a);
+	$sList =~ s/\s+,/,/g; # replace multiple spaces followed by comma with comma
+	$sList =~ s/\s/_/g;   # replace spaces in stationName with underscore for list in frontende
+	return;
 }
 
 sub readItem {
@@ -1122,6 +1111,11 @@ sub createIndexFile($){
 }
 
 sub fillMappingTables($){
+
+    $tempDir  = "/tmp/";
+    $aList    = "please_use_rereadcfg_first";
+	$sList    = $aList;
+ 	$fList    = $aList;
 
 	$bulaList =	"Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
 				"Hamburg,Hessen,Mecklenburg-Vorpommern,Niedersachsen,".
@@ -1303,28 +1297,15 @@ sub initDropdownLists($){
 	my($hash) = @_;
 	my $name = $hash->{NAME};
 
- 	if ($name){
- 		if(-e $tempDir.$name."_conditions"){
- 			$sList = getListStationsDropdown($hash);
- 		} else {
- 			Log3($name, 3, "GDS $name: no datafile (conditions) found"); 
- 			$sList = "please_use_rereadcfg_first";
- 		}
- 
- 		if (-e $tempDir.$name."_alerts.dir/$name"."_alerts.zip"){
-             unzipCapFile($hash);
- 			($aList, undef) = buildCAPList($hash);
- 		} else {
- 			Log3($name, 3, "GDS $name: no datafile (alerts) found"); 
- 			$aList = "please_use_rereadcfg_first";
- 		}
- 
- 		$fList = "please_use_rereadcfg_first";
- 	} else {
- 		$aList = "please_use_rereadcfg_first";
- 		$sList = $aList;
- 		$fList = $aList;
+    # fill $aList
+    if (-e $tempDir.$name."_alerts.dir/$name"."_alerts.zip"){
+       unzipCapFile($hash);
+       buildCAPList($hash);
  	}
+
+    # fill $sList
+    getListStationsDropdown($hash) if(-e $tempDir.$name."_conditions");
+
 	return;
 }
 
@@ -1367,13 +1348,11 @@ sub unzipCapFile($) {
    }
 
    # unzip
-   my $zip = Archive::Extract->new( archive => $zipname );
-   my $ret = $zip->extract( to => $destinationDirectory);
-   Log3($name, 1, "GDS $name: error ".$zip->error()) unless $ret;
+   system("/usr/bin/unzip $zipname -d $destinationDirectory");
 
    # delete archive file
    unlink $zipname unless AttrVal($name,"gdsDebug",0);
-   return;
+   
 }
 
 sub mergeCapFile($) {
@@ -1496,8 +1475,10 @@ sub mergeCapFile($) {
 #
 #   2015-10-08  changed added mergeCapFile()
 #                       code cleanup in buildCAPList()
-#                       use Archive::Extract instead of Archive::Zip
-#                       (apt-get install libarchive-extract-perl)
+#                       use system call "unzip" instead of Archive::Zip
+#                       added NotifyFn for rereadcfg after INITIALIZED|REREADCFG
+#                       improved startup data retrieval
+#                       improved attribute handling
 #
 ####################################################################################################
 #
@@ -1561,7 +1542,7 @@ sub mergeCapFile($) {
 	
 		<br/>
 		Module uses following additional Perl modules:<br/><br/>
-		<code>Net::FTP, List::MoreUtils, XML::Simple, Text::CSV, Archive::Extract</code><br/><br/>
+		<code>Net::FTP, List::MoreUtils, XML::Simple, Text::CSV</code><br/><br/>
 		If not already installed in your environment, please install them using appropriate commands from your environment.
 
 	</ul>
