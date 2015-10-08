@@ -513,8 +513,12 @@ EnOcean_Define($$)
   $def = "00000000";
   if(@a > 2 && @a < 5) {
     if ($a[2] eq "getNextID") {
-      AssignIoPort($hash);
-      $defs{$name}{DEF} = $def;
+      AssignIoPort($hash) if (!exists $hash->{IODev});
+      if (exists $hash->{OLDDEF}) {
+        delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
+        #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
+      }
+      $hash->{DEF} = $def;
       $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
       $hash->{DEF} = $def;
       $modules{EnOcean}{defptr}{$def} = $hash;
@@ -522,10 +526,14 @@ EnOcean_Define($$)
       $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
       $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
     } elsif ($a[2] =~ m/^[A-Fa-f0-9]{8}$/i) {
+      AssignIoPort($hash) if (!exists $hash->{IODev});
+      if (exists $hash->{OLDDEF}) {
+        delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
+        #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
+      }
       $def = uc($a[2]);
       $hash->{DEF} = $def;
       $modules{EnOcean}{defptr}{$def} = $hash;
-      AssignIoPort($hash);
       $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
       $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
       $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
@@ -548,17 +556,26 @@ EnOcean_Define($$)
         }
       }
     } elsif ($a[2] =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
-      AssignIoPort($hash);
-      $defs{$name}{DEF} = $def;
-      $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
-      $hash->{DEF} = $def;
-      $modules{EnOcean}{defptr}{$def} = $hash;
       my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
+      AssignIoPort($hash) if (!exists $hash->{IODev});
+      if (exists $hash->{OLDDEF}) {
+        delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
+        #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
+      }
+      if (!exists $hash->{DEF} || $hash->{DEF} =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
+        $hash->{DEF} = $def;
+        $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
+        $hash->{DEF} = $def;
+      }
+      $modules{EnOcean}{defptr}{$def} = $hash;
       $rorg = "F6" if ($rorg eq "05");
       $rorg = "D5" if ($rorg eq "06");
       $rorg = "A5" if ($rorg eq "07");
       my $eep = "$rorg.$func.$type";
       if (exists $EnO_eepConfig{$eep}) {
+        if (exists $attr{$name}) {
+          delete $attr{$name};
+        }
         $attr{$name}{eep} = "$rorg-$func-$type";
         $attr{$name}{manufID} = "7FF";
         $attr{$name}{room} = "EnOcean";
@@ -658,7 +675,7 @@ sub EnOcean_Get($@)
   my $manufID = uc(AttrVal($name, "manufID", ""));
   my $model = AttrVal($name, "model", "");
   my $packetType = 1;
-  $packetType = 0x0A if (ReadingsVal($hash->{IODev}, "mode", "00") eq "01");
+  $packetType = 0x0A if (ReadingsVal($hash->{IODev}{NAME}, "mode", "00") eq "01");
   my $rorg;
   my $status = "00";
   my $st = AttrVal($name, "subType", "");
@@ -948,7 +965,7 @@ sub EnOcean_Set($@)
   my $manufID = uc(AttrVal($name, "manufID", ""));
   my $model = AttrVal($name, "model", "");
   my $packetType = 1;
-  $packetType = 0x0A if (ReadingsVal($hash->{IODev}, "mode", "00") eq "01");
+  $packetType = 0x0A if (ReadingsVal($hash->{IODev}{NAME}, "mode", "00") eq "01");
   my $rorg;
   my $sendCmd = 1;
   my $status = "00";
@@ -8668,15 +8685,7 @@ sub EnOcean_Notify(@)
       #Log3($name, 5, "EnOcean $name <notify> DELETEATTR $1");
 
     } elsif ($devName eq "global" && $s =~ m/^MODIFIED ([^ ]*)$/) {
-      # delete old DEF pointer in %modules
-      my ($key, $val);
-      my $modulesPointer = \%modules;
-      while (($key, $val) = each(%{$modulesPointer->{EnOcean}{defptr}})) {
-        if ($val == $hash && $key ne $hash->{DEF}) {
-          delete $modules{EnOcean}{defptr}{$key};
-          #Log3 $name, 2, "EnOcean $name <notify> MODIFIED $1: modules DEF $key deleted";
-        }
-      }
+      #Log3($name, 5, "EnOcean $name <notify> MODIFIED");
       
     } elsif ($devName eq "global" && $s =~ m/^SAVE$/) {
       #Log3($name, 5, "EnOcean $name <notify> SAVE");
