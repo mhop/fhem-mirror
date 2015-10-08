@@ -29,8 +29,9 @@ sub LaCrosse_Initialize($) {
                        ." filterThreshold"
                        ." resolution"
                        ." $readingFnAttributes";
-                       
-  ###$hash->{AutoCreate} = { "LaCrosse.*" => { autocreateThreshold => "2:120" } };                     
+
+  $hash->{AutoCreate} = { "LaCrosse.*" => { autocreateThreshold => "2:120", FILTER => "%NAME" }};
+
 }
 
 sub LaCrosse_Define($$) {
@@ -372,10 +373,10 @@ sub LaCrosse_Parse($$) {
     if($autoCreateState < 2 && $laCrosseInIgnoreTypes == 0) {
       $loglevel = 3;
     }
-    
+
     Log3 $name, $loglevel, "LaCrosse: Unknown device $rname, please define it";
     Log3 $name, $loglevel, "LaCrosse: check commandref on usage of LaCrossePairForSec" if( !$hash->{LaCrossePair} && !defined($modules{LaCrosse}{defptr}) );
-   
+
     return "" if( !$hash->{LaCrossePair} );
 
     return "UNDEFINED LaCrosse_$rname LaCrosse $raddr" if( $battery_new || $hash->{LaCrossePair} == 2 );
