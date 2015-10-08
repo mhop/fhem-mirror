@@ -37,7 +37,8 @@ use Text::CSV;
 use Net::FTP;
 use List::MoreUtils 'first_index'; 
 use XML::Simple;
-use Archive::Zip;
+use Archive::Extract;
+
 
 no if $] >= 5.017011, warnings => 'experimental';
 
@@ -970,7 +971,9 @@ sub retrieveFile($$;$$){
 		when("alerts"){
 			$dir = "gds/specials/alerts/cap/GER/status/";
 			$dwd = "Z_CAP*";
-			$targetFile = $tempDir.$name."_$request.dir/$name"."_$request.zip";
+            my $targetDir = $tempDir.$name."_alerts.dir";
+            mkdir $targetDir unless -d $targetDir;
+			$targetFile = "$targetDir/$name"."_alerts.zip";
 			break;
 			}
 
@@ -1349,13 +1352,11 @@ sub unzipCapFile($) {
 	my($hash) = @_;
 	my $name = $hash->{NAME};
 
-#   my $zipname = $tempDir.$name."_alerts.zip";
    my $destinationDirectory = $tempDir.$name."_alerts.dir";
-#   my $zipname = $tempDir.$name."_alerts.zip";
    my $zipname = "$destinationDirectory/$name"."_alerts.zip";
   
    if (-d $destinationDirectory) {
-#     delete old files in directory
+      # delete old files in directory
       my @remove = _readDir($destinationDirectory); 
       foreach my $f (@remove){
          next if -d $f;
@@ -1364,20 +1365,13 @@ sub unzipCapFile($) {
          unlink("$destinationDirectory/$f"); 
       }
    }
-   
-#  unzip files from archive
-   my $zip = Archive::Zip->new($zipname);
-   foreach my $member ($zip->members)
-   {
-      next if $member->isDirectory;
-      (my $extractName = $member->fileName) =~ s{.*/}{};
-	  Log3($name, 4, "GDS $name: extracting $destinationDirectory/$extractName"); 
-      $member->extractToFileNamed(
-      "$destinationDirectory/$extractName");
-   }
-   Log3($name, 4, "GDS $name: deleting $zipname"); 
 
-#  delete archive file
+   # unzip
+   my $zip = Archive::Extract->new( archive => $zipname );
+   my $ret = $zip->extract( to => $destinationDirectory);
+   Log3($name, 1, "GDS $name: error ".$zip->error()) unless $ret;
+
+   # delete archive file
    unlink $zipname unless AttrVal($name,"gdsDebug",0);
    return;
 }
@@ -1399,6 +1393,7 @@ sub mergeCapFile($) {
        # merge all capFiles
        $cF = $destinationDirectory."/".$cF;
        next if -d $cF;
+       next unless -s $cF;
        next unless $cF =~ m/\.xml$/; # read xml files only!
        Log3($name, 4, "GDS $name: analyzing $cF"); 
 
@@ -1423,7 +1418,6 @@ sub mergeCapFile($) {
 }
 
 1;
-
 
 ####################################################################################################
 #
@@ -1502,6 +1496,8 @@ sub mergeCapFile($) {
 #
 #   2015-10-08  changed added mergeCapFile()
 #                       code cleanup in buildCAPList()
+#                       use Archive::Extract instead of Archive::Zip
+#                       (apt-get install libarchive-extract-perl)
 #
 ####################################################################################################
 #
@@ -1565,8 +1561,7 @@ sub mergeCapFile($) {
 	
 		<br/>
 		Module uses following additional Perl modules:<br/><br/>
-		<code>Net::FTP, List::MoreUtils, XML::Simple, Text::CSV<br/>
-		Archive::Zip, LWP::Parallel::UserAgent</code><br/><br/>
+		<code>Net::FTP, List::MoreUtils, XML::Simple, Text::CSV, Archive::Extract</code><br/><br/>
 		If not already installed in your environment, please install them using appropriate commands from your environment.
 
 	</ul>
