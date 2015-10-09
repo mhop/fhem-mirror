@@ -136,7 +136,7 @@ autocreate_Notify($$)
 
       my $at = AttrVal($me, "autocreateThreshold", undef);
       LoadModule($type) if( !$at );
-      if($at) {
+      if( $at || $modules{$type}{AutoCreate} ) {
         my @at = split( '[, ]', $at?$at:"" );
 
         my $hash = $defs{$me};
@@ -182,30 +182,34 @@ autocreate_Notify($$)
         #if there is an entry for this type
         if( @v || $modules{$type}{AutoCreate} ) {
           my( undef, $min_count, $interval ) = split( ':', $v[0]?$v[0]:"" );
+          my $found;
           if( !@v ) {
             if( my $fp = $modules{$type}{AutoCreate} ) {
               foreach my $k (keys %{$fp}) {
                 next if($name !~ m/^$k$/ || !$fp->{$k}{autocreateThreshold});
                 ($min_count, $interval) =
                                     split(':', $fp->{$k}{autocreateThreshold});
+                $found = 1;
                 last;
               }
             }
           }
-          $min_count = 2 if( !$min_count );
-          $interval = 60 if( !$interval );
+          if( @v || $found ) {
+            $min_count = 2 if( !$min_count );
+            $interval = 60 if( !$interval );
 
-          #add this event
-          $hash->{received}{$type}{$arg}{$now} = 1;
+            #add this event
+            $hash->{received}{$type}{$arg}{$now} = 1;
 
-          my $count = keys %{$hash->{received}{$type}{$arg}};
-          Log3 $me, 4, "autocreate: received $count event(s) for ".
+            my $count = keys %{$hash->{received}{$type}{$arg}};
+            Log3 $me, 4, "autocreate: received $count event(s) for ".
                         "'$type $arg' during the last $interval seconds";
 
-          if( $count < $min_count ) {
-            Log3 $me, 4, "autocreate: ignoring event for ".
-                        "'$type $arg': at least $min_count needed";
-            next;
+            if( $count < $min_count ) {
+              Log3 $me, 4, "autocreate: ignoring event for ".
+                          "'$type $arg': at least $min_count needed";
+              next;
+            }
           }
 
           #forget entries for this type
