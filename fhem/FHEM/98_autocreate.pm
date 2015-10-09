@@ -121,7 +121,8 @@ autocreate_Notify($$)
     my $temporary;
 
     ################
-    if($s =~ m/^UNDEFINED -temporary/) { # Special for EnOcean. DO NOT use it elsewhere
+    # Special for EnOcean. DO NOT use it elsewhere
+    if($s =~ m/^UNDEFINED -temporary/) {
       $temporary = 1;
       $s =~ s/ -temporary//;
     }
@@ -135,7 +136,7 @@ autocreate_Notify($$)
 
       my $at = AttrVal($me, "autocreateThreshold", undef);
       LoadModule($type) if( !$at );
-      if( $at || $modules{$type}{AutoCreate} ) {
+      if($at) {
         my @at = split( '[, ]', $at?$at:"" );
 
         my $hash = $defs{$me};
@@ -227,6 +228,7 @@ autocreate_Notify($$)
           last;
         }
       }
+
       $hash = $defs{$name};
       $nrcreated++;
       my $room = replace_wildcards($hash, AttrVal($me, "device_room", "%TYPE"));
@@ -288,12 +290,18 @@ autocreate_Notify($$)
         Log3 $me, 2, "autocreate: define $cmd";
         $ret = CommandDefine(undef, $cmd);
         if($ret) {
-          Log3 $me, 1, "ERROR: $ret";
+          Log3 $me, 1, "ERROR: define $cmd: $ret";
           last;
         }
         $attr{$wlname}{room} = $room if($room);
         $attr{$wlname}{label} = '"' . $name .
                 ' Min $data{min1}, Max $data{max1}, Last $data{currval1}"';
+
+        $ret = CommandSet(undef, "$wlname copyGplotFile");
+        if($ret) {
+          Log3 $me, 1, "ERROR: set $wlname copyGplotFile: $ret";
+          last;
+        }
       }
     }
 

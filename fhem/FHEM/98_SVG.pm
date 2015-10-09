@@ -116,6 +116,7 @@ SVG_Set($@)
     if($cmd ne "copyGplotFile");
 
   my $srcName = "$FW_gplotdir/$hash->{GPLOTFILE}.gplot";
+  my ($og,$od) = ($hash->{GPLOTFILE}, $hash->{DEF});
   $hash->{GPLOTFILE} = $hash->{NAME};
   my $dstName = "$FW_gplotdir/$hash->{GPLOTFILE}.gplot";
   return "this is already a unique gplot file" if($srcName eq $dstName);
@@ -126,6 +127,12 @@ SVG_Set($@)
   my ($err,@rows) = FileRead($srcName);
   return $err if($err);
   $err = FileWrite($dstName, @rows);
+
+  if($err) {
+    $hash->{DEF} = $od; $hash->{GPLOTFILE} = $og;
+  } else {
+    addStructChange("modify", $me, "$me $hash->{DEF}")
+  }
   return $err;
 }
 
@@ -469,6 +476,21 @@ SVG_PEdit($$$$)
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
   $ret .= "Example lines for input:<br>$example</td></tr>";
 
+  my %gpf;
+  map { 
+    $gpf{$defs{$_}{GPLOTFILE}}{$_} = 1 if($defs{$_}{TYPE} eq "SVG");
+  } sort keys %defs;
+
+  if(int(keys %{$gpf{$defs{$d}{GPLOTFILE}}}) > 1) {
+    $ret .= "<tr class='".(($r++&1)?"odd":"even")."'><td colspan='3'>".
+      "<b>Note:</b>".
+      "The .gplot file ($defs{$d}{GPLOTFILE}) is used by multiple SVG ".
+      "devices (".join(",", sort keys %{$gpf{$defs{$d}{GPLOTFILE}}})."), ".
+      "writing probably will corrupt the other SVGs. ".
+      "Remedy: execute set $d copyGplotFile".
+    "</td></tr>";
+  }
+
   $ret .= "<tr class=\"".(($r++&1)?"odd":"even")."\"><td colspan=\"3\">";
   $ret .= FW_submit("submit", "Write .gplot file")."&nbsp;".
           FW_submit("showFileLogData", "Show preprocessed input").
@@ -609,13 +631,6 @@ SVG_WriteGplot($)
     $maxLines = $1 if($1 > $maxLines);
   }
 
-  my $wlName = $FW_webArgs{detail};
-  my $hash = $defs{$wlName};
-  if($hash->{GPLOTFILE} ne $wlName) {
-    Log 1, "WriteGplot: calling set $wlName copyGplotFile";
-    SVG_Set($hash, $wlName, "copyGplotFile");
-  }
-
   my @rows;
   push @rows, "# Created by FHEM/98_SVG.pm, ".TimeNow();
   push @rows, "set terminal png transparent size <SIZE> crop";
@@ -665,6 +680,7 @@ SVG_WriteGplot($)
     push @rows, $r;
   }
 
+  my $hash = $defs{$FW_webArgs{detail}};
   my $err = FileWrite("$FW_gplotdir/$hash->{GPLOTFILE}.gplot", @rows);
   $FW_RET .= "<div id='errmsg'>SVG_WriteGplot: $err</div>" if($err);
 
