@@ -1202,9 +1202,24 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         definiert, um es um &lt;timedet&gt; (Format: HH:MM[:SS]) per off
         auszuschalten.  Diese at Instanz ist sichtbar unter dem Namen
         ger&auml;teName+"_till".  Um das Ausschalten zu deaktivieren
-        l&ouml;scht man diese at Definition.  </li>
+        l&ouml;scht man diese at Definition. Achtung: das Ein/Ausschalten wird
+        nicht durchgef&uuml;hrt, falls die aktuelle Uhrzeit nach der
+        spezifizierten Zeit ist, um folgende Szenarien zu vereinfachen:
+        <ul><code>
+          define morningLight at *06:00 set Lamp on-till {sunrise()}
+        </code></ul>
+        </li>
+    <li>on-till-overnight &lt;timedet&gt<br>
+        Wie on-till, aber die aktuelle Uhrzeit wird nicht mit der
+        Spezifizierten verglichen, damit folgendes funktioniert:
+        <ul><code>
+          define nightLight at *{sunset()} set Lamp on-till-overnight 01:00
+        </code></ul>
+        </li>
     <li>off-till &lt;timedet&gt<br>
         siehe on-till.</li>
+    <li>off-till-overnight &lt;timedet&gt<br>
+        siehe on-till-overnight.</li>
     <li>blink &lt;anzahl&gt; &lt;blink-periode&gt;<br>
         Das Ger&auml;t wird mit "on" f&uuml;r die &lt;blink-periode&gt;
         eingeschaltet, und das wird nach &lt;blink-periode&gt; wiederholt. Um

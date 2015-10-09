@@ -1139,9 +1139,23 @@ The following local attributes are used by a wider range of devices:
         Issue the on command for the device, and create an at definition with
         &lt;timedet&gt; (in the form HH:MM[:SS]) to set it off. This definition
         is visible, and its name is deviceName+"_till". To cancel the scheduled
-        off, delete the at definition.</li>
+        off, delete the at definition. Note: on-till is not active, if the
+        specified time is after the current time, in order to make things like
+        <ul><code>
+          define morningLight at *06:00 set Lamp on-till {sunrise()}
+        </code></ul>
+        easy.</li>
+    <li>on-till-overnight &lt;timedet&gt<br>
+        Like on-till, but wont compare the current time with the timespec, so
+        following will work:
+        <ul><code>
+          define nightLight at *{sunset()} set Lamp on-till-overnight 01:00
+        </code></ul>
+        </li>
     <li>off-till &lt;timedet&gt<br>
         see on-till above.</li>
+    <li>off-till-overnight &lt;timedet&gt<br>
+        see on-till-overnight above.</li>
     <li>blink &lt;number&gt; &lt;blink-period&gt;<br>
         set the device on for &lt;blink-period&gt; then off for
         &lt;blink-period&gt; and repeat this &lt;number&gt; times.
