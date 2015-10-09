@@ -6,9 +6,10 @@
 #	An FHEM Perl module to retrieve data from "Deutscher Wetterdienst"
 #
 #	Copyright: betateilchen ®
-#              some patches provided by jensb@FHEM_Forum 
-#                           - forecasts as readings or text
-#                           - weather weblinks
+#
+#              some patches provided by jensb
+#              forecasts    provided by jensb
+#              weblinks     provided by jensb
 #
 #	This file is part of fhem.
 #
@@ -44,7 +45,7 @@ my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd,
 
 ####################################################################################################
 #
-# Main routines
+#  Main routines
 #
 ####################################################################################################
 
@@ -145,9 +146,9 @@ sub GDS_Set($@) {
 	given($command) {
 		when("clear"){
 			CommandDeleteReading(undef, "$name a_.*");
-			CommandDeleteReading(undef, "$name c_.*") if(defined($parameter) && $parameter eq "all");
-			CommandDeleteReading(undef, "$name f_.*") if(defined($parameter) && $parameter eq "all");
-			CommandDeleteReading(undef, "$name g_.*") if(defined($parameter) && $parameter eq "all");
+			CommandDeleteReading(undef, "$name c_.*")    if(defined($parameter) && $parameter eq "all");
+			CommandDeleteReading(undef, "$name fc.?_.*") if(defined($parameter) && $parameter eq "all");
+			CommandDeleteReading(undef, "$name g_.*")    if(defined($parameter) && $parameter eq "all");
 			}
 
 		when("help"){
@@ -164,9 +165,9 @@ sub GDS_Set($@) {
 				retrieveFile($hash,"alerts");
 				($aList, undef) = buildCAPList($hash);
 			}; 
-#			eval {
-#				$fList = getListForecastStationsDropdown($hash);
-#			};
+			eval {
+				$fList = getListForecastStationsDropdown($hash);
+			};
  			break;
 			}
 
@@ -187,11 +188,14 @@ sub GDS_Set($@) {
 			break;
 			}
 
-#		when("forecasts"){
-#			retrieveForecasts($hash, "f", @a);
-#			$attr{$name}{gdsSetForecast} = ReadingsVal($name,'f_stationName',undef);
-#			break;
-#			}
+		when("forecasts"){
+			retrieveForecasts($hash, "fc", @a);
+			my $station = ReadingsVal($name, 'fc_stationName', undef);
+			if (defined($station)) {
+				$attr{$name}{gdsSetForecast} = $station;
+			}
+			break;
+			}
 
 		default { return $usage; };
 	}
@@ -291,6 +295,9 @@ sub GDS_Get($@) {
 			} else {
 				$result = "Keine Warnmeldung für die gesuchte Region vorhanden.";
 			}
+            my $_gdsAll		= AttrVal($name,"gdsAll", 0);
+            my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
+			readingsSingleUpdate($hash,'_lastAlertCheck','see timestamp ->',1) if($_gdsAll || $_gdsDebug);
 			break;
 			}
 
@@ -312,9 +319,9 @@ sub GDS_Get($@) {
 				retrieveFile($hash,"conditions");
 			}; 
 			initDropdownLists($hash);
-#			eval {
-#				$fList = getListForecastStationsDropdown($hash);
-#			};
+			eval {
+				$fList = getListForecastStationsDropdown($hash);
+			};
 
 			break;
 			}
@@ -402,21 +409,53 @@ sub GDS_GetUpdate($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my (@a, $next);
+  
+  my $interval = $hash->{helper}{INTERVAL};
+  my $forcastsStationName = ReadingsVal($name, "fc_stationName", undef);
 
-	if(IsDisabled($name)) {
-		readingsSingleUpdate($hash, 'state', 'disabled', 0);
-		Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
-	} else {
-		readingsSingleUpdate($hash, 'state', 'active', 0);
-		push @a, undef;
-		push @a, undef;
-		push @a, ReadingsVal($name, "c_stationName", "");
-		retrieveConditions($hash, "c", @a);
-	}
+  if(IsDisabled($name)) {
+    readingsSingleUpdate($hash, 'state', 'disabled', 0);
+    Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
+  } else {
+    readingsSingleUpdate($hash, 'state', 'active', 0);
 
-	$next = gettimeofday()+$hash->{helper}{INTERVAL};
-	readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
-	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
+    # schedule only one ftp fetch per update call to avoid blocking FHEM for extended periods
+    if (!defined($hash->{helper}{UPDATE_CYCLE}) || !defined($forcastsStationName)) {
+      $hash->{helper}{UPDATE_CYCLE} = 0;
+    } else {
+      $hash->{helper}{UPDATE_CYCLE} = ++$hash->{helper}{UPDATE_CYCLE}%11;
+    }
+    
+    # perform one ftp fetch
+    if ($hash->{helper}{UPDATE_CYCLE} == 0) {    
+      push @a, undef;
+      push @a, undef;
+      push @a, ReadingsVal($name, "c_stationName", "");
+      retrieveConditions($hash, "c", @a);
+    } else {
+      push @a, undef;
+      push @a, undef;
+      push @a, $forcastsStationName;
+      push @a, $hash->{helper}{UPDATE_CYCLE};
+      retrieveForecasts($hash, "fc", @a);    
+    }
+
+    # vary interval for staggered fetching and waiting
+    if (defined($forcastsStationName)) {    
+      if ($hash->{helper}{UPDATE_CYCLE} < 10) {
+        $interval = 1; # use short interval to get next forecast
+      } else {
+        $interval -= 16; # cut back approximate staggered retrieval time from interval
+      }
+    }
+  }
+
+  # schedule next update
+  $next = gettimeofday() + $interval;
+  if ($interval > 1) {    
+    readingsSingleUpdate($hash, "c_nextUpdate", localtime($next), 1);
+  }
+  InternalTimer($next, "GDS_GetUpdate", $hash, 1);
 
 	return 1;
 }
@@ -561,7 +600,7 @@ sub getListStationsText($){
 sub getListCapStations($$){
 	my ($hash, $command) = @_;
 	my $name = $hash->{NAME};
-	my (%capHash, $file, $csv, @columns, $err, $key, $cList);
+	my (%capHash, $file, $csv, @columns, $err, $key, $cList, $found);
 
 	$file = $tempDir.'capstations.csv';
 	$csv = Text::CSV->new( { binary => 1 } );
@@ -570,27 +609,37 @@ sub getListCapStations($$){
 	# prüfen, ob CSV schon vorhanden,
 	# falls nicht: vom Server holen
 	if (!-e $tempDir."caplist.csv"){
-		retrieveFile($hash, $command);
-	}
-
-	# CSV öffnen und parsen
-	open (CSV, "<", $file) or die $!;
-	while (<CSV>) {
-		next if ($. == 1);
-		if ($csv->parse($_)) {
-			@columns = $csv->fields();
-			$capHash{latin1ToUtf8($columns[4])} = $columns[0];
-		} else {
-			$err = $csv->error_input;
-			print "Failed to parse line: $err";
+		(undef, $found) = retrieveFile($hash, $command);
+		if(!$found){
+			$cList = "Error: Unable to retrieve capstation list!";
+			Log3($name, 2, "GDS $name: $cList");
 		}
 	}
-	close CSV;
 
-	# Ausgabe sortieren und zusammenstellen
-	foreach $key (sort keys %capHash) {
-		$cList .= $capHash{$key}."\t".$key."\n";
+	if (!defined($cList)) {
+		# CSV öffnen und parsen
+		if (open (CSV, "<", $file)) {
+			while (<CSV>) {
+				next if ($. == 1);
+				if ($csv->parse($_)) {
+					@columns = $csv->fields();
+					$capHash{latin1ToUtf8($columns[4])} = $columns[0];
+				} else {
+					$err = $csv->error_input;
+					print "Failed to parse line: $err";
+				}
+			}
+			close CSV;
+		} else {
+			Log3($name, 4, "GDS $name: Error: unable to open capstations file: $!!");
+		}
+    
+		# Ausgabe sortieren und zusammenstellen
+		foreach $key (sort keys %capHash) {
+			$cList .= $capHash{$key}."\t".$key."\n";
+		}
 	}
+
 	return $cList;
 }
 
@@ -612,7 +661,7 @@ sub buildCAPList($){
 	%capCityHash	= ();
 	%capCellHash	= ();
 	$alertsXml		= undef;
-    $aList    = "please_use_rereadcfg_first";
+    $aList          = "please_use_rereadcfg_first";
 
 	my $xml			= new XML::Simple;
 	my $area		= 0;
@@ -622,11 +671,7 @@ sub buildCAPList($){
     my $destinationDirectory = $tempDir.$name."_alerts.dir";
     
     # make XML array and analyze data
-    my ($err,$cF,$countInfo) = mergeCapFile($hash);
-    if (defined($err) && $err) {
-       Log3($name,1,"GDS: merge error: $err - aborting...");
-       return(undef,undef);
-    }
+    my ($countInfo,$cF) = mergeCapFile($hash);
     eval	{	
 	  $alertsXml = $xml->XMLin($cF, KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
     };
@@ -1092,24 +1137,6 @@ sub _rgbd2h($) {
 	return $output;
 }
 
-sub createIndexFile($){
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-
-	if($name){
-		my $text =	"<html><head></head><body>".
-					"<a href=\"./".$name."/".$name."_conditionsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>".
-					"<a href=\"./".$name."/".$name."_forecastsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>".
-					"<a href=\"./".$name."/".$name."_warningsmap.jpg\" target=\"blank\">Aktuelle Wetterkarte: Warnungen</a><br/>".
-					"<a href=\"./".$name."/".$name."_radarmap.jpg\" target=\"blank\">Aktuelle Radarkarte</a><br/>".
-					"</body></html>";
-		open	(DATEI, ">".$tempDir.$name.".html") or die $!;
-		print	 DATEI $text;
-		close	(DATEI);
-	}
-	return;
-}
-
 sub fillMappingTables($){
 
     $tempDir  = "/tmp/";
@@ -1389,18 +1416,582 @@ sub mergeCapFile($) {
     }
     push (@alertsArray,"</alert>");
 
-    # write the big XML file
-    my $cF = $destinationDirectory."/gds_alerts";
-    unlink $cF if -e $cF;
-    my $err = FileWrite({ FileName=>$cF,ForceType=>"file" },@alertsArray);
-    return ($err,$cF,$countInfo);
+    # write the big XML file if needed
+    if(AttrVal($name,"gdsDebug", 0)) {
+       my $cF = $destinationDirectory."/gds_alerts";
+       unlink $cF if -e $cF;
+       FileWrite({ FileName=>$cF,ForceType=>"file" },@alertsArray);
+    }
+
+    my $xmlContent = join('',@alertsArray);
+    return ($countInfo,$xmlContent);
+}
+
+####################################################################################################
+#
+#  forecast retrieval 
+#  provided by jensb
+#
+####################################################################################################
+
+sub retrieveForecasts($$@){
+#
+# parameter: hash, prefix, region/station, forecast index (0 .. 10)
+#
+	my ($hash, $prefix, @a) = @_;
+	my $name		= $hash->{NAME};
+	my $user		= $hash->{helper}{USER};
+	my $pass		= $hash->{helper}{PASS};
+  
+  # extract region and station name
+  if (!defined($a[2])) {
+    return;
+  }
+  my $i = index($a[2], '/');
+  if ($i <= 0 ) {
+    return;
+  }
+  my $area = utf8ToLatin1(substr($a[2], 0, $i));
+  my $station = utf8ToLatin1(substr($a[2], $i+1));
+  $station =~ s/_/ /g; # replace underscore in station name by space
+  my $searchLen = length($station);  
+
+	my ($dataFile, $found, $line, %fread, $k, $v); 
+
+  # define fetch scope (all forecasts or single forecast)
+  my $fc = 0;
+  my $fcStep = 1;
+  if (defined($a[3]) && $a[3] > 0) {
+    # single forecast
+    $fc = $a[3] - 1;
+    $fcStep = 10;
+  }
+  
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();  
+  
+  %fread = ();
+  
+  # fetch up to 10 forecasts for today and the next 3 days
+  do {
+    my $day;
+    my $early;
+    if ($fc < 4) {
+      $day = 0;
+      $early = 0;
+    } else {
+      $day = int(($fc - 2)/2);
+      $early = $fc%2 == 0;
+    } 
+    my $areaAndTime = $area;
+    if ($day == 1) {
+      $areaAndTime .= "_morgen";
+    } elsif ($day == 2) {
+      $areaAndTime .= "_uebermorgen";
+    } elsif ($day == 3) {
+      $areaAndTime .= "_Tag4";
+    }
+    my $timeLabel = undef;
+    my $tempLabel = '_tAvgAir';
+    my $copyDay = undef;
+    my $copyTimeLabel = undef;
+    if ($day == 0) {
+      if ($fc == 0) {
+        $areaAndTime .= "_frueh";  # .. 6 h
+        $timeLabel = '06';
+        $tempLabel ='_tMinAir';
+        $copyDay = 1;
+        $copyTimeLabel = '12';
+      } elsif ($fc == 1) {
+        $areaAndTime .= "_mittag"; # .. 12 h
+        $timeLabel = '12';
+        $tempLabel .= $timeLabel;
+      } elsif ($fc == 2) {
+        $areaAndTime .= "_spaet";  # .. 18 h
+        $timeLabel = '18';
+        $tempLabel ='_tMaxAir';
+        $copyDay = 1;
+        $copyTimeLabel = '24';
+      } elsif ($fc == 3) {
+        $areaAndTime .= "_nacht";  # .. 24 h
+        $timeLabel = '24';
+        $tempLabel .= $timeLabel;
+      }
+    } else {
+      if ($early) {    
+        $areaAndTime .= "_frueh";  # .. 12 h
+        $timeLabel = '12';
+        $tempLabel ='_tMinAir';
+        if ($day < 3) {
+          $copyDay = $day + 1;
+          $copyTimeLabel = '12';
+        }
+      } else {
+        $areaAndTime .= "_spaet";  # .. 24 h
+        $timeLabel .= '24';
+        $tempLabel ='_tMaxAir';
+        if ($day < 3) {
+          $copyDay = $day + 1;
+          $copyTimeLabel = '24';
+        }
+      }
+    }
+
+    # define forecast date (based on "now" + day)   
+    my $fcEpoch = time() + $day*24*60*60;
+    if ($fc == 3) {
+      # night continues at next day
+      $fcEpoch += 24*60*60;
+    }
+    my ($fcSec,$fcMin,$fcHour,$fcMday,$fcMon,$fcYear,$fcWday,$fcYday,$fcIsdst) = localtime($fcEpoch);
+    my $fcWeekday = $weekdays[$fcWday];
+    my $fcDate = sprintf("%02d.%02d.%04d", $fcMday, 1+$fcMon, 1900+$fcYear);
+    my $fcDateFound = 0;
+    
+    # FTP retrieve
+    my $noDataFound = 1;
+    Log3($name, 4, "GDS $name: Retrieving forecasts data for day $day: $areaAndTime");
+    ($dataFile, $found) = retrieveFile($hash, "forecasts", $areaAndTime, undef);
+    if (open WXDATA, $tempDir.$name."_forecasts") {
+      while (!eof(WXDATA) && chomp($line = <WXDATA>)) {
+        if (index($line, $fcDate) > 0) { 
+          # forecast date found
+          $fcDateFound = 1; 
+        }
+        if (index(substr(lc($line),0,$searchLen), substr(lc($station),0,$searchLen)) != -1) { 
+          # station found
+          last; 
+        }
+      }
+      close WXDATA;
+
+      # parse file
+      if ($fcDateFound && length($line) > 0) {
+        if (index(substr(lc($line),0,$searchLen), substr(lc($station),0,$searchLen)) != -1) {
+          # station found but there is no header line and column width varies:
+          $line =~ s/---/   ---/g; # column distance may drop to zero between station name and invalid temp "---" -> prepend 3 spaces
+          $line =~ s/   /;/g;      # now min. column distance is 3 spaces -> convert to semicolon 
+          $line =~ s/;+/;/g;       # replace multiple consecutive semicolons by one semicolon
+          my @b = split(';', $line); # split columns by semicolon
+          $b[0] =~ s/^\s+|\s+$//g; # trim station name
+          $b[1] =~ s/^\s+|\s+$//g; # trim temperature
+          $b[2] =~ s/^\s+|\s+$//g; # trim weather   
+          if (scalar(@b) > 3) {
+            $b[3] =~ s/^\s+|\s+$//g; # trim wind gust
+          } else {
+            $b[3] = ' ';
+          }
+          $fread{$prefix."_stationName"} = $area.'/'.$b[0];
+          $fread{$prefix.$day.$tempLabel}  = $b[1];
+          $fread{$prefix.$day."_weather".$timeLabel} = $b[2];
+          $fread{$prefix.$day."_windGust".$timeLabel} = $b[3];
+          if ($fc != 3) {
+            $fread{$prefix.$day."_weekday"} = $fcWeekday;
+          }
+          $noDataFound = 0;
+        } else {
+          # station not found, abort
+          $fread{$prefix."_stationName"} = "unknown: $station in $area";
+          last;
+        }
+      }
+    }
+    
+    if ($noDataFound) {
+      # forecast period already passed or no data available 
+      $fread{$prefix.$day.$tempLabel} = "---";
+      $fread{$prefix.$day."_weather".$timeLabel} = "---";      
+      $fread{$prefix.$day."_windGust".$timeLabel} = "---";      
+      if ($fc != 3) {
+        $fread{$prefix.$day."_weekday"} = $fcWeekday;
+      }
+    }
+      
+    # day change preset by rotation
+    my $ltime = ReadingsTimestamp($name, $prefix.$day."_weather".$timeLabel, undef);
+    my ($lsec,$lmin,$lhour,$lmday,$lmon,$lyear,$lwday,$lyday,$lisdst);
+    if (defined($ltime)) {
+      ($lsec,$lmin,$lhour,$lmday,$lmon,$lyear,$lwday,$lyday,$lisdst) = localtime(time_str2num($ltime));
+    }
+    if (!defined($ltime) || $mday != $lmday) {
+      # day has changed, rotate old forecast forward by one day because new forecast is not immediately available
+      my $temp = $fread{$prefix.$day.$tempLabel};
+      if (defined($temp) && substr($temp, 0, 1) eq '-') {
+        if (defined($copyTimeLabel)) {
+          $fread{$prefix.$day.$tempLabel} = utf8ToLatin1(ReadingsVal($name, $prefix.$copyDay.$tempLabel, '---'));
+        } else {
+          # today noon/night and 3rd day is undefined
+          $fread{$prefix.$day.$tempLabel} = ' ';
+        }
+      }
+      my $weather = $fread{$prefix.$day."_weather".$timeLabel};
+      if (defined($weather) && substr($weather, 0, 1) eq '-') {
+        if (defined($copyTimeLabel)) {
+          $fread{$prefix.$day."_weather".$timeLabel} = utf8ToLatin1(ReadingsVal($name, $prefix.$copyDay."_weather".$copyTimeLabel, '---'));
+        } else {
+          # today noon/night and 3rd day is undefined
+          $fread{$prefix.$day."_weather".$timeLabel} = ' ';
+        }
+      }
+      my $windGust = $fread{$prefix.$day."_windGust".$timeLabel};
+      if (defined($windGust) && substr($windGust, 0, 1) eq '-') {
+        if (defined($copyTimeLabel)) {
+          $fread{$prefix.$day."_windGust".$timeLabel} = utf8ToLatin1(ReadingsVal($name, $prefix.$copyDay."_windGust".$copyTimeLabel, '---'));
+        } else {
+          # today noon/night and 3rd day is undefined
+          $fread{$prefix.$day."_windGust".$timeLabel} = ' ';
+        }
+      }
+    }
+      
+    $fc += $fcStep;
+  } while ($fc < 10);
+    
+  readingsBeginUpdate($hash);
+  while (($k, $v) = each %fread) { 
+    # skip update if no valid data is available
+    if (defined($v) && substr($v, 0, 1) ne '-') {
+      readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
+    }
+  }
+  readingsEndUpdate($hash, 1);
+}
+
+sub getListForecastStationsDropdown($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+  my @a;
+  my @regions = keys(%rmapList);
+  foreach (@regions) {
+    my $areaAndTime = $_.'_morgen_spaet';
+    my ($dataFile, $found) = retrieveFile($hash, "forecasts", $areaAndTime, undef);
+    if (open WXDATA, $tempDir.$name."_forecasts") {
+      my $lineCount = 0;
+      while (chomp(my $line = <WXDATA>)) {
+        # skip header lines
+        $lineCount++;
+        if ($lineCount > 2) {
+          if (length($line) == 0 || substr($line, 0, 3) eq '   ') {
+            # empty line, done
+            last;
+          } else {
+            # line with station name found
+            $line = latin1ToUtf8($line);
+            $line =~ s/---/   ---/g;   # column distance may drop to zero between station name and invalid temp "---" -> prepend 3 spaces
+            $line =~ s/   /;/g;        # now min. column distance is 3 spaces -> convert to semicolon 
+            $line =~ s/;+/;/g;         # replace multiple consecutive semicolons by one semicolon
+            my @b = split(';', $line); # split columns by semicolon
+            push @a, $_.'/'.$b[0];     # concat region name and station name (1st column)
+          }
+        }
+      }
+      close WXDATA;
+    }
+  }
+   
+  if (!@a) {
+    Log3($name, 4, "GDS $name: Error: unable to open forecast file!");
+  }
+  
+  @a = sort(@a);
+  my $liste = join(",", @a);
+  $liste =~ s/\s+,/,/g; # replace multiple spaces followed by comma with comma
+  $liste =~ s/\s/_/g;   # replace spaces in stationName with underscore for list in frontend
+  
+  return $liste;
+}
+
+####################################################################################################
+#
+#  create weblinks 
+#  provided by jensb
+#
+####################################################################################################
+
+# weather description to icon name mapping
+my %GDSDayWeatherIconMap = (
+  'bedeckt' => 'overcast',
+  'bewölkt' => 'mostlycloudy',
+  'Dunst oder flacher Nebel' => 'haze',
+  'gefrierender Nebel' => 'icy',
+  'gering bewölkt' => 'partlycloudy',
+  'Gewitter' => 'thunderstorm',
+  'Glatteisbildung' => 'icy',
+  'Graupelschauer' => 'snow',
+  'Hagelschauer' => 'snow',
+  'heiter' => 'partlycloudy',
+  'in Wolken' => 'mostlycloudy',
+  'kein signifikantes Wetter' => 'na',
+  'kräftiger Graupelschauer' => 'heavysnow',
+  'kräftiger Hagelschauer' => 'heavysnow',
+  'kräftiger Regen' => 'heavyrain',
+  'kräftiger Regenschauer' => 'scatteredshowers',
+  'kräftiger Schneefall' => 'heavysnow',
+  'kräftiger Schneeregen' => 'rainsnow',
+  'kräftiger Schneeregenschauer' => 'rainsnow',
+  'kräftiger Schneeschauer' => 'heavysnow',
+  'leicht bewölkt' => 'partlycloudy',
+  'leichter Regen' => 'mist',
+  'leichter Schneefall' => 'snow',
+  'leichter Schneeregen' => 'rainsnow',
+  'Nebel' => 'fog',
+  'Regen' => 'rain',
+  'Regenschauer' => 'scatteredshowers',
+  'Sandsturm' => 'dust',
+  'Schneefall' => 'snow',
+  'Schneefegen' => 'snow',
+  'Schneeregen' => 'rainsnow',
+  'Schneeregenschauer' => 'rainsnow',
+  'Schneeschauer' => 'snow',
+  'schweres Gewitter' => 'thunderstorm',
+  'stark bewölkt' => 'mostlycloudy',
+  'starkes Gewitter' => 'thunderstorm',
+  'wolkenlos' => 'sunny',
+  '---' => 'mostlycloudy',
+  );
+  
+my %GDSNightWeatherIconMap = (
+  'bedeckt' => 'overcast',
+  'bewölkt' => 'mostlycloudy_night',
+  'Dunst oder flacher Nebel' => 'haze_night',
+  'gefrierender Nebel' => 'icy',
+  'gering bewölkt' => 'partlycloudy_night',
+  'Gewitter' => 'thunderstorm',
+  'Glatteisbildung' => 'icy',
+  'Graupelschauer' => 'snow',
+  'Hagelschauer' => 'snow',
+  'heiter' => 'partlycloudy_night',
+  'in Wolken' => 'mostlycloudy_night',
+  'kein signifikantes Wetter' => 'na',
+  'kräftiger Graupelschauer' => 'heavysnow',
+  'kräftiger Hagelschauer' => 'heavysnow',
+  'kräftiger Regen' => 'heavyrain',
+  'kräftiger Regenschauer' => 'scatteredshowers_night',
+  'kräftiger Schneefall' => 'heavysnow',
+  'kräftiger Schneeregen' => 'rainsnow',
+  'kräftiger Schneeregenschauer' => 'rainsnow',
+  'kräftiger Schneeschauer' => 'heavysnow',
+  'leicht bewölkt' => 'partlycloudy_night',
+  'leichter Regen' => 'mist',
+  'leichter Schneefall' => 'snow',
+  'leichter Schneeregen' => 'rainsnow',
+  'Nebel' => 'fog',
+  'Regen' => 'rain',
+  'Regenschauer' => 'scatteredshowers_night',
+  'Sandsturm' => 'dust',
+  'Schneefall' => 'snow',
+  'Schneefegen' => 'snow',
+  'Schneeregen' => 'rainsnow',
+  'Schneeregenschauer' => 'rainsnow',
+  'Schneeschauer' => 'snow',
+  'schweres Gewitter' => 'thunderstorm',
+  'stark bewölkt' => 'mostlycloudy_night',
+  'starkes Gewitter' => 'thunderstorm',
+  'wolkenlos' => 'sunny_night',
+  '---' => 'mostlycloudy_night',
+  );
+  
+# icon parameters
+use constant ICONHIGHT => 120;
+use constant ICONWIDTH => 175;
+use constant ICONSCALE => 0.5;
+
+sub GDSIsDay($$) {
+# check if it is day at given time
+#
+# @param: time
+# @param: altitude, see documentation of module SUNRISE_EL
+  my ($time, $altitude) = @_;
+
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($time);
+  my $t = ($hour*60 + $min) + $sec;
+  
+  my (undef, $srHour, $srMin, $srSec, undef) = GetTimeSpec(sunrise_abs_dat($time, $altitude));
+  my $sunrise = ($srHour*60 + $srMin) + $srSec;
+
+  my (undef, $ssHour, $ssMin, $ssSec, undef) = GetTimeSpec(sunset_abs_dat($time, $altitude));
+  my $sunset = ($ssHour*60 + $ssMin) + $ssSec;
+  
+  return $t >= $sunrise && $t <= $sunset;
+}
+
+sub GDSIconIMGTag($;$) {
+# get FHEM weather icon
+#
+# @param: weather description
+# @param: time of weather description or 1 for night, optional, defaults to daytime icons
+  my $width = int(ICONSCALE*ICONWIDTH);
+  my ($weather, $time) = @_;
+  my $icon;
+  if (!defined($time) || (defined($time) && $time > 1 && GDSIsDay($time, "REAL"))) {
+    $icon = $GDSDayWeatherIconMap{$weather};
+  } else {
+    $icon = $GDSNightWeatherIconMap{$weather};
+  }
+  if (defined($icon)) {
+    my $url= FW_IconURL("weather/$icon");
+    my $style= " width=$width";
+    return "<img src=\"$url\"$style alt=\"$icon\">";
+  } else {
+    return "";
+  }
+}
+
+sub GDSAsHtmlV($;$) {
+# create forecast in a vertical HTML table 
+#
+# @param: device name
+# @param: number of icons, optional, default 8
+  my ($d,$items) = @_;
+  $d = "<none>" if(!$d);
+  $items = $items? $items - 1 : 7;
+  return "$d is not a GDS instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "GDS");
+
+  my $width = int(ICONSCALE*ICONWIDTH);
+      
+  my $ret = sprintf('<table class="weather"><tr><th width=%d></th><th></th></tr>', $width);
+  $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">Aktuell: </span><span class="weatherCondition">%s</span><br><span class="weatherValue">%s°C</span><br><span class="weatherWind">Wind %s km/h %s</span></td></tr>',
+        $width,
+        GDSIconIMGTag(ReadingsVal($d, "c_weather", "?"), time_str2num(ReadingsTimestamp($d, "c_weather", TimeNow()))),
+        ReadingsVal($d, "c_weather", "?"),
+        ReadingsVal($d, "c_temperature", "?"),
+        ReadingsVal($d, "c_windSpeed", "?"), ReadingsVal($d, "c_windDir", "?"));
+
+  # get time of last forecast
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time_str2num(ReadingsTimestamp($d, "fc3_weather24", TimeNow())));
+        
+  for(my $i=0; $i<$items; $i++) {
+    my $day = int(($i + 1)/2);
+    my $timeLabel = $i == 0? ($hour < 17? '18' : '24') : ($i - 1)%2 == 0? '12' : '24';
+    my $weekday = $i == 0? ($hour < 17? 'Spät' : 'Nachts') : ($i - 1)%2 == 0? ReadingsVal($d, "fc".$day."_weekday", "?").' früh' : ReadingsVal($d, "fc".$day."_weekday", "?").' spät';
+
+    if (($i - 1)%2 == 0) {
+      $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: </span><span class="weatherCondition">%s</span><br><span class="weatherMin">min %s°C</span><br><span class="weatherWind">%s</span></span></td></tr>',
+          $width,
+          GDSIconIMGTag(ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?")),
+          $weekday,
+          ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?"),
+          ReadingsVal($d, "fc".$day."_tMinAir", "?"),
+          ReadingsVal($d, "fc".$day."_windGust".$timeLabel, ""));
+    } else {    
+      if ($i == 0 && $hour >= 17) {
+        $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: </span><span class="weatherCondition">%s</span><br><span class="weatherValue">%s°C</span><br><span class="weatherWind">%s</span></td></tr>',
+            $width,
+            GDSIconIMGTag(ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?"), 1),
+            $weekday,
+            ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?"),
+            ReadingsVal($d, "fc".$day."_tAvgAir".$timeLabel, "?"),
+            ReadingsVal($d, "fc".$day."_windGust".$timeLabel, ""));
+      } else {
+        $ret .= sprintf('<tr><td class="weatherIcon" width=%d>%s</td><td class="weatherValue"><span class="weatherDay">%s: </span><span class="weatherCondition">%s</span><br><span class="weatherMax">max %s°C</span><br><span class="weatherWind">%s</span></td></tr>',
+            $width,
+            GDSIconIMGTag(ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?")),
+            $weekday,
+            ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?"),
+            ReadingsVal($d, "fc".$day."_tMaxAir", "?"),
+            ReadingsVal($d, "fc".$day."_windGust".$timeLabel, ""));
+      }
+    }
+  }
+      
+  $ret .= "</table>";
+  return $ret;
+}
+
+sub GDSAsHtmlH($;$) {
+# create forecast in a horizontal HTML table 
+#
+# @param: device name
+# @param: number of icons, optional, default 8
+  my ($d, $items) = @_;
+  $d = "<none>" if(!$d);
+  $items = $items? $items - 1 : 7;
+  return "$d is not a GDS instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "GDS");
+
+  my $width = 110;
+  
+  my $ret = '<table class="weather">';
+
+  # get time of last forecast
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time_str2num(ReadingsTimestamp($d, "fc3_weather24", TimeNow())));
+  
+  # weekday / time
+  $ret .= sprintf('<tr><td align="center" class="weatherDay">Aktuell</td>');
+  for(my $i=0; $i<$items; $i++) {
+    my $day = int(($i + 1)/2);
+    my $timeLabel = $i == 0? ($hour < 17? '18' : '24') : ($i - 1)%2 == 0? '12' : '24';
+    my $weekday = $i == 0? ($hour < 17? 'Spät' : 'Nachts') : ($i - 1)%2 == 0? ReadingsVal($d, "fc".$day."_weekday", "?").' früh' : ReadingsVal($d, "fc".$day."_weekday", "?").' spät';
+    $ret .= sprintf('<td align="center" class="weatherDay">%s</td>', $weekday);
+  }
+  $ret .= '</tr>';
+  
+  # condition icon
+  $ret .= sprintf('<tr><td align="center" class="weatherIcon" width=%d>%s</td>', $width, GDSIconIMGTag(ReadingsVal($d, "c_weather", "?"), time_str2num(ReadingsTimestamp($d, "c_weather", TimeNow()))));
+  for(my $i=0; $i<$items; $i++) {
+    my $day = int(($i + 1)/2);
+    my $timeLabel = $i == 0? ($hour < 17? '18' : '24') : ($i - 1)%2 == 0? '12' : '24';
+    $ret .= sprintf('<td align="center" class="weatherIcon" width=%d>%s</td>', $width, GDSIconIMGTag(ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?"), $i==0 && $hour >= 17? 1 : undef));
+  }
+  $ret .= '</tr>';
+  
+  # condition text
+  $ret .= sprintf('<tr><td align="center" class="weatherCondition">%s</td>', ReadingsVal($d, "c_weather", "?"));
+  for(my $i=0; $i<$items; $i++) {
+    my $day = int(($i + 1)/2);
+    my $timeLabel = $i == 0? ($hour < 17? '18' : '24') : ($i - 1)%2 == 0? '12' : '24';
+    $ret .= sprintf('<td align="center" class="weatherCondition">%s</td>', ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?"));
+  }
+  $ret .= '</tr>';
+  
+  # temperature / min temperature
+  $ret .= sprintf('<tr><td align="center" class="weatherValue">%s°C</td>', ReadingsVal($d, "c_temperature", "?"));
+  for(my $i=0; $i<$items; $i++) {
+    my $day = int(($i + 1)/2);
+    my $timeLabel = $i == 0? ($hour < 17? '18' : '24') : ($i - 1)%2 == 0? '12' : '24';
+    if (($i - 1)%2 == 0) {
+      $ret .= sprintf('<td align="center" class="weatherMin">min %s°C</td>', ReadingsVal($d, "fc".$day."_tMinAir", "?"));
+    } else {
+      if ($i == 0 && $hour >= 17) {
+        $ret .= sprintf('<td align="center" class="weatherValue">%s°C</td>', ReadingsVal($d, "fc".$day."_tAvgAir".$timeLabel, "?"));
+      } else {
+        $ret .= sprintf('<td align="center" class="weatherMax">max %s°C</td>', ReadingsVal($d, "fc".$day."_tMaxAir", "?"));
+      }
+    }
+  }
+  $ret .= '</tr>';
+  
+  # wind
+  $ret .= sprintf('<tr><td align="center" class="weatherWind">%s km/h %s</td>', ReadingsVal($d, "c_windSpeed", "?"), ReadingsVal($d, "c_windDir", "?"));
+  for(my $i=0; $i<$items; $i++) {
+    my $day = int(($i + 1)/2);
+    my $timeLabel = $i == 0? ($hour < 17? '18' : '24') : ($i - 1)%2 == 0? '12' : '24';
+    $ret .= sprintf('<td align="center" class="weatherWind">%s</td>', ReadingsVal($d, "fc".$day."_windGust".$timeLabel, ""));
+  }
+  $ret .= "</tr></table>";
+
+  return $ret;
+}
+
+sub GDSAsHtmlD($;$) {
+# create forecast in a horizontal or vertical HTML table depending on the display orientation
+#
+# @param: device name
+# @param: number of icons, optional, default 8
+  my ($d,$i) = @_;
+  if($FW_ss) {
+    GDSAsHtmlV($d,$i);
+  } else {
+    GDSAsHtmlH($d,$i);
+  }
 }
 
 1;
 
 ####################################################################################################
 #
-# Documentation 
+#  Documentation 
 #
 ####################################################################################################
 #
@@ -1476,9 +2067,14 @@ sub mergeCapFile($) {
 #   2015-10-08  changed added mergeCapFile()
 #                       code cleanup in buildCAPList()
 #                       use system call "unzip" instead of Archive::Zip
-#                       added NotifyFn for rereadcfg after INITIALIZED|REREADCFG
+#                       added NotifyFn for rereadcfg after INITIALIZED
 #                       improved startup data retrieval
 #                       improved attribute handling
+#
+#   2015-10-09  changed removed createIndexFile(), no longer needed since 2015-01-30
+#                       added forecast retrieval
+#                       added weblink generator
+#                       done  a lot of code cleanup
 #
 ####################################################################################################
 #
@@ -1513,22 +2109,6 @@ sub mergeCapFile($) {
 # ---   : Wert nicht vorhanden
 #
 ####################################################################################################
-#
-# sub
-# _calctz($@)
-# {
-  # my ($nt,@lt) = @_;
-
-  # my $off = $lt[2]*3600+$lt[1]*60+$lt[0];
-  # $off = 12*3600-$off;
-  # $nt += $off;  # This is noon, localtime
-
-  # my @gt = gmtime($nt);
-
-  # return (12-$gt[2]);
-# }
-#
-####################################################################################################
 
 =pod
 =begin html
@@ -1552,11 +2132,20 @@ sub mergeCapFile($) {
 	<b>Define</b>
 	<ul>
 
-		<br/>
-		<code>define &lt;name&gt; GDS &lt;username&gt; &lt;password&gt;</code>
-		<br/><br/>
-		This module provides connection to <a href="http://www.dwd.de/grundversorgung">GDS service</a> generated by <a href="http://www.dwd.de">DWD</a><br/>
-
+		<br>
+		<code>define &lt;name&gt; GDS &lt;username&gt; &lt;password&gt;</code><br>
+		<br>
+		This module provides connection to <a href="http://www.dwd.de/grundversorgung">GDS service</a> generated by <a href="http://www.dwd.de">DWD</a><br>
+		<br>
+		It also provides three additional functions <code>GDSAsHtmlV</code>, <code>GDSAsHtmlH</code> and <code>GDSAsHtmlD</code>. 
+		The first function returns the HTML code for a vertically arranged weather forecast. 
+		The second function returns the HTML code for a horizontally arranged weather forecast. 
+		The third function dynamically picks the orientation depending on whether a smallscreen style is set (vertical layout) or not (horizontal layout).
+		The attributes gdsSetCond and gdsSetForecast must be configured for the functions to work.
+		Each of these functions accepts an additional parameter to limit the number of icons to display (1...8). 
+		If the attribute gdsSetForecast is not configured this parameter should be set to 1.<br>
+		<br>
+		Example: <code>define MyForecastWeblink weblink htmlCode { GDSAsHtml("MyWeather") }</code> where "MyWeather" is the name of your GDS device.
 	</ul>
 	<br/><br/>
 
@@ -1569,13 +2158,18 @@ sub mergeCapFile($) {
 		<br/><br/>
 		<ul>
 			<li>alerts: Delete all a_* readings</li>
-			<li>all: Delete all a_*, c_* and g_* readings</li>
+			<li>all: Delete all a_*, c_*, g_* and fc_* readings</li>
 		</ul>
 		<br/>
 
 		<code>set &lt;name&gt; conditions &lt;stationName&gt;</code>
 		<br/><br/>
 		<ul>Retrieve current conditions at selected station. Data will be updated periodically.</ul>
+		<br/>
+
+		<code>set &lt;name&gt; forecasts &lt;region&gt;/&lt;stationName&gt;</code>
+		<br/><br/>
+		<ul>Retrieve forecasts for today and the following 3 days for selected station. Data will be updated periodically.</ul>
 		<br/>
 
 		<code>set &lt;name&gt; help</code>
@@ -1585,16 +2179,17 @@ sub mergeCapFile($) {
 
 		<code>set &lt;name&gt; rereadcfg</code>
 		<br/><br/>
-		<ul>Reread all required data from DWD Server manually: station list and CAP data</ul>
+		<ul>Reread all required data from DWD Server manually: station lists and CAP data</ul>
 		<br/>
 
 		<code>set &lt;name&gt; update</code>
 		<br/><br/>
-		<ul>Update conditions readings at selected station and restart update-timer</ul>
+		<ul>Update conditions and forecasts readings at selected station and restart update-timer</ul>
 		<br/>
 
 		<li>condition readings generated by SET use prefix "c_"</li>
-		<li>readings generated by SET will be updated automatically every 60 minutes</li>
+		<li>forecast readings generated by SET use prefix "fcd_" and a postfix of "hh" with d=relative day (0=today) and hh=last hour of forecast (exclusive)</li>
+		<li>readings generated by SET will be updated automatically every 20 minutes</li>
 
 	</ul>
 	<br/><br/>
@@ -1612,6 +2207,11 @@ sub mergeCapFile($) {
 		<code>get &lt;name&gt; conditions &lt;stationName&gt;</code>
 		<br/><br/>
 		<ul>Retrieve current conditions at selected station</ul>
+		<br/>
+
+		<code>get &lt;name&gt; forecasts &lt;region&gt;</code>
+		<br/><br/>
+		<ul>Retrieve forecasts for today and the following 3 days for selected region as text</ul>
 		<br/>
 
 		<code>get &lt;name&gt; conditionsmap &lt;region&gt;</code>
@@ -1685,8 +2285,10 @@ sub mergeCapFile($) {
 		<li><b>gdsAll</b> - defines filter for "all data" from alert message</li>
 		<li><b>gdsDebug</b> - defines filter for debug informations</li>
 		<li><b>gdsSetCond</b> - defines conditions area to be used after system restart</li>
+		<li><b>gdsSetForecast</b> - defines forecasts region/station to be used after system restart</li>
 		<li><b>gdsLong</b> - show long text fields "description" and "instruction" from alert message in readings</li>
 		<li><b>gdsPolygon</b> - show polygon data from alert message in a reading</li>
+		<li><b>gdsShowMapFilesMenu</b> - if set to 0, the "GDS Files" menu in the left navigation bar will not be shown</li>
 		<br/>
 		<li><b>gdsPassiveFtp</b> - set to 1 to use passive FTP transfer</li>
 		<li><b>gdsFwName</b> - define firewall hostname in format &lt;hostname&gt;:&lt;port&gt;</li>
@@ -1703,7 +2305,23 @@ sub mergeCapFile($) {
 			that will be increased for every valid alert message in selected area<br/></li>
 		<li><b>a_count</b> - number of currently valid alert messages, can be used for own loop iterations on alert messages</li>
 		<li><b>a_valid</b> - returns 1 if at least one of decoded alert messages is valid</li>
-		<li><b>c_&lt;readingName&gt;</b> - weather data from SET weather conditions. Readings will be updated every 20 minutes</li>
+		<li><b>c_&lt;readingName&gt;</b> - weather data from SET weather conditions. Readings will be updated every 20 minutes.</li>
+		<li><b>fc?_&lt;readingName&gt;??</b> - weather data from SET weather forecasts, prefix by relative day and postfixed by last hour. Readings will be updated every 20 minutes.<br>
+			<i><ul>
+				<li>0_weather06 and ?_weather12 (with ? greater 0) is the weather in the morning</li>
+				<li>0_weather12 is the weather at noon</li>
+				<li>0_weather18 and ?_weather24 (with ? greater 0) is the weather in the afternoon</li>
+				<li>0_weather24 is the weather at midnight</li>
+				<li>0_windGust06 and ?_windGust12 (with ? greater 0) is the wind in the morning</li>
+				<li>0_windGust12 is the wind at noon</li>
+				<li>0_windGust18 and ?_windGust24 (with ? greater 0) is the wind in the afternoon</li>
+				<li>0_windGust24 is the wind at midnight</li>
+				<li>?_tMinAir is minimum temperature in the morning</li>
+				<li>0_tAvgAir12 is the average temperature at noon</li>
+				<li>?_tMaxAir is the maximum temperature in the afternoon</li>
+				<li>0_tAvgAir24 is the average temperature at midnight</li>        
+			</ul></i>
+		</li>
 		<li><b>g_&lt;readingName&gt;</b> - weather data from GET weather conditions. Readings will NOT be updated automatically</li>
 	</ul>
 	<br/><br/>
