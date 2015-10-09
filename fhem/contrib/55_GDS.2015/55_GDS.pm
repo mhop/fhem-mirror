@@ -122,7 +122,7 @@ sub GDS_Shutdown($) {
 sub GDS_Set($@) {
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
-	my $usage =	"Unknown argument, choose one of clear:alerts,all help:noArg rereadcfg:noArg update:noArg ".
+	my $usage =	"Unknown argument, choose one of clear:alerts,conditions,forecasts,all help:noArg rereadcfg:noArg update:noArg ".
 				"conditions:".$sList." forecasts:".$fList." ";
 
 	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
@@ -145,10 +145,14 @@ sub GDS_Set($@) {
 
 	given($command) {
 		when("clear"){
-			CommandDeleteReading(undef, "$name a_.*");
-			CommandDeleteReading(undef, "$name c_.*")    if(defined($parameter) && $parameter eq "all");
-			CommandDeleteReading(undef, "$name fc.?_.*") if(defined($parameter) && $parameter eq "all");
-			CommandDeleteReading(undef, "$name g_.*")    if(defined($parameter) && $parameter eq "all");
+			CommandDeleteReading(undef, "$name a_.*")
+			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "alerts"));
+			CommandDeleteReading(undef, "$name c_.*")    
+			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "conditions"));
+			CommandDeleteReading(undef, "$name g_.*")
+			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "conditions"));
+			CommandDeleteReading(undef, "$name fc.?_.*") 
+			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "forecasts"));
 			}
 
 		when("help"){
@@ -2074,6 +2078,7 @@ sub GDSAsHtmlD($;$) {
 #   2015-10-09  changed removed createIndexFile(), no longer needed since 2015-01-30
 #                       added forecast retrieval
 #                       added weblink generator
+#                       added more "set clear ..." commands
 #                       done  a lot of code cleanup
 #
 ####################################################################################################
