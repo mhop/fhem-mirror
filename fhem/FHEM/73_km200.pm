@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0053 2015-07-15 15:00:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0054 2015-10-09 16:30:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -212,6 +212,7 @@
 #		0053    15.07.2015	Sailor				km200_ParseHttpResponseInit		Static Service deleted
 #		0053    15.07.2015	Sailor				km200_GetStatService			Deleted
 #		0053    15.07.2015	Sailor				km200_ParseHttpResponseStat		Deleted
+#		0053    09.10.2015	Sailor				km200_ParseHttpResponseInit		Adding a timer to restart Initialisation process if first contact failed.
 ########################################################################################################################
 
 
@@ -280,7 +281,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0053";
+	my $ModuleVersion           = "0054";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -469,10 +470,7 @@ sub km200_Define($$)
 	{
 		$Km200Info = $hash->{temp}{TransferValue};
 		$hash->{temp}{TransferValue} = "";
-	}
 
-	if ($Km200Info eq "ERROR") 
-	{
 		## Communication with Gateway WRONG !! ##
 		$hash->{STATE}="Error - No Communication";
 		return ($name .": km200 - ERROR - The communication between fhem and the Buderus KM200 failed! \n". 
@@ -489,7 +487,7 @@ sub km200_Define($$)
 	####END####### Check whether communication to the physical unit is possible ################################END#####
 
 	###START###### Initiate the timer for first time polling of  values from KM200 but wait 10s ###############START####
-	InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 0);
+	InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 5);
 	Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services started for the first time.";
 	####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ################END#####
 	
@@ -2080,14 +2078,19 @@ sub km200_ParseHttpResponseInit($)
 	
 	
 	### Log entries for debugging purposes
-	Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: Try to parse     : " .$Service;
+	# Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: Try to parse     : " .$Service;
 	### Log entries for debugging purposes
 
 	
 	if($err ne "") 
 	{
-		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
+		Log3 $name, 2, $name . " : km200_ParseHttpResponseInit - ERROR - Service: ".$Service. ": No proper Communication with Gateway: " .$err;
 		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_ParseHttpResponseInit ERROR: $err\n");}
+		
+		### Start the timer for polling again but wait 10s
+		InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 0);
+		Log3 $name, 2, $name . " : km200_ParseHttpResponseInit - ERROR - Timer restarted to try again in 10s";
+		
 		return "ERROR";	
 	}
 
@@ -3226,9 +3229,9 @@ sub km200_ParseHttpResponseDyn($)
 <ul><ul>
 	<table>
 		<tr>
-			<td align="right" valign="top"><code>&lt;option&gt;</code> : </td><td align="left" valign="top">Das optionelle Argument f𲠤ie Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>
-																											 &nbsp;&nbsp;Folgende Optionen sind verf𧢡r:<BR>
-																											 &nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zur𣫮 
+			<td align="right" valign="top"><code>&lt;option&gt;</code> : </td><td align="left" valign="top">Das optionelle Argument fð² ¤ie Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>
+																											 &nbsp;&nbsp;Folgende Optionen sind verfð§¢¡r:<BR>
+																											 &nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zurð£«® 
 			</td>
 		</tr>
 	</table>
@@ -3311,7 +3314,7 @@ sub km200_ParseHttpResponseDyn($)
 	<table>
 		<tr>
 			<td>
-			<tr><td align="right" valign="top"><li><code>ReadBackDelay</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zur𣫬esen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>
+			<tr><td align="right" valign="top"><li><code>ReadBackDelay</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zurð£«¬esen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>
 																												   Der  Default-Wert ist 100 = 100ms = 0,1s.<BR>
 			</td></tr>
 			</td>
