@@ -16,13 +16,15 @@ SetExtensions($$@)
   return "Unknown argument $cmd, choose one of " if(!$list);
 
   my %se_list = (
-    "on-for-timer"  => 1,
-    "off-for-timer" => 1,
-    "on-till"       => 1,
-    "off-till"      => 1,
-    "blink"         => 2,
-    "intervals"     => 0,
-    "toggle"        => 0
+    "on-for-timer"      => 1,
+    "off-for-timer"     => 1,
+    "on-till"           => 1,
+    "off-till"          => 1,
+    "on-till-overnight" => 1,
+    "off-till-overnight"=> 1,
+    "blink"             => 2,
+    "intervals"         => 0,
+    "toggle"            => 0
   );
 
   my $hasOn  = ($list =~ m/(^| )on\b/);
@@ -54,8 +56,8 @@ SetExtensions($$@)
     return "$cmd requires $se_list{$cmd} parameter";
   }
 
-  my $cmd1 = ($cmd =~ m/on.*/ ? "on" : "off");
-  my $cmd2 = ($cmd =~ m/on.*/ ? "off" : "on");
+  my $cmd1 = ($cmd =~ m/^on.*/ ? "on" : "off");
+  my $cmd2 = ($cmd =~ m/^on.*/ ? "off" : "on");
   my $param = $a[0];
 
   if($cmd eq "on-for-timer" || $cmd eq "off-for-timer") {
@@ -67,20 +69,22 @@ SetExtensions($$@)
       InternalTimer(gettimeofday()+$param,"SetExtensionsFn","SE $name $cmd",0);
     }
 
-  } elsif($cmd eq "on-till" || $cmd eq "off-till") {
+  } elsif($cmd =~ m/^(on|off)-till/) {
     my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($param);
     return "$cmd: $err" if($err);
 
     my $at = $name . "_till";
     CommandDelete(undef, $at) if($defs{$at});
 
-    my @lt = localtime;
     my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
-    my $hms_now  = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
-    if($hms_now ge $hms_till) {
-      Log3 $hash, 4,
-        "$cmd: won't switch as now ($hms_now) is later than $hms_till";
-      return "";
+    if($cmd =~ m/-till$/) {
+      my @lt = localtime;
+      my $hms_now  = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+      if($hms_now ge $hms_till) {
+        Log3 $hash, 4,
+          "$cmd: won't switch as now ($hms_now) is later than $hms_till";
+        return "";
+      }
     }
     DoSet($name, $cmd1);
     CommandDefine(undef, "$at at $hms_till set $name $cmd2");
