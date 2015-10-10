@@ -720,9 +720,11 @@ DOIF_cmd ($$$$)
     }
   }
   if ($hash->{do}{$nr}{$subnr}) { 
+     $hash->{helper}{cur_cmd_nr}="cmd_".($nr+1)."_".($subnr+1);
     ($cmd,$err)=ParseCommandsDoIf($hash,$hash->{do}{$nr}{$subnr},1);
   }
   DOIF_SetState ($hash,$nr,$subnr,$event,$err);
+  delete $hash->{helper}{cur_cmd_nr}; 
   if (defined $hash->{do}{$nr}{++$subnr}) {
     my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
     if (DOIF_SetSleepTimer($hash,$last_cond,$nr,$subnr,$event,-1)) {
@@ -1072,6 +1074,9 @@ DOIF_SetSleepTimer($$$$$$)
 {
   my ($hash,$last_cond,$nr,$subnr,$device,$timerNr)=@_;
   my $pn = $hash->{NAME};
+  if (defined $hash->{helper}{cur_cmd_nr}) {
+    return 0;
+  }  
   my $sleeptimer=$hash->{helper}{sleeptimer};
   my @waitdel=split(/:/,AttrVal($pn,"waitdel",""));
   my @waitdelsubnr=split(/,/,defined $waitdel[$sleeptimer] ? $waitdel[$sleeptimer] : "");
@@ -2062,19 +2067,6 @@ Angaben, bei denen aufgrund der Definition kein Zustandswechsel erfolgen kann z.
 attr di_light do always</code><br>
 <br>
 müssen mit Attribut <code>do always</code> definiert werden, damit sie nicht nur einmal, sondern jedes mal (hier jeden Tag) ausgeführt werden.<br>
-<br>
-Rekursionen vermeiden<br>
-<br>
-Das Verändern des Status eines Devices z. B. durch set-Befehl, welches in der Bedingung bereits vorkommt, würde das Modul erneut triggern.
-Solche Rekursionen (Loops) werden zwar von FHEM unterbunden, können jedoch elegant durch Abfragen mit Fragezeichen [?...] gelöst werden:<br>
-<br>
-statt:<br>
-<br>
-<code>define di_lamp ([brightness] < 50 and [lamp] eq "off")(set lamp on)</code><br>
-<br>
-mit Fragezeichen abfragen:<br>
-<br>
-<code>define di_lamp ([brightness] < 50 and [?lamp] eq "off")(set lamp on)</code><br>
 <br>
 Bei Devices, die mit Zwischenzuständen arbeiten, insbesondere HM-Komponenten (Zwischenzustand: set_on, set_off), sollte die Definition möglichst genau formuliert werden, um unerwünschte Effekte zu vermeiden: <br>
 <br>
