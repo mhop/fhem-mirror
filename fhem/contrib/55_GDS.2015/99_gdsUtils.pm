@@ -298,3 +298,26 @@ sub GDSAsHtmlD($;$) {
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="gdsUtils"></a>
+<h3>gdsUtils</h3>
+<ul>
+		This module provides three additional functions:<br/> 
+		<code>GDSAsHtmlV</code>, <code>GDSAsHtmlH</code> and <code>GDSAsHtmlD</code>. <br/>
+		The first function returns the HTML code for a vertically arranged weather forecast. <br/>
+		The second function returns the HTML code for a horizontally arranged weather forecast. <br/>
+		The third function dynamically picks the orientation depending on whether a <br/>
+		smallscreen style is set (vertical layout) or not (horizontal layout).<br/>
+		The attributes gdsSetCond and gdsSetForecast must be configured for the functions to work.<br/>
+		Each of these functions accepts an additional parameter to limit the number of icons to display (1...8). <br/>
+		If the attribute gdsSetForecast is not configured this parameter should be set to 1.<br/>
+		<br/>
+		Example: <code>define MyForecastWeblink weblink htmlCode { GDSAsHtml("MyWeather") }</code> <br/>
+		where "MyWeather" is the name of your GDS device.<br/>
+</ul>
+
+=end html
+=cut
