@@ -87,6 +87,7 @@ yowsup_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
+  yowsup_Disconnect($hash);
   yowsup_Connect($hash);
 }
 
