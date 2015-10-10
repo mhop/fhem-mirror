@@ -512,6 +512,7 @@ EnOcean_Define($$)
   my $name = $hash->{NAME};
   $def = "00000000";
   if(@a > 2 && @a < 5) {
+  
     if ($a[2] eq "getNextID") {
       AssignIoPort($hash) if (!exists $hash->{IODev});
       if (exists $hash->{OLDDEF}) {
@@ -525,18 +526,8 @@ EnOcean_Define($$)
       $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
       $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
       $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
+      
     } elsif ($a[2] =~ m/^[A-Fa-f0-9]{8}$/i) {
-      AssignIoPort($hash) if (!exists $hash->{IODev});
-      if (exists $hash->{OLDDEF}) {
-        delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
-        #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
-      }
-      $def = uc($a[2]);
-      $hash->{DEF} = $def;
-      $modules{EnOcean}{defptr}{$def} = $hash;
-      $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
-      $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
-      $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
       if (defined($a[3]) && $a[3] =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
         my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
         $rorg = "F6" if ($rorg eq "05");
@@ -544,6 +535,16 @@ EnOcean_Define($$)
         $rorg = "A5" if ($rorg eq "07");
         my $eep = "$rorg.$func.$type";
         if (exists $EnO_eepConfig{$eep}) {
+          AssignIoPort($hash) if (!exists $hash->{IODev});
+          if (exists $hash->{OLDDEF}) {
+            delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
+            #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
+          }
+          $def = uc($a[2]);
+          $hash->{DEF} = $def;
+          $modules{EnOcean}{defptr}{$def} = $hash;
+          $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
+          $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
           $attr{$name}{eep} = "$rorg-$func-$type";
           foreach my $attrCntr (keys %{$EnO_eepConfig{$eep}{attr}}) {
             if ($attrCntr ne "subDef") {
@@ -554,28 +555,39 @@ EnOcean_Define($$)
         } else {
           return "EEP $rorg-$func-$type not supported";
         }
+      } else {
+        AssignIoPort($hash) if (!exists $hash->{IODev});
+        if (exists $hash->{OLDDEF}) {
+          delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
+          #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
+        }
+        $def = uc($a[2]);
+        $hash->{DEF} = $def;
+        $modules{EnOcean}{defptr}{$def} = $hash;
+        $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
+        $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
+        $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
       }
+      
     } elsif ($a[2] =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
       my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
-      AssignIoPort($hash) if (!exists $hash->{IODev});
-      if (exists $hash->{OLDDEF}) {
-        delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
-        #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
-      }
-      if (!exists $hash->{DEF} || $hash->{DEF} =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
-        $hash->{DEF} = $def;
-        $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
-        $hash->{DEF} = $def;
-      }
-      $modules{EnOcean}{defptr}{$def} = $hash;
       $rorg = "F6" if ($rorg eq "05");
       $rorg = "D5" if ($rorg eq "06");
       $rorg = "A5" if ($rorg eq "07");
       my $eep = "$rorg.$func.$type";
       if (exists $EnO_eepConfig{$eep}) {
-        if (exists $attr{$name}) {
-          delete $attr{$name};
+        AssignIoPort($hash) if (!exists $hash->{IODev});
+        if (exists $hash->{OLDDEF}) {
+          delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
+          #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
         }
+        if (!exists $hash->{DEF} || $hash->{DEF} =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
+          $hash->{DEF} = $def;
+          $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
+          $hash->{DEF} = $def;
+        }
+        $modules{EnOcean}{defptr}{$def} = $hash;
+        delete $attr{$name} if (exists $attr{$name});
         $attr{$name}{eep} = "$rorg-$func-$type";
         $attr{$name}{manufID} = "7FF";
         $attr{$name}{room} = "EnOcean";
@@ -591,9 +603,11 @@ EnOcean_Define($$)
     } else {
       return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
     }
+  
   } else {
     return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
   }
+
   # autocreate: parse received device telegram
   if (@a == 4 && $name =~ m/EnO_$def/) {
     $hash->{DEF} = $def;
@@ -635,7 +649,6 @@ EnOcean_Define($$)
       Log3 $name, 2, "EnOcean $name GP teach-in is missing";
     }
     EnOcean_Parse($hash, $a[3]);
-
   }
   #$hash->{NOTIFYDEV} = "global";
   # polling
@@ -8083,8 +8096,9 @@ sub EnOcean_Attr(@)
              $attrVal =~ m/^[+-]?\d+?$/ && $attrVal >= 1 && $attrVal <= 6) {
 
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      #Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      #CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "alarmAction") {
@@ -8111,8 +8125,7 @@ sub EnOcean_Attr(@)
         EnOcean_SndRadio(undef, $hash, 1, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
       }
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName =~ m/^block.*/) {
@@ -8124,24 +8137,21 @@ sub EnOcean_Attr(@)
         readingsSingleUpdate($hash, "waitingCmds", $waitingCmds, 0);
       }
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "comMode") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^biDir|uniDir|confirm$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "dataEnc") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^VAES|AES-CBC$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "daylightSavingTime") {
@@ -8153,23 +8163,21 @@ sub EnOcean_Attr(@)
         readingsSingleUpdate($hash, "waitingCmds", $waitingCmds, 0);
       }
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "demandRespRandomTime") {
     if (!defined $attrVal) {
 
     } elsif ($attrVal !~ m/^\d+?$/ || $attrVal < 1) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal is not a integer number or not valid";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal is not a integer number or not valid";
     }
 
   } elsif ($attrName =~ m/^(demandRespMax|demandRespMin)$/) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^(A0|AI|B0|BI|C0|CI|D0|DI)$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      $err = "attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
@@ -8177,48 +8185,40 @@ sub EnOcean_Attr(@)
     if (!defined $attrVal) {
 
     } elsif ($attrVal !~ m/^\d+?$/ || $attrVal < 0 || $attrVal > 15) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal is not a integer number or not valid";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal is not a integer number or not valid";
     }
 
   } elsif ($attrName eq "devChannel") {
     if (!defined $attrVal){
 
     } elsif ($attrVal =~ m/^[\dA-Fa-f]{2}$/) {
-      # convert old format
-      #$attr{$name}{$attrName} = hex $attrVal;
-      CommandAttr(undef, "$name $attrName " .  hex $attrVal);
-      EnOcean_CommandSave(undef, undef);
+      # actions see EnOcean_Notify, global ATTR 
 
     } elsif ($attrVal =~ m/^\d+$/ && $attrVal >= 0 && $attrVal <= 255) {
 
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "devMode") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^master|slave$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "devUpdate") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^(off|auto|demand|polling|interrupt)$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName =~ m/^dimMax|dimMin$/) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^off|[\d+]$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "displayContent") {
@@ -8230,16 +8230,14 @@ sub EnOcean_Attr(@)
         readingsSingleUpdate($hash, "waitingCmds", $waitingCmds, 0);
       }
     } else {													
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "eep") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{2}-[\dA-Fa-f]{2}-[\dA-Fa-f]{2}$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "gpDef") {
@@ -8266,11 +8264,9 @@ sub EnOcean_Attr(@)
           push(@err, "engMax") if (!defined($engMax) || $engMax !~ m/^[+-]?\d+$/ || $engMax < -128 || $engMax > 127);
           push(@err, "scalingMax") if (!defined($scalingMax) || $scalingMax !~ m/^\d+$/ || $scalingMax < 1 || $scalingMax > 13);
         }
-        $err = 1 if (defined $err[0]);
-        Log3 $name, 2, "EnOcean $name attribute-value $attrName/channel " . sprintf('%02d', $channel) . ": " .
+        $err = "attribute-value $attrName/channel " . sprintf('%02d', $channel) . ": " .
                        join(', ', @err) . " wrong" if (defined $err[0]);
       }
-      CommandDeleteAttr(undef, "$name $attrName") if ($err);
     }
 
   } elsif ($attrName eq "humidity") {
@@ -8280,64 +8276,56 @@ sub EnOcean_Attr(@)
 
     } else {
       #RemoveInternalTimer($hash);
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal is not a valid number";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal is not a integer number or not valid";
     }
 
   } elsif ($attrName =~ m/^key/) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{32}$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "macAlgo") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^no|[3-4]$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "manufID") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^[0-7][\dA-Fa-f]{2}$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "observe") {
     if (!defined $attrVal){
 
     } elsif (lc($attrVal) !~ m/^(off|on)$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "observeCmdRepetition") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^[1-5]$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "observeInterval") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^\d+?$/ || $attrVal < 1) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "observeLogic") {
     if (!defined $attrVal){
 
     } elsif (lc($attrVal) !~ m/^and|or$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "pollInterval") {
@@ -8350,16 +8338,14 @@ sub EnOcean_Attr(@)
       }
     } else {
       #RemoveInternalTimer($hash);
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal is not a integer number";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal is not a integer number or not valid";
     }
 
   } elsif ($attrName eq "productID") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{8}$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "rampTime") {
@@ -8368,45 +8354,38 @@ sub EnOcean_Attr(@)
     } elsif ($attrVal =~ m/^\d+?$/) {
       if (AttrVal($name, "subType", "") eq "gateway") {
         if ($attrVal < 0 || $attrVal > 255) {
-          Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-          CommandDeleteAttr(undef, "$name $attrName");
+          $err = "attribute-value [$attrName] = $attrVal wrong";
         }
       } elsif (AttrVal($name, "subType", "") eq "lightCtrl.01") {
         if ($attrVal < 0 || $attrVal > 65535) {
-          Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-          CommandDeleteAttr(undef, "$name $attrName");
+          $err = "attribute-value [$attrName] = $attrVal wrong";
         }
       } else {
-        Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-        CommandDeleteAttr(undef, "$name $attrName");
+        $err = "attribute-value [$attrName] = $attrVal wrong";
       }
     } else {
-      Log3 $name, 2, "EnOcean $name attribute $attrName not supported for subType " . AttrVal($name, "subType", "");
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute $attrName not supported for subType " . AttrVal($name, "subType", "");
     }
 
   } elsif ($attrName eq "releasedChannel") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^A|B|C|D|I|0|auto$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "remoteManagement") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^(off|on)$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "reposition") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^(directly|opens|closes)$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName =~ m/^rlcRcv|rlcSnd$/) {
@@ -8417,72 +8396,63 @@ sub EnOcean_Attr(@)
     } elsif (AttrVal($name, "rlcAlgo", "") eq "3++" && $attrVal =~ m/^[\dA-Fa-f]{6}$/) {
 
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "rlcAlgo") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^no|2++|3++$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "rlcTX") {
     if (!defined $attrVal){
 
     } elsif (lc($attrVal) !~ m/^true|false$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "secCode") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{8}$/ || $attrVal eq "00000000" || uc($attrVal) eq "FFFFFFFF") {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "secLevel") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^encapsulation|encryption|off$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "secMode") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^rcv|snd|bidir$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "sendDevStatus") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^no|yes$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "serviceOn") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^(no|yes)$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "setCmdTrigger") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^man|refDev$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "shutTime") {
@@ -8501,29 +8471,24 @@ sub EnOcean_Attr(@)
              $attrVal =~ m/^[+-]?\d+$/ && $attrVal >= 1 && $attrVal <= 255) {
 
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "summerMode") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^(off|on)$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName =~ m/^subDef.?/) {
     if (!defined $attrVal){
 
     } elsif ($attrVal eq "getNextID") {
-      $attr{$name}{$attrName} = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000");
-      #CommandAttr(undef, "$name $attrName " . EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000"));
-      EnOcean_CommandSave(undef, undef);
-      #CommandRereadCfg(undef, "");
+      # actions see EnOcean_Notify, global ATTR 
+
     } elsif ($attrVal !~ m/^[\dA-Fa-f]{8}$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "switchHysteresis") {
@@ -8533,8 +8498,7 @@ sub EnOcean_Attr(@)
 
     } else {
       #RemoveInternalTimer($hash);
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal is not a valid number";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal is not a valid number";
     }
 
   } elsif ($attrName eq "temperatureScale") {
@@ -8546,8 +8510,7 @@ sub EnOcean_Attr(@)
         readingsSingleUpdate($hash, "waitingCmds", $waitingCmds, 0);
       }
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "timeNotation") {
@@ -8559,8 +8522,7 @@ sub EnOcean_Attr(@)
         readingsSingleUpdate($hash, "waitingCmds", $waitingCmds, 0);
       }
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName =~ m/^timeProgram[1-4]$/) {
@@ -8580,31 +8542,25 @@ sub EnOcean_Attr(@)
         readingsSingleUpdate($hash, "waitingCmds", $waitingCmds, 0);
       }
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "updateState") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^default|yes|no$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   } elsif ($attrName eq "uteResponseRequest") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^(yes|no)$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
-      CommandDeleteAttr(undef, "$name $attrName");
+      $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
   }
-#  if (defined $attrVal) {
-#    Log3 $name, 2, "EnOcean $name [$attrName] = $attrVal";
-#  }
-  return undef;
+  return $err;
 }
 
 sub EnOcean_Notify(@)
@@ -8679,6 +8635,15 @@ sub EnOcean_Notify(@)
       #Log3($name, 5, "EnOcean $name <notify> REREADCFG");
 
     } elsif ($devName eq "global" && $s =~ m/^ATTR ([^ ]*) ([^ ]*) ([^ ]*)$/) {
+      my ($sdev, $attrName, $attrVal) = ($1, $2, $3);
+      if ($attrName =~ m/^subDef.?/ && $attrVal eq "getNextID") {
+        $attr{$name}{$attrName} = '0' x 8;
+        $attr{$name}{$attrName} = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000");
+      
+      } elsif ($attrName eq "devChannel" && $attrVal =~ m/^[\dA-Fa-f]{2}$/) {
+        # convert old format
+        $attr{$name}{$attrName} = hex $attrVal;
+      }
       #Log3($name, 5, "EnOcean $name <notify> ATTR $1 $2 $3");
 
     } elsif ($devName eq "global" && $s =~ m/^DELETEATTR ([^ ]*)$/) {
