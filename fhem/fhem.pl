@@ -661,7 +661,16 @@ while (1) {
       } elsif(defined($hash->{$wbName})) {
         my $wb = $hash->{$wbName};
         alarm($hash->{ALARMTIMEOUT}) if($hash->{ALARMTIMEOUT});
-        my $ret = syswrite($hash->{CD}, $wb);
+
+        my $ret;
+        eval { $ret = syswrite($hash->{CD}, $wb); };
+        if($@) {
+          Log 4, "Syswrite: $@, deleting $hash->{NAME}";
+          TcpServer_Close($hash);
+          CommandDelete(undef, $hash->{NAME});
+          next;
+        }
+
         my $werr = int($!);
         alarm(0) if($hash->{ALARMTIMEOUT});
 
