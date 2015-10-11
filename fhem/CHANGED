@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 14_CUL_TCM: implement new sensor types. Fix some wrong 
+                        interpretations. Add additional readings.
   - feature: on/off-till-overnight (SetExtensions.pm)
   - bugfix:  73_km200: Bugfix for freeze in "Sounding"
   - change:  93_DbLog: changed min/max val 999999 to system specific (~0 >> 1)
