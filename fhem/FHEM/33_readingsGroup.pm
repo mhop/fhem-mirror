@@ -1626,7 +1626,8 @@ readingsGroup_Attr($$$;$)
     <b>Attributes</b>
     <ul>
       <li>alwaysTrigger<br>
-        1 -> alwaysTrigger update events. even if not visible.</li><br>
+        1 -> alwaysTrigger update events. even if not visible.<br>
+        2 -> trigger events for calculated values.</li><br>
       <li>disable<br>
         1 -> disable notify processing and longpoll updates. Notice: this also disables rename and delete handling.<br>
         2 -> also disable html table creation<br>
@@ -1723,14 +1724,14 @@ readingsGroup_Attr($$$;$)
         hidden -> default state is hidden but can be expanded<br>
         hideable -> default state is visible but can be hidden<br><br>
         </ul>
-        if set to collapsed or collapsible will recognise the specials &lt;-&gt;,&lt;+&gt; and &lt;+-&gt; as the first elements of
+        if set to collapsed or collapsible readingsGroup will recognise the specials &lt;-&gt;,&lt;+&gt; and &lt;+-&gt; as the first elements of
         a line to add a + or - symbol to this line. clicking on the + or - symbol will toggle between expanded and collapsed state. if a readingsGroup is expanded then all others in the same group will be collapsed.
         <ul>
         - -> line will be visible in expanded state<br>
         + -> line will be visible in collapsed state<br>
         +- -> line will be visible in both states<br>
         <br>
-        collapsed-> default state is collapsed but can be expanded<br>
+        collapsed -> default state is collapsed but can be expanded<br>
         collapsible -> default state is visible but can be collapsed </li>
         </ul>
     </ul><br>
