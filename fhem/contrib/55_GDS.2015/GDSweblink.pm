@@ -1,4 +1,4 @@
-# $Id: 99_GDSweblink.pm 9418 2015-10-10 09:32:35Z betateilchen $
+# $Id$
 package main;
 
 use strict;
@@ -8,15 +8,9 @@ use POSIX;
 ####################################################################################################
 #
 #  create weblinks 
-#  provided by jensb
+#  provided and maintained by jensb
 #
 ####################################################################################################
-
-#sub
-#gdsUtils_Initialize($$)
-#{
-#  my ($hash) = @_;
-#}
 
 # weather description to icon name mapping
 my %GDSDayWeatherIconMap = (
