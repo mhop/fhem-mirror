@@ -57,7 +57,7 @@ my %models = (
     "AURIOL"      => 'AURIOL',
     "Type1"       => 'Type1',
     "Mebus"       => 'Mebus',
-    "EAS800"      => 'EAS800',
+    "Eurochron"      => 'Eurochron',
     "Unknown"     => 'Unknown',
 );
 
@@ -514,7 +514,7 @@ CUL_TCM97001_Parse($$)
       }
     }
 
-    if (($readedModel eq "EAS800" || (hex($a[6]) == 0xF && $readedModel eq "Unknown"))) {
+    if (($readedModel eq "Eurochron" || (hex($a[6]) == 0xF && $readedModel eq "Unknown"))) {
       # EAS 800 
       # G is every time 1111
       #
@@ -562,7 +562,7 @@ CUL_TCM97001_Parse($$)
         $hastrend = TRUE;     
         $packageOK = TRUE;
         $hasmode = TRUE;
-        $model="EAS800";
+        $model="Eurochron";
         $readedModel=$model;
       } else {
           $name = "Unknown";
@@ -819,7 +819,7 @@ CUL_TCM97001_Parse($$)
       my $readChannel = ReadingsVal($name, "channel", "");
       if (defined($readChannel) && $readChannel ne $channel) { readingsBulkUpdate($def, "channel", $channel); }
     }
-    if ($model eq "Prologue") {
+    if ($model eq "Prologue" || $model eq "Eurochron") {
          # plausibility check 
          my $oldtemp = ReadingsVal($name, "temperature", "unknown");
          if ($oldtemp eq "unknown" || ($val+5 > $oldtemp && $val-5 < $oldtemp)) {
@@ -912,7 +912,7 @@ CUL_TCM97001_Parse($$)
     <li>NC_WS</li>
     <li>GT-WT-02</li>
     <li>AURIOL</li>
-    <li>EAS800</li>
+    <li>Eurochron</li>
   </ul>
   <br>
   New received device packages are add in fhem category CUL_TCM97001 with autocreate.
@@ -976,7 +976,7 @@ CUL_TCM97001_Parse($$)
     <li>NC_WS</li>
     <li>GT-WT-02</li>
     <li>AURIOL</li>
-    <li>EAS800</li>
+    <li>Eurochron</li>
   </ul>
   <br>
   Neu empfangene Sensoren werden in der fhem Kategory CUL_TCM97001 per autocreate angelegt.
