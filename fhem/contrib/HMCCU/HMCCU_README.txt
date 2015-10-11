@@ -11,11 +11,15 @@
 1    HMCCU Introduction
 1.1    HMCCU Description
 1.2    HMCCU Requirements
+
 2    HMCCU Usage
 2.1    HMCCU Set Commands
 2.2    HMCCU Get Commands
 2.3    HMCCU Attributes
 2.4    HMCCU Parameter File
+
+3    Executing FHEM commands on CCU
+
 
 ------------------------------------
  1 HMCCU Introduction
@@ -187,4 +191,40 @@ The format of a parfile entry is:
   <ccudevice>:<channel>[.<datapoint_exp>] [<regexp1>:<subtext1>[,...]]
 
 Empty lines and lines starting with a '#' are ignored.
+
+
+------------------------------------
+ 3 Executing FHEM commands on CCU
+------------------------------------
+
+It's possible to execute FHEM commands from CCU via the FHEM telnet port.
+The following shell script encapsulates the necessary commands. It can
+be placed somewhere under /etc/config/addons directory in CCU. The script
+requires the installation of the netcat command (nc) on CCU (search for
+the binary in google and install it somewhere in /etc/config/addons).
+
+--- Script ---
+#!/bin/sh
+
+# Set name or IP address and port of FHEM server
+FHEM_SERVER="myfhem"
+FHEM_PORT=7072
+
+# Set path to nc command
+NCCMD="/etc/config/addons/scripts"
+
+if [ $# -ne 1 ]; then
+	echo "Usage: $0 Command"
+	exit 1
+fi
+
+echo -e "$1\nquit\n" | $NCCMD/nc $FHEM_SERVER $FHEM_PORT
+
+--- End of script ---
+
+The script should be called from a CCU program by using the CUXD exec object.
+If FHEM command contains blanks it should be enclosed in double quotes.
+
+
+*** Have fun! zap ***
 
