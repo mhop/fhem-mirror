@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: SYSMON: FormatString for SYSMON_ShowValues.
   - feature: 36_JeeLink: added timeout attribute (by HCS)
   - change: 14_CUL_TCM: implement new sensor types. Fix some wrong 
                         interpretations. Add additional readings.
