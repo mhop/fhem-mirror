@@ -81,6 +81,7 @@ JeeLink_Initialize($)
                       ." dummy"
                       ." initCommands"
                       ." flashCommand"
+                      ." timeout"
                       ." DebounceTime BeepLong BeepShort BeepDelay"
                       ." tune " . join(" ", map { "tune_$_" } keys %RxListJeeLink)
                       ." $readingFnAttributes";
@@ -853,6 +854,28 @@ JeeLink_ResetDevice($)
   return $ret;
 }
 
+sub JeeLink_OnTimer($) {
+  my ($timerName) = @_;
+  my ($name, $suffix) = split("#", $timerName);
+  my $hash = $defs{$name};
+
+  my $attrVal = AttrVal($name, "timeout", undef);
+  if(defined($attrVal)) {
+    my ($timeout, $interval) = split(',', $attrVal);
+    InternalTimer(gettimeofday() + $interval, "JeeLink_OnTimer", $timerName, 0);
+    my $jeeLinkTime = InternalVal($name, "myJeeLink_TIME", "2000-01-01 00:00:00");
+    my ($date, $time, $year, $month, $day, $hour, $min, $sec, $timestamp);
+    ($date, $time) = split( ' ', $jeeLinkTime);
+    ($year, $month, $day) = split( '-', $date);
+    ($hour, $min, $sec) = split( ':', $time);
+    $month -= 01;
+    $timestamp = timelocal($sec, $min, $hour, $day, $month, $year);
+
+    if (gettimeofday() - $timestamp > $timeout) {
+      return JeeLink_ResetDevice($hash);
+    }
+  }
+}
 
 sub
 JeeLink_Attr(@)
@@ -863,6 +886,18 @@ JeeLink_Attr(@)
   if( $aName eq "Clients" ) {
     $hash->{Clients} = $aVal;
     $hash->{Clients} = $clientsJeeLink if( !$hash->{Clients}) ;
+  
+  } elsif( $aName eq "timeout" ) {
+    return "Usage: attr $name $aName <timeout,checkInterval>" if($aVal && $aVal !~ m/^[0-9]{1,6},[0-9]{1,6}$/);
+
+    my $timerName = $name . "#ResetTimer";
+    RemoveInternalTimer($timerName);
+
+    if($aVal) {
+      my ($timeout, $interval) = split(',', $aVal);
+      InternalTimer(gettimeofday()+$interval, "JeeLink_OnTimer", $timerName, 0);
+    }
+    
   } elsif( $aName eq "MatchList" ) {
     my $match_list;
     if( $cmd eq "set" ) {
@@ -1078,9 +1113,14 @@ sub JeeLink_getIndexOfArray($@) {
 
     <li>flashCommand<br>
       See "Set flash"
+    </li>
+  
+    <li>timeout<br>
+      format: &lt;timeout, checkInterval&gt;
+      Checks every 'checkInterval' seconds if the last data reception is longer than 'timout' seconds ago.<br>
+      If this is the case, a reset is done for the IO-Device.
     </li><br>
-
-
+    
   </ul>
   <br>
 </ul>
