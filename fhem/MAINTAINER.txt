@@ -313,6 +313,7 @@ FHEM/Blocking.pm             rudolfkoenig         http://forum.fhem.de Automatis
 FHEM/DevIo.pm                rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/Color.pm                justme1968           http://forum.fhem.de Sonstiges
 FHEM/FritzBoxUtils.pm        rudolfkoenig         http://forum.fhem.de FRITZ!Box
+FHEM/GDSweblink.pm           jensb                http://forum.fhem.de Unterstuetzende Dienste
 FHEM/HMConfig.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/HttpUtils.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/MaxCommon.pm            mgehre               http://forum.fhem.de MAX
