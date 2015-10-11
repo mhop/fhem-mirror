@@ -434,7 +434,7 @@ sub LW12_Write( $$ ) {
     }
 	else {
 		Log3 $name, 4, "LW12: Can't connect to LW12!";
-		return 0;
+		return "0";
 	}
 }
 
@@ -475,7 +475,7 @@ sub LW12_updateStatus( $ ) {
 	return if IsDisabled($name);
 	
 	my $res = LW12_Write( $hash, "\x{EF}\x{01}\x{77}" );	
-	if (hex($res) != 0){
+	if ($res ne "0"){
     	$res = uc($res);
     	my @colors = ( $res =~ m/..?/g );
     
