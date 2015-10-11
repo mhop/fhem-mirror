@@ -232,17 +232,17 @@ sub GDSAsHtmlH($;$) {
   for(my $i=0; $i<$items; $i++) {
     my $day = int(($i + 1)/2);
     my $timeLabel = $i == 0? ($hour < 17? '18' : '24') : ($i - 1)%2 == 0? '12' : '24';
-    my $weekday = $i == 0? ($hour < 17? 'Spät' : 'Nachts') : ($i - 1)%2 == 0? ReadingsVal($d, "fc".$day."_weekday", "?").' früh' : ReadingsVal($d, "fc".$day."_weekday", "?").' spät';
+    my $weekday = $i == 0? ($hour < 17? 'Spät' : 'Nachts') : ($i - 1)%2 == 0? ReadingsVal($d, "fc".$day."_weekday", "").' früh' : ReadingsVal($d, "fc".$day."_weekday", "").' spät';
     $ret .= sprintf('<td align="center" class="weatherDay">%s</td>', $weekday);
   }
   $ret .= '</tr>';
   
   # condition icon
-  $ret .= sprintf('<tr><td align="center" class="weatherIcon" width=%d>%s</td>', $width, GDSIconIMGTag(ReadingsVal($d, "c_weather", "?"), time_str2num(ReadingsTimestamp($d, "c_weather", TimeNow()))));
+  $ret .= sprintf('<tr><td align="center" class="weatherIcon" width=%d>%s</td>', $width, GDSIconIMGTag(ReadingsVal($d, "c_weather", "na"), time_str2num(ReadingsTimestamp($d, "c_weather", TimeNow()))));
   for(my $i=0; $i<$items; $i++) {
     my $day = int(($i + 1)/2);
     my $timeLabel = $i == 0? ($hour < 17? '18' : '24') : ($i - 1)%2 == 0? '12' : '24';
-    $ret .= sprintf('<td align="center" class="weatherIcon" width=%d>%s</td>', $width, GDSIconIMGTag(ReadingsVal($d, "fc".$day."_weather".$timeLabel, "?"), $i==0 && $hour >= 17? 1 : undef));
+    $ret .= sprintf('<td align="center" class="weatherIcon" width=%d>%s</td>', $width, GDSIconIMGTag(ReadingsVal($d, "fc".$day."_weather".$timeLabel, "na"), $i==0 && $hour >= 17? 1 : undef));
   }
   $ret .= '</tr>';
   
