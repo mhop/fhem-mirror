@@ -1,4 +1,4 @@
-# $Id: GDSweblink.pm 9426 2015-10-11 10:07:59Z betateilchen $
+# $Id$
 package main;
 
 use strict;

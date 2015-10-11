@@ -1,4 +1,4 @@
-# $Id: 55_GDS.pm 9416 2015-10-09 18:25:18Z betateilchen $
+# $Id$
 
 # copyright and license informations
 =pod
@@ -1760,6 +1760,8 @@ sub getListForecastStations($) {
 #	Changelog $Revision: $ 
 #
 ###################################################################################################
+#
+#   ----------  public    RC2 published, SVN #9429
 #
 #   2015-10-11  renamed   99_gdsUtils.pm to GDSweblink.pm
 #               changed   load GDSweblink.pm in eval() on module startup
