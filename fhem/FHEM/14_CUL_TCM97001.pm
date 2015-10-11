@@ -11,6 +11,7 @@
 #  - "NC_WS"
 #  - "GT-WT-02"
 #  - "AURIOL"
+#  - "EAS800"
 #
 # Unsupported models are saved in a device named CUL_TCM97001_Unknown
 #
@@ -54,6 +55,9 @@ my %models = (
     "NC_WS"       => 'NC_WS',
     "GT-WT-02"    => 'GT-WT-02',
     "AURIOL"      => 'AURIOL',
+    "Type1"       => 'Type1',
+    "Mebus"       => 'Mebus',
+    "EAS800"      => 'EAS800',
     "Unknown"     => 'Unknown',
 );
 
@@ -71,7 +75,9 @@ CUL_TCM97001_Initialize($)
                         "model:".join(",", sort keys %models);
 
   $hash->{AutoCreate}=
-        { "CUL_TCM97001.*" => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME" } };
+        { "CUL_TCM97001.*" => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME" },
+          "CUL_TCM97001_Unknown.*" => { GPLOT => "", FILTER => "%NAME" } 
+        };
 }
 
 #############################
@@ -131,6 +137,22 @@ sub checkCRC {
 }
 
 #
+# CRC Check for Mebus
+#
+sub checkCRC_Mebus {
+  my $msg = shift;
+  my @a = split("", $msg);
+
+  my $CRC = ((hex($a[1])+hex($a[2])+hex($a[3])
+            +hex($a[4])+hex($a[5])+hex($a[6])) -1) & 15;
+  my $CRCCHECKVAL= (hex($a[0])); 
+  if ($CRC == $CRCCHECKVAL) {
+      return TRUE;
+  }
+  return FALSE;
+}
+
+#
 # CRC Check for GT-WT-02
 #
 sub checkCRC_GTWT02 {
@@ -139,6 +161,22 @@ sub checkCRC_GTWT02 {
 
   my $CRC = (hex($a[0])+hex($a[1])+hex($a[2])+hex($a[3])
             +hex($a[4])+hex($a[5])+hex($a[6])+hex($a[7])) -1;
+  my $CRCCHECKVAL= (hex($a[7].$a[8].$a[9]) & 0x1F8) >> 3; 
+  if ($CRC == $CRCCHECKVAL) {
+      return TRUE;
+  }
+  return FALSE;
+}
+
+#
+# CRC Check for Sensor-Type1
+#
+sub checkCRC_Type1 {
+  my $msg = shift;
+  my @a = split("", $msg);
+
+  my $CRC = (hex($a[0])+hex($a[1])+hex($a[2])+hex($a[3])
+            +hex($a[4])+hex($a[5])+hex($a[6])+hex($a[7]));
   my $CRCCHECKVAL= (hex($a[7].$a[8].$a[9]) & 0x1F8) >> 3; 
   if ($CRC == $CRCCHECKVAL) {
       return TRUE;
@@ -168,20 +206,18 @@ CUL_TCM97001_Parse($$)
   my @a = split("", $msg);
 
   my $id3 = hex($a[0] . $a[1]);
+  my $idType2 = hex($a[1] . $a[2]);
   #my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
   my $def = $modules{CUL_TCM97001}{defptr}{$id3};
-  #my $def2 = $modules{CUL_TCM97001}{defptr}{$id4};
-  
+  #my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
   
   my $now = time();
 
   my $name = "Unknown";
   if($def) {
     $name = $def->{NAME};
-  #} elsif($def2) {
-  #  $name = $def2->{NAME};
-  } 
+  }
 
   my $readedModel = AttrVal($name, "model", "Unknown");
   
@@ -210,6 +246,7 @@ CUL_TCM97001_Parse($$)
   my $hasbatcheck = FALSE;
   my $hastrend = FALSE;
   my $haschannel = FALSE;
+  my $hasmode = FALSE;
   my $model="Unknown";
   my $temp = undef;
   my $humidity=undef;  
@@ -224,7 +261,8 @@ CUL_TCM97001_Parse($$)
     if($def) {
       $name = $def->{NAME};
     }
-    $readedModel = AttrVal($name, "model", "Unknown");
+
+    $readedModel = AttrVal($name, "model", "Unknown");    
     
     if ($readedModel eq "Unknown" || $readedModel eq "TCM97...") {
       $def = $modules{CUL_TCM97001}{defptr}{$tcm97id};
@@ -258,13 +296,14 @@ CUL_TCM97001_Parse($$)
           Log3 $name, 5, "CUL_TCM97001 Unknown Bit: $unknown";
       }
       
-      if (checkValues($temp, 50)) {
+      if (checkValues($temp, $humidity)) {
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $tcm97id, please define it";
+          Log3 $name, 2, "CUL_TCM97001 Unknown TCM97001 device $tcm97id, please define it";
           return "UNDEFINED CUL_TCM97001_$tcm97id CUL_TCM97001 $tcm97id"; 
         }        
         $packageOK = TRUE;
         $hasbatcheck = TRUE;
+        $hasmode = TRUE;
         $model="TCM97...";
         $readedModel=$model;
       }
@@ -282,21 +321,76 @@ CUL_TCM97001_Parse($$)
       }
       $batbit = ((hex($a[4]) & 0x8) != 0x8);
       $mode = (hex($a[4]) & 0x4) >> 2;
-      if (checkValues($temp, 50)) {
+      if (checkValues($temp, $humidity)) {
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $tcm97id, please define it";
+          Log3 $name, 2, "CUL_TCM97001 Unknown ABS700 device $tcm97id, please define it";
           return "UNDEFINED CUL_TCM97001_$tcm97id CUL_TCM97001 $tcm97id"; 
         }
         $hasbatcheck = TRUE;
         $packageOK = TRUE;
+        $hasmode = TRUE;
         $model="ABS700";
         $readedModel=$model;
       }
     } 
+  } elsif (length($msg) == 10) {
+    my $idType2 = hex($a[1] . $a[2]);
+    $def = $modules{CUL_TCM97001}{defptr}{$idType2};
+    if($def) {
+      $name = $def->{NAME};
+    }
+    
+    $readedModel = AttrVal($name, "model", "Unknown");
+    
+    if (checkCRC_Mebus($msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "Mebus")) {
+        # Protocol prologue start everytime with 1001
+        # Sync bit 9700ms, bit 0 = 350ms, bit 1 = 2000ms
+        # e.g. 8250ED70	    1000  0010  0101  0000  1110  1101  0111
+        #                   A     B     C     D     E     F     G    
+        # A = CRC ((B+C+D+E+F+G)-1)
+        # B+C = Random Address
+        # D+E+F temp (/10) 
+        # G  Bit 4,3 = Channel, Bit 2 = Battery, Bit 1 = Force sending
+        $def = $modules{CUL_TCM97001}{defptr}{$idType2};
+        if($def) {
+          $name = $def->{NAME};
+        } 
+        $temp    = (hex($a[3].$a[4].$a[5])) & 0x3FF;  
+        my $negative    = (hex($a[3])) & 0xC; 
+
+        if ($negative == 0xC) {
+          $temp = (~$temp & 0x03FF) + 1;
+          $temp = -$temp;
+        }
+        $temp = $temp / 10;
+
+        $batbit = (hex($a[6]) & 0x2) >> 1;
+        #$batbit = ~$batbit & 0x1; # Bat bit umdrehen
+        $mode   = (hex($a[6]) & 0x1);
+        $channel = (hex($a[6]) & 0xC) >> 2;
+
+        if (checkValues($temp, $humidity)) {
+          if(!$def) {
+            Log3 $name, 2, "CUL_TCM97001 Unknown Mebus device $idType2, please define it";
+            return "UNDEFINED CUL_TCM97001_$idType2 CUL_TCM97001 $idType2" if(!$def); 
+          }
+          $packageOK = TRUE;
+          $model="Mebus";
+          $readedModel=$model;
+          $hasmode = TRUE;
+          $hasbatcheck = TRUE;
+          $haschannel = TRUE;
+          $id3 = $idType2
+        } else {
+            $name = "Unknown";
+        }
+    }
+
+    
   } elsif (length($msg) == 12) { 
     my $bin = undef;
     my $idType1 = hex($a[0] . $a[1]);
-    #my $idType2 = hex($a[0] . $a[1] . $a[2]);
+    #my $idType2 = hex($a[1] . $a[2]);
     #my $idType3 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
     $def = $modules{CUL_TCM97001}{defptr}{$idType1};
@@ -310,14 +404,14 @@ CUL_TCM97001_Parse($$)
     #} elsif($def3) {
     #  $def = $def3;
     #  $name = $def->{NAME};
+
     }
-    $readedModel = AttrVal($name, "model", "Unknown");
-    Log3 $name, 4, "CUL_TCM97001 Define Name: $name  Model defined: $readedModel";
     
+
     if (checkCRC($msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "TCM21....")) {
         # Long with tmp
         # All nibbles must be reversed  
-        # e.g. 154E800480	   0001	0101 0100	1110 1000	0000 0000	0100 1000	0000
+        # e.g. 154E800480	   0001	0101 0100 1110 1000	0000 0000 0100 1000	0000
         #                      A    B    C    D    E    F    G    H    I
         # A+B = Addess
         # C Bit 1 Battery
@@ -353,10 +447,11 @@ CUL_TCM97001_Parse($$)
         $humidity = hex($aReverse[7]).hex($aReverse[6]);
 
         $batbit = (hex($a[2]) & 0x8) >> 3;
+        #$mode = (hex($a[2]) & 0x4) >> 2; 
 
         if (checkValues($temp, $humidity)) {
           if(!$def) {
-              Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+              Log3 $name, 2, "CUL_TCM97001 Unknown TCM21.... device $idType1, please define it";
               return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1"; 
           }
           $hashumidity = TRUE;    
@@ -369,7 +464,8 @@ CUL_TCM97001_Parse($$)
         }
     } 
 
-    if (checkCRC_GTWT02($msg) == TRUE && ($readedModel eq "GT-WT-02" || $readedModel eq "Unknown")) {
+    if (checkCRC_GTWT02($msg) == TRUE && ($readedModel eq "GT-WT-02" || $readedModel eq "Type1" || $readedModel eq "Unknown")
+        || checkCRC_Type1($msg) == TRUE && ($readedModel eq "Type1" || $readedModel eq "GT-WT-02" || $readedModel eq "Unknown")) {
       #    F    F    0    0    F    9    5    5    F   
         # 1111 1111 0000 0000 1111 1001 0101 0101 1111 
         #    A    B    C    D    E    F    G    H    I 
@@ -383,7 +479,9 @@ CUL_TCM97001_Parse($$)
       if($def) {
         $name = $def->{NAME};
       } 
-      $channel    = (hex($a[2])) & 0x3;
+      $channel = (hex($a[2])) & 0x3;
+      $batbit  = (hex($a[2]) & 0x8) >> 3;
+      $mode    = (hex($a[2]) & 0x4) >> 2;
       $temp    = (hex($a[3].$a[4].$a[5])) & 0x3FF;  
       my $negative    = (hex($a[3])) & 0xC; 
       if ($negative == 0xC) {
@@ -395,16 +493,76 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($temp, $humidity)) {
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+          Log3 $name, 2, "CUL_TCM97001 Unknown device GT-WT-02 $idType1, please define it";
           return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1"; 
         }
         if ($humidity >= 20) {
           $hashumidity = TRUE;
         }
         $hasbatcheck = TRUE;  
-        $haschannel = TRUE;     
+        $haschannel = TRUE;   
+        $hasmode = TRUE;  
         $packageOK = TRUE;
-        $model="GT-WT-02";
+        if (checkCRC_Type1($msg) == TRUE) {
+            $model="GT-WT-02";
+        } else {
+            $model="Type1";
+        }
+        $readedModel=$model;
+      } else {
+          $name = "Unknown";
+      }
+    }
+
+    if (($readedModel eq "EAS800" || (hex($a[6]) == 0xF && $readedModel eq "Unknown"))) {
+      # EAS 800 
+      # G is every time 1111
+      #
+      # 0100 1110 1001 0000 1010 0001 1111 0100 1001 
+      # A    B    C    D    E    F    G    H    I
+      #  
+      # A+B = ID = 4E
+      # C Bit 0 = Bat (1) OK
+      # C Bit 1-3 = Channel 001 = 1
+      # D-F = Temp (0000 1010 0001) = 161 ~ 16,1°
+      # G = Unknown
+      # H+I = hum (0100 1001) = 73
+      $def = $modules{CUL_TCM97001}{defptr}{$idType1};
+      if($def) {
+        $name = $def->{NAME};
+      } 
+      $temp    = (hex($a[3].$a[4].$a[5])) & 0x7FF;  
+      my $negative    = (hex($a[3])) & 0x8; 
+      if ($negative == 0x8) {
+        $temp = (~$temp & 0x07FF) + 1;
+        $temp = -$temp;
+      }
+      $temp = $temp / 10;
+
+      $batbit = (hex($a[2]) & 0x8) >> 3;
+      $batbit = ~$batbit & 0x1; # Bat bit umdrehen
+      $mode   = (hex($a[2]) & 0x4) >> 2;
+      $channel = (hex($a[2])) & 0x3;
+
+      $humidity = hex($a[7].$a[8]) & 0x7F;
+
+      $trend = (hex($a[7]) & 0x3);
+      if (checkValues($temp, 50)) {
+        if(!$def) {
+          Log3 $name, 2, "CUL_TCM97001 Unknown EAS800 device $idType1, please define it";
+          return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
+        }
+        if (defined($humidity)) {
+          if ($humidity >= 20) {
+            $hashumidity = TRUE;
+          }  
+        }  
+        $hasbatcheck = TRUE;
+        $haschannel = TRUE;
+        $hastrend = TRUE;     
+        $packageOK = TRUE;
+        $hasmode = TRUE;
+        $model="EAS800";
         $readedModel=$model;
       } else {
           $name = "Unknown";
@@ -414,7 +572,7 @@ CUL_TCM97001_Parse($$)
       # Check for Prologue
     if ($readedModel eq "Prologue" || (hex($a[0]) == 0x9 && $readedModel eq "Unknown")) {
         # Protocol prologue start everytime with 1001
-        # e.g. 91080F614C	    1001 0001 0000 1000 0000 1111 0110 0001 0100 1100
+        # e.g. 91080F614C	   1001 0001 0000 1000 0000 1111 0110 0001 0100 1100
         #                      A    B    C    D    E    F    G    H    I
         # A = Startbit 1001
         # B+C = Random Address
@@ -435,16 +593,18 @@ CUL_TCM97001_Parse($$)
         }
         $temp = $temp / 10;
 
-        if (hex($a[7]) != 0xC && hex($a[8]) != 0xC) {
+        if (!(hex($a[7]) == 0xC && hex($a[8]) == 0xC)) {
           $humidity = hex($a[7].$a[8]);
         }
 
         $channel = (hex($a[3])) & 0x3;
         $batbit = (hex($a[3]) & 0x8) >> 3;
+        
         $mode = (hex($a[3]) & 0x4) >> 2;
+        
         if (checkValues($temp, $humidity)) {
           if(!$def) {
-            Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+            Log3 $name, 2, "CUL_TCM97001 Unknown Prologue device $idType1, please define it";
             return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1"; 
           }
           if (defined($humidity)) {
@@ -453,6 +613,7 @@ CUL_TCM97001_Parse($$)
             }  
           }  
           $hasbatcheck = TRUE;
+          $hasmode = TRUE;
           $packageOK = TRUE;
           $haschannel = TRUE;
           $model="Prologue";
@@ -494,17 +655,19 @@ CUL_TCM97001_Parse($$)
       $humidity = hex($a[7].$a[8]) & 0x7F;
 
       $batbit = (hex($a[3]) & 0x8) >> 3;
+      $mode   = (hex($a[3]) & 0x4) >> 2;
       $batbit = ~$batbit & 0x1; # Bat bit umdrehen
       $mode = (hex($a[3]) & 0x4) >> 2;
       if (checkValues($temp, $humidity)) {
         if(!$def) {
           #Log3 $name, 2, "CUL_TCM97001 Unknown device $idType3, please define it";
           #return "UNDEFINED CUL_TCM97001_$idType3 CUL_TCM97001 $idType3" if(!$def); 
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+          Log3 $name, 2, "CUL_TCM97001 Unknown NC_WS device $idType1, please define it";
           return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
         }
         $hashumidity = TRUE;
         $hasbatcheck = TRUE;
+        $hasmode = TRUE;
         $packageOK = TRUE;
         $haschannel = TRUE; 
         $model="NC_WS";
@@ -537,7 +700,7 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($temp, $humidity)) {
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+          Log3 $name, 2, "CUL_TCM97001 Unknown Rubicson device $idType1, please define it";
           return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
         }
         $packageOK = TRUE;
@@ -573,18 +736,20 @@ CUL_TCM97001_Parse($$)
       }
       $temp = $temp / 10;
 
-      $batbit = (hex($a[3]) & 0x8) >> 3;
+      $batbit = (hex($a[2]) & 0x8) >> 3;
       $batbit = ~$batbit & 0x1; # Bat bit umdrehen
+      $mode   = (hex($a[2]) & 0x4) >> 2;
 
       $trend = (hex($a[7]) & 0x3);
       if (checkValues($temp, 50)) {
         if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $idType1, please define it";
+          Log3 $name, 2, "CUL_TCM97001 Unknown AURIOL device $idType1, please define it";
           return "UNDEFINED CUL_TCM97001_$idType1 CUL_TCM97001 $idType1" if(!$def); 
         }
         $hasbatcheck = TRUE;
         $hastrend = TRUE;     
         $packageOK = TRUE;
+        $hasmode = TRUE;
         $model="AURIOL";
         $readedModel=$model;
       } else {
@@ -597,11 +762,23 @@ CUL_TCM97001_Parse($$)
   if ($packageOK == TRUE) {
     if($def) {
       $def->{lastT} = $now;
-    } 
+    }
+    readingsBeginUpdate($def);
     my ($val, $valH, $state);
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($temp) );
     $state="T: $val";
+    if ($hashumidity == TRUE) {
+      if ($model eq "Prologue") {
+         # plausibility check 
+         my $oldhumidity = ReadingsVal($name, "humidity", "unknown");
+         if ($oldhumidity eq "unknown" || ($humidity+15 > $oldhumidity && $humidity-15 < $oldhumidity)) {
+            $hashumidity = TRUE;
+         } else {
+            $hashumidity = FALSE;
+         }
+      } 
+    }
     if ($hashumidity == TRUE) {
       $msgtypeH = "humidity";
       $valH = $humidity;
@@ -611,7 +788,7 @@ CUL_TCM97001_Parse($$)
       Log3 $name, 4, "CUL_TCM97001 $msgtype $name $id3 T: $val";
     }
 
-    readingsBeginUpdate($def);
+    
 
 
     if($hastrend) {
@@ -624,59 +801,90 @@ CUL_TCM97001_Parse($$)
     }
     if ($hasbatcheck) {
       my $battery = ReadingsVal($name, "battery", "unknown");
-      if ($batbit) {
-        if ($battery ne  "low") { readingsBulkUpdate($def, "battery", "low"); }
-      } else {
+      if ($battery) {
         if ($battery ne  "ok") { readingsBulkUpdate($def, "battery", "ok"); }
+      } else {
+        if ($battery ne  "low") { readingsBulkUpdate($def, "battery", "low"); }
+      }
+    }
+    if ($hasmode) {
+      my $modeVal = ReadingsVal($name, "mode", "unknown");
+      if ($mode) {
+        if ($modeVal ne  "forced") { readingsBulkUpdate($def, "mode", "forced"); }    
+      } else {
+        if ($modeVal ne  "normal") { readingsBulkUpdate($def, "mode", "normal"); }
       }
     }
     if ($haschannel) {
       my $readChannel = ReadingsVal($name, "channel", "");
       if (defined($readChannel) && $readChannel ne $channel) { readingsBulkUpdate($def, "channel", $channel); }
     }
-    readingsBulkUpdate($def, $msgtype, $val);
+    if ($model eq "Prologue") {
+         # plausibility check 
+         my $oldtemp = ReadingsVal($name, "temperature", "unknown");
+         if ($oldtemp eq "unknown" || ($val+5 > $oldtemp && $val-5 < $oldtemp)) {
+            readingsBulkUpdate($def, $msgtype, $val);
+         }
+    } else { 
+        readingsBulkUpdate($def, $msgtype, $val);
+    }
     if ($hashumidity == TRUE) {
       readingsBulkUpdate($def, $msgtypeH, $valH);
     }
     
     readingsBulkUpdate($def, "state", $state);
-    
+    # for testing only
+    #my $rawlen = length($msg);
+    #my $rawVal = substr($msg, 0, $rawlen-2);
+    #readingsBulkUpdate($def, "RAW", $rawVal);
+
     readingsEndUpdate($def, 1);
     if(defined($rssi)) {
       $def->{RSSI} = $rssi;
     } 
     $attr{$name}{model} = $model;
+
+
+
     return $name;
   } else {
-    my $defUnknown = $modules{CUL_TCM97001}{defptr}{"Unknown"};
-    
-    if (!$defUnknown) {
-      Log3 "Unknown", 2, "CUL_TCM97001 Unknown device Unknown, please define it";
-      return "UNDEFINED CUL_TCM97001_Unknown CUL_TCM97001 Unknown"; 
-    } 
-    $name = $defUnknown->{NAME};
-    Log3 $name, 4, "CUL_TCM97001 Device not implemented yet name Unknown msg $msg";
+    if (length($msg) == 8 || length($msg) == 10 || length($msg) == 12) {
+      my $defUnknown = $modules{CUL_TCM97001}{defptr}{"Unknown"};
+      
+      if (!$defUnknown) {
+        Log3 "Unknown", 2, "CUL_TCM97001 Unknown device Unknown, please define it";
+        return "UNDEFINED CUL_TCM97001_Unknown CUL_TCM97001 Unknown"; 
+      } 
+      $name = $defUnknown->{NAME};
+      Log3 $name, 4, "CUL_TCM97001 Device not implemented yet name Unknown msg $msg";
 
-    my $state="Code: $msg";
+      my $rawlen = length($msg);
+      my $rawVal = substr($msg, 0, $rawlen-2);
+      my $state="Code: $rawVal";
 
-    if ($defUnknown) {
-      $defUnknown->{lastT} = $now;
+      if ($defUnknown) {
+        $defUnknown->{lastT} = $now;
+      }
+
+      $attr{$name}{model} = $model;
+      readingsBeginUpdate($defUnknown);
+      readingsBulkUpdate($defUnknown, "state", $state);
+
+      # for testing only
+      #readingsBulkUpdate($defUnknown, "RAW", $rawVal);
+
+      readingsEndUpdate($defUnknown, 1);
+      if(defined($rssi)) {
+        $defUnknown->{RSSI} = $rssi;
+      }
+
+      #my $defSvg = $defs{"SVG_CUL_TCM97001_Unknown"}; 
+
+      #if ($defSvg) {
+      #  CommandDelete(undef, $defSvg->{NAME});
+      #}
+      return $name;
     }
-
-    $attr{$name}{model} = $model;
-    readingsBeginUpdate($defUnknown);
-    readingsBulkUpdate($defUnknown, "state", $state);
-    readingsEndUpdate($defUnknown, 1);
-    if(defined($rssi)) {
-      $defUnknown->{RSSI} = $rssi;
-    }
-
-    my $defSvg = $defs{"SVG_CUL_TCM97001_Unknown"}; 
-
-    if ($defSvg) {
-      CommandDelete(undef, $defSvg->{NAME});
-    }
-    return $name;
   }
 
 
@@ -704,6 +912,7 @@ CUL_TCM97001_Parse($$)
     <li>NC_WS</li>
     <li>GT-WT-02</li>
     <li>AURIOL</li>
+    <li>EAS800</li>
   </ul>
   <br>
   New received device packages are add in fhem category CUL_TCM97001 with autocreate.
@@ -767,6 +976,7 @@ CUL_TCM97001_Parse($$)
     <li>NC_WS</li>
     <li>GT-WT-02</li>
     <li>AURIOL</li>
+    <li>EAS800</li>
   </ul>
   <br>
   Neu empfangene Sensoren werden in der fhem Kategory CUL_TCM97001 per autocreate angelegt.
