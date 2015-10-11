@@ -38,7 +38,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.2.6";
+my $VERSION = "2.2.7";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -3181,7 +3181,7 @@ sub SYSMON_getFBCRCFEC($$) {
 #------------------------------------------------------------------------------
 # Systemparameter als HTML-Tabelle ausgeben
 # Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
-# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix[:FormatString]]],...)
 # Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesHTML ($;@)
@@ -3194,7 +3194,7 @@ sub SYSMON_ShowValuesHTML ($;@)
 # Systemparameter als HTML-Tabelle ausgeben. Zusaetzlich wird eine Ueberschrift ausgegeben.
 # Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
 # Title: Ueberschrift (Text)
-# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix[:FormatString]]],...)
 # Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesHTMLTitled ($;$@)
@@ -3208,7 +3208,7 @@ sub SYSMON_ShowValuesHTMLTitled ($;$@)
 #------------------------------------------------------------------------------
 # Systemparameter im Textformat ausgeben
 # Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
-# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix[:FormatString]]],...)
 # Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesText('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesText ($;@)
@@ -3221,7 +3221,7 @@ sub SYSMON_ShowValuesText ($;@)
 # Systemparameter im Textformat ausgeben
 # Parameter: Name des SYSMON-Geraetes (muss existieren, kann auch anderer Modul genutzt werden), dessen Daten zur Anzeige gebracht werden sollen.
 # Title: Ueberschrift (Text)
-# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+# (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix[:FormatString]]],...)
 # Beispiel: define sysv weblink htmlCode {SYSMON_ShowValuesText('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: °C', 'cpu_freq:CPU Frequenz: MHz'))}
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesTextTitled ($;$@)
@@ -3238,7 +3238,7 @@ sub SYSMON_ShowValuesTextTitled ($;$@)
 #   Name des SYSMON-Geraetes (muss existieren), dessen Daten zur Anzeige gebracht werden sollen.
 #   Title: Ueberschrift
 #   Format: 0 = Text, 1 = HTML
-#   (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix]],...)
+#   (optional) Liste der anzuzeigenden Werte (ReadingName[:Comment:[Postfix[:FormatString]]],...)
 #------------------------------------------------------------------------------
 sub SYSMON_ShowValuesFmt ($$$;@)
 {
@@ -3265,7 +3265,7 @@ sub SYSMON_ShowValuesFmt ($$$;@)
     # bei der Benutzung mit CloneDummies ist $cur_readings_map nicht unbedingt definiert
     @dataDescription = (DATE,
                         #CPU_TEMP.":".$hash->{helper}{cur_readings_map}->{+CPU_TEMP}.": ".$deg."C", 
-                        CPU_TEMP.":"."CPU temperature".": ".$deg."C", 
+                        CPU_TEMP.":"."CPU temperature".": ".$deg."C".":%.1f", 
                         #CPU_FREQ.":".$hash->{helper}{cur_readings_map}->{+CPU_FREQ}.": "."MHz", 
                         CPU_FREQ.":"."CPU frequency".": "."MHz", 
                         CPU_MODEL_NAME, CPU_BOGOMIPS,
@@ -3341,7 +3341,7 @@ sub SYSMON_ShowValuesFmt ($$$;@)
   
   # oben definierte Werte anzeigen
   foreach (@dataDescription) {
-    my($rName, $rComment, $rPostfix) = split(/:/, $_);
+    my($rName, $rComment, $rPostfix, $fmtStr) = split(/:/, $_);
     if(defined $rName) {
       if(!defined $rComment) {
         $rComment = $hash->{helper}{cur_readings_map}->{$rName};
@@ -3357,6 +3357,9 @@ sub SYSMON_ShowValuesFmt ($$$;@)
       }
       if(!defined $rPostfix) { $rPostfix = ""; }
       if(defined $rVal) {
+        if(defined($fmtStr)) {
+          $rVal = sprintf($fmtStr,$rVal);
+        }
         if($format == 1) {
           $htmlcode .= "<tr><td valign='top'>".$rComment.":&nbsp;</td><td>".$rVal.$rPostfix."</td></tr>";
         } else {
@@ -5216,12 +5219,13 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     The module provides a function that returns selected Readings as HTML.<br>
     As a parameter the name of the defined SYSMON device is expected.<br>
     It can also Reading Group, Clone dummy or other modules be used. Their readings are simple used for display. <br>
-    The second parameter is optional and specifies a list of readings to be displayed in the format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;]]</code>.<br>
-    <code>ReadingName</code> is the Name of desired Reading, <code>Comment</code> is used as the display name and postfix is displayed after eihentlichen value (such as units or as MHz can be displayed).<br>
+    The second parameter is optional and specifies a list of readings to be displayed in the format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;[:&lt;FormatString&gt;]]]</code>.<br>
+    <code>ReadingName</code> is the Name of desired Reading, <code>Comment</code> is used as the display name and postfix is displayed after the value (such as units or as MHz can be displayed).
+    If FormatString is specified, the output is formatted with sprintf (s. sprintf in Perl documentation).<br>
     If no <code>Comment</code> is specified, an internally predefined description is used.<br>
     If no list specified, a predefined selection is used (all values are displayed).<br><br>
     <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
-    <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
+    <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C:%.1f'', 'cpu_freq:CPU Frequenz: MHz'))}</code>
     </ul><br>
   <b>Text output method (see Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
     <ul>
@@ -5886,9 +5890,9 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
     Als Parameter wird der Name des definierten SYSMON-Ger&auml;ts erwartet.<br>
     Es kann auch ReadingsGroup, CloneDummy oder andere Module genutzt werden, dann werden einfach deren Readings verwendet.<br>
     Der zweite Parameter ist optional und gibt eine Liste der anzuzeigende Readings 
-    im Format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;]]</code> an.<br>
+    im Format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;[:&lt;FormatString&gt;]]]</code> an.<br>
     Dabei gibt <code>ReadingName</code> den anzuzeigenden Reading an, der Wert aus <code>Comment</code> wird als der Anzeigename verwendet
-    und <code>Postfix</code> wird nach dem eihentlichen Wert angezeigt (so k&ouml;nnen z.B. Einheiten wie MHz angezeigt werden).<br>
+    und <code>Postfix</code> wird nach dem eihentlichen Wert angezeigt (so k&ouml;nnen z.B. Einheiten wie MHz angezeigt werden). Mit Hilfe von FormatString kann die Ausgabe beeinflusst werden (s. sprintf in PerlDoku).<br>
     Falls kein <code>Comment</code> angegeben ist, wird eine intern vordefinierte Beschreibung angegeben. 
     Bei benutzerdefinierbaren Readings wird ggf. <code>Comment</code> aus der Definition verwendet.<br>
     Wird keine Liste angegeben, wird eine vordefinierte Auswahl verwendet (alle Werte).<br><br>
