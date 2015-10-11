@@ -446,6 +446,7 @@ EnOcean_Initialize($)
 
   $hash->{Match}     = "^EnOcean:";
   $hash->{DefFn}     = "EnOcean_Define";
+  $hash->{DeleteFn}  = "EnOcean_Delete";  
   $hash->{UndefFn}   = "EnOcean_Undef";
   $hash->{ParseFn}   = "EnOcean_Parse";
   $hash->{SetFn}     = "EnOcean_Set";
@@ -8051,7 +8052,7 @@ sub EnOcean_Parse($$)
   if (defined $deleteDevice) {
     # delete device and save config
     CommandDelete(undef, $deleteDevice);
-    CommandDelete(undef, "FileLog_" . $deleteDevice);
+    #CommandDelete(undef, "FileLog_" . $deleteDevice);
     Log3 $name, 2, "EnOcean $name device $deleteDevice deleted";
     if (defined $oldDevice) {
       Log3 $name, 2, "EnOcean $name renamed $oldDevice to $deleteDevice";
@@ -10106,7 +10107,7 @@ sub EnOcean_CommandDelete($) {
   my $name = $hash->{NAME};
   my $oldDevice = $functionHash->{oldDevice};
   CommandDelete(undef, $deleteDevice);
-  CommandDelete(undef, "FileLog_" . $deleteDevice);
+  #CommandDelete(undef, "FileLog_" . $deleteDevice);
   delete $defs{$deleteDevice};
   delete $modules{EnOcean}{defptr}{$hash->{DEF}};
   if (defined $oldDevice) {
@@ -10933,6 +10934,26 @@ EnOcean_Undef($$)
 {
   my ($hash, $name) = @_;
   delete $modules{EnOcean}{defptr}{uc($hash->{DEF})};
+  return undef;
+}
+
+# Delete
+sub
+EnOcean_Delete($$)
+{
+  my ($hash, $name) = @_;
+  my $logName = "FileLog_$name";
+  if (exists $defs{$logName}) {
+    my $count;
+    my $logFile = $defs{$logName}{logfile};
+    Log3 $hash->{NAME}, 2, "EnOcean_Delete (1): $logName $logFile";
+    $logFile =~ /^(.*)($name).*\.(.*)$/;
+    $logFile = $1 . $2 . "*." . $3;
+    CommandDelete(undef, "FileLog_$name");
+    #unlink glob "./log/$name*.log";
+    $count = unlink glob $logFile;
+    Log3 $hash->{NAME}, 2, "EnOcean_Delete (2): $logFile >> $count files deleted";
+  }
   return undef;
 }
 
