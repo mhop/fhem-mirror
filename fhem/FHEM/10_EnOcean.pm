@@ -1,5 +1,12 @@
 ##############################################
 # $Id$
+# 2015-10-11
+
+# Added new EEP:
+# EnOcean_Notify():
+# EnOcean_Attr():
+# Remote Management (incomplete, experimental)
+# commandref: further explanations added
 
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
 # Copyright: Jan Schneider (timberwolf at tec-observer dot de)
@@ -8052,7 +8059,6 @@ sub EnOcean_Parse($$)
   if (defined $deleteDevice) {
     # delete device and save config
     CommandDelete(undef, $deleteDevice);
-    #CommandDelete(undef, "FileLog_" . $deleteDevice);
     Log3 $name, 2, "EnOcean $name device $deleteDevice deleted";
     if (defined $oldDevice) {
       Log3 $name, 2, "EnOcean $name renamed $oldDevice to $deleteDevice";
@@ -10107,9 +10113,6 @@ sub EnOcean_CommandDelete($) {
   my $name = $hash->{NAME};
   my $oldDevice = $functionHash->{oldDevice};
   CommandDelete(undef, $deleteDevice);
-  #CommandDelete(undef, "FileLog_" . $deleteDevice);
-  delete $defs{$deleteDevice};
-  delete $modules{EnOcean}{defptr}{$hash->{DEF}};
   if (defined $oldDevice) {
     Log3 $name, 2, "EnOcean $name: $oldDevice renamed to $deleteDevice";
     CommandRename(undef, "$oldDevice $deleteDevice");
@@ -10117,7 +10120,6 @@ sub EnOcean_CommandDelete($) {
   } else {
     Log3 $name, 2, "EnOcean $name: $deleteDevice deleted";
     CommandSave(undef, undef);
-    #CommandRereadCfg(undef, undef);
   }
   return;
 }
@@ -10946,13 +10948,12 @@ EnOcean_Delete($$)
   if (exists $defs{$logName}) {
     my $count;
     my $logFile = $defs{$logName}{logfile};
-    Log3 $hash->{NAME}, 2, "EnOcean_Delete (1): $logName $logFile";
     $logFile =~ /^(.*)($name).*\.(.*)$/;
     $logFile = $1 . $2 . "*." . $3;
     CommandDelete(undef, "FileLog_$name");
     #unlink glob "./log/$name*.log";
     $count = unlink glob $logFile;
-    Log3 $hash->{NAME}, 2, "EnOcean_Delete (2): $logFile >> $count files deleted";
+    Log3 $hash->{NAME}, 5, "EnOcean_Delete: $logFile >> $count files deleted";
   }
   return undef;
 }
