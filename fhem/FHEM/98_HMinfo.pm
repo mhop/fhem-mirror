@@ -661,10 +661,7 @@ sub HMinfo_tempList(@) { ######################################################
    close(aSave);
     $ret = "incomplete data for ".join("\n     ",@incmpl) if (scalar@incmpl);
   }
-  elsif ($action eq "verify"){
-    $ret = HMinfo_tempListTmpl($hiN,$filter,"",$action,$fName);
-  }
-  elsif ($action eq "restore"){
+  elsif ($action =~ m/(verify|restore)/){
     $ret = HMinfo_tempListTmpl($hiN,$filter,"",$action,$fName);
   }
   else{
@@ -1124,12 +1121,27 @@ sub HMinfo_GetFn($@) {#########################################################
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
     my $repl;
-    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-      unshift @a, $dName;
-      $repl .= HMinfo_templateChk(@a);
-      shift @a;
+    if(@a){
+      foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+        unshift @a, $dName;
+        $repl .= HMinfo_templateChk(@a);
+        shift @a;
+      }
     }
+    else{
+      foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+        next if (!defined $defs{$dName}{helper}{tmpl});
+        foreach (keys %{$defs{$dName}{helper}{tmpl}}){
+          my ($p,$t)=split(">",$_);
+          $repl .= HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
+        }
+      }
+    }
+
     return $repl;
+  }
+  elsif($cmd eq "templateUsg"){##template: see if it applies ------------------
+    return HMinfo_templateUsg($opt,$filter,@a);
   }
   #------------ print tables ---------------
   elsif($cmd eq "peerXref")   {##print cross-references------------------------
@@ -1303,7 +1315,7 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"protoEvents","msgStat","rssi"
             ,"models"
             ,"regCheck","register"
-            ,"templateList","templateChk"
+            ,"templateList","templateChk","templateUsg"
             );
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
@@ -1364,6 +1376,9 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "templateSet"){##template: set of register --------------------
     return HMinfo_templateSet(@a);
   }
+  elsif($cmd eq "templateDel"){##template: set of register --------------------
+    return HMinfo_templateDel(@a);
+  }
   elsif($cmd eq "templateDef"){##template: define one -------------------------
     return HMinfo_templateDef(@a);
   }
@@ -1374,28 +1389,22 @@ sub HMinfo_SetFn($@) {#########################################################
     $ret = HMinfo_status($hash);
   }
   elsif($cmd eq "tempList")   {##handle thermostat templist from file ---------
-    my $fn = $a[1]?$a[1]:"tempList.cfg";
-    $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
-          if ($fn !~ m/\//);
-    $ret = HMinfo_tempList($name,$filter,$a[0],$fn);
-  }
-  elsif($cmd eq "tempListTmpl"){##handle thermostat templist from file --------
-
-    if ($a[0] && $a[0] eq "status"){#show status
-      $ret = HMinfo_tempListTmplView();
-    }
-    elsif ($a[0] && $a[0] eq "genPlot"){#generatelog and gplot file 
+    my $action = $a[0]?$a[0]:"";
+    if ( $action eq "genPlot"){#generatelog and gplot file 
       $ret = HMinfo_tempListTmplGenLog($name,$a[1]);
     }
-    else{
-      if ($a[0] && $a[0] =~ m/(verify|restore)/){#allow default template - i.e. not specified
-        unshift @a,"";
-      }
-      my $fn = $a[2]?$a[2]:"";
-      my $ac = $a[1]?$a[1]:"verify";
-      $fn = AttrVal($name,"configDir",".")."\/".$fn if ($fn && $fn !~ m/\//);
-      $ret = HMinfo_tempListTmpl($name,$filter,$a[0],$ac,$fn);
+    elsif ($action eq "status"){
+      $ret = HMinfo_tempListTmplView();
     }
+    else{
+      my $fn = $a[1]?$a[1]:"tempList.cfg";
+      $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
+            if ($fn !~ m/\//);
+      $ret = HMinfo_tempList($name,$filter,$action,$fn);
+    }
+  }
+  elsif($cmd eq "templateExe"){##template: see if it applies ------------------
+    return HMinfo_templateExe($opt,$filter,@a);
   }
   elsif($cmd eq "loadConfig") {##action: loadConfig----------------------------
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
@@ -1449,8 +1458,8 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"archConfig:-0,-a","saveConfig","verifyConfig","loadConfig","purgeConfig"
             ,"update"
             ,"cpRegs"
-            ,"tempList tempListTmpl"
-            ,"templateDef","templateSet");
+            ,"tempList"
+            ,"templateDef","templateSet","templateDel","templateExe");
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
   return $ret;
@@ -1469,8 +1478,7 @@ sub HMInfo_help(){ ############################################################
            ."\n set loadConfig [<typeFilter>] <file>               # restores register and peer readings if missing"
            ."\n set verifyConfig [<typeFilter>] <file>             # compare curent date with configfile,report differences"
            ."\n set autoReadReg [<typeFilter>]                     # trigger update readings if attr autoReadReg is set"
-           ."\n set tempList [<typeFilter>][save|restore|verify][<filename>]# handle tempList of thermostat devices"
-           ."\n set tempListTmpl[<typeFilter>][templateName][verify|restore|status|genPlot] [<filename>]# program a templist from a template in the file to one or multiple devices"
+           ."\n set tempList [<typeFilter>][save|restore|verify|status|genPlot][<filename>]# handle tempList of thermostat devices"
            ."\n  ---infos---"
            ."\n set update                                         # update HMindfo counts"
            ."\n get register [<typeFilter>]                        # devicefilter parse devicename. Partial strings supported"
@@ -1504,6 +1512,12 @@ sub HMInfo_help(){ ############################################################
            ."\n                 define a template"
            ."\n set templateSet <entity> <templateName> <peer:[long|short]> [<param1> ...] "
            ."\n                 write register according to a given template"
+           ."\n set templateDel <entity> <templateName> <peer:[long|short]>  "
+           ."\n                 remove a template set"
+           ."\n set templateExe <templateName>"
+           ."\n                 write all assigned templates to the file"
+           ."\n get templateUsg <templateName>"
+           ."\n                 show template usage"
            ."\n get templateChk [<typeFilter>] <templateName> <peer:[long|short]> [<param1> ...] "
            ."\n                 compare whether register match the template values"
            ."\n get templateList [<templateName>]         # gives a list of templates or a description of the named template"
@@ -1633,15 +1647,16 @@ sub HMinfo_loadConfig($@) {####################################################
   my @entryNF = ();
   my %changes;
   my @rUpdate;
+  my @tmplList = (); #collect templates
   while(<rFile>){
     chomp;
     my $line = $_;
     $line =~ s/\r//g;
     next if (   $line !~ m/set .* (peerBulk|regBulk) .*/
-             && $line !~ m/setreading .*/);
+             && $line !~ m/(setreading|template.e.) .*/);
     my ($cmd1,$eN,$cmd,$param) = split(" ",$line,4);
     next if ($eN !~ m/$filter/);
-    if (!$eN || !$defs{$eN}){
+    if ($cmd1 !~ m /^template(Def|Set)$/ && (!$eN || !$defs{$eN})){
       push @entryNF,$eN;
       next;
     }
@@ -1649,6 +1664,23 @@ sub HMinfo_loadConfig($@) {####################################################
       $changes{$eN}{$cmd}=$param if (!$defs{$eN}{READINGS}{$cmd});
       $defs{$eN}{READINGS}{$cmd}{VAL} = $param;
       $defs{$eN}{READINGS}{$cmd}{TIME} = "from archive";
+    }
+    elsif($cmd1 eq "templateDef"){
+      if ($eN eq "templateStart"){#if new block we remove all old templates
+        @tmplList = ();
+      }
+      push @tmplList,$line;
+    }
+    elsif($cmd1 eq "templateSet"){
+      my (undef,$eNt,$tpl,$param) = split("=>",$line);
+      if (defined($defs{$eNt})){
+        if($tpl eq "start"){
+          delete $defs{$eNt}{helper}{tmpl};
+        }
+        else{
+          $defs{$eNt}{helper}{tmpl}{$tpl} = $param;
+        }
+      }
     }
     elsif($cmd eq "peerBulk"){
       next if(!$param);
@@ -1699,6 +1731,17 @@ sub HMinfo_loadConfig($@) {####################################################
   $ret .= "\nadded data:\n     "          .join("\n     ",@el)       if (scalar@el);
   $ret .= "\nfile data incomplete:\n     ".join("\n     ",@elincmpl) if (scalar@elincmpl);
   $ret .= "\nentries not defind:\n     "  .join("\n     ",@entryNF)  if (scalar@entryNF);
+  foreach ( @tmplList){
+    my @tmplCmd = split("=>",$_);
+    next if (!defined $tmplCmd[4]);
+    delete $HMConfig::culHmTpl{$tmplCmd[1]};
+    HMinfo_templateDef($tmplCmd[1],$tmplCmd[2],$tmplCmd[3],split(" ",$tmplCmd[4]));
+  }
+  $HMConfig::culHmTpl{tmplDefChange} = 0;# all changes are obsolete
+  $HMConfig::culHmTpl{tmplUsgChange} = 0;# all changes are obsolete
+  foreach my $tmpN(devspec2array("TYPE=CUL_HM")){
+    $defs{$tmpN}{helper}{tmplChg} = 0 if(!$defs{$tmpN}{helper}{role}{vrt});
+  }
 
   return $ret;
 }
@@ -1714,7 +1757,7 @@ sub HMinfo_purgeConfig($) {####################################################
     my $line = $_;
     $line =~ s/\r//g;
     next if (   $line !~ m/set (.*) (peerBulk|regBulk) (.*)/
-             && $line !~ m/setreading .*/);
+             && $line !~ m/(setreading) .*/);#&& $line !~ m/(setreading|templateDef) .*/);
     my ($cmd,$eN,$typ,$p1,$p2) = split(" ",$line,5);
     if ($cmd eq "set" && $typ eq "regBulk"){
       $p1 =~ s/\.RegL_/RegL_/;
@@ -1757,9 +1800,16 @@ sub HMinfo_purgeConfig($) {####################################################
       }
     }
   }
+  print aSave "\n\n";
   print aSave "\n======= finished ===\n";
   close(aSave);
-
+  
+  HMinfo_templateWriteDef($fName);
+  foreach my $eNt(devspec2array("TYPE=CUL_HM")){
+    $defs{$eNt}{helper}{tmplChg} = 1 if(!$defs{$eNt}{helper}{role}{vrt});
+  }
+  HMinfo_templateWriteUsg($fName);
+  
   return $id;
 }
 sub HMinfo_saveConfig($) {#####################################################
@@ -1769,6 +1819,7 @@ sub HMinfo_saveConfig($) {#####################################################
   foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
     CUL_HM_Get($defs{$dName},$dName,"saveConfig",$fN,$strict);
   }
+  HMinfo_templateWrite($fN); 
   HMinfo_purgeConfig($param) if (-e $fN && 200000 < -s $fN);# auto purge if file to big
   return $id;
 }
@@ -1842,6 +1893,7 @@ sub HMinfo_bpAbort($) {#bp timeout ############################################
 sub HMinfo_templateDef(@){#####################################################
   my ($name,$param,$desc,@regs) = @_;
   return "insufficient parameter" if(!defined $param);
+  $HMConfig::culHmTpl{tmplDefChange} = 1;# signal we have a change!
   if ($param eq "del"){
     delete $HMConfig::culHmTpl{$name};
     return;
@@ -1875,7 +1927,7 @@ sub HMinfo_templateDef(@){#####################################################
   $HMConfig::culHmTpl{$name}{t} = $desc;
   
   foreach (@regs){
-    my ($r,$v)=split":",$_;
+    my ($r,$v)=split(":",$_,2);
     if (!defined $v){
       delete $HMConfig::culHmTpl{$name};
       return " empty reg value for $r";
@@ -1883,17 +1935,19 @@ sub HMinfo_templateDef(@){#####################################################
     elsif($v =~ m/^p(.)/){
       return ($1+1)." params are necessary, only $paramNo given"
             if (($1+1)>$paramNo);
-    }
+    } 
     $HMConfig::culHmTpl{$name}{reg}{$r} = $v;
   }
 }
 sub HMinfo_templateSet(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
+  return "aktor $aName unknown"                           if(!$defs{$aName});
+  return "template undefined $tmpl"                       if(!$HMConfig::culHmTpl{$tmpl});
+  return "exec set $aName getConfig first"                if(!(grep /RegL_/,keys%{$defs{$aName}{READINGS}}));
+
+  my $tmplID = "$pSet>$tmpl";
   $pSet = ":" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
-  return "template undefined $tmpl"                       if(!$HMConfig::culHmTpl{$tmpl});
-  return "aktor $aName unknown"                           if(!$defs{$aName});
-  return "exec set $aName getConfig first"                if(!(grep /RegL_/,keys%{$defs{$aName}{READINGS}}));
   return "give <peer>:[short|long] with peer, not $pSet"  if($pName && $pTyp !~ m/(short|long)/);
   $pSet = $pTyp ? ($pTyp eq "long"?"lg":"sh"):"";
   my $aHash = $defs{$aName};
@@ -1921,7 +1975,42 @@ sub HMinfo_templateSet(@){#####################################################
     return $ret if ($ret);
   }
   my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet","exec",split(",",$regCh[0]),$pName);
+  $aHash->{helper}{tmpl}{$tmplID} = join(" ",@p);
+  $HMConfig::culHmTpl{tmplUsgChange} = 1; # mark change
+  $aHash->{helper}{tmplChg} = 1;
   return $ret;
+}
+sub HMinfo_templateDel(@){#####################################################
+  my ($aName,$tmpl,$pSet) = @_;
+  delete $defs{$aName}{helper}{tmpl}{"$pSet>$tmpl"};
+  $HMConfig::culHmTpl{tmplUsgChange} = 1; # mark change
+  $defs{$aName}{helper}{tmplChg} = 1;
+  return;
+}
+sub HMinfo_templateExe(@){#####################################################
+  my ($opt,$filter,$tFilter) = @_;
+  foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+    next if(!defined $defs{$dName}{helper}{tmpl});
+    foreach my $tid(keys %{$defs{$dName}{helper}{tmpl}}){
+      my ($p,$t) = split(">",$tid);
+      next if($tFilter && $tFilter ne $t);
+      HMinfo_templateSet($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$tid}));
+    }
+  }
+  return;
+}
+sub HMinfo_templateUsg(@){#####################################################
+  my ($opt,$filter,$tFilter) = @_;
+  my @ul;
+  foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+    next if(!defined $defs{$dName}{helper}{tmpl});
+    foreach my $tid(keys %{$defs{$dName}{helper}{tmpl}}){
+      my ($p,$t) = split(">",$tid);
+      next if($tFilter && $tFilter ne $t);
+      push @ul,"$dName |$p |$t |$defs{$dName}{helper}{tmpl}{$tid}";
+    }
+  }
+  return join("\n",sort(@ul));
 }
 sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
@@ -1951,7 +2040,7 @@ sub HMinfo_templateChk(@){#####################################################
   foreach my $pS (@pNames){
     ($pName,$pTyp) = split(":",$pS);
     my $replPeer="";
-    if($pName && (grep !/$pName/,ReadingsVal($aName,"peerList" ,undef))){
+    if($pName && (grep !/$pName/,ReadingsVal($aName,"peerList" ,""))){
       $replPeer="  no peer:$pName\n";
     }
     else{
@@ -1983,8 +2072,9 @@ sub HMinfo_templateChk(@){#####################################################
 sub HMinfo_templateList($){####################################################
   my $templ = shift;
   my $reply = "";
-  if(!($templ && (grep /$templ/,keys%HMConfig::culHmTpl))){# list all templates
+  if(!$templ ){# list all templates
     foreach (sort keys%HMConfig::culHmTpl){
+      next if ($_ =~ m/^tmpl...Change$/); #ignore control
       $reply .= sprintf("%-16s params:%-24s Info:%s\n"
                              ,$_
                              ,$HMConfig::culHmTpl{$_}{p}
@@ -1992,7 +2082,7 @@ sub HMinfo_templateList($){####################################################
                        );
     }
   }
-  else{#details about one template
+  elsif( grep /$templ/,keys%HMConfig::culHmTpl ){#details about one template
     $reply = sprintf("%-16s params:%-24s Info:%s\n",$templ,$HMConfig::culHmTpl{$templ}{p},$HMConfig::culHmTpl{$templ}{t});
     foreach (sort keys %{$HMConfig::culHmTpl{$templ}{reg}}){
       my $val = $HMConfig::culHmTpl{$templ}{reg}{$_};
@@ -2004,6 +2094,69 @@ sub HMinfo_templateList($){####################################################
     }
   }
   return $reply;
+}
+sub HMinfo_templateWrite($){###################################################
+  my $fName = shift;
+  HMinfo_templateWriteDef($fName) if ($HMConfig::culHmTpl{tmplDefChange});
+  HMinfo_templateWriteUsg($fName) if ($HMConfig::culHmTpl{tmplUsgChange});
+  return;
+}
+sub HMinfo_templateWriteDef($){###################################################
+  my $fName = shift;
+  $HMConfig::culHmTpl{tmplDefChange} = 0; # reset changed bits
+  my @tmpl =();
+  #set templateDef <templateName> <param1[:<param2>...] <description> <reg1>:<val1> [<reg2>:<val2>] ... 
+  foreach my $tpl(sort keys%HMConfig::culHmTpl){
+    next if ($tpl =~ m/^tmpl...Change$/  ||!defined$HMConfig::culHmTpl{$tpl}{reg}); 
+    my @reg =();
+    foreach (keys%{$HMConfig::culHmTpl{$tpl}{reg}}){
+      push @reg,$_.":".$HMConfig::culHmTpl{$tpl}{reg}{$_};
+    }
+    push @tmpl,sprintf("templateDef =>%s=>%s=>%s=>%s"
+                           ,$tpl
+                           ,($HMConfig::culHmTpl{$tpl}{p}?join(":",split(" ",$HMConfig::culHmTpl{$tpl}{p})):"0")
+                           ,$HMConfig::culHmTpl{$tpl}{t}
+                           ,join(" ",@reg)
+                     );
+  }
+
+  open(aSave, ">>$fName") || return("Can't open $fName: $!");
+  #important - this is the header - prior entires in the file will be ignored
+  print aSave "\n\ntemplateDef templateStart Block stored:".TimeNow()."*******************\n\n";
+  print aSave "\n".$_ foreach(sort @tmpl);
+  print aSave "\n======= finished templates ===\n";
+  close(aSave);
+
+  return;
+}
+sub HMinfo_templateWriteUsg($){###################################################
+  my $fName = shift;
+  $HMConfig::culHmTpl{tmplUsgChange} = 0; # reset changed bits
+  my @tmpl =();
+  foreach my $eN(sort (devspec2array("TYPE=CUL_HM"))){
+    next if($defs{$eN}{helper}{role}{vrt} || !$defs{$eN}{helper}{tmplChg});
+    push @tmpl,sprintf("templateSet =>%s=>start",$eN);# indicates: all entries before are obsolete
+    $defs{$eN}{helper}{tmplChg} = 0;
+    if (defined $defs{$eN}{helper}{tmpl}){
+      foreach my $tid(keys %{$defs{$eN}{helper}{tmpl}}){
+        my ($p,$t) = split(">",$tid);
+        next if (!defined$HMConfig::culHmTpl{$t});
+        push @tmpl,sprintf("templateSet =>%s=>%s=>%s"
+                             ,$eN
+                             ,$tid
+                             ,$defs{$eN}{helper}{tmpl}{$tid}
+                       );
+      }
+    }
+  }
+  if (@tmpl){
+    open(aSave, ">>$fName") || return("Can't open $fName: $!");
+    #important - this is the header - prior entires in the file will be ignored
+    print aSave "\n".$_ foreach(@tmpl);
+    print aSave "\n======= finished templates ===\n";
+    close(aSave);
+  }
+  return;
 }
 
 sub HMinfo_cpRegs(@){##########################################################
@@ -2065,6 +2218,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 1;
 =pod
 =begin html
+
 
 <a name="HMinfo"></a>
 <h3>HMinfo</h3>
@@ -2157,7 +2311,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           list defined templates. If no name is given all templates will be listed<br>
       </li>
-
+      <li><a name="#HMinfotemplateUsg">templateUsg</a> &lt;template&gt; <br>
+          templare usage<br>
+          template filters the output
+      </li>
       <li><a name="#HMinfomsgStat">msgStat</a> <a href="#HMinfoFilter">[filter]</a><br>
           statistic about message transferes over a week<br>
       </li>
@@ -2240,7 +2397,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 
       
          <br>
-      <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter] [save|restore|verify] [&lt;file&gt;]</a><br>
+      <li><a name="#HMinfotempList">tempList</a> <a href="#HMinfoFilter">[filter] [save|restore|verify|status|genPlot] [&lt;file&gt;]</a><br>
           this function supports handling of tempList for thermstates.
           It allows templists to be saved in a separate file, verify settings against the file
           and write the templist of the file to the devices. <br>
@@ -2253,6 +2410,17 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
               to the device</li>
           <li><B>verify</B> file data is compared to readings as present in FHEM. It does not
               verify data in the device - user needs to ensure actuallity of present readings</li>
+          <li><B>status</B> gives an overview of templates being used by any CUL_HM thermostat. It alls showes 
+            templates being defined in the relevant files.
+            <br></li>
+          <li><B>genPlot</B> generates a set of records to display templates graphicaly.<br>
+            Out of the given template-file it generates a .log extended file which contains log-formated template data. timestamps are 
+            set to begin Year 2000.<br>
+            A prepared .gplot file will be added to gplot directory.<br>
+            Logfile-entity <file>_Log will be added if not already present. It is necessary for plotting.<br>
+            SVG-entity <file>_SVG will be generated if not already present. It will display the graph.<br>
+            <br></li>
+          <li><B>file</B> name of the file to be used. Default: <B>tempList.cfg</B></li>
           <br>
           <li><B>filename</B> is the name of the file to be used. Default ist <B>tempList.cfg</B></li>
           File example<br>
@@ -2281,26 +2449,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          </ul>
          <br>
      </li>
-      <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter] [templateName][verify|restore|status|genPlot] [&lt;file&gt;]</a><br>
-            program one or more thermostat lists. The list of thermostats is selected by filter.<br>
-        <ul>
-          <li><B>templateName</B> is the name of the template as being named in the file. The file format ist 
-            identical to <a ref="#HMinfotempList">tempList</a>. If the entity in the file matches templateName the subsequent
-            temp-settings from the file are bing programmed to all Thermostats that match the filter
-            <br></li>
-          <li><B>status</B> gives an overview of templates being used by any CUL_HM thermostat. It alls showes 
-            templates being defined in the relevant files.
-            <br></li>
-          <li><B>genPlot</B> generates a set of records to display templates graphicaly.<br>
-            Out of the given template-file it generates a .log extended file which contains log-formated template data. timestamps are 
-            set to begin Year 2000.<br>
-            A prepared .gplot file will be added to gplot directory.<br>
-            Logfile-entity <file>_Log will be added if not already present. It is necessary for plotting.<br>
-            SVG-entity <file>_SVG will be generated if not already present. It will display the graph.<br>
-            <br></li>
-          <li><B>file</B> name of the file to be used. Default: <B>tempList.cfg</B></li>
-        </ul>
-      </li>
          <br>
       <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
           allows to copy register, setting and behavior of a channel to
@@ -2361,6 +2509,14 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           <br>
 
         </ul>
+      </li>
+      <li><a name="#HMinfotemplateDel">templateDel</a> &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; ]<br>
+         remove a template installed by templateSet
+          <br>
+
+      </li>
+      <li><a name="#HMinfotemplateExe">templateExe</a> &lt;template&gt; <br>
+          executes the register write once again if necessary (e.g. a device had a reset)<br>
       </li>
 
   </ul>
@@ -2583,6 +2739,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateList">templateList [&lt;name&gt;]</a><br>
           zeigt eine Liste von Vorlagen. Ist kein Name angegeben, werden alle Vorlagen angezeigt<br>
       </li>
+      <li><a name="#HMinfotemplateUsg">templateUsg</a> &lt;template&gt; <br>
+          Liste der genutzten templates.<br>
+          template filtert die Einträge nach diesem template
+      </li>
       <li><a name="#HMinfomsgStat">msgStat</a> <a href="#HMinfoFilter">[filter]</a><br>
           zeigt eine Statistik aller Meldungen der letzen Woche<br>
       </li>
@@ -2676,6 +2836,15 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           <li><B>restore</B> in der Datei gespeicherte Termperaturliste wird direkt an das Ger&auml;t gesendet.</li>
           <li><B>verify</B> vergleicht die Temperaturliste in der Datei mit den aktuellen Werten in FHEM. Der Benutzer muss 
               selbst sicher stellen, dass diese mit den Werten im Ger&auml;t &uuml;berein stimmen.</li>
+          <li><B>status</B> gibt einen Ueberblick aller genutzten template files. Ferner werden vorhandene templates in den files gelistst.
+            <br></li>
+          <li><B>genPlot</B> erzeugt einen Satz Daten um temp-templates graphisch darzustellen<br>
+            Aus den gegebenen template-file wird ein .log erweitertes file erzeugt welches log-formatierte daten beinhaltet. 
+            Zeitmarken sind auf Beginn 2000 terminiert.<br>
+            Ein .gplot file wird in der gplt directory erzeugt.<br>
+            Eine Logfile-entity <file>_Log, falls nicht vorhanden, wird erzeugt.<br>
+            Eine SVG-entity <file>_SVG, falls nicht vorhanden, wird erzeugt.<br>
+            </li>
           <br>
           <li><B>filename</B> Name der Datei. Vorgabe ist <B>tempList.cfg</B></li>
           Beispiel f&uuml;r einen Dateiinhalt:<br>
@@ -2704,26 +2873,6 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          <li><B>tempList...</B> Zeiten und Temperaturen sind genau wie im Befehl "set tempList" anzugeben</li>
          <br>
      </li>
-     <li><a name="#HMinfotempListTmpl">tempListTmpl</a> <a href="#HMinfoFilter">[filter]</a>[templateName][verify|restore|status|genPlot] [&lt;file&gt;]</a><br>
-         programmiert eine oder mehrere Thermostatlisten (Vorlagen). Die Liste der Thermostate wird mittels Filter selektiert.<br>
-        <ul>
-          <li><B>templateName</B> ist der Name wie in der Datei angegeben. Das Dateiformat ist identisch mit
-                dem Format von <a ref="#HMinfotempList">tempList</a>. Wenn die in der Datei angegebene Instanz mit templateName
-                &uuml;bereinstimmt, werden die Termperatureinstellungen aus der Datei an diejenigen Thermostate gesendet, die mittels
-                filter ausgew&auml;hlt sind.
-                <br></li>
-          <li><B>status</B> gibt einen Ueberblick aller genutzten template files. Ferner werden vorhandene templates in den files gelistst.
-            <br></li>
-          <li><B>genPlot</B> erzeugt einen Satz Daten um temp-templates graphisch darzustellen<br>
-            Aus den gegebenen template-file wird ein .log erweitertes file erzeugt welches log-formatierte daten beinhaltet. 
-            Zeitmarken sind auf Beginn 2000 terminiert.<br>
-            Ein .gplot file wird in der gplt directory erzeugt.<br>
-            Eine Logfile-entity <file>_Log, falls nicht vorhanden, wird erzeugt.<br>
-            Eine SVG-entity <file>_SVG, falls nicht vorhanden, wird erzeugt.<br>
-            <br></li>
-          <li><B>file</B> Name der Datei. Vorgabe: <B>tempList.cfg</B></li>
-        </ul>
-      </li>
          <br>
       <li><a name="#HMinfocpRegs">cpRegs &lt;src:peer&gt; &lt;dst:peer&gt; </a><br>
           erm&ouml;glicht das Kopieren von Registern, Einstellungen und Verhalten zwischen gleichen Kan&auml;len, bei einem Peer auch
@@ -2783,6 +2932,12 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          templateSet konfiguriert ggf. nur einzelne Register und keinen vollst&auml;ndigen Satz. Dies h&auml;ngt vom Design der Vorlage ab.<br>
          <br>
         </ul>
+      </li>
+      <li><a name="#HMinfotemplateDel">templateDel</a> &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt;<br>
+          entfernt ein Template das mit templateSet eingetragen wurde
+      </li>
+      <li><a name="#HMinfotemplateExe">templateExe</a> &lt;template&gt; <br>
+          führt das templateSet erneut aus. Die Register werden nochmals geschrieben, falls sie nicht zum template passen. <br>
       </li>
     </ul>
   </ul>
@@ -2892,7 +3047,8 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
     <li><b>ERR_names:</b> Fehler: Namen von Instanzen, die in einem ERR_&lt;reading&gt; enthalten sind.</li>
     <li><b>W_sum_&lt;reading&gt;</b> Warnung: Anzahl der mit Attribut <a href="#HMinfosumStatus">sumStatus</a> definierten Readings.</li>
     Beispiele:<br>
-    <ul><code>
+    <ul>
+    <code>
       ERR___rssiCrit LightKittchen,WindowDoor,Remote12<br>
       ERR__protocol NACK:2 ResendFail:5 CmdDel:2 CmdPend:1<br>
       ERR__protoNames LightKittchen,WindowDoor,Remote12,Ligth1,Light5<br>
@@ -2902,7 +3058,8 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       W_sum_battery: ok:5;low:2;<br>
       W_sum_overheat: off:7;<br>
       C_sumDefined: entities:23 device:11 channel:16 virtual:5;<br>
-    </code></ul>
+    </code>
+    </ul>
    </ul>
 </ul>
 =end html

@@ -3187,7 +3187,9 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
 
   if ($mTp eq "40"){ #test
     my $trgCnt = hex(substr($p,2,2));
+    my $err = hex(substr($p,0,2));
     push @evtEt,[$sHash,1,"teamCall:from $dName:$trgCnt"];
+    push @evtEt,[$dHash,1,"battery:"   .(($err&0x80) ? "low":"ok")];
     foreach (split ",",$attr{$sName}{peerIDs}){
       my $tHash = CUL_HM_id2Hash($_);
       push @evtEt,[$tHash,1,"teamCall:from $dName:$trgCnt"];
@@ -4592,7 +4594,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $prgChn = 2;
       $addr = hex($addr);
     }
-
     my $prep = "";
     if ($a[2] =~ m/^(prep|exec)$/){
       $prep = $a[2];
@@ -7017,6 +7018,7 @@ sub CUL_HM_CvTflt($) { # config time -> float
 sub CUL_HM_min2time($) { # minutes -> time
   my $min = shift;
   $min = $min * 30;
+  Log 1,"General time $min : ".sprintf("%02d:%02d",int($min/60),$min%60);
   return sprintf("%02d:%02d",int($min/60),$min%60);
 }
 sub CUL_HM_time2min($) { # minutes -> time
@@ -8193,7 +8195,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           $val = join(" ",split(" ",$val));
           my $nv = ReadingsVal($eN,$tln,"empty");
           $nv = join(" ",split(" ",$nv));
-          push @entryFail,$eN." :".$tln." mismatch" if ($val ne $nv);
+          push @entryFail,$eN." :".$tln." mismatch $val ne $nv ##" if ($val ne $nv);
         }
         elsif($action eq "restore"){
           $val = lc($1)." ".$val if ($tln =~ m/(P.)_._tempList/);

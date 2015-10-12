@@ -1195,7 +1195,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 %culHmTpl = (
    autoOff           => {p=>"time"             ,t=>"staircase - auto off after <time>, extend time with each trigger"
                     ,reg=>{ OnTime          =>"p0"
-                           ,OffTime         =>111600
+                           ,OffTime         =>"unused"
                            ,SwJtOn          =>"on"
                            ,SwJtOff         =>"dlyOn"
                            ,SwJtDlyOn       =>"no"
@@ -1203,8 +1203,8 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                            ,ActionType      =>"jmpToTarget"
                      }}
   ,SwToggle          => {p=>""                 ,t=>"Switch: toggle on trigger"
-                    ,reg=>{ OnTime          =>111600
-                           ,OffTime         =>111600
+                    ,reg=>{ OnTime          =>"unused"
+                           ,OffTime         =>"unused"
                            ,SwJtOn          =>"dlyOff"
                            ,SwJtOff         =>"dlyOn"
                            ,SwJtDlyOn       =>"on"
@@ -1212,8 +1212,8 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                            ,ActionType      =>"jmpToTarget"
                      }}
   ,SwOn              => {p=>""                 ,t=>"Switch: on if trigger"
-                    ,reg=>{ OnTime          =>111600
-                           ,OffTime         =>111600
+                    ,reg=>{ OnTime          =>"unused"
+                           ,OffTime         =>"unused"
                            ,SwJtOn          =>"no"
                            ,SwJtOff         =>"dlyOn"
                            ,SwJtDlyOn       =>"on"
@@ -1221,13 +1221,35 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                            ,ActionType      =>"jmpToTarget"
                      }}
   ,SwOff             => {p=>""                 ,t=>"Switch: off if trigger"
-                    ,reg=>{ OnTime          =>111600
-                           ,OffTime         =>111600
+                    ,reg=>{ OnTime          =>"unused"
+                           ,OffTime         =>"unused"
                            ,SwJtOn          =>"dlyOff"
                            ,SwJtOff         =>"no"
                            ,SwJtDlyOn       =>"dlyOff"
                            ,SwJtDlyOff      =>"off"
                            ,ActionType      =>"jmpToTarget"
+                     }}
+  ,DimOn             => {p=>""                 ,t=>"Dimmer: on if trigger"
+                    ,reg=>{ OnTime          =>"unused"
+                           ,OffTime         =>"unused"
+                           ,DimJtOn         =>"no"
+                           ,DimJtOff        =>"dlyOn"
+                           ,DimJtDlyOn      =>"on"
+                           ,DimJtDlyOff     =>"dlyOn"
+                           ,DimJtRampOff    =>"dlyOn"
+                           ,DimJtRampOn     =>"dlyOn"
+                           ,ActionTypeDim   =>"jmpToTarget"
+                     }}
+  ,DimOff            => {p=>""                 ,t=>"Dimmer: off if trigger"
+                    ,reg=>{ OnTime          =>"unused"
+                           ,OffTime         =>"unused"
+                           ,DimJtOn         =>"dlyOff"
+                           ,DimJtOff        =>"no"
+                           ,DimJtDlyOn      =>"dlyOff"
+                           ,DimJtDlyOff     =>"off"
+                           ,DimJtRampOff    =>"dlyOff"
+                           ,DimJtRampOn     =>"dlyOff"
+                           ,ActionTypeDim   =>"jmpToTarget"
                      }}
   ,motionOnDim       => {p=>"ontime brightness",t=>"Dimmer: on for time if MDIR-brightness below level"
                     ,reg=>{ CtDlyOn         =>"ltLo"
@@ -1237,7 +1259,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                            ,CtValLo         =>"p1"
                            ,CtRampOn        =>"ltLo"
                            ,CtRampOff       =>"ltLo"
-                           ,OffTime         =>111600
+                           ,OffTime         =>"unused"
                            ,OnTime          =>"p0"
 
                            ,ActionTypeDim   =>"jmpToTarget"
@@ -1254,7 +1276,7 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                            ,CtOn            =>"ltLo"
                            ,CtOff           =>"ltLo"
                            ,CtValLo         =>"p1"
-                           ,OffTime         =>111600
+                           ,OffTime         =>"unused"
                            ,OnTime          =>"p0"
 
                            ,ActionType      =>"jmpToTarget"
@@ -1571,10 +1593,10 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                             }
                      ,"HM-Sen-RD-O00"     =>{ fwUpdate       =>"<filename> <bootTime> ..."}
                      ,"HM-MOD-Re-800"     =>{ fwUpdate       =>"<filename> <bootTime> ..."}
+                     ,"HM-LC-Bl1PBU-FM00" =>{ fwUpdate       =>"<filename> <bootTime> ..."}
                      ,"HM-CC-RT-DN00"     =>{ sysTime        =>""
                                              ,fwUpdate       =>"<filename> <bootTime> ..."
                                             }
-                     ,"HM-LC-Bl1PBU-FM00" =>{ fwUpdate       =>"<filename> <bootTime> ..."}
                      ,"HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manual|boost|day|night]"
                                              ,controlManu    =>"[on|off|5.0..30.0]"
                                              ,controlParty   =>"<temp> <startDate> <startTime> <enddate> <endTime>"
