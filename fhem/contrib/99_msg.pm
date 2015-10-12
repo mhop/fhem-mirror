@@ -36,6 +36,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(time);
+use Data::Dumper;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
@@ -139,56 +140,156 @@ sub CommandMsg($$;$$) {
 "Usage: msg [<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>";
     }
 
-    # default commands
-    my %defaults;
+    # FHEM module command schema definitions
+    my $cmdSchema = {
+      'audio' => {
 
-    $defaults{audio}{Normal}    = "set \$DEVICE Speak 40 de |\$TITLE| \$MSG";
-    $defaults{audio}{ShortPrio} = "set \$DEVICE Speak 30 de |\$TITLE| Achtung!";
-    $defaults{audio}{Short}     = "set \$DEVICE Speak 30 de |\$TITLE|";
+        'SONOSPLAYER' => {
+          'Normal'    => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSG%',
+          'ShortPrio' => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSH%',
+          'Short'     => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSH%',
+          'defaultValues' => {
+            'Normal' => {
+              'VOLUME' => 38,
+              'LANG' => 'de',
+            },
+            'ShortPrio' => {
+              'VOLUME' => 33,
+              'LANG' => 'de',
+              'MSGSH' => 'Achtung!',
+            },
+            'Short' => {
+              'VOLUME' => 28,
+              'LANG' => 'de',
+              'MSGSH' => '',
+            },
+          },
+        },
 
-    $defaults{light}{Normal} =
-"{my \$state=ReadingsVal(\"\$DEVICE\",\"state\",\"off\"); fhem \"set \$DEVICE blink 2 1\"; fhem \"sleep 4;set \$DEVICE:FILTER=state!=\$state \$state\"}";
-    $defaults{light}{High} =
-"{my \$state=ReadingsVal(\"\$DEVICE\",\"state\",\"off\"); fhem \"set \$DEVICE blink 10 1\"; fhem \"sleep 20;set \$DEVICE:FILTER=state!=\$state \$state\"}";
-    $defaults{light}{Low} = "set \$DEVICE alert select";
+      },
 
-    $defaults{mail}{Normal} =
-"{system(\"echo '\$MSG' | /usr/bin/mail -s '\$TITLE' -t '\$RECIPIENT'\")}";
-    $defaults{mail}{High} =
-"{system(\"/bin/echo '\$MSG' | /usr/bin/mail -s '\$TITLE' -t '\$RECIPIENT' -a 'MIME-Version: 1.0' -a 'Content-Type: text/html; charset=UTF-8' -a 'X-Priority: 1 (Highest)' -a 'X-MSMail-Priority: High' -a 'Importance: high'\")}";
-    $defaults{mail}{Low} =
-"{system(\"/bin/echo '\$MSG' | /usr/bin/mail -s '\$TITLE' -t '\$RECIPIENT' -a 'MIME-Version: 1.0' -a 'Content-Type: text/html; charset=UTF-8' -a 'X-Priority: 5 (Lowest)' -a 'X-MSMail-Priority: Low' -a 'Importance: low'\")}";
+      'light' => {
 
-    $defaults{push}{Normal} =
-      "set \$DEVICE msg '\$TITLE' '\$MSG' '' \$PRIORITY ''";
-    $defaults{push}{High} =
-      "set \$DEVICE msg '\$TITLE' '\$MSG' '' \$PRIORITY '' 120 600";
-    $defaults{push}{Low} =
-      "set \$DEVICE msg '\$TITLE' '\$MSG' '' \$PRIORITY ''";
+        'HUEDevice' => {
+          'Normal'  => '{my \$state=ReadingsVal("%DEVICE%","state","off"); fhem "set %DEVICE% blink 2 1"; fhem "sleep 4;set %DEVICE%:FILTER=state!=$state $state"}',
+          'High'    => '{my \$state=ReadingsVal("%DEVICE%","state","off"); fhem "set %DEVICE% blink 10 1"; fhem "sleep 20;set %DEVICE%:FILTER=state!=$state $state"}',
+          'Low'     => 'set %DEVICE% alert select',
+        },
+        
+      },
 
-    $defaults{screen}{Normal} = "set \$DEVICE msg info 8 \$MSG";
-    $defaults{screen}{High}   = "set \$DEVICE msg attention 12 \$MSG";
-    $defaults{screen}{Low}    = "set \$DEVICE msg message 8 \$MSG";
+      'mail' => {
 
-    # default forwards
-    my %forwards;
-    $forwards{screen}{gwUnavailable} = "light";
-    $forwards{light}{gwUnavailable}  = "audio";
-    $forwards{audio}{gwUnavailable}  = "text";
-    $forwards{push}{gwUnavailable}   = "mail";
+        'fhemMsgMail' => {
+          'Normal'  => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\'")}',
+          'High'    => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\' -a \'X-Priority: 1 (Highest)\' -a \'X-MSMail-Priority: High\' -a \'Importance: high\'")}',
+          'Low'     => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\' -a \'X-Priority: 5 (Lowest)\' -a \'X-MSMail-Priority: Low\' -a \'Importance: low\'")}',
+        },
+        
+      },
 
-    $forwards{screen}{emergency} = "light";
-    $forwards{light}{emergency}  = "audio";
-    $forwards{audio}{emergency}  = "text";
-    $forwards{push}{emergency}   = "mail";
+      'push' => {
 
-    $forwards{screen}{highPrio}{residentGone} = "light";
-    $forwards{light}{highPrio}{residentGone}  = "audio";
-    $forwards{audio}{highPrio}{residentGone}  = "text";
+        'Pushover' => {
+          'Normal'  => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PUSHDEVICE%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'High'    => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PUSHDEVICE%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'Low'     => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PUSHDEVICE%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'defaultValues' => {
+            'Normal' => {
+              'PUSHDEVICE' => '',
+              'RETRY'     => '',
+              'EXPIRE'    => '',
+              'URLTITLE'  => '',
+              'ACTION'    => '',
+            },
+            'High' => {
+              'PUSHDEVICE' => '',
+              'RETRY'     => '120',
+              'EXPIRE'    => '600',
+              'URLTITLE'  => '',
+              'ACTION'    => '',
+            },
+            'Low' => {
+              'PUSHDEVICE' => '',
+              'RETRY'     => '',
+              'EXPIRE'    => '',
+              'URLTITLE'  => '',
+              'ACTION'    => '',
+            },
+          },
+        },
 
-    $forwards{screen}{highPrio}{residentAbsent} = "light";
-    $forwards{light}{highPrio}{residentAbsent}  = "audio";
-    $forwards{audio}{highPrio}{residentAbsent}  = "text";
+      },
+
+      'screen' => {
+
+        'ENIGMA2' => {
+          'Normal'  => 'set %DEVICE% msg %TYPE% %TIMEOUT% %MSG%',
+          'High'    => 'set %DEVICE% msg %TYPE% %TIMEOUT% %MSG%',
+          'Low'     => 'set %DEVICE% msg %TYPE% %TIMEOUT% %MSG%',
+          'defaultValues' => {
+            'Normal' => {
+              'TYPE' => 'info',
+              'TIMEOUT'     => 8,
+            },
+            'High' => {
+              'TYPE'     => 'attention',
+              'TIMEOUT'     => 12,
+            },
+            'Low' => {
+              'TYPE'     => 'message',
+              'TIMEOUT'     => 8,
+            },
+          },
+        },
+
+      },
+    };
+
+    # default settings
+    my $settings = {
+      'audio' => {
+          'typeEscalation' => {
+            'gwUnavailable' => 'text',
+            'emergency' => 'text',
+            'residentGone' => 'text',
+            'residentAbsent' => 'text',
+          },
+          'title' => 'Announcement',
+      },
+
+      'light' => {
+          'typeEscalation' => {
+            'gwUnavailable' => 'audio',
+            'emergency' => 'audio',
+            'residentGone' => 'audio',
+            'residentAbsent' => 'audio',
+          },        
+          'title' => 'Announcement',
+      },
+
+      'mail' => {
+          'title' => 'System Message',
+      },
+
+      'push' => {
+          'typeEscalation' => {
+            'gwUnavailable' => 'mail',
+            'emergency' => 'mail',
+          },
+          'title' => 'System Message',
+      },
+
+      'screen' => {
+          'typeEscalation' => {
+            'gwUnavailable' => 'light',
+            'emergency' => 'light',
+            'residentGone' => 'light',
+            'residentAbsent' => 'light',
+          },
+          'title' => 'Info',
+      },
+    };
 
     ################################################################
     ### extract message details
@@ -197,7 +298,8 @@ sub CommandMsg($$;$$) {
     my $types      = "";
     my $recipients = "";
     my $priority   = "";
-    my $title      = "";
+    my $title      = "-";
+    my $advanced   = "";
 
     my $priorityCat = "";
 
@@ -228,6 +330,19 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
       )
     {
         $title = $1;
+    }
+
+    # check for advanced options
+    if ( $msg =~ s/[\s\t]*O(\[\{.*\}\])[\s\t]*$// )
+    {
+      # Use JSON module if possible
+      eval 'use JSON qw( decode_json ); 1';
+      if ( !$@ ) {
+        $advanced = decode_json( Encode::encode_utf8($1) );
+        Log3 "global", 5, "msg: Advanced options\n" . Dumper($advanced);
+      } else {
+        Log3 "global", 3, "msg: To use advanced options, please install Perl::JSON.";
+      }
     }
 
     ################################################################
@@ -340,8 +455,8 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                           if ( $testMode ne "1" );
 
                         my $regex1 =
-                          "\s*!?@?" . $device . "[,|]";    # at the beginning
-                        my $regex2 = "[,|]!?@?" . $device . "\s*";  # at the end
+                          "\\s*!?@?" . $device . "[,|]";    # at the beginning
+                        my $regex2 = "[,|]!?@?" . $device . "\\s*";  # at the end
                         my $regex3 =
                           ",!?@?" . $device . ",";    # in the middle with comma
                         my $regex4 =
@@ -349,10 +464,10 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                           . $device
                           . "[\|,]";    # in the middle with pipe and/or comma
 
-                        $recipients =~ s/^$regex1//;
-                        $recipients =~ s/$regex2$/|/g;
-                        $recipients =~ s/$regex3/,/g;
-                        $recipients =~ s/$regex4/|/g;
+                        $recipients =~ s/^$regex1//gi;
+                        $recipients =~ s/$regex2$/|/gi;
+                        $recipients =~ s/$regex3/,/gi;
+                        $recipients =~ s/$regex4/|/gi;
 
                         next;
                     }
@@ -617,39 +732,17 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     ################################################################
                     ### given device name is already a gateway device itself
                     ###
+                    
+                    my $deviceType2 = defined($defs{$device}) ? $defs{$device}{TYPE} : "";
 
                     if (
                            $gatewayDevs eq ""
-                        && defined( $defs{$device} )
+                        && $deviceType2 ne ""
                         && (
-                            $type[$i] eq "screen"
-                            && (   $defs{$device}{TYPE} eq "ENIGMA2"
-                                || $defs{$device}{TYPE} eq "STV" )
-
-                            || (   $type[$i] eq "light"
-                                && $defs{$device}{TYPE} eq "HUEDevice" )
-
-                            || (
-                                $type[$i] eq "audio"
-                                && (
-                                       $defs{$device}{TYPE} eq "SONOSPLAYER"
-                                    || $defs{$device}{TYPE} eq "SB_PLAYER"
-                                    || $defs{$device}{TYPE} eq "Text2Speech"
-                                    || ( $defs{$device}{TYPE} eq "CUL_HM"
-                                        && AttrVal( $device, "model", "" ) eq
-                                        "HM-OU-CFM-PI" )
-                                )
-                            )
-
-                            || (
-                                $type[$i] eq "push"
-                                && (   $defs{$device}{TYPE} eq "PushNotifier"
-                                    || $defs{$device}{TYPE} eq "Pushalot"
-                                    || $defs{$device}{TYPE} eq "Pushbullet"
-                                    || $defs{$device}{TYPE} eq "Pushover"
-                                    || $defs{$device}{TYPE} eq "yowsup"
-                                    || $defs{$device}{TYPE} eq "Jabber" )
-                            )
+                          ( $type[$i] eq "audio"  && defined($cmdSchema->{ $type[$i] }{$deviceType2}) ) ||
+                          ( $type[$i] eq "light"  && defined($cmdSchema->{ $type[$i] }{$deviceType2}) ) ||
+                          ( $type[$i] eq "push"   && defined($cmdSchema->{ $type[$i] }{$deviceType2}) ) ||
+                          ( $type[$i] eq "screen" && defined($cmdSchema->{ $type[$i] }{$deviceType2}) )
                         )
                       )
                     {
@@ -1340,81 +1433,6 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         }
                     }
 
-                    my $defTitle = "System Message";
-                    $defTitle = "Announcement" if ( $type[$i] eq "audio" );
-                    $defTitle = "Announcement" if ( $type[$i] eq "light" );
-                    $defTitle = "Info"         if ( $type[$i] eq "screen" );
-
-                    # use title from device, global or internal default
-                    my $loopTitle;
-                    $loopTitle = $title if ( $title ne "" );
-                    $loopTitle =
-
-                      # look for direct high
-                      AttrVal(
-                        $device, "msgTitle$typeUc$priorityCat",
-
-                        # look for indirect high
-                        AttrVal(
-                            AttrVal( $device, "msgRecipient$typeUc", "" ),
-                            "msgTitle$typeUc$priorityCat",
-
-                            #look for indirect general high
-                            AttrVal(
-                                AttrVal( $device, "msgRecipient", "" ),
-                                "msgTitle$typeUc$priorityCat",
-
-                                # look for global direct high
-                                AttrVal(
-                                    "global", "msgTitle$typeUc$priorityCat",
-
-                                    # look for global indirect high
-                                    AttrVal(
-                                        AttrVal(
-                                            "global", "msgRecipient$typeUc",
-                                            ""
-                                        ),
-                                        "msgTitle$typeUc$priorityCat",
-
-                                        #look for global indirect general high
-                                        AttrVal(
-                                            AttrVal(
-                                                "global", "msgRecipient",
-                                                ""
-                                            ),
-                                            "msgTitle$typeUc$priorityCat",
-
-                                            # default
-                                            $defTitle
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                      ) if ( $title eq "" );
-
-                    my $loopMsg = $msg;
-                    if ( $catchall == 1 ) {
-                        $loopTitle = "Fw: $loopTitle";
-                        if ( $type[$i] eq "mail" ) {
-                            $loopMsg .=
-"\n\n-- \nMail forwarded from device $device due to catchall";
-                        }
-                        else {
-                            $loopMsg .= " ### (from device $device)";
-                        }
-                    }
-
-                    # correct message format
-                    #
-                    $loopMsg =~ s/((|(\d+)| )\|\w+\|( |))/\n\n/g
-                      if ( $type[$i] ne "audio" ); # Remove Sonos Speak commands
-
-                    if ( $type[$i] eq "mail" && $priorityCat ne "" ) {
-                        $loopTitle = "[$priorityCat] $loopTitle";
-                        $loopMsg =~ s/\n/<br \/>/g;
-                    }
-
                     # get resident presence information
                     #
                     my $residentDevState    = "";
@@ -1636,23 +1654,51 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             elsif (
                                 $type[$i] ne "mail"
                                 && (
-                                    AttrVal( $gatewayDev, "disable", "0" ) eq
+                                ReadingsVal(
+                                    $gatewayDev, "power",
+                                    "on"
+                                ) eq "off"
+                                || ReadingsVal(
+                                    $gatewayDev, "presence",
+                                    "present"
+                                ) eq "absent"
+                                || ReadingsVal(
+                                    $gatewayDev, "presence",
+                                    "appeared"
+                                ) eq "disappeared"
+                                || ReadingsVal(
+                                    $gatewayDev, "state",
+                                    "present"
+                                ) eq "absent"
+                                || ReadingsVal(
+                                    $gatewayDev, "state",
+                                    "connected"
+                                ) eq "unauthorized"
+                                || ReadingsVal(
+                                    $gatewayDev, "state",
+                                    "connected"
+                                ) eq "disconnected"
+                                || ReadingsVal(
+                                    $gatewayDev, "state",
+                                    "reachable"
+                                ) eq "unreachable"
+                                || ReadingsVal(
+                                    $gatewayDev, "available",
                                     "1"
-                                    || ReadingsVal( $gatewayDev, "power", "on" )
-                                    eq "off"
-                                    || ReadingsVal( $gatewayDev, "presence",
-                                        "present" ) eq "absent"
-                                    || ReadingsVal( $gatewayDev, "presence",
-                                        "appeared" ) eq "disappeared"
-                                    || ReadingsVal( $gatewayDev, "state",
-                                        "present" ) eq "absent"
-                                    || ReadingsVal( $gatewayDev, "state",
-                                        "reachable" ) eq "unreachable"
-                                    || ReadingsVal(
-                                        $gatewayDev, "reachable", "1"
-                                    ) eq "0"
-                                    || ReadingsVal( $gatewayDev, "reachable",
-                                        "yes" ) eq "no"
+                                ) eq "0"
+                                || ReadingsVal(
+                                    $gatewayDev, "available",
+                                    "yes"
+                                ) eq "no"
+                                || ReadingsVal(
+                                    $gatewayDev, "reachable",
+                                    "1"
+                                ) eq "0"
+                                || ReadingsVal(
+                                    $gatewayDev, "reachable",
+                                    "yes"
+                                ) eq "no"
+
                                 )
                               )
                             {
@@ -1715,12 +1761,92 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 $routeStatus .= "+LOCATION";
                             }
 
-                           # use command from device, global or internal default
-                            my $defCmd;
-                            $defCmd = $defaults{ $type[$i] }{$priorityCat}
-                              if ( $priorityCat ne "" );
-                            $defCmd = $defaults{ $type[$i] }{Normal}
-                              if ( $priorityCat eq "" );
+
+                            my $gatewayType = $type[$i] eq "mail" ? "fhemMsgMail" : $defs{$gatewayDev}{TYPE};
+
+                            my $defTitle = defined($settings->{ $type[$i] }{title}) ? $settings->{ $type[$i] }{title} : "System Message";
+                            $defTitle = $cmdSchema->{ $type[$i] }{$gatewayType}{defaultValues}{$priorityCat}{TITLE}
+                              if ( defined($cmdSchema->{ $type[$i] }{$gatewayType}{defaultValues}{$priorityCat}{TITLE}) && $priorityCat ne "" );
+                            $defTitle = $cmdSchema->{ $type[$i] }{$gatewayType}{defaultValues}{Normal}{TITLE}
+                              if ( defined($cmdSchema->{ $type[$i] }{$gatewayType}{defaultValues}{Normal}{TITLE}) && $priorityCat eq "" );
+
+                            # use title from device, global or internal default
+                            my $loopTitle;
+                            $loopTitle = $title if ( $title ne "-" );
+                            $loopTitle =
+
+                              # look for direct high
+                              AttrVal(
+                                $device, "msgTitle$typeUc$priorityCat",
+
+                                # look for indirect high
+                                AttrVal(
+                                    AttrVal( $device, "msgRecipient$typeUc", "" ),
+                                    "msgTitle$typeUc$priorityCat",
+
+                                    #look for indirect general high
+                                    AttrVal(
+                                        AttrVal( $device, "msgRecipient", "" ),
+                                        "msgTitle$typeUc$priorityCat",
+
+                                        # look for global direct high
+                                        AttrVal(
+                                            "global", "msgTitle$typeUc$priorityCat",
+
+                                            # look for global indirect high
+                                            AttrVal(
+                                                AttrVal(
+                                                    "global", "msgRecipient$typeUc",
+                                                    ""
+                                                ),
+                                                "msgTitle$typeUc$priorityCat",
+
+                                                #look for global indirect general high
+                                                AttrVal(
+                                                    AttrVal(
+                                                        "global", "msgRecipient",
+                                                        ""
+                                                    ),
+                                                    "msgTitle$typeUc$priorityCat",
+
+                                                    # default
+                                                    $defTitle
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                              ) if ( $title eq "-" );
+
+                            if ( $type[$i] eq "mail" && $priorityCat ne "" ) {
+                              $loopTitle = "[$priorityCat] $loopTitle";
+                            }
+
+                            my $loopMsg = $msg;
+                            if ( $catchall == 1 ) {
+                                $loopTitle = "Fw: $loopTitle";
+                                if ( $type[$i] eq "mail" ) {
+                                    $loopMsg .=
+        "\n\n-- \nMail catched from device $device";
+                                }
+                                else {
+                                    $loopMsg .= " ### (Catched from device $device)";
+                                }
+                            }
+
+                            # correct message format
+                            #
+                            $loopMsg =~ s/\n/<br \/>/gi;
+                            $loopMsg =~ s/((|(\d+)| )\|\w+\|( |))/\n\n/gi
+                              if ( $type[$i] ne "audio" ); # Remove Sonos Speak commands
+
+
+                            # use command from device, global or internal default
+                            my $defCmd = "";
+                            $defCmd = $cmdSchema->{ $type[$i] }{$gatewayType}{$priorityCat}
+                              if ( defined($cmdSchema->{ $type[$i] }{$gatewayType}{$priorityCat}) && $priorityCat ne "" );
+                            $defCmd = $cmdSchema->{ $type[$i] }{$gatewayType}{Normal}
+                              if ( defined($cmdSchema->{ $type[$i] }{$gatewayType}{Normal}) && $priorityCat eq "" );
                             my $cmd =
 
                               # gateway device
@@ -1779,15 +1905,78 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 )
                               );
 
-                            $cmd =~ s/\$RECIPIENT/$gatewayDev/g;
-                            $cmd =~ s/\$DEVICE/$gatewayDev/g;
-                            $cmd =~ s/\$PRIORITY/$loopPriority/g;
-                            $cmd =~ s/\$TITLE/$loopTitle/g;
-                            $cmd =~ s/\$MSG/$loopMsg/g;
+                            if ($cmd eq "") {
+                              Log3 $logDevice, 4, "$gatewayDev: Unknown command schema for gateway device type $gatewayType. Use manual definition by userattr msgCmd*";
+                              $return .= "$gatewayDev: Unknown command schema for gateway device type $gatewayType. Use manual definition by userattr msgCmd*\n";
+                              next;
+                            }
+
+                            $cmd =~ s/%DEVICE%/$gatewayDev/gi;
+                            $cmd =~ s/%PRIORITY%/$loopPriority/gi;
+                            $cmd =~ s/%TITLE%/$loopTitle/gi;
+                            $cmd =~ s/%MSG%/$loopMsg/gi;
+
+                            # advanced options from message
+                            if (ref($advanced) eq "ARRAY") {
+                              for my $item (@$advanced) {
+                                 for my $key (keys(%$item)) {
+                                    my $val = $item->{$key};
+                                    $cmd =~ s/%$key%/$val/gi;
+                                 }
+                              }
+                            }
+
+                            # advanced options from command schema hash
+                            if ($priorityCat ne "" && defined( $cmdSchema->{ $type[$i] }{$gatewayType}{defaultValues}{$priorityCat} )) {
+
+                              for my $item ($cmdSchema->{ $type[$i] }{$gatewayType}{defaultValues}{$priorityCat}) {
+                                 for my $key (keys(%$item)) {
+                                    my $val = $item->{$key};
+                                    $cmd =~ s/%$key%/$val/gi;
+                                 }
+                              }
+
+                            }
+                            elsif ($priorityCat eq "" && defined( $cmdSchema->{ $type[$i] }{$gatewayType}{defaultValues}{Normal} )) {
+
+                              for my $item ($cmdSchema->{ $type[$i] }{$gatewayType}{defaultValues}{Normal}) {
+                                 for my $key (keys(%$item)) {
+                                    my $val = $item->{$key};
+                                    $cmd =~ s/%$key%/$val/gi;
+                                 }
+                              }
+
+                            }
 
                             $sentCounter++;
 
                             if ( $routeStatus =~ /^OK\w*/ ) {
+                                  
+                                my $error = 0;
+
+                                # run command
+                                undef $@;
+                                if ( $cmd =~ s/^[ \t]*\{|\}[ \t]*$//gi ) {
+                                    $cmd =~ s/@\w+/\\$&/gi;
+                                    Log3 $logDevice, 5,
+"msg $device: $type[$i] route command (Perl): $cmd";
+                                    eval $cmd;
+                                    if ( $@ ) {
+                                      $error = 1;
+                                      $return .= "$gatewayDev: $@\n";
+                                    }
+                                }
+                                else {
+                                    Log3 $logDevice, 5,
+"msg $device: $type[$i] route command (fhem): $cmd";
+                                    fhem $cmd;
+                                    if ( $@ ) {
+                                      $error = 1;
+                                      $return .= "$gatewayDev: $@\n";
+                                    }
+                                }
+
+                                $routeStatus = "ERROR" if ($error == 1);
 
                                 Log3 $logDevice, 3,
 "msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
@@ -1796,22 +1985,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 "msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
                                   if ( $priorityCat eq "" );
 
-                                # run command
-                                if ( $cmd =~ s/^[ \t]*\{|\}[ \t]*$//g ) {
-                                    $cmd =~ s/@\w+/\\$&/g;
-                                    Log3 $logDevice, 5,
-"msg $device: $type[$i] route command (Perl): $cmd";
-                                    eval $cmd;
-                                }
-                                else {
-                                    Log3 $logDevice, 5,
-"msg $device: $type[$i] route command (fhem): $cmd";
-                                    fhem $cmd;
-                                }
-
-                                $messageSent                 = 1;
-                                $messageSentDev              = 1;
-                                $gatewaysStatus{$gatewayDev} = $routeStatus;
+                                  $messageSent                 = 1 if ($error == 0);
+                                  $messageSentDev              = 1 if ($error == 0);
+                                  $gatewaysStatus{$gatewayDev} = $routeStatus;
                             }
                             elsif ($routeStatus eq "UNAVAILABLE"
                                 || $routeStatus eq "UNDEFINED" )
@@ -1862,9 +2038,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     readingsBeginUpdate($readingsDev);
 
                     readingsBulkUpdate( $readingsDev, "fhemMsg" . $typeUc,
-                        $loopMsg );
+                        $msg );
                     readingsBulkUpdate( $readingsDev,
-                        "fhemMsg" . $typeUc . "Title", $loopTitle );
+                        "fhemMsg" . $typeUc . "Title", $title );
                     readingsBulkUpdate( $readingsDev,
                         "fhemMsg" . $typeUc . "Prio",
                         $loopPriority );
@@ -1906,9 +2082,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             scalar( grep { defined $_ } @recipientsOr ) )
                         {
                             my $regex1 =
-                              "\s*!?@?" . $device . "[,|]";   # at the beginning
+                              "\\s*!?@?" . $device . "[,|]";   # at the beginning
                             my $regex2 =
-                              "[,|]!?@?" . $device . "\s*";    # at the end
+                              "[,|]!?@?" . $device . "\\s*";    # at the end
                             my $regex3 =
                                 ",!?@?"
                               . $device
@@ -1919,9 +2095,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                               . "[\|,]";  # in the middle with pipe and/or comma
 
                             $recipients =~ s/^$regex1//;
-                            $recipients =~ s/$regex2$/|/g;
-                            $recipients =~ s/$regex3/,/g;
-                            $recipients =~ s/$regex4/|/g;
+                            $recipients =~ s/$regex2$/|/gi;
+                            $recipients =~ s/$regex3/,/gi;
+                            $recipients =~ s/$regex4/|/gi;
                         }
 
                         next;
@@ -2019,18 +2195,15 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                       if ( $residentDevPresence ne ""
                         || $residentDevState ne "" );
 
-                    my $fw_gwUnavailable =
-                      $forwards{ $type[$i] }{gwUnavailable};
-                    my $fw_emergency = $forwards{ $type[$i] }{emergency};
-                    my $fw_residentAbsent =
-                      $forwards{ $type[$i] }{highPrio}{residentAbsent};
-                    my $fw_residentGone =
-                      $forwards{ $type[$i] }{highPrio}{residentGone};
+my $fw_gwUnavailable = defined($settings->{ $type[$i] }{typeEscalation}{gwUnavailable}) ? $settings->{ $type[$i] }{typeEscalation}{gwUnavailable} : "";
+my $fw_emergency = defined($settings->{ $type[$i] }{typeEscalation}{emergency}) ? $settings->{ $type[$i] }{typeEscalation}{emergency} : "";
+my $fw_residentAbsent = defined($settings->{ $type[$i] }{typeEscalation}{residentAbsent}) ? $settings->{ $type[$i] }{typeEscalation}{residentAbsent} : "";
+my $fw_residentGone = defined($settings->{ $type[$i] }{typeEscalation}{residentGone}) ? $settings->{ $type[$i] }{typeEscalation}{residentGone} : "";
 
                     # Forward message
                     # if no gateway device for this type was available
                     if (   $messageSentDev == 0
-                        && defined($fw_gwUnavailable)
+                        && $fw_gwUnavailable ne ""
                         && !( $fw_gwUnavailable ~~ @type )
                         && $routes{$fw_gwUnavailable} == 1 )
                     {
@@ -2048,7 +2221,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     # Forward message
                     # if emergency priority
                     if (   $loopPriority >= $msgFwPrioEmergency
-                        && defined($fw_emergency)
+                        && $fw_emergency ne ""
                         && !( $fw_emergency ~~ @type )
                         && $routes{$fw_emergency} == 1 )
                     {
@@ -2067,7 +2240,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     # if high priority and residents are constantly not at home
                     if (   $residentDevPresence eq "absent"
                         && $loopPriority >= $msgFwPrioGone
-                        && defined($fw_residentGone)
+                        && $fw_residentGone ne ""
                         && !( $fw_residentGone ~~ @type )
                         && $routes{$fw_residentGone} == 1 )
                     {
@@ -2087,7 +2260,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     # are not at home but nearby
                     if (   $residentDevState eq "absent"
                         && $loopPriority >= $msgFwPrioAbsent
-                        && defined($fw_residentAbsent)
+                        && $fw_residentAbsent ne ""
                         && !( $fw_residentAbsent ~~ @type )
                         && $routes{$fw_residentAbsent} == 1 )
                     {
