@@ -150,6 +150,7 @@ IT_Set($@)
   if ($hash->{READINGS}{protocol}{VAL} eq "V3") {
       if($na > 1 && $a[0] eq "dim") {  
             $a[0] = ($a[1] eq "0" ? "off" : sprintf("dim%02d%%",$a[1]) );
+            
             splice @a, 1, 1;
             $na = int(@a);
       } elsif ($na == 2 && ($a[0] =~ /dim/)) {
@@ -253,7 +254,13 @@ IT_Set($@)
         }
       
       } else {
-        $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}.$hash->{$c}.$hash->{READINGS}{unit}{VAL});
+        my $stateVal;
+        if ($a[0] eq "off") { 
+          $stateVal = "0"; 
+        } else {
+          $stateVal = $hash->{$c};
+        }
+        $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}.$stateVal.$hash->{READINGS}{unit}{VAL});
       }
     } else {
       $message = "is".uc(substr($hash->{XMIT},0,length($hash->{XMIT})-5).$hash->{READINGS}{group}{VAL}.$hash->{$c}.$hash->{READINGS}{unit}{VAL});
