@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0054 2015-10-09 16:30:00Z Matthias_Deeke $
+# $Id: 73_km200.pm 0055 2015-10-11 10:45:00Z Matthias_Deeke $
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -212,7 +212,8 @@
 #		0053    15.07.2015	Sailor				km200_ParseHttpResponseInit		Static Service deleted
 #		0053    15.07.2015	Sailor				km200_GetStatService			Deleted
 #		0053    15.07.2015	Sailor				km200_ParseHttpResponseStat		Deleted
-#		0053    09.10.2015	Sailor				km200_ParseHttpResponseInit		Adding a timer to restart Initialisation process if first contact failed.
+#		0054    09.10.2015	Sailor				km200_ParseHttpResponseInit		Adding a timer to restart Initialisation process if first contact failed.
+#		0055    09.10.2015	Sailor				km200_ParseHttpResponseInit		Setting state accordingly if connection is failed
 ########################################################################################################################
 
 
@@ -281,7 +282,7 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0054";
+	my $ModuleVersion           = "0055";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
@@ -2076,19 +2077,19 @@ sub km200_ParseHttpResponseInit($)
 	my $type;
     my $json ->{type} = "";
 	
-	
-	### Log entries for debugging purposes
-	# Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: Try to parse     : " .$Service;
-	### Log entries for debugging purposes
-
-	
 	if($err ne "") 
 	{
+		### Create Log entry
 		Log3 $name, 2, $name . " : km200_ParseHttpResponseInit - ERROR - Service: ".$Service. ": No proper Communication with Gateway: " .$err;
 		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_ParseHttpResponseInit ERROR: $err\n");}
+				
+		### Set status of km200 fhem module
+		$hash->{STATE} = "ERROR - Initial Connection failed... Try to re-connect in 10s";
 		
 		### Start the timer for polling again but wait 10s
 		InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 0);
+		
+		### Create Log entry
 		Log3 $name, 2, $name . " : km200_ParseHttpResponseInit - ERROR - Timer restarted to try again in 10s";
 		
 		return "ERROR";	
@@ -3229,9 +3230,9 @@ sub km200_ParseHttpResponseDyn($)
 <ul><ul>
 	<table>
 		<tr>
-			<td align="right" valign="top"><code>&lt;option&gt;</code> : </td><td align="left" valign="top">Das optionelle Argument fð² ¤ie Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>
-																											 &nbsp;&nbsp;Folgende Optionen sind verfð§¢¡r:<BR>
-																											 &nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zurð£«® 
+			<td align="right" valign="top"><code>&lt;option&gt;</code> : </td><td align="left" valign="top">Das optionelle Argument f𲠤ie Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>
+																											 &nbsp;&nbsp;Folgende Optionen sind verf𧢡r:<BR>
+																											 &nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zur𣫮 
 			</td>
 		</tr>
 	</table>
@@ -3314,7 +3315,7 @@ sub km200_ParseHttpResponseDyn($)
 	<table>
 		<tr>
 			<td>
-			<tr><td align="right" valign="top"><li><code>ReadBackDelay</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zurð£«¬esen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>
+			<tr><td align="right" valign="top"><li><code>ReadBackDelay</code> : </li></td><td align="left" valign="top">Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zur𣫬esen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>
 																												   Der  Default-Wert ist 100 = 100ms = 0,1s.<BR>
 			</td></tr>
 			</td>
