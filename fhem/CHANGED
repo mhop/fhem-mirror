@@ -1,5 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: HUEbridge: added support for HUE scenes
+                          (get: scenes; set: savescene, modifyscene, scene)
+                        new unified syntax for multiple lights
+                          in group and scene commands
+                        don't query status after set: use bridge response instead
+                        added queryAfterSet attribute
+  - feature: HUEDevice: added support for HUE scenes (set: savescene, scene)
+                        new unified syntax for multiple lights in lights command
+  - feature: LightScene: support HUE scenes
+                         added asyncDelay attribute
   - bugfix:  10_IT: Fix wrong V3 dimm/off code
   - feature: 73_km200: Improving error message in state
   - feature: SYSMON: FormatString for SYSMON_ShowValues.

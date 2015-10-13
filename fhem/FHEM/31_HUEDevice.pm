@@ -16,6 +16,9 @@ use POSIX;
 use JSON;
 use SetExtensions;
 
+#require "30_HUEBridge.pm";
+#require "$attr{global}{modpath}/FHEM/30_HUEBridge.pm";
+
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my %hueModels = (
@@ -270,7 +273,7 @@ HUEDevice_SetParam($$@)
   if( $cmd eq "color" ) {
     $value = int(1000000/$value);
     $cmd = 'ct';
-  } elsif( $cmd eq "toggle" ) {
+  } elsif( $name && $cmd eq "toggle" ) {
     $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
   } elsif( $cmd =~ m/^dim(\d+)/ ) {
     $value2 = $value;
@@ -290,7 +293,7 @@ HUEDevice_SetParam($$@)
 
   if($cmd eq 'on') {
     $obj->{'on'}  = JSON::true;
-    $obj->{'bri'} = 254 if( ReadingsVal($name,"bri","0") eq 0 );
+    $obj->{'bri'} = 254 if( $name && ReadingsVal($name,"bri","0") eq 0 );
     $obj->{'transitiontime'} = $value * 10 if( defined($value) );
 
   } elsif($cmd eq 'off') {
@@ -318,13 +321,13 @@ HUEDevice_SetParam($$@)
     $obj->{'bri'}  = 0+$value;
     $obj->{'transitiontime'} = $value2 * 10 if( defined($value2) );
 
-  } elsif($cmd eq "dimUp") {
+  } elsif($name && $cmd eq "dimUp") {
     if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (7<<8) ) {
       $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
       $obj->{'bri_inc'}  = 25;
       $obj->{'bri_inc'} = $value if( defined($value) );
       $obj->{'transitiontime'} = 1;
-      $defs{$name}->{helper}->{update_timeout} = 0;
+      #$defs{$name}->{helper}->{update_timeout} = 0;
     } else {
       my $bri = ReadingsVal($name,"bri","0");
       $bri += 25;
@@ -336,13 +339,13 @@ HUEDevice_SetParam($$@)
       $defs{$name}->{helper}->{update_timeout} = 0;
     }
 
-  } elsif($cmd eq "dimDown") {
+  } elsif($name && $cmd eq "dimDown") {
     if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (7<<8) ) {
       $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
       $obj->{'bri_inc'}  = -25;
       $obj->{'bri_inc'} = -$value if( defined($value) );
       $obj->{'transitiontime'} = 1;
-      $defs{$name}->{helper}->{update_timeout} = 0;
+      #$defs{$name}->{helper}->{update_timeout} = 0;
     } else {
       my $bri = ReadingsVal($name,"bri","0");
       $bri -= 25;
@@ -375,7 +378,7 @@ HUEDevice_SetParam($$@)
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
 
-    if( !defined( AttrVal($name, "model", undef) ) ) {
+    if( $name && !defined( AttrVal($name, "model", undef) ) ) {
       my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
 
       $obj->{'on'}  = JSON::true;
@@ -426,11 +429,11 @@ HUEDevice_SetParam($$@)
     $obj->{'effect'}  = $value;
   } elsif( $cmd eq "transitiontime" ) {
     $obj->{'transitiontime'} = 0+$value;
-  } elsif( $cmd eq "delayedUpdate" ) {
+  } elsif( $name &&  $cmd eq "delayedUpdate" ) {
     $defs{$name}->{helper}->{update_timeout} = 1;
-  } elsif( $cmd eq "immediateUpdate" ) {
+  } elsif( $name &&  $cmd eq "immediateUpdate" ) {
     $defs{$name}->{helper}->{update_timeout} = 0;
-  } elsif( $cmd eq "noUpdate" ) {
+  } elsif( $name &&  $cmd eq "noUpdate" ) {
     $defs{$name}->{helper}->{update_timeout} = -1;
   } else {
     return 0;
@@ -443,20 +446,17 @@ sub
 HUEDevice_Set($@)
 {
   my ($hash, $name, @aa) = @_;
+  my ($cmd, @args) = @aa;
 
   my %obj;
 
-  $hash->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 0);
+  $hash->{helper}->{update_timeout} =  AttrVal($name, "delayedUpdate", 1);
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
-    if( $aa[0] eq 'lights' ) {
-      my @lights = ();
-      for my $param (@aa[1..@aa-1]) {
-        $param = $defs{$param}{ID} if( defined $defs{$param} && $defs{$param}{TYPE} eq 'HUEDevice' );
-        push( @lights, $param );
-      }
+    if( $cmd eq 'lights' ) {
+      return "usage: lights <lights>" if( @args != 1 );
 
-      my $obj = { 'lights' => \@lights, };
+      my $obj = { 'lights' => HUEBridge_string2array($args[0]), };
 
       my $result = HUEDevice_ReadFromServer($hash,$hash->{ID},$obj);
       if( $result->{success} ) {
@@ -465,20 +465,51 @@ HUEDevice_Set($@)
       }
 
       return $result->{error}{description} if( $result->{error} );
+      return undef;
 
+    } elsif( $cmd eq 'savescene' ) {
+      return "usage: savescene <id>" if( @args != 1 );
+
+      return fhem( "set $hash->{IODev}{NAME} savescene $aa[1] $aa[1] $hash->{NAME}" );
+
+    } elsif( $cmd eq 'scene' ) {
+      return "usage: scene <id>" if( @args != 1 );
+
+      my $obj = { 'scene' => $aa[1] };
+      $hash->{helper}->{update} = 1;
+      my $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/action",$obj);
+      return $result->{error}{description} if( $result->{error} );
+
+      if( defined($result) && $result->{'error'} ) {
+        $hash->{STATE} = $result->{'error'}->{'description'};
+        return undef;
+      }
+
+      return undef if( !defined($result) );
+
+      if( $hash->{helper}->{update_timeout} == -1 ) {
+      } elsif( $hash->{helper}->{update_timeout} ) {
+        RemoveInternalTimer($hash);
+        InternalTimer(gettimeofday()+$hash->{helper}->{update_timeout}, "HUEDevice_GetUpdate", $hash, 0);
+      } else {
+        RemoveInternalTimer($hash);
+        HUEDevice_GetUpdate( $hash );
+      }
+      return undef;
     }
+
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
 
-    if( $aa[0] eq "statusRequest" ) {
+    if( $cmd eq "statusRequest" ) {
       RemoveInternalTimer($hash);
       HUEDevice_GetUpdate($hash);
       return undef;
     }
 
-    return "Unknown argument $aa[0], choose one of statusRequest:noArg";
+    return "Unknown argument $cmd, choose one of statusRequest:noArg";
   }
 
-  if( $aa[0] eq 'rename' ) {
+  if( $cmd eq 'rename' ) {
     my $new_name =  join( ' ', @aa[1..@aa-1]);
     my $obj = { 'name' => $new_name, };
 
@@ -534,9 +565,9 @@ HUEDevice_Set($@)
     my $result;
     if( $hash->{helper}->{devtype} eq 'G' ) {
       $hash->{helper}->{update} = 1;
-      $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/action",\%obj);
+      $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/action",\%obj);
     } else {
-      $result = HUEDevice_ReadFromServer($hash,$hash->{ID}."/state",\%obj);
+      $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/state",\%obj);
     }
 
     if( defined($result) && $result->{'error'} ) {
@@ -544,6 +575,7 @@ HUEDevice_Set($@)
       return undef;
     }
 
+    $hash->{".triggerUsed"} = 1;
     return undef if( !defined($result) );
 
     if( $hash->{helper}->{update_timeout} == -1 ) {
@@ -571,6 +603,7 @@ HUEDevice_Set($@)
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( $subtype =~ m/dimmer/ );
 
   $list .= " lights" if( $hash->{helper}->{devtype} eq 'G' );
+  $list .= " savescene scene" if( $hash->{helper}->{devtype} eq 'G' );
   $list .= " rename";
 
   return SetExtensions($hash, $list, $name, @aa);
@@ -826,19 +859,16 @@ HUEDevice_Parse($$)
   $hash->{uniqueid} = $result->{'uniqueid'};
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
+    $hash->{STATE} = 'Initialized';
     $hash->{lights} = join( ",", @{$result->{lights}} ) if( $result->{lights} );
 
-    foreach my $id ( @{$result->{lights}} ) {
-      my $code = $hash->{IODev}->{NAME} ."-". $id;
-      my $chash = $modules{HUEDevice}{defptr}{$code};
-
-      HUEDevice_GetUpdate($chash) if( defined($chash) && defined($hash->{helper}->{update}) );
+    if( defined($hash->{helper}->{update}) ) {
+      delete $hash->{helper}->{update};
+      fhem( "set $hash->{IODev}{NAME} statusRequest" );
+      return undef;
     }
 
-    delete $hash->{helper}->{update};
-
     return undef;
-
   }
 
   $hash->{modelid} = $result->{modelid};
@@ -935,6 +965,7 @@ HUEDevice_Parse($$)
   my $reachable = $state->{reachable}?1:0;
   my $colormode = $state->{'colormode'};
   my $bri       = $state->{'bri'};
+     $bri = $hash->{helper}{bri} if( !defined( $bri) );
   my $ct        = $state->{'ct'};
   my $hue       = $state->{'hue'};
   my $sat       = $state->{'sat'};
@@ -1007,6 +1038,9 @@ HUEDevice_Parse($$)
   my $rgb = CommandGet("","$name rgb");
   if( $rgb ne $hash->{helper}{rgb} ) { readingsSingleUpdate($hash,"rgb", $rgb,1); };
   $hash->{helper}{rgb} = $rgb;
+
+  $hash->{helper}->{update_timeout} = -1;
+  RemoveInternalTimer($hash);
 }
 
 1;
@@ -1107,9 +1141,12 @@ HUEDevice_Parse($$)
       <li>delayedUpdate</li>
       <li>immediateUpdate</li>
       <br>
-      <li>lights &lt;light-1&gt[ &lt;light-2&gt;..&lt;light-n&gt;]<br>
+      <li>savescene &lt;id&gt;</li>
+      <li>scene</li>
+      <br>
+      <li>lights &lt;lights&gt;<br>
       Only valid for groups. Changes the list of lights in this group.
-      The lights can be given as fhem device names or bridge device numbers.</li>
+      The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
       <li>rename &lt;new name&gt;<br>
       Renames the device in the bridge and changes the fhem alias.</li>
       <br>

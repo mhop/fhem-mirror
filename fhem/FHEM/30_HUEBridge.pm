@@ -39,7 +39,7 @@ sub HUEBridge_Initialize($)
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList}= "key disable:1 httpUtils:1,0 pollDevices:1";
+  $hash->{AttrList}= "key disable:1 httpUtils:1,0 pollDevices:1 queryAfterSet:1";
 }
 
 sub
@@ -226,14 +226,39 @@ sub HUEBridge_Pair($)
   return undef;
 }
 
+sub
+HUEBridge_string2array($)
+{
+  my ($lights) = @_;
+
+  my %lights = ();
+  foreach my $part ( split(',', $lights) ) {
+    my $light = $part;
+    $light = $defs{$light}{ID} if( defined $defs{$light} && $defs{$light}{TYPE} eq 'HUEDevice' );
+    if( $light =~ m/^G/ ) {
+      my $lights = $defs{$part}->{lights};
+      foreach my $light ( split(',', $lights) ) {
+        $lights{$light} = 1;
+      }
+    } else {
+      $lights{$light} = 1;
+    }
+  }
+
+  my @lights = sort {$a<=>$b} keys(%lights);
+  return \@lights;
+}
 
 sub
 HUEBridge_Set($@)
 {
-  my ($hash, $name, $cmd, $arg, @params) = @_;
+  my ($hash, $name, $cmd, @args) = @_;
+  my ($arg, @params) = @args;
 
   # usage check
   if($cmd eq 'statusRequest') {
+    return "usage: statusRequest" if( @args != 0 );
+
     $hash->{LOCAL} = 1;
     #RemoveInternalTimer($hash);
     HUEBridge_GetUpdate($hash);
@@ -241,6 +266,8 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'swupdate') {
+    return "usage: swupdate" if( @args != 0 );
+
     my $obj = {
       'swupdate' => { 'updatestate' => 3, },
     };
@@ -256,9 +283,13 @@ HUEBridge_Set($@)
     return "starting update";
 
   } elsif($cmd eq 'autocreate') {
+    return "usage: autocreate" if( @args != 0 );
+
     return HUEBridge_Autocreate($hash,1);
 
   } elsif($cmd eq 'autodetect') {
+    return "usage: autodetect" if( @args != 0 );
+
     my $result = HUEBridge_Call($hash, undef, 'lights', undef, 'POST');
 
     return $result->{success}{'/lights'} if( $result->{success} );
@@ -267,9 +298,13 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'delete') {
+    return "usage: delete <id>" if( @args != 1 );
+
     if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
       $arg = $defs{$arg}{ID};
     }
+
+    return "$arg is not hue light number" if( $arg !~ m/^\d+$/ );
 
     my $code = $name ."-". $arg;
     if( defined($modules{HUEDevice}{defptr}{$code}) ) {
@@ -283,15 +318,10 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'creategroup') {
+    return "usage: creategroup <name> <lights>" if( @args < 2 );
 
-    my @lights = ();
-    for my $param (@params) {
-      $param = $defs{$param}{ID} if( defined $defs{$param} && $defs{$param}{TYPE} eq 'HUEDevice' );
-      push( @lights, $param );
-    }
-
-    my $obj = { 'name' => $arg,
-                'lights' => \@lights,
+    my $obj = { 'name' => join( ' ', @args[0..@args-2]),
+                'lights' => HUEBridge_string2array($args[@args-1]),
     };
 
     my $result = HUEBridge_Call($hash, undef, 'groups', $obj, 'POST');
@@ -307,7 +337,10 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'deletegroup') {
+    return "usage: deletegroup <id>" if( @args != 1 );
+
     if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
+      return "$arg is not a hue group" if( $defs{$arg}{ID} != m/^G/ );
       $defs{$arg}{ID} =~ m/G(.*)/;
       $arg = $1;
     }
@@ -318,12 +351,66 @@ HUEBridge_Set($@)
       CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
     }
 
+    return "$arg is not hue group number" if( $arg !~ m/^\d+$/ );
+
     my $result = HUEBridge_Call($hash, undef, "groups/$arg", undef, 'DELETE');
     return $result->{error}{description} if( $result->{error} );
 
     return undef;
 
+  } elsif($cmd eq 'savescene') {
+    return "usage: savescene <id> <name> <lights>" if( @args < 3 );
+
+    my $obj = { 'name' => join( ' ', @args[1..@args-2]),
+                'lights' => HUEBridge_string2array($args[@args-1]),
+    };
+
+    my $result = HUEBridge_Call($hash, undef, "scenes/$arg", $obj, 'PUT');
+
+    if( $result->{success} ) {
+      return "created $arg";
+    }
+
+    return $result->{error}{description} if( $result->{error} );
+    return undef;
+
+  } elsif($cmd eq 'modifyscene') {
+    return "usage: modifyscene <id> <light> <light args>" if( @args < 3 );
+
+    my( $light, @aa ) = @params;
+    $light = $defs{$light}{ID} if( defined $defs{$light} && $defs{$light}{TYPE} eq 'HUEDevice' );
+
+    my %obj;
+    if( (my $joined = join(" ", @aa)) =~ /:/ ) {
+      my @cmds = split(":", $joined);
+      for( my $i = 0; $i <= $#cmds; ++$i ) {
+        HUEDevice_SetParam(undef, \%obj, split(" ", $cmds[$i]) );
+      }
+    } else {
+      my ($cmd, $value, $value2, @a) = @aa;
+
+      HUEDevice_SetParam(undef, \%obj, $cmd, $value, $value2);
+    }
+
+    my $result = HUEBridge_Call($hash, undef, "scenes/$arg/lights/$light/state", \%obj, 'PUT');
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef;
+
+  } elsif($cmd eq 'scene') {
+    return "usage: scene <id>" if( @args != 1 );
+
+    my $obj = { 'scene' => $arg };
+    my $result = HUEBridge_Call($hash, undef, "groups/0/action", $obj, 'PUT');
+    return $result->{error}{description} if( $result->{error} );
+
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+10, "HUEBridge_GetUpdate", $hash, 0);
+
+    return undef;
+
   } elsif($cmd eq 'deletewhitelist') {
+    return "usage: deletewhitelist <key>" if( @args != 1 );
 
     my $result = HUEBridge_Call($hash, undef, "config/whitelist/$arg", undef, 'DELETE');
     return $result->{error}{description} if( $result->{error} );
@@ -331,6 +418,8 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'touchlink') {
+    return "usage: touchlink" if( @args != 0 );
+
     my $obj = { 'touchlink' => JSON::true };
 
     my $result = HUEBridge_Call($hash, undef, 'config', $obj, 'PUT');
@@ -342,7 +431,7 @@ HUEBridge_Set($@)
 
 
   } else {
-    my $list = "delete creategroup deletegroup deletewhitlist touchlink autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup savescene modifyscene scene deletewhitlist touchlink autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -356,10 +445,11 @@ HUEBridge_Get($@)
   return "$name: get needs at least one parameter" if( !defined($cmd) );
 
   # usage check
-  if($cmd eq 'devices') {
+  if($cmd eq 'devices'
+     || $cmd eq 'lights') {
     my $result =  HUEBridge_Call($hash, undef, 'lights', undef);
     my $ret = "";
-    foreach my $key ( sort {$a<=>$b} keys %$result ) {
+    foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-". $key;
       my $fhem_name ="";
       $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
@@ -372,7 +462,7 @@ HUEBridge_Get($@)
     my $result =  HUEBridge_Call($hash, undef, 'groups', undef);
     $result->{0} = { name => 'Lightset 0', type => 'LightGroup', lights => ["ALL"] };
     my $ret = "";
-    foreach my $key ( sort {$a<=>$b} keys %$result ) {
+    foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-G". $key;
       my $fhem_name ="";
       $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
@@ -381,16 +471,25 @@ HUEBridge_Get($@)
     $ret = sprintf( "%2s  %-15s %-15s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE", "LIGHTS" ) .$ret if( $ret );
     return $ret;
 
+  } elsif($cmd eq 'scenes') {
+    my $result =  HUEBridge_Call($hash, undef, 'scenes', undef);
+    my $ret = "";
+    foreach my $key ( sort {$a cmp $b} keys %{$result} ) {
+      $ret .= sprintf( "%-20s %-20s %s\n", $key, $result->{$key}{name}, join( ",", @{$result->{$key}{lights}} ) );
+    }
+    $ret = sprintf( "%-20s %-20s %s\n", "ID", "NAME", "LIGHTS" ) .$ret if( $ret );
+    return $ret;
+
   } elsif($cmd eq 'sensors') {
     my $result =  HUEBridge_Call($hash, undef, 'sensors', undef);
     my $ret = "";
-    foreach my $key ( sort {$a<=>$b} keys %$result ) {
+    foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-S". $key;
       my $fhem_name ="";
       $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
       $ret .= sprintf( "%2i: %-15s %-15s %-15s\n", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
     }
-    $ret = sprintf( "%2s  %-15s %-15s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE", "LIGHTS" ) .$ret if( $ret );
+    $ret = sprintf( "%2s  %-15s %-15s %-15s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
     return $ret;
 
   } elsif($cmd eq 'whitelist') {
@@ -404,7 +503,7 @@ HUEBridge_Get($@)
     return $ret;
 
   } else {
-    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg sensors:noArg whitelist:noArg";
+    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg scenes:noArg sensors:noArg whitelist:noArg";
   }
 }
 
@@ -502,7 +601,7 @@ HUEBridge_Autocreate($;$)
 
   my $autocreated = 0;
   my $result =  HUEBridge_Call($hash,undef, 'lights', undef);
-  foreach my $key ( keys %$result ) {
+  foreach my $key ( keys %{$result} ) {
     my $id= $key;
 
     my $code = $name ."-". $id;
@@ -531,7 +630,7 @@ HUEBridge_Autocreate($;$)
 
   $result =  HUEBridge_Call($hash,undef, 'groups', undef);
   $result->{0} = { name => "Lightset 0", };
-  foreach my $key ( keys %$result ) {
+  foreach my $key ( keys %{$result} ) {
     my $id= $key;
 
     my $code = $name ."-G". $id;
@@ -580,23 +679,38 @@ sub HUEBridge_ProcessResponse($$)
           $hash->{STATE} = $error;
         }
 
-if( 0 ) {
+    if( !AttrVal( $name,'queryAfterSet', 0 ) ) {
+      my $successes;
+      my $errors;
       my %json = ();
       foreach my $item (@{$obj}) {
         if( my $success = $item->{success} ) {
+          next if( ref($success) ne 'HASH' );
           foreach my $key ( keys %{$success} ) {
             my @l = split( '/', $key );
+            next if( !$l[1] );
             if( $l[1] eq 'lights' && $l[3] eq 'state' ) {
               $json{$l[2]}->{state}->{$l[4]} = $success->{$key};
+              $successes++;
+
+            } elsif( $l[1] eq 'groups' && $l[3] eq 'action' ) {
+              my $code = $name ."-G". $l[2];
+              my $d = $modules{HUEDevice}{defptr}{$code};
+              my $lights = $d->{lights};
+              foreach my $light ( split(',', $lights) ) {
+                $json{$light}->{state}->{$l[4]} = $success->{$key};
+                $successes++;
+              }
+
             }
           }
 
         } elsif( my $error = $item->{error} ) {
           my $msg = $error->{'description'};
           Log3 $name, 3, $msg;
+          $errors++;
         }
       }
-#Log 3, Dumper \%json;
 
       foreach my $id ( keys %json ) {
         my $code = $name ."-". $id;
@@ -605,7 +719,9 @@ if( 0 ) {
           HUEDevice_Parse( $chash, $json{$id} );
         }
       }
-}
+    }
+
+      #return undef if( !$errors && $successes );
 
       return ($obj->[0]);
     }
@@ -698,7 +814,8 @@ HUEBridge_HTTP_Call($$$;$)
   } elsif($ret eq '') {
     return undef;
   } elsif($ret =~ /^error:(\d){3}$/) {
-    return "HTTP Error Code " . $1;
+    my %result = { error => "HTTP Error Code $1" };
+    return \%result;
   }
 
   if( !$ret ) {
@@ -807,11 +924,15 @@ HUEBridge_dispatch($$$;$)
       return undef;
     }
 
+    my $queryAfterSet = AttrVal( $name,'queryAfterSet', 0 );
+
     $json = from_json($data) if( !$json );
     my $type = $param->{type};
 
     if( ref($json) eq 'ARRAY' )
       {
+        HUEBridge_ProcessResponse($hash,$json) if( !$queryAfterSet );
+
         if( defined($json->[0]->{error}))
           {
             my $error = $json->[0]->{error}->{'description'};
@@ -892,13 +1013,15 @@ HUEBridge_dispatch($$$;$)
       HUEDevice_Parse($param->{chash},$json);
 
     } elsif( $type =~ m/^lights\/(\d*)\/state$/ ) {
-      my $chash = $param->{chash};
-      if( $chash->{helper}->{update_timeout} ) {
-        RemoveInternalTimer($chash);
-        InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $chash, 0);
-      } else {
-        RemoveInternalTimer($chash);
-        HUEDevice_GetUpdate( $chash );
+      if( $queryAfterSet ) {
+        my $chash = $param->{chash};
+        if( $chash->{helper}->{update_timeout} ) {
+          RemoveInternalTimer($chash);
+          InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $chash, 0);
+        } else {
+          RemoveInternalTimer($chash);
+          HUEDevice_GetUpdate( $chash );
+        }
       }
 
     } elsif( $type =~ m/^groups\/(\d*)\/action$/ ) {
@@ -1000,7 +1123,8 @@ HUEBridge_HTTP_Request($$$@)
   }
   undef $conn;
   if($header[0] =~ /^[^ ]+ ([\d]{3})/ && $1 != 200) {
-    return "error:" . $1;
+    my %result = { error => "error: $1" };
+    return \%result;
   }
   return $ret;
 }
@@ -1057,6 +1181,8 @@ HUEBridge_HTTP_Request($$$@)
       list the devices known to the bridge.</li>
     <li>groups<br>
       list the groups known to the bridge.</li>
+    <li>scenes<br>
+      list the scenes known to the bridge.</li>
     <li>sensors<br>
       list the sensors known to the bridge.</li>
     <li>whitelist<br>
@@ -1074,11 +1200,18 @@ HUEBridge_HTTP_Request($$$@)
       can be created by <code>set <bridge> autocreate</code>.</li>
     <li>delete &lt;name&gt;|&lt;id&gt;<br>
       Deletes the given device in the bridge and deletes the associated fhem device.</li>
-    <li>creategroup &lt;name&gt; &lt;light-1&gt[ &lt;light-2&gt;..&lt;lignt-n&gt;]<br>
-      Create a group out of &lt;light-1&gt-&lt;light-n&gt in the bridge.
-      The lights can be given as fhem device names or bridge device numbers.</li>
+    <li>creategroup &lt;name&gt; &lt;lights&gt;<br>
+      Create a group out of &lt;lights&gt; in the bridge.
+      The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
     <li>deletegroup &lt;name&gt;|&lt;id&gt;<br>
       Deletes the given group in the bridge and deletes the associated fhem device.</li>
+    <li>savescene &lt;id&gt; &lt;name&gt; &lt;lights&gt;<br>
+      Create a scene from the current state of &lt;lights&gt; in the bridge.
+      The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
+    <li>scene &lt;id&gt;<br>
+      Recalls the scene with the given id.</li>
+    <li>modifyscene &lt;id&gt; &lt;light&gt; &lt;light-args&gt;<br>
+      Modifys the given scene in the bridge.</li>
     <li>deletwhitelist &lt;key&gt;<br>
       Deletes the given key from the whitelist in the bridge.</li>
     <li>touchlink<br>

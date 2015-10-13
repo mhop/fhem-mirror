@@ -29,7 +29,7 @@ sub LightScene_Initialize($)
   $hash->{SetFn}    = "LightScene_Set";
   $hash->{GetFn}    = "LightScene_Get";
   $hash->{AttrFn}   = "LightScene_Attr";
-  $hash->{AttrList} = "followDevices:1,2 switchingOrder ". $readingFnAttributes;
+  $hash->{AttrList} = "async_delay followDevices:1,2 switchingOrder ". $readingFnAttributes;
 
   $hash->{FW_detailFn}  = "LightScene_detailFn";
   $data{FWEXT}{"/LightScene"}{FUNC} = "LightScene_CGI"; #mod
@@ -76,6 +76,9 @@ sub LightScene_Define($$)
   }
 
   LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
+
+  my @arr = ();
+  $hash->{".asyncQueue"} = \@arr;
 
   $hash->{STATE} = 'Initialized';
 
@@ -410,9 +413,9 @@ LightScene_Load($)
 }
 
 sub
-LightScene_SaveDevice($$)
+LightScene_SaveDevice($$;$)
 {
-  my($hash,$d) = @_;
+  my($hash,$d,$scene) = @_;
 
   my $state = "";
   my $icon = undef;
@@ -490,10 +493,22 @@ LightScene_SaveDevice($$)
       $state = "rgb ". $state if( $state ne "off" );
   } elsif( $type eq 'HUEDevice' ) {
     my $subtype = AttrVal($d,"subType","");
-    if( $subtype eq "switch" || Value($d) eq "off" ) {
+    if( $defs{$d}->{helper}->{devtype} eq "G" ) {
+
+      if( $scene ) {
+        my $id = "FHEM-$hash->{NAME}-$scene";
+        $state = "scene $id";
+        fhem( "set $d savescene $id" );
+      } else {
+        $state = "<unknown>";
+      }
+
+    } elsif( $subtype eq "switch" || Value($d) eq "off" ) {
       $state = Value($d);
+
     } elsif( $subtype eq "dimmer" ) {
       $state = "bri ". ReadingsVal($d,'bri',"0");
+
     } elsif( $subtype =~ m/color|ct/ ) {
       my $cm = ReadingsVal($d,"colormode","");
       if( $cm eq "ct" ) {
@@ -505,6 +520,7 @@ LightScene_SaveDevice($$)
         $state = "bri ". ReadingsVal($d,'bri',"0") ." : xy ". ReadingsVal($d,'xy',"");
       }
     }
+
   } elsif( $type eq 'IT' ) {
     my $subtype = AttrVal($d,"model","");
     if( $subtype eq "itswitch" ) {
@@ -535,11 +551,22 @@ LightScene_RestoreDevice($$$)
       return ("",0) if( $state eq $cmd );
     }
 
+  my $async_delay = AttrVal($hash->{NAME}, "async_delay", undef);
   my $ret;
   if( $cmd =~m/^;/ ) {
-    $ret = AnalyzeCommandChain(undef,"$cmd");
+    if(defined($async_delay)) {
+      push @{$hash->{".asyncQueue"}}, $cmd;
+    } else {
+      $ret = AnalyzeCommandChain(undef,$cmd);
+    }
+
   } else {
-    $ret = CommandSet(undef,"$d $cmd");
+    if(defined($async_delay)) {
+      push @{$hash->{".asyncQueue"}}, "$d $cmd";
+    } else {
+      $ret = CommandSet(undef,"$d $cmd");
+    }
+
   }
 
   return ($ret,1);
@@ -608,6 +635,8 @@ LightScene_Set($@)
   }
 
   my $count = 0;
+  my $async_delay = AttrVal($hash->{NAME}, "async_delay", undef);
+  my $asyncQueueLength = @{$hash->{".asyncQueue"}};
   foreach my $d (@devices) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
@@ -616,7 +645,7 @@ LightScene_Set($@)
     }
 
     if( $cmd eq "save" ) {
-      my($state,$icon,$type) = LightScene_SaveDevice($hash,$d);
+      my($state,$icon,$type) = LightScene_SaveDevice($hash,$d,$scene);
 
       if( $icon || ref($state) eq 'ARRAY' || $type eq "SWAP_0000002200000003" || $type eq "HUEDevice"  ) {
         my %desc;
@@ -667,8 +696,28 @@ LightScene_Set($@)
 
   LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
 
+  InternalTimer(gettimeofday()+0, "LightScene_asyncQueue", $hash, 0) if( @{$hash->{".asyncQueue"}} && !$asyncQueueLength );
+
   return $ret;
 
+  return undef;
+}
+
+sub
+LightScene_asyncQueue(@)
+{
+  my ($hash) = @_;
+
+  my $cmd = shift @{$hash->{".asyncQueue"}};
+  if(defined $cmd) {
+    if( $cmd =~m/^;/ ) {
+      AnalyzeCommandChain(undef,$cmd);
+    } else {
+      CommandSet(undef, $cmd);
+    }
+    my $async_delay = AttrVal($hash->{NAME}, "async_delay", 0);
+    InternalTimer(gettimeofday()+$async_delay,"LightScene_asyncQueue",$hash,0) if( @{$hash->{".asyncQueue"}} );
+  }
   return undef;
 }
 
@@ -952,6 +1001,15 @@ LightScene_editTable($) {
   <a name="LightScene_Attr"></a>
     <b>Attributes</b>
     <ul>
+    <a name="async_delay"></a>
+    <li>async_delay<br>
+        If this attribute is defined, unfiltered set commands will not be
+        executed in the clients immediately. Instead, they are added to a queue
+        to be executed later. The set command returns immediately, whereas the
+        clients will be set timer-driven, one at a time. The delay between two
+        timercalls is given by the value of async_delay (in seconds) and may be
+        0 for fastest possible execution.
+        </li>
       <li>lightSceneParamsToSave<br>
         this attribute can be set on the devices to be included in a scene. it is set to a comma separated list of readings
         that will be saved. multiple readings separated by : are collated in to a single set command (this has to be supported
