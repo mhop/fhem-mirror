@@ -248,9 +248,9 @@ sub CommandMsg($$;$$) {
         },
 
         'TelegramBot' => {
-          'Normal'  => 'set %DEVICE% message %RECIPIENT% %TITLE%: %MSG%',
-          'High'    => 'set %DEVICE% message %RECIPIENT% %TITLE%: %MSG%',
-          'Low'     => 'set %DEVICE% message %RECIPIENT% %TITLE%: %MSG%',
+          'Normal'  => 'set %DEVICE% message %TGRECIPIENT% %TITLE%: %MSG%',
+          'High'    => 'set %DEVICE% message %TGRECIPIENT% %TITLE%: %MSG%',
+          'Low'     => 'set %DEVICE% message %TGRECIPIENT% %TITLE%: %MSG%',
           'defaultValues' => {
             'Normal' => {
               'TGRECIPIENT' => '',
