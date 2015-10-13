@@ -1853,7 +1853,7 @@ ZWave_isSecureClass($$)
     my $cc_name = $zwave_id2class{lc($cc)};
     my $sec_classes = AttrVal($name, "secure_classes", "");
 
-    if ($sec_classes =~ m/$cc_name/) {
+    if (($sec_classes =~ m/$cc_name/) && ($cc_name ne 'SECURITY')){
       Log3 $name, 5, "$name: $cc_name is a secured class!";
       return (1);
     }
@@ -2616,8 +2616,10 @@ ZWave_Parse($$@)
       my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
       return "" if(!$dh);
 
+      ZWave_wakeupTimer($dh, 1) if(ZWave_isWakeUp($dh));
+
       if($iodev->{addSecure}) {
-        readingsSingleUpdate($dh, "SECURITY", 
+        readingsSingleUpdate($dh, "SECURITY",
                                 "INITIALIZING (starting secure inclusion)", 0);
         my $classes = AttrVal($dh->{NAME}, "classes", "");
         if($classes =~ m/SECURITY/) {
@@ -2647,7 +2649,7 @@ ZWave_Parse($$@)
             "SECURITY disabled, device does not support SECURITY command class";
         }
       }
-      ZWave_wakeupTimer($dh, 1) if(ZWave_isWakeUp($dh));
+
       return ZWave_execInits($dh, 0);
     }
 
