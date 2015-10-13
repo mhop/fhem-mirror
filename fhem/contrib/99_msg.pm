@@ -144,6 +144,17 @@ sub CommandMsg($$;$$) {
     my $cmdSchema = {
       'audio' => {
 
+        'AMAD' => {
+          'Normal'    => 'set %DEVICE% ttsMsg %MSG%',
+          'ShortPrio' => 'set %DEVICE% ttsMsg %MSGSH%',
+          'Short'     => 'set %DEVICE% notifySndFile %FILENAME%',
+          'defaultValues' => {
+            'ShortPrio' => {
+              'MSGSH' => 'Achtung!',
+            },
+          },
+        },
+
         'SONOSPLAYER' => {
           'Normal'    => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSG%',
           'ShortPrio' => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSH%',
@@ -190,27 +201,44 @@ sub CommandMsg($$;$$) {
 
       'push' => {
 
-        'Pushover' => {
-          'Normal'  => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PUSHDEVICE%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-          'High'    => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PUSHDEVICE%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-          'Low'     => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PUSHDEVICE%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+        'Fhemapppush' => {
+          'Normal'  => 'set %DEVICE% message \'%TITLE%: %MSG%\' %ACTION%',
+          'High'    => 'set %DEVICE% message \'%TITLE%: %MSG%\' %ACTION%',
+          'Low'     => 'set %DEVICE% message \'%TITLE%: %MSG%\' %ACTION%',
           'defaultValues' => {
             'Normal' => {
-              'PUSHDEVICE' => '',
+              'ACTION'    => '',
+            },
+            'High' => {
+              'ACTION'    => '',
+            },
+            'Low' => {
+              'ACTION'    => '',
+            },
+          },
+        },
+
+        'Pushover' => {
+          'Normal'  => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PORECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'High'    => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PORECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'Low'     => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PORECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'defaultValues' => {
+            'Normal' => {
+              'PORECIPIENT' => '',
               'RETRY'     => '',
               'EXPIRE'    => '',
               'URLTITLE'  => '',
               'ACTION'    => '',
             },
             'High' => {
-              'PUSHDEVICE' => '',
+              'PORECIPIENT' => '',
               'RETRY'     => '120',
               'EXPIRE'    => '600',
               'URLTITLE'  => '',
               'ACTION'    => '',
             },
             'Low' => {
-              'PUSHDEVICE' => '',
+              'PORECIPIENT' => '',
               'RETRY'     => '',
               'EXPIRE'    => '',
               'URLTITLE'  => '',
@@ -219,9 +247,32 @@ sub CommandMsg($$;$$) {
           },
         },
 
+        'TelegramBot' => {
+          'Normal'  => 'set %DEVICE% message %RECIPIENT% %TITLE%: %MSG%',
+          'High'    => 'set %DEVICE% message %RECIPIENT% %TITLE%: %MSG%',
+          'Low'     => 'set %DEVICE% message %RECIPIENT% %TITLE%: %MSG%',
+          'defaultValues' => {
+            'Normal' => {
+              'TGRECIPIENT' => '',
+            },
+            'High' => {
+              'TGRECIPIENT' => '',
+            },
+            'Low' => {
+              'TGRECIPIENT' => '',
+            },
+          },
+        },
+
       },
 
       'screen' => {
+
+        'AMAD' => {
+          'Normal'  => 'set %DEVICE% screenMsg %TITLE%: %MSG%',
+          'High'    => 'set %DEVICE% screenMsg %TITLE%: %MSG%',
+          'Low'     => 'set %DEVICE% screenMsg %TITLE%: %MSG%',
+        },
 
         'ENIGMA2' => {
           'Normal'  => 'set %DEVICE% msg %TYPE% %TIMEOUT% %MSG%',
