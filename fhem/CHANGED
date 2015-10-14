@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: PRESENCE: support for Solaris ping (mode: local-ping)
   - feature: HUEbridge: added support for HUE scenes
                           (get: scenes; set: savescene, modifyscene, scene)
                         new unified syntax for multiple lights
