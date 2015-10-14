@@ -1,4 +1,4 @@
-# $Id: configDB.pm 7696 2015-01-24 18:16:54Z betateilchen $
+# $Id$
 
 ##############################################################################
 #
@@ -100,6 +100,8 @@
 # 2015-01-23 - changed   attribute handling for internal configDB attrs
 #
 # 2015-01-23 - added     FileRead() caching - experimental
+#
+# 2015-10-14 - changed   search conditions use ESCAPE, forum #42190
 #
 ##############################################################################
 #
@@ -585,7 +587,7 @@ sub cfgDB_MigrationImport() {
 
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId() { 
-	return "# ".'$Id: configDB.pm 7696 2015-01-24 18:16:54Z betateilchen $' 
+	return "# ".'$Id$' 
 }
 
 # return filelist depending on directory and regexp
@@ -895,8 +897,11 @@ sub _cfgDB_Search($$;$) {
 	my ($sql, $sth, @line, $row, @result, $ret, $text);
 	$sql  = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ";
 	$sql .= "WHERE v.version = '$searchversion' AND command not like '#create%' ";
-	$sql .= "AND device like '$search%' " if($dsearch);
-	$sql .= "AND (device like '$search%' OR P1 like '$search%' OR P2 like '$search%') " if(!$dsearch);
+# 2015-10-14 - changed, forum #42190
+	$sql .= "AND device like '$search%' ESCAPE '\\' " if($dsearch);
+	$sql .= "AND (device like '$search%' ESCAPE '\\' OR P1 like '$search%' ESCAPE '\\' OR P2 like '$search%' ESCAPE '\\') " if(!$dsearch);
+#	$sql .= "AND device like '$search%' " if($dsearch);
+#	$sql .= "AND (device like '$search%' OR P1 like '$search%' OR P2 like '$search%') " if(!$dsearch);
 	$sql .= "ORDER BY lower(device),command DESC";
 	$sth = $fhem_dbh->prepare( $sql);
 	$sth->execute();
