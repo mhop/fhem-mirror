@@ -610,6 +610,21 @@ PRESENCE_DoLocalPingScan($)
             $return = "$name|$local|error|Could not execute ping command: \"ping -n $count -4 $device\"";
         }
     }
+    elsif($^O =~ m/solaris/)
+    {
+        $temp = qx(ping $device 4);
+
+        chomp $temp;
+        if($temp ne "")
+        {
+            Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
+            $return = "$name|$local|".($temp =~ /is alive/ ? "present" : "absent");
+        }
+        else
+        { 
+            $return = "$name|$local|error|Could not execute ping command: \"ping -n $count -4 $device\"";
+        }
+    }
     else
     {
         $temp = qx(ping -c $count $device 2>&1);
@@ -1226,7 +1241,7 @@ Options:
     If this attribute is activated, an active check will be disabled.<br><br>
     Possible values: 0 => not disabled , 1 => disabled<br>
     Default Value is 0 (not disabled)<br><br>
-    <li><a>ping_count</a></li> (Only in Mode "ping" on non-Windows machines applicable)<br>
+    <li><a>ping_count</a></li> (Only in Mode "ping" on Linux based OS applicable)<br>
     Changes the count of the used ping packets to recognize a present state. Depending on your network performance sometimes a packet can be lost or blocked.<br><br>
     Default Value is 4 (packets)<br><br>
     <li><a>fritzbox_speed</a></li> (only for mode "fritzbox")<br>
@@ -1471,7 +1486,7 @@ Options:
     Wenn dieses Attribut aktiviert ist, wird die Anwesenheitserkennung nicht mehr durchgef&uuml;hrt.<br><br>
     M&ouml;gliche Werte: 0 => Erkennung durchf&uuml;hren , 1 => Keine Erkennungen durchf&uuml;hren<br>
     Standardwert ist 0 (Erkennung durchf&uuml;hren)<br><br>
-    <li><a>ping_count</a></li> (Nur im Modus "ping" anwendbar auf Nicht-Windows-Maschinen)<br>
+    <li><a>ping_count</a></li> (Nur im Modus "ping" anwendbar auf Linux-basierten Betriebssystemen)<br>
     Verändert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
     Je nach Netzwerkstabilität können erste Pakete verloren gehen oder blockiert werden.<br><br>
     Standartwert ist 4 (Versuche)<br><br>
