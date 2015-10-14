@@ -45,6 +45,8 @@ my %hueModels = (
   LWB001 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWB003 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWB004 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWB006 => {name => 'Hue White'                ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWB007 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 
  'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
