@@ -42,7 +42,7 @@ SYSSTAT_Initialize($)
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
   $hash->{AttrList} = "disable:1 disabledForIntervals raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 ssh_user ";
-  $hash->{AttrList} .= " snmp:1 mibs" if( $SYSSTAT_hasSNMP );
+  $hash->{AttrList} .= " snmp:1 mibs:textField-long snmpVersion:1,2" if( $SYSSTAT_hasSNMP );
   $hash->{AttrList} .= " filesystems showpercent";
   $hash->{AttrList} .= " useregex:1" if( $SYSSTAT_hasSysStatistics );
   $hash->{AttrList} .= " $readingFnAttributes";
@@ -132,7 +132,7 @@ SYSSTAT_InitSNMP($)
            -hostname  => $host,
            -community => $community,
            -port      => 161,
-           -version   => 1
+           -version   => AttrVal($name,"snmpVersion",1),
                         );
   if( $error ) {
     Log3 $name, 2, "$name: $error";
@@ -207,18 +207,23 @@ SYSSTAT_Attr($$$)
   $attrVal = "1" if($attrName eq "showpercent");
   $attrVal = "1" if($attrName eq "raspberrycpufreq");
 
+  my $hash = $defs{$name};
   if( $attrName eq "filesystems") {
-    my $hash = $defs{$name};
     my @filesystems = split(",",$attrVal);
     @{$hash->{filesystems}} = @filesystems;
+
   } elsif( $attrName eq "ssh_user") {
     $attr{$name}{$attrName} = $attrVal;
-    my $hash = $defs{$name};
     SYSSTAT_InitSys( $hash ) if( $SYSSTAT_hasSysStatistics );
+
+  } elsif( $attrName eq "snmpVersion" && $SYSSTAT_hasSNMP ) {
+      $hash->{$attrName} = $attrVal;
+    SYSSTAT_InitSNMP( $hash );
+
   } elsif ($attrName eq "snmp" && $SYSSTAT_hasSNMP ) {
-    my $hash = $defs{$name};
     if( $cmd eq "set" && $attrVal ne "0" ) {
       $hash->{USE_SNMP} = $attrVal;
+      SYSSTAT_InitSNMP( $hash );
     } else {
       delete $hash->{USE_SNMP};
     }
