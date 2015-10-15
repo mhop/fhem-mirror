@@ -361,15 +361,21 @@ SYSSTAT_GetUpdate($)
   if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
     if( my $mibs = AttrVal($name, "mibs", undef) ) {
       my @snmpoids;
-      foreach my $entry (split(' ,', $mibs)) {
+      foreach my $entry (split(/[ ,\n]/, $mibs)) {
+        next if( !$entry );
         my($mib,undef) = split(':', $entry );
+        next if( !$mib );
+
         push @snmpoids, $mib;
       }
 
       my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
 
-      foreach my $entry (split(' ,', $mibs)) {
+      foreach my $entry (split(/[ ,\n]/, $mibs)) {
+        next if( !$entry );
         my($mib,$reading) = split(':', $entry );
+        next if( !$mib );
+        next if( !$reading );
 
         my $result = $response->{$mib};
         readingsBulkUpdate($hash,$reading,$result);
@@ -481,7 +487,7 @@ SYSSTAT_readOIDs($$)
 
   if( ref($snmpoids) eq "ARRAY" ) {
     $response = $hash->{session}->get_request( @{$snmpoids} );
-    Log3 $name, 4, "$name: got empty result from snmp query" if( !$response );
+    Log3 $name, 4, "$name: got empty result from snmp query ".$hash->{session}->error() if( !$response );
   } else {
     $response = $hash->{session}->get_next_request($snmpoids);
 
@@ -494,7 +500,8 @@ SYSSTAT_readOIDs($$)
       @nextid   = keys %$response;
     }
 
-    $response = $hash->{session}->get_request( @snmpoids )
+    $response = $hash->{session}->get_request( @snmpoids );
+    #Log3 $name, 4, "$name: got empty result from snmp query ".$hash->{session}->error() if( !$response );
   }
 
   return $response;
