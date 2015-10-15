@@ -863,7 +863,7 @@ sub JeeLink_OnTimer($) {
   if(defined($attrVal)) {
     my ($timeout, $interval) = split(',', $attrVal);
     InternalTimer(gettimeofday() + $interval, "JeeLink_OnTimer", $timerName, 0);
-    my $jeeLinkTime = InternalVal($name, "myJeeLink_TIME", "2000-01-01 00:00:00");
+    my $jeeLinkTime = InternalVal($name, "${name}_TIME", "2000-01-01 00:00:00");
     my ($date, $time, $year, $month, $day, $hour, $min, $sec, $timestamp);
     ($date, $time) = split( ' ', $jeeLinkTime);
     ($year, $month, $day) = split( '-', $date);
