@@ -147,7 +147,7 @@ sub CommandMsg($$;$$) {
         'AMAD' => {
           'Normal'    => 'set %DEVICE% ttsMsg %MSG%',
           'ShortPrio' => 'set %DEVICE% ttsMsg %MSGSH%',
-          'Short'     => 'set %DEVICE% notifySndFile %FILENAME%',
+          'Short'     => 'set %DEVICE% notifySndFile %AMAD_FILENAME%',
           'defaultValues' => {
             'ShortPrio' => {
               'MSGSH' => 'Achtung!',
@@ -196,7 +196,7 @@ sub CommandMsg($$;$$) {
           'High'    => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\' -a \'X-Priority: 1 (Highest)\' -a \'X-MSMail-Priority: High\' -a \'Importance: high\'")}',
           'Low'     => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\' -a \'X-Priority: 5 (Lowest)\' -a \'X-MSMail-Priority: Low\' -a \'Importance: low\'")}',
         },
-        
+
       },
 
       'push' => {
@@ -218,27 +218,50 @@ sub CommandMsg($$;$$) {
           },
         },
 
-        'Pushover' => {
-          'Normal'  => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PORECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-          'High'    => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PORECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-          'Low'     => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%PORECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+        'Pushbullet' => {
+          'Normal'  => 'set %DEVICE% message %MSG% | %TITLE% %Pushbullet_RECIPIENT%',
+          'High'    => 'set %DEVICE% message %MSG% | %TITLE% %Pushbullet_RECIPIENT%',
+          'Low'     => 'set %DEVICE% message %MSG% | %TITLE% %Pushbullet_RECIPIENT%',
           'defaultValues' => {
             'Normal' => {
-              'PORECIPIENT' => '',
+              'Pushbullet_RECIPIENT' => '',
+            },
+            'High' => {
+              'Pushbullet_RECIPIENT' => '',
+            },
+            'Low' => {
+              'Pushbullet_RECIPIENT' => '',
+            },
+          },
+        },
+
+        'PushNotifier' => {
+          'Normal'  => 'set %DEVICE% message %TITLE%: %MSG%',
+          'High'    => 'set %DEVICE% message %TITLE%: %MSG%',
+          'Low'     => 'set %DEVICE% message %TITLE%: %MSG%',
+        },
+
+        'Pushover' => {
+          'Normal'  => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%Pushover_RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'High'    => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%Pushover_RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'Low'     => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%Pushover_RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+          'defaultValues' => {
+            'Normal' => {
+              'Pushover_RECIPIENT' => '',
               'RETRY'     => '',
               'EXPIRE'    => '',
               'URLTITLE'  => '',
               'ACTION'    => '',
             },
             'High' => {
-              'PORECIPIENT' => '',
+              'Pushover_RECIPIENT' => '',
               'RETRY'     => '120',
               'EXPIRE'    => '600',
               'URLTITLE'  => '',
               'ACTION'    => '',
             },
             'Low' => {
-              'PORECIPIENT' => '',
+              'Pushover_RECIPIENT' => '',
               'RETRY'     => '',
               'EXPIRE'    => '',
               'URLTITLE'  => '',
@@ -248,18 +271,35 @@ sub CommandMsg($$;$$) {
         },
 
         'TelegramBot' => {
-          'Normal'  => 'set %DEVICE% message %TGRECIPIENT% %TITLE%: %MSG%',
-          'High'    => 'set %DEVICE% message %TGRECIPIENT% %TITLE%: %MSG%',
-          'Low'     => 'set %DEVICE% message %TGRECIPIENT% %TITLE%: %MSG%',
+          'Normal'  => 'set %DEVICE% message %TelegramBot_RECIPIENT% %TITLE%: %MSG%',
+          'High'    => 'set %DEVICE% message %TelegramBot_RECIPIENT% %TITLE%: %MSG%',
+          'Low'     => 'set %DEVICE% message %TelegramBot_RECIPIENT% %TITLE%: %MSG%',
           'defaultValues' => {
             'Normal' => {
-              'TGRECIPIENT' => '',
+              'TelegramBot_RECIPIENT' => '',
             },
             'High' => {
-              'TGRECIPIENT' => '',
+              'TelegramBot_RECIPIENT' => '',
             },
             'Low' => {
-              'TGRECIPIENT' => '',
+              'TelegramBot_RECIPIENT' => '',
+            },
+          },
+        },
+
+        'yowsup' => {
+          'Normal'  => 'set %DEVICE% send %yowsup_RECIPIENT% %TITLE%: %MSG%',
+          'High'    => 'set %DEVICE% send %yowsup_RECIPIENT% %TITLE%: %MSG%',
+          'Low'     => 'set %DEVICE% send %yowsup_RECIPIENT% %TITLE%: %MSG%',
+          'defaultValues' => {
+            'Normal' => {
+              'yowsup_RECIPIENT' => '',
+            },
+            'High' => {
+              'yowsup_RECIPIENT' => '',
+            },
+            'Low' => {
+              'yowsup_RECIPIENT' => '',
             },
           },
         },
@@ -275,20 +315,20 @@ sub CommandMsg($$;$$) {
         },
 
         'ENIGMA2' => {
-          'Normal'  => 'set %DEVICE% msg %TYPE% %TIMEOUT% %MSG%',
-          'High'    => 'set %DEVICE% msg %TYPE% %TIMEOUT% %MSG%',
-          'Low'     => 'set %DEVICE% msg %TYPE% %TIMEOUT% %MSG%',
+          'Normal'  => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
+          'High'    => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
+          'Low'     => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
           'defaultValues' => {
             'Normal' => {
-              'TYPE' => 'info',
+              'ENIGMA2_TYPE' => 'info',
               'TIMEOUT'     => 8,
             },
             'High' => {
-              'TYPE'     => 'attention',
+              'ENIGMA2_TYPE'     => 'attention',
               'TIMEOUT'     => 12,
             },
             'Low' => {
-              'TYPE'     => 'message',
+              'ENIGMA2_TYPE'     => 'message',
               'TIMEOUT'     => 8,
             },
           },
@@ -436,7 +476,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
             last if ( !defined( $type[$i] ) );
 
             my $forceType = 0;
-            if ( $type[$i] =~ s/^!(.*)// ) {
+            if ( $type[$i] =~ s/(.*)![\s\t]*$// ) {
                 $type[$i] = $1;
                 $forceType = 1;
             }
@@ -489,7 +529,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         $gatewayDevs = $1;
                         $deviceType  = "email";
                     }
-                    elsif ( $device =~ s/^!@?(.*)// ) {
+                    elsif ( $device =~ s/^@?(.*)![\s\t]*$// ) {
                         $device      = $1;
                         $forceDevice = 1;
                     }
