@@ -9,6 +9,10 @@
 # 29.07.15 GA change set <name> manualTempDuration <minutes>
 # 21.09.15 GA update, use Log3 and readingsSingleUpdate
 # 07.10.15 GA initial version published
+# 07.10.15 GA fix calculation of PWMPulse, default for c_autoCalcTemp
+# 13.10.15 GA add event-on-change-reading
+# 14.10.15 GA fix round energyusedp 
+# 15.10.15 GA add a_regexp_on, a regular expression for the on state of the actor
 
 # module for PWM (Pulse Width Modulation) calculation
 # this module defines a room for calculation 
@@ -80,7 +84,7 @@ PWMR_Initialize($)
   $hash->{UndefFn}   = "PWMR_Undef";
   $hash->{AttrFn}    = "PWMR_Attr";
 
-  $hash->{AttrList}  = "disable:1,0 loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrList}  = "disable:1,0 loglevel:0,1,2,3,4,5 event-on-change-reading ".
 			"frostProtect:0,1 ".
 			"autoCalcTemp:0,1 ".
                         "tempFrostProtect ".
@@ -358,7 +362,7 @@ PWMR_Define($$)
 
   my $name = $hash->{NAME};
 
-  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading:t_regexp]> <actor> [<window>[,<window>]:w_regexp]"
+  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading:t_regexp]> <actor>[:<a_regexp_on>] [<window>[,<window>]:<w_regexp>]"
     if(int(@a) < 6 || int(@a) > 8);
 
   my $iodev   = $a[2];
@@ -458,11 +462,16 @@ PWMR_Define($$)
   ##########
   # check actor
 
-  $actor              =~ s/dummy//;
-  $hash->{actor}      = $actor;
-  $hash->{actorState} = "unknown";
+  my ($tactor, $a_regexp_on) = split (":", $actor, 2);
 
-  $hash->{STATE}     = "Initialized";
+  $a_regexp_on = "on" unless defined ($a_regexp_on);
+
+  $tactor              =~ s/dummy//;
+  $hash->{actor}       = $tactor;
+  $hash->{a_regexp_on} = $a_regexp_on;
+  $hash->{actorState}  = "unknown";
+
+  $hash->{STATE}       = "Initialized";
 
   # values for calculation of desired-temp
 
@@ -534,7 +543,7 @@ PWMR_SetRoom(@)
     $energyused = $energyused.($newState eq "on" ? "1" : "0");
   }
   $room->{READINGS}{energyused}{VAL} = $energyused;
-  $room->{READINGS}{energyusedp}{VAL} = ($energyused =~ tr/1//) /30;
+  $room->{READINGS}{energyusedp}{VAL} = sprintf ("%.2f", ($energyused =~ tr/1//) /30);
   
   
   return if ($newState eq "");
@@ -607,6 +616,16 @@ PWMR_ReadRoom(@)
     } else {
       $actorV = $room->{actorState};
     } 
+
+    #my $actorVOrg = $actorV;
+    
+    my $a_regexp_on = $room->{a_regexp_on};
+    if ($actorV =~ /^$a_regexp_on$/) {
+      $actorV = "on";
+    } else {
+      $actorV = "off";
+    }
+    #Log3 ($room, 2, "$name actorV $actorV org($actorVOrg) regexp($a_regexp_on)");
   }
 
   if (!$room->{READINGS}{"desired-temp"}{TIME})
@@ -661,11 +680,11 @@ PWMR_ReadRoom(@)
   
   my $factoroffset = $room->{FOFFSET};
   
-  my $PWMPulse    = (( $deltaTemp * $factor) ** 2);
+  my $PWMPulse    = min ($MaxPulse,  (( $deltaTemp * $factor) ** 2) + $factoroffset);
 
-  $newpulse       = $PWMPulse + $factoroffset;
+  $newpulse       = $PWMPulse;
+  #$newpulse       = min ($MaxPulse, $newpulse); # default 85% max ontime
   $newpulse       = sprintf ("%.2f", $newpulse);
-  $newpulse       = min ($MaxPulse, $newpulse); # default 85% max ontime
 
   my $PWMOnTime =  sprintf ("%02s:%02s", int ($PWMPulse * $cycletime / 60), ($PWMPulse * $cycletime) % 60);
 
@@ -830,7 +849,7 @@ PWMR_Attr(@)
     } elsif ($attr eq "frostProtect") {
       $hash->{c_frostProtect} = 0;
     } elsif ($attr eq "autoCalcTemp") {
-      $hash->{c_autoCalcTemp} = 0;
+      $hash->{c_autoCalcTemp} = 1;
     }
   
   }
@@ -855,7 +874,7 @@ PWMR_Attr(@)
     if ($val eq 0 or $val eq 1) {
       $hash->{c_autoCalcTemp} = $val;
     } elsif ($val eq "") {
-      $hash->{c_autoCalcTemp} = 0;
+      $hash->{c_autoCalcTemp} = 1;
     } else {
       return "valid values are 0 or 1";
     }
@@ -975,7 +994,7 @@ PWMR_Boost(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:t_regexp]&gt; &lt;actor&gt; [&lt;window&gt;[,&lt;window&gt;:w_regexp]<br></code>
+    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:t_regexp]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window&gt;[,&lt;window&gt;:w_regexp]<br></code>
 
     <br>
     Define a calculation object with the following parameters:<br>
@@ -996,8 +1015,9 @@ PWMR_Boost(@)
       <i>t_regexp</i> defines a regular expression to be applied to the reading. Default is '([\\d\\.]*)'.<br>
     </li>
 
-    <li>actor<br>
+    <li>actor[:&lt;a_regexp_on&gt;]<br>
       The actor will be set to "on" of "off" to turn on/off heating.<br>
+      <i>a_regexp_on</i> defines a regular expression to be applied to the state of the actor. Default is 'on". If state matches the regular expression it is handled as "on", otherwise "off"<br>
     </li>
 
     <li>window[,window]:w_regexp<br>
