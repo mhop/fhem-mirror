@@ -730,9 +730,8 @@ readingsGroup_2html($;$)
   $ret .= "<tr><td><table $style id='readingsGroup-$d' groupId=\"$group\" class=\"block wide readingsGroup\">";
   $ret .= "<tr><td colspan=\"99\"><div style=\"color:#ff8888;text-align:center\">updates disabled</div></tr>" if( $disable > 0 );
 
-  my $item = 0;
   foreach my $device (@{$devices}) {
-    $item++;
+    my $item = 0;
     my $h = $defs{$device->[0]};
     my $regex = $device->[1];
     if( !$h && $device->[0] =~ m/^<.*>$/ ) {
@@ -759,6 +758,7 @@ readingsGroup_2html($;$)
              && defined($list[++$i]) ) {
         $regex .= ",". $list[$i];
       }
+      $item++;
       my $h = $h;
       my $type;
       my $force_show = 0;
@@ -906,7 +906,7 @@ readingsGroup_2html($;$)
         }
 
         my $informid = "";
-        $informid = "informId=\"$d-item:$item\"" if( $readings );
+        $informid = "informId=\"$d-item:$cell_row:$item\"" if( $readings );
         $ret .= "<td $value_columns><div $cell_style $name_style $informid>$txt</div></td>";
         $first = 0;
         ++$cell_column;
@@ -1163,9 +1163,10 @@ readingsGroup_Notify($$)
       $value = "" if( !defined($value) );
       my $show_state = !AttrVal( $name, "nostate", "0" );
 
-      my $item = 0;
+      my $cell_row = 0;
       foreach my $device (@{$devices}) {
-        $item++;
+        my $item = 0;
+        ++$cell_row;
         my $h = $defs{@{$device}[0]};
         next if( !$h );
         next if( $dev->{NAME} ne $h->{NAME} );
@@ -1174,7 +1175,7 @@ readingsGroup_Notify($$)
         my @list = (undef);
         @list = split(",",$regex) if( $regex );
         for( my $i = 0; $i <= $#list; ++$i ) {
-        my $regex = $list[$i];
+          my $regex = $list[$i];
           while ($regex
                  && ( ($regex =~ m/^</ && $regex !~ m/>$/)            #handle , in <...>
                       || ($regex =~ m/@\{/ && $regex !~ m/\}$/)       #handle , in reading@{...}
@@ -1182,6 +1183,7 @@ readingsGroup_Notify($$)
                  && defined($list[++$i]) ) {
             $regex .= ",". $list[$i];
           }
+          ++$item;
           next if( $reading eq "state" && !$show_state && (!defined($regex) || $regex ne "state") );
           my $modifier = "";
           if( $regex && $regex =~ m/^([+?!\$]*)(.*)/ ) {
@@ -1224,7 +1226,7 @@ readingsGroup_Notify($$)
                 ($txt,undef) = readingsGroup_makeLink($txt,undef,$cmd);
               }
 
-              DoTrigger( $name, "item:$item: $txt" );
+              DoTrigger( $name, "item:$cell_row:$item: $txt" );
             }
 
             next;
