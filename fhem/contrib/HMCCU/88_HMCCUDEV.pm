@@ -10,7 +10,7 @@
 #
 ################################################################
 #
-#  define <name> HMCCUDEV <hmccu> <ccudev> [ readonly ]
+#  define <name> HMCCUDEV <ccudev> [readonly]
 #
 #  set <name> datapoint <channel>.<datapoint> <value>
 #  set <name> devstate <value>
@@ -83,7 +83,6 @@ sub HMCCUDEV_Define ($$)
 	}
 
 	# Inform HMCCU device about client device
-	Log 1, "HMCCUDEV: Assigning IO Port";
 	AssignIoPort ($hash);
 
 	readingsSingleUpdate ($hash, "state", "Initialized", 1);
@@ -248,6 +247,10 @@ sub HMCCUDEV_Get ($@)
 	}
 }
 
+#####################################
+# Set error status
+#####################################
+
 sub HMCCUDEV_SetError ($$)
 {
 	my ($hash, $text) = @_;
@@ -268,7 +271,8 @@ sub HMCCUDEV_SetError ($$)
 <h3>HMCCUDEV</h3>
 <div style="width:800px"> 
 <ul>
-   The module implements client devices for HMCCU.
+   The module implements client devices for HMCCU. A HMCCU device must exist
+   before a client device can be defined.
    </br></br>
    <a name="HMCCUDEVdefine"></a>
    <b>Define</b>
@@ -303,8 +307,14 @@ sub HMCCUDEV_SetError ($$)
       <li>set &lt;<i>Name</i>&gt; &lt;<i>StateValue</i>&gt;
          <br/>
          State of a CCU device channel is set to state value. Channel must
-         be defined as attribute statechannel. State values can 
-         be replaced by setting attribute stateval.
+         be defined as attribute statechannel. State values can be replaced
+         by setting attribute stateval.
+         <br/><br/>
+         <code>
+         attr myswitch statechannel 1
+         attr myswitch stateval on:true,off:false
+         set myswitch on
+         </code>
       </li><br/>
       <li>set &lt;<i>Name</i>&gt; datapoint &lt;<i>channel</i>.<i>datapoint</i>&gt; &lt;<i>Value</i>&gt;
         <br/>
