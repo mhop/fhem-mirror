@@ -33,7 +33,7 @@ XmlEscape($)
   # Not needed since we've gone UTF-8
   # $a =~ s/([^ -~])/sprintf("&#%02x;", ord($1))/ge;
   # Esacape characters 0-31, as they are not part of UTF-8
-  $a =~ s/([\x00-\x07])//ge; # Forum #37955. Chrome wont accept 5 & 6.
+  $a =~ s/([\x00-\x07])//g; # Forum #37955. Chrome wont accept 5 & 6.
 
   return $a;
 }
