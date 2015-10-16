@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2015-10-11
+# 2015-10-16
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -166,34 +166,34 @@ my %EnO_manuf = (
 );
 
 my %EnO_eepConfig = (
-  "A5.02.01" => {attr => {subType => "tempSensor.01"}},
-  "A5.02.02" => {attr => {subType => "tempSensor.02"}},
-  "A5.02.03" => {attr => {subType => "tempSensor.03"}},
-  "A5.02.04" => {attr => {subType => "tempSensor.04"}},
-  "A5.02.05" => {attr => {subType => "tempSensor.05"}},
-  "A5.02.06" => {attr => {subType => "tempSensor.06"}},
-  "A5.02.07" => {attr => {subType => "tempSensor.07"}},
-  "A5.02.08" => {attr => {subType => "tempSensor.08"}},
-  "A5.02.09" => {attr => {subType => "tempSensor.09"}},
-  "A5.02.0A" => {attr => {subType => "tempSensor.0A"}},
-  "A5.02.0B" => {attr => {subType => "tempSensor.0B"}},
-  "A5.02.10" => {attr => {subType => "tempSensor.10"}},
-  "A5.02.11" => {attr => {subType => "tempSensor.11"}},
-  "A5.02.12" => {attr => {subType => "tempSensor.12"}},
-  "A5.02.13" => {attr => {subType => "tempSensor.13"}},
-  "A5.02.14" => {attr => {subType => "tempSensor.14"}},
-  "A5.02.15" => {attr => {subType => "tempSensor.15"}},
-  "A5.02.16" => {attr => {subType => "tempSensor.16"}},
-  "A5.02.17" => {attr => {subType => "tempSensor.17"}},
-  "A5.02.18" => {attr => {subType => "tempSensor.18"}},
-  "A5.02.19" => {attr => {subType => "tempSensor.19"}},
-  "A5.02.1A" => {attr => {subType => "tempSensor.1A"}},
-  "A5.02.1B" => {attr => {subType => "tempSensor.1B"}},
-  "A5.02.20" => {attr => {subType => "tempSensor.20"}},
-  "A5.02.30" => {attr => {subType => "tempSensor.30"}},
-  "A5.04.01" => {attr => {subType => "roomSensorControl.01"}},
-  "A5.04.02" => {attr => {subType => "tempHumiSensor.02"}},
-  "A5.04.03" => {attr => {subType => "tempHumiSensor.03"}},
+  "A5.02.01" => {attr => {subType => "tempSensor.01"}, GPLOT => "temp4:Temp,"},
+  "A5.02.02" => {attr => {subType => "tempSensor.02"}, GPLOT => "temp4:Temp,"},
+  "A5.02.03" => {attr => {subType => "tempSensor.03"}, GPLOT => "temp4:Temp,"},
+  "A5.02.04" => {attr => {subType => "tempSensor.04"}, GPLOT => "temp4:Temp,"},
+  "A5.02.05" => {attr => {subType => "tempSensor.05"}, GPLOT => "temp4:Temp,"},
+  "A5.02.06" => {attr => {subType => "tempSensor.06"}, GPLOT => "temp4:Temp,"},
+  "A5.02.07" => {attr => {subType => "tempSensor.07"}, GPLOT => "temp4:Temp,"},
+  "A5.02.08" => {attr => {subType => "tempSensor.08"}, GPLOT => "temp4:Temp,"},
+  "A5.02.09" => {attr => {subType => "tempSensor.09"}, GPLOT => "temp4:Temp,"},
+  "A5.02.0A" => {attr => {subType => "tempSensor.0A"}, GPLOT => "temp4:Temp,"},
+  "A5.02.0B" => {attr => {subType => "tempSensor.0B"}, GPLOT => "temp4:Temp,"},
+  "A5.02.10" => {attr => {subType => "tempSensor.10"}, GPLOT => "temp4:Temp,"},
+  "A5.02.11" => {attr => {subType => "tempSensor.11"}, GPLOT => "temp4:Temp,"},
+  "A5.02.12" => {attr => {subType => "tempSensor.12"}, GPLOT => "temp4:Temp,"},
+  "A5.02.13" => {attr => {subType => "tempSensor.13"}, GPLOT => "temp4:Temp,"},
+  "A5.02.14" => {attr => {subType => "tempSensor.14"}, GPLOT => "temp4:Temp,"},
+  "A5.02.15" => {attr => {subType => "tempSensor.15"}, GPLOT => "temp4:Temp,"},
+  "A5.02.16" => {attr => {subType => "tempSensor.16"}, GPLOT => "temp4:Temp,"},
+  "A5.02.17" => {attr => {subType => "tempSensor.17"}, GPLOT => "temp4:Temp,"},
+  "A5.02.18" => {attr => {subType => "tempSensor.18"}, GPLOT => "temp4:Temp,"},
+  "A5.02.19" => {attr => {subType => "tempSensor.19"}, GPLOT => "temp4:Temp,"},
+  "A5.02.1A" => {attr => {subType => "tempSensor.1A"}, GPLOT => "temp4:Temp,"},
+  "A5.02.1B" => {attr => {subType => "tempSensor.1B"}, GPLOT => "temp4:Temp,"},
+  "A5.02.20" => {attr => {subType => "tempSensor.20"}, GPLOT => "temp4:Temp,"},
+  "A5.02.30" => {attr => {subType => "tempSensor.30"}, GPLOT => "temp4:Temp,"},
+  "A5.04.01" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.04.02" => {attr => {subType => "tempHumiSensor.02"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.04.03" => {attr => {subType => "tempHumiSensor.03"}, GPLOT => "temp4hum6:Temp/Hum,"},
   "A5.05.01" => {attr => {subType => "baroSensor.01"}},
   "A5.06.01" => {attr => {subType => "lightSensor.01"}},
   "A5.06.02" => {attr => {subType => "lightSensor.02"}},
@@ -214,37 +214,37 @@ my %EnO_eepConfig = (
   "A5.09.09" => {attr => {subType => "CO2Sensor.01"}},
   "A5.09.0A" => {attr => {subType => "HSensor.01"}},
   "A5.09.0B" => {attr => {subType => "radiationSensor.01"}},
-  "A5.10.01" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.02" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.03" => {attr => {subType => "roomSensorControl.05", comMode => "confirm", subDef => "getNextID"}},
-  "A5.10.04" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.05" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.06" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.07" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.08" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.09" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.0A" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.0B" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.0C" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.0D" => {attr => {subType => "roomSensorControl.05"}},
-  "A5.10.10" => {attr => {subType => "roomSensorControl.01"}},
-  "A5.10.11" => {attr => {subType => "roomSensorControl.01"}},
-  "A5.10.12" => {attr => {subType => "roomSensorControl.01"}},
-  "A5.10.13" => {attr => {subType => "roomSensorControl.01"}},
-  "A5.10.14" => {attr => {subType => "roomSensorControl.01"}},
-  "A5.10.15" => {attr => {subType => "roomSensorControl.02"}},
-  "A5.10.16" => {attr => {subType => "roomSensorControl.02"}},
-  "A5.10.17" => {attr => {subType => "roomSensorControl.02"}},
-  "A5.10.18" => {attr => {subType => "roomSensorControl.18"}},
-  "A5.10.19" => {attr => {subType => "roomSensorControl.19"}},
-  "A5.10.1A" => {attr => {subType => "roomSensorControl.1A"}},
-  "A5.10.1B" => {attr => {subType => "roomSensorControl.1B"}},
-  "A5.10.1C" => {attr => {subType => "roomSensorControl.1C"}},
-  "A5.10.1D" => {attr => {subType => "roomSensorControl.1D"}},
-  "A5.10.1E" => {attr => {subType => "roomSensorControl.1B"}},
-  "A5.10.1F" => {attr => {subType => "roomSensorControl.1F"}},
-  "A5.10.20" => {attr => {subType => "roomSensorControl.20"}},
-  "A5.10.21" => {attr => {subType => "roomSensorControl.20"}},
+  "A5.10.01" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.02" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.03" => {attr => {subType => "roomSensorControl.05", comMode => "confirm", subDef => "getNextID"}, GPLOT => "temp4:Temp,"},
+  "A5.10.04" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.05" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.06" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.07" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.08" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.09" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.0A" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.0B" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.0C" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.0D" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
+  "A5.10.10" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.11" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.12" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.13" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.14" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.15" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "temp4:Temp,"},
+  "A5.10.16" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "temp4:Temp,"},
+  "A5.10.17" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "temp4:Temp,"},
+  "A5.10.18" => {attr => {subType => "roomSensorControl.18"}, GPLOT => "temp4:Temp,"},
+  "A5.10.19" => {attr => {subType => "roomSensorControl.19"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.1A" => {attr => {subType => "roomSensorControl.1A"}, GPLOT => "temp4:Temp,"},
+  "A5.10.1B" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "temp4:Temp,"},
+  "A5.10.1C" => {attr => {subType => "roomSensorControl.1C"}, GPLOT => "temp4:Temp,"},
+  "A5.10.1D" => {attr => {subType => "roomSensorControl.1D"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.1E" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "temp4:Temp,"},
+  "A5.10.1F" => {attr => {subType => "roomSensorControl.1F"}, GPLOT => "temp4:Temp,"},
+  "A5.10.20" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.21" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "temp4hum6:Temp/Hum,"},
   "A5.11.01" => {attr => {subType => "lightCtrlState.01"}},
   "A5.11.02" => {attr => {subType => "tempCtrlState.01"}},
   "A5.11.03" => {attr => {subType => "shutterCtrlState.01", subDef => "getNextID", subTypeSet => "gateway", gwCmd => "blindCmd"}},
@@ -269,7 +269,7 @@ my %EnO_eepConfig = (
   "A5.14.04" => {attr => {subType => "multiFuncSensor"}},
   "A5.14.05" => {attr => {subType => "multiFuncSensor"}},
   "A5.14.06" => {attr => {subType => "multiFuncSensor"}},
-  "A5.20.01" => {attr => {subType => "hvac.01", webCmd => "setpointTemp"}},
+  "A5.20.01" => {attr => {subType => "hvac.01", webCmd => "setpointTemp"}, GPLOT => "temp4:Temp,"},
  #"A5.20.02" => {attr => {subType => "hvac.02"}},
  #"A5.20.03" => {attr => {subType => "hvac.03"}},
   "A5.20.10" => {attr => {subType => "hvac.10", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}},
@@ -301,9 +301,9 @@ my %EnO_eepConfig = (
   "D2.03.00" => {attr => {subType => "switch.00"}},
   "D2.03.10" => {attr => {subType => "windowHandle.10"}},
   "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}},
-  "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}},
-  "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}},
-  "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}},
+  "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "temp4:Temp,"},
+  "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "temp4:Temp,"},
   "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}},
   "D2.32.00" => {attr => {subType => "currentClamp.00"}},
   "D2.32.01" => {attr => {subType => "currentClamp.01"}},
@@ -451,53 +451,55 @@ EnOcean_Initialize($)
   }
   my $subTypeList = join(",", sort grep { !$subTypeList{$_}++ } @subTypeList);
 
-  $hash->{Match}     = "^EnOcean:";
-  $hash->{DefFn}     = "EnOcean_Define";
-  $hash->{DeleteFn}  = "EnOcean_Delete";  
-  $hash->{UndefFn}   = "EnOcean_Undef";
-  $hash->{ParseFn}   = "EnOcean_Parse";
-  $hash->{SetFn}     = "EnOcean_Set";
- #$hash->{StateFn}   = "EnOcean_State";
-  $hash->{GetFn}     = "EnOcean_Get";
-  $hash->{NotifyFn}  = "EnOcean_Notify";
-  $hash->{AttrFn}    = "EnOcean_Attr";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 " .
-                       "actualTemp angleMax:slider,-180,20,180 alarmAction:no,stop,opens,closes " .
-                       "angleMin:slider,-180,20,180 " .
-                       "angleTime setCmdTrigger:man,refDev blockUnknownMSC:no,yes blockMotion:no,yes " .
-                       "blockTemp:no,yes blockDisplay:no,yes blockDateTime:no,yes " .
-                       "blockTimeProgram:no,yes blockOccupancy:no,yes blockSetpointTemp:no,yes " .
-                       "blockFanSpeed:no,yes blockKey:no,yes comMode:confirm,biDir,uniDir " .
-                       "daylightSavingTime:supported,not_supported dataEnc:VAES,AES-CBC " .
-                       "defaultChannel:" . join(",", @EnO_defaultChannel) . " " .
-                       "demandRespAction demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
-                       "demandRespMin:A0,AI,B0,BI,C0,CI,D0,DI demandRespRandomTime " .
-                       "demandRespThreshold:slider,0,1,15 demandRespTimeoutLevel:max,last destinationID " .
-                       "devChannel devMode:master,slave devUpdate:off,auto,demand,polling,interrupt " .
-                       "dimMax dimMin dimValueOn disable:0,1 disabledForIntervals " .
-                       "displayContent:default,humidity,off,setPointTemp,tempertureExtern,temperatureIntern,time,no_change " .
-                       "eep gpDef gwCmd:" . join(",", sort @EnO_gwCmd) . " humitity humidityRefDev " .
-                       "keyRcv keySnd macAlgo:no,3,4 " .
-                       "manufID:" . join(",", sort keys %EnO_manuf) . " " .
-                       "model:" . join(",", @EnO_models) . " " .
-                       "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction observeInterval observeLogic:and,or " .
-                       #observeCmds observeExeptions
-                       "observeRefDev " .
-                       "pollInterval productID rampTime releasedChannel:A,B,C,D,I,0,auto repeatingAllowed:yes,no " .
-                       "remoteManagement:off,on rlcAlgo:no,2++,3++ rlcRcv rlcSnd rlcTX:true,false " .
-                       "reposition:directly,opens,closes " .
-                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir" .
-                       "secCode secLevel:encapsulation,encryption,off sendDevStatus:no,yes sensorMode:switch,pushbutton " .
-                       "serviceOn:no,yes shutTime shutTimeCloses subDef " .
-                       "subDef0 subDefI subDefA subDefB subDefC subDefD " .
-                       "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
-                       "summerMode:off,on switchMode:switch,pushbutton " .
-                       "switchHysteresis switchType:direction,universal,channel,central temperatureRefDev " .
-                       "temperatureScale:C,F,default,no_change timeNotation:12,24,default,no_change " .
-                       "timeProgram1 timeProgram2 timeProgram3 timeProgram4 updateState:default,yes,no " .
-                       "uteResponseRequest:yes,no " .
-                       $readingFnAttributes;
+  $hash->{AutoCreate} = {"EnO.*" => {ATTR => "creator:autocreate", FILTER => "%NAME"}};
+  $hash->{noAutocreatedFilelog} = 1; 
+  $hash->{Match} = "^EnOcean:";
+  $hash->{DefFn} = "EnOcean_Define";
+  $hash->{DeleteFn} = "EnOcean_Delete";  
+  $hash->{UndefFn} = "EnOcean_Undef";
+  $hash->{ParseFn} = "EnOcean_Parse";
+  $hash->{SetFn} = "EnOcean_Set";
+ #$hash->{StateFn} = "EnOcean_State";
+  $hash->{GetFn} = "EnOcean_Get";
+  $hash->{NotifyFn} = "EnOcean_Notify";
+  $hash->{AttrFn} = "EnOcean_Attr";
+  $hash->{AttrList} = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
+                      "showtime:1,0 " .
+                      "actualTemp angleMax:slider,-180,20,180 alarmAction:no,stop,opens,closes " .
+                      "angleMin:slider,-180,20,180 " .
+                      "angleTime setCmdTrigger:man,refDev blockUnknownMSC:no,yes blockMotion:no,yes " .
+                      "blockTemp:no,yes blockDisplay:no,yes blockDateTime:no,yes " .
+                      "blockTimeProgram:no,yes blockOccupancy:no,yes blockSetpointTemp:no,yes " .
+                      "blockFanSpeed:no,yes blockKey:no,yes comMode:confirm,biDir,uniDir creator:autocreate,manual " .
+                      "daylightSavingTime:supported,not_supported dataEnc:VAES,AES-CBC " .
+                      "defaultChannel:" . join(",", @EnO_defaultChannel) . " " .
+                      "demandRespAction demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
+                      "demandRespMin:A0,AI,B0,BI,C0,CI,D0,DI demandRespRandomTime " .
+                      "demandRespThreshold:slider,0,1,15 demandRespTimeoutLevel:max,last destinationID " .
+                      "devChannel devMode:master,slave devUpdate:off,auto,demand,polling,interrupt " .
+                      "dimMax dimMin dimValueOn disable:0,1 disabledForIntervals " .
+                      "displayContent:default,humidity,off,setPointTemp,tempertureExtern,temperatureIntern,time,no_change " .
+                      "eep gpDef gwCmd:" . join(",", sort @EnO_gwCmd) . " humitity humidityRefDev " .
+                      "keyRcv keySnd macAlgo:no,3,4 " .
+                      "manufID:" . join(",", sort keys %EnO_manuf) . " " .
+                      "model:" . join(",", @EnO_models) . " " .
+                      "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction observeInterval observeLogic:and,or " .
+                      #observeCmds observeExeptions
+                      "observeRefDev " .
+                      "pollInterval productID rampTime releasedChannel:A,B,C,D,I,0,auto repeatingAllowed:yes,no " .
+                      "remoteManagement:off,on rlcAlgo:no,2++,3++ rlcRcv rlcSnd rlcTX:true,false " .
+                      "reposition:directly,opens,closes " .
+                      "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir" .
+                      "secCode secLevel:encapsulation,encryption,off sendDevStatus:no,yes sensorMode:switch,pushbutton " .
+                      "serviceOn:no,yes shutTime shutTimeCloses subDef " .
+                      "subDef0 subDefI subDefA subDefB subDefC subDefD " .
+                      "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
+                      "summerMode:off,on switchMode:switch,pushbutton " .
+                      "switchHysteresis switchType:direction,universal,channel,central temperatureRefDev " .
+                      "temperatureScale:C,F,default,no_change timeNotation:12,24,default,no_change " .
+                      "timeProgram1 timeProgram2 timeProgram3 timeProgram4 updateState:default,yes,no " .
+                      "uteResponseRequest:yes,no " .
+                      $readingFnAttributes;
 
   for (my $i = 0; $i < @EnO_ptm200btn; $i++) {
     $EnO_ptm200btn{$EnO_ptm200btn[$i]} = "$i:30";
@@ -518,93 +520,201 @@ EnOcean_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
+  my ($autocreateFilelog, $autocreateHash, $autocreateName, $autocreateDeviceRoom, $autocreateWeblinkRoom) =
+     ('./log/' . $name . '-%Y.log', undef, 'autocreate', 'EnOcean', 'Plots');
+  my ($cmd, $eep, $ret);
+  my $filelogName = "FileLog_$name";
   $def = "00000000";
   if(@a > 2 && @a < 5) {
-  
+    # find autocreate device
+    while (($autocreateName, $autocreateHash) = each(%defs)) {
+      last if ($defs{$autocreateName}{TYPE} eq "autocreate");
+    }
+    $autocreateDeviceRoom = $attr{$autocreateName}{device_room} if (exists $attr{$autocreateName}{device_room});
+    $autocreateDeviceRoom = 'EnOcean' if ($autocreateDeviceRoom eq '%TYPE');
+    $autocreateDeviceRoom = $name if ($autocreateDeviceRoom eq '%NAME');
+    $autocreateDeviceRoom = $attr{$name}{room} if (exists $attr{$name}{room});
+    if ($init_done) {
+      if (!defined(AttrVal($autocreateName, "disable", undef)) && !exists($defs{$filelogName})) {
+        # create FileLog
+        $autocreateFilelog = $attr{$autocreateName}{filelog} if (exists $attr{$autocreateName}{filelog});
+        $autocreateFilelog =~ s/%NAME/$name/g;
+        $cmd = "$filelogName FileLog $autocreateFilelog $name";
+        Log3 $filelogName, 2, "EnOcean define $cmd";
+        $ret = CommandDefine(undef, $cmd);
+        if($ret) {
+          Log3 $filelogName, 2, "EnOcean ERROR: $ret";
+        } else {
+          $attr{$filelogName}{room} = $autocreateDeviceRoom;
+          $attr{$filelogName}{logtype} = 'text';
+        }
+      }
+    }
+
     if ($a[2] eq "getNextID") {
       AssignIoPort($hash) if (!exists $hash->{IODev});
       if (exists $hash->{OLDDEF}) {
         delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
-        #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
       }
       $hash->{DEF} = $def;
       $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
       $hash->{DEF} = $def;
       $modules{EnOcean}{defptr}{$def} = $hash;
       $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
-      $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
+      $attr{$name}{room} = $autocreateDeviceRoom;
       $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
       
     } elsif ($a[2] =~ m/^[A-Fa-f0-9]{8}$/i) {
+      # DestinationID
+      $def = uc($a[2]);
+      $hash->{DEF} = $def;
       if (defined($a[3]) && $a[3] =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
+        # EEP
         my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
         $rorg = "F6" if ($rorg eq "05");
         $rorg = "D5" if ($rorg eq "06");
         $rorg = "A5" if ($rorg eq "07");
-        my $eep = "$rorg.$func.$type";
+        $eep = "$rorg.$func.$type";
         if (exists $EnO_eepConfig{$eep}) {
           AssignIoPort($hash) if (!exists $hash->{IODev});
           if (exists $hash->{OLDDEF}) {
             delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
-            #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
           }
-          $def = uc($a[2]);
-          $hash->{DEF} = $def;
           $modules{EnOcean}{defptr}{$def} = $hash;
-          $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
-          $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
+          if (exists($attr{$name}{eep}) && $attr{$name}{eep} ne "$rorg-$func-$type") {
+            delete $attr{$name};
+            $attr{$filelogName}{logtype} = $EnO_eepConfig{$eep}{GPLOT} . 'text'
+              if (exists $attr{$filelogName}{logtype});
+            # delete SVG devices
+            my ($weblinkName, $weblinkHash);
+            while (($weblinkName, $weblinkHash) = each(%defs)) {
+              if ($weblinkName =~ /^SVG_$name.*/) {
+                CommandDelete(undef, $weblinkName) ;
+                Log3 $hash->{NAME}, 2, "EnOcean $weblinkName deleted";
+              }
+            }
+          }
           $attr{$name}{eep} = "$rorg-$func-$type";
+          $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
+          $attr{$name}{room} = $autocreateDeviceRoom;
           foreach my $attrCntr (keys %{$EnO_eepConfig{$eep}{attr}}) {
             if ($attrCntr ne "subDef") {
               $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
             }
           }
-          return undef;
+          EnOcean_CreateSVG(undef, $hash);
         } else {
           return "EEP $rorg-$func-$type not supported";
         }
+      } elsif (defined($a[3]) && $a[3] =~ m/^EnOcean:.*/) {
+        # autocreate: parse received device telegram
+        AssignIoPort($hash) if (!exists $hash->{IODev});
+        $modules{EnOcean}{defptr}{$def} = $hash;
+        my ($data, $rorg, $status);
+        (undef, undef, $rorg, $data, undef, $status, undef) = split(':', $a[3]);     
+        $attr{$name}{subType} = $EnO_rorgname{$rorg};
+        if ($attr{$name}{subType} eq "switch") {
+          my $nu = (hex($status) & 0x10) >> 4;
+          my $t21 = (hex($status) & 0x20) >> 5;
+          $attr{$name}{manufID} = "7FF";
+          if ($t21 && $nu) {
+            $attr{$name}{eep} = "F6-02-01";
+            readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-02-01 Manufacturer: no ID", 1);
+            Log3 $name, 2, "EnOcean $name teach-in EEP F6-02-01 Manufacturer: no ID";
+          } elsif (!$t21 && $nu) {
+            $attr{$name}{eep} = "F6-03-01";
+            readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-03-01 Manufacturer: no ID", 1);
+            Log3 $name, 2, "EnOcean $name teach-in EEP F6-03-01 Manufacturer: no ID";
+          }      
+        } elsif ($attr{$name}{subType} eq "contact" && hex($data) & 8) {
+          $attr{$name}{eep} = "D5-00-01";
+          $attr{$name}{manufID} = "7FF";
+          readingsSingleUpdate($hash, "teach", "1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID", 1);
+          Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
+        } elsif ($attr{$name}{subType} eq "4BS" && hex(substr($data, 6, 2)) & 8) {
+          $hash->{helper}{teachInWait} = "4BS";      
+          readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
+          Log3 $name, 2, "EnOcean $name 4BS teach-in is missing";
+        } elsif ($attr{$name}{subType} eq "UTE") {
+          $hash->{helper}{teachInWait} = "UTE";
+        } elsif ($attr{$name}{subType} eq "VLD") {
+          $hash->{helper}{teachInWait} = "UTE";
+          readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
+          Log3 $name, 2, "EnOcean $name UTE teach-in is missing";
+        } elsif ($attr{$name}{subType} eq "MSC") {
+          readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
+          Log3 $name, 2, "EnOcean $name MSC not supported";
+        } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
+          $hash->{helper}{teachInWait} = "STE";
+          readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
+          Log3 $name, 2, "EnOcean $name STE teach-in is missing";
+        } elsif ($attr{$name}{subType} =~ m/^GPCD|GPSD$/) {
+          $hash->{helper}{teachInWait} = "GPTI";
+          readingsSingleUpdate($hash, "teach", "GP teach-in is missing", 1);
+          Log3 $name, 2, "EnOcean $name GP teach-in is missing";
+        }
+        EnOcean_Parse($hash, $a[3]);
+        if (exists $attr{$name}{eep}) {
+          $attr{$name}{eep} =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i;
+          $eep = uc("$1.$2.$3");
+          if (exists($attr{$filelogName}{logtype}) && exists($EnO_eepConfig{$eep}{GPLOT})) {
+            $attr{$filelogName}{logtype} = $EnO_eepConfig{$eep}{GPLOT} . 'text';
+            EnOcean_CreateSVG(undef, $hash);
+          }
+        }
+
       } else {
+        # no device infos
         AssignIoPort($hash) if (!exists $hash->{IODev});
         if (exists $hash->{OLDDEF}) {
           delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
-          #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
         }
-        $def = uc($a[2]);
-        $hash->{DEF} = $def;
         $modules{EnOcean}{defptr}{$def} = $hash;
         $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
-        $attr{$name}{room} = "EnOcean" if (!exists $attr{$name}{room});
+        $attr{$name}{room} = $autocreateDeviceRoom;
         $attr{$name}{subType} = "raw" if (!exists $attr{$name}{subType});
       }
       
     } elsif ($a[2] =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
+      # EEP
       my ($rorg, $func, $type) = (uc($1), uc($2), uc($3));
       $rorg = "F6" if ($rorg eq "05");
       $rorg = "D5" if ($rorg eq "06");
       $rorg = "A5" if ($rorg eq "07");
-      my $eep = "$rorg.$func.$type";
+      $eep = "$rorg.$func.$type";
       if (exists $EnO_eepConfig{$eep}) {
         AssignIoPort($hash) if (!exists $hash->{IODev});
-        if (exists $hash->{OLDDEF}) {
+        if (exists($hash->{OLDDEF}) && $hash->{OLDDEF} =~ m/^[A-Fa-f0-9]{8}$/i) {
           delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
-          #Log3 $name, 2, "EnOcean $name old DEF $hash->{OLDDEF} deleted";
-        }
-        if (!exists $hash->{DEF} || $hash->{DEF} =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
+          if ($hash->{DEF} =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
+            $def = $hash->{OLDDEF};
+            $hash->{DEF} = $hash->{OLDDEF};
+          }
+        } else {
           $hash->{DEF} = $def;
           $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
           $hash->{DEF} = $def;
         }
         $modules{EnOcean}{defptr}{$def} = $hash;
-        delete $attr{$name} if (exists $attr{$name});
+        if (exists($attr{$name}{eep}) && $attr{$name}{eep} ne "$rorg-$func-$type") {
+          delete $attr{$name};
+          if (exists $attr{$filelogName}{logtype}) {
+            if (exists$EnO_eepConfig{$eep}{GPLOT}) {
+              $attr{$filelogName}{logtype} = $EnO_eepConfig{$eep}{GPLOT} . 'text';
+            } else {
+              $attr{$filelogName}{logtype} = 'text';
+            }
+          }
+        }
         $attr{$name}{eep} = "$rorg-$func-$type";
-        $attr{$name}{manufID} = "7FF";
-        $attr{$name}{room} = "EnOcean";
+        $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
+        $attr{$name}{room} = $autocreateDeviceRoom;
         foreach my $attrCntr (keys %{$EnO_eepConfig{$eep}{attr}}) {
           if ($attrCntr ne "subDef") {
             $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
           }
         }
-        return undef;
+        EnOcean_CreateSVG('del', $hash);
       } else {
         return "EEP $rorg-$func-$type not supported";
       }      
@@ -616,48 +726,6 @@ EnOcean_Define($$)
     return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
   }
 
-  # autocreate: parse received device telegram
-  if (@a == 4 && $name =~ m/EnO_$def/) {
-    $hash->{DEF} = $def;
-    my ($data, $rorg, $status);
-    (undef, undef, $rorg, $data, undef, $status, undef) = split(':', $a[3]);     
-    $attr{$name}{subType} = $EnO_rorgname{$rorg};
-    if ($attr{$name}{subType} eq "switch") {
-      my $nu = (hex($status) & 0x10) >> 4;
-      my $t21 = (hex($status) & 0x20) >> 5;
-      $attr{$name}{manufID} = "7FF";
-      if ($t21 && $nu) {
-        $attr{$name}{eep} = "F6-02-01";
-        readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-02-01 Manufacturer: no ID", 1);
-        Log3 $name, 2, "EnOcean $name teach-in EEP F6-02-01 Manufacturer: no ID";
-      } elsif (!$t21 && $nu) {
-        $attr{$name}{eep} = "F6-03-01";
-        readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-03-01 Manufacturer: no ID", 1);
-        Log3 $name, 2, "EnOcean $name teach-in EEP F6-03-01 Manufacturer: no ID";
-      }      
-    } elsif ($attr{$name}{subType} eq "contact" && hex($data) & 8) {
-      $attr{$name}{eep} = "D5-00-01";
-      $attr{$name}{manufID} = "7FF";
-      readingsSingleUpdate($hash, "teach", "1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID", 1);
-      Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
-    } elsif ($attr{$name}{subType} eq "4BS" && hex(substr($data, 6, 2)) & 8) {
-      readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
-      Log3 $name, 2, "EnOcean $name 4BS teach-in is missing";
-    } elsif ($attr{$name}{subType} eq "VLD") {
-      readingsSingleUpdate($hash, "teach", "UTE teach-in is missing", 1);
-      Log3 $name, 2, "EnOcean $name UTE teach-in is missing";
-    } elsif ($attr{$name}{subType} eq "MSC") {
-      readingsSingleUpdate($hash, "teach", "MSC not supported", 1);
-      Log3 $name, 2, "EnOcean $name MSC not supported";
-    } elsif ($attr{$name}{subType} =~ m/^SEC|ENC$/) {
-      readingsSingleUpdate($hash, "teach", "STE teach-in is missing", 1);
-      Log3 $name, 2, "EnOcean $name STE teach-in is missing";
-    } elsif ($attr{$name}{subType} =~ m/^GPCD|GPSD$/) {
-      readingsSingleUpdate($hash, "teach", "GP teach-in is missing", 1);
-      Log3 $name, 2, "EnOcean $name GP teach-in is missing";
-    }
-    EnOcean_Parse($hash, $a[3]);
-  }
   #$hash->{NOTIFYDEV} = "global";
   # polling
   # InternalAt();
@@ -4511,7 +4579,7 @@ sub EnOcean_Parse($$)
 {
   my ($iohash, $msg) = @_;
   my $IODev = $iohash->{NAME};
-  my ($hash, $name, $rorgname);
+  my ($hash, $name, $filelogName, $rorgname);
   my ($err, $logLevel, $response);
   Log3 $IODev, 4, "EnOcean received via $IODev: $msg";
   my @msg = split(':', $msg);
@@ -4585,6 +4653,7 @@ sub EnOcean_Parse($$)
     
     if($hash) {
       $name = $hash->{NAME};
+      $filelogName = "FileLog_$name";
       #if ($IODev ne $hash->{IODev}{NAME}) {
         # transceiver wrong
       #  Log3 $name, 4, "EnOcean $name locked telegram via $IODev PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status";
@@ -4675,7 +4744,9 @@ sub EnOcean_Parse($$)
         $rorg = substr($eep, 0, 2);
         Log3 $name, 5, "EnOcean $name decrypted data RORG: 32 >> $rorg DATA: $data SenderID: $senderID STATUS: $status";
       } else {
-        # UTE telegram expected
+        # Teach-In telegram expected
+        #####
+        # telegram analyse needed >> 1BS, 4BS, UTE
         if (length($data) == 14) {
           $rorg = "D4";
         } else {
@@ -4897,7 +4968,7 @@ sub EnOcean_Parse($$)
 
   } elsif ($rorg eq "A5") {
   # 4BS telegram
-    if (($db[0] & 0x08) == 0) {
+    if (($db[0] & 8) == 0) {
     # Teach-In telegram
       if ($teach || AttrVal($hash->{IODev}{NAME}, "learningMode", "demand") eq "always") {
 
@@ -4950,7 +5021,7 @@ sub EnOcean_Parse($$)
             
           } else {
             # 4BS teach-in query          
-            if($EnO_eepConfig{$st}{attr}) {
+            if(exists $EnO_eepConfig{$st}{attr}) {
               push @event, "3:teach:4BS teach-in accepted EEP A5-$func-$type Manufacturer: $mid";
               Log3 $name, 2, "EnOcean $name 4BS teach-in accepted EEP A5-$func-$type Manufacturer: $mid";
               foreach my $attrCntr (keys %{$EnO_eepConfig{$st}{attr}}) {
@@ -4961,6 +5032,12 @@ sub EnOcean_Parse($$)
                 } else {
                   $attr{$name}{$attrCntr} = $EnO_eepConfig{$st}{attr}{$attrCntr};
                 }
+              }
+              if (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} =~ m/^4BS|STE$/) {
+                $attr{$filelogName}{logtype} = $EnO_eepConfig{$st}{GPLOT} . 'text'
+                  if (exists $attr{$filelogName}{logtype});
+                EnOcean_CreateSVG(undef, $hash);
+                delete $hash->{helper}{teachInWait};
               }
               $st = $EnO_eepConfig{$st}{attr}{subType};
             } else {
@@ -5044,19 +5121,19 @@ sub EnOcean_Parse($$)
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
       # [Kieback&Peter MD15-FTL-xx]
-      push @event, "3:state:$db[3]";
-      push @event, "3:currentValue:$db[3]";
-      push @event, "3:setpoint:$db[3]";
-      push @event, "3:serviceOn:"    . (($db[2] & 0x80) ? "yes" : "no");
-      push @event, "3:energyInput:"  . (($db[2] & 0x40) ? "enabled" : "disabled");
-      push @event, "3:energyStorage:". (($db[2] & 0x20) ? "charged" : "empty");
-      push @event, "3:battery:"      . (($db[2] & 0x10) ? "ok" : "low");
-      push @event, "3:cover:"        . (($db[2] & 0x08) ? "open" : "closed");
-      push @event, "3:tempSensor:"   . (($db[2] & 0x04) ? "failed" : "ok");
-      push @event, "3:window:"       . (($db[2] & 0x02) ? "open" : "closed");
       push @event, "3:actuatorStatus:".(($db[2] & 0x01) ? "obstructed" : "ok");
+      push @event, "3:battery:" . (($db[2] & 0x10) ? "ok" : "low");
+      push @event, "3:cover:" . (($db[2] & 0x08) ? "open" : "closed");
+      push @event, "3:currentValue:$db[3]";
+      push @event, "3:energyInput:"  . (($db[2] & 0x40) ? "enabled" : "disabled");
+      push @event, "3:energyStorage:" . (($db[2] & 0x20) ? "charged" : "empty");
       push @event, "3:measured-temp:". sprintf "%0.1f", ($db[1]*40/255);
-      push @event, "3:selfCtl:"      . (($db[0] & 0x04) ? "on" : "off");
+      push @event, "3:setpoint:$db[3]";
+      push @event, "3:serviceOn:" . (($db[2] & 0x80) ? "yes" : "no");
+      push @event, "3:selfCtl:" . (($db[0] & 0x04) ? "on" : "off");
+      push @event, "3:tempSensor:" . (($db[2] & 0x04) ? "failed" : "ok");
+      push @event, "3:window:" . (($db[2] & 0x02) ? "open" : "closed");
+      push @event, "3:state:$db[3]";
       EnOcean_hvac_01Cmd($hash, $packetType, $db[1]);
 
     } elsif ($st eq "hvac.10") {
@@ -7762,18 +7839,24 @@ sub EnOcean_Parse($$)
       my $teachInReq = ($db[6] & 0x30) >> 4;
       if ($teachInReq == 0 || $teachInReq == 2) {
         # Teach-In Request
-        if($EnO_eepConfig{$subType}) {
-          # EEP Teach-In
+        if(exists $EnO_eepConfig{$subType}) {
+          # Teach-In EEP supported
           foreach my $attrCntr (keys %{$EnO_eepConfig{$subType}{attr}}) {
             $attr{$name}{$attrCntr} = $EnO_eepConfig{$subType}{attr}{$attrCntr};
           }
-          $subType = $EnO_eepConfig{$subType}{attr}{subType};
-          #$attr{$name}{subType} = $subType;
           $attr{$name}{manufID} = $mid;
           $attr{$name}{devChannel} = $devChannel;
           $attr{$name}{comMode} = $comMode;
           $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
           $attr{$name}{eep} = "$rorg-$func-$type";
+          if (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} =~ m/^UTE|STE$/) {
+            $attr{$filelogName}{logtype} = $EnO_eepConfig{$subType}{GPLOT} . 'text'
+              if (exists $attr{$filelogName}{logtype});
+            EnOcean_CreateSVG(undef, $hash);
+            delete $hash->{helper}{teachInWait};
+          }
+          $subType = $EnO_eepConfig{$subType}{attr}{subType};
+          #$attr{$name}{subType} = $subType;
           push @event, "3:teach:UTE teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
           if (!($db[6] & 0x40)) {
             # UTE Teach-In-Response expected
@@ -7789,7 +7872,7 @@ sub EnOcean_Parse($$)
           }
           Log3 $name, 2, "EnOcean $name UTE teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
         } else {
-          # EEP type not supported
+          # Teach-In EEP not supported
           $attr{$name}{subType} = "raw";
           $attr{$name}{manufID} = $mid;
           $attr{$name}{devChannel} = $devChannel;
@@ -8151,6 +8234,13 @@ sub EnOcean_Attr(@)
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^biDir|uniDir|confirm$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "creator") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^autocreate|manual$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -9345,11 +9435,83 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
   return ($err, $response, $data, $logLevel);
 }
 
+# create SVG devices
+sub EnOcean_CreateSVG($$)
+{
+  my ($ctrl, $hash) = @_;
+  my $name = $hash->{NAME};
+  my ($autocreateHash, $autocreateName, $autocreateDeviceRoom, $autocreateWeblinkRoom) =
+     (undef, 'autocreate', 'EnOcean', 'Plots');
+  my ($weblinkName, $weblinkHash);
+  my $cmd;
+  return undef if (!exists($attr{$name}{eep}) || $attr{$name}{eep} !~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i);
+  my $eep = uc("$1.$2.$3");
+  my $filelogName = "FileLog_$name";
+  my $ret;
+  # find autocreate device
+  while (($autocreateName, $autocreateHash) = each(%defs)) {
+    last if ($defs{$autocreateName}{TYPE} eq "autocreate");
+  }
+  # delete old SVG devices
+  if (defined($ctrl) && $ctrl eq 'del' || !exists($defs{$filelogName})) {
+    while (($weblinkName, $weblinkHash) = each(%defs)) {
+      if ($weblinkName =~ /^SVG_$name.*/) {
+        CommandDelete(undef, $weblinkName);
+        Log3 $hash->{NAME}, 5, "EnOcean_CreateSVG: device $weblinkName deleted";
+      }
+    }   
+  }
+  if (!defined(AttrVal($autocreateName, "disable", undef)) && exists($defs{$filelogName})) {
+    if (exists $EnO_eepConfig{$eep}{GPLOT}) {
+      # add GPLOT parameters
+      $attr{$filelogName}{logtype} = $EnO_eepConfig{$eep}{GPLOT} . $attr{$filelogName}{logtype}
+        if (!exists($attr{$filelogName}{logtype}) || $attr{$filelogName}{logtype} eq 'text');
+      if (AttrVal($autocreateName, "weblink", 1)) {
+        $autocreateWeblinkRoom = $attr{$autocreateName}{weblink_room} if (exists $attr{$autocreateName}{weblink_room});
+        $autocreateWeblinkRoom = 'EnOcean' if ($autocreateWeblinkRoom eq '%TYPE');
+        $autocreateWeblinkRoom = $name if ($autocreateWeblinkRoom eq '%NAME');
+        $autocreateWeblinkRoom = $attr{$name}{room} if (exists $attr{$name}{room});
+        my $wnr = 1;
+        #create SVG devices
+        foreach my $wdef (split(/,/, $EnO_eepConfig{$eep}{GPLOT})) {
+          next if(!$wdef);
+          my ($gplotfile, $stuff) = split(/:/, $wdef);
+          next if(!$gplotfile);
+          $weblinkName = "SVG_$name";
+          $weblinkName .= "_$wnr" if($wnr > 1);
+          $wnr++;
+          next if (exists $defs{$weblinkName});
+          $cmd = "$weblinkName SVG $filelogName:$gplotfile:CURRENT";
+          Log3 $weblinkName, 2, "EnOcean define $cmd";
+          $ret = CommandDefine(undef, $cmd);
+          if($ret) {
+            Log3 $weblinkName, 2, "EnOcean ERROR: define $cmd: $ret";
+            last;
+          }
+          $attr{$weblinkName}{room} = $autocreateWeblinkRoom;
+          $attr{$weblinkName}{label} = '"' . $name . ' Min $data{min1}, Max $data{max1}, Last $data{currval1}"';
+          $ret = CommandSet(undef, "$weblinkName copyGplotFile");
+          if($ret) {
+            Log3 $weblinkName, 2, "EnOcean ERROR: set $weblinkName copyGplotFile: $ret";
+            last;
+          }
+        }
+      } 
+    }
+  }
+  return undef;
+}
+
 #CommandSave
 sub EnOcean_CommandSave($$)
 {
   my ($ctrl, $param) = @_;
-  my $autosave = AttrVal("autocreate", "autosave", undef);
+  # find autocreate device
+  my ($autocreateHash, $autocreateName);
+  while (($autocreateName, $autocreateHash) = each(%defs)) {
+    last if ($defs{$autocreateName}{TYPE} eq "autocreate");
+  }
+  my $autosave = AttrVal($autocreateName, "autosave", undef);
   if (!defined $autosave) {
     CommandSave($ctrl, $param) if (AttrVal("global", "autosave", 1));
   } elsif ($autosave) {
@@ -10305,6 +10467,7 @@ sub EnOcean_sec_parseTeachIn($$$$) {
               $attr{$name}{comMode} = "biDir";
               $attr{$name}{secMode} = "biDir";
             }
+            $hash->{helper}{teachInWait} = "STE";            
 	  } else {
 	    # switch teach-in
             if ($info == 0) {
@@ -10945,15 +11108,24 @@ EnOcean_Delete($$)
 {
   my ($hash, $name) = @_;
   my $logName = "FileLog_$name";
+  my ($weblinkName, $weblinkHash);
+  # delete FileLog device and logfiles
   if (exists $defs{$logName}) {
     my $count;
     my $logFile = $defs{$logName}{logfile};
     $logFile =~ /^(.*)($name).*\.(.*)$/;
     $logFile = $1 . $2 . "*." . $3;
     CommandDelete(undef, "FileLog_$name");
-    #unlink glob "./log/$name*.log";
+    Log3 $hash->{NAME}, 2, "EnOcean FileLog_$name deleted";
     $count = unlink glob $logFile;
-    Log3 $hash->{NAME}, 5, "EnOcean_Delete: $logFile >> $count files deleted";
+    Log3 $hash->{NAME}, 2, "EnOcean $logFile >> $count files deleted";
+  }
+  # delete SVG devices
+  while (($weblinkName, $weblinkHash) = each(%defs)) {
+    if ($weblinkName =~ /^SVG_$name.*/) {
+      CommandDelete(undef, $weblinkName) ;
+      Log3 $hash->{NAME}, 2, "EnOcean $weblinkName deleted";
+    }
   }
   return undef;
 }
