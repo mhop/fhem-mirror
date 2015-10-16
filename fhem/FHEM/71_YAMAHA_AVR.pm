@@ -642,8 +642,8 @@ YAMAHA_AVR_Set($@)
     }
     elsif($what eq "remoteControl")
     {
-        # the RX-Vx75 series use a different tag name to access the remoteControl commands
-        my $control_tag = (exists($hash->{MODEL}) and $hash->{MODEL} =~ /RX-V\d75/ ? "Cursor_Control" : "List_Control");
+        # the RX-Vx71, RX-Vx73, RX-Ax10, RX-Ax20 series use a different tag name to access the remoteControl commands
+        my $control_tag = (exists($hash->{MODEL}) and $hash->{MODEL} =~ /^(RX-V\d{1,2}7(1|3)|RX-A\d{1,2}(1|2)0)$/ ? "List_Control" : "Cursor_Control");
         
         if($a[2] eq "up")
         {
