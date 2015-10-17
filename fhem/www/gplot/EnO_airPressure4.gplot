@@ -1,0 +1,31 @@
+##############################################
+# $Id$
+# Display the measured temperature
+#
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device voltage: 3.4
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+set title '<L1>'
+set grid xtics ytics
+
+set ylabel "P/hPa"
+
+#FileLog 4:airPressure:0:
+
+plot \
+  "< egrep 'airPressure:' <IN>"\
+     using 1:4 ls l2fill axes x1y1 title 'Air Pressure' with lines
