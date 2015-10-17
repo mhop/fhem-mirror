@@ -2,7 +2,7 @@
 # Do not insert empty lines here, update check depends on it.
   - bugfix:  YAMAHA_AVR: fixing not working remoteControl commands for
              several models
-  - feature: PRESENCE: support for Solaris ping (mode: local-ping)
+  - feature: PRESENCE: support for Solaris ping (mode: lan-ping)
   - feature: HUEbridge: added support for HUE scenes
                           (get: scenes; set: savescene, modifyscene, scene)
                         new unified syntax for multiple lights
