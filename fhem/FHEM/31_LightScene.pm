@@ -788,7 +788,7 @@ LightScene_updateHelper($$)
     my ($s,$devices) = split( ':', $part,2 );
 
     my $reverse = 0;
-    if( $devices =~ m/^!(.*)/ ) {
+    if( $devices && $devices =~ m/^!(.*)/ ) {
       $reverse = 1;
       $devices = $1;
     }
