@@ -1,5 +1,5 @@
 ##############################################
-# $Id: EnO_temp4.gplot 9488 2015-10-17 17:04:01Z klaus-schauer $
+# $Id$
 # Display the on and off values for a Occupancy Sensor 
 # FileLog definition: 
 # define FileLog_device FileLog ./log/device-%Y.log device
