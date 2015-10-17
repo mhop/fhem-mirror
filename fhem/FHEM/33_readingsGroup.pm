@@ -643,6 +643,7 @@ readingsGroup_2html($;$)
   my($hash,$extPage) = @_;
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
   return undef if( !$hash );
+  return undef if( !$init_done );
 
   #if( $hash->{fhem}->{cached} && $hash->{fhem}->{lastDefChange} && $hash->{fhem}->{lastDefChange} == $lastDefChange ) {
   #  return $hash->{fhem}->{cached};
