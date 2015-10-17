@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2015-10-16
+# 2015-10-17
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -166,35 +166,35 @@ my %EnO_manuf = (
 );
 
 my %EnO_eepConfig = (
-  "A5.02.01" => {attr => {subType => "tempSensor.01"}, GPLOT => "temp4:Temp,"},
-  "A5.02.02" => {attr => {subType => "tempSensor.02"}, GPLOT => "temp4:Temp,"},
-  "A5.02.03" => {attr => {subType => "tempSensor.03"}, GPLOT => "temp4:Temp,"},
-  "A5.02.04" => {attr => {subType => "tempSensor.04"}, GPLOT => "temp4:Temp,"},
-  "A5.02.05" => {attr => {subType => "tempSensor.05"}, GPLOT => "temp4:Temp,"},
-  "A5.02.06" => {attr => {subType => "tempSensor.06"}, GPLOT => "temp4:Temp,"},
-  "A5.02.07" => {attr => {subType => "tempSensor.07"}, GPLOT => "temp4:Temp,"},
-  "A5.02.08" => {attr => {subType => "tempSensor.08"}, GPLOT => "temp4:Temp,"},
-  "A5.02.09" => {attr => {subType => "tempSensor.09"}, GPLOT => "temp4:Temp,"},
-  "A5.02.0A" => {attr => {subType => "tempSensor.0A"}, GPLOT => "temp4:Temp,"},
-  "A5.02.0B" => {attr => {subType => "tempSensor.0B"}, GPLOT => "temp4:Temp,"},
-  "A5.02.10" => {attr => {subType => "tempSensor.10"}, GPLOT => "temp4:Temp,"},
-  "A5.02.11" => {attr => {subType => "tempSensor.11"}, GPLOT => "temp4:Temp,"},
-  "A5.02.12" => {attr => {subType => "tempSensor.12"}, GPLOT => "temp4:Temp,"},
-  "A5.02.13" => {attr => {subType => "tempSensor.13"}, GPLOT => "temp4:Temp,"},
-  "A5.02.14" => {attr => {subType => "tempSensor.14"}, GPLOT => "temp4:Temp,"},
-  "A5.02.15" => {attr => {subType => "tempSensor.15"}, GPLOT => "temp4:Temp,"},
-  "A5.02.16" => {attr => {subType => "tempSensor.16"}, GPLOT => "temp4:Temp,"},
-  "A5.02.17" => {attr => {subType => "tempSensor.17"}, GPLOT => "temp4:Temp,"},
-  "A5.02.18" => {attr => {subType => "tempSensor.18"}, GPLOT => "temp4:Temp,"},
-  "A5.02.19" => {attr => {subType => "tempSensor.19"}, GPLOT => "temp4:Temp,"},
-  "A5.02.1A" => {attr => {subType => "tempSensor.1A"}, GPLOT => "temp4:Temp,"},
-  "A5.02.1B" => {attr => {subType => "tempSensor.1B"}, GPLOT => "temp4:Temp,"},
-  "A5.02.20" => {attr => {subType => "tempSensor.20"}, GPLOT => "temp4:Temp,"},
-  "A5.02.30" => {attr => {subType => "tempSensor.30"}, GPLOT => "temp4:Temp,"},
-  "A5.04.01" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.04.02" => {attr => {subType => "tempHumiSensor.02"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.04.03" => {attr => {subType => "tempHumiSensor.03"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.05.01" => {attr => {subType => "baroSensor.01"}},
+  "A5.02.01" => {attr => {subType => "tempSensor.01"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.02" => {attr => {subType => "tempSensor.02"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.03" => {attr => {subType => "tempSensor.03"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.04" => {attr => {subType => "tempSensor.04"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.05" => {attr => {subType => "tempSensor.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.06" => {attr => {subType => "tempSensor.06"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.07" => {attr => {subType => "tempSensor.07"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.08" => {attr => {subType => "tempSensor.08"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.09" => {attr => {subType => "tempSensor.09"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.0A" => {attr => {subType => "tempSensor.0A"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.0B" => {attr => {subType => "tempSensor.0B"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.10" => {attr => {subType => "tempSensor.10"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.11" => {attr => {subType => "tempSensor.11"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.12" => {attr => {subType => "tempSensor.12"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.13" => {attr => {subType => "tempSensor.13"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.14" => {attr => {subType => "tempSensor.14"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.15" => {attr => {subType => "tempSensor.15"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.16" => {attr => {subType => "tempSensor.16"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.17" => {attr => {subType => "tempSensor.17"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.18" => {attr => {subType => "tempSensor.18"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.19" => {attr => {subType => "tempSensor.19"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.1A" => {attr => {subType => "tempSensor.1A"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.1B" => {attr => {subType => "tempSensor.1B"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.20" => {attr => {subType => "tempSensor.20"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.02.30" => {attr => {subType => "tempSensor.30"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.04.01" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.04.02" => {attr => {subType => "tempHumiSensor.02"}, GPLOT => "EnO_temp4humi6:Temp/Humi,EnO_voltage4:Voltage,"},
+  "A5.04.03" => {attr => {subType => "tempHumiSensor.03"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.05.01" => {attr => {subType => "baroSensor.01"}, GPLOT => "EnO_airPressure4:Airpressure,"},
   "A5.06.01" => {attr => {subType => "lightSensor.01"}},
   "A5.06.02" => {attr => {subType => "lightSensor.02"}},
   "A5.06.03" => {attr => {subType => "lightSensor.03"}},
@@ -214,37 +214,37 @@ my %EnO_eepConfig = (
   "A5.09.09" => {attr => {subType => "CO2Sensor.01"}},
   "A5.09.0A" => {attr => {subType => "HSensor.01"}},
   "A5.09.0B" => {attr => {subType => "radiationSensor.01"}},
-  "A5.10.01" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.02" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.03" => {attr => {subType => "roomSensorControl.05", comMode => "confirm", subDef => "getNextID"}, GPLOT => "temp4:Temp,"},
-  "A5.10.04" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.05" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.06" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.07" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.08" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.09" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.0A" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.0B" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.0C" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.0D" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "temp4:Temp,"},
-  "A5.10.10" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.10.11" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.10.12" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.10.13" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.10.14" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.10.15" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "temp4:Temp,"},
-  "A5.10.16" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "temp4:Temp,"},
-  "A5.10.17" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "temp4:Temp,"},
-  "A5.10.18" => {attr => {subType => "roomSensorControl.18"}, GPLOT => "temp4:Temp,"},
-  "A5.10.19" => {attr => {subType => "roomSensorControl.19"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.10.1A" => {attr => {subType => "roomSensorControl.1A"}, GPLOT => "temp4:Temp,"},
-  "A5.10.1B" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "temp4:Temp,"},
-  "A5.10.1C" => {attr => {subType => "roomSensorControl.1C"}, GPLOT => "temp4:Temp,"},
-  "A5.10.1D" => {attr => {subType => "roomSensorControl.1D"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.10.1E" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "temp4:Temp,"},
-  "A5.10.1F" => {attr => {subType => "roomSensorControl.1F"}, GPLOT => "temp4:Temp,"},
-  "A5.10.20" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "A5.10.21" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "temp4hum6:Temp/Hum,"},
+  "A5.10.01" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.02" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.03" => {attr => {subType => "roomSensorControl.05", comMode => "confirm", subDef => "getNextID"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.04" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.05" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.06" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.07" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.08" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.09" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.0A" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.0B" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.0C" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.0D" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.10" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.11" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.12" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.13" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.14" => {attr => {subType => "roomSensorControl.01"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.15" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.16" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.17" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.18" => {attr => {subType => "roomSensorControl.18"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.19" => {attr => {subType => "roomSensorControl.19"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.1A" => {attr => {subType => "roomSensorControl.1A"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.1B" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.1C" => {attr => {subType => "roomSensorControl.1C"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.1D" => {attr => {subType => "roomSensorControl.1D"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.1E" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.1F" => {attr => {subType => "roomSensorControl.1F"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.20" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.21" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "A5.11.01" => {attr => {subType => "lightCtrlState.01"}},
   "A5.11.02" => {attr => {subType => "tempCtrlState.01"}},
   "A5.11.03" => {attr => {subType => "shutterCtrlState.01", subDef => "getNextID", subTypeSet => "gateway", gwCmd => "blindCmd"}},
@@ -269,7 +269,7 @@ my %EnO_eepConfig = (
   "A5.14.04" => {attr => {subType => "multiFuncSensor"}},
   "A5.14.05" => {attr => {subType => "multiFuncSensor"}},
   "A5.14.06" => {attr => {subType => "multiFuncSensor"}},
-  "A5.20.01" => {attr => {subType => "hvac.01", webCmd => "setpointTemp"}, GPLOT => "temp4:Temp,"},
+  "A5.20.01" => {attr => {subType => "hvac.01", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-01:Temp/Setpoint,"},
  #"A5.20.02" => {attr => {subType => "hvac.02"}},
  #"A5.20.03" => {attr => {subType => "hvac.03"}},
   "A5.20.10" => {attr => {subType => "hvac.10", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}},
@@ -301,9 +301,9 @@ my %EnO_eepConfig = (
   "D2.03.00" => {attr => {subType => "switch.00"}},
   "D2.03.10" => {attr => {subType => "windowHandle.10"}},
   "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}},
-  "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "temp4hum6:Temp/Hum,"},
-  "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "temp4:Temp,"},
-  "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "temp4:Temp,"},
+  "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
+  "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
   "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}},
   "D2.32.00" => {attr => {subType => "currentClamp.00"}},
   "D2.32.01" => {attr => {subType => "currentClamp.01"}},
@@ -719,11 +719,11 @@ EnOcean_Define($$)
         return "EEP $rorg-$func-$type not supported";
       }      
     } else {
-      return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
+      return "wrong syntax: define <name> EnOcean <8-digit-hex-code> [<EEP>]|getNextID|<EEP>";
     }
   
   } else {
-    return "wrong syntax: define <name> EnOcean <8-digit-hex-code>|getNextID|<EEP>";
+    return "wrong syntax: define <name> EnOcean <8-digit-hex-code> [<EEP>]|getNextID|<EEP>";
   }
 
   #$hash->{NOTIFYDEV} = "global";
@@ -5881,7 +5881,6 @@ sub EnOcean_Parse($$)
     } elsif ($st eq "baroSensor.01") {
       # Barometric Sensor(EEP A5-04-03)
       # [untested]
-      # $db[3] is the humidity where 0x00 = 0%rH ... 0xFF = 100%rH
       # $db[3] .. $db[2] is the barometric  where 0x00 = 500 hPa ... 0x3FF = 1150 hPa
       my $baro = sprintf "%d", 500 + ($db[2] << 8 | $db[1]) * 650 / 1023;
       push @event, "3:state:$baro";
@@ -11305,7 +11304,7 @@ EnOcean_Delete($$)
   <a name="EnOceandefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; EnOcean &lt;DEF&gt;|getNextID|&lt;EEP&gt;</code>
+    <code>define &lt;name&gt; EnOcean &lt;DEF&gt; [&lt;EEP&gt;]|getNextID|&lt;EEP&gt;</code>
     <br><br>
 
     Define an EnOcean device, connected via a <a href="#TCM">TCM</a> modul. The
@@ -11358,6 +11357,11 @@ EnOcean_Delete($$)
   <a name="EnOceaninternals"></a>
   <b>Internals</b>
   <ul>
+    <li>DEF: 0000000 ... FFFFFFFF|<EEP><br>
+      EnOcean DestinationID or SenderID<br>
+      If the attributes subDef* are set, this values are used as EnOcean SenderID.<br>
+      For an existing device, the device can be re-parameterized by entering the EEP.<br>
+    </li>
     <li>&lt;IODev&gt;_DestinationID: 0000000 ... FFFFFFFF<br>
       Received destination address, Broadcast radio: FFFFFFFF<br>
     </li>
@@ -13839,9 +13843,9 @@ EnOcean_Delete($$)
        <li>serviceOn: yes|no</li>
        <li>setpoint: setpoint/%</li>
        <li>setpointTemp: t/&#176C</li>
+       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>temperature: t/&#176C</li>
        <li>tempSensor: failed|ok</li>
-       <li>teach: &lt;result of teach procedure&gt;</li>
        <li>window: open|closed</li>
        <li>state: setpoint/%</li>
      </ul><br>
