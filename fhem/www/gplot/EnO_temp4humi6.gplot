@@ -18,18 +18,18 @@ set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
-set ytics nomirror
-set y2tics
-#set ytics
+#set ytics nomirror
+set ytics
+#set y2tics
 set title '<L1>'
-set grid xtics y2tics
+set grid xtics ytics
 
-set y2label "t/C"
-set ylabel "rH/%"
+set ylabel "t/C"
+set y2label "rH/%"
 
 #FileLog 4:T\x3a:0:
 #FileLog 6:H\x3a:0:
 
 plot \
-  "< awk '/T:/ {print $1, $4}' <IN>" using 1:2 ls l0 axes x1y2 title 'Temperature' with lines,\
-  "< awk '/H:/ {print $1, $6}' <IN>" using 1:2 ls l2fill axes x1y1 title 'Humidity' with lines
+  "< awk '/T:/ {print $1, $4}' <IN>" using 1:2 ls l0 axes x1y1 title 'Temperature' with lines,\
+  "< awk '/H:/ {print $1, $6}' <IN>" using 1:2 ls l2fill axes x1y2 title 'Humidity' with lines
