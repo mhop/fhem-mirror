@@ -466,6 +466,7 @@ HUEBridge_Get($@)
       my $code = $name ."-G". $key;
       my $fhem_name ="";
       $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
+      $result->{$key}{type} = '<unknown>' if( !defined($result->{$key}{type}) );
       $ret .= sprintf( "%2i: %-15s %-15s %-15s %s\n", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type},  join( ",", @{$result->{$key}{lights}} ) );
     }
     $ret = sprintf( "%2s  %-15s %-15s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE", "LIGHTS" ) .$ret if( $ret );
@@ -822,7 +823,7 @@ HUEBridge_HTTP_Call($$$;$)
     Log3 $name, 2, "$name: empty answer received for $uri";
     return undef;
   } elsif( $ret !~ m/^[\[{].*[\]}]$/ ) {
-    Log3 $name, 2, "$name: invalid json detected for $uri: $ret";
+    Log3 $name, 2, "$name: invalid json detected for $uri: ". Dumper $ret;
     return undef;
   }
 
