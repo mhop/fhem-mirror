@@ -1,5 +1,5 @@
 ##############################################
-# $Id: EnO_temp4humi6.gplot 9465 2015-10-16 15:36:37Z klaus-schauer $
+# $Id$
 #
 # Display the measured temp and the humidity.
 # FileLog definition: 
