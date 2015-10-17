@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# Display the measured temperature
+# Display the battery voltage
 #
 # FileLog definition: 
 # define FileLog_device FileLog ./log/device-%Y.log device
