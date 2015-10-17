@@ -354,11 +354,13 @@ OPENWEATHER_Start($)
 
    $hash->{INTERVAL} = AttrVal( $name, "INTERVAL", 3600 );
 
+   readingsSingleUpdate($hash, "state", "disabled", 1)     if AttrVal($name, "disable", 0 ) == 1;
+
    if( $hash->{fhem}{LOCAL} != 1 && $hash->{INTERVAL} > 0 )
    {
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OPENWEATHER_Start", $hash, 1);
-      return undef if( AttrVal($name, "disable", 0 ) == 1 );
+      return undef      if AttrVal($name, "disable", 0 ) == 1;
    }
 
    my $timeOut = AttrVal($name, "timeOut", 10);
@@ -387,12 +389,12 @@ OPENWEATHER_Run ($)
                                        , agent => "Mozilla/5.0 (FHEM)" );
    my $request  = HTTP::Request->new( GET => $URL );
    my $response = $agent->request($request);
-   $err_log = "Can't get $URL -- " . $response->status_line
+   $err_log = "Error: Can't get $URL -- " . $response->status_line
      unless $response->is_success;
      
    if ( $err_log ne "" )
    {
-      return "$name|0|" . $response->status_line;
+      return "$name|0|" . $err_log;
    }
 
    OPENWEATHER_Log $hash, 5, length($response->content)." characters captured";
@@ -416,7 +418,7 @@ OPENWEATHER_Done($)
 
    readingsBeginUpdate($hash);
 
-   if ( $success == 1 ){
+   if ( $success == 1 ) {
       my $message = decode_base64($result);
 
       OPENWEATHER_Log $hash, 5, "Start parsing of XML data.";
@@ -449,10 +451,9 @@ OPENWEATHER_Done($)
          readingsBulkUpdate ($hash, "state", $state);
       }
    }
-   else
-   {
+   else {
       readingsBulkUpdate($hash, "lastConnection", $result);
-      readingsBulkUpdate($hash, "state", $result);
+      readingsBulkUpdate($hash, "state", "Error");
       OPENWEATHER_Log $hash, 1, $result;
    }
 
@@ -466,6 +467,7 @@ OPENWEATHER_UpdateAborted($)
   my ($hash) = @_;
   delete($hash->{helper}{RUNNING_PID});
   OPENWEATHER_Log $hash, 1, "Timeout when connecting to wetter.com";
+  readingsSingleUpdate($hash, "lastConnection", "Error: Timeout when connecting to wetter.com", 1);
 
 } # end OPENWEATHER_UpdateAborted
 
