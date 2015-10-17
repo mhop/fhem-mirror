@@ -552,8 +552,8 @@ ECMD_Write($$$)
   my $name= $hash->{NAME};
   my $answer;
   my $ret= "";
-  my $requestSeparator= AttrVal($hash, "requestSeparator", undef);
-  my $responseSeparator= AttrVal($hash, "responseSeparator", "");
+  my $requestSeparator= AttrVal($name, "requestSeparator", undef);
+  my $responseSeparator= AttrVal($name, "responseSeparator", "");
   my @ecmds;
   if(defined($requestSeparator)) {
     @ecmds= split $requestSeparator, $msg;
