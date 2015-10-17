@@ -5042,6 +5042,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     
     my $peerId = CUL_HM_name2Id($peerN);
     return "please enter peer"                                    if(!$peerId);
+    return "peer is not a channel"                                if(!$defs{$peerN}{helper}{role}{chn});
     $peerId .= "01" if( length($peerId) == 6);
 
     my @pCh;
