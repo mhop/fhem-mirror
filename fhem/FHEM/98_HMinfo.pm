@@ -1741,8 +1741,8 @@ sub HMinfo_loadConfig($@) {####################################################
   $HMConfig::culHmTpl{tmplUsgChange} = 0;# all changes are obsolete
   foreach my $tmpN(devspec2array("TYPE=CUL_HM")){
     $defs{$tmpN}{helper}{tmplChg} = 0 if(!$defs{$tmpN}{helper}{role}{vrt});
+    CUL_HM_setTmplDisp($defs{$tmpN});#set readings if desired    
   }
-
   return $ret;
 }
 sub HMinfo_purgeConfig($) {####################################################
@@ -1978,6 +1978,7 @@ sub HMinfo_templateSet(@){#####################################################
   $aHash->{helper}{tmpl}{$tmplID} = join(" ",@p);
   $HMConfig::culHmTpl{tmplUsgChange} = 1; # mark change
   $aHash->{helper}{tmplChg} = 1;
+  CUL_HM_setTmplDisp($aHash);#set readings if desired
   return $ret;
 }
 sub HMinfo_templateDel(@){#####################################################
@@ -1985,6 +1986,7 @@ sub HMinfo_templateDel(@){#####################################################
   delete $defs{$aName}{helper}{tmpl}{"$pSet>$tmpl"};
   $HMConfig::culHmTpl{tmplUsgChange} = 1; # mark change
   $defs{$aName}{helper}{tmplChg} = 1;
+  CUL_HM_setTmplDisp($defs{$aName});#set readings if desired
   return;
 }
 sub HMinfo_templateExe(@){#####################################################
@@ -2006,15 +2008,25 @@ sub HMinfo_templateUsg(@){#####################################################
     next if(!defined $defs{$dName}{helper}{tmpl});
     foreach my $tid(keys %{$defs{$dName}{helper}{tmpl}}){
       my ($p,$t) = split(">",$tid);
-      next if($tFilter && $tFilter ne $t);
-      push @ul,"$dName |$p |$t |$defs{$dName}{helper}{tmpl}{$tid}";
+      if($tFilter){
+        if($tFilter eq "sortTemplate"){
+          push @ul,sprintf("%20s|%-15s|%s|%s",$t,$dName,$p,$defs{$dName}{helper}{tmpl}{$tid});
+        }
+        if($tFilter eq "sortPeer"){
+          my ($pn,$ls) = split(":",$p);
+          push @ul,sprintf("%20s|%-15s|%5s:%-20s|%s",$pn,$t,$ls,$dName,$defs{$dName}{helper}{tmpl}{$tid});
+        }
+        elsif($tFilter ne $t){
+          next;}
+      }
+      else{ push @ul,sprintf("%20s|%-15s|%s|%s",$dName,$p,$t,$defs{$dName}{helper}{tmpl}{$tid});}
     }
   }
   return join("\n",sort(@ul));
 }
 sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
-  $pSet = "" if (!$pSet || $pSet eq "none");
+  $pSet = ":" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
   return "template undefined $tmpl\n"                     if(!$HMConfig::culHmTpl{$tmpl});
   return "aktor $aName unknown\n"                         if(!$defs{$aName});
@@ -2046,8 +2058,11 @@ sub HMinfo_templateChk(@){#####################################################
     else{
       my $pRnm = $pName?($pName."-".($pTyp eq "long"?"lg":"sh")):"";
       foreach my $rn (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
-        my $regV = ReadingsVal($aName,"R-$pRnm$rn" ,undef);
-        $regV    = ReadingsVal($aName,".R-$pRnm$rn",undef) if (!defined $regV);
+        my $regV;
+        if ($pRnm){
+          $regV    = ReadingsVal($aName,"R-$pRnm$rn" ,undef);
+          $regV    = ReadingsVal($aName,".R-$pRnm$rn",undef) if (!defined $regV);
+        }
         $regV    = ReadingsVal($aName,"R-".$rn     ,undef) if (!defined $regV);
         $regV    = ReadingsVal($aName,".R-".$rn    ,undef) if (!defined $regV);
         if (defined $regV){
@@ -2065,9 +2080,9 @@ sub HMinfo_templateChk(@){#####################################################
         }
       }
     }
-    $repl .= "$aName $pS-> ".($replPeer?"failed\n$replPeer":"match\n");
+    $repl .= "$aName $pS-> failed\n$replPeer" if($replPeer);
   }
-  return ($repl?$repl:"template $tmpl match actor:$aName peer:$pSet");
+  return ($repl?$repl:"");
 }
 sub HMinfo_templateList($){####################################################
   my $templ = shift;
@@ -2341,6 +2356,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          set hm templateChk -f RolloNord BlStopUpLg all              # RolloNord any peer,long and short<br>
          set hm templateChk -f Rollo.*   BlStopUpLg all              # each Rollo* any peer,long and short<br>
          set hm templateChk BlStopUpLg                               # each entities<br>
+         set hm templateChk                                          # all assigned templates<br>
+         set hm templateChk sortTemplate                             # all assigned templates sortiert nach Template<br>
+         set hm templateChk sortPeer                                 # all assigned templates sortiert nach Peer<br>
         </code></ul>
       </li>
   </ul>
@@ -2770,6 +2788,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          set hm templateChk -f RolloNord BlStopUpLg all              # RolloNord any peer,long and short<br>
          set hm templateChk -f Rollo.*   BlStopUpLg all              # each Rollo* any peer,long and short<br>
          set hm templateChk BlStopUpLg                               # each entities<br>
+         set hm templateChk                                          # all assigned templates<br>
+         set hm templateChk sortTemplate                             # all assigned templates, sort by template<br>
+         set hm templateChk sortPeer                                 # all assigned templates, sort by peer<br>
         </code></ul>
       </li>
   </ul>

@@ -164,7 +164,7 @@ sub CUL_HM_Initialize($) {
                        ."levelRange levelMap ";
   $hash->{Attr}{glb} =  "do_not_notify:1,0 showtime:1,0 "
                        ."rawToReadable unit "#"KFM-Sensor" only
-                       ."expert:0_off,1_on,2_full "
+                       ."expert:0_off,1_on,4_none,8_templ_default,12_template "
                        ."param "
                        ."actAutoTry:0_off,1_on "
                        ."aesCommReq:1,0 "      # IO will request AES if 
@@ -577,52 +577,49 @@ sub CUL_HM_Rename($$$) {#############################
 sub CUL_HM_Attr(@) {#################################
   my ($cmd,$name, $attrName,$attrVal) = @_;
   my $chk = CUL_HM_AttrCheck($name, $attrName);
-  return $chk if ($chk);
-  my @hashL;
-  my $updtReq = 0;
   my $hash = CUL_HM_name2Hash($name);
+  return $chk if ($chk);
+  
+  my $updtReq = 0;
   if   ($attrName eq "expert"){#[0,1,2]
     $attr{$name}{$attrName} = $attrVal;
     my $eHash = $defs{$name};
-    foreach my $chId (CUL_HM_getAssChnIds($name)){
-      my $cHash = CUL_HM_id2Hash($chId);
-      push(@hashL,$cHash) if ($eHash ne $cHash);
-    }
-    push(@hashL,$eHash);
-    foreach my $hash (@hashL){
-      my $exLvl = CUL_HM_getAttrInt($hash->{NAME},"expert");
-      if    ($exLvl eq "0"){# off
-        foreach my $rdEntry (grep /^RegL_/,keys %{$hash->{READINGS}}){
-          $hash->{READINGS}{".".$rdEntry} = $hash->{READINGS}{$rdEntry};
-          delete $hash->{READINGS}{$rdEntry};
-        }
-        foreach my $rdEntry (grep /^R-/   ,keys %{$hash->{READINGS}}){
-           my $reg = $rdEntry;
-            $reg =~ s/.*-//;
-          next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
-          $hash->{READINGS}{".".$rdEntry} = $hash->{READINGS}{$rdEntry};
-          delete $hash->{READINGS}{$rdEntry};
-        }
+
+    foreach my $tHash ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name))
+                      ,$eHash){
+      my $exLvl = CUL_HM_getAttrInt($tHash->{NAME},"expert");
+      $tHash->{helper}{expert}{def} = (!($exLvl & 0x04))?1:0;#default register on
+      $tHash->{helper}{expert}{det} = ( ($exLvl & 0x01))?1:0;#detail register on
+      $tHash->{helper}{expert}{raw} = ( ($exLvl & 0x02))?1:0;#raw register on
+      $tHash->{helper}{expert}{tpl} = ( ($exLvl & 0x08))?1:0;#template on
+      my ($nTag,$grp);
+      if ($tHash->{helper}{expert}{def}){($nTag,$grp) = ("",".R-")}
+      else{                              ($nTag,$grp) = (".","R-")}
+      foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
+        my $reg = $rdEntry;
+        $reg =~ s/.*-//;
+        next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '0');
+        $tHash->{READINGS}{$nTag."R-".$reg} = $tHash->{READINGS}{$rdEntry};
+        delete $tHash->{READINGS}{$rdEntry};
       }
-      elsif ($exLvl eq "1"){# on: Only register values, no raw data
-        # move register to visible if available
-        foreach my $rdEntry (grep /^RegL_/,keys %{$hash->{READINGS}}){
-          $hash->{READINGS}{".".$rdEntry} = $hash->{READINGS}{$rdEntry};
-          delete $hash->{READINGS}{$rdEntry};
-        }
-        foreach my $rdEntry (grep /^\.R-/ ,keys %{$hash->{READINGS}}){
-          $hash->{READINGS}{substr($rdEntry,1)} = $hash->{READINGS}{$rdEntry};
-          delete $hash->{READINGS}{$rdEntry};
-        }
+      if ($tHash->{helper}{expert}{det}){($nTag,$grp) = ("",".R-")}
+      else{                              ($nTag,$grp) = (".","R-")}
+      foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
+        my $reg = $rdEntry;
+        $reg =~ s/.*-//;
+        next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
+        $tHash->{READINGS}{$nTag."R-".$reg} = $tHash->{READINGS}{$rdEntry};
+        delete $tHash->{READINGS}{$rdEntry};
       }
-      elsif ($exLvl eq "2"){# full - incl raw data
-        foreach my $rdEntry (grep /^\.R(egL_|-)/,keys %{$hash->{READINGS}}){
-          $hash->{READINGS}{substr($rdEntry,1)} = $hash->{READINGS}{$rdEntry};
-          delete $hash->{READINGS}{$rdEntry};
-        }
+      if ($tHash->{helper}{expert}{raw}){($nTag,$grp) = ("",".RegL_")}
+      else{                              ($nTag,$grp) = (".","RegL_")}
+      foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
+        my $reg = $rdEntry;
+        $reg =~ s/\.//;
+        $tHash->{READINGS}{$nTag.$reg} = $tHash->{READINGS}{$rdEntry};
+        delete $tHash->{READINGS}{$rdEntry};
       }
-      else{;
-      }
+      CUL_HM_setTmplDisp($tHash);
     }
   }
   elsif($attrName eq "actCycle"){#"000:00" or 'off'
@@ -2243,7 +2240,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
         $mh{shash}->{helper}{pon} = 1;# power on is detected - only ssend once
       }
-      elsif($el > 800000 && $el < $eCnt ){# handle overflow
+      elsif($el > 800000 && $el > $eCnt ){# handle overflow
         $eo += 838860.7;
         push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
       }
@@ -2920,6 +2917,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         }
 
         $_ = '00000000' foreach (grep /^000000/,@peers);#correct bad term(6 chars) from rain sens)
+        $_ .= 'xx' foreach (grep /^......$/,@peers);
         $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
 
         CUL_HM_ID2PeerList ($chnName,$_,1) foreach (@peers);
@@ -2988,7 +2986,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         my $lastAddr = hex($1) if ($data =~ m/.*(..):..$/);
         my $peer = $rspWait->{forPeer};
         my $regLNp = "RegL_$list:$peer";# pure, no expert
-        my $regLN = ((CUL_HM_getAttrInt($mhp->{cName},"expert") == 2)?"":".").$regLNp;
+        my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
         if (   defined $lastAddr 
             && (    $lastAddr > $rspWait->{nAddr}
                  || $lastAddr == 0)){
@@ -3023,7 +3021,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       my $regLNp = "RegL_$list:".CUL_HM_id2Name($peerID);
       $regLNp =~ s/broadcast//;
       $regLNp =~ s/ /_/g; #remove blanks
-      my $regLN = ((CUL_HM_getAttrInt($mhp->{cHash}{NAME},"expert") == 2)?"":".").$regLNp;
+      my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
 
       $data =~ s/(..)(..)/ $1:$2/g;
 
@@ -3846,7 +3844,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         my $chnNoTyp = 1;
         for (my $chnNoAbs = $chnStart; $chnNoAbs <= $chnEnd;$chnNoAbs++){
           my $chnId = $hash->{DEF}.sprintf("%02X",$chnNoAbs);
-          push @chLst,$newName."_".$chnTpName.(($chnStart == $chnEnd)
+          $chLst[$chnNoAbs] = $newName."_".$chnTpName.(($chnStart == $chnEnd)
                                                 ? ''
                                                 : '_'.sprintf("%02d",$chnNoTyp));
           $chnNoTyp++;
@@ -5603,7 +5601,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   $peerN =~ s/broadcast//;
   $peerN =~ s/ /_/g;#remote blanks
   my $regLNp = "RegL_".$list.":".$peerN;
-  my $regPre = ((CUL_HM_getAttrInt($hash->{NAME},"expert") == 2)?"":".");
+  my $regPre = ($hash->{helper}{expert}{raw}?"":".");
   my $regLN = $regPre.$regLNp;
   #--- copy data from readings to shadow
   my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
@@ -5769,8 +5767,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 
         $peer ="" if($list !~ m/^0[347]$/);
         #empty val since reading will be cumulative
-        my $rlName = ((CUL_HM_getAttrInt($chnhash->{NAME},"expert") == 2)?
-                                         "":".")."RegL_".$list.":".$peer;
+        my $rlName = ($chnhash->{helper}{expert}{raw}?"":".")."RegL_".$list.":".$peer;
         $chnhash->{READINGS}{$rlName}{VAL}="";
         my $chnHash = $modules{CUL_HM}{defptr}{$dst.$chn};
         delete ($chnhash->{READINGS}{$rlName}{TIME});
@@ -6753,7 +6750,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   }
   my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
-    $regLN = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".")
+    $regLN = ($hash->{helper}{expert}{raw}?"":".")
               .sprintf("RegL_%02X:",$list)
               .($peerId?CUL_HM_peerChName($peerId,
                                           $dst)
@@ -6812,6 +6809,17 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   }     
   return $convFlg.$data.$unit;
 }
+sub CUL_HM_setTmplDisp($){ # remove register i outdated
+  my $tHash = shift;
+  delete $tHash->{READINGS}{$_} foreach (grep /^tmpl_/ ,keys %{$tHash->{READINGS}});
+  if ($tHash->{helper}{expert}{tpl}){
+    foreach (keys %{$tHash->{helper}{tmpl}}){
+      my ($p,$t) = split(">",$_);
+      $tHash->{READINGS}{"tmpl_".$p}{VAL} .= $t.",";#could be more than one!
+      $tHash->{READINGS}{"tmpl_".$p}{TIME} .= "-";# time does not make sense
+    }
+  }
+}
 sub CUL_HM_updtRegDisp($$$) {
   my($hash,$list,$peerId)=@_;
   my $listNo = $list+0;
@@ -6829,10 +6837,8 @@ sub CUL_HM_updtRegDisp($$$) {
   $chn = (length($chn) == 8)?substr($chn,6,2):"";
   my @regArr = CUL_HM_getRegN($st,$md,$chn);
   my @changedRead;
-  my $expL = CUL_HM_getAttrInt($name,"expert");
-  my $expLvl = ($expL != 0)?1:0;
   
-  my $regLN = (($expL == 2)?"":".")
+  my $regLN = ($hash->{helper}{expert}{raw}?"":".")
               .sprintf("RegL_%02X:",$listNo)
               .($peerId?CUL_HM_peerChName($peerId,$devId):"");
               
@@ -6843,7 +6849,9 @@ sub CUL_HM_updtRegDisp($$$) {
     next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$rgN,$list,$peerId,$regLN);
     next if (!defined $rgVal || $rgVal =~ m /invalid/);
-    my $rdN = ((!$expLvl && !$culHmRegDefine->{$rgN}->{d})?".":"").$pReg.$rgN;
+    my $rdN = ($culHmRegDefine->{$rgN}->{d} ? ($hash->{helper}{expert}{def} ?"":".")
+                                            : ($hash->{helper}{expert}{det} ?"":"."))
+              .$pReg.$rgN;
     push (@changedRead,$rdN.":".$rgVal)
           if (ReadingsVal($name,$rdN,"") ne $rgVal);
   }
@@ -7018,7 +7026,6 @@ sub CUL_HM_CvTflt($) { # config time -> float
 sub CUL_HM_min2time($) { # minutes -> time
   my $min = shift;
   $min = $min * 30;
-  Log 1,"General time $min : ".sprintf("%02d:%02d",int($min/60),$min%60);
   return sprintf("%02d:%02d",int($min/60),$min%60);
 }
 sub CUL_HM_time2min($) { # minutes -> time
@@ -7045,7 +7052,7 @@ sub CUL_HM_4DisText($) {      # convert text for 4dis
   #text2: start at 70 (0x46) length 12 (0x0c)
   my ($hash)=@_;
   my $name = $hash->{NAME};
-  my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
+  my $regPre = ($hash->{helper}{expert}{raw}?"":".");
   my $reg1 = ReadingsVal($name,$regPre."RegL_01:" ,"");
   my $pref = "";
   if ($hash->{helper}{shadowReg}{"RegL_01:"}){
@@ -7073,7 +7080,7 @@ sub CUL_HM_4DisText($) {      # convert text for 4dis
 sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my ($hash)=@_;
   my $name = $hash->{NAME};
-  my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
+  my $regPre = ($hash->{helper}{expert}{raw}?"":".");
   my $reg5 = ReadingsVal($name,$regPre."RegL_05:" ,"");
   my $reg6 = ReadingsVal($name,$regPre."RegL_06:" ,"");
   { #update readings in device - oldfashioned style, copy from Readings
@@ -7154,7 +7161,7 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
 sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
   my ($hash,$md,@list)=@_;
   my $name = $hash->{NAME};
-  my $regPre = ((CUL_HM_getAttrInt($name,"expert") == 2)?"":".");
+  my $regPre = ($hash->{helper}{expert}{raw}?"":".");
   my @changedRead;
   my $setting="";
   my %idxN = (7=>"P1_",8=>"P2_",9=>"P3_");
@@ -8001,15 +8008,15 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   $default = 0 if (!defined $default);
   if($name && $defs{$name}){
-    my $val = (defined $attr{$name}{$attrName})
-                 ?$attr{$name}{$attrName}
-                 :"";
     no warnings 'numeric';
+    my $val = (defined $attr{$name}{$attrName})
+                 ?int($attr{$name}{$attrName})
+                 :"";
     my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
     $val = int($attr{$devN}{$attrName}?$attr{$devN}{$attrName}:$default)+0
           if($val eq "");
     use warnings 'numeric';
-    return substr($val,0,1);
+    return substr($val,0,2);
   }
   else{
     return $default;
@@ -8071,7 +8078,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
       }
     }
   }
-  my $pre = (CUL_HM_getAttrInt($name,"expert") == 2)?"":".";
+  my $pre = $hash->{helper}{expert}{raw}?"":".";
 
   $_ = $pre."RegL_0".$_ foreach (@lsNo);
   return @lsNo;
