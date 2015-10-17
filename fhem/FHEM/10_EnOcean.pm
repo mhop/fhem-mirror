@@ -195,15 +195,15 @@ my %EnO_eepConfig = (
   "A5.04.02" => {attr => {subType => "tempHumiSensor.02"}, GPLOT => "EnO_temp4humi6:Temp/Humi,EnO_voltage4:Voltage,"},
   "A5.04.03" => {attr => {subType => "tempHumiSensor.03"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "A5.05.01" => {attr => {subType => "baroSensor.01"}, GPLOT => "EnO_airPressure4:Airpressure,"},
-  "A5.06.01" => {attr => {subType => "lightSensor.01"}},
-  "A5.06.02" => {attr => {subType => "lightSensor.02"}},
-  "A5.06.03" => {attr => {subType => "lightSensor.03"}},
-  "A5.07.01" => {attr => {subType => "occupSensor.01"}},
+  "A5.06.01" => {attr => {subType => "lightSensor.01"}, GPLOT => "EnO_brightness4:Brightness,"},
+  "A5.06.02" => {attr => {subType => "lightSensor.02"}, GPLOT => "EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
+  "A5.06.03" => {attr => {subType => "lightSensor.03"}, GPLOT => "EnO_brightness4:Brightness,"},
+  "A5.07.01" => {attr => {subType => "occupSensor.01"}, GPLOT => "EnO_motion3:Motion,EnO_voltage4current4:Voltage/Current,"},
   "A5.07.02" => {attr => {subType => "occupSensor.02"}},
   "A5.07.03" => {attr => {subType => "occupSensor.03"}},
-  "A5.08.01" => {attr => {subType => "lightTempOccupSensor.01"}},
-  "A5.08.02" => {attr => {subType => "lightTempOccupSensor.02"}},
-  "A5.08.03" => {attr => {subType => "lightTempOccupSensor.03"}},
+  "A5.08.01" => {attr => {subType => "lightTempOccupSensor.01"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
+  "A5.08.02" => {attr => {subType => "lightTempOccupSensor.02"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
+  "A5.08.03" => {attr => {subType => "lightTempOccupSensor.03"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
   "A5.09.01" => {attr => {subType => "COSensor.01"}},
   "A5.09.02" => {attr => {subType => "COSensor.02"}},
   "A5.09.04" => {attr => {subType => "tempHumiCO2Sensor.01"}},
@@ -213,7 +213,7 @@ my %EnO_eepConfig = (
   "A5.09.08" => {attr => {subType => "CO2Sensor.01"}},
   "A5.09.09" => {attr => {subType => "CO2Sensor.01"}},
   "A5.09.0A" => {attr => {subType => "HSensor.01"}},
-  "A5.09.0B" => {attr => {subType => "radiationSensor.01"}},
+  "A5.09.0B" => {attr => {subType => "radiationSensor.01"}, GPLOT => "EnO_voltage4:Voltage,"},
   "A5.10.01" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.02" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.03" => {attr => {subType => "roomSensorControl.05", comMode => "confirm", subDef => "getNextID"}, GPLOT => "EnO_temp4:Temp,"},
@@ -237,10 +237,10 @@ my %EnO_eepConfig = (
   "A5.10.17" => {attr => {subType => "roomSensorControl.02"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.18" => {attr => {subType => "roomSensorControl.18"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.19" => {attr => {subType => "roomSensorControl.19"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
-  "A5.10.1A" => {attr => {subType => "roomSensorControl.1A"}, GPLOT => "EnO_temp4:Temp,"},
-  "A5.10.1B" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "EnO_temp4:Temp,"},
+  "A5.10.1A" => {attr => {subType => "roomSensorControl.1A"}, GPLOT => "EnO_temp4:Temp,EnO_voltage4:Voltage,"},
+  "A5.10.1B" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "EnO_temp4:Temp,EnO_voltage4:Voltage,"},
   "A5.10.1C" => {attr => {subType => "roomSensorControl.1C"}, GPLOT => "EnO_temp4:Temp,"},
-  "A5.10.1D" => {attr => {subType => "roomSensorControl.1D"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
+  "A5.10.1D" => {attr => {subType => "roomSensorControl.1D"}, GPLOT => "EnO_temp4humi6:Temp/Humi"},
   "A5.10.1E" => {attr => {subType => "roomSensorControl.1B"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.1F" => {attr => {subType => "roomSensorControl.1F"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.20" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
@@ -5471,9 +5471,9 @@ sub EnOcean_Parse($$)
       my $unit = ($db[0] & 6) >> 1;
       $unit = $unit{$unit};
       my $radioactivity = $db[2] << 8 | $db[1];
-      push @event, "3:battery:" . sprintf("%0.1f", (($db[3] & 0xF0) >> 4) / 15 * 3 + 2)  if ($db[0] & 1);
       push @event, "3:radioactivity:" . sprintf "$scaleDecimals", $radioactivity * $scaleMulti;
       push @event, "3:radioactivityUnit:$unit";
+      push @event, "3:voltage:" . sprintf("%0.1f", (($db[3] & 0xF0) >> 4) / 15 * 3 + 2)  if ($db[0] & 1);
       push @event, "3:state:" . sprintf "$scaleDecimals", $radioactivity * $scaleMulti;
 
     } elsif ($st eq "roomSensorControl.05") {
@@ -13335,9 +13335,9 @@ EnOcean_Delete($$)
          [untested]<br>
      <ul>
        <li>1/[unit]</li>
-       <li>battery: U/V (Sensor Range: U = 2 V ... 5 V)</li>
        <li>radioactivity: 1/[unit] (Sensor Range: c = 0 [unit] ... 65535 [unit])</li>
        <li>unit: uSv/h|cpm|Bq/L|Bq/kg</li>
+       <li>voltage: U/V (Sensor Range: U = 2 V ... 5 V)</li>
        <li>state: 1/[unit]</li>
      </ul><br>
         The attr subType must be radiationSensor.01. This is done if the device was
@@ -13464,7 +13464,7 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
-     <li>Room Sensor and Control Unit (EEP A5-10-1B, A5-10-1D)<br>
+     <li>Room Sensor and Control Unit (EEP A5-10-1B)<br>
          [untested]<br>
      <ul>
        <li>T: t/&#176C B: E/lx F: 0|1|2|3|4|5|auto|off P: absent|present|disabled U: U/V</li>
