@@ -18,14 +18,14 @@ set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
-set y2tics
+set ytics
 set title '<L1>'
-set grid xtics y2tics
+set grid xtics ytics
 
-set y2label "t/C"
+set ylabel "t/C"
 
 #FileLog 4:temperature:0:
 
 plot \
   "< egrep 'temperature:' <IN>"\
-     using 1:4 axes x1y2 title 'Temperature' with lines
+     using 1:4 axes x1y1 title 'Temperature' with lines
