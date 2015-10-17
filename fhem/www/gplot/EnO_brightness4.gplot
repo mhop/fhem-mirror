@@ -1,0 +1,31 @@
+##############################################
+# $Id: EnO_brightness4.gplot 9490 2015-10-17 17:04:52Z klaus-schauer $
+# Display the brightness
+#
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device brightness: 100
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+set title '<L1>'
+set grid xtics ytics
+
+set ylabel "E/lx"
+
+#FileLog 4:brightness:0:
+
+plot \
+  "< egrep 'brightness:' <IN>"\
+     using 1:4 ls l2fill axes x1y1 title 'Brightness' with lines
