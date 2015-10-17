@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 1.0
+#  Version 1.1
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -16,6 +16,7 @@
 #  set <name> devstate <value>
 #  set <name> <stateval_cmds>
 #
+#  get <name> devstate
 #  get <name> datapoint <channel>.<datapoint>
 #  get <name> update
 #
@@ -219,7 +220,17 @@ sub HMCCUDEV_Get ($@)
 	my $hmccu_name = $hash->{IODev}->{NAME};
 	my $ccudev = $hash->{ccudev};
 
-	if ($opt eq 'datapoint') {
+	if ($opt eq 'devstate') {
+		my $statechannel = AttrVal ($name, 'statechannel', '');
+		if ($statechannel ne '') {
+			my $objname = $ccudev.':'.$statechannel;
+
+			HMCCU_Get ($hmccu_hash, $hmccu_name, 'devstate', $objname);
+		}
+
+		return undef;
+	}
+	elsif ($opt eq 'datapoint') {
 		my $objname = shift @a;
 		if (!defined ($objname) || $objname !~ /^[0-9]+\..*$/) {
 			return HMCCUDEV_SetError ($hash, "Usage: get <device> datapoint <channel>.<datapoint>");
@@ -243,7 +254,7 @@ sub HMCCUDEV_Get ($@)
 		}
 	}
 	else {
-		return "HMCCUDEV: Unknown argument $opt, choose one of datapoint update:noArg";
+		return "HMCCUDEV: Unknown argument $opt, choose one of devstate:noArg datapoint update:noArg";
 	}
 }
 
@@ -281,10 +292,9 @@ sub HMCCUDEV_SetError ($$)
       <code>define &lt;name&gt; HMCCUDEV &lt;<i>CCU_Device</i>&gt; [readonly]</code>
       <br/><br/>
       If <i>readonly</i> parameter is specified no set command will be available.
-      <br/>
-      Examples:
-      <br/>
-      <code>define window_living HMCCUDEV WIN-LIV-1 readonly</code>
+      <br/><br/>
+      Examples:<br/>
+      <code>define window_living HMCCUDEV WIN-LIV-1 readonly</code><br/>
       <code>define temp_control HMCCUDEV TEMP-CONTROL</code>
       <br/><br/>
       <i>CCU_Device</i> - Name of device in CCU without channel or datapoint.
@@ -306,13 +316,14 @@ sub HMCCUDEV_SetError ($$)
       </li><br/>
       <li>set &lt;<i>Name</i>&gt; &lt;<i>StateValue</i>&gt;
          <br/>
-         State of a CCU device channel is set to state value. Channel must
+         State of a CCU device channel is set to <i>StateValue</i>. Channel must
          be defined as attribute statechannel. State values can be replaced
          by setting attribute stateval.
          <br/><br/>
+         Example:<br/>
          <code>
-         attr myswitch statechannel 1
-         attr myswitch stateval on:true,off:false
+         attr myswitch statechannel 1<br/>
+         attr myswitch stateval on:true,off:false<br/>
          set myswitch on
          </code>
       </li><br/>
@@ -330,9 +341,13 @@ sub HMCCUDEV_SetError ($$)
    <b>Get</b><br/>
    <ul>
       <br/>
+      <li>get &lt;<i>Name</i>&gt; devstate
+         <br/>
+         Get state of CCU device. Attribute 'statechannel' must be set.
+      </li><br/>
       <li>get &lt;<i>Name</i>&gt; datapoint &lt;<i>Device</i>:<i>Channel</i>.<i>datapoint</i>&gt;
          <br/>
-         Get state of a CCU device datapoint.
+         Get value of a CCU device datapoint.
       </li><br/>
       <li>get &lt;<i>Name</i>&gt; update
          <br/>
