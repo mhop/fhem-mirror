@@ -573,10 +573,12 @@ sub PROPLANTA_Start($)
    
    $hash->{INTERVAL} = AttrVal( $name, "INTERVAL",  $hash->{INTERVAL} );
    
+   readingsSingleUpdate($hash, "state", "disabled", 1)    if AttrVal($name, "disable", 0 ) == 1;
+   
    if($hash->{INTERVAL} > 0) {
     # reset timer if interval is defined
       RemoveInternalTimer( $hash );
-      InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PROPLANTA_Start", $hash, 1 );  
+      InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PROPLANTA_Start", $hash, 1 );
       return undef if AttrVal($name, "disable", 0 ) == 1 && !$hash->{fhem}{LOCAL};
    }
    
