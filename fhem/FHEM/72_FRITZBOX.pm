@@ -629,11 +629,15 @@ sub FRITZBOX_Readout_Start($)
    
    $hash->{fhem}{LOCAL} = 2   if $hash->{fhem}{LOCAL} == 1;
    
-   FRITZBOX_Log $hash, 4, "Fork process $runFn";
-   $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall($runFn, $name,
+   unless( exists $hash->{helper}{READOUT_RUNNING_PID} ) {
+      $hash->{helper}{READOUT_RUNNING_PID} = BlockingCall($runFn, $name,
                                                        "FRITZBOX_Readout_Done", 55,
-                                                       "FRITZBOX_Readout_Aborted", $hash)
-                         unless exists( $hash->{helper}{READOUT_RUNNING_PID} );
+                                                       "FRITZBOX_Readout_Aborted", $hash);
+      FRITZBOX_Log $hash, 4, "Fork process $runFn";
+   } 
+   else {
+      FRITZBOX_Log $hash, 4, "Skip fork process $runFn";
+   }
 
 } # end FRITZBOX_Readout_Start
 
@@ -796,7 +800,7 @@ sub FRITZBOX_API_Check_Run($)
    my $returnStr = join('|', @roReadings );
 
    FRITZBOX_Log $hash, 4, "Captured " . @roReadings . " values";
-   FRITZBOX_Log $hash, 5, "Handover (".length ($returnStr)."): ".$returnStr;
+   FRITZBOX_Log $hash, 5, "Handover to main process (".length ($returnStr)."): ".$returnStr;
    
    return $name."|".encode_base64($returnStr,"");
    
@@ -1113,7 +1117,7 @@ sub FRITZBOX_Readout_Run_Shell($)
    FRITZBOX_Telnet_CloseCon ( $hash );
 
    FRITZBOX_Log $hash, 4, "Captured " . @roReadings . " values";
-   FRITZBOX_Log $hash, 5, "Handover (".length ($returnStr)."): ".$returnStr;
+   FRITZBOX_Log $hash, 5, "Handover to main process (".length ($returnStr)."): ".$returnStr;
    return $name."|".encode_base64($returnStr,"");
 
 } # End FRITZBOX_Readout_Run_Shell
@@ -1411,7 +1415,7 @@ sub FRITZBOX_Readout_Run_Web($)
    my $returnStr = join('|', @roReadings );
 
    FRITZBOX_Log $hash, 4, "Captured " . @roReadings . " values";
-   FRITZBOX_Log $hash, 5, "Handover (".length ($returnStr)."): ".$returnStr;
+   FRITZBOX_Log $hash, 5, "Handover to main process (".length ($returnStr)."): ".$returnStr;
    return $name."|".encode_base64($returnStr,"");
 
 } # End FRITZBOX_Readout_Run_Web
@@ -1519,7 +1523,7 @@ sub FRITZBOX_Readout_Process($$)
          }
       }
 
-   # Create state with wlan state
+   # Create state with wlan states
       if ( defined $values{"box_wlan_2.4GHz"} ) {
          my $newState = "WLAN: ";
          if ( $values{"box_wlan_2.4GHz"} eq "on" ) {
@@ -2201,7 +2205,7 @@ sub FRITZBOX_GuestWlan_Run_Shell($)
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
    $returnStr .= join('|', @roReadings );
-   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
+   FRITZBOX_Log $hash, 5, "Handover to main process: ".$returnStr;
    return $name."|2|".encode_base64($returnStr,"");
 
 } # end FRITZBOX_GuestWlan_Run_Shell
@@ -2274,7 +2278,7 @@ sub FRITZBOX_GuestWlan_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
 
    my $returnStr = join('|', @roReadings );
-   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
+   FRITZBOX_Log $hash, 5, "Handover to main process: ".$returnStr;
    return $name."|2|".encode_base64($returnStr,"");
 
 } # end FRITZBOX_GuestWlan_Run_Web
@@ -2317,7 +2321,7 @@ sub FRITZBOX_Wlan_Run_Shell($)
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
    $returnStr .= join('|', @roReadings );
-   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
+   FRITZBOX_Log $hash, 5, "Handover to main process: ".$returnStr;
    return $name."|2|".encode_base64($returnStr,"");
 
 } # end FRITZBOX_Wlan_Run_Shell
@@ -2376,7 +2380,7 @@ sub FRITZBOX_Wlan_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
 
    my $returnStr = join('|', @roReadings );
-   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
+   FRITZBOX_Log $hash, 5, "Handover to main process: ".$returnStr;
    return $name."|2|".encode_base64($returnStr,"");
 
 } # end FRITZBOX_Wlan_Run_Web
@@ -2989,7 +2993,7 @@ sub FRITZBOX_Ring_Run_Web($)
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
    }
    my $returnStr = join('|', @roReadings );
-   FRITZBOX_Log $hash, 5, "Handover: ".$returnStr;
+   FRITZBOX_Log $hash, 5, "Handover to main process: ".$returnStr;
    return $name."|2|".encode_base64($returnStr,"");
 
    # return $name."|1|Ringing done";
