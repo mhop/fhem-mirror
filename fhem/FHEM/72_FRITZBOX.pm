@@ -288,6 +288,9 @@ sub FRITZBOX_Set($$@)
             . " tam"
             . " update:noArg"
             . " wlan:on,off";
+   $list .= " wlan2.4:on,off"
+          . " wlan5:on,off"         
+         if $hash->{fhem}->{is_double_wlan} == 1;
    $list .= " alarm"
           . " dect:on,off"
           . " diversity"
@@ -479,6 +482,13 @@ sub FRITZBOX_Set($$@)
       if (int @val == 1 && $val[0] =~ /^(on|off)$/) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          push @cmdBuffer, "wlan ".join(" ", @val);
+         return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
+      }
+   }
+   elsif ( lc $cmd =~ /^wlan(2\.4|5)$/ && $hash->{fhem}->{is_double_wlan} == 1 ) {
+      if ( int @val == 1 && $val[0] =~ /^(on|off)$/ ) {
+         Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
+         push @cmdBuffer, lc ($cmd) . " " . join(" ", @val);
          return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
       }
    }
@@ -1742,12 +1752,18 @@ sub FRITZBOX_Set_Cmd_Start($)
    }
 # Preparing SET WLAN
    elsif ($val[0] eq "wlan") {
-      shift @val;
       $timeout = 10;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Wlan_Run_Web";
       $cmdFunction = "FRITZBOX_Wlan_Run_Shell" if $forceShell;
+   }
+# Preparing SET WLAN2.4
+   elsif ( $val[0] =~ /^wlan(2\.4|5)$/ ) {
+      $timeout = 10;
+      $cmdBufferTimeout = time() + $timeout;
+      $handover = $name . "|" . join( "|", @val );
+      $cmdFunction = "FRITZBOX_Wlan_Run_Web";
    }
 # No valid set operation
    else {
@@ -2267,7 +2283,7 @@ sub FRITZBOX_GuestWlan_Run_Web($)
 sub FRITZBOX_Wlan_Run_Shell($)
 {
    my ($string) = @_;
-   my ($name, @val) = split "\\|", $string;
+   my ($name, $cmd, @val) = split "\\|", $string;
    my $hash = $defs{$name};
    my $result;
    my @readoutCmdArray;
@@ -2310,7 +2326,7 @@ sub FRITZBOX_Wlan_Run_Shell($)
 sub FRITZBOX_Wlan_Run_Web($) 
 {
    my ($string) = @_;
-   my ($name, @val) = split "\\|", $string;
+   my ($name, $cmd, @val) = split "\\|", $string;
    my $hash = $defs{$name};
    my $result;
    my @webCmdArray;
@@ -2324,15 +2340,18 @@ sub FRITZBOX_Wlan_Run_Web($)
  
 # Set WLAN
    if ($hash->{WEBCM}) { #webcm
-      push @webCmdArray, "wlan:settings/wlan_enable" => $state;
+      push @webCmdArray, "wlan:settings/wlan_enable" => $state         if $cmd eq "wlan";
+      push @webCmdArray, "wlan:settings/ap_enabled" => $state          if $cmd eq "wlan2.4";
+      push @webCmdArray, "wlan:settings/ap_enabled_scnd" => $state     if $cmd eq "wlan5";
       FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
       # push @webCmdArray, "active" => "on" if $val[0] eq "on";
       # FRITZBOX_Web_CmdPost ($hash, \@webCmdArray, '/wlan/wlan_settings.lua');
    }
    elsif ($hash->{SECPORT}) { #TR-064
-      push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", $state];
+      push @tr064CmdArray, ["WLANConfiguration:1", "wlanconfig1", "SetEnable", "NewEnable", $state]
+               if $cmd =~ /^(wlan|wlan2\.4)$/;
       push @tr064CmdArray, ["WLANConfiguration:2", "wlanconfig2", "SetEnable", "NewEnable", $state]
-               if $hash->{fhem}->{is_double_wlan} == 1;
+               if $hash->{fhem}->{is_double_wlan} == 1 && $cmd ne "wlan2.4";
       $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
    }
    else { #no API
