@@ -1,0 +1,37 @@
+##############################################
+# $Id$
+# Display the battery voltage und current
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device voltage: 1.4
+# 2015-10-17_08:38:08 device current: 100
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent truecolor rounded medium size <SIZE> enhanced
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+#set ytics nomirror
+set ytics
+#set y2tics
+set title '<L1>'
+set grid xtics ytics
+
+set ylabel "U/V"
+set y2label "I/uA"
+
+set yrange [0:7]
+
+#FileLog 4:voltage:0:
+#FileLog 4:current:0:
+
+plot \
+  "< awk '/voltage:/ {print $1, $4}' <IN>" using 1:2 ls l0 axes x1y1 title 'Voltage' with lines,\
+  "< awk '/current:/ {print $1, $4}' <IN>" using 1:2 ls l2 axes x1y2 title 'Current' with lines
