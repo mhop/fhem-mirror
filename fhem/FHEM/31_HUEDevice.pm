@@ -577,7 +577,7 @@ HUEDevice_Set($@)
       return undef;
     }
 
-    $hash->{".triggerUsed"} = 1;
+    $hash->{".triggerUsed"} = 1 if( $hash->{helper}->{devtype} ne 'G' );
     return undef if( !defined($result) );
 
     if( $hash->{helper}->{update_timeout} == -1 ) {
