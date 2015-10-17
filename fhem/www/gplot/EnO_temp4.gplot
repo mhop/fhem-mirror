@@ -1,0 +1,31 @@
+##############################################
+# $Id$
+# Display the measured temperature
+#
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device temperature: 17.4
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set y2tics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "t/C"
+
+#FileLog 4:temperature:0:
+
+plot \
+  "< egrep 'temperature:' <IN>"\
+     using 1:4 axes x1y2 title 'Temperature' with lines
