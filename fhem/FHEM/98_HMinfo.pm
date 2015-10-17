@@ -1118,6 +1118,14 @@ sub HMinfo_GetFn($@) {#########################################################
       push @tlr,"$e: $tr" if($tr);
     }
     $ret .= "\n\n templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
+    $ret .= "\n\n templateCheck: \n";
+    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+      next if (!defined $defs{$dName}{helper}{tmpl});
+      foreach (keys %{$defs{$dName}{helper}{tmpl}}){
+        my ($p,$t)=split(">",$_);
+        $ret .= "\n    ".HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
+      }
+    }
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
     my $repl;
