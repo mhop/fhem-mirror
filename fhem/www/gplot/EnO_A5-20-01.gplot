@@ -1,5 +1,5 @@
 ##############################################
-# $Id: EnO_A5-20-01.gplot $
+# $Id: EnO_A5-20-01.gplot 9465 2015-10-16 15:36:37Z klaus-schauer $
 
 # Display the measured temp and the setpoint (valve position).
 # FileLog definition: 
