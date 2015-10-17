@@ -42,7 +42,7 @@ SYSSTAT_Initialize($)
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
   $hash->{AttrList} = "disable:1 disabledForIntervals raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 ssh_user ";
-  $hash->{AttrList} .= " snmp:1 mibs:textField-long snmpVersion:1,2" if( $SYSSTAT_hasSNMP );
+  $hash->{AttrList} .= " snmp:1 mibs:textField-long snmpVersion:1,2 snmpCommunity" if( $SYSSTAT_hasSNMP );
   $hash->{AttrList} .= " filesystems showpercent";
   $hash->{AttrList} .= " useregex:1" if( $SYSSTAT_hasSysStatistics );
   $hash->{AttrList} .= " $readingFnAttributes";
@@ -130,7 +130,7 @@ SYSSTAT_InitSNMP($)
 
   my ( $session, $error ) = Net::SNMP->session(
            -hostname  => $host,
-           -community => $community,
+           -community => AttrVal($name,"snmpCommunity","public"),
            -port      => 161,
            -version   => AttrVal($name,"snmpVersion",1),
                         );
@@ -217,7 +217,11 @@ SYSSTAT_Attr($$$)
     SYSSTAT_InitSys( $hash ) if( $SYSSTAT_hasSysStatistics );
 
   } elsif( $attrName eq "snmpVersion" && $SYSSTAT_hasSNMP ) {
-      $hash->{$attrName} = $attrVal;
+    $hash->{$attrName} = $attrVal;
+    SYSSTAT_InitSNMP( $hash );
+
+  } elsif( $attrName eq "snmpCommunity" && $SYSSTAT_hasSNMP ) {
+    $hash->{$attrName} = $attrVal;
     SYSSTAT_InitSNMP( $hash );
 
   } elsif ($attrName eq "snmp" && $SYSSTAT_hasSNMP ) {
@@ -841,6 +845,8 @@ SYSSTAT_getStat($)
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>
       The username for ssh remote access.</li>
+    <li>snmpVersion</li>
+    <li>snmpCommunity</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
 </ul>
@@ -969,6 +975,8 @@ SYSSTAT_getStat($)
       Wenn Wert gesetzt, werden die Eintr&auml;ge der Dateisysteme als regex behandelt.</li>
     <li>ssh_user<br>
       Der Username f&uuml;r den ssh Zugang auf dem entfernten Rechner.</li>
+    <li>snmpVersion</li>
+    <li>snmpCommunity</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
 </ul>
