@@ -20,7 +20,7 @@ TechemHKV_Initialize(@) {
   # require "Broker.pm";
 
   # TECHEM HKV
-  $hash->{Match}      = "^b..446850[\d]{8}6980....A0.*";
+  $hash->{Match}      = "^b..446850[\\d]{8}6980....A0.*";
 
   $hash->{DefFn}      = "TechemHKV_Define";
   $hash->{UndefFn}    = "TechemHKV_Undef";
