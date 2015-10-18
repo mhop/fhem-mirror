@@ -215,8 +215,8 @@ FBAHA_configInd($$)
 
     if($onlyId && $onlyId == $id) {
       my $mnf = hex(substr($data,184, 8)); # empty/0
-      my $idf = substr($data,192,40);      # empty/0
-      my $frm = substr($data,232,40);      # empty/0
+      my $idf = substr($data,192,40); $idf =~ s/(00)*$//; $idf =pack("H*",$idf);
+      my $frm = substr($data,232,40); $frm =~ s/(00)*$//; $frm =pack("H*",$frm);
       push @answer, "  MANUF:$mnf";
       push @answer, "  UniqueID:$idf";
       push @answer, "  Firmware:$frm";
