@@ -72,7 +72,7 @@ weblink_FwDetail($@)
 {
   my ($d, $text, $nobr)= @_;
   return "" if(AttrVal($d, "group", "") || AttrVal($d, "nodetaillink", ""));
-  my $alias= AttrVal($d, "alias", $d);
+  my $alias = AttrVal($d, "alias", $d);
 
   my $ret = ($nobr ? "" : "<br>");
   $ret .= "$text " if($text);
@@ -96,7 +96,8 @@ weblink_FwFn($$$$)
     $ret = $link;
 
   } elsif($wltype eq "link") {
-    $ret = "<a href=\"$link\" $attr>$d</a>"; # no FW_pH, open extra browser
+    my $alias = AttrVal($d, "alias", $d);
+    $ret = "<a href=\"$link\" $attr>$alias</a>"; # no FW_pH, open extra browser
 
   } elsif($wltype eq "image") {
     $ret = "<img src=\"$link\" $attr><br>" . 
