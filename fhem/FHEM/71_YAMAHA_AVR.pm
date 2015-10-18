@@ -99,26 +99,27 @@ YAMAHA_AVR_GetStatus($;$)
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Update><YAMAHA_Network_Site><Status>GetParam</Status></YAMAHA_Network_Site></Update></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", 1);
 
-    if (YAMAHA_AVR_isModel_DSP($hash))
-    {
-        #Log3 $name, 5, "ZONE: " . $zone;
-        if ($zone eq "Main_Zone")
+    if(!exists($hash->{helper}{SUPPORT_TONE_STATUS}) or (exists($hash->{helper}{SUPPORT_TONE_STATUS}) and $hash->{helper}{SUPPORT_TONE_STATUS}))
+    {   
+        if (YAMAHA_AVR_isModel_DSP($hash))
         {
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Bass>GetParam</Bass></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Treble>GetParam</Treble></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
+            if ($zone eq "Main_Zone")
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Bass>GetParam</Bass></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Treble>GetParam</Treble></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
+            }
+            else
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Bass>GetParam</Bass></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Treble>GetParam</Treble></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
+            }
         }
         else
         {
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Bass>GetParam</Bass></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Treble>GetParam</Treble></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Bass>GetParam</Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Treble>GetParam</Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
         }
     }
-    else
-    {
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Bass>GetParam</Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Treble>GetParam</Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus");
-    }
-    
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Update><Status>GetParam</Status></Update></Network></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", 1);
     
     YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
@@ -204,16 +205,19 @@ YAMAHA_AVR_Set($@)
                                                           "volume:slider,0,1,100 ".
                                                           "volumeUp ".
                                                           "volumeDown ".
-                                                          (exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"").
+                                                          (exists($hash->{helper}{INPUTS}) ? "input:".$inputs_comma." " : "").
                                                           "mute:on,off,toggle ".
                                                           "remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".
-                                                          (exists($hash->{helper}{SCENES})?"scene:".$scenes_comma." ":"").
-                                                          (exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone" ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".(exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").(exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")."enhancer:on,off " : "").
-                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "play:noArg pause:noArg stop:noArg skip:reverse,forward ".(exists($hash->{helper}{PLAY_CONTROL}) ? "shuffle:on,off repeat:off,one,all " : "") : "").
+                                                          (exists($hash->{helper}{SCENES}) ? "scene:".$scenes_comma." " : "").
+                                                          ((exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".
+                                                          (exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").
+                                                          (exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")."enhancer:on,off " : "").
+                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "play:noArg pause:noArg stop:noArg skip:reverse,forward ".
+                                                          (exists($hash->{helper}{PLAY_CONTROL}) ? "shuffle:on,off repeat:off,one,all " : "") : "").
                                                           "sleep:off,30min,60min,90min,120min,last ".
-                                                          (exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
-                                                          (exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and (YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
-                                                          (exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and (not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
+                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
+                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
+                                                          (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
                                                           "statusRequest:noArg";
 
     Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a);
@@ -774,7 +778,7 @@ YAMAHA_AVR_Define($$)
     my @a = split("[ \t][ \t]*", $def);
     my $name = $hash->{NAME};
     
-    if(! @a >= 4)
+    if(!@a >= 4)
     {
         my $msg = "wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<zone>] [<ON-statusinterval>] [<OFF-statusinterval>] ";
         Log3 $name, 2, $msg;
@@ -820,15 +824,15 @@ YAMAHA_AVR_Define($$)
     {
 		if(defined(YAMAHA_AVR_getParamName($hash, lc $hash->{helper}{SELECTED_ZONE}, $hash->{helper}{ZONES})))
 		{
-		    $hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
-		    YAMAHA_AVR_getInputs($hash); 
+		    $hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE}; 
 		}
 		else
 		{
 		    Log3 $name, 2, "YAMAHA_AVR ($name) - selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device ".$hash->{NAME}.". Using Main Zone instead";
 		    $hash->{ACTIVE_ZONE} = "mainzone";
-		    YAMAHA_AVR_getInputs($hash);
 		}
+        
+        YAMAHA_AVR_getInputs($hash);
     }
     
     # set the volume-smooth-change attribute only if it is not defined, so no user values will be overwritten
@@ -974,9 +978,16 @@ YAMAHA_AVR_ParseResponse ($$$)
     {
         Log3 $name, 5, "YAMAHA_AVR ($name) - received HTTP code ".$param->{code}." for command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
         
-        if($cmd eq "statusRequest" and $arg eq "playShuffle" and $param->{code} ne "200")
+        if($cmd eq "statusRequest" and $param->{code} ne "200")
         {
-            delete($hash->{helper}{PLAY_CONTROL}) if(exists($hash->{helper}{PLAY_CONTROL}));
+            if($arg eq "playShuffle")
+            {
+                delete($hash->{helper}{PLAY_CONTROL}) if(exists($hash->{helper}{PLAY_CONTROL}));
+            }
+            elsif($arg eq "toneStatus")
+            {
+                $hash->{helper}{SUPPORT_TONE_STATUS} = 0;
+            }
         }
     }
     
@@ -1005,7 +1016,7 @@ YAMAHA_AVR_ParseResponse ($$$)
         
         $hash->{helper}{AVAILABLE} = 1;
         
-        if(not $data =~ / RC="0"/ and $data =~ / RC="(\d+)"/)
+        if(not $data =~ / RC="0"/ and $data =~ / RC="(\d+)"/ and not $can_fail)
 		{
 			# if the returncode isn't 0, than the command was not successful
 			Log3 $name, 3, "YAMAHA_AVR ($name) - Could not execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": received return code $1";
@@ -1092,16 +1103,12 @@ YAMAHA_AVR_ParseResponse ($$$)
             }
             elsif($arg eq "toneStatus")
             {
-                # Response DSP-Z7: <Main_Zone><Tone><Speaker><Bass><Cross_Over><Val>125</Val><Exp>0</Exp><Unit>Hz</Unit></Cross_Over><Lvl><Val>35</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Bass></Speaker></Tone></Main_Zone>
-                # Response DSP-Z7: <Zone_2><Tone><Bass><Val>0</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Zone_2>
-                # Response other models ???: <Sound_Video><Tone><Bass><Val>0</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Sound_Video>
-                if (($data =~ /<Tone><Speaker><Bass><Cross_Over><Val>(.+?)<\/Val><Exp>.*?<\/Exp><Unit>.*?<\/Unit><\/Cross_Over><Lvl><Val>(.+?)<\/Val>.*?<\/Lvl><\/Bass><\/Speaker><\/Tone>/) ||
-                    ($data =~ /<Tone><Bass><Val>(.+?)<\/Val><Exp>1<\/Exp><Unit>dB<\/Unit><\/Bass><\/Tone>/))
+                if(($data =~ /<Tone><Speaker><Bass><Cross_Over><Val>(.+?)<\/Val><Exp>.*?<\/Exp><Unit>.*?<\/Unit><\/Cross_Over><Lvl><Val>(.+?)<\/Val>.*?<\/Lvl><\/Bass><\/Speaker><\/Tone>/) or ($data =~ /<Tone><Bass><Val>(.+?)<\/Val><Exp>1<\/Exp><Unit>dB<\/Unit><\/Bass><\/Tone>/))
                 {
-                    Log3 $name, 5, "YAMAHA_AVR ($name) - toneStatus Bass: " . $data;
+                    $hash->{helper}{SUPPORT_TONE_STATUS} = 1;
+                    
                     if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
                     {
-                    
                         if($2)
                         {
                             readingsBulkUpdate($hash, "bass", int($2)/10);
@@ -1112,22 +1119,19 @@ YAMAHA_AVR_ParseResponse ($$$)
                             readingsBulkUpdate($hash, "bass", int($1)/10);
                         }
                     }
-                    else #!main_zone
+                    else
                     {
                         readingsBulkUpdate($hash, "bass", int($1)/10);
                     }
                 }
-
-                # Response DSP-Z7: <Main_Zone><Tone><Speaker><Treble><Cross_Over><Val>35</Val><Exp>1</Exp><Unit>kHz</Unit></Cross_Over><Lvl><Val>10</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Treble></Speaker></Tone></Main_Zone>
-                # Response DSP-Z7: <Zone_2><Tone><Treble><Val>0</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Zone_2>
-                # Response other models ???: <Sound_Video><Tone><Treble><Val>0</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Sound_Video>
-                elsif (($data =~ /<Tone><Speaker><Treble><Cross_Over><Val>(.+?)<\/Val><Exp>.*?<\/Exp><Unit>.*?<\/Unit><\/Cross_Over><Lvl><Val>(.+?)<\/Val>.*?<\/Lvl><\/Treble><\/Speaker><\/Tone>/) ||
-                       ($data =~ /<Tone><Treble><Val>(.+?)<\/Val><Exp>1<\/Exp><Unit>dB<\/Unit><\/Treble><\/Tone>/))
+                elsif(($data =~ /<Tone><Speaker><Treble><Cross_Over><Val>(.+?)<\/Val><Exp>.*?<\/Exp><Unit>.*?<\/Unit><\/Cross_Over><Lvl><Val>(.+?)<\/Val>.*?<\/Lvl><\/Treble><\/Speaker><\/Tone>/) or ($data =~ /<Tone><Treble><Val>(.+?)<\/Val><Exp>1<\/Exp><Unit>dB<\/Unit><\/Treble><\/Tone>/))
                 {
-                    Log3 $name, 5, "YAMAHA_AVR ($name) - toneStatus Treble: " . $data;
-                    if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
+                    
+                    $hash->{helper}{SUPPORT_TONE_STATUS} = 1;
+                    
+                    if((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
                     {
-                       if($2)
+                        if($2)
                         {
                             readingsBulkUpdate($hash, "treble", int($2)/10);
                             readingsBulkUpdate($hash, "trebleCrossover", lc($1));
@@ -1137,10 +1141,14 @@ YAMAHA_AVR_ParseResponse ($$$)
                             readingsBulkUpdate($hash, "treble", int($1)/10);
                         }
                     }
-                    else #!main_zone
+                    else
                     {
                         readingsBulkUpdate($hash, "treble", int($1)/10);
                     }
+                }
+                else
+                {
+                    $hash->{helper}{SUPPORT_TONE_STATUS} = 0;
                 }
             }
             elsif($arg eq "basicStatus")
