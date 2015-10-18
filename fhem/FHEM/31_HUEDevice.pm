@@ -336,7 +336,7 @@ HUEDevice_SetParam($$@)
       $bri = 254 if( $bri > 254 );
       $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
       $obj->{'bri'}  = 0+$bri;
-      #$obj->{'transitiontime'} = 1;
+      $obj->{'transitiontime'} = 1;
       #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
       $defs{$name}->{helper}->{update_timeout} = 0;
     }
@@ -346,7 +346,7 @@ HUEDevice_SetParam($$@)
       $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
       $obj->{'bri_inc'}  = -25;
       $obj->{'bri_inc'} = 0-$value if( defined($value) );
-      $obj->{'transitiontime'} = 1;
+      #$obj->{'transitiontime'} = 1;
       #$defs{$name}->{helper}->{update_timeout} = 0;
     } else {
       my $bri = ReadingsVal($name,"bri","0");
