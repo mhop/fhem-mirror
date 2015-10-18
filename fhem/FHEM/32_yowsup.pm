@@ -294,7 +294,11 @@ yowsup_Set($$@)
       my $number = shift(@args);
       $number =~ s/\./-/;
 
-      return yowsup_Write( $hash, "/message send $number '". join( ' ', @args ) ."'" );
+      if( $number =~ m/,/ ) {
+        return yowsup_Write( $hash, "/message broadcast $number '". join( ' ', @args ) ."'" );
+      } else {
+        return yowsup_Write( $hash, "/message send $number '". join( ' ', @args ) ."'" );
+      }
 
       return undef;
 
