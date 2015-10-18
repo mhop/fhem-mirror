@@ -31,4 +31,4 @@ set y2range [0:100]
 
 plot \
   "< egrep 'dim:' <IN>"\
-     using 1:4 axes x1y1 title 'Dimming' with lines
+     using 1:4 axes x1y1 title 'Dimming' with points
