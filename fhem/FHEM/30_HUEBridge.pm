@@ -719,7 +719,7 @@ sub HUEBridge_ProcessResponse($$)
       foreach my $id ( keys %json ) {
         my $code = $name ."-". $id;
         if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
-          $json{$id}->{state}->{reachable} = 1;
+          #$json{$id}->{state}->{reachable} = 1;
           HUEDevice_Parse( $chash, $json{$id} );
         }
       }
