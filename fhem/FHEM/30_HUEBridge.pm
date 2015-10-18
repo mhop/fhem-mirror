@@ -237,8 +237,10 @@ HUEBridge_string2array($)
     $light = $defs{$light}{ID} if( defined $defs{$light} && $defs{$light}{TYPE} eq 'HUEDevice' );
     if( $light =~ m/^G/ ) {
       my $lights = $defs{$part}->{lights};
-      foreach my $light ( split(',', $lights) ) {
-        $lights{$light} = 1;
+      if( $lights ) {
+        foreach my $light ( split(',', $lights) ) {
+          $lights{$light} = 1;
+        }
       }
     } else {
       $lights{$light} = 1;
@@ -431,7 +433,7 @@ HUEBridge_Set($@)
 
 
   } else {
-    my $list = "delete creategroup deletegroup savescene modifyscene scene deletewhitlist touchlink autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup savescene modifyscene scene deletewhitelist touchlink autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -466,7 +468,8 @@ HUEBridge_Get($@)
       my $code = $name ."-G". $key;
       my $fhem_name ="";
       $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
-      $result->{$key}{type} = '<unknown>' if( !defined($result->{$key}{type}) );
+      $result->{$key}{lights} = '' if( !defined($result->{$key}{lights}) );      #deCONZ fix
+      $result->{$key}{type} = '<unknown>' if( !defined($result->{$key}{type}) ); #deCONZ fix
       $ret .= sprintf( "%2i: %-15s %-15s %-15s %s\n", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type},  join( ",", @{$result->{$key}{lights}} ) );
     }
     $ret = sprintf( "%2s  %-15s %-15s %-15s %s\n", "ID", "NAME", "FHEM", "TYPE", "LIGHTS" ) .$ret if( $ret );
