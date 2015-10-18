@@ -43,7 +43,7 @@
 #
 # attr <name> LogM <string> = device name (not file name) of monthly log file
 # attr <name> LogY <string> = device name (not file name) of yearly log file
-# attr <name> nomemory      = 1|0 (when set to 1, disabels use of internal memory)
+# attr <name> nomemory      = 1|0 (when set to 1, disables use of internal memory)
 # attr <name> <channel>Name <string>[|<string>] = name for the channel [|name used in state reading]
 # attr <name> <channel>Unit <string>[|<string>] = unit of measurement for this channel [|unit used in state reading] 
 # attr <name> <channel>Rate <string>[|<string>] = name for the channel rate [|name used in state reading]
@@ -99,7 +99,7 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="5.31";
+my $owx_version="5.33";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -590,7 +590,7 @@ sub OWCOUNT_FormatValues($) {
       $dvalue    = sprintf($dvalue,$total0,$total1);
       readingsBulkUpdate($hash,"day",$dvalue);
     }else{
-      Log3 $name,3,"OWCOUNT: No monthly summary possible, ".$monthv[0];
+      Log3 $name,3,"OWCOUNT: No monthly summary possible, ".$monthv[0]." for device $name";
       $total0 = 0;
       $total1 = 0;
     };
@@ -604,7 +604,7 @@ sub OWCOUNT_FormatValues($) {
         readingsBulkUpdate($hash,"month",$mvalue);
       }  
     }else{
-      Log3 $name,3,"OWCOUNT: No yearly summary possible, ".$yearv[0];
+      Log3 $name,3,"OWCOUNT: No yearly summary possible, ".$yearv[0]." for device $name";
       $total2 = 0;
       $total3 = 0;
     };
@@ -1529,9 +1529,9 @@ sub OWFSCOUNT_GetPage($$$) {
   my $nomemory  = defined($attr{$name}{"nomemory"}) ? $attr{$name}{"nomemory"} : 0;    
   #-- get values - or shoud we rather get the uncached ones ?
   if( $page == 14 || $page == 15 ) {
-    $vval    = OWServer_Read($master,"/$owx_add/counters.$owg_channel[$page-14]");
-    return "no return from OWServer for counter.$owg_channel[$page-14]" unless defined $vval;
-    return "empty return from OWServer for counter.$owg_channel[$page-14]" if($vval eq "");
+    $vval    = OWServer_Read($master,"/$owx_add/counters.$owg_fixed[$page-14]");
+    return "no return from OWServer for counter.$owg_fixed[$page-14]" unless defined $vval;
+    return "empty return from OWServer for counter.$owg_fixed[$page-14]" if($vval eq "");
     if ($nomemory == 0) {
       $strval  = OWServer_Read($master,"/$owx_add/pages/page.$page");
       return "no return from OWServer for page.$page" unless defined $strval;
