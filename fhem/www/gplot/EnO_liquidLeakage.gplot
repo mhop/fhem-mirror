@@ -1,0 +1,27 @@
+##############################################
+# $Id$
+# Display a keycard log
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device dry|wet
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "Liquid Leakage Sensor"
+set title '<TL>'
+set ytics ("wet" 1, "dry" 0)
+set y2tics ("wet" 1, "dry" 0)
+set yrange [-0.1:1.1]
+set y2range [-0.1:1.1]
+
+#FileLog "1":wet:1:
+#FileLog "0":dry:0:
+
+plot\
+  "< awk '/wet/ {print $1, 1;}' <IN>" using 1:2 notitle with points,\
+  "< awk '/dry/ {print $1, 0;}' <IN>" using 1:2 notitle with points
