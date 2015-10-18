@@ -328,7 +328,7 @@ HUEDevice_SetParam($$@)
       $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
       $obj->{'bri_inc'}  = 25;
       $obj->{'bri_inc'} = 0+$value if( defined($value) );
-      $obj->{'transitiontime'} = 1;
+      #$obj->{'transitiontime'} = 1;
       #$defs{$name}->{helper}->{update_timeout} = 0;
     } else {
       my $bri = ReadingsVal($name,"bri","0");
@@ -336,7 +336,7 @@ HUEDevice_SetParam($$@)
       $bri = 254 if( $bri > 254 );
       $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
       $obj->{'bri'}  = 0+$bri;
-      $obj->{'transitiontime'} = 1;
+      #$obj->{'transitiontime'} = 1;
       #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
       $defs{$name}->{helper}->{update_timeout} = 0;
     }
@@ -964,10 +964,12 @@ HUEDevice_Parse($$)
   my $state = $result->{'state'};
 
   my $on        = $state->{on};
+     $on = $hash->{helper}{on} if( !defined($on) );
   my $reachable = $state->{reachable}?1:0;
+     $reachable = $hash->{helper}{reachable} if( !defined($state->{reachable}) );
   my $colormode = $state->{'colormode'};
   my $bri       = $state->{'bri'};
-     $bri = $hash->{helper}{bri} if( !defined( $bri) );
+     $bri = $hash->{helper}{bri} if( !defined($bri) );
   my $ct        = $state->{'ct'};
   my $hue       = $state->{'hue'};
   my $sat       = $state->{'sat'};
@@ -989,7 +991,7 @@ HUEDevice_Parse($$)
   if( defined($hue) && $hue != $hash->{helper}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
   if( defined($sat) && $sat != $hash->{helper}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
   if( defined($xy) && $xy ne $hash->{helper}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
-  if( !defined($hash->{helper}{reachable}) || $reachable != $hash->{helper}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable);}
+  if( !defined($hash->{helper}{reachable}) || $reachable != $hash->{helper}{reachable} ) {readingsBulkUpdate($hash,"reachable",$reachable?1:0);}
   if( defined($alert) && $alert ne $hash->{helper}{alert} ) {readingsBulkUpdate($hash,"alert",$alert);}
   if( defined($effect) && $effect ne $hash->{helper}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
 
