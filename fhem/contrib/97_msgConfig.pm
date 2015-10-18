@@ -184,18 +184,9 @@ sub msgConfig_Undefine($$) {
       <li>
         <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
         <div style="margin-left: 2em">
-          <code>define &lt;name&gt;</code><br>
+          <code>define &lt;name&gt; msgConfig</code><br>
           <br>
-          Defines the global msg control device instance. Pleae note there can only be one unique definition of this device type.<br>
-        </div>
-        <br>
-        <b>Usage information</b><br>
-        <br>
-        <br>
-        <b>Integration with Home Automation</b><br>
-        <br>
-        <div style="margin-left: 2em">
-          You might want to have a look to the module family of <a href="#ROOMMATE">ROOMMATE</a>, <a href="#GUEST">GUEST</a> and <a href="#RESIDENTS">RESIDENTS</a> for an easy processing of msgConfig events.
+          Defines the global msg control device instance. Pleae note there can only be one unique definition of this device type.
         </div>
       </li>
     </ul>
