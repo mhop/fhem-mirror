@@ -258,6 +258,7 @@ telnet_Read($)
     $gotCmd = 1;
     if($cmd) {
       if($cmd =~ m/\\ *$/) {                     # Multi-line
+        $cmd =~ s/\\ *$//;
         $hash->{prevlines} .= $cmd . "\n";
       } else {
         if($hash->{prevlines}) {

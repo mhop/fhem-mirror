@@ -223,7 +223,7 @@ use vars qw(@structChangeHist); # Contains the last 10 structural changes
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 use vars qw($featurelevel); 
 
-my $AttrList = "verbose:0,1,2,3,4,5 room group comment alias ".
+my $AttrList = "verbose:0,1,2,3,4,5 room group comment:textField-long alias ".
                 "eventMap userReadings";
 my $currcfgfile="";             # current config/include file
 my $currlogfile;                # logfile, without wildcards

@@ -901,6 +901,11 @@ FW_digestCgi($)
   $cmd.=" $arg{$c}" if(defined($arg{$c}) &&
                        ($arg{$c} ne "state" || $cmd !~ m/^set/));
   $cmd.=" $val{$c}" if(defined($val{$c}));
+
+  #replace unicode newline symbol \u2424 with real newline
+  my $nl = chr(226) . chr(144) . chr(164);
+  $cmd =~ s/$nl/\n/g;
+
   return ($cmd, $c);
 }
 

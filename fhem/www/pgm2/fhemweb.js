@@ -591,9 +591,9 @@ FW_replaceWidget(oldEl, devName, vArr, currVal, reading, set, params, cmd)
     }
 
     if(!newEl) { // Select as fallback
-     vArr.unshift("select");
-     newEl = FW_createSelect(elName, devName, vArr, currVal, set, params, cmd);
-     wn = "select";
+      vArr.unshift("select");
+      newEl = FW_createSelect(elName, devName, vArr, currVal, set, params, cmd);
+      wn = "select";
     }
   }
 
@@ -631,7 +631,8 @@ FW_queryValue(cmd, el)
   qConn.onreadystatechange = function() {
     if(qConn.readyState != 4)
       return;
-    var qResp = qConn.responseText.replace(/[\r\n]/g, "");
+    var qResp = qConn.responseText.replace(/\n$/, '');
+    qResp = qResp.replace(/\n/g, '\u2424');
     if(el.setValueFn)
       el.setValueFn(qResp);
     qConn.abort();
@@ -681,7 +682,9 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
         '<textarea id="td_longText" rows="25" cols="60" style="width:99%"/>'+
       '</div>');
 
-    $("#td_longText").val($(inp).val());
+    var txt = $(inp).val();
+    txt = txt.replace(/\u2424/g, '\n');
+    $("#td_longText").val(txt);
 
     var cm;
     if( typeof AddCodeMirror == 'function' ) 
@@ -700,6 +703,7 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
           if(cm)
             $("#td_longText").val(cm.getValue());
           var res=$("#td_longText").val();
+          res = res.replace(/\n/g, '\u2424' );
           $(this).dialog('close');
           $(inp).val(res);
           addBlur();
