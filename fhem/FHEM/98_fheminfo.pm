@@ -1,13 +1,13 @@
 ################################################################
-# $Id$
-# vim: ts=2:et
+#+$Id$
+#+vim: ts=2:et
 #
-#  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
-#  All rights reserved
+#+ (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
+#+ All rights reserved
 #
-#  This script free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
+#+ This script free software; you can redistribute it and/or modify
+#+ it under the terms of the GNU General Public License as published by
+#+ the Free Software Foundation; either version 2 of the License, or
 #  any later version.
 #
 #  The GNU General Public License can be found at
@@ -103,7 +103,7 @@ CommandFheminfo($$)
     my $m = "unknown";
     $m = $defs{$d}{model} if( defined($defs{$d}{model}) );
     $m = AttrVal($n,"model",$m);
-    if($official_module{$t} && !$defs{$d}{TEMPORARY}) {
+    if($official_module{$t} && !$defs{$d}{TEMPORARY} && !$attr{$d}{ignore}) {
       $info{modules}{$t}{$n} = $m;
     }
   }
