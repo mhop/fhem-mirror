@@ -1,7 +1,7 @@
 # $Id$
 ##############################################################################
 #
-#     99_msg.pm
+#     98_msg.pm
 #     Dynamic message and notification routing for FHEM
 #
 #     Copyright by Julian Pawlowski
@@ -50,90 +50,26 @@ sub msg_Initialize($$) {
 "[<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>",
     );
     $cmds{msg} = \%hash;
-
-    # add attributes for configuration
-    no warnings 'qw';
-    my @attrList = qw(
-      msgCmdAudio
-      msgCmdAudioShort
-      msgCmdAudioShortPrio
-      msgCmdLight
-      msgCmdLightHigh
-      msgCmdLightLow
-      msgCmdMail
-      msgCmdMailHigh
-      msgCmdMailLow
-      msgCmdPush
-      msgCmdPushHigh
-      msgCmdPushLow
-      msgCmdScreen
-      msgCmdScreenHigh
-      msgCmdScreenLow
-      msgFwPrioAbsentAudio
-      msgFwPrioAbsentLight
-      msgFwPrioAbsentScreen
-      msgFwPrioEmergencyAudio
-      msgFwPrioEmergencyLight
-      msgFwPrioEmergencyPush
-      msgFwPrioEmergencyScreen
-      msgFwPrioGoneAudio
-      msgFwPrioGoneLight
-      msgFwPrioGoneScreen
-      msgLocationDevs
-      msgPriorityAudio:-2,-1,0,1,2
-      msgPriorityLight:-2,-1,0,1,2
-      msgPriorityMail:-2,-1,0,1,2
-      msgPriorityPush:-2,-1,0,1,2
-      msgPriorityScreen:-2,-1,0,1,2
-      msgPriorityText:-2,-1,0,1,2
-      msgResidentsDev
-      msgSwitcherDev
-      msgThPrioHigh:-2,-1,0,1,2
-      msgThPrioNormal:-2,-1,0,1,2
-      msgThPrioAudioEmergency:-2,-1,0,1,2
-      msgThPrioAudioHigh:-2,-1,0,1,2
-      msgThPrioTextEmergency:-2,-1,0,1,2
-      msgThPrioTextNormal:-2,-1,0,1,2
-      msgThPrioGwEmergency:-2,-1,0,1,2
-      msgTitleAudio
-      msgTitleAudioShort
-      msgTitleAudioShortPrio
-      msgTitleLight
-      msgTitleLightHigh
-      msgTitleLightLow
-      msgTitleMail
-      msgTitleMailHigh
-      msgTitleMailLow
-      msgTitlePush
-      msgTitlePushHigh
-      msgTitlePushLow
-      msgTitleScreen
-      msgTitleScreenHigh
-      msgTitleScreenLow
-      msgTitleText
-      msgTitleTextHigh
-      msgTitleTextLow
-
-    );
-    use warnings 'qw';
-    $modules{Global}{AttrList} .= " " . join( " ", @attrList );
-
-    # add global attributes
-    foreach (
-        "msgContactAudio",    "msgContactMail",   "msgContactPush",
-        "msgContactScreen",   "msgContactLight",  "msgRecipient",
-        "msgRecipientAudio",  "msgRecipientMail", "msgRecipientPush",
-        "msgRecipientScreen", "msgRecipientText", "msgRecipientLight",
-      )
-    {
-        addToAttrList($_);
-    }
 }
 
 ########################################
 sub CommandMsg($$;$$) {
     my ( $cl, $msg, $testMode ) = @_;
     my $return = "";
+
+    # find existing msgConfig device or create a new instance
+    my $globalDevName = "";
+    if (defined ($defs{"msgConfig"})) {
+      if ($defs{"msgConfig"}{TYPE} eq "msgConfig") {
+        $globalDevName = "msgConfig";
+      } else {
+        return "Device msgConfig has incorrect type - aborting...";
+      }
+    } else {
+      fhem "define msgConfig msgConfig";
+      $globalDevName = "msgConfig";
+      $return .= "Global configuration device msgConfig was created.";
+    }
 
     if ( $msg eq "" || $msg =~ /^\?[\s\t]*$/ || $msg eq "help" ) {
         return
@@ -430,9 +366,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
       eval 'use JSON qw( decode_json ); 1';
       if ( !$@ ) {
         $advanced = decode_json( Encode::encode_utf8($1) );
-        Log3 "global", 5, "msg: Advanced options\n" . Dumper($advanced);
+        Log3 $globalDevName, 5, "msg: Advanced options\n" . Dumper($advanced);
       } else {
-        Log3 "global", 3, "msg: To use advanced options, please install Perl::JSON.";
+        Log3 $globalDevName, 3, "msg: To use advanced options, please install Perl::JSON.";
       }
     }
 
@@ -451,11 +387,11 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
     my $isRecipientOr  = 1;
     my $hasTypeOr      = 0;
     my $hasRecipientOr = 0;
-    $recipients = "\@global" if ( $recipients eq "" );
+    $recipients = "\@".$globalDevName if ( $recipients eq "" );
 
     my @typesOr = split( /\|/, $types );
     $hasTypeOr = 1 if ( scalar( grep { defined $_ } @typesOr ) > 1 );
-    Log3 "global", 5,
+    Log3 $globalDevName, 5,
       "msg: typeOr total is " . scalar( grep { defined $_ } @typesOr )
       if ( $testMode ne "1" );
 
@@ -465,13 +401,13 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
         $iTypesOr++
       )
     {
-        Log3 "global", 5,
+        Log3 $globalDevName, 5,
           "msg: start typeOr loop for type(s) $typesOr[$iTypesOr]"
           if ( $testMode ne "1" );
 
         my @type = split( /,/, $typesOr[$iTypesOr] );
         for ( my $i = 0 ; $i < scalar( grep { defined $_ } @type ) ; $i++ ) {
-            Log3 "global", 5, "msg: running loop for type $type[$i]"
+            Log3 $globalDevName, 5, "msg: running loop for type $type[$i]"
               if ( $testMode ne "1" );
             last if ( !defined( $type[$i] ) );
 
@@ -496,7 +432,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
             my @recipientsOr = split( /\|/, $recipients );
             $hasRecipientOr = 1
               if ( scalar( grep { defined $_ } @recipientsOr ) > 1 );
-            Log3 "global", 5,
+            Log3 $globalDevName, 5,
               "msg: recipientOr total is "
               . scalar( grep { defined $_ } @recipientsOr )
               if ( $testMode ne "1" );
@@ -507,14 +443,14 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                 $iRecipOr++
               )
             {
-                Log3 "global", 5,
+                Log3 $globalDevName, 5,
 "msg: start recipientsOr loop for recipient(s) $recipientsOr[$iRecipOr]"
                   if ( $testMode ne "1" );
 
                 my @recipient = split( /,/, $recipientsOr[$iRecipOr] );
                 foreach my $device (@recipient) {
 
-                    Log3 "global", 5, "msg: running loop for device $device"
+                    Log3 $globalDevName, 5, "msg: running loop for device $device"
                       if ( $testMode ne "1" );
 
                     my $messageSentDev = 0;
@@ -542,7 +478,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         && $deviceType eq "device" )
                     {
                         $return .= "Device $device does not exist\n";
-                        Log3 "global", 5, "msg $device: Device does not exist"
+                        Log3 $globalDevName, 5, "msg $device: Device does not exist"
                           if ( $testMode ne "1" );
 
                         my $regex1 =
@@ -568,7 +504,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     my $useLocation = 0;
 
                     my $logDevice;
-                    $logDevice = "global";
+                    $logDevice = $globalDevName;
                     $logDevice = $device
                       if (
                         # look for direct
@@ -617,12 +553,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                     # look for global direct
                                     AttrVal(
-                                        "global", "msgLocationDevs",
+                                        $globalDevName, "msgLocationDevs",
 
                                         #look for global indirect
                                         AttrVal(
                                             AttrVal(
-                                                "global",
+                                                $globalDevName,
                                                 "msgRecipient$typeUc", ""
                                             ),
                                             "msgLocationDevs",
@@ -630,7 +566,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                             # look for global indirect general
                                             AttrVal(
                                                 AttrVal(
-                                                    "global", "msgRecipient",
+                                                    $globalDevName, "msgRecipient",
                                                     ""
                                                 ),
                                                 "msgLocationDevs",
@@ -897,7 +833,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         # fallback/catchall
                         if ( $gatewayDevs eq "" ) {
                             $catchall = 1
-                              if ( $device ne "global" );
+                              if ( $device ne $globalDevName );
 
                             Log3 $logDevice, 5,
 "msg $device:			(No $typeUc contact defined, trying global instead)"
@@ -907,18 +843,18 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                               # look for direct
                               AttrVal(
-                                "global", "msgContact$typeUc",
+                                $globalDevName, "msgContact$typeUc",
 
                                 #look for indirect
                                 AttrVal(
                                     AttrVal(
-                                        "global", "msgRecipient$typeUc", ""
+                                        $globalDevName, "msgRecipient$typeUc", ""
                                     ),
                                     "msgContact$typeUc",
 
                                     #look for indirect general
                                     AttrVal(
-                                        AttrVal( "global", "msgRecipient", "" ),
+                                        AttrVal( $globalDevName, "msgRecipient", "" ),
                                         "msgContact$typeUc",
 
                                         # no contact found
@@ -949,12 +885,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                 # look for global direct
                                 AttrVal(
-                                    "global", "msgPriority$typeUc",
+                                    $globalDevName, "msgPriority$typeUc",
 
                                     #look for global indirect
                                     AttrVal(
                                         AttrVal(
-                                            "global", "msgRecipient$typeUc",
+                                            $globalDevName, "msgRecipient$typeUc",
                                             ""
                                         ),
                                         "msgPriority$typeUc",
@@ -962,7 +898,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                         #look for global indirect general
                                         AttrVal(
                                             AttrVal(
-                                                "global", "msgRecipient",
+                                                $globalDevName, "msgRecipient",
                                                 ""
                                             ),
                                             "msgPriority$typeUc",
@@ -1078,12 +1014,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                       # look for global direct
                                       AttrVal(
-                                          "global", "msgThPrioTextEmergency",
+                                          $globalDevName, "msgThPrioTextEmergency",
 
                                           #look for global indirect type
                                           AttrVal(
                                               AttrVal(
-                                                  "global",
+                                                  $globalDevName,
                                                   "msgRecipient$typeUc", ""
                                               ),
                                               "msgThPrioTextEmergency",
@@ -1091,7 +1027,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                               #look for global indirect general
                                               AttrVal(
                                                   AttrVal(
-                                                      "global", "msgRecipient",
+                                                      $globalDevName, "msgRecipient",
                                                       ""
                                                   ),
                                                   "msgThPrioTextEmergency",
@@ -1124,12 +1060,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                       # look for global direct
                                       AttrVal(
-                                          "global", "msgThPrioTextNormal",
+                                          $globalDevName, "msgThPrioTextNormal",
 
                                           #look for global indirect type
                                           AttrVal(
                                               AttrVal(
-                                                  "global",
+                                                  $globalDevName,
                                                   "msgRecipient$typeUc", ""
                                               ),
                                               "msgThPrioTextNormal",
@@ -1137,7 +1073,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                               #look for global indirect general
                                               AttrVal(
                                                   AttrVal(
-                                                      "global", "msgRecipient",
+                                                      $globalDevName, "msgRecipient",
                                                       ""
                                                   ),
                                                   "msgThPrioTextNormal",
@@ -1238,7 +1174,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     # FATAL ERROR: we could not find any targets for
                     # user specified device...
                     if (   $gatewayDevs eq ""
-                        && $device ne "global" )
+                        && $device ne $globalDevName )
                     {
                         $return .=
 "ERROR: Could not find any $typeUc contact for device $device - set attributes: msgContact$typeUc | msgRecipient$typeUc | msgRecipient\n";
@@ -1283,12 +1219,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                     # look for global direct
                                     AttrVal(
-                                        "global", "msgSwitcherDev",
+                                        $globalDevName, "msgSwitcherDev",
 
                                         #look for global indirect type
                                         AttrVal(
                                             AttrVal(
-                                                "global",
+                                                $globalDevName,
                                                 "msgRecipient$typeUc", ""
                                             ),
                                             "msgSwitcherDev",
@@ -1296,7 +1232,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                             #look for global indirect general
                                             AttrVal(
                                                 AttrVal(
-                                                    "global", "msgRecipient",
+                                                    $globalDevName, "msgRecipient",
                                                     ""
                                                 ),
                                                 "msgSwitcherDev",
@@ -1331,12 +1267,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                     # look for global direct
                                     AttrVal(
-                                        "global", "msgThPrioAudioEmergency",
+                                        $globalDevName, "msgThPrioAudioEmergency",
 
                                         #look for global indirect type
                                         AttrVal(
                                             AttrVal(
-                                                "global",
+                                                $globalDevName,
                                                 "msgRecipient$typeUc", ""
                                             ),
                                             "msgThPrioAudioEmergency",
@@ -1344,7 +1280,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                             #look for global indirect general
                                             AttrVal(
                                                 AttrVal(
-                                                    "global", "msgRecipient",
+                                                    $globalDevName, "msgRecipient",
                                                     ""
                                                 ),
                                                 "msgThPrioAudioEmergency",
@@ -1377,12 +1313,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                     # look for global direct
                                     AttrVal(
-                                        "global", "msgThPrioAudioHigh",
+                                        $globalDevName, "msgThPrioAudioHigh",
 
                                         #look for global indirect type
                                         AttrVal(
                                             AttrVal(
-                                                "global",
+                                                $globalDevName,
                                                 "msgRecipient$typeUc", ""
                                             ),
                                             "msgThPrioAudioHigh",
@@ -1390,7 +1326,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                             #look for global indirect general
                                             AttrVal(
                                                 AttrVal(
-                                                    "global", "msgRecipient",
+                                                    $globalDevName, "msgRecipient",
                                                     ""
                                                 ),
                                                 "msgThPrioAudioHigh",
@@ -1423,12 +1359,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                     # look for global direct
                                     AttrVal(
-                                        "global", "msgThPrioHigh",
+                                        $globalDevName, "msgThPrioHigh",
 
                                         #look for global indirect type
                                         AttrVal(
                                             AttrVal(
-                                                "global",
+                                                $globalDevName,
                                                 "msgRecipient$typeUc", ""
                                             ),
                                             "msgThPrioHigh",
@@ -1436,7 +1372,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                             #look for global indirect general
                                             AttrVal(
                                                 AttrVal(
-                                                    "global", "msgRecipient",
+                                                    $globalDevName, "msgRecipient",
                                                     ""
                                                 ),
                                                 "msgThPrioHigh",
@@ -1469,12 +1405,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                     # look for global direct
                                     AttrVal(
-                                        "global", "msgThPrioNormal",
+                                        $globalDevName, "msgThPrioNormal",
 
                                         #look for global indirect type
                                         AttrVal(
                                             AttrVal(
-                                                "global",
+                                                $globalDevName,
                                                 "msgRecipient$typeUc", ""
                                             ),
                                             "msgThPrioNormal",
@@ -1482,7 +1418,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                             #look for global indirect general
                                             AttrVal(
                                                 AttrVal(
-                                                    "global", "msgRecipient",
+                                                    $globalDevName, "msgRecipient",
                                                     ""
                                                 ),
                                                 "msgThPrioNormal",
@@ -1609,18 +1545,18 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             || $residentDevPresence eq ""
                         )
                         && ReadingsVal(
-                            AttrVal( "global", "msgRecipient$typeUc", "" ),
+                            AttrVal( $globalDevName, "msgRecipient$typeUc", "" ),
                             "presence", "-" ) ne "-"
                       )
                     {
                         $residentDevState =
                           ReadingsVal(
-                            AttrVal( "global", "msgRecipient$typeUc", "" ),
+                            AttrVal( $globalDevName, "msgRecipient$typeUc", "" ),
                             "state", "" )
                           if ( $residentDevState eq "" );
                         $residentDevPresence =
                           ReadingsVal(
-                            AttrVal( "global", "msgRecipient$typeUc", "" ),
+                            AttrVal( $globalDevName, "msgRecipient$typeUc", "" ),
                             "presence", "" )
                           if ( $residentDevPresence eq "" );
                     }
@@ -1631,16 +1567,16 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                $residentDevState eq ""
                             || $residentDevPresence eq ""
                         )
-                        && ReadingsVal( AttrVal( "global", "msgRecipient", "" ),
+                        && ReadingsVal( AttrVal( $globalDevName, "msgRecipient", "" ),
                             "presence", "-" ) ne "-"
                       )
                     {
                         $residentDevState =
-                          ReadingsVal( AttrVal( "global", "msgRecipient", "" ),
+                          ReadingsVal( AttrVal( $globalDevName, "msgRecipient", "" ),
                             "state", "" )
                           if ( $residentDevState eq "" );
                         $residentDevPresence =
-                          ReadingsVal( AttrVal( "global", "msgRecipient", "" ),
+                          ReadingsVal( AttrVal( $globalDevName, "msgRecipient", "" ),
                             "presence", "" )
                           if ( $residentDevPresence eq "" );
                     }
@@ -1652,18 +1588,18 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             || $residentDevPresence eq ""
                         )
                         && ReadingsVal(
-                            AttrVal( "global", "msgResidentsDev", "" ),
+                            AttrVal( $globalDevName, "msgResidentsDev", "" ),
                             "presence", "-" ) ne "-"
                       )
                     {
                         $residentDevState =
                           ReadingsVal(
-                            AttrVal( "global", "msgResidentsDev", "" ),
+                            AttrVal( $globalDevName, "msgResidentsDev", "" ),
                             "state", "" )
                           if ( $residentDevState eq "" );
                         $residentDevPresence =
                           ReadingsVal(
-                            AttrVal( "global", "msgResidentsDev", "" ),
+                            AttrVal( $globalDevName, "msgResidentsDev", "" ),
                             "presence", "" )
                           if ( $residentDevPresence eq "" );
                     }
@@ -1690,12 +1626,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                     # look for global direct
                                     AttrVal(
-                                        "global", "msgThPrioGwEmergency",
+                                        $globalDevName, "msgThPrioGwEmergency",
 
                                         #look for global indirect type
                                         AttrVal(
                                             AttrVal(
-                                                "global",
+                                                $globalDevName,
                                                 "msgRecipient$typeUc", ""
                                             ),
                                             "msgThPrioGwEmergency",
@@ -1703,7 +1639,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                             #look for global indirect general
                                             AttrVal(
                                                 AttrVal(
-                                                    "global", "msgRecipient",
+                                                    $globalDevName, "msgRecipient",
                                                     ""
                                                 ),
                                                 "msgThPrioGwEmergency",
@@ -1882,12 +1818,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                         # look for global direct high
                                         AttrVal(
-                                            "global", "msgTitle$typeUc$priorityCat",
+                                            $globalDevName, "msgTitle$typeUc$priorityCat",
 
                                             # look for global indirect high
                                             AttrVal(
                                                 AttrVal(
-                                                    "global", "msgRecipient$typeUc",
+                                                    $globalDevName, "msgRecipient$typeUc",
                                                     ""
                                                 ),
                                                 "msgTitle$typeUc$priorityCat",
@@ -1895,7 +1831,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                                 #look for global indirect general high
                                                 AttrVal(
                                                     AttrVal(
-                                                        "global", "msgRecipient",
+                                                        $globalDevName, "msgRecipient",
                                                         ""
                                                     ),
                                                     "msgTitle$typeUc$priorityCat",
@@ -1965,13 +1901,13 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                             # look for global direct
                                             AttrVal(
-                                                "global",
+                                                $globalDevName,
                                                 "msgCmd$typeUc$priorityCat",
 
                                                 # look for global indirect
                                                 AttrVal(
                                                     AttrVal(
-                                                        "global",
+                                                        $globalDevName,
                                                         "msgRecipient$typeUc",
                                                         ""
                                                     ),
@@ -1980,7 +1916,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                                #look for global indirect general
                                                     AttrVal(
                                                         AttrVal(
-                                                            "global",
+                                                            $globalDevName,
                                                             "msgRecipient",
                                                             ""
                                                         ),
@@ -2113,19 +2049,19 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     }
                     else {
                         if ( !defined( $sentTypesPerDevice{$device} ) ) {
-                            $sentTypesPerDevice{"global"} = "";
+                            $sentTypesPerDevice{$globalDevName} = "";
                         }
                         else {
-                            $sentTypesPerDevice{"global"} .= " ";
+                            $sentTypesPerDevice{$globalDevName} .= " ";
                         }
 
-                        $sentTypesPerDevice{"global"} .=
+                        $sentTypesPerDevice{$globalDevName} .=
                           $type[$i] . ":" . $messageSentDev;
                     }
 
                     # update device readings
                     my $readingsDev = $defs{$device};
-                    $readingsDev = $defs{"global"} if ( $catchall == 1 );
+                    $readingsDev = $defs{$globalDevName} if ( $catchall == 1 );
                     readingsBeginUpdate($readingsDev);
 
                     readingsBulkUpdate( $readingsDev, "fhemMsg" . $typeUc,
