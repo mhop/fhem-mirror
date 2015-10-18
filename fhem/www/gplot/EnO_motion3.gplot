@@ -5,7 +5,7 @@
 # define FileLog_device FileLog ./log/device-%Y.log device
 #
 # Logfile record example:
-# 2015-10-17_08:38:08 device on|off
+# 2015-10-17_08:38:08 device motion: on|off
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
