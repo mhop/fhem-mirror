@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2015-10-17
+# 2015-10-18
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -199,7 +199,7 @@ my %EnO_eepConfig = (
   "A5.06.02" => {attr => {subType => "lightSensor.02"}, GPLOT => "EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
   "A5.06.03" => {attr => {subType => "lightSensor.03"}, GPLOT => "EnO_brightness4:Brightness,"},
   "A5.07.01" => {attr => {subType => "occupSensor.01"}, GPLOT => "EnO_motion3:Motion,EnO_voltage4current4:Voltage/Current,"},
-  "A5.07.02" => {attr => {subType => "occupSensor.02"}},
+  "A5.07.02" => {attr => {subType => "occupSensor.02"}, GPLOT => "EnO_motion3:Motion,EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
   "A5.07.03" => {attr => {subType => "occupSensor.03"}},
   "A5.08.01" => {attr => {subType => "lightTempOccupSensor.01"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
   "A5.08.02" => {attr => {subType => "lightTempOccupSensor.02"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
@@ -311,25 +311,25 @@ my %EnO_eepConfig = (
   "D2.40.00" => {attr => {subType => "ledCtrlState.00"}},
   "D2.40.01" => {attr => {subType => "ledCtrlState.01"}},
   "D2.A0.01" => {attr => {subType => "valveCtrl.00", defaultChannel => 0, webCmd => "opens:closes"}},
-  "D5.00.01" => {attr => {subType => "contact", manufID => "7FF"}},
+  "D5.00.01" => {attr => {subType => "contact", manufID => "7FF"}, GPLOT => "EnO_contact:Contact,"},
   "F6.02.01" => {attr => {subType => "switch"}},
   "F6.02.02" => {attr => {subType => "switch"}},
   "F6.02.03" => {attr => {subType => "switch"}},
  #"F6.02.04" => {attr => {subType => "switch.04"}},
   "F6.03.01" => {attr => {subType => "switch"}},
   "F6.03.02" => {attr => {subType => "switch"}},
-  "F6.04.01" => {attr => {subType => "keycard"}},
- #"F6.04.02" => {attr => {subType => "keycard.02"}},
-  "F6.05.01" => {attr => {subType => "liquidLeakage"}},
-  "F6.10.00" => {attr => {subType => "windowHandle"}},
- #"F6.10.01" => {attr => {subType => "windowHandle.01"}},
+  "F6.04.01" => {attr => {subType => "keycard"}, GPLOT => "EnO_keycard:Keycard,"},
+ #"F6.04.02" => {attr => {subType => "keycard.02"}, GPLOT => "EnO_keycard:Keycard,"},
+  "F6.05.01" => {attr => {subType => "liquidLeakage"}, GPLOT => "EnO_liquidLeakage:LiquidLeakage,"},
+  "F6.10.00" => {attr => {subType => "windowHandle"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
+ #"F6.10.01" => {attr => {subType => "windowHandle.01"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
   "B0.00.00" => {attr => {subType => "genericProfile"}},
  # special profiles
-  "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}},
+  "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
-  "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}},
+  "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion3:Motion,EnO_brightness4:Brightness,"},
   "L6.02.01" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
   "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}},
 );
@@ -524,6 +524,7 @@ EnOcean_Define($$)
      ('./log/' . $name . '-%Y.log', undef, 'autocreate', 'EnOcean', 'Plots');
   my ($cmd, $eep, $ret);
   my $filelogName = "FileLog_$name";
+  Log3 $name, 2, "EnOcean define $def";
   $def = "00000000";
   if(@a > 2 && @a < 5) {
     # find autocreate device
@@ -602,7 +603,7 @@ EnOcean_Define($$)
               $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
             }
           }
-          EnOcean_CreateSVG(undef, $hash);
+          EnOcean_CreateSVG(undef, $hash, $a[3]);
         } else {
           return "EEP $rorg-$func-$type not supported";
         }
@@ -659,7 +660,7 @@ EnOcean_Define($$)
           $eep = uc("$1.$2.$3");
           if (exists($attr{$filelogName}{logtype}) && exists($EnO_eepConfig{$eep}{GPLOT})) {
             $attr{$filelogName}{logtype} = $EnO_eepConfig{$eep}{GPLOT} . 'text';
-            EnOcean_CreateSVG(undef, $hash);
+            EnOcean_CreateSVG(undef, $hash, undef);
           }
         }
 
@@ -714,7 +715,7 @@ EnOcean_Define($$)
             $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
           }
         }
-        EnOcean_CreateSVG('del', $hash);
+        EnOcean_CreateSVG('del', $hash, $a[2]);
       } else {
         return "EEP $rorg-$func-$type not supported";
       }      
@@ -759,8 +760,11 @@ sub EnOcean_Get($@)
   }
   $destinationID = uc($destinationID);
   my $eep = uc(AttrVal($name, "eep", "00-00-00"));
-  $eep =~ m/^(..)(.)(..)(.)(..)$/;
-  $eep = (((hex($1) << 6) | hex($3)) << 7) | hex($5);
+  if ($eep =~ m/^([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})$/i) {
+    $eep = (((hex($1) << 6) | hex($2)) << 7) | hex($3);
+  } else {
+    $eep = 0;
+  }
   my $manufID = uc(AttrVal($name, "manufID", ""));
   my $model = AttrVal($name, "model", "");
   my $packetType = 1;
@@ -5036,7 +5040,7 @@ sub EnOcean_Parse($$)
               if (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} =~ m/^4BS|STE$/) {
                 $attr{$filelogName}{logtype} = $EnO_eepConfig{$st}{GPLOT} . 'text'
                   if (exists $attr{$filelogName}{logtype});
-                EnOcean_CreateSVG(undef, $hash);
+                EnOcean_CreateSVG(undef, $hash, undef);
                 delete $hash->{helper}{teachInWait};
               }
               $st = $EnO_eepConfig{$st}{attr}{subType};
@@ -5231,9 +5235,9 @@ sub EnOcean_Parse($$)
       # Light and Presence Sensor [Omnio Ratio eagle-PM101]
       # The sensor also sends switching commands (RORG F6) with the senderID-1
       # $db[2] is the illuminance where 0x00 = 0 lx ... 0xFF = 1000 lx
-      my $channel2 = $db[0] & 2 ? "yes" : "no";
+      my $channel2 = $db[0] & 2 ? "on" : "off";
       push @event, "3:brightness:" . ($db[2] << 2);
-      push @event, "3:channel1:" . ($db[0] & 1 ? "yes" : "no");
+      push @event, "3:channel1:" . ($db[0] & 1 ? "on" : "off");
       push @event, "3:channel2:" . $channel2;
       push @event, "3:motion:" . $channel2;
       push @event, "3:state:" . $channel2;
@@ -5964,6 +5968,7 @@ sub EnOcean_Parse($$)
           push @event, "3:sensorType:wall";
         }
       }
+      push @event, "3:battery:" . ($db[3] * 0.02 > 2.9 ? "ok" : "low");
       push @event, "3:button:" . ($db[0] & 4 ? "released" : "pressed") if ($manufID eq "7FF");
       push @event, "3:motion:$motion";
       push @event, "3:state:$motion";
@@ -5975,6 +5980,7 @@ sub EnOcean_Parse($$)
       # $db[0]_bit_7 is PIR Status (motion) where 0 = off, 1 = on
       my $motion = $db[0] >> 7 ? "on" : "off";
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
+      push @event, "3:battery:" . ($db[3] * 0.02 > 2.9 ? "ok" : "low");
       push @event, "3:motion:$motion";
       push @event, "3:voltage:" . sprintf "%0.1f", $db[3] * 0.02;
       push @event, "3:state:$motion";
@@ -5990,6 +5996,7 @@ sub EnOcean_Parse($$)
       if ($lux == 1001) {$lux = "over range";}
       my $voltage = sprintf "%0.1f", $db[3] * 0.02;
       if ($db[3] > 250) {push @event, "3:errorCode:$db[3]";}
+      push @event, "3:battery:" . ($db[3] * 0.02 > 2.9 ? "ok" : "low");
       push @event, "3:brightness:$lux";
       push @event, "3:motion:$motion";
       push @event, "3:voltage:$voltage";
@@ -7851,7 +7858,7 @@ sub EnOcean_Parse($$)
           if (exists($hash->{helper}{teachInWait}) && $hash->{helper}{teachInWait} =~ m/^UTE|STE$/) {
             $attr{$filelogName}{logtype} = $EnO_eepConfig{$subType}{GPLOT} . 'text'
               if (exists $attr{$filelogName}{logtype});
-            EnOcean_CreateSVG(undef, $hash);
+            EnOcean_CreateSVG(undef, $hash, undef);
             delete $hash->{helper}{teachInWait};
           }
           $subType = $EnO_eepConfig{$subType}{attr}{subType};
@@ -9435,18 +9442,21 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
 }
 
 # create SVG devices
-sub EnOcean_CreateSVG($$)
+sub EnOcean_CreateSVG($$$)
 {
-  my ($ctrl, $hash) = @_;
+  my ($ctrl, $hash, $eepSVG) = @_;
   my $name = $hash->{NAME};
   my ($autocreateHash, $autocreateName, $autocreateDeviceRoom, $autocreateWeblinkRoom) =
      (undef, 'autocreate', 'EnOcean', 'Plots');
-  my ($weblinkName, $weblinkHash);
-  my $cmd;
-  return undef if (!exists($attr{$name}{eep}) || $attr{$name}{eep} !~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i);
-  my $eep = uc("$1.$2.$3");
   my $filelogName = "FileLog_$name";
-  my $ret;
+  my ($cmd, $eep, $weblinkName, $weblinkHash, $ret);
+  if (defined($eepSVG) && $eepSVG =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
+    $eep = uc("$1.$2.$3");
+  } elsif (exists($attr{$name}{eep}) && $attr{$name}{eep} =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
+    $eep = uc("$1.$2.$3");
+  } else {
+    return undef;
+  }
   # find autocreate device
   while (($autocreateName, $autocreateHash) = each(%defs)) {
     last if ($defs{$autocreateName}{TYPE} eq "autocreate");
@@ -11107,23 +11117,26 @@ EnOcean_Delete($$)
 {
   my ($hash, $name) = @_;
   my $logName = "FileLog_$name";
-  my ($weblinkName, $weblinkHash);
-  # delete FileLog device and logfiles
+  my ($count, $gplotFile, $logFile, $weblinkName, $weblinkHash);
+  Log3 $name, 2, "EnOcean $name deleted";
+  # delete FileLog device and log files
   if (exists $defs{$logName}) {
-    my $count;
-    my $logFile = $defs{$logName}{logfile};
+    $logFile = $defs{$logName}{logfile};
     $logFile =~ /^(.*)($name).*\.(.*)$/;
     $logFile = $1 . $2 . "*." . $3;
     CommandDelete(undef, "FileLog_$name");
-    Log3 $hash->{NAME}, 2, "EnOcean FileLog_$name deleted";
+    Log3 $name, 2, "EnOcean FileLog_$name deleted";
     $count = unlink glob $logFile;
-    Log3 $hash->{NAME}, 2, "EnOcean $logFile >> $count files deleted";
+    Log3 $name, 2, "EnOcean $logFile >> $count files deleted";
   }
-  # delete SVG devices
+  # delete SVG devices and gplot files
   while (($weblinkName, $weblinkHash) = each(%defs)) {
     if ($weblinkName =~ /^SVG_$name.*/) {
-      CommandDelete(undef, $weblinkName) ;
-      Log3 $hash->{NAME}, 2, "EnOcean $weblinkName deleted";
+      $gplotFile = "./www/gplot/" . $defs{$weblinkName}{GPLOTFILE} . "*.gplot";
+      CommandDelete(undef, $weblinkName);      
+      Log3 $name, 2, "EnOcean $weblinkName deleted";
+      $count = unlink glob $gplotFile;
+      Log3 $name, 2, "EnOcean $gplotFile >> $count files deleted";      
     }
   }
   return undef;
@@ -11357,7 +11370,7 @@ EnOcean_Delete($$)
   <a name="EnOceaninternals"></a>
   <b>Internals</b>
   <ul>
-    <li>DEF: 0000000 ... FFFFFFFF|<EEP><br>
+    <li>DEF: 0000000 ... FFFFFFFF|&lt;EEP&gt;<br>
       EnOcean DestinationID or SenderID<br>
       If the attributes subDef* are set, this values are used as EnOcean SenderID.<br>
       For an existing device, the device can be re-parameterized by entering the EEP.<br>
@@ -13181,6 +13194,7 @@ EnOcean_Delete($$)
          [EnOcean EOSW]<br>
      <ul>
        <li>on|off</li>
+       <li>battery: ok|low</li>
        <li>button: pressed|released</li>
        <li>current: I/&#181;A (Sensor Range: I = 0 V ... 127.0 &#181;A)</li>
        <li>errorCode: 251 ... 255</li>
@@ -13199,6 +13213,7 @@ EnOcean_Delete($$)
          [untested]<br>
      <ul>
        <li>M: on|off E: E/lx U: U/V</li>
+       <li>battery: ok|low</li>
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 1000 lx, over range)</li>
        <li>errorCode: 251 ... 255</li>
        <li>motion: on|off</li>
@@ -13320,7 +13335,7 @@ EnOcean_Delete($$)
          [untested]<br>
      <ul>
        <li>c/ppm</li>
-       <li>battery: U/V (Sensor Range: U = 2 V ... 5 V)</li>
+       <li>voltage: U/V (Sensor Range: U = 2 V ... 5 V)</li>
        <li>H: c/ppm (Sensor Range: c = 0 ppm ... 2000 ppm)</li>
        <li>temperature: t/&#176C (Sensor Range: t = -20 &#176C ... 60 &#176C)</li>
        <li>state: c/ppm</li>
@@ -14337,16 +14352,16 @@ EnOcean_Delete($$)
     <li>Light and Presence Sensor<br>
         [Omnio Ratio eagle-PM101]<br>
     <ul>
-      <li>yes</li>
-      <li>no</li>
+      <li>on</li>
+      <li>off</li>
       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 1000 lx)</li>
-      <li>channel1: yes|no<br>
+      <li>channel1: on|off<br>
       Motion message in depending on the brightness threshold</li>
-      <li>channel2: yes|no<br>
+      <li>channel2: on|off<br>
       Motion message</li>
-      <li>motion: yes|no<br>
+      <li>motion: on|off<br>
       Channel 2</li>
-      <li>state: yes|no<br>
+      <li>state: on|off<br>
       Channel 2</li>
     </ul><br>
     The sensor also sends switching commands (RORG F6) with the SenderID-1.<br>
