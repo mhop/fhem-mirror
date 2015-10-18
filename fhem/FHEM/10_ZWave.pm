@@ -396,6 +396,12 @@ my %zwave_class = (
   NON_INTEROPERABLE        => { id => 'f0' },
 );
 
+my %zwave_noStateSetCmds = (
+  secScheme=>1,
+  sendNonce=>1,
+  secEncap=>1
+);
+
 my %zwave_cmdArgs = (
   set => {
     dim          => "slider,0,1,99",
@@ -745,7 +751,8 @@ ZWave_Cmd($$@)
 
   }
 
-  readingsSingleUpdate($hash, "state", $cmd, 1) if($type eq "set");
+  readingsSingleUpdate($hash, "state", $cmd, 1)
+        if($type eq "set" && !$zwave_noStateSetCmds{$cmd});
   return $val;
 }
 
