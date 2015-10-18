@@ -1,0 +1,29 @@
+##############################################
+# $Id$
+# Display a window log
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device closed|open|tilted|open_from_tilted
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "Window"
+set title '<TL>'
+set ytics ("open" 1, "tilted" 0.5, "closed" 0)
+set y2tics ("open" 1, "tilted" 0.5, "closed" 0)
+set yrange [-0.1:1.1]
+set y2range [-0.1:1.1]
+
+#FileLog "1":open|open_from_tilted:1:
+#FileLog "0.5":tilted:0.5:
+#FileLog "0":closed:0:
+
+plot\
+  "< awk '/open|open_from_tilted/ {print $1, 1;}' <IN>" using 1:2 notitle with points,\
+  "< awk '/tilted/ {print $1, 0.5;}' <IN>" using 1:2 notitle with points,\
+  "< awk '/closed/ {print $1, 0;}' <IN>" using 1:2 notitle with points
