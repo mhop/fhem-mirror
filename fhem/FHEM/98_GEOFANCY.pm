@@ -510,7 +510,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
           Note: GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.
         </p><a name="GEOFANCYdefine" id="GEOFANCYdefine"></a> <b>Define</b>
         <div style="margin-left: 2em">
-          <code>define &lt;name&gt; &lt;infix&gt;</code><br>
+          <code>define &lt;name&gt; GEOFANCY &lt;infix&gt;</code><br>
           <br>
           Defines the webhook server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually <code>http://hostname:8083/fhem</code>)<br>
           <br>
