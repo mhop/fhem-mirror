@@ -37,6 +37,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(time);
 use Data::Dumper;
+use msgSchema;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
@@ -76,204 +77,8 @@ sub CommandMsg($$;$$) {
 "Usage: msg [<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>";
     }
 
-    # FHEM module command schema definitions
-    my $cmdSchema = {
-      'audio' => {
-
-        'AMAD' => {
-          'Normal'    => 'set %DEVICE% ttsMsg %MSG%',
-          'ShortPrio' => 'set %DEVICE% ttsMsg %MSGSH%',
-          'Short'     => 'set %DEVICE% notifySndFile %AMAD_FILENAME%',
-          'defaultValues' => {
-            'ShortPrio' => {
-              'MSGSH' => 'Achtung!',
-            },
-          },
-        },
-
-        'SONOSPLAYER' => {
-          'Normal'    => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSG%',
-          'ShortPrio' => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSH%',
-          'Short'     => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSH%',
-          'defaultValues' => {
-            'Normal' => {
-              'VOLUME' => 38,
-              'LANG' => 'de',
-            },
-            'ShortPrio' => {
-              'VOLUME' => 33,
-              'LANG' => 'de',
-              'MSGSH' => 'Achtung!',
-            },
-            'Short' => {
-              'VOLUME' => 28,
-              'LANG' => 'de',
-              'MSGSH' => '',
-            },
-          },
-        },
-
-      },
-
-      'light' => {
-
-        'HUEDevice' => {
-          'Normal'  => '{my \$state=ReadingsVal("%DEVICE%","state","off"); fhem "set %DEVICE% blink 2 1"; fhem "sleep 4;set %DEVICE%:FILTER=state!=$state $state"}',
-          'High'    => '{my \$state=ReadingsVal("%DEVICE%","state","off"); fhem "set %DEVICE% blink 10 1"; fhem "sleep 20;set %DEVICE%:FILTER=state!=$state $state"}',
-          'Low'     => 'set %DEVICE% alert select',
-        },
-        
-      },
-
-      'mail' => {
-
-        'fhemMsgMail' => {
-          'Normal'  => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\'")}',
-          'High'    => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\' -a \'X-Priority: 1 (Highest)\' -a \'X-MSMail-Priority: High\' -a \'Importance: high\'")}',
-          'Low'     => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\' -a \'X-Priority: 5 (Lowest)\' -a \'X-MSMail-Priority: Low\' -a \'Importance: low\'")}',
-        },
-
-      },
-
-      'push' => {
-
-        'Fhemapppush' => {
-          'Normal'  => 'set %DEVICE% message \'%TITLE%: %MSG%\' %ACTION%',
-          'High'    => 'set %DEVICE% message \'%TITLE%: %MSG%\' %ACTION%',
-          'Low'     => 'set %DEVICE% message \'%TITLE%: %MSG%\' %ACTION%',
-          'defaultValues' => {
-            'Normal' => {
-              'ACTION'    => '',
-            },
-            'High' => {
-              'ACTION'    => '',
-            },
-            'Low' => {
-              'ACTION'    => '',
-            },
-          },
-        },
-
-        'Pushbullet' => {
-          'Normal'  => 'set %DEVICE% message %MSG% | %TITLE% %Pushbullet_RECIPIENT%',
-          'High'    => 'set %DEVICE% message %MSG% | %TITLE% %Pushbullet_RECIPIENT%',
-          'Low'     => 'set %DEVICE% message %MSG% | %TITLE% %Pushbullet_RECIPIENT%',
-          'defaultValues' => {
-            'Normal' => {
-              'Pushbullet_RECIPIENT' => '',
-            },
-            'High' => {
-              'Pushbullet_RECIPIENT' => '',
-            },
-            'Low' => {
-              'Pushbullet_RECIPIENT' => '',
-            },
-          },
-        },
-
-        'PushNotifier' => {
-          'Normal'  => 'set %DEVICE% message %TITLE%: %MSG%',
-          'High'    => 'set %DEVICE% message %TITLE%: %MSG%',
-          'Low'     => 'set %DEVICE% message %TITLE%: %MSG%',
-        },
-
-        'Pushover' => {
-          'Normal'  => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%Pushover_RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-          'High'    => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%Pushover_RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-          'Low'     => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%Pushover_RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-          'defaultValues' => {
-            'Normal' => {
-              'Pushover_RECIPIENT' => '',
-              'RETRY'     => '',
-              'EXPIRE'    => '',
-              'URLTITLE'  => '',
-              'ACTION'    => '',
-            },
-            'High' => {
-              'Pushover_RECIPIENT' => '',
-              'RETRY'     => '120',
-              'EXPIRE'    => '600',
-              'URLTITLE'  => '',
-              'ACTION'    => '',
-            },
-            'Low' => {
-              'Pushover_RECIPIENT' => '',
-              'RETRY'     => '',
-              'EXPIRE'    => '',
-              'URLTITLE'  => '',
-              'ACTION'    => '',
-            },
-          },
-        },
-
-        'TelegramBot' => {
-          'Normal'  => 'set %DEVICE% message %TelegramBot_RECIPIENT% %TITLE%: %MSG%',
-          'High'    => 'set %DEVICE% message %TelegramBot_RECIPIENT% %TITLE%: %MSG%',
-          'Low'     => 'set %DEVICE% message %TelegramBot_RECIPIENT% %TITLE%: %MSG%',
-          'defaultValues' => {
-            'Normal' => {
-              'TelegramBot_RECIPIENT' => '',
-            },
-            'High' => {
-              'TelegramBot_RECIPIENT' => '',
-            },
-            'Low' => {
-              'TelegramBot_RECIPIENT' => '',
-            },
-          },
-        },
-
-        'yowsup' => {
-          'Normal'  => 'set %DEVICE% send %yowsup_RECIPIENT% %TITLE%: %MSG%',
-          'High'    => 'set %DEVICE% send %yowsup_RECIPIENT% %TITLE%: %MSG%',
-          'Low'     => 'set %DEVICE% send %yowsup_RECIPIENT% %TITLE%: %MSG%',
-          'defaultValues' => {
-            'Normal' => {
-              'yowsup_RECIPIENT' => '',
-            },
-            'High' => {
-              'yowsup_RECIPIENT' => '',
-            },
-            'Low' => {
-              'yowsup_RECIPIENT' => '',
-            },
-          },
-        },
-
-      },
-
-      'screen' => {
-
-        'AMAD' => {
-          'Normal'  => 'set %DEVICE% screenMsg %TITLE%: %MSG%',
-          'High'    => 'set %DEVICE% screenMsg %TITLE%: %MSG%',
-          'Low'     => 'set %DEVICE% screenMsg %TITLE%: %MSG%',
-        },
-
-        'ENIGMA2' => {
-          'Normal'  => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
-          'High'    => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
-          'Low'     => 'set %DEVICE% msg %ENIGMA2_TYPE% %TIMEOUT% %MSG%',
-          'defaultValues' => {
-            'Normal' => {
-              'ENIGMA2_TYPE' => 'info',
-              'TIMEOUT'     => 8,
-            },
-            'High' => {
-              'ENIGMA2_TYPE'     => 'attention',
-              'TIMEOUT'     => 12,
-            },
-            'Low' => {
-              'ENIGMA2_TYPE'     => 'message',
-              'TIMEOUT'     => 8,
-            },
-          },
-        },
-
-      },
-    };
-
     # default settings
+    my $cmdSchema = msgSchema::get();
     my $settings = {
       'audio' => {
           'typeEscalation' => {
@@ -661,6 +466,11 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                     foreach my $gatewayDev ( split /,/,
                                         $gatewayDevOr )
                                     {
+                                        my $subRecipient = "";
+                                        if ( $gatewayDev =~ s/:(.*)//)
+                                        {
+                                            $subRecipient = $1;
+                                        }                                        
 
                                         if (   $type[$i] ne "mail"
                                             && !defined( $defs{$gatewayDev} )
@@ -1658,8 +1468,15 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                     foreach my $gatewayDevOr ( split /\|/, $gatewayDevs ) {
                         foreach my $gatewayDev ( split /,/, $gatewayDevOr ) {
+
+                            my $subRecipient = "";
+                            if ( $gatewayDev =~ s/:(.*)//)
+                            {
+                                $subRecipient = $1;
+                            }                                        
+
                             Log3 $logDevice, 5,
-"msg $device: Trying to send message via gateway $gatewayDev";
+"msg $device: Trying to send message via gateway $gatewayDev to recipient $subRecipient";
 
                             ##############
                            # check for gateway availability and set route status
@@ -1943,6 +1760,8 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             $cmd =~ s/%TITLE%/$loopTitle/gi;
                             $cmd =~ s/%MSG%/$loopMsg/gi;
 
+                            $cmd =~ s/%RECIPIENT%/$subRecipient/gi if ($subRecipient ne "");
+
                             # advanced options from message
                             if (ref($advanced) eq "ARRAY") {
                               for my $item (@$advanced) {
@@ -2006,10 +1825,10 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 $routeStatus = "ERROR" if ($error == 1);
 
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
+"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
                                   if ( $priorityCat ne "" );
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
+"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
                                   if ( $priorityCat eq "" );
 
                                   $messageSent                 = 1 if ($error == 0);
@@ -2020,12 +1839,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 || $routeStatus eq "UNDEFINED" )
                             {
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'";
+"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'";
                                 $gatewaysStatus{$gatewayDev} = $routeStatus;
                             }
                             else {
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'";
+"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'";
                                 $messageSent    = 2 if ( $messageSent != 1 );
                                 $messageSentDev = 2 if ( $messageSentDev != 1 );
                                 $gatewaysStatus{$gatewayDev} = $routeStatus;
