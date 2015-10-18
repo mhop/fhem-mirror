@@ -180,7 +180,7 @@ readingsGroup_updateDevices($;$)
         next if( $regex && $regex =~ m/^\?(.*)/ );
 
         my $name = $2;
-        if( $name =~ m/^{(.*)}$/ ) {
+        if( $name =~ m/^{(.*)}$/s ) {
           my $DEVICE = $device->[0];
           $name = eval $name;
         }
@@ -267,7 +267,7 @@ lookup($$$$$$$$$)
   my($mapping,$name,$alias,$reading,$value,$room,$group,$row,$default) = @_;
 
   if( $mapping ) {
-    if( !ref($mapping) && $mapping =~ m/^{.*}$/) {
+    if( !ref($mapping) && $mapping =~ m/^{.*}$/s) {
       my $DEVICE = $name;
       my $READING = $reading;
       my $VALUE = $value;
@@ -293,7 +293,7 @@ lookup($$$$$$$$$)
 
     return $default if( !defined($default) );
 
-    if( !ref($default) && $default =~ m/^{.*}$/) {
+    if( !ref($default) && $default =~ m/^{.*}$/s) {
       my $DEVICE = $name;
       my $READING = $reading;
       my $VALUE = $value;
@@ -331,7 +331,7 @@ lookup2($$$$;$$)
 
   return "" if( !$lookup );
 
-  if( !ref($lookup) && $lookup =~ m/^{.*}$/) {
+  if( !ref($lookup) && $lookup =~ m/^{.*}$/s) {
     my $DEVICE = $name;
     my $READING = $reading;
     my $VALUE = $value;
@@ -361,7 +361,7 @@ lookup2($$$$;$$)
 
   return undef if( !defined($lookup) );
 
-  if( !ref($lookup) && $lookup =~ m/^{.*}$/) {
+  if( !ref($lookup) && $lookup =~ m/^{.*}$/s) {
     my $DEVICE = $name;
     my $READING = $reading;
     my $VALUE = $value;
@@ -696,7 +696,7 @@ readingsGroup_2html($;$)
   my $separator = AttrVal( $d, "separator", ":" );
 
   my $style = AttrVal( $d, "style", "" );
-  if( $style =~ m/^{.*}$/ ) {
+  if( $style =~ m/^{.*}$/s ) {
     my $s = eval $style;
     $style = $s if( $s );
   }
@@ -917,7 +917,7 @@ readingsGroup_2html($;$)
           $regex = $1;
           my $force_device = $2;
           $name = $3;
-          if( $name =~ m/^{(.*)}$/ ) {
+          if( $name =~ m/^{(.*)}$/s ) {
             my $DEVICE = $device->[0];
             $name = eval $name;
           }
@@ -1424,7 +1424,7 @@ readingsGroup_Set($@)
 
         my $v = join(" ", @a);
         my $set_fn = AttrVal( $hash->{NAME}, "setFn", "" );
-        if( $set_fn =~ m/^{.*}$/ ) {
+        if( $set_fn =~ m/^{.*}$/s ) {
           my $CMD = $cmd;
           my $ARGS = $param ." ". join(" ", @a);
 
@@ -1483,7 +1483,7 @@ readingsGroup_Attr($$$;$)
 
     if( $cmd eq "set" ) {
       my $attrVal = $attrVal;
-      if( $attrVal =~ m/^{.*}$/ && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
+      if( $attrVal =~ m/^{.*}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
         my $av = eval $attrVal;
         if( $@ ) {
           Log3 $hash->{NAME}, 3, $hash->{NAME} .": ". $@;
