@@ -327,7 +327,7 @@ HUEDevice_SetParam($$@)
     if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (7<<8) ) {
       $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
       $obj->{'bri_inc'}  = 25;
-      $obj->{'bri_inc'} = $value if( defined($value) );
+      $obj->{'bri_inc'} = 0+$value if( defined($value) );
       $obj->{'transitiontime'} = 1;
       #$defs{$name}->{helper}->{update_timeout} = 0;
     } else {
@@ -345,7 +345,7 @@ HUEDevice_SetParam($$@)
     if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (7<<8) ) {
       $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
       $obj->{'bri_inc'}  = -25;
-      $obj->{'bri_inc'} = -$value if( defined($value) );
+      $obj->{'bri_inc'} = 0-$value if( defined($value) );
       $obj->{'transitiontime'} = 1;
       #$defs{$name}->{helper}->{update_timeout} = 0;
     } else {
