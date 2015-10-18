@@ -1,0 +1,27 @@
+##############################################
+# $Id$
+# Display a keycard log
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device keycard_inserted|keycard_removed
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "Keycard"
+set title '<TL>'
+set ytics ("inserted" 1, "removed" 0)
+set y2tics ("inserted" 1, "removed" 0)
+set yrange [-0.1:1.1]
+set y2range [-0.1:1.1]
+
+#FileLog "1":keycard_inserted:1:
+#FileLog "0":keycard_removed:0:
+
+plot\
+  "< awk '/keycard_inserted/ {print $1, 1;}' <IN>" using 1:2 notitle with points,\
+  "< awk '/keycard_removed/ {print $1, 0;}' <IN>" using 1:2 notitle with points
