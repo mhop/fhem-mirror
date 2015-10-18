@@ -14,8 +14,8 @@ set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ylabel "Keycard"
 set title '<TL>'
-set ytics ("inserted" 1, "removed" 0)
-set y2tics ("inserted" 1, "removed" 0)
+set ytics ("in" 1, "out" 0)
+set y2tics ("in" 1, "out" 0)
 set yrange [-0.1:1.1]
 set y2range [-0.1:1.1]
 
