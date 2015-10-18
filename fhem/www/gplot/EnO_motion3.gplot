@@ -13,16 +13,15 @@ set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ylabel "Motion"
-#set y2label "Motion"
 set title '<TL>'
 set ytics ("on" 1, "off" 0.0)
 set y2tics ("on" 1, "off" 0.0)
 set yrange [-0.1:1.1]
 set y2range [-0.1:1.1]
 
-#FileLog "1.0":on:1.0:
-#FileLog "0.0":off:0.0:
+#FileLog "1.0":motion..on:1.0:
+#FileLog "0.0":motion..off:0.0:
 
 plot\
-  "< awk '/on/ {print $1, 1.0; }' <IN>" using 1:2 notitle with points,\
-  "< awk '/off/{print $1, 0.0; }' <IN>" using 1:2 notitle with points
+  "< awk '/motion:.on/ {print $1, 1.0; }' <IN>" using 1:2 notitle with points,\
+  "< awk '/motion:.off/{print $1, 0.0; }' <IN>" using 1:2 notitle with points
