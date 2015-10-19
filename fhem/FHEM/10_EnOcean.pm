@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2015-10-18
+# 2015-10-19
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -198,8 +198,8 @@ my %EnO_eepConfig = (
   "A5.06.01" => {attr => {subType => "lightSensor.01"}, GPLOT => "EnO_brightness4:Brightness,"},
   "A5.06.02" => {attr => {subType => "lightSensor.02"}, GPLOT => "EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
   "A5.06.03" => {attr => {subType => "lightSensor.03"}, GPLOT => "EnO_brightness4:Brightness,"},
-  "A5.07.01" => {attr => {subType => "occupSensor.01"}, GPLOT => "EnO_motion3:Motion,EnO_voltage4current4:Voltage/Current,"},
-  "A5.07.02" => {attr => {subType => "occupSensor.02"}, GPLOT => "EnO_motion3:Motion,EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
+  "A5.07.01" => {attr => {subType => "occupSensor.01"}, GPLOT => "EnO_motion:Motion,EnO_voltage4current4:Voltage/Current,"},
+  "A5.07.02" => {attr => {subType => "occupSensor.02"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
   "A5.07.03" => {attr => {subType => "occupSensor.03"}},
   "A5.08.01" => {attr => {subType => "lightTempOccupSensor.01"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
   "A5.08.02" => {attr => {subType => "lightTempOccupSensor.02"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
@@ -286,14 +286,14 @@ my %EnO_eepConfig = (
   "A5.3F.7F" => {attr => {subType => "manufProfile"}},
   "D2.01.00" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.01" => {attr => {subType => "actuator.01", defaultChannel => 0}},
-  "D2.01.02" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}},
-  "D2.01.03" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}},
-  "D2.01.04" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}},
-  "D2.01.05" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}},
+  "D2.01.02" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
+  "D2.01.03" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
+  "D2.01.04" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
+  "D2.01.05" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "D2.01.06" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.07" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.08" => {attr => {subType => "actuator.01", defaultChannel => 0}},
-  "D2.01.09" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}},
+  "D2.01.09" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "D2.01.0A" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.0B" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.10" => {attr => {subType => "actuator.01", defaultChannel => 0}},
@@ -329,7 +329,7 @@ my %EnO_eepConfig = (
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
-  "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion3:Motion,EnO_brightness4:Brightness,"},
+  "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
   "L6.02.01" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
   "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}},
 );
@@ -763,7 +763,7 @@ sub EnOcean_Get($@)
   if ($eep =~ m/^([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})-([A-Fa-f0-9]{2})$/i) {
     $eep = (((hex($1) << 6) | hex($2)) << 7) | hex($3);
   } else {
-    $eep = 0;
+    $eep = (((hex("A5") << 6) | hex("3F")) << 7) | hex("7F");
   }
   my $manufID = uc(AttrVal($name, "manufID", ""));
   my $model = AttrVal($name, "model", "");
@@ -9498,7 +9498,7 @@ sub EnOcean_CreateSVG($$$)
             last;
           }
           $attr{$weblinkName}{room} = $autocreateWeblinkRoom;
-          $attr{$weblinkName}{label} = '"' . $name . ' Min $data{min1}, Max $data{max1}, Last $data{currval1}"';
+          $attr{$weblinkName}{title} = '"' . $name . ' Min $data{min1}, Max $data{max1}, Last $data{currval1}"';
           $ret = CommandSet(undef, "$weblinkName copyGplotFile");
           if($ret) {
             Log3 $weblinkName, 2, "EnOcean ERROR: set $weblinkName copyGplotFile: $ret";
@@ -14183,7 +14183,7 @@ EnOcean_Delete($$)
         <li>devTemp: t/&#176C|invalid</li>
         <li>devTempState: ok|max|warning</li>
         <li>dim&lt;0...29|Input&gt;: dim/% (Sensor Range: dim = 0 % ... 100 %)</li>
-        <li>energy&lt;channel&gt;: 1/[Ws|Wh|KWh]</li>
+        <li>energy&lt;channel&gt;: E/[Ws|Wh|KWh]</li>
         <li>energyUnit&lt;channel&gt;: Ws|Wh|KWh</li>
         <li>error&lt;channel&gt;: ok|warning|failure|not_supported</li>
         <li>loadClassification: no</li>
@@ -14194,12 +14194,12 @@ EnOcean_Delete($$)
         <li>measurementMode: energy|power</li>
         <li>measurementReport: auto|query</li>
         <li>measurementReset: not_active|trigger</li>
-        <li>measurementDelta: 1/[Ws|Wh|KWh|W|KW]</li>
+        <li>measurementDelta: E/[Ws|Wh|KWh|W|KW]</li>
         <li>measurementUnit: Ws|Wh|KWh|W|KW</li>
         <li>overCurrentOff&lt;channel&gt;: executed|ready</li>
         <li>overCurrentShutdown&lt;channel&gt;: off|restart</li>
         <li>overCurrentShutdownReset&lt;channel&gt;: not_active|trigger</li>
-        <li>power&lt;channel&gt;: 1/[W|KW]</li>
+        <li>power&lt;channel&gt;: P/[W|KW]</li>
         <li>powerFailure&lt;channel&gt;: enabled|disabled</li>
         <li>powerFailureDetection&lt;channel&gt;: detected|not_detected</li>
         <li>powerUnit&lt;channel&gt;: W|KW</li>
