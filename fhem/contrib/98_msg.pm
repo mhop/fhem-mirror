@@ -69,11 +69,12 @@ sub CommandMsg($$;$$) {
     } else {
       fhem "define msgConfig msgConfig";
       $globalDevName = "msgConfig";
-      $return .= "Global configuration device msgConfig was created.";
+      $return .= "Global configuration device msgConfig was created.\n\n";
     }
 
     if ( $msg eq "" || $msg =~ /^\?[\s\t]*$/ || $msg eq "help" ) {
         return
+$return .
 "Usage: msg [<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>";
     }
 
@@ -1826,10 +1827,16 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                 Log3 $logDevice, 3,
 "msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
-                                  if ( $priorityCat ne "" );
+                                  if ( $priorityCat ne "" && $subRecipient ne "");
                                 Log3 $logDevice, 3,
 "msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
-                                  if ( $priorityCat eq "" );
+                                  if ( $priorityCat eq "" && $subRecipient ne "");
+                                  Log3 $logDevice, 3,
+  "msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
+                                    if ( $priorityCat ne "" && $subRecipient eq "");
+                                  Log3 $logDevice, 3,
+  "msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
+                                    if ( $priorityCat eq "" && $subRecipient eq "");
 
                                   $messageSent                 = 1 if ($error == 0);
                                   $messageSentDev              = 1 if ($error == 0);
@@ -1839,12 +1846,16 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 || $routeStatus eq "UNDEFINED" )
                             {
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'";
+"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient ne "");
+                                Log3 $logDevice, 3,
+"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient eq "");
                                 $gatewaysStatus{$gatewayDev} = $routeStatus;
                             }
                             else {
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'";
+"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient ne "");
+                                Log3 $logDevice, 3,
+"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient eq "");
                                 $messageSent    = 2 if ( $messageSent != 1 );
                                 $messageSentDev = 2 if ( $messageSentDev != 1 );
                                 $gatewaysStatus{$gatewayDev} = $routeStatus;
