@@ -19,6 +19,7 @@
 # 07.10.2015 : A.Goebel : beautify and complete commandref
 # 12.10.2015 : A.Goebel : fix handling of timeouts in BlockingCall Interface (additional parameter in doEbusCmd forces restart (no shutdown restart))
 #                         timeout for reads increased
+# 19.10.2015 : A.Goebel : add attribute disable to disable loop to collect readings
 
 
 package main;
@@ -64,7 +65,7 @@ my $allSetParamsForWriting = "";
 my $allGetParams           = "";
 my $delimiter              = "~";
 
-my $attrsDefault = "do_not_notify:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading ebusWritesEnabled:0,1";
+my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading ebusWritesEnabled:0,1";
 my %ebusCmd  = ();
 
 sub
@@ -924,7 +925,16 @@ GAEBUS_GetUpdates($)
 
   my $name = $hash->{NAME};
 
-  Log3 $hash, 4, "$hash->{NAME} start GetUpdates2";
+  if (defined($attr{$name}{disable}) and ($attr{$name}{disable} == 1)) {
+    Log3 $hash, 4, "$name GetUpdates2 is disabled";
+ 
+    InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
+    return;
+ 
+  } else {
+    Log3 $hash, 4, "$name start GetUpdates2";
+ 
+  }
 
   $hash->{UpdateCnt} = $hash->{UpdateCnt} + 1;
 
@@ -1124,6 +1134,7 @@ GAEBUS_GetUpdatesAborted($)
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#attrdummy">disable</a></li><br>
     <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
