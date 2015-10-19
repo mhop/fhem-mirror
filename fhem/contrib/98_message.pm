@@ -37,39 +37,39 @@ use strict;
 use warnings;
 use Time::HiRes qw(time);
 use Data::Dumper;
-use msgSchema;
+use messageSchema;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
-sub CommandMsg($$;$$);
+sub CommandMessage($$;$$);
 
 ########################################
-sub msg_Initialize($$) {
+sub message_Initialize($$) {
     my %hash = (
-        Fn => "CommandMsg",
+        Fn => "CommandMessage",
         Hlp =>
 "[<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>",
     );
-    $cmds{msg} = \%hash;
+    $cmds{message} = \%hash;
 }
 
 ########################################
-sub CommandMsg($$;$$) {
+sub CommandMessage($$;$$) {
     my ( $cl, $msg, $testMode ) = @_;
     my $return = "";
 
-    # find existing msgConfig device or create a new instance
+    # find existing messageConfig device or create a new instance
     my $globalDevName = "";
-    if (defined ($defs{"msgConfig"})) {
-      if ($defs{"msgConfig"}{TYPE} eq "msgConfig") {
-        $globalDevName = "msgConfig";
+    if (defined ($defs{"messageConfig"})) {
+      if ($defs{"messageConfig"}{TYPE} eq "messageConfig") {
+        $globalDevName = "messageConfig";
       } else {
-        return "Device msgConfig has incorrect type - aborting...";
+        return "Device messageConfig has incorrect type - aborting...";
       }
     } else {
-      fhem "define msgConfig msgConfig";
-      $globalDevName = "msgConfig";
-      $return .= "Global configuration device msgConfig was created.\n\n";
+      fhem "define messageConfig messageConfig";
+      $globalDevName = "messageConfig";
+      $return .= "Global configuration device messageConfig was created.\n\n";
     }
 
     if ( $msg eq "" || $msg =~ /^\?[\s\t]*$/ || $msg eq "help" ) {
@@ -79,7 +79,7 @@ $return .
     }
 
     # default settings
-    my $cmdSchema = msgSchema::get();
+    my $cmdSchema = messageSchema::get();
     my $settings = {
       'audio' => {
           'typeEscalation' => {
@@ -745,7 +745,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         $routes{screen} = 1
                           if (
                             $deviceType eq "device"
-                            && CommandMsg( "screen",
+                            && CommandMessage( "screen",
                                 "screen \@$device $priority Routing Test", 1 )
                             eq "ROUTE_AVAILABLE"
                           );
@@ -753,7 +753,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         $routes{light} = 1
                           if (
                             $deviceType eq "device"
-                            && CommandMsg( "light",
+                            && CommandMessage( "light",
                                 "light \@$device $priority Routing Test", 1 )
                             eq "ROUTE_AVAILABLE"
                           );
@@ -761,14 +761,14 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         $routes{audio} = 1
                           if (
                             $deviceType eq "device"
-                            && CommandMsg( "audio",
+                            && CommandMessage( "audio",
                                 "audio \@$device $priority Routing Test", 1 )
                             eq "ROUTE_AVAILABLE"
                           );
 
                         if (
                             $deviceType eq "device"
-                            && CommandMsg( "push",
+                            && CommandMessage( "push",
                                 "push \@$device $priority Routing Test", 1 ) eq
                             "ROUTE_AVAILABLE"
                           )
@@ -778,7 +778,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         }
 
                         if (
-                            CommandMsg( "mail",
+                            CommandMessage( "mail",
                                 "mail \@$device $priority Routing Test", 1 ) eq
                             "ROUTE_AVAILABLE"
                           )

@@ -1,7 +1,7 @@
 # $Id$
 ##############################################################################
 #
-#     msgSchema.pm
+#     messageSchema.pm
 #     Schema database for FHEM modules and their messaging options.
 #     These commands are being used as default setting for FHEM command 'msg'
 #     unless there is an explicit msgCmd* attribute.
@@ -28,7 +28,7 @@
 #
 ##############################################################################
 
-package msgSchema;
+package messageSchema;
 
 use strict;
 use warnings;
