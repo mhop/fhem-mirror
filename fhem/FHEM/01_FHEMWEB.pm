@@ -1002,7 +1002,7 @@ FW_makeTable($$$@)
       } else {
         $val = FW_htmlEscape($val);
 
-        # if possible provide som links
+        # if possible provide some links
         if ($n eq "room"){
           FW_pO "<td><div class=\"dval\">".
                 join(",", map { FW_pH("room=$_",$_,0,"",1,1) } split(",",$val)).
@@ -1021,6 +1021,7 @@ FW_makeTable($$$@)
           FW_pH "cmd=list%20TYPE=$val", $val,1;
 
         } else {
+           $val = "<pre>$val</pre>" if($val =~ m/\n/ && $title eq "Attributes");
            FW_pO "<td><div class=\"dval\">".
                    join(",", map { ($_ ne $name && $defs{$_}) ?
                      FW_pH( "detail=$_", $_ ,0,"",1,1) : $_ } split(",",$val)).
