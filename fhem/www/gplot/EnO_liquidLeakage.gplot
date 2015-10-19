@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# Display a keycard log
+# Display a liquid leakage sensor log
 # FileLog definition: 
 # define FileLog_device FileLog ./log/device-%Y.log device
 #
@@ -9,19 +9,18 @@
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
+set title '<TL>'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ylabel "Liquid Leakage Sensor"
-set title '<TL>'
+set y2label ""
 set ytics ("wet" 1, "dry" 0)
 set y2tics ("wet" 1, "dry" 0)
 set yrange [-0.1:1.1]
 set y2range [-0.1:1.1]
+set grid
 
-#FileLog "1":wet:1:
-#FileLog "0":dry:0:
+#FileLog 3:.*:0:$fld[2]=~"wet"?1:0
 
-plot\
-  "< awk '/wet/ {print $1, 1;}' <IN>" using 1:2 notitle with points,\
-  "< awk '/dry/ {print $1, 0;}' <IN>" using 1:2 notitle with points
+plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with steps
