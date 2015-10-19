@@ -22,6 +22,7 @@ use vars qw(%FW_pos);     # scroll position
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 sub FileLog_seekTo($$$$$);
+sub FileLog_dailySwitch($);
 
 #####################################
 sub
@@ -49,8 +50,21 @@ FileLog_Initialize($)
   
   InternalTimer(time()+0.1, sub() {      # Forum #39792
     map { HandleArchiving($defs{$_},1) } devspec2array("TYPE=FileLog");
+    FileLog_dailySwitch($hash);          # Forum #42415
   }, $hash, 0);
 }
+
+sub
+FileLog_dailySwitch($)
+{
+  my ($hash) = @_;
+  map { FileLog_Switch($defs{$_}) } devspec2array("TYPE=FileLog");
+
+  my $t = time();
+  $t = 86400*(int($t/86400)+1)+1-fhemTzOffset($t); # tomorrow, 1s after midnight
+  InternalTimer($t, "FileLog_dailySwitch", $hash, 0);
+}
+
 
 
 #####################################
