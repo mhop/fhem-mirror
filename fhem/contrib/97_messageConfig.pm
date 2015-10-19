@@ -1,7 +1,7 @@
 # $Id$
 ##############################################################################
 #
-#     97_msgConfig.pm
+#     97_messageConfig.pm
 #     Global configuration settings for FHEM msg command.
 #
 #     Copyright by Julian Pawlowski
@@ -36,16 +36,16 @@ package main;
 use strict;
 use warnings;
 
-sub msgConfig_Set($@);
-sub msgConfig_Define($$);
-sub msgConfig_Undefine($$);
+sub messageConfig_Set($@);
+sub messageConfig_Define($$);
+sub messageConfig_Undefine($$);
 
 ###################################
-sub msgConfig_Initialize($) {
+sub messageConfig_Initialize($) {
     my ($hash) = @_;
 
-    $hash->{DefFn}    = "msgConfig_Define";
-    $hash->{UndefFn}  = "msgConfig_Undefine";
+    $hash->{DefFn}    = "messageConfig_Define";
+    $hash->{UndefFn}  = "messageConfig_Undefine";
 
     # add attributes for configuration
     no warnings 'qw';
@@ -127,13 +127,13 @@ sub msgConfig_Initialize($) {
 }
 
 ###################################
-sub msgConfig_Define($$) {
+sub messageConfig_Define($$) {
 
     my ( $hash, $def ) = @_;
 
     my @a = split( "[ \t]+", $def, 5 );
 
-    return "Usage: define <name> msgConfig"
+    return "Usage: define <name> messageConfig"
       if ( int(@a) < 2 );
     my $name  = $a[0];
 
@@ -158,7 +158,7 @@ sub msgConfig_Define($$) {
 }
 
 ###################################
-sub msgConfig_Undefine($$) {
+sub messageConfig_Undefine($$) {
 
     my ( $hash, $name ) = @_;
 
@@ -172,19 +172,19 @@ sub msgConfig_Undefine($$) {
 =begin html
 
     <p>
-      <a name="msgConfig" id="msgConfig"></a>
+      <a name="messageConfig" id="messageConfig"></a>
     </p>
     <h3>
-      msgConfig
+      messageConfig
     </h3>
     <ul>
       <li>Provides global settings to configure FHEM command 'msg'.<br>
         <br>
       </li>
       <li>
-        <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
+        <a name="messageConfigdefine" id="messageConfigdefine"></a> <b>Define</b>
         <div style="margin-left: 2em">
-          <code>define &lt;name&gt; msgConfig</code><br>
+          <code>define &lt;name&gt; messageConfig</code><br>
           <br>
           Defines the global msg control device instance. Pleae note there can only be one unique definition of this device type.
         </div>
@@ -196,16 +196,16 @@ sub msgConfig_Undefine($$) {
 =begin html_DE
 
     <p>
-      <a name="msgConfig" id="msgConfig"></a>
+      <a name="messageConfig" id="messageConfig"></a>
     </p>
     <h3>
-      msgConfig
+      messageConfig
     </h3>
     <div style="margin-left: 2em">
       Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
     </div>
     <div style="margin-left: 2em">
-      <a href='http://fhem.de/commandref.html#msgConfig'>msgConfig</a>
+      <a href='http://fhem.de/commandref.html#messageConfig'>messageConfig</a>
     </div>
 
 =end html_DE
