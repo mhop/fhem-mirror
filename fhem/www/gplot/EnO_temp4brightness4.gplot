@@ -19,12 +19,10 @@ set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
-#set ytics nomirror
 set ytics
 #set y2tics
-set title '<L1>'
+set title '<TL>'
 set grid xtics ytics
-
 set ylabel "t/C"
 set y2label "E/lx"
 
@@ -32,5 +30,5 @@ set y2label "E/lx"
 #FileLog 4:brightness:0:
 
 plot \
-  "< awk '/temperature:/ {print $1, $4}' <IN>" using 1:2 ls l0 axes x1y1 title 'Temperature' with lines,\
-  "< awk '/brightness:/ {print $1, $4}' <IN>" using 1:2 ls l2fill axes x1y2 title 'Brightness' with lines
+  "<IN>" using 1:2 ls l0 axes x1y1 title 'Temperature' with lines,\
+  "<IN>" using 1:2 ls l2fill axes x1y2 title 'Brightness' with lines
