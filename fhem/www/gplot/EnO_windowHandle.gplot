@@ -19,11 +19,6 @@ set y2tics ("open" 1, "tilted" 0.5, "closed" 0)
 set yrange [-0.1:1.1]
 set y2range [-0.1:1.1]
 
-#FileLog "1":open|open_from_tilted:1:
-#FileLog "0.5":tilted:0.5:
-#FileLog "0":closed:0:
+#FileLog 3:.*:0:$fld[2]=~m/open|open_from_tilted/?1:($fld[2]=~m/tilted/?0.5:0)
 
-plot\
-  "< awk '/open|open_from_tilted/ {print $1, 1;}' <IN>" using 1:2 notitle with points,\
-  "< awk '/tilted/ {print $1, 0.5;}' <IN>" using 1:2 notitle with points,\
-  "< awk '/closed/ {print $1, 0;}' <IN>" using 1:2 notitle with points
+plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with steps
