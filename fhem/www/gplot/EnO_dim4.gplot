@@ -13,22 +13,17 @@
 #set terminal png transparent small size <SIZE> crop
 
 set terminal png transparent size <SIZE> crop
-
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ytics
-set title '<L1>'
+set title '<TL>'
 set grid xtics ytics
-
 set ylabel "dim/%"
-
 set yrange [0:100]
 set y2range [0:100]
 
 #FileLog 4:dim:0:
 
-plot \
-  "< egrep 'dim:' <IN>"\
-     using 1:4 axes x1y1 title 'Dimming' with points
+plot "<IN>" using 1:2 axes x1y1 title 'Dimming' with steps
