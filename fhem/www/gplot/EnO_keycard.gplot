@@ -9,19 +9,19 @@
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
+set title '<TL>'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ylabel "Keycard"
-set title '<TL>'
+set y2label ""
 set ytics ("in" 1, "out" 0)
 set y2tics ("in" 1, "out" 0)
 set yrange [-0.1:1.1]
 set y2range [-0.1:1.1]
+set grid
 
-#FileLog "1":keycard_inserted:1:
-#FileLog "0":keycard_removed:0:
+#FileLog 3:.*:0:$fld[2]=~"keycard_inserted"?1:0
 
-plot\
-  "< awk '/keycard_inserted/ {print $1, 1;}' <IN>" using 1:2 notitle with points,\
-  "< awk '/keycard_removed/ {print $1, 0;}' <IN>" using 1:2 notitle with points
+plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with steps
+
