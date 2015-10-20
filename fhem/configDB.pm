@@ -898,10 +898,11 @@ sub _cfgDB_Search($$;$) {
 	$sql  = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ";
 	$sql .= "WHERE v.version = '$searchversion' AND command not like '#create%' ";
 # 2015-10-14 - changed, forum #42190
-	$sql .= "AND device like '$search%' ESCAPE '\\' " if($dsearch);
-	$sql .= "AND (device like '$search%' ESCAPE '\\' OR P1 like '$search%' ESCAPE '\\' OR P2 like '$search%' ESCAPE '\\') " if(!$dsearch);
-#	$sql .= "AND device like '$search%' " if($dsearch);
-#	$sql .= "AND (device like '$search%' OR P1 like '$search%' OR P2 like '$search%') " if(!$dsearch);
+#	$sql .= "AND device like '$search%' ESCAPE '\\' " if($dsearch);
+#	$sql .= "AND (device like '$search%' ESCAPE '\\' OR P1 like '$search%' ESCAPE '\\' OR P2 like '$search%' ESCAPE '\\') " if(!$dsearch);
+# 2015-10-20 - reverted due to mysql failure
+	$sql .= "AND device like '$search%' " if($dsearch);
+	$sql .= "AND (device like '$search%' OR P1 like '$search%' OR P2 like '$search%') " if(!$dsearch);
 	$sql .= "ORDER BY lower(device),command DESC";
 	$sth = $fhem_dbh->prepare( $sql);
 	$sth->execute();
