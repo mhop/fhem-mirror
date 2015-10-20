@@ -1,0 +1,27 @@
+##############################################
+# $Id$
+# Display a valve log
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device open|opens|closed|closes
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set title '<TL>'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "Valve"
+set y2label ""
+set ytics ("open" 1, "closed" 0)
+set y2tics ("open" 1, "closed" 0)
+set yrange [-0.1:1.1]
+set y2range [-0.1:1.1]
+set grid
+
+#FileLog 3:.*:0:$fld[2]=~m/open|opens/?1:0
+
+plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with steps
+
