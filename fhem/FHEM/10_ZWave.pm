@@ -1460,6 +1460,7 @@ ZWave_configParseModel($)
       my $value = $1 if($line =~ m/value="([^"]*)"/i);
       my ($item, $shortened) = ZWave_cleanString($label, $value);
       $hash{$cmdName}{Item}{$item} = $value;
+      $hash{$cmdName}{type} = "list";   # Forum #42604
       $hash{$cmdName}{Help} .= "Full text for $item is $label<br>"
         if($shortened);
     }
