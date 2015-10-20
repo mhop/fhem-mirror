@@ -721,7 +721,8 @@ ZWave_Cmd($$@)
     if (ZWave_isSecureClass($hash, $cc_cmd)) {
       my $interceptedMSG = $cc_cmd . $payload;
       # message stored in reading, will be processed when nonce arrives
-      ZWave_putSecMsg($hash, $interceptedMSG);
+      my $cmd2 = "$type $name $cmd ".join(" ", @a);
+      ZWave_putSecMsg($hash, $interceptedMSG, $cmd2);
       return ZWave_Get($hash, $name, "secNonce");
     }
   }
@@ -752,7 +753,7 @@ ZWave_Cmd($$@)
   }
 
   readingsSingleUpdate($hash, "state", $cmd, 1)
-        if($type eq "set" && !$zwave_noStateSetCmds{$cmd});
+        if($type eq "set" && !$zwave_noStateSetCmds{( split / /, $cmd, 2 )[0]});
   return $val;
 }
 
@@ -1950,7 +1951,11 @@ ZWave_secNonceReceived($$)
   }
 
   # if nonce is received, we should have stored a message for encryption
-  my $secMsg = ZWave_getSecMsg($hash);
+  my $getSecMsg = ZWave_getSecMsg($hash);
+  my $secMsg = ( split / /, $getSecMsg, 4 )[0];
+  my $type = ( split / /, $getSecMsg, 4 )[1];
+  my $state = ( split / /, $getSecMsg, 4 )[3];
+
   if (!$secMsg) {
     Log3 $name, 1, "$name: Error, nonce reveived but no stored command for ".
       "encryption found";
@@ -1959,40 +1964,27 @@ ZWave_secNonceReceived($$)
 
   my $enc = ZWave_secEncrypt($hash, $r_nonce_hex, $secMsg);
   ZWave_Set($hash, $name, ("secEncap", $enc));
+  if ($type eq "set" && $state) {
+    readingsSingleUpdate($hash, "state", $state, 1);
+    Log3 $name, 5, "$name: type=$type, state=$state ($getSecMsg)";
+  }
 
   return undef;
 }
 
 
 sub
-ZWave_putSecMsg_old ($$)
+ZWave_putSecMsg ($$$)
 {
-  my ($hash, $s) = @_;
-  my $name = $hash->{NAME};
-  my $secMsg = ReadingsVal($name, "secMsg", undef);
-  if ($secMsg) {
-    my @secMsg = split (' ', $secMsg);
-    push(@secMsg, $s);
-    $secMsg = join(" ",@secMsg);
-  } else {
-    $secMsg = $s;
-  }
-  setReadingsVal($hash, "secMsg", $secMsg, TimeNow());
-  Log3 $name, 3, "$name SECURITY: $s stored for encryption";
-}
-
-sub
-ZWave_putSecMsg ($$)
-{
-  my ($hash, $s) = @_;
+  my ($hash, $s, $cmd) = @_;
   my $name = $hash->{NAME};
 
   if (!$hash->{secMsg}) {
     my @arr = ();
     $hash->{secMsg} = \@arr;
   }
-  push @{$hash->{secMsg}}, $s;
-  Log3 $name, 3, "$name SECURITY: $s stored for encryption";
+  push @{$hash->{secMsg}}, $s . " ". $cmd;
+  Log3 $name, 5, "$name SECURITY: $s stored for encryption";
 }
 
 sub
@@ -2005,7 +1997,7 @@ ZWave_getSecMsg ($)
   if ($secMsg && @{$secMsg}) {
     my $ret = shift(@{$secMsg});
     if ($ret) {
-      Log3 $name, 3, "$name SECURITY: $ret retrieved for encryption";
+      Log3 $name, 5, "$name SECURITY: $ret retrieved for encryption";
       return $ret;
     }
   }
@@ -2078,7 +2070,7 @@ ZWave_secNetWorkKeyVerify ($)
 
   #Log3 $iodev, 4, "$name: NetworkKeyVerify received, SECURITY is enabled";
   readingsSingleUpdate($hash, "SECURITY", 'ENABLED', 0);
-  Log3 $name, 2, "$name: SECURITY enabled, networkkey was verified";
+  Log3 $name, 3, "$name: SECURITY enabled, networkkey was verified";
   ZWave_Get($hash, $name, ("secSupported"));
 }
 
