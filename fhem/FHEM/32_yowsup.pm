@@ -208,9 +208,9 @@ yowsup_Disconnect($)
     delete $hash->{PID};
   }
 
-  close($hash->{CD}) if($hash->{CD});
+  close($hash->{FH}) if($hash->{FH});
+  delete($hash->{FH});
   delete($hash->{FD});
-  delete($hash->{CD});
   delete($selectlist{$name});
 
   $hash->{STATE} = "Disconnected";
