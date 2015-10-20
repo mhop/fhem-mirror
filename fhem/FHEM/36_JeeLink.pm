@@ -6,6 +6,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use Time::Local;
 
 sub JeeLink_Attr(@);
 sub JeeLink_Clear($);
