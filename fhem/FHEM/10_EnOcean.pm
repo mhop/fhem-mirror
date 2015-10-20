@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2015-10-19
+# 2015-10-20
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -195,12 +195,12 @@ my %EnO_eepConfig = (
   "A5.04.02" => {attr => {subType => "tempHumiSensor.02"}, GPLOT => "EnO_temp4humi6:Temp/Humi,EnO_voltage4:Voltage,"},
   "A5.04.03" => {attr => {subType => "tempHumiSensor.03"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "A5.05.01" => {attr => {subType => "baroSensor.01"}, GPLOT => "EnO_airPressure4:Airpressure,"},
-  "A5.06.01" => {attr => {subType => "lightSensor.01"}, GPLOT => "EnO_brightness4:Brightness,"},
+  "A5.06.01" => {attr => {subType => "lightSensor.01"}, GPLOT => "EnO_brightness4:Brightness,,EnO_voltage4:Voltage,"},
   "A5.06.02" => {attr => {subType => "lightSensor.02"}, GPLOT => "EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
   "A5.06.03" => {attr => {subType => "lightSensor.03"}, GPLOT => "EnO_brightness4:Brightness,"},
   "A5.07.01" => {attr => {subType => "occupSensor.01"}, GPLOT => "EnO_motion:Motion,EnO_voltage4current4:Voltage/Current,"},
-  "A5.07.02" => {attr => {subType => "occupSensor.02"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
-  "A5.07.03" => {attr => {subType => "occupSensor.03"}},
+  "A5.07.02" => {attr => {subType => "occupSensor.02"}, GPLOT => "EnO_motion:Motion4brightness4:Motion/Brightness,EnO_voltage4:Voltage,"},
+  "A5.07.03" => {attr => {subType => "occupSensor.03"}, GPLOT => "EnO_motion:Motion4brightness4:Motion/Brightness,EnO_voltage4:Voltage,"},
   "A5.08.01" => {attr => {subType => "lightTempOccupSensor.01"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
   "A5.08.02" => {attr => {subType => "lightTempOccupSensor.02"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
   "A5.08.03" => {attr => {subType => "lightTempOccupSensor.03"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
@@ -299,7 +299,7 @@ my %EnO_eepConfig = (
   "D2.01.10" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.11" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.03.00" => {attr => {subType => "switch.00"}},
-  "D2.03.10" => {attr => {subType => "windowHandle.10"}},
+  "D2.03.10" => {attr => {subType => "windowHandle.10"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
   "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}},
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
@@ -308,9 +308,9 @@ my %EnO_eepConfig = (
   "D2.32.00" => {attr => {subType => "currentClamp.00"}},
   "D2.32.01" => {attr => {subType => "currentClamp.01"}},
   "D2.32.02" => {attr => {subType => "currentClamp.02"}},
-  "D2.40.00" => {attr => {subType => "ledCtrlState.00"}},
-  "D2.40.01" => {attr => {subType => "ledCtrlState.01"}},
-  "D2.A0.01" => {attr => {subType => "valveCtrl.00", defaultChannel => 0, webCmd => "opens:closes"}},
+  "D2.40.00" => {attr => {subType => "ledCtrlState.00"}, GPLOT => "EnO_dim4:Dim,"},
+  "D2.40.01" => {attr => {subType => "ledCtrlState.01"}, GPLOT => "EnO_dim4RGB:DimRGB,"},
+  "D2.A0.01" => {attr => {subType => "valveCtrl.00", defaultChannel => 0, webCmd => "opens:closes"}, GPLOT => "EnO_valveCtrl:Valve,"},
   "D5.00.01" => {attr => {subType => "contact", manufID => "7FF"}, GPLOT => "EnO_contact:Contact,"},
   "F6.02.01" => {attr => {subType => "switch"}},
   "F6.02.02" => {attr => {subType => "switch"}},
@@ -524,7 +524,6 @@ EnOcean_Define($$)
      ('./log/' . $name . '-%Y.log', undef, 'autocreate', 'EnOcean', 'Plots');
   my ($cmd, $eep, $ret);
   my $filelogName = "FileLog_$name";
-  Log3 $name, 2, "EnOcean define $def";
   $def = "00000000";
   if(@a > 2 && @a < 5) {
     # find autocreate device
@@ -536,6 +535,7 @@ EnOcean_Define($$)
     $autocreateDeviceRoom = $name if ($autocreateDeviceRoom eq '%NAME');
     $autocreateDeviceRoom = $attr{$name}{room} if (exists $attr{$name}{room});
     if ($init_done) {
+      Log3 $name, 2, "EnOcean define " . join(' ', @a);    
       if (!defined(AttrVal($autocreateName, "disable", undef)) && !exists($defs{$filelogName})) {
         # create FileLog
         $autocreateFilelog = $attr{$autocreateName}{filelog} if (exists $attr{$autocreateName}{filelog});
