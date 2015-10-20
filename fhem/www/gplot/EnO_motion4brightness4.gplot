@@ -1,0 +1,35 @@
+##############################################
+# $Id$
+#
+# Display the measured temp and the humidity.
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device motion: on|off
+# 2015-10-17_08:38:08 device brightness: 100
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent truecolor rounded medium size <SIZE> enhanced
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+#set y2tics
+set title '<TL>'
+set grid xtics ytics
+set ytics ("on" 1, "off" 0.0)
+set y2label "E/lx"
+set yrange [-0.1:1.1]
+
+#FileLog 4:motion:0:$fld[3]=~"on"?1:0
+#FileLog 4:brightness:0:
+
+plot \
+  "<IN>" using 1:2 ls l0 axes x1y1 title 'Motion' with steps,\
+  "<IN>" using 1:2 ls l2fill axes x1y2 title 'Brightness' with lines
