@@ -109,24 +109,32 @@ TechemHKV_Receive(@) {
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "temp1", $msg->{temp1});
   readingsBulkUpdate($hash, "temp2", $msg->{temp2});
+  readingsEndUpdate($hash, 1);
 
   # day period changed
   $ats = ReadingsTimestamp($hash->{NAME},"current_period", "0");
-  $ts = "".($t[5]+1900)."-".$msg->{actual}->{month}."-".$msg->{actual}->{day}." 00:00:00";
+  $ts = "20".($msg->{last}->{year} + $msg->{actual}->{year})."-".$msg->{actual}->{month}."-".$msg->{actual}->{day}." 00:00:00";
   if ($ats ne $ts) {
+    readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
     readingsBulkUpdate($hash, "current_period", $msg->{actualVal});
+    $hash->{CHANGETIME}[0] = $ts;
+    readingsEndUpdate($hash, 1);
+    delete $hash->{CHANGETIME};
   }
 
   # billing period changed
   $ats = ReadingsTimestamp($hash->{NAME},"previous_period", "0");
   $ts = "20".$msg->{last}->{year}."-".$msg->{last}->{month}."-".$msg->{last}->{day}." 00:00:00";
   if ($ats ne $ts) {
+    readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
     readingsBulkUpdate($hash, "previous_period", $msg->{lastVal});
+    $hash->{CHANGETIME}[0] = $ts;
+    readingsEndUpdate($hash, 1);
+    delete $hash->{CHANGETIME};
   }
 
-  readingsEndUpdate($hash, 1);
   return undef;
 }
 
@@ -168,7 +176,7 @@ TechemHKV_Parse(@) {
   $message->{actualVal} = TechemHKV_ParseActualPeriod(@m);
   $message->{temp1} = TechemHKV_ParseT1(@m);
   $message->{temp2} = TechemHKV_ParseT2(@m);
-  ($message->{actual}->{month}, $message->{actual}->{day}) = TechemHKV_ParseActualDate(@m);
+  ($message->{actual}->{year}, $message->{actual}->{month}, $message->{actual}->{day}) = TechemHKV_ParseActualDate(@m);
   ($message->{last}->{year}, $message->{last}->{month}, $message->{last}->{day}) = TechemHKV_ParseLastDate(@m);
 
   # dispatch
@@ -179,7 +187,7 @@ TechemHKV_Parse(@) {
   }
   # broadcast
 
-  return ($iohash->{NAME});
+  return (undef);
 }
 
 sub
@@ -218,7 +226,8 @@ TechemHKV_ParseActualDate(@) {
   my $b = hex("$m[19]$m[18]");
   my $d = ($b >> 4) & 0x1F;
   my $m = ($b >> 9) & 0x0F;
-  return ($m, $d);
+  my $y = ($b >> 13) & 0x07;
+  return ($y, $m, $d);
 }
 
 sub
