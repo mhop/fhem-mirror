@@ -164,7 +164,7 @@ sub CUL_HM_Initialize($) {
                        ."levelRange levelMap ";
   $hash->{Attr}{glb} =  "do_not_notify:1,0 showtime:1,0 "
                        ."rawToReadable unit "#"KFM-Sensor" only
-                       ."expert:0_off,1_on,4_none,8_templ_default,12_template "
+                       ."expert:0_off,1_on,2_raw,3_all,4_none,8_templ+default,12_templOnly,255_anything "
                        ."param "
                        ."actAutoTry:0_off,1_on "
                        ."aesCommReq:1,0 "      # IO will request AES if 
@@ -1584,19 +1584,20 @@ sub CUL_HM_Parse($$) {#########################################################
       my %errTbl=( 0=>"ok", 1=>"ValveTight", 2=>"adjustRangeTooLarge"
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
                   ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
-
+      if ($mh{mTyp} eq "100A"){
+        push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"  ];
+        push @evtEt,[$mh{shash},1,"controlMode:$ctlTbl{$ctrlMode}"];
+        push @evtEt,[$mh{shash},1,"state:T: $actTemp desired: $setTemp valve: $vp"];
+        push @evtEt,[$mh{devH} ,1,"desired-temp:$setTemp"];
+      }
       push @evtEt,[$mh{shash},1,"motorErr:$errTbl{$err}" ];
-      push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"  ];
-      push @evtEt,[$mh{shash},1,"controlMode:$ctlTbl{$ctrlMode}"];
       push @evtEt,[$mh{shash},1,"boostTime:$bTime"];
-      push @evtEt,[$mh{shash},1,"state:T: $actTemp desired: $setTemp valve: $vp"];
       push @evtEt,[$mh{shash},1,"partyStart:$pStart"];
       push @evtEt,[$mh{shash},1,"partyEnd:$pEnd"];
       push @evtEt,[$mh{shash},1,"partyTemp:$pTemp"];
       #push @evtEt,[$mh{shash},1,"unknown0:$uk0"];
       #push @evtEt,[$mh{shash},1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
       push @evtEt,[$mh{devH},1,"battery:$lBat"] if ($lBat);
-      push @evtEt,[$mh{devH},1,"desired-temp:$setTemp"];
     }
     elsif($mh{mTp} eq "59" && defined $mI[0]) {#inform team about new value
       my $setTemp = sprintf("%.1f",int(hex($mI[0])/4)/2);
@@ -2177,7 +2178,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
         $mh{shash}->{helper}{pon} = 1;# power on is detected - only ssend once
       }
-      elsif($el > 800000 && $el < $eCnt ){# handle overflow
+      elsif($el > 800000 && $el > $eCnt ){# handle overflow
         $eo += 838860.7;
         push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
       }
@@ -4499,6 +4500,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
 
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
+    $state = "";
     my $mode = $a[2];
     if ($cmd ne "controlMode"){
       $mode = substr($cmd,7);
@@ -4551,11 +4553,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                         $sh,$sd,$sy,$eh,$ed,$ey,($sm*16+$em));
     }
     my %mCmd = (auto=>0,manual=>1,party=>2,boost=>3,day=>4,night=>5);
-    CUL_HM_UpdtReadSingle($hash,"controlMode","set_".$mode,1);
     my $msg = '8'.($mCmd{$mode}).$chn;
     $msg .= sprintf("%02X",$temp) if ($temp);
     $msg .= $party if ($party);
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$msg);
+    foreach my $team ( split(",",InternalVal(CUL_HM_id2Name($dst."05"),"peerList",""))
+                      ,$name){
+      next if (!defined $defs{$team} );
+      my $tId = substr(CUL_HM_name2Id($team),0,6);
+      CUL_HM_UpdtReadSingle($defs{$team},"controlMode","set_".$mode,1);
+      CUL_HM_PushCmdStack($defs{$team},'++'.$flag.'11'.$id.$tId.$msg);
+    }
   }
   elsif($cmd eq "desired-temp") { #############################################
     if ($md =~ m/(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)/){
@@ -4563,6 +4570,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "invalid temp:$a[2]" if($temp <9 ||$temp > 61);
       $temp = sprintf ("%02X",$temp);
       CUL_HM_PushCmdStack($hash,'++'.$flag."11$id$dst"."8604$temp");
+      foreach my $team ( split(",",InternalVal(CUL_HM_id2Name($dst."05"),"peerList",""))
+                        ,$name){
+        next if (!defined $defs{$team} );
+        my $tId = substr(CUL_HM_name2Id($team),0,6);
+        CUL_HM_PushCmdStack($defs{$team},'++'.$flag."11$id$tId"."8604$temp");
+      }
     }
     else{
       my $temp = CUL_HM_convTemp($a[2]);
