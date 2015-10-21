@@ -1584,12 +1584,10 @@ sub CUL_HM_Parse($$) {#########################################################
       my %errTbl=( 0=>"ok", 1=>"ValveTight", 2=>"adjustRangeTooLarge"
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
                   ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
-      if ($mh{mTyp} eq "100A"){
-        push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"  ];
-        push @evtEt,[$mh{shash},1,"controlMode:$ctlTbl{$ctrlMode}"];
-        push @evtEt,[$mh{shash},1,"state:T: $actTemp desired: $setTemp valve: $vp"];
-        push @evtEt,[$mh{devH} ,1,"desired-temp:$setTemp"];
-      }
+
+      push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"  ];
+      push @evtEt,[$mh{shash},1,"controlMode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$mh{shash},1,"state:T: $actTemp desired: $setTemp valve: $vp"];
       push @evtEt,[$mh{shash},1,"motorErr:$errTbl{$err}" ];
       push @evtEt,[$mh{shash},1,"boostTime:$bTime"];
       push @evtEt,[$mh{shash},1,"partyStart:$pStart"];
@@ -1598,6 +1596,7 @@ sub CUL_HM_Parse($$) {#########################################################
       #push @evtEt,[$mh{shash},1,"unknown0:$uk0"];
       #push @evtEt,[$mh{shash},1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
       push @evtEt,[$mh{devH},1,"battery:$lBat"] if ($lBat);
+      push @evtEt,[$mh{devH} ,1,"desired-temp:$setTemp"];
     }
     elsif($mh{mTp} eq "59" && defined $mI[0]) {#inform team about new value
       my $setTemp = sprintf("%.1f",int(hex($mI[0])/4)/2);
