@@ -157,7 +157,7 @@ FHEMWEB_Initialize($)
     nameDisplay
     ploteditor:always,onClick,never
     plotfork:1,0
-    plotmode:gnuplot,gnuplot-scroll,SVG
+    plotmode:gnuplot-scroll,gnuplot-scroll-svg,SVG
     plotEmbed:0,1
     plotsize
     plotWeekStartDay:0,1,2,3,4,5,6
@@ -3206,14 +3206,12 @@ FW_widgetOverride($$)
           <li>SVG<br>
               The plots are created with the <a href="#SVG">SVG</a> module.
               This is the default.</li>
-
-          <li>gnuplot<br>
-              The plots are created with the gnuplot program. Note: this mode
-              ist only available due to historic reasons.</li>
-
           <li>gnuplot-scroll<br>
-              Like the gnuplot-mode, but scrolling to historical values is alos
-              possible, just like with SVG.</li>
+              The plots are created with the gnuplot program. The gnuplot 
+              output terminal PNG is assumed. Scrolling to historical values 
+              is also possible, just like with SVG.</li>
+          <li>gnuplot-scroll-svg<br>
+              Like gnuplot-scroll, but the output terminal SVG is assumed.</li>
         </ul>
         </li><br>
 
@@ -3923,15 +3921,15 @@ FW_widgetOverride($$)
           Die Plots werden mit Hilfe des <a href="#SVG">SVG</a> Moduls als SVG
           Grafik gerendert. Das ist die Standardeinstellung.</li>
 
-          <li>gnuplot<br>
-          Die Plots werden mit Hilfe des gnuplot Programmes erzeugt. Diese
-          Option ist aus historischen Gr&uuml;nden vorhanden.
+          <li>gnuplot-scroll<br>
+          Die plots werden mit dem Programm gnuplot erstellt. Das output
+          terminal ist PNG. Der einfache Zugriff auf historische Daten
+          ist m&ouml;glich (analog SVG).
           </li>
 
-          <li>gnuplot-scroll<br>
-          Wie gnuplot, der einfache Zugriff auf historische Daten ist aber
-          genauso m&ouml;glich wie mit dem SVG Modul.</li>
-
+          <li>gnuplot-scroll-svg<br>
+          Wie gnuplot-scroll, aber als output terminal wird SVG angenommen.
+          </li>
         </ul>
         </li><br>
 
