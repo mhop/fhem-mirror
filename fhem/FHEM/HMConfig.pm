@@ -646,6 +646,11 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   mtrConstLed     =>{a=>154.0,s=>2  ,l=>1,min=>1   ,max=>65536  ,c=>''         ,f=>''      ,u=>'i/kWh',d=>0,t=>"constant led"},
   mtrSensIr       =>{a=>156.0,s=>1  ,l=>1,min=>-99 ,max=>99     ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"sensiblity IR"},
 
+  waRed           =>{a=>164.0,s=>1  ,l=>1,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"whitebalance red"},
+  waGreen         =>{a=>165.0,s=>1  ,l=>1,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"whitebalance green"},
+  waBlue          =>{a=>166.0,s=>1  ,l=>1,min=>0  ,max=>100     ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"whitebalance blue"},
+  colChangeSpeed  =>{a=>167.0,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s/U'  ,d=>0,t=>"color change speed"},
+
   #un-identified List1
 # SEC-WM55 08:01 (AES on?)
 # SEC-WDS  34:0x64 ?
@@ -1172,7 +1177,8 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
                          ,lgMultiExec     =>1
                         }
- ,"HM-LC-RGBW-WM02"   =>{ ActHsvCol       =>1}
+ ,"HM-LC-RGBW-WM02"   =>{ ActHsvCol       =>1
+                         ,waRed           =>1,waGreen         =>1,waBlue          =>1,colChangeSpeed  =>1}
  ,"HM-LC-RGBW-WM03"   =>{ ActColPrgm      =>1,ActMinBoarder   =>1,ActMaxBoarder   =>1}
  );
 
@@ -1666,11 +1672,15 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                              ,inhibit        =>"[on|off]"
                                              ,statusRequest  =>""
                                              ,peerIODev      =>"[IO] <btn> [set|unset]... not for future use"
+                                             ,brightCol      =>"<bright> <colVal> <duration> <ramp>" 
+                                             ,brightAuto     =>"<bright> <colProg> <min> <max> <duration> <ramp>"
                                             }
-                     ,"HM-LC-RGBW-WM02"   =>{ brightCol      =>"" #General work 2 do!!!
-                                             ,brightAuto     =>""
+                     ,"HM-LC-RGBW-WM02"   =>{ brightCol      =>"<bright> <colVal> <duration> <ramp>" #General rework
+                                             ,brightAuto     =>"<bright> <colProg> <min> <max> <duration> <ramp>"
                                             }
-
+                     ,"HM-LC-RGBW-WM03"   =>{ brightCol      =>"<bright> <colVal> <duration> <ramp>" 
+                                             ,brightAuto     =>"<bright> <colProg> <min> <max> <duration> <ramp>"
+                                            }
                                             
  );
 # clones- - - - - - - - - - - - - - - - -

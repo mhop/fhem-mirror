@@ -4381,6 +4381,28 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "device for command cannot be identified";
     }
   }
+  elsif($cmd eq "brightCol") { ################################################
+    my (undef,undef,$bright,$colVal,$duration,$ramp) = @a; #date prepared extention to entdate
+    return "please enter the duration in seconds"
+          if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
+    my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
+    return "timer value to low" if ($tval eq "0000");
+    $ramp = CUL_HM_encodeTime16($ramp);
+
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
+                           sprintf("%02x%02",$bright,$colVal).$ramp.$tval);
+  }
+  elsif($cmd eq "brightAuto") { ###############################################
+    my (undef,undef,$bright,$colProg,$min,$max,$duration,$ramp) = @a; #date prepared extention to entdate
+    return "please enter the duration in seconds"
+          if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
+    my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
+    return "timer value to low" if ($tval eq "0000");
+    $ramp = CUL_HM_encodeTime16($ramp);
+
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
+                           sprintf("%02x%02%02x%02",$bright,$colProg,$min,$max).$ramp.$tval);
+  }
   elsif($cmd eq "playTone") { #################################################
     my $msg;
     if ($a[2] eq 'replay'){
