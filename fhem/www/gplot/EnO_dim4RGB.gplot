@@ -28,6 +28,6 @@ set y2range [0:100]
 #FileLog 4:green:0:
 #FileLog 4:blue:0:
 
-plot "<IN>" using 1:2 ls l0 axes x1y1 title 'Red' with steps\
-     "<IN>" using 1:2 ls l1 axes x1y1 title 'Green' with steps\
+plot "<IN>" using 1:2 ls l0 axes x1y1 title 'Red' with steps,\
+     "<IN>" using 1:2 ls l1 axes x1y1 title 'Green' with steps,\
      "<IN>" using 1:2 ls l2 axes x1y1 title 'Blue' with steps
