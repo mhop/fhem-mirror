@@ -29,5 +29,5 @@ set yrange [0:100]
 #FileLog 4:fanSpeed:0:$fld[3]=~"not_supported"?0:$fld[3]
 #FileLog 4:humidity:0:$fld[3]=~"not_supported"?0:$fld[3]
 
-plot "<IN>" using 1:2 ls l0 axes x1y1 title 'FanSpeed' with steps,\
+plot "<IN>" using 1:2 ls l0 axes x1y1 title 'Fan Speed' with steps,\
      "<IN>" using 1:2 ls l2fill axes x1y2 title 'Humidity' with lines
