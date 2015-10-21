@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2015-10-20
+# 2015-10-21
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -304,10 +304,10 @@ my %EnO_eepConfig = (
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
   "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
-  "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}},
-  "D2.32.00" => {attr => {subType => "currentClamp.00"}},
-  "D2.32.01" => {attr => {subType => "currentClamp.01"}},
-  "D2.32.02" => {attr => {subType => "currentClamp.02"}},
+  "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}, GPLOT => "EnO_fanSpeed4humi4:FanSpeed/Humi,"},
+  "D2.32.00" => {attr => {subType => "currentClamp.00"}, GPLOT => "EnO_D2-32-xx:Current,"},
+  "D2.32.01" => {attr => {subType => "currentClamp.01"}, GPLOT => "EnO_D2-32-xx:Current,"},
+  "D2.32.02" => {attr => {subType => "currentClamp.02"}, GPLOT => "EnO_D2-32-xx:Current,"},
   "D2.40.00" => {attr => {subType => "ledCtrlState.00"}, GPLOT => "EnO_dim4:Dim,"},
   "D2.40.01" => {attr => {subType => "ledCtrlState.01"}, GPLOT => "EnO_dim4RGB:DimRGB,"},
   "D2.A0.01" => {attr => {subType => "valveCtrl.00", defaultChannel => 0, webCmd => "opens:closes"}, GPLOT => "EnO_valveCtrl:Valve,"},
