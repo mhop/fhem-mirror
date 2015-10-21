@@ -187,7 +187,7 @@ TechemHKV_Parse(@) {
   }
   # broadcast
 
-  return (undef);
+  return ('');
 }
 
 sub
