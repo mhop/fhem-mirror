@@ -67,32 +67,23 @@ HttpUtils_Close($)
   delete($hash->{hu_sslAdded});
   delete($hash->{hu_filecount});
   delete($hash->{hu_blocking});
+  delete($hash->{directReadFn});
+  delete($hash->{directWriteFn});
 }
 
 sub
-HttpUtils_ConnErr($)
+HttpUtils_Err($$)
 {
-  my ($hash) = @_;
+  my ($hash, $errtxt) = @_;
   $hash = $hash->{hash};
-  if(defined($hash->{FD})) {
-    delete($hash->{FD});
-    delete($selectlist{$hash});
-    $hash->{conn}->close() if($hash->{conn});
-    $hash->{callback}($hash, "connect to $hash->{addr} timed out", "");
-  }
+  return if(!defined($hash->{FD})); # Already closed
+  HttpUtils_Close($hash);
+  $hash->{callback}($hash, "$errtxt to $hash->{addr} timed out", "");
 }
 
-sub
-HttpUtils_ReadErr($)
-{
-  my ($hash) = @_;
-  $hash = $hash->{hash};
-  if(defined($hash->{FD})) {
-    delete($hash->{FD});
-    delete($selectlist{$hash});
-    $hash->{callback}($hash, "read from $hash->{addr} timed out", "");
-  }
-}
+sub HttpUtils_ConnErr($) { my ($hash) = @_; HttpUtils_Err($hash, "connect to");}
+sub HttpUtils_ReadErr($) { my ($hash) = @_; HttpUtils_Err($hash, "read from"); }
+sub HttpUtils_WriteErr($){ my ($hash) = @_; HttpUtils_Err($hash, "write to"); }
 
 sub
 HttpUtils_File($)
@@ -268,13 +259,10 @@ HttpUtils_Connect2($)
                 if ($hdr !~ "Content-Type:");
   }
   $hdr .= "\r\n";
-  syswrite $hash->{conn}, $hdr;
-  syswrite $hash->{conn}, $data if(defined($data));
 
   my $s = $hash->{shutdown};
   $s =(defined($hash->{noshutdown}) && $hash->{noshutdown}==0) if(!defined($s));
   $s = 0 if($hash->{protocol} eq "https");
-  shutdown($hash->{conn}, 1) if($s);
 
   if($hash->{callback}) { # Nonblocking read
     $hash->{FD} = $hash->{conn}->fileno();
@@ -292,14 +280,39 @@ HttpUtils_Connect2($)
         RemoveInternalTimer(\%timerHash);
         my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash, $hash->{buf});
         $hash->{callback}($hash, $err, $ret) if(!$redirect);
-        return;
+      }
+    };
+
+    $data = $hdr.(defined($data) ? $data:"");
+    $hash->{directWriteFn} = sub($) { # Nonblocking write
+      my $ret = syswrite $hash->{conn}, $data;
+      if($ret <= 0) {
+        my $err = $!;
+        RemoveInternalTimer(\%timerHash);
+        HttpUtils_Close($hash);
+        return $hash->{callback}($hash, "write error: $err", undef)
+      }
+      $data = substr($data,$ret);
+      if(length($data) == 0) {
+        shutdown($hash->{conn}, 1) if($s);
+        delete($hash->{directWriteFn});
+        RemoveInternalTimer(\%timerHash);
+        InternalTimer(gettimeofday()+$hash->{timeout},
+                      "HttpUtils_ReadErr", \%timerHash, 0);
       }
     };
     $selectlist{$hash} = $hash;
     InternalTimer(gettimeofday()+$hash->{timeout},
-                  "HttpUtils_ReadErr", \%timerHash, 0);
+                  "HttpUtils_WriteErr", \%timerHash, 0);
     return undef;
+
+  } else {
+    syswrite $hash->{conn}, $hdr;
+    syswrite $hash->{conn}, $data if(defined($data));
+    shutdown($hash->{conn}, 1) if($s);
+
   }
+
 
   return undef;
 }
