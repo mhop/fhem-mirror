@@ -202,17 +202,15 @@ SVG_FwFn($$$$)
 
   # plots navigation buttons
   my $pm = AttrVal($d,"plotmode",$FW_plotmode);
-  if($pm ne "gnuplot") {
-    if((!$pageHash || !$pageHash->{buttons}) &&
-       AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
+  if((!$pageHash || !$pageHash->{buttons}) &&
+     AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
 
-      $ret .= SVG_zoomLink("zoom=-1", "Zoom-in", "zoom in");
-      $ret .= SVG_zoomLink("zoom=1",  "Zoom-out","zoom out");
-      $ret .= SVG_zoomLink("off=-1",  "Prev",    "prev");
-      $ret .= SVG_zoomLink("off=1",   "Next",    "next");
-      $pageHash->{buttons} = 1 if($pageHash);
-      $ret .= "<br>";
-    }
+    $ret .= SVG_zoomLink("zoom=-1", "Zoom-in", "zoom in");
+    $ret .= SVG_zoomLink("zoom=1",  "Zoom-out","zoom out");
+    $ret .= SVG_zoomLink("off=-1",  "Prev",    "prev");
+    $ret .= SVG_zoomLink("off=1",   "Next",    "next");
+    $pageHash->{buttons} = 1 if($pageHash);
+    $ret .= "<br>";
   }
 
 
@@ -268,9 +266,13 @@ SVG_FwFn($$$$)
     }
     $ret .= "</div>";
 
-  } else {
+  } elsif($pm eq "gnuplot-scroll") {
     $ret .= "<img src=\"$arg\"/>";
+  } elsif($pm eq "gnuplot-scroll-svg") {
+    $ret .= "<object type=\"image/svg+xml\" ".
+                "data=\"$arg\">Your browser does not support SVG.</object>";
   }
+
 
   if(!$pageHash) {
     if($FW_plotmode eq "SVG") {
@@ -849,7 +851,6 @@ SVG_calcOffsets($$)
   my ($d,$wl) = @_;
 
   my $pm = AttrVal($wl,"plotmode",$FW_plotmode);
-  return if($pm eq "gnuplot");
 
   my ($fr, $fo);
   my $frx; #fixedrange with offset
@@ -1024,73 +1025,72 @@ SVG_doShowLog($$$$;$)
 
     my $tmpfile = "/tmp/file.$$";
     my $errfile = "/tmp/gnuplot.err";
+    
+    my $f;
+    my $t; 
+    my $xrange;
 
-    if($pm eq "gnuplot" || !$SVG_devs{$d}{from}) {
+    if(!$SVG_devs{$d}{from}) {
       # Fix range, as we are without scroll
-      my $f = 0;     # From the beginning of time...
-      my $t = 9;     # till the end
-
+      $f = 0;     # From the beginning of time...
+      $t = 9;     # till the end
+      $xrange = "\n";        #We don't have a range, but need the new line
+    } else {
       # Read the data from the filelog
-      my $oll = $attr{global}{verbose};
-      $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
-      my @path = split(" ",
-                      FW_fC("get $d $file $tmpfile $f $t $srcDesc->{all}", 1));
-      $attr{global}{verbose} = $oll;
-
-      # replace the path with the temporary filenames of the filelog output
-      my $i = 0;
-      $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
-      my $xrange = "\n";        #We don't have a range, but need the new line
-      foreach my $p (@path) {   # If the file is empty, write a 0 line
-        next if(!-z $p);
-        open(FH, ">$p");
-        print FH "$f 0\n";
-        close(FH);
-      }
-
-      my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
-
-      $plot =~ s/ls \w+//g;
-      open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
-      print FH $gplot_script, $xrange, $plot;
-      close(FH);
-
-    } elsif($pm eq "gnuplot-scroll") {
-      # Read the data from the filelog
-      my ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
-      my $oll = $attr{global}{verbose};
-      $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
-      my @path = split(" ",
-                      FW_fC("get $d $file $tmpfile $f $t $srcDesc->{all}", 1));
-      $attr{global}{verbose} = $oll;
-
-      # replace the path with the temporary filenames of the filelog output
-      my $i = 0;
-      $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
-      my $xrange = "set xrange [\"$f\":\"$t\"]\n";
-      foreach my $p (@path) {   # If the file is empty, write a 0 line
-        next if(!-z $p);
-        open(FH, ">$p");
-        print FH "$f 0\n";
-        close(FH);
-      }
-
-      my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
-
-      $plot =~ s/ls \w+//g;
-      open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
-      print FH $gplot_script, $xrange, $plot;
-      close(FH);
-      foreach my $p (@path) {
-        unlink($p);
-      }
+      ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
+      $xrange = "set xrange [\"$f\":\"$t\"]\n";
     }
-    $FW_RETTYPE = "image/png";
-    open(FH, "$tmpfile.png");         # read in the result and send it
-    binmode (FH); # necessary for Windows
-    FW_pO join("", <FH>);
+
+    my $oll = $attr{global}{verbose};
+    $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
+    my @path;
+    my $tmp = 0;
+    foreach my $src (@{$srcDesc->{order}}) {
+      my $s = $srcDesc->{src}{$src};
+      my $fname = ($src eq $defs{$d}{LOGDEVICE} ? $defs{$d}{LOGFILE}:"CURRENT");
+      my $cmd = "get $src $fname $tmpfile$tmp $f $t ".$s->{arg};
+      my @files = split(" ", FW_fC($cmd, 1));
+      push(@path, @files);
+      $tmp++;
+    }
+    $attr{global}{verbose} = $oll;
+
+    # replace the path with the temporary filenames of the filelog output
+    my $i = 0;
+    $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
+    foreach my $p (@path) {   # If the file is empty, write a 0 line
+      next if(!-z $p);
+      open(FH, ">$p");
+      print FH "$f 0\n";
+      close(FH);
+    }
+
+    my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
+
+    $plot =~ s/ls \w+//g;
+    open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
+    print FH $gplot_script, $xrange, $plot;
     close(FH);
-    unlink("$tmpfile.png");
+    foreach my $p (@path) {
+      unlink($p);
+    }
+    
+    if($pm eq "gnuplot-scroll") {
+      $FW_RETTYPE = "image/png";
+      open(FH, "$tmpfile.png");         # read in the result and send it
+      binmode (FH); # necessary for Windows
+      FW_pO join("", <FH>);
+      close(FH);
+      unlink("$tmpfile.png");
+    }
+    else {
+      $FW_RETTYPE = "image/svg+xml";
+      open(FH, "$tmpfile.svg");         # read in the result and send it
+      binmode (FH); # necessary for Windows
+      FW_pO join("", <FH>);
+      close(FH);
+      unlink("$tmpfile.svg");
+    }
 
   } elsif($pm eq "SVG") {
     my ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
@@ -2328,14 +2328,14 @@ plotAsPng(@)
     <a name="fixedrange"></a>
     <li>fixedrange [offset]<br>
         Contains two time specs in the form YYYY-MM-DD separated by a space.
-        In plotmode gnuplot-scroll or SVG the given time-range will be used,
-        and no scrolling for this SVG will be possible. Needed e.g. for
-        looking at last-years data without scrolling.<br><br>
-        If the value is one of hour, day, &lt;N&gt;days, week, month, year than
-        set the zoom level for this SVG independently of the user specified
-        zoom-level. This is useful for pages with multiple plots: one of the
-        plots is best viewed in with the default (day) zoom, the other one with
-        a week zoom.<br>
+        In plotmode gnuplot-scroll(-svg) or SVG the given time-range will be
+        used, and no scrolling for this SVG will be possible. Needed e.g. for
+        looking at last-years data without scrolling.<br><br> If the value is
+        one of hour, day, &lt;N&gt;days, week, month, year than set the zoom
+        level for this SVG independently of the user specified zoom-level. This
+        is useful for pages with multiple plots: one of the plots is best
+        viewed in with the default (day) zoom, the other one with a week
+        zoom.<br>
 
         If given, the optional integer parameter offset refers to a different
         period (e.g. last year: fixedrange year -1, 2 days ago: fixedrange day
@@ -2367,13 +2367,11 @@ plotAsPng(@)
       (&lt;L1&gt;, &lt;L2&gt;, etc.). Each value will be evaluated as a perl
       expression, so you have access e.g. to the Value functions.<br><br>
 
-      If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
-      mindate, maxdate, avg, cnt, sum, firstval, firstdate, currval (last
+      If the plotmode is gnuplot-scroll(-svg) or SVG, you can also use the min,
+      max, mindate, maxdate, avg, cnt, sum, firstval, firstdate, currval (last
       value) and currdate (last date) values of the individual curves, by
-      accessing the corresponding
-
-      values from the data hash, see the example below:<br>
-
+      accessing the corresponding values from the data hash, see the example
+      below:<br>
       <ul>
         <li>Fixed text for the right and left axis:<br>
           <ul>
@@ -2525,10 +2523,10 @@ plotAsPng(@)
     <li>fixedrange [offset]<br>
       Version 1<br>
       Enth&auml;lt zwei Zeit-Spezifikationen in der Schreibweise YYYY-MM-DD,
-      getrennt durch ein Leerzeichen. Im Plotmodus gnuplot-Scroll oder SVG wird
-      das vorgegebene Intervall verwendet und ein Scrolling der Zeitachse ist
-      nicht m&ouml;glich. Dies wird z.B. verwendet, um sich die Daten des
-      vergangenen Jahres ohne Scrollen anzusehen.<br><br>   
+      getrennt durch ein Leerzeichen. Im Plotmodus gnuplot-scroll(-svg) oder
+      SVG wird das vorgegebene Intervall verwendet und ein Scrolling der
+      Zeitachse ist nicht m&ouml;glich. Dies wird z.B. verwendet, um sich die
+      Daten des vergangenen Jahres ohne Scrollen anzusehen.<br><br>   
 
       Version 2<br>
       Wenn der Wert entweder Tag, &lt;N&gt;Tage, Woche, Monat oder Jahr lautet,
@@ -2568,11 +2566,12 @@ plotAsPng(@)
       Jeder Wert wird als Perl-Ausdruck bewertet, deshalb hat man Zugriff z.B.
       auf die hinterlegten Funktionen. <br><br>
 
-      Egal, ob es sich bei der Plotart um gnuplot-scroll oder SVG handelt, es
-      k&ouml;nnen ebenfalls die Werte der individuellen Kurve f&uuml;r min,
-      max, mindate, maxdate, avg, cnt, sum, currval (letzter Wert) und currdate
-      (letztes Datum) durch Zugriff der entsprechenden Werte &uuml;ber das
-      data Hash verwendet werden. Siehe untenstehendes Beispiel:<br>
+      Egal, ob es sich bei der Plotart um gnuplot-scroll(-svg) oder SVG
+      handelt, es k&ouml;nnen ebenfalls die Werte der individuellen Kurve
+      f&uuml;r min, max, mindate, maxdate, avg, cnt, sum, currval (letzter
+      Wert) und currdate (letztes Datum) durch Zugriff der entsprechenden Werte
+      &uuml;ber das data Hash verwendet werden. Siehe untenstehendes
+      Beispiel:<br>
       <ul>
         <li>Beschriftunng der rechten und linken y-Achse:<br>
           <ul>
