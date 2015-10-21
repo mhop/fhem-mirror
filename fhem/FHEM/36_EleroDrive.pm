@@ -2,8 +2,6 @@
 
 # ToDo-List
 # ---------
-# [x] attribute -> TopToBottomTime
-# [x] Refresh after move command
 # [ ] Numeric position reading -> percentOpen (0 ... 100)
 # [ ] Move to any position, not only top, bottom, intermediate, ... 
 
