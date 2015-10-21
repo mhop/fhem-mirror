@@ -114,7 +114,7 @@ sub getAllGets($);
 sub getAllSets($);
 sub getUniqueId();
 sub latin1ToUtf8($);
-sub myrename($$);
+sub myrename($$$);
 sub notifyRegexpChanged($$);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
@@ -255,6 +255,7 @@ my @globalAttrList = qw(
   apiversion
   archivecmd
   archivedir
+  archiveCompress
   autoload_undefined_devices:1,0
   autosave:1,0
   backup_before_update
@@ -3121,10 +3122,20 @@ doGlobalDef($)
 #####################################
 # rename does not work over Filesystems: lets copy it
 sub
-myrename($$)
+myrename($$$)
 {
-  my ($from, $to) = @_;
+  my ($name, $from, $to) = @_;
 
+  my $ca = AttrVal($name, "archiveCompress", 0);
+  if($ca) {
+    eval { require Compress::Zlib; };
+    if($@) {
+      $ca = 0;
+      Log 1, $@;
+    }
+  }
+  $to .= ".gz" if($ca);
+ 
   if(!open(F, $from)) {
     Log(1, "Rename: Cannot open $from: $!");
     return;
@@ -3133,8 +3144,18 @@ myrename($$)
     Log(1, "Rename: Cannot open $to: $!");
     return;
   }
-  while(my $l = <F>) {
-    print T $l;
+
+  if($ca) {
+    my $d = Compress::Zlib::deflateInit(-WindowBits=>31);
+    my $buf;
+    while(sysread(F,$buf,32768) > 0) {
+      syswrite(T, $d->deflate($buf));
+    }
+    syswrite(T, $d->flush());
+  } else {
+    while(my $l = <F>) {
+      print T $l;
+    }
   }
   close(F);
   close(T);
@@ -3146,13 +3167,14 @@ myrename($$)
 sub
 HandleArchiving($;$)
 {
-  my ($log,$diff) = @_;
+  my ($log,$flogInitial) = @_;
   my $ln = $log->{NAME};
   return if(!$attr{$ln});
 
   # If there is a command, call that
   my $cmd = $attr{$ln}{archivecmd};
   if($cmd) {
+    return if($flogInitial); # Forum #41245
     $cmd =~ s/%/$log->{currentlogfile}/g;
     Log 2, "Archive: calling $cmd";
     system($cmd);
@@ -3179,11 +3201,11 @@ HandleArchiving($;$)
   closedir(DH);
 
   my $max = int(@files)-$nra;
-  $max -= $diff if($diff);
+  $max-- if($flogInitial);
   for(my $i = 0; $i < $max; $i++) {
     if($ard) {
       Log 2, "Moving $files[$i] to $ard";
-      myrename("$dir/$files[$i]", "$ard/$files[$i]");
+      myrename($ln, "$dir/$files[$i]", "$ard/$files[$i]");
     } else {
       Log 2, "Deleting $files[$i]";
       unlink("$dir/$files[$i]");
