@@ -31,5 +31,5 @@ set grid xtics ytics
 
 plot \
   "<IN>" using 1:2 ls l0 axes x1y1 title 'Channel 1' with lines,\
-  "<IN>" using 1:2 ls l1 axes x1y2 title 'Channel 2' with lines
+  "<IN>" using 1:2 ls l1 axes x1y2 title 'Channel 2' with lines,\
   "<IN>" using 1:2 ls l2 axes x1y2 title 'Channel 3' with lines
