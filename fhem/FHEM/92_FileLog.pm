@@ -39,7 +39,8 @@ FileLog_Initialize($)
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
   $hash->{AttrList} = "disable:0,1 disabledForIntervals logtype reformatFn ".
-                      "nrarchive archivedir archivecmd addStateEvent:0,1";
+                      "nrarchive archivedir archivecmd addStateEvent:0,1 ".
+                      "archiveCompress";
 
   $hash->{FW_summaryFn}     = "FileLog_fhemwebFn";
   $hash->{FW_detailFn}      = "FileLog_fhemwebFn";
@@ -1202,12 +1203,18 @@ FileLog_regexpFn($$)
         shell command (no enclosing " is needed), and each % in the command
         will be replaced with the name of the old logfile.<br>
 
-        If this attribute is not set, but nrarchive and/or archivecmd are set,
-        then nrarchive old logfiles are kept along the current one while older
-        ones are moved to archivedir (or deleted if archivedir is not set).
-        <br>
+        If this attribute is not set, but nrarchive is set, then nrarchive old
+        logfiles are kept along the current one while older ones are moved to
+        archivedir (or deleted if archivedir is not set).  <br>
+
         Note: setting these attributes for the global instance will effect the
         <a href="#logfile">FHEM logfile</a> only.
+        </li><br>
+
+    <a name="archiveCompress"></a>
+    <li>archiveCompress<br>
+        If nrarchive, archivedir and archiveCompress is set, then the files
+        in the archivedir will be compressed.
         </li><br>
 
     <li><a href="#disable">disable</a></li>
@@ -1486,17 +1493,21 @@ FileLog_regexpFn($$)
         shell-Kommando ( eine Einbettung in " ist nicht notwendig), und jedes %
         in diesem Befehl wird durch den Namen des alten Logfiles ersetzt.<br>
 
-        Wenn dieses Attribut nicht gesetzt wird, aber daf&uuml;r nrarchive
-        und/oder archivecmd, werden nrarchive viele Logfiles im aktuellen
-        Verzeichnis gelassen, und &auml;ltere Dateien in das Archivverzeichnis
-        (archivedir) verschoben (oder gel&ouml;scht, falls kein archivedir
-        gesetzt wurde).<br>
+        Wenn dieses Attribut nicht gesetzt wird, aber daf&uuml;r nrarchive,
+        werden nrarchive viele Logfiles im aktuellen Verzeichnis gelassen, und
+        &auml;ltere Dateien in das Archivverzeichnis (archivedir) verschoben
+        (oder gel&ouml;scht, falls kein archivedir gesetzt wurde).<br>
 		
         Hinweis: Werden diese Attribute als global instance gesetzt, hat das
         auschlie&szlig;lich auf das <a href="#logfile">FHEM logfile</a>
-        Auswirkungen.
+        Auswirkungen.  </li><br>
 
+    <a name="archiveCompress"></a>
+    <li>archiveCompress<br>
+        Falls nrarchive, archivedir und archiveCompress gesetzt ist, dann
+        werden die Dateien im archivedir komprimiert abgelegt.
         </li><br>
+
 
     <li><a href="#disable">disable</a></li>
     <li><a href="#addStateEvent">addStateEvent</a></li>
