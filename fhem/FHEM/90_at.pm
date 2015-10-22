@@ -130,15 +130,15 @@ at_Exec($)
 
   return if($hash->{DELETED});           # Just deleted
   my $name = $hash->{NAME};
-  Log3 $name, 5, "exec at command $name";
 
   my $skip = AttrVal($name, "skip_next", undef);
   delete $attr{$name}{skip_next} if($skip);
 
-  my $command = SemicolonEscape($hash->{COMMAND});
-  my $ret = AnalyzeCommandChain(undef, $command)
-        if(!$skip && !IsDisabled($name));
-  Log3 $name, 3, "$name: $ret" if($ret);
+  if(!$skip && !IsDisabled($name)) {
+    Log3 $name, 5, "exec at command $name";
+    my $ret = AnalyzeCommandChain(undef, SemicolonEscape($hash->{COMMAND}));
+    Log3 $name, 3, "$name: $ret" if($ret);
+  }
 
   return if($hash->{DELETED});           # Deleted in the Command
 
