@@ -21,8 +21,8 @@ set xlabel " "
 set ytics
 set title '<TL>'
 set grid xtics ytics
-set ylabel "1/%"
-set y2label "1/%"
+set ylabel "position/%"
+set y2label "anglePos/%"
 set yrange [0:100]
 set y2range [0:100]
 set ytics ("open" 100, "25" 75, "50" 50, "75" 25, "closed" 0)
@@ -30,5 +30,5 @@ set ytics ("open" 100, "25" 75, "50" 50, "75" 25, "closed" 0)
 #FileLog 4:position:0:100-$fld[3]
 #FileLog 4:anglePos:0:
 
-plot "<IN>" using ls l0 1:2 axes x1y1 title 'Position' with lines,\
-     "<IN>" using ls l1 1:2 axes x1y1 title 'Angle Position' with lines
+plot "<IN>" using ls l0 1:2 axes x1y1 title 'Position' with steps,\
+     "<IN>" using ls l1 1:2 axes x1y1 title 'Angle Position' with steps
