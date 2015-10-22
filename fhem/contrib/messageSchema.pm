@@ -40,10 +40,13 @@ my $db = {
     'AMAD' => {
       'Normal'    => 'set %DEVICE% ttsMsg %MSG%',
       'ShortPrio' => 'set %DEVICE% ttsMsg %MSGSH%',
-      'Short'     => 'set %DEVICE% notifySndFile %AMAD_FILENAME%',
+      'Short'     => 'set %DEVICE% ttsMsg %MSGSH%',
       'defaultValues' => {
         'ShortPrio' => {
           'MSGSH' => 'Achtung!',
+        },
+        'Short' => {
+          'MSGSH' => 'Hinweis!',
         },
       },
     },
@@ -66,6 +69,20 @@ my $db = {
           'VOLUME' => 28,
           'LANG' => 'de',
           'MSGSH' => '',
+        },
+      },
+    },
+
+    'Text2Speech' => {
+      'Normal'    => 'set %DEVICE% tts %MSG%',
+      'ShortPrio' => 'set %DEVICE% tts %MSGSH%',
+      'Short'     => 'set %DEVICE% tts %MSGSH%',
+      'defaultValues' => {
+        'ShortPrio' => {
+          'MSGSH' => 'Achtung!',
+        },
+        'Short' => {
+          'MSGSH' => 'Hinweis!',
         },
       },
     },
