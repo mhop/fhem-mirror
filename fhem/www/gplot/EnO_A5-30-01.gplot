@@ -1,0 +1,29 @@
+##############################################
+# $Id$
+# Display contact sensor log
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device contact open|closed
+# 2015-10-17_08:38:08 device battery ok|low
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set title '<TL>'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "Contact"
+set y2label "Battery"
+set ytics ("closed" 1, "open" 0.6)
+set y2tics ("ok" 0.4, "low" 0)
+set yrange [-0.1:1.1]
+set y2range [-0.1:1.1]
+set grid
+
+#FileLog 4:contact:0:$fld[3]=~"closed"?1:0.6
+#FileLog 4:battery:0:$fld[3]=~"ok"?0.4:0
+
+plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with steps,\
+     "<IN>" using 1:2 axes x1y2 notitle ls l1 lw 1 with steps
