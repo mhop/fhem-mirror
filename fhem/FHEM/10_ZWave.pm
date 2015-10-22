@@ -396,10 +396,12 @@ my %zwave_class = (
   NON_INTEROPERABLE        => { id => 'f0' },
 );
 
-my %zwave_noStateSetCmds = (
+my %zwave_quietCmds = (
   secScheme=>1,
   sendNonce=>1,
-  secEncap=>1
+  secEncap=>1,
+
+  secNonce=>1 
 );
 
 my %zwave_cmdArgs = (
@@ -619,13 +621,13 @@ ZWave_Cmd($$@)
 
   if(!$cmdList{$cmd}) {
     my @list;
-    foreach my $cmd (sort keys %cmdList) {
-      if($zwave_cmdArgs{$type}{$cmd}) {
-        push @list, "$cmd:$zwave_cmdArgs{$type}{$cmd}";
-      } elsif($cmdList{$cmd}{fmt} !~ m/%/) {
-        push @list, "$cmd:noArg";
+    foreach my $lcmd (sort keys %cmdList) {
+      if($zwave_cmdArgs{$type}{$lcmd}) {
+        push @list, "$lcmd:$zwave_cmdArgs{$type}{$lcmd}";
+      } elsif($cmdList{$lcmd}{fmt} !~ m/%/) {
+        push @list, "$lcmd:noArg";
       } else {
-        push @list, $cmd;
+        push @list, $lcmd;
       }
     }
     my $list = join(" ",@list);
@@ -674,10 +676,10 @@ ZWave_Cmd($$@)
   }
 
   if($cmd =~ m/^config/ && $cmd ne "configRequestAll") {
-    my ($err, $cmd) =
+    my ($err, $lcmd) =
         ZWave_configCheckParam($hash, $cfgReq, $type, $cmd, $cmdFmt, @a);
     return $err if($err);
-    $cmdFmt = $cmd;
+    $cmdFmt = $lcmd;
   } else {
     $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
     my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
@@ -686,7 +688,8 @@ ZWave_Cmd($$@)
     return "" if($ncmd && $ncmd eq "EMPTY"); # e.g. configRequestAll
   }
 
-  Log3 $name, 2, "ZWave $type $name $cmd ".join(" ", @a);
+  Log3 $name, 2, "ZWave $type $name $cmd ".join(" ", @a)
+        if(!$zwave_quietCmds{$cmd});
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
   if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
@@ -748,12 +751,13 @@ ZWave_Cmd($$@)
     $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
 
   } else {
-    $cmd .= " ".join(" ", @a) if(@a);
+    if(!$zwave_quietCmds{$cmd}) {
+      $cmd .= " ".join(" ", @a) if(@a);
+      readingsSingleUpdate($hash, "state", $cmd, 1);
+    }
 
   }
 
-  readingsSingleUpdate($hash, "state", $cmd, 1)
-        if($type eq "set" && !$zwave_noStateSetCmds{( split / /, $cmd, 2 )[0]});
   return $val;
 }
 
