@@ -137,6 +137,12 @@ sub messageConfig_Define($$) {
       if ( int(@a) < 2 );
     my $name  = $a[0];
 
+    return "Global configuration device already defined: " . $modules{msgConfig}{defptr}{NAME}
+      if (defined($modules{msgConfig}{defptr}));
+
+    # create global unique device definition
+    $modules{msgConfig}{defptr} = $hash;
+
     # set default settings on first define
     if ($init_done) {
         my $group = AttrVal("global","group","Global");
@@ -146,7 +152,7 @@ sub messageConfig_Define($$) {
         $attr{$name}{group} = $group;
         $attr{$name}{verbose} = $verbose;
         $attr{$name}{room} = $room if ($room ne "");
-        $attr{$name}{comment} = "FHEM Global Configuration for command 'msg'";
+        $attr{$name}{comment} = "FHEM Global Configuration for command 'message'";
         $attr{$name}{stateFormat} = "fhemMsgState";
 
         readingsBeginUpdate($hash);
@@ -161,6 +167,9 @@ sub messageConfig_Define($$) {
 sub messageConfig_Undefine($$) {
 
     my ( $hash, $name ) = @_;
+
+    # release global unique device definition
+    delete $modules{msgConfig}{defptr};
 
     return undef;
 }
@@ -178,15 +187,13 @@ sub messageConfig_Undefine($$) {
       messageConfig
     </h3>
     <ul>
-      <li>Provides global settings to configure FHEM command 'msg'.<br>
+      <li>Provides global settings for FHEM command <a href="#message">message</a>.<br>
         <br>
       </li>
       <li>
         <a name="messageConfigdefine" id="messageConfigdefine"></a> <b>Define</b>
         <div style="margin-left: 2em">
           <code>define &lt;name&gt; messageConfig</code><br>
-          <br>
-          Defines the global msg control device instance. Pleae note there can only be one unique definition of this device type.
         </div>
       </li>
     </ul>
@@ -201,12 +208,17 @@ sub messageConfig_Undefine($$) {
     <h3>
       messageConfig
     </h3>
-    <div style="margin-left: 2em">
-      Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
-    </div>
-    <div style="margin-left: 2em">
-      <a href='http://fhem.de/commandref.html#messageConfig'>messageConfig</a>
-    </div>
+    <ul>
+      <li>Stellt globale Einstellungen für das FHEM Kommando <a href="#message">message</a> bereit.<br>
+        <br>
+      </li>
+      <li>
+        <a name="messageConfigdefine" id="messageConfigdefine"></a> <b>Define</b>
+        <div style="margin-left: 2em">
+          <code>define &lt;name&gt; messageConfig</code><br>
+        </div>
+      </li>
+    </ul>
 
 =end html_DE
 

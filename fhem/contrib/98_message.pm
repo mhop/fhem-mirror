@@ -1,7 +1,7 @@
 # $Id$
 ##############################################################################
 #
-#     98_msg.pm
+#     98_message.pm
 #     Dynamic message and notification routing for FHEM
 #
 #     Copyright by Julian Pawlowski
@@ -48,7 +48,7 @@ sub message_Initialize($$) {
     my %hash = (
         Fn => "CommandMessage",
         Hlp =>
-"[<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>",
+"[<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message-text>",
     );
     $cmds{message} = \%hash;
 }
@@ -59,23 +59,18 @@ sub CommandMessage($$;$$) {
     my $return = "";
 
     # find existing messageConfig device or create a new instance
-    my $globalDevName = "";
-    if (defined ($defs{"messageConfig"})) {
-      if ($defs{"messageConfig"}{TYPE} eq "messageConfig") {
-        $globalDevName = "messageConfig";
-      } else {
-        return "Device messageConfig has incorrect type - aborting...";
-      }
+    my $globalDevName = "messageConfig";
+    if (defined ($modules{msgConfig}{defptr})) {
+        $globalDevName = $modules{msgConfig}{defptr}{NAME};
     } else {
-      fhem "define messageConfig messageConfig";
-      $globalDevName = "messageConfig";
-      $return .= "Global configuration device messageConfig was created.\n\n";
+      fhem "define $globalDevName messageConfig";
+      $return .= "Global configuration device $globalDevName was created.\n\n";
     }
 
     if ( $msg eq "" || $msg =~ /^\?[\s\t]*$/ || $msg eq "help" ) {
         return
 $return .
-"Usage: msg [<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>";
+"Usage: message [<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message>";
     }
 
     # default settings
@@ -172,9 +167,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
       eval 'use JSON qw( decode_json ); 1';
       if ( !$@ ) {
         $advanced = decode_json( Encode::encode_utf8($1) );
-        Log3 $globalDevName, 5, "msg: Advanced options\n" . Dumper($advanced);
+        Log3 $globalDevName, 5, "message: Advanced options\n" . Dumper($advanced);
       } else {
-        Log3 $globalDevName, 3, "msg: To use advanced options, please install Perl::JSON.";
+        Log3 $globalDevName, 3, "message: To use advanced options, please install Perl::JSON.";
       }
     }
 
@@ -198,7 +193,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
     my @typesOr = split( /\|/, $types );
     $hasTypeOr = 1 if ( scalar( grep { defined $_ } @typesOr ) > 1 );
     Log3 $globalDevName, 5,
-      "msg: typeOr total is " . scalar( grep { defined $_ } @typesOr )
+      "message: typeOr total is " . scalar( grep { defined $_ } @typesOr )
       if ( $testMode ne "1" );
 
     for (
@@ -208,12 +203,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
       )
     {
         Log3 $globalDevName, 5,
-          "msg: start typeOr loop for type(s) $typesOr[$iTypesOr]"
+          "message: start typeOr loop for type(s) $typesOr[$iTypesOr]"
           if ( $testMode ne "1" );
 
         my @type = split( /,/, $typesOr[$iTypesOr] );
         for ( my $i = 0 ; $i < scalar( grep { defined $_ } @type ) ; $i++ ) {
-            Log3 $globalDevName, 5, "msg: running loop for type $type[$i]"
+            Log3 $globalDevName, 5, "message: running loop for type $type[$i]"
               if ( $testMode ne "1" );
             last if ( !defined( $type[$i] ) );
 
@@ -239,7 +234,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
             $hasRecipientOr = 1
               if ( scalar( grep { defined $_ } @recipientsOr ) > 1 );
             Log3 $globalDevName, 5,
-              "msg: recipientOr total is "
+              "message: recipientOr total is "
               . scalar( grep { defined $_ } @recipientsOr )
               if ( $testMode ne "1" );
 
@@ -250,13 +245,13 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
               )
             {
                 Log3 $globalDevName, 5,
-"msg: start recipientsOr loop for recipient(s) $recipientsOr[$iRecipOr]"
+"message: start recipientsOr loop for recipient(s) $recipientsOr[$iRecipOr]"
                   if ( $testMode ne "1" );
 
                 my @recipient = split( /,/, $recipientsOr[$iRecipOr] );
                 foreach my $device (@recipient) {
 
-                    Log3 $globalDevName, 5, "msg: running loop for device $device"
+                    Log3 $globalDevName, 5, "message: running loop for device $device"
                       if ( $testMode ne "1" );
 
                     my $messageSentDev = 0;
@@ -284,7 +279,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         && $deviceType eq "device" )
                     {
                         $return .= "Device $device does not exist\n";
-                        Log3 $globalDevName, 5, "msg $device: Device does not exist"
+                        Log3 $globalDevName, 5, "message $device: Device does not exist"
                           if ( $testMode ne "1" );
 
                         my $regex1 =
@@ -558,7 +553,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 # if it has been confirmed to be available
                                 if ( $useLocation == 1 ) {
                                     Log3 $logDevice, 4,
-"msg $device: Matching location definition found.";
+"message $device: Matching location definition found.";
                                 }
                                 else {
                                     $gatewayDevs = "";
@@ -585,7 +580,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                       )
                     {
                         Log3 $logDevice, 4,
-"msg $device: This recipient seems to be a gateway device itself. Still checking for any delegates ...";
+"message $device: This recipient seems to be a gateway device itself. Still checking for any delegates ...";
 
                         $gatewayDevs =
 
@@ -647,7 +642,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                               if ( $device ne $globalDevName );
 
                             Log3 $logDevice, 5,
-"msg $device:			(No $typeUc contact defined, trying global instead)"
+"message $device:			(No $typeUc contact defined, trying global instead)"
                               if ( $catchall == 1 );
 
                             $gatewayDevs =
@@ -740,7 +735,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                       )
                     {
                         Log3 $logDevice, 5,
-"msg $device: Checking for available routes (triggered by type $type[$i])";
+"message $device: Checking for available routes (triggered by type $type[$i])";
 
                         $routes{screen} = 1
                           if (
@@ -788,7 +783,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         }
 
                         Log3 $logDevice, 4,
-                            "msg $device: Available routes: screen="
+                            "message $device: Available routes: screen="
                           . $routes{screen}
                           . " light="
                           . $routes{light}
@@ -905,7 +900,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             && $routes{mail} == 1 )
                         {
                             Log3 $logDevice, 4,
-"msg $device: Text routing decision: push+mail(1)";
+"message $device: Text routing decision: push+mail(1)";
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push+mail";
@@ -917,7 +912,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             && $routes{mail} == 0 )
                         {
                             Log3 $logDevice, 4,
-                              "msg $device: Text routing decision: push(2)";
+                              "message $device: Text routing decision: push(2)";
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
@@ -928,7 +923,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             && $routes{mail} == 1 )
                         {
                             Log3 $logDevice, 4,
-                              "msg $device: Text routing decision: mail(3)";
+                              "message $device: Text routing decision: mail(3)";
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
@@ -936,7 +931,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         }
                         elsif ( $loopPriority >= $prioThresTextNormal && $routes{push} == 1 ) {
                             Log3 $logDevice, 4,
-                              "msg $device: Text routing decision: push(4)";
+                              "message $device: Text routing decision: push(4)";
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
@@ -944,7 +939,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         }
                         elsif ( $loopPriority >= $prioThresTextNormal && $routes{mail} == 1 ) {
                             Log3 $logDevice, 4,
-                              "msg $device: Text routing decision: mail(5)";
+                              "message $device: Text routing decision: mail(5)";
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
@@ -952,7 +947,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         }
                         elsif ( $routes{mail} == 1 ) {
                             Log3 $logDevice, 4,
-                              "msg $device: Text routing decision: mail(6)";
+                              "message $device: Text routing decision: mail(6)";
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>mail";
@@ -960,7 +955,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         }
                         elsif ( $routes{push} == 1 ) {
                             Log3 $logDevice, 4,
-                              "msg $device: Text routing decision: push(7)";
+                              "message $device: Text routing decision: push(7)";
                             $forwarded .= ","
                               if ( $forwarded ne "" );
                             $forwarded .= "text>push";
@@ -970,7 +965,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         # FATAL ERROR: routing decision failed
                         else {
                             Log3 $logDevice, 4,
-"msg $device: Text routing FAILED - priority=$loopPriority push="
+"message $device: Text routing FAILED - priority=$loopPriority push="
                               . $routes{push}
                               . " mail="
                               . $routes{mail};
@@ -1002,10 +997,10 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     #
                     if ( defined($testMode) && $testMode eq "1" ) {
                         Log3 $logDevice, 5,
-"msg $device:		$type[$i] route check result: ROUTE_AVAILABLE"
+"message $device:		$type[$i] route check result: ROUTE_AVAILABLE"
                           if ( $return eq "" );
                         Log3 $logDevice, 5,
-"msg $device:		$type[$i] route check result: ROUTE_UNAVAILABLE"
+"message $device:		$type[$i] route check result: ROUTE_UNAVAILABLE"
                           if ( $return ne "" );
                         return "ROUTE_AVAILABLE"   if ( $return eq "" );
                         return "ROUTE_UNAVAILABLE" if ( $return ne "" );
@@ -1477,7 +1472,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             }                                        
 
                             Log3 $logDevice, 5,
-"msg $device: Trying to send message via gateway $gatewayDev to recipient $subRecipient";
+"message $device: Trying to send message via gateway $gatewayDev to recipient $subRecipient";
 
                             ##############
                            # check for gateway availability and set route status
@@ -1806,7 +1801,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 if ( $cmd =~ s/^[ \t]*\{|\}[ \t]*$//gi ) {
                                     $cmd =~ s/@\w+/\\$&/gi;
                                     Log3 $logDevice, 5,
-"msg $device: $type[$i] route command (Perl): $cmd";
+"message $device: $type[$i] route command (Perl): $cmd";
                                     eval $cmd;
                                     if ( $@ ) {
                                       $error = 1;
@@ -1815,7 +1810,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 }
                                 else {
                                     Log3 $logDevice, 5,
-"msg $device: $type[$i] route command (fhem): $cmd";
+"message $device: $type[$i] route command (fhem): $cmd";
                                     fhem $cmd;
                                     if ( $@ ) {
                                       $error = 1;
@@ -1826,16 +1821,16 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 $routeStatus = "ERROR" if ($error == 1);
 
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
+"message $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
                                   if ( $priorityCat ne "" && $subRecipient ne "");
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
+"message $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
                                   if ( $priorityCat eq "" && $subRecipient ne "");
                                   Log3 $logDevice, 3,
-  "msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
+  "message $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority($priorityCat) TITLE='$loopTitle' MSG='$msg'"
                                     if ( $priorityCat ne "" && $subRecipient eq "");
                                   Log3 $logDevice, 3,
-  "msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
+  "message $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' MSG='$msg'"
                                     if ( $priorityCat eq "" && $subRecipient eq "");
 
                                   $messageSent                 = 1 if ($error == 0);
@@ -1846,16 +1841,16 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 || $routeStatus eq "UNDEFINED" )
                             {
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient ne "");
+"message $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient ne "");
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient eq "");
+"message $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient eq "");
                                 $gatewaysStatus{$gatewayDev} = $routeStatus;
                             }
                             else {
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient ne "");
+"message $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient ne "");
                                 Log3 $logDevice, 3,
-"msg $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient eq "");
+"message $device: ID=$messageID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient eq "");
                                 $messageSent    = 2 if ( $messageSent != 1 );
                                 $messageSentDev = 2 if ( $messageSentDev != 1 );
                                 $gatewaysStatus{$gatewayDev} = $routeStatus;
@@ -1930,7 +1925,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         && $isTypeOr < scalar( grep { defined $_ } @typesOr ) )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Skipping implicit forward due to typesOr definition";
+"message $device: Skipping implicit forward due to typesOr definition";
 
                         # remove recipient from list to avoid
                         # other interaction when using recipientOr in parallel
@@ -1970,7 +1965,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         scalar( grep { defined $_ } @recipientsOr ) )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Skipping implicit forward due to recipientOr definition";
+"message $device: Skipping implicit forward due to recipientOr definition";
 
                         next;
                     }
@@ -2048,7 +2043,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                       );
 
                     Log3 $logDevice, 5,
-"msg $device: Implicit forwards: recipient presence=$residentDevPresence state=$residentDevState"
+"message $device: Implicit forwards: recipient presence=$residentDevPresence state=$residentDevState"
                       if ( $residentDevPresence ne ""
                         || $residentDevState ne "" );
 
@@ -2065,7 +2060,7 @@ my $fw_residentGone = defined($settings->{ $type[$i] }{typeEscalation}{residentG
                         && $routes{$fw_gwUnavailable} == 1 )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Implicit forwards: No $type[$i] gateway device available for recipient $device ($gatewayDevs). Trying alternative message type "
+"message $device: Implicit forwards: No $type[$i] gateway device available for recipient $device ($gatewayDevs). Trying alternative message type "
                           . $fw_gwUnavailable;
 
                         push @type, $fw_gwUnavailable;
@@ -2083,7 +2078,7 @@ my $fw_residentGone = defined($settings->{ $type[$i] }{typeEscalation}{residentG
                         && $routes{$fw_emergency} == 1 )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Implicit forwards: Escalating high priority $type[$i] message via "
+"message $device: Implicit forwards: Escalating high priority $type[$i] message via "
                           . $fw_emergency;
 
                         push @type, $fw_emergency;
@@ -2102,7 +2097,7 @@ my $fw_residentGone = defined($settings->{ $type[$i] }{typeEscalation}{residentG
                         && $routes{$fw_residentGone} == 1 )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Implicit forwards: Escalating high priority $type[$i] message via "
+"message $device: Implicit forwards: Escalating high priority $type[$i] message via "
                           . $fw_residentGone;
 
                         push @type, $fw_residentGone;
@@ -2122,7 +2117,7 @@ my $fw_residentGone = defined($settings->{ $type[$i] }{typeEscalation}{residentG
                         && $routes{$fw_residentAbsent} == 1 )
                     {
                         Log3 $logDevice, 4,
-"msg $device: Implicit forwards: Escalating $type[$i] message via "
+"message $device: Implicit forwards: Escalating $type[$i] message via "
                           . $fw_residentAbsent
                           . " due to absence";
 
@@ -2174,26 +2169,26 @@ my $fw_residentGone = defined($settings->{ $type[$i] }{typeEscalation}{residentG
 =pod
 =begin html
 
-<a name="msg"></a>
-<h3>mail</h3>
+<a name="message"></a>
+<h3>message</h3>
 <ul>
-  <code>msg [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
+  <code>message [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
   <br>
   <br>
-  No documentation yet, sorry.<br>
+  No documentation here yet, sorry.<br>
   <a href="http://forum.fhem.de/index.php/topic,39983.0.html">FHEM Forum</a>
 </ul>
 
 =end html
 =begin html_DE
 
-<a name="mail"></a>
-<h3>mail</h3>
+<a name="message"></a>
+<h3>message</h3>
 <ul>
-  <code>msg [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
+  <code>message [&lt;type&gt;] [&lt;@device&gt;|&lt;e-mail address&gt;] [&lt;priority&gt;] [|&lt;title&gt;|] &lt;message&gt;</code>
   <br>
   <br>
-  Bisher keine Dokumentation, sorry.<br>
+  Bisher keine Dokumentation hier, sorry.<br>
   <a href="http://forum.fhem.de/index.php/topic,39983.0.html">FHEM Forum</a>
 </ul>
 
