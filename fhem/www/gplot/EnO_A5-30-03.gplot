@@ -1,0 +1,38 @@
+##############################################
+# $Id$
+# Display contact sensor log
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device wake low|high
+# 2015-10-17_08:38:08 device in0 low|high
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set title '<TL>'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "Contact"
+set y2label "Contact"
+set ytics ("high" 1, "low" 0.85)
+set ytics ("high" 0.75, "low" 0.6)
+set ytics ("high" 0.55, "low" 0.4)
+set ytics ("high" 0.35, "low" 0.2)
+set ytics ("high" 0.15, "low" 0)
+set yrange [-0.1:1.1]
+set y2range [-0.1:1.1]
+set grid
+
+#FileLog 4:wake:0:$fld[3]=~"high"?1:0.85
+#FileLog 4:in0:0:$fld[3]=~"high"?0.75:0.6
+#FileLog 4:in1:0:$fld[3]=~"high"?0.55:0.4
+#FileLog 4:in2:0:$fld[3]=~"high"?0.55:0.2
+#FileLog 4:in3:0:$fld[3]=~"high"?0.15:0
+
+plot "<IN>" using 1:2 axes x1y1 title "Wake" ls l0 lw 1 with steps,\
+     "<IN>" using 1:2 axes x1y1 title "Input 0" ls l1 lw 1 with steps,\
+     "<IN>" using 1:2 axes x1y1 title "Input 1" ls l2 lw 1 with steps,\
+     "<IN>" using 1:2 axes x1y1 title "Input 2" ls l3 lw 1 with steps,\
+     "<IN>" using 1:2 axes x1y1 title "Input 3" ls l4 lw 1 with steps
