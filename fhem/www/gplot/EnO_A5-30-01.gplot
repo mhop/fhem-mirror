@@ -25,5 +25,5 @@ set grid
 #FileLog 4:contact:0:$fld[3]=~"closed"?1:0.6
 #FileLog 4:battery:0:$fld[3]=~"ok"?0.4:0
 
-plot "<IN>" using 1:2 axes x1y1 notitle ls l0 lw 1 with steps,\
-     "<IN>" using 1:2 axes x1y2 notitle ls l1 lw 1 with steps
+plot "<IN>" using 1:2 axes x1y1 title 'Contact' ls l0 lw 1 with steps,\
+     "<IN>" using 1:2 axes x1y2 title 'Battery' ls l1 lw 1 with steps
