@@ -636,3 +636,6 @@
   
 - Mon Aug 23 2015 (rapster)
   - added new module 74_Unifi for the Ubiquiti Networks (UBNT) - Unifi Controller.
+
+- Wed Okt 21 2015 (sidey)
+  - added new module 00_SIGNALduino, 90_SIGNALduino_un, 14_Hideki, 14_SD_WS07
