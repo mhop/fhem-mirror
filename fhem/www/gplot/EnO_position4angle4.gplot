@@ -1,0 +1,34 @@
+##############################################
+# $Id$
+# Display the blinds position
+#
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device position: 25
+# 2015-10-17_08:38:08 device angle: 75
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+set title '<TL>'
+set grid xtics ytics
+set ylabel "1/%"
+set y2label "1/%"
+set yrange [0:100]
+set y2range [0:100]
+set ytics ("open" 100, "25" 75, "50" 50, "75" 25, "closed" 0)
+
+#FileLog 4:position:0:100-$fld[3]
+#FileLog 4:anglePos:0:
+
+plot "<IN>" using ls l0 1:2 axes x1y1 title 'Position' with lines,\
+     "<IN>" using ls l1 1:2 axes x1y1 title 'Angle Position' with lines
