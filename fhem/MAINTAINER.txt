@@ -30,6 +30,7 @@ FHEM/00_NetzerI2C.pm         klausw               http://forum.fhem.de Sonstige 
 FHEM/00_OWX.pm               pahenning/ntruchsess http://forum.fhem.de 1Wire
 FHEM/00_OWX_ASYNC            ntruchsess           http://forum.fhem.de 1Wire
 FHEM/00_RPII2C               klausw               http://forum.fhem.de Einplatinencomputer
+FHEM/00_SIGNALduino.pm       Sidey           	  http://forum.fhem.de Sonstige Systeme
 FHEM/00_SONOS.pm             Reinerlein           http://forum.fhem.de Multimedia
 FHEM/00_TCM.pm               klaus-schauer        http://forum.fhem.de EnOcean
 FHEM/00_THZ.pm               immiimmi             http://forum.fhem.de Heizungssteuerung/Raumklima
@@ -65,6 +66,7 @@ FHEM/10_pilight_ctrl.pm      risiko               http://forum.fhem.de Sonstige 
 FHEM/11_FHT.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/11_FHT8V.pm             rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/11_OWDevice.pm          borisneubert/mfr69bs http://forum.fhem.de 1Wire
+FHEM/14_Hideki.pm       	 Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
 FHEM/12_HMS.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/13_KS300.pm             rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/14_CUL_MAX.pm           mgehre               http://forum.fhem.de MAX
@@ -75,6 +77,7 @@ FHEM/15_CUL_EM.pm            rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/16_CUL_RFR.pm           rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/16_STACKABLE_CC.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/17_EGPM2LAN.pm          alexus               http://forum.fhem.de Sonstiges
+FHEM/14_SD_WS07.pm       	 Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
 FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/19_Revolt.pm            martinppp/mehf       http://forum.fhem.de SlowRF
@@ -247,6 +250,7 @@ FHEM/88_WEBCOUNT.pm          sachag               http://forum.fhem.de Sonstiges
 FHEM/89_HEATRONIC.pm         heikoranft           http://forum.fhem.de Sonstige Systeme
 FHEM/89_VCONTROL.pm          adamwit              http://forum.fhem.de Heizungssteuerung/Raumklima
 FHEM/90_at.pm                rudolfkoenig         http://forum.fhem.de Automatisierung
+FHEM/14_SIGNALduino_un.pm    Side		          http://forum.fhem.de Sonstige Systeme
 FHEM/91_eventTypes.pm        rudolfkoenig         http://forum.fhem.de Frontends
 FHEM/91_notify.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/91_sequence.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
