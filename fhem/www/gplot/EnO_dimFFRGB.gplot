@@ -1,0 +1,33 @@
+##############################################
+# $Id$
+# Display the red, green and blue channel
+#
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device red: 54
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+set title '<TL>'
+set grid xtics ytics
+set ylabel "dim"
+set yrange [0:255]
+set y2range [0:255]
+
+#FileLog 4:red:0:
+#FileLog 4:green:0:
+#FileLog 4:blue:0:
+
+plot "<IN>" using 1:2 ls l0 axes x1y1 title 'Red' with steps,\
+     "<IN>" using 1:2 ls l1 axes x1y1 title 'Green' with steps,\
+     "<IN>" using 1:2 ls l2 axes x1y1 title 'Blue' with steps
