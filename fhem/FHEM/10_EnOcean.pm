@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2015-10-21
+# 2015-10-22
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -300,7 +300,7 @@ my %EnO_eepConfig = (
   "D2.01.11" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.03.00" => {attr => {subType => "switch.00"}},
   "D2.03.10" => {attr => {subType => "windowHandle.10"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
-  "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}},
+  "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/Angle,"},
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
   "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
