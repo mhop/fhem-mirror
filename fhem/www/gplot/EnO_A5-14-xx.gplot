@@ -1,0 +1,35 @@
+##############################################
+# $Id: EnO_A5-14-01.gplot 9551 2015-10-19 20:06:42Z klaus-schauer $
+#
+# Display the measured temp and the humidity.
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device voltage: 3.4
+# 2015-10-17_08:38:08 device brightness: 100
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent truecolor rounded medium size <SIZE> enhanced
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+#set y2tics
+set title '<TL>'
+set grid xtics ytics
+set ylabel "U/V"
+set y2label "E/lx"
+set yrange [0:5]
+
+#FileLog 4:voltage:0:
+#FileLog 4:brightness:0:
+
+plot \
+  "<IN>" using 1:2 ls l0 axes x1y1 title 'Voltage' with lines,\
+  "<IN>" using 1:2 ls l1 axes x1y2 title 'Brightness' with lines
