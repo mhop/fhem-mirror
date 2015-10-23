@@ -855,7 +855,7 @@ sub FRITZBOX_Readout_Run_Shell($)
       push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Diversity/count" ];
 
 # Box Features
-      push @readoutCmdArray, [ "fhem->is_double_wlan", "ctlmgr_ctl r wlan settings/feature_flags/DBDC" ];
+      push @readoutCmdArray, [ "fhem->is_double_wlan", "ctlmgr_ctl r wlan settings/feature_flags/DBDC", "01" ];
 
    # Box model and firmware
       push @readoutCmdArray, [ "box_model", 'echo $CONFIG_PRODUKT_NAME' ];
