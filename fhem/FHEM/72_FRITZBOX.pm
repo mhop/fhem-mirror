@@ -1,5 +1,5 @@
 ###############################################################
-# $Id$Date: $
+# $Id$
 #
 #  72_FRITZBOX.pm 
 #
@@ -615,6 +615,7 @@ sub FRITZBOX_Readout_Start($)
    if( $interval != 0 ) {
       RemoveInternalTimer($hash->{helper}{TimerReadout});
       InternalTimer(gettimeofday()+$interval, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
+      readingsSingleUpdate($hash, "state", "disabled", 1)     if AttrVal($name, "disable", 0 ) == 1;
       return undef if( AttrVal($name, "disable", 0 ) == 1 );
   }
 
@@ -1583,13 +1584,16 @@ sub FRITZBOX_Readout_Format($$$)
 
    $readout = ""        unless defined $readout;
 
-   return $readout       unless defined $format;
-   return $readout       unless $readout ne "" && $format ne "" ;
+   return $readout       unless defined( $format ) && $format ne "";
+# return $readout       unless $readout ne "" && $format ne "" ; #Funktioniert nicht bei $format "01"
 
-   if ($format eq "01") {
-      $readout = 0   if $readout ne "1";
+   if ($format eq "01" && $readout ne "1") {
+      $readout = 0;
    }
-   elsif ($format eq "aldays") {
+   
+   return $readout       unless $readout ne "";
+   
+   if ($format eq "aldays") {
       if ($readout eq "0") {
          $readout = "once";
       }
