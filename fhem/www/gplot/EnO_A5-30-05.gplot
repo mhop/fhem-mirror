@@ -24,5 +24,5 @@ set grid
 #FileLog 3:.*:0:$fld[2]=~"error"?1:$fld[2]=~"error"?0.5:0
 #FileLog 4:voltage:0:
 
-plot "<IN>" using 1:2 axes x1y1 title 'Contact' ls l0 lw 1 with steps,\
+plot "<IN>" using 1:2 axes x1y1 title 'Contact' ls l0 lw 1 with points,\
      "<IN>" using 1:2 axes x1y2 title 'Voltage' ls l1 lw 1 with lines
