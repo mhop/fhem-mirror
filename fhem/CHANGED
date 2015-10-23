@@ -1,8 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - feature: new module 00_SIGNALduino.pm and 90_SIGNALduino_un: added SIGNALduino module and firmware
-  - feature: new module 14_Hideki.pm: added module for sensors with hideki protocol
-  - feature: new module 14_SD_WS07.pm: added module for sensor devices with protocol id7
+  - feature: new module 00_SIGNALduino.pm and 90_SIGNALduino_un: added 
+             SIGNALduino module and firmware
+  - feature: new module 14_Hideki.pm: added module for sensors with hideki 
+             protocol
+  - feature: new module 14_SD_WS07.pm: added module for sensor devices with 
+             protocol id7
   - feature: 32_yowsup.pm: allow comma separated receiver list on master send
   - bugfix:  YAMAHA_AVR: fixing not working remoteControl commands for
              several models
