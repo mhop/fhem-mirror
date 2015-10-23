@@ -13,7 +13,7 @@
 # if plotsize is less than 800,400
 #set terminal png transparent small size <SIZE> crop
 
-set terminal png transparent truecolor rounded medium size <SIZE> enhanced
+set terminal png transparent size <SIZE> crop
 
 set output '<OUT>.png'
 set xdata time
