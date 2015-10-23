@@ -15,12 +15,9 @@ set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ylabel "Contact"
-set y2label "Contact"
-set ytics ("high" 1, "low" 0.85)
-set ytics ("high" 0.75, "low" 0.6)
-set ytics ("high" 0.55, "low" 0.4)
-set ytics ("high" 0.35, "low" 0.2)
-set ytics ("high" 0.15, "low" 0)
+set y2label " "
+set ytics ("high" 1, "low" 0.85, "high" 0.75, "low" 0.6, "high" 0.55, "low" 0.4, "high" 0.35, "low" 0.2, "high" 0.15, "low" 0)
+set y2tics ("high" 1, "low" 0.85, "high" 0.75, "low" 0.6, "high" 0.55, "low" 0.4, "high" 0.35, "low" 0.2, "high" 0.15, "low" 0)
 set yrange [-0.1:1.1]
 set y2range [-0.1:1.1]
 set grid
