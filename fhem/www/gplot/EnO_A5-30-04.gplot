@@ -5,8 +5,8 @@
 # define FileLog_device FileLog ./log/device-%Y.log device
 #
 # Logfile record example:
-# 2015-10-17_08:38:08 device contact open|closed
-# 2015-10-17_08:38:08 device battery ok|low
+# 2015-10-17_08:38:08 device in0 high|low
+# 2015-10-17_08:38:08 device in3 124
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
@@ -16,9 +16,7 @@ set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ylabel "Digital"
 set y2label "Contact"
-set y2tics ("high" 0.95, "low" 0.7)
-set y2tics ("high" 0.625, "low" 0.375)
-set y2tics ("high" 0.3, "low" 0.05)
+set y2tics ("high" 0.95, "low" 0.7, "high" 0.625, "low" 0.375, "high" 0.3, "low" 0.05)
 set yrange [0:255]
 set y2range [0:1]
 set grid
@@ -28,7 +26,7 @@ set grid
 #FileLog 4:in2:0:$fld[3]=~"high"?0.3:0.05
 #FileLog 4:in3:0:
 
-plot "<IN>" using 1:2 axes x1y1 title "Input 0" ls l1 lw 1 with steps,\
-     "<IN>" using 1:2 axes x1y1 title "Input 1" ls l2 lw 1 with steps,\
-     "<IN>" using 1:2 axes x1y1 title "Input 2" ls l3 lw 1 with steps,\
+plot "<IN>" using 1:2 axes x1y2 title "Input 0" ls l1 lw 1 with steps,\
+     "<IN>" using 1:2 axes x1y2 title "Input 1" ls l2 lw 1 with steps,\
+     "<IN>" using 1:2 axes x1y2 title "Input 2" ls l3 lw 1 with steps,\
      "<IN>" using 1:2 axes x1y1 title "Input 3" ls l4 lw 1 with speps
