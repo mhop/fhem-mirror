@@ -42,7 +42,7 @@ use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
 
-use Data::Dumper;
+#use Data::Dumper;
 
 eval { use GDSweblink; };
 
@@ -60,7 +60,7 @@ my @allConditionsData;
 
 ###################################################################################################
 #
-#  Main routines
+#	Main routines
 
 sub GDS_Initialize($) {
 	my ($hash) = @_;
@@ -106,7 +106,7 @@ sub _fillMappingTables($){
 
     $tempDir  = "/tmp/";
     
-    $aList    = "data_retrieval_running";
+    $aList    = "no_data_available";
 	$sList    = $aList;
  	$fList    = $aList;
 
@@ -362,8 +362,6 @@ sub GDS_Set($@) {
 
 	my ($result, $next);
 
-	$hash->{LOCAL} = 1;
-
 	return $usage if $command eq '?';
 
 	if(IsDisabled($name)) {
@@ -420,8 +418,6 @@ sub GDS_Get($@) {
 	my $command		= lc($a[1]);
 	my $parameter	= $a[2] if(defined($a[2]));
 	my $name = $hash->{NAME};
-
-	$hash->{LOCAL} = 1;
 
 	my $usage = "Unknown argument $command, choose one of help:noArg rereadcfg:noArg ".
 				"list:stations,capstations,data ".
@@ -534,7 +530,6 @@ sub GDS_Get($@) {
 			}
             my $_gdsAll		= AttrVal($name,"gdsAll", 0);
             my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
-			readingsSingleUpdate($hash,'_lastAlertCheck','see timestamp ->',1) if($_gdsAll || $_gdsDebug);
 			break;
 			}
 
@@ -569,7 +564,6 @@ sub GDS_Get($@) {
 				$parameter = $bula2bulaShort{lc($parameter)};
 			}
 			my $dwd = $bulaShort2dwd{lc($parameter)};
-#			my $dir = $dwd2Dir{$dwd};
 			my $dir = "gds/specials/warnings/".$dwd2Dir{$dwd}."/";
 			$hash->{file}{dir}		= $dir;
 
@@ -980,24 +974,30 @@ sub decodeCAPData($$$){
 	Log3($name, 4, "GDS $name: Decoding CAP record #".$datensatz);
 
 # topLevel informations
-	@dummy = split(/\./, $alertsXml->{identifier});
-
-	$readings{"a_".$anum."_identifier"}		= Dumper($alertsXml->{identifier})	if($_gdsAll || $_gdsDebug);
-	$readings{"a_".$anum."_idPublisher"}	= $dummy[5]					if($_gdsAll);
-	$readings{"a_".$anum."_idSysten"}		= $dummy[6]					if($_gdsAll);
-	$readings{"a_".$anum."_idTimeStamp"}	= $dummy[7]					if($_gdsAll);
-	$readings{"a_".$anum."_idIndex"}		= $dummy[8]					if($_gdsAll);
+	if($_gdsAll || $_gdsDebug) {
+		@dummy = split(/\./, $alertsXml->{identifier});
+		$readings{"a_".$anum."_identifier"}		= $alertsXml->{identifier};
+		$readings{"a_".$anum."_idPublisher"}	= $dummy[5];
+		$readings{"a_".$anum."_idSysten"}		= $dummy[6];
+		$readings{"a_".$anum."_idTimeStamp"}	= $dummy[7];
+		$readings{"a_".$anum."_idIndex"}		= $dummy[8];
+	}
+	
 	$readings{"a_".$anum."_sent"}			= $alertsXml->{sent}[0];
 	$readings{"a_".$anum."_status"}			= $alertsXml->{status}[0];
 	$readings{"a_".$anum."_msgType"}		= $alertsXml->{msgType}[0];
+
 # infoSet informations
-	$readings{"a_".$anum."_language"}		= $alertsXml->{info}[$info]{language}		if($_gdsAll);
+	if($_gdsAll || $_gdsDebug) {
+		$readings{"a_".$anum."_language"}	= $alertsXml->{info}[$info]{language};
+		$readings{"a_".$anum."_urgency"}	= $alertsXml->{info}[$info]{urgency};
+		$readings{"a_".$anum."_severity"}	= $alertsXml->{info}[$info]{severity};
+		$readings{"a_".$anum."_certainty"}	= $alertsXml->{info}[$info]{certainty};
+	}
+	
 	$readings{"a_".$anum."_category"}		= $alertsXml->{info}[$info]{category};
 	$readings{"a_".$anum."_event"}			= $alertsXml->{info}[$info]{event};
 	$readings{"a_".$anum."_responseType"}	= $alertsXml->{info}[$info]{responseType};
-	$readings{"a_".$anum."_urgency"}		= $alertsXml->{info}[$info]{urgency}		if($_gdsAll);
-	$readings{"a_".$anum."_severity"}		= $alertsXml->{info}[$info]{severity}		if($_gdsAll);
-	$readings{"a_".$anum."_certainty"}		= $alertsXml->{info}[$info]{certainty}		if($_gdsAll);
 
 # eventCode informations
 # loop through array
@@ -1013,7 +1013,7 @@ sub decodeCAPData($$$){
 	}
 
 # time/validity informations
-	$readings{"a_".$anum."_effective"}		= $alertsXml->{info}[$info]{effective}					if($_gdsAll);
+	$readings{"a_".$anum."_effective"}		= $alertsXml->{info}[$info]{effective} if($_gdsAll);
 	$readings{"a_".$anum."_onset"}			= $alertsXml->{info}[$info]{onset};
 	$readings{"a_".$anum."_expires"}		= $alertsXml->{info}[$info]{expires};
 	$readings{"a_".$anum."_valid"}			= _checkCAPValid($readings{"a_".$anum."_onset"},$readings{"a_".$anum."_expires"});
@@ -1026,13 +1026,13 @@ sub decodeCAPData($$$){
 
 # text informations
 	$readings{"a_".$anum."_headline"}		= $alertsXml->{info}[$info]{headline};
-	$readings{"a_".$anum."_description"}	= $alertsXml->{info}[$info]{description}				if($_gdsAll || $_gdsLong);
+	$readings{"a_".$anum."_description"}	= $alertsXml->{info}[$info]{description} if($_gdsAll || $_gdsLong);
 	$readings{"a_".$anum."_instruction"}	= $alertsXml->{info}[$info]{instruction}
 			if($readings{"a_".$anum."_responseType"} eq "Prepare" & ($_gdsAll || $_gdsLong));
 
 # area informations
 	$readings{"a_".$anum."_areaDesc"} 		=  $alertsXml->{info}[$info]{area}[$area]{areaDesc};
-	$readings{"a_".$anum."_areaPolygon"}	=  $alertsXml->{info}[$info]{area}[$area]{polygon}		if($_gdsAll || $_gdsPolygon);
+	$readings{"a_".$anum."_areaPolygon"}	=  $alertsXml->{info}[$info]{area}[$area]{polygon} if($_gdsAll || $_gdsPolygon);
 
 # area geocode informations
 # loop through array
@@ -1110,7 +1110,7 @@ sub _capTrans($) {
 
 ###################################################################################################
 #
-#	new: nonblocking data retrieval
+#	nonblocking data retrieval
 
 sub retrieveData($$){
 	my ($hash,$req) = @_;
@@ -1551,7 +1551,7 @@ sub _abortedFORECAST {
 
 ###################################################################################################
 #
-# forecast retrieval - provided by jensb
+#	forecast retrieval - provided by jensb
 
 sub retrieveForecasts($$@) {
 	#
