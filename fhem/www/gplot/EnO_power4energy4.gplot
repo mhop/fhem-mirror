@@ -1,6 +1,5 @@
 ##############################################
 # $Id$
-# Display the battery voltage und current
 # FileLog definition: 
 # define FileLog_device FileLog ./log/device-%Y.log device
 #
