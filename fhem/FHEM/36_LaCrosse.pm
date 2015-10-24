@@ -465,7 +465,6 @@ sub LaCrosse_Parse($$) {
     else {
       $rhash->{"bufferedT"} = undef;
       $rhash->{"bufferedH"} = undef;
-      readingsSingleUpdate($rhash, "battery$channel", $battery_low ? "low" : "ok", 1);
     }
 
     $rhash->{"previousT$channel"} = int($previousT*10 + 0.5) / 10;
