@@ -4390,7 +4390,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $ramp = CUL_HM_encodeTime16($ramp);
 
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
-                           sprintf("%02x%02",$bright,$colVal).$ramp.$tval);
+                           sprintf("%02X%02X",$bright,$colVal).$ramp.$tval);
   }
   elsif($cmd eq "brightAuto") { ###############################################
     my (undef,undef,$bright,$colProg,$min,$max,$duration,$ramp) = @a; #date prepared extention to entdate
@@ -4401,7 +4401,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $ramp = CUL_HM_encodeTime16($ramp);
 
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
-                           sprintf("%02x%02%02x%02",$bright,$colProg,$min,$max).$ramp.$tval);
+                           sprintf("%02X%02X%02X%02X",$bright,$colProg,$min,$max).$ramp.$tval);
   }
   elsif($cmd eq "playTone") { #################################################
     my $msg;
