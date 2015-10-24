@@ -1,0 +1,33 @@
+##############################################
+# $Id$
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device flowrate: 134
+# 2015-10-17_08:38:08 device consumption0: 100
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set title '<TL>'
+set xlabel " "
+set ylabel "Vs/l"
+set y2label "V/m3"
+set ytics
+set grid xtics ytics
+
+#FileLog 4:flowrate:0:
+#FileLog 4:consumption0:0:
+#FileLog 4:consumption1:0:
+
+plot \
+  "<IN>" using 1:2 ls l0 axes x1y1 title 'Flowrate' with lines,\
+  "<IN>" using 1:2 ls l1 axes x1y2 title 'Consumption Channel 0' with lines,\
+  "<IN>" using 1:2 ls l2 axes x1y2 title 'Consumption Channel 1' with lines
