@@ -38,22 +38,29 @@ use warnings;
 use feature qw/say switch/;
 
 use Blocking;
+use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
+
 use Data::Dumper;
 
 eval { use GDSweblink; };
 
 no if $] >= 5.017011, warnings => 'experimental';
 
-my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, %bulaShort2dwd, %dwd2Dir, %dwd2Name,
-	$alertsXml, %capCityHash, %capCellHash, $sList, $aList, $fList, $fcmapList, $tempDir, @weekdays);
+my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, 
+    %bulaShort2dwd, %dwd2Dir, %dwd2Name, $alertsXml, %capCityHash,
+    %capCellHash, $sList, $aList, $fList, $fcmapList, $tempDir, @weekdays);
+
+
+#my %foreCastHash = ();
+
+my %allForecastData;
+my @allConditionsData;
 
 ###################################################################################################
 #
 #  Main routines
-#
-###################################################################################################
 
 sub GDS_Initialize($) {
 	my ($hash) = @_;
@@ -69,1100 +76,39 @@ sub GDS_Initialize($) {
 	$hash->{NotifyFn}   =   "GDS_Notify";
 	$hash->{NOTIFYDEV}  =   "global";
 	$hash->{AttrFn}		=	"GDS_Attr";
-	$hash->{AttrList}	=	"disable:0,1 ".
-							"gdsFwName gdsFwType:0,1,2,3,4,5,6,7 gdsAll:0,1 ".
-							"gdsDebug:0,1 gdsLong:0,1 gdsPolygon:0,1 ".
-							"gdsSetCond gdsSetForecast gdsPassiveFtp:0,1 ".
-							"gdsHideFiles:0,1 ".
-							$readingFnAttributes;
+	
+	no warnings 'qw';
+	my @attrList = qw(
+		disable:0,1
+		gdsAll:0,1
+		gdsDebug:0,1
+		gdsFwName
+		gdsFwType:0,1,2,3,4,5,6,7
+		gdsHideFiles:0,1
+		gdsLong:0,1
+		gdsPassiveFtp:0,1
+		gdsPolygon:0,1
+		gdsSetCond
+		gdsSetForecast
+		gdsUseAlerts:0,1
+		gdsUseForecasts:0,1
+	);
+	use warnings 'qw';
+	$hash->{AttrList}  = join(" ", @attrList);
+	$hash->{AttrList} .= " $readingFnAttributes";
 
     $tempDir  = "/tmp/";
-    $aList    = "please_use_rereadcfg_first";
-	$sList    = $aList;
- 	$fList    = $aList;
+	_fillMappingTables($hash);
 
 }
-
-sub GDS_Define($$$) {
-	my ($hash, $def) = @_;
-	my @a = split("[ \t][ \t]*", $def);
-	my ($found, $dummy);
-
-	return "syntax: define <name> GDS <username> <password> [<host>]" if(int(@a) != 4 ); 
-	my $name = $hash->{NAME};
-
-	$hash->{helper}{USER}		= $a[2];
-	$hash->{helper}{PASS}		= $a[3];
-	$hash->{helper}{URL}		= defined($a[4]) ? $a[4] : "ftp-outgoing2.dwd.de";
-	$hash->{helper}{INTERVAL}   = 1200;
-
-	Log3($name, 4, "GDS $name: created");
-	Log3($name, 4, "GDS $name: tempDir=".$tempDir);
-
-    GDS_addExtension("GDS_CGI","gds","GDS Files");
-
-	fillMappingTables($hash);
-	initDropdownLists($hash);
-
-	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
-	readingsSingleUpdate($hash, 'state', 'active',1);
-
-	return undef;
-}
-
-sub GDS_Undef($$) {
-	my ($hash, $arg) = @_;
-	my $name = $hash->{NAME};
-	RemoveInternalTimer($hash);
-    my $url = '/gds';
-    delete $data{FWEXT}{$url} if int(devspec2array('TYPE=GDS')) == 1;
-	return undef;
-}
-
-sub GDS_Shutdown($) {
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	Log3 ($name,4,"GDS $name: shutdown requested");
-	return undef;
-}
-
-sub GDS_Notify ($$) {
-  my ($hash,$dev) = @_;
-  my $name = $hash->{NAME};
-  return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED/, @{$dev->{CHANGED}}));
-
-  my $d;
-  
-  GDS_Get($hash,undef,'rereadcfg');
-
-  $d = AttrVal($name,'gdsSetCond',undef);
-  GDS_Set($hash,undef,'conditions',$d) if(defined($d));
-
-  $d = AttrVal($name,'gdsSetForecast',undef);
-  GDS_Set($hash,undef,'forecasts',$d) if(defined($d));
-
-  return undef;
-}
-
-sub GDS_Set($@) {
-	my ($hash, @a) = @_;
-	my $name = $hash->{NAME};
-	my $usage =	"Unknown argument, choose one of ".
-	            "clear:alerts,conditions,forecasts,all ".
-				"conditions:$sList ".
-				"forecasts:$fList ".
-	            "help:noArg ".
-	            "update:noArg ";				;
-
-	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
-
-	my $command		= lc($a[1]);
-	my $parameter	= $a[2] if(defined($a[2]));
-
-	my ($result, $next);
-
-	$hash->{LOCAL} = 1;
-
-	return $usage if $command eq '?';
-
-	if(IsDisabled($name)) {
-		readingsSingleUpdate($hash, 'state', 'disabled', 0);
-		return "GDS $name is disabled. Aborting..." if IsDisabled($name);
-	}
-
-	readingsSingleUpdate($hash, 'state', 'active', 0);
-
-	given($command) {
-		when("clear"){
-			CommandDeleteReading(undef, "$name a_.*")
-			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "alerts"));
-			CommandDeleteReading(undef, "$name c_.*")    
-			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "conditions"));
-			CommandDeleteReading(undef, "$name g_.*")
-			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "conditions"));
-			CommandDeleteReading(undef, "$name fc.?_.*") 
-			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "forecasts"));
-			}
-
-		when("help"){
-			$result = setHelp();
-			break;
-			}
-
-		when("update"){
-			RemoveInternalTimer($hash);
-			GDS_GetUpdate($hash);
-			break;
-			}
-
-		when("conditions"){
-			retrieveConditions($hash, "c", @a);
-            $attr{$name}{gdsSetCond} = ReadingsVal($name,'c_stationName',undef);
-			$next = gettimeofday()+$hash->{helper}{INTERVAL};
-			readingsSingleUpdate($hash, "_nextUpdate", localtime($next), 1);
-			RemoveInternalTimer($hash);
-			InternalTimer($next, "GDS_GetUpdate", $hash, 1);
-			break;
-			}
-
-		when("forecasts"){
-			CommandDeleteReading(undef, "$name fc.?_.*") if($parameter ne AttrVal($name,'gdsSetForecast',''));
-			retrieveForecasts($hash, "fc", @a);
-			my $station = ReadingsVal($name, 'fc_stationName', undef);
-			if (defined($station)) {
-				$attr{$name}{gdsSetForecast} = $station;
-			}
-			break;
-			}
-
-		default { return $usage; };
-	}
-	return $result;
-}
-
-sub GDS_Get($@) {
-	my ($hash, @a) = @_;
-	my $command		= lc($a[1]);
-	my $parameter	= $a[2] if(defined($a[2]));
-	my $name = $hash->{NAME};
-
-	$hash->{LOCAL} = 1;
-
-	my $usage = "Unknown argument $command, choose one of help:noArg rereadcfg:noArg ".
-				"list:stations,capstations,data ".
-				"alerts:".$aList." ".
-				"conditions:".$sList." ".
-				"conditionsmap:".$cmapList." ".
-				"forecasts:".$fcmapList." ".
-				"forecastsmap:".$fmapList." ".
-				"radarmap:".$cmapList." ".
-				"warningsmap:"."Deutschland,Bodensee,".$bulaList." ".
-				"warnings:".$bulaList;
-
-	return $usage if $command eq '?';
-
-	if(IsDisabled($name)) {
-		readingsSingleUpdate($hash, 'state', 'disabled', 0);
-		return "GDS $name is disabled. Aborting..." if IsDisabled($name);
-	}
-
-	readingsSingleUpdate($hash, 'state', 'active', 0);
-	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
-
-	my ($result, @datensatz, $found);
-
-	given($command) {
-
-		when("conditionsmap"){
-			# retrieve map: current conditions
-			retrieveFile($hash,$command,$parameter,undef);
-			break;
-		}
-
-		when("forecastsmap"){
-			# retrieve map: forecasts
-			retrieveFile($hash,$command,$parameter,undef);
-			break;
-		}
-
-		when("warningsmap"){
-			# retrieve map: warnings
-			retrieveFile($hash,$command,$parameter,undef);
-			break;
-		}
-
-		when("radarmap"){
-			# retrieve map: radar
-			$parameter = ucfirst($parameter);
-			retrieveFile($hash,$command,$parameter,$rmapList{$parameter});
-			break;
-			}
-
-		when("help"){
-			$result = getHelp();
-			break;
-			}
-
-		when("list"){
-			given($parameter){
-				when("capstations")	{ $result = getListCapStations($hash,$parameter); break,}
-				when("data")		{ $result = retrieveText($hash,"conditions","\n"); break; }
-				when("stations")	{ $result = retrieveText($hash,"conditions2","\n"); break; }
-				default				{ $usage  = "get <name> list <parameter>"; return $usage; }
-			}
-			break;
-			}
-
-		when("alerts"){
-			if($parameter =~ y/0-9// == length($parameter)){
-				while ( my( $key, $val ) = each %capCellHash ) {
-					push @datensatz,$val if $key =~ m/^$parameter/;
-				}
-#				push @datensatz,$capCellHash{$parameter};
-			} else {
-				push @datensatz,$capCityHash{$parameter};
-			}
-			CommandDeleteReading(undef, "$name a_.*");
-			if($datensatz[0]){
-				my $anum = 0;
-				foreach(@datensatz) {
-					decodeCAPData($hash,$_,$anum);
-					$anum++;
-				};
-				readingsSingleUpdate($hash,'a_count',$anum,1);
-			} else {
-				$result = "Keine Warnmeldung für die gesuchte Region vorhanden.";
-			}
-            my $_gdsAll		= AttrVal($name,"gdsAll", 0);
-            my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
-			readingsSingleUpdate($hash,'_lastAlertCheck','see timestamp ->',1) if($_gdsAll || $_gdsDebug);
-			break;
-			}
-
-		when("headlines"){
-			$result = gdsHeadlines($name);
-			break;
-			}
-
-		when("conditions"){
-			retrieveConditions($hash, "g", @a);
-			break;
-			}
-
-		when("rereadcfg"){
-			eval {
-				retrieveFile($hash,"alerts",undef,undef);
-			};
-			eval {
-				retrieveFile($hash,"conditions",undef,undef);
-			}; 
-			initDropdownLists($hash);
-			eval {
-				getListForecastStations($hash);
-			};
-			break;
-			}
-
-		when("warnings"){
-			my $vhdl;
-			$result =	"     VHDL30 = current          |     VHDL31 = weekend or holiday\n".
-						"     VHDL32 = preliminary      |     VHDL33 = cancel VHDL32\n".
-						sepLine(31)."+".sepLine(38);
-			for ($vhdl=30; $vhdl <=33; $vhdl++){
-				(undef, $found) = retrieveFile($hash, $command, $parameter, $vhdl);
-				if($found){
-					$result .= retrieveText($hash, "warnings", "");
-					$result .= "\n".sepLine(70);
-				}
-			}
-			$result .= "\n\n";
-			break;
-			}
-
-		when("forecasts"){
-			$parameter = ucfirst($parameter);
-			$result = sepLine(67)."\n";
-			(undef, $found) = retrieveFile($hash,$command,$parameter,undef);
-			if($found){
-					$result .= retrieveText($hash, $command, "\n");
-			}
-			$result .= "\n".sepLine(67)."\n";
-			break;
-			}
-
-		default { return $usage; };
-	}
-	return $result;
-}
-
-sub GDS_Attr(@){
-	my @a = @_;
-	my $hash = $defs{$a[1]};
-	my ($cmd, $name, $attrName, $attrValue) = @a;
-
-	given($attrName){
-		when("gdsDebug"){
-			CommandDeleteReading(undef, "$name _dF.*") if($attrValue != 1 || $cmd eq 'delete');
-			break;
-			}
- 		when("gdsSetCond"){
-            GDS_Set($hash,undef,'conditions',$attrValue) if($init_done && $cmd eq 'set');
-            break;
-            }
- 		when("gdsSetForecast"){
-            GDS_Set($hash,undef,'forecasts',$attrValue) if($init_done && $cmd eq 'set');
-            break;
- 			}
- 		when("gdsHideFiles"){
- 		    my $hR = AttrVal($FW_wname,'hiddenroom','');
- 		    $hR =~ s/\,GDS.Files//g;
-			if($attrValue) {
-	 		    $hR .= "," if(length($hR));
- 			    $hR .= "GDS Files";
-			}
-			CommandAttr(undef,"$FW_wname hiddenroom $hR");
- 			break;
- 			}
-		default {$attr{$name}{$attrName} = $attrValue;}
-	}
-	if(IsDisabled($name)) {
-		readingsSingleUpdate($hash, 'state', 'disabled', 0);
-	} else {
-		readingsSingleUpdate($hash, 'state', 'active', 0);
-	}
-	return;
-}
-
-sub GDS_GetUpdate($) {
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my $next;
-  
-	my $interval            = $hash->{helper}{INTERVAL};
-	my $forcastsStationName = ReadingsVal($name, "fc_stationName", undef);
-	my $condStationName     = ReadingsVal($name, "c_stationName", undef);
-
-	if(IsDisabled($name)) {
-    	readingsSingleUpdate($hash, 'state', 'disabled', 0);
-		Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
-	} else {
-		readingsSingleUpdate($hash, 'state', 'active', 0);
-		if($condStationName) {
-			my @a;
-			push @a, undef;
-			push @a, undef;
-			push @a, ReadingsVal($name, "c_stationName", "");
-			retrieveConditions($hash, "c", @a);
-		}
-		if($forcastsStationName) {
-			my @a;
-			push @a, undef;
-			push @a, undef;
-			push @a, $forcastsStationName;
-			retrieveForecasts($hash, "fc", @a);    
-		}
-	}
-	# schedule next update
-	$next = gettimeofday() + $interval;
-	readingsSingleUpdate($hash, "_nextUpdate", localtime($next), 1);
-	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
-
-	return 1;
-}
-
-###################################################################################################
-#
-#	FWEXT implementation
-#
-###################################################################################################
-
-sub GDS_addExtension($$$) {
-    my ($func,$link,$friendlyname)= @_;
-  
-    my $url = "/" . $link;
-    Log3(undef,4,"Register gds webservice in FWEXT");
-    $data{FWEXT}{$url}{FUNC} = $func;
-    $data{FWEXT}{$url}{LINK} = "+$link";
-    $data{FWEXT}{$url}{NAME} = $friendlyname;
-    $data{FWEXT}{$url}{FORKABLE} = 0;
-}
-
-sub GDS_CGI {
-  my ($request) = @_;
-  my ($name,$ext)= GDS_splitRequest($request);
-  if(defined($name)) {
-     my $filename= "$tempDir/$name.$ext";
-     my $MIMEtype= filename2MIMEType($filename);
-     my @contents;
-     if(open(INPUTFILE, $filename)) {
-       binmode(INPUTFILE);
-       @contents= <INPUTFILE>;
-       close(INPUTFILE);
-       return("$MIMEtype; charset=utf-8", join("", @contents));
-     } else {
-       return("text/plain; charset=utf-8", "File not found: $filename");
-     }
-  } else {
-    return GDS_Overview();
-  }
-}
-
-sub GDS_splitRequest($) {
-  my ($request) = @_;
-
-  if($request =~ /^.*\/gds$/) {
-    # http://localhost:8083/fhem/gds2
-    return (undef,undef); # name, ext
-  } else {
-    my $call= $request;
-    $call =~ s/^.*\/gds\/([^\/]*)$/$1/;
-    my $name= $call;
-    $name =~ s/^(.*)\.(jpg)$/$1/;
-    my $ext= $call;
-    $ext =~ s/^$name\.(.*)$/$1/;
-    return ($name,$ext);
-  }
-}
-
-sub GDS_Overview {
-  my ($name, $url);
-  my $html= GDS_HTMLHead("GDS Overview") . "<body>\n\n";
-  foreach my $def (sort keys %defs) {
-     if($defs{$def}{TYPE} eq "GDS") {
-        $name= $defs{$def}{NAME};
-        $url   = GDS_getURL();
-        $html .= "$name<br>\n<ul>\n";
-        $html .= "<a href=\"$url/gds/$name\_conditionsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>\n";
-        $html .= "<a href=\"$url/gds/$name\_forecastsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>\n";
-        $html .= "<a href=\"$url/gds/$name\_warningsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Warnungen</a><br/>\n";
-        $html .= "<a href=\"$url/gds/$name\_radarmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Radarkarte</a><br/>\n";
-        $html.= "</ul>\n\n";
-    }
-  }
-  $html.="</body>\n" . GDS_HTMLTail();
-
-  return ("text/html; charset=utf-8", $html);
-}
-
-sub GDS_HTMLHead($) {
-  my ($title) = @_;
-  my $doctype= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
-  my $xmlns= 'xmlns="http://www.w3.org/1999/xhtml"';
-  my $code= "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n</head>\n";
-  return $code;
-}
-
-sub GDS_HTMLTail {
-  return "</html>";
-}
-
-sub GDS_getURL {
-  my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
-  return $proto."://$FW_httpheader{Host}$FW_ME"; #".$FW_ME;
-}
-
-###################################################################################################
-#
-#	Tools
-#
-###################################################################################################
-
-sub setHelp(){
-	return	"Use one of the following commands:\n".
-			sepLine(35)."\n".
-			"set <name> clear alerts|all\n".
-			"set <name> conditions <stationName>\n".
-			"set <name> forecasts <regionName>/<stationName>\n".
-			"set <name> help\n".
-			"set <name> rereadcfg\n".
-			"set <name> update\n";
-}
-
-sub getHelp(){
-	return	"Use one of the following commands:\n".
-			sepLine(35)."\n".
-			"get <name> alerts <region>\n".
-			"get <name> conditions <stationName>\n".
-			"get <name> forecasts <regionName>\n".
-			"get <name> help\n".
-			"get <name> list capstations|stations|data\n".
-			"get <name> rereadcfg\n".
-			"get <name> warnings <region>\n";
-}
-
-sub retrieveText($$$) {
-   my ($hash, $fileName, $separator) = @_;
-   my $name = $hash->{NAME};
-   my ($err,@a);
-   
-   given ($fileName) {
-      when ("conditions2") {
-         # get conditions stations list
-         $fileName = $tempDir.$name."_conditions";
-         ($err,@a) = FileRead({FileName=>$fileName,ForceType=>"file" });
-         return "GDS error reading $fileName" if($err);
-         @a = map (substr(latin1ToUtf8($_),0,19), @a);    
-         unshift(@a, "Use one of the following stations:", sepLine(40));
-      }
-      default {
-         $fileName = $tempDir.$name."_$fileName";
-         ($err,@a) = FileRead({FileName=>$fileName,ForceType=>"file" });
-         return "GDS error reading $fileName" if($err);
-         @a = map (latin1ToUtf8($_), @a);
-      }
-   }
-
-   return join($separator, @a);
-}
-
-sub getListCapStations($$){
-	my ($hash, $command) = @_;
-	my $name = $hash->{NAME};
-	my (%capHash, $file, @columns, $key, $cList, $count);
-
-	$file = $tempDir.'capstations.csv';
-	return "GDS error: $file not found." unless(-e $file);
-
-	if (!defined($cList)) {
-		# CSV öffnen und parsen
-		my ($err,@a) = FileRead({FileName=>$file,ForceType=>"file" });
-		return "GDS error reading $file" if($err);
-
-		foreach my $l (@a) {
-			next if (substr($l,0,1) eq '#');
-			@columns = split(";",$l);
-			$capHash{latin1ToUtf8($columns[4])} = $columns[0];
-		}
-
-		# Ausgabe sortieren und zusammenstellen
-		foreach $key (sort keys %capHash) {
-			$cList .= $capHash{$key}."\t".$key."\n";
-		}
-	}
-	return $cList;
-}
-
-sub getListStations($){
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my ($line, $liste);
-
-    my $fileName = $tempDir.$name."_conditions";
-    return unless -e $fileName;
-    my $filesize = -s $fileName;
-    return unless $filesize != 0;
-
-    my ($err,@a) = FileRead({FileName=>$fileName,ForceType=>"file" });
-    return "GDS error reading $fileName" if($err);
-    @a = map (trim(substr(latin1ToUtf8($_),0,19)), @a);    
-
-	# delete header lines 
-	splice(@a, 0, 6);
-	# delete legend 
-	splice(@a, _first_index("Höhe",@a)-1);
-	@a = sort(@a);
-
-	$sList = join(",", @a);
-	$sList =~ s/\s+,/,/g; # replace multiple spaces followed by comma with comma
-	$sList =~ s/\s/_/g;   # replace spaces in stationName with underscore for list in frontende
-	return;
-}
-
-sub buildCAPList($){
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-
-	%capCityHash	= ();
-	%capCellHash	= ();
-	$alertsXml		= undef;
-    $aList          = "please_use_rereadcfg_first";
-
-	my $xml			= new XML::Simple;
-	my $area		= 0;
-	my $record		= 0;
-	my $n			= 0;
-	my ($capCity, $capCell, $capEvent, $capEvt, @a);
-    my $destinationDirectory = $tempDir.$name."_alerts.dir";
-    
-    # make XML array and analyze data
-    my ($countInfo,$cF) = mergeCapFile($hash);
-    eval	{	
-	  $alertsXml = $xml->XMLin($cF, KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
-    };
-    if ($@) {
-       Log3($name,1,'GDS: error analyzing alerts XML:'.$@);
-       return (undef,undef);
-    }
-
-    # analyze entries based on info and area array
-    # array elements are determined by $info and $area
-    #
-    for (my $info=0; $info<=$countInfo;$info++) {
-       $area = 0;
-       while(1){
-          $capCity  = $alertsXml->{info}[$info]{area}[$area]{areaDesc};
-          $capEvent = $alertsXml->{info}[$info]{event};
-          last unless $capCity;
-          $capCell  = findCAPWarnCellId($info, $area);
-          $n        = 100*$info+$area;
-          $capCity  = latin1ToUtf8($capCity.' '.$capEvent);
-          push @a, $capCity;
-          $capCity =~ s/\s/_/g;
-          $capCityHash{$capCity} = $n;
-          $capCellHash{"$capCell$n"} = $n;
-          $area++;
-          $record++;
-          $capCity = undef;
-       }
-    }
-
-	@a = sort(@a);
-    $aList = undef;
-	$aList = join(",", @a);
-	$aList =~ s/\s/_/g;
-	$aList = "No_alerts_published!" if !$record;
-    return;
-}
-
-sub decodeCAPData($$$){
-	my ($hash, $datensatz, $anum) = @_;
-	my $name		= $hash->{NAME};
-	my $info		= int($datensatz/100);
-	my $area		= $datensatz-$info*100;
-
-	my (%readings, @dummy, $i, $k, $n, $v, $t);
-
-	my $_gdsAll		= AttrVal($name,"gdsAll", 0);
-	my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
-	my $_gdsLong	= AttrVal($name,"gdsLong", 0);
-	my $_gdsPolygon	= AttrVal($name,"gdsPolygon", 0);
-
-	Log3($name, 4, "GDS $name: Decoding CAP record #".$datensatz);
-
-# topLevel informations
-	@dummy = split(/\./, $alertsXml->{identifier});
-
-	$readings{"a_".$anum."_identifier"}		= $alertsXml->{identifier}	if($_gdsAll || $_gdsDebug);
-	$readings{"a_".$anum."_idPublisher"}	= $dummy[5]					if($_gdsAll);
-	$readings{"a_".$anum."_idSysten"}		= $dummy[6]					if($_gdsAll);
-	$readings{"a_".$anum."_idTimeStamp"}	= $dummy[7]					if($_gdsAll);
-	$readings{"a_".$anum."_idIndex"}		= $dummy[8]					if($_gdsAll);
-	$readings{"a_".$anum."_sent"}			= $alertsXml->{sent}[0];
-	$readings{"a_".$anum."_status"}			= $alertsXml->{status}[0];
-	$readings{"a_".$anum."_msgType"}		= $alertsXml->{msgType}[0];
-# infoSet informations
-	$readings{"a_".$anum."_language"}		= $alertsXml->{info}[$info]{language}		if($_gdsAll);
-	$readings{"a_".$anum."_category"}		= $alertsXml->{info}[$info]{category};
-	$readings{"a_".$anum."_event"}			= $alertsXml->{info}[$info]{event};
-	$readings{"a_".$anum."_responseType"}	= $alertsXml->{info}[$info]{responseType};
-	$readings{"a_".$anum."_urgency"}		= $alertsXml->{info}[$info]{urgency}		if($_gdsAll);
-	$readings{"a_".$anum."_severity"}		= $alertsXml->{info}[$info]{severity}		if($_gdsAll);
-	$readings{"a_".$anum."_certainty"}		= $alertsXml->{info}[$info]{certainty}		if($_gdsAll);
-
-# eventCode informations
-# loop through array
-	$i = 0;
-	while(1){
-		($n, $v) = (undef, undef);
-		$n = $alertsXml->{info}[$info]{eventCode}[$i]{valueName};
-		if(!$n) {last;}
-		$n = "a_".$anum."_eventCode_".$n;
-		$v = $alertsXml->{info}[$info]{eventCode}[$i]{value};
-		$readings{$n} .= $v." " if($v);
-		$i++;
-	}
-
-# time/validity informations
-	$readings{"a_".$anum."_effective"}		= $alertsXml->{info}[$info]{effective}					if($_gdsAll);
-	$readings{"a_".$anum."_onset"}			= $alertsXml->{info}[$info]{onset};
-	$readings{"a_".$anum."_expires"}		= $alertsXml->{info}[$info]{expires};
-	$readings{"a_".$anum."_valid"}			= checkCAPValid($readings{"a_".$anum."_onset"},$readings{"a_".$anum."_expires"});
-	$readings{"a_".$anum."_onset_local"}	= capTrans($readings{"a_".$anum."_onset"});
-	$readings{"a_".$anum."_expires_local"}	= capTrans($readings{"a_".$anum."_expires"}) 
-	         if(defined($alertsXml->{info}[$info]{expires}));
-	$readings{"a_".$anum."_sent_local"}		= capTrans($readings{"a_".$anum."_sent"});
-
-	$readings{a_valid} = ReadingsVal($name,'a_valid',0) || $readings{"a_".$anum."_valid"};
-
-# text informations
-	$readings{"a_".$anum."_headline"}		= $alertsXml->{info}[$info]{headline};
-	$readings{"a_".$anum."_description"}	= $alertsXml->{info}[$info]{description}				if($_gdsAll || $_gdsLong);
-	$readings{"a_".$anum."_instruction"}	= $alertsXml->{info}[$info]{instruction} 				if($readings{"a_".$anum."_responseType"} eq "Prepare" 
-																						&& ($_gdsAll || $_gdsLong));
-
-# area informations
-	$readings{"a_".$anum."_areaDesc"} 		=  $alertsXml->{info}[$info]{area}[$area]{areaDesc};
-	$readings{"a_".$anum."_areaPolygon"}	=  $alertsXml->{info}[$info]{area}[$area]{polygon}		if($_gdsAll || $_gdsPolygon);
-
-# area geocode informations
-# loop through array
-	$i = 0;
-	while(1){
-		($n, $v) = (undef, undef);
-		$n = $alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{valueName};
-		if(!$n) {last;}
-		$n = "a_".$anum."_geoCode_".$n;
-		$v = $alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{value};
-		$readings{$n} .= $v." " if($v);
-		$i++;
-	}
-
-	$readings{"a_".$anum."_altitude"}		= $alertsXml->{info}[$info]{area}[$area]{altitude}		if($_gdsAll);
-	$readings{"a_".$anum."_ceiling"}		= $alertsXml->{info}[$info]{area}[$area]{ceiling}		if($_gdsAll);
-
-	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "_dataSource", "Quelle: Deutscher Wetterdienst");
-	while(($k, $v) = each %readings){
-		# skip update if no valid data is available
-        next unless(defined($v));
-		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
-	}
-#	readingsEndUpdate($hash, 1);
-
-	# convert color value to hex
-	eval { readingsBulkUpdate($hash, 'a_'.$anum.'_eventCode_AREA_COLOR_hex', 
-	       _rgbd2h(ReadingsVal($name, 'a_'.$anum.'_eventCode_AREA_COLOR', '')));};
-	readingsEndUpdate($hash, 1);
-
-	return;
-}
-
-# sub checkCAPValid($$){
-# 	my ($onset,$expires) = @_;
-# 	my $valid = 0;
-# 	my $offset = _calctz(time,localtime(time))*3600; # used from 99_SUNRISE_EL
-#     my $t = (time - $offset);
-# 
-# 	$onset =~ s/T/ /;
-# 	$onset =~ s/\+/ \+/;
-# 	$onset = time_str2num($onset);
-# 
-# 	$expires =~ s/T/ /;
-# 	$expires =~ s/\+/ \+/;
-# 	$expires = time_str2num($expires);
-# 
-# 	$valid = 1 if($onset lt $t && $expires gt $t);
-# 	return $valid;
-# }
-
-sub checkCAPValid($$;$$){
-	my ($onset,$expires,$t,$tmax) = @_;
-	my $valid = 0;
-  
-	$t = time() if (!defined($t));
-	my $offset = _calctz($t,localtime($t))*3600; # used from 99_SUNRISE_EL
-	$t -= $offset;
-	$tmax -= $offset if (defined($tmax));
-
-	$onset =~ s/T/ /;
-	$onset =~ s/\+/ \+/;
-	$onset = time_str2num($onset);
-
-	$expires =~ s/T/ /;
-	$expires =~ s/\+/ \+/;
-	$expires = time_str2num($expires);
-
-	if (defined($tmax)) {  
-		$valid = 1 if($tmax ge $onset && $t lt $expires);
-	} else {
-		$valid = 1 if($onset lt $t && $expires gt $t);
-	}
-	return $valid;
-}
-
-sub capTrans($) {
-	my ($t) = @_;
-	my $valid = 0;
-	my $offset = _calctz(time,localtime(time))*3600; # used from 99_SUNRISE_EL
-	$t =~ s/T/ /;
-	$t =~ s/\+/ \+/;
-	$t = time_str2num($t);
-	my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime($t+$offset);
-	$mon  += 1;
-	$year += 1900;
-	$t = sprintf "%02s.%02s.%02s %02s:%02s:%02s", $mday, $mon, $year, $hour, $min, $sec;
-	return $t;
-}
-
-sub findCAPWarnCellId($$){
-	my ($info, $area) = @_;
-	my $i = 0;
-	while($i < 100){
-		if($alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{valueName} eq "WARNCELLID"){
-			return $alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{value};
-			last;
-		}
-		$i++;
-	}
-}
-
-sub retrieveConditions($$@){
-	my ($hash, $prefix, @a) = @_;
-	my $name		= $hash->{NAME};
-	(my $myStation	= utf8ToLatin1($a[2])) =~ s/_/ /g; # replace underscore in stationName by space
-	my $searchLen	= length($myStation);
-
-	my ($line, $item, %pos, %alignment, %wx, %cread, $k, $v);
-
-	Log3($name, 4, "GDS $name: Retrieving conditions data");
-	retrieveFile($hash,"conditions",undef,undef);
-	
-    my $fileName = $tempDir.$name."_conditions";
-    my ($err,@file) = FileRead({FileName=>$fileName,ForceType=>"file" });
-    return "GDS error reading $fileName" if($err);
-
-    foreach my $l (@file) {
-        $line = $l;                 # save line for further use
- 		if ($l =~ /Station/) {		# Header line... find out data positions
- 			@a = split(/\s+/, $l);
- 			foreach $item (@a) {
- 				$pos{$item} = index($line, $item);
- 			}
- 		}
- 		if (index(substr(lc($line),0,$searchLen), substr(lc($myStation),0,$searchLen)) != -1) { last; }
-    }	
-
-	%alignment = ("Station" => "l", "H\xF6he" => "r", "Luftd." => "r", "TT" => "r", "Tn12" => "r", "Tx12" => "r", 
-	"Tmin" => "r", "Tmax" => "r", "Tg24" => "r", "Tn24" => "r", "Tm24" => "r", "Tx24" => "r", "SSS24" => "r", "SGLB24" => "r", 
-	"RR1" => "r", "RR12" => "r", "RR24" => "r", "SSS" => "r", "DD" => "r", "FF" => "r", "FX" => "r", "Wetter/Wolken" => "l", "B\xF6en" => "l");
-	
-	foreach $item (@a) {
-		Log3($hash, 4, "conditions item: $item");
-		$wx{$item} = &readItem($line, $pos{$item}, $alignment{$item}, $item);
-	}
-
-	%cread = ();
-	$cread{"_dataSource"} = "Quelle: Deutscher Wetterdienst";
-
-	if(length($wx{"Station"})){
-		$cread{$prefix."_stationName"}	= $wx{"Station"};
-		$cread{$prefix."_altitude"}			= $wx{"H\xF6he"};
-		$cread{$prefix."_pressure-nn"}	= $wx{"Luftd."};
-		$cread{$prefix."_temperature"}	= $wx{"TT"};
-		$cread{$prefix."_tMinAir12"}		= $wx{"Tn12"};
-		$cread{$prefix."_tMaxAir12"}		= $wx{"Tx12"};
-		$cread{$prefix."_tMinGrnd24"}		= $wx{"Tg24"};
-		$cread{$prefix."_tMinAir24"}		= $wx{"Tn24"};
-		$cread{$prefix."_tAvgAir24"}		= $wx{"Tm24"};
-		$cread{$prefix."_tMaxAir24"}		= $wx{"Tx24"};
-		$cread{$prefix."_tempMin"}			= $wx{"Tmin"};
-		$cread{$prefix."_tempMax"}			= $wx{"Tmax"};
-		$cread{$prefix."_rain1h"}				= $wx{"RR1"};
-		$cread{$prefix."_rain12h"}			= $wx{"RR12"};
-		$cread{$prefix."_rain24h"}			= $wx{"RR24"};
-		$cread{$prefix."_snow"}					= $wx{"SSS"};
-		$cread{$prefix."_sunshine"}			= $wx{"SSS24"};
-		$cread{$prefix."_solar"}				= $wx{"SGLB24"};
-		$cread{$prefix."_windDir"}			= $wx{"DD"};
-		$cread{$prefix."_windSpeed"}		= $wx{"FF"};
-		$cread{$prefix."_windPeak"}			= $wx{"FX"};
-		$cread{$prefix."_weather"}			= $wx{"Wetter\/Wolken"};
-		$cread{$prefix."_windGust"}			= $wx{"B\xF6en"};
-	} else {
-		$cread{$prefix."_stationName"}	= "unknown: $myStation";
-	}
-
-	readingsBeginUpdate($hash);
-	while (($k, $v) = each %cread) {
-		# skip update if no valid data is available
-        unless(defined($v))      {delete($defs{$name}{READINGS}{$k}); next;}
-		if($v =~ m/^--/)         {delete($defs{$name}{READINGS}{$k}); next;};
-        unless(length(trim($v))) {delete($defs{$name}{READINGS}{$k}); next;};
-		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
-	}
-	readingsEndUpdate($hash, 1);
-
-	return ;
-}
-
-sub retrieveFile($$$$){
-    #
-    # request = type, e.g. alerts, conditions, warnings
-    # parameter = additional selector, e.g. Bundesland
-    #
-	my ($hash, $request, $parameter, $parameter2) = @_;
-	$hash->{helper}{request}    = $request;
-	$hash->{helper}{parameter}  = $parameter;
-	$hash->{helper}{parameter2} = $parameter2;
-	BlockingCall('_retrieveFile',$hash,undef,60,undef,undef);
-	delete $hash->{helper}{request};
-	delete $hash->{helper}{parameter};
-	delete $hash->{helper}{parameter2};
-
-    return(undef,undef);
-}
-
-sub _retrieveFile($){
-	my ($hash) = @_;
-	my $name		= $hash->{NAME};
-	my $user		= $hash->{helper}{USER};
-	my $pass		= $hash->{helper}{PASS};
-	my $host		= $hash->{helper}{URL};
-    my $request		= $hash->{helper}{request};
-	my $parameter   = $hash->{helper}{parameter};
-	my $parameter2  = $hash->{helper}{parameter2};
-	
-	my $proxyName	= AttrVal($name, "gdsProxyName", "");
-	my $proxyType	= AttrVal($name, "gdsProxyType", "");
-	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
-	my $debug		= AttrVal($name, "gdsDebug",0);
-
-	my ($dwd, $dir, $ftp, @files, $dataFile, $targetFile, $found, $readingName);
-	
-	my $urlString =	"ftp://$user:$pass\@".$host."/";
-
-	given($request){
-
-		when("capstations"){
-			$dir = "gds/help/";
-			$dwd = "legend_warnings_CAP_WarnCellsID.csv";
-			$targetFile = $tempDir.$request.".csv";
-			break;
-		}
-
-		when("conditionsmap"){
-			$dir = "gds/specials/observations/maps/germany/";
-			$dwd = $parameter."*";
-			$targetFile = $tempDir.$name."_".$request.".jpg";
-			break;
-		}
-
-		when("forecastsmap"){
-			$dir = "gds/specials/forecasts/maps/germany/";
-			$dwd = $parameter."*";
-			$targetFile = $tempDir.$name."_".$request.".jpg";
-			break;
-		}
-
-		when("warningsmap"){
-			if(length($parameter) != 2){
-				$parameter = $bula2bulaShort{lc($parameter)};
-			}
-			$dwd = "Schilder".$dwd2Dir{$bulaShort2dwd{lc($parameter)}}.".jpg";
-			$dir = "gds/specials/alerts/maps/";
-			$targetFile = $tempDir.$name."_".$request.".jpg";
-			break;
-		}
-
-		when("radarmap"){
-			$dir = "gds/specials/radar/".$parameter2;
-			$dwd = "Webradar_".$parameter."*";
-			$targetFile = $tempDir.$name."_".$request.".jpg";
-			break;
-		}
-
-		when("alerts"){
-			$dir = "gds/specials/alerts/cap/GER/status/";
-			$dwd = "Z_CAP*";
-            my $targetDir = $tempDir.$name."_alerts.dir";
-            mkdir $targetDir unless -d $targetDir;
-			$targetFile = "$targetDir/$name"."_alerts.zip";
-			break;
-			}
-
-		when("conditions"){
-			$dir = "gds/specials/observations/tables/germany/";
-			$dwd = "*";
-			$targetFile = $tempDir.$name."_".$request;
-			break;
-			}
-
-		when("forecasts"){
-			$dir = "gds/specials/forecasts/tables/germany/";
-			$dwd = "Daten_".$parameter;
-			$targetFile = $tempDir.$name."_".$request;
-			break;
-			}
-
-		when("warnings"){
-			if(length($parameter) != 2){
-				$parameter = $bula2bulaShort{lc($parameter)};
-			}
-			$dwd = $bulaShort2dwd{lc($parameter)};
-			$dir = $dwd2Dir{$dwd};
-			$dwd = "VHDL".$parameter2."_".$dwd."*";
-			$dir = "gds/specials/warnings/".$dir."/";
-			$targetFile = $tempDir.$name."_".$request;
-			break;
-			}
-	}
-
-	# delete old file 
-	eval{ unlink $targetFile; };
- 
-	Log3($name, 4, "GDS $name: searching for $dir".$dwd." on DWD server");
-	$urlString .= $dir;
-
-	$found = 0;
-	eval {
-		$ftp = Net::FTP->new(	$host,
-								Debug        => 0,
-								Timeout      => 10,
-								Passive      => $passive,
-								FirewallType => $proxyType,
-								Firewall     => $proxyName);
-		if(defined($ftp)){
-			Log3($name, 4, "GDS $name: ftp connection established.");
-			$ftp->login($user, $pass);
-			$ftp->binary;
-			$ftp->cwd("$dir");
-			@files = undef;
-			@files = $ftp->ls($dwd);
-			if(@files){
-				Log3($name, 4, "GDS $name: filelist found.");
-				$found = 1;
-				@files = sort(@files);
-				$dataFile = $files[-1];
-				$urlString .= $dataFile;
-				Log3($name, 5, "GDS $name: retrieving $dataFile");
-				$ftp->get($dataFile,$targetFile);
-				my $s = -s $targetFile;
-                Log3($name, 5, "GDS: ftp transferred $s bytes");
-			} else { 
-				Log3($name, 4, "GDS $name: filelist not found.");
-				$found = 0;
-			}
-			$ftp->quit;
-		}
-		Log3($name, 4, "GDS $name: updating readings.");
-		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash, "_dataSource",		"Quelle: Deutscher Wetterdienst");
-		readingsBulkUpdate($hash, "_dF_".$request, $dataFile) if(AttrVal($name, "gdsDebug", 0));
-		readingsEndUpdate($hash, 0);
-	};
-	return ($hash);
-}
-
-sub readItem {
-	my ($line, $pos, $align, $item)  = @_;
-	my $x;
-	
-	if ($align eq "l") {
-		$x = substr($line, $pos);
-		$x =~ s/  .+$//g;	# after two spaces => next field
-	}
-	if ($align eq "r") {
-		$pos += length($item);
-		$x = substr($line, 0, $pos);
-		$x =~ s/^.+  //g;	# remove all before the item
-	}
-	return $x;
-}
-
-sub sepLine($) {
-	my ($len) = @_;
-	my ($output, $i);
-	for ($i=0; $i<$len; $i++) { $output .= "-"; }
-	return $output;
-}
-
-sub _rgbd2h($) {
-	my ($input) = @_;
-	my @a = split(" ", $input);
-	my $output = sprintf( "%02x%02x%02x", $a[0],$a[1],$a[2]);
-	return $output;
-}
-
-sub _first_index ($@) {
-    my ($reg,@a) = @_;
-    my $i        = 0;
-    foreach my $l (@a) {
-        return $i if ($l =~ m/$reg/);
-        $i++;
-    }
-    return -1;
-}
-
-sub fillMappingTables($){
+sub _fillMappingTables($){
     my ($hash) = @_;
 
     $tempDir  = "/tmp/";
-    $aList    = "please_use_rereadcfg_first";
+    
+    $aList    = "data_retrieval_running";
 	$sList    = $aList;
  	$fList    = $aList;
-
-	retrieveFile($hash,"capstations",undef,undef);
 
 	$bulaList =	"Baden-Württemberg,Bayern,Berlin,Brandenburg,Bremen,".
 				"Hamburg,Hessen,Mecklenburg-Vorpommern,Niedersachsen,".
@@ -1340,24 +286,493 @@ sub fillMappingTables($){
     return;
 }
 
-sub initDropdownLists($){
-	my($hash) = @_;
+sub GDS_Define($$$) {
+	my ($hash, $def) = @_;
+	my @a = split("[ \t][ \t]*", $def);
+	my ($found, $dummy);
+
+	return "syntax: define <name> GDS <username> <password> [<host>]" if(int(@a) != 4 ); 
 	my $name = $hash->{NAME};
 
-    # fill $aList
-    if (-e $tempDir.$name."_alerts.dir/$name"."_alerts.zip"){
-       unzipCapFile($hash);
-       buildCAPList($hash);
- 	}
+	$hash->{helper}{USER}		= $a[2];
+	$hash->{helper}{PASS}		= $a[3];
+	$hash->{helper}{URL}		= defined($a[4]) ? $a[4] : "ftp-outgoing2.dwd.de";
+	$hash->{helper}{INTERVAL}   = 1200;
 
-    # fill $sList
-    getListStations($hash) if(-e $tempDir.$name."_conditions");
+	Log3($name, 4, "GDS $name: created");
+	Log3($name, 4, "GDS $name: tempDir=".$tempDir);
 
-	# fill $fList
-    getListForecastStations($hash) if(-e $tempDir.$name."_forecasts");
+    _GDS_addExtension("GDS_CGI","gds","GDS Files");
 
+	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
+	readingsSingleUpdate($hash, 'state', 'active',1);
+
+	return undef;
+}
+
+sub GDS_Undef($$) {
+	my ($hash, $arg) = @_;
+	my $name = $hash->{NAME};
+	RemoveInternalTimer($hash);
+    my $url = '/gds';
+    delete $data{FWEXT}{$url} if int(devspec2array('TYPE=GDS')) == 1;
+	return undef;
+}
+
+sub GDS_Shutdown($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	Log3 ($name,4,"GDS $name: shutdown requested");
+	return undef;
+}
+
+sub GDS_Notify ($$) {
+  my ($hash,$dev) = @_;
+  my $name = $hash->{NAME};
+  return if($dev->{NAME} ne "global");
+  return if(!grep(m/^INITIALIZED/, @{$dev->{CHANGED}}));
+
+  my $d;
+  
+  GDS_Get($hash,undef,'rereadcfg');
+
+#  $d = AttrVal($name,'gdsSetCond',undef);
+#  GDS_Set($hash,undef,'conditions',$d) if(defined($d));
+
+#  $d = AttrVal($name,'gdsSetForecast',undef);
+#  GDS_Set($hash,undef,'forecasts',$d) if(defined($d));
+  
+  return undef;
+}
+
+sub GDS_Set($@) {
+	my ($hash, @a) = @_;
+	my $name = $hash->{NAME};
+	my $usage =	"Unknown argument, choose one of ".
+	            "clear:alerts,conditions,forecasts,all ".
+				"conditions:$sList ".
+				"forecasts:$fList ".
+	            "help:noArg ".
+	            "update:noArg ";				;
+
+	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
+
+	my $command		= lc($a[1]);
+	my $parameter	= $a[2] if(defined($a[2]));
+
+	my ($result, $next);
+
+	$hash->{LOCAL} = 1;
+
+	return $usage if $command eq '?';
+
+	if(IsDisabled($name)) {
+		readingsSingleUpdate($hash, 'state', 'disabled', 0);
+		return "GDS $name is disabled. Aborting..." if IsDisabled($name);
+	}
+
+	readingsSingleUpdate($hash, 'state', 'active', 0);
+
+	given($command) {
+		when("clear"){
+			CommandDeleteReading(undef, "$name a_.*")
+			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "alerts"));
+			CommandDeleteReading(undef, "$name c_.*")    
+			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "conditions"));
+			CommandDeleteReading(undef, "$name g_.*")
+			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "conditions"));
+			CommandDeleteReading(undef, "$name fc.?_.*") 
+			       if(defined($parameter) && ($parameter eq "all" || $parameter eq "forecasts"));
+			}
+
+		when("help"){
+			$result = setHelp();
+			break;
+			}
+
+		when("update"){
+			RemoveInternalTimer($hash);
+			GDS_GetUpdate($hash);
+			break;
+			}
+
+		when("conditions"){
+            $attr{$name}{gdsSetCond} = $parameter; #ReadingsVal($name,'c_stationName',undef);
+			GDS_GetUpdate($hash);
+			break;
+			}
+
+		when("forecasts"){
+			return "Error: Forecasts disabled by attribute." unless AttrVal($name,'gdsUseForecasts',0);
+			CommandDeleteReading(undef, "$name fc.*") if($parameter ne AttrVal($name,'gdsSetForecast',''));
+            $attr{$name}{gdsSetForecast} = $parameter;
+			GDS_GetUpdate($hash);
+			break;
+			}
+
+		default { return $usage; };
+	}
+	return $result;
+}
+
+sub GDS_Get($@) {
+	my ($hash, @a) = @_;
+	my $command		= lc($a[1]);
+	my $parameter	= $a[2] if(defined($a[2]));
+	my $name = $hash->{NAME};
+
+	$hash->{LOCAL} = 1;
+
+	my $usage = "Unknown argument $command, choose one of help:noArg rereadcfg:noArg ".
+				"list:stations,capstations,data ".
+				"alerts:".$aList." ".
+				"conditions:".$sList." ".
+				"conditionsmap:".$cmapList." ".
+				"forecasts:".$fcmapList." ".
+				"forecastsmap:".$fmapList." ".
+				"radarmap:".$cmapList." ".
+				"warningsmap:"."Deutschland,Bodensee,".$bulaList." ".
+				"warnings:".$bulaList;
+
+	return $usage if $command eq '?';
+
+	if(IsDisabled($name)) {
+		readingsSingleUpdate($hash, 'state', 'disabled', 0);
+		return "GDS $name is disabled. Aborting..." if IsDisabled($name);
+	}
+
+	readingsSingleUpdate($hash, 'state', 'active', 0);
+	my $_gdsAll		= AttrVal($name,"gdsAll", 0);
+	my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
+	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
+
+	my ($result, @datensatz, $found);
+
+	given($command) {
+
+		when("conditionsmap"){
+			# retrieve map: current conditions
+			$hash->{file}{dir}		= "gds/specials/observations/maps/germany/";
+			$hash->{file}{dwd}		= $parameter."*";
+			$hash->{file}{target}	= $tempDir.$name."_conditionsmap.jpg";
+			retrieveData($hash,'FILE');
+			break;
+		}
+
+		when("forecastsmap"){
+			# retrieve map: forecasts
+			$hash->{file}{dir}		= "gds/specials/forecasts/maps/germany/";
+			$hash->{file}{dwd}		= $parameter."*";
+			$hash->{file}{target}	= $tempDir.$name."_forecastsmap.jpg";
+			retrieveData($hash,'FILE');
+			break;
+		}
+
+		when("warningsmap"){
+			# retrieve map: warnings
+			if(length($parameter) != 2){
+				$parameter = $bula2bulaShort{lc($parameter)};
+			}
+			$hash->{file}{dwd}		= "Schilder".$dwd2Dir{$bulaShort2dwd{lc($parameter)}}.".jpg";
+			$hash->{file}{dir}		= "gds/specials/alerts/maps/";
+			$hash->{file}{target}	= $tempDir.$name."_warningsmap.jpg";
+			retrieveData($hash,'FILE');
+			break;
+		}
+
+		when("radarmap"){
+			# retrieve map: radar
+			$parameter = ucfirst($parameter);
+			$hash->{file}{dir}		= "gds/specials/radar/".$rmapList{$parameter};
+			$hash->{file}{dwd}		= "Webradar_".$parameter."*";
+			$hash->{file}{target}	= $tempDir.$name."_radarmap.jpg";
+			retrieveData($hash,'FILE');
+			break;
+			}
+
+		when("help"){
+			$result = getHelp();
+			break;
+			}
+
+		when("list"){
+			given($parameter){
+				when("capstations")	{ 
+					return "Error: Alerts disabled by attribute." unless AttrVal($name,'gdsUseAlerts',0);
+					$result = getListCapStations($hash,$parameter); }
+				when("data")		{ $result = latin1ToUtf8(join("\n",@allConditionsData)); } # new
+				when("stations")	{
+					my @a = map (latin1ToUtf8(substr($_,0,19)), @allConditionsData);    
+         			unshift(@a, "Use one of the following stations:", sepLine(40));
+					$result = join("\n",@a);
+				}
+				default				{ $usage  = "get <name> list <parameter>"; return $usage; }
+			}
+			break;
+			}
+
+		when("alerts"){
+			return "Error: Alerts disabled by attribute." unless AttrVal($name,'gdsUseAlerts',0);
+			if($parameter =~ y/0-9// == length($parameter)){
+				while ( my( $key, $val ) = each %capCellHash ) {
+					push @datensatz,$val if $key =~ m/^$parameter/;
+				}
+#				push @datensatz,$capCellHash{$parameter};
+			} else {
+				push @datensatz,$capCityHash{$parameter};
+			}
+			CommandDeleteReading(undef, "$name a_.*");
+			if($datensatz[0]){
+				my $anum = 0;
+				foreach(@datensatz) {
+					decodeCAPData($hash,$_,$anum);
+					$anum++;
+				};
+				readingsSingleUpdate($hash,'a_count',$anum,1);
+			} else {
+				$result = "Keine Warnmeldung für die gesuchte Region vorhanden.";
+			}
+            my $_gdsAll		= AttrVal($name,"gdsAll", 0);
+            my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
+			readingsSingleUpdate($hash,'_lastAlertCheck','see timestamp ->',1) if($_gdsAll || $_gdsDebug);
+			break;
+			}
+
+		when("headlines"){
+			return "Error: Alerts disabled by attribute." unless AttrVal($name,'gdsUseAlerts',0);
+			$result = gdsHeadlines($name);
+			break;
+			}
+
+		when("conditions"){
+			getConditions($hash, "g", @a);
+			break;
+			}
+
+		when("rereadcfg"){
+			$hash->{GDS_REREAD} = time();
+			DoTrigger($name, "REREAD", 1);
+			retrieveData($hash,'conditions');
+			retrieveData($hash,'capdata')  if AttrVal($name,'gdsUseAlerts',0);
+			retrieveListCapStations($hash) if AttrVal($name,'gdsUseAlerts',0);
+			retrieveData($hash,'forecast') if AttrVal($name,'gdsUseForecasts',0);
+			break;
+			}
+
+		when("warnings"){
+			my $vhdl;
+			$result =	"     VHDL30 = current          |     VHDL31 = weekend or holiday\n".
+						"     VHDL32 = preliminary      |     VHDL33 = cancel VHDL32\n".
+						sepLine(31)."+".sepLine(38)."\n";
+
+			if(length($parameter) != 2){
+				$parameter = $bula2bulaShort{lc($parameter)};
+			}
+			my $dwd = $bulaShort2dwd{lc($parameter)};
+#			my $dir = $dwd2Dir{$dwd};
+			my $dir = "gds/specials/warnings/".$dwd2Dir{$dwd}."/";
+			$hash->{file}{dir}		= $dir;
+
+			for ($vhdl=30; $vhdl <=33; $vhdl++){
+				my $dwd2	= "VHDL".$vhdl."_".$dwd."*";
+				my $target	= $tempDir.$name."_warnings_$vhdl";
+				unlink $target;
+				$hash->{file}{dwd}		= $dwd2;
+				$hash->{file}{target}	= $target;
+				retrieveData($hash,'FILE');
+			}
+
+			sleep 2;
+			for ($vhdl=30; $vhdl <=33; $vhdl++){
+				my $target	= $tempDir.$name."_warnings_$vhdl";
+				$result .= retrieveText($hash, "warnings_$vhdl", "") if (-e $target);
+				$result .= "\n".sepLine(70);
+			}
+
+			$result .= "\n\n";
+			break;
+			}
+
+
+
+		when("forecasts"){
+			return "Error: Forecasts disabled by attribute." unless AttrVal($name,'gdsUseForecasts',0);
+			$parameter = "Daten_$parameter";
+			my ($k,$v,$data);
+			$result = sepLine(67)."\n";
+
+			# retrieve from hash
+			$data = undef;
+			while(($k, $v) = each %allForecastData){
+				if ($k eq $parameter) {
+					$data = $v;
+					last;
+				};
+			}
+			$data //= "No forecast data found.";
+			$data =~ s/\$/\n/g;
+			$result .= $data;
+			$result .= "\n".sepLine(67)."\n";
+			break;
+			}
+
+		default { return $usage; };
+	}
+	return $result;
+}
+
+sub GDS_Attr(@){
+	my @a = @_;
+	my $hash = $defs{$a[1]};
+	my ($cmd, $name, $attrName, $attrValue) = @a;
+
+	given($attrName){
+ 		when("gdsHideFiles"){
+ 		    my $hR = AttrVal($FW_wname,'hiddenroom','');
+ 		    $hR =~ s/\,GDS.Files//g;
+			if($attrValue) {
+	 		    $hR .= "," if(length($hR));
+ 			    $hR .= "GDS Files";
+			}
+			CommandAttr(undef,"$FW_wname hiddenroom $hR");
+ 			break;
+ 			}
+		default {$attr{$name}{$attrName} = $attrValue;}
+	}
+	if(IsDisabled($name)) {
+		readingsSingleUpdate($hash, 'state', 'disabled', 0);
+	} else {
+		readingsSingleUpdate($hash, 'state', 'active', 0);
+	}
 	return;
 }
+
+sub GDS_GetUpdate($) {
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	RemoveInternalTimer($hash);
+
+	my $fs = AttrVal($name, "gdsSetForecast", '');
+	my $cs = AttrVal($name, "gdsSetCond",     '');
+
+	if(IsDisabled($name)) {
+    	readingsSingleUpdate($hash, 'state', 'disabled', 0);
+		Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
+	} else {
+		readingsSingleUpdate($hash, 'state', 'active', 0);
+		if($cs) {
+			my @a;
+			push @a, undef;
+			push @a, undef;
+			push @a, $cs;
+			getConditions($hash, "c", @a);
+		}
+		if($fs) {
+			my @a;
+			push @a, undef;
+			push @a, undef;
+			push @a, $fs;
+			retrieveForecasts($hash, "fc", @a);    
+		}
+	}
+
+	# schedule next update
+	my $next = gettimeofday()+$hash->{helper}{INTERVAL};
+	my $_gdsAll		= AttrVal($name,"gdsAll", 0);
+	my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
+	readingsSingleUpdate($hash, "_nextUpdate", localtime($next), 1) if($_gdsAll || $_gdsDebug);
+	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
+
+	return 1;
+}
+
+###################################################################################################
+#
+#	FWEXT implementation
+
+sub _GDS_addExtension($$$) {
+    my ($func,$link,$friendlyname)= @_;
+  
+    my $url = "/" . $link;
+    Log3(undef,4,"Register gds webservice in FWEXT");
+    $data{FWEXT}{$url}{FUNC} = $func;
+    $data{FWEXT}{$url}{LINK} = "+$link";
+    $data{FWEXT}{$url}{NAME} = $friendlyname;
+    $data{FWEXT}{$url}{FORKABLE} = 0;
+}
+sub GDS_CGI {
+  my ($request) = @_;
+  my ($name,$ext)= _GDS_splitRequest($request);
+  if(defined($name)) {
+     my $filename= "$tempDir/$name.$ext";
+     my $MIMEtype= filename2MIMEType($filename);
+     my @contents;
+     if(open(INPUTFILE, $filename)) {
+       binmode(INPUTFILE);
+       @contents= <INPUTFILE>;
+       close(INPUTFILE);
+       return("$MIMEtype; charset=utf-8", join("", @contents));
+     } else {
+       return("text/plain; charset=utf-8", "File not found: $filename");
+     }
+  } else {
+    return _GDS_Overview();
+  }
+}
+sub _GDS_splitRequest($) {
+  my ($request) = @_;
+
+  if($request =~ /^.*\/gds$/) {
+    # http://localhost:8083/fhem/gds2
+    return (undef,undef); # name, ext
+  } else {
+    my $call= $request;
+    $call =~ s/^.*\/gds\/([^\/]*)$/$1/;
+    my $name= $call;
+    $name =~ s/^(.*)\.(jpg)$/$1/;
+    my $ext= $call;
+    $ext =~ s/^$name\.(.*)$/$1/;
+    return ($name,$ext);
+  }
+}
+sub _GDS_Overview {
+  my ($name, $url);
+  my $html= __GDS_HTMLHead("GDS Overview") . "<body>\n\n";
+  foreach my $def (sort keys %defs) {
+     if($defs{$def}{TYPE} eq "GDS") {
+        $name  = $defs{$def}{NAME};
+        $url   = __GDS_getURL();
+        $html .= "$name<br>\n<ul>\n";
+        $html .= "<a href=\"$url/gds/$name\_conditionsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Wetterlage</a><br/>\n";
+        $html .= "<a href=\"$url/gds/$name\_forecastsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Vorhersage</a><br/>\n";
+        $html .= "<a href=\"$url/gds/$name\_warningsmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Warnungen</a><br/>\n";
+        $html .= "<a href=\"$url/gds/$name\_radarmap.jpg\" target=\"_blank\">Aktuelle Wetterkarte: Radarkarte</a><br/>\n";
+        $html .= "</ul>\n\n";
+    }
+  }
+  $html.="</body>\n" . __GDS_HTMLTail();
+  return ("text/html; charset=utf-8", $html);
+}
+sub __GDS_HTMLHead($) {
+  my ($title) = @_;
+  my $doctype = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" '.
+                '"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
+  my $xmlns   = 'xmlns="http://www.w3.org/1999/xhtml"';
+  my $code    = "$doctype\n<html $xmlns>\n<head>\n<title>$title</title>\n</head>\n";
+  return $code;
+}
+sub __GDS_getURL {
+  my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
+  return $proto."://$FW_httpheader{Host}$FW_ME"; #".$FW_ME;
+}
+sub __GDS_HTMLTail {
+  return "</html>";
+}
+
+###################################################################################################
+#
+#	Tools
 
 sub gdsHeadlines($;$) {
   my ($d,$sep) = @_;
@@ -1369,6 +784,37 @@ sub gdsHeadlines($;$) {
     $text .= ReadingsVal('gds','a_'.$i.'_headline','')
   }
   return $text;
+}
+
+sub setHelp(){
+	return	"Use one of the following commands:\n".
+			sepLine(35)."\n".
+			"set <name> clear alerts|all\n".
+			"set <name> conditions <stationName>\n".
+			"set <name> forecasts <regionName>/<stationName>\n".
+			"set <name> help\n".
+			"set <name> rereadcfg\n".
+			"set <name> update\n";
+}
+
+sub getHelp(){
+	return	"Use one of the following commands:\n".
+			sepLine(35)."\n".
+			"get <name> alerts <region>\n".
+			"get <name> conditions <stationName>\n".
+			"get <name> forecasts <regionName>\n".
+			"get <name> help\n".
+			"get <name> list capstations|stations|data\n".
+			"get <name> rereadcfg\n".
+			"get <name> warnings <region>\n";
+}
+
+sub sepLine($;$) {
+	my ($len,$c) = @_;
+    $c //= '-';
+	my ($output, $i);
+	for ($i=0; $i<$len; $i++) { $output .= $c; }
+	return $output;
 }
 
 sub _readDir($) {
@@ -1383,33 +829,545 @@ sub _readDir($) {
    return @files;
 }
 
-sub unzipCapFile($) {
-	my($hash) = @_;
+sub retrieveText($$$) {
+	my ($hash, $fileName, $separator) = @_;
 	my $name = $hash->{NAME};
-
-   my $destinationDirectory = $tempDir.$name."_alerts.dir";
-   my $zipname = "$destinationDirectory/$name"."_alerts.zip";
-  
-   if (-d $destinationDirectory) {
-      # delete old files in directory
-      my @remove = _readDir($destinationDirectory); 
-      foreach my $f (@remove){
-         next if -d $f;
-         next if $zipname =~ m/$f$/;
-   	     Log3($name, 4, "GDS $name: deleting $destinationDirectory/$f"); 
-         unlink("$destinationDirectory/$f"); 
-      }
-   }
-
-   # unzip
-   system("/usr/bin/unzip $zipname -d $destinationDirectory");
-
-   # delete archive file
-   unlink $zipname unless AttrVal($name,"gdsDebug",0);
-   
+	my ($err,@a);
+	$fileName = $tempDir.$name."_$fileName";
+	($err,@a) = FileRead({FileName=>$fileName,ForceType=>"file" });
+	return "GDS error reading $fileName" if($err);
+	@a = map (latin1ToUtf8($_), @a);
+	return join($separator, @a);
 }
 
-sub mergeCapFile($) {
+###################################################################################################
+#
+#	Data retrieval
+
+sub getListCapStations($$){
+	my ($hash, $command) = @_;
+	my $name = $hash->{NAME};
+	my (%capHash, $file, @columns, $key, $cList, $count);
+
+	$file = $tempDir.'capstations.csv';
+	return "GDS error: $file not found." unless(-e $file);
+
+	# CSV öffnen und parsen
+	my ($err,@a) = FileRead({FileName=>$file,ForceType=>"file" });
+	return "GDS error reading $file" if($err);
+	foreach my $l (@a) {
+		next if (substr($l,0,1) eq '#');
+		@columns = split(";",$l);
+		$capHash{latin1ToUtf8($columns[4])} = $columns[0];
+	}
+
+	# Ausgabe sortieren und zusammenstellen
+	foreach $key (sort keys %capHash) {
+		$cList .= $capHash{$key}."\t".$key."\n";
+	}
+	return $cList;
+}
+
+sub getConditions($$@){
+	my ($hash, $prefix, @a) = @_;
+	my $name		= $hash->{NAME};
+	(my $myStation	= utf8ToLatin1($a[2])) =~ s/_/ /g; # replace underscore in stationName by space
+
+	my $searchLen	= length($myStation);
+
+	my ($line, $item, %pos, %alignment, %wx, %cread, $k, $v);
+
+    foreach my $l (@allConditionsData) {
+        $line = $l;                 # save line for further use
+ 		if ($l =~ /Station/) {		# Header line... find out data positions
+ 			@a = split(/\s+/, $l);
+ 			foreach $item (@a) {
+ 				$pos{$item} = index($line, $item);
+ 			}
+ 		}
+ 		if (index(substr(lc($line),0,$searchLen), substr(lc($myStation),0,$searchLen)) != -1) { last; }
+    }	
+
+	%alignment = ("Station" => "l", "H\xF6he" => "r", "Luftd." => "r", "TT" => "r", "Tn12" => "r", "Tx12" => "r", 
+	"Tmin" => "r", "Tmax" => "r", "Tg24" => "r", "Tn24" => "r", "Tm24" => "r", "Tx24" => "r", "SSS24" => "r", "SGLB24" => "r", 
+	"RR1" => "r", "RR12" => "r", "RR24" => "r", "SSS" => "r", "DD" => "r", "FF" => "r", "FX" => "r", "Wetter/Wolken" => "l", "B\xF6en" => "l");
+	
+	foreach $item (@a) {
+		Log3($hash, 4, "conditions item: $item");
+		$wx{$item} = &_readItem($line, $pos{$item}, $alignment{$item}, $item);
+	}
+
+	%cread = ();
+	$cread{"_dataSource"} = "Quelle: Deutscher Wetterdienst";
+
+	if(length($wx{"Station"})){
+		$cread{$prefix."_stationName"}	= utf8ToLatin1($wx{"Station"});
+		$cread{$prefix."_altitude"}			= $wx{"H\xF6he"};
+		$cread{$prefix."_pressure-nn"}	= $wx{"Luftd."};
+		$cread{$prefix."_temperature"}	= $wx{"TT"};
+		$cread{$prefix."_tMinAir12"}		= $wx{"Tn12"};
+		$cread{$prefix."_tMaxAir12"}		= $wx{"Tx12"};
+		$cread{$prefix."_tMinGrnd24"}		= $wx{"Tg24"};
+		$cread{$prefix."_tMinAir24"}		= $wx{"Tn24"};
+		$cread{$prefix."_tAvgAir24"}		= $wx{"Tm24"};
+		$cread{$prefix."_tMaxAir24"}		= $wx{"Tx24"};
+		$cread{$prefix."_tempMin"}			= $wx{"Tmin"};
+		$cread{$prefix."_tempMax"}			= $wx{"Tmax"};
+		$cread{$prefix."_rain1h"}				= $wx{"RR1"};
+		$cread{$prefix."_rain12h"}			= $wx{"RR12"};
+		$cread{$prefix."_rain24h"}			= $wx{"RR24"};
+		$cread{$prefix."_snow"}					= $wx{"SSS"};
+		$cread{$prefix."_sunshine"}			= $wx{"SSS24"};
+		$cread{$prefix."_solar"}				= $wx{"SGLB24"};
+		$cread{$prefix."_windDir"}			= $wx{"DD"};
+		$cread{$prefix."_windSpeed"}		= $wx{"FF"};
+		$cread{$prefix."_windPeak"}			= $wx{"FX"};
+		$cread{$prefix."_weather"}			= utf8ToLatin1($wx{"Wetter\/Wolken"});
+		$cread{$prefix."_windGust"}			= $wx{"B\xF6en"};
+	} else {
+		$cread{$prefix."_stationName"}	= "unknown: $myStation";
+	}
+
+	readingsBeginUpdate($hash);
+	while (($k, $v) = each %cread) {
+		# skip update if no valid data is available
+        unless(defined($v))      {delete($defs{$name}{READINGS}{$k}); next;}
+		if($v =~ m/^--/)         {delete($defs{$name}{READINGS}{$k}); next;};
+        unless(length(trim($v))) {delete($defs{$name}{READINGS}{$k}); next;};
+		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
+	}
+	readingsEndUpdate($hash, 1);
+
+	return ;
+}
+sub _readItem {
+	my ($line, $pos, $align, $item)  = @_;
+	my $x;
+	
+	if ($align eq "l") {
+		$x = substr($line, $pos);
+		$x =~ s/  .+$//g;	# after two spaces => next field
+	}
+	if ($align eq "r") {
+		$pos += length($item);
+		$x = substr($line, 0, $pos);
+		$x =~ s/^.+  //g;	# remove all before the item
+	}
+	return $x;
+}
+
+sub retrieveListCapStations($){
+	my ($hash) = @_;
+	$hash->{file}{dir}		= "gds/help/";
+	$hash->{file}{dwd}		= "legend_warnings_CAP_WarnCellsID.csv";
+	$hash->{file}{target}	= $tempDir."capstations.csv";
+	retrieveData($hash,'FILE');
+}
+
+sub decodeCAPData($$$){
+	my ($hash, $datensatz, $anum) = @_;
+	my $name		= $hash->{NAME};
+	my $info		= int($datensatz/100);
+	my $area		= $datensatz-$info*100;
+
+	my (%readings, @dummy, $i, $k, $n, $v, $t);
+
+	my $_gdsAll		= AttrVal($name,"gdsAll", 0);
+	my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
+	my $_gdsLong	= AttrVal($name,"gdsLong", 0);
+	my $_gdsPolygon	= AttrVal($name,"gdsPolygon", 0);
+
+	Log3($name, 4, "GDS $name: Decoding CAP record #".$datensatz);
+
+# topLevel informations
+	@dummy = split(/\./, $alertsXml->{identifier});
+
+	$readings{"a_".$anum."_identifier"}		= Dumper($alertsXml->{identifier})	if($_gdsAll || $_gdsDebug);
+	$readings{"a_".$anum."_idPublisher"}	= $dummy[5]					if($_gdsAll);
+	$readings{"a_".$anum."_idSysten"}		= $dummy[6]					if($_gdsAll);
+	$readings{"a_".$anum."_idTimeStamp"}	= $dummy[7]					if($_gdsAll);
+	$readings{"a_".$anum."_idIndex"}		= $dummy[8]					if($_gdsAll);
+	$readings{"a_".$anum."_sent"}			= $alertsXml->{sent}[0];
+	$readings{"a_".$anum."_status"}			= $alertsXml->{status}[0];
+	$readings{"a_".$anum."_msgType"}		= $alertsXml->{msgType}[0];
+# infoSet informations
+	$readings{"a_".$anum."_language"}		= $alertsXml->{info}[$info]{language}		if($_gdsAll);
+	$readings{"a_".$anum."_category"}		= $alertsXml->{info}[$info]{category};
+	$readings{"a_".$anum."_event"}			= $alertsXml->{info}[$info]{event};
+	$readings{"a_".$anum."_responseType"}	= $alertsXml->{info}[$info]{responseType};
+	$readings{"a_".$anum."_urgency"}		= $alertsXml->{info}[$info]{urgency}		if($_gdsAll);
+	$readings{"a_".$anum."_severity"}		= $alertsXml->{info}[$info]{severity}		if($_gdsAll);
+	$readings{"a_".$anum."_certainty"}		= $alertsXml->{info}[$info]{certainty}		if($_gdsAll);
+
+# eventCode informations
+# loop through array
+	$i = 0;
+	while(1){
+		($n, $v) = (undef, undef);
+		$n = $alertsXml->{info}[$info]{eventCode}[$i]{valueName};
+		if(!$n) {last;}
+		$n = "a_".$anum."_eventCode_".$n;
+		$v = $alertsXml->{info}[$info]{eventCode}[$i]{value};
+		$readings{$n} .= $v." " if($v);
+		$i++;
+	}
+
+# time/validity informations
+	$readings{"a_".$anum."_effective"}		= $alertsXml->{info}[$info]{effective}					if($_gdsAll);
+	$readings{"a_".$anum."_onset"}			= $alertsXml->{info}[$info]{onset};
+	$readings{"a_".$anum."_expires"}		= $alertsXml->{info}[$info]{expires};
+	$readings{"a_".$anum."_valid"}			= _checkCAPValid($readings{"a_".$anum."_onset"},$readings{"a_".$anum."_expires"});
+	$readings{"a_".$anum."_onset_local"}	= _capTrans($readings{"a_".$anum."_onset"});
+	$readings{"a_".$anum."_expires_local"}	= _capTrans($readings{"a_".$anum."_expires"}) 
+	         if(defined($alertsXml->{info}[$info]{expires}));
+	$readings{"a_".$anum."_sent_local"}		= _capTrans($readings{"a_".$anum."_sent"});
+
+	$readings{a_valid} = ReadingsVal($name,'a_valid',0) || $readings{"a_".$anum."_valid"};
+
+# text informations
+	$readings{"a_".$anum."_headline"}		= $alertsXml->{info}[$info]{headline};
+	$readings{"a_".$anum."_description"}	= $alertsXml->{info}[$info]{description}				if($_gdsAll || $_gdsLong);
+	$readings{"a_".$anum."_instruction"}	= $alertsXml->{info}[$info]{instruction}
+			if($readings{"a_".$anum."_responseType"} eq "Prepare" & ($_gdsAll || $_gdsLong));
+
+# area informations
+	$readings{"a_".$anum."_areaDesc"} 		=  $alertsXml->{info}[$info]{area}[$area]{areaDesc};
+	$readings{"a_".$anum."_areaPolygon"}	=  $alertsXml->{info}[$info]{area}[$area]{polygon}		if($_gdsAll || $_gdsPolygon);
+
+# area geocode informations
+# loop through array
+	$i = 0;
+	while(1){
+		($n, $v) = (undef, undef);
+		$n = $alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{valueName};
+		if(!$n) {last;}
+		$n = "a_".$anum."_geoCode_".$n;
+		$v = $alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{value};
+		$readings{$n} .= $v." " if($v);
+		$i++;
+	}
+
+	$readings{"a_".$anum."_altitude"}		= $alertsXml->{info}[$info]{area}[$area]{altitude}		if($_gdsAll);
+	$readings{"a_".$anum."_ceiling"}		= $alertsXml->{info}[$info]{area}[$area]{ceiling}		if($_gdsAll);
+
+	readingsBeginUpdate($hash);
+	readingsBulkUpdate($hash, "_dataSource", "Quelle: Deutscher Wetterdienst");
+	while(($k, $v) = each %readings){
+		# skip update if no valid data is available
+        next unless(defined($v));
+		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
+	}
+
+	# convert color value to hex
+	my $r = ReadingsVal($name, 'a_'.$anum.'_eventCode_AREA_COLOR', '');
+	if(length($r)) {
+		my $v = sprintf( "%02x%02x%02x", split(" ", $r));
+		readingsBulkUpdate($hash, 'a_'.$anum.'_eventCode_AREA_COLOR_hex', $v);
+	}
+	
+	readingsEndUpdate($hash, 1);
+
+	return;
+}
+sub _checkCAPValid($$;$$){
+	my ($onset,$expires,$t,$tmax) = @_;
+	my $valid = 0;
+  
+	$t = time() if (!defined($t));
+	# we use _calctz() from 99_SUNRISE_EL
+	my $offset = _calctz($t,localtime($t))*3600; 
+	$t -= $offset;
+	$tmax -= $offset if (defined($tmax));
+
+	$onset =~ s/T/ /;
+	$onset =~ s/\+/ \+/;
+	$onset = time_str2num($onset);
+
+	$expires =~ s/T/ /;
+	$expires =~ s/\+/ \+/;
+	$expires = time_str2num($expires);
+
+	if (defined($tmax)) {  
+		$valid = 1 if($tmax ge $onset && $t lt $expires);
+	} else {
+		$valid = 1 if($onset lt $t && $expires gt $t);
+	}
+	return $valid;
+}
+sub _capTrans($) {
+	my ($t) = @_;
+	my $valid = 0;
+	my $offset = _calctz(time,localtime(time))*3600; # used from 99_SUNRISE_EL
+	$t =~ s/T/ /;
+	$t =~ s/\+/ \+/;
+	$t = time_str2num($t);
+	my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime($t+$offset);
+	$mon  += 1;
+	$year += 1900;
+	$t = sprintf "%02s.%02s.%02s %02s:%02s:%02s", $mday, $mon, $year, $hour, $min, $sec;
+	return $t;
+}
+
+###################################################################################################
+#
+#	new: nonblocking data retrieval
+
+sub retrieveData($$){
+	my ($hash,$req) = @_;
+	$req = uc($req);
+	my $tag = "GDS_".$req."_READ";
+	delete $hash->{$tag};
+	$tag = "GDS_".$req."_ABORTED";
+	delete $hash->{$tag};
+	BlockingCall("_retrieve$req",$hash,"_finished$req",60,"_aborted$req",$hash);
+}
+
+#	any file
+sub _retrieveFILE {
+	my ($hash)		= shift;
+	my $name		= $hash->{NAME};
+	my $user		= $hash->{helper}{USER};
+	my $pass		= $hash->{helper}{PASS};
+	my $host		= $hash->{helper}{URL};
+	my $proxyName	= AttrVal($name, "gdsProxyName", "");
+	my $proxyType	= AttrVal($name, "gdsProxyType", "");
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
+
+	my $dir			= $hash->{file}{dir};
+	my $dwd			= $hash->{file}{dwd};
+	my $target		= $hash->{file}{target};
+
+	my $ret = "";
+
+	eval {
+		my $ftp = Net::FTP->new(	$host,
+									Debug        => 0,
+									Timeout      => 10,
+									Passive      => $passive,
+									FirewallType => $proxyType,
+									Firewall     => $proxyName);
+		if(defined($ftp)){
+			Log3($name, 4, "GDS $name: ftp connection established.");
+			$ftp->login($user, $pass);
+			$ftp->binary;
+			$ftp->cwd($dir);
+			my @files = $ftp->ls($dwd);
+			if(@files) {
+				@files = sort(@files);
+				$dwd   = $files[-1];
+ 				Log3($name, 4, "GDS $name: file found.");
+				Log3($name, 4, "GDS $name: retrieving $dwd");
+				if(defined($target)) {
+					$ftp->get($dwd,$target);
+					my $s = -s $target;
+        	        Log3($name, 4, "GDS: ftp transferred $s bytes");
+				} else {
+					my ($file_content,$file_handle);
+					open($file_handle, '>', \$file_content);
+					$ftp->get($dwd,$file_handle);
+					$file_content = latin1ToUtf8($file_content);
+					$file_content =~ s/\r\n/\$/g;
+					$ret = $file_content;
+				}
+			}
+			$ftp->quit;
+		}
+	};
+	return "$name;;;$dwd;;;$ret";
+}
+sub _finishedFILE {
+	my ($name,$file,$ret) = split(/;;;/,shift); #@_;
+	my $hash = $defs{$name};
+	DoTrigger($name,"REREADFILE $file",1);
+}
+sub _abortedFILE {
+	my ($hash) = shift;
+}
+
+#	Conditions
+sub _retrieveCONDITIONS {
+	my ($hash)		= shift;
+	my $name		= $hash->{NAME};
+	my $user		= $hash->{helper}{USER};
+	my $pass		= $hash->{helper}{PASS};
+	my $host		= $hash->{helper}{URL};
+	my $proxyName	= AttrVal($name, "gdsProxyName", "");
+	my $proxyType	= AttrVal($name, "gdsProxyType", "");
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
+	my $dir			= "gds/specials/observations/tables/germany/";
+
+	my $ret;
+
+	eval {
+		my $ftp = Net::FTP->new(	$host,
+									Debug        => 0,
+									Timeout      => 10,
+									Passive      => $passive,
+									FirewallType => $proxyType,
+									Firewall     => $proxyName);
+		if(defined($ftp)){
+			Log3($name, 4, "GDS $name: ftp connection established.");
+			$ftp->login($user, $pass);
+			$ftp->binary;
+			$ftp->cwd("$dir");
+			my @files = $ftp->ls();
+			if(@files) {
+ 				Log3($name, 4, "GDS $name: filelist found.");
+ 				@files			= sort(@files);
+				my $datafile	= $files[-1];
+				Log3($name, 5, "GDS $name: retrieving $datafile");
+				my ($file_content,$file_handle);
+				open($file_handle, '>', \$file_content);
+				$ftp->get($datafile,$file_handle);
+#				$file_content = latin1ToUtf8($file_content);
+				$file_content =~ s/\r\n/\$/g;
+				$ret = "$datafile;;;$file_content";
+			}
+			$ftp->quit;
+		}
+	};
+	return "$name;;;$ret" if $ret;
+	return "$name";
+}
+sub _finishedCONDITIONS {
+	my ($name,$file_name,$file_content) = split(/;;;/,shift);
+	my $hash = $defs{$name};
+	@allConditionsData = split(/\$/,$file_content);
+
+	# fill dropdown list
+    my @a = map (trim(substr($_,0,19)), @allConditionsData);    
+	@a = map (latin1ToUtf8($_), @a);
+	# delete header lines 
+	splice(@a, 0, 6);
+	# delete legend 
+	splice(@a, __first_index("Höhe",@a)-1);
+	@a = sort(@a);
+	$sList = join(",", @a);
+	$sList =~ s/\s+,/,/g; # replace multiple spaces followed by comma with comma
+	$sList =~ s/\s/_/g;   # replace spaces in stationName with underscore for list in frontende
+	readingsSingleUpdate($hash, "_dF_conditions",$file_name,0) if(AttrVal($name, "gdsDebug", 0));
+
+	$hash->{GDS_CONDITIONS_READ}	= time();
+	my $cf = AttrVal($name,'gdsSetCond','');
+	my $up = time() - $fhem_started;
+	GDS_GetUpdate($hash) if $cf; #if ($cf && $up < 120);
+	DoTrigger($name,"REREADCONDITIONS",1);
+}
+sub __first_index ($@) {
+    my ($reg,@a) = @_;
+    my $i        = 0;
+    foreach my $l (@a) {
+        return $i if ($l =~ m/$reg/);
+        $i++;
+    }
+    return -1;
+}
+sub _abortedCONDITIONS {
+	my ($hash) = shift;
+	delete $hash->{GDS_CONDITIONS_READ};
+	$hash->{GDS_CONDITIONS_ABORTED} = localtime(time());
+}
+
+# 	CapData
+sub _retrieveCAPDATA {
+	my ($hash)		= shift;
+	my $name		= $hash->{NAME};
+	my $user		= $hash->{helper}{USER};
+	my $pass		= $hash->{helper}{PASS};
+	my $host		= $hash->{helper}{URL};
+	my $proxyName	= AttrVal($name, "gdsProxyName", "");
+	my $proxyType	= AttrVal($name, "gdsProxyType", "");
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
+	my $dir 		= "gds/specials/alerts/cap/GER/status/";
+	my $dwd			= "Z_CAP*";
+
+	my $datafile;
+	my $targetDir	= $tempDir.$name."_alerts.dir";
+	my $targetFile	= "$targetDir/$name"."_alerts.zip";
+	mkdir $targetDir unless -d $targetDir;
+
+	eval {
+		my $ftp = Net::FTP->new(	$host,
+									Debug        => 0,
+									Timeout      => 10,
+									Passive      => $passive,
+									FirewallType => $proxyType,
+									Firewall     => $proxyName);
+		if(defined($ftp)){
+			Log3($name, 4, "GDS $name: ftp connection established.");
+			$ftp->login($user, $pass);
+			$ftp->binary;
+			$ftp->cwd("$dir");
+			my @files = $ftp->ls($dwd);
+			if(@files) {
+ 				Log3($name, 4, "GDS $name: filelist found.");
+ 				@files			= sort(@files);
+				$datafile		= $files[-1];
+				Log3($name, 5, "GDS $name: retrieving $datafile");
+				$ftp->get($datafile,$targetFile);
+				my $s = -s $targetFile;
+                Log3($name, 5, "GDS: ftp transferred $s bytes");
+			}
+			$ftp->quit;
+		}
+	};
+
+	
+	# delete old files in directory
+	if (-d $targetDir) {
+		my @remove = _readDir($targetDir); 
+		foreach my $f (@remove){
+			next if -d $f;
+			next if $targetFile =~ m/$f$/;
+			Log3($name, 4, "GDS $name: deleting $targetDir/$f"); 
+			unlink("$targetDir/$f"); 
+		}
+	}
+
+	# unzip
+	my $zip = Archive::Extract->new( archive => $targetFile );
+	my $ok  = $zip->extract( to => $targetDir);
+	Log3($name, 1, "GDS $name: error ".$zip->error()) unless $ok;
+
+	# delete archive file
+	unlink $targetFile;
+
+#	# merge
+    my ($countInfo,$cF)		= _mergeCapFile($hash);
+	my ($aList,$cellData)	= _buildCAPList($hash,$countInfo,$cF);
+
+	return "$name;;;$datafile;;;$aList;;;$cF;;;$cellData";
+}
+sub _finishedCAPDATA {
+	my ($name,$datafile,$aL,$capFile,$cellData) = split(/;;;/,shift);
+	my $hash = $defs{$name};
+	$aList = $aL;
+
+	my @h = split(/;;/,$cellData);
+	foreach(@h) {
+		my ($n,$city,$cell)		= split(/:/,$_);
+		$capCityHash{$city}		= $n;
+		$capCellHash{"$cell$n"}	= $n;
+	}
+
+	my $xml		= new XML::Simple;
+	eval {
+	$alertsXml	= $xml->XMLin($capFile, KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
+	};
+    if ($@) {
+       Log3($name,1,'GDS: error analyzing alerts XML:'.$@);
+       return;
+    }
+	readingsSingleUpdate($hash, "_dF_alerts",$datafile,0) if(AttrVal($name, "gdsDebug", 0));
+	$hash->{GDS_CAPDATA_READ} = time();
+	DoTrigger($name,"REREADALERTS",1);
+}
+sub _abortedCAPDATA {
+	my ($hash) = shift;
+	delete $hash->{GDS_CAPDATA_READ};
+	$hash->{GDS_CAPDATA_ABORTED} = localtime(time());
+}
+sub _mergeCapFile($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     
@@ -1453,23 +1411,147 @@ sub mergeCapFile($) {
     my $xmlContent = join('',@alertsArray);
     return ($countInfo,$xmlContent);
 }
+sub _buildCAPList($$$){
+	my ($hash,$countInfo,$cF) = @_;
+	my $name = $hash->{NAME};
 
-# forecast retrieval 
-=pod
+	$alertsXml		= undef;
+
+	my $xml			= new XML::Simple;
+	my $area		= 0;
+	my $record		= 0;
+	my $n			= 0;
+	my ($capCity, $capCell, $capEvent, $capEvt, @a);
+    my $destinationDirectory = $tempDir.$name."_alerts.dir";
+    
+    # make XML array and analyze data
+    eval	{	
+	  $alertsXml = $xml->XMLin($cF, KeyAttr => {}, ForceArray => [ 'info', 'eventCode', 'area', 'geocode' ]);
+    };
+    if ($@) {
+       Log3($name,1,'GDS: error analyzing alerts XML:'.$@);
+       return (undef,undef);
+    }
+
+    # analyze entries based on info and area array
+    # array elements are determined by $info and $area
+    #
+
+	my $cellData = "";
+
+    for (my $info=0; $info<=$countInfo;$info++) {
+       $area = 0;
+       while(1){
+          $capCity  = $alertsXml->{info}[$info]{area}[$area]{areaDesc};
+          $capEvent = $alertsXml->{info}[$info]{event};
+          last unless $capCity;
+          $capCell  = __findCAPWarnCellId($info, $area);
+          $n        = 100*$info+$area;
+          $capCity  = latin1ToUtf8($capCity.' '.$capEvent);
+          push @a, $capCity;
+          $capCity =~ s/\s/_/g;
+			$cellData .= "$n:$capCity:$capCell$n;;";
+          $area++;
+          $record++;
+          $capCity = undef;
+       }
+    }
+
+	@a = sort(@a);
+    $aList = undef;
+	$aList = join(",", @a);
+	$aList =~ s/\s/_/g;
+	$aList = "No_alerts_published!" if !$record;
+
+    return($aList,$cellData);
+}
+sub __findCAPWarnCellId($$){
+	my ($info, $area) = @_;
+	my $i = 0;
+	while($i < 100){
+		if($alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{valueName} eq "WARNCELLID"){
+			return $alertsXml->{info}[$info]{area}[$area]{geocode}[$i]{value};
+			last;
+		}
+		$i++; # emergency exit :)
+	}
+}
+
+#	ForecastData
+sub _retrieveFORECAST {
+	my ($hash)		= shift;
+	my $name		= $hash->{NAME};
+	my $user		= $hash->{helper}{USER};
+	my $pass		= $hash->{helper}{PASS};
+	my $host		= $hash->{helper}{URL};
+	my $proxyName	= AttrVal($name, "gdsProxyName", "");
+	my $proxyType	= AttrVal($name, "gdsProxyType", "");
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
+	my $dir         = "gds/specials/forecasts/tables/germany/";
+
+    my $ret;
+
+	eval {
+		my $ftp = Net::FTP->new(	$host,
+									Debug        => 0,
+									Timeout      => 10,
+									Passive      => $passive,
+									FirewallType => $proxyType,
+									Firewall     => $proxyName);
+		if(defined($ftp)){
+			Log3($name, 4, "GDS $name: ftp connection established.");
+			$ftp->login($user, $pass);
+			$ftp->binary;
+			$ftp->cwd("$dir");
+			my @files = $ftp->ls();
+			if(@files) {
+ 				Log3($name, 4, "GDS $name: filelist found.");
+ 				@files = sort(@files);
+				$fcmapList = undef;
+ 				map ( $fcmapList .= (split(/Daten_/,$_,2))[1].",", @files );
+				my $count = 0;
+				foreach my $file (@files) {
+					my ($file_content,$file_handle);
+					open($file_handle, '>', \$file_content);
+					$ftp->get($file,$file_handle);
+					next unless (length($file_content));
+					$file_content = latin1ToUtf8($file_content);
+					$file_content =~ s/\r\n/\$/g;
+					$ret .= "$file:$file_content;";
+					$count++;
+				}
+			}
+			$ftp->quit;
+		}
+	};
+
+	return $name.";;;".$ret;
+}
+sub _finishedFORECAST {
+	my ($name,$ret) = split(/;;;/,shift); #@_;
+	my $hash = $defs{$name};
+	my @a = split(/;/,$ret);
+	%allForecastData = ();
+	foreach my $l (@a) {
+		my ($fn,$fc) = split(/\:/,$l);
+		$allForecastData{$fn} = $fc;
+	}
+	$hash->{GDS_FORECAST_READ} = time();
+	getListForecastStations($hash);
+	my $sf = AttrVall($name,'gdsSetForecast','');
+	my $up = time() - $fhem_started;
+	GDS_GetUpdate($hash) if $sf; #if ($sf && $up < 120);
+	DoTrigger($name,"REREADFORECAST",1);
+}
+sub _abortedFORECAST {
+	my ($hash) = shift;
+	delete $hash->{GDS_FORECAST_READ};
+	$hash->{GDS_FORECAST_ABORTED} = localtime(time());
+}
+
 ###################################################################################################
 #
-#  forecast retrieval 
-#
-#  provided by jensb
-#  modified by betateilchen
-#  - use FileRead instead of own I/O
-#  - do not set empty readings
-#  - allow temperature readings below zero degree
-#  - read forecasts on startup if attr gdsSetForecasts already defined before
-#  - delete all fc_.* readings in case of new station selection
-#
-###################################################################################################
-=cut
+# forecast retrieval - provided by jensb
 
 sub retrieveForecasts($$@) {
 	#
@@ -1477,8 +1559,6 @@ sub retrieveForecasts($$@) {
 	#
 	my ($hash, $prefix, @a) = @_;
 	my $name		= $hash->{NAME};
-	my $user		= $hash->{helper}{USER};
-	my $pass		= $hash->{helper}{PASS};
 
 	# extract region and station name
 	if (!defined($a[2])) {
@@ -1490,7 +1570,7 @@ sub retrieveForecasts($$@) {
 	}
 
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();  
-	my ($dataFile, $found, $line, %fread, $k, $v); 
+	my ($dataFile, $found, $line, %fread, $k, $v, $data); 
 	my $area      =  utf8ToLatin1(substr($a[2], 0, $i));
 	my $station   =  utf8ToLatin1(substr($a[2], $i+1));
 	   $station   =~ s/_/ /g; # replace underscore in station name by space
@@ -1582,16 +1662,20 @@ sub retrieveForecasts($$@) {
 		my $fcDate = sprintf("%02d.%02d.%04d", $fcMday, 1+$fcMon, 1900+$fcYear);
 		my $fcDateFound = 0;
 
-		# FTP retrieve
+		# retrieve from hash
 		my $noDataFound = 1;
-		Log3($name, 4, "GDS $name: Retrieving forecasts data for day $day: $areaAndTime");
-		retrieveFile($hash, "forecasts", $areaAndTime, undef); sleep 1;
+		$data = undef;
+		while(($k, $v) = each %allForecastData){
+			if ($k eq "Daten_$areaAndTime") {
+				$data = $v;
+				last;
+			};
+		}
 
-		my $fileName = $tempDir.$name."_forecasts";
-		my ($err,@data) = FileRead({FileName=>$fileName,ForceType=>"file" });
-		return "GDS error reading $fileName" if($err);
 
-		unless ($err) {
+		if (defined($data) && $data) {
+
+			my @data = split(/\$/,$data);
 
 			foreach my $l (@data) {
 				if (index($l, $fcDate) > 0) { 
@@ -1695,57 +1779,45 @@ sub retrieveForecasts($$@) {
         unless(defined($v))      {delete($defs{$name}{READINGS}{$k}); next;}
 		if($v =~ m/^--/)        {delete($defs{$name}{READINGS}{$k}); next;};
         unless(length(trim($v))) {delete($defs{$name}{READINGS}{$k}); next;};
-		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
+#		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
+		readingsBulkUpdate($hash, $k, $v); 
 	}
 	readingsEndUpdate($hash, 1);
 }
 
 sub getListForecastStations($) {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
+	my ($hash)  = @_;
+	my $name    = $hash->{NAME};
+	my @regions = keys(%rmapList);
+	my (@a,$data,$k,$v);
 
-  my @a;
-  my @regions = keys(%rmapList);
-  foreach (@regions) {
-    my $areaAndTime = $_.'_morgen_spaet';
-    retrieveFile($hash, "forecasts", $areaAndTime, undef);
-    my $fileName = $tempDir.$name."_forecasts";
-    my ($err,@data) = FileRead({FileName=>$fileName,ForceType=>"file" });
-    return "GDS error reading $fileName" if($err);
-    my $lineCount = 0;
-    foreach my $line (@data) {
-      # skip header lines
-      $lineCount++;
-      if ($lineCount > 2) {
-        if (length($line) == 0 || substr($line, 0, 3) eq '   ') {
-          # empty line, done
-          last;
-        } else {
-          # line with station name found
-          $line = latin1ToUtf8($line);
-          $line =~ s/---/   ---/g;   # column distance may drop to zero between station name and invalid temp "---" -> prepend 3 spaces
-          $line =~ s/   /;/g;        # now min. column distance is 3 spaces -> convert to semicolon 
-          $line =~ s/;+/;/g;         # replace multiple consecutive semicolons by one semicolon
-          my @b = split(';', $line); # split columns by semicolon
-          push @a, $_.'/'.$b[0];     # concat region name and station name (1st column)
-        }
-      }
-    } # foreach @data
-  } # foreach @regions
-   
-  if (!@a) {
-    Log3($name, 4, "GDS $name: error: unable to read forecast data");
-  }
-  @a = sort(@a);
-  
-  $fList = join(",", @a);
-  $fList =~ s/\s+,/,/g; # replace multiple spaces followed by comma with comma
-  $fList =~ s/\s/_/g;   # replace spaces in stationName with underscore for list in frontend
-  
-  return;
+	eval {
+		foreach my $region (@regions) {
+			my $areaAndTime = 'Daten_'.$region.'_morgen_spaet';
+			while(($k, $v) = each %allForecastData){
+				if ($k eq $areaAndTime) {
+					$data = $v;
+					last;
+				};
+			}
+			my @data = split(/\$/,$data);
+			splice(@data, 0,2);
+			splice(@data,-2);
+			map ( push(@a,"$region/".(split(/(\s|--)/,$_,2))[0]), @data );
+		}
+	};
+	   
+	Log3($name, 4, "GDS $name: forecast data not found") unless (!@a);
+
+	@a = sort(@a);
+  	$fList = join(",", @a);
+	$fList =~ s/\s+,/,/g; # replace multiple spaces followed by comma with comma
+	$fList =~ s/\s/_/g;   # replace spaces in stationName with underscore for list in frontend
+	return;
 }
 
 1;
+
 
 # development documentation
 =pod
@@ -1753,13 +1825,33 @@ sub getListForecastStations($) {
 #
 #   ToDo
 #
-#   - improve nonblocking processing
+###################################################################################################
+#
+#	Changelog $Revision$ 
 #
 ###################################################################################################
 #
-#	Changelog $Revision: $ 
+#	2015-10-13	changed		getListForecastStations()	completed
+#				changed		retrieveForecasts()			completed
+#				added		DoTrigger() according to reread
 #
-###################################################################################################
+#	2015-10-12  changed		conditions		completed
+#				changed		capstationlist	completed
+#				changed		conditionsmap	completed
+#				changed		forecastsmap	completed
+#				changed		radarmap		completed
+#				changed		warningsmap		completed
+#				changed		warnings		completed
+#				changed		get alerts		completed
+#
+#   2015-10-11 	changed		use Archive::Extract for unzip
+#				changed		code cleanup
+# 				changed		forecast nonblocking retrieval:
+#								hash generation completed
+#				changed		capstations nonblocking retrieval:
+#								alertslist dropdown completed
+#								datafile retrieval completed
+#
 #
 #   ----------  public    RC2 published, SVN #9429
 #
