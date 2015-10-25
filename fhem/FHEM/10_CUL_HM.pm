@@ -1441,19 +1441,19 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
 
       my $stErr = ($err >>1) & 0x7;    # Status-Byte Evaluation
-      push @evtEt,[$mh{shash},1,"battery:".(($stErr == 4)?"critical":($err&0x80?"low":"ok"))];
+      push @evtEt,[$mh{devH},1,"battery:".(($stErr == 4)?"critical":($err&0x80?"low":"ok"))];
       if (!$stErr){#remove both conditions
-        push @evtEt,[$mh{shash},1,"motorErr:ok"];
+        push @evtEt,[$mh{devH},1,"motorErr:ok"];
       }
       else{
-        push @evtEt,[$mh{shash},1,"motorErr:blocked"                  ]if($stErr == 1);
-        push @evtEt,[$mh{shash},1,"motorErr:loose"                    ]if($stErr == 2);
-        push @evtEt,[$mh{shash},1,"motorErr:adjusting range too small"]if($stErr == 3);
+        push @evtEt,[$mh{devH},1,"motorErr:blocked"                  ]if($stErr == 1);
+        push @evtEt,[$mh{devH},1,"motorErr:loose"                    ]if($stErr == 2);
+        push @evtEt,[$mh{devH},1,"motorErr:adjusting range too small"]if($stErr == 3);
 #       push @evtEt,[$mh{shash},1,"battery:critical"                  ]if($stErr == 4);
       }
-      push @evtEt,[$mh{shash},1,"motor:opening"] if(($err&0x30) == 0x10);
-      push @evtEt,[$mh{shash},1,"motor:closing"] if(($err&0x30) == 0x20);
-      push @evtEt,[$mh{shash},1,"motor:stop"   ] if(($err&0x30) == 0x00);
+      push @evtEt,[$mh{devH},1,"motor:opening"] if(($err&0x30) == 0x10);
+      push @evtEt,[$mh{devH},1,"motor:closing"] if(($err&0x30) == 0x20);
+      push @evtEt,[$mh{devH},1,"motor:stop"   ] if(($err&0x30) == 0x00);
 
       #VD hang detection
       my $des = ReadingsVal($mh{devN}, "ValveDesired", $vp);
@@ -1543,22 +1543,22 @@ sub CUL_HM_Parse($$) {#########################################################
         $bTime     = ((hex($mI[5])  ) & 0x3f)." min";
       }
 
-      my %errTbl=( 0=>"ok", 1=>"ValveTight", 2=>"adjustRangeTooLarge"
+      my %errTbl=( 0=>"ok", 1=>"ValveTight",  2=>"adjustRangeTooLarge"
                   ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
                   ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
-
-      push @evtEt,[$mh{shash},1,"desired-temp:$setTemp"  ];
-      push @evtEt,[$mh{shash},1,"controlMode:$ctlTbl{$ctrlMode}"];
-      push @evtEt,[$mh{shash},1,"state:T: $actTemp desired: $setTemp valve: $vp"];
-      push @evtEt,[$mh{shash},1,"motorErr:$errTbl{$err}" ];
-      push @evtEt,[$mh{shash},1,"boostTime:$bTime"];
-      push @evtEt,[$mh{shash},1,"partyStart:$pStart"];
-      push @evtEt,[$mh{shash},1,"partyEnd:$pEnd"];
-      push @evtEt,[$mh{shash},1,"partyTemp:$pTemp"];
+      my $climaHash = CUL_HM_id2Hash($mh{src}."04");# always to Clima channel
+      push @evtEt,[$climaHash,1,"desired-temp:$setTemp"  ];
+      push @evtEt,[$climaHash,1,"controlMode:$ctlTbl{$ctrlMode}"];
+      push @evtEt,[$climaHash,1,"state:T: $actTemp desired: $setTemp valve: $vp"];
+      push @evtEt,[$climaHash,1,"boostTime:$bTime"];
+      push @evtEt,[$climaHash,1,"partyStart:$pStart"];
+      push @evtEt,[$climaHash,1,"partyEnd:$pEnd"];
+      push @evtEt,[$climaHash,1,"partyTemp:$pTemp"];
       #push @evtEt,[$mh{shash},1,"unknown0:$uk0"];
       #push @evtEt,[$mh{shash},1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
+      push @evtEt,[$mh{devH},1,"motorErr:$errTbl{$err}" ];
       push @evtEt,[$mh{devH},1,"battery:$lBat"] if ($lBat);
-      push @evtEt,[$mh{devH} ,1,"desired-temp:$setTemp"];
+      push @evtEt,[$mh{devH},1,"desired-temp:$setTemp"];
     }
     elsif($mh{mTp} eq "59" && defined $mI[0]) {#inform team about new value
       my $setTemp = sprintf("%.1f",int(hex($mI[0])/4)/2);
