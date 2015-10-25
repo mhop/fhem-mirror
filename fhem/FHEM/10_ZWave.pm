@@ -749,6 +749,7 @@ ZWave_Cmd($$@)
     $data = "$cmd $id $data" if($re);
 
     $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
+    ZWave_processSendStack($hash, 1) if($data && $cmd eq "neighborList");
 
   } else {
     if(!$zwave_quietCmds{$cmd}) {
