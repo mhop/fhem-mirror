@@ -1,5 +1,19 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: codemirror modules now loaded by default: search.js, comment.js
+                 dialog.js, autorefresh.js, searchcursor.js, dialog.css
+             codemirror search & replace is now activated by default.
+                 to use this feature now you must only load in fhemweb
+                 attribute 'JavaScripts' the codemirror/fhem_codemirror.js file
+             new extraKeys for 'TAB', 'Shift+Tab', 'STRG+Q', 'STRG+UP',
+                 and 'STRG+DOWN' are added.
+             codemirror default parameters are now:
+                 indentUnit:4, indentWithTabs:false, autoCloseBrackets:false,
+                 matchBrackets:true, autofocus:true, theme:"blackboard",
+                 lineNumbers:true, autoRefresh:true
+               this can be overwritten with fhemweb attribute 'codemirrorParam'
+  - updated: codemirror version to 5.8 
+             the default codemirror javascript files are now minified
   - feature: 70_XBMC: -added disable attribute
                       -added reading tvshowid
   - feature: new module 00_SIGNALduino.pm and 90_SIGNALduino_un: added 

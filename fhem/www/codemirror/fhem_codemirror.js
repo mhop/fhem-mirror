@@ -22,13 +22,19 @@ $(document).ready(function(){
 function
 AddCodeMirror(e, cb)
 {
-  if(cm_loaded == 4)
+  if(cm_loaded == 9)
     return cm_wait(e, cb);
   loadLink("codemirror/codemirror.css");
   loadLink("codemirror/show-hint.css");
+  loadLink("codemirror/dialog.css");
   loadScript("codemirror/codemirror.js",   function(){ cm_loaded++;} );
   loadScript("codemirror/closebrackets.js",function(){ cm_loaded++;} );
   loadScript("codemirror/matchbrackets.js",function(){ cm_loaded++;} );
+  loadScript("codemirror/search.js",       function(){ cm_loaded++;} );
+  loadScript("codemirror/searchcursor.js", function(){ cm_loaded++;} );
+  loadScript("codemirror/dialog.js",       function(){ cm_loaded++;} );
+  loadScript("codemirror/comment.js",      function(){ cm_loaded++;} );
+  loadScript("codemirror/autorefresh.js",  function(){ cm_loaded++;} );
   loadScript("codemirror/show-hint.js",    function(){
     cm_loaded++;
     cm_wait(e, cb);
@@ -38,7 +44,7 @@ AddCodeMirror(e, cb)
 function
 cm_wait(cm_editor, callback)
 {
-  if(cm_loaded != 4) {
+  if(cm_loaded != 9) {
     setTimeout(cm_wait, 10);
     return;
   }
@@ -51,11 +57,52 @@ cm_wait(cm_editor, callback)
     if(ltype=="svg") type = "xml";
   });
   var attr = {
+    indentUnit: 4,
+    indentWithTabs: false,
+    autoCloseBrackets: false,
+    matchBrackets: true,
+    autofocus: true,
     theme: "blackboard",
     lineNumbers: true,
-    matchBrackets: true,
-    autoCloseBrackets: true,
-    extraKeys:{'Ctrl-Space':'autocomplete'}
+    autoRefresh: true,
+    extraKeys: {
+        'Ctrl-Space': 'autocomplete',
+        'Tab': function(cm) {
+            if (cm.somethingSelected()) {
+                var sel = cm.getSelection("\n");
+                // Indent only if there are multiple lines selected, or if the selection spans a full line
+                if (sel.length > 0 && (sel.indexOf("\n") > -1 || sel.length === cm.getLine(cm.getCursor().line).length)) {
+                    cm.indentSelection("add");
+                    return;
+                }
+            }
+            cm.getOption("indentWithTabs") ? cm.execCommand("insertTab") : cm.execCommand("insertSoftTab");
+        },
+        'Shift-Tab': function(cm) {
+            cm.indentSelection("subtract");
+        },
+        'Ctrl-Q': function(cm) {   // Needs comment.js
+            cm.toggleComment({ indent: false, lineComment: "#" });
+        },
+        'Ctrl-Up': function(cm) {
+            var info = cm.getScrollInfo();
+            if (!cm.somethingSelected()) {
+                var visibleBottomLine = cm.lineAtHeight(info.top + info.clientHeight, "local");
+                if (cm.getCursor().line >= visibleBottomLine)
+                    cm.execCommand("goLineUp");
+            }
+            cm.scrollTo(null, info.top - cm.defaultTextHeight());
+        },
+        'Ctrl-Down': function(cm) {
+            var info = cm.getScrollInfo();
+            if (!cm.somethingSelected()) {
+                var visibleTopLine = cm.lineAtHeight(info.top, "local")+1;
+                if (cm.getCursor().line <= visibleTopLine)
+                    cm.execCommand("goLineDown");
+            }
+            cm.scrollTo(null, info.top + cm.defaultTextHeight());
+        }
+    }
   };
   var userAttr = scriptAttribute("fhem_codemirror.js");
   for(var a in userAttr)

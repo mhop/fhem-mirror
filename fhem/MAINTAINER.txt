@@ -354,7 +354,7 @@ contrib/98_PID.pm            betateilchen         http://forum.fhem.de Automatis
 contrib/WebViewControl/*     Dirk                 http://forum.fhem.de Mobile Devices
 contrib/GDS/GDSweblink.pm    jensb                http://forum.fhem.de Unterstuetzende Dienste
 
-www/codemirror/*             betateilchen         http://forum.fhem.de Frontends
+www/codemirror/*             rapster              http://forum.fhem.de Frontends
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends
 www/images/*                 ulimaass             http://forum.fhem.de Frontends
 www/pgm2/dashboard/*         svenson08            http://forum.fhem.de Frontends
