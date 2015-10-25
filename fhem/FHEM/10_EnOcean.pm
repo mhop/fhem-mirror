@@ -1,6 +1,7 @@
+
 ##############################################
 # $Id$
-# 2015-10-22
+# 2015-10-25
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -204,16 +205,16 @@ my %EnO_eepConfig = (
   "A5.08.01" => {attr => {subType => "lightTempOccupSensor.01"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
   "A5.08.02" => {attr => {subType => "lightTempOccupSensor.02"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
   "A5.08.03" => {attr => {subType => "lightTempOccupSensor.03"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,EnO_voltage4:Voltage,"},
-  "A5.09.01" => {attr => {subType => "COSensor.01"}},
-  "A5.09.02" => {attr => {subType => "COSensor.02"}},
-  "A5.09.04" => {attr => {subType => "tempHumiCO2Sensor.01"}},
-  "A5.09.05" => {attr => {subType => "vocSensor.01"}},
-  "A5.09.06" => {attr => {subType => "radonSensor.01"}},
-  "A5.09.07" => {attr => {subType => "particlesSensor.01"}},
-  "A5.09.08" => {attr => {subType => "CO2Sensor.01"}},
-  "A5.09.09" => {attr => {subType => "CO2Sensor.01"}},
-  "A5.09.0A" => {attr => {subType => "HSensor.01"}},
-  "A5.09.0B" => {attr => {subType => "radiationSensor.01"}, GPLOT => "EnO_voltage4:Voltage,"},
+  "A5.09.01" => {attr => {subType => "COSensor.01"}, GPLOT => "EnO_A5-09-01:CO/Temp,"},
+  "A5.09.02" => {attr => {subType => "COSensor.02"}, GPLOT => "EnO_A5-09-02:CO/Temp,EnO_voltage4:Voltage,"},
+  "A5.09.04" => {attr => {subType => "tempHumiCO2Sensor.01"}, GPLOT => "EnO_CO2:CO2,EnO_temp4humi6:Temp/Humi,"},
+  "A5.09.05" => {attr => {subType => "vocSensor.01"}, GPLOT => "EnO_A5-09-05:Concentration,"},
+  "A5.09.06" => {attr => {subType => "radonSensor.01"}, GPLOT => "EnO_A5-09-06:Radon,"},
+  "A5.09.07" => {attr => {subType => "particlesSensor.01"}, GPLOT => "EnO_A5-09-07:Particles,"},
+  "A5.09.08" => {attr => {subType => "CO2Sensor.01"}, GPLOT => "EnO_CO2:CO2,"},
+  "A5.09.09" => {attr => {subType => "CO2Sensor.01"}, GPLOT => "EnO_CO2:CO2,"},
+  "A5.09.0A" => {attr => {subType => "HSensor.01"}, GPLOT => "EnO_A5-09-0A:H/Temp,EnO_voltage4:Voltage,"},
+  "A5.09.0B" => {attr => {subType => "radiationSensor.01"}, GPLOT => "EnO_radioactivity4/Radioactivity,EnO_voltage4:Voltage,"},
   "A5.10.01" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.02" => {attr => {subType => "roomSensorControl.05"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.03" => {attr => {subType => "roomSensorControl.05", comMode => "confirm", subDef => "getNextID"}, GPLOT => "EnO_temp4:Temp,"},
@@ -245,58 +246,58 @@ my %EnO_eepConfig = (
   "A5.10.1F" => {attr => {subType => "roomSensorControl.1F"}, GPLOT => "EnO_temp4:Temp,"},
   "A5.10.20" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "A5.10.21" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
-  "A5.11.01" => {attr => {subType => "lightCtrlState.01"}},
-  "A5.11.02" => {attr => {subType => "tempCtrlState.01"}},
-  "A5.11.03" => {attr => {subType => "shutterCtrlState.01", subDef => "getNextID", subTypeSet => "gateway", gwCmd => "blindCmd"}},
-  "A5.11.04" => {attr => {subType => "lightCtrlState.02", subDef => "getNextID", subTypeSet => "lightCtrl.01", webCmd => "on:off:dim:rgb"}},
-  "A5.12.00" => {attr => {subType => "autoMeterReading.00"}},
-  "A5.12.01" => {attr => {subType => "autoMeterReading.01"}},
-  "A5.12.02" => {attr => {subType => "autoMeterReading.02"}},
-  "A5.12.03" => {attr => {subType => "autoMeterReading.03"}},
-  "A5.12.04" => {attr => {subType => "autoMeterReading.04"}},
-  "A5.12.05" => {attr => {subType => "autoMeterReading.05"}},
-  "A5.12.10" => {attr => {subType => "autoMeterReading.10"}},
-  "A5.13.01" => {attr => {subType => "environmentApp"}},
-  "A5.13.02" => {attr => {subType => "environmentApp"}},
+  "A5.11.01" => {attr => {subType => "lightCtrlState.01"}, GPLOT => "EnO_A5-11-01:Dim/Brightness,"},
+  "A5.11.02" => {attr => {subType => "tempCtrlState.01"}, GPLOT => "EnO_A5-11-02:SetpointTemp/ControlVar,"},
+  "A5.11.03" => {attr => {subType => "shutterCtrlState.01", subDef => "getNextID", subTypeSet => "gateway", gwCmd => "blindCmd"}, GPLOT => "EnO_A5-11-03:Position/AnglePos,"},
+  "A5.11.04" => {attr => {subType => "lightCtrlState.02", subDef => "getNextID", subTypeSet => "lightCtrl.01", webCmd => "on:off:dim:rgb"}, GPLOT => "EnO_dimFFRGB:DimRGB,"},
+  "A5.12.00" => {attr => {subType => "autoMeterReading.00"}, GPLOT => "EnO_A5-12-00:Value/Counter,"},
+  "A5.12.01" => {attr => {subType => "autoMeterReading.01"}, GPLOT => "EnO_power4energy4:Power/Energie,"},
+  "A5.12.02" => {attr => {subType => "autoMeterReading.02"}, GPLOT => "EnO_A5-12-02:Flowrate/Consumption,"},
+  "A5.12.03" => {attr => {subType => "autoMeterReading.03"}, GPLOT => "EnO_A5-12-03:Flowrate/Consumption,"},
+  "A5.12.04" => {attr => {subType => "autoMeterReading.04"}, GPLOT => "EnO_A5-12-04:Weight,EnO_A5-12-04_2:Temperature/Battery,"},
+  "A5.12.05" => {attr => {subType => "autoMeterReading.05"}, GPLOT => "EnO_A5-12-05:Amount,EnO_A5-12-05_2:Temperature/Battery,"},
+  "A5.12.10" => {attr => {subType => "autoMeterReading.10"}, GPLOT => "EnO_A5-12-10:Current/Change,"},
+  "A5.13.01" => {attr => {subType => "environmentApp"}, GPLOT => "EnO_A5-13-01:WindSpeed/Raining,EnO_temp4brightness4:Temp/Brightness,"},
+  "A5.13.02" => {attr => {subType => "environmentApp"}, GPLOT => "EnO_A5-13-01:SunIntensity,"},
   "A5.13.03" => {attr => {subType => "environmentApp"}},
   "A5.13.04" => {attr => {subType => "environmentApp"}},
   "A5.13.05" => {attr => {subType => "environmentApp"}},
   "A5.13.06" => {attr => {subType => "environmentApp"}},
-  "A5.13.10" => {attr => {subType => "environmentApp"}},
-  "A5.14.01" => {attr => {subType => "multiFuncSensor"}},
-  "A5.14.02" => {attr => {subType => "multiFuncSensor"}},
-  "A5.14.03" => {attr => {subType => "multiFuncSensor"}},
-  "A5.14.04" => {attr => {subType => "multiFuncSensor"}},
-  "A5.14.05" => {attr => {subType => "multiFuncSensor"}},
-  "A5.14.06" => {attr => {subType => "multiFuncSensor"}},
+  "A5.13.10" => {attr => {subType => "environmentApp"}, GPLOT => "EnO_solarRadiation4:SolarRadiation,"},
+  "A5.14.01" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.02" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.03" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.04" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.05" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
+  "A5.14.06" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
   "A5.20.01" => {attr => {subType => "hvac.01", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-01:Temp/Setpoint,"},
  #"A5.20.02" => {attr => {subType => "hvac.02"}},
  #"A5.20.03" => {attr => {subType => "hvac.03"}},
-  "A5.20.10" => {attr => {subType => "hvac.10", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}},
+  "A5.20.10" => {attr => {subType => "hvac.10", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}, GPLOT => "EnO_A5-20-10:FanSpeed,"},
   "A5.20.11" => {attr => {subType => "hvac.11", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}},
  #"A5.20.12" => {attr => {subType => "hvac.12"}},
-  "A5.30.01" => {attr => {subType => "digitalInput.01"}},
-  "A5.30.02" => {attr => {subType => "digitalInput.02"}},
-  "A5.30.03" => {attr => {subType => "digitalInput.03"}},
-  "A5.30.04" => {attr => {subType => "digitalInput.04"}},
-  "A5.30.05" => {attr => {subType => "digitalInput.05"}},
-  "A5.37.01" => {attr => {subType => "energyManagement.01", webCmd => "level:max"}},
+  "A5.30.01" => {attr => {subType => "digitalInput.01"}, GPLOT => "EnO_A5-30-01:Contact/Battery,"},
+  "A5.30.02" => {attr => {subType => "digitalInput.02"}, GPLOT => "EnO_A5-30-02:Contact,"},
+  "A5.30.03" => {attr => {subType => "digitalInput.03"}, GPLOT => "EnO_A5-30-03:Contact,EnO_temp4:Temp,"},
+  "A5.30.04" => {attr => {subType => "digitalInput.04"}, GPLOT => "EnO_A5-30-04:Contact/Digital,"},
+  "A5.30.05" => {attr => {subType => "digitalInput.05"}, GPLOT => "EnO_A5-30-05:Contact/Voltage,"},
+  "A5.37.01" => {attr => {subType => "energyManagement.01", webCmd => "level:max"}, GPLOT => "EnO_A5-37-01:Level,"},
   "A5.38.08" => {attr => {subType => "gateway"}},
-  "A5.38.09" => {attr => {subType => "lightCtrl.01"}},
+  "A5.38.09" => {attr => {subType => "lightCtrl.01"}, GPLOT => "EnO_dimFFRGB:DimRGB,"},
   "A5.3F.7F" => {attr => {subType => "manufProfile"}},
-  "D2.01.00" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.00" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
   "D2.01.01" => {attr => {subType => "actuator.01", defaultChannel => 0}},
-  "D2.01.02" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
+  "D2.01.02" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,EnO_power4energy4:Power/Energie,"},
   "D2.01.03" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
-  "D2.01.04" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
-  "D2.01.05" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
-  "D2.01.06" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.04" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,EnO_power4energy4:Power/Energie,"},
+  "D2.01.05" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,EnO_power4energy4:Power/Energie,"},
+  "D2.01.06" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
   "D2.01.07" => {attr => {subType => "actuator.01", defaultChannel => 0}},
-  "D2.01.08" => {attr => {subType => "actuator.01", defaultChannel => 0}},
-  "D2.01.09" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
+  "D2.01.08" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
+  "D2.01.09" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,EnO_power4energy4:Power/Energie,"},
   "D2.01.0A" => {attr => {subType => "actuator.01", defaultChannel => 0}},
-  "D2.01.0B" => {attr => {subType => "actuator.01", defaultChannel => 0}},
-  "D2.01.10" => {attr => {subType => "actuator.01", defaultChannel => 0}},
+  "D2.01.0B" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
+  "D2.01.10" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
   "D2.01.11" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.03.00" => {attr => {subType => "switch.00"}},
   "D2.03.10" => {attr => {subType => "windowHandle.10"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
@@ -599,7 +600,11 @@ EnOcean_Define($$)
           $attr{$name}{manufID} = "7FF" if (!exists $attr{$name}{manufID});
           $attr{$name}{room} = $autocreateDeviceRoom;
           foreach my $attrCntr (keys %{$EnO_eepConfig{$eep}{attr}}) {
-            if ($attrCntr ne "subDef") {
+            if ($attrCntr eq "subDef") {
+              if (!exists $attr{$name}{$attrCntr}) {
+                $attr{$name}{$attrCntr} = EnOcean_CheckSenderID($EnO_eepConfig{$eep}{attr}{$attrCntr}, $hash->{IODev}{NAME}, "00000000");
+              }
+            } else {
               $attr{$name}{$attrCntr} = $EnO_eepConfig{$eep}{attr}{$attrCntr};
             }
           }
@@ -2771,7 +2776,12 @@ sub EnOcean_Set($@)
             $ctrlParam2 = hex substr($a[1], 2, 2);
             # blue
             $ctrlParam3 = hex substr($a[1], 4, 2);
-            readingsSingleUpdate($hash, "rgb", uc($a[1]), 1);
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate($hash, "red", $ctrlParam1);
+            readingsBulkUpdate($hash, "green", $ctrlParam2);
+            readingsBulkUpdate($hash, "blue", $ctrlParam3);
+            readingsBulkUpdate($hash, "rgb", uc($a[1]));
+            readingsEndUpdate($hash, 0);
             shift(@a);
           } else {
             return "Usage: $cmd value is not hexadecimal or out of range.";
@@ -5313,8 +5323,8 @@ sub EnOcean_Parse($$)
       # $db[1] is the temperature where 0x00 = 0°C ... 0xFF = +51 °C
       # $db[0] bit D2 humidity sensor available 0 = no, 1 = yes
       # $db[0] bit D1 temperature sensor available 0 = no, 1 = yes
-      my $humi = "unknown";
-      my $temp = "unknown";
+      my $humi = "-";
+      my $temp = "-";
       my $airQuality;
       if ($db[0] & 4) {
         $humi = $db[3] >> 1;
@@ -5336,7 +5346,7 @@ sub EnOcean_Parse($$)
         $airQuality = "low";
       }
       push @event, "3:airQuality:$airQuality";
-      push @event, "3:state:CO2: $co2 AQ: $airQuality T: $temp H: $humi";
+      push @event, "3:state:T: $temp H: $humi CO2: $co2 AQ: $airQuality";
 
     } elsif ($st eq "radonSensor.01") {
       # Gas Sensor, Radon Sensor (EEP A5-09-06)
@@ -5438,7 +5448,7 @@ sub EnOcean_Parse($$)
       # [untested]
       # $db[3]_$db[2] is the H concentration where 0x00 = 0 ppm ... 0xFFFF = 2000 ppm
       my $hydro = ($db[3] << 8 | $db[2]) / 65535 * 2000;
-      push @event, "3:battery:" . sprintf("%0.1f", (($db[0] & 0xF0) >> 4) / 15 * 3 + 2)  if ($db[0] & 1);
+      push @event, "3:voltage:" . sprintf("%0.1f", (($db[0] & 0xF0) >> 4) / 15 * 3 + 2)  if ($db[0] & 1);
       push @event, "3:temperature:" . sprintf("%0.1f", $db[1] / 255 * 80 - 20) if ($db[0] & 2);
       push @event, "3:H:" . sprintf "%0.2f", $hydro;
       push @event, "3:state:" . sprintf "%0.2f", $hydro;
@@ -6212,7 +6222,9 @@ sub EnOcean_Parse($$)
         }
       } elsif ($mode == 1){
         # RGB value
-        #push @event, "3:rgb:$db[3] $db[2] $db[1]";
+        push @event, "3:red:$db[3]";
+        push @event, "3:green:$db[2]";
+        push @event, "3:blue:$db[1]";
         push @event, "3:rgb:" . substr($data, 0, 6);
       } elsif ($mode == 2){
         # energy metering value
@@ -6272,11 +6284,11 @@ sub EnOcean_Parse($$)
         # [Thermokon SR-MI-HS, untested]
         if ($dataType == 1) {
           # current value
-          push @event, "3:currentValue:$meterReading";
+          push @event, "3:currentValue" . sprintf('%02d', $channel) . ":$meterReading";
           push @event, "3:state:$meterReading";
         } else {
           # cumulative counter
-          push @event, "3:counter$channel:$meterReading";
+          push @event, "3:counter" . sprintf('%02d', $channel) . ":$meterReading";
         }
       } elsif ($st eq "autoMeterReading.01" || $st eq "actuator.01" && $manufID eq "033") {
         # Automated meter reading (AMR), Electricity (EEP A5-12-01)
@@ -6509,7 +6521,7 @@ sub EnOcean_Parse($$)
       my $signalIdx = $db[1] & 0x7F;
       my $signalIdxLast = ReadingsVal($name, "signalIdx", undef);
       my $signalType = $db[1] & 0x80 ? "heartbeat" : "event";
-      push @event, "3:battery:" . sprintf "%0.1f", $db[2] / 255 * 3.3;
+      push @event, "3:voltage:" . sprintf "%0.1f", $db[2] / 255 * 3.3;
       push @event, "3:signalIdx:$signalIdx";
       push @event, "3:telegramType:$signalType";
       if (defined $signalIdxLast) {
@@ -13250,8 +13262,7 @@ EnOcean_Delete($$)
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 255 &#176C)</li>
        <li>state: c/ppm</li>
      </ul><br>
-        The attr subType must be COSensor.01. This is done if the device was
-        created by autocreate.
+        The attr subType must be COSensor.01. This is done if the device was created by autocreate.
      </li>
      <br><br>
 
@@ -13275,7 +13286,7 @@ EnOcean_Delete($$)
        <li>CO2: c/ppm (Sensor Range: c = 0 ppm ... 2550 ppm)</li>
        <li>humidity: rH/% (Sensor Range: rH = 0 % ... 100 %)</li>
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 51 &#176C)</li>
-       <li>state: CO2: c/ppm AQ: high|mean|moderate|low T: t/&#176C  H: rH/%</li>
+       <li>state: T: t/&#176C H: rH/% CO2: c/ppm AQ: high|mean|moderate|low</li>
      </ul><br>
         The attr subType must be tempHumiCO2Sensor.01. This is done if the device was
         created by autocreate.
@@ -13647,7 +13658,7 @@ EnOcean_Delete($$)
      <ul>
        <li>open|closed|not_reached|not_available</li>
        <li>alarm: on|off|no endpoints defined|not used</li>
-       <li>anglePos: &alpha;/&#176 (Sensor Range: &alpha; = -360 &#176 ... 360 &#176)</li>
+       <li>anglePos: &alpha;/&#176 (Sensor Range: &alpha; = -180 &#176 ... 180 &#176)</li>
        <li>endPosition: open|closed|not_reached|not_available</li>
        <li>position: pos/% (Sensor Range: pos = 0 % ... 100 %)</li>
        <li>positionMode: normal|inverse</li>
@@ -13669,17 +13680,20 @@ EnOcean_Delete($$)
      <ul>
        <li>on|off</li>
        <li>alarm: off|lamp_failure|internal_failure|external_periphery_failure</li>
+       <li>blue: 0 ... 255</li>
        <li>current: &lt;formula symbol&gt;/&lt;unit&gt; (Sensor range: &lt;formula symbol&gt; = 0 ... 65535 &lt;unit&gt;</li>
        <li>currentUnit: mA|A</li>
        <li>dim: 0 ... 255</li>
        <li>energy: &lt;formula symbol&gt;/&lt;unit&gt; (Sensor range: &lt;formula symbol&gt; = 0 ... 65535 &lt;unit&gt;</li>
        <li>energyUnit: Wh|kWh|MWh|GWh</li>
+       <li>green: 0 ... 255</li>
        <li>measuredValue: &lt;formula symbol&gt;/&lt;unit&gt; (Sensor range: &lt;formula symbol&gt; = 0 ... 65535 &lt;unit&gt;</li>
        <li>measureUnit: unknown</li>
        <li>lampOpHours: t/h |unknown (Sensor range: t = 0 h ... 65535 h)</li>
        <li>power: &lt;formula symbol&gt;/&lt;unit&gt; (Sensor range: &lt;formula symbol&gt; = 0 ... 65535 &lt;unit&gt;</li>
        <li>powerSwitch: on|off</li>
        <li>powerUnit: mW|W|kW|MW</li>
+       <li>red: 0 ... 255</li>
        <li>rgb: RRGGBB (red (R), green (G) or blue (B) color component values: 00 ... FF)</li>
        <li>serviceOn: yes|no</li>
        <li>voltage: &lt;formula symbol&gt;/&lt;unit&gt; (Sensor range: &lt;formula symbol&gt; = 0 ... 65535 &lt;unit&gt;</li>
@@ -13695,10 +13709,9 @@ EnOcean_Delete($$)
          [Thermokon SR-MI-HS, untested]<br>
      <ul>
        <li>1/s</li>
-       <li>currentValue: 1/s</li>
-       <li>counter<0 ... 15>: 0 ... 16777215</li>
-       <li>channel: 0 ... 15</li>
-      <li>state: 1/s</li>
+       <li>currentValue<00 ... 15>: 1/s</li>
+       <li>counter<00 ... 15>: 0 ... 16777215</li>
+       <li>state: 1/s</li>
      </ul><br>
         The attr subType must be autoMeterReading.00. This is done if the device was
         created by autocreate.
@@ -13758,7 +13771,6 @@ EnOcean_Delete($$)
        <li>battery: full|ok|low|empty</li>
        <li>location<0 ... 9>: possessed|not_possessed</li>
        <li>temperature: t/&#176C (Sensor Range: t = -40 &#176C ... 40 &#176C)</li>
-       <li>weight: m/g</li>
        <li>state: T: t/&#176C L: <location0 ... location9> B: full|ok|low|empty</li>
      </ul><br>
         The attr subType must be autoMeterReading.05.
@@ -14096,9 +14108,12 @@ EnOcean_Delete($$)
        <li>on</li>
        <li>off</li>
        <li>block: unlock|on|off|local</li>
+       <li>blue: &lt;blue channel value&gt; (Range: blue = 0  ... 255)</li>
        <li>dimMax: &lt;maximum dimming value&gt; (Range: dim = 0  ... 255)</li>
        <li>dimMin: &lt;minimum dimming value&gt; (Range: dim = 0  ... 255)</li>
+       <li>green: &lt;green channel value&gt; (Range: green = 0  ... 255)</li>
        <li>rampTime: t/s (Range: t = 0 s ... 65535 s)</li>
+       <li>red: &lt;red channel value&gt; (Range: red = 0  ... 255)</li>
        <li>rgb: RRGGBB (red (R), green (G) or blue (B) color component values: 00 ... FF)</li>
        <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: on|off</li>
