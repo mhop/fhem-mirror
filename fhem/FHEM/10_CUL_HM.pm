@@ -3059,7 +3059,7 @@ sub CUL_HM_parseCommon(@){#####################################################
             if($long eq "long");
 
       push @evtEt,[$mhp->{cHash},1,"trigger:".(ucfirst($long))."_$cnt"];
-      push @evtEt,[$mhp->{cHash},1,"state:".$state." (to $mhp->{devN})"] if ($mhp->{devH} ne $mhp->{cHash});
+      push @evtEt,[$mhp->{cHash},1,"state:".$state." (to $mhp->{dstN})"] if ($mhp->{devH} ne $mhp->{cHash});
     }
     push @evtEt,[$mhp->{cHash},1,"trigger_cnt:$cnt"];
 
