@@ -2543,6 +2543,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         Example<br>
         <ul><code>
           set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
+          set hm templateDef SwOnCond del # delete a template<br>
+          set hm templateDef SwOnCond fromMaster &lt;masterChannel&gt; &lt;peer:[long|short]&gt;# define a template with register as of the example<br>
+          set hm templateDef SwOnCond fromMaster myChannel peerChannel:long  # <br>
         </code></ul>
       </li>
       <li><a name="#HMinfotemplateSet">templateSet</a> &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]<br>
@@ -2970,7 +2973,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         <br>
         Beispiel<br>
         <ul><code>
-         set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
+          set hm templateDef SwOnCond level:cond "my description" CtValLo:p0 CtDlyOn:p1 CtOn:geLo<br>
+          set hm templateDef SwOnCond del # lösche template SwOnCond<br>
+          set hm templateDef SwOnCond fromMaster &lt;masterChannel&gt; &lt;peer:[long|short]&gt;# masterKanal mit peer wird als Vorlage genommen<br>
+          set hm templateDef SwOnCond fromMaster myChannel peerChannel:long  <br>
         </code></ul>
       </li>
       <li><a name="#HMinfotemplateSet">templateSet</a> &lt;entity&gt; &lt;template&gt; &lt;peer:[long|short]&gt; [&lt;param1&gt; ...]<br>

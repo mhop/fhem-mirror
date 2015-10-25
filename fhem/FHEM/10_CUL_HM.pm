@@ -164,13 +164,12 @@ sub CUL_HM_Initialize($) {
                        ."levelRange levelMap ";
   $hash->{Attr}{glb} =  "do_not_notify:1,0 showtime:1,0 "
                        ."rawToReadable unit "#"KFM-Sensor" only
-                       ."expert:0_off,1_on,2_raw,3_all,4_none,8_templ+default,12_templOnly,255_anything "
+                       ."expert:0_off,1_on,2_raw,3_all,4_none,8_templ+default,12_templOnly,251_anything "
                        ."param "
                        ."actAutoTry:0_off,1_on "
                        ."aesCommReq:1,0 "      # IO will request AES if 
                        ;
-  $hash->{AttrList}  =  
-                        $hash->{Attr}{glb}
+  $hash->{AttrList}  =  $hash->{Attr}{glb}
                        .$hash->{Attr}{dev}
                        .$hash->{Attr}{devPhy}
                        .$hash->{Attr}{chn}
@@ -378,7 +377,7 @@ sub CUL_HM_updateConfig($){
     foreach(keys %{$attr{$name}}){
       delete $attr{$name}{$_} if(CUL_HM_AttrCheck($name,$_));
     }
-
+    CUL_HM_chgExpLvl($hash);# need to update expert visib as of device
     # -+-+-+-+-+ add default web-commands
     my $webCmd;
     $webCmd  = AttrVal($name,"webCmd",undef);
@@ -583,48 +582,7 @@ sub CUL_HM_Attr(@) {#################################
   my $updtReq = 0;
   if   ($attrName eq "expert"){#[0,1,2]
     $attr{$name}{$attrName} = $attrVal;
-    my $eHash = $defs{$name};
-
-    foreach my $tHash ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name))
-                      ,$eHash){
-      my $exLvl = CUL_HM_getAttrInt($tHash->{NAME},"expert");
-      $tHash->{helper}{expert}{def} = (!($exLvl & 0x04))?1:0;#default register on
-      $tHash->{helper}{expert}{det} = ( ($exLvl & 0x01))?1:0;#detail register on
-      $tHash->{helper}{expert}{raw} = ( ($exLvl & 0x02))?1:0;#raw register on
-      $tHash->{helper}{expert}{tpl} = ( ($exLvl & 0x08))?1:0;#template on
-      my ($nTag,$grp);
-      if ($tHash->{helper}{expert}{def}){($nTag,$grp) = ("",".R-")}
-      else{                              ($nTag,$grp) = (".","R-")}
-      foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
-        my $reg = $rdEntry;
-        my $p = "";
-        $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
-        $reg =~ s/\.?R-.*?-//;
-        next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '0');
-        $tHash->{READINGS}{$nTag."R-$p".$reg} = $tHash->{READINGS}{$rdEntry};
-        delete $tHash->{READINGS}{$rdEntry};
-      }
-      if ($tHash->{helper}{expert}{det}){($nTag,$grp) = ("",".R-")}
-      else{                              ($nTag,$grp) = (".","R-")}
-      foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
-        my $reg = $rdEntry;
-        my $p = "";
-        $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
-        $reg =~ s/\.?R-.*?-//;
-        next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
-        $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
-        delete $tHash->{READINGS}{$rdEntry};
-      }
-      if ($tHash->{helper}{expert}{raw}){($nTag,$grp) = ("",".RegL_")}
-      else{                              ($nTag,$grp) = (".","RegL_")}
-      foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
-        my $reg = $rdEntry;
-        $reg =~ s/\.//;
-        $tHash->{READINGS}{$nTag.$reg} = $tHash->{READINGS}{$rdEntry};
-        delete $tHash->{READINGS}{$rdEntry};
-      }
-      CUL_HM_setTmplDisp($tHash);
-    }
+    CUL_HM_chgExpLvl($_) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
   }
   elsif($attrName eq "actCycle"){#"000:00" or 'off'
     if ($cmd eq "set"){
@@ -6852,6 +6810,47 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     $unit = "";
   }     
   return $convFlg.$data.$unit;
+}
+
+sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert 
+  my $tHash = shift;
+  my $exLvl = CUL_HM_getAttrInt($tHash->{NAME},"expert");
+  $tHash->{helper}{expert}{def} = (!($exLvl & 0x04))?1:0;#default register on
+  $tHash->{helper}{expert}{det} = ( ($exLvl & 0x01))?1:0;#detail register on
+  $tHash->{helper}{expert}{raw} = ( ($exLvl & 0x02))?1:0;#raw register on
+  $tHash->{helper}{expert}{tpl} = ( ($exLvl & 0x08))?1:0;#template on
+  my ($nTag,$grp);
+  if ($tHash->{helper}{expert}{def}){($nTag,$grp) = ("",".R-")}
+  else{                              ($nTag,$grp) = (".","R-")}
+  foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
+    my $reg = $rdEntry;
+    my $p = "";
+    $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
+    $reg =~ s/\.?R-(.*?-)?//;
+    next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '0');
+    $tHash->{READINGS}{$nTag."R-$p".$reg} = $tHash->{READINGS}{$rdEntry};
+    delete $tHash->{READINGS}{$rdEntry};
+  }
+  if ($tHash->{helper}{expert}{det}){($nTag,$grp) = ("",".R-")}
+  else{                              ($nTag,$grp) = (".","R-")}
+  foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
+    my $reg = $rdEntry;
+    my $p = "";
+    $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
+    $reg =~ s/\.?R-(.*?-)?//;
+    next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
+    $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
+    delete $tHash->{READINGS}{$rdEntry};
+  }
+  if ($tHash->{helper}{expert}{raw}){($nTag,$grp) = ("",".RegL_")}
+  else{                              ($nTag,$grp) = (".","RegL_")}
+  foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
+    my $reg = $rdEntry;
+    $reg =~ s/\.//;
+    $tHash->{READINGS}{$nTag.$reg} = $tHash->{READINGS}{$rdEntry};
+    delete $tHash->{READINGS}{$rdEntry};
+  }
+  CUL_HM_setTmplDisp($tHash);
 }
 sub CUL_HM_setTmplDisp($){ # remove register i outdated
   my $tHash = shift;
