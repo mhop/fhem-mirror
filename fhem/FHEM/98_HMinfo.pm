@@ -1586,8 +1586,7 @@ sub HMinfo_verifyConfig($@) {##################################################
       next if($param !~ m/RegL_0[0-9]:/);
       $param =~ s/\.RegL/RegL/;
       my ($reg,$data) = split(" ",$param,2);
-      my $exp = CUL_HM_getAttrInt($eN,"expert");
-      my $eReg = ReadingsVal($eN,(($exp != 2)?".":"").$reg,"");
+      my $eReg = ReadingsVal($eN,($defs{$eN}{helper}{expert}{raw}?"":".").$reg,"");
       my ($ensp,$dnsp) = ($eReg,$data);
       $ensp =~ s/ //g;
       $dnsp =~ s/ //g;
@@ -1662,14 +1661,18 @@ sub HMinfo_loadConfig($@) {####################################################
     $line =~ s/\r//g;
     next if (   $line !~ m/set .* (peerBulk|regBulk) .*/
              && $line !~ m/(setreading|template.e.) .*/);
-    my ($cmd1,$eN,$cmd,$param) = split(" ",$line,4);
+    my ($command,$timeStamp) = split("#",$line,2);
+    my ($cmd1,$eN,$cmd,$param) = split(" ",$command,4);
     next if ($eN !~ m/$filter/);
     if ($cmd1 !~ m /^template(Def|Set)$/ && (!$eN || !$defs{$eN})){
       push @entryNF,$eN;
       next;
     }
     if   ($cmd1 eq "setreading"){
-      $changes{$eN}{$cmd}=$param if (!$defs{$eN}{READINGS}{$cmd});
+      if (!$defs{$eN}{READINGS}{$cmd}){
+        $changes{$eN}{$cmd}{d}=$param ;
+        $changes{$eN}{$cmd}{t}=$timeStamp ;
+      }
       $defs{$eN}{READINGS}{$cmd}{VAL} = $param;
       $defs{$eN}{READINGS}{$cmd}{TIME} = "from archive";
     }
@@ -1704,31 +1707,35 @@ sub HMinfo_loadConfig($@) {####################################################
     }
     elsif($cmd eq "regBulk"){
       next if($param !~ m/RegL_0[0-9]:/);
-      my $exp = CUL_HM_getAttrInt($eN,"expert");
       $param =~ s/\.RegL/RegL/;
-      $param =~ s/RegL/\.RegL/ if ($exp != 2);
+      $param = ".".$param if (!$defs{$eN}{helper}{expert}{raw});
       my ($reg,$data) = split(" ",$param,2);
       my @rla = CUL_HM_reglUsed($eN);
       next if (!$rla[0]);
       my $rl = join",",@rla;
       my $r2 = $reg;
       $r2 =~ s/^\.//;
-
       next if ($rl !~ m/$r2/);
-
       if ($data !~ m/00:00/){
         push @elincmpl,"$eN reg list:$reg";
         next;
       }
-      $changes{$eN}{$reg}=$data if (!$defs{$eN}{READINGS}{$reg} || 
-                                     $defs{$eN}{READINGS}{$reg}{VAL} !~ m/00:00/);
+      
+      if (  !$defs{$eN}{READINGS}{$reg} 
+          || $defs{$eN}{READINGS}{$reg}{VAL} !~ m/00:00/
+          || (   $timeStamp 
+              && $timeStamp gt ReadingsTimestamp($eN,$reg,"1900-01-01 00:00:01")
+              )){
+        $changes{$eN}{$reg}{d}=$data;
+        $changes{$eN}{$reg}{t}=$timeStamp;
+      }
     }
   }
   close(rFile);
   foreach my $eN (keys %changes){
     foreach my $reg (keys %{$changes{$eN}}){
-      $defs{$eN}{READINGS}{$reg}{VAL} = $changes{$eN}{$reg};
-      $defs{$eN}{READINGS}{$reg}{TIME} = "from archive";
+      $defs{$eN}{READINGS}{$reg}{VAL}  = $changes{$eN}{$reg}{d};
+      $defs{$eN}{READINGS}{$reg}{TIME} = $changes{$eN}{$reg}{t};
       my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..):(.*)/);
       next if (!$list);
       my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));
@@ -1765,8 +1772,9 @@ sub HMinfo_purgeConfig($) {####################################################
     my $line = $_;
     $line =~ s/\r//g;
     next if (   $line !~ m/set (.*) (peerBulk|regBulk) (.*)/
-             && $line !~ m/(setreading) .*/);#&& $line !~ m/(setreading|templateDef) .*/);
-    my ($cmd,$eN,$typ,$p1,$p2) = split(" ",$line,5);
+             && $line !~ m/(setreading) .*/);
+    my ($command,$timeStamp) = split("#",$line,2);
+    my ($cmd,$eN,$typ,$p1,$p2) = split(" ",$command,5);
     if ($cmd eq "set" && $typ eq "regBulk"){
       $p1 =~ s/\.RegL_/RegL_/;
       $typ .= " $p1";
@@ -1775,7 +1783,7 @@ sub HMinfo_purgeConfig($) {####################################################
     elsif ($cmd eq "set" && $typ eq "peerBulk"){
       delete $purgeH{$eN}{$cmd}{regBulk};# regBulk needs to be rewritten
     }
-    $purgeH{$eN}{$cmd}{$typ} = $p1;
+    $purgeH{$eN}{$cmd}{$typ} = $p1.($timeStamp?"#$timeStamp":"");
   }
   close(aSave);
   open(aSave, ">$fName") || return("Can't open $fName: $!");
@@ -1906,6 +1914,30 @@ sub HMinfo_templateDef(@){#####################################################
     delete $HMConfig::culHmTpl{$name};
     return;
   }
+  return "$name already defined, delete it first" if($HMConfig::culHmTpl{$name});
+  if ($param eq "fromMaster"){#set hm templateDef <tmplName> fromMaster <master> <(peer:long|0)> <descr>
+    my ($master,$pl) = ($desc,@regs);
+    return "master $master not defined" if(!$defs{$master});
+    @regs = ();
+    if ($pl eq "0"){
+      foreach my $rdN (grep !/^\.?R-.*-(sh|lg)/,grep /^\.?R-/,keys %{$defs{$master}{READINGS}}){
+        my $rdP = $rdN;
+        $rdP =~ s/^\.?R-//;
+        push @regs,"$rdP:$defs{$master}{READINGS}{$rdN}{VAL}";
+      }
+    }
+    else{
+      my ($peer,$shlg) = split(":",$pl,2);
+      $shlg = ($shlg eq "short"?"sh":($shlg eq "long"?"lg":""));
+      foreach my $rdN (grep /^\.?R-$peer-$shlg/,keys %{$defs{$master}{READINGS}}){
+        my $rdP = $rdN;
+        $rdP =~ s/^\.?R-$peer-$shlg//;
+        push @regs,"$rdP:$defs{$master}{READINGS}{$rdN}{VAL}";
+      }
+    }
+    $param = "0";
+    $desc = "from Master $name > $pl";
+  }
   # get description if marked wir ""
   if ($desc =~ m/^"/){
     my $cnt = 0;
@@ -1918,7 +1950,6 @@ sub HMinfo_templateDef(@){#####################################################
     splice @regs,0,$cnt;
   }
 
-  return "$name already defined, delete it first" if($HMConfig::culHmTpl{$name});
   return "insufficient parameter" if(@regs < 1);
  
   my $paramNo;
@@ -2018,16 +2049,16 @@ sub HMinfo_templateUsg(@){#####################################################
       my ($p,$t) = split(">",$tid);
       if($tFilter){
         if($tFilter eq "sortTemplate"){
-          push @ul,sprintf("%20s|%-15s|%s|%s",$t,$dName,$p,$defs{$dName}{helper}{tmpl}{$tid});
+          push @ul,sprintf("%-20s|%-15s|%s|%s",$t,$dName,$p,$defs{$dName}{helper}{tmpl}{$tid});
         }
         if($tFilter eq "sortPeer"){
           my ($pn,$ls) = split(":",$p);
-          push @ul,sprintf("%20s|%-15s|%5s:%-20s|%s",$pn,$t,$ls,$dName,$defs{$dName}{helper}{tmpl}{$tid});
+          push @ul,sprintf("%-20s|%-15s|%5s:%-20s|%s",$pn,$t,$ls,$dName,$defs{$dName}{helper}{tmpl}{$tid});
         }
         elsif($tFilter ne $t){
           next;}
       }
-      else{ push @ul,sprintf("%20s|%-15s|%s|%s",$dName,$p,$t,$defs{$dName}{helper}{tmpl}{$tid});}
+      else{ push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$defs{$dName}{helper}{tmpl}{$tid});}
     }
   }
   return join("\n",sort(@ul));
