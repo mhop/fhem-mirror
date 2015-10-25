@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 70_XBMC: -added disable attribute
+                      -added reading tvshowid
   - feature: new module 00_SIGNALduino.pm and 90_SIGNALduino_un: added 
              SIGNALduino module and firmware
   - feature: new module 14_Hideki.pm: added module for sensors with hideki 
