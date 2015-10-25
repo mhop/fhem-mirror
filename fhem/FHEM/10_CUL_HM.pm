@@ -6828,7 +6828,7 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
     $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
     $reg =~ s/\.?R-(.*?-)?//;
     next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '0');
-    $tHash->{READINGS}{$nTag."R-$p".$reg} = $tHash->{READINGS}{$rdEntry};
+    $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
     delete $tHash->{READINGS}{$rdEntry};
   }
   if ($tHash->{helper}{expert}{det}){($nTag,$grp) = ("",".R-")}
