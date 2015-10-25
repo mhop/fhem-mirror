@@ -897,12 +897,14 @@ sub _cfgDB_Search($$;$) {
 	my ($sql, $sth, @line, $row, @result, $ret, $text);
 	$sql  = "SELECT command, device, p1, p2 FROM fhemconfig as c join fhemversions as v ON v.versionuuid=c.versionuuid ";
 	$sql .= "WHERE v.version = '$searchversion' AND command not like '#create%' ";
-# 2015-10-14 - changed, forum #42190
-#	$sql .= "AND device like '$search%' ESCAPE '\\' " if($dsearch);
-#	$sql .= "AND (device like '$search%' ESCAPE '\\' OR P1 like '$search%' ESCAPE '\\' OR P2 like '$search%' ESCAPE '\\') " if(!$dsearch);
-# 2015-10-20 - reverted due to mysql failure
-	$sql .= "AND device like '$search%' " if($dsearch);
-	$sql .= "AND (device like '$search%' OR P1 like '$search%' OR P2 like '$search%') " if(!$dsearch);
+	# 2015-10-24 - changed, forum #42190
+	if($cfgDB_dbtype eq 'SQLITE') {;
+		$sql .= "AND device like '$search%' ESCAPE '\\' " if($dsearch);
+		$sql .= "AND (device like '$search%' ESCAPE '\\' OR P1 like '$search%' ESCAPE '\\' OR P2 like '$search%' ESCAPE '\\') " if(!$dsearch);
+	} else {
+		$sql .= "AND device like '$search%' " if($dsearch);
+		$sql .= "AND (device like '$search%' OR P1 like '$search%' OR P2 like '$search%') " if(!$dsearch);
+	}
 	$sql .= "ORDER BY lower(device),command DESC";
 	$sth = $fhem_dbh->prepare( $sql);
 	$sth->execute();
@@ -1059,41 +1061,6 @@ sub _cfgDB_Filelist(;$) {
 	return $ret;
 }
 
-#######################################
-#
-# temporary inserted funktions
-# for data migration
-# and database maintenance
-#
-#######################################
-
-sub _cfgDB_Move() {
-	my $fhem_dbh = _cfgDB_Connect;
-	my $sth = $fhem_dbh->prepare( "select filename from fhemfilesave group by filename" );
-	$sth->execute();
-	while (my @file = $sth->fetchrow_array()) {
-		my @in = ();
-		Log3(undef, 1, "configDB: Moving $file[0] to binary filesave");
-		my $sth2 = $fhem_dbh->prepare( "SELECT * FROM fhemfilesave WHERE filename LIKE '$file[0]'" );  
-		$sth2->execute();
-		while (my @line = $sth2->fetchrow_array()) {
-			push @in, "$line[1]";
-		}
-		$sth2->finish();
-		$fhem_dbh->do("delete from fhembinfilesave where filename LIKE '$file[0]'");
-		$fhem_dbh->commit();
-		my $content = join("\n", @in);
-		my $sth3 = $fhem_dbh->prepare( 'INSERT INTO fhembinfilesave values (?, ?)' );
-		$sth3->execute($file[0],$content);
-		$sth3->finish();
-		$fhem_dbh->do("delete from fhemfilesave where filename = '$file[0]'");
-		$fhem_dbh->commit();
-	}
-	$fhem_dbh->do("drop table fhemfilesave");
-	$fhem_dbh->commit();
-	$fhem_dbh->disconnect();
-	return;
-}
 
 1;
 
