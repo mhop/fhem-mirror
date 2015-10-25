@@ -179,6 +179,24 @@ weblink_FwFn($$$$)
 
   <a name="weblinkattr"></a>
   <b>Attributes</b>
+  <ul>
+    <a name="htmlattr"></a>
+    <li>htmlattr<br>
+      HTML attributes to be used for link, image and iframe type of links.
+      E.g.:<br>
+      <ul>
+        <code>
+        define yw weblink wl_im1 iframe http://weather.yahooapis.com/forecastrss?w=650272&u=c<br>
+        attr yw weblink htmlattr width="480" height="560"<br>
+        </code>
+      </ul></li>
+
+    <a name="nodetaillink"></a>
+    <li>nodetaillink<br>
+      Show no detail link for the types image and iframe.
+      </li>
+  </ul>
+
   <br>
 
 </ul>
