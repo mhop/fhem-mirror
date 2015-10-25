@@ -29,7 +29,8 @@ sub XBMC_Initialize($$)
   $hash->{ReadFn}   = "XBMC_Read";  
   $hash->{ReadyFn}  = "XBMC_Ready";
   $hash->{UndefFn}  = "XBMC_Undefine";
-  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,standby updateInterval " . $readingFnAttributes;
+  $hash->{AttrFn}   = "XBMC_Attr";
+  $hash->{AttrList} = "fork:enable,disable compatibilityMode:xbmc,plex offMode:quit,hibernate,shutdown,standby updateInterval disable:1,0 " . $readingFnAttributes;
   
   $data{RC_makenotify}{XBMC} = "XBMC_RCmakenotify";
   $data{RC_layout}{XBMC_RClayout}  = "XBMC_RClayout";
@@ -75,6 +76,28 @@ sub XBMC_Define($$)
   return undef;
 }
 
+sub XBMC_Attr($$$$)
+{
+  my ($cmd, $name, $attr, $value) = @_;
+  my $hash = $defs{$name};
+  
+  if($attr eq "disable") {
+    if($cmd eq "set" && ($value || !defined($value))) {
+      XBMC_Disconnect($hash);
+      $hash->{STATE} = "Disabled";
+    } else {
+      if (AttrVal($hash->{NAME}, 'disable', 0)) {
+        $hash->{STATE} = "Initialized";
+        
+        my $dev = $hash->{DeviceName};
+        $readyfnlist{"$name.$dev"} = $hash;
+      }
+    }
+  }
+
+  return undef;
+}
+
 # Force a connection attempt to XBMC as soon as possible 
 # (e.g. you know you just started it and want to connect immediately without waiting up to 60 s)
 sub XBMC_Connect($)
@@ -99,13 +122,29 @@ sub XBMC_Connect($)
   } else {
     $hash->{NEXT_OPEN} = 0; # force NEXT_OPEN used in DevIO
   }
-    
+
   return undef;
+}
+
+# kills child process trying to connect (if existing)
+sub XBMC_KillConnectionChild($)
+{
+  my ($hash) = @_;
+
+  return if !$hash->{CHILDPID};
+    
+  kill 'KILL', $hash->{CHILDPID};
+  undef $hash->{CHILDPID};
 }
 
 sub XBMC_Ready($)
 {
   my ($hash) = @_;
+  
+  if (AttrVal($hash->{NAME}, 'disable', 0)) {
+    return;
+  }
+  
   if($hash->{Protocol} eq 'tcp') {
     if(AttrVal($hash->{NAME},'fork','disable') eq 'enable') {
       if($hash->{CHILDPID} && !(kill 0, $hash->{CHILDPID})) {
@@ -153,10 +192,19 @@ sub XBMC_Undefine($$)
   
   RemoveInternalTimer($hash);
   
+  XBMC_Disconnect($hash);
+  
+  return undef;
+}
+
+sub XBMC_Disconnect($)
+{
+  my ($hash) = @_;
   if($hash->{Protocol} eq 'tcp') {
     DevIo_CloseDev($hash); 
   }
-  return undef;
+  
+  XBMC_KillConnectionChild($hash);
 }
 
 sub XBMC_Init($) 
@@ -293,7 +341,7 @@ sub XBMC_PlayerGetItem($$)
     "method" => "Player.GetItem",
     "params" => { 
       "properties" => ["artist", "album", "thumbnail", "file", "title",
-                        "track", "year", "streamdetails"]
+                        "track", "year", "streamdetails", "tvshowid"]
     }
   };
   if($playerid >= 0) {    
@@ -387,7 +435,7 @@ sub XBMC_ResetMediaReadings($)
   # delete streamdetails readings
   # NOTE: we actually delete the readings (unlike the other readings)
   #       because they are stream count dependent
-  fhem("deletereading $hash->{NAME} sd_.*");
+  fhem("deletereading $hash->{NAME} sd_.*", 1);
 }
 
 sub XBMC_ResetPlayerReadings($)
@@ -1588,8 +1636,10 @@ sub XBMC_HTTP_Request($$@)
       If XBMC does not run all the time it used to be the case that FHEM blocks because it cannot reach XBMC (only happened 
     if TCP was used). If you encounter problems like FHEM not responding for a few seconds then you should set <code>attr &lt;XBMC_device&gt; fork enable</code>
     which will move the search for XBMC into a separate process.</li>
-    <li>updateInterval<br>
+  <li>updateInterval<br>
       The interval which is used to check if Kodi is still alive (by sending a JSON ping) and also it is used to update current player item.</li>
+  <li>disable<br>
+      Disables the device. All connections will be closed immediately.</li>
   </ul>
 </ul>
 
