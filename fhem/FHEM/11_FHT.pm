@@ -905,6 +905,7 @@ getFhtBuffer($)
           <li> 1: warnings</li>
           <li> 2: mode</li>
           <li> 4: day-temp, night-temp, windowopen-temp</li>
+          <li> 8: desired-temp</li>
           <li>64: lowtemp-offset</li>
           </ul>
           measured-temp and actuator is sent along if it is considered
@@ -1231,6 +1232,7 @@ getFhtBuffer($)
           <li> 1: warnings</li>
           <li> 2: mode</li>
           <li> 4: day-temp, night-temp, windowopen-temp</li>
+          <li> 8: desired-temp</li>
           <li>64: lowtemp-offset</li>
           </ul>
           measured-temp und actuator werden mitgesendet wenn vom FHT als
