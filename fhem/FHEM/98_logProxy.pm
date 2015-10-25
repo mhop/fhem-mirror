@@ -353,6 +353,27 @@ logProxy_WeekProfile2Plot($$$;$)
   return ($ret,$min,$max,$prev_value);
 }
 
+sub logProxy_hms2sec($){
+  my ($h,$m,$s) = split(":", shift);
+  $m = 0 if(!$m);
+  $s = 0 if(!$s);
+  my $t  = $s;
+     $t += $m * 60;
+     $t += $h * 60*60;
+  return ($t)
+}
+sub logProxy_isDay($) {
+  my ($sec) = @_;
+
+  my $sr = logProxy_hms2sec(sunrise_abs_dat($sec));
+  my $ss = logProxy_hms2sec(sunset_abs_dat($sec));
+
+  my ($s,$m,$h) = localtime($sec);
+  my $cur = logProxy_hms2sec( "$h:$m:$s" );
+
+  return $cur > $sr && $cur < $ss;
+}
+
 sub logProxy_hms2dec($){
   my ($h,$m,$s) = split(":", shift);
   $m = 0 if(!$m);
