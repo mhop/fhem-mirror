@@ -1,7 +1,7 @@
 ##############################################
 # $Id$
 #
-# Display the measured temp and the humidity.
+# Display the measured temp and the brightness.
 # FileLog definition: 
 # define FileLog_device FileLog ./log/device-%Y.log device
 #
