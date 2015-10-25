@@ -499,13 +499,13 @@ sub HMinfo_burstCheck(@) { ####################################################
       my $prxt = CUL_HM_getRxType($defs{$pn});
       
       next if (!($prxt & 0x82)); # not a burst peer
-      my $pnb = ReadingsVal($eName,"R-$pn-peerNeedsBurst",undef);
+      my $pnb = ReadingsVal($eName,"R-$pn-peerNeedsBurst",ReadingsVal($eName,".R-$pn-peerNeedsBurst",undef));
       if (!$pnb)           {push @needBurstMiss, $eName;}
       elsif($pnb !~ m /on/){push @needBurstFail, $eName;}
 
       if ($prxt & 0x80){# conditional burst - is it on?
         my $pDevN = CUL_HM_getDeviceName($pn);
-        push @peerIDsCond," $pDevN for remote $eName" if (ReadingsVal($pDevN,"R-burstRx","") !~ m /on/);
+        push @peerIDsCond," $pDevN for remote $eName" if (ReadingsVal($pDevN,"R-burstRx",ReadingsVal($pDevN,".R-burstRx","")) !~ m /on/);
       }
     }
   }
@@ -2100,11 +2100,9 @@ sub HMinfo_templateChk(@){#####################################################
       foreach my $rn (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
         my $regV;
         if ($pRnm){
-          $regV    = ReadingsVal($aName,"R-$pRnm$rn" ,undef);
-          $regV    = ReadingsVal($aName,".R-$pRnm$rn",undef) if (!defined $regV);
+          $regV    = ReadingsVal($aName,"R-$pRnm$rn" ,ReadingsVal($aName,".R-$pRnm$rn",undef));
         }
-        $regV    = ReadingsVal($aName,"R-".$rn     ,undef) if (!defined $regV);
-        $regV    = ReadingsVal($aName,".R-".$rn    ,undef) if (!defined $regV);
+        $regV    = ReadingsVal($aName,"R-".$rn     ,ReadingsVal($aName,".R-".$rn    ,undef)) if (!defined $regV);
         if (defined $regV){
           $regV =~s/ .*//;#strip unit
           my $tplV = $HMConfig::culHmTpl{$tmpl}{reg}{$rn};
