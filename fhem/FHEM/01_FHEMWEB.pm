@@ -1753,7 +1753,7 @@ FW_fileNameToPath($)
   my $cfgFileName = $1;
   if($name eq $cfgFileName) {
     return $attr{global}{configfile};
-  } elsif($name =~ m/.*(css|_defs.svg)$/) {
+  } elsif($name =~ m/.*(js|css|_defs.svg)$/) {
     return "$FW_cssdir/$name";
   } elsif($name =~ m/.*(png|svg)$/) {
     my $d="";
