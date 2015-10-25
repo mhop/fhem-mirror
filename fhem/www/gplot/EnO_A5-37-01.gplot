@@ -1,0 +1,29 @@
+##############################################
+# $Id$
+# Display the energy level
+#
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device level: 3
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics
+set title '<TL>'
+set grid xtics ytics
+set ylabel "Level"
+set yrange [0:15]
+set y2range [0:15]
+
+#FileLog 4:level:0:
+
+plot "<IN>" using 1:2 axes x1y1 title 'Level' with steps
