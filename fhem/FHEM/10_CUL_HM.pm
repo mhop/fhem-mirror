@@ -597,18 +597,22 @@ sub CUL_HM_Attr(@) {#################################
       else{                              ($nTag,$grp) = (".","R-")}
       foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
         my $reg = $rdEntry;
-        $reg =~ s/.*-//;
+        my $p = "";
+        $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
+        $reg =~ s/\.?R-.*?-//;
         next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '0');
-        $tHash->{READINGS}{$nTag."R-".$reg} = $tHash->{READINGS}{$rdEntry};
+        $tHash->{READINGS}{$nTag."R-$p".$reg} = $tHash->{READINGS}{$rdEntry};
         delete $tHash->{READINGS}{$rdEntry};
       }
       if ($tHash->{helper}{expert}{det}){($nTag,$grp) = ("",".R-")}
       else{                              ($nTag,$grp) = (".","R-")}
       foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
         my $reg = $rdEntry;
-        $reg =~ s/.*-//;
+        my $p = "";
+        $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
+        $reg =~ s/\.?R-.*?-//;
         next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
-        $tHash->{READINGS}{$nTag."R-".$reg} = $tHash->{READINGS}{$rdEntry};
+        $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
         delete $tHash->{READINGS}{$rdEntry};
       }
       if ($tHash->{helper}{expert}{raw}){($nTag,$grp) = ("",".RegL_")}
@@ -3485,13 +3489,16 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
         $timestamps .= "\n#        "
                       .InternalVal($eName,"peerList","")
                       ." :peerList";
-        print aSave "\nset ".$eName." peerBulk ".$pIds;
-      }
+        print aSave "\nset $eName peerBulk $pIds#"
+                   .ReadingsTimestamp($eName,"peerList","1900-01-01 00:00:01");
+      } 
       my $ehash = $defs{$eName};
       foreach my $read (sort grep(/^[\.]?RegL_/,keys %{$ehash->{READINGS}})){
-        print aSave "\nset ".$eName." regBulk ".$read." "
-              .ReadingsVal($eName,$read,"");
-        $timestamps .= "\n#        ".ReadingsTimestamp($eName,$read,"")." :".$read;
+        my $ts = ReadingsTimestamp($eName,$read,"1900-01-01 00:00:01");
+        print aSave "\nset $eName regBulk $read"
+                   ." ".ReadingsVal($eName,$read,"")
+                   ." #$ts";
+        $timestamps .= "\n#        $ts :$read";
       }
       print aSave $timestamps;
     }
@@ -3891,6 +3898,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
              if ($a[3] && $a[3] !~ m/^(set|unset)/);
     my $set = ($a[3] && $a[3] eq "unset")?"02":"01";
     foreach my $peer (grep(!/^self/,split(',',$pL))){
+      last if($peer =~ m/^#/);
       my $pID = CUL_HM_peerChId($peer,$dst);
       return "unknown peer".$peer if (length($pID) != 8);# peer only to channel
       my $pCh1 = substr($pID,6,2);
@@ -3951,6 +3959,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       shift @adIn;shift @adIn;shift @adIn;
       my $adList;
       foreach my $ad (sort @adIn){
+        last if($ad =~ m/^#/);
         ($addr,$data) = split(":",$ad);
         $adList .= sprintf("%02X%02X",hex($addr),hex($data)) if ($addr ne "00");
         return "wrong addr or data:".$ad if (hex($addr)>255 || hex($data)>255);
@@ -6861,8 +6870,9 @@ sub CUL_HM_updtRegDisp($$$) {
   my $name = $hash->{NAME};
   my $devId = substr(CUL_HM_name2Id($name),0,6);
   my $ioId = CUL_HM_IoId(CUL_HM_id2Hash($devId));
-  my $pReg = ($peerId && $peerId ne '00000000' )?
-     CUL_HM_peerChName($peerId,$devId)."-":"";
+  my $pReg = ($peerId && $peerId ne '00000000' )
+              ? CUL_HM_peerChName($peerId,$devId)."-"
+              : "";
   $pReg=~s/:/-/;
   $pReg="R-".$pReg;
   my $devName =CUL_HM_getDeviceHash($hash)->{NAME};# devName as protocol entity
@@ -8097,7 +8107,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
   if ($hash->{helper}{role}{dev}){
     push @lsNo,"0:";
   }
-  elsif ($hash->{helper}{role}{chn}){
+  if ($hash->{helper}{role}{chn}){
     foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
       my ($l,$c) = split":",$ls;
       if ($l ne "p"){# ignore peer-only entries
