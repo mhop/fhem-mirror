@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# Display the measured temperature
+# Display the measured CO2 concentration
 #
 # FileLog definition: 
 # define FileLog_device FileLog ./log/device-%Y.log device
