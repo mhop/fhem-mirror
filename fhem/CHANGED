@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  38_CO20: fixed error messages on timeout
   - feature: codemirror modules now loaded by default: search.js, comment.js
                  dialog.js, autorefresh.js, searchcursor.js, dialog.css
              codemirror search & replace is now activated by default.

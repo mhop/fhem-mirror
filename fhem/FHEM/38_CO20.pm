@@ -539,9 +539,13 @@ CO20_dataset($$$)
 
     if($ret == 16 and $buflen > 15) {
       $hash->{DEV}->interrupt_read(0x00000081, $buf, 0x0000010, $hash->{timeout});
+      $buflen = length($buf);
       Log3 $name, 5, "getdata read $ret";
+      if($buflen > 15)
+      {
       my $intdata .= ord(substr($buf,0,1))." ".ord(substr($buf,1,1))." ".ord(substr($buf,2,1))." ".ord(substr($buf,3,1))." ".ord(substr($buf,4,1))." ".ord(substr($buf,5,1))." ".ord(substr($buf,6,1))." ".ord(substr($buf,7,1))." ".ord(substr($buf,8,1))." ".ord(substr($buf,9,1))." ".ord(substr($buf,10,1))." ".ord(substr($buf,11,1))." ".ord(substr($buf,12,1))." ".ord(substr($buf,13,1))." ".ord(substr($buf,14,1))." ".ord(substr($buf,15,1));
       Log3 $name, 4, "$buf";
+      }
     } else {
       Log3 $name, 4, "set data failed: $buf";
       return undef;
@@ -591,7 +595,7 @@ CO20_Set($$$$)
   my ($hash, $name, $cmd, $val) = @_;
 
   my $list = "";
-  $list = "flag_WARMUP flag_BURN-IN flag_RESET_BASELINE flag_CALIBRATE_HEATER flag_LOGGING knob_CO2/VOC_level_warn1 knob_CO2/VOC_level_warn2 knob_Reg_Set knob_Reg_P knob_Reg_I knob_Reg_D knob_LogInterval knob_ui16StartupBits recalibrate_heater:noArg reset_baseline:noArg reset_device:noArg" if( AttrVal($name, "advanced", 0 ) == 1 );
+  $list = "knob_CO2/VOC_level_warn1 knob_CO2/VOC_level_warn2 knob_Reg_Set knob_Reg_P knob_Reg_I knob_Reg_D knob_LogInterval knob_ui16StartupBits recalibrate_heater:noArg reset_baseline:noArg reset_device:noArg" if( AttrVal($name, "advanced", 0 ) == 1 );
   if (index($list, $cmd) != -1) {
     $hash->{BLOCKED} = 1;
     CO20_dataset($hash,$cmd,$val);
