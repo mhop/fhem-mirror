@@ -1,0 +1,26 @@
+##############################################
+# $Id$
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+#
+# Logfile record example:
+# 2015-10-17_08:38:08 device battery full|ok|low|empty
+# 2015-10-17_08:38:08 device temperature 2.9
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set title '<TL>'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "t/C"
+set y2label "Battery"
+set y2tics ("full" 3, "ok" 2, "low" 1, "empty" 0)
+set y2range [-0.1:4.1]
+set grid
+
+#FileLog 4:temperature:0:
+#FileLog 4:battery:0:$fld[3]=~"full"?3:$fld[3]=~"ok"?2:$fld[3]=~"low"?1:0
+
+plot "<IN>" using 1:2 axes x1y1 title 'Temperature' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y2 title 'Battery' ls l1 lw 1 with steps"
