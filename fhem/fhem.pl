@@ -752,6 +752,7 @@ IsDisabled($)
   return 1 if($attr{$devname}{disable});
   return 3 if($defs{$devname} && $defs{$devname}{STATE} &&
               $defs{$devname}{STATE} eq "inactive");
+  return 3 if(ReadingsVal($devname, "state", "") eq "inactive");
 
   my $dfi = $attr{$devname}{disabledForIntervals};
   if(defined($dfi)) {
