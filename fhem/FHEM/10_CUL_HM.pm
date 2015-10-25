@@ -4367,7 +4367,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "timer value to low" if ($tval eq "0000");
     $ramp = CUL_HM_encodeTime16($ramp);
 
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
                            sprintf("%02X%02X%02X%02X",$bright,$colProg,$min,$max).$ramp.$tval);
   }
   elsif($cmd eq "playTone") { #################################################
