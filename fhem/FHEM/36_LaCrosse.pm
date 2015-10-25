@@ -180,14 +180,14 @@ sub LaCrosse_Parse($$) {
   
   if( $msg =~ m/^OK 9/ ) {
     # Temperature sensor - Format:
-    #      0  1   3   3   4
-    # ----------------------
-    # OK 9 56 1   4   156 37     ID = 56  T: 18.0  H: 37  no NewBatt
-    # OK 9 49 1   4   182 54     ID = 49  T: 20.6  H: 54  no NewBatt
-    # OK 9 55 129 4 192 56       ID = 55  T: 21.6  H: 56  WITH NewBatt 
+    #      0   1   2   3   4
+    # -------------------------
+    # OK 9 56  1   4   156 37     ID = 56  T: 18.0  H: 37  no NewBatt
+    # OK 9 49  1   4   182 54     ID = 49  T: 20.6  H: 54  no NewBatt
+    # OK 9 55  129 4   192 56     ID = 55  T: 21.6  H: 56  WITH NewBatt
     
-    # OK 9 2 1   4 212 106       ID = 2   T: 23.6  H: -- Channel: 1
-    # OK 9 2 130 4 225 125       ID = 2   T: 24.9  H: -- Channel: 2
+    # OK 9 2   1   4 212 106       ID = 2   T: 23.6  H: -- Channel: 1
+    # OK 9 2   130 4 225 125       ID = 2   T: 24.9  H: -- Channel: 2
     
     # OK 9 ID XXX XXX XXX XXX
     # |  | |  |   |   |   |
@@ -200,6 +200,8 @@ sub LaCrosse_Parse($$) {
     # |---------------------- fix "OK"
 
     @bytes = split( ' ', substr($msg, 5) );
+
+    return "" if(@bytes != 5);
 
     $addr = sprintf( "%02X", $bytes[0] );
     $battery_new = ($bytes[1] & 0x80) >> 7;
@@ -243,6 +245,8 @@ sub LaCrosse_Parse($$) {
     #                                 |---------- Low battery
     
     @bytes = split( ' ', substr($msg, 5) );
+
+    return "" if(@bytes < 14);
     
     $addr = sprintf( "%02X", $bytes[0] );
     $typeNumber = $bytes[1];
@@ -405,33 +409,36 @@ sub LaCrosse_Parse($$) {
     if(!defined($rhash->{"previousT$channel"}) 
         || (defined($rhash->{"previousT$channel"})
             && abs($rhash->{"previousH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
-            && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) )){
-      
+            && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) )) {
+
       # Calculate average
-      if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousT$channel"}) && $temperature != 0xFFFF ) {
-        $temperature = ($rhash->{"previousT$channel"}*3+$temperature)/4;
+      if (AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousT$channel"}) && $temperature != 0xFFFF) {
+        $temperature = ($rhash->{"previousT$channel"} * 3 + $temperature) / 4;
       }
-      if( AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousH$channel"}) && $humidity != 0xFF ) {
-        $humidity = ($rhash->{"previousH$channel"}*3+$humidity)/4;
-      }    
-      
+      if (AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousH$channel"}) && $humidity != 0xFF) {
+        $humidity = ($rhash->{"previousH$channel"} * 3 + $humidity) / 4;
+      }
+
       # Handle resolution
-      if(my $resolution = AttrVal( $rname, "resolution", 0 )) {
+      if (my $resolution = AttrVal( $rname, "resolution", 0 )) {
         if ($temperature != 0xFFFF) {
-          $temperature = int($temperature*10 / $resolution + 0.5) * $resolution / 10;
+          $temperature = int($temperature * 10 / $resolution + 0.5) * $resolution / 10;
         }
         if ($humidity != 0xFF) {
-          $humidity = int($humidity*10 / $resolution + 0.5) * $resolution / 10;
+          $humidity = int($humidity * 10 / $resolution + 0.5) * $resolution / 10;
         }
       }
-        
+
       readingsBeginUpdate($rhash);
       if ($typeNumber > 0) {
         readingsBulkUpdate($rhash, "error", $error ? "1" : "0");
       }
-      
+
       # Battery state
-      readingsBulkUpdate($rhash, "battery$channel", $battery_low?"low":"ok");
+      if (defined ($rhash->{READINGS}{battery2})) {
+        delete $rhash->{READINGS}{battery2}
+      }
+      readingsBulkUpdate($rhash, "battery", $battery_low? "low" : "ok");
       
       # Calculate dewpoint
       my $dewpoint;
