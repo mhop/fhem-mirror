@@ -1123,7 +1123,8 @@ sub HMinfo_GetFn($@) {#########################################################
       next if (!defined $defs{$dName}{helper}{tmpl});
       foreach (keys %{$defs{$dName}{helper}{tmpl}}){
         my ($p,$t)=split(">",$_);
-        $ret .= "\n    ".HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
+        my $tck = HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
+        $ret .= "\n    ".$tck if ($tck);
       }
     }
   }
