@@ -3262,6 +3262,7 @@ Dispatch($$$)
               no strict "refs"; $readingsUpdateDelayTrigger = 1;
               @found = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
               use strict "refs"; $readingsUpdateDelayTrigger = 0;
+              last if(defined($found[0]));
             } else {
               Log 0, "ERROR: Cannot autoload $mname";
             }
