@@ -729,7 +729,7 @@ ZWave_Cmd($$@)
       # message stored in reading, will be processed when nonce arrives
       my $cmd2 = "$type $name $cmd ".join(" ", @a);
       ZWave_secPutMsg($hash, $interceptedMSG, $cmd2);
-      return ZWave_Get($hash, $name, "secNonce");
+      return ZWave_Cmd("get", $hash, $name, "secNonce");
     }
   }
 
