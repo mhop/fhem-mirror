@@ -33,14 +33,15 @@ sub DbLog_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{DefFn}    = "DbLog_Define";
-  $hash->{UndefFn}  = "DbLog_Undef";
-  $hash->{NotifyFn} = "DbLog_Log";
-  $hash->{SetFn}    = "DbLog_Set";
-  $hash->{GetFn}    = "DbLog_Get";
-  $hash->{AttrFn}   = "DbLog_Attr";
-  $hash->{ShutdownFn} = "DbLog_Shutdown";
-  $hash->{AttrList} = "disable:0,1 ".
+  $hash->{DefFn}            = "DbLog_Define";
+  $hash->{UndefFn}          = "DbLog_Undef";
+  $hash->{NotifyFn}         = "DbLog_Log";
+  $hash->{SetFn}            = "DbLog_Set";
+  $hash->{GetFn}            = "DbLog_Get";
+  $hash->{AttrFn}           = "DbLog_Attr";
+  $hash->{SVG_regexpFn}     = "DbLog_regexpFn";
+  $hash->{ShutdownFn}       = "DbLog_Shutdown";
+  $hash->{AttrList}         = "disable:0,1 ".
            "DbLogType:Current,History,Current/History ".
            "shutdownWait ".
            "suppressUndef:0,1 ".
@@ -140,6 +141,32 @@ sub DbLog_Attr(@)
   $defs{$a[1]}{STATE} = ($do == 1 ? "disabled" : "active");
 
   return undef;
+}
+
+################################################################
+#
+# Exrahieren des Filters aus der ColumnsSpec (gplot-Datei)
+#
+# Die grundlegend idee ist das jeder svg plot einen filter hat der angibt 
+# welches device und reading dargestellt wird so das der plot sich neu 
+# lädt wenn es ein entsprechendes event gibt. 
+#
+# Parameter: Quell-Instanz-Name, und alle FileLog-Parameter, die diese Instanz betreffen.
+# Quelle: http://forum.fhem.de/index.php/topic,40176.msg325200.html#msg325200
+################################################################
+sub DbLog_regexpFn($$) {                            
+  my ($name, $filter) = @_;
+  my $ret;
+ 
+  my @a = split( ' ', $filter );
+  for(my $i = 0; $i < int(@a); $i++) {
+    my @fld = split(":", $a[$i]);
+
+    $ret .= '|' if( $ret );
+    $ret .=  $fld[0] .'.'. $fld[1];
+  }                  
+
+  return $ret;
 }
 
 ################################################################
@@ -500,6 +527,8 @@ sub DbLog_Push(@) {
 sub DbLog_Log($$) {
   # Log is my entry, Dev is the entry of the changed device
   my ($hash, $dev) = @_;
+
+  Log3 $hash,5, "Notify from Device: ".$dev->{NAME}." recieved";
 
   return undef if($hash->{STATE} eq "disabled");
 
@@ -1884,7 +1913,7 @@ DbLog_sampleDataFn($$$$$)
   # Table Current present, use it for sample data
 
     my $dbhf = $defs{$dlName}{DBHF};
-    my $query = "select device,reading,value from current where device <> '' group by device,reading order by device,reading";
+    my $query = "select device,reading,value from current where device <> '' order by device,reading";
     my $sth = $dbhf->prepare( $query );  
     $sth->execute();
     while (my @line = $sth->fetchrow_array()) {
