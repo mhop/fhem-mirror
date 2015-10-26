@@ -3127,13 +3127,12 @@ FW_widgetOverride($$)
     <li>longpollSVG<br>
         Reloads an SVG weblink, if an event should modify its content. Since 
         an exact determination of the affected events is too complicated, we
-        need some help from the #FileLog definition in the .gplot file: the
-        filter used there (second parameter) must either contain only the
-        deviceName or have the form deviceName.event or deviceName.*. This is
-        always the case when using the <a href="#plotEditor">Plot
+        need some help from the definition in the .gplot file: the filter used
+        there (second parameter if the source is FileLog) must either contain
+        only the deviceName or have the form deviceName.event or deviceName.*.
+        This is always the case when using the <a href="#plotEditor">Plot
         editor</a>. The SVG will be reloaded for <b>any</b> event triggered by
-        this deviceName.
-        Default is off.
+        this deviceName. Default is off.
         </li>
         <br>
 
@@ -3843,12 +3842,12 @@ FW_widgetOverride($$)
     <a name="longpollSVG"></a>
     <li>longpollSVG<br>
         L&auml;dt SVG Instanzen erneut, falls ein Ereignis dessen Inhalt
-        &auml;ndert. Funktioniert nur, falls der dazugeh&ouml;rige #FileLog
-        Definition in der .gplot Datei folgenden Form hat: deviceName.Event
-        bzw. deviceName.*. Wenn man den <a href="#plotEditor">Plot
-        Editor</a> benutzt, ist das &uuml;brigens immer der Fall. Die SVG Datei
-        wird bei <b>jedem</b> ausl&ouml;senden Event dieses Ger&auml;tes neu
-        geladen.  Standard ist aus.
+        &auml;ndert. Funktioniert nur, falls die dazugeh&ouml;rige Definition
+        der Quelle in der .gplot Datei folgenden Form hat: deviceName.Event
+        bzw. deviceName.*. Wenn man den <a href="#plotEditor">Plot Editor</a>
+        benutzt, ist das &uuml;brigens immer der Fall. Die SVG Datei wird bei
+        <b>jedem</b> ausl&ouml;senden Event dieses Ger&auml;tes neu geladen.
+        Die Voreinstellung ist aus.
         </li><br>
 
     <a name="menuEntries"></a>

@@ -2744,8 +2744,8 @@ RemoveInternalTimer($)
 
 #####################################
 sub
-stacktrace() {
-  
+stacktrace()
+{
   my $i = 1;
   my $max_depth = 50;
   
