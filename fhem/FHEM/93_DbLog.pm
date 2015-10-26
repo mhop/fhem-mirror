@@ -1016,6 +1016,16 @@ DbLog_Get($@)
 
     while($sth->fetch()) {
 
+      if($readings[$i]->[4]) {
+        #evaluate
+        my $val = $sql_value;
+        my $ts  = $sql_timestamp;
+        eval("$readings[$i]->[4]");
+        $sql_value = $val;
+        $sql_timestamp = $ts;
+        if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
+      }
+
       if($sql_timestamp lt $from && $deltacalc) {
         if(Scalar::Util::looks_like_number($sql_value)){
           #nur setzen wenn nummerisch
@@ -1034,16 +1044,9 @@ DbLog_Get($@)
         # die Regexep wird vor der Function ausgewertet und der Wert im Feld
         # Value angepasst.
         ####################################################################
-        if($readings[$i]->[4] && $readings[$i]->[4]) {
-          #evaluate
-          my $val = $sql_value;
-          my $ts  = $sql_timestamp;
-          eval("$readings[$i]->[4]");
-          $sql_value = $val;
-          $sql_timestamp = $ts;
-          if($@) {Log3 $hash->{NAME}, 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
+        if($readings[$i]->[4]) {
           $out_tstamp = $sql_timestamp;
-          $writeout=1;
+          $writeout=1 if(!$deltacalc);
         }
 
         ############ Auswerten des 4. Parameters: function ###################
