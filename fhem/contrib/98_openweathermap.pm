@@ -64,6 +64,10 @@
 #
 #	2014-03-22	added:	added set command 'clear'
 #
+#	2015-10-26	added:	support for stationByZip
+#				modi:	use HttpUtils instead of LWP::UA
+#						for nonblocking http
+#
 
 package main;
 
@@ -71,15 +75,11 @@ use strict;
 use warnings;
 use POSIX;
 use XML::Simple;
-eval {require JSON};
+use HttpUtils;
+eval "use JSON";
 use feature qw/say switch/;
 
 no if $] >= 5.017011, warnings => 'experimental';
-
-require LWP::UserAgent;			# test
-my	$ua = LWP::UserAgent->new;	# test
-	$ua->timeout(10);				# test
-	$ua->env_proxy;					# test
 
 sub OWO_abs2rel($$$);
 sub OWO_isday($$);
@@ -98,7 +98,7 @@ sub openweathermap_Initialize($) {
 
 	$hash->{AttrList}	=	"do_not_notify:0,1 ".
 							"owoGetUrl owoSendUrl owoInterval:600,900,1800,3600 ".
-							"owoApiKey owoProxy owoStation owoUser owoUseXml:1,0 ".
+							"owoApiKey owoStation owoUser owoUseXml:1,0 ".
 							"owoDebug:0,1 owoRaw:0,1 owoTimestamp:0,1 ".
 							"owoSrc00 owoSrc01 owoSrc02 owoSrc03 owoSrc04 ".
 							"owoSrc05 owoSrc06 owoSrc07 owoSrc08 owoSrc09 ".
@@ -136,6 +136,7 @@ sub OWO_Set($@){
 			CommandDeleteReading(undef, "$name _.*");
 			CommandDeleteReading(undef, "$name c_.*");
 			CommandDeleteReading(undef, "$name g_.*");
+			CommandDeleteReading(undef, "$name my_.*");
 			return;
 		}
 
@@ -245,12 +246,6 @@ sub OWO_Attr(@){
 			break;
 		}
 
-		when("owoProxy"){
-			if($attrValue ne ""){
-				$ua->proxy(['http'], $attrValue);
-			}
-		}
-
 		default {
 			$attr{$name}{$attrName} = $attrValue;
 		}
@@ -321,15 +316,17 @@ sub OWO_GetStatus($;$){
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
 			Log3($name, 4, "owo $name: sending: $dataString");
-			$htmlDummy = $ua->post($sendString);
-			Log3($name, 3, "owo $name: htmlResponse: ".$htmlDummy->status_line);
+			my $ll = AttrVal($name,'verbose',2);
+			$htmlDummy = GetFileFromURLQuiet($sendString,10,1,0,$ll);
+			$htmlDummy //= "no answer";
+			Log3($name, 3, "owo $name: htmlResponse: ".$htmlDummy); #->status_line);
 		} else {
 			Log3($name, 3, "owo $name: debug:   $dataString");
 		}
 
 		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash, "_httpResponse_my", $htmlDummy->status_line) if $htmlDummy;
-		readingsBulkUpdate($hash, "my_response", $htmlDummy->decoded_content) if $htmlDummy;
+		readingsBulkUpdate($hash, "_httpResponse_my", $htmlDummy); #->status_line) if $htmlDummy;
+		readingsBulkUpdate($hash, "my_response", $htmlDummy); #->decoded_content) if $htmlDummy;
 		readingsBulkUpdate($hash, "state","active");
 		if(AttrVal($name, "owoTimestamp", 0) == 1){
 			readingsBulkUpdate($hash, "my_lastSent", time);
@@ -337,9 +334,9 @@ sub OWO_GetStatus($;$){
 			readingsBulkUpdate($hash, "my_lastSent", localtime(time));
 		}
 		readingsEndUpdate($hash, 1);
-		if(defined($htmlDummy)){
-			CommandDeleteReading(undef, "$name my_.*") if $htmlDummy->is_error;
-		}
+#		if(defined($htmlDummy)){
+#			CommandDeleteReading(undef, "$name my_.*") if $htmlDummy->is_error;
+#		}
 	}
 
 ##### end of send job
@@ -405,20 +402,13 @@ sub UpdateReadings($$$){
 	my $xmlMode = AttrVal($name, "owoUseXml", "");
 	$url .= "&mode=xml" if($xmlMode eq "1");
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
-	eval {$response = $ua->get("$url")};
 
-#
-#	error handling for not found stations (error 404 from server)
-#
-	if($response->decoded_content =~ m/error/i){
-		CommandDeleteReading(undef, "$name $prefix.*");
-		readingsSingleUpdate($hash, "_httpResponse_".substr($prefix,0,1), $response->decoded_content, 1);
-		return;
-	}
+	my $ll = AttrVal($name,'verbose',2);
+	$response = GetFileFromURLQuiet($url,10,1,0,$ll);
 
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
-			Log3($name, 4, "owo $name: response:\n".$response->decoded_content);
+			Log3($name, 4, "owo $name: response:\n".$response);
 		}
 	} else {
 		Log3($name, 4, "owo $name: error: no response from server");
@@ -426,18 +416,18 @@ sub UpdateReadings($$$){
 	}
 
 	CommandDeleteReading(undef, "$name $prefix.*");
-	readingsSingleUpdate($hash, "_httpResponse_".substr($prefix,0,1), $response->status_line, 1);
+	readingsSingleUpdate($hash, "_httpResponse_".substr($prefix,0,1), "data found", 1);
 
-	if($xmlMode eq "1" && $response->is_success){
+	if($xmlMode eq "1" && $response){
 		Log3($name, 4, "owo $name: decoding XML");
 		my $xml			= new XML::Simple;
 		$jsonWeather	= undef;
-		$jsonWeather	= $xml->XMLin($response->decoded_content, KeyAttr => 'current' );
+		$jsonWeather	= $xml->XMLin($response, KeyAttr => 'current' );
 
 		if(defined($jsonWeather)){
 			readingsBeginUpdate($hash);
 			if(AttrVal($name, "owoRaw", 0) == 1){
-				readingsBulkUpdate($hash, $prefix."rawData", $response->decoded_content);
+				readingsBulkUpdate($hash, $prefix."rawData", $response);
 			}
 			readingsBulkUpdate($hash, "_dataSource",			"www.openweathermap.org");
 			readingsBulkUpdate($hash, "_decodedWith",			"XML");
@@ -467,15 +457,15 @@ sub UpdateReadings($$$){
 		}
 	}
 	
-	if($xmlMode ne "1" && $response->is_success){
+	if($xmlMode ne "1" && $response){
 		Log3($name, 4, "owo $name: decoding JSON");
 		my $json = JSON->new->allow_nonref;
-		eval {$jsonWeather = $json->decode($response->decoded_content)}; warn $@ if $@;
+		eval {$jsonWeather = $json->decode($response)}; warn $@ if $@;
 
 		if(defined($jsonWeather)){
 			readingsBeginUpdate($hash);
 			if(AttrVal($name, "owoRaw", 0) == 1){
-				readingsBulkUpdate($hash, $prefix."rawData",  $response->decoded_content);
+				readingsBulkUpdate($hash, $prefix."rawData",  $response);
 			}
 			if(AttrVal($name, "owoTimestamp", 0) == 1){
 				readingsBulkUpdate($hash, $prefix."lastWx",   $jsonWeather->{dt});
