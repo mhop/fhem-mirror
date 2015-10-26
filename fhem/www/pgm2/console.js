@@ -1,8 +1,7 @@
 var consConn;
 
-var isFF = (navigator.userAgent.toLowerCase().indexOf('firefox') > -1);
-var consFilter, consTxt;
-
+var consFilter, oldFilter;
+var consLastIndex = 0;
 log("Console is opening");
 
 function
@@ -16,9 +15,17 @@ consUpdate()
 
   if(consConn.readyState != 3)
     return;
-
+  var len = consConn.responseText.length;
+  
+  if (consLastIndex == len) // No new data
+    return; 
+ 
+  var new_content = consConn.responseText.substring(consLastIndex, len);
+  consLastIndex = len;
+  
+  log("Console Rcvd: "+new_content);
   $("#console")
-    .html(consTxt+consConn.responseText)
+    .append(new_content.replace(/ /g, "&nbsp;"))
     .scrollTop($("#console")[0].scrollHeight);
 }
 
@@ -39,6 +46,11 @@ consFill()
   consConn.open("GET", query, true);
   consConn.onreadystatechange = consUpdate;
   consConn.send(null);
+  consLastIndex = 0;
+  if(oldFilter != consFilter)  // only clear, when filter changes
+    $("#console").html("");
+  
+  oldFilter = consFilter;
 }
 
 function
@@ -49,8 +61,13 @@ consStart()
   consFilter = $("a#eventFilter").html();
   if(consFilter == undefined)
     consFilter = ".*";
-  consTxt = el.innerHTML;
+  oldFilter = consFilter;
   setTimeout("consFill()", 1000);
+  
+   $("a#eventReset").click(function(evt){  // Event Monitor Reset
+     log("Console resetted by user");
+     $("#console").html("");
+   });
   
   $("a#eventFilter").click(function(evt){  // Event-Filter Dialog
     $('body').append(
@@ -70,7 +87,6 @@ consStart()
           consFilter = val ? val : ".*";
           $(this).dialog('close');
           $("a#eventFilter").html(consFilter);
-          $("#console").html(consTxt);
           consFill();
         }}]
     });

@@ -1929,7 +1929,8 @@ FW_style($$)
           "</script>";
     FW_pO "<div id=\"content\">";
     my $filter = ($a[2] && $a[2] ne "1") ? $a[2] : ".*";
-    FW_pO "Events (Filter:<a href=\"#\" id=\"eventFilter\">$filter</a>):<br>\n";
+    FW_pO "Events (Filter:<a href=\"#\" id=\"eventFilter\">$filter</a>)".
+          " <a href=\"#\" id=\"eventReset\">[Reset]</a>:<br>\n";
     FW_pO "<div id=\"console\"></div>";
     FW_pO "</div>";
 
