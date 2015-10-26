@@ -307,8 +307,8 @@ CommandAddStruct($)
 
   foreach my $d (devspec2array($a[0])) {
     $hash->{CONTENT}{$d} = 1;
+    $hash->{DEF} .= " $d";
   }
-  $hash->{DEF} = $hash->{ATTR} . " " . join(" ",sort keys %{$hash->{CONTENT}});
 
   @a = ( "set", $hash->{NAME}, $hash->{ATTR}, $hash->{NAME} );
   structure_Attr(@a);
@@ -335,8 +335,9 @@ CommandDelStruct($)
 
   foreach my $d (devspec2array($a[0])) {
     delete($hash->{CONTENT}{$d});
+    $hash->{DEF} =~ s/\b$d\b//g;
   }
-  $hash->{DEF} = $hash->{ATTR} . " " . join(" ",sort keys %{$hash->{CONTENT}});
+  $hash->{DEF} =~ s/  / /g;
 
   @a = ( "del", $hash->{NAME}, $hash->{ATTR} );
   structure_Attr(@a);
@@ -370,7 +371,9 @@ structure_Set($@)
     }
   }
 
-  foreach my $d (sort keys %{ $hash->{CONTENT} }) {
+  my @devList = split("[ \t][ \t]*", $hash->{DEF});
+  shift @devList;
+  foreach my $d (@devList) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
       Log3 $hash, 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
@@ -475,7 +478,9 @@ structure_Attr($@)
   $hash->{INATTR} = 1;
 
   my $ret = "";
-  foreach my $d (sort keys %{ $hash->{CONTENT} }) {
+  my @devList = split("[ \t][ \t]*", $hash->{DEF});
+  shift @devList;
+  foreach my $d (@devList) {
     next if(!$defs{$d});
     if($attr{$d} && $attr{$d}{structexclude}) {
       my $se = $attr{$d}{structexclude};
