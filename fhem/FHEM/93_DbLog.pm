@@ -1016,6 +1016,10 @@ DbLog_Get($@)
 
     while($sth->fetch()) {
 
+      ############ Auswerten des 5. Parameters: Regexp ###################
+      # die Regexep wird vor der Function ausgewertet und der Wert im Feld
+      # Value angepasst.
+      ####################################################################
       if($readings[$i]->[4]) {
         #evaluate
         my $val = $sql_value;
@@ -1040,10 +1044,6 @@ DbLog_Get($@)
         $out_tstamp = "";
         $retvaldummy = "";
 
-        ############ Auswerten des 5. Parameters: Regexp ###################
-        # die Regexep wird vor der Function ausgewertet und der Wert im Feld
-        # Value angepasst.
-        ####################################################################
         if($readings[$i]->[4]) {
           $out_tstamp = $sql_timestamp;
           $writeout=1 if(!$deltacalc);
