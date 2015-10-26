@@ -688,7 +688,7 @@ not to be translated
 			</ul>
 		</ul>
 		<br/><br/>
-		<code>set &lt;name&gt; &lt;stationById stationId&gt;|&lt;stationByName stationName&gt;|&lt;stationByGeo> [lat lon]&gt;</code>
+		<code>set &lt;name&gt; &lt;stationById stationId&gt;|&lt;stationByName stationName&gt;|&lt;stationByGeo> [lat lon]&gt;|&lt;stationByZip stationZipCode&gt;</code>
 		<br/><br/>
 		<ul>see description above: <a href="#owoconfiguration2">Configuration task 2</a></ul>
 		<br/><br/>
@@ -698,7 +698,7 @@ not to be translated
 	<b>Get-Commands</b><br/>
 	<ul>
 		<br/>
-		<code>get &lt;name&gt; &lt;stationById stationId&gt;|&lt;stationByName stationName&gt;|&lt;stationByGeo> [lat lon]&gt;</code>
+		<code>get &lt;name&gt; &lt;stationById stationId&gt;|&lt;stationByName stationName&gt;|&lt;stationByGeo> [lat lon]&gt;|&lt;stationByZip stationZipCode&gt;</code>
 		<br/><br/>
 		<ul>see description above: <a href="#owoconfiguration3">Configuration task 3</a></ul>
 		<br/>
