@@ -118,7 +118,8 @@ sub OWO_Shutdown($) {
 sub OWO_Set($@){
 	my ($hash, @a)	= @_;
 	my $name		= $hash->{NAME};
-	my $usage		= "Unknown argument, choose one of clear:readings stationById stationByGeo stationByName send:noArg";
+	my $usage		= "Unknown argument, choose one of clear:readings stationById stationByGeo ".
+	                  "stationByName stationByZip send:noArg";
 	my $response;
 	
 	return "No Argument given" if(!defined($a[1]));
@@ -156,6 +157,10 @@ sub OWO_Set($@){
 			$urlString = $urlString."?id=".$a[2];
 		}
 
+		when("stationByZip"){
+			$urlString = $urlString."?zip=".$a[2];
+		}
+
 		when("stationByGeo"){
 			$a[2] = AttrVal("global", "latitude", 0) unless(defined($a[2]));
 			$a[3] = AttrVal("global", "longitude", 0) unless(defined($a[3]));
@@ -174,7 +179,7 @@ sub OWO_Set($@){
 sub OWO_Get($@){
 	my ($hash, @a) = @_;
 	my $name = $hash->{NAME};
-	my $usage = "Unknown argument, choose one of stationById stationByGeo stationByName";
+	my $usage = "Unknown argument, choose one of stationById stationByGeo stationByName stationByZip";
 	my $response;
 	
 	return "No Argument given" if(!defined($a[1]));
@@ -198,6 +203,10 @@ sub OWO_Get($@){
 
 		when("stationById"){
 			$urlString = $urlString."?id=".$a[2];
+		}
+
+		when("stationByZip"){
+			$urlString = $urlString."?zip=".$a[2];
 		}
 
 		when("stationByGeo"){

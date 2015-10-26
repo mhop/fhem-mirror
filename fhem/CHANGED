@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: contrib/98_openweathermap.pm - add support for stationByZip.
+             e.g. 76133,de will find weather data for Karlsruhe,Germany
   - bugfix:  38_CO20: fixed error messages on timeout
   - feature: codemirror modules now loaded by default: search.js, comment.js
                  dialog.js, autorefresh.js, searchcursor.js, dialog.css
