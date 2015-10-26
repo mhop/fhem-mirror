@@ -67,6 +67,7 @@
 #	2015-10-26	added:	support for stationByZip
 #				modi:	use HttpUtils instead of LWP::UA
 #						for nonblocking http
+#				modi:	attribute owoProxy for proxy configuration
 #
 
 package main;
@@ -316,8 +317,7 @@ sub OWO_GetStatus($;$){
 		my $sendString = $urlString."?".$dataString;
 		if(AttrVal($name, "owoDebug",1) == 0){
 			Log3($name, 4, "owo $name: sending: $dataString");
-			my $ll = AttrVal($name,'verbose',2);
-			$htmlDummy = GetFileFromURLQuiet($sendString,10,1,0,$ll);
+			$htmlDummy = GetFileFromURLQuiet($sendString,10,1,0,0);
 			$htmlDummy //= "no answer";
 			Log3($name, 3, "owo $name: htmlResponse: ".$htmlDummy); #->status_line);
 		} else {
@@ -403,8 +403,7 @@ sub UpdateReadings($$$){
 	$url .= "&mode=xml" if($xmlMode eq "1");
 	$url .= "&APPID=".AttrVal($name, "owoApiKey", "");
 
-	my $ll = AttrVal($name,'verbose',2);
-	$response = GetFileFromURLQuiet($url,10,1,0,$ll);
+	$response = GetFileFromURLQuiet($url,10,1,0,0);
 
 	if(defined($response)){
 		if(AttrVal($name, "owoDebug", 1) == 1){
