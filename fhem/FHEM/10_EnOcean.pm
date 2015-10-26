@@ -301,7 +301,7 @@ my %EnO_eepConfig = (
   "D2.01.11" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.03.00" => {attr => {subType => "switch.00"}},
   "D2.03.10" => {attr => {subType => "windowHandle.10"}, GPLOT => "EnO_windowHandle:WindowHandle,"},
-  "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/Angle,"},
+  "D2.05.00" => {attr => {subType => "blindsCtrl.00", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
   "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_temp4:Temp,"},
@@ -732,9 +732,9 @@ EnOcean_Define($$)
     return "wrong syntax: define <name> EnOcean <8-digit-hex-code> [<EEP>]|getNextID|<EEP>";
   }
 
+  # all notifys needed
   #$hash->{NOTIFYDEV} = "global";
-  # polling
-  # InternalAt();
+
   return undef;
 }
 
@@ -781,7 +781,7 @@ sub EnOcean_Get($@)
   if (defined $stSet) {$st = $stSet;}
   my $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));
   if ($subDef !~ m/^[\dA-F]{8}$/) {return "SenderID $subDef wrong, choose <8-digit-hex-code>.";}
-  my $tn = TimeNow();
+  my $timeNow = TimeNow();
   if (AttrVal($name, "remoteManagement", "off") eq "on") {
     # Remote Management
     $cmdList = "remoteCommands:noArg remoteID:noArg remotePing:noArg remoteStatus:noArg ";
@@ -1073,7 +1073,7 @@ sub EnOcean_Set($@)
   my $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));
   if ($subDef !~ m/^[\dA-F]{8}$/) {return "SenderID $subDef wrong, choose <8-digit-hex-code>.";}
   my $switchMode = AttrVal($name, "switchMode", "switch");
-  my $tn = TimeNow();
+  my $timeNow = TimeNow();
   if (AttrVal($name, "remoteManagement", "off") eq "on") {
     # Remote Management
     $cmdList = "remoteAction:noArg remoteLock:noArg remote_teach-in:noArg remote_teach-out:noArg remoteSetCode:noArg remoteUnlock:noArg ";
@@ -8751,15 +8751,15 @@ sub EnOcean_Notify(@)
 
     } elsif ($devName eq "global" && $s =~ m/^ATTR ([^ ]*) ([^ ]*) ([^ ]*)$/) {
       my ($sdev, $attrName, $attrVal) = ($1, $2, $3);
-      if ($attrName =~ m/^subDef.?/ && $attrVal eq "getNextID") {
+      Log3 $name, 5, "EnOcean $name <notify> ATTR $1 $2 $3";
+      if ($name eq $sdev && $attrName =~ m/^subDef.?/ && $attrVal eq "getNextID") {
         $attr{$name}{$attrName} = '0' x 8;
         $attr{$name}{$attrName} = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000");
-      
+        Log3 $name, 2, "EnOcean set $name attribute $attrName to " . $attr{$name}{$attrName};      
       } elsif ($attrName eq "devChannel" && $attrVal =~ m/^[\dA-Fa-f]{2}$/) {
         # convert old format
         $attr{$name}{$attrName} = hex $attrVal;
       }
-      #Log3($name, 5, "EnOcean $name <notify> ATTR $1 $2 $3");
 
     } elsif ($devName eq "global" && $s =~ m/^DELETEATTR ([^ ]*)$/) {
       #Log3($name, 5, "EnOcean $name <notify> DELETEATTR $1");
