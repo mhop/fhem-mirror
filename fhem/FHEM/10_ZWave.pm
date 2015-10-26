@@ -1908,7 +1908,7 @@ ZWave_secIsSecureClass($$)
 
     if (($sec_classes =~ m/$cc_name/) && ($cc_name ne 'SECURITY')){
       Log3 $name, 5, "$name: $cc_name is a secured class!";
-      return (1);
+      return 1;
     }
 
     # some SECURITY commands need to be encrypted allways
@@ -1917,7 +1917,7 @@ ZWave_secIsSecureClass($$)
           $cmd eq '06' || # NetworkKeySet
           $cmd eq '08' ){ # SchemeInherit
         Log3 $name, 5, "$name: Security commands will be encrypted!";
-        return (1);
+        return 1;
         }
     }
     # these SECURITY commands should not be encrypted
@@ -1925,7 +1925,7 @@ ZWave_secIsSecureClass($$)
     # MessageEncap = 0x81 is already encrypted
     # MessageEncapNonceGet = 0xc1 is already encrypted
   }
-  return (0);
+  return 0;
 }
 
 
@@ -1997,9 +1997,10 @@ ZWave_secNonceReceived($$)
 
   # if nonce is received, we should have stored a message for encryption
   my $getSecMsg = ZWave_secGetMsg($hash);
-  my $secMsg = ( split / /, $getSecMsg, 4 )[0];
-  my $type = ( split / /, $getSecMsg, 4 )[1];
-  my $state = ( split / /, $getSecMsg, 4 )[3];
+  my @secArr = split / /, $getSecMsg, 4;
+  my $secMsg = $secArr[0];
+  my $type   = $secArr[1];
+  my $cmd    = $secArr[3];
 
   if (!$secMsg) {
     Log3 $name, 1, "$name: Error, nonce reveived but no stored command for ".
@@ -2009,9 +2010,9 @@ ZWave_secNonceReceived($$)
 
   my $enc = ZWave_secEncrypt($hash, $r_nonce_hex, $secMsg);
   ZWave_Cmd("set", $hash, $name, ("secEncap", $enc));
-  if ($type eq "set" && $state) {
-    readingsSingleUpdate($hash, "state", $state, 1);
-    Log3 $name, 5, "$name: type=$type, state=$state ($getSecMsg)";
+  if ($type eq "set" && $cmd && $cmd !~ m/^config.*request$/) {
+    readingsSingleUpdate($hash, "state", $cmd, 1);
+    Log3 $name, 5, "$name: type=$type, cmd=$cmd ($getSecMsg)";
     ZWave_secEnd($hash);
   }
 
