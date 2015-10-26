@@ -3444,7 +3444,7 @@ ReplaceEventMap($$$)
   return @{$str} if(!$dir && (!$em || int(@{$str}) < 2 ||
                     !defined($str->[1]) || $str->[1] eq "?"));
 
-  return ReplaceEventMap2($dev, $str, $dir, $em) if($em =~ m/^{.*}$/);
+  return ReplaceEventMap2($dev, $str, $dir, $em) if($em =~ m/^{.*}$/s);
   my @emList = attrSplit($em);
 
   if(!defined $defs{$dev}{".eventMapCmd"}) {
