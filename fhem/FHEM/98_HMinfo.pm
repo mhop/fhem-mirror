@@ -978,7 +978,7 @@ sub HMinfo_GetFn($@) {#########################################################
     my @IOlist;
     my @plSum; push @plSum,0 for (0..9);#prefill
     my $maxNlen = 3;
-    foreach my $dName (HMinfo_getEntities($opt."d",$filter)){
+    foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
       my $id = $defs{$dName}{DEF};
       my $nl = length($dName); 
       $maxNlen = $nl if($nl > $maxNlen);
@@ -1166,8 +1166,8 @@ sub HMinfo_GetFn($@) {#########################################################
                                               grep /^trigDst_/,
                                               keys %{$defs{$dName}{READINGS}})){
         push @peerUndef,"$dName triggers $_"
-            if( ($peerIDs && $peerIDs !~ m/$_/)
-               ||("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
+            if(  ($peerIDs && $peerIDs !~ m/$_/)
+               &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
       }
 
       #--- check regular references
@@ -1359,7 +1359,7 @@ sub HMinfo_SetFn($@) {#########################################################
     }
     if ($type ne "msgStat"){
       return "unknown parameter - use Protocol, readings, msgStat, register, rssi or all"
-            if ($type !~ m/^(Protocol|readings|register|rssi|all|trigger)$/);
+            if ($type !~ m/^(Protocol|readings|register|oldRegs|rssi|all|trigger)$/);
       $opt .= "d" if ($type =~ m/(Protocol|rssi)/);# readings apply to all, others device only
       my @entities;
       $type = "msgEvents" if ($type eq "Protocol");# translate parameter
@@ -1663,9 +1663,10 @@ sub HMinfo_loadConfig($@) {####################################################
     next if (   $line !~ m/set .* (peerBulk|regBulk) .*/
              && $line !~ m/(setreading|template.e.) .*/);
     my ($command,$timeStamp) = split("#",$line,2);
+    $timeStamp = "1900-01-01 00:00:01" if (!$timeStamp || $timeStamp !~ m /^20..-..-.. /);
     my ($cmd1,$eN,$cmd,$param) = split(" ",$command,4);
     next if ($eN !~ m/$filter/);
-    if ($cmd1 !~ m /^template(Def|Set)$/ && (!$eN || !$defs{$eN})){
+    if   ($cmd1 !~ m /^template(Def|Set)$/ && (!$eN || !$defs{$eN})){
       push @entryNF,$eN;
       next;
     }
@@ -1675,7 +1676,7 @@ sub HMinfo_loadConfig($@) {####################################################
         $changes{$eN}{$cmd}{t}=$timeStamp ;
       }
       $defs{$eN}{READINGS}{$cmd}{VAL} = $param;
-      $defs{$eN}{READINGS}{$cmd}{TIME} = "from archive";
+      $defs{$eN}{READINGS}{$cmd}{TIME} = "from archivexx";
     }
     elsif($cmd1 eq "templateDef"){
       if ($eN eq "templateStart"){#if new block we remove all old templates
@@ -1701,9 +1702,11 @@ sub HMinfo_loadConfig($@) {####################################################
         push @elincmpl,"$eN peerList";
         next;
       }
-      if (!AttrVal($eN,"peerIDs","")){
+      if (   $timeStamp 
+          && $timeStamp gt ReadingsTimestamp($eN,".peerListRDate","1900-01-01 00:00:01")){
         CUL_HM_ID2PeerList($eN,$_,1) foreach (grep /[0-9A-F]{8}/,split(",",$param));
         push @el,"$eN peerIDs";
+        $defs{$eN}{READINGS}{".peerListRDate"}{VAL} = $defs{$eN}{READINGS}{".peerListRDate"}{TIME} = $timeStamp;
       }
     }
     elsif($cmd eq "regBulk"){
@@ -1721,12 +1724,16 @@ sub HMinfo_loadConfig($@) {####################################################
         push @elincmpl,"$eN reg list:$reg";
         next;
       }
-      
+      my $ts = ReadingsTimestamp($eN,$reg,"1900-01-01 00:00:01");
+      $ts = "1900-01-01 00:00:00" if ($ts !~ m /^20..-..-.. /);
       if (  !$defs{$eN}{READINGS}{$reg} 
           || $defs{$eN}{READINGS}{$reg}{VAL} !~ m/00:00/
-          || (   $timeStamp 
-              && $timeStamp gt ReadingsTimestamp($eN,$reg,"1900-01-01 00:00:01")
-              )){
+          || (   (  $timeStamp gt $ts
+                  ||(   $changes{$eN}
+                     && $changes{$eN}{$reg}
+                     && $timeStamp gt $changes{$eN}{$reg}{t})
+              ))){
+        $data =~ s/  //g;
         $changes{$eN}{$reg}{d}=$data;
         $changes{$eN}{$reg}{t}=$timeStamp;
       }
@@ -1909,7 +1916,7 @@ sub HMinfo_bpAbort($) {#bp timeout ############################################
 
 sub HMinfo_templateDef(@){#####################################################
   my ($name,$param,$desc,@regs) = @_;
-  return "insufficient parameter" if(!defined $param);
+  return "insufficient parameter, no param" if(!defined $param);
   $HMConfig::culHmTpl{tmplDefChange} = 1;# signal we have a change!
   if ($param eq "del"){
     delete $HMConfig::culHmTpl{$name};
@@ -1951,7 +1958,7 @@ sub HMinfo_templateDef(@){#####################################################
     splice @regs,0,$cnt;
   }
 
-  return "insufficient parameter" if(@regs < 1);
+  return "insufficient parameter, regs missing" if(@regs < 1);
  
   my $paramNo;
   if($param ne "0"){
@@ -2059,7 +2066,8 @@ sub HMinfo_templateUsg(@){#####################################################
         elsif($tFilter ne $t){
           next;}
       }
-      else{ push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$defs{$dName}{helper}{tmpl}{$tid});}
+      else{ 
+        push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$defs{$dName}{helper}{tmpl}{$tid});}
     }
   }
   return join("\n",sort(@ul));
