@@ -572,6 +572,9 @@ HUEDevice_Set($@)
       $result = HUEDevice_ReadFromServer($hash,"$hash->{ID}/state",\%obj);
     }
 
+    RemoveInternalTimer("SE $name on-for-timer");
+    #RemoveInternalTimer("SE $name off-for-timer");
+
     if( defined($result) && $result->{'error'} ) {
       $hash->{STATE} = $result->{'error'}->{'description'};
       return undef;
