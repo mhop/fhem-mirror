@@ -1391,7 +1391,6 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
 %culHmVrtGets = (
                     param      => "<param>",
                     cmdList    => "",
-                    saveConfig => "<filename> ...",
 );
 %culHmSubTypeGets = (
                     none4Type  =>{ "test"=>"" },
@@ -1409,13 +1408,11 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                       ,getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [<PeerChannel>]"
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] <regName> <value> ... [<peerChannel>]"
-                      ,clear         => "[readings|trigger|register|rssi|msgEvents|attack|all]"
+                      ,clear         => "[readings|trigger|register|oldRegs|rssi|msgEvents|attack|all]"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
-                       raw           => "data ..."
-                      ,virtual       => "<noButtons>"
+                       virtual       => "<noButtons>"
                       ,clear         => "[readings|rssi|msgEvents|unknownDev]"
-                      ,deviceRename  => "newName"
 );
 %culHmGlobalSetsDevice = (# all devices but virtuals
                        raw           => "data ..."
@@ -1656,7 +1653,6 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
                                              ,hmPairForSec   =>"<sec> ..."
                                              ,hmPairSerial   =>"<serial>"
                                              ,defIgnUnknown  =>""
-                                             ,virtual        =>"<noButtons>"
                                              ,assignIO       =>"<IO> [set|unset]..."
                                             }
                      ,"HM-LC-RGBW-WM01"   =>{ "on-for-timer" =>"<ontime> [<ramptime>]..."
