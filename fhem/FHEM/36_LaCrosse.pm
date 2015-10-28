@@ -14,7 +14,7 @@ sub LaCrosse_Parse($$);
 sub LaCrosse_Initialize($) {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^\\S+\\s+9 ";
+  $hash->{Match}     = "^(\\S+\\s+9 | OK\\sWS\\s)"; 
   $hash->{SetFn}     = "LaCrosse_Set";
   ###$hash->{GetFn}     = "LaCrosse_Get";
   $hash->{DefFn}     = "LaCrosse_Define";
