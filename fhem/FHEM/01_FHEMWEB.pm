@@ -754,13 +754,18 @@ FW_answerCall($)
   FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/jquery.min.js");
   FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/jquery-ui.min.js");
 
+  my (%jsNeg, @jsList);
+  map { $_ =~ m/^-(.*)$/ ? $jsNeg{$1} = 1 : push(@jsList, $_); }
+      split(" ", AttrVal($FW_wname, "JavaScripts", ""));
+  map { FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/$_") if(!$jsNeg{$_}); }
+      @FW_fhemwebjs;
+
   #######################
   # "Own" JavaScripts + their Attributes
-  map { FW_pO sprintf($jsTemplate, "", "$FW_ME/pgm2/$_") } @FW_fhemwebjs;
   map {
     my $n = $_; $n =~ s+.*/++; $n =~ s/.js$//; $n =~ s/fhem_//; $n .= "Param";
     FW_pO sprintf($jsTemplate, AttrVal($FW_wname, $n, ""), "$FW_ME/$_");
-  } split(" ", AttrVal($FW_wname, "JavaScripts", ""));
+  } @jsList;
 
   ########################
   # FW Extensions
@@ -2149,7 +2154,7 @@ FW_Attr(@)
     map { $a{$_} = 1 } split(" ", $modules{FHEMWEB}{AttrList});
     map {
       $_ =~ s+.*/++; $_ =~ s/.js$//; $_ =~ s/fhem_//; $_ .= "Param";
-      push @add, $_ if(!$a{$_});
+      push @add, $_ if(!$a{$_} && $_ !~ m/^-/);
     } split(" ", $a[3]);
     $modules{FHEMWEB}{AttrList} .= " ".join(" ",@add) if(@add);
   }
@@ -3112,6 +3117,8 @@ FW_widgetOverride($$)
          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
        </code></ul>
+       Note: if the filename starts with - then it will be excluded for the
+       automatically loaded list (e.g. -fhemweb_fbcalllist.js)
        </li><br>
 
     <a name="longpoll"></a>
@@ -3824,11 +3831,13 @@ FW_widgetOverride($$)
        Benutzer dem Skript Parameter weiterreichen kann. Bei diesem
        Attributnamen werden Verzeichnisname und fhem_ Pr&auml;fix entfernt
        und Param als Suffix hinzugef&uuml;gt. Beispiel:
-
        <ul><code>
          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
        </code></ul>
+       Falls der Dateiname mit - anf&auml;ngt, dann wird diese sonst
+       aus www/pgm2 automatisch geladene Datei nicht geladen. (z.Bsp.:
+       -fhemweb_fbcalllist.js)
        </li><br>
 
     <a name="longpoll"></a>
