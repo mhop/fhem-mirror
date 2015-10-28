@@ -62,7 +62,8 @@ FileLog_dailySwitch($)
   map { FileLog_Switch($defs{$_}) } devspec2array("TYPE=FileLog");
 
   my $t = time();
-  $t = 86400*(int($t/86400)+1)+1-fhemTzOffset($t); # tomorrow, 1s after midnight
+  my $off = fhemTzOffset($t);
+  $t = 86400*(int(($t+$off)/86400)+1)+1-$off; # tomorrow, 1s after midnight
   InternalTimer($t, "FileLog_dailySwitch", $hash, 0);
 }
 
