@@ -153,6 +153,8 @@ sub Pushover_Undefine($$) {
         Pushover_removeExtension( $hash->{fhem}{infix} );
     }
 
+    RemoveInternalTimer($hash);
+
     return undef;
 }
 
@@ -529,7 +531,10 @@ sub Pushover_ValidateUser ($;$) {
     Log3 $name, 5, "Pushover $name: called function Pushover_ValidateUser()";
 
     RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 600, "Pushover_ValidateUser", $hash, 0 );
+    InternalTimer( gettimeofday() + 900, "Pushover_ValidateUser", $hash, 0 )
+      if ($hash->{READINGS}{available}{VAL} eq "0");
+    InternalTimer( gettimeofday() + 21600, "Pushover_ValidateUser", $hash, 0 )
+      if ($hash->{READINGS}{available}{VAL} eq "1");
 
     return
       if ( AttrVal( $name, "disable", 0 ) == 1 );
