@@ -2466,7 +2466,7 @@ FW_Notify($$)
       my $dt = $dev->{TYPE};
       for(my $i = 0; $i < $max; $i++) {
         my $line = ("$tn $dt $dn ".$events->[$i]."<br>");
-        push @data,$line if($line =~ m/$h->{filter}/);
+        eval { push @data,$line if($line =~ m/$h->{filter}/) }
       }
     }
   }
