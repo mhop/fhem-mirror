@@ -509,6 +509,11 @@ sub Pushover_ReceiveCommand($$$) {
         readingsBulkUpdate( $hash, "available", $available );
     }
 
+    if ($available eq "0") {
+      RemoveInternalTimer($hash);
+      InternalTimer( gettimeofday() + 900, "Pushover_ValidateUser", $hash, 0 )
+    }
+
     # Set reading for state
     #
     if ( !defined( $hash->{READINGS}{state}{VAL} )
@@ -531,10 +536,11 @@ sub Pushover_ValidateUser ($;$) {
     Log3 $name, 5, "Pushover $name: called function Pushover_ValidateUser()";
 
     RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 900, "Pushover_ValidateUser", $hash, 0 )
-      if ($hash->{READINGS}{available}{VAL} eq "0");
-    InternalTimer( gettimeofday() + 21600, "Pushover_ValidateUser", $hash, 0 )
-      if ($hash->{READINGS}{available}{VAL} eq "1");
+    if (ReadingsVal($name, "available", "0") ne "1") {
+      InternalTimer( gettimeofday() + 900, "Pushover_ValidateUser", $hash, 0 );
+    } else {
+      InternalTimer( gettimeofday() + 21600, "Pushover_ValidateUser", $hash, 0 );
+    }
 
     return
       if ( AttrVal( $name, "disable", 0 ) == 1 );
