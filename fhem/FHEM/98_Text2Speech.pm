@@ -57,7 +57,7 @@ my %ttsQuery        = ("Google"     => "q=",
 my %ttsPath         = ("Google"     => "/translate_tts?",
                        "VoiceRSS"   => "/?"
                        );
-my %ttsAddon        = ("Google"     => "client=t&prev=input", 
+my %ttsAddon        = ("Google"     => "client=tw-ob", 
                        "VoiceRSS"   => ""
                        );
 my %ttsAPIKey       = ("Google"     => "", # kein APIKey nötig
