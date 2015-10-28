@@ -467,6 +467,8 @@ HCS_getValues($$) {
     $devs{$d}{tempMeasured} = ReadingsVal($d,"measured-temp","n/a")      if($t =~ m/(FHT|CUL_HM)/);
     $devs{$d}{tempMeasured} = ReadingsVal($d,"temperature","n/a")        if($t =~ m/(MAX)/);
 
+    $devs{$d}{tempDesired}  = ($t =~ m/(FHT)/) ? 5.5 : 4.5               if($devs{$d}{tempDesired} eq "off");
+    $devs{$d}{tempDesired}  = 30.5                                       if($devs{$d}{tempDesired} eq "on");
 
     $devs{$d}{type}         = $t;
     $hash->{helper}{device}{$d}{excluded} = $devs{$d}{excluded};
