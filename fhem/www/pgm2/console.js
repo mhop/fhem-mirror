@@ -84,6 +84,11 @@ consStart()
         { text:"Cancel", click:function(){ $(this).dialog('close'); }},
         { text:"OK", click:function(){
           var val = $("#filtertext").val().trim();
+          try { 
+            new RegExp(val ? val : ".*");
+          } catch(e) {
+            return FW_okDialog(e);
+          }
           consFilter = val ? val : ".*";
           $(this).dialog('close');
           $("a#eventFilter").html(consFilter);
