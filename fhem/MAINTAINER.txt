@@ -66,7 +66,7 @@ FHEM/10_pilight_ctrl.pm      risiko               http://forum.fhem.de Sonstige 
 FHEM/11_FHT.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/11_FHT8V.pm             rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/11_OWDevice.pm          borisneubert/mfr69bs http://forum.fhem.de 1Wire
-FHEM/14_Hideki.pm       	 Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
+FHEM/14_Hideki.pm            Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
 FHEM/12_HMS.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/13_KS300.pm             rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/14_CUL_MAX.pm           mgehre               http://forum.fhem.de MAX
@@ -77,7 +77,7 @@ FHEM/15_CUL_EM.pm            rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/16_CUL_RFR.pm           rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/16_STACKABLE_CC.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/17_EGPM2LAN.pm          alexus               http://forum.fhem.de Sonstiges
-FHEM/14_SD_WS07.pm       	 Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
+FHEM/14_SD_WS07.pm           Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
 FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/19_Revolt.pm            martinppp/mehf       http://forum.fhem.de SlowRF
