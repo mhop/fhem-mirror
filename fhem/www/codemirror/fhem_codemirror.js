@@ -71,12 +71,12 @@ $(document).ready(function(){
 });
 
 function AddCodeMirror(e, cb) {
+    if(cm_active && cm_loaded == cm_active)
+        return cm_wait(e, cb);
+        
     var userAttr = scriptAttribute("fhem_codemirror.js");
     for(var a in userAttr)
         cm_attr[a] = userAttr[a];
-
-    if(cm_active && cm_loaded == cm_active)
-        return cm_wait(e, cb);
 
     cm_active++;
       loadLink("codemirror/codemirror.css");
@@ -97,7 +97,7 @@ function AddCodeMirror(e, cb) {
     }
     if (cm_attr.comment) {
         cm_active++; loadScript("codemirror/comment.js", function(){cm_loaded++;} );
-        cm_attr.extraKeys['Ctrl-Q'] = function(cm) { 
+        cm_attr.extraKeys['Ctrl-Q'] = function(cm) {
             cm.toggleComment({ indent: false, lineComment: "#" });
         };
     }
@@ -137,8 +137,8 @@ function AddCodeMirror(e, cb) {
 }
 
 function cm_wait(cm_editor, callback, recursions) {
-    recursions = typeof recursions !== 'undefined' ? recursions : 0;
     if(cm_loaded != cm_active) {
+        recursions = typeof recursions !== 'undefined' ? recursions : 0;
         if(recursions < 100) {
             recursions++;
             setTimeout(function(){ cm_wait(cm_editor, callback, recursions) }, 20);
