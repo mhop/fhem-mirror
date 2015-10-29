@@ -1342,7 +1342,7 @@ sub DbLog_reduceLog($@) {
         my $sth_upd = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
         my $sth_delD = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
         my $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-        my $sth_get = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE ".($filter ? $filter : '')."TIMESTAMP < ".$cmd." ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
+        my $sth_get = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE ".(($a[-1] =~ /^INCLUDE=.+:.+$/i) ? $filter : '')."TIMESTAMP < ".$cmd." ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
         $sth_get->execute();
         
         do {
