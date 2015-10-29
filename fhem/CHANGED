@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Mirror Version
+  - feature: 74_AMAD: AMADCommBridge (AMADCommunication Device)
+                      toggle between to BT Devices, clear Notificationbar
+                      (Automagic,All), play Notify Soundfile (WallClock),
+                      check for a activ task on the tablet/phone
+  - bugfix: 74_AMAD:  improved error handling
   - bugfix: 70_PIONEERAVR: fixed the decoding for the reading "display".
   - feature: 93_DbLog: Added support for longpoll SVG.
   - feature: contrib/98_openweathermap.pm - add support for stationByZip.
