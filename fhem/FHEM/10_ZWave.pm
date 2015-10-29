@@ -8,6 +8,7 @@ use warnings;
 use SetExtensions;
 use Compress::Zlib;
 use Time::HiRes qw( gettimeofday );
+use HttpUtils;
 
 sub ZWave_Cmd($$@);
 sub ZWave_Get($@);
@@ -20,6 +21,7 @@ sub ZWave_secEnd($);
 
 use vars qw(%zw_func_id);
 use vars qw(%zw_type6);
+use vars qw($FW_ME);
 
 my %zwave_id2class;
 my %zwave_class = (
@@ -442,6 +444,8 @@ use vars qw(%zwave_deviceSpecial);
 
 my $zwave_cryptRijndael = 0;
 my $zwave_lastHashSent;
+my %zwave_pepperLink;
+my %zwave_pepperImg;
 
 sub
 ZWave_Initialize($)
@@ -466,6 +470,29 @@ ZWave_Initialize($)
   } else {
     $zwave_cryptRijndael = 1;
   }
+
+  ################
+  # Read in the pepper translation table
+  my $fn = $attr{global}{modpath}."/FHEM/lib/zwave_pepperlinks.csv.gz";
+  my $gz = gzopen($fn, "rb");
+  if($gz) {
+    my $line;
+    while($gz->gzreadline($line)) {
+      chomp($line);
+      my @a = split(",",$line);
+      $zwave_pepperLink{$a[0]} = $a[1];
+      $zwave_pepperImg{$a[0]} = $a[2];
+    }
+    $gz->gzclose();
+  } else {
+    Log 3, "Can't open $fn: $!";
+  }
+
+  # Create cache directory
+  $fn = $attr{global}{modpath}."/www/deviceimages";
+  if(! -d $fn) { mkdir($fn) || Log 3, "Can't create $fn"; }
+  $fn .= "/zwave";
+  if(! -d $fn) { mkdir($fn) || Log 3, "Can't create $fn"; }
 }
 
 
@@ -2921,8 +2948,30 @@ ZWave_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
+  my $pl=""; # Pepper link and image
+  my $model = ReadingsVal($d, "modelId", "");
+  if($model) {
+    $pl .= "<div class='zwavepepper' style='float:right'>";
+    my $img = $zwave_pepperImg{$model};
+    if($img) {
+      $pl .= "<img style='width:160px;' src='$FW_ME/deviceimages/zwave/$img'>";
+      my $fn = $attr{global}{modpath}."/www/deviceimages/zwave/$img";
+      if(!-f $fn) {      # Cache the picture
+        my $data = GetFileFromURL("http://fhem.de/deviceimages/zwave/$img");
+        if($data && open(FH,">$fn")) {
+          print FH $data;
+          close(FH)
+        }
+      }
+    }
+    my $link = $zwave_pepperLink{$model};
+    $pl .= "<br><a href='http://www.pepper1.net/zwavedb/device/".
+               "$link'>Details in pepper1.net</a>" if($link);
+    $pl .= "</div>";
+  }
+
   return
-  '<div id="ZWHelp" class="makeTable help"></div>'.
+  '<div id="ZWHelp" class="makeTable help"></div>'.$pl.
   '<script type="text/javascript">'.
    "var d='$d';" . <<'JSEND'
     $(document).ready(function() {
