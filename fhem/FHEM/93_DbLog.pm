@@ -1322,8 +1322,8 @@ sub DbLog_reduceLog($@) {
     if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
         ($filter) = $a[-1] =~ /^EXCLUDE=(.+)/i;
         @excludeRegex = split(',',$filter);
-    } elsif ($a[-1] =~ /^INCLUDE=(.+):(.+)$/i) {
-        $filter = "DEVICE like '$1' AND READING like '$2' AND ";
+    } elsif ($a[-1] =~ /^INCLUDE=.+:.+$/i) {
+        $filter = 1;
     }
     if (defined($a[3])) {
         $average = ($a[3] =~ /average=day/i) ? "AVERAGE=DAY" : ($a[3] =~ /average/i) ? "AVERAGE=HOUR" : 0;
@@ -1342,7 +1342,9 @@ sub DbLog_reduceLog($@) {
         my $sth_upd = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
         my $sth_delD = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
         my $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-        my $sth_get = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE ".(($a[-1] =~ /^INCLUDE=.+:.+$/i) ? $filter : '')."TIMESTAMP < ".$cmd." ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
+        my $sth_get = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE "
+            .($a[-1] =~ /^INCLUDE=(.+):(.+)$/i ? "DEVICE like '$1' AND READING like '$2' AND " : '')
+            ."TIMESTAMP < $cmd ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
         $sth_get->execute();
         
         do {
