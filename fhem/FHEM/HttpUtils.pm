@@ -6,7 +6,6 @@ use strict;
 use warnings;
 use IO::Socket::INET;
 use MIME::Base64;
-use Digest::MD5;
 use vars qw($SSL_ERROR);
 
 my %ext2MIMEType= qw{
@@ -132,7 +131,7 @@ HttpUtils_Connect($)
   }
   $hash->{path} = '/' unless defined($hash->{path});
   $hash->{addr} = "$hash->{protocol}://$host:$port";
-  $hash->{auth} = "$user:$pwd" if($authstring);
+  $hash->{auth} = encode_base64("$user:$pwd","") if($authstring);
 
   return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
 
@@ -252,11 +251,7 @@ HttpUtils_Connect2($)
   $hdr .= "Connection: keep-alive\r\n" if($hash->{keepalive});
   $hdr .= "Connection: Close\r\n"
                               if($httpVersion ne "1.0" && !$hash->{keepalive});
-
-  $hdr .= "Authorization: Basic ".encode_base64($hash->{auth})."\r\n"
-              if(defined($hash->{auth}) && 
-                 !($hash->{header} &&
-                   $hash->{header} =~ /^Authorization:\s*Digest/mi));
+  $hdr .= "Authorization: Basic $hash->{auth}\r\n" if(defined($hash->{auth}));
   $hdr .= $hash->{header}."\r\n" if(defined($hash->{header}));
   if(defined($data)) {
     $hdr .= "Content-Length: ".length($data)."\r\n";
@@ -335,56 +330,6 @@ HttpUtils_DataComplete($)
 }
 
 sub
-HttpUtils_DigestHeader($$)
-{
-  my ($hash, $header) = @_;
-  my %digdata;
- 
-  while($header =~ /(\w+)="?([^"]+?)"?(?:,\s+|$)/gc) {
-    $digdata{$1} = $2;
-  } 
- 
-  my ($ha1, $ha2, $response);
-  my ($user,$passwd) = split(/:/, $hash->{auth}, 2);
-
-  if(exists($digdata{qop})) {
-    $digdata{nc} = "00000001";
-    $digdata{cnonce} = md5_hex(rand.time);
-  }
-  $digdata{uri} = $hash->{path};
-  $digdata{username} = $user;
-
-  if(exists($digdata{algorithm}) && $digdata{algorithm} eq "MD5-sess") {
-    $ha1 = md5_hex(md5_hex($user.":".$digdata{realm}.":".$passwd).
-                  ":".$digdata{nonce}.":".$digdata{cnonce});
-  } else {
-    $ha1 = md5_hex($user.":".$digdata{realm}.":".$passwd);
-  }
- 
-  # forcing qop=auth as qop=auth-int is not implemented
-  $digdata{qop} = "auth" if($digdata{qop});
-  my $method = $hash->{method};
-  $method = ($hash->{data} ? "POST" : "GET") if( !$method );
-  $ha2 = md5_hex($method.":".$hash->{path});
-
-  if(exists($digdata{qop}) && $digdata{qop} =~ /(auth-int|auth)/) {
-    $digdata{response} =  md5_hex($ha1.":".
-                                  $digdata{nonce}.":".
-                                  $digdata{nc}.":".
-                                  $digdata{cnonce}.":".
-                                  $digdata{qop}.":".
-                                  $ha2);
-  } else {
-    $digdata{response} = md5_hex($ha1.":".$digdata{nonce}.":".$ha2)
-  }
- 
-  return "Authorization: Digest ".
-         join(", ", map(($_.'='.($_ ne "nc" ? '"' :'').
-                         $digdata{$_}.($_ ne "nc" ? '"' :'')), keys(%digdata)));
-
-}
-
-sub
 HttpUtils_ParseAnswer($$)
 {
   my ($hash, $ret) = @_;
@@ -430,29 +375,6 @@ HttpUtils_ParseAnswer($$)
   }
   Log3 $hash,$hash->{loglevel}, "$hash->{displayurl}: HTTP response code $code";
   $hash->{code} = $code;
-
-  # if servers requests digest authentication
-  if($code==401 && defined($hash->{auth}) &&
-    !($hash->{header} && $hash->{header} =~ /^Authorization:\s*Digest/mi) &&
-    $hash->{httpheader} =~ /^WWW-Authenticate:\s*Digest\s*(.+?)\s*$/mi) {
-   
-    $hash->{header} .= "\r\n".
-                      HttpUtils_DigestHeader($hash, $1) if($hash->{header});
-    $hash->{header} = HttpUtils_DigestHeader($hash, $1) if(!$hash->{header});
- 
-    # Request the URL with the Digest response
-    if($hash->{callback}) {
-      HttpUtils_NonblockingGet($hash);
-      return ("", "", 1);
-    } else {
-      return HttpUtils_BlockingGet($hash);
-    }
-   
-  } elsif($code==401 && defined($hash->{auth})) {
-   return ("$hash->{displayurl}: wrong authentication", "")
-
-  }
-  
   if(($code==301 || $code==302 || $code==303) 
 	&& !$hash->{ignoreredirects}) { # redirect
     if(++$hash->{redirects} > 5) {
