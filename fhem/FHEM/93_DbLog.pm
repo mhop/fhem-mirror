@@ -1322,11 +1322,15 @@ sub DbLog_reduceLog($@) {
     if ($a[-1] =~ /^EXCLUDE=(.+:.+)+/i) {
         ($filter) = $a[-1] =~ /^EXCLUDE=(.+)/i;
         @excludeRegex = split(',',$filter);
+    } elsif ($a[-1] =~ /^INCLUDE=(.+):(.+)$/i) {
+        $filter = "DEVICE like '$1' AND READING like '$2' AND ";
     }
     if (defined($a[3])) {
         $average = ($a[3] =~ /average=day/i) ? "AVERAGE=DAY" : ($a[3] =~ /average/i) ? "AVERAGE=HOUR" : 0;
     }
-    Log3($name, 3, "DbLog $name: reduceLog requested with DAYS=$a[2]".(($average || $filter) ? ', ' : '').(($average) ? "$average" : '').(($average && $filter) ? ", " : '').(($filter) ? "EXCLUDE=$filter" : ''));
+    Log3($name, 3, "DbLog $name: reduceLog requested with DAYS=$a[2]"
+        .(($average || $filter) ? ', ' : '').(($average) ? "$average" : '')
+        .(($average && $filter) ? ", " : '').(($filter) ? uc((split('=',$a[-1]))[0]).'='.(split('=',$a[-1]))[1] : ''));
     
     if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd = "datetime('now', '-$a[2] days')"; }
     elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd = "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
@@ -1338,7 +1342,7 @@ sub DbLog_reduceLog($@) {
         my $sth_upd = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?) AND (VALUE=?)");
         my $sth_delD = $dbh->prepare_cached("DELETE FROM history WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
         my $sth_updD = $dbh->prepare_cached("UPDATE history SET TIMESTAMP=?, EVENT=?, VALUE=? WHERE (DEVICE=?) AND (READING=?) AND (TIMESTAMP=?)");
-        my $sth_get = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE TIMESTAMP < $cmd ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
+        my $sth_get = $dbh->prepare("SELECT TIMESTAMP,DEVICE,'',READING,VALUE FROM history WHERE ".($filter ? $filter : '')."TIMESTAMP < ".$cmd." ORDER BY TIMESTAMP ASC");  # '' was EVENT, no longer in use
         $sth_get->execute();
         
         do {
@@ -2066,7 +2070,8 @@ sub dbReadings($@) {
             With the optional argument 'average' not only the records will be reduced, but all numerical values of an hour will be reduced to a single average.<br/>
             With the optional argument 'average=day' not only the records will be reduced, but all numerical values of a day will be reduced to a single average. (implies 'average')<br/>
             You can optional set the last argument to "EXCLUDE=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...." to exclude device/readings from reduceLog<br/>
-            </ul><br/>
+            You can optional set the last argument to "INCLUDE=Database-deviceRegExp:Database-ReadingRegExp" to delimit the SELECT statement which is executet on the database. This reduce the system RAM load and increase the performance. (Wildcards are % and _)<br/>
+          </ul><br/>
 
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
       <ul><b>DO NOT USE THIS COMMAND UNLESS YOU REALLY (REALLY!) KNOW WHAT YOU ARE DOING!!!</b><br/><br/>
@@ -2425,6 +2430,7 @@ sub dbReadings($@) {
           Durch die optionale Angabe von 'average' wird nicht nur die Datenbank bereinigt, sondern alle numerischen Werte einer Stunde werden auf einen einzigen Mittelwert reduziert.<br/>
           Durch die optionale Angabe von 'average=day' wird nicht nur die Datenbank bereinigt, sondern alle numerischen Werte eines Tages auf einen einzigen Mittelwert reduziert. (impliziert 'average')<br/>
           Optional kann als letzer Parameter "EXCLUDE=deviceRegExp1:ReadingRegExp1,deviceRegExp2:ReadingRegExp2,...." angegeben werden um device/reading Kombinationen von reduceLog auszuschließen.<br/>
+          Optional kann als letzer Parameter "INCLUDE=Database-deviceRegExp:Database-ReadingRegExp" angegeben werden um die auf die Datenbank ausgeführte SELECT abfrage einzugrenzen, was die RAM-Belastung verringer und die Performance erhöht. (Wildcards sind % und _)<br/>
           </ul><br/>
 
     <code>set &lt;name&gt; userCommand &lt;validSqlStatement&gt;</code><br/><br/>
