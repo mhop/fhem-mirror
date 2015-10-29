@@ -14,7 +14,7 @@ sub LaCrosse_Parse($$);
 sub LaCrosse_Initialize($) {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^(\\S+\\s+9 | OK\\sWS\\s)"; 
+  $hash->{Match}     = "^(\\S+\\s+9 | OK\\sWS\\s)";
   $hash->{SetFn}     = "LaCrosse_Set";
   ###$hash->{GetFn}     = "LaCrosse_Get";
   $hash->{DefFn}     = "LaCrosse_Define";
@@ -23,12 +23,12 @@ sub LaCrosse_Initialize($) {
   $hash->{ParseFn}   = "LaCrosse_Parse";
   ###$hash->{AttrFn}    = "LaCrosse_Attr";
   $hash->{AttrList}  = "IODev"
-                       ." ignore:1,0"
-                       ." doAverage:1,0"
-                       ." doDewpoint:1,0"
-                       ." filterThreshold"
-                       ." resolution"
-                       ." $readingFnAttributes";
+    ." ignore:1,0"
+    ." doAverage:1,0"
+    ." doDewpoint:1,0"
+    ." filterThreshold"
+    ." resolution"
+    ." $readingFnAttributes";
 
   $hash->{AutoCreate} = { "LaCrosse.*" => { autocreateThreshold => "2:120", FILTER => "%NAME" }};
 
@@ -62,7 +62,7 @@ sub LaCrosse_Define($$) {
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
     Log3 $name, 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
-  } 
+  }
   else {
     Log3 $name, 1, "$name: no I/O device";
   }
@@ -119,7 +119,7 @@ sub LaCrosse_CalcDewpoint (@) {
   if($temp>=0) {
     $a = 7.5;
     $b = 237.3;
-  } 
+  }
   else {
     $a = 7.6;
     $b = 240.7;
@@ -168,16 +168,16 @@ sub LaCrosse_Parse($$) {
   my ($hash, $msg) = @_;
   my $name = $hash->{NAME};
 
-  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain, $pressure );    
+  my( @bytes, $addr, $typeNumber, $typeName, $battery_new, $battery_low, $error, $type, $channel, $temperature, $humidity, $windDirection, $windSpeed, $windGust, $rain, $pressure );
   $temperature = 0xFFFF;
   $humidity = 0xFF;
   $windDirection = 0xFFFF;
   $windSpeed = 0xFFFF;
   $windGust = 0xFFFF;
-  $rain = 0xFFFF;  
+  $rain = 0xFFFF;
   $pressure = 0xFFFF;
   $error = 0;
-  
+
   if( $msg =~ m/^OK 9/ ) {
     # Temperature sensor - Format:
     #      0   1   2   3   4
@@ -185,10 +185,10 @@ sub LaCrosse_Parse($$) {
     # OK 9 56  1   4   156 37     ID = 56  T: 18.0  H: 37  no NewBatt
     # OK 9 49  1   4   182 54     ID = 49  T: 20.6  H: 54  no NewBatt
     # OK 9 55  129 4   192 56     ID = 55  T: 21.6  H: 56  WITH NewBatt
-    
+
     # OK 9 2   1   4 212 106       ID = 2   T: 23.6  H: -- Channel: 1
     # OK 9 2   130 4 225 125       ID = 2   T: 24.9  H: -- Channel: 2
-    
+
     # OK 9 ID XXX XXX XXX XXX
     # |  | |  |   |   |   |
     # |  | |  |   |   |   --- Humidity incl. WeakBatteryFlag
@@ -212,7 +212,7 @@ sub LaCrosse_Parse($$) {
     $channel = $bytes[1] & 0x0F;
     $temperature = ($bytes[2]*256 + $bytes[3] - 1000)/10;
     $humidity = $bytes[4] & 0x7f;
-  } 
+  }
   elsif ($msg =~ m/^OK WS/) {
     # Weather station - Format:
     #        0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15
@@ -222,9 +222,9 @@ sub LaCrosse_Parse($$) {
     #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |--    Pressure LSB
     #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |   |   |------    Pressure MSB
     #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |   |----------    Flags *
-    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |--------------    WindGust * 10 LSB (0.0 ... 50.0 m/s)           FF/FF = none 
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |   |   |--------------    WindGust * 10 LSB (0.0 ... 50.0 m/s)           FF/FF = none
     #  |  |  |   |   |   |   |   |   |   |   |   |   |   |------------------    WindGust * 10 MSB
-    #  |  |  |   |   |   |   |   |   |   |   |   |   |----------------------    WindSpeed  * 10 LSB(0.0 ... 50.0 m/s)          FF/FF = none  
+    #  |  |  |   |   |   |   |   |   |   |   |   |   |----------------------    WindSpeed  * 10 LSB(0.0 ... 50.0 m/s)          FF/FF = none
     #  |  |  |   |   |   |   |   |   |   |   |   |--------------------------    WindSpeed  * 10 MSB
     #  |  |  |   |   |   |   |   |   |   |   |------------------------------    WindDirection * 10 LSB (0.0 ... 365.0 Degrees) FF/FF = none
     #  |  |  |   |   |   |   |   |   |   |----------------------------------    WindDirection * 10 MSB
@@ -238,16 +238,16 @@ sub LaCrosse_Parse($$) {
     #  |  |-----------------------------------------------------------------    fix "WS"
     #  |--------------------------------------------------------------------    fix "OK"
     #
-    #   * Flags: 128  64  32  16  8   4   2   1        
+    #   * Flags: 128  64  32  16  8   4   2   1
     #                                 |   |   |
     #                                 |   |   |-- New battery
     #                                 |   |------ ERROR
     #                                 |---------- Low battery
-    
+
     @bytes = split( ' ', substr($msg, 5) );
 
     return "" if(@bytes < 14);
-    
+
     $addr = sprintf( "%02X", $bytes[0] );
     $typeNumber = $bytes[1];
 
@@ -257,10 +257,13 @@ sub LaCrosse_Parse($$) {
     elsif($typeNumber == 2) {
       $typeName = "NodeSensor";
     }
+    elsif($typeNumber == 3) {
+      $typeName = "WS1080";
+    }
     else {
       $typeName = "unknown";
     }
-    
+
     $battery_new = $bytes[13] & 0x01;
     $battery_low = $bytes[13] & 0x04;
     $error = $bytes[13] & 0x02;
@@ -268,7 +271,7 @@ sub LaCrosse_Parse($$) {
     $channel = 1;
 
     my $rh = $modules{LaCrosse}{defptr}{$addr};
-    
+
     if($bytes[2] != 0xFF) {
       $temperature = ($bytes[2]*256 + $bytes[3] - 1000)/10;
       $rh->{"bufferedT"} = $temperature;
@@ -278,7 +281,7 @@ sub LaCrosse_Parse($$) {
         $temperature = $rh->{"bufferedT"};
       }
     }
-    
+
     if($bytes[4] != 0xFF) {
       $humidity = $bytes[4];
       if (defined($rh)) {
@@ -290,11 +293,11 @@ sub LaCrosse_Parse($$) {
         $humidity = $rh->{"bufferedH"};
       }
     }
-    
+
     if($bytes[5] != 0xFF) {
       $rain = ($bytes[5]*256 + $bytes[6]) * 0.5;
     }
-    
+
     if($bytes[7] != 0xFF) {
       $windDirection = ($bytes[7]*256 + $bytes[8]) / 10;
     }
@@ -304,11 +307,11 @@ sub LaCrosse_Parse($$) {
     if($bytes[11] != 0xFF) {
       $windGust = ($bytes[11] * 256 + $bytes[12]) / 10;
     }
-     
+
     if(@bytes > 15 && $bytes[14] != 0xFF) {
-     $pressure = $bytes[14] * 256 + $bytes[15];
+      $pressure = $bytes[14] * 256 + $bytes[15];
     }
-    
+
   }
   else {
     DoTrigger($name, "UNKNOWNCODE $msg");
@@ -346,7 +349,7 @@ sub LaCrosse_Parse($$) {
         return "";
       }
     }
-    
+
     # get info about autocreate
     my $autoCreateState = 0;
     my $laCrosseInIgnoreTypes = 0;
@@ -354,24 +357,24 @@ sub LaCrosse_Parse($$) {
       next if($defs{$d}{TYPE} ne "autocreate");
       $autoCreateState = 1;
       $autoCreateState = 2 if(!AttrVal($defs{$d}{NAME}, "disable", undef));
-     
+
       my $it = AttrVal($defs{$d}{NAME}, "ignoreTypes", "");
       if("LaCrosse" =~ m/$it/i) {
         $laCrosseInIgnoreTypes = 1
       }
     }
-    
+
     # $autoCreateState
     # ----------------
     # 0 = autoreate not defined
     # 1 = autocreate defined
     # 2 = autocreate active
-    
+
     #$laCrosseInIgnoreTypes
     #----------------------
     # 0 = no
     # 1 = yes
-    
+
     # decide how to log
     my $loglevel = 4;
     if($autoCreateState < 2 && $laCrosseInIgnoreTypes == 0) {
@@ -393,23 +396,23 @@ sub LaCrosse_Parse($$) {
   push(@list, $rname);
 
   $rhash->{LaCrosse_lastRcv} = TimeNow();
-  $rhash->{"sensorType"} = "$typeNumber=$typeName"; 
+  $rhash->{"sensorType"} = "$typeNumber=$typeName";
 
   if( $type == 0x00) {
     $channel = "" if( $channel == 1 );
-    
+
     # Correction
     $temperature += $rhash->{corr1};
-    $humidity += $rhash->{corr2};  
-    
+    $humidity += $rhash->{corr2};
+
     my $previousT = $temperature;
     my $previousH = $humidity;
-    
+
     # Check filterThreshold
-    if(!defined($rhash->{"previousT$channel"}) 
-        || (defined($rhash->{"previousT$channel"})
-            && abs($rhash->{"previousH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
-            && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) )) {
+    if(!defined($rhash->{"previousT$channel"})
+      || (defined($rhash->{"previousT$channel"})
+      && abs($rhash->{"previousH$channel"} - $humidity) <= AttrVal( $rname, "filterThreshold", 10 )
+      && abs($rhash->{"previousT$channel"} - $temperature) <= AttrVal( $rname, "filterThreshold", 10 ) )) {
 
       # Calculate average
       if (AttrVal( $rname, "doAverage", 0 ) && defined($rhash->{"previousT$channel"}) && $temperature != 0xFFFF) {
@@ -439,7 +442,7 @@ sub LaCrosse_Parse($$) {
         delete $rhash->{READINGS}{battery2}
       }
       readingsBulkUpdate($rhash, "battery", $battery_low? "low" : "ok");
-      
+
       # Calculate dewpoint
       my $dewpoint;
       if( AttrVal( $rname, "doDewpoint", 0 ) && $humidity && $humidity <= 99 && $temperature != 0xFFFF ) {
@@ -447,9 +450,9 @@ sub LaCrosse_Parse($$) {
         $dewpoint = int($dewpoint*10 + 0.5) / 10;
         readingsBulkUpdate($rhash, "dewpoint$channel", $dewpoint);
       }
-      
+
       # Round and write temperature and humidity
-      if ($temperature != 0xFFFF) {           
+      if ($temperature != 0xFFFF) {
         $temperature = int($temperature*10 + 0.5) / 10;
         readingsBulkUpdate($rhash, "temperature$channel", $temperature);
       }
@@ -463,12 +466,12 @@ sub LaCrosse_Parse($$) {
         my $state = "T: ". $temperature;
         $state .= " H: ". ($humidity) if( $humidity && $humidity <= 99 );
         $state .= " D: $dewpoint" if( $dewpoint );
-        
+
         readingsBulkUpdate($rhash, "state", $state) if( Value($rname) ne $state );
       }
 
       readingsEndUpdate($rhash,1);
-    } 
+    }
     else {
       $rhash->{"bufferedT"} = undef;
       $rhash->{"bufferedH"} = undef;
@@ -476,27 +479,27 @@ sub LaCrosse_Parse($$) {
 
     $rhash->{"previousT$channel"} = int($previousT*10 + 0.5) / 10;
     $rhash->{"previousH$channel"} = int($previousH*10 + 0.5) / 10;
-    
+
     readingsBeginUpdate($rhash);
-    
+
     if ($typeNumber > 0 && $windSpeed != 0xFFFF) {
       readingsBulkUpdate($rhash, "windSpeed", $windSpeed );
     }
-    
+
     if ($typeNumber > 0 && $windGust != 0xFFFF) {
       readingsBulkUpdate($rhash, "windGust", $windGust );
     }
-    
+
     if ($typeNumber > 0 && $rain != 0xFFFF) {
       if(!defined($rhash->{"previousR"}) || (defined($rhash->{"previousR"}) && abs($rhash->{"previousR"} - $rain) <= AttrVal( $rname, "filterThreshold", 10 ))){
         readingsBulkUpdate($rhash, "rain", $rain );
       }
       $rhash->{"previousR"} = $rain;
     }
-    
+
     if ($typeNumber > 0 && $windDirection != 0xFFFF) {
       readingsBulkUpdate($rhash, "windDirectionDegree", $windDirection );
-      
+
       my $windDirectionText = "---";
       if    ($windDirection >=    0 && $windDirection <=  11.2) { $windDirectionText = "N"; }
       elsif ($windDirection >  11.2 && $windDirection <=  33.7) { $windDirectionText = "NNE"; }
@@ -514,16 +517,16 @@ sub LaCrosse_Parse($$) {
       elsif ($windDirection > 281.2 && $windDirection <= 303.7) { $windDirectionText = "WNW"; }
       elsif ($windDirection > 303.7 && $windDirection <= 326.2) { $windDirectionText = "NW"; }
       elsif ($windDirection > 326.2 && $windDirection <= 348.7) { $windDirectionText = "NNW"; };
-      
+
       readingsBulkUpdate($rhash, "windDirectionText", $windDirectionText );
     }
-    
+
     if ($typeNumber > 0 && $pressure != 0xFFFF) {
       readingsBulkUpdate($rhash, "pressure", $pressure );
     }
-    
+
     readingsEndUpdate($rhash,1);
-    
+
   }
 
   return @list;
@@ -599,15 +602,15 @@ sub LaCrosse_Parse($$) {
     <li>ignore<br>
     1 -> ignore this device.</li>
   </ul><br>
-  
+
   <b>Logging and autocreate</b><br>
   <ul>
-  <li>If autocreate is not active (not defined or disabled) and LaCrosse is not contained in the ignoreTypes attribute of autocreate then 
+  <li>If autocreate is not active (not defined or disabled) and LaCrosse is not contained in the ignoreTypes attribute of autocreate then
   the <i>Unknown device xx, please define it</i> messages will be logged with loglevel 3. In all other cases they will be logged with loglevel 4. </li>
   <li>The autocreateThreshold attribute of the autocreate module (see <a href="#autocreate">autocreate</a>) is respected. The default is 2:120, means, that
-  autocreate will create a device for a sensor only, if the sensor was received at least two times within two minutes.</li>  
+  autocreate will create a device for a sensor only, if the sensor was received at least two times within two minutes.</li>
   </ul>
-  
+
 </ul>
 
 =end html
