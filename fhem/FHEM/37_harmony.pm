@@ -74,9 +74,11 @@ harmony_Define($$)
     $modules{$hash->{TYPE}}{defptr}{$id} = $hash;
 
   } elsif( @a == 5 ) {
-    my $username = $a[2];
-    my $password = $a[3];
+    my $username = harmony_encrypt($a[2]);
+    my $password = harmony_encrypt($a[3]);
     my $ip = $a[4];
+
+    $hash->{DEF} = "$username $password $ip";
 
     $hash->{helper}{username} = $username;
     $hash->{helper}{password} = $password;
@@ -608,7 +610,8 @@ harmony_getLoginToken($)
   my $https = "https";
   $https = "http" if( AttrVal($hash->{NAME}, "nossl", 0) );
 
-  my $json = encode_json( { email => $hash->{helper}{username}, password => $hash->{helper}{password} } );
+  my $json = encode_json( { email => harmony_decrypt($hash->{helper}{username}),
+                            password => harmony_decrypt($hash->{helper}{password}) } );
 
   my($err,$data) = HttpUtils_BlockingGet({
     url => "$https://svcs.myharmony.com/CompositeSecurityServices/Security.svc/json/GetUserAuthToken",
@@ -1634,8 +1637,23 @@ harmony_Get($$@)
     }
   }
 
+  if( $cmd eq 'showAccount' ) {
+    my $user = $hash->{helper}{username};
+    my $password = $hash->{helper}{password};
+                        
+    return 'no user set' if( !$user );
+    return 'no password set' if( !$password );
+                        
+    $user = harmony_decrypt( $user );
+    $password = harmony_decrypt( $password );
+                        
+    return "user: $user\npassword: $password";
+  }
+  $list .= " showAccount";
+
   $list .= " currentActivity:noArg";
 
+  $list =~ s/^ //; 
   return "Unknown argument $cmd, choose one of $list";
 }
 
@@ -1668,6 +1686,43 @@ harmony_Attr($$$)
   }
 
   return;
+}
+
+
+
+sub
+harmony_encrypt($)
+{
+  my ($decoded) = @_;
+  my $key = getUniqueId();
+  my $encoded;
+
+  return $decoded if( $decoded =~ /^crypt:(.*)/ );
+
+  for my $char (split //, $decoded) {
+    my $encode = chop($key);
+    $encoded .= sprintf("%.2x",ord($char)^ord($encode));
+    $key = $encode.$key;
+  }
+
+  return 'crypt:'. $encoded;
+}
+sub
+harmony_decrypt($)
+{
+  my ($encoded) = @_;
+  my $key = getUniqueId();
+  my $decoded;
+
+  $encoded = $1 if( $encoded =~ /^crypt:(.*)/ );
+
+  for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {
+    my $decode = chop($key);
+    $decoded .= chr(ord($char)^ord($decode));
+    $key = $decode.$key;
+  }
+
+  return $decoded;
 }
 
 
@@ -1788,6 +1843,8 @@ harmony_Attr($$$)
     <li>configDetail</li>
     <li>currentActivity<br>
       returns the current activity name</li>
+    <li>showAccount<br>
+      display obfuscated user and password in cleartext</li>
   </ul>
   The commands commmand is also available for the autocreated devices. The &lt;id&gt|&ltname&gt; paramter hast to be omitted.<br><br>
 
