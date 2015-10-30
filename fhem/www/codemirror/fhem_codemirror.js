@@ -15,6 +15,7 @@ var cm_attr = {
     indentWithTabs:   true,
     autofocus:        true,
     lineNumbers:      true,
+    smartIndent:      false,
     extraKeys: {
         'Tab': function(cm) {
             if (cm.somethingSelected()) {
