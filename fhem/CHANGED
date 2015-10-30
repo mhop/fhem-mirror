@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  fhem_codemirror.js: Enabled indentWithTabs by default
+                                 Enabled autoCloseBrackets by default
+                                 Disabled smartIndent by default
   - bugfix:  74_AMAD: wrong flowset xml file on lib/
   - updated: 74_AMAD: New Mirror Version
                       !!! IMPORTANT: please forget to update the Flowset !!!
