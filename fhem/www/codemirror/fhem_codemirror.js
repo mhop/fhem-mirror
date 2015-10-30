@@ -8,7 +8,7 @@ var cm_attr = {
     search:           true,
     comment:          true,
     autocomplete:     true,
-    autoCloseBrackets:false,
+    autoCloseBrackets:true,
     indentUnit:       4,
     type:             "fhem",
     theme:            "blackboard",
