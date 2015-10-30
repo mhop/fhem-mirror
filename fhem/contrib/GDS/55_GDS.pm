@@ -1,5 +1,5 @@
 # $Id$
-
+# RC6
 # copyright and license informations
 =pod
 ###################################################################################################
@@ -42,6 +42,8 @@ use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
 
+#use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+
 #use Data::Dumper;
 
 eval "use GDSweblink";
@@ -51,9 +53,6 @@ no if $] >= 5.017011, warnings => 'experimental';
 my ($bulaList, $cmapList, %rmapList, $fmapList, %bula2bulaShort, 
     %bulaShort2dwd, %dwd2Dir, %dwd2Name, $alertsXml, %capCityHash,
     %capCellHash, $sList, $aList, $fList, $fcList, $fcmapList, $tempDir, @weekdays);
-
-
-#my %foreCastHash = ();
 
 my %allForecastData;
 my @allConditionsData;
@@ -86,12 +85,13 @@ sub GDS_Initialize($) {
 		gdsFwType:0,1,2,3,4,5,6,7
 		gdsHideFiles:0,1
 		gdsLong:0,1
-		gdsPassiveFtp:0,1
+		gdsPassiveFtp:1,0
 		gdsPolygon:0,1
 		gdsSetCond
 		gdsSetForecast
 		gdsUseAlerts:0,1
 		gdsUseForecasts:0,1
+		gdsUseFritzkotz:0,1
 	);
 	use warnings 'qw';
 	$hash->{AttrList}  = join(" ", @attrList);
@@ -289,11 +289,11 @@ sub _fillMappingTables($){
 
 sub GDS_Define($$$) {
 	my ($hash, $def) = @_;
+	my $name = $hash->{NAME};
 	my @a = split("[ \t][ \t]*", $def);
-	my ($found, $dummy);
 
 	return "syntax: define <name> GDS <username> <password> [<host>]" if(int(@a) != 4 ); 
-	my $name = $hash->{NAME};
+#	return "You must not define more than one gds device!" if int(devspec2array('TYPE=GDS'));
 
 	$hash->{helper}{USER}		= $a[2];
 	$hash->{helper}{PASS}		= $a[3];
@@ -305,7 +305,6 @@ sub GDS_Define($$$) {
 
     _GDS_addExtension("GDS_CGI","gds","GDS Files");
 
-	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
 	readingsSingleUpdate($hash, 'state', 'active',1);
 
 	return undef;
@@ -328,18 +327,18 @@ sub GDS_Shutdown($) {
 }
 
 sub GDS_Notify ($$) {
-  my ($hash,$dev) = @_;
-  my $name = $hash->{NAME};
-  return if($dev->{NAME} ne "global");
-  return if(!grep(m/^INITIALIZED|^REREAD/, @{$dev->{CHANGED}}));
+	my ($hash,$dev) = @_;
+	my $name = $hash->{NAME};
+	return if($dev->{NAME} ne "global");
+	return if(!grep(m/^INITIALIZED|^REREAD/, @{$dev->{CHANGED}}));
 
 	$aList		= "disabled_by_attribute" unless AttrVal($name,'gdsUseAlerts',0);
 	$fList		= "disabled_by_attribute" unless AttrVal($name,'gdsUseForecasts',0);
 	$fcmapList	= "disabled_by_attribute" unless AttrVal($name,'gdsUseForecasts',0);
-		  
-  GDS_Get($hash,undef,'rereadcfg');
 
-  return undef;
+	GDS_GetUpdate($hash);
+	
+	return undef;
 }
 
 sub GDS_Set($@) {
@@ -351,8 +350,6 @@ sub GDS_Set($@) {
 				"forecasts:$fList ".
 	            "help:noArg ".
 	            "update:noArg ";				;
-
-#	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
 
 	my $command		= lc($a[1]);
 	my $parameter	= $a[2] if(defined($a[2]));
@@ -387,13 +384,13 @@ sub GDS_Set($@) {
 
 		when("update"){
 			RemoveInternalTimer($hash);
-			GDS_GetUpdate($hash);
+			GDS_GetUpdate($hash,'set update');
 			break;
 			}
 
 		when("conditions"){
             $attr{$name}{gdsSetCond} = $parameter; #ReadingsVal($name,'c_stationName',undef);
-			GDS_GetUpdate($hash);
+			GDS_GetUpdate($hash,'set conditions');
 			break;
 			}
 
@@ -401,7 +398,7 @@ sub GDS_Set($@) {
 			return "Error: Forecasts disabled by attribute." unless AttrVal($name,'gdsUseForecasts',0);
 			CommandDeleteReading(undef, "$name fc.*") if($parameter ne AttrVal($name,'gdsSetForecast',''));
             $attr{$name}{gdsSetForecast} = $parameter;
-			GDS_GetUpdate($hash);
+			GDS_GetUpdate($hash,'set forecasts');
 			break;
 			}
 
@@ -437,7 +434,6 @@ sub GDS_Get($@) {
 	readingsSingleUpdate($hash, 'state', 'active', 0);
 	my $_gdsAll		= AttrVal($name,"gdsAll", 0);
 	my $_gdsDebug	= AttrVal($name,"gdsDebug", 0);
-#	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
 
 	my ($result, @datensatz, $found);
 
@@ -542,12 +538,13 @@ sub GDS_Get($@) {
 			}
 
 		when("rereadcfg"){
-			$hash->{GDS_REREAD} = int(time());
 			DoTrigger($name, "REREAD", 1);
+			$hash->{GDS_REREAD}  = int(time());
 			retrieveData($hash,'conditions');
 			retrieveData($hash,'capdata')  if AttrVal($name,'gdsUseAlerts',0);
 			retrieveListCapStations($hash) if AttrVal($name,'gdsUseAlerts',0);
 			retrieveData($hash,'forecast') if AttrVal($name,'gdsUseForecasts',0);
+#			GDS_GetUpdate($hash);
 			break;
 			}
 
@@ -655,20 +652,29 @@ sub GDS_Attr(@){
 	return;
 }
 
-sub GDS_GetUpdate($) {
-	my ($hash) = @_;
+sub GDS_GetUpdate($;$) {
+	my ($hash,$local) = @_;
+	$local //= 0;
 	my $name = $hash->{NAME};
+
+
+	my $diff = int(time()) - $hash->{GDS_REREAD};
+#Debug "GDS_GetUpdate started Diff: $diff";
+	return if( $diff < 60 );
+#Debug "GDS_GetUpdate continued";
 
 	RemoveInternalTimer($hash);
 
-	my $fs = AttrVal($name, "gdsSetForecast", '');
-	my $cs = AttrVal($name, "gdsSetCond",     '');
+	my $fs = AttrVal($name, "gdsSetForecast", 0);
+	my $cs = AttrVal($name, "gdsSetCond",     0);
 
 	if(IsDisabled($name)) {
     	readingsSingleUpdate($hash, 'state', 'disabled', 0);
 		Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
 	} else {
-		readingsSingleUpdate($hash, 'state', 'active', 0);
+ 		readingsSingleUpdate($hash, 'state', 'active', 0);
+#		CommandGet($hash,"$name rereadcfg");
+#	}
 		if($cs) {
 			if(time() - InternalVal($name,'GDS_CONDITIONS_READ',0) > ($hash->{helper}{INTERVAL}-10)) {
 				retrieveData($hash,'conditions') ;
@@ -704,7 +710,6 @@ sub GDS_GetUpdate($) {
 	InternalTimer($next, "GDS_GetUpdate", $hash, 1);
 	readingsSingleUpdate($hash, "_nextUpdate", localtime($next), 1) if($_gdsAll || $_gdsDebug);
 
-	readingsSingleUpdate($hash, '_tzOffset', _calctz(time,localtime(time))*3600, 0);
 	return 1;
 }
 
@@ -861,9 +866,44 @@ sub retrieveText($$$) {
 	return join($separator, @a);
 }
 
+sub gds_calctz($@) {
+	my ($nt,@lt) = @_;
+	my $off = $lt[2]*3600+$lt[1]*60+$lt[0];
+	$off = 12*3600-$off;
+	$nt += $off;  # This is noon, localtime
+	my @gt = gmtime($nt);
+	return (12-$gt[2]);
+}
+
+sub ua_test($$$) {
+	my ($hash,$dir,$file) = @_;
+
+	my $name		= $hash->{NAME};
+	my $user		= $hash->{helper}{USER};
+	my $pass		= $hash->{helper}{PASS};
+	my $host		= $hash->{helper}{URL};
+
+	use LWP::UserAgent;
+	my $ua;
+	$ua = LWP::UserAgent->new;
+	$ua->timeout(10);
+	$ua->env_proxy;
+
+	my $urlString =	"ftp://$user:$pass\@$host/";
+	$urlString .= $dir;
+	$urlString .= $file;
+	my $response = $ua->get($urlString); #,':content_file' => $file_handle);
+
+	if ($response->is_success) {
+		return $response->decoded_content;
+	} else {
+		return "";
+	}
+}
+
 ###################################################################################################
 #
-#	Data retrieval
+#	Data retrieval (internal)
 
 sub getListCapStations($$){
 	my ($hash, $command) = @_;
@@ -1107,8 +1147,7 @@ sub _checkCAPValid($$;$$){
 	my $valid = 0;
   
 	$t = time() if (!defined($t));
-	# we use _calctz() from 99_SUNRISE_EL
-	my $offset = _calctz($t,localtime($t))*3600; 
+	my $offset = gds_calctz($t,localtime($t))*3600; 
 	$t -= $offset;
 	$tmax -= $offset if (defined($tmax));
 
@@ -1130,7 +1169,7 @@ sub _checkCAPValid($$;$$){
 sub _capTrans($) {
 	my ($t) = @_;
 	my $valid = 0;
-	my $offset = _calctz(time,localtime(time))*3600; # used from 99_SUNRISE_EL
+	my $offset = gds_calctz(time,localtime(time))*3600; # used from 99_SUNRISE_EL
 	$t =~ s/T/ /;
 	$t =~ s/\+/ \+/;
 	$t = time_str2num($t);
@@ -1164,7 +1203,7 @@ sub _retrieveFILE {
 	my $host		= $hash->{helper}{URL};
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
-	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
 
 	my $dir			= $hash->{file}{dir};
 	my $dwd			= $hash->{file}{dwd};
@@ -1226,9 +1265,9 @@ sub _retrieveCONDITIONS {
 	my $host		= $hash->{helper}{URL};
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
-	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
+	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir			= "gds/specials/observations/tables/germany/";
-
 	my $ret;
 
 	eval {
@@ -1253,6 +1292,7 @@ sub _retrieveCONDITIONS {
 				open($file_handle, '>', \$file_content);
 				$ftp->get($datafile,$file_handle);
 #				$file_content = latin1ToUtf8($file_content);
+				$file_content //= "";
 				$file_content =~ s/\r\n/\$/g;
 				$ret = "$datafile;;;$file_content";
 			}
@@ -1282,8 +1322,13 @@ sub _finishedCONDITIONS {
 	readingsSingleUpdate($hash, "_dF_conditions",$file_name,0) if(AttrVal($name, "gdsDebug", 0));
 
 	$hash->{GDS_CONDITIONS_READ}	= int(time());
-	my $cf = AttrVal($name,'gdsSetCond','');
-	GDS_GetUpdate($hash) if $cf; 
+	my $cf = AttrVal($name,'gdsSetCond',0);
+#	GDS_GetUpdate($hash,1) if $cf; 
+	my @b;
+	push @b, undef;
+	push @b, undef;
+	push @b, $cf;
+	getConditions($hash, "c", @b);
 	DoTrigger($name,"REREADCONDITIONS",1);
 }
 sub __first_index ($@) {
@@ -1310,14 +1355,18 @@ sub _retrieveCAPDATA {
 	my $host		= $hash->{helper}{URL};
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
-	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
+	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir 		= "gds/specials/alerts/cap/GER/status/";
 	my $dwd			= "Z_CAP*";
 
-	my $datafile;
+	my $datafile	= "";
 	my $targetDir	= $tempDir.$name."_alerts.dir";
 	my $targetFile	= $tempDir.$name."_alerts.zip";
 	mkdir $targetDir unless -d $targetDir;
+
+	# delete archive file
+	unlink $targetFile;
 
 	eval {
 		my $ftp = Net::FTP->new(	$host,
@@ -1358,14 +1407,25 @@ sub _retrieveCAPDATA {
 	}
 
 	# unzip
-	my $zip = Archive::Extract->new( archive => $targetFile );
-	my $ok  = $zip->extract( to => $targetDir);
-	Log3($name, 5, "GDS $name: error ".$zip->error()) unless $ok;
+	my $zip;
+	eval {
+		$Archive::Extract::PREFER_BIN	= 1;
+		$Archive::Extract::WARN			= 0;
+		$zip = Archive::Extract->new( archive => $targetFile, type => 'zip' );
+		my $ok  = $zip->extract( to => $targetDir );
+		Log3($name, 5, "GDS $name: error ".$zip->error()) unless $ok;
+	};
 
-	# delete archive file
-	unlink $targetFile;
+#	my $zip;
+#	eval {
+#		$zip = Archive::Zip->new($targetFile);
+#		foreach my $member ($zip->members()) {
+#			my $fileName = $member->fileName();
+#			$zip->extractMember($member,$targetDir."/".$fileName) == AZ_OK || Debug "unzip error: $member";
+#		}
+#	};
 
-#	# merge
+	# merge
     my ($countInfo,$cF)		= _mergeCapFile($hash);
 	my ($aList,$cellData)	= _buildCAPList($hash,$countInfo,$cF);
 
@@ -1519,7 +1579,8 @@ sub _retrieveFORECAST {
 	my $host		= $hash->{helper}{URL};
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
-	my $passive		= AttrVal($name, "gdsPassiveFtp", 0);
+	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
+	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir         = "gds/specials/forecasts/tables/germany/";
 
     my $ret = "";
@@ -1572,8 +1633,13 @@ sub _finishedFORECAST {
 	$hash->{GDS_FORECAST_READ} = int(time());
 	DoTrigger($name,"REREADFORECAST",1);
 	getListForecastStations($hash);
-	my $sf = AttrVall($name,'gdsSetForecast',0);
-	GDS_GetUpdate($hash) if $sf; 
+	my $sf = AttrVal($name,'gdsSetForecast',0);
+#	GDS_GetUpdate($hash,1) if $sf; 
+	my @b;
+	push @b, undef;
+	push @b, undef;
+	push @b, $sf;
+	retrieveForecasts($hash, "fc", @b);    
 }
 sub _abortedFORECAST {
 	my ($hash) = shift;
@@ -1848,6 +1914,7 @@ sub getListForecastStations($) {
 	return;
 }
 
+
 1;
 
 
@@ -1863,7 +1930,15 @@ sub getListForecastStations($) {
 #
 ###################################################################################################
 #
-#	2015-10-25	public		RC5 published, SVN #
+#	2015-10-30	changed		use passive ftp per default
+#
+#	2015-10-27	changed		add own function gds_calcTz due to announced
+#							changes in SUNRISE_EL
+#
+#	2015-10-26	changed		multiple instances are forbidden
+#
+#	2015-10-25	public		RC5 published, SVN #9663
+#				changed		a lot of code cleanup
 #
 #	2015-10-24	public		RC3 published, SVN #9627
 #
