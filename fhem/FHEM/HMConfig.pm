@@ -1433,7 +1433,6 @@ $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
                      ,repeater         =>{ statusRequest => ""
                                           ,getSerial     => ""
                                          }
-                     ,outputUnit       =>{ statusRequest => ""}
 );
 $culHmSubTypeDevSets{dimmer}         = $culHmSubTypeDevSets{switch};
 $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
@@ -1499,15 +1498,14 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
                                           ,inhibit        => "[on|off]"
                                           ,statusRequest  =>""
                                          }
-                     ,outputUnit       =>{ statusRequest  =>""}
+                     ,KFM100           =>{ statusRequest  =>""}
 );
 # clones- - - - - - - - - - - - - - - - -
 $culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
 $culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
  
-$culHmSubTypeSets{KFM100}          = $culHmSubTypeSets{outputUnit};
-$culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{outputUnit};
-$culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{outputUnit};
+$culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{KFM100};
+$culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{KFM100};
 
 $culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
 $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
@@ -1544,14 +1542,18 @@ $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
 );
 # clones- - - - - - - - - - - - - - - - -
 
-$culHmModelSets{"HM-OU-CM-PCB"}        = $culHmModelSets{"HM-OU-CFM-PL"};
-$culHmModelSets{"HM-OU-CF-PL"}         = $culHmModelSets{"HM-OU-CFM-PL"};
-$culHmModelSets{"ROTO_ZEL-STG-RM-FWT"} = $culHmModelSets{"HM-CC-TC"};
-$culHmModelSets{"HM-Sen-Wa-Od"}        = $culHmModelSets{"HM-SEC-SD"};
-$culHmModelSets{"HM-PB-4DIS-WM-2"}     = $culHmModelSets{"HM-PB-4DIS-WM"};
-$culHmModelSets{"HM-Dis-WM55"}         = $culHmModelSets{"HM-PB-4DIS-WM"};
-$culHmModelSets{"HM-RC-Dis-H-x-EU"}    = $culHmModelSets{"HM-PB-4DIS-WM"};
+$culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-OU-CFM-PL"};
+$culHmModelSets{"HM-OU-CF-PL"}           = $culHmModelSets{"HM-OU-CFM-PL"};
+$culHmModelSets{"ROTO_ZEL-STG-RM-FWT"}   = $culHmModelSets{"HM-CC-TC"};
+$culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
+$culHmModelSets{"HM-PB-4DIS-WM-2"}       = $culHmModelSets{"HM-PB-4DIS-WM"};
+$culHmModelSets{"HM-Dis-WM55"}           = $culHmModelSets{"HM-PB-4DIS-WM"};
+$culHmModelSets{"HM-RC-Dis-H-x-EU"}      = $culHmModelSets{"HM-PB-4DIS-WM"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
+$culHmModelSets{"HM-OU-CF-PL"}           = $culHmModelSets{"HM-SEC-SD"};
+$culHmModelSets{"HM-OU-LED16"}           = $culHmModelSets{"HM-SEC-SD"};
+#$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
+$culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
 
 
 

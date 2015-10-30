@@ -477,7 +477,7 @@ sub HMLAN_Write($$$) {#########################################################
     HMLAN_SimpleWrite($hash,$msg);
     return;
   }
-  elsif (length($msg)>21){
+  if (length($msg)>21){
     my ($mtype,$src,$dst) = (substr($msg, 8, 2),
                              substr($msg, 10, 6),
                              substr($msg, 16, 6));
@@ -507,6 +507,9 @@ sub HMLAN_Write($$$) {#########################################################
                   :" report:$hash->{helper}{assIdRep}")
               ;
     }
+  }
+  elsif(length($msg)<5){
+    Log3 $hash, 2, "HMLAN_Send:  cmd too short:".($fn?$fn:"noFn").":".($msg?$msg:"no_msg");
   }
   elsif($msg =~ m /init:(......)/){
     my $dst = $1;
