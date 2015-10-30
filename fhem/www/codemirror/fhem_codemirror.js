@@ -12,7 +12,7 @@ var cm_attr = {
     indentUnit:       4,
     type:             "fhem",
     theme:            "blackboard",
-    indentWithTabs:   false,
+    indentWithTabs:   true,
     autofocus:        true,
     lineNumbers:      true,
     extraKeys: {
