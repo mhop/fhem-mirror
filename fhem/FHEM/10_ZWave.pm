@@ -21,7 +21,7 @@ sub ZWave_secEnd($);
 
 use vars qw(%zw_func_id);
 use vars qw(%zw_type6);
-use vars qw($FW_ME);
+use vars qw($FW_ME $FW_tp $FW_ss);
 
 my %zwave_id2class;
 my %zwave_class = (
@@ -2948,13 +2948,21 @@ ZWave_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
-  my $pl=""; # Pepper link and image
+  my $pl = ""; # Pepper link and image
   my $model = ReadingsVal($d, "modelId", "");
   if($model) {
-    $pl .= "<div class='zwavepepper' style='float:right'>";
+    my $link = $zwave_pepperLink{$model};
+    $pl .= "<div class='detLink ZWPepper'>";
+    $pl .= "<a target='_blank' href='http://www.pepper1.net/zwavedb/device/".
+               "$link'>Details in pepper1.net</a>" if($link);
+    $pl .= "</div>";
+
     my $img = $zwave_pepperImg{$model};
-    if($img) {
-      $pl .= "<img style='width:160px;' src='$FW_ME/deviceimages/zwave/$img'>";
+    if($img && !$FW_ss) {
+      $pl .= "<div class='img ZWPepper'".($FW_tp?"":" style='float:right'").">";
+      $pl .= "<img style='max-width:96;max-height:96px;' ".
+                        "src='$FW_ME/deviceimages/zwave/$img'>";
+      $pl .= "</div>";
       my $fn = $attr{global}{modpath}."/www/deviceimages/zwave/$img";
       if(!-f $fn) {      # Cache the picture
         my $data = GetFileFromURL("http://fhem.de/deviceimages/zwave/$img");
@@ -2964,18 +2972,16 @@ ZWave_fhemwebFn($$$$)
         }
       }
     }
-    my $link = $zwave_pepperLink{$model};
-    $pl .= "<br><a href='http://www.pepper1.net/zwavedb/device/".
-               "$link'>Details in pepper1.net</a>" if($link);
-    $pl .= "</div>";
   }
 
   return
-  '<div id="ZWHelp" class="makeTable help"></div>'.$pl.
+  "<div id='ZWHelp' class='makeTable help'></div>$pl".
   '<script type="text/javascript">'.
-   "var d='$d';" . <<'JSEND'
+   "var d='$d', FW_tp='$FW_tp';" . <<'JSEND'
     $(document).ready(function() {
       $("div#ZWHelp").insertBefore("div.makeTable.wide:first"); // Move
+      $("div.detLink.ZWPepper").insertAfter("div.detLink.devSpecHelp");
+      if(FW_tp) $("div.img.ZWPepper").appendTo("div#menu");
       $("select.set,select.get").each(function(){
         $(this).get(0).setValueFn = function(val) {
           $("div#ZWHelp").html(val);
