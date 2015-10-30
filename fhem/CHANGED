@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_AMAD: wrong flowset xml file on lib/
   - updated: 74_AMAD: New Mirror Version
   - feature: 74_AMAD: AMADCommBridge (AMADCommunication Device)
                       toggle between to BT Devices, clear Notificationbar
