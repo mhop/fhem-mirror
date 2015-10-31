@@ -1076,6 +1076,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     KeyAttr        => {}
                 );
                 $return = $parser->XMLin( Encode::encode_utf8($data) );
+                undef $parser;
             }
             else {
                 if ( !defined($cmd) || $cmd eq "" ) {
@@ -2310,6 +2311,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
     readingsEndUpdate( $hash, 1 );
 
+    undef $return;
     return;
 }
 
