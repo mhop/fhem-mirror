@@ -1698,6 +1698,7 @@ $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
 $culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
 
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
+$culHmChanSets{"HM-CC-RT-DN03"}         = $culHmChanSets{"HM-CC-RT-DN06"};
 
 $culHmChanSets{"HM-ES-PMSw1-Pl04"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
 $culHmChanSets{"HM-ES-PMSw1-Pl05"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};

@@ -246,8 +246,9 @@ sub CUL_HM_updateConfig($){
     my $chn = substr($id."00",6,2);
     my $st  = CUL_HM_Get($hash,$name,"param","subType");
     my $md  = CUL_HM_Get($hash,$name,"param","model");
-
-    $hash->{helper}{role}{prs} = 1 if(CUL_HM_Set($hash,$name,"?") =~ m /press/ && $st ne "virtual");
+    
+    my $dHash = CUL_HM_getDeviceHash($hash);
+    $dHash->{helper}{role}{prs} = 1 if(CUL_HM_Set($hash,$name,"?") =~ m /press/ && $st ne "virtual");
     foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
       # move certain attributes to readings for future handling
       my $aName = $rName;
@@ -4561,7 +4562,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "invalid temp:$a[2]" if($temp <9 ||$temp > 61);
       $temp = sprintf ("%02X",$temp);
       CUL_HM_PushCmdStack($hash,'++'.$flag."11$id$dst"."8604$temp");
-      foreach my $team ( split(",",InternalVal(CUL_HM_id2Name($dst."05"),"peerList",""))
+      my $idTch = ($md =~ m/HM-CC-RT-DN/ ? $dst."05" : $dst."02");
+      foreach my $team ( split(",",InternalVal(CUL_HM_id2Name($idTch),"peerList",""))
                         ,$name){
         next if (!defined $defs{$team} );
         my $tId = substr(CUL_HM_name2Id($team),0,6);
@@ -4870,7 +4872,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         }
       }
       if(!$snd){# send 2 broadcast if no relevant peers 
-        CUL_HM_PushCmdStack($hash,"++8440${dst}000000$pc");
+        CUL_HM_SndCmd($hash,"++8440${dst}000000$pc");
       }
     }
     else{#serve internal channels for actor
@@ -4896,10 +4898,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                      hex($pCh)+$mode,
                                      $pressCnt);
       for (my $cnt = 1;$cnt < $repCnt; $cnt++ ){
-        CUL_HM_SndCmd($hash, "++80$msg");
+        CUL_HM_SndCmd($hash, "++80$msg"); # send direct Wont work for burst!
         select(undef, undef, undef, $repDly);
       }
-      CUL_HM_SndCmd($hash, "++${flag}$msg");
+      CUL_HM_PushCmdStack($hash, "++${flag}$msg"); # send thru commandstack
     }
   }
   elsif($cmd eq "fwUpdate") { #################################################
