@@ -2838,7 +2838,16 @@ ZWave_Parse($$@)
 
 
   if(!$hash) {
-    Log3 $ioName, 1, "ZWave: unknown message $msg, please report";
+    if(!$baseHash) {
+      Log3 $ioName, 1, "ZWave: unknown message $msg, please report";
+      return;
+    }
+    # autocreate the device when pressing the remote button (Forum #43261)
+    $id=hex($id); $baseId=hex($baseId); $ep=hex($ep);
+    my $nn = "ZWave_Node_$baseId".($ep eq "0" ? "" : ".$ep");
+    my $ret = "UNDEFINED $nn ZWave $homeId $id";
+    Log3 $ioName, 3, "$ret, please define it";
+    DoTrigger("global", $ret);
     return "";
   }
 
