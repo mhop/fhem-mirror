@@ -195,6 +195,7 @@
 	<Manufacturer id="0031" name="Destiny Networks">
 	</Manufacturer>
 	<Manufacturer id="0175" name="devolo">
+	        <Product type="0001" id="0011" name="Metering Plug MT02646" config="devolo/mt02646.xml"/>
 		<Product type="0002" id="000e" name="Door/Window Contact MT02648" config="philio/pst02-1c.xml"/>
 	</Manufacturer>
 	<Manufacturer id="0050" name="Digital 5">
