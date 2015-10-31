@@ -1784,7 +1784,7 @@ ZWave_configRequestAll($)
   #use Data::Dumper;
   #Log 1, Dumper $mc;
   foreach my $c (sort keys %{$mc->{get}}) {
-    my $r = ZWave_Cmd("set", $hash, $hash->{NAME}, $c, "request");
+    my $r = ZWave_Set($hash, $hash->{NAME}, $c, "request");
     Log 1, "$c: $r" if($r);
   }
   return ("","EMPTY");
@@ -1806,7 +1806,7 @@ ZWave_associationRequest($$)
   $grp = $1 if($data =~ m/..8503(..)/);
   return if($grp >= $nGrp);
   $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationRequest;
-  ZWave_Cmd("set", $hash, $hash->{NAME}, "associationRequest", $grp+1);
+  ZWave_Set($hash, $hash->{NAME}, "associationRequest", $grp+1);
 }
 
 
