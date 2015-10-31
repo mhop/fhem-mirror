@@ -5,7 +5,7 @@ package main;
 use strict;
 use warnings;
 use HttpUtils;
-use File::Copy qw(mv cp);
+use File::Copy qw(mv copy);
 use Blocking;
 
 sub CommandUpdate($$);
@@ -399,8 +399,8 @@ upd_writeFile($$$$)
   upd_mkDir($root, $fName, 1);
   upd_mkDir($root, "$restoreDir/$fName", 1) if($restoreDir);
   if($restoreDir && -f "$root/$fName" &&
-     ! cp("$root/$fName", "$root/$restoreDir/$fName")) {
-    uLog 1, "cp $root/$fName $root/$restoreDir/$fName failed:$!, ".
+     ! copy("$root/$fName", "$root/$restoreDir/$fName")) {
+    uLog 1, "copy $root/$fName $root/$restoreDir/$fName failed:$!, ".
               "aborting the update";
     return 0;
   }
@@ -411,7 +411,7 @@ upd_writeFile($$$$)
   $fPath = $0 if($fPath =~ m/$mainPgm/);
   if(!open(FD, ">$fPath")) {
     uLog 1, "open $fPath failed: $!, $rest";
-    cp "$root/$restoreDir/$fName", "$root/$fName" if($restoreDir);
+    copy "$root/$restoreDir/$fName", "$root/$fName" if($restoreDir);
     return 0;
   }
   binmode(FD);
@@ -421,7 +421,7 @@ upd_writeFile($$$$)
   my $written = -s "$fPath";
   if($written != length($content)) {
     uLog 1, "writing $fPath failed: $!, $rest";
-    cp "$root/$restoreDir/$fName", "$fPath" if($restoreDir);
+    copy "$root/$restoreDir/$fName", "$fPath" if($restoreDir);
     return;
   }
 
