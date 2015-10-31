@@ -1931,16 +1931,21 @@ sub HMinfo_templateDef(@){#####################################################
       foreach my $rdN (grep !/^\.?R-.*-(sh|lg)/,grep /^\.?R-/,keys %{$defs{$master}{READINGS}}){
         my $rdP = $rdN;
         $rdP =~ s/^\.?R-//;
-        push @regs,"$rdP:$defs{$master}{READINGS}{$rdN}{VAL}";
+        my ($val) = map{s/ .*//;$_;}$defs{$master}{READINGS}{$rdN}{VAL};
+        push @regs,"$rdP:$val";
       }
     }
     else{
       my ($peer,$shlg) = split(":",$pl,2);
-      $shlg = ($shlg eq "short"?"sh":($shlg eq "long"?"lg":""));
+      return "peersegment not allowed. use <peer>:(both|short|long)" if($shlg != m/(short|long|both)/);
+      $shlg = ($shlg eq "short"?"sh"
+             :($shlg eq "long" ?"lg"
+             :""));
       foreach my $rdN (grep /^\.?R-$peer-$shlg/,keys %{$defs{$master}{READINGS}}){
         my $rdP = $rdN;
         $rdP =~ s/^\.?R-$peer-$shlg//;
-        push @regs,"$rdP:$defs{$master}{READINGS}{$rdN}{VAL}";
+        my ($val) = map{s/ .*//;$_;}$defs{$master}{READINGS}{$rdN}{VAL};
+        push @regs,"$rdP:$val";
       }
     }
     $param = "0";
@@ -1979,9 +1984,11 @@ sub HMinfo_templateDef(@){#####################################################
       delete $HMConfig::culHmTpl{$name};
       return " empty reg value for $r";
     }
-    elsif($v =~ m/^p(.)/){
-      return ($1+1)." params are necessary, only $paramNo given"
-            if (($1+1)>$paramNo);
+    elsif($v =~ m/^p(\d)/){
+      if (($1+1)>$paramNo){
+        delete $HMConfig::culHmTpl{$name};
+        return ($1+1)." params are necessary, only $paramNo given";
+      }
     } 
     $HMConfig::culHmTpl{$name}{reg}{$r} = $v;
   }
@@ -1995,8 +2002,11 @@ sub HMinfo_templateSet(@){#####################################################
   my $tmplID = "$pSet>$tmpl";
   $pSet = ":" if (!$pSet || $pSet eq "none");
   my ($pName,$pTyp) = split(":",$pSet);
-  return "give <peer>:[short|long] with peer, not $pSet"  if($pName && $pTyp !~ m/(short|long)/);
-  $pSet = $pTyp ? ($pTyp eq "long"?"lg":"sh"):"";
+  return "give <peer>:[short|long|both] with peer, not $pSet $pName,$pTyp"  if($pName && $pTyp !~ m/(short|long|both)/);
+  $pSet = $pTyp ? ($pTyp eq "long" ?"lg"
+                 :($pTyp eq "short"?"sh"
+                 :""))                  # could be "both"
+                 :"";
   my $aHash = $defs{$aName};
 
   my @regCh;
@@ -2074,61 +2084,48 @@ sub HMinfo_templateUsg(@){#####################################################
 }
 sub HMinfo_templateChk(@){#####################################################
   my ($aName,$tmpl,$pSet,@p) = @_;
-  $pSet = ":" if (!$pSet || $pSet eq "none");
-  my ($pName,$pTyp) = split(":",$pSet);
+  # pset: 0                = template w/o peers
+  #       peer / peer:both = template for peer, not extending Long/short
+  #       peer:short|long  = template for peerlong or short
+
   return "template undefined $tmpl\n"                     if(!$HMConfig::culHmTpl{$tmpl});
   return "aktor $aName unknown\n"                         if(!$defs{$aName});
-  return "give <peer>:[short|long|all] wrong:$pTyp\n"     if($pTyp && $pTyp !~ m/(short|long|all)/);
-
-  my @pNames;
-  if ($pName eq "all"){
-    my $dId = substr(CUL_HM_name2Id($aName),0,6);
-    foreach (grep !/00000000/,split(",",AttrVal($aName,"peerIDs",""))){
-      push @pNames,CUL_HM_peerChName($_,$dId).":long"  if (!$pTyp || $pTyp ne "short");
-      push @pNames,CUL_HM_peerChName($_,$dId).":short" if (!$pTyp || $pTyp ne "long");
-    }
-  }
-  elsif(($pName && !$pTyp) || $pTyp eq "all"){
-    push @pNames,$pName.":long";
-    push @pNames,$pName.":short";
+  return "give <peer>:[short|long|both] wrong:$pSet\n"    if($pSet && $pSet !~ m/:(short|long|both)$/);
+  $pSet = "0:0" if (!$pSet);
+  
+  my $repl = "";
+  my($pName,$pTyp) = split(":",$pSet);
+  if($pName && (grep !/$pName/,ReadingsVal($aName,"peerList" ,""))){
+    $repl = "  no peer:$pName\n";
   }
   else{
-    push @pNames,$pSet;
-  }
-
-  my $repl = "";
-  foreach my $pS (@pNames){
-    ($pName,$pTyp) = split(":",$pS);
-    my $replPeer="";
-    if($pName && (grep !/$pName/,ReadingsVal($aName,"peerList" ,""))){
-      $replPeer="  no peer:$pName\n";
-    }
-    else{
-      my $pRnm = $pName?($pName."-".($pTyp eq "long"?"lg":"sh")):"";
-      foreach my $rn (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
-        my $regV;
-        if ($pRnm){
-          $regV    = ReadingsVal($aName,"R-$pRnm$rn" ,ReadingsVal($aName,".R-$pRnm$rn",undef));
+    my $pRnm = $pName ? $pName."-" : "";
+    my $pRnmLS = $pTyp eq "long"?"lg":($pTyp eq "short"?"sh":"");
+    foreach my $rn (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
+      my $regV;
+      my $pRnmChk = $pRnm.($rn !~ m/^(lg|sh)/ ? $pRnmLS :"");
+      if ($pRnm){
+        $regV    = ReadingsVal($aName,"R-$pRnmChk$rn" ,ReadingsVal($aName,".R-$pRnmChk$rn",undef));
+      }
+      $regV    = ReadingsVal($aName,"R-".$rn     ,ReadingsVal($aName,".R-".$rn    ,undef)) if (!defined $regV);
+      if (defined $regV){
+        $regV =~s/ .*//;#strip unit
+        my $tplV = $HMConfig::culHmTpl{$tmpl}{reg}{$rn};
+        if ($tplV =~m /^p(.)$/) {#replace with User parameter
+          return "insufficient data - at least ".$HMConfig::culHmTpl{p}." are $1 necessary"
+                                                         if (@p < ($1+1));
+          $tplV = $p[$1];
         }
-        $regV    = ReadingsVal($aName,"R-".$rn     ,ReadingsVal($aName,".R-".$rn    ,undef)) if (!defined $regV);
-        if (defined $regV){
-          $regV =~s/ .*//;#strip unit
-          my $tplV = $HMConfig::culHmTpl{$tmpl}{reg}{$rn};
-          if ($tplV =~m /^p(.)$/) {#replace with User parameter
-            return "insufficient data - at least ".$HMConfig::culHmTpl{p}." are $1 necessary"
-                                                           if (@p < ($1+1));
-            $tplV = $p[$1];
-          }
-          $replPeer .= "  $rn :$regV should $tplV \n" if ($regV ne $tplV);
-        }
-        else{
-          $replPeer .= "  reg not found: $rn\n";
-        }
+        $repl .= "  $rn :$regV should $tplV \n" if ($regV ne $tplV);
+      }
+      else{
+        $repl .= "  reg not found: $rn :$pRnm\n";
       }
     }
-    $repl .= "$aName $pS-> failed\n$replPeer" if($replPeer);
   }
-  return ($repl?$repl:"");
+  $repl .= "$aName $pSet-> failed\n$repl" if($repl);
+
+  return $repl;
 }
 sub HMinfo_templateList($){####################################################
   my $templ = shift;
