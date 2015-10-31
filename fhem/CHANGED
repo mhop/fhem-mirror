@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix   00_SIGNALduino: Updated Firmware (3.8.1-HF1) 
+             fixed send raw
   - updated: 74_AMAD: New Mijor Release 0.8.1
   - bugfix:  74_AMAD: fix call statusRequest then screen off is set
                       fix change room then device modify
