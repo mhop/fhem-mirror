@@ -1,11 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Mijor Release 0.8.1
+  - bugfix:  74_AMAD: fix call statusRequest then screen off is set
+                      fix change room then device modify
+  - feature: 74_AMAD: insert first code parts of voice input
   - change:  55_GDS.pm new version released, see forum „Announcements“ 
   - change:  fhem_codemirror.js: Enabled indentWithTabs by default
                                  Enabled autoCloseBrackets by default
                                  Disabled smartIndent by default
   - bugfix:  74_AMAD: wrong flowset xml file on lib/
-  - updated: 74_AMAD: New Mirror Version
+  - updated: 74_AMAD: New Major Release 0.8.0
                       !!! IMPORTANT: please forget to update the Flowset !!!
   - feature: 74_AMAD: AMADCommBridge (AMADCommunication Device)
                       toggle between to BT Devices, clear Notificationbar

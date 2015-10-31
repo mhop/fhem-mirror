@@ -35,7 +35,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use TcpServerUtils;
 
-my $version = "0.8.0";
+my $version = "0.8.1";
 
 
 
@@ -92,7 +92,7 @@ sub AMAD_Define($$) {
 
 	$hash->{BRIDGE} = 1;
 	$modules{AMAD}{defptr}{BRIDGE} = $hash;
-	$attr{$name}{room} = "AMAD";
+	$attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
 	Log3 $name, 3, "AMAD ($name) - defined Bridge with Socketport $hash->{PORT}";
 	AMAD_CommBridge_Open( $hash );
 
@@ -103,7 +103,7 @@ sub AMAD_Define($$) {
 
 	Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and interval $hash->{INTERVAL} (sec)";
 	
-	$attr{$name}{room} = "AMAD";
+	$attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
 	readingsSingleUpdate ( $hash, "state", "initialized", 1 ) if( $hash->{HOST} );
 	readingsSingleUpdate ( $hash, "deviceState", "online", 1 ) if( $hash->{HOST} );
         
@@ -459,6 +459,7 @@ sub AMAD_Set($$@) {
 	$list .= "notifySndFile ";
 	$list .= "clearNotificationBar:All,Automagic ";
 	$list .= "changetoBTDevice:$btdev " if( AttrVal( $name, "setBluetoothDevice", "none" ) ne "none" );
+	#$list .= "activateVoiceInput:noArg ";    # erste Codeteile für Spracheingabe
 
 	if( lc $cmd eq 'screenmsg'
 	    || lc $cmd eq 'ttsmsg'
@@ -477,6 +478,7 @@ sub AMAD_Set($$@) {
 	    || lc $cmd eq 'notifysndfile'
 	    || lc $cmd eq 'changetobtdevice'
 	    || lc $cmd eq 'clearnotificationbar'
+	    || lc $cmd eq 'activatevoiceinput'
 	    || lc $cmd eq 'statusrequest' ) {
 
 	    Log3 $name, 5, "AMAD ($name) - set $name $cmd ".join(" ", @val);
@@ -487,7 +489,7 @@ sub AMAD_Set($$@) {
 	    return AMAD_SelectSetCmd( $hash, $cmd, @val ) if( @val ) && ( ReadingsVal( $name, "deviceState", "online" ) eq "offline" ) && ( lc $cmd eq 'devicestate' );
 	    return "Cannot set command, FHEM Device is offline" if( ReadingsVal( $name, "deviceState", "online" ) eq "offline" );
 	  
-	    return AMAD_SelectSetCmd( $hash, $cmd, @val ) if( @val ) || ( lc $cmd eq 'statusrequest' );
+	    return AMAD_SelectSetCmd( $hash, $cmd, @val ) if( @val ) || ( lc $cmd eq 'statusrequest' ) || ( lc $cmd eq 'activatevoiceinput' );
 	}
 
 	return "Unknown argument $cmd, bearword as argument or wrong parameter(s), choose one of $list";
@@ -589,6 +591,14 @@ sub AMAD_SelectSetCmd($$@) {
 	my $mod = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setScreenOrientation?orientation=$mod";
+	
+	return AMAD_HTTP_POST( $hash,$url );
+    }
+    
+    elsif( lc $cmd eq 'activatevoiceinput' ) {
+	#my $cmd = join( " ", @data );
+
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setvoicecmd";
 	
 	return AMAD_HTTP_POST( $hash,$url );
     }
@@ -875,9 +885,8 @@ sub AMAD_CommBridge_Read($) {
              $response;
 
 
-    ## hier den close Client einbauen auf hash vom Accept $chash siehe oben
-    ## close($hash->{CD})
-
+    
+    #### Verarbeitung der Daten welche über die AMADCommBridge kommen ####
 
     
     ###
@@ -923,6 +932,14 @@ sub AMAD_CommBridge_Read($) {
         
         fhem ("$fhemCmd") if( ReadingsVal( "AMADCommBridge", "expertMode", 0 ) eq "1" );
 	readingsSingleUpdate( $brihash, "receiveFhemCommand", $fhemCmd, 1 );
+	
+	return;
+    }
+    
+    elsif ( $data[0] =~ /FHEMCMD: voicecmd\b/ ) {
+        my $fhemCmd = $data[1];
+        
+	readingsSingleUpdate( $brihash, "receiveVoiceCommand", $fhemCmd, 1 );
 	
 	return;
     }
