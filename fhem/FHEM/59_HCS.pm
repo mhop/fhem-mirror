@@ -74,13 +74,28 @@ HCS_Initialize($$)
   $hash->{GetFn}    = "HCS_Get";
   $hash->{SetFn}    = "HCS_Set";
   $hash->{NotifyFn} = "HCS_Notify";
-  $hash->{AttrList} = "deviceCmdOn deviceCmdOff exclude ecoTemperatureOn ecoTemperatureOff ".
-                      "interval idleperiod mode:thermostat,valve ".
-                      "sensor sensorThresholdOn sensorThresholdOff sensorReading ".
-                      "thermostatThresholdOn thermostatThresholdOff ".
-                      "valveThresholdOn valveThresholdOff ".
-                      "do_not_notify:1,0 " . $readingFnAttributes .
-                      "disable:0,1";
+  no warnings 'qw';
+  my @attrList = qw(
+    deviceCmdOff
+    deviceCmdOn
+    disable:0,1
+    ecoTemperatureOff
+    ecoTemperatureOn
+    exclude
+    idleperiod
+    interval
+    mode:thermostat,valve
+    sensor
+    sensorReading
+    sensorThresholdOff
+    sensorThresholdOn
+    thermostatThresholdOff
+    thermostatThresholdOn
+    valveThresholdOff
+    valveThresholdOn
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList) ." ". $readingFnAttributes;
 }
 
 #####################################
