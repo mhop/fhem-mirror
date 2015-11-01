@@ -1,5 +1,5 @@
 # $Id$
-# RC6
+
 # copyright and license informations
 =pod
 ###################################################################################################
@@ -35,16 +35,12 @@ package main;
 
 use strict;
 use warnings;
-use feature qw/say switch/;
+use feature qw/switch/;
 
 use Blocking;
 use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
-
-#use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
-
-#use Data::Dumper;
 
 eval "use GDSweblink";
 
@@ -91,7 +87,6 @@ sub GDS_Initialize($) {
 		gdsSetForecast
 		gdsUseAlerts:0,1
 		gdsUseForecasts:0,1
-		gdsUseFritzkotz:0,1
 	);
 	use warnings 'qw';
 	$hash->{AttrList}  = join(" ", @attrList);
@@ -875,32 +870,6 @@ sub gds_calctz($@) {
 	return (12-$gt[2]);
 }
 
-sub ua_test($$$) {
-	my ($hash,$dir,$file) = @_;
-
-	my $name		= $hash->{NAME};
-	my $user		= $hash->{helper}{USER};
-	my $pass		= $hash->{helper}{PASS};
-	my $host		= $hash->{helper}{URL};
-
-	use LWP::UserAgent;
-	my $ua;
-	$ua = LWP::UserAgent->new;
-	$ua->timeout(10);
-	$ua->env_proxy;
-
-	my $urlString =	"ftp://$user:$pass\@$host/";
-	$urlString .= $dir;
-	$urlString .= $file;
-	my $response = $ua->get($urlString); #,':content_file' => $file_handle);
-
-	if ($response->is_success) {
-		return $response->decoded_content;
-	} else {
-		return "";
-	}
-}
-
 ###################################################################################################
 #
 #	Data retrieval (internal)
@@ -1266,7 +1235,6 @@ sub _retrieveCONDITIONS {
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
 	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
-	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir			= "gds/specials/observations/tables/germany/";
 	my $ret;
 
@@ -1356,7 +1324,6 @@ sub _retrieveCAPDATA {
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
 	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
-	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir 		= "gds/specials/alerts/cap/GER/status/";
 	my $dwd			= "Z_CAP*";
 
@@ -1393,7 +1360,6 @@ sub _retrieveCAPDATA {
 			$ftp->quit;
 		}
 	};
-
 	
 	# delete old files in directory
 	if (-d $targetDir) {
@@ -1415,15 +1381,6 @@ sub _retrieveCAPDATA {
 		my $ok  = $zip->extract( to => $targetDir );
 		Log3($name, 5, "GDS $name: error ".$zip->error()) unless $ok;
 	};
-
-#	my $zip;
-#	eval {
-#		$zip = Archive::Zip->new($targetFile);
-#		foreach my $member ($zip->members()) {
-#			my $fileName = $member->fileName();
-#			$zip->extractMember($member,$targetDir."/".$fileName) == AZ_OK || Debug "unzip error: $member";
-#		}
-#	};
 
 	# merge
     my ($countInfo,$cF)		= _mergeCapFile($hash);
@@ -1580,7 +1537,6 @@ sub _retrieveFORECAST {
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
 	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
-	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir         = "gds/specials/forecasts/tables/germany/";
 
     my $ret = "";
@@ -1914,9 +1870,7 @@ sub getListForecastStations($) {
 	return;
 }
 
-
 1;
-
 
 # development documentation
 =pod
@@ -1926,11 +1880,11 @@ sub getListForecastStations($) {
 #
 ###################################################################################################
 #
-#	Changelog $Revision: 9625 $ 
+#	Changelog 
 #
 ###################################################################################################
 #
-#	2015-10-31	public		new version released, SVN $Revision: 9625 $
+#	2015-10-31	public		new version released, SVN #9739
 #
 #	2015-10-30	public		RC6 published, SVN #9727
 #				changed		use passive ftp per default
