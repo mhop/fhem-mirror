@@ -35,12 +35,16 @@ package main;
 
 use strict;
 use warnings;
-use feature qw/switch/;
+use feature qw/say switch/;
 
 use Blocking;
 use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
+
+#use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+
+#use Data::Dumper;
 
 eval "use GDSweblink";
 
@@ -87,6 +91,7 @@ sub GDS_Initialize($) {
 		gdsSetForecast
 		gdsUseAlerts:0,1
 		gdsUseForecasts:0,1
+		gdsUseFritzkotz:0,1
 	);
 	use warnings 'qw';
 	$hash->{AttrList}  = join(" ", @attrList);
@@ -684,7 +689,7 @@ sub GDS_GetUpdate($;$) {
 			getConditions($hash, "c", @a);
 		}
 		if($fs) {
-			if(time() - InternalVal($name,'GDS_FORECAST_READ',0) >= ($hash->{helper}{INTERVAL}-10)) {
+			if(!defined('GDS_FORECAST_BUSY') && time() - InternalVal($name,'GDS_FORECAST_READ',0) >= ($hash->{helper}{INTERVAL}-10)) {
 				retrieveData($hash,'forecast') ;
 				my $next = gettimeofday() + 1;
 				InternalTimer($next, "GDS_GetUpdate", $hash, 1);
@@ -868,6 +873,32 @@ sub gds_calctz($@) {
 	$nt += $off;  # This is noon, localtime
 	my @gt = gmtime($nt);
 	return (12-$gt[2]);
+}
+
+sub ua_test($$$) {
+	my ($hash,$dir,$file) = @_;
+
+	my $name		= $hash->{NAME};
+	my $user		= $hash->{helper}{USER};
+	my $pass		= $hash->{helper}{PASS};
+	my $host		= $hash->{helper}{URL};
+
+	use LWP::UserAgent;
+	my $ua;
+	$ua = LWP::UserAgent->new;
+	$ua->timeout(10);
+	$ua->env_proxy;
+
+	my $urlString =	"ftp://$user:$pass\@$host/";
+	$urlString .= $dir;
+	$urlString .= $file;
+	my $response = $ua->get($urlString); #,':content_file' => $file_handle);
+
+	if ($response->is_success) {
+		return $response->decoded_content;
+	} else {
+		return "";
+	}
 }
 
 ###################################################################################################
@@ -1156,6 +1187,14 @@ sub _capTrans($) {
 sub retrieveData($$){
 	my ($hash,$req) = @_;
 	$req = uc($req);
+	if ($req eq "FORECAST") {
+		my $busyTag = "GDS_".$req."_BUSY";
+		if (defined($hash->{$busyTag})) {
+			return;
+		} else {
+			$hash->{$busyTag} = localtime(time());
+		}
+	}
 	my $tag = "GDS_".$req."_READ";
 	delete $hash->{$tag};
 	$tag = "GDS_".$req."_ABORTED";
@@ -1235,6 +1274,7 @@ sub _retrieveCONDITIONS {
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
 	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
+	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir			= "gds/specials/observations/tables/germany/";
 	my $ret;
 
@@ -1324,6 +1364,7 @@ sub _retrieveCAPDATA {
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
 	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
+	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir 		= "gds/specials/alerts/cap/GER/status/";
 	my $dwd			= "Z_CAP*";
 
@@ -1360,6 +1401,7 @@ sub _retrieveCAPDATA {
 			$ftp->quit;
 		}
 	};
+
 	
 	# delete old files in directory
 	if (-d $targetDir) {
@@ -1381,6 +1423,15 @@ sub _retrieveCAPDATA {
 		my $ok  = $zip->extract( to => $targetDir );
 		Log3($name, 5, "GDS $name: error ".$zip->error()) unless $ok;
 	};
+
+#	my $zip;
+#	eval {
+#		$zip = Archive::Zip->new($targetFile);
+#		foreach my $member ($zip->members()) {
+#			my $fileName = $member->fileName();
+#			$zip->extractMember($member,$targetDir."/".$fileName) == AZ_OK || Debug "unzip error: $member";
+#		}
+#	};
 
 	# merge
     my ($countInfo,$cF)		= _mergeCapFile($hash);
@@ -1537,6 +1588,7 @@ sub _retrieveFORECAST {
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
 	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
+	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir         = "gds/specials/forecasts/tables/germany/";
 
     my $ret = "";
@@ -1569,6 +1621,7 @@ sub _retrieveFORECAST {
 					$file_content =~ s/\r\n/\$/g;
 					$ret .= "$file:$file_content;";
 					$count++;
+					Log3 ($name, 5, "GDS $name retrieved forecast $file");
 				}
 			}
 			$ftp->quit;
@@ -1596,11 +1649,13 @@ sub _finishedFORECAST {
 	push @b, undef;
 	push @b, $sf;
 	retrieveForecasts($hash, "fc", @b);    
+	delete $hash->{GDS_FORECAST_BUSY};
 }
 sub _abortedFORECAST {
 	my ($hash) = shift;
 	delete $hash->{GDS_FORECAST_READ};
 	$hash->{GDS_FORECAST_ABORTED} = localtime(time());
+	delete $hash->{GDS_FORECAST_BUSY};
 }
 
 ###################################################################################################
@@ -1715,6 +1770,7 @@ sub retrieveForecasts($$@) {
 		# retrieve from hash
 		my $noDataFound = 1;
 		$data = undef;
+		my $hashSize = keys%allForecastData; # checking size of hash seems to make all entries "visible" in loop
 		while(($k, $v) = each %allForecastData){
 			if ($k eq "Daten_$areaAndTime") {
 				$data = $v;
@@ -1722,9 +1778,7 @@ sub retrieveForecasts($$@) {
 			};
 		}
 
-
 		if (defined($data) && $data) {
-
 			my @data = split(/\$/,$data);
 
 			foreach my $l (@data) {
@@ -1773,7 +1827,7 @@ sub retrieveForecasts($$@) {
 		} # unless
 
 		if ($noDataFound) {
-			# forecast period already passed or no data available 
+			# forecast period already passed or no data available 			
 			$fread{$prefix.$day.$tempLabel} = "---";
 			$fread{$prefix.$day."_weather".$timeLabel} = "---";      
 			$fread{$prefix.$day."_windGust".$timeLabel} = "---";      
@@ -1793,7 +1847,6 @@ sub retrieveForecasts($$@) {
 			my $temp = $fread{$prefix.$day.$tempLabel};
 			if (defined($temp) && substr($temp, 0, 2) eq '--') {
 				if (defined($copyTimeLabel)) {
-#					$fread{$prefix.$day.$tempLabel} = utf8ToLatin1(ReadingsVal($name, $prefix.$copyDay.$tempLabel, '---'));
 					$fread{$prefix.$day.$tempLabel} = ReadingsVal($name, $prefix.$copyDay.$tempLabel, '---');
 				} else {
 					# today noon/night and 3rd day is undefined
@@ -1804,7 +1857,6 @@ sub retrieveForecasts($$@) {
 			if (defined($weather) && substr($weather, 0, 2) eq '--') {
 				if (defined($copyTimeLabel)) {
 					$fread{$prefix.$day."_weather".$timeLabel} = 
-#						utf8ToLatin1(ReadingsVal($name, $prefix.$copyDay."_weather".$copyTimeLabel, '---'));
 						ReadingsVal($name, $prefix.$copyDay."_weather".$copyTimeLabel, '---');
 			} else {
 				# today noon/night and 3rd day is undefined
@@ -1815,7 +1867,6 @@ sub retrieveForecasts($$@) {
 		if (defined($windGust) && substr($windGust, 0, 2) eq '--') {
 			if (defined($copyTimeLabel)) {
 				$fread{$prefix.$day."_windGust".$timeLabel} = 
-#					utf8ToLatin1(ReadingsVal($name, $prefix.$copyDay."_windGust".$copyTimeLabel, '---'));
 					ReadingsVal($name, $prefix.$copyDay."_windGust".$copyTimeLabel, '---');
 			} else {
 				# today noon/night and 3rd day is undefined
@@ -1832,7 +1883,6 @@ sub retrieveForecasts($$@) {
         unless(defined($v))      {delete($defs{$name}{READINGS}{$k}); next;}
 		if($v =~ m/^--/)        {delete($defs{$name}{READINGS}{$k}); next;};
         unless(length(trim($v))) {delete($defs{$name}{READINGS}{$k}); next;};
-#		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
 		readingsBulkUpdate($hash, $k, utf8ToLatin1($v)); 
 	}
 	readingsEndUpdate($hash, 1);
@@ -1861,7 +1911,7 @@ sub getListForecastStations($) {
 		}
 	};
 	   
-	Log3($name, 4, "GDS $name: forecast data not found") unless (!@a);
+	Log3($name, 4, "GDS $name: forecast data not found") unless (@a);
 
 	@a = sort(@a);
   	$fList = join(",", @a);
@@ -1870,7 +1920,9 @@ sub getListForecastStations($) {
 	return;
 }
 
+
 1;
+
 
 # development documentation
 =pod
@@ -1880,9 +1932,14 @@ sub getListForecastStations($) {
 #
 ###################################################################################################
 #
-#	Changelog 
+#	Changelog
 #
 ###################################################################################################
+#
+#	2015-11-01	changed		getListForecastStations: fixed inverted logging "data not found"
+#				changed		GDS_GetUpdate, retrieveData, _finishedFORECAST, _abortedFORECAST: 
+#							prevent multiple parallel processing
+#				changed		retrieveForecasts: make available data in hash "visible" for processing
 #
 #	2015-10-31	public		new version released, SVN #9739
 #
