@@ -2041,7 +2041,7 @@ ZWave_secNonceReceived($$)
   if ($type eq "set" && $cmd && $cmd !~ m/^config.*request$/) {
     readingsSingleUpdate($hash, "state", $cmd, 1);
     Log3 $name, 5, "$name: type=$type, cmd=$cmd ($getSecMsg)";
-    ZWave_secEnd($hash);
+    ZWave_secEnd($hash) if ($type eq "set");
   }
 
   return undef;
