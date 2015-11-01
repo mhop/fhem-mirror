@@ -6278,7 +6278,7 @@ sub CUL_HM_eventP($$) {#handle protocol events
     return;
   }
 
-  my $evnt = $hash->{"prot".$evntType}?$hash->{"prot".$evntType}:"0 > x";
+  my $evnt = $hash->{"prot".$evntType}?$hash->{"prot".$evntType}:"0";
   my ($evntCnt,undef) = split(' last_at:',$evnt);
   $hash->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
 
