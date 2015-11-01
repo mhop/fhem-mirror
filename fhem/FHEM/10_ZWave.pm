@@ -325,7 +325,8 @@ my %zwave_class = (
                associationRequestAll => 'ZWave_associationRequest($hash,"")' },
     get   => { association          => "02%02x",
                associationGroups    => "05" },
-    parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"',
+    parse => { "..8503(..)(..)..(.*)" =>
+          'sprintf("assocGroup_%d:Max %d Nodes %d", hex($1), hex($2), hex($3))',
                "..8506(..)"           => '"assocGroups:".hex($1)' },
     init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
