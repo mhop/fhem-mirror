@@ -20,6 +20,7 @@ sub HMinfo_Initialize($$) {####################################################
   my ($hash) = @_;
 
   $hash->{DefFn}     = "HMinfo_Define";
+  $hash->{UndefFn}   = "HMinfo_Undef";
   $hash->{SetFn}     = "HMinfo_SetFn";
   $hash->{GetFn}     = "HMinfo_GetFn";
   $hash->{AttrFn}    = "HMinfo_Attr";
@@ -28,13 +29,15 @@ sub HMinfo_Initialize($$) {####################################################
                        ."autoUpdate autoArchive "
                        ."hmAutoReadScan hmIoMaxDly "
                        ."hmManualOper:0_auto,1_manual "
-                       ."configDir configFilename "
+                       ."configDir configFilename configTempFile "
                        .$readingFnAttributes;
 
 }
 sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
+  return "only one instance of HMInfo allowed, $modules{HMinfo}{define} already instantiated"
+        if (defined $modules{HMinfo}{define});
   my $name = $hash->{NAME};
   $hash->{Version} = "01";
   $attr{$name}{webCmd} = "update:protoEvents short:rssi:peerXref:configCheck:models";
@@ -55,7 +58,13 @@ sub HMinfo_Define($$){#########################################################
                             .",cover:closed"
                             ;
   $hash->{nb}{cnt} = 0;
+  $modules{HMinfo}{define} = $name;
   return;
+}
+sub HMinfo_Undef($$){#########################################################
+  my ($hash, $name) = @_;
+  delete $modules{HMinfo}{define};
+  return undef;
 }
 sub HMinfo_Attr(@) {###########################################################
   my ($cmd,$name, $attrName,$attrVal) = @_;
@@ -573,6 +582,8 @@ sub HMinfo_tempList(@) { ######################################################
   $action = "" if (!$action);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret;
+  Log 1,"General tempList $fName";
+
   if    ($action eq "save"){
 #    foreach my $eN(HMinfo_getEntities("d")){#search and select channel
 #      my $md = AttrVal($eN,"model","");
@@ -672,6 +683,7 @@ sub HMinfo_tempList(@) { ######################################################
 sub HMinfo_tempListTmpl(@) { ##################################################
   my ($hiN,$filter,$tmpl,$action,$fName)=@_;
   $filter = "." if (!$filter);
+  Log 1,"General template $fName";
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret = "";
   my @el ;
@@ -686,13 +698,15 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   }
   return "no entities selected" if (!scalar @el);
 
-  $fName = AttrVal($hiN,"configDir",".")."/tempList.cfg" if(!$fName);
+  $fName = HMinfo_tempListDefFn($fName);
   $tmpl =  $fName.":".$tmpl                              if($tmpl);
   my @rs;
   foreach my $name (@el){
-    my $tmplDev = $tmpl ? $tmpl
+   Log 1,"General entity:$name t:$tmpl";
+   my $tmplDev = $tmpl ? $tmpl
                         : AttrVal($name,"tempListTmpl",$fName.":$name");
     $tmplDev = $fName.":$tmplDev" if ($tmplDev !~ m/:/);
+  Log 1,"General entity:$name tDev:$tmplDev";
   
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
     push @rs,  ($r ? "fail  : $tmplDev for $name: $r"
@@ -704,15 +718,18 @@ sub HMinfo_tempListTmpl(@) { ##################################################
 }
 sub HMinfo_tempListTmplView() { ###############################################
   my %tlEntitys;
-  $tlEntitys{$_}{v} = 1 foreach ((devspec2array("TYPE=CUL_HM:FILTER=DEF=........:FILTER=model=HM-CC-RT.*:FILTER=chanNo=04")
-                              ,devspec2array("TYPE=CUL_HM:FILTER=DEF=........:FILTER=model=.*-TC.*:FILTER=chanNo=02")));
-  my @tlFiles = ("./tempList.cfg");
+  $tlEntitys{$_}{v} = 1 foreach ((devspec2array("TYPE=CUL_HM:FILTER=model=HM-CC-RT.*:FILTER=chanNo=04")
+                                 ,devspec2array("TYPE=CUL_HM:FILTER=model=.*-TC.*:FILTER=chanNo=02")));
+  my $defFn = HMinfo_tempListDefFn();
+  my @tlFiles = $defFn;
+  
+  
   my @tlFileMiss;
   my @tNfound;# templates found in files
   my @dWoTmpl;# Device not using templates
   foreach my $d (keys %tlEntitys){
     my ($tf,$tn) = split(":",AttrVal($d,"tempListTmpl","empty"));
-    ($tf,$tn) = ("./tempList.cfg",$tf) if (!defined $tn); # no file given, switch parameter
+    ($tf,$tn) = ($defFn,$tf) if (!defined $tn); # no file given, switch parameter
     if($tn =~ m/^(none|0) *$/){
       push @dWoTmpl,$d;
       delete $tlEntitys{$d};
@@ -766,10 +783,21 @@ sub HMinfo_tempListTmplView() { ###############################################
   $ret .= "\ndevices not using tempList templates:\n      =>  "   .join("\n      =>  ",@dWoTmpl) if (@dWoTmpl);
   return $ret;
 }
+sub HMinfo_tempListDefFn(@) { ###########################################
+  #return Default filename for tempList
+  my ($fn) = shift;
+  my $ret = "";
+  $ret .= "$attr{global}{modpath}/"                                        if (!$fn || $fn !~ m/^\//);#if not absolut path add modpath
+  $ret .= AttrVal($modules{HMinfo}{define},"configDir",".")."/"            if (!$fn || $fn !~ m/..*\//);#if no \ them add defDir
+  $ret .= AttrVal($modules{HMinfo}{define},"configTempFile","tempList.cfg")if (!$fn);#set filename
+  
+  return $ret.$fn;
+}
+
 sub HMinfo_tempListTmplGenLog($$) { ###########################################
   my ($hiN,$fN) = @_;
 
-  $fN = AttrVal($hiN,"configDir",".")."/tempList.cfg" if(!$fN);
+  $fN = HMinfo_tempListDefFn($fN);
   open(fnRead, $fN) || return("Can't open file: $!");
   my @eNl = ();
   my %wdl = ( tempListSun =>"02"
@@ -1107,13 +1135,14 @@ sub HMinfo_GetFn($@) {#########################################################
                          .HMinfo_burstCheck(@entities)
                          .HMinfo_paramCheck(@entities);
 
-    my @td = (devspec2array("model=HM-CC-RT-DN.*:FILTER=chanNo=04:FILTER=tempListTmpl=.*"),
-              devspec2array("model=HM.*-TC.*:FILTER=chanNo=02:FILTER=tempListTmpl=.*"));
+    my @td = (devspec2array("model=HM-CC-RT-DN.*:FILTER=chanNo=04"),
+              devspec2array("model=HM.*-TC.*:FILTER=chanNo=02"));
     my @tlr;
     foreach my $e (@td){
       next if(!grep /$e/,@entities );
       my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl"
-                                                         ,AttrVal($hash->{NAME},"configDir",".")."/tempList.cfg:$e"));
+                                                         ,HMinfo_tempListDefFn().":$e"));
+                                                         
       next if ($tr eq "unused");
       push @tlr,"$e: $tr" if($tr);
     }
@@ -1406,9 +1435,8 @@ sub HMinfo_SetFn($@) {#########################################################
       $ret = HMinfo_tempListTmplView();
     }
     else{
-      my $fn = $a[1]?$a[1]:"tempList.cfg";
-      $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
-            if ($fn !~ m/\//);
+      my $fn = HMinfo_tempListDefFn($a[1]);
+      Log 1,"General  cmd:$fn = ($a[1])";
       $ret = HMinfo_tempList($name,$filter,$action,$fn);
     }
   }
