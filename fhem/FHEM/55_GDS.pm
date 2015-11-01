@@ -35,16 +35,12 @@ package main;
 
 use strict;
 use warnings;
-use feature qw/say switch/;
+use feature qw/switch/;
 
 use Blocking;
 use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
-
-#use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
-
-#use Data::Dumper;
 
 eval "use GDSweblink";
 
@@ -875,59 +871,9 @@ sub gds_calctz($@) {
 	return (12-$gt[2]);
 }
 
-sub ua_test($$$) {
-	my ($hash,$dir,$file) = @_;
-
-	my $name		= $hash->{NAME};
-	my $user		= $hash->{helper}{USER};
-	my $pass		= $hash->{helper}{PASS};
-	my $host		= $hash->{helper}{URL};
-
-	use LWP::UserAgent;
-	my $ua;
-	$ua = LWP::UserAgent->new;
-	$ua->timeout(10);
-	$ua->env_proxy;
-
-	my $urlString =	"ftp://$user:$pass\@$host/";
-	$urlString .= $dir;
-	$urlString .= $file;
-	my $response = $ua->get($urlString); #,':content_file' => $file_handle);
-
-	if ($response->is_success) {
-		return $response->decoded_content;
-	} else {
-		return "";
-	}
-}
-
 ###################################################################################################
 #
 #	Data retrieval (internal)
-
-sub getListCapStations($$){
-	my ($hash, $command) = @_;
-	my $name = $hash->{NAME};
-	my (%capHash, $file, @columns, $key, $cList, $count);
-
-	$file = $tempDir.'capstations.csv';
-	return "GDS error: $file not found." unless(-e $file);
-
-	# CSV öffnen und parsen
-	my ($err,@a) = FileRead({FileName=>$file,ForceType=>"file" });
-	return "GDS error reading $file" if($err);
-	foreach my $l (@a) {
-		next if (substr($l,0,1) eq '#');
-		@columns = split(";",$l);
-		$capHash{latin1ToUtf8($columns[4])} = $columns[0];
-	}
-
-	# Ausgabe sortieren und zusammenstellen
-	foreach $key (sort keys %capHash) {
-		$cList .= $capHash{$key}."\t".$key."\n";
-	}
-	return $cList;
-}
 
 sub getConditions($$@){
 	my ($hash, $prefix, @a) = @_;
@@ -1017,6 +963,29 @@ sub _readItem {
 	return $x;
 }
 
+sub getListCapStations($$){
+	my ($hash, $command) = @_;
+	my $name = $hash->{NAME};
+	my (%capHash, $file, @columns, $key, $cList, $count);
+
+	$file = $tempDir.'capstations.csv';
+	return "GDS error: $file not found." unless(-e $file);
+
+	# CSV öffnen und parsen
+	my ($err,@a) = FileRead({FileName=>$file,ForceType=>"file" });
+	return "GDS error reading $file" if($err);
+	foreach my $l (@a) {
+		next if (substr($l,0,1) eq '#');
+		@columns = split(";",$l);
+		$capHash{latin1ToUtf8($columns[4])} = $columns[0];
+	}
+
+	# Ausgabe sortieren und zusammenstellen
+	foreach $key (sort keys %capHash) {
+		$cList .= $capHash{$key}."\t".$key."\n";
+	}
+	return $cList;
+}
 sub retrieveListCapStations($){
 	my ($hash) = @_;
 	$hash->{file}{dir}		= "gds/help/";
@@ -1030,7 +999,6 @@ sub retrieveListCapStations($){
 		retrieveData($hash,'FILE') if ($alter > 86400);
 	}
 }
-
 sub decodeCAPData($$$){
 	my ($hash, $datensatz, $anum) = @_;
 	my $name		= $hash->{NAME};
