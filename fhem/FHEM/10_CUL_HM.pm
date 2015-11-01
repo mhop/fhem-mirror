@@ -4644,15 +4644,25 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "tempListTmpl") { #############################################
     $state= "";
     my $action = "verify";#defaults
-    my $template = AttrVal($name,"tempListTmpl","tempList.cfg:$name");
+    my ($template,$fn);
     for my $ax ($a[2],$a[3]){
       next if (!$ax);
       if ($ax =~ m/^(verify|restore)$/){
         $action = $ax;
       }
       else{
-        $template = $ax if ($ax);
+        $template = $ax;
       }
+    }
+    ($fn,$template) = split(":",($template?$template
+                                          :AttrVal($name,"tempListTmpl",$name)));
+    if ($modules{HMinfo} && $modules{HMinfo}{define}){
+      if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
+      else{            $template = HMinfo_tempListDefFn($fn).":$template";}
+    }
+    else{
+      if (!$template){ $template = "./tempList.cfg:$fn";}
+      else{            $template = "$fn:$template"     ;}
     }
     my $ret = CUL_HM_tempListTmpl($name,$action,$template);
     $ret = "verifed with no faults" if (!$ret && $action eq "verify");
