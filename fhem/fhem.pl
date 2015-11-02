@@ -2503,6 +2503,7 @@ CommandSetstate($$)
       my ($sname, $sval) = split(" ", $nameval, 2);
       (undef, $sval) = ReplaceEventMap($sdev, [$sdev, $sval], 0)
                                 if($attr{$sdev}{eventMap});
+      $sval = "" if(!defined($sval));
       my $ret = CallFn($sdev, "StateFn", $d, $tim, $sname, $sval);
       if($ret) {
         push @rets, $ret;
