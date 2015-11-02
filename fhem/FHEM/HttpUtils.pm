@@ -403,7 +403,7 @@ HttpUtils_ParseAnswer($$)
     while( $offset < $size ) {
       my $next = index($ret, "\r\n", $offset);
       last if( $next == -1 );
-      if( substr($ret,$offset,$next-$offset) =~ m/([\da-f]+)/ ) {
+      if( substr($ret,$offset,$next-$offset) =~ m/([\da-f]+)/i ) {
         my $len = hex($1);
         $offset = $next + 2;
         $data .= substr($ret,$offset,$len);
