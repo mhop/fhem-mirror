@@ -395,7 +395,29 @@ HttpUtils_ParseAnswer($$)
       }
     }
   }
-  
+
+  if( $hash->{httpheader} =~ m/^Transfer-Encoding: Chunked/mi ) {
+    my $data;
+    my $header;
+    my ($size, $offset) = (length($ret), 0);
+    while( $offset < $size ) {
+      my $next = index($ret, "\r\n", $offset);
+      last if( $next == -1 );
+      if( substr($ret,$offset,$next-$offset) =~ m/([\da-f]+)/ ) {
+        my $len = hex($1);
+        $offset = $next + 2;
+        $data .= substr($ret,$offset,$len);
+        $offset += $len + 2;
+        next if( $len > 0 );
+      }
+
+    $hash->{httpheader} .= substr($ret,$offset);
+
+    }
+
+    $ret = $data;
+  }
+
   # Debug
   Log3 $hash, $hash->{loglevel},
        "HttpUtils $hash->{displayurl}: Got data, length: ".  length($ret);
@@ -406,6 +428,7 @@ HttpUtils_ParseAnswer($$)
       Log3 $hash, $hash->{loglevel}, "  $_";
     }
   }
+
   return ("", $ret);
 }
 
