@@ -109,7 +109,7 @@ readingsProxy_update($$)
   $value = ReadingsVal($DEVICE,$READING,undef) if( !defined($value) );
 
   my $value_fn = AttrVal( $name, "valueFn", "" );
-  if( $value_fn =~ m/^{.*}$/ ) {
+  if( $value_fn =~ m/^{.*}$/s ) {
     my $VALUE = $value;
     my $LASTCMD = ReadingsVal($name,"lastCmd",undef);
 
@@ -219,7 +219,7 @@ readingsProxy_Set($@)
 
   my $v = join(" ", @a);
   my $set_fn = AttrVal( $hash->{NAME}, "setFn", "" );
-  if( $set_fn =~ m/^{.*}$/ ) {
+  if( $set_fn =~ m/^{.*}$/s ) {
     my $CMD = $a[0];
     my $DEVICE = $hash->{DEVICE};
     my $READING = $hash->{READING};
@@ -269,7 +269,7 @@ readingsProxy_Get($@)
 
   my $v = join(" ", @a);
   my $get_fn = AttrVal( $hash->{NAME}, "getFn", "" );
-  if( $get_fn =~ m/^{.*}$/ ) {
+  if( $get_fn =~ m/^{.*}$/s ) {
     my $DEVICE = $hash->{DEVICE};
     my $READING = $hash->{READING};
     my $CMD = $a[0];
