@@ -168,8 +168,8 @@ sub GUEST_Define($$) {
         $modules{dummy}{AttrFn} = "RESIDENTStk_AttrFnDummy";
     }
     elsif ( $modules{dummy}{AttrFn} ne "RESIDENTStk_AttrFnDummy" ) {
-        Log3 $name, 5,
-"RESIDENTStk $name: concurrent AttrFn already defined for dummy module. Some attribute based functions like auto-creations will not be available.";
+        Log3 $name, 4,
+"RESIDENTStk $name: concurrent AttrFn already defined for dummy module (".$modules{dummy}{AttrFn}."). Some attribute based functions like auto-creations will not be available.";
     }
 
     return undef;
