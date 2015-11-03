@@ -59,7 +59,7 @@ sub CommandMsg($$;$$) {
     my $return = "";
 
     # find existing msgConfig device or create a new instance
-    my $globalDevName = "msgConfig";
+    my $globalDevName = "globalMsg";
     if (defined ($modules{msgConfig}{defptr})) {
         $globalDevName = $modules{msgConfig}{defptr}{NAME};
     } else {
@@ -263,7 +263,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     if ( $device =~
                         /^(([A-Za-z0-9%+._-])+[@]+([%+a-z0-9A-Z.-]*))$/ )
                     {
-                        $gatewayDevs = $1;
+                        $gatewayDevs = $globalDevName;
                         $deviceType  = "email";
                     }
                     elsif ( $device =~ s/^@?(.*)![\s\t]*$// ) {
@@ -298,6 +298,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         $recipients =~ s/$regex4/|/gi;
 
                         next;
+                    }
+
+                    # next type loop if device is an email address and this is not the mail type loop run
+                    if ($deviceType eq "email" && $type[$i] ne "mail") {
+                      Log3 $globalDevName, 5, "msg $device: Skipping loop for device type 'email' with unmatched message type '" . $type[$i] . "'";
+                      next;
                     }
 
                     my $typeUc      = ucfirst( $type[$i] );
@@ -408,7 +414,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                           );
 
                         my $locationDev = "";
-                        if ( $deviceLocation ne "" ) {
+                        if ( $deviceLocation ne "" && $deviceType eq "device" ) {
 
                             # lookup matching location
                             foreach (@locationDevs) {
@@ -570,6 +576,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                     if (
                            $gatewayDevs eq ""
+                        && $deviceType eq "device"
                         && $deviceType2 ne ""
                         && (
                           ( $type[$i] eq "audio"  && defined($cmdSchema->{ $type[$i] }{$deviceType2}) ) ||
@@ -782,6 +789,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                             $routes{text} = 1;
                         }
 
+                        $routes{mail} = 1
+                          if ($deviceType eq "email");
+
                         Log3 $logDevice, 4,
                             "msg $device: Available routes: screen="
                           . $routes{screen}
@@ -989,7 +999,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     # FATAL ERROR: we could not find any targets at all
                     elsif ( $gatewayDevs eq "" ) {
                         $return .=
-"ERROR: No global $typeUc contact defined. Please specify a destination device or set global attributes: msgContact$typeUc | msgRecipient$typeUc | msgRecipient\n";
+"ERROR: Could not find any general $typeUc contact. Please specify a destination device or set attributes in general msg configuration device $globalDevName : msgContact$typeUc | msgRecipient$typeUc | msgRecipient\n";
                     }
 
                     #####################
@@ -1835,7 +1845,8 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                   $msgSent                 = 1 if ($error == 0);
                                   $msgSentDev              = 1 if ($error == 0);
-                                  $gatewaysStatus{$gatewayDev} = $routeStatus;
+                                  $gatewaysStatus{$gatewayDev} = $routeStatus if ($globalDevName ne $gatewayDev);
+                                  $gatewaysStatus{$device} = $routeStatus if ($globalDevName eq $gatewayDev);
                             }
                             elsif ($routeStatus eq "UNAVAILABLE"
                                 || $routeStatus eq "UNDEFINED" )
@@ -1844,7 +1855,8 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 "msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev RECIPIENT=$subRecipient STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient ne "");
                                 Log3 $logDevice, 3,
 "msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient eq "");
-                                $gatewaysStatus{$gatewayDev} = $routeStatus;
+                                $gatewaysStatus{$gatewayDev} = $routeStatus if ($globalDevName ne $gatewayDev);
+                                $gatewaysStatus{$device} = $routeStatus if ($globalDevName eq $gatewayDev);
                             }
                             else {
                                 Log3 $logDevice, 3,
@@ -1853,7 +1865,8 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 "msg $device: ID=$msgID.$sentCounter TYPE=$type[$i] ROUTE=$gatewayDev STATUS=$routeStatus PRIORITY=$loopPriority TITLE='$loopTitle' '$msg'" if ($subRecipient eq "");
                                 $msgSent    = 2 if ( $msgSent != 1 );
                                 $msgSentDev = 2 if ( $msgSentDev != 1 );
-                                $gatewaysStatus{$gatewayDev} = $routeStatus;
+                                $gatewaysStatus{$gatewayDev} = $routeStatus if ($globalDevName ne $gatewayDev);
+                                $gatewaysStatus{$device} = $routeStatus if ($globalDevName eq $gatewayDev);
                             }
 
                         }
@@ -1886,7 +1899,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                     # update device readings
                     my $readingsDev = $defs{$device};
-                    $readingsDev = $defs{$globalDevName} if ( $catchall == 1 );
+                    $readingsDev = $defs{$globalDevName} if ( $catchall == 1 || $deviceType eq "email" );
                     readingsBeginUpdate($readingsDev);
 
                     readingsBulkUpdate( $readingsDev, "fhemMsg" . $typeUc,
@@ -1897,11 +1910,12 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                         "fhemMsg" . $typeUc . "Prio",
                         $loopPriority );
 
-                    my $gwStates = "";
+                    my $gwStates = "-";
 
                     while ( ( my $gwName, my $gwState ) = each %gatewaysStatus )
                     {
-                        $gwStates .= " " if $gwStates ne "";
+                        $gwStates = "" if $gwStates eq "-";
+                        $gwStates .= " " if $gwStates ne "-";
                         $gwStates .= "$gwName:$gwState";
                     }
                     readingsBulkUpdate( $readingsDev,
@@ -2143,6 +2157,8 @@ my $fw_residentGone = defined($settings->{ $type[$i] }{typeEscalation}{residentG
 
     # finalize device readings
     while ( ( my $device, my $types ) = each %sentTypesPerDevice ) {
+        $device = $globalDevName if ( $device =~ /^(([A-Za-z0-9%+._-])+[@]+([%+a-z0-9A-Z.-]*))$/ );
+
         readingsBulkUpdate( $defs{$device}, "fhemMsgStateTypes", $types )
           if ( $forwarded eq "" );
         readingsBulkUpdate( $defs{$device}, "fhemMsgStateTypes",
