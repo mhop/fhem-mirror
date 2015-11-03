@@ -231,7 +231,8 @@ FHEM/73_PRESENCE.pm          markusbloch          http://forum.fhem.de Unterstue
 FHEM/73_MPD.pm               Wzut                 http://forum.fhem.de Multimedia
 FHEM/74_AMAD.pm              CoolTux              http://forum.fhem.de Unterstuetzende Dienste
 FHEM/74_Unifi.pm             rapster              http://forum.fhem.de Automatisierung
-FHEM/75_MSG.pm               gandy                http://forum.fhem.de Automatisierung
+FHEM/75_MSG.pm               loredo               http://forum.fhem.de Automatisierung
+FHEM/75_msgConfig.pm         loredo               http://forum.fhem.de Automatisierung
 FHEM/76_MSGFile.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/80_M232.pm              borisneubert         http://forum.fhem.de Sonstige Systeme
@@ -321,6 +322,7 @@ FHEM/FritzBoxUtils.pm        rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/HMConfig.pm             martinp876           http://forum.fhem.de HomeMatic
 FHEM/HttpUtils.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/MaxCommon.pm            mgehre               http://forum.fhem.de MAX
+FHEM/msgSchema.pm            loredo               http://forum.fhem.de Automatisierung
 FHEM/ONKYOdb.pm              loredo               http://forum.fhem.de Multimedia
 FHEM/OWX_DS2480.pm           ntruchsess           http://forum.fhem.de 1Wire
 FHEM/OWX_DS9097.pm           ntruchsess           http://forum.fhem.de 1Wire

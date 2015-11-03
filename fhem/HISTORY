@@ -618,7 +618,7 @@
   - added new RESIDENTS toolkit functions for RESIDENTS, ROOMMMATE and GUEST devices
     first function: wakeuptimer
 
-- Thu Mar 13 2015 (loredo)
+- Thu Mar 13 2015 (chris1284)
   - fixed CALVIEW commandref (ms to sec)
 
 - Tue Mar 17 2015 (wzut)
@@ -637,5 +637,9 @@
 - Mon Aug 23 2015 (rapster)
   - added new module 74_Unifi for the Ubiquiti Networks (UBNT) - Unifi Controller.
 
-- Wed Okt 21 2015 (sidey)
+- Wed Oct 21 2015 (sidey)
   - added new module 00_SIGNALduino, 90_SIGNALduino_un, 14_Hideki, 14_SD_WS07
+
+- Thu Nov 3 2015 (loredo)
+  - removed deprecated wrapper module 75_MSG.pm. Users will need to replace device definitions by 75_MSGFile.pm or 75_MSGMail.pm respectively.
+  - added new FHEM command 'msg' to introduce integrated message routing functionality

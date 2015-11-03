@@ -1,7 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - bugfix   98_Text2Speech: Google fixed, svox-pico added
-  - bugfix   00_SIGNALduino: Updated Firmware (3.8.1-HF1) 
+  - change:  ATTENTION: Removed deprecated module 75_MSG.pm. Users will need to
+             manually change their device definitions to MSGFile or MSGMail
+             respectively.
+  - feature: Introduce FHEM message routing by new command 'msg'
+  - bugfix:  98_Text2Speech: Google fixed, svox-pico added
+  - bugfix:  00_SIGNALduino: Updated Firmware (3.8.1-HF1) 
              fixed send raw
   - updated: 74_AMAD: New Mijor Release 0.8.1
   - bugfix:  74_AMAD: fix call statusRequest then screen off is set
@@ -18,8 +22,8 @@
                       toggle between to BT Devices, clear Notificationbar
                       (Automagic,All), play Notify Soundfile (WallClock),
                       check for a activ task on the tablet/phone
-  - bugfix: 74_AMAD:  improved error handling
-  - bugfix: 70_PIONEERAVR: fixed the decoding for the reading "display".
+  - bugfix:  74_AMAD:  improved error handling
+  - bugfix:  70_PIONEERAVR: fixed the decoding for the reading "display".
   - feature: 93_DbLog: Added support for longpoll SVG.
   - feature: contrib/98_openweathermap.pm - add support for stationByZip.
              e.g. 76133,de will find weather data for Karlsruhe,Germany

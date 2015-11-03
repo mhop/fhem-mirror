@@ -1,7 +1,7 @@
 # $Id$
 ##############################################################################
 #
-#     97_messageConfig.pm
+#     97_msgConfig.pm
 #     Global configuration settings for FHEM msg command.
 #
 #     Copyright by Julian Pawlowski
@@ -36,16 +36,16 @@ package main;
 use strict;
 use warnings;
 
-sub messageConfig_Set($@);
-sub messageConfig_Define($$);
-sub messageConfig_Undefine($$);
+sub msgConfig_Set($@);
+sub msgConfig_Define($$);
+sub msgConfig_Undefine($$);
 
 ###################################
-sub messageConfig_Initialize($) {
+sub msgConfig_Initialize($) {
     my ($hash) = @_;
 
-    $hash->{DefFn}    = "messageConfig_Define";
-    $hash->{UndefFn}  = "messageConfig_Undefine";
+    $hash->{DefFn}    = "msgConfig_Define";
+    $hash->{UndefFn}  = "msgConfig_Undefine";
 
     # add attributes for configuration
     no warnings 'qw';
@@ -127,13 +127,13 @@ sub messageConfig_Initialize($) {
 }
 
 ###################################
-sub messageConfig_Define($$) {
+sub msgConfig_Define($$) {
 
     my ( $hash, $def ) = @_;
 
     my @a = split( "[ \t]+", $def, 5 );
 
-    return "Usage: define <name> messageConfig"
+    return "Usage: define <name> msgConfig"
       if ( int(@a) < 2 );
     my $name  = $a[0];
 
@@ -152,7 +152,7 @@ sub messageConfig_Define($$) {
         $attr{$name}{group} = $group;
         $attr{$name}{verbose} = $verbose;
         $attr{$name}{room} = $room if ($room ne "");
-        $attr{$name}{comment} = "FHEM Global Configuration for command 'message'";
+        $attr{$name}{comment} = "FHEM Global Configuration for command 'msg'";
         $attr{$name}{stateFormat} = "fhemMsgState";
 
         readingsBeginUpdate($hash);
@@ -164,7 +164,7 @@ sub messageConfig_Define($$) {
 }
 
 ###################################
-sub messageConfig_Undefine($$) {
+sub msgConfig_Undefine($$) {
 
     my ( $hash, $name ) = @_;
 
@@ -181,19 +181,19 @@ sub messageConfig_Undefine($$) {
 =begin html
 
     <p>
-      <a name="messageConfig" id="messageConfig"></a>
+      <a name="msgConfig" id="msgConfig"></a>
     </p>
     <h3>
-      messageConfig
+      msgConfig
     </h3>
     <ul>
-      <li>Provides global settings for FHEM command <a href="#message">message</a>.<br>
+      <li>Provides global settings for FHEM command <a href="#MSG">msg</a>.<br>
         <br>
       </li>
       <li>
-        <a name="messageConfigdefine" id="messageConfigdefine"></a> <b>Define</b>
+        <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
         <div style="margin-left: 2em">
-          <code>define &lt;name&gt; messageConfig</code><br>
+          <code>define &lt;name&gt; msgConfig</code><br>
         </div>
       </li>
     </ul>
@@ -203,19 +203,19 @@ sub messageConfig_Undefine($$) {
 =begin html_DE
 
     <p>
-      <a name="messageConfig" id="messageConfig"></a>
+      <a name="msgConfig" id="msgConfig"></a>
     </p>
     <h3>
-      messageConfig
+      msgConfig
     </h3>
     <ul>
-      <li>Stellt globale Einstellungen für das FHEM Kommando <a href="#message">message</a> bereit.<br>
+      <li>Stellt globale Einstellungen für das FHEM Kommando <a href="#MSG">msg</a> bereit.<br>
         <br>
       </li>
       <li>
-        <a name="messageConfigdefine" id="messageConfigdefine"></a> <b>Define</b>
+        <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
         <div style="margin-left: 2em">
-          <code>define &lt;name&gt; messageConfig</code><br>
+          <code>define &lt;name&gt; msgConfig</code><br>
         </div>
       </li>
     </ul>
