@@ -136,7 +136,11 @@ sub Pushover_Define($$) {
 
         # start Validation Timer
         RemoveInternalTimer($hash);
-        InternalTimer( gettimeofday() + 5, "Pushover_ValidateUser", $hash, 0 );
+        if (ReadingsVal($name,"tokenState","invalid") ne "valid" || ReadingsVal($name,"userState","invalid") ne "valid" || $init_done) {
+          InternalTimer( gettimeofday() + 5, "Pushover_ValidateUser", $hash, 0 );
+        } else {
+          InternalTimer( gettimeofday() + 21600, "Pushover_ValidateUser", $hash, 0 );
+        }
 
         return undef;
     }
@@ -170,13 +174,17 @@ sub Pushover_Set($@) {
           . join( " ", sort keys %sets );
     }
 
-    if ( AttrVal( $name, "disable", 0 ) == 1 ) {
-        return "Device is disabled";
-    }
+    return "Unable to send message: Device is disabled"
+      if ( AttrVal( $name, "disable", 0 ) == 1 );
 
-    if ( $cmd eq 'msg' ) {
-        return Pushover_SetMessage( $hash, @args );
-    }
+    return "Unable to send message: User key is invalid"
+      if ( ReadingsVal( $name, "userState", "valid" ) eq "invalid" );
+
+    return "Unable to send message: App token is invalid"
+      if ( ReadingsVal( $name, "tokenState", "valid" ) eq "invalid" );
+
+    return Pushover_SetMessage( $hash, @args )
+      if ( $cmd eq 'msg' );
 }
 
 #------------------------------------------------------------------------------
@@ -310,7 +318,7 @@ sub Pushover_ReceiveCommand($$$) {
     my $values  = $param->{type};
     my $return;
 
-    Log3 $name, 5, "Pushover $name: called function Pushover_ReceiveCommand()";
+    Log3 $name, 5, "Pushover $name: Received HttpUtils callback:\n\nPARAM:\n".Dumper($param)."\n\nERROR:\n".Dumper($err)."\n\nDATA:\n".Dumper($data);
 
     readingsBeginUpdate($hash);
 
@@ -378,6 +386,81 @@ sub Pushover_ReceiveCommand($$$) {
         #
 
         $values{result} = "ok";
+        
+        # extract API stats
+        my $apiLimit = 7500;
+        my $apiRemaining = 1;
+        my $apiReset;
+        if ( $param->{httpheader} =~ m/X-Limit-App-Limit:[\s\t]*(.*)[\s\t\n]*/ ) {
+          $apiLimit = $1;
+          readingsBulkUpdate( $hash, "apiLimit", $1 )
+            if ( ReadingsVal($name,"apiLimit","") ne $1 );
+        }
+        if ( $param->{httpheader} =~ m/X-Limit-App-Remaining:[\s\t]*(.*)[\s\t\n]*/ ) {
+          $apiRemaining = $1;
+          readingsBulkUpdate( $hash, "apiRemaining", $1 )
+            if ( ReadingsVal($name,"apiRemaining","") ne $1 );
+        }
+        if ( $param->{httpheader} =~ m/X-Limit-App-Reset:[\s\t]*(.*)[\s\t\n]*/ ) {
+          $apiReset = $1;
+          readingsBulkUpdate( $hash, "apiReset", $1 )
+            if ( ReadingsVal($name,"apiReset","") ne $1 );
+        }
+
+        # Server error
+        if ($param->{code} >= 500) {
+          $state = "error";
+          $values{result} = "Server Error " . $param->{code};
+        }
+
+        # error handling
+        elsif ( ($param->{code} == 200 || $param->{code} >= 400) &&
+                ( (ref($return) eq "HASH" && $return->{status} ne "1") || (ref($return) ne "HASH" && $return !~ m/"status":1,/) ) ) {
+          $values{result} = "Error " . $param->{code} . ": Unspecified error occured";
+          if (ref($return) eq "HASH" && defined $return->{errors}) {
+            $values{result} =
+              "Error " . $param->{code} . ": " . join( ". ", @{ $return->{errors} } ) . ".";
+          }
+          elsif ( ref($return) ne "HASH" && $return =~ m/"errors":\[(.*)\]/ ) {
+              $values{result} = "Error " . $param->{code} . ": " . $1;
+          }
+
+          $state = "error";
+
+          if ( ref($return) eq "HASH" && defined($return->{token}) ) {
+            $state = "unauthorized";
+            readingsBulkUpdate( $hash, "tokenState", $return->{token} )
+              if ( ReadingsVal($name,"tokenState","") ne $return->{token} );
+          } elsif ( ref($return) ne "HASH" && $return =~ m/"token":"invalid"/ ) {
+            $state = "unauthorized";
+            readingsBulkUpdate( $hash, "tokenState", "invalid" )
+              if ( ReadingsVal($name,"tokenState","") ne "invalid" );
+          } else {
+            readingsBulkUpdate( $hash, "tokenState", "valid" )
+              if ( ReadingsVal($name,"tokenState","") ne "valid" );
+          }
+
+          if ( ref($return) eq "HASH" && defined($return->{user}) ) {
+            $state = "unauthorized";
+            readingsBulkUpdate( $hash, "tokenState", $return->{user} )
+              if ( ReadingsVal($name,"tokenState","") ne $return->{user} );
+          } elsif ( ref($return) ne "HASH" && $return =~ m/"user":"invalid"/ ) {
+            $state = "unauthorized";
+            readingsBulkUpdate( $hash, "userState", "invalid" )
+              if ( ReadingsVal($name,"userState","") ne "invalid" );
+          } else {
+            readingsBulkUpdate( $hash, "userState", "valid" )
+              if ( ReadingsVal($name,"userState","") ne "valid" );
+          }
+
+        } else {
+          $state = "limited" if($apiRemaining < 1);
+
+          readingsBulkUpdate( $hash, "tokenState", "valid" )
+            if ( ReadingsVal($name,"tokenState","") ne "valid" );
+          readingsBulkUpdate( $hash, "userState", "valid" )
+            if ( ReadingsVal($name,"userState","") ne "valid" );          
+        }
 
         # messages.json
         if ( $service eq "messages.json" ) {
@@ -391,22 +474,10 @@ sub Pushover_ReceiveCommand($$$) {
               if ( $values->{action} eq "" );
             readingsBulkUpdate( $hash, "lastDevice", $values->{device} )
               if ( $values->{device} ne "" );
-            readingsBulkUpdate( $hash, "lastDevice", $hash->{DEVICES} )
-              if ( $values->{device} eq "" && defined( $hash->{DEVICES} ) );
-            readingsBulkUpdate( $hash, "lastDevice", "all" )
-              if ( $values->{device} eq "" && !defined( $hash->{DEVICES} ) );
+            readingsBulkUpdate( $hash, "lastDevice", ReadingsVal($name, "devices", "all") )
+              if ( $values->{device} eq "" );
 
             if ( ref($return) eq "HASH" ) {
-
-                if ( $return->{status} ne "1" && defined $return->{errors} ) {
-                    $values{result} =
-                      "Error: " . Dumper( $return->{errors} );
-                    $state = "error";
-                }
-                elsif ( $return->{status} ne "1" ) {
-                    $values{result} = "Unspecified error";
-                    $state = "error";
-                }
 
                 readingsBulkUpdate( $hash, "lastRequest", $return->{request} )
                   if ( defined $return->{request} );
@@ -427,7 +498,7 @@ sub Pushover_ReceiveCommand($$$) {
                     }
                     else {
                         readingsBulkUpdate( $hash, "cbDev_" . $values->{cbNr},
-                            $hash->{DEVICES} );
+                            ReadingsVal($name, "devices", "all") );
                     }
 
                     if ( defined $return->{receipt} ) {
@@ -446,16 +517,6 @@ sub Pushover_ReceiveCommand($$$) {
                 }
             }
 
-            # simple error handling if no JSON module was loaded
-            elsif ( $return !~ m/"status":1,/ ) {
-                $state = "error";
-                if ( $return =~ m/"errors":\[(.*)\]/ ) {
-                    $values{result} = "Error: " . $1;
-                }
-                else {
-                    $values{result} = "Unspecified error";
-                }
-            }
             elsif ( $values{expire} ne "" ) {
                 $values{result} =
                   "SoftFail: Callback not supported. Please install Perl::JSON";
@@ -464,36 +525,17 @@ sub Pushover_ReceiveCommand($$$) {
 
         # users/validate.json
         elsif ( $service eq "users/validate.json" ) {
-
             if ( ref($return) eq "HASH" ) {
+              my $devices = "-";
+              my $group = "0";
+              $devices = join( ",", @{ $return->{devices} } ) if (defined($return->{devices}));
+              $group = $return->{group} if (defined($return->{group}));
 
-                if ( $return->{status} ne "1" && defined $return->{errors} ) {
-                    $values{result} =
-                      "Error: " . join( ". ", @{ $return->{errors} } ) . ".";
-                    $state = "unauthorized";
-                }
-                elsif ( $return->{status} ne "1" ) {
-                    $values{result} = "Unspecified error";
-                    $state = "unauthorized";
-                }
-                else {
-                    $hash->{DEVICES} = join( ",", @{ $return->{devices} } );
-                    $hash->{GROUP} = $return->{group};
-                }
-
+              readingsBulkUpdate( $hash, "devices", $devices )
+                if ( ReadingsVal($name,"devices","") ne $devices );
+              readingsBulkUpdate( $hash, "group", $group )
+                if ( ReadingsVal($name,"group","") ne $group );
             }
-
-            # simple error handling if no JSON module was loaded
-            elsif ( $return !~ m/"status":1,/ ) {
-                $state = "unauthorized";
-                if ( $return =~ m/"errors":\[(.*)\]/ ) {
-                    $values{result} = "Error: " . $1;
-                }
-                else {
-                    $values{result} = "Unspecified error";
-                }
-            }
-
         }
 
         readingsBulkUpdate( $hash, "lastResult", $values{result} );
@@ -502,25 +544,33 @@ sub Pushover_ReceiveCommand($$$) {
     # Set reading for availability
     #
     my $available = 0;
-    $available = 1 if ( $state eq "connected" );
-    if ( !defined( $hash->{READINGS}{available}{VAL} )
-        || $hash->{READINGS}{available}{VAL} ne $available )
-    {
-        readingsBulkUpdate( $hash, "available", $available );
-    }
-
-    if ($available eq "0") {
-      RemoveInternalTimer($hash);
-      InternalTimer( gettimeofday() + 900, "Pushover_ValidateUser", $hash, 0 )
-    }
+    $available = 1 if ( $param->{code} ne "429" && ($state eq "connected" || $state eq "error") );
+    readingsBulkUpdate( $hash, "available", $available )
+      if ( ReadingsVal($name,"available","") ne $available );
 
     # Set reading for state
     #
-    if ( !defined( $hash->{READINGS}{state}{VAL} )
-        || $hash->{READINGS}{state}{VAL} ne $state )
-    {
-        readingsBulkUpdate( $hash, "state", $state );
+    readingsBulkUpdate( $hash, "state", $state )
+      if ( ReadingsVal($name,"state","") ne $state );
+
+    # credentials validation loop
+    #
+    my $nextTimer = "none";
+
+    # if we could not connect, try again in 5 minutes
+    if ($state eq "disconnected") {
+      $nextTimer = gettimeofday() + 300;
+
+    # re-validate every 6 hours if there was no message sent during that time
+    } elsif ($available eq "1") {
+      $nextTimer = gettimeofday() + 21600;
+    # re-validate after API limit was reset
+    } elsif ($state eq "limited" || $param->{code} == 429) {
+      $nextTimer = ReadingsVal($name,"apiReset",gettimeofday() + 21277) + 323;
     }
+    RemoveInternalTimer($hash);
+    $hash->{VALIDATION_TIMER} = $nextTimer;
+    InternalTimer( $nextTimer, "Pushover_ValidateUser", $hash, 0 ) if ($nextTimer ne "none");
 
     readingsEndUpdate( $hash, 1 );
 
@@ -536,18 +586,18 @@ sub Pushover_ValidateUser ($;$) {
     Log3 $name, 5, "Pushover $name: called function Pushover_ValidateUser()";
 
     RemoveInternalTimer($hash);
-    if (ReadingsVal($name, "available", "0") ne "1") {
+
+    if ( AttrVal( $name, "disable", 0 ) == 1 ) {
+      $hash->{VALIDATION_TIMER} = "disabled";
+      RemoveInternalTimer($hash);
       InternalTimer( gettimeofday() + 900, "Pushover_ValidateUser", $hash, 0 );
-    } else {
-      InternalTimer( gettimeofday() + 21600, "Pushover_ValidateUser", $hash, 0 );
+      return;
     }
 
-    return
-      if ( AttrVal( $name, "disable", 0 ) == 1 );
-
-    if ( $device ne "" ) {
+    elsif ( $device ne "" ) {
         Pushover_SendCommand( $hash, "users/validate.json", "device=$device" );
     }
+
     else {
         Pushover_SendCommand( $hash, "users/validate.json" );
     }
@@ -730,7 +780,7 @@ sub Pushover_SetMessage {
 
             $values{cbNr} = int( time() ) + $values{expire};
             my $cbReading = "cb_" . $values{cbNr};
-            until ( !defined( $hash->{READINGS}{$cbReading}{VAL} ) ) {
+            until ( ReadingsVal($name, $cbReading, "") eq "" ) {
                 $values{cbNr}++;
                 $cbReading = "cb_" . $values{cbNr};
             }
@@ -798,11 +848,11 @@ sub Pushover_SetMessage {
                   . $hash->{NAME}
                   . " $key: time="
                   . $rBase[1] . " ack="
-                  . $hash->{READINGS}{$rAck}{VAL}
+                  . ReadingsVal($name, $rAck, "-")
                   . " curTime="
                   . int( time() );
 
-                if (   $hash->{READINGS}{$rAck}{VAL} == 1
+                if (   ReadingsVal($name, $rAck, 0) == 1
                     || $rBase[1] <= int( time() ) )
                 {
                     delete $hash->{READINGS}{$key};
@@ -922,7 +972,7 @@ sub Pushover_CGI() {
               if ( !defined( $webArgs->{acknowledged_by} )
                 || $webArgs->{acknowledged_by} ne $hash->{USER_KEY} );
 
-            if (   $hash->{READINGS}{$rAck}{VAL} == 0
+            if (   ReadingsVal($name, $rAck, 1) == 0
                 && $rBase[1] > int( time() ) )
             {
                 readingsBeginUpdate($hash);
@@ -944,21 +994,19 @@ sub Pushover_CGI() {
                 my $redirect = "";
 
                 # run FHEM command if desired
-                if ( defined( $hash->{READINGS}{$rAct}{VAL} )
-                    && $hash->{READINGS}{$rAct}{VAL} !~ /^[\w-]+:\/\/.*$/ )
+                if ( ReadingsVal($name, $rAct, "pushover://") !~ /^[\w-]+:\/\/.*$/ )
                 {
                     $redirect = "pushover://";
 
-                    fhem $hash->{READINGS}{$rAct}{VAL};
+                    fhem ReadingsVal($name, $rAct, "");
                     readingsBulkUpdate( $hash, $rAct,
-                        "executed: " . $hash->{READINGS}{$rAct}{VAL} );
+                        "executed: " . ReadingsVal($name, $rAct, ""));
                 }
 
                 # redirect to presented URL
-                if ( defined( $hash->{READINGS}{$rAct}{VAL} )
-                    && $hash->{READINGS}{$rAct}{VAL} =~ /^[\w-]+:\/\/.*$/ )
+                if ( ReadingsVal($name, $rAct, "none") =~ /^[\w-]+:\/\/.*$/ )
                 {
-                    $redirect = $hash->{READINGS}{$rAct}{VAL};
+                    $redirect = ReadingsVal($name, $rAct, "");
                 }
 
                 readingsEndUpdate( $hash, 1 );
