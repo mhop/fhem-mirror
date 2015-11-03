@@ -1124,7 +1124,7 @@ DOIF_SetSleepTimer($$$$$$)
        }
     } 
     if ($sleeptime) {
-      my ($seconds, $microseconds) = gettimeofday();
+      my $seconds = gettimeofday();
       my $next_time = $seconds+$sleeptime;
       $hash->{helper}{sleeptimer}=$nr;
       $hash->{helper}{sleepsubtimer}=$subnr;
@@ -1619,7 +1619,7 @@ Anstatt einer Zifferkombination kann ein Status oder Reading in eckigen Klammern
 <code>define dummy Wochentag<br>
 set Wochentag 135<br>
 <br>
-define di_radio DOIF ([06:30|[Wochentag]] (set radio on) DOELSEIF ([07:30|[Wochentag]]) (set radio off)</code><br>
+define di_radio DOIF ([06:30|[Wochentag]]) (set radio on) DOELSEIF ([07:30|[Wochentag]]) (set radio off)</code><br>
 <br>
 <b>Zeitsteuerung mit Zeitintervallen</b><br>
 <br>
