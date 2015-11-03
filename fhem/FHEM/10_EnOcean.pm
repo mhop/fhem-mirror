@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2015-10-25
+# 2015-11-02
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -273,6 +273,7 @@ my %EnO_eepConfig = (
   "A5.20.01" => {attr => {subType => "hvac.01", webCmd => "setpointTemp"}, GPLOT => "EnO_A5-20-01:Temp/Setpoint,"},
  #"A5.20.02" => {attr => {subType => "hvac.02"}},
  #"A5.20.03" => {attr => {subType => "hvac.03"}},
+  "A5.20.04" => {attr => {subType => "hvac.04"}},
   "A5.20.10" => {attr => {subType => "hvac.10", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}, GPLOT => "EnO_A5-20-10:FanSpeed,"},
   "A5.20.11" => {attr => {subType => "hvac.11", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}},
  #"A5.20.12" => {attr => {subType => "hvac.12"}},
@@ -327,6 +328,7 @@ my %EnO_eepConfig = (
   "F6.3F.7F" => {attr => {subType => "switch.7F"}},
   "B0.00.00" => {attr => {subType => "genericProfile"}},
  # special profiles
+  "G5.10.12" => {attr => {subType => "roomSensorControl.01", eep => "A5-10-12", manufID => "00D", scaleMax => 40, scaleMin => 0, scaleDecimals => 1}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
@@ -359,6 +361,140 @@ my @EnO_models = qw (
 );
 
 my @EnO_defaultChannel = ("all", "input", 0..29);
+
+my %wakeUpCycle = (
+      10 => 0,
+      60 => 1,
+      90 => 2,
+     120 => 3,
+     150 => 4,
+     180 => 5,
+     210 => 6,
+     240 => 7,
+     270 => 8,
+     300 => 9,
+     330 => 10,
+     360 => 11,
+     390 => 12,
+     420 => 13,
+     450 => 14,
+     480 => 15,
+     510 => 16,
+     540 => 17,
+     570 => 18,
+     600 => 19,
+     630 => 20,
+     660 => 21,
+     690 => 22,
+     720 => 23,
+     750 => 24,
+     780 => 25,
+     810 => 26,
+     840 => 27,
+     870 => 28,
+     900 => 29,
+     930 => 30,
+     960 => 31,
+     990 => 32,
+    1020 => 33,
+    1050 => 34,
+    1080 => 35,
+    1110 => 36,
+    1140 => 37,
+    1170 => 38,
+    1200 => 39,
+    1230 => 40,
+    1260 => 41,
+    1290 => 42,
+    1320 => 43,
+    1350 => 44,
+    1380 => 45,
+    1410 => 46,
+    1440 => 47,
+    1470 => 48,
+    1500 => 49,
+   10800 => 50,
+   21600 => 51,
+   32400 => 52,
+   43200 => 53,
+   54000 => 54,
+   64800 => 55,
+   75600 => 56,
+   86400 => 57,
+   97200 => 58,
+  108000 => 59,
+  118800 => 60,
+  129600 => 61,
+  140400 => 62,
+  151200 => 63,
+);
+
+my %wakeUpCycleInv = (
+   0 => 10,
+   1 => 60,
+   2 => 90,
+   3 => 120,
+   4 => 150,
+   5 => 180,
+   6 => 210,
+   7 => 240,
+   8 => 270,
+   9 => 300,
+  10 => 330,
+  11 => 360,
+  12 => 390,
+  13 => 420,
+  14 => 450,
+  15 => 480,
+  16 => 510,
+  17 => 540,
+  18 => 570,
+  19 => 600,
+  20 => 630,
+  21 => 660,
+  22 => 690,
+  23 => 720,
+  24 => 750,
+  25 => 780,
+  26 => 810,
+  27 => 840,
+  28 => 870,
+  29 => 900,
+  30 => 930,
+  31 => 960,
+  32 => 990,
+  33 => 1020,
+  34 => 1050,
+  35 => 1080,
+  36 => 1110,
+  37 => 1140,
+  38 => 1170,
+  39 => 1200,
+  40 => 1230,
+  41 => 1260,
+  42 => 1290,
+  43 => 1320,
+  44 => 1350,
+  45 => 1380,
+  46 => 1410,
+  47 => 1440,
+  48 => 1470,
+  49 => 1500,
+  50 => 10800,
+  51 => 21600,
+  52 => 32400,
+  53 => 43200,
+  54 => 54000,
+  55 => 64800,
+  56 => 75600,
+  57 => 86400,
+  58 => 97200,
+  59 => 108000,
+  60 => 118800,
+  61 => 129600,
+  62 => 140400,
+  63 => 151200,
+);
 
 my @EnO_resolution = (1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32);
 
@@ -480,8 +616,9 @@ EnOcean_Initialize($)
                       "devChannel devMode:master,slave devUpdate:off,auto,demand,polling,interrupt " .
                       "dimMax dimMin dimValueOn disable:0,1 disabledForIntervals " .
                       "displayContent:default,humidity,off,setPointTemp,tempertureExtern,temperatureIntern,time,no_change " .
+                      "displayOrientation:0,90,180,270 " .
                       "eep gpDef gwCmd:" . join(",", sort @EnO_gwCmd) . " humitity humidityRefDev " .
-                      "keyRcv keySnd macAlgo:no,3,4 " .
+                      "keyRcv keySnd macAlgo:no,3,4 measurementCtrl:disable,enable " .
                       "manufID:" . join(",", sort keys %EnO_manuf) . " " .
                       "model:" . join(",", @EnO_models) . " " .
                       "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction observeInterval observeLogic:and,or " .
@@ -500,6 +637,7 @@ EnOcean_Initialize($)
                       "temperatureScale:C,F,default,no_change timeNotation:12,24,default,no_change " .
                       "timeProgram1 timeProgram2 timeProgram3 timeProgram4 updateState:default,yes,no " .
                       "uteResponseRequest:yes,no " .
+                      "wakeUpCycle:" . join(",", keys %wakeUpCycle) . " " .
                       $readingFnAttributes;
 
   for (my $i = 0; $i < @EnO_ptm200btn; $i++) {
@@ -732,6 +870,14 @@ EnOcean_Define($$)
     return "wrong syntax: define <name> EnOcean <8-digit-hex-code> [<EEP>]|getNextID|<EEP>";
   }
 
+  # device specific actions
+  if (exists($attr{$name}{eep}) && $attr{$name}{eep} eq "A5-20-04" ||
+      exists($attr{$name}{subDef}) && $attr{$name}{subDef} eq "hvac.04") {
+    # pid parameter
+    
+    # start pid calc
+    
+  }
   # all notifys needed
   #$hash->{NOTIFYDEV} = "global";
 
@@ -1046,7 +1192,7 @@ sub EnOcean_Set($@)
   my $cmdID;
   my $cmdList = "";
   my @cmdObserve = @a;
-  my ($data, $err, $logLevel, $response);
+  my ($ctrl, $data, $err, $logLevel, $response);
   my $destinationID = AttrVal($name, "destinationID", undef);
   if (AttrVal($name, "comMode", "uniDir") eq "biDir") {
     $destinationID = defined(AttrVal($name, "subDef", undef)) ? $hash->{DEF} : "FFFFFFFF";
@@ -1373,9 +1519,15 @@ sub EnOcean_Set($@)
       my $switch = ReadingsVal($name, "switch", "off");
       $setCmd |= 1 if ($switch eq "on");
       if ($cmd eq "teach") {
-        # teach-in EEP A5-10-10, Manufacturer "Multi user Manufacturer ID"
-        $data = "4087FF80";
-        $attr{$name}{eep} = "A$-10-10";
+        if ($manufID eq "00D") {
+          # teach-in EEP A5-10-12, Manufacturer "Eltako"
+          $data = "40900D80";
+          $attr{$name}{eep} = "A5-10-12";
+        } else {
+          # teach-in EEP A5-10-10, Manufacturer "Multi user Manufacturer ID"
+          $data = "4087FF80";
+          $attr{$name}{eep} = "A5-10-10";
+        }
         CommandDeleteReading(undef, "$name .*");
         readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
         $updateState = 0;
@@ -1786,8 +1938,7 @@ sub EnOcean_Set($@)
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
       # [Kieback&Peter MD15-FTL-xx]
-      # See also http://www.oscat.de/community/index.php/topic,985.30.html
-      # Maintenance commands (runInit, liftSet, valveOpen, valveClosed)
+      # Maintenance commands: runInit, liftSet, valveOpen, valveClosed
       $rorg = "A5";
       my %sets = (
         "desired-temp" => "\\d+(\\.\\d)?",
@@ -1818,6 +1969,84 @@ sub EnOcean_Set($@)
       }
       readingsSingleUpdate($hash, $cmd, $arg, 1);
 
+    } elsif ($st eq "hvac.04") {
+     # heating radiator valve actuating drive EEP A5-20-04)
+      $rorg = "A5";
+      if ($cmd eq "setpoint") {
+        if (defined $a[1] && $a[1] =~ m/^\d+$/ && $a[1] >= 0 && $a[1] <= 100) {
+          CommandDeleteReading(undef, "$name setpointTempSet");
+          readingsBeginUpdate($hash);
+          #readingsBulkUpdate($hash, $cmd, $a[1]);
+          #readingsBulkUpdate($hash, "operationMode", $cmd);
+          readingsBulkUpdate($hash, "setpointSet", $a[1]);
+          if (ReadingsVal($name, "maintenanceMode", "off") eq "valveOpendRunInit") {
+            readingsBulkUpdate($hash, "runInitSetpoint", $cmd);
+          } else {
+            readingsBulkUpdate($hash, "waitingCmds", $cmd);
+          }
+          readingsEndUpdate($hash, 0);
+          Log3 $name, 3, "EnOcean set $name setpoint $a[1]";
+          shift(@a);
+        } else {
+          return "Usage: $cmd value wrong.";
+        }
+        $updateState = 2;
+      
+      } elsif ($cmd eq "desired-temp"|| $cmd eq "setpointTemp") {
+        if (defined $a[1] && $a[1] =~ m/^\d+(\.\d)?$/ && $a[1] >= 10 && $a[1] <= 30) {
+          CommandDeleteReading(undef, "$name setpointSet");
+          readingsBeginUpdate($hash);
+          #readingsBulkUpdate($hash, $cmd, $a[1]);
+          #readingsBulkUpdate($hash, "operationMode", "setpointTemp");
+          readingsBulkUpdate($hash, "setpointTempSet", $a[1]);
+          if (ReadingsVal($name, "maintenanceMode", "off") eq "valveOpendRunInit") {
+            readingsBulkUpdate($hash, "runInitSetpointTemp", $cmd);
+          } else {
+            readingsBulkUpdate($hash, "waitingCmds", "setpointTemp");
+          }
+          readingsEndUpdate($hash, 0);
+          Log3 $name, 3, "EnOcean set $name setpointTemp $a[1]";
+          shift(@a);
+        } else {
+          return "Usage: $cmd value wrong.";
+        }
+        $updateState = 2;
+      
+      } elsif ($cmd eq "valveOpens") {
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTempSet");        
+        readingsBeginUpdate($hash);
+        #readingsBulkUpdate($hash, "maintenanceMode", $cmd);
+        readingsBulkUpdate($hash, "waitingCmds", $cmd);
+        readingsEndUpdate($hash, 0);
+        Log3 $name, 3, "EnOcean set $name valveOpens";
+        $updateState = 2;
+      
+      } elsif ($cmd eq "valveCloses") {
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTempSet");        
+        readingsBeginUpdate($hash);
+        #readingsBulkUpdate($hash, "maintenanceMode", $cmd);
+        readingsBulkUpdate($hash, "waitingCmds", $cmd);
+        readingsEndUpdate($hash, 0);
+        Log3 $name, 3, "EnOcean set $name valveCloses";
+        $updateState = 2;
+      
+      } elsif ($cmd eq "runInit") {
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTempSet");        
+        readingsBeginUpdate($hash);
+        #readingsBulkUpdate($hash, "maintenanceMode", $cmd);
+        readingsBulkUpdate($hash, "waitingCmds", $cmd);
+        readingsEndUpdate($hash, 0);
+        Log3 $name, 3, "EnOcean set $name runInit";
+        $updateState = 2;
+      
+      } else {
+        $cmdList .= "setpointTemp:slider,10,1,30 setpoint:slider,0,5,100 runInit:noArg valveCloses:noArg valveOpens:noArg";
+        return "Unknown command " . $cmd . ", choose one of " . $cmdList;
+      }
+ 
     } elsif ($st eq "hvac.10") {
       # Generic HVAC Interface (EEP A5-20-10)
       $rorg = "A5";
@@ -1878,7 +2107,7 @@ sub EnOcean_Set($@)
                     join(",", sort keys %vanePosition);
         return SetExtensions ($hash, $cmdList, $name, @a);
       }
-      my $ctrl = ReadingsVal($name, "ctrl", "auto");
+      $ctrl = ReadingsVal($name, "ctrl", "auto");
       my $fanSpeed = ReadingsVal($name, "fanSpeed", "auto");
       my $mode = ReadingsVal($name, "mode", "off");
       my $occupancy = ReadingsVal($name, "occupancy", "off");
@@ -3977,7 +4206,7 @@ sub EnOcean_Set($@)
       } elsif ($cmd eq "desired-temp" || $cmd eq "setpointTemp") {
         $updateState = 0;
         my $temperatureRefDev = AttrVal($name, "temperatureRefDev", undef);
-        return "Attention: attr $name temperatureRefDev <refDev> must be defined" if (!defined $temperatureRefDev);
+        return "attribute missing: attr $name temperatureRefDev <refDev> must be defined" if (!defined $temperatureRefDev);
         my $temperature = ReadingsVal($temperatureRefDev, "temperature", 20);
         my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
         my $switchHysteresis = AttrVal($name, "switchHysteresis", 1);
@@ -4594,7 +4823,7 @@ sub EnOcean_Parse($$)
   my ($iohash, $msg) = @_;
   my $IODev = $iohash->{NAME};
   my ($hash, $name, $filelogName, $rorgname);
-  my ($err, $logLevel, $response);
+  my ($ctrl, $err, $logLevel, $response);
   Log3 $IODev, 4, "EnOcean received via $IODev: $msg";
   my @msg = split(':', $msg);
   my ($rorg, $data, $senderID, $status, $odata, $subDef, $destinationID, $funcNumber, $manufID, $RSSI, $delay, $subTelNum);
@@ -5087,6 +5316,17 @@ sub EnOcean_Parse($$)
                 EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, "00000000", "00", $hash->{DEF});
                 Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
 
+              } elsif ($st eq "hvac.04") {
+                # heating radiator valve actuating drive EEP A5-20-04)
+                $attr{$name}{comMode} = "biDir";
+                $attr{$name}{destinationID} = "unicast";
+                ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "biDir");
+                # teach-in response
+                $data = sprintf "%06XF0", (hex($func) << 7 | hex($type)) << 11 | 0x7FF;
+                EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, $subDef, "00", $hash->{DEF});
+                Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
+                #EnOcean_hvac_04Cmd($hash, $packetType, 128); # 128 == 20 degree C
+
               #} elsif ($st =~ m/^hvac\.1[0-1]$/) {
                 # EEP A5-20-10, A5-20-11
                 # teach-in response
@@ -5150,6 +5390,143 @@ sub EnOcean_Parse($$)
       push @event, "3:state:$db[3]";
       EnOcean_hvac_01Cmd($hash, $packetType, $db[1]);
 
+    } elsif ($st eq "hvac.04") {
+      # heating radiator valve actuating drive EEP A5-20-04)
+      my %failureCode = (
+        17 => "measurement_error",
+        18 => "battery_empty",
+        20 => "frost_protection",
+        33 => "blocked_valve",
+        36 => "end_point_detection_error",
+        40 => "no_valve",
+        49 => "not_taught_in",
+        53 => "no_response_from_controller",
+        54 => "teach-in_error"
+      );
+      my $cmd;
+      my %displayOrientation = (0 => 0, 90 => 1, 180 => 2, 270 => 3);
+      my $setpoint = $db[3];
+      push @event, "3:setpoint:$setpoint";
+      my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
+      my $setpointTempSet = ReadingsVal($name, "setpointTempSet", 20);
+      my $temperature = ReadingsVal($name, "temperature", 20);
+      if ($db[0] & 2) {
+        $setpointTemp = sprintf "%0.1f", ($db[2] * 20 / 255 + 10);
+        push @event, "3:setpointTemp:$setpointTemp";      
+      } else {
+        if ($db[0] & 0x80) {
+          CommandDeleteReading(undef, "$name feedTemp");
+        } else {
+          push @event, "3:feedTemp:" . sprintf("%0.1f", ($db[2] * 60 / 255 + 20));      
+        }
+      }
+      my $measurementCtrl = AttrVal($name, "measurementCtrl", "actuator");
+      if ($measurementCtrl eq "actuator") {
+        $temperature = sprintf("%0.1f", ($db[1] * 20 / 255 + 10)) if ($db[0] & 1 && (!($db[0] & 0x80)));
+      } else {
+        my $temperatureRefDev = AttrVal($name, "temperatureRefDev", undef);
+        return "attribute missing: attr $name temperatureRefDev <refDev> must be defined" if (!defined $temperatureRefDev);
+        $temperature = ReadingsVal($temperatureRefDev, "temperature", 20);
+      }
+      push @event, "3:temperature:$temperature";
+      push @event, "3:measurementState:" . ($db[0] & 0x80 ? "inactive" : "active");
+      push @event, "3:blockKey:" . ($db[0] & 4 ? "yes" : "no");
+      # failure occurred
+      if ($db[0] & 1) {
+        if (exists $failureCode{$db[1]}) {
+          push @event, "3:error:" . $failureCode{$db[1]};
+        } else {
+          push @event, "3:error:unknown"
+        }
+      }
+      if ($db[0] & 0x40) {
+        # status request
+        # action needed?      
+      }
+      
+      #####
+      
+      $measurementCtrl = $measurementCtrl eq "actuator" ? 0 : 0x40;
+      my $wakeUpCycle = $wakeUpCycle{AttrVal($name, "wakeUpCycle", 600)};
+      my $displayOrientation = $displayOrientation{AttrVal($name, "displayOrientation", 0)} << 4;
+      my $blockKey = AttrVal($name, "blockKey", 0) << 2;
+      my $maintenanceMode = ReadingsVal($name, "maintenanceMode", "off");
+      my $operationMode = ReadingsVal($name, "operationMode", "off");
+      my $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
+      
+      if ($operationMode eq "setpoint" || $waitingCmds eq "setpoint") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, "stop");
+        $setpoint = ReadingsVal($name, "setpointSet", $setpoint);
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name waitingCmds");
+        push @event, "3:setpoint:$setpoint";
+        push @event, "3:$maintenanceMode:off";
+        push @event, "3:$operationMode:setpoint";
+        $waitingCmds = 0;
+
+      } elsif ($operationMode eq "setpointTemp" || $waitingCmds eq "setpointTemp") {
+        # activate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, "start");
+        $setpointTemp = ReadingsVal($name, "setpointTempSet", $setpointTemp);
+        push @event, "3:setpointTemp:$setpointTemp";
+        CommandDeleteReading(undef, "$name setpointTempSet");
+        CommandDeleteReading(undef, "$name waitingCmds");
+        push @event, "3:$maintenanceMode:off";
+        push @event, "3:$operationMode:setpointTemp";
+
+        # calc valve setpoint
+        ($err, $logLevel, $response, $setpoint) = EnOcean_calcPID(undef, $hash, $cmd, $setpointTempSet, $temperature);
+        push @event, "3:setpoint:$setpoint";
+        $waitingCmds = 0;
+        
+      } elsif ($waitingCmds eq "valveOpens") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, "stop");
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name setpointTempSet");       
+        push @event, "3:setpoint:100";
+        push @event, "3:$maintenanceMode:valveOpendRunInit";
+        push @event, "3:$operationMode:off";
+        $waitingCmds = 1;
+
+      } elsif ($waitingCmds eq "valveCloses") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, "stop");
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name setpointTempSet");       
+        CommandDeleteReading(undef, "$name waitingCmds");
+        push @event, "3:setpoint:0";
+        push @event, "3:$maintenanceMode:valveClosed";
+        push @event, "3:$operationMode:off";
+        $waitingCmds = 3;
+
+      } elsif ($waitingCmds eq "runInit") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, "stop");
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name setpointTempSet");       
+        CommandDeleteReading(undef, "$name waitingCmds");
+        push @event, "3:setpoint:0";
+        push @event, "3:$maintenanceMode:runInit";
+        push @event, "3:$operationMode:off";
+        $waitingCmds = 2;
+
+      } else {
+
+      }
+      
+      # sent message to the actuator
+      $data = sprintf "%02X%02X%02X%02X", $setpoint,
+                                          ($setpointTemp - 10) / 20 * 255,
+                                          $measurementCtrl | $wakeUpCycle,
+                                          $displayOrientation | 8 | $blockKey | $waitingCmds;
+      EnOcean_SndRadio(undef, $hash, $packetType, "A5", $data, $subDef, "00", $hash->{DEF});
+
+  
     } elsif ($st eq "hvac.10") {
       # Generic HVAC Interface (EEP A5-20-10)
       my %mode = (
@@ -8348,6 +8725,13 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "displayOrientation") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^0|90|180|270$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
   } elsif ($attrName eq "eep") {
     if (!defined $attrVal){
 
@@ -8412,6 +8796,13 @@ sub EnOcean_Attr(@)
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^[0-7][\dA-Fa-f]{2}$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "measurementCtrl") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^disable|enable$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -8671,6 +9062,14 @@ sub EnOcean_Attr(@)
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^(yes|no)$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "wakeUpCycle") {
+    my $wakeUpCycle = join("|", keys %wakeUpCycle);
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^$wakeUpCycle$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -8986,6 +9385,24 @@ EnOcean_hvac_01Cmd($$$)
       EnOcean_SndRadio(undef, $hash, $packetType, "A5", $msg, $subDef, "00", $hash->{DEF});
     }
   }
+}
+
+# calc valve setpoint (PID regulator)
+sub EnOcean_calcPID($$$$$) {
+  my ($crtl, $hash, $cmd, $setpointTemp, $temperature) = @_;
+  my $name = $hash->{NAME};
+  my ($err, $response, $logLevel, $setpoint);
+
+  return ($err, $logLevel, $response, $setpoint);
+}
+
+# set PID regulator
+sub EnOcean_setPID($$$) {
+  my ($crtl, $hash, $cmd) = @_;
+  my $name = $hash->{NAME};
+  my ($err, $response, $logLevel);
+
+  return ($err, $logLevel, $response);
 }
 
 # sent message to Room Control Panel (EEP D2-10-xx)
@@ -11264,7 +11681,7 @@ EnOcean_Delete($$)
     <li>lightCtrl.01 (dim 0...255)</li>
     <li>actuator.01 (dim 0...100)</li>
     <li>roomSensorControl.01 (setpoint 0...255)</li>
-    <li>roomSensorControl.05 (setpoint 0...255 and nightReduction 0...5 for Eltako devices)</li>
+    <li>roomSensorControl.05 (setpoint 0...255 or nightReduction 0...5 for Eltako devices)</li>
     <li>roomCtrlPanel.00 (roomCtrlMode comfort|economy)</li>
     </ul>
     <li>On the target actuator can be specified alternatively a freely definable command.
@@ -11637,7 +12054,7 @@ EnOcean_Delete($$)
     <br><br>
 
     <li>Room Sensor and Control Unit (A5-10-06 plus night reduction)<br>
-        [Eltako FVS]<br>
+        [Eltako FTR65DS, FTR65HS]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -11654,7 +12071,7 @@ EnOcean_Delete($$)
       The actual temperature will be taken from the temperature reported by
       a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
       primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
-      If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
+      If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpointTemp
       command is sent when the reference device is updated.<br>
       This profil can be used with a further Room Sensor and Control Unit Eltako FTR55*
       to control a heating/cooling relay FHK12, FHK14 or FHK61. If Fhem and FTR55*
@@ -11694,6 +12111,30 @@ EnOcean_Delete($$)
       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled setting
       setpointScaled.<br>
       The attr subType must be roomSensorControl.01. The attribute must be set manually.
+    </li>
+    <br><br>
+
+    <li>Room Sensor and Control Unit (EEP A5-10-12)<br>
+        [Eltako FUTH65D]<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>teach<br>
+          initiate teach-in</li>
+      <li>setpoint [0 ... 255]<br>
+          Set the actuator to the specifed setpoint.</li>
+      <li>setpointScaled [&lt;floating-point number&gt;]<br>
+          Set the actuator to the scaled setpoint.</li>
+      <li>switch [on|off]<br>
+          Set switch</li>
+    </ul><br>
+      The actual temperature will be taken from the temperature reported by
+      a temperature reference device <a href="#temperatureRefDev">temperatureRefDev</a>
+      primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
+      If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
+      command is sent when the reference device is updated.<br>
+      The attr subType must be roomSensorControl.01 and attr manufID must be 00D. The attribute must be set manually.
     </li>
     <br><br>
 
@@ -12525,7 +12966,7 @@ EnOcean_Delete($$)
       blockFanSpeed is supported for roomCtrlPanel.00.
       </li>
     <li><a name="EnOcean_blockKey">blockKey</a> yes|no, [blockKey] = no is default.<br>
-      blockKey is supported for roomCtrlPanel.00.
+      blockKey is supported for roomCtrlPanel.00 and hvac.04.
       </li>
     <li><a name="EnOcean_blockMotion">blockMotion</a> yes|no, [blockMotion] = no is default.<br>
       blockMotion is supported for roomCtrlPanel.00.
@@ -13401,7 +13842,7 @@ EnOcean_Delete($$)
      <br><br>
 
      <li>Room Sensor and Control Unit (EEP A5-04-01, A5-10-10 ... A5-10-14)<br>
-         [Thermokon SR04 * rH, Thanos SR *]<br>
+         [Eltako FUTH65D, Thermokon SR04 * rH, Thanos SR *]<br>
      <ul>
        <li>T: t/&#176C H: rH/% SP: 0 ... 255 SW: 0|1</li>
        <li>humidity: rH/% (Sensor Range: rH = 0 % ... 100 %)</li>
@@ -13416,7 +13857,8 @@ EnOcean_Delete($$)
        <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
        setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
        adjust the scaling alternatively.<br>
-       The attr subType must be roomSensorControl.01. This is
+       The attr subType must be roomSensorControl.01 and attr
+       manufID must be 00D for Eltako Devices. This is
        done if the device was created by autocreate.
      </li>
      <br><br>
