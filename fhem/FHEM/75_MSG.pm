@@ -301,7 +301,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     }
 
                     # next type loop if device is an email address and this is not the mail type loop run
-                    if ($deviceType eq "email" && $type[$i] ne "mail") {
+                    if ($deviceType eq "email" && ($type[$i] ne "mail" && $type[$i] ne "text") {
                       Log3 $globalDevName, 5, "msg $device: Skipping loop for device type 'email' with unmatched message type '" . $type[$i] . "'";
                       next;
                     }
@@ -587,7 +587,8 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                       )
                     {
                         Log3 $logDevice, 4,
-"msg $device: This recipient seems to be a gateway device itself. Still checking for any delegates ...";
+"msg $device: Recipient type $deviceType2 is a gateway device itself for message type ".$type[$i].". Still checking for any delegates ..."
+  if ( $testMode ne "1" );
 
                         $gatewayDevs =
 
