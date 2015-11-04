@@ -333,7 +333,7 @@ sub
 HttpUtils_DataComplete($)
 {
   my ($ret) = @_;
-  return 0 if($ret !~ m/^(.*?)\r\n\r\n(.*)$/s);
+  return 0 if($ret !~ m/^(.*?)\r?\n\r?\n(.*)$/s);
   my $hdr = $1;
   my $data = $2;
   return 0 if($hdr !~ m/Content-Length:\s*(\d+)/si);
