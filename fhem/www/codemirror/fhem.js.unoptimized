@@ -1,4 +1,5 @@
-// $Id: fhem.js 5485 2014-04-08 10:10:56Z betateilchen $
+/* $Id$ */
+
 // CodeMirror2 mode/perl/perl.js (text/x-perl) beta 0.10 (2011-11-08)
 // This is a part of CodeMirror from https://github.com/sabaca/CodeMirror_mode_perl (mail@sabaca.com)
 CodeMirror.defineMode("fhem",function(){
@@ -462,15 +463,19 @@ CodeMirror.defineMode("fhem",function(){
                 warn                            :1,     // - print debugging info
                 when                            :1,     //
                 write                           :1,     // - print a picture record
-				
-                define                           :2,
-                attr                           :2,
-                at                           :2,
-				notify :2,
-				set :2,
-                ReadingsVal                           :1,
+                // FHEM Keywords ////////////////////////
+                define                          :2,
+                attr                            :2,
+                at                              :2,
+                notify                          :2,
+                set                             :2,
+                ReadingsVal                     :1,
                 Value                           :1,
-                fhem                           :1,
+                fhem                            :1,
+                IF                              :2,
+                DOIF                            :2,
+                DOELSE                          :2,
+                DOELSEIF                        :2,
                 y                               :null}; // - transliterate a string
 
 		keywords.foreach( function( k, v ) {
@@ -839,7 +844,7 @@ CodeMirror.commands.autocomplete = function(cm) {
 	CodeMirror.showHint(cm, CodeMirror.hint.fhem, {async:true});
 }
 
-var keywords = ["at","attr","define","delete","deleteattr","deletereading","displayattr","fhem","get","getstate",
+var keywords = ["at","attr","define","delete","deleteattr","deletereading","IF","DOIF","DOELSEIF","DOELSE","displayattr","fhem","get","getstate",
   "list","modify","notify","set","setdefaultattr","setreading","setstate","trigger",
   "AttrVal","OldTimestamp","OldValue","ReadingsVal","ReadingsTimestamp","Value"];
 var variables = ["$defs","$hms","$hour","$isdst","$mday","$min","$month","$sec","$wday","$we","$yday","$year"];
@@ -849,13 +854,15 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 
 	if( devices.length == 0 ) {
 		$.getJSON( '/fhem?cmd=jsonlist2&XHR=1', function ( data ) {
-			data.Results.foreach( function(k,v) {
-			    devices.push(v);
-			});
-			devices.sort(function (a, b) {
-				return a.Name.toLowerCase().localeCompare(b.Name.toLowerCase());
-			});
-			hintfhem(cm,callback,options);
+            if( devices.length == 0 ) {
+                data.Results.foreach( function(k,v) {
+                    devices.push(v);
+                });
+                devices.sort(function (a, b) {
+                    return a.Name.toLowerCase().localeCompare(b.Name.toLowerCase());
+                });
+                hintfhem(cm,callback,options);
+            }
 		});
 		return;
 	}
@@ -881,6 +888,14 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		word = RegExp.$3;
 		var d = searchDevice(devices,device);
 		_var = getDeviceAttributes(d);
+	}
+	// only device reading names
+	else if( /^[ \t]*(DOIF|DOELSE|DOELSEIF).*\[+\??(\w+):\??([\w-]*)$/.test(line) ) {
+		_key = _dev = _var = [];
+	    var device = RegExp.$2;
+		word = RegExp.$3;
+		var d = searchDevice(devices,device);
+		_var = getDeviceReadings(d);
 	}
 	// only device reading names
 	else if( /^[ \t]*(deletereading|setreading)[ \t]+(\w+)[ \t]+([\w-]*)$/.test(line) ) {

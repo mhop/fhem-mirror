@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: fhem_codemirror: Added DOIF autocomplete-keywords. Added feature
+                              to autocomplete on any keypress (on by default).
   - change:  ATTENTION: Removed deprecated module 75_MSG.pm. Users will need to
              manually change their device definitions to MSGFile or MSGMail
              respectively.
