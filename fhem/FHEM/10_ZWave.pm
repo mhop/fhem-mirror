@@ -1985,7 +1985,48 @@ ZWave_secSupported($$)
         $zwave_id2class{lc($sec_classId)} : "UNKNOWN_".lc($sec_classId);
     }
     $attr{$name}{secure_classes} = join(" ", @sec_classes)
-      if (@sec_classes && !$attr{$name}{secure_classes});
+      if (@sec_classes);
+  }
+
+  # Add new secure_classes to classes if not already present
+  # Needed for classes that are only supported with SECURITY
+
+  if ($attr{$name}{secure_classes} && $attr{$name}{classes}) {
+    my $classes        = $attr{$name}{classes};
+    my $secure_classes = $attr{$name}{secure_classes};
+    my $c1;
+    my $c2;
+    my $s1;
+    my $s2;
+    my $classname;
+
+    if ($classes =~ m/(.*)(MARK)(.*)/) {
+      ($c1, $c2) = ($1, $2 . $3);
+    } else {
+      ($c1, $c2) = ($classes, "");
+    }
+
+    if ($secure_classes =~ m/(.*)(MARK)(.*)/) {
+      ($s1, $s2) = ($1, $2 . $3);
+    } else {
+      ($s1, $s2) = ($secure_classes, "");
+    }
+
+    foreach $classname (split(" ", $s1)) {
+      if ($c1 !~ m/$classname/) {
+        $c1 = join (" ", $c1, $classname);
+      }
+    }
+
+    foreach $classname (split(" ", $s2)) {
+      if ($c2 !~ m/$classname/) {
+        $c2 = join (" ", $c2, $classname);
+      }
+    }
+
+    $classes = join (" ", $c1, $c2);
+    $classes =~ s/ +/ /gs;
+    $attr{$name}{classes} = $classes;
   }
 
   if ($iodev->{secInitName} && $hash->{secStatus}) {
