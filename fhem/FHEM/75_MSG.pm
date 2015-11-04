@@ -1675,10 +1675,6 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 )
                               ) if ( $title eq "-" );
 
-                            if ( $type[$i] eq "mail" && $priorityCat ne "" ) {
-                              $loopTitle = "[$priorityCat] $loopTitle";
-                            }
-
                             my $loopMsg = $msg;
                             if ( $catchall == 1 ) {
                                 $loopTitle = "Fw: $loopTitle";
