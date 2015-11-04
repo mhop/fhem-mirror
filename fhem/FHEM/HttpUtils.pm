@@ -240,6 +240,13 @@ HttpUtils_Connect2($)
     }
   }
 
+  if(defined($hash->{header})) {
+    if( ref($hash->{header}) eq 'HASH' ) {
+      $hash->{header} = join("\r\n",
+        map(($_.': '.$hash->{header}{$_}), keys($hash->{header})));
+      }
+   }
+
   $hash->{host} =~ s/:.*//;
   my $method = $hash->{method};
   $method = ($data ? "POST" : "GET") if( !$method );
@@ -514,7 +521,7 @@ HttpUtils_ParseAnswer($$)
 #  mandatory:
 #    url, callback
 #  optional(default):
-#    hideurl(0),timeout(4),data(""),loglevel(4),header(""),
+#    hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data ? "POST" : "GET"),keepalive(0),sslargs({})
 # Example:
