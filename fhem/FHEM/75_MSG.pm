@@ -301,7 +301,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     }
 
                     # next type loop if device is an email address and this is not the mail type loop run
-                    if ($deviceType eq "email" && ($type[$i] ne "mail" && $type[$i] ne "text") {
+                    if ($deviceType eq "email" && $type[$i] ne "mail" && $type[$i] ne "text") {
                       Log3 $globalDevName, 5, "msg $device: Skipping loop for device type 'email' with unmatched message type '" . $type[$i] . "'";
                       next;
                     }
