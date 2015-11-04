@@ -35,8 +35,11 @@ package main;
 
 use strict;
 use warnings;
+use Data::Dumper;
+use msgSchema;
 
 sub msgConfig_Set($@);
+sub msgConfig_Get($@);
 sub msgConfig_Define($$);
 sub msgConfig_Undefine($$);
 
@@ -45,6 +48,8 @@ sub msgConfig_Initialize($) {
     my ($hash) = @_;
 
     $hash->{DefFn}    = "msgConfig_Define";
+#    $hash->{SetFn}    = "msgConfig_Set";
+    $hash->{GetFn}    = "msgConfig_Get";
     $hash->{UndefFn}  = "msgConfig_Undefine";
 
     # add attributes for configuration
@@ -174,6 +179,173 @@ sub msgConfig_Undefine($$) {
     return undef;
 }
 
+###################################
+sub msgConfig_Get($@) {
+    my ( $hash, @a ) = @_;
+    my $name = $hash->{NAME};
+    my $what = "";
+
+    Log3 $name, 5, "msgConfig $name: called function msgConfig_Get()";
+
+    my @msgTypes =
+      ( "audio", "light", "mail", "push", "screen" );
+
+    $what = $a[1];
+
+    if ( lc($what) eq "routecmd" ) {
+        my $return = "";
+        my $msgTypesReq = defined($a[2]) ? lc($a[2]) : join( ',', @msgTypes );
+        my $devicesReq = defined($a[3]) ? $a[3] : "";
+        my $cmdSchema = msgSchema::get();
+        my $UserDeviceTypes = "";
+
+        foreach my $msgType (split( /,/, $msgTypesReq )) {
+
+          # Check device
+          if ($devicesReq ne "") {
+            foreach my $device (split( /,/, $devicesReq )) {
+              if (defined($defs{$device})) {
+                $return .= "USER DEFINED COMMANDS FOR MESSAGE TYPE '".uc($msgType)."'\n-------------------------------------------------------------------------------\n\n";
+                $return .= "  $device (DEVICE TYPE: ".$defs{$device}{TYPE}.")\n";
+                $UserDeviceTypes .= ",".$defs{$device}{TYPE} if ($UserDeviceTypes ne "" && $msgType ne "mail");
+                $UserDeviceTypes = $defs{$device}{TYPE} if ($UserDeviceTypes eq "" && $msgType ne "mail");
+                $UserDeviceTypes .= ",fhemMsgMail" if ($UserDeviceTypes ne "" && $msgType eq "mail");
+                $UserDeviceTypes = "fhemMsgMail" if ($UserDeviceTypes eq "" && $msgType eq "mail");
+
+                  my $typeUc = ucfirst($msgType);
+
+                  my @priorities;
+                  @priorities = ("Normal", "ShortPrio", "Short") if ($msgType eq "audio");
+                  @priorities = ("Normal", "High", "Low") if ($msgType ne "audio");
+
+                  foreach my $prio (@priorities) {
+                    my $priorityCat;
+                    $priorityCat = $prio if ($prio ne "Normal");
+                    
+                    my $cmd =
+                                # look for direct
+                                AttrVal(
+                                    $device, "msgCmd$typeUc$priorityCat",
+
+                                    # look for indirect
+                                    AttrVal(
+                                        AttrVal(
+                                            $device, "msgRecipient$typeUc",
+                                            ""
+                                        ),
+                                        "msgCmd$typeUc$priorityCat",
+
+                                        #look for indirect general
+                                        AttrVal(
+                                            AttrVal(
+                                                $device, "msgRecipient", ""
+                                            ),
+                                            "msgCmd$typeUc$priorityCat",
+
+                                            # look for global direct
+                                            AttrVal(
+                                                $name,
+                                                "msgCmd$typeUc$priorityCat",
+
+                                                # look for global indirect
+                                                AttrVal(
+                                                    AttrVal(
+                                                        $name,
+                                                        "msgRecipient$typeUc",
+                                                        ""
+                                                    ),
+                                                    "msgCmd$typeUc$priorityCat",
+
+                                               #look for global indirect general
+                                                    AttrVal(
+                                                        AttrVal(
+                                                            $name,
+                                                            "msgRecipient",
+                                                            ""
+                                                        ), "msgCmd$typeUc$priorityCat",
+
+                                                        # none
+                                                        ""
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                );
+
+                      $return .= "    Priority $prio:\n      $cmd\n" if ($cmd ne "");
+                      $return .= "    Priority $prio:\n      [DEFAULT]\n" if ($cmd eq "");
+                  }
+
+                
+                
+                $return .= "\n" if ($return ne "");
+              }
+            }
+
+            $return .= "\n" if ($return ne "");
+          }
+
+          # Default commands
+          if (defined($cmdSchema->{$msgType})) {
+
+            my $deviceTypes = $devicesReq;
+            $deviceTypes = join(',', keys $cmdSchema->{$msgType})
+              if ($deviceTypes eq "");
+            $deviceTypes = $UserDeviceTypes
+              if ($UserDeviceTypes ne "");
+
+            my $outout = 0;
+            foreach my $deviceType (split( /,/, $deviceTypes )) {
+
+              if (defined($cmdSchema->{$msgType}{$deviceType})) {
+                $return .= "DEFAULT COMMANDS FOR MESSAGE TYPE '".uc($msgType)."'\n-------------------------------------------------------------------------------\n\n"
+                  if ($outout == 0);
+                $outout = 1;
+                $return .= "  $deviceType\n";
+
+                my @priorities;
+                @priorities = ("Normal", "ShortPrio", "Short") if ($msgType eq "audio");
+                @priorities = ("Normal", "High", "Low") if ($msgType ne "audio");
+
+                foreach my $prio (@priorities) {
+                  $return .= "    Priority $prio:\n      ".$cmdSchema->{$msgType}{$deviceType}{$prio}."\n";
+
+                  if (defined($cmdSchema->{$msgType}{$deviceType}{defaultValues}{$prio})) {
+                    $return .= "      Default Values:\n";
+
+                    foreach my $key (keys $cmdSchema->{$msgType}{$deviceType}{defaultValues}{$prio}) {
+                      if ($cmdSchema->{$msgType}{$deviceType}{defaultValues}{$prio}{$key} ne "") {
+                        $return .= "        $key = ".$cmdSchema->{$msgType}{$deviceType}{defaultValues}{$prio}{$key}."\n" ;
+                      } else {
+                        $return .= "        $key = [EMPTY]\n" ;
+                      }
+                    }
+
+                  }
+                }
+
+                $return .= "\n" if ($return ne "");
+              }
+
+            }
+          } else {
+            $return .= "Unknown messaging type $msgType.\n";
+          }
+
+          $return .= "\n" if ($return ne "");
+        }
+
+        $return = "Non-existing device or module name: $devicesReq" if ($return eq "");
+        return $return;
+    }
+
+    else {
+        return
+"Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen";
+    }
+}
+
 1;
 
 =pod
@@ -187,15 +359,14 @@ sub msgConfig_Undefine($$) {
       msgConfig
     </h3>
     <ul>
-      <li>Provides global settings for FHEM command <a href="#MSG">msg</a>.<br>
+      Provides global settings for FHEM command <a href="#MSG">msg</a>.<br>
         <br>
-      </li>
-      <li>
+      <ul>
         <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
         <div style="margin-left: 2em">
           <code>define &lt;name&gt; msgConfig</code><br>
         </div>
-      </li>
+      </ul>
     </ul>
 
 =end html
@@ -209,15 +380,14 @@ sub msgConfig_Undefine($$) {
       msgConfig
     </h3>
     <ul>
-      <li>Stellt globale Einstellungen für das FHEM Kommando <a href="#MSG">msg</a> bereit.<br>
+      Stellt globale Einstellungen für das FHEM Kommando <a href="#MSG">msg</a> bereit.<br>
         <br>
-      </li>
-      <li>
+      <ul>
         <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
         <div style="margin-left: 2em">
           <code>define &lt;name&gt; msgConfig</code><br>
         </div>
-      </li>
+      </ul>
     </ul>
 
 =end html_DE
