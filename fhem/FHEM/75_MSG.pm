@@ -141,7 +141,7 @@ s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
 
     # check for given recipients
     if ( $msg =~
-s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|]*)[\s\t]+//
+s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
       )
     {
         $recipients = $1;
@@ -272,6 +272,13 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     }
                     elsif ( $device =~ s/^@(.*)// ) {
                         $device = $1;
+                    }
+
+                    # sub-recipient
+                    my $subRecipient = "";
+                    if ( $device =~ s/^@?(.*):(.*)$// ) {
+                        $device      = $1;
+                        $subRecipient = $2;
                     }
 
                     # FATAL ERROR: device does not exist
@@ -468,10 +475,10 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                     foreach my $gatewayDev ( split /,/,
                                         $gatewayDevOr )
                                     {
-                                        my $subRecipient = "";
+                                      my $tmpSubRecipient;
                                         if ( $gatewayDev =~ s/:(.*)//)
                                         {
-                                            $subRecipient = $1;
+                                            $tmpSubRecipient = $1;
                                         }                                        
 
                                         if (   $type[$i] ne "mail"
@@ -1476,10 +1483,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     foreach my $gatewayDevOr ( split /\|/, $gatewayDevs ) {
                         foreach my $gatewayDev ( split /,/, $gatewayDevOr ) {
 
-                            my $subRecipient = "";
                             if ( $gatewayDev =~ s/:(.*)//)
                             {
-                                $subRecipient = $1;
+                                $subRecipient = $1 if ($subRecipient eq "");
                             }                                        
 
                             Log3 $logDevice, 5,
