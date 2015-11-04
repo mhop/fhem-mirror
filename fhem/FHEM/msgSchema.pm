@@ -102,9 +102,9 @@ my $db = {
   'mail' => {
 
     'fhemMsgMail' => {
-      'Normal'  => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\'")}',
-      'High'    => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\' -a \'X-Priority: 1 (Highest)\' -a \'X-MSMail-Priority: High\' -a \'Importance: high\'")}',
-      'Low'     => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' -t \'%DEVICE%\' -a \'MIME-Version: 1.0\' -a \'Content-Type: text/html; charset=UTF-8\' -a \'X-Priority: 5 (Lowest)\' -a \'X-MSMail-Priority: Low\' -a \'Importance: low\'")}',
+      'Normal'  => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' \'%DEVICE%\'")}',
+      'High'    => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'[High] %TITLE%\' \'%DEVICE%\'")}',
+      'Low'     => '{system("echo \'%MSG%\' | /usr/bin/mail -s \'[Low] %TITLE%\' \'%DEVICE%\'")}',
     },
 
   },
