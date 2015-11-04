@@ -3,19 +3,20 @@
 var cm_loaded = 0;
 var cm_active = 0;
 var cm_attr = {
-    matchBrackets:    true,
-    autoRefresh:      true,
-    search:           true,
-    comment:          true,
-    autocomplete:     true,
-    autoCloseBrackets:true,
-    indentUnit:       4,
-    type:             "fhem",
-    theme:            "blackboard",
-    indentWithTabs:   true,
-    autofocus:        true,
-    lineNumbers:      true,
-    smartIndent:      false,
+    matchBrackets:      true,
+    autoRefresh:        true,
+    search:             true,
+    comment:            true,
+    autocomplete:       true,
+    autocompleteAlways: true,
+    autoCloseBrackets:  true,
+    indentUnit:         4,
+    type:               "fhem",
+    theme:              "blackboard",
+    indentWithTabs:     true,
+    autofocus:          true,
+    lineNumbers:        true,
+    smartIndent:        false,
     extraKeys: {
         'Tab': function(cm) {
             if (cm.somethingSelected()) {
@@ -148,6 +149,15 @@ function cm_wait(cm_editor, callback, recursions) {
     }
 
     var cm = CodeMirror.fromTextArea(cm_editor, cm_attr);
+
+    if (cm_attr.autocomplete && cm_attr.autocompleteAlways) {
+        cm.on("keyup", function (cm, event) {
+            if ( !cm.state.completionActive && String.fromCharCode(event.keyCode).match(/\w/) ) {
+                CodeMirror.commands.autocomplete(cm, null, {completeSingle: false});
+            }
+        });
+    }
+
     if(callback)
         callback(cm);
 }
