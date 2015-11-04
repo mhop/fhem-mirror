@@ -419,7 +419,7 @@ HttpUtils_ParseAnswer($$)
   $hash->{hu_filecount} = 0 if(!$hash->{hu_filecount});
   $hash->{hu_filecount}++;
 
-  $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
+  $ret=~ s/(.*?)\r?\n\r?\n//s; # Not greedy: separate the header (F:#43482)
   return ("", $ret) if(!defined($1));
 
   $hash->{httpheader} = $1;
