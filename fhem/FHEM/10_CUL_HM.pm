@@ -540,8 +540,9 @@ sub CUL_HM_Undef($$) {###############################
 }
 sub CUL_HM_Rename($$$) {#############################
   my ($name, $oldName) = @_;
-  my $HMid = CUL_HM_name2Id($name);
   my $hash = $defs{$name};
+  return if($hash->{TYPE} ne "CUL_HM");
+  my $HMid = CUL_HM_name2Id($name);
   if (!$hash->{helper}{role}{dev}){# we are channel, inform the device
     $hash->{chanNo} = substr($HMid,6,2);
     my $devHash = CUL_HM_id2Hash(substr($HMid,0,6));
@@ -550,6 +551,7 @@ sub CUL_HM_Rename($$$) {#############################
   }
   else{# we are a device - inform channels if exist
     foreach (grep (/^channel_/, keys%{$hash})){
+      next if(!$_);
       my $chnHash = $defs{$hash->{$_}};
       $chnHash->{device} = $name;
     }
@@ -8225,8 +8227,13 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   my $ret = "";
   my @el = split",",$name;
   my ($fName,$tmpl) = split":",$template;
-  $tmpl = $name if(!$fName);
-  ($fName,$tmpl) = ("tempList.cfg",$fName) if(!defined $tmpl && defined $fName);
+  if(!$tmpl){ # just a template - switch
+    $tmpl = $fName ? $fName: $name;
+    $fName = (eval "defined(&HMinfo_tempListDefFn)")
+                              ? HMinfo_tempListDefFn()
+                              : "./tempList.cfg";
+  }
+  
   return "file: $fName for $name does not exist"  if (!(-e $fName));
   open(aSave, "$fName") || return("Can't open $fName: $!");
   my $found = 0;

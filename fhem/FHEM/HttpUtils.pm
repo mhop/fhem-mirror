@@ -243,7 +243,7 @@ HttpUtils_Connect2($)
   if(defined($hash->{header})) {
     if( ref($hash->{header}) eq 'HASH' ) {
       $hash->{header} = join("\r\n",
-        map(($_.': '.$hash->{header}{$_}), keys($hash->{header})));
+        map(($_.': '.$hash->{header}{$_}), keys %{$hash->{header}}));
       }
    }
 
