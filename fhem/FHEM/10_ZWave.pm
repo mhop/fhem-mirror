@@ -612,7 +612,7 @@ ZWave_Cmd($$@)
   # Collect the commands from the distinct classes
   my %cmdList;
   my $classes = AttrVal($name, "classes", "");
-  my $cfgReq = ($type eq "set" && $cmd =~ m/^config/ && @a&&$a[0] eq "request");
+  my $cfgReq = ($type eq "set" && $cmd =~ m/^config/ && @a && $a[0] eq "request");
   shift(@a) if($cfgReq);
   foreach my $cl (split(" ", $classes)) {
     my $ptr = ZWave_getHash($hash, $cl, $cfgReq ? "get" : $type);
@@ -624,6 +624,10 @@ ZWave_Cmd($$@)
         $cmdList{$k}{id}  = $zwave_class{$cl}{id};
       }
     }
+  }
+
+  if ($cfgReq) {
+    $type="get";
   }
 
   my $id = $hash->{nodeIdHex};
@@ -753,10 +757,9 @@ ZWave_Cmd($$@)
     #check message here for needed encryption (SECURITY)
     if(ZWave_secIsSecureClass($hash, $cc_cmd)) {
       ZWave_secStart($hash);
-      my $interceptedMSG = $cc_cmd . $payload;
       # message stored in reading, will be processed when nonce arrives
       my $cmd2 = "$type $name $cmd ".join(" ", @a);
-      ZWave_secPutMsg($hash, $interceptedMSG, $cmd2);
+      ZWave_secPutMsg($hash, $cc_cmd . $payload, $cmd2);
       return ZWave_Cmd("get", $hash, $name, "secNonce");
     }
   }
@@ -916,7 +919,6 @@ Zwave_meterGet($)
     return("argument must be one of: 0 to 6","");
   } else {
     $scale = $scale << 3;
-    #~ Log 1, "cmd" .sprintf('01%02x', $scale);
     return("",sprintf('01%02x', $scale));
   };
 
@@ -2005,7 +2007,6 @@ ZWave_secNonceReceived($$)
   {
     return;
   }
-  setReadingsVal($hash, "received_nonce", $r_nonce_hex, TimeNow());
 
   # If a nonce is received during secure_Include, send the networkkey...
   if ($hash->{secStatus} && ($hash->{secStatus} == 2)) {
@@ -2223,7 +2224,7 @@ ZWave_secDecrypt($$$)
     return "";
   }
 
-  readingsSingleUpdate($hash, "send_nonce", undef, 0);
+  delete $hash->{READINGS}{send_nonce};
 
   # encrypted message format:
   # data=  bcb328fe5d924a402b2901fc2699cc3bcacd30e0
@@ -2233,7 +2234,6 @@ ZWave_secDecrypt($$$)
   # 2699cc3bcacd30e0 = 8 byte authentification code
   if ($data !~ m/^(................)(.*)(..)(................)$/) {
     Log3 $name, 1, "$name: Error, wrong format of encrypted msg";
-    #return (undef, undef);
     ZWave_secEnd($hash);
     return "";
   }
