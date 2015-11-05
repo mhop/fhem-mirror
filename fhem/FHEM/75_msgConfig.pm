@@ -70,16 +70,16 @@ sub msgConfig_Initialize($) {
       msgCmdScreen
       msgCmdScreenHigh
       msgCmdScreenLow
-      msgFwPrioAbsentAudio
-      msgFwPrioAbsentLight
-      msgFwPrioAbsentScreen
-      msgFwPrioEmergencyAudio
-      msgFwPrioEmergencyLight
-      msgFwPrioEmergencyPush
-      msgFwPrioEmergencyScreen
-      msgFwPrioGoneAudio
-      msgFwPrioGoneLight
-      msgFwPrioGoneScreen
+      msgFwPrioAbsentAudio:-2,-1,0,1,2
+      msgFwPrioAbsentLight:-2,-1,0,1,2
+      msgFwPrioAbsentScreen:-2,-1,0,1,2
+      msgFwPrioEmergencyAudio:-2,-1,0,1,2
+      msgFwPrioEmergencyLight:-2,-1,0,1,2
+      msgFwPrioEmergencyPush:-2,-1,0,1,2
+      msgFwPrioEmergencyScreen:-2,-1,0,1,2
+      msgFwPrioGoneAudio:-2,-1,0,1,2
+      msgFwPrioGoneLight:-2,-1,0,1,2
+      msgFwPrioGoneScreen:-2,-1,0,1,2
       msgLocationDevs
       msgPriorityAudio:-2,-1,0,1,2
       msgPriorityLight:-2,-1,0,1,2
@@ -192,10 +192,18 @@ sub msgConfig_Get($@) {
 
     $what = $a[1];
 
-    if ( lc($what) eq "routecmd" ) {
+    # cleanReadings
+    if ( lc($what) eq "cleanreadings" ) {
+        my $device = defined($a[2]) ? $a[2] : ".*";
+
+        return fhem ("deletereading $device fhemMsg.*");
+    }
+
+    # routeCmd
+    elsif ( lc($what) eq "routecmd" ) {
         my $return = "";
         my $msgTypesReq = defined($a[2]) ? lc($a[2]) : join( ',', @msgTypes );
-        my $devicesReq = defined($a[3]) ? $a[3] : "";
+        my $devicesReq = defined($a[3]) ? $a[3] : $name;
         my $cmdSchema = msgSchema::get();
         my $UserDeviceTypes = "";
 
@@ -205,12 +213,10 @@ sub msgConfig_Get($@) {
           if ($devicesReq ne "") {
             foreach my $device (split( /,/, $devicesReq )) {
               if (defined($defs{$device})) {
-                $return .= "USER DEFINED COMMANDS FOR MESSAGE TYPE '".uc($msgType)."'\n-------------------------------------------------------------------------------\n\n";
-                $return .= "  $device (DEVICE TYPE: ".$defs{$device}{TYPE}.")\n";
-                $UserDeviceTypes .= ",".$defs{$device}{TYPE} if ($UserDeviceTypes ne "" && $msgType ne "mail");
-                $UserDeviceTypes = $defs{$device}{TYPE} if ($UserDeviceTypes eq "" && $msgType ne "mail");
-                $UserDeviceTypes .= ",fhemMsgMail" if ($UserDeviceTypes ne "" && $msgType eq "mail");
-                $UserDeviceTypes = "fhemMsgMail" if ($UserDeviceTypes eq "" && $msgType eq "mail");
+                $UserDeviceTypes .= ",".$defs{$device}{TYPE} if ($UserDeviceTypes ne "" && $msgType ne "mail" && $device ne $name);
+                $UserDeviceTypes = $defs{$device}{TYPE} if ($UserDeviceTypes eq "" && $msgType ne "mail" && $device ne $name);
+                $UserDeviceTypes .= ",fhemMsgMail" if ($UserDeviceTypes ne "" && $msgType eq "mail" && $device ne $name);
+                $UserDeviceTypes = "fhemMsgMail" if ($UserDeviceTypes eq "" && $msgType eq "mail" && $device ne $name);
 
                   my $typeUc = ucfirst($msgType);
 
@@ -218,6 +224,7 @@ sub msgConfig_Get($@) {
                   @priorities = ("Normal", "ShortPrio", "Short") if ($msgType eq "audio");
                   @priorities = ("Normal", "High", "Low") if ($msgType ne "audio");
 
+                  my $output = 0;
                   foreach my $prio (@priorities) {
                     my $priorityCat;
                     $priorityCat = $prio if ($prio ne "Normal");
@@ -273,8 +280,13 @@ sub msgConfig_Get($@) {
                                     )
                                 );
 
+                      next if ($cmd eq "" && $device eq $name && $output == 0);
+                      $return .= uc($msgType).": USER DEFINED COMMANDS WITH PRECEDENCE\n-------------------------------------------------------------------------------\n\n" if ($output == 0);
+                      $return .= "  $device (DEVICE TYPE: ".$defs{$device}{TYPE}.")\n" if ($output == 0);
+                      $output = 1 if ($output == 0);
+
                       $return .= "    Priority $prio:\n      $cmd\n" if ($cmd ne "");
-                      $return .= "    Priority $prio:\n      [DEFAULT]\n" if ($cmd eq "");
+                      $return .= "    Priority $prio:\n      [DEFAULT COMMAND]\n" if ($cmd eq "");
                   }
 
                 
@@ -291,7 +303,7 @@ sub msgConfig_Get($@) {
 
             my $deviceTypes = $devicesReq;
             $deviceTypes = join(',', keys $cmdSchema->{$msgType})
-              if ($deviceTypes eq "");
+              if ($deviceTypes eq "" || $devicesReq eq $name);
             $deviceTypes = $UserDeviceTypes
               if ($UserDeviceTypes ne "");
 
@@ -299,7 +311,7 @@ sub msgConfig_Get($@) {
             foreach my $deviceType (split( /,/, $deviceTypes )) {
 
               if (defined($cmdSchema->{$msgType}{$deviceType})) {
-                $return .= "DEFAULT COMMANDS FOR MESSAGE TYPE '".uc($msgType)."'\n-------------------------------------------------------------------------------\n\n"
+                $return .= uc($msgType).": DEFAULT COMMANDS\n-------------------------------------------------------------------------------\n\n"
                   if ($outout == 0);
                 $outout = 1;
                 $return .= "  $deviceType\n";
@@ -330,19 +342,20 @@ sub msgConfig_Get($@) {
 
             }
           } else {
-            $return .= "Unknown messaging type $msgType.\n";
+            $return .= "Unknown messaging type '$msgType'\n" if ($msgType ne "text");
+            $return .= "Messaging type 'text' does not have dedicated routing commands. This is a wrapper type to dynamically distinguish between push and mail.\n" if ($msgType eq "text");
           }
 
           $return .= "\n" if ($return ne "");
         }
 
-        $return = "Non-existing device or module name: $devicesReq" if ($return eq "");
+        $return = "Non-existing device or unknown module messaging schema definition: $devicesReq" if ($return eq "");
         return $return;
     }
 
     else {
         return
-"Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen";
+"Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen cleanReadings";
     }
 }
 
