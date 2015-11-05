@@ -4,32 +4,40 @@
 #
 #  $Id$
 #
-#  Version 1.8
+#  Version 1.9
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
 ################################################################
 #
-#  define <name> HMCCU <host_or_ip>
+#  define <name> HMCCU <host_or_ip> [<read_interval>]
 #
-#  set <name> devstate <ccu_object> <value>
-#  set <name> datapoint <device>:<channel>.<datapoint> <value>
-#  set <name> var <value>
+#  set <name> devstate <ccu_object> <value> [...]
+#  set <name> datapoint <device>:<channel>.<datapoint> <value> [...]
+#  set <name> var <value> [...]
 #  set <name> execute <ccu_program>
 #  set <name> clearmsg
 #
+#  get <name> devicelist
 #  get <name> devstate <ccu_object> [<reading>]
 #  get <name> vars <regexp>[,...]
 #  get <name> channel <device>:<channel>[.<datapoint_exp>]
 #  get <name> datapoint <channel>.<datapoint> [<reading>]
 #  get <name> parfile [<parfile>]
 #
+#  attr <name> ccureadingformat { name | address }
 #  attr <name> ccureadings { 0 | 1 }
-#  attr <name> stripchar <character>
 #  attr <name> parfile <parfile>
-#  attr <name> stateval <text1>:<subtext1>[,...]
+#  attr <name> rpcinterval { 3 | 5 | 10 }
+#  attr <name> rpcport <ccu_rpc_port>
+#  attr <name> rpcserver { on | off }
+#  attr <name> statevals <text1>:<subtext1>[,...]
+#  attr <name> stripchar <character>
 #  attr <name> substitute <regexp1>:<subtext1>[,...]
 #
+#  Notes:
+#
+#  - Attribute 'unit' is no longer supported.
 ################################################################
 
 package main;
@@ -38,18 +46,57 @@ use strict;
 use warnings;
 use SetExtensions;
 use XML::Simple qw(:strict);
+use File::Queue;
 # use Data::Dumper;
 
+# CCU Device names, key = CCU device address
+my %HMCCU_Devices;
+# CCU Device addresses, key = CCU device name
+my %HMCCU_Addresses;
+
+# Flags for CCU object specification
+my $HMCCU_FLAG_NAME      = 1;
+my $HMCCU_FLAG_CHANNEL   = 2;
+my $HMCCU_FLAG_DATAPOINT = 4;
+my $HMCCU_FLAG_ADDRESS   = 8;
+my $HMCCU_FLAG_INTERFACE = 16;
+
+# Valid flag combinations
+my $HMCCU_FLAGS_IACD = $HMCCU_FLAG_INTERFACE | $HMCCU_FLAG_ADDRESS |
+	$HMCCU_FLAG_CHANNEL | $HMCCU_FLAG_DATAPOINT;
+my $HMCCU_FLAGS_IAC = $HMCCU_FLAG_INTERFACE | $HMCCU_FLAG_ADDRESS |
+	$HMCCU_FLAG_CHANNEL;
+my $HMCCU_FLAGS_ACD = $HMCCU_FLAG_ADDRESS | $HMCCU_FLAG_CHANNEL |
+	$HMCCU_FLAG_DATAPOINT;
+my $HMCCU_FLAGS_AC = $HMCCU_FLAG_ADDRESS | $HMCCU_FLAG_CHANNEL;
+my $HMCCU_FLAGS_ND = $HMCCU_FLAG_NAME | $HMCCU_FLAG_DATAPOINT;
+my $HMCCU_FLAGS_NC = $HMCCU_FLAG_NAME | $HMCCU_FLAG_CHANNEL;
+my $HMCCU_FLAGS_NCD = $HMCCU_FLAG_NAME | $HMCCU_FLAG_CHANNEL |
+	$HMCCU_FLAG_DATAPOINT;
+
+# Declare functions
 sub HMCCU_Define ($$);
 sub HMCCU_Undef ($$);
 sub HMCCU_Set ($@);
 sub HMCCU_Get ($@);
 sub HMCCU_Attr ($@);
-sub HMCCU_ParseCCUDev ($);
+sub HMCCU_ParseObject ($$);
+sub HMCCU_GetReadingName ($$$$$$);
 sub HMCCU_SetError ($$);
 sub HMCCU_SetState ($$);
 sub HMCCU_Substitute ($$);
-sub HMCCU_UpdateClientReading ($$$);
+sub HMCCU_UpdateClientReading ($$$$);
+sub HMCCU_StartRPCServer ($);
+sub HMCCU_StopRPCServer ($);
+sub HMCCU_IsRPCServerRunning ($);
+sub HMCCU_GetDeviceList ($);
+sub HMCCU_GetAddress ($$$);
+sub HMCCU_GetDeviceName ($$);
+sub HMCCU_GetChannelName ($$);
+sub HMCCU_GetDeviceType ($$);
+sub HMCCU_GetDeviceInterface ($$);
+sub HMCCU_ReadRPCQueue ($);
+
 
 #####################################
 # Initialize module
@@ -65,7 +112,7 @@ sub HMCCU_Initialize ($)
 	$hash->{GetFn} = "HMCCU_Get";
 	$hash->{AttrFn} = "HMCCU_Attr";
 
-	$hash->{AttrList} = "stripchar ccureadings:0,1 parfile stateval substitute units:0,1 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "stripchar ccureadings:0,1 ccureadingformat:name,address rpcinterval:3,5,10 rpcport rpcserver:on,off parfile statevals substitute units:0,1 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
@@ -80,12 +127,10 @@ sub HMCCU_Define ($$)
 
 	return "Define CCU hostname or IP address as a parameter" if(@a < 3);
 
-	my $host = $a[2];
-
-	$hash->{host} = $host;
+	$hash->{host} = $a[2];
 	$hash->{Clients} = ':HMCCUDEV:';
 
-	HMCCU_SetState ($hash, "Initialized");
+	$hash->{DevCount} = HMCCU_GetDeviceList ($hash);
 
 	return undef;
 }
@@ -97,6 +142,21 @@ sub HMCCU_Define ($$)
 sub HMCCU_Attr ($@)
 {
 	my ($cmd, $name, $attrname, $attrval) = @_;
+	my $hash = $defs{$name};
+
+	if (defined ($attrval) && $cmd eq "set") {
+		if ($attrname eq "rpcserver") {
+			if ($attrval eq 'on') {
+				HMCCU_StartRPCServer ($hash);
+				InternalTimer (gettimeofday()+60,
+				   'HMCCU_ReadRPCQueue', $hash, 0);
+			}
+			elsif ($attrval eq 'off') {
+				HMCCU_StopRPCServer ($defs{$name});
+				RemoveInternalTimer ($hash);
+			}
+		}
+	}
 
 	return undef;
 }
@@ -109,6 +169,11 @@ sub HMCCU_Undef ($$)
 {
 	my ($hash, $arg) = @_;
 	my $name = $hash->{NAME};
+
+	# Shutdown RPC server
+	HMCCU_StopRPCServer ($hash);
+
+	RemoveInternalTimer ($hash);
 
 	# Delete reference to IO module in client devices
 	foreach my $d (sort keys %defs) {
@@ -130,11 +195,11 @@ sub HMCCU_Set ($@)
 	my ($hash, @a) = @_;
 	my $name = shift @a;
 	my $opt = shift @a;
-	my $options = "devstate datapoint var execute clearmsg";
+	my $options = "devstate datapoint var execute clearmsg:noArg";
 	my $host = $hash->{host};
 
 	my $stripchar = AttrVal ($name, "stripchar", '');
-	my $stateval = AttrVal ($name, "stateval", '');
+	my $statevals = AttrVal ($name, "statevals", '');
 
 	# process set <name> command par1 par2 ...
 	# if more than one parameter is specified parameters
@@ -145,28 +210,48 @@ sub HMCCU_Set ($@)
 		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("';
 
 		if (!defined ($objname) || !defined ($objvalue)) {
-			return HMCCU_SetError ($hash, "Usage: set <device> $opt <objname> <objvalue>");
+			return HMCCU_SetError ($hash, "Usage: set <device> $opt <ccuobject> <objvalue>");
 		}
 
 		$objname =~ s/$stripchar$// if ($stripchar ne '');
-		$objvalue = HMCCU_Substitute ($objvalue, $stateval);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals);
 
-		my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($objname);
-		if ($opt eq 'devstate' || $opt eq 'state' || $opt eq 'var') {
-			if ($flags > 3) {
-				return HMCCU_SetError ($hash, "Specify varname or device:channel");
+		my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($objname, $HMCCU_FLAG_INTERFACE);
+		if ($opt eq 'var') {
+			if ($flags & $HMCCU_FLAG_NAME) {
+				$url .= $objname.'").State("'.$objvalue.'")';
 			}
-			$url = $url.$objname.'").State("'.$objvalue.'")';
+			else {
+				return HMCCU_SetError ($hash, "Invalid variable name");
+			}
+		}
+		elsif ($opt eq 'devstate' || $opt eq 'state') {
+			if ($flags == $HMCCU_FLAGS_NC) {
+				$url .= $objname.'").State("'.$objvalue.'")';
+			}
+			elsif ($flags == $HMCCU_FLAGS_IAC) {
+				$url .= $int.'.'.$add.':'.$chn.'.STATE").State("'.$objvalue.'")';
+			}
+			else {
+				return HMCCU_SetError ($hash, "Object := channelname | [interface.]address:channel");
+			}
 		}
 		else {
-			if ($flags != 7) {
-				return HMCCU_SetError ($hash, "Specify device:channel.datapoint");
+			# Datapoint
+			if ($flags == $HMCCU_FLAGS_IACD) {
+				$url .= $int.'.'.$add.':'.$chn.'.'.$dpt.'").State("'.$objvalue.'")';
 			}
-			$url = $url.$dev.':'.$chn.'").DPByHssDP("'.$dpt.'").State("'.$objvalue.'")';
+			elsif ($flags == $HMCCU_FLAGS_NCD) {
+				$url .= $nam.'").DPByHssDP("'.$dpt.'").State("'.$objvalue.'")';
+			}
+			else {
+				return HMCCU_SetError ($hash, "Object := channelname.datapoint | interface.address:channel.datapoint");
+			}
 		}
 
 		my $response = GetFileFromURL ($url);
 		if ($response =~ /<r1>null</) {
+			Log 1,"HMCCU: Error URL = ".$url;
 			return HMCCU_SetError ($hash, "Error during CCU communication");
 		}
 
@@ -183,11 +268,15 @@ sub HMCCU_Set ($@)
 		my $programid;
 
 		if (!defined ($program)) {
-			return HMCCU_SetError ($hash, "Usage: set <device> execute <program>");
+			return HMCCU_SetError ($hash, "Usage: set <device> execute <program name>");
 		}
 
 		# Query program ID
 		$response = GetFileFromURL ($url);
+		if ($response !~ /^<\?xml.*<programList>.*<\/programList>$/) {
+			return HMCCU_SetError ($hash, "XML-API request error (programlist.cgi)");
+		}
+
 		my $xmlin = XMLin ($response, ForceArray => 0, KeyAttr => ['name']);
 		if (!defined ($xmlin->{program}->{$program}->{id})) {
 			return HMCCU_SetError ($hash, "Program not found");
@@ -225,41 +314,60 @@ sub HMCCU_Get ($@)
 	my ($hash, @a) = @_;
 	my $name = shift @a;
 	my $opt = shift @a;
-	my $options = "devstate datapoint vars channel parfile";
+	my $options = "devicelist:noArg devstate datapoint vars channel parfile";
 	my $host = $hash->{host};
 
-	my $readings = AttrVal ($name, "ccureadings", 1);
+	my $ccureadingformat = AttrVal ($name, "ccureadingformat", 'name');
+	my $ccureadings = AttrVal ($name, "ccureadings", 1);
 	my $parfile = AttrVal ($name, "parfile", '');
+
+	my $readname;
+	my $readaddr;
 
 	if ($opt eq 'state' || $opt eq 'devstate') {
 		my $ccuobj = shift @a;
 		my $reading = shift @a;
 		my $response;
 		my $retcode;
+		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("';
 
 		if (!defined ($ccuobj)) {
 			return HMCCU_SetError ($hash,
-			   "Usage: get <device> devstate <device>:<channel> [<reading>]");
+			   "Usage: get <device> devstate { <channelname> | [<interface>.]<address>:<channel> } [<reading>]");
 		}
 
-		my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($ccuobj);
-		if ($flags != 3) {
-			return HMCCU_SetError ($hash, "Specify <device>:<channel>");
+		my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($ccuobj, $HMCCU_FLAG_INTERFACE);
+		if ($flags == $HMCCU_FLAGS_NC) {
+			$url .= $ccuobj.'").State()';
+			$add = HMCCU_GetAddress ($nam, '', 1);
+		}
+		elsif ($flags == $HMCCU_FLAGS_IAC) {
+			$url .= $int.'.'.$add.':'.$chn.'.STATE").State()';
+		}
+		else {
+			return HMCCU_SetError ($hash, "object := channelname | [interface.]address:channel");
 		}
 
-		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("'.$ccuobj.'").State()';
-		$reading = $ccuobj.".STATE" if (!defined ($reading));
+		# Build reading name
+		if (!defined ($reading)) {
+			$reading = HMCCU_GetReadingName ($int, $add, $chn, 'STATE', $nam,
+			   $ccureadingformat);
+		}
 
+		# Send request to CCU
 		$response = GetFileFromURL ($url);
 		$response =~ m/<r1>(.*)<\/r1>/;
 		$retcode = $1;
 
 		if (defined ($retcode) && $retcode ne '' && $retcode ne 'null') {
 			HMCCU_SetState ($hash, "OK");
-			$retcode = HMCCU_UpdateClientReading ($hash, $reading, $retcode);
-			return $readings ? undef : $retcode;
+			if ($reading ne '') {
+				$retcode = HMCCU_UpdateClientReading ($hash, $add, $reading, $retcode);
+			}
+			return $ccureadings ? undef : $retcode;
 		}
 		else {
+			Log 1,"HMCCU: Error URL = ".$url;
 			return HMCCU_SetError ($hash, "Error during CCU request");
 		}
 	}
@@ -268,18 +376,28 @@ sub HMCCU_Get ($@)
 		my $reading = shift @a;
 		my $response;
 		my $retcode;
+		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("';
 
 		if (!defined ($ccuobj)) {
 			return HMCCU_SetError ($hash,
-			   "Usage: get <device> datapoint <device>:<channel>.<datapoint> [<reading>]");
-		}
-		my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($ccuobj);
-		if ($flags != 7) {
-			return HMCCU_SetError ($hash, "Specify device:channel.datapoint");
+			   "Usage: get <device> datapoint { <channelname>.<datapoint> | [<interface>.]<address>:<channel>.<datapoint> } [<reading>]");
 		}
 
-		my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("'.$dev.':'.$chn.'").DPByHssDP("'.$dpt.'").Value()';
-		$reading = $ccuobj if (!defined ($reading));
+		my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($ccuobj, $HMCCU_FLAG_INTERFACE);
+		if ($flags == $HMCCU_FLAGS_IACD) {
+			$url .= $int.'.'.$add.':'.$chn.'.'.$dpt.'").State()';
+		}
+		elsif ($flags == $HMCCU_FLAGS_NCD) {
+			$url .= $nam.'").DPByHssDP("'.$dpt.'").State()';
+			$add = HMCCU_GetAddress ($nam, '', 1);
+		}
+		else {
+			return HMCCU_SetError ($hash, "object := channelname.datapoint | [interface.]address:channel.datapoint");
+		}
+
+		if (!defined ($reading)) {
+			$reading = HMCCU_GetReadingName ($int, $add, $chn, $dpt, $nam, $ccureadingformat);
+		}
 
 		$response = GetFileFromURL ($url);
 		$response =~ m/<r1>(.*)<\/r1>/;
@@ -287,10 +405,13 @@ sub HMCCU_Get ($@)
 
 		if (defined ($retcode) && $retcode ne '' && $retcode ne 'null') {
 			HMCCU_SetState ($hash, "OK");
-			$retcode = HMCCU_UpdateClientReading ($hash, $ccuobj, $retcode);
-			return $readings ? undef : $retcode;
+			if ($reading ne '') {
+				$retcode = HMCCU_UpdateClientReading ($hash, $add, $reading, $retcode);
+			}
+			return $ccureadings ? undef : $retcode;
 		}
 		else {
+			Log 1,"HMCCU: Error URL = ".$url;
 			return HMCCU_SetError ($hash, "Error during CCU request");
 		}
 	}
@@ -307,9 +428,13 @@ sub HMCCU_Get ($@)
 		my @varlist = split /,/, $varname;
 
 		$response = GetFileFromURL ($url);
+		if ($response !~ /^<\?xml.*<systemVariables>.*<\/systemVariables>$/) {
+			return HMCCU_SetError ($hash, "XML-API request error (sysvarlist.cgi)");
+		}
+
 		my $xmlin = XMLin ($response, ForceArray => 0, KeyAttr => ['systemVariable']);
 
-		if ($readings) {
+		if ($ccureadings) {
 			readingsBeginUpdate ($hash);
 		}
 
@@ -317,18 +442,20 @@ sub HMCCU_Get ($@)
 			foreach my $varexp (@varlist) {
 				if ($variable->{name} =~ /$varexp/) {
 					$result .= $variable->{name}."=".$variable->{value}."\n";
-					if ($readings) {
+					if ($ccureadings) {
 						readingsBulkUpdate ($hash, $variable->{name}, $variable->{value}); 
 					}
 				}
 			}
 		}
 
-		if ($readings) {
+		if ($ccureadings) {
 			readingsEndUpdate ($hash, 1);
+			HMCCU_SetState ($hash, "OK");
 			return undef;
 		}
 		else {
+			HMCCU_SetState ($hash, "OK");
 			return $result;
 		}
 	}
@@ -338,41 +465,63 @@ sub HMCCU_Get ($@)
 		my $response;
 		my $result = '';
 		my $rname;
+		my $devname = '';
+		my $chnname = '';
 
-		my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($param);
-		if (($flags & 3 ) != 3) {
-			return HMCCU_SetError ($hash,
-			   "Usage: get <device> channel <ccudev>:<channel>[.<datapoint>]");
-		}
+		my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($param,
+		   $HMCCU_FLAG_INTERFACE | $HMCCU_FLAG_DATAPOINT);
 
-		my $devch = $dev.':'.$chn;
-		$response = GetFileFromURL ($url);
-		my $xmlin = XMLin ($response,
-		   ForceArray => ['device', 'channel', 'datapoint'],
-		   KeyAttr => { device => 'name', channel => 'name' }
-		);
-		if (!defined (@{$xmlin->{device}->{$dev}->{channel}->{$devch}->{datapoint}})) {
-			return HMCCU_SetError ($hash, "Device or channel not defined");
-		}
-
-		my @dps = @{$xmlin->{device}->{$dev}->{channel}->{$devch}->{datapoint}};
-
-		foreach my $dp (@dps) {
-			if ($dp->{name} =~ /$dpt/) {
-				my $dpname = $dp->{name};
-				my $v = $dp->{value};
-
-				$dpname =~ /.*\.(.*)$/;
-				$rname = $devch.".$1";
-
-				$v = HMCCU_UpdateClientReading ($hash, $rname, $v);
-				$result .= $rname."=".$v."\n";
+		if ($flags == $HMCCU_FLAGS_NCD || $flags == $HMCCU_FLAGS_IACD) {
+			$response = GetFileFromURL ($url);
+			if ($response !~ /^<\?xml.*<stateList>.*<\/stateList>$/) {
+				return HMCCU_SetError ($hash, "XML-API request error (statelist.cgi)");
 			}
+
+			if ($flags == $HMCCU_FLAGS_IACD) {
+				$devname = HMCCU_GetDeviceName ($add, '');
+				$chnname = HMCCU_GetChannelName ($add.':'.$chn, '');
+				if ($devname eq '' || $chnname eq '') {
+					return HMCCU_SetError ($hash, "Device name or channel name not found for address $add");
+				}
+			}
+			else {
+				$chnname = $nam;
+				$add = HMCCU_GetAddress ($nam, '', 1);
+				$devname = HMCCU_GetDeviceName ($add, '');
+			}
+
+			my $xmlin = XMLin ($response,
+			   ForceArray => ['device', 'channel', 'datapoint'],
+			   KeyAttr => { device => 'name', channel => 'name' }
+			);
+			if (!defined (@{$xmlin->{device}->{$devname}->{channel}->{$chnname}->{datapoint}})) {
+				return HMCCU_SetError ($hash, "Device $devname or channel $chnname not defined in CCU");
+			}
+
+			my @dps = @{$xmlin->{device}->{$devname}->{channel}->{$chnname}->{datapoint}};
+
+			foreach my $dp (@dps) {
+				if ($dp->{name} =~ /$dpt/) {
+					my $dpname = $dp->{name};
+					my $v = $dp->{value};
+
+					$dpname =~ /.*\.(.*)$/;
+					$rname = HMCCU_GetReadingName ($int, $add, $chn, $1,
+					   $chnname, $ccureadingformat);
+					if ($rname ne '') {
+						$v = HMCCU_UpdateClientReading ($hash, $add, $rname, $v);
+					}
+					$result .= $rname."=".$v."\n";
+				}
+			}
+		}
+		else {
+			HMCCU_SetError ($hash, "object := channelname.datapoint_expression | [interface.]address:channel.datapoint_expression");
 		}
 
 		HMCCU_SetState ($hash, "OK");
 
-		return $readings ? undef : $result;
+		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'parfile') {
 		my $par_parfile = shift @a;
@@ -383,14 +532,14 @@ sub HMCCU_Get ($@)
 		my $result = '';
 		my $rname;
 		my $text;
+		my $devname = '';
+		my $chnname = '';
 
 		if (defined ($par_parfile)) {
 			$parfile = $par_parfile;
 		}
 		else {
-			if ($parfile eq '') {
-				return HMCCU_SetError ($hash, "No parameter file specified");
-			}
+			return HMCCU_SetError ($hash, "No parameter file specified") if ($parfile eq '');
 		}
 
 		# Read parameter file
@@ -403,32 +552,58 @@ sub HMCCU_Get ($@)
 			return HMCCU_SetError ($hash, "Can't open file $parfile");
 		}
 
-		if ($parcount < 1) {
-			return HMCCU_SetError ($hash, "Empty parameter file");
-		}
+		return HMCCU_SetError ($hash, "Empty parameter file") if ($parcount < 1);
 
 		$response = GetFileFromURL ($url);
+		if ($response !~ /^<\?xml.*<stateList>.*<\/stateList>$/) {
+			return HMCCU_SetError ($hash, "XML-API request error (statelist.cgi)");
+		}
+
 		my $xmlin = XMLin (
 		   $response,
 		   ForceArray => ['device', 'channel', 'datapoint'],
 		   KeyAttr => { device => 'name', channel => 'name' }
 		);
 
+		my $lineno = 0;
 		foreach my $param (@parameters) {
 			my @partoks = split /\s+/, $param;
+			$lineno++;
 
 			# Ignore empty lines or comments
 			next if (scalar @partoks == 0);
 			next if ($partoks[0] =~ /^#/);
 
-			# Ignore wrong CCU device specifications
-			my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($partoks[0]);
-			next if (($flags & 3) != 3);
-			my $devch = $dev.':'.$chn;
+			my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($partoks[0],
+			   $HMCCU_FLAG_INTERFACE | $HMCCU_FLAG_DATAPOINT);
+
+			# Ignore wrong CCU object specifications
+			if ($flags != $HMCCU_FLAGS_IACD && $flags != $HMCCU_FLAGS_NCD) {
+				Log 1, "Invalid CCU object name or address ".$partoks[0]." in line $lineno";
+				next;
+			}
+
+			if ($flags == $HMCCU_FLAGS_IACD) {
+				$devname = HMCCU_GetDeviceName ($add, '');
+				$chnname = HMCCU_GetChannelName ($add.':'.$chn, '');
+				if ($devname eq '' || $chnname eq '') {
+					Log 1, "Device name or channel name not found for address $add in line $lineno";
+					next;
+				}
+			}
+			else {
+				$chnname = $nam;
+				$add = HMCCU_GetAddress ($nam, '', 1);
+				$devname = HMCCU_GetDeviceName ($add, '');
+			}
 
 			# Ignore not existing devices/channels/datapoints
-			next if (!defined (@{$xmlin->{device}->{$dev}->{channel}->{$devch}->{datapoint}}));
-			my @dps = @{$xmlin->{device}->{$dev}->{channel}->{$devch}->{datapoint}};
+			if (!defined (@{$xmlin->{device}->{$devname}->{channel}->{$chnname}->{datapoint}})) {
+				Log 1,"Device $devname or channel $chnname not defined in CCU in line $lineno";
+				next;
+			}
+
+			my @dps = @{$xmlin->{device}->{$devname}->{channel}->{$chnname}->{datapoint}};
 
 			foreach my $dp (@dps) {
 				if ($dp->{name} =~ /$dpt/) {
@@ -437,8 +612,11 @@ sub HMCCU_Get ($@)
 
 					$v = HMCCU_Substitute ($v, $partoks[1]) if (@partoks > 1);
 					$dpname =~ /.*\.(.*)$/;
-					$rname = $devch.".$1";
-					$v = HMCCU_UpdateClientReading ($hash, $rname, $v);
+					$rname = HMCCU_GetReadingName ($int, $add, $chn, $1,
+					   $chnname, $ccureadingformat);
+					if ($rname ne '') {
+						$v = HMCCU_UpdateClientReading ($hash, $add, $rname, $v);
+					}
 					$result .= $rname."=".$v.' '.$dp->{valueunit}."\n";
 				}
 			}
@@ -446,7 +624,16 @@ sub HMCCU_Get ($@)
 
 		HMCCU_SetState ($hash, "OK");
 
-		return $readings ? undef : $result;
+		return $ccureadings ? undef : $result;
+	}
+	elsif ($opt eq 'devicelist') {
+		$hash->{DevCount} = HMCCU_GetDeviceList ($hash);
+
+		if ($hash->{DevCount} > 0) {
+			HMCCU_SetState ($hash, "OK");
+		}
+
+		return undef;
 	}
 	else {
 		return "HMCCU: Unknown argument $opt, choose one of ".$options;
@@ -454,43 +641,120 @@ sub HMCCU_Get ($@)
 }
 
 ##################################################################
-# Parse CCU object name.
+# Parse CCU object specification
 #
-# Input: object name in format device:channel.datapoint
+# Possible syntax for datapoints:
+#   Interface.Address:Channel.Datapoint
+#   Address:Channel.Datapoint
+#   Channelname.Datapoint
 #
-# Output: array with ( device, channel, datapoint, flags )
-#   flag bits: 0=Device 1=Channel 2=Datapoint
+# Possible syntax for channels:
+#   Interface.Address:Channel
+#   Address:Channel
+#   Channelname
+#
+# If object name doesn't match the rules above object is treated
+# as name.
+#
+# Return list of detected attributes:
+#   (Interface, Address, Channel, Datapoint, Name, Flags)
 ##################################################################
 
-sub HMCCU_ParseCCUDev ($)
+sub HMCCU_ParseObject ($$)
 {
-	my $param = $_[0];
-	my $p1 = '?';
-	my $p2 = '?';
-	my $p3 = '.*';
-	my $p4 = 0;
+	my ($object, $flags) = @_;
+	my ($i, $a, $c, $d, $n, $f) = ('', '', '', '', '', '', 0);
 
-	# Syntax of CCU device specification is:
-	# devicename:channelno[.datapoint]
-	if ($param =~ /^.+:/) {
-		$param =~ /^(.*):/;
-		$p1 = $1;
-		$p4 = 1;
+	if ($object =~ /^(.+?)\.([A-Z]{3,3}[0-9]{7,7}):([0-9]{1,2})\.(.+)$/) {
+		#
+		# Interface.Address:Channel.Datapoint [30=11110]
+		#
+		$f = $HMCCU_FLAGS_IACD;
+		($i, $a, $c, $d) = ($1, $2, $3, $4);
+	}
+	elsif ($object =~ /^(.+)\.([A-Z]{3,3}[0-9]{7,7}):([0-9]{1,2})$/) {
+		#
+		# Interface.Address:Channel [26=11010]
+		#
+		$f = $HMCCU_FLAGS_IAC | ($flags & $HMCCU_FLAG_DATAPOINT);
+		($i, $a, $c, $d) = ($1, $2, $3, $flags & $HMCCU_FLAG_DATAPOINT ? '.*' : '');
+	}
+	elsif ($object =~ /^([A-Z]{3,3}[0-9]{7,7}):([0-9]){1,2}\.(.+)$/) {
+		#
+		# Address:Channel.Datapoint [14=01110]
+		#
+		$f = $HMCCU_FLAGS_ACD | ($flags & $HMCCU_FLAG_INTERFACE);
+		($i, $a, $c, $d) = ($flags & $HMCCU_FLAG_INTERFACE ? 'BidCos-RF' : '', $1, $2, $3);;
+	}
+	elsif ($object =~ /^([A-Z]{3,3}[0-9]{7,7}):([0-9]){1,2}$/) {
+		#
+		# Address:Channel [10=01010]
+		#
+		$f = $HMCCU_FLAGS_AC | ($flags & $HMCCU_FLAG_DATAPOINT) | ($flags & $HMCCU_FLAG_INTERFACE);
+		($i, $a, $c, $d) = ($flags & $HMCCU_FLAG_INTERFACE ? 'BidCos-RF' : '', $1, $2,
+		   $flags & $HMCCU_FLAG_DATAPOINT ? '.*' : '');
+	}
+	elsif ($object =~ /^(.+?)\.(.+)$/) {
+		#
+		# Name.Datapoint
+		#
+		$f = $HMCCU_FLAGS_ND;
+		($n, $d) = ($1, $2);
+	}
+	elsif ($object =~ /^.+$/) {
+		#
+		# Name [1=00001]
+		#
+		$f = $HMCCU_FLAG_NAME | ($flags & $HMCCU_FLAG_DATAPOINT);
+		($n, $d) = ($object, $flags & $HMCCU_FLAG_DATAPOINT ? '.*' : '');
+	}
+	else {
+		$f = 0;
+	}
 
-		if ($param =~ /^.+:[0-9]+/) {
-			$param =~ /^.*:([0-9]+)/;
-			$p2 = $1;
-			$p4 |= 2;
-
-			if ($param =~ /\..*$/) {
-				$param =~ /\.(.*)$/;
-				$p3 = $1;
-				$p4 |= 4;
-			}
+	# Check if name is a valid channel name
+	if ($f & $HMCCU_FLAG_NAME) {
+		my $add = HMCCU_GetAddress ($n, '', 0);
+		if ($add ne '' && $add =~ /:[0-9]$/) {
+			$f = $f | $HMCCU_FLAG_CHANNEL;
 		}
 	}
 
-	return ($p1, $p2, $p3, $p4);
+	return ($i, $a, $c, $d, $n, $f);
+}
+
+sub HMCCU_GetReadingName ($$$$$$)
+{
+	my ($i, $a, $c, $d, $n, $rf) = @_;
+
+	return '' if ($d eq '');
+
+	if (($a eq '' || $c eq '') && $n ne '') {
+		$a = HMCCU_GetAddress ($n, '', 0);
+		if ($a =~ /:[0-9]+$/) {
+			$c = $a;
+			$a =~ s/:[0-9]+$//;
+			$c =~ s/^.+://;
+		}
+		$i = HMCCU_GetDeviceInterface ($n, '');
+	}
+	elsif ($a ne '' && $n eq '') {
+		if ($c ne '') {
+			$n = HMCCU_GetChannelName ($a.":".$c, '');
+		}
+		else {
+			$n = HMCCU_GetDeviceName ($a, '');
+		}
+	}
+
+	$i = HMCCU_GetDeviceInterface ($a, '') if ($a ne '');
+
+	if ($rf eq 'name') {
+		return ($n ne '') ? $n.'.'.$d : '';
+	}
+	else {
+		return ($i ne '' && $a ne '' && $c ne '') ? $i.'.'.$a.':'.$c.'.'.$d : '';
+	}
 }
 
 sub HMCCU_SetError ($$)
@@ -535,29 +799,24 @@ sub HMCCU_Substitute ($$)
 
 ####################################################
 # Update HMCCU readings and client readings.
-# Reading values are substituted with client priority
+# Reading values are substituted if attribute
+# substitute is set in client device.
+# Parameters: hash, clientdev, reading, value
 ####################################################
 
-sub HMCCU_UpdateClientReading ($$$)
+sub HMCCU_UpdateClientReading ($$$$)
 {
-	my ($hash, $reading, $value) = @_;
+	my ($hash, $clientadd, $reading, $value) = @_;
 	my $name = $hash->{NAME};
 
 	my $hmccu_substitute = AttrVal ($name, 'substitute', '');
 	my $hmccu_updreadings = AttrVal ($name, 'ccureadings', 1);
 
 	# Check syntax
-	return 0 if (!defined ($hash) || !defined ($reading) || !defined ($value));
+	return 0 if (!defined ($hash) || !defined ($clientadd) ||
+	   !defined ($reading) || !defined ($value));
 
-	# Get CCU device name from reading name
-	my ($dev, $chn, $dpt, $flags) = HMCCU_ParseCCUDev ($reading);
-	return 0 if ($flags == 0);
-
-	# Update HMCCU reading
-	my $hmccu_value = HMCCU_Substitute ($value, $hmccu_substitute);
-	if ($hmccu_updreadings) {
-		readingsSingleUpdate ($hash, $reading, $hmccu_value, 1);
-	}
+	my $hmccu_value = '';
 
 	# Update client readings
 	foreach my $d (keys %defs) {
@@ -565,31 +824,303 @@ sub HMCCU_UpdateClientReading ($$$)
 		my $ch = $defs{$d};
 
 		if (defined ($ch->{IODev}) && $ch->{IODev} == $hash &&
-		    defined ($ch->{ccudev}) && $ch->{ccudev} eq $dev) {
+		    defined ($ch->{ccuaddr}) && $ch->{ccuaddr} eq $clientadd) {
 			my $upd = AttrVal ($ch->{NAME}, 'ccureadings', 1);
+			my $crf = AttrVal ($ch->{NAME}, 'ccureadingformat', 'name');
 			my $substitute = AttrVal ($ch->{NAME}, 'substitute', '');
+
+			last if ($upd == 0);
+
+			my $clreading = $reading;
+			if ($crf eq 'datapoint') {
+				$clreading =~ s/.*\.(.+)$/$1/;
+			}
 
 			# Client substitute attribute has priority
 			if ($substitute ne '') {
+				$hmccu_value = HMCCU_Substitute ($value, $substitute);
 				$value = HMCCU_Substitute ($value, $substitute);
 			}
 			else {
+				$hmccu_value = HMCCU_Substitute ($value, $hmccu_substitute);
 				$value = $hmccu_value;
 			}
 
-			if ($upd == 1) {
-				readingsSingleUpdate ($ch, $reading, $value, 1);
-				if ($dpt eq 'STATE') {
-					HMCCU_SetState ($ch, $value);
-				}
+			readingsSingleUpdate ($ch, $clreading, $value, 1);
+			if ($reading =~ /\.STATE$/) {
+				HMCCU_SetState ($ch, $value);
 			}
 
+			# There should be no duplicate devices
 			last;
 		}
 	}
 
+	if ($hmccu_substitute ne '') {
+		$hmccu_value = HMCCU_Substitute ($value, $hmccu_substitute);
+	}
+	if ($hmccu_updreadings) {
+		readingsSingleUpdate ($hash, $reading, $hmccu_value, 1);
+	}
+
 	return $hmccu_value;
 }
+
+####################################################
+# Start RPC server
+####################################################
+
+sub HMCCU_StartRPCServer ($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+
+	my $modpath = AttrVal ('global', 'modpath', '/opt/fhem');
+	my $logfile = $modpath."/log/ccurpcd.log";
+	my $queue = "/tmp/ccuqueue";
+	my $rpcport = AttrVal ($name, 'rpcport', '2001');
+
+	if (HMCCU_IsRPCServerRunning ($hash)) {
+		Log 1, "HMCCU: RPC Server already running";
+		return 0;
+	}
+
+	# Check if RPC server exists
+	my $rpcserver = $modpath."/FHEM/ccurpcd.pl";
+	if (! -e $rpcserver) {
+		Log 1, "HMCCU: RPC server not found";
+		return 0;
+	}
+
+	# Fork child process
+	my $pid = fork ();
+	if (!defined ($pid)) {
+		Log 1, "HMCCU: Can't fork child process";
+		return 0;
+	}
+
+	if (!$pid) {
+		# Child process, replace it by RPC server
+		exec ($rpcserver." ".$hash->{host}." ".$rpcport." ".$queue." ".$logfile);
+
+		# When we reach this line start of RPC server failed
+		die;
+	}
+
+	Log 1, "HMCCU: RPC server started with pid ".$pid;
+	$hash->{RPCPID} = $pid;
+
+	return $pid;
+}
+
+####################################################
+# Start RPC server
+####################################################
+
+sub HMCCU_StopRPCServer ($)
+{
+	my ($hash) = @_;
+
+	if (HMCCU_IsRPCServerRunning ($hash)) {
+		Log 1, "HMCCU: Stoppinng RPC server";
+		kill ('INT', $hash->{RPCPID});
+		$hash->{RPCPID} = 0;
+		return 1;
+	}
+	else {
+		Log 1, "HMCCU: RPC server not running";
+		return 0;
+	}
+}
+
+####################################################
+# Check if RPC server is running
+####################################################
+
+sub HMCCU_IsRPCServerRunning ($)
+{
+	my ($hash) = @_;
+
+	if (defined ($hash->{RPCPID}) && $hash->{RPCPID} > 0) {
+		return kill (0, $hash->{RPCPID}) ? 1 : 0;
+	}
+	else {
+		return 0;
+	}
+}
+
+####################################################
+# Read list of CCU devices via XML-API.
+# Update addresses of client devices if not set.
+####################################################
+
+sub HMCCU_GetDeviceList ($)
+{
+	my ($hash) = @_;
+	my $count = 0;
+        
+	my $url = "http://".$hash->{host}."/config/xmlapi/devicelist.cgi?show_internal=1";
+	my $response = GetFileFromURL ($url);
+	if ($response !~ /^<\?xml.*<deviceList>.*<\/deviceList>$/) {
+		HMCCU_SetError ($hash, "XML-API request error (devicelist.cgi)");
+		return 0;
+	}
+
+	my $devlist = XMLin ($response, ForceArray => ['channel'], KeyAttr => ['address']);
+	%HMCCU_Devices = ();
+	%HMCCU_Addresses = ();
+
+	foreach my $da (keys %{$devlist->{'device'}}) {
+		# Device address in format CCCNNNNNNN
+		my $devname = $devlist->{'device'}->{$da}->{'name'};
+		$HMCCU_Devices{$da}{name} = $devname;
+		$HMCCU_Devices{$da}{type} = $devlist->{'device'}->{$da}->{'device_type'};
+		$HMCCU_Devices{$da}{interface} = $devlist->{'device'}->{$da}->{'interface'};
+		$HMCCU_Addresses{$devname} = $da;
+		$count++;
+
+		# Channels. Channel address in format CCCNNNNNNN:N
+		foreach my $ca (keys %{$devlist->{'device'}->{$da}->{'channel'}}) {
+			my $chnname = $devlist->{'device'}->{$da}->{'channel'}->{$ca}->{'name'};
+			$HMCCU_Devices{$ca}{name} = $chnname;
+			$HMCCU_Addresses{$chnname} = $ca;
+			$count++;
+		}
+	}
+
+	return $count;
+}
+
+####################################################
+# Get name of a CCU device by address.
+# Channel number will be removed if specified.
+####################################################
+
+sub HMCCU_GetDeviceName ($$)
+{
+	my ($addr, $default) = @_;
+
+	if ($addr =~ /^[A-Z]{3,3}[0-9]{7,7}$/ || $addr =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]+$/) {
+		$addr =~ s/:[0-9]+$//;
+		if (defined ($HMCCU_Devices{$addr})) {
+			return $HMCCU_Devices{$addr}{name};
+		}
+	}
+
+	return $default;
+}
+
+####################################################
+# Get name of a CCU device channel by address.
+####################################################
+
+sub HMCCU_GetChannelName ($$)
+{
+	my ($addr, $default) = @_;
+
+	if ($addr =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]+$/ && defined ($HMCCU_Devices{$addr})) {
+		return $HMCCU_Devices{$addr}{name};
+	}
+
+	return $default;
+}
+
+####################################################
+# Get type of a CCU device by address.
+# Channel number will be removed if specified.
+####################################################
+
+sub HMCCU_GetDeviceType ($$)
+{
+	my ($addr, $default) = @_;
+
+	if ($addr =~ /^[A-Z]{3,3}[0-9]{7,7}$/ || $addr =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]+$/) {
+		$addr =~ s/:[0-9]+$//;
+		if (defined ($HMCCU_Devices{$addr})) {
+			return $HMCCU_Devices{$addr}{type};
+		}
+	}
+
+	return $default;
+}
+
+####################################################
+# Get interface of a CCU device by address.
+# Channel number will be removed if specified.
+####################################################
+
+sub HMCCU_GetDeviceInterface ($$)
+{
+	my ($addr, $default) = @_;
+
+	if ($addr =~ /^[A-Z]{3,3}[0-9]{7,7}$/ || $addr =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]+$/) {
+		$addr =~ s/:[0-9]+$//;
+		if (defined ($HMCCU_Devices{$addr})) {
+			return $HMCCU_Devices{$addr}{interface};
+		}
+	}
+
+	return $default;
+}
+
+####################################################
+# Get address of a CCU device or channel by name.
+# If parameter devaddress is set to 1, channel
+# number will be removed from address.
+####################################################
+
+sub HMCCU_GetAddress ($$$)
+{
+	my ($name, $default, $devaddress) = @_;
+
+	if (defined ($HMCCU_Addresses{$name})) {
+		my $addr = $HMCCU_Addresses{$name};
+		$addr =~ s/:[0-9]+$// if ($devaddress == 1);
+		return $addr;
+	}
+
+	return $default;
+}
+
+####################################################
+# Timer function for reading RPC queue
+####################################################
+
+sub HMCCU_ReadRPCQueue ($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	my $maxevents = 10;
+	my $eventno = 0;
+
+	my $rpcinterval = AttrVal ($name, 'rpcinterval', 3);
+
+	my $queue = new File::Queue (File => '/tmp/ccuqueue');
+
+	my $element = $queue->deq();
+	while ($element) {
+		my @Tokens = split ('|', $element);
+		if ($Tokens[0] eq 'EV') {
+			$eventno++;
+			last if ($eventno == $maxevents);
+		}
+		elsif ($Tokens[0] eq 'ND') {
+			$HMCCU_Devices{$Tokens[1]}{name} = $Tokens[2];
+		}
+		elsif ($Tokens[0] eq 'EX') {
+		}
+
+		$element = $queue->deq();
+	}
+
+	if (HMCCU_IsRPCServerRunning ($hash)) {
+		InternalTimer (gettimeofday()+$rpcinterval, 'HMCCU_ReadRPCQueue', $hash, 0);
+	}
+	else {
+		$hash->{RPCPID} = 0;
+	}
+}
+
 
 1;
 
@@ -601,7 +1132,9 @@ sub HMCCU_UpdateClientReading ($$$)
 <h3>HMCCU</h3>
 <div style="width:800px"> 
 <ul>
-   The module provides an easy get/set interface for Homematic CCU.
+   The module provides an easy get/set interface for Homematic CCU. It acts as an
+   IO device for HMCCUDEV client devices. The module requires additional Perl modules
+   XML::Simple and File::Queue.
    </br></br>
    <a name="HMCCUdefine"></a>
    <b>Define</b>
@@ -622,29 +1155,31 @@ sub HMCCU_UpdateClientReading ($$$)
    <b>Set</b><br/>
    <ul>
       <br/>
-      <li>set &lt;<i>Name</i>&gt; devstate &lt;<i>Device</i>:<i>Channel</i>&gt; &lt;<i>Value</i>&gt;
+      <li>set &lt;name&gt; devstate {[&lt;interface&gt;.]&lt;channel-address&gt;|&lt;channel-name&gt;} &lt;value&gt; [...]
          <br/>
-         Set state of a CCU device or value of a CCU system variable.
+         Set state of a CCU device. Specified CCU channel must have a datapoint STATE.
          <br/><br/>
          Example:<br/>
-         <code>set d_ccu devstate ST-WZ-Bass:1 0</code>
+         <code>set d_ccu devstate ST-WZ-Bass false</code><br/>
+         <code>set d_ccu devstate BidCos-RF.LEQ1462664:1 false</code>
       </li><br/>
-      <li>set &lt;<i>Name</i>&gt; datapoint &lt;<i>device</i>:<i>channel</i>.<i>datapoint</i>&gt; &lt;<i>Value</i>&gt;
+      <li>set &lt;name&gt; datapoint {[&lt;interface&gt;.]&lt;channel-address&gt;.&lt;datapoint&gt;|&lt;channel-name&gt;.&lt;datapoint&gt;} &lt;value&gt; [...]
         <br/>
         Set value of a datapoint of a CCU device channel.
         <br/><br/>
         Example:<br/>
-        <code> set d_ccu datapoint THERMOSTAT_WOHNEN:2.SET_TEMPERATURE 21</code>
+        <code> set d_ccu datapoint THERMOSTAT_CHN2.SET_TEMPERATURE 21</code><br/>
+        <code> set d_ccu datapoint LEQ1234567:2.SET_TEMPERATURE 21</code>
       </li><br/>
-      <li>set &lt;<i>Name</i>&gt; var &lt;<i>variable</i>&gt; &lt;<i>Value</i>&gt;
+      <li>set &lt;name&gt; var &lt;variable>&gt; &lt;Value&gt; [...]
         <br/>
         Set CCU variable value.
       </li><br/>
-      <li>set &lt;<i>Name</i>&gt; clearmsg
+      <li>set &lt;name&gt; clearmsg
         <br/>
         Clear CCU messages.
       </li><br/>
-      <li>set &lt;<i>Name</i>&gt; execute &lt;<i>Program</i>&gt;
+      <li>set &lt;name&gt; execute &lt;program&gt;
          <br/>
          Execute CCU program.
          <br/><br/>
@@ -658,29 +1193,35 @@ sub HMCCU_UpdateClientReading ($$$)
    <b>Get</b><br/><br/>
    <ul>
       <br/>
-      <li>get &lt;<i>Name</i>&gt; devstate &lt;<i>Device</i>:<i>Channel</i>&gt; [&lt;<i>Reading</i>&gt;]
+      <li>get &lt;name&gt; devstate {[&lt;interface&gt;.]&lt;channel-address&gt;|&lt;channel-name&gt;} [&lt;reading&gt;]
          <br/>
-         Get state of a CCU device or value of a CCU system variable. If <i>Reading</i>
+         Get state of a CCU device. Specified channel must have a datapoint STATE. If &lt;reading&gt;
          is specified the value will be stored using this name.
       </li><br/>
-      <li>get &lt;<i>Name</i>&gt; vars &lt;<i>RegExp</i>&gt;[,...]
+      <li>get &lt;name&gt; vars &lt;regexp&gt;[,...]
          <br/>
-         Get CCU system variables matching <i>RegExp</i> and store them as readings.
+         Get CCU system variables matching &lt;regexp&gt; and store them as readings.
       </li><br/>
-      <li>get &lt;<i>Name</i>&gt; channel &lt;<i>Device</i>:<i>Channel</i>[.<i>Datapoint</i>]&gt;
+      <li>get &lt;name>&gt; channel {[&lt;interface&gt;.]&lt;channel-address&gt;[.&lt;datapoint-expr&gt;]|&lt;channel-name&gt;[.&lt;datapoint-expr&gt;]}
          <br/>
-         Get value of channel datapoint. If no datapoint is specified all datapoints of specified
-         channel is read. <i>Datapoint</i> can be specified as a regular expression.
+         Get value of datapoint(s). If no datapoint is specified all datapoints of specified
+         channel are read. &lt;datapoint&gt; can be specified as a regular expression.
       </li><br/>
-      <li>get &lt;<i>Name</i>&gt; parfile [&lt;<i>ParFile</i>&gt;]
+      <li>get &lt;name&gt; devicelist
          <br/>
-         Get values of all channels / datapoints specified in <i>ParFile</i>. <i>ParFile</i> can also
+         Read list of devices and channels from CCU. This command is executed automatically after device
+         definition. Must be executed after module HMCCU is reloaded.
+      </li><br/>
+      <li>get &lt;name&gt; parfile [&lt;parfile&gt;]
+         <br/>
+         Get values of all channels / datapoints specified in &lt;parfile&gt;. &lt;parfile&gt; can also
          be defined as an attribute. The file must contain one channel / datapoint definition per line.
-         Datapoints are optional (for syntax see command get channel). After the channel definition
-         a list of string substitution rules for datapoint values can be specified.<br/>
+         Datapoints are optional (for syntax see command <i>get channel</i>). After the channel definition
+         a list of string substitution rules for datapoint values can be specified (like attribute
+         <i>substitute</i>).<br/>
          The syntax of Parfile entries is:
          <br/><br/>
-         <i>Device</i>:<i>Channel</i>[<i>Datapoint</i>] <i>RegExp</i>:<i>SubstString</i>[,...]
+         {[&lt;interface&gt;.]&lt;channel-address&gt;[.&lt;datapoint-expr&gt;]|&lt;channel-name&gt;[.&lt;datapoint-expr&gt;]} &lt;regexp&gt;:&lt;subsstr&gt;[,...]
          <br/><br/>
          Empty lines or lines starting with a # are ignored.
       </li><br/>
@@ -691,30 +1232,32 @@ sub HMCCU_UpdateClientReading ($$$)
    <b>Attributes</b><br/>
    <br/>
    <ul>
+      <li>ccureadingformat &lt;name | address&gt;
+         <br/>
+           Format of reading names (channel name or channel address)
+      </li><br/>
       <li>ccureadings &lt;0 | 1&gt;
          <br/>
-            If set to 1 values read from CCU will be stored as readings.
+            If set to 1 values read from CCU will be stored as readings. Otherwise output
+            is displayed in browser window.
       </li><br/>
-      <li>parfile &lt;<i>Filename</i>&gt;
+      <li>parfile &lt;filename&gt;
          <br/>
-            Define parameter file for command get parfile.
+            Define parameter file for command <i>get parfile</i>.
       </li><br/>
-      <li>stateval &lt;<i>text</i>:<i>text</i>[,...]</i>&gt;
+      <li>statevals &lt;text:substext[,...]</i>&gt;
          <br/>
-            Define substitions for values in set devstate/datapoint command.
+            Define substitutions for values in <i>set devstate/datapoint</i> command.
       </li><br/>
-      <li>substitude &lt;<i>expression</i>:<i>string</i>[,...]</i>&gt;
+      <li>substitude &lt;expression&gt;:&lt;substext&gt;[,...]
          <br/>
             Define substitions for reading values. Substitutions for parfile values must
             be specified in parfiles.
       </li><br/>
-      <li>stripchar &lt;<i>Character</i>&gt;
+      <li>stripchar &lt;character&gt;
          <br/>
             Strip the specified character from variable or device name in set commands. This
             is useful if a variable should be set in CCU using the reading with trailing colon.
-      <li>units &lt;0 | 1&gt;
-         <br/>
-            If set to 1 value units will be appended to readings.
       </li><br/>
    </ul>
 </ul>
