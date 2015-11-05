@@ -102,9 +102,9 @@ my $db = {
   'mail' => {
 
     'fhemMsgMail' => {
-      'Normal'  => '{ my $dev=\'%DEVICE%\'; system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' \'$dev\'"); }',
-      'High'    => '{ my $dev=\'%DEVICE%\'; system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' \'$dev\'"); }',
-      'Low'     => '{ my $dev=\'%DEVICE%\'; system("echo \'%MSG%\' | /usr/bin/mail -s \'%TITLE%\' \'$dev\'"); }',
+      'Normal'  => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$dev\'"); }',
+      'High'    => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$dev\'"); }',
+      'Low'     => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; system("echo \'$msg\' | /usr/bin/mail -s \'$title\' \'$dev\'"); }',
     },
 
   },
