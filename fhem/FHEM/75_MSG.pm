@@ -1848,8 +1848,13 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                                   $msgSent                 = 1 if ($error == 0);
                                   $msgSentDev              = 1 if ($error == 0);
-                                  $gatewaysStatus{$gatewayDev} = $routeStatus if ($globalDevName ne $gatewayDev);
-                                  $gatewaysStatus{$device} = $routeStatus if ($globalDevName eq $gatewayDev);
+                                  if ($subRecipient ne "") {
+                                    $gatewaysStatus{"$gatewayDev:$subRecipient"} = $routeStatus if ($globalDevName ne $gatewayDev);
+                                    $gatewaysStatus{"$device:$subRecipient"} = $routeStatus if ($globalDevName eq $gatewayDev);
+                                  } else {
+                                    $gatewaysStatus{$gatewayDev} = $routeStatus if ($globalDevName ne $gatewayDev);
+                                    $gatewaysStatus{$device} = $routeStatus if ($globalDevName eq $gatewayDev);
+                                  }
                             }
                             elsif ($routeStatus eq "UNAVAILABLE"
                                 || $routeStatus eq "UNDEFINED" )
