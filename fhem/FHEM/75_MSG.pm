@@ -1812,7 +1812,6 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 # run command
                                 undef $@;
                                 if ( $cmd =~ s/^[ \t]*\{|\}[ \t]*$//gi ) {
-                                    $cmd =~ s/@\w+/\\$&/gi;
                                     Log3 $logDevice, 5,
 "msg $device: $type[$i] route command (Perl): $cmd";
                                     eval $cmd;
