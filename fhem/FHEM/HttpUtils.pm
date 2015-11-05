@@ -244,8 +244,8 @@ HttpUtils_Connect2($)
     if( ref($hash->{header}) eq 'HASH' ) {
       $hash->{header} = join("\r\n",
         map(($_.': '.$hash->{header}{$_}), keys %{$hash->{header}}));
-      }
-   }
+    }
+  }
 
   $hash->{host} =~ s/:.*//;
   my $method = $hash->{method};
