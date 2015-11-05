@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_AMAD: Bessere Variante zur HTTP Headeranalyse, Code aufgeräumt
   - bugfix:  74_AMAD: AMADCommBridge communication problem with automagic 1.29
   - feature: fhem_codemirror: Added DOIF autocomplete-keywords. Added feature
                               to autocomplete on any keypress.
