@@ -35,7 +35,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use TcpServerUtils;
 
-my $version = "0.8.2";
+my $version = "0.8.3";
 
 
 
@@ -894,7 +894,19 @@ sub AMAD_CommBridge_Read($) {
     ###
 
     my @data = split( '\R\R',  $buf );
-    my $chash = undef;
+    my $chash;
+    my $fhemdev;
+
+    
+    my @fhemdev = split( '\R',  $data[0] );
+        foreach my $ret( @fhemdev ) {
+            if( $ret =~ /FHEMDEVICE: (.*)/ ) {
+                $fhemdev = $1;
+            }
+        }
+        
+    $chash = $defs{$fhemdev};
+    
     
     if ( $data[0] =~ /FHEMCMD: setreading\b/ ) {
 	my $tv = $data[1];
@@ -913,37 +925,16 @@ sub AMAD_CommBridge_Read($) {
     
 		my $t;
 		my $v;
-		
-		if( $data[2] =~ /FHEMDEVICE:/ ) {
-                
-                    $data[2] =~ s/FHEMDEVICE: //;
-                    my $chash = $defs{$data[2]};
                     
-                    while( ( $t, $v ) = each %buffer ) {
-                        $v =~ s/null//g;
+                while( ( $t, $v ) = each %buffer ) {
+                    $v =~ s/null//g;
 		    
-                        readingsBeginUpdate( $chash );
-                        readingsBulkUpdate( $chash, $t, $v ) if( defined( $v ) );
-                    }
-    
-                    readingsBulkUpdate( $chash, "lastStatusRequestState", "statusRequest_done" );
-                    readingsEndUpdate( $chash, 1 );
-                    
-                } else {
-                    $data[3] =~ s/FHEMDEVICE: //;
-                    my $chash = $defs{$data[3]};
-                    
-                    while( ( $t, $v ) = each %buffer ) {
-                        $v =~ s/null//g;
-		    
-                        readingsBeginUpdate( $chash );
-                        readingsBulkUpdate( $chash, $t, $v ) if( defined( $v ) );
-                    }
-    
-                    readingsBulkUpdate( $chash, "lastStatusRequestState", "statusRequest_done" );
-                    readingsEndUpdate( $chash, 1 );
-                    
+                    readingsBeginUpdate( $chash );
+                    readingsBulkUpdate( $chash, $t, $v ) if( defined( $v ) );
                 }
+    
+                readingsBulkUpdate( $chash, "lastStatusRequestState", "statusRequest_done" );
+                readingsEndUpdate( $chash, 1 );
                 
 		### End Response Processing
 
@@ -969,21 +960,7 @@ sub AMAD_CommBridge_Read($) {
     
     elsif ( $data[0] =~ /FHEMCMD: statusrequest\b/ ) {
 	
-	@data = split( '\R',  $data[0] );
-	if( $data[2] =~ /FHEMDEVICE:/ ) {
-	
-            $data[2] =~ s/FHEMDEVICE: //;
-            my $chash = $defs{$data[2]};
-            
-            return AMAD_GetUpdateLocal( $chash );
-        
-        } else {
-            $data[3] =~ s/FHEMDEVICE: //;
-            my $chash = $defs{$data[3]};
-            
-            return AMAD_GetUpdateLocal( $chash );
-            
-        }
+        return AMAD_GetUpdateLocal( $chash );
     }
 }
 
