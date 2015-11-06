@@ -1407,6 +1407,8 @@ sub _retrieveCAPDATA {
     my ($countInfo,$cF)		= _mergeCapFile($hash);
 	my ($aList,$cellData)	= _buildCAPList($hash,$countInfo,$cF);
 
+	unlink $targetFile unless AttrVal($name,'gdsDebug',0); 
+
 	return "$name;;;$datafile;;;$aList;;;$cF;;;$cellData";
 }
 sub _finishedCAPDATA {
@@ -1905,6 +1907,9 @@ sub getListForecastStations($) {
 #	Changelog
 #
 ###################################################################################################
+#
+#	2015-11-06	fixed		problems after global rereadcfg
+#				fixed		delete CAP-zipfile unless gdsDebug set
 #
 #	2015-11-01	changed		getListForecastStations: fixed inverted logging "data not found"
 #				changed		GDS_GetUpdate, retrieveData, _finishedFORECAST, _abortedFORECAST: 
