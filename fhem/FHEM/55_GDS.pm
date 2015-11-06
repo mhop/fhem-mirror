@@ -318,6 +318,7 @@ sub GDS_Undef($$) {
 sub GDS_Shutdown($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
+	RemoveInternalTimer($hash);
 	Log3 ($name,4,"GDS $name: shutdown requested");
 	return undef;
 }
@@ -326,7 +327,8 @@ sub GDS_Notify ($$) {
 	my ($hash,$dev) = @_;
 	my $name = $hash->{NAME};
 	return if($dev->{NAME} ne "global");
-	return if(!grep(m/^INITIALIZED|^REREAD/, @{$dev->{CHANGED}}));
+	my $type = $dev->{CHANGED}[0];
+	return unless (grep(m/^INITIALIZED/, $type));
 
 	$aList		= "disabled_by_attribute" unless AttrVal($name,'gdsUseAlerts',0);
 	$fList		= "disabled_by_attribute" unless AttrVal($name,'gdsUseForecasts',0);
@@ -652,12 +654,6 @@ sub GDS_GetUpdate($;$) {
 	my ($hash,$local) = @_;
 	$local //= 0;
 	my $name = $hash->{NAME};
-
-
-	my $diff = int(time()) - $hash->{GDS_REREAD};
-#Debug "GDS_GetUpdate started Diff: $diff";
-	return if( $diff < 60 );
-#Debug "GDS_GetUpdate continued";
 
 	RemoveInternalTimer($hash);
 
