@@ -21,7 +21,7 @@ foreach my $modDir (@modDir) {
     $mods{$l} = "$modDir/$of";
   }
 }
-$mods{configDB} = "configDB.pm" if(-f "configDb.pm");
+$mods{configDB} = "configDB.pm" if(-f "configDB.pm");
 
 
 my @lang = ("EN", "DE");
