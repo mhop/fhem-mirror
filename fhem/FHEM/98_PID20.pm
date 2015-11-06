@@ -6,7 +6,7 @@
 #	valve dependent of the current and desired temperature.
 #
 #	This module is derived from the contrib/99_PID by Alexander Titzel.
-#   The framework of the module is derived from proposals by betateilchen.
+#  The framework of the module is derived from proposals by betateilchen.
 #
 #	This file is part of fhem.
 #
@@ -47,6 +47,9 @@
 #  20.11.2014   Bug: processing of D-Portion and handling of disable
 # V 1.0.0.4
 #  27.11.2014   Change: all readings are updated cyclically
+# V 1.0.0.5
+#  06.11.2015   Fix: reg expression in sub PID20_Notify modifed. Thanks to user gero
+
 ####################################################################################################
 package main;
 
@@ -58,7 +61,7 @@ use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
 
-my $PID20_Version = "1.0.0.4";
+my $PID20_Version = "1.0.0.5";
 sub PID20_Calc($);
 ########################################
 sub PID20_Log($$$)
@@ -218,7 +221,7 @@ sub PID20_Notify($$)
     # continue, if no match with reading-name
     $s = "" if ( !defined($s) );
     PID20_Log $hash, 5, "check event:<$s>";
-    next if ( $s !~ m/$sensorReadingName/ );
+    next if ( $s !~ m/^$sensorReadingName:.*$/ );
 
     # ---- build difference current - old value
     # get sensor value
