@@ -96,7 +96,7 @@ sub Unifi_Define($$) {
         noshutdown      => 0,
         ignoreredirects => 1,
         loglevel        => AttrVal($name,"httpLoglevel",5),
-        sslargs         => { SSL_verify_mode => 'SSL_VERIFY_NONE' },
+        sslargs         => { SSL_verify_mode => 0 },
     };
     if($hash->{unifi}->{version} == 3) {
         ( $hash->{httpParams}->{loginUrl} = $hash->{unifi}->{url} ) =~ s/api\/s.+/login/;
