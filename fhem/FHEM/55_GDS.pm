@@ -68,7 +68,7 @@ sub GDS_Initialize($) {
 	$hash->{GetFn}		=	"GDS_Get";
 	$hash->{SetFn}		=	"GDS_Set";
 	$hash->{ShutdownFn}	=	"GDS_Shutdown";
-	$hash->{NotifyFn}   =   "GDS_Notify";
+#	$hash->{NotifyFn}   =   "GDS_Notify";
 	$hash->{NOTIFYDEV}  =   "global";
 	$hash->{AttrFn}		=	"GDS_Attr";
 	
@@ -87,7 +87,6 @@ sub GDS_Initialize($) {
 		gdsSetForecast
 		gdsUseAlerts:0,1
 		gdsUseForecasts:0,1
-		gdsUseFritzkotz:0,1
 	);
 	use warnings 'qw';
 	$hash->{AttrList}  = join(" ", @attrList);
@@ -609,8 +608,16 @@ sub GDS_Attr(@){
 	my @a = @_;
 	my $hash = $defs{$a[1]};
 	my ($cmd, $name, $attrName, $attrValue) = @a;
+	my $useUpdate = 0;
 
 	given($attrName){
+ 		when("gdsSetCond"){
+			unless ($attrValue eq '' || $cmd eq 'del') {
+				$attr{$name}{$attrName} = $attrValue;
+				retrieveData($hash,'conditions');
+				$useUpdate = 1;
+			}
+		}
  		when("gdsUseAlerts"){
 			if ($attrValue == 0 || $cmd eq 'del') {
 		    	$aList = "disabled_by_attribute";
@@ -627,7 +634,9 @@ sub GDS_Attr(@){
 			} else {
 				$fcList = $fcmapList;
 				$fList = "data_retrieval_running";
+				$attr{$name}{$attrName} = $attrValue;
 				retrieveData($hash,'forecast');
+				$useUpdate = 1;
 			}
 		}
  		when("gdsHideFiles"){
@@ -646,6 +655,11 @@ sub GDS_Attr(@){
 		readingsSingleUpdate($hash, 'state', 'disabled', 0);
 	} else {
 		readingsSingleUpdate($hash, 'state', 'active', 0);
+		if ($useUpdate) {
+			RemoveInternalTimer($hash);
+			my $next = gettimeofday()+$hash->{helper}{INTERVAL};
+			InternalTimer($next, "GDS_GetUpdate", $hash, 0);
+		}
 	}
 	return;
 }
@@ -665,8 +679,6 @@ sub GDS_GetUpdate($;$) {
 		Log3 ($name, 2, "GDS $name is disabled, data update cancelled.");
 	} else {
  		readingsSingleUpdate($hash, 'state', 'active', 0);
-#		CommandGet($hash,"$name rereadcfg");
-#	}
 		if($cs) {
 			if(time() - InternalVal($name,'GDS_CONDITIONS_READ',0) > ($hash->{helper}{INTERVAL}-10)) {
 				retrieveData($hash,'conditions') ;
@@ -681,12 +693,7 @@ sub GDS_GetUpdate($;$) {
 			getConditions($hash, "c", @a);
 		}
 		if($fs) {
-			if(!defined('GDS_FORECAST_BUSY') && time() - InternalVal($name,'GDS_FORECAST_READ',0) >= ($hash->{helper}{INTERVAL}-10)) {
-				retrieveData($hash,'forecast') ;
-				my $next = gettimeofday() + 1;
-				InternalTimer($next, "GDS_GetUpdate", $hash, 1);
-				return;
-			}
+			retrieveData($hash,'forecast') ;
 			my @a;
 			push @a, undef;
 			push @a, undef;
@@ -1238,7 +1245,6 @@ sub _retrieveCONDITIONS {
 	my $proxyName	= AttrVal($name, "gdsProxyName", "");
 	my $proxyType	= AttrVal($name, "gdsProxyType", "");
 	my $passive		= AttrVal($name, "gdsPassiveFtp", 1);
-	my $useFritz	= AttrVal($name, "gdsUseFritzkotz", 0);
 	my $dir			= "gds/specials/observations/tables/germany/";
 	my $ret;
 
