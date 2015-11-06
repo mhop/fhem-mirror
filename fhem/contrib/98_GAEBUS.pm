@@ -20,6 +20,7 @@
 # 12.10.2015 : A.Goebel : fix handling of timeouts in BlockingCall Interface (additional parameter in doEbusCmd forces restart (no shutdown restart))
 #                         timeout for reads increased
 # 19.10.2015 : A.Goebel : add attribute disable to disable loop to collect readings
+# 05.11.2015 : A.Goebel : add support for "h" (broadcast update) commands from csv, handle them equal to (r)ead
 
 
 package main;
@@ -353,7 +354,7 @@ GAEBUS_Get($@)
     $readingname       =~ s/:.*//;
 
     # only for "r" commands
-    if ($oneattr =~ /^r.*$delimiter.*$delimiter.*$delimiter.*$/)
+    if ($oneattr =~ /^[rh].*$delimiter.*$delimiter.*$delimiter.*$/)
     {
       $readings{$readingname} = $readingcmdname;
       $readingsCmdaddon{$readingname} = $cmdaddon;
@@ -387,7 +388,7 @@ GAEBUS_Get($@)
 
   # other read commands
 
-  if ($a[1] =~ /^r$delimiter/) 
+  if ($a[1] =~ /^[rh]$delimiter/) 
   {
     my $readingname = "";
     my $readingcmdname = $a[1].$delimiter.$a[2];
@@ -713,7 +714,7 @@ GAEBUS_ProcessCSV($$)
         #Log3 $hash, 3, "$dir, $actCircuit, $vname, $comment";
 
 	my $dirSimple = substr($dir, 0,1);
-	if ($dirSimple =~ /^[rw]/)
+	if ($dirSimple =~ /^[rhw]/)
         {
           my $rkey = join (";", ($dirSimple, $actCircuit, $vname));
           $ebusCmd{$rkey} = $comment;
@@ -740,6 +741,7 @@ GAEBUS_ReadCSV($)
     my @infiles = grep /^[^\.].*\.csv$/, readdir INDIR; # all files exept those starting with "."
     foreach my $file (@infiles)
     {
+      next if ($file =~ /^_/);
       Log3 ($hash, 4, "GAEBUS: process config $file");
       GAEBUS_ProcessCSV($hash, $dir."/".$file);
     }
@@ -756,11 +758,11 @@ GAEBUS_ReadCSV($)
 
       my ($io,$class,$var) = split (";", $key, 3);
 
-      push @{$sets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r");
+      push @{$sets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
 
       push @{$setsForWriting{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "w");
 
-      push @{$gets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "u");
+      push @{$gets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
       
       Log3 ($hash, 5, "GAEBUS: add attr $key $comment");
     }
@@ -813,7 +815,7 @@ sub
 GAEBUS_doEbusCmd($$$$$$$)
 {
   my $hash           = shift;
-  my $action         = shift; # "r" = set reading, "v" = verbose mode, "w" = write to ebus
+  my $action         = shift; # "r" = get reading, "v" = verbose mode, "w" = write to ebus
   my $readingname    = shift;
   my $readingcmdname = shift;
   my $writeValues    = shift;
@@ -858,10 +860,13 @@ GAEBUS_doEbusCmd($$$$$$$)
 
   } else {
 
-    $cmd = "$io -f ";
+    $cmd = "$io ";
+    $cmd .= " -f " if ($io ne "h");
     $cmd .= "-v " if ($action eq "v");
     $cmd .= "-c $class $var";
     $cmd .= " $cmdaddon" if ($action eq "r");
+
+    $cmd =~ s/^h /r /;
   }
 
   Log3 ($name, 3, "$name execute $cmd");
@@ -976,7 +981,7 @@ GAEBUS_GetUpdatesDoit($)
   foreach my $oneattr (keys %{$attr{$name}})
   {
     # only for "r" commands
-    if ($oneattr =~ /^r.*$delimiter.*$delimiter.*$delimiter.*$/)
+    if ($oneattr =~ /^[rh].*$delimiter.*$delimiter.*$delimiter.*$/)
     {
 
       my ($readingnameX, $cmdaddon) = split (" ", $attr{$name}{$oneattr}, 2);
@@ -1144,7 +1149,7 @@ GAEBUS_GetUpdatesAborted($)
         If Attribute is missing, default value is 0 (disable writes)<br>
         </li><br>
     <li>Attributes of the format<br>
-        <code>[r]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt;</code><br>
+        <code>[r|h]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt;</code><br>
         define variables that can be retrieved from the ebusd.
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
