@@ -46,6 +46,7 @@ sub XBMC_Define($$)
   }
   my ($name, $type, $addr, $protocol, $username, $password) = @args;
   $hash->{Protocol} = $protocol;
+  $hash->{NextID} = 1;
   $addr =~ /^(.*?)(:([0-9]+))?$/;  
   $hash->{Host} = $1;
   if(defined($3)) {
@@ -96,6 +97,14 @@ sub XBMC_Attr($$$$)
   }
 
   return undef;
+}
+
+sub XBMC_CreateId($) 
+{
+  my ($hash) = @_;
+  my $res = $hash->{NextID};
+  $hash->{NextID} = ($res >= 1000000) ? 1 : $res + 1;
+  return $res;
 }
 
 # Force a connection attempt to XBMC as soon as possible 
@@ -397,7 +406,9 @@ sub XBMC_ProcessRead($$)
     }
     #otherwise it is a answer of a request
     else {
-      XBMC_ProcessResponse($hash,$obj);
+        if (XBMC_ProcessResponse($hash,$obj) == -1) {
+            Log3($name, 2, "XBMC_ProcessRead: Faulty message: $msg");
+        }
     }
     ($msg,$tail) = XBMC_ParseMsg($hash, $tail);
   }
@@ -457,7 +468,7 @@ sub XBMC_PlayerOnPlay($$)
 {
   my ($hash,$obj) = @_;
   my $name = $hash->{NAME};
-  my $id = XBMC_CreateId();
+  my $id = XBMC_CreateId($hash);
   my $type = $obj->{params}->{data}->{item}->{type};
   if(AttrVal($hash->{NAME},'compatibilityMode','xbmc') eq 'plex' || !defined($obj->{params}->{data}->{item}->{id}) || $type eq "picture" || $type eq "unknown") {
     # we either got unknown or picture OR an item not in the library (id not existing)
@@ -617,6 +628,7 @@ sub XBMC_ProcessNotification($$)
 sub XBMC_ProcessResponse($$) 
 {
   my ($hash,$obj) = @_;
+  my $name = $hash->{NAME};
   my $id = $obj->{id};
   #check if the id of the answer matches the id of a pending event
   if(defined($hash->{PendingEvents}{$id})) {
@@ -641,15 +653,25 @@ sub XBMC_ProcessResponse($$)
     } 
     $hash->{PendingEvents}{$id} = undef;
   }
-  elsif(defined($hash->{PendingPlayerCMDs}{$id})) {
+  elsif(exists($hash->{PendingPlayerCMDs}{$id})) {
     my $cmd = $hash->{PendingPlayerCMDs}{$id};
     my $players = $obj->{result};
+    if (ref($players) ne "ARRAY") {
+        my $keys = "";
+        while ((my $k, my $v) = each $hash->{PendingPlayerCMDs} ) {
+          $keys .= ",$k";
+        }
+        delete $hash->{PendingPlayerCMDs}{$id};
+        Log3($name, 2, "XBMC_ProcessResponse: Not received a player array! Pending command cancelled!");
+        Log3($name, 2, "XBMC_ProcessResponse: Keys in PendingPlayerCMDs: $keys");
+        return -1;
+    }
     foreach my $player (@$players) {
-      $cmd->{id} = XBMC_CreateId();
+      $cmd->{id} = XBMC_CreateId($hash);
       $cmd->{params}->{playerid} = $player->{playerid};
       XBMC_Call($hash,$cmd,1);
     }
-    $hash->{PendingPlayerCMDs}{$id} = undef;
+    delete $hash->{PendingPlayerCMDs}{$id};
   }  
   else {
     my $result = $obj->{result};
@@ -671,7 +693,7 @@ sub XBMC_ProcessResponse($$)
       readingsEndUpdate($hash, 1);
     }
   }
-  return undef;
+  return 0;
 }
 
 sub XBMC_Is3DFile($$) {
@@ -835,6 +857,9 @@ sub XBMC_Set($@)
   }
   elsif($cmd eq 'openepisodeid') {
     return XBMC_Set_Open($hash, 'episode', @args);
+  }
+  elsif($cmd eq 'openchannelid') {
+    return XBMC_Set_Open($hash, 'channel', @args);
   }
   elsif($cmd eq 'addon') {
     return XBMC_Set_Addon($hash, @args);
@@ -1040,6 +1065,12 @@ sub XBMC_Set_Open($@)
         'resume' => JSON::true
        }
     };
+  } elsif($opt eq 'channel') {
+    $params = { 
+      'item' => {
+        'channelid' => $path +0
+      },
+    };
   }
   my $obj = {
     'method' => 'Player.Open',
@@ -1220,7 +1251,7 @@ sub XBMC_PlayerCommand($$$)
   }
   
   #we need to find out the correct player first
-  my $id = XBMC_CreateId();
+  my $id = XBMC_CreateId($hash);
   $hash->{PendingPlayerCMDs}->{$id} = $obj;
   my $req = {
     'method'  => 'Player.GetActivePlayers',
@@ -1263,7 +1294,7 @@ sub XBMC_Call($$$)
   my $name = $hash->{NAME};
   #add an ID otherwise XBMC will not respond
   if($id &&!defined($obj->{id})) {
-    $obj->{id} = XBMC_CreateId();
+    $obj->{id} = XBMC_CreateId($hash);
   }
   $obj->{jsonrpc} = "2.0"; #JSON RPC version has to be passed
   my $json = JSON->new->utf8(0)->encode($obj);
@@ -1287,11 +1318,6 @@ sub XBMC_Call_raw($$$)
   else {
     return XBMC_TCP_Call($hash,$obj);
   }
-}
-
-sub XBMC_CreateId() 
-{
-  return int(rand(1000000));
 }
 
 sub XBMC_RCmakenotify($$) {
@@ -1514,8 +1540,9 @@ sub XBMC_HTTP_Request($$@)
     <li><b>repeat &lt;one|all|off&gt; [&lt;audio|video|picture&gt;]</b> -  Sets the repeat mode.</li>
     <li><b>open &lt;URI&gt;</b> -  Plays the resource located at the URI (can be a url or a file)</li>
     <li><b>opendir &lt;path&gt;</b> -  Plays the content of the directory</li>
-    <li><b>openmovieid &lt;path&gt;</b> -  Plays the movie of the id</li>
-    <li><b>openepisodeid &lt;path&gt;</b> -  Plays the episode of the id</li>
+    <li><b>openmovieid &lt;path&gt;</b> -  Plays a movie by id</li>
+    <li><b>openepisodeid &lt;path&gt;</b> -  Plays an episode by id</li>
+    <li><b>openchannelid &lt;path&gt;</b> -  Switches to channel by id</li>
     <li><b>addon &lt;addonid&gt; &lt;parametername&gt; &lt;parametervalue&gt;</b> -  Executes addon with one Parameter, for example set xbmc addon script.json-cec command activate</li>
   </ul>
   <br>Input related commands:<br>
