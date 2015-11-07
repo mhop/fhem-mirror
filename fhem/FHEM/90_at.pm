@@ -386,9 +386,9 @@ EOF
       executed <i>repeatedly</i>.<br>
       The optional <code>{N}</code> after the * indicates,that the command
       should be repeated <i>N-times</i> only.<br>
-      &lt;timedet&gt; is either HH:MM, HH:MM:SS or {perlfunc()}, where perlfunc
-      must return a HH:MM or HH:MM:SS date. Note: {perlfunc()} may not contain
-      any spaces or tabs.
+      &lt;timedet&gt; is either HH:MM, HH:MM:SS, seconds since 1970 or
+      {perlfunc()}. perlfunc must return a string in timedet format.
+      Note: {perlfunc()} may not contain any spaces or tabs.
     </ul>
     <br>
 
@@ -547,9 +547,9 @@ EOF
       Das optionale <code>{N}</code> nach dem * bedeutet, dass der Befehl genau
       <i>N-mal</i> wiederholt werden soll.<br>
 
-      &lt;timedet&gt; ist entweder HH:MM, HH:MM:SS oder {perlfunc()}, wobei
-      perlfunc HH:MM or HH:MM:SS zur&uuml;ckgeben muss. Hinweis: {perlfunc()}
-      darf keine Leerzeichen enthalten.
+      &lt;timedet&gt; ist entweder HH:MM, HH:MM:SS, Sekunden seit 1970 oder
+      {perlfunc()}.  perlfunc muss ein String in timedet Format zurueckliefern.
+      Achtung: {perlfunc()} darf keine Leerzeichen enthalten.
 
     </ul>
     <br>
