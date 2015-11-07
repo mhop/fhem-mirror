@@ -92,8 +92,8 @@ my $db = {
   'light' => {
 
     'HUEDevice' => {
-      'Normal'  => '{my $state=ReadingsVal("%DEVICE%","state","off"); fhem "set %DEVICE% blink 2 1"; fhem "sleep 4.25;set %DEVICE%:FILTER=state!=$state $state"}',
-      'High'    => '{my $state=ReadingsVal("%DEVICE%","state","off"); fhem "set %DEVICE% blink 10 1"; fhem "sleep 20.25;set %DEVICE%:FILTER=state!=$state $state"}',
+      'Normal'  => '{ my $dev=\'%DEVICE%\'; my $state=ReadingsVal($dev,"state","off"); fhem "set $dev blink 2 1"; fhem "sleep 4.25; set $dev:FILTER=state!=$state $state"; }',
+      'High'    => '{ my $dev=\'%DEVICE%\'; my $state=ReadingsVal($dev,"state","off"); fhem "set $dev blink 10 1"; fhem "sleep 20.25; set $dev:FILTER=state!=$state $state"; }',
       'Low'     => 'set %DEVICE% alert select',
     },
     
@@ -126,6 +126,12 @@ my $db = {
           'ACTION'    => '',
         },
       },
+    },
+
+    'Jabber' => {
+      'Normal'  => 'set %DEVICE% msg %RECIPIENT% %TITLE%: %MSG%',
+      'High'    => 'set %DEVICE% msg %RECIPIENT% %TITLE%: %MSG%',
+      'Low'     => 'set %DEVICE% msg %RECIPIENT% %TITLE%: %MSG%',
     },
 
     'Pushbullet' => {
@@ -218,6 +224,26 @@ my $db = {
         'Low' => {
           'ENIGMA2_TYPE'     => 'message',
           'TIMEOUT'     => 8,
+        },
+      },
+    },
+
+    'XBMC' => {
+      'Normal'  => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=\'%TIMEOUT%\'*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+      'High'    => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=\'%TIMEOUT%\'*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+      'Low'     => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=\'%TIMEOUT%\'*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+      'defaultValues' => {
+        'Normal' => {
+          'TIMEOUT'   => 8,
+          'XBMC_ICON' => 'info',
+        },
+        'High' => {
+          'TIMEOUT'   => 12,
+          'XBMC_ICON' => 'warning',
+        },
+        'Low' => {
+          'TIMEOUT'   => 8,
+          'XBMC_ICON' => '',
         },
       },
     },
