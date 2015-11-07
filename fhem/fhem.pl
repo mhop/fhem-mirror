@@ -2908,29 +2908,32 @@ EvalSpecials($%)
 }
 
 #####################################
-# Parse a timespec: Either HH:MM:SS or HH:MM or { perfunc() }
+# Parse a timespec: HH:MM:SS, HH:MM, sec-since-1970 or { perfunc() }
 sub
 GetTimeSpec($)
 {
   my ($tspec) = @_;
   my ($hr, $min, $sec, $fn);
 
-  if($tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) {
+  if($tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) { # HH:MM:SS
     ($hr, $min, $sec) = ($1, $2, $3);
-  } elsif($tspec =~ m/^([0-9]+):([0-5][0-9])$/) {
+
+  } elsif($tspec =~ m/^([0-9]+):([0-5][0-9])$/) {         # HH:MM
     ($hr, $min, $sec) = ($1, $2, 0);
-  } elsif($tspec =~ m/^{(.*)}$/) {
+
+  } elsif($tspec =~ m/^([0-9]{10})$/) {                   # seconds-since-1970
+    my @a = localtime($1);
+    ($hr, $min, $sec) = ($a[2],$a[1],$a[0]);
+
+  } elsif($tspec =~ m/^{(.*)}$/) {                        # {function}
     $fn = $1;
     $tspec = AnalyzeCommand(undef, "{$fn}");
-    if(!$@ && $tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) {
-      ($hr, $min, $sec) = ($1, $2, $3);
-    } elsif(!$@ && $tspec =~ m/^([0-9]+):([0-5][0-9])$/) {
-      ($hr, $min, $sec) = ($1, $2, 0);
-    } else {
-      $tspec = "<empty string>" if(!$tspec);
-      return ("the at function \"$fn\" must return a timespec and not $tspec.",
-                undef, undef, undef, undef);
-    }
+    $tspec = "<empty string>" if(!$tspec);
+    my ($err, $fn2);
+    ($err, $hr, $min, $sec, $fn2) = GetTimeSpec($tspec);
+    return ("the function \"$fn\" must return a timespec and not $tspec.",
+                undef, undef, undef, undef) if($err);
+
   } else {
     return ("Wrong timespec $tspec: either HH:MM:SS or {perlcode}",
                 undef, undef, undef, undef);
