@@ -177,7 +177,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
     ### command queue
     ###
 
-    $types = "text"
+    $types = AttrVal("msgType", $globalDevName, "text")
       if ( $types eq "" );
     my $msgSent = 0;
     my $forwarded   = "";
@@ -1823,7 +1823,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                 else {
                                     Log3 $logDevice, 5,
 "msg $device: $type[$i] route command (fhem): $cmd";
-                                    fhem $cmd;
+                                    fhem $cmd, 1;
                                     if ( $@ ) {
                                       $error = 1;
                                       $return .= "$gatewayDev: $@\n";
