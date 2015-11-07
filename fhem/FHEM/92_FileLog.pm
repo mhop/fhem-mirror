@@ -574,10 +574,38 @@ FileLog_Get($@)
       if($from =~ m/^(....)-(..)-(..)/) {
         $linf = $hash->{logfile};
         my ($Y,$m,$d) = ($1,$2,$3);
-        $linf =~ s/%Y/$Y/g;
-        $linf =~ s/%m/$m/g;
-        $linf =~ s/%d/$d/g;
-        $linf =~ s/%L/$attr{global}{logdir}/g if($attr{global}{logdir});
+        sub expandFileWildcards($$$$) {
+            my $f=shift;
+            my ($Y,$m,$d)=@_;
+            $f =~ s/%Y/$Y/g;
+            $f =~ s/%m/$m/g;
+            $f =~ s/%d/$d/g;
+            $f =~ s/%L/$attr{global}{logdir}/g if($attr{global}{logdir});
+            return($f);
+        };
+        $linf=expandFileWildcards($linf,$Y,$m,$d);
+        if($to =~ m/^(....)-(..)-(..)/) {
+          my $linf_to = $hash->{logfile};
+          my ($Y,$m,$d) = ($1,$2,$3);
+          $linf_to=expandFileWildcards($linf_to,$Y,$m,$d);
+          if(!($linf_to =~ m/%/)){
+            if($linf ne $linf_to){  # use to log files
+              my $tempread=$linf_to.".transit.temp.log";
+              if(open(my $temp,'>',$tempread)){
+                if(open(my $i,'<',$linf)){
+                  print $temp join("",<$i>);
+                  close($i);
+                }
+                if(open(my $i,'<',$linf_to)){
+                  print $temp join("",<$i>);
+                  close($i);
+                }
+                $linf=$tempread;
+                close($temp);
+              }
+            }
+          }
+        }
         $linf = $hash->{currentlogfile} if($linf =~ m/%/ || ! -f $linf);
       } else {
         $linf = $hash->{currentlogfile};
