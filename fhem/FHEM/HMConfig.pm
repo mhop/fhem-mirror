@@ -1178,8 +1178,8 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,lgMultiExec     =>1
                         }
  ,"HM-LC-RGBW-WM02"   =>{ ActHsvCol       =>1
-                         ,waRed           =>1,waGreen         =>1,waBlue          =>1,colChangeSpeed  =>1}
- ,"HM-LC-RGBW-WM03"   =>{ ActColPrgm      =>1,ActMinBoarder   =>1,ActMaxBoarder   =>1}
+                         ,waRed           =>1,waGreen         =>1,waBlue          =>1}
+ ,"HM-LC-RGBW-WM03"   =>{ ActColPrgm      =>1,ActMinBoarder   =>1,ActMaxBoarder   =>1,colChangeSpeed  =>1}
  );
 
 #clones - - - - - - - - - - - - - - -
