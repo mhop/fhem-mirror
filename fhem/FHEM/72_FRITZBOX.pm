@@ -71,6 +71,7 @@ sub FRITZBOX_Readout_Process($$);
 sub FRITZBOX_SendMail_Shell($@);
 sub FRITZBOX_SetCustomerRingTone($@);
 sub FRITZBOX_SetMOH($@);
+sub FRITZBOX_TR064_Init($$);
 sub FRITZBOX_Wlan_Run($);
 sub FRITZBOX_Web_Query($$@);
 
@@ -213,8 +214,8 @@ sub FRITZBOX_Define($$)
    $hash->{helper}{TimerReadout} = $name.".Readout";
    $hash->{helper}{TimerCmd} = $name.".Cmd";
 
-   my $tr064Port = FRITZBOX_TR064_Init ($hash);
-   $hash->{SECPORT} = $tr064Port    if $tr064Port;
+   # my $tr064Port = FRITZBOX_TR064_Init ($hash);
+   # $hash->{SECPORT} = $tr064Port    if $tr064Port;
    
  # Check APIs after fhem.cfg is processed
    $hash->{APICHECKED} = 0;
@@ -688,7 +689,7 @@ sub FRITZBOX_API_Check_Run($)
 
 # Check if perl modules for remote APIs exists
    if ($missingModulWeb) {
-      FRITZBOX_Log $hash, 3, "Cannot check for APIs webcm, luaQuery and TR064 because perl modul $missingModulWeb is missing on this system.";
+      FRITZBOX_Log $hash, 3, "Cannot check for box model and APIs webcm, luaQuery and TR064 because perl modul $missingModulWeb is missing on this system.";
    }
 # Check for remote APIs
    else {
@@ -718,18 +719,28 @@ sub FRITZBOX_API_Check_Run($)
          FRITZBOX_Log $hash, 4, "API luaQuery does not exist: ".$response->status_line;
       }
 
-   # Check if tr064 specification exists
+   # Check if tr064 specification exists and determine TR064-Port
       $response = $agent->get( "http://".$host.":49000/tr64desc.xml" );
 
-      if ($response->is_success) {
+      if ($response->is_success) { #determine TR064-Port
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
          FRITZBOX_Log $hash, 4, "API TR-064 found.";
+      #Determine TR064-Port
+         my $tr064Port = FRITZBOX_TR064_Init ( $hash, $host );
+         if ($tr064Port) {
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
+            FRITZBOX_Log $hash, 4, "TR-064-SecurePort is $tr064Port.";
+         }
+         else {
+            FRITZBOX_Log $hash, 4, "TR-064-SecurePort does not exist";
+         }
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
          FRITZBOX_Log $hash, 4, "API TR-064 does not exist: ".$response->status_line;
       }
 
+   
    # Check if m3u can be created and the URL tested
       my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", "./www/images/".$name.".m3u" );
       if (open my $fh, '>', $m3uFileLocal) {
@@ -774,6 +785,30 @@ sub FRITZBOX_API_Check_Run($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_LOCAL", "undefined";
          FRITZBOX_Log $hash, 4, "Error: Cannot create save file '$m3uFileLocal' because $!\n";
       }
+
+   # Box model
+      FRITZBOX_Log $hash, 5, "Read 'system_status'";
+      my $url = "http://$host/cgi-bin/system_status";
+      
+      my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
+      my $response = $agent->get ($url);
+      my $content  = $response->content;
+      $content=$1    if $content =~ /<body>(.*)<\/body>/;
+      
+      my @result = split /-/, $content;
+      # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
+      # 0 FritzBox-Modell
+      # 1 Annex/Erweiterte Kennzeichnung
+      # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
+      # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
+      # 4+5 Hashcode
+      # 6 Status
+      # 7 Firmwareversion
+      # 8 Sub-Version/Unterversion der Firmware
+      # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+
    }
    
 # Check if telnet modul exists
@@ -1158,34 +1193,8 @@ sub FRITZBOX_Readout_Run_Web($)
    my $runNo;
    my $sid;
    
-   if ( int(time/3600) != $hash->{fhem}{lastHour} || $hash->{fhem}{LOCAL} != 0) {
-         FRITZBOX_Log $hash, 4, "Start update of slow changing device readings.";
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->lastHour", int(time/3600);
-   # Box model
-      my $host = $hash->{HOST};
-      my $url = "http://$host/cgi-bin/system_status";
-      
-      my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
-      my $response = $agent->get ($url);
-      my $content  = $response->content;
-      $content=$1    if $content =~ /<body>(.*)<\/body>/;
-      
-      my @result = split /-/, $content;
-      # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
-      # 0 FritzBox-Modell
-      # 1 Annex/Erweiterte Kennzeichnung
-      # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
-      # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
-      # 4+5 Hashcode
-      # 6 Status
-      # 7 Firmwareversion
-      # 8 Sub-Version/Unterversion der Firmware
-      # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
-   }  
- 
-   FRITZBOX_Log $hash, 4, "Start update of fast changing device readings.";
+#Start update 
+   FRITZBOX_Log $hash, 4, "Prepare query string for luaQuery.";
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
@@ -1554,7 +1563,7 @@ sub FRITZBOX_Readout_Process($$)
       }
       elsif ( defined $values{box_tr064} && $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
             FRITZBOX_Log $hash, 3, "TR-064 is switched on";
-         my $tr064Port = FRITZBOX_TR064_Init ($hash);
+         my $tr064Port = FRITZBOX_TR064_Init ($hash, $hash->{HOST});
          $hash->{SECPORT} = $tr064Port    if $tr064Port;
       }
 
@@ -4074,9 +4083,9 @@ sub FRITZBOX_TR064_Get_ServiceList($)
 }
 
 #######################################################################
-sub FRITZBOX_TR064_Init ($)
+sub FRITZBOX_TR064_Init ($$)
 {
-   my ($hash) = @_;
+   my ($hash, $host) = @_;
    my $name = $hash->{NAME};
 
    return   if AttrVal( $name, "forceTelnetConnection",  0 );   
@@ -4085,23 +4094,9 @@ sub FRITZBOX_TR064_Init ($)
       FRITZBOX_Log $hash, 2,  "Cannot use TR-064. Perl modul ".$missingModulTR064."is missing on this system. Please install.";
       return undef;
    }
-   if ($missingModulWeb) {
-      FRITZBOX_Log $hash, 2,  "Cannot test TR-064 access. Perl modul ".$missingModulWeb."is missing on this system. Please install.";
-      return undef;
-   }
 
-   my $host = $hash->{HOST};
-
-      FRITZBOX_Log $hash, 4, "Check if TR-064 description 'http://".$host.":49000/tr64desc.xml' exists.";
-   my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
-   my $response = $agent->get( "http://".$host.":49000/tr64desc.xml" );
-   if ( $response->is_error() ) {
-      FRITZBOX_Log $hash, 2, "The device '$host' doesn't have a TR-064 API or TR-064 is switched off.";
-      return undef;
-   }
-   
 # Security Port anfordern
-      FRITZBOX_Log $hash, 4, "Open TR-064 connection";
+      FRITZBOX_Log $hash, 4, "Open TR-064 connection and ask for security port";
    my $s = SOAP::Lite
       -> uri('urn:dslforum-org:service:DeviceInfo:1')
       -> proxy('http://'.$host.':49000/upnp/control/deviceinfo')
@@ -4150,7 +4145,7 @@ sub FRITZBOX_Web_OpenCon ($)
    my $pwd = FRITZBOX_readPassword($hash);
 
    unless (defined $pwd) {
-      FRITZBOX_Log $hash, 2, "Error: No password set. Please define it with 'set $name password YourPassword'";
+      FRITZBOX_Log $hash, 2, "Error: No password set. Please define it (once) with 'set $name password YourPassword'";
       return undef;
    }
    my $user = AttrVal( $name, "boxUser", "" );
@@ -4280,6 +4275,7 @@ sub FRITZBOX_Web_Query($$@)
       return \%retHash;
    }
 
+   FRITZBOX_Log $hash, 5, "Request data via API luaQuery.";
    my $host = $hash->{HOST};
    my $url = 'http://' . $host . '/query.lua?sid=' . $sid . $queryStr;
    
@@ -4483,7 +4479,7 @@ sub FRITZBOX_fritztris($)
    <br>
    For detail instructions, look at and please maintain the <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a>.
    <br/><br/>
-   The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a web or telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must once be set.
+   The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a web or telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must <u>once</u> be set.
    <br/><br/>
    The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel. The modul works best with Fritz!OS 6.24. AVM has removed internal interfaces from later Fritz!OS versions without replacement. For these versions, some modul functions are hence restricted or do not work at all (see remarks to required API).
    <br>
@@ -4828,7 +4824,7 @@ sub FRITZBOX_fritztris($)
    <br>
    F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
    <br/><br/>
-   Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Web oder Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss einmalig das Passwort gesetzt werden.
+   Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Web oder Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss <u>einmalig</u> das Passwort gesetzt werden.
    <br/><br/>
    Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen ersatzlos gestrichen. Einige Modul-Funktionen sind dadurch nicht oder nur eingeschr&auml;nkt verf&uuml;gbar (siehe Anmerkungen zu ben&ouml;tigten API).
    <br>
