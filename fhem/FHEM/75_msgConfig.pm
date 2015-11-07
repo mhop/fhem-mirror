@@ -184,25 +184,61 @@ sub msgConfig_Undefine($$) {
 sub msgConfig_Set($@) {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
-    my $what = "";
+    shift @a;
+    my $what = shift @a;
 
     Log3 $name, 5, "msgConfig $name: called function msgConfig_Set()";
 
     my @msgTypes =
       ( "audio", "light", "mail", "push", "screen" );
 
-    $what = $a[1];
-
     # cleanReadings
     if ( lc($what) eq "cleanreadings" ) {
-        my $device = defined($a[2]) ? $a[2] : ".*";
+        my $device = defined($a[0]) ? $a[0] : ".*";
 
         return fhem ("deletereading $device fhemMsg.*", 1);
     }
 
+    # addLocation
+    elsif ( lc($what) eq "addlocation" ) {
+        my $location = join(" ", @a);
+        my $group = AttrVal($name, "group", "msgConfig");
+        my $room = AttrVal($name, "room", "");
+        my $return = "";
+
+        return "Missing argument 'location'"
+          if ($location eq "");
+
+        my $device = "msgRoom_" . $location;
+        $device =~ s/[\s\t-]+/_/g;
+        
+        return "Device $device is already existing"
+          if (defined($defs{$device}) && $defs{$device}{TYPE} ne "dummy");
+
+        if (!defined($defs{$device})) {
+          $return = fhem ("define $device dummy", 1);
+          $return .= "Device $device was created"
+            if ($return eq "");
+        } else {
+          $return = "Existing dummy device $device was updated";
+        }
+
+        $attr{$device}{group} = $group if (!defined($attr{$device}{group}));
+        $attr{$device}{room} = $room if (!defined($attr{$device}{room}) && $room ne "");
+        $attr{$device}{comment} = "Auto-created by $name" if (!defined($attr{$device}{comment}));
+        $attr{$device}{userattr} .= " msgLocationName" if (defined($attr{$device}{userattr}) && $attr{$device}{userattr} !~ /^msgLocationName$|^msgLocationName\s|\smsgLocationName\s|\smsgLocationName$/);
+        $attr{$device}{userattr} = "msgLocationName" if (!defined($attr{$device}{userattr}));
+        $attr{$device}{msgLocationName} = $location;
+
+        $attr{$name}{msgLocationDevs} .= ",".$device if (defined($attr{$name}{msgLocationDevs}) && $attr{$name}{msgLocationDevs} !~ /^$device\$|^$device,|,$device,|,$device$/);
+        $attr{$name}{msgLocationDevs} = $device if (!defined($attr{$name}{msgLocationDevs}));
+        
+        return $return;
+    }
+
     else {
         return
-"Unknown argument $what, choose one of cleanReadings";
+"Unknown argument $what, choose one of cleanReadings addLocation";
     }
 }
 
@@ -210,20 +246,19 @@ sub msgConfig_Set($@) {
 sub msgConfig_Get($@) {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
-    my $what = "";
+    shift @a;
+    my $what = shift @a;
 
     Log3 $name, 5, "msgConfig $name: called function msgConfig_Get()";
 
     my @msgTypes =
       ( "audio", "light", "mail", "push", "screen" );
 
-    $what = $a[1];
-
     # routeCmd
     if ( lc($what) eq "routecmd" ) {
         my $return = "";
-        my $msgTypesReq = defined($a[2]) ? lc($a[2]) : join( ',', @msgTypes );
-        my $devicesReq = defined($a[3]) ? $a[3] : $name;
+        my $msgTypesReq = defined($a[0]) ? lc($a[0]) : join( ',', @msgTypes );
+        my $devicesReq = defined($a[1]) ? $a[1] : $name;
         my $cmdSchema = msgSchema::get();
         my $UserDeviceTypes = "";
 
