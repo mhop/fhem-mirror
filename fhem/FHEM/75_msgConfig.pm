@@ -48,7 +48,7 @@ sub msgConfig_Initialize($) {
     my ($hash) = @_;
 
     $hash->{DefFn}    = "msgConfig_Define";
-#    $hash->{SetFn}    = "msgConfig_Set";
+    $hash->{SetFn}    = "msgConfig_Set";
     $hash->{GetFn}    = "msgConfig_Get";
     $hash->{UndefFn}  = "msgConfig_Undefine";
 
@@ -114,6 +114,7 @@ sub msgConfig_Initialize($) {
       msgTitleText
       msgTitleTextHigh
       msgTitleTextLow
+      msgType
 
     );
     use warnings 'qw';
@@ -180,6 +181,32 @@ sub msgConfig_Undefine($$) {
 }
 
 ###################################
+sub msgConfig_Set($@) {
+    my ( $hash, @a ) = @_;
+    my $name = $hash->{NAME};
+    my $what = "";
+
+    Log3 $name, 5, "msgConfig $name: called function msgConfig_Set()";
+
+    my @msgTypes =
+      ( "audio", "light", "mail", "push", "screen" );
+
+    $what = $a[1];
+
+    # cleanReadings
+    if ( lc($what) eq "cleanreadings" ) {
+        my $device = defined($a[2]) ? $a[2] : ".*";
+
+        return fhem ("deletereading $device fhemMsg.*", 1);
+    }
+
+    else {
+        return
+"Unknown argument $what, choose one of cleanReadings";
+    }
+}
+
+###################################
 sub msgConfig_Get($@) {
     my ( $hash, @a ) = @_;
     my $name = $hash->{NAME};
@@ -192,15 +219,8 @@ sub msgConfig_Get($@) {
 
     $what = $a[1];
 
-    # cleanReadings
-    if ( lc($what) eq "cleanreadings" ) {
-        my $device = defined($a[2]) ? $a[2] : ".*";
-
-        return fhem ("deletereading $device fhemMsg.*");
-    }
-
     # routeCmd
-    elsif ( lc($what) eq "routecmd" ) {
+    if ( lc($what) eq "routecmd" ) {
         my $return = "";
         my $msgTypesReq = defined($a[2]) ? lc($a[2]) : join( ',', @msgTypes );
         my $devicesReq = defined($a[3]) ? $a[3] : $name;
@@ -355,7 +375,7 @@ sub msgConfig_Get($@) {
 
     else {
         return
-"Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen cleanReadings";
+"Unknown argument $what, choose one of routeCmd:,audio,light,mail,push,screen";
     }
 }
 
@@ -373,13 +393,11 @@ sub msgConfig_Get($@) {
     </h3>
     <ul>
       Provides global settings for FHEM command <a href="#MSG">msg</a>.<br>
-        <br>
-      <ul>
-        <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
-        <div style="margin-left: 2em">
-          <code>define &lt;name&gt; msgConfig</code><br>
-        </div>
-      </ul>
+      <br>
+      <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
+      <div style="margin-left: 2em">
+        <code>define &lt;name&gt; msgConfig</code><br>
+      </div>
     </ul>
 
 =end html
@@ -394,13 +412,11 @@ sub msgConfig_Get($@) {
     </h3>
     <ul>
       Stellt globale Einstellungen für das FHEM Kommando <a href="#MSG">msg</a> bereit.<br>
-        <br>
-      <ul>
-        <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
-        <div style="margin-left: 2em">
-          <code>define &lt;name&gt; msgConfig</code><br>
-        </div>
-      </ul>
+      <br>
+      <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
+      <div style="margin-left: 2em">
+        <code>define &lt;name&gt; msgConfig</code><br>
+      </div>
     </ul>
 
 =end html_DE
