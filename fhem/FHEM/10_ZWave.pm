@@ -460,7 +460,7 @@ ZWave_Initialize($)
   $hash->{ParseFn}   = "ZWave_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 noExplorerFrames:1,0 ".
     "ignore:1,0 dummy:1,0 showtime:1,0 classes vclasses ".
-    "secure_classes $readingFnAttributes";
+    "secure_classes WNMI_delay $readingFnAttributes";
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 
   $hash->{FW_detailFn} = "ZWave_fhemwebFn";
@@ -2519,13 +2519,14 @@ ZWave_wakeupTimer($$)
 {
   my ($hash, $direct) = @_;
   my $now = gettimeofday();
+  my $wnmi_delay = AttrVal($hash->{NAME}, "WNMI_delay", 2);
 
   if(!$hash->{wakeupAlive}) {
     $hash->{wakeupAlive} = 1;
     $hash->{lastMsgSent} = $now;
     InternalTimer($now+0.1, "ZWave_wakeupTimer", $hash, 0);
 
-  } elsif(!$direct && $now - $hash->{lastMsgSent} > 2) {
+  } elsif(!$direct && $now - $hash->{lastMsgSent} > $wnmi_delay) {
     if(!$hash->{SendStack}) {
       my $nodeId = $hash->{nodeIdHex};
       my $cmdEf  = (AttrVal($hash->{NAME},"noExplorerFrames",0)==0 ? "25":"05");
@@ -3638,6 +3639,13 @@ s2Hex($)
   <b>Attributes</b>
   <ul>
     <li><a href="#IODev">IODev</a></li>
+    <li><a name="WNMI_delay">WNMI_delay</a>
+      This attribute set the time delay between the last message sent to an
+      WakeUp device and the sending of the WNMI Message
+      (WakeUpNoMoreInformation) that will set the device to sleep mode.  Value
+      is in seconds, subseconds my be specified. Values outside of 0.2-5.0 are
+      probably harmful.
+      </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#dummy">dummy</a></li>
