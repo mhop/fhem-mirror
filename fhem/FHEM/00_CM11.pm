@@ -415,7 +415,7 @@ sub CM11_Get($@)
   my ($hash, @a) = @_;
 
   return "CM11: get needs only one parameter" if(@a != 2);
-  return "Unknown argument $a[1], choose one of " . join(",", sort keys %gets)
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
         if(!defined($gets{$a[1]}));
 
   my ($fn, $arg) = split(" ", $gets{$a[1]});
