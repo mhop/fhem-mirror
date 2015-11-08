@@ -56,7 +56,7 @@ RSS_Initialize($) {
     $hash->{DefFn}    = "RSS_Define";
     $hash->{UndefFn}  = "RSS_Undefine";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList} = "size bg bgcolor tmin refresh areas autoreread:1,0 viewport";
+    $hash->{AttrList} = "size bg bgcolor tmin refresh areas autoreread:1,0 viewport noscroll";
     $hash->{SetFn}    = "RSS_Set";
     $hash->{NotifyFn} = "RSS_Notify";
 
@@ -299,11 +299,13 @@ RSS_returnHTML($) {
   my $type = $defs{$name}{fhem}{style};
   my $img= "$url/rss/$name.$type";
   my $refresh= AttrVal($name, 'refresh', 60);
+  my $noscroll= AttrVal($name, 'noscroll', 0);
+  my $overflow= $noscroll ? "  style=\"overflow:hidden\"" : "";
   my $areas= AttrVal($name, 'areas', "");
   my $embed= $defs{$name}{".embed"};
   my $r= (defined($refresh) && ($refresh> 0)) ? " onload=\"setTimeout(function(){reloadImage(\'img0\')},$refresh*1000);\"" : "";
   my $code= RSS_HTMLHead($name, $refresh) . 
-                "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\">\n" .
+                "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\"$overflow>\n" .
                     "<div id=\"rss_$name\" style=\"z-index:1;\" >\n" .
                       "<img id=\"img0\" src=\"$img\" usemap=\"#map\"$r/>\n" .
                       "<map name=\"map\" id=\"map\">\n$areas\n</map>\n" .
@@ -1005,6 +1007,8 @@ plotFromUrl(@)
     <li>viewport<br>Adds a viewport directive to the HTML header.<br>
         Example: <code>attr FrameRSS viewport width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0</code><br>
         This scales the image to fit to the browser's viewport and inhibits zooming in or out on tablets.
+    </li><br>
+    <li>noscroll</br>Suppresses scrollbars in browsers, if set to 1.
     </li><br>
     <li>areas<br>HTML code that goes into the image map.<br>
         Example: <code>attr FrameRSS areas &lt;area shape="rect" coords="0,0,200,200" href="http://fhem.de"/&gt;&lt;area shape="rect" coords="600,400,799,599" href="http://has:8083/fhem" target="_top"/&gt;</code>
