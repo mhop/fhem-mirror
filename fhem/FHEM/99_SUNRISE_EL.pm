@@ -87,15 +87,24 @@ sr_alt($$$$$$$$$)
   my @lt = localtime($nt);
   my $gmtoff = _calctz($nt,@lt); # in hour
 
-  my ($rt,$st) = _sr_alt($altit,$needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $gmtoff);
+  my ($rt,$st) = _sr_alt($altit,$needrise,$needset,
+                        $lt[5]+1900,$lt[4]+1,$lt[3], $gmtoff);
   my $sst = ($rise ? $rt : $st) + ($seconds/3600);
 
   my $nh = $lt[2] + $lt[1]/60 + $lt[0]/3600;    # Current hour since midnight
   if($daycheck) {
-    return 0 if($nh < $rt || $nh > $st);
-    return 0 if(defined($min) && $nh < hms2h($min));
-    return 0 if(defined($max) && $nh > hms2h($max));
-    return 1;
+    if(defined($min) && defined($max)) { #Forum #43742
+      $min = hms2h($min); $max = hms2h($max);
+      if($min < $max) {
+        $rt = $min if($rt < $min);
+        $st = $max if($st > $max);
+      } else {
+        $rt = $max if($rt > $max);
+        $st = $min if($st < $min);
+      }
+    }
+    return 1 if($rt <= $nh && $nh <= $st);
+    return 0;
   }
 
   $sst = hms2h($min) if(defined($min) && (hms2h($min) > $sst));
@@ -109,7 +118,8 @@ sr_alt($$$$$$$$$)
     my $ngmtoff = _calctz($nt,@lt); # in hour
     $diff = 24+$gmtoff-$ngmtoff;
 
-    ($rt,$st) = _sr_alt($altit,$needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $ngmtoff);
+    ($rt,$st) = _sr_alt($altit,$needrise,$needset,
+                        $lt[5]+1900,$lt[4]+1,$lt[3], $ngmtoff);
     $sst = ($rise ? $rt : $st) + ($seconds/3600);
 
     $sst = hms2h($min) if(defined($min) && (hms2h($min) > $sst));
@@ -400,17 +410,18 @@ sunrise, sunset,
 sunrise_rel, sunset_rel
 sunrise_abs, sunset_abs
 isday</pre>
-  perl functions, to be used in <a href="#at">at</a> or FS20 on-till commands.<br>
+  perl functions, to be used in <a href="#at">at</a> or FS20 on-till commands.
+  <br>
   First you should set the longitude and latitude global attributes to the
   exact longitude and latitude values (see e.g. maps.google.com for the exact
   values, which should be in the form of a floating point value).  The default
   value is Frankfurt am Main, Germany.
   <br><br>
-  The default altitude ($defaultaltit in SUNRISE_EL.pm) defines the sunrise/sunset
-  for Civil twilight (i.e. one can no longer read outside without artificial
-  illumination), which differs from sunrise/sunset times found on different
-  websites.  See perldoc "DateTime::Event::Sunrise" for alternatives.
-  <br><br>
+  The default altitude ($defaultaltit in SUNRISE_EL.pm) defines the
+  sunrise/sunset for Civil twilight (i.e. one can no longer read outside
+  without artificial illumination), which differs from sunrise/sunset times
+  found on different websites.  See perldoc "DateTime::Event::Sunrise" for
+  alternatives.  <br><br>
 
   sunrise()/sunset() returns the absolute time of the next sunrise/sunset,
   adding 24 hours if the next event is tomorrow, to use it in the timespec of
@@ -420,9 +431,9 @@ isday</pre>
   sunrise/sunset. <br>
   sunrise_abs()/sunset_abs() return the absolute time of the corresponding
   event today (no 24 hours added).<br>
-  sunrise_abs_dat()/sunset_abs_dat() return the absolute time of the corresponding
-  event to a given date(no 24 hours added).<br>
-  
+  sunrise_abs_dat()/sunset_abs_dat() return the absolute time of the
+  corresponding event to a given date(no 24 hours added).<br>
+
   All functions take up to three arguments:<br>
   <ul>
     <li>The first specifies an offset (in seconds), which will be added to the
@@ -430,21 +441,26 @@ isday</pre>
     <li>The second and third specify min and max values (format: "HH:MM").</li>
   </ul>
   <br>
-  isday() can be used in some notify or at commands to check if the sun is up or
-  down.<br><br>
+  isday() can be used in some notify or at commands to check if the sun is up
+  or down. isday() ignores the seconds parameter, but respects min and max.
+  If min < max, than the day starts not before min, and ends not after max.
+  If min > max, than the day starts not after max, and ends not before min.
+  <br><br>
 
-  Optionally, for all functions you can set first argument which defines a horizon value
-  which then is used instead of the $defaultaltit in SUNRISE_EL.pm.<br>
-  Possible values are: "REAL", "CIVIL", "NAUTIC", "ASTRONOMIC" or a 
-  positive or negative number preceded by "HORIZON="<br>
-  REAL is 0, CIVIL is -6, NATUIC is -12, ASTRONOMIC is -18 degrees above horizon.<br><br>
+  Optionally, for all functions you can set first argument which defines a
+  horizon value which then is used instead of the $defaultaltit in
+  SUNRISE_EL.pm.<br> Possible values are: "REAL", "CIVIL", "NAUTIC",
+  "ASTRONOMIC" or a positive or negative number preceded by "HORIZON="<br> REAL
+  is 0, CIVIL is -6, NATUIC is -12, ASTRONOMIC is -18 degrees above
+  horizon.<br><br>
+
   Examples:<br>
   <ul>
   <PRE>
     # When sun is 6 degrees below horizon - same as sunrise();
     sunrise("CIVIL");
 
-    # When sun is 3 degrees below (-3 above) horizon (Between real and civil sunset)
+    # When sun is 3 degrees below horizon (between real and civil sunset)
     sunset("HORIZON=-3");
 
     # When sun is 1 degree above horizon
@@ -455,7 +471,9 @@ isday</pre>
   </PRE>
   </ul>
   
-  The functions sunrise_abs_dat()/sunset_abs_dat() need as a very first parameter the date(format epoch: time()) for which the events should be calculated.
+  The functions sunrise_abs_dat()/sunset_abs_dat() need as a very first
+  parameter the date(format epoch: time()) for which the events should be
+  calculated.
   <br><br>
   Examples:
   <br>
@@ -501,7 +519,6 @@ isday</pre>
       attr global longitude 8.686<br>
     </ul>
   </ul><br>
-
 
 </ul>
 
