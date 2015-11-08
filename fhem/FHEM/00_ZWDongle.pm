@@ -192,7 +192,7 @@ ZWDongle_Initialize($)
   $hash->{AttrFn}  = "ZWDongle_Attr";
   $hash->{UndefFn} = "ZWDongle_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 ".
-                     "homeId networkKey delayNeeded:1,0";
+                     "homeId networkKey";
 }
 
 #####################################
@@ -237,7 +237,7 @@ ZWDongle_Define($$)
   $hash->{nrNAck} = 0;
   my @empty;
   $hash->{SendStack} = \@empty;
-  ZWDongle_shiftSendStack($hash, 5, undef);
+  ZWDongle_shiftSendStack($hash, 0, 5, undef);
   
   my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
   return $ret;
@@ -361,7 +361,10 @@ ZWDongle_Get($@)
     for my $byte (0..28) {
       my $bits = $r[5+$byte];
       for my $bit (0..7) {
-        push @list, $byte*8+$bit+1 if($bits & (1<<$bit));
+        next if(!($bits & (1<<$bit)));
+        my $idx = $byte*8+$bit+1;
+        my @l = devspec2array(sprintf(".*:FILTER=nodeIdHex=%02x", $idx));
+        push @list, ($l[0] && $defs{$l[0]} ? $l[0] : "UNKNOWN_$idx");
       }
     }
     $msg = join(",", @list);
@@ -386,6 +389,7 @@ ZWDongle_Get($@)
     $msg = sprintf("HomeId:%s CtrlNodeId:%s", 
                 substr($ret,4,8), substr($ret,12,2));
     $hash->{homeId} = substr($ret,4,8);
+    $hash->{nodeIdHex} = substr($ret,12,2);
     $attr{NAME}{homeId} = substr($ret,4,8);
 
   } elsif($type eq "version") {                 ############################
@@ -509,17 +513,25 @@ ZWDongle_Write($$$)
 }
 
 sub
-ZWDongle_shiftSendStack($$$)
+ZWDongle_shiftSendStack($$$$)
 {
-  my ($hash, $level, $txt) = @_;
+  my ($hash, $reason, $loglevel, $txt) = @_;
   my $ss = $hash->{SendStack};
-  my $cmd = shift @{$ss};
-  Log3 $hash, $level, "$txt, removing $cmd from dongle sendstack"
-        if($txt && $cmd);
+  my $cmd = $ss->[0];
 
-  $hash->{WaitForAck}=0;
-  $hash->{SendRetries}=0;
-  $hash->{MaxSendRetries}=3;
+  if($cmd && $reason==0 && $cmd =~ m/^01..0013/) { # ACK for SEND_DATA
+    Log3 $hash, $loglevel, "$txt, WaitForAck=>2 for $cmd"
+        if($txt && $cmd);
+    $hash->{WaitForAck}=2;
+
+  } else {
+    shift @{$ss};
+    Log3 $hash, $loglevel, "$txt, removing $cmd from dongle sendstack"
+        if($txt && $cmd);
+    $hash->{WaitForAck}=0;
+    $hash->{SendRetries}=0;
+    $hash->{MaxSendRetries}=3;
+  }
 }
 
 sub
@@ -535,11 +547,14 @@ ZWDongle_ProcessSendStack($)
   my $ts = gettimeofday();  
 
   if($hash->{WaitForAck}){
-    if($ts-$hash->{SendTime} >= 1){
+    if($hash->{WaitForAck} == 1 && $ts-$hash->{SendTime} >= 1) {
       Log3 $hash, 2, "ZWDongle_ProcessSendStack: no ACK, resending message ".
                       $hash->{SendStack}->[0];
       $hash->{SendRetries}++;
       $hash->{WaitForAck} = 0;
+
+    } elsif($hash->{WaitForAck} == 2 && $ts-$hash->{SendTime} >= 2) {
+      ZWDongle_shiftSendStack($hash, 1, 4, "no response from device");
 
     } else {
       InternalTimer($ts+1, "ZWDongle_ProcessSendStack", $hash, 0);
@@ -549,7 +564,7 @@ ZWDongle_ProcessSendStack($)
   }
 
   if($hash->{SendRetries} > $hash->{MaxSendRetries}){
-    ZWDongle_shiftSendStack($hash, 1, "ERROR: max send retries reached");
+    ZWDongle_shiftSendStack($hash, 1, 1, "ERROR: max send retries reached");
   }
   
   return if(!@{$hash->{SendStack}} ||
@@ -594,7 +609,7 @@ ZWDongle_Read($@)
     my $fb = substr($data, 0, 2);
 
     if($fb eq "06") {   # ACK
-      ZWDongle_shiftSendStack($hash, 5, "ACK received");
+      ZWDongle_shiftSendStack($hash, 0, 5, "ACK received");
       $data = substr($data, 2);
       next;
     }
@@ -652,6 +667,8 @@ ZWDongle_Read($@)
     $hash->{nrNAck} = 0;
     Log3 $name, 4, "ZWDongle_Read $name: sending ACK, processing $msg";
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
+    ZWDongle_shiftSendStack($hash, 1, 5, "device ack reveived")
+        if($msg =~ m/^0013/);
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     $hash->{PARTIAL} = $data;	 # Recursive call by ZWave get, Forum #37418
@@ -880,8 +897,9 @@ ZWDongle_Ready($)
   <b>Get</b>
   <ul>
   <li>nodeList<br>
-    return the list of included nodeIds. Can be used to recreate fhem-nodes
-    with the createNode command.</li>
+    return the list of included nodenames or UNKNOWN_id, if there is no
+    corresponding device in FHEM. Can be used to recreate fhem-nodes with the
+    createNode command.</li>
 
   <li>homeId<br>
     return the six hex-digit homeId of the controller.</li>
@@ -917,10 +935,6 @@ ZWDongle_Ready($)
       wich sometimes report a wrong/nonexisten homeId (Forum #35126)</li>
     <li><a href="#networkKey">networkKey</a><br>
       Needed for secure inclusion, hex string with length of 32
-      </li>
-    <li><a href="#delayNeeded">delayNeeded</a><br>
-      If set to 0, no delay is needed between sending consecutive commands to
-      the same receiver. Default is 1 (delay is needed).
       </li>
   </ul>
   <br>

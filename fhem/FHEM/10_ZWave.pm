@@ -783,7 +783,7 @@ ZWave_Cmd($$@)
     $data = "$cmd $id $data" if($re);
 
     $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
-    ZWave_processSendStack($hash, 1) if($data && $cmd eq "neighborList");
+    ZWave_processSendStack($hash) if($data && $cmd eq "neighborList");
 
   } else {
     if(!$zwave_quietCmds{$cmd}) {
@@ -2552,19 +2552,12 @@ ZWave_isWakeUp($)
 }
 
 sub
-ZWave_processSendStack($$)
+ZWave_processSendStack($)
 {
-  my ($hash, $withDelay) = @_;
+  my ($hash) = @_;
   my $ss = $hash->{SendStack};
   return if(!$ss);
 
-  if($withDelay && AttrVal($hash->{IODev}{NAME}, "delayNeeded",1)) {
-    InternalTimer(gettimeofday()+0.3, sub {
-      ZWave_processSendStack($hash, 0);
-    }, {}, 0);
-    return;
-  }
-  
   if(index($ss->[0],"sent") == 0) {
     shift @{$ss};
     RemoveInternalTimer($hash) if(!ZWave_isWakeUp($hash));
@@ -2584,7 +2577,7 @@ ZWave_processSendStack($$)
   if(!ZWave_isWakeUp($hash)) {
     InternalTimer($hash->{lastMsgSent}+10, sub {
       Log 2, "ZWave: No ACK from $hash->{NAME} after 10s for $ss->[0]";
-      ZWave_processSendStack($hash, 0);
+      ZWave_processSendStack($hash);
     }, $hash, 0);
   }
 }
@@ -2617,7 +2610,7 @@ ZWave_addToSendStack($$)
       return ZWave_addToSendStack($hash, $cmd);
     }
   }
-  ZWave_processSendStack($hash, 0) if(@{$ss} == 1);
+  ZWave_processSendStack($hash) if(@{$ss} == 1);
   return undef;
 }
 
@@ -2676,7 +2669,7 @@ ZWave_Parse($$@)
           my $hash = $zwave_lastHashSent;
           readingsSingleUpdate($hash, "SEND_DATA", "failed:$arg", 1);
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA to $hash->{NAME}: $arg";
-          ZWave_processSendStack($hash, 1);
+          ZWave_processSendStack($hash);
 
         } else {
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg (unknown device)";
@@ -2782,7 +2775,7 @@ ZWave_Parse($$@)
     if($hash) {
       if(ZWave_isWakeUp($hash)) {
         ZWave_wakeupTimer($hash, 1);
-        ZWave_processSendStack($hash, 0);
+        ZWave_processSendStack($hash);
       }
 
       if(!$ret) {
@@ -2802,7 +2795,7 @@ ZWave_Parse($$@)
       Log3 $ioName, 4, "$ioName transmit $lmsg for $callbackid";
       if($hash) {
         readingsSingleUpdate($hash, "transmit", $lmsg, 0);
-        ZWave_processSendStack($hash, 1);
+        ZWave_processSendStack($hash);
       }
       return "";
 
@@ -2951,7 +2944,7 @@ ZWave_Parse($$@)
 
   if($arg =~ m/^028407/) { # wakeup:notification
     ZWave_wakeupTimer($hash, 1);
-    ZWave_processSendStack($hash, 0);
+    ZWave_processSendStack($hash);
   }
 
   return "" if(!@event);
