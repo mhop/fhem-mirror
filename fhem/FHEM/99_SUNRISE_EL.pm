@@ -93,6 +93,8 @@ sr_alt($$$$$$$$$)
   my $nh = $lt[2] + $lt[1]/60 + $lt[0]/3600;    # Current hour since midnight
   if($daycheck) {
     return 0 if($nh < $rt || $nh > $st);
+    return 0 if(defined($min) && $nh < hms2h($min));
+    return 0 if(defined($max) && $nh > hms2h($max));
     return 1;
   }
 
@@ -376,7 +378,7 @@ sub sunrise_abs(@) { return sr_alt(time(),1,0,0,1,shift,shift,shift,shift); }
 sub sunset_abs (@) { return sr_alt(time(),0,0,0,1,shift,shift,shift,shift); }
 sub sunrise    (@) { return sr_alt(time(),1,2,0,1,shift,shift,shift,shift); }
 sub sunset     (@) { return sr_alt(time(),0,2,0,1,shift,shift,shift,shift); }
-sub isday      (@) { return sr_alt(time(),1,0,1,1,shift,    0,undef,undef); }
+sub isday      (@) { return sr_alt(time(),1,0,1,1,shift,shift,shift,shift); }
 
 sub sunrise_abs_dat(@) {
   return sr_alt(sr_noon(shift),1,0,0,0,shift,shift,shift,shift);
