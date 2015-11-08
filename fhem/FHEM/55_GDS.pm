@@ -1782,9 +1782,9 @@ sub retrieveForecasts($$@) {
 					} else {
 						$b[3] = ' ';
 					}
-					$fread{$prefix."_stationName"} = $area.'/'.latin1ToUtf8($b[0]);
+					$fread{$prefix."_stationName"} = $area.'/'.$b[0];
 					$fread{$prefix.$day.$tempLabel}  = $b[1];
-					$fread{$prefix.$day."_weather".$timeLabel} = latin1ToUtf8($b[2]);
+					$fread{$prefix.$day."_weather".$timeLabel} = $b[2];
 					$fread{$prefix.$day."_windGust".$timeLabel} = $b[3];
 					if ($fc != 3) {
 						$fread{$prefix.$day."_weekday"} = $fcWeekday;
@@ -1855,7 +1855,7 @@ sub retrieveForecasts($$@) {
         unless(defined($v))      {delete($defs{$name}{READINGS}{$k}); next;}
 		if($v =~ m/^--/)        {delete($defs{$name}{READINGS}{$k}); next;};
         unless(length(trim($v))) {delete($defs{$name}{READINGS}{$k}); next;};
-		readingsBulkUpdate($hash, $k, utf8ToLatin1($v)); 
+		readingsBulkUpdate($hash, $k, $v); 
 	}
 	readingsEndUpdate($hash, 1);
 }
@@ -1908,7 +1908,8 @@ sub getListForecastStations($) {
 #
 ###################################################################################################
 #
-#	2015-11-06	fixed		problems after global rereadcfg
+#	2015-11-06	changed		character encoding in forecast readings (jensb)
+#				fixed		problems after global rereadcfg
 #				fixed		delete CAP-zipfile unless gdsDebug set
 #
 #	2015-11-01	changed		getListForecastStations: fixed inverted logging "data not found"
