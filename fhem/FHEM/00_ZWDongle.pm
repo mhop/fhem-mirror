@@ -367,7 +367,7 @@ ZWDongle_Get($@)
         push @list, ($l[0] && $defs{$l[0]} ? $l[0] : "UNKNOWN_$idx");
       }
     }
-    $msg = join(",", @list);
+    $msg = join(" ", @list);
 
   } elsif($type eq "caps") {                    ############################
     $msg  = sprintf("Vers:%d Rev:%d ",       $r[2], $r[3]);

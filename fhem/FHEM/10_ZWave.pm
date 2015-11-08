@@ -2654,7 +2654,7 @@ ZWave_Parse($$@)
         }
       }
     }
-    $msg = @list ? join(",", @list) : "empty";
+    $msg = @list ? join(" ", @list) : "empty";
     readingsSingleUpdate($hash, "neighborList", $msg, 1) if($hash);
     return $msg if($srcCmd);
     return "";
