@@ -200,6 +200,8 @@ at_adjustAlign($$)
   $hash->{TRIGGERTIME_FMT} = FmtDateTime($ttime);
   $hash->{STATE} = "Next: " . FmtTime($ttime);
   $hash->{NTM} = FmtTime($ttime);
+  readingsSingleUpdate($hash, "state", $hash->{STATE}, 1)
+           if(!IsDisabled($hash->{NAME}));
   return undef;
 }
 
