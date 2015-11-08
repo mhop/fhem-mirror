@@ -520,10 +520,12 @@ sub onInternalMessage($$) {
     };
     $type == I_SKETCH_NAME and do {
       $hash->{$typeStr} = $msg->{payload};
+      readingsSingleUpdate($hash,"SKETCH_NAME",$msg->{payload},1);
       last;
     };
     $type == I_SKETCH_VERSION and do {
       $hash->{$typeStr} = $msg->{payload};
+      readingsSingleUpdate($hash,"SKETCH_VERSION",$msg->{payload},1);
       last;
     };
     $type == I_REBOOT and do {
