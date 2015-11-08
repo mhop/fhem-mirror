@@ -781,11 +781,12 @@ sub HMinfo_tempListTmplView() { ###############################################
 sub HMinfo_tempListDefFn(@) { ###########################################
   #return Default filename for tempList
   my ($fn) = shift;
+  $fn = "" if (!defined $fn);
   my $ret = "";
   my ($n) =devspec2array("TYPE=HMinfo");
-  $ret .= "$attr{global}{modpath}/"                  if (!$fn || $fn !~ m/^\//);#if not absolut path add modpath
-  $ret .= AttrVal($n,"configDir",".")."/"            if (!$fn || $fn !~ m/..*\//);#if no \ them add defDir
-  $ret .= AttrVal($n,"configTempFile","tempList.cfg")if (!$fn);#set filename
+  $ret .= "$attr{global}{modpath}/"                  if (!$fn || $fn !~ m/^\//);  #no path? add modpath
+  $ret .= AttrVal($n,"configDir",".")."/"            if (!$fn || $fn !~ m/..*\//);#no dir?  add defDir
+  $ret .= AttrVal($n,"configTempFile","tempList.cfg")if (!$fn);                   #set filename
 
   return $ret.$fn;
 }
@@ -1170,8 +1171,7 @@ sub HMinfo_GetFn($@) {#########################################################
           $repl .= HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
         }
       }
-    }
-
+    }    
     return $repl;
   }
   elsif($cmd eq "templateUsg"){##template: see if it applies ------------------
@@ -1919,7 +1919,6 @@ sub HMinfo_archConfigPost($)  {################################################
   shift @arr;
   push @{$modules{CUL_HM}{helper}{confUpdt}},@arr;
   delete $defs{$name}{nb}{$id};
-
   return ;
 }
 
@@ -2146,7 +2145,7 @@ sub HMinfo_templateChk(@){#####################################################
       }
     }
   }
-  $repl .= "$aName $pSet-> failed\n$repl" if($repl);
+  $repl = "$aName $pSet-> failed\n$repl" if($repl);
 
   return $repl;
 }

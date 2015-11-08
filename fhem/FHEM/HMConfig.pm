@@ -682,7 +682,8 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
 #CC-TC
 
 #--- list 3, link level for actor - mainly in short/long hash, only specials here------------------
-  lgMultiExec     =>{a=>138.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
+  lgMultiExec     =>{a=>138.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"execution per repeat message"         ,lit=>{off=>0,on=>1}},
+  shMultiExec     =>{a=> 10.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"reg unused, placeholder only"         ,lit=>{off=>0,on=>1}},
 
 #--- list 4, link level for Button ------------------
   peerNeedsBurst  =>{a=>  1.0,s=>0.1,l=>4,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"peer expects burst"                   ,lit=>{off=>0,on=>1}},
@@ -794,7 +795,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,CtRefOn         =>1
                          ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,CtRefOff        =>1
-                         ,lgMultiExec     =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,dimmer              =>{ intKeyVisib     =>1
                          ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
@@ -810,7 +811,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
                          ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
                          ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
                          ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
-                         ,lgMultiExec     =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,switch              =>{ intKeyVisib     =>1,sign            =>1
                          ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
@@ -818,7 +819,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
                          ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
-                         ,lgMultiExec     =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,winMatic            =>{ intKeyVisib     =>1,signal          =>1,signalTone      =>1,keypressSignal  =>1}
  ,keyMatic            =>{ signal          =>1,signalTone      =>1,keypressSignal  =>1
@@ -912,7 +913,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
-                         ,ActionType      =>1,ActNum          =>1,lgMultiExec     =>1
+                         ,ActionType      =>1,ActNum          =>1,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,"HM-OU-CF-PL"       =>{ ActTypeOuCf     =>1,ActNum          =>1}
  ,"HM-OU-CM-PCB"      =>{ localResetDis   =>1,
@@ -922,7 +923,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
                          ,ActionType      =>1
-                         ,ActTypeMp3      =>1,ActNum          =>1,Intense         =>1,lgMultiExec     =>1
+                         ,ActTypeMp3      =>1,ActNum          =>1,Intense         =>1,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,"HM-SEC-MDIR"       =>{                     sabotageMsg     =>1}
  ,"HM-CC-SCD"         =>{ peerNeedsBurst  =>1,expectAES       =>1
@@ -969,7 +970,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,ActionType      =>1,OffTimeMode     =>1,OnTimeMode      =>1
                          ,DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,DimJtDlyOff     =>1
                          ,DimJtRampOn     =>1,DimJtRampOff    =>1
-                         ,lgMultiExec     =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,"HM-Sen-Wa-Od"      =>{ cyclicInfoMsgDis=>1,                    transmDevTryMax =>1,localResDis     =>1
                          ,                    ledOnTime       =>1,transmitTryMax  =>1
@@ -1133,7 +1134,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,CtValLo         =>1,CtValHi         =>1
                          ,CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1
                          ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
-                         ,lgMultiExec     =>1,powerUpAction   =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1,powerUpAction   =>1
                           }
  ,"HM-ES-PMSw1-Pl02"  =>{ averaging       =>1
                          ,txMinDly        =>1,txThrPwr        =>1,txThrCur        =>1,txThrVlt        =>1,txThrFrq        =>1
@@ -1175,7 +1176,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
                          ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
                          ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
-                         ,lgMultiExec     =>1
+                         ,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,"HM-LC-RGBW-WM02"   =>{ ActHsvCol       =>1
                          ,waRed           =>1,waGreen         =>1,waBlue          =>1}
