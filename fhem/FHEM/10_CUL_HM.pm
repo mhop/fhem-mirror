@@ -1905,8 +1905,11 @@ sub CUL_HM_Parse($$) {#########################################################
       $physLvl = ReadingsVal($mh{cName},"phyLevel",$val)
             if(!defined $physLvl);             #not updated? use old or ignore
 
-      my $vs = ($mh{cHash}->{helper}{lm} && $mh{cHash}->{helper}{lm}{$val})?$mh{cHash}->{helper}{lm}{$val}
-                     :($val==100 ? "on":($pVal==0 ? "off":"$val")); # user string...
+      my $vs = ($mh{cHash}->{helper}{lm} && $mh{cHash}->{helper}{lm}{$val})
+                     ?$mh{cHash}->{helper}{lm}{$val}
+                     :($val==100 ? "on"
+                                 :($pVal==0 ? "off"
+                                            : "$val")); # user string...
       push @evtEt,[$mh{cHash},1,"level:$val"];
       push @evtEt,[$mh{cHash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
@@ -3257,6 +3260,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   $h = $culHmVrtGets->{$cmd}          if(!defined($h) && $roleV);
   $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
   $h = $culHmModelGets->{$md}{$cmd}   if(!defined($h) && $culHmModelGets->{$md});
+  $h = ""                             if(!defined($h) && (eval "defined(&HMinfo_GetFn)" && $cmd eq "regTable"));
+
   my @h;
   @h = split(" ", $h) if($h);
 
@@ -3266,7 +3271,9 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     if($roleV)                      {foreach(keys %{$culHmVrtGets}           ){push @arr,"$_:".$culHmVrtGets->{$_}             }};
     if($culHmSubTypeGets->{$st})    {foreach(keys %{$culHmSubTypeGets->{$st}}){push @arr,"$_:".${$culHmSubTypeGets->{$st}}{$_} }};
     if($culHmModelGets->{$md})      {foreach(keys %{$culHmModelGets->{$md}}  ){push @arr,"$_:".${$culHmModelGets->{$md}}{$_}   }};
-    
+    if($culHmModelGets->{$md})      {foreach(keys %{$culHmModelGets->{$md}}  ){push @arr,"$_:".${$culHmModelGets->{$md}}{$_}   }};
+    if(eval"defined(&HMinfo_GetFn)"){                                         {push @arr,"regTable:"                            }};
+   
     foreach(@arr){
       my ($cmd,$val) = split(":",$_,2);
       if (!$val               ||
@@ -3359,11 +3366,14 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     }
     else{
       my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
-	  $regVal =~ s/ .*// if ($cmd eq "regVal");
+	$regVal =~ s/ .*// if ($cmd eq "regVal");
       return ($regVal =~ m /^invalid/)? "Value not captured:$name - $regReq"
                                      : $regVal;
     }
   }
+  elsif($cmd eq "regTable") {  ########################################
+    return HMinfo_GetFn($hash,$name,"register","-f","\^".$name."\$");
+  }       
   elsif($cmd eq "regList") {  #################################################
     my @regArr = CUL_HM_getRegN($st,$md,$chn);
 
@@ -8088,15 +8098,10 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   $default = 0 if (!defined $default);
   if($name && $defs{$name}){
-    no warnings 'numeric';
-    my $val = (defined $attr{$name}{$attrName})
-                 ?int($attr{$name}{$attrName})
-                 :"";
     my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
-    $val = int($attr{$devN}{$attrName}?$attr{$devN}{$attrName}:$default)+0
-          if($val eq "");
-    use warnings 'numeric';
-    return substr($val,0,2);
+    my $val = "0".AttrVal($name,$attrName,AttrVal($devN,$attrName,$default));
+    $val =~s/(\d*).*/$1/;
+    return int($val);
   }
   else{
     return $default;
