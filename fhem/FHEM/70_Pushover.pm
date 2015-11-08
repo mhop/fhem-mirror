@@ -215,7 +215,14 @@ sub Pushover_SendCommand($$;$\%) {
     }
 
     $cmd .= "&" if ( $cmd ne "" );
-    $cmd .= "token=" . $hash->{APP_TOKEN} . "&user=" . $hash->{USER_KEY};
+    $cmd .= "token=" . $hash->{APP_TOKEN};
+    
+    if (!defined($type->{USER_KEY})) {
+      $cmd .= "&user=" . $hash->{USER_KEY};
+    } else {
+      Log3 $name, 4, "Pushover $name: USER_KEY found in device name: ".$type->{USER_KEY};
+      $cmd .= "&user=" . $type->{USER_KEY};      
+    }
 
     my $URL;
     my $response;
@@ -419,7 +426,7 @@ sub Pushover_ReceiveCommand($$$) {
           $values{result} = "Error " . $param->{code} . ": Unspecified error occured";
           if (ref($return) eq "HASH" && defined $return->{errors}) {
             $values{result} =
-              "Error " . $param->{code} . ": " . join( ". ", @{ $return->{errors} } ) . ".";
+              "Error " . $param->{code} . ": " . join( ". ", @{ $return->{errors} } );
           }
           elsif ( ref($return) ne "HASH" && $return =~ m/"errors":\[(.*)\]/ ) {
               $values{result} = "Error " . $param->{code} . ": " . $1;
@@ -440,17 +447,19 @@ sub Pushover_ReceiveCommand($$$) {
               if ( ReadingsVal($name,"tokenState","") ne "valid" );
           }
 
-          if ( ref($return) eq "HASH" && defined($return->{user}) ) {
-            $state = "unauthorized";
-            readingsBulkUpdate( $hash, "tokenState", $return->{user} )
-              if ( ReadingsVal($name,"tokenState","") ne $return->{user} );
-          } elsif ( ref($return) ne "HASH" && $return =~ m/"user":"invalid"/ ) {
-            $state = "unauthorized";
-            readingsBulkUpdate( $hash, "userState", "invalid" )
-              if ( ReadingsVal($name,"userState","") ne "invalid" );
-          } else {
-            readingsBulkUpdate( $hash, "userState", "valid" )
-              if ( ReadingsVal($name,"userState","") ne "valid" );
+          if (!defined($values->{USER_KEY})) {            
+            if ( ref($return) eq "HASH" && defined($return->{user}) ) {
+              $state = "unauthorized";
+              readingsBulkUpdate( $hash, "userState", $return->{user} )
+                if ( ReadingsVal($name,"userState","") ne $return->{user} );
+            } elsif ( ref($return) ne "HASH" && $return =~ m/"user":"invalid"/ ) {
+              $state = "unauthorized";
+              readingsBulkUpdate( $hash, "userState", "invalid" )
+                if ( ReadingsVal($name,"userState","") ne "invalid" );
+            } else {
+              readingsBulkUpdate( $hash, "userState", "valid" )
+                if ( ReadingsVal($name,"userState","") ne "valid" );
+            }
           }
 
         } else {
@@ -718,6 +727,12 @@ sub Pushover_SetMessage {
     }
     if ( $values{action} =~ /^['"](.*)['"]$/s ) {
         $values{action} = $1;
+    }
+
+    # check if we got a user or group key as device and use it as user-key instead of USER_KEY
+    if ( $values{device} =~ /^([A-Za-z0-9]{30})(:([A-Za-z0-9_-]+))?$/s ) {
+      $values{USER_KEY} = $1;
+      $values{device}  = $3;
     }
 
 #Check if all mandatory arguments are filled
@@ -1115,6 +1130,8 @@ sub Pushover_CGI() {
       </li>
       <li>If device is empty, the message will be sent to all devices.
       </li>
+      <li>If device has a User or Group Key, the message will be sent to this recipient instead. Should you wish to address a specific device here, add it at the end separated by colon.
+      </li>
       <li>If sound is empty, the default setting in the app will be used.
       </li>
       <li>If priority is higher or equal 2, retry and expire must be defined.
@@ -1220,6 +1237,8 @@ sub Pushover_CGI() {
       <li>Bei der Verwendung der ersten beiden Beispiele müssen die entsprechenden Attribute als Ersatz für die fehlenden Parameter belegt sein (s. Attribute)
       </li>
       <li>Wenn device leer ist, wird die Nachricht an alle Geräte geschickt.
+      </li>
+      <li>Wenn device ein User oder Group Key ist, wird die Nachricht stattdessen hierhin verschickt. Möchte man trotzdem ein dediziertes Device angeben, trennt man den Namen mit einem Doppelpunkt ab.
       </li>
       <li>Wenn sound leer ist, dann wird die Standardeinstellung in der App verwendet.
       </li>
