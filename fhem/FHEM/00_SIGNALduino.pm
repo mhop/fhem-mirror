@@ -113,6 +113,7 @@ my %ProtocolListSIGNALduino  = (
 			postamble		=> '',					# Append to converted message	 	
 			clientmodule    => 'SIGNALduino_RSL',   # not used now
 			modulematch     => '^r[A-Fa-f0-9]+', 	# not used now
+			length_min      => '12',
         },
 
     "2"    => 
@@ -1303,7 +1304,7 @@ sub SIGNALduno_Dispatch($$$)
 		$hash->{MSGCNT}++;
 		$hash->{TIME} = time();
 		$hash->{DMSG} = $dmsg;
-		readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 0);
+		readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 1);
 		$hash->{RAWMSG} = $rmsg;
 		my %addvals = (RAWMSG => $rmsg, DMSG => $dmsg);
 		Dispatch($hash, $dmsg, \%addvals);  ## Dispatch to other Modules 
@@ -2066,12 +2067,13 @@ sub	SIGNALduino_Hideki()
 
 	<br><br>
 	<ul>
-	<li>Temperatur / humidity sensors suppored by 14_CUL_TCM97001</li>
+	<li>Temperatur / humidity sensors suppored by 14_CUL_TCM97001:</li>
 	<li>PEARL NC7159, LogiLink WS0002,GT-WT-02,AURIOL,TCM97001, TCM27 and many more </li>
 	<li>Oregon Scientific v2 Sensors  --> 41_OREGON.pm</li>
 	<li>Temperatur / humidity sensors suppored by 14_SD_WS07</li>
     <li>technoline WS 6750 and TX70DTH</li>
     <li>Eurochon EAS 800z</li>
+	<li>FreeTec NC-7344</li>
 	</ul>
 	<br><br>
 
@@ -2081,9 +2083,8 @@ sub	SIGNALduino_Hideki()
 	Note: this module require the Device::SerialPort or Win32::SerialPort
 	module. It can currently only attatched via USB.
 
-	</td><td>
-	<img src="ccc.jpg"/>
-	</td></tr>
+	</td>
+	</tr>
 	</table>
 	<a name="SIGNALduinodefine"></a>
 	<b>Define</b><br>
@@ -2176,6 +2177,13 @@ attr sduino longids BTHR918N
 		Issue a SIGNALduino firmware command, and wait for one line of data returned by
 		the SIGNALduino. See the SIGNALduino firmware code  for details on SIGNALduino
 		commands. With this line, you can send almost any signal via a transmitter connected
+		<br><br>
+		Example for Send raw:
+		SR;R=5;P0=294;P1=-381;P2=650;P3=-727;P4=-13076;P5=-15842;D=0501230121212301230301230121212121212303012301230304012301212123012303012301212121212123030123012303;
+		<br>
+		<br>Message is send 5 Types (R=5)
+		<br>D= specifies the messages, which is generated with Pulses (P0-P5).
+		
 		</li><br>
 		<li>cmds<br>
 		Depending on the firmware installed, SIGNALduinos have a different set of
