@@ -561,6 +561,7 @@ FileLog_Get($@)
   }
 
   my $reformatFn = AttrVal($name, "reformatFn", "");
+  my $tempread;
 
   if($inf eq "-") {
     # In case now is after midnight, before the first event is logged.
@@ -588,21 +589,19 @@ FileLog_Get($@)
           my $linf_to = $hash->{logfile};
           my ($Y,$m,$d) = ($1,$2,$3);
           $linf_to=expandFileWildcards($linf_to,$Y,$m,$d);
-          if(!($linf_to =~ m/%/)){
-            if($linf ne $linf_to){  # use to log files
-              my $tempread=$linf_to.".transit.temp.log";
-              if(open(my $temp,'>',$tempread)){
-                if(open(my $i,'<',$linf)){
-                  print $temp join("",<$i>);
-                  close($i);
-                }
-                if(open(my $i,'<',$linf_to)){
-                  print $temp join("",<$i>);
-                  close($i);
-                }
-                $linf=$tempread;
-                close($temp);
+          if($linf ne $linf_to){  # use to log files
+            $tempread=$linf_to.".transit.temp.log";
+            if(open(my $temp,'>',$tempread)){
+              if(open(my $i,'<',$linf)){
+                print $temp join("",<$i>);
+                close($i);
               }
+              if(open(my $i,'<',$linf_to)){
+                print $temp join("",<$i>);
+                close($i);
+              }
+              $linf=$tempread;
+              close($temp);
             }
           }
         }
@@ -825,6 +824,7 @@ RESCAN:
   }
 
   $ifh->close() if($ifh);
+  unlink($tempread) if($tempread);
 
   my $ret = "";
   for(my $i = 0; $i < int(@a); $i++) {
