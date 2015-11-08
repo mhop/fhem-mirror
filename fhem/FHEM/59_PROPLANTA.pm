@@ -617,7 +617,7 @@ sub PROPLANTA_Start($)
 #####################################
 sub PROPLANTA_Run($)
 {
-   setpriority( 0, 0, 10);
+   eval "setpriority( 0, 0, 10);"; #work-around for old perl
    my ($name) = @_;
    my $ptext=$name;
    my $URL;
