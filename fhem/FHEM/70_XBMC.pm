@@ -984,7 +984,7 @@ sub XBMC_Set($@)
   my $res = "Unknown argument " . $cmd . ", choose one of " . 
     "off play:all,audio,video,picture playpause:all,audio,video,picture pause:all,audio,video,picture " . 
     "prev:all,audio,video,picture next:all,audio,video,picture goto stop:all,audio,video,picture " . 
-    "open opendir openmovieid openepisodeid addon shuffle:toggle,on,off repeat:one,all,off volumeUp:noArg volumeDown:noArg " . 
+    "open opendir openmovieid openepisodeid openchannelid addon shuffle:toggle,on,off repeat:one,all,off volumeUp:noArg volumeDown:noArg " . 
     "back:noArg contextmenu:noArg down:noArg home:noArg info:noArg left:noArg " . 
     "right:noArg select:noArg send exec:left,right," . 
     "up,down,pageup,pagedown,select,highlight,parentdir,parentfolder,back," . 
