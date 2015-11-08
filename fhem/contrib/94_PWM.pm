@@ -6,6 +6,10 @@
 #
 # 21.09.15 GA update, use Log3
 # 07.10.15 GA initial version published
+# 13.10.15 GA add event-on-change-reading
+# 13.10.15 GA add several readings
+# 15.10.15 GA add reading for avg pulses
+
 ##############################################
 # $Id: 
 
@@ -42,7 +46,6 @@ sub PWM_Set($@);
 sub PWM_Define($$);
 sub PWM_Calculate($);
 sub PWM_Undef($$);
-sub PWM_State($$$$);
 sub PWM_CalcRoom(@);
 
 my %roomsWaitOffset = ();
@@ -57,9 +60,8 @@ PWM_Initialize($)
   $hash->{SetFn}     = "PWM_Set";
   $hash->{DefFn}     = "PWM_Define";
   $hash->{UndefFn}   = "PWM_Undef";
-  #$hash->{StateFn}   = "PWM_State";
 
-  $hash->{AttrList}  = "";
+  $hash->{AttrList}  = "event-on-change-reading";
 
 }
 
@@ -77,6 +79,7 @@ PWM_Calculate($)
   my %RoomsPulses           = ();
   my $roomsActive           = 0;
   my $newpulseSum           = 0;
+  my $newpulseMax           = 0;
   my $wkey                  = "";
 
   if($hash->{INTERVAL} > 0) {
@@ -85,9 +88,11 @@ PWM_Calculate($)
 
   Log3 ($hash, 3, "PWM_Calculate $name");
 
+  readingsBeginUpdate ($hash);
+
   #$hash->{STATE} = "lastrun: ".TimeNow();
   #$hash->{STATE} = "calculating";
-  readingsSingleUpdate ($hash,  "lastrun", "calculating", 1);
+  readingsBulkUpdate ($hash,  "lastrun", "calculating");
   $hash->{STATE} = "lastrun: ".$hash->{READINGS}{lastrun}{TIME};
 
   # loop over all devices
@@ -127,6 +132,7 @@ PWM_Calculate($)
           $roomsActive++;
           $RoomsPulses{$d} = $newpulse;
           $newpulseSum += $newpulse;
+          $newpulseMax = max($newpulseMax, $newpulse);
 
           # $newstate ne "" -> state changed "on" -> "off" or "off" -> "on"
           if ((int($hash->{MINONOFFTIME}) > 0) &&
@@ -263,7 +269,6 @@ PWM_Calculate($)
   #my $maxRoomsOn = $roomsActive * 0.6;  # 11 rooms -> max 6 active
   #$maxRoomsOn = (8 * 0.7)  if ($roomsActive < 8);
 
-  # HERE
   my $maxRoomsOn = $roomsActive - $hash->{NoRoomsToStayOff};
 
   #
@@ -309,8 +314,8 @@ PWM_Calculate($)
   #  $minRoomsOn = 0;
   #} 
 
-  # HERE
   my $minRoomsOn = $hash->{NoRoomsToStayOn};
+  my $minRoomsOnList = "";
 
   if ($minRoomsOn > 0) {
 
@@ -322,9 +327,11 @@ PWM_Calculate($)
       last if ($roomsCounted == $minRoomsOn);
       Log3 ($hash, 3, "PWM_Calculate: loop $roomsCounted $room $RoomsPulses{$room}");
 
+      $minRoomsOnList .= "$room,";
       $pulseSum += $RoomsPulses{$room};
       $roomsCounted++;
     }
+    $minRoomsOnList =~ s/,$//;
 
     #if ($roomsActive == 0 or $hash->{NoRoomsToStayOnThreshold} == 0 or $newpulseSum/$roomsActive < $hash->{NoRoomsToStayOnThreshold}) {
 
@@ -369,10 +376,18 @@ PWM_Calculate($)
   #
   # now process the calculated actions
   #
-  
+
+  my $cntRoomsOn = 0;
+  my $cntRoomsOff = 0;
+  my $pulseRoomsOn = 0;
+  my $pulseRoomsOff = 0;
+
   foreach my $roomStay (sort keys %RoomsToStayOff) {
 
 	PWMR_SetRoom ($defs{$roomStay}, ""); 
+
+        $cntRoomsOff++;
+        $pulseRoomsOff += $RoomsPulses{$roomStay};
 
   }
 
@@ -380,11 +395,17 @@ PWM_Calculate($)
 
 	PWMR_SetRoom ($defs{$roomStay}, ""); 
 
+        $cntRoomsOn++;
+        $pulseRoomsOn += $RoomsPulses{$roomStay};
+
   }
   
   foreach my $roomOff (sort keys %RoomsToSwitchOff) {
 
 	PWMR_SetRoom ($defs{$roomOff}, "off"); 
+
+        $cntRoomsOff++;
+        $pulseRoomsOff += $RoomsPulses{$roomOff};
   } 
 
   foreach my $roomOn (sort keys %RoomsToSwitchOn) {
@@ -393,7 +414,26 @@ PWM_Calculate($)
         $roomsWaitOffset{$wkey} = 0;
 	PWMR_SetRoom ($defs{$roomOn}, "on"); 
 
+        $cntRoomsOn++;
+        $pulseRoomsOn += $RoomsPulses{$roomOn};
+
   }
+  
+
+  readingsBulkUpdate ($hash,  "roomsActive",   $roomsActive);
+  readingsBulkUpdate ($hash,  "roomsOn",       $cntRoomsOn);
+  readingsBulkUpdate ($hash,  "roomsOff",      $cntRoomsOff);
+  readingsBulkUpdate ($hash,  "avgPulseRoomsOn",  ($cntRoomsOn > 0 ? sprintf ("%.2f", $pulseRoomsOn / $cntRoomsOn) : 0));
+  readingsBulkUpdate ($hash,  "avgPulseRoomsOff", ($cntRoomsOff > 0 ? sprintf ("%.2f", $pulseRoomsOff /$cntRoomsOff) : 0));
+  readingsBulkUpdate ($hash,  "pulseMax",      $newpulseMax);
+  readingsBulkUpdate ($hash,  "pulseSum",      $newpulseSum);
+
+  if ( $hash->{NoRoomsToStayOn} > 0) {
+    readingsBulkUpdate ($hash,  "roomsToStayOn", $minRoomsOn);
+    readingsBulkUpdate ($hash,  "roomsToStayOnList", $minRoomsOnList);
+  }
+ 
+  readingsEndUpdate($hash, 1);
 
 #  if(!$hash->{LOCAL}) {
 #    DoTrigger($name, undef) if($init_done);
@@ -659,26 +699,6 @@ sub PWM_Undef($$)
   {
     RemoveInternalTimer($hash);
   }
-
-  return undef;
-
-}
-###################################
-sub PWM_State($$$$)
-{
-  my ($hash, $time, $var, $value) = @_;
-
-  my $name = $hash->{NAME};
-  Log3 ($hash, 3, "PWM States $name: $time $var $value");
-
-  $hash->{READINGS}{$var}{VAL} = $value;
-  $hash->{READINGS}{$var}{TIME} = $time;
-
-  #if ($var =~ /INTERVAL|SCOPE|CYCLETIME/) 
-  #{
-  #	Log3 ($hash, 3, "PWM States $name: set $var $value");
-  #	$hash->{$var} = $value;
-  #}
 
   return undef;
 
