@@ -13,6 +13,9 @@
 # 13.10.15 GA add event-on-change-reading
 # 14.10.15 GA fix round energyusedp 
 # 15.10.15 GA add a_regexp_on, a regular expression for the on state of the actor
+# 05.11.15 GA fix new reading desired-temp-until which substitutes modification date of desired-temp in the future
+#                 events for desired-temp adjusted (no update of timestamp if temperature stays the same)
+
 
 # module for PWM (Pulse Width Modulation) calculation
 # this module defines a room for calculation 
@@ -107,10 +110,8 @@ PWMR_CalcDesiredTemp($)
 {
   my ($hash) = @_;
 
-  $hash->{STATE}     = "Calculating";
-
   if($hash->{INTERVAL} > 0) {
-    if ($hash->{INTERVAL} eq 300) {
+    if ($hash->{INTERVAL} == 300) {
       # align interval to hh:00:ss, hh:05:ss, ... hh:55:ss
       
       my $n = gettimeofday();
@@ -129,21 +130,44 @@ PWMR_CalcDesiredTemp($)
   }
 
   my $name = $hash->{NAME};
-  if ($hash->{READINGS}{"desired-temp"}{TIME} gt TimeNow()) {
-    Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: desired-temp was manualy set until ".
-        $hash->{READINGS}{"desired-temp"}{TIME});
 
-    $hash->{STATE}     = "ManualSetUntil";
-    return undef;
-  } else {
-    Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: calc desired-temp");
+  if (defined($hash->{READINGS}{"desired-temp-until"})) {
+    if ($hash->{READINGS}{"desired-temp-until"}{VAL} ne "no" ) {
+
+      if ($hash->{READINGS}{"desired-temp-until"}{VAL} gt TimeNow()) {
+
+        Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: desired-temp was manualy set until ".
+          $hash->{READINGS}{"desired-temp"}{TIME});
+        $hash->{STATE}     = "ManualSetUntil";
+        return undef;
+      }
+      else
+      {
+        readingsSingleUpdate ($hash,  "desired-temp-until", "no", 1);
+        Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: calc desired-temp");
+      }
+    }
   }
+
+  #if ($hash->{READINGS}{"desired-temp"}{TIME} gt TimeNow()) {
+  #  Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: desired-temp was manualy set until ".
+  #      $hash->{READINGS}{"desired-temp"}{TIME});
+  #
+  #  $hash->{STATE}     = "ManualSetUntil";
+  #  return undef;
+  #} else {
+  #  Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: calc desired-temp");
+  #}
 
   ####################
   # frost protection
 
   if ($hash->{c_frostProtect} > 0) {
-    readingsSingleUpdate ($hash,  "desired-temp", $hash->{c_tempFrostProtect}, 1);
+    if ($hash->{READINGS}{"desired-temp"}{VAL} ne $hash->{c_tempFrostProtect}) {
+      readingsSingleUpdate ($hash,  "desired-temp", $hash->{c_tempFrostProtect}, 1);
+    } else {
+      readingsSingleUpdate ($hash,  "desired-temp", $hash->{c_tempFrostProtect}, 0);
+    }
 
     #$hash->{READINGS}{"desired-tem"}{TIME} = TimeNow();
     #$hash->{READINGS}{"desired-temp"}{VAL} = $hash->{c_tempFrostProtect};
@@ -159,6 +183,8 @@ PWMR_CalcDesiredTemp($)
   # rule based calculation
 
   if ($hash->{c_autoCalcTemp} > 0) {
+
+    $hash->{STATE}     = "Calculating";
 
     my @time = localtime();
     my $wday = $time[6];
@@ -202,7 +228,11 @@ PWMR_CalcDesiredTemp($)
 
               Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: match i:$i $points[$i] ($tempV/$temperature)");
                
-              readingsSingleUpdate ($hash,  "desired-temp", $temperature, 1);
+              if ($hash->{READINGS}{"desired-temp"}{VAL} ne $temperature) {
+                readingsSingleUpdate ($hash,  "desired-temp", $temperature, 1);
+              } else {
+                readingsSingleUpdate ($hash,  "desired-temp", $temperature, 0);
+              }
 
               #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
               #$hash->{READINGS}{"desired-temp"}{VAL} = $temperature;
@@ -221,7 +251,11 @@ PWMR_CalcDesiredTemp($)
           my $act_dtemp = $hash->{READINGS}{"desired-temp"}{VAL};
           Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: use last value ($act_dtemp)");
 
-          readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 1);
+          if ($act_dtemp ne $newTemp) {
+            readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 1);
+          #} else {
+          #  readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 0);
+          }
 
           #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
           #$hash->{READINGS}{"desired-temp"}{VAL} = $newTemp;
@@ -237,7 +271,7 @@ PWMR_CalcDesiredTemp($)
     $hash->{STATE}     = "Manual";
   }
 
-  DoTrigger($name, undef);
+  #DoTrigger($name, undef);
   return undef;
 
 }
@@ -289,7 +323,7 @@ PWMR_Set($@)
   # manualTempDuration
 
   if ( $cmd eq "manualTempDuration" ) {
-    readingsSingleUpdate ($hash,  "manualTempDuration", $a[2], 0);
+    readingsSingleUpdate ($hash,  "manualTempDuration", $a[2], 1);
 
     #$hash->{READINGS}{"manualTempDuration"}{VAL} = $a[2];
     #$hash->{READINGS}{"manualTempDuration"}{TIME} = TimeNow();
@@ -311,18 +345,29 @@ PWMR_Set($@)
       $duration = int($a[3]) * 60;
     }
     
-    #$hash->{READINGS}{$cmd}{TIME} = TimeNow();
- 
     # manual set desired-temp will be set for 1 hour (default)
     # afterwards it will be overwritten by auto calc
  
     my $now =  time();
 
-    $hash->{READINGS}{$cmd}{TIME} = FmtDateTime($now + $duration);
-    $hash->{READINGS}{$cmd}{VAL} = $val;
+    readingsBeginUpdate ($hash);
+    readingsBulkUpdate ($hash,  "desired-temp", $a[2]);
+    if ($hash->{c_autoCalcTemp} == 0) {
+      $hash->{STATE}     = "Manual";
+    } else {
+      $hash->{STATE}     = "ManualSetUntil";
+      readingsBulkUpdate ($hash,  "desired-temp-until", FmtDateTime($now + $duration));
+    }
+    readingsEndUpdate($hash, 1);
+ 
+    #readingsSingleUpdate ($hash,  "desired-temp", $a[2], 1);
 
-    $hash->{STATE}     = "ManualSetUntil";
+    #$hash->{READINGS}{$cmd}{TIME} = FmtDateTime($now + $duration);
+    #$hash->{READINGS}{$cmd}{VAL} = $val;
 
+
+    #push @{$hash->{CHANGED}}, "$cmd: $val";
+    #DoTrigger($hash, undef);
     return undef
   } 
 
@@ -526,27 +571,26 @@ PWMR_SetRoom(@)
 
   Log3 ($room, 4, "PWMR_SetRoom $name <$newState>");
 
-  my $nowR = TimeNow();
-  my $now  = time();
-  
-  $room->{READINGS}{energyused}{TIME} = $nowR;
-  $room->{READINGS}{energyusedp}{TIME} = $nowR;
-  if (!defined($room->{READINGS}{energyused}{VAL})) {                                        
-    $room->{READINGS}{energyused}{VAL} = "";
+  my $energyused = "";
+  if (defined($room->{READINGS}{energyused}{VAL})) {                                        
+    $energyused = substr ( $room->{READINGS}{energyused}{VAL}, -29);
   }
-      
-  my $energyused = substr ( $room->{READINGS}{energyused}{VAL}, -29);
+
   # newState may be "", "on", "off"
   if ($newState eq "") {
     $energyused = $energyused.substr ( $energyused ,-1);
   } else {
     $energyused = $energyused.($newState eq "on" ? "1" : "0");
   }
-  $room->{READINGS}{energyused}{VAL} = $energyused;
-  $room->{READINGS}{energyusedp}{VAL} = sprintf ("%.2f", ($energyused =~ tr/1//) /30);
+
+  readingsBeginUpdate ($room);
+  readingsBulkUpdate ($room,  "energyused", $energyused);
+  readingsBulkUpdate ($room,  "energyusedp", sprintf ("%.2f", ($energyused =~ tr/1//) /30));
+  readingsEndUpdate($room, 0);
   
-  
-  return if ($newState eq "");
+  if ($newState eq "") {
+    return;
+  }
 
   if ($room->{actor})
   {
@@ -555,12 +599,8 @@ PWMR_SetRoom(@)
       Log3 ($room, 2, "PWMR_SetRoom $room->{NAME}: set $room->{actor} $newState");
        
       $room->{actorState}                 = $newState;
+      readingsSingleUpdate ($room,  "lastswitch", time(), 1);
 
-      $room->{READINGS}{lastswitch}{TIME} = $nowR;
-      $room->{READINGS}{lastswitch}{VAL}  = $now;
- 
-      push @{$room->{CHANGED}}, "actor $newState";
-      DoTrigger($name, undef);
     } else {
       Log3 ($room, 2, "PWMR_SetRoom $name: set $room->{actor} $newState failed ($ret)");
     }
@@ -630,20 +670,17 @@ PWMR_ReadRoom(@)
 
   if (!$room->{READINGS}{"desired-temp"}{TIME})
   {
-    $room->{READINGS}{"desired-temp"}{VAL} = 6.0;
-    $room->{READINGS}{"desired-temp"}{TIME} = TimeNow();
+    readingsSingleUpdate ($room,  "desired-temp", 6.0, 0);
   }
 
   if (!$room->{READINGS}{oldpulse}{TIME})
   {
-    $room->{READINGS}{oldpulse}{VAL} = 0.0;
-    $room->{READINGS}{oldpulse}{TIME} = TimeNow();
+    readingsSingleUpdate ($room,  "oldpulse", 0.0, 0);
   }
 
   if (!$room->{READINGS}{lastswitch}{TIME})
   {
-    $room->{READINGS}{lastswitch}{VAL} = time();
-    $room->{READINGS}{lastswitch}{TIME} = TimeNow();
+    readingsSingleUpdate ($room,  "lastswitch", time(), 0);
   }
 
   $factor          = $room->{FACTOR};
@@ -850,6 +887,7 @@ PWMR_Attr(@)
       $hash->{c_frostProtect} = 0;
     } elsif ($attr eq "autoCalcTemp") {
       $hash->{c_autoCalcTemp} = 1;
+      $hash->{STATE}     = "Calculating";
     }
   
   }
@@ -871,10 +909,15 @@ PWMR_Attr(@)
     }
 
   } elsif ($attr eq "autoCalcTemp") {                       # autoCalcTemp 0/1
-    if ($val eq 0 or $val eq 1) {
-      $hash->{c_autoCalcTemp} = $val;
+    if ($val eq 0) {
+      $hash->{c_autoCalcTemp} = 0;
+      $hash->{STATE}     = "Manual";
+    } elsif ( $val eq 1) {
+      $hash->{c_autoCalcTemp} = 1;
+      $hash->{STATE}     = "Calculating";
     } elsif ($val eq "") {
       $hash->{c_autoCalcTemp} = 1;
+      $hash->{STATE}     = "Calculating";
     } else {
       return "valid values are 0 or 1";
     }
@@ -947,12 +990,18 @@ PWMR_Boost(@)
         "temp($temperaturV) desired-temp($desiredTemp) -> boost");
         
       my $now =  time();
-      $room->{READINGS}{"desired-temp"}{TIME} = FmtDateTime($now + $boostDuration * 60);
-      $room->{READINGS}{"desired-temp"}{VAL} = $desiredTemp + $desiredOffset;
 
-      my $t = $room->{READINGS}{"desired-temp"}{VAL};
-      push @{$room->{CHANGED}}, "desired-temp $t";
-      DoTrigger($name, undef);
+      readingsBeginUpdate ($room);
+      readingsBulkUpdate ($room,  "desired-temp", $desiredTemp + $desiredOffset);
+      readingsBulkUpdate ($room,  "desired-temp-until", FmtDateTime($now + $boostDuration * 60));
+      readingsEndUpdate($room, 1);
+
+      #$room->{READINGS}{"desired-temp"}{TIME} = FmtDateTime($now + $boostDuration * 60);
+      #$room->{READINGS}{"desired-temp"}{VAL} = $desiredTemp + $desiredOffset;
+
+      #my $t = $room->{READINGS}{"desired-temp"}{VAL};
+      #push @{$room->{CHANGED}}, "desired-temp $t";
+      #DoTrigger($name, undef);
 
       Log3 ($room, 4, "PWMR_Boost: $name ".
         "set desiredtemp ".$room->{READINGS}{"desired-temp"}{TIME}." ".
