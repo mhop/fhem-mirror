@@ -339,7 +339,7 @@ sub STV_55000($$$)
             my $messagepart3 = chr(0x00) . chr(0x00) . chr(0x00) . chr(length(encode_base64($key, ""))) . chr(0x00) . encode_base64($key, "");
             my $part3 = chr(0x00) . chr(length($tvappstring)) . chr(0x00) . $tvappstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
             print $sock $part3;
-            sleep(1);
+        #    sleep(1);
         #        select(undef, undef, undef, 0.5);
           }
         }
