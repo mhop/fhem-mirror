@@ -325,8 +325,7 @@ my %zwave_class = (
                associationRequestAll => 'ZWave_associationRequest($hash,"")' },
     get   => { association          => "02%02x",
                associationGroups    => "05" },
-    parse => { "..8503(..)(..)..(.*)" =>
-          'sprintf("assocGroup_%d:Max %d Nodes %d", hex($1), hex($2), hex($3))',
+    parse => { "..8503(..)(..)..(.*)" => 'ZWave_assocGroup($homeId,$1,$2,$3)',
                "..8506(..)"           => '"assocGroups:".hex($1)' },
     init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
@@ -1870,6 +1869,19 @@ ZWave_sensorbinaryV2Parse($$)
   return ($zwave_sensorBinaryTypeV2{"$sensorType"} ?
           $zwave_sensorBinaryTypeV2{"$sensorType"} :"unknown") .
           ":".$value;
+}
+
+sub
+ZWave_assocGroup($$$$)
+{
+  my ($homeId, $gId, $max, $nodes) = @_;
+  my %list = map { $defs{$_}{nodeIdHex} => $_ }
+             grep { $defs{$_}{homeId} && $defs{$_}{homeId} eq $homeId }
+             keys %defs;
+  $nodes = join(" ",
+           map { $list{$_} ? $list{$_} : "UNKNOWN_".hex($_); }
+           ($nodes =~ m/../g));
+  return sprintf("assocGroup_%d:Max %d Nodes %s", hex($gId),hex($max), $nodes);
 }
 
 ##############################################
