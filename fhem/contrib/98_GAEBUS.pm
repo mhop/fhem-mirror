@@ -21,6 +21,9 @@
 #                         timeout for reads increased
 # 19.10.2015 : A.Goebel : add attribute disable to disable loop to collect readings
 # 05.11.2015 : A.Goebel : add support for "h" (broadcast update) commands from csv, handle them equal to (r)ead
+# 09.11.2015 : A.Goebel : add support for multiple readings generated from one command to ebusd
+#                         ebusd may return a list of values like "52.0;43.0;8.000;41.0;45.0;error"
+#                         defining a reading "VL;RL;dummy;VLWW;RLWW" will create redings VL, RL, VLWW and RLWW
 
 
 package main;
@@ -586,8 +589,10 @@ GAEBUS_Attr(@)
       $reading    =~ s/ .*//;
       $reading    =~ s/:.*//;
 
-      Log3 ($name, 3, "$name: delete reading: $reading");
-      delete($defs{$name}{READINGS}{$reading});
+      foreach my $r (split /;/, $reading) {
+        Log3 ($name, 3, "$name: delete reading: $reading");
+        delete($defs{$name}{READINGS}{$reading});
+      }
     }
 
     return undef;
@@ -603,23 +608,32 @@ GAEBUS_Attr(@)
       my $newreading = $attrval;
       $newreading    =~ s/ .*//;
       $newreading    =~ s/:.*//;
- 
-      if ($oldreading ne $newreading)
+
+      my @or = split /;/, $oldreading;
+      my @nr = split /;/, $newreading;
+
+      for (my $i; $i <= $#or; $i++)
       {
-        #Log3 ($name, 2, "$name: adjust reading: $oldreading");
-
-        if (defined($defs{$name}{READINGS}{$oldreading}))
+        if ($or[$i] ne $nr[$i])
         {
-          unless ($newreading =~ /^1*$/)  # matches "1" or ""
+          #Log3 ($name, 2, "$name: adjust reading: $or[$i]");
+
+          if (defined($defs{$name}{READINGS}{$or[$i]}))
           {
-            #Log3 ($name, 2, "$name: change attribute $attrname ($oldreading -> $newreading)");
+            if (defined ($nr[$i] and $nr[$i] ne "dummy" ))
+            {
+              unless ($nr[$i] =~ /^1*$/)  # matches "1" or ""
+              {
+                #Log3 ($name, 2, "$name: change attribute $attrname ($or[$i] -> $nr[$i])");
 
-            $defs{$name}{READINGS}{$newreading}{VAL}  = $defs{$name}{READINGS}{$oldreading}{VAL};
-            $defs{$name}{READINGS}{$newreading}{TIME} = $defs{$name}{READINGS}{$oldreading}{TIME};
-          }
+                $defs{$name}{READINGS}{$nr[$i]}{VAL}  = $defs{$name}{READINGS}{$or[$i]}{VAL};
+                $defs{$name}{READINGS}{$nr[$i]}{TIME} = $defs{$name}{READINGS}{$or[$i]}{TIME};
+              }
+            }
 
-          delete($defs{$name}{READINGS}{$oldreading});
+            delete($defs{$name}{READINGS}{$or[$i]});
           
+          }
         }
       }
     }
@@ -884,7 +898,7 @@ GAEBUS_doEbusCmd($$$$$$$)
     #Log3 ($name, 2, "$name try to read");
     sysread ($hash->{TCPDev}, $actMessage, 4096);
     $actMessage =~ s/\n//g;
-    $actMessage =~ s/;/ /g;
+    #$actMessage =~ s/;/ /g;
 
     Log3 ($name, 3, "$name answer $action $readingname $actMessage");
 
@@ -907,17 +921,53 @@ GAEBUS_doEbusCmd($$$$$$$)
     Log3 ($name, 2, "$name $actMessage");
   }
 
-  if ($action eq "r") {
-    if (defined ($readingname)) {
-      #  BlockingCall changes
-      readingsSingleUpdate ($hash,  $readingname, "$actMessage", 1);
+  my @values = split /;/, $actMessage;
+  my @targetreading = defined ($readingname) ? split /;/, $readingname : ();
+
+
+  if ($inBlockingCall)
+  {
+    $actMessage = "";
+
+    for (my $i=0; $i <= $#targetreading; $i++)
+    {
+      next if ($targetreading[$i] eq "dummy");
+      my $v = defined($values[$i]) ? $values[$i] : "";
+
+      $actMessage .= $targetreading[$i]."|".$v."|";
     }
- 
+
+    $actMessage =~ s/\|$//;
+
   }
 
-  if ($inBlockingCall) {
-    $actMessage = $readingname."|".$actMessage;
+  if ($action eq "r")
+  {
+    readingsBeginUpdate ($hash);
+    for (my $i=0; $i <= $#targetreading; $i++)
+    {
+      next if ($targetreading[$i] eq "dummy");
+      my $v = defined($values[$i]) ? $values[$i] : "";
+
+      readingsBulkUpdate ($hash, $targetreading[$i], $v);
+    }
+    readingsEndUpdate($hash, 1);
   }
+
+  
+  #if ($inBlockingCall) {
+  #  $actMessage = $readingname."|".$actMessage;
+  #}
+  #else {
+  #
+  #  if ($action eq "r") {
+  #    if (defined ($readingname)) {
+  #      #  BlockingCall changes
+  #      readingsSingleUpdate ($hash,  $readingname, "$actMessage", 1);
+  #    }
+  #  }
+  #}
+
  
   return $actMessage;
 
@@ -1016,7 +1066,7 @@ GAEBUS_GetUpdatesDoit($)
   }
 
   # returnvalue for BlockingCall ... done routine
-  return "$name".$readingsToUpdate;
+  return $name.$readingsToUpdate;
 
 
 }
@@ -1153,7 +1203,9 @@ GAEBUS_GetUpdatesAborted($)
         define variables that can be retrieved from the ebusd.
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
-        The name of the reading can be suffixed by "&lt;number&gt;" which is a multiplicator for 
+        If ebusd returns a list of semicolon separated values then several semicolon separated readings can be defined.<br>
+	"dummy" is a placeholder for a reading that will be ignored. (e.g.: temperature;dummy;pressure).<br>
+        The name of the reading can be suffixed by "&lt;:number&gt;" which is a multiplicator for 
         the evaluation within the specified interval. (eg. OutsideTemp:3 will evaluate this reading every 3-th cycle)<br>
         All text followed the reading seperated by a blank is given as an additional parameter to ebusd. 
         This can be used to request a single value if more than one is retrieved from ebus.<br>
