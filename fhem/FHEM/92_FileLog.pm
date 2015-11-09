@@ -38,9 +38,21 @@ FileLog_Initialize($)
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
-  $hash->{AttrList} = "disable:0,1 disabledForIntervals logtype reformatFn ".
-                      "nrarchive archivedir archivecmd addStateEvent:0,1 ".
-                      "archiveCompress";
+  no warnings 'qw';
+  my @attrList = qw(
+    addStateEvent:0,1 
+    archiveCompress
+    archivecmd
+    archivedir
+    createGluedFile:0,1
+    disable:0,1
+    disabledForIntervals
+    logtype
+    nrarchive
+    reformatFn 
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList);
 
   $hash->{FW_summaryFn}     = "FileLog_fhemwebFn";
   $hash->{FW_detailFn}      = "FileLog_fhemwebFn";
@@ -585,23 +597,25 @@ FileLog_Get($@)
             return($f);
         };
         $linf=expandFileWildcards($linf,$Y,$m,$d);
-        if($to =~ m/^(....)-(..)-(..)/) {
-          my $linf_to = $hash->{logfile};
-          my ($Y,$m,$d) = ($1,$2,$3);
-          $linf_to=expandFileWildcards($linf_to,$Y,$m,$d);
-          if($linf ne $linf_to){  # use to log files
-            $tempread=$linf_to.".transit.temp.log";
-            if(open(my $temp,'>',$tempread)){
-              if(open(my $i,'<',$linf)){
-                print $temp join("",<$i>);
-                close($i);
+        if(AttrVal($name, "createGluedFile", 0)) {
+          if($to =~ m/^(....)-(..)-(..)/) {
+            my $linf_to = $hash->{logfile};
+            my ($Y,$m,$d) = ($1,$2,$3);
+            $linf_to=expandFileWildcards($linf_to,$Y,$m,$d);
+            if($linf ne $linf_to){  # use to log files
+              $tempread=$linf_to.".transit.temp.log";
+              if(open(my $temp,'>',$tempread)){
+                if(open(my $i,'<',$linf)){
+                  print $temp join("",<$i>);
+                  close($i);
+                }
+                if(open(my $i,'<',$linf_to)){
+                  print $temp join("",<$i>);
+                  close($i);
+                }
+                $linf=$tempread;
+                close($temp);
               }
-              if(open(my $i,'<',$linf_to)){
-                print $temp join("",<$i>);
-                close($i);
-              }
-              $linf=$tempread;
-              close($temp);
             }
           }
         }
@@ -1246,6 +1260,13 @@ FileLog_regexpFn($$)
         in the archivedir will be compressed.
         </li><br>
 
+    <a name="createGluedFile"></a>
+    <li>createGluedFile<br>
+        If set (to 1), and the SVG-Plot requests a time-range wich is stored
+        in two files, a temporary file with the content of both files will be
+        created, in order to satisfy the request.
+        </li><br>
+
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
@@ -1537,6 +1558,12 @@ FileLog_regexpFn($$)
         werden die Dateien im archivedir komprimiert abgelegt.
         </li><br>
 
+    <a name="createGluedFile"></a>
+    <li>createGluedFile<br>
+        Falls gesetzt (1), und im SVG-Plot ein Zeitbereich abgefragt wird, was
+        in zwei Logdateien gespeichert ist, dann wird f&uuml;r die Anfrage eine
+        tempor&auml;re Datei mit dem Inhalt der beiden Dateien erzeugt.
+        </li><br>
 
     <li><a href="#disable">disable</a></li>
     <li><a href="#addStateEvent">addStateEvent</a></li>
