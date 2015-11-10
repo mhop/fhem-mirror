@@ -15,6 +15,7 @@
 # 15.10.15 GA add a_regexp_on, a regular expression for the on state of the actor
 # 05.11.15 GA fix new reading desired-temp-until which substitutes modification date of desired-temp in the future
 #                 events for desired-temp adjusted (no update of timestamp if temperature stays the same)
+# 10.11.15 GA fix event for actor change added again, desired-temp notifications adjusted for midnight change
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -163,7 +164,8 @@ PWMR_CalcDesiredTemp($)
   # frost protection
 
   if ($hash->{c_frostProtect} > 0) {
-    if ($hash->{READINGS}{"desired-temp"}{VAL} ne $hash->{c_tempFrostProtect}) {
+    if ($hash->{READINGS}{"desired-temp"}{VAL} ne $hash->{c_tempFrostProtect}  
+        or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
       readingsSingleUpdate ($hash,  "desired-temp", $hash->{c_tempFrostProtect}, 1);
     } else {
       readingsSingleUpdate ($hash,  "desired-temp", $hash->{c_tempFrostProtect}, 0);
@@ -228,7 +230,8 @@ PWMR_CalcDesiredTemp($)
 
               Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: match i:$i $points[$i] ($tempV/$temperature)");
                
-              if ($hash->{READINGS}{"desired-temp"}{VAL} ne $temperature) {
+              if ($hash->{READINGS}{"desired-temp"}{VAL} ne $temperature 
+                  or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
                 readingsSingleUpdate ($hash,  "desired-temp", $temperature, 1);
               } else {
                 readingsSingleUpdate ($hash,  "desired-temp", $temperature, 0);
@@ -251,7 +254,8 @@ PWMR_CalcDesiredTemp($)
           my $act_dtemp = $hash->{READINGS}{"desired-temp"}{VAL};
           Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: use last value ($act_dtemp)");
 
-          if ($act_dtemp ne $newTemp) {
+          if ($act_dtemp ne $newTemp
+            or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
             readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 1);
           #} else {
           #  readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 0);
@@ -601,7 +605,9 @@ PWMR_SetRoom(@)
       $room->{actorState}                 = $newState;
       readingsSingleUpdate ($room,  "lastswitch", time(), 1);
 
-    } else {
+      push @{$room->{CHANGED}}, "actor $newState";
+      DoTrigger($name, undef);
+
       Log3 ($room, 2, "PWMR_SetRoom $name: set $room->{actor} $newState failed ($ret)");
     }
 
