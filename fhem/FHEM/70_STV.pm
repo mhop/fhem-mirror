@@ -333,6 +333,7 @@ sub STV_55000($$$)
         }
         else {
           foreach my $argnum (0 .. $#ARGV) {
+		    sleep(1) if ($argnum > 0);
             # Send remote key(s)
             #Log4 $name, 4, "[STV] sending ".uc($ARGV[$argnum]);
             my $key = "KEY_" . uc($ARGV[$argnum]);
