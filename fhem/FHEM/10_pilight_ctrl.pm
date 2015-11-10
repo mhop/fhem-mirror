@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_pilight_ctrl.pm 1.12 2015-09-11 Risiko $
+# $Id: 10_pilight_ctrl.pm 1.13 2015-11-10 Risiko $
 #
 # Usage
 # 
@@ -37,6 +37,7 @@
 # V 1.10 2015-08-30 - NEW: support pressure, windavg, winddir, windgust from weather stations and GPIO sensors
 # V 1.11 2015-09-06 - FIX: pressure, windavg, winddir, windgust from weather stations without temperature 
 # V 1.12 2015-09-11 - FIX: handling ContactAsSwitch befor white list check
+# V 1.13 2015-11-10 - FIX: POSIX isdigit is deprecated replaced by own isDigit
 ############################################## 
 package main;
 
@@ -67,6 +68,12 @@ my @unitList = ("unit","unitcode","programcode");
 #ignore tfa:0,...         list of <protocol>:<id> to ignore
 #brands arctech:kaku,...  list of <search>:<replace> protocol names  
 #ContactAsSwitch 1234,... list of ids where contact is transformed to switch
+
+sub isDigit($)
+{
+  my ($d) = @_;
+  return $d =~ /^\d+?$/ ? 1 : 0; 
+}
 
 sub pilight_ctrl_Initialize($)
 {
@@ -281,7 +288,7 @@ sub pilight_ctrl_Check($)
   
   RemoveInternalTimer($hash); 
   
-  $hash->{helper}{CHECK} = 0 if (!isdigit($hash->{helper}{CHECK}));
+  $hash->{helper}{CHECK} = 0 if (!isDigit($hash->{helper}{CHECK}));
   $hash->{helper}{CHECK} +=1;
   Log3 $me, 5, "$me(Check): $hash->{STATE}";
   
@@ -392,8 +399,8 @@ sub pilight_ctrl_Write($@)
   my $id = $defs{$cName}->{ID};
   my $unit = $defs{$cName}->{UNIT};
   
-  $id = "\"".$id."\""     if (defined($id) && !isdigit($id));
-  $unit = "\"".$unit."\"" if (defined($unit) && !isdigit($unit));
+  $id = "\"".$id."\""     if (defined($id) && !isDigit($id));
+  $unit = "\"".$unit."\"" if (defined($unit) && !isDigit($unit));
         
   my $code;
   switch($cType){
