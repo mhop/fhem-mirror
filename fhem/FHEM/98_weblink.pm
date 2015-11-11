@@ -14,7 +14,8 @@ weblink_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "weblink_Define";
-  $hash->{AttrList} = "htmlattr nodetaillink:1,0";
+  $hash->{AttrList} =
+        "disable:0,1 disabledForIntervals htmlattr nodetaillink:1,0";
   $hash->{FW_summaryFn} = "weblink_FwFn";
   $hash->{FW_detailFn}  = "weblink_FwFn";
   $hash->{FW_atPageEnd} = 1;
@@ -90,6 +91,7 @@ weblink_FwFn($$$$)
   my $wltype = $hash->{WLTYPE};
   my $ret = "";
 
+  return "" if(IsDisabled($d));
   my $attr = AttrVal($d, "htmlattr", "");
   if($wltype eq "htmlCode") {
     $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/s);
@@ -186,7 +188,7 @@ weblink_FwFn($$$$)
       E.g.:<br>
       <ul>
         <code>
-        define yw weblink wl_im1 iframe http://weather.yahooapis.com/forecastrss?w=650272&u=c<br>
+        define yw weblink iframe http://weather.yahooapis.com/forecastrss?w=650272&u=c<br>
         attr yw weblink htmlattr width="480" height="560"<br>
         </code>
       </ul></li>
@@ -195,6 +197,9 @@ weblink_FwFn($$$$)
     <li>nodetaillink<br>
       Show no detail link for the types image and iframe.
       </li>
+
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
   </ul>
 
   <br>
