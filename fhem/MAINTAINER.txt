@@ -70,6 +70,7 @@ FHEM/14_Hideki.pm            Sidey/Ralf9          http://forum.fhem.de Sonstige 
 FHEM/12_HMS.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/13_KS300.pm             rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/14_CUL_MAX.pm           mgehre               http://forum.fhem.de MAX
+FHEM/14_CUL_OTHER.pm         dancer0705/bjoernh   http://forum.fhem.de Sonstiges
 FHEM/14_CUL_TCM97001.pm      dancer0705/bjoernh   http://forum.fhem.de Sonstiges
 FHEM/14_CUL_TX.pm            rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/14_CUL_WS.pm            rudolfkoenig         http://forum.fhem.de SlowRF
