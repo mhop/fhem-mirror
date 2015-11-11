@@ -29,7 +29,7 @@
 #
 #
 ###########################
-# $Id: 45_Plugwise.pm 3874 2015-11-09 18:04:30Z sguttmann $
+# $Id$
 package main;
 
 use strict;
@@ -63,13 +63,13 @@ my %PW_gets = (
 # 	"pwPairForSec"  => ""
  );
 my %PWType = (
-  	"00" => "Circle",
-  	"01" => "Circle",
-  	"02" => "Circle",
-  	"03" => "Switch",
-  	"04" => "Switch",
-  	"05" => "Sense",
-  	"06" => "Scan"
+  	"00" => "PW_Circle",
+  	"01" => "PW_Circle",
+  	"02" => "PW_Circle",
+  	"03" => "PW_Switch",
+  	"04" => "PW_Switch",
+  	"05" => "PW_Sense",
+  	"06" => "PW_Scan"
 );
 sub PW_Read($);
 sub PW_Ready($);
@@ -90,12 +90,12 @@ sub Plugwise_Initialize($$)
 require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
-  $hash->{Clients} = ":Circles:Scan:Switch:Sense:";
+  $hash->{Clients} = ":PW_Circle:PW_Scan:PW_Switch:PW_Sense:";
   my %mc = (
-    "1:Circles"     => "^Circle",
-    "2:Scan"        => "^Scan",
-    "3:Switch"      => "^Switch",
-    "4:Sense"       => "^Sense"
+    "1:PW_Circle"      => "^PW_Circle",
+    "2:PW_Scan"        => "^PW_Scan",
+    "3:PW_Switch"      => "^PW_Switch",
+    "4:PW_Sense"       => "^PW_Sense"
   );
   $hash->{MatchList} = \%mc;
 # Normal devices
@@ -178,12 +178,12 @@ sub PW_GetUpdate($)
   foreach ( keys %{ $self->{_plugwise}->{circles} } ) {
     $n=$_;
     if (!defined $self->{_plugwise}->{circles}->{$n}->{type}) {$self->{_plugwise}->{circles}->{$n}->{type}=""};
-#    	if ($self->{_plugwise}->{circles}->{$n}->{type} eq "Circle" || 
+#    	if ($self->{_plugwise}->{circles}->{$n}->{type} eq "PW_Circle" || 
 #        	$self->{_plugwise}->{circles}->{$n}->{type} eq "" ||
         if ($self->{_plugwise}->{circles}->{$n}->{type} eq "" ||
         	!defined $self->{_plugwise}->{circles}->{$n}->{type}) {
     			command($hash,'status',$n);
-#    			command($hash,'livepower',$n) if($self->{_plugwise}->{circles}->{$n}->{type} eq "Circle");
+#    			command($hash,'livepower',$n) if($self->{_plugwise}->{circles}->{$n}->{type} eq "PW_Circle");
         	}
     	if (defined $attr{$name}{autosync}) {
     		if ($attr{$name}{autosync}>0 && time > $lastSync+$attr{$name}{autosync}) {
@@ -358,7 +358,7 @@ sub PW_Read($)
 		     	}
 		        if ($body->{text} eq "Connected") {$hash->{"STATE"}="Connected";}
 	 	        if ($body->{type} =~ /output|power|sense|humtemp|energy|ping/)    {
-	 	        	if ($body->{dest} eq "Switch" && $Make2Channels==1) {
+	 	        	if ($body->{dest} eq "PW_Switch" && $Make2Channels==1) {
 	 	        		my $dest=$body->{short};
 #	 	        		$body->{short}=$dest . "_Ch1";
 #	 	        		MyRead($hash,$body);
@@ -950,7 +950,7 @@ if ( $frame =~ /^0061([[:xdigit:]]{4})([[:xdigit:]]{16})$/ ) {
 	        $xplmsg{short} = $s_id;
 			$xplmsg{val1} = hex($4);
 			if ($Make2Channels==0) {
-				$xplmsg{val1} = hex($4); #+((hex($3)-1)<<1) if ($self->{_plugwise}->{circles}->{$s_id}->{type} eq "Switch");
+				$xplmsg{val1} = hex($4); #+((hex($3)-1)<<1) if ($self->{_plugwise}->{circles}->{$s_id}->{type} eq "PW_Switch");
 				$xplmsg{val2} = (hex($3)-1)<<1;
 			} else {
 				$xplmsg{val3} = hex($3);
@@ -1104,9 +1104,9 @@ sub command {
  # if multiple devices are defined
             my $circle = uc($target);
             if ( $command =~ /(on|off)/ ) {
-            	if ($self->{_plugwise}->{circles}->{$circle}->{type} eq "Circle") {
+            	if ($self->{_plugwise}->{circles}->{$circle}->{type} eq "PW_Circle") {
                 	$packet = "0017" . _addr_s2l($circle) . ($1 eq 'on' ? '01' : '00');
-            	} elsif($self->{_plugwise}->{circles}->{$circle}->{type} eq "Switch"){
+            	} elsif($self->{_plugwise}->{circles}->{$circle}->{type} eq "PW_Switch"){
 #            		Log 3,"Set Switch $circle $parameter to $1";
             		if ($parameter eq "left") {
             			$packet = "0017" . _addr_s2l($circle) . "01" . $1 eq 'on' ? '01' : '00';         			
@@ -1433,6 +1433,7 @@ sub _pulsecorrection {
       <ul>Writes the complete communication matching a RegEx into the reading "communication"
       (can be viewed in EventMonitor or used with a FileLog)
       </ul><br><br>      
+  
   <br>
 </ul>
 
