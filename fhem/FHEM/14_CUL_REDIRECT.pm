@@ -33,12 +33,12 @@ use SetExtensions;
 use constant { TRUE => 1, FALSE => 0 };
 
 sub
-CUL_OTHER_Initialize($)
+CUL_REDIRECT_Initialize($)
 {
   my ($hash) = @_;
 
   $hash->{Match}     = "^o........";
-  $hash->{ParseFn}   = "CUL_OTHER_Parse";
+  $hash->{ParseFn}   = "CUL_REDIRECT_Parse";
 }
 
 #
@@ -49,7 +49,7 @@ sub decodeOrego2 {
     my $name = shift;
     my @a = split("", $msg);
 
-    Log3 $name, 5, "CUL_OTHER decode Oregon 2 ($msg)"; 
+    Log3 $name, 5, "CUL_REDIRECT decode Oregon 2 ($msg)"; 
     my $newMSG = "";
     my $bitData;
     my $hlen = length($msg);
@@ -91,11 +91,11 @@ sub decodeOrego2 {
 		}
 		$osv2hex = sprintf("%02X", length($osv2hex)*4).$osv2hex;
 		if (length($osv2hex)*4 == 88) {
-		    Log3 $name, 5, "CUL_OTHER: OSV2 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits \n";
+		    Log3 $name, 5, "CUL_REDIRECT: OSV2 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits \n";
             return (1,$osv2hex);
         } else {
-            Log3 $name, 5, "CUL_OTHER: ERROR: To short: OSV2 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits \n"; 
-            return (-1, "CUL_OTHER: ERROR: To short: OSV2 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits"); 
+            Log3 $name, 5, "CUL_REDIRECT: ERROR: To short: OSV2 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits \n"; 
+            return (-1, "CUL_REDIRECT: ERROR: To short: OSV2 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits"); 
         }  
 	}
 	return (-1, "Not a origon 2 protocol");
@@ -107,7 +107,7 @@ sub	decode_Hideki
     my $name = shift;
     my @a = split("", $msg);
     
-    Log3 $name, 5, "CUL_OTHER decode Hideki ($msg)"; 
+    Log3 $name, 5, "CUL_REDIRECT decode Hideki ($msg)"; 
     my $bitData;
     my $hlen = length($msg);
 	my $blen = $hlen * 4;
@@ -153,7 +153,7 @@ sub	decode_Hideki
 }
 
 # Function which dispatches a message if needed.
-sub CUL_OTHER_Dispatch($$$)
+sub CUL_REDIRECT_Dispatch($$$)
 {
 	my ($hash, $rmsg,$dmsg) = @_;
 	my $name = $hash->{NAME};
@@ -192,7 +192,7 @@ sub CUL_OTHER_Dispatch($$$)
 
 ###################################
 sub
-CUL_OTHER_Parse($$)
+CUL_REDIRECT_Parse($$)
 {
 
     my ($hash, $msg) = @_;
@@ -211,26 +211,26 @@ CUL_OTHER_Parse($$)
     {
         $rssi = hex($rssi);
         $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74)) if defined($rssi);
-        Log3 $name, 5, "CUL_OTHER ($msg) length: $l RSSI: $rssi";
+        Log3 $name, 5, "CUL_REDIRECT ($msg) length: $l RSSI: $rssi";
     } else {
-        Log3 $name, 5, "CUL_OTHER ($msg) length: $l"; 
+        Log3 $name, 5, "CUL_REDIRECT ($msg) length: $l"; 
     }
 
     if ("$a[0]" eq "m") {
         # Orego2
-        Log3 $name, 5, "CUL_OTHER ($msg) match Manchester COODE length: $l"; 
+        Log3 $name, 5, "CUL_REDIRECT ($msg) match Manchester COODE length: $l"; 
         my ($rcode,$res) = decodeOrego2(substr($msg, 1), $name); 
 	    if ($rcode != -1) {
 			$dmsg = $res;	
 			Log3 $name, 5, "$name Dispatch now to Oregon Module.";	
-			CUL_OTHER_Dispatch($hash,$msg,$dmsg);
+			CUL_REDIRECT_Dispatch($hash,$msg,$dmsg);
 			$message_dispatched=TRUE;
 		} 
 		($rcode,$res) = decode_Hideki(substr($msg, 1), $name); 
 		if ($rcode != -1) {
 			$dmsg = 'P12#' . $res;	
 			Log3 $name, 5, "$name Dispatch now to Hideki Module.";	
-			CUL_OTHER_Dispatch($hash,$msg,$dmsg);
+			CUL_REDIRECT_Dispatch($hash,$msg,$dmsg);
 			$message_dispatched=TRUE;
 		} 
 		if ($rcode == -1) {
@@ -252,14 +252,14 @@ CUL_OTHER_Parse($$)
 =pod
 =begin html
 
-<a name="CUL_OTHER"></a>
-<h3>CUL_OTHER</h3>
+<a name="CUL_REDIRECT"></a>
+<h3>CUL_REDIRECT</h3>
 <ul>
-  The CUL_OTHER modul receive additional protocols from CUL<br>
+  The CUL_REDIRECT modul receive additional protocols from CUL<br>
   and redirect them to other modules.
   <br>
   
-  <a name="CUL_OTHER_Parse"></a>
+  <a name="CUL_REDIRECT_Parse"></a>
 
 </ul>
 
@@ -267,14 +267,14 @@ CUL_OTHER_Parse($$)
 
 =begin html_DE
 
-<a name="CUL_OTHER"></a>
-<h3>CUL_OTHER</h3>
+<a name="CUL_REDIRECT"></a>
+<h3>CUL_REDIRECT</h3>
 <ul>
-  Das CUL_OTHER Modul empfängt weitere Protokolle vom CUL<br>
+  Das CUL_REDIRECT Modul empfängt weitere Protokolle vom CUL<br>
   und leitet diese an die entsprechenden Module weiter.
   <br>
   
-  <a name="CUL_OTHER_Parse"></a>
+  <a name="CUL_REDIRECT_Parse"></a>
 
 </ul>
 
