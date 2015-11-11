@@ -219,6 +219,7 @@ structure_Notify($$)
 
         } elsif(@value == 2) {           # state:value[0] -> value[1]
           $devstate = ReadingsVal($d, "state", undef);
+          $devstate = $defs{$d}{STATE} if(!defined($devstate));
           if(defined($devstate) && $devstate =~ m/^$value[0]/){
             $devstate = $value[1];
             $i=99999; # RKO: ??
@@ -248,6 +249,7 @@ structure_Notify($$)
 
     } else {
       $devstate = ReadingsVal($d, "state", undef);
+      $devstate = $defs{$d}{STATE} if(!defined($devstate));
       if(defined($devstate)) {
         if(!$priority{$devstate} && $behavior eq "relativeKnown") {
           delete($hash->{INNTFY});
