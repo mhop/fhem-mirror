@@ -51,6 +51,7 @@ sub MYSENSORS_DEVICE_Initialize($) {
     "mapReading_.+ ".
     "requestAck:1 ". 
     "IODev ".
+    "showtime:0,1 ".
     $main::readingFnAttributes;
 
   main::LoadModule("MYSENSORS");
@@ -469,7 +470,7 @@ sub onInternalMessage($$) {
     };
     $type == I_TIME and do {
       if ($msg->{ack}) {
-        Log3 ($name,4,"MYSENSORS_DEVICE $name: respons to time-request acknowledged");
+        Log3 ($name,4,"MYSENSORS_DEVICE $name: response to time-request acknowledged");
       } else {
         sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_TIME, payload => time);
         Log3 ($name,4,"MYSENSORS_DEVICE $name: update of time requested");
@@ -494,10 +495,11 @@ sub onInternalMessage($$) {
     };
     $type == I_CONFIG and do {
       if ($msg->{ack}) {
-        Log3 ($name,4,"MYSENSORS_DEVICE $name: respons to config-request acknowledged");
+        Log3 ($name,4,"MYSENSORS_DEVICE $name: response to config-request acknowledged");
       } else {
+        readingsSingleUpdate($hash,"parentId",$msg->{payload},1);
         sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
-        Log3 ($name,4,"MYSENSORS_DEVICE $name: respond to config-request");
+        Log3 ($name,4,"MYSENSORS_DEVICE $name: respond to config-request, node parentId = " . ($msg->{payload});
       }
       last;
     };
