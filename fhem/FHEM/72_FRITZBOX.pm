@@ -132,7 +132,8 @@ my $cmdBufferTimeout=0;
 
 my $ttsCmdTemplate = 'wget -U Mozilla -O "[ZIEL]" "http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&prev=input&tl=[SPRACHE]&q=[TEXT]"';
 my $ttsLinkTemplate = 'http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&prev=input&tl=[SPRACHE]&q=[TEXT]';
-   
+# VoiceRSS: http://www.voicerss.org/api/documentation.aspx
+
 my $mohUpload = '/var/tmp/fhem_moh_upload';
 my $mohOld = '/var/tmp/fhem_fx_moh_old';
 my $mohNew = '/var/tmp/fhem_fx_moh_new';
@@ -787,15 +788,16 @@ sub FRITZBOX_API_Check_Run($)
       }
 
    # Box model
-      FRITZBOX_Log $hash, 5, "Read 'system_status'";
-      my $url = "http://$host/cgi-bin/system_status";
+      FRITZBOX_Log $hash, 5, "Read 'jason_boxinfo'";
+      # FRITZBOX_Log $hash, 5, "Read 'system_status'";
+      # my $url = "http://$host/cgi-bin/system_status";
+      my $url = "http://$host/jason_boxinfo.xml";
       
-      my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10 );
-      my $response = $agent->get ($url);
+      $response = $agent->get( $url );
       my $content  = $response->content;
-      $content=$1    if $content =~ /<body>(.*)<\/body>/;
+      # $content=$1    if $content =~ /<body>(.*)<\/body>/;
       
-      my @result = split /-/, $content;
+      # my @result = split /-/, $content;
       # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
       # 0 FritzBox-Modell
       # 1 Annex/Erweiterte Kennzeichnung
@@ -806,9 +808,13 @@ sub FRITZBOX_API_Check_Run($)
       # 7 Firmwareversion
       # 8 Sub-Version/Unterversion der Firmware
       # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+      # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+      # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
 
+      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)    if $content =~ /<j:Name>(.*)<\/j:Name>/;
+      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)    if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
+      FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1)    if $content =~ /<j:Version>(.*)<\/j:Version>/;
+         
    }
    
 # Check if telnet modul exists
@@ -1512,7 +1518,7 @@ sub FRITZBOX_Readout_Process($$)
                $hash->{$rName1}{$rName2} = $rValue;
             }
          }
-         elsif ($rName eq "box_fwVersion") {
+         elsif ($rName eq "box_fwVersion" && defined $values{box_fwUpdate}) {
             $rValue .= " (old)" if $values{box_fwUpdate} eq "1";
          }
          elsif ($rName eq "box_model") {
