@@ -47,7 +47,7 @@ my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
                        ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_HOERMANN: ".
                        ":ESA2000:CUL_IR:CUL_TX:Revolt:IT:UNIRoll:SOMFY: ".
-                       ":STACKABLE_CC:CUL_RFR::CUL_TCM97001:";
+                       ":STACKABLE_CC:CUL_RFR::CUL_TCM97001:CUL_REDIRECT:";
 my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:STACKABLE_CC:";
 my $clientsMAX       = ":CUL_MAX:HMS:CUL_IR:STACKABLE_CC:";
 my $clientsWMBus     = ":WMBUS:HMS:CUL_IR:STACKABLE_CC:";
@@ -73,6 +73,7 @@ my %matchListSlowRF = (
     "I:UNIRoll"   => "^[0-9A-F]{5}(B|D|E)",
     "J:SOMFY"     => "^Y[r|t|s]:?[A-F0-9]+",
     "K:CUL_TCM97001"  => "^s[A-F0-9]+",
+    "L:CUL_REDIRECT"  => "^o+",
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A....................",
@@ -909,6 +910,8 @@ CUL_Parse($$$$@)
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
     $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
   } elsif($fn eq "s" && $len >= 5)  {              # CUL_TCM97001
+    ;
+  } elsif($fn eq "o" && $len >= 5)  {              # CUL_REDIRECT
     ;
   } else {
     DoTrigger($name, "UNKNOWNCODE $dmsg");
