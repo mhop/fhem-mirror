@@ -22,7 +22,7 @@
 # The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 ###################################
 #
-# $Id: 46_PW_Circle.pm 0037 2015-11-09 19:18:38Z sguttmann $ 
+# $Id: 46_PW_Circle.pm 0038 2015-11-11 16:18:38Z sguttmann $ 
 package main;
 
 use strict;
@@ -47,7 +47,7 @@ sub PW_Circle_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "Circle";
+  $hash->{Match}     = "PW_Circle";
   $hash->{DefFn}     = "PW_Circle_Define";
   $hash->{UndefFn}   = "PW_Circle_Undef";
   $hash->{ParseFn}   = "PW_Circle_Parse";
@@ -56,7 +56,7 @@ sub PW_Circle_Initialize($)
   $hash->{AttrList}  = "IODev interval do_not_notify:1,0 ".
                        $readingFnAttributes;
   $hash->{AutoCreate} =
-        { "Circle.*" => { ATTR => "room:Plugwise interval:10"} };
+        { "PW_Circle.*" => { ATTR => "room:Plugwise interval:10"} };
 
 #  Log3 $hash, 3, "PW_Circle_Initialize() Initialize";
 }
@@ -67,11 +67,11 @@ sub PW_Circle_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $a = int(@a);
-Log 3,"Circle define $a[0]";
+#Log 3,"Circle define $a[0]";
   return "wrong syntax: define <name> PW_Circle address" if(int(@a) != 3);
   my $name = $a[0];
   my $code = $a[2];
-  my $device_name = "Circle".$DOT.$code;
+  my $device_name = "PW_Circle".$DOT.$code;
 #Log 3,Dumper($hash);
 
   $hash->{CODE} = $code;
@@ -128,7 +128,7 @@ sub PW_Circle_Set($@)
 		IOWrite($hash,$hash->{CODE},$opt);
     } elsif($opt =~ "(on|off)-for-timer")  
     {
-    	if (@a == 3) {
+    	if (@a == 1) {
 			IOWrite($hash,$hash->{CODE},$1);
 		 	RemoveInternalTimer("onofffortimer:".$name.":off");
 		 	RemoveInternalTimer("onofffortimer:".$name.":on");
@@ -191,7 +191,7 @@ if ($msg->{type} eq "err") {return undef};
   
   $time_old = $time;
   Log3 $hash,5, Dumper($msg);
-  my $device_name = "Circle".$DOT.$msg->{short};
+  my $device_name = "PW_Circle".$DOT.$msg->{short};
   Log3 $hash,5,"New Devicename: $device_name";
   my $def = $modules{PW_Circle}{defptr}{"$device_name"};
   if(!$def) {
