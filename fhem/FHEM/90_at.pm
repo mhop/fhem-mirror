@@ -56,14 +56,28 @@ at_Define($$)
       (undef, $command) = split("[ \t]+", $hash->{OLDDEF}, 2);
       $hash->{DEF} = "$tm $command";
     } else {
-      return "Usage: define <name> at <timespec> <command>";
+      return "Usage: define <name> at [timespec or datespec] <command>";
     }
   }
+
   return "Wrong timespec, use \"[+][*[{count}]]<time or func>\""
                                         if($tm !~ m/^(\+)?(\*({\d+})?)?(.*)$/);
   my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
-  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($tspec);
-  return $err if($err);
+
+  my ($abstime, $err, $hr, $min, $sec, $fn);
+  if($tspec =~ m/^\d{10}$/) {
+    $abstime = $tspec;
+
+  } elsif($tspec =~ m/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)$/) {
+    my ($y,$m,$d,$h,$m2,$s) = ($1,$2,$3,$4,$5,$6);
+    $abstime = mktime($s,$m2,$h,$d,$m-1,$y-1900);
+
+  } else {
+    ($err, $hr, $min, $sec, $fn) = GetTimeSpec($tspec);
+    return $err if($err);
+
+  }
+  return "datespec is not allowed with + or *" if($abstime && ($rel || $rep));
 
   $rel = "" if(!defined($rel));
   $rep = "" if(!defined($rep));
@@ -77,7 +91,10 @@ at_Define($$)
   $ot = int($ot) if(!$rel);     # No way to specify subseconds
   my $nt = $ot;
 
-  if($rel eq "+") {
+  if($abstime) {
+    $nt = $abstime;
+
+  } elsif($rel eq "+") {
     $nt += ($hr*3600+$min*60+$sec); # Relative time
 
   } else {
@@ -113,7 +130,8 @@ at_Define($$)
     InternalTimer($nt, "at_Exec", $hash, 0);
     $hash->{NTM} = $ntm if($rel eq "+" || $fn);
     my $d = IsDisabled($name);  # 1
-    my $val = ($d==3 ? "inactive" : ($d ? "disabled":("Next: ".FmtTime($nt))));
+    my $val = ($d==3 ? "inactive" : ($d ? "disabled":("Next: ".
+                        ($abstime ? FmtDateTime($nt) : FmtTime($nt)) )));
     readingsSingleUpdate($hash, "state", $val,
           !$hash->{READINGS}{state} || $hash->{READINGS}{state}{VAL} ne $val);
   }
@@ -378,7 +396,8 @@ EOF
   <a name="atdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; at &lt;timespec&gt; &lt;command&gt;</code><br>
+    <code>define &lt;name&gt; at [&lt;timespec&gt;|&lt;datespec&gt;]
+                &lt;command&gt;</code><br>
     <br>
     <code>&lt;timespec&gt;</code> format: [+][*{N}]&lt;timedet&gt;<br>
     <ul>
@@ -388,9 +407,13 @@ EOF
       executed <i>repeatedly</i>.<br>
       The optional <code>{N}</code> after the * indicates,that the command
       should be repeated <i>N-times</i> only.<br>
-      &lt;timedet&gt; is either HH:MM, HH:MM:SS, seconds since 1970 or
-      {perlfunc()}. perlfunc must return a string in timedet format.
-      Note: {perlfunc()} may not contain any spaces or tabs.
+
+      &lt;timespec&gt; is either HH:MM, HH:MM:SS or {perlfunc()}. perlfunc must
+      return a string in timedet format.  Note: {perlfunc()} may not contain
+      any spaces or tabs.<br>
+
+      &lt;datespec&gt; is either ISO8601 (YYYY-MM-DDTHH:MM:SS) or number of
+      seconds since 1970.
     </ul>
     <br>
 
@@ -536,7 +559,8 @@ EOF
   <a name="atdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; at &lt;timespec&gt; &lt;command&gt;</code><br>
+    <code>define &lt;name&gt; at [&lt;timespec&gt;|&lt;datespec&gt;]
+                &lt;command&gt;</code><br>
     <br>
     <code>&lt;timespec&gt;</code> Format: [+][*{N}]&lt;timedet&gt;<br>
     <ul>
@@ -549,9 +573,12 @@ EOF
       Das optionale <code>{N}</code> nach dem * bedeutet, dass der Befehl genau
       <i>N-mal</i> wiederholt werden soll.<br>
 
-      &lt;timedet&gt; ist entweder HH:MM, HH:MM:SS, Sekunden seit 1970 oder
-      {perlfunc()}.  perlfunc muss ein String in timedet Format zurueckliefern.
-      Achtung: {perlfunc()} darf keine Leerzeichen enthalten.
+      &lt;timespec&gt; ist entweder HH:MM, HH:MM:SS oder {perlfunc()}.  perlfunc
+      muss ein String in timedet Format zurueckliefern.  Achtung: {perlfunc()}
+      darf keine Leerzeichen enthalten.<br>
+
+      &lt;datespec&gt; ist entweder ISO8601 (YYYY-MM-DDTHH:MM:SS) oder Anzahl
+      der Sekunden seit 1970.
 
     </ul>
     <br>

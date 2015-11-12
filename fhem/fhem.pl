@@ -2908,7 +2908,7 @@ EvalSpecials($%)
 }
 
 #####################################
-# Parse a timespec: HH:MM:SS, HH:MM, sec-since-1970 or { perfunc() }
+# Parse a timespec: HH:MM:SS, HH:MM or { perfunc() }
 sub
 GetTimeSpec($)
 {
@@ -2920,10 +2920,6 @@ GetTimeSpec($)
 
   } elsif($tspec =~ m/^([0-9]+):([0-5][0-9])$/) {         # HH:MM
     ($hr, $min, $sec) = ($1, $2, 0);
-
-  } elsif($tspec =~ m/^([0-9]{10})$/) {                   # seconds-since-1970
-    my @a = localtime($1);
-    ($hr, $min, $sec) = ($a[2],$a[1],$a[0]);
 
   } elsif($tspec =~ m/^{(.*)}$/) {                        # {function}
     $fn = $1;
