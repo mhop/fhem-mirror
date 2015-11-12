@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 53_GHoma.pm
+# $Id: 53_GHoma.pm 9272 2015-09-18 20:23:44Z klauswitt $
 #
 # Protokoll:
 # Prefix (5a a5), Anzahl Nutzbytes (2 Byte), Payload, Checksumme (FF - LowByte der Summe aller Payloadbytes), Postfix (5b b5)
