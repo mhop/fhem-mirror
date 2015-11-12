@@ -1511,10 +1511,10 @@ ReplaceSetMagic(@)       # Forum #38276
     my $x = ReadingsVal($1,$2,""); $x eq "" ? "[$1:$2]" : $x
   }/egi;
 
-  $a =~ s/({[^}]+})/{
+  $a =~ s/{\((.*)\)}/{
     my $x = eval $1;
     Log 1, "ReplaceSetMagic: $1 -> $@" if($@);
-    ($@ || ref($x) eq "HASH") ? $1 : $x
+    $@ ? $1 : $x
   }/eg;
 
   return split(" ", $a);
