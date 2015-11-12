@@ -499,7 +499,7 @@ sub onInternalMessage($$) {
       } else {
         readingsSingleUpdate($hash,"parentId",$msg->{payload},1);
         sendClientMessage($hash,cmd => C_INTERNAL, childId => 255, subType => I_CONFIG, payload => AttrVal($name,"config","M"));
-        Log3 ($name,4,"MYSENSORS_DEVICE $name: respond to config-request, node parentId = " . ($msg->{payload});
+        Log3 ($name,4,"MYSENSORS_DEVICE $name: respond to config-request, node parentId = " . $msg->{payload});
       }
       last;
     };
