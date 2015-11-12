@@ -113,6 +113,8 @@ TcpServer_Accept($$)
   my %nhash;
   $nhash{NR}    = $devcount++;
   $nhash{NAME}  = $cname;
+  $nhash{PEER}  = $caddr;
+  $nhash{PORT}  = $port;
   $nhash{FD}    = $clientinfo[0]->fileno();
   $nhash{CD}    = $clientinfo[0];     # sysread / close won't work on fileno
   $nhash{TYPE}  = $type;

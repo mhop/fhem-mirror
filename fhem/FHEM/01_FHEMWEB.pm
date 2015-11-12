@@ -2409,8 +2409,10 @@ FW_Notify($$)
 
   if($dn eq $ntfy->{SNAME} &&
      $dev->{CHANGED} &&
-     $dev->{CHANGED}->[0] =~ m/^JS:(.*)$/) {
-    my $data = FW_longpollInfo($h->{fmt}, "#FHEMWEB:$ntfy->{NAME}",$1,"");
+     $dev->{CHANGED}->[0] =~ m/^JS(#([^:]*))?:(.*)$/) {
+    my $data = $3;
+    return if( $2 && $ntfy->{PEER} !~ m/$2/ );
+    $data = FW_longpollInfo($h->{fmt}, "#FHEMWEB:$ntfy->{NAME}",$data,"");
     addToWritebuffer($ntfy, $data."\n");
     return;
   }
