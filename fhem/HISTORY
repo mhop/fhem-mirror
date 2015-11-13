@@ -643,3 +643,6 @@
 - Thu Nov 3 2015 (loredo)
   - removed deprecated wrapper module 75_MSG.pm. Users will need to replace device definitions by 75_MSGFile.pm or 75_MSGMail.pm respectively.
   - added new FHEM command 'msg' to introduce integrated message routing functionality
+
+- Fri Nov 13 2015 (loredo)
+  - added new module 50_HP1000
