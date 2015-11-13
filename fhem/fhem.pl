@@ -1513,11 +1513,11 @@ ReplaceSetMagic(@)       # Forum #38276
 
   $a =~ s/{\((.*)\)}/{
     my $x = eval $1;
-    Log 1, "ReplaceSetMagic: $1 -> $@" if($@);
+    return ("$1: $@") if($@);
     $@ ? $1 : $x
   }/eg;
 
-  return split(" ", $a);
+  return (undef, split(" ", $a));
 }
 
 #####################################
@@ -1536,7 +1536,9 @@ DoSet(@)
   return CallFn($dev, "SetFn", $hash, @a) if($a[1] && $a[1] eq "?");
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
-  @a = ReplaceSetMagic(@a) if($featurelevel >= 5.7);
+  my $err;
+  ($err, @a) = ReplaceSetMagic(@a) if($featurelevel >= 5.7);
+  return $err if($err);
 
   $hash->{".triggerUsed"} = 0; 
   my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, @a);
