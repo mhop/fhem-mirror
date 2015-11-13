@@ -188,15 +188,15 @@ attr lcCinema room Cinema
 attr lcCinema webCmd scene
 
 define anyViews Dashboard
+attr anyViews userattr dashboard_tab2backgroundimage dashboard_tab2colcount dashboard_tab2devices dashboard_tab2groups dashboard_tab2icon dashboard_tab2name dashboard_tab2rowcentercolwidth dashboard_tab2sorting
 attr anyViews dashboard_colcount 2
-attr anyViews dashboard_row top-center
-attr anyViews dashboard_rowcentercolwidth 400
-attr anyViews dashboard_rowtopheight 205
-attr anyViews dashboard_tab1groups Home State,Light,AV,Single Lights
+attr anyViews dashboard_row center
+attr anyViews dashboard_rowcentercolwidth 50%
+attr anyViews dashboard_tab1groups Home State,Light,AV,Single Lights,Color Lights
 attr anyViews dashboard_tab1name Dashboard Demo
-attr anyViews dashboard_tab1sorting t0c100,Light,true,518,129:t0c100,Home State,true,496,204:t0c0,Single Lights,true,522,209:t0c0,AV,true,221,170:
-attr anyViews dashboard_width 80%
+attr anyViews dashboard_tab1sorting t0c0,Single Lights,true,400,209,0,0:t0c0,AV,true,400,170,0,209:t0c1,Light,true,444,129,h84,0:t0c1,Home State,true,444,204,384,129:
 attr anyViews room hidden
+attr anyViews alias Dashboard Demo
 
 define anyViews_weblink weblink htmlCode {DashboardAsHtml("anyViews")}
 attr anyViews_weblink room DashboardRoom
