@@ -1233,7 +1233,6 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&TodayBytesSentHigh=inetstat:status/Today/BytesSentHigh";
    $queryStr .= "&TodayBytesSentLow=inetstat:status/Today/BytesSentLow";
 
-
    $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
    
    if (defined $result->{Error}) {
