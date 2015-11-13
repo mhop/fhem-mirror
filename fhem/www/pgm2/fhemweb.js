@@ -827,11 +827,14 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
     var oldFn1 = document.onmousemove, oldFn2 = document.onmouseup,
         oldFn3 = document.ontouchmove, oldFn4 = document.ontouchend;
 
+    e.stopPropagation();  // Dashboard fix
     lastX = e.clientX;  // Does not work on IE8
 
     function
     mouseMove(e)
     {
+      e.stopPropagation();  // Dashboard fix
+
       if(maxX == 0) // Forum #35846
         maxX = slider.offsetWidth-sh.offsetWidth;
       var diff = e.clientX-lastX; lastX = e.clientX;
@@ -849,6 +852,7 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
 
     document.onmouseup = document.ontouchend = function(e)
     {
+      e.stopPropagation();  // Dashboard fix
       document.onmousemove = oldFn1; document.onmouseup  = oldFn2;
       document.ontouchmove = oldFn3; document.ontouchend = oldFn4;
       if(cmd)
