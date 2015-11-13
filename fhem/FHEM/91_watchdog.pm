@@ -214,7 +214,7 @@ watchdog_Attr(@)
     The syntax for &lt;regexp1&gt; and &lt;regexp2&gt; is the same as the
     regexp for <a href="#notify">notify</a>.<br>
     &lt;timespec&gt; is HH:MM[:SS]<br>
-    &lt;command&gt; is a usual fhem command like used int the <a
+    &lt;command&gt; is a usual fhem command like used in the <a
     href="#at">at</a> or <a href="#notify">notify</a>
     <br><br>
 
