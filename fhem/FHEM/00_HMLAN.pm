@@ -516,6 +516,7 @@ sub HMLAN_Write($$$) {#########################################################
     if ($modules{CUL_HM}{defptr}{$dst} &&
         $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn} ){
       HMLAN_SimpleWrite($hash,$modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn});
+      $hash->{helper}{ids}{$dst}{cfg}  = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn};
       $hash->{helper}{ids}{$dst}{name} = CUL_HM_id2Name($dst);
       $hash->{helper}{assIdCnt} = scalar(keys %{$hash->{helper}{ids}});
       $hash->{assignedIDsCnt} = $hash->{helper}{assIdCnt}
@@ -722,7 +723,6 @@ sub HMLAN_Parse($$) {##########################################################
 
     if ($letter eq 'R' && $hash->{helper}{ids}{$src}{flg}){
       $hash->{helper}{ids}{$src}{flg} = 0 if($dst ne "000000"); #release send-holdoff
-
       if ($hash->{helper}{ids}{$src}{msg}){                #send delayed msg if any
         Log3 $hash, HMLAN_getVerbLvl ($hash,$src,$dst,"5")
                   ,"HMLAN_SdDly: $name $src";
@@ -841,10 +841,11 @@ sub HMLAN_SimpleWrite(@) {#####################################################
       my $chn = substr($msg,52,2);
       if (!$hDst->{chn} || $hDst->{chn} ne $chn){
         my $updt = $modules{CUL_HM}{defptr}{$dst}{helper}{io}{newChn};
-        if ($updt){
+        if ($updt && (!$hDst->{cfg} || $updt ne $hDst->{cfg})){
           Log3 $hash,  HMLAN_getVerbLvl($hash,$src,$dst,"5")
                   , 'HMLAN_Send:  '.$name.' S:'.$updt;
           syswrite($hash->{TCPDev}, $updt."\r\n")     if($hash->{TCPDev});
+          $hDst->{cfg} = $updt;
         }
       }
       $hDst->{chn} = $chn;
@@ -921,7 +922,7 @@ sub HMLAN_writeAesKey($) {#####################################################
   my ($name) = @_;
   return if (!$name || !$defs{$name} || $defs{$name}{TYPE} ne "HMLAN");
   my $vccu = InternalVal($name,"owner_CCU",$name);
-  $vccu = $name if(!AttrVal($vccu,"hmKey",""));#General if keys are not in vccu
+  $vccu = $name if(!AttrVal($vccu,"hmKey",""));
   foreach my $i (1..3){
      my ($kNo,$k) = split(":",AttrVal($vccu,"hmKey".($i== 1?"":$i),""));
      HMLAN_SimpleWrite($defs{$name}, "Y0$i,".($k?"$kNo,$k":"00,"));
