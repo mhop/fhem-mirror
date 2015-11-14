@@ -1875,7 +1875,7 @@ sub CUL_HM_Parse($$) {#########################################################
               my $vl = ReadingsVal($vh->{NAME},"level","???");
               my $vs = ($vl eq "100"?"on":($vl eq "0"?"off":"$vl"));
               my($clvlMin,$clvlMax)=split",",AttrVal($vh->{NAME}, "levelRange", "0,100");
-              my $plc = int(($pl-$clvlMin)/($clvlMax - $clvlMin)*200)/2;
+              my $plc = int((($pl-$clvlMin)*200)/($clvlMax - $clvlMin))/2;
               $plc = 1 if ($pl && $plc <= 0);
               $vs = ($plc ne $vl)?"chn:$vs  phys:$plc":$vs;
               push @evtEt,[$vh,1,"state:$vs"];
@@ -1883,7 +1883,7 @@ sub CUL_HM_Parse($$) {#########################################################
             }
             $pl = (($pl-$lvlMin)<=0 && $pl)
                      ? 1
-                     : int(($pl-$lvlMin)/($lvlMax - $lvlMin)*200)/2;
+                     : int((($pl-$lvlMin)*200)/($lvlMax - $lvlMin))/2;
             push @evtEt,[$mh{cHash},1,"phyLevel:$pl"];      #phys level
             $physLvl = $pl;
           }
@@ -1896,7 +1896,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $pVal = $val;# necessary for roper 'off', not logical off
       $val = (($val-$lvlMin)<=0 && $val)
                   ? 1
-                  : int((($val-$lvlMin)/($lvlMax - $lvlMin))*200)/2;
+                  : int((($val-$lvlMin)*200)/($lvlMax - $lvlMin))/2;
 
       # blind option: reverse Level Meaning 0 = open, 100 = closed
       if ("levelInverse" eq AttrVal($mh{cName}, "param", "")){;
