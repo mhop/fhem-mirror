@@ -405,7 +405,7 @@ my %zwave_quietCmds = (
   sendNonce=>1,
   secEncap=>1,
 
-  secNonce=>1 
+  secNonce=>1
 );
 
 my %zwave_cmdArgs = (
@@ -529,7 +529,7 @@ ZWave_Define($$)
       $proposed = $p if($defs{$p}{homeId} && $defs{$p}{homeId} eq $homeId);
     }
   }
-  AssignIoPort($hash, $proposed); 
+  AssignIoPort($hash, $proposed);
 
   if(@a) {      # Autocreate: set the classes, execute the init calls
     ZWave_SetClasses($homeId, $id, undef, $a[0]);
@@ -736,7 +736,7 @@ ZWave_Cmd($$@)
 
 
   my $data;
-  if($cmd eq "neighborUpdate" || 
+  if($cmd eq "neighborUpdate" ||
      $cmd eq "neighborList") {
     $data = $cmdFmt;
 
@@ -1858,20 +1858,20 @@ ZWave_plusInfoParse($$$$$)
 }
 
 my %zwave_sensorBinaryTypeV2 = (
-  	"00"=>"unknown",
-	"01"=>"generalPurpose",
-	"02"=>"smoke",
-	"03"=>"CO",
-	"04"=>"CO2",
-	"05"=>"heat",
-	"06"=>"water",
-	"07"=>"freeze",
-	"08"=>"tamper",
-	"09"=>"aux",
-	"0a"=>"doorWindow",
-	"0b"=>"tilt",
-	"0c"=>"motion",
-	"0d"=>"glassBreak"
+  "00"=>"unknown",
+  "01"=>"generalPurpose",
+  "02"=>"smoke",
+  "03"=>"CO",
+  "04"=>"CO2",
+  "05"=>"heat",
+  "06"=>"water",
+  "07"=>"freeze",
+  "08"=>"tamper",
+  "09"=>"aux",
+  "0a"=>"doorWindow",
+  "0b"=>"tilt",
+  "0c"=>"motion",
+  "0d"=>"glassBreak"
 );
 
 sub
@@ -1894,6 +1894,34 @@ ZWave_assocGroup($$$$)
            map { $list{$_} ? $list{$_} : "UNKNOWN_".hex($_); }
            ($nodes =~ m/../g));
   return sprintf("assocGroup_%d:Max %d Nodes %s", hex($gId),hex($max), $nodes);
+}
+
+sub
+ZWave_CRC16($)
+{
+  my ($msg) = @_;
+  my $buf = pack 'H*', $msg;
+  my $len = length($buf);
+
+  my $poly = 0x1021;  #CRC-CCITT (CRC-16) x16 + x12 + x5 + 1
+  my $crc16 = 0x1D0F; #Startvalue
+
+  for(my $i=0; $i<$len; $i++) {
+    my $byte = ord(substr($buf, $i, 1));
+    $byte = $byte * 0x100;        # expand to 16 Bit
+    for(0..7) {
+      if(($byte & 0x8000) ^ ($crc16 & 0x8000)) { # if Hi-bits are different
+        $crc16 <<= 1;
+        $crc16 ^= $poly;
+      } else {
+        $crc16 <<= 1;
+      }
+      $crc16 &= 0xFFFF;
+      $byte <<= 1;
+      $byte &= 0xFFFF;
+    }
+  }
+  return sprintf "%x", $crc16;
 }
 
 ##############################################
@@ -2619,7 +2647,7 @@ ZWave_addToSendStack($$)
 
   if(ZWave_isWakeUp($hash)) {
     # SECURITY XXX and neighborList
-    if ($cmd =~ m/^......988[01].*/ || $cmd =~ m/^80..0101$/) { 
+    if ($cmd =~ m/^......988[01].*/ || $cmd =~ m/^80..0101$/) {
       Log3 $hash->{NAME}, 5, "$hash->{NAME}: Sendstack bypassed for $cmd";
     } else {
       return "Scheduled for sending after WAKEUP" if(!$hash->{wakeupAlive});
@@ -2875,9 +2903,16 @@ ZWave_Parse($$@)
     $arg = sprintf("%s%02x%s", $1, hex($2) & 0x7f, $3);
   }
 
-  if($arg =~ /^..5601(.*)..../) { # CRC_16_ENCAP: Unwrap encapsulated command
+  if($arg =~ /^..5601(.*)(....)/) { # CRC_16_ENCAP: Unwrap encapsulated command
     #Log3 $ioName, 4, "CRC FIX, MSG: ($1)"; # see Forum #23494
-    $arg = sprintf("%02x$1", length($1)/2);
+    my $crc16 = ZWave_CRC16("5601".$1);
+    if ($2 eq $crc16) {
+      $arg = sprintf("%02x$1", length($1)/2);
+    } else {
+      Log3 $ioName, 4, "$ioName CRC_16 checksum mismatch, received $2," .
+       " calculated $crc16";
+      return "";
+    }
   }
 
   my ($baseHash, $baseId, $ep) = ("",$id,"");
@@ -3159,11 +3194,11 @@ s2Hex($)
   <br><br><b>Class BASIC_WINDOW_COVERING</b>
   <li>coveringClose<br>
     Starts closing the window cover. Moving stops if blinds are fully closed or
-    a coveringStop command was issued. 
+    a coveringStop command was issued.
     </li>
   <li>coveringOpen<br>
     Starts opening the window cover.  Moving stops if blinds are fully open or
-    a coveringStop command was issued. 
+    a coveringStop command was issued.
     </li>
   <li>coveringStop<br>
     Stop moving the window cover. Blinds are partially open (closed).
@@ -3194,7 +3229,7 @@ s2Hex($)
       set &lt;name&gt; wcrgb 0 255 0 0 0 (setting full cold white)<br>
     </ul>
     </li>
-	
+
   <br><br><b>Class CONFIGURATION</b>
   <li>configByte cfgAddress 8bitValue<br>
       configWord cfgAddress 16bitValue<br>
@@ -3233,7 +3268,7 @@ s2Hex($)
     value is supported by the device.<br>
     The command will reset ALL accumulated values, it is not possible to
     choose a single value.</li>
-  
+
   <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
   <li>mcaAdd groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
     Add a list of node or node:endpoint associations. The latter can be used to
@@ -3265,7 +3300,7 @@ s2Hex($)
     level 0=normal, level 1=-1dBm, .., level 9=-9dBm.</li>
   <li>powerlevelTest nodeId level frames <br>
     send number of frames [1-65535] to nodeId with level [0-9].</li>
-  
+
   <br><br><b>Class PROTECTION</b>
   <li>protectionOff<br>
     device is unprotected</li>
@@ -3279,19 +3314,19 @@ s2Hex($)
   <br><br><b>Class SCENE_ACTIVATION</b>
   <li>sceneConfig<br>
     activate settings for a specific scene.
-	Parameters are: sceneId, dimmingDuration (00..ff)
+    Parameters are: sceneId, dimmingDuration (00..ff)
     </li>
-	
+
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
   <li>sceneConfig<br>
     set configuration for a specific scene.
-	Parameters are: sceneId, dimmingDuration, finalValue (00..ff)
+    Parameters are: sceneId, dimmingDuration, finalValue (00..ff)
     </li>
-	
+
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
   <li>groupConfig<br>
     set configuration for a specific scene.
-	Parameters are: groupId, sceneId, dimmingDuration.
+    Parameters are: groupId, sceneId, dimmingDuration.
     </li>
 
   <br><br><b>Class SECURITY</b>
@@ -3475,7 +3510,7 @@ s2Hex($)
     return the indicator status of the node, as indState:on, indState:off or
     indState:dim value.
     </li>
-  
+
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
   <li>position<br>
     Fibaro FGRM-222 only: return the blinds position and slat angle.
@@ -3536,7 +3571,7 @@ s2Hex($)
     Get the name from the EEPROM. Note: only ASCII is supported.</li>
   <li>location<br>
     Get the location from the EEPROM. Note: only ASCII is supported.</li>
-  
+
   <br><br><b>Class POWERLEVEL</b>
   <li>powerlevel<br>
     Get the current powerlevel and remaining time in this level.</li>
@@ -3581,7 +3616,7 @@ s2Hex($)
   <li>alarm alarmType<br>
     return the nodes alarm status of the requested alarmType. 00 = GENERIC,
     01 = SMOKE, 02 = CO, 03 = CO2, 04 = HEAT, 05 = WATER, ff = returns the
-    nodes first supported alarm type.    
+    nodes first supported alarm type.
     </li>
 
   <br><br><b>Class SENSOR_BINARY</b>
@@ -3608,7 +3643,7 @@ s2Hex($)
   <li>swmStatus<br>
     return the status of the node, as state:on, state:off or state:dim value.
     </li>
-	
+
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>thermostatMode<br>
     request the mode
@@ -3648,7 +3683,7 @@ s2Hex($)
   <li>zwavePlusInfo<br>
     request the zwavePlusInfo
     </li>
-  
+
   </ul>
   <br>
 
@@ -3740,7 +3775,7 @@ s2Hex($)
   <li>config_X:Y<br>
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config messages are available.</li>
-  
+
   <br><br><b>Class DEVICE_RESET_LOCALLY</b>
   <li>deviceResetLocally:yes<br></li>
 
@@ -3766,7 +3801,7 @@ s2Hex($)
     (VenetianBlindMode)</li>
   <li>position:[%]<br>
     (RollerBlindMode)</li>
-  
+
   <br><br><b>Class MANUFACTURER_SPECIFIC</b>
   <li>modelId:hexValue hexValue hexValue</li>
   <li>model:manufacturerName productName</li>
@@ -3795,16 +3830,16 @@ s2Hex($)
     NOTE: "current 0 remain 0" means normal mode without timeout</li>
   <li>powerlvlTest:node x status y frameAck z<br>
     NOTE: status 0=failed, 1=success (at least one ACK), 2=in progress</li>
-  
+
   <br><br><b>Class PROTECTION</b>
   <li>protection:[on|off|seq]</li>
 
   <br><br><b>Class SCENE_ACTIVATION</b>
   <li>scene_Id:level finalValue</li>
-    
+
   <br><br><b>Class SCENE_ACTUATOR_CONF</b>
   <li>scene_Id:level dimmingDuration finalValue</li>
-  
+
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
   <li>group_Id:scene dimmingDuration</li>
 
@@ -3814,7 +3849,7 @@ s2Hex($)
   intended to generate event</li>
 
   <br><br><b>Class SENSOR_ALARM</b>
-  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li> 
+  <li>alarm_type_X:level Y node $nodeID seconds $seconds</li>
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>SENSORY_BINARY V1:</li>
@@ -3906,7 +3941,7 @@ s2Hex($)
   <li>state:swmBeginUp</li>
   <li>state:swmBeginDown</li>
   <li>state:swmEnd</li>
-    
+
   <br><br><b>Class THERMOSTAT_MODE</b>
   <li>off</li>
   <li>cooling</li>
@@ -3935,7 +3970,7 @@ s2Hex($)
   <li>wakeup:notification</li>
   <li>wakeupReport:interval:X target:Y</li>
   <li>wakeupIntervalCapabilitiesReport:min W max X default Y step Z</li>
-  
+
   <br><br><b>Class ZWAVEPLUS_INFO</b>
   <li>zwavePlusInfo:version: V role: W node: X installerIcon: Y userIcon: Z</li>
 
