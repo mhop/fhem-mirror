@@ -86,12 +86,12 @@ sub HP1000_Define($$) {
     return "Device already defined: " . $modules{HP1000}{defptr}{NAME}
       if (defined($modules{HP1000}{defptr}));
 
-    $hash->{fhem}{infix} = "updateweatherstation.php";
+    $hash->{fhem}{infix} = "updateweatherstation";
 
     # create global unique device definition
     $modules{HP1000}{defptr} = $hash;
 
-    HP1000_addExtension( $name, "HP1000_CGI", "updateweatherstation.php" );
+    HP1000_addExtension( $name, "HP1000_CGI", "updateweatherstation" );
 
     return undef;
 }
@@ -128,16 +128,16 @@ sub HP1000_CGI() {
     my $webArgs;
 
     # data received
-    if ( $request =~ m,^(/[^/]+?)(?:\&|\?)(.*)?$, ) {
-        $link = $1;
-        $URI  = $2;
+    if ( $request =~ /^\/updateweatherstation\.\w{3}\?(.+=.+)/ ) {
+        $URI  = $1;
 
         # get device name
-        $name = $data{FWEXT}{$link}{deviceName} if ( $data{FWEXT}{$link} );
+        $name = $data{FWEXT}{"/updateweatherstation"}{deviceName}
+          if (defined($data{FWEXT}{"/updateweatherstation"}));
 
         # return error if no such device
         return ( "text/plain; charset=utf-8",
-            "No HP1000 device for webhook $link" )
+            "No HP1000 device for webhook /updateweatherstation" )
           unless ($name);
 
         # extract values from URI
@@ -200,8 +200,8 @@ sub HP1000_CGI() {
       $result .= " "      if ($result ne "");
       $result .= "T:$v"   if ($p eq "temperature");
       $result .= "H:$v"   if ($p eq "humidity");
-      $result .= "Tin:$v" if ($p eq "temperature_indoor");
-      $result .= "Hin:$v" if ($p eq "humidity_indoor");
+      $result .= "Ti:$v" if ($p eq "temperature_indoor");
+      $result .= "Hi:$v" if ($p eq "humidity_indoor");
       $result .= "P:$v"   if ($p eq "pressure");
       $result .= "R:$v"   if ($p eq "rain");
       $result .= "L:$v"   if ($p eq "light");
@@ -232,17 +232,29 @@ sub HP1000_CGI() {
     <h3>
       HP1000
     </h3>
-    <ul>
-      <li>Provides webhook receiver for weather station HP1000 of Fine Offset Electronics.<br>
+    <div style="margin-left: 2em">
+      <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
+      <div style="margin-left: 2em">
+        <code>define &lt;WeatherStation&gt; HP1000 [<ID> <PASSWORD>]</code><br>
+        <br>
+          Provides webhook receiver for weather station HP1000 of Fine Offset Electronics.<br>
           There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
           No other name will work as it's hardcoded in the HP1000 device itself!<br>
           <br>
           As the URI has a fixed coding as well there can only be one single HP1000 station per FHEM installation.<br>
+        <br>
+        Example:<br>
+        <div style="margin-left: 2em">
+          <code># unprotected instance where ID and PASSWORD will be ignored<br>
+          define WeatherStation HP1000<br>
           <br>
-          In your HP1000 device, make sure you use a DNS name as some revisions cannot handle IP addresses directly.<br>
-          You also wanna set server type to PHP and the server port you configured in your FHEMWEB instance just mentioned above.
-      </li>
-    </ul>
+          # protected instance: Weather Station needs to be configured<br>
+          # to send this ID and PASSWORD for data to be accepted<br>
+          define WeatherStation HP1000 MyHouse SecretPassword</code>
+        </div><br>
+          IMPORTANT: In your HP1000 device, make sure you use a DNS name as most revisions cannot handle IP addresses directly.<br>
+      </div><br>
+    </div>
 
 =end html
 
@@ -254,17 +266,29 @@ sub HP1000_CGI() {
     <h3>
       HP1000
     </h3>
-    <ul>
-      <li>Stellt einen Webhook f&uuml;r die HP1000 Wetterstation von Fine Offset Electronics bereit.<br>
+    <div style="margin-left: 2em">
+      <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
+      <div style="margin-left: 2em">
+        <code>define &lt;WeatherStation&gt; HP1000 [<ID> <PASSWORD>]</code><br>
+        <br>
+          Stellt einen Webhook f&uuml;r die HP1000 Wetterstation von Fine Offset Electronics bereit.<br>
           Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
           Kein anderer Name funktioniert, da dieser hard im HP1000 Ger%auml;t hinterlegt ist!<br>
           <br>
           Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine HP1000 Station gleichzeitig verwendet werden.<br>
+        <br>
+        Beispiel:<br>
+        <div style="margin-left: 2em">
+          <code># ungesch&uuml;tzte Instanz bei der ID und PASSWORD ignoriert werden<br>
+          define WeatherStation HP1000<br>
           <br>
-          Im HP1000 Ger&auml; muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
-          Der Server-Typ muss au&szlig;erdem auf PHP gesetzt und der Port passend zur oben genannten FHEMWEB Instanz eingestellt sein.
-      </li>
-    </ul>
+          # gesch&uuml;tzte Instanz: Die Wetterstation muss so konfiguriert sein, dass sie<br>
+          # diese ID und PASSWORD sendet, damit Daten akzeptiert werden<br>
+          define WeatherStation HP1000 MyHouse SecretPassword</code>
+        </div><br>
+          WICHTIG: Im HP1000 Ger&auml; muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
+      </div><br>
+    </div>
 
 =end html_DE
 
