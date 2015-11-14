@@ -677,6 +677,9 @@ sub RESIDENTS_UpdateReadings (@) {
     my $state_totalGuests               = 0;
     my $state_totalGuestsPresent        = 0;
     my $state_totalGuestsAbsent         = 0;
+    my $state_totalOwners               = 0;
+    my $state_totalOwnersPresent        = 0;
+    my $state_totalOwnersAbsent         = 0;
     my $state_guestDev                  = 0;
     my $residentsDevs_home              = "-";
     my $residentsDevs_absent            = "-";
@@ -690,6 +693,8 @@ sub RESIDENTS_UpdateReadings (@) {
     my $residentsDevs_totalPresent      = "-";
     my $residentsDevs_totalAbsentGuest  = "-";
     my $residentsDevs_totalPresentGuest = "-";
+    my $residentsDevs_totalAbsentOwner  = "-";
+    my $residentsDevs_totalPresentOwner = "-";
     my $residents_home                  = "-";
     my $residents_absent                = "-";
     my $residents_asleep                = "-";
@@ -702,6 +707,8 @@ sub RESIDENTS_UpdateReadings (@) {
     my $residents_totalPresent          = "-";
     my $residents_totalAbsentGuest      = "-";
     my $residents_totalPresentGuest     = "-";
+    my $residents_totalAbsentOwner      = "-";
+    my $residents_totalPresentOwner     = "-";
     my $wayhome                         = 0;
     my $wakeup                          = 0;
     my $newstate;
@@ -719,6 +726,7 @@ sub RESIDENTS_UpdateReadings (@) {
     # count child states for ROOMMATE devices
     foreach my $roommate (@registeredRoommates) {
         $state_total++;
+        $state_totalOwners++;
 
         my $roommateName =
           AttrVal( $roommate,
@@ -740,14 +748,23 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $roommateName ne "" && $residents_home eq "-" );
 
                 $state_totalPresent++;
+                $state_totalOwnersPresent++;
                 $residentsDevs_totalPresent .= "," . $roommate
                   if ( $residentsDevs_totalPresent ne "-" );
                 $residentsDevs_totalPresent = $roommate
                   if ( $residentsDevs_totalPresent eq "-" );
+                $residentsDevs_totalPresentOwner .= "," . $roommate
+                  if ( $residentsDevs_totalPresentOwner ne "-" );
+                $residentsDevs_totalPresentOwner = $roommate
+                  if ( $residentsDevs_totalPresentOwner eq "-" );
                 $residents_totalPresent .= "," . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent eq "-" );
+                $residents_totalPresentOwner .= "," . $roommateName
+                  if ( $roommateName ne "" && $residents_totalPresentOwner ne "-" );
+                $residents_totalPresentOwner = $roommateName
+                  if ( $roommateName ne "" && $residents_totalPresentOwner eq "-" );
             }
 
             elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "gotosleep" ) {
@@ -762,14 +779,23 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $roommateName ne "" && $residents_gotosleep eq "-" );
 
                 $state_totalPresent++;
+                $state_totalOwnersPresent++;
                 $residentsDevs_totalPresent .= "," . $roommate
                   if ( $residentsDevs_totalPresent ne "-" );
                 $residentsDevs_totalPresent = $roommate
                   if ( $residentsDevs_totalPresent eq "-" );
+                $residentsDevs_totalPresentOwner .= "," . $roommate
+                  if ( $residentsDevs_totalPresentOwner ne "-" );
+                $residentsDevs_totalPresentOwner = $roommate
+                  if ( $residentsDevs_totalPresentOwner eq "-" );
                 $residents_totalPresent .= "," . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent eq "-" );
+                $residents_totalPresentOwner .= "," . $roommateName
+                  if ( $roommateName ne "" && $residents_totalPresentOwner ne "-" );
+                $residents_totalPresentOwner = $roommateName
+                  if ( $roommateName ne "" && $residents_totalPresentOwner eq "-" );
             }
 
             elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "asleep" ) {
@@ -784,14 +810,23 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $roommateName ne "" && $residents_asleep eq "-" );
 
                 $state_totalPresent++;
+                $state_totalOwnersPresent++;
                 $residentsDevs_totalPresent .= "," . $roommate
                   if ( $residentsDevs_totalPresent ne "-" );
                 $residentsDevs_totalPresent = $roommate
                   if ( $residentsDevs_totalPresent eq "-" );
+                $residentsDevs_totalPresentOwner .= "," . $roommate
+                  if ( $residentsDevs_totalPresentOwner ne "-" );
+                $residentsDevs_totalPresentOwner = $roommate
+                  if ( $residentsDevs_totalPresentOwner eq "-" );
                 $residents_totalPresent .= "," . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent eq "-" );
+                $residents_totalPresentOwner .= "," . $roommateName
+                  if ( $roommateName ne "" && $residents_totalPresentOwner ne "-" );
+                $residents_totalPresentOwner = $roommateName
+                  if ( $roommateName ne "" && $residents_totalPresentOwner eq "-" );
             }
 
             elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "awoken" ) {
@@ -806,14 +841,23 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $roommateName ne "" && $residents_awoken eq "-" );
 
                 $state_totalPresent++;
+                $state_totalOwnersPresent++;
                 $residentsDevs_totalPresent .= "," . $roommate
                   if ( $residentsDevs_totalPresent ne "-" );
                 $residentsDevs_totalPresent = $roommate
                   if ( $residentsDevs_totalPresent eq "-" );
+                $residentsDevs_totalPresentOwner .= "," . $roommate
+                  if ( $residentsDevs_totalPresentOwner ne "-" );
+                $residentsDevs_totalPresentOwner = $roommate
+                  if ( $residentsDevs_totalPresentOwner eq "-" );
                 $residents_totalPresent .= "," . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent eq "-" );
+                $residents_totalPresentOwner .= "," . $roommateName
+                  if ( $roommateName ne "" && $residents_totalPresentOwner ne "-" );
+                $residents_totalPresentOwner = $roommateName
+                  if ( $roommateName ne "" && $residents_totalPresentOwner eq "-" );
             }
 
             elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "absent" ) {
@@ -828,14 +872,23 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $roommateName ne "" && $residents_absent eq "-" );
 
                 $state_totalAbsent++;
+                $state_totalOwnersAbsent++;
                 $residentsDevs_totalAbsent .= "," . $roommate
                   if ( $residentsDevs_totalAbsent ne "-" );
                 $residentsDevs_totalAbsent = $roommate
                   if ( $residentsDevs_totalAbsent eq "-" );
+                $residentsDevs_totalAbsentOwner .= "," . $roommate
+                  if ( $residentsDevs_totalAbsentOwner ne "-" );
+                $residentsDevs_totalAbsentOwner = $roommate
+                  if ( $residentsDevs_totalAbsentOwner eq "-" );
                 $residents_totalAbsent .= "," . $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsent ne "-" );
                 $residents_totalAbsent = $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsent eq "-" );
+                $residents_totalAbsentOwner .= "," . $roommateName
+                  if ( $roommateName ne "" && $residents_totalAbsentOwner ne "-" );
+                $residents_totalAbsentOwner = $roommateName
+                  if ( $roommateName ne "" && $residents_totalAbsentOwner eq "-" );
             }
 
             elsif ( $defs{$roommate}{READINGS}{state}{VAL} eq "gone" ) {
@@ -850,14 +903,23 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $roommateName ne "" && $residents_gone eq "-" );
 
                 $state_totalAbsent++;
+                $state_totalOwnersAbsent++;
                 $residentsDevs_totalAbsent .= "," . $roommate
                   if ( $residentsDevs_totalAbsent ne "-" );
                 $residentsDevs_totalAbsent = $roommate
                   if ( $residentsDevs_totalAbsent eq "-" );
+                $residentsDevs_totalAbsentOwner .= "," . $roommate
+                  if ( $residentsDevs_totalAbsentOwner ne "-" );
+                $residentsDevs_totalAbsentOwner = $roommate
+                  if ( $residentsDevs_totalAbsentOwner eq "-" );
                 $residents_totalAbsent .= "," . $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsent ne "-" );
                 $residents_totalAbsent = $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsent eq "-" );
+                $residents_totalAbsentOwner .= "," . $roommateName
+                  if ( $roommateName ne "" && $residents_totalAbsentOwner ne "-" );
+                $residents_totalAbsentOwner = $roommateName
+                  if ( $roommateName ne "" && $residents_totalAbsentOwner eq "-" );
             }
         }
 
@@ -1142,6 +1204,52 @@ sub RESIDENTS_UpdateReadings (@) {
         || $hash->{READINGS}{residentsTotalGuestsAbsentNames}{VAL} ne
         $residents_totalAbsentGuest );
 
+    readingsBulkUpdate( $hash, "residentsTotalOwners", $state_totalOwners )
+      if ( !defined( $hash->{READINGS}{residentsTotalOwners}{VAL} )
+        || $hash->{READINGS}{residentsTotalOwners}{VAL} ne $state_totalOwners );
+
+    readingsBulkUpdate( $hash, "residentsTotalOwnersPresent",
+        $state_totalOwnersPresent )
+      if ( !defined( $hash->{READINGS}{residentsTotalOwnersPresent}{VAL} )
+        || $hash->{READINGS}{residentsTotalOwnersPresent}{VAL} ne
+        $state_totalOwnersPresent );
+
+    readingsBulkUpdate(
+        $hash,
+        "residentsTotalOwnersPresentDevs",
+        $residentsDevs_totalPresentOwner
+      )
+      if ( !defined( $hash->{READINGS}{residentsTotalOwnersPresentDevs}{VAL} )
+        || $hash->{READINGS}{residentsTotalOwnersPresentDevs}{VAL} ne
+        $residentsDevs_totalPresentOwner );
+
+    readingsBulkUpdate( $hash, "residentsTotalOwnersPresentNames",
+        $residents_totalPresentOwner )
+      if ( !defined( $hash->{READINGS}{residentsTotalOwnersPresentNames}{VAL} )
+        || $hash->{READINGS}{residentsTotalOwnersPresentNames}{VAL} ne
+        $residents_totalPresentOwner );
+
+    readingsBulkUpdate( $hash, "residentsTotalOwnersAbsent",
+        $state_totalOwnersAbsent )
+      if ( !defined( $hash->{READINGS}{residentsTotalOwnersAbsent}{VAL} )
+        || $hash->{READINGS}{residentsTotalOwnersAbsent}{VAL} ne
+        $state_totalOwnersAbsent );
+
+    readingsBulkUpdate(
+        $hash,
+        "residentsTotalOwnersAbsentDevs",
+        $residentsDevs_totalAbsentOwner
+      )
+      if ( !defined( $hash->{READINGS}{residentsTotalOwnersAbsentDevs}{VAL} )
+        || $hash->{READINGS}{residentsTotalOwnersAbsentDevs}{VAL} ne
+        $residentsDevs_totalAbsentOwner );
+
+    readingsBulkUpdate( $hash, "residentsTotalOwnersAbsentNames",
+        $residents_totalAbsentOwner )
+      if ( !defined( $hash->{READINGS}{residentsTotalOwnersAbsentNames}{VAL} )
+        || $hash->{READINGS}{residentsTotalOwnersAbsentNames}{VAL} ne
+        $residents_totalAbsentOwner );
+
     readingsBulkUpdate( $hash, "residentsTotalPresent", $state_totalPresent )
       if ( !defined( $hash->{READINGS}{residentsTotalPresent}{VAL} )
         || $hash->{READINGS}{residentsTotalPresent}{VAL} ne
@@ -1347,6 +1455,7 @@ sub RESIDENTS_UpdateReadings (@) {
 
     # none
     elsif ($state_totalGuests == 0
+        && $state_totalOwners == 0
         && $state_gone == 0
         && $state_absent == 0
         && $state_home == 0
@@ -1369,7 +1478,7 @@ sub RESIDENTS_UpdateReadings (@) {
       : "absent";
 
     Log3 $name, 4,
-"RESIDENTS $name: calculation result - residentsTotal:$state_total residentsTotalGuests:$state_totalGuests residentsTotalGuestsPresent:$state_totalGuestsPresent residentsTotalGuestsAbsent:$state_totalGuestsAbsent residentsTotalPresent:$state_totalPresent residentsTotalAbsent:$state_totalAbsent residentsHome:$state_home residentsGotosleep:$state_gotosleep residentsAsleep:$state_asleep residentsAwoken:$state_awoken residentsAbsent:$state_absent residentsGone:$state_gone presence:$newpresence state:$newstate";
+"RESIDENTS $name: calculation result - residentsTotal:$state_total residentsTotalOwners:$state_totalOwners residentsTotalOwnersPresent:$state_totalOwnersPresent residentsTotalOwnersAbsent:$state_totalOwnersAbsent residentsTotalGuests:$state_totalGuests residentsTotalGuestsPresent:$state_totalGuestsPresent residentsTotalGuestsAbsent:$state_totalGuestsAbsent residentsTotalPresent:$state_totalPresent residentsTotalAbsent:$state_totalAbsent residentsHome:$state_home residentsGotosleep:$state_gotosleep residentsAsleep:$state_asleep residentsAwoken:$state_awoken residentsAbsent:$state_absent residentsGone:$state_gone presence:$newpresence state:$newstate";
 
     # safe current time
     my $datetime = FmtDateTime(time);
@@ -1741,6 +1850,27 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>residentsTotalGuestsPresentNames</b> - device alias of all active guests who are currently at home
           </li>
           <li>
+            <b>residentsTotalOwners</b> - number of residents treated as being a permanent resident
+          </li>
+          <li>
+            <b>residentsTotalOwnersAbsent</b> - number of all owners who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalOwnersAbsentDevs</b> - device name of all owners who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalOwnersAbsentNames</b> - device alias of all owners who are currently underway
+          </li>
+          <li>
+            <b>residentsTotalOwnersPresent</b> - number of all owners who are currently at home
+          </li>
+          <li>
+            <b>residentsTotalOwnersPresentDevs</b> - device name of all owners who are currently at home
+          </li>
+          <li>
+            <b>residentsTotalOwnersPresentNames</b> - device alias of all owners who are currently at home
+          </li>
+          <li>
             <b>residentsTotalPresent</b> - number of all residents who are currently at home
           </li>
           <li>
@@ -2077,6 +2207,27 @@ sub RESIDENTS_UpdateReadings (@) {
           </li>
           <li>
             <b>residentsTotalGuestsPresentNames</b> - Gerätealias der aktiven Gäste, die momentan zu Hause sind
+          </li>
+          <li>
+            <b>residentsTotalOwners</b> - Anzahl der Bewohner, die als permanente Bewohner behandelt werden
+          </li>
+          <li>
+            <b>residentsTotalOwnersAbsent</b> - Anzahl der Besitzer, die momentan unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalOwnersAbsentDevs</b> - Gerätename der Besitzer, die momentan unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalOwnersAbsentNames</b> - Gerätealias der Besitzer, die momentan unterwegs sind
+          </li>
+          <li>
+            <b>residentsTotalOwnersPresent</b> - Anzahl der Besitzer, die momentan zu Hause sind
+          </li>
+          <li>
+            <b>residentsTotalOwnersPresentDevs</b> - Gerätename der Besitzer, die momentan zu Hause sind
+          </li>
+          <li>
+            <b>residentsTotalOwnersPresentNames</b> - Gerätealias der Besitzer, die momentan zu Hause sind
           </li>
           <li>
             <b>residentsTotalPresent</b> - Summe aller aktiven Bewohner, die momentan zu Hause sind
