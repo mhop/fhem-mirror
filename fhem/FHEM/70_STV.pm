@@ -3,28 +3,12 @@
 # 70_STV.pm
 #
 # a module to send messages or commands to a Samsung TV
-# for example a LE40B650
 #
 # written 2012 by Gabriel Bentele <gabriel at bentele.de>>
 #
 # $Id$
 #
-# Version = 1.4
-#
-##############################################################################
-# 
-# define <name> STV <host> <port>
-# define <name> STV <host> 55000 for newer Samsung models
-#
-# set <name> <key> <value>
-#
-# where <key> is one of mute, volume, call, sms, date
-# examples:
-# set <name> mute on
-# set <name> volume 20
-# set <name> call Peter 1111111 Klaus 222222Peter 1111111 Klaus 222222
-# set <name> sms Peter 1111111 Klaus 222222 das ist der text
-# set <name> date 2012-12-10 18:07:04 Peter 11111 Bier 2012-12-11 23:59:20 Paulaner
+# Version = 1.5
 #
 ##############################################################################
 
@@ -34,6 +18,8 @@ use warnings;
 use IO::Socket::INET;
 use Sys::Hostname;
 use MIME::Base64;
+use Net::Address::IP::Local; #libnet-address-ip-local-perl
+use IO::Interface::Simple; # libio-interface-perl
 use DevIo;
 
 my @gets = ('dummy');
@@ -80,9 +66,23 @@ STV_SetState($$$$)
 
 sub getIP()
 {
-  my $host = hostname();
-  my $address = inet_ntoa(scalar gethostbyname(hostname() || 'localhost'));
+  my $address = eval {Net::Address::IP::Local->public_ipv4};
+  if ($@) {
+    $address = 'localhost';
+  } 
   return "$address";
+}
+
+sub getMAC4IP($)
+{
+  my $IP = shift;
+  my @interfaces = IO::Interface::Simple->interfaces;
+  foreach my $if (@interfaces) {
+    if ($if->address eq $IP) {
+        return $if->hwaddr;
+    }
+  }
+  return "";
 }
 
 # Force a connection attempt to STV as soon as possible 
@@ -209,35 +209,9 @@ sub STV_Define($$)
 "RSURF SCALE SEFFECT SETUP_CLOCK_TIMER SLEEP SOUND_MODE SOURCE SRS STANDARD STB_MODE STILL_PICTURE STOP ".
 "SUB_TITLE SVIDEO1 SVIDEO2 SVIDEO3 TOOLS TOPMENU TTX_MIX TTX_SUBFACE TURBO TV TV_MODE UP VCHIP VCR_MODE ".
 "VOLDOWN VOLUP WHEEL_LEFT WHEEL_RIGHT W_LINK YELLOW ZOOM1 ZOOM2 ZOOM_IN ZOOM_MOVE ZOOM_OUT connect";
-    my $system = $^O;
-    my $result = "";
-    if($system =~ m/Win/) {
-      $result = `ipconfig /all`;
-      my @myarp=split(/\n/,$result);
-      foreach (@myarp){
-        if ( /([0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2})$/i )
-        {
-          $result = $1;
-          $result =~ s/-/:/g;
-        }
-      }
-    }
-    if($system eq "linux") {
-      $result = `ifconfig -a`;
-      my @myarp=split(/\n/,$result);
-      foreach (@myarp){
-        if ( /^(lan|eth0) .*(..:..:..:..:..:..) .*$/ )
-        {
-          $result = $2;
-        }
-      }
-    }
-    # Fritzbox "? (192.168.0.1) at 00:0b:5d:91:fc:bb [ether]  on lan"
-    # debian   "192.168.0.1              ether   c0:25:06:1f:3c:14   C                     eth0"
-    #$result = "? (192.168.0.1) at 00:0b:5d:91:fc:bb [ether]  on lan";
 
-    $hash->{MAC} = $result;
     $hash->{MyIP} = getIP();
+    $hash->{MAC} = getMAC4IP($hash->{MyIP});
     
     $hash->{DeviceName} = $hash->{Host} . ":" . $hash->{Port};
     my $dev = $hash->{DeviceName};
@@ -333,14 +307,13 @@ sub STV_55000($$$)
         }
         else {
           foreach my $argnum (0 .. $#ARGV) {
-		    sleep(1) if ($argnum > 0);
+			sleep(1) if ($argnum > 0);
             # Send remote key(s)
             #Log4 $name, 4, "[STV] sending ".uc($ARGV[$argnum]);
             my $key = "KEY_" . uc($ARGV[$argnum]);
             my $messagepart3 = chr(0x00) . chr(0x00) . chr(0x00) . chr(length(encode_base64($key, ""))) . chr(0x00) . encode_base64($key, "");
             my $part3 = chr(0x00) . chr(length($tvappstring)) . chr(0x00) . $tvappstring . chr(length($messagepart3)) . chr(0x00) . $messagepart3;
             print $sock $part3;
-        #    sleep(1);
         #        select(undef, undef, undef, 0.5);
           }
         }
