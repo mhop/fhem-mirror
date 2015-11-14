@@ -272,7 +272,7 @@ sub MilightDevice_Set(@)
   my $event = undef;
   my $usage = "set $name ...";
 
-  if ($hash->{IODev}->{STATE} ne "ok") {
+  if ($hash->{IODev}->{STATE} ne "ok" && $hash->{IODev}->{STATE} ne "Initialized") {
     readingsSingleUpdate($hash, "state", "error", 1);
     $flags = "q";
     $args[2] .= "q" if ($args[2] !~ m/.*[qQ].*/);
@@ -1991,7 +1991,7 @@ sub MilightDevice_CmdQueue_Exec(@)
 {
   my ($hash) = @_; 
 
-  if ($hash->{IODev}->{STATE} ne "ok") {
+  if ($hash->{IODev}->{STATE} ne "ok" && $hash->{IODev}->{STATE} ne "Initialized") {
     InternalTimer(gettimeofday() + 60, "MilightDevice_CmdQueue_Exec", $hash, 0);
     return undef;    
   }
@@ -2052,7 +2052,7 @@ sub MilightDevice_CmdQueue_Clear(@)
 {
   my ($hash) = @_;
 
-  if ($hash->{IODev}->{STATE} ne "ok") {
+  if ($hash->{IODev}->{STATE} ne "ok" && $hash->{IODev}->{STATE} ne "Initialized") {
     InternalTimer(gettimeofday() + 60, "MilightDevice_CmdQueue_Exec", $hash, 0);
     return undef;    
   }
