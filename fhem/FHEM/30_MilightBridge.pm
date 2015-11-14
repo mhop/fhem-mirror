@@ -98,8 +98,12 @@ sub MilightBridge_Define($$)
   $attr{$name}{"event-on-change-reading"} = "state" if (!defined($attr{$name}{"event-on-change-reading"}));
   $attr{$name}{"checkInterval"} = 10 if (!defined($attr{$name}{"checkInterval"}));
 
+  readingsSingleUpdate($hash, "state", "Initialized", 1);
+
   # Set state
   $hash->{SENDFAIL} = 0;
+  
+  # Get initial bridge state
   MilightBridge_State($hash);
 
   return undef;
@@ -139,11 +143,12 @@ sub MilightBridge_Attr($$$$) {
   }
   if ($attribute eq "checkInterval")
   {
-    if (($value !~ /^\d*$/) || ($value < 5))
+    if (($value !~ /^\d*$/) || ($value < 0))
     {
       $attr{$name}{"checkInterval"} = 10;
-      return "checkInterval is required in s (default: 10, min: 5)";
+      return "checkInterval is required in s (default: 10, min: 0)";
     }
+    readingsSingleUpdate($hash, "state", "Initialized", 1);
   }
   elsif ($attribute eq "port")
   {
@@ -164,11 +169,11 @@ sub MilightBridge_Attr($$$$) {
     # Disable on 1, enable on anything else.
     if ($value eq "1")
     {
-      $hash->{STATE} = "disabled";
+      readingsSingleUpdate($hash, "state", "disabled", 1);
     }
     else
     {
-      $hash->{STATE} = "ok";
+      readingsSingleUpdate($hash, "state", "Initialized", 1);
     }
   }
 
@@ -199,6 +204,12 @@ sub MilightBridge_State(@)
   # Update Bridge state
   my ($hash) = @_;
   
+  if (AttrVal($hash->{NAME}, "checkInterval", "10") == 0)
+  {
+    Log3 ( $hash, 5, "$hash->{NAME}_State: Bridge status disabled");
+    return undef;
+  }
+  
   Log3 ( $hash, 5, "$hash->{NAME}_State: Checking Bridge Status");
   
   # Do a ping check to see if bridge is reachable
@@ -217,11 +228,11 @@ sub MilightBridge_State(@)
   $p->close();
   $pingstatus = "ok" if $alive;
 
-  # And update state
-  readingsSingleUpdate($hash, "state", $pingstatus, 1);
-  
-  # Update send fail flag
-  readingsSingleUpdate( $hash, "sendFail", $hash->{SENDFAIL}, 1 );
+  # Update readings
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "state", $pingstatus);
+  readingsBulkUpdate( $hash, "sendFail", $hash->{SENDFAIL});
+  readingsEndUpdate($hash, 1);
 
   # Check state every X seconds  
   InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, "checkInterval", "10"), "MilightBridge_State", $hash, 0);
@@ -378,7 +389,7 @@ sub MilightBridge_CmdQueue_Send(@)
   <ul>
     <li>
       <b>state</b><br/>
-         [ok|unreachable]: Set depending on result of a UDP ping sent every 10 seconds.
+         [Initialized|ok|unreachable]: Shows reachable status of bridge using "ping" check every 10 (checkInterval) seconds.
     </li>
     <li>
       <b>sendFail</b><br/>
@@ -398,7 +409,8 @@ sub MilightBridge_CmdQueue_Send(@)
     </li>
     <li>
       <b>checkInterval</b><br/>
-         Default: 10s. Time after the bridge connection is re-checked.
+         Default: 10s. Time after the bridge connection is re-checked.<br>
+         If this is set to 0 checking is disabled and state = "Initialized".
     </li>
     <li>
       <b>port</b><br/>
