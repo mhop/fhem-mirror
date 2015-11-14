@@ -18,6 +18,7 @@ sub ZWave_SetClasses($$$$);
 sub ZWave_addToSendStack($$);
 sub ZWave_secStart($);
 sub ZWave_secEnd($);
+sub ZWave_configParseModel($;$);
 
 use vars qw(%zw_func_id);
 use vars qw(%zw_type6);
@@ -102,8 +103,7 @@ my %zwave_class = (
                "..3204(.*)" => 'ZWave_meterSupportedParse($hash, $1)' } },
   COLOR_CONTROL            => { id => '33',
     get   => { ccCapability=> '01', # no more args
-               ccStatus    => '03%02x',
-             },
+               ccStatus    => '03%02x' },
     set   => { # Forum #36050
                rgb         => '05050000010002%02x03%02x04%02x',
                wcrgb       => '050500%02x01%02x02%02x03%02x04%02x' },
@@ -413,6 +413,8 @@ my %zwave_cmdArgs = (
     dim          => "slider,0,1,99",
     indicatorDim => "slider,0,1,99",
     rgb          => "colorpicker,RGB",
+
+    configRGBLedColorForTesting     => "colorpicker,RGB", # Aeon SmartSwitch 6
   },
   get => {
   },
@@ -625,9 +627,7 @@ ZWave_Cmd($$@)
     }
   }
 
-  if ($cfgReq) {
-    $type="get";
-  }
+  $type="get" if($cfgReq);
 
   my $id = $hash->{nodeIdHex};
   my $isMc = ($id =~ m/(....)/);
@@ -1462,20 +1462,25 @@ ZWave_cleanString($$)
 ###################################
 # Poor mans XML-Parser
 sub
-ZWave_configParseModel($)
+ZWave_configParseModel($;$)
 {
-  my ($cfg) = @_;
-  Log 3, "ZWave reading config for $cfg";
-  my $fn = $attr{global}{modpath}."/FHEM/lib/openzwave_deviceconfig.xml.gz";
+  my ($cfg, $my) = @_;
+  return if(!$my && ZWave_configParseModel($cfg, 1));
+
+  my $fn = $attr{global}{modpath}."/FHEM/lib/".($my ? "fhem_":"open").
+                                "zwave_deviceconfig.xml.gz";
   my $gz = gzopen($fn, "rb");
   if(!$gz) {
-    Log 3, "Can't open $fn: $!";
-    return;
+    Log 3, "Can't open $fn: $!" if(!$my);
+    return 0;
   }
 
-  my ($line, $class, %hash, $cmdName, %classInfo, %group);
+  my ($ret, $line, $class, %hash, $cmdName, %classInfo, %group);
   while($gz->gzreadline($line)) {       # Search the "file" entry
-    last if($line =~ m/^\s*<Product.*sourceFile="$cfg"/);
+    if($line =~ m/^\s*<Product.*sourceFile="$cfg"/) {
+      $ret = 1;
+      last;
+    }
   }
 
   while($gz->gzreadline($line)) {
@@ -1531,6 +1536,8 @@ ZWave_configParseModel($)
   }
 
   $zwave_modelConfig{$cfg} = \%mc;
+  Log 3, "ZWave got config for $cfg from $fn" if($ret);
+  return $ret;
 }
 
 ###################################
@@ -1555,6 +1562,11 @@ ZWave_configCheckParam($$$$$@)
 
   # Support "set XX configYY request" for configRequestAll
   return ("", sprintf("05%02x", $h->{index})) if($type eq "get" || $cfgReq);
+
+  if($cmd eq "configRGBLedColorForTesting") {
+    return ("6 digit hext number needed","") if($arg[0] !~ m/^[0-9a-f]{6}$/i);
+    return ("", sprintf("04%02x03%s", $h->{index}, $arg[0]));
+  }
 
   my $t = $h->{type};
   if($t eq "list") {
