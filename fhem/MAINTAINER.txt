@@ -316,6 +316,7 @@ FHEM/98_HourCounter.pm       john                 http://forum.fhem.de MAX
 FHEM/98_logProxy.pm          justme1968           http://forum.fhem.de Frontends
 FHEM/98_notice.pm            mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_pilight.pm           andreas-fey          http://forum.fhem.de Unterstuetzende Dienste
+FHEM/98_ping                 mattwire             http://forum.fhem.de Sonstiges
 FHEM/98_rain.pm              baumrasen            http://forum.fhem.de Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_statistics.pm        tupol                http://forum.fhem.de Unterstuetzende Dienste (Link als PM an tupol)

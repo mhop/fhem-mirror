@@ -646,3 +646,6 @@
 
 - Fri Nov 13 2015 (loredo)
   - added new module 50_HP1000
+
+- Sat Nov 14 2015 (mattwire)
+  - added new module 98_ping to allow easy ping checks for devices
