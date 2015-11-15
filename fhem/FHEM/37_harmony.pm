@@ -351,8 +351,12 @@ harmony_Set($$@)
 
     harmony_sendEngineGet($hash, "startactivity", "activityId=$param:timestamp=0");
 
+    delete $hash->{channelAfterStart};
+    $hash->{channelAfterStart} = $param2 if( $param2 );
+
     return undef;
   } elsif( $cmd eq "channel" ) {
+    delete $hash->{channelAfterStart};
     return "no current activity" if( !defined($hash->{currentActivityID}) || $hash->{currentActivityID} == -1 );
 
     my $activity = harmony_activityOfId($hash, $hash->{currentActivityID});
@@ -832,7 +836,11 @@ harmony_updateActivity($$;$)
   readingsSingleUpdate( $hash, "currentActivity", "$modifier$activity", 1 );
 
   $activity =~ s/ /./g;
-  readingsSingleUpdate( $hash, "activity", $activity, 1 ) if( !$modifier && $activity ne ReadingsVal($hash->{NAME},"activity", "" ) );
+  if( !$modifier && $activity ne ReadingsVal($hash->{NAME},"activity", "" ) ) {
+    readingsSingleUpdate( $hash, "activity", $activity, 1 );
+
+    harmony_sendEngineGet($hash, "changeChannel", "channel=$hash->{channelAfterStart}:timestamp=0") if( $hash->{channelAfterStart} );
+  }
 
   delete $hash->{hidDevice} if( $id == -1 );
 }
@@ -1640,20 +1648,20 @@ harmony_Get($$@)
   if( $cmd eq 'showAccount' ) {
     my $user = $hash->{helper}{username};
     my $password = $hash->{helper}{password};
-                        
+
     return 'no user set' if( !$user );
     return 'no password set' if( !$password );
-                        
+
     $user = harmony_decrypt( $user );
     $password = harmony_decrypt( $password );
-                        
+
     return "user: $user\npassword: $password";
   }
   $list .= " showAccount";
 
   $list .= " currentActivity:noArg";
 
-  $list =~ s/^ //; 
+  $list =~ s/^ //;
   return "Unknown argument $cmd, choose one of $list";
 }
 
@@ -1789,11 +1797,11 @@ harmony_decrypt($)
   <a name="harmony_Set"></a>
   <b>Set</b>
   <ul>
-    <li>activity &lt;id&gt|&ltname&gt;<br>
-      switch to this activity</li>
+    <li>activity &lt;id&gt;|&ltname&gt; [&lt;channel&gt;]<br>
+      switch to this activit and optionally switch to &lt;channel&gt;</li>
     <li>channel &lt;channel&gt;<br>
       switch to &lt;channel&gt; in the current activity</li>
-    <li>command [&lt;id&gt|&ltname&gt;] &lt;command&gt;<br>
+    <li>command [&lt;id&gt;|&ltname&gt;] &lt;command&gt;<br>
       send the given ir command for the current activity or for the given device</li>
     <li>getConfig<br>
       request the configuration from the hub</li>
@@ -1809,7 +1817,7 @@ harmony_decrypt($)
       default -> 60 minutes</li>
     <li>sync<br>
       syncs the hub to the myHarmony config</li>
-    <li>hidDevice [&lt;id&gt|&ltname&gt;]<br>
+    <li>hidDevice [&lt;id&gt;|&ltname&gt;]<br>
       sets the target device for keyboard commands, if no device is given -> set the target to the
       default device for the current activity.</li>
     <li>text &lt;text&gt;<br>
@@ -1818,13 +1826,13 @@ harmony_decrypt($)
       moves the cursor by bluetooth/smart keaboard dongle. &lt;direction&gt; can be one of: up, down, left, right, pageUp, pageDown, home, end.</li>
     <li>special &lt;key&gt;<br>
       sends special key by bluetooth/smart keaboard dongle. &lt;key&gt; can be one of: previousTrack, nextTrack, stop, playPause, volumeUp, volumeDown, mute.</li>
-    <li>autocreate [&lt;id&gt|&ltname&gt;]<br>
+    <li>autocreate [&lt;id&gt;|&ltname&gt;]<br>
       creates a fhem device for a single/all device(s) in the harmony hub. if activities are startet the state
       of these devices will be updatet with the power state defined in these activites.</li>
     <li>update<br>
       triggers a firmware update. only available if a new firmware is available.</li>
   </ul>
-  The command, hidDevice, text, cursor and special commmands are also available for the autocreated devices. The &lt;id&gt|&ltname&gt; paramter hast to be omitted.<br><br>
+  The command, hidDevice, text, cursor and special commmands are also available for the autocreated devices. The &lt;id&gt;|&ltname&gt; paramter hast to be omitted.<br><br>
 
   <a name="harmony_Get"></a>
   <b>Get</b>
@@ -1846,7 +1854,7 @@ harmony_decrypt($)
     <li>showAccount<br>
       display obfuscated user and password in cleartext</li>
   </ul>
-  The commands commmand is also available for the autocreated devices. The &lt;id&gt|&ltname&gt; paramter hast to be omitted.<br><br>
+  The commands commmand is also available for the autocreated devices. The &lt;id&gt;|&ltname&gt; paramter hast to be omitted.<br><br>
 
 
   <a name="harmony_Attr"></a>
