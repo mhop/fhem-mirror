@@ -9608,7 +9608,7 @@ sub EnOcean_calcPID($) {
     $pidCycle = 10 if ($pidCycle < 10);
     $hash->{helper}{actorInterval}  = 10;
     $hash->{helper}{actorThreshold} = 0;
-    $hash->{helper}{actorKeepAlive} = $wakeUpCycle;
+    $hash->{helper}{actorKeepAlive} = $pidCycle;
     $hash->{helper}{actorValueDecPlaces} = 0;
     $hash->{helper}{actorErrorAction} = AttrVal($name, 'pidActorErrorAction', 'freeze');
     $hash->{helper}{actorErrorPos} = AttrVal($name, 'pidActorErrorPos',  0);
