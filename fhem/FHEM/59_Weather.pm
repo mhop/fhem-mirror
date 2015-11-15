@@ -31,6 +31,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw($FW_ss); 
 use Blocking;
+use DateTime::Format::Strptime;  # Debian: libdatetime-format-strptime-perl
 
 #
 # uses the Yahoo! Weather API: http://developer.yahoo.com/weather/
@@ -328,11 +329,38 @@ sub Weather_RetrieveDataFinished($$$)
       %pressure_trend_txt_i18n= %pressure_trend_txt_en;
     }
 
+    $urlResult->{"readings"}->{"pubDateTs"}= 0;
+    $urlResult->{"readings"}->{"pubDateComment"}= "no pubDate received";
+    
     foreach my $l (split("<",$xml)) {
-      #Debug "DEBUG WEATHER: line=\"$l\"";
       next if($l eq "");                   # skip empty lines
+      
+      # pick the pubdate
+      if ($l =~ '^pubDate>(.*)$') {
+        my $value= $1;
+        ### pubDate  Fri, 13 Nov 2015 8:00 am CET
+        $urlResult->{"readings"}->{"pubDate"}= $value;
+        my $strp = DateTime::Format::Strptime->new(
+            pattern   => '%a, %d %b %Y %I:%M %p %Z',
+            locale    => 'en_US');
+        ##main::Debug "pubDate= $value";    
+        my $ts= $strp->parse_datetime($value);
+        if(defined($ts)) {
+            $urlResult->{"readings"}->{"pubDateTs"}= $ts->epoch();
+            $urlResult->{"readings"}->{"pubDateComment"}= "okay";
+        } else {
+            $urlResult->{"readings"}->{"pubDateTs"}= 0;
+            $urlResult->{"readings"}->{"pubDateComment"}= "pubDate: " . $strp->errmsg unless(defined($ts));
+        } 
+        next;
+      }
+      
+      
       $l =~ s/(\/|\?)?>$//;                # strip off /> and >
       my ($tag,$value)= split(" ", $l, 2); # split tag data=..... at the first blank
+      
+      
+      # skip all but weather
       next if(!defined($tag) || ($tag !~ /^yweather:/));
       $fc= 0 if($tag eq "yweather:condition");
       $fc++ if($tag eq "yweather:forecast");
@@ -425,19 +453,32 @@ sub Weather_RetrieveDataFinished($$$)
   }
 
   if (exists($urlResult->{readings})) {
+  
+      my $ts1= $hash->{READINGS}{pubDateTs}{VAL};
+      my $ts2= $urlResult->{"readings"}->{"pubDateTs"};
+
       readingsBeginUpdate($hash);
-      while ( (my $key, my $value) = each %{$urlResult->{readings}} )
-      {
-        readingsBulkUpdate($hash, $key, $value);
-      }
       
-      my $temperature= $hash->{READINGS}{temperature}{VAL};
-      my $humidity= $hash->{READINGS}{humidity}{VAL};
-      my $wind= $hash->{READINGS}{wind}{VAL};
-      my $pressure=  $hash->{READINGS}{pressure}{VAL};
-      my $val= "T: $temperature  H: $humidity  W: $wind  P: $pressure";
-      Log3 $hash, 4, "Weather ". $hash->{NAME} . ": $val";
-      readingsBulkUpdate($hash, "state", $val);
+      main::Debug "ts1= $ts1, ts2= $ts2";
+        
+      if($ts1 && $ts2 && ($ts2< $ts1)) {
+        readingsBulkUpdate($hash, "validity", "stale");
+      } else {
+        readingsBulkUpdate($hash, "validity", "up-to-date");
+
+        while ( (my $key, my $value) = each %{$urlResult->{readings}} )
+        {
+            readingsBulkUpdate($hash, $key, $value);
+        }
+        
+        my $temperature= $hash->{READINGS}{temperature}{VAL};
+        my $humidity= $hash->{READINGS}{humidity}{VAL};
+        my $wind= $hash->{READINGS}{wind}{VAL};
+        my $pressure=  $hash->{READINGS}{pressure}{VAL};
+        my $val= "T: $temperature  H: $humidity  W: $wind  P: $pressure";
+        Log3 $hash, 4, "Weather ". $hash->{NAME} . ": $val";
+        readingsBulkUpdate($hash, "state", $val);
+      }
       readingsEndUpdate($hash, $doTrigger ? 1 : 0);
   }
 }
