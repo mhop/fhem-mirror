@@ -97,7 +97,7 @@ my %zwave_class = (
     parse => { "..3105(..)(..)(.*)" => 'ZWave_multilevelParse($1,$2,$3)'} },
   METER                    => { id => '32',
     set   => { meterReset => "05" },
-    get   => { meter       => 'Zwave_meterGet("%s")',
+    get   => { meter       => 'ZWave_meterGet("%s")',
                meterSupported => "03" },
     parse => { "..3202(.*)" => 'ZWave_meterParse($hash, $1)',
                "..3204(.*)" => 'ZWave_meterSupportedParse($hash, $1)' } },
@@ -105,9 +105,9 @@ my %zwave_class = (
     get   => { ccCapability=> '01', # no more args
                ccStatus    => '03%02x' },
     set   => { # Forum #36050
-               rgb         => '05050000010002%02x03%02x04%02x',
+               rgb         => '050302%02x03%02x04%02x',
                wcrgb       => '050500%02x01%02x02%02x03%02x04%02x' },
-    parse => { "043302(.*)"=> '"ccCapability:$1"',
+    parse => { "043302(..)(..)"=> 'ZWave_ccCapability($1,$2)',
                "043304(..)(.*)"=> '"ccStatus_$1:$2"' } },
   ZIP_ADV_CLIENT           => { id => '34' },
   METER_PULSE              => { id => '35' },
@@ -830,6 +830,20 @@ ZWave_HrvStatus($)
   return join("\n", @l);
 }
 
+sub
+ZWave_ccCapability($$)
+{
+  my ($l,$h) = @_;
+  my @names = ("WarmWhite","ColdWhite","Red","Green",
+               "Blue","Amber","Cyan","Purpple","Indexed");
+  my $x = hex($l)+256*hex($h);
+  my @ret;
+  for(my $i=0; $i<int(@names); $i++) {
+    push @ret,$names[$i] if($x & (1<<$i));
+  }
+  return join(",",@ret);
+}
+
 my %zwm_unit = (
   energy=> ["kWh", "kVAh", "W", "pulseCount", "V", "A", "PowerFactor"],
   gas   => ["m3", "feet3", "undef", "pulseCount"],
@@ -906,7 +920,7 @@ ZWave_meterParse($$)
 
 
 sub
-Zwave_meterGet($)
+ZWave_meterGet($)
 {
   my ($scale) = @_;
 
