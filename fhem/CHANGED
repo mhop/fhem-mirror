@@ -1,8 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 59_Weather: prevent retrieval of older forecasts than the
+             one previously retrieved
   - fhem 5.7 released.
-  - IPORTANT: featurelevel is now 5.7, rendering @ and % non-functional
-
+  - IMPORTANT: featurelevel is now 5.7, rendering @ and % non-functional
+  
 - 2015-11-15 (5.6)
   - change: 30_MilightBridge/31_MilightDevice: Allow to disable ping check.
                             Add state "Initialized".
