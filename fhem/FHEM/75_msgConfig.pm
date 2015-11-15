@@ -321,9 +321,9 @@ sub msgConfig_Set($@) {
         $attr{$device}{comment} = "Auto-created by $name" if (!defined($attr{$device}{comment}) || $attr{$device}{comment} ne "Auto-created by $name");
         $attr{$device}{devStateIcon} = '.*home:status_available@green .*absent:status_away_1@orange .*gone:status_standby .*none:control_building_empty .*gotosleep:status_night@green:asleep .*asleep:status_night@green .*awoken:status_available@green:home .*zu_Hause:user_available:absent .*außer_Haus:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown';
 
-        $return .= "\nIf you would like this device to act as a global presence device for ALL msg commands, please adjust attribute msgResidentsDev at device $name to $device."
+        $return .= "\nIf you would like this device to act as an overall presence device for ALL msg commands, please adjust attribute msgResidentsDev at device $name to $device."
           if (defined($attr{$name}{msgResidentsDev}) && $attr{$name}{msgResidentsDev} ne $device);
-        $return .= "\nNext, set a device's msgResidentsDev attribute to '$device' (think of using 'userattr' to add 'msgResidentsDev' to the list of available attributes). \nIf you would like '$device' to act as a global presence device for ALL msg commands, sett attribute msgResidentsDev at device $name to $device."
+        $return .= "\nNext, set a device's msgResidentsDev attribute to '$device' (think of using 'userattr' to add 'msgResidentsDev' to the list of available attributes). \nIf you would like '$device' to act as an overall presence device for ALL msg commands, sett attribute msgResidentsDev at device $name to $device."
           if (!defined($attr{$name}{msgResidentsDev}));
 
         return $return;
@@ -374,7 +374,7 @@ sub msgConfig_Get($@) {
 
                   my $output = 0;
                   foreach my $prio (@priorities) {
-                    my $priorityCat;
+                    my $priorityCat = "";
                     $priorityCat = $prio if ($prio ne "Normal");
                     
                     my $cmd =
