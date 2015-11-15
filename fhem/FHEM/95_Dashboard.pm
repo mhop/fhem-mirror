@@ -817,7 +817,9 @@ sub BuildGroup
 		
 		$row++;		
 			
+         	$extPage{group} = $groupname;
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
+		$allSets = FW_widgetOverride($d, $allSets);
 		
 	        ##############   Customize Result for Special Types #####################
 		my @txtarray = split(">", $txt);				
@@ -837,24 +839,30 @@ sub BuildGroup
 		###########################################################
 
 		###### Commands, slider, dropdown
-		if(!$FW_ss && $cmdlist) {
+		my $smallscreenCommands = AttrVal($FW_wname, "smallscreenCommands", "");
+		if((!$FW_ss || $smallscreenCommands) && $cmdlist) {	
+			my @a = split("[: ]", AttrVal($d, "cmdIcon", ""));
+			my %cmdIcon = @a;
 			foreach my $cmd (split(":", $cmdlist)) {
 				my $htmlTxt;
 				my @c = split(' ', $cmd);
-				if($allSets && $allSets =~ m/$c[0]:([^ ]*)/) {
+				if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
 					my $values = $1;
 					foreach my $fn (sort keys %{$data{webCmdFn}}) {
 						no strict "refs";
-						$htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname, $d, $FW_room, $cmd, $values);
+						$htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
+										   $d, $FW_room, $cmd, $values);
 						use strict "refs";
 						last if(defined($htmlTxt));
-					}
+				      	}	
 				}
 				if($htmlTxt) {
 					# add colspan to avoid squeezed table cells
 					$htmlTxt =~ s/<td>/<td colspan="10">/;
 					$ret .= $htmlTxt;
 				} else {
+					my $nCmd = $cmdIcon{$cmd} ?
+                            				FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
 					$ret .= FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3", 1;
 				}
 			}
