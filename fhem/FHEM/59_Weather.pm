@@ -739,6 +739,9 @@ WeatherAsHtmlD($;$)
     <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [&lt;language&gt;]]</code><br>
     <br>
     Defines a virtual device for weather forecasts.<br><br>
+    
+    You need the DateTime::Format::Strptime perl module. On Debian and derivatives, it can be installed
+    via apt-get install libdatetime-format-strptime-perl.
 
     A Weather device periodically gathers current and forecast weather conditions
     from the Yahoo Weather API.<br><br>
@@ -850,6 +853,9 @@ WeatherAsHtmlD($;$)
     <br>
     Bezechnet ein virtuelles Gerät für Wettervorhersagen.<br><br>
 
+    Man braucht das Perl-Modul DateTime::Format::Strptime. Auf Debian und seinen Derivaten wird es 
+    via apt-get install libdatetime-format-strptime-perl installiert.
+    
     Eine solche virtuelle Wetterstation sammelt periodisch aktuelle und zukünftige Wetterdaten aus der Yahoo-Wetter-API.<br><br>
 
     Der Parameter <code>location</code> entspricht der sechsstelligen WOEID (WHERE-ON-EARTH-ID). Die WOEID für den eigenen Standort kann auf <a href="http://weather.yahoo.com">http://weather.yahoo.com</a> gefunden werden.<br><br>
