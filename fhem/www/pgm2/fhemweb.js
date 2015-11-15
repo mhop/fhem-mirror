@@ -766,6 +766,12 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
   var stp = parseFloat(vArr[2]);
   var max = parseFloat(vArr[3]);
   var flt = vArr[4];
+  var dp = 0; // decimal points for float
+  if(flt) {
+    var s = ""+stp;
+    if(s.indexOf(".") >= 0)
+      dp = s.substr(s.indexOf(".")+1).length;
+  }
   if(currVal != undefined)
     currVal = currVal.replace(/[^\d.\-]/g, "");
   currVal = (currVal==undefined || currVal=="") ?  min : parseFloat(currVal);
@@ -842,8 +848,8 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
       if(offX < 0) offX = 0;
       if(offX > maxX) offX = maxX;
       val = offX/maxX * (max-min);
-      val = (flt ? Math.floor(val/stp)*stp :
-                   Math.floor(Math.floor(val/stp)*stp))+min;
+      val = flt ? (Math.floor(val/stp)*stp+min).toFixed(dp) :
+                  (Math.floor(Math.floor(val/stp)*stp)+min);
       sh.innerHTML = val;
       sh.setAttribute('style', 'left:'+offX+'px;');
     }
@@ -871,6 +877,8 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
     currVal = (res ? parseFloat(res[0]) : min);
     if(currVal < min || currVal > max)
       currVal = min;
+    if(flt)
+      currVal = parseFloat(currVal).toFixed(dp);
     newEl.activateFn();
   };
   return newEl;
