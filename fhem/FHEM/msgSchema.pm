@@ -138,6 +138,17 @@ my $db = {
       'Normal'  => 'set %DEVICE% message %MSG% | %TITLE% %RECIPIENT%',
       'High'    => 'set %DEVICE% message %MSG% | %TITLE% %RECIPIENT%',
       'Low'     => 'set %DEVICE% message %MSG% | %TITLE% %RECIPIENT%',
+      'defaultValues' => {
+        'Normal' => {
+          'RECIPIENT' => '',
+        },
+        'High' => {
+          'RECIPIENT' => '',
+        },
+        'Low' => {
+          'RECIPIENT' => '',
+        },
+      },
     },
 
     'PushNotifier' => {
@@ -147,9 +158,9 @@ my $db = {
     },
 
     'Pushover' => {
-      'Normal'  => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-      'High'    => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
-      'Low'     => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+      'Normal'  => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+      'High'    => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
+      'Low'     => 'set %DEVICE% msg \'%TITLE%\' \'%MSG%\' \'%RECIPIENT%\' %PRIORITY% \'%Pushover_SOUND%\' %RETRY% %EXPIRE% %URLTITLE% %ACTION%',
       'defaultValues' => {
         'Normal' => {
           'RECIPIENT' => '',
@@ -157,6 +168,7 @@ my $db = {
           'EXPIRE'    => '',
           'URLTITLE'  => '',
           'ACTION'    => '',
+          'Pushover_SOUND' => '',
         },
         'High' => {
           'RECIPIENT' => '',
@@ -164,6 +176,7 @@ my $db = {
           'EXPIRE'    => '600',
           'URLTITLE'  => '',
           'ACTION'    => '',
+          'Pushover_SOUND' => '',
         },
         'Low' => {
           'RECIPIENT' => '',
@@ -171,6 +184,7 @@ my $db = {
           'EXPIRE'    => '',
           'URLTITLE'  => '',
           'ACTION'    => '',
+          'Pushover_SOUND' => '',
         },
       },
     },
@@ -229,9 +243,9 @@ my $db = {
     },
 
     'XBMC' => {
-      'Normal'  => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=\'%TIMEOUT%\'*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
-      'High'    => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=\'%TIMEOUT%\'*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
-      'Low'     => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=\'%TIMEOUT%\'*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+      'Normal'  => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=%TIMEOUT%*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+      'High'    => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=%TIMEOUT%*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+      'Low'     => '{ my $dev=\'%DEVICE%\'; my $title=\'%TITLE%\'; my $msg=\'%MSG%\'; $timeout=%TIMEOUT%*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
       'defaultValues' => {
         'Normal' => {
           'TIMEOUT'   => 8,
