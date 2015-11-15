@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2014
+#  (c) 2005-2015
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -244,7 +244,7 @@ my @cmdList;                    # Remaining commands in a chain. Used by sleep
 $init_done = 0;
 $lastDefChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
-$featurelevel = 5.6;
+$featurelevel = 5.7;
 
 
 $modules{Global}{ORDER} = -1;
