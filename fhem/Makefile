@@ -1,5 +1,5 @@
-VERS=5.6
-DATE=2014-11-09
+VERS=5.7
+DATE=2015-11-15
 
 # used for nightly build
 DATEN=$(shell date +"%Y-%m-%d")
