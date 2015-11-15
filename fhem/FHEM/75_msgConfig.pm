@@ -258,12 +258,12 @@ sub msgConfig_Set($@) {
         }
 
         if ($lang eq "de") {
-          $attr{$device}{alias} = "Durchsagen" if (!defined($attr{$device}{alias}));
+          $attr{$device}{alias} = "Durchsagen";
           $attr{$device}{eventMap} = "active:aktiv long:lang short:kurz visual:visuell off:aus";
           $attr{$device}{room} = "Haus" if (!defined($attr{$device}{room}));
           $attr{$device}{setList} = "state:lang,kurz,visuell,aus";
         } else {
-          $attr{$device}{alias} = "Announcements" if (!defined($attr{$device}{alias}));
+          $attr{$device}{alias} = "Announcements";
           $attr{$device}{room} = "House" if (!defined($attr{$device}{room}));
           $attr{$device}{setList} = "state:long,short,visual,off";
           delete $attr{$device}{eventMap} if (defined($attr{$device}{eventMap}));
@@ -306,13 +306,13 @@ sub msgConfig_Set($@) {
         }
 
         if ($lang eq "de") {
-          $attr{$device}{alias} = "Bewohner" if (!defined($attr{$device}{alias}));
+          $attr{$device}{alias} = "Bewohner";
           $attr{$device}{eventMap} = "home:zu_Hause absent:außer_Haus gone:verreist gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
           $attr{$device}{group} = "Haus Status" if (!defined($attr{$device}{group}));
           $attr{$device}{room} = "Haus" if (!defined($attr{$device}{room}));
           $attr{$device}{widgetOverride} = "state:zu_Hause,bettfertig,außer_Haus,verreist";
         } else {
-          $attr{$device}{alias} = "Residents" if (!defined($attr{$device}{alias}));
+          $attr{$device}{alias} = "Residents";
           $attr{$device}{group} = "Home State" if (!defined($attr{$device}{group}));
           $attr{$device}{room} = "House" if (!defined($attr{$device}{room}));
           delete $attr{$device}{eventMap} if (defined($attr{$device}{eventMap}));
