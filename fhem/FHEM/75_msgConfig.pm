@@ -212,7 +212,7 @@ sub msgConfig_Set($@) {
         my $device = "msgRoom_" . $location;
         $device =~ s/[\s\t-]+/_/g;
         
-        return "Device $device is already existing"
+        return "Device $device is already existing but not a dummy device"
           if (defined($defs{$device}) && $defs{$device}{TYPE} ne "dummy");
 
         if (!defined($defs{$device})) {
@@ -236,9 +236,102 @@ sub msgConfig_Set($@) {
         return $return;
     }
 
+    # createSwitcherDev
+    elsif ( lc($what) eq "createswitcherdev" ) {
+        my $device = AttrVal($name, "msgSwitcherDev", "HouseAnn");
+        my $state = AttrVal($device, "state", "???");
+        my $return = "";
+
+        my $lang = "en";
+        $lang = $a[0]
+          if (defined($a[0]) && $a[0] eq "de");
+
+        return "Device $device is already existing but not a dummy device"
+          if (defined($defs{$device}) && $defs{$device}{TYPE} ne "dummy");
+
+        if (!defined($defs{$device})) {
+          $return = fhem ("define $device dummy", 1);
+          $return .= "Device $device was created"
+            if ($return eq "");
+        } else {
+          $return = "Existing dummy device $device was updated";
+        }
+
+        if ($lang eq "de") {
+          $attr{$device}{alias} = "Durchsagen" if (!defined($attr{$device}{alias}));
+          $attr{$device}{eventMap} = "active:aktiv long:lang short:kurz visual:visuell off:aus";
+          $attr{$device}{room} = "Haus" if (!defined($attr{$device}{room}));
+          $attr{$device}{setList} = "state:lang,kurz,visuell,aus";
+        } else {
+          $attr{$device}{alias} = "Announcements" if (!defined($attr{$device}{alias}));
+          $attr{$device}{room} = "House" if (!defined($attr{$device}{room}));
+          $attr{$device}{setList} = "state:long,short,visual,off";
+          delete $attr{$device}{eventMap} if (defined($attr{$device}{eventMap}));
+        }
+        $attr{$device}{comment} = "Auto-created by $name" if (!defined($attr{$device}{comment}) || $attr{$device}{comment} ne "Auto-created by $name");
+        $attr{$device}{devStateIcon} = 'aktiv:general_an@90EE90 active:general_an@90EE90 lang:general_an@green:off long:general_an@green:off  aus:general_aus@red:long off:general_aus@red:long kurz:general_an@orange:long short:general_an@orange:long visuell:general_an@orange:long visual:general_an@orange:long';
+        $attr{$device}{"event-on-change-reading"} = "state" if (!defined($attr{$device}{"event-on-change-reading"}));
+        $attr{$device}{group} = "Automation" if (!defined($attr{$device}{group}));
+        $attr{$device}{icon} = "audio_volume_mid";
+        $attr{$device}{webCmd} = "state";
+        fhem ("set $device long") if ($state eq "???");
+
+        $return .= "\nAttribute msgSwitcherDev at device $name was changed to $device"
+          if (defined($attr{$name}{msgSwitcherDev}));
+        $return .= "\nAdded attribute msgSwitcherDev to device $name"
+          if (!defined($attr{$name}{msgSwitcherDev}));
+        $attr{$name}{msgSwitcherDev} = $device;
+
+        return $return;
+    }
+
+    # createResidentsDev
+    elsif ( lc($what) eq "createresidentsdev" ) {
+        my $device = AttrVal($name, "msgResidentsDev", "rgr_Residents");
+        my $return = "";
+
+        my $lang = "en";
+        $lang = $a[0]
+          if (defined($a[0]) && $a[0] eq "de");
+
+        return "Device $device is already existing but not a RESIDENTS or ROOMMATE device"
+          if (defined($defs{$device}) && ($defs{$device}{TYPE} ne "RESIDENTS" && $defs{$device}{TYPE} ne "ROOMMATE"));
+
+        if (!defined($defs{$device})) {
+          $return = fhem ("define $device RESIDENTS", 1);
+          $return .= "RESIDENTS device $device was created."
+            if ($return eq "");
+        } else {
+          $return = "Existing ".$defs{$device}{TYPE}." device $device was updated.";
+        }
+
+        if ($lang eq "de") {
+          $attr{$device}{alias} = "Bewohner" if (!defined($attr{$device}{alias}));
+          $attr{$device}{eventMap} = "home:zu_Hause absent:außer_Haus gone:verreist gotosleep:bettfertig asleep:schläft awoken:aufgestanden";
+          $attr{$device}{group} = "Haus Status" if (!defined($attr{$device}{group}));
+          $attr{$device}{room} = "Haus" if (!defined($attr{$device}{room}));
+          $attr{$device}{widgetOverride} = "state:zu_Hause,bettfertig,außer_Haus,verreist";
+        } else {
+          $attr{$device}{alias} = "Residents" if (!defined($attr{$device}{alias}));
+          $attr{$device}{group} = "Home State" if (!defined($attr{$device}{group}));
+          $attr{$device}{room} = "House" if (!defined($attr{$device}{room}));
+          delete $attr{$device}{eventMap} if (defined($attr{$device}{eventMap}));
+          delete $attr{$device}{widgetOverride} if (defined($attr{$device}{widgetOverride}));
+        }
+        $attr{$device}{comment} = "Auto-created by $name" if (!defined($attr{$device}{comment}) || $attr{$device}{comment} ne "Auto-created by $name");
+        $attr{$device}{devStateIcon} = '.*home:status_available@green .*absent:status_away_1@orange .*gone:status_standby .*none:control_building_empty .*gotosleep:status_night@green:asleep .*asleep:status_night@green .*awoken:status_available@green:home .*zu_Hause:user_available:absent .*außer_Haus:user_away:home .*verreist:user_ext_away:home .*bettfertig:scene_toilet:asleep .*schläft:scene_sleeping:awoken .*aufgestanden:scene_sleeping_alternat:home .*:user_unknown';
+
+        $return .= "\nIf you would like this device to act as a global presence device for ALL msg commands, please adjust attribute msgResidentsDev at device $name to $device."
+          if (defined($attr{$name}{msgResidentsDev}) && $attr{$name}{msgResidentsDev} ne $device);
+        $return .= "\nNext, set a device's msgResidentsDev attribute to '$device' (think of using 'userattr' to add 'msgResidentsDev' to the list of available attributes). \nIf you would like '$device' to act as a global presence device for ALL msg commands, sett attribute msgResidentsDev at device $name to $device."
+          if (!defined($attr{$name}{msgResidentsDev}));
+
+        return $return;
+    }
+
     else {
         return
-"Unknown argument $what, choose one of cleanReadings addLocation";
+"Unknown argument $what, choose one of cleanReadings addLocation createSwitcherDev:de,en createResidentsDev:de,en";
     }
 }
 
