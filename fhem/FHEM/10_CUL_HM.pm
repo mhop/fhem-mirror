@@ -1334,7 +1334,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   elsif($mh{md} =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/) { #######################
-    my ($sType,$chn) = ($mI[0],$mI[1]);
+    my $chn = $mI[1];
     if(    $mh{mTp} eq "70") { # weather event
       $chn = '01'; # fix definition
       my (    $t,      $h) =  (hex($mI[0].$mI[1]), hex($mI[2]));# temp is 15 bit signed
@@ -1375,8 +1375,8 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{dstH},1,"ValveDesired:$vp"];
       }
     }
-    elsif(($mh{mTp} eq '02' &&$sType eq '01')||    # ackStatus
-          ($mh{mTp} eq '10' &&$sType eq '06')){    # infoStatus
+    elsif(($mh{mTyp} eq '0201')||    # ackStatus
+          ($mh{mTyp} eq '1006')){    # infoStatus
       my $dTemp = hex($mI[2])/2;
       $dTemp = ($dTemp < 6 )?'off':
                ($dTemp >30 )?'on' :sprintf("%0.1f", $dTemp);
@@ -4129,8 +4129,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "please enter the duration in seconds"
           if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
-    return "timer value to low" if ($tval eq "0000");
-    $ramp = ($ramp && $st eq "dimmer")?CUL_HM_encodeTime16($ramp):"0000";
+    #    return "timer value to low" if ($tval eq "0000"); does it work for all if "0000"?
+    $tval = "" if ($tval eq "0000");
+    $ramp = ($ramp && $st eq "dimmer") ? CUL_HM_encodeTime16($ramp)
+           :($tval eq ""               ? ""
+                                       : "0000");
     delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     $hash->{helper}{stateUpdatDly} = ($duration>120)?$duration:120;
     my(undef,$lvlMax)=split",",AttrVal($name, "levelRange", "0,100");
@@ -4159,22 +4162,25 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
     my ($lvl,$tval,$rval,$duration) = (($a[2]?$a[2]:0),"","",0);
-    $lvl =~ s/(\d*\.?\d*).*/$1/;
     my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
     my $lvlInv = (AttrVal($name, "param", "") eq "levelInverse")?1:0;
 
-    if ($cmd eq "pct"){
-      $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100;
+    if ($lvl eq "old"){#keep it - it means "old value"
     }
-    else{#dim [<changeValue>] ... [ontime] [ramptime]
-      $lvl = 10 if (!defined $a[2]); #set default step
-      $lvl = $lvl*($lvlMax-$lvlMin)/100;
-      $lvl = -1*$lvl if (($cmd eq "down" && !$lvlInv)|| 
-                         ($cmd ne "down" && $lvlInv));
-      $lvl += CUL_HM_getChnLvl($name);
+    else{
+      $lvl =~ s/(\d*\.?\d*).*/$1/;
+      if ($cmd eq "pct"){
+        $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100;
+      }
+      else{#dim [<changeValue>] ... [ontime] [ramptime]
+        $lvl = 10 if (!defined $a[2]); #set default step
+        $lvl = $lvl*($lvlMax-$lvlMin)/100;
+        $lvl = -1*$lvl if (($cmd eq "down" && !$lvlInv)|| 
+                           ($cmd ne "down" && $lvlInv));
+        $lvl += CUL_HM_getChnLvl($name);
+      }
+      $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvl <= $lvlMin)?0:$lvl);
     }
-    $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvl <= $lvlMin)?0:$lvl);
-    my $plvl = ($lvlInv)?100-$lvl :$lvl;
     if ($st eq "dimmer"){# at least blind cannot stand ramp time...
       if (!$a[3]){
         $tval = "FFFF";
@@ -4197,8 +4203,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $hash->{helper}{stateUpdatDly} = ($duration>120)?$duration:120;
     }
     # store desiredLevel in and its Cmd in case we have to repeat
-    $plvl = sprintf("%02X",$plvl*2);
-    if ($tval && $tval ne "FFFF"){
+    my $plvl = ($lvl eq "old")?"C9"
+                              :sprintf("%02X",(($lvlInv)?100-$lvl :$lvl)*2);
+    if (($tval && $tval ne "FFFF") || $lvl eq "old"){
       delete $hash->{helper}{dlvl};#stop desiredLevel supervision
     }
     else{
@@ -4369,7 +4376,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "please enter the duration in seconds"
           if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
-    return "timer value to low" if ($tval eq "0000");
     $ramp = CUL_HM_encodeTime16($ramp);
 
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
@@ -4380,7 +4386,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "please enter the duration in seconds"
           if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
-    return "timer value to low" if ($tval eq "0000");
     $ramp = CUL_HM_encodeTime16($ramp);
 
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
@@ -4580,6 +4585,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         next if (!defined $defs{$team} );
         my $tId = substr(CUL_HM_name2Id($team),0,6);
         CUL_HM_PushCmdStack($defs{$team},'++'.$flag."11$id$tId"."8604$temp");
+        CUL_HM_UpdtReadSingle($defs{$team},"state",$state,1);
       }
     }
     else{
