@@ -470,7 +470,7 @@ sub CUL_HM_Define($$) {##############################
   my $HMid = uc($a[2]);
 
   return "wrong syntax: define <name> CUL_HM 6-digit-hex-code [Raw-Message]"
-        if(!(int(@a)==3 || int(@a)==4) || $HMid !~ m/^[A-F0-9]{6,8}$/i);
+        if(!(int(@a)==3 || int(@a)==4) || $HMid !~ m/^[A-F0-9]{6}([A-F0-9]{2})?$/i );
   return  "HMid DEF already used by " . CUL_HM_id2Name($HMid)
         if ($modules{CUL_HM}{defptr}{$HMid});
   my $name = $hash->{NAME};
