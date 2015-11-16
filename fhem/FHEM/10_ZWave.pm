@@ -105,7 +105,7 @@ my %zwave_class = (
     get   => { ccCapability=> '01', # no more args
                ccStatus    => '03%02x' },
     set   => { # Forum #36050
-               rgb         => '050302%02x03%02x04%02x',
+               rgb         => '05050000010002%02x03%02x04%02x', # Forum #44014
                wcrgb       => '050500%02x01%02x02%02x03%02x04%02x' },
     parse => { "043302(..)(..)"=> 'ZWave_ccCapability($1,$2)',
                "043304(..)(.*)"=> '"ccStatus_$1:$2"' } },
