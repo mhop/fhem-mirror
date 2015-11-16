@@ -98,8 +98,8 @@ replace_wildcards($$)
 {
   my ($hash, $str) = @_;
   return "" if(!$str);
-  my $t = $hash->{TYPE}; $str =~ s/%TYPE/$t/g;
-  my $n = $hash->{NAME}; $str =~ s/%NAME/$n/g;
+  my $t = $hash->{TYPE}; $str =~ s/[%\$]TYPE/$t/g;
+  my $n = $hash->{NAME}; $str =~ s/[%\$]NAME/$n/g;
   return $str;
 }
 
