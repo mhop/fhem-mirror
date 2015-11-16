@@ -649,3 +649,7 @@
 
 - Sat Nov 14 2015 (mattwire)
   - added new module 98_ping to allow easy ping checks for devices
+  
+- Mon Nov 16 2015 (telekatz)
+  - added new module 10_DUOFERNSTICK
+  - added new module 30_DUOFERN
