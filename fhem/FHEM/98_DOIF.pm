@@ -68,7 +68,7 @@ DOIF_Initialize($)
   $hash->{UndefFn}  = "DOIF_Undef";
   $hash->{AttrFn}   = "DOIF_Attr";
   $hash->{NotifyFn} = "DOIF_Notify";
-  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame waitsame waitdel cmdpause timerWithWait ".$readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 loglevel:0,1,2,3,4,5,6 wait do:always,resetwait cmdState state initialize repeatsame repeatcmd waitsame waitdel cmdpause timerWithWait ".$readingFnAttributes;
 }
 
 
@@ -523,7 +523,7 @@ DOIF_time($$$$$$)
     if ($hms ge $begin) {
       $ret=1;
     } elsif ($hms lt $end) {
-      $wday=1 if ($wday-- == -1);
+      $wday=6 if ($wday-- == 0);
       $we=DOIF_we($wday);
       $ret=1; 
     } 
@@ -678,6 +678,7 @@ DOIF_cmd ($$$$)
   my @repeatsame=split(/:/,AttrVal($pn,"repeatsame",""));
   my @cmdpause=split(/:/,AttrVal($pn,"cmdpause",""));
   my @waitsame=split(/:/,AttrVal($pn,"waitsame",""));
+  my @sleeptimer=split(/:/,AttrVal($pn,"repeatcmd",""));
   my ($seconds, $microseconds) = gettimeofday();
   if ($cmdpause[$nr] and $subnr==0) {
     return undef if ($seconds - time_str2num(ReadingsTimestamp($pn, "state", "1970-01-01 01:00:00")) < $cmdpause[$nr]);
@@ -690,6 +691,7 @@ DOIF_cmd ($$$$)
           if ($repeatnr < $repeatsame[$nr]) {
             $repeatnr++;
           } else {
+            delete ($defs{$hash->{NAME}}{READINGS}{cmd_count}) if (defined ($sleeptimer[$nr]) and (AttrVal($pn,"do","") eq "always" or AttrVal($pn,"do","") eq "resetwait"));
             return undef;
           }
         } else {
@@ -727,8 +729,15 @@ DOIF_cmd ($$$$)
   delete $hash->{helper}{cur_cmd_nr}; 
   if (defined $hash->{do}{$nr}{++$subnr}) {
     my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
-    if (DOIF_SetSleepTimer($hash,$last_cond,$nr,$subnr,$event,-1)) {
+    if (DOIF_SetSleepTimer($hash,$last_cond,$nr,$subnr,$event,-1,undef)) {
       DOIF_cmd ($hash,$nr,$subnr,$event);
+    }
+  } else {
+    if (defined ($sleeptimer[$nr])) {
+      my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
+      if (DOIF_SetSleepTimer($hash,$last_cond,$nr,0,$event,-1,$sleeptimer[$nr])) {
+        DOIF_cmd ($hash,$nr,$subnr,$event);
+      }
     }
   }
   return undef;
@@ -763,7 +772,7 @@ DOIF_Trigger ($$$)
         return undef;
       }
       if ($ret) {
-        if (DOIF_SetSleepTimer($hash,$last_cond,$i,0,$device,$timerNr)) {
+        if (DOIF_SetSleepTimer($hash,$last_cond,$i,0,$device,$timerNr,undef)) {
           DOIF_cmd ($hash,$i,0,$event);
           return 1;
         } else {
@@ -776,7 +785,7 @@ DOIF_Trigger ($$$)
   }
   if ($doelse) {  #DOELSE
     if (defined ($hash->{do}{$max_cond}{0}) or ($max_cond == 1 and !(AttrVal($pn,"do","") or AttrVal($pn,"repeatsame","")))) {  #DOELSE
-      if (DOIF_SetSleepTimer($hash,$last_cond,$max_cond,0,$device,$timerNr)) {
+      if (DOIF_SetSleepTimer($hash,$last_cond,$max_cond,0,$device,$timerNr,undef)) {
         DOIF_cmd ($hash,$max_cond,0,$event) ;
         return 1;
       }
@@ -1070,9 +1079,9 @@ DOIF_SetTimer($$)
 }
 
 sub
-DOIF_SetSleepTimer($$$$$$)
+DOIF_SetSleepTimer($$$$$$$)
 {
-  my ($hash,$last_cond,$nr,$subnr,$device,$timerNr)=@_;
+  my ($hash,$last_cond,$nr,$subnr,$device,$timerNr,$repeatcmd)=@_;
   my $pn = $hash->{NAME};
   if (defined $hash->{helper}{cur_cmd_nr}) {
     return 0;
@@ -1098,16 +1107,23 @@ DOIF_SetSleepTimer($$$$$$)
       return 0;
     }
   } 
- 
-  if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or $subnr > 0 or AttrVal($pn,"do","") eq "always" or AttrVal($pn,"do","") eq "resetwait" or AttrVal($pn,"repeatsame",""))) {
-    my @sleeptimer=split(/:/,AttrVal($pn,"wait",""));
+  if ($hash->{helper}{sleeptimer} == -1 and ($last_cond != $nr or $subnr > 0 
+      or AttrVal($pn,"do","") eq "always" 
+      or AttrVal($pn,"do","") eq "resetwait" 
+      or AttrVal($pn,"repeatsame","") 
+      or defined($repeatcmd))) {
     my $sleeptime=0;
-    if ($waitdelsubnr[$subnr]) { 
-      $sleeptime = $waitdelsubnr[$subnr];
+    if (defined ($repeatcmd)) {
+      $sleeptime=$repeatcmd;
     } else {
-      my @sleepsubtimer=split(/,/,defined $sleeptimer[$nr]? $sleeptimer[$nr]: "");
-      if ($sleepsubtimer[$subnr]) {
-        $sleeptime=$sleepsubtimer[$subnr];
+      my @sleeptimer=split(/:/,AttrVal($pn,"wait",""));
+      if ($waitdelsubnr[$subnr]) { 
+        $sleeptime = $waitdelsubnr[$subnr];
+      } else {
+        my @sleepsubtimer=split(/,/,defined $sleeptimer[$nr]? $sleeptimer[$nr]: "");
+        if ($sleepsubtimer[$subnr]) {
+          $sleeptime=$sleepsubtimer[$subnr];
+        }
       }
     }
     ($sleeptime,$err)=ReplaceAllReadingsDoIf($hash,$sleeptime,-1,1);
@@ -1139,8 +1155,10 @@ DOIF_SetSleepTimer($$$$$$)
       }
       InternalTimer($next_time, "DOIF_SleepTrigger",$hash, 0);
       return 0;
+    } elsif (defined($repeatcmd)){
+      return 0;
     } else {
-      return 1;
+      return 1;   
     }
   } else {
     return 0;
@@ -1158,7 +1176,7 @@ DOIF_SleepTrigger ($)
   my $pn = $hash->{NAME};
   readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
 # if (!AttrVal($hash->{NAME},"disable","")) {
-  if (ReadingsVal($pn,"mode","") ne "disable") {
+  if (ReadingsVal($pn,"mode","") ne "disabled") {
     DOIF_cmd ($hash,$sleeptimer,$sleepsubtimer,$hash->{helper}{sleepdevice});
   }
   
@@ -1840,7 +1858,7 @@ Verzögerungen können mit Hilfe des Attributs <code>timerWithWait</code> auf Ti
 <br>
 <u>Anwendungsbeispiel</u>: Lampe soll zufällig nach Sonnenuntergang verzögert werden.<br>
 <br>
-<code>define di_rand_sunset([{sunset()}])(set lamp on)<br>
+<code>define di_rand_sunset DOIF ([{sunset()}])(set lamp on)<br>
 attr di_rand_sunset wait rand(1200)<br>
 attr di_rand_sunset timerWithWait<br>
 attr di_rand_sunset do always</code><br>
@@ -1889,6 +1907,41 @@ Das Attribut <code>do resetwait</code> impliziert eine beliebige Wiederholung wi
 <code>define di_push DOIF ([Tempsensor])(set pushmsg "sensor failed again")<br>
 attr di_push wait 1800<br>
 attr di_push do resetwait</code><br>
+<br>
+<b>Wiederholung von Befehlsausführung</b><br>
+<br>
+Wiederholungen der Ausführung von Kommandos werden pro Befehlsfolge über das Attribut "repeatcmd" definiert. Syntax:<br>
+<br>
+<code>attr &lt;DOIF-modul&gt; repeatcmd &lt;Sekunden für Befehlsfolge des ersten DO-Falls&gt;:&lt;Sekunden für Befehlsfolge des zweiten DO-Falls&gt;:...<br></code>
+<br>
+Statt Sekundenangaben können ebenfalls Stati in eckigen Klammen oder Perlbefehle angegeben werden.<br>
+<br>
+Die Wiederholung findet so lange statt, bis der Zustand des Moduls durch einen anderen DO-Fall wechselt.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Nach dem Eintreffen des Ereignisses wird die push-Meldung stündlich wiederholt, bis Frost ungleich "on" ist.<br>
+<br>
+<code>define di_push DOIF ([frost] eq "on")(set pushmsg "danger of frost")<br>
+attr di_push repeatcmd 3600</code><br>
+<br>
+Eine Begrenzung der Wiederholungen kann mit dem Attribut repeatsame vorgenommen werden<br>
+<code>attr di_push repeatsame 3</code><br>
+<br>
+Ebenso lässt sich das repeatcmd-Attribut mit Zeitangaben kombinieren.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Wiederholung ab einem Zeitpunkt<br>
+<br>
+<code>define di_alarm_clock DOIF ([08:00])(set alarm_clock on)<br>
+attr di_alarm_clock repeatcmd 300<br>
+attr di_alarm_clock repeatsame 10<br>
+attr di_alarm_clock do always</code><br>
+<br>
+Ab 8:00 Uhr wird 10 mal Weckton alle 5 Minuten wiederholt.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Anwesenheitssimulation<br>
+<br>
+<code>define di_presence_simulation DOIF ([19:00-00:00])(set lamp on-for-timer {(int(rand(1800)+300))}) DOELSE <br>
+attr di_presence_simulation repeatcmd rand(3600)+2100<br>
+attr di_presence_simulation do always</code><br>
 <br>
 <b>Zwangspause für das Ausführen eines Kommandos seit der letzten Zustandsänderung</b><br>
 <br>
