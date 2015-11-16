@@ -177,7 +177,6 @@ sub WeekdayTimer_Define($$) {
 sub WeekdayTimer_Profile($) {   
   my $hash = shift;
   
-  my $nochZuAendern  = 0;  #  $d
   my $language =   $hash->{LANGUAGE};
   my %longDays = %{$hash->{longDays}}; 
   
@@ -194,12 +193,8 @@ sub WeekdayTimer_Profile($) {
      foreach  my $d (@{$tage}) {
 
         my    @listeDerTage = ($d);
-        push (@listeDerTage, (0, 6) ) if ($d==7); # sa,so   ($we)
-        push (@listeDerTage, (1..5) ) if ($d==8); # mo-fr
+        push  (@listeDerTage, WeekdayTimer_getListeDerTage($d, $time)) if ($d>=7);
         
-        # alle Tage prüfen hash anlegen mit d>1, d=>0 
-        # wenn 0, dann nur auf Feiertag prüfen
-
         map { my $day = $_; 
            my $dayOfEchteZeit = $day;
               $dayOfEchteZeit = ($wday>=1&&$wday<=5) ? 6 : $wday  if ($day==7); # ggf. Samstag $wday ~~ [1..5]  
@@ -236,12 +231,45 @@ sub WeekdayTimer_Profile($) {
        Log3 $hash, 4,  "[$hash->{NAME}] $profiltext ($profilKey)";  
   }
 
-  #Log 3, $hash->{NAME}  ."--->\n".   Dumper $hash->{profile};
-  #Log 3, $hash->{NAME}  ."--->\n".   Dumper $hash->{profile_IDX};
-  
   # für logProxy umhaengen
   $hash->{helper}{SWITCHINGTIME} = $hash->{profile};
   delete $hash->{profile};
+}
+################################################################################   
+sub WeekdayTimer_getListeDerTage($$) {
+  my ($d, $time) = @_;
+
+  my %hdays=();
+  @hdays{(0, 6)} = undef  if ($d==7); # sa,so   ( $we)
+  @hdays{(1..5)} = undef  if ($d==8); # mo-fr   (!$we)
+  
+  my $wday;
+  my $now = time();
+  my ($sec,$min,$hour,$mday,$mon,$year,$nowWday,$yday,$isdst) = localtime($now);
+  
+  my @realativeWdays  = (0..6);  
+  for (my $i=0;$i<=6;$i++) {
+
+     my $relativeDay = $i-$nowWday;
+    #Log 3, "relativeDay------------>$relativeDay";
+     my ($stunde, $minute, $sekunde) = split (":",$time);   
+        
+     my $echteZeit = WeekdayTimer_zeitErmitteln ($now, $stunde, $minute, $sekunde, $relativeDay);
+    #Log 3, "echteZeit---$i---->>>$relativeDay<<<----->".FmtDateTime($echteZeit);
+     ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($echteZeit);
+     my $h2we = $attr{global}{holiday2we};
+     if($h2we) {
+        my $ergebnis = fhem("get $h2we ".sprintf("%02d-%02d",$mon+1,$mday),1);
+        if ($ergebnis ne "none") {
+          #Log 3, "ergebnis-------$i----->$ergebnis";
+          $hdays{$i} = undef   if ($d==7); #  $we Tag aufnehmen
+          delete $hdays{$i}    if ($d==8); # !$we Tag herausnehmen
+        }
+     }
+  }  
+    
+  #Log 3, "result------------>" . join (" ", sort keys %hdays);
+  return keys %hdays;
 }
 ################################################################################   
 sub WeekdayTimer_SwitchingTime($$) {
@@ -810,7 +838,7 @@ sub WeekdayTimer_Device_Schalten($$$) {
   #modifier des Zieldevices auswaehlen
   my $setModifier = WeekdayTimer_isHeizung($hash);
   
-  $command = "set @ " . $setModifier . " %";
+  $command = 'set $NAME ' . $setModifier . ' $EVENT';
   $command = $hash->{COMMAND}   if (defined $hash->{COMMAND});
 
   my $activeTimer = 1;
@@ -825,7 +853,9 @@ sub WeekdayTimer_Device_Schalten($$$) {
   Log3 $hash, 4, "[$name] aktParam:$aktParam newParam:$newParam - is $disabled_txt disabled";
 
   #Kommando ausführen
-  if ($command && !$disabled && $aktParam ne $newParam && $activeTimer) {
+  if ($command && !$disabled && $activeTimer 
+    && $aktParam ne $newParam 
+    ) {
     $newParam =~ s/:/ /g;
     
     my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
