@@ -215,6 +215,7 @@ harmony_labelOfDevice($$;$)
 {
   my ($hash, $id, $default) = @_;
 
+  return undef if( $id eq '<unknown>' );
   return undef if( !defined($hash->{config}) );
 
   foreach my $device (@{$hash->{config}->{device}}) {
