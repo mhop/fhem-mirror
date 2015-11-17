@@ -1008,60 +1008,19 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
       by the well-known Block with {}.<br>
       Note: if a command is defined only this command is executed. In case of executing
       a "set desired-temp" command, you must define the hole commandpart explicitly by yourself.<br>
-  <!-- -------------------------------------------------------------------------- -->
-  <!----------------------------------------------------------------------------- -->
-  <!-- -------------------------------------------------------------------------- -->
-      <li>in the command section you can access the event:
-      <ul>
-        <li>The variable $EVENT will contain the complete event, e.g.
-          <code>measured-temp: 21.7 (Celsius)</code></li>
-        <li>$EVTPART0,$EVTPART1,$EVTPART2,etc contain the space separated event
-          parts (e.g. <code>$EVTPART0="measured-temp:", $EVTPART1="21.7",
-          $EVTPART2="(Celsius)"</code>. This data is available as a local
-          variable in perl, as environment variable for shell scripts, and will
-          be textually replaced for FHEM commands.</li>
-        <li>$NAME contains the device to send the event, e.g.
-          <code>myFht</code></li>
-       </ul></li>
-
-      <li>Note: the following is deprecated and will be removed in a future
-        release. The described replacement is attempted if none of the above
-        variables ($NAME/$EVENT/etc) found in the command.
-      <ul>
-        <li>The character <code>%</code> will be replaced with the received
-        event, e.g. with <code>on</code> or <code>off</code> or
-        <code>measured-temp: 21.7 (Celsius)</code><br> It is advisable to put
-        the <code>%</code> into double quotes, else the shell may get a syntax
-        error.</li>
-
-        <li>The character <code>@</code> will be replaced with the device
-        name.</li>
-
-        <li>To use % or @ in the text itself, use the double mode (%% or
-        @@).</li>
-
-        <li>Instead of <code>%</code> and <code>@</code>, the parameters
-        <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code> (same
-        as <code>@</code>) and <code>%TYPE</code> (contains the device type,
-        e.g.  <code>FHT</code>) can be used. The space separated event "parts"
-        are available as %EVTPART0, %EVTPART1, etc.  A single <code>%</code>
-        looses its special meaning if any of these parameters appears in the
-        definition.</li>
-      </ul></li>
-  <!-- -------------------------------------------------------------------------- -->
   <!----------------------------------------------------------------------------- -->
   <!-- -------------------------------------------------------------------------- -->
       The following parameter are replaced:<br>
         <ol>
-          <li>@ => the device to switch</li>
-          <li>% => the new temperature</li>
+          <li>$NAME  => the device to switch</li>
+          <li>$EVENT => the new temperature</li>
         </ol>
     </ul>
     <p>
     <ul><b>condition</b><br>
-      if a condition is defined you must declared this with () and a valid perl-code.<br>
+      if a condition is defined you must declare this with () and a valid perl-code.<br>
       The return value must be boolean.<br>
-      The parameter @ and % will be interpreted.
+      The parameters $NAME and $EVENT will be interpreted.
     </ul>
     <p>
     <b>Example:</b>
@@ -1070,7 +1029,7 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
         Mo-Fr are setting the shutter at 05:20 to <b>up</b>, and at 20:30 <b>down</b>.<p>
 
         <code>define heatingBath WeekdayTimer bath 07:00|16 Mo,Tu,Th-Fr|16:00|18.5 20:00|eco
-          {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
+          {fhem("set dummy on"); fhem("set $NAME desired-temp $EVENT");}</code><br>
         At the given times and weekdays only(!) the command will be executed.<p>
 
         <code>define dimmer WeekdayTimer livingRoom Sa-Su,We|07:00|dim30% Sa-Su,We|21:00|dim90% (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>

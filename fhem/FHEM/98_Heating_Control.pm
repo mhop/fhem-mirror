@@ -191,60 +191,20 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       by the well-known Block with {}.<br>
       Note: if a command is defined only this command is executed. In case of executing
       a "set desired-temp" command, you must define the hole commandpart explicitly by yourself.<br>
-  <!-- -------------------------------------------------------------------------- -->
   <!----------------------------------------------------------------------------- -->
-  <!-- -------------------------------------------------------------------------- -->
-      <li>in the command section you can access the event:
-      <ul>
-        <li>The variable $EVENT will contain the complete event, e.g.
-          <code>measured-temp: 21.7 (Celsius)</code></li>
-        <li>$EVTPART0,$EVTPART1,$EVTPART2,etc contain the space separated event
-          parts (e.g. <code>$EVTPART0="measured-temp:", $EVTPART1="21.7",
-          $EVTPART2="(Celsius)"</code>. This data is available as a local
-          variable in perl, as environment variable for shell scripts, and will
-          be textually replaced for FHEM commands.</li>
-        <li>$NAME contains the device to send the event, e.g.
-          <code>myFht</code></li>
-       </ul></li>
-
-      <li>Note: the following is deprecated and will be removed in a future
-        release. The described replacement is attempted if none of the above
-        variables ($NAME/$EVENT/etc) found in the command.
-      <ul>
-        <li>The character <code>%</code> will be replaced with the received
-        event, e.g. with <code>on</code> or <code>off</code> or
-        <code>measured-temp: 21.7 (Celsius)</code><br> It is advisable to put
-        the <code>%</code> into double quotes, else the shell may get a syntax
-        error.</li>
-
-        <li>The character <code>@</code> will be replaced with the device
-        name.</li>
-
-        <li>To use % or @ in the text itself, use the double mode (%% or
-        @@).</li>
-
-        <li>Instead of <code>%</code> and <code>@</code>, the parameters
-        <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code> (same
-        as <code>@</code>) and <code>%TYPE</code> (contains the device type,
-        e.g.  <code>FHT</code>) can be used. The space separated event "parts"
-        are available as %EVTPART0, %EVTPART1, etc.  A single <code>%</code>
-        looses its special meaning if any of these parameters appears in the
-        definition.</li>
-      </ul></li>
-  <!-- -------------------------------------------------------------------------- -->
   <!----------------------------------------------------------------------------- -->
   <!-- -------------------------------------------------------------------------- -->
       The following parameter are replaced:<br>
         <ol>
-          <li>@ => the device to switch</li>
-          <li>% => the new temperature</li>
+          <li>$NAME  => the device to switch</li>
+          <li>$EVENT => the new temperature</li>
         </ol>
     </ul>
     <p>
     <ul><b>condition</b><br>
       if a condition is defined you must declare this with () and a valid perl-code.<br>
       The returnvalue must be boolean.<br>
-      The parameter @ and % will be interpreted.
+      The parameter $NAME and $EVENT will be interpreted.
     </ul>
     <p>
     <b>Example:</b>
@@ -254,7 +214,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         Every day will be set the temperature at 17:20 to 21&deg;C and 17:25 to <b>eco</b>.<p>
 
         <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Tu,Th-Fr|16:00|18.5 20:00|12
-          {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
+          {fhem("set dummy on"); fhem("set $NAME desired-temp $EVENT");}</code><br>
         At the given times and weekdays only(!) the command will be executed.<p>
 
         <code>define HCW Heating_Control WZ_Heizung Sa-Su,We|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
@@ -286,11 +246,11 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         </code></pre>
         The daylist can be given globaly for the whole WeekdayTimer:<p>
         <code><pre>
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de  !$we     09:00|an 19:00|aus (bedingung("@", "%")  
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de   $we     09:00|an 19:00|aus (bedingung("@", "%")  
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de   78      09:00|an 19:00|aus (bedingung("@", "%")  
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de   57      09:00|an 19:00|aus (bedingung("@", "%")  
-        define WD_Wohnen_an  WeekdayTimer WDdevice  de  fr,$we   09:00|an 19:00|aus (bedingung("@", "%")  
+        define WD_Wohnen_an  WeekdayTimer WDdevice  de  !$we     09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
+        define WD_Wohnen_an  WeekdayTimer WDdevice  de   $we     09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
+        define WD_Wohnen_an  WeekdayTimer WDdevice  de   78      09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
+        define WD_Wohnen_an  WeekdayTimer WDdevice  de   57      09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
+        define WD_Wohnen_an  WeekdayTimer WDdevice  de  fr,$we   09:00|an 19:00|aus (bedingung($NAME, $EVENT)  
         </code></pre>
 
     </ul>
@@ -416,15 +376,15 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
       so muss dies explizit angegeben werden.<br>
       Folgende Parameter werden ersetzt:<br>
         <ol>
-          <li>@ => das zu schaltende Device</li>
-          <li>% => die zu setzende Temperatur</li>
+          <li>$NAME  => das zu schaltende Device</li>
+          <li>$EVENT => die zu setzende Temperatur</li>
         </ol>
     </ul>
     <p>
     <ul><b>condition</b><br>
       Bei Angabe einer Condition ist diese in () zu setzen und mit validem Perl-Code zu versehen.<br>
       Der R&uumlckgabedatentyp der condition muss boolean sein.<br>
-      Die Parameter @ und  % werden interpretiert.
+      Die Parameter $NAME und $EVENT werden interpretiert.
     </ul>
     <p>
     <b>Beispiel:</b>
@@ -434,7 +394,7 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
         Jeden Tag wird die Temperatur um 17:20Uhr auf 21&deg;C und 17:25Uhr auf <b>eco</b> gesetzt.<p>
 
         <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Di,Mi|16:00|18.5 20:00|12
-          {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
+          {fhem("set dummy on"); fhem("set $NAME desired-temp $EVENT");}</code><br>
         Zu den definierten Schaltzeiten wird nur(!) der in {} angegebene Perl-Code ausgef&uumlhrt.<p>
 
         <code>define HCW Heating_Control WZ_Heizung Sa-So,Mi|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
