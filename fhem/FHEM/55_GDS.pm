@@ -1535,7 +1535,7 @@ sub _retrieveCAPDATA {
     my ($countInfo,$cF)		= _mergeCapFile($hash);
 	my ($aList,$cellData)	= _buildCAPList($hash,$countInfo,$cF);
 
-#	unlink $targetFile unless AttrVal($name,'gdsDebug',0); 
+	unlink $targetFile unless AttrVal($name,'gdsDebug',0); 
 
 	return "$name;;;$datafile;;;$aList;;;$cF;;;$cellData";
 }
