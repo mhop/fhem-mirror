@@ -1603,11 +1603,11 @@ sub _mergeCapFile($) {
     push (@alertsArray,"</gds>");
 
     # write the big XML file if needed
-#    if(AttrVal($name,"gdsDebug", 0)) {
+    if(AttrVal($name,"gdsDebug", 0)) {
        my $cF = $destinationDirectory."/gds_alerts";
        unlink $cF if -e $cF;
        FileWrite({ FileName=>$cF,ForceType=>"file" },@alertsArray);
-#    }
+    }
 
     my $xmlContent = join('',@alertsArray);
     return ($countInfo,$xmlContent);
