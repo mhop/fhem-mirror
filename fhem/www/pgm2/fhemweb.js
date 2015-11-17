@@ -765,7 +765,7 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
   var min = parseFloat(vArr[1]);
   var stp = parseFloat(vArr[2]);
   var max = parseFloat(vArr[3]);
-  var flt = vArr[4];
+  var flt = (vArr.length == 5 && vArr[4] == "1");
   var dp = 0; // decimal points for float
   if(flt) {
     var s = ""+stp;
@@ -797,10 +797,11 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
       return;
     maxX = slider.offsetWidth-sh.offsetWidth;
     offX = (currVal-min)*maxX/(max-min);
-    sh.innerHTML = currVal;
+    var strVal = (flt ? currVal.toFixed(dp) : ""+parseInt(currVal));
+    sh.innerHTML = strVal
     sh.setAttribute('style', 'left:'+offX+'px;');
     if(elName)
-      slider.nextSibling.setAttribute('value', currVal);
+      slider.nextSibling.setAttribute('value', strVal);
   }
 
   $(newEl).keydown(function(e){
@@ -809,12 +810,13 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
     if(currVal < min) currVal = min;
     if(currVal > max) currVal = max;
     offX = (currVal-min)*maxX/(max-min);
-    sh.innerHTML = currVal;
+    var strVal = (flt ? currVal.toFixed(dp) : ""+parseInt(currVal));
+    sh.innerHTML = strVal;
     sh.setAttribute('style', 'left:'+offX+'px;');
     if(cmd)
-      cmd(currVal);
+      cmd(strVal);
     if(elName)
-      slider.nextSibling.setAttribute('value', currVal);
+      slider.nextSibling.setAttribute('value', strVal);
   });
 
   function
@@ -877,8 +879,6 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
     currVal = (res ? parseFloat(res[0]) : min);
     if(currVal < min || currVal > max)
       currVal = min;
-    if(flt)
-      currVal = parseFloat(currVal).toFixed(dp);
     newEl.activateFn();
   };
   return newEl;
