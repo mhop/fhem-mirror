@@ -45,6 +45,12 @@ sub PIFACE_Notify(@);
 sub PIFACE_Attr(@);
 
 my $base = 200;
+my $gpioCmd;
+if (-e '/usr/local/bin/gpio') {
+  $gpioCmd = '/usr/local/bin/gpio';
+} else {
+  $gpioCmd = 'gpio';
+}
 
 sub PIFACE_Initialize($){
   my ($hash) = @_;
@@ -98,7 +104,7 @@ sub PIFACE_Set($@) {
 	if ($port ne "all") {
 		$adr = $base + $port;
 		Log3($name, 3, "PIFACE $name set port $port $val");
-		$cmd = "/usr/local/bin/gpio -p write $adr $val";
+		$cmd = "$gpioCmd -p write $adr $val";
 		$cmd = `$cmd`;
 		readingsSingleUpdate($hash, 'out'.$port, $val, 1);
 	} else {
@@ -110,7 +116,7 @@ sub PIFACE_Set($@) {
 			$k = ($k) ? 1 : 0;
 			Log3($name, 3, "PIFACE $name set port $i $k");
 			$adr = $base + $i;
-			$cmd = "/usr/local/bin/gpio -p write $adr $k";
+			$cmd = "$gpioCmd -p write $adr $k";
 			$cmd = `$cmd`;
 			readingsBulkUpdate($hash, 'out'.$i, $k);
 		}
@@ -137,7 +143,7 @@ sub PIFACE_Get($@){
           PIFACE_Read_Outports(0, $hash);	
 	} else {
 	  $adr  = $base + $port;
-	  $cmd = '/usr/local/bin/gpio -p read '.$adr;
+	  $cmd = "$gpioCmd -p read $adr";
 	  $val = `$cmd`;
 	  $val =~ s/\n//g;
 	  $val =~ s/\r//g;
@@ -153,7 +159,7 @@ sub PIFACE_Attr(@) {
   if ($attrName eq "pollInterval") {
     if (!defined $attrVal) {
       #RemoveInternalTimer($hash);    
-    } elsif ($attrVal eq "off" || $attrVal ~~ [1..10]) {
+    } elsif ($attrVal eq "off" || ($attrVal =~ m/^\d+?$/ && $attrVal > 0 && $attrVal < 11)) {
       PIFACE_GetUpdate($hash);
     } else {
       #RemoveInternalTimer($hash);    
@@ -180,9 +186,9 @@ sub PIFACE_Attr(@) {
       Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name $port");
     }
-    $cmd = '/usr/local/bin/gpio -p mode ' . $adr . ' ' . $portMode;
+    $cmd = "$gpioCmd -p mode $adr $portMode";
     $val = `$cmd`;
-    $cmd = '/usr/local/bin/gpio -p read ' . $adr;
+    $cmd = "$gpioCmd -p read $adr";
     $val = `$cmd`;
     $val =~ s/\n//g;
     $val =~ s/\r//g;
@@ -232,7 +238,7 @@ sub PIFACE_Read_Outports($$){
 	readingsBeginUpdate($hash);
 	for($i=0; $i<8; $i++){
 		$port = $base + $i + 8;
-		$cmd = '/usr/local/bin/gpio -p read '.$port;
+		$cmd = "$gpioCmd -p read $port";
 		$val = `$cmd`;
 		$val =~ s/\n//g;
 		$val =~ s/\r//g;
@@ -253,7 +259,7 @@ sub PIFACE_Read_Inports($$){
 	readingsBeginUpdate($hash);
 	for($i=0; $i<8; $i++){
 	  $port = $base + $i;
-	  $cmd = '/usr/local/bin/gpio -p read '.$port;
+	  $cmd = "$gpioCmd -p read $port";
 	  $val = `$cmd`;
 	  $val =~ s/\n//g;
 	  $val =~ s/\r//g;
@@ -319,24 +325,24 @@ PIFACE_Watchdog($) {
     for (my $i=0; $i<7; $i++) {
      $port = $base + $i;
      $portMode = AttrVal($name, "portMode" . $i, "tri");     
-     $cmd = '/usr/local/bin/gpio -p mode ' . $port . ' ' . $portMode;
+     $cmd = "$gpioCmd -p mode $port $portMode";
      $valIn = `$cmd`;
     }    
-    $cmd = '/usr/local/bin/gpio -p mode 207 up';
+    $cmd = "$gpioCmd -p mode 207 up";
     $valIn = `$cmd`;
-    $cmd = '/usr/local/bin/gpio -p read 207';
+    $cmd = "$gpioCmd -p read 207";
     $valIn = `$cmd`;
     $valIn =~ s/\n//g;
     $valIn =~ s/\r//g;
-    $cmd = '/usr/local/bin/gpio -p write 207 0';
+    $cmd = "$gpioCmd -p write 207 0";
     $cmd = `$cmd`;    
-    $cmd = '/usr/local/bin/gpio -p read 215';
+    $cmd = "$gpioCmd -p read 215";
     $valOut0 = `$cmd`;
     $valOut0 =~ s/\n//g;
     $valOut0 =~ s/\r//g;    
-    $cmd = '/usr/local/bin/gpio -p write 207 1';
+    $cmd = "$gpioCmd -p write 207 1";
     $cmd = `$cmd`;    
-    $cmd = '/usr/local/bin/gpio -p read 215';
+    $cmd = "$gpioCmd -p read 215";
     $valOut1 = `$cmd`;
     $valOut1 =~ s/\n//g;
     $valOut1 =~ s/\r//g;    
@@ -411,13 +417,14 @@ PIFACE_Watchdog($) {
   The use of PIFACE module requires some preparatory work.
   <ul>
     <br>
+    Raspbian Wheezy<br>
     <li>Module needs tools from <a href=http://wiringpi.com>Wiring Pi</a>. Install it with<br>
       <code>git clone git://git.drogon.net/wiringPi<br>
         cd wiringPi<br>
         ./build</code><br>
     </li>
     <li>PiFace Digital need the SPI pins on the Raspberry Pi to be enabled in order to function.
-    Start <code>sudo raspi-config</code>, select <code>Option 8 Advanced Options</code>
+    Start <code>sudo raspi-config</code>, select <code>8 Advanced Options</code>
     and set the <code>A5 SPI</code> option to "Yes".
     </li>
     <li>The function of the PiFace Digital can be tested at OS command line. For example:<br>
@@ -432,7 +439,26 @@ PIFACE_Watchdog($) {
       be executed in case of malfunction. For example, with <code>chmod +s /sbin/shutdown</code>
       or <code>sudo chmod +s /sbin/shutdown</code>.<br>
     </li>
-    
+  </ul>
+  <ul>
+    <br>
+    Raspbian Jessie<br>
+    <li>PiFace Digital need the SPI pins on the Raspberry Pi to be enabled in order to function.
+    Start <code>sudo raspi-config</code>, select <code>9 Advanced Options</code>
+    and set the <code>A6 SPI</code> option to "Yes".
+    </li>
+    <li>The function of the PiFace Digital can be tested at OS command line. For example:<br>
+    <code>gpio -p readall</code><br>
+    <code>gpio -p read 200</code><br>
+    <code>gpio -p write 201 0</code> or <code>gpio -p write 201 1</code><br>
+    </li>
+    <li>The watchdog function monitors the input port 7 and the output port 7.<br>
+      If the watchdog is enabled, this ports can not be used for other tasks.
+      In order to monitor the input port 7, it must be connected to the ground!<br>
+      The OS command "shutdown" must be enable for fhem if an OS restart is to
+      be executed in case of malfunction. For example, with <code>chmod +s /sbin/shutdown</code>
+      or <code>sudo chmod +s /sbin/shutdown</code>.<br>
+    </li>
   </ul>
   <br>
 	
