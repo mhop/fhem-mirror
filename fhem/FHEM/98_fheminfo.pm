@@ -74,7 +74,7 @@ CommandFheminfo($$)
        lc(AttrVal("global","sendStatistics","")) eq "never");
 
   my $branch   = "DEVELOPMENT"; # UNUSED
-  my $release  = "5.6";
+  my $release  = "5.7";
   my $os       = $^O;
   my $arch     = $Config{"archname"};
   my $perl     = $^V;
