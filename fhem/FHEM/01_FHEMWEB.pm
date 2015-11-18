@@ -106,6 +106,7 @@ my %FW_types;      # device types, for sorting
 my %FW_hiddengroup;# hash of hidden groups
 my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
+my $FW_id;         # id of current page
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
 my $FW_headercors; #
 my $FW_chash;      # client fhem hash
@@ -125,6 +126,7 @@ FHEMWEB_Initialize($)
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
   $hash->{NotifyFn}= ($init_done ? "FW_Notify" : "FW_SecurityCheck");
+  $hash->{AsyncOutputFn} = "FW_AsyncOutput";
   $hash->{ActivateInformFn} = "FW_ActivateInform";
   no warnings 'qw';
   my @attrList = qw(
@@ -476,6 +478,43 @@ FW_Read($$)
 }
 
 sub
+FW_AsyncOutput($$)
+{
+  my ($hash, $ret) = @_;
+
+  if( $ret =~ m/^<html>(.*)<\/html>$/s ) {
+    $ret = $1;
+
+  } else {
+    $ret =~ s/&/&amp;/g;
+    $ret =~ s/'/&apos;/g;
+    $ret =~ s/</&lt;/g;
+    $ret =~ s/>/&gt;/g;
+    $ret = "<pre>$ret</pre>" if($ret =~ m/\n/ );
+    $ret =~ s/\n/<br>/g;
+  }
+
+  # find the longpoll connection with the same fw_id as the page that was the
+  # origin of the get command
+  my $found = 0;
+  my $data = FW_longpollInfo('JSON',
+                                "#FHEMWEB:$FW_wname","FW_okDialog('$ret')","");
+  foreach my $d (keys %defs ) {
+    my $chash = $defs{$d};
+    next if( $chash->{TYPE} ne 'FHEMWEB' );
+    next if( !$chash->{inform} );
+    next if( !$chash->{FW_ID} || $chash->{FW_ID} ne $hash->{FW_ID} );
+    addToWritebuffer($chash, $data."\n");
+    $found = 1;
+    last;
+  }
+
+  $defs{$FW_wname}{asyncOutput}{$hash->{FW_ID}} = $data if( !$found );
+
+  return undef;
+}
+
+sub
 FW_closeConn($)
 {
   my ($hash) = @_;
@@ -601,6 +640,11 @@ FW_answerCall($)
     }
   }
 
+  if( $FW_id ) {
+    $me->{FW_ID} = $FW_id;
+    $me->{canAsyncOutput} = 1;
+  }
+
   if($FW_inform) {      # Longpoll header
     if($FW_inform =~ /type=/) {
       foreach my $kv (split(";", $FW_inform)) {
@@ -632,6 +676,12 @@ FW_answerCall($)
        $FW_headercors.
        "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
        FW_roomStatesForInform($me, $sinceTimestamp));
+
+    if( my $data = $defs{$FW_wname}{asyncOutput}{$FW_id} ) {
+      addToWritebuffer($me, $data."\n");
+      delete $defs{$FW_wname}{asyncOutput}{$FW_id};
+    }
+
     return -1;
   }
 
@@ -692,8 +742,9 @@ FW_answerCall($)
   # Redirect after a command, to clean the browser URL window
   if($docmd && !$FW_cmdret && AttrVal($FW_wname, "redirectCmds", 1)) {
     my $tgt = $FW_ME;
-       if($FW_detail) { $tgt .= "?detail=$FW_detail" }
-    elsif($FW_room)   { $tgt .= "?room=$FW_room" }
+       if($FW_detail) { $tgt .= "?detail=$FW_detail&fw_id=$FW_id" }
+    elsif($FW_room)   { $tgt .= "?room=$FW_room&fw_id=$FW_id" }
+    else              { $tgt .= "?fw_id=$FW_id" }
     TcpServer_WriteBlocking($me,
              "HTTP/1.1 302 Found\r\n".
              "Content-Length: 0\r\n". $FW_headercors.
@@ -782,7 +833,8 @@ FW_answerCall($)
   my $csrf= ($FW_CSRF ? "fwcsrf='$defs{$FW_wname}{CSRFTOKEN}'" : "");
   my $gen = 'generated="'.(time()-1).'"';
   my $lp  = 'longpoll="'.AttrVal($FW_wname,"longpoll",1).'"';
-  FW_pO "</head>\n<body name=\"$t\" $gen $lp $csrf>";
+  $FW_id = $FW_chash->{NR} if( !$FW_id );
+  FW_pO "</head>\n<body name=\"$t\" fw_id=\"$FW_id\" $gen $lp $csrf>";
 
   if($FW_activateInform) {
     $cmd = "style eventMonitor $FW_activateInform";
@@ -874,6 +926,7 @@ FW_digestCgi($)
   $FW_room = "";
   $FW_detail = "";
   $FW_XHR = undef;
+  $FW_id = undef;
   $FW_jsonp = undef;
   $FW_inform = undef;
 
@@ -900,6 +953,7 @@ FW_digestCgi($)
     if($p eq "pos")          { %FW_pos =  split(/[=;]/, $v); }
     if($p eq "data")         { $FW_data = $v; }
     if($p eq "XHR")          { $FW_XHR = 1; }
+    if($p eq "fw_id")        { $FW_id = $v; }
     if($p eq "jsonp")        { $FW_jsonp = $v; }
     if($p eq "inform")       { $FW_inform = $v; }
 
@@ -1363,7 +1417,8 @@ FW_roomOverview($)
   FW_pO "<div id=\"hdr\">";
   FW_pO '<table border="0" class="header"><tr><td style="padding:0">';
   FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME\">";
-  FW_pO FW_hidden("room", "$FW_room") if($FW_room);
+  FW_pO FW_hidden("fw_id", $FW_id) if($FW_id);
+  FW_pO FW_hidden("room", $FW_room) if($FW_room);
   FW_pO FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
   FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
   FW_pO "</form>";

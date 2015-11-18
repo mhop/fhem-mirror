@@ -52,8 +52,8 @@ function
 FW_jqueryReadyFn()
 {
   FW_docReady = true;
-  FW_serverGenerated = document.body.getAttribute("generated");
-  if(document.body.getAttribute("longpoll"))
+  FW_serverGenerated = $("body").attr("generated");
+  if($("body").attr("longpoll"))
     setTimeout("FW_longpoll()", 100);
 
   $("a").each(function() { FW_replaceLink(this); })
@@ -128,6 +128,7 @@ FW_jqueryReadyFn()
     });
     FW_cmd(FW_root+"?"+cmd+"&XHR=1&addLinks=1", function(data) {
       if(!data.match(/^[\r\n]*$/)) // ignore empty answers
+        data = data.replace( '<', '&lt;' );
         FW_okDialog('<pre>'+data+'</pre>', el);
     });
   });
@@ -146,12 +147,32 @@ FW_jqueryReadyFn()
     var input = $(this).find("input.maininput");
     if(!input.length)
       return;
-    $(this).on("submit", function() {
-      if($(input).val().match(/^\s*shutdown/)) {
-        FW_cmd(FW_root+"?XHR=1&cmd="+$(input).val());
+    $(this).on("submit", function(e) {
+      var val = $(input).val();
+      if(val.match(/^\s*shutdown/)) {
+        FW_cmd(FW_root+"?XHR=1&cmd="+val);
+        $(input).val("");
+        return false;
+
+      } else if(val.match(/^\s*get\s+/)) {
+        // make get use xhr instead of reload
+        //return true;
+        FW_cmd(FW_root+"?cmd="+val+"&XHR=1", function(data) {
+          if( !data.match( /^<html>.*<\/html>/ ) ) {
+            data = data.replace( '<', '&lt;' );
+            data = '<pre>'+data+'</pre>';
+          }
+          if( location.href.indexOf('?') === -1 )
+            $('#content').html(data);
+          else
+            FW_okDialog(data);
+        });
+
+        e.preventDefault();
         $(input).val("");
         return false;
       }
+
       return true;
     });
   });
@@ -215,7 +236,7 @@ log(txt)
 function
 addcsrf(arg)
 {
-  var csrf = document.body.getAttribute('fwcsrf');
+  var csrf = $("body").attr('fwcsrf');
   if(csrf && arg.indexOf('fwcsrf') < 0)
     arg += '&fwcsrf='+csrf;
   return arg;
@@ -226,6 +247,7 @@ FW_cmd(arg, callback)
 {
   log("FW_cmd:"+arg);
   arg = addcsrf(arg);
+  arg += '&fw_id='+$("body").attr('fw_id');
   var req = new XMLHttpRequest();
   req.open("POST", arg, true);
   req.send(null);
@@ -509,7 +531,7 @@ FW_longpoll()
         filter="room="+room;
     }
   }
-  var iP = document.body.getAttribute("iconPath");
+  var iP = $("body").attr("iconPath");
   if(iP != null)
     filter = filter +";iconPath="+iP;
 
@@ -519,6 +541,7 @@ FW_longpoll()
 
   var query = location.pathname+"?XHR=1"+
               "&inform=type=status;filter="+filter+";since="+since+";fmt=JSON"+
+              '&fw_id='+$("body").attr('fw_id')+
               "&timestamp="+new Date().getTime();
   query = addcsrf(query);
   FW_pollConn.open("GET", query, true);
