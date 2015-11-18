@@ -569,6 +569,8 @@ DUOFERN_Parse($$)
   my $code = substr($msg,30,6);
   $code = substr($msg,36,6) if ($msg =~ m/81.{42}/);
 
+  return $hash->{NAME} if ($code eq "FFFFFF");
+  
   my $def = $modules{DUOFERN}{defptr}{$code};
    
   my $def01;
@@ -1229,7 +1231,7 @@ DUOFERN_StatusTimeout($)
     <li><b>blindsMode [on|off]</b><br>
         Activates the blinds mode.
         </li><br>
-    <li><b>position &lt;value&gt;</b><br>
+    <li><b>slatPosition &lt;value&gt;</b><br>
         Set the slat to a desired absolut level.
         </li><br>   
     <li><b>defaultSlatPos &lt;value&gt;</b><br>
