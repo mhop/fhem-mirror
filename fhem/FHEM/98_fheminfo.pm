@@ -75,6 +75,7 @@ CommandFheminfo($$)
 
   my $branch   = "DEVELOPMENT"; # UNUSED
   my $release  = "5.7";
+  my $feature  = $featurelevel ? $featurelevel : $release;
   my $os       = $^O;
   my $arch     = $Config{"archname"};
   my $perl     = $^V;
@@ -112,7 +113,8 @@ CommandFheminfo($$)
 
   my $str;
   $str  = "Fhem info:\n";
-  $str .= sprintf("  Release%*s: %s\n",2," ",$release);
+  $str .= sprintf("  Release%*s: %s FeatureLevel: %s\n",
+                        2, " ", $release, $feature);
   $str .= sprintf("  OS%*s: %s\n",7," ",$os);
   $str .= sprintf("  Arch%*s: %s\n",5," ",$arch);
   $str .= sprintf("  Perl%*s: %s\n",5," ",$perl);
