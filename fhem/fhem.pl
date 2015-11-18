@@ -1601,10 +1601,31 @@ CommandGet($$)
     }
 
     $a[0] = $sdev;
+    $defs{$sdev}->{CL} = $cl;
     my $ret = CallFn($sdev, "GetFn", $defs{$sdev}, @a);
+    delete $defs{$sdev}->{CL};
     push @rets, $ret if(defined($ret) && $ret ne "");
   }
   return join("\n", @rets);
+}
+
+sub
+asyncOutput($$)
+{
+  my ($cl,$ret) = @_;
+
+  return undef if( !$cl );
+
+  if( !$defs{$cl->{NAME}}
+      || $defs{$cl->{NAME}}->{NR} != $cl->{NR}
+      || $defs{$cl->{NAME}}->{NAME} ne $cl->{NAME} ) {
+    Log3 $cl->{NAME},3,"$cl->{NAME} asyncOutput: device gone, output was: $ret";
+    return undef;
+  }
+
+  $ret = CallFn($cl->{NAME}, "AsyncOutputFn", $defs{$cl->{NAME}}, $ret);
+
+  return $ret;
 }
 
 #####################################

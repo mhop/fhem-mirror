@@ -17,6 +17,7 @@ telnet_Initialize($)
 
   $hash->{DefFn}   = "telnet_Define";
   $hash->{ReadFn}  = "telnet_Read";
+  $hash->{AsyncOutputFn}  = "telnet_Output";
   $hash->{UndefFn} = "telnet_Undef";
   $hash->{AttrFn}  = "telnet_Attr";
   $hash->{NotifyFn}= "telnet_SecurityCheck";
@@ -187,6 +188,7 @@ telnet_Read($)
   if($hash->{SERVERSOCKET}) {   # Accept and create a child
     my $chash = TcpServer_Accept($hash, "telnet");
     return if(!$chash);
+    $chash->{canAsyncOutput} = 1;
     $chash->{encoding} = AttrVal($name, "encoding", "utf8");
     $chash->{prompt}  = AttrVal($name, "prompt", "fhem>");
     syswrite($chash->{CD}, sprintf("%c%c%c", 255, 253, 0) )
@@ -203,6 +205,7 @@ telnet_Read($)
     if($hash->{isClient}) {
       telnet_ClientDisconnect($hash, 0);
     } else {
+      delete $hash->{canAsyncOutput};
       CommandDelete(undef, $name);
     }
     return;
@@ -284,17 +287,10 @@ telnet_Read($)
   $ret .= (join("\n", @ret) . "\n") if(@ret);
   $ret .= ($hash->{prevlines} ? "> " : $hash->{prompt}." ")
           if($gotCmd && $hash->{showPrompt} && !$hash->{rcvdQuit});
-  if($ret) {
-    $ret = utf8ToLatin1($ret) if( $hash->{encoding} eq "latin1" );
-    $ret =~ s/\n/\r\n/g if($pw);  # only for DOS telnet 
-    for(;;) {
-      my $l = syswrite($hash->{CD}, $ret);
-      last if(!$l || $l == length($ret));
-      $ret = substr($ret, $l);
-    }
-    $hash->{CD}->flush();
 
-  }
+  $ret =~ s/\n/\r\n/g if($pw);  # only for DOS telnet 
+  telnet_Output($hash,$ret);
+
   if($hash->{rcvdQuit}) {
     if($hash->{isClient}) {
       delete($hash->{rcvdQuit});
@@ -303,6 +299,24 @@ telnet_Read($)
       CommandDelete(undef, $name);
     }
   }
+}
+sub
+telnet_Output($$)
+{
+  my ($hash,$ret) = @_;
+
+  if($ret) {
+    $ret = utf8ToLatin1($ret) if( $hash->{encoding} eq "latin1" );
+    for(;;) {
+      my $l = syswrite($hash->{CD}, $ret);
+      last if(!$l || $l == length($ret));
+      $ret = substr($ret, $l);
+    }
+    $hash->{CD}->flush();
+
+  }
+
+  return undef;
 }
 
 ##########################
