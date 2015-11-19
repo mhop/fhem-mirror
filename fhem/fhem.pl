@@ -44,7 +44,7 @@ sub AddDuplicate($$);
 sub AnalyzeCommand($$;$);
 sub AnalyzeCommandChain($$;$);
 sub AnalyzeInput($);
-sub AnalyzePerlCommand($$);
+sub AnalyzePerlCommand($$;$);
 sub AssignIoPort($;$);
 sub AttrVal($$$);
 sub CallFn(@);
@@ -932,9 +932,9 @@ AnalyzeCommandChain($$;$)
 
 #####################################
 sub
-AnalyzePerlCommand($$)
+AnalyzePerlCommand($$;$)
 {
-  my ($cl, $cmd) = @_;
+  my ($cl, $cmd, $calledFromChain) = @_;
 
   $cmd =~ s/\\ *\n/ /g;               # Multi-line. Probably not needed anymore
 
@@ -967,7 +967,7 @@ AnalyzePerlCommand($$)
            . $cmd;
     # Normally this is deleted in AnalyzeCommandChain, but ECMDDevice calls us
     # directly, and combining perl with something else isnt allowed anyway.
-    $evalSpecials = undef;
+    $evalSpecials = undef if(!$calledFromChain);
   }
 
   $cmdFromAnalyze = $cmd;
@@ -991,7 +991,7 @@ AnalyzeCommand($$;$)
 
   if($cmd =~ m/^{.*}$/s) {              # Perl code
     return "Forbidden command $cmd." if($allowed && $allowed !~ m/\bperl\b/);
-    return AnalyzePerlCommand($cl, $cmd);
+    return AnalyzePerlCommand($cl, $cmd, 1);
   }
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
