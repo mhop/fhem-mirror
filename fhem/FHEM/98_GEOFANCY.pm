@@ -181,6 +181,7 @@ sub GEOFANCY_CGI() {
     my $id      = "";
     my $lat     = "";
     my $long    = "";
+    my $address = "-";
     my $entry   = "";
     my $msg     = "";
     my $date    = "";
@@ -330,6 +331,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
             $date    = $webArgs->{date};
             $lat     = $webArgs->{latitude};
             $long    = $webArgs->{longitude};
+            $address = $webArgs->{address} if (defined($webArgs->{address}));
             $device  = $webArgs->{device};
         }
         else {
@@ -397,7 +399,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
     # General readings
     readingsBulkUpdate( $hash, "state",
-"id:$id name:$locName trig:$entry date:$date lat:$lat long:$long dev:$device"
+"id:$id name:$locName trig:$entry date:$date lat:$lat long:$long address:$address dev:$device"
     );
 
     $id = $locName if ( defined($locName) && $locName ne "" );
@@ -414,6 +416,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         readingsBulkUpdate( $hash, "currLoc_" . $device,     $id );
         readingsBulkUpdate( $hash, "currLocLat_" . $device,  $lat );
         readingsBulkUpdate( $hash, "currLocLong_" . $device, $long );
+        readingsBulkUpdate( $hash, "currLocAddr_" . $device, $address );
         readingsBulkUpdate( $hash, "currLocTime_" . $device, $time );
     }
     elsif ( $entry eq "exit" || $entry eq "0" ) {
@@ -447,6 +450,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         readingsBulkUpdate( $hash, "currLoc_" . $device,     "underway" );
         readingsBulkUpdate( $hash, "currLocLat_" . $device,  "-" );
         readingsBulkUpdate( $hash, "currLocLong_" . $device, "-" );
+        readingsBulkUpdate( $hash, "currLocAddr_" . $device, "-" );
         readingsBulkUpdate( $hash, "currLocTime_" . $device, $time );
     }
 
