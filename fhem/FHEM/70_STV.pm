@@ -18,8 +18,6 @@ use warnings;
 use IO::Socket::INET;
 use Sys::Hostname;
 use MIME::Base64;
-use Net::Address::IP::Local; #libnet-address-ip-local-perl
-use IO::Interface::Simple; # libio-interface-perl
 use DevIo;
 
 my @gets = ('dummy');
@@ -67,6 +65,16 @@ STV_SetState($$$$)
 sub getIP()
 {
   my $address = eval {Net::Address::IP::Local->public_ipv4};
+  if ($@) {
+    $address = 'localhost';
+  } 
+  return "$address";
+}
+
+sub getIP_old()
+{
+  my $host = hostname();
+  my $address = inet_ntoa(scalar gethostbyname(hostname() || 'localhost'));
   if ($@) {
     $address = 'localhost';
   } 
@@ -210,13 +218,65 @@ sub STV_Define($$)
 "SUB_TITLE SVIDEO1 SVIDEO2 SVIDEO3 TOOLS TOPMENU TTX_MIX TTX_SUBFACE TURBO TV TV_MODE UP VCHIP VCR_MODE ".
 "VOLDOWN VOLUP WHEEL_LEFT WHEEL_RIGHT W_LINK YELLOW ZOOM1 ZOOM2 ZOOM_IN ZOOM_MOVE ZOOM_OUT connect";
 
-    $hash->{MyIP} = getIP();
-    $hash->{MAC} = getMAC4IP($hash->{MyIP});
+    my $rc = eval
+    {
+      require Net::Address::IP::Local;
+      require IO::Interface::Simple;
+      Net::Address::IP::Local->import();
+      IO::Interface::Simple->import();
+      1;
+    };
+
+    if($rc)
+    {
+
+      $hash->{MyIP} = getIP();
+      $hash->{MAC} = getMAC4IP($hash->{MyIP});
     
-    $hash->{DeviceName} = $hash->{Host} . ":" . $hash->{Port};
-    my $dev = $hash->{DeviceName};
-    $readyfnlist{"$args[0].$dev"} = $hash;
-    Log3 undef, 3, "[STV] defined with host: $hash->{Host} port: $hash->{Port} MAC: $hash->{MAC}";
+      $hash->{DeviceName} = $hash->{Host} . ":" . $hash->{Port};
+      my $dev = $hash->{DeviceName};
+      $readyfnlist{"$args[0].$dev"} = $hash;
+      Log3 undef, 3, "[STV] defined with host: $hash->{Host} port: $hash->{Port} MAC: $hash->{MAC}";
+    }else{
+      Log3 undef, 3, "[STV] You are using a deprecated MAC detection mechanism using ifconfig.";
+      Log3 undef, 3, "[STV] Please install Pearl Modules libnet-address-ip-local-perl and libio-interface-perl";
+
+    my $system = $^O;
+    my $result = "";
+    if($system =~ m/Win/) {
+      $result = `ipconfig /all`;
+      my @myarp=split(/\n/,$result);
+      foreach (@myarp){
+        if ( /([0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2}[:-][0-9a-f]{2})$/i )
+        {
+          $result = $1;
+          $result =~ s/-/:/g;
+        }
+      }
+    }
+    if($system eq "linux") {
+      $result = `ifconfig -a`;
+      my @myarp=split(/\n/,$result);
+      foreach (@myarp){
+        if ( /^(lan|eth0) .*(..:..:..:..:..:..) .*$/ )
+        {
+          $result = $2;
+        }
+      }
+    }
+    # Fritzbox "? (192.168.0.1) at 00:0b:5d:91:fc:bb [ether]  on lan"
+    # debian   "192.168.0.1              ether   c0:25:06:1f:3c:14   C                     eth0"
+    #$result = "? (192.168.0.1) at 00:0b:5d:91:fc:bb [ether]  on lan";
+
+      $hash->{MAC} = $result;
+
+      $hash->{MyIP} = getIP_old();
+    
+      $hash->{DeviceName} = $hash->{Host} . ":" . $hash->{Port};
+      my $dev = $hash->{DeviceName};
+      $readyfnlist{"$args[0].$dev"} = $hash;
+	
+   }
   } 
 
   if ( $hash->{Port} != 55000 && $hash->{Port} != 52235 ){
