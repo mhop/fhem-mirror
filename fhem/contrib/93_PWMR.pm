@@ -16,6 +16,9 @@
 # 05.11.15 GA fix new reading desired-temp-until which substitutes modification date of desired-temp in the future
 #                 events for desired-temp adjusted (no update of timestamp if temperature stays the same)
 # 10.11.15 GA fix event for actor change added again, desired-temp notifications adjusted for midnight change
+# 17.11.15 GA add ReadRoom will now set a reading named temperature containing the last temperature used for calculation
+# 18.11.15 GA add adjusted energyusedp to be in percent. Now it can be used in Tablet-UI as valve-position
+# 19.11.15 GA fix move actorState to readings
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -516,9 +519,19 @@ PWMR_Define($$)
   $a_regexp_on = "on" unless defined ($a_regexp_on);
 
   $tactor              =~ s/dummy//;
+
+  if (!$defs{$tactor} && $tactor ne "dummy")
+  {
+    my $msg = "$name: Unknown actor device $tactor specified";
+    Log3 ($hash, 3, "PWMR_Define $msg");
+    return $msg;
+  }
+
   $hash->{actor}       = $tactor;
   $hash->{a_regexp_on} = $a_regexp_on;
-  $hash->{actorState}  = "unknown";
+  #$hash->{actorState}  = "unknown";
+
+  readingsSingleUpdate ($hash,  "actorState", "unknown", 0);
 
   $hash->{STATE}       = "Initialized";
 
@@ -589,10 +602,10 @@ PWMR_SetRoom(@)
 
   readingsBeginUpdate ($room);
   readingsBulkUpdate ($room,  "energyused", $energyused);
-  readingsBulkUpdate ($room,  "energyusedp", sprintf ("%.2f", ($energyused =~ tr/1//) /30));
-  readingsEndUpdate($room, 0);
+  readingsBulkUpdate ($room,  "energyusedp", sprintf ("%.1f", ($energyused =~ tr/1//) /30*100));
   
   if ($newState eq "") {
+    readingsEndUpdate($room, 1);
     return;
   }
 
@@ -602,8 +615,11 @@ PWMR_SetRoom(@)
     if (!defined($ret)) {    # sucessfull
       Log3 ($room, 2, "PWMR_SetRoom $room->{NAME}: set $room->{actor} $newState");
        
-      $room->{actorState}                 = $newState;
-      readingsSingleUpdate ($room,  "lastswitch", time(), 1);
+      #$room->{actorState}                 = $newState;
+
+      readingsBulkUpdate ($room,  "actorState", $newState);
+      readingsBulkUpdate ($room,  "lastswitch", time());
+      readingsEndUpdate($room, 1);
 
       push @{$room->{CHANGED}}, "actor $newState";
       DoTrigger($name, undef);
@@ -660,7 +676,8 @@ PWMR_ReadRoom(@)
     } elsif (defined($defs{$room->{actor}}->{STATE})) {
       $actorV =  $defs{$room->{actor}}->{STATE};
     } else {
-      $actorV = $room->{actorState};
+      #$actorV = $room->{actorState};
+      $actorV = $room->{READINGS}{actorState};
     } 
 
     #my $actorVOrg = $actorV;
@@ -723,17 +740,23 @@ PWMR_ReadRoom(@)
   
   my $factoroffset = $room->{FOFFSET};
   
-  my $PWMPulse    = min ($MaxPulse,  (( $deltaTemp * $factor) ** 2) + $factoroffset);
+  $newpulse        = min ($MaxPulse,  (( $deltaTemp * $factor) ** 2) + $factoroffset); # default 85% max ontime
+  $newpulse        = sprintf ("%.2f", $newpulse);
 
-  $newpulse       = $PWMPulse;
-  #$newpulse       = min ($MaxPulse, $newpulse); # default 85% max ontime
-  $newpulse       = sprintf ("%.2f", $newpulse);
+  
+  my $PWMPulse     = $newpulse * 100;
+  my $PWMOnTime    =  sprintf ("%02s:%02s", int ($newpulse * $cycletime / 60), ($newpulse * $cycletime) % 60);
 
-  my $PWMOnTime =  sprintf ("%02s:%02s", int ($PWMPulse * $cycletime / 60), ($PWMPulse * $cycletime) % 60);
+  my $iodev = $room->{IODev};
+  if ($newpulse * $defs{$iodev}->{CYCLETIME} < $defs{$iodev}->{MINONOFFTIME}) {
+	$PWMPulse = 0;
+	$PWMOnTime = "00:00";
+  }
 
   readingsBeginUpdate ($room);
   readingsBulkUpdate ($room,  "PWMOnTime", $PWMOnTime);
-  readingsBulkUpdate ($room,  "PWMPulse", $newpulse);
+  readingsBulkUpdate ($room,  "PWMPulse", $PWMPulse);
+  readingsBulkUpdate ($room,  "temperature", $temperaturV);
   readingsEndUpdate($room, 1);
 
   
