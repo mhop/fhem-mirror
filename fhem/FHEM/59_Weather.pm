@@ -163,6 +163,33 @@ my @iconlist = (
        'sunny', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredthunderstorms', 'scatteredshowers', 'heavysnow',
        'chance_of_snow', 'heavysnow', 'partly_cloudy', 'heavyrain', 'chance_of_snow', 'scatteredshowers');
 
+my @months= qw/Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec/;
+my %monthindex;
+@monthindex{@months} = (0..$#months);
+       
+sub Weather_ParseDateTime($) {
+
+    my ($value)= @_; ### "Fri, 13 Nov 2015 8:00 am CET"
+    
+    if($value =~ '^(\w{3}), (\d{1,2}) (\w{3}) (\d{4}) (\d{1,2}):(\d{2}) (\w{2}) (\w{3})$') {
+        my ($wd, $d, $mon, $y, $h, $n, $p, $tz)= ($1,$2,$3,$4,$5,$6,$7,$8);
+        # 12 AM= 0, 12 PM= 12
+        $h+=12 if($h==12); if($p eq "pm") { $h= ($h+12) % 24 } else { $h%= 12 };
+        my $m= $monthindex{$mon};
+        return undef unless $m;
+        #main::Debug "######  $value -> $wd $d $m $y $h:$n $tz";
+        # $mday= 1.. 
+        # $month= 0..11
+        # $year is year-1900
+        # we ignore the time zone as it probably never changes for a weather device an assume
+        # local time zone
+        return fhemTimeLocal(0, $n, $h, $d, $m, $y-1900);
+    } else {
+        return undef;
+    }
+}
+       
+       
 ###################################
 sub Weather_DebugCodes() {
 
@@ -340,17 +367,14 @@ sub Weather_RetrieveDataFinished($$$)
         my $value= $1;
         ### pubDate  Fri, 13 Nov 2015 8:00 am CET
         $urlResult->{"readings"}->{"pubDate"}= $value;
-        my $strp = DateTime::Format::Strptime->new(
-            pattern   => '%a, %d %b %Y %I:%M %p %Z',
-            locale    => 'en_US');
-        ##main::Debug "pubDate= $value";    
-        my $ts= $strp->parse_datetime($value);
+        
+        my $ts= Weather_ParseDateTime($value);
         if(defined($ts)) {
-            $urlResult->{"readings"}->{"pubDateTs"}= $ts->epoch();
+            $urlResult->{"readings"}->{"pubDateTs"}= $ts;
             $urlResult->{"readings"}->{"pubDateComment"}= "okay";
         } else {
             $urlResult->{"readings"}->{"pubDateTs"}= 0;
-            $urlResult->{"readings"}->{"pubDateComment"}= "pubDate: " . $strp->errmsg unless(defined($ts));
+            $urlResult->{"readings"}->{"pubDateComment"}= "could not parse pubDate $value";
         } 
         next;
       }
@@ -458,8 +482,9 @@ sub Weather_RetrieveDataFinished($$$)
       my $ts2= $urlResult->{"readings"}->{"pubDateTs"};
 
       readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "pubDateRemote", $urlResult->{"readings"}->{"pubDate"});
       
-      main::Debug "ts1= $ts1, ts2= $ts2";
+      #main::Debug "ts1= $ts1, ts2= $ts2";
         
       if($ts1 && $ts2 && ($ts2< $ts1)) {
         readingsBulkUpdate($hash, "validity", "stale");
@@ -740,9 +765,6 @@ WeatherAsHtmlD($;$)
     <br>
     Defines a virtual device for weather forecasts.<br><br>
     
-    You need the DateTime::Format::Strptime perl module. On Debian and derivatives, it can be installed
-    via apt-get install libdatetime-format-strptime-perl.
-
     A Weather device periodically gathers current and forecast weather conditions
     from the Yahoo Weather API.<br><br>
 
@@ -825,6 +847,14 @@ WeatherAsHtmlD($;$)
     <tr><td>wind_direction</td><td>direction wind comes from in degrees (0 = north wind)</td></tr>
     <tr><td>wind_speed</td><td>same as wind</td></tr>
     </table>
+    <br>
+    The following readings help to identify whether a workaround has kicked in to avoid the retrieval of
+    stale data from the remote server:
+    <table>
+    <tr><td>pubDate</td><td>publication time of forecast for current set of readings</td></tr>
+    <tr><td>pubDateRemote</td><td>publication time of forecast as seen on remote server</td></tr>
+    <tr><td>validity</td><td>stale, if publication time as seen on remote server is before that of current set of readings</td></tr>
+    </table>
 
   </ul>
   <br>
@@ -853,9 +883,6 @@ WeatherAsHtmlD($;$)
     <br>
     Bezechnet ein virtuelles Gerät für Wettervorhersagen.<br><br>
 
-    Man braucht das Perl-Modul DateTime::Format::Strptime. Auf Debian und seinen Derivaten wird es 
-    via apt-get install libdatetime-format-strptime-perl installiert.
-    
     Eine solche virtuelle Wetterstation sammelt periodisch aktuelle und zukünftige Wetterdaten aus der Yahoo-Wetter-API.<br><br>
 
     Der Parameter <code>location</code> entspricht der sechsstelligen WOEID (WHERE-ON-EARTH-ID). Die WOEID für den eigenen Standort kann auf <a href="http://weather.yahoo.com">http://weather.yahoo.com</a> gefunden werden.<br><br>
@@ -922,6 +949,14 @@ WeatherAsHtmlD($;$)
     <tr><td>wind_condition</td><td>Windrichtung und -geschwindigkeit</td></tr>
     <tr><td>wind_direction</td><td>Gradangabe der Windrichtung (0 = Nordwind)</td></tr>
     <tr><td>wind_speed</td><td>Windgeschwindigkeit in km/h (mit wind identisch)</td></tr>
+    </table>
+    <br>
+    Die folgenden Daten helfen zu identifizieren, ob ein Workaround angeschlagen hat, der die Verwendung von
+    veralteten Daten auf dem entfernten Server verhindert:
+    <table>
+    <tr><td>pubDate</td><td>Ver&ouml;ffentlichungszeitpunkt der Wettervorhersage in den aktuellen Daten (readings)</td></tr>
+    <tr><td>pubDateRemote</td><td>Ver&ouml;ffentlichungszeitpunkt der Wettervorhersage auf dem entfernten Server</td></tr>
+    <tr><td>validity</td><td>stale, wenn der Ver&ouml;ffentlichungszeitpunkt auf dem entfernten Server vor dem Zeitpunkt der aktuellen Daten (readings) liegt</td></tr>
     </table>
 
   </ul>
