@@ -187,29 +187,28 @@ sub HP1000_CGI() {
       $p = "pressure_abs" if ($p eq "absbaro");
       $p = "humidity_indoor" if ($p eq "inhumi");
       $p = "temperature_indoor" if ($p eq "intemp");
+      $p = "lightsensor" if ($p eq "light");
       $p = "humidity" if ($p eq "outhumi");
       $p = "temperature" if ($p eq "outtemp");
-      $p = "rain" if ($p eq "rainrate");
+      $p = "rain_rate" if ($p eq "rainrate");
       $p = "pressure" if ($p eq "relbaro");
       $p = "rain_day" if ($p eq "dailyrain");
       $p = "rain_week" if ($p eq "weeklyrain");
       $p = "rain_month" if ($p eq "monthlyrain");
       $p = "rain_year" if ($p eq "yearlyrain");
+      $p = "wind_chill" if ($p eq "windchill");
+      $p = "wind_direction" if ($p eq "winddir");
+      $p = "wind_gust" if ($p eq "wind_gust");
+      $p = "wind_speed" if ($p eq "windspeed");
 
       # add to state
       $result .= " "      if ($result ne "");
-      $result .= "T:$v"   if ($p eq "temperature");
-      $result .= "H:$v"   if ($p eq "humidity");
-      $result .= "Ti:$v" if ($p eq "temperature_indoor");
-      $result .= "Hi:$v" if ($p eq "humidity_indoor");
-      $result .= "P:$v"   if ($p eq "pressure");
-      $result .= "R:$v"   if ($p eq "rain");
-      $result .= "L:$v"   if ($p eq "light");
-      $result .= "UV:$v"  if ($p eq "uv");
-      $result .= "WC:$v"  if ($p eq "windchill");
-      $result .= "WD:$v"  if ($p eq "winddir");
-      $result .= "WG:$v"  if ($p eq "windgust");
-      $result .= "WS:$v"  if ($p eq "windspeed");
+      $result .= "T: $v"   if ($p eq "temperature");
+      $result .= "H: $v"   if ($p eq "humidity");
+      $result .= "Ti: $v"  if ($p eq "temperature_indoor");
+      $result .= "Hi: $v"  if ($p eq "humidity_indoor");
+      $result .= "P: $v"   if ($p eq "pressure");
+      $result .= "W: $v"  if ($p eq "wind_speed");
 
       readingsBulkUpdate( $hash, lc($p), $v );
     }
