@@ -1,7 +1,7 @@
 ###############################################################
 # $Id$
 #
-#  59_OPENWEATHER.pm
+#  59_OPENWEATHER.pm 
 #
 #  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
 #
