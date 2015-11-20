@@ -20,7 +20,7 @@ sub JeeLink_Write($$);
 sub JeeLink_SimpleWrite(@);
 sub JeeLink_ResetDevice($);
 
-my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:ETH200comfort:CUL_IR:HX2272:FS20:AliRF:Level:EMT7110";
+my $clientsJeeLink = ":PCA301:EC3000:RoomNode:LaCrosse:ETH200comfort:CUL_IR:HX2272:FS20:AliRF:Level:EMT7110:KeyValueProtocol";
 
 my %matchListPCA301 = (
     "1:PCA301"           => "^\\S+\\s+24",
@@ -30,6 +30,7 @@ my %matchListPCA301 = (
     "5:AliRF"            => "^\\S+\\s+5 ",
     "6:EMT7110"          => "^OK\\sEMT7110\\s",
     "7:KeyValueProtocol" => "^OK\\sVALUES\\s",
+   "77:KeyValueProtocol" => "^OK\\sDICTIONARY\\s",
 );
 
 my %matchListJeeLink433 = (
