@@ -750,7 +750,7 @@
 		<Product type="2007" id="0703" name="Plug-in Switch"/>
 		<Product type="2008" id="0803" name="ZL7101 Plug-in Dimmer Module"/>
 		<Product type="2009" id="0903" name="ZM1602 Main Operated Siren" config="vision/zm1602eu.xml"/>
-		<Product type="2009" id="0908" name="ZM1602 Main Operated Siren" config="vision/zm1602eu.xml"/>
+		<Product type="2009" id="0908" name="ZM1602-5 Main Operated Siren" config="vision/zm1601eu_5.xml"/>
                 <Product type="200a" id="0a02" name="ZG8101 Garage Door Detector" config="vision/zg8101.xml"/>
 		<Product type="200f" id="0f02" name="ZS6301 CO Detector"/>
 		<Product type="200f" id="0f03" name="ZS6301 CO Detector"/>
