@@ -98,7 +98,7 @@ SD_WS07_Parse($$)
   #}
     my $bitData2 = substr($bitData,0,8) . ' ' . substr($bitData,8,1) . ' ' . substr($bitData,9,3);
        $bitData2 = $bitData2 . ' ' . substr($bitData,12,12) . ' ' . substr($bitData,24,4) . ' ' . substr($bitData,28,8);
-    Log3 $iohash, 3, $model . ' converted to bits: ' . $bitData2;
+    Log3 $iohash, 5, $model . ' converted to bits: ' . $bitData2;
     
     my $id = substr($rawData,0,2);
     my $bat = int(substr($bitData,8,1)) eq "1" ? "ok" : "low";
@@ -127,13 +127,13 @@ SD_WS07_Parse($$)
     }  
     $temp /= 10;
     
-    Log3 $iohash, 3, "$model decoded protocolid: 7 sensor id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat" ;
+    Log3 $iohash, 4, "$model decoded protocolid: 7 sensor id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat" ;
     my $deviceCode;
     
 	my $longids = AttrVal($iohash->{NAME},'longids',0);
 	if ( ($longids != 0) && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))
 	{
-		$deviceCode=$model._$id.$channel;
+		$deviceCode=$model."_".$id.$channel;
 		Log3 $iohash,4, "$name using longid: $longids model: $model";
 	} else {
 		$deviceCode = $model . "_" . $channel;
@@ -153,7 +153,7 @@ SD_WS07_Parse($$)
 	
 	my $hash = $def;
 	$name = $hash->{NAME};
-	Log3 $name, 4, "SD_WS07: $name ($rawData)";  
+	Log3 $name, 5, "SD_WS07: $name ($rawData)";  
 
 	if (!defined(AttrVal($hash->{NAME},"event-min-interval",undef)))
 	{

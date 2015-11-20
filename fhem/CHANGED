@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  14_SD_WS07 - corrected syntax error and raised loglevels
   - bugfix:  55_GDS.pm - correct wrong cumulation in alerts (1st try)
   - feature: new module 10_DUOFERNSTICK and 30_DUOFERN added
   - feature: 59_Weather: prevent retrieval of older forecasts than the

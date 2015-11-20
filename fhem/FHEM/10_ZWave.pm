@@ -2784,7 +2784,7 @@ ZWave_Parse($$@)
     my @vals = ("learnReady", "nodeFound", "slave",
                 "controller", "protocolDone", "done", "failed");
     $evt = ($id eq "00" || hex($id)>@vals+1) ? "unknownArg" : $vals[hex($id)-1];
-    if(($evt eq "slave" || $evt eq "controller") &&
+    if($evt eq "slave" &&
        $arg =~ m/(..)....(..)..(.*)$/) {
       my ($id,$type6,$classes) = ($1, $2, $3);
       return ZWave_SetClasses($homeId, $id, $type6, $classes)
