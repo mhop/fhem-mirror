@@ -32,7 +32,7 @@ use vars qw(%data);
 use HttpUtils;
 use Time::Local;
 use Data::Dumper;
-use 98_dewpoint;
+use FHEM::98_dewpoint;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
@@ -203,7 +203,7 @@ sub HP1000_CGI() {
       $p = "windGust" if ($p eq "windgust");
       $p = "windSpeed" if ($p eq "windspeed");
 
-      readingsBulkUpdate( $hash, lc($p), $v );
+      readingsBulkUpdate( $hash, $p, $v );
     }
 
     # calculated readings
@@ -211,19 +211,19 @@ sub HP1000_CGI() {
 
     # dewpointIndoor
     if (defined($webArgs->{intemp}) && defined($webArgs->{inhumi})) {
-      my $v = dewpoint_dewpoint($webArgs->{intemp}, $webArgs->{inhumi});
+      my $v = int( dewpoint_dewpoint($webArgs->{intemp}, $webArgs->{inhumi}) + 0.5 );
       readingsBulkUpdate( $hash, "dewpointIndoor", $v );
     }
 
     # humidityAbs
     if (defined($webArgs->{outtemp}) && defined($webArgs->{outhumi})) {
-      my $v = dewpoint_absFeuchte($webArgs->{outtemp}, $webArgs->{outhumi});
+      my $v = int( dewpoint_absFeuchte($webArgs->{outtemp}, $webArgs->{outhumi}) + 0.5 );
       readingsBulkUpdate( $hash, "humidityAbs", $v );
     }
 
     # humidityIndoorAbs
     if (defined($webArgs->{intemp}) && defined($webArgs->{inhumi})) {
-      my $v = dewpoint_absFeuchte($webArgs->{intemp}, $webArgs->{inhumi});
+      my $v = int( dewpoint_absFeuchte($webArgs->{intemp}, $webArgs->{inhumi}) + 0.5 );
       readingsBulkUpdate( $hash, "humidityIndoorAbs", $v );
     }
     
