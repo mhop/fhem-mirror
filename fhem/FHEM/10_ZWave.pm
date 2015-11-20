@@ -2079,13 +2079,13 @@ ZWave_secSupported($$)
     }
 
     foreach $classname (split(" ", $s1)) {
-      if ($c1 !~ m/$classname/) {
+      if ($c1 !~ m/\b$classname\b/) {
         $c1 = join (" ", $c1, $classname);
       }
     }
 
     foreach $classname (split(" ", $s2)) {
-      if ($c2 !~ m/$classname/) {
+      if ($c2 !~ m/\b$classname\b/) {
         $c2 = join (" ", $c2, $classname);
       }
     }
