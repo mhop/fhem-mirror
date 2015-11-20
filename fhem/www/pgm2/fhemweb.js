@@ -128,7 +128,6 @@ FW_jqueryReadyFn()
     });
     FW_cmd(FW_root+"?"+cmd+"&XHR=1&addLinks=1", function(data) {
       if(!data.match(/^[\r\n]*$/)) // ignore empty answers
-        data = data.replace( '<', '&lt;' );
         FW_okDialog('<pre>'+data+'</pre>', el);
     });
   });
