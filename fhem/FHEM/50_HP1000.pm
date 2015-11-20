@@ -32,6 +32,7 @@ use vars qw(%data);
 use HttpUtils;
 use Time::Local;
 use Data::Dumper;
+use 98_dewpoint;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
@@ -178,40 +179,77 @@ sub HP1000_CGI() {
 
     readingsBeginUpdate($hash);
 
+    # write general readings
     while ( (my $p, my $v) = each %$webArgs ) {
       # ignore those values
       next if ($v eq "");
 
       # name translation
-      $p = "uv" if ($p eq "UV");
-      $p = "pressure_abs" if ($p eq "absbaro");
-      $p = "humidity_indoor" if ($p eq "inhumi");
-      $p = "temperature_indoor" if ($p eq "intemp");
-      $p = "lightsensor" if ($p eq "light");
+      $p = "humidityIndoor" if ($p eq "inhumi");
+      $p = "temperatureIndoor" if ($p eq "intemp");
       $p = "humidity" if ($p eq "outhumi");
       $p = "temperature" if ($p eq "outtemp");
-      $p = "rain_rate" if ($p eq "rainrate");
+      $p = "luminosity" if ($p eq "light");
       $p = "pressure" if ($p eq "relbaro");
-      $p = "rain_day" if ($p eq "dailyrain");
-      $p = "rain_week" if ($p eq "weeklyrain");
-      $p = "rain_month" if ($p eq "monthlyrain");
-      $p = "rain_year" if ($p eq "yearlyrain");
-      $p = "wind_chill" if ($p eq "windchill");
-      $p = "wind_direction" if ($p eq "winddir");
-      $p = "wind_gust" if ($p eq "wind_gust");
-      $p = "wind_speed" if ($p eq "windspeed");
-
-      # add to state
-      $result .= " "      if ($result ne "");
-      $result .= "T: $v"   if ($p eq "temperature");
-      $result .= "H: $v"   if ($p eq "humidity");
-      $result .= "Ti: $v"  if ($p eq "temperature_indoor");
-      $result .= "Hi: $v"  if ($p eq "humidity_indoor");
-      $result .= "P: $v"   if ($p eq "pressure");
-      $result .= "W: $v"  if ($p eq "wind_speed");
+      $p = "pressureAbs" if ($p eq "absbaro");
+      $p = "rain" if ($p eq "rainrate");
+      $p = "rainDay" if ($p eq "dailyrain");
+      $p = "rainWeek" if ($p eq "weeklyrain");
+      $p = "rainMonth" if ($p eq "monthlyrain");
+      $p = "rainYear" if ($p eq "yearlyrain");
+      $p = "uv" if ($p eq "UV");
+      $p = "windChill" if ($p eq "windchill");
+      $p = "windDir" if ($p eq "winddir");
+      $p = "windGust" if ($p eq "windgust");
+      $p = "windSpeed" if ($p eq "windspeed");
 
       readingsBulkUpdate( $hash, lc($p), $v );
     }
+
+    # calculated readings
+    #
+
+    # dewpointIndoor
+    if (defined($webArgs->{intemp}) && defined($webArgs->{inhumi})) {
+      my $v = dewpoint_dewpoint($webArgs->{intemp}, $webArgs->{inhumi});
+      readingsBulkUpdate( $hash, "dewpointIndoor", $v );
+    }
+
+    # humidityAbs
+    if (defined($webArgs->{outtemp}) && defined($webArgs->{outhumi})) {
+      my $v = dewpoint_absFeuchte($webArgs->{outtemp}, $webArgs->{outhumi});
+      readingsBulkUpdate( $hash, "humidityAbs", $v );
+    }
+
+    # humidityIndoorAbs
+    if (defined($webArgs->{intemp}) && defined($webArgs->{inhumi})) {
+      my $v = dewpoint_absFeuchte($webArgs->{intemp}, $webArgs->{inhumi});
+      readingsBulkUpdate( $hash, "humidityIndoorAbs", $v );
+    }
+    
+    # condition_forecast (based on pressure trendency)
+    
+    # day/night
+    
+    # isRaining
+    # solarRadiation
+    # soilTemperature
+    # brightness in % ??
+
+    # uv_index, uv_risk
+    if (defined($webArgs->{UV})) {
+      my $wavelength = $webArgs->{UV};      
+    }
+
+    $result = "T: ".$webArgs->{outtemp} if (defined($webArgs->{outtemp}));
+    $result .= " H: ".$webArgs->{outhumi} if (defined($webArgs->{outhumi}));
+    $result .= " Ti: ".$webArgs->{intemp} if (defined($webArgs->{intemp}));
+    $result .= " Hi: ".$webArgs->{inhumi} if (defined($webArgs->{inhumi}));
+    $result .= " W: ".$webArgs->{windspeed} if (defined($webArgs->{windspeed}));
+    $result .= " R: ".$webArgs->{rainrate} if (defined($webArgs->{rainrate}));
+    $result .= " WD: ".$webArgs->{winddir} if (defined($webArgs->{winddir}));
+    $result .= " D: ".$webArgs->{dewpoint} if (defined($webArgs->{dewpoint}));
+    $result .= " P: ".$webArgs->{relbaro} if (defined($webArgs->{relbaro}));
 
     readingsBulkUpdate( $hash, "state", $result );
     readingsEndUpdate( $hash, 1 );
@@ -236,11 +274,11 @@ sub HP1000_CGI() {
       <div style="margin-left: 2em">
         <code>define &lt;WeatherStation&gt; HP1000 [<ID> <PASSWORD>]</code><br>
         <br>
-          Provides webhook receiver for weather station HP1000 of Fine Offset Electronics.<br>
+          Provides webhook receiver for weather station HP1000 and WH2600 of Fine Offset Electronics.<br>
           There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
-          No other name will work as it's hardcoded in the HP1000 device itself!<br>
+          No other name will work as it's hardcoded in the HP1000/WH2600 device itself!<br>
           <br>
-          As the URI has a fixed coding as well there can only be one single HP1000 station per FHEM installation.<br>
+          As the URI has a fixed coding as well there can only be one single HP1000/WH2600 station per FHEM installation.<br>
         <br>
         Example:<br>
         <div style="margin-left: 2em">
@@ -251,7 +289,7 @@ sub HP1000_CGI() {
           # to send this ID and PASSWORD for data to be accepted<br>
           define WeatherStation HP1000 MyHouse SecretPassword</code>
         </div><br>
-          IMPORTANT: In your HP1000 device, make sure you use a DNS name as most revisions cannot handle IP addresses directly.<br>
+          IMPORTANT: In your HP1000/WH2600 device, make sure you use a DNS name as most revisions cannot handle IP addresses correctly.<br>
       </div><br>
     </div>
 
@@ -270,11 +308,11 @@ sub HP1000_CGI() {
       <div style="margin-left: 2em">
         <code>define &lt;WeatherStation&gt; HP1000 [<ID> <PASSWORD>]</code><br>
         <br>
-          Stellt einen Webhook f&uuml;r die HP1000 Wetterstation von Fine Offset Electronics bereit.<br>
+          Stellt einen Webhook f&uuml;r die HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit.<br>
           Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
-          Kein anderer Name funktioniert, da dieser hard im HP1000 Ger%auml;t hinterlegt ist!<br>
+          Kein anderer Name funktioniert, da dieser hard im HP1000/WH2600 Ger%auml;t hinterlegt ist!<br>
           <br>
-          Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine HP1000 Station gleichzeitig verwendet werden.<br>
+          Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine HP1000/WH2600 Station gleichzeitig verwendet werden.<br>
         <br>
         Beispiel:<br>
         <div style="margin-left: 2em">
@@ -285,7 +323,7 @@ sub HP1000_CGI() {
           # diese ID und PASSWORD sendet, damit Daten akzeptiert werden<br>
           define WeatherStation HP1000 MyHouse SecretPassword</code>
         </div><br>
-          WICHTIG: Im HP1000 Ger&auml; muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
+          WICHTIG: Im HP1000/WH2600 Ger&auml; muss sichergestellt sein, dass ein DNS Name statt einer IP Adresse verwendet wird, da einige Revisionen damit nicht umgehen k&ouml;nnen.<br>
       </div><br>
     </div>
 
