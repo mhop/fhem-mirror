@@ -677,9 +677,12 @@ FW_answerCall($)
        "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
        FW_roomStatesForInform($me, $sinceTimestamp));
 
-    if( my $data = $defs{$FW_wname}{asyncOutput}{$FW_id} ) {
-      addToWritebuffer($me, $data."\n");
-      delete $defs{$FW_wname}{asyncOutput}{$FW_id};
+    if($FW_id && $defs{$FW_wname}{asyncOutput}) {
+      my $data = $defs{$FW_wname}{asyncOutput}{$FW_id};
+      if($data) {
+        addToWritebuffer($me, $data."\n");
+        delete $defs{$FW_wname}{asyncOutput}{$FW_id};
+      }
     }
 
     return -1;
