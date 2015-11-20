@@ -1,7 +1,7 @@
 ###############################################################
 # $Id$Date: $
 #
-#  23_LUXTRONIK2.pm
+#  23_LUXTRONIK2.pm 
 #
 #  (c) 2012,2014 Torsten Poitzsch (torsten poitzsch at gmx . de)
 #  (c) 2012-2013 Jan-Hinrich Fessel (oskar at fessel . org)

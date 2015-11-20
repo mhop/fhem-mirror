@@ -1602,7 +1602,7 @@ sub FRITZBOX_Readout_Format($$$)
 # return $readout       unless $readout ne "" && $format ne "" ; #Funktioniert nicht bei $format "01"
 
    if ($format eq "01" && $readout ne "1") {
-      $readout = 0;
+      $readout = "0";
    }
    
    return $readout       unless $readout ne "";
