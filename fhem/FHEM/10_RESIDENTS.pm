@@ -213,7 +213,7 @@ sub RESIDENTS_Notify($$) {
 
                     # update statistics
                     readingsBeginUpdate($hash);
-                    readingsBulkUpdate( $hash, "lastActivity",      $change );
+                    readingsBulkUpdate( $hash, "lastActivity",      ReadingsVal($devName, "state", $change) );
                     readingsBulkUpdate( $hash, "lastActivityBy",    $realname );
                     readingsBulkUpdate( $hash, "lastActivityByDev", $devName );
                     readingsEndUpdate( $hash, 1 );
