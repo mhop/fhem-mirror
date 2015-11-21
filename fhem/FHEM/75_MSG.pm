@@ -263,7 +263,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                     if ( $device =~
                         /^(([A-Za-z0-9%+._-])+[@]+([%+a-z0-9A-Z.-]*))$/ )
                     {
-                        $gatewayDevs = $globalDevName;
+                        $gatewayDevs = $1;
                         $deviceType  = "email";
                     }
                     elsif ( $device =~ s/^@?(.*)![\s\t]*$// ) {
