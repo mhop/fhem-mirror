@@ -25,7 +25,6 @@
 var DashboardConfigHash = {};
 var dashboard_buttonbar = "top";
 var DashboardDraggable = true;
-var fhemUrl = '/fhem';
 
 /* evol.colorpicker 2.2
    (c) 2014 Olivier Giulieri
@@ -318,27 +317,19 @@ function dashboard_get_params() {
 	return dashboard_get_params.dashboard_params;
 }
 
-function dashboard_setlock(){
+function dashboard_setlock(iTabIndex){
         if(is_dashboard_flexible()) {
-		$( ".dashboard_widget" ).draggable( "option", "disabled", true );
+		$( "#dashboard_tab" + iTabIndex + " .dashboard_column" ).draggable( "destroy");
         }
         else {
-		$( ".dashboard_column" ).sortable( "option", "disabled", true );
+		$( "#dashboard_tab" + iTabIndex + " .dashboard_column" ).sortable( "destroy");
         }
 	$( ".dashboard_widget" ).removeClass("dashboard_widgethelper");
-	if ($( ".dashboard_widget" ).hasClass("ui-resizable")) {
-    		$( ".dashboard_widget" ).resizable("destroy");
-	};
+	$( "#dashboard_tab" + iTabIndex + " .dashboard_widget" ).resizable("destroy");
 	$( ".dashboard_column" ).removeClass("dashboard_columnhelper");
 }
 
-function dashboard_unsetlock(){
-        if(is_dashboard_flexible()) {
-		$( ".dashboard_widget" ).draggable( "option", "disabled", false );
-        }
-        else {
-		$( ".dashboard_column" ).sortable( "option", "disabled", false );
-        }
+function dashboard_unsetlock(iTabIndex){
 	if (DashboardConfigHash['lockstate'] == "unlock") { $( ".dashboard_widget" ).addClass("dashboard_widgethelper"); } else { $( ".dashboard_widget" ).removeClass("dashboard_widgethelper"); }//Show Widget-Helper Frame
 	if (DashboardConfigHash['lockstate'] == "unlock") { $( ".dashboard_column" ).addClass("dashboard_columnhelper"); } else { $( ".dashboard_column" ).removeClass("dashboard_columnhelper"); }//Show Widget-Helper Frame
 	dashboard_modifyWidget();
@@ -542,15 +533,15 @@ function dashboard_init_tab(tabIndex) {
 		stop: function() { saveOrder(); }
 		  });
 	  }
-	  makeResizable('.dashboard_widget');
+	  makeResizable('#dashboard_tab' + tabIndex + ' .dashboard_widget');
 
 	  // call the initialization of reading groups
 	  FW_readingsGroupReadyFn($('#dashboard_tab' + tabIndex));
 
 	  if ((DashboardConfigHash['lockstate']  == "lock") || (dashboard_buttonbar == "hidden")) {
-		dashboard_setlock();
+		dashboard_setlock(tabIndex);
 	  } else {
-		dashboard_unsetlock();
+		dashboard_unsetlock(tabIndex);
 	  }
 	  restoreGroupVisibility(tabIndex);
 }
@@ -677,7 +668,7 @@ function dashboard_buildDashboard(){
 
 	dashboard_modifyWidget();
 	if (dashboard_buttonbar != "hidden") dashboard_buildButtons();
-	if ((DashboardConfigHash['lockstate']  == "lock") || (dashboard_buttonbar == "hidden")) {dashboard_setlock();} else {dashboard_unsetlock();}	
+	if ((DashboardConfigHash['lockstate']  == "lock") || (dashboard_buttonbar == "hidden")) {dashboard_setlock(iActiveTab);} else {dashboard_unsetlock(iActiveTab);}	
 	if (DashboardConfigHash['dashboard_customcss']) {$('<style type="text/css">'+DashboardConfigHash['dashboard_customcss']+'</style>').appendTo($('head')); }	
 }
 

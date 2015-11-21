@@ -477,6 +477,9 @@ sub Dashboard_SummaryFN($$$$)
  
 	################################ 
 	################################
+
+	############################ Set FHEM url to avoid hardcoding it in javascript ############################ 
+	$ret .= "<script type='text/javascript'>var fhemUrl = '" . $FW_ME . "';</script>";
  
 	$ret .= "<div id=\"tabEdit\" class=\"dashboard-dialog-content dashboard-widget-content\" title=\"Dashboard-Tab\" style=\"display:none;\">\n";		
 	$ret .= "	<div id=\"dashboard-dialog-tabs\" class=\"dashboard dashboard_tabs\">\n";	
@@ -509,7 +512,7 @@ sub Dashboard_SummaryFN($$$$)
 	 $ret .= "<input type=\"$debugfield\" size=\"100%\" id=\"dashboard_jsdebug\" value=\"\">\n";
 	 $ret .= "</div></td></tr>\n"; 
 	 $ret .= "<tr><td><div id=\"dashboardtabs\" class=\"dashboard dashboard_tabs\" style=\"background: " . ($backgroundimage ? "url(/fhem/images/" . FW_iconPath($backgroundimage) . ")" : "") . " no-repeat !important;\">\n";  
-	 
+
 	 ########################### Dashboard Tab-Liste ##############################################
 	 $ret .= "	<ul id=\"dashboard_tabnav\" class=\"dashboard dashboard_tabnav dashboard_tabnav_".$showbuttonbar."\">\n";	   		
 	 for (my $i=0;$i<$tabcount;$i++){$ret .= "    <li class=\"dashboard dashboard_tab dashboard_tab_".$showbuttonbar."\"><a href=\"#dashboard_tab".$i."\">".trim($tabnames[$i])."</a></li>";}
@@ -817,7 +820,7 @@ sub BuildGroup
 		
 		$row++;		
 			
-         	$extPage{group} = $groupname;
+                $extPage{group} = $groupname;
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
 		$allSets = FW_widgetOverride($d, $allSets);
 		
