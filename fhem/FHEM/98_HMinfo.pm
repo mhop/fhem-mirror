@@ -339,10 +339,11 @@ sub HMinfo_getParam(@) { ######################################################
   my $found = 0;
   foreach (@param){
     my $para = CUL_HM_Get($ehash,$eName,"param",$_);
+    $para =~ s/,/ ,/g;
     push @paramList,sprintf("%-15s",($para eq "undefined"?" -":$para));
     $found = 1 if ($para ne "undefined") ;
   }
-  return $found,sprintf("%-20s\t: %s",$eName,join "\t|",@paramList);
+  return $found,sprintf("%-20s\t: %s",$eName,join "\t| ",@paramList);
 }
 sub HMinfo_regCheck(@) { ######################################################
   my @entities = @_;
@@ -442,17 +443,19 @@ sub HMinfo_peerCheck(@) { #####################################################
         my $pName = CUL_HM_id2Name($pId);
         $pName =~s/_chn:01//;           #chan 01 could be covered by device
         my $pPlist = AttrVal($pName,"peerIDs","");
-        push @peerIDsNoPeer,$eName." p:".$pName 
-              if (!$pPlist || $pPlist !~ m/$id/);
         my $pDName = CUL_HM_id2Name($pDid);
+        my $pSt = AttrVal($pDName,"subType","");
         my $pMd = AttrVal($pDName,"model","");
-        if (AttrVal($pDName,"subType","") eq "virtual"){
+        
+        push @peerIDsNoPeer,$eName." p:".$pName 
+              if ((!$pPlist || $pPlist !~ m/$id/) && $pSt ne "smokeDetector");
+        if ($pSt eq "virtual"){
           if (AttrVal($devN,"aesCommReq",0) != 0){
             push @peerIDsAES,$eName." p:".$pName     
                   if ($pMd ne "CCU-FHEM");
           }
         }
-        if ($md eq "HM-CC-RT-DN"){
+        elsif ($md eq "HM-CC-RT-DN"){
           if ($chn =~ m/(0[45])$/){ # special RT climate
             my $c = $1 eq "04"?"05":"04";
             push @peerIDsNoPeer,$eName." pID:".$pId if ($pId !~ m/$c$/);
@@ -1286,7 +1289,7 @@ sub HMinfo_GetFn($@) {#########################################################
       push @paramList,$para if($found || $optEmpty);
     }
     my $prtHdr = "entity              \t: ";
-    $prtHdr .= sprintf("%-20s \t|",$_)foreach (@a);
+    $prtHdr .= sprintf("%-20s \t| ",$_)foreach (@a);
     $ret = $cmd." done:"
                ."\n param list"  ."\n    "
                .$prtHdr          ."\n    "
@@ -1338,6 +1341,11 @@ sub HMinfo_GetFn($@) {#########################################################
                           )
             .join"\n  ", @model;
   }
+  elsif($cmd eq "overview")       { 
+    my @entities = HMinfo_getEntities($opt."d",$filter);
+    return HMI_overview(\@entities,\@a);
+  }                                
+  
   elsif($cmd eq "help")       {
     $ret = HMInfo_help();
   }
@@ -1348,6 +1356,7 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"configCheck","param","peerCheck","peerXref"
             ,"protoEvents","msgStat","rssi"
             ,"models"
+#            ,"overview"
             ,"regCheck","register"
             ,"templateList","templateChk","templateUsg"
             );
@@ -2294,6 +2303,75 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
   delete $all{""}; #remove empties if present
   return (sort keys %all);
 }
+
+
+
+
+##############################################################
+# HM overview
+##############################################################
+# Gives an overview of all CUL_HM devices and their channels
+#
+# $p1: regexp to select devicenames
+# $p2: list of internals, readings and attributes to be displayed. Comma-separated, case sensitive.
+#
+#use vars qw($FW_encoding); #for handover from fhemweb
+sub HMI_overview(@) {
+  my ($p1,$paramList)=@_;
+  my @dd = @{$p1};
+  my @p2l = ("DEF","peerList");
+  if (!defined($paramList)){
+    @p2l=@{$paramList};
+  }
+  ######### prepare html
+  my $html ='<html><table class="block wide">'."\n"
+           .'<style> .HMIdev { border-top:3px solid #555555; width:10%; }'
+           .'        .HMIchn { width:10%;  }'
+           .'</style>'
+           ."\n"
+           .'<tr><th>Device/Channel</th><th>'
+           .join('</th><th>',@p2l)
+           ."</th></tr>\n";
+  ######### loop for output
+  my $row=0;
+  foreach my $d (sort @dd) {
+    $html.=HMI_output($defs{$d},1,$row++,\@p2l);
+    foreach my $c (CUL_HM_getAssChnNames($d)) {
+      $html.=HMI_output($defs{$c},2,$row++,\@p2l);
+    }
+  }
+  $html.="</table></html>\n";
+  return ('text/html; charset=UTF-8',$html);
+} #end sub HMI_overview
+
+sub HMI_output(@) {
+  my ($hash,$lvl,$drow,$l)=@_;
+  my @list = @{$l};
+  my $n=$hash->{NAME};
+  my $class= ($lvl==1)?'HMIdev':'HMIchn';
+  ######### device/channel
+  my $html.='<tr class = "'
+           .(($drow/2==int($drow/2))?"even":"odd")
+           ."\"><td class=\"$class\">"
+           .($lvl==2?"&nbsp&nbsp&nbsp":"")
+           ."<a href=\"$FW_ME?detail=$n\">$n<\/a>"
+           .'</td>';
+  ######### further values
+
+  foreach my $p (@list) {
+    $html.="<td class=\"$class\">";
+    foreach my $pp (split(',',CUL_HM_Get($defs{$n},$n,"param",$p))) {
+      $pp =~ s/(.*)/<a href=\"$FW_ME?detail=$1\">$1<\/a>/ if (defined($defs{$pp}));
+      $pp = "" if($pp eq "undefined");
+      $html.=$pp.', ' if ($pp !~ /HASH.*/);
+    }
+    $_  =~ s/(.*), $/$1/;
+    $html.='</td>';
+  }
+  $html.="</tr>\n";
+  return $html;
+} #end sub HMI_output
+
 
 1;
 =pod
