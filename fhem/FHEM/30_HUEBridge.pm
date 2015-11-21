@@ -830,15 +830,16 @@ HUEBridge_HTTP_Call($$$;$)
     return undef;
   }
 
-#  try {
-#    from_json($ret);
-#  } catch {
-#    return undef;
-#  }
+  my $decoded;
+  if( HUEBridge_isFritzBox() ) {
+    $decoded = eval { decode_json($ret) };
+    Log3 $name, 2, "$name: json error: $@ in $ret" if( $@ );
+  } else {
+    $decoded = eval { from_json($ret) };
+    Log3 $name, 2, "$name: json error: $@ in $ret" if( $@ );
+  }
 
-  return HUEBridge_ProcessResponse($hash,decode_json($ret)) if( HUEBridge_isFritzBox() );
-
-  return HUEBridge_ProcessResponse($hash,from_json($ret));
+  return HUEBridge_ProcessResponse($hash, $decoded);
 }
 
 sub
