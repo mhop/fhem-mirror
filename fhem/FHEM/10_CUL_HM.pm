@@ -412,7 +412,7 @@ sub CUL_HM_updateConfig($){
         else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
       }
       elsif($st eq "smokeDetector"){   $webCmd="statusRequest";
-        if ($hash->{helper}{fkt} eq "sdLead"){
+        if (defined $hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead"){
                                         $webCmd.=":teamCall:alarmOn:alarmOff";}
       }
       elsif($st eq "keyMatic"     ){   $webCmd="lock:inhibit on:inhibit off";
@@ -3315,6 +3315,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     my $p = $a[2];
     return $attr{$name}{$p}              if ($attr{$name}{$p});
     return $hash->{READINGS}{$p}{VAL}    if ($hash->{READINGS}{$p});
+    return $hash->{READINGS}{".$p"}{VAL} if ($hash->{READINGS}{".$p"});
     return $hash->{$p}                   if ($hash->{$p});
     return $hash->{helper}{$p}           if ($hash->{helper}{$p} && ref($hash->{helper}{$p}) ne "HASH");
     
