@@ -26,10 +26,10 @@ sub CommandHelp {
   $lang //= AttrVal('global','language','en');
   $lang = (lc($lang) eq 'de') ? '_DE' : '';
 
-  $mod =~ s/\?/help/;
-
   if($mod) {
 
+    $mod = "help" if($mod eq "?");
+  
     my $internals = "attributes,command,commands,devspec,global,perl";
     $mod = lc($mod);
     my $modPath = AttrVal('global','modpath','.');
@@ -85,44 +85,16 @@ sub CommandHelp {
 
 	}
 
-    my $url_prefix;
-    
-    if(AttrVal('global','exclude_from_update','') =~ m/commandref/) {
-       $url_prefix = "http://fhem.de/commandref$lang.html";
-    } else {
-       $url_prefix = "$FW_ME/docs/commandref$lang.html";
-    }
-    
-    # replace <a href="#..."> tags with a
-    # working real link to commandref
-    $output =~ s,<a\s+href="#,<a target="_blank" href="$url_prefix#,g;
-    
-    if( $cl  && $cl->{TYPE} eq 'telnet' ) {
-    $output =~ s/<br>/\n/g;
-    $output =~ s/<br\/>/\n/g;
-    $output =~ s/<table>//g;
-    $output =~ s/<\/table>//g;
-    $output =~ s/<t.>//g;
-    $output =~ s/<\/t.>//g;
-    $output =~ s/<h.>//g;
-    $output =~ s/<\/h.>//g;
-    $output =~ s/<a\s+href.*?>//g;
-    $output =~ s/<a name.*?\/a>//g;
-    $output =~ s/<a\s+target.*?>//g;
-    $output =~ s/<ul>/\n/g;
-    $output =~ s/<\/ul>/\n/g;
-    $output =~ s/<li>/-/g;
-    $output =~ s/<\/li>/\n/g;
-    $output =~ s/<code>//g;
-    $output =~ s/<\/code>//g;
-    $output =~ s/<pre>//ig;
-    $output =~ s/<\/pre>//ig;
+    if( $cl  && $cl->{TYPE} eq 'telnet' ) { # telnet output      
+    $output =~ s/<br\s*\?>/\n/ig;
+    $output =~ s/\s*<li>\s*/\n- /ig;
+    $output =~ s/<\/?ul>/\n/ig;
+    $output =~ s/<\/?[^>]+>//g;
     $output =~ s/&lt;/</g;
     $output =~ s/&gt;/>/g;
-    $output =~ s/<[bui]>//g;
-    $output =~ s/<\/[buia]>//g;
     $output =~ tr/ / /s;
     $output =~ s/\n\n\ /\n/g;
+    $output =~ s/&nbsp;/ /g;
     $output =~ s/&auml;/ä/g;
     $output =~ s/&Auml;/Ä/g;
     $output =~ s/&ouml;/ö/g;
@@ -130,11 +102,26 @@ sub CommandHelp {
     $output =~ s/&uuml;/ü/g;
     $output =~ s/&Uuml;/Ü/g;
     $output =~ s/&szlig;/ß/g;
+    $output =~ s/\n\s*\n\s*\n/\n\n\n/g; 
+    $output =~ s/^\s+//;
+    $output =~ s/\s+$//;
     
-    return $output;
+    } else  { # html output
+      my $url_prefix;
+
+      if(AttrVal('global','exclude_from_update','') =~ m/commandref/) {
+        $url_prefix = "http://fhem.de/commandref$lang.html";
+      } else {
+        $url_prefix = "$FW_ME/docs/commandref$lang.html";
+      }
+
+      # replace <a href="#..."> tags with a
+      # working real link to commandref
+      $output =~ s,<a\s+href="#,<a target="_blank" href="$url_prefix#,g;
+      $output = "<html>$output</html>";
     }
     
-    return "<html>$output</html>";
+    return $output;
 
   } else {   # mod
 
