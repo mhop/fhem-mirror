@@ -31,7 +31,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use vars qw($FW_ss); 
 use Blocking;
-use DateTime::Format::Strptime;  # Debian: libdatetime-format-strptime-perl
+#use DateTime::Format::Strptime;  # Debian: libdatetime-format-strptime-perl
 
 #
 # uses the Yahoo! Weather API: http://developer.yahoo.com/weather/
