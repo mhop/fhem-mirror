@@ -23,6 +23,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use DevIo;
 
 my %LGTV_RS232_response = (
 
@@ -87,8 +88,15 @@ my %LGTV_RS232_set = (
             "component" => "kb 01 04",
             "hdmi1"     => "kb 01 08",
             "hdmi2"     => "kb 01 09",
+           },
+"power" => {
+	    "on"        => "ka 01 01",
+	    "off"       => "ka 01 00",
            }
 );
+
+
+
 #####################################
 sub
 LGTV_RS232_Initialize($)
