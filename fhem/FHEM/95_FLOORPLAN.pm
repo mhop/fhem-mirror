@@ -51,6 +51,7 @@
 # 0039: added style 8 for commands-popup provided by André (justme68) (Feb 17, 2015)
 # 0040: fixed "no commands for IT devices", drag&drop won't switch device-status anymore (June 15, 2015)
 # 0041: fixed eventmap, excess "delete"-messages during rereadconfig (Sept 24, 2015)
+# 0042: fixed log-errors, for commandref changed link to german installation guide in fhemwiki (Nov 21, 2015)
 #
 ################################################################
 #
@@ -578,8 +579,10 @@ FP_show(){
 		# $style = style (0=icon only, 1=name+icon, 2=name+icon+commands, 3=device-Reading + name from $text2, 4=S300TH, 5=icon+commands, 6 device-Reading+timestamp, 7 command only, 8 icon+commands popup)
 		# $text  = alternativeCaption
 		# $text2 = special for style3+6: $text = ReadingID, $text2=alternativeCaption
-		$left = 0 if (!$left);
-		$style = 0 if (!$style);
+		$top   = 0   if (!$top);
+		$left  = 0   if (!$left);
+		$text  = ' ' if (!$text);
+		$style = 0   if (!$style);
         # start device-specific table
         my $t2 = $text2 ? $text2 : " ";
         # wrapper-div needed for floorplan_drag.js and for positioning
@@ -672,9 +675,11 @@ FP_show(){
               foreach my $fn (sort keys %{$data{webCmdFn}}) {
 			    my $FW_room = ''; ##needed to be able to reuse code from FHEMWEB
                 no strict "refs";
+				if ($data{webCmdFn}{$fn}) {
                 $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_ME,
                                                    $d, $FW_room, $cmd, $values);
-                if ($htmlTxt eq '') {
+				}
+                if ($htmlTxt || $htmlTxt eq '') {
                   $FW_ME = $oldMe;
                 }
                 use strict "refs";
@@ -992,7 +997,7 @@ FP_pOfill($@) {
   Use floorplanstyle.css to adapt the representation.<br>
   Step-by-step setup guides are available in
   <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf?format=raw">english</a> and
-  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf?format=raw">german</a>. <br>
+  <a href="http://www.fhemwiki.de/wiki/Floorplan_Installations-Leitfaden" target="_blank">german</a>. <br>
   <br>
 
   <a name="FLOORPLANdefine"></a>
@@ -1162,7 +1167,7 @@ FP_pOfill($@) {
   Mit floorplanstyle.css kann die Formatierung angepasst werden.<br>
   Eine Schritt-für-Schritt-Anleitung zur Einrichtung ist verfügbar in
   <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf?format=raw">Englisch</a> und
-  <a href="http://sourceforge.net/p/fhem/code/HEAD/tree/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf?format=raw">Deutsch</a>. <br>
+  <a href="http://www.fhemwiki.de/wiki/Floorplan_Installations-Leitfaden" target="_blank">Deutsch</a>. <br>
   <br>
 
   <a name="FLOORPLANdefine"></a>
