@@ -1256,9 +1256,9 @@ Options:
     
     When executing the powerCmd (set command: power) following placeholders will be replaced by there corresponding values:<br><br>
     <ul>
-    <li><code>%NAME</code> - name of the PRESENCE definition</li>
-    <li><code>%ADDRESS</code> - the address of the PRESENCE definition as given in the define statement</li>
-    <li><code>%ARGUMENT</code> - the argument given to the power set command (e.g. "on" or "off)</li>
+    <li><code>$NAME</code> - name of the PRESENCE definition</li>
+    <li><code>$ADDRESS</code> - the address of the PRESENCE definition as given in the define statement</li>
+    <li><code>$ARGUMENT</code> - the argument given to the power set command (e.g. "on" or "off)</li>
     </ul>
     <br>
     Example FHEM commands:<br><br>
@@ -1502,9 +1502,9 @@ Options:
     
     Wenn der power-Befehl ausgef&uuml;hrt wird (set-Befehl: power) werden folgende Platzhalter durch ihre entsprechenden Werte ersetzt:<br><br>
     <ul>
-    <li><code>%NAME</code> - Name der PRESENCE-Definition</li>
-    <li><code>%ADDRESS</code> - Die &uuml;berwachte Addresse der PRESENCE Definition, wie sie im define-Befehl angegeben wurde.</li>
-    <li><code>%ARGUMENT</code> - Das Argument, was dem Set-Befehl "power" &uuml;bergeben wurde. (z.B. "on" oder "off")</li>
+    <li><code>$NAME</code> - Name der PRESENCE-Definition</li>
+    <li><code>$ADDRESS</code> - Die &uuml;berwachte Addresse der PRESENCE Definition, wie sie im define-Befehl angegeben wurde.</li>
+    <li><code>$ARGUMENT</code> - Das Argument, was dem Set-Befehl "power" &uuml;bergeben wurde. (z.B. "on" oder "off")</li>
     </ul>
     <br>
     Beispielhafte FHEM-Befehle:<br><br>
