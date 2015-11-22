@@ -2117,7 +2117,7 @@ sub getListForecastStations($) {
 	
 		<br/>
 		Module uses following additional Perl modules:<br/><br/>
-		<code>Net::FTP, XML::Simple</code><br/><br/>
+		<code>Net::FTP, XML::Simple, Archive::Extract</code><br/><br/>
 		If not already installed in your environment, 
 		please install them using appropriate commands from your environment.
 
@@ -2323,7 +2323,7 @@ sub getListForecastStations($) {
 	<ul>
 
 		<li>Module uses following additional Perl modules:<br/><br/>
-		<code>Net::FTP, XML::Simple</code><br/><br/>
+		<code>Net::FTP, XML::Simple, Archive::Extract</code><br/><br/>
 		If not already installed in your environment, please install them using appropriate commands from your environment.</li>
 		<br/><br/>
 		<li>Have fun!</li><br/>
