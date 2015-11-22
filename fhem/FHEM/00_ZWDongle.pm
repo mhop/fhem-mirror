@@ -224,7 +224,7 @@ ZWDongle_Define($$)
     Log3 $name, 1, 
         "$name device is none (homeId:$1), commands will be echoed only";
     $attr{$name}{dummy} = 1;
-    $hash->{STATE} = "dummy";
+    readingsSingleUpdate($hash, "state", "dummy", 1);
     return undef;
 
   } elsif($dev !~ m/@/ && $dev !~ m/:/) {
@@ -750,7 +750,8 @@ ZWDongle_Parse($$$)
 {
   my ($hash, $name, $rmsg) = @_;
 
-  if(!defined($hash->{STATE}) || $hash->{STATE} ne "Initialized"){
+  if(!defined($hash->{STATE}) || 
+     ReadingsVal($name, "state", "") ne "Initialized"){
     Log3 $hash, 4,"ZWDongle_Parse $rmsg: dongle not yet initialized";
     return;
   }
@@ -774,11 +775,11 @@ ZWDongle_Attr($$$$)
   if($attr eq "disable") {
     if($cmd eq "set" && ($value || !defined($value))) {
       DevIo_CloseDev($hash) if(!AttrVal($name,"dummy",undef));
-      $hash->{STATE} = "disabled";
+      readingsSingleUpdate($hash, "state", "disabled", 1);
 
     } else {
       if(AttrVal($name,"dummy",undef)) {
-        $hash->{STATE} = "dummy";
+        readingsSingleUpdate($hash, "state", "dummy", 1);
         return;
       }
       DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
@@ -808,7 +809,7 @@ ZWDongle_Ready($)
   return undef if (IsDisabled($hash->{NAME}));
 
   return DevIo_OpenDev($hash, 1, "ZWDongle_DoInit")
-                if($hash->{STATE} eq "disconnected");
+                if(ReadingsVal($hash->{NAME}, "state", "disconnected"));
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
