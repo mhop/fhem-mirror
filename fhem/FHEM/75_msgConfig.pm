@@ -229,6 +229,7 @@ sub msgConfig_Set($@) {
         $attr{$device}{userattr} .= " msgLocationName" if (defined($attr{$device}{userattr}) && $attr{$device}{userattr} !~ /^msgLocationName$|^msgLocationName\s|\smsgLocationName\s|\smsgLocationName$/);
         $attr{$device}{userattr} = "msgLocationName" if (!defined($attr{$device}{userattr}));
         $attr{$device}{msgLocationName} = $location;
+        fhem ("set $device $location");
 
         $attr{$name}{msgLocationDevs} .= ",".$device if (defined($attr{$name}{msgLocationDevs}) && $attr{$name}{msgLocationDevs} !~ /^$device\$|^$device,|,$device,|,$device$/);
         $attr{$name}{msgLocationDevs} = $device if (!defined($attr{$name}{msgLocationDevs}));
