@@ -145,6 +145,7 @@ FHEM/36_EC3000.pm            justme1968           http://forum.fhem.de Sonstige 
 FHEM/36_EleroDrive.pm        HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_EleroStick.pm        HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_JeeLink.pm           justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/36_KeyValueProtocol.pm  HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_PCA301.pm            justme1968           http://forum.fhem.de Sonstige Systeme
 FHEM/36_LaCrosse.pm          HCS                  http://forum.fhem.de Sonstige Systeme
 FHEM/36_EMT7110.pm           HCS                  http://forum.fhem.de Sonstige Systeme
