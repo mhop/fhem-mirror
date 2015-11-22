@@ -959,7 +959,7 @@ AnalyzePerlCommand($$;$)
   $year+=1900;
 
   if($evalSpecials) {
-    $cmd = join("", map { my $n = substr($_,1);
+    $cmd = join("", map { my $n = substr($_,1); # ignore the %
                           my $v = $evalSpecials->{$_};
                           $v =~ s/(['\\])/\\$1/g;
                           "my \$$n='$v';";
@@ -2878,18 +2878,12 @@ SemicolonEscape($)
 sub
 EvalSpecials($%)
 {
-  # The character % will be replaced with the received event,
-  #     e.g. with on or off or measured-temp: 21.7 (Celsius)
-  # The character @ will be replaced with the device name.
-  # To use % or @ in the text itself, use the double mode (%% or @@).
-  # Instead of % and @, the parameters %EVENT (same as %),
-  #     %NAME (same as @) and %TYPE (contains the device type, e.g. FHT)
-  #     can be used. A single % looses its special meaning if any of these
-  #     parameters appears in the definition.
+  # $NAME will be replaced with the device name which generated the event
+  # $EVENT will be replaced with the whole event string
+  # $EVTPART<N> will be replaced with single words of an event
   my ($exec, %specials)= @_;
   $exec = SemicolonEscape($exec);
 
-  # %EVTPART due to HM remote logic
   my $idx = 0;
   if(defined($specials{"%EVENT"})) {
     foreach my $part (split(" ", $specials{"%EVENT"})) {
@@ -2898,15 +2892,25 @@ EvalSpecials($%)
     }
   }
 
-  my $re = join("|", keys %specials);
+  if($featurelevel > 5.6) {
+    $evalSpecials = \%specials;
+    return $exec;
+  }
+
+  # featurelevel <= 5.6 only:
+  # The character % will be replaced with the received event,
+  #     e.g. with on or off or measured-temp: 21.7 (Celsius)
+  # The character @ will be replaced with the device name.
+  # To use % or @ in the text itself, use the double mode (%% or @@).
+
+  my $re = join("|", keys %specials); # Found the $syntax, skip the rest
   $re =~ s/%//g;
   if($exec =~ m/\$($re)\b/) {
     $evalSpecials = \%specials;
     return $exec;
   }
 
-  $exec =~ s/%%/____/g if($featurelevel <= 5.6);
-
+  $exec =~ s/%%/____/g;
 
   # perform macro substitution
   my $extsyntax= 0;
@@ -2914,18 +2918,14 @@ EvalSpecials($%)
     $extsyntax+= ($exec =~ s/$special/$specials{$special}/g);
   }
 
-  if($featurelevel <= 5.6) {
-    if(!$extsyntax) {
-      $exec =~ s/%/$specials{"%EVENT"}/g;
-    }
-    $exec =~ s/____/%/g;
+  if(!$extsyntax) {
+    $exec =~ s/%/$specials{"%EVENT"}/g;
   }
+  $exec =~ s/____/%/g;
 
-  if($featurelevel <= 5.6) {
-    $exec =~ s/@@/____/g;
-    $exec =~ s/@/$specials{"%NAME"}/g;
-    $exec =~ s/____/@/g;
-  }
+  $exec =~ s/@@/____/g;
+  $exec =~ s/@/$specials{"%NAME"}/g;
+  $exec =~ s/____/@/g;
 
   return $exec;
 }
