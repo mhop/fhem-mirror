@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new module 36_KeyValueProtocol
   - bugfix:  95_Dashboard: the fhem root url is not hardcoded any more 
                 but read from the $FW_ME variable.
 		Fixed a problem that causes drag&drop being still activated
