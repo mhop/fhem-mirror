@@ -2829,7 +2829,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           $attr{$mhp->{devN}}{IOgrp} = "$ioOwn:$ioHash->{NAME}" if($ioOwn);
           CUL_HM_assignIO($mhp->{devH}) ;
         }
-        
+
         my ($idstr, $s) = ($ioId, 0xA);
         $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
         CUL_HM_pushConfig($mhp->{devH}, $ioId, $mhp->{src},0,0,0,0, "0201$idstr");
@@ -3241,6 +3241,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
   return "no value specified" if(@a < 2);
   return "" if(!$hash->{NAME});
+
   my $name = $hash->{NAME};
   my $devName = InternalVal($name,"device",$name);
   my $st = AttrVal($devName, "subType", "");
@@ -4675,7 +4676,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     ($fn,$template) = split(":",($template?$template
                                           :AttrVal($name,"tempListTmpl",$name)));
-    if ($modules{HMinfo} && $modules{HMinfo}{define}){
+    if ($modules{HMinfo}){
       if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
       else{            $template = HMinfo_tempListDefFn($fn).":$template";}
     }
@@ -7166,6 +7167,7 @@ sub CUL_HM_4DisText($) {      # convert text for 4dis
     $txtHex =~ s/ ..:/,/g;         #remove addr
     $txtHex =~ s/ //g;             #remove space
     $txtHex =~ s/,00.*//;          #remove trailing string
+    $txt{$sAddr} = "";
     my @ch = split(",",$txtHex,12);
     foreach (@ch){$txt{$sAddr}.=chr(hex($_)) if (length($_)==2)};
   }

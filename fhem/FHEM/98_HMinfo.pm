@@ -12,6 +12,8 @@ sub HMinfo_peerCheck(@);
 sub HMinfo_getEntities(@);
 sub HMinfo_SetFn($@);
 sub HMinfo_SetFnDly($);
+sub HMinfo_noDup(@);
+sub HMinfo_register ($);
 
 use Blocking;
 use HMConfig;
@@ -986,7 +988,7 @@ sub HMinfo_GetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
-  
+
   if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
     $opt = $a[0];
     $optEmpty = ($opt =~ m/e/)?1:0;
@@ -1129,53 +1131,20 @@ sub HMinfo_GetFn($@) {#########################################################
     $ret = $cmd." done:" .HMinfo_peerCheck(@entities);
   }
   elsif($cmd eq "configCheck"){##check peers and register----------------------
-    my @entities = HMinfo_getEntities($opt,$filter);
-    $ret = $cmd." done:" .HMinfo_regCheck(@entities)
-                         .HMinfo_peerCheck(@entities)
-                         .HMinfo_burstCheck(@entities)
-                         .HMinfo_paramCheck(@entities);
-
-    my @td = (devspec2array("model=HM-CC-RT-DN.*:FILTER=chanNo=04"),
-              devspec2array("model=HM.*-TC.*:FILTER=chanNo=02"));
-    my @tlr;
-    foreach my $e (@td){
-      next if(!grep /$e/,@entities );
-      my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl"
-                                                         ,HMinfo_tempListDefFn().":$e"));
-                                                         
-      next if ($tr eq "unused");
-      push @tlr,"$e: $tr" if($tr);
-    }
-    $ret .= "\n\n templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
-    $ret .= "\n\n templateCheck: \n";
-    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-      next if (!defined $defs{$dName}{helper}{tmpl});
-      foreach (keys %{$defs{$dName}{helper}{tmpl}}){
-        my ($p,$t)=split(">",$_);
-        my $tck = HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
-        $ret .= "\n    ".$tck if ($tck);
-      }
-    }
+    my $id = ++$hash->{nb}{cnt};
+    my $bl = BlockingCall("HMinfo_configCheck", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter)), 
+                          "HMinfo_bpPost", 30, 
+                          "HMinfo_bpAbort", "$name:0");
+    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    $ret = "";
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
-    my $repl;
-    if(@a){
-      foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-        unshift @a, $dName;
-        $repl .= HMinfo_templateChk(@a);
-        shift @a;
-      }
-    }
-    else{
-      foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-        next if (!defined $defs{$dName}{helper}{tmpl});
-        foreach (keys %{$defs{$dName}{helper}{tmpl}}){
-          my ($p,$t)=split(">",$_);
-          $repl .= HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
-        }
-      }
-    }    
-    return $repl;
+    my $id = ++$hash->{nb}{cnt};
+    my $bl = BlockingCall("HMinfo_templateChk_Get", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter,@a)), 
+                          "HMinfo_bpPost", 30, 
+                          "HMinfo_bpAbort", "$name:0");
+    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    $ret = "";
   }
   elsif($cmd eq "templateUsg"){##template: see if it applies ------------------
     return HMinfo_templateUsg($opt,$filter,@a);
@@ -1230,56 +1199,63 @@ sub HMinfo_GetFn($@) {#########################################################
     return HMinfo_templateList($a[0]);
   }
   elsif($cmd eq "register")   {##print register--------------------------------
-    # devicenameFilter
-    my $RegReply = "";
-    my @noReg;
-    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
-      my $regs = CUL_HM_Get(CUL_HM_name2Hash($dName),$dName,"reg","all");
-      if ($regs !~ m/[0-6]:/){
-          push @noReg,$dName;
-          next;
-      }
-      my ($peerOld,$ptOld,$ptLine,$peerLine) = ("","",pack('A23',""),pack('A23',""));
-      foreach my $reg (split("\n",$regs)){
-        my ($peer,$h1) = split ("\t",$reg);
-        $peer =~s/ //g;
-        if ($peer !~ m/3:/){
-          $RegReply .= $reg."\n";
-          next;
-        }
-        next if (!$h1);
-        $peer =~s/3://;
-        my ($regN,$h2) = split (":",$h1);
-        my ($pt,$rN) = unpack 'A2A*',$regN;
-        if (!defined($hash->{helper}{r}{$rN})){
-          $hash->{helper}{r}{$rN}{v} = "";
-          $hash->{helper}{r}{$rN}{u} = pack('A5',"");
-        }
-        my ($val,$unit) = split (" ",$h2);
-        $hash->{helper}{r}{$rN}{v} .= pack('A16',$val);
-        $hash->{helper}{r}{$rN}{u} =  pack('A5',"[".$unit."]") if ($unit);
-        if ($pt ne $ptOld){
-          $ptLine .= pack('A16',$pt);
-          $ptOld = $pt;
-        }
-        if ($peer ne $peerOld){
-          $peerLine .= pack('A32',$peer);
-          $peerOld = $peer;
-        }
-      }
-      $RegReply .= $peerLine."\n".$ptLine."\n";
-      foreach my $rN (sort keys %{$hash->{helper}{r}}){
-        $hash->{helper}{r}{$rN} =~ s/(     o..)/$1                /g
-              if($rN =~ m/^MultiExec /); #shift thhis reading since it does not appear for short
-        $RegReply .=  pack ('A18',$rN)
-                     .$hash->{helper}{r}{$rN}{u}
-                     .$hash->{helper}{r}{$rN}{v}
-                     ."\n";
-      }
-      delete $hash->{helper}{r};
-    }
-    $ret = "No regs found for:".join(",",sort @noReg)."\n\n"
-           .$RegReply;
+    my $id = ++$hash->{nb}{cnt};
+    my $bl = BlockingCall("HMinfo_register", join(",",("$name;$id;$hash->{CL}{NAME}",$name,$opt,$filter)), 
+                          "HMinfo_bpPost", 30, 
+                          "HMinfo_bpAbort", "$name:0");
+    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    $ret = "";
+###################
+#    # devicenameFilter
+#    my $RegReply = "";
+#    my @noReg;
+#    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+#      my $regs = CUL_HM_Get(CUL_HM_name2Hash($dName),$dName,"reg","all");
+#      if ($regs !~ m/[0-6]:/){
+#          push @noReg,$dName;
+#          next;
+#      }
+#      my ($peerOld,$ptOld,$ptLine,$peerLine) = ("","",pack('A23',""),pack('A23',""));
+#      foreach my $reg (split("\n",$regs)){
+#        my ($peer,$h1) = split ("\t",$reg);
+#        $peer =~s/ //g;
+#        if ($peer !~ m/3:/){
+#          $RegReply .= $reg."\n";
+#          next;
+#        }
+#        next if (!$h1);
+#        $peer =~s/3://;
+#        my ($regN,$h2) = split (":",$h1);
+#        my ($pt,$rN) = unpack 'A2A*',$regN;
+#        if (!defined($hash->{helper}{r}{$rN})){
+#          $hash->{helper}{r}{$rN}{v} = "";
+#          $hash->{helper}{r}{$rN}{u} = pack('A5',"");
+#        }
+#        my ($val,$unit) = split (" ",$h2);
+#        $hash->{helper}{r}{$rN}{v} .= pack('A16',$val);
+#        $hash->{helper}{r}{$rN}{u} =  pack('A5',"[".$unit."]") if ($unit);
+#        if ($pt ne $ptOld){
+#          $ptLine .= pack('A16',$pt);
+#          $ptOld = $pt;
+#        }
+#        if ($peer ne $peerOld){
+#          $peerLine .= pack('A32',$peer);
+#          $peerOld = $peer;
+#        }
+#      }
+#      $RegReply .= $peerLine."\n".$ptLine."\n";
+#      foreach my $rN (sort keys %{$hash->{helper}{r}}){
+#        $hash->{helper}{r}{$rN} =~ s/(     o..)/$1                /g
+#              if($rN =~ m/^MultiExec /); #shift thhis reading since it does not appear for short
+#        $RegReply .=  pack ('A18',$rN)
+#                     .$hash->{helper}{r}{$rN}{u}
+#                     .$hash->{helper}{r}{$rN}{v}
+#                     ."\n";
+#      }
+#      delete $hash->{helper}{r};
+#    }
+#    $ret = "No regs found for:".join(",",sort @noReg)."\n\n"
+#           .$RegReply;
   }
   elsif($cmd eq "param")      {##print param ----------------------------------
     my @paramList;
@@ -1463,7 +1439,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
     $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
           if ($fn !~ m/\//);
-    my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name:$id",$fn)), 
+    my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name;$id;none",$fn)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
@@ -1474,7 +1450,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my $fn = $a[0]?$a[0]:AttrVal($name,"configFilename","regSave.cfg");
     $fn = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fn 
           if ($fn !~ m/\//);
-    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name:$id",$fn,$opt,$filter)), 
+    my $bl = BlockingCall("HMinfo_saveConfig", join(",",("$name;$id;none",$fn,$opt,$filter)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
     $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
@@ -1866,7 +1842,7 @@ sub HMinfo_purgeConfig($) {####################################################
   }
   HMinfo_templateWriteUsg($fName);
   
-  return $id;
+  return "$id;";
 }
 sub HMinfo_saveConfig($) {#####################################################
   my ($param) = @_;
@@ -1887,7 +1863,7 @@ sub HMinfo_archConfig($$$$) {##################################################
   $fN = "$attr{global}{modpath}/".AttrVal($name,"configDir",".")."\/".$fN 
         if ($fN !~ m/\//);
   my $id = ++$hash->{nb}{cnt};
-  my $bl = BlockingCall("HMinfo_archConfigExec", join(",",("$name:$id"
+  my $bl = BlockingCall("HMinfo_archConfigExec", join(",",("$name;$id;none"
                                                        ,$fN
                                                        ,$opt)), 
                         "HMinfo_archConfigPost", 30, 
@@ -1924,16 +1900,110 @@ sub HMinfo_archConfigExec($)  {################################################
 }
 sub HMinfo_archConfigPost($)  {################################################
   my @arr = split(",",shift);
-  my ($name,$id) = split(":",$arr[0]);
+  my ($name,$id,$cl) = split(";",$arr[0]);
   shift @arr;
   push @{$modules{CUL_HM}{helper}{confUpdt}},@arr;
   delete $defs{$name}{nb}{$id};
   return ;
 }
 
+sub HMinfo_configCheck ($){ ###################################################
+  my ($param) = shift;
+  my ($id,$opt,$filter) = split ",",$param;
+  
+  my @entities = HMinfo_getEntities($opt,$filter);
+  my $ret = "configCheck done:" .HMinfo_regCheck  (@entities)
+                                .HMinfo_peerCheck (@entities)
+                                .HMinfo_burstCheck(@entities)
+                                .HMinfo_paramCheck(@entities);
+
+  my @td = (devspec2array("model=HM-CC-RT-DN.*:FILTER=chanNo=04"),
+            devspec2array("model=HM.*-TC.*:FILTER=chanNo=02"));
+  my @tlr;
+  foreach my $e (@td){
+    next if(!grep /$e/,@entities );
+    my $tr = CUL_HM_tempListTmpl($e,"verify",AttrVal($e,"tempListTmpl"
+                                                       ,HMinfo_tempListDefFn().":$e"));
+                                                       
+    next if ($tr eq "unused");
+    push @tlr,"$e: $tr" if($tr);
+  }
+  $ret .= "\n\n templist mismatch \n    ".join("\n    ",@tlr) if (@tlr);
+  $ret .= "\n\n templateCheck: \n";
+  foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+    next if (!defined $defs{$dName}{helper}{tmpl});
+    foreach (keys %{$defs{$dName}{helper}{tmpl}}){
+      my ($p,$t)=split(">",$_);
+      my $tck = HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
+      $ret .= "\n    ".$tck if ($tck);
+    }
+  }
+  $ret =~ s/\n/-ret-/g; # replace return with a placeholder - we cannot transfere direct
+  return "$id;$ret";
+}
+sub HMinfo_register ($){ ######################################################
+  my ($param) = shift;
+  my ($id,$name,$opt,$filter) = split ",",$param;
+  my $hash = $defs{$name};
+  my $RegReply = "";
+  my @noReg;
+  foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+    my $regs = CUL_HM_Get(CUL_HM_name2Hash($dName),$dName,"reg","all");
+    if ($regs !~ m/[0-6]:/){
+        push @noReg,$dName;
+        next;
+    }
+    my ($peerOld,$ptOld,$ptLine,$peerLine) = ("","",pack('A23',""),pack('A23',""));
+    foreach my $reg (split("\n",$regs)){
+      my ($peer,$h1) = split ("\t",$reg);
+      $peer =~s/ //g;
+      if ($peer !~ m/3:/){
+        $RegReply .= $reg."\n";
+        next;
+      }
+      next if (!$h1);
+      $peer =~s/3://;
+      my ($regN,$h2) = split (":",$h1);
+      my ($pt,$rN) = unpack 'A2A*',$regN;
+      if (!defined($hash->{helper}{r}{$rN})){
+        $hash->{helper}{r}{$rN}{v} = "";
+        $hash->{helper}{r}{$rN}{u} = pack('A5',"");
+      }
+      my ($val,$unit) = split (" ",$h2);
+      $hash->{helper}{r}{$rN}{v} .= pack('A16',$val);
+      $hash->{helper}{r}{$rN}{u} =  pack('A5',"[".$unit."]") if ($unit);
+      if ($pt ne $ptOld){
+        $ptLine .= pack('A16',$pt);
+        $ptOld = $pt;
+      }
+      if ($peer ne $peerOld){
+        $peerLine .= pack('A32',$peer);
+        $peerOld = $peer;
+      }
+    }
+    $RegReply .= $peerLine."\n".$ptLine."\n";
+    foreach my $rN (sort keys %{$hash->{helper}{r}}){
+      $hash->{helper}{r}{$rN} =~ s/(     o..)/$1                /g
+            if($rN =~ m/^MultiExec /); #shift thhis reading since it does not appear for short
+      $RegReply .=  pack ('A18',$rN)
+                   .$hash->{helper}{r}{$rN}{u}
+                   .$hash->{helper}{r}{$rN}{v}
+                   ."\n";
+    }
+    delete $hash->{helper}{r};
+  }
+  my $ret = "No regs found for:".join(",",sort @noReg)."\n\n".$RegReply;
+  $ret =~ s/\n/-ret-/g; # replace return with a placeholder - we cannot transfere direct
+  return "$id;$ret";
+}
+
 sub HMinfo_bpPost($) {#bp finished ############################################
   my ($rep) = @_;
-  my ($name,$id) = split(":",$rep);
+  my ($name,$id,$cl,$ret) = split(";",$rep,4);
+  if ($ret && defined $defs{$cl}){
+    $ret =~s/-ret-/\n/g; # re-insert new-line
+    asyncOutput($defs{$cl},$ret);
+  }
   delete $defs{$name}{nb}{$id};
   return;
 }
@@ -1944,7 +2014,31 @@ sub HMinfo_bpAbort($) {#bp timeout ############################################
   return;
 }
 
-
+sub HMinfo_templateChk_Get ($){ ###############################################
+  my ($param) = shift;
+  my ($id,$opt,$filter,@a) = split ",",$param;
+  my $ret;
+  if(@a){
+    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+      unshift @a, $dName;
+      $ret .= HMinfo_templateChk(@a);
+      shift @a;
+    }
+  }
+  else{
+    foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
+      next if (!defined $defs{$dName}{helper}{tmpl});
+      foreach (keys %{$defs{$dName}{helper}{tmpl}}){
+        my ($p,$t)=split(">",$_);
+        $ret .= HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
+      }
+    }
+  }    
+  $ret = $ret ? $ret
+                :"templateChk: passed";
+  $ret =~ s/\n/-ret-/g; # replace return with a placeholder - we cannot transfere direct
+  return "$id;$ret";
+}
 sub HMinfo_templateDef(@){#####################################################
   my ($name,$param,$desc,@regs) = @_;
   return "insufficient parameter, no param" if(!defined $param);
@@ -2190,7 +2284,7 @@ sub HMinfo_templateWrite($){###################################################
   HMinfo_templateWriteUsg($fName) if ($HMConfig::culHmTpl{tmplUsgChange});
   return;
 }
-sub HMinfo_templateWriteDef($){###################################################
+sub HMinfo_templateWriteDef($){################################################
   my $fName = shift;
   $HMConfig::culHmTpl{tmplDefChange} = 0; # reset changed bits
   my @tmpl =();
@@ -2218,7 +2312,7 @@ sub HMinfo_templateWriteDef($){#################################################
 
   return;
 }
-sub HMinfo_templateWriteUsg($){###################################################
+sub HMinfo_templateWriteUsg($){################################################
   my $fName = shift;
   $HMConfig::culHmTpl{tmplUsgChange} = 0; # reset changed bits
   my @tmpl =();
@@ -2305,9 +2399,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 }
 
 
-
-
-##############################################################
+########################tetsection#############################################
 # HM overview
 ##############################################################
 # Gives an overview of all CUL_HM devices and their channels
