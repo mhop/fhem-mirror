@@ -19,6 +19,8 @@
 # 17.11.15 GA add ReadRoom will now set a reading named temperature containing the last temperature used for calculation
 # 18.11.15 GA add adjusted energyusedp to be in percent. Now it can be used in Tablet-UI as valve-position
 # 19.11.15 GA fix move actorState to readings
+# 22.11.15 GA fix rules on wednesday are now possible (thanks to Skusi)
+# 22.11.15 GA fix error handling in SetRoom (thanks to cobra112)
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -63,7 +65,7 @@ use warnings;
 my %dayno = (
    "mo"  => 1,
    "di"  => 2,
-   "di"  => 3,
+   "mi"  => 3,
    "do"  => 4,
    "fr"  => 5,
    "sa"  => 6,
@@ -624,6 +626,7 @@ PWMR_SetRoom(@)
       push @{$room->{CHANGED}}, "actor $newState";
       DoTrigger($name, undef);
 
+    } else {
       Log3 ($room, 2, "PWMR_SetRoom $name: set $room->{actor} $newState failed ($ret)");
     }
 
