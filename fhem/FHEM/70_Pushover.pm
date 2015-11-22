@@ -447,28 +447,41 @@ sub Pushover_ReceiveCommand($$$) {
               if ( ReadingsVal($name,"tokenState","") ne "valid" );
           }
 
-          if (!defined($values->{USER_KEY})) {            
-            if ( ref($return) eq "HASH" && defined($return->{user}) ) {
-              $state = "unauthorized";
-              readingsBulkUpdate( $hash, "userState", $return->{user} )
-                if ( ReadingsVal($name,"userState","") ne $return->{user} );
-            } elsif ( ref($return) ne "HASH" && $return =~ m/"user":"invalid"/ ) {
-              $state = "unauthorized";
-              readingsBulkUpdate( $hash, "userState", "invalid" )
-                if ( ReadingsVal($name,"userState","") ne "invalid" );
-            } else {
-              readingsBulkUpdate( $hash, "userState", "valid" )
-                if ( ReadingsVal($name,"userState","") ne "valid" );
-            }
+          if ( ref($return) eq "HASH" && defined($return->{user}) ) {
+
+            $state = "unauthorized" if ( !defined($values->{USER_KEY}) );
+            readingsBulkUpdate( $hash, "userState", $return->{user} )
+              if ( ReadingsVal($name,"userState","") ne $return->{user} && !defined($values->{USER_KEY}) );
+
+            $hash->{helper}{FAILED_USERKEYS}{ $values->{USER_KEY} } = "USERKEY ".$values->{USER_KEY}." ".$return->{user}." - ".$values{result}
+              if (defined($values->{USER_KEY}));
+
+          } elsif ( ref($return) ne "HASH" && $return =~ m/"user":"invalid"/ ) {
+
+            $state = "unauthorized" if ( !defined($values->{USER_KEY}) );
+            readingsBulkUpdate( $hash, "userState", "invalid" )
+              if ( ReadingsVal($name,"userState","") ne "invalid" && !defined($values->{USER_KEY}) );
+
+            $hash->{helper}{FAILED_USERKEYS}{ $values->{USER_KEY} } = "USERKEY ".$values->{USER_KEY}." invalid - ".$values{result}
+              if (defined($values->{USER_KEY}));
+
+          } else {
+
+            readingsBulkUpdate( $hash, "userState", "valid" )
+              if ( ReadingsVal($name,"userState","") ne "valid" && !defined($values->{USER_KEY}) );
+
+            delete $hash->{helper}{FAILED_USERKEYS}{ $values->{USER_KEY} }
+              if (!defined($values->{USER_KEY}) && defined($hash->{helper}{FAILED_USERKEYS}{ $values->{USER_KEY} }) );
+
           }
 
         } else {
           $state = "limited" if($apiRemaining < 1);
 
           readingsBulkUpdate( $hash, "tokenState", "valid" )
-            if ( ReadingsVal($name,"tokenState","") ne "valid" );
+            if ( ReadingsVal($name,"tokenState","") ne "valid" && !defined($values->{USER_KEY}) );
           readingsBulkUpdate( $hash, "userState", "valid" )
-            if ( ReadingsVal($name,"userState","") ne "valid" );          
+            if ( ReadingsVal($name,"userState","") ne "valid" && !defined($values->{USER_KEY}) );
         }
 
         # messages.json
@@ -729,10 +742,13 @@ sub Pushover_SetMessage {
         $values{action} = $1;
     }
 
-    # check if we got a user or group key as device and use it as user-key instead of USER_KEY
+    # check if we got a user or group key as device and use it as user-key instead of hash->USER_KEY
     if ( $values{device} =~ /^([A-Za-z0-9]{30})(:([A-Za-z0-9_-]+))?$/s ) {
       $values{USER_KEY} = $1;
       $values{device}  = $3;
+
+      return $hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} }
+        if (defined($hash->{helper}{FAILED_USERKEYS}{ $values{USER_KEY} }) );
     }
 
 #Check if all mandatory arguments are filled
