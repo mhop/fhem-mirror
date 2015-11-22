@@ -106,7 +106,7 @@ my %FW_types;      # device types, for sorting
 my %FW_hiddengroup;# hash of hidden groups
 my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
-my $FW_id;         # id of current page
+my $FW_id="";      # id of current page
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
 my $FW_headercors; #
 my $FW_chash;      # client fhem hash
@@ -929,7 +929,7 @@ FW_digestCgi($)
   $FW_room = "";
   $FW_detail = "";
   $FW_XHR = undef;
-  $FW_id = undef;
+  $FW_id = "";
   $FW_jsonp = undef;
   $FW_inform = undef;
 
