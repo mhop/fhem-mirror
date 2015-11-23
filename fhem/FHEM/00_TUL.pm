@@ -2,6 +2,7 @@
 # $Id$
 # ABU 20150916 removed print: simpleWriteDate, cleaned init
 # ABU 20150918 fixed deprecated warning, fixed warning related to hex-conversion in simple-write
+# ABU 20151123 added error-label in getGroup. Responsible for error-handling, if knxd is not accesible
 
 package main;
 
@@ -1056,7 +1057,10 @@ sub getGroup($)
 	
 	Log(2,"DevType $hash->{DevType} not supported for getGroup\n");
 	return undef;
-  	    
+	
+	error:
+    print "seems like eibd not connected\n";
+    return undef;  	    
 }
 
 # Gets a request from eibd
