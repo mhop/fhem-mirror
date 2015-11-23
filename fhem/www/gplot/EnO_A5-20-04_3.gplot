@@ -15,14 +15,14 @@ set grid xtics ytics
 set ylabel "t/C"
 set y2label "PID values"
 set yrange [10:30]
-set y2range [-20:150]
+set y2range [-30:150]
 
-#FileLog 4:temperture\x3a:0:
+#FileLog 4:temperature\x3a:0:
 #FileLog 4:setpointTemp\x3a:0:
 #FileLog 4:setpoint\x3a:0:
 #FileLog 4:setpointCalc\x3a:0:
-#FileLog 4:p_i:0:
-#FileLog 4:p_p:0:
+#FileLog 4:p_i\x3a:0:
+#FileLog 4:p_p\x3a:0:
 
 plot "<IN>" using 1:2 ls l3 axes x1y1 title 'Temperature' with lines,\
      "<IN>" using 1:2 ls l0 axes x1y1 title 'Setpoint Temperature' with lines,\     
