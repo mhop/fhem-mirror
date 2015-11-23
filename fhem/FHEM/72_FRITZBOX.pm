@@ -113,6 +113,20 @@ my %dialPort = qw {
    64 dect5 65 dect6
    };
 
+my %gsmNetworkState = qw {
+   0 disabled  1 registered_home
+   2 searching 3 registration_denied
+   4 unknown   5 registered_roaming
+   6 limited_service
+   };
+
+my %gsmTechnology = qw {
+   0 GPRS 1 GPRS
+   2 UMTS 
+   3 EDGE
+   4 HSPA 5 HSPA 6 HSPA
+   };
+
 my %ringToneNumber;
 while (my ($key, $value) = each %ringTone) {
    $ringToneNumber{lc $value}=$key;
@@ -1232,6 +1246,32 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&TodayBytesReceivedLow=inetstat:status/Today/BytesReceivedLow";
    $queryStr .= "&TodayBytesSentHigh=inetstat:status/Today/BytesSentHigh";
    $queryStr .= "&TodayBytesSentLow=inetstat:status/Today/BytesSentLow";
+   $queryStr .= "&GSM_RSSI=gsm:settings/RSSI";
+   # $queryStr .= "&GSM_BER=gsm:settings/BER";
+   # $queryStr .= "&GSM_Manufacturer=gsm:settings/Manufacturer";
+   # $queryStr .= "&GSM_Model=gsm:settings/Model";
+   $queryStr .= "&GSM_NetworkState=gsm:settings/NetworkState";
+   # $queryStr .= "&GSM_Operator=gsm:settings/Operator";
+   $queryStr .= "&GSM_AcT=gsm:settings/AcT";
+   $queryStr .= "&GSM_MaxUL=gsm:settings/MaxUL";
+   $queryStr .= "&GSM_MaxDL=gsm:settings/MaxDL";
+   $queryStr .= "&GSM_CurrentUL=gsm:settings/CurrentUL";
+   $queryStr .= "&GSM_CurrentDL=gsm:settings/CurrentDL";
+   $queryStr .= "&GSM_Established=gsm:settings/Established";
+   # $queryStr .= "&GSM_PIN_State=gsm:settings/PIN_State";
+   # $queryStr .= "&GSM_Trycount=gsm:settings/Trycount";
+   # $queryStr .= "&GSM_ModemPresent=gsm:settings/ModemPresent";
+   # $queryStr .= "&GSM_AllowRoaming=gsm:settings/AllowRoaming";
+   # $queryStr .= "&GSM_VoiceStatus=gsm:settings/VoiceStatus";
+   # $queryStr .= "&GSM_SubscriberNumber=gsm:settings/SubscriberNumber";
+   # $queryStr .= "&GSM_InHomeZone=gsm:settings/InHomeZone";
+   # $queryStr .= "&UMTS_enabled=umts:settings/enabled"; 
+   # $queryStr .= "&UMTS_name=umts:settings/name";
+   # $queryStr .= "&UMTS_provider=umts:settings/provider";
+   # $queryStr .= "&UMTS_idle=umts:settings/idle";
+   # $queryStr .= "&UMTS_backup_enable=umts:settings/backup_enable";
+   # $queryStr .= "&UMTS_backup_downtime=umts:settings/backup_downtime";
+   # $queryStr .= "&UMTS_backup_reverttime=umts:settings/backup_reverttime";
 
    $result = FRITZBOX_Web_Query( $hash, $queryStr) ;
    
@@ -1356,7 +1396,29 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_ipExtern", $result->{box_ipExtern};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_connect", $result->{box_connect};
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp", $result->{box_cpuTemp};
-
+# GSM
+#FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_modem", $result->{GSM_ModemPresent};
+   if ($result->{GSM_NetworkState} ne "0") {
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_rssi", $result->{GSM_RSSI};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_netState", $result->{GSM_NetworkState}, "gsmnetstate";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_established", $result->{GSM_Established};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_technology", $result->{GSM_AcT}, "gsmact";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_rateDown", $result->{GSM_CurrentDL};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_rateUp", $result->{GSM_CurrentUL};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_maxRateDown", $result->{GSM_MaxDL};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_maxRateUp", $result->{GSM_MaxUL};
+    }
+   else {
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_rssi", "";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_netState", "";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_established", "";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_technology", "";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_rateDown", "";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_rateUp", "";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_maxRateDown", "";
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_maxRateUp", "";
+   }
+     
 # Alarm clock
    $runNo = 1;
    foreach ( @{ $result->{alarmClock} } ) {
@@ -1418,6 +1480,7 @@ sub FRITZBOX_Readout_Run_Web($)
       $runNo++;
       $rName = "diversity".$runNo;
    }
+   
 
 # statistics
 # attr global showInternalValues 0
@@ -1647,6 +1710,12 @@ sub FRITZBOX_Readout_Format($$$)
    } 
    elsif ($format eq "dialport") {
       $readout = $dialPort{$readout}   if $dialPort{$readout};
+   } 
+   elsif ($format eq "gsmnetstate") {
+      $readout = $gsmNetworkState{$readout} if defined $gsmNetworkState{$readout};
+   } 
+   elsif ($format eq "gsmact") {
+      $readout = $gsmTechnology{$readout} if defined $gsmTechnology{$readout};
    } 
    elsif ($format eq "model") {
       $readout = $fonModel{$readout} if defined $fonModel{$readout};
