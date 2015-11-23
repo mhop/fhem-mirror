@@ -760,7 +760,7 @@ if (\$EVTPART0 eq \"stop\") {\
 
     # auto or reset
     #
-    elsif ( $VALUE eq "auto" || $VALUE eq "reset" ) {
+    elsif ( $VALUE eq "auto" || $VALUE eq "reset" || $VALUE =~ /^NaN:|:NaN$/ ) {
         my $resetTime = ReadingsVal( $NAME, "lastRun", 0 );
         if ($wakeupDefaultTime) {
             $resetTime = $wakeupDefaultTime;
