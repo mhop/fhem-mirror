@@ -532,7 +532,11 @@ sub WeekdayTimer_SetTimer($) {
         if (!defined $hash->{SETTIMERATMIDNIGHT} && $isActiveTimer);
      
      if ($secondsToSwitch>-5) {
-        Log3 $hash, 4, "[$name] setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$para" if($isActiveTimer);
+        if($isActiveTimer) {           
+           Log3 $hash, 4, "[$name] setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$para";
+        } else {   
+           Log3 $hash, 4, "[$name] setTimer - timer seems to be NOT active today: ".join("",@$tage)."|$time|$para ". $hash->{CONDITION};
+        }   
         myInternalTimer ("$idx", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0);
      }
   }
@@ -683,14 +687,17 @@ sub WeekdayTimer_Update($) {
 sub WeekdayTimer_isAnActiveTimer ($$$) {
   my ($hash, $tage, $newParam)  = @_;
   
+  my $name = $hash->{NAME};
   my %specials   = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
   
   my $condition  = WeekdayTimer_Condition ($hash, $tage);
   my $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
   my $xPression  = "{".$tageAsHash.";;".$condition ."}";
      $xPression  = EvalSpecials($xPression, %specials);  
+  Log3 $hash, 5, "[$name] condition: $xPression";
   
   my $ret = AnalyzeCommandChain(undef, $xPression);
+  Log3 $hash, 3, "[$name] result of condition:$ret";
   return  $ret;
 }
 ################################################################################
