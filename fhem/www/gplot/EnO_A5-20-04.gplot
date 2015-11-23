@@ -23,8 +23,8 @@ set grid xtics ytics
 set ylabel "t/C"
 set y2label "t/C"
 
-#FileLog 4:temperature:0:
-#FileLog 4:feedTemp:0:
+#FileLog 4:temperature\x3a:0:
+#FileLog 4:feedTemp\x3a:0:
 
 plot "<IN>" using 1:2 ls l0 axes x1y1 title 'Temperature' with lines,\
-     "<IN>" using 1:2 ls l1 axes x1y2 title 'Feed Temperature' with lines
+     "<IN>" using 1:2 ls l1 axes x1y1 title 'Feed Temperature' with lines

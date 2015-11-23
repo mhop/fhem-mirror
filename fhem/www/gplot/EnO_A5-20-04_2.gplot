@@ -24,7 +24,7 @@ set ylabel "t/C"
 set y2label "setpoint/%"
 set y2range [0:100]
 
-#FileLog 4:setpointTemp:0:
+#FileLog 4:setpointTemp\x3a:0:
 #FileLog 4:setpoint\x3a:0:
 
 plot "<IN>" using 1:2 ls l0 axes x1y1 title 'Setpoint Temperature' with lines,\
