@@ -1000,12 +1000,14 @@ sub ROOMMATE_StartInternalTimers($$) {
     <div style="margin-left: 2em">
       <a name="ROOMMATEdefine" id="ROOMMATEdefine"></a> <b>Define</b>
       <div style="margin-left: 2em">
-        <code>define &lt;rr_FirstName&gt; ROOMMATE [&lt;device name of resident group&gt;]</code><br>
+        <code>define &lt;rr_FirstName&gt; ROOMMATE [&lt;device name(s) of resident group(s)&gt;]</code><br>
         <br>
-        Provides a special dummy device to represent a resident of your home.<br>
+        Provides a special virtual device to represent a resident of your home.<br>
         Based on the current state and other readings, you may trigger other actions within FHEM.<br>
         <br>
         Used by superior module <a href="#RESIDENTS">RESIDENTS</a> but may also be used stand-alone.<br>
+        <br />
+        Use comma separated list of resident device names for multi-membership (see example below).<br />
         <br>
         Example:<br>
         <div style="margin-left: 2em">
@@ -1295,12 +1297,14 @@ sub ROOMMATE_StartInternalTimers($$) {
     <div style="margin-left: 2em">
       <a name="ROOMMATEdefine" id="ROOMMATEdefine"></a> <b>Define</b>
       <div style="margin-left: 2em">
-        <code>define &lt;rr_FirstName&gt; ROOMMATE [&lt;Device Name der Bewohnergruppe&gt;]</code><br />
+        <code>define &lt;rr_FirstName&gt; ROOMMATE [&lt;Device Name(n) der Bewohnergruppe(n)&gt;]</code><br />
         <br />
-        Stellt ein spezielles Dummy Device bereit, welches einen Mitbewohner repräsentiert.<br />
+        Stellt ein spezielles virtuelles Device bereit, welches einen Mitbewohner repräsentiert.<br />
         Basierend auf dem aktuellen Status und anderen Readings können andere Aktionen innerhalb von FHEM angestoßen werden.<br />
         <br />
         Wird vom übergeordneten Modul <a href="#RESIDENTS">RESIDENTS</a> verwendet, kann aber auch einzeln benutzt werden.<br />
+        <br />
+        Bei Mitgliedschaft mehrerer Bewohnergruppen werden diese durch Komma getrennt angegeben (siehe Beispiel unten).<br />
         <br />
         Beispiele:<br />
         <div style="margin-left: 2em">
@@ -1311,7 +1315,7 @@ sub ROOMMATE_StartInternalTimers($$) {
           define rr_Manfred ROOMMATE rgr_Residents # um Mitglied der Gruppe rgr_Residents zu sein<br />
           <br />
           # Mitglied in mehreren Gruppen<br />
-          define rr_Manfred ROOMMATE rgr_Residents,rgr_Parents # um Mitglied den Gruppen rgr_Residents und rgr_Parents zu sein<br />
+          define rr_Manfred ROOMMATE rgr_Residents,rgr_Parents # um Mitglied der Gruppen rgr_Residents und rgr_Parents zu sein<br />
           <br />
           # Komplexe Familien Struktur<br />
           define rr_Manfred ROOMMATE rgr_Residents,rgr_Parents # Elternteil<br />
