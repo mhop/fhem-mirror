@@ -433,7 +433,7 @@ HUEBridge_Set($@)
 
 
   } else {
-    my $list = "delete creategroup deletegroup savescene modifyscene scene deletewhitelist touchlink autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup savescene modifyscene scene deletewhitelist touchlink:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
