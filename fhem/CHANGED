@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: YAMAHA_BD: fix power off events when player is turned on
+            via set command on
   - bugfix:  95_Dashboard: fixed javascript bug causing tabs not to load
   - feature: 36_DavisVantage.zip (author: "habeIchVergessen")
              Receive Davis Vantage Weather Stations with JeeLink 
