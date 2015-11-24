@@ -697,7 +697,7 @@ sub WeekdayTimer_isAnActiveTimer ($$$) {
   Log3 $hash, 5, "[$name] condition: $xPression";
   
   my $ret = AnalyzeCommandChain(undef, $xPression);
-  Log3 $hash, 3, "[$name] result of condition:$ret";
+  Log3 $hash, 5, "[$name] result of condition:$ret";
   return  $ret;
 }
 ################################################################################
