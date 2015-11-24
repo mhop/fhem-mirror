@@ -859,9 +859,9 @@ HUEDevice_Parse($$)
   Log3 $name, 4, "parse status message for $name";
   #Log3 $name, 5, Dumper $result;
 
-  $hash->{name} = $result->{'name'} if( defined($hash->{name}) );
-  $hash->{type} = $result->{'type'} if( defined($hash->{type}) );
-  $hash->{uniqueid} = $result->{'uniqueid'} if( defined($hash->{uniqueid}) );
+  $hash->{name} = $result->{name} if( defined($result->{name}) );
+  $hash->{type} = $result->{type} if( defined($result->{type}) );
+  $hash->{uniqueid} = $result->{uniqueid} if( defined($result->{uniqueid}) );
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
     $hash->{STATE} = 'Initialized';
@@ -877,9 +877,9 @@ HUEDevice_Parse($$)
   }
 
   $hash->{modelid} = $result->{modelid} if( defined($result->{modelid}) );
-  $hash->{manufacturername} = $result->{manufacturername} if( defined($hash->{manufacturername}) );
-  $hash->{luminaireuniqueid} = $result->{luminaireuniqueid} if( defined($hash->{luminaireuniqueid}) );
-  $hash->{swversion} = $result->{swversion} if( defined($hash->{swversion}) );
+  $hash->{manufacturername} = $result->{manufacturername} if( defined($result->{manufacturername}) );
+  $hash->{luminaireuniqueid} = $result->{luminaireuniqueid} if( defined($result->{luminaireuniqueid}) );
+  $hash->{swversion} = $result->{swversion} if( defined($result->{swversion}) );
 
   if( $hash->{helper}->{devtype} eq 'S' ) {
 
