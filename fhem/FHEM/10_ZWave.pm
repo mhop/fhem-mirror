@@ -1828,10 +1828,10 @@ ZWave_associationRequest($$)
     return("", "05");
   }
 
-  my $nGrp = ($data =~ m/..8506(..)/ ? $1 :
+  my $nGrp = ($data =~ m/..8506(..)/ ? hex($1) :
                 ReadingsVal($hash->{NAME}, "assocGroups", 0));
   my $grp = 0;
-  $grp = $1 if($data =~ m/..8503(..)/);
+  $grp = hex($1) if($data =~ m/..8503(..)/);
   return if($grp >= $nGrp);
   $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationRequest;
   ZWave_Set($hash, $hash->{NAME}, "associationRequest", $grp+1);
