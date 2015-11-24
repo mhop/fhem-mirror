@@ -79,7 +79,9 @@ DUOFERNSTICK_Define($$)
   return $ret;
 }
 
-sub DUOFERNSTICK_setStates($$)
+#####################################
+sub 
+DUOFERNSTICK_setStates($$)
 {
   my ($hash, $val) = @_;
   $hash->{STATE} = $val;
@@ -111,7 +113,8 @@ DUOFERNSTICK_Undef($$)
 
 
 #####################################
-sub DUOFERNSTICK_Set($@)
+sub 
+DUOFERNSTICK_Set($@)
 {
   my ($hash, @a) = @_;
 
@@ -129,21 +132,21 @@ sub DUOFERNSTICK_Set($@)
     return DUOFERNSTICK_Reopen($hash);
     
   } elsif ($cmd eq "statusBroadcast") {
-    DUOFERNSTICK_SimpleWrite($hash, $duoStatusRequest);
+    DUOFERNSTICK_AddSendQueue($hash, $duoStatusRequest);
     return undef;
     
   } elsif ($cmd eq "pair") {
-    DUOFERNSTICK_SimpleWrite($hash, $duoStartPair);
+    DUOFERNSTICK_AddSendQueue($hash, $duoStartPair);
     $hash->{pair} = 1;
     delete($hash->{unpair});
-    InternalTimer(gettimeofday()+60, "DUOFERNSTICK_RemovePair", $hash, 1);
+    InternalTimer(gettimeofday()+60, "DUOFERNSTICK_RemovePair", "$hash->{NAME}:RP", 1);
     return undef;
     
   } elsif ($cmd eq "unpair") {
-    DUOFERNSTICK_SimpleWrite($hash, $duoStartUnpair);
+    DUOFERNSTICK_AddSendQueue($hash, $duoStartUnpair);
     $hash->{unpair} = 1;
     delete($hash->{pair});
-    InternalTimer(gettimeofday()+60, "DUOFERNSTICK_RemoveUnpair", $hash, 1);
+    InternalTimer(gettimeofday()+60, "DUOFERNSTICK_RemoveUnpair", "$hash->{NAME}:RU", 1);
     return undef;
   
    } elsif ($cmd eq "remotePair") {
@@ -151,7 +154,7 @@ sub DUOFERNSTICK_Set($@)
                 if(!$arg || (uc($arg) !~ m/^[a-f0-9]{6}$/i)); 
     my $buf =  $duoRemotePair;
     $buf =~ s/yyyyyy/$arg/;      
-    DUOFERNSTICK_SimpleWrite($hash, $buf);
+    DUOFERNSTICK_AddSendQueue($hash, $buf);
     return undef;
       
   }
@@ -217,8 +220,8 @@ DUOFERNSTICK_Write($$)
 
   $msg =~ s/zzzzzz/$hash->{DongleSerial}/;
   
-  DUOFERNSTICK_SimpleWrite($hash, $msg);
-
+  DUOFERNSTICK_AddSendQueue($hash,$msg);
+  
 }
 
 #####################################
@@ -227,11 +230,15 @@ DUOFERNSTICK_Parse($$)
 {
   my ($hash, $rmsg) = @_;
 
+  DUOFERNSTICK_SimpleWrite($hash, $duoACK) if($rmsg ne $duoACK);;
+  
+  if($rmsg =~ m/81.{42}/) {
+    DUOFERNSTICK_HandleWriteQueue($hash);
+  }
+  
   return if($rmsg eq $duoACK);
   
   $hash->{RAWMSG} = $rmsg;
-  return undef if ($rmsg eq $duoACK);
-  DUOFERNSTICK_SimpleWrite($hash, $duoACK);
   
   if($rmsg =~ m/0602.{40}/) {
     my %addvals = (RAWMSG => $rmsg);
@@ -248,6 +255,9 @@ DUOFERNSTICK_Parse($$)
     return undef;
     
   } elsif ($rmsg =~ m/0FFF11.{38}/) {
+    return undef;
+  
+  } elsif ($rmsg =~ m/81000000.{36}/) {
     return undef;
   
   }
@@ -279,11 +289,10 @@ DUOFERNSTICK_Ready($)
 sub
 DUOFERNSTICK_RemovePair($)
 {
-    my ($hash) = @_;
+    my ($name,$id) = split(":",$_[0]);
+    my ($hash) = $defs{$name};
     
-    DUOFERNSTICK_SimpleWrite($hash, $duoStopPair);
-    (undef, undef) = DUOFERNSTICK_ReadAnswer($hash, "Pair");
-    DUOFERNSTICK_SimpleWrite($hash, $duoACK);
+    DUOFERNSTICK_AddSendQueue($hash, $duoStopPair);
     
     delete($hash->{pair});
     
@@ -294,11 +303,10 @@ DUOFERNSTICK_RemovePair($)
 sub
 DUOFERNSTICK_RemoveUnpair($)
 {
-    my ($hash) = @_;
+    my ($name,$id) = split(":",$_[0]);
+    my ($hash) = $defs{$name};
     
-    DUOFERNSTICK_SimpleWrite($hash, $duoStopUnpair);
-    (undef, undef) = DUOFERNSTICK_ReadAnswer($hash, "Unpair");
-    DUOFERNSTICK_SimpleWrite($hash, $duoACK);
+    DUOFERNSTICK_AddSendQueue($hash, $duoStopUnpair);
     
     delete($hash->{unpair});
     
@@ -394,6 +402,9 @@ DUOFERNSTICK_DoInit($)
     next if($err);
     DUOFERNSTICK_SimpleWrite($hash, $duoACK);
     
+    $hash->{helper}{cmdEx} = 0;
+    @{$hash->{cmdStack}} = ();
+  
     readingsSingleUpdate($hash, "state", "Initialized", 1);
     return undef;
   }
@@ -493,7 +504,8 @@ DUOFERNSTICK_ReadAnswer($$$$)
 }
 
 #####################################
-sub DUOFERNSTICK_Notify($$)
+sub 
+DUOFERNSTICK_Notify($$)
 {
   my ($own, $dev) = @_;
   my $me = $own->{NAME}; # own name / hash
@@ -513,6 +525,47 @@ sub DUOFERNSTICK_Notify($$)
     }
   }
   return undef;
+}
+
+#####################################
+sub
+DUOFERNSTICK_HandleWriteQueue($)
+{
+  my ($hash) = @_;
+  
+  RemoveInternalTimer($hash);
+  
+  $hash->{helper}{cmdEx} -= 1 if ($hash->{helper}{cmdEx});
+  
+  my $entries = scalar @{$hash->{cmdStack}};
+  if ($entries > 0) {
+    readingsSingleUpdate($hash, "state", ($entries + $hash->{helper}{cmdEx})." CMDs_pending", 1);
+    my $msg = shift @{$hash->{cmdStack}};
+    $hash->{helper}{cmdEx} += 1;
+    DUOFERNSTICK_SimpleWrite($hash, $msg);
+    InternalTimer(gettimeofday()+5, "DUOFERNSTICK_HandleWriteQueue", $hash, 1);
+  } else {
+    readingsSingleUpdate($hash, "state","CMDs_done", 1);
+  }   
+
+}
+
+#####################################
+sub
+DUOFERNSTICK_AddSendQueue($$)
+{
+  my ($hash, $msg) = @_;
+  
+  push(@{$hash->{cmdStack}}, $msg);
+  my $entries = scalar @{$hash->{cmdStack}};
+  
+  if ($hash->{helper}{cmdEx} == 0 ) {
+    DUOFERNSTICK_HandleWriteQueue($hash);
+  } else {
+    readingsSingleUpdate($hash, "state", ($entries + $hash->{helper}{cmdEx})." CMDs_pending", 1);
+    InternalTimer(gettimeofday()+5, "DUOFERNSTICK_HandleWriteQueue", $hash, 1);
+  };
+
 }
 
 1;
