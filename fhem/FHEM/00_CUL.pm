@@ -117,7 +117,7 @@ CUL_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN sendpool addvaltrigger ".
                      "rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S ".
-                     "hmId ".
+                     "hmId longids ".
                      "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger " .
                      $readingFnAttributes;
 
@@ -1339,6 +1339,28 @@ CUL_prefix($$$)
         </code>
         </ul>
         </li><br>
+    
+    <li><a name="longids">longids</a><br>
+        Comma separated list of device-types for CUL that should be handled 
+        using long IDs. This additional ID allows it to differentiate some 
+        weather sensors, if they are sending on the same channel. 
+        Therefore a random generated id is added. If you choose to use longids, 
+        then you'll have to define a different device after battery change.
+        Default is not to use long IDs.<br>
+        Modules which are using this functionality are for e.g. :
+        14_Hideki, 41_OREGON, 14_CUL_TCM97001, 14_SD_WS07.<br>
+
+        Examples:<br>
+        <ul><code>
+        # Do not use any long IDs for any devices (this is default):<br>
+        attr cul longids 0<br>
+        # Use long IDs for all devices:<br>
+        attr cul longids 1<br>
+        # Use longids for SD_WS07 devices.<br>
+        # Will generate devices names like SD_WS07_TH_3 for channel 3.<br>
+        attr cul longids SD_WS07
+        </code></ul>
+    </li><br>
         
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
@@ -1621,6 +1643,29 @@ CUL_prefix($$$)
         </code>
         </ul>
         </li><br>
+
+    <li><a name="longids">longids</a><br>
+        Durch Kommata getrennte Liste von Device-Typen f&uuml;r Empfang von
+        langen IDs mit den CUL. Diese zus&auml;tzliche ID erlaubt es
+        Wettersensoren, welche auf dem gleichen Kanal senden zu unterscheiden.
+        Hierzu wird eine zuf&auml;llig generierte ID hinzugef&uuml;gt. Wenn Sie
+        longids verwenden, dann wird in den meisten F&auml;llen nach einem
+        Batteriewechsel ein neuer Sensor angelegt.
+        Standardm&auml;&szlig;ig werden keine langen IDs verwendet.<br>
+        Folgende Module verwenden diese Funktionalit&auml;t:
+        14_Hideki, 41_OREGON, 14_CUL_TCM97001, 14_SD_WS07.<br>
+        Beispiele:
+        <ul><code>
+        # Keine langen IDs verwenden (Default Einstellung):<br>
+        attr cul longids 0<br>
+        # Immer lange IDs verwenden:<br>
+        attr cul longids 1<br>
+        # Verwende lange IDs f&uuml;r SD_WS07 Devices.<br>
+        # Device Namen sehen z.B. so aus: SD_WS07_TH_3 for channel 3.<br>
+        attr cul longids SD_WS07
+        </code></ul>
+    </li><br>
+    
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
