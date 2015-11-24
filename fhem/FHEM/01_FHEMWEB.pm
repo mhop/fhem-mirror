@@ -2657,7 +2657,7 @@ FW_devState($$@)
       $link .= "&room=$room";
     }
     $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>"
-       if($link !~ m/ noFhemwebLink$/);
+       if($link !~ m/ noFhemwebLink\b/);
   }
 
   my $style = AttrVal($d, "devStateStyle", "");
