@@ -319,7 +319,7 @@ function dashboard_get_params() {
 
 function dashboard_setlock(iTabIndex){
         if(is_dashboard_flexible()) {
-		$( "#dashboard_tab" + iTabIndex + " .dashboard_column" ).draggable( "destroy");
+		$( "#dashboard_tab" + iTabIndex + " .dashboard_widget" ).draggable( "destroy");
         }
         else {
 		$( "#dashboard_tab" + iTabIndex + " .dashboard_column" ).sortable( "destroy");
