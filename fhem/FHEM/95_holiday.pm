@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use POSIX;
 
-sub holiday_refresh($$);
+sub holiday_refresh($;$);
 
 #####################################
 sub
@@ -27,7 +27,7 @@ holiday_Define($$)
 {
   my ($hash, $def) = @_;
 
-  return holiday_refresh($hash->{NAME}, undef) if($init_done);
+  return holiday_refresh($hash->{NAME}) if($init_done);
   InternalTimer(gettimeofday()+1, "holiday_refresh", $hash->{NAME}, 0);
   return undef;
 }
@@ -41,7 +41,7 @@ holiday_Undef($$)
 }
 
 sub
-holiday_refresh($$)
+holiday_refresh($;$)
 {
   my ($name, $fordate) = (@_);
   my $hash = $defs{$name};
