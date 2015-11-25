@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: TelegramBot: multiple enhancements and fixes V1.1
+                keyboards on favorites and last command
+                reduced logging: pollingVerbose:0_None,1_Digest,2_Log
+                yowsup compatibility commands added
+                writeStatefile on contact change
+                cmdReturnEmptyResult - to suppress empty results from command execution
+                and more
   - feature: 55_GDS: new command get <name> headlines [separator]
   - bugfix:  YAMAHA_BD: fix power off events when player is turned on
              via set command on
