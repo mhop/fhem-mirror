@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2015-11-22
+# 2015-11-24
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -1981,10 +1981,10 @@ sub EnOcean_Set($@)
           readingsBulkUpdate($hash, "setpointSet", $a[1]);          
           readingsBulkUpdate($hash, "waitingCmds", $cmd);
           readingsEndUpdate($hash, 0);
-          CommandDeleteReading(undef, "$name setpointTempSet");
-          Log3 $name, 3, "EnOcean set $name setpoint $a[1]";
           # stop PID regulator
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          CommandDeleteReading(undef, "$name setpointTempSet");
+          Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
           shift(@a);
         } else {
           return "Usage: $cmd value wrong.";
@@ -1995,14 +1995,14 @@ sub EnOcean_Set($@)
         if (defined $a[1] && $a[1] =~ m/^\d+(\.\d)?$/ && $a[1] >= 10 && $a[1] <= 30) {
           $cmd = "setpointTemp";
           $setpointTemp = $a[1];
-          CommandDeleteReading(undef, "$name setpointSet");
           readingsBeginUpdate($hash);
           readingsBulkUpdate($hash, "setpointTempSet", $setpointTemp);
           readingsBulkUpdate($hash, "waitingCmds", "setpointTemp");
           readingsEndUpdate($hash, 0);
-          Log3 $name, 3, "EnOcean set $name setpointTemp $setpointTemp";
           # PID regulator active
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'start', '');
+          CommandDeleteReading(undef, "$name setpointSet");
+          Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
           shift(@a);
         } else {
           return "Usage: $cmd value wrong.";
@@ -2010,36 +2010,36 @@ sub EnOcean_Set($@)
         $updateState = 2;
       
       } elsif ($cmd eq "valveOpens") {
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTempSet");        
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, "waitingCmds", $cmd);
         readingsEndUpdate($hash, 0);
-        Log3 $name, 3, "EnOcean set $name valveOpens";
         # stop PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTempSet");        
+        Log3 $name, 3, "EnOcean set $name $cmd";
         $updateState = 2;
       
       } elsif ($cmd eq "valveCloses") {
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTempSet");        
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, "waitingCmds", $cmd);
         readingsEndUpdate($hash, 0);
-        Log3 $name, 3, "EnOcean set $name valveCloses";
         # stop PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTempSet");        
+        Log3 $name, 3, "EnOcean set $name $cmd";
         $updateState = 2;
       
       } elsif ($cmd eq "runInit") {
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTempSet");        
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, "waitingCmds", $cmd);
         readingsEndUpdate($hash, 0);
-        Log3 $name, 3, "EnOcean set $name runInit";
         # stop PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTempSet");        
+        Log3 $name, 3, "EnOcean set $name $cmd";
         $updateState = 2;
       
       } else {
@@ -5451,7 +5451,8 @@ sub EnOcean_Parse($$)
           EnOcean_CommandSave(undef, undef);          
         } else {
           $temperature = $roomTemp;
-          push @event, "3:temperature:$temperature";
+          readingsSingleUpdate($hash, 'temperature', $temperature, 1);
+          #push @event, "3:temperature:$temperature";
         }
       }
       push @event, "3:measurementState:" . ($db[0] & 0x80 ? "inactive" : "active");
@@ -5464,18 +5465,102 @@ sub EnOcean_Parse($$)
         # action needed?      
       }
       
-      #####
-      
-      my $measurementCtrl = (AttrVal($name, 'measurementCtrl', 'enable') eq 'enable') ? 0 : 0x40;
-      my $wakeUpCycle = $wakeUpCycle{AttrVal($name, "wakeUpCycle", 300)};
-      my $displayOrientation = $displayOrientation{AttrVal($name, "displayOrientation", 0)} << 4;
       my $blockKey = AttrVal($name, "blockKey", 0) << 2;
+      my $displayOrientation = $displayOrientation{AttrVal($name, "displayOrientation", 0)} << 4;
       my $maintenanceMode = ReadingsVal($name, "maintenanceMode", "off");
+      my $measurementCtrl = (AttrVal($name, 'measurementCtrl', 'enable') eq 'enable') ? 0 : 0x40;
       #my $operationMode = ReadingsVal($name, "operationMode", "off");
       my $operationMode = ReadingsVal($name, "operationMode", ((AttrVal($name, 'pidCtrl', 'on') eq 'on') ? 'setpointTemp' : 'setpoint'));
+      my $summerMode = AttrVal($name, "summerMode", "off");
       my $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
-      
-      if ($waitingCmds eq "setpoint" || $operationMode eq "setpoint") {
+      my $wakeUpCycle = $wakeUpCycle{AttrVal($name, "wakeUpCycle", 300)};
+      if ($summerMode eq 'off' && $wakeUpCycle >= 50) {
+        # set default Wake-up Cycle (300 s)
+        $wakeUpCycle = 9;      
+      } elsif ($summerMode eq 'on') {
+        readingsSingleUpdate($hash, 'setpointSet', 100, 0);
+        $wakeUpCycle = 50 if ($wakeUpCycle < 50);
+      }      
+      if ($waitingCmds eq "valveOpens") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        $setpoint = 100;
+        push @event, "3:maintenanceMode:valveOpend:runInit";
+        push @event, "3:operationMode:off";
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name setpointTempSet");
+        $waitingCmds = 1;
+
+      } elsif ($waitingCmds eq "valveCloses") {
+        if ($maintenanceMode eq "valveOpend:runInit") {
+          push @event, "3:maintenanceMode:runInit";
+          push @event, "3:operationMode:off";
+          $setpoint = 100;
+          $waitingCmds = 2;          
+        } else {        
+          push @event, "3:maintenanceMode:valveClosed";
+          push @event, "3:operationMode:off";
+          $setpoint = 0;
+          CommandDeleteReading(undef, "$name waitingCmds");
+          $waitingCmds = 3;
+        }
+        # stop PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name setpointTempSet");       
+        
+      } elsif ($waitingCmds eq "runInit") {
+        # deactivate PID regulator
+        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        push @event, "3:maintenanceMode:runInit";
+        push @event, "3:operationMode:off";
+        $setpoint = 100;
+        CommandDeleteReading(undef, "$name setpointSet");
+        CommandDeleteReading(undef, "$name setpointTemp");
+        CommandDeleteReading(undef, "$name setpointTempSet");       
+        CommandDeleteReading(undef, "$name waitingCmds");
+        $waitingCmds = 2;
+
+       } elsif ($waitingCmds eq "setpoint") {
+        if ($maintenanceMode eq "valveOpend:runInit") {
+          push @event, "3:maintenanceMode:runInit";
+          push @event, "3:operationMode:off";
+          $waitingCmds = 2;          
+        } else {
+          # deactivate PID regulator
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+          push @event, "3:maintenanceMode:off";
+          push @event, "3:operationMode:setpoint";
+          $setpoint = ReadingsVal($name, "setpointSet", $setpoint);
+          push @event, "3:setpoint:$setpoint";
+          #CommandDeleteReading(undef, "$name setpointSet");
+          CommandDeleteReading(undef, "$name setpointTemp");
+          CommandDeleteReading(undef, "$name setpointTempSet");
+          CommandDeleteReading(undef, "$name waitingCmds");
+          $waitingCmds = 0;
+        }
+
+      } elsif ($waitingCmds eq "setpointTemp") {
+        if ($maintenanceMode eq "valveOpend:runInit") {
+          push @event, "3:maintenanceMode:runInit";
+          push @event, "3:operationMode:off";
+          $waitingCmds = 2;          
+        } else {        
+          # activate PID regulator
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+          $setpointTemp = ReadingsVal($name, "setpointTempSet", $setpointTemp);
+          push @event, "3:setpointTemp:$setpointTemp";
+          push @event, "3:maintenanceMode:off";
+          push @event, "3:operationMode:setpointTemp";
+          #CommandDeleteReading(undef, "$name setpointSet");
+          CommandDeleteReading(undef, "$name setpointTempSet");
+          CommandDeleteReading(undef, "$name waitingCmds");
+          $waitingCmds = 0;
+        }
+
+       } elsif ($operationMode eq "setpoint") {
         if ($maintenanceMode eq "valveOpend:runInit") {
           push @event, "3:maintenanceMode:runInit";
           push @event, "3:operationMode:off";
@@ -5484,7 +5569,9 @@ sub EnOcean_Parse($$)
           # deactivate PID regulator
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
           $setpoint = ReadingsVal($name, "setpointSet", $setpoint);
+          #CommandDeleteReading(undef, "$name setpointSet");
           CommandDeleteReading(undef, "$name setpointTemp");
+          CommandDeleteReading(undef, "$name setpointTempSet");
           CommandDeleteReading(undef, "$name waitingCmds");
           push @event, "3:setpoint:$setpoint";
           push @event, "3:maintenanceMode:off";
@@ -5492,72 +5579,41 @@ sub EnOcean_Parse($$)
           $waitingCmds = 0;
         }
 
-      } elsif ($waitingCmds eq "setpointTemp" || $operationMode eq "setpointTemp") {
+      } elsif ($operationMode eq "setpointTemp") {
         if ($maintenanceMode eq "valveOpend:runInit") {
           push @event, "3:maintenanceMode:runInit";
           push @event, "3:operationMode:off";
           $waitingCmds = 2;          
         } else {        
           # activate PID regulator
+          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
           $setpointTemp = ReadingsVal($name, "setpointTempSet", $setpointTemp);
           push @event, "3:setpointTemp:$setpointTemp";
-          CommandDeleteReading(undef, "$name setpointTempSet");
-          CommandDeleteReading(undef, "$name waitingCmds");
           push @event, "3:maintenanceMode:off";
           push @event, "3:operationMode:setpointTemp";
-          ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'actuator', '');
+          #CommandDeleteReading(undef, "$name setpointSet");
+          CommandDeleteReading(undef, "$name setpointTempSet");
+          CommandDeleteReading(undef, "$name waitingCmds");
           $waitingCmds = 0;
         }
 
-      } elsif ($waitingCmds eq "valveOpens") {
+      } elsif ($operationMode eq "summerMode") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");       
-        push @event, "3:setpoint:100";
-        push @event, "3:maintenanceMode:valveOpend:runInit";
+        push @event, "3:maintenanceMode:summerMode";
         push @event, "3:operationMode:off";
-        $waitingCmds = 1;
-
-      } elsif ($waitingCmds eq "valveCloses") {
-        if ($maintenanceMode eq "valveOpend:runInit") {
-          push @event, "3:maintenanceMode:runInit";
-          push @event, "3:operationMode:off";
-          push @event, "3:setpoint:100";
-          $waitingCmds = 2;          
-        } else {        
-          push @event, "3:setpoint:0";
-          push @event, "3:maintenanceMode:valveClosed";
-          push @event, "3:operationMode:off";
-          CommandDeleteReading(undef, "$name waitingCmds");
-          $waitingCmds = 3;
-        }
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");       
-        # stop PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
-        
-      } elsif ($waitingCmds eq "runInit") {
-        # deactivate PID regulator
-        ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
+        $setpoint = 100;
         CommandDeleteReading(undef, "$name setpointSet");
         CommandDeleteReading(undef, "$name setpointTemp");
         CommandDeleteReading(undef, "$name setpointTempSet");       
         CommandDeleteReading(undef, "$name waitingCmds");
-        push @event, "3:setpoint:100";
-        push @event, "3:maintenanceMode:runInit";
-        push @event, "3:operationMode:off";
-        $waitingCmds = 2;
-
+        $waitingCmds = 0;
       } else {
 
       }
       
       # sent message to the actuator
-      #my $setpointSet = ReadingsVal($name, "setpointSet", 0);
-      $data = sprintf "%02X%02X%02X%02X", ReadingsVal($name, "setpointSet", 0),
+      $data = sprintf "%02X%02X%02X%02X", ReadingsVal($name, "setpointSet", $setpoint),
                                           ($setpointTemp - 10) / 20 * 255,
                                           $measurementCtrl | $wakeUpCycle,
                                           $displayOrientation | 8 | $blockKey | $waitingCmds;
@@ -9074,7 +9130,22 @@ sub EnOcean_Attr(@)
   } elsif ($attrName eq "summerMode") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^(off|on)$/) {
+    } elsif ($attrVal eq 'on') {
+      if (AttrVal($name, 'subType', '') eq 'hvac.04' && AttrVal($name, 'summerMode', 'off') eq 'off') {
+        readingsSingleUpdate($hash, 'waitingCmds', 'summerMode', 0);
+
+      } else {
+        # attr not changed
+      
+      }
+    } elsif ($attrVal eq 'off') {
+      if (AttrVal($name, 'subType', '') eq 'hvac.04' && AttrVal($name, 'summerMode', 'off') eq 'on') {
+        readingsSingleUpdate($hash, 'waitingCmds', 'runInit', 0);        
+      
+      } else {
+       # attr not changed
+      }
+    } else {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -9160,7 +9231,17 @@ sub EnOcean_Attr(@)
     my $wakeUpCycle = join("|", keys %wakeUpCycle);
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^$wakeUpCycle$/) {
+    } elsif ($attrVal =~ m/^$wakeUpCycle$/) {
+      if ($attrVal >= 1500 && AttrVal($name, 'wakeUpCycle', 300) < 1500) {
+        # switch to summer mode
+        $attr{$name}{summerMode} = 'on';
+        readingsSingleUpdate($hash, 'waitingCmds', 'summerMode', 0);        
+      } elsif ($attrVal < 1500 && AttrVal($name, 'wakeUpCycle', 300) >= 1500) {
+        # runInit necessary before switch to operation mode
+        $attr{$name}{summerMode} = 'off';
+        readingsSingleUpdate($hash, 'waitingCmds', 'runInit', 0);        
+      }
+    } else {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -9906,7 +9987,7 @@ sub EnOcean_calcPID($) {
   Log3($name, 5, "EnOcean $name EnOcean_pidCalc Cmd: $cmd pidState: $stateStr T: $sensorValue SP: $setpoint SPT: $desired");
   @{$hash->{helper}{calcPID}} = (undef, $hash, 'periodic');
   RemoveInternalTimer($hash->{helper}{calcPID});
-  InternalTimer(gettimeofday() + $hash->{helper}{calcInterval} * 1.1, "EnOcean_calcPID", $hash->{helper}{calcPID}, 0);  
+  InternalTimer(gettimeofday() + $hash->{helper}{calcInterval} * 1.05, "EnOcean_calcPID", $hash->{helper}{calcPID}, 0);  
   return ($err, $logLevel, $response);
 }
 
@@ -12729,6 +12810,7 @@ EnOcean_Delete($$)
          <li><a href="#EnOcean_pidFactor_I">pidFactor_I</a></li>
          <li><a href="#EnOcean_pidFactor_D">pidFactor_D</a></li>
          <li><a href="#EnOcean_pidSensorTimeout">pidSensorTimeout</a></li>
+         <li><a href="#EnOcean_summerMode">summerMode</a></li>
          <li><a href="#EnOcean_wakeUpCycle">wakeUpCycle</a></li>
        </ul>
     The attr subType must be hvac.04. This is done if the device was
@@ -13919,7 +14001,7 @@ EnOcean_Delete($$)
     </li>
     <li><a name="EnOcean_summerMode">summerMode</a> off|on,
       [summerMode] = off is default.<br>
-      Put Battery Powered Actuator (hvac.01) in summer operation to reduce energy consumption.
+      Put Battery Powered Actuator (hvac.01) or Heating Radiator Actuating Drive (hvac.04) in summer operation to reduce energy consumption.
     </li>
     <li><a name="EnOcean_switchHysteresis">switchHysteresis</a> &lt;value&gt;,
       [switchHysteresis] = 1 is default.<br>
