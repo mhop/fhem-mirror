@@ -417,6 +417,7 @@ sub GDS_Get($@) {
 				"conditionsmap:".$cmapList." ".
 				"forecasts:".$fcList." ".
 				"forecastsmap:".$fmapList." ".
+				"headlines ".
 				"radarmap:".$cmapList." ".
 				"warningsmap:"."Deutschland,Bodensee,".$bulaList." ".
 				"warnings:".$bulaList;
@@ -452,6 +453,11 @@ sub GDS_Get($@) {
 			$hash->{file}{target}	= $tempDir.$name."_forecastsmap.jpg";
 			retrieveData($hash,'FILE');
 			break;
+		}
+
+		when("headlines"){
+			$parameter //= "|";
+			return gdsHeadlines($name,$parameter);
 		}
 
 		when("warningsmap"){
@@ -2196,14 +2202,14 @@ sub getListForecastStations($) {
 		<ul>Retrieve current conditions at selected station</ul>
 		<br/>
 
-		<code>get &lt;name&gt; forecasts &lt;region&gt;</code>
-		<br/><br/>
-		<ul>Retrieve forecasts for today and the following 3 days for selected region as text</ul>
-		<br/>
-
 		<code>get &lt;name&gt; conditionsmap &lt;region&gt;</code>
 		<br/><br/>
 		<ul>Retrieve map (imagefile) showing current conditions at selected station</ul>
+		<br/>
+
+		<code>get &lt;name&gt; forecasts &lt;region&gt;</code>
+		<br/><br/>
+		<ul>Retrieve forecasts for today and the following 3 days for selected region as text</ul>
 		<br/>
 
 		<code>get &lt;name&gt; forecastsmap &lt;stationName&gt;</code>
@@ -2211,9 +2217,10 @@ sub getListForecastStations($) {
 		<ul>Retrieve map (imagefile) showing forecasts for selected region</ul>
 		<br/>
 
-		<code>get &lt;name&gt; headlines</code>
+		<code>get &lt;name&gt; headlines [separator]</code>
 		<br/><br/>
-		<ul>Returns a string, containing all alert headlines separated by |</ul>
+		<ul>Returns a string, containing all alert headlines. <br/>
+		    Default separator is | but can be overriden.</ul>
 		<br/>
 
 		<code>get &lt;name&gt; help</code>
