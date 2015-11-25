@@ -29,142 +29,60 @@
 #
 ##############################################################################
 # 0.0 2015-09-16 Started
-#
-#   Convert Telegram to TelegramBot 
-#
-# 0.1 2015-09-17 Send only
-#
-#   Add a nonBlocking Get for Update
-#   Read Message 
-#   added polling internal and pollingtimeout
-#
-# 0.2 2015-09-17 Basic send and receive
-#
-#   Extend DoUrlCommand to correctly analyze return
-#   GetMe as connectivity check
-#   pollingTimeout is now default 0 (no reception possible without pollingtimeout set > 0)
-#   Handle state - Polling / Static / Failed
-#   in case of failures wait before starting next poll
-#   avoid excessive update with increasing delays
-#   exception handling for json decoder
-#
-# 0.3 2015-09-18 Stable receive / define / error handling
-#
-#   handle contacts from received messages
-#   manage contacts as interna and readings
-#   new set: reset internal contacts from attribute / reading / URLs reset also
-#   Contacts will be updated every reception
-#   fixed contact handling on restart
-#   new set: contacts to allow manual contact setting
-#   ensure correct contacts on set
-#   show names instead of ids (names is full_name)
-#   ensure contacts without spaces and ids only digits for set contacts
-#   replaceContacts (instead of just set contacts)
-#   Allow usage of names (either username starting with @ or full name not only digits)
-#   peer / peerId in received and sent message
-#   unauthorized result handled correctly and sent to defaultpeer
-#   
-# 0.4 2015-09-20 Contact management available
-#   
-#   initial doccumentation
-#   quick hack for emoticons ??? - replace \u with \\u (so it gets not converted to multibyte
-#   
-# 0.5 2015-09-21 Contact management available
-#   
-#   FIX: undef is returned from AnalyzeCommand - accept as ok
-#   reset will reinitiate polling independant of current polling state
-#   FIX: Allow underscores in tokens
-#   FIX: Allow only a single updater loop
-#   return message on commands could be shortened (no double user ids)
-#   return message on commands to include readable name
-#   translate \n into %0A for message
-#   put complete hash into internals
-#   httputil_close on undef/shutdown/reset
-#   removed non working raw set command
-#   added JSON comment in documentation
-#   Increased timeout on nonblocking get - due to changes on telegram side
-# 0.6 2015-09-27 Stabilized / Multi line return
-#
-#   send Photos
-#   align sendIt mit sendText 
-#   method cleanup
-#   Only one callback for all nonBlockingGets
-#   Allow also usernames and full names in cmdRestrictedpeer
-#   Queuuing for message and photo sending
-#   streamline sendPhoto(sendIt) with new httputil 
-#   Change message send to Post
-# 0.7 2015-09-30 sendPhoto (relying on new HTTPUtils) / all sendIt on Post
-#   
-#   corrected documentation to describe local path
-#   FIX: file not found error on send photo works now
-#   caption for sendPhoto
-#   FIX #1 : crash when GetMe fails on http level
-#   Contacts written to log when updated or newly found
-#   URLs hidden for log file since they contain Authtoken
-#   increase polling id up to 256
-#   changed doc example and log entries (thanks to Maista from his notes)
-#   Store last commands --> reading StoredCommands
-#   FIX: allow contact cuser to be empty
-#   remove cmdNUmericIds
-#   Sent last commands as return value on HandledCOmmand --> attribute cmdSentCommands
-#   FIX: undefined aVal in AttrFn}
-#   FIX: URL also hidden in timeout message
-#   Workaround: Run GetMe 2 times in case of failure especially due to message: "Can't connect(2) to https://api.telegram.org:443:  SSL wants a read first"
-#   Added timer for new polling cycle after attribute set and also on init 
-#   Favorites Command --> attribute cmdKeyFavorites
-#   Favorites Commandlist --> attribute cmdFavorites
-#   favorite commands can be executed
-#   cmd results cut to 4000 char
-#   keep line feed / new line in cmd results
-#   Last and favorites will sent repsonse to sender and not default
-#   make command result sent to default configurable --> defaultPeerCopy (default ON)
-#   add set <device> msg (for compatibility)
-#   new attribute maxFileSize - for restricting size of images
-#   sendImage/sendImageto as addtl commands for sendPhoto/sendPhotoTo
-# 0.8 2015-10-10 extended cmd handling 
-#
-#   FIX: changed error handling for sendIt (ensure unified error handling / avoid queuing up)
-#   Allow also negative values for contacts (prep for chats/groups)
-#   Allow also # in 3rd part of contacts for groups
-#   Encode user names and full names in contacts (: to _ / remove multiple spaces / space to _ )
-#   Get chatid from communication to allow answering to groups
-#   Contacts can also have empty names (but either name or user must be set)
-#   FIX: multiple polling cycles in parallel after rereadcfg --> all resetpollings delayed by some time to end current cycles
-#   Support for emoticons (by strangely marking the data as latin-1 then now conversion is happening)
-#   utf8 conversion needs to be done before using in print etc 
-#   message / sendImage are accepting an optional peerid with prefix @ (@@ for usernames)
-#       set telegrambot message @123456 a message to be send
-#   changed documentation on message and sendImage
-#   deprecated messageTo / sendImageTo (not showing up in web) but still working
-#   show in msgPeer (and other readings) user readable name (fullname or username or id if both not found) 
-#   add chat id on received messages
-#   reduced logging (3 is normal / 2 is only issues) 
-#   deprecated sendPhoto / sendPhotoTo --> only sendImage
-#   captions also mentioned in internal after send
-# 0.9 2015-10-15 alignment of commands (ATTENTION), support for unicode and emojis, chat-group support 
-#   
-#   FIX: deprecated sets not executed in set
-#   Internal: Change send on commands to message command
-#   Final edits for SVN
 # 1.0 2015-10-17 Initial SVN-Version 
 #   
-#
+#   INTERNAL: sendIt allows providing a keyboard json
+#   Favorites sent as keyboard
+#   allow sending to contacts not in the contacts list (by giving id of user)
+#   added comment on save (statefile) for correct operation in documentation
+#   contacts changed on new contacts found
+#   saveStateOnContactChange attribute to disaloow statefile save on contact change
+#   writeStatefile on contact change
+#   make contact restore simpler --> whenever new contact found write all contacts into log with loglevel 1
+#   Do not allow shutdown as command for execution
+#   ret from command handlings logged
+#   maxReturnSize for command results
+#   limit sentMsgTxt internal to 1000 chars (even if longer texts are sent)
+#   contact reading now written in contactsupdate before statefile written
+#   documentation corrected - forum#msg350873
+#   cleanup on comments 
+#   removed old version changes to history.txt
+#   add digest readings for error
+#   attribute to reduce logging on updatepoll errors - pollingVerbose:0_None,1_Digest,2_Log - (no log, default digest log daily, log every issue)
+#   documentation for pollingverbose
+#   reset / log polling status also in case of no error
+#   removed remark on timeout of 20sec
+#   LastCommands returns keyboard with commands 
+#   added send / image command for compatibility with yowsup
+#   image not in cmd list to avoid this being first option
+#   FIX: Keyboard removed after fac execution
+#   Do not use contacts from msg since this might be NON-Telegram contact
+#   cmdReturnEmptyResult - to suppress empty results from command execution
+#   prev... Readings do not trigger events (to reduce log content)
+#   Contacts reading only changed if string is not equal
+#   Need to replace \n again with Chr10 - linefeed due to a telegram change - FORUM #msg363825
+# 1.1 2015-11-24 keyboards added, log changes and multiple smaller enhancements
+#   
+#   
+#   
 ##############################################################################
 # TASKS 
 #
-#   svn checkin + add to maintainer.txt + checkin with description new module + ankuendigungs post + telegram thread post + wiki change
-#
+#   allow multiple accounts to be specified
+#   
+#   allow keyboards in the device api
+#   
+#   dialog function
+#   
+#   allowed commands
+#   
+#   comment on a single telegram bot api
+#   
 #
 ##############################################################################
 # Ideas / Future
-#   add keyboards
-#   Merge TelegramBot into Telegram
-#   Allow send to multiple recipients?
 #   add replyTo
 #
-##############################################################################
-# Info: Max time out for getUpdates seem to be 20 s (TelegramBot)
-#	
 ##############################################################################
 
 package main;
@@ -196,17 +114,16 @@ sub TelegramBot_Callback($$$);
 my %sets = (
 	"message" => "textField",
 	"msg" => "textField",
+	"send" => "textField",
+
 	"sendImage" => "textField",
-	"zDebug" => "textField",
+#	"image" => "textField",
 
-#	"messageTo" => "textField",   deprecated
-#	"sendImageTo" => "textField", deprecated
-#	"sendPhoto" => "textField",   removed
-#	"sendPhotoTo" => "textField", removed
-
-  # BOTONLY
 	"replaceContacts" => "textField",
-	"reset" => undef
+	"reset" => undef,
+
+	"zDebug" => "textField"
+
 );
 
 my %deprecatedsets = (
@@ -244,6 +161,13 @@ my %TelegramBot_hu_do_params = (
 );
 
 
+##############################################################################
+##############################################################################
+##
+## Module operation
+##
+##############################################################################
+##############################################################################
 
 #####################################
 # Initialize is called from fhem.pl after loading the module
@@ -260,7 +184,7 @@ sub TelegramBot_Initialize($) {
 	$hash->{GetFn}      = "TelegramBot_Get";
 	$hash->{SetFn}      = "TelegramBot_Set";
 	$hash->{AttrFn}     = "TelegramBot_Attr";
-	$hash->{AttrList}   = "defaultPeer defaultPeerCopy:0,1 pollingTimeout cmdKeyword cmdSentCommands favorites:textField-long cmdFavorites cmdRestrictedPeer cmdTriggerOnly:0,1 maxFileSize ".
+	$hash->{AttrList}   = "defaultPeer defaultPeerCopy:0,1 pollingTimeout cmdKeyword cmdSentCommands favorites:textField-long cmdFavorites cmdRestrictedPeer cmdTriggerOnly:0,1 saveStateOnContactChange:1,0 maxFileSize maxReturnSize cmdReturnEmptyResult:1,0 pollingVerbose:1_Digest,2_Log,0_None ".
 						$readingFnAttributes;           
 }
 
@@ -331,13 +255,15 @@ sub TelegramBot_Undef($$)
 
   RemoveInternalTimer($hash);
 
-  Log3 $name, 3, "TelegramBot_Undef $name: done ";
+  Log3 $name, 4, "TelegramBot_Undef $name: done ";
   return undef;
 }
 
 ##############################################################################
 ##############################################################################
+##
 ## Instance operational methods
+##
 ##############################################################################
 ##############################################################################
 
@@ -375,7 +301,7 @@ sub TelegramBot_Set($@)
 
 	if( (!exists($sets{$cmd})) && (!exists($deprecatedsets{$cmd})) ) {
 		my @cList;
-		foreach my $k (sort keys %sets) {
+		foreach my $k (keys %sets) {
 			my $opts = undef;
 			$opts = $sets{$k};
 
@@ -391,7 +317,7 @@ sub TelegramBot_Set($@)
 
   my $ret = undef;
   
-	if( ($cmd eq 'message') || ($cmd eq 'msg') ) {
+	if( ($cmd eq 'message') || ($cmd eq 'msg') || ($cmd eq 'send') ) {
     if ( $numberOfArgs < 2 ) {
       return "TelegramBot_Set: Command $cmd, no text (and no optional peer) specified";
     }
@@ -410,7 +336,7 @@ sub TelegramBot_Set($@)
     my $arg = join(" ", @args );
     $ret = TelegramBot_SendIt( $hash, $peer, $arg, undef, 1 );
 
-  } elsif ( ($cmd eq 'sendPhoto') || ($cmd eq 'sendImage')  ) {
+  } elsif ( ($cmd eq 'sendPhoto') || ($cmd eq 'sendImage') || ($cmd eq 'image') ) {
     if ( $numberOfArgs < 2 ) {
       return "TelegramBot_Set: Command $cmd, need to specify filename ";
     }
@@ -487,9 +413,10 @@ sub TelegramBot_Set($@)
     # first set the hash accordingly
     TelegramBot_CalcContactsHash($hash, $arg);
 
-    # then calculate correct string reading and put this into the rading
+    # then calculate correct string reading and put this into the reading
     my @dumarr;
-    readingsSingleUpdate($hash, "Contacts", TelegramBot_ContactUpdate($hash, @dumarr) , 1); 
+    
+    TelegramBot_ContactUpdate($hash, @dumarr);
 
     Log3 $name, 5, "TelegramBot_Set $name: contacts newly set ";
 
@@ -590,20 +517,28 @@ sub TelegramBot_Attr(@) {
 
 		} elsif ($aName eq 'cmdRestrictedPeer') {
       $aVal =~ s/^\s+|\s+$//g;
-
-      # allow multiple peers with spaces separated
-      # $aVal =~ s/ /_/g;
       $attr{$name}{'cmdRestrictedPeer'} = $aVal;
       
 		} elsif ($aName eq 'defaultPeerCopy') {
 			$attr{$name}{'defaultPeerCopy'} = ($aVal eq "1")? "1": "0";
 
+		} elsif ($aName eq 'saveStateOnContactChange') {
+			$attr{$name}{'saveStateOnContactChange'} = ($aVal eq "1")? "1": "0";
+
+		} elsif ($aName eq 'cmdReturnEmptyResult') {
+			$attr{$name}{'cmdReturnEmptyResult'} = ($aVal eq "1")? "1": "0";
+
 		} elsif ($aName eq 'cmdTriggerOnly') {
 			$attr{$name}{'cmdTriggerOnly'} = ($aVal eq "1")? "1": "0";
 
-		} elsif ($aName eq 'maxFileSize') {
+      } elsif ($aName eq 'maxFileSize') {
       if ( $aVal =~ /^[[:digit:]]+$/ ) {
         $attr{$name}{'maxFileSize'} = $aVal;
+      }
+
+		} elsif ($aName eq 'maxReturnSize') {
+      if ( $aVal =~ /^[[:digit:]]+$/ ) {
+        $attr{$name}{'maxReturnSize'} = $aVal;
       }
 
     } elsif ($aName eq 'pollingTimeout') {
@@ -677,8 +612,8 @@ sub TelegramBot_checkCmdKeyword($$$$) {
 #####################################
 #####################################
 # INTERNAL: handle sentlast and favorites
-sub TelegramBot_SentFavorites($$$) {
-  my ($hash, $mpeernorm, $mtext ) = @_;
+sub TelegramBot_SentFavorites($$$$) {
+  my ($hash, $mpeernorm, $mtext, $mid ) = @_;
   my $name = $hash->{NAME};
 
   my $ret;
@@ -689,45 +624,67 @@ sub TelegramBot_SentFavorites($$$) {
   Log3 $name, 4, "TelegramBot_SentFavorites cmd correct peer ";
 
   my $slc =  AttrVal($name,'favorites',"");
-#  Log3 $name, 3, "TelegramBot_SentFavorites Favorites :$slc: ";
+  Log3 $name, 4, "TelegramBot_SentFavorites Favorites :$slc: ";
   my @clist = split( /;/, $slc);
   
+  $cmd = $1 if ( $cmd =~ /^\s*([0-9]+)[^0-9=]*=.*$/ );
   
   # if given a number execute the numbered favorite as a command
   if ( looks_like_number( $cmd ) ) {
+    return $ret if ( $cmd == 0 );
     my $cmdId = ($cmd-1);
 #    Log3 $name, 3, "TelegramBot_SentFavorites exec cmd :$cmdId: ";
     if ( ( $cmdId >= 0 ) && ( $cmdId < scalar( @clist ) ) ) { 
       $cmd = $clist[$cmdId];
-      $ret = TelegramBot_ExecuteCommand( $hash, $mpeernorm, $cmd );
+      return TelegramBot_ExecuteCommand( $hash, $mpeernorm, $cmd );
+    } else {
+      Log3 $name, 3, "TelegramBot_SentFavorites cmd id not defined :($cmdId+1): ";
     }
     
   }
   
   # ret not defined means no favorite found that matches cmd or no fav given in cmd
   if ( ! defined( $ret ) ) {
-#  Log3 $name, 3, "TelegramBot_SentFavorites Favorites :".scalar(@clist).": ";
       my $cnt = 0;
-      $slc = "";
+      my @keys = ();
 
-      my $ck = AttrVal($name,'cmdKeyword',"");
-
+      my $fcmd = AttrVal($name,'cmdFavorites',undef);
+      
       foreach my $cs (  @clist ) {
         $cnt += 1;
-        $slc .= $cnt."\n  $ck ".$cs."\n";
-      }  
+        my @tmparr = ( $fcmd.$cnt." = ".$cs );
+        push( @keys, \@tmparr );
+      }
+      my @tmparr = ( $fcmd."0 = Abbruch" );
+      push( @keys, \@tmparr );
 
-#      Log3 $name, 3, "TelegramBot_SentFavorites Joined Favorites :$slc: ";
+      my $jsonkb = TelegramBot_MakeKeyboard( $hash, 1, @keys );
 
-      my $defpeer = AttrVal($name,'defaultPeer',undef);
-      $defpeer = TelegramBot_GetIdForPeer( $hash, $defpeer ) if ( defined( $defpeer ) );
+      Log3 $name, 5, "TelegramBot_SentFavorites keyboard:".$jsonkb.": ";
       
-      $ret = "TelegramBot fhem  : ($mpeernorm)\n Favorites \n\n".$slc;
+      $ret = "TelegramBot fhem  : ($mpeernorm)\n Favorites \n";
       
-      AnalyzeCommand( undef, "set $name message \@$mpeernorm $ret", "" );
-  }
+      $ret = TelegramBot_SendIt( $hash, $mpeernorm, $ret, $jsonkb, 1 );
   
+  
+############ OLD Favorites sent as message   
+#  Log3 $name, 3, "TelegramBot_SentFavorites Favorites :".scalar(@clist).": ";
+      # my $cnt = 0;
+      # $slc = "";
+      # my $ck = AttrVal($name,'cmdKeyword',"");
+
+      # foreach my $cs (  @clist ) {
+        # $cnt += 1;
+        # $slc .= $cnt."\n  $ck ".$cs."\n";
+      # }  
+
+      # my $defpeer = AttrVal($name,'defaultPeer',undef);
+      # $defpeer = TelegramBot_GetIdForPeer( $hash, $defpeer ) if ( defined( $defpeer ) );
+      # $ret = "TelegramBot fhem  : ($mpeernorm)\n Favorites \n\n".$slc;
+      # $ret = TelegramBot_SendIt( $hash, $defpeer, $ret, $mid, 1 );
+  }
   return $ret;
+  
 }
 
   
@@ -749,10 +706,31 @@ sub TelegramBot_SentLastCommand($$$) {
 
   my $defpeer = AttrVal($name,'defaultPeer',undef);
   $defpeer = TelegramBot_GetIdForPeer( $hash, $defpeer ) if ( defined( $defpeer ) );
+ 
+  my @cmds = split( "\n", $slc );
+
+  # create keyboard
+  my @keys = ();
+
+  foreach my $cs (  @cmds ) {
+    my @tmparr = ( $cs );
+    push( @keys, \@tmparr );
+  }
+#  my @tmparr = ( $fcmd."0 = Abbruch" );
+#  push( @keys, \@tmparr );
+
+  my $jsonkb = TelegramBot_MakeKeyboard( $hash, 1, @keys );
+
+  $ret = "TelegramBot fhem  : $mpeernorm \n Last Commands \n";
   
-  $ret = "TelegramBot fhem  : $mpeernorm \nLast Commands \n\n".$slc;
+  # overwrite ret with result from SendIt --> send response
+  $ret = TelegramBot_SendIt( $hash, $mpeernorm, $ret, $jsonkb, 1 );
+
+############ OLD SentLastCommands sent as message   
+#  $ret = "TelegramBot fhem  : $mpeernorm \nLast Commands \n\n".$slc;
   
-  AnalyzeCommand( undef, "set $name message \@$mpeernorm $ret", "" );
+#  # overwrite ret with result from Analyzecommand --> send response
+#  $ret = AnalyzeCommand( undef, "set $name message \@$mpeernorm $ret", "" );
 
   return $ret;
 }
@@ -807,8 +785,11 @@ sub TelegramBot_ExecuteCommand($$$) {
 
   Log3 $name, 5, "TelegramBot_ExecuteCommand final cmd for analyze :".$cmd.": ";
 
+  # special case shutdown caught here to avoid endless loop
+  $ret = "shutdown command can not be executed" if ( $cmd =~ /^shutdown(\s+.*)?$/ );
+  
   # Execute command
-  $ret = AnalyzeCommand( undef, $cmd, "" );
+  $ret = AnalyzeCommand( undef, $cmd, "" ) if ( ! defined( $ret ) );
 
   Log3 $name, 5, "TelegramBot_ExecuteCommand result for analyze :".(defined($ret)?$ret:"<undef>").": ";
 
@@ -818,47 +799,79 @@ sub TelegramBot_ExecuteCommand($$$) {
   my $retstart = "TelegramBot fhem";
   $retstart .= " from $pname ($mpeernorm)" if ( $defpeer ne $mpeernorm );
   
+  my $retempty = AttrVal($name,'cmdReturnEmptyResult',1);
+
   # undef is considered ok
   if ( ( ! defined( $ret ) ) || ( length( $ret) == 0 ) ) {
-    $ret = "$retstart cmd :$cmd: result OK";
+    $ret = "$retstart cmd :$cmd: result OK" if ( $retempty );
   } else {
     $ret = "$retstart cmd :$cmd: result :$ret:";
   }
-  Log3 $name, 5, "TelegramBot_ExecuteCommand $name: ".$ret.": ";
+  Log3 $name, 5, "TelegramBot_ExecuteCommand $name: ".(defined($ret)?$ret:"<undef>").": ";
   
-  # replace line ends with spaces
-#  $ret =~ s/(\r|\n)/ /gm;
-  $ret =~ s/\r//gm;
-  
-  # shorten to 4096
-  if ( length($ret) > 4000 ) {
-    $ret = substr( $ret, 0, 4000 )."\n\n...";
-  }
+  if ( ( defined( $ret ) ) && ( length( $ret) != 0 ) ) {
+    # replace line ends with spaces
+    $ret =~ s/\r//gm;
+    
+    # shorten to maxReturnSize if set
+    my $limit = AttrVal($name,'maxReturnSize',0);
 
-  AnalyzeCommand( undef, "set $name message \@$mpeernorm $ret", "" );
+    if ( ( length($ret) > $limit ) && ( $limit != 0 ) ) {
+      $ret = substr( $ret, 0, $limit )."\n\n...";
+    }
 
-  my $dpc = AttrVal($name,'defaultPeerCopy',1);
-  if ( ( $dpc ) && ( defined( $defpeer ) ) ) {
-#      if ( TelegramBot_convertpeer( $defpeer ) ne $mpeernorm ) {
-    if ( $defpeer ne $mpeernorm ) {
-      AnalyzeCommand( undef, "set $name message $ret", "" );
+    AnalyzeCommand( undef, "set $name message \@$mpeernorm $ret", "" );
+
+    my $dpc = AttrVal($name,'defaultPeerCopy',1);
+    if ( ( $dpc ) && ( defined( $defpeer ) ) ) {
+      if ( $defpeer ne $mpeernorm ) {
+        AnalyzeCommand( undef, "set $name message $ret", "" );
+      }
     }
   }
-
+  
   return $ret;
 }
 
+######################################
+#  add a command to the StoredCommands reading 
+#  hash, cmd
+sub TelegramBot_AddStoredCommands($$) {
+	my ($hash, $cmd) = @_;
+ 
+  my $stcmds = ReadingsVal($hash->{NAME},"StoredCommands","");
+  $stcmds = $stcmds;
+
+  if ( $stcmds !~ /^\Q$cmd\E$/m ) {
+    # add new cmd
+    $stcmds .= $cmd."\n";
+    
+    # check number lines 
+    my $num = ( $stcmds =~ tr/\n// );
+    if ( $num > 10 ) {
+      $stcmds =~ /^[^\n]+\n(.*)$/s;
+      $stcmds = $1;
+    }
+
+    # change reading  
+    readingsSingleUpdate($hash, "StoredCommands", $stcmds , 1); 
+    Log3 $hash->{NAME}, 4, "TelegramBot_AddStoredCommands :$stcmds: ";
+  }
+ 
+}
+    
   
 ##############################################################################
 ##############################################################################
 ##
-## Internal BOT
+## Communication - Send - receive - Parse
 ##
 ##############################################################################
 ##############################################################################
 
 #####################################
 # INTERNAL: Function to send a photo (and text message) to a peer and handle result
+# addPar is caption for images / keyboard for text
 sub TelegramBot_SendIt($$$$$)
 {
 	my ( $hash, @args) = @_;
@@ -881,8 +894,9 @@ sub TelegramBot_SendIt($$$$$)
   my $ret;
   $hash->{sentMsgResult} = "WAITING";
 
-  # trim and convert spaces in peer to underline 
-#  my $peer2 = TelegramBot_convertpeer( $peer );
+  Log3 $name, 5, "TelegramBot_SendIt $name: try to send message to :$peer: -:$msg: - :".(defined($addPar)?$addPar:"<undef>").":";
+
+    # trim and convert spaces in peer to underline 
   my $peer2 = TelegramBot_GetIdForPeer( $hash, $peer );
 
   if ( ! defined( $peer2 ) ) {
@@ -907,16 +921,23 @@ sub TelegramBot_SendIt($$$$$)
 
     if ( $isText ) {
       $TelegramBot_hu_do_params{url} = $hash->{URL}."sendMessage";
-      # $TelegramBot_hu_do_params{url} = "http://requestb.in/q6o06yq6";
+#      $TelegramBot_hu_do_params{url} = "http://requestb.in/1dvvb8u1";
 
-      $hash->{sentMsgText} = $msg;
-  #    my $c = chr(10);
-  #    $msg =~ s/([^\\])\\n/$1$c/g;
+      if ( length($msg) > 1000 ) {
+        $hash->{sentMsgText} = substr($msg,0, 1000)."...";
+       } else {
+        $hash->{sentMsgText} = $msg;
+       }
+      my $c = chr(10);
+      $msg =~ s/([^\\])\\n/$1$c/g;
 
       # add msg (no file)
       $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "text", undef, $msg, 0 ) if ( ! defined( $ret ) );
+
       
-  #    $TelegramBot_hu_do_params{url} = $hash->{URL}."sendMessage?chat_id=".$peer2."&text=".urlEncode($msg);
+      if ( defined( $addPar ) ) {
+        $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, "reply_markup", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+      }
 
     } else {
       # Photo send    
@@ -936,13 +957,11 @@ sub TelegramBot_SendIt($$$$$)
       
       # only for test / debug               
       $TelegramBot_hu_do_params{loglevel} = 3;
-  #    TelegramBot_BinaryFileWrite( $hash, "/opt/fhem/test.bin", $TelegramBot_hu_do_params{data} );
     }
 
     # finalize multipart 
     $ret = TelegramBot_AddMultipart($hash, \%TelegramBot_hu_do_params, undef, undef, undef, 0 ) if ( ! defined( $ret ) );
 
-    #  Log3 $name, 3, "TelegramBot_SendIt $name: multipart data :".$TelegramBot_hu_do_params{data}.":";
   }
 
   
@@ -1019,6 +1038,39 @@ sub TelegramBot_AddMultipart($$$$$$)
   return undef;
 }
 
+
+#####################################
+# INTERNAL: Build a keyboard string for sendMessage
+# Parameter
+#   hash (device hash)
+#   onetime/hide --> true means onetime / false means hide / undef means nothing
+#   keys array of arrays for keyboard
+#   > returns string in case of error or undef
+sub TelegramBot_MakeKeyboard($$@)
+{
+	my ( $hash, $onetime_hide, @keys ) = @_;
+  my $name = $hash->{NAME};
+
+  my $ret;
+  
+  my %par;
+  
+  if ( ( defined( $onetime_hide ) ) && ( ! $onetime_hide ) ) {
+    %par = ( "hide_keyboard" => JSON::true );
+  } else {
+    return $ret if ( ! @keys );
+    %par = ( "one_time_keyboard" => (( ( defined( $onetime_hide ) ) && ( $onetime_hide ) )?JSON::true:JSON::true ) );
+    $par{keyboard} = \@keys;
+  }
+  
+  my $refkb = \%par;
+  
+  $ret = encode_json( $refkb );
+
+  return $ret;
+}
+
+  
   
 
 #####################################
@@ -1075,6 +1127,7 @@ sub TelegramBot_UpdatePoll($)
   $hash->{STATE} = "Polling";
 
   $hash->{POLLING} = ( ( defined( $hash->{OLD_POLLING} ) )?$hash->{OLD_POLLING}:1 );
+  Log3 $name, 4, "TelegramBot_UpdatePoll $name: initiate polling with nonblockingGet with ".$timeout."s";
   HttpUtils_NonblockingGet( \%TelegramBot_hu_upd_params); 
 }
 
@@ -1094,6 +1147,7 @@ sub TelegramBot_Callback($$$)
 
   my $ret;
   my $result;
+  my $ll = 5;
 
   if ( defined( $param->{isPolling} ) ) {
     $hash->{OLD_POLLING} = ( ( defined( $hash->{POLLING} ) )?$hash->{POLLING}:0 ) + 1;
@@ -1153,13 +1207,6 @@ sub TelegramBot_Callback($$$)
       foreach my $update ( @$result ) {
         Log3 $name, 5, "UpdatePoll $name: parse result ";
         if ( defined( $update->{message} ) ) {
-  # print "MSG:";
-  # if ( defined( $update->{message}{text} ) ) {
-  ##  print $update->{message}{text};
-  #} else {
-  #  print "NOT DEFINED";
-  #}
-  # print ";\n";
           
           $ret = TelegramBot_ParseMsg( $hash, $update->{update_id}, $update->{message} );
         }
@@ -1169,11 +1216,49 @@ sub TelegramBot_Callback($$$)
           $hash->{offset_id} = $update->{update_id}+1;
         }
       }
-    } else {
-      # something went wrong increase fails
-      $hash->{FAILS} += 1;
     }
     
+    # get timestamps and verbose
+    my $now = FmtDateTime( gettimeofday() ); 
+    my $tst = ReadingsTimestamp( $name, "PollingErrCount", "1970-01-01 01:00:00" );
+    my $pv = AttrVal( $name, "pollingVerbose", "1_Digest" );
+
+    # get current error cnt
+    my $cnt = ReadingsVal( $name, "PollingErrCount", "0" );
+
+    # flag if log needs to be written
+    my $doLog = 0;
+    
+    # Error to be converted to Reading for Poll
+    if ( defined( $ret ) ) {
+      # something went wrong increase fails
+      $hash->{FAILS} += 1;
+
+      # Put last error into reading
+      readingsSingleUpdate($hash, "PollingLastError", $ret , 1); 
+      
+      if ( substr($now,0,10) eq substr($tst,0,10) ) {
+        # Still same date just increment
+        $cnt += 1;
+        readingsSingleUpdate($hash, "PollingErrCount", $cnt, 1); 
+      } else {
+        # Write digest in log on next date
+        $doLog = ( $pv ne "3_None" );
+        readingsSingleUpdate($hash, "PollingErrCount", 1, 1); 
+      }
+      
+    } elsif ( substr($now,0,10) ne substr($tst,0,10) ) {
+      readingsSingleUpdate($hash, "PollingErrCount", 0, 1);
+      $doLog = ( $pv ne "3_None" );
+    }
+
+    # log level is 2 on error if not digest is selected
+    $ll =( ( $pv eq "2_Log" )?2:4 );
+
+    # log digest if flag set
+    Log3 $name, 3, "TelegramBot_Callback $name: Digest: Number of poll failures on ".substr($tst,0,10)." is :$cnt:" if ( $doLog );
+
+
     # start next poll or wait
     TelegramBot_UpdatePoll($hash); 
 
@@ -1181,10 +1266,10 @@ sub TelegramBot_Callback($$$)
   } else {
     # Non Polling means reset only the 
     $TelegramBot_hu_do_params{data} = "";
+    $ll = 3 if ( defined( $ret ) );
   }
   
-  my $ll = ( ( defined( $ret ) )?3:5);
-
+  
   $ret = "SUCCESS" if ( ! defined( $ret ) );
   Log3 $name, $ll, "TelegramBot_Callback $name: resulted in :$ret: from ".(( defined( $param->{isPolling} ) )?"Polling":"SendIt");
 
@@ -1236,12 +1321,12 @@ sub TelegramBot_ParseMsg($$$)
     $chatId = $chat->{id};
   }
 
-  my $user = $message->{contact};
-  if ( defined( $user ) ) {
-    push( @contacts, $user );
-  }
+#  my $user = $message->{contact};
+#  if ( defined( $user ) ) {
+#    push( @contacts, $user );
+#  }
 
-  $user = $message->{new_chat_participant};
+  my $user = $message->{new_chat_participant};
   if ( defined( $user ) ) {
     push( @contacts, $user );
   }
@@ -1259,6 +1344,9 @@ sub TelegramBot_ParseMsg($$$)
     $mpeernorm =~ s/ /_/g;
 
 #    Log3 $name, 5, "TelegramBot_ParseMsg $name: Found message $mid from $mpeer :$mtext:";
+
+    # contacts handled separately since readings are updated in here
+    TelegramBot_ContactUpdate($hash, @contacts) if ( scalar(@contacts) > 0 );
     
     readingsBeginUpdate($hash);
 
@@ -1268,7 +1356,9 @@ sub TelegramBot_ParseMsg($$$)
     readingsBulkUpdate($hash, "prevMsgChat", $hash->{READINGS}{msgChat}{VAL});				
     readingsBulkUpdate($hash, "prevMsgText", $hash->{READINGS}{msgText}{VAL});				
 
-    readingsBulkUpdate($hash, "Contacts", TelegramBot_ContactUpdate( $hash, @contacts )) if ( scalar(@contacts) > 0 );
+    readingsEndUpdate($hash, 0);
+    
+    readingsBeginUpdate($hash);
 
     readingsBulkUpdate($hash, "msgId", $mid);				
     readingsBulkUpdate($hash, "msgPeer", TelegramBot_GetFullnameForContact( $hash, $mpeernorm ));				
@@ -1283,16 +1373,23 @@ sub TelegramBot_ParseMsg($$$)
     # trim whitespace from message text
     $mtext =~ s/^\s+|\s+$//g;
 
-    my $cmdRet = TelegramBot_ReadHandleCommand( $hash, $mpeernorm, $mtext );
+    my $cmdRet;
+    
+    $cmdRet = TelegramBot_ReadHandleCommand( $hash, $mpeernorm, $mtext );
+    Log3 $name, 3, "TelegramBot_ParseMsg $name: ReadHandleCommand returned :$cmdRet:" if ( defined($cmdRet) );
+    
     #  ignore result of readhandlecommand since it leads to endless loop
 
-    my $cmd2Ret = TelegramBot_SentLastCommand( $hash, $mpeernorm, $mtext );
+    $cmdRet = TelegramBot_SentLastCommand( $hash, $mpeernorm, $mtext );
+    Log3 $name, 3, "TelegramBot_ParseMsg $name: SentLastCommand returned :$cmdRet:" if ( defined($cmdRet) );
     
-    my $cmd3Ret = TelegramBot_SentFavorites( $hash, $mpeernorm, $mtext );
+    $cmdRet = TelegramBot_SentFavorites( $hash, $mpeernorm, $mtext, $mid );
+    Log3 $name, 3, "TelegramBot_ParseMsg $name: SentFavorites returned :$cmdRet:" if ( defined($cmdRet) );
     
     
   } elsif ( scalar(@contacts) > 0 )  {
-    readingsSingleUpdate($hash, "Contacts", TelegramBot_ContactUpdate( $hash, @contacts ), 1); 
+    # will also update reading
+    TelegramBot_ContactUpdate( $hash, @contacts );
 
     Log3 $name, 5, "TelegramBot_ParseMsg $name: Found message $mid from $mpeer without text but with contacts";
 
@@ -1358,7 +1455,112 @@ sub TelegramBot_DoUrlCommand($$)
 ##############################################################################
 ##############################################################################
 ##
-## CONTACT handler
+## Polling / Setup
+##
+##############################################################################
+##############################################################################
+
+
+######################################
+#  make sure a reinitialization is triggered on next update
+#  
+sub TelegramBot_ResetPolling($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "TelegramBot_ResetPolling $name: called ";
+
+  RemoveInternalTimer($hash);
+
+  HttpUtils_Close(\%TelegramBot_hu_upd_params); 
+  HttpUtils_Close(\%TelegramBot_hu_do_params); 
+  
+  $hash->{WAIT} = 0;
+  $hash->{FAILS} = 0;
+
+  # let all existing methods first run into block
+  $hash->{POLLING} = -1;
+  
+  # wait some time before next polling is starting
+  InternalTimer(gettimeofday()+30, "TelegramBot_RestartPolling", $hash,0); 
+
+  Log3 $name, 4, "TelegramBot_ResetPolling $name: finished ";
+
+}
+
+  
+######################################
+#  make sure a reinitialization is triggered on next update
+#  
+sub TelegramBot_RestartPolling($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "TelegramBot_RestartPolling $name: called ";
+
+  # Now polling can start
+  $hash->{POLLING} = 0;
+
+  # wait some time before next polling is starting
+  TelegramBot_UpdatePoll($hash);
+
+  Log3 $name, 4, "TelegramBot_RestartPolling $name: finished ";
+
+}
+
+  
+######################################
+#  make sure a reinitialization is triggered on next update
+#  
+sub TelegramBot_Setup($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "TelegramBot_Setup $name: called ";
+
+  $hash->{me} = "<unknown>";
+  $hash->{STATE} = "Undefined";
+
+  $hash->{POLLING} = -1;
+
+  # Ensure queueing is not happening
+  delete( $hash->{sentQueue} );
+  delete( $hash->{sentMsgResult} );
+  
+  $hash->{URL} = "https://api.telegram.org/bot".$hash->{Token}."/";
+
+  $hash->{STATE} = "Defined";
+
+  # getMe as connectivity check and set internals accordingly
+  my $url = $hash->{URL}."getMe";
+  my $meret = TelegramBot_DoUrlCommand( $hash, $url );
+  if ( ( ! defined($meret) ) || ( ref($meret) ne "HASH" ) ) {
+    # retry on first failure
+    $meret = TelegramBot_DoUrlCommand( $hash, $url );
+  }
+
+  if ( ( defined($meret) ) && ( ref($meret) eq "HASH" ) ) {
+    $hash->{me} = TelegramBot_userObjectToString( $meret );
+    $hash->{STATE} = "Setup";
+
+  } else {
+    $hash->{me} = "Failed - see log file for details";
+    $hash->{STATE} = "Failed";
+    $hash->{FAILS} = 1;
+  }
+  
+  TelegramBot_InternalContactsFromReading( $hash);
+
+  TelegramBot_ResetPolling($hash);
+
+  Log3 $name, 4, "TelegramBot_Setup $name: ended ";
+
+}
+
+##############################################################################
+##############################################################################
+##
+## CONTACT handling
 ##
 ##############################################################################
 ##############################################################################
@@ -1379,7 +1581,9 @@ sub TelegramBot_GetIdForPeer($$)
   
   if ( $mpeer =~ /^\-?[[:digit:]]+$/ ) {
     # check if id is in hash 
-    $id = $mpeer if ( defined( $hash->{Contacts}{$mpeer} ) );
+#    $id = $mpeer if ( defined( $hash->{Contacts}{$mpeer} ) );
+    # Allow also sending to ids which are not in the contacts list
+    $id = $mpeer;
   } elsif ( $mpeer =~ /^[@#].*$/ ) {
     foreach  my $mkey ( keys $hash->{Contacts} ) {
       my @clist = split( /:/, $hash->{Contacts}{$mkey} );
@@ -1531,6 +1735,7 @@ sub TelegramBot_CalcContactsHash($$)
       $hash->{Contacts}{$id} = $id.":".$cname.":".$cuser;
     }
   }
+
 }
 
 
@@ -1544,10 +1749,14 @@ sub TelegramBot_InternalContactsFromReading($)
 
 
 #####################################
-# INTERNAL: update contacts hash and return complete readings string
+# INTERNAL: update contacts hash and change readings string (no return)
 sub TelegramBot_ContactUpdate($@) {
 
   my ($hash, @contacts) = @_;
+
+  my $newfound = ( int(@contacts) == 0 );
+
+  my $oldContactString = ReadingsVal($hash->{NAME},"Contacts","");
 
   TelegramBot_InternalContactsFromReading( $hash ) if ( ! defined( $hash->{Contacts} ) );
   
@@ -1557,6 +1766,7 @@ sub TelegramBot_ContactUpdate($@) {
     my $contactString = TelegramBot_userObjectToString( $user );
     if ( ! defined( $hash->{Contacts}{$user->{id}} ) ) {
       Log3 $hash->{NAME}, 3, "TelegramBot_ContactUpdate new contact :".$contactString.":";
+      $newfound = 1;
     } elsif ( $contactString ne $hash->{Contacts}{$user->{id}} ) {
       Log3 $hash->{NAME}, 3, "TelegramBot_ContactUpdate updated contact :".$contactString.":";
     }
@@ -1575,7 +1785,16 @@ sub TelegramBot_ContactUpdate($@) {
       }
     }
 
-  return $rc;		
+  # Do a readings change directly for contacts
+  readingsSingleUpdate($hash, "Contacts", $rc , 1) if ( $rc ne $oldContactString );
+    
+  # save state file on new contact 
+  if ( $newfound ) {
+    WriteStatefile() if ( AttrVal($hash->{NAME}, 'saveStateOnContactChange', 1) ) ;
+    Log3 $hash->{NAME}, 2, "TelegramBot_ContactUpdate Updated Contact list :".$rc.":";
+  }
+  
+  return;		
 }
   
 #####################################
@@ -1618,42 +1837,32 @@ sub TelegramBot_encodeContactString($) {
   return TelegramBot_GetUTF8Back( $str );
 }
 
-##############################################################################
-##############################################################################
-##
-## Command store and dialog handling
-##
-##############################################################################
-##############################################################################
+#####################################
+# INTERNAL: Check if peer is allowed - true if allowed
+sub TelegramBot_checkAllowedPeer($$) {
+  my ($hash,$mpeer) = @_;
+  my $name = $hash->{NAME};
 
+  Log3 $name, 5, "TelegramBot_checkAllowedPeer $name: called with $mpeer";
 
-######################################
-#  add a command to the StoredCommands reading 
-#  hash, cmd
-sub TelegramBot_AddStoredCommands($$) {
-	my ($hash, $cmd) = @_;
- 
-  my $stcmds = ReadingsVal($hash->{NAME},"StoredCommands","");
-  $stcmds = $stcmds;
+  my $cp = AttrVal($name,'cmdRestrictedPeer','');
 
-  if ( $stcmds !~ /^\Q$cmd\E$/m ) {
-    # add new cmd
-    $stcmds .= $cmd."\n";
-    
-    # check number lines 
-    my $num = ( $stcmds =~ tr/\n// );
-    if ( $num > 10 ) {
-      $stcmds =~ /^[^\n]+\n(.*)$/s;
-      $stcmds = $1;
+  return 1 if ( $cp eq '' );
+  
+  my @peers = split( " ", $cp);  
+  foreach my $cp (@peers) {
+    return 1 if ( $cp eq $mpeer );
+    my $cdefpeer = TelegramBot_GetIdForPeer( $hash, $cp );
+    if ( defined( $cdefpeer ) ) {
+      return 1 if ( $cdefpeer eq $mpeer );
     }
-
-    # change reading  
-    readingsSingleUpdate($hash, "StoredCommands", $stcmds , 1); 
-    Log3 $hash->{NAME}, 4, "TelegramBot_AddStoredCommands :$stcmds: ";
   }
- 
-}
-    
+  
+  return 0;
+}  
+
+
+
 ##############################################################################
 ##############################################################################
 ##
@@ -1700,162 +1909,7 @@ sub TelegramBot_BinaryFileWrite($$$) {
 }
 
 
-
-######################################
-#  make sure a reinitialization is triggered on next update
-#  
-sub TelegramBot_ResetPolling($) {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  Log3 $name, 4, "TelegramBot_ResetPolling $name: called ";
-
-  RemoveInternalTimer($hash);
-
-  HttpUtils_Close(\%TelegramBot_hu_upd_params); 
-  HttpUtils_Close(\%TelegramBot_hu_do_params); 
   
-  $hash->{WAIT} = 0;
-  $hash->{FAILS} = 0;
-
-  # let all existing methods first run into block
-  $hash->{POLLING} = -1;
-  
-  # wait some time before next polling is starting
-  InternalTimer(gettimeofday()+45, "TelegramBot_RestartPolling", $hash,0); 
-
-  Log3 $name, 4, "TelegramBot_ResetPolling $name: finished ";
-
-}
-
-  
-######################################
-#  make sure a reinitialization is triggered on next update
-#  
-sub TelegramBot_RestartPolling($) {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  Log3 $name, 4, "TelegramBot_RestartPolling $name: called ";
-
-  # Now polling can start
-  $hash->{POLLING} = 0;
-
-  # wait some time before next polling is starting
-  TelegramBot_UpdatePoll($hash);
-
-  Log3 $name, 4, "TelegramBot_RestartPolling $name: finished ";
-
-}
-
-  
-######################################
-#  make sure a reinitialization is triggered on next update
-#  
-sub TelegramBot_Setup($) {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  Log3 $name, 4, "TelegramBot_Setup $name: called ";
-
-  $hash->{me} = "<unknown>";
-  $hash->{STATE} = "Undefined";
-
-  $hash->{POLLING} = -1;
-
-  # Ensure queueing is not happening
-  delete( $hash->{sentQueue} );
-  delete( $hash->{sentMsgResult} );
-  
-  $hash->{URL} = "https://api.telegram.org/bot".$hash->{Token}."/";
-
-  $hash->{STATE} = "Defined";
-
-  # getMe as connectivity check and set internals accordingly
-  my $url = $hash->{URL}."getMe";
-  my $meret = TelegramBot_DoUrlCommand( $hash, $url );
-  if ( ( ! defined($meret) ) || ( ref($meret) ne "HASH" ) ) {
-    # retry on first failure
-    $meret = TelegramBot_DoUrlCommand( $hash, $url );
-  }
-
-  if ( ( defined($meret) ) && ( ref($meret) eq "HASH" ) ) {
-    $hash->{me} = TelegramBot_userObjectToString( $meret );
-    $hash->{STATE} = "Setup";
-
-  } else {
-    $hash->{me} = "Failed - see log file for details";
-    $hash->{STATE} = "Failed";
-    $hash->{FAILS} = 1;
-  }
-  
-  TelegramBot_InternalContactsFromReading( $hash);
-
-  TelegramBot_ResetPolling($hash);
-
-  Log3 $name, 4, "TelegramBot_Setup $name: ended ";
-
-}
-
-  
-#####################################
-# INTERNAL: Check if peer is allowed - true if allowed
-sub TelegramBot_checkAllowedPeer($$) {
-  my ($hash,$mpeer) = @_;
-  my $name = $hash->{NAME};
-
-  Log3 $name, 5, "TelegramBot_checkAllowedPeer $name: called with $mpeer";
-
-  my $cp = AttrVal($name,'cmdRestrictedPeer','');
-
-  return 1 if ( $cp eq '' );
-  
-  my @peers = split( " ", $cp);  
-  foreach my $cp (@peers) {
-    return 1 if ( $cp eq $mpeer );
-    my $cdefpeer = TelegramBot_GetIdForPeer( $hash, $cp );
-    if ( defined( $cdefpeer ) ) {
-      return 1 if ( $cdefpeer eq $mpeer );
-    }
-  }
-  
-  return 0;
-}  
-
-
-#####################################
-# INTERNAL: split message into id peer and text
-# returns id, peer, msgtext
-sub TelegramBot_SplitMsg($)
-{
-	my ( $msg ) = @_;
-
-  if ( $msg =~ /^(\d+)\s\[[^\]]+\]\s+([^\s][^>]*)\s>>>\s(.*)$/s  ) {
-    return ( $1, $2, $3 );
-    
-  } elsif ( $msg =~ /^(-?\d+)\s\[[^\]]+\]\s+!_([^»]*)\s\»»»\s(.*)$/s  ) {
-    # secret chats have slightly different message format: can have a minus / !_ prefix on name and underscore between first and last / Â» instead of >
-    return ( $1, $2, $3 );
-  }
-
-  return undef;
-}
-
-
-#####################################
-# INTERNAL: Function to convert a peer name to a normalized form
-sub TelegramBot_convertpeer($)
-{
-	my ( $peer ) = @_;
-
-  my $peer2 = $peer;
-     $peer2 =~ s/^\s+|\s+$//g;
-     $peer2 =~ s/ /_/g;
-
-  return $peer2;
-}
-
-
 
 ##############################################################################
 ##############################################################################
@@ -1896,6 +1950,7 @@ sub TelegramBot_convertpeer($)
     <li>This module requires the perl JSON module.<br>
         Please install the module (e.g. with <code>sudo apt-get install libjson-perl</code>) or the correct method for the underlying platform/system.</li>
     <li>The attribute pollingTimeout needs to be set to a value greater than zero, to define the interval of receiving messages (if not set or set to 0, no messages will be received!)</li>
+    <li>Multiple infomations are stored in readings (esp contacts) and internals that are needed for the bot operation, so having an recent statefile will help in correct operation of the bot. Generally it is recommended to regularly store the statefile (see save command)</li>
   </ul>   
   <br><br>
 
@@ -1935,7 +1990,7 @@ sub TelegramBot_convertpeer($)
     where &lt;what&gt; is one of
 
   <br><br>
-    <li><code>message|msg [@&lt;peer&gt;] &lt;text&gt;</code><br>Sends the given message to the given peer or if peer is ommitted currently defined default peer user. If a peer is given it needs to be always prefixed with a '@'. Peers can be specified as contact ids, full names (with underscore instead of space), usernames (prefixed with another @) or chat names (also known as groups in telegram groups must be prefixed with #).<br>
+    <li><code>message|msg|send [@&lt;peer&gt;] &lt;text&gt;</code><br>Sends the given message to the given peer or if peer is ommitted currently defined default peer user. If a peer is given it needs to be always prefixed with a '@'. Peers can be specified as contact ids, full names (with underscore instead of space), usernames (prefixed with another @) or chat names (also known as groups in telegram groups must be prefixed with #).<br>
     Messages do not need to be quoted if containing spaces.<br>
     Examples:<br>
       <dl>
@@ -1949,7 +2004,7 @@ sub TelegramBot_convertpeer($)
           <dd> to send the message "Bye" to a contact or chat with the id "1234567". Chat ids might be negative and need to be specified with a leading hyphen (-). <br></dd>
       <dl>
     </li>
-    <li><code>sendImage [@&lt;peer&gt;] &lt;file&gt; [&lt;caption&gt;]</code><br>Sends a photo to the given or if ommitted to the default peer. 
+    <li><code>sendImage|image [@&lt;peer&gt;] &lt;file&gt; [&lt;caption&gt;]</code><br>Sends a photo to the given or if ommitted to the default peer. 
     File is specifying a filename and path to the image file to be send. 
     Local paths should be given local to the root directory of fhem (the directory of fhem.pl e.g. /opt/fhem).
     filenames containing spaces need to be given in parentheses.<br>
@@ -1988,7 +2043,9 @@ sub TelegramBot_convertpeer($)
         Please also consider cmdRestrictedPeer for restricting access to this feature!<br>
         Example: If this attribute is set to a value of <code>ok fhem</code> a message of <code>ok fhem attr telegram room IM</code> 
         send to the bot would execute the command  <code>attr telegram room IM</code> and set a device called telegram into room IM.
-        The result of the cmd is sent to the requestor and in addition (if different) always sent also as message to the defaultPeer 
+        The result of the cmd is sent to the requestor and in addition (if different) sent also as message to the defaultPeer (This can be controlled with the attribute <code>defaultPeerCopy</code>). 
+    <br>
+        Note: <code>shutdown</code> is not supported as a command (also in favorites) and will be rejected. This is needed to avoid reexecution of the shutdown command directly after restart (endless loop !).
     </li> 
     <li><code>cmdSentCommands &lt;keyword&gt;</code><br>Specify a specific text that will trigger sending the last commands back to the sender<br>
         Example: If this attribute is set to a value of <code>last cmd</code> a message of <code>last cmd</code> 
@@ -2014,16 +2071,29 @@ sub TelegramBot_convertpeer($)
     <li><code>cmdTriggerOnly &lt;0 or 1&gt;</code><br>Restrict the execution of commands only to trigger command. If this attr is set (value 1), then only the name of the trigger even has to be given (i.e. without the preceding statement trigger). 
           So if for example cmdKeyword is set to <code>ok fhem</code> and cmdTriggerOnly is set, then a message of <code>ok fhem someMacro</code> would execute the fhem command  <code>trigger someMacro</code>.
     </li> 
+    <li><code>cmdReturnEmptyResult &lt;1 or 0&gt;</code><br>Return empty (success) message for commands (default). Otherwise return messages are only sent if a result text or error message is the result of the command execution.
+    </li> 
+
 
   <br><br>
     <li><code>pollingTimeout &lt;number&gt;</code><br>Used to specify the timeout for long polling of updates. A value of 0 is switching off any long poll. 
-      In this case no updates are automatically received and therefore also no messages can be received. 
-      As of now the long poll timeout is limited to a maximium of 20 sec, longer values will be ignored from the telegram service.
+      In this case no updates are automatically received and therefore also no messages can be received. It is recommended to set the pollingtimeout to a reasonable time between 15 (not too short) and 60 (to avoid broken connections). 
     </li> 
+    <li><code>pollingVerbose &lt;0_None 1_Digest 2_Log&gt;</code><br>Used to limit the amount of logging for errors of the polling connection. These errors are happening regularly and usually are not consider critical, since the polling restarts automatically and pauses in case of excess errors. With the default setting "1_Digest" once a day the number of errors on the last day is logged (log level 3). With "2_Log" every error is logged with log level 2. With the setting "0_None" no errors are logged. In any case the count of errors during the last day and the last error is stored in the readings <code>PollingErrCount</code> and <code>PollingLastError</code> </li> 
 
+    
+pollingVerbose:1_Digest,2_Log,0_None
+    
   <br><br>
     <li><code>maxFileSize &lt;number of bytes&gt;</code><br>Maximum file size in bytes for transfer of files (images). If not set the internal limit is specified as 10MB (10485760B).
     </li> 
+    <li><code>maxReturnSize &lt;number of chars&gt;</code><br>Maximum size of command result returned as a text message including header (Default is unlimited). The internal shown on the device is limited to 1000 chars.
+    </li> 
+
+    <br><br>
+    <li><code>saveStateOnContactChange &lt;1 or 0&gt;</code><br>Allow statefile being written on every new contact found, ensures new contacts not being lost on any loss of statefile. Default is on (1).
+    </li> 
+
 
 
     <li><a href="#verbose">verbose</a></li>
@@ -2051,9 +2121,15 @@ sub TelegramBot_convertpeer($)
     <li>prevMsgPeerId &lt;text&gt;<br>The sender id of the SECOND last received message</li> 
     <li>prevMsgText &lt;text&gt;<br>The SECOND last received message text is stored in this reading</li> 
 
+  <br>All prev... Readings are not triggering events<br>
+
   <br><br>
     <li>StoredCommands &lt;text&gt;<br>A list of the last commands executed through TelegramBot. Maximum 10 commands are stored.</li> 
 
+  <br><br>
+    <li>PollingErrCount &lt;number&gt;<br>Show the number of polling errors during the last day. The number is reset at the beginning of the next day.</li> 
+    <li>PollingLastError &lt;number&gt;<br>Last error message that occured during a polling update call</li> 
+    
   </ul>
   <br><br>
   
