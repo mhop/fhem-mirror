@@ -42,6 +42,8 @@ use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
 
+use Data::Dumper;
+
 eval "use GDSweblink";
 
 no if $] >= 5.017011, warnings => 'experimental';
@@ -1882,6 +1884,7 @@ sub getListForecastStations($) {
 
 	eval {
 		foreach my $region (@regions) {
+			$data = "";
 			my $areaAndTime = 'Daten_'.$region.'_morgen_spaet';
 			while(($k, $v) = each %allForecastData){
 				if ($k eq $areaAndTime) {
