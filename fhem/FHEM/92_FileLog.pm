@@ -147,7 +147,7 @@ FileLog_Switch($)
   my $cn = ResolveDateWildcards($log->{logfile},  @t);
 
   if($cn ne $log->{currentlogfile}) { # New logfile
-    $fh->close();
+    $fh->close() if($fh);
     HandleArchiving($log);
     $fh = new IO::File ">>$cn";
     if(!defined($fh)) {
