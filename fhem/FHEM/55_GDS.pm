@@ -824,6 +824,12 @@ sub gdsHeadlines($;$) {
   return $text;
 }
 
+sub gdsAlertsHeadlines($;$) {
+  my ($d,$sep) = @_;
+  $sep //= '|';
+  return gdsHeadlines($d,$sep); 
+}
+
 sub setHelp(){
 	return	"Use one of the following commands:\n".
 			sepLine(35)."\n".
@@ -1924,6 +1930,9 @@ sub getListForecastStations($) {
 #	Changelog
 #
 ###################################################################################################
+#
+#	2015-11-26	fixed		wrong region handling
+#				added		gdsAlertsHeadlines()
 #
 #	2015-11-17	changed		decodeCAPData - fix wrong cumulation (first try)
 #				fixed		minor bugs
