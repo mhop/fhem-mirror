@@ -812,7 +812,7 @@ sub __GDS_HTMLTail {
 #
 #	Tools
 
-sub gdsHeadlines($;$) {
+sub gdsAlertsHeadlines($;$) {
   my ($d,$sep) = @_;
   my $text = "";
   $sep = (defined($sep)) ? $sep : '|';
@@ -824,10 +824,8 @@ sub gdsHeadlines($;$) {
   return $text;
 }
 
-sub gdsAlertsHeadlines($;$) {
-  my ($d,$sep) = @_;
-  $sep //= '|';
-  return gdsHeadlines($d,$sep); 
+sub gdsHeadlines($;$) {
+  return "gdsHeadlines() is deprecated. Please use gdsAlertsHeadlines()"; 
 }
 
 sub setHelp(){
