@@ -1131,12 +1131,18 @@ sub HMinfo_GetFn($@) {#########################################################
     $ret = $cmd." done:" .HMinfo_peerCheck(@entities);
   }
   elsif($cmd eq "configCheck"){##check peers and register----------------------
-    my $id = ++$hash->{nb}{cnt};
-    my $bl = BlockingCall("HMinfo_configCheck", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter)), 
-                          "HMinfo_bpPost", 30, 
-                          "HMinfo_bpAbort", "$name:0");
-    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
-    $ret = "";
+    if ($hash->{CL}){
+      my $id = ++$hash->{nb}{cnt};
+      my $bl = BlockingCall("HMinfo_configCheck", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter)), 
+                            "HMinfo_bpPost", 30, 
+                            "HMinfo_bpAbort", "$name:0");
+      $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+      $ret = "";
+    }
+    else{
+      $ret = HMinfo_configCheck (join(",",("$name;;",$opt,$filter)));
+      $ret =~s/-ret-/\n/g;
+    }
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
     my $id = ++$hash->{nb}{cnt};

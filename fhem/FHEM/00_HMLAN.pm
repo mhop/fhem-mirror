@@ -251,28 +251,34 @@ sub HMLAN_Attr(@) {############################################################
   elsif($aName eq "logIDs"){
     if ($cmd eq "set"){
       if ($init_done){
-        my @ids = split",",$aVal;
-        my @idName;
-        if (grep /sys/,@ids){
-          push @idName,"sys";
-          $defs{$name}{helper}{log}{sys}=1;
+        if ($aVal){
+          my @ids = split",",$aVal;
+          my @idName;
+          if (grep /sys/,@ids){
+            push @idName,"sys";
+            $defs{$name}{helper}{log}{sys}=1;
+          }
+          else{
+            $defs{$name}{helper}{log}{sys}=0;
+          }
+          if (grep /all/,@ids){
+            push @idName,"all";
+            $defs{$name}{helper}{log}{all}=1;
+          }
+          else{
+            $defs{$name}{helper}{log}{all}=0;
+            $_=substr(CUL_HM_name2Id($_),0,6) foreach(grep !/^$/,@ids);
+            $_="" foreach(grep !/^[A-F0-9]{6}$/,@ids);
+            @ids = HMLAN_noDup(@ids);
+            push @idName,CUL_HM_id2Name($_) foreach(@ids);
+          }
+          $attr{$name}{$aName} = join(",",@idName);
+          @{$defs{$name}{helper}{log}{ids}}=grep !/^(sys|all)$/,@ids;
         }
         else{
-          $defs{$name}{helper}{log}{sys}=0;
+          $attr{$name}{$aName} = "";
+          @{$defs{$name}{helper}{log}{ids}}=();          
         }
-        if (grep /all/,@ids){
-          push @idName,"all";
-          $defs{$name}{helper}{log}{all}=1;
-        }
-        else{
-          $defs{$name}{helper}{log}{all}=0;
-          $_=substr(CUL_HM_name2Id($_),0,6) foreach(grep !/^$/,@ids);
-          $_="" foreach(grep !/^[A-F0-9]{6}$/,@ids);
-          @ids = HMLAN_noDup(@ids);
-          push @idName,CUL_HM_id2Name($_) foreach(@ids);
-        }
-        $attr{$name}{$aName} = join(",",@idName);
-        @{$defs{$name}{helper}{log}{ids}}=grep !/^(sys|all)$/,@ids;
       }
       else{
         $defs{$name}{helper}{attrPend} = 1;
