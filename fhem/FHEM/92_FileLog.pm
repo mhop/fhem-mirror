@@ -147,6 +147,8 @@ FileLog_Switch($)
   my $cn = ResolveDateWildcards($log->{logfile},  @t);
 
   if($cn ne $log->{currentlogfile}) { # New logfile
+    $log->{currentlogfile} = $cn;
+    return 1 if($log->{READONLY});
     $fh->close() if($fh);
     HandleArchiving($log);
     $fh = new IO::File ">>$cn";
@@ -154,7 +156,6 @@ FileLog_Switch($)
       Log3 $log, 0, "Can't open $cn";
       return 0;
     }
-    $log->{currentlogfile} = $cn;
     $log->{FH} = $fh;
     return 1;
   }
