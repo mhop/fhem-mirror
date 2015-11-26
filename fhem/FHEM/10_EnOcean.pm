@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2015-11-25
+# 2015-11-26
 
 # Added new EEP:
 # EnOcean_Notify():
@@ -876,8 +876,8 @@ EnOcean_Define($$) {
   if (exists($attr{$name}{subType}) && $attr{$name}{subType} eq "hvac.04") {
     # pid parameter
     @{$hash->{helper}{calcPID}} = (undef, $hash, 'defined');
-    #$hash->{helper}{PID}{stopped} = 0;
-    #$hash->{helper}{PID}{adjust} = '';
+    $hash->{helper}{stopped} = 0;
+    #$hash->{helper}{adjust} = '';
   }
   # all notifys needed
   #$hash->{NOTIFYDEV} = "global";
@@ -5410,7 +5410,7 @@ sub EnOcean_Parse($$)
       my %displayOrientation = (0 => 0, 90 => 1, 180 => 2, 270 => 3);
       my $setpoint = $db[3];
       push @event, "3:setpoint:$setpoint";
-      my $roomTemp = '-';
+      my $roomTemp = ReadingsVal($name, "roomTemp", 20);
       my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
       my $setpointTempSet = ReadingsVal($name, "setpointTempSet", 20);
       my $temperature = ReadingsVal($name, "temperature", 20);
@@ -9255,14 +9255,43 @@ sub EnOcean_Notify(@)
   my $name = $hash->{NAME};
   my $devName = $dev->{NAME};
   return undef if (AttrVal($name ,"disable", 0) > 0);
-  return undef if ($devName eq $name);
+  #return undef if ($devName eq $name);
 
   my $max = int(@{$dev->{CHANGED}});
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
     $s = "" if(!defined($s));
 
-    if ($devName eq "global" && $s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
+    if ($devName eq $name) {
+      my @parts = split(/: | /, $s);
+
+      if ($name eq $devName && exists($hash->{helper}{stopped}) && $parts[0] eq "temperature") {
+        # PID regulator: calc gradient for delta as base for d-portion calculation
+        my $setpointTemp = ReadingsVal($name, "setpointTemp", undef);
+        my $temperature = $parts[1];
+        # ---- build difference current - old value 
+        # calc difference of delta/deltaOld
+        my $delta = $setpointTemp - $temperature if (defined($setpointTemp));
+        my $deltaOld = ($hash->{helper}{deltaOld} + 0) if (exists($hash->{helper}{deltaOld}));
+        my $deltaDiff = ($delta - $deltaOld) if (defined($delta) && defined($deltaOld));
+        # ----- build difference of timestamps
+        my $deltaOldTsStr = $hash->{helper}{deltaOldTS};
+        my $deltaOldTsNum = time_str2num($deltaOldTsStr) if (defined($deltaOldTsStr));
+        my $nowTsNum = gettimeofday();
+        my $tsDiff = ($nowTsNum - $deltaOldTsNum)
+          if (defined($deltaOldTsNum) && (($nowTsNum - $deltaOldTsNum) > 0));
+        # ----- calculate gradient of delta
+        my $deltaGradient = $deltaDiff / $tsDiff
+          if (defined($deltaDiff) && defined($tsDiff) && ($tsDiff > 0 ));
+        $deltaGradient = 0 if ( !defined($deltaGradient) );
+        # ----- store results
+        $hash->{helper}{deltaGradient} = $deltaGradient;
+        $hash->{helper}{deltaOld} = $delta;
+        $hash->{helper}{deltaOldTS} = TimeNow();
+        #Log3 $name, 5, "EnOcean $name <notify> $devName $s";
+      }
+      
+    } elsif ($devName eq "global" && $s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
       if (defined AttrVal($name, "temperatureRefDev", undef)) {
         if (AttrVal($name, "temperatureRefDev", undef) eq $1) {
           CommandAttr(undef, "$name temperatureRefDev $2");
@@ -9525,32 +9554,6 @@ sub EnOcean_Notify(@)
         }
       }
 
-#####
-      if ($name eq $devName && exists($hash->{helper}{PID}{stopped}) && $parts[0] eq "temperature") {
-        # PID regulator: calc gradient for delta as base for d-portion calculation
-        my $setpointTemp = ReadingsVal($name, "setpointTemp", undef);
-        my $temperature = $parts[1];
-        # ---- build difference current - old value 
-        # calc difference of delta/deltaOld
-        my $delta = $setpointTemp - $temperature if (defined($setpointTemp));
-        my $deltaOld = ($hash->{helper}{PID}{deltaOld} + 0) if (exists($hash->{helper}{PID}{deltaOld}));
-        my $deltaDiff = ($delta - $deltaOld) if (defined($delta) && defined($deltaOld));
-        # ----- build difference of timestamps
-        my $deltaOldTsStr = $hash->{helper}{PID}{deltaOldTS};
-        my $deltaOldTsNum = time_str2num($deltaOldTsStr) if (defined($deltaOldTsStr));
-        my $nowTsNum = gettimeofday();
-        my $tsDiff = ($nowTsNum - $deltaOldTsNum)
-          if (defined($deltaOldTsNum) && (($nowTsNum - $deltaOldTsNum) > 0));
-        # ----- calculate gradient of delta
-        my $deltaGradient = $deltaDiff / $tsDiff
-          if (defined($deltaDiff) && defined($tsDiff) && ($tsDiff > 0 ));
-        $deltaGradient = 0 if ( !defined($deltaGradient) );
-        # ----- store results
-        $hash->{helper}{PID}{deltaGradient} = $deltaGradient;
-        $hash->{helper}{PID}{deltaOld} = $delta;
-        $hash->{helper}{PID}{deltaOldTS} = TimeNow();
-      }
-
     }
   }
   return undef;
@@ -9658,7 +9661,7 @@ sub EnOcean_calcPID($) {
   my $DEBUG = $DEBUG_Sensor || $DEBUG_Actuation || $DEBUG_Calc || $DEBUG_Delta || $DEBUG_Update;
 
   my $actuation        = "";
-  my $actuationDone    = ReadingsVal( $name, 'setpoint', "" );
+  my $actuationDone    = ReadingsVal( $name, 'setpointSet', ReadingsVal( $name, 'setpoint', ""));
   my $actuationCalc    = ReadingsVal( $name, 'setpointCalc', "" );
   my $actuationCalcOld = $actuationCalc;
   my $actorTimestamp =
@@ -9684,7 +9687,6 @@ sub EnOcean_calcPID($) {
   my $calcReq          = 0;
   my $readingUpdateReq = '';
 
-######
   # ---------------- check conditions
   while (1)
   {
@@ -9715,8 +9717,7 @@ sub EnOcean_calcPID($) {
     $hash->{helper}{factor_I} = AttrVal($name, 'pidFactor_I', 0.25);
     $hash->{helper}{factor_D} = AttrVal($name, 'pidFactor_D', 0);
 
-    if ( $hash->{helper}{stopped} )
-    {
+    if ($hash->{helper}{stopped}) {
       $stateStr = "stopped";
       last;
     }
@@ -9941,7 +9942,7 @@ sub EnOcean_calcPID($) {
       #PID20_Log $hash, 3, "<$cmd> " . $retStr;
     }
     my $updateAlive = ( $actuation ne "" )
-      && EnOcean_TimeDiff( ReadingsTimestamp( $name, 'setpoint', gettimeofday() ) ) >= $hash->{helper}{updateInterval};
+      && EnOcean_TimeDiff( ReadingsTimestamp( $name, 'setpointSet', gettimeofday() ) ) >= $hash->{helper}{updateInterval};
 
   # my $updateReq = ( ( $actuationReq || $updateAlive ) && $actuation ne "" );
   # PID20_Log $hash, 2, "U1 actReq:$actuationReq updateAlive:$updateAlive -->  updateReq:$updateReq" if ($DEBUG_Update);
@@ -9979,15 +9980,14 @@ sub EnOcean_calcPID($) {
 
   #PID20_Log $hash, 2, "InternalTimer next:".FmtDateTime($next)." PID20_Calc name:$name DEBUG_Calc:$DEBUG_Calc";
 
-#####  
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, 'pidState', $stateStr);
   readingsBulkUpdate($hash, 'pidAlarm', $err) if (defined $err);
   readingsEndUpdate($hash, 1);
-  Log3($name, 5, "EnOcean $name EnOcean_pidCalc Cmd: $cmd pidState: $stateStr T: $sensorValue SP: $setpoint SPT: $desired");
+  Log3($name, 5, "EnOcean $name EnOcean_calcPID Cmd: $cmd pidState: $stateStr T: $sensorValue SP: $setpoint SPT: $desired");
   @{$hash->{helper}{calcPID}} = (undef, $hash, 'periodic');
   RemoveInternalTimer($hash->{helper}{calcPID});
-  InternalTimer(gettimeofday() + $hash->{helper}{calcInterval} * 1.05, "EnOcean_calcPID", $hash->{helper}{calcPID}, 0);  
+  InternalTimer(gettimeofday() + $hash->{helper}{calcInterval} * 1.02, "EnOcean_calcPID", $hash->{helper}{calcPID}, 0);  
   return ($err, $logLevel, $response);
 }
 
