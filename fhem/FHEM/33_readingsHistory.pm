@@ -426,9 +426,7 @@ readingsHistory_Notify($$)
         }
       }
 
-      my @parts = split(/: /,$s);
-      my $reading = shift @parts;
-      my $value   = join(": ", @parts);
+      my ($reading,$value) = split(": ", $s, 2);
 
       $reading = "" if( !defined($reading) );
       next if( $reading =~ m/^\./);
