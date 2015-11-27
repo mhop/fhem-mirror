@@ -45,6 +45,7 @@ my %gets = (
   "getVirtualNodes" => "a5",      # ZW_GET_VIRTUAL_NODES
   "homeId"          => "20",      # MEMORY_GET_ID
   "isFailedNode"    => "62%02x",  # ZW_IS_FAILED_NODE
+  "neighborList"    => "80%0x",   # GET_ROUTING_TABLE_LINE
   "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
   "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
   "random"          => "1c%02x",  # ZW_GET_RANDOM
@@ -326,36 +327,46 @@ ZWDongle_Get($@)
   my $name = shift @a;
 
   return "\"get $name\" needs at least one parameter" if(@a < 1);
-  my $type = shift @a;
+  my $cmd = shift @a;
 
-  return "Unknown argument $type, choose one of " .
+  return "Unknown argument $cmd, choose one of " .
         join(" ", map { $gets{$_} =~ m/%/ ? $_ : "$_:noArg" } sort keys %gets)
-        if(!defined($gets{$type}));
+        if(!defined($gets{$cmd}));
 
-  my $fb = substr($gets{$type}, 0, 2);
-  if($fb =~ m/^[0-8A-F]+$/i && $type ne "caps" &&
+  my $fb = substr($gets{$cmd}, 0, 2);
+  if($fb =~ m/^[0-8A-F]+$/i && $cmd ne "caps" &&
      ReadingsVal($name, "caps","") !~ m/\b$zw_func_id{$fb}\b/) {
-    return "$type is unsupported by this controller";
+    return "$cmd is unsupported by this controller";
   }
 
-  Log3 $hash, 4, "ZWDongle get $name $type ".join(" ",@a);
-  my @ga = split("%", $gets{$type}, -1);
+  Log3 $hash, 4, "ZWDongle get $name $cmd ".join(" ",@a);
+
+  if($cmd eq "neighborList") {
+    my @b;
+    @b = grep(!/noRepeater/i,  @a); my $noRep = (@b != @a); @a = @b;
+    @b = grep(!/includeDead/i, @a); my $wDead = (@b != @a); @a = @b;
+    $gets{neighborList} = "80%02x".($wDead ? "01":"00").($noRep ? "01":"00");
+    return "Usage: get $name $cmd [noRepeater] [includeDead] nodeId"
+        if(int(@a) != 1);
+  }
+
+  my @ga = split("%", $gets{$cmd}, -1);
   my $nargs = int(@ga)-1;
-  return "get $name $type needs $nargs arguments" if($nargs != int(@a));
+  return "get $name $cmd needs $nargs arguments" if($nargs != int(@a));
 
-  return "No $type for dummies" if(IsDummy($name));
+  return "No $cmd for dummies" if(IsDummy($name));
 
-  my $out = sprintf($gets{$type}, @a);
+  my $out = sprintf($gets{$cmd}, @a);
   ZWDongle_Write($hash,  "00", $out);
   my $re = "^01".substr($out,0,2);  # Start with <01><len><01><CMD>
-  my ($err, $ret) = ZWDongle_ReadAnswer($hash, $type, $re);
+  my ($err, $ret) = ZWDongle_ReadAnswer($hash, $cmd, $re);
   return $err if($err);
 
   my $msg="";
   $msg = $ret if($ret);
   my @r = map { ord($_) } split("", pack('H*', $ret)) if(defined($ret));
 
-  if($type eq "nodeList") {                     ############################
+  if($cmd eq "nodeList") {                     ############################
     return "$name: Bogus data received" if(int(@r) != 36);
     my @list;
     for my $byte (0..28) {
@@ -369,7 +380,7 @@ ZWDongle_Get($@)
     }
     $msg = join(" ", @list);
 
-  } elsif($type eq "caps") {                    ############################
+  } elsif($cmd eq "caps") {                    ############################
     $msg  = sprintf("Vers:%d Rev:%d ",       $r[2], $r[3]);
     $msg .= sprintf("ManufID:%02x%02x ",     $r[4], $r[5]);
     $msg .= sprintf("ProductType:%02x%02x ", $r[6], $r[7]);
@@ -385,21 +396,21 @@ ZWDongle_Get($@)
     }
     $msg .= " ".join(" ",@list);
 
-  } elsif($type eq "homeId") {                  ############################
+  } elsif($cmd eq "homeId") {                  ############################
     $msg = sprintf("HomeId:%s CtrlNodeId:%s", 
                 substr($ret,4,8), substr($ret,12,2));
     $hash->{homeId} = substr($ret,4,8);
     $hash->{nodeIdHex} = substr($ret,12,2);
     $attr{NAME}{homeId} = substr($ret,4,8);
 
-  } elsif($type eq "version") {                 ############################
+  } elsif($cmd eq "version") {                 ############################
     $msg = join("",  map { chr($_) } @r[2..13]);
     my @type = qw( STATIC_CONTROLLER CONTROLLER ENHANCED_SLAVE
                    SLAVE INSTALLER NO_INTELLIGENT_LIFE BRIDGE_CONTROLLER);
     my $idx = $r[14]-1;
     $msg .= " $type[$idx]" if($idx >= 0 && $idx <= $#type);
 
-  } elsif($type eq "ctrlCaps") {                ############################
+  } elsif($cmd eq "ctrlCaps") {                ############################
     my @type = qw(SECONDARY OTHER MEMBER PRIMARY SUC);
     my @list;
     for my $bit (0..7) {
@@ -407,10 +418,10 @@ ZWDongle_Get($@)
     }
     $msg = join(" ", @list);
 
-  } elsif($type eq "getVirtualNodes") {         ############################
+  } elsif($cmd eq "getVirtualNodes") {         ############################
     $msg = join(" ", @r);
 
-  } elsif($type eq "nodeInfo") {                 ############################
+  } elsif($cmd eq "nodeInfo") {                ############################
     my $id = sprintf("%02x", $r[6]);
     if($id eq "00") {
       $msg = "node $a[0] is not present";
@@ -429,20 +440,24 @@ ZWDongle_Get($@)
       $msg = join(" ", @list);
     }
 
-  } elsif($type eq "random") {                  ############################
+  } elsif($cmd eq "random") {                  ############################
     return "$name: Cannot generate" if($ret !~ m/^011c01(..)(.*)$/);
     $msg = $2; @a = ();
 
-  } elsif($type eq "isFailedNode") {                  ############################
+  } elsif($cmd eq "isFailedNode") {            ############################
     $msg = ($r[2]==1)?"yes":"no";
+
+  } elsif($cmd eq "neighborList") {            ############################
+    $msg =~ s/^....//;
+    $msg = ZWDongle_parseNeighborList($hash, $msg);
 
   }
 
-  $type .= "_".join("_", @a) if(@a);
-  $hash->{READINGS}{$type}{VAL} = $msg;
-  $hash->{READINGS}{$type}{TIME} = TimeNow();
+  $cmd .= "_".join("_", @a) if(@a);
+  $hash->{READINGS}{$cmd}{VAL} = $msg;
+  $hash->{READINGS}{$cmd}{TIME} = TimeNow();
 
-  return "$name $type => $msg";
+  return "$name $cmd => $msg";
 }
 
 #####################################
@@ -820,6 +835,33 @@ ZWDongle_Ready($)
   return 0;
 }
 
+sub
+ZWDongle_parseNeighborList($$)
+{
+  my ($iodev, $data) = @_;
+  my $homeId = $iodev->{homeId};
+  my $ioName = $iodev->{NAME};
+  my @r = map { ord($_) } split("", pack('H*', $data));
+  return "Bogus neightborList $data" if(int(@r) != 29);
+
+  my @list;
+  my $ioId = ReadingsVal($ioName, "homeId", "");
+  $ioId = $1 if($ioId =~ m/CtrlNodeId:(..)/);
+  for my $byte (0..28) {
+    my $bits = $r[$byte];
+    for my $bit (0..7) {
+      if($bits & (1<<$bit)) {
+        my $dec = $byte*8+$bit+1;
+        my $hex = sprintf("%02x", $dec);
+        my $h = $modules{ZWave}{defptr}{"$homeId $hex"};
+        push @list, ($hex eq $ioId ? $ioName :
+                    ($h ? $h->{NAME} : "UNKNOWN_$dec"));
+      }
+    }
+  }
+  return @list ? join(" ", @list) : "empty";
+}
+
 1;
 
 =pod
@@ -911,6 +953,12 @@ ZWDongle_Ready($)
   <li>caps, ctrlCaps, version<br>
     return different controller specific information. Needed by developers
     only.  </li>
+
+  <li>neighborList [noRepeater] [includeDead] nodeId<br>
+    return data for the decimal nodeId.
+    With noRepeater the result will exclude nodes with repeater functionality.
+    With includeDead the result will exclude nodes believed to be unreachable.
+    </li>
 
   <li>nodeInfo<br>
     return node specific information. Needed by developers only.</li>

@@ -637,8 +637,8 @@ ZWave_Cmd($$@)
       $cmdList{neighborUpdate}{id} = "";
     }
     if($type eq "get") {
-      # GET_ROUTING_TABLE_LINE, include dead links, non-routing neigbors
-      $cmdList{neighborList}{fmt} = "80${id}0101";
+      # GET_ROUTING_TABLE_LINE, no dead links, include routing neighbors
+      $cmdList{neighborList}{fmt} = "80${id}0100";
       $cmdList{neighborList}{id} = "";
       $cmdList{neighborList}{regexp} = "^0180";
     }
@@ -2702,25 +2702,8 @@ ZWave_Parse($$@)
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     my $name = ($hash ? $hash->{NAME} : "unknown");
 
-    my @r = map { ord($_) } split("", pack('H*', $data));
-    return "Bogus answer: $msg" if(int(@r) != 29);
+    $msg = ZWDongle_parseNeighborList($iodev, $data);
 
-    my @list;
-    my $ioId = ReadingsVal($ioName, "homeId", "");
-    $ioId = $1 if($ioId =~ m/CtrlNodeId:(..)/);
-    for my $byte (0..28) {
-      my $bits = $r[$byte];
-      for my $bit (0..7) {
-        if($bits & (1<<$bit)) {
-          my $dec = $byte*8+$bit+1;
-          my $hex = sprintf("%02x", $dec);
-          my $h = $modules{ZWave}{defptr}{"$homeId $hex"};
-          push @list, ($hex eq $ioId ? $ioName :
-                      ($h ? $h->{NAME} : "UNKNOWN_$dec"));
-        }
-      }
-    }
-    $msg = @list ? join(" ", @list) : "empty";
     readingsSingleUpdate($hash, "neighborList", $msg, 1) if($hash);
     return $msg if($srcCmd);
     return "";
