@@ -5465,7 +5465,7 @@ sub EnOcean_Parse($$)
         # action needed?      
       }
       
-      my $blockKey = AttrVal($name, "blockKey", 0) << 2;
+      my $blockKey = ((AttrVal($name, "blockKey", 'no') eq 'yes') ? 1 : 0) << 2;
       my $displayOrientation = $displayOrientation{AttrVal($name, "displayOrientation", 0)} << 4;
       my $maintenanceMode = ReadingsVal($name, "maintenanceMode", "off");
       my $measurementCtrl = (AttrVal($name, 'measurementCtrl', 'enable') eq 'enable') ? 0 : 0x40;
@@ -9368,7 +9368,7 @@ sub EnOcean_Notify(@)
 
     } elsif ($devName eq "global" && $s =~ m/^ATTR ([^ ]*) ([^ ]*) ([^ ]*)$/) {
       my ($sdev, $attrName, $attrVal) = ($1, $2, $3);
-      Log3 $name, 5, "EnOcean $name <notify> ATTR $1 $2 $3";
+      #Log3 $name, 5, "EnOcean $name <notify> ATTR $1 $2 $3";
       if ($name eq $sdev && $attrName =~ m/^subDef.?/ && $attrVal eq "getNextID") {
         $attr{$name}{$attrName} = '0' x 8;
         $attr{$name}{$attrName} = EnOcean_CheckSenderID("getNextID", $defs{$name}{IODev}{NAME}, "00000000");
