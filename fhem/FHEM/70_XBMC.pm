@@ -658,7 +658,7 @@ sub XBMC_ProcessResponse($$)
     my $players = $obj->{result};
     if (ref($players) ne "ARRAY") {
         my $keys = "";
-        while ((my $k, my $v) = each %$hash->{PendingPlayerCMDs} ) {
+        while ((my $k, my $v) = each %{ $hash->{PendingPlayerCMDs} } ) {
           $keys .= ",$k";
         }
         delete $hash->{PendingPlayerCMDs}{$id};
