@@ -458,8 +458,9 @@ sub GDS_Get($@) {
 		}
 
 		when("headlines"){
+			return "Error: Alerts disabled by attribute." unless AttrVal($name,'gdsUseAlerts',0);
 			$parameter //= "|";
-			return gdsHeadlines($name,$parameter);
+			return gdsAlertsHeadlines($name,$parameter);
 		}
 
 		when("warningsmap"){
@@ -529,12 +530,6 @@ sub GDS_Get($@) {
 			}
             my $_gdsAll		= AttrVal($name,"gdsAll", 0);
             my $gdsDebug	= AttrVal($name,"gdsDebug", 0);
-			break;
-			}
-
-		when("headlines"){
-			return "Error: Alerts disabled by attribute." unless AttrVal($name,'gdsUseAlerts',0);
-			$result = gdsHeadlines($name);
 			break;
 			}
 
