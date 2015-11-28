@@ -1289,8 +1289,10 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"models"
 #            ,"overview"
             ,"regCheck","register"
-            ,"templateList","templateChk","templateUsg"
+            ,"templateList:".join(",",("all",sort keys%HMConfig::culHmTpl))
+            ,"templateChk","templateUsg"
             );
+            
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
   return $ret;
@@ -1362,7 +1364,7 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "update")     {##update hm counts -----------------------------
     $ret = HMinfo_status($hash);
   }
-  elsif($cmd eq "tempList")   {##handle thermostat templist from file ---------
+  elsif($cmd =~ m/tempList[G]?/){##handle thermostat templist from file -------
     my $action = $a[0]?$a[0]:"";
     if ( $action eq "genPlot"){#generatelog and gplot file 
       $ret = HMinfo_tempListTmplGenLog($name,$a[1]);
@@ -1431,7 +1433,9 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"update"
             ,"cpRegs"
             ,"tempList"
-            ,"templateDef","templateSet","templateDel","templateExe");
+            ,"tempListG:verify,status,save,restore,genPlot"
+            ,"templateDef","templateSet","templateDel","templateExe"
+            );
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
   return $ret;
@@ -2213,7 +2217,7 @@ sub HMinfo_templateChk(@){#####################################################
 sub HMinfo_templateList($){####################################################
   my $templ = shift;
   my $reply = "";
-  if(!$templ ){# list all templates
+  if(!$templ || $templ eq "all"){# list all templates
     foreach (sort keys%HMConfig::culHmTpl){
       next if ($_ =~ m/^tmpl...Change$/); #ignore control
       $reply .= sprintf("%-16s params:%-24s Info:%s\n"
