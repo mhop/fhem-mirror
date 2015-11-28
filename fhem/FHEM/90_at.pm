@@ -124,8 +124,13 @@ at_Define($$)
     return $ret if($ret);
 
   } else {
+    my $fmt = FmtDateTime($nt);
     $hash->{TRIGGERTIME} = $nt;
-    $hash->{TRIGGERTIME_FMT} = FmtDateTime($nt);
+    $hash->{TRIGGERTIME_FMT} = $fmt;
+    if($hash->{PERIODIC} eq "no") {      # Need for restart
+      $fmt =~ s/ /T/;
+      $hash->{DEF} = $fmt." ".$hash->{COMMAND};
+    }
     RemoveInternalTimer($hash);
     InternalTimer($nt, "at_Exec", $hash, 0);
     $hash->{NTM} = $ntm if($rel eq "+" || $fn);
@@ -295,25 +300,7 @@ at_State($$$$)
 
   if($vt eq "state" && $val eq "inactive") {
     readingsSingleUpdate($hash, "state", "inactive", 1);
-    return undef;
   }
-
-  return undef if($hash->{DEF} !~ m/^\+\d/ ||
-                  $val !~ m/Next: (\d\d):(\d\d):(\d\d)/);
-
-  my ($h, $m, $s) = ($1, $2, $3);
-  my $then = ($h*60+$m)*60+$s;
-  my $now = time();
-  my @lt = localtime($now);
-  my $ntime = ($lt[2]*60+$lt[1])*60+$lt[0];
-  return undef if($ntime > $then); 
-
-  my $name = $hash->{NAME};
-  RemoveInternalTimer($hash);
-  InternalTimer($now+$then-$ntime, "at_Exec", $hash, 0);
-  $hash->{NTM} = "$h:$m:$s";
-  $hash->{STATE} = $val;
-  
   return undef;
 }
 
