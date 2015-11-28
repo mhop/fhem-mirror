@@ -581,7 +581,6 @@ FP_show(){
 		# $text2 = special for style3+6: $text = ReadingID, $text2=alternativeCaption
 		$top   = 0   if (!$top);
 		$left  = 0   if (!$left);
-		$text  = ' ' if (!$text);
 		$style = 0   if (!$style);
         # start device-specific table
         my $t2 = $text2 ? $text2 : " ";
@@ -679,9 +678,7 @@ FP_show(){
                 $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_ME,
                                                    $d, $FW_room, $cmd, $values);
 				}
-                if ($htmlTxt || $htmlTxt eq '') {
-                  $FW_ME = $oldMe;
-                }
+                $FW_ME = $oldMe if (defined($htmlTxt));
                 use strict "refs";
                 last if(defined($htmlTxt));
               }
