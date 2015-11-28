@@ -624,7 +624,10 @@ DOIF_we($) {
   my $we = (($wday==0 || $wday==6) ? 1 : 0);
   if(!$we) {
     my $h2we = $attr{global}{holiday2we};
-    $we = 1 if($h2we && $value{$h2we} && $value{$h2we} ne "none");
+    if($h2we && Value($h2we)) {
+      my ($a, $b) = ReplaceEventMap($h2we, [$h2we, Value($h2we)], 0);
+      $we = 1 if($b ne "none");
+    }
   }
   return $we;
 }
