@@ -343,10 +343,10 @@ ZWDongle_Get($@)
 
   if($cmd eq "neighborList") {
     my @b;
-    @b = grep(!/noRepeater/i,  @a); my $noRep = (@b != @a); @a = @b;
+    @b = grep(!/onlyRep/i,  @a); my $onlyRep = (@b != @a); @a = @b;
     @b = grep(!/includeDead/i, @a); my $wDead = (@b != @a); @a = @b;
-    $gets{neighborList} = "80%02x".($wDead ? "01":"00").($noRep ? "01":"00");
-    return "Usage: get $name $cmd [noRepeater] [includeDead] nodeId"
+    $gets{neighborList} = "80%02x".($wDead ? "00":"01").($onlyRep ? "01":"00");
+    return "Usage: get $name $cmd [onlyRep] [includeDead] nodeId"
         if(int(@a) != 1);
   }
 
@@ -954,10 +954,11 @@ ZWDongle_parseNeighborList($$)
     return different controller specific information. Needed by developers
     only.  </li>
 
-  <li>neighborList [noRepeater] [includeDead] nodeId<br>
-    return data for the decimal nodeId.
-    With noRepeater the result will exclude nodes with repeater functionality.
-    With includeDead the result will exclude nodes believed to be unreachable.
+  <li>neighborList [onlyRep] [includeDead] nodeId<br>
+    return data for the decimal nodeId.<br>
+    With onlyRep the result will include only nodes with repeater
+    functionality.<br>
+    With includeDead the result will include nodes believed to be unreachable.
     </li>
 
   <li>nodeInfo<br>
