@@ -1518,7 +1518,14 @@ Bei der Angabe von zyklisch sendenden Sensoren (Temperatur, Feuchtigkeit, Hellig
 <br>
 ist die Nutzung des Attributes <code>do always</code> nicht sinnvoll, da das entsprechende Kommando hier: "set heating on" jedes mal ausgeführt wird,
 wenn der Temperatursensor in regelmäßigen Abständen eine Temperatur unter 20 Grad sendet.
-Ohne <code>do always</code> wird hier dagegen erst wieder "set heating on" ausgeführt, wenn der Zustand des Moduls gewechselt hat, also die Temperatur zwischendurch größer oder gleich 20 Grad war.<br>
+Ohne <code>do always</code> wird hier dagegen erst wieder "set heating on" ausgeführt, wenn der Zustand des Moduls auf "cmd_2" gewechselt hat, also die Temperatur zwischendurch größer oder gleich 20 Grad war.<br>
+<br>
+Zu beachten ist, dass bei <code>do always</code> der Zustand "cmd_2" bei Nichterfüllung der Bedingung nicht gesetzt wird.
+Möchte man dennoch bei Nichterfüllung der Bedingung einen Zustandswechsel auf "cmd_2" erreichen, so muss man am Ende seiner Definition DOELSE ohne weitere Angaben setzen.
+Wenn das Attribut <code>do always</code> nicht gesetzt ist, wird dagegen bei Definitionen mit einer einzigen Bedingung, wie im obigen Beispiel, der Zustand "cmd_2" bei Nichterfüllung der Bedingung automatisch gesetzt.
+Ohne diesen automatischen Zustandswechsel, wäre ansonsten die Definition nicht sinnvoll, da der Zustand "cmd_1" ohne <code>do always</code> nur ein einziges Mal ausgeführt werden könnte.<br> 
+<br>
+<b>Teilausdrücke abfragen</b><br>
 <br>
 Abfragen nach Vorkommen eines Wortes innerhalb einer Zeichenkette können mit Hilfe des Perl-Operators <code>=~</code> vorgenommen werden.<br>
 <br>
@@ -1935,16 +1942,24 @@ Ebenso lässt sich das repeatcmd-Attribut mit Zeitangaben kombinieren.<br>
 <br>
 <code>define di_alarm_clock DOIF ([08:00])(set alarm_clock on)<br>
 attr di_alarm_clock repeatcmd 300<br>
-attr di_alarm_clock repeatsame 10<br>
+attr di_alarm_clock repeatsame 3<br>
 attr di_alarm_clock do always</code><br>
 <br>
-Ab 8:00 Uhr wird 10 mal Weckton alle 5 Minuten wiederholt.<br>
+Ab 8:00 Uhr wird 3 mal der Weckton jeweils nach 5 Minuten wiederholt.<br>
+<br>
+<u>Anwendungsbeispiel</u>: Warmwasserzirkulation<br>
+<br>
+<code>define di_pump_circ DOIF ([05:00-22:00])(set pump on)(set pump off)<br>
+attr di_pump_circ wait 0,300<br>
+attr di_pump_circ repeatcmd 3600</code><br>
+<br>
+Zwischen 5:00 und 22:00 Uhr läuft die Zirkulationspumpe alle 60 Minuten jeweils 5 Minuten lang.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Anwesenheitssimulation<br>
 <br>
-<code>define di_presence_simulation DOIF ([19:00-00:00])(set lamp on-for-timer {(int(rand(1800)+300))}) DOELSE <br>
-attr di_presence_simulation repeatcmd rand(3600)+2100<br>
-attr di_presence_simulation do always</code><br>
+<code>define di_presence_simulation DOIF ([19:00-00:00])(set lamp on-for-timer {(int(rand(1800)+300))})<br>
+attr di_presence_simulation repeatcmd rand(3600)+2100</code><br>
+<br>
 <br>
 <b>Zwangspause für das Ausführen eines Kommandos seit der letzten Zustandsänderung</b><br>
 <br>
