@@ -1,9 +1,9 @@
 
 ##############################################
 # $Id$
-# 2015-11-26
+# 2015-11-28
 
-# Added new EEP:
+# Added new EEP: A5-20-04 (hvac.04)
 # EnOcean_Notify():
 # EnOcean_Attr():
 # Remote Management (incomplete, experimental)
@@ -5412,11 +5412,22 @@ sub EnOcean_Parse($$)
       push @event, "3:setpoint:$setpoint";
       my $roomTemp = ReadingsVal($name, "roomTemp", 20);
       my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
-      my $setpointTempSet = ReadingsVal($name, "setpointTempSet", 20);
-      my $temperature = ReadingsVal($name, "temperature", 20);
+      my $setpointTempSet = ReadingsVal($name, "setpointTempSet", $setpointTemp);
+      my $temperature = ReadingsVal($name, "temperature", $roomTemp);
       if ($db[0] & 2) {
-        $setpointTemp = sprintf "%0.1f", ($db[2] * 20 / 255 + 10);
-        push @event, "3:setpointTemp:$setpointTemp";      
+        if ($setpointTemp == $setpointTempSet) {          
+          $setpointTemp = sprintf "%0.1f", ($db[2] * 20 / 255 + 10);
+          if ($setpointTemp != $setpointTempSet) {
+            # setpointTempSet has been changed by actuator
+            $setpointTempSet = $setpointTemp;
+            readingsSingleUpdate($hash, 'setpointTempSet', $setpointTempSet, 1);          
+          }        
+        } else {
+          # setpointTempSet has been changed by Fhem
+          $setpointTemp = sprintf "%0.1f", ($db[2] * 20 / 255 + 10);
+        }
+        push @event, "3:setpointTemp:$setpointTemp";
+
       } else {
         if ($db[0] & 0x80) {
           # temperature measurement inactive
@@ -5464,7 +5475,9 @@ sub EnOcean_Parse($$)
         # status request
         # action needed?      
       }
-      
+
+      Log3 $name, 5, "EnOcean $name EnOcean_parse SPT: $setpointTemp SPTS: $setpointTempSet";
+        
       my $blockKey = ((AttrVal($name, "blockKey", 'no') eq 'yes') ? 1 : 0) << 2;
       my $displayOrientation = $displayOrientation{AttrVal($name, "displayOrientation", 0)} << 4;
       my $maintenanceMode = ReadingsVal($name, "maintenanceMode", "off");
@@ -5611,7 +5624,8 @@ sub EnOcean_Parse($$)
       } else {
 
       }
-      
+
+      push @event, "3:state:T: $temperature SPT: $setpointTemp SP: $setpoint";
       # sent message to the actuator
       $data = sprintf "%02X%02X%02X%02X", ReadingsVal($name, "setpointSet", $setpoint),
                                           ($setpointTemp - 10) / 20 * 255,
