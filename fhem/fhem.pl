@@ -127,6 +127,7 @@ sub setReadingsVal($$$$);
 sub utf8ToLatin1($);
 
 sub CommandAttr($$);
+sub CommandCancel($$);
 sub CommandDefaultAttr($$);
 sub CommandDefine($$);
 sub CommandDefMod($$);
@@ -240,6 +241,7 @@ my $wbName = ".WRITEBUFFER";    # Buffer-name for delayed writing via select
 my %comments;                   # Comments from the include files
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
+my %sleepers;                   # list of sleepers
 
 $init_done = 0;
 $lastDefChange = 0;
@@ -307,6 +309,8 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "?"       => { ReplacedBy => "help" },
   "attr"    => { Fn=>"CommandAttr",
            Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>"},
+  "cancel"  => { Fn=>"CommandCancel",
+           Hlp=>"[<id> [quiet]],list sleepers, cancel sleeper with <id>" },
   "createlog"=> { ModuleName => "autocreate" },
   "define"  => { Fn=>"CommandDefine",
            Hlp=>"<name> <type> <options>,define a device" },
@@ -361,7 +365,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "shutdown"=> { Fn=>"CommandShutdown",
             Hlp=>"[restart],terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
-            Hlp=>"<sec> [quiet],sleep for sec, 3 decimal places" },
+            Hlp=>"<sec> [<id>] [quiet],sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<devspec> <state>,trigger notify command" },
   "update" => {
@@ -2625,28 +2629,65 @@ sub
 WakeUpFn($)
 {
   my $h = shift;
+  delete $sleepers{$h->{id}} if( $h->{id} );
+
   $evalSpecials = $h->{evalSpecials};
   my $ret = AnalyzeCommandChain(undef, $h->{cmd});
   Log 2, "After sleep: $ret" if($ret && !$h->{quiet});
 }
+sub
+CommandCancel($$)
+{
+  my ($cl, $param) = @_;
+  my ($id, $quiet) = split(" ", $param, 3);
+  return "Last parameter must be quiet" if($quiet && $quiet ne "quiet");
 
+  if( !$id ) {
+    my $ret;
+    foreach $id (keys %sleepers) {
+      $ret .= "\n" if( $ret );
+      $ret .= sprintf( "%-10s %s", $id, $sleepers{$id}->{cmd} );
+    }
+    $ret = "no pending sleeps" if( !$ret );
+    return $ret;
+
+  } elsif( my $h = $sleepers{$id} ) {
+    RemoveInternalTimer( $h );
+    delete $sleepers{$h->{id}};
+
+  } else {
+    return "no such id: $id" if( !$quiet );
+
+  }
+
+  return undef;
+}
 
 sub
 CommandSleep($$)
 {
   my ($cl, $param) = @_;
-  my ($sec, $quiet) = split(" ", $param);
+  my ($sec, $id, $quiet) = split(" ", $param, 3);
+  if( $id && $id eq 'quiet' ) {
+    $quiet = $id;
+    $id = undef;
+  }
 
   return "Argument missing" if(!defined($sec));
   return "Cannot interpret $sec as seconds" if($sec !~ m/^[0-9\.]+$/);
-  return "Second parameter must be quiet" if($quiet && $quiet ne "quiet");
+  return "Last parameter must be quiet" if($quiet && $quiet ne "quiet");
 
   Log 4, "sleeping for $sec";
 
   if(@cmdList && $sec && $init_done) {
     my %h = (cmd          => join(";", @cmdList),
              evalSpecials => $evalSpecials,
-             quiet        => $quiet);
+             quiet        => $quiet,
+             id           => $id);
+    if( $id ) {
+      RemoveInternalTimer( $sleepers{$id} ) if( $sleepers{$id} );
+      $sleepers{$id} = \%h;
+    }
     InternalTimer(gettimeofday()+$sec, "WakeUpFn", \%h, 0);
     @cmdList=();
 

@@ -38,6 +38,7 @@
       <a href="#attr">attr</a> &nbsp;
       <a href="#backup">backup</a> &nbsp;
       <a href="#CULflash">CULflash</a> &nbsp;
+      <a href="#cancel">cancel</a> &nbsp;
       <a href="#cmdalias">cmdalias</a> &nbsp;
       <a href="#configdb">configdb</a> &nbsp;
       <a href="#copy">copy</a> &nbsp;
@@ -732,6 +733,15 @@ The following local attributes are used by a wider range of devices:
   </ul>
 </ul>
 
+<a name="cancel"></a>
+<h3>cancel</h3>
+<ul>
+  <code>cancel [&lt;id&gt; [quiet]]</code>
+  <br><br>
+  Cancels a named <a href="#sleep">sleep</a>.
+
+</ul>
+
 <a name="define"></a>
 <h3>define</h3>
 <ul>
@@ -1250,12 +1260,15 @@ The following local attributes are used by a wider range of devices:
 <a name="sleep"></a>
 <h3>sleep</h3>
 <ul>
-  <code>sleep &lt;sec&gt; [quiet]</code>
+  <code>sleep &lt;sec&gt; [&lt;id&gt;] [quiet]</code>
   <br><br>
   sleep followed by another command is comparable to a nameless <a
   href="#at">at</a>, it executes the following commands after waiting the
   specified time. The unit is seconds, with millisecond accuracy, as you can
   specify decimal places.<br><br>
+
+  A sleep with an &lt;id&lt; will replace a sleep with the same &lt;id&lt;
+  and can be canceled by <a href="#cancel">cancel</a>.
 
   When called in a notify/at/etc, then nonempty return values of the following
   commands are logged to the global logfile with loglevel 2.<br> If quiet is

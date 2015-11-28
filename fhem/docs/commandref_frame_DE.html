@@ -38,6 +38,7 @@
       <a href="#attr">attr</a> &nbsp;
       <a href="#backup">backup</a> &nbsp;
       <a href="#CULflash">CULflash</a> &nbsp;
+      <a href="#cancel">cancel</a> &nbsp;
       <a href="#cmdalias">cmdalias</a> &nbsp;
       <a href="#configdb">configdb</a> &nbsp;
       <a href="#copy">copy</a> &nbsp;
@@ -761,6 +762,14 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   </ul>
 </ul>
 
+<a name="cancel"></a>                        
+<h3>cancel</h3>                              
+<ul>                                         
+  <code>cancel [&lt;id&gt; [quiet]]</code>           
+  <br><br>                                   
+  Entfernt ein benanntes <a href="#sleep">sleep</a>.
+                                             
+</ul>                                        
 
 <a name="define"></a>
 <h3>define</h3>
@@ -1335,6 +1344,9 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   nachdem es die spezifizierte Zeitspanne gewartet hat. Die Einheit ist
   Sekunde, Millisekunden genau, da man Nachkommastellen spezifizieren
   kann.<br><br>
+
+  Ein sleep mit einer &lt;id&lt; ersetzt ein sleep mit der gleichen &lt;id&lt;
+  and can mit <a href="#cancel">cancel</a> entfernt werden.
 
   Falls sleep in at/notify/etc aufgerufen wurde, und die nachfolgenden
   Kommandos einen nicht leeren Text zur&uuml;ckgeliefert haben, dann wird
