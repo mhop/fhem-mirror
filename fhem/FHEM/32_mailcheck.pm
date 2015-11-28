@@ -375,8 +375,10 @@ mailcheck_Read($)
       my $msg_count = $client->unseen_count||0;
       if ($msg_count > 0) {
         my $from = $client->get_header($resp, "From");
-        $from =~ s/<[^>]*>//g; #strip the email, only display the sender's name
         Log3 $name, 4, "from: $from";
+        if( $from =~ m/<([^>]*)>/ ) {
+          $from = $1;
+        }
 
         my $subject = $client->get_header($resp, "Subject");
         Log3 $name, 4, "subject: $subject";
