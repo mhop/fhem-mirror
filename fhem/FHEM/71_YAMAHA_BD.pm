@@ -767,14 +767,14 @@ YAMAHA_BD_ParseResponse($$$)
         }
              
         readingsEndUpdate($hash, 1);
-    
-        if(@{$hash->{helper}{CMD_QUEUE}})
-        {
-            YAMAHA_BD_HandleCmdQueue($hash);
-        }
-   
+        
         YAMAHA_BD_GetStatus($hash, 1) if($cmd ne "statusRequest" and $cmd ne "on");
         YAMAHA_BD_ResetTimer($hash, 10) if($cmd eq "on");
+    }
+    
+    if(@{$hash->{helper}{CMD_QUEUE}})
+    {
+        YAMAHA_BD_HandleCmdQueue($hash);
     }
     
     $hash->{helper}{AVAILABLE} = ($err ? 0 : 1);
