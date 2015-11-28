@@ -344,8 +344,9 @@ ZWDongle_Get($@)
   if($cmd eq "neighborList") {
     my @b;
     @b = grep(!/onlyRep/i,  @a); my $onlyRep = (@b != @a); @a = @b;
-    $gets{neighborList} = "80%02x01".($onlyRep ? "01":"00");
-    return "Usage: get $name $cmd [onlyRep] nodeId"
+    @b = grep(!/excludeDead/i,  @a); my $exclDead = (@b != @a); @a = @b;
+    $gets{neighborList} = "80%02x".($exclDead ?"00":"01").($onlyRep ?"01":"00");
+    return "Usage: get $name $cmd [excludeDead] [onlyRep] nodeId"
         if(int(@a) != 1);
   }
 
