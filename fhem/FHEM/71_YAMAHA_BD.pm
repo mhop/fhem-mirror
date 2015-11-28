@@ -134,7 +134,6 @@ YAMAHA_BD_Get($@)
     }
 }
 
-
 ###################################
 sub
 YAMAHA_BD_Set($@)
@@ -479,6 +478,9 @@ YAMAHA_BD_Define($$)
         $hash->{helper}{ON_INTERVAL}=$hash->{helper}{OFF_INTERVAL};
     } 
 
+    $hash->{helper}{CMD_QUEUE} = ();
+    delete($hash->{helper}{HTTP_CONNECTION}) if(exists($hash->{helper}{HTTP_CONNECTION}));
+    
     # start the status update timer
     $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
     YAMAHA_BD_ResetTimer($hash, 2);
@@ -538,34 +540,65 @@ YAMAHA_BD_Undefine($$)
 
 
 #############################
+# pushes new command to cmd queue
 sub
 YAMAHA_BD_SendCommand($$$$)
 {
     my ($hash, $data,$cmd,$arg) = @_;
     my $name = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
+    
     my $response;
      
-    Log3 $name, 4, "YAMAHA_BD ($name) - execute \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
+    Log3 $name, 4, "YAMAHA_BD ($name) - append to queue \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
     
     # In case any URL changes must be made, this part is separated in this function".
     
-
-    HttpUtils_NonblockingGet({
-                                url        => "http://".$address.":50100/YamahaRemoteControl/ctrl",
-                                timeout    => AttrVal($name, "request-timeout", 4),
-                                noshutdown => 1,
-                                data       => "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data,
-                                loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
-                                hash       => $hash,
-                                cmd        => $cmd,
-                                arg        => $arg,
-                                callback   => \&YAMAHA_BD_ParseResponse
-                            }
-    );
+    my $param = {
+                    data       => "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data,
+                    cmd        => $cmd,
+                    arg        => $arg,
+                };
     
+    push @{$hash->{helper}{CMD_QUEUE}}, $param;  
+    
+    YAMAHA_BD_HandleCmdQueue($hash);
 }
 
+#############################
+# starts http requests from cmd queue
+sub
+YAMAHA_BD_HandleCmdQueue($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $address = $hash->{helper}{ADDRESS};
+    
+    if(not($hash->{helper}{RUNNING_REQUEST}) and @{$hash->{helper}{CMD_QUEUE}})
+    {
+        my $params =  {
+                       url        => "http://".$address.":50100/YamahaRemoteControl/ctrl",
+                       timeout    => AttrVal($name, "request-timeout", 4),
+                       noshutdown => 1,
+                       keepalive  => 0,
+                       httpversion => "1.0",
+                       loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
+                       hash       => $hash,
+                       callback   => \&YAMAHA_BD_ParseResponse
+                      };
+   
+        my $request = pop @{$hash->{helper}{CMD_QUEUE}};
+
+        map {$hash->{helper}{HTTP_CONNECTION}{$_} = $params->{$_}} keys %{$params};
+        map {$hash->{helper}{HTTP_CONNECTION}{$_} = $request->{$_}} keys %{$request};
+        
+        $hash->{helper}{RUNNING_REQUEST} = 1;
+        Log3 $name, 4, "YAMAHA_BD ($name) - send command \"$request->{cmd}".(defined($request->{arg}) ? " ".$request->{arg} : "")."\": $request->{data}";
+        HttpUtils_NonblockingGet($hash->{helper}{HTTP_CONNECTION});
+    }
+}
+
+#############################
+# parses all HTTP response and creates events/readings
 sub
 YAMAHA_BD_ParseResponse($$$)
 {
@@ -578,6 +611,9 @@ YAMAHA_BD_ParseResponse($$$)
     my $cmd = $param->{cmd};
     my $arg = $param->{arg};
     
+    $hash->{helper}{RUNNING_REQUEST} = 0;
+    
+    delete($hash->{helper}{HTTP_CONNECTION}) unless($param->{keepalive});
     
     if($err ne "")
     {
@@ -592,10 +628,8 @@ YAMAHA_BD_ParseResponse($$$)
     }
     elsif($data ne "")
     {
-    
         Log3 $name, 5, "YAMAHA_BD ($name) - got HTTP response for \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
-    
-   
+        
         if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} == 0)
         {
             Log3 $name, 3, "YAMAHA_BD: device $name reappeared";
@@ -733,13 +767,18 @@ YAMAHA_BD_ParseResponse($$$)
         }
              
         readingsEndUpdate($hash, 1);
+    
+        if(@{$hash->{helper}{CMD_QUEUE}})
+        {
+            YAMAHA_BD_HandleCmdQueue($hash);
+        }
    
         YAMAHA_BD_GetStatus($hash, 1) if($cmd ne "statusRequest" and $cmd ne "on");
+        YAMAHA_BD_ResetTimer($hash, 10) if($cmd eq "on");
     }
     
     $hash->{helper}{AVAILABLE} = ($err ? 0 : 1);
 }
-
 
 #############################
 # resets the StatusUpdate Timer according to the device state and respective interval
