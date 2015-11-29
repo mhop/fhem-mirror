@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_temp.pm 0.16 2015-09-06 Risiko $
+# $Id: 30_pilight_temp.pm 0.17 2015-11-29 Risiko $
 #
 # Usage
 # 
@@ -15,6 +15,7 @@
 # V 0.14 2015-05-30 - FIX:  StateFn 
 # V 0.15 2015-08-30 - NEW:  support pressure, windavg, winddir, windgust
 # V 0.16 2015-09-06 - FIX:  pressure, windavg, winddir, windgust from weather stations without temperature 
+# V 0.17 2015-11-29 - NEW:  offsetTemp and offsetHumidity to correct temperature and humidity 
 ############################################## 
 
 package main;
@@ -36,7 +37,7 @@ sub pilight_temp_Initialize($)
   $hash->{Match}    = "^PITEMP";
   $hash->{ParseFn}  = "pilight_temp_Parse";
   $hash->{StateFn}  = "pilight_temp_State";
-  $hash->{AttrList} = "corrTemp corrHumidity ".$readingFnAttributes;
+  $hash->{AttrList} = "corrTemp corrHumidity offsetTemp offsetHumidity ".$readingFnAttributes;
 }
 
 #####################################
@@ -104,6 +105,9 @@ sub pilight_temp_Parse($$)
   my $corrTemp = AttrVal($chash->{NAME}, "corrTemp",1);  
   my $corrHumidity = AttrVal($chash->{NAME}, "corrHumidity",1);
   
+  my $tempOffset = AttrVal($chash->{NAME}, "offsetTemp",0);  
+  my $humidityOffset = AttrVal($chash->{NAME}, "offsetHumidity",0);
+  
   readingsBeginUpdate($chash);
   
   foreach my $arg (@args){
@@ -112,10 +116,10 @@ sub pilight_temp_Parse($$)
     my($feature,$value) = split(":",$arg);
     switch($feature) {
       case m/temperature/ {
-          $value = $value * $corrTemp;
+          $value = $value * $corrTemp + $tempOffset;
           readingsBulkUpdate($chash,"state",$value);
         }
-      case m/humidity/    { $value = $value * $corrHumidity;}
+      case m/humidity/    { $value = $value * $corrHumidity + $humidityOffset;}
     }
     readingsBulkUpdate($chash,$feature,$value);
   }
@@ -193,9 +197,19 @@ sub pilight_temp_Parse($$)
   <ul>
     <li><a name="corrTemp">corrTemp</a><br>
       A factor (e.q. 0.1) to correct the temperture value. Default: 1
+      temperature = corrTemp * piligt_temp + offsetTemp
+    </li>
+    <li><a name="offsetTemp">offsetTemp</a><br>
+      An offset for temperature value. Default: 0
+      temperature = corrTemp * piligt_temp + offsetTemp
     </li>
     <li><a name="corrHumidity">corrHumidity</a><br>
       A factor (e.q. 0.1) to correct the humidity value. Default: 1
+      humidity = corrHumidity * piligt_humidity + offsetHumidity
+    </li>
+    <li><a name="offsetHumidity">offsetHumidity</a><br>
+      An offset for humidity value. Default: 0
+      humidity = corrHumidity * piligt_humidity + offsetHumidity
     </li>
   </ul>
 </ul>
