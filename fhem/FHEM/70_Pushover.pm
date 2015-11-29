@@ -782,11 +782,11 @@ sub Pushover_SetMessage {
             Log3 $name, 4,
               "Pushover $name: explicitly ignoring HTML tags in message";
             $values{message} =~ s/^(nohtml:).*//;
-            $body = $body . "&message=" . urlEncode( $values{message} );
         }
-        else {
-            $body = $body . "&message=" . urlEncode( $values{message} );
-        }
+        $values{message} = urlEncode( $values{message} );
+        $values{message} =~ s/(?<!%5c)(%5cn)/%0a/g; # replace any URL-encoded \n with their hex equivalent but ignore \\n
+        $values{message} =~ s/%5c%5cn/%5cn/g; # replace any URL-encoded \\n with \n
+        $body = $body . "&message=" . $values{message};
 
         if ( $values{device} ne "" ) {
             $body = $body . "&device=" . $values{device};
