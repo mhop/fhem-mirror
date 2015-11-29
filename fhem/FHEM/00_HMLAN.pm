@@ -927,13 +927,26 @@ sub HMLAN_assignIDs($){
 sub HMLAN_writeAesKey($) {#####################################################
   my ($name) = @_;
   return if (!$name || !$defs{$name} || $defs{$name}{TYPE} ne "HMLAN");
+  my %keys = ();
   my $vccu = InternalVal($name,"owner_CCU",$name);
   $vccu = $name if(!AttrVal($vccu,"hmKey",""));
   foreach my $i (1..3){
      my ($kNo,$k) = split(":",AttrVal($vccu,"hmKey".($i== 1?"":$i),""));
-     HMLAN_SimpleWrite($defs{$name}, "Y0$i,".($k?"$kNo,$k":"00,"));
-   }
- }
+     if (defined($kNo) && defined($k)) {
+       $keys{$kNo} = $k;
+     }
+  }
+  my  @kNos = reverse(sort(keys(%keys)));
+  foreach my $i (1..3){
+    my $k;
+    my $kNo;
+    if (defined($kNos[$i-1])) {
+      $kNo = $kNos[$i-1];
+      $k = $keys{$kNo};
+    }
+    HMLAN_SimpleWrite($defs{$name}, "Y0$i,".($k?"$kNo,$k":"00,"));
+  }
+}
 
 sub HMLAN_KeepAlive($) {#######################################################
   my($in ) = shift;
