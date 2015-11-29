@@ -824,7 +824,7 @@ ZWDongle_Ready($)
   return undef if (IsDisabled($hash->{NAME}));
 
   return DevIo_OpenDev($hash, 1, "ZWDongle_DoInit")
-                if(ReadingsVal($hash->{NAME}, "state", "disconnected"));
+            if(ReadingsVal($hash->{NAME}, "state","") eq "disconnected");
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
