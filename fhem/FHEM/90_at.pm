@@ -179,7 +179,7 @@ at_Exec($)
   $data{AT_TRIGGERTIME} = $hash->{TRIGGERTIME} if($def =~ m/^\+/);
 
   if($count) {
-    $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{\d+}/);  # Replace the count
+    $def =~ s/\{\d+\}/{$count}/ if($def =~ m/^\+?\*\{\d+\}/); # Replace count
     Log3 $name, 5, "redefine at command $name as $def";
 
     $data{AT_RECOMPUTE} = 1;             # Tell sunrise compute the next day
