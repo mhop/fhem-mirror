@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 30_pilight_temp add attributes offsetTemp and offsetHumidity to correct temperature and humidity 
   - changed: PRESENCE/collectord: new collectord-1.5.deb package released
   - changed: YAMAHA_BD: added HTTP request queue, send only one request at the
              same time. This increases command reliability and response behaviour of 
