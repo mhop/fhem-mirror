@@ -55,6 +55,8 @@ if( $^O =~ /Win/ ) {
   require Device::SerialPort;
 }
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 #########################
 # Forward declaration
 sub PIONEERAVR_Set($@);
