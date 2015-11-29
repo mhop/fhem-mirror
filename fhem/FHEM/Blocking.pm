@@ -54,7 +54,8 @@ BlockingCall($$@)
   if(!$telnetDevice) {
     my $ret = CommandDefine(undef, "$tName telnet 0");
     if($ret) {
-      $ret = "CallBlockingFn: No telnet port found and cannot create one: $ret";
+      $ret = "BlockingCall ($blockingFn): ".
+                "No telnet port found and cannot create one: $ret";
       Log 1, $ret;
       return $ret;
     }
@@ -72,7 +73,8 @@ BlockingCall($$@)
   }
 
   if($pid) {
-    Log 4, "BlockingCall created child ($pid), uses $tName to connect back";
+    Log 4, "BlockingCall ($blockingFn) created child ($pid), ".
+                "uses $tName to connect back";
     my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn, 
               abortFn=>$abortFn, abortArg=>$abortArg );
     if($timeout) {
@@ -105,7 +107,7 @@ BlockingInformParent($;$$)
     my $addr = "localhost:$defs{$telnetDevice}{PORT}";
     $telnetClient = IO::Socket::INET->new(PeerAddr => $addr);
     if(!$telnetClient) {
-      Log 1, "CallBlockingFn: Can't connect to $addr: $@";
+      Log 1, "BlockingInformParent ($informFn): Can't connect to $addr: $@";
       return;
     }
   }
@@ -129,6 +131,14 @@ BlockingInformParent($;$$)
     my $len = sysread($telnetClient, $ret, 4096);
     chop($ret);
     $ret = undef if(!defined($len));
+  } else {
+    # if data is available read anyway to keep input stream clear
+    my $rin = '';
+    vec($rin, $telnetClient->fileno(), 1) = 1;
+    if (select($rin, undef, undef, 0) > 0) {
+      sysread($telnetClient, $ret, 4096);
+      $ret = undef;
+    }
   }
 
   return $ret;
@@ -177,6 +187,5 @@ BlockingExit()
 
   }
 }
-
 
 1;
