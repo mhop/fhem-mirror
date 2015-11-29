@@ -820,7 +820,9 @@ sub gdsAlertsHeadlines($;$) {
 }
 
 sub gdsHeadlines($;$) {
-  return "gdsHeadlines() is deprecated. Please use gdsAlertsHeadlines()"; 
+  my $text = "GDS error: gdsHeadlines() is deprecated. Please use gdsAlertsHeadlines()";
+  Log 1, $text;
+  return $text; 
 }
 
 sub setHelp(){
