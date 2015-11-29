@@ -571,10 +571,10 @@ if($motd eq "$sc_text\n\n") {
   }
 }
 
-my $osuser = "os $^O, user ".(getlogin || getpwuid($<) || "unknown");
+my $osuser = "os:$^O user:".(getlogin || getpwuid($<) || "unknown");
 Log 0, "Featurelevel: $featurelevel";
 Log 0, "Server started with ".int(keys %defs).
-        " defined entities (version $attr{global}{version}, $osuser, pid $$)";
+        " defined entities ($attr{global}{version} perl:$] $osuser pid:$$)";
 
 ################################################
 # Main Loop
@@ -2319,7 +2319,8 @@ GlobalAttr($$$$)
 
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
     push @INC, $modpath if(!grep(/\Q$modpath\E/, @INC));
-    $attr{global}{version} = $cvsid;
+    $cvsid =~ m/(fhem.pl) (\d+) (\d+-\d+-\d+)/;
+    $attr{global}{version} = "$1:$2/$3";
     my $counter = 0;
 
     if(configDBUsed()) {
