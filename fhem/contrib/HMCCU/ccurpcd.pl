@@ -3,7 +3,7 @@
 #########################################################
 # ccurpcd.pl
 #
-# Version 1.0
+# Version 1.2
 #
 # RPC server for Homematic CCU.
 #
@@ -24,12 +24,14 @@
 
 use strict;
 use warnings;
-use File::Queue;
+# use File::Queue;
 use RPC::XML::Server;
 use RPC::XML::Client;
-use XML::Simple qw(:strict);
+# use XML::Simple qw(:strict);
 use IO::Socket::INET;
-
+use FindBin qw($Bin);
+use lib "$Bin";
+use RPCQueue;
 
 # Global variables
 my $client;
@@ -37,8 +39,24 @@ my $server;
 my $queue;
 my $logfile;
 my $shutdown = 0;
-my %devnames;
+my $eventcount = 0;
 
+
+#####################################
+# Get PID of running RPC server or 0
+#####################################
+
+sub CheckProcess
+{
+	my $pdump = `ps -ef | grep ccurpcd | grep -v grep`;
+	my @plist = split "\n", $pdump;
+	foreach my $proc (@plist) {
+		my @procattr = split /\s+/, $proc;
+		return $procattr[1] if ($procattr[1] != $$);
+	}
+
+	return 0;
+}
 
 #####################################
 # Write logfile entry
@@ -189,7 +207,6 @@ sub CCURPC_NewDevicesCB ($$$)
 	Log "NewDevice: received ".scalar(@$a)." device specifications";
 	
 #	for my $dev (@$a) {
-#		my $dn = (defined ($devnames{$dev->{ADDRESS}})) ? $devnames{$dev->{ADDRESS}} : "??";
 #		WriteQueue ("ND|".$dev->{ADDRESS}."|".$dev->{TYPE});
 #	}
 
@@ -235,6 +252,12 @@ sub CCURPC_EventCB ($$$$$)
 	
 	WriteQueue ("EV|".$devid."|".$attr."|".$val);
 
+	$eventcount++;
+	if ($eventcount == 250) {
+		Log "Received $eventcount events from CCU since last check";
+		$eventcount++;
+	}
+
 	# Never remove this statement!
 	return;
 }
@@ -264,9 +287,15 @@ my $ccuport = $ARGV[1];
 my $queuefile = $ARGV[2];
 $logfile = $ARGV[3];
 
+my $pid = CheckProcess ();
+if ($pid > 0) {
+	Log "Error: ccurpcd.pl is already running (PID=$pid)";
+	die "Error: ccurpcd.pl is already running (PID=$pid)\n";
+}
+
 # Create or open queue
 Log "Creating file queue";
-$queue = new File::Queue (File => $queuefile, Mode => 0666);
+$queue = new RPCQueue (File => $queuefile, Mode => 0666);
 if (!defined ($queue)) {
 	Log "Error: Can't create queue";
 	die "Error: Can't create queue\n";
