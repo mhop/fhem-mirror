@@ -284,7 +284,12 @@ yowsup_Set($$@)
       return undef;
 
     } elsif( $cmd eq 'image' ) {
-      return yowsup_Write( $hash, "/image send $args[0] $args[1]" );
+      readingsSingleUpdate( $hash, "sent", 'image: '. join( ' ', @args ), 1 );
+
+      my $number = shift(@args);
+      $number =~ s/\./-/;
+
+      return yowsup_Write( $hash, "/image send $number $args[0]" );
 
       return undef;
 
