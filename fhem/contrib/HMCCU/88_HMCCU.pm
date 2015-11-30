@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 2.0
+#  Version 2.1
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -46,8 +46,11 @@ use warnings;
 use SetExtensions;
 # use XML::Simple qw(:strict);
 use RPC::XML::Client;
-use File::Queue;
+# use File::Queue;
 # use Data::Dumper;
+use FindBin qw($Bin);
+use lib "$Bin";
+use RPCQueue;
 
 # CCU Device names, key = CCU device address
 my %HMCCU_Devices;
@@ -92,6 +95,7 @@ sub HMCCU_UpdateClientReading ($@);
 sub HMCCU_StartRPCServer ($);
 sub HMCCU_StopRPCServer ($);
 sub HMCCU_IsRPCServerRunning ($);
+sub HMCCU_CheckProcess ($);
 sub HMCCU_GetDeviceList ($);
 sub HMCCU_GetAddress ($$$);
 sub HMCCU_GetCCUObjectAttribute ($$);
@@ -99,6 +103,7 @@ sub HMCCU_GetHash;
 sub HMCCU_GetDeviceName ($$);
 sub HMCCU_GetChannelName ($$);
 sub HMCCU_GetDeviceType ($$);
+sub HMCCU_GetDeviceChannels ($);
 sub HMCCU_GetDeviceInterface ($$);
 sub HMCCU_ReadRPCQueue ($);
 sub HMCCU_HTTPRequest ($@);
@@ -679,9 +684,11 @@ sub HMCCU_UpdateClientReading ($@)
 		$dpt = $1;
 	}
 
-	if ($hmccu_updreadings && ($updatemode eq 'hmccu' || $updatemode eq 'both')) {
+	if ($hmccu_updreadings && $updatemode ne 'client') {
 		$hmccu_value = HMCCU_Substitute ($value, $hmccu_substitute);
-		readingsSingleUpdate ($hash, $reading, $hmccu_value, 1);
+		if ($updatemode eq 'rpcevent' && exists ($hash->{READINGS}{$reading}{VAL})) {
+			readingsSingleUpdate ($hash, $reading, $hmccu_value, 1);
+		}
 		return $hmccu_value if ($updatemode eq 'hmccu');
 	}
 
@@ -746,8 +753,13 @@ sub HMCCU_StartRPCServer ($)
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
 	my $rpcport = AttrVal ($name, 'rpcport', '2001');
 
-	if (HMCCU_IsRPCServerRunning ($hash)) {
+	my $rc = HMCCU_IsRPCServerRunning ($hash);
+	if ($rc > 0) {
 		Log 1, "HMCCU: RPC Server already running";
+		return 0;
+	}
+	elsif ($rc < 0) {
+		Log 1, "HMCCU: Externally launched RPC server detected. Kill process manually with command kill -SIGINT ".(-$rc);
 		return 0;
 	}
 
@@ -787,11 +799,15 @@ sub HMCCU_StopRPCServer ($)
 {
 	my ($hash) = @_;
 
-	if (HMCCU_IsRPCServerRunning ($hash)) {
+	my $rc = HMCCU_IsRPCServerRunning ($hash);
+	if ($rc > 0) {
 		Log 1, "HMCCU: Stopping RPC server";
 		kill ('INT', $hash->{RPCPID});
 		$hash->{RPCPID} = 0;
 		return 1;
+	}
+	elsif ($rc < 0) {
+		Log 1, "HMCCU: Externally launched RPC server detected. Kill process manually with command kill -SIGINT ".(-$rc);
 	}
 	else {
 		Log 1, "HMCCU: RPC server not running";
@@ -801,18 +817,48 @@ sub HMCCU_StopRPCServer ($)
 
 ####################################################
 # Check if RPC server is running
+# 0 = Not running
+# 1 = Running
+# <0 = Externally launched RPC server
 ####################################################
 
 sub HMCCU_IsRPCServerRunning ($)
 {
 	my ($hash) = @_;
 
+	my $pid = HMCCU_CheckProcess ($hash);
+
 	if (defined ($hash->{RPCPID}) && $hash->{RPCPID} > 0) {
-		return kill (0, $hash->{RPCPID}) ? 1 : 0;
+		return -$pid if ($pid != $hash->{RPCPID});
+		my $procstate = kill (0, $hash->{RPCPID}) ? 1 : 0;
+		if (! $procstate) {
+			$hash->{RPCPID} = 0;
+		}
+		return $procstate;
 	}
 	else {
+		return -$pid if ($pid > 0);
 		return 0;
 	}
+}
+
+####################################################
+# Get PID of RPC server process (0=not running)
+####################################################
+
+sub HMCCU_CheckProcess ($)
+{
+	my ($hash) = @_;
+
+	my $pdump = `ps -ef | grep ccurpcd | grep -v grep`;
+	my @plist = split "\n", $pdump;
+
+	foreach my $proc (@plist) {
+		my @procattr = split /\s+/, $proc;
+		return $procattr[1] if ($procattr[1] != $$);
+	}
+
+	return 0;
 }
 
 ####################################################
@@ -928,6 +974,26 @@ sub HMCCU_GetDeviceType ($$)
 	}
 
 	return $default;
+}
+
+
+####################################################
+# Get number of channels of a CCU device.
+# Channel number will be removed if specified.
+####################################################
+
+sub HMCCU_GetDeviceChannels ($)
+{
+	my ($addr, $default) = @_;
+
+	if ($addr =~ /^[A-Z]{3,3}[0-9]{7,7}$/ || $addr =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]+$/) {
+		$addr =~ s/:[0-9]+$//;
+		if (exists ($HMCCU_Devices{$addr})) {
+			return $HMCCU_Devices{$addr}{channels};
+		}
+	}
+
+	return 0;
 }
 
 ####################################################
@@ -1060,7 +1126,7 @@ sub HMCCU_ReadRPCQueue ($)
 	my $ccureadingformat = AttrVal ($name, 'ccureadingformat', 'name');
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
 
-	my $queue = new File::Queue (File => $rpcqueue, Mode => 0666);
+	my $queue = new RPCQueue (File => $rpcqueue, Mode => 0666);
 
 	my $element = $queue->deq();
 	while ($element) {
@@ -1069,7 +1135,7 @@ sub HMCCU_ReadRPCQueue ($)
 			my ($add, $chn) = split (/:/, $Tokens[1]);
 			my $reading = HMCCU_GetReadingName ('', $add, $chn, $Tokens[2], '',
 			   $ccureadingformat);
-			HMCCU_UpdateClientReading ($hash, $add, $chn, $reading, $Tokens[3], 'client');
+			HMCCU_UpdateClientReading ($hash, $add, $chn, $reading, $Tokens[3], 'rpcevent');
 			$eventno++;
 			last if ($eventno == $maxevents);
 		}
@@ -1087,11 +1153,17 @@ sub HMCCU_ReadRPCQueue ($)
 		$element = $queue->deq();
 	}
 
-	if ($f == 0 && HMCCU_IsRPCServerRunning ($hash)) {
+	my $rc = HMCCU_IsRPCServerRunning ($hash);
+	if ($f == 0 && $rc > 0) {
 		InternalTimer (gettimeofday()+$rpcinterval, 'HMCCU_ReadRPCQueue', $hash, 0);
 	}
 	else {
-		Log 1, "HMCCU: RPC server has been shut down. f=$f";
+		if ($rc < 0) {
+			Log 1, "HMCCU: Externally launched RPC server detected. Kill process manually with command kill -SIGINT ".(-$rc);
+		}
+		else {
+			Log 1, "HMCCU: RPC server has been shut down. f=$f";
+		}
 		$hash->{RPCPID} = 0;
 		$attr{$name}{rpcserver} = "off";
 	}
