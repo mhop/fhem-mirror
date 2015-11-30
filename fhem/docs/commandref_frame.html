@@ -1126,7 +1126,7 @@ The following local attributes are used by a wider range of devices:
   Each device has different set parameters, see the corresponding device
   section for details.<br>
   <br><br>
-  From featurelevel 5.7 on the set command replaces:
+  From featurelevel 5.7 on the set (and setreading) command replaces:
   <ul>
   <li>[device:reading] with the corresponding reading of device, if both device
     and reading exists.</li>
@@ -1196,7 +1196,8 @@ The following local attributes are used by a wider range of devices:
   <br><br>
   Set the reading &lt;reading&gt; for the device <code>&lt;name&gt;</code> to
   &lt;value&gt; without sending out commands to the device, but triggering
-  events and eventMap/stateFormat transformations as usual.
+  events and eventMap/stateFormat transformations as usual. See the set
+  command documentation for replacement description.
   <br><br>
   Examples:
   <ul>
