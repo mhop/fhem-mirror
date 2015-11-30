@@ -258,13 +258,20 @@ yowsup_Set($$@)
     if( $cmd eq 'image' ) {
       return "MASTER not connected" if( !$phash->{PID} );
 
+      readingsSingleUpdate( $hash, 'sent', 'image: '. join( ' ', @args ), 1 );
+
+      my $number = $hash->{NUMBER};
+      $number =~ s/\./-/;
+
+      my $image = shift(@args);
+
       return yowsup_Write( $phash, "/image send $hash->{NUMBER} $args[0]" );
 
       return undef;
     } elsif( $cmd eq 'send' ) {
       return "MASTER not connected" if( !$phash->{PID} );
 
-      readingsSingleUpdate( $hash, "sent", join( ' ', @args ), 1 );
+      readingsSingleUpdate( $hash, 'sent', join( ' ', @args ), 1 );
 
       my $number = $hash->{NUMBER};
       $number =~ s/\./-/;
@@ -284,17 +291,19 @@ yowsup_Set($$@)
       return undef;
 
     } elsif( $cmd eq 'image' ) {
-      readingsSingleUpdate( $hash, "sent", 'image: '. join( ' ', @args ), 1 );
+      readingsSingleUpdate( $hash, 'sent', 'image: '. join( ' ', @args ), 1 );
 
       my $number = shift(@args);
       $number =~ s/\./-/;
 
-      return yowsup_Write( $hash, "/image send $number $args[0]" );
+      my $image = shift(@args);
+
+      return yowsup_Write( $hash, "/image send $number $image '". join( ' ', @args ) ."'" );
 
       return undef;
 
     } elsif( $cmd eq 'send' ) {
-      readingsSingleUpdate( $hash, "sent", join( ' ', @args ), 1 );
+      readingsSingleUpdate( $hash, 'sent', join( ' ', @args ), 1 );
 
       my $number = shift(@args);
       $number =~ s/\./-/;
@@ -592,10 +601,10 @@ yowsup_Attr($$$)
   <a name="yowsup_Set"></a>
   <b>Set</b>
   <ul>
-    <li>image &lt;path&gt;<br>
-      sends an image</li>
-    <li>send &lt;text&gt;<br>
-      sends &lt;text&gt;</li>
+    <li>image [&lt;number&gt;] &lt;path&gt; [&lt;text&gt;]<br>
+      sends an image with optional text. &lt;number&gt; has to be given if sending via master device.</li>
+    <li>send [&lt;numner&gt;] &lt;text&gt;<br>
+      sends &lt;text&gt;. &lt;number&gt; has to be given if sending via master device.</li>
   </ul><br>
 
   <a name="yowsup_Attr"></a>
