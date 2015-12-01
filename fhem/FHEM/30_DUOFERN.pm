@@ -107,6 +107,7 @@ my %commands = (
                              "up"       => "071400FE000000"},
   "windDirection"        => {"down"     => "071500FD000000",
                              "up"       => "071500FE000000"},
+  "toggle"               => {"noArg"    => "071A0000000000"},
   "slatPosition"         => {"value"    => "071B00000000nn"},
   "sunAutomatic"         => {"on"       => "080100FD000000",
                              "off"      => "080100FE000000"},
@@ -184,6 +185,7 @@ my %setsDefaultRollerShutter = (
   "up:noArg"                            => "",
   "down:noArg"                          => "",
   "stop:noArg"                          => "",
+  "toggle:noArg"                        => "",
   "dusk:noArg"                          => "",
   "dawn:noArg"                          => "",
   "sunMode:on,off"                      => "",
@@ -328,7 +330,7 @@ DUOFERN_Initialize($)
   $hash->{ParseFn}   = "DUOFERN_Parse";
   $hash->{RenameFn}  = "DUOFERN_Rename";
   $hash->{AttrFn}    = "DUOFERN_Attr";
-  $hash->{AttrList}  = "IODev timeout ". $readingFnAttributes;
+  $hash->{AttrList}  = "IODev timeout toggleUpDown ". $readingFnAttributes;
   #$hash->{AutoCreate}=
   #      { "DUOFERN" => { GPLOT => "", FILTER => "%NAME" } };
 }
@@ -434,6 +436,32 @@ DUOFERN_Set($@)
     }
     
     return "Wrong argument $arg" if (!exists $commands{$cmd}{$subCmd});
+    
+    my $toggleUpDown  = AttrVal($name, "toggleUpDown", "0");
+    my $moving        = ReadingsVal($name, "moving", "stop");
+    my $position      = ReadingsVal($name, "position", 50);
+    my $timeAutomatic = ReadingsVal($name, "timeAutomatic", "on");
+    my $dawnAutomatic = ReadingsVal($name, "dawnAutomatic", "on");
+    my $duskAutomatic = ReadingsVal($name, "duskAutomatic", "on");
+    
+    readingsSingleUpdate($hash, "moving", "moving", 1) if (($cmd eq "toggle") && ($moving eq "stop"));
+    readingsSingleUpdate($hash, "moving", "up", 1)     if (($cmd eq "dawn") && ($dawnAutomatic eq "on"));
+    readingsSingleUpdate($hash, "moving", "down", 1)   if (($cmd eq "dusk") && ($duskAutomatic eq "on"));
+    
+    if ($timer eq "00" || $timeAutomatic eq "on") { 
+      if ($cmd =~ m/^(up|down)$/) {
+        $cmd = "stop" if (($moving ne "stop") && $toggleUpDown);
+        readingsSingleUpdate($hash, "moving", $cmd, 1);
+      } elsif ($cmd eq "position") {
+        if ($arg > $position) {
+          readingsSingleUpdate($hash, "moving", "down", 1);
+        } elsif ($arg < $position) {
+          readingsSingleUpdate($hash, "moving", "up", 1);
+        } else {
+          readingsSingleUpdate($hash, "moving", "stop", 1);
+        }
+      }
+    }
     
     $command = $commands{$cmd}{$subCmd};
     
@@ -662,6 +690,7 @@ DUOFERN_Parse($$)
       readingsBulkUpdate($hash, "manualMode",           $manualMode,  1);
       readingsBulkUpdate($hash, "position",             $pos        , 1);
       readingsBulkUpdate($hash, "state",                $state      , 1);
+      readingsBulkUpdate($hash, "moving",               "stop"      , 1);
       readingsEndUpdate($hash, 1); # Notify is done by Dispatch
     
     
@@ -801,7 +830,7 @@ DUOFERN_Parse($$)
          delete($hash->{READINGS}{slatPosition});
        }
       
-      
+      readingsBulkUpdate($hash, "moving",               "stop"      , 1);
       readingsBulkUpdate($hash, "state",                $state      , 1);
       readingsEndUpdate($hash, 1); # Notify is done by Dispatch
       
@@ -849,6 +878,7 @@ DUOFERN_Parse($$)
       readingsBulkUpdate($hash, "state",                $state      , 1);
       readingsBulkUpdate($hash, "obstacle",             $obstacle   , 1);
       readingsBulkUpdate($hash, "block",                $block      , 1);
+      readingsBulkUpdate($hash, "moving",               "stop"      , 1);
       
       if ($code =~ m/^4E..../) { #SX5
         readingsBulkUpdate($hash, "10minuteAlarm",        $alert10    , 1);
@@ -1128,6 +1158,9 @@ DUOFERN_StatusTimeout($)
         Set roller shutter to a desired absolut level. If parameter <b>timer</b> is used the 
         command will only be executed if timeAutomatic is activated.
         </li><br>
+    <li><b>toggle</b><br>
+        Switch the roller shutter through the sequence up/stop/down/stop.
+        </li><br>
     <li><b>on [timer]</b><br>
         Switch on the actor. If parameter <b>timer</b> is used the command will
         only be executed if timeAutomatic is activated.
@@ -1281,6 +1314,9 @@ DUOFERN_StatusTimeout($)
         After sending a command to an actor, the actor must respond with its status within this time. If no status message is received,
         up to two getStatus commands are resend.<br>
         Default 60s.
+        </li><br>
+    <li><b>toggleUpDown</b><br>
+        If attribute is set, a stop command is send instead of the up or down command if the roller shutter is moving.
         </li><br>
   </ul>
   <br>
