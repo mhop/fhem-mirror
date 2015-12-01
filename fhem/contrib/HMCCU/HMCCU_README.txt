@@ -3,7 +3,7 @@
    *** HMCCU/HMCCUDEV - Modules for FHEM - Homematic CCU integration ***
   =======================================================================
 
-* Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.0 (RPC server)
+* Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.1 (RPC server)
 * Please read carefully before using the modules.
 * Last modified: 25.11.2015
 
@@ -60,11 +60,14 @@ update of CCU readings in FHEM or use the external RPC server.
 --------------------------------------
 
 The module HMCCU no longer requires the XML-API CCU addon. The FHEM module requires
-the packages LWP::UserAgent, Time::HiRes and File::Queue. The RPC server ccurpcd.pl
-requires the packages File::Queue, RPC::XML::Server, RPC::XML::Client, XML::Simple
-and IO::Socket::INET.
-All module files 88_HMCCU* and the RPC daemon ccurpcd.pl must be copied into the
-folder FHEM under the FHEM installation directory. 
+the packages LWP::UserAgent, Time::HiRes, RPC::XML::Client  and RPCQueue.
+The RPC server ccurpcd.pl requires the packages RPC::XML::Server, RPC::XML::Client,
+RPCQueue and IO::Socket::INET.
+All module files 88_HMCCU*, RPCQueue.pm  and the RPC daemon ccurpcd.pl must be copied
+into the folder FHEM under the FHEM installation directory. 
+
+NOTE: RPCQueue.pm is a bug fixed copy of File::Queue and part of the HMCCU installation
+package. It's not available via CPAN!
 
 
 ====================================
@@ -170,9 +173,9 @@ device states as "true" or "false" these values can be replaced by "open" or
 "closed" by setting "substitute" to "true:open,false:closed". The attribute
 'substitute' is ignored if the same attribute is defined in a client device.
 
-Get values of channel datapoints:
+Get values of channel datapoints (supports multiple channels):
 
-   get <name> channel {<channel-name>|<channel-address>}[.<datapoint_exp>] 
+   get <name> channel {<channel-name>|<channel-address>}[.<datapoint_exp>] [...]
 
    Attention: There's no blank between channel and datapoint. If datapoint is
    not specified all datapoints will be read. The command accepts a regular
@@ -384,9 +387,9 @@ Get value of datapoint:
    
    If no datapoibt is specified all datapoints for specified channel are read.
 
-Get multiple datapoints of channel:
+Get multiple datapoints of channel (supports multiple channels):
 
-   get <name> channel <channel-number>[.<datapoint-expr>]
+   get <name> channel <channel-number>[.<datapoint-expr>] [...]
 
    Parameter <datapoint-expr> is a regular expression. Default is .* (query all
    datapoints of a channel).
