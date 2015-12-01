@@ -21,6 +21,7 @@
 #  get <name> channel <channel>[.<datapoint-expr>]
 #
 #  attr <name> ccureadings { 0 | 1 }
+#  attr <name> ccureadingformat { address | name }
 #  attr <name> statechannel <channel>
 #  attr <name> statedatapoint <datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
@@ -56,7 +57,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingformat:name,address,datapoint ccureadings:0,1 statevals substitute statechannel statedatapoint loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingformat:name,address ccureadings:0,1 statevals substitute statechannel statedatapoint loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
@@ -297,13 +298,16 @@ sub HMCCUDEV_Get ($@)
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'channel') {
-		my $objname = shift @a;
-		if (!defined ($objname) || $objname !~ /^[0-9]+/) {
-			return HMCCUDEV_SetError ($hash, "Usage: get <name>> channel <channel-number>[.<datapoint-expr>]");
+		my @chnlist;
+		foreach my $objname (@a) {
+			last if (!defined ($objname));
+			return HMCCUDEV_SetError ($hash, "Invalid channel number: $objname") if ($objname !~ /^[0-9]+/);
+			push (@chnlist, $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$objname);
+		}
+		if (@chnlist == 0) {
+			return HMCCUDEV_SetError ($hash, "Usage: get $name channel {channel-number}[.{datapoint-expr}] [...]");
 		}
 
-		$objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$objname;
-		my @chnlist = ($objname);
 		($rc, $result) = HMCCU_GetChannel ($hash, \@chnlist);
 		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $result;
@@ -431,6 +435,10 @@ sub HMCCUDEV_SetError ($$)
       <li>ccureadings &lt;0 | 1&gt;
          <br/>
             If set to 1 values read from CCU will be stored as readings.
+      </li><br/>
+      <li>ccureadingformat &lt;address | name&gt;
+         <br/>
+            Set format of readings. Default is 'name'.
       </li><br/>
       <li>statechannel &lt;channel-number&gt;
          <br/>
