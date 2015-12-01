@@ -216,7 +216,7 @@ sub camstart {
   $apiextrecpath   = $hash->{APIEXTRECPATH};
   $apiextrecmaxver = $hash->{APIEXTRECMAXVER};
   $errorcode       = "";
-  $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=SYNO.SurveillanceStation.ExternalRecording&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&session=SurveillanceStation&_sid=$sid"; 
+  $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=SYNO.SurveillanceStation.ExternalRecording&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&session=SurveillanceStation&_sid=\"$sid\""; 
   $myjson = get $url;
   
   # Evaluiere ob Daten im JSON-Format empfangen
@@ -245,7 +245,7 @@ sub camstart {
        readingsEndUpdate($hash, 1);
        $hash->{STATE} = "on";
        
-       # bedingt Browseraktualisierung und Status der "Lampen"
+       # Generiert das Ereignis "on", bedingt Browseraktualisierung und Status der "Lampen"
        { fhem "trigger $device on" }
        
        # Logausgabe
@@ -334,7 +334,7 @@ sub camstop {
   $apiextrecmaxver = $hash->{APIEXTRECMAXVER};
  
   $errorcode = "";
-  $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=SYNO.SurveillanceStation.ExternalRecording&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&session=SurveillanceStation&_sid=$sid";
+  $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=SYNO.SurveillanceStation.ExternalRecording&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&session=SurveillanceStation&_sid=\"$sid\"";
   $myjson = get $url;
   
   # Evaluiere ob Daten im JSON-Format empfangen
@@ -362,8 +362,8 @@ sub camstop {
        readingsEndUpdate($hash, 1);
        $hash->{STATE} = "off";
        
-       # bedingt Browseraktualisierung und Status der "Lampen"
-       { fhem "trigger $device on" }
+       # Generiert das Ereignis "on", bedingt Browseraktualisierung und Status der "Lampen"
+       { fhem "trigger $device off" }
        
        # Logausgabe
        $logstr = "Camera $camname Recording stopped";
@@ -605,7 +605,7 @@ sub getcamid {
   &printlog($hash,$logstr,"5");
   
   # einlesen aller Kameras
-  $url = "http://$servername:$serverport/webapi/$apicampath?api=SYNO.SurveillanceStation.Camera&version=$apicammaxver&method=List&session=SurveillanceStation&_sid=$sid";
+  $url = "http://$servername:$serverport/webapi/$apicampath?api=SYNO.SurveillanceStation.Camera&version=$apicammaxver&method=List&session=SurveillanceStation&_sid=\"$sid\"";
   $myjson = get $url;
 
   # Evaluiere ob Daten im JSON-Format empfangen
@@ -967,6 +967,10 @@ return($hash,$success);
 <h3>SSCam</h3>
 <ul>
   <br>
+    Using this Modul you are able to start and stop recordings of cameras which are defined in Synology Surveillance Station. <br>
+    The recordings are stored in Synology Surveillance Station and are managed like the other (normal) recordings defined by Surveillance Station rules.<br>
+    For example the recordings are stored for a defined time in Surveillance Station and will be deleted after that period.<br><br>
+  
 <b> Prerequisites </b> <br><br>
     This module uses other CPAN-modules LWP and JSON. Consider to install these packages (Debian: libwww-perl, libjson-perl).<br>
     You also need to add an user in Synology DSM as member of Administrators group for using in this module. <br><br>
@@ -978,24 +982,14 @@ return($hash,$success);
     <code>define &lt;name&gt; SSCam &lt;Servername&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; &lt;RecordTime&gt;</code><br>
     <br>
     Defines a new camera device for SSCam. At first the devices have to be set up and operable in Synology Surveillance Station 7.0 and above. <br><br>
-    Using this Modul you are able to start and stop recordings of cameras defined in Synology Surveillance Station. <br>
-    The recordings are stored in Synology Surveillance Station Database<br>
-    and managed like the other (normal) recordings defined by Surveillance Station rules.<br><br>
     
-    The parameter <RecordTime> describes the minimum Recordtime. Dependend on other factors like the performance of you Synology Diskstation and <br>
+    The parameter "RecordTime" describes the minimum Recordtime. Dependend on other factors like the performance of you Synology Diskstation and <br>
     Surveillance Station the effective Recordtime could be longer.
     
     The Modul SSCam ist based on functions of Synology Surveillance Station API. <br>
     Please refer the <a href="http://global.download.synology.com/download/Document/DeveloperGuide/Surveillance_Station_Web_API_v2.0.pdf">Web API Guide</a>. <br><br>
     
-    At the time only HTTP-Protokoll is supported to call Synology DS. <br><br>  
-    
-<b>Known Issues</b> <br><br>  
-
-    Sometimes the Error 105 "Insuffucient privileges" occurs because of problems with Synology User check implementation.<br> 
-    Until Synology is solving that problem I have implemented a workaround. <br>
-    Please consider it if you will get some entries like "Insuffucient privileges" in FHEM-Logfile.<br> 
-    <br> <br>
+    At present only HTTP-Protokoll is supported to call Synology DS. <br><br>  
 
     The parameters are in detail:
    <br>
@@ -1063,6 +1057,10 @@ return($hash,$success);
 <h3>SSCam</h3>
 <ul>
   <br>
+    Mit diesem Modul kann die Aufnahme von in der Synology Surveillance Station definierten Kameras gestartet bzw. gestoppt werden.  <br>
+    Die Aufnahmen stehen in der Synology Surveillance Station zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
+    So werden zum Beispiel die Aufnahmen entsprechend ihrer Archivierungsfrist gehalten und dann gelöscht.<br><br>
+
 <b>Vorbereitung </b> <br><br>
     Dieses Modul nutzt weitere CPAN Module LWP und JSON. Bitte darauf achten diese Pakete zu installieren. (Debian: libwww-perl, libjson-perl). <br>
     Im DSM muß ebenfalls ein Nutzer als Mitglied der Administratorgruppe angelegt sein. Die Daten werden beim define des Gerätes benötigt.<br><br>
@@ -1073,11 +1071,9 @@ return($hash,$success);
     <code>define &lt;name&gt; SSCam &lt;Servername&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; &lt;RecordTime&gt;</code><br>
     <br>
     
-    Definiert eine neues Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
-    Mit diesem Modul kann die Aufnahme einer in der Synology Surveillance Station definierten Kamera gestartet oder gestoppt werden.  <br>
-    Die Aufnahmen stehen in der Synology Surveillance Station Datenbank zur Verfügung und unterliegen wie jede andere Aufnahme den in der Synology Surveillance Station eingestellten Regeln. <br><br>
+    Definiert eine neue Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
     
-    Der Parameter <RecordTime> beschreibt die Mindestaufnahmezeit. Abhängig von Faktoren wie Performance der Synology Diskstation und der Surveillance Station <br>
+    Der Parameter "RecordTime" beschreibt die Mindestaufnahmezeit. Abhängig von Faktoren wie Performance der Synology Diskstation und der Surveillance Station <br>
     kann die effektive Aufnahmezeit geringfügig länger sein.<br><br>
     
     Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br>
@@ -1086,14 +1082,7 @@ return($hash,$success);
     Es müssen die Perl-Module LWP (Debian: libwww-perl) und JSON (Debian: libjson-perl) installiert sein.
     Momentan wird nur das HTTP-Protokoll unterstützt um die Web-Services der Synology DS aufzurufen. <br><br>  
     
-<b>Bekannte Probleme</b> <br><br>  
-
-    Manchmal taucht der Fehler 105 "Insuffucient privileges" auf wegen eines Problems in dem Standard Synology User check auf.<br>
-    Bis Synology diesen Fehler gefixt hat, habe ich einen Workaround eingebaut.<br>
-    Bitte diesen Umstand berücksichtigen wenn im FHEM-Logfile etliche Einträge der Form "Insuffucient privileges" auftauchen.<br> 
-    <br> <br>
-
-    Die Parameter sind im Einzelnen:
+    Die Parameter beschreiben im Einzelnen:
    <br>
    <br>    
     
@@ -1119,7 +1108,7 @@ return($hash,$success);
   <b>Set </b>
   <ul>
     
-    Es gibt zwei Optionen für "Set".<br><br>
+    Es gibt zur Zeit zwei Optionen für "Set".<br><br>
     
 <pre>
     "on"    :   startet die Aufnahme.

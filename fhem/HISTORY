@@ -653,3 +653,6 @@
 - Mon Nov 16 2015 (telekatz)
   - added new module 10_DUOFERNSTICK
   - added new module 30_DUOFERN
+
+- Sun Nov 29 2015 (DS_Starter)
+  - added new module 49_SSCam to trigger records of cameras within Synology Surveillance Station
