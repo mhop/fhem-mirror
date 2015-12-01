@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: avoid messages "insufficient user privilege" even
+             though the user was set up properly
   - bugfix:  70_PIONEERAVR: suppressed Smartmatch is experimental warnings
   - feature: 30_pilight_temp add attributes offsetTemp and offsetHumidity to
              correct temperature and humidity
