@@ -1507,8 +1507,9 @@ CommandShutdown($$)
 
 #####################################
 sub
-ReplaceSetMagic($@)       # Forum #38276
+ReplaceSetMagic($$@)       # Forum #38276
 {
+  my $hash = shift;
   my $nsplit = shift;
   my $a = join(" ", @_);
 
@@ -1516,11 +1517,7 @@ ReplaceSetMagic($@)       # Forum #38276
     my $x = ReadingsVal($1,$2,""); $x eq "" ? "[$1:$2]" : $x
   }/egi;
 
-  $a =~ s/{\((.*)\)}/{
-    my $x = eval $1;
-    return ("$1: $@") if($@);
-    $@ ? $1 : $x
-  }/eg;
+  $a =~ s/{\((.*)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/eg;
 
   return (undef, split(" ", $a, $nsplit));
 }
@@ -1542,7 +1539,7 @@ DoSet(@)
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
   my $err;
-  ($err, @a) = ReplaceSetMagic(0, @a) if($featurelevel >= 5.7);
+  ($err, @a) = ReplaceSetMagic($hash, 0, @a) if($featurelevel >= 5.7);
   return $err if($err);
 
   $hash->{".triggerUsed"} = 0; 
@@ -1576,7 +1573,9 @@ CommandSet($$)
   foreach my $sdev (devspec2array($a[0])) {
 
     $a[0] = $sdev;
+    $defs{$sdev}->{CL} = $cl;
     my $ret = DoSet(@a);
+    delete $defs{$sdev}->{CL};
     push @rets, $ret if($ret);
 
   }
@@ -2010,8 +2009,6 @@ CommandSetReading($$)
   return "Usage: setreading <name> <reading> <value>\n$namedef" if(@a != 3);
 
   my $err;
-  ($err, @a) = ReplaceSetMagic(3,@a) if($featurelevel >= 5.7);
-  return $err if($err);
 
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
@@ -2019,6 +2016,12 @@ CommandSetReading($$)
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
       next;
+    }
+    my $hash = $defs{$sdev};
+    if($featurelevel >= 5.7) {
+      $hash->{CL} = $cl;
+      ($err, @a) = ReplaceSetMagic($hash, 3, @a);
+      delete($hash->{CL});
     }
     readingsSingleUpdate($defs{$sdev}, $a[1], $a[2], 1);
   }
