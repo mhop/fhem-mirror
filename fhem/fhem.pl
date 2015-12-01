@@ -101,7 +101,7 @@ sub concatc($$$);
 sub configDBUsed();
 sub createNtfyHash();
 sub createUniqueId();
-sub devspec2array($);
+sub devspec2array($;$);
 sub doGlobalDef($);
 sub escapeLogLine($);
 sub evalStateFormat($);
@@ -940,6 +940,8 @@ AnalyzePerlCommand($$;$)
 {
   my ($cl, $cmd, $calledFromChain) = @_;
 
+  return "Forbidden command $cmd."
+        if($cl && $cl->{".allowed"} && $cl->{".allowed"} !~ m/\bperl\b/);
   $cmd =~ s/\\ *\n/ /g;               # Multi-line. Probably not needed anymore
 
   # Make life easier for oneliners:
@@ -986,6 +988,7 @@ AnalyzeCommand($$;$)
 {
   my ($cl, $cmd, $allowed) = @_;
 
+  $cl->{".allowed"} = $allowed if($cl); Forum #38276
   $cmd = "" if(!defined($cmd)); # Forum #29963
   $cmd =~ s/^(\n|[ \t])*//;# Strip space or \n at the begginning
   $cmd =~ s/[ \t]*$//;
@@ -994,7 +997,6 @@ AnalyzeCommand($$;$)
   return undef if(!$cmd);
 
   if($cmd =~ m/^{.*}$/s) {              # Perl code
-    return "Forbidden command $cmd." if($allowed && $allowed !~ m/\bperl\b/);
     return AnalyzePerlCommand($cl, $cmd, 1);
   }
 
@@ -1061,9 +1063,9 @@ AnalyzeCommand($$;$)
 }
 
 sub
-devspec2array($)
+devspec2array($;$)
 {
-  my ($name) = @_;
+  my ($name, $cl) = @_;
 
   return "" if(!defined($name));
   if(defined($defs{$name})) {
@@ -1096,7 +1098,7 @@ devspec2array($)
 
         if($op eq "eval") {
           my $exec = EvalSpecials($n, %{{"%DEVICE"=>$d}});
-          push @res, $d if(AnalyzePerlCommand(undef, $exec));
+          push @res, $d if(AnalyzePerlCommand($cl, $exec));
           next;
         }
 
@@ -1570,7 +1572,7 @@ CommandSet($$)
   return "Usage: set <name> <type-dependent-options>\n$namedef" if(int(@a)<1);
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0])) {
+  foreach my $sdev (devspec2array($a[0], $cl)) {
 
     $a[0] = $sdev;
     $defs{$sdev}->{CL} = $cl;
@@ -1594,7 +1596,7 @@ CommandGet($$)
 
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0])) {
+  foreach my $sdev (devspec2array($a[0], $cl)) {
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
       next;
@@ -1845,7 +1847,7 @@ CommandDelete($$)
   return "Usage: delete <name>$namedef\n" if(!$def);
 
   my @rets;
-  foreach my $sdev (devspec2array($def)) {
+  foreach my $sdev (devspec2array($def, $cl)) {
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
       next;
@@ -1894,7 +1896,7 @@ CommandDeleteAttr($$)
   return "Usage: deleteattr <name> [<attrname>]\n$namedef" if(@a < 1);
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0])) {
+  foreach my $sdev (devspec2array($a[0], $cl)) {
 
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
@@ -1940,7 +1942,7 @@ CommandDisplayAttr($$)
   return "Usage: displayattr <name> [<attrname>]\n$namedef" if(@a < 1);
 
   my @rets;
-  my @devspec = devspec2array($a[0]);
+  my @devspec = devspec2array($a[0],$cl);
 
   foreach my $sdev (@devspec) {
 
@@ -1980,7 +1982,7 @@ CommandDeleteReading($$)
 
   %ntfyHash = ();
   my @rets;
-  foreach my $sdev (devspec2array($a[0])) {
+  foreach my $sdev (devspec2array($a[0],$cl)) {
 
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
@@ -2011,7 +2013,7 @@ CommandSetReading($$)
   my $err;
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0])) {
+  foreach my $sdev (devspec2array($a[0],$cl)) {
 
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
@@ -2095,7 +2097,7 @@ CommandList($$)
   } else { # devspecArray
 
     my @arg = split(" ", $param);
-    my @list = devspec2array($arg[0]);
+    my @list = devspec2array($arg[0],$cl);
     if($arg[1]) {
       foreach my $sdev (@list) { # Show a Hash-Entry or Reading for each device
 
@@ -2381,7 +2383,7 @@ CommandAttr($$)
            if(@a && @a < 2);
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0])) {
+  foreach my $sdev (devspec2array($a[0],$cl)) {
 
     my $hash = $defs{$sdev};
     my $attrName = $a[1];
@@ -2525,7 +2527,7 @@ CommandSetstate($$)
   return "Usage: setstate <name> <state>\n$namedef" if(@a != 2);
 
   my @rets;
-  foreach my $sdev (devspec2array($a[0])) {
+  foreach my $sdev (devspec2array($a[0],$cl)) {
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
       next;
@@ -2585,7 +2587,7 @@ CommandTrigger($$)
   $state = "" if(!defined($state));
 
   my @rets;
-  foreach my $sdev (devspec2array($dev)) {
+  foreach my $sdev (devspec2array($dev,$cl)) {
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
       next;

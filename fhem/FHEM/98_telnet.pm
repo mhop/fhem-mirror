@@ -21,7 +21,7 @@ telnet_Initialize($)
   $hash->{UndefFn} = "telnet_Undef";
   $hash->{AttrFn}  = "telnet_Attr";
   $hash->{NotifyFn}= "telnet_SecurityCheck";
-  $hash->{AttrList} = "globalpassword password prompt ".
+  $hash->{AttrList} = "globalpassword password prompt allowedCommands ".
                         "allowfrom SSL connectTimeout connectInterval ".
                         "encoding:utf8,latin1 sslVersion";
   $hash->{ActivateInformFn} = "telnet_ActivateInform";
@@ -269,7 +269,8 @@ telnet_Read($)
           undef($hash->{prevlines});
         }
         $cmd = latin1ToUtf8($cmd) if( $hash->{encoding} eq "latin1" );
-        $ret = AnalyzeCommandChain($hash, $cmd);
+        $ret = AnalyzeCommandChain($hash, $cmd,
+                                AttrVal($sname,"allowedCommands",undef));
         push @ret, $ret if(defined($ret));
       }
     } else {
@@ -420,6 +421,8 @@ telnet_ActivateInform($;$)
   <a name="telnetattr"></a>
   <b>Attributes:</b>
   <ul>
+    <a href="#allowedCommands">allowedCommands</a><br>
+
     <a name="password"></a>
     <li>password<br>
         Specify a password, which has to be entered as the very first string
@@ -570,6 +573,8 @@ telnet_ActivateInform($;$)
   <a name="telnetattr"></a>
   <b>Attribute</b>
   <ul>
+    <a href="#allowedCommands">allowedCommands</a><br>
+
     <a name="password"></a>
     <li>password<br>
         Bezeichnet ein Passwort, welches als allererster String eingegeben
