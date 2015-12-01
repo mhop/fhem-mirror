@@ -771,21 +771,23 @@ sub Pushover_SetMessage {
         my $body = "title=" . urlEncode( $values{title} );
 
         if ( $values{message} =~
-            /\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>/
+            /\<(\/|)[biu]\>|\<(\/|)font(.+)\>|\<(\/|)a(.*)\>|\<br\s?\/?\>/
             && $values{message} !~ /^nohtml:.*/ )
         {
             Log3 $name, 4, "Pushover $name: handling message with HTML content";
             $body = $body . "&html=1";
+            $values{message} =~ s/(?<!\\)(\\n)/<br \/>/g; # replace \n by <br /> but ignore \\n
         }
 
-        if ( $values{message} =~ /^nohtml:.*/ ) {
+        elsif ( $values{message} =~ /^nohtml:.*/ ) {
             Log3 $name, 4,
               "Pushover $name: explicitly ignoring HTML tags in message";
             $values{message} =~ s/^(nohtml:).*//;
         }
-        $values{message} = urlEncode( $values{message} );
+
+        $values{message} = urlEncode( $values{message} ); # HttpUtil's urlEncode() does not handle \n but would escape % so we encode first
         $values{message} =~ s/(?<!%5c)(%5cn)/%0a/g; # replace any URL-encoded \n with their hex equivalent but ignore \\n
-        $values{message} =~ s/%5c%5cn/%5cn/g; # replace any URL-encoded \\n with \n
+        $values{message} =~ s/%5c%5cn/%5cn/g; # replace any URL-encoded \\n by \n
         $body = $body . "&message=" . $values{message};
 
         if ( $values{device} ne "" ) {
