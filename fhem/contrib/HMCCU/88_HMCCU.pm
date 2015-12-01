@@ -372,7 +372,7 @@ sub HMCCU_Get ($@)
 	elsif ($opt eq 'vars') {
 		my $varname = shift @a;
 
-		return HMCCU_SetError ($hash, "Usage: get <device> vars <regexp>[,...]") if (!defined ($varname));
+		return HMCCU_SetError ($hash, "Usage: get $name vars {regexp}[,...]") if (!defined ($varname));
 
 		($rc, $result) = HMCCU_GetVariables ($hash, $varname);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
@@ -381,11 +381,16 @@ sub HMCCU_Get ($@)
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'channel') {
-		my $param = shift @a;
+		my @chnlist;
 
-		return HMCCU_SetError ($hash, "object := {channelname|channeladdress}.datapoint_expression") if (!defined ($param));
+		foreach my $objname (@a) {
+			last if (!defined ($objname));
+			push (@chnlist, $objname);
+		}
+		if (@chnlist == 0) {
+			return HMCCUDEV_SetError ($hash, "Usage: get $name channel {channel-name|channel-address}[.{datapoint-expr}] [...]");
+		}
 
-		my @chnlist = ($param);
 		($rc, $result) = HMCCU_GetChannel ($hash, \@chnlist);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
@@ -686,7 +691,7 @@ sub HMCCU_UpdateClientReading ($@)
 
 	if ($hmccu_updreadings && $updatemode ne 'client') {
 		$hmccu_value = HMCCU_Substitute ($value, $hmccu_substitute);
-		if ($updatemode eq 'rpcevent' && exists ($hash->{READINGS}{$reading}{VAL})) {
+		if ($updatemode ne 'rpcevent' || exists ($hash->{READINGS}{$reading}{VAL})) {
 			readingsSingleUpdate ($hash, $reading, $hmccu_value, 1);
 		}
 		return $hmccu_value if ($updatemode eq 'hmccu');
@@ -1454,7 +1459,7 @@ foreach (sChannel, sChnList.Split(","))
 		else {
 			if ($ccureadings) {
 				readingsBulkUpdate ($hash, $reading, $value); 
-				HMCCU_SetState ($hash, $value) if ($reading =~ /\.STATE$/);
+				readingsBulkUpdate ($hash, "state", $value) if ($reading =~ /\.STATE$/);
 			}
 		}
 
