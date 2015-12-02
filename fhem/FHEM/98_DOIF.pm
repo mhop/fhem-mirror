@@ -1463,6 +1463,66 @@ Zeitschaltuhr (Zeitsteuerung): <code>define di_clock_radio DOIF ([06:30]) (set r
 <br>
 Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00] and [sensor:brightness] &lt; 40) (set lamp on) DOELSE (set lamp off)</code><br>
 </ol><br>
+<b>Inhaltsübersicht</b><br>
+<ul><br>
+  <a href="#DOIF_Features">Features</a><br>
+  <a href="#DOIF_Lesbarkeit_der_Definitionen">Lesbarkeit der Definitionen</a><br>
+  <a href="#DOIF_Ereignissteuerung">Ereignissteuerung</a><br>
+  <a href="#DOIF_Teilausdruecke_abfragen">Teilausdrücke abfragen</a><br>
+  <a href="#DOIF_Ereignissteuerung_ueber_Auswertung_von_Events">Ereignissteuerung über Auswertung von Events</a><br>
+  <a href="#DOIF_Angaben_im_Ausfuehrungsteil">Angaben im Ausführungsteil</a><br>
+  <a href="#DOIF_Zeitsteuerung">Zeitsteuerung</a><br>
+  <a href="#DOIF_Relative_Zeitangaben">Relative Zeitangaben</a><br>
+  <a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet">Zeitangaben nach Zeitraster ausgerichtet</a><br>
+  <a href="#DOIF_Relative_Zeitangaben_nach_Zeitraster_ausgerichtet">Relative Zeitangaben nach Zeitraster ausgerichtet</a><br>
+  <a href="#DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet_alle_X_Stunden">Zeitangaben nach Zeitraster ausgerichtet alle X Stunden</a><br>
+  <a href="#DOIF_Wochentagsteuerung">Wochentagsteuerung</a><br>
+  <a href="#DOIF_Zeitsteuerung_mit_Zeitintervallen">Zeitsteuerung mit Zeitintervallen</a><br>
+  <a href="#DOIF_Indirekten_Zeitangaben">Indirekten Zeitangaben</a><br>
+  <a href="#DOIF_Zeitsteuerung_mit_Zeitberechnung">Zeitsteuerung mit Zeitberechnung</a><br>
+  <a href="#DOIF_Kombination_von_Ereignis_und_Zeitsteuerung_mit_logischen_Abfragen">Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</a><br>
+  <a href="#DOIF_Zeitintervalle_Readings_und_Stati_ohne_Trigger">Zeitintervalle, Readings und Stati ohne Trigger</a><br>
+  <a href="#DOIF_Nutzung_von_Readings_Stati_oder_Internals_im_Ausfuehrungsteil">Nutzung von Readings, Stati oder Internals im Ausführungsteil</a><br>
+  <a href="#DOIF_Berechnungen_im_Ausfuehrungsteil">Berechnungen im Ausführungsteil</a><br>
+  <a href="#DOIF_Filtern_nach_Zahlen">Filtern nach Zahlen</a><br>
+  <a href="#DOIF_wait">Verzögerungen</a><br>
+  <a href="#DOIF_timerWithWait">Verzögerungen von Timern</a><br>
+  <a href="#DOIF_do_resetwait">Zurücksetzen des Waittimers für das gleiche Kommando</a><br>
+  <a href="#DOIF_repeatcmd">Wiederholung von Befehlsausführung</a><br>
+  <a href="#DOIF_cmdpause">Zwangspause für das Ausführen eines Kommandos seit der letzten Zustandsänderung</a><br>
+  <a href="#DOIF_repeatsame">Begrenzung von Wiederholungen eines Kommandos</a><br>
+  <a href="#DOIF_waitsame">Ausführung eines Kommandos nach einer Wiederholung einer Bedingung</a><br>
+  <a href="#DOIF_waitdel">Löschen des Waittimers nach einer Wiederholung einer Bedingung</a><br>
+  <a href="#DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung">Zeitspanne eines Readings seit der letzten Änderung</a><br>
+  <a href="#DOIF_cmdState">Status des Moduls</a><br>
+  <a href="#DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen">Reine Statusanzeige ohne Ausführung von Befehlen</a><br>
+  <a href="#DOIF_state">Anpassung des Status mit Hilfe des Attributes <code>state</code></a><br>
+  <a href="#DOIF_initialize">Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></a><br>
+  <a href="#DOIF_disable">Deaktivieren des Moduls</a><br>
+  <a href="#DOIF_Initialisieren_des_Moduls">Initialisieren des Moduls</a><br>
+  <a href="#DOIF_Weitere_Anwendungsbeispiele">Weitere Anwendungsbeispiele</a><br>
+  <a href="#DOIF_Zu_beachten">Zu beachten</a><br>
+  <a href="#DOIF_"></a><br>
+<a name="DOIF_"></a>
+</ul>
+  <b>DOIF spezifische Attribute</b><br>
+  <ul>
+  <a href="#DOIF_cmdpause">cmdpause</a> &nbsp;
+  <a href="#DOIF_cmdState">cmdState</a> &nbsp;
+  <a href="#DOIF_disable">disable</a> &nbsp;
+  <a href="#DOIF_do_always">do always</a> &nbsp;
+  <a href="#DOIF_do_resetwait">do resetwait</a> &nbsp;
+  <a href="#DOIF_initialize">initialize</a> &nbsp;
+  <a href="#DOIF_repeatcmd">repeatcmd</a> &nbsp;
+  <a href="#DOIF_repeatsame">repeatsame</a> &nbsp;
+  <a href="#DOIF_state">state</a> &nbsp;
+  <a href="#DOIF_timerWithWait">timerWithWait</a> &nbsp;
+  <a href="#DOIF_wait">wait</a> &nbsp;
+  <a href="#DOIF_waitdel">waitdel</a> &nbsp;
+  <a href="#DOIF_waitsame">waitsame</a> &nbsp;
+  </ul>
+<br>
+<a name="DOIF_Features"></a>
 <b>Features</b><br>
 <ol><br>
 + Syntax angelehnt an Verzweigungen if - elseif - ... - elseif - else in höheren Sprachen<br>
@@ -1472,6 +1532,7 @@ Kombinierte Ereignis- und Zeitsteuerung: <code>define di_lamp DOIF ([06:00-09:00
 + Verzögerungsangaben mit Zurückstellung sind möglich (watchdog-Funktionalität)<br>
 + Der Ausführungsteil kann jeweils ausgelassen werden. Damit kann das Modul für reine Statusanzeige genutzt werden<br>
 </ol><br>
+<a name="DOIF_Lesbarkeit_der_Definitionen"></a>
 <b>Lesbarkeit der Definitionen</b><br>
 <br>
 Da die Definitionen im Laufe der Zeit recht umfangreich werden können, sollten die gleichen Regeln, wie auch beim Programmieren in höheren Sprachen, beachtet werden.
@@ -1492,6 +1553,7 @@ DOELSE ## im sonst-Fall, also wenn einer der Schalter off ist<br>
 <br>
 Im Folgenden wird die Funktionalität des Moduls im Einzelnen an vielen praktischen Beispielen erklärt.<br>
 <br>
+<a name="DOIF_Ereignissteuerung"></a>
 <b>Ereignissteuerung</b><br>
 <br>
 Vergleichende Abfragen werden, wie in Perl gewohnt, mit Operatoren <code>==, !=, <, <=, >, >=</code> bei Zahlen und mit <code>eq, ne, lt, le, gt, ge, =~, !~</code> bei Zeichenketten angegeben.
@@ -1508,8 +1570,10 @@ Internals mit <code>[&lt;devicename&gt;:&&lt;internal&gt;]</code> angegeben.<br>
 Das Modul wird getriggert, sobald das angegebene Device hier "remotecontrol" ein Event erzeugt. Das geschieht, wenn irgendein Reading oder der Status von "remotecontrol" aktualisiert wird.
 Ausgewertet wird hier der Zustand des Statuses von remotecontrol nicht das Event selbst. Die Ausführung erfolgt standardmäßig einmalig nur nach Zustandswechsel des Moduls.
 Das bedeutet, dass ein mehrmaliges Drücken der Fernbedienung auf "on" nur einmal "set garage on" ausführt. Die nächste mögliche Ausführung ist "set garage off", wenn Fernbedienung "off" liefert.
+<a name="DOIF_do_always"></a>
 Wünscht man eine Ausführung des gleichen Befehls mehrfach nacheinander bei jedem Trigger, unabhängig davon welchen Zustand das DOIF-Modul hat, weil z. B. Garage nicht nur über die Fernbedienung geschaltet wird und dann muss man das per "do always"-Attribut angeben:<br>
 <br>
+
 <code>attr di_garage do always</code><br>
 <br>
 Bei der Angabe von zyklisch sendenden Sensoren (Temperatur, Feuchtigkeit, Helligkeit usw.) wie z. B.:<br>
@@ -1525,6 +1589,7 @@ Möchte man dennoch bei Nichterfüllung der Bedingung einen Zustandswechsel auf 
 Wenn das Attribut <code>do always</code> nicht gesetzt ist, wird dagegen bei Definitionen mit einer einzigen Bedingung, wie im obigen Beispiel, der Zustand "cmd_2" bei Nichterfüllung der Bedingung automatisch gesetzt.
 Ohne diesen automatischen Zustandswechsel, wäre ansonsten die Definition nicht sinnvoll, da der Zustand "cmd_1" ohne <code>do always</code> nur ein einziges Mal ausgeführt werden könnte.<br> 
 <br>
+<a name="DOIF_Teilausdruecke_abfragen"></a>
 <b>Teilausdrücke abfragen</b><br>
 <br>
 Abfragen nach Vorkommen eines Wortes innerhalb einer Zeichenkette können mit Hilfe des Perl-Operators <code>=~</code> vorgenommen werden.<br>
@@ -1536,6 +1601,7 @@ attr di_garage do always</code><br>
 <br>
 Weitere Möglichkeiten bei der Nutzung des Perl-Operators: <code>=~</code>, insbesondere in Verbindung mit regulären Ausdrücken, können in der Perl-Dokumentation nachgeschlagen werden.<br>
 <br>
+<a name="DOIF_Ereignissteuerung_ueber_Auswertung_von_Events"></a>
 <b>Ereignissteuerung über Auswertung von Events</b><br>
 <br>
 Eine Alternative zur Auswertung von Stati oder Readings ist das Auswerten von Ereignissen (Events) mit Hilfe von regulären Ausdrücken, wie beim notify. Eingeleitet wird die Angabe eines regulären Ausdrucks durch ein Fragezeichen.
@@ -1552,6 +1618,7 @@ Die Angabe von regulären Ausdrücken kann recht komplex werden und würde die A
 Weitere Informationenen zu regulären Ausdrücken sollten in der Perl-Dokumentation nachgeschlagen werden.
 Die logische Verknüpfung "and" mehrerer Ereignisse ist nicht sinnvoll, da zu einem Zeitpunkt immer nur ein Ereignis zutreffen kann.<br>
 <br>
+<a name="DOIF_Angaben_im_Ausfuehrungsteil"></a>
 <b>Angaben im Ausführungsteil</b>:<br>
 <br>
 Der Ausführungsteil wird immer, wie die Bedingung, in runden Klammern angegeben. Es werden standardmäßig FHEM-Befehle angegeben, wie z. B.: <code>...(set lamp on)</code><br>
@@ -1566,6 +1633,7 @@ Mehrere Perlbefehle hintereinander werden im DEF-Editor mit zwei Semikolons ange
 <br>
 FHEM-Befehle lassen sich mit Perl-Befehlen kombinieren: <code>... ({system ("wmail Peter is at home")}, set lamp on)</code><br>
 <br>
+<a name="DOIF_Zeitsteuerung"></a>
 <b>Zeitsteuerung</b><br>
 <br>
 Zeitangaben in der Bedingung im Format: <code>[HH:MM:SS]</code> oder <code>[HH:MM]</code> oder <code>[Zahl]</code><br>
@@ -1584,6 +1652,7 @@ Zeitangaben können ebenfalls in Sekunden angegeben werden. Es handelt sich dann
 <br>
 <code>define di_light DOIF ([3600]) (set lamp on)</code><br>
 <br>
+<a name="DOIF_Relative_Zeitangaben"></a>
 <b>Relative Zeitangaben</b><br>
 <br>
 Zeitangaben, die mit Pluszeichen beginnen, werden relativ behandelt, d. h. die angegebene Zeit wird zum aktuellen Zeitpunkt hinzuaddiert.<br>
@@ -1597,6 +1666,7 @@ Ebenfalls lassen sich relative Angaben in Sekunden angeben. Das obige Beispiel e
 <br>
 <code>define di_save DOIF ([+3600]) (save)</code><br>
 <br>
+<a name="DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet"></a>
 <b>Zeitangaben nach Zeitraster ausgerichtet</b><br>
 <br>
 Das Format lautet: [:MM] MM sind Minutenangaben zwischen 00 und 59.<br>
@@ -1612,6 +1682,7 @@ DOELSEIF ([:30])<br>
 DOELSEIF ([:45])<br>
   <ol>({system ("mplayer /opt/fhem/Sound/BigBen_45.mp3 -volume 90 −really−quiet &")})</ol></code>
 <br>
+<a name="DOIF_Relative_Zeitangaben_nach_Zeitraster_ausgerichtet"></a>
 <b>Relative Zeitangaben nach Zeitraster ausgerichtet</b><br>
 <br>
 Das Format lautet: [+:MM] MM sind Minutenangaben zwischen 1 und 59.<br>
@@ -1621,6 +1692,7 @@ Das Format lautet: [+:MM] MM sind Minutenangaben zwischen 1 und 59.<br>
 <code>define di_gong DOIF ([+:15]) (set Gong_mp3 playTone 1)<br>
 attr di_gong do always</code><br>
 <br>
+<a name="DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet_alle_X_Stunden"></a>
 <b>Zeitangaben nach Zeitraster ausgerichtet alle X Stunden</b><br>
 <br>
 Format: [+[h]:MM] mit: h sind Stundenangaben zwischen 2 und 23 und MM Minuten zwischen 00 und 59<br>
@@ -1630,6 +1702,7 @@ Format: [+[h]:MM] mit: h sind Stundenangaben zwischen 2 und 23 und MM Minuten zw
 <code>define di_gong DOIF ([+[2]:05]) (set pump on-for-timer 300)<br>
 attr di_gong do always</code><br>
 <br>
+<a name="DOIF_Wochentagsteuerung"></a>
 <b>Wochentagsteuerung</b><br>
 <br>
 Hinter der Zeitangabe kann ein oder mehrere Wochentage als Ziffer getrennt mit einem Pipezeichen | angegeben werden. Die Syntax lautet:<br>
@@ -1649,6 +1722,7 @@ set Wochentag 135<br>
 <br>
 define di_radio DOIF ([06:30|[Wochentag]]) (set radio on) DOELSEIF ([07:30|[Wochentag]]) (set radio off)</code><br>
 <br>
+<a name="DOIF_Zeitsteuerung_mit_Zeitintervallen"></a>
 <b>Zeitsteuerung mit Zeitintervallen</b><br>
 <br>
 Zeitintervalle werden im Format angegeben: <code>[&lt;begin&gt;-&lt;end&gt;]</code>,
@@ -1697,6 +1771,7 @@ Schalten mit Zeitfunktionen, hier: bei Sonnenaufgang und Sonnenuntergang:<br>
 <br>
 <code>define di_light DOIF ([+{sunrise_rel(900,"06:00","08:00")}]) (set outdoorlight off) DOELSEIF ([+{sunset_rel(900,"17:00","21:00")}]) (set outdoorlight on)</code><br>
 <br>
+<a name="DOIF_Indirekten_Zeitangaben"></a>
 <b>Indirekten Zeitangaben</b><br>
 <br>
 Oft möchte man keine festen Zeiten im Modul angeben, sondern Zeiten, die man z. B. über Dummys über die Weboberfläche verändern kann.
@@ -1740,6 +1815,7 @@ Indirekte Zeitangaben lassen sich mit Wochentagangaben kombinieren, z. B.:<br>
 <br>
 <code>define di_time DOIF ([[begin]-[end]|7]) (set radio on) DOELSE (set radio off)</code><br>
 <br>
+<a name="DOIF_Zeitsteuerung_mit_Zeitberechnung"></a>
 <b>Zeitsteuerung mit Zeitberechnung</b><br>
 <br>
 Zeitberechnungen werden innerhalb der eckigen Klammern zusätzlich in runde Klammern gesetzt. Die berechneten Triggerzeiten können absolut oder relativ mit einem Pluszeichen vor den runden Klammern angegeben werden.
@@ -1781,6 +1857,7 @@ Ein Änderung des Dummys Fixtime z. B. durch "set Fixtime ...", führt zur sofor
 <br>
 Für die Zeitberechnung wird der Perlinterpreter benutzt, daher sind für die Berechnung der Zeit keine Grenzen gesetzt.<br>
 <br>
+<a name="DOIF_Kombination_von_Ereignis_und_Zeitsteuerung_mit_logischen_Abfragen"></a>
 <b>Kombination von Ereignis- und Zeitsteuerung mit logischen Abfragen</b><br>
 <br>
 <u>Anwendungsbeispiel</u>: Lampe soll ab 6:00 Uhr angehen, wenn es dunkel ist und wieder ausgehen, wenn es hell wird, spätestens aber um 9:00 Uhr:<br>
@@ -1791,6 +1868,7 @@ Für die Zeitberechnung wird der Perlinterpreter benutzt, daher sind für die Be
 <br>
 <code>define di_shutters DOIF ([sensor:brightness]&gt;100 and [06:25-09:00|8] or [09:00|7]) (set shutters up) DOELSEIF ([sensor:brightness]&lt;50) (set shutters down)</code><br>
 <br>
+<a name="DOIF_Zeitintervalle_Readings_und_Stati_ohne_Trigger"></a>
 <b>Zeitintervalle, Readings und Stati ohne Trigger</b><br>
 <br>
 Angaben in eckigen Klammern, die mit einem Fragezeichen beginnen, führen zu keiner Triggerung des Moduls, sie dienen lediglich der Abfrage.<br>
@@ -1800,6 +1878,7 @@ Angaben in eckigen Klammern, die mit einem Fragezeichen beginnen, führen zu kei
 <code>define di_motion DOIF ([?06:00-10:00] and [button])(set lamp on-for-timer 600)<br>
 attr di_motion do always</code><br>
 <br>
+<a name="DOIF_Nutzung_von_Readings_Stati_oder_Internals_im_Ausfuehrungsteil"></a>
 <b>Nutzung von Readings, Stati oder Internals im Ausführungsteil</b><br>
 <br>
 <u>Anwendungsbeispiel</u>: Wenn ein Taster betätigt wird, soll Lampe1 mit dem aktuellen Zustand der Lampe2 geschaltet werden:<br>
@@ -1811,6 +1890,7 @@ attr di_button do always</code><br>
 <br>
 <code>define di_pushmsg DOIF ([window] eq "open" and [alarm] eq "armed") (set Pushover msg 'alarm' 'open windows [window:LastDevice]' '' 2 'persistent' 30 3600)</code><br>
 <br>
+<a name="DOIF_Berechnungen_im_Ausfuehrungsteil"></a>
 <b>Berechnungen im Ausführungsteil</b><br>
 <br>
 Berechnungen können in geschweiften Klammern erfolgen. Aus Kompatibilitätsgründen, muss die Berechnung mit einer runden Klammer beginnen. Innerhalb der Perlberechnung können Readings, Stati oder Internals wie gewohnt in eckigen Klammern angegeben werden.<br>
@@ -1820,12 +1900,14 @@ Berechnungen können in geschweiften Klammern erfolgen. Aus Kompatibilitätsgrü
 <code>define di_average DOIF ([08:00]) (set TH_Modul desired {([default:temperature]+[outdoor:temperature])/2})<br>
 attr di_average do always</code><br>
 <br>
+<a name="DOIF_Filtern_nach_Zahlen"></a>
 <b>Filtern nach Zahlen</b><br>
 <br>
 Es soll aus einem Reading, das z. B. ein Prozentzeichen beinhaltet, nur der Zahlenwert für den Vergleich genutzt werden:<br>
 <br>
 <code>define di_heating DOIF ([adjusting:actuator:d] &lt; 10) (set heating off) DOELSE (set heating on)</code><br>
 <br>
+<a name="DOIF_wait"></a>
 <b>Verzögerungen</b><br>
 <br>
 Verzögerungen für die Ausführung von Kommandos werden pro Befehlsfolge über das Attribut "wait" definiert. Syntax:<br>
@@ -1862,6 +1944,7 @@ attr &lt;DOIF-modul&gt; wait 1,2:3,0.5</code><br>
 <br>
 Für Kommandos ohne Verzögerung werden Sekundenangaben ausgelassen oder auf Null gesetzt. Die Verzögerungen werden nur auf Events angewandt und nicht auf Zeitsteuerung. Eine bereits ausgelöste Verzögerung wird zurückgesetzt, wenn während der Wartezeit ein Kommando eines anderen DO-Falls, ausgelöst durch ein neues Ereignis, ausgeführt werden soll.<br>
 <br>
+<a name="DOIF_timerWithWait"></a>
 <b>Verzögerungen von Timern</b><br>
 <br>
 Verzögerungen können mit Hilfe des Attributs <code>timerWithWait</code> auf Timer ausgeweitet werden.<br>
@@ -1906,6 +1989,7 @@ DOELSEIF ([light] eq "off" and [sensor:humidity]&lt;60)<br>  <ol>
 <br>
 attr di_fan wait 120:0:180</code><br>
 <br>
+<a name="DOIF_do_resetwait"></a>
 <b>Zurücksetzen des Waittimers für das gleiche Kommando</b><br>
 <br>
 Im Gegensatz zu <code>do always</code> wird ein Waittimer mit dem Attribut <code>do resetwait</code> auch dann zurückgesetzt, wenn die gleiche Bedingung wiederholt wahr wird.<br>
@@ -1918,6 +2002,7 @@ Das Attribut <code>do resetwait</code> impliziert eine beliebige Wiederholung wi
 attr di_push wait 1800<br>
 attr di_push do resetwait</code><br>
 <br>
+<a name="DOIF_repeatcmd"></a>
 <b>Wiederholung von Befehlsausführung</b><br>
 <br>
 Wiederholungen der Ausführung von Kommandos werden pro Befehlsfolge über das Attribut "repeatcmd" definiert. Syntax:<br>
@@ -1961,6 +2046,7 @@ Zwischen 5:00 und 22:00 Uhr läuft die Zirkulationspumpe alle 60 Minuten jeweils
 attr di_presence_simulation repeatcmd rand(3600)+2100</code><br>
 <br>
 <br>
+<a name="DOIF_cmdpause"></a>
 <b>Zwangspause für das Ausführen eines Kommandos seit der letzten Zustandsänderung</b><br>
 <br>
 Mit dem Attribut <code>cmdpause &lt;Sekunden für cmd_1&gt;:&lt;Sekunden für cmd_2&gt;:...</code> wird die Zeitspanne in Sekunden angegeben für eine Zwangspause seit der letzten Zustandsänderung.
@@ -1972,6 +2058,7 @@ In der angegebenen Zeitspanne wird ein Kommando nicht ausgeführt, auch wenn die
 attr di_frost cmdpause 3600<br>
 attr di_frost do always</code><br>
 <br>
+<a name="DOIF_repeatsame"></a>
 <b>Begrenzung von Wiederholungen eines Kommandos</b><br>
 <br>
 Mit dem Attribut <code>repeatsame &lt;maximale Anzahl von cmd_1&gt;:&lt;maximale Anzahl von cmd_2&gt;:...</code> wird die maximale Anzahl hintereinander folgenden Ausführungen festgelegt.<br>
@@ -1991,6 +2078,7 @@ in Kombination mit <code>do always</code> bzw. <code>do resetwait</code> gilt f�
 <code>attr di_repeat repeatsame 0:2<br>
 attr di_repeat do always</code><br>
 <br>
+<a name="DOIF_waitsame"></a>
 <b>Ausführung eines Kommandos nach einer Wiederholung einer Bedingung</b><br>
 <br>
 Mit dem Attribut <code>waitsame &lt;Zeitspanne in Sekunden für cmd_1&gt;:&lt;Zeitspanne in Sekunden für das cmd_2&gt;:...</code> wird ein Kommando erst dann ausgeführt, wenn innerhalb einer definierten Zeitspanne die entsprechende Bedingung zweimal hintereinander wahr wird.<br>
@@ -2002,6 +2090,7 @@ Für Kommandos, für die <code>waitsame</code> nicht gelten soll, werden die ent
 attr di_shuttersup waitsame 2<br>
 attr di_shuttersup do always</code><br>
 <br>
+<a name="DOIF_waitdel"></a>
 <b>Löschen des Waittimers nach einer Wiederholung einer Bedingung</b><br>
 <br>
 Das Gegenstück zum <code>repeatsame</code>-Attribut ist das Attribut <code>waitdel</code>. Die Syntax mit Sekundenangaben pro Kommando entspricht der, des wait-Attributs. Im Gegensatz zum wait-Attribut, wird ein laufender Timer gelöscht, falls eine Bedingung wiederholt wahr wird.
@@ -2022,6 +2111,7 @@ Die Attribute <code>wait</code> und <code>waitdel</code> lassen sich für versch
 <code>attr di_cmd wait 2:0<br>
 attr di_cmd waitdel 0:2</code><br>
 <br>
+<a name="DOIF_Zeitspanne_eines_Readings_seit_der_letzten_Aenderung"></a>
 <b>Zeitspanne eines Readings seit der letzten Änderung</b><br>
 <br>
 Bei Readingangaben kann die Zeitspanne mit <code>[&lt;Device&gt;:&lt;Reading&gt;:sec]</code> in Sekunden seit der letzten Änderung bestimmt werden<br>
@@ -2034,6 +2124,7 @@ attr di_lamp do always</code><br>
 Bei HM-Bewegungsmelder werden periodisch Readings aktualisiert, dadurch wird das Modul getrigger, auch wenn keine Bewegung stattgefunden hat.
 Der Status bleibt dabei auf "motion". Mit der obigen Abfrage lässt sich feststellen, ob der Status aufgrund einer Bewegung tatsächlich upgedatet wurde.<br>
 <br>
+<a name="DOIF_cmdState"></a>
 <b>Status des Moduls</b><br>
 <br>
 Der Status des Moduls wird standardmäßig mit cmd_1, cmd_2, usw. belegt. Dieser lässt sich über das Attribut "cmdState" mit | getrennt umdefinieren:<br>
@@ -2046,6 +2137,7 @@ z. B.<br>
 <br>
 Wenn nur der DOIF-Fall angegeben wird, so wird, wenn Bedingung nicht erfüllt ist, ein cmd_2-Status gesetzt. Damit wird ein Zustandswechsel des Moduls erreicht, was zur Folge hat, dass beim nächsten Wechsel von false auf true das DOIF-Kommando erneut ausgeführt wird.<br>
 <br>
+<a name="DOIF_Reine_Statusanzeige_ohne_Ausfuehrung_von_Befehlen"></a>
 <b>Reine Statusanzeige ohne Ausführung von Befehlen</b><br>
 <br>
 Der Ausführungsteil kann jeweils ausgelassen werden.<br>
@@ -2055,6 +2147,7 @@ Der Ausführungsteil kann jeweils ausgelassen werden.<br>
 <code>define di_hum DOIF ([outdoor:humidity]&gt;70) DOELSEIF ([outdoor:humidity]&gt;50) DOELSE<br>
 attr di_hum cmdState wet|normal|dry</code><br>
 <br>
+<a name="DOIF_state"></a>
 <b>Anpassung des Status mit Hilfe des Attributes <code>state</code></b><br>
 <br>
 Es können beliebige Reading und Stati oder Internals angegeben werden.<br>
@@ -2076,6 +2169,7 @@ Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwer
 <br>
 <code>attr di_average state Average of the two rooms is {(sprintf("%.1f",([room1:temperature]+[room2:temperature])/2))}</code><br>
 <br>
+<a name="DOIF_initialize"></a>
 <b>Vorbelegung des Status mit Initialisierung nach dem Neustart mit dem Attribut <code>initialize</code></b><br>
 <br>
 <u>Anwendungsbeispiel</u>: Nach dem Neustart soll der Zustand von <code>di_lamp</code> mit "initialized" vorbelegt werden. Das Reading <code>cmd_nr</code> wird auf 0 gesetzt, damit wird ein Zustandswechsel provoziert, das Modul wird initialisiert - der nächste Trigger führt zum Ausführen eines Kommandos.<br>
@@ -2084,6 +2178,7 @@ Da man beliebige Perl-Ausdrücke verwenden kann, lässt sich z. B. der Mittelwer
 <br>
 Das ist insb. dann sinnvoll, wenn das System ohne Sicherung der Konfiguration (unvorhergesehen) beendet wurde und nach dem Neustart die zuletzt gespeicherten Zustände des Moduls nicht mit den tatsächlichen übereinstimmen.<br>
 <br>
+<a name="DOIF_disable"></a>
 <b>Deaktivieren des Moduls</b><br>
 <br>
 Ein DOIF-Modul kann mit Hilfe des Attributes disable, deaktiviert werden. Dabei werden alle Timer und Readings des Moduls gelöscht.
@@ -2091,12 +2186,14 @@ Soll das Modul nur vorübergehend deaktiviert werden, so kann das durch <code>se
 Hierbei bleiben alle Timer aktiv, sie werden aktualisiert - das Modul bleibt im Takt, allerding werden keine Befehle ausgeführt.
 Das Modul braucht mehr Rechenzeit, als wenn es komplett über das Attribut deaktiviert wird. In beiden Fällen bleibt der Zustand nach dem Neustart erhalten, das Modul bleibt deaktiviert.<br>
 <br>
+<a name="DOIF_Initialisieren_des_Moduls"></a>
 <b>Initialisieren des Moduls</b><br>
 <br>
 Mit <code>set &lt;DOIF-modul&gt; initialize</code> wird ein mit <code>set &lt;DOIF-modul&gt; disable</code> deaktiviertes Modul wieder aktiviert.
 Das Kommando <code>set &lt;DOIF-modul&gt; initialize</code> kann auch dazu genutzt werden ein aktives Modul zu initialisiert,
 in diesem Falle wird der letzte Zustand des Moduls gelöscht, damit wird ein Zustandswechsel herbeigeführt, der nächste Trigger führt zur Ausführung.<br>
 <br>
+<a name="DOIF_Weitere_Anwendungsbeispiele"></a>
 <b>Weitere Anwendungsbeispiele</b><br>
 <br>
 Zweipunktregler a la THRESHOLD<br>
@@ -2122,6 +2219,7 @@ Hiermit wird das Licht bei Bewegung eingeschaltet. Dabei wird, solange es brennt
 <br>
 Die Beispiele stellen nur eine kleine Auswahl von möglichen Problemlösungen dar. Da sowohl in der Bedingung (hier ist die komplette Perl-Syntax möglich), als auch im Ausführungsteil, keine Einschränkungen gegeben sind, sind die Möglichkeiten zur Lösung eigener Probleme mit Hilfe des Moduls sehr vielfältig.<br>
 <br>
+<a name="DOIF_Zu_beachten"></a>
 <b>Zu beachten</b><br>
 <br>
 In jeder Bedingung muss mindestens ein Trigger angegeben sein (Angaben in eckigen Klammern). Die entsprechenden DO-Fälle werden nur dann ausgewertet, wenn auch das entsprechende Event oder Zeit-Trigger ausgelöst wird.<br>
