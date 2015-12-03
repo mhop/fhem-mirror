@@ -369,6 +369,7 @@ sub statistics_DoStatisticsAll($$)
       }
    }
    
+# To avoid data loose, store all readings once a day in the state file
    if ($periodSwitch < -1 || $periodSwitch > 1 ) { WriteStatefile(); }
 }
 
@@ -810,9 +811,9 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
 
    unshift @hidden, $value;
       statistics_Log $hash, 4, "Add $value to $hiddenReadingName";
-   while ( $#hidden > $specialPeriod ) { 
+   while ( $#hidden >= $specialPeriod ) { 
       my $lastValue = pop @hidden;
-         statistics_Log $hash, 4, "Remove last value '$lastValue' from '$hiddenReadingName'";
+         statistics_Log $hash, 4, "Remove last (".$#hidden.") value '$lastValue' from '$hiddenReadingName'";
    }
    
   # Calculate specialPeriodValue
