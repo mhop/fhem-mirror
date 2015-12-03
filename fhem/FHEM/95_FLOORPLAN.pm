@@ -678,7 +678,7 @@ FP_show(){
                 $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_ME,
                                                    $d, $FW_room, $cmd, $values);
                 }
-                $FW_ME = $oldMe if (defined($htmlTxt));
+                $FW_ME = $oldMe if (defined($htmlTxt) && $htmlTxt eq '');
                 use strict "refs";
                 last if(defined($htmlTxt));
               }
@@ -691,7 +691,7 @@ FP_show(){
                 $h .= "<p><a href='$FW_ME$FW_subdir?$link$FW_CSRF'>$cmd</a></p>";
               }
             } else {
-                if (defined($htmlTxt)) {
+                if (defined($htmlTxt) && $htmlTxt ne '') {
                    $htmlTxt =~ s/>desired-temp/>/;        #for FHT
                    $htmlTxt =~ s/>desiredTemperature/>/;  #for MAX!
                    FW_pO $htmlTxt;      
