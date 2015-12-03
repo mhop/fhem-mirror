@@ -753,16 +753,28 @@ sub WeekdayTimer_FensterOffen ($$$) {
   my ($hash, $event, $time) = @_;
   my $name = $hash->{NAME};
   
-  my $verzoegerteAusfuehrungCond = AttrVal($hash->{NAME}, "delayedExecutionCond", "0");
-
-  my %specials= (
-         "%HEATING_CONTROL"  => $hash->{NAME},
-         "%WEEKDAYTIMER"     => $hash->{NAME},
-         "%NAME"             => $hash->{DEVICE},
-         "%EVENT"            => $event
+  my %specials = (
+         '%HEATING_CONTROL'  => $hash->{NAME},
+         '%WEEKDAYTIMER'     => $hash->{NAME},
+         '%NAME'             => $hash->{DEVICE},
+         '%EVENT'            => $event,
+         '$HEATING_CONTROL'  => $hash->{NAME},
+         '$WEEKDAYTIMER'     => $hash->{NAME},
+         '$NAME'             => $hash->{DEVICE},
+         '$EVENT'            => $event,
   );
-  $verzoegerteAusfuehrungCond = EvalSpecials($verzoegerteAusfuehrungCond, %specials);
+  
+  my $verzoegerteAusfuehrungCond = AttrVal($hash->{NAME}, "delayedExecutionCond", "0");
+  #$verzoegerteAusfuehrungCond    = 'xxx(%WEEKDAYTIMER,%NAME,%HEATING_CONTROL,$WEEKDAYTIMER,$EVENT,$NAME,$HEATING_CONTROL)';
+  
+  map { my $key =  $_; $key =~ s/\$/\\\$/g;
+        my $val = $specials{$_}; 
+        $verzoegerteAusfuehrungCond =~ s/$key/$val/g 
+      } keys %specials;
+  Log3 $hash, 5, "[$name] delayedExecutionCond:$verzoegerteAusfuehrungCond";
+  
   my $verzoegerteAusfuehrung = eval($verzoegerteAusfuehrungCond);
+  Log3 $hash, 5, "[$name] result of delayedExecutionCond:$verzoegerteAusfuehrung";
   
   if ($verzoegerteAusfuehrung) {
      if (!defined($hash->{VERZOEGRUNG})) {
