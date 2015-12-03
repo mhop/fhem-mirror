@@ -225,7 +225,7 @@ use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 use vars qw($featurelevel); 
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment:textField-long alias ".
-                "eventMap userReadings";
+                "eventMap userReadings:textField-long";
 my $currcfgfile="";             # current config/include file
 my $currlogfile;                # logfile, without wildcards
 my $cvsid = '$Id$';
@@ -2429,7 +2429,7 @@ CommandAttr($$)
 
       #Log 1, "arg is $arg";
 
-      while($arg =~ /$regexo/) {
+      while($arg =~ /$regexo/s) {
         my $userReading= $2;
         my $trigger= $3 ? $3 : undef;
         my $modifier= $5 ? $5 : "none";
