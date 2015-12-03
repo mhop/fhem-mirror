@@ -253,7 +253,7 @@ sub camstart {
        &printlog($hash,$logstr,"3");
        
        # FHEM Sleep Kommando, kein blockieren von FHEM 
-       {fhem("sleep $rectime;set $device off")};
+       {fhem("sleep $rectime;set $device off;")};
        $logstr = "Autostop command: {fhem(\"sleep $rectime quiet;set $device off\")}";
        &printlog($hash,$logstr,"5");
       
