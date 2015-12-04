@@ -3,7 +3,7 @@
 #########################################################
 # ccurpcd.pl
 #
-# Version 1.2
+# Version 1.3
 #
 # RPC server for Homematic CCU.
 #
@@ -227,6 +227,8 @@ sub CCURPC_DeleteDevicesCB ($$$)
 	for my $dev (@$a) {
 		WriteQueue ("DD|".$dev);
 	}
+
+	return;
 }
 
 #####################################
