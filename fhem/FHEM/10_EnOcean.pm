@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2015-12-02
+# 2015-12-04
 
 # Added new EEP: A5-20-04 (hvac.04)
 # EnOcean_Notify():
@@ -250,7 +250,7 @@ my %EnO_eepConfig = (
   "A5.10.21" => {attr => {subType => "roomSensorControl.20"}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "A5.11.01" => {attr => {subType => "lightCtrlState.01"}, GPLOT => "EnO_A5-11-01:Dim/Brightness,"},
   "A5.11.02" => {attr => {subType => "tempCtrlState.01"}, GPLOT => "EnO_A5-11-02:SetpointTemp/ControlVar,"},
-  "A5.11.03" => {attr => {subType => "shutterCtrlState.01", subDef => "getNextID", subTypeSet => "gateway", gwCmd => "blindCmd"}, GPLOT => "EnO_A5-11-03:Position/AnglePos,"},
+  "A5.11.03" => {attr => {subType => "shutterCtrlState.01", subDef => "getNextID", subTypeSet => "gateway", gwCmd => "blindCmd", webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_A5-11-03:Position/AnglePos,"},
   "A5.11.04" => {attr => {subType => "lightCtrlState.02", subDef => "getNextID", subTypeSet => "lightCtrl.01", webCmd => "on:off:dim:rgb"}, GPLOT => "EnO_dimFFRGB:DimRGB,"},
   "A5.12.00" => {attr => {subType => "autoMeterReading.00"}, GPLOT => "EnO_A5-12-00:Value/Counter,"},
   "A5.12.01" => {attr => {subType => "autoMeterReading.01"}, GPLOT => "EnO_power4energy4:Power/Energie,"},
@@ -2652,11 +2652,26 @@ sub EnOcean_Set($@)
           "positionLogic"  => 11,
           "teach"          => 255,
         );
+        my @blindFunc = (
+          "position:slider,0,1,100",
+          "opens:noArg",
+          "closes:noArg",
+          "up",
+          "down",
+          "stop:noArg",
+          "status:noArg",
+          "runtimeSet",
+          "angleSet",
+          "positionMinMax",
+          "angleMinMax",
+          "positionLogic:normal,inverse",
+          "teach:noArg",
+        );
         my $blindFuncID;
         if (defined $blindFunc {$cmd}) {
           $blindFuncID = $blindFunc {$cmd};
         } else {
-          return "Unknown Gateway Blind Central Function " . $cmd . ", choose one of ". join(" ", sort keys %blindFunc);
+          return "Unknown Gateway Blind Central Function " . $cmd . ", choose one of ". join(" ", @blindFunc);
         }
         my $blindParam1 = 0;
         my $blindParam2 = 0;
@@ -2689,19 +2704,40 @@ sub EnOcean_Set($@)
           # position
           if (defined $a[1] && $a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 100) {
             $blindParam1 = $a[1];
-            if (defined $a[2] && $a[2] =~ m/^[+-]?\d+$/ && $a[2] >= -180 && $a[2] <= 180) {
-              $blindParam2 = abs($a[2]) / 2;
-              if ($a[2] < 0) {$blindParam2 |= 0x80;}
-              shift(@a);
-            } else {
-              return "Usage: $cmd variable is not numeric or out of range.";
-            }
-            # angle und position value available
-            $setCmd |= 2;
             shift(@a);
+            if (defined $a[1]) {
+              if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= -180 && $a[1] <= 180) {
+                # set angle
+                $blindParam2 = abs($a[1]) / 2;
+                if ($a[1] < 0) {$blindParam2 |= 0x80;}
+                shift(@a);
+              } else {
+                return "Usage: $cmd variable is not numeric or out of range.";
+              }
+            } else {
+              # set angle defaults
+              my $positionLogic = ReadingsVal($name, 'positionLogic', 'normal');
+              my $angleMin = ReadingsVal($name, 'angleMin', -180);
+              my $angleMax = ReadingsVal($name, 'angleMax', 180);
+              if ($blindParam1 == 0) {
+                $blindParam2 = $positionLogic eq 'normal' ? $angleMax : $angleMin;              
+              } elsif ($blindParam1 == 100) {
+                $blindParam2 = $positionLogic eq 'normal' ? $angleMin : $angleMax;
+              } else {
+                $blindParam2 = $angleMin + ($angleMax - $angleMin) / 2;
+              }
+              if ($blindParam2 < 0) {
+                $blindParam2 = abs($blindParam2) / 2;
+                $blindParam2 |= 0x80;
+              } else {
+                $blindParam2 = $blindParam2 / 2;
+              }
+            }
           } else {
             return "Usage: $cmd variable is not numeric or out of range.";
           }
+          # angle und position value available
+          $setCmd |= 2;
           $updateState = 0;
         } elsif ($blindFuncID == 5 || $blindFuncID == 6) {
           # up / down
@@ -2796,6 +2832,7 @@ sub EnOcean_Set($@)
           } else {
             return "Usage: $cmd variable is unknown.";
           }
+          readingsSingleUpdate($hash, "positionLogic", $a[1], 1);
           shift(@a);
           $updateState = 0;
         } else {
@@ -13171,7 +13208,7 @@ EnOcean_Delete($$)
           issue blinds closes command</li>
         <li>down td/s ta/s<br>
           issue roll down command</li>
-        <li>position position/% &alpha;/&#176<br>
+        <li>position position/% [&alpha;/&#176]<br>
           drive blinds to position with angle value</li>
         <li>stop<br>
           issue blinds stops command</li>
