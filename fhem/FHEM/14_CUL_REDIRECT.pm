@@ -100,6 +100,63 @@ sub decodeOrego2 {
 	}
 	return (-1, "Not a origon 2 protocol");
 }
+#
+# Decode Oregon 3
+#
+sub decodeOrego3 {
+    my $msg = shift;
+    my $name = shift;
+    my @a = split("", $msg);
+
+    Log3 $name, 5, "CUL_REDIRECT decode Oregon 3 ($msg)"; 
+    my $newMSG = "";
+    my $bitData;
+    my $hlen = length($msg);
+	my $blen = $hlen * 4;
+	$bitData= unpack("B$blen", pack("H$hlen", $msg)); 
+	Log3 $name, 5, "bitdata: $bitData";
+    
+    if (index($bitData,"11110101") != -1) 
+    {  # Valid OSV2 detected!	
+	
+	    Log3 $name, 5, "OSV3 protocol detected ($msg)";
+	    
+	    my $message_start=index($bitData,"0101");
+	    my $message_end=length($bitData)-8;
+       	
+		my $message_length = $message_end - $message_start;
+        my $idx=0;
+		my $osv2bits="";
+		my $osv2hex ="";
+		
+		
+		
+		for ($idx=$message_start; $idx<$message_end; $idx=$idx+8)
+		{
+		    if (length($bitData)-$idx  < 16 )
+			{
+			  last;
+			}
+			my $byte = "";
+			$byte= substr($bitData,$idx,8); ## Ignore every 9th bit
+			Log3 $name, 5, "$name: byte in order $byte ";
+			$byte = scalar reverse $byte;
+			Log3 $name, 5, "$name: byte reversed $byte , as hex: ".sprintf('%X', oct("0b$byte"))."\n";
+
+			#$osv2hex=$osv2hex.sprintf('%X', oct("0b$byte"));
+			$osv2hex=$osv2hex.sprintf('%2X', oct("0b$byte")) ;
+		}
+		$osv2hex = sprintf("%2X", length($osv2hex)*4).$osv2hex;
+		if (length($osv2hex)*4 > 87) {
+		    Log3 $name, 5, "CUL_REDIRECT: OSV3 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits \n";
+            return (1,$osv2hex);
+        } else {
+            Log3 $name, 5, "CUL_REDIRECT: ERROR: To short: OSV3 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits \n"; 
+            return (-1, "CUL_REDIRECT: ERROR: To short: OSV3 protocol converted to hex: ($osv2hex) with length (".(length($osv2hex)*4).") bits"); 
+        }  
+	}
+	return (-1, "Not a origon 3 protocol");
+}
 
 sub	decode_Hideki
 {
@@ -220,6 +277,13 @@ CUL_REDIRECT_Parse($$)
         # Orego2
         Log3 $name, 5, "CUL_REDIRECT ($msg) match Manchester COODE length: $l"; 
         my ($rcode,$res) = decodeOrego2(substr($msg, 1), $name); 
+	    if ($rcode != -1) {
+			$dmsg = $res;	
+			Log3 $name, 5, "$name Dispatch now to Oregon Module.";	
+			CUL_REDIRECT_Dispatch($hash,$msg,$dmsg);
+			$message_dispatched=TRUE;
+		} 
+		($rcode,$res) = decodeOrego3(substr($msg, 1), $name); 
 	    if ($rcode != -1) {
 			$dmsg = $res;	
 			Log3 $name, 5, "$name Dispatch now to Oregon Module.";	
