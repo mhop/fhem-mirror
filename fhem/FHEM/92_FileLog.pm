@@ -942,8 +942,13 @@ FileLog_seekTo($$$$$)
   $fh->seek(0, 2); # Go to the end
   my $upper = $fh->tell;
 
-  my ($lower, $next, $last) = (0, $upper/2, 0);
+  my ($lower, $next, $last) = (0, $upper/2, -1);
   while() {                                             # Binary search
+    if($next == $last) {
+      $fh->seek($next, 0);
+      last;
+    }
+
     $fh->seek($next, 0);
     my $data = <$fh>;
     if(!$data) {
@@ -952,24 +957,8 @@ FileLog_seekTo($$$$$)
     }
     if($reformatFn) { no strict; $data = &$reformatFn($data); use strict; }
     if($data !~ m/^\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /o) {
-      $next = $fh->tell;
-      $data = <$fh>;
-      if(!$data) {
-        $last = seekBackOneLine($fh, $next);
-        last;
-      }
-      if($reformatFn) { no strict; $data = &$reformatFn($data); use strict; }
-
-      # If the second line is longer then the first,
-      # binary search will never get it: 
-      if($next eq $last && $data ge $ts) {
-        $last = seekBackOneLine($fh, $next);
-        last;
-      }
-    }
-    if($next eq $last) {
-      $fh->seek($next, 0);
-      last;
+      $next = seekBackOneLine($fh, $fh->tell);
+      next;
     }
 
     $last = $next;
