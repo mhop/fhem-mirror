@@ -21,6 +21,8 @@
 # 19.11.15 GA fix move actorState to readings
 # 22.11.15 GA fix rules on wednesday are now possible (thanks to Skusi)
 # 22.11.15 GA fix error handling in SetRoom (thanks to cobra112)
+# 30.11.15 GA fix set reading of desired-temp-used to frost_protect if window is opened
+# 30.11.15 GA add call PWMR_Attr in PWMR_Define if already some attributes are defined
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -416,7 +418,7 @@ PWMR_Define($$)
 
   my $name = $hash->{NAME};
 
-  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading:t_regexp]> <actor>[:<a_regexp_on>] [<window>[,<window>]:<w_regexp>]"
+  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window>[,<window>][:<w_regexp>]]"
     if(int(@a) < 6 || int(@a) > 8);
 
   my $iodev   = $a[2];
@@ -555,6 +557,12 @@ PWMR_Define($$)
   $hash->{INTERVAL}           = 300;
 
   AssignIoPort($hash);
+
+  # if attributes already defined then recall set for them
+  foreach my $oneattr (sort keys %{$attr{$name}})
+  {
+    PWMR_Attr ("set", $name, $oneattr, $attr{$name}{$oneattr});
+  }
 
   if($hash->{INTERVAL}) {
     InternalTimer(gettimeofday()+10, "PWMR_CalcDesiredTemp", $hash, 0);
@@ -735,6 +743,7 @@ PWMR_ReadRoom(@)
 
   if ($windowV > 0) {
     $desiredTemp    = $room->{c_tempFrostProtect};
+
   } else {
     $desiredTemp    = $room->{READINGS}{"desired-temp"}{VAL};
   }
@@ -757,6 +766,7 @@ PWMR_ReadRoom(@)
   }
 
   readingsBeginUpdate ($room);
+  readingsBulkUpdate ($room,  "desired-temp-used", $desiredTemp);
   readingsBulkUpdate ($room,  "PWMOnTime", $PWMOnTime);
   readingsBulkUpdate ($room,  "PWMPulse", $PWMPulse);
   readingsBulkUpdate ($room,  "temperature", $temperaturV);
@@ -1036,7 +1046,7 @@ PWMR_Boost(@)
       #DoTrigger($name, undef);
 
       Log3 ($room, 4, "PWMR_Boost: $name ".
-        "set desiredtemp ".$room->{READINGS}{"desired-temp"}{TIME}." ".
+        "set desired-temp ".$room->{READINGS}{"desired-temp"}{TIME}." for ".
         $room->{READINGS}{"desired-temp"}{VAL});
         
     } else {
@@ -1075,7 +1085,7 @@ PWMR_Boost(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:t_regexp]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window&gt;[,&lt;window&gt;:w_regexp]<br></code>
+    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window&gt;[,&lt;window&gt;[:w_regexp]]<br></code>
 
     <br>
     Define a calculation object with the following parameters:<br>
@@ -1090,7 +1100,7 @@ PWMR_Boost(@)
       <i>factor</i> can be used to weight rooms.<br>
     </li>
 
-    <li>tsensor[:reading:t_regexp]<br>
+    <li>tsensor[:reading[:t_regexp]]<br>
       <i>tsensor</i> defines the temperature sensor for the actual room temperature.<br>
       <i>reading</i> defines the reading of the temperature sensor. Default is "temperature"<br>
       <i>t_regexp</i> defines a regular expression to be applied to the reading. Default is '([\\d\\.]*)'.<br>
@@ -1101,7 +1111,7 @@ PWMR_Boost(@)
       <i>a_regexp_on</i> defines a regular expression to be applied to the state of the actor. Default is 'on". If state matches the regular expression it is handled as "on", otherwise "off"<br>
     </li>
 
-    <li>window[,window]:w_regexp<br>
+    <li>window[,window][:w_regexp]<br>
       <i>window</i> defines several window devices that can prevent heating to be turned on. 
       If STATE matches the regular expression then the desired-temp will be decreased to frost-protect temperature.<br>
       <i>w_regexp</i> defines a regular expression to be applied to the reading. Default is '.*Open.*'.<br>
