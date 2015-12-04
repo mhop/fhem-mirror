@@ -265,7 +265,7 @@ yowsup_Set($$@)
 
       my $image = shift(@args);
 
-      return yowsup_Write( $phash, "/image send $hash->{NUMBER} $args[0]" );
+      return yowsup_Write( $phash, "/image send $number $image '". join( ' ', @args ) ."'" );
 
       return undef;
     } elsif( $cmd eq 'send' ) {
