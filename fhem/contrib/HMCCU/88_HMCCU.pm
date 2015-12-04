@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 2.1
+#  Version 2.2
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -17,6 +17,7 @@
 #  set <name> var <value> [...]
 #  set <name> execute <ccu_program>
 #  set <name> hmscript <hm_script_file>
+#  set <name> config <ccu_object> <parameter>=<value> [...]
 #
 #  get <name> devicelist
 #  get <name> devstate <ccu_object> [<reading>]
@@ -24,6 +25,8 @@
 #  get <name> channel <device>:<channel>[.<datapoint_exp>]
 #  get <name> datapoint <channel>.<datapoint> [<reading>]
 #  get <name> parfile [<parfile>]
+#  get <name> config
+#  get <name> configdesc
 #
 #  attr <name> ccureadingformat { name | address }
 #  attr <name> ccureadings { 0 | 1 }
@@ -113,6 +116,8 @@ sub HMCCU_SetDatapoint ($$$);
 sub HMCCU_GetVariables ($$);
 sub HMCCU_SetVariable ($$$);
 sub HMCCU_GetChannel ($$);
+sub HMCCU_RPCGetConfig ($$$);
+sub HMCCU_RPCSetConfig ($$$);
 
 
 #####################################
@@ -212,7 +217,7 @@ sub HMCCU_Set ($@)
 	my ($hash, @a) = @_;
 	my $name = shift @a;
 	my $opt = shift @a;
-	my $options = "devstate datapoint var execute hmscript";
+	my $options = "devstate datapoint var execute hmscript config";
 	my $host = $hash->{host};
 
 	my $stripchar = AttrVal ($name, "stripchar", '');
@@ -311,6 +316,17 @@ sub HMCCU_Set ($@)
 
 		return undef;
 	}
+	elsif ($opt eq 'config') {
+		my $ccuobj = shift @a;
+
+		return HMCCU_SetError ($hash,
+		   "Usage: set $name config {devicename|deviceaddress|channelname|channeladdress} {param=value} [...]") if (!defined ($ccuobj) || @a < 1);
+		my $rc = HMCCU_RPCSetConfig ($hash, $ccuobj, \@a);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+
+		HMCCU_SetState ($hash, "OK");
+		return undef;
+	}
 	else {
 		return "HMCCU: Unknown argument $opt, choose one of ".$options;
 	}
@@ -325,7 +341,7 @@ sub HMCCU_Get ($@)
 	my ($hash, @a) = @_;
 	my $name = shift @a;
 	my $opt = shift @a;
-	my $options = "devicelist:noArg devstate datapoint vars channel parfile";
+	my $options = "devicelist:noArg devstate datapoint vars channel parfile config configdesc";
 	my $host = $hash->{host};
 
 	my $ccureadingformat = AttrVal ($name, "ccureadingformat", 'name');
@@ -450,6 +466,28 @@ sub HMCCU_Get ($@)
 
 		return undef;
 	}
+	elsif ($opt eq 'config') {
+		my $ccuobj = shift @a;
+
+		return HMCCU_SetError ($hash,
+		   "Usage: get $name config {devicename|deviceaddress|channelname|channeladdress}") if (!defined ($ccuobj));
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset");
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+
+		HMCCU_SetState ($hash, "OK");
+		return $ccureadings ? undef : $result;
+	}
+	elsif ($opt eq 'configdesc') {
+		my $ccuobj = shift @a;
+
+		return HMCCU_SetError ($hash,
+		   "Usage: get $name configdesc {devicename|deviceaddress|channelname|channeladdress}") if (!defined ($ccuobj));
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription");
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+
+		HMCCU_SetState ($hash, "OK");
+		return $res;
+	}
 	else {
 		return "HMCCU: Unknown argument $opt, choose one of ".$options;
 	}
@@ -499,7 +537,7 @@ sub HMCCU_ParseObject ($$)
 		# Address:Channel.Datapoint [14=01110]
 		#
 		$f = $HMCCU_FLAGS_ACD | ($flags & $HMCCU_FLAG_INTERFACE);
-		($i, $a, $c, $d) = ($flags & $HMCCU_FLAG_INTERFACE ? 'BidCos-RF' : '', $1, $2, $3);;
+		($i, $a, $c, $d) = ($flags & $HMCCU_FLAG_INTERFACE ? 'BidCos-RF' : '', $1, $2, $3);
 	}
 	elsif ($object =~ /^([A-Z]{3,3}[0-9]{7,7}):([0-9]){1,2}$/) {
 		#
@@ -508,6 +546,13 @@ sub HMCCU_ParseObject ($$)
 		$f = $HMCCU_FLAGS_AC | ($flags & $HMCCU_FLAG_DATAPOINT) | ($flags & $HMCCU_FLAG_INTERFACE);
 		($i, $a, $c, $d) = ($flags & $HMCCU_FLAG_INTERFACE ? 'BidCos-RF' : '', $1, $2,
 		   $flags & $HMCCU_FLAG_DATAPOINT ? '.*' : '');
+	}
+	elsif ($object =~ /^([A-Z]{3,3}[0-9]{7,7})$/) {
+		#
+		# Address
+		#
+		$f = $HMCCU_FLAG_ADDRESS;
+		($i, $a) = ($flags & $HMCCU_FLAG_INTERFACE ? 'BidCos-RF' : '', $1);
 	}
 	elsif ($object =~ /^(.+?)\.(.+)$/) {
 		#
@@ -1471,6 +1516,134 @@ foreach (sChannel, sChnList.Split(","))
 
 	return ($count, $result);
 }
+
+####################################################
+# Get RPC paramSet or paramSetDescription
+####################################################
+
+sub HMCCU_RPCGetConfig ($$$)
+{
+	my ($hash, $param, $mode) = @_;
+	
+	my $addr;
+	my $hmccu_hash;
+	my $result = '';
+
+	my $ccureadings = AttrVal ($hash->{NAME}, 'ccureadings', 1);
+	my $readingformat = AttrVal ($hash->{NAME}, 'ccureadingformat', 'name');
+
+	if ($hash->{TYPE} ne 'HMCCU') {
+		# Get hash of HMCCU IO device
+		return (-3, $result) if (!exists ($hash->{IODev}));
+		$hmccu_hash = $hash->{IODev};
+	}
+	else {
+		# Hash of HMCCU IO device supplied as parameter
+		$hmccu_hash = $hash;
+	}
+
+	my $name = $hmccu_hash->{NAME};
+	my $port = AttrVal ($name, 'rpcport', 2001);
+
+	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($param, $HMCCU_FLAG_FULLADDR);
+	if ($flags & $HMCCU_FLAG_ADDRESS) {
+		$addr = $add;
+		$addr .= ':'.$chn if ($flags & $HMCCU_FLAG_CHANNEL);
+	}
+	else {
+		return (-1, '');
+	}
+
+	my $client = RPC::XML::Client->new ("http://".$hmccu_hash->{host}.":".$port."/");
+	my $res = $client->simple_request ($mode, $addr, "MASTER");
+	if ($res) {
+		if (exists ($res->{faultString})) {
+			Log 1, "HMCCU: ".$res->{faultString};
+			return (-2, $res->{faultString});
+		}
+		elsif ($res eq '') {
+			return (-2, '');
+		}
+	}
+	else {
+		return (0, '');
+	}
+
+	if ($mode eq 'getParamsetDescription') {
+		foreach my $key (sort keys %$res) {
+			my $oper = '';
+			$oper .= 'R' if ($res->{$key}->{OPERATIONS} & 1);
+			$oper .= 'W' if ($res->{$key}->{OPERATIONS} & 2);
+			$oper .= 'E' if ($res->{$key}->{OPERATIONS} & 4);
+			$result .= $key.": ".$res->{$key}->{TYPE}." [".$oper."]\n";
+		}
+
+		return (0, $result);
+	}
+
+	readingsBeginUpdate ($hash) if ($ccureadings);
+
+	foreach my $key (sort keys %$res) {
+		my $value = $res->{$key};
+		$result .= "$key=$value\n";
+
+		if ($ccureadings) {
+			my $reading = HMCCU_GetReadingName ($int, $add, $chn, $key, $nam,
+			   $readingformat);
+			$reading = "R-".$reading;
+			readingsBulkUpdate ($hash, $reading, $value);
+		}
+	}
+
+	readingsEndUpdate ($hash, 1) if ($ccureadings);
+
+	return (0, $result);
+}
+
+####################################################
+# Set RPC paramSet
+####################################################
+
+sub HMCCU_RPCSetConfig ($$$)
+{
+	my ($hash, $param, $parref) = @_;
+
+	my $name = $hash->{NAME};
+	my $port = AttrVal ($name, 'rpcport', 2001);
+	my $addr;
+	my %paramset;
+
+	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($param, $HMCCU_FLAG_FULLADDR);
+	if ($flags & $HMCCU_FLAG_ADDRESS) {
+		$addr = $add;
+		$addr .= ':'.$chn if ($flags & $HMCCU_FLAG_CHANNEL);
+	}
+	else {
+		return -1;
+	}
+
+	# Build param set
+	foreach my $pardef (@$parref) {
+		my ($par,$val) = split ("=", $pardef);
+		next if (!defined ($par) || !defined ($val));
+		$paramset{$par} = $val;
+	}
+
+	my $client = RPC::XML::Client->new ("http://".$hash->{host}.":".$port."/");
+	my $res = $client->simple_request ("putParamset", $addr, "MASTER", \%paramset);
+	if ($res) {
+		if (exists ($res->{faultString})) {
+			Log 1, "HMCCU: ".$res->{faultString};
+			return -2;
+		}
+		elsif ($res eq '') {
+			return -2;
+		}
+	}
+
+	return 0;
+}
+
 
 1;
 
