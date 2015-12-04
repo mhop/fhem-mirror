@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 2.0
+#  Version 2.2
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -15,10 +15,13 @@
 #  set <name> datapoint <channel>.<datapoint> <value>
 #  set <name> devstate <value>
 #  set <name> <stateval_cmds>
+#  set <name> config [<channel>] <parameter>=<value> [...]
 #
 #  get <name> devstate
 #  get <name> datapoint <channel>.<datapoint>
 #  get <name> channel <channel>[.<datapoint-expr>]
+#  get <name> config [<channel>]
+#  get <name> configdesc [<channel>]
 #
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address | name }
@@ -233,8 +236,17 @@ sub HMCCUDEV_Set ($@)
 
 		return undef;
 	}
+	elsif ($opt eq 'config') {
+		return HMCCUDEV_SetError ($hash, "Usage: set $name config [{channel-number}] {parameter}={value} [...]") if (@a < 1);;
+		my $objname = $hash->{ccuaddr};
+		$objname .= ':'.shift @a if ($a[0] =~ /^[0-9]+$/);
+
+		my $rc = HMCCU_RPCSetConfig ($hash, $objname, \@a);
+		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+		return undef;
+	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint";
+		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of config datapoint";
 		return undef if ($hash->{statevals} eq 'readonly');
 
 		if ($statechannel ne '') {
@@ -312,8 +324,26 @@ sub HMCCUDEV_Get ($@)
 		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
+	elsif ($opt eq 'config') {
+		my $channel = shift @a;
+		my $ccuobj = $hash->{ccuaddr};
+		$ccuobj .= ':'.$channel if (defined ($channel));
+
+                my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset");
+                return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+                return $ccureadings ? undef : $result;
+	}
+	elsif ($opt eq 'configdesc') {
+		my $channel = shift @a;
+		my $ccuobj = $hash->{ccuaddr};
+		$ccuobj .= ':'.$channel if (defined ($channel));
+
+                my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription");
+                return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+                return $res;
+	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint channel";
+		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint channel config configdesc";
 		if ($statechannel ne '') {
 			$retmsg .= ' devstate:noArg';
 		}
@@ -410,6 +440,10 @@ sub HMCCUDEV_SetError ($$)
         Example:<br/>
         <code>set temp_control datapoint 1.SET_TEMPERATURE 21</code>
       </li><br/>
+      <li>set &lt;name&gt; config [&lt;channel-number&gt;] &lt;parameter&gt;=&lt;value&gt; [...]
+        <br/>
+        Set configuration parameter of CCU device or channel.
+      </li>
    </ul>
    <br/>
    
@@ -424,6 +458,14 @@ sub HMCCUDEV_SetError ($$)
       <li>get &lt;name&gt; datapoint &lt;channel-number&gt;.&lt;datapoint&gt;
          <br/>
          Get value of a CCU device datapoint.
+      </li><br/>
+      <li>get &lt;name&gt; config
+         <br/>
+         Get configuration parameters of CCU device.
+      </li><br/>
+      <li>get &lt;name&gt; configdesc
+         <br/>
+         Get description of configuration parameters for CCU device.
       </li><br/>
    </ul>
    <br/>
