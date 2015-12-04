@@ -24,7 +24,7 @@
 # 09.11.2015 : A.Goebel : add support for multiple readings generated from one command to ebusd
 #                         ebusd may return a list of values like "52.0;43.0;8.000;41.0;45.0;error"
 #                         defining a reading "VL;RL;dummy;VLWW;RLWW" will create redings VL, RL, VLWW and RLWW
-
+# 04.12.2015 : A.Goebel : add event-min-interval to attributes
 
 package main;
 
@@ -69,7 +69,7 @@ my $allSetParamsForWriting = "";
 my $allGetParams           = "";
 my $delimiter              = "~";
 
-my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading ebusWritesEnabled:0,1";
+my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading event-min-interval ebusWritesEnabled:0,1";
 my %ebusCmd  = ();
 
 sub
