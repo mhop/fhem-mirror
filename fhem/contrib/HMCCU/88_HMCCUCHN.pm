@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 2.0
+#  Version 2.2
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -15,10 +15,13 @@
 #  set <name> datapoint <datapoint> <value> [...]
 #  set <name> devstate <value> [...]
 #  set <name> <stateval_cmds>
+#  set <name> config <parameter>=<value> [...]
 #
 #  get <name> devstate
 #  get <name> datapoint <datapoint>
 #  get <name> channel <datapoint-expr>
+#  get <name> config
+#  get <name> configdesc
 #
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> statevals <text1>:<subtext1>[,...]
@@ -158,7 +161,7 @@ sub HMCCUCHN_Set ($@)
 	if (!defined ($hash->{IODev})) {
 		return HMCCUCHN_SetError ($hash, "No IO device defined");
 	}
-	if ($hash->{statevals} eq 'readonly') {
+	if ($hash->{statevals} eq 'readonly' && $opt ne 'config') {
 		return undef;
 	}
 
@@ -210,8 +213,15 @@ sub HMCCUCHN_Set ($@)
 
 		return undef;
 	}
+	elsif ($opt eq 'config') {
+		return HMCCUCHN_SetError ($hash, "Usage: set $name config {parameter}={value} [...]") if (@a < 1);;
+
+                my $rc = HMCCU_RPCSetConfig ($hash, $hash->{ccuaddr}, \@a);
+                return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+                return undef;
+	}
 	else {
-		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of datapoint devstate";
+		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of config datapoint devstate";
 		return undef if ($hash->{statevals} eq 'readonly');
 
 		if ($hash->{statevals} ne '') {
@@ -271,8 +281,22 @@ sub HMCCUCHN_Get ($@)
 		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
+	elsif ($opt eq 'config') {
+		my $ccuobj = $hash->{ccuaddr};
+
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset");
+		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return $ccureadings ? undef : $result;
+	}
+	elsif ($opt eq 'configdesc') {
+		my $ccuobj = $hash->{ccuaddr};
+
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription");
+		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return $res;
+	}
 	else {
-		return "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg datapoint channel";
+		return "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg datapoint channel config:noArg configdesc:noArg";
 	}
 }
 
@@ -378,6 +402,14 @@ sub HMCCUCHN_SetError ($$)
       <li>get &lt;name&gt; datapoint &lt;datapoint&gt;
          <br/>
          Get value of a CCU device datapoint.
+      </li><br/>
+      <li>get &lt;name&gt; config
+         <br/>
+         Get configuration parameters of CCU channel.
+      </li><br/>
+      <li>get &lt;name&gt; configdesc
+         <br/>
+         Get description of configuration parameters of CCU channel.
       </li>
    </ul>
    <br/>
