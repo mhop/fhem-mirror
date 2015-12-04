@@ -40,6 +40,11 @@ CommandCULflash($$)
                'dfu-programmer atmega32u4 flash $filepath && '.
                'dfu-programmer atmega32u4 start',
         flash => 'CUL_SimpleWrite($defs{$device},"B01");sleep(4); undef;' },
+    CUL_V3_ZWAVE => 
+      { cmd => 'dfu-programmer atmega32u4 erase && '.
+               'dfu-programmer atmega32u4 flash $filepath && '.
+               'dfu-programmer atmega32u4 start',
+        flash => 'CUL_SimpleWrite($defs{$device},"B01");sleep(4); undef;' },
     CUL_V4 =>
       { cmd => 'dfu-programmer atmega32u2 erase && '.
                'dfu-programmer atmega32u2 flash $filepath && '.
@@ -101,7 +106,7 @@ CommandCULflash($$)
     Download the firmware from a nightly SVN chekout and flash the
     hardware.
     Currently the CUL is supported with its versions:
-    CUL_V2, CUL_V2_HM, CUL_V3, CUL_V4.<br>
+    CUL_V2, CUL_V2_HM, CUL_V3, CUL_V3_ZWAVE, CUL_V4.<br>
     If the fhem-device is none, than the inserted device must already be in the
     flash-mode.<br>
     <b>Note:</b>for flashing the CUL dfu-programmer has to be installed in the
@@ -129,7 +134,7 @@ CommandCULflash($$)
     L&auml;dt die spezifizierte Firmware von fhem.de und programmiert das
     angeschlossene Ger&auml;t.
     Z.Zt unterst&uuml;tzt wird das CUL und folgende Versionen:
-    CUL_V2, CUL_V2_HM, CUL_V3, CUL_V4.<br>
+    CUL_V2, CUL_V2_HM, CUL_V3, CUL_V3_ZWAVE, CUL_V4.<br>
     Falls als fhem-device none angegeben wurde, dann muss sich das
     angeschlossene Ger&auml;t bereits in flash-mode befinden.<br>
     <b>Achtung:</b>F&uuml;r CUL flashen muss dfu-programmer installiert und im
