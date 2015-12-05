@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLMONITOR: added attribute disabledForIntervals to specify
+             specific time ranges, where FB_CALLMONITOR will be disabled
+             (see commandref for the exact syntax)
   - changed: YAMAHA_AVR: added HTTP request queue, send only one request at the
              same time. This increases command reliability and response behaviour of
              the AV receiver.

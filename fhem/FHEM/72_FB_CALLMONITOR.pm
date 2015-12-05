@@ -93,6 +93,7 @@ FB_CALLMONITOR_Initialize($)
     $hash->{NOTIFYDEV} = "global";
     $hash->{AttrList}  = "do_not_notify:0,1 ".
                          "disable:0,1 ".
+                         "disabledForIntervals ".
                          "unique-call-ids:0,1 ".
                          "local-area-code ".
                          "country-code ".
@@ -305,7 +306,7 @@ FB_CALLMONITOR_Read($)
 
     my $buf = DevIo_SimpleRead($hash);
     
-    return "" if(!defined($buf));
+    return "" if(!defined($buf) or IsDisabled($hash->{NAME}));
     
     my $name = $hash->{NAME};
     my @array;
@@ -471,17 +472,9 @@ FB_CALLMONITOR_Attr($@)
             return FB_CALLMONITOR_loadTextFile($hash, $value);
         }
             
-        if($attrib eq "disable")
+        if($attrib eq "disable" and $value eq "1")
         {
-            if($value eq "0")
-            {
-                DevIo_OpenDev($hash, 0, undef);
-            }
-            elsif($value eq "1")
-            {
-                DevIo_CloseDev($hash); 
-                $hash->{STATE} = "disabled";
-            }
+            $hash->{STATE} = "disabled";
         }
     }
     elsif($cmd eq "del")
@@ -499,11 +492,6 @@ FB_CALLMONITOR_Attr($@)
         if($attrib eq "reverse-search-text-file")
         {
             delete($hash->{helper}{TEXTFILE}) if(defined($hash->{helper}{TEXTFILE}));
-        }
-        
-        if($attrib eq "disable")
-        {
-            DevIo_OpenDev($hash, 0, undef);
         }
     }
     
@@ -1758,7 +1746,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
 <ul>
   <tr><td>
   The FB_CALLMONITOR module connects to a AVM FritzBox Fon and listens for telephone
-  <a href="#FB_CALLMONITORevents">events</a> (Receiving incoming call, Making a call)
+  <a href="#FB_CALLMONITOR_events">events</a> (Receiving incoming call, Making a call)
   <br><br>
   In order to use this module with fhem you <b>must</b> enable the Callmonitor feature via 
   telephone shortcode.<br><br>
@@ -1775,7 +1763,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
   This module work with any FritzBox Fon model.
   <br><br>
   
-  <a name="FB_CALLMONITORdefine"></a>
+  <a name="FB_CALLMONITOR_define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; FB_CALLMONITOR &lt;ip-address&gt;[:port]</code><br>
@@ -1784,17 +1772,17 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     <br>
   </ul>
   <br>
-  <a name="FB_CALLMONITORset"></a>
+  <a name="FB_CALLMONITOR_set"></a>
   <b>Set</b>
   <ul>
-  <li><b>rereadCache</b> - Reloads the cache file if configured (see attribute: <a href="#reverse-search-cache-file">reverse-search-cache-file</a>)</li>
+  <li><b>rereadCache</b> - Reloads the cache file if configured (see attribute: <a href="#FB_CALLMONITOR_reverse-search-cache-file">reverse-search-cache-file</a>)</li>
   <li><b>rereadPhonebook</b> - Reloads the FritzBox phonebook (from given file, via telnet or directly if available)</li>
-  <li><b>rereadTextfile</b> - Reloads the user given textfile if configured (see attribute: <a href="#reverse-search-text-file">reverse-search-text-file</a>)</li>
-  <li><b>password</b> - set the FritzBox password (only available when password is really needed for network access to FritzBox phonebook, see attribute <a href="#fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>)</li>
+  <li><b>rereadTextfile</b> - Reloads the user given textfile if configured (see attribute: <a href="#FB_CALLMONITOR_reverse-search-text-file">reverse-search-text-file</a>)</li>
+  <li><b>password</b> - set the FritzBox password (only available when password is really needed for network access to FritzBox phonebook, see attribute <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>)</li>
   </ul>
   <br>
 
-  <a name="FB_CALLMONITORget"></a>
+  <a name="FB_CALLMONITOR_get"></a>
   <b>Get</b>
   <ul>
   <li><b>search &lt;phone-number&gt;</b> - returns the name of the given number via reverse-search (internal phonebook, cache or internet lookup)</li>
@@ -1805,30 +1793,37 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
   </ul>
   <br>
 
-  <a name="FB_CALLMONITORattr"></a>
+  <a name="FB_CALLMONITOR_attr"></a>
   <b>Attributes</b><br><br>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
-    <li><a name="disable">disable</a></li>
+    <li><a name="FB_CALLMONITOR_disable">disable</a></li>
 	Optional attribute to disable the Callmonitor. When disabled, no phone events can be detected.
 	<br><br>
 	Possible values: 0 => Callmonitor is activated, 1 => Callmonitor is deactivated.<br>
     Default Value is 0 (activated)<br><br>
-    <li><a name="reverse-search">reverse-search</a> (phonebook,textfile,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
+    <li><a name="FB_CALLMONITOR_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...</li>
+    Optional attribute to disable FB_CALLMONITOR during specific time intervals. The attribute contains a space separated list of HH:MM tupels.
+    If the current time is between any of these time specifications, no phone events will be processed.
+    Instead of HH:MM you can also specify HH or HH:MM:SS. 
+    <br><br>To specify an interval spawning midnight, you have to specify two intervals, e.g.:
+    <pre>23:00-24:00 00:00-01:00</pre>
+    Default Value is <i>empty</i> (no intervals defined, FB_CALLMONITOR is always active)<br><br>
+    <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,textfile,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
     Enables the reverse searching of the external number (at dial and call receiving).
     This attribute contains a comma separated list of providers which should be used to reverse search a name to a specific phone number. 
     The reverse search process will try to lookup the name according to the order of providers given in this attribute (from left to right). The first valid result from the given provider order will be used as reverse search result.
     <br><br>per default, reverse search is disabled.<br><br>
-    <li><a name="reverse-search-cache">reverse-search-cache</a></li>
+    <li><a name="FB_CALLMONITOR_reverse-search-cache">reverse-search-cache</a></li>
     If this attribute is activated each reverse-search result from an internet provider is saved in an internal cache
     and will be used instead of requesting each internet provider every time with the same number. The cache only contains reverse-search results from internet providers.<br><br>
     Possible values: 0 => off , 1 => on<br>
     Default Value is 0 (off)<br><br>
-    <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
+    <li><a name="FB_CALLMONITOR_reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
     Write the internal reverse-search-cache to the given file and use it next time FHEM starts.
     So all reverse search results are persistent written to disk and will be used instantly after FHEM starts.<br><br>
-    <li><a name="reverse-search-text-file">reverse-search-text-file</a> &lt;file&gt;</li>
+    <li><a name="FB_CALLMONITOR_reverse-search-text-file">reverse-search-text-file</a> &lt;file&gt;</li>
     Define a custom list of numbers and their according names in a textfile. This file uses comma separated values per line in form of:
     <pre>
     &lt;number1&gt;,&lt;name1&gt;
@@ -1838,40 +1833,40 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     </pre>
     You can use the hash sign to comment entries in this file. If the specified file does not exists, it will be created by FHEM.
     <br><br>
-    <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;file&gt;</li>
+    <li><a name="FB_CALLMONITOR_reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;file&gt;</li>
     This attribute can be used to specify the (full) path to a phonebook file in FritzBox format (XML structure). Using this option it is possible to use the phonebook of a FritzBox even without FHEM running on a Fritzbox.
     The phonebook file can be obtained by an export via FritzBox web UI<br><br>
     Default value is /var/flash/phonebook (phonebook filepath on FritzBox)<br><br>
-    <li><a name="remove-leading-zero">remove-leading-zero</a></li>
+    <li><a name="FB_CALLMONITOR_remove-leading-zero">remove-leading-zero</a></li>
     If this attribute is activated, a leading zero will be removed from the external number (e.g. in telefon systems).<br><br>
     Possible values: 0 => off , 1 => on<br>
     Default Value is 0 (off)<br><br>
-    <li><a name="unique-call-ids">unique-call-ids</a></li>
+    <li><a name="FB_CALLMONITOR_unique-call-ids">unique-call-ids</a></li>
     If this attribute is activated, each call will use a biunique call id. So each call can be separated from previous calls in the past.<br><br>
     Possible values: 0 => off , 1 => on<br>
     Default Value is 0 (off)<br><br>
-    <li><a name="local-area-code">local-area-code</a></li>
+    <li><a name="FB_CALLMONITOR_local-area-code">local-area-code</a></li>
     Use the given local area code for reverse search in case of a local call (e.g. 0228 for Bonn, Germany)<br><br>
-    <li><a name="country-code">country-code</a></li>
+    <li><a name="FB_CALLMONITOR_country-code">country-code</a></li>
     Your local country code. This is needed to identify phonenumbers in your phonebook with your local country code as a national phone number instead of an international one as well as handling Call-By-Call numbers in german speaking countries (e.g. 0049 for Germany, 0043 for Austria or 001 for USA)<br><br>
     Default Value is 0049 (Germany)<br><br>
-    <li><a name="fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
+    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
     If this attribute is activated, the phonebook should be obtained direct from the FritzBox via remote network connection (in case FHEM is not running on a FritzBox). This is only possible if a password (and depending on configuration a username as well) is configured.<br><br>
     Possible values: 0 => off , 1 => on (use remote telnet connection to obtain FritzBox phonebook)<br>
     Default Value is 0 (off)<br><br>
-    <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
+    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
     Set the method how the phonebook should be requested via network. When set to "web", the phonebook is obtained from the web interface via HTTP. When set to "telnet", it uses a telnet connection to login and retrieve the phonebook (telnet must be activated via dial shortcode #96*7*). When set to "tr064" the phonebook is obtained via TR-064 SOAP request.<br><br>
     Possible values: web,telnet,tr064<br>
     Default Value is web (retrieve phonebooks via web interface)<br><br>
-    <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
-    A comma separated list of phonebook id's which should be excluded when retrieving all possible phonebooks via web method (see attribute <i>fritzbox-remote-phonebook-via</i>). All list possible values is provided by <a href="#FB_CALLMONITORget">get command</a> <i>showPhonebookIds</i>. This attribute is not applicable when using telnet method to obtain remote phonebook.<br><br>
+    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
+    A comma separated list of phonebook id's which should be excluded when retrieving all possible phonebooks via web method (see attribute <i>fritzbox-remote-phonebook-via</i>). All list possible values is provided by <a href="#FB_CALLMONITOR_get">get command</a> <i>showPhonebookIds</i>. This attribute is not applicable when using telnet method to obtain remote phonebook.<br><br>
     Default Value: <i>empty</i> (all phonebooks should be used, no exclusions)<br><br>
-    <li><a name="fritzbox-user">fritzbox-user</a></li>
+    <li><a name="FB_CALLMONITOR_fritzbox-user">fritzbox-user</a></li>
     Use the given user for remote connect to obtain the phonebook. This attribute is only needed, if you use multiple users on your FritzBox.<br><br>
     </ul>
   <br>
  
-  <a name="FB_CALLMONITORevents"></a>
+  <a name="FB_CALLMONITOR_events"></a>
   <b>Generated Events:</b><br><br>
   <ul>
   <li><b>event</b> (call|ring|connect|disconnect) - which event in detail was triggerd</li>
@@ -1902,7 +1897,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
 <ul>
   <tr><td>
   Das Modul FB_CALLMONITOR verbindet sich zu einer AVM FritzBox Fon und verarbeitet
-  Telefonie-<a href="#FB_CALLMONITORevents">Ereignisse</a>.(eingehende & ausgehende Telefonate)
+  Telefonie-<a href="#FB_CALLMONITOR_events">Ereignisse</a>.(eingehende & ausgehende Telefonate)
   <br><br>
   Um dieses Modul nutzen zu k&ouml;nnen, muss der Callmonitor via Kurzwahl mit einem Telefon aktiviert werden.
  .<br><br>
@@ -1918,7 +1913,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
   Dieses Modul funktioniert mit allen Fritz!Box Modellen, welche Telefonie unterst&uuml;tzen (Namenszusatz: Fon).
   <br><br>
   
-  <a name="FB_CALLMONITORdefine"></a>
+  <a name="FB_CALLMONITOR_define"></a>
   <b>Definition</b>
   <ul>
     <code>define &lt;name&gt; FB_CALLMONITOR &lt;IP-Addresse&gt;[:Port]</code><br>
@@ -1927,17 +1922,17 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     <br>
   </ul>
   <br>
-  <a name="FB_CALLMONITORset"></a>
+  <a name="FB_CALLMONITOR_set"></a>
   <b>Set-Kommandos</b>
   <ul>
-  <li><b>rereadCache</b> - Liest den Cache aus der Datei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#reverse-search-cache-file">reverse-search-cache-file</a>)</li>
+  <li><b>rereadCache</b> - Liest den Cache aus der Datei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#FB_CALLMONITOR_reverse-search-cache-file">reverse-search-cache-file</a>)</li>
   <li><b>rereadPhonebook</b> - Liest das Telefonbuch der FritzBox neu ein (per Datei, Telnet oder direkt lokal)</li>
-  <li><b>rereadTextfile</b> - Liest die nutzereigene Textdatei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#reverse-search-text-file">reverse-search-text-file</a>)</li>
-  <li><b>password</b> - speichert das FritzBox Passwort, welches f&uuml;r das Einlesen aller Telefonb&uuml;cher direkt von der FritzBox ben&ouml;tigt wird. Dieses Kommando ist nur verf&uuml;gbar, wenn ein Passwort ben&ouml;tigt wird um das Telefonbuch via Netzwerk einzulesen, siehe dazu Attribut <a href="#fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>.</li>
+  <li><b>rereadTextfile</b> - Liest die nutzereigene Textdatei neu ein (sofern konfiguriert, siehe dazu Attribut <a href="#FB_CALLMONITOR_reverse-search-text-file">reverse-search-text-file</a>)</li>
+  <li><b>password</b> - speichert das FritzBox Passwort, welches f&uuml;r das Einlesen aller Telefonb&uuml;cher direkt von der FritzBox ben&ouml;tigt wird. Dieses Kommando ist nur verf&uuml;gbar, wenn ein Passwort ben&ouml;tigt wird um das Telefonbuch via Netzwerk einzulesen, siehe dazu Attribut <a href="#FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a>.</li>
   </ul>
   <br>
 
-  <a name="FB_CALLMONITORget"></a>
+  <a name="FB_CALLMONITOR_get"></a>
   <b>Get-Kommandos</b>
   <ul>
   <li><b>search &lt;Rufnummer&gt;</b> - gibt den Namen der Telefonnummer zur&uuml;ck (aus Cache, Telefonbuch oder R&uuml;ckw&auml;rtssuche)</li>
@@ -1948,17 +1943,25 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
   </ul>
   <br>
 
-  <a name="FB_CALLMONITORattr"></a>
+  <a name="FB_CALLMONITOR_attr"></a>
   <b>Attribute</b><br><br>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
-    <li><a name="disable">disable</a></li>
+    <li><a name="FB_CALLMONITOR_disable">disable</a></li>
 	Optionales Attribut zur Deaktivierung des Callmonitors. Es k&ouml;nnen dann keine Anruf-Events mehr erkannt und erzeugt werden.
 	<br><br>
 	M&ouml;gliche Werte: 0 => Callmonitor ist aktiv, 1 => Callmonitor ist deaktiviert.<br>
     Standardwert ist 0 (aktiv)<br><br>
-    <li><a name="reverse-search">reverse-search</a> (phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
+    <li><a name="FB_CALLMONITOR_disabledForIntervals">disabledForIntervals</a></li>
+    Optionales Attribut zur Deaktivierung des Callmonitors innerhalb von bestimmten Zeitintervallen.
+    Das Argument ist eine Leerzeichen-getrennte Liste von Minuszeichen-getrennten HH:MM P&auml;rchen (Stunde : Minute).
+    Falls die aktuelle Uhrzeit zwischen diese Werte f&auml;llt, dann wird die Verarbeitung, wie bei <a href="#FB_CALLMONITOR_disable">disable</a>, ausgesetzt.
+    Statt HH:MM kann man auch HH oder HH:MM:SS angeben.<br><br>
+    Um einen Intervall um Mitternacht zu spezifizieren, muss man zwei einzelne Intervalle angeben, z.Bsp.:
+    <pre>23:00-24:00 00:00-01:00</pre>
+    Standardwert ist <i>nicht gesetzt</i> (dauerhaft aktiv)<br><br>
+    <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer (bei eingehenden/ausgehenden Anrufen).
     Dieses Attribut enth&auml;lt eine komma-separierte Liste mit allen Anbietern die f&uuml;r eine R&uuml;ckw&auml;rtssuche benutzt werden sollen.
     Die R&uuml;ckw&auml;rtssuche prüft in der gegebenen Reihenfolge (von links nach rechts) ob der entsprechende Anbieter (Telefonbuch, Textdatei oder Internetanbieter) die Rufnummer auflösen können.
@@ -1967,18 +1970,18 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     Der Anbieter "textfile" verwendet die nutzereigene Textdatei, sofern definiert (siehe Attribut reverse-search-text-file).
     Der Anbieter "phonebook" verwendet das Telefonbuch der FritzBox (siehe Attribut reverse-search-phonebook-file oder fritzbox-remote-phonebook).<br><br>
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (nicht gesetzt)<br><br>
-    <li><a name="reverse-search-cache">reverse-search-cache</a></li>
+    <li><a name="FB_CALLMONITOR_reverse-search-cache">reverse-search-cache</a></li>
     Wenn dieses Attribut gesetzt ist, werden alle Ergebisse von Internetanbietern in einem modul-internen Cache gespeichert
     und alle existierenden Ergebnisse aus dem Cache genutzt anstatt eine erneute Anfrage bei einem Internet-Anbieter durchzuf&uuml;hren. 
     Der Cache ist immer an die Internetanbieter gekoppelt und speichert nur Ergebnisse von Internetanbietern.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>
-    <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;Dateipfad&gt;</li>
+    <li><a name="FB_CALLMONITOR_reverse-search-cache-file">reverse-search-cache-file</a> &lt;Dateipfad&gt;</li>
     Da der Cache nur im Arbeitsspeicher existiert, ist er nicht persistent und geht beim stoppen von FHEM verloren.
     Mit diesem Parameter werden alle Cache-Ergebnisse in eine Textdatei geschrieben (z.B. /usr/share/fhem/telefonbuch.txt) 
     und beim n&auml;chsten Start von FHEM wieder in den Cache geladen und genutzt.
     <br><br>
-    <li><a name="reverse-search-cache-file">reverse-search-text-file</a> &lt;Dateipfad&gt;</li>
+    <li><a name="FB_CALLMONITOR_reverse-search-cache-file">reverse-search-text-file</a> &lt;Dateipfad&gt;</li>
     L&auml;dt eine nutzereigene Textdatei welche eine eigene Namenszuordnungen für Rufnummern enth&auml;lt. Diese Datei enth&auml;lt zeilenweise komma-separierte Werte nach folgendem Schema:
     <pre>
     &lt;Nummer1&gt;,&lt;Name1&gt;
@@ -1988,41 +1991,41 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     </pre>
     Die Datei kann dabei auch Kommentar-Zeilen enthalten mit # vorangestellt. Sollte die Datei nicht existieren, wird sie durch FHEM erstellt.
     <br><br>
-    <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;Dateipfad&gt</li>
+    <li><a name="FB_CALLMONITOR_reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;Dateipfad&gt</li>
     Mit diesem Attribut kann man optional den Pfad zu einer Datei angeben, welche ein Telefonbuch im FritzBox-Format (XML-Struktur) enth&auml;lt.
     Dadurch ist es m&ouml;glich ein FritzBox-Telefonbuch zu verwenden, ohne das FHEM auf einer FritzBox laufen muss.
     Sofern FHEM auf einer FritzBox l&auml;uft (und nichts abweichendes angegeben wurde), wird das interne File /var/flash/phonebook verwendet. Alternativ kann man das Telefonbuch in der FritzBox-Weboberfl&auml;che exportieren und dieses verwenden<br><br>
     Standardwert ist /var/flash/phonebook (entspricht dem Pfad auf einer FritzBox)<br><br>
-    <li><a name="remove-leading-zero">remove-leading-zero</a></li>
+    <li><a name="FB_CALLMONITOR_remove-leading-zero">remove-leading-zero</a></li>
     Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden & abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>
-    <li><a name="unique-call-ids">unique-call-ids</a></li>
+    <li><a name="FB_CALLMONITOR_unique-call-ids">unique-call-ids</a></li>
     Wenn dieses Attribut aktiviert ist, wird f&uuml;r jedes Gespr&auml;ch eine eineindeutige Identifizierungsnummer verwendet. Dadurch lassen sich auch bereits beendete Gespr&auml;che voneinander unterscheiden. Dies ist z.B. notwendig bei der Verarbeitung der Events durch eine Datenbank.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>
-    <li><a name="local-area-code">local-area-code</a></li>
+    <li><a name="FB_CALLMONITOR_local-area-code">local-area-code</a></li>
     Verwendet die gesetze Vorwahlnummer bei R&uuml;ckw&auml;rtssuchen von Ortsgespr&auml;chen (z.B. 0228 f&uuml;r Bonn)<br><br>
-    <li><a name="country-code">country-code</a></li>
+    <li><a name="FB_CALLMONITOR_country-code">country-code</a></li>
     Die Landesvorwahl wird ben&ouml;tigt um Telefonbucheintr&auml;ge mit lokaler Landesvorwahl als Inlands-Rufnummern, als auch um Call-By-Call-Vorwahlen richtig zu erkennen (z.B. 0049 f&uuml;r Deutschland, 0043 f&uuml;r &Ouml;sterreich oder 001 f&uuml;r USA).<br><br>
     Standardwert ist 0049 (Deutschland)<br><br>
-    <li><a name="fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
+    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook">fritzbox-remote-phonebook</a></li>
     Wenn dieses Attribut aktiviert ist, wird das FritzBox Telefonbuch direkt von der FritzBox gelesen. Dazu ist das FritzBox Passwort und je nach FritzBox Konfiguration auch ein Username notwendig, der in den entsprechenden Attributen konfiguriert sein muss.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>  
-    <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
+    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
     Setzt die Methode mit der das Telefonbuch von der FritzBox abgefragt werden soll. Bei der Methode "web", werden alle verf&uuml;gbaren Telefonb&uuml;cher (lokales sowie alle konfigurierten Online-Telefonb&uuml;cher) &uuml;ber die Web-Oberfl&auml;che eingelesen. Bei der Methode "telnet" wird eine Telnet-Verbindung zur FritzBox aufgebaut um das lokale Telefonbuch abzufragen (keine Online-Telefonb&uuml;cher). Dazu muss die Telnet-Funktion aktiviert sein (Telefon Kurzwahl: #96*7*). Bei der Methode "tr064" werden alle verf&uuml;gbaren Telefonb&uuml;cher &uuml;ber die TR-064 SOAP Schnittstelle ausgelesen. <br><br>
     M&ouml;gliche Werte: web,telnet,tr064<br>
     Standardwert ist "web" (Abfrage aller verf&uuml;gbaren Telefonb&uuml;cher &uuml;ber die Web-Oberfl&auml;che)<br><br>
-    <li><a name="fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
-    Eine komma-separierte Liste von Telefonbuch-ID's welche beim einlesen &uuml;bersprungen werden sollen. Dieses Attribut greift nur beim einlesen der Telefonb&uuml;cher via "web"-Methode (siehe Attribut <i>fritzbox-remote-phonebook-via</i>). Eine Liste aller m&ouml;glichen Werte kann &uuml;ber das <a href="#FB_CALLMONITORget">Get-Kommando</a> <i>showPhonebookIds</i> angezeigt werden.<br><br>
+    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
+    Eine komma-separierte Liste von Telefonbuch-ID's welche beim einlesen &uuml;bersprungen werden sollen. Dieses Attribut greift nur beim einlesen der Telefonb&uuml;cher via "web"-Methode (siehe Attribut <i>fritzbox-remote-phonebook-via</i>). Eine Liste aller m&ouml;glichen Werte kann &uuml;ber das <a href="#FB_CALLMONITOR_get">Get-Kommando</a> <i>showPhonebookIds</i> angezeigt werden.<br><br>
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (alle Telefonb&uuml;cher werden eingelesen)<br><br>
-    <li><a name="fritzbox-user">fritzbox-user</a></li>
+    <li><a name="FB_CALLMONITOR_fritzbox-user">fritzbox-user</a></li>
     Der Username f&uuml;r das Telnet-Interface, sofern das Telefonbuch direkt von der FritzBox geladen werden soll (Attribut: fritzbox-remote-phonebook). Dieses Attribut ist nur notwendig, wenn mehrere Benutzer auf der FritzBox konfiguriert sind.<br><br>
     </ul>
   <br>
  
-  <a name="FB_CALLMONITORevents"></a>
+  <a name="FB_CALLMONITOR_events"></a>
   <b>Generierte Events:</b><br><br>
   <ul>
   <li><b>event</b> (call|ring|connect|disconnect) - Welches Event wurde genau ausgel&ouml;st. ("call" =&gt; ausgehender Rufversuch, "ring" =&gt; eingehender Rufversuch, "connect" =&gt; Gespr&auml;ch ist zustande gekommen, "disconnect" =&gt; es wurde aufgelegt)</li>
