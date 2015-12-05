@@ -742,7 +742,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_home ne "-" );
                 $residentsDevs_home = $roommate
                   if ( $residentsDevs_home eq "-" );
-                $residents_home .= "," . $roommateName
+                $residents_home .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_home ne "-" );
                 $residents_home = $roommateName
                   if ( $roommateName ne "" && $residents_home eq "-" );
@@ -757,11 +757,11 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresentOwner ne "-" );
                 $residentsDevs_totalPresentOwner = $roommate
                   if ( $residentsDevs_totalPresentOwner eq "-" );
-                $residents_totalPresent .= "," . $roommateName
+                $residents_totalPresent .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent eq "-" );
-                $residents_totalPresentOwner .= "," . $roommateName
+                $residents_totalPresentOwner .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresentOwner ne "-" );
                 $residents_totalPresentOwner = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresentOwner eq "-" );
@@ -773,7 +773,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_gotosleep ne "-" );
                 $residentsDevs_gotosleep = $roommate
                   if ( $residentsDevs_gotosleep eq "-" );
-                $residents_gotosleep .= "," . $roommateName
+                $residents_gotosleep .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_gotosleep ne "-" );
                 $residents_gotosleep = $roommateName
                   if ( $roommateName ne "" && $residents_gotosleep eq "-" );
@@ -788,11 +788,11 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresentOwner ne "-" );
                 $residentsDevs_totalPresentOwner = $roommate
                   if ( $residentsDevs_totalPresentOwner eq "-" );
-                $residents_totalPresent .= "," . $roommateName
+                $residents_totalPresent .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent eq "-" );
-                $residents_totalPresentOwner .= "," . $roommateName
+                $residents_totalPresentOwner .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresentOwner ne "-" );
                 $residents_totalPresentOwner = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresentOwner eq "-" );
@@ -804,7 +804,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_asleep ne "-" );
                 $residentsDevs_asleep = $roommate
                   if ( $residentsDevs_asleep eq "-" );
-                $residents_asleep .= "," . $roommateName
+                $residents_asleep .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_asleep ne "-" );
                 $residents_asleep = $roommateName
                   if ( $roommateName ne "" && $residents_asleep eq "-" );
@@ -819,11 +819,11 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresentOwner ne "-" );
                 $residentsDevs_totalPresentOwner = $roommate
                   if ( $residentsDevs_totalPresentOwner eq "-" );
-                $residents_totalPresent .= "," . $roommateName
+                $residents_totalPresent .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent eq "-" );
-                $residents_totalPresentOwner .= "," . $roommateName
+                $residents_totalPresentOwner .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresentOwner ne "-" );
                 $residents_totalPresentOwner = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresentOwner eq "-" );
@@ -835,7 +835,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_awoken ne "-" );
                 $residentsDevs_awoken = $roommate
                   if ( $residentsDevs_awoken eq "-" );
-                $residents_awoken .= "," . $roommateName
+                $residents_awoken .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_awoken ne "-" );
                 $residents_awoken = $roommateName
                   if ( $roommateName ne "" && $residents_awoken eq "-" );
@@ -850,11 +850,11 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresentOwner ne "-" );
                 $residentsDevs_totalPresentOwner = $roommate
                   if ( $residentsDevs_totalPresentOwner eq "-" );
-                $residents_totalPresent .= "," . $roommateName
+                $residents_totalPresent .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresent eq "-" );
-                $residents_totalPresentOwner .= "," . $roommateName
+                $residents_totalPresentOwner .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalPresentOwner ne "-" );
                 $residents_totalPresentOwner = $roommateName
                   if ( $roommateName ne "" && $residents_totalPresentOwner eq "-" );
@@ -866,7 +866,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_absent ne "-" );
                 $residentsDevs_absent = $roommate
                   if ( $residentsDevs_absent eq "-" );
-                $residents_absent .= "," . $roommateName
+                $residents_absent .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_absent ne "-" );
                 $residents_absent = $roommateName
                   if ( $roommateName ne "" && $residents_absent eq "-" );
@@ -881,11 +881,11 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalAbsentOwner ne "-" );
                 $residentsDevs_totalAbsentOwner = $roommate
                   if ( $residentsDevs_totalAbsentOwner eq "-" );
-                $residents_totalAbsent .= "," . $roommateName
+                $residents_totalAbsent .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsent ne "-" );
                 $residents_totalAbsent = $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsent eq "-" );
-                $residents_totalAbsentOwner .= "," . $roommateName
+                $residents_totalAbsentOwner .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsentOwner ne "-" );
                 $residents_totalAbsentOwner = $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsentOwner eq "-" );
@@ -897,7 +897,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_gone ne "-" );
                 $residentsDevs_gone = $roommate
                   if ( $residentsDevs_gone eq "-" );
-                $residents_gone .= "," . $roommateName
+                $residents_gone .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_gone ne "-" );
                 $residents_gone = $roommateName
                   if ( $roommateName ne "" && $residents_gone eq "-" );
@@ -912,11 +912,11 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalAbsentOwner ne "-" );
                 $residentsDevs_totalAbsentOwner = $roommate
                   if ( $residentsDevs_totalAbsentOwner eq "-" );
-                $residents_totalAbsent .= "," . $roommateName
+                $residents_totalAbsent .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsent ne "-" );
                 $residents_totalAbsent = $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsent eq "-" );
-                $residents_totalAbsentOwner .= "," . $roommateName
+                $residents_totalAbsentOwner .= ", " . $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsentOwner ne "-" );
                 $residents_totalAbsentOwner = $roommateName
                   if ( $roommateName ne "" && $residents_totalAbsentOwner eq "-" );
@@ -931,7 +931,7 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $residentsDevs_wakeup ne "-" );
             $residentsDevs_wakeup = $roommate
               if ( $residentsDevs_wakeup eq "-" );
-            $residents_wakeup .= "," . $roommateName
+            $residents_wakeup .= ", " . $roommateName
               if ( $roommateName ne "" && $residents_wakeup ne "-" );
             $residents_wakeup = $roommateName
               if ( $roommateName ne "" && $residents_wakeup eq "-" );
@@ -944,7 +944,7 @@ sub RESIDENTS_UpdateReadings (@) {
             $residents_wayhome .= "," . $roommate
               if ( $residents_wayhome ne "-" );
             $residents_wayhome = $roommate if ( $residents_wayhome eq "-" );
-            $residents_wayhome .= "," . $roommateName
+            $residents_wayhome .= ", " . $roommateName
               if ( $roommateName ne "" && $residents_wayhome ne "-" );
             $residents_wayhome = $roommateName
               if ( $roommateName ne "" && $residents_wayhome eq "-" );
@@ -972,7 +972,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresentGuest ne "-" );
                 $residentsDevs_totalPresentGuest = $guest
                   if ( $residentsDevs_totalPresentGuest eq "-" );
-                $residents_totalPresentGuest .= "," . $guestName
+                $residents_totalPresentGuest .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalPresentGuest ne "-" );
                 $residents_totalPresentGuest = $guestName
@@ -983,7 +983,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresent ne "-" );
                 $residentsDevs_totalPresent = $guest
                   if ( $residentsDevs_totalPresent eq "-" );
-                $residents_totalPresent .= "," . $guestName
+                $residents_totalPresent .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $guestName
@@ -1002,7 +1002,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresentGuest ne "-" );
                 $residentsDevs_totalPresentGuest = $guest
                   if ( $residentsDevs_totalPresentGuest eq "-" );
-                $residents_totalPresentGuest .= "," . $guestName
+                $residents_totalPresentGuest .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalPresentGuest ne "-" );
                 $residents_totalPresentGuest = $guestName
@@ -1013,7 +1013,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresent ne "-" );
                 $residentsDevs_totalPresent = $guest
                   if ( $residentsDevs_totalPresent eq "-" );
-                $residents_totalPresent .= "," . $guestName
+                $residents_totalPresent .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $guestName
@@ -1032,7 +1032,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresentGuest ne "-" );
                 $residentsDevs_totalPresentGuest = $guest
                   if ( $residentsDevs_totalPresentGuest eq "-" );
-                $residents_totalPresentGuest .= "," . $guestName
+                $residents_totalPresentGuest .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalPresentGuest ne "-" );
                 $residents_totalPresentGuest = $guestName
@@ -1043,7 +1043,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresent ne "-" );
                 $residentsDevs_totalPresent = $guest
                   if ( $residentsDevs_totalPresent eq "-" );
-                $residents_totalPresent .= "," . $guestName
+                $residents_totalPresent .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $guestName
@@ -1062,7 +1062,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresentGuest ne "-" );
                 $residentsDevs_totalPresentGuest = $guest
                   if ( $residentsDevs_totalPresentGuest eq "-" );
-                $residents_totalPresentGuest .= "," . $guestName
+                $residents_totalPresentGuest .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalPresentGuest ne "-" );
                 $residents_totalPresentGuest = $guestName
@@ -1073,7 +1073,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalPresent ne "-" );
                 $residentsDevs_totalPresent = $guest
                   if ( $residentsDevs_totalPresent eq "-" );
-                $residents_totalPresent .= "," . $guestName
+                $residents_totalPresent .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalPresent ne "-" );
                 $residents_totalPresent = $guestName
@@ -1092,7 +1092,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalAbsentGuest ne "-" );
                 $residentsDevs_totalAbsentGuest = $guest
                   if ( $residentsDevs_totalAbsentGuest eq "-" );
-                $residents_totalAbsentGuest .= "," . $guestName
+                $residents_totalAbsentGuest .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalAbsentGuest ne "-" );
                 $residents_totalAbsentGuest = $guestName
@@ -1103,7 +1103,7 @@ sub RESIDENTS_UpdateReadings (@) {
                   if ( $residentsDevs_totalAbsent ne "-" );
                 $residentsDevs_totalAbsent = $guest
                   if ( $residentsDevs_totalAbsent eq "-" );
-                $residents_totalAbsent .= "," . $guestName
+                $residents_totalAbsent .= ", " . $guestName
                   if ( $guestName ne ""
                     && $residents_totalAbsent ne "-" );
                 $residents_totalAbsent = $guestName
@@ -1120,7 +1120,7 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $residentsDevs_wakeup ne "-" );
             $residentsDevs_wakeup = $guest
               if ( $residentsDevs_wakeup eq "-" );
-            $residents_wakeup .= "," . $guestName
+            $residents_wakeup .= ", " . $guestName
               if ( $guestName ne "" && $residents_wakeup ne "-" );
             $residents_wakeup = $guestName
               if ( $guestName ne "" && $residents_wakeup eq "-" );
@@ -1133,7 +1133,7 @@ sub RESIDENTS_UpdateReadings (@) {
             $residents_wayhome .= "," . $guest
               if ( $residents_wayhome ne "-" );
             $residents_wayhome = $guest if ( $residents_wayhome eq "-" );
-            $residents_wayhome .= "," . $guestName
+            $residents_wayhome .= ", " . $guestName
               if ( $guestName ne "" && $residents_wayhome ne "-" );
             $residents_wayhome = $guestName
               if ( $guestName ne "" && $residents_wayhome eq "-" );
@@ -1142,7 +1142,7 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $residentsDevs_totalAbsent ne "-" );
             $residentsDevs_totalAbsent = $guest
               if ( $residentsDevs_totalAbsent eq "-" );
-            $residents_totalAbsent .= "," . $guestName
+            $residents_totalAbsent .= ", " . $guestName
               if ( $guestName ne ""
                 && $residents_totalAbsent ne "-" );
             $residents_totalAbsent = $guestName
