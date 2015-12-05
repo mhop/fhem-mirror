@@ -1,0 +1,16 @@
+# Created by FHEM/98_SVG.pm, 2015-10-30 23:06:33
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics 
+set y2tics 
+set grid
+set ylabel ""
+set y2label "Temperatur"
+
+#logRlWohn1 4:OG_RL_Wohn1.*:0:
+
+plot "<IN>" using 1:2 axes x1y2 title 'Wohn1' ls l0 lw 1 with lines

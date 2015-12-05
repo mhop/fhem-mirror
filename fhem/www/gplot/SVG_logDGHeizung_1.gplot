@@ -1,0 +1,16 @@
+# Created by FHEM/98_SVG.pm, 2015-11-04 22:46:57
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics 
+set y2tics 
+set grid
+set ylabel ""
+set y2label "Temperature"
+
+#logDGHeizung 4:DG_VL.*:0:
+
+plot "<IN>" using 1:2 axes x1y2 title 'VL' ls l0 lw 1 with lines

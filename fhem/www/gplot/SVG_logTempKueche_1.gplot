@@ -1,0 +1,16 @@
+# Created by FHEM/98_SVG.pm, 2015-12-04 20:26:59
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics 
+set y2tics 
+set grid
+set ylabel "Humidity"
+set y2label "Temperature"
+
+#logTempKueche 4:tempKueche.temperature\x3a::
+
+plot "<IN>" using 1:2 axes x1y2 title 'Line 1' ls l0 lw 1 with lines

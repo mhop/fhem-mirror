@@ -1,0 +1,16 @@
+# Created by FHEM/98_SVG.pm, 2015-11-28 19:38:06
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set title '<TL>'
+set ytics 
+set y2tics 
+set grid
+set ylabel ""
+set y2label "Temperature"
+
+#logTempStudio 4:tempStudio.temperature\x3a::
+
+plot "<IN>" using 1:2 axes x1y2 title 'Studio' ls l0 lw 1 with lines

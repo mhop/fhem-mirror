@@ -1,0 +1,21 @@
+############################
+# Display the power reported by the EM1010
+# Corresponding FileLog definition:
+# define ememlog FileLog /var/log/fhem/emem-%Y.log emem:power.*
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+
+set title '<TL>'
+set ylabel "Humidity"
+set y2label "Temperature"
+set grid
+set ytics
+set y2tics
+
+#FileLog 4:RegExp::
+
+plot "<IN>" using 1:2 title 'Line 1' with lines
