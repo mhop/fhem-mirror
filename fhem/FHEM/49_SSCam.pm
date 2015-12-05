@@ -180,15 +180,15 @@ sub camstart {
   
   # API-Pfade und MaxVersions ermitteln
   ($hash, $success) = &getapisites($hash);
-  unless ($success == 1) {return};
+  unless ($success) {return};
   
   # Login und SID ermitteln
   ($sid, $success)  = &serverlogin($hash);
-  unless ($success == 1) {return};
+  unless ($success) {return};
 
   # Kamera-ID anhand des Kamaeranamens ermitteln
   ($camid, $success) = &getcamid($hash,$sid);
-  unless ($success == 1) {&serverlogout($hash,$sid); return};
+  unless ($success) {&serverlogout($hash,$sid); return};
 
   # Start der Aufnahme
   $apiextrecpath   = $hash->{APIEXTRECPATH};
@@ -199,7 +199,7 @@ sub camstart {
   
   # Evaluiere ob Daten im JSON-Format empfangen
   ($hash, $success) = &evaljson($hash,$myjson,$url);
-  unless ($success == 1) {&serverlogout($hash,$sid); return};
+  unless ($success) {&serverlogout($hash,$sid); return};
   
   # Logausgabe
   $logstr = "URL call: $url";
@@ -212,7 +212,7 @@ sub camstart {
   $success = $data->{'success'};
   
  
-  if ($success == 1) {
+  if ($success) {
        
        # die URL konnte erfolgreich aufgerufen werden
        # Setreading 
@@ -299,14 +299,14 @@ sub camstop {
   
   # API-Pfade und MaxVersions ermitteln
   ($hash, $success) = &getapisites($hash);
-  unless ($success == 1) {return};
+  unless ($success) {return};
   
   # SID ermitteln nach Login
   ($sid, $success)  = &serverlogin($hash);
-  unless ($success == 1) {return};
+  unless ($success) {return};
 
   ($camid, $success) = &getcamid($hash,$sid);
-  unless ($success == 1) {&serverlogout($hash,$sid); return};
+  unless ($success) {&serverlogout($hash,$sid); return};
 
   $apiextrecpath   = $hash->{APIEXTRECPATH};
   $apiextrecmaxver = $hash->{APIEXTRECMAXVER};
@@ -317,7 +317,7 @@ sub camstop {
   
   # Evaluiere ob Daten im JSON-Format empfangen
   ($hash, $success) = &evaljson($hash,$myjson,$url);
-  unless ($success == 1) {&serverlogout($hash,$sid); return};
+  unless ($success) {&serverlogout($hash,$sid); return};
   
   # Logausgabe
   $logstr = "URL call: $url";
@@ -329,7 +329,7 @@ sub camstop {
   my $data = decode_json($myjson);
   $success = $data->{'success'};
 
-  if ($success == 1) {
+  if ($success) {
        # die URL konnte erfolgreich aufgerufen werden
        
        # Setreading 
@@ -405,7 +405,7 @@ sub serverlogin {
   
   # Evaluiere ob Daten im JSON-Format empfangen
   ($hash, $success) = &evaljson($hash,$myjson,$loginurl);
-  unless ($success == 1) {return($sid, $success)};
+  unless ($success) {return($sid, $success)};
   
   # Logausgabe
   $logstr = "URL call: $loginurl";
@@ -418,7 +418,7 @@ sub serverlogin {
   $success = $data->{'success'};
   
   # der login war erfolgreich
-  if ($success == 1) {
+  if ($success) {
        $sid = $data->{'data'}->{'sid'};
        
        # Setreading 
@@ -486,7 +486,7 @@ sub serverlogout {
  
  # Evaluiere ob Daten im JSON-Format empfangen
  ($hash, $success) = &evaljson($hash,$myjson,$logouturl);
- unless ($success == 1) {return};
+ unless ($success) {return};
  
  # Logausgabe
  $logstr = "URL call: $logouturl";
@@ -498,7 +498,7 @@ sub serverlogout {
  $data = decode_json($myjson);
  $success = $data->{'success'};
 
- if ($success == 1)  {
+ if ($success)  {
     # die URL konnte erfolgreich aufgerufen werden
     
     # Logausgabe
@@ -588,7 +588,7 @@ sub getcamid {
 
   # Evaluiere ob Daten im JSON-Format empfangen
   ($hash, $success) = &evaljson($hash,$myjson,$url);
-  unless ($success == 1) {return($camid,$success)};
+  unless ($success) {return($camid,$success)};
   
   # Logausgabe
   $logstr = "URL call: $url";
@@ -601,7 +601,7 @@ sub getcamid {
   $success = $data->{'success'};
   
 
-       if ($success == 1) {
+       if ($success) {
        # die Liste aller Kameras konnte ausgelesen werden
        # Anzahl der definierten Kameras ist in Var "total"
        $camcount = $data->{'data'}->{'total'};
@@ -624,7 +624,7 @@ sub getcamid {
                  # Setreading 
                  readingsBeginUpdate($hash);
                  readingsBulkUpdate($hash,"Errorcode","none");
-                 readingsBulkUpdate($hash,"Error","Kamera(ID) nicht gefunden");
+                 readingsBulkUpdate($hash,"Error","Camera(ID) not found in Surveillance Station");
                  readingsEndUpdate($hash, 1);
                                   
                  # Logausgabe
@@ -838,7 +838,7 @@ sub getapisites {
    
    # Evaluiere ob Daten im JSON-Format empfangen
    ($hash, $success) = &evaljson($hash,$myjson,$url);
-   unless ($success == 1) {return($hash,$success)};
+   unless ($success) {return($hash,$success)};
    
    # Logausgabe
    $logstr = "URL call: $url";
@@ -852,7 +852,7 @@ sub getapisites {
    $success = $data->{'success'};
    
    
-   if ($success == 1) {
+   if ($success) {
        
        # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
        
