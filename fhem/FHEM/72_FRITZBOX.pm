@@ -4860,6 +4860,11 @@ sub FRITZBOX_fritztris($)
       <li><b>fon</b><i>1</i><b>_intern</b> - Internal number of the analog FON port <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_out</b> - Outgoing number of the analog FON port <i>1</i></li>
       <br>
+      <li><b>gsm_internet</b> - connection to internet established via GSM stick</li>
+      <li><b>gsm_rssi</b> - received signal strength indication (0-100)</li>
+      <li><b>gsm_state</b> - state of the connection to the GSM network</li>
+      <li><b>gsm_technology</b> - technology used for internet connections via GSM (GPRS, EDGE, UMTS, HSPA)</li>
+      <br>
       <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an <u>active</u> network device</li>
       <br>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
@@ -5192,6 +5197,11 @@ sub FRITZBOX_fritztris($)
       <li><b>fon</b><i>1</i> - Name des analogen Telefonanschlusses <i>1</i> an der Fritz!Box</li>
       <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
+      <br>
+      <li><b>gsm_internet</b> - Internetverbindung errichtet über Mobilfunk-Stick </li>
+      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalstärke (0-100)</li>
+      <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
+      <li><b>gsm_technology</b> - Technologie die für eine Internetverbindung über GSM genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
       <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
       <br>
