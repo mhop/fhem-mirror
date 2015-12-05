@@ -1964,8 +1964,8 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer (bei eingehenden/ausgehenden Anrufen).
     Dieses Attribut enth&auml;lt eine komma-separierte Liste mit allen Anbietern die f&uuml;r eine R&uuml;ckw&auml;rtssuche benutzt werden sollen.
-    Die R&uuml;ckw&auml;rtssuche prüft in der gegebenen Reihenfolge (von links nach rechts) ob der entsprechende Anbieter (Telefonbuch, Textdatei oder Internetanbieter) die Rufnummer auflösen können.
-    Das erste Resultat was dabei gefunden wird, wird als Ergebnis für die R&uuml;ckw&auml;rtssuche verwendet.
+    Die R&uuml;ckw&auml;rtssuche pr&uuml;ft in der gegebenen Reihenfolge (von links nach rechts) ob der entsprechende Anbieter (Telefonbuch, Textdatei oder Internetanbieter) die Rufnummer aufl&ouml;sen k&ouml;nnen.
+    Das erste Resultat was dabei gefunden wird, wird als Ergebnis f&uuml;r die R&uuml;ckw&auml;rtssuche verwendet.
     Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher f&uuml;r die R&uuml;ckw&auml;rtssuche verwendet werden soll.
     Der Anbieter "textfile" verwendet die nutzereigene Textdatei, sofern definiert (siehe Attribut reverse-search-text-file).
     Der Anbieter "phonebook" verwendet das Telefonbuch der FritzBox (siehe Attribut reverse-search-phonebook-file oder fritzbox-remote-phonebook).<br><br>
@@ -1982,7 +1982,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     und beim n&auml;chsten Start von FHEM wieder in den Cache geladen und genutzt.
     <br><br>
     <li><a name="FB_CALLMONITOR_reverse-search-cache-file">reverse-search-text-file</a> &lt;Dateipfad&gt;</li>
-    L&auml;dt eine nutzereigene Textdatei welche eine eigene Namenszuordnungen für Rufnummern enth&auml;lt. Diese Datei enth&auml;lt zeilenweise komma-separierte Werte nach folgendem Schema:
+    L&auml;dt eine nutzereigene Textdatei welche eine eigene Namenszuordnungen f&uuml;r Rufnummern enth&auml;lt. Diese Datei enth&auml;lt zeilenweise komma-separierte Werte nach folgendem Schema:
     <pre>
     &lt;Nummer1&gt;,&lt;Name1&gt;
     &lt;Nummer2&gt;,&lt;Name2&gt;
