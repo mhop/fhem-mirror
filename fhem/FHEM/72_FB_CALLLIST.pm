@@ -1104,7 +1104,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Default Value is 0 (activated)<br><br>
     <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...</li>
     Optional attribute to disable the call list update during a specific time interval. The attribute contains a space separated list of HH:MM tupels.
-    If the current time is between the two time specifications, the callist will be disabled and no longer updated.
+    If the current time is between any of these time specifications, the callist will be disabled and no longer updated.
     Instead of HH:MM you can also specify HH or HH:MM:SS. 
     <br><br>To specify an interval spawning midnight, you have to specify two intervals, e.g.:
     <pre>23:00-24:00 00:00-01:00</pre>
@@ -1295,14 +1295,14 @@ sub FB_CALLLIST_returnTableHeader($)
     <br><br>
     M&ouml;gliche Werte: 0 => Anrufliste ist aktiv, 1 => Anrufliste ist deaktiviert.<br>
     Standardwert ist 0 (aktiv)<br><br>
-    <li><a name="FB_CALLLIST_disableForIntervals">disableForIntervals</a></li>
-    Optionales Attribut zur Deaktivierung der Anrufliste innerhalb von bestimten Zeitintervallen.
+    <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a></li>
+    Optionales Attribut zur Deaktivierung der Anrufliste innerhalb von bestimmten Zeitintervallen.
     Das Argument ist eine Leerzeichen-getrennte Liste von Minuszeichen-getrennten HH:MM Paaren (Stunde : Minute).
-    Falls die aktuelle Uhrzeit zwischen diese Werte f&auml;llt, dann wird die Ausf&uuml;hrung, wie beim disable, ausgesetzt.
+    Falls die aktuelle Uhrzeit zwischen diese Werte f&auml;llt, dann wird die Ausf&uuml;hrung, wie bei <a href="#FB_CALLLIST_disable">disable</a>, ausgesetzt.
     Statt HH:MM kann man auch HH oder HH:MM:SS angeben.<br><br>
     Um einen Intervall um Mitternacht zu spezifizieren, muss man zwei einzelne Intervalle angeben, z.Bsp.:
     <pre>23:00-24:00 00:00-01:00</pre>
-    Standardwert ist <i>nicht gesetzt</i> (aktiv)<br><br>
+    Standardwert ist <i>nicht gesetzt</i> (dauerhaft aktiv)<br><br>
     <li><a name="FB_CALLLIST_create-readings">create-readings</a> 0,1</li>
     Sofern aktiviert, werden f&uuml;r alle sichtbaren Anrufe in der Liste entsprechende Readings und Events erzeugt.
     Es wird empfohlen das Attribut <a href="#event-on-change-reading">event-on-change-reading</a> auf den Wert <code>.*</code> zu stellen um die hohe Anzahl an Events in bestimmten F&auml;llen zu minimieren.<br><br>
