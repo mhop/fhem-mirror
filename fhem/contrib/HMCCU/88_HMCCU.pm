@@ -950,6 +950,7 @@ foreach(devid, root.Devices().EnumUsedIDs())
 	foreach my $hmdef (split /\n/,$response) {
 		my @hmdata = split /;/,$hmdef;
 		if ($hmdata[0] eq 'D') {
+			# 1=Interface 2=Device-Address 3=Device-Name 4=Device-Type 5=Channel-Count
 			$HMCCU_Devices{$hmdata[2]}{name} = $hmdata[3];
 			$HMCCU_Devices{$hmdata[2]}{type} = $hmdata[4];
 			$HMCCU_Devices{$hmdata[2]}{interface} = $hmdata[1];
@@ -960,12 +961,29 @@ foreach(devid, root.Devices().EnumUsedIDs())
 			$count++;
 		}
 		elsif ($hmdata[0] eq 'C') {
+			# 1=Channel-Address 2=Channel-Name
 			$HMCCU_Devices{$hmdata[1]}{name} = $hmdata[2];
 			$HMCCU_Devices{$hmdata[1]}{addtype} = 'chn';
 			$HMCCU_Addresses{$hmdata[2]}{address} = $hmdata[1];
 			$HMCCU_Addresses{$hmdata[2]}{addtype} = 'chn';
 			$count++;
 		}
+	}
+
+	# Update client devices
+	foreach my $d (keys %defs) {
+		# Get hash of client device
+		my $ch = $defs{$d};
+		next if (!defined ($ch->{IODev}) || !defined ($ch->{ccuaddr}));
+		my $add = $ch->{ccuaddr};
+
+		# Update device or channel attributes if it has changed in CCU
+		$ch->{ccuname} = $HMCCU_Devices{$add}{name}
+		   if (!defined ($ch->{ccuname}) || $ch->{ccuname} ne $HMCCU_Devices{$add}{name});
+		$ch->{ccuif} = $HMCCU_Devices{$add}{interface}
+		   if (!defined ($ch->{ccuif}) || $ch->{ccuif} ne $HMCCU_Devices{$add}{interface});
+		$ch->{ccutype} = $HMCCU_Devices{$add}{type}
+		   if (!defined ($ch->{ccutype}) || $ch->{ccutype} ne $HMCCU_Devices{$add}{type});
 	}
 
 	return $count;
