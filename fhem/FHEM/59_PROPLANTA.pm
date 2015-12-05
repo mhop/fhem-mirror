@@ -408,8 +408,8 @@ my $MODUL          = "PROPLANTA";
    my %url_template_1 =( "de" => "http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html"
    , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/LOKALERORT/"
    , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/LOKALERORT/"
-   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/LOKALERORT/"
-   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/LOKALERORT/"
+   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/LOKALERORT.html"
+   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/LOKALERORT.html"
    );
 
    my %url_template_2 = ( "de" => "http://www.proplanta.de/Wetter/profi-wetter.php?SITEID=60&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter&wT="
