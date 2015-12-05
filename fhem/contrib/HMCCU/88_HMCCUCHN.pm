@@ -79,14 +79,14 @@ sub HMCCUCHN_Define ($@)
 		# CCU Channel address with interface
 		$hash->{ccuif} = $1;
 		$hash->{ccuaddr} = $2;
-		$hash->{ccuname} = HMCCU_GetDeviceName ($hash->{ccuaddr}, '');
+		$hash->{ccuname} = HMCCU_GetChannelName ($hash->{ccuaddr}, '');
 		return "CCU device name not found for channel address $devspec" if ($hash->{ccuname} eq '');
 	}
 	elsif ($devspec =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]+$/) {
 		# CCU Channel address
 		$hash->{ccuaddr} = $devspec;
 		$hash->{ccuif} = HMCCU_GetDeviceInterface ($hash->{ccuaddr}, 'BidCos-RF');
-		$hash->{ccuname} = HMCCU_GetDeviceName ($devspec, '');
+		$hash->{ccuname} = HMCCU_GetChannelName ($devspec, '');
 		return "CCU device name not found for channel address $devspec" if ($hash->{ccuname} eq '');
 	}
 	else {
