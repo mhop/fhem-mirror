@@ -908,19 +908,22 @@ RESCAN:
 }
 
 ###############
-# this is not elegant
+# this is not elegant. Assume, that current seek pos is after a cr/nl
 sub
 seekBackOneLine($$)
 {
   my ($fh, $pos) = @_;
   my $buf;
-  $pos -= 2; # skip current CR/NL
+
+  while($pos > 0) { # skip current CR/NL
+    $fh->seek(--$pos, 0);
+    $fh->read($buf, 1);
+    last if($buf ne "\n" || $buf ne "\r");
+  }
   $fh->seek($pos, 0);
+
   while($pos > 0 && $fh->read($buf, 1)) {
-    if($buf eq "\n" || $buf eq "\r") {
-      $fh->seek(++$pos, 0);
-      return $pos;
-    }
+    return ++$pos if($buf eq "\n" || $buf eq "\r");
     $fh->seek(--$pos, 0);
   }
   return 0;
@@ -943,7 +946,7 @@ FileLog_seekTo($$$$$)
   my $upper = $fh->tell;
 
   my ($lower, $next, $last) = (0, $upper/2, -1);
-  while() {                                             # Binary search
+  for(my $iter=0; $iter<200; $iter++) {       # Binary search
     if($next == $last) {
       $fh->seek($next, 0);
       last;
