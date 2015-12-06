@@ -191,7 +191,7 @@ ZWCUL_SimpleWrite($$)
   return if(!$hash);
 
   my $name = $hash->{NAME};
-  Log3 $name, 1, "SW: $msg";
+  Log3 $name, 5, "SW: $msg";
   $msg .= "\n";
 
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
