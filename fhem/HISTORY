@@ -656,3 +656,7 @@
 
 - Sun Nov 29 2015 (DS_Starter)
   - added new module 49_SSCam to trigger records of cameras within Synology Surveillance Station
+
+- Sun Dec 06 2015 (Benni)
+  - added new module 98_rssFeed to get data from rss news feeds
+  
