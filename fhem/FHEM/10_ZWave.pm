@@ -9,6 +9,7 @@ use SetExtensions;
 use Compress::Zlib;
 use Time::HiRes qw( gettimeofday );
 use HttpUtils;
+use ZWLib;
 
 sub ZWave_Cmd($$@);
 sub ZWave_Get($@);
@@ -20,11 +21,9 @@ sub ZWave_secStart($);
 sub ZWave_secEnd($);
 sub ZWave_configParseModel($;$);
 
-use vars qw(%zw_func_id);
-use vars qw(%zw_type6);
 use vars qw($FW_ME $FW_tp $FW_ss);
+use vars qw(%zwave_id2class);
 
-my %zwave_id2class;
 my %zwave_class = (
   NO_OPERATION             => { id => '00' },
   BASIC                    => { id => '20',
@@ -525,7 +524,7 @@ ZWave_Define($$)
   $modules{ZWave}{defptr}{"$homeId $id"} = $hash;
   my $proposed;
   if($init_done) { # Use the right device while inclusion is running
-    for my $p (devspec2array("TYPE=ZWDongle|FHEM2FHEM")) {
+    for my $p (devspec2array("TYPE=ZWDongle|ZWCUL|FHEM2FHEM")) {
       $proposed = $p if($defs{$p}{homeId} && $defs{$p}{homeId} eq $homeId);
     }
   }
@@ -2597,7 +2596,7 @@ ZWave_wakeupTimer($$)
       my $nodeId = $hash->{nodeIdHex};
       my $cmdEf  = (AttrVal($hash->{NAME},"noExplorerFrames",0)==0 ? "25":"05");
       # wakeupNoMoreInformation
-      IOWrite($hash, "00", "13${nodeId}028408${cmdEf}$nodeId");
+      IOWrite($hash, $hash->{homeId}, "0013${nodeId}028408${cmdEf}$nodeId");
     }
     delete $hash->{wakeupAlive};
 
@@ -2634,7 +2633,7 @@ ZWave_processSendStack($)
     return;
   }
 
-  IOWrite($hash, "00", $ss->[0]);
+  IOWrite($hash, $hash->{homeId}, "00".$ss->[0]);
   $ss->[0] = "sent:".$ss->[0];
 
   $hash->{lastMsgSent} = gettimeofday();
@@ -2702,7 +2701,7 @@ ZWave_Parse($$@)
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     my $name = ($hash ? $hash->{NAME} : "unknown");
 
-    $msg = ZWDongle_parseNeighborList($iodev, $data);
+    $msg = zwlib_parseNeighborList($iodev, $data);
 
     readingsSingleUpdate($hash, "neighborList", $msg, 1) if($hash);
     return $msg if($srcCmd);
