@@ -51,6 +51,20 @@ my $db = {
       },
     },
 
+    'SB_PLAYER' => {
+      'Normal'    => 'set %DEVICE% talk |%TITLE%| %MSG%',
+      'ShortPrio' => 'set %DEVICE% talk |%TITLE%| %MSGSH%',
+      'Short'     => 'set %DEVICE% talk |%TITLE%| %MSGSH%',
+      'defaultValues' => {
+        'ShortPrio' => {
+          'MSGSH' => 'Achtung!',
+        },
+        'Short' => {
+          'MSGSH' => '',
+        },
+      },
+    },
+
     'SONOSPLAYER' => {
       'Normal'    => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSG%',
       'ShortPrio' => 'set %DEVICE% Speak %VOLUME% %LANG% |%TITLE%| %MSGSH%',
