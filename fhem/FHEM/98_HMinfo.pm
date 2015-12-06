@@ -370,9 +370,11 @@ sub HMinfo_regCheck(@) { ######################################################
     }
     if ($ehash->{helper}{shadowReg}){
       foreach my $rl (keys %{$ehash->{helper}{shadowReg}}){
+        my $pre =  (CUL_HM_getAttrInt($eName,"expert") & 0x02)?"":".";#raw register on
+
         delete $ehash->{helper}{shadowReg}{$rl} 
-              if (   (   $ehash->{READINGS}{$rl} 
-                      && $ehash->{READINGS}{$rl}{VAL} eq $ehash->{helper}{shadowReg}{$rl}
+              if (   (   $ehash->{READINGS}{$pre.$rl} 
+                      && $ehash->{READINGS}{$pre.$rl}{VAL} eq $ehash->{helper}{shadowReg}{$rl}
                       )                                  # content is already displayed
                    ||(!$ehash->{helper}{shadowReg}{$rl}) # content is missing
                    );
