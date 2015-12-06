@@ -417,7 +417,8 @@ FW_Read($$)
       my $pid = fhemFork();
       if($pid) { # success, parent
 	use constant PRIO_PROCESS => 0;
-	setpriority(PRIO_PROCESS, $pid, getpriority(PRIO_PROCESS,$pid) + $pf);
+	setpriority(PRIO_PROCESS, $pid, getpriority(PRIO_PROCESS,$pid) + $pf)
+          if($^O !~ m/Win/);
         # a) while child writes a new request might arrive if client uses
         # pipelining or
         # b) parent doesn't know about ssl-session changes due to child writing
