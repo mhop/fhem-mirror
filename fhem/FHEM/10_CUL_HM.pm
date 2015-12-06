@@ -1478,6 +1478,9 @@ sub CUL_HM_Parse($$) {#########################################################
 
     if(  ($mh{mTyp} eq "100A") #info-level/
        ||($mh{mTyp} eq "0201")){#ackInfo
+      my %errTbl=( 0=>"ok", 1=>"ValveTight",  2=>"adjustRangeTooLarge"
+                  ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
+                  ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
 
       my ($err       ,$ctrlMode  ,$setTemp          ,$bTime,$pTemp,$pStart,$pEnd,$chn,$uk0,$lBat,$actTemp,$vp) = 
          (hex($mI[3]),hex($mI[5]),hex($mI[1].$mI[2]),"-"    ,"-"   ,"-"    ,"-"                             );
@@ -1496,6 +1499,8 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{devH},1,"measured-temp:$actTemp"];
         push @evtEt,[$mh{devH},1,"batteryLevel:$bat"];
         push @evtEt,[$mh{devH},1,"actuator:$vp"];
+        $lBat = "low" if ($err == 6); # 
+
         #weather Chan
         my $wHash = $modules{CUL_HM}{defptr}{$mh{src}."01"}; 
         if ($wHash){
@@ -1509,8 +1514,8 @@ sub CUL_HM_Parse($$) {#########################################################
         $lBat       = $err&0x80?"low":"ok"; # prior to changes of $err!
         $err        = ($err        >> 1);
         $mh{shash} = $modules{CUL_HM}{defptr}{"$mh{src}$chn"} if($modules{CUL_HM}{defptr}{"$mh{src}$chn"});
-        $actTemp = ReadingsVal($mh{devN},"measured-temp","");
-        $vp      = ReadingsVal($mh{devN},"actuator","");
+        $actTemp   = ReadingsVal($mh{devN},"measured-temp","");
+        $vp        = ReadingsVal($mh{devN},"actuator","");
       }
       delete $mh{devH}->{helper}{getBatState};
       $setTemp    =(($setTemp        ) & 0x3f )/2;
@@ -1543,9 +1548,6 @@ sub CUL_HM_Parse($$) {#########################################################
         $bTime     = ((hex($mI[5])  ) & 0x3f)." min";
       }
 
-      my %errTbl=( 0=>"ok", 1=>"ValveTight",  2=>"adjustRangeTooLarge"
-                  ,3=>"adjustRangeTooSmall" , 4=>"communicationERR"
-                  ,5=>"unknown", 6=>"lowBat", 7=>"ValveErrorPosition" );
       my $climaHash = CUL_HM_id2Hash($mh{src}."04");# always to Clima channel
       push @evtEt,[$climaHash,1,"desired-temp:$setTemp"  ];
       push @evtEt,[$climaHash,1,"controlMode:$ctlTbl{$ctrlMode}"];
@@ -1556,7 +1558,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$climaHash,1,"partyTemp:$pTemp"];
       #push @evtEt,[$mh{shash},1,"unknown0:$uk0"];
       #push @evtEt,[$mh{shash},1,"unknown1:".$2 if ($p =~ m/^0A(.10)(.*)/)];
-      push @evtEt,[$mh{devH},1,"motorErr:$errTbl{$err}" ];
+      push @evtEt,[$mh{devH},1,"motorErr:$errTbl{$err}" ] if($mh{mTp} eq "10");
       push @evtEt,[$mh{devH},1,"battery:$lBat"] if ($lBat);
       push @evtEt,[$mh{devH},1,"desired-temp:$setTemp"];
     }
@@ -1852,7 +1854,7 @@ sub CUL_HM_Parse($$) {#########################################################
                  if ($hHash && $hHash->{helper}{param}{offAtPon});
     }
   }
-  elsif($mh{st} =~ m /^(switch|dimmer|blindActuator)$/) {######################
+  elsif($mh{st} =~ m /^(switch|dimmer|blindActuator|rgb)$/) {##################
     if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
         ($mh{mTyp} eq "1006")) { #    or Info_Status message here
 
@@ -1915,9 +1917,9 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
       push @evtEt,[$mh{cHash},1,"state:".(($physLvl ne $val)?"chn:$vs phys:$physLvl":$vs)];
       my $eventName = "unknown"; # different names for events
-      if   ($mh{st} eq "switch")       {$eventName = "switch";}  
-      elsif($mh{st} eq "blindActuator"){$eventName = "motor" ;}  
-      elsif($mh{st} eq "dimmer")       {$eventName = "dim"   ;}
+      if   ($mh{st} eq "switch")           {$eventName = "switch";}  
+      elsif($mh{st} eq "blindActuator")    {$eventName = "motor" ;}  
+      elsif($mh{st} =~ m /^(dimmer|rgb)$/) {$eventName = "dim"   ;}
       
       my $action; #determine action
       push @evtEt,[$mh{cHash},1,"timedOn:".(($err&0x40)?"running":"off")];
@@ -1962,7 +1964,7 @@ sub CUL_HM_Parse($$) {#########################################################
         delete $mh{cHash}->{helper}{stateUpdatDly};
       }
  
-      if ($mh{st} eq "dimmer"){
+      if    ($mh{st} eq "dimmer"){
         push @evtEt,[$mh{cHash},1,"overload:".(($err&0x02)?"on":"off")];
         push @evtEt,[$mh{cHash},1,"overheat:".(($err&0x04)?"on":"off")];
         push @evtEt,[$mh{cHash},1,"reduced:" .(($err&0x08)?"on":"off")];
