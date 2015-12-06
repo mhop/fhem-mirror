@@ -1575,9 +1575,9 @@ CommandSet($$)
   foreach my $sdev (devspec2array($a[0], $cl)) {
 
     $a[0] = $sdev;
-    $defs{$sdev}->{CL} = $cl;
+    $defs{$sdev}->{CL} = $cl if($defs{$sdev});
     my $ret = DoSet(@a);
-    delete $defs{$sdev}->{CL};
+    delete $defs{$sdev}->{CL} if($defs{$sdev});
     push @rets, $ret if($ret);
 
   }
