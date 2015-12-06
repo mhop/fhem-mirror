@@ -1021,6 +1021,7 @@ sub btIP_evalLayout {
 	      $params{yy} = $y1+$radius;
 	      $filled  //= 0; 
 	      $stroked //= 0;
+	      $link //= "";
           $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemCircle($id,$x1,$y1,$radius,$filled,$stroked,$link,%params);
 	    }
@@ -1049,6 +1050,7 @@ sub btIP_evalLayout {
 	      $params{yy} = $y1+$ry;
 	      $filled  //= 0;
 	      $stroked //= 0;
+	      $link //= "";
           $link = AnalyzePerlCommand(undef,$link);
 	      $svg .= btIP_itemEllipse($id,$x1,$y1,$rx,$ry,$filled,$stroked,$link,%params);
 	    }
