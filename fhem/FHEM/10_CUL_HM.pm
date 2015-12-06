@@ -1499,7 +1499,8 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{devH},1,"measured-temp:$actTemp"];
         push @evtEt,[$mh{devH},1,"batteryLevel:$bat"];
         push @evtEt,[$mh{devH},1,"actuator:$vp"];
-        $lBat = "low" if ($err == 6); # 
+        if   ($err == 6){ $lBat = "low";} 
+        elsif($err == 0){ $lBat = "ok";}# we cannot determin bat if any other state!
 
         #weather Chan
         my $wHash = $modules{CUL_HM}{defptr}{$mh{src}."01"}; 
