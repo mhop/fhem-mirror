@@ -105,6 +105,7 @@ sub HMCCUDEV_Define ($@)
 	return "CCU device name not found for $devspec" if ($hash->{ccuname} eq '');
 
 	$hash->{ccutype} = HMCCU_GetDeviceType ($hash->{ccuaddr}, '');
+	$hash->{channels} = HMCCU_GetDeviceChannels ($hash->{ccuaddr});
 	$hash->{statevals} = 'devstate';
 
 	my $n = 0;
@@ -201,7 +202,7 @@ sub HMCCUDEV_Set ($@)
 		if (!defined ($objname) || $objname !~ /^[0-9]+\..+$/ || !defined ($objvalue)) {
 			return HMCCUDEV_SetError ($hash, "Usage: set <name> datapoint <channel-number>.<datapoint> <value> [...]");
 		}
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1);
 
 		# Build datapoint address
 		$objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$objname;
@@ -222,7 +223,7 @@ sub HMCCUDEV_Set ($@)
 		return HMCCUDEV_SetError ($hash, "No state channel specified") if ($statechannel eq '');
 		return HMCCUDEV_SetError ($hash, "Usage: set <name> devstate <value> [...]") if (!defined ($objvalue));
 
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1);
 
 		# Build datapoint address
 		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$statechannel.'.'.$statedatapoint;
@@ -313,7 +314,12 @@ sub HMCCUDEV_Get ($@)
 		my @chnlist;
 		foreach my $objname (@a) {
 			last if (!defined ($objname));
-			return HMCCUDEV_SetError ($hash, "Invalid channel number: $objname") if ($objname !~ /^[0-9]+/);
+			if ($objname =~ /^([0-9]+)/ && exists ($hash->{channels})) {
+				return HMCCUDEV_SetError ($hash, "Invalid channel number: $objname") if ($1 >= $hash->{channels});
+			}
+			else {
+				return HMCCUDEV_SetError ($hash, "Invalid channel number: $objname");
+			}
 			push (@chnlist, $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$objname);
 		}
 		if (@chnlist == 0) {
