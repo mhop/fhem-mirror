@@ -310,9 +310,13 @@ my %zwave_class = (
                wakeupNoMoreInformation => "08" },
     get   => { wakeupInterval => "05",
                wakeupIntervalCapabilities => "09" },
-    parse => { "028407"    => 'wakeup:notification',
+    parse => { "..8404(.*)"=> '"cmdSet:wakeupInterval $1"',
+               "..8405"    => 'cmdGet:wakeupInterval',
                "..8406(......)(..)" =>
                          '"wakeupReport:interval ".hex($1)." target ".hex($2)',
+               "..8407"    => 'wakeup:notification',
+               "..8408"    => 'cmdSet:wakeupNoMoreInformation',
+               "..8409"    => 'cmdGet:wakeupIntervalCapabilities',
                "..840a(......)(......)(......)(......)" =>
                          '"wakeupIntervalCapabilitiesReport:min ".hex($1).'.
                          '" max ".hex($2)." default ".hex($3)." step ".hex($4)'
@@ -331,7 +335,8 @@ my %zwave_class = (
     set   => { versionClassRequest => 'ZWave_versionClassRequest($hash,"%s")'},
     get   => { version      => "11",
                versionClass => 'ZWave_versionClassGet("%s")' },
-    parse => { "078612(..........)" => 'sprintf("version:Lib %d Prot '.
+    parse => { "028611"             => "cmdGet:version",
+               "078612(..........)" => 'sprintf("version:Lib %d Prot '.
                 '%d.%d App %d.%d", unpack("C*",pack("H*","$1")))',
                "098612(..............)" => 'sprintf("version:Lib %d Prot '.
                  '%d.%d App %d.%d HW %d FWCounter %d",'.
