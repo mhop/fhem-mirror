@@ -293,12 +293,11 @@ ZWCUL_Parse($$$$)
 
     if(length($P)) {
       $rmsg = sprintf("0004%s%s%02x%s", $S, $S, length($P)/2, $P);
-      my $ctrlIsTgt = ($T eq $hash->{nodeIdHex});
       my $th = $modules{ZWave}{defptr}{"$H $S"};
 
-      if(!$ctrlIsTgt && !$th) {
-        DoTrigger("global", "UNDEFINED ZWNode_$1_$2 ZWave $1 ".hex($2));
-        $th = $modules{ZWave}{defptr}{"$1 $2"};
+      if(!($S eq $hash->{nodeIdHex} && $H eq $hash->{homeIdSet}) && !$th) {
+        DoTrigger("global", "UNDEFINED ZWNode_${H}_$S ZWave $H ".hex($S));
+        $th = $modules{ZWave}{defptr}{"$H $S"};
       }
 
       # Auto-Add classes
