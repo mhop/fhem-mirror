@@ -17,6 +17,7 @@
 # ABU 20150923 improved failure-tolerance for none / wrong model
 # ABU 20150924 fixed date/time again
 # ABU 20150926 removed eventMarker, removed no get for dummies
+# ABU 20151207 added dpt3, fixed doku-section myDimmer
 package main;
 
 use strict;
@@ -55,6 +56,10 @@ my %models = (
 my %eib_dpttypes = (
   #Binary value
   "dpt1" 		=> {"CODE"=>"dpt1", "UNIT"=>"",  "factor"=>1},
+  
+  
+  #Step value (four-bit)
+  "dpt3" 		=> {"CODE"=>"dpt3", "UNIT"=>"",  "factor"=>1},
 
   # 1-Octet unsigned value
   "dpt5" 		=> {"CODE"=>"dpt5", "UNIT"=>"",  "factor"=>1},
@@ -569,6 +574,82 @@ EIB_EncodeByDatapointType($$$$) {
 				
 		Log3 $hash, 5,"EIB $code encode $value translated: $transval";
 	}
+	elsif ($code eq "dpt3") 
+	{
+		#4-bit steps
+		my $rawval = $value;
+		my $sign = undef;
+		my $fullval = undef;
+		
+		#determine dim-direction, assuming positive direction by default
+		if ($value =~ /^-/)
+		{
+			$value = -$value;
+			$sign = 0;
+		}
+		else
+		{
+			$sign = 1;
+		}
+		
+		#determine value
+		if ($value >= 75)
+		{
+			#adjust 100%
+			$fullval = 01;
+		}
+		elsif ($value >= 50)
+		{
+			#adjust 50%
+			$fullval = 02;
+		}
+		elsif ($value >= 25)
+		{
+			#adjust 25%
+			$fullval = 03;
+		}
+		elsif ($value >= 12)
+		{
+			#adjust 12%
+			$fullval = 04;
+		}
+		elsif ($value >= 6)
+		{
+			#adjust 6%
+			$fullval = 05;
+		}
+		elsif ($value >= 3)
+		{
+			#adjust 3%
+			$fullval = 06;
+		}
+		elsif ($value >= 1)
+		{
+			#adjust 1%
+			$fullval = 07;
+		}
+		elsif ($value >= 0)
+		{
+			#adjust 0%
+			$fullval = 00;
+		}
+		else 
+		{
+			#do nothing
+			$fullval = undef;
+		}
+
+		#place signe
+		if (defined ($fullval) && ($sign eq 1))
+		{
+			$fullval = $fullval | 8;
+		}
+
+		#make it hex
+		$transval = sprintf("0%.1x",$fullval);
+		
+		Log3 $hash, 5,"EIB $code encode $rawval = sign $sign value $value to $fullval. Translated to hex $transval.";
+	}
 	elsif ($code eq "dpt5") 
 	{
 		#1-byte unsigned
@@ -795,6 +876,83 @@ EIB_ParseByDatapointType($$$$)
 		$value = "off" if ($value eq 0); 
 		$value = "on" if ($value eq 1); 
 		$transval = $value;	
+	}
+	elsif ($code eq "dpt3") 
+	{
+		#4-bit steps
+		my $rawval = $value;
+		my $sign = undef;
+		my $fullval = undef;
+		
+		#make it decimal
+		$value = hex ($value);
+		
+		#determine dim-direction
+		if ($value & 8)
+		{
+			$sign = "+";
+		}
+		else
+		{
+			$sign = "-";
+		}
+		
+		#mask it...
+		$value = $value & 7; 
+		
+		#determine value
+		if ($value == 7)
+		{
+			#adjust 1%
+			$fullval = 1;
+		}
+		elsif ($value == 6)
+		{
+			#adjust 3%
+			$fullval = 3;
+		}
+		elsif ($value == 5)
+		{
+			#adjust 6%
+			$fullval = 6;
+		}
+		elsif ($value == 4)
+		{
+			#adjust 12%
+			$fullval = 12;
+		}
+		elsif ($value == 3)
+		{
+			#adjust 25%
+			$fullval = 25;
+		}
+		elsif ($value == 2)
+		{
+			#adjust 50%
+			$fullval = 50;
+		}
+		elsif ($value == 1)
+		{
+			#adjust 100%
+			$fullval = 100;
+		}
+		elsif ($value == 0)
+		{
+			#adjust 0%
+			$fullval = 0;
+		}
+		else 
+		{
+			#do nothing
+			$fullval = undef;
+		}
+		
+		if (defined ($sign) && defined ($fullval))
+		{
+			$transval = "$sign$fullval";
+		}
+		
+		Log3 $hash, 5,"EIB $code decode $rawval = sign $sign value $value to $fullval";
 	}
 	elsif ($code eq "dpt5") 
 	{
@@ -1105,6 +1263,7 @@ eib_name2hex($)
       	<li>dpt5.003</li>
       	<li>angle</li>
       	<li>percent</li>
+		<li>dpt3 -> usage: set value to +/-0..100. -54 means dim down by 50%</li>
       	<li>dpt5.004</li>
       	<li>percent255</li>
       	<li>dpt6</li>
@@ -1155,9 +1314,9 @@ eib_name2hex($)
       <pre>
       define myDimmer EIB 0/1/1 0/1/2
       attr myDimmer EIBreadingX 1
-      attr myDimmer model dpt1 dpt5.slider # GA 0/1/1 will be interpreted as on/off, GA 0/1/2 will be handled as dpt5 and show a slider on FHEMWEB
-      attr myDimmer eventmap /on:An/off:Aus/value g2:dim/
-      attr myDimmer webcmd on off dim
+      attr myDimmer model dpt1 dpt5.Slider # GA 0/1/1 will be interpreted as on/off, GA 0/1/2 will be handled as dpt5 and show a slider on FHEMWEB
+      attr myDimmer eventMap /on:An/off:Aus/value g2:dim/
+      attr myDimmer webCmd on:off:dim
       attr myDimmer stateFormat getG2 % # copies actual dim-level (as sent/received to/from dimmer) into STATE 
       </pre>    
      </li>
