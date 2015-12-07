@@ -25,6 +25,7 @@ use constant DEFAULT_SUBSCRIPTION_PORT => 8058;
 use constant DEFAULT_SUBSCRIPTION_URL => '/eventSub';
 
 our %IGNOREIP;
+our %USEDONLYIP;
 
 sub new {
     my($self, %args) = @_;
@@ -36,6 +37,7 @@ sub new {
     my $subscriptionPort = $args{SubscriptionPort} || DEFAULT_SUBSCRIPTION_PORT;
 	my $maxWait = $args{MaxWait} || 3;
 	%IGNOREIP = %{$args{IgnoreIP}};
+	%USEDONLYIP = %{$args{UsedOnlyIP}};
 
 	# Create the socket on which search requests go out
     $self->{_searchSocket} = IO::Socket::INET->new(Proto => 'udp',
@@ -147,7 +149,8 @@ sub handleOnce {
 	}
 	elsif ($socket == $self->{_subscriptionSocket}) {
 		if (my $connect = $socket->accept()) {
-                        return if ($IGNOREIP{$connect->peerhost()});
+			return if (scalar(%USEDONLYIP) && (!$USEDONLYIP{$connect->peerhost()}));
+			return if ($IGNOREIP{$connect->peerhost()});
 			$self->_receiveSubscriptionNotification($connect);
 		}
 	}
@@ -340,8 +343,10 @@ sub _receiveSearchResponse {
 	my $buf = '';
 
 	my $peer = recv($socket, $buf, 2048, 0);
-        my @peerdata = unpack_sockaddr_in($peer);
-        return if ($IGNOREIP{inet_ntoa($peerdata[1])});
+	my @peerdata = unpack_sockaddr_in($peer);
+	
+	return if (scalar(%USEDONLYIP) && (!$USEDONLYIP{inet_ntoa($peerdata[1])}));
+	return if ($IGNOREIP{inet_ntoa($peerdata[1])});
 
 	if ($buf !~ /\015?\012\015?\012/) {
 		return;
@@ -398,8 +403,10 @@ sub _receiveSSDPEvent {
 	my $buf = '';
 
 	my $peer = recv($socket, $buf, 2048, 0);
-        my @peerdata = unpack_sockaddr_in($peer);
-        return if ($IGNOREIP{inet_ntoa($peerdata[1])});
+	my @peerdata = unpack_sockaddr_in($peer);
+	
+	return if (scalar(%USEDONLYIP) && (!$USEDONLYIP{inet_ntoa($peerdata[1])}));
+	return if ($IGNOREIP{inet_ntoa($peerdata[1])});
 
 	if ($buf !~ /\015?\012\015?\012/) {
 		return;
@@ -713,7 +720,7 @@ sub unsubscribe {
 	}
 	else {
 		if ($response->code != 412) {
-			carp("Unsubscription request failed with error: " . 
+			croak("Unsubscription request failed with error: " . 
 				 $response->code . " " . $response->message);
 		}
 	}
