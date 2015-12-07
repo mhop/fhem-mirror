@@ -99,6 +99,7 @@ sub HMCCUCHN_Define ($@)
 	}
 
 	$hash->{ccutype} = HMCCU_GetDeviceType ($hash->{ccuaddr}, '');
+	$hash->{channels} = 1;
 	$hash->{statevals} = 'devstate';
 
 	my $arg = shift @a;
@@ -178,7 +179,7 @@ sub HMCCUCHN_Set ($@)
 		if (!defined ($objname) || !defined ($objvalue)) {
 			return HMCCUCHN_SetError ($hash, "Usage: set <name> datapoint <datapoint> <value> [...]");
 		}
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1);
 
 		# Build datapoint address
 		$objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$objname;
@@ -199,7 +200,7 @@ sub HMCCUCHN_Set ($@)
 		if (!defined ($objvalue)) {
 			return HMCCUCHN_SetError ($hash, "Usage: set <device> devstate <value>");
 		}
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1);
 
 		# Build datapoint address
 		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$statedatapoint;
