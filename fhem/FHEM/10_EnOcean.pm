@@ -2368,6 +2368,13 @@ sub EnOcean_Set($@)
         my $rampTime = AttrVal($name, "rampTime", 1);
         my $sendDimCmd = 0;
         $setCmd = 9;
+
+        if ($cmd =~ m/^\d+$/) {
+          # interpretive numeric value as dimming
+          unshift(@a, 'dim');
+          $cmd = 'dim';
+        }
+
         if ($cmd eq "teach") {
           # teach-in EEP A5-38-08, Manufacturer "Multi user Manufacturer ID"
           #$data = "E047FF80";
@@ -2670,6 +2677,11 @@ sub EnOcean_Set($@)
         my $blindFuncID;
         if (defined $blindFunc {$cmd}) {
           $blindFuncID = $blindFunc {$cmd};
+        } elsif ($cmd =~ m/^\d+$/) {
+          # interpretive numeric value as position
+          unshift(@a, 'position');
+          $cmd = 'position';
+          $blindFuncID = 4;
         } else {
           return "Unknown Gateway Blind Central Function " . $cmd . ", choose one of ". join(" ", @blindFunc);
         }
@@ -2963,6 +2975,11 @@ sub EnOcean_Set($@)
       my $ctrlFuncID;
       if (exists $ctrlFunc{$cmd}) {
         $ctrlFuncID = $ctrlFunc{$cmd};
+      } elsif ($cmd =~ m/^\d+$/) {
+        # interpretive numeric value as dimming
+        unshift(@a, 'dim');
+        $cmd = 'dim';
+        $ctrlFuncID = 6;
       } else {
         $cmdList .= "dim:slider,0,5,255 dimup:noArg dimdown:noArg on:noArg off:noArg stop:noArg rgb:colorpicker,RGB scene dimMinMax lampOpHours block meteringValue teach:noArg";
         return SetExtensions ($hash, $cmdList, $name, @a);
@@ -3231,6 +3248,11 @@ sub EnOcean_Set($@)
         $shutTime = 255 if ($shutTime !~ m/^[+-]?\d+$/);
         $shutTime = 255 if ($shutTime > 255);
         $shutTime = 1 if ($shutTime < 1);
+        if ($cmd =~ m/^\d+$/) {
+          # interpretive numeric value as position
+          unshift(@a, 'position');
+          $cmd = 'position';
+        }
         if ($cmd eq "teach") {
           # teach-in EEP A5-3F-7F, Manufacturer "Eltako"
           $data = "FFF80D80";
@@ -3451,6 +3473,12 @@ sub EnOcean_Set($@)
       my $channel;
       my $dimValTimer = 0;
       my $outputVal;
+
+      if ($cmd =~ m/^\d+$/) {
+        # interpretive numeric value as position
+        unshift(@a, 'dim');
+        $cmd = 'dim';
+      }
 
       if ($cmd eq "on") {
         shift(@a);
@@ -3931,6 +3959,12 @@ sub EnOcean_Set($@)
         $repo = 0;
       }
       my $lock = 0;
+
+      if ($cmd =~ m/^\d+$/) {
+        # interpretive numeric value as position
+        unshift(@a, 'position');
+        $cmd = 'position';
+      }
 
       if ($cmd eq "position") {
         $cmdID = 1;
@@ -13071,6 +13105,8 @@ EnOcean_Delete($$)
       <code>set &lt;name&gt; &lt;value&gt;</code>
       <br><br>
       where <code>value</code> is
+        <li>dim/% [rampTime/s [lock|unlock]]<br>
+          issue dim command</li>
         <li>teach<br>
           initiate teach-in mode</li>
         <li>on [lock|unlock]<br>
@@ -13196,6 +13232,8 @@ EnOcean_Delete($$)
       <code>set &lt;name&gt; &lt;value&gt;</code>
       <br><br>
       where <code>value</code> is
+        <li>position/% [&alpha;/&#176]<br>
+          drive blinds to position with angle value</li>
         <li>teach<br>
           initiate teach-in mode</li>
         <li>status<br>
@@ -13291,7 +13329,9 @@ EnOcean_Delete($$)
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
-      <li>teach<br>
+      <li>position/% [&alpha;/&#176]<br>
+        drive blinds to position with angle value</li>
+     <li>teach<br>
         initiate teach-in mode</li>
       <li>opens<br>
         issue blinds opens command</li>
@@ -13326,6 +13366,8 @@ EnOcean_Delete($$)
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
+      <li>dim/% [&lt;channel&gt; [&lt;rampTime&gt;]]<br>
+        issue dimming command</li>
       <li>on [&lt;channel&gt;]<br>
         issue switch on command</li>
       <li>off [&lt;channel&gt;]<br>
