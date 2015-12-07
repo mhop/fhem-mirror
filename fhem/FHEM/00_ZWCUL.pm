@@ -2,6 +2,16 @@
 # $Id$
 package main;
 
+# TODO
+#   inclusion
+#   exclusion
+#   security
+#   routing
+#   neighborUpdate
+#   100k
+#   get
+#   wakeupNoMore
+
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
@@ -47,8 +57,8 @@ ZWCUL_Initialize($)
   $hash->{GetFn}   = "ZWCUL_Get";
   $hash->{AttrFn}  = "ZWCUL_Attr";
   $hash->{UndefFn} = "ZWCUL_Undef";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model disable:0,1 ";
-                     "networkKey";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model disable:0,1 ".
+                     "networkKey noDispatch";
 }
 
 #####################################
@@ -214,6 +224,10 @@ ZWCUL_Write($$$)
       Log 1, "ZWCUL: no device found for $fn $t";
       return;
     }
+
+    # No wakeupNoMoreInformation in monitor mode
+    return if($p eq "8408" && $hash->{homeId} eq "00000000");
+
     $th->{sentIdx} = ($th->{sentIdx}++ % 16);
     $msg = sprintf("%s%s41%02x%02x%s%s", 
                     $fn, $hash->{nodeIdHex}, $th->{sentIdx},
@@ -273,6 +287,7 @@ ZWCUL_Parse($$$$)
 
     my ($H, $S, $F, $f, $L, $T, $P, $C) = ($1,$2,$3,$4,$5,$6,$7,$8);
     Log3 $hash, 5, "$H S:$S F:$F f:$f L:$L T:$T P:$P C:$C";
+    return if(AttrVal($hash->{NAME}, "noDispatch", 0));
 
     $hash->{homeId} = $H;
 
@@ -482,6 +497,9 @@ ZWCUL_Ready($)
     <li><a href="#model">model</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#networkKey">networkKey</a></li>
+    <li><a name="#noDispatch">noDispatch</a><br>
+      prohibit dispatching messages or creating ZWave devices.
+      </li>
   </ul>
   <br>
 
