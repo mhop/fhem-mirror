@@ -758,10 +758,12 @@ sub WeekdayTimer_FensterOffen ($$$) {
          '%WEEKDAYTIMER'     => $hash->{NAME},
          '%NAME'             => $hash->{DEVICE},
          '%EVENT'            => $event,
+         '%TIME'             => $time,
          '$HEATING_CONTROL'  => $hash->{NAME},
          '$WEEKDAYTIMER'     => $hash->{NAME},
          '$NAME'             => $hash->{DEVICE},
          '$EVENT'            => $event,
+         '$TIME'             => $time,
   );
   
   my $verzoegerteAusfuehrungCond = AttrVal($hash->{NAME}, "delayedExecutionCond", "0");
