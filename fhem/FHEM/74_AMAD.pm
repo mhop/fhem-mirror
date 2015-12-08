@@ -35,7 +35,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use TcpServerUtils;
 
-my $version = "0.8.3";
+my $version = "1.0.0";
 
 
 
@@ -58,8 +58,8 @@ sub AMAD_Initialize($) {
 			  "root:0,1 ".
 			  "interval ".
 			  "port ".
-			  "disable:1 ";
-    $hash->{AttrList}	.= $readingFnAttributes;
+			  "disable:1 ".
+			  $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{AMAD}{defptr}}) {
 	my $hash = $modules{AMAD}{defptr}{$d};
@@ -73,7 +73,7 @@ sub AMAD_Define($$) {
     
     my @a = split( "[ \t][ \t]*", $def );
 
-    return "too few parameters: define <name> AMAD <HOST>" if( @a != 3 && $a[0] ne "AMADCommBridge" );
+    return "too few parameters: define <name> AMAD <HOST>" if( @a < 2 && @a > 3 );
 
     my $name    	= $a[0];
     my $host    	= $a[2];
@@ -88,7 +88,7 @@ sub AMAD_Define($$) {
     $hash->{helper}{setCmdErrorCounter} = 0 if( $hash->{HOST} );
     
     if( ! $hash->{HOST} ) {
-	return "there is already a AMAD Bridge" if( $modules{AMAD}{defptr}{BRIDGE} );
+	return "there is already a AMAD Bridge, did you want to define a AMAD host use: define <name> AMAD <HOST>" if( $modules{AMAD}{defptr}{BRIDGE} );
 
 	$hash->{BRIDGE} = 1;
 	$modules{AMAD}{defptr}{BRIDGE} = $hash;
@@ -110,7 +110,7 @@ sub AMAD_Define($$) {
 	InternalTimer( gettimeofday()+$hash->{INTERVAL}, "AMAD_GetUpdateTimer", $hash, 0 ) if( $hash->{HOST} );
 
 	$modules{AMAD}{defptr}{$hash->{HOST}} = $hash;
-
+	
 	return undef;
     }
 }
@@ -121,8 +121,7 @@ sub AMAD_Undef($$) {
     
     if( $hash->{BRIDGE} ) {
 	delete $modules{AMAD}{defptr}{BRIDGE};
-	my $ret = TcpServer_Close( $hash );
-	return $ret;
+	TcpServer_Close( $hash );
 
     } else {
         delete $modules{AMAD}{defptr}{$hash->{HOST}};
@@ -133,7 +132,8 @@ sub AMAD_Undef($$) {
 	    my $host = $hash->{HOST};
 	    
 	    return if( $host );
-	    CommandDelete( undef, "AMADCommBridge" );
+              my $name = $hash->{NAME};
+              CommandDelete( undef, $name );
 	}
     }
 }
@@ -244,10 +244,12 @@ sub AMAD_GetUpdateTimer($) {
 sub AMAD_RetrieveAutomagicInfo($) {
 
     my ($hash) = @_;
+    my $bhash = $modules{AMAD}{defptr}{BRIDGE};
+    my $bname = $bhash->{NAME};
     my $name = $hash->{NAME};
     my $host = $hash->{HOST};
     my $port = $hash->{PORT};
-    my $fhemip = ReadingsVal( "AMADCommBridge", "fhemServerIP", "none" );
+    my $fhemip = ReadingsVal( $bname, "fhemServerIP", "none" );
     my $activetask = AttrVal( $name, "checkActiveTask", "none" );
     
 
@@ -435,7 +437,10 @@ sub AMAD_Set($$@) {
     
     my ( $hash, $name, $cmd, @val ) = @_;
     
-    if( $name ne "AMADCommBridge" ) {
+    my $bhash = $modules{AMAD}{defptr}{BRIDGE};
+    my $bname = $bhash->{NAME};
+    
+    if( $name ne "$bname" ) {
 	my $apps = AttrVal( $name, "setOpenApp", "none" );
 	my $btdev = AttrVal( $name, "setBluetoothDevice", "none" );
 	my $activetask = AttrVal( $name, "setActiveTask", "none" );
@@ -445,7 +450,7 @@ sub AMAD_Set($$@) {
 	$list .= "ttsMsg ";
 	$list .= "volume:slider,0,1,15 ";
 	$list .= "deviceState:online,offline ";
-	$list .= "mediaPlayer:play,stop,next,back " if( ReadingsVal( "AMADCommBridge", "fhemServerIP", "none" ) ne "none");
+	$list .= "mediaPlayer:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
 	$list .= "screenBrightness:slider,0,1,255 " if( AttrVal( $name, "setScreenBrightness", "1" ) eq "1" );
 	$list .= "screen:on,off ";
 	$list .= "screenOrientation:auto,landscape,portrait " if( AttrVal( $name, "setScreenOrientation", "1" ) eq "1" );
@@ -459,7 +464,7 @@ sub AMAD_Set($$@) {
 	$list .= "notifySndFile ";
 	$list .= "clearNotificationBar:All,Automagic ";
 	$list .= "changetoBTDevice:$btdev " if( AttrVal( $name, "setBluetoothDevice", "none" ) ne "none" );
-	#$list .= "activateVoiceInput:noArg ";    # erste Codeteile für Spracheingabe
+	$list .= "activateVoiceInput:noArg ";
 
 	if( lc $cmd eq 'screenmsg'
 	    || lc $cmd eq 'ttsmsg'
@@ -495,7 +500,8 @@ sub AMAD_Set($$@) {
 	return "Unknown argument $cmd, bearword as argument or wrong parameter(s), choose one of $list";
     }
     
-    elsif( $name eq "AMADCommBridge" ) {
+    #elsif( $name eq "$bname" ) {
+    elsif( $modules{AMAD}{defptr}{BRIDGE} ) {
     
 	my $list = "";
     
@@ -836,29 +842,29 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
 
 sub AMAD_CommBridge_Open($) {
 
-    my ( $hash ) = @_;
-    my $name = $hash->{NAME};
+    my ( $bhash ) = @_;
+    my $bname = $bhash->{NAME};
 
     # Oeffnen des TCP Sockets
-    my $ret = TcpServer_Open( $hash, "8090", "global" );
+    my $bret = TcpServer_Open( $bhash, "8090", "global" );
     
-    if( $ret && !$init_done ) {
-	Log3 $name, 3, "$ret. Exiting.";
+    if( $bret && !$init_done ) {
+	Log3 $bname, 3, "$bret. Exiting.";
 	exit(1);
     }
     
-    readingsSingleUpdate ( $hash, "state", "opened", 1 );
-    Log3 $name, 5, "Socket wird geöffnet.";
+    readingsSingleUpdate ( $bhash, "state", "opened", 1 );
+    Log3 $bname, 5, "Socket wird geöffnet.";
     
-    return $ret;
+    return $bret;
 }
 
 sub AMAD_CommBridge_Read($) {
 
     my ( $hash ) = @_;
     my $name = $hash->{NAME};
-    my $brihash = $modules{AMAD}{defptr}{BRIDGE};
-
+    my $bhash = $modules{AMAD}{defptr}{BRIDGE};
+    my $bname = $bhash->{NAME};
     
     if( $hash->{SERVERSOCKET} ) {   # Accept and create a child
         TcpServer_Accept( $hash, "AMAD" );
@@ -875,16 +881,7 @@ sub AMAD_CommBridge_Read($) {
         CommandDelete( undef, $hash->{NAME} );
         return;
     }
-
-    my $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM will process\r\n now\r\n";
-
-    my $c = $hash->{CD};
-    print $c "HTTP/1.1 200 OK\r\n",
-             "Content-Type: text/plain\r\n",
-             "Content-Length: ".length($response)."\r\n\r\n",
-             $response;
-
-
+    
     
     #### Verarbeitung der Daten welche über die AMADCommBridge kommen ####
 
@@ -894,26 +891,22 @@ sub AMAD_CommBridge_Read($) {
     ###
 
     my @data = split( '\R\R',  $buf );
-    my $chash;
-    my $fhemdev;
+    
+    my $header = AMAD_Header2Hash( $data[0] );
+    my $device = $header->{FHEMDEVICE};
+    my $dhash = $defs{$device};
+    my $response;
+    my $c;
+    
+    my $fhemcmd = $header->{FHEMCMD};
 
-    
-    my @fhemdev = split( '\R',  $data[0] );
-        foreach my $ret( @fhemdev ) {
-            if( $ret =~ /FHEMDEVICE: (.*)/ ) {
-                $fhemdev = $1;
-            }
-        }
-        
-    $chash = $defs{$fhemdev};
-    
-    
-    if ( $data[0] =~ /FHEMCMD: setreading\b/ ) {
+    if ( $fhemcmd =~ /setreading\b/ ) {
 	my $tv = $data[1];
 	
 	@data = split( '\R',  $data[0] );
-                    
+
 		### Begin Response Processing
+		Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: processing receive reading values";
     
 		my @valuestring = split( '@@@@',  $tv );
 		my %buffer;
@@ -928,45 +921,141 @@ sub AMAD_CommBridge_Read($) {
                     
                 while( ( $t, $v ) = each %buffer ) {
                     $v =~ s/null//g;
-		    
-                    readingsBeginUpdate( $chash );
-                    readingsBulkUpdate( $chash, $t, $v ) if( defined( $v ) );
+
+                    readingsBeginUpdate( $dhash );
+                    readingsBulkUpdate( $dhash, $t, $v ) if( defined( $v ) );
                 }
-    
-                readingsBulkUpdate( $chash, "lastStatusRequestState", "statusRequest_done" );
-                readingsEndUpdate( $chash, 1 );
+                    
+                readingsBulkUpdate( $dhash, "lastStatusRequestState", "statusRequest_done" );
+                readingsEndUpdate( $dhash, 1 );
                 
 		### End Response Processing
+		
+        $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM was processes\r\n";
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
 
         return;
     }
 
-    elsif ( $data[0] =~ /FHEMCMD: set\b/ ) {
+    elsif ( $fhemcmd =~ /set\b/ ) {
         my $fhemCmd = $data[1];
         
-        fhem ("$fhemCmd") if( ReadingsVal( "AMADCommBridge", "expertMode", 0 ) eq "1" );
-	readingsSingleUpdate( $brihash, "receiveFhemCommand", $fhemCmd, 1 );
+        fhem ("set $fhemCmd") if( ReadingsVal( $bname, "expertMode", 0 ) eq "1" );
+	readingsSingleUpdate( $bhash, "receiveFhemCommand", "set ".$fhemCmd, 0 );
+	Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: set reading receive fhem command";
+	
+	$response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM execute set command now\r\n";
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
 	
 	return;
     }
     
-    elsif ( $data[0] =~ /FHEMCMD: voicecmd\b/ ) {
+    elsif ( $fhemcmd =~ /voiceinputvalue\b/ ) {
         my $fhemCmd = $data[1];
         
-	readingsSingleUpdate( $brihash, "receiveVoiceCommand", $fhemCmd, 1 );
+        readingsBeginUpdate( $bhash);
+	readingsBulkUpdate( $bhash, "receiveVoiceCommand", $fhemCmd );
+	readingsBulkUpdate( $bhash, "receiveVoiceDevice", $device );
+	readingsEndUpdate( $bhash, 1 );
+	Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: set reading receive voice command";
 	
+	$response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM was processes\r\n";
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
+            
 	return;
     }
     
-    elsif ( $data[0] =~ /FHEMCMD: statusrequest\b/ ) {
-	
-        return AMAD_GetUpdateLocal( $chash );
+    elsif ( $fhemcmd eq "statusrequest" ) {
+    
+        $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM was processes\r\n";
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
+
+        Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: Call statusRequest";
+        return AMAD_GetUpdateLocal( $dhash );
     }
+    
+    elsif ( $fhemcmd =~ /readingsval\b/ ) {
+        my $fhemCmd = $data[1];
+        my @datavalue = split( ' ', $data[1] );
+
+        $response = ReadingsVal( $datavalue[0], $datavalue[1], $datavalue[2] );
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
+        
+	Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: response ReadingsVal Value to Automagic Device";
+	return;
+    }
+    
+    elsif ( $fhemcmd =~ /fhemfunc\b/ ) {
+        my $fhemCmd = $data[1];
+	
+	Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: receive fhem-function command";
+	
+        if( $fhemcmd =~ /^{.*}$/ ) {
+        
+            $response = $fhemCmd if( ReadingsVal( $bname, "expertMode", 0 ) eq "1" );
+            
+	} else {
+	
+            $response = "header lines: \r\n AMADCommBridge receive no typical FHEM function\r\n FHEM to do nothing\r\n";
+	}
+	
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
+	
+	return;
+    }
+
+
+    $response = "header lines: \r\n AMADCommBridge receive incomplete or corrupt Data\r\n FHEM to do nothing\r\n";
+    $c = $hash->{CD};
+    print $c "HTTP/1.1 200 OK\r\n",
+        "Content-Type: text/plain\r\n",
+        "Content-Length: ".length($response)."\r\n\r\n",
+        $response;
+}
+
+sub AMAD_Header2Hash($) {       
+    my ( $string ) = @_;
+    my %hash = ();
+
+    foreach my $line (split("\r\n", $string)) {
+        my ($key,$value) = split( ": ", $line );
+        next if( !$value );
+
+        $value =~ s/^ //;
+        $hash{$key} = $value;
+    }     
+        
+    return \%hash;
 }
 
 
-1;
 
+
+1;
 
 =pod
 =begin html
@@ -980,6 +1069,7 @@ sub AMAD_CommBridge_Read($) {
   The AndroidAPP Auto Magic (this 3rd party app costs 2.90Euro) works better than Tasker and is more user-friendly.<br>
   The following information can be displayed:
   <ul>
+    <li>Android Version</li>
     <li>State of Automagic on the device</li>
     <li>Bluetooth on / off</li>
     <li>Connected Bluetooth devices </li>
@@ -1004,6 +1094,7 @@ sub AMAD_CommBridge_Read($) {
   <br><br>
   With this module it is also possible to control an Android device as follows.
   <ul>
+    <li>Activate Voice Input</li>
     <li>Switch Bluetooth on/off</li>
     <li>Set or change the connection to a specific Bluetooth device</li>
     <li>State of the device (online, offline)</li>
@@ -1056,7 +1147,8 @@ sub AMAD_CommBridge_Read($) {
   <a name="AMADCommBridge"></a>
   <b>AMAD Communication Bridge</b>
   <ul>
-    When you define the first AMAD device instance another device named AMADCommBridge will also be defined. Its room attribute is AMAD.YOU SHOULD NEVER CHANGE THIS NAME. Feel free to change all other properties. You need this device for the communication fom the Andoid unit to FHEM without having received any query from FHEM. The Android unit must know the IP address of FHEM, so you must enter the set command for the corresponding reading immediately after the definition of the bridge. This is extremly important to get the functionality working properly!
+    When you define the first AMAD device instance another device named AMADCommBridge will also be defined. Its room attribute is AMAD.
+    You need this device for the communication fom the Andoid unit to FHEM without having received any query from FHEM. The Android unit must know the IP address of FHEM, so you must enter the set command for the corresponding reading immediately after the definition of the bridge. This is extremly important to get the functionality working properly!
     The command is
     set AMADCommBridge fhemServerIP <FHEM-IP>.
     There is another reading expertMode which allows a direct communication with FHEM without haviung to use a notify or being limited to set commands.
@@ -1065,6 +1157,7 @@ sub AMAD_CommBridge_Read($) {
   <a name="AMADreadings"></a>
   <b>Readings</b>
   <ul>
+    <li>androidVersion - installed Android Version</li>
     <li>automagic state - status messages from the AutomagicApp</li>
     <li>bluetooth on / off - is Bluetooth switched on or off on the device</li>
     <li>checkActiveTask - state of an app being defined before, 1=activ in the foreground, see the hint further down</li>
@@ -1135,6 +1228,7 @@ sub AMAD_CommBridge_Read($) {
   <a name="AMADset"></a>
   <b>Set</b>
   <ul>
+    <li>activateVoiceInput - activat Voice Input on Android Device</li>
     <li>Device State - sets the Device Status Online / Offline. See Readings</li>
     <li>Media Player - controls the default media player. Play, Stop, Back Route title, ahead of title.</li>
     <li>NextAlarm time - sets the alarm time. only within the next 24hrs.</li>
@@ -1178,11 +1272,6 @@ sub AMAD_CommBridge_Read($) {
     My 10 "Tablet in the living room is media player for the living room with Bluetooth speakers. The volume is automatically set down when the Fritzbox signals a incoming call on the living room handset.
   </ul>
   <br><br><br>
-  <b><u>And finally I would like to say thank you.</u><br>
-  The biggest thank is for my mentor Andre (justme1968), who told me lots of useful hints that helped me to understandPerl code and made programming a real fun.<br>
-  I would also like to thank Jens (jensb) who has supported me when I made my first steps in Perl code.<br>
-  And lastbut not least a special thank to PAH (Prof. Dr. Peter Henning), without his statement "Keine Ahnung hatten wir alle mal, das ist keine Ausrede" (We had all times of 'I do not know', that's no excuse), - I would not have started to get interested in module development of FHEM :-)<br><br>
-  Thanks to J&uuml;rgen (ujaudio) for the english translation</b>
 </ul>
 
 =end html
@@ -1197,6 +1286,7 @@ sub AMAD_CommBridge_Read($) {
   Die AndroidAPP Automagic (welche nicht von mir stammt und 2.90Euro kostet) funktioniert wie Tasker, ist aber bei weitem User freundlicher.
   Im Auslieferungszustand werden folgende Zust&auml;nde dargestellt:
   <ul>
+    <li>Android Version</li>
     <li>Zustand von Automagic auf dem Ger&auml;t</li>
     <li>Bluetooth An/Aus</li>
     <li>Zustand einer definierten App (l&auml;uft aktiv im Vordergrund oder nicht?)</li>
@@ -1223,6 +1313,7 @@ sub AMAD_CommBridge_Read($) {
   <br><br>
   Das Modul gibt Dir auch die M&ouml;glichkeit Deine Androidger&auml;te zu steuern. So k&ouml;nnen folgende Aktionen durchgef&uuml;hrt werden.
   <ul>
+    <li>aktiviert Spracheingabe</li>
     <li>Bluetooth Ein/Aus schalten</li>
     <li>zu einem bestimmten Bluetoothger&auml;t wechseln/verbinden</li>
     <li>Status des Ger&auml;tes (Online,Offline)</li>
@@ -1274,7 +1365,7 @@ sub AMAD_CommBridge_Read($) {
   <a name="AMADCommBridge"></a>
   <b>AMAD Communication Bridge</b>
   <ul>
-    Beim ersten anlegen einer AMAD Deviceinstanz wird automatisch ein Ger&auml;t Namens AMADCommBridge im Raum AMAD angelegt. <b>BITTE NIEMALS DEN NAMEN DER BRIDGE &Auml;NDERN!!!</b> 
+    Beim ersten anlegen einer AMAD Deviceinstanz wird automatisch ein Ger&auml;t Namens AMADCommBridge im Raum AMAD angelegt.
     Alle anderen Eigenschaften k&ouml;nnen ge&auml;ndert werden. Dieses Ger&auml;t diehnt zur Kommunikation
     vom Androidger&auml;t zu FHEM ohne das zuvor eine Anfrage von FHEM aus ging. <b>Damit das Androidger&auml;t die IP von FHEM kennt, muss diese sofort nach dem anlegen der Bridge
     &uuml;ber den set Befehl in ein entsprechendes Reading in die Bridge  geschrieben werden. DAS IST SUPER WICHTIG UND F&Uuml;R DIE FUNKTION DER BRIDGE NOTWENDIG.</b><br>
@@ -1286,6 +1377,7 @@ sub AMAD_CommBridge_Read($) {
   <a name="AMADreadings"></a>
   <b>Readings</b>
   <ul>
+    <li>androidVersion - aktuell installierte Androidversion</li>
     <li>automagicState - Statusmeldungen von der AutomagicApp <b>(Voraussetzung Android >4.3). Wer ein Android >4.3 hat und im Reading steht "wird nicht unterst&uuml;tzt", mu&szlig; in den Androideinstellungen unter Ton und Benachrichtigungen -> Benachrichtigungszugriff ein Haken setzen f&uuml;r Automagic</b></li>
     <li>bluetooth on/off - ist auf dem Ger&auml;t Bluetooth an oder aus</li>
     <li>checkActiveTask - Zustand einer zuvor definierten APP. 0=nicht aktiv oder nicht aktiv im Vordergrund, 1=aktiv im Vordergrund, <b>siehe Hinweis unten</b></li>
@@ -1356,6 +1448,7 @@ sub AMAD_CommBridge_Read($) {
   <a name="AMADset"></a>
   <b>Set</b>
   <ul>
+    <li>activateVoiceInput - schaltet die Spracheingabe ein</li>
     <li>bluetooth - Schaltet Bluetooth on/off</li>
     <li>clearNotificationBar - (All,Automagic) l&ouml;scht alle Meldungen oder nur die Automagic Meldungen in der Statusleiste</li>
     <li>deviceState - setzt den Device Status Online/Offline. Siehe Readings</li>
@@ -1408,13 +1501,6 @@ sub AMAD_CommBridge_Read($) {
     Wohnzimmer Handger&auml;t signalisiert.
   </ul>
   <br><br><br>
-  <b><u>Und zu guter letzt m&ouml;chte ich mich noch bedanken.</u><br>
-  Der gr&ouml;&szlig;te Dank geht an meinen Mentor Andre (justme1968), er hat mir mit hilfreichen Tips geholfen Perlcode zu verstehen und Spa&szlig; am programmieren zu haben.<br>
-  Auch m&ouml;chte ich mich bei Jens bedanken (jensb) welcher mir ebenfalls mit hilfreichen Tips bei meinen aller ersten Gehversuchen beim Perlcode schreiben unterst&uuml;tzt hat.<br>
-  So und nun noch ein besonderer Dank an pah (Prof. Dr. Peter Henning ), ohne seine Aussage "Keine Ahnung hatten wir alle mal, das ist keine Ausrede" h&auml;tte ich bestimmt nicht angefangen Interesse an
-  Modulentwicklung zu zeigen :-)<br>
-  Danke an J&uuml;rgen(ujaudio) der sich um die &Uuml;bersetzung der Commandref ins Englische gek&uuml;mmert hat und hoffentlich weiter k&uuml;mmern wird :-)<br>
-  Danke auch an Ronny(RoBra81) f&uuml;r seine tolle Idee und Umsetzung von eigenen AMAD Readings aus externen Flows.</b>
 </ul>
 
 =end html_DE

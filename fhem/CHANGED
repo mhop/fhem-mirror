@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Mijor Release 1.0.0
+                      Add Reading Android Version
+                      Add VoiceInput fo VoiceCommands
+                      Bug Fixes
+                      Call ReadingsVal from Automagic HTTP Request with Response
   - feature: 89_rssFeed: New module to get data from rss news feeds 
   - feature: FB_CALLMONITOR: added attribute disabledForIntervals to specify
              specific time ranges, where FB_CALLMONITOR will be disabled
