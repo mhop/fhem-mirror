@@ -4405,11 +4405,18 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my @itemList = split(',',$a[2]);
       my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
       my $itemCnt = int(@itemList);
-      return "no more then 12 entries please"  if ($itemCnt>12);
+      my $volume = (defined $a[4] && $a[4] =~ m/^(\d+)$/)?$a[4]:10;
+      return "no more than 10 entries please"  if ($itemCnt>10);
       return "repetition $repeat out of range [1..255]"
             if($repeat < 1 || $repeat > 255);
       #<entries><multiply><MP3><MP3>
       my $msgBytes = sprintf("%02X%02X",$itemCnt,$repeat);
+
+      return "volume $volume out of range [0..10]"
+            if($volume < 0 || $volume > 10);
+      #<volume><multiply><MP3><MP3>
+      my $msgBytes = sprintf("%02X%02X",$volume*20,$repeat);
+
       foreach my $mp3 (@itemList){
         return "input: $mp3 is not an integer below 255" 
            if (!defined $mp3 || $mp3 !~ /^[+-]?\d+$/ || $mp3 > 255);
@@ -9035,11 +9042,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               'L' long ilumination. <br>
               <b>repeat</b> defines how often the sequence shall be executed. Defaults to 1.<br>
             </li>
-            <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [&lt;repeat&gt..]</B><br>
+            <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [&lt;repeat&gt;] [&lt;volume&gt;]</B><br>
               Play a series of tones. List is to be entered separated by ','. White
               spaces must not be used in the list.<br>
               <b>replay</b> can be entered to repeat the last sound played once more.<br>
               <b>repeat</b> defines how often the sequence shall be played. Defaults to 1.<br>
+ 	      <b>volume</b> is defined between 0 and 10. 0 stops any sound currently playing. Defaults to 10 (100%).<br>
               Example:
               <ul><code>
                  # "hello" in display, symb bulb on, backlight, beep<br>
@@ -10333,15 +10341,17 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               'L' lange Beleuchtungsdauer. <br>
               <b>repeat</b> definiert wie oft die Sequenz ausgef&uuml;hrt werden soll. Standard ist 1.<br>
             </li>
-            <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..] [&lt;repeat&gt..]</B><br>
+             <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt;..] [&lt;repeat&gt;] [&lt;volume&gt;]</B><br>
               Spielt eine Reihe von T&ouml;nen. Die Liste muss mit ',' getrennt werden. Leerzeichen
               d&uuml;rfen in der Liste nicht benutzt werden.<br>
               <b>replay</b> kann verwendet werden um den zuletzt gespielten Klang zu wiederholen.<br>
               <b>repeat</b> definiert wie oft die Sequenz ausgef&uuml;hrt werden soll. Standard ist 1.<br>
+ 	      <b>volume</b> kann im Bereich 0..10 liegen. 0 stoppt jeden aktuell gespielten Sound. Standard ist 10 (100%.<br>
               Beispiel:
               <ul><code>
                 set cfm_Mp3 playTone 3 # MP3 Titel 3 einmal<br>
                 set cfm_Mp3 playTone 3 3 # MP3 Titel 3 dreimal<br>
+ 		set cfm_Mp3 playTone 3 1 5 # MP3 Titel 3 mit halber Lautst&auml;rke<br>
                 set cfm_Mp3 playTone 3,6,8,3,4 # MP3 Titelfolge 3,6,8,3,4 einmal<br>
                 set cfm_Mp3 playTone 3,6,8,3,4 255# MP3 Titelfolge 3,6,8,3,4 255 mal<br>
                 set cfm_Mp3 playTone replay # Wiederhole letzte Sequenz<br>
