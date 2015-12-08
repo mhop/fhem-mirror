@@ -87,6 +87,7 @@ my %sets = (
 	'DeletePlaylist' => 'playlistname',
 	'CurrentPlaylist' => '',
 	'EmptyPlaylist' => '',
+	'LoadFavourite' => 'favouritename',
 	'StartFavourite' => 'favouritename [NoStart]',
 	'LoadRadio' => 'radioname',
 	'StartRadio' => 'radioname',
@@ -624,6 +625,11 @@ sub SONOSPLAYER_Set($@) {
 	
 		SONOS_DoWork($udn, 'loadRadio', $value);
 		SONOS_DoWork($udn, 'play');
+	} elsif (lc($key) eq 'loadfavourite') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+	
+		SONOS_DoWork($udn, 'startFavourite', $value, 'NoStart');
 	} elsif (lc($key) eq 'startfavourite') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -1239,6 +1245,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_EmptyPlaylist">
 <b><code>EmptyPlaylist</code></b></a>
 <br /> Clears the current queue</li>
+<li><a name="SONOSPLAYER_setter_LoadFavourite">
+<b><code>LoadFavourite &lt;Favouritename&gt;</code></b></a>
+<br /> Loads the named sonos-favorite. The parameter should be URL-encoded for proper naming of lists with special characters.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/meine.hits/</code>.</li>
 <li><a name="SONOSPLAYER_setter_LoadPlaylist">
 <b><code>LoadPlaylist &lt;Playlistname|Fhem-Devicename&gt; [EmptyQueueBeforeImport]</code></b></a>
 <br /> Loads the named playlist to the current playing queue. The parameter should be URL-encoded for proper naming of lists with special characters. The Playlistnamen can be an Fhem-Devicename, then the current playlist of this referenced player will be copied. The Playlistname can also be a filename and then must be startet with 'file:' (e.g. 'file:c:/Test.m3u')<br />If EmptyQueueBeforeImport is given and set to 1, the queue will be emptied before the import process. If not given, the parameter will be interpreted as 1.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/hits.2014/</code>.</li>
@@ -1246,7 +1255,7 @@ sub SONOSPLAYER_Log($$$) {
 <b><code>LoadRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Loads the named radiostation (favorite). The current queue will not be touched but deactivated. The parameter should be URL-encoded for proper naming of lists with special characters.<br />Additionally it's possible to use a regular expression as the name. The first hit will be used. The format is e.g. <code>/radio/</code>.</li>
 <li><a name="SONOSPLAYER_setter_LoadSearchlist">
-<b><code>LoadSearchlist &lt;Categoryname&gt; &lt;CategoryElement&gt; [[TitlefilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [maxElem]]</code></b></a>
+<b><code>LoadSearchlist &lt;Categoryname&gt; &lt;CategoryElement&gt; [[TitlefilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [[*]maxElem[+|-]]]</code></b></a>
 <br /> Loads titles from the Sonos-Bibliothek into the current playlist according to the given category and filtervalues. Please consult the (german) Wiki for detailed informations.</li>
 <li><a name="SONOSPLAYER_setter_SavePlaylist">
 <b><code>SavePlaylist &lt;Playlistname&gt;</code></b></a>
@@ -1586,6 +1595,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_EmptyPlaylist">
 <b><code>EmptyPlaylist</code></b></a>
 <br /> Leert die aktuelle Abspielliste</li>
+<li><a name="SONOSPLAYER_setter_LoadFavourite">
+<b><code>LoadFavourite &lt;FavouriteName&gt;</code></b></a>
+<br /> Lädt den angegebenen Favoriten. Der Name bezeichnet einen Eintrag in der Sonos-Favoritenliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/meine.hits/</code>.</li>
 <li><a name="SONOSPLAYER_setter_LoadPlaylist">
 <b><code>LoadPlaylist &lt;Playlistname|Fhem-Devicename&gt; [EmptyQueueBeforeImport]</code></b></a>
 <br /> Lädt die angegebene Playlist in die aktuelle Abspielliste. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen. Der Playlistname kann ein Fhem-Sonosplayer-Devicename sein, dann wird dessen aktuelle Abpielliste kopiert. Der Playlistname kann aber auch ein Dateiname sein. Dann muss dieser mit 'file:' beginnen (z.B. 'file:c:/Test.m3u).<br />Wenn der Parameter EmptyQueueBeforeImport mit ''1'' angegeben wirde, wird die aktuelle Abspielliste vor dem Import geleert. Standardmäßig wird hier ''1'' angenommen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/hits.2014/</code>.</li>
@@ -1593,7 +1605,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <b><code>LoadRadio &lt;Radiostationname&gt;</code></b></a>
 <br /> Startet den angegebenen Radiostream. Der Name bezeichnet einen Sender in der Radiofavoritenliste. Die aktuelle Abspielliste wird nicht verändert. Der Parameter sollte/kann URL-Encoded werden um auch Spezialzeichen zu ermöglichen.<br />Zusätzlich kann ein regulärer Ausdruck für den Namen verwendet werden. Der erste Treffer wird verwendet. Das Format ist z.B. <code>/radio/</code>.</li>
 <li><a name="SONOSPLAYER_setter_LoadSearchlist">
-<b><code>LoadSearchlist &lt;Kategoriename&gt; &lt;KategorieElement&gt; [[TitelfilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [maxElem]]</code></b></a>
+<b><code>LoadSearchlist &lt;Kategoriename&gt; &lt;KategorieElement&gt; [[TitelfilterRegEx]/[AlbumfilterRegEx]/[ArtistfilterRegEx] [[*]maxElem[+|-]]]</code></b></a>
 <br /> Lädt Titel nach diversen Kriterien in die aktuelle Abspielliste. Nähere Beschreibung bitte im Wiki nachlesen.</li>
 <li><a name="SONOSPLAYER_setter_SavePlaylist">
 <b><code>SavePlaylist &lt;Playlistname&gt;</code></b></a>
