@@ -277,6 +277,9 @@ CUL_MAX_Parse($$)
   $dst = lc($dst);
   my $msgType = exists($msgId2Cmd{$msgTypeRaw}) ? $msgId2Cmd{$msgTypeRaw} : $msgTypeRaw;
   Log3 $hash, 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
+
+  return $shash->{NAME} if (exists($modules{MAX}{defptr}{$src}) && IsIgnored($modules{MAX}{defptr}{$src}{NAME}));
+
   my $isToMe = ($dst eq $shash->{addr}) ? 1 : 0; # $isToMe is true if that packet was directed at us
 
   #Set RSSI on MAX device
