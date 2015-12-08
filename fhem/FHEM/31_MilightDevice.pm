@@ -140,7 +140,7 @@ sub MilightDevice_Define($$)
   # Verify IODev is valid
   AssignIoPort($hash, $iodev);
   if(defined($hash->{IODev}->{NAME})) {
-    Log3 $name, 3, $name."_Define: I/O device is " . $hash->{IODev}->{NAME};
+    Log3 $name, 4, $name."_Define: I/O device is " . $hash->{IODev}->{NAME};
   } else {
     Log3 $name, 1, $name."_Define: no I/O device";
   }
