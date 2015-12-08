@@ -49,6 +49,11 @@
 # Cover von Amazon funktionieren nicht
 #
 # SVN-History:
+# 08.12.2015
+#	Bei der Erkennung von Streams beim Restore von PlayURITemp wurde ein neues Format nicht berücksichtigt.
+#	Bei der Verwendung von "set Sonos Groups Reset" tauchte eine Fehlermeldung wegen eines Leerstrings auf.
+#	Es wurde ein neuer Setter "LoadFavourite" eingebaut, der einem StartFavourite mit der Angabe von NoStart entspricht.
+#	Man kann bei LoadSearchList nun auch an das Ende der aktuellen Abspielliste anhängen lassen. Dazu muss man an den Parameter maxElem ein "+" anhängen.
 # 07.12.2015
 #	Zwei neue Setter "DialogLevel" und "NightMode", die an einer PlayBar ausgeführt werden können.
 #	"Set Sonos Groups" hat eine neue Option "Reset", mit der alle Gruppen in einem Rutsch aufgelöst werden können.
@@ -72,12 +77,6 @@
 # 12.07.2015
 #	Es gibt zwei neue Setter "GroupVolumeU" und "GroupVolumeD", um die Gruppenlautstärke um 'VolumeStep'-Einheiten zu erhöhen oder zu verringern.
 #	Innerhalb des SubProzesses wurden die Devicenamen der bereits in Fhem definierten Player nicht korrekt verwendet. Das machte sich erst mit dem neuen Feature Bookmarks bemerkbar.
-# 14.06.2015
-#	Zwei weitere Ausnahmen für das Neustarten des SubThreads eingefügt.
-#	ControlPoint.pm: Beim Renew von Subscription wurde aus dem "carp" ein "croak" gemacht. Dadurch greifen die darüberliegenden Auffangmassnahmen.
-#	Neues Feature: Bookmarks für Playlisten und Titel
-#	Changelog in der Quelltextdatei enthält nur noch für die letzten vier Veröffentlichungen. Die komplette Liste ist nur noch im Wiki vorhanden. Dadurch wird die Dateigröße geringer.
-#	SetEQ eingebaut, um Subwoofer und Surroundeinstellungen vornehmen zu können: "SurroundEnable", "SurroundLevel", "SubEnable", "SubGain" und "AudioDelay"
 #
 ########################################################################################
 #
@@ -1910,6 +1909,8 @@ sub SONOS_Set($@) {
 			
 			# Alle Player als Standalone-Group festlegen
 			for(my $i = 0; $i <= $#list; $i++) {
+				next if (!$list[$i]); # Wenn hier ein Leerstring aus dem Split kam, dann überspringen...
+				
 				my $elemHash = SONOS_getDeviceDefHash($list[$i]);
 				
 				SONOS_DoWork($elemHash->{UDN}, 'makeStandaloneGroup');
@@ -2833,7 +2834,7 @@ sub SONOS_Discover() {
 						}
 						
 						# Nicht alle übernehmen?
-						if ($maxElems =~ m/^\*{0,1}(\d+)-{0,1}$/) {
+						if ($maxElems =~ m/^\*{0,1}(\d+)[\+-]{0,1}$/) {
 							splice(@matches, $1) if ($1 && ($1 <= $#matches));
 							SONOS_Log $udn, 4, 'getSearchlist maxElems('.$maxElems.'): '.$1;
 						}
@@ -2847,7 +2848,13 @@ sub SONOS_Discover() {
 								$answer .= 'Queue successfully emptied. ';
 							}
 							
-							my $currentInsertPos = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('Track') + 1;
+							# An das Ende der Playlist oder hinter dem aktuellen Titel einfügen?
+							my $currentInsertPos = 0;
+							if ($maxElems =~ m/\+$/) {
+								$currentInsertPos = $SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0)->getValue('NrTracks') + 1;
+							} else {
+								$currentInsertPos = $SONOS_AVTransportControlProxy{$udn}->GetPositionInfo(0)->getValue('Track') + 1;
+							}
 							
 							# Die Matches in die Playlist laden...
 							my $sliceSize = 16;
@@ -4291,7 +4298,7 @@ sub SONOS_RestoreOldPlaystate() {
 		SONOS_Log $udn, 3, 'Restoring playerstate...';
 		SONOS_Log $udn, 5, 'StoredURI: "'.$old{CurrentURI}.'"';
 		# Die Liste als aktuelles Abspielstück einstellen, oder den Stream wieder anwerfen
-		if ($old{CurrentURI} =~ /^x-.*?-.*?stream/) {
+		if ($old{CurrentURI} =~ /^x-.*?-(.*?stream|mp3radio)/) {
 			SONOS_Log $udn, 5, 'Restore Stream...';
 			
 			$AVProxy->SetAVTransportURI(0, $old{CurrentURI}, $old{CurrentURIMetaData});
@@ -5173,7 +5180,7 @@ sub SONOS_Discover_Callback($$$) {
 					
 					$result = $SONOS_AVTransportControlProxy{$udn}->GetMediaInfo(0);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'numberOfTracks', $result->getValue('NrTracks'));
-					my $stream = ($result->getValue('CurrentURI') =~ m/^x-(sonosapi|rincon)-stream:.*?/);
+					my $stream = ($result->getValue('CurrentURI') =~ m/^x-(sonosapi|rincon)-(stream|mp3radio):.*?/);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentStreamAudio', $stream);
 					SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'currentNormalAudio', !$stream);
 				};
@@ -5893,7 +5900,7 @@ sub SONOS_ServiceCallback($$) {
 		SONOS_Client_Notifier('ProcessCover:'.$udn.':0:'.$tempURI.':'.$groundURL);
 		
 		# Auch hier den XML-Parser verhindern, und alles per regulärem Ausdruck ermitteln...
-		if ($currentTrackMetaData =~ m/<dc:title>x-(sonosapi|rincon)-stream:.*?<\/dc:title>/) {
+		if ($currentTrackMetaData =~ m/<dc:title>x-(sonosapi|rincon)-(stream|mp3radio):.*?<\/dc:title>/) {
 			# Wenn es ein Stream ist, dann muss da was anderes erkannt werden
 			SONOS_Log $udn, 4, "Transport-Event: Stream erkannt!";
 			SONOS_Client_Notifier('SetCurrent:StreamAudio:1');
