@@ -99,6 +99,7 @@ sub HMCCU_StartRPCServer ($);
 sub HMCCU_StopRPCServer ($);
 sub HMCCU_IsRPCServerRunning ($);
 sub HMCCU_CheckProcess ($);
+sub HMCCU_GetDeviceInfo ($$);
 sub HMCCU_GetDeviceList ($);
 sub HMCCU_GetAddress ($$$);
 sub HMCCU_GetCCUObjectAttribute ($$);
@@ -331,7 +332,7 @@ sub HMCCU_Get ($@)
 	my ($hash, @a) = @_;
 	my $name = shift @a;
 	my $opt = shift @a;
-	my $options = "devicelist:noArg devstate datapoint vars channel parfile config configdesc";
+	my $options = "devicelist:noArg devstate datapoint vars channel parfile config configdesc deviceinfo";
 	my $host = $hash->{host};
 
 	my $ccureadingformat = AttrVal ($name, "ccureadingformat", 'name');
@@ -431,13 +432,22 @@ sub HMCCU_Get ($@)
 		HMCCU_SetState ($hash, "OK");
 		return $ccureadings ? undef : $result;
 	}
+	elsif ($opt eq 'deviceinfo') {
+		my $device = shift @a;
+
+		return HMCCU_SetError ($hash, "") if (!defined ($device));
+
+		$result = HMCCU_GetDeviceInfo ($hash, $device);
+		return HMCCU_SetError ($hash, -2) if ($result eq '');
+		return $result;
+	}
 	elsif ($opt eq 'devicelist') {
 		my $dumplist = shift @a;
 
 		$hash->{DevCount} = HMCCU_GetDeviceList ($hash);
 
 		if ($hash->{DevCount} < 0) {
-			return HMCCU_SetError ($hash, "HM Script execution failed");
+			return HMCCU_SetError ($hash, -2);
 		}
 		elsif ($hash->{DevCount} == 0) {
 			return HMCCU_SetError ($hash, "No devices received from CCU");
@@ -910,6 +920,43 @@ sub HMCCU_CheckProcess ($)
 	}
 
 	return 0;
+}
+
+####################################################
+# Get channel and datapoints of CCU device
+####################################################
+
+sub HMCCU_GetDeviceInfo ($$)
+{
+	my ($hash, $device) = @_;
+	my $devname = '';
+
+	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($device, 0);
+	if ($flags == $HMCCU_FLAG_ADDRESS) {
+		$devname = HMCCU_GetDeviceName ($add, '');
+		return '' if ($devname eq '');
+	}
+	else {
+		$devname = $nam;
+	}
+
+	my $script = qq(
+string chnid;
+string sDPId;
+object odev = dom.GetObject ("$devname");
+foreach (chnid, odev.Channels())
+{
+   object ochn = dom.GetObject(chnid);
+   WriteLine("Channel " # ochn.Address() # " " # ochn.Name());
+   foreach(sDPId, ochn.DPs().EnumUsedIDs())
+   {
+      object oDP = dom.GetObject(sDPId);
+      WriteLine ("  DP " # oDP.Name() # " = " # oDP.Value());
+   }
+}
+	);
+
+	return HMCCU_HMScript ($hash->{host}, $script);
 }
 
 ####################################################
@@ -1755,6 +1802,10 @@ sub HMCCU_RPCSetConfig ($$$)
          <br/>
          Get value of datapoint(s). If no datapoint is specified all datapoints of specified
          channel are read. &lt;datapoint&gt; can be specified as a regular expression.
+      </li><br/>
+      <li>get &lt;name&gt; deviceinfo &lt;device-name&gt;
+         <br/>
+         List device channels and datapoints.
       </li><br/>
       <li>get &lt;name&gt; devicelist [dump]
          <br/>
