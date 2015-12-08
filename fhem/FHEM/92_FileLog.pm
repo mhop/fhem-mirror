@@ -367,15 +367,8 @@ FileLog_fhemwebFn($$$$)
 
   $ret .= "<br>Regexp parts";
   $ret .= "<br><table class=\"block wide\">";
-  
-  my $regexp= $hash->{REGEXP};
-  my @ra= ();
-  while($regexp =~ /^(.+?:.+?)\|(.+?:.+)$/) {
-    push @ra, $1;
-    $regexp= $2;
-  }
-  push @ra, $regexp;
-  if(@ra > 0) {
+  my @ra = split(/\|/, $hash->{REGEXP});
+  if(@ra > 1) {
     foreach my $r (@ra) {
       $ret .= "<tr class=\"".(($row++&1)?"odd":"even")."\">";
       my $cmd = "cmd.X= set $d removeRegexpPart&val.X=$r"; # =.set: avoid JS
