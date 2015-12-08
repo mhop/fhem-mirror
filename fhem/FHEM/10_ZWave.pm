@@ -313,14 +313,14 @@ my %zwave_class = (
     parse => { "..8404(.*)"=> '"cmdSet:wakeupInterval $1"',
                "..8405"    => 'cmdGet:wakeupInterval',
                "..8406(......)(..)" =>
-                         '"wakeupReport:interval ".hex($1)." target ".hex($2)',
+                        '"wakeupReport:interval ".hex($1)." target ".hex($2)',
                "..8407"    => 'wakeup:notification',
                "..8408"    => 'cmdSet:wakeupNoMoreInformation',
                "..8409"    => 'cmdGet:wakeupIntervalCapabilities',
                "..840a(......)(......)(......)(......)" =>
-                         '"wakeupIntervalCapabilitiesReport:min ".hex($1).'.
-                         '" max ".hex($2)." default ".hex($3)." step ".hex($4)'
-             } },
+                        '"wakeupIntervalCapabilitiesReport:min ".hex($1).'.
+                        '" max ".hex($2)." default ".hex($3)." step ".hex($4)'},
+    init  => { ORDER=>11, CMD => '"set $NAME wakeupInterval 86400 $CTRLID"' } },
   ASSOCIATION              => { id => '85',
     set   => { associationAdd => "01%02x%02x*",
                associationDel => "04%02x%02x*",
