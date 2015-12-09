@@ -285,9 +285,28 @@ ZWCUL_Parse($$$$)
   $rmsg = lc($rmsg) if($rmsg =~ m/^z/);
   if($rmsg =~ m/^z(........)(..)(..)(..)(..)(..)(.*)(..)$/) {
 
+    my $me = $hash->{NAME};
     my ($H, $S, $F, $f, $L, $T, $P, $C) = ($1,$2,$3,$4,$5,$6,$7,$8);
-    Log3 $hash, 5, "$H S:$S F:$F f:$f L:$L T:$T P:$P C:$C";
-    return if(AttrVal($hash->{NAME}, "noDispatch", 0));
+    if(AttrVal($me, "verbose", 1) > 4) {
+      Log3 $hash, 5, "$H S:$S F:$F f:$f L:$L T:$T P:$P C:$C";
+      my $hF=hex($F);
+      Log3 $hash, 5, "   F:".unpack("B*",chr($hF)).
+        (($hF&0xf)==1 ? " singleCast" :
+         ($hF&0xf)==2 ? " multiCast" :
+         ($hF&0xf)==3 ? " ack" : " unknownHeaderType").
+        (($hF&0x10)==0x10 ? " lowSpeed" : "").
+        (($hF&0x20)==0x20 ? " lowPower" : "").
+        (($hF&0x40)==0x40 ? " ackReq"   : "").
+        (($hF&0x80)==0x80 ? " routed"   : "");
+      my $hf=hex($f);
+      Log3 $hash, 5, "   f:".unpack("B*",chr(($hf))).
+        " seqNum:".($hf&0xf).
+        (($hf&0x10)==0x10 ? " wakeUpBeam":"").
+        (($hf&0xe0)       ? " unknownBits":"");
+    }
+
+    return if(AttrVal($me, "noDispatch", 0));
+
 
     $hash->{homeId} = $H;
 
@@ -303,10 +322,9 @@ ZWCUL_Parse($$$$)
       # Auto-Add classes
       my $pcl = $zwave_id2class{substr($P, 0, 2)};
       if($th && $pcl) {
-        my $cl = AttrVal($th->{NAME},"classes","");
-        if($cl !~ m/\b$pcl\b/) {
-          $attr{$th->{NAME}}{classes} = "$cl $pcl";
-        }
+        my $tname = $th->{NAME};
+        my $cl = AttrVal($tname, "classes", "");
+        $attr{$tname}{classes} = "$cl $pcl" if($cl !~ m/\b$pcl\b/);
       }
 
     } else {
@@ -498,6 +516,10 @@ ZWCUL_Ready($)
     <li><a href="#networkKey">networkKey</a></li>
     <li><a name="#noDispatch">noDispatch</a><br>
       prohibit dispatching messages or creating ZWave devices.
+      </li>
+    <li>verbose<br>
+      If the verbose attribute of this device (not global!) is set to 5 or
+      higher, then detailed logging of the RF message will be done.
       </li>
   </ul>
   <br>
