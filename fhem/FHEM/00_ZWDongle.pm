@@ -41,13 +41,12 @@ my %gets = (
   "getVirtualNodes" => "a5",      # ZW_GET_VIRTUAL_NODES
   "homeId"          => "20",      # MEMORY_GET_ID
   "isFailedNode"    => "62%02x",  # ZW_IS_FAILED_NODE
-  "neighborList"    => "80%0x",   # GET_ROUTING_TABLE_LINE
+  "neighborList"    => "80%02x",  # GET_ROUTING_TABLE_LINE
   "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
   "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
   "random"          => "1c%02x",  # ZW_GET_RANDOM
   "version"         => "15",      # ZW_GET_VERSION
   "timeouts"        => "06",      # SERIAL_API_SET_TIMEOUTS
-
   "raw"             => "%s",            # hex
 );
 
@@ -158,6 +157,13 @@ ZWDongle_Set($@)
     return;
   }
 
+  if(($type eq "removeFailedNode" ||
+      $type eq "replaceFailedNode" ||
+      $type eq "sendNIF") &&
+     $defs{$a[0]} && $defs{$a[0]}{nodeIdHex}) {
+    $a[0] = hex($defs{$a[0]}{nodeIdHex});
+  }
+
   my $cmd = $sets{$type}{cmd};
   my $fb = substr($cmd, 0, 2);
   if($fb =~ m/^[0-8A-F]+$/i &&
@@ -196,7 +202,6 @@ ZWDongle_Set($@)
   return undef;
 }
 
-
 #####################################
 sub
 ZWDongle_Get($@)
@@ -234,6 +239,13 @@ ZWDongle_Get($@)
 
   return "No $cmd for dummies" if(IsDummy($name));
 
+  if(($cmd eq "neighborList" ||
+      $cmd eq "nodeInfo" ||
+      $cmd eq "isFailedNode") &&
+     $defs{$a[0]} && $defs{$a[0]}{nodeIdHex}) {
+    $a[0] = hex($defs{$a[0]}{nodeIdHex});
+  }
+
   my $out = sprintf($gets{$cmd}, @a);
   ZWDongle_Write($hash, "", "00".$out);
   my $re = "^01".substr($out,0,2);  # Start with <01><len><01><CMD>
@@ -245,18 +257,8 @@ ZWDongle_Get($@)
   my @r = map { ord($_) } split("", pack('H*', $ret)) if(defined($ret));
 
   if($cmd eq "nodeList") {                     ############################
-    return "$name: Bogus data received" if(int(@r) != 36);
-    my @list;
-    for my $byte (0..28) {
-      my $bits = $r[5+$byte];
-      for my $bit (0..7) {
-        next if(!($bits & (1<<$bit)));
-        my $idx = $byte*8+$bit+1;
-        my @l = devspec2array(sprintf(".*:FILTER=nodeIdHex=%02x", $idx));
-        push @list, ($l[0] && $defs{$l[0]} ? $l[0] : "UNKNOWN_$idx");
-      }
-    }
-    $msg = join(" ", @list);
+    $msg =~ s/^.{10}(.{58}).*/$1/;
+    $msg = zwlib_parseNeighborList($hash, $msg);
 
   } elsif($cmd eq "caps") {                    ############################
     $msg  = sprintf("Vers:%d Rev:%d ",       $r[2], $r[3]);
