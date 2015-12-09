@@ -310,7 +310,6 @@ ZWCUL_Parse($$$$)
          ($hF & 3)==3 ? " ack" : " unknownHeaderType:".($hF&0x3)).
         (($hF & 4)    ? " explorer" : "").
         (($hF & 0x10)==0x10 ? " lowSpeed" : "").
-        (($hF & 0x10)==0x10 ? " lowSpeed" : "").
         (($hF & 0x20)==0x20 ? " lowPower" : "").
         (($hF & 0x40)==0x40 ? " ackReq"   : "").
         (($hF & 0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops" : "");
