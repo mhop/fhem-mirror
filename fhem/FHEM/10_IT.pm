@@ -83,7 +83,7 @@ IT_Initialize($)
   $hash->{DefFn}     = "IT_Define";
   $hash->{UndefFn}   = "IT_Undef";
   $hash->{ParseFn}   = "IT_Parse";
-  $hash->{AttrList}  = "IODev ITfrequency ITrepetition switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 protocol:V1,V3,HE_EU,HE800 unit group dummy:1,0 " .
+  $hash->{AttrList}  = "IODev ITfrequency ITrepetition ITclock switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 protocol:V1,V3,HE_EU,HE800 unit group dummy:1,0 " .
                        "$readingFnAttributes " .
                        "loglevel:0,1,2,3,4,5,6 " .
                        "model:".join(",", sort keys %models);
@@ -141,6 +141,8 @@ IT_Set($@)
   my $message;
 
   return "no set value specified" if($na < 1);
+  # return, if this is a dummy device
+  return "Dummydevice $hash->{NAME}: will not set data" if(IsDummy($hash->{NAME}));
 
   my $list = "";
   $list .= "off:noArg on:noArg " if( AttrVal($name, "model", "") ne "itremote" );
@@ -206,11 +208,20 @@ IT_Set($@)
   		  my $ret = CallFn($io->{NAME}, "AttrFn", "set", ($io->{NAME}, "rfmode", "SlowRF"));
  	 	}	
 	}
+    ## Do we need to change ITClock ??	}
+    if(defined($attr{$name}) && defined($attr{$name}{"ITclock"})) 
+    {
+        #$message = "isc".$attr{$name}{"ITclock"};
+        #CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", $message));
+        $message = $attr{$name}{"ITclock"};
+        CallFn($io->{NAME}, "SetFn", $io, ($hash->{NAME}, "ITClock", $message));
+		Log GetLogLevel($name,4), "IT set ITclock: $message for $io->{NAME}";
+    }
 
-  ## Do we need to change ITrepetition ??	
-  if(defined($attr{$name}) && defined($attr{$name}{"ITrepetition"})) {
-  	$message = "isr".$attr{$name}{"ITrepetition"};
-                CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", $message));
+    ## Do we need to change ITrepetition ??	
+    if(defined($attr{$name}) && defined($attr{$name}{"ITrepetition"})) {
+  	    $message = "isr".$attr{$name}{"ITrepetition"};
+        CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", $message));
 		Log GetLogLevel($name,4), "IT set ITrepetition: $message for $io->{NAME}";
 	}
 
@@ -314,11 +325,19 @@ IT_Set($@)
 		Log GetLogLevel($name,4), "IT set ITrepetition back: $message for $io->{NAME}";
 	}
 
-  ## Do we need to change ITfrequency back??	
-  if(defined($attr{$name}) && defined($attr{$name}{"ITfrequency"})) {
-    Log GetLogLevel($name,4), "Setting ITfrequency back to 433.92 MHz";
-    CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "if0"));
-	}
+    ## Do we need to change ITfrequency back??	
+    if(defined($attr{$name}) && defined($attr{$name}{"ITfrequency"})) {
+        Log GetLogLevel($name,4), "Setting ITfrequency back to 433.92 MHz";
+        CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "if0"));
+    }
+	
+	## Do we need to change ITClock back??	
+    if(defined($attr{$name}) && defined($attr{$name}{"ITclock"})) 
+    {
+        Log GetLogLevel($name,4), "Setting ITClock back to 250";
+        #CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "sic250"));
+        CallFn($io->{NAME}, "SetFn", $io, ($hash->{NAME}, "ITClock", "250"));
+    }
 
 	## Do we need to change RFMode back to HomeMatic??
   if(defined($attr{$name}) && defined($attr{$name}{"switch_rfmode"})) {
