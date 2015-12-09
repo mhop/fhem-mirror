@@ -287,9 +287,18 @@ ZWCUL_Parse($$$$)
 
     my $me = $hash->{NAME};
     my ($H, $S, $F, $f, $L, $T, $P, $C) = ($1,$2,$3,$4,$5,$6,$7,$8);
+    my ($hF, $hf, $rf, $hc, $hops, $ri) = (hex($F), hex($f), "", 0, "", "");
+    if($hF&0x80) {
+      $hc = hex(substr($P,2,1));
+      $ri = "R:".substr($P, 0, ($hc+2)*2)." ";
+      $rf = substr($P, 0, 2);
+      $hops = substr($P, 4, $hc*2);
+      $hops =~ s/(..)/$1 /g;
+      $P  = substr($P,($hc+2)*2);
+    }
+
     if(AttrVal($me, "verbose", 1) > 4) {
-      Log3 $hash, 5, "$H S:$S F:$F f:$f L:$L T:$T P:$P C:$C";
-      my $hF=hex($F);
+      Log3 $hash, 5, "$H S:$S F:$F f:$f L:$L T:$T ${ri}P:$P C:$C";
       Log3 $hash, 5, "   F:".unpack("B*",chr($hF)).
         (($hF&0xf)==1 ? " singleCast" :
          ($hF&0xf)==2 ? " multiCast" :
@@ -297,7 +306,7 @@ ZWCUL_Parse($$$$)
         (($hF&0x10)==0x10 ? " lowSpeed" : "").
         (($hF&0x20)==0x20 ? " lowPower" : "").
         (($hF&0x40)==0x40 ? " ackReq"   : "").
-        (($hF&0x80)==0x80 ? " routed"   : "");
+        (($hF&0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops" : "");
       my $hf=hex($f);
       Log3 $hash, 5, "   f:".unpack("B*",chr(($hf))).
         " seqNum:".($hf&0xf).
