@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 14_CUL_TCM97001: Fix creation of plots 
   - updated: 74_AMAD: New Mijor Release 1.0.0
                       Add Reading Android Version
                       Add VoiceInput fo VoiceCommands
