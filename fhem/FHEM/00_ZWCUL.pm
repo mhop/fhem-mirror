@@ -287,8 +287,8 @@ ZWCUL_Parse($$$$)
 
     my $me = $hash->{NAME};
     my ($H, $S, $F, $f, $L, $T, $P, $C) = ($1,$2,$3,$4,$5,$6,$7,$8);
-    my ($hF, $hf, $rf, $hc, $hops, $ri) = (hex($F), hex($f), "", 0, "", "");
-    if($hF&0x80) {
+    my ($hF,$hf,$rf,$hc,$hops,$ri,$u1) = (hex($F),hex($f),"",0,"","","");
+    if($hF&0x80) { # routing
       $hc = hex(substr($P,2,1));
       $ri = "R:".substr($P, 0, ($hc+2)*2)." ";
       $rf = substr($P, 0, 2);
@@ -297,16 +297,23 @@ ZWCUL_Parse($$$$)
       $P  = substr($P,($hc+2)*2);
     }
 
+    if($hF&4) { # Explorer?
+      $u1 = " E:".substr($P,0,16)." ";
+      $P = substr($P,16);
+    }
+
     if(AttrVal($me, "verbose", 1) > 4) {
-      Log3 $hash, 5, "$H S:$S F:$F f:$f L:$L T:$T ${ri}P:$P C:$C";
+      Log3 $hash, 5, "$H S:$S F:$F f:$f L:$L T:$T ${ri}${u1}P:$P C:$C";
       Log3 $hash, 5, "   F:".unpack("B*",chr($hF)).
-        (($hF&0xf)==1 ? " singleCast" :
-         ($hF&0xf)==2 ? " multiCast" :
-         ($hF&0xf)==3 ? " ack" : " unknownHeaderType").
-        (($hF&0x10)==0x10 ? " lowSpeed" : "").
-        (($hF&0x20)==0x20 ? " lowPower" : "").
-        (($hF&0x40)==0x40 ? " ackReq"   : "").
-        (($hF&0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops" : "");
+        (($hF & 3)==1 ? " singleCast" :
+         ($hF & 3)==2 ? " multiCast" :
+         ($hF & 3)==3 ? " ack" : " unknownHeaderType:".($hF&0x3)).
+        (($hF & 4)    ? " explorer" : "").
+        (($hF & 0x10)==0x10 ? " lowSpeed" : "").
+        (($hF & 0x10)==0x10 ? " lowSpeed" : "").
+        (($hF & 0x20)==0x20 ? " lowPower" : "").
+        (($hF & 0x40)==0x40 ? " ackReq"   : "").
+        (($hF & 0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops" : "");
       my $hf=hex($f);
       Log3 $hash, 5, "   f:".unpack("B*",chr(($hf))).
         " seqNum:".($hf&0xf).
