@@ -84,7 +84,7 @@ CUL_TX_Parse($$)
   Log3 $name, 4, "CUL_TX $name $id3 ($msg)";
 
   my ($msgtype, $val);
-  my $valraw = ($a[5].$a[6].".".$a[7]);
+  my $valraw = (hex($a[5]).$a[6].".".$a[7]);
   my $type = $a[2];
   if($type eq "0") {
     if($now - $def->{lastT} < $def->{minsecs} ) {
