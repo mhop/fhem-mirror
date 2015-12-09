@@ -147,7 +147,8 @@ HttpUtils_Connect($)
       }
       my $ret = connect($hash->{conn}, sockaddr_in($port, $iaddr));
       if(!$ret) {
-        if($!{EINPROGRESS} || int($!)==10035) { # Nonblocking connect
+        if($!{EINPROGRESS} || int($!)==10035 ||
+           (int($!)==140 && $^O eq "MSWin32")) { # Nonblocking connect
 
           $hash->{FD} = $hash->{conn}->fileno();
           my %timerHash = ( hash => $hash );
