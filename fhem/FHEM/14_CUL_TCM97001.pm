@@ -1195,7 +1195,7 @@ CUL_TCM97001_Parse($$)
   } else {
    #Log3 "Unknown", 2, "xxxxxxxx $msg xxxx " . length($msg);
     if (length($msg) == 8 || length($msg) == 10 || length($msg) == 12 || length($msg) == 14) {
-    my $defUnknown = $modules{CUL_TCM97001}{defptr}{"Unknown"};
+    my $defUnknown = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
     
     if (!$defUnknown) {
       Log3 "Unknown", 2, "CUL_TCM97001 Unknown device Unknown, please define it";
