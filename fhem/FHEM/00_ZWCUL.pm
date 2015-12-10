@@ -8,7 +8,6 @@ package main;
 #   security
 #   routing
 #   neighborUpdate
-#   100k
 #   get
 #   wakeupNoMore
 
@@ -58,7 +57,7 @@ ZWCUL_Initialize($)
   $hash->{AttrFn}  = "ZWCUL_Attr";
   $hash->{UndefFn} = "ZWCUL_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model disable:0,1 ".
-                     "networkKey noDispatch";
+                     "networkKey noDispatch dataRate:40k,100k";
 }
 
 #####################################
@@ -79,6 +78,7 @@ ZWCUL_Define($$)
   $hash->{homeId} = $a[3];
   $hash->{homeIdSet} = $a[3];
   $hash->{nodeIdHex} = $a[4];
+  $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm":"zr");
 
   $hash->{Clients} = ":ZWave:STACKABLE_CC:";
   my %matchList = ( "1:ZWave" => ".*",
@@ -133,7 +133,7 @@ ZWCUL_DoInit($)
   $hash->{VERSION} = $ver;
 
   ZWCUL_SimpleWrite($hash, "zi".$hash->{homeIdSet}.$hash->{nodeIdHex});
-  ZWCUL_SimpleWrite($hash, $hash->{homeIdSet} =~ m/^0*$/ ? "zm" : "zr");
+  ZWCUL_SimpleWrite($hash, $hash->{initString});
 
   readingsSingleUpdate($hash, "state", "Initialized", 1);
   return undef;
@@ -282,70 +282,89 @@ ZWCUL_Parse($$$$)
   $hash->{RAWMSG} = $rmsg;
   my %addvals = (RAWMSG => $rmsg);
 
-  $rmsg = lc($rmsg) if($rmsg =~ m/^z/);
-  if($rmsg =~ m/^z(........)(..)(..)(..)(..)(..)(.*)(..)$/) {
+  Dispatch($hash, $rmsg, \%addvals) if($rmsg !~ m/^z/);
 
-    my $me = $hash->{NAME};
-    my ($H, $S, $F, $f, $L, $T, $P, $C) = ($1,$2,$3,$4,$5,$6,$7,$8);
-    my ($hF,$hf,$rf,$hc,$hops,$ri,$u1) = (hex($F),hex($f),"",0,"","","");
-    if($hF&0x80) { # routing
-      $hc = hex(substr($P,2,1));
-      $ri = "R:".substr($P, 0, ($hc+2)*2)." ";
-      $rf = substr($P, 0, 2);
-      $hops = substr($P, 4, $hc*2);
-      $hops =~ s/(..)/$1 /g;
-      $P  = substr($P,($hc+2)*2);
+  $rmsg = lc($rmsg);
+  my $me = $hash->{NAME};
+  my $s100 = (AttrVal($me, "dataRate", "100k") eq "100k");
+
+  my ($H, $S, $F, $f, $sn, $L, $T, $P, $C);
+  if($s100 && $rmsg =~ '^z(........)(..)(..)(..)(..)(..)(..)(.*)(....)$') {
+    ($H,$S,$F,$f,$L,$sn,$T,$P,$C) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+
+  } elsif(!$s100 && $rmsg =~ '^z(........)(..)(..)(.)(.)(..)(..)(.*)(..)$') {
+    ($H,$S,$F,$f,$sn,$L,$T,$P,$C) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+
+  } else {
+    Log 1, "ERROR: Unknown packet $rmsg";
+    return;
+
+  }
+
+  my ($hF,$hf, $rf,$hc,$hops,$ri,$u1) = (hex($F),hex($f),"",0,"","","");
+  # ITU G.9959, 8-4, 8-11
+  if(($s100 && ($hF&8)) || (!$s100 && ($hF&0x80))) { # routing
+    $hc = hex(substr($P,2,1));
+    $ri = "R:".substr($P, 0, ($hc+2)*2)." ";
+    $rf = substr($P, 0, 2);
+    $hops = substr($P, 4, $hc*2);
+    $hops =~ s/(..)/$1 /g;
+    $P  = substr($P,($hc+2)*2);
+  }
+  if($hF&4) { # Explorer?
+    $u1 = " E:".substr($P,0,16)." ";
+    $P = substr($P,16);
+  }
+
+  if(AttrVal($me, "verbose", 1) > 4) {
+    Log3 $hash, 5, "$H S:$S F:$F f:$f SN:$sn L:$L T:$T ${ri}${u1}P:$P C:$C";
+    Log3 $hash, 5, "   F:".
+      (($hF & 3)==1 ? " singleCast" :
+       ($hF & 3)==2 ? " multiCast" :
+       ($hF & 3)==3 ? " ack" : " unknownHeaderType:".($hF&0x3)).
+      (($hF & 4)    ? " explorer" : "").
+      (($hF & 8)    ? " routedFrame" : ""). # s100 only?
+      ($s100 ? 
+        ((($hF & 0x40)==0x20 ? " lowPower":"").
+         (($hF & 0x80)==0x40 ? " ackReq":"").
+         (($hf&0x7)==0 ? " "               :
+          ($hf&0x7)==1 ? " shortBeam"      :
+          ($hf&0x7)==2 ? " longBeam"       :
+          ($hf&0x7)==4 ? " fragmentedBeam" : " unknownBeam"))
+      : ((($hF & 0x10)==0x10 ? " speedModified":"").
+         (($hF & 0x20)==0x20 ? " lowPower":"").
+         (($hF & 0x40)==0x40 ? " ackReq":"").
+         (($hF & 0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops":"").
+         ((($hf>>1)&3)==0 ? " "          : 
+          (($hf>>1)&3)==1 ? " shortBeam" :
+          (($hf>>1)&3)==2 ? " longBeam"  :" unknownBeam")));
+  }
+
+  return if(AttrVal($me, "noDispatch", 0));
+
+
+  $hash->{homeId} = $H; # Fake homeId for monitor mode
+
+  if(length($P)) {
+    $rmsg = sprintf("0004%s%s%02x%s", $S, $S, length($P)/2, $P);
+    my $th = $modules{ZWave}{defptr}{"$H $S"};
+
+    if(!($S eq $hash->{nodeIdHex} && $H eq $hash->{homeIdSet}) && !$th) {
+      DoTrigger("global", "UNDEFINED ZWNode_${H}_$S ZWave $H ".hex($S));
+      $th = $modules{ZWave}{defptr}{"$H $S"};
     }
 
-    if($hF&4) { # Explorer?
-      $u1 = " E:".substr($P,0,16)." ";
-      $P = substr($P,16);
+    # Auto-Add classes, for easier monitor-mode set/get handling
+    my $pcl = $zwave_id2class{substr($P, 0, 2)};
+    if($th && $pcl) {
+      my $tname = $th->{NAME};
+      my $cl = AttrVal($tname, "classes", "");
+      $attr{$tname}{classes} = "$cl $pcl" if($cl !~ m/\b$pcl\b/);
     }
 
-    if(AttrVal($me, "verbose", 1) > 4) {
-      Log3 $hash, 5, "$H S:$S F:$F f:$f L:$L T:$T ${ri}${u1}P:$P C:$C";
-      Log3 $hash, 5, "   F:".unpack("B*",chr($hF)).
-        (($hF & 3)==1 ? " singleCast" :
-         ($hF & 3)==2 ? " multiCast" :
-         ($hF & 3)==3 ? " ack" : " unknownHeaderType:".($hF&0x3)).
-        (($hF & 4)    ? " explorer" : "").
-        (($hF & 0x10)==0x10 ? " lowSpeed" : "").
-        (($hF & 0x20)==0x20 ? " lowPower" : "").
-        (($hF & 0x40)==0x40 ? " ackReq"   : "").
-        (($hF & 0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops" : "");
-      my $hf=hex($f);
-      Log3 $hash, 5, "   f:".unpack("B*",chr(($hf))).
-        " seqNum:".($hf&0xf).
-        (($hf&0x10)==0x10 ? " wakeUpBeam":"").
-        (($hf&0xe0)       ? " unknownBits":"");
-    }
+  } else {
+    $rmsg = sprintf("0013%s00", $6);
 
-    return if(AttrVal($me, "noDispatch", 0));
-
-
-    $hash->{homeId} = $H;
-
-    if(length($P)) {
-      $rmsg = sprintf("0004%s%s%02x%s", $S, $S, length($P)/2, $P);
-      my $th = $modules{ZWave}{defptr}{"$H $S"};
-
-      if(!($S eq $hash->{nodeIdHex} && $H eq $hash->{homeIdSet}) && !$th) {
-        DoTrigger("global", "UNDEFINED ZWNode_${H}_$S ZWave $H ".hex($S));
-        $th = $modules{ZWave}{defptr}{"$H $S"};
-      }
-
-      # Auto-Add classes
-      my $pcl = $zwave_id2class{substr($P, 0, 2)};
-      if($th && $pcl) {
-        my $tname = $th->{NAME};
-        my $cl = AttrVal($tname, "classes", "");
-        $attr{$tname}{classes} = "$cl $pcl" if($cl !~ m/\b$pcl\b/);
-      }
-
-    } else {
-      $rmsg = sprintf("0013%s00", $6);
-
-    }
   }
   Dispatch($hash, $rmsg, \%addvals);
 }
@@ -434,6 +453,12 @@ ZWCUL_Attr($$$$)
       return "attr $name networkKey: not a hex string with a length of 32";
     }
     return;
+
+  } elsif($attr eq "dataRate" && $cmd eq "set") {
+    my $sfx = ($value eq "100k" ? "1" : "4");
+    $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm$sfx":"zr$sfx");
+    ZWCUL_DoInit($hash);
+
   }
 
   return undef;  
@@ -524,6 +549,9 @@ ZWCUL_Ready($)
   <a name="ZWCULattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a name="#dataRate">dataRate</a> [40k|100k]<br>
+      specify the data rate.
+      </li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#model">model</a></li>
@@ -535,6 +563,9 @@ ZWCUL_Ready($)
     <li>verbose<br>
       If the verbose attribute of this device (not global!) is set to 5 or
       higher, then detailed logging of the RF message will be done.
+      </li>
+    <li><a name="#noDispatch">noDispatch</a><br>
+      prohibit dispatching messages or creating ZWave devices
       </li>
   </ul>
   <br>
