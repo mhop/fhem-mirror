@@ -1099,7 +1099,7 @@ GetActiveTab ($)
 			devspec list of devices that should appear in the tab. The format is:<br/>
     			GROUPNAME:devspec1,devspec2,...,devspecN:ICONNAME</br/>
 			THe icon name is optional. Also the group name is optional. In case of missing group name, the matching devices are not grouped but shown as separate widgets without titles. For further details on the devspec format see:<br/>
-			<a href="http://192.168.20.20:8083/fhem/docs/commandref.html#devspec">Dev-Spec</a>
+			<a href="#devspec">Dev-Spec</a>
 		</li><br>		
 	  <a name="dashboard_tabXicon"></a>	
 		<li>dashboard_tabXicon<br>
@@ -1268,7 +1268,7 @@ GetActiveTab ($)
  			devspec Liste von Geräten, die im Tab angezeigt werden sollen. Das format ist:<br/>
     			GROUPNAME:devspec1,devspec2,...,devspecN:ICONNAME</br/>
 			Das Icon ist optional. Auch der Gruppenname muss nicht vorhanden sein. Im Falle dass dieser fehlt, werden die gefunden Geräte nicht gruppiert sondern als einzelne Widgets im Tab angezeigt. Für weitere Details bezüglich devspec:
-			<a href="http://192.168.20.20:8083/fhem/docs/commandref.html#devspec">Dev-Spec</a>
+			<a href="#devspec">Dev-Spec</a>
 		</li><br>		
 	  <a name="dashboard_tabXicon"></a>	
 		<li>dashboard_tabXicon<br>
