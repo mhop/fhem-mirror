@@ -286,7 +286,8 @@ ZWCUL_Parse($$$$)
 
   $rmsg = lc($rmsg);
   my $me = $hash->{NAME};
-  my $s100 = (AttrVal($me, "dataRate", "100k") eq "100k");
+  my $s100 = (AttrVal($me, "dataRate", "40k") eq "100k");
+
 
   my ($H, $S, $F, $f, $sn, $L, $T, $P, $C);
   if($s100 && $rmsg =~ '^z(........)(..)(..)(..)(..)(..)(..)(.*)(....)$') {
