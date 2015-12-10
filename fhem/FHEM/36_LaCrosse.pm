@@ -260,6 +260,9 @@ sub LaCrosse_Parse($$) {
     elsif($typeNumber == 3) {
       $typeName = "WS1080";
     }
+    elsif($typeNumber == 4) {
+      $typeName = "LaCrosseGateway";
+    }
     else {
       $typeName = "unknown";
     }
