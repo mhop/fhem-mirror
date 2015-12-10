@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 95_Dashboard: fixed local link in command ref
   - bugfix: 10_IT: Ignore sending if dummy (Forum ID 44990)
     feature: 10_IT: Add functionality for setting ITClock (Forum ID 44451)
   - bugfix: 14_CUL_TCM97001: Fix creation of plots 
