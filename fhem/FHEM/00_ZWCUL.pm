@@ -162,7 +162,7 @@ ZWCUL_cmd($$@)
 
   if(!defined($cmdList->{$cmdName})) {
     return "Unknown argument $cmdName, choose one of " .
-                join(",",sort keys %{$cmdList});
+                join(" ",sort keys %{$cmdList});
   }
 
   Log3 $hash, 4, "ZWCUL $type $name $cmdName ".join(" ",@a);
@@ -290,8 +290,8 @@ ZWCUL_Parse($$$$)
 
 
   my ($H, $S, $F, $f, $sn, $L, $T, $P, $C);
-  if($s100 && $rmsg =~ '^z(........)(..)(..)(..)(..)(..)(..)(.*)(....)$') {
-    ($H,$S,$F,$f,$L,$sn,$T,$P,$C) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
+  if($s100 && $rmsg =~ '^z(........)(..)(..)(.)(.)(..)(..)(.*)(....)$') {
+    ($H,$S,$F,$f,$sn,$L,$T,$P,$C) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
 
   } elsif(!$s100 && $rmsg =~ '^z(........)(..)(..)(.)(.)(..)(..)(.*)(..)$') {
     ($H,$S,$F,$f,$sn,$L,$T,$P,$C) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
@@ -304,7 +304,7 @@ ZWCUL_Parse($$$$)
 
   my ($hF,$hf, $rf,$hc,$hops,$ri,$u1) = (hex($F),hex($f),"",0,"","","");
   # ITU G.9959, 8-4, 8-11
-  if(($s100 && ($hF&8)) || (!$s100 && ($hF&0x80))) { # routing
+  if($hF&0x80) { # routing
     $hc = hex(substr($P,2,1));
     $ri = "R:".substr($P, 0, ($hc+2)*2)." ";
     $rf = substr($P, 0, 2);
@@ -324,21 +324,13 @@ ZWCUL_Parse($$$$)
        ($hF & 3)==2 ? " multiCast" :
        ($hF & 3)==3 ? " ack" : " unknownHeaderType:".($hF&0x3)).
       (($hF & 4)    ? " explorer" : "").
-      (($hF & 8)    ? " routedFrame" : ""). # s100 only?
-      ($s100 ? 
-        ((($hF & 0x40)==0x20 ? " lowPower":"").
-         (($hF & 0x80)==0x40 ? " ackReq":"").
-         (($hf&0x7)==0 ? " "               :
-          ($hf&0x7)==1 ? " shortBeam"      :
-          ($hf&0x7)==2 ? " longBeam"       :
-          ($hf&0x7)==4 ? " fragmentedBeam" : " unknownBeam"))
-      : ((($hF & 0x10)==0x10 ? " speedModified":"").
-         (($hF & 0x20)==0x20 ? " lowPower":"").
-         (($hF & 0x40)==0x40 ? " ackReq":"").
-         (($hF & 0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops":"").
-         ((($hf>>1)&3)==0 ? " "          : 
-          (($hf>>1)&3)==1 ? " shortBeam" :
-          (($hf>>1)&3)==2 ? " longBeam"  :" unknownBeam")));
+      (($hF & 0x10)==0x10 ? " speedModified":"").
+      (($hF & 0x20)==0x20 ? " lowPower":"").
+      (($hF & 0x40)==0x40 ? " ackReq":"").
+      (($hF & 0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops":"").
+      ((($hf>>1)&3)==0 ? " "          : 
+      (($hf>>1)&3)==1 ? " shortBeam" :
+      (($hf>>1)&3)==2 ? " longBeam"  :" unknownBeam");
   }
 
   return if(AttrVal($me, "noDispatch", 0));
@@ -353,14 +345,6 @@ ZWCUL_Parse($$$$)
     if(!($S eq $hash->{nodeIdHex} && $H eq $hash->{homeIdSet}) && !$th) {
       DoTrigger("global", "UNDEFINED ZWNode_${H}_$S ZWave $H ".hex($S));
       $th = $modules{ZWave}{defptr}{"$H $S"};
-    }
-
-    # Auto-Add classes, for easier monitor-mode set/get handling
-    my $pcl = $zwave_id2class{substr($P, 0, 2)};
-    if($th && $pcl) {
-      my $tname = $th->{NAME};
-      my $cl = AttrVal($tname, "classes", "");
-      $attr{$tname}{classes} = "$cl $pcl" if($cl !~ m/\b$pcl\b/);
     }
 
   } else {
