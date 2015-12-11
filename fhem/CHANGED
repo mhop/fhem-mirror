@@ -4,7 +4,7 @@
              - new set command navigateMenuList for automatic menu navigation
              - new set command/reading partyMode
              - disabledForInterval attribute added
-             see detaily in commandref
+             see details in commandref
   - change: YAMAHA AVR: optimized HTTP request command queue to allow 
             correct processing of concatenated set commands
             (no sleep commands neccesary anymore)
