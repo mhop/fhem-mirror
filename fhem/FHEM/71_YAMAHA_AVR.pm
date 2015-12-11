@@ -56,7 +56,7 @@ YAMAHA_AVR_Initialize($)
   $hash->{AttrFn}    = "YAMAHA_AVR_Attr";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 disabledForIntervals request-timeout:1,2,3,4,5 volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 model volume-smooth-change:0,1 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
                       $readingFnAttributes;
 }
 
@@ -108,8 +108,10 @@ YAMAHA_AVR_Define($$)
         $hash->{helper}{ON_INTERVAL} = $hash->{helper}{OFF_INTERVAL};
     }
     
-    $hash->{helper}{CMD_QUEUE} = ();
-    delete($hash->{helper}{HTTP_CONNECTION}) if(exists($hash->{helper}{HTTP_CONNECTION}));
+    $hash->{helper}{CMD_QUEUE} = [];
+    delete($hash->{helper}{".HTTP_CONNECTION"}) if(exists($hash->{helper}{".HTTP_CONNECTION"}));
+    
+    YAMAHA_AVR_getModel($hash);
     
     # In case of a redefine, check the zone parameter if the specified zone exist, otherwise use the main zone
     if(defined($hash->{helper}{ZONES}) and length($hash->{helper}{ZONES}) > 0)
@@ -138,8 +140,7 @@ YAMAHA_AVR_Define($$)
     }
 
     # start the status update timer
-    $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
-    YAMAHA_AVR_ResetTimer($hash,0);
+    YAMAHA_AVR_ResetTimer($hash,1);
   
     return undef;
 }
@@ -162,8 +163,6 @@ YAMAHA_AVR_GetStatus($;$)
     if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{helper}{ZONES}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
         YAMAHA_AVR_getModel($hash);
-        YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
-        return;
     }
 
     # get all available inputs and scenes if nothing is available
@@ -181,30 +180,38 @@ YAMAHA_AVR_GetStatus($;$)
     }
     
     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Update><YAMAHA_Network_Site><Status>GetParam</Status></YAMAHA_Network_Site></Update></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", 1);
 
+    if($hash->{ACTIVE_ZONE} eq "mainzone" and (!exists($hash->{helper}{SUPPORT_PARTY_MODE}) or (exists($hash->{helper}{SUPPORT_PARTY_MODE}) and $hash->{helper}{SUPPORT_PARTY_MODE})))
+    {
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Party_Mode><Mode>GetParam</Mode></Party_Mode></System></YAMAHA_AV>", "statusRequest", "partyModeStatus", {options => {can_fail => 1}});
+    }
+    elsif($hash->{ACTIVE_ZONE} ne "mainzone" and (!exists($hash->{helper}{SUPPORT_PARTY_MODE}) or (exists($hash->{helper}{SUPPORT_PARTY_MODE}) and $hash->{helper}{SUPPORT_PARTY_MODE})))
+    {
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Party_Mode><Target_Zone>GetParam</Target_Zone></Party_Mode></System></YAMAHA_AV>", "statusRequest", "partyModeZones", {options => {can_fail => 1}});
+    }
+    
     if(!exists($hash->{helper}{SUPPORT_TONE_STATUS}) or (exists($hash->{helper}{SUPPORT_TONE_STATUS}) and $hash->{helper}{SUPPORT_TONE_STATUS}))
     {   
         if (YAMAHA_AVR_isModel_DSP($hash))
         {
             if ($zone eq "Main_Zone")
             {
-                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Bass>GetParam</Bass></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
-                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Treble>GetParam</Treble></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Bass>GetParam</Bass></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", {options => {can_fail => 1}});
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Speaker><Treble>GetParam</Treble></Speaker></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", {options => {can_fail => 1}});
             }
             else
             {
-                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Bass>GetParam</Bass></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
-                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Treble>GetParam</Treble></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Bass>GetParam</Bass></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", {options => {can_fail => 1}});
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Tone><Treble>GetParam</Treble></Tone></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", {options => {can_fail => 1}});
             }
         }
         else
         {
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Bass>GetParam</Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Treble>GetParam</Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", 1);
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Bass>GetParam</Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", {options => {can_fail => 1}});
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Treble>GetParam</Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", {options => {can_fail => 1}});
         }
     }
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Update><Status>GetParam</Status></Update></Network></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", 1);
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Update><Status>GetParam</Status></Update></Network></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", {options => {can_fail => 1}});
     
     YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
     
@@ -296,57 +303,52 @@ YAMAHA_AVR_Set($@)
                                                           ((exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".
                                                           (exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").
                                                           (exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")."enhancer:on,off " : "").
-                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "play:noArg pause:noArg stop:noArg skip:reverse,forward ".
+                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward ".
                                                           (exists($hash->{helper}{PLAY_CONTROL}) ? "shuffle:on,off repeat:off,one,all " : "") : "").
                                                           "sleep:off,30min,60min,90min,120min,last ".
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
+                                                          (($hash->{helper}{SUPPORT_PARTY_MODE}) ? "partyMode:on,off " : "").
                                                           "statusRequest:noArg";
 
     Log3 $name, 5, "YAMAHA_AVR ($name) - set ".join(" ", @a);
     
     if($what eq "on")
     {        
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what,undef);
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>" ,$what,$a[2], {options => {wait_after_response => 2}});
     }
     elsif($what eq "off")
     {
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef);
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>", $what, undef,{options => {wait_after_response => 2}});
     }
     elsif($what eq "input")
     {
         if(defined($a[2]))
         {
-            if($hash->{READINGS}{power}{VAL} eq "on")
+
+            if(not $inputs_piped eq "")
             {
-                if(not $inputs_piped eq "")
+                if($a[2] =~ /^($inputs_piped)$/)
                 {
-                    if($a[2] =~ /^($inputs_piped)$/)
+                    my $command = YAMAHA_AVR_getParamName($hash, $a[2], $hash->{helper}{INPUTS});
+                    if(defined($command) and length($command) > 0)
                     {
-                        my $command = YAMAHA_AVR_getParamName($hash, $a[2], $hash->{helper}{INPUTS});
-                        if(defined($command) and length($command) > 0)
-                        {
-                             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>", $what, $a[2]);
-                        }
-                        else
-                        {
-                            return "invalid input: ".$a[2];
-                        } 
+                         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>", $what, $a[2]);
                     }
                     else
                     {
-                        return $usage;
-                    }
+                        return "invalid input: ".$a[2];
+                    } 
                 }
                 else
                 {
-                    return "No inputs are avaible. Please try an statusUpdate.";
+                    return $usage;
                 }
             }
             else
             {
-                return "input can only be used when device is powered on";
+                return "No inputs are avaible. Please try an statusUpdate.";
             }
         }
         else
@@ -393,27 +395,20 @@ YAMAHA_AVR_Set($@)
     {
         if(defined($a[2]))
         {
-            if($hash->{READINGS}{power}{VAL} eq "on")
+            # Depending on the status response, use the short or long Volume command
+            my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
+        
+            if( $a[2] eq "on" or ($a[2] eq "toggle" and ReadingsVal($hash->{NAME}, "mute", "off") eq "off"))
             {
-                # Depending on the status response, use the short or long Volume command
-                my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
-            
-                if( $a[2] eq "on" or ($a[2] eq "toggle" and ReadingsVal($hash->{NAME}, "mute", "off") eq "off"))
-                {
-                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>On</Mute></$volume_cmd></$zone></YAMAHA_AV>", $what, "on");
-                }
-                elsif($a[2] eq "off" or ($a[2] eq "toggle" and ReadingsVal($hash->{NAME}, "mute", "off") eq "on"))
-                {
-                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>Off</Mute></$volume_cmd></$zone></YAMAHA_AV>", $what, "off"); 
-                }
-                else
-                {
-                    return $usage;
-                }   
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>On</Mute></$volume_cmd></$zone></YAMAHA_AV>", $what, "on");
+            }
+            elsif($a[2] eq "off" or ($a[2] eq "toggle" and ReadingsVal($hash->{NAME}, "mute", "off") eq "on"))
+            {
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>Off</Mute></$volume_cmd></$zone></YAMAHA_AV>", $what, "off"); 
             }
             else
             {
-                return "mute can only used when device is powered on";
+                return $usage;
             }
         }
     }
@@ -446,50 +441,42 @@ YAMAHA_AVR_Set($@)
         
         if(defined($target_volume) )
         {
-            if($hash->{READINGS}{power}{VAL} eq "on")
-            {
-                # Depending on the status response, use the short or long Volume command
-                my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
-                
-                if(AttrVal($name, "volume-smooth-change", "0") eq "1")
-                {
-                
-                    my $steps = AttrVal($name, "volume-smooth-steps", 5);
-                    my $diff = int(($target_volume - $hash->{READINGS}{volumeStraight}{VAL}) / $steps / 0.5) * 0.5;
-                    my $current_volume = $hash->{READINGS}{volumeStraight}{VAL};
-
-                    if($diff > 0)
-                    {
-                        Log3 $name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of +$diff volume change to reach $target_volume)";
-                    }
-                    else
-                    {
-                        Log3 $name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of $diff volume change to reach $target_volume)";
-                    }
+            # Depending on the status response, use the short or long Volume command
+            my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
             
-                    # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
-                    if(defined($hash->{READINGS}{volumeStraight}{VAL}) and $diff != 0 and not (defined($a[3]) and $a[3] eq "direct"))
-                    {        
-                        Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff)."|$diff|$target_volume" );
-                    }
-                    else
-                    {
-                        # Set the desired volume
-                        Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB";
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", "$target_volume|0|$target_volume");
-                    }
+            if(AttrVal($name, "volume-smooth-change", "0") eq "1")
+            {
+                my $steps = AttrVal($name, "volume-smooth-steps", 5);
+                my $diff = int(($target_volume - $hash->{READINGS}{volumeStraight}{VAL}) / $steps / 0.5) * 0.5;
+                my $current_volume = $hash->{READINGS}{volumeStraight}{VAL};
+
+                if($diff > 0)
+                {
+                    Log3 $name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of +$diff volume change to reach $target_volume)";
+                }
+                else
+                {
+                    Log3 $name, 4, "YAMAHA_AVR ($name) - use smooth volume change (with $steps steps of $diff volume change to reach $target_volume)";
+                }
+        
+                # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
+                if(defined($hash->{READINGS}{volumeStraight}{VAL}) and $diff != 0 and not (defined($a[3]) and $a[3] eq "direct"))
+                {        
+                    Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff), {options => {volume_diff => $diff, volume_target => $target_volume}});
                 }
                 else
                 {
                     # Set the desired volume
                     Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB";
-                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", "$target_volume|0|$target_volume");
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", $target_volume, {options => {volume_diff => $diff, volume_target => $target_volume}});
                 }
             }
             else
             {
-                return "volume can only be used when device is powered on";
+                # Set the desired volume
+                Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB";
+                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", $target_volume, {options => {volume_diff => 0, volume_target => $target_volume}});
             }
         }
     }
@@ -497,43 +484,36 @@ YAMAHA_AVR_Set($@)
     {
         if(defined($a[2]))
         {
-            if($hash->{READINGS}{power}{VAL} eq "on")
+            my $bassVal = $a[2];
+            if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
             {
-                my $bassVal = $a[2];
-                if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
+                $bassVal = int($a[2]) if not (($a[2] =~ /^\d$/ ) || ($a[2] =~ /\.5/) || ($a[2] =~ /\.0/));
+                $bassVal = -6 if($bassVal < -6);
+                $bassVal = 6 if($bassVal > 6);
+                if (YAMAHA_AVR_isModel_DSP($hash))
                 {
-                    $bassVal = int($a[2]) if not (($a[2] =~ /^\d$/ ) || ($a[2] =~ /\.5/) || ($a[2] =~ /\.0/));
-                    $bassVal = -6 if($bassVal < -6);
-                    $bassVal = 6 if($bassVal > 6);
-                    if (YAMAHA_AVR_isModel_DSP($hash))
-                    {
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Speaker><Bass><Cross_Over><Val>" . ReadingsVal($name,".bass_crossover","125") . "</Val><Exp>0</Exp><Unit>Hz</Unit></Cross_Over><Lvl><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Bass></Speaker></Tone></$zone></YAMAHA_AV>", $what, $bassVal);
-                    }
-                    else
-                    {
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $bassVal);
-                    }
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Speaker><Bass><Cross_Over><Val>" . ReadingsVal($name,".bass_crossover","125") . "</Val><Exp>0</Exp><Unit>Hz</Unit></Cross_Over><Lvl><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Bass></Speaker></Tone></$zone></YAMAHA_AV>", $what, $bassVal);
                 }
-                else # !main_zone
+                else
                 {
-                    $bassVal = int($a[2]);
-                    $bassVal = -10 if($bassVal < -10);
-                    $bassVal = 10 if($bassVal > 10);
-                    if (YAMAHA_AVR_isModel_DSP($hash))
-                    {
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></$zone></YAMAHA_AV>", $what, $bassVal);
-                    }
-                    else
-                    {
-                        $bassVal-- if (($bassVal % 2 != 0) && ($bassVal > 0));
-                        $bassVal++ if (($bassVal % 2 != 0) && ($bassVal < 0));
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $bassVal);
-                    }
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $bassVal);
                 }
             }
-            else
+            else # !main_zone
             {
-                return "bass can only used when device is powered on";
+                $bassVal = int($a[2]);
+                $bassVal = -10 if($bassVal < -10);
+                $bassVal = 10 if($bassVal > 10);
+                if (YAMAHA_AVR_isModel_DSP($hash))
+                {
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></$zone></YAMAHA_AV>", $what, $bassVal);
+                }
+                else
+                {
+                    $bassVal-- if (($bassVal % 2 != 0) && ($bassVal > 0));
+                    $bassVal++ if (($bassVal % 2 != 0) && ($bassVal < 0));
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Bass><Val>" . $bassVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Bass></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $bassVal);
+                }
             }
         }
     }
@@ -541,43 +521,36 @@ YAMAHA_AVR_Set($@)
     {
         if(defined($a[2]))
         {
-            if($hash->{READINGS}{power}{VAL} eq "on")
+            my $trebleVal = $a[2];
+            if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
             {
-                my $trebleVal = $a[2];
-                if ((exists($hash->{ACTIVE_ZONE})) && ($hash->{ACTIVE_ZONE} eq "mainzone"))
+                $trebleVal = int($a[2]) if not (($a[2] =~ /^\d$/ ) || ($a[2] =~ /\.5/) || ($a[2] =~ /\.0/));
+                $trebleVal = -6 if($trebleVal < -6);
+                $trebleVal = 6 if($trebleVal > 6);
+                if (YAMAHA_AVR_isModel_DSP($hash))
                 {
-                    $trebleVal = int($a[2]) if not (($a[2] =~ /^\d$/ ) || ($a[2] =~ /\.5/) || ($a[2] =~ /\.0/));
-                    $trebleVal = -6 if($trebleVal < -6);
-                    $trebleVal = 6 if($trebleVal > 6);
-                    if (YAMAHA_AVR_isModel_DSP($hash))
-                    {
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Speaker><Treble><Cross_Over><Val>" . ReadingsVal($name,".treble_crossover","35") . "</Val><Exp>1</Exp><Unit>kHz</Unit></Cross_Over><Lvl><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Treble></Speaker></Tone></$zone></YAMAHA_AV>", $what, $trebleVal);
-                    }
-                    else
-                    {
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $trebleVal);
-                    }
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Speaker><Treble><Cross_Over><Val>" . ReadingsVal($name,".treble_crossover","35") . "</Val><Exp>1</Exp><Unit>kHz</Unit></Cross_Over><Lvl><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Treble></Speaker></Tone></$zone></YAMAHA_AV>", $what, $trebleVal);
                 }
-                else # !main_zone
+                else
                 {
-                    $trebleVal = int($trebleVal);
-                    $trebleVal = -10 if($trebleVal < -10);
-                    $trebleVal = 10 if($trebleVal > 10);
-                    if (YAMAHA_AVR_isModel_DSP($hash))
-                    {
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></$zone></YAMAHA_AV>", $what, $trebleVal);
-                    }
-                    else
-                    {
-                        $trebleVal-- if (($trebleVal % 2 != 0) && ($trebleVal > 0));
-                        $trebleVal++ if (($trebleVal % 2 != 0) && ($trebleVal < 0));
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $trebleVal);
-                    }
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $trebleVal);
                 }
             }
-            else
+            else # !main_zone
             {
-                return "treble can only used when device is powered on";
+                $trebleVal = int($trebleVal);
+                $trebleVal = -10 if($trebleVal < -10);
+                $trebleVal = 10 if($trebleVal > 10);
+                if (YAMAHA_AVR_isModel_DSP($hash))
+                {
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></$zone></YAMAHA_AV>", $what, $trebleVal);
+                }
+                else
+                {
+                    $trebleVal-- if (($trebleVal % 2 != 0) && ($trebleVal > 0));
+                    $trebleVal++ if (($trebleVal % 2 != 0) && ($trebleVal < 0));
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Sound_Video><Tone><Treble><Val>" . $trebleVal*10 . "</Val><Exp>1</Exp><Unit>dB</Unit></Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", $what, $trebleVal);
+                }
             }
         }
     }
@@ -782,27 +755,31 @@ YAMAHA_AVR_Set($@)
             return $usage;
         }
     }
-    elsif($what eq "play" and exists($hash->{helper}{CURRENT_INPUT_TAG}))
+    elsif($what eq "play")
     {
-         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Play</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Playback>Play</Playback></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
     }
-    elsif($what eq "stop" and exists($hash->{helper}{CURRENT_INPUT_TAG}))
+    elsif($what eq "stop")
     {
-         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Stop</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Playback>Stop</Playback></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
     }
-    elsif($what eq "pause" and exists($hash->{helper}{CURRENT_INPUT_TAG}))
+    elsif($what eq "pause")
     {
-         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Pause</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Playback>Pause</Playback></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
+    }
+    elsif($what eq "navigateListMenu")
+    {
+        YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, join(" ", @a[2..$#a]), {options => {init => 1}});
     }
     elsif($what eq "skip")
     {
         if($a[2] eq "forward")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Skip Fwd</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Playback>Skip Fwd</Playback></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
         }
         elsif($a[2] eq "reverse")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Playback>Skip Rev</Playback></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Playback>Skip Rev</Playback></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
         }
         else
         {
@@ -813,11 +790,11 @@ YAMAHA_AVR_Set($@)
     {
         if($a[2] eq "on")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Shuffle>On</Shuffle></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Play_Mode><Shuffle>On</Shuffle></Play_Mode></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
         }
         elsif($a[2] eq "off")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Shuffle>Off</Shuffle></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Play_Mode><Shuffle>Off</Shuffle></Play_Mode></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
         }
         else
         {
@@ -828,19 +805,44 @@ YAMAHA_AVR_Set($@)
     {
         if($a[2] eq "one")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Repeat>One</Repeat></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Play_Mode><Repeat>One</Repeat></Play_Mode></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
         }
         elsif($a[2] eq "off")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Repeat>Off</Repeat></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Play_Mode><Repeat>Off</Repeat></Play_Mode></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
         }
         elsif($a[2] eq "all")
         {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><".$hash->{helper}{CURRENT_INPUT_TAG}."><Play_Control><Play_Mode><Repeat>All</Repeat></Play_Mode></Play_Control></".$hash->{helper}{CURRENT_INPUT_TAG}."></YAMAHA_AV>", $what, $a[2]);
+            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Play_Mode><Repeat>All</Repeat></Play_Mode></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2]);
         }
         else
         {
             return $usage;
+        }
+    }
+    elsif($what eq "partyMode")
+    {
+        if($hash->{helper}{SUPPORT_PARTY_MODE} and $hash->{ACTIVE_ZONE} eq "mainzone")
+        {
+            if($a[2] eq "on")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><System><Party_Mode><Mode>On</Mode></Party_Mode></System></YAMAHA_AV>", $what, $a[2]);
+            }
+            elsif($a[2] eq "off")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><System><Party_Mode><Mode>Off</Mode></Party_Mode></System></YAMAHA_AV>", $what, $a[2]);
+            }
+        }
+        elsif($hash->{helper}{SUPPORT_PARTY_MODE} and $hash->{ACTIVE_ZONE} ne "mainzone")
+        {
+            if($a[2] eq "on")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><System><Party_Mode><Target_Zone><$zone>Enable</$zone></Target_Zone></Party_Mode></System></YAMAHA_AV>", $what, $a[2]);
+            }
+            elsif($a[2] eq "off")
+            {
+                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><System><Party_Mode><Target_Zone><$zone>Disable</$zone></Target_Zone></Party_Mode></System></YAMAHA_AV>", $what, $a[2]);
+            }
         }
     }
     elsif($what eq "statusRequest")
@@ -861,27 +863,12 @@ YAMAHA_AVR_Attr(@)
     my @a = @_;
     my $hash = $defs{$a[1]};
 
-    if($a[0] eq "set" && $a[2] eq "disable")
+    if($a[2] eq "disable")
     {
-        if($a[3] eq "0")
-        {
-            $hash->{helper}{DISABLED} = 0;
-            YAMAHA_AVR_GetStatus($hash, 1);
-        }
-        elsif($a[3] eq "1")
-        {
-            $hash->{helper}{DISABLED} = 1;
-        }
-    }
-    elsif($a[0] eq "del" && $a[2] eq "disable")
-    {
-        $hash->{helper}{DISABLED} = 0;
-        YAMAHA_AVR_GetStatus($hash, 1);
+        # Start/Stop Timer according to new disabled-Value
+        YAMAHA_AVR_ResetTimer($hash, 1);
     }
 
-    # Start/Stop Timer according to new disabled-Value
-    YAMAHA_AVR_ResetTimer($hash);
-    
     return undef;
 }
 
@@ -908,25 +895,40 @@ YAMAHA_AVR_Undefine($$)
 #############################
 # sends a command to the receiver via HTTP
 sub
-YAMAHA_AVR_SendCommand($@)
+YAMAHA_AVR_SendCommand($$$$;$)
 {
-    my ($hash, $data,$cmd,$arg,$can_fail) = @_;
+    my ($hash, $data,$cmd,$arg,$additional_args) = @_;
     my $name = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
-    my $blocking = 0;
+    my $options;
+    
+    $data = "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data if($data);
     
     # In case any URL changes must be made, this part is separated in this function".
     
     my $param = {
-                    data       => "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$data,
+                    data       => $data,
                     cmd        => $cmd,
-                    arg        => $arg,
-                    can_fail   => $can_fail                   
-                };
-    Log3 $name, 4, "YAMAHA_AVR ($name) - append to queue \"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
-    push @{$hash->{helper}{CMD_QUEUE}}, $param;  
+                    arg        => $arg
+                };     
+    
+    map {$param->{$_} = $additional_args->{$_}} keys %{$additional_args};
+    
+    $options = $additional_args->{options} if(exists($additional_args->{options}));
+    
+    Log3 $name, 4, "YAMAHA_AVR ($name) - append to queue ".($options->{at_first} ? "(at first) ":"")."\"$cmd".(defined($arg) ? " ".$arg : "")."\": $data";
+    
+    if($options->{at_first})
+    {
+        unshift @{$hash->{helper}{CMD_QUEUE}}, $param;  
+    }
+    else
+    {
+        push @{$hash->{helper}{CMD_QUEUE}}, $param;  
+    }
     
     YAMAHA_AVR_HandleCmdQueue($hash);
+    
+    return undef;
 }
 
 #############################
@@ -935,6 +937,13 @@ sub
 YAMAHA_AVR_HandleCmdQueue($)
 {
     my ($hash) = @_;
+    
+    if(ref($hash) ne "HASH")
+    {
+        my ($tmp,$name) = split(":", $hash,2);
+        $hash = $defs{$name};
+    }
+    
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     
@@ -951,18 +960,117 @@ YAMAHA_AVR_HandleCmdQueue($)
                         callback   => \&YAMAHA_AVR_ParseResponse
                       };
    
-        my $request = pop @{$hash->{helper}{CMD_QUEUE}};
+        my $request = YAMAHA_AVR_getNextRequestHash($hash);
 
-        map {$hash->{helper}{HTTP_CONNECTION}{$_} = $params->{$_}} keys %{$params};
-        map {$hash->{helper}{HTTP_CONNECTION}{$_} = $request->{$_}} keys %{$request};
+        unless(defined($request))
+        {
+            # still request in queue, but not mentioned to be executed now
+            RemoveInternalTimer("YAMAHA_AVR_HandleCmdQueue:$name");
+            InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", "YAMAHA_AVR_HandleCmdQueue:$name", 0);
+            return undef;
+        }
         
+        $request->{options}{priority} = 3 unless(exists($request->{options}{priority}));
+        delete($request->{data}) if(exists($request->{data}) and !$request->{data});
+        $request->{data}=~ s/\[CURRENT_INPUT_TAG\]/$hash->{helper}{CURRENT_INPUT_TAG}/g if(exists($request->{data}) and exists($hash->{helper}{CURRENT_INPUT_TAG}));
+
+        
+        map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $params->{$_}} keys %{$params};
+        map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $request->{$_}} keys %{$request};
+       
         $hash->{helper}{RUNNING_REQUEST} = 1;
-        Log3 $name, 4, "YAMAHA_AVR ($name) - send command \"$request->{cmd}".(defined($request->{arg}) ? " ".$request->{arg} : "")."\": $request->{data}";
-        HttpUtils_NonblockingGet($hash->{helper}{HTTP_CONNECTION});
+        Log3 $name, 4, "YAMAHA_AVR ($name) - send command \"$request->{cmd}".(defined($request->{arg}) ? " ".$request->{arg} : "")."\"".(exists($request->{data}) ? ": ".$request->{data} : "");
+        HttpUtils_NonblockingGet($hash->{helper}{".HTTP_CONNECTION"});
     }
+    
+    $hash->{CMDs_pending} = @{$hash->{helper}{CMD_QUEUE}};
+    delete($hash->{CMDs_pending}) unless($hash->{CMDs_pending}); 
+    
+    return undef;
 }
 
+#############################
+# selects the next command from command queue that has to be executed (undef if no command has to be executed now)
+sub YAMAHA_AVR_getNextRequestHash($)
+{
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
 
+    if(@{$hash->{helper}{CMD_QUEUE}})
+    {
+        my $last = $#{$hash->{helper}{CMD_QUEUE}};
+        
+        my $next_item;
+        my $next_item_prio;
+        
+        for my $item (0 .. $last)
+        {
+            if(defined($hash->{helper}{CMD_QUEUE}[$item]))
+            {
+                my $cmd = (defined($hash->{helper}{CMD_QUEUE}[$item]{cmd}) ? $hash->{helper}{CMD_QUEUE}[$item]{cmd} : "");
+                my $arg = (defined($hash->{helper}{CMD_QUEUE}[$item]{arg}) ? $hash->{helper}{CMD_QUEUE}[$item]{arg} : "");
+                my $data = (defined($hash->{helper}{CMD_QUEUE}[$item]{data}) ? "1" : "0");
+                
+                my $not_before = (exists($hash->{helper}{CMD_QUEUE}[$item]{options}{not_before}) ? sprintf("%.2fs", ($hash->{helper}{CMD_QUEUE}[$item]{options}{not_before} - gettimeofday())): "0");
+                my $priority = (exists($hash->{helper}{CMD_QUEUE}[$item]{options}{priority}) ? $hash->{helper}{CMD_QUEUE}[$item]{options}{priority} : "-");
+                my $at_first = (exists($hash->{helper}{CMD_QUEUE}[$item]{options}{at_first}) ? $hash->{helper}{CMD_QUEUE}[$item]{options}{at_first} : "0");
+                
+                Log3 $name, 5, "YAMAHA_AVR ($name) - checking cmd queue item: $item (cmd: $cmd, arg: $arg, data: $data, priority: $priority, at_first: $at_first, not_before: $not_before)";
+            
+                if(exists($hash->{helper}{CMD_QUEUE}[$item]{data}))
+                {
+                    if(defined($next_item) and ((defined($next_item_prio) and exists($hash->{helper}{CMD_QUEUE}[$item]{options}{priority}) and  $hash->{helper}{CMD_QUEUE}[$item]{options}{priority} < $next_item_prio) or (defined($hash->{helper}{CMD_QUEUE}[$item]{options}{priority}) and not defined($next_item_prio))))
+                    {
+                        # choose actual item if priority of previous selected item is higher or not set
+                        $next_item = $item;
+                        $next_item_prio = $hash->{helper}{CMD_QUEUE}[$item]{options}{priority};
+                    }
+            
+                    unless((exists($hash->{helper}{CMD_QUEUE}[$item]{options}{not_before}) and $hash->{helper}{CMD_QUEUE}[$item]{options}{not_before} > gettimeofday()) or (defined($next_item)))
+                    {
+                        $next_item = $item;
+                        $next_item_prio = $hash->{helper}{CMD_QUEUE}[$item]{options}{priority};
+                    }
+                }
+                else # dummy command to delay the execution of further commands in queue 
+                {
+                    if(exists($hash->{helper}{CMD_QUEUE}[$item]{options}{not_before}) and $hash->{helper}{CMD_QUEUE}[$item]{options}{not_before} <= gettimeofday() and not(defined($next_item)))
+                    {
+                        # if not_before timestamp of dummy item is reached, delete it and continue processing for next command
+                        Log3 $name, 5, "YAMAHA_AVR ($name) - item $item is a dummy cmd item with 'not_before' set which is already expired, delete it and recheck index $item again";
+                        splice(@{$hash->{helper}{CMD_QUEUE}}, $item, 1);
+                        redo;
+                    }
+                    elsif(exists($hash->{helper}{CMD_QUEUE}[$item]{options}{not_before}) and not(defined($next_item) and defined($next_item_prio)))
+                    {
+                        Log3 $name, 5, "YAMAHA_AVR ($name) - we have to wait ".sprintf("%.2fs", ($hash->{helper}{CMD_QUEUE}[$item]{options}{not_before} - gettimeofday()))." seconds before next item can be checked"; 
+                        last;
+                    }
+                }
+            }
+        }
+        
+        if(defined($next_item))
+        {
+        
+            if(exists($hash->{helper}{CMD_QUEUE}[$next_item]{options}{not_before}))
+            {
+                delete($hash->{helper}{CMD_QUEUE}[$next_item]{options}{not_before});
+            }
+        
+            my $return = $hash->{helper}{CMD_QUEUE}[$next_item];
+            
+            splice(@{$hash->{helper}{CMD_QUEUE}}, $next_item, 1);
+            $hash->{helper}{CMD_QUEUE} = () unless(defined($hash->{helper}{CMD_QUEUE}));
+            
+            Log3 $name, 5, "YAMAHA_AVR ($name) - choosed item $next_item as next command";
+            return $return;
+        }
+        
+        Log3 $name, 5, "YAMAHA_AVR ($name) - no suitable command item found";
+        return undef;
+    }
+}
 
 #############################
 # parses the receiver response
@@ -975,11 +1083,14 @@ YAMAHA_AVR_ParseResponse ($$$)
     my $name = $hash->{NAME};
     my $cmd = $param->{cmd};
     my $arg = $param->{arg};
-    my $can_fail = $param->{can_fail};
+    my $options = $param->{options};
     my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
  
+    $data = "" unless(defined($data));
+    $err = "" unless(defined($err));
+    
     $hash->{helper}{RUNNING_REQUEST} = 0;
-    delete($hash->{helper}{HTTP_CONNECTION}) unless($param->{keepalive});
+    delete($hash->{helper}{".HTTP_CONNECTION"}) unless($param->{keepalive});
     
     if(exists($param->{code}))
     {
@@ -995,10 +1106,14 @@ YAMAHA_AVR_ParseResponse ($$$)
             {
                 $hash->{helper}{SUPPORT_TONE_STATUS} = 0;
             }
+            elsif($arg eq "partyModeStatus" or $arg eq "partyModeZones")
+            {
+                $hash->{helper}{SUPPORT_TONE_STATUS} = 0;
+            }
         }
     }
     
-    if($err ne "" and not $can_fail)
+    if($err ne "" and not $options->{can_fail})
     {
         Log3 $name, 5, "YAMAHA_AVR ($name) - could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $err";
 
@@ -1010,6 +1125,13 @@ YAMAHA_AVR_ParseResponse ($$$)
         }  
 
         $hash->{helper}{AVAILABLE} = 0;
+    }
+    
+    # add a dummy queue entry to wait a specific time before next command starts
+    if($options->{wait_after_response})
+    {
+        Log3 $name, 5, "YAMAHA_AVR ($name) - next command has to wait at least ".$options->{wait_after_response}." seconds before execution";
+        unshift @{$hash->{helper}{CMD_QUEUE}}, {options=> { priority => 1, not_before => (gettimeofday()+$options->{wait_after_response})} };
     }
     
     if($data ne "")
@@ -1025,7 +1147,7 @@ YAMAHA_AVR_ParseResponse ($$$)
         
         $hash->{helper}{AVAILABLE} = 1;
         
-        if(not $data =~ / RC="0"/ and $data =~ / RC="(\d+)"/ and not $can_fail)
+        if(not $data =~ / RC="0"/ and $data =~ / RC="(\d+)"/ and not $options->{can_fail})
         {
             # if the returncode isn't 0, than the command was not successful
             Log3 $name, 3, "YAMAHA_AVR ($name) - Could not execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": received return code $1";
@@ -1048,15 +1170,11 @@ YAMAHA_AVR_ParseResponse ($$$)
                 
                 Log3 $name, 5, "YAMAHA_AVR ($name) - requesting unit description XML: http://".$hash->{helper}{ADDRESS}.$hash->{helper}{XML};
                 
-                HttpUtils_NonblockingGet({
-                            url        => "http://".$hash->{helper}{ADDRESS}.$hash->{helper}{XML} ,
-                            timeout    => AttrVal($name, "request-timeout", 4),
-                            noshutdown => 1,
-                            loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
-                            hash       => $hash,
-                            callback   => \&YAMAHA_AVR_ParseXML
-                        }
-                );  
+               YAMAHA_AVR_SendCommand($hash,0,"statusRequest","retrieveDescXML", {
+                                                                                    url        => "http://".$hash->{helper}{ADDRESS}.$hash->{helper}{XML} ,
+                                                                                    callback   => \&YAMAHA_AVR_ParseXML,
+                                                                                    options    => {at_first => 1, priority => 1}
+                                                                                 });
             }
             elsif($arg eq "systemConfig")
             {
@@ -1108,6 +1226,39 @@ YAMAHA_AVR_ParseResponse ($$$)
                         Log3 $name, 4, "YAMAHA_AVR ($name) - found scene: $1";
                         $hash->{helper}{SCENES} .= $1;
                     }
+                }
+            }
+            elsif($arg eq "partyModeStatus")
+            {            
+                if($hash->{ACTIVE_ZONE} eq "mainzone" and $data =~ /<Mode>(.+?)<\/Mode>/)
+                {
+                    $hash->{helper}{SUPPORT_PARTY_MODE} = 1;
+                    readingsBulkUpdate($hash, "partyMode", lc($1));
+                }
+                else
+                {
+                    $hash->{helper}{SUPPORT_PARTY_MODE} = 0;
+                }
+            }  
+            elsif($arg eq "partyModeZones")
+            {
+                if($hash->{ACTIVE_ZONE} ne "mainzone" and $data =~ /<Target_Zone>.*?<$zone>(.+?)<\/$zone>.*?<\/Target_Zone>/)
+                {
+                    $hash->{helper}{SUPPORT_PARTY_MODE} = 1;
+                    
+                    if($1 eq "Enable")
+                    {
+                        readingsBulkUpdate($hash, "partyModeStatus", "on");  
+                    
+                    }
+                    elsif($1 eq "Disable")
+                    {
+                        readingsBulkUpdate($hash, "partyModeStatus", "off");  
+                    }
+                }
+                else
+                {
+                    $hash->{helper}{SUPPORT_PARTY_MODE} = 0;
                 }
             }
             elsif($arg eq "toneStatus")
@@ -1210,20 +1361,20 @@ YAMAHA_AVR_ParseResponse ($$$)
                 # current input same as the corresponding set command name
                 if($data =~ /<Input_Sel>(.+?)<\/Input_Sel>/)
                 {
-                    $hash->{helper}{CURRENT_INPUT_TAG} = $1;
-                    
                     readingsBulkUpdate($hash, "input", YAMAHA_AVR_Param2Fhem(lc($1), 0));
                     
                     if($data =~ /<Src_Name>(.+?)<\/Src_Name>/)
                     {
+                        $hash->{helper}{CURRENT_INPUT_TAG} = $1;
                         Log3 $name, 4, "YAMAHA_AVR ($name) - check for extended input informations on <$1>";
                     
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo", 1);
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat", 1);
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle", 1);
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo", {options => {can_fail => 1}});
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat", {options => {can_fail => 1}});
+                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle", {options => {can_fail => 1}});
                     }
                     else
                     {
+                        delete($hash->{helper}{CURRENT_INPUT_TAG}) if(exists($hash->{helper}{CURRENT_INPUT_TAG}));
                         readingsBulkUpdate($hash, "currentAlbum", "", 0);
                         readingsBulkUpdate($hash, "currentTitle", "", 0);
                         readingsBulkUpdate($hash, "currentChannel", "", 0);
@@ -1382,23 +1533,14 @@ YAMAHA_AVR_ParseResponse ($$$)
                 {
                     readingsBulkUpdate($hash, "newFirmware", lc($1));
                 }
-            
             }
         }
         elsif($cmd eq "on")
         {
             if($data =~ /RC="0"/ and $data =~ /<Power><\/Power>/)
             {
-                # As the receiver startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
                 readingsBulkUpdate($hash, "power", "on");
                 readingsBulkUpdate($hash, "state","on");
-                
-                readingsEndUpdate($hash, 1);
-                
-                YAMAHA_AVR_ResetTimer($hash, 5);
-                YAMAHA_AVR_HandleCmdQueue($hash);
-
-                return undef;
             }
         }
         elsif($cmd eq "off")
@@ -1407,18 +1549,103 @@ YAMAHA_AVR_ParseResponse ($$$)
             {
                 readingsBulkUpdate($hash, "power", "off");
                 readingsBulkUpdate($hash, "state","off");
+            }
+        }
+        elsif($cmd eq "navigateListMenu")
+        {
+            my @list_cmds = split("/", $arg);
+            
+            if($data =~ /<Menu_Status>(.+?)<\/Menu_Status><Menu_Layer>(.+?)<\/Menu_Layer><Menu_Name>(.+?)<\/Menu_Name><Current_List>(.+?)<\/Current_List><Cursor_Position><Current_Line>(\d+)<\/Current_Line><Max_Line>(\d+)<\/Max_Line><\/Cursor_Position>/)
+            {
+                my $menu_status = $1;
+                my $menu_layer = $2;
+                my $menu_name = $3;
+                my $current_list = $4;
+                my $current_line = $5;
+                my $max_line = $6;
+                my $last = ($param->{last_menu_item} or ($menu_layer == ($#list_cmds + 1)));
+
+                if($menu_status eq "Ready")
+                {
+                    # menu browsing finished
+                   
+                    if(exists($options->{last_layer}) and $options->{last_layer} == $menu_layer and $last and $options->{item_selected})
+                    {
+                         readingsEndUpdate($hash, 1);
+                         YAMAHA_AVR_HandleCmdQueue($hash);
+                         return;
+                    }
+                    
+                    # initialization sequence
+                    if($options->{init} and $menu_layer > 1)
+                    {
+                        Log3 $name, 5 ,"YAMAHA_AVR ($name) - return to start of menu to begin menu browsing";
+                        YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Cursor>Return to Home</Cursor></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
+                        YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg,  {options => {init => 1}});
+                        readingsEndUpdate($hash, 1);
+                        YAMAHA_AVR_HandleCmdQueue($hash);
+                        return;
+                    }
+                    
+                    if($menu_layer > @list_cmds)
+                    {
+                        # menu is still not browsed fully, but no more commands are left.
+                        Log3 $name, 5 ,"YAMAHA_AVR ($name) - no more commands left to browse deeper into current menu.";
+                    }
+                    else # browse through the current item list
+                    {
+                        my $search = $list_cmds[($menu_layer - 1)];
+                        
+                        if($current_list =~ /<Line_(\d+)><Txt>[^<]*$search[^<]*<\/Txt><Attribute>(.+?)<\/Attribute>/)
+                        {
+                            my $last = ($2 eq "Item");                       
+                            my $absolute_line_number = $1 + int($current_line / 8) * 8;
+                            
+                            Log3 $name, 5 ,"YAMAHA_AVR ($name) - selecting menu line item $1 (absolute number: $absolute_line_number)";
+                            
+                            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Jump_Line>$absolute_line_number</Jump_Line></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
+                            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Direct_Sel>Line_$1</Direct_Sel></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
+                            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg, {options => {last_layer => $menu_layer, item_selected => 1, last_menu_item => $last, not_before => gettimeofday()+1}});
+                        }
+                        else
+                        {
+                            if(($current_line + 8) < $max_line)
+                            {
+                                #request next page
+                                Log3 $name, 5 ,"YAMAHA_AVR ($name) - request next page of menu (current line: $current_line, max lines: $max_line)";
+                                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Page>Down</Page></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
+                                YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg, {options => {not_before => gettimeofday()+1}});
+                            }
+                            else
+                            {
+                                Log3 $name, 3 ,"YAMAHA_AVR ($name) - no more pages left on menu to find item $search in $menu_name. aborting menu browsing";
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    # list must be checked again in 1 second.
+                    Log3 $name, 5 ,"YAMAHA_AVR ($name) - menu is busy. retrying in 1 second";
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg,{options => {not_before => (gettimeofday()+1), last_layer => $menu_layer}});
+                }
                 
-                readingsEndUpdate($hash, 1);
-                
-                YAMAHA_AVR_ResetTimer($hash, 3);
+                # avoid statusRequest during menu browsing
+                readingsEndUpdate($hash, 1); 
                 YAMAHA_AVR_HandleCmdQueue($hash);
-                
                 return undef;
             }
         }
-        elsif($cmd eq "volume")
+        elsif($cmd eq "input")
         {
-            my ($current_volume, $diff,$target_volume ) = split("\\|", $arg);
+            # schedule an immediate status request right before the next command to ensure the correct presence of $hash->{helper}{CURRENT_INPUT_TAG} for the next command
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus", {options => {priority => 1, at_first => 1}});
+        }
+        elsif($cmd eq "volume" and $data =~ /RC="0"/)
+        {
+            my $current_volume = $arg;
+            my $target_volume = $options->{volume_target};
+            my $diff = $options->{volume_diff};
             
             # Depending on the status response, use the short or long Volume command
             my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
@@ -1432,33 +1659,27 @@ YAMAHA_AVR_ParseResponse ($$$)
             {
                 readingsEndUpdate($hash, 1);  
      
-                if($diff == 0)
+                if($diff == 0 or (abs($current_volume - $target_volume) < abs($diff)))
                 {
                     Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB (target is $target_volume dB)";
-                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", "$target_volume|0|$target_volume" );
-                    return undef;
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", $target_volume, {options => {volume_diff => $diff, at_first => 1, priority => 1, volume_target => $target_volume}});
                 }
                 else
                 {
-                    if(abs($current_volume - $target_volume) < abs($diff))
-                    {
-                        Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".$target_volume." dB (target is $target_volume dB)";
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".($target_volume*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", "$target_volume|0|$target_volume" );
-                        return undef;
-                    }
-                    else
-                    {
-                        Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff)."|$diff|$target_volume" );
-                        return undef;
-                    }
+                    Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
+                    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff), {options => {volume_diff => $diff, at_first => 1, priority => 1, volume_target => $target_volume}});
                 }
+            }
+            else
+            {
+                # volume change finished, requesting overall status
+                YAMAHA_AVR_GetStatus($hash, 1)
             }
         }
         
         readingsEndUpdate($hash, 1);  
         
-        YAMAHA_AVR_GetStatus($hash, 1) if($cmd ne "statusRequest" and $cmd ne "on");
+        YAMAHA_AVR_GetStatus($hash, 1) if($cmd ne "statusRequest" and $cmd ne "volume" and $cmd ne "input");
         YAMAHA_AVR_ResetTimer($hash, 10) if($cmd eq "on");
     }
     
@@ -1510,8 +1731,8 @@ sub YAMAHA_AVR_getModel($)
 {
     my ($hash) = @_;
    
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>", "statusRequest","unitDescription");
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig");
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>", "statusRequest","unitDescription", {options => {at_first => 1, priority => 1}});
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig", {options => {at_first => 1, priority => 1}});
 }    
     
 #############################
@@ -1526,7 +1747,15 @@ YAMAHA_AVR_ParseXML($$$)
    
     Log3 $name, 3, "YAMAHA_AVR ($name) - could not get unit description. Please turn on the device or check for correct hostaddress!" if ($err ne "" and defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
     
-    return undef if($data eq "");
+    $hash->{helper}{RUNNING_REQUEST} = 0;
+    delete($hash->{helper}{".HTTP_CONNECTION"}) unless($param->{keepalive});
+    
+    if($data eq "")
+    {
+        YAMAHA_AVR_HandleCmdQueue($hash);
+        return undef
+    }
+    
 
     delete($hash->{helper}{ZONES}) if(exists($hash->{helper}{ZONES}));
     
@@ -1583,7 +1812,7 @@ YAMAHA_AVR_ParseXML($$$)
         $hash->{ACTIVE_ZONE} = "mainzone";
     }
     
-    YAMAHA_AVR_GetStatus($hash, 1);
+    YAMAHA_AVR_HandleCmdQueue($hash); 
 }
 
 #############################
@@ -1619,10 +1848,10 @@ sub YAMAHA_AVR_getInputs($)
     return undef if (not defined($zone) or $zone eq "");
     
     # query all inputs
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>", "statusRequest","getInputs");
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>", "statusRequest","getInputs", {options => {at_first => 1, priority => 1}});
 
     # query all available scenes (only in mainzone available)
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes", 1) if($hash->{ACTIVE_ZONE} eq "mainzone");
+    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Scene><Scene_Sel_Item>GetParam</Scene_Sel_Item></Scene></$zone></YAMAHA_AV>", "statusRequest","getScenes", {options => {can_fail => 1, at_first => 1, priority => 1}}) if($hash->{ACTIVE_ZONE} eq "mainzone");
 }
 
 #############################
@@ -1633,7 +1862,7 @@ sub YAMAHA_AVR_ResetTimer($;$)
     
     RemoveInternalTimer($hash);
     
-    if($hash->{helper}{DISABLED} == 0)
+    unless(IsDisabled($hash->{NAME}))
     {
         if(defined($interval))
         {
@@ -1670,7 +1899,11 @@ sub YAMAHA_AVR_html2txt($)
     $string =~ s/(\xdc|&Uuml;)/Ü/g;
     $string =~ s/(\xdf|&szlig;)/ß/g;
     
-    $string =~ s/<.+?>//g;
+    $string =~ s/<[^>]+>//g;
+    
+    $string =~ s/&gt;/>/g;
+    $string =~ s/&lt;/</g;
+    
     $string =~ s/(^\s+|\s+$)//g;
 
     return $string;
@@ -1797,6 +2030,8 @@ YAMAHA_AVR_isModel_DSP($)
 <li><b>enhancer</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the internal sound enhancer</li>
 <li><b>3dCinemaDsp</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the CINEMA DSP 3D mode</li>
 <li><b>adaptiveDrc</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the Adaptive DRC</li>
+<li><b>partyMode</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp;controls the party mode. In Main Zone the whole party mode is enabled/disabled system wide. In each zone executed, it enables/disables the current zone from party mode.</li>
+<li><b>navigateListMenu</b> [item1]/[item2]/[itemN]/... &nbsp;&nbsp;-&nbsp;&nbsp; select a specific item within a menu structure. for menu-based inputs (e.g. Net Radio, USB, Server, ...) only. See chapter "Automatic Menu Navigation" for further details and examples.</li>
 <li><b>straight</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses the internal codec converter and plays the original sound codec</li>
 <li><b>direct</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses all internal sound enhancement features and plays the sound straight directly</li> 
 <li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; activates the internal sleep timer</li>
@@ -1813,10 +2048,6 @@ YAMAHA_AVR_isModel_DSP($)
 </ul><br><br>
 <u>Remote control (not in all zones available, depending on your model)</u><br><br>
 <ul>
-    In many receiver models, inputs exist, which can't be used just by selecting them. These inputs needs
-    a manual interaction with the remote control to activate the playback (e.g. Internet Radio, Network Streaming).<br><br>
-    For this application the following commands are available:<br><br>
-
     <u>Cursor Selection:</u><br><br>
     <ul><code>
     remoteControl up<br>
@@ -1840,39 +2071,63 @@ YAMAHA_AVR_isModel_DSP($)
     remoteControl tunerPresetDown<br>
     </code></ul><br><br>
 
-    The button names are the same as on your remote control.<br><br>
-    
-    A typical example is the automatical turn on and play an internet radio broadcast:<br><br>
-    <ul><code>
-    # the initial definition.<br>
-    define AV_receiver YAMAHA_AVR 192.168.0.3
-    </code></ul><br><br>
-    And in your myUtils.pm (based on myUtilsTemplate.pm) the following function:<br><br>
-    <ul><code>
-        sub startNetRadio()<br>
-        {<br>
-        &nbsp;&nbsp;fhem("set AV_Receiver on;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 5;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver input netradio;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 4;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 2;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 2;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter");<br>
-        }<br>
-    </code></ul><br><br>
-    The remote control commands must be separated with a sleep, because the receiver is loading meanwhile and don't accept commands. These commands will be executed in background and does not harm the FHEM main process.<br><br>
-    
-    Now you can use this function by typing the following line in your FHEM command line or in your notify-definitions:<br><br>
-    <ul><code>
-    {startNetRadio()}
-    </code></ul><br><br>
-    
-    
-    
+    The button names are the same as on your remote control.
   </ul>
-
+  <br>
+<a name="YAMAHA_AVR-MenuNavigation"></a>
+<u>Automatic Menu Navigation (only for menu based inputs like Net Radio, Server, USB, ...)</u><br><br>
+<ul>
+For menu based inputs you have to select a specific item out of a complex menu structure to start playing music.
+Mostly you want to start automatic playback for a specific internet radio (input: Net Radio) or similar, which you have to navigate through several menu and submenu items.
+<br><br>
+To automate such a complex menu navigation, you can use the set command "navigateListMenu". 
+As Parameter you give a menu path of the desired item you want to select. 
+YAMAHA_AVR will go through the menu and selects all menu items given as parameter from left to right. 
+All menu items are separated by a forward slash (/).
+<br><br>
+So here are some examples:
+    Receiver's current input is "netradio":<br><br>
+    <ul>
+    <code>
+          set &lt;name&gt; navigateListMenu Countries/Australia/All Stations/1Radio.FM<br>
+          set &lt;name&gt; navigateListMenu Bookmarks/Favorites/1LIVE</code>
+    </ul><br>
+    If you want to turn on your receiver and immediatly select a specific internet radio you may use:<br><br>
+    <ul>
+        <code>
+          set &lt;name&gt; on ; set &lt;name&gt; volume 20 direct ; set &lt;name&gt; input netradio ; set &lt;name&gt; navigateListMenu Bookmarks/Favorites/1LIVE<br><br>
+          # for regular execution to a specific time using the <a href="#at">at</a> module<br>
+          define turn_on_Radio_morning at *08:00 set &lt;name&gt; on ; set &lt;name&gt; volume 20 direct ; set &lt;name&gt; input netradio ; set &lt;name&gt; navigateListMenu Countries/Australia/All Stations/1Radio.FM<br><br>
+          define turn_on_Radio_evening at *17:00 set &lt;name&gt; on ; set &lt;name&gt; volume 20 direct ; set &lt;name&gt; input netradio ; set &lt;name&gt; navigateListMenu Bookmarks/Favorites/1LIVE</code>
+    </ul>
+    <br>
+    Receiver's current input is "server" (network DLNA shares):<br><br> 
+    <ul>
+    <code>
+          set &lt;name&gt; navigateListMenu NAS/Music/Sort By Artist/Alicia Keys/Songs in A Minor/Fallin
+    </code>
+    </ul>
+    <br>
+    The exact menu structure depends on your own configuration and network devices who provide content. 
+    Each menu item name has not to be provided fully. Each item name will be treated as keyword search. That means, if any menu item contains the given item name, it will be selected, for example:
+    <br><br>
+    <ul>
+    Your real menu path you want to select looks like this: <code> <i><b>Bookmarks</b></i> =&gt; <i><b>Favorites</b></i> =&gt; <i><b>foo:BAR 70's-90's [[HITS]]</b></i></code><br><br>
+    The last item has many non-word characters, that can cause you trouble in some situations. But you don't have to use the full name to select this entry. 
+    It's enough to use a specific part of the item name, that only exists in this one particular item. So to select this item you can use for instance the following set command:<br><br>
+    <code>
+          set &lt;name&gt; navigateListMenu Bookmarks/Favorites/foo:BAR
+    </code>
+    <br><br>
+    This works, even without giving the full item name (<i><code>foo:BAR 70's-90's [[HITS]]</code></i>).
+    </ul>
+    <br>
+    This also allows you to pare down long item names to shorter versions.
+    The shorter version must be still unique enough to identify the right item.
+    The first item in the list (from top to bottom), that contains the given keyword, will be selected.
+    
+<br><br>
+</ul>
   <a name="YAMAHA_AVRget"></a>
   <b>Get</b>
   <ul>
@@ -1886,6 +2141,7 @@ YAMAHA_AVR_isModel_DSP($)
   <ul>
   
     <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="request-timeout">request-timeout</a></li>
     Optional attribute change the response timeout in seconds for all queries to the receiver.
@@ -1920,6 +2176,7 @@ YAMAHA_AVR_isModel_DSP($)
   <li><b>newFirmware</b> - indicates if a firmware update is available (can be "available" or "unavailable")</li>
   <li><b>power</b> - Reports the power status of the receiver or zone (can be "on" or "off")</li>
   <li><b>presence</b> - Reports the presence status of the receiver or zone (can be "absent" or "present"). In case of an absent device, it cannot be controlled via FHEM anymore.</li>
+  <li><b>partyMode</b> - indicates if the party mode is enabled/disabled for the whole device (in main zone) or if the current zone is enabled for party mode (other zones than main zone)</li>
   <li><b>volume</b> - Reports the current volume level of the receiver or zone in percentage values (between 0 and 100 %)</li>
   <li><b>volumeStraight</b> - Reports the current volume level of the receiver or zone in decibel values (between -80.5 and +15.5 dB)</li>
   <li><b>sleep</b> - indicates if the internal sleep timer is activated or not.</li>
@@ -2030,6 +2287,8 @@ YAMAHA_AVR_isModel_DSP($)
 <li><b>enhancer</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den Sound Enhancer f&uuml;r einen verbesserten Raumklang</li>
 <li><b>3dCinemaDsp</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den CINEMA DSP 3D Modus</li>
 <li><b>adaptiveDrc</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert Adaptive DRC</li>
+<li><b>partyMode</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp;Aktiviert den Party Modus. In der Main Zone wird hierbei der Party Modus ger&auml;teweit aktiviert oder deaktiviert. In den anderen Zonen kann man damit die entsprechende Zone dem Party Modus zuschalten oder entziehen.</li>
+<li><b>navigateListMenu</b> [Element 1]/[Element 2]/[Element N]/... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt ein spezifisches Element aus einer Men&uuml;struktur aus. Nur verwendbar bei Men&uuml;-basierenden Eing&auml;ngen (z.B. Net Radio, USB, Server, etc.). Siehe nachfolgendes Kapitel "<a href="#YAMAHA_AVR-MenuNavigation">Automatische Men&uuml; Navigation</a>" f&uuml;r weitere Details und Beispiele.</li>
 <li><b>direct</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht alle internen soundverbessernden Ma&szlig;nahmen (Equalizer, Enhancer, Adaptive DRC,...) und gibt das Signal unverf&auml;lscht wieder</li>
 <li><b>input</b> hdmi1,hdmiX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>
@@ -2055,10 +2314,6 @@ YAMAHA_AVR_isModel_DSP($)
 </ul>
 <u>Fernbedienung (je nach Modell nicht in allen Zonen verf&uuml;gbar)</u><br><br>
 <ul>
-    In vielen Receiver-Modellen existieren Eing&auml;nge, welche nach der Auswahl keinen Sound ausgeben. Diese Eing&auml;nge
-    bed&uuml;rfen manueller Interaktion mit der Fernbedienung um die Wiedergabe zu starten (z.B. Internet Radio, Netzwerk Streaming, usw.).<br><br>
-    F&uuml;r diesen Fall gibt es folgende Befehle:<br><br>
-
     <u>Cursor Steuerung:</u><br><br>
     <ul><code>
     remoteControl up<br>
@@ -2079,38 +2334,68 @@ YAMAHA_AVR_isModel_DSP($)
     <u>Radio Steuerung:</u><br><br>
     <ul><code>
     remoteControl tunerPresetUp<br>
+    
+    
+    
     remoteControl tunerPresetDown<br>
-    </code></ul><br><br>
-    Die Befehlsnamen entsprechen den Tasten auf der Fernbedienung.<br><br>
-    
-    Ein typisches Beispiel ist das automatische Einschalten und Abspielen eines Internet Radio Sender:<br><br>
-    <ul><code>
-    # Die Ger&auml;tedefinition<br><br>
-    define AV_receiver YAMAHA_AVR 192.168.0.3
-    </code></ul><br><br>
-    Und in der myUtils.pm (basierend auf der myUtilsTemplate.pm) die folgende Funktion:<br><br>
-    <ul><code>
-        sub startNetRadio()<br>
-        {<br>
-        &nbsp;&nbsp;fhem("set AV_Receiver on;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 5;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver input netradio;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 4;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 2;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sleep 2;<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set AV_Receiver remoteControl enter");<br>
-        }<br>
-    </code></ul><br><br>
-    Die Kommandos der Fernbedienung m&uuml;ssen mit einem sleep pausiert werden, da der Receiver in der Zwischenzeit arbeitet und keine Befehle annimmt. Diese Befehle werden alle im Hintergrund ausgef&uuml;hrt, so dass f&uuml;r den FHEM Hauptprozess keine Verz&ouml;gerung entsteht.<br><br>
-    
-    Nun kann man diese Funktion in der FHEM Kommandozeile oder in notify-Definitionen wie folgt verwenden.:<br><br>
-    <ul><code>
-    {startNetRadio()}
-    </code></ul><br><br>
+    </code></ul><br>
   </ul>
-
+<a name="YAMAHA_AVR-MenuNavigation"></a>
+<u>Automatische Men&uuml; Navigation (nur f&uuml;r Men&uuml;-basierte Eing&auml;nge wie z.B. Net Radio, Server, USB, ...)</u><br><br>
+<ul>
+F&uuml;r Men&uuml;-basierte Eing&auml;nge muss man einen bestimmten Eintrag aus einer komplexen Struktur ausw&auml;hlen um die Wiedergabe zu starten.
+Ein typischer Fall ist das Abspielen von Internet-Radios (Eingang: Net Radio) oder &auml;hnlichen, netzwerkbasierten Diensten. 
+Erst durch das Navigieren durch mehrere Men&uuml;s und Untermen&uuml;s selektiert man das gew&uuml;nschte Element und die Wiedergabe beginnt.
+<br><br>
+Um diese Navigation durch verschiedene Men&uuml;strukturen zu automatisieren, gibt es das Set-Kommando "navigateListMenu".
+Als Parameter &uuml;bergibt man den Pfad (ausgehend vom Beginn) zu dem gew&uuml;nschtem Men&uuml;eintrag
+YAMAHA_AVR wird diese Liste von links nach rechts abarbeiten und sich so durch das Men&uuml; hangeln.
+Alle angegebenen Men&uuml;elemente sind dabei durch einen Schr&auml;gstrich (/) getrennt.
+<br><br>
+Ein paar Beispiele:
+    Aktueller Eingang ist "netradio":<br><br>
+    <ul>
+    <code>
+          set &lt;name&gt; navigateListMenu L&auml;nder/Ozeanien/Australien/Alle Sender/1Radio.FM<br>
+          set &lt;name&gt; navigateListMenu Lesezeichen/Favoriten/1LIVE</code>
+    </ul><br>
+    Wenn man den Receiver mit einem Befehl anschalten m&ouml;chte und einen bestimmten Internet-Radio Sender ausw&auml;hlen will:<br><br>
+    <ul>
+        <code>
+          set &lt;name&gt; on ; set &lt;name&gt; volume 20 direct ; set &lt;name&gt; input netradio ; set &lt;name&gt; navigateListMenu Lesezeichen/Favoriten/1LIVE<br><br>
+          # f&uuml;r t&auml;gliches einschalten eines Internet-Radios via <a href="#at">at-Modul</a><br>
+          define 1Radio_am_Morgen at *08:00 set &lt;name&gt; on ; set &lt;name&gt; volume 20 direct ; set &lt;name&gt; input netradio ; set &lt;name&gt; navigateListMenu L&auml;nder/Ozeanien/Australien/Alle Sender/1Radio.FM<br><br>
+          define 1LIVE_am_Abend at *17:00 set &lt;name&gt; on ; set &lt;name&gt; volume 20 direct ; set &lt;name&gt; input netradio ; set &lt;name&gt; navigateListMenu Lesezeichen/Favoriten/1LIVE</code>
+    </ul>
+    <br>
+    Aktueller Eingang ist "server" (Netzwerk-Freigaben via UPnP/DLNA):<br><br> 
+    <ul>
+    <code>
+          set &lt;name&gt; navigateListMenu NAS/Musik/Nach Interpret/Alicia Keys/Songs in A Minor/Fallin
+    </code>
+    </ul>
+    <br>
+    Die exakte Men&uuml;struktur h&auml;ngt von ihrer eigenen Receiver-Konfiguration, sowie den zur Verf&uuml;gung stehenden Freigaben in ihrem Netzwerk ab.
+    Jeder einzelne Men&uuml;eintrag muss nicht vollst&auml;ndig als Pfadelement angegeben werden.
+    Jedes Pfadelement wird als Stichwort verwendet um den richtigen Men&uuml;eintrag aus der aktuellen Listenebene zu finden, z.B:
+    <br><br>
+    <ul>
+    Der tats&auml;chliche Men&uuml;pfad (wie im Display des Receiveres erkennbar) sieht beispielhaft folgenderma&szlig;en aus: <code> <i><b>Lesezeichen</b></i> =&gt; <i><b>Favoriten</b></i> =&gt; <i><b>foo:BAR 70'er-90'er [[HITS]]</b></i></code><br><br>
+    Der letzte Men&uuml;eintrag hat in diesem Fall viele Sonderzeichen die einem in einer FHEM-Konfiguration durchaus Probleme bereiten k&ouml;nen.
+    Man muss aber nicht die vollst&auml;ndige Bezeichnung in der Pfadangabe benutzen, sondern kann ein k&uuml;rzeres Stichwort benutzen, was in der vollst&auml;ndigen Bezeichnung jedoch vorkommen muss.
+    So kann man beispielsweise folgendes Set-Kommando benutzen um diesen Eintrag auszuw&auml;hlen und die Wiedergabe damit zu starten:<br><br>
+    <code>
+          set &lt;name&gt; navigateListMenu Lesezeichen/Favoriten/foo:BAR
+    </code>
+    <br><br>
+    Dieser Befehl funktioniert, obwohl man nicht die vollst&auml;ndige Bezeichnung angegeben hat (<i><code>foo:BAR 70's-90's [[HITS]]</code></i>).
+    </ul>
+    <br>
+    Auf selbe Wei&szlig;e kann man somit lange Men&uuml;eintr&auml;ge abk&uuml;rzen, damit die Befehle nicht so lang werden.
+    Solche gek&uuml;rzten Pfadangaben m&uuml;ssen aber trotzdem soweit eindeutig sein, damit sie nur auf das gew&uuml;nschte Element passen.
+    Das erste Element aus einer Listenebene (von oben nach unten), was auf eine Pfadangabe passt, wird ausgew&auml;hlt.
+<br><br>
+</ul>
   <a name="YAMAHA_AVRget"></a>
   <b>Get-Kommandos</b>
   <ul>
@@ -2124,6 +2409,7 @@ YAMAHA_AVR_isModel_DSP($)
   <ul>
   
     <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="request-timeout">request-timeout</a></li>
     Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Receiver.
@@ -2157,6 +2443,7 @@ YAMAHA_AVR_isModel_DSP($)
   <li><b>newFirmware</b> - Zeigt an, ob eine neue Firmware zum installieren bereit liegt ("available" =&gt; neue Firmware verf&uuml;gbar, "unavailable" =&gt; keine neue Firmware verf&uuml;gbar)</li>
   <li><b>power</b> - Der aktuelle Betriebsstatus ("on" =&gt; an, "off" =&gt; aus)</li>
   <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereit, z.B. Stromausfall)</li>
+  <li><b>partyMode</b> - Der Status des Party Modus ( "enabled" =&gt; aktiviert, "disabled" =&gt; deaktiviert). In der Main Zone stellt dies den ger&auml;teweiten Zustand des Party Modus dar. In den einzelnen Zonen zeigt es an, ob die jeweilige Zone f&uuml;r den Party Modus verwendet wird.</li>
   <li><b>volume</b> - Der aktuelle Lautst&auml;rkepegel in Prozent (zwischen 0 und 100 %)</li>
   <li><b>volumeStraight</b> - Der aktuelle Lautst&auml;rkepegel in Dezibel (zwischen -80.0 und +15 dB)</li>
   <li><b>direct</b> - Zeigt an, ob soundverbessernde Features umgangen werden oder nicht ("on" =&gt; soundverbessernde Features werden umgangen, "off" =&gt; soundverbessernde Features werden benutzt)</li>

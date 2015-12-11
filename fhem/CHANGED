@@ -1,5 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: YAMAHA_AVR: several new features:
+             - new set command navigateMenuList for automatic menu navigation
+             - new set command/reading partyMode
+             - disabledForInterval attribute added
+             see detaily in commandref
+  - change: YAMAHA AVR: optimized HTTP request command queue to allow 
+            correct processing of concatenated set commands
+            (no sleep commands neccesary anymore)
   - bugfix: 95_Dashboard: fixed local link in command ref
   - bugfix: 10_IT: Ignore sending if dummy (Forum ID 44990)
     feature: 10_IT: Add functionality for setting ITClock (Forum ID 44451)
