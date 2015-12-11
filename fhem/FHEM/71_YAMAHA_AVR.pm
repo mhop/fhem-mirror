@@ -32,6 +32,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday sleep);
+use Encode qw(decode encode);
 use HttpUtils;
  
 sub YAMAHA_AVR_Get($@);
@@ -949,6 +950,7 @@ YAMAHA_AVR_HandleCmdQueue($)
     
     if(not($hash->{helper}{RUNNING_REQUEST}) and @{$hash->{helper}{CMD_QUEUE}})
     {
+        Log3 $name, 5, "YAMAHA_AVR ($name) - no commands currently running, but queue has pending commands. preparing new request";
         my $params =  {
                         url        => "http://".$address."/YamahaRemoteControl/ctrl",
                         timeout    => AttrVal($name, "request-timeout", 4),
@@ -965,6 +967,7 @@ YAMAHA_AVR_HandleCmdQueue($)
         unless(defined($request))
         {
             # still request in queue, but not mentioned to be executed now
+            Log3 $name, 5, "YAMAHA_AVR ($name) - still requests in queue, but no command shall be executed at the moment. Retry in 1 second.";
             RemoveInternalTimer("YAMAHA_AVR_HandleCmdQueue:$name");
             InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", "YAMAHA_AVR_HandleCmdQueue:$name", 0);
             return undef;
@@ -1178,13 +1181,13 @@ YAMAHA_AVR_ParseResponse ($$$)
             }
             elsif($arg eq "systemConfig")
             {
-                if($data =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>.*<Main>(.+?)<\/Main>.*<Sub>(.+?)<\/Sub>.*?<\/Version>/)
+                if($data =~ /<Model_Name>(.+?)<\/Model_Name>.*?<System_ID>(.+?)<\/System_ID>.*?<Version>.*?<Main>(.+?)<\/Main>.*?<Sub>(.+?)<\/Sub>.*?<\/Version>/)
                 {
                     $hash->{MODEL} = $1;
                     $hash->{SYSTEM_ID} = $2;
                     $hash->{FIRMWARE} = $3."  ".$4;
                 }
-                elsif($data =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>(.+?)<\/Version>/)
+                elsif($data =~ /<Model_Name>(.+?)<\/Model_Name>.*?<System_ID>(.+?)<\/System_ID>.*?<Version>(.+?)<\/Version>/)
                 {
                     $hash->{MODEL} = $1;
                     $hash->{SYSTEM_ID} = $2;
@@ -1627,7 +1630,7 @@ YAMAHA_AVR_ParseResponse ($$$)
                 {
                     # list must be checked again in 1 second.
                     Log3 $name, 5 ,"YAMAHA_AVR ($name) - menu is busy. retrying in 1 second";
-                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg,{options => {not_before => (gettimeofday()+1), last_layer => $menu_layer}});
+                    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg,{options => {not_before => (gettimeofday()+1), last_layer => $menu_layer, at_first => 1}});
                 }
                 
                 # avoid statusRequest during menu browsing
@@ -1891,13 +1894,16 @@ sub YAMAHA_AVR_html2txt($)
     $string =~ s/&amp;/&/g;
     $string =~ s/&nbsp;/ /g;
     $string =~ s/&apos;/'/g;
-    $string =~ s/(\xe4|&auml;)/ä/g;
-    $string =~ s/(\xc4|&Auml;)/Ä/g;
-    $string =~ s/(\xf6|&ouml;)/ö/g;
-    $string =~ s/(\xd6|&Ouml;)/Ö/g;
-    $string =~ s/(\xfc|&uuml;)/ü/g;
-    $string =~ s/(\xdc|&Uuml;)/Ü/g;
-    $string =~ s/(\xdf|&szlig;)/ß/g;
+    
+    $string = decode('UTF-8', $string); 
+    
+    $string =~ s/&auml;/ä/g;
+    $string =~ s/&Auml;/Ä/g;
+    $string =~ s/&ouml;/ö/g;
+    $string =~ s/&Ouml;/Ö/g;
+    $string =~ s/&uuml;/ü/g;
+    $string =~ s/&Uuml;/Ü/g;
+    $string =~ s/&szlig;/ß/g;
     
     $string =~ s/<[^>]+>//g;
     
@@ -1905,7 +1911,7 @@ sub YAMAHA_AVR_html2txt($)
     $string =~ s/&lt;/</g;
     
     $string =~ s/(^\s+|\s+$)//g;
-
+   
     return $string;
 }
 
