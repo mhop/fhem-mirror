@@ -1399,7 +1399,7 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp", $result->{box_cpuTemp};
 # GSM
 #FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_modem", $result->{GSM_ModemPresent};
-   if ($result->{GSM_NetworkState} ne "0") {
+   if (defined $result->{GSM_NetworkState} && $result->{GSM_NetworkState} ne "0") {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_rssi", $result->{GSM_RSSI};
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_state", $result->{GSM_NetworkState}, "gsmnetstate";
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "gsm_technology", $result->{GSM_AcT}, "gsmact";
@@ -1541,17 +1541,23 @@ sub FRITZBOX_Readout_Process($$)
    # Statistics
       if ( defined $values{".box_TodayBytesReceivedLow"} && defined $hash->{READINGS}{".box_TodayBytesReceivedLow"}) {
          my $valueHigh = $values{".box_TodayBytesReceivedHigh"} - $hash->{READINGS}{".box_TodayBytesReceivedHigh"}{VAL};
+         # FRITZBOX_Log $hash, 5, "valueHigh $valueHigh";
          $valueHigh *= 2**22;
+         # FRITZBOX_Log $hash, 5, "valueHigh $valueHigh";
          my $valueLow = $values{".box_TodayBytesReceivedLow"} - $hash->{READINGS}{".box_TodayBytesReceivedLow"}{VAL};;
+         # FRITZBOX_Log $hash, 5, "valueLow $valueLow";
          $valueLow /= 2**10;
+         # FRITZBOX_Log $hash, 5, "valueLow $valueLow";
+         # FRITZBOX_Log $hash, 5, "valueHigh+valueLow: ". ($valueHigh+$valueLow);
          my $time = time()-time_str2num($hash->{READINGS}{".box_TodayBytesReceivedLow"}{TIME});
-         readingsBulkUpdate( $hash, "box_rateDown", sprintf ("%.3f", ($valueHigh+$valueLow) / $time )); 
+         # FRITZBOX_Log $hash, 5, "time: $time";
+         $values{ "box_rateDown" } = sprintf ("%.3f", ($valueHigh+$valueLow) / $time ); 
       }
       if ( defined $values{".box_TodayBytesSentLow"} && defined $hash->{READINGS}{".box_TodayBytesSentLow"}) {
          my $valueHigh = $values{".box_TodayBytesSentHigh"} - $hash->{READINGS}{".box_TodayBytesSentHigh"}{VAL};
          my $time = time()-time_str2num($hash->{READINGS}{".box_TodayBytesSentLow"}{TIME});
          my $valueLow = $values{".box_TodayBytesSentLow"} - $hash->{READINGS}{".box_TodayBytesSentLow"}{VAL};;
-         readingsBulkUpdate( $hash, "box_rateUp", sprintf ("%.3f", ($valueHigh*2**22+$valueLow/2**10) / $time )); 
+         $values{ "box_rateUp" } = sprintf ("%.3f", ( $valueHigh * 2**22 + $valueLow / 2**10 ) / $time ); 
       }
 
    # Fill all handed over readings
@@ -4345,6 +4351,7 @@ sub FRITZBOX_Web_Query($$@)
    FRITZBOX_Log $hash, 5, "Request data via API luaQuery.";
    my $host = $hash->{HOST};
    my $url = 'http://' . $host . '/query.lua?sid=' . $sid . $queryStr;
+   # FRITZBOX_Log $hash, 5, "URL: $url";
    
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
    my $response = $agent->get ( $url );
@@ -4360,7 +4367,7 @@ sub FRITZBOX_Web_Query($$@)
       my %retHash = ("Error" => $response->status_line);
       return \%retHash;
    }
-   if ($response->content =~ "<html>") {
+   if ($response->content =~ /<html>|"pid": "logout"/) {
       my %retHash = ("Error" => "Old SID not valid anymore.", "ResetSID" => "1");
       return \%retHash;
    }
@@ -4863,7 +4870,7 @@ sub FRITZBOX_fritztris($)
       <li><b>gsm_internet</b> - connection to internet established via GSM stick</li>
       <li><b>gsm_rssi</b> - received signal strength indication (0-100)</li>
       <li><b>gsm_state</b> - state of the connection to the GSM network</li>
-      <li><b>gsm_technology</b> - technology used for internet connections via GSM (GPRS, EDGE, UMTS, HSPA)</li>
+      <li><b>gsm_technology</b> - GSM technology used for data transfer (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
       <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an <u>active</u> network device</li>
       <br>
@@ -5201,7 +5208,7 @@ sub FRITZBOX_fritztris($)
       <li><b>gsm_internet</b> - Internetverbindung errichtet über Mobilfunk-Stick </li>
       <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalstärke (0-100)</li>
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
-      <li><b>gsm_technology</b> - Technologie die für eine Internetverbindung über GSM genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
+      <li><b>gsm_technology</b> - GSM-Technologie, die für die Datenübertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
       <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
       <br>
