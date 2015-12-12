@@ -1,4 +1,4 @@
-﻿# $Id$
+# $Id$
 ##############################################################################
 #
 #     71_YAMAHA_AVR.pm
@@ -1145,7 +1145,7 @@ YAMAHA_AVR_ParseResponse ($$$)
         {
             Log3 $name, 3, "YAMAHA_AVR ($name) - device $name reappeared";
             readingsSingleUpdate($hash, "presence", "present", 1); 
-            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");            
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus", {options => {at_first => 1}}) if(defined($zone));
         }
         
         $hash->{helper}{AVAILABLE} = 1;
@@ -1574,9 +1574,9 @@ YAMAHA_AVR_ParseResponse ($$$)
                    
                     if(exists($options->{last_layer}) and $options->{last_layer} == $menu_layer and $last and $options->{item_selected})
                     {
-                         readingsEndUpdate($hash, 1);
-                         YAMAHA_AVR_HandleCmdQueue($hash);
-                         return;
+                        readingsEndUpdate($hash, 1);
+                        YAMAHA_AVR_GetStatus($hash, 1);
+                        return;
                     }
                     
                     # initialization sequence
