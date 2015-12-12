@@ -585,6 +585,11 @@ readingsGroup_value2html($$$$$$$$$)
       if( $htmlTxt && $htmlTxt =~ m/class='fhemWidget'/ ) {
         $htmlTxt =~ s/class='fhemWidget'/class='fhemWidget' informId='$d-$name.$n'/;
         $informid = "";
+
+        my $txt = lookup($hash->{helper}{mapping},$name,$name,$n,"",$room,$group,$cell_row,undef);
+        if( defined($txt) ) {
+          $informid = "rg-fhemWidget-label=\"$txt\"";
+        }
       }
 
       if( $htmlTxt ) {

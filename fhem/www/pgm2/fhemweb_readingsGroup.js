@@ -15,6 +15,11 @@ FW_readingsGroupReadyFn() {
         $(this).attr('informId', informId);
       }
     });
+
+    $(this).find("[rg-fhemWidget-label]").each(function() {
+      var txt = $(this).attr('rg-fhemWidget-label');
+      $(this).find('div').first().contents().first().replaceWith(txt);
+    });
   });
 }
 
