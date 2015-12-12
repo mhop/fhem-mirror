@@ -911,7 +911,7 @@ seekBackOneLine($$)
   while($pos > 0) { # skip current CR/NL
     $fh->seek(--$pos, 0);
     $fh->read($buf, 1);
-    last if($buf ne "\n" || $buf ne "\r");
+    last if($buf ne "\n" && $buf ne "\r");
   }
   $fh->seek($pos, 0);
 
