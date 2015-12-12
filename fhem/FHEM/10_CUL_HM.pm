@@ -1280,7 +1280,7 @@ sub CUL_HM_Parse($$) {#########################################################
   my $parse = CUL_HM_parseCommon($iohash,\%mh);
   push @evtEt,[$mh{devH},1,"powerOn:$tn"] if($parse eq "powerOn");
   push @evtEt,[$mh{devH},1,""]            if($parse eq "parsed"); # msg is parsed but may
-                                                             # be processed further
+                                                             # be processed further 
   $mh{devH}->{helper}{HM_CMDNR} = hex($mh{mNo});
   if   ($parse eq "ACK" ||
         $parse eq "done"   ){# remember - ACKinfo will be passed on
@@ -2143,7 +2143,7 @@ sub CUL_HM_Parse($$) {#########################################################
         }
         $eo += $el;
         push @evtEt,[$mh{shash},1,"energyOffset:".$eo];
-        $mh{shash}->{helper}{pon} = 1;# power on is detected - only ssend once
+        $mh{shash}->{helper}{pon} = 1;# power on is detected - only send once
       }
       elsif($el > 800000 && $el > $eCnt ){# handle overflow
         $eo += 838860.7;
@@ -2644,7 +2644,8 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
   }  
   
-  $mhp->{devH}{helper}{PONtest} = 1 if($mhp->{mNo} eq "00");
+  $mhp->{devH}{helper}{PONtest} = 1 if($mhp->{mNo} eq "00" &&
+                                       $mhp->{devH}{helper}{HM_CMDNR} < 250);# this is power on
   my $repeat;
   if   ($mhp->{mTp} eq "02"){# Ack/Nack/aesReq ####################
     my $reply;
@@ -3027,9 +3028,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
       else{
         if ($mhp->{chn} == 0
-            || (   $mhp->{mNo} eq "00" 
-                && $mhp->{chn} == 1 
-                && $mhp->{devH}{helper}{HM_CMDNR} < 250)){# this is power on
+            || (   $mhp->{chn} == 1 
+                && $mhp->{devH}{helper}{PONtest})){# this is power on
           CUL_HM_qStateUpdatIfEnab($mhp->{devN});
           CUL_HM_qAutoRead($mhp->{devN},2);
           $ret = "powerOn" ;# check dst eq "000000" as well?
@@ -4409,9 +4409,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "no more than 10 entries please"  if ($itemCnt>10);
       return "repetition $repeat out of range [1..255]"
             if($repeat < 1 || $repeat > 255);
-      #<entries><multiply><MP3><MP3>
-      my $msgBytes = sprintf("%02X%02X",$itemCnt,$repeat);
-
       return "volume $volume out of range [0..10]"
             if($volume < 0 || $volume > 10);
       #<volume><multiply><MP3><MP3>
