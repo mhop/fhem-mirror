@@ -405,14 +405,14 @@ use vars qw($readingFnAttributes);
 use vars qw(%defs);
 my $MODUL          = "PROPLANTA";
 
-   my %url_template_1 =( "de" => "http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html"
-   , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/LOKALERORT/"
-   , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/LOKALERORT/"
-   , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/LOKALERORT.html"
-   , "it" => "http://www.proplanta.de/Agrarwetter-Italien/LOKALERORT.html"
-   );
+   # my %url_template_1 =( "de" => "http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html"
+   # , "at" => "http://www.proplanta.de/Agrarwetter-Oesterreich/LOKALERORT/"
+   # , "ch" => "http://www.proplanta.de/Agrarwetter-Schweiz/LOKALERORT/"
+   # , "fr" => "http://www.proplanta.de/Agrarwetter-Frankreich/LOKALERORT.html"
+   # , "it" => "http://www.proplanta.de/Agrarwetter-Italien/LOKALERORT.html"
+   # );
 
-   my %url_template_2 = ( "de" => "http://www.proplanta.de/Wetter/profi-wetter.php?SITEID=60&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter&wT="
+   my %url_template = ( "de" => "http://www.proplanta.de/Wetter/profi-wetter.php?SITEID=60&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter&wT="
    , "at" => "http://www.proplanta.de/Wetter-Oesterreich/profi-wetter-at.php?SITEID=70&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter&wT="
    , "ch" => "http://www.proplanta.de/Wetter-Schweiz/profi-wetter-ch.php?SITEID=80&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter&wT="
    , "fr" => "http://www.proplanta.de/Wetter-Frankreich/profi-wetter-fr.php?SITEID=50&PLZ=LOKALERORT&STADT=LOKALERORT&WETTERaufrufen=stadt&Wtp=&SUCHE=Wetter-Frankreich&wT="
@@ -459,23 +459,23 @@ sub PROPLANTA_Define($$)
 
    if ( $lang ne "")
    { # {my $test="http://www.proplanta.de/Wetter/LOKALERORT-Wetter.html";; $test =~ s/LOKALERORT/München/g;; return $test;;}
-      return "Wrong country code '$lang': use " . join(" | ",  keys( %url_template_1 ) ) unless defined( $url_template_1{$lang} );
-      my $URL = $url_template_1{$lang};
-      my $ort= $a[2];
+      return "Wrong country code '$lang': use " . join(" | ",  keys( %url_template ) ) unless defined( $url_template{$lang} );
+      my $URL = $url_template{$lang};
+      my $ort_encode= $a[2];
 # change Umlaute from UTF8 in Percent-encode 
-      $ort =~ s/Ä|Ã„/%C4/g;
-      $ort =~ s/Ö|Ã–/%D6/g;
-      $ort =~ s/Ü|Ãœ/%DC/g;
-      $ort =~ s/ß|ÃŸ/%DF/g;
-      $ort =~ s/ä|Ã¤/%E4/g;
-      $ort =~ s/ö|Ã¶/%F6/g;
-      $ort =~ s/ü|Ã¼/%FC/g;
+      $ort_encode =~ s/Ä|Ã„/%C4/g;
+      $ort_encode =~ s/Ö|Ã–/%D6/g;
+      $ort_encode =~ s/Ü|Ãœ/%DC/g;
+      $ort_encode =~ s/ß|ÃŸ/%DF/g;
+      $ort_encode =~ s/ä|Ã¤/%E4/g;
+      $ort_encode =~ s/ö|Ã¶/%F6/g;
+      $ort_encode =~ s/ü|Ã¼/%FC/g;
       
-      $URL =~ s/LOKALERORT/$ort/g;
+      $URL =~ s/LOKALERORT/$ort_encode/g;
       $hash->{URL} = $URL;
-      $URL = $url_template_2{$lang};
-      $URL =~ s/LOKALERORT/$ort/g;
-      $hash->{URL2} = $URL;
+      # $URL = $url_template_2{$lang};
+      # $URL =~ s/LOKALERORT/$ort/g;
+      # $hash->{URL2} = $URL;
    }
 
    $hash->{STATE}          = "Initializing";
@@ -621,6 +621,7 @@ sub PROPLANTA_Run($)
    my ($name) = @_;
    my $ptext=$name;
    my $URL;
+   my $response;
    return unless ( defined($name) );
    
    my $hash = $defs{$name};
@@ -628,60 +629,49 @@ sub PROPLANTA_Run($)
    my $readingStartTime = time();
     
    my $fcDays = AttrVal( $name, 'forecastDays', 14 );
+   my $parser = MyProplantaParser->new;
+
+  # get date from Attribut URL only
    my $attrURL = AttrVal( $name, 'URL', "" );
-   if ($attrURL eq "")
-   {
-      $URL = $hash->{URL};
-   }
-   else
-   {
-      $URL = $attrURL;
-   }
+   if ($attrURL ne "") {
 
-   # acquire the html-page
-   my $response = PROPLANTA_HtmlAcquire($hash,$URL); 
+      $response = PROPLANTA_HtmlAcquire($hash,$attrURL); 
    
-   if ($response =~ /^Error\|/)
-   {
-      $ptext .= "|".$response;
+      if ($response =~ /^Error\|/)  {
+         $ptext .= "|".$response;
+      }
+      else {
+         PROPLANTA_Log $hash, 4, "Start HTML parsing of captured page";
+
+         $parser->report_tags(qw(tr td span b img));
+         @MyProplantaParser::texte = ();
+         $MyProplantaParser::startDay = 0;
+
+         # parsing the complete html-page-response, needs some time
+         $parser->parse($response);
+      }
    }
-   else
-   {
-      PROPLANTA_Log $hash, 4, "Start HTML parsing of captured page";
 
-      my $parser = MyProplantaParser->new;
-      $parser->report_tags(qw(tr td span b img));
-      @MyProplantaParser::texte = ();
-      $MyProplantaParser::startDay = 0;
+# Get data from location specified in define
+   else {
+      $URL = $hash->{URL};
+      my @URL_days = (0, 4, 7, 11);
+      
+      foreach (@URL_days) {
+         last unless $_ < $fcDays;
+         $response = PROPLANTA_HtmlAcquire($hash,$URL . $_); 
+         $MyProplantaParser::startDay = $_;
 
-      # parsing the complete html-page-response, needs some time
-      $parser->parse($response);
-
-   # add next periods
-      if ($attrURL eq "")
-      {
-         $URL = $hash->{URL2};
-         my @URL_days = (4, 7, 11);
-         unshift @URL_days, 0
-            if @MyProplantaParser::texte == 0; 
-         foreach (@URL_days)
-         {
-            last unless $_ < $fcDays;
-            $response = PROPLANTA_HtmlAcquire($hash,$URL . $_); 
-            $MyProplantaParser::startDay = $_;
-            if ($response !~ /^Error\|/)
-            {
-               PROPLANTA_Log $hash, 4, "Start HTML parsing of captured page";
-               $parser->parse($response);
-            }
+         if ($response !~ /^Error\|/) {
+            PROPLANTA_Log $hash, 4, "Start HTML parsing of captured page";
+            $parser->parse($response);
          }
      }
       
       PROPLANTA_Log $hash, 4, "Found terms: " . @MyProplantaParser::texte;
       
       # pack the results in a single string
-      if (@MyProplantaParser::texte > 0) 
-      {
+      if (@MyProplantaParser::texte > 0) {
          $ptext .= "|". join('|', @MyProplantaParser::texte);
       }
       PROPLANTA_Log $hash, 5, "Parsed string: " . $ptext;
