@@ -1,4 +1,4 @@
-# $Id$
+ï»¿# $Id$
 ##############################################################################
 #
 #     71_YAMAHA_AVR.pm
@@ -1897,13 +1897,13 @@ sub YAMAHA_AVR_html2txt($)
     
     $string = decode('UTF-8', $string); 
     
-    $string =~ s/&auml;/ä/g;
-    $string =~ s/&Auml;/Ä/g;
-    $string =~ s/&ouml;/ö/g;
-    $string =~ s/&Ouml;/Ö/g;
-    $string =~ s/&uuml;/ü/g;
-    $string =~ s/&Uuml;/Ü/g;
-    $string =~ s/&szlig;/ß/g;
+    $string =~ s/(\xe4|&auml;)/\xc3\xa4/g;
+    $string =~ s/(\xc4|&Auml;)/\xc3\x84/g;
+    $string =~ s/(\xf6|&ouml;)/\xc3\xb6/g;
+    $string =~ s/(\xd6|&Ouml;)/\xc3\x96/g;
+    $string =~ s/(\xfc|&uuml;)/\xc3\xbc/g;
+    $string =~ s/(\xdc|&Uuml;)/\xc3\x9c/g;
+    $string =~ s/(\xdf|&szlig;)/\xc3\x9f/g;
     
     $string =~ s/<[^>]+>//g;
     
