@@ -81,12 +81,6 @@ CUL_MAX_Define($$)
 
   return "wrong syntax: define <name> CUL_MAX <srcAddr>" if(@a<3);
 
-  if(exists($modules{CUL_MAX}{defptr})) {
-    Log3 $hash, 1, "There is already one CUL_MAX defined";
-    return "There is already one CUL_MAX defined";
-  }
-  $modules{CUL_MAX}{defptr} = $hash;
-
   if (length($a[2]) != 6) {
 	  Log3 $hash, 1, "The adress must be 6 hexadecimal digits";
 	  return "The adress must be 6 hexadecimal digits";
@@ -114,7 +108,6 @@ CUL_MAX_Undef($$)
 {
   my ($hash, $name) = @_;
   RemoveInternalTimer($hash);
-  delete($modules{CUL_MAX}{defptr});
   return undef;
 }
 
@@ -253,13 +246,24 @@ sub
 CUL_MAX_Parse($$)
 {
   #Attention: there is a limit in the culfw firmware: It only receives messages shorter than 30 bytes (see rf_moritz.h)
+  # $hash is for the CUL instance
   my ($hash, $rmsg) = @_;
 
-  if(!exists($modules{CUL_MAX}{defptr})) {
-      Log3 $hash, 2, "No CUL_MAX defined";
-      return "UNDEFINED CULMAX0 CUL_MAX 123456";
+  my $shash = undef; #shash is for the CUL_MAX instance
+
+  #Find a CUL_MAX that has the CUL $hash as its IODev;
+  #if no matching is found, just use the last encountered CUL_MAX.
+  foreach my $d (keys %defs) {
+    if($defs{$d}{TYPE} eq "CUL_MAX") {
+      $shash = $defs{$d};
+      last if($defs{$d}{IODev} == $hash);
+    }
   }
-  my $shash = $modules{CUL_MAX}{defptr};
+
+  if(!defined($shash)) {
+    Log3 $hash, 2, "No CUL_MAX defined";
+    return "UNDEFINED CULMAX0 CUL_MAX 123456";
+  }
 
   return () if($rmsg !~ m/Z(..)(..)(..)(..)(......)(......)(..)(.*)/);
 

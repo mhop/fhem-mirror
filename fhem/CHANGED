@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: CUL_MAX: allow multiple instances
+             Make sure that you set attr IODev on each MAX device
+             (pointing to its CUL_MAX) and set attr IODev on each CUL_MAX
+             (pointing to its CUL).
   - feature: YAMAHA_AVR: several new features:
              - new set command navigateMenuList for automatic menu navigation
              - new set command/reading partyMode
