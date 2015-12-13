@@ -55,7 +55,7 @@ my $curReadingType = 0;
   #   6 = Time Col 3
   #   7 = alternative text of image Col 2-5 (weather state)
   #   8 = MinMaxNummer Col 3
-  #   9 = Date Col 2-5
+  #   9 = Date Col 2-5 / bold
   #   10 = alternative text of Col 3 (Wind direction)
   my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
       ,["relative Feuchte", "humidity", 1]
@@ -150,8 +150,8 @@ my $curReadingType = 0;
      ,"Nord-Nordwest" => 248
   );
   
-sub 
-get_wday($)
+##############################################
+sub get_wday($)
 {
    my ($date) = @_;
    my @wday_txt = qw(So Mo Di Mi Do Fr Sa);
@@ -160,6 +160,7 @@ get_wday($)
    return $wday_txt [$th[6]];
 }
 
+##############################################
 # here HTML::text/start/end are overridden
 sub text
 {
@@ -168,8 +169,7 @@ sub text
    my $readingName;
    # Wait 1ms to reduce CPU load and hence blocking of FHEM by it (workaround until a better solution is available)
    usleep (1000);
-   if ( $curTag =~ $lookupTag )
-   {
+   if ( $curTag =~ $lookupTag ) {
       $curTextPos++;
 
       $text =~ s/^\s+//;    # trim string
@@ -186,8 +186,7 @@ sub text
       $text =~ s/&#57;/9/g;  # replace 9
       
    # Tag-Type 0 = Check for readings without tag-ID (current readings)
-      if ($curReadingType == 0)
-      {
+      if ($curReadingType == 0) {
          if ($startDay == 0 && $curCol == 1 && $curTextPos == 1)
          {
             foreach my $r (@knownNoneIDs) 
@@ -202,8 +201,7 @@ sub text
          }
       }
    # Tag-Type 1 = Number Col 3
-      elsif ($curReadingType == 1) 
-      {
+      elsif ($curReadingType == 1) {
          if ( $curCol == 3 )
          {
             $readingName = $curReadingName;
@@ -217,8 +215,7 @@ sub text
          }
       }
    # Tag-Type 2 = Number Col 2-5
-      elsif ($curReadingType == 2) 
-      {
+      elsif ($curReadingType == 2) {
          if ( 1 < $curCol && $curCol <= 5 )
          {
             $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
@@ -231,8 +228,7 @@ sub text
          }
       }
    # Tag-Type 3 = Number Col 2|4|6|8
-      elsif ($curReadingType == 3) 
-      {
+      elsif ($curReadingType == 3) {
          if ( 2 <= $curCol && $curCol <= 5 )
          {
             if ( $curTextPos % 2 == 1 ) 
@@ -244,8 +240,7 @@ sub text
          }
       }
    # Tag-Type 4 = Intensity-Text Col 2-5
-      elsif ($curReadingType == 4) 
-      {
+      elsif ($curReadingType == 4) {
          if ( 2 <= $curCol && $curCol <= 5 )
          {
             $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
@@ -254,8 +249,7 @@ sub text
          }
       }
    # Tag-Type 5 = Time Col 2-5
-      elsif ($curReadingType == 5) 
-      {
+      elsif ($curReadingType == 5) {
          if ( 2 <= $curCol && $curCol <= 5 )
          {
             $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
@@ -268,8 +262,7 @@ sub text
          }
       }
    # Tag-Type 6 = Time Col 3
-      elsif ($curReadingType == 6) 
-      {
+      elsif ($curReadingType == 6) {
          if ( $curCol == 3 )
          {
             $readingName = $curReadingName;
@@ -282,8 +275,7 @@ sub text
          }
       }
    # Tag-Type 8 = MinMaxNumber Col 3
-      elsif ($curReadingType == 8) 
-      {
+      elsif ($curReadingType == 8) {
          if ( $curCol == 3 )
          {
             $readingName = $curReadingName;
@@ -300,10 +292,8 @@ sub text
          }
       }
    # Tag-Type 9 = Date Col 2-5
-      elsif ($curReadingType == 9) 
-      {
-         if ( 1 < $curCol && $curCol <= 5 )
-         {
+      elsif ($curReadingType == 9 && $curTag eq "b") {
+         if ( 1 < $curCol && $curCol <= 5 ) {
             $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
             push( @texte, $readingName."|".$text ); 
          }
@@ -311,21 +301,18 @@ sub text
    }
 }
 
+##############################################
 sub start
 {
    my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
    $curTag = $tagname;
-   if ( $tagname eq "tr" )
-   {
+   if ( $tagname eq "tr" ) {
       $curReadingType = 0;
       $curCol = 0;
       $curTextPos = 0;
-      if ( defined( $attr->{id} ) ) 
-      {
-         foreach my $r (@knownIDs) 
-         { 
-            if ( $$r[0] eq $attr->{id} ) 
-            {
+      if ( defined( $attr->{id} ) ) {
+         foreach my $r (@knownIDs) { 
+            if ( $$r[0] eq $attr->{id} ) {
                $curReadingName = $$r[1];
                $curReadingType = $$r[2];
                last;
@@ -333,16 +320,13 @@ sub start
          }
       }
    }
-   elsif ($tagname eq "td") 
-   {
+   elsif ($tagname eq "td") {
       $curCol++;
       $curTextPos = 0;
    }
-   #wetterstate and icon
-   elsif ($tagname eq "img" && $curReadingType == 7) 
-   {
-      if ( 2 <= $curCol && $curCol <= 5 )
-      {
+   #wetterstate and icon - process immediately
+   elsif ($tagname eq "img" && $curReadingType == 7) {
+      if ( 2 <= $curCol && $curCol <= 5 ) {
        # process alternative text
          $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
          $text = $attr->{alt};
@@ -356,9 +340,8 @@ sub start
          push( @texte, $readingName."Icon" . "|" . $attr->{src} ); 
       }
    }
-   #wind direction
-   elsif ($tagname eq "img" && $curReadingType == 10 && $curCol == 3 )
-   {
+   #wind direction - process immediately
+   elsif ($tagname eq "img" && $curReadingType == 10 && $curCol == 3 ) {
     # process alternative text
       $readingName = $curReadingName;
       $text = $attr->{alt};
@@ -374,13 +357,13 @@ sub start
    }
 }
 
+##############################################
 sub end
 {
    my ( $self, $tagname, $attr, $attrseq, $origtext ) = @_;
    $curTag = "";
 
-   if ( $tagname eq "tr" ) 
-   {       
+   if ( $tagname eq "tr" ) {       
       $curReadingType = 0 
    };
 }
