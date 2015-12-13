@@ -711,10 +711,19 @@ sub HMinfo_tempListTmpl(@) { ##################################################
     $tmplDev = $fName.":$tmplDev" if ($tmplDev !~ m/:/);
   
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
-    push @rs,  ($r ? "fail  : $tmplDev for $name: $r"
-                   : "passed: $tmplDev for $name")
-               ."\n";
+    HMinfo_regCheck($name);#clean helper data (shadowReg) after restore
+    if($action eq "restore"){
+      push @rs,  (keys %{$defs{$name}{helper}{shadowReg}}? "restore: $tmplDev for $name"
+                                                         : "passed : $tmplDev for $name")
+                                                         ."\n";
+    }
+    else{
+      push @rs,  ($r ? "fail  : $tmplDev for $name: $r"
+                     : "passed: $tmplDev for $name")
+                 ."\n";
+    }
   }
+
   $ret .= join "",sort @rs;
   return $ret;
 }

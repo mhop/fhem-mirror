@@ -8315,7 +8315,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           $tln =~ s/R_(P._)?._//;
           my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
           push @entryFail,$eN." :".$tln." respose:$x" if ($x ne "1");
-          push @exec,$eN." ".$tln." exec ".$val;
+          push @exec,"$eN $tln exec $val";
         }
       }
     }
