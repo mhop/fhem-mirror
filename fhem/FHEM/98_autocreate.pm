@@ -317,25 +317,59 @@ autocreate_Notify($$)
       if($defs{"FileLog_$old"}) {
         CommandRename(undef, "FileLog_$old FileLog_$new");
         my $hash = $defs{"FileLog_$new"};
-        my $oldlogfile = $hash->{currentlogfile};
+        my $oldfile = $hash->{currentlogfile};
 
+        $hash->{DEF} =~ s/$old/$new/g;
         $hash->{REGEXP} =~ s/$old/$new/g;
         $hash->{logfile} =~ s/$old/$new/g;
         $hash->{currentlogfile} =~ s/$old/$new/g;
-        $hash->{DEF} =~ s/$old/$new/g;
 
-        rename($oldlogfile, $hash->{currentlogfile});
         Log3 $me, 2, "autocreate: renamed FileLog_$old to FileLog_$new";
         $nrcreated++;
+
+        notifyRegexpChanged($hash, $hash->{REGEXP});
+
+        # Content
+        if($oldfile ne $hash->{currentlogfile} && 
+           open(IN, $oldfile) && open(OUT, ">".$hash->{currentlogfile})) {
+          while(my $l = <IN>) {
+            $l =~ s/$old/$new/;
+            syswrite(OUT, $l);
+          }
+          close(IN); close(OUT);
+          unlink($oldfile);
+        } else {
+          Log 1, "$oldfile or $hash->{currentfile}: $!";
+          close(IN); 
+        }
       }
 
       if($defs{"SVG_$old"}) {
         CommandRename(undef, "SVG_$old SVG_$new");
         my $hash = $defs{"SVG_$new"};
-        $hash->{LINK} =~ s/$old/$new/g;
+        my $oldfile = $hash->{GPLOTFILE};
         $hash->{DEF} =~ s/$old/$new/g;
+        $hash->{GPLOTFILE} =~ s/$old/$new/g;
+        $hash->{LOGDEVICE} =~ s/$old/$new/g;
         $attr{"SVG_$new"}{label} =~ s/$old/$new/g;
         Log3 $me, 2, "autocreate: renamed SVG_$old to SVG_$new";
+
+        use vars qw($FW_gplotdir);# gplot directory
+        if($oldfile ne $hash->{GPLOTFILE} && $FW_gplotdir) {
+          $oldfile = $FW_gplotdir."/".$oldfile.".gplot";
+          my $newfile = $FW_gplotdir."/".$hash->{GPLOTFILE}.".gplot";
+          if(open(IN, $oldfile) && open(OUT, ">$newfile")) {
+            while(my $l = <IN>) {
+              $l =~ s/$old/$new/;
+              syswrite(OUT, $l);
+            }
+            close(IN); close(OUT);
+            unlink($oldfile);
+          } else {
+            Log 1, "$oldfile or $newfile: $!";
+            close(IN); 
+          }
+        }
         $nrcreated++;
       }
     }
