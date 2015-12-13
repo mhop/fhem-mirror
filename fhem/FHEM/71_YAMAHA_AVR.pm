@@ -112,8 +112,6 @@ YAMAHA_AVR_Define($$)
     $hash->{helper}{CMD_QUEUE} = [];
     delete($hash->{helper}{".HTTP_CONNECTION"}) if(exists($hash->{helper}{".HTTP_CONNECTION"}));
     
-    YAMAHA_AVR_getModel($hash);
-    
     # In case of a redefine, check the zone parameter if the specified zone exist, otherwise use the main zone
     if(defined($hash->{helper}{ZONES}) and length($hash->{helper}{ZONES}) > 0)
     {
