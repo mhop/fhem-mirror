@@ -1219,6 +1219,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
    $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,name,mac,active)"; # LAN devices
+   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(state,is_guest,mac)"; # WLAN devices
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
    $queryStr .= "&box_stdDialPort=telcfg:settings/DialPort"; #Dial Port
    $queryStr .= "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Name,Intern,IntRingTone,AlarmRingTone0,RadioRingID,ImagePath,G722RingTone,G722RingToneName)"; # DECT Numbers
@@ -1374,6 +1375,24 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
    }
+
+# Remove Guest WLAN devices that are not online anymore
+   foreach ( @{ $result->{wlanList} } ) {
+      if ( $_->{is_guest} eq '1' && $_->{state} eq '0' ) {
+         my $rName = "mac_".$_->{mac};
+         $rName =~ s/:/_/g;
+      # set the mac readings to 'inactive' and delete at next readout
+         if ( exists $hash->{READINGS}{$rName} ) {
+            if ( $hash->{READINGS}{$rName}{VAL} ne "inactive" ) {
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "inactive";
+            }
+            else {
+               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "";
+            }
+         }
+      }
+   }
+
 
 # WLANs
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
