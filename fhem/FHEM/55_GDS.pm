@@ -42,8 +42,6 @@ use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
 
-use Data::Dumper;
-
 eval "use GDSweblink";
 
 no if $] >= 5.017011, warnings => 'experimental';
@@ -301,7 +299,7 @@ sub GDS_Define($$$) {
 	Log3($name, 4, "GDS $name: tempDir=".$tempDir);
 
     _GDS_addExtension("GDS_CGI","gds","GDS Files");
-
+	retrieveData($hash,'conditions');
 	readingsSingleUpdate($hash, 'state', 'active',1);
 
 	return undef;
@@ -419,7 +417,6 @@ sub GDS_Get($@) {
 				"conditionsmap:".$cmapList." ".
 				"forecasts:".$fcList." ".
 				"forecastsmap:".$fmapList." ".
-				"headlines ".
 				"radarmap:".$cmapList." ".
 				"warningsmap:"."Deutschland,Bodensee,".$bulaList." ".
 				"warnings:".$bulaList;
@@ -455,12 +452,6 @@ sub GDS_Get($@) {
 			$hash->{file}{target}	= $tempDir.$name."_forecastsmap.jpg";
 			retrieveData($hash,'FILE');
 			break;
-		}
-
-		when("headlines"){
-			return "Error: Alerts disabled by attribute." unless AttrVal($name,'gdsUseAlerts',0);
-			$parameter //= "|";
-			return gdsAlertsHeadlines($name,$parameter);
 		}
 
 		when("warningsmap"){
@@ -530,6 +521,12 @@ sub GDS_Get($@) {
 			}
             my $_gdsAll		= AttrVal($name,"gdsAll", 0);
             my $gdsDebug	= AttrVal($name,"gdsDebug", 0);
+			break;
+			}
+
+		when("headlines"){
+			return "Error: Alerts disabled by attribute." unless AttrVal($name,'gdsUseAlerts',0);
+			$result = gdsHeadlines($name);
 			break;
 			}
 
@@ -807,7 +804,7 @@ sub __GDS_HTMLTail {
 #
 #	Tools
 
-sub gdsAlertsHeadlines($;$) {
+sub gdsHeadlines($;$) {
   my ($d,$sep) = @_;
   my $text = "";
   $sep = (defined($sep)) ? $sep : '|';
@@ -817,12 +814,6 @@ sub gdsAlertsHeadlines($;$) {
     $text .= ReadingsVal('gds','a_'.$i.'_headline','')
   }
   return $text;
-}
-
-sub gdsHeadlines($;$) {
-  my $text = "GDS error: gdsHeadlines() is deprecated. Please use gdsAlertsHeadlines()";
-  Log 1, $text;
-  return $text; 
 }
 
 sub setHelp(){
@@ -1318,6 +1309,7 @@ sub _finishedCONDITIONS {
 
 	$hash->{GDS_CONDITIONS_READ}	= int(time());
 	my $cf = AttrVal($name,'gdsSetCond',0);
+	return unless $cf;
 #	GDS_GetUpdate($hash,1) if $cf; 
 	my @b;
 	push @b, undef;
@@ -1885,7 +1877,6 @@ sub getListForecastStations($) {
 
 	eval {
 		foreach my $region (@regions) {
-			$data = "";
 			my $areaAndTime = 'Daten_'.$region.'_morgen_spaet';
 			while(($k, $v) = each %allForecastData){
 				if ($k eq $areaAndTime) {
@@ -1926,8 +1917,7 @@ sub getListForecastStations($) {
 #
 ###################################################################################################
 #
-#	2015-11-26	fixed		wrong region handling
-#				added		gdsAlertsHeadlines()
+#	2015-12-14	fixed		empty stations list #45633
 #
 #	2015-11-17	changed		decodeCAPData - fix wrong cumulation (first try)
 #				fixed		minor bugs
@@ -2130,7 +2120,7 @@ sub getListForecastStations($) {
 	
 		<br/>
 		Module uses following additional Perl modules:<br/><br/>
-		<code>Net::FTP, XML::Simple, Archive::Extract</code><br/><br/>
+		<code>Net::FTP, XML::Simple</code><br/><br/>
 		If not already installed in your environment, 
 		please install them using appropriate commands from your environment.
 
@@ -2209,14 +2199,14 @@ sub getListForecastStations($) {
 		<ul>Retrieve current conditions at selected station</ul>
 		<br/>
 
-		<code>get &lt;name&gt; conditionsmap &lt;region&gt;</code>
-		<br/><br/>
-		<ul>Retrieve map (imagefile) showing current conditions at selected station</ul>
-		<br/>
-
 		<code>get &lt;name&gt; forecasts &lt;region&gt;</code>
 		<br/><br/>
 		<ul>Retrieve forecasts for today and the following 3 days for selected region as text</ul>
+		<br/>
+
+		<code>get &lt;name&gt; conditionsmap &lt;region&gt;</code>
+		<br/><br/>
+		<ul>Retrieve map (imagefile) showing current conditions at selected station</ul>
 		<br/>
 
 		<code>get &lt;name&gt; forecastsmap &lt;stationName&gt;</code>
@@ -2224,10 +2214,9 @@ sub getListForecastStations($) {
 		<ul>Retrieve map (imagefile) showing forecasts for selected region</ul>
 		<br/>
 
-		<code>get &lt;name&gt; headlines [separator]</code>
+		<code>get &lt;name&gt; headlines</code>
 		<br/><br/>
-		<ul>Returns a string, containing all alert headlines. <br/>
-		    Default separator is | but can be overriden.</ul>
+		<ul>Returns a string, containing all alert headlines separated by |</ul>
 		<br/>
 
 		<code>get &lt;name&gt; help</code>
@@ -2337,7 +2326,7 @@ sub getListForecastStations($) {
 	<ul>
 
 		<li>Module uses following additional Perl modules:<br/><br/>
-		<code>Net::FTP, XML::Simple, Archive::Extract</code><br/><br/>
+		<code>Net::FTP, XML::Simple</code><br/><br/>
 		If not already installed in your environment, please install them using appropriate commands from your environment.</li>
 		<br/><br/>
 		<li>Have fun!</li><br/>
