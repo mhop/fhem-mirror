@@ -23,6 +23,14 @@
 #	along with fhem.  If not, see <http://www.gnu.org/licenses/>.# 
 #
 ######################################################################################################
+#  Versionshistorie:
+#
+#  1.2  14.12.2015 improve usage of verbose-modes
+#  1.1  13.12.2015 use of InternalTimer instead of fhem(sleep)
+#  1.0  12.12.2015 changed completly to HttpUtils_NonblockingGet for calling websites nonblocking, 
+#                  LWP is not needed anymore
+#
+#
 # Definition: define <name> SSCam <servername> <serverport> <username> <password> <camname> <rectime> 
 # 
 # Beispiel: define CamCP1 SSCAM dd.myds.net 5000 apiuser apipw Carport 5
@@ -39,10 +47,11 @@
 
 package main;
 
-use LWP::Simple;                       # From CPAN , Debian libwww-perl
-use JSON qw( decode_json );            # From CPAN,, Debian libjson-perl  
-use strict;                            # Good practice
-use warnings;                          # Good practice
+use JSON qw( decode_json );            # From CPAN,, Debian libjson-perl 
+use Data::Dumper;                      # Perl Core module
+use strict;                           
+use warnings;                         
+use HttpUtils;
 
 
 sub
@@ -91,17 +100,24 @@ sub SSCam_Define {
   $hash->{SERVERNAME} = $servername;
   $hash->{SERVERPORT} = $serverport;
   $hash->{USERNAME} = $username;
-  $hash->{PASSWORD} = $password;
+  $hash->{HELPER}{PASSWORD} = $password;
   $hash->{CAMNAME} = $camname;
-  $hash->{RECTIME} = $rectime;  
-   
+  $hash->{RECTIME} = $rectime; 
+  
+  # benötigte API's in $hash einfügen
+  $hash->{HELPER}{APIINFO}   = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
+  $hash->{HELPER}{APIAUTH}   = "SYNO.API.Auth";                                                  
+  $hash->{HELPER}{APIEXTREC} = "SYNO.SurveillanceStation.ExternalRecording";                     
+  $hash->{HELPER}{APICAM}    = "SYNO.SurveillanceStation.Camera"; 
+
   return undef;
 }
 
 
 sub SSCam_Undef {
-  my ($hash, $arg) = @_;
-  return undef;
+    my ($hash, $arg) = @_;
+    RemoveInternalTimer($hash);
+    return undef;
 }
 
 sub SSCam_Attr { 
@@ -110,14 +126,12 @@ sub SSCam_Attr {
 sub SSCam_Set {
         my ( $hash, @a ) = @_;
         return "\"set X\" needs at least an argument" if ( @a < 2 );
-	my $name = shift @a;
+	my $device = shift @a;
 	my $opt = shift @a;
-	my $value = join("", @a);
 	my %SSCam_sets = (
 	                 on => "on",
 	                 off => "off");
-	my $errorcode;
-	my $s;
+	my $camname = $hash->{CAMNAME};
 	my $logstr;
 	my @cList;
 	
@@ -128,399 +142,761 @@ sub SSCam_Set {
                 } else {
                           
                 # Aufnahme starten
-                if ($opt eq "on") {
-                        &camstart($hash);
+                if ($opt eq "on") 
+                        {
+                        $logstr = "Recording of Camera $camname should be started now";
+                        &printlog($hash,$logstr,"4");
+                        
+                        $hash->{OPMODE} = "Start";
+                        &getapisites_nonbl($hash);
                         }
                     
                     
                 # Aufnahme stoppen
-                if ($opt eq "off") {
-                        &camstop($hash);
+                if ($opt eq "off") 
+                        {
+                        $logstr = "Recording of Camera $camname should be stopped now";
+                        &printlog($hash,$logstr,"4");
+                        
+                        $hash->{OPMODE} = "Stop";
+                        &getapisites_nonbl($hash);
                         }
                 }          
 }
 
 
-###############################################################################
-####     Starten einer Kameraaufnahme
+#############################################################################################################################
+#######    Begin Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                                 #######
+#######                                                                                                               #######
+#######    Ablauflogik:                                                                                               #######
+#######                                                                                                               #######
+#######    getapisites_nonbl -> login_nonbl ->  getcamid_nonbl  -> camop_nonbl ->  camret_nonbl -> logout_nonbl       #######
+#######                                                             |       |                                         #######
+#######                                                           Start    Stop                                       #######
+#######                                                                                                               #######
+#############################################################################################################################
 
-sub camstart {
-  # Übernahmewerte sind $username, $password,$camname, $servername, $serverport
-  my ($hash) = @_;
-  my $servername = $hash->{SERVERNAME};
-  my $serverport = $hash->{SERVERPORT};
-  my $username = $hash->{USERNAME};
-  my $password = $hash->{PASSWORD};
-  my $camname = $hash->{CAMNAME};
-  my $device = $hash->{NAME};
-  my $rectime = $hash->{RECTIME};
-  my $logstr;
-  my $validurl;
-  my $success;
-  my $sid;
-  my $camid;
-  my $apiextrecpath;
-  my $apiextrecmaxver;
-  my $errorcode;
-  my $url;
-  my $myjson;
-  my $data;
-  my $error;
+sub getapisites_nonbl {
+   my ($hash) = @_;
+   my $servername = $hash->{SERVERNAME};
+   my $serverport = $hash->{SERVERPORT};
+   my $apiinfo    = $hash->{HELPER}{APIINFO};                         # Info-Seite für alle API's, einzige statische Seite !
+   my $apiauth    = $hash->{HELPER}{APIAUTH};                         # benötigte API-Pfade für Funktionen,  
+   my $apiextrec  = $hash->{HELPER}{APIEXTREC};                       # in der Abfrage-Url an Parameter "&query="
+   my $apicam     = $hash->{HELPER}{APICAM};                          # mit Komma getrennt angeben
+   my $logstr;
+   my $url;
+   my $param;
   
-  # Logausgabe
-  $logstr = "--- Begin Function camstart ---";
-  &printlog($hash,$logstr,"5");
+   #### API-Pfade und MaxVersions ermitteln #####
+   # Logausgabe
+   $logstr = "--- Begin Function getapisites nonblocking ---";
+   &printlog($hash,$logstr,"4");
+   
+   # URL zur Abfrage der Eigenschaften von API SYNO.SurveillanceStation.ExternalRecording,$apicam
+   $url = "http://$servername:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam";
+   
+   $param = {
+               url      => $url,
+               timeout  => 5,
+               hash     => $hash,
+               method   => "GET",
+               header   => "Accept: application/json",
+               callback => \&login_nonbl
+            };
+   
+   # API-Sites werden abgefragt und mit Routine "login_nonbl" verarbeitet
+   HttpUtils_NonblockingGet ($param);  
+} 
+    
+
+####################################################################################  
+####      Rückkehr aus Funktion API-Pfade und MaxVersions ermitteln,  
+####      nach erfolgreicher Verarbeitung wird login ausgeführt und $sid ermittelt
+
+sub login_nonbl ($) {
+   my ($param, $err, $myjson) = @_;
+   my $hash       = $param->{hash};
+   my $device     = $hash->{NAME};
+   my $servername = $hash->{SERVERNAME};
+   my $serverport = $hash->{SERVERPORT};
+   my $username   = $hash->{USERNAME};
+   my $password   = $hash->{HELPER}{PASSWORD};
+   my $apiauth    = $hash->{HELPER}{APIAUTH};
+   my $apiextrec  = $hash->{HELPER}{APIEXTREC};
+   my $apicam     = $hash->{HELPER}{APICAM};
+   my $data;
+   my $logstr;
+   my $url;
+   my $success;
+   my $apiauthpath;
+   my $apiauthmaxver;
+   my $apiextrecpath;
+   my $apiextrecmaxver;
+   my $apicampath;
+   my $apicammaxver;
+   my $error;
   
-  $logstr = "Recording of Camera $camname should be started now";
-  &printlog($hash,$logstr,"5");
-  
-  # Erreichbarkeit Disk Station Url testen
-  $validurl = &validurl($hash);
-  unless ($validurl eq "true") {return};
-  
-  # API-Pfade und MaxVersions ermitteln
-  ($hash, $success) = &getapisites($hash);
-  unless ($success) {return};
+    # Verarbeitung der asynchronen Rückkehrdaten aus sub "getapisites_nonbl"
+    if ($err ne "")                                                                                    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+    {
+        $logstr = "error while requesting ".$param->{url}." - $err";
+        &printlog($hash,$logstr,"1");	                                                             
+        $logstr = "--- End Function getapisites nonblocking with error ---";
+        &printlog($hash,$logstr,"4");
+        readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
+        return;
+    }
+
+    elsif ($myjson ne "")                                                                               # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+    {
+        $logstr = "URL-Call: ".$param->{url};                                                          
+        &printlog($hash,$logstr,"4");
+          
+        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson
+        
+        # Evaluiere ob Daten im JSON-Format empfangen wurden
+        ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
+        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); return($hash,$success)};
+        
+        $data = decode_json($myjson);
+   
+        $success = $data->{'success'};
+    
+                if ($success) 
+                     {
+                        # Logausgabe decodierte JSON Daten
+                        $logstr = "JSON returned: ". Dumper $data;                                                         
+                        &printlog($hash,$logstr,"4");
+                        
+			# Pfad und Maxversion von "SYNO.API.Auth" ermitteln
+       
+			$apiauthpath = $data->{'data'}->{$apiauth}->{'path'};
+			# Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+			$apiauthpath =~ tr/_//d;
+       
+			# maximale Version ermitteln
+			$apiauthmaxver = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
+       
+			$logstr = "Path of $apiauth selected: $apiauthpath";
+			&printlog($hash, $logstr,"4");
+			$logstr = "MaxVersion of $apiauth selected: $apiauthmaxver";
+			&printlog($hash, $logstr,"4");
+       
+			# Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
+       
+			$apiextrecpath = $data->{'data'}->{$apiextrec}->{'path'};
+			# Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+			$apiextrecpath =~ tr/_//d;
+       
+			# maximale Version ermitteln
+			$apiextrecmaxver = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
+       
+			$logstr = "Path of $apiextrec selected: $apiextrecpath";
+			&printlog($hash, $logstr,"4");
+			$logstr = "MaxVersion of $apiextrec selected: $apiextrecmaxver";
+			&printlog($hash, $logstr,"4");
+       
+			# Pfad und Maxversion von "SYNO.SurveillanceStation.Camera" ermitteln
+       		        $apicampath = $data->{'data'}->{$apicam}->{'path'};
+			# Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+			$apicampath =~ tr/_//d;
+       
+			# maximale Version ermitteln
+			$apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
+			# um 1 verringern - Fehlerprävention
+			if (defined $apicammaxver) {$apicammaxver -= 1};
+       
+			$logstr = "Path of $apicam selected: $apicampath";
+			&printlog($hash, $logstr,"4");
+			$logstr = "MaxVersion of $apicam (optimized): $apicammaxver";
+			&printlog($hash, $logstr,"4");
+       
+			# ermittelte Werte in $hash einfügen
+			$hash->{HELPER}{APIAUTHPATH}     = $apiauthpath;
+			$hash->{HELPER}{APIAUTHMAXVER}   = $apiauthmaxver;
+			$hash->{HELPER}{APIEXTRECPATH}   = $apiextrecpath;
+			$hash->{HELPER}{APIEXTRECMAXVER} = $apiextrecmaxver;
+			$hash->{HELPER}{APICAMPATH}      = $apicampath;
+			$hash->{HELPER}{APICAMMAXVER}    = $apicammaxver;
+       
+       
+			# Setreading 
+			readingsBeginUpdate($hash);
+			readingsBulkUpdate($hash,"Errorcode","none");
+			readingsBulkUpdate($hash,"Error","none");
+			readingsEndUpdate($hash,1);
+			
+			# Logausgabe
+		        $logstr = "--- End Function getapisites nonblocking ---";
+                        &printlog($hash,$logstr,"4");
+       
+		    } 
+		    else 
+		    {
+       
+			# Fehlertext setzen
+			$error = "couldn't call API-Infosite";
+       
+			# Setreading 
+			readingsBeginUpdate($hash);
+			readingsBulkUpdate($hash,"Errorcode","none");
+			readingsBulkUpdate($hash,"Error",$error);
+			readingsEndUpdate($hash, 1);
+
+			# Logausgabe
+			$logstr = "ERROR - the API-Query couldn't be executed successfully";
+			&printlog($hash,$logstr,"1");
+			
+		        $logstr = "--- End Function getapisites nonblocking with error ---";
+                        &printlog($hash,$logstr,"4");
+			return;
+		    }
+		
+		
+
+    }
   
   # Login und SID ermitteln
-  ($sid, $success)  = &serverlogin($hash);
-  unless ($success) {return};
-
-  # Kamera-ID anhand des Kamaeranamens ermitteln
-  ($camid, $success) = &getcamid($hash,$sid);
-  unless ($success) {&serverlogout($hash,$sid); return};
-
-  # Start der Aufnahme
-  $apiextrecpath   = $hash->{APIEXTRECPATH};
-  $apiextrecmaxver = $hash->{APIEXTRECMAXVER};
-  $errorcode       = "";
-  $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=SYNO.SurveillanceStation.ExternalRecording&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&session=SurveillanceStation&_sid=\"$sid\""; 
-  $myjson = get $url;
-  
-  # Evaluiere ob Daten im JSON-Format empfangen
-  ($hash, $success) = &evaljson($hash,$myjson,$url);
-  unless ($success) {&serverlogout($hash,$sid); return};
-  
   # Logausgabe
-  $logstr = "URL call: $url";
-  &printlog($hash,$logstr,"4");
-  $logstr = "JSON response: $myjson";
-  &printlog($hash,$logstr,"4");
-  
-  # dekodiere Response aus JSON Format
-  $data = decode_json($myjson);
-  $success = $data->{'success'};
-  
+  $logstr = "--- Begin Function serverlogin nonblocking ---";
+  &printlog($hash,$logstr,"4");  
  
-  if ($success) {
+  $url = "http://$servername:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=sid";
+   
+  
+  $param = {
+               url      => $url,
+               timeout  => 5,
+               hash     => $hash,
+               method   => "GET",
+               header   => "Accept: application/json",
+               callback => \&getcamid_nonbl
+           };
+   
+   # login wird ausgeführt, $sid ermittelt und mit Routine "getcamid_nonbl" verarbeitet
+   HttpUtils_NonblockingGet ($param);
+  
+  
+}  
+  
+###############################################################################  
+####      Rückkehr aus Funktion login und $sid ermitteln,  
+####      nach erfolgreicher Verarbeitung wird Kamera-ID ermittelt 
+  
+sub getcamid_nonbl ($) {  
+  
+   my ($param, $err, $myjson) = @_;
+   my $hash         = $param->{hash};
+   my $servername   = $hash->{SERVERNAME};
+   my $serverport   = $hash->{SERVERPORT};
+   my $username     = $hash->{USERNAME};
+   my $apicam       = $hash->{HELPER}{APICAM};
+   my $apicampath   = $hash->{HELPER}{APICAMPATH};
+   my $apicammaxver = $hash->{HELPER}{APICAMMAXVER};
+   my $url;
+   my $data;
+   my $logstr;
+   my $success;
+   my $sid;
+   my $error;
+   my $errorcode;
+   
+   
+  
+   # Verarbeitung der asynchronen Rückkehrdaten aus sub "login_nonbl"
+   if ($err ne "")                                                                                      # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   {
+        $logstr = "error while requesting ".$param->{url}." - $err";
+        &printlog($hash,$logstr,"1");		                                                       # Eintrag fürs Log
+        $logstr = "--- End Function serverlogin nonblocking with error ---";
+        &printlog($hash,$logstr,"4");
+        readingsSingleUpdate($hash, "Error", $err, 1);                                      	       # Readings erzeugen
+        return;
+   }
+   elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+   {
+        $logstr = "URL-Call: ".$param->{url};                                                          # Eintrag fürs Log
+        &printlog($hash,$logstr,"4");
+          
+        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson
+        
+        # Evaluiere ob Daten im JSON-Format empfangen wurden
+        ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
+        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); return($hash,$success)};
+        
+        $data = decode_json($myjson);
+   
+        $success = $data->{'success'};
+        
+        # Fall login war erfolgreich
+        if ($success) 
+        {
+             # Logausgabe decodierte JSON Daten
+             $logstr = "JSON returned: ". Dumper $data;                                                         
+             &printlog($hash,$logstr,"4");
+             
+             $sid = $data->{'data'}->{'sid'};
+             
+             # Session ID in hash eintragen
+             $hash->{HELPER}{SID} = $sid;
        
-       # die URL konnte erfolgreich aufgerufen werden
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Record","Start");
-       readingsBulkUpdate($hash,"Errorcode","none");
-       readingsBulkUpdate($hash,"Error","none");
-       readingsEndUpdate($hash, 1);
-       $hash->{STATE} = "on";
+             # Setreading 
+             readingsBeginUpdate($hash);
+             readingsBulkUpdate($hash,"Errorcode","none");
+             readingsBulkUpdate($hash,"Error","none");
+             readingsEndUpdate($hash, 1);
        
-       # Generiert das Ereignis "on", bedingt Browseraktualisierung und Status der "Lampen"
-       { fhem "trigger $device on" }
+             # Logausgabe
+             $logstr = "Login of User $username successful - SID: $sid";
+             &printlog($hash,$logstr,"4");
+             $logstr = "--- End Function serverlogin nonblocking ---";
+             &printlog($hash,$logstr,"4");    
+       } 
+       else 
+       {
+             # Errorcode aus JSON ermitteln
+             $errorcode = $data->{'error'}->{'code'};
        
-       # Logausgabe
-       $logstr = "Camera $camname with Recordtime $rectime"."s started";
-       &printlog($hash,$logstr,"3");
+             # Fehlertext zum Errorcode ermitteln
+             $error = &experrorauth($hash,$errorcode);
+
+             # Setreading 
+             readingsBeginUpdate($hash);
+             readingsBulkUpdate($hash,"Errorcode",$errorcode);
+             readingsBulkUpdate($hash,"Error",$error);
+             readingsEndUpdate($hash, 1);
        
-       # FHEM Sleep Kommando, kein blockieren von FHEM 
-       {fhem("sleep $rectime;set $device off;")};
-       $logstr = "Autostop command: {fhem(\"sleep $rectime quiet;set $device off\")}";
-       &printlog($hash,$logstr,"5");
+             # Logausgabe
+             $logstr = "ERROR - Login of User $username unsuccessful. Errorcode: $errorcode - $error";
+             &printlog($hash,$logstr,"1");
+             
+             $logstr = "--- End Function serverlogin nonblocking with error ---";
+             &printlog($hash,$logstr,"4"); 
+             return;
+       }
+   }
+  
+  
+  # die Kamera-Id wird aus dem Kameranamen (Surveillance Station) ermittelt und mit Routine "camop_nonbl" verarbeitet
+  # Logausgabe
+  $logstr = "--- Begin Function getcamid nonblocking ---";
+  &printlog($hash,$logstr,"4");
+  
+  # einlesen aller Kameras - Auswertung in Rückkehrfunktion "camop_nonbl"
+  $url = "http://$servername:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&session=SurveillanceStation&_sid=\"$sid\"";
+
+  $param = {
+               url      => $url,
+               timeout  => 5,
+               hash     => $hash,
+               method   => "GET",
+               header   => "Accept: application/json",
+               callback => \&camop_nonbl
+           };
+   
+  HttpUtils_NonblockingGet ($param);
+  
+} 
+
+
+
+#############################################################################################
+####      Rückkehr aus Funktion Kamera-ID ermitteln (getcamid_nonbl),  
+####      nach erfolgreicher Verarbeitung wird Kameraoperation entspr. "OpMode" ausgeführt
+  
+sub camop_nonbl ($) {  
+   my ($param, $err, $myjson) = @_;
+   my $hash            = $param->{hash};
+   my $servername      = $hash->{SERVERNAME};
+   my $serverport      = $hash->{SERVERPORT};
+   my $camname         = $hash->{CAMNAME};
+   my $apiextrec       = $hash->{HELPER}{APIEXTREC};
+   my $apiextrecpath   = $hash->{HELPER}{APIEXTRECPATH};
+   my $apiextrecmaxver = $hash->{HELPER}{APIEXTRECMAXVER};
+   my $sid             = $hash->{HELPER}{SID};
+   my $OpMode          = $hash->{OPMODE};
+   my $url;
+   my $camid;
+   my $data;
+   my $logstr;
+   my $success;
+   my $error;
+   my $errorcode;
+   my $camcount;
+   my $i;
+   my %allcams;
+   my $name;
+   my $id;
+  
+   # Verarbeitung der asynchronen Rückkehrdaten aus sub "getcamid_nonbl"
+   if ($err ne "")                                                                         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   {
+        $logstr = "error while requesting ".$param->{url}." - $err";
+        &printlog($hash,$logstr,"1");		                                           # Eintrag fürs Log
+        $logstr = "--- End Function getcamid nonblocking with error ---";
+        &printlog($hash,$logstr,"4");
+        readingsSingleUpdate($hash, "Error", $err, 1);                                     # Readings erzeugen
+        return;
+   }
+   elsif ($myjson ne "")                                                                   # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+   {
+        $logstr = "URL-Call: ".$param->{url};                                                          
+        &printlog($hash,$logstr,"4");                                          
+         
+        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson 
+        
+        # Evaluiere ob Daten im JSON-Format empfangen wurden, Achtung: sehr viele Daten mit verbose=5
+        ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
+        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"5"); return($hash,$success)};
+        
+        $data = decode_json($myjson);
+   
+        $success = $data->{'success'};
+                
+        if ($success)                                                                       # die Liste aller Kameras konnte ausgelesen werden, Anzahl der definierten Kameras ist in Var "total"
+        {
+             # lesbare Ausgabe der decodierten JSON-Daten
+             $logstr = "JSON returned: ". Dumper $data;                                     # Achtung: SEHR viele Daten !                                              
+             &printlog($hash,$logstr,"5");
+                    
+             $camcount = $data->{'data'}->{'total'};
+             $i = 0;
+         
+             # Namen aller installierten Kameras mit Id's in Hash (Assoziatives Array) einlesen
+             %allcams = ();
+             while ($i < $camcount) 
+                 {
+                 $name = $data->{'data'}->{'cameras'}->[$i]->{'name'};
+                 $id = $data->{'data'}->{'cameras'}->[$i]->{'id'};
+                 $allcams{"$name"} = "$id";
+                 $i += 1;
+                 }
+             
+             # Ist der gesuchte Kameraname im Hash enhalten (in SS eingerichtet ?)
+             if (exists($allcams{$camname})) 
+             {
+                 $camid = $allcams{$camname};
+                 # in hash eintragen
+                 $hash->{CAMID} = $camid;
+                 
+                 # Logausgabe
+                 $logstr = "Detection Camid successful - $camname ID: $camid";
+                 &printlog($hash,$logstr,"4");
+                 $logstr = "--- End Function getcamid nonblocking ---";
+                 &printlog($hash,$logstr,"4");  
+             } 
+             else 
+             {
+                 # Kameraname nicht gefunden, id = ""
+                 
+                 # Setreading 
+                 readingsBeginUpdate($hash);
+                 readingsBulkUpdate($hash,"Errorcode","none");
+                 readingsBulkUpdate($hash,"Error","Camera(ID) not found in Surveillance Station");
+                 readingsEndUpdate($hash, 1);
+                                  
+                 # Logausgabe
+                 $logstr = "ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Cameraname and Spelling.";
+                 &printlog($hash,$logstr,"1");
+                 $logstr = "--- End Function getcamid nonblocking with error ---";
+                 &printlog($hash,$logstr,"4");
+                 return;
+              }
+       }
+       else 
+       {
+            # die Abfrage konnte nicht ausgeführt werden
+            # Errorcode aus JSON ermitteln
+            $errorcode = $data->{'error'}->{'code'};
+
+            # Fehlertext zum Errorcode ermitteln
+            $error = &experror($hash,$errorcode);
+       
+            # Setreading 
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate($hash,"Errorcode",$errorcode);
+            readingsBulkUpdate($hash,"Error",$error);
+            readingsEndUpdate($hash, 1);
+
+            # Logausgabe
+            $logstr = "ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error";
+            &printlog($hash,$logstr,"1");
+            $logstr = "--- End Function getcamid nonblocking with error ---";
+            &printlog($hash,$logstr,"4");
+            return;
+       }
+       
+   # Logausgabe
+   $logstr = "--- Begin Function cam: $OpMode nonblocking ---";
+   &printlog($hash,$logstr,"4");
+
+   if ($OpMode eq "Start") 
+   {
+      # die Aufnahme wird gestartet, Rückkehr wird mit "camret_nonbl" verarbeitet
+      $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&session=SurveillanceStation&_sid=\"$sid\""; 
+   } 
+   elsif ($OpMode eq "Stop")
+   {
+      # die Aufnahme wird gestoppt, Rückkehr wird mit "camret_nonbl" verarbeitet
+      $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&session=SurveillanceStation&_sid=\"$sid\"";
+   }
+  
+   $param = {
+                url      => $url,
+                timeout  => 5,
+                hash     => $hash,
+                method   => "GET",
+                header   => "Accept: application/json",
+                callback => \&camret_nonbl
+            };
+   
+   HttpUtils_NonblockingGet ($param);   
+
+   } 
+} 
+  
+  
+###################################################################################  
+####      Rückkehr aus Funktion camop_nonbl,  
+####      Check ob Kameraoperation erfolgreich wie in "OpMOde" definiert 
+####      danach logout
+  
+sub camret_nonbl ($) {  
+   my ($param, $err, $myjson) = @_;
+   my $hash             = $param->{hash};
+   my $device           = $hash->{NAME};
+   my $servername       = $hash->{SERVERNAME};
+   my $serverport       = $hash->{SERVERPORT};
+   my $camname          = $hash->{CAMNAME};
+   my $rectime          = $hash->{RECTIME};
+   my $apiauth          = $hash->{HELPER}{APIAUTH};
+   my $apiauthpath      = $hash->{HELPER}{APIAUTHPATH};
+   my $apiauthmaxver    = $hash->{HELPER}{APIAUTHMAXVER};
+   my $sid              = $hash->{HELPER}{SID};
+   my $OpMode           = $hash->{OPMODE};
+   my $url;
+   my $data;
+   my $logstr;
+   my $success;
+   my $error;
+   my $errorcode;
+  
+   # Verarbeitung der asynchronen Rückkehrdaten aus sub "camop_nonbl"
+   if ($err ne "")                                                                                     # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   {
+        $logstr = "error while requesting ".$param->{url}." - $err";
+        &printlog($hash,$logstr,"1");		                                                      # Eintrag fürs Log
+        $logstr = "--- End Function cam: $OpMode nonblocking with error ---";
+        &printlog($hash,$logstr,"4");
+        readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
+        return;
+   }
+   elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+   {
+        $logstr = "URL-Call: ".$param->{url};                                                          
+        &printlog($hash,$logstr,"4");
+  
+        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson 
       
-       }
-       else {
-       # die URL konnte nicht erfolgreich aufgerufen werden
-       # Errorcode aus JSON ermitteln
-       $errorcode = $data->{'error'}->{'code'};
-
-       # Fehlertext zum Errorcode ermitteln
-       $error = &experror($hash,$errorcode);
-
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Errorcode",$errorcode);
-       readingsBulkUpdate($hash,"Error",$error);
-       readingsEndUpdate($hash, 1);
-       
-       # Logausgabe
-       $logstr = "ERROR - Start Recording of Camera $camname not possible. Errorcode: $errorcode - $error";
-       &printlog($hash,$logstr,"1");
-       }
-  &serverlogout($hash,$sid);
-
-  # Logausgabe
-  $logstr = "--- End Function camstart ---";
-  &printlog($hash,$logstr,"5");
-  
-return;
-}
-
-##############################################################################
-###      Stoppen Kameraaufnahme
-
-sub camstop {
-  # Übernahmewerte sind $username, $password,$camname, $servername, $serverport
-  my ($hash) = @_;
-  my $servername      = $hash->{SERVERNAME};
-  my $serverport      = $hash->{SERVERPORT};
-  my $username        = $hash->{USERNAME};
-  my $password        = $hash->{PASSWORD};
-  my $camname         = $hash->{CAMNAME};
-  my $device          = $hash->{NAME};
-  my $logstr;
-  my $validurl;
-  my $success;
-  my $sid;
-  my $camid;
-  my $apiextrecpath;
-  my $apiextrecmaxver;
-  my $errorcode;
-  my $url;
-  my $myjson;
-  
-  # Logausgabe
-  $logstr = "--- Begin Function camstop ---";
-  &printlog($hash,$logstr,"5");  
-  
-  $logstr = "Recording of Camera $camname should be stopped now";
-  &printlog($hash,$logstr,"5");
-
-  # Erreichbarkeit Disk Station Url testen
-  $validurl = &validurl($hash);
-  unless ($validurl eq "true") {return};
-  
-  # API-Pfade und MaxVersions ermitteln
-  ($hash, $success) = &getapisites($hash);
-  unless ($success) {return};
-  
-  # SID ermitteln nach Login
-  ($sid, $success)  = &serverlogin($hash);
-  unless ($success) {return};
-
-  ($camid, $success) = &getcamid($hash,$sid);
-  unless ($success) {&serverlogout($hash,$sid); return};
-
-  $apiextrecpath   = $hash->{APIEXTRECPATH};
-  $apiextrecmaxver = $hash->{APIEXTRECMAXVER};
- 
-  $errorcode = "";
-  $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=SYNO.SurveillanceStation.ExternalRecording&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&session=SurveillanceStation&_sid=\"$sid\"";
-  $myjson = get $url;
-  
-  # Evaluiere ob Daten im JSON-Format empfangen
-  ($hash, $success) = &evaljson($hash,$myjson,$url);
-  unless ($success) {&serverlogout($hash,$sid); return};
-  
-  # Logausgabe
-  $logstr = "URL call: $url";
-  &printlog($hash,$logstr,"4");
-  $logstr = "JSON response: $myjson";
-  &printlog($hash,$logstr,"4");  
-  
-  # dekodiere Response aus JSON Format
-  my $data = decode_json($myjson);
-  $success = $data->{'success'};
-
-  if ($success) {
-       # die URL konnte erfolgreich aufgerufen werden
-       
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Record","Stop");
-       readingsBulkUpdate($hash,"Errorcode","none");
-       readingsBulkUpdate($hash,"Error","none");
-       readingsEndUpdate($hash, 1);
-       $hash->{STATE} = "off";
-       
-       # Generiert das Ereignis "on", bedingt Browseraktualisierung und Status der "Lampen"
-       { fhem "trigger $device off" }
-       
-       # Logausgabe
-       $logstr = "Camera $camname Recording stopped";
-       &printlog($hash,$logstr,"3");
-       }
-       else {
-       # die URL konnte nicht erfolgreich aufgerufen werden
-       # Errorcode aus JSON ermitteln
-       $errorcode = $data->{'error'}->{'code'};
-
-       # Fehlertext zum Errorcode ermitteln
-       my $error = &experror($hash,$errorcode);
-       
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Errorcode",$errorcode);
-       readingsBulkUpdate($hash,"Error",$error);
-       readingsEndUpdate($hash, 1);     
-
-       # Logausgabe
-       my $logstr = "ERROR - Stop Recording Camera $camname not possible. Errorcode: $errorcode - $error";
-       &printlog($hash,$logstr,"1");
-       }
-
-   &serverlogout($hash,$sid);
-
-   # Logausgabe
-   $logstr = "--- End Function camstop ---";
-   &printlog($hash,$logstr,"5");
+        # Evaluiere ob Daten im JSON-Format empfangen wurden
+        ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
+        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); return($hash,$success)};
+        
+        $data = decode_json($myjson);
    
-return;
-}
+        $success = $data->{'success'};
 
-############################################################################
-####   Login auf SS Server und ermitteln _sid
+        if ($success) 
+        {       
+            # Kameraoperation entsprechend "OpMode" war erfolgreich
+            
+            # Logausgabe decodierte JSON Daten
+            $logstr = "JSON returned: ". Dumper $data;                                                        
+            &printlog($hash,$logstr,"4");
+                
+            if ($OpMode eq "Start") 
+            {
+                $hash->{STATE} = "on";
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Record","Start");
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                
+                # Logausgabe
+                $logstr = "Camera $camname with Recordtime $rectime"."s started";
+                &printlog($hash,$logstr,"3");  
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");                
+       
+                # Generiert das Ereignis "on", bedingt Browseraktualisierung und Status der "Lampen" wenn kein longpoll=1
+                # { fhem "trigger $device on" }
+                
+                # Logausgabe
+                $logstr = "Time for Recording is set to: $rectime";
+                &printlog($hash,$logstr,"4");
+                
+                # Stop der Aufnahme wird eingeleitet
+                $logstr = "Recording of Camera $camname should be stopped in $rectime seconds";
+                &printlog($hash,$logstr,"4");
+                $hash->{OPMODE} = "Stop";
+                InternalTimer(gettimeofday()+$rectime, "getapisites_nonbl", $hash, 0);
+                                  
 
-sub serverlogin {
-  my ($hash) = @_;
-  my $servername    = $hash->{SERVERNAME};
-  my $serverport    = $hash->{SERVERPORT};
-  my $username      = $hash->{USERNAME};
-  my $password      = $hash->{PASSWORD};
-  my $apiauthpath   = $hash->{APIAUTHPATH};
-  my $apiauthmaxver = $hash->{APIAUTHMAXVER};
-  my $sid = "";
-  my $logstr;
-  my $loginurl;
-  my $myjson;
-  my $success;
-  my $data;
-  my $errorcode;
-  my $error;
-  
-  
-  # Logausgabe
-  $logstr = "--- Begin Function serverlogin ---";
-  &printlog($hash,$logstr,"5");  
- 
-  $loginurl = "http://$servername:$serverport/webapi/$apiauthpath?api=SYNO.API.Auth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=sid";
-  $myjson = get $loginurl;
-  
-  # Evaluiere ob Daten im JSON-Format empfangen
-  ($hash, $success) = &evaljson($hash,$myjson,$loginurl);
-  unless ($success) {return($sid, $success)};
-  
-  # Logausgabe
-  $logstr = "URL call: $loginurl";
-  &printlog($hash,$logstr,"4");
-  $logstr = "JSON response: $myjson";
-  &printlog($hash,$logstr,"4");  
-  
-  # die Response wird im JSON Format geliefert, Beispiel: {"data":{"sid":"zvJraLU.5Yg6E14A0MIN235902"},"success":true} 
-  $data = decode_json($myjson);
-  $success = $data->{'success'};
-  
-  # der login war erfolgreich
-  if ($success) {
-       $sid = $data->{'data'}->{'sid'};
+            }
+            elsif ($OpMode eq "Stop") 
+            {
+                $hash->{STATE} = "off";
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Record","Stop");
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+            
+                # Generiert das Ereignis "off", bedingt Browseraktualisierung und Status der "Lampen" wenn kein longpoll=1
+                # { fhem "trigger $device off" }
+                
+                RemoveInternalTimer($hash);
        
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Errorcode","none");
-       readingsBulkUpdate($hash,"Error","none");
-       readingsEndUpdate($hash, 1);
-       
-       # Logausgabe
-       $logstr = "Login of User $username successful - SID: $sid";
-       &printlog($hash,$logstr,"5");
-       } else {
-       # Errorcode aus JSON ermitteln
-       $errorcode = $data->{'error'}->{'code'};
-       
-       # Fehlertext zum Errorcode ermitteln
-       $error = &experrorauth($hash,$errorcode);
-
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Errorcode",$errorcode);
-       readingsBulkUpdate($hash,"Error",$error);
-       readingsEndUpdate($hash, 1);
-       
-       # Logausgabe
-       $logstr = "ERROR - Login of User $username unsuccessful. Errorcode: $errorcode - $error";
-       &printlog($hash,$logstr,"1");
+                # Logausgabe
+                $logstr = "Camera $camname Recording stopped";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
        }
-   
-   # Logausgabe
-   $logstr = "--- End Function serverlogin ---";
-   &printlog($hash,$logstr,"5");    
-   
-return ($sid, $success);
-}
+       else 
+       {
+            # die URL konnte nicht erfolgreich aufgerufen werden
+            # Errorcode aus JSON ermitteln
+            $errorcode = $data->{'error'}->{'code'};
 
+            # Fehlertext zum Errorcode ermitteln
+            $error = &experror($hash,$errorcode);
 
-############################################################################
-### Logout Session 
+            # Setreading 
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate($hash,"Errorcode",$errorcode);
+            readingsBulkUpdate($hash,"Error",$error);
+            readingsEndUpdate($hash, 1);
+       
+            # Logausgabe
+            $logstr = "ERROR - Operationmode $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error";
+            &printlog($hash,$logstr,"1");
+            $logstr = "--- End Function cam: $OpMode nonblocking with error ---";
+            &printlog($hash,$logstr,"4");
+            return;
 
-sub serverlogout {
- # Übernahmewerte sind Session-id: $sid, $servername, $serverport
- my ($hash,@sid) = @_;
- my $servername    = $hash->{SERVERNAME};
- my $serverport    = $hash->{SERVERPORT};
- my $apiauthpath   = $hash->{APIAUTHPATH};
- my $apiauthmaxver = $hash->{APIAUTHMAXVER};
- my $username      = $hash->{USERNAME};
- my $sid = shift @sid;
- my $logstr;
- my $logouturl;
- my $myjson;
- my $success;
- my $data;
- my $errorcode;
- my $error; 
- 
- 
- # Logausgabe
- $logstr = "--- Begin Function serverlogout ---";
- &printlog($hash,$logstr,"5"); 
- 
- $logouturl = "http://$servername:$serverport/webapi/$apiauthpath?api=SYNO.API.Auth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
- $myjson = get $logouturl;
- 
- # Evaluiere ob Daten im JSON-Format empfangen
- ($hash, $success) = &evaljson($hash,$myjson,$logouturl);
- unless ($success) {return};
- 
- # Logausgabe
- $logstr = "URL call: $logouturl";
- &printlog($hash,$logstr,"4");
- $logstr = "JSON response: $myjson";
- &printlog($hash,$logstr,"4");
-
- # Response erfolgt im JSON Format der Art: {"success":true} 
- $data = decode_json($myjson);
- $success = $data->{'success'};
-
- if ($success)  {
-    # die URL konnte erfolgreich aufgerufen werden
-    
+       }
+    # logout wird ausgeführt, Rückkehr wird mit "logout_nonbl" verarbeitet
     # Logausgabe
-    $logstr = "Session of User $username quit - SID: $sid.";
-    &printlog($hash,$logstr,"5");
-    } else {
-    # Errorcode aus JSON ermitteln
-    $errorcode = $data->{'error'}->{'code'};
+    $logstr = "--- Begin Function logout nonblocking ---";
+    &printlog($hash,$logstr,"4");
+  
+    $url = "http://$servername:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid"; 
 
-    # Fehlertext zum Errorcode ermitteln
-    $error = &experrorauth($hash,$errorcode);
-    
-    # Logausgabe
-    $logstr = "ERROR - Logout of User $username was not successful. Errorcode: $errorcode - $error";
-    &printlog($hash,$logstr,"1");
-    }
-  # Logausgabe
-  $logstr = "--- End Function serverlogout ---";
-  &printlog($hash,$logstr,"5");
-    
-return;
+    $param = {
+                url      => $url,
+                timeout  => 5,
+                hash     => $hash,
+                method   => "GET",
+                header   => "Accept: application/json",
+                callback => \&logout_nonbl
+             };
+   
+    HttpUtils_NonblockingGet ($param);
+   }
 }
+
+
+###################################################################################  
+####      Rückkehr aus Funktion camret_nonbl,  
+####      check Funktion logout
+  
+sub logout_nonbl ($) {  
+   my ($param, $err, $myjson) = @_;
+   my $hash            = $param->{hash};
+   my $username        = $hash->{USERNAME};
+   my $sid             = $hash->{HELPER}{SID};
+   my $data;
+   my $logstr;
+   my $success;
+   my $error;
+   my $errorcode;
+  
+   # Verarbeitung der asynchronen Rückkehrdaten aus sub "camop_nonbl"
+   if($err ne "")                                                                                     # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   {
+        $logstr = "error while requesting ".$param->{url}." - $err";
+        &printlog($hash,$logstr,"1");		                                                      # Eintrag fürs Log
+        $logstr = "--- End Function logout nonblocking with error ---";
+        &printlog($hash,$logstr,"4");
+        readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
+        return;
+   }
+   elsif($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+   {
+        $logstr = "URL-Call: ".$param->{url};                                                          
+        &printlog($hash,$logstr,"4");
+  
+        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson 
+        
+        # Evaluiere ob Daten im JSON-Format empfangen wurden
+        ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
+        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); return($hash,$success)};
+        
+        $data = decode_json($myjson);
+   
+        $success = $data->{'success'};
+
+        if ($success)  
+        {
+             # die Logout-URL konnte erfolgreich aufgerufen werden
+             # Logausgabe decodierte JSON Daten
+             $logstr = "JSON returned: ". Dumper $data;                                                        
+             &printlog($hash,$logstr,"4");
+                        
+             # Session-ID aus Helper-hash löschen
+             delete $hash->{HELPER}{SID};
+             
+             # Logausgabe
+             $logstr = "Session of User $username has ended - SID: $sid has been deleted";
+             &printlog($hash,$logstr,"4");
+             $logstr = "--- End Function logout nonblocking ---";
+             &printlog($hash,$logstr,"4");
+             
+        } 
+        else 
+        {
+             # Errorcode aus JSON ermitteln
+             $errorcode = $data->{'error'}->{'code'};
+
+             # Fehlertext zum Errorcode ermitteln
+             $error = &experrorauth($hash,$errorcode);
+    
+             # Logausgabe
+             $logstr = "ERROR - Logout of User $username was not successful. Errorcode: $errorcode - $error";
+             &printlog($hash,$logstr,"1");
+             $logstr = "--- End Function logout nonblocking with error ---";
+             &printlog($hash,$logstr,"4");
+         }
+   }
+}
+
+#############################################################################################################################
+#########              Ende Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                #############
+#############################################################################################################################
+
+
+
+#############################################################################################################################
+#########                                               Hilfsroutinen                                           #############
+#############################################################################################################################
 
 ###############################################################################
 ###   Test ob JSON-String empfangen wurde
@@ -533,129 +909,16 @@ sub evaljson {
   
   eval {decode_json($myjson);1;} or do 
   {
-  $success = 0;
-  $e = $@;
+      $success = 0;
+      $e = $@;
   
-  # Setreading 
-  readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"Errorcode","none");
-  readingsBulkUpdate($hash,"Error","malformed JSON string received");
-  readingsEndUpdate($hash, 1);
-  
-  # Logausgabe
-  $logstr = "URL call: $url";
-  &printlog($hash,$logstr,"4");
-  $logstr = "Output eval: ERROR - $e";
-  &printlog($hash,$logstr,"3");
+      # Setreading 
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash,"Errorcode","none");
+      readingsBulkUpdate($hash,"Error","malformed JSON string received");
+      readingsEndUpdate($hash, 1);
   };
 return($hash,$success);
-}
-
-
-###############################################################################
-###      Id für einen Kameranamen ermitteln
-
-sub getcamid {
-  # Übernahmewerte sind Session-id $sid, Kameraname: $camname, $servername, $serverport
-  my ($hash,@sid)     = @_;
-  my $servername      = $hash->{SERVERNAME};
-  my $serverport      = $hash->{SERVERPORT};
-  my $camname         = $hash->{CAMNAME};
-  my $apicampath      = $hash->{APICAMPATH};
-  my $apicammaxver    = $hash->{APICAMMAXVER};
-  my $sid = shift @sid;
-  my $camid = "";
-  my $logstr;
-  my $url;
-  my $myjson;
-  my $success;
-  my $data;
-  my $camcount;
-  my $i;
-  my %allcams;
-  my $name;
-  my $id;
-  my $errorcode;
-  my $error;
-    
-  # Logausgabe
-  $logstr = "--- Begin Function getcamid ---";
-  &printlog($hash,$logstr,"5");
-  
-  # einlesen aller Kameras
-  $url = "http://$servername:$serverport/webapi/$apicampath?api=SYNO.SurveillanceStation.Camera&version=$apicammaxver&method=List&session=SurveillanceStation&_sid=\"$sid\"";
-  $myjson = get $url;
-
-  # Evaluiere ob Daten im JSON-Format empfangen
-  ($hash, $success) = &evaljson($hash,$myjson,$url);
-  unless ($success) {return($camid,$success)};
-  
-  # Logausgabe
-  $logstr = "URL call: $url";
-  &printlog($hash,$logstr,"4");
-  # $logstr = "JSON response: $myjson";
-  # &printlog($hash,$logstr,"5");
-  
-  # Response erfolgt im JSON Format der Art: {"success":true} 
-  $data = decode_json($myjson);
-  $success = $data->{'success'};
-  
-
-       if ($success) {
-       # die Liste aller Kameras konnte ausgelesen werden
-       # Anzahl der definierten Kameras ist in Var "total"
-       $camcount = $data->{'data'}->{'total'};
-
-       $i = 0;
-         # Namen aller installierten Kameras mit Id's in Hash (Assoziatives Array) einlesen
-         %allcams = ();
-         while ($i < $camcount) {
-             $name = $data->{'data'}->{'cameras'}->[$i]->{'name'};
-             $id = $data->{'data'}->{'cameras'}->[$i]->{'id'};
-             $allcams{"$name"} = "$id";
-             $i += 1;
-             }
-             # Ist der gesuchte Kameraname im Hash enhalten (in SS eingerichtet ?)
-             if (exists($allcams{$camname})) {
-                 $camid = $allcams{$camname};
-                 } else {
-                 # Kameraname nicht gefunden, id = ""
-                 
-                 # Setreading 
-                 readingsBeginUpdate($hash);
-                 readingsBulkUpdate($hash,"Errorcode","none");
-                 readingsBulkUpdate($hash,"Error","Camera(ID) not found in Surveillance Station");
-                 readingsEndUpdate($hash, 1);
-                                  
-                 # Logausgabe
-                 $logstr = "ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Cameraname and Spelling.";
-                 &printlog($hash,$logstr,"1");
-                 $success = 0;
-                 }
-       }
-       else {
-       # die Abfrage konnte nicht ausgeführt werden
-       # Errorcode aus JSON ermitteln
-       $errorcode = $data->{'error'}->{'code'};
-
-       # Fehlertext zum Errorcode ermitteln
-       $error = &experror($hash,$errorcode);
-       
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Errorcode",$errorcode);
-       readingsBulkUpdate($hash,"Error",$error);
-       readingsEndUpdate($hash, 1);
-
-       # Logausgabe
-       $logstr = "ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error";
-       &printlog($hash,$logstr,"1");
-       }
-   # Logausgabe
-   $logstr = "--- End Function getcamid ---";
-   &printlog($hash,$logstr,"5");
-   
-return ($camid,$success);  
 }
 
 ##############################################################################
@@ -680,7 +943,7 @@ sub experrorauth {
   403 => "One time password not specified",
   404 => "One time password authenticate failed",
   );
-  unless (exists ($errorlist {$errorcode})) {$error = "Meldung nicht gefunden. (bitte API-Guide konsultieren)"; return ($error);}
+  unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle oben ermitteln
   $error = $errorlist {$errorcode};
@@ -698,7 +961,6 @@ sub experror {
   my %errorlist;
   my $error;
   
-
   # Aufbau der Errorcode-Liste (siehe Surveillance_Station_Web_API_v2.0.pdf)
   %errorlist = (
   100 => "Unknown error",
@@ -726,7 +988,7 @@ sub experror {
   419 => "Visualstation name repetition",
   439 => "Too many items selected",
   );
-  unless (exists ($errorlist {$errorcode})) {$error = "Meldung nicht gefunden. (bitte API-Guide konsultieren)"; return ($error);}
+  unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle oben ermitteln
   $error = $errorlist {$errorcode};
@@ -745,197 +1007,6 @@ sub printlog {
 return;
 }
 
-############################################################################
-###  ist die angegebene URL erreichbar ?
-
-sub validurl {
-  # Übernahmewerte ist $hash
-  my ($hash)= @_;
-  my $servername = $hash->{SERVERNAME};
-  my $serverport = $hash->{SERVERPORT};
-  my $validurl = " ";
-  my $url;
-  my $logstr;
-  
-  # Seite zum testen
-  $url = "http://$servername:$serverport";
-
-  # Logausgabe
-  $logstr = "--- Begin Function validurl ---";
-  &printlog($hash,$logstr,"5");  
-  
-  if (head($url)) {
-        
-    # Setreading 
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash,"Errorcode","none");
-    readingsBulkUpdate($hash,"Error","none");
-    readingsEndUpdate($hash, 1);
-    
-    # Logausgabe
-    $logstr = "Site http://$servername:$serverport reachable";
-    &printlog($hash,$logstr,"5");
-    $validurl = "true";
-    
-    } else {
-    
-    # Setreading 
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash,"Errorcode","none");
-    readingsBulkUpdate($hash,"Error","Site http://$servername:$serverport not reachable");
-    readingsEndUpdate($hash, 1);
-    
-    #Logausgabe 
-    $logstr = "ERROR - Site http://$servername:$serverport not reachable. Check Servername / IP-Adresse and Port";
-    &printlog($hash,$logstr,"1");
-    $validurl = "false";
-    }
-  
-  # Logausgabe
-  $logstr = "--- End Function validurl ---";
-  &printlog($hash,$logstr,"5");  
-    
-return($validurl);
-}
-
-############################################################################
-####    Ermittlung der Web API -Pfade und MaxVersionen
-
-sub getapisites {
-   # Übernahmewerte sind $servername, $serverport
-   my ($hash) = @_;
-   my $servername = $hash->{SERVERNAME};
-   my $serverport = $hash->{SERVERPORT};
-   my $success = " ";
-   my $apiauth;
-   my $apiextrec;
-   my $apicam;
-   my $logstr;
-   my $url;
-   my $myjson;
-   my $data;
-   my $apiauthpath;
-   my $apiauthmaxver;
-   my $apiextrecpath;
-   my $apiextrecmaxver;
-   my $apicampath;
-   my $apicammaxver;
-   my $error;
-   
-     
-   # benötigte API-Pfade, in der Abfrage-Url an Parameter "&query=" mit Komma getrennt angeben
-   $apiauth   = "SYNO.API.Auth";
-   $apiextrec = "SYNO.SurveillanceStation.ExternalRecording";
-   $apicam    = "SYNO.SurveillanceStation.Camera";
-   
-   # Logausgabe
-   $logstr = "--- Begin Function getapisites ---";
-   &printlog($hash,$logstr,"5");   
-   
-   # Abfrage der Eigenschaften von API SYNO.SurveillanceStation.ExternalRecording,$apicam
-   $url = "http://$servername:$serverport/webapi/query.cgi?api=SYNO.API.Info&method=Query&version=1&query=$apiauth,$apiextrec,$apicam";
-   $myjson = get $url;
-   
-   # Evaluiere ob Daten im JSON-Format empfangen
-   ($hash, $success) = &evaljson($hash,$myjson,$url);
-   unless ($success) {return($hash,$success)};
-   
-   # Logausgabe
-   $logstr = "URL call: $url";
-   &printlog($hash,$logstr,"4");
-   $logstr = "JSON response: $myjson";
-   &printlog($hash,$logstr,"4");   
-  
-   # Response erfolgt im JSON Format 
-   $data = decode_json($myjson);
-   
-   $success = $data->{'success'};
-   
-   
-   if ($success) {
-       
-       # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
-       
-       $apiauthpath = $data->{'data'}->{$apiauth}->{'path'};
-       # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
-       $apiauthpath =~ tr/_//d;
-       
-       # maximale Version ermitteln
-       $apiauthmaxver = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
-       
-       $logstr = "Path of $apiauth selected: $apiauthpath";
-       &printlog($hash, $logstr,"4");
-       $logstr = "MaxVersion of $apiauth selected: $apiauthmaxver";
-       &printlog($hash, $logstr,"4");
-       
-       # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
-       
-       $apiextrecpath = $data->{'data'}->{$apiextrec}->{'path'};
-       # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
-       $apiextrecpath =~ tr/_//d;
-       
-       # maximale Version ermitteln
-       $apiextrecmaxver = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
-       
-       $logstr = "Path of $apiextrec selected: $apiextrecpath";
-       &printlog($hash, $logstr,"4");
-       $logstr = "MaxVersion of $apiextrec selected: $apiextrecmaxver";
-       &printlog($hash, $logstr,"4");
-       
-       # Pfad und Maxversion von "SYNO.SurveillanceStation.Camera" ermitteln
-       
-       $apicampath = $data->{'data'}->{$apicam}->{'path'};
-       # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
-       $apicampath =~ tr/_//d;
-       
-       # maximale Version ermitteln
-       $apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
-       # um 1 verringern - Fehlerprävention
-       if (defined $apicammaxver) {$apicammaxver -= 1};
-       
-       $logstr = "Path of $apicam selected: $apicampath";
-       &printlog($hash, $logstr,"4");
-       $logstr = "MaxVersion of $apicam: $apicammaxver";
-       &printlog($hash, $logstr,"4");
-       
-       # ermittelte Werte in $hash einfügen
-       $hash->{APIAUTHPATH} = $apiauthpath;
-       $hash->{APIAUTHMAXVER} = $apiauthmaxver;
-       $hash->{APIEXTRECPATH} = $apiextrecpath;
-       $hash->{APIEXTRECMAXVER} = $apiextrecmaxver;
-       $hash->{APICAMPATH} = $apicampath;
-       $hash->{APICAMMAXVER} = $apicammaxver;
-       
-       
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Errorcode","none");
-       readingsBulkUpdate($hash,"Error","none");
-       readingsEndUpdate($hash, 1);
-       
-       } else {
-       
-       # Fehlertext setzen
-       $error = "couldn't call API-Infosite";
-       
-       # Setreading 
-       readingsBeginUpdate($hash);
-       readingsBulkUpdate($hash,"Errorcode","none");
-       readingsBulkUpdate($hash,"Error",$error);
-       readingsEndUpdate($hash, 1);
-
-       # Logausgabe
-       $logstr = "ERROR - the API-Query couldn't be executed successfully";
-       &printlog($hash,$logstr,"1");
-       }
-   # Logausgabe
-   $logstr = "--- End Function getapisites ---";
-   &printlog($hash,$logstr,"5");
-
-return($hash,$success);          
-}
-
-
 
 1;
 
@@ -951,9 +1022,10 @@ return($hash,$success);
     For example the recordings are stored for a defined time in Surveillance Station and will be deleted after that period.<br><br>
   
 <b> Prerequisites </b> <br><br>
-    This module uses other CPAN-modules LWP and JSON. Consider to install these packages (Debian: libwww-perl, libjson-perl).<br>
+    This module uses the CPAN-module JSON. Consider to install these package (Debian: libjson-perl).<br>
+    You don't need to install LWP anymore, because of SSCam is now completely using the nonblocking functions of HttpUtils respectively HttpUtils_NonblockingGet. <br> 
     You also need to add an user in Synology DSM as member of Administrators group for using in this module. <br><br>
-
+    
 
   <a name="SCamdefine"></a>
   <b>Define</b>
@@ -989,7 +1061,7 @@ return($hash,$success);
     Examples:
      <pre>
       define CamDoor SSCAM ds1.myds.ds 5000 apiuser apipass Door 10      
-    </table>
+    </pre>
   </ul>
   <br>
   <a name="SSCamset"></a>
@@ -998,11 +1070,14 @@ return($hash,$success);
     
     There are two options for set.<br><br>
     
-<pre>
-    "on"    :   triggers start of record.
-    "off"   :   triggers stop of record.
-</pre>
-
+    "on"    :   starts a recording. The recording will be stopped after the period given by the value of &lt;RecordTime&gt; in device definition.
+    <pre>            
+                Command: set &lt;name&gt on
+    </pre>            
+    "off"   :   stops a running recording manually or other event (for example by using <a href="#at">at</a>, <a href="#notify">notify</a> or others).
+    <pre>            
+                Command: set &lt;name&gt off
+    </pre>
   </ul>
   <br>
 
@@ -1018,7 +1093,7 @@ return($hash,$success);
     1   -   Error messages will be logged
     3   -   sended commands will be logged
     4   -   sended and received informations will be logged
-    5   -   further outputs will be logged due to error-analyses
+    5   -   all outputs will be logged for error-analyses. Please use it carefully, a lot of data could be written into the logfile !
 </pre>
 
    <br><br>
@@ -1041,7 +1116,8 @@ return($hash,$success);
     So werden zum Beispiel die Aufnahmen entsprechend ihrer Archivierungsfrist gehalten und dann gelöscht.<br><br>
 
 <b>Vorbereitung </b> <br><br>
-    Dieses Modul nutzt weitere CPAN Module LWP und JSON. Bitte darauf achten diese Pakete zu installieren. (Debian: libwww-perl, libjson-perl). <br>
+    Dieses Modul nutzt das CPAN Module JSON. Bitte darauf achten dieses Paket zu installieren. (Debian: libjson-perl). <br>
+    Das CPAN-Modul LWP wird für SSCam nicht mehr benötigt. Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br> 
     Im DSM muß ebenfalls ein Nutzer als Mitglied der Administratorgruppe angelegt sein. Die Daten werden beim define des Gerätes benötigt.<br><br>
 
   <a name="SCamdefine"></a>
@@ -1077,10 +1153,10 @@ return($hash,$success);
 
     <br><br>
 
-    Examples:
+    Beispiel:
      <pre>
       define CamTür SSCAM ds1.myds.ds 5000 apiuser apipass Tür 10      
-    </table>
+     </pre>
   </ul>
   
   <a name="SSCamset"></a>
@@ -1089,10 +1165,15 @@ return($hash,$success);
     
     Es gibt zur Zeit zwei Optionen für "Set".<br><br>
     
-<pre>
-    "on"    :   startet die Aufnahme.
-    "off"   :   stoppt die Aufnahme.
-</pre>
+
+    "on"    :   startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit &lt;RecordTime&gt; gestoppt.
+    <pre>            
+                Befehl: set &lt;name&gt on     
+    </pre>            
+    "off"   :   stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. durch <a href="#at">at</a>, <a href="#notify">notify</a> oder andere)
+    <pre>  
+                Befehl: set &lt;name&gt off
+    </pre> 
 
   </ul>
   <br>
@@ -1109,7 +1190,7 @@ return($hash,$success);
     1   -   Fehlermeldungen werden geloggt
     3   -   gesendete Kommandos werden geloggt
     4   -   gesendete und empfangene Daten werden geloggt
-    5   -   weitere Ausgaben zur Fehleranalyse werden geloggt
+    5   -   alle Ausgaben zur Fehleranalyse werden geloggt. ACHTUNG: unter Umständen sehr viele Daten im Logfile !
 </pre>
 
    <br><br>
