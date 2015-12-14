@@ -334,9 +334,9 @@ IT_Set($@)
 	## Do we need to change ITClock back??	
     if(defined($attr{$name}) && defined($attr{$name}{"ITclock"})) 
     {
-        Log GetLogLevel($name,4), "Setting ITClock back to 250";
+        Log GetLogLevel($name,4), "Setting ITClock back to 420";
         #CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "sic250"));
-        CallFn($io->{NAME}, "SetFn", $io, ($hash->{NAME}, "ITClock", "250"));
+        CallFn($io->{NAME}, "SetFn", $io, ($hash->{NAME}, "ITClock", "420"));
     }
 
 	## Do we need to change RFMode back to HomeMatic??
