@@ -33,8 +33,8 @@
              specific time ranges, where FB_CALLMONITOR will be disabled
              (see commandref for the exact syntax)
   - changed: YAMAHA_AVR: added HTTP request queue, send only one request at the
-             same time. This increases command reliability and response behaviour of
-             the AV receiver.
+             same time. This increases command reliability and response
+             behaviour of the AV receiver.
   - bugfix:  49_SSCam: avoid problems when running this module on 
              windows systems
   - feature: 14_CUL_TCM97001: Add redirect for Eurochron to SD_WS07 modul
@@ -50,16 +50,14 @@
              correct temperature and humidity
   - changed: PRESENCE/collectord: new collectord-1.5.deb package released
   - changed: YAMAHA_BD: added HTTP request queue, send only one request at the
-             same time. This increases command reliability and response behaviour of 
-             the player.
+             same time. This increases command reliability and response
+             behaviour of the player.
   - changed: 55_GDS.pm: provide gdsAlertsHeadlines() instead of gdsHeadlines
-  - feature: TelegramBot: multiple enhancements and fixes V1.1
-                keyboards on favorites and last command
-                reduced logging: pollingVerbose:0_None,1_Digest,2_Log
-                yowsup compatibility commands added
-                writeStatefile on contact change
-                cmdReturnEmptyResult - to suppress empty results from command execution
-                and more
+  - feature: TelegramBot: multiple enhancements and fixes V1.1 keyboards on
+             favorites and last command reduced logging:
+             pollingVerbose:0_None,1_Digest,2_Log yowsup compatibility commands
+             added writeStatefile on contact change cmdReturnEmptyResult - to
+             suppress empty results from command execution and more
   - feature: 55_GDS: new command get <name> headlines [separator]
   - bugfix:  YAMAHA_BD: fix power off events when player is turned on
              via set command on
