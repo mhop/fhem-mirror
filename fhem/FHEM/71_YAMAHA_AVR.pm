@@ -395,7 +395,7 @@ YAMAHA_AVR_Set($@)
         if(defined($a[2]))
         {
             # Depending on the status response, use the short or long Volume command
-            my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
+            my $volume_cmd = (YAMAHA_AVR_isModel_DSP($hash) ? "Vol" : "Volume");
         
             if( $a[2] eq "on" or ($a[2] eq "toggle" and ReadingsVal($hash->{NAME}, "mute", "off") eq "off"))
             {
@@ -440,14 +440,14 @@ YAMAHA_AVR_Set($@)
         
         if(defined($target_volume) )
         {
-            # Depending on the status response, use the short or long Volume command
-            my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
+            # DSP based models use "Vol" instead of "Volume"
+            my $volume_cmd = (YAMAHA_AVR_isModel_DSP($hash) ? "Vol" : "Volume");
             
             if(AttrVal($name, "volume-smooth-change", "0") eq "1")
             {
                 my $steps = AttrVal($name, "volume-smooth-steps", 5);
-                my $diff = int(($target_volume - $hash->{READINGS}{volumeStraight}{VAL}) / $steps / 0.5) * 0.5;
-                my $current_volume = $hash->{READINGS}{volumeStraight}{VAL};
+                my $diff = int($target_volume - ReadingsVal($name, "volumeStraight", $target_volume) / $steps / 0.5) * 0.5;
+                my $current_volume = ReadingsVal($name, "volumeStraight", undef); 
 
                 if($diff > 0)
                 {
@@ -459,7 +459,7 @@ YAMAHA_AVR_Set($@)
                 }
         
                 # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
-                if(defined($hash->{READINGS}{volumeStraight}{VAL}) and $diff != 0 and not (defined($a[3]) and $a[3] eq "direct"))
+                if(defined($current_volume) and $diff != 0 and not (defined($a[3]) and $a[3] eq "direct"))
                 {        
                     Log3 $name, 4, "YAMAHA_AVR ($name) - set volume to ".($current_volume + $diff)." dB (target is $target_volume dB)";
                     YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Lvl><Val>".(($current_volume + $diff)*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></$volume_cmd></$zone></YAMAHA_AV>", "volume", ($current_volume + $diff), {options => {volume_diff => $diff, volume_target => $target_volume}});
@@ -1179,7 +1179,7 @@ YAMAHA_AVR_ParseResponse ($$$)
             }
             elsif($arg eq "systemConfig")
             {
-                if($data =~ /<Model_Name>(.+?)<\/Model_Name>.*?<System_ID>(.+?)<\/System_ID>.*?<Version>.*?<Main>(.+?)<\/Main>.*?<Sub>(.+?)<\/Sub>.*?<\/Version>/)
+                if($data =~ /<Model_Name>(.+?)<\/Model_Name>.*?<System_ID>(.+?)<\/System_ID>.*?<Version>.*?<Main>(.+?)<\/Main>.*?<Sub>(.+?)<\/Sub>.*?<\/Version>/) # DSP based models
                 {
                     $hash->{MODEL} = $1;
                     $hash->{SYSTEM_ID} = $2;
@@ -1332,16 +1332,12 @@ YAMAHA_AVR_ParseResponse ($$$)
                     readingsBulkUpdate($hash, "volumeStraight", ($1 / 10 ** $2));
                     readingsBulkUpdate($hash, "volume", YAMAHA_AVR_volume_abs2rel(($1 / 10 ** $2)));
                     readingsBulkUpdate($hash, "mute", lc($3));
-                    
-                    $hash->{helper}{USE_SHORT_VOL_CMD} = "0";
                 }
-                elsif($data =~ /<Vol><Lvl><Val>(.+?)<\/Val><Exp>(.+?)<\/Exp><Unit>.+?<\/Unit><\/Lvl><Mute>(.+?)<\/Mute>.*?<\/Vol>/)
+                elsif($data =~ /<Vol><Lvl><Val>(.+?)<\/Val><Exp>(.+?)<\/Exp><Unit>.+?<\/Unit><\/Lvl><Mute>(.+?)<\/Mute>.*?<\/Vol>/) # DSP based models
                 {
                     readingsBulkUpdate($hash, "volumeStraight", ($1 / 10 ** $2));
                     readingsBulkUpdate($hash, "volume", YAMAHA_AVR_volume_abs2rel(($1 / 10 ** $2)));
                     readingsBulkUpdate($hash, "mute", lc($3));
-                    
-                    $hash->{helper}{USE_SHORT_VOL_CMD} = "1";
                 }
                 
                 # (only available in zones other than mainzone) absolute or relative volume change to the mainzone
@@ -1349,7 +1345,7 @@ YAMAHA_AVR_ParseResponse ($$$)
                 {
                     readingsBulkUpdate($hash, "output", lc($1));
                 }
-                elsif($data =~ /<Vol>.*?<Output>(.+?)<\/Output>.*?<\/Vol>/)
+                elsif($data =~ /<Vol>.*?<Output>(.+?)<\/Output>.*?<\/Vol>/) # DSP based models
                 {
                     readingsBulkUpdate($hash, "output", lc($1));
                 }
@@ -1648,8 +1644,8 @@ YAMAHA_AVR_ParseResponse ($$$)
             my $target_volume = $options->{volume_target};
             my $diff = $options->{volume_diff};
             
-            # Depending on the status response, use the short or long Volume command
-            my $volume_cmd = (exists($hash->{helper}{USE_SHORT_VOL_CMD}) and $hash->{helper}{USE_SHORT_VOL_CMD} eq "1" ? "Vol" : "Volume");
+            # DSP based models use "Vol" instead of "Volume"
+            my $volume_cmd = (YAMAHA_AVR_isModel_DSP($hash) ? "Vol" : "Volume");
             
             my $zone = YAMAHA_AVR_getParamName($hash, $hash->{ACTIVE_ZONE}, $hash->{helper}{ZONES});
 
