@@ -3,7 +3,7 @@
 #########################################################
 # ccurpcd.pl
 #
-# Version 1.3
+# Version 1.4
 #
 # RPC server for Homematic CCU.
 #
@@ -128,6 +128,15 @@ sub CCURPC_Initialize ($$)
 	close ($socket);
 
 	$client = RPC::XML::Client->new ("http://$serveraddr:$serverport/");
+
+	# Check if RPC daemon on CCU is running
+	my $resp = $client->send_request ('system.listMethods');
+	if (!ref($resp)) {
+		Log "No response from CCU. Error message follows in next line";
+		Log $resp;
+		return undef;
+	}
+
 	$server = RPC::XML::Server->new (port=>$callbackport);
 	if (!ref($server))
 	{
