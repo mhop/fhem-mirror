@@ -133,7 +133,7 @@ sub GHoma_ClientDisconnect($$) {	# im Mom unnuetz
 #####################################
 sub GHoma_Shutdown($) {				#
   my ($hash) = @_;
-  return unless defined $hash->{Id};
+  return unless defined $hash->{Id};        #nicht für Server
   # state auf letzten Schaltwert setzen oder auf fixen Startwert (wird bereitsbeim Shutdown ausgefuehrt)
   if      (AttrVal($hash->{NAME},"restoreOnStartup","last") eq "on") {
 	readingsSingleUpdate($hash, "state", "on", 1);
@@ -148,7 +148,7 @@ sub GHoma_Shutdown($) {				#
 sub GHoma_Define($$$) {				#
   my ($hash, $def) = @_;
 
-  my @a = split("[ \t][ \t]*", $def);
+  #my @a = split("[ \t][ \t]*", $def);
   my ($name, $type, $pport, $global) = split("[ \t]+", $def);
 
   my $port = $pport;
@@ -161,12 +161,12 @@ sub GHoma_Define($$$) {				#
   #return "Usage: define <name> GHoma { [IPV6:]<tcp-portnr>|<serverName:port> }" if(!($isServer || $isClient || $isSerCli));
   return "Usage: define <name> GHoma { [IPV6:]<tcp-portnr> }" if(!($isServer || $isClient || $isSerCli));
 
-  $hash->{DeviceName} = $pport;
-
+  #$hash->{DeviceName} = $pport;
   if($isSerCli) {				#ServerClient
-	my $name = $a[0];
-    my $addr = $a[2];
-	$hash->{Id} = pack('C*', ( hex(substr($addr,0,2)), hex(substr($addr,2,2)), hex(substr($addr,4,2)) ) );
+	#my $name = $a[0];
+  # my $addr = $a[2];
+	#$hash->{Id} = pack('C*', ( hex(substr($pport,0,2)), hex(substr($pport,2,2)), hex(substr($pport,4,2)) ) );
+	$hash->{Id} = $pport;
     return;
   }
   
@@ -247,7 +247,7 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
     return;
   }
   
-  if ( substr($buf,0,10) eq ($prefix . $dosehb )) {     									# Heartbeat
+  if ( substr($buf,0,10) eq ($prefix . $dosehb )) {     									# Heartbeat (Dosen Id wird nicht ueberprueft)
     #DevIo_SimpleWrite($hash, GHoma_BuildString($hbeat) , undef);
 	RemoveInternalTimer($hash);
 	$buf =~ s/(.|\n)/sprintf("%.2X ",ord($1))/eg;		#empfangene Zeichen in Hexwerte wandeln
@@ -275,9 +275,10 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 		Log3 $hash, 5, "$hash->{NAME} RX: 5A A5 $smsg";										# ...und ins Log schreiben
 		
 		if ( substr($_,2,6) eq ($cinit1)) {  												# Antwort auf erstes Init
-			$hash->{Id} = substr($_,8,3);
+			#$hash->{Id} = substr($_,8,3);
+			$hash->{Id} = unpack('H*', substr($_,8,3) );
 			unless ($hash->{isClient}) {
-				# fuer Server Loesung bei erster Antwort von Dose nach bestehendem Devicem it gleicher Id suchen und Verbindung auf dieses Modul uebertragen
+				# fuer Server Loesung bei erster Antwort von Dose nach bestehendem Device mit gleicher Id suchen und Verbindung auf dieses Modul uebertragen
 				my $clientdefined = undef;
 				foreach my $dev (devspec2array("TYPE=$hash->{TYPE}")) {		# bereits bestehendes define mit dieser Id suchen
 					if ($hash->{Id} eq InternalVal($dev,"Id","") && $hash->{NAME} ne $dev && InternalVal($dev,"TEMPORARY","") ne "1") {
@@ -288,10 +289,13 @@ sub GHoma_Read($) {					# wird von der globalen loop aufgerufen (ueber $hash->{F
 					}
 				}
 				unless ( defined $clientdefined) {							# ...ein Neues anlegen, falls keins existiert
-					my $id = unpack('H*', $hash->{Id} );
-					Log3 $name, 4, "GHoma Unknown device $id, please define it";
-					DoTrigger("global", "UNDEFINED GHoma_$id GHoma $id");
-					GHoma_moveclient($hash, $defs{"GHoma_$id"}) if ($defs{"GHoma_$id"});
+					#my $id = unpack('H*', $hash->{Id} );
+					#Log3 $name, 4, "GHoma Unknown device $id, please define it";
+					#DoTrigger("global", "UNDEFINED GHoma_$id GHoma $id");
+					#GHoma_moveclient($hash, $defs{"GHoma_$id"}) if ($defs{"GHoma_$id"});
+					Log3 $name, 4, "GHoma Unknown device $hash->{Id}, please define it";
+					DoTrigger("global", "UNDEFINED GHoma_$hash->{Id} GHoma $hash->{Id}");
+					GHoma_moveclient($hash, $defs{"GHoma_$hash->{Id}"}) if ($defs{"GHoma_$hash->{Id}"});
 				}
 			} else {
 				readingsSingleUpdate($hash, "state", "Initialize...", 1);
@@ -390,7 +394,7 @@ sub GHoma_Set($@) {					#
 	return SetExtensions($hash, $slist, @a);
   }
   if (defined $hash->{CD}) {
-	syswrite( $hash->{CD}, GHoma_BuildString($switch1 . $hash->{Id} . $switch2 . $type) );
+	syswrite( $hash->{CD}, GHoma_BuildString($switch1 . pack('C*', ( hex(substr($hash->{Id},0,2)), hex(substr($hash->{Id},2,2)), hex(substr($hash->{Id},4,2)) ) ) . $switch2 . $type) );
   }
   return undef;
 }
@@ -398,7 +402,7 @@ sub GHoma_Set($@) {					#
 sub GHoma_State($$$$) {				# reload readings at FHEM start
 	my ($hash, $tim, $sname, $sval) = @_;
 	Log3 $hash, 4, "$hash->{NAME}: $sname kann auf $sval wiederhergestellt werden $tim";
-	if ( $sname eq "state" 	&& defined $hash->{Id} ) {
+	if ( $sname eq "state" 	&& defined $hash->{Id} ) {        #wenn kein Server
 		$hash->{LASTSTATE} = $sval;
 		readingsSingleUpdate($hash, "state", "offline", 1)
 	}
