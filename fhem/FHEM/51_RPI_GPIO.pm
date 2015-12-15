@@ -36,6 +36,7 @@ sub RPI_GPIO_Initialize($) {
 											" interrupt:none,falling,rising,both" .
 											" toggletostate:no,yes active_low:no,yes" .
 											" debounce_in_ms restoreOnStartup:no,yes,on,off,last" .
+                                                                                        " unexportpin:no,yes" .
 											" longpressinterval " .
 											"$readingFnAttributes";
 }
@@ -353,28 +354,27 @@ sub RPI_GPIO_Attr(@) {
       $msg = "$hash->{NAME}: debounce_in_ms value to big. Use 0 to 250";
     }
   }
-	if ($attr eq 'pud_resistor') {#nur fuer Raspberry (ueber gpio utility)
-		my $pud;
-		if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {
-			Log3 $hash, 1, "$hash->{NAME}: unable to change pud resistor:" . $ret;
-			return "$hash->{NAME}: " . $ret;
-		} else {
-			if ( !$val ) {
-			} elsif ($val eq "off") {
-				$pud = $gpioprg.' -g mode '.$hash->{RPI_pin}.' tri';
-				$pud = `$pud`;
-			} elsif ($val eq "up") {
-				$pud = $gpioprg.' -g mode '.$hash->{RPI_pin}.' up';
-				$pud = `$pud`;
-			} elsif ($val eq "down") {
-				$pud = $gpioprg.' -g mode '.$hash->{RPI_pin}.' down';
-				$pud = `$pud`;
-			} else {
-				$msg = "$hash->{NAME}: Wrong $attr value. Use off, up or down";
-			}
-		}
-	}
-	return ($msg) ? $msg : undef; 
+  if ($attr eq "pud_resistor" && $val) {
+    if($val =~ /^(off|up|down)$/) {
+      if(-w "$gpiodir/gpio$hash->{RPI_pin}/pull") {
+        $val =~ s/off/disable/;
+        RPI_GPIO_fileaccess($hash, "pull", $val);
+      } else { #nur fuer Raspberry (ueber gpio utility)
+        my $pud;
+        if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {
+          Log3 $hash, 1, "$hash->{NAME}: unable to change pud resistor:" . $ret;
+          return "$hash->{NAME}: " . $ret;
+        } else {
+          $val =~ s/off/tri/;
+          $pud = $gpioprg." -g mode ".$hash->{RPI_pin}." ".$val;
+          $pud = `$pud`;
+        }
+      }
+    } else {
+      $msg = "$hash->{NAME}: Wrong $attr value. Use off, up or down";
+    }
+  }
+  return ($msg) ? $msg : undef; 
 }
 
 sub RPI_GPIO_Poll($) {		#for attr poll_intervall -> readout pin value
@@ -397,13 +397,17 @@ sub RPI_GPIO_Undef($$) {
 		delete $selectlist{$hash->{NAME}};
 		close($hash->{filehandle});
 	}
-	if (-w "$gpiodir/unexport") {#unexport Pin alte Version
+        # to have a chance to externaly setup the GPIOs -
+        # leave GPIOs untouched if attr unexportpin is set to "no"
+        if(AttrVal($hash->{NAME},"unexportpin","") ne "no") {
+            if (-w "$gpiodir/unexport") {#unexport Pin alte Version
 		my $uexp = IO::File->new("> $gpiodir/unexport");
 		print $uexp "$hash->{RPI_pin}";
 		$uexp->close;
-	} else {#alternative unexport Pin:
+            } else {#alternative unexport Pin:
 		RPI_GPIO_exuexpin($hash, "unexport");
-	}
+            }
+        }
 	Log3 $hash, 1, "$hash->{NAME}: entfernt";
 	return undef;
 }
@@ -651,7 +655,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 		In addition to the Raspberry Pi, also BBB, Cubie, Banana Pi and almost every linux system which provides gpio access in userspace is supported.<br>
 		<b>Warning: Never apply any external voltage to an output configured pin! GPIO's internal logic operate with 3,3V. Don't exceed this Voltage!</b><br><br>
 		<b>preliminary:</b><br>
-		GPIO Pins accessed by sysfs. The files are located in folder <code>/system/class/gpio</code> and belong to the gpio group (on actual Raspbian distributions since jan 2014).<br>
+		GPIO Pins accessed by sysfs. The files are located in folder <code>/system/class/gpio</code> and belong to the gpio group (on actual Raspbian distributions since jan 2014). It will work even on an Jessie version but NOT if you perform an kerlen update<br>
 		After execution of following commands, GPIO's are usable whithin PRI_GPIO:<br>
 		<ul><code>
 			sudo adduser fhem gpio<br>
@@ -675,7 +679,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 		echo 23 > /sys/class/gpio/export<br>
 		chown -R fhem:root /sys/devices/virtual/gpio/* (or chown -R fhem:gpio /sys/devices/platform/gpio-sunxi/gpio/* for Banana Pi)<br>
 		chown -R fhem:root /sys/class/gpio/*<br>
-	</code></ul><br> 
+	</code></ul><br>
 	<a name="RPI_GPIODefine"></a>
 	<b>Define</b>
 	<ul>
@@ -815,8 +819,12 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
       Restore Readings and sets after reboot<br>
       Default: last, valid values: last, on, off, no<br><br>
     </li>
-	<li>longpressinterval<br>
-	  <b>works with interrupt set to both only</b><br>
+    <li>unexportpin<br>
+      do an unexport to /sys/class/gpio/unexport if the pin definition gets cleared (e.g. by rereadcmd, delete,...)<br>
+      Default: yes, valid values: yes, no<br><br>
+    </li>
+    <li>longpressinterval<br>
+      <b>works with interrupt set to both only</b><br>
       time in seconds, a port need to be high to set reading longpress to on<br>
       Default: 1, valid values: 0.1 - 10<br><br>
     </li>
@@ -840,7 +848,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 		Neben dem Raspberry Pi k&ouml;nnen auch die GPIO's von BBB, Cubie, Banana Pi und jedem Linuxsystem, das diese im Userspace zug&auml;gig macht, genutzt werden.<br>
     <b>Wichtig: Niemals Spannung an einen GPIO anlegen, der als Ausgang eingestellt ist! Die interne Logik der GPIO's arbeitet mit 3,3V. Ein &uuml;berschreiten der 3,3V zerst&ouml;rt den GPIO und vielleicht auch den ganzen Prozessor!</b><br><br>
     <b>Vorbereitung:</b><br>
-		Auf GPIO Pins wird im Modul &uuml;ber sysfs zugegriffen. Die Dateien befinden sich unter <code>/system/class/gpio</code> und sind in der aktuellen Raspbian Distribution (ab Jan 2014) in der Gruppe gpio.<br>
+		Auf GPIO Pins wird im Modul &uuml;ber sysfs zugegriffen. Die Dateien befinden sich unter <code>/system/class/gpio</code> und sind in der aktuellen Raspbian Distribution (ab Jan 2014) in der Gruppe gpio. Es funktioniert auch mit der Jessie Version. Allerdings NICHT wenn ein Kernelupgrade durchgef&uuml;hrt wird<br>
 		Nach dem ausf&uuml;hren folgender Befehle sind die GPIO's von PRI_GPIO aus nutzbar:<br>
 		<ul><code>
 			sudo adduser fhem gpio<br>
@@ -1000,6 +1008,10 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
     <li>debounce_in_ms<br>
       Wartezeit in ms bis nach ausgel&ouml;stem Interrupt der entsprechende Pin abgefragt wird. Kann zum entprellen von mechanischen Schaltern verwendet werden<br>
       Standard: 0, g&uuml;ltige Werte: Dezimalzahl<br><br>
+    </li>
+    <li>unexportpin<br>
+      F&uuml;hre unexport &uuml;ber /sys/class/gpio/unexport aus wenn die Pin-Definition gel&ouml;scht wird (z.B. durch rereadcfg, delete,...)<br>
+      Standard: yes, , g&uuml;ltige Werte: yes, no<br><br>
     </li>
     <li>restoreOnStartup<br>
       Wiederherstellen der Portzust&auml;nde nach Neustart<br>
