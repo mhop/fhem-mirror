@@ -49,6 +49,10 @@
 # Cover von Amazon funktionieren nicht
 #
 # SVN-History:
+# 15.12.2015
+#	Es gibt eine neue Funktionalität an den Sonosplayern: Repeat für einen einzelnen Titel. Durch diese Umstellung wurde der Repeat-Zustand nicht korrekt erkannt. Dafür gibt es jetzt noch einen zusätzlichen Setter und ein zusätzliches Reading: "RepeatOne".
+#	Es gibt eine neue Funktion "DeleteFromQueue", die Titel aus der aktuellen Abspielliste entfernen kann. Angegeben wird der Index des Elements / der Elemente.
+#	Das Reading "fieldType" wurde nicht ordnungsgemäß auf Leer gesetzt, wenn du Gruppierung aufgelöst wurde.
 # 08.12.2015
 #	Bei der Erkennung von Streams beim Restore von PlayURITemp wurde ein neues Format nicht berücksichtigt.
 #	Bei der Verwendung von "set Sonos Groups Reset" tauchte eine Fehlermeldung wegen eines Leerstrings auf.
@@ -74,9 +78,6 @@
 # 02.08.2015
 #	uri_escape() umgestellt, sodass auch UTF8-Sonderzeichen übersetzt werden
 #	Google-Translator-URL parametrisiert und um die mittlerweile notwendigen Parameter 'client=t' und 'prev=input' erweitert
-# 12.07.2015
-#	Es gibt zwei neue Setter "GroupVolumeU" und "GroupVolumeD", um die Gruppenlautstärke um 'VolumeStep'-Einheiten zu erhöhen oder zu verringern.
-#	Innerhalb des SubProzesses wurden die Devicenamen der bereits in Fhem definierten Player nicht korrekt verwendet. Das machte sich erst mit dem neuen Feature Bookmarks bemerkbar.
 #
 ########################################################################################
 #
@@ -1216,6 +1217,7 @@ sub SONOS_Read($) {
 				SONOS_readingsBulkUpdateIfChanged($hash, "transportState", $current{TransportState});
 				SONOS_readingsBulkUpdateIfChanged($hash, "Shuffle", $current{Shuffle});
 				SONOS_readingsBulkUpdateIfChanged($hash, "Repeat", $current{Repeat});
+				SONOS_readingsBulkUpdateIfChanged($hash, "RepeatOne", $current{RepeatOne});
 				SONOS_readingsBulkUpdateIfChanged($hash, "CrossfadeMode", $current{CrossfadeMode});
 				SONOS_readingsBulkUpdateIfChanged($hash, "SleepTimer", $current{SleepTimer});
 				SONOS_readingsBulkUpdateIfChanged($hash, "AlarmRunning", $current{AlarmRunning});
@@ -2394,22 +2396,16 @@ sub SONOS_Discover() {
 					
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 						my $result = $SONOS_AVTransportControlProxy{$udn}->GetTransportSettings(0)->getValue('PlayMode');
+						my ($shuffle, $repeat, $repeatOne) = SONOS_GetShuffleRepeatStates($result);
 						
-						my $shuffle = $result eq 'SHUFFLE' || $result eq 'SHUFFLE_NOREPEAT';
-						my $repeat = $result eq 'SHUFFLE' || $result eq 'REPEAT_ALL';
+						$value1 = !$shuffle if (!defined($value1));
 						
-						$value1 = !$shuffle if (!$value1);
-						
-						my $newMode = 'NORMAL';
-						$newMode = 'SHUFFLE' if ($value1 && $repeat);
-						$newMode = 'SHUFFLE_NOREPEAT' if ($value1 && !$repeat);
-						$newMode = 'REPEAT_ALL' if (!$value1 && $repeat);
-					
-						$SONOS_AVTransportControlProxy{$udn}->SetPlayMode(0, $newMode);
+						$SONOS_AVTransportControlProxy{$udn}->SetPlayMode(0, SONOS_GetShuffleRepeatString($value1, $repeat, $repeatOne));
 					
 						# Wert wieder abholen, um das wahre Ergebnis anzeigen zu können
 						$result = $SONOS_AVTransportControlProxy{$udn}->GetTransportSettings(0)->getValue('PlayMode');
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($result eq 'SHUFFLE' || $result eq 'SHUFFLE_NOREPEAT'));
+						($shuffle, $repeat, $repeatOne) = SONOS_GetShuffleRepeatStates($result);
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($shuffle));
 					}
 				} elsif ($workType eq 'setRepeat') {
 					my $value1 =  undef;
@@ -2420,22 +2416,36 @@ sub SONOS_Discover() {
 					
 					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 						my $result = $SONOS_AVTransportControlProxy{$udn}->GetTransportSettings(0)->getValue('PlayMode');
+						my ($shuffle, $repeat, $repeatOne) = SONOS_GetShuffleRepeatStates($result);
 						
-						my $shuffle = $result eq 'SHUFFLE' || $result eq 'SHUFFLE_NOREPEAT';
-						my $repeat = $result eq 'SHUFFLE' || $result eq 'REPEAT_ALL';
+						$value1 = !$repeat if (!defined($value1));
 						
-						$value1 = !$repeat if (!$value1);
-						
-						my $newMode = 'NORMAL';
-						$newMode = 'SHUFFLE' if ($value1 && $shuffle);
-						$newMode = 'SHUFFLE_NOREPEAT' if (!$value1 && $shuffle);
-						$newMode = 'REPEAT_ALL' if ($value1 && !$shuffle);
-					
-						$SONOS_AVTransportControlProxy{$udn}->SetPlayMode(0, $newMode);
+						$SONOS_AVTransportControlProxy{$udn}->SetPlayMode(0, SONOS_GetShuffleRepeatString($shuffle, $value1, $repeatOne && !$value1));
 					
 						# Wert wieder abholen, um das wahre Ergebnis anzeigen zu können
 						$result = $SONOS_AVTransportControlProxy{$udn}->GetTransportSettings(0)->getValue('PlayMode');
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($result eq 'SHUFFLE' || $result eq 'REPEAT_ALL'));
+						($shuffle, $repeat, $repeatOne) = SONOS_GetShuffleRepeatStates($result);
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($repeat));
+					}
+				} elsif ($workType eq 'setRepeatOne') {
+					my $value1 =  undef;
+					
+					if ($params[0] ne '~~') {
+						$value1 = SONOS_ConvertWordToNum($params[0]);
+					}
+					
+					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
+						my $result = $SONOS_AVTransportControlProxy{$udn}->GetTransportSettings(0)->getValue('PlayMode');
+						my ($shuffle, $repeat, $repeatOne) = SONOS_GetShuffleRepeatStates($result);
+						
+						$value1 = !$repeatOne if (!defined($value1));
+						
+						$SONOS_AVTransportControlProxy{$udn}->SetPlayMode(0, SONOS_GetShuffleRepeatString($shuffle, $repeat && !$value1, $value1));
+					
+						# Wert wieder abholen, um das wahre Ergebnis anzeigen zu können
+						$result = $SONOS_AVTransportControlProxy{$udn}->GetTransportSettings(0)->getValue('PlayMode');
+						($shuffle, $repeat, $repeatOne) = SONOS_GetShuffleRepeatStates($result);
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_ConvertNumToWord($repeatOne));
 					}
 				} elsif ($workType eq 'setCrossfadeMode') {
 					my $value1 = SONOS_ConvertWordToNum($params[0]);
@@ -3353,6 +3363,31 @@ sub SONOS_Discover() {
 							}
 						}
 					}
+				} elsif ($workType eq 'deleteFromQueue') {
+					$params[0] = uri_unescape($params[0]);
+					
+					# Simple Check...
+					if ($params[0] !~ m/^[\.\,\d]*$/) {
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Parameter Error: '.$params[0]);
+						return;
+					}
+					my @elemList = sort { $a <=> $b } SONOS_DeleteDoublettes(eval('('.$params[0].')'));
+					SONOS_Log undef, 5, 'DeleteFromQueue: Index-Liste: '.Dumper(\@elemList);
+					
+					if (SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn}) && SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
+						# Maximale Indizies bestimmen
+						my $maxElems = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('Q:0', 'BrowseDirectChildren', '', 0, 0, '')->getValue('TotalMatches');
+						
+						my $deleteCounter = 0;
+						foreach my $elem (@elemList) {
+							if (($elem > 0) && ($elem <= $maxElems)) {
+								$deleteCounter++ if ($SONOS_AVTransportControlProxy{$udn}->RemoveTrackFromQueue(0, 'Q:0/'.($elem - $deleteCounter), 0)->isSuccessful());
+							}
+						}
+						
+						$maxElems = $SONOS_ContentDirectoryControlProxy{$udn}->Browse('Q:0', 'BrowseDirectChildren', '', 0, 0, '')->getValue('TotalMatches');
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Deleted '.$deleteCounter.' elems. In list are now '.$maxElems.' elems.');
+					}
 				} elsif ($workType eq 'deletePlaylist') {
 					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
 					my $playlistName = $1 if ($regSearch);
@@ -3815,6 +3850,52 @@ sub SONOS_Fisher_Yates_Shuffle($) {
 		my $j = int rand ($i+1);
 		@$deck[$i,$j] = @$deck[$j,$i];
 	}
+}
+
+########################################################################################
+#
+#  SONOS_GetShuffleRepeatStates - Retreives the information according shuffle and repeat
+#
+########################################################################################
+sub SONOS_GetShuffleRepeatStates($) {
+	my ($data) = @_;
+	
+	my $shuffle = $data =~ m/SHUFFLE/;
+	my $repeat = $data eq 'SHUFFLE' || $data eq 'REPEAT_ALL';
+	my $repeatOne = $data =~ m/REPEAT_ONE/;
+	
+	return ($shuffle, $repeat, $repeatOne);
+}
+
+########################################################################################
+#
+#  SONOS_GetShuffleRepeatString - Generates the information string according shuffle and repeat
+#
+########################################################################################
+sub SONOS_GetShuffleRepeatString($$$) {
+	my ($shuffle, $repeat, $repeatOne) = @_;
+	
+	my $newMode = 'NORMAL';
+	$newMode = 'SHUFFLE' if ($shuffle && $repeat && $repeatOne);
+	$newMode = 'SHUFFLE' if ($shuffle && $repeat && !$repeatOne);
+	$newMode = 'SHUFFLE_REPEAT_ONE' if ($shuffle && !$repeat && $repeatOne);
+	$newMode = 'SHUFFLE_NOREPEAT' if ($shuffle && !$repeat && !$repeatOne);
+	
+	$newMode = 'REPEAT_ALL' if (!$shuffle && $repeat && $repeatOne);
+	$newMode = 'REPEAT_ALL' if (!$shuffle && $repeat && !$repeatOne);
+	$newMode = 'REPEAT_ONE' if (!$shuffle && !$repeat && $repeatOne);
+	$newMode = 'NORMAL' if (!$shuffle && !$repeat && !$repeatOne);
+	
+	return $newMode;
+}
+
+########################################################################################
+#
+#  SONOS_DeleteDoublettes - Deletes duplicate entries in the given array
+#
+########################################################################################
+sub SONOS_DeleteDoublettes{ 
+	return keys %{{ map { $_ => 1 } @_ }}; 
 }
 
 ########################################################################################
@@ -5588,6 +5669,7 @@ sub SONOS_GetReadingsToCurrentHash($$) {
 		$current{TransportState} = 'ERROR';
 		$current{Shuffle} = 0;
 		$current{Repeat} = 0;
+		$current{RepeatOne} = 0;
 		$current{CrossfadeMode} = 0;
 		$current{NumberOfTracks} = '';
 		$current{Track} = '';
@@ -5626,6 +5708,7 @@ sub SONOS_GetReadingsToCurrentHash($$) {
 		$current{TransportState} = ReadingsVal($name, 'transportState', 'ERROR');
 		$current{Shuffle} = ReadingsVal($name, 'Shuffle', 0);
 		$current{Repeat} = ReadingsVal($name, 'Repeat', 0);
+		$current{RepeatOne} = ReadingsVal($name, 'RepeatOne', 0);
 		$current{CrossfadeMode} = ReadingsVal($name, 'CrossfadeMode', 0);
 		$current{NumberOfTracks} = ReadingsVal($name, 'numberOfTracks', '');
 		$current{Track} = ReadingsVal($name, 'currentTrack', '');
@@ -5840,8 +5923,10 @@ sub SONOS_ServiceCallback($$) {
 		# PlayMode ermitteln
 		my $currentPlayMode = 'NORMAL';
 		$currentPlayMode = $1 if ($properties{LastChangeDecoded} =~ m/<CurrentPlayMode.*?val="(.*?)".*?\/>/i);
-		SONOS_Client_Notifier('SetCurrent:Shuffle:1') if ($currentPlayMode eq 'SHUFFLE' || $currentPlayMode eq 'SHUFFLE_NOREPEAT');
-		SONOS_Client_Notifier('SetCurrent:Repeat:1') if ($currentPlayMode eq 'SHUFFLE' || $currentPlayMode eq 'REPEAT_ALL');
+		my ($shuffle, $repeat, $repeatOne) = SONOS_GetShuffleRepeatStates($currentPlayMode);
+		SONOS_Client_Notifier('SetCurrent:Shuffle:1') if ($shuffle);
+		SONOS_Client_Notifier('SetCurrent:Repeat:1') if ($repeat);
+		SONOS_Client_Notifier('SetCurrent:RepeatOne:1') if ($repeatOne);
 		
 		# CrossfadeMode ermitteln
 		SONOS_Client_Notifier('SetCurrent:CrossfadeMode:'.$1) if ($properties{LastChangeDecoded} =~ m/<CurrentCrossfadeMode.*?val="(\d+)".*?\/>/i);
@@ -7157,7 +7242,11 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 		}
 		
 		SONOS_Log undef, 4, 'Retrieved TopoType: '.$topoType;
-		$fieldType = substr($topoType, 1) if ($topoType ne '');
+		if ($topoType ne '') {
+			$fieldType = substr($topoType, 1);
+		} else {
+			$fieldType = '';
+		}
 		
 		# Für den Aliasnamen schöne Bezeichnungen ermitteln...
 		my $aliasSuffix = '';

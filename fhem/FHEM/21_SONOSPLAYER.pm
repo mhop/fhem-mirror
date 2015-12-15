@@ -85,6 +85,7 @@ my %sets = (
 	'StartPlaylist' => 'playlistname [ClearPlaylist]',
 	'SavePlaylist' => 'playlistname',
 	'DeletePlaylist' => 'playlistname',
+	'DeleteFromQueue' => 'PerlNumberListOfIndizies',
 	'CurrentPlaylist' => '',
 	'EmptyPlaylist' => '',
 	'LoadFavourite' => 'favouritename',
@@ -99,11 +100,13 @@ my %sets = (
 	'Mute' => 'state',
 	'Shuffle' => 'state',
 	'Repeat' => 'state',
+	'RepeatOne' => 'state',
 	'CrossfadeMode' => 'state',
 	'LEDState' => 'state',
 	'MuteT' => '',
 	'ShuffleT' => '',
 	'RepeatT' => '',
+	'RepeatOneT' => '',
 	'VolumeD' => '',
 	'VolumeU' => '',
 	'Volume' => 'volumelevel(0..100) [RampType]',
@@ -396,7 +399,7 @@ sub SONOSPLAYER_Set($@) {
 				$key = $key.':slider,-100,1,100' if ($key eq 'Balance');
 				$key = $key.':slider,-15,1,15' if ($key eq 'SubGain');
 				$key = $key.':slider,-15,1,15' if ($key eq 'SurroundLevel');
-				$key = $key.':slider,1,1,'.ReadingsVal($hash->{NAME}, 'numberOfTracks', 0) if ($key eq 'currentTrack');
+				$key = $key.':slider,1,1,'.ReadingsVal($hash->{NAME}, 'numberOfTracks', 0) if (($key eq 'currentTrack') || ($key eq 'track'));
 			}
 			
 			$key = $key.':0,1,2' if ($key eq 'SubPolarity');
@@ -418,6 +421,7 @@ sub SONOSPLAYER_Set($@) {
 								|| (lc($key) eq 'outputfixed')  
 								|| (lc($key) eq 'resetattributestodefault')  
 								|| (lc($key) eq 'repeat') 
+								|| (lc($key) eq 'repeatone') 
 								|| (lc($key) eq 'shuffle'));
 			
 			# Iconauswahl einsetzen
@@ -577,6 +581,16 @@ sub SONOSPLAYER_Set($@) {
 		$udn = $hash->{UDN};
 	
 		SONOS_DoWork($udn, 'setRepeat', '~~');
+	} elsif (lc($key) eq 'repeatone') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+	
+		SONOS_DoWork($udn, 'setRepeatOne', $value);
+	} elsif (lc($key) eq 'repeatonet') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+	
+		SONOS_DoWork($udn, 'setRepeatOne', '~~');
 	} elsif (lc($key) eq 'crossfademode') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -680,6 +694,13 @@ sub SONOSPLAYER_Set($@) {
 		}
 	} elsif (lc($key) eq 'deleteplaylist') {
 		SONOS_DoWork($udn, 'deletePlaylist', $value);
+	} elsif (lc($key) eq 'deletefromqueue') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+		
+		$value =~ s/ //g;
+		
+		SONOS_DoWork($udn, 'deleteFromQueue', uri_escape($value));
 	} elsif (lc($key) eq 'currentplaylist') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -1201,6 +1222,12 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_Repeat">
 <b><code>Repeat &lt;State&gt;</code></b></a>
 <br /> Sets the repeat-state. Retrieves the new state as the result.</li>
+<li><a name="SONOSPLAYER_setter_RepeatOne">
+<b><code>RepeatOne &lt;State&gt;</code></b></a>
+<br /> Sets the repeatOne-state. Retrieves the new state as the result.</li>
+<li><a name="SONOSPLAYER_setter_RepeatOneT">
+<b><code>RepeatOneT</code></b></a>
+<br /> Toggles the repeatOne-state. Retrieves the new state as the result.</li>
 <li><a name="SONOSPLAYER_setter_RepeatT">
 <b><code>RepeatT</code></b></a>
 <br /> Toggles the repeat-state. Retrieves the new state as the result.</li>
@@ -1239,6 +1266,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_setter_CurrentPlaylist">
 <b><code>CurrentPlaylist</code></b></a>
 <br /> Sets the current playing to the current queue, but doesn't start playing (e.g. after hearing of a radiostream, where the current playlist still exists but is currently "not in use")</li>
+<li><a name="SONOSPLAYER_setter_DeleteFromQueue">
+<b><code>DeleteFromQueue <index_of_elems></code></b></a>
+<br /> Deletes the elements from the current queue with the given indices. You can use the ususal perl-array-formats like "1..12,17,20..22". The indices reference to the position in the current view of the list (this usually differs between the normal playmode and the shuffleplaymode).</li>
 <li><a name="SONOSPLAYER_setter_DeletePlaylist">
 <b><code>DeletePlaylist</code></b></a>
 <br /> Deletes the Sonos-Playlist with the given name. According to the possibilities of the playlistname have a close look at LoadPlaylist.</li>
@@ -1367,7 +1397,7 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_attribut_generateInfoSummarize4"><b><code>generateInfoSummarize4 &lt;string&gt;</code></b>
 </a><br /> Generates the reading 'InfoSummarize4' with the given format. More Information on this in the examples-section.</li>
 <li><a name="SONOSPLAYER_attribut_stateVariable"><b><code>stateVariable &lt;string&gt;</code></b>
-</a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,<br />InfoSummarize2,InfoSummarize3,InfoSummarize4). Defines, which variable has to be copied to the content of the state-variable.</li>
+</a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,RepeatOne,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,<br />InfoSummarize2,InfoSummarize3,InfoSummarize4). Defines, which variable has to be copied to the content of the state-variable.</li>
 </ul></li>
 <li><b>Controloptions</b><ul>
 <li><a name="SONOSPLAYER_attribut_maxVolume"><b><code>maxVolume &lt;int&gt;</code></b>
@@ -1392,7 +1422,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_examples_InfoSummarize">Format of InfoSummarize:</a><br />
 <code>infoSummarizeX := &lt;NormalAudio&gt;:summarizeElem:&lt;/NormalAudio&gt; &lt;StreamAudio&gt;:summarizeElem:&lt;/StreamAudio&gt;|:summarizeElem:</code><br />
 <code>:summarizeElem: := &lt;:variable:[ prefix=":text:"][ suffix=":text:"][ instead=":text:"][ ifempty=":text:"]/[ emptyVal=":text:"]&gt;</code><br />
-<code>:variable: := TransportState|NumberOfTracks|Track|TrackURI|TrackDuration|Title|Artist|Album|OriginalTrackNumber|AlbumArtist|<br />Sender|SenderCurrent|SenderInfo|StreamAudio|NormalAudio|AlbumArtURI|nextTrackDuration|nextTrackURI|nextAlbumArtURI|<br />nextTitle|nextArtist|nextAlbum|nextAlbumArtist|nextOriginalTrackNumber|Volume|Mute|Shuffle|Repeat|CrossfadeMode|Balance|<br />HeadphoneConnected|SleepTimer|Presence|RoomName|SaveRoomName|PlayerType|Location|SoftwareRevision|SerialNum|InfoSummarize1|<br />InfoSummarize2|InfoSummarize3|InfoSummarize4</code><br />
+<code>:variable: := TransportState|NumberOfTracks|Track|TrackURI|TrackDuration|Title|Artist|Album|OriginalTrackNumber|AlbumArtist|<br />Sender|SenderCurrent|SenderInfo|StreamAudio|NormalAudio|AlbumArtURI|nextTrackDuration|nextTrackURI|nextAlbumArtURI|<br />nextTitle|nextArtist|nextAlbum|nextAlbumArtist|nextOriginalTrackNumber|Volume|Mute|Shuffle|Repeat|RepeatOne|CrossfadeMode|Balance|<br />HeadphoneConnected|SleepTimer|Presence|RoomName|SaveRoomName|PlayerType|Location|SoftwareRevision|SerialNum|InfoSummarize1|<br />InfoSummarize2|InfoSummarize3|InfoSummarize4</code><br />
 <code>:text: := [Any text without double-quotes]</code><br /></li>
 </ul>
 
@@ -1551,6 +1581,12 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_Repeat">
 <b><code>Repeat &lt;State&gt;</code></b></a>
 <br /> Legt den Zustand des Repeat-Zustands fest. Liefert den aktuell gültigen Repeat-Zustand.</li>
+<li><a name="SONOSPLAYER_setter_RepeatOne">
+<b><code>RepeatOne &lt;State&gt;</code></b></a>
+<br /> Legt den Zustand des RepeatOne-Zustands fest. Liefert den aktuell gültigen RepeatOne-Zustand.</li>
+<li><a name="SONOSPLAYER_setter_RepeatOneT">
+<b><code>RepeatOneT</code></b></a>
+<br /> Schaltet den Zustand des RepeatOne-Zustands um. Liefert den aktuell gültigen RepeatOne-Zustand.</li>
 <li><a name="SONOSPLAYER_setter_RepeatT">
 <b><code>RepeatT</code></b></a>
 <br /> Schaltet den Zustand des Repeat-Zustands um. Liefert den aktuell gültigen Repeat-Zustand.</li>
@@ -1589,6 +1625,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_setter_CurrentPlaylist">
 <b><code>CurrentPlaylist</code></b></a>
 <br /> Setzt den Abspielmodus auf die aktuelle Abspielliste, startet aber keine Wiedergabe (z.B. nach dem Hören eines Radiostreams, wo die aktuelle Abspielliste noch existiert, aber gerade "nicht verwendet" wird)</li>
+<li><a name="SONOSPLAYER_setter_DeleteFromQueue">
+<b><code>DeleteFromQueue <index_of_elems></code></b></a>
+<br /> Löscht die angegebenen Elemente aus der aktuellen Abspielliste. Die Angabe erfolgt über die Indizies der Titel. Es können die bei Perl-Array-üblichen Formate verwendet werden: "1..12,17,20..22". Die Indizies beziehen sich auf die aktuell angezeigte Reihenfolge (diese unterscheidet sich zwischen der normalen Abspielweise und dem Shufflemodus).</li>
 <li><a name="SONOSPLAYER_setter_DeletePlaylist">
 <b><code>DeletePlaylist</code></b></a>
 <br /> Löscht die bezeichnete Playliste. Zum möglichen Format des Playlistenamen unter LoadPlaylist nachsehen.</li>
@@ -1717,7 +1756,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_attribut_generateInfoSummarize4"><b><code>generateInfoSummarize4 &lt;string&gt;</code></b>
 </a><br /> Erzeugt das Reading 'InfoSummarize4' mit dem angegebenen Format. Mehr Informationen dazu im Bereich Beispiele.</li>
 <li><a name="SONOSPLAYER_attribut_stateVariable"><b><code>stateVariable &lt;string&gt;</code></b>
-</a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,I<br />nfoSummarize2,InfoSummarize3,InfoSummarize4). Gibt an, welche Variable in das Reading <code>state</code> kopiert werden soll.</li>
+</a><br /> One of (TransportState,NumberOfTracks,Track,TrackURI,TrackDuration,Title,Artist,Album,OriginalTrackNumber,AlbumArtist,<br />Sender,SenderCurrent,SenderInfo,StreamAudio,NormalAudio,AlbumArtURI,nextTrackDuration,nextTrackURI,nextAlbumArtURI,<br />nextTitle,nextArtist,nextAlbum,nextAlbumArtist,nextOriginalTrackNumber,Volume,Mute,Shuffle,Repeat,RepeatOne,CrossfadeMode,Balance,<br />HeadphoneConnected,SleepTimer,Presence,RoomName,SaveRoomName,PlayerType,Location,SoftwareRevision,SerialNum,InfoSummarize1,I<br />nfoSummarize2,InfoSummarize3,InfoSummarize4). Gibt an, welche Variable in das Reading <code>state</code> kopiert werden soll.</li>
 </ul></li>
 <li><b>Steueroptionen</b><ul>
 <li><a name="SONOSPLAYER_attribut_maxVolume"><b><code>maxVolume &lt;int&gt;</code></b>
@@ -1742,7 +1781,7 @@ Hier wird definiert, dass ein Event erzeugt werden soll, wenn innerhalb von 2 Se
 <li><a name="SONOSPLAYER_examples_InfoSummarize">Format von InfoSummarize:</a><br />
 <code>infoSummarizeX := &lt;NormalAudio&gt;:summarizeElem:&lt;/NormalAudio&gt; &lt;StreamAudio&gt;:summarizeElem:&lt;/StreamAudio&gt;|:summarizeElem:</code><br />
 <code>:summarizeElem: := &lt;:variable:[ prefix=":text:"][ suffix=":text:"][ instead=":text:"][ ifempty=":text:"]/[ emptyVal=":text:"]&gt;</code><br />
-<code>:variable: := TransportState|NumberOfTracks|Track|TrackURI|TrackDuration|Title|Artist|Album|OriginalTrackNumber|AlbumArtist|<br />Sender|SenderCurrent|SenderInfo|StreamAudio|NormalAudio|AlbumArtURI|nextTrackDuration|nextTrackURI|nextAlbumArtURI|<br />nextTitle|nextArtist|nextAlbum|nextAlbumArtist|nextOriginalTrackNumber|Volume|Mute|Shuffle|Repeat|CrossfadeMode|Balance|<br />HeadphoneConnected|SleepTimer|Presence|RoomName|SaveRoomName|PlayerType|Location|SoftwareRevision|SerialNum|InfoSummarize1|<br />InfoSummarize2|InfoSummarize3|InfoSummarize4</code><br />
+<code>:variable: := TransportState|NumberOfTracks|Track|TrackURI|TrackDuration|Title|Artist|Album|OriginalTrackNumber|AlbumArtist|<br />Sender|SenderCurrent|SenderInfo|StreamAudio|NormalAudio|AlbumArtURI|nextTrackDuration|nextTrackURI|nextAlbumArtURI|<br />nextTitle|nextArtist|nextAlbum|nextAlbumArtist|nextOriginalTrackNumber|Volume|Mute|Shuffle|Repeat|RepeatOne|CrossfadeMode|Balance|<br />HeadphoneConnected|SleepTimer|Presence|RoomName|SaveRoomName|PlayerType|Location|SoftwareRevision|SerialNum|InfoSummarize1|<br />InfoSummarize2|InfoSummarize3|InfoSummarize4</code><br />
 <code>:text: := [Jeder beliebige Text ohne doppelte Anführungszeichen]</code><br /></li>
 </ul>
 
