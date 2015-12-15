@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 2.2
+#  Version 2.3
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -24,8 +24,10 @@
 #  get <name> configdesc
 #
 #  attr <name> ccureadings { 0 | 1 }
+#  attr <name> ccureadingfilter <datapoint-expr>
+#  attr <name> ccureadingformat { name | address | datapoint }
 #  attr <name> statevals <text1>:<subtext1>[,...]
-#  attr <name> substitute <regexp1>:<subtext1>[,...]
+#  attr <name> substitute <subst-rule>[;...]
 #
 ################################################################
 #  Requires module 88_HMCCU
@@ -56,7 +58,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingformat:name,address,datapoint ccureadings:0,1 statedatapoint statevals substitute loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 statedatapoint statevals substitute stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
@@ -179,7 +181,7 @@ sub HMCCUCHN_Set ($@)
 		if (!defined ($objname) || !defined ($objvalue)) {
 			return HMCCUCHN_SetError ($hash, "Usage: set <name> datapoint <datapoint> <value> [...]");
 		}
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
 
 		# Build datapoint address
 		$objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$objname;
@@ -200,7 +202,7 @@ sub HMCCUCHN_Set ($@)
 		if (!defined ($objvalue)) {
 			return HMCCUCHN_SetError ($hash, "Usage: set <device> devstate <value>");
 		}
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
 
 		# Build datapoint address
 		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$statedatapoint;
@@ -423,6 +425,11 @@ sub HMCCUCHN_SetError ($$)
          <br/>
             If set to 1 values read from CCU will be stored as readings.
       </li><br/>
+      <li>ccureadingfilter &lt;datapoint-expr&gt;
+         <br/>
+            Only datapoints matching specified expression are stored as
+            readings.
+      </li><br/>
       <li>statedatapoint &lt;datapoint&gt;
          <br/>
             Set datapoint for devstate commands.
@@ -434,9 +441,11 @@ sub HMCCUCHN_SetError ($$)
             <code>attr my_switch statevals on:true,off:false</code><br/>
             <code>set my_switch on</code>
       </li><br/>
-      <li>substitude &lt;expression&gt;:&lt;subststr&gt;[,...]
+      <li>substitude &lt;subst-rule&gt;[;...]
          <br/>
-            Define substitions for reading values.
+            Define substitions for reading values. Substitutions for parfile values must
+            be specified in parfiles. Syntax of subst-rule is<br/><br/>
+            [datapoint!]&lt;regexp1&gt;:&lt;text1&gt;[,...]
       </li>
    </ul>
 </ul>
