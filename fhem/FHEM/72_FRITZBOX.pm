@@ -298,6 +298,7 @@ sub FRITZBOX_Set($$@)
    
    my $list = "call"
             . " checkAPIs:noArg"
+            . " diversity"
             . " guestWlan:on,off"
             . " password"
             . " ring"
@@ -309,7 +310,6 @@ sub FRITZBOX_Set($$@)
          if $hash->{fhem}->{is_double_wlan} == 1;
    $list .= " alarm"
           . " dect:on,off"
-          . " diversity"
           . " startRadio"
          if $hash->{WEBCM} || $hash->{TELNET};
    $list .= " sendMail"
@@ -401,11 +401,19 @@ sub FRITZBOX_Set($$@)
          if ($forceShell) { # Shell
             FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/Diversity".( $val[0] - 1 )."/Active ".$state );
          }
-         else { #webcm
-            return "'set ... diversity' is not supported by the limited interfaces of your Fritz!Box firmware."
-               unless $hash->{WEBCM};
+         elsif ( $hash->{WEBCM} ) { #webcm
             my @webCmdArray = ( ["telcfg:settings/Diversity".( $val[0] - 1 )."/Active " => $state] );
             FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
+         }
+         elsif ( $hash->{TR064} ) { #tr064
+         # get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDeflections
+         # get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDeflection NewDeflectionId 0
+         # get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact SetDeflectionEnable NewDeflectionId 0 NewEnable 0
+            my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetDeflectionEnable", "NewDeflectionId", $val[0] - 1, "NewEnable", $state] );
+            FRITZBOX_TR064_Cmd ($hash, 0, \@tr064CmdArray);
+         }
+         else {
+            return "'set ... diversity' is not supported by the limited interfaces of your Fritz!Box firmware.";
          }
          readingsSingleUpdate($hash,"diversity".$val[0]."_state",$val[1], 1);
          return undef;
@@ -2228,7 +2236,6 @@ sub FRITZBOX_Call_Run_Web($)
       $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
    }
   
-
 #Preparing 5th command array to ring
       FRITZBOX_Log $hash, 4, "Call $extNo for $duration seconds";
    if ($hash->{SECPORT}) { #ring with TR-064
@@ -4636,7 +4643,7 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code>
          <br>
          Switches the call diversity number (1, 2 ...) on or off.
-         A call diversity for an incoming number has to be created with the Fritz!Box web interface. Requires the API: Telnet or webcm.
+         A call diversity for an incoming number has to be created with the Fritz!Box web interface. Requires the API: Telnet, webcm or TR064 (>=6.50).
          <br>
          Note! The Fritz!Box allows also forwarding in accordance to the calling number. This is not included in this feature. 
       </li><br>
@@ -4992,7 +4999,7 @@ sub FRITZBOX_fritztris($)
          <br>
          Achtung! Die Fritz!Box erm&ouml;glicht auch eine Weiterleitung in Abh&auml;ngigkeit von der anrufenden Nummer. Diese Art der Weiterleitung kann hiermit nicht geschaltet werden. 
          <br>
-         Ben&ouml;tigt die API: Telnet oder webcm.
+         Ben&ouml;tigt die API: Telnet, webcm oder TR064 (>=6.50).
       </li><br>
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
