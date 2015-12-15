@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 2.2
+#  Version 2.3
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -25,6 +25,7 @@
 #
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address | name }
+#  attr <name> ccureadingfilter <regexp>
 #  attr <name> statechannel <channel>
 #  attr <name> statedatapoint <datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
@@ -60,7 +61,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingformat:name,address ccureadings:0,1 statevals substitute statechannel statedatapoint loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address ccureadings:0,1 statevals substitute statechannel statedatapoint stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
@@ -202,7 +203,7 @@ sub HMCCUDEV_Set ($@)
 		if (!defined ($objname) || $objname !~ /^[0-9]+\..+$/ || !defined ($objvalue)) {
 			return HMCCUDEV_SetError ($hash, "Usage: set <name> datapoint <channel-number>.<datapoint> <value> [...]");
 		}
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
 
 		# Build datapoint address
 		$objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$objname;
@@ -214,6 +215,7 @@ sub HMCCUDEV_Set ($@)
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
 		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
 
+		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
 	elsif ($opt =~ /^($hash->{statevals})$/) {
@@ -223,7 +225,7 @@ sub HMCCUDEV_Set ($@)
 		return HMCCUDEV_SetError ($hash, "No state channel specified") if ($statechannel eq '');
 		return HMCCUDEV_SetError ($hash, "Usage: set <name> devstate <value> [...]") if (!defined ($objvalue));
 
-		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1);
+		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
 
 		# Build datapoint address
 		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$statechannel.'.'.$statedatapoint;
@@ -235,6 +237,7 @@ sub HMCCUDEV_Set ($@)
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
 		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
 
+		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
 	elsif ($opt eq 'config') {
@@ -244,6 +247,8 @@ sub HMCCUDEV_Set ($@)
 
 		my $rc = HMCCU_RPCSetConfig ($hash, $objname, \@a);
 		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+
+		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
 	else {
@@ -308,6 +313,8 @@ sub HMCCUDEV_Get ($@)
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
 
 		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+
+		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'channel') {
@@ -320,6 +327,9 @@ sub HMCCUDEV_Get ($@)
 			else {
 				return HMCCUDEV_SetError ($hash, "Invalid channel number: $objname");
 			}
+			if ($objname =~ /^[0-9]{1,2}.*=/) {
+				$objname =~ s/=/ /;
+			}
 			push (@chnlist, $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$objname);
 		}
 		if (@chnlist == 0) {
@@ -328,7 +338,14 @@ sub HMCCUDEV_Get ($@)
 
 		($rc, $result) = HMCCU_GetChannel ($hash, \@chnlist);
 		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+
+		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $ccureadings ? undef : $result;
+	}
+	elsif ($opt eq 'deviceinfo') {
+		$result = HMCCU_GetDeviceInfo ($hash, $hash->{ccuaddr});
+		return HMCCUDEV_SetError ($hash, -2) if ($result eq '');
+		return $result;
 	}
 	elsif ($opt eq 'config') {
 		my $channel = shift @a;
@@ -337,6 +354,7 @@ sub HMCCUDEV_Get ($@)
 
                 my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset");
                 return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
                 return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'configdesc') {
@@ -346,10 +364,11 @@ sub HMCCUDEV_Get ($@)
 
                 my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription");
                 return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
                 return $res;
 	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint channel config configdesc";
+		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint channel config configdesc deviceinfo:noArg";
 		if ($statechannel ne '') {
 			$retmsg .= ' devstate:noArg';
 		}
@@ -484,6 +503,11 @@ sub HMCCUDEV_SetError ($$)
          <br/>
             If set to 1 values read from CCU will be stored as readings.
       </li><br/>
+      <li>ccureadingfilter &lt;datapoint-expr&gt;
+         <br/>
+            Only datapoints matching specified expression are stored as
+            readings.
+      </li><br/>
       <li>ccureadingformat &lt;address | name&gt;
          <br/>
             Set format of readings. Default is 'name'.
@@ -503,10 +527,11 @@ sub HMCCUDEV_SetError ($$)
             <code>attr my_switch statevals on:true,off:false</code><br/>
             <code>set my_switch on</code>
       </li><br/>
-      <li>substitude &lt;expression&gt;:&lt;subststr&gt;[,...]
+      <li>substitude &lt;subst-rule&gt;[;...]
          <br/>
             Define substitions for reading values. Substitutions for parfile values must
-            be specified in parfiles.
+            be specified in parfiles. Syntax of subst-rule is<br/><br/>
+            [datapoint!]&lt;regexp1&gt;:&lt;text1&gt;[,...]
       </li><br/>
    </ul>
 </ul>
