@@ -3,9 +3,9 @@
    *** HMCCU/HMCCUDEV - Modules for FHEM - Homematic CCU integration ***
   =======================================================================
 
-* Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.1 (RPC server)
+* Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.3
 * Please read carefully before using the modules.
-* Last modified: 25.11.2015
+* Last modified: 15.12.2015
 
 ----------------------------------------------
  Content
@@ -185,6 +185,10 @@ Get value of datapoint:
 
    get <name> datapoint {<channel-name>|<channel-address>}.<datapoint> [<reading>]
    
+Display list of channels and datapoints of a device:
+
+   get <name> deviceinfo {<device-name>|<device-address>}
+
 Read list of devices and channels from CCU:
 
    get <name> devicelist [dump]
@@ -219,6 +223,13 @@ Get CCU variable values:
  2.3 HMCCU Attributes
 ------------------------------------
 
+Set filter for datapoint readings (default is '.*'):
+
+   attr <name> ccureadingfilter <datapoint-expr>
+
+   Only datapoints matching the specified expression will be stored as
+   readings.
+
 Set reading name format (default is 'name'):
 
    attr <name> ccureadingformat { name | address }
@@ -234,6 +245,8 @@ Control reading creation (default is 1):
 Set datapoint for "get/set devstate" commands (default is 'STATE'):
 
    attr <name> statedatapoint <datapoint>
+
+   The value of this datapoint is stored in internal STATE of the FHEM device.
    
 Remove character from CCU device or variable specification in set commands:
 
@@ -276,9 +289,36 @@ Specify text substitutions for values in set commands:
    
    Note: Parameters <textn> are no regular expressions.
 
-Specify text substitutions for values returned by get commands:
+Set format of readings with floating point numbers (default is 0):
 
-   attr <name> substitute <regexp1>:<text1>[,...]
+   attr <name> stripnumber { 0 | 1 | 2 }
+
+   0 = Floating point numbers are stored as read from CCU (i.e. with trailing zeros).
+   1 = Trailing zeros are stripped from floating point numbers except one digit.
+   2 = All trailing zeros are stripped from floating point numbers.
+
+Specify text substitution rules for values returned by get commands:
+
+   attr <name> substitute <subst_rule>[;...]
+
+   The substitution rules are applied to values read from CCU before they are
+   stored as readings. The syntax of a substitution rule is:
+
+   [<datapoint>!]<regexp1>:<subtext1>[,...]
+
+   If a datapoint is specified the rule is applied only for values of this 
+   datapoint.
+
+   Note: Floating point numbers are ignored. Integer numbers are only substituted
+   if they match the complete regular expression.
+
+   Example: Substitute values of datapoints STATE and LOWBAT.
+
+   STATE!(1|true):on,(0|false):off;LOWBAT!(1|true):yes,(0|false):no
+
+   Note: get commands return true/false for boolean values while RPC server 
+   returns 1/0. 
+
 
 ------------------------------------
  2.4 HMCCU Parameter files
@@ -288,7 +328,7 @@ A parameter file contains a list of CCU channel or datapoint definitions. Each
 line can contain a text substitution rule. A parameter file is used by command
 "get parfile". The format of a parfile entry is:
 
-  {<channel-name>|<channel-address>}[.<datapoint_exp>] [<regexp1>:<subtext1>[,...]]
+  {<channel-name>|<channel-address>}[.<datapoint_exp>] [<substitution_rule[;...]]
 
 First part corresponds to command 'get channel'. Empty lines and lines starting
 with a '#' are ignored.
@@ -394,6 +434,10 @@ Get multiple datapoints of channel (supports multiple channels):
    Parameter <datapoint-expr> is a regular expression. Default is .* (query all
    datapoints of a channel).
    
+Display list of channels and datapoints of a device:
+
+   get <name> deviceinfo
+
 Get state of device:
 
    get <name> devstate
@@ -407,6 +451,13 @@ Get state of device:
 ------------------------------------
 
 Client device attributes overwrite corresponding HMCCU attributes!
+
+Set filter for datapoint readings (default is '.*'):
+
+   attr <name> ccureadingfilter <datapoint-expr>
+
+   Only datapoints matching the specified expression will be stored as
+   readings.
 
 Set reading name format (default is 'name'):
 
@@ -444,9 +495,19 @@ Specify text substitutions for values in set commands:
 	  set switch1 off
 	  set switch1 devstate on
 
+Set format of readings with floating point numbers (default is 0):
+
+   attr <name> stripnumber { 0 | 1 | 2 }
+
+   0 = Floating point numbers are stored as read from CCU (i.e. with trailing zeros).
+   1 = Trailing zeros are stripped from floating point numbers except one digit.
+   2 = All trailing zeros are stripped from floating point numbers.
+
 Specify text substitutions for values returned by get commands:
 
-   attr <name> substitute <regexp1>:<text1>[,...]
+   attr <name> substitute <substitution_rule>[;...]
+
+   For detailed information see description of HMCCU attribute 'substitute'.
    
    
 ====================================
@@ -509,6 +570,13 @@ Get state of device:
 
 Client device attributes overwrite corresponding HMCCU attributes!
 
+Set filter for datapoint readings (default is '.*'):
+
+   attr <name> ccureadingfilter <datapoint-expr>
+
+   Only datapoints matching the specified expression will be stored as
+   readings.
+
 Set reading name format (default is 'name'):
 
    attr <name> ccureadingformat { name | address | datapoint }
@@ -539,9 +607,19 @@ Specify text substitutions for values in set commands:
 	  set switch1 off
 	  set switch1 devstate on
 
+Set format of readings with floating point numbers (default is 0):
+
+   attr <name> stripnumber { 0 | 1 | 2 }
+
+   0 = Floating point numbers are stored as read from CCU (i.e. with trailing zeros).
+   1 = Trailing zeros are stripped from floating point numbers except one digit.
+   2 = All trailing zeros are stripped from floating point numbers.
+
 Specify text substitutions for values returned by get commands:
 
-   attr <name> substitute <regexp1>:<text1>[,...]
+   attr <name> substitute <substitution_rule>[;...]
+
+   For detailed information see description of HMCCU attribute 'substitute'.
 
    
 ====================================
