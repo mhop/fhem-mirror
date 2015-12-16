@@ -1,9 +1,9 @@
 
 ##############################################
 # $Id$
-# 2015-12-04
+# 2015-12-16
 
-# Added new EEP: A5-20-04 (hvac.04)
+# Added new EEP: A5-20-04 (hvac.04), A5-3F-00 (radioLinkTest)
 # EnOcean_Notify():
 # EnOcean_Attr():
 # Remote Management (incomplete, experimental)
@@ -287,6 +287,7 @@ my %EnO_eepConfig = (
   "A5.37.01" => {attr => {subType => "energyManagement.01", webCmd => "level:max"}, GPLOT => "EnO_A5-37-01:Level,"},
   "A5.38.08" => {attr => {subType => "gateway"}},
   "A5.38.09" => {attr => {subType => "lightCtrl.01"}, GPLOT => "EnO_dimFFRGB:DimRGB,"},
+  "A5.3F.00" => {attr => {subType => "radioLinkTest", comMode => "biDir", destinationID => "unicast", subDef => "getNextID"}},
   "A5.3F.7F" => {attr => {subType => "manufProfile"}},
   "D2.01.00" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
   "D2.01.01" => {attr => {subType => "actuator.01", defaultChannel => 0}},
@@ -629,7 +630,7 @@ EnOcean_Initialize($)
                       "pidCtrl:on,off pidDeltaTreshold pidFactor_D pidFactor_I pidFactor_P pidSensorTimeout " .
                       "pollInterval productID rampTime releasedChannel:A,B,C,D,I,0,auto repeatingAllowed:yes,no " .
                       "remoteManagement:off,on rlcAlgo:no,2++,3++ rlcRcv rlcSnd rlcTX:true,false " .
-                      "reposition:directly,opens,closes " .
+                      "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir" .
                       "secCode secLevel:encapsulation,encryption,off sendDevStatus:no,yes sensorMode:switch,pushbutton " .
                       "serviceOn:no,yes setpointRefDev setpointTempRefDev shutTime shutTimeCloses subDef " .
@@ -718,6 +719,18 @@ EnOcean_Define($$) {
         $rorg = "A5" if ($rorg eq "07");
         $eep = "$rorg.$func.$type";
         if (exists $EnO_eepConfig{$eep}) {
+          if ($eep eq 'A5.3F.00') {
+            my ($rltHash, $rltName);
+            foreach my $dev (keys %defs) {
+              next if ($defs{$dev}{TYPE} ne 'EnOcean');
+              next if (!exists($attr{$dev}{subType}));
+              next if ($attr{$dev}{subType} ne 'radioLinkTest');
+              $rltHash = $defs{$dev};
+              $rltName = $rltHash->{NAME};
+              last;
+            }
+            return "Radio Link Test device already defined, use $rltName" if ($rltHash);
+          }
           AssignIoPort($hash) if (!exists $hash->{IODev});
           if (exists $hash->{OLDDEF}) {
             delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
@@ -829,6 +842,20 @@ EnOcean_Define($$) {
       $rorg = "A5" if ($rorg eq "07");
       $eep = "$rorg.$func.$type";
       if (exists $EnO_eepConfig{$eep}) {
+        if ($eep eq 'A5.3F.00') {
+          # radio link test device
+          my ($rltHash, $rltName);
+          foreach my $dev (keys %defs) {
+            next if ($defs{$dev}{TYPE} ne 'EnOcean');
+            next if (!exists($attr{$dev}{subType}));
+            next if ($attr{$dev}{subType} ne 'radioLinkTest');
+            $rltHash = $defs{$dev};
+            $rltName = $rltHash->{NAME};
+            last;
+          }
+          return "Radio Link Test device already defined, use $rltName" if ($rltHash);
+        }
+
         AssignIoPort($hash) if (!exists $hash->{IODev});
         if (exists($hash->{OLDDEF}) && $hash->{OLDDEF} =~ m/^[A-Fa-f0-9]{8}$/i) {
           delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
@@ -838,8 +865,12 @@ EnOcean_Define($$) {
           }
         } else {
           $hash->{DEF} = $def;
-          $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
-          $hash->{DEF} = $def;
+          if ($eep eq 'A5.3F.00') {
+            $attr{$name}{subDef} = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");          
+          } else {
+            $def = EnOcean_CheckSenderID("getNextID", $hash->{IODev}{NAME}, "00000000");
+            $hash->{DEF} = $def;
+          }
         }
         $modules{EnOcean}{defptr}{$def} = $hash;
         if (exists($attr{$name}{eep}) && $attr{$name}{eep} ne "$rorg-$func-$type") {
@@ -2859,8 +2890,7 @@ sub EnOcean_Set($@)
       Log3 $name, 3, "EnOcean set $name $cmd";
 
     } elsif ($st eq "energyManagement.01") {
-      # Energy Management, Demand Response
-      # (A5-37-01)
+      # Energy Management, Demand Response (A5-37-01)
       $rorg = "A5";
       $updateState = 0;
       my $drLevel = 15;
@@ -3200,6 +3230,18 @@ sub EnOcean_Set($@)
       #shift(@a);
       Log3 $name, 3, "EnOcean set $name $cmd";
 
+    } elsif ($st eq "radioLinkTest") {
+      # Radio Link Test (A5-3F-00)
+      $rorg = "A5";
+      $updateState = 3;
+      if($cmd =~ m/^standby|stop$/) {
+        @{$hash->{helper}{rlt}{param}} = ($cmd, $hash, undef, $subDef, 'master', 0);
+        EnOcean_RLT($hash->{helper}{rlt}{param});
+      } else {
+        return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "standby:noArg stop:noArg"
+      }
+      Log3 $name, 3, "EnOcean set $name $cmd";
+      
     } elsif ($st eq "manufProfile") {
       if ($manufID eq "00D") {
         # Eltako Shutter
@@ -4968,22 +5010,88 @@ sub EnOcean_Parse($$)
     
     if($hash) {
       $name = $hash->{NAME};
+      if ($rorg eq 'A5' && !(hex(substr($data, 6, 2)) & 8) &&
+          hex(substr($data, 0, 2)) >> 2 == 0x3F &&
+          (hex(substr($data, 0, 4)) >> 3 & 0x7F) == 0) {
+        # find Radio Link Test device
+        my $rltHash;
+        foreach my $dev (keys %defs) {
+          next if ($defs{$dev}{TYPE} ne 'EnOcean');
+          next if (!exists($attr{$dev}{subType}));
+          next if ($attr{$dev}{subType} ne 'radioLinkTest');
+          $rltHash = $defs{$dev};
+          last;
+        }
+        if (defined $rltHash) {
+          if ($rltHash != $hash) {
+            if (ReadingsVal($rltHash->{NAME}, 'state', '') =~ m/^standby$/) {
+              # device is temporarily subType radioLinkTest
+              @{$rltHash->{helper}{rlt}{oldDev}} = ($hash, $name, $hash->{DEF});
+              CommandModify(undef, "$name 00000000");
+              delete $modules{EnOcean}{defptr}{$hash->{DEF}};
+              $hash = $rltHash;
+              $name = $hash->{NAME};
+              CommandModify(undef, "$name $senderID");
+              $modules{EnOcean}{defptr}{$senderID} = $hash;              
+            } else {
+              # Radio Link Test Devices not ready at the moment
+              return '';
+            }
+          }
+          Log3 $name, 4, "EnOcean received RLT Query messsage DATA: $data from DeviceID: $senderID";
+        } else {
+          Log3 $name, 4, "EnOcean received RLT Query messsage DATA: $data from DeviceID: $senderID";
+        }      
+      } else {
+        Log3 $name, 4, "EnOcean $name received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status";
+      }
+      $manufID = uc(AttrVal($name, "manufID", ""));
+      $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));
       $filelogName = "FileLog_$name";
+
       #if ($IODev ne $hash->{IODev}{NAME}) {
         # transceiver wrong
       #  Log3 $name, 4, "EnOcean $name locked telegram via $IODev PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status";
       #  return "";
       #}
-      Log3 $name, 4, "EnOcean $name received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status";
-      $manufID = uc(AttrVal($name, "manufID", ""));
-      $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));
+
     } else {
       # SenderID unknown, created new device
       Log3 undef, 5, "EnOcean received PacketType: $packetType RORG: $rorg DATA: $data SenderID: $senderID STATUS: $status";
       my $learningMode = AttrVal($IODev, "learningMode", "demand");
       my $ret = "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
+      
       if ($rorgname =~ m/^GPCD|GPSD$/) {        
         Log3 undef, 4, "EnOcean Unknown GP device with SenderID $senderID and $rorgname telegram, please define it.";
+        
+      } elsif ($rorg eq 'A5' && 
+               hex(substr($data, 0, 2)) >> 2 == 0x3F &&
+               (hex(substr($data, 0, 4)) >> 3 & 0x7F) == 0 &&
+               !(hex(substr($data, 6, 2)) & 8)) {
+        # find Radio Link Test device
+        my $rltHash;
+        foreach my $dev (keys %defs) {
+          next if ($defs{$dev}{TYPE} ne 'EnOcean');
+          next if (!exists($attr{$dev}{subType}));
+          next if ($attr{$dev}{subType} ne 'radioLinkTest');
+          $rltHash = $defs{$dev};
+          last;
+        }
+        if ($rltHash) {
+          return '' if (ReadingsVal($rltHash->{NAME}, 'state', '') !~ m/^standby$/);
+          $hash = $rltHash;
+          $name = $hash->{NAME};
+          CommandModify(undef, "$name $senderID");
+          $modules{EnOcean}{defptr}{$senderID} = $hash;
+          $filelogName = "FileLog_$name";
+          Log3 $name, 4, "EnOcean RLT Query messsage DATA: $data from SenderID: $senderID received";
+          $manufID = uc(AttrVal($name, "manufID", ""));
+          $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));        
+        } else {
+          Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and RLT Query message, please define it.";
+          return $ret;
+        }
+          
       } elsif ($learningMode eq "demand" && $iohash->{Teach}) {
         Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram, please define it.";
         return $ret;
@@ -5266,26 +5374,32 @@ sub EnOcean_Parse($$)
     }
 
   } elsif ($rorg eq "D5") {
-  # 1BS telegram
-  # Single Input Contact (EEP D5-00-01)
-  # [Eltako FTK, STM-250]
-    push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
-    if (!($db[0] & 8)) {
-      # teach-in
-      $attr{$name}{eep} = "D5-00-01";
-      $attr{$name}{manufID} = "7FF";
-      $attr{$name}{subType} = "contact";
-      push @event, "3:teach:1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID";
-      Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
-      # store attr subType, manufID ...
-      EnOcean_CommandSave(undef, undef);
+    # 1BS telegram
+    if ($st eq "radioLinkTest") {
+      # Radio Link Test (EEP A5-3F-00)
+      @{$hash->{helper}{rlt}{param}} = ('parse', $hash, $data, $subDef, 'master', $RSSI);
+      EnOcean_RLT($hash->{helper}{rlt}{param});
+    } else {
+      # Single Input Contact (EEP D5-00-01)
+      # [Eltako FTK, STM-250]
+        push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
+        if (!($db[0] & 8)) {
+          # teach-in
+          $attr{$name}{eep} = "D5-00-01";
+          $attr{$name}{manufID} = "7FF";
+          $attr{$name}{subType} = "contact";
+          push @event, "3:teach:1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID";
+          Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
+          # store attr subType, manufID ...
+          EnOcean_CommandSave(undef, undef);
+       }
     }
 
   } elsif ($rorg eq "A5") {
   # 4BS telegram
     if (($db[0] & 8) == 0) {
     # Teach-In telegram
-      if ($teach || AttrVal($hash->{IODev}{NAME}, "learningMode", "demand") eq "always") {
+      if ($teach || AttrVal($hash->{IODev}{NAME}, "learningMode", "demand") eq "always" || $st eq "radioLinkTest") {
 
         if ($db[0] & 0x80) {
           # 4BS Teach-In telegram with EEP and manufacturer ID
@@ -5362,7 +5476,7 @@ sub EnOcean_Parse($$)
               $st = "raw";
             }
 
-            if ($teach) {
+            if ($teach || $st eq "radioLinkTest") {
               # bidirectional 4BS teach-in
               if ($st eq "hvac.01" || $st eq "MD15") {
                 # EEP A5-20-01
@@ -5389,7 +5503,7 @@ sub EnOcean_Parse($$)
                 Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
 
               } elsif ($st eq "hvac.04") {
-                # heating radiator valve actuating drive EEP A5-20-04)
+                # heating radiator valve actuating drive (EEP A5-20-04)
                 $attr{$name}{comMode} = "biDir";
                 $attr{$name}{destinationID} = "unicast";
                 ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "biDir");
@@ -5398,6 +5512,22 @@ sub EnOcean_Parse($$)
                 EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, $subDef, "00", $hash->{DEF});
                 Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
                 readingsSingleUpdate($hash, 'operationMode', 'setpointTemp', 0);
+
+              } elsif ($st eq "radioLinkTest") {
+                # Radio Link Test (EEP A5-3F-00)
+                if (ReadingsVal($name, "state", 'standby') eq 'standby') {
+                  $attr{$name}{comMode} = "biDir";
+                  $attr{$name}{destinationID} = "unicast";
+                  ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "biDir");
+                  # teach-in response, SenderID not stored
+                  $data = sprintf "%06XD0", (hex($func) << 7 | hex($type)) << 11 | hex($attr{$name}{manufID});
+                  #$data = sprintf "%06XD0", (hex($func) << 7 | hex($type)) << 11 | 0x7FF;
+                  #$data = sprintf "%06XF0", (hex($func) << 7 | hex($type)) << 11 | 0x7FF;
+                  EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $data, $subDef, "00", $hash->{DEF});
+                  Log3 $name, 2, "EnOcean $name 4BS teach-in response sent to " . $hash->{DEF};
+                  @{$hash->{helper}{rlt}{param}} = ('start', $hash, undef, $subDef, 'master', $RSSI);
+                  EnOcean_RLT($hash->{helper}{rlt}{param});
+                }
 
               #} elsif ($st =~ m/^hvac\.1[0-1]$/) {
                 # EEP A5-20-10, A5-20-11
@@ -7321,6 +7451,11 @@ sub EnOcean_Parse($$)
         push @event, "3:state:Manufacturer Specific Application unknown";
       }
 
+    } elsif ($st eq "radioLinkTest") {
+      # Radio Link Test (EEP A5-3F-00)
+      @{$hash->{helper}{rlt}{param}} = ('parse', $hash, $data, $subDef, 'master', $RSSI);
+      EnOcean_RLT($hash->{helper}{rlt}{param});
+
     } elsif ($st eq "raw") {
       # raw
       push @event, "3:state:RORG: $rorg DATA: $data STATUS: $status ODATA: $odata";
@@ -9162,6 +9297,22 @@ sub EnOcean_Attr(@)
     if (!defined $attrVal){
 
     } elsif (lc($attrVal) !~ m/^true|false$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "rltType") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^1BS|4BS$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "rltRepeat") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal =~ m/^\d+?$/ && $attrVal >= 16 && $attrVal <= 256) {
+    
+    } else {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -11187,6 +11338,191 @@ sub EnOcean_observeRepeat($)
   }
   return;
 }
+
+#####
+sub EnOcean_RLT($) {
+  # Radio Link Test
+  my ($rltParam) = @_;
+  my ($ctrl, $hash, $dataRx, $subDef, $rltMode, $rssiMaster) = @$rltParam;
+  my $name = $hash->{NAME};
+  my $def = $hash->{DEF};
+  my ($err, $logLevel, $response, $dataTx, $rorg, $msgID) = (undef, 5, undef, undef, undef, 0);
+  my $rltCntrMax = AttrVal($name, 'rltRepeat', 16);
+  my $rltType = AttrVal($name, 'rltType', '4BS');
+
+  if ($rltType eq '1BS') {
+    $msgID = $hash->{helper}{rlt}{cntr} & 0x3F if (exists($hash->{helper}{rlt}{cntr}));    
+    $dataTx = sprintf("%02X", ($msgID & 0x3C) << 2 | 8 | ($msgID & 3) << 1);
+    $rorg = 'D5';
+  } else {
+    $dataTx = '0000000C';
+    $rorg = 'A5';
+  }
+  if ($ctrl eq 'start') {
+    RemoveInternalTimer($hash->{helper}{rlt}{param});
+    $hash->{helper}{rlt}{cntr} = 0;
+    $hash->{helper}{rlt}{param}[0] = 'periodic';
+    readingsSingleUpdate($hash, 'state', 'active', 1);
+    EnOcean_SndRadio(undef, $hash, 1, $rorg, $dataTx, $subDef, "00", $def);
+    InternalTimer(gettimeofday() + 0.15, "EnOcean_RLT", $hash->{helper}{rlt}{param}, 0); 
+    
+  } elsif ($ctrl eq 'parse') {
+    $hash->{helper}{rlt}{param}[0] = 'periodic';
+    if ($hash->{helper}{rlt}{cntr} < $rltCntrMax) {
+      # store received RLT data from slave
+      $hash->{helper}{rlt}{dataRx}[$hash->{helper}{rlt}{cntr}] = $dataRx;
+      $hash->{helper}{rlt}{rssiMaster}[$hash->{helper}{rlt}{cntr}] = $rssiMaster;
+      if ($hash->{helper}{rlt}{cntr} < $rltCntrMax - 1) {
+        RemoveInternalTimer($hash->{helper}{rlt}{param});
+        $hash->{helper}{rlt}{cntr} ++;
+        EnOcean_SndRadio(undef, $hash, 1, $rorg, $dataTx, $subDef, "00", $def);
+        InternalTimer(gettimeofday() + 0.15, "EnOcean_RLT", $hash->{helper}{rlt}{param}, 0);
+      }
+    } else {
+      RemoveInternalTimer($hash->{helper}{rlt}{param});
+      readingsSingleUpdate($hash, 'state', 'stoped', 1);
+      EnOcean_RLTResult(undef, $hash, $rltType, $rltCntrMax);
+      if (exists $hash->{helper}{rlt}{oldDev}) {
+        # activate old device subType
+        my $oldHash = $hash->{helper}{rlt}{oldDev}[0];
+        my $oldName = $hash->{helper}{rlt}{oldDev}[1];
+        my $oldDef = $hash->{helper}{rlt}{oldDev}[2];
+        CommandModify(undef, "$oldName $oldDef");
+        $modules{EnOcean}{defptr}{$oldDef} = $oldHash;
+      }    
+      delete $hash->{helper}{rlt};
+      # delete deviceID
+      CommandModify(undef, "$name 00000000");
+      delete $modules{EnOcean}{defptr}{$def};
+      
+    }
+    
+  } elsif ($ctrl eq 'periodic') {
+    RemoveInternalTimer($hash->{helper}{rlt}{param});
+    if ($hash->{helper}{rlt}{cntr} < $rltCntrMax - 1) {
+      # no RLT_SlaveTest telegram received from slave
+      $hash->{helper}{rlt}{param}[0] = 'periodic';
+      $hash->{helper}{rlt}{cntr} ++;
+      EnOcean_SndRadio(undef, $hash, 1, $rorg, $dataTx, $subDef, "00", $def);
+      InternalTimer(gettimeofday() + 0.11, "EnOcean_RLT", $hash->{helper}{rlt}{param}, 0);
+
+    } else {
+      # waiting for last RLT_SlaveTest telegram
+      $hash->{helper}{rlt}{param}[0] = 'waiting';
+      InternalTimer(gettimeofday() + 0.15, "EnOcean_RLT", $hash->{helper}{rlt}{param}, 0);
+
+    }
+  
+  } elsif ($ctrl eq 'waiting') {
+    readingsSingleUpdate($hash, 'state', 'stoped', 1);
+    EnOcean_RLTResult(undef, $hash, $rltType, $rltCntrMax);    
+    if (exists $hash->{helper}{rlt}{oldDev}) {
+      # activate old device subType
+      my $oldHash = $hash->{helper}{rlt}{oldDev}[0];
+      my $oldName = $hash->{helper}{rlt}{oldDev}[1];
+      my $oldDef = $hash->{helper}{rlt}{oldDev}[2];
+      CommandModify(undef, "$oldName $oldDef");
+      $modules{EnOcean}{defptr}{$oldDef} = $oldHash;
+    }    
+    delete $hash->{helper}{rlt};
+    # delete deviceID
+    CommandModify(undef, "$name 00000000");
+    delete $modules{EnOcean}{defptr}{$def};
+      
+  } elsif ($ctrl eq 'standby') {
+    RemoveInternalTimer($hash->{helper}{rlt}{param});
+    delete $hash->{helper}{rlt};
+    readingsSingleUpdate($hash, 'state', 'standby', 1);
+    # delete deviceID
+    CommandModify(undef, "$name 00000000");
+    delete $modules{EnOcean}{defptr}{$def};
+    
+  } elsif ($ctrl eq 'stop') {
+    RemoveInternalTimer($hash->{helper}{rlt}{param});
+    if (exists $hash->{helper}{rlt}{oldDev}) {
+      # activate old device subType
+      my $oldHash = $hash->{helper}{rlt}{oldDev}[0];
+      my $oldName = $hash->{helper}{rlt}{oldDev}[1];
+      my $oldDef = $hash->{helper}{rlt}{oldDev}[2];
+      CommandModify(undef, "$oldName $oldDef");
+      $modules{EnOcean}{defptr}{$oldDef} = $oldHash;
+    }    
+    delete $hash->{helper}{rlt};
+    readingsSingleUpdate($hash, 'state', 'stoped', 1);
+    # delete deviceID
+    CommandModify(undef, "$name 00000000");
+    delete $modules{EnOcean}{defptr}{$def};
+    
+  }  
+  return ($err, $logLevel, $response);
+}
+
+sub EnOcean_RLTResult($$$$) {
+  # show RLT results
+  my ($ctrl, $hash, $rltType, $rltCntrMax) = @_;
+  my $name = $hash->{NAME};
+  my ($err, $logLevel, $response, $data, $msgCntr, $msgID, $subTelNum, $rssiMaster, $rssiMasterAvg, $rssiSlave, $rssiLevel1, $rssiLevel2, $rssiNonEnOcean) =
+     (undef, 5, undef, undef, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  my %rssi = (0 => '-', 1 => '>= -31', 2 => '-32', 0x3F => '<= -93');
+  my %rssiNonEnOcean =
+       (0 => '-',
+        1 => '>= -31',
+        2 => '-32 ... -37',
+        3 => '-38 ... -43',
+        4 => '-44 ... -49',
+        5 => '-50 ... -55',
+        6 => '-56 ... -61',
+        7 => '-62 ... -67',
+        8 => '-68 ... -73',
+        9 => '-74 ... -79',              
+        10 => '-80 ... -85',
+        11 => '<= -92');
+              
+  for (my $cntr = 0; $cntr < $rltCntrMax; $cntr++) {
+    $data = $hash->{helper}{rlt}{dataRx}[$cntr];
+    if (defined $data) {
+      $msgCntr ++;
+      $rssiMaster = -$hash->{helper}{rlt}{rssiMaster}[$cntr];
+      $rssiMasterAvg += $rssiMaster;
+      if ($rltType eq '1BS') {
+        $msgID = (hex($data) & 0xF0) >> 6 | (hex($data) & 6) >> 1;      
+        Log3 $name, 2, "EnOcean RLT DeviceID: " . $hash->{DEF} . " msgCntr: ". ($cntr + 1) . " msgID: $msgID RSSI Master: $rssiMaster response received";
+      
+      } else {
+        $subTelNum = (hex(substr($data, 0, 2)) & 0xC0) >> 6;
+        $rssiLevel2 = hex(substr($data, 0, 2)) & 0x3F;
+        $rssiLevel2 = $rssi{$rssiLevel2} if (exists $rssi{$rssiLevel2});
+        $rssiLevel1 = hex(substr($data, 2, 2));
+        $rssiLevel1 = $rssi{$rssiLevel1} if (exists $rssi{$rssiLevel1});
+        $rssiSlave = hex(substr($data, 4, 2));
+        $rssiSlave = $rssi{$rssiSlave} if (exists $rssi{$rssiSlave});
+        $rssiNonEnOcean = (hex(substr($data, 6, 2)) & 0xF0) >> 4;
+        $rssiNonEnOcean = $rssiNonEnOcean{$rssiNonEnOcean} if (exists $rssiNonEnOcean{$rssiNonEnOcean});
+        $msgID = (hex(substr($data, 6, 2)) & 6) >> 1;
+        
+        Log3 $name, 2, "EnOcean RLT DeviceID: " . $hash->{DEF} . " msgCntr: ". ($cntr + 1) . " subTelNum: $subTelNum " .
+                       "RSSI Master: $rssiMaster RSSI Slave: $rssiSlave RSSI Level 1: $rssiLevel1 RSSI Level 2: $rssiLevel2 " .
+                       "RSSI non EnOcean: $rssiNonEnOcean";
+      
+      }    
+      
+    } else {
+      Log3 $name, 2, "EnOcean RLT DeviceID: " . $hash->{DEF} . " msgCntr: ". ($cntr + 1) . " no answer";
+      
+    }
+  }
+  if ($msgCntr > 0) {
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, 'msgLost', (sprintf "%0.1f", ($rltCntrMax - $msgCntr) / $rltCntrMax * 100));
+    readingsBulkUpdate($hash, 'rssiMasterAvg', (sprintf "%0.1f", $rssiMasterAvg / $msgCntr));
+    readingsEndUpdate($hash, 1);
+  } else {
+    CommandDeleteReading(undef, "$name msgLost");
+    CommandDeleteReading(undef, "$name rssiMasterAvg");  
+  }
+  return ($err, $logLevel, $response);
+}
+
 #
 sub EnOcean_energyManagement_01Parse($@)
 {
@@ -12379,7 +12715,7 @@ EnOcean_Delete($$)
   to block receiving telegrams with a TCM SenderIDs.
   <br><br>
 
-  <b>EnOcean Observing Functions</b><br>
+  <b>Observing Functions</b><br>
   <ul>
     Interference or overloading of the radio transmission can prevent the reception of Fhem
     commands at the receiver. With the help of the observing function Fhem checks the reception
@@ -12402,7 +12738,7 @@ EnOcean_Delete($$)
     <br><br>
   </ul>
 
-  <b>EnOcean Energy Management</b><br>
+  <b>Energy Management</b><br>
   <ul>
     <li><a href="#demand_response">Demand Response</a> (EEP A5-37-01)</li>
     Demand Response (DR) is a standard to allow utility companies to send requests for reduction in power
@@ -12457,7 +12793,31 @@ EnOcean_Delete($$)
   <br><br>
   </ul>
 
-  <b>EnOcean Security features</b><br>
+  <b>Radio Link Test</b><br>
+  <ul>
+    Units supporting the Radio Link Test (RLT) shall offer a functionality that allows for radio link testing between them
+    (Position A to Position B, point-to-point only). Fhem support at least 1BS and 4BS test messages. When two units
+    perform radio link testing one unit needs to act in a mode called RLT Master and the other unit needs to act in
+    a mode called RLT Slave. Fhem acts as RLT Master (subType radioLinkTest).<br>
+    The Radio Link Test device must be defined as follows<br>
+    <ul><br>
+      <code>define <name> EnOcean A5-3F-00</code><br>
+    </ul><br>
+    and has to by activated
+    <ul><br>
+      <code>set <name> standby</code><br>    
+    </ul><br>
+    Alternatively, the device can also be created automatically by autocreate. Only one RLT device may be defined in FHEM.<br>
+    After activation the RLT Master listens for RLT Query messages. On reception of at least one RLT Query messsage the
+    RLT Master responds and starts transmission of RLT MasterTest messages. After that the RLT Master awaits the response
+    from the RLT Slave.<br>
+    A radio link test communication consits of a minimum of 16 and a maximum of 256 RLT MasterTest messages. When the
+    radio link test communication is completed the RLT Master gets deactivated automatically. The test results can be
+    found in the log file.
+    <br><br>
+  </ul>
+
+  <b>Security features</b><br>
   <ul>
     The receiving and sending of encrypted messages is supported. This module currently allows the secure operating mode of PTM 215
     based switches.<br>
@@ -13624,7 +13984,27 @@ EnOcean_Delete($$)
     Generic Profiles.
     </li>
     <br><br>
-  </ul></ul>
+ 
+    <li>Radio Link Test<br>
+    <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is
+      <li>standby|stop<br>
+        set RLT Master state
+      </li>
+      </ul><br>
+        The Radio Link Test device is configured using the following attributes:<br>
+      <ul>
+        <li><a href="#EnOcean_rltRepeat">rltRepeat</a></li>
+        <li><a href="#EnOcean_rltType">rltType</a></li>
+      </ul>
+      The attr subType must be readioLinkTest. This is done if the device was
+      created by autocreate or manually by <code>define <name> EnOcean 00000000 A5-3F-00</code><br>.
+    </li>
+    <br><br>
+ 
+ </ul></ul>
 
   <a name="EnOceanget"></a>
   <b>Get</b>
@@ -14040,6 +14420,14 @@ EnOcean_Delete($$)
     </li>
     <li><a name="EnOcean_rlcTX">rlcTX</a> false|true<br>
       Rolling Code is expected in the received telegram
+    </li>
+    <li><a name="EnOcean_rltRepeat">rltRepeat</a> 16|32|64|128|256,
+      [rltRepeat] = 16 is default.<br>
+      Number of RLT MasterTest messages sent
+    </li>
+    <li><a name="EnOcean_rltType">rltType</a> 1BS|4BS,
+      [rltType] = 4BS is default.<br>
+      Type of RLT MasterTest message
     </li>
     <li><a name="scaleDecimals">scaleDecimals</a> 0 ... 9<br>
       Decimal rounding with x digits of the scaled reading setpoint
@@ -15726,6 +16114,18 @@ EnOcean_Delete($$)
     Set attr subType to PM101 manually. Automatic teach-in is not possible,
     since no EEP and manufacturer ID are sent.
     </li>
+
+    <li>Radio Link Test<br>
+    <ul>
+      <li>standby|active|stoped</li>
+      <li>msgLost: msgLost/%</li>
+      <li>rssiMasterAvg: LP/dBm</li>
+      <li>state: standby|active|stoped<br></li>
+    </ul><br>
+      The attr subType must be readioLinkTest. This is done if the device was
+      created by autocreate or manually by <code>define <name> EnOcean 00000000 A5-3F-00</code><br>.
+    </li>
+
   </ul>
 </ul>
 
