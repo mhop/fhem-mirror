@@ -446,7 +446,7 @@ YAMAHA_AVR_Set($@)
             if(AttrVal($name, "volume-smooth-change", "0") eq "1")
             {
                 my $steps = AttrVal($name, "volume-smooth-steps", 5);
-                my $diff = int($target_volume - ReadingsVal($name, "volumeStraight", $target_volume) / $steps / 0.5) * 0.5;
+                my $diff = int(($target_volume - ReadingsVal($name, "volumeStraight", $target_volume)) / $steps / 0.5) * 0.5;
                 my $current_volume = ReadingsVal($name, "volumeStraight", undef); 
 
                 if($diff > 0)
