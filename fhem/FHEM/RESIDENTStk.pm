@@ -22,13 +22,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.0.2
-#
-# Version History:
-# - 1.0.0 - 2015-03-11
-# -- First release
-#
 ##############################################################################
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -91,6 +84,16 @@ sub RESIDENTStk_wakeupSet($$) {
     my $macroNameGotosleep    = "Macro_" . $wakeupUserdevice . "_gotosleep";
     my $macroNameAsleep       = "Macro_" . $wakeupUserdevice . "_asleep";
     my $macroNameAwoken       = "Macro_" . $wakeupUserdevice . "_awoken";
+
+    my $wakeupUserdeviceRealname = "Bewohner";
+
+    if (defined($defs{$wakeupUserdevice})) {
+      if ($defs{$wakeupUserdevice}{TYPE} eq "ROOMMATE") {
+        $wakeupUserdeviceRealname = AttrVal( AttrVal($NAME,"wakeupUserdevice",""), AttrVal( AttrVal($NAME,"wakeupUserdevice",""), "rr_realname", "group" ), $wakeupUserdeviceRealname );
+      } elsif ($defs{$wakeupUserdevice}{TYPE} eq "GUEST") {
+        $wakeupUserdeviceRealname = AttrVal( AttrVal($NAME,"wakeupUserdevice",""), AttrVal( AttrVal($NAME,"wakeupUserdevice",""), "rg_realname", "group" ), $wakeupUserdeviceRealname );
+      }
+    }
 
     # check for required userattr attribute
     my $userattributes =
@@ -168,7 +171,7 @@ if (\$EVTPART0 eq \"start\") {\
 \	
 #	fhem \"define atTmp_1_\$NAME at +00:10:00 set BR_Shutter:FILTER=pct<20 pct 20\";;\
 #	fhem \"define atTmp_2_\$NAME at +00:20:00 set BR_Shutter:FILTER=pct<40 pct 40\";;\
-#	fhem \"define atTmp_4_\$NAME at +00:30:00 set Sonos_Bedroom Speak 33 de |Hint| Es ist \".\$EVTPART1.\" Uhr, Zeit zum aufstehen!;;;; set BR_FloorLamp:FILTER=pct<100 pct 100 60;;;; sleep 10;;;; set BR_Shutter:FILTER=pct<60 pct 60;;;; set Sonos_Bedroom:FILTER=Volume<10 Volume 10 10\";;\
+#	fhem \"define atTmp_4_\$NAME at +00:30:00 msg audio \@Sonos_Bedroom |Hint| Es ist \".\$EVTPART1.\" Uhr, Zeit zum aufstehen!;;;; set BR_FloorLamp:FILTER=pct<100 pct 100 60;;;; sleep 10;;;; set BR_Shutter:FILTER=pct<60 pct 60;;;; set Sonos_Bedroom:FILTER=Volume<10 Volume 10 10\";;\
 \
 	# if wake-up should be enforced\
 	if (\$EVTPART3) {\
@@ -360,12 +363,14 @@ if (\$EVTPART0 eq \"stop\") {\
 ## via SONOS at Bedroom and stop playback elsewhere\
 ##\
 \
-#my \$nextWakeup = ReadingsVal(\"rr_Bewohner\",\"nextWakeup\",0);;
-#my \$text = \"|Hint| Bewohner, es ist kein Wecker gestellt. Du könntest verschlafen! Trotzdem eine gute Nacht.\";;
+#my \$nextWakeup = ReadingsVal(\"$wakeupUserdevice\",\"nextWakeup\",\"none\");;
+#my \$text = \"|Hint| $wakeupUserdeviceRealname, es ist kein Wecker gestellt. Du könntest verschlafen! Trotzdem eine gute Nacht.\";;
 #if (\$nextWakeup ne \"OFF\") {
-#	\$text = \"|Hint| Bewohner, dein Wecker ist auf \$nextWakeup Uhr gestellt. Gute Nacht und schlaf gut.\";;
+#	\$text = \"|Hint| $wakeupUserdeviceRealname, dein Wecker ist auf \$nextWakeup Uhr gestellt. Gute Nacht und schlaf gut.\";;
 #}
-#fhem \"set Sonos_Bedroom RemoveMember Sonos_Bedroom;; sleep 0.5;; set Sonos_Bedroom Speak 28 de \$text\";;\
+#if (\$nextWakeup ne \"none\") {
+#	fhem \"set Sonos_Bedroom RemoveMember Sonos_Bedroom;; sleep 0.5;; msg audio \@Sonos_Bedroom \$text\";;\
+#}
 \
 }";
 
@@ -424,7 +429,7 @@ if (\$EVTPART0 eq \"stop\") {\
 ##\
 \
 ## Play morning announcement via SONOS at Bedroom\
-#fhem \"set Sonos_Bedroom Stop;; set Sonos_Bedroom Speak 40 de |Hint| Guten Morgen, Bewohner.\";;\
+#fhem \"set Sonos_Bedroom Stop;; msg audio \@Sonos_Bedroom |Hint| Guten Morgen, $wakeupUserdeviceRealname<.\";;\
 \
 ## In 10 seconds, start webradio playback in Bedroom\
 #fhem \"sleep 10;; set Sonos_Bedroom StartRadio /Charivari/;; sleep 2;; set Sonos_Bedroom Volume 15\";;\
@@ -630,7 +635,7 @@ if (\$EVTPART0 eq \"stop\") {\
 ## In 90 minutes, switch House Mode to 'day' and\
 ## play voice announcement via SONOS\
 #if (!defined($defs{\"atTmp_HouseMode_day\"})) {\
-#	fhem \"define atTmp_HouseMode_day at +01:30:00 {if (ReadingsVal(\\\"HouseMode\\\", \\\"state\\\", 0) ne \\\"day\\\") {fhem \\\"set Sonos_Kitchen Speak 40 de |Notification| Tagesmodus wird etabliert.;;;; sleep 10;;;; set HouseMode day\\\"}}\";;\
+#	fhem \"define atTmp_HouseMode_day at +01:30:00 {if (ReadingsVal(\\\"HouseMode\\\", \\\"state\\\", 0) ne \\\"day\\\") {fhem \\\"msg audio \@Sonos_Kitchen Tagesmodus wird etabliert.;;;; sleep 10;;;; set HouseMode day\\\"}}\";;\
 #}\
 \
 }";
