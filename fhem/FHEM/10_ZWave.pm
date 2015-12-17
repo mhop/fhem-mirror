@@ -918,8 +918,8 @@ ZWave_meterParse($$)
       };
       return "$meter_type_text: $mv $unit_text previous: $pmv delta_time: ".
                 "$delta_time"; # V2 report
-    };
-  };
+    }
+  }
 }
 
 
@@ -2985,8 +2985,8 @@ ZWave_Parse($$@)
     foreach my $k (keys %{$ptr}) {
       if($arg =~ m/^$k/) {
         my $val = $ptr->{$k};
-        $val = eval $val if(index($val, '$') >= 0);
-        push @event, $val if(defined($val));
+        my @val = eval $val if(index($val, '$') >= 0);
+        push @event, @val if(defined($val[0]));
         $matched++;
       }
     }
