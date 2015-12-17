@@ -128,6 +128,7 @@ sub HMCCU_SetVariable ($$$);
 sub HMCCU_GetChannel ($$);
 sub HMCCU_RPCGetConfig ($$$);
 sub HMCCU_RPCSetConfig ($$$);
+sub HMCCU_State ($);
 
 
 #####################################
@@ -1007,7 +1008,7 @@ sub HMCCU_CheckProcess ($)
 {
 	my ($hash) = @_;
 
-	my $pdump = `ps -ef | grep ccurpcd | grep -v grep`;
+	my $pdump = `ps -ef | grep ccurpcd\.pl | grep -v grep`;
 	my @plist = split "\n", $pdump;
 
 	foreach my $proc (@plist) {
@@ -1835,6 +1836,33 @@ sub HMCCU_RPCSetConfig ($$$)
 	}
 
 	return 0;
+}
+
+####################################################
+# Return string for internal STATE. This function
+# can be used in attribute stateFormat.
+####################################################
+
+sub HMCCU_State ($)
+{
+	my ($name) = @_;
+
+	my $hash = $defs{$name};
+	my $sf = AttrVal ($name, 'ccustate', '');
+
+	return ReadingsVal ($name, 'state', '') if ($sf eq '');
+
+	my $st = $sf;
+	my $r = $hash->{READINGS};
+
+	if ($r->{state}{VAL} ne "Error") {
+		$st =~ s/\b([A-Za-z\d_\.\:-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
+	}
+	else {
+		$st = "Error";
+	}
+
+	return $st;
 }
 
 
