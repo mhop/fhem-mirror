@@ -48,7 +48,7 @@ my $eventcount = 0;
 
 sub CheckProcess
 {
-	my $pdump = `ps -ef | grep ccurpcd | grep -v grep`;
+	my $pdump = `ps -ef | grep ccurpcd\.pl | grep -v grep`;
 	my @plist = split "\n", $pdump;
 	foreach my $proc (@plist) {
 		my @procattr = split /\s+/, $proc;
