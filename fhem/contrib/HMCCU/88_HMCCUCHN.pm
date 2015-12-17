@@ -58,7 +58,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 statedatapoint statevals substitute stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccustate statedatapoint statevals substitute stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
