@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_dimmer.pm 0.55 2015-07-27 Risiko $
+# $Id: 30_pilight_dimmer.pm 0.56 2015-12-17 Risiko $
 #
 # Usage
 # 
@@ -15,6 +15,7 @@
 # V 0.53 2015-05-30 - FIX: set dimlevel 0
 # V 0.54 2015-05-30 - FIX: StateFn
 # V 0.55 2015-07-27 - NEW: SetExtensions on-for-timer
+# V 0.56 2015-12-17 - NEW: Attribut IODev to switch IO-Device
 ############################################## 
 
 package main;
@@ -36,7 +37,7 @@ sub pilight_dimmer_Initialize($)
   $hash->{ParseFn}  = "pilight_dimmer_Parse";
   $hash->{SetFn}    = "pilight_dimmer_Set";
   $hash->{StateFn}  = "pilight_dimmer_State";
-  $hash->{AttrList} = "dimlevel_max dimlevel_step dimlevel_max_device dimlevel_on dimlevel_off ".$readingFnAttributes;
+  $hash->{AttrList} = "dimlevel_max dimlevel_step dimlevel_max_device dimlevel_on dimlevel_off IODev ".$readingFnAttributes;
 }
 
 #####################################

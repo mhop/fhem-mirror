@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_temp.pm 0.17 2015-11-29 Risiko $
+# $Id: 30_pilight_temp.pm 0.18 2015-12-17 Risiko $
 #
 # Usage
 # 
@@ -15,7 +15,8 @@
 # V 0.14 2015-05-30 - FIX:  StateFn 
 # V 0.15 2015-08-30 - NEW:  support pressure, windavg, winddir, windgust
 # V 0.16 2015-09-06 - FIX:  pressure, windavg, winddir, windgust from weather stations without temperature 
-# V 0.17 2015-11-29 - NEW:  offsetTemp and offsetHumidity to correct temperature and humidity 
+# V 0.17 2015-11-29 - NEW:  offsetTemp and offsetHumidity to correct temperature and humidity
+# V 0.18 2015-12-17 - NEW:  Attribut IODev to switch IO-Device 
 ############################################## 
 
 package main;
@@ -37,7 +38,7 @@ sub pilight_temp_Initialize($)
   $hash->{Match}    = "^PITEMP";
   $hash->{ParseFn}  = "pilight_temp_Parse";
   $hash->{StateFn}  = "pilight_temp_State";
-  $hash->{AttrList} = "corrTemp corrHumidity offsetTemp offsetHumidity ".$readingFnAttributes;
+  $hash->{AttrList} = "corrTemp corrHumidity offsetTemp offsetHumidity IODev ".$readingFnAttributes;
 }
 
 #####################################
@@ -85,7 +86,7 @@ sub pilight_temp_Parse($$)
   my ($mhash, $rmsg, $rawdata) = @_;
   my $backend = $mhash->{NAME};
 
-  Log3 $backend, 4, "pilight_temp_Parse: RCV -> $rmsg";
+  Log3 $backend, 4, "pilight_temp_Parse ($backend): RCV -> $rmsg";
   
   my ($dev,$protocol,$id,@args) = split(",",$rmsg);
   return () if($dev ne "PITEMP");

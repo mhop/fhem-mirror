@@ -838,11 +838,16 @@ sub pilight_ctrl_Parse($$)
   }
     
   switch($protoID){
-    case 1 { return Dispatch($hash, "PISWITCH,$proto,$id,$unit,$state",undef ); }
+    case 1 {
+      my $msg = "PISWITCH,$proto,$id,$unit,$state";
+      Log3 $me, 4, "$me(Dispatch): $msg";
+      return Dispatch($hash, $msg,undef );
+      }
     case 2 {
       my $dimlevel = (defined($data->{$s}{dimlevel})) ? $data->{$s}{dimlevel} : "";
       my $msg = "PIDIMMER,$proto,$id,$unit,$state";
       $msg.= ",$dimlevel" if ($dimlevel ne "");
+      Log3 $me, 4, "$me(Dispatch): $msg";
       return Dispatch($hash, $msg ,undef);
     }
     case 3 {return;}
@@ -857,6 +862,7 @@ sub pilight_ctrl_Parse($$)
         $piTempData .= ",windgust:$data->{$s}{windgust}"        if (defined($data->{$s}{windgust}));
         
         my $msg = "PITEMP,$proto,$id$piTempData";
+        Log3 $me, 4, "$me(Dispatch): $msg";
         return Dispatch($hash, $msg,undef);
     }
     case 5 { return Dispatch($hash, "PISCREEN,$proto,$id,$unit,$state",undef); }
