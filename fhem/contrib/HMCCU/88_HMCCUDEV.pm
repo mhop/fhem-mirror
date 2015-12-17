@@ -61,7 +61,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address ccureadings:0,1 statevals substitute statechannel statedatapoint stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address ccureadings:0,1 ccustate statevals substitute statechannel statedatapoint stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
