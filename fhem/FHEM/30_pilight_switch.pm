@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_switch.pm 0.14 2015-07-27 Risiko $
+# $Id: 30_pilight_switch.pm 0.15 2015-12-17 Risiko $
 #
 # Usage
 # 
@@ -12,6 +12,7 @@
 # V 0.12 2015-05-18 - FIX:  add version information
 # V 0.13 2015-05-30 - FIX:  StateFn, noArg
 # V 0.14 2015-07-27 - NEW:  SetExtensions on-for-timer
+# V 0.15 2015-12-17 - NEW:  Attribut IODev to switch IO-Device
 ############################################## 
 
 package main;
@@ -38,7 +39,7 @@ sub pilight_switch_Initialize($)
   $hash->{ParseFn}  = "pilight_switch_Parse";
   $hash->{SetFn}    = "pilight_switch_Set";
   $hash->{StateFn}  = "pilight_switch_State";
-  $hash->{AttrList} = $readingFnAttributes;
+  $hash->{AttrList} = "IODev ".$readingFnAttributes;
 }
 
 #####################################

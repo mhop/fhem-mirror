@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 30_pilight_raw.pm 0.11 2015-07-27 Risiko $
+# $Id: 30_pilight_raw.pm 0.12 2015-12-17 Risiko $
 #
 # Usage
 # 
@@ -9,6 +9,7 @@
 #
 # V 0.10 2015-07-21 - initial beta version
 # V 0.11 2015-07-27 - SetExtensions on-for-timer
+# V 0.12 2015-12-17 - NEW:  Attribut IODev to switch IO-Device 
 ############################################## 
 
 package main;
@@ -31,7 +32,7 @@ sub pilight_raw_Initialize($)
   $hash->{DefFn}    = "pilight_raw_Define";
   $hash->{Match}    = "^PIRAW";
   $hash->{SetFn}    = "pilight_raw_Set";
-  $hash->{AttrList} = "onCode:textField-long offCode:textField-long ".$readingFnAttributes;
+  $hash->{AttrList} = "onCode:textField-long offCode:textField-long IODev ".$readingFnAttributes;
 }
 
 #####################################
