@@ -38,7 +38,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 sub HP1000_Define($$);
 sub HP1000_Undefine($$);
-
+  
 #########################
 sub HP1000_addExtension($$$) {
     my ( $name, $func, $link ) = @_;
@@ -272,7 +272,7 @@ sub HP1000_CGI() {
     <div style="margin-left: 2em">
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
       <div style="margin-left: 2em">
-        <code>define &lt;WeatherStation&gt; HP1000 [<ID> <PASSWORD>]</code><br>
+        <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
           Provides webhook receiver for weather station HP1000 and WH2600 of Fine Offset Electronics.<br>
           There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
@@ -306,7 +306,7 @@ sub HP1000_CGI() {
     <div style="margin-left: 2em">
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
       <div style="margin-left: 2em">
-        <code>define &lt;WeatherStation&gt; HP1000 [<ID> <PASSWORD>]</code><br>
+        <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
           Stellt einen Webhook f&uuml;r die HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit.<br>
           Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
