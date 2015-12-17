@@ -2289,7 +2289,7 @@ sub getListForecastStations($) {
 	</ul>
 	<br/><br/>
 
-	<b>Generated Readings/Events:</b>
+	<b>Generated Readings:</b>
 	<br/><br/>
 	<ul>
 		<li><b>_&lt;readingName&gt;</b> - debug informations</li>
@@ -2319,6 +2319,16 @@ sub getListForecastStations($) {
 		</li>
 		<li><b>g_&lt;readingName&gt;</b> - weather data from GET weather conditions. 
 		    Readings will NOT be updated automatically</li>
+	</ul>
+	<br/><br/>
+	<b>Other events:</b>
+	<br/><br/>
+	<ul>
+		<li><b>REREAD</b> - start of rereadcfg</li>
+		<li><b>REREADFILE</b> - end of file read</li>
+		<li><b>REREADCONDITIONS</b> - end of condition read and analyzing</li>
+		<li><b>REREADALERTS</b> - end of alerts read and analyzing</li>
+		<li><b>REREADFORECAST</b> - end of forecast read and analyzing</li>
 	</ul>
 	<br/><br/>
 
