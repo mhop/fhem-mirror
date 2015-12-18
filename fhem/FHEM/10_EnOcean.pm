@@ -1,9 +1,9 @@
 
 ##############################################
 # $Id$
-# 2015-12-16
+# 2015-12-17
 
-# Added new EEP: A5-20-04 (hvac.04), A5-3F-00 (radioLinkTest)
+# Added new EEP: A5-20-04 (hvac.04)
 # EnOcean_Notify():
 # EnOcean_Attr():
 # Remote Management (incomplete, experimental)
@@ -12801,7 +12801,7 @@ EnOcean_Delete($$)
     a mode called RLT Slave. Fhem acts as RLT Master (subType radioLinkTest).<br>
     The Radio Link Test device must be defined as follows<br>
     <ul><br>
-      <code>define <name> EnOcean A5-3F-00</code><br>
+      <code>define &lt;name&gt; EnOcean A5-3F-00</code><br>
     </ul><br>
     and has to by activated
     <ul><br>
@@ -14000,7 +14000,7 @@ EnOcean_Delete($$)
         <li><a href="#EnOcean_rltType">rltType</a></li>
       </ul>
       The attr subType must be readioLinkTest. This is done if the device was
-      created by autocreate or manually by <code>define <name> EnOcean 00000000 A5-3F-00</code><br>.
+      created by autocreate or manually by <code>define &lt;name&gt; EnOcean A5-3F-00</code><br>.
     </li>
     <br><br>
  
@@ -16114,6 +16114,7 @@ EnOcean_Delete($$)
     Set attr subType to PM101 manually. Automatic teach-in is not possible,
     since no EEP and manufacturer ID are sent.
     </li>
+    <br><br>
 
     <li>Radio Link Test<br>
     <ul>
@@ -16123,7 +16124,7 @@ EnOcean_Delete($$)
       <li>state: standby|active|stoped<br></li>
     </ul><br>
       The attr subType must be readioLinkTest. This is done if the device was
-      created by autocreate or manually by <code>define <name> EnOcean 00000000 A5-3F-00</code><br>.
+      created by autocreate or manually by <code>define &lt;name&gt; EnOcean A5-3F-00</code><br>.
     </li>
 
   </ul>
