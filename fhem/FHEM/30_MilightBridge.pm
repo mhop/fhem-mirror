@@ -296,7 +296,7 @@ sub MilightBridge_CmdQueue_Send(@)
   
   # Check if we are called again before send interval has elapsed
   my $now = gettimeofday();
-  if (($hash->{cmdLastSent} + ($hash->{INTERVAL} / 1000)) < $now)
+  if ((($hash->{cmdLastSent} + ($hash->{INTERVAL} / 1000)) < $now) && $init_done)
   {
     # Lock cmdQueue
     $hash->{cmdQueueLock} = 1;
@@ -318,7 +318,14 @@ sub MilightBridge_CmdQueue_Send(@)
       # Check bridge is not disabled, and send command
       if (!IsDisabled($hash->{NAME}))
       {
-        my $portaddr = sockaddr_in($hash->{PORT}, inet_aton($hash->{HOST}));
+        my $hostip = inet_aton($hash->{HOST});
+        if (!defined($hostip) || $hostip eq '')
+        {
+          Log3 ($hash, 3, "$hash->{NAME}: Could not resolve hostname " . $hash->{HOST});
+          return undef;
+        }
+        # sockaddr_in crashes if ip address is undef
+        my $portaddr = sockaddr_in($hash->{PORT}, $hostip);
         if (!send($hash->{SOCKET}, $command, 0, $portaddr))
         {
           # Send failed
@@ -333,6 +340,11 @@ sub MilightBridge_CmdQueue_Send(@)
         }
       }
     }
+  }
+  elsif (!$init_done)
+  {
+    # fhem not initialized, wait for init
+    Log3 ($hash, 3, "$hash->{NAME}_cmdQueue_Send: init not done, delay sending from queue");
   }
   else
   {
