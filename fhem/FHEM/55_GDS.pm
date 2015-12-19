@@ -959,7 +959,7 @@ sub getConditions($$@){
 sub _readItem {
 	my ($line, $pos, $align, $item)  = @_;
 	my $x;
-	
+	Debug $line unless $align;
 	if ($align eq "l") {
 		$x = substr($line, $pos);
 		$x =~ s/  .+$//g;	# after two spaces => next field
