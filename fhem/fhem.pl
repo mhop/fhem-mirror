@@ -1092,6 +1092,11 @@ devspec2array($;$)
       }
       ($n,$op,$re) = ($1,"eval","") if($dName =~ m/^{(.*)}$/);
 
+      my $fType="";
+      if($n =~ m/^(.:)(.*$)/) {
+        $fType = $1;
+        $n = $2;
+      }
       @res=();
       foreach my $d (@names) {
         next if($attr{$d} && $attr{$d}{ignore});
@@ -1107,12 +1112,13 @@ devspec2array($;$)
           Log 1, "Error: $d has no TYPE";
           next;
         }
-        my $val = $hash->{$n};
-        if(!defined($val)) {
+        my $val;
+        $val = $hash->{$n} if(!$fType || $fType eq "i:");
+        if(!defined($val) && (!$fType || $fType eq "r:")) {
           my $r = $hash->{READINGS};
           $val = $r->{$n}{VAL} if($r && $r->{$n});
         }
-        if(!defined($val)) {
+        if(!defined($val) && (!$fType || $fType eq "a:")) {
           $val = $attr{$d}{$n} if($attr{$d});
         }
         $val="" if(!defined($val));
