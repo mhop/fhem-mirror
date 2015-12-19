@@ -308,9 +308,11 @@ A line ending with \ will be concatenated with the next one, so long lines
   <li>a single device name. This is the most common case.</li>
   <li>a list of devices, separated by comma (,)</li>
   <li>a regular expression</li>
-  <li>a NAME=VALUE pair, where NAME can be an Internal value like TYPE, a
+  <li>a NAME=VALUE pair, where NAME can be an internal value like TYPE, a
         Reading-Name or an attribute. VALUE is a regexp. To negate the
-        comparison, use NAME!=VALUE</li>
+        comparison, use NAME!=VALUE. To restrict the search, use i: as prefix
+        for internal values, r: for readings and a: for attributes. See the
+        example below.</li>
   <li>if the spec is followed by the expression :FILTER=NAME=VALUE, then the
       values found in the first round are filtered by the second expression.
   </ul>
@@ -324,6 +326,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>set room=kitchen:FILTER=STATE!=off off</code><br>
     <code>list disabled=</code><br>
     <code>list TYPE=FS20 STATE</code><br>
+    <code>list i:TYPE=FS20 STATE</code><br>
   </ul>
   Notes:
   <ul>

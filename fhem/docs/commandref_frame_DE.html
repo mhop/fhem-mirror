@@ -319,7 +319,10 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <li>ein regul&auml;rer Ausdruck</li>
   <li>ein NAME=WERT Ausdruck, wo NAME ein "Internal" Wert wie TYPE ist, ein
       Reading-Name oder ein Attribut. WERT ist ein regul&auml;rer Ausdruck.
-      Um die Bedingung zu negieren, sollte NAME!=WERT verwendet werden.
+      Um die Bedingung zu negieren, muss NAME!=WERT verwendet werden.
+      Um die Suche einzugrenzen, kann man als Praefix i: f&uuml;r internal
+      Werte, r: f&uuml;r Reading-Namen und a: f&uuml;r Attribute verwenden,
+      siehe das Beispiel unten.
       </li>
   <li>Falls die Spezifikation von :FILTER=NAME=WERT gefolgt wird,
       dann wird die zuvor gefundene Liste durch diesen neuen Ausdruck
@@ -335,6 +338,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <code>set room=kitchen:FILTER=STATE!=off off</code><br>
     <code>list disabled=</code><br>
     <code>list TYPE=FS20 STATE</code><br>
+    <code>list i:TYPE=FS20 STATE</code><br>
   </ul>
   Bemerkungen:
   <ul>
