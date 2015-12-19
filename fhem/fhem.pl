@@ -2548,6 +2548,10 @@ CommandSetstate($$)
         next;
       }
 
+      Log3 $d, 3, "WARNING: unsupported character in reading $sname ".
+             "(not A-Za-z\\d_\\.-), notify the $d->{TYPE} module maintainer."
+        if($sname !~ m/^[A-Za-z\d_\.-]+$/);
+
       if(!defined($d->{READINGS}{$sname}) ||
          !defined($d->{READINGS}{$sname}{TIME}) ||
          $d->{READINGS}{$sname}{TIME} lt $tim) {
@@ -3796,6 +3800,12 @@ readingsBeginUpdate($)
   my ($hash)= @_;
   my $name = $hash->{NAME};
   
+  if(!$name) {
+    Log 1, "ERROR: empty name in readingsBeginUpdate";
+    stacktrace();
+    return;
+  }
+
   # get timestamp
   my $now = gettimeofday();
   my $fmtDateTime = FmtDateTime($now);
