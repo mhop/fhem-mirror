@@ -2985,7 +2985,8 @@ ZWave_Parse($$@)
     foreach my $k (keys %{$ptr}) {
       if($arg =~ m/^$k/) {
         my $val = $ptr->{$k};
-        my @val = eval $val if(index($val, '$') >= 0);
+        my @val = ($val);
+        @val = eval $val if(index($val, '$') >= 0);
         push @event, @val if(defined($val[0]));
         $matched++;
       }
