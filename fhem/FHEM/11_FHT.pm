@@ -185,6 +185,7 @@ FHT_Initialize($)
   $hash->{DefFn}     = "FHT_Define";
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
+  $hash->{StateFn}   = "FHT_State";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 model:fht80b dummy:1,0 " .
                        "showtime:1,0 retrycount " .
                        "minfhtbuffer lazy tmpcorr ignore:1,0 ".
@@ -566,7 +567,7 @@ FHT_Parse($$)
     Log3 $name, 4, "FHT $name windowsensor: $valSensor";
   }
 
-  $cmd = "FHZ:$cmd" if(substr($msg,24,1) eq "7");
+  $cmd = "FHZ_$cmd" if(substr($msg,24,1) eq "7");
 
   readingsBulkUpdate($def, $cmd, $val);
   if($cmd eq "measured-temp") {
@@ -702,6 +703,21 @@ getFhtBuffer($)
     return hex($1) if($msg && $msg =~ m/=> ([0-9A-F]+)$/i);
     return 0 if($count++ >= 5);
   }
+}
+
+#####################################
+# Remap the old FHZ: readingnames to FHZ_
+sub
+FHT_State($$$$)
+{
+  my ($hash, $tim, $rname, $rval) = @_;
+
+  return undef if($rname !~ m/^FHZ:/);
+
+  my $newname = $rname;
+  $newname =~ s/:/_/g;
+  setReadingsVal($hash, $newname, $rval, $tim);
+  return "FHT: renamed reading $rname to $newname for $hash->{NAME}";
 }
 
 1;
