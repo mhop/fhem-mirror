@@ -85,7 +85,10 @@ sub MilightDevice_Initialize($)
   $hash->{GetFn} = "MilightDevice_Get";
   $hash->{AttrFn} = "MilightDevice_Attr";
   $hash->{NotifyFn} = "MilightDevice_Notify";
-  $hash->{AttrList} = "IODev dimStep defaultBrightness defaultRampOn defaultRampOff presets dimOffWhite:1,0 updateGroupDevices:1,0 colorCast gamma lightSceneParamsToSave ".$readingFnAttributes;
+  $hash->{AttrList} = "IODev dimStep defaultBrightness defaultRampOn " .
+                      "defaultRampOff presets dimOffWhite:1,0 updateGroupDevices:1,0 " .
+                      "restoreAtStart:1,0 colorCast gamma lightSceneParamsToSave " . 
+                      $readingFnAttributes;
   FHEM_colorpickerInit();
     
 }
@@ -204,6 +207,13 @@ sub MilightDevice_Define($$)
 
   # IODev
   $attr{$name}{IODev} = $hash->{IODev} if (!defined($attr{$name}{IODev}));
+
+  # restoreAtStart
+  if($slot eq 'A') {
+    $attr{$name}{"restoreAtStart"} = 0 if (!defined($attr{$name}{"restoreAtStart"}));
+  } else {
+    $attr{$name}{"restoreAtStart"} = 1 if (!defined($attr{$name}{"restoreAtStart"}));
+  }
   
   return undef;
 }
@@ -725,23 +735,7 @@ sub MilightDevice_Attr(@)
 sub MilightDevice_Notify(@)
 {
   my ($hash,$dev) = @_;
-  #my $events = deviceEvents($dev, 1);
-  #my ($hue, $sat, $val);
-  
   return MilightDevice_Restore($hash);
-  
-  #return if($dev->{NAME} ne "global");
-  #Log3 ($hash, 5, "$hash->{NAME}_Notify: Triggered by $dev->{NAME}");
-  #return if(!grep(m/^INITIALIZED|REREADCFG|DEFINED$/, @{$dev->{CHANGED}}));
-
-  # Restore previous state (as defined in statefile)
-  # wait for global: INITIALIZED after start up
-  #if (@{$events}[0] eq 'INITIALIZED')
-  #{
-  #  MilightDevice_Restore($hash);
-  #}
-  
-  return undef;
 }
 
 #####################################
@@ -754,6 +748,7 @@ sub MilightDevice_Restore(@)
   return if ($hash->{INIT});
   if ($init_done)
   {
+    return if (AttrVal($hash->{NAME}, "restoreAtStart", 0) == 0);
     Log3 ($hash, 4, "$hash->{NAME}_Restore: Restoring saved HSV values");
     $hash->{INIT} = 1;
     # Initialize device
@@ -2355,6 +2350,10 @@ sub MilightDevice_roundfunc($) {
     <li>
       <b>updateGroupDevices</b><br/>
          Update the state of single devices switched with slot 'A'.
+    </li>
+    <li>
+      <b>restoreAtStart</b><br/>
+         Restore the state of devices at startup. Default 0 for slot 'A', 1 otherwise.
     </li>
     <li>
       <b>defaultBrightness</b><br/>
