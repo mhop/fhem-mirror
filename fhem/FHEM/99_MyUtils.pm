@@ -18,17 +18,17 @@ use constant {
 
 
 my @rolls = (
-    { roll => "wohn.rollTerrR", dir=>"W", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"wohn.fenTerr", state=>STATE_IDLE, },
-    { roll => "wohn.rollTerrL", dir=>"W", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
-    { roll => "wohn.rollSofa",  dir=>"S", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
-    { roll => "ess.roll",       dir=>"S", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
-    { roll => "kuch.rollBar",   dir=>"S", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
-    { roll => "kuch.rollStr",   dir=>"O", typ=>"n", temp=>"wohn.fht",   tempS=>21, win=>"",             state=>STATE_IDLE, },
-    { roll => "arb.rollTerr",   dir=>"W", typ=>"n", temp=>"studio.fht", tempS=>21, win=>"wohn.fenTerr", state=>STATE_IDLE, },
-    { roll => "arb.rollWeg",    dir=>"S", typ=>"n", temp=>"studio.fht", tempS=>21, win=>"",             state=>STATE_IDLE, },
-    { roll => "bad.roll",       dir=>"S", typ=>"n", temp=>"bad.fht",    tempS=>23, win=>"",             state=>STATE_IDLE, },
-    { roll => "schlaf.rollWeg", dir=>"S", typ=>"s", temp=>"schlaf.fht", tempS=>18, win=>"",             state=>STATE_IDLE, },
-    { roll => "schlaf.rollStr", dir=>"O", typ=>"s", temp=>"schlaf.fht", tempS=>18, win=>"wohn.fenTerr", state=>STATE_IDLE, },
+    { roll => "wohn.rollTerrR", dir=>"W", typ=>"n", temp=>"tempWohn",   tempS=>21, win=>"wohn.fenTerr", state=>STATE_IDLE, },
+    { roll => "wohn.rollTerrL", dir=>"W", typ=>"n", temp=>"tempWohn",   tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "wohn.rollSofa",  dir=>"S", typ=>"n", temp=>"tempWohn",   tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "ess.roll",       dir=>"S", typ=>"n", temp=>"tempWohn",   tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "kuch.rollBar",   dir=>"S", typ=>"n", temp=>"tempKueche", tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "kuch.rollStr",   dir=>"O", typ=>"n", temp=>"tempKueche", tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "arb.rollTerr",   dir=>"W", typ=>"n", temp=>"tempStudio", tempS=>21, win=>"wohn.fenTerr", state=>STATE_IDLE, },
+    { roll => "arb.rollWeg",    dir=>"S", typ=>"n", temp=>"tempStudio", tempS=>21, win=>"",             state=>STATE_IDLE, },
+    { roll => "bad.roll",       dir=>"S", typ=>"n", temp=>"tempBad",    tempS=>23, win=>"",             state=>STATE_IDLE, },
+    { roll => "schlaf.rollWeg", dir=>"S", typ=>"s", temp=>"tempSchlaf", tempS=>18, win=>"",             state=>STATE_IDLE, },
+    { roll => "schlaf.rollStr", dir=>"O", typ=>"s", temp=>"tempSchlaf", tempS=>18, win=>"wohn.fenTerr", state=>STATE_IDLE, },
 );
 
 #my %rollStates = (
@@ -301,7 +301,8 @@ sub RollCheck() {
 	#Dbg("--------r:g ".$r->{roll}." / ".$r->{temp});
 
         # Raum zu warm und aussentemp hoch ?
-        $temp=ReadingsVal($r->{temp},"measured-temp", 99);
+        #$temp=ReadingsVal($r->{temp},"measured-temp", 99);
+        $temp=ReadingsVal($r->{temp},"temperature", 99);
 	if( ($temp>$r->{tempS} && $tempOut>($r->{tempS}-3)) || $temp>($r->{tempS}+2) ) {
 	    $tempH=1;
 	}
