@@ -8167,7 +8167,7 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
   my $mId = CUL_HM_getMId($hash);
   return undef if (!$mId || !$culHmModel->{$mId});
   if ($hash->{helper}{role}{dev}){
-    push @lsNo,"0:";
+    push @lsNo,"0.";
   }
   if ($hash->{helper}{role}{chn}){
     foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
@@ -8175,12 +8175,12 @@ sub CUL_HM_reglUsed($) {# provide data for HMinfo
       if ($l ne "p"){# ignore peer-only entries
         if ($c){
           my $chNo = hex($chn);
-          if   ($c =~ m/($chNo)p/){push @lsNo,"$l:$_" foreach (@pNames);}
-          elsif($c =~ m/$chNo/   ){push @lsNo,"$l:";}
+          if   ($c =~ m/($chNo)p/){push @lsNo,"$l.$_" foreach (@pNames);}
+          elsif($c =~ m/$chNo/   ){push @lsNo,"$l.";}
         }
         else{
-          if ($l == 3 || $l == 4){push @lsNo,"$l:$_" foreach (@pNames);
-          }else{                  push @lsNo,"$l:" ;}
+          if ($l == 3 || $l == 4){push @lsNo,"$l.$_" foreach (@pNames);
+          }else{                  push @lsNo,"$l." ;}
         }
       }
     }
