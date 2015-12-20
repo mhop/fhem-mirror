@@ -224,6 +224,12 @@ sub CUL_HM_updateConfig($){
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
     next if (!$hash->{DEF}); # likely renamed
+    foreach my $read (grep/RegL_0.:/,keys%{$defs{$name}{READINGS}}){
+      my $readN = $read;
+      $readN =~ s/(RegL_0.):/$1\./;
+      $defs{$name}{READINGS}{$readN} = $defs{$name}{READINGS}{$read};
+      delete $defs{$name}{READINGS}{$read};
+    }
     
     my $id = $hash->{DEF};
     my $nAttr = $modules{CUL_HM}{helper}{hmManualOper};# no update for attr
@@ -2825,8 +2831,8 @@ sub CUL_HM_parseCommon(@){#####################################################
         delete $mhp->{devH}{cmdStack};
         delete $mhp->{devH}{helper}{prt}{rspWait};
         delete $mhp->{devH}{helper}{prt}{rspWaitSec};
-        delete $mhp->{devH}{READINGS}{"RegL_00:"};
-        delete $mhp->{devH}{READINGS}{".RegL_00:"};
+        delete $mhp->{devH}{READINGS}{"RegL_00."};
+        delete $mhp->{devH}{READINGS}{".RegL_00."};
         
         if (!$modules{CUL_HM}{helper}{hmManualOper}){
           $attr{$mhp->{devN}}{IODev} = $ioN;
@@ -2924,7 +2930,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         $ret = "done";
       }
     }
-    elsif($mhp->{mStp} eq "02" ||$mhp->{mStp} eq "03"){ #ParamResp==================
+    elsif($mhp->{mStp} eq "02" ||$mhp->{mStp} eq "03"){ #ParamResp==============
       my $mNoInt = hex($mhp->{mNo}); 
       if ( $pendType eq "RegisterRead" && 
           ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
@@ -2955,7 +2961,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         }
         my $lastAddr = hex($1) if ($data =~ m/.*(..):..$/);
         my $peer = $rspWait->{forPeer};
-        my $regLNp = "RegL_$list:$peer";# pure, no expert
+        my $regLNp = "RegL_".$list.".".$peer;# pure, no expert
         my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
         if (   defined $lastAddr 
             && (    $lastAddr > $rspWait->{nAddr}
@@ -2988,7 +2994,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     elsif($mhp->{mStp} eq "04"){ #ParamChange===================================
       my($peerID,$list,$data) = ($1,$2,$3,$4) if($mhp->{p} =~ m/^04..(........)(..)(.*)/);
       CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
-      my $regLNp = "RegL_$list:".CUL_HM_id2Name($peerID);
+      my $regLNp = "RegL_".$list.".".CUL_HM_id2Name($peerID);
       $regLNp =~ s/broadcast//;
       $regLNp =~ s/ /_/g; #remove blanks
       my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
@@ -3630,7 +3636,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
     return "$a[3] not specified. choose 0-127 for duration"   if ($a[3]>127);
     return "unsupported for channel, use $devName"            if (!$roleD);
-    splice @a,1,3, ("regBulk","RegL_00:",sprintf("04:%02X",$a[2]),sprintf("08:%02X",$a[3]*2));
+    splice @a,1,3, ("regBulk","RegL_00.",sprintf("04:%02X",$a[2]),sprintf("08:%02X",$a[3]*2));
   }
   elsif($cmd eq "text") { ################################################# reg
     my ($bn,$l1, $l2) = ($chn,$a[2],$a[3]); # Create CONFIG_WRITE_INDEX string
@@ -3653,7 +3659,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $l2 =~ s/\\_/ /g;
     $l2 = substr($l2."\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 0, 12);
     $l2 =~ s/(.)/sprintf(" %02X:%02X",$s++,ord($1))/ge;
-    @a = ($a[0],"regBulk","RegL_01:",split(" ",$l1.$l2));
+    @a = ($a[0],"regBulk","RegL_01.",split(" ",$l1.$l2));
   }
   elsif($cmd =~ m /(displayMode|displayTemp|displayTempUnit|controlMode)/) {
     if ($md =~ m/(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){#controlMode different for RT
@@ -3681,13 +3687,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $cHash = CUL_HM_id2Hash($dst."02");
     $cHash->{helper}{partyReg} = sprintf("61%02X62%02X0000",$eH,$days);
     $cHash->{helper}{partyReg} =~ s/(..)(..)/ $1:$2/g;
-    if ($cHash->{READINGS}{"RegL_06:"}){#remove old settings
-      $cHash->{READINGS}{"RegL_06:"}{VAL} =~ s/ 61:.*//;
-      $cHash->{READINGS}{"RegL_06:"}{VAL} =~ s/ 00:00//;
-      $cHash->{READINGS}{"RegL_06:"}{VAL} .= $cHash->{helper}{partyReg};
+    if ($cHash->{READINGS}{"RegL_06."}){#remove old settings
+      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ 61:.*//;
+      $cHash->{READINGS}{"RegL_06."}{VAL} =~ s/ 00:00//;
+      $cHash->{READINGS}{"RegL_06."}{VAL} .= $cHash->{helper}{partyReg};
     }
     else{
-      $cHash->{READINGS}{"RegL_06:"}{VAL} = $cHash->{helper}{partyReg};
+      $cHash->{READINGS}{"RegL_06."}{VAL} = $cHash->{helper}{partyReg};
     }
     CUL_HM_pushConfig($hash,$id,$dst,2,"000000","00",6,
                       sprintf("61%02X62%02X",$eH,$days),$prep);
@@ -5644,7 +5650,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   my $peerN = ($peerAddr ne "000000")?CUL_HM_peerChName($peerAddr.$peerChn,$dst):"";
   $peerN =~ s/broadcast//;
   $peerN =~ s/ /_/g;#remote blanks
-  my $regLNp = "RegL_".$list.":".$peerN;
+  my $regLNp = "RegL_".$list.".".$peerN;
   my $regPre = ($hash->{helper}{expert}{raw}?"":".");
   my $regLN = $regPre.$regLNp;
   #--- copy data from readings to shadow
@@ -5688,7 +5694,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     $change =~ s/(\ |:)//g;
     my $peerN;
     $changed = 1;# yes, we did
-    ($list,$peerN) = ($1,$2) if($nrn =~ m/RegL_(..):(.*)/);
+    ($list,$peerN) = ($1,$2) if($nrn =~ m/RegL_(..)\.(.*)/);
     if ($peerN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($peerN,$hash));}
     else       {($peerAddr,$peerChn) = ('000000','00');}
     CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
@@ -5811,7 +5817,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 
         $peer ="" if($list !~ m/^0[347]$/);
         #empty val since reading will be cumulative
-        my $rlName = ($chnhash->{helper}{expert}{raw}?"":".")."RegL_".$list.":".$peer;
+        my $rlName = ($chnhash->{helper}{expert}{raw}?"":".")."RegL_".$list.".".$peer;
         $chnhash->{READINGS}{$rlName}{VAL}="";
         my $chnHash = $modules{CUL_HM}{defptr}{$dst.$chn};
         delete ($chnhash->{READINGS}{$rlName}{TIME});
@@ -6795,7 +6801,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   my $dst = substr(CUL_HM_name2Id($name),0,6);
   if(!$regLN){
     $regLN = ($hash->{helper}{expert}{raw}?"":".")
-              .sprintf("RegL_%02X:",$list)
+              .sprintf("RegL_%02X.",$list)
               .($peerId?CUL_HM_peerChName($peerId,
                                           $dst)
                        :"");
@@ -6925,7 +6931,7 @@ sub CUL_HM_updtRegDisp($$$) {
   my @changedRead;
   
   my $regLN = ($hash->{helper}{expert}{raw}?"":".")
-              .sprintf("RegL_%02X:",$listNo)
+              .sprintf("RegL_%02X.",$listNo)
               .($peerId?CUL_HM_peerChName($peerId,$devId):"");
               
   if (($md eq "HM-MOD-Re-8") && $listNo == 0){#handle Fw bug 
@@ -6987,7 +6993,7 @@ sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
   my $peers = ReadingsVal($name,"peerList","");
   my $dH = CUL_HM_getDeviceHash($defs{$name});
   foreach(grep /\.?RegL_/,keys %{$defs{$name}{READINGS}}){
-    my ($l,$p) = ($1,$2) if($_ =~ m/RegL_(..):(.*)/);
+    my ($l,$p) = ($1,$2) if($_ =~ m/RegL_(..)\.(.*)/);
     my $ps = $p;
     $ps =~ s/_chn:.*//;
     if (!$p || $peers =~ m /$ps/){
@@ -7158,11 +7164,11 @@ sub CUL_HM_4DisText($) {      # convert text for 4dis
   my ($hash)=@_;
   my $name = $hash->{NAME};
   my $regPre = ($hash->{helper}{expert}{raw}?"":".");
-  my $reg1 = ReadingsVal($name,$regPre."RegL_01:" ,"");
+  my $reg1 = ReadingsVal($name,$regPre."RegL_01." ,"");
   my $pref = "";
-  if ($hash->{helper}{shadowReg}{"RegL_01:"}){
+  if ($hash->{helper}{shadowReg}{"RegL_01."}){
     $pref = "set_";
-    $reg1 = $hash->{helper}{shadowReg}{"RegL_01:"};
+    $reg1 = $hash->{helper}{shadowReg}{"RegL_01."};
   }
   my %txt;
   foreach my $sAddr (54,70){
@@ -7187,8 +7193,8 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   my ($hash)=@_;
   my $name = $hash->{NAME};
   my $regPre = ($hash->{helper}{expert}{raw}?"":".");
-  my $reg5 = ReadingsVal($name,$regPre."RegL_05:" ,"");
-  my $reg6 = ReadingsVal($name,$regPre."RegL_06:" ,"");
+  my $reg5 = ReadingsVal($name,$regPre."RegL_05." ,"");
+  my $reg6 = ReadingsVal($name,$regPre."RegL_06." ,"");
   { #update readings in device - oldfashioned style, copy from Readings
     my @histVals;
     foreach my $var ("displayMode","displayTemp","controlMode","decalcDay","displayTempUnit","day-temp","night-temp","party-temp"){
@@ -7213,7 +7219,7 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
     if (   $reg6                # ugly handling to add vanishing party register
         && $reg6 !~ m/ 61:/
         && $hash->{helper}{partyReg}){
-      $hash->{READINGS}{"RegL_06:"}{VAL} =~s/ 00:00/$hash->{helper}{partyReg}/;
+      $hash->{READINGS}{"RegL_06."}{VAL} =~s/ 00:00/$hash->{helper}{partyReg}/;
     }
    }
   else{
@@ -7243,8 +7249,8 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
     foreach  (@time){$_=hex($_)*10};
     foreach  (@temp){$_=hex($_)/2};
     push (@changedRead,"R_tempList_State:".
-                  (($hash->{helper}{shadowReg}{"RegL_05:"} ||
-                    $hash->{helper}{shadowReg}{"RegL_06:"} )?"set":"verified"));
+                  (($hash->{helper}{shadowReg}{"RegL_05."} ||
+                    $hash->{helper}{shadowReg}{"RegL_06."} )?"set":"verified"));
     for (my $day = 0; $day < 7; $day++){
       my $tSpan  = 0;
       my $dayRead = "";
@@ -7280,7 +7286,7 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
     my $ln = length($idxN{$lst})?substr($idxN{$lst},0,2):"";
     delete $hash->{READINGS}{$_} 
           foreach (grep !/_/,grep /tempList$ln/,keys %{$hash->{READINGS}});
-    my $tempRegs = ReadingsVal($name,$regPre."RegL_0$lst:","");
+    my $tempRegs = ReadingsVal($name,$regPre."RegL_0$lst.","");
     if ($tempRegs !~ m/00:00/){
       for (my $day = 0;$day<7;$day++){
         push (@changedRead,"R_$idxN{$lst}${day}_tempList".$days[$day].":incomplete");
@@ -7295,9 +7301,9 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
       $r1[hex($a)] = $d;
     }
 
-    if ($hash->{helper}{shadowReg}{"RegL_0$lst:"}){
+    if ($hash->{helper}{shadowReg}{"RegL_0$lst."}){
       my $ch = 0;
-      foreach(split " ",$hash->{helper}{shadowReg}{"RegL_0$lst:"}){
+      foreach(split " ",$hash->{helper}{shadowReg}{"RegL_0$lst."}){
         my ($a,$d) = split ":",$_;
         $a = hex($a);
         $ch = 1 if ((!$r1[$a] || $r1[$a] ne $d) && $a >= 20);
@@ -8547,7 +8553,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
            the 'internal links' it is necessary to issue <br>
            'set &lt;name&gt; <a href="#CUL_HMregSet">regSet</a> intKeyVisib visib'<br>
            or<br>
-           'set &lt;name&gt; <a href="#CUL_HMregBulk">regBulk</a> RegL_0: 2:81'<br>
+           'set &lt;name&gt; <a href="#CUL_HMregBulk">regBulk</a> RegL_0. 2:81'<br>
         
            Reset it by replacing '81' with '01'<br> example:<br>
         
@@ -8621,8 +8627,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           format.<br>
           Example:<br>
           <ul><code>
-            set myChannel regBulk RegL_00: 02:01 0A:17 0B:43 0C:BF 15:FF 00:00<br>
-            RegL_03:FB_Btn_07
+            set myChannel regBulk RegL_00. 02:01 0A:17 0B:43 0C:BF 15:FF 00:00<br>
+            RegL_03.FB_Btn_07
            01:00 02:00 03:00 04:32 05:64 06:00 07:FF 08:00 09:FF 0A:01 0B:44 0C:54 0D:93 0E:00 0F:00 11:C8 12:00 13:00 14:00 15:00 16:00 17:00 18:00 19:00 1A:00 1B:00 1C:00 1D:FF 1E:93 1F:00 81:00 82:00 83:00 84:32 85:64 86:00 87:FF 88:00 89:FF 8A:21 8B:44 8C:54 8D:93 8E:00 8F:00 91:C8 92:00 93:00 94:00 95:00 96:00 97:00 98:00 99:00 9A:00 9B:00 9C:00 9D:05 9E:93 9F:00 00:00<br>
             set myblind regBulk 01 0B:10<br>
             set myblind regBulk 01 0C:00<br>
@@ -9881,7 +9887,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           zu bekommen ist es notwendig folgendes zu erstellen:<br>
           'set &lt;name&gt; <a href="#CUL_HMregSet">regSet</a> intKeyVisib visib'<br>
           oder<br>
-          'set &lt;name&gt; <a href="#CUL_HMregBulk">regBulk</a> RegL_0: 2:81'<br>
+          'set &lt;name&gt; <a href="#CUL_HMregBulk">regBulk</a> RegL_0. 2:81'<br>
           Zur&uuml;cksetzen l&auml;sst es sich indem '81' mit '01' ersetzt wird.<br> example:<br>
           
           <ul><code>
@@ -9957,8 +9963,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           &lt;addr1:data1&gt; ist die Liste der Register im Hex-Format.<br>
           Beispiel:<br>
           <ul><code>
-            set myChannel regBulk RegL_00: 02:01 0A:17 0B:43 0C:BF 15:FF 00:00<br>
-            RegL_03:FB_Btn_07
+            set myChannel regBulk RegL_00. 02:01 0A:17 0B:43 0C:BF 15:FF 00:00<br>
+            RegL_03.FB_Btn_07
             01:00 02:00 03:00 04:32 05:64 06:00 07:FF 08:00 09:FF 0A:01 0B:44 0C:54 0D:93 0E:00 0F:00 11:C8 12:00 13:00 14:00 15:00 16:00 17:00 18:00 19:00 1A:00 1B:00 1C:00 1D:FF 1E:93 1F:00 81:00 82:00 83:00 84:32 85:64 86:00 87:FF 88:00 89:FF 8A:21 8B:44 8C:54 8D:93 8E:00 8F:00 91:C8 92:00 93:00 94:00 95:00 96:00 97:00 98:00 99:00 9A:00 9B:00 9C:00 9D:05 9E:93 9F:00 00:00<br>
             set myblind regBulk 01 0B:10<br>
             set myblind regBulk 01 0C:00<br>

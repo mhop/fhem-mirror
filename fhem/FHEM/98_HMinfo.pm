@@ -1562,7 +1562,7 @@ sub HMinfo_verifyConfig($@) {##################################################
       }
     }
     elsif($cmd eq "regBulk"){
-      next if($param !~ m/RegL_0[0-9]:/);
+      next if($param !~ m/RegL_0[0-9][:\.]/);#allow . and : for the time to convert to . only
       $param =~ s/\.RegL/RegL/;
       my ($reg,$data) = split(" ",$param,2);
       my $eReg = ReadingsVal($eN,($defs{$eN}{helper}{expert}{raw}?"":".").$reg,"");
@@ -1688,13 +1688,14 @@ sub HMinfo_loadConfig($@) {####################################################
       }
     }
     elsif($cmd eq "regBulk"){
-      next if($param !~ m/RegL_0[0-9]:/);
+      next if($param !~ m/RegL_0[0-9][:\.]/);#allow . and : for the time to convert to . only
       $param =~ s/\.RegL/RegL/;
       $param = ".".$param if (!$defs{$eN}{helper}{expert}{raw});
       my ($reg,$data) = split(" ",$param,2);
       my @rla = CUL_HM_reglUsed($eN);
       next if (!$rla[0]);
       my $rl = join",",@rla;
+      $reg =~ s/(RegL_0.):/$1\./;# conversion - : not allowed anymore. Update old versions
       my $r2 = $reg;
       $r2 =~ s/^\.//;
       next if ($rl !~ m/$r2/);
@@ -1722,7 +1723,7 @@ sub HMinfo_loadConfig($@) {####################################################
     foreach my $reg (keys %{$changes{$eN}}){
       $defs{$eN}{READINGS}{$reg}{VAL}  = $changes{$eN}{$reg}{d};
       $defs{$eN}{READINGS}{$reg}{TIME} = $changes{$eN}{$reg}{t};
-      my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..):(.*)/);
+      my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..)\.(.*)/);
       next if (!$list);
       my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));
       CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
@@ -1763,6 +1764,7 @@ sub HMinfo_purgeConfig($) {####################################################
     my ($cmd,$eN,$typ,$p1,$p2) = split(" ",$command,5);
     if ($cmd eq "set" && $typ eq "regBulk"){
       $p1 =~ s/\.RegL_/RegL_/;
+      $p1 =~ s/(RegL_0.):/$1\./;#replace old : with .
       $typ .= " $p1";
       $p1 = $p2;
     }
@@ -1787,10 +1789,10 @@ sub HMinfo_purgeConfig($) {####################################################
                     split",",$purgeH{$eN}{$cmd}{$typ};
         }
         elsif($typ =~ m/^regBulk/){#
-          if ($typ !~ m/regBulk RegL_..:(self..)?$/){# only if peer is mentioned
+          if ($typ !~ m/regBulk RegL_..\.(self..)?$/){# only if peer is mentioned
             my $found = 0;
             foreach my $p (@peers){
-              if ($typ =~ m/regBulk RegL_..:$p/){
+              if ($typ =~ m/regBulk RegL_..\.$p/){
                 $found = 1;
                 last;
               }
@@ -2341,17 +2343,17 @@ sub HMinfo_cpRegs(@){##########################################################
     return "source peer not in peerlist"       if ($attr{$srcCh}{peerIDs} !~ m/$srcPid/);
     return "destination peer not in peerlist"  if ($attr{$dstCh}{peerIDs} !~ m/$dstPid/);
 
-    if   ($defs{$srcCh}{READINGS}{"RegL_03:".$srcP})  {$srcRegLn =  "RegL_03:".$srcP}
-    elsif($defs{$srcCh}{READINGS}{".RegL_03:".$srcP}) {$srcRegLn = ".RegL_03:".$srcP}
-    elsif($defs{$srcCh}{READINGS}{"RegL_04:".$srcP})  {$srcRegLn =  "RegL_04:".$srcP}
-    elsif($defs{$srcCh}{READINGS}{".RegL_04:".$srcP}) {$srcRegLn = ".RegL_04:".$srcP}
+    if   ($defs{$srcCh}{READINGS}{"RegL_03.".$srcP})  {$srcRegLn =  "RegL_03.".$srcP}
+    elsif($defs{$srcCh}{READINGS}{".RegL_03.".$srcP}) {$srcRegLn = ".RegL_03.".$srcP}
+    elsif($defs{$srcCh}{READINGS}{"RegL_04.".$srcP})  {$srcRegLn =  "RegL_04.".$srcP}
+    elsif($defs{$srcCh}{READINGS}{".RegL_04.".$srcP}) {$srcRegLn = ".RegL_04.".$srcP}
     $dstRegLn = $srcRegLn;
     $dstRegLn =~ s/:.*/:/;
     $dstRegLn .= $dstP;
   }
   else{
-    if   ($defs{$srcCh}{READINGS}{"RegL_01:"})  {$srcRegLn = "RegL_01:"}
-    elsif($defs{$srcCh}{READINGS}{".RegL_01:"}) {$srcRegLn = ".RegL_01:"}
+    if   ($defs{$srcCh}{READINGS}{"RegL_01."})  {$srcRegLn = "RegL_01."}
+    elsif($defs{$srcCh}{READINGS}{".RegL_01."}) {$srcRegLn = ".RegL_01."}
     $dstRegLn = $srcRegLn;
   }
   return "source register not available"     if (!$srcRegLn);
