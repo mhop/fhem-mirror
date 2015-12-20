@@ -145,7 +145,7 @@ PushNotifier_Send_Message
     $result.="Regex ".$hash->{deviceID}." seems not to fit on any of your devices.";
   }
 
-  return $result;
+  return;
 }
 
 1;
