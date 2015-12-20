@@ -5,6 +5,7 @@
   - bugfix: 49_SSCam: fixed a bug that functions may impact each other
   - feature: 31_MilightDevice: Add restoreAtStart attribute so group devices (slot 'A') do not restore state by default at startup
   - bugfix: 30_MilightBridge/31_MilightDevice: Fix startup restore.  Fix crash on invalid hostname.
+  - feature: YAMAHA_NP: Direct FM frequency setting.
   - feature: 30_pilight_xyz: possibility to change IO-Device (IODEV)
   - bugfix: YAMAHA_AVR: fixing not correctly volume smoothing
   - change: 49_SSCam: turned completly to HttpUtils_NonblockingGet for 
