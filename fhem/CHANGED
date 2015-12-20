@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 50_Telegrambot: multiple contacts for send etc/removed depreacted messageTo,sendImageTo,sendPhotoTo/allowunknowncontacts
   - bugfix: 70_PushNotifier: remove messages fron FHEM-logfile
   - feature: 49_SSCam: function "snap" for taking snapshots added,
   - bugfix: 49_SSCam: fixed a bug that functions may impact each other

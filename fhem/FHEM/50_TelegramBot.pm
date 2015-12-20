@@ -63,12 +63,26 @@
 #   Need to replace \n again with Chr10 - linefeed due to a telegram change - FORUM #msg363825
 # 1.1 2015-11-24 keyboards added, log changes and multiple smaller enhancements
 #   
+#   Prepared for allowing multiple contacts being given for msg/image commands
+#   Prepare for defaultpeer specifying multiple peers as a list
+#   Allow multiple peers specified for send/msg/image etc
+#   Remove deprecated commands messageTo sendImageTo sendPhotoTo
+#   Minor fixes on lineendings for cmd results and log messages
+#   pollingVerbose attribute checked on set
+#   allowUnknownContacts attribute added default 1
+# 1.2 2015-12-20 multiple contacts for send etc/removed depreacted messageTo,sendImageTo,sendPhotoTo/allowunknowncontacts
+
+#   
 #   
 #   
 ##############################################################################
 # TASKS 
 #
-#   allow multiple accounts to be specified
+#   send audio files
+#
+#   receive any media files and store locally
+#
+#   allow alias cmds in the form alias1:cmdx; alias2:cmdy; ...
 #   
 #   allow keyboards in the device api
 #   
@@ -107,6 +121,7 @@ sub TelegramBot_Set($@);
 sub TelegramBot_Get($@);
 
 sub TelegramBot_Callback($$$);
+sub TelegramBot_SendIt($$$$$);
 
 
 #########################
@@ -184,7 +199,7 @@ sub TelegramBot_Initialize($) {
 	$hash->{GetFn}      = "TelegramBot_Get";
 	$hash->{SetFn}      = "TelegramBot_Set";
 	$hash->{AttrFn}     = "TelegramBot_Attr";
-	$hash->{AttrList}   = "defaultPeer defaultPeerCopy:0,1 pollingTimeout cmdKeyword cmdSentCommands favorites:textField-long cmdFavorites cmdRestrictedPeer cmdTriggerOnly:0,1 saveStateOnContactChange:1,0 maxFileSize maxReturnSize cmdReturnEmptyResult:1,0 pollingVerbose:1_Digest,2_Log,0_None ".
+	$hash->{AttrList}   = "defaultPeer defaultPeerCopy:0,1 pollingTimeout cmdKeyword cmdSentCommands favorites:textField-long cmdFavorites cmdRestrictedPeer cmdTriggerOnly:0,1 saveStateOnContactChange:1,0 maxFileSize maxReturnSize cmdReturnEmptyResult:1,0 pollingVerbose:1_Digest,2_Log,0_None allowUnknownContacts:1,0 ".
 						$readingFnAttributes;           
 }
 
@@ -318,37 +333,48 @@ sub TelegramBot_Set($@)
   my $ret = undef;
   
 	if( ($cmd eq 'message') || ($cmd eq 'msg') || ($cmd eq 'send') ) {
-    if ( $numberOfArgs < 2 ) {
-      return "TelegramBot_Set: Command $cmd, no text (and no optional peer) specified";
-    }
-    my $peer;
-    if ( $args[0] =~ /^@(..+)$/ ) {
-      $peer = $1;
+
+    my $peers;
+    while ( $args[0] =~ /^@(..+)$/ ) {
+      my $ppart = $1;
+      $peers .= " " if ( defined( $peers ) );
+      $peers .= $ppart;
+      
       shift @args;
-      return "TelegramBot_Set: Command $cmd, no text specified" if ( $numberOfArgs < 3 );
-    } else {
-      $peer = AttrVal($name,'defaultPeer',undef);
-      return "TelegramBot_Set: Command $cmd, without explicit peer requires defaultPeer being set" if ( ! defined($peer) );
+      $numberOfArgs--;
+      last if ( $numberOfArgs == 0 );
+    }
+    
+    return "TelegramBot_Set: Command $cmd, no text (and no optional peer) specified" if ( $numberOfArgs < 1 );
+
+    if ( ! defined( $peers ) ) {
+      $peers = AttrVal($name,'defaultPeer',undef);
+      return "TelegramBot_Set: Command $cmd, without explicit peer requires defaultPeer being set" if ( ! defined($peers) );
     }
 
     # should return undef if succesful
     Log3 $name, 4, "TelegramBot_Set $name: start message send ";
     my $arg = join(" ", @args );
-    $ret = TelegramBot_SendIt( $hash, $peer, $arg, undef, 1 );
+    $ret = TelegramBot_SendIt( $hash, $peers, $arg, undef, 1 );
 
   } elsif ( ($cmd eq 'sendPhoto') || ($cmd eq 'sendImage') || ($cmd eq 'image') ) {
-    if ( $numberOfArgs < 2 ) {
-      return "TelegramBot_Set: Command $cmd, need to specify filename ";
-    }
 
-    my $peer;
-    if ( $args[0] =~ /^@(..+)$/ ) {
-      $peer = $1;
+    my $peers;
+    while ( $args[0] =~ /^@(..+)$/ ) {
+      my $ppart = $1;
+      $peers .= " " if ( defined( $peers ) );
+      $peers .= $ppart;
+      
       shift @args;
-      return "TelegramBot_Set: Command $cmd, need to specify filename" if ( $numberOfArgs < 3 );
-    } else {
-      $peer = AttrVal($name,'defaultPeer',undef);
-      return "TelegramBot_Set: Command $cmd, without explicit peer requires defaultPeer being set" if ( ! defined($peer) );
+      $numberOfArgs--;
+      last if ( $numberOfArgs == 0 );
+    }
+    
+    return "TelegramBot_Set: Command $cmd, need to specify filename " if ( $numberOfArgs < 1 );
+
+    if ( ! defined( $peers ) ) {
+      $peers = AttrVal($name,'defaultPeer',undef);
+      return "TelegramBot_Set: Command $cmd, without explicit peer requires defaultPeer being set" if ( ! defined($peers) );
     }
 
     # should return undef if succesful
@@ -359,39 +385,7 @@ sub TelegramBot_Set($@)
     $caption = join(" ", @args ) if ( int(@args) > 0 );
 
     Log3 $name, 5, "TelegramBot_Set $name: start photo send ";
-#    $ret = "TelegramBot_Set: Command $cmd, not yet supported ";
-    $ret = TelegramBot_SendIt( $hash, $peer, $file, $caption, 0 );
-
-  # DEPRECATED
-	} elsif($cmd eq 'messageTo') {
-    if ( $numberOfArgs < 3 ) {
-      return "TelegramBot_Set: Command $cmd, need to specify peer and text ";
-    }
-
-    # should return undef if succesful
-    my $peer = shift @args;
-    my $arg = join(" ", @args );
-
-    Log3 $name, 4, "TelegramBot_Set $name: start message send ";
-    $ret = TelegramBot_SendIt( $hash, $peer, $arg, undef, 1 );
- 
-  # DEPRECATED
-  } elsif ( ($cmd eq 'sendPhotoTo') || ($cmd eq 'sendImageTo') ) {
-    if ( $numberOfArgs < 3 ) {
-      return "TelegramBot_Set: Command $cmd, need to specify peer and text ";
-    }
-
-    # should return undef if succesful
-    my $peer = shift @args;
-
-    my $file = shift @args;
-    $file = $1 if ( $file =~ /^\"(.*)\"$/ );
-    
-    my $caption;
-    $caption = join(" ", @args ) if ( $numberOfArgs > 3 );
-
-    Log3 $name, 5, "TelegramBot_Set $name: start photo send to $peer";
-    $ret = TelegramBot_SendIt( $hash, $peer, $file, $caption, 0 );
+    $ret = TelegramBot_SendIt( $hash, $peers, $file, $caption, 0 );
 
   } elsif($cmd eq 'zDebug') {
     # for internal testing only
@@ -552,6 +546,11 @@ sub TelegramBot_Attr(@) {
       # wait some time before next polling is starting
       TelegramBot_ResetPolling( $hash );
 
+		} elsif ($aName eq 'pollingVerbose') {
+      return "\"TelegramBot_Attr: \" Incorrect value given for pollingVerbose" if ( $aVal !~ /^((1_Digest)|(2_Log)|(0_None))$/ );
+      $attr{$name}{'pollingVerbose'} = $aVal;
+		} elsif ($aName eq 'allowUnknownContacts') {
+			$attr{$name}{'allowUnknownContacts'} = ($aVal eq "1")? "1": "0";
     }
 	}
 
@@ -600,7 +599,6 @@ sub TelegramBot_checkCmdKeyword($$$$) {
   
   # send unauthorized to defaultpeer
   my $defpeer = AttrVal($name,'defaultPeer',undef);
-  $defpeer = TelegramBot_GetIdForPeer( $hash, $defpeer ) if ( defined( $defpeer ) );
   if ( defined( $defpeer ) ) {
     AnalyzeCommand( undef, "set $name message $ret", "" );
   }
@@ -704,9 +702,6 @@ sub TelegramBot_SentLastCommand($$$) {
 
   my $slc =  ReadingsVal($name ,"StoredCommands","");
 
-  my $defpeer = AttrVal($name,'defaultPeer',undef);
-  $defpeer = TelegramBot_GetIdForPeer( $hash, $defpeer ) if ( defined( $defpeer ) );
- 
   my @cmds = split( "\n", $slc );
 
   # create keyboard
@@ -795,6 +790,7 @@ sub TelegramBot_ExecuteCommand($$$) {
 
   my $defpeer = AttrVal($name,'defaultPeer',undef);
   $defpeer = TelegramBot_GetIdForPeer( $hash, $defpeer ) if ( defined( $defpeer ) );
+  $defpeer = AttrVal($name,'defaultPeer',undef) if ( ! defined( $defpeer ) );
   
   my $retstart = "TelegramBot fhem";
   $retstart .= " from $pname ($mpeernorm)" if ( $defpeer ne $mpeernorm );
@@ -814,11 +810,13 @@ sub TelegramBot_ExecuteCommand($$$) {
     $ret =~ s/\r//gm;
     
     # shorten to maxReturnSize if set
-    my $limit = AttrVal($name,'maxReturnSize',0);
+    my $limit = AttrVal($name,'maxReturnSize',4000);
 
     if ( ( length($ret) > $limit ) && ( $limit != 0 ) ) {
-      $ret = substr( $ret, 0, $limit )."\n\n...";
+      $ret = substr( $ret, 0, $limit )."\n \n ...";
     }
+
+    $ret =~ s/\n/\\n/gm;
 
     AnalyzeCommand( undef, "set $name message \@$mpeernorm $ret", "" );
 
@@ -876,7 +874,7 @@ sub TelegramBot_SendIt($$$$$)
 {
 	my ( $hash, @args) = @_;
 
-	my ( $peer, $msg, $addPar, $isText) = @args;
+	my ( $peers, $msg, $addPar, $isText) = @args;
   my $name = $hash->{NAME};
 	
   Log3 $name, 5, "TelegramBot_SendIt $name: called ";
@@ -886,7 +884,7 @@ sub TelegramBot_SendIt($$$$$)
     if ( ! defined( $hash->{sentQueue} ) ) {
       $hash->{sentQueue} = [];
     }
-    Log3 $name, 3, "TelegramBot_SendIt $name: add send to queue :$peer: -:$msg: - :".(defined($addPar)?$addPar:"<undef>").":";
+    Log3 $name, 4, "TelegramBot_SendIt $name: add send to queue :$peers: -:$msg: - :".(defined($addPar)?$addPar:"<undef>").":";
     push( @{ $hash->{sentQueue} }, \@args );
     return;
   }  
@@ -894,6 +892,15 @@ sub TelegramBot_SendIt($$$$$)
   my $ret;
   $hash->{sentMsgResult} = "WAITING";
 
+  my $peer;
+  ( $peer, $peers ) = split( " ", $peers, 2 ); 
+  
+  # handle addtl peers specified (will be queued since WAITING is set already) 
+  if ( defined( $peers ) ) {
+    # ignore return, since it is only queued
+    TelegramBot_SendIt( $hash, $peers, $msg, $addPar, $isText );
+  }
+  
   Log3 $name, 5, "TelegramBot_SendIt $name: try to send message to :$peer: -:$msg: - :".(defined($addPar)?$addPar:"<undef>").":";
 
     # trim and convert spaces in peer to underline 
@@ -1069,8 +1076,6 @@ sub TelegramBot_MakeKeyboard($$@)
 
   return $ret;
 }
-
-  
   
 
 #####################################
@@ -1311,6 +1316,11 @@ sub TelegramBot_ParseMsg($$$)
   my $from = $message->{from};
   my $mpeer = $from->{id};
 
+  # ignore if unknown contacts shall be accepter
+  if ( AttrVal($name,'allowUnknownContacts',1) == 0 ) {
+    return $ret if ( ! TelegramBot_IsKnownContact( $hash, $mpeer ) ) ;
+  }
+
   # check peers beside from only contact (shared contact) and new_chat_participant are checked
   push( @contacts, $from );
 
@@ -1376,15 +1386,15 @@ sub TelegramBot_ParseMsg($$$)
     my $cmdRet;
     
     $cmdRet = TelegramBot_ReadHandleCommand( $hash, $mpeernorm, $mtext );
-    Log3 $name, 3, "TelegramBot_ParseMsg $name: ReadHandleCommand returned :$cmdRet:" if ( defined($cmdRet) );
+    Log3 $name, 4, "TelegramBot_ParseMsg $name: ReadHandleCommand returned :$cmdRet:" if ( defined($cmdRet) );
     
     #  ignore result of readhandlecommand since it leads to endless loop
 
     $cmdRet = TelegramBot_SentLastCommand( $hash, $mpeernorm, $mtext );
-    Log3 $name, 3, "TelegramBot_ParseMsg $name: SentLastCommand returned :$cmdRet:" if ( defined($cmdRet) );
+    Log3 $name, 4, "TelegramBot_ParseMsg $name: SentLastCommand returned :$cmdRet:" if ( defined($cmdRet) );
     
     $cmdRet = TelegramBot_SentFavorites( $hash, $mpeernorm, $mtext, $mid );
-    Log3 $name, 3, "TelegramBot_ParseMsg $name: SentFavorites returned :$cmdRet:" if ( defined($cmdRet) );
+    Log3 $name, 4, "TelegramBot_ParseMsg $name: SentFavorites returned :$cmdRet:" if ( defined($cmdRet) );
     
     
   } elsif ( scalar(@contacts) > 0 )  {
@@ -1564,6 +1574,8 @@ sub TelegramBot_Setup($) {
 ##
 ##############################################################################
 ##############################################################################
+
+
 
 #####################################
 # INTERNAL: get id for a peer
@@ -1766,6 +1778,7 @@ sub TelegramBot_ContactUpdate($@) {
     my $contactString = TelegramBot_userObjectToString( $user );
     if ( ! defined( $hash->{Contacts}{$user->{id}} ) ) {
       Log3 $hash->{NAME}, 3, "TelegramBot_ContactUpdate new contact :".$contactString.":";
+      next if ( AttrVal($hash->{NAME},'allowUnknownContacts',1) == 0 );
       $newfound = 1;
     } elsif ( $contactString ne $hash->{Contacts}{$user->{id}} ) {
       Log3 $hash->{NAME}, 3, "TelegramBot_ContactUpdate updated contact :".$contactString.":";
@@ -1990,11 +2003,13 @@ sub TelegramBot_BinaryFileWrite($$$) {
     where &lt;what&gt; is one of
 
   <br><br>
-    <li><code>message|msg|send [@&lt;peer&gt;] &lt;text&gt;</code><br>Sends the given message to the given peer or if peer is ommitted currently defined default peer user. If a peer is given it needs to be always prefixed with a '@'. Peers can be specified as contact ids, full names (with underscore instead of space), usernames (prefixed with another @) or chat names (also known as groups in telegram groups must be prefixed with #).<br>
+    <li><code>message|msg|send [ @&lt;peer1&gt; ... @&lt;peerN&gt; ] &lt;text&gt;</code><br>Sends the given message to the given peer or if peer(s) is ommitted currently defined default peer user. Each peer given needs to be always prefixed with a '@'. Peers can be specified as contact ids, full names (with underscore instead of space), usernames (prefixed with another @) or chat names (also known as groups in telegram groups must be prefixed with #). Multiple peers are to be separated by space<br>
     Messages do not need to be quoted if containing spaces.<br>
     Examples:<br>
       <dl>
         <dt><code>set aTelegramBotDevice message @@someusername a message to be sent</code></dt>
+          <dd> to send to a user having someusername as username (not first and last name) in telegram <br> </dd>
+        <dt><code>set aTelegramBotDevice message @@someusername @1234567 a message to be sent to multiple receipients</code></dt>
           <dd> to send to a user having someusername as username (not first and last name) in telegram <br> </dd>
         <dt><code>set aTelegramBotDevice message @Ralf_Mustermann another message</code></dt>
           <dd> to send to a user Ralf as firstname and Mustermann as last name in telegram   <br></dd>
@@ -2004,11 +2019,11 @@ sub TelegramBot_BinaryFileWrite($$$) {
           <dd> to send the message "Bye" to a contact or chat with the id "1234567". Chat ids might be negative and need to be specified with a leading hyphen (-). <br></dd>
       <dl>
     </li>
-    <li><code>sendImage|image [@&lt;peer&gt;] &lt;file&gt; [&lt;caption&gt;]</code><br>Sends a photo to the given or if ommitted to the default peer. 
+    <li><code>sendImage|image [ @&lt;peer1&gt; ... @&lt;peerN&gt;] &lt;file&gt; [&lt;caption&gt;]</code><br>Sends a photo to the given peer(s) or if ommitted to the default peer. 
     File is specifying a filename and path to the image file to be send. 
     Local paths should be given local to the root directory of fhem (the directory of fhem.pl e.g. /opt/fhem).
     filenames containing spaces need to be given in parentheses.<br>
-    Rule for specifying peers are the same as for messages. Captions can also contain multiple words and do not need to be quoted.
+    Rule for specifying peers are the same as for messages. Multiple peers are to be separated by space. Captions can also contain multiple words and do not need to be quoted.
     </li>
   <br><br>
     <li><code>replaceContacts &lt;text&gt;</code><br>Set the contacts newly from a string. Multiple contacts can be separated by a space. 
@@ -2017,12 +2032,6 @@ sub TelegramBot_BinaryFileWrite($$$) {
     internal contact handling, queue of send items and polling <br>
     ATTENTION: Messages that might be queued on the telegram server side (especially commands) might be then worked off afterwards immedately. 
     If in doubt it is recommened to temporarily deactivate (delete) the cmdKeyword attribute before resetting.</li>
-
-  <br><br>
-    <li>DEPRECATED: <code>sendImageTo &lt;peer&gt; &lt;file&gt; [&lt;caption&gt;]</code><br>Sends a photo to the given peer, 
-    other arguments are handled as with <code>sendPhoto</code></li>
-    <li>DEPRECATED: <code>messageTo &lt;peer&gt; &lt;text&gt;</code><br>Sends the given message to the given peer. 
-    Peer needs to be given without space or other separator, i.e. spaces should be replaced by underscore (e.g. first_last)</li>
 
   </ul>
   <br><br>
@@ -2082,8 +2091,6 @@ sub TelegramBot_BinaryFileWrite($$$) {
     <li><code>pollingVerbose &lt;0_None 1_Digest 2_Log&gt;</code><br>Used to limit the amount of logging for errors of the polling connection. These errors are happening regularly and usually are not consider critical, since the polling restarts automatically and pauses in case of excess errors. With the default setting "1_Digest" once a day the number of errors on the last day is logged (log level 3). With "2_Log" every error is logged with log level 2. With the setting "0_None" no errors are logged. In any case the count of errors during the last day and the last error is stored in the readings <code>PollingErrCount</code> and <code>PollingLastError</code> </li> 
 
     
-pollingVerbose:1_Digest,2_Log,0_None
-    
   <br><br>
     <li><code>maxFileSize &lt;number of bytes&gt;</code><br>Maximum file size in bytes for transfer of files (images). If not set the internal limit is specified as 10MB (10485760B).
     </li> 
@@ -2094,7 +2101,8 @@ pollingVerbose:1_Digest,2_Log,0_None
     <li><code>saveStateOnContactChange &lt;1 or 0&gt;</code><br>Allow statefile being written on every new contact found, ensures new contacts not being lost on any loss of statefile. Default is on (1).
     </li> 
 
-
+    <li><code>allowUnknownContacts &lt;1 or 0&gt;</code><br>Allow new contacts to be added automatically (1 - Default) or restrict message reception only to known contacts and unknwown contacts will be ignored (0).
+    </li> 
 
     <li><a href="#verbose">verbose</a></li>
   </ul>
