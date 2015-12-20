@@ -147,8 +147,7 @@ telnet_Define($$$)
   return "Usage: define <name> telnet { [IPV6:]<tcp-portnr> [global] | ".
                                       " [IPV6:]serverName:port }"
         if(!($isServer || $isClient) ||
-            ($isClient && $global) ||
-            ($global && $global ne "global"));
+            ($isClient && $global));
 
   # Make sure that fhem only runs once
   if($isServer) {
@@ -366,15 +365,19 @@ telnet_ActivateInform($;$)
   <a name="telnetdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; telnet &lt;portNumber&gt; [global]</code><br>
+    <code>define &lt;name&gt; telnet &lt;portNumber&gt;
+    [global|hostname]</code><br>
+
     or<br>
     <code>define &lt;name&gt; telnet &lt;servername&gt:&lt;portNumber&gt;</code>
     <br><br>
 
     First form, <b>server</b> mode:<br>
     Listen on the TCP/IP port <code>&lt;portNumber&gt;</code> for incoming
-    connections. If the second parameter global is <b>not</b> specified,
-    the server will only listen to localhost connections.
+    connections. If the second parameter is <b>not</b> specified,
+    the server will only listen to localhost connections. If the second
+    parameter is global, telnet will listen on all interfaces, else it wil try
+    to resolve the parameter as a hostname, and listen only on this interface.
     <br>
     To use IPV6, specify the portNumber as IPV6:&lt;number&gt;, in this
     case the perl module IO::Socket:INET6 will be requested.
@@ -512,16 +515,19 @@ telnet_ActivateInform($;$)
   <a name="telnetdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; telnet &lt;portNumber&gt; [global]</code><br>
-    oder<br>
+    <code>define &lt;name&gt; telnet &lt;portNumber&gt;
+    [global|hostname]</code><br> oder<br>
+
     <code>define &lt;name&gt; telnet &lt;servername&gt:&lt;portNummer&gt;</code>
     <br><br>
 
     Erste Form, <b>Server</b>-mode:<br>
     &Uuml;berwacht den TCP/IP-Port <code>&lt;portNummer&gt;</code> auf
-    ankommende Verbindungen. Wenn der zweite Parameter gobal <b>nicht</b>
+    ankommende Verbindungen. Wenn der zweite Parameter <b>nicht</b>
     angegeben wird, wird der Server nur auf Verbindungen von localhost achten.
-
+    Falls der zweite Parameter global ist, dann wird telnet auf allen lokalen
+    Netzwerk-Interfaces zuh&ouml;ren, ansonsten wird der Parameter als Hostname
+    oder Adresse interpretiert, und nur diese lokale Adresse bedient.
     <br>
     F&uuml;r den Gebrauch von IPV6 muss die Portnummer als IPV6:&lt;nummer&gt;
     angegeben werden, in diesem Fall wird das Perl-Modul IO::Socket:INET6
