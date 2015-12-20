@@ -190,20 +190,15 @@ doUpdate($$)
       return 1;
     }
 
-    my $isExcl;
-    foreach my $ex (@excl) {
-      $isExcl = 1 if($fName =~ m/$ex/);
-    }
-
     if($isSingle) {
       next if($fName !~ m/$arg/);
-      if($isExcl) {
-        uLog 1, "update: skipping $fName, matches exclude_from_update";
-        $nSkipped++;
-        next;
-      }
 
     } else {
+   
+      my $isExcl;
+      foreach my $ex (@excl) {
+        $isExcl = 1 if($fName =~ m/$ex/);
+      }
       my $fPath = "$root/$fName";
       $fPath = $0 if($fPath =~ m/$mainPgm/);
       my $fileOk = ($lh{$fName} &&
