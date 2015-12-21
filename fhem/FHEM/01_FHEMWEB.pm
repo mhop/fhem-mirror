@@ -258,7 +258,10 @@ FW_Undef($$)
 {
   my ($hash, $arg) = @_;
   my $ret = TcpServer_Close($hash);
-  %FW_visibleDeviceHash = FW_visibleDevices() if($hash->{inform});
+  if($hash->{inform}) {
+    %FW_visibleDeviceHash = FW_visibleDevices();
+    delete($logInform{$hash->{NAME}});
+  }
   return $ret;
 }
 
@@ -527,6 +530,7 @@ FW_closeConn($)
       delete($defs{$hash->{NAME}});
     }
   }
+
   POSIX::exit(0) if($hash->{isChild});
   FW_Read($hash, 1) if($hash->{BUF});
 }
@@ -684,6 +688,11 @@ FW_answerCall($)
         addToWritebuffer($me, $data."\n");
         delete $defs{$FW_wname}{asyncOutput}{$FW_id};
       }
+    }
+    if($me->{inform}{withLog}) {
+      $logInform{$me->{NAME}} = "FW_logInform";
+    } else {
+      delete($logInform{$me->{NAME}});
     }
 
     return -1;
@@ -1993,8 +2002,10 @@ FW_style($$)
           "</script>";
     FW_pO "<div id=\"content\">";
     my $filter = ($a[2] && $a[2] ne "1") ? $a[2] : ".*";
-    FW_pO "Events (Filter:<a href=\"#\" id=\"eventFilter\">$filter</a>)".
-          " <a href=\"#\" id=\"eventReset\">[Reset]</a>:<br>\n";
+    FW_pO "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
+          "&nbsp;&nbsp;<span class='changed'>FHEM log ".
+                "<input id='eventWithLog' type='checkbox'></span>".
+          "&nbsp;&nbsp;<button id='eventReset'>Reset</button><br><br>\n";
     FW_pO "<div id=\"console\"></div>";
     FW_pO "</div>";
 
@@ -2447,6 +2458,23 @@ FW_roomStatesForInform($$)
   }
   my $data = join("\n", map { s/\n/ /gm; $_ } @data)."\n";
   return $data;
+}
+
+sub
+FW_logInform($$)
+{
+  my ($me, $msg) = @_; # _NO_ Log3 here!
+
+  my $ntfy = $defs{$me};
+  if(!$ntfy) {
+    delete $logInform{$me};
+    return;
+  }
+  if(!addToWritebuffer($ntfy, "<div class='changed'>$msg</div>") ){
+    TcpServer_Close($ntfy);
+    delete $logInform{$me};
+    delete $defs{$me};
+  }
 }
 
 sub
