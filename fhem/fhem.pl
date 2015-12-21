@@ -364,7 +364,7 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
   "setdefaultattr" => { Fn=>"CommandDefaultAttr",
             Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "shutdown"=> { Fn=>"CommandShutdown",
-            Hlp=>"[restart],terminate the server" },
+            Hlp=>"[restart|exitValue],terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
             Hlp=>"<sec> [<id>] [quiet],sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
@@ -1496,7 +1496,12 @@ sub
 CommandShutdown($$)
 {
   my ($cl, $param) = @_;
-  return "Usage: shutdown [restart]"
+  my $exitValue = 0;
+  if($param && $param =~ m/^(\d+)$/) {
+    $exitValue = $1;
+    $param = "";
+  }
+  return "Usage: shutdown [restart|exitvalue]"
         if($param && $param ne "restart");
 
   DoTrigger("global", "SHUTDOWN", 1);
@@ -1517,7 +1522,7 @@ CommandShutdown($$)
       exec('cmd.exe /C net stop fhem & net start fhem');
     }
   }
-  exit(0);
+  exit($exitValue);
 }
 
 

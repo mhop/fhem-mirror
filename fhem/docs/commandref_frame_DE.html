@@ -1309,16 +1309,18 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="shutdown"></a>
 <h3>shutdown</h3>
 <ul>
-  <code>shutdown [restart]</code>
+  <code>shutdown [restart|exitValue]</code>
   <br><br>
   Der Befehl f&auml;hrt den Server herunter (nach dem sichern aller <a
   href="#statefile">Ger&auml;testati</a>). Er triggert das global:SHUTDOWN
   Ereignis.  Mit der optionalen Parameter restart startet FHEM danach neu.
+  exitValue ist bei bestimmten Start-programmen von n&oulm;ten.
   <br><br>
   Beispiel:
   <ul>
     <code>shutdown</code><br>
-    <code>shutdown restart</code>
+    <code>shutdown restart</code><br>
+    <code>shutdown 1</code>
   </ul>
 </ul>
 
