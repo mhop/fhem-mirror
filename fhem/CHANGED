@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 71_YAMAHA_NP: More secure FM frequency input 
   - feature: FHEMWEB/Event Monitor: optional FHEM Log monitor.
   - feature: 50_Telegrambot: multiple contacts for send etc/removed depreacted
       messageTo,sendImageTo,sendPhotoTo/allowunknowncontacts
