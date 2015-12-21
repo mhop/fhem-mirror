@@ -703,45 +703,45 @@ sub YAMAHA_NP_Set
     }
     elsif($what eq "tunerFMFrequency")
     {
-		if(length($a[2]) <= 6 and length($a[2]) >= 5) 	# Check the string length (x)xx.xx
-		{
-			if ( $a[2] =~ /^[0-9,.E]+$/ )				# Check if value is numeric
-			{
-			  if( $a[2] >= 87.50 and $a[2] <= 108.00) 	# Check if within the value range
-			  {
-				if(substr($a[2], -3, 1) eq '.') 		# Check for decimal point
-				{
-					my $lastDigit = substr($a[2], -1, 1);
-					if(($lastDigit eq "0") or ($lastDigit eq "5"))
-					{
-						my $frequency = $a[2];
-						$frequency =~ s/\.//; 			# Remove decimal point
-						YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><FM><Freq>".$frequency."<\/Freq><\/FM><\/Tuning><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerFMFrequency", $a[2]);
-					}
-					else
-					{
-						return "Last digit must be '0' or '5'";
-					}
-				}
-				else
-				{
-					return "Missing decimal point. Accepted format (x)xx.xx"
-				}			
-			  }
-			  else
-			  {
-				return "Frequency value must be in the range 87.50 ... 108.00 of the format (x)xx.xx";
-			  }
-			}
-			else
-			{
-			  return "Frequency value must be numeric in the range 87.50 ... 108.00 of the format (x)xx.xx";
-			}
-		}
-		else
-		{
-			return "Frequency length must be 5 or 6 characters e.g. 89.50 or 108.00";
-		}
+  		if(length($a[2]) <= 6 and length($a[2]) >= 5) 	# Check the string length (x)xx.xx
+  		{
+  			if ( $a[2] =~ /^[0-9,.E]+$/ )				# Check if value is numeric
+  			{
+  			  if(substr($a[2], -3, 1) eq '.')    # Check for decimal point
+          {
+    				if( $a[2] >= 87.50 and $a[2] <= 108.00)   # Check if within the value range
+    				{
+  					  my $lastDigit = substr($a[2], -1, 1);
+    					if(($lastDigit eq "0") or ($lastDigit eq "5"))
+    					{
+    						my $frequency = $a[2];
+    						$frequency =~ s/\.//; 			# Remove decimal point
+    						YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><FM><Freq>".$frequency."<\/Freq><\/FM><\/Tuning><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerFMFrequency", $a[2]);
+    					}
+    					else
+    					{
+    						return "Last digit must be '0' or '5'";
+    					}
+    				}
+    				else
+    				{
+    				  return "Frequency value must be in the range 87.50 ... 108.00 of the format (x)xx.xx";	
+    				}			
+  			  }
+  			  else
+  			  {
+  				  return "Missing decimal point. Accepted format (x)xx.xx";            
+  			  }
+  			}
+  			else
+  			{
+  			  return "Frequency value must be numeric in the range 87.50 ... 108.00 of the format (x)xx.xx";
+  			}
+  		}
+  		else
+  		{
+  			return "Frequency length must be 5 or 6 characters e.g. 89.50 or 108.00";
+  		}
     }
     else
     {
