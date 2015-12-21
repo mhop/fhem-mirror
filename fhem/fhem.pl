@@ -212,6 +212,7 @@ use vars qw(%data);             # Hash for user data
 use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
 use vars qw(%defs);             # FHEM device/button definitions
 use vars qw(%inform);           # Used by telnet_ActivateInform
+use vars qw(%logInform);        # Used by FHEMWEB/Event-Monitor
 use vars qw(%intAt);            # Internal at timer hash, global for benchmark
 use vars qw(%modules);          # List of loaded modules (device/log/etc)
 use vars qw(%ntfyHash);         # hash of devices needed to be notified.
@@ -833,6 +834,13 @@ Log3($$$)
   } else {
     print "$tim $loglevel: $text\n";
   }
+
+  no strict "refs";
+  foreach my $li (keys %logInform) {
+    &{$logInform{$li}}($li, "$tim $loglevel : $text");
+  }
+  use strict "refs";
+
   return undef;
 }
 

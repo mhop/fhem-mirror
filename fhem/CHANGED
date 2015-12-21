@@ -1,11 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - feature: 50_Telegrambot: multiple contacts for send etc/removed depreacted messageTo,sendImageTo,sendPhotoTo/allowunknowncontacts
+  - feature: FHEMWEB/Event Monitor: optional FHEM Log monitor.
+  - feature: 50_Telegrambot: multiple contacts for send etc/removed depreacted
+      messageTo,sendImageTo,sendPhotoTo/allowunknowncontacts
   - bugfix: 70_PushNotifier: remove messages fron FHEM-logfile
   - feature: 49_SSCam: function "snap" for taking snapshots added,
   - bugfix: 49_SSCam: fixed a bug that functions may impact each other
-  - feature: 31_MilightDevice: Add restoreAtStart attribute so group devices (slot 'A') do not restore state by default at startup
-  - bugfix: 30_MilightBridge/31_MilightDevice: Fix startup restore.  Fix crash on invalid hostname.
+  - feature: 31_MilightDevice: Add restoreAtStart attribute so group devices
+      (slot 'A') do not restore state by default at startup
+  - bugfix: 30_MilightBridge/31_MilightDevice: Fix startup restore.  Fix crash
+      on invalid hostname.
   - feature: YAMAHA_NP: Direct FM frequency setting.
   - feature: 30_pilight_xyz: possibility to change IO-Device (IODEV)
   - bugfix: YAMAHA_AVR: fixing not correctly volume smoothing

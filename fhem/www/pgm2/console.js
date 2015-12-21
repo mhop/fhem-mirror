@@ -2,6 +2,7 @@ var consConn;
 
 var consFilter, oldFilter;
 var consLastIndex = 0;
+var withLog = 0;
 log("Console is opening");
 
 function
@@ -24,8 +25,10 @@ consUpdate()
   consLastIndex = len;
   
   log("Console Rcvd: "+new_content);
+  if(new_content.indexOf('<') != 0)
+    new_content = new_content.replace(/ /g, "&nbsp;");
   $("#console")
-    .append(new_content.replace(/ /g, "&nbsp;"))
+    .append(new_content)
     .scrollTop($("#console")[0].scrollHeight);
 }
 
@@ -40,7 +43,7 @@ consFill()
   }
   consConn = new XMLHttpRequest();
   var query = document.location.pathname+"?XHR=1"+
-       "&inform=type=raw;filter="+consFilter+
+       "&inform=type=raw;withLog="+withLog+";filter="+consFilter+
        "&timestamp="+new Date().getTime();
   query = addcsrf(query);
   consConn.open("GET", query, true);
@@ -62,14 +65,14 @@ consStart()
   if(consFilter == undefined)
     consFilter = ".*";
   oldFilter = consFilter;
-  setTimeout("consFill()", 1000);
+  setTimeout(consFill, 1000);
   
-   $("a#eventReset").click(function(evt){  // Event Monitor Reset
+   $("#eventReset").click(function(evt){  // Event Monitor Reset
      log("Console resetted by user");
      $("#console").html("");
    });
   
-  $("a#eventFilter").click(function(evt){  // Event-Filter Dialog
+  $("#eventFilter").click(function(evt){  // Event-Filter Dialog
     $('body').append(
       '<div id="evtfilterdlg">'+
         '<div>Filter:</div><br>'+
@@ -95,6 +98,11 @@ consStart()
           consFill();
         }}]
     });
+  });
+
+  $("#eventWithLog").change(function(evt){  // Event-Filter Dialog
+    withLog = ($("#eventWithLog").is(':checked') ? 1 : 0);
+    consFill();
   });
 }
 
