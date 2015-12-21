@@ -1524,7 +1524,7 @@ ZWave_configParseModel($;$)
       my ($cmd,$shortened) = ZWave_cleanString($h{label}, $h{index});
       $cmdName = "config$cmd";
       $h{Help} = "";
-      $h{Help} .= "Full text for $cmdName is $h{label}<br>" if($shortened);
+      $h{Help} .= "Full text for $cmdName is: $h{label}<br>" if($shortened);
       $hash{$cmdName} = \%h;
     }
 
@@ -3046,7 +3046,14 @@ ZWave_helpFn($$)
   return "" if(!$mc);
   my $h = $mc->{config}{$cmd};
   return "" if(!$h || !$h->{Help});
-  return "Help for $cmd:<br>".$h->{Help};
+  $cmd .= " (numeric code $h->{index})" if(defined($h->{index}));
+  my $ret = "Help for $cmd:<br>".$h->{Help};
+
+  my $hi = $h->{Item};
+  $ret .= "Possible values: ".
+          join(", ", map {"$_ ($hi->{$_})"} sort keys %{$hi})."<br>"
+    if($hi);
+  return $ret;
 }
 
 sub
