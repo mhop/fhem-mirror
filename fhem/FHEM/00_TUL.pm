@@ -3,6 +3,7 @@
 # ABU 20150916 removed print: simpleWriteDate, cleaned init
 # ABU 20150918 fixed deprecated warning, fixed warning related to hex-conversion in simple-write
 # ABU 20151123 added error-label in getGroup. Responsible for error-handling, if knxd is not accesible
+# ABU 20151213 changed message-check in decode_tpuart() to avoid ignore while receiving repeated messages
 
 package main;
 
@@ -773,9 +774,11 @@ sub decode_tpuart($)
     my ($ctrl,$src, $dst, $routingcnt,$cmd, $bytes) = unpack("CnnCxCa*", $buf);
     my $drl = $routingcnt >>7;
     my $len = ($routingcnt & 0x0F) +1;
-    if(($ctrl & 0xB0)!=0xB0)
+	#if(($ctrl & 0xB0)!=0xB0)
+    if(($ctrl & 0x90)!=0x90)
     {
-    	Log(3,"Control Byte " . sprintf("0x%02x",$ctrl) . " does not match expected mask 0xB0");
+    	#Log(3,"Control Byte " . sprintf("0x%02x",$ctrl) . " does not match expected mask 0xB0");
+		Log(3,"Control Byte " . sprintf("0x%02x",$ctrl) . " does not match expected mask 2x1001nnnn");
     	return undef;
     }
 
