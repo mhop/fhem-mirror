@@ -18,6 +18,9 @@
 # ABU 20150924 fixed date/time again
 # ABU 20150926 removed eventMarker, removed no get for dummies
 # ABU 20151207 added dpt3, fixed doku-section myDimmer
+# ABU 20151213 added dpt13
+# ABU 20151221 added multiple group support for get according thread 45954
+
 package main;
 
 use strict;
@@ -113,6 +116,11 @@ my %eib_dpttypes = (
   # 4-Octet unsigned value (handled as dpt7)
   "dpt12" 		=> {"CODE"=>"dpt12", "UNIT"=>""},
   
+  # 4-Octet Signed Value
+  "dpt13" 		=> {"CODE"=>"dpt13", "UNIT"=>"",  "factor"=>1},
+  "dpt13.010" 		=> {"CODE"=>"dpt13", "UNIT"=>"W/h",  "factor"=>1},
+  "dpt13.013" 		=> {"CODE"=>"dpt13", "UNIT"=>"kW/h",  "factor"=>1},
+
   # 4-Octet single precision float
   "dpt14"         => {"CODE"=>"dpt14", "UNIT"=>""},
 
@@ -226,15 +234,36 @@ EIB_SetState($$$$) {
 ###################################
 sub
 EIB_Get($@) {
-	my ($hash, @a) = @_;
-
-	#return "No get for dummies" if(IsDummy($hash->{NAME}));
+	#my ($hash, @a) = @_;
+	##return "No get for dummies" if(IsDummy($hash->{NAME}));
+	#return "" if($a[1] && $a[1] eq "?");  # Temporary hack for FHEMWEB
+	##send read-request to the bus
+	#IOWrite($hash, "B", "r" . $hash->{GROUP});
+	#return "Current value for $hash->{NAME} ($hash->{GROUP}) requested.";
+	
+	my ($hash, @a, $str) = @_;
+	my $na = int(@a);
+	my $value = $a[1];
+	
 	return "" if($a[1] && $a[1] eq "?");  # Temporary hack for FHEMWEB
 
-	#send read-request to the bus
-	IOWrite($hash, "B", "r" . $hash->{GROUP});
+  	my $groupnr = 1;
+	
+	# the command can be send to any of the defined groups indexed starting by 1
+	# optional last argument starting with g indicates the group
+	# execute only for non-strings. Otherwise a "g" is interpreted to execute this group-send-mechanism...
+	if (defined($value) and ($value ne "string"))
+	{
+		$groupnr = $1 if($na=2 && $a[1]=~ m/g([0-9]*)/);
+		#return, if unknown group
+		return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
+	}
+	my $groupcode = $hash->{CODE}{$groupnr};
+
+  	#send read-request to the bus
+	IOWrite($hash, "B", "r" . $groupcode);
   
-	return "Current value for $hash->{NAME} ($hash->{GROUP}) requested.";	  
+	return "Current value for $hash->{NAME} ($groupcode) requested.";
 }
 
 ###################################
@@ -781,6 +810,18 @@ EIB_EncodeByDatapointType($$$$) {
 		my $fullval = sprintf("00%.8x",$value);
 		$transval = $fullval;
 		Log3 $hash, 5,"EIB $code encode $value" . '=' . " $fullval translated: $transval";
+	}
+	elsif ($code eq "dpt13") 
+	{
+	  #4-byte signed
+	  my $dpt13factor = $eib_dpttypes{"$model"}{"factor"};
+	  my $fullval = int($value/$dpt13factor);
+      $fullval += 4294967296 if ($fullval < 0);
+      $fullval = 0 if ($fullval < 0);
+      $fullval = 0xFFFFFFFF if ($fullval > 0xFFFFFFFF);
+	  $transval = sprintf("00%.8x",$fullval);
+
+	  Log3 $hash, 5,"EIB $code encode $value = $fullval factor = $dpt13factor translated: $transval";
 	} 
 	elsif($code eq "dpt14") 
 	{
@@ -1044,6 +1085,14 @@ EIB_ParseByDatapointType($$$$)
 		my $fullval = hex($value);
 		$transval = $fullval;		
 	} 
+	elsif ($code eq "dpt13") 
+	{
+		my $dpt13factor = $eib_dpttypes{"$model"}{"factor"};
+		my $fullval = hex($value);
+		$transval = $fullval;
+		$transval -= 4294967296 if $transval >= 0x80000000;
+		$transval = sprintf("%.0f",$transval * $dpt13factor) if($dpt13factor != 0);
+	}	
 	elsif ($code eq "dpt14")
     {
         # 4-byte float
@@ -1298,6 +1347,7 @@ eib_name2hex($)
       	<li>dpt11  -> transferred from and to state, format hh:mm:ss</li>
       	<li>date  -> receiving has no effect, sending any value contains actual system date</li>
       	<li>dpt12</li>
+		<li>dpt13</li>
       	<li>dpt14</li>
       	<li>dpt16  -> has to be used with "set string"</li>
       </ul>      
