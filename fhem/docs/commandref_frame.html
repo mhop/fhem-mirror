@@ -1233,16 +1233,18 @@ The following local attributes are used by a wider range of devices:
 <a name="shutdown"></a>
 <h3>shutdown</h3>
 <ul>
-  <code>shutdown [restart]</code>
+  <code>shutdown [restart|exitValue]</code>
   <br><br>
   Shut down the server (after saving the <a href="#statefile">state information
   </a>). It triggers the global:SHUTDOWN event.  If the optional restart
-  parameter is specified, fhem tries to restart itself.
+  parameter is specified, fhem tries to restart itself. exitValue may be
+  important for start scripts.
   <br><br>
   Example:
   <ul>
     <code>shutdown</code><br>
-    <code>shutdown restart</code>
+    <code>shutdown restart</code><br>
+    <code>shutdown 1</code><br>
   </ul>
 </ul>
 
