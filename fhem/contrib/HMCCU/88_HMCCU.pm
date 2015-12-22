@@ -129,6 +129,7 @@ sub HMCCU_GetChannel ($$);
 sub HMCCU_RPCGetConfig ($$$);
 sub HMCCU_RPCSetConfig ($$$);
 sub HMCCU_State ($);
+sub HMCCU_Dewpoint ($$$$);
 
 
 #####################################
@@ -300,7 +301,7 @@ sub HMCCU_Set ($@)
 		my $script;
 		my $response;
 
-		return HMCCU_SetError ($hash, "Usage: set <device> hmscript <scriptfile>") if (!defined ($scrfile));
+		return HMCCU_SetError ($hash, "Usage: set $name hmscript {scriptfile}") if (!defined ($scrfile));
 		if (open (SCRFILE, "<$scrfile")) {
 			my @lines = <SCRFILE>;
 			$script = join ("\n", @lines);
@@ -636,27 +637,33 @@ sub HMCCU_ParseObject ($$)
 sub HMCCU_GetReadingName ($$$$$$)
 {
 	my ($i, $a, $c, $d, $n, $rf) = @_;
+	my $rn = '';
 
 	# Datapoint is mandatory
 	return '' if ($d eq '');
 
 	if ($rf eq 'datapoint') {
-		return $d;
+		$rn = $d;
 	}
 	elsif ($rf eq 'name') {
 		if ($n eq '') {
 			if ($a ne '' && $c ne '') {
 				$n = HMCCU_GetChannelName ($a.':'.$c, '');
+				$n =~ s/\:/\./;
 			}
 			elsif ($a ne '' && $c eq '') {
 				$n = HMCCU_GetDeviceName ($a, '');
+				$n =~ s/\:/_/g;
 			}
 			else {
 				return '';
 			}
 		}
+		else {
+			$n =~ s/\:/\./;
+		}
 
-		return $n ne '' ? $n.'.'.$d : '';
+		$rn = $n ne '' ? $n.'.'.$d : '';
 	}
 	elsif ($rf eq 'address') {
 		if ($a eq '' && $n ne '') {
@@ -667,12 +674,13 @@ sub HMCCU_GetReadingName ($$$$$$)
 			my $t = $a;
 			$i = HMCCU_GetDeviceInterface ($a, '') if ($i  eq '');
 			$t = $i.'.'.$t if ($i ne '');
-			$t = $t.':'.$c if ($c ne '');
-			return $t.'.'.$d;
+			$t = $t.'.'.$c if ($c ne '');
+
+			$rn = $t.'.'.$d;
 		}
 	}
 
-	return '';
+	return $rn;
 }
 
 ##################################################################
@@ -852,7 +860,9 @@ sub HMCCU_UpdateClientReading ($@)
 		my $ch = $defs{$d};
 		my $cn = $ch->{NAME};
 
-		next if (!defined ($ch->{IODev}) || !defined ($ch->{IODev}) || !defined ($ch->{ccuaddr}));
+		next if ($hash->{TYPE} ne 'HMCCUDEV' && $hash->{TYPE} ne 'HMCCUCHN');
+		next if (!defined ($ch->{IODev}) || !defined ($ch->{ccuaddr}));
+		next if ($ch->{IODev} != $hash);
 		next if ($ch->{ccuaddr} ne $devadd && $ch->{ccuaddr} ne $chnadd);
 
 		# Get attributes of client device
@@ -862,21 +872,25 @@ sub HMCCU_UpdateClientReading ($@)
 		my $st = AttrVal ($cn, 'statedatapoint', 'STATE');
 		my $substitute = AttrVal ($cn, 'substitute', '');
 		last if ($upd == 0);
-		next if ($dpt ne '' && $dpt !~ /$flt/);
+#		next if ($dpt ne '' && $dpt !~ /$flt/);
+		next if ($dpt eq '' || $dpt !~ /$flt/);
 
-		my $clreading = $reading;
-		if ($crf eq 'datapoint') {
-			$clreading = $dpt ne '' ? $dpt : $reading;
-		}
-		elsif ($crf eq 'name') {
-			$clreading = HMCCU_GetChannelName ($chnadd, $reading);
-			$clreading .= '.'.$dpt if ($dpt ne '');
-		}
-		elsif ($crf eq 'address') {
-			my $int = HMCCU_GetDeviceInterface ($devadd, 'BidCos-RF');
-			$clreading = $int.'.'.$chnadd;
-			$clreading .= '.'.$dpt if ($dpt ne '');
-		}
+		my $clreading = HMCCU_GetReadingName ('', $devadd, $channel, $dpt, '', $crf);
+		next if ($clreading eq '');
+
+#		my $clreading = $reading;
+#		if ($crf eq 'datapoint') {
+#			$clreading = $dpt ne '' ? $dpt : $reading;
+#		}
+#		elsif ($crf eq 'name') {
+#			$clreading = HMCCU_GetChannelName ($chnadd, $reading);
+#			$clreading .= '.'.$dpt if ($dpt ne '');
+#		}
+#		elsif ($crf eq 'address') {
+#			my $int = HMCCU_GetDeviceInterface ($devadd, 'BidCos-RF');
+#			$clreading = $int.'.'.$chnadd;
+#			$clreading .= '.'.$dpt if ($dpt ne '');
+#		}
 
 		# Client substitute attribute has priority
 		my $cl_value;
@@ -939,12 +953,14 @@ sub HMCCU_StartRPCServer ($)
 		# Child process, replace it by RPC server
 		exec ($rpcserver." ".$hash->{host}." ".$rpcport." ".$rpcqueue." ".$logfile);
 
-		# When we reach this line start of RPC server failed
+		# When we reach this line start of RPC server failed and child
+		# process can exit.
 		die;
 	}
 
 	Log 1, "HMCCU: RPC server started with pid ".$pid;
 	$hash->{RPCPID} = $pid;
+	$hash->{RPCPRC} = $rpcserver;
 
 	return $pid;
 }
@@ -962,6 +978,7 @@ sub HMCCU_StopRPCServer ($)
 		Log 1, "HMCCU: Stopping RPC server";
 		kill ('INT', $hash->{RPCPID});
 		$hash->{RPCPID} = 0;
+		$hash->{RPCPRC} = 'none';
 		return 1;
 	}
 	elsif ($rc < 0) {
@@ -991,6 +1008,7 @@ sub HMCCU_IsRPCServerRunning ($)
 		my $procstate = kill (0, $hash->{RPCPID}) ? 1 : 0;
 		if (! $procstate) {
 			$hash->{RPCPID} = 0;
+			$hash->{RPCPRC} = 'none';
 		}
 		return $procstate;
 	}
@@ -1008,12 +1026,14 @@ sub HMCCU_CheckProcess ($)
 {
 	my ($hash) = @_;
 
-	my $pdump = `ps -ef | grep ccurpcd\.pl | grep -v grep`;
+	return 0 if (!defined ($hash->{RPCPRC}) || $hash->{RPCPRC} eq 'none');
+
+	my $pdump = `ps -ef | grep $hash->{RPCPRC} | grep -v grep`;
 	my @plist = split "\n", $pdump;
 
 	foreach my $proc (@plist) {
 		my @procattr = split /\s+/, $proc;
-		return $procattr[1] if ($procattr[1] != $$);
+		return $procattr[1] if ($procattr[1] != $$ && $procattr[7] =~ /perl$/ && $procattr[8] eq $hash->{RPCPRC});
 	}
 
 	return 0;
@@ -1347,9 +1367,11 @@ sub HMCCU_ReadRPCQueue ($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my $maxevents = 10;
+	my $maxevents = 20;
 	my $eventno = 0;
 	my $f = 0;
+	my @newdevices;
+	my @deldevices;
 
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', 5);
 	my $ccureadingformat = AttrVal ($name, 'ccureadingformat', 'name');
@@ -1370,6 +1392,10 @@ sub HMCCU_ReadRPCQueue ($)
 			last if ($eventno == $maxevents);
 		}
 		elsif ($Tokens[0] eq 'ND') {
+#			push (@newdevices, $Tokens[1]);
+		}
+		elsif ($Tokens[0] eq 'DD') {
+#			push (@deldevices, $Tokens[1]);
 		}
 		elsif ($Tokens[0] eq 'EX') {
 			Log 1, "HMCCU: Received EX event. RPC server terminated.";
@@ -1387,6 +1413,9 @@ sub HMCCU_ReadRPCQueue ($)
 		Log 1, "HMCCU: Received no events from CCU since 180 seconds";
 	}
 
+#	HMCCU_DeleteDevices (\@deldevices) if (@deldevices > 0);
+#	HMCCU_NewDevices (\@newdevices) if (@newdevices > 0);
+
 	my $rc = HMCCU_IsRPCServerRunning ($hash);
 	if ($f == 0 && $rc > 0) {
 		InternalTimer (gettimeofday()+$rpcinterval, 'HMCCU_ReadRPCQueue', $hash, 0);
@@ -1399,6 +1428,7 @@ sub HMCCU_ReadRPCQueue ($)
 			Log 1, "HMCCU: RPC server has been shut down. f=$f";
 		}
 		$hash->{RPCPID} = 0;
+		$hash->{RPCPRC} = 'none';
 		$attr{$name}{rpcserver} = "off";
 	}
 }
@@ -1687,10 +1717,9 @@ foreach (sChannel, sChnList.Split(","))
 		my $reading = HMCCU_GetReadingName ($adrtoks[0], $add, $chn, $adrtoks[2],
 		   $dpdata[0], $readingformat);
 		next if ($reading eq '');
+		Log 1, "HMCCU: Readingname = $reading";
                  
-		Log 1, "HMCCU: Calling Substitute from GetChannel";
 		my $value = HMCCU_Substitute ($dpdata[2], $chnpars{$dpdata[0]}{sub}, 0, $reading);
-		Log 1, "HMCCU: Type=".$hash->{TYPE};
 		if ($hash->{TYPE} eq 'HMCCU') {
 			HMCCU_UpdateClientReading ($hmccu_hash, $add, $chn, $reading, $value);
 		}
@@ -1865,6 +1894,37 @@ sub HMCCU_State ($)
 	return $st;
 }
 
+####################################################
+# Calculate dewpoint. Requires reading names of
+# temperature and humidity as parameters.
+####################################################
+
+sub HMCCU_Dewpoint ($$$$)
+{
+	my ($name, $rtmp, $rhum, $defdp) = @_;
+	my $a;
+	my $b;
+
+	my $tmp = ReadingsVal ($name, $rtmp, 100.0);
+	my $hum = ReadingsVal ($name, $rhum, 0.0);
+	return $defdp if ($tmp == 100.0 || $hum == 0.0);
+
+	if ($tmp >= 0.0) {
+		$a = 7.5;
+		$b = 237.3;
+	}
+	else {
+		$a = 7.6;
+		$b = 240.7;
+	}
+
+	my $sdd = 6.1078*(10.0**(($a*$tmp)/($b+$tmp)));
+	my $dd = $hum/100.0*$sdd;
+	my $v = log($dd/6.1078)/log(10.0);
+	my $td = $b*$v/($a-$v);
+
+	return sprintf "%.1f", $td;
+}
 
 1;
 
