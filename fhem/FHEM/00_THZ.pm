@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 04/2015
-my $thzversion = "0.146";
+my $thzversion = "0.147";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -1003,13 +1003,17 @@ sub THZ_Get($@){
   if ($cmd eq "debug_read_raw_register_slow") {
     THZ_debugread($hash);
     return ("all raw registers read and saved");
-  } 
-  
+  }
+  if ($cmd eq "zBackupParameters") {
+    $err=THZ_backup_readings($hash);
+    return $err;
+  }
   my $cmdhash = $gets{$cmd};
   #return "Unknown argument $cmd, choose one of " .   join(" ", sort keys %gets) if(!defined($cmdhash));
   if(!defined($cmdhash)) {
     my $getList;
     foreach my $key (sort keys %gets) {$getList .= "$key:noArg ";}
+    $getList .= "zBackupParameters:noArg";
     return "Unknown argument $cmd, choose one of  $getList";
   }
   
@@ -1677,9 +1681,9 @@ sub function_heatSetTemp($$) {
   my $Simul_heatSetTemp; my $Simul_heatSetTemp_simplified;  my @ret; 
   foreach ($start..$stop) {
    my $tmp =$_ * $_ * $c + $_ * $b;
-   $Simul_heatSetTemp 		 = sprintf("%.1f", ( $tmp + $a));
+   $Simul_heatSetTemp 		 = sprintf("%.1f", maxNum(5,( $tmp + $a)));
    #$Simul_heatSetTemp 		 =  8 if ($pOpMode eq "DHWmode"); # DHWmode is always at 8 grad C 
-   $Simul_heatSetTemp_simplified = sprintf("%.1f", ($tmp + $a1));
+   $Simul_heatSetTemp_simplified = sprintf("%.1f", maxNum(5,($tmp + $a1)));
    push(@ret, [$_, $Simul_heatSetTemp, $Simul_heatSetTemp_simplified]);
   }
   my $titlestring =  'roomSetTemp=' . $roomSetTemp . '°C p13GradientHC1=' . $p13GradientHC1 . ' p14LowEndHC1=' . $p14LowEndHC1  .  'K p15RoomInfluenceHC1=' . $p15RoomInfluenceHC1 . "% insideTemp=" . $insideTemp .'°C';
@@ -1819,6 +1823,40 @@ sub THZ_detailFn(@)
 }
 
 #####################################
+sub THZ_backup_readings($){
+  my ($hash) = @_;
+  return "No statefile specified" if(!$attr{global}{statefile});
+  my $backupfile=$attr{global}{statefile};
+  my $t = localtime;
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  $month++;
+  $year+=1900;
+  #$year+=1900 - 2000;
+  my $replacestr= "$hash->{NAME}-$year-$month-$mday.backup"; 
+  $backupfile=~ s/fhem.save/$replacestr/g;  #saving to statefile path
+  if(!open(BAFH, ">$backupfile")) {
+    my $msg = "WriteStateFile: Cannot open $backupfile: $!";
+    Log 1, $msg;
+    return $msg;
+  }
+  print BAFH "#$t\n";
+  my $r = $hash->{READINGS};
+  foreach my $c (sort keys %{$r}) {
+    my $rd = $r->{$c};
+    if(($c =~ /^p[HOr0-9]/) and (defined($rd->{VAL}))) {
+	my $val = $rd->{VAL};
+	$val =~ s/;/;;/g;
+	$val =~ s/\n/\\\n/g;
+	print BAFH "set $hash->{NAME}  $c $val\n";
+    }
+  }
+  return "$backupfile: $!" if(!close(BAFH));
+  return "saved Readings in $backupfile";
+}
+
+
+
+
 
 
 1;
