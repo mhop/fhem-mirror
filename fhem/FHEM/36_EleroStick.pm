@@ -53,6 +53,67 @@ sub EleroStick_Fingerprint($$) {
 }
 
 #=======================================================================================
+sub EleroStick_Enqueue($$) {
+  my ($hash, $data) = @_;
+  my $name = $hash->{NAME};
+
+#  EleroStick_SimpleWrite($hash, $data);
+
+  if(!$hash->{QUEUE}) {
+    $hash->{QUEUE} = [$data];
+    ###debugLog($name, "QUEUE created with: $data");
+    EleroStick_StartQueueTimer($hash);
+  }
+  else {
+    push(@{$hash->{QUEUE}}, $data);
+    ###debugLog($name, "Pushed to QUEUE: $data");
+  }
+
+}
+
+#=======================================================================================
+sub EleroStick_StartQueueTimer($) {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $timerName = $name . "#QueueTimer";
+
+  my $interval = 0.5;
+
+  InternalTimer(gettimeofday() + $interval, "EleroStick_OnQueueTimer", $timerName, 0);
+
+  ###debugLog($name, "Timer started: $timerName");
+}
+
+
+#=======================================================================================
+sub EleroStick_OnQueueTimer($) {
+  my ($timerName) = @_;
+  my ($name, $suffix) = split("#", $timerName);
+  my $hash = $defs{$name};
+  my $queue = $hash->{QUEUE};
+
+  ###debugLog($name, "OnQueueTimer");
+
+  if (defined($queue) && @{$queue} > 0) {
+    my $data = $queue->[0];
+    if ($data ne "") {
+      EleroStick_SimpleWrite($hash, $data);
+      ###debugLog($name, "Timer msg=$data");
+    }
+
+    shift(@{$queue});
+    if (@{$queue} == 0) {
+      delete($hash->{QUEUE});
+    }
+    else {
+      EleroStick_StartQueueTimer($hash);
+    }
+
+  }
+
+}
+
+#=======================================================================================
 sub EleroStick_SimpleWrite($$) {
   my ($hash, $data) = @_;
 
@@ -68,7 +129,7 @@ sub EleroStick_SimpleWrite($$) {
     readingsSingleUpdate($hash, 'SendType', "easy_check", 1);
   }
   
-  readingsSingleUpdate($hash, 'SendMsg', $data, 1); 
+  readingsSingleUpdate($hash, 'SendMsg', $data, 1);
 }
 
 
@@ -134,7 +195,8 @@ sub EleroStick_SendEasyCheck($) {
 
     my $byteMsg = $head.$msgLength.$msgCmd.$checksum;
 
-    EleroStick_SimpleWrite($hash, $byteMsg);
+    EleroStick_Enqueue($hash, $byteMsg);
+    ###EleroStick_SimpleWrite($hash, $byteMsg)
    
   }
 }
@@ -174,8 +236,8 @@ sub EleroStick_SendEasyInfo($$) {
     my $checksum = sprintf('%02x', $checksumNumber);
      
     my $byteMsg = $head.$msgLength.$msgCmd.$firstChannels.$secondChannels.$checksum;
-        
-    EleroStick_SimpleWrite($hash, $byteMsg);
+
+    EleroStick_Enqueue($hash, $byteMsg);
   }
   
 }
@@ -249,8 +311,8 @@ sub EleroStick_Write($$) {
   
   # Send to the transmitter stick
   if($cmd eq 'send'){
-    ###debugLog($name, "EleroStick cmd=send msg=$msg");
-    EleroStick_SimpleWrite($hash, $msg);
+    ###debugLog($name, "EleroStick send cmd=send msg=$msg");
+    EleroStick_Enqueue($hash, $msg);
   }
   
   # Request status for a channel
