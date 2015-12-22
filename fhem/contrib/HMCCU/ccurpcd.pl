@@ -41,18 +41,26 @@ my $logfile;
 my $shutdown = 0;
 my $eventcount = 0;
 
+sub CheckProcess ($);
+sub Log ($);
+
 
 #####################################
 # Get PID of running RPC server or 0
 #####################################
 
-sub CheckProcess
+sub CheckProcess ($)
 {
-	my $pdump = `ps -ef | grep ccurpcd\.pl | grep -v grep`;
+	my ($prcname) = @_;
+
+	my $pdump = `ps -ef | grep $prcname | grep -v grep`;
 	my @plist = split "\n", $pdump;
 	foreach my $proc (@plist) {
 		my @procattr = split /\s+/, $proc;
-		return $procattr[1] if ($procattr[1] != $$);
+		if ($procattr[1] != $$ && $procattr[7] =~ /perl$/ && $procattr[8] eq $prcname) {
+			Log "Process $proc is running";
+			return $procattr[1];
+		}
 	}
 
 	return 0;
@@ -215,9 +223,9 @@ sub CCURPC_NewDevicesCB ($$$)
 	
 	Log "NewDevice: received ".scalar(@$a)." device specifications";
 	
-#	for my $dev (@$a) {
-#		WriteQueue ("ND|".$dev->{ADDRESS}."|".$dev->{TYPE});
-#	}
+	for my $dev (@$a) {
+		WriteQueue ("ND|".$dev->{ADDRESS}."|".$dev->{TYPE});
+	}
 
 #	return RPC::XML::array->new();
 	return;
@@ -288,9 +296,11 @@ sub CCURPC_ListDevicesCB ()
 # MAIN 
 #####################################
 
+my $name = $0;
+
 # Process command line arguments
 if ($#ARGV+1 != 4) {
-	die "Usage: ccurpc.pl CCU-Host Port QueueFile LogFile\n";
+	die "Usage: $name CCU-Host Port QueueFile LogFile\n";
 }
 
 my $ccuhost = $ARGV[0];
@@ -298,7 +308,7 @@ my $ccuport = $ARGV[1];
 my $queuefile = $ARGV[2];
 $logfile = $ARGV[3];
 
-my $pid = CheckProcess ();
+my $pid = CheckProcess ($name);
 if ($pid > 0) {
 	Log "Error: ccurpcd.pl is already running (PID=$pid)";
 	die "Error: ccurpcd.pl is already running (PID=$pid)\n";
