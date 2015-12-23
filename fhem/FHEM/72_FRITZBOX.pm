@@ -1655,14 +1655,16 @@ sub FRITZBOX_Readout_Process($$)
       }
 
    # adapt TR064-Mode
-      if ( defined $values{box_tr064} && $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
-            FRITZBOX_Log $hash, 3, "TR-064 is switched off";
-         delete $hash->{SECPORT};
-      }
-      elsif ( defined $values{box_tr064} && $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
-            FRITZBOX_Log $hash, 3, "TR-064 is switched on";
-         my $tr064Port = FRITZBOX_TR064_Init ($hash, $hash->{HOST});
-         $hash->{SECPORT} = $tr064Port    if $tr064Port;
+      if ( defined $values{box_tr064} ) {
+         if ( $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
+               FRITZBOX_Log $hash, 3, "TR-064 is switched off";
+            delete $hash->{SECPORT};
+         }
+         elsif ( $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
+               FRITZBOX_Log $hash, 3, "TR-064 is switched on";
+            my $tr064Port = FRITZBOX_TR064_Init ($hash, $hash->{HOST});
+            $hash->{SECPORT} = $tr064Port    if $tr064Port;
+         }
       }
 
       my $msg = keys( %values )." values captured in ".$values{readoutTime}." s";
@@ -3106,11 +3108,12 @@ sub FRITZBOX_Ring_Run_Web($)
    $result = FRITZBOX_Web_CmdGet( $hash, \@getCmdArray )
       if int( @getCmdArray ) > 0;
    
-   if ($result->[0] == 1) {
+   if ( $result->[0] == 1 ) {
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->[1];
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
    }
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
+
    my $returnStr = join('|', @roReadings );
    FRITZBOX_Log $hash, 5, "Handover to main process: ".$returnStr;
    return $name."|2|".encode_base64($returnStr,"");
@@ -4017,7 +4020,7 @@ sub FRITZBOX_TR064_Cmd($$$)
    }
 
 # Set Password und User for TR064 access
-   $FRITZBOX_TR064pwd = FRITZBOX_readPassword($hash);
+   $FRITZBOX_TR064pwd = FRITZBOX_readPassword($hash)     unless defined $FRITZBOX_TR064pwd;
    $FRITZBOX_TR064user = AttrVal( $name, "boxUser", "dslf-config" );   
    
    my $host = $hash->{HOST};
@@ -4052,6 +4055,7 @@ sub FRITZBOX_TR064_Cmd($$$)
          FRITZBOX_Log $hash, 2, "TR064-Transport-Error: ".$soap->transport->status;
          my %errorMsg = ( "Error" => $soap->transport->status );
          push @retArray, \%errorMsg;
+         $FRITZBOX_TR064pwd = undef;
       }
       elsif( $res->fault ) { # SOAP Error - will be defined if Fault element is in the message
          # my $fcode =  $s->faultcode;   #
@@ -4064,6 +4068,7 @@ sub FRITZBOX_TR064_Cmd($$$)
          # my $fdetail = Dumper($res->faultdetail); # returns value of 'detail' element as string or object
          # return "Error\n".$fdetail;
          push @retArray, $res->faultdetail;
+         $FRITZBOX_TR064pwd = undef;
       } 
       else { # normal result
          push @retArray, $res->body;
@@ -4287,7 +4292,7 @@ sub FRITZBOX_Web_CmdPost($$@)
 
    my $sid = FRITZBOX_Web_OpenCon($hash);
    unless ($sid) {
-      my @retArray = (0, "Didn't get a session ID");
+      my @retArray = (2, "Didn't get a session ID");
       return \@retArray;
    }
    
@@ -4375,9 +4380,8 @@ sub FRITZBOX_Web_Query($$@)
    my $name = $hash->{NAME};
 
    my $sid = FRITZBOX_Web_OpenCon( $hash );
-   unless ($sid)
-   {
-      my %retHash = ( "Error" => "Didn't get a session ID" ) ;
+   unless ($sid) {
+      my %retHash = ( "Error" => "Didn't get a session ID", "ResetSID" => "1" ) ;
       return \%retHash;
    }
 
@@ -4396,10 +4400,6 @@ sub FRITZBOX_Web_Query($$@)
       return \%retHash;
    }
 
-   if ($response->is_error) {
-      my %retHash = ("Error" => $response->status_line);
-      return \%retHash;
-   }
    if ($response->content =~ /<html>|"pid": "logout"/) {
       my %retHash = ("Error" => "Old SID not valid anymore.", "ResetSID" => "1");
       return \%retHash;
