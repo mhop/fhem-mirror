@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7014 2015-08-05 10:50:00Z chris1284 $
+# $Id: 57_CALVIEW.pm 7015 2015-12-23 13:30:00Z chris1284 $
 ###########################
 #	CALVIEW
 #	
@@ -103,9 +103,11 @@ sub CALVIEW_GetUpdate($){
 			location => $item->[4],
 			edate => $tempend[0],
 			etime => $tempend[1],
-			btimestamp => $bts[0]};	}
+			btimestamp => $bts[0],
+			mode => $item->[5]};	}
 	my $todaycounter = 1;
 	my $tomorrowcounter = 1;
+	my $runningcounter = 1;
 	my $readingstyle = AttrVal($name,"oldStyledReadings",0);	
 	# sort the array by btimestamp
 	my @sdata = map  $_->[0], 
@@ -121,10 +123,11 @@ sub CALVIEW_GetUpdate($){
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_location", $termin->{location});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_edate", $termin->{edate});
 			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_etime", $termin->{etime});
+			readingsBulkUpdate($hash, "t_".sprintf ('%03d', $counter)."_mode", $termin->{mode}); 
 			last if ($counter++ == $max);
 		};
 		for my $termin (@sdata){	#check ob temin heute
-			if ($date eq $termin->{bdate}){
+			if ($date eq $termin->{bdate} && $termin->{mode} ne "modeStart"){
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime}); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
@@ -132,7 +135,18 @@ sub CALVIEW_GetUpdate($){
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_edate", $termin->{edate}); 
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
+				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode}); 
 				$todaycounter ++;}
+			elsif ($date eq $termin->{bdate} && $termin->{mode} eq "modeStart"){
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_source", $termin->{source}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_edate", $termin->{edate}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode});
+				$runningcounter ++;}
 			#check ob termin morgen
 			elsif ($datenext eq $termin->{bdate}){
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_btime", "morgen"); 
@@ -141,13 +155,15 @@ sub CALVIEW_GetUpdate($){
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_source", $termin->{source});
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_location", $termin->{location});
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_edate", $termin->{edate}); 
-				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_etime", $termin->{etime}); 
+				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_etime", $termin->{etime});
+				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_mode", $termin->{mode}); 	
 				$tomorrowcounter++;}
 		};
-		readingsBulkUpdate($hash, "state", "t: ".($counter-1)." td: ".($todaycounter-1)." tm: ".($tomorrowcounter-1)); 
+		readingsBulkUpdate($hash, "state", "t: ".($counter-1)." td: ".($todaycounter-1)." tm: ".($tomorrowcounter-1)." tr: ".($runningcounter-1)); 
 		readingsBulkUpdate($hash, "c-term", $counter-1); 
 		readingsBulkUpdate($hash, "c-tomorrow", $tomorrowcounter-1); 
 		readingsBulkUpdate($hash, "c-today", $todaycounter-1); 
+		readingsBulkUpdate($hash, "c-started", $runningcounter-1);
 	}
 	else{
 		my $lastreadingname = "";
@@ -182,12 +198,13 @@ sub getsummery($)
 		foreach my $mode (@modes){
 			my $all = ReadingsVal($calendername, $mode, "");
 			my @uids=split(/;/,$all);
+			
 			foreach my $uid (@uids){
 				my $terminstart = CallFn($calendername, "GetFn", $defs{$calendername},(" ","start", $uid));
 				my $termintext = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","summary", $uid));
 				my $terminend = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","end", $uid));
 				my $terminort = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","location", $uid));
-				push(@terminliste, [$terminstart, $termintext, $terminend, $calendername, $terminort]);
+				push(@terminliste, [$terminstart, $termintext, $terminend, $calendername, $terminort, $mode]);
 			};
 		};
 	};
@@ -199,7 +216,7 @@ sub getsummery($)
 
 <a name="CALVIEW"></a>
 <h3>CALVIEW</h3>
-<ul>This module creates a device with deadlines based on calendar-devices of the 57_Calendar.pm module.</ul>
+<ul>This module creates a device with deadlines based on calendar-devices of the 57_Calendar.pm module. You need to install the  perl-modul Date::Parse!</ul>
 <b>Define</b>
 <ul><code>define &lt;Name&gt; CALVIEW &lt;calendarname(s) separate with ','&gt; &lt;0 for modeAlarm;modeStart;modeStarted; 1 for modeAlarm;modeStart;modeStarted;modeUpcoming; 2 for all (reading all);  3 for modeAlarmOrStart;modeUpcoming &gt; &lt;updateintervall in sec (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlecalendar 1</code></ul><br>
@@ -226,7 +243,7 @@ sub getsummery($)
 
 <a name="CALVIEW"></a>
 <h3>CALVIEW</h3>
-<ul>Dieses Modul erstellt ein Device welches als Readings Termine eines oder mehrere Kalender(s), basierend auf dem 57_Calendar.pm Modul, besitzt.</ul>
+<ul>Dieses Modul erstellt ein Device welches als Readings Termine eines oder mehrere Kalender(s), basierend auf dem 57_Calendar.pm Modul, besitzt. Ihr müsst das Perl-Modul Date::Parse installieren!</ul>
 <b>Define</b>
 <ul><code>define &lt;Name&gt; CALVIEW &lt;Kalendername(n) getrennt durch ','&gt; &lt;0 für modeAlarm;modeStart;modeStarted; 1 für modeAlarm;modeStart;modeStarted;modeUpcoming; 2 für alle (reading all); 3 für modeAlarmOrStart;modeUpcoming &gt &lt;updateintervall in sek (default 43200)&gt;</code></ul><br>
 <ul><code>define myView CALVIEW Googlekalender 1</code></ul><br>
