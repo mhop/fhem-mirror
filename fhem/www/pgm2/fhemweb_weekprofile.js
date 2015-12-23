@@ -133,7 +133,7 @@ function FW_weekprofileShow(widget)
   
   var table = widget.CONTENT;    
   for (var i = 0; i < shortDays.length; ++i) {
-    $(table).append('<tr class="'+ ( (i+1)%2==0 ? 'even':'odd')+ '"><td>'+shortDays[i]+'</td></tr>');
+    $(table).append('<tr class="'+ ( (i+1)%2==0 ? 'even':'odd')+ '"><td>'+widget.WEEKDAYS[i]+'</td></tr>');
     
     var tr = $(table).find("tr").get(i);
     
