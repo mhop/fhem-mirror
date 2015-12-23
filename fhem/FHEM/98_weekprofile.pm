@@ -67,6 +67,7 @@ sub weekprofile_getDeviceType($)
 
   # determine device type
   my $devHash = $main::defs{$device};
+  return undef unless (!defined($devHash));
   
   my $type = undef;
 
@@ -331,6 +332,10 @@ sub weekprofile_Define($$)
   my @profiles = ();
   $hash->{PROFILES} = \@profiles;
   
+  weekprofile_assignDev($hash);
+  weekprofile_readProfilesFromFile($hash);
+  weekprofile_updateReadings($hash);
+  
   #$attr{$me}{verbose} = 5;  
   return undef;
 }
@@ -533,6 +538,7 @@ sub weekprofile_Notify($$)
     my ($what,$who) = split(' ',$s);
     
     if ($what =~ m/INITIALIZED/) {
+      splice($own->{PROFILES});
       Log3 $me, 5, "$me(Notify): assign to device $own->{MASTERDEV}->{NAME}" if (defined($own->{MASTERDEV}->{NAME}));
       weekprofile_assignDev($own);
       weekprofile_readProfilesFromFile($own);
@@ -636,7 +642,8 @@ sub weekprofile_SummaryFn()
   $lnk = "<a name=\"$d.detail\" href=\"$FW_ME$FW_subdir?detail=$d\">$lnk</a>" if($show_links);
   
   my $args = "weekprofile";
-  my $curr = $hash->{PROFILES}[0]->{NAME};
+  my $curr = undef;
+  $curr = $hash->{PROFILES}[0]->{NAME} if (@{$hash->{PROFILES}} > 0 );
   
   $html .= "<table>";
   $html .= "<tr><td>";
