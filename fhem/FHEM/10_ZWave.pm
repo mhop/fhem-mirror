@@ -26,6 +26,7 @@ use vars qw(%zwave_id2class);
 
 my %zwave_class = (
   NO_OPERATION             => { id => '00' },
+  NEIGHBOR_UPDATE          => { id => '01' }, # reported by ZWCUL
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x",
                basicSet    => "01%02x"  }, # Alias, Forum #38200

@@ -3,13 +3,12 @@
 package main;
 
 # TODO
-#   inclusion
-#   exclusion
+#   battery devices
+#   inclusion/exclusion
+#   routing 
+#   neighborUpdate: 010404010c0001 010604000c0040 010700 0105
+#   explorer frames
 #   security
-#   routing
-#   neighborUpdate
-#   get
-#   wakeupNoMore
 
 use strict;
 use warnings;
@@ -79,6 +78,7 @@ ZWCUL_Define($$)
   $hash->{homeIdSet} = $a[3];
   $hash->{nodeIdHex} = $a[4];
   $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm":"zr");
+  $hash->{monitor} = 1 if($hash->{homeIdSet} eq "00000000");
 
   $hash->{Clients} = ":ZWave:STACKABLE_CC:";
   my %matchList = ( "1:ZWave" => ".*",
@@ -225,8 +225,8 @@ ZWCUL_Write($$$)
       return;
     }
 
-    # No wakeupNoMoreInformation in monitor mode
-    return if($p eq "8408" && $hash->{homeId} eq "00000000");
+    # Do not send wakeupNoMoreInformation in monitor mode
+    return if($p eq "8408" && $hash->{monitor});
 
     $th->{sentIdx} = ($th->{sentIdx}++ % 16);
     $msg = sprintf("%s%s41%02x%02x%s%s", 
@@ -302,10 +302,11 @@ ZWCUL_Parse($$$$)
 
   }
 
-  my ($hF,$hf, $rf,$hc,$hops,$ri,$u1) = (hex($F),hex($f),"",0,"","","");
+  my ($hF,$hf, $rf,$hc,$hp,$hops,$ri,$u1) = (hex($F),hex($f),"",0,0,"","","");
   # ITU G.9959, 8-4, 8-11
   if($hF&0x80) { # routing
     $hc = hex(substr($P,2,1));
+    $hp = hex(substr($P,3,1));
     $ri = "R:".substr($P, 0, ($hc+2)*2)." ";
     $rf = substr($P, 0, 2);
     $hops = substr($P, 4, $hc*2);
@@ -327,12 +328,14 @@ ZWCUL_Parse($$$$)
       (($hF & 0x10)==0x10 ? " speedModified":"").
       (($hF & 0x20)==0x20 ? " lowPower":"").
       (($hF & 0x40)==0x40 ? " ackReq":"").
-      (($hF & 0x80)==0x80 ? " routed, rf:$rf hopCount:$hc, hops:$hops":"").
+      (($hF & 0x80)==0x80 ? 
+                        " routed, rf:$rf hopCnt:$hc hopPos:$hp hops:$hops":"").
       ((($hf>>1)&3)==0 ? " "          : 
       (($hf>>1)&3)==1 ? " shortBeam" :
       (($hf>>1)&3)==2 ? " longBeam"  :" unknownBeam");
   }
 
+  return if($hc && !$hash->{monitor} && $hc == $hp);
   return if(AttrVal($me, "noDispatch", 0));
 
 
