@@ -1,10 +1,12 @@
 #####################################################################################################
+# $Id $
+#####################################################################################################
 #       49_SSCam.pm
 #
-#       Copyright by Heiko Maaz
+#       written by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
-#       This Modul is used to operate Cameras defined in Synology Surveillance Station 7.0 or higher
+#       This Modul can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
 #       It's based on Synology Surveillance Station API Guide 2.0
 # 
 #	This file is part of fhem.
@@ -24,7 +26,8 @@
 #
 ######################################################################################################
 #  Versionshistorie:
-#
+#  1.4  23.12.2015 function "enable" and "disable" for SS-Cams added,
+#                  changed timout of Http-calls to a higher value
 #  1.3  19.12.2015 function "snap" for taking snapshots added,
 #                  fixed a bug that functions may impact each other 
 #  1.2  14.12.2015 improve usage of verbose-modes
@@ -44,7 +47,7 @@
 # $username   = "";          # User für login auf DS
 # $password   = "";          # Passwort für User login
 # $camname    = "";          # Name der Kamera
-# $rectime    = "";          # Dauer der Aufnahme in Sekunden
+# $rectime    = "";          # Dauer der Aufnahme in Sekunden 
   
 
 package main;
@@ -114,6 +117,7 @@ sub SSCam_Define {
   # Anfangswerte setzen
   $hash->{HELPER}{ACTIVE} = "off";
   readingsSingleUpdate($hash,"Record","Stop",0);
+  readingsSingleUpdate($hash, "Availability", "", 0); 
   
   return undef;
 }
@@ -136,7 +140,9 @@ sub SSCam_Set {
 	my %SSCam_sets = (
 	                 on        => "on",
 	                 off       => "off",
-	                 snap      => "snap"
+	                 snap      => "snap",
+	                 enable    => "enable",
+	                 disable   => "disable"
 	                 );
 	
 	my $camname = $hash->{CAMNAME};  
@@ -153,23 +159,32 @@ sub SSCam_Set {
                 {
                     if ($opt eq "on") 
                     {
-                       &camstartrec($hash);
+                        &camstartrec($hash);
                     }
-                   elsif ($opt eq "off") 
-                   {
+                    elsif ($opt eq "off") 
+                    {
                         &camstoprec($hash);
-                   }
-                   elsif ($opt eq "snap") 
-                   {
+                    }
+                    elsif ($opt eq "snap") 
+                    {
                         &camsnap($hash);
-                   }
+                    }
+                    elsif ($opt eq "enable") 
+                    {
+                        &camenable($hash);
+                    }
+                    elsif ($opt eq "disable") 
+                    {
+                        &camdisable($hash);
+                    }
+
                 }          
 }
 
 
 #############################################################################################################################
 #########                                        OpMode-Startroutinen                                           #############
-#########                                                                                                       #############
+#########   $hash->{HELPER}{ACTIVE} = Funktionstoken                                                            #############
 #########   $hash->{HELPER}{ACTIVE} = "on"    ->  eine Routine läuft, Start anderer Routine erst wenn "off".    #############
 #########   $hash->{HELPER}{ACTIVE} = "off"   ->  keine andere Routine läuft, sofortiger Start möglich          #############
 #############################################################################################################################
@@ -182,6 +197,26 @@ sub camstartrec ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $logstr;
+    my $errorcode;
+    my $error;
+    
+    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {
+        # wenn Kamera disabled ist ....
+        $errorcode = "402";
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        $logstr = "ERROR - Start Recording of Camera $camname can't be executed - $error" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
     
     if ($hash->{HELPER}{ACTIVE} ne "on" and ReadingsVal("$name", "Record", "Start") ne "Start") {
         # Aufnahme starten
@@ -207,6 +242,26 @@ sub camstoprec ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $logstr;
+    my $errorcode;
+    my $error;
+    
+    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {
+        # wenn Kamera disabled ist ....
+        $errorcode = "402";
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        $logstr = "ERROR - Stop Recording of Camera $camname can't be executed - $error" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
     
     if ($hash->{HELPER}{ACTIVE} ne "on" and ReadingsVal("$name", "Record", "Stop") ne "Stop") {
         # Aufnahme stoppen
@@ -232,6 +287,26 @@ sub camsnap ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $logstr;
+    my $errorcode;
+    my $error;
+    
+    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {
+        # wenn Kamera disabled ist ....
+        $errorcode = "402";
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        $logstr = "ERROR - Snapshot of Camera $camname can't be executed - $error" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
     
     if ($hash->{HELPER}{ACTIVE} ne "on") {
         # einen Schnappschuß aufnehmen
@@ -249,6 +324,59 @@ sub camsnap ($) {
     }    
 }
 
+###############################################################################
+###   Kamera aktivieren
+
+sub camenable ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    
+    if (ReadingsVal("$name", "Availability", "disabled") eq "enabled") {return;}       # Kamera ist bereits enabled
+    
+    if ($hash->{HELPER}{ACTIVE} ne "on") {
+        # eine Kamera aktivieren
+        $logstr = "Enable Camera $camname";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "Enable";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        &getapisites_nonbl($hash);
+    }
+    else
+    {
+    InternalTimer(gettimeofday()+0.1, "camenable", $hash, 0);
+    }    
+}
+
+###############################################################################
+###   Kamera deaktivieren
+
+sub camdisable ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    
+    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {return;}       # Kamera ist bereits disabled
+    
+    if ($hash->{HELPER}{ACTIVE} ne "on" and ReadingsVal("$name", "Record", "Start") ne "Start") {
+        # eine Kamera deaktivieren
+        $logstr = "Disable Camera $camname";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "Disable";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        &getapisites_nonbl($hash);
+    }
+    else
+    {
+    InternalTimer(gettimeofday()+0.2, "camdisable", $hash, 0);
+    }    
+}
 
 
 #############################################################################################################################
@@ -283,12 +411,12 @@ sub getapisites_nonbl {
    $logstr = "--- Begin Function getapisites nonblocking ---";
    &printlog($hash,$logstr,"4");
    
-   # URL zur Abfrage der Eigenschaften von API SYNO.SurveillanceStation.ExternalRecording,$apicam
+   # URL zur Abfrage der Eigenschaften der  API's
    $url = "http://$servername:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap";
    
    $param = {
                url      => $url,
-               timeout  => 5,
+               timeout  => 10,
                hash     => $hash,
                method   => "GET",
                header   => "Accept: application/json",
@@ -337,7 +465,12 @@ sub login_nonbl ($) {
         &printlog($hash,$logstr,"1");	                                                             
         $logstr = "--- End Function getapisites nonblocking with error ---";
         &printlog($hash,$logstr,"4");
+       
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
+
+        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+        $hash->{HELPER}{ACTIVE} = "off"; 
+
         return;
     }
 
@@ -436,9 +569,6 @@ sub login_nonbl ($) {
                     } 
                     else 
                     {
-                        # ausgeführte Funktion ist erledigt
-                        $hash->{HELPER}{ACTIVE} = "off";
-                        
                         # Fehlertext setzen
                         $error = "couldn't call API-Infosite";
        
@@ -454,6 +584,10 @@ sub login_nonbl ($) {
 
                         $logstr = "--- End Function getapisites nonblocking with error ---";
                         &printlog($hash,$logstr,"4");
+                        
+                        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+                        $hash->{HELPER}{ACTIVE} = "off"; 
+                        
                         return;
                      }
     }
@@ -468,7 +602,7 @@ sub login_nonbl ($) {
   
   $param = {
                url      => $url,
-               timeout  => 5,
+               timeout  => 10,
                hash     => $hash,
                method   => "GET",
                header   => "Accept: application/json",
@@ -512,7 +646,12 @@ sub getcamid_nonbl ($) {
         &printlog($hash,$logstr,"1");		                                                       # Eintrag fürs Log
         $logstr = "--- End Function serverlogin nonblocking with error ---";
         &printlog($hash,$logstr,"4");
+        
         readingsSingleUpdate($hash, "Error", $err, 1);                                      	       # Readings erzeugen
+        
+        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+        $hash->{HELPER}{ACTIVE} = "off"; 
+
         return;
    }
    elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
@@ -556,9 +695,6 @@ sub getcamid_nonbl ($) {
        } 
        else 
        {
-             # ausgeführte Funktion ist erledigt
-             $hash->{HELPER}{ACTIVE} = "off"; 
-             
              # Errorcode aus JSON ermitteln
              $errorcode = $data->{'error'}->{'code'};
        
@@ -577,6 +713,10 @@ sub getcamid_nonbl ($) {
              
              $logstr = "--- End Function serverlogin nonblocking with error ---";
              &printlog($hash,$logstr,"4"); 
+             
+             # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+             $hash->{HELPER}{ACTIVE} = "off"; 
+             
              return;
        }
    }
@@ -592,7 +732,7 @@ sub getcamid_nonbl ($) {
 
   $param = {
                url      => $url,
-               timeout  => 5,
+               timeout  => 10,
                hash     => $hash,
                method   => "GET",
                header   => "Accept: application/json",
@@ -615,6 +755,9 @@ sub camop_nonbl ($) {
    my $servername        = $hash->{SERVERNAME};
    my $serverport        = $hash->{SERVERPORT};
    my $camname           = $hash->{CAMNAME};
+   my $apicam            = $hash->{HELPER}{APICAM};
+   my $apicampath        = $hash->{HELPER}{APICAMPATH};
+   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER};
    my $apiextrec         = $hash->{HELPER}{APIEXTREC};
    my $apiextrecpath     = $hash->{HELPER}{APIEXTRECPATH};
    my $apiextrecmaxver   = $hash->{HELPER}{APIEXTRECMAXVER};
@@ -644,6 +787,10 @@ sub camop_nonbl ($) {
         $logstr = "--- End Function getcamid nonblocking with error ---";
         &printlog($hash,$logstr,"4");
         readingsSingleUpdate($hash, "Error", $err, 1);                                     # Readings erzeugen
+ 
+        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+        $hash->{HELPER}{ACTIVE} = "off"; 
+
         return;
    }
    elsif ($myjson ne "")                                                                   # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
@@ -708,15 +855,15 @@ sub camop_nonbl ($) {
                  &printlog($hash,$logstr,"1");
                  $logstr = "--- End Function getcamid nonblocking with error ---";
                  &printlog($hash,$logstr,"4");
+                 
+                 # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+                 $hash->{HELPER}{ACTIVE} = "off"; 
+           
                  return;
               }
        }
        else 
        {
-            # die Abfrage konnte nicht ausgeführt werden
-            # ausgeführte Funktion ist erledigt
-            $hash->{HELPER}{ACTIVE} = "off"; 
-   
             # Errorcode aus JSON ermitteln
             $errorcode = $data->{'error'}->{'code'};
 
@@ -734,6 +881,10 @@ sub camop_nonbl ($) {
             &printlog($hash,$logstr,"1");
             $logstr = "--- End Function getcamid nonblocking with error ---";
             &printlog($hash,$logstr,"4");
+            
+            # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+            $hash->{HELPER}{ACTIVE} = "off"; 
+            
             return;
        }
        
@@ -753,13 +904,25 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "Snap")
    {
-      # ein Schnappschuß wird gemacht und in SS gespeichert, Rückkehr wird mit "camret_nonbl" verarbeitet
+      # ein Schnappschuß wird ausgelöst und in SS gespeichert, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$servername:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=0&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=$camid&blSave=true&_sid=\"$sid\"";
-   }   
+      $hash->{STATE} = "snap";
+      readingsSingleUpdate($hash, "LastSnapId", "", 1);
+   }
+   elsif ($OpMode eq "Enable")
+   {
+      # eine Kamera wird aktiviert, Rückkehr wird mit "camret_nonbl" verarbeitet
+      $url = "http://$servername:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
+   }
+   elsif ($OpMode eq "Disable")
+   {
+      # eine Kamera wird aktiviert, Rückkehr wird mit "camret_nonbl" verarbeitet
+      $url = "http://$servername:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
+   }
   
    $param = {
                 url      => $url,
-                timeout  => 5,
+                timeout  => 10,
                 hash     => $hash,
                 method   => "GET",
                 header   => "Accept: application/json",
@@ -780,7 +943,7 @@ sub camop_nonbl ($) {
 sub camret_nonbl ($) {  
    my ($param, $err, $myjson) = @_;
    my $hash             = $param->{hash};
-   my $device           = $hash->{NAME};
+   my $name             = $hash->{NAME};
    my $servername       = $hash->{SERVERNAME};
    my $serverport       = $hash->{SERVERPORT};
    my $camname          = $hash->{CAMNAME};
@@ -805,7 +968,12 @@ sub camret_nonbl ($) {
         &printlog($hash,$logstr,"1");		                                                      # Eintrag fürs Log
         $logstr = "--- End Function cam: $OpMode nonblocking with error ---";
         &printlog($hash,$logstr,"4");
+        
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
+        
+        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+        $hash->{HELPER}{ACTIVE} = "off"; 
+
         return;
    }
    elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
@@ -832,10 +1000,10 @@ sub camret_nonbl ($) {
             &printlog($hash,$logstr,"4");
                 
             if ($OpMode eq "Start") 
-            {
+            {  
                 # bedingt Browseraktualisierung und Status der "Lampen" 
                 $hash->{STATE} = "on";
-                
+                               
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Record","Start");
@@ -870,10 +1038,7 @@ sub camret_nonbl ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
             
-                # Generiert das Ereignis "off", bedingt Browseraktualisierung und Status der "Lampen" wenn kein longpoll=1
-                # { fhem "trigger $device off" }
-                
-                RemoveInternalTimer($hash);
+                # RemoveInternalTimer($hash);
        
                 # Logausgabe
                 $logstr = "Camera $camname Recording stopped";
@@ -883,7 +1048,15 @@ sub camret_nonbl ($) {
             }
             elsif ($OpMode eq "Snap") 
             {
-                # ein Schnapschuß wurde aufgenommen      
+                # ein Schnapschuß wurde aufgenommen
+                # falls Aufnahme noch läuft -> STATE = on setzen
+                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
+                    $hash->{STATE} = "on";
+                    }
+                    else
+                    {
+                    $hash->{STATE} = "off";
+                    }
                 
                 $snapid = $data->{data}{'id'};
                 
@@ -893,9 +1066,45 @@ sub camret_nonbl ($) {
                 readingsBulkUpdate($hash,"Error","none");
                 readingsBulkUpdate($hash,"LastSnapId",$snapid);
                 readingsEndUpdate($hash, 1);
-                   
+                                
                 # Logausgabe
                 $logstr = "Snapshot of Camera $camname has been done successfully";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "Enable") 
+            {
+                # Kamera wurde aktiviert
+                $hash->{STATE} = "enable";
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Availability","enabled");
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                   
+                # Logausgabe
+                $logstr = "Camera $camname has been enabled successfully";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "Disable") 
+            {
+                # Kamera wurde deaktiviert
+                $hash->{STATE} = "disable";
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Availability","disabled");
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                   
+                # Logausgabe
+                $logstr = "Camera $camname has been disabled successfully";
                 &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
@@ -917,14 +1126,14 @@ sub camret_nonbl ($) {
             readingsEndUpdate($hash, 1);
        
             # Logausgabe
-            $logstr = "ERROR - Operationmode $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error";
+            $logstr = "ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error";
             &printlog($hash,$logstr,"1");
             $logstr = "--- End Function cam: $OpMode nonblocking with error ---";
             &printlog($hash,$logstr,"4");
             
-            # ausgeführte Funktion ist erledigt
+            # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
             $hash->{HELPER}{ACTIVE} = "off"; 
-            
+           
             return;
 
        }
@@ -937,7 +1146,7 @@ sub camret_nonbl ($) {
 
     $param = {
                 url      => $url,
-                timeout  => 5,
+                timeout  => 10,
                 hash     => $hash,
                 method   => "GET",
                 header   => "Accept: application/json",
@@ -964,7 +1173,7 @@ sub logout_nonbl ($) {
    my $error;
    my $errorcode;
   
-   # ausgeführte Funktion ist erledigt
+   # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
    $hash->{HELPER}{ACTIVE} = "off";   
    
    if($err ne "")                                                                                     # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -973,7 +1182,9 @@ sub logout_nonbl ($) {
         &printlog($hash,$logstr,"1");		                                                      # Eintrag fürs Log
         $logstr = "--- End Function logout nonblocking with error ---";
         &printlog($hash,$logstr,"4");
-        readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
+        
+        readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen 
+
         return;
    }
    elsif($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
@@ -1156,18 +1367,25 @@ return;
   <br>
     Using this Module you are able to operate with cameras which are defined in Synology Surveillance Station. <br>
     At present the following functions are available: <br><br>
-    
-    <li>Start a Rocording</li>
-    <li>Stop a Recording</li>
-    <li>Trigger a Snapshot </li><br>
- 
+    <ul>
+     <ul>
+        <li>Start a Rocording</li>
+        <li>Stop a Recording</li>
+        <li>Trigger a Snapshot </li>
+        <li>Deaktivate a Camera in Synology Surveillance Station</li>
+        <li>Activate a Camera in Synology Surveillance Station</li><br>
+     </ul>
+    </ul>
     The recordings and snapshots will be stored in Synology Surveillance Station and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
     For example the recordings are stored for a defined time in Surveillance Station and will be deleted after that period.<br><br>
+    
+    If you like to discuss or help to improve this module please use FHEM-Forum with link: <br>
+    <a href="http://forum.fhem.de/index.php/topic,45671.msg374390.html#msg374390">49_SSCam: Fragen, Hinweise, Neuigkeiten und mehr rund um dieses Modul</a>.<br><br>
   
 <b> Prerequisites </b> <br><br>
     This module uses the CPAN-module JSON. Please consider to install this package (Debian: libjson-perl).<br>
     You don't need to install LWP anymore, because of SSCam is completely using the nonblocking functions of HttpUtils respectively HttpUtils_NonblockingGet now. <br> 
-    You also need to add an user in Synology DSM as member of Administrators group for using in this module. <br><br>
+    You also need to add an user in Synology DSM as member of Administrators group. <br><br>
     
 
   <a name="SCamdefine"></a>
@@ -1222,10 +1440,13 @@ return;
       <tr><td>"on":          </td><td>starts a recording. The recording will be stopped automatically after a period of &lt;RecordTime&gt; as determined</td></tr>
       <tr><td>"off" :        </td><td>stopps a running recording manually or using other events (e.g. with at, notify)</td></tr>
       <tr><td>"snap":        </td><td>triggers a snapshot of the relevant camera and store it into Synology Surveillance Station</td></tr>
+      <tr><td>"disable":     </td><td>deactivates a camera in Synology Surveillance Station</td></tr>
+      <tr><td>"enable":      </td><td>activates a camera in Synology Surveillance Station</td></tr>
+
   </table>
   <br><br>
         
-  <b>Example</b> for simple Start/Stop of Recording: <br><br>
+  Example for simple <b>Start/Stop of a Recording</b>: <br><br>
 
   <table>
   <colgroup> <col width=15%> <col width=85%> </colgroup>
@@ -1239,7 +1460,7 @@ return;
      set &lt;name&gt; snap 
   </pre>
 
-  Subsequent some <b>Examples</b> for taking snapshots: <br><br>
+  Subsequent some Examples for <b>taking snapshots</b>: <br><br>
   
   If a serial of snapshots should be released, it can be done using the following notify command.
   For the example a serial of snapshots are to be triggerd if the recording of a camera starts. <br>
@@ -1257,14 +1478,39 @@ return;
   </pre>
 
   The ID of the last snapshot will be displayed as value of variable "LastSnapId" in the device-Readings. <br><br>
-  </ul>
-  <br>
+  
+  For <br>deactivating / activating</br> a list of cameras or all cameras using a Regex-expression, subsequent two examples using "at":
+  <pre>
+     define a13 at 21:46 set CamCP1,CamFL,CamHE1,CamTER disable (enable)
+     define a14 at 21:46 set Cam.* disable (enable)
+  </pre>
+  
+  A bit more convenient is it to use a dummy-device for enable/disable all available cameras in Surveillance Station.<br>
+  At first the Dummy will be created.
+  <pre>
+     define allcams dummy
+     attr allcams eventMap on:enable off:disable
+     attr allcams room Cams
+     attr allcams webCmd enable:disable
+  </pre>
+  
+  With combination of two created notifies, respectively one for "enable" and one for "diasble", you are able to switch all cameras into "enable" or "disable" state at the same time if you set the dummy to "enable" or "disable". 
+  <pre>
+     define all_cams_disable notify allcams:.*off set CamCP1,CamFL,CamHE1,CamTER disable
+     attr all_cams_disable room Cams
+
+     define all_cams_enable notify allcams:on set CamCP1,CamFL,CamHE1,CamTER enable
+     attr all_cams_enable room Cams
+  </pre>
+  
+ </ul>
+<br>
 
   
   
 <a name="SSCamattr"></a>
 <b>Attributes</b>
-  <ul>
+<ul>
   
    Different Verbose-Level are supported.<br>
    Those are in detail:<br><br>
@@ -1295,14 +1541,20 @@ return;
   <br>
     Mit diesem Modul können Operationen von in der Synology Surveillance Station definierten Kameras ausgeführt werden. <br>
     Zur Zeit werden folgende Funktionen unterstützt: <br><br>
-    
-    <li>Start einer Aufnahme</li>
-    <li>Stop einer Aufnahme</li>
-    <li>Aufnehmen eines Schnappschusses und Ablage in der Synology Surveillance Station </li><br>
-    
+    <ul>
+     <ul>
+      <li>Start einer Aufnahme</li>
+      <li>Stop einer Aufnahme</li>
+      <li>Aufnehmen eines Schnappschusses und Ablage in der Synology Surveillance Station </li>
+      <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
+      <li>Aktivieren einer Kamera in Synology Surveillance Station</li><br>
+     </ul> 
+    </ul>
     Die Aufnahmen stehen in der Synology Surveillance Station zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
     So werden zum Beispiel die Aufnahmen entsprechend ihrer Archivierungsfrist gehalten und dann gelöscht. <br><br>
-
+    
+    Wenn du über dieses Modul diskutieren oder zur Verbesserung des Moduls beitragen möchtest ist im FHEM-Forum ein Sammelplatz unter:<br>
+    <a href="http://forum.fhem.de/index.php/topic,45671.msg374390.html#msg374390">49_SSCam: Fragen, Hinweise, Neuigkeiten und mehr rund um dieses Modul</a>.<br><br>
 
 <b>Vorbereitung </b> <br><br>
     Dieses Modul nutzt das CPAN Module JSON. Bitte darauf achten dieses Paket zu installieren. (Debian: libjson-perl). <br>
@@ -1313,7 +1565,7 @@ return;
 <b>Define</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;Servername&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; &lt;RecordTime&gt;</code><br>
+    <code>define &lt;name&gt; SSCam &lt;Servername&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Kameraname in SS&gt; &lt;RecordTime&gt;</code><br>
     <br>
     
     Definiert eine neue Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
@@ -1361,10 +1613,12 @@ return;
       <tr><td>"on":          </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit &lt;RecordTime&gt; gestoppt.</td></tr>
       <tr><td>"off" :        </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
       <tr><td>"snap":        </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
+      <tr><td>"disable":     </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"enable":      </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
   </table>
   <br><br>
         
-  <b>Beispiele</b> für einfachen Start/Stop einer Aufnahme: <br><br>
+  Beispiele für einfachen <b>Start/Stop einer Aufnahme</b>: <br><br>
 
   <table>
   <colgroup> <col width=15%> <col width=85%> </colgroup>
@@ -1378,15 +1632,15 @@ return;
      set &lt;name&gt; snap 
   </pre>
   
-  Nachfolgend einige <b>Beispiele</b> für die Auslösung von Schnappschüssen. <br><br>
+  Nachfolgend einige Beispiele für die <b>Auslösung von Schnappschüssen</b>. <br><br>
   
   Soll eine Reihe von Schnappschüssen ausgelöst werden wenn eine Aufnahme startet, kann das z.B. durch folgendes notify geschehen. <br>
   Sobald der Start der Kamera CamHE1 ausgelöst wird (Attribut event-on-change-reading -> "Record" setzen), werden abhängig davon 3 Snapshots im Abstand von 2 Sekunden getriggert.
 
   <pre>
-     define he1_snap_3 notify CamHE1:Record.*Start define h3 at +*{3}00:00:02 set CamHE1 snap 
+     define he1_snap_3 notify CamHE1:Record.*Start define h3 at +*{3}00:00:02 set CamHE1 snap
   </pre>
-
+  
   Triggern von 2 Schnappschüssen der Kamera "CamHE1" im Abstand von 6 Sekunden nachdem der Bewegungsmelder "MelderHE1" einen Event gesendet hat, <br>
   kann z.B. mit folgendem notify geschehen:
 
@@ -1395,6 +1649,30 @@ return;
   </pre>
 
   Es wird die ID des letzten Snapshots als Wert der Variable "LastSnapId" in den Readings der Kamera ausgegeben. <br><br>
+  
+  Um eine Liste von Kameras oder alle Kameras (mit Regex) zum Beispiel um 21:46 zu <b>deaktivieren</b> / zu <b>aktivieren</b> zwei Beispiele mit at:
+  <pre>
+     define a13 at 21:46 set CamCP1,CamFL,CamHE1,CamTER disable (enable)
+     define a14 at 21:46 set Cam.* disable (enable)
+  </pre>
+  
+  Etwas komfortabler gelingt das Schalten aller Kameras über einen Dummy. Zunächst wird der Dummy angelegt:
+  <pre>
+     define allcams dummy
+     attr allcams eventMap on:enable off:disable
+     attr allcams room Cams
+     attr allcams webCmd enable:disable
+  </pre>
+  
+  Durch Verknüpfung mit zwei angelegten notify, jeweils ein notify für "enable" und "disable", kann man durch Schalten des Dummys auf "enable" bzw. "disable" alle Kameras auf einmal aktivieren bzw. deaktivieren.
+  <pre>
+     define all_cams_disable notify allcams:.*off set CamCP1,CamFL,CamHE1,CamTER disable
+     attr all_cams_disable room Cams
+
+     define all_cams_enable notify allcams:on set CamCP1,CamFL,CamHE1,CamTER enable
+     attr all_cams_enable room Cams
+  </pre>
+
 
 </ul>
   <br>
@@ -1402,7 +1680,7 @@ return;
   
   
 <a name="SSCamattr"></a>
-<b>Attributes</b>
+<b>Attribute</b>
   <ul>
   
    Es werden verschiedene Verbose-Level unterstützt.<br>
