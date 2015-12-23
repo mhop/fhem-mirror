@@ -3,12 +3,13 @@
 package main;
 
 # TODO
-#   battery devices
-#   inclusion/exclusion
-#   routing 
-#   neighborUpdate: 010404010c0001 010604000c0040 010700 0105
-#   explorer frames
-#   security
+#   implement resend in firmware
+#   fix remotes
+#   implement inclusion/exclusion
+#   implement neighborUpdate: 010404010c0001 010604000c0040 010700 0105
+#   implement static routing
+#   implement/understand explorer frames
+#   check security
 
 use strict;
 use warnings;
@@ -17,7 +18,7 @@ use Time::HiRes qw(gettimeofday);
 use ZWLib;
 use DevIo;
 
-sub ZWCUL_Parse($$$$);
+sub ZWCUL_Parse($$$$$);
 sub ZWCUL_Read($@);
 sub ZWCUL_ReadAnswer($$$);
 sub ZWCUL_Ready($);
@@ -67,16 +68,16 @@ ZWCUL_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   return "wrong syntax: define <name> ZWCUL device homeId ctrlId" if(@a != 5);
-  return "wrong syntax: homeId is 8 digit hex" if($a[3] !~ m/^[0-9A-F]{8}$/);
-  return "wrong syntax: ctrlId is 2 digit hex" if($a[4] !~ m/^[0-9A-F]{2}$/);
+  return "wrong syntax: homeId is 8 digit hex" if($a[3] !~ m/^[0-9A-F]{8}$/i);
+  return "wrong syntax: ctrlId is 2 digit hex" if($a[4] !~ m/^[0-9A-F]{2}$/i);
 
   DevIo_CloseDev($hash);
 
   my $name = $a[0];
   my $dev = $a[2];
-  $hash->{homeId} = $a[3];
-  $hash->{homeIdSet} = $a[3];
-  $hash->{nodeIdHex} = $a[4];
+  $hash->{homeId} = lc($a[3]);
+  $hash->{homeIdSet} = lc($a[3]);
+  $hash->{nodeIdHex} = lc($a[4]);
   $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm":"zr");
   $hash->{monitor} = 1 if($hash->{homeIdSet} eq "00000000");
 
@@ -259,16 +260,17 @@ ZWCUL_Read($@)
     $hash->{PARTIAL} = $culdata; # for recursive calls
     return $rmsg 
         if(defined($local) && (!defined($regexp) || ($rmsg =~ m/$regexp/)));
-    ZWCUL_Parse($hash, $hash, $name, $rmsg) if($rmsg);
+    ZWCUL_Parse($hash, $hash, $name, $rmsg, 0) if($rmsg);
     $culdata = $hash->{PARTIAL};
   }
   $hash->{PARTIAL} = $culdata;
+  return undef;
 }
 
 sub
-ZWCUL_Parse($$$$)
+ZWCUL_Parse($$$$$)
 {
-  my ($hash, $iohash, $name, $rmsg) = @_;
+  my ($hash, $iohash, $name, $rmsg, $nodispatch) = @_;
 
   if($rmsg =~ m/^\*/) {                           # STACKABLE_CC
     Dispatch($hash, $rmsg, undef);
@@ -311,7 +313,7 @@ ZWCUL_Parse($$$$)
     $rf = substr($P, 0, 2);
     $hops = substr($P, 4, $hc*2);
     $hops =~ s/(..)/$1 /g;
-    $P  = substr($P,($hc+2)*2);
+    $P = substr($P,($hc+2)*2);
   }
   if($hF&4) { # Explorer?
     $u1 = " E:".substr($P,0,16)." ";
@@ -351,9 +353,10 @@ ZWCUL_Parse($$$$)
     }
 
   } else {
-    $rmsg = sprintf("0013%s00", $6);
+    $rmsg = sprintf("0013%s00", $S);
 
   }
+  return $rmsg if($nodispatch);
   Dispatch($hash, $rmsg, \%addvals);
 }
 
@@ -364,6 +367,11 @@ ZWCUL_ReadAnswer($$$)
 {
   my ($hash, $arg, $regexp) = @_;
   Log3 $hash, 4, "ZWCUL_ReadAnswer arg:$arg regexp:".($regexp ? $regexp:"");
+  my $transform;
+  if($regexp =~ m/^\^000400(..)..(..)/) {
+    $regexp = "^z........$1........$2";
+    $transform = 1;
+  }
   return ("No FD (dummy device?)", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
   my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 1);
@@ -409,6 +417,10 @@ ZWCUL_ReadAnswer($$$)
 
     my $ret = ZWCUL_Read($hash, $buf, $regexp);
     if(defined($ret)){
+      if($transform) {
+        my $name = $hash->{NAME};
+        $ret = ZWCUL_Parse($hash, $hash, $name, $ret, 1);
+      }
       Log3 $hash, 4, "ZWCUL_ReadAnswer for $arg: $ret";
       return (undef, $ret);
     }
