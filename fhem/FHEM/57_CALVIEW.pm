@@ -159,7 +159,7 @@ sub CALVIEW_GetUpdate($){
 				readingsBulkUpdate($hash, "tomorrow_".sprintf ('%03d', $tomorrowcounter)."_mode", $termin->{mode}); 	
 				$tomorrowcounter++;}
 		};
-		readingsBulkUpdate($hash, "state", "t: ".($counter-1)." td: ".($todaycounter-1)." tm: ".($tomorrowcounter-1)." tr: ".($runningcounter-1)); 
+		readingsBulkUpdate($hash, "state", "t: ".($counter-1)." td: ".($todaycounter-1)." tm: ".($tomorrowcounter-1)." ts: ".($runningcounter-1)); 
 		readingsBulkUpdate($hash, "c-term", $counter-1); 
 		readingsBulkUpdate($hash, "c-tomorrow", $tomorrowcounter-1); 
 		readingsBulkUpdate($hash, "c-today", $todaycounter-1); 
