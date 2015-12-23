@@ -194,6 +194,7 @@ sub FRITZBOX_Initialize($)
                 ."useGuiHack:0,1 "
                # ."ttsRessource:Google,ESpeak "
                 .$readingFnAttributes;
+                
 } # end FRITZBOX_Initialize
 
 #######################################################################
@@ -234,6 +235,12 @@ sub FRITZBOX_Define($$)
    
  # Check APIs after fhem.cfg is processed
    $hash->{APICHECKED} = 0;
+   $hash->{fhem}->{is_double_wlan} = -1;
+   $hash->{LUAQUERY} = -1;
+   $hash->{REMOTE} = -1;
+   $hash->{TELNET} = -1;
+   $hash->{TR064} = -1;
+   $hash->{WEBCM} = -1;
    RemoveInternalTimer($hash->{helper}{TimerReadout});
    InternalTimer(gettimeofday()+1 , "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 0);
 
@@ -311,11 +318,11 @@ sub FRITZBOX_Set($$@)
    $list .= " alarm"
           . " dect:on,off"
           . " startRadio"
-         if $hash->{WEBCM} || $hash->{TELNET};
+         if $hash->{WEBCM}==1 || $hash->{TELNET}==1;
    $list .= " sendMail"
           . " customerRingTone"
           . " moh"
-         if $hash->{TELNET};
+         if $hash->{TELNET}==1;
 
 # . " convertMOH"
             # . " convertRingTone"
@@ -327,7 +334,7 @@ sub FRITZBOX_Set($$@)
       if ( int @val > 0 && $val[0] =~ /^(1|2|3)$/ ) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return "'set ... alarm' is not supported by the limited interfaces of your Fritz!Box firmware."
-            unless $hash->{WEBCM} || $forceShell;
+            unless $hash->{WEBCM}==1 || $forceShell;
          return FRITZBOX_Set_Alarm_Web ($hash, @val)
             unless $forceShell;
          return FRITZBOX_Set_Alarm_Shell ($hash, @val);
@@ -384,7 +391,7 @@ sub FRITZBOX_Set($$@)
          else { #webcm
             my @webCmdArray = ( ["dect:settings/enabled" => $state] );
             return "'set ... dect' is not supported by the limited interfaces of your Fritz!Box firmware."
-               unless $hash->{WEBCM};
+               unless $hash->{WEBCM}==1;
             FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
          }
          
@@ -401,14 +408,11 @@ sub FRITZBOX_Set($$@)
          if ($forceShell) { # Shell
             FRITZBOX_Shell_Exec( $hash, "ctlmgr_ctl w telcfg settings/Diversity".( $val[0] - 1 )."/Active ".$state );
          }
-         elsif ( $hash->{WEBCM} ) { #webcm
+         elsif ( $hash->{WEBCM}==1 ) { #webcm
             my @webCmdArray = ( ["telcfg:settings/Diversity".( $val[0] - 1 )."/Active " => $state] );
             FRITZBOX_Web_CmdPost ($hash, \@webCmdArray);
          }
-         elsif ( $hash->{TR064} ) { #tr064
-         # get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDeflections
-         # get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact GetDeflection NewDeflectionId 0
-         # get Fritzbox tr064Command X_AVM-DE_OnTel:1 x_contact SetDeflectionEnable NewDeflectionId 0 NewEnable 0
+         elsif ( $hash->{TR064}==1 ) { #tr064
             my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetDeflectionEnable", "NewDeflectionId", $val[0] - 1, "NewEnable", $state] );
             FRITZBOX_TR064_Cmd ($hash, 0, \@tr064CmdArray);
          }
@@ -460,7 +464,7 @@ sub FRITZBOX_Set($$@)
    elsif ( lc $cmd eq 'sendmail') {
       Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
       return "'set ... sendMail' is not supported by the limited interfaces of your Fritz!Box firmware."
-         unless $hash->{TELNET};
+         unless $hash->{TELNET}==1;
       FRITZBOX_SendMail_Shell $hash, @val;
       return undef;
    }
@@ -468,7 +472,7 @@ sub FRITZBOX_Set($$@)
       if (int @val > 0) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          return "'set ... startRadio' is not supported by the limited interfaces of your Fritz!Box firmware."
-            unless $hash->{WEBCM} || $forceShell;
+            unless $hash->{WEBCM}==1 || $forceShell;
          return FRITZBOX_StartRadio_Web $hash, @val unless $forceShell;
          return FRITZBOX_StartRadio_Shell $hash, @val;
       }
@@ -557,7 +561,7 @@ sub FRITZBOX_Get($@)
    elsif( lc $cmd eq "shellcommand" && int @val && AttrVal( $name, "allowShellCommand", 0 ) ) {  
       Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
       return "'get ... shellcommand' is not supported by the limited interfaces of your Fritz!Box firmware."
-         unless $hash->{TELNET};
+         unless $hash->{TELNET}==1;
       my $shCmd = join " ", @val;
       return FRITZBOX_Shell_Exec( $hash, $shCmd );
    }
@@ -600,7 +604,7 @@ sub FRITZBOX_Get($@)
    $list .= " luaQuery"      if AttrVal( $name, "allowTR064Command", 0 );
    $list .= " tr064Command"  if AttrVal( $name, "allowTR064Command", 0 ) && defined $hash->{SECPORT};;
    $list .= " tr064ServiceList:noArg"      if AttrVal( $name, "allowTR064Command", 0 );
-   $list .= " shellCommand"     if AttrVal( $name, "allowShellCommand", 0 ) && $hash->{TELNET};
+   $list .= " shellCommand"     if AttrVal( $name, "allowShellCommand", 0 ) && $hash->{TELNET}==1;
    return "Unknown argument $cmd, choose one of $list";
 } # end FRITZBOX_Get
 
@@ -2344,7 +2348,7 @@ sub FRITZBOX_GuestWlan_Run_Web($)
 
 
 # Set guestWLAN, if necessary set also WLAN
-   if ( $hash->{WEBCM} ) { #webcm
+   if ( $hash->{WEBCM}==1 ) { #webcm
       push @webCmdArray, "wlan:settings/wlan_enable" => "1"    if $state == 1;
       # push @webCmdArray, "active" => "on";
       # FRITZBOX_Web_CmdPost ($hash, \@webCmdArray, '/wlan/wlan_settings.lua');
@@ -2767,7 +2771,7 @@ sub FRITZBOX_Ring_Run_Web($)
    my @getCmdArray;
    my @tr064CmdArray;
    my @roReadings;
-   my $duration = 5;
+   my $duration = -1;
    my $intNo = $val[0];
    my @FritzFons;
    my $ringTone;
@@ -2797,7 +2801,7 @@ sub FRITZBOX_Ring_Run_Web($)
  # Check if 2nd parameter is the duration
    shift @val;
    if (int @val) {
-      if ($val[0] =~ /^\d+$/ && int $val[0] > 0) {
+      if ($val[0] =~ /^\d+$/ && int $val[0] >= 0) {
          $duration = $val[0];
          FRITZBOX_Log $hash, 5, "Extracted ring duration of $duration s.";
          shift @val;
@@ -2837,7 +2841,7 @@ sub FRITZBOX_Ring_Run_Web($)
    }
    $msg = substr($msg, 0, 30);
 # no webcm no Message
-   unless ( $hash->{WEBCM} ) {
+   unless ( $hash->{WEBCM}==1 ) {
       $msg = "";
       FRITZBOX_Log $hash, 3, "Your Fritz!OS version has limited interfaces. Parameter 'show:' ignored."
          if $field{msg} || $field{show};
@@ -3046,12 +3050,15 @@ sub FRITZBOX_Ring_Run_Web($)
       $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
    }
    
-   sleep $duration; #+1; # 1s added because it takes sometime until it starts ringing
+   sleep  5          if $duration <= 0; # always wait before reseting everything
+   sleep $duration   if $duration > 0 ; #+1; # 1s added because it takes some time until it starts ringing
    
-#Preparing 4th command array to stop ringing 
-   push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
-   $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )      if $hash->{SECPORT};
-   push( @webCmdArray, "telcfg:command/Hangup" => "" )   unless $hash->{SECPORT};
+#Preparing 4th command array to stop ringing (but not when duration is 0 or play: and say: is used without duration)
+   unless ( $duration == 0 || $duration == -1 && $ttsLink ) {
+      push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
+      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )      if $hash->{SECPORT};
+      push( @webCmdArray, "telcfg:command/Hangup" => "" )   unless $hash->{SECPORT};
+   }
       
 #Preparing 5th command array to reset everything
    push @webCmdArray, "telcfg:settings/DialPort" => $startValue->{dialPort}      if defined $startValue->{dialPort};
@@ -3087,10 +3094,10 @@ sub FRITZBOX_Ring_Run_Web($)
    }
    
 # ??? Switch of Internet Radio stations 
-   if (!$ttsLink && defined $ringTone && $ringTone ==33 ) {
-      push @webCmdArray, "telcfg:command/Dial **".$intNo;
-      push @webCmdArray, "telcfg:command/Hangup **".$intNo;
-   }
+   # if (!$ttsLink && defined $ringTone && $ringTone ==33 ) {
+      # push @webCmdArray, "telcfg:command/Dial **".$intNo;
+      # push @webCmdArray, "telcfg:command/Hangup **".$intNo;
+   # }
 #set Fritzbox ring 612 show:test test say:test test
    
 # Execute command array
@@ -4270,7 +4277,7 @@ sub FRITZBOX_Web_CmdPost($$@)
    my ($hash, $webCmdArray, $page) = @_;
    my $name = $hash->{NAME};
    
-   unless ( $hash->{WEBCM} ) {
+   unless ( $hash->{WEBCM}==1 ) {
       @{$webCmdArray} = ();
       my $msg = "API webcm not available on the box.";
       FRITZBOX_Log $hash, 4, $msg;
