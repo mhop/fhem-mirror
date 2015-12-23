@@ -49,12 +49,11 @@ function weekprofile_DoEditWeek(devName)
   widget.setValueFn("REUSEPRF");
 }
 
-function FW_weekprofilePRFCached(devName,select)
+function FW_weekprofilePRFChached(devName,select)
 {
   var widget = $('div[informid="'+devName+'"]').get(0)
   
   var prfName = select.options[select.selectedIndex].value;
-  
   widget.CURPRF = prfName;
   widget.PROFILE = null;  
   FW_queryValue('get '+devName+' profile_data '+prfName, widget);
@@ -77,7 +76,7 @@ function FW_weekprofileCopyPrf(devName,lnk)
   
   FW_weekprofileInputDialog("<span>Name:</span>","text",lnk,function(name,ok){
     if (!name || name.length <=0)
-      return;  
+      return;
     FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" copy_profile "+widget.CURPRF+" "+name+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
     });
 }
@@ -88,7 +87,7 @@ function FW_weekprofileRemovePrf(devName,lnk)
   
   FW_weekprofileInputDialog("<p>Delete Profile: '"+widget.CURPRF+"'&nbsp;?</p>","hidden",lnk,function(name,ok){
     if (ok < 1)
-      return;  
+      return;
     FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" remove_profile "+widget.CURPRF+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
     });
 }
@@ -103,7 +102,7 @@ function FW_weekprofileShow(widget)
   
   if (widget.PROFILENAMES) {
     html += "&nbsp;"
-    html += "<select name=\"PROFILES\" onchange=\"FW_weekprofilePRFCached('"+widget.DEVICE+"',this)\">";
+    html += "<select name=\"PROFILES\" onchange=\"FW_weekprofilePRFChached('"+widget.DEVICE+"',this)\">";
     for (var k=0; k < widget.PROFILENAMES.length; k++)
     {
         var selected = (widget.CURPRF == widget.PROFILENAMES[k]) ? "selected " : "";
@@ -121,6 +120,11 @@ function FW_weekprofileShow(widget)
     html += "<button type=\"button\" onclick=\"FW_weekprofileSendToDev('"+widget.DEVICE+"',this)\" data-toggle=\"tooltip\" title=\"send to device\">--></button>";   
     
     $(widget.MENU.CONTENT).append(html);
+    
+    var select = $(widget.MENU.CONTENT).find('select[name="PROFILES"]').get(0);
+    var prfName = select.options[select.selectedIndex].value;
+    if (widget.CURPRF != prfName)
+      FW_weekprofilePRFChached(widget.DEVICE,select);
   }
   
   if (!widget.PROFILE) {
@@ -403,7 +407,7 @@ function FW_weekprofileGetValues(devName,what,data)
     widget.WEEKDAYS = data.split(',');
   } else if (what == "PROFILENAMES") {
     widget.PROFILENAMES = data.split(',');
-    if (widget.MODE != 'EDIT') {
+    if (widget.MODE != 'EDIT') {      
       widget.setValueFn("REUSEPRF");
     }
   }

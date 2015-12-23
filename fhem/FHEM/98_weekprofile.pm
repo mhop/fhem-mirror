@@ -67,7 +67,9 @@ sub weekprofile_getDeviceType($)
 
   # determine device type
   my $devHash = $main::defs{$device};
-  return undef unless (!defined($devHash));
+  if (!defined($devHash)){
+    return undef;
+  }
   
   my $type = undef;
 
@@ -244,8 +246,14 @@ sub weekprofile_assignDev($)
   
   my $prf = undef;
   if ($hash->{MASTERDEV}->{NAME}) {
+    
+    Log3 $me, 5, "$me(assignDev): assign to device $hash->{MASTERDEV}->{NAME}";
+    
     my $type     = weekprofile_getDeviceType($hash->{MASTERDEV}->{NAME});
-    return if (!defined($type));
+    if (!defined($type)) {
+      Log3 $me, 2, "$me(assignDev): device $hash->{MASTERDEV}->{NAME} not supported or defined";
+      return;
+    }
     
     $hash->{MASTERDEV}->{TYPE} = $type;
     
@@ -323,7 +331,7 @@ sub weekprofile_Define($$)
     return $msg;
   }
 
-  my $me = $a[0];  
+  my $me = $a[0];
   
   $hash->{MASTERDEV}->{NAME} = undef;
   $hash->{MASTERDEV}->{NAME} = $a[2] if (@a > 1);
@@ -332,11 +340,11 @@ sub weekprofile_Define($$)
   my @profiles = ();
   $hash->{PROFILES} = \@profiles;
   
-  weekprofile_assignDev($hash);
-  weekprofile_readProfilesFromFile($hash);
-  weekprofile_updateReadings($hash);
+  #$attr{$me}{verbose} = 5;
   
-  #$attr{$me}{verbose} = 5;  
+  weekprofile_assignDev($hash);
+  weekprofile_updateReadings($hash);
+
   return undef;
 }
 ############################################## 
@@ -495,6 +503,7 @@ sub weekprofile_Set($$@)
   if ($cmd eq 'remove_profile') {
     return 'usage: remove_profile <name>' if(@params < 1);
     return 'Error master profile can not removed' if($params[0] eq "master");
+    return 'Error Remove last profile is not allowed' if(scalar(@{$hash->{PROFILES}}) == 1);
     
     my $delprf = undef;
     my $idx = 0;
@@ -539,7 +548,6 @@ sub weekprofile_Notify($$)
     
     if ($what =~ m/INITIALIZED/) {
       splice($own->{PROFILES});
-      Log3 $me, 5, "$me(Notify): assign to device $own->{MASTERDEV}->{NAME}" if (defined($own->{MASTERDEV}->{NAME}));
       weekprofile_assignDev($own);
       weekprofile_readProfilesFromFile($own);
       weekprofile_updateReadings($own);
