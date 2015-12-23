@@ -664,3 +664,6 @@
   - added new function for running terms
   - improved commandref
 
+- Wed Dec 23 2015 (risiko)
+  - added new module 98_weekprofile to manage week profiles
+  

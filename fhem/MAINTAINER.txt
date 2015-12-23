@@ -329,6 +329,7 @@ FHEM/98_structure.pm         rudolfkoenig         http://forum.fhem.de Automatis
 FHEM/98_telnet.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_update.pm            rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/98_weblink.pm           rudolfkoenig         http://forum.fhem.de Frontends
+FHME/98_weekprofile.pm       risiko               http://forum.fhem.de Frontends
 FHEM/99_SUNRISE_EL.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/99_Utils.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/Blocking.pm             rudolfkoenig         http://forum.fhem.de Automatisierung
@@ -380,6 +381,7 @@ www/pgm2/fhemweb_readingsHistory.js  justme1968   http://forum.fhem.de Frontends
 www/pgm2/fhemweb_sortable.js markusbloch          http://forum.fhem.de Frontends
 www/pgm2/fhemweb_fbcalllist.js markusbloch        http://forum.fhem.de Frontends
 www/pgm2/fhemweb_uzsu.js     justme1968           http://forum.fhem.de Frontends
+www/pgm2/fhemweb_weekprofile.js     risiko        http://forum.fhem.de Frontends
 www/pgm2/*                   rudolfkoenig         http://forum.fhem.de Frontends
 www/jscolor/*                justme1968           http://forum.fhem.de Frontends
 www/frontend/*               johannnes            http://forum.fhem.de Frontends
