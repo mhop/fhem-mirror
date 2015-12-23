@@ -207,13 +207,13 @@ doUpdateLoop($$)
 
   my ($max,$curr) = (0,0);
   foreach my $srcLine (@list)  {
-    next if($src && $srcLine !~ m/controls_{$src}/);
+    next if($src && $srcLine !~ m/controls_${src}.txt/);
     $max++;
   }
   uLog 1, "No source file named controls_$src found" if($src && !$max);
 
   foreach my $srcLine (@list)  {
-    next if($src && $srcLine !~ m/controls_{$src}/);
+    next if($src && $srcLine !~ m/controls_${src}.txt/);
     doUpdate(++$curr, $max, $srcLine, $arg);
     HttpUtils_Close(\%upd_connecthash);
   }
