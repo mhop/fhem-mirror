@@ -24,6 +24,7 @@ my %updDirs;
 my $updArg;
 my $mainPgm = "/fhem.pl\$";
 my %upd_connecthash;
+my $upd_needJoin;
 
 
 ########################################
@@ -73,7 +74,6 @@ CommandUpdate($$)
 
   } else {
     doUpdateLoop($src, $arg);
-    HttpUtils_Close(\%upd_connecthash);
     my $ret = $updRet; $updRet = "";
     return $ret;
 
@@ -117,7 +117,7 @@ upd_metacmd($@)
     my $fname = $1;
     open(FH, $mpath) || return "Can't open $mpath: $!";
     my (%fulls, %parts);
-    map { chomp($_); $fulls{$_}=1; my $x=$_; $x =~ s,^.*/,,; $parts{$x}=$_; } <FH>;
+    map {chomp($_);$fulls{$_}=1; my $x=$_; $x =~ s,^.*/,,; $parts{$x}=$_;} <FH>;
     close(FH);
     return "$args[1] is already in the list" if($fulls{$args[1]});
     return "$fname is already present in $parts{$fname}" if($parts{$fname});
@@ -181,7 +181,6 @@ doUpdateInBackground($)
   *Log = \&update_Log2Event;
   sleep(2); # Give time for ActivateInform / FHEMWEB / JavaScript
   doUpdateLoop($h->{src}, $h->{arg});
-  HttpUtils_Close(\%upd_connecthash);
 }
 
 sub
@@ -189,29 +188,35 @@ doUpdateLoop($$)
 {
   my ($src, $arg) = @_;
 
-  doUpdate(1,1, $src, $arg) if($src =~ m/^http.*/);
+  $upd_needJoin = 0;
+  if($src =~ m/^http.*/) {
+    doUpdate(1,1, $src, $arg);
+    HttpUtils_Close(\%upd_connecthash);
+    return;
+  }
 
   my $mpath = $attr{global}{modpath}."/FHEM/controls.txt";
-  if(!open(LFH, "$mpath")) {
+  if(!open(LFH, $mpath)) {
     my $msg = "Can't open $mpath: $!";
     uLog 1, $msg;
     return $msg;
   }
+  my @list = <LFH>;
+  close(LFH);
+  chomp @list;
+
   my ($max,$curr) = (0,0);
-  while(my $srcLine = <LFH>)  {
-    chomp($srcLine);
-    continue if($src && $srcLine !~ m/controls_{$src}/);
+  foreach my $srcLine (@list)  {
+    next if($src && $srcLine !~ m/controls_{$src}/);
     $max++;
   }
   uLog 1, "No source file named controls_$src found" if($src && !$max);
 
-  seek(LFH,0,0);
-  while(my $srcLine = <LFH>)  {
-    chomp($srcLine);
-    continue if($src && $srcLine !~ m/controls_{$src}/);
+  foreach my $srcLine (@list)  {
+    next if($src && $srcLine !~ m/controls_{$src}/);
     doUpdate(++$curr, $max, $srcLine, $arg);
+    HttpUtils_Close(\%upd_connecthash);
   }
-  close(LFH);
 }
 
 sub
@@ -267,7 +272,7 @@ doUpdate($$$$)
     $lh{$l[3]}{LEN} = $l[2];
   }
 
-  my ($canJoin, $needJoin);
+  my $canJoin;
   my $cj = "$root/contrib/commandref_join.pl";
   if(-f $cj &&
      -f "$root/docs/commandref_frame.html" &&
@@ -334,7 +339,7 @@ doUpdate($$$$)
       }
     }
 
-    $needJoin = 1 if($fName =~ m/commandref_frame/ || $fName =~ m/\d+.*.pm/);
+    $upd_needJoin = 1 if($fName =~ m/commandref_frame/ || $fName=~ m/\d+.*.pm/);
     next if($fName =~ m/commandref.*html/ && $fName !~ m/frame/ && $canJoin);
 
     uLog 1, "List of new / modified files since last update:"
@@ -362,26 +367,22 @@ doUpdate($$$$)
     return if(!upd_writeFile($root, $restoreDir, $fName, $remFile));
   }
 
-  if($nChanged == 0 && $nSkipped == 0) {
-    uLog 1, "nothing to do...";
-    return;
-  }
+  uLog 1, "nothing to do..." if($nChanged == 0 && $nSkipped == 0);
 
-  if(@rl) {
+  if(@rl && ($nChanged || $nSkipped)) {
     uLog(1, "");
     uLog 1, "New entries in the CHANGED file:";
     map { uLog 1, $_ } @rl;
   }
   return if($arg eq "check");
 
-  if($arg eq "all" || $arg eq "force") { # store the controlfile
+  if(($arg eq "all" || $arg eq "force") && ($nChanged || $nSkipped)) {
     return if(!upd_writeFile($root, $restoreDir,
                            "FHEM/$ctrlFileName", $remCtrlFile));
   }
 
-  return "" if(!$nChanged);
 
-  if($canJoin && $needJoin && $curr == $max) {
+  if($canJoin && $upd_needJoin && $curr == $max) {
     chdir($root);
     uLog(1, "Calling $^X $cj, this may take a while");
     my $ret = `$^X $cj`;
@@ -390,10 +391,12 @@ doUpdate($$$$)
     }
   }
 
+  return "" if(!$nChanged);
+
   uLog(1, "");
   if($curr == $max) {
     uLog 1,
-        'update finished, "shutdown restart" is needed to activate the changes.';
+       'update finished, "shutdown restart" is needed to activate the changes.';
     my $ss = AttrVal("global","sendStatistics",undef);
     if(!defined($ss)) {
       uLog(1, "");
