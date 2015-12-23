@@ -8,6 +8,9 @@ use POSIX;
 
 use Encode qw(encode);
 
+use IO::Uncompress::Gunzip qw(gunzip $GunzipError );
+
+
 use XML::Simple;
 
 my $modulename='rssFeed';	#Module-Name = TYPE 
@@ -408,17 +411,40 @@ rssFeed_update(@)
   
   #If verbose is set to 5 then log complete response
   rssFeed_Log3 $name,5,$response;
+    
+  #Trying to unzip received response
+  my $runzipped=undef;
+  gunzip \$response => \$runzipped;
   
+  rssFeed_Log3 $name,5,"unzipError: $GunzipError";
+
+  #If the response was not zipped, the unzip-result is the original response data
+  my $zipped=0;
+  $zipped=1 if($runzipped ne $response);
+  readingsSingleUpdate($dhash,"gzippedFeed",$zipped,0);
+
   #If rfDebug attribute is set then store complete response in reading
   if ($rfDebug) {
     readingsSingleUpdate($dhash,$debug_prefix."LastResponse",$response,0);  
-    #readingsSingleUpdate($dhash,$debug_prefix."LastResponse",$response,0) if (!$enc);  
-    #readingsSingleUpdate($dhash,$debug_prefix."LastResponse",encode($enc,$response),0) if ($enc);
+	readingsSingleUpdate($dhash,$debug_prefix."UnzippedResponse",$runzipped,0) if ($zipped);
   }
 
+  #using unzipped responsedata if it was originally zipped
+  $response=$runzipped if($zipped);
+  
   #Convert xml data from reponse to an array (hash?)
   $xml         = new XML::Simple;
-  $nachrichten = $xml->XMLin($response, ForceArray => ['item']);
+  
+  rssFeed_Log3 $name,5,'Trying to convert xml to array...';
+  eval {$xml->XMLin($response, ForceArray => ['item']);};
+  rssFeed_Log3 $name,5,"evalXMLerror: $@";
+  
+  #rssFeed_Log3 $name,4,"evalXMLresult: $evResult";
+  
+  if(!$@) {
+  	$nachrichten = $xml->XMLin($response, ForceArray => ['item']);
+  }
+  
   
   
   # -> ToDo: Add a title line to the ticker data e.g. to describe what's
@@ -712,6 +738,11 @@ return;
         This readings contains the number of new items that were extracted
         in the last update of the feed data.
       </li>
+      <li><code>gzippedFeed</code><br/>
+        Sometimes RSS-Feed data is delivered gzipped. This is automatically
+		recognized by the module. So if the received data was originally
+		gzipped this reading is set to 1 otherwise it is set to 0
+      </li>
       <li><code>state</code><br/>
         The state reading contains the timestamp of the last automatic or manual
         update of the device data from the feed, as long as the device is not
@@ -918,6 +949,12 @@ return;
         Dieses Reading gibt an, wie viele Schlagzeilen tats&auml;chlich beim letzten
         update aus dem Nachrichten-Feed extrahiert wurden.
       </li>
+      <li><code>gzippedFeed</code><br>
+		Manche Feeds werden in gezippter (gzip) Form ausgeliefert. Das wird vom
+		Modul automatisch erkannt und die Daten im Bedarfsfall dekomprimiert.
+		Wurde beim letzten update der Feed in gezippter Form ausgeliefert, so wird
+		dieses Reading auf 1 gesetzt, andernfalls auf 0.
+	  </li>
       <li><code>state</code><br>
         Dieses Reading gibt, wenn das Device nicht disabled ist, den Zeitpunkt
         der letzten aktualisierung mittels update an, egal ob automatisch oder
