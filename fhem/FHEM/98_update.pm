@@ -15,6 +15,8 @@ sub upd_mkDir($$$);
 sub upd_rmTree($);
 sub upd_writeFile($$$$);
 sub upd_mv($$);
+sub upd_metainit($);
+sub upd_metacmd($@);
 
 my $updateInBackground;
 my $updRet;
@@ -41,9 +43,20 @@ CommandUpdate($$)
 {
   my ($cl,$param) = @_;
   my @args = split(/ +/,$param);
+
+  my $err = upd_metainit(0);
+  return $err if($err);
+
+  if($args[0] &&
+     ($args[0] eq "list" ||
+      $args[0] eq "add" ||
+      $args[0] eq "delete" ||
+      $args[0] eq "reset")) {
+    return upd_metacmd($cl, @args);
+  }
+
   my $arg = (defined($args[0]) ? $args[0] : "all");
-  my $src = (defined($args[1]) ? $args[1] :
-                "http://fhem.de/fhemupdate/controls_fhem.txt");
+  my $src = (defined($args[1]) ? $args[1] : "");
 
   my $ret = eval { "Hello" =~ m/$arg/ };
   return "first argument must be a valid regexp, all, force or check"
@@ -59,11 +72,76 @@ CommandUpdate($$)
     return "Executing the update the background.";
 
   } else {
-    doUpdate($src, $arg);
+    doUpdateLoop($src, $arg);
     HttpUtils_Close(\%upd_connecthash);
     my $ret = $updRet; $updRet = "";
     return $ret;
 
+  }
+}
+
+sub
+upd_metainit($)
+{
+  my $force = shift;
+  my $mpath = $attr{global}{modpath}."/FHEM/controls.txt";
+  if($force || ! -f $mpath || -s $mpath == 0) {
+     if(!open(FH, ">$mpath")) {
+       my $msg = "Can't open $mpath: $!";
+       Log 1, $msg;
+       return $msg;
+     }
+     print FH "http://fhem.de/fhemupdate/controls_fhem.txt\n";
+     close(FH);
+  }
+  return undef;
+}
+
+sub
+upd_metacmd($@)
+{
+  my ($cl, @args) = @_;
+
+  my $mpath = $attr{global}{modpath}."/FHEM/controls.txt";
+
+  if($args[0] eq "list") {
+    open(FH, $mpath) || return "Can't open $mpath: $!";
+    my $ret = join("", <FH>);
+    close(FH);
+    return $ret;
+  }
+
+  if($args[0] eq "add") {
+    return "Usage: update add http://.../controls_.*.txt"
+        if(int(@args) != 2 || $args[1] !~ m,^http.*/(controls_.*.txt)$,);
+    my $fname = $1;
+    open(FH, $mpath) || return "Can't open $mpath: $!";
+    my (%fulls, %parts);
+    map { chomp($_); $fulls{$_}=1; my $x=$_; $x =~ s,^.*/,,; $parts{$x}=$_; } <FH>;
+    close(FH);
+    return "$args[1] is already in the list" if($fulls{$args[1]});
+    return "$fname is already present in $parts{$fname}" if($parts{$fname});
+
+    open(FH, ">>$mpath") || return "Can't write $mpath: $!";
+    print FH $args[1],"\n";
+    close(FH);
+    return undef;
+  }
+
+  if($args[0] eq "delete") {
+    return "Usage: update delete http://.../controls_.*.txt"
+        if(int(@args) != 2 || $args[1] !~ m,^http.*/(controls_.*.txt)$,);
+    open(FH, $mpath) || return "Can't open $mpath: $!";
+    my @list = grep { $_ ne $args[1]."\n"; } <FH>;
+    close(FH);
+    open(FH, ">$mpath") || return "Can't write $mpath: $!";
+    print FH join("", @list);
+    close(FH);
+    return undef;
+  }
+
+  if($args[0] eq "reset") {
+    return upd_metainit(1);
   }
 }
 
@@ -102,15 +180,44 @@ doUpdateInBackground($)
   no warnings 'redefine'; # The main process is not affected
   *Log = \&update_Log2Event;
   sleep(2); # Give time for ActivateInform / FHEMWEB / JavaScript
-  doUpdate($h->{src}, $h->{arg});
+  doUpdateLoop($h->{src}, $h->{arg});
   HttpUtils_Close(\%upd_connecthash);
 }
 
-
 sub
-doUpdate($$)
+doUpdateLoop($$)
 {
   my ($src, $arg) = @_;
+
+  doUpdate(1,1, $src, $arg) if($src =~ m/^http.*/);
+
+  my $mpath = $attr{global}{modpath}."/FHEM/controls.txt";
+  if(!open(LFH, "$mpath")) {
+    my $msg = "Can't open $mpath: $!";
+    uLog 1, $msg;
+    return $msg;
+  }
+  my ($max,$curr) = (0,0);
+  while(my $srcLine = <LFH>)  {
+    chomp($srcLine);
+    continue if($src && $srcLine !~ m/controls_{$src}/);
+    $max++;
+  }
+  uLog 1, "No source file named controls_$src found" if($src && !$max);
+
+  seek(LFH,0,0);
+  while(my $srcLine = <LFH>)  {
+    chomp($srcLine);
+    continue if($src && $srcLine !~ m/controls_{$src}/);
+    doUpdate(++$curr, $max, $srcLine, $arg);
+  }
+  close(LFH);
+}
+
+sub
+doUpdate($$$$)
+{
+  my ($curr, $max, $src, $arg) = @_;
   my ($basePath, $ctrlFileName);
   if($src !~ m,^(.*)/([^/]*)$,) {
     uLog 1, "Cannot parse $src, probably not a valid http control file";
@@ -118,8 +225,10 @@ doUpdate($$)
   }
   $basePath = $1;
   $ctrlFileName = $2;
+  $ctrlFileName =~ m/controls_(.*).txt/;
+  my $srcName = $1;
 
-  if(AttrVal("global", "backup_before_update", 0) && $arg ne "check") {
+  if(AttrVal("global", "backup_before_update", 0) && $arg ne "check" && $curr==1) {
     my $cmdret = AnalyzeCommand(undef, "backup");
     if ($cmdret !~ m/backup done.*/) {
       uLog 1, "Something went wrong during backup: $cmdret";
@@ -128,10 +237,15 @@ doUpdate($$)
     }
   }
 
+  if($max != 1) {
+    uLog 1, "";
+    uLog 1, $srcName;
+  }
+
   my $remCtrlFile = upd_getUrl($src);
   return if(!$remCtrlFile);
   my @remList = split(/\R/, $remCtrlFile);
-  uLog 4, "Got remote controlfile with ".int(@remList)." entries.";
+  uLog 4, "Got remote $ctrlFileName with ".int(@remList)." entries.";
 
   ###########################
   # read in & digest the local control file
@@ -143,7 +257,7 @@ doUpdate($$)
      open(FD, "$root/FHEM/$ctrlFileName")) {
     @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
     close(FD);
-    uLog 4, "Got local controlfile with ".int(@locList)." entries.";
+    uLog 4, "Got local $ctrlFileName with ".int(@locList)." entries.";
   }
   my %lh;
   foreach my $l (@locList) {
@@ -234,8 +348,7 @@ doUpdate($$)
     return if(!$remFile); # Error already reported
 
     if(length($remFile) ne $r[2]) {
-      uLog 1,
-          "Got ".length($remFile)." bytes for $fName, not $r[2] as expected,";
+      uLog 1, "Got ".length($remFile)." bytes for $fName, expected $r[2]";
       if($attr{global}{verbose} == 5) {
         upd_writeFile($root, $restoreDir, "$fName.corrupt", $remFile);
         uLog 1, "saving it to $fName.corrupt .";
@@ -268,7 +381,7 @@ doUpdate($$)
 
   return "" if(!$nChanged);
 
-  if($canJoin && $needJoin) {
+  if($canJoin && $needJoin && $curr == $max) {
     chdir($root);
     uLog(1, "Calling $^X $cj, this may take a while");
     my $ret = `$^X $cj`;
@@ -278,17 +391,19 @@ doUpdate($$)
   }
 
   uLog(1, "");
-  uLog 1,
-      'update finished, "shutdown restart" is needed to activate the changes.';
-  my $ss = AttrVal("global","sendStatistics",undef);
-  if(!defined($ss)) {
-    uLog(1, "");
-    uLog(1, "Please consider using the global attribute sendStatistics");
-  } elsif(defined($ss) && lc($ss) eq "onupdate") {
-    uLog(1, "");
-    my $ret = AnalyzeCommandChain(undef, "fheminfo send");
-    $ret =~ s/.*server response:/server response:/ms;
-    uLog(1, "fheminfo $ret");
+  if($curr == $max) {
+    uLog 1,
+        'update finished, "shutdown restart" is needed to activate the changes.';
+    my $ss = AttrVal("global","sendStatistics",undef);
+    if(!defined($ss)) {
+      uLog(1, "");
+      uLog(1, "Please consider using the global attribute sendStatistics");
+    } elsif(defined($ss) && lc($ss) eq "onupdate") {
+      uLog(1, "");
+      my $ret = AnalyzeCommandChain(undef, "fheminfo send");
+      $ret =~ s/.*server response:/server response:/ms;
+      uLog(1, "fheminfo $ret");
+    }
   }
 }
 
@@ -498,13 +613,17 @@ upd_initRestoreDirs($)
 <ul>
   <code>update [&lt;fileName&gt;|all|check|force]
        [http://.../controlfile]</code>
+  <br>or<br>
+  <code>update [add source|delete source|list|reset]</code>
   <br>
   <br>
   Update the FHEM installation. Technically this means update will download
-  http://fhem.de/fhemupdate/controls_fhem.txt first, compare it to the local
-  version in FHEM/controls_fhem.txt, and will download each file where the
-  attributes (timestamp and filelength) are different.
+  the controlfile(s) first, compare it to the local version of the file in the
+  moddir/FHEM directory, and download each file where the attributes (timestamp
+  and filelength) are different.
   <br>
+  With the commands add/delete/list/reset you can manage the list of
+  controlfiles, e.g. for thirdparty packages.
   Notes:
   <ul>
     <li>The contrib directory will not be updated.</li>
@@ -591,13 +710,19 @@ upd_initRestoreDirs($)
 <ul>
   <code>update [&lt;fileName&gt;|all|check|force]
         [http://.../controlfile]</code>
+  <br>oder<br>
+  <code>update [add source|delete source|list|reset]</code>
   <br>
   <br>
-  Erneuert die FHEM Installation. D.h. es wird zuerst die Datei
-  http://fhem.de/fhemupdate/controls_fhem.txt heruntergeladen, mit der lokalen
-  Version dieser Datei (FHEM/controls_fhem.txt) verglichen. Danach werden
-  alle Programmdateien heruntergeladen, deren Gr&ouml;&szlig;e oder Zeitstempel
-  sich unterscheidet.
+  Erneuert die FHEM Installation. D.h. es wird (werden) zuerst die
+  Kontroll-Datei(en) heruntergeladen, und mit der lokalen Version dieser Datei
+  in moddir/FHEM verglichen. Danach werden alle in der  Kontroll-Datei
+  spezifizierten Dateien heruntergeladen, deren Gr&ouml;&szlig;e oder
+  Zeitstempel sich unterscheidet.
+  <br>
+  Mit den Befehlen add/delete/list/reset kann man die Liste der Kontrolldateien 
+  pflegen.
+  <br>
   <br>
   Zu beachten:
   <ul>
