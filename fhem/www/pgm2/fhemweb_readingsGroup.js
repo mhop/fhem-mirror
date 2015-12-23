@@ -18,7 +18,9 @@ FW_readingsGroupReadyFn() {
 
     $(this).find("[rg-fhemWidget-label]").each(function() {
       var txt = $(this).attr('rg-fhemWidget-label');
-      $(this).find('div').first().contents().first().replaceWith(txt);
+      var contents = $(this).find('div').first().contents();
+      if( contents.size() == 2 )
+        contents.first().replaceWith(txt);
     });
   });
 }
