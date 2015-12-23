@@ -660,3 +660,7 @@
 - Sun Dec 06 2015 (Benni)
   - added new module 98_rssFeed to get data from rss news feeds
   
+- Wed Dec 23 2015 (chris1284)
+  - added new function for running terms
+  - improved commandref
+
