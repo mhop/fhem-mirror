@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_weekprofile: new module to manage week profiles
   - feature: 49_SSCam: function "enable" and "disable" for SS-Cams added
   - change:  49_SSCam: changed timout of Http-calls to a higher value,
                        commandref enhanced
