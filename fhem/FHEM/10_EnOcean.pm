@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2015-12-17
+# 2015-12-24
 
 # Added new EEP: A5-20-04 (hvac.04)
 # EnOcean_Notify():
@@ -7366,7 +7366,7 @@ sub EnOcean_Parse($$)
         }
 
       } elsif ($manufID eq "00D") {
-        # [Eltako shutters, untested]
+        # [Eltako shutter]
         my $angleMax = AttrVal($name, "angleMax", 90);
 	my $angleMin = AttrVal($name, "angleMin", -90);
 	my $anglePos = ReadingsVal($name, ".anglePosStart", undef);
@@ -7418,6 +7418,8 @@ sub EnOcean_Parse($$)
             }
             push @event, "3:anglePos:" . sprintf("%d", $anglePos);
             push @event, "3:position:" . sprintf("%d", $position);
+            push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
+            push @event, "3:.positionStart:" . sprintf("%d", $position);
           } elsif ($db[1] == 2) {
           # down
             $position += $shutTimeStop / $shutTime * 100;
@@ -7440,6 +7442,8 @@ sub EnOcean_Parse($$)
             }
             push @event, "3:anglePos:" . sprintf("%d", $anglePos);
             push @event, "3:position:" . sprintf("%d", $position);
+            push @event, "3:.anglePosStart:" . sprintf("%d", $anglePos);
+            push @event, "3:.positionStart:" . sprintf("%d", $position);
           } else {
             $state = "not_reached";
           }
@@ -12805,7 +12809,7 @@ EnOcean_Delete($$)
     </ul><br>
     and has to by activated
     <ul><br>
-      <code>set <name> standby</code><br>    
+      <code>set &lt;name&gt; standby</code><br>    
     </ul><br>
     Alternatively, the device can also be created automatically by autocreate. Only one RLT device may be defined in FHEM.<br>
     After activation the RLT Master listens for RLT Query messages. On reception of at least one RLT Query messsage the
