@@ -45,6 +45,7 @@ use strict;
 use warnings;
 use URI::Escape;
 use Thread::Queue;
+use Encode;
 
 # SmartMatch-Fehlermeldung unterdrücken...
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -71,6 +72,7 @@ my %gets = (
 	'RadiosWithCovers' => '',
 	'Alarm' => 'ID',
 	'EthernetPortStatus' => 'PortNum(0..3)',
+	'SupportLinks' => '',
 	'PossibleRoomIcons' => '',
 	'SearchlistCategories' => ''
 );
@@ -356,6 +358,11 @@ sub SONOSPLAYER_Get($@) {
 		my $statusPage = GetFileFromURL($url);
 		return (($1 == 0) ? 'Inactive' : 'Active') if ($statusPage =~ m/<Port port='$portNum'><Link>(\d+)<\/Link><Speed>.*?<\/Speed><\/Port>/i);
 		return 'Inactive';
+	} elsif (lc($reading) eq 'supportlinks') {
+		my $playerurl = ReadingsVal($name, 'location', '');
+		$playerurl =~ s/(^http:\/\/.*?)\/.*/$1/;
+		
+		return '<a href="'.$playerurl.'/support/review" target="_blank">Support Review</a><br /><a href="'.$playerurl.'/status" target="_blank">Status</a>';
 	} elsif (lc($reading) eq 'alarm') {
 		my $id = $a[2];
 		
@@ -774,8 +781,10 @@ sub SONOSPLAYER_Set($@) {
 			# Hier die komplette restliche Zeile in den Text-Parameter packen, da damit auch Leerzeichen möglich sind
 			my $text = '';
 			for(my $i = 4; $i < @a; $i++) {
-				$text .= ' '.$a[$i];
+				$text .= ' ' if ($i > 4);
+				$text .= $a[$i];
 			}
+			$text = decode('utf8', $text);
 		
 			SONOS_DoWork($udn, lc($key), $value, $value2, $text);
 		}
@@ -783,8 +792,10 @@ sub SONOSPLAYER_Set($@) {
 		# Hier die komplette restliche Zeile in den zweiten Parameter packen, da damit auch Leerzeichen möglich sind
 		my $text = '';
 		for(my $i = 4; $i < @a; $i++) {
-			$text .= ' '.$a[$i];
+			$text .= ' ' if ($i > 4);
+			$text .= $a[$i];
 		}
+		$text = decode('utf8', $text);
 		
 		SONOS_DoWork($udn, 'setAlarm', $value, $value2, $text);
 	} elsif (lc($key) eq 'snoozealarm') {
@@ -890,8 +901,10 @@ sub SONOSPLAYER_Set($@) {
 		# Hier die komplette restliche Zeile in den Parameter packen, da damit auch Leerzeichen möglich sind
 		my $text = '';
 		for(my $i = 2; $i < @a; $i++) {
-			$text .= ' '.$a[$i];
+			$text .= ' ' if ($i > 2);
+			$text .= $a[$i];
 		}
+		$text = decode('utf8', $text);
 		
 		SONOS_DoWork($udn, 'setName', $text);
 	} elsif (lc($key) eq 'roomicon') {
@@ -1338,6 +1351,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYER_getter_PossibleRoomIcons">
 <b><code>PossibleRoomIcons</code></b></a>
 <br /> Retreives a list of all possible Roomiconnames for the use with "set RoomIcon".</li>
+<li><a name="SONOSPLAYER_getter_SupportLinks">
+<b><code>SupportLinks</code></b></a>
+<br /> Shows a list with direct links to the player-support-sites.</li>
 </ul></li>
 <li><b>Lists</b><ul>
 <li><a name="SONOSPLAYER_getter_Favourites">
@@ -1697,6 +1713,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYER_getter_PossibleRoomIcons">
 <b><code>PossibleRoomIcons</code></b></a>
 <br /> Liefert eine Liste aller möglichen RoomIcon-Bezeichnungen zurück.</li>
+<li><a name="SONOSPLAYER_getter_SupportLinks">
+<b><code>SupportLinks</code></b></a>
+<br /> Ausnahmefall. Diese Get-Anweisung liefert eine Liste mit passenden Links zu den Supportseiten des Player.</li>
 </ul></li>
 <li><b>Listen</b><ul>
 <li><a name="SONOSPLAYER_getter_Favourites">

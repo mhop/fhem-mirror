@@ -3,6 +3,7 @@ package UPnP::ControlPoint;
 use 5.006;
 use strict;
 use warnings;
+use utf8;
 
 use Carp;
 use IO::Socket::INET;
@@ -33,16 +34,14 @@ sub new {
 
     $self = $class->SUPER::new(%args);
 
-    my $searchPort = $args{SearchPort} || DEFAULT_SSDP_SEARCH_PORT;
-    my $subscriptionPort = $args{SubscriptionPort} || DEFAULT_SUBSCRIPTION_PORT;
+    my $searchPort = defined($args{SearchPort}) ? $args{SearchPort} : DEFAULT_SSDP_SEARCH_PORT;
+    my $subscriptionPort = defined($args{SubscriptionPort}) ? $args{SubscriptionPort} : DEFAULT_SUBSCRIPTION_PORT;
 	my $maxWait = $args{MaxWait} || 3;
 	%IGNOREIP = %{$args{IgnoreIP}};
 	%USEDONLYIP = %{$args{UsedOnlyIP}};
 
 	# Create the socket on which search requests go out
-    $self->{_searchSocket} = IO::Socket::INET->new(Proto => 'udp',
-												   LocalPort => $searchPort) ||
-	croak("Error creating search socket: $!\n");
+    $self->{_searchSocket} = IO::Socket::INET->new(Proto => 'udp', LocalPort => $searchPort) || croak("Error creating search socket: $!\n");
 	setsockopt($self->{_searchSocket}, 
 			   IP_LEVEL,
 			   IP_MULTICAST_TTL,
@@ -51,11 +50,9 @@ sub new {
 
 	# Create the socket on which we'll listen for events to which we are
 	# subscribed.
-    $self->{_subscriptionSocket} = HTTP::Daemon->new(
-											 LocalPort => $subscriptionPort, Reuse=>1, Listen=>20) ||
-	croak("Error creating subscription socket: $!\n");
+    $self->{_subscriptionSocket} = HTTP::Daemon->new(LocalPort => $subscriptionPort, Reuse=>1, Listen=>20) || croak("Error creating subscription socket: $!\n");
 	$self->{_subscriptionURL} = $args{SubscriptionURL} || DEFAULT_SUBSCRIPTION_URL;
-	$self->{_subscriptionPort} = $subscriptionPort;
+	$self->{_subscriptionPort} = $self->{_subscriptionSocket}->sockport();;
 
 	# Create the socket on which we'll listen for SSDP Notifications.
 	$self->{_ssdpMulticastSocket} = IO::Socket::INET->new(
