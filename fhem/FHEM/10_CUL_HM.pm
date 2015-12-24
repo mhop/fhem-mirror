@@ -4040,7 +4040,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if ($dLen < 8){# fractional byte see whether we have stored the register
       #read full 8 bit!!!
       my $rName = CUL_HM_id2Name($dst.$lChn);
-      $rName =~ s/_chn:.*//;
+      $rName =~ s/_chn-\d\d$//;
       my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
       if ($curVal !~ m/^(set_|)(\d+)$/){
 	return "peer required for $regName" if ($curVal =~ m/peer/);
@@ -4902,7 +4902,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         foreach my $pCh(grep /$peer/,@peerLchn){
           my $n = CUL_HM_id2Name($pCh);
           next if (!$n);
-          $n =~s/_chn:.*//;
+          $n =~s/_chn-\d\d$//;
           delete $defs{$n}{helper}{dlvl};#stop desiredLevel supervision
           CUL_HM_stateUpdatDly($n,10);
         }
@@ -6413,7 +6413,7 @@ sub CUL_HM_ID2PeerList ($$$) {
   my $md = AttrVal($dHash->{NAME},"model","");
   my $chn = InternalVal($name,"chanNo","");
   if ($peerNames){
-    $peerNames =~ s/_chn:01//g; # channel 01 is part of device
+    $peerNames =~ s/_chn-01//g; # channel 01 is part of device
     CUL_HM_UpdtReadSingle($hash,"peerList",$peerNames,0);
     $hash->{peerList} = $peerNames;
     if ($st eq "virtual"){
@@ -6656,7 +6656,7 @@ sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
   my $hash = $defs{$name};
   return $hash->{DEF}        if($hash && $hash->{TYPE} eq "CUL_HM");#name is entity
   return $name               if($name =~ m/^[A-F0-9]{6,8}$/i);#was already HMid
-  return $defs{$1}->{DEF}.$2 if($name =~ m/(.*)_chn:(..)/);   #<devname> chn:xx
+  return $defs{$1}->{DEF}.$2 if($name =~ m/(.*)_chn-(..)$/);   #<devname> chn-xx
   return "000000"            if($name eq "broadcast");        #broadcast
   return substr($idHash->{DEF},0,6).sprintf("%02X",$1)
                              if($idHash && ($name =~ m/self(.*)/));
@@ -6667,7 +6667,7 @@ sub CUL_HM_name2Id(@) { #in: name or HMid ==>out: HMid, "" if no match
 sub CUL_HM_id2Name($) { #in: name or HMid out: name
   my ($p) = @_;
   $p = "" if (!defined $p);
-  return $p                               if($defs{$p}||$p =~ m/_chn:/
+  return $p                               if($defs{$p}||$p =~ m/_chn-\d\d$/
                                              || $p !~ m/^[A-F0-9]{6,8}$/i);
   my $devId= substr($p, 0, 6);
   return "broadcast"                      if($devId eq "000000");
@@ -6675,7 +6675,7 @@ sub CUL_HM_id2Name($) { #in: name or HMid out: name
   my $defPtr = $modules{CUL_HM}{defptr};
   if (length($p) == 8){
     return $defPtr->{$p}{NAME}            if(defined $defPtr->{$p});#channel
-    return $defPtr->{$devId}{NAME}."_chn:".substr($p,6,2)
+    return $defPtr->{$devId}{NAME}."_chn-".substr($p,6,2)
                                           if($defPtr->{$devId});#dev, add chn
     return $p;                               #not defined, return ID only
   }
@@ -6995,7 +6995,7 @@ sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
   foreach(grep /\.?RegL_/,keys %{$defs{$name}{READINGS}}){
     my ($l,$p) = ($1,$2) if($_ =~ m/RegL_(..)\.(.*)/);
     my $ps = $p;
-    $ps =~ s/_chn:.*//;
+    $ps =~ s/_chn-\d\d$//;
     if (!$p || $peers =~ m /$ps/){
       CUL_HM_updtRegDisp($defs{$name},$l,CUL_HM_name2Id($p,$dH));
     }
@@ -7910,7 +7910,7 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request
   my ($name,$force) = @_;
   $name = substr($name,6) if ($name =~ m/^sUpdt:/);
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
-  $name =~ s /_chn:..$//;
+  $name =~ s /_chn-\d\d$//;
   return if (  !$defs{$name}                  #device unknown, ignore
              || CUL_HM_Set($defs{$name},$name,"help") !~ m/statusRequest/);
   if ($force || ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x0f) > 3)){
@@ -8727,7 +8727,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                    set actor press on # trigger short of internal peer self related to 'on'<br>
                    set actor press long off # trigger long of internal peer self related to 'of'<br>
                    set actor press long FB_Btn01 # trigger long peer FB button 01<br>
-                   set actor press long FB_chn:8 # trigger long peer FB button 08<br>
+                   set actor press long FB_chn-8 # trigger long peer FB button 08<br>
                    set actor press self01 # trigger short of internal peer 01<br>
                    set actor press fhem02 # trigger short of FHEM channel 2<br>
                 </code>

@@ -445,7 +445,7 @@ sub HMinfo_peerCheck(@) { #####################################################
           next;
         }
         my $pName = CUL_HM_id2Name($pId);
-        $pName =~s/_chn:01//;           #chan 01 could be covered by device
+        $pName =~s/_chn-01//;           #chan 01 could be covered by device
         my $pPlist = AttrVal($pName,"peerIDs","");
         my $pDName = CUL_HM_id2Name($pDid);
         my $pSt = AttrVal($pDName,"subType","");
@@ -1190,7 +1190,7 @@ sub HMinfo_GetFn($@) {#########################################################
       my @pl = ();
       foreach (split",",$peerIDs){
         my $pn = CUL_HM_peerChName($_,$dId);
-        $pn =~ s/_chn:01//;
+        $pn =~ s/_chn-01//;
         push @pl,$pn;
         push @fheml,"$_$dName" if ($pn =~ m/^fhem..$/);
       }
@@ -2331,12 +2331,12 @@ sub HMinfo_cpRegs(@){##########################################################
   if ($srcP){# will be peer related copy
     if   ($srcP =~ m/self(.*)/)      {$srcPid = substr($defs{$srcCh}{DEF},0,6).sprintf("%02X",$1)}
     elsif($srcP =~ m/^[A-F0-9]{8}$/i){$srcPid = $srcP;}
-    elsif($srcP =~ m/(.*)_chn:(..)/) {$srcPid = $defs{$1}->{DEF}.$2;}
+    elsif($srcP =~ m/(.*)_chn-(..)/) {$srcPid = $defs{$1}->{DEF}.$2;}
     elsif($defs{$srcP})              {$srcPid = $defs{$srcP}{DEF}.$2;}
 
     if   ($dstP =~ m/self(.*)/)      {$dstPid = substr($defs{$dstCh}{DEF},0,6).sprintf("%02X",$1)}
     elsif($dstP =~ m/^[A-F0-9]{8}$/i){$dstPid = $dstP;}
-    elsif($dstP =~ m/(.*)_chn:(..)/) {$dstPid = $defs{$1}->{DEF}.$2;}
+    elsif($dstP =~ m/(.*)_chn-(..)/) {$dstPid = $defs{$1}->{DEF}.$2;}
     elsif($defs{$dstP})              {$dstPid = $defs{$dstP}{DEF}.$2;}
 
     return "invalid peers src:$srcP dst:$dstP" if(!$srcPid || !$dstPid);
