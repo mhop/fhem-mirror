@@ -1335,7 +1335,7 @@ sub Calendar_Undef($$) {
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
-    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* { Log3 %NAME, 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
+    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* { Log3 $NAME, 1, "ALARM name=$NAME event=$EVENT part1=$EVTPART0 part2=$EVTPART1" }
     </code><br><br>
     </ul>
 
@@ -1345,16 +1345,16 @@ sub Calendar_Undef($$) {
     You want the respective devices to switch on when the calendar event starts and to switch off when the calendar event ends.<br><br>
    <code>
     define SwitchActorOn  notify MyCalendar:modeStarted.* { 
-                my $reading="%EVTPART0";; 
-                my $uid= "%EVTPART1";; 
+                my $reading="$EVTPART0";; 
+                my $uid= "$EVTPART1";; 
                 my $actor= fhem("get MyCalendar summary $uid");; 
                 if(defined $actor) { 
                    fhem("set $actor on") 
                 } 
     }<br><br>
     define SwitchActorOff  notify MyCalendar:modeEnded.* { 
-                my $reading="%EVTPART0";; 
-                my $uid= "%EVTPART1";; 
+                my $reading="$EVTPART0";; 
+                my $uid= "$EVTPART1";; 
                 my $actor= fhem("get MyCalendar summary $uid");; 
                 if(defined $actor) { 
                    fhem("set $actor off") 
@@ -1363,7 +1363,7 @@ sub Calendar_Undef($$) {
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
-    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "%EVTPART0";; my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 %NAME, 1, "Actor: $actor, Reading $reading" }
+    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 $NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
 
@@ -1538,7 +1538,7 @@ sub Calendar_Undef($$) {
     </code><br><br>
     Du kannst auch ein Logging aufsetzen:<br><br>
     <code>
-    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* { Log3 %NAME, 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
+    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* { Log3 $NAME, 1, "ALARM name=$NAME event=$EVENT part1=$EVTPART0 part2=$EVTPART1" }
     </code><br><br>
     </ul>
 
@@ -1548,16 +1548,16 @@ sub Calendar_Undef($$) {
     Du willst nun die entsprechenden Devices an- und ausschalten wenn das Kalender-Ereignis beginnt bzw. endet.<br><br>
    <code>
     define SwitchActorOn  notify MyCalendar:modeStarted.* { 
-                my $reading="%EVTPART0";; 
-                my $uid= "%EVTPART1";; 
+                my $reading="$EVTPART0";; 
+                my $uid= "$EVTPART1";; 
                 my $actor= fhem("get MyCalendar summary $uid");; 
                 if(defined $actor) { 
                    fhem("set $actor on") 
                 } 
     }<br><br>
     define SwitchActorOff  notify MyCalendar:modeEnded.* { 
-                my $reading="%EVTPART0";; 
-                my $uid= "%EVTPART1";; 
+                my $reading="$EVTPART0";; 
+                my $uid= "$EVTPART1";; 
                 my $actor= fhem("get MyCalendar summary $uid");; 
                 if(defined $actor) { 
                    fhem("set $actor off") 
@@ -1566,7 +1566,7 @@ sub Calendar_Undef($$) {
     </code><br><br>
     Auch hier kann ein Logging aufgesetzt werden:<br><br>
     <code>
-    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "%EVTPART0";; my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 %NAME, 1, "Actor: $actor, Reading $reading" }
+    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 $NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
 
