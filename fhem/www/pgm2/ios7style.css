@@ -96,6 +96,8 @@ table.block tr.odd { background: #fff;}
 table.block tr.sel { background: #d9d9d9; }
 table.block td { padding:3px; }
 
+table.readings tr td:nth-child(3) { min-width: 150px; }
+
 /* Bugfix fuer readingsGroup, Spalten Link überall klickbar */
 table.block table.block, table.fileList table.fileList, table table {
 width: 100%;
