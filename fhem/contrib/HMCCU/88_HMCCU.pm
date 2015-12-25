@@ -860,7 +860,7 @@ sub HMCCU_UpdateClientReading ($@)
 		my $ch = $defs{$d};
 		my $cn = $ch->{NAME};
 
-		next if ($hash->{TYPE} ne 'HMCCUDEV' && $hash->{TYPE} ne 'HMCCUCHN');
+		next if ($ch->{TYPE} ne 'HMCCUDEV' && $ch->{TYPE} ne 'HMCCUCHN');
 		next if (!defined ($ch->{IODev}) || !defined ($ch->{ccuaddr}));
 		next if ($ch->{IODev} != $hash);
 		next if ($ch->{ccuaddr} ne $devadd && $ch->{ccuaddr} ne $chnadd);
@@ -1384,6 +1384,7 @@ sub HMCCU_ReadRPCQueue ($)
 		$HMCCU_EventTime = time () if ($eventno == 0);
 		my @Tokens = split (/\|/, $element);
 		if ($Tokens[0] eq 'EV') {
+			Log 2, "HMCCU: Event from ".$Tokens[1]." dp=".$Tokens[2]." val=".$Tokens[3];
 			my ($add, $chn) = split (/:/, $Tokens[1]);
 			my $reading = HMCCU_GetReadingName ('', $add, $chn, $Tokens[2], '',
 			   $ccureadingformat);
