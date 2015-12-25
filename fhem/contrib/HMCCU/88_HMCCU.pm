@@ -1384,7 +1384,7 @@ sub HMCCU_ReadRPCQueue ($)
 		$HMCCU_EventTime = time () if ($eventno == 0);
 		my @Tokens = split (/\|/, $element);
 		if ($Tokens[0] eq 'EV') {
-			Log 2, "HMCCU: Event from ".$Tokens[1]." dp=".$Tokens[2]." val=".$Tokens[3];
+#			Log 2, "HMCCU: Event from ".$Tokens[1]." dp=".$Tokens[2]." val=".$Tokens[3];
 			my ($add, $chn) = split (/:/, $Tokens[1]);
 			my $reading = HMCCU_GetReadingName ('', $add, $chn, $Tokens[2], '',
 			   $ccureadingformat);
