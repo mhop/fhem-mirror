@@ -1329,7 +1329,6 @@ YAMAHA_AVR_ParseResponse ($$$)
                     }
                     else
                     { 
-                        Log 3, "YAMAHA_AVR: set  bass only 2 to ". (int($1)/10);
                         readingsBulkUpdate($hash, "bass", int($1)/10);
                     }
                 }
