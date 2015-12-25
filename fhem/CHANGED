@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: YAMAHA_AVR: add pointer to main zone in Internals for zone defs
+  - change:  YAMAHA_AVR: DSP based models use command queue of main zone
+             to execute commands for zone definitions 
+             (many thanks to dev0 for patience and support)
+  - bugfix:  YAMAHA_AVR: fix navigateListMenu for RX-Vx71 series models,
+             fix bass/treble missbehaviour for DSP based models
   - feature: 98_weekprofile: new module to manage week profiles
   - feature: 49_SSCam: function "enable" and "disable" for SS-Cams added
   - change:  49_SSCam: changed timout of Http-calls to a higher value,
