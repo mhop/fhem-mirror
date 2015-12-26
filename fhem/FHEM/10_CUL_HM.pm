@@ -224,9 +224,10 @@ sub CUL_HM_updateConfig($){
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
     next if (!$hash->{DEF}); # likely renamed
-    foreach my $read (grep/RegL_0.:/,keys%{$defs{$name}{READINGS}}){
+    foreach my $read (grep/(RegL_0.:|_chn:\d\d)/,keys%{$defs{$name}{READINGS}}){
       my $readN = $read;
       $readN =~ s/(RegL_0.):/$1\./;
+      $readN =~ s/_chn:(\d\d)/_chn-$1/;
       $defs{$name}{READINGS}{$readN} = $defs{$name}{READINGS}{$read};
       delete $defs{$name}{READINGS}{$read};
     }
