@@ -1196,7 +1196,7 @@ sub I2C_TSL2561_CalculateLux($) {
     if ($hash->{tsl2561Package} == TSL2561_PACKAGE_CS) {
       #  CS package
       if ($ratio <= 0.52) {
-        $lux = 0.0315*$channel0 - 0.0593*$channel1*pow($ratio, 1.4);
+        $lux = 0.0315*$channel0 - 0.0593*$channel0*pow($ratio, 1.4);
       } elsif ($ratio <= 0.65) {
         $lux = 0.0229*$channel0 - 0.0291*$channel1;
       } elsif ($ratio <= 0.80) {
@@ -1209,7 +1209,7 @@ sub I2C_TSL2561_CalculateLux($) {
     } else {
       #  T, FN and CL package
       if ($ratio <= 0.50) {
-        $lux = 0.0304*$channel0 - 0.062*$channel1*pow($ratio, 1.4);
+        $lux = 0.0304*$channel0 - 0.062*$channel0*pow($ratio, 1.4);
       } elsif ($ratio <= 0.61) {
         $lux = 0.0224*$channel0 - 0.031*$channel1;
       } elsif ($ratio <= 0.80) {
