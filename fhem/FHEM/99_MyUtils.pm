@@ -343,7 +343,7 @@ sub RollCheck() {
             }
 	}
 
-        Dbg("RollCheck:$r->{roll}-tempH:$tempH temp:$temp tempO:$tempOut so:$sonne wett:$wett sr:$sr twil:$twil tag:$tag fen:$fen skipR:$skipRunter skipH:$skipHoch st:$r->{state}");
+        #Dbg("RollCheck:$r->{roll}-tempH:$tempH temp:$temp tempO:$tempOut so:$sonne wett:$wett sr:$sr twil:$twil tag:$tag fen:$fen skipR:$skipRunter skipH:$skipHoch st:$r->{state}");
 
 	if( $tag and $sonne and $tempH) {
             if($r->{state}!=STATE_SCHLITZ) {
