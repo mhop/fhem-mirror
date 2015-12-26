@@ -42,6 +42,8 @@ use warnings;
 use SetExtensions;
 # use Data::Dumper;
 
+use Time::HiRes;
+
 sub HMCCUDEV_Define ($@);
 sub HMCCUDEV_Set ($@);
 sub HMCCUDEV_Get ($@);
