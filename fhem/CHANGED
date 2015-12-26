@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  51_I2C_TSL2561: correct lux calculation floatArithmetics case
   - feature: YAMAHA_AVR: add pointer to main zone in Internals for zone defs
   - change:  YAMAHA_AVR: DSP based models use command queue of main zone
              to execute commands for zone definitions 
