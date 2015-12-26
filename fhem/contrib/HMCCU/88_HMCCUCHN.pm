@@ -39,6 +39,8 @@ use strict;
 use warnings;
 use SetExtensions;
 
+use Time::HiRes;
+
 sub HMCCUCHN_Define ($@);
 sub HMCCUCHN_Set ($@);
 sub HMCCUCHN_Get ($@);
