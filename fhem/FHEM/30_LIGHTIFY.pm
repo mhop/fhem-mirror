@@ -285,7 +285,7 @@ LIGHTIFY_Write($@)
     $chash->{helper}->{update_timeout} = AttrVal($name, "delayedUpdate", 0);;
     #$chash->{helper}->{update_timeout} = 1 if( !$chash->{helper}->{update_timeout} );
 
-    RemoveInternalTimer($chash);            
+    RemoveInternalTimer($chash);
     InternalTimer(gettimeofday()+$chash->{helper}->{update_timeout}, "HUEDevice_GetUpdate", $chash, 0);
 
   } else {
@@ -409,21 +409,24 @@ LIGHTIFY_Parse($$)
   my $response = substr($hex,2*3,2*1);
   my $cnt = substr($hex,2*4,2*1);
   if( $response eq getDevices ) {
+    my $size = length($hex)/2;
     my $nr_lights = hex(substr($hex,2*9,2*1));
+
+    my $offset = ($size-11) / $nr_lights;
 
     my $autocreated = 0;
     for( my $i = 0; $i < $nr_lights; ++$i ) {
-      my $short = substr($hex,$i*42*2+2*11,2*2);
-      my $id = substr($hex,$i*42*2+2*13,2*8);
-      my $type = substr($hex,$i*42*2+2*21,2*1);
-      my $mode = substr($hex,$i*42*2+2*27,2*1);
-      my $onoff = hex(substr($hex,$i*42*2+2*29,2*1));
-      my $dim = hex(substr($hex,$i*42*2+2*30,2*1));
-      my $ct = hex(substr($hex,$i*42*2+2*32,2*1).substr($hex,$i*42*2+2*31,2*1));
-      my $r = (substr($hex,$i*42*2+2*33,2*1));
-      my $g = (substr($hex,$i*42*2+2*34,2*1));
-      my $b = (substr($hex,$i*42*2+2*35,2*1));
-      my $alias = pack('H*', substr($hex,$i*42*2+2*37,2*16));
+      my $short = substr($hex,$i*$offset*2+2*11,2*2);
+      my $id = substr($hex,$i*$offset*2+2*13,2*8);
+      my $type = substr($hex,$i*$offset*2+2*21,2*1);
+      my $mode = substr($hex,$i*$offset*2+2*27,2*1);
+      my $onoff = hex(substr($hex,$i*$offset*2+2*29,2*1));
+      my $dim = hex(substr($hex,$i*$offset*2+2*30,2*1));
+      my $ct = hex(substr($hex,$i*$offset*2+2*32,2*1).substr($hex,$i*$offset*2+2*31,2*1));
+      my $r = (substr($hex,$i*$offset*2+2*33,2*1));
+      my $g = (substr($hex,$i*$offset*2+2*34,2*1));
+      my $b = (substr($hex,$i*$offset*2+2*35,2*1));
+      my $alias = pack('H*', substr($hex,$i*$offset*2+2*37,2*16));
 
       my $has_w = (hex($type) & 0x02) ? 1: 0;
       my $has_rgb = (hex($type) & 0x08) ? 1 : 0;
