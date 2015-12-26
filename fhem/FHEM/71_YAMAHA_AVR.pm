@@ -782,7 +782,8 @@ YAMAHA_AVR_Set($@)
     }
     elsif($what eq "navigateListMenu")
     {
-        YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, join(" ", @a[2..$#a]), {options => {init => 1}});
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, join(" ", @a[2..$#a]), {options => {init => 1}});
     }
     elsif($what eq "skip")
     {
