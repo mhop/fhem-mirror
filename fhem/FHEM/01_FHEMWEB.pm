@@ -2470,6 +2470,7 @@ FW_logInform($$)
     delete $logInform{$me};
     return;
   }
+  $msg = FW_htmlEscape($msg);
   if(!addToWritebuffer($ntfy, "<div class='changed'>$msg</div>") ){
     TcpServer_Close($ntfy);
     delete $logInform{$me};
