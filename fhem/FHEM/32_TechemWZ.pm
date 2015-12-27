@@ -229,14 +229,14 @@ TechemWZ_Parse(@) {
   if (exists( $modules{TechemWZ}{defptr}{'00000000'} ) && defined( $defs{$modules{TechemWZ}{defptr}{'00000000'}->{NAME}} )) { 
     my $listdev = $modules{TechemWZ}{defptr}{'00000000'};
     $listdev->{helper}->{list}->{$message->{long}}->{msg} = $message;
-    push @d, $listdev;
+    push @d, $listdev->{NAME};
   }
   
   # dispatch
   if (exists( $modules{TechemWZ}{defptr}{$message->{long}})) {
     my $deviceHash = $modules{TechemWZ}{defptr}{$message->{long}};
     TechemWZ_Receive($deviceHash, $message);
-    push @d, $deviceHash;
+    push @d, $deviceHash->{NAME};
   }
   
   return (@d);
