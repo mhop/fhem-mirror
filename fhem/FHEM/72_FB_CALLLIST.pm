@@ -132,24 +132,15 @@ sub FB_CALLLIST_Attr($@)
             }
             else 
             {
-                my %lines;
+                delete($hash->{helper}{INTERNAL_FILTER}) if(exists($hash->{helper}{INTERNAL_FILTER}));
+                
                 foreach my $item (split("[ \t,][ \t,]*",$value))
                 {
-                    $lines{$item} = $item; 
+                    $hash->{helper}{INTERNAL_FILTER}{$item} = $item; 
                 }
                 
-                $hash->{helper}{INTERNAL_FILTER} = \%lines;
                 Log3 $name, 4, "FB_CALLLIST ($name) - filter stored as list $value";
             } 
-            
-            if($init_done)
-            {
-                # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
-                FB_CALLLIST_cleanupList($hash);
-                
-                # Inform all FHEMWEB clients
-                FB_CALLLIST_updateFhemWebClients($hash);
-            }
         }
         elsif($attrib eq "connection-mapping")
         {
@@ -161,9 +152,6 @@ sub FB_CALLLIST_Attr($@)
                 {
                     $hash->{helper}{CONNECTION_MAP} = $table;
                     Log3 $name, 4, "FB_CALLLIST ($name) - connection map stored as hash: $value";
-                    
-                    # Inform all FHEMWEB clients
-                    FB_CALLLIST_updateFhemWebClients($hash) if($init_done);
                 } 
                 else
                 {
@@ -187,9 +175,6 @@ sub FB_CALLLIST_Attr($@)
                 {
                     $hash->{helper}{ICON_MAP} = $table;
                     Log3 $name, 4, "FB_CALLLIST ($name) - icon map stored as hash: $value";
-                    
-                    # Inform all FHEMWEB clients
-                    FB_CALLLIST_updateFhemWebClients($hash) if($init_done);
                 } 
                 else
                 {
@@ -211,9 +196,6 @@ sub FB_CALLLIST_Attr($@)
                 {
                     $hash->{helper}{EXTERNAL_MAP} = $table;
                     Log3 $name, 4, "FB_CALLLIST ($name) - external map stored as hash: $value";
-                    
-                    # Inform all FHEMWEB clients
-                    FB_CALLLIST_updateFhemWebClients($hash) if($init_done);
                 } 
                 else
                 {
@@ -230,15 +212,6 @@ sub FB_CALLLIST_Attr($@)
             if($value and $value =~ /^incoming|outgoing|missed-call|completed|active$/)
             {
                 $attr{$name}{$attrib} = $value;
-                
-                if($init_done)
-                {
-                    # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
-                    FB_CALLLIST_cleanupList($hash);
-                    
-                    # Inform all FHEMWEB clients
-                    FB_CALLLIST_updateFhemWebClients($hash);
-                }
             }
         }       
     }
@@ -247,23 +220,31 @@ sub FB_CALLLIST_Attr($@)
         if($attrib eq "internal-number-filter")
         {
             delete($hash->{helper}{INTERNAL_FILTER}) if(exists($hash->{helper}{INTERNAL_FILTER}));
-            return undef;
         }
         elsif($attrib eq "connection-mapping")
         {
             delete($hash->{helper}{CONNECTION_MAP}) if(exists($hash->{helper}{CONNECTION_MAP}));
-            return undef;
         }
         elsif($attrib eq "icon-mapping")
         {
             delete($hash->{helper}{ICON_MAP}) if(exists($hash->{helper}{ICON_MAP}));
-            return undef;
         }
         elsif($attrib eq "external-mapping")
         {
             delete($hash->{helper}{EXTERNAL_MAP}) if(exists($hash->{helper}{EXTERNAL_MAP}));
-            return undef;
         }
+    }
+    
+    if($init_done)
+    {
+        # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
+        FB_CALLLIST_cleanupList($hash);
+
+        # Inform all FHEMWEB clients
+        FB_CALLLIST_updateFhemWebClients($hash);
+        
+        # save current list state to file/configDB
+        FB_CALLLIST_saveList($hash);
     }
 }
 
@@ -284,8 +265,6 @@ sub FB_CALLLIST_Set($@)
         
         # Delete stored list
         FB_CALLLIST_saveList($hash);
-        
-        return undef;
     }
     else
     {
@@ -493,24 +472,24 @@ sub FB_CALLLIST_returnIcon($$$)
     
     my $icon_name;
     
-    my $standard = {
+    my %standard = (
         
-        "incoming.connected" => "phone_ring_in\@blue",
-        "outgoing.connected" => "phone_ring_out\@green",
+        "incoming.connected" => 'phone_ring_in@blue',
+        "outgoing.connected" => 'phone_ring_out@green',
     
-        "incoming.ring" => "phone_ring\@blue",
-        "outgoing.ring" => "phone_ring\@green",
+        "incoming.ring" => 'phone_ring@blue',
+        "outgoing.ring" => 'phone_ring@green',
         
-        "incoming.missed" => "phone_missed_in\@red",
-        "outgoing.missed" => "phone_missed_out\@green",
+        "incoming.missed" => 'phone_missed_in@red',
+        "outgoing.missed" => 'phone_missed_out@green',
         
-        "incoming.done" => "phone_call_end_in\@blue",
-        "outgoing.done" => "phone_call_end_out\@green",
+        "incoming.done" => 'phone_call_end_in@blue',
+        "outgoing.done" => 'phone_call_end_out@green',
         
-        "incoming.tam" => "phone_answering\@blue"
-    };
+        "incoming.tam" => 'phone_answering@blue'
+    );
     
-    $icon_name = $standard->{$icon} if(exists($standard->{$icon}));
+    $icon_name = $standard{$icon} if(exists($standard{$icon}));
     $icon_name = $hash->{helper}{ICON_MAP}{$icon} if(exists($hash->{helper}{ICON_MAP}{$icon}));
 
     my $result = FW_makeImage($icon_name);
@@ -529,7 +508,7 @@ sub FB_CALLLIST_returnCallState($$;$)
     
     return undef unless(exists($hash->{helper}{DATA}{$index}));
     
-    my $data = \%{$hash->{helper}{DATA}{$index}};
+    my $data = $hash->{helper}{DATA}{$index};
     my $state;
     
     $icons = AttrVal($hash->{NAME}, "show-icons", 1) unless(defined($icons));
@@ -606,7 +585,7 @@ sub FB_CALLLIST_list2html($;$)
     
     my $create_readings = AttrVal($hash->{NAME}, "create-readings",0);
     
-    my $td_style = "style=\"padding-left:6px;padding-right:6px;\"";
+    my $td_style = 'style="padding-left:6px;padding-right:6px;"';
     my @json_output = ();
     my $line;
     
@@ -617,15 +596,15 @@ sub FB_CALLLIST_list2html($;$)
     if(AttrVal($name, "no-heading", "0") eq "0")
     {
         $ret .=" <tr><td>";
-        $ret .= "<div class=\"devType\"><a href=\"$FW_ME$FW_subdir?detail=$name\">$alias</a>".(IsDisabled($name) ? " (disabled)" : "")."</div>" unless($FW_webArgs{"detail"});
+        $ret .= '<div class="devType"><a href="'.$FW_ME.$FW_subdir.'?detail='.$name.'">'.$alias.'</a>'.(IsDisabled($name) ? " (disabled)" : "").'</div>' unless($FW_webArgs{"detail"});
         $ret .= "</td></tr>";
     }
     
     $ret .= "<tr><td>";
-    $ret .= "<div class=\"fhemWidget\" informId=\"$name\" cmd=\"\" arg=\"fbcalllist\" dev=\"$name\">"; # div tag to support inform updates
-    $ret .= "<table class=\"block fbcalllist\">";
+    $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">'; # div tag to support inform updates
+    $ret .= '<table class="block fbcalllist">';
     
-    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), "class=\"fbcalllist header\"","");
+    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"','');
     
     if(exists($hash->{helper}{DATA}) and (scalar keys %{$hash->{helper}{DATA}}) > 0)
     {
@@ -633,7 +612,7 @@ sub FB_CALLLIST_list2html($;$)
         
         my @json_list;
         
-        my @list = sort { if(AttrVal($name, "list-order","descending") eq "descending") {return $b <=> $a;} else {return $a <=> $b;} } keys %{$hash->{helper}{DATA}};
+        my @list = sort { (AttrVal($name, "list-order","descending") eq "descending") ? $b <=> $a : $a <=> $b } keys %{$hash->{helper}{DATA}};
         
         if(AttrVal($hash->{NAME}, "list-type", "all") eq "missed-calls")
         {
@@ -676,11 +655,9 @@ sub FB_CALLLIST_list2html($;$)
             
             push @json_output,  FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
             FB_CALLLIST_updateReadings($hash, $line) if($to_json and $create_readings);
-            $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, "number=\"$count\" class=\"fbcalllist ".($count % 2 == 1 ? "odd" : "even")."\"", "class=\"fbcalllist\" $td_style");
+            $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, 'number="'.$count.'" class="fbcalllist '.($count % 2 == 1 ? "odd" : "even").'"', 'class="fbcalllist" '.$td_style);
             $count++;
         }
-        
-
     }
     else
     {
@@ -698,7 +675,7 @@ sub FB_CALLLIST_list2html($;$)
         my @columns = split(",",AttrVal($name, "visible-columns", $hash->{helper}{DEFAULT_COLUMN_ORDER}));
         my $additional_columns = scalar(@columns);
         
-        $ret .= "<tr align=\"center\" name=\"empty\"><td style=\"padding:10px;\" colspan=\"$additional_columns\"><i>$string</i></td></tr>";
+        $ret .= '<tr align="center" name="empty"><td style="padding:10px;" colspan="'.$additional_columns.'"><i>'.$string.'</i></td></tr>';
     }
     
     $ret .= "</table></div>";
@@ -858,11 +835,11 @@ sub FB_CALLLIST_returnOrderedHTMLOutput($$$$)
     
     my @ret = ();
     
-    push @ret, "<tr align=\"center\" $tr_additions>";
+    push @ret, '<tr align="center" '.$tr_additions.'>';
     
     foreach my $col (@order)
     {
-        push @ret, "<td name=\"$col\" $td_additions>".$line->{$col}."</td>",
+        push @ret, '<td name="'.$col.'" '.$td_additions.'>'.$line->{$col}.'</td>';
     }
     
     return join("",@ret)."</tr>";
@@ -881,13 +858,13 @@ sub FB_CALLLIST_returnOrderedJSONOutput($$)
     
     my @ret = ();
    
-    push @ret, "\"line\":\"".$line->{line}."\"";
+    push @ret, '"line":"'.$line->{line}.'"';
     
     foreach my $col (@order)
     {
         my $val = $line->{$col};
-        $val =~ s/"/\\"/g;
-        push @ret, "\"$col\":\"$val\"",
+        $val =~ s,",\",g;
+        push @ret, '"'.$col.'":"'.$val.'"';
     }
     
     return "{".join(",",@ret)."}";
