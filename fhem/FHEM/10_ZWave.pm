@@ -430,6 +430,7 @@ my %zwave_cmdArgs = (
 my %zwave_parseHook; # nodeId:regexp => fn, used by assocRequest
 my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
+                           "010f-0302-1000" => "Fibaro_FGRM222", # FGR 222
                            "0115-0100-0102" => "ZME_KFOB" );
 
 # Patching certain devices.
