@@ -1318,6 +1318,7 @@ sub _finishedCONDITIONS {
 
 	$hash->{GDS_CONDITIONS_READ}	= int(time());
 	my $cf = AttrVal($name,'gdsSetCond',0);
+	return unless $cf;
 #	GDS_GetUpdate($hash,1) if $cf; 
 	my @b;
 	push @b, undef;
