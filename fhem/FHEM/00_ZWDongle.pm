@@ -389,7 +389,7 @@ ZWDongle_Write($$$)
   # assemble complete message
   $msg = sprintf("%02x%s", length($msg)/2+1, $msg);
 
-  $msg = "01$msg" . zwlib_checkSum($msg);
+  $msg = "01$msg" . zwlib_checkSum_8($msg);
   push @{$hash->{SendStack}}, $msg;
 
   ZWDongle_ProcessSendStack($hash);
@@ -535,7 +535,7 @@ ZWDongle_Read($@)
     my $rcs  = substr($data, $l+2, 2);          # Received Checksum
     $data = substr($data, $l+4);
 
-    my $ccs = zwlib_checkSum("$len$msg");    # Computed Checksum
+    my $ccs = zwlib_checkSum_8("$len$msg");    # Computed Checksum
     if($rcs ne $ccs) {
       Log3 $name, 1,
            "$name: wrong checksum: received $rcs, computed $ccs for $len$msg";

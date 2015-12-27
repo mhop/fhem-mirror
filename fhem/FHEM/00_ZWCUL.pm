@@ -3,13 +3,16 @@
 package main;
 
 # TODO
-#   implement resend in firmware
-#   fix remotes
-#   implement inclusion/exclusion
-#   implement neighborUpdate: 010404010c0001 010604000c0040 010700 0105
-#   implement static routing
-#   implement/understand explorer frames
-#   check security
+#   9.6k, needed by inclusion
+#   always verify checksum in firmware
+#   inclusion/exclusion
+#   resend in firmware
+#   send anomaly on remotes
+#   neighborUpdate Class: 010404010c0001 010604000c0040 010700 0105
+#   static routing
+#   explorer frames
+#   implement security
+#   multicast
 
 use strict;
 use warnings;
@@ -222,18 +225,23 @@ ZWCUL_Write($$$)
     my ($t,$l,$p) = ($1,$2,$3);
     my $th = $modules{ZWave}{defptr}{"$fn $t"};
     if(!$th) {
-      Log 1, "ZWCUL: no device found for $fn $t";
+      Log3 $hash, 1, "ZWCUL: no device found for $fn $t";
       return;
     }
 
     # Do not send wakeupNoMoreInformation in monitor mode
     return if($p eq "8408" && $hash->{monitor});
 
-    $th->{sentIdx} = ($th->{sentIdx}++ % 16);
+    $th->{sentIdx} = 0 if(!$th->{sentIdx} || $th->{sentIdx} == 15);
+    $th->{sentIdx}++;
+
+    my $s100 = (AttrVal($hash->{NAME}, "dataRate", "40k") eq "100k");
+
     $msg = sprintf("%s%s41%02x%02x%s%s", 
                     $fn, $hash->{nodeIdHex}, $th->{sentIdx},
-                    length($p)/2+10, $th->{nodeIdHex}, $p);
-    $msg .= zwlib_checkSum($msg);
+                    length($p)/2+($s100 ? 11 : 10), $th->{nodeIdHex}, $p);
+    $msg .= ($s100 ? zwlib_checkSum_16($msg) : zwlib_checkSum_8($msg));
+
     ZWCUL_SimpleWrite($hash, "zs".$msg);
   }
 }
@@ -290,6 +298,10 @@ ZWCUL_Parse($$$$$)
   my $me = $hash->{NAME};
   my $s100 = (AttrVal($me, "dataRate", "40k") eq "100k");
 
+  if($rmsg =~ m/^za(..)$/) {
+    Log3 $hash, 5, "$me sent ACK to $1";
+    return;
+  }
 
   my ($H, $S, $F, $f, $sn, $L, $T, $P, $C);
   if($s100 && $rmsg =~ '^z(........)(..)(..)(.)(.)(..)(..)(.*)(....)$') {
@@ -299,7 +311,7 @@ ZWCUL_Parse($$$$$)
     ($H,$S,$F,$f,$sn,$L,$T,$P,$C) = ($1,$2,$3,$4,$5,$6,$7,$8,$9);
 
   } else {
-    Log 1, "ERROR: Unknown packet $rmsg";
+    Log3 $hash, 1, "ERROR: Unknown packet $rmsg";
     return;
 
   }
@@ -368,7 +380,7 @@ ZWCUL_ReadAnswer($$$)
   my ($hash, $arg, $regexp) = @_;
   Log3 $hash, 4, "ZWCUL_ReadAnswer arg:$arg regexp:".($regexp ? $regexp:"");
   my $transform;
-  if($regexp =~ m/^\^000400(..)..(..)/) {
+  if($regexp && $regexp =~ m/^\^000400(..)..(..)/) {
     $regexp = "^z........$1........$2";
     $transform = 1;
   }

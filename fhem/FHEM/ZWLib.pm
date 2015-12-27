@@ -166,7 +166,7 @@ zwlib_parseNeighborList($$)
 
 #####################################
 sub
-zwlib_checkSum($)
+zwlib_checkSum_8($)
 {
   my ($data) = @_;
   my $cs = 0xff;
@@ -174,5 +174,17 @@ zwlib_checkSum($)
   return sprintf("%02x", $cs);
 }
 
+sub
+zwlib_checkSum_16($) # CRC16-CCITT (Polynom: 1021)
+{
+  my ($data) = @_;
+  my $crc = 0x1d0f;
+  for my $c (split("", pack('H*', $data))) {
+    my $x = ($crc>>8) ^ ord($c);
+    $x ^= $x>>4;
+    $crc = (($crc<<8) ^ ($x<<12) ^ ($x<<5) ^ $x) & 0xffff;
+  }
+  return sprintf("%04x", $crc);
+}
 
 1;
