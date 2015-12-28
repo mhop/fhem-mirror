@@ -313,7 +313,7 @@ sub weekprofile_Initialize($)
   $hash->{SetFn}    = "weekprofile_Set";
   $hash->{StateFn}  = "weekprofile_State";
   $hash->{NotifyFn} = "weekprofile_Notify";
-  $hash->{AttrList} = "widgetWeekdays configFile".$readingFnAttributes;
+  $hash->{AttrList} = "widgetWeekdays configFile ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
