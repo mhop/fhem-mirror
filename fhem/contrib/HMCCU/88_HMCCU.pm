@@ -631,7 +631,6 @@ sub HMCCU_ParseObject ($$)
 #   ChannelNam,Datapoint
 #   Address,Datapoint
 #   Address,ChannelNo,Datapoint
-#
 ##################################################################
 
 sub HMCCU_GetReadingName ($$$$$$)
@@ -649,19 +648,17 @@ sub HMCCU_GetReadingName ($$$$$$)
 		if ($n eq '') {
 			if ($a ne '' && $c ne '') {
 				$n = HMCCU_GetChannelName ($a.':'.$c, '');
-				$n =~ s/\:/\./;
 			}
 			elsif ($a ne '' && $c eq '') {
 				$n = HMCCU_GetDeviceName ($a, '');
-				$n =~ s/\:/_/g;
 			}
 			else {
 				return '';
 			}
 		}
-		else {
-			$n =~ s/\:/\./;
-		}
+
+		$n =~ s/\:/\./g;
+		$n =~ s/[^A-Za-z\d_\.-]+/_/g;
 
 		$rn = $n ne '' ? $n.'.'.$d : '';
 	}
@@ -684,8 +681,7 @@ sub HMCCU_GetReadingName ($$$$$$)
 }
 
 ##################################################################
-# Format reading value depending depending on attribute
-# stripnumber.
+# Format reading value depending attribute stripnumber.
 ##################################################################
 
 sub HMCCU_FormatReadingValue ($$)
@@ -810,16 +806,18 @@ sub HMCCU_SubstRule ($$$)
 	return ($rc, $value);
 }
 
-##############################################################
+##################################################################
 # Update HMCCU readings and client readings.
 #
 # Parameters:
 #   hash, devadd, channelno, reading, value, [mode]
 #
-# Parameter devadd can be a device or a channel address.
-# Reading values are substituted if attribute substitute is
-# is set in client device.
-##############################################################
+# Parameter devadd can be a device or a channel address. If
+# devadd is a channel address parameter channelno should be ''.
+# Valid modes are: hmccu, rpcevent, client.
+# Reading values are substituted if attribute substitute is set
+# in client device.
+##################################################################
 
 sub HMCCU_UpdateClientReading ($@)
 {
@@ -872,25 +870,10 @@ sub HMCCU_UpdateClientReading ($@)
 		my $st = AttrVal ($cn, 'statedatapoint', 'STATE');
 		my $substitute = AttrVal ($cn, 'substitute', '');
 		last if ($upd == 0);
-#		next if ($dpt ne '' && $dpt !~ /$flt/);
 		next if ($dpt eq '' || $dpt !~ /$flt/);
 
 		my $clreading = HMCCU_GetReadingName ('', $devadd, $channel, $dpt, '', $crf);
 		next if ($clreading eq '');
-
-#		my $clreading = $reading;
-#		if ($crf eq 'datapoint') {
-#			$clreading = $dpt ne '' ? $dpt : $reading;
-#		}
-#		elsif ($crf eq 'name') {
-#			$clreading = HMCCU_GetChannelName ($chnadd, $reading);
-#			$clreading .= '.'.$dpt if ($dpt ne '');
-#		}
-#		elsif ($crf eq 'address') {
-#			my $int = HMCCU_GetDeviceInterface ($devadd, 'BidCos-RF');
-#			$clreading = $int.'.'.$chnadd;
-#			$clreading .= '.'.$dpt if ($dpt ne '');
-#		}
 
 		# Client substitute attribute has priority
 		my $cl_value;
@@ -1410,8 +1393,8 @@ sub HMCCU_ReadRPCQueue ($)
 		$element = $queue->deq();
 	}
 
-	if ($HMCCU_EventTime > 0 && time()-$HMCCU_EventTime > 180) {
-		Log 1, "HMCCU: Received no events from CCU since 180 seconds";
+	if ($HMCCU_EventTime > 0 && time()-$HMCCU_EventTime > 300) {
+		Log 1, "HMCCU: Received no events from CCU since 300 seconds";
 	}
 
 #	HMCCU_DeleteDevices (\@deldevices) if (@deldevices > 0);
