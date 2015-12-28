@@ -8,9 +8,10 @@
 #     such as MCi, Streamium and Fidelio devices.
 #     The module provides basic functionality accessible through the port 8889 of the device:
 #     (http://<device_ip>:8889/index).
+#     It seems the 3000 family e.g. NP3500, NP3700, NP3900 use that port. 
 #
 #     Copyright by Radoslaw Watroba
-#     (e-mail: ra666ack@googlemail.com)
+#     (e-mail: ra666ack at googlemail dot com)
 #
 #     This file is part of fhem.
 #
@@ -151,6 +152,7 @@ sub PHILIPS_AUDIO_Set
            "aux:noArg ".
            #"input:aux,internetRadio,mediaLibrary,onlineServices ".
            "inetRadioPreset:1,2,3,4,5,6,7,8,9,10 ".
+           "inetRadioFavorite:1,2,3,4,5,6,7,8,9,10 ".
            "statusRequest:noArg ".
            #"addToFavourites:noArg ".
            #"removeFromFavourites:noArg ".
@@ -260,6 +262,13 @@ sub PHILIPS_AUDIO_Set
     $hash->{helper}{cmdStep} = 1;
     $hash->{helper}{inetRadioPreset} = $a[2];
     PHILIPS_AUDIO_SendCommand($hash, "/index", "", $what, $a[2]);    
+  }
+  elsif($what eq "inetRadioFavorite")
+  {
+    # Hierarchichal navigation through the contents mandatory
+    $hash->{helper}{cmdStep} = 1;
+    $hash->{helper}{inetRadioFavorite} = $a[2];
+    PHILIPS_AUDIO_SendCommand($hash, "/index", "", $what, $a[2]);
   }
   elsif($what eq "volumeStraight")
   {
@@ -535,6 +544,28 @@ sub PHILIPS_AUDIO_ParseResponse
           # Preset select
           PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$03\$".sprintf("%03d", $hash->{helper}{inetRadioPreset})."\$1", "","inetRadioPreset", $hash->{helper}{inetRadioPreset});
         }               
+      }
+      elsif($cmd eq "inetRadioFavorite")
+      {
+      # This command must be processed hierarchicaly through the navigation path
+        if($hash->{helper}{cmdStep} == 1)
+        {
+          $hash->{helper}{cmdStep} = 2;
+          # Internet radio favorite
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$01\$001\$0", "", "inetRadioFavorite", $hash->{helper}{inetRadioFavorite});
+        }
+        elsif($hash->{helper}{cmdStep} == 2)
+        {
+          $hash->{helper}{cmdStep} = 3;
+          # Favorite Presets
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$02\$002\$0", "","inetRadioFavorite", $hash->{helper}{inetRadioFavorite});
+        }
+        elsif($hash->{helper}{cmdStep} == 3)
+        {
+          $hash->{helper}{cmdStep} = 4;
+          # Favorite Preset select
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$03\$".sprintf("%03d", $hash->{helper}{inetRadioFavorite})."\$1", "","inetRadioFavorite", $hash->{helper}{inetRadioFavorite});
+        }
       }
       elsif($cmd eq "play_pause")
       {
@@ -852,7 +883,8 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
       <ul><br><br>
       <u>Available commands:</u><br><br>
       <li><b>aux</b>&nbsp;&nbsp;-&nbsp;&nbsp; Switches to the AUX input (MP3 Link or similar).</li>
-      <li><b>inetRadioPreset</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio preset (be patient...).</li>
+      <li><b>inetRadioPreset</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio preset (May take some seconds...).</li>
+      <li><b>inetRadioFavorite</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio favorite (May take some seconds...).</li>
       <li><b>mute</b>&nbsp;&nbsp;-&nbsp;&nbsp; Mutes the device.</li>
       <li><b>unmute</b>&nbsp;&nbsp;-&nbsp;&nbsp; Unmutes the device.</li>
       <li><b>next</b> &nbsp;&nbsp;-&nbsp;&nbsp; Selects the next song, preset etc.</li>
@@ -1004,7 +1036,8 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
     <i>Bemerkung: Bitte bei den Befehlen und Parametern die Gro&szlig;- und Kleinschreibung beachten.</i><br>
     <ul><br><br>
       <li><b>aux</b>&nbsp;&nbsp;-&nbsp;&nbsp; Schaltet auf den AUX Eingang um (MP3 Link oder &auml;hnlich.).</li>
-      <li><b>inetRadioPreset</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt die Internetradio Voreinstellung (Gedult...).</li>
+      <li><b>inetRadioPreset</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt die Internetradio Voreinstellung (Das Umschalten kann einige Sekunden dauern...).</li>
+      <li><b>inetRadioFavorite</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Internetradio-Lieblingssender (Das Umschalten kann einige Sekunden dauern...).</li>
       <li><b>mute</b>&nbsp;&nbsp;-&nbsp;&nbsp; Stummschaltung des Players.</li>
       <li><b>unmute</b>&nbsp;&nbsp;-&nbsp;&nbsp; Deaktivierung der Stummschaltung.</li>
       <li><b>next</b> &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den n&auml;chten Titel, Voreinstellung etc.</li>
