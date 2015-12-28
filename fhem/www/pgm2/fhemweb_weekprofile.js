@@ -1,4 +1,4 @@
-//fhemweb_weekprofile.js 0.01 2015-12-23 Risiko 
+// $Id$
 
 //for tooltip
 $(document).ready(function(){
@@ -332,7 +332,7 @@ function FW_weekprofilePrepAndSendProf(devName)
     }
     
     var id = $(tableDay[i]).attr('id').split('.');
-    var day = id[2];
+    var day = id[id.length-1];
     
     prf[day] = new Object();
     prf[day]['time'] = new Array();
