@@ -56,6 +56,7 @@ SWAP_0000002200000003_Initialize($)
   $hash->{SWAP_SetFn}     = "SWAP_0000002200000003_Set";
   $hash->{SWAP_SetList}   = { off => 0, on => 0, "on-for-timer" => 1, fadeTo => undef,
                               "rgb:colorpicker,RGB" => 1,
+                              "hue:colorpicker,HUE,0,1,360" => 1,
                               toggle => 0,
                               dimUp => 0, dimDown => 0,
                               getIR => 1, setIR => 2, learnIR => 1, storeIR => 3,
@@ -186,6 +187,7 @@ SWAP_0000002200000003_Parse($$$$)
   InternalTimer(gettimeofday()+hex($hash->{'SWAP_0A-PeriodicTxInterval'})+10, "SWAP_0000002200000003_Watchdog", $hash, 0) if( defined $hash->{'SWAP_0A-PeriodicTxInterval'} );
 }
 
+sub SWAP_0000002200000003_Set($@);
 sub
 SWAP_0000002200000003_Set($@)
 {
@@ -208,16 +210,21 @@ SWAP_0000002200000003_Set($@)
     } else {
       return( "regSet", CMD_REG, ret(CMD_On. "FF" x $hash->{helper}->{RGB_SIZE} ."01") );
     }
+
   } elsif( $cmd eq "on-for-timer" ) {
     return( "regSet", CMD_REG, ret(CMD_OnForTimer. sprintf( "%04X",$arg ) ) ) if( $arg =~ /^\d{1,4}$/ );
     return (undef, "$arg not a valid time" );
+
   } elsif( $cmd eq "off" ) {
     return( "regSet", CMD_REG, ret(CMD_Off."0001" ) );
     return( "regSet", CMD_REG, ret(CMD_Off) );
+
   } elsif( $cmd eq "toggle" ) {
     return( "regSet", CMD_REG, ret(CMD_Toggle) );
+
   } elsif( $cmd eq "rgb" ) {
     my $d = $hash->{CHANNELS}*2;
+    $d = 6 if( !$d );
     $arg .= "00" x ($d/2-length($arg)/2);
     return (undef, "$arg is not a valid color" ) if( $arg !~ /^[\da-f]{$d}$/i );
     $arg .= "00" x ($hash->{helper}->{RGB_SIZE}-length($arg)/2);
@@ -227,6 +234,20 @@ SWAP_0000002200000003_Set($@)
       return( "regSet", CMD_REG, ret(CMD_On.$arg."00") );
     }
     return (undef, "$arg is not a valid color" );
+
+  } elsif( $cmd eq "hue" ) {
+    return (undef, "$arg is not a valid color" ) if( $arg !~ /^\d{1,3}$/ );
+    return (undef, "$arg is not a valid color" ) if( $arg > 360 );
+    my $h = $arg/360;
+    my $s = 1;
+    my ($v,undef) = SWAP_0000002200000003_rgbToPct(ReadingsVal( $name, "0B-RGBlevel", undef));
+    $v /= 100;
+
+    my ($r,$g,$b) = Color::hsv2rgb($h,$s,$v);
+    my $rgb = Color::rgb2hex( $r*255, $g*255, $b*255 );
+
+    return SWAP_0000002200000003_Set( $hash, $name, 'rgb', $rgb );
+
   } elsif( $cmd eq "fadeTo" ) {
     return (undef, "set $cmd requires 1 or 2 parameters" ) if( !defined($arg) || defined($arg3) );
     $arg2 = AttrVal($name, "defaultFadeTime", 1) if( !defined($arg2) );
@@ -241,10 +262,13 @@ SWAP_0000002200000003_Set($@)
       return( "regSet", CMD_REG, ret(CMD_On.$arg.sprintf( "%02X",$arg2 ) ) );
     }
     return (undef, "$arg is not a valid color" );
+
   } elsif( $cmd eq "dimUp" ) {
     return( "regSet", CMD_REG, ret(CMD_DimUp) );
+
   } elsif( $cmd eq "dimDown" ) {
     return( "regSet", CMD_REG, ret(CMD_DimDown) );
+
   } elsif( $cmd eq "getIR" ) {
     if( $arg eq "all" ) {
       for( my $reg = 0; $reg <= 0xF; ++$reg) {
@@ -254,13 +278,16 @@ SWAP_0000002200000003_Set($@)
     }
     return( "regSet", CMD_REG, ret(CMD_GetIR."0".sprintf("%1X",$arg) ) ) if( $arg =~ /^(\d|0\d|1[0-5])$/ );
     return (undef, "$arg is not a valid ir register number" );
+
   } elsif( $cmd eq "setIR" ) {
     return (undef, "$arg2 not a valid ir value" )if( $arg2 !~ /^[\da-f]{8}$/i );
     return( "regSet", CMD_REG, ret(CMD_SetIR."0".sprintf("%1X",$arg).$arg2 ) ) if( $arg =~ /^(\d|0\d|1[0-5])$/ );
     return (undef, "$arg is not a valid ir register" );
+
   } elsif( $cmd eq "learnIR" ) {
     return( "regSet", CMD_REG, ret(CMD_LearnIR."0".sprintf("%1X",$arg) ) ) if( $arg =~ /^(\d|0\d|1[0-5])$/ );
     return (undef, "$arg is not a valid ir register number" );
+
   } elsif( $cmd eq "storeIR" ) {
     return (undef, "$arg is not a valid ir register number" ) if( $arg !~ /^(\d|0\d|1[0-5])$/ );
     return (undef, "$arg2 not a valid ir value" )if( $arg2 !~ /^[\da-f]{8}$/i );
@@ -268,6 +295,7 @@ SWAP_0000002200000003_Set($@)
     SWAP_Send($hash, $hash->{addr}, "02", CMD_REG, ret(CMD_SetIR."0".sprintf("%1X",$arg).$arg2 ) );
     SWAP_Send($hash, $hash->{addr}, "02", CMD_REG, ret($arg3) );
     return( "regSet", CMD_REG, CMD_GetIR."0".sprintf("%1X",$arg)."00000000" );
+
   } elsif( $cmd eq "getFade" ) {
     if( $arg eq "all" ) {
       for( my $reg = 0; $reg <= 0xF; ++$reg) {
@@ -277,20 +305,25 @@ SWAP_0000002200000003_Set($@)
     }
     return( "regSet", CMD_REG, ret(CMD_GetFade."0".sprintf("%1X",$arg) ) ) if( $arg =~ /^(\d|0\d|1[0-5])$/ );
     return (undef, "$arg is not a valid fade register number" );
+
   } elsif( $cmd eq "setFade" ) {
     return (undef, "$arg2 not a valid rgb value" ) if( $arg2 !~ /^[\da-f]{6}$/i );
     return (undef, "$arg3 not a valid time value" ) if( $arg3 !~ /^[\da-f]{1,3}$/i );
     return( "regSet", CMD_REG, ret(CMD_SetFade."0".sprintf("%1X",$arg).$arg2.sprintf( "%02X",$arg3 ) ) ) if( $arg =~ /^(\d|0\d|1[0-5])$/ );
+
     return (undef, "$arg not a valid fade register" );
   } elsif( $cmd eq "startFade" ) {
     return (undef, "$arg is not a valid fade register number" ) if( $arg !~ /^(\d|0\d|1[0-5])$/ );
     return( "regSet", CMD_REG, ret(CMD_StartFade."0".sprintf("%1X",$arg)."0".sprintf( "%1X",$arg2 ) ) ) if( $arg2 =~ /^(\d|0\d|1[0-5])$/ );
     return (undef, "$arg2 not a valid fade register number" );
+
   } elsif( $cmd eq "sendIR" ) {
     return( "regSet", CMD_REG, ret(CMD_SendIR.$arg ) ) if( $arg =~ /^[\da-f]{10}$/i );
     return (undef, "$arg is not a valid IR command" );
+
   } elsif( $cmd eq "reset" ) {
     return( "regSet", CMD_REG, ret(CMD_RESET) );
+
   }
 
   return undef;
