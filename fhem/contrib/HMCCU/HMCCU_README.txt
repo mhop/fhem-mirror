@@ -5,7 +5,7 @@
 
 * Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.3
 * Please read carefully before using the modules.
-* Last modified: 15.12.2015
+* Last modified: 28.12.2015
 
 ----------------------------------------------
  Content
@@ -55,6 +55,11 @@ The states and values of CCU channels and variables are not updated automaticall
 in FHEM. You have to define AT devices with get commands to ensure a continuous
 update of CCU readings in FHEM or use the external RPC server.
 
+NOTE: Because FHEM doesn't support the same set of special characters for devices
+and channels some characters are replaced automatically when storing CCU values
+as readings in FHEM. The character ':' is replaced by '.'. All characters which
+are not matching the expression [A-Za-z\d_\.-] are replaced by '_'.
+
 --------------------------------------
  1.2 HMCCU Requirements & Installation
 --------------------------------------
@@ -98,7 +103,7 @@ A <channel-name> or a <device-name> is the alias for an device or channel define
 in the CCU.
 
 IMPORTANT NOTE: During device definition HMCCU reads the available CCU devices.
-This request must be repeated by using command "get devicelist" after a reload
+This request must be repeated by using command 'get devicelist' after a reload
 of the module or after modification or definition of devices in the CCU. Otherwise
 HMCCU, HMCCUDEV and HMCCUCHN won't work correctly. It's recommended to define
 an automatic device synchronization (i.e. daily) with AT and command
@@ -170,8 +175,18 @@ in client devices only or both in IO device and client devices.
 With attribute 'substitute' one can define expressions which are substituted by
 strings before CCU values are stored in readings. For example if CCU reports
 device states as "true" or "false" these values can be replaced by "open" or
-"closed" by setting "substitute" to "true:open,false:closed". The attribute
+"closed" by setting 'substitute' to "true:open,false:closed". The attribute
 'substitute' is ignored if the same attribute is defined in a client device.
+
+If substitutions should apply only to some datapoints the datapoint name can be
+added as a prefix to the substitution rules. Several rules can be separated by
+a semicolon. For example define 2 datapoint related rules and 1 standard rule:
+
+STATE!(1|true):on,(0|false):off;LOWBAT!(1|true):yes,(0|false):no;true:ok,false:error
+
+For datapoint STATE 1/true and 0/false are replaced by on and off. For datapoint
+LOWBAT 1/true and 0/false are replaced by yes and no. For all other datapoints
+true and false are subsituted by ok and error.
 
 Get values of channel datapoints (supports multiple channels):
 
@@ -473,6 +488,13 @@ Set datapoint for 'devstate' command (default is "STATE"):
    
    attr <name> statedatapoint <datapoint>
    
+Set format of internal STATE:
+
+   attr <name> ccustate <format-string>
+
+   The parameter <format-string> is identical to standard attribute 'stateFormat'.
+   In addition attribute 'stateFormat' must be set to {HMCCU_State()}.
+   
 Specify IO device for client device:
 
    attr <name> IODev <HMCCU-Device>
@@ -590,6 +612,13 @@ Control reading creation (default is 1):
 Set datapoint for "devstate" command (default is "STATE"):
    
    attr <name> statedatapoint <datapoint>
+
+Set format of internal STATE:
+
+   attr <name> ccustate <format-string>
+
+   The parameter <format-string> is identical to standard attribute 'stateFormat'.
+   In addition attribute 'stateFormat' must be set to {HMCCU_State()}.
    
 Specify IO device for client device:
 
