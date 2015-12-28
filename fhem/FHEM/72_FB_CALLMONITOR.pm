@@ -36,44 +36,6 @@ use HttpUtils;
 use DevIo;
 use FritzBoxUtils;
 
-my %connection_type = (
-    0 => "0",
-    1 => "FON1",
-    2 => "FON2",
-    3 => "FON3",
-    4 => "ISDN",
-    5 => "FAX",
-    6 => "not_defined",
-    7 => "not_defined",
-    8 => "not_defined",
-    9 => "not_defined",
-    10 => "DECT_1",
-    11 => "DECT_2",
-    12 => "DECT_3",
-    13 => "DECT_4",
-    14 => "DECT_5",
-    15 => "DECT_6",
-    16 => "FRITZMini_1",
-    17 => "FRITZMini_2",
-    18 => "FRITZMini_3",
-    19 => "FRITZMini_4",
-    20 => "VoIP_1",
-    21 => "VoIP_2",
-    22 => "VoIP_3",
-    23 => "VoIP_4",
-    24 => "VoIP_5",
-    25 => "VoIP_6",
-    26 => "VoIP_7",
-    27 => "VoIP_8",
-    28 => "VoIP_9",
-    29 => "VoIP_10",
-    40 => "Answering_Machine_1",
-    41 => "Answering_Machine_2",
-    42 => "Answering_Machine_3",
-    43 => "Answering_Machine_4",
-    44 => "Answering_Machine_5"
-);
-
 
 #####################################
 sub
@@ -304,6 +266,44 @@ FB_CALLMONITOR_Read($)
 {
     my ($hash) = @_;
 
+    my %connection_type = (
+        0 => "0",
+        1 => "FON1",
+        2 => "FON2",
+        3 => "FON3",
+        4 => "ISDN",
+        5 => "FAX",
+        6 => "not_defined",
+        7 => "not_defined",
+        8 => "not_defined",
+        9 => "not_defined",
+        10 => "DECT_1",
+        11 => "DECT_2",
+        12 => "DECT_3",
+        13 => "DECT_4",
+        14 => "DECT_5",
+        15 => "DECT_6",
+        16 => "FRITZMini_1",
+        17 => "FRITZMini_2",
+        18 => "FRITZMini_3",
+        19 => "FRITZMini_4",
+        20 => "VoIP_1",
+        21 => "VoIP_2",
+        22 => "VoIP_3",
+        23 => "VoIP_4",
+        24 => "VoIP_5",
+        25 => "VoIP_6",
+        26 => "VoIP_7",
+        27 => "VoIP_8",
+        28 => "VoIP_9",
+        29 => "VoIP_10",
+        40 => "Answering_Machine_1",
+        41 => "Answering_Machine_2",
+        42 => "Answering_Machine_3",
+        43 => "Answering_Machine_4",
+        44 => "Answering_Machine_5"
+    );
+    
     my $buf = DevIo_SimpleRead($hash);
     
     return "" if(!defined($buf) or IsDisabled($hash->{NAME}));
@@ -610,7 +610,7 @@ FB_CALLMONITOR_reverseSearch($$)
                 else
                 {
                     #Log 2, $result;
-                    if($result =~ /<a href="http\:\/\/.+?\.dasoertliche\.de.+?".+?class="name ".+?><span class="">(.+?)<\/span>/)
+                    if($result =~ m,<a href="http\://.+?\.dasoertliche\.de.+?".+?class="name ".+?><span class="">(.+?)</span>,)
                     {
                         $invert_match = $1;
                         $invert_match = FB_CALLMONITOR_html2txt($invert_match);
@@ -645,23 +645,23 @@ FB_CALLMONITOR_reverseSearch($$)
                 else
                 {
                     #Log 2, $result;
-                    if($result =~ /<entry>(.+?)<\/entry>/s)
+                    if($result =~ m,<entry>(.+?)</entry>,s)
                     {
                         my $xml = $1;
                         
                         $invert_match = "";
                         
-                        if($xml =~ /<tel:firstname>(.+?)<\/tel:firstname>/)
+                        if($xml =~ m,<tel:firstname>(.+?)</tel:firstname>,)
                         {
                             $invert_match .= $1;
                         }
                         
-                        if($xml =~ /<tel:name>(.+?)<\/tel:name>/)
+                        if($xml =~ m,<tel:name>(.+?)</tel:name>,)
                         {
                             $invert_match .= " $1";
                         }
                         
-                        if($xml =~ /<tel:occupation>(.+?)<\/tel:occupation>/)
+                        if($xml =~ m,<tel:occupation>(.+?)</tel:occupation>,)
                         {
                             $invert_match .= ", $1";
                         }
@@ -859,8 +859,8 @@ sub FB_CALLMONITOR_readPhonebook($;$)
                 
                 if(defined($err))
                 {
-                        Log3 $name, 2, "FB_CALLMONITOR ($name) - unable to retrieve phonebook \"".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}."\" from FritzBox - $err";
-                        return "unable to retrieve phonebook \"".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}."\" from FritzBox - $err";
+                        Log3 $name, 2, 'FB_CALLMONITOR ($name) - unable to retrieve phonebook "'.$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}.'" from FritzBox - '.$err;
+                        return 'unable to retrieve phonebook "'.$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}.'" from FritzBox - $err';
                 }
                 else
                 {
@@ -873,7 +873,7 @@ sub FB_CALLMONITOR_readPhonebook($;$)
                     }
                     else
                     {
-                        Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from remote phonebook \"".$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}."\"";
+                        Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s").' from remote phonebook "'.$hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}.'"';
                     }
                 }
             }
@@ -934,18 +934,18 @@ sub FB_CALLMONITOR_parsePhonebook($$)
     my $count_contacts = 0;
 
    
-    if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/) 
+    if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ m,</phonebook>,) 
     {
     
-        while($phonebook =~ m/<contact[^>]*>(.+?)<\/contact>/gs) 
+        while($phonebook =~ m,<contact[^>]*>(.+?)</contact>,gs) 
         {
             $contact = $1;
              
-            if($contact =~ m/<realName>(.+?)<\/realName>/) 
+            if($contact =~ m,<realName>(.+?)</realName>,) 
             {
                 $contact_name = $1; 
                 
-                while($contact =~ m/<number[^>]*?type="([^<>"]+?)"[^<>]*?>([^<>"]+?)<\/number>/gs) 
+                while($contact =~ m,<number[^>]*?type="([^<>"]+?)"[^<>]*?>([^<>"]+?)</number>,gs) 
                 {
                     if($1 ne "intern" and $1 ne "memo") 
                     {
@@ -1049,7 +1049,7 @@ sub FB_CALLMONITOR_loadTextFile($;$)
             foreach my $line (@file)
             {
                 $line =~ s/#.*$//g;
-                $line =~ s/\/\/.*$//g;
+                $line =~ s,//.*$,,g;
                 
                 
                 if(not $line =~ /^\s*$/)
@@ -1274,12 +1274,12 @@ EOD
 
     my ($nonce, $realm);
     
-    if($data =~ /<Nonce>(.+?)<\/Nonce>/i)
+    if($data =~ m,<Nonce>(.+?)</Nonce>,i)
     {
         $nonce = $1;
     }
     
-    if($data =~ /<Realm>(.+?)<\/Realm>/i)
+    if($data =~ m,<Realm>(.+?)</Realm>,i)
     {
         $realm = $1;
     }
@@ -1335,7 +1335,7 @@ EOD
     Log3 $name, 5, "FB_CALLMONITOR ($name) - received response:\n$data";
 
     # if status is still "unauthenticated" => user/password combination is wrong
-    if($data =~ /<Status>Unauthenticated<\/Status>/i)
+    if($data =~ m,<Status>Unauthenticated</Status>,i)
     {
         $hash->{helper}{PWD_NEEDED} = 1;
         Log3 $name, 3, "FB_CALLMONITOR ($name) - unable to login via TR-064, wrong user/password";
@@ -1345,7 +1345,7 @@ EOD
     my @phonebooks;
 
     # read list response (TR-064 id's: "0,1,2,...")
-    if($data =~ m/<NewPhonebookList>(.+?)<\/NewPhonebookList>/si)
+    if($data =~ m,<NewPhonebookList>(.+?)</NewPhonebookList>,si)
     {
         @phonebooks = split(",",$1);
         Log3 $name, 3, "FB_CALLMONITOR ($name) - found ".scalar @phonebooks." phonebooks";
@@ -1405,14 +1405,14 @@ EOD
 
         Log3 $name, 5, "FB_CALLMONITOR ($name) - received response with phonebook description for id $_:\n$data";
 
-        if($data =~ m/<NewPhonebookName>(.+?)<\/NewPhonebookName>.*?<NewPhonebookURL>.*?pbid=(\d+)\D*?<\/NewPhonebookURL>/si)
+        if($data =~ m,<NewPhonebookName>(.+?)</NewPhonebookName>.*?<NewPhonebookURL>.*?pbid=(\d+)\D*?</NewPhonebookURL>,si)
         {
             $phb_id = $2;
             $hash->{helper}{PHONEBOOK_NAMES}{$phb_id} = $1;
             Log3 $name, 4, "FB_CALLMONITOR ($name) - found phonebook: $1 - $2";
         }
 
-        if($data =~ m/<NewPhonebookURL>(.*?)<\/NewPhonebookURL>/i)
+        if($data =~ m,<NewPhonebookURL>(.*?)</NewPhonebookURL>,i)
         {
             $hash->{helper}{PHONEBOOK_URL}{$phb_id} = $1;
             $hash->{helper}{PHONEBOOK_URL}{$phb_id} =~ s/&amp;/&/g;
@@ -1519,14 +1519,14 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaWeb($;$)
 
     Log3 $name, 4, "FB_CALLMONITOR ($name) - phonebooks successfully identified";
     
-    if($data =~ m/<form[^>]*name="mainform"[^>]*>(.+?)<\/form>/s)
+    if($data =~ m,<form[^>]*name="mainform"[^>]*>(.+?)</form>,s)
     {
         $data = $1;
     }
 
     delete($hash->{helper}{PHONEBOOK_NAMES}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
     
-    while($data =~ /<label[^>]*for="uiBookid:(\d+)"[^>]*>\s*(.+?)\s*<\/label>/gcs)
+    while($data =~ m,<label[^>]*for="uiBookid:(\d+)"[^>]*>\s*(.+?)\s*</label>,gcs)
     {
         $hash->{helper}{PHONEBOOK_NAMES}{$1} = $2;
         Log3 $name, 4, "FB_CALLMONITOR ($name) - found phonebook: $2";
