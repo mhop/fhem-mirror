@@ -291,6 +291,8 @@ sub FB_CALLLIST_Notify($$)
         return undef;
     } 
  
+    return if(!grep(m/^event:/, @{$d->{CHANGED}}));
+ 
     my $event = ReadingsVal($fb, "event", undef);
     my $call_id = ReadingsVal($fb, "call_id", undef);  
     
