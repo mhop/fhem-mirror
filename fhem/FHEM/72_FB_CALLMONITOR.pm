@@ -211,7 +211,6 @@ FB_CALLMONITOR_Get($@)
     {
         return "unknown argument ".$arguments[1].", choose one of search".(exists($hash->{helper}{PHONEBOOK_NAMES}) ? " showPhonebookIds" : "").(exists($hash->{helper}{PHONEBOOK}) ? " showPhonebookEntries" : "").(exists($hash->{helper}{CACHE}) ? " showCacheEntries" : "").(exists($hash->{helper}{TEXTFILE}) ? " showTextfileEntries" : ""); 
     }
-
 }
 
 #####################################
@@ -431,7 +430,6 @@ FB_CALLMONITOR_Read($)
         } 
         
         readingsEndUpdate($hash, 1);
-        
     }
 }
 
@@ -450,7 +448,6 @@ FB_CALLMONITOR_Ready($)
 sub
 FB_CALLMONITOR_Attr($@)
 {
-    
     my ($cmd, $name, $attrib, $value) = @_;
     my $hash = $defs{$name};
     
@@ -498,7 +495,9 @@ FB_CALLMONITOR_Attr($@)
     return undef;
 }
 
-
+#####################################
+# receives events, waits for global INITIALIZED or REREADCFG
+# to initiate the phonebook initialization
 sub
 FB_CALLMONITOR_Notify($$)
 {
@@ -528,10 +527,8 @@ FB_CALLMONITOR_reverseSearch($$)
     my $invert_match = undef;
     my @attr_list = split("(,|\\|)", AttrVal($name, "reverse-search", ""));
     
-    
     foreach my $method (@attr_list)
     {
-    
         # Using internal phonebook if available and enabled
         if($method eq "phonebook")
         {
@@ -563,7 +560,6 @@ FB_CALLMONITOR_reverseSearch($$)
                 }
             }    
             
-        
             # Ask klicktel.de
             if($method eq "klicktel.de")
             { 
@@ -626,8 +622,7 @@ FB_CALLMONITOR_reverseSearch($$)
                     $status = "unknown";
                 }
             }
-        
-
+            
             # SWITZERLAND ONLY!!! Ask search.ch
             elsif($method eq  "search.ch")
             {
@@ -715,8 +710,7 @@ FB_CALLMONITOR_reverseSearch($$)
                     $status = "unknown";
                 }
             }
-        }
-        
+        } 
     }
     
     if(AttrVal($name, "reverse-search-cache", "0") eq "1" and defined($status))
@@ -726,14 +720,12 @@ FB_CALLMONITOR_reverseSearch($$)
     }
 
     return undef;
-
 } 
 
 #####################################
 # replaces all HTML entities to their utf-8 counter parts.
 sub FB_CALLMONITOR_html2txt($)
 {
-
     my ($string) = @_;
 
     $string =~ s/&nbsp;/ /g;
@@ -749,7 +741,6 @@ sub FB_CALLMONITOR_html2txt($)
     $string =~ s/(^\s+|\s+$)//g;
 
     return trim($string);
-
 }
 
 #####################################
@@ -789,7 +780,7 @@ sub FB_CALLMONITOR_writeToCache($$$)
 }
 
 #####################################
-# reads a FritzBox phonebook
+# get and reads a FritzBox phonebook
 sub FB_CALLMONITOR_readPhonebook($;$)
 {
     my ($hash, $testPassword) = @_;
@@ -799,7 +790,7 @@ sub FB_CALLMONITOR_readPhonebook($;$)
     
 	if(AttrVal($name, "fritzbox-remote-phonebook", "0") eq "1")
     {
-        if(AttrVal($name, "fritzbox-remote-phonebook-via", "web") eq "telnet")
+        if(AttrVal($name, "fritzbox-remote-phonebook-via", "tr064") eq "telnet")
         {
             ($err, $phonebook) = FB_CALLMONITOR_readRemotePhonebookViaTelnet($hash, $testPassword);
             
@@ -823,9 +814,8 @@ sub FB_CALLMONITOR_readPhonebook($;$)
                 Log3 $name, 2, "FB_CALLMONITOR ($name) - read $count_contacts contact".($count_contacts == 1 ? "" : "s")." from remote phonebook via telnet";
             }
         }
-        elsif(AttrVal($name, "fritzbox-remote-phonebook-via", "web") =~ /(web|tr064)/)
+        elsif(AttrVal($name, "fritzbox-remote-phonebook-via", "tr064") =~ /^(web|tr064)$/)
         {
-
             my $do_with = $1;
             $err = FB_CALLMONITOR_identifyPhoneBooksViaWeb($hash, $testPassword) if($do_with eq "web");
             $err = FB_CALLMONITOR_identifyPhoneBooksViaTR064($hash, $testPassword) if($do_with eq "tr064");
@@ -925,15 +915,13 @@ sub FB_CALLMONITOR_readPhonebook($;$)
 # reads the FritzBox phonebook file and parses the entries
 sub FB_CALLMONITOR_parsePhonebook($$)
 {
-
     my ($hash, $phonebook) = @_;
     my $name = $hash->{NAME};
     my $contact;
     my $contact_name;
     my $number;
     my $count_contacts = 0;
-
-   
+    
     if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ m,</phonebook>,) 
     {
     
@@ -1034,8 +1022,7 @@ sub FB_CALLMONITOR_loadTextFile($;$)
     my $name = $hash->{NAME};
     my $err;
     $file = AttrVal($hash->{NAME}, "reverse-search-text-file", "") unless(defined($file));
-  
-
+    
     if($file ne "" and -r $file)
     { 
         delete($hash->{helper}{TEXTFILE}) if(defined($hash->{helper}{TEXTFILE}));
@@ -1051,10 +1038,8 @@ sub FB_CALLMONITOR_loadTextFile($;$)
                 $line =~ s/#.*$//g;
                 $line =~ s,//.*$,,g;
                 
-                
                 if(not $line =~ /^\s*$/)
                 {
-                
                     chomp $line;
                     @tmpline = split(/,/, $line,2);
                     if(@tmpline == 2)
@@ -1320,6 +1305,9 @@ EOD
     
     ($err, $data) = HttpUtils_BlockingGet($param);
 
+    $err = "" unless(defined($err));
+    $data = "" unless(defined($data));
+    
     if ($err ne "")
     {
         Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebook id's: $err";
@@ -1418,7 +1406,6 @@ EOD
             $hash->{helper}{PHONEBOOK_URL}{$phb_id} =~ s/&amp;/&/g;
             Log3 $name, 4, "FB_CALLMONITOR ($name) - found phonebook url for id $phb_id: ".$hash->{helper}{PHONEBOOK_URL}{$phb_id};
         }
-
     }
 
     Log3 $name, 4, "FB_CALLMONITOR ($name) - phonebooks found: ".join(", ", map { $hash->{helper}{PHONEBOOK_NAMES}{$_}." (id: $_)" } sort keys %{$hash->{helper}{PHONEBOOK_NAMES}}) if(exists($hash->{helper}{PHONEBOOK_NAMES}));
@@ -1615,7 +1602,6 @@ sub FB_CALLMONITOR_readRemotePhonebookViaWeb($$;$)
     delete($hash->{helper}{PWD_NEEDED}) if(exists($hash->{helper}{PWD_NEEDED}));
 
     return (undef, $phonebook); 
-    
 }
 
 #####################################
@@ -1708,7 +1694,8 @@ sub FB_CALLMONITOR_readPassword($;$)
     }
 }
 
-
+#####################################
+# normalizes a formated phone number
 sub FB_CALLMONITOR_normalizePhoneNumber($$)
 {
 
@@ -1718,24 +1705,20 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     my $area_code = AttrVal($name, "local-area-code", "");
     my $country_code = AttrVal($name, "country-code", "0049");
     
-
     $number =~ s/\s//g;                             # Remove spaces
     $number =~ s/^(\#[0-9]{1,10}\#)//g;             # Remove phone control codes
     $number =~ s/^\+/00/g;                          # Convert leading + to 00 country extension
     $number =~ s/[^*\d]//g if(not $number =~ /@/);  # Remove anything else isn't a number if it is no VoIP number
     $number =~ s/^$country_code/0/g;                # Replace own country code with leading 0
 
-
-
     if(not $number =~ /^0/ and not $number =~ /@/ and $area_code =~ /^0[1-9]\d+$/) 
     {
        $number = $area_code.$number;
-    }   
-
-
+    }
+    
     return $number;
 }
-  
+
 1;
 
 =pod
@@ -1857,9 +1840,9 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
     Set the method how the phonebook should be requested via network. When set to "web", the phonebook is obtained from the web interface via HTTP. When set to "telnet", it uses a telnet connection to login and retrieve the phonebook (telnet must be activated via dial shortcode #96*7*). When set to "tr064" the phonebook is obtained via TR-064 SOAP request.<br><br>
     Possible values: web,telnet,tr064<br>
-    Default Value is web (retrieve phonebooks via web interface)<br><br>
-    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
-    A comma separated list of phonebook id's which should be excluded when retrieving all possible phonebooks via web method (see attribute <i>fritzbox-remote-phonebook-via</i>). All list possible values is provided by <a href="#FB_CALLMONITOR_get">get command</a> <i>showPhonebookIds</i>. This attribute is not applicable when using telnet method to obtain remote phonebook.<br><br>
+    Default Value is tr064 (retrieve phonebooks via TR-064 interface)<br><br>
+    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-exclude">fritzbox-remote-phonebook-exclude</a></li>
+    A comma separated list of phonebook id's which should be excluded when retrieving all possible phonebooks via web or tr064 method (see attribute <i>fritzbox-remote-phonebook-via</i>). All list possible values is provided by <a href="#FB_CALLMONITOR_get">get command</a> <i>showPhonebookIds</i>. This attribute is not applicable when using telnet method to obtain remote phonebook.<br><br>
     Default Value: <i>empty</i> (all phonebooks should be used, no exclusions)<br><br>
     <li><a name="FB_CALLMONITOR_fritzbox-user">fritzbox-user</a></li>
     Use the given user for remote connect to obtain the phonebook. This attribute is only needed, if you use multiple users on your FritzBox.<br><br>
@@ -2016,9 +1999,9 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-via</a></li>
     Setzt die Methode mit der das Telefonbuch von der FritzBox abgefragt werden soll. Bei der Methode "web", werden alle verf&uuml;gbaren Telefonb&uuml;cher (lokales sowie alle konfigurierten Online-Telefonb&uuml;cher) &uuml;ber die Web-Oberfl&auml;che eingelesen. Bei der Methode "telnet" wird eine Telnet-Verbindung zur FritzBox aufgebaut um das lokale Telefonbuch abzufragen (keine Online-Telefonb&uuml;cher). Dazu muss die Telnet-Funktion aktiviert sein (Telefon Kurzwahl: #96*7*). Bei der Methode "tr064" werden alle verf&uuml;gbaren Telefonb&uuml;cher &uuml;ber die TR-064 SOAP Schnittstelle ausgelesen. <br><br>
     M&ouml;gliche Werte: web,telnet,tr064<br>
-    Standardwert ist "web" (Abfrage aller verf&uuml;gbaren Telefonb&uuml;cher &uuml;ber die Web-Oberfl&auml;che)<br><br>
-    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-via">fritzbox-remote-phonebook-exclude</a></li>
-    Eine komma-separierte Liste von Telefonbuch-ID's welche beim einlesen &uuml;bersprungen werden sollen. Dieses Attribut greift nur beim einlesen der Telefonb&uuml;cher via "web"-Methode (siehe Attribut <i>fritzbox-remote-phonebook-via</i>). Eine Liste aller m&ouml;glichen Werte kann &uuml;ber das <a href="#FB_CALLMONITOR_get">Get-Kommando</a> <i>showPhonebookIds</i> angezeigt werden.<br><br>
+    Standardwert ist "tr064" (Abfrage aller verf&uuml;gbaren Telefonb&uuml;cher &uuml;ber die TR-064-Schnittstelle)<br><br>
+    <li><a name="FB_CALLMONITOR_fritzbox-remote-phonebook-exclude">fritzbox-remote-phonebook-exclude</a></li>
+    Eine komma-separierte Liste von Telefonbuch-ID's welche beim einlesen &uuml;bersprungen werden sollen. Dieses Attribut greift nur beim einlesen der Telefonb&uuml;cher via "web"- oder "tr064"-Methode (siehe Attribut <i>fritzbox-remote-phonebook-via</i>). Eine Liste aller m&ouml;glichen Werte kann &uuml;ber das <a href="#FB_CALLMONITOR_get">Get-Kommando</a> <i>showPhonebookIds</i> angezeigt werden.<br><br>
     Standardm&auml;&szlig;ig ist diese Funktion deaktiviert (alle Telefonb&uuml;cher werden eingelesen)<br><br>
     <li><a name="FB_CALLMONITOR_fritzbox-user">fritzbox-user</a></li>
     Der Username f&uuml;r das Telnet-Interface, sofern das Telefonbuch direkt von der FritzBox geladen werden soll (Attribut: fritzbox-remote-phonebook). Dieses Attribut ist nur notwendig, wenn mehrere Benutzer auf der FritzBox konfiguriert sind.<br><br>
