@@ -141,7 +141,7 @@ sub CustomReadings_GetHTML ($)
   my @sortedReadings = sort keys %{$hash->{READINGS}};
   foreach my $reading (@sortedReadings) {
     $result .= "<tr>";
-    $result .= "<td>$reading:&nbsp;</td><td>" . ReadingsVal($name, $reading, "???") . "</td>";   
+    $result .= "<td>$reading:&nbsp;</td><td>" . ReadingsVal($name, $reading, "???") . "</td>";
     $result .= "</tr>";
   }
   $result .= "</table>";
@@ -161,7 +161,6 @@ sub CustomReadings_GetHTML ($)
 <h3>CustomReadings</h3>
 
 <ul>
-  <tr><td>
   FHEM module to define own readings.
   <br><br>
   This module allows to define own readings. The readings can be defined in an attribute so that they can get changed without changing the code of the module.<br>
@@ -189,7 +188,7 @@ fhem_backup_folder_size:qx(du -ch /opt/fhem/backup | grep total | cut -d 't' -f1
 define myReadingsDisplay weblink htmlCode {CustomReadings_GetHTML('myReadings')}<br>
 attr myReadingsDisplay group Readings<br>
 attr myReadingsDisplay room 0-Test<br>
-
+  </code>
 
   <br>
   <u>Resulting readings:</u><br>
@@ -198,7 +197,7 @@ attr myReadingsDisplay room 0-Test<br>
     <tr>
       <td>ac_powersupply_current</td>
       <td>0.236</td>
-      <td>2014-08-09 15:40:21<td>
+      <td>2014-08-09 15:40:21</td>
     </tr>
     <tr>
       <td>ac_powersupply_voltage</td>
@@ -241,7 +240,7 @@ attr myReadingsDisplay room 0-Test<br>
       <td>2014-08-09 15:40:21</td>
     </tr>
   </table>
-  </code>
+
 
   <br>
   <a name="CustomReadings_Define"></a>

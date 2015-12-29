@@ -2,7 +2,6 @@
 
 # ToDo-List
 # ---------
-# [ ] Numeric position reading -> percentOpen (0 ... 100)
 # [ ] Move to any position, not only top, bottom, intermediate, ... 
 
 
@@ -77,16 +76,12 @@ sub EleroDrive_Get($@) {
   return undef;
 }
 
-
 #=======================================================================================
-sub EleroDrive_Set($@) {
-  my ( $hash, $name, $cmd, @params ) = @_;
-    
-  my $channel = $hash->{channel};
-  my $iodev = $hash->{IODev}->{NAME};
+sub EleroDrive_ToFixPosition($$) {
+  my ( $hash, $position) = @_;
   
-  my $commands=("stop:noArg moveDown:noArg moveUp:noArg moveIntermediate:noArg moveTilt:noArg refresh:noArg");
-  return $commands if( $cmd eq '?' || $cmd eq '');
+  my $channel = $hash->{channel};
+  ###my $iodev = $hash->{IODev}->{NAME};
   
   my $head = 'aa';
   my $msgLength = '05';
@@ -97,33 +92,21 @@ sub EleroDrive_Set($@) {
   my $secondChannels = '';
   my $checksum = '';
   my $payload = '';
-  my $doRefresh = '0';
   
-  if($cmd eq 'refresh'){
-    $payload = '0';
-    IOWrite($hash, "refresh", $channel);
-  }
-  elsif($cmd eq 'moveDown'){
+  if($position eq 'bottom'){
     $payload = '40';
-    $doRefresh = '1';
   }
-  elsif($cmd eq 'moveUp'){
+  elsif($position eq 'top'){
     $payload = '20';
-    $doRefresh = '1';
   }
-  elsif($cmd eq 'stop'){
+  elsif($position eq 'stop'){
     $payload = '10';
   }
-  elsif($cmd eq 'moveIntermediate'){
+  elsif($position eq 'intermediate'){
     $payload = '44';
-    $doRefresh = '1';
   }
-  elsif($cmd eq 'moveTilt'){
+  elsif($position eq 'tilt'){
     $payload = '24';
-    $doRefresh = '1';
-  }
-  else {
-    return "Unknown argument $cmd, choose one of $commands";
   }
   
   if($payload) {
@@ -152,12 +135,67 @@ sub EleroDrive_Set($@) {
     ###debugLog($name, "EleroDrive_Set->IOWrite: byteMsg=$byteMsg");
     IOWrite($hash, "send", $byteMsg); 
     
-    # Start a one time timer that refreshes the position for this drive
-    my $refreshDelay = AttrVal($name, "TopToBottomTime", 0);
-    if($doRefresh && $refreshDelay) {
-      InternalTimer(gettimeofday() + $refreshDelay + 2, "EleroDrive_OnRefreshTimer", $hash, 0);
-    }
+  }
+ 
+}
+
+
+#=======================================================================================
+sub EleroDrive_ToAnyPosition($$) {
+  my ( $hash, $position) = @_;
+  my $name = $hash->{NAME};
+
+  ###debugLog($name, "ToAnyPosition: $position");
+}
+
+#=======================================================================================
+sub EleroDrive_Set($@) {
+  my ( $hash, $name, $cmd, @params ) = @_;
     
+  my $channel = $hash->{channel};
+  my $iodev = $hash->{IODev}->{NAME};
+  
+  my $commands=("stop:noArg moveDown:noArg moveUp:noArg moveIntermediate:noArg moveTilt:noArg refresh:noArg moveTo");
+  return $commands if( $cmd eq '?' || $cmd eq '');
+
+  my $doRefresh = '0';
+  
+  if($cmd eq 'refresh'){
+    IOWrite($hash, "refresh", $channel);
+  }
+  elsif($cmd eq 'moveDown'){
+    EleroDrive_ToFixPosition($hash, "bottom");
+    $doRefresh = '1';
+  }
+  elsif($cmd eq 'moveUp'){
+    EleroDrive_ToFixPosition($hash, "top");
+    $doRefresh = '1';
+  }
+  elsif($cmd eq 'stop'){
+    EleroDrive_ToFixPosition($hash, "stop");
+  }
+  elsif($cmd eq 'moveIntermediate'){
+    EleroDrive_ToFixPosition($hash, "intermediate");
+    $doRefresh = '1';
+  }
+  elsif($cmd eq 'moveTilt'){
+    EleroDrive_ToFixPosition($hash, "tilt");
+    $doRefresh = '1';
+  }
+  elsif($cmd eq 'moveTo' && scalar @params eq 1){
+    EleroDrive_ToAnyPosition($hash, $params[0]);
+    
+    $doRefresh = '1';
+  }
+  else {
+    return "Unknown argument $cmd, choose one of $commands";
+  }
+
+  # Start a one time timer that refreshes the position for this drive
+  my $refreshDelay = AttrVal($name, "TopToBottomTime", 0);
+  if($doRefresh && $refreshDelay) {
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday() + $refreshDelay + 2, "EleroDrive_OnRefreshTimer", $hash, 0);
   }
 
   return undef;
@@ -214,8 +252,8 @@ sub EleroDrive_Parse($$) {
                       );
                       
     my %percentDefinitions = ('00' => 50,
-                       '01' => 100,
-                       '02' => 0,
+                       '01' => 0,
+                       '02' => 100,
                        '03' => 50,
                        '04' => 50,
                        '05' => -1,
@@ -226,14 +264,14 @@ sub EleroDrive_Parse($$) {
                        '0a' => -1,
                        '0b' => -1,
                        '0d' => 50,
-                       '0e' => 100,
-                       '0f' => 0,
+                       '0e' => 0,
+                       '0f' => 100,
                        '10' => -1,
                        '11' => -1                 
                       );                      
                          
     my $newstate = $deviceStati{$statusByte};
-    my $percentOpen = $percentDefinitions{$statusByte};
+    my $percentClosed = $percentDefinitions{$statusByte};
          
     my $rhash = $modules{EleroDrive}{defptr}{$channel};
     my $rname = $rhash->{NAME};
@@ -244,11 +282,11 @@ sub EleroDrive_Parse($$) {
       readingsBeginUpdate($rhash);
       readingsBulkUpdate($rhash, "state", $newstate);
       readingsBulkUpdate($rhash, "position", $newstate);
-      if($percentOpen ne -1) {
-        readingsBulkUpdate($rhash, "percentOpen", $percentOpen);
+      if($percentClosed ne -1) {
+        readingsBulkUpdate($rhash, "percentClosed", $percentClosed);
       }
       readingsEndUpdate($rhash,1);
-         
+           
       my @list;
       push(@list, $rname);
       return @list;
@@ -288,7 +326,6 @@ sub EleroDrive_OnRefreshTimer($$) {
 <h3>EleroDrive</h3>
 
 <ul>
-  <tr><td>
   This mudule implements an Elero drive. It uses EleroStick as IO-Device.
   <br><br>
   
@@ -341,9 +378,9 @@ sub EleroDrive_OnRefreshTimer($$) {
     <li>position<br>
     Current position of the drive (top_position, bottom_position, ...)</li>
     
-    <li>percentOpen<br>
+    <li>percentClosed<br>
     0 ... 100<br>
-    0 is completely closed, 100 is completely open</li>
+    100 is completely closed, 0 is completely open</li>
   </ul><br>
 
 </ul>

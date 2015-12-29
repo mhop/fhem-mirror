@@ -206,7 +206,6 @@ Level_Attr(@)
 <h3>Level</h3>
 
 <ul>
-  <tr><td>
   FHEM module for Level.<br><br>
 
   It can be integrated in to FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>
