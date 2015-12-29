@@ -1057,7 +1057,6 @@ PRESENCE_ProcessAbortedScan($)
 <a name="PRESENCE"></a>
 <h3>PRESENCE</h3>
 <ul>
-  <tr><td>
   The PRESENCE module provides several possibilities to check the presence of mobile phones or similar mobile devices such as tablets.
   <br><br>
   This module provides several operational modes to serve your needs. These are:<br><br>
@@ -1300,7 +1299,6 @@ Options:
 <a name="PRESENCE"></a>
 <h3>PRESENCE</h3>
 <ul>
-  <tr><td>
   Das PRESENCE Module bietet mehrere M&ouml;glichkteiten um die Anwesenheit von Handys/Smartphones oder anderen mobilen Ger&auml;ten (z.B. Tablets) zu erkennen.
   <br><br>
   Dieses Modul bietet dazu mehrere Modis an um Anwesenheit zu erkennen. Diese sind:<br><br>
