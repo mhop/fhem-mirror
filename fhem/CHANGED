@@ -1,6 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - bugfix:  fixing not working volumeStraight set command
+  - bugfix:  YAMAHA_AVR: fixing not working volumeStraight set command
   - change:  FB_CALLLIST: start call processing only when "event:" is triggered 
              by corresponding FB_CALLMONITOR device.
   - change:  FB_CALLMONITOR: default value for attr fritzbox-remote-phonebook-via
