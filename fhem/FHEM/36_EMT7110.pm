@@ -229,8 +229,6 @@ EMT7110_Attr(@)
 <a name="EMT7110"></a>
 <h3>EMT7110</h3>
 <ul>
-
-  <tr><td>
   The EMT7110 is a plug with integrated power meter functionality.<br>
   It can be integrated into FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>
   The EMT7110 sends with 9.579 kbit/s. Therefore it is necessary to set the JeeLink to a mode where it recieves this data rate.<br>
