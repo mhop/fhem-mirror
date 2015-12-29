@@ -450,8 +450,7 @@ yowsup_Parse($$)
           if( !$accept_from || $last_sender || ",$accept_from," =~/,$last_sender,/ ) {
             Log3 $name, 3, "$cname: received command: $cmd";
 
-            my $allowed = AttrVal($cname, "allowedCommands", undef );
-            my $ret = AnalyzeCommandChain( $hash, $cmd, $allowed );
+            my $ret = AnalyzeCommandChain( $hash, $cmd );
 
             Log3 $name, 4, "$cname: command result: $ret";
 
@@ -531,11 +530,21 @@ yowsup_Write($$)
 sub
 yowsup_Attr($$$)
 {
-  my ($cmd, $name, $attrName, $attrVal) = @_;
+  my ($cmd, $name, $attrName, @params) = @_;
+  my ($attrVal) = @params;
 
   my $orig = $attrVal;
 
-  if( $attrName eq "disable" ) {
+  if($attrName eq "allowedCommands" && $cmd eq "set") {
+    my $aName = "allowed_$name";
+    my $exists = ($defs{$aName} ? 1 : 0);
+    AnalyzeCommand(undef, "defmod $aName allowed");
+    AnalyzeCommand(undef, "attr $aName validFor $name");
+    AnalyzeCommand(undef, "attr $aName $attrName ".join(" ",@params));
+    return "$name: ".($exists ? "modifying":"creating").
+                " device $aName for attribute $attrName";
+
+  } elsif( $attrName eq "disable" ) {
     my $hash = $defs{$name};
     yowsup_Disconnect($hash);
     if( $cmd eq "set" && $attrVal ne "0" ) {
