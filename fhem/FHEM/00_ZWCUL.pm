@@ -3,16 +3,18 @@
 package main;
 
 # TODO
-#   9.6k, needed by inclusion
-#   always verify checksum in firmware
 #   inclusion/exclusion
 #   resend in firmware
-#   send anomaly on remotes
 #   neighborUpdate Class: 010404010c0001 010604000c0040 010700 0105
 #   static routing
 #   explorer frames
 #   implement security
 #   multicast
+# NIF:
+#zwcul:        0101 d3 9c01 10 01 5e25263370273281855972867a73ef5a82 (zwcul)
+#zme reporting:     1404    10 01 5e25263370273281855972867a73ef5a82
+#zme nodeInfo: 0141 d3 9c01 041001 
+
 
 use strict;
 use warnings;
@@ -60,7 +62,7 @@ ZWCUL_Initialize($)
   $hash->{AttrFn}  = "ZWCUL_Attr";
   $hash->{UndefFn} = "ZWCUL_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model disable:0,1 ".
-                     "networkKey noDispatch dataRate:40k,100k";
+                     "networkKey noDispatch dataRate:40k,100k,9600";
 }
 
 #####################################
@@ -467,7 +469,8 @@ ZWCUL_Attr($$$$)
     return;
 
   } elsif($attr eq "dataRate" && $cmd eq "set") {
-    my $sfx = ($value eq "100k" ? "1" : "4");
+    my $sfx = ($value eq "100k" ? "1" :
+              ($value eq "9600" ? "9" : "4"));
     $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm$sfx":"zr$sfx");
     ZWCUL_DoInit($hash);
 
@@ -561,7 +564,7 @@ ZWCUL_Ready($)
   <a name="ZWCULattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="#dataRate">dataRate</a> [40k|100k]<br>
+    <li><a name="#dataRate">dataRate</a> [40k|100k|9600]<br>
       specify the data rate.
       </li>
     <li><a href="#dummy">dummy</a></li>
