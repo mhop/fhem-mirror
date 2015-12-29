@@ -425,7 +425,7 @@ YAMAHA_AVR_Set($@)
     {
         my $target_volume;
         
-        if($what eq "volume" and defined($a[2]) and $a[2] >= 0 &&  $a[2] <= 100)
+        if($what eq "volume" and defined($a[2]) and $a[2] =~ /^\d{1,3}$/ and $a[2] >= 0 &&  $a[2] <= 100)
         {
             $target_volume = YAMAHA_AVR_volume_rel2abs($a[2]);
         }
@@ -437,7 +437,7 @@ YAMAHA_AVR_Set($@)
         {
             $target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} + ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
         }
-        elsif(defined($a[2]) and $a[2] =~ /^\d+(?:\.\d)?$/)
+        elsif(defined($a[2]) and $a[2] =~ /^-?\d+(?:\.\d)?$/)
         {
             $target_volume = $a[2];
         }
