@@ -1,12 +1,14 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: allowed module added. allowedCommands, basicAuth, password,
+             globalpassword attributes moved to this module.
   - bugfix:  YAMAHA_AVR: fixing not working volumeStraight set command
   - change:  FB_CALLLIST: start call processing only when "event:" is triggered 
              by corresponding FB_CALLMONITOR device.
-  - change:  FB_CALLMONITOR: default value for attr fritzbox-remote-phonebook-via
-             has been changed to "tr064" (previous: "web") to ensure
-             no problems with new Fritz!OS web layout. 
-             Besides TR-064 is official supported by AVM.
+  - change:  FB_CALLMONITOR: default value for attr
+             fritzbox-remote-phonebook-via has been changed to "tr064"
+             (previous: "web") to ensure no problems with new Fritz!OS web
+             layout.  Besides TR-064 is official supported by AVM.
   - feature: PHILIPS_AUDIO: Favorite station selection
   - feature: YAMAHA_AVR: new set commands and readings for tuner control
              - new set commands tunerFrequency,tunerPreset for

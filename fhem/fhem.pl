@@ -81,6 +81,7 @@ sub PrintHash($$);
 sub ReadingsNum($$$);
 sub ReadingsTimestamp($$$);
 sub ReadingsVal($$$);
+sub RefreshAuthList();
 sub RemoveInternalTimer($);
 sub ReplaceEventMap($$$);
 sub ResolveDateWildcards($@);
@@ -224,6 +225,9 @@ use vars qw($lastDefChange);    # number of last def/attr change
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
 use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 use vars qw($featurelevel); 
+use vars qw(@authorize);        # List of authorization devices
+use vars qw(@authenticate);     # List of authentication devices
+use vars qw($auth_refresh);
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment:textField-long alias ".
                 "eventMap userReadings:textField-long";
@@ -231,7 +235,7 @@ my $currcfgfile="";             # current config/include file
 my $currlogfile;                # logfile, without wildcards
 my $cvsid = '$Id$';
 my $duplidx=0;                  # helper for the above pool
-my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand parameter passing
+my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand
 my $intAtCnt=0;
 my $logopened = 0;              # logfile opened or using stdout
 my $namedef = "where <name> is a single device name, a list separated by komma (,) or a regexp. See the devspec section in the commandref.html for details.\n";
@@ -910,7 +914,7 @@ CommandIOWrite($$)
 sub
 AnalyzeCommandChain($$;$)
 {
-  my ($c, $cmd, $allowed) = @_;
+  my ($c, $cmd) = @_;
   my @ret;
 
   if($cmd =~ m/^[ \t]*(#.*)?$/) {      # Save comments
@@ -933,7 +937,7 @@ AnalyzeCommandChain($$;$)
   my $subcmd;
   while(defined($subcmd = shift @cmdList)) {
     $subcmd =~ s/SeMiCoLoN/;/g;
-    my $lret = AnalyzeCommand($c, $subcmd, $allowed);
+    my $lret = AnalyzeCommand($c, $subcmd);
     push(@ret, $lret) if(defined($lret));
   }
   @cmdList = @saveCmdList;
@@ -946,15 +950,15 @@ AnalyzeCommandChain($$;$)
 sub
 AnalyzePerlCommand($$;$)
 {
-  my ($cl, $cmd, $calledFromChain) = @_;
+  my ($cl, $cmd, $calledFromChain) = @_; # third parmeter is deprecated
 
-  return "Forbidden command $cmd."
-        if($cl && $cl->{".allowed"} && $cl->{".allowed"} !~ m/\bperl\b/);
+  return "Forbidden command $cmd." if($cl && !Authorized($cl, "cmd", "perl"));
+
   $cmd =~ s/\\ *\n/ /g;               # Multi-line. Probably not needed anymore
 
   # Make life easier for oneliners:
-  %value = ();
   if($featurelevel <= 5.6) {
+    %value = ();
     foreach my $d (keys %defs) {
       $value{$d} = $defs{$d}{STATE}
     }
@@ -994,9 +998,8 @@ AnalyzePerlCommand($$;$)
 sub
 AnalyzeCommand($$;$)
 {
-  my ($cl, $cmd, $allowed) = @_;
+  my ($cl, $cmd) = @_; # third parmeter is deprecated
 
-  $cl->{".allowed"} = $allowed if($cl); # Forum #38276
   $cmd = "" if(!defined($cmd)); # Forum #29963
   $cmd =~ s/^(\n|[ \t])*//;# Strip space or \n at the begginning
   $cmd =~ s/[ \t]*$//;
@@ -1009,7 +1012,7 @@ AnalyzeCommand($$;$)
   }
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
-    return "Forbidden command $cmd." if($allowed && $allowed !~ m/\bshell\b/);
+    return "Forbidden command $cmd." if($cl || !Authorized($cl,"cmd","shell"));
     if($evalSpecials) {
       map { $ENV{substr($_,1)} = $evalSpecials->{$_}; } keys %{$evalSpecials};
     }
@@ -1041,7 +1044,7 @@ AnalyzeCommand($$;$)
   $fn = $cmds{$fn}{ReplacedBy}
                 if(defined($cmds{$fn}) && defined($cmds{$fn}{ReplacedBy}));
 
-  return "Forbidden command $fn." if($allowed && $allowed !~ m/\b$fn\b/);
+  return "Forbidden command $fn." if($cl && !Authorized($cl,"cmd",$fn));
 
   #############
   # autoload commands.
@@ -1077,6 +1080,11 @@ devspec2array($;$)
 
   return "" if(!defined($name));
   if(defined($defs{$name})) {
+    if($cl && !Authorized($cl, "devicename", $name)) {
+      Log 4, "Forbidden device $name";
+      return "";
+    }
+
     # FHEM2FHEM LOG mode fake device, avoid local set/attr/etc operations on it
     return "FHEM2FHEM_FAKE_$name" if($defs{$name}{FAKEDEVICE});
     return $name;
@@ -1156,6 +1164,7 @@ devspec2array($;$)
     push @ret,@res;
   }
   return $name if(!@ret && !$isAttr);
+  @ret = grep { Authorized($cl, "devicename", $_) } @ret if($cl);
   return @ret;
 }
 
@@ -4524,6 +4533,56 @@ Each($$;$)      # can be used e.g. in at, Forum #40022
   $defs{$dev}{EACH_INDEX} = $idx+1;
 
   return $arr[$idx];
+}
+
+##################
+# Return 1 if Authorized, else 0
+sub
+Authorized($$$)
+{
+  my ($cl, $type, $arg) = @_;
+
+  return 1 if(!$init_done || !$cl || !$cl->{SNAME}); # Safeguarding
+  RefreshAuthList() if($auth_refresh);
+
+  foreach my $a (@authorize) {
+    my $r = CallFn($a, "AuthorizeFn", $defs{$a}, $cl, $type, $arg);
+    return 1 if($r == 1);
+    return 0 if($r == 2);
+  }
+  return 1;
+}
+
+##################
+# Return 0 if not needed, 1 if authenticated, 2 if authentication failed
+sub
+Authenticate($$)
+{
+  my ($cl, $arg) = @_;
+
+  return 1 if(!$init_done || !$cl || !$cl->{SNAME}); # Safeguarding
+  RefreshAuthList() if($auth_refresh);
+
+  foreach my $a (@authenticate) {
+    my $r = CallFn($a, "AuthenticateFn", $defs{$a}, $cl, $arg);
+    return $r if($r);
+  }
+  return 0;
+}
+
+sub
+RefreshAuthList()
+{
+  @authorize = ();
+  @authenticate = ();
+
+  foreach my $d (sort keys %defs) {
+    my $h = $defs{$d};
+    next if(!$h->{TYPE} || !$modules{$h->{TYPE}});
+    push @authorize, $d if($modules{$h->{TYPE}}{AuthorizeFn});
+    push @authenticate, $d if($modules{$h->{TYPE}}{AuthenticateFn});
+  }
+  $auth_refresh = 0;
 }
 
 1;
