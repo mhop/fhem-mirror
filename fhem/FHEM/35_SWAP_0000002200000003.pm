@@ -415,8 +415,6 @@ SWAP_0000002200000003_Get($@)
 <a name="SWAP_0000002200000003"></a>
 <h3>SWAP_0000002200000003</h3>
 <ul>
-
-  <tr><td>
   Module for the justme version of the panstamp rgb driver board with ir (sketch product code 0000002200000003).
 
   <br><br>

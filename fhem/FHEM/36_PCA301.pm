@@ -288,8 +288,6 @@ PCA301_Attr(@)
 <a name="PCA301"></a>
 <h3>PCA301</h3>
 <ul>
-
-  <tr><td>
   The PCA301 is a RF controlled AC mains plug with integrated power meter functionality from ELV.<br><br>
 
   It can be integrated in to FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>

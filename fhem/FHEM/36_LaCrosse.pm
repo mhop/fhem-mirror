@@ -544,8 +544,6 @@ sub LaCrosse_Parse($$) {
 <a name="LaCrosse"></a>
 <h3>LaCrosse</h3>
 <ul>
-
-  <tr><td>
   FHEM module for LaCrosse Temperature and Humidity sensors and weather stations like WS 1600 (TX22 sensor).<br><br>
 
   It can be integrated in to FHEM via a <a href="#JeeLink">JeeLink</a> as the IODevice.<br><br>
