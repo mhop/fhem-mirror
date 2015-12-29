@@ -1018,7 +1018,6 @@ sub FB_CALLLIST_returnTableHeader($)
 <a name="FB_CALLLIST"></a>
 <h3>FB_CALLLIST</h3>
 <ul>
-  <tr><td>
   The FB_CALLLIST module creates a call history list by processing events of a <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a> definition.
   It logs all calls and displays them in a historic table.
   <br><br>
@@ -1034,17 +1033,19 @@ sub FB_CALLLIST_returnTableHeader($)
   <br>
   If you use no icons (see <a href="#FB_CALLLIST_show-icons">show-icons</a>) the following states will be shown:<br><br>
   <ul>
-   <table>
-    <tr><td><code>&lt;= ((o))</code></td><td> - outgoing call (ringing) - icon: <code>outgoing.ring</code> </td></tr>
-    <tr><td><code>=&gt; ((o))</code></td><td> - incoming call (ringing) - icon: <code>incoming.ring</code></td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;= [=]</code></td><td> - outgoing call (currently active) - icon: <code>outgoing.connected</code></td></tr>
-    <tr><td><code>=&gt; [=]</code></td><td> - incoming call (currently active) - icon: <code>incoming.connected</code></td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;= X</code></td><td> - outgoing unsuccessful call (nobody picked up) - icon: <code>outgoing.missed</code></td></tr>
-    <tr><td><code>=&gt; X</code></td><td> - incoming unsuccessful call (missed call) - icon: <code>incoming.missed</code></td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>=&gt; O_O</code></td><td> - incoming finished call recorded on answering machine - icon: <code>incoming.tam</code></td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;=</code></td><td> - outgoing finished call - icon: <code>outgoing.done</code></td></tr>
-    <tr><td><code>=&gt;</code></td><td> - incoming finished call - icon: <code>incoming.done</code></td></tr>
-    </table>
+    <li><code><b>&lt;= ((o))</b></code></td><td> - outgoing call (ringing) - icon: <code><b>outgoing.ring</b></code></li>
+    <li><code><b>=&gt; ((o))</b></code></td><td> - incoming call (ringing) - icon: <code><b>incoming.ring</b></code></li>
+    <br>
+    <li><code><b>&lt;= [=]</b></code></td><td> - outgoing call (currently active) - icon: <code><b>outgoing.connected</b></code></li>
+    <li><code><b>=&gt; [=]</b></code></td><td> - incoming call (currently active) - icon: <code><b>incoming.connected</b></code></li>
+    <br>
+    <li><code><b>&lt;= X</b></code></td><td> - outgoing unsuccessful call (nobody picked up) - icon: <code><b>outgoing.missed</b></code></li>
+    <li><code><b>=&gt; X</b></code></td><td> - incoming unsuccessful call (missed call) - icon: <code><b>incoming.missed</b></code></li>
+    <br>
+    <li><code><b>=&gt; O_O</b></code></td><td> - incoming finished call recorded on answering machine - icon: <code><b>incoming.tam</b></code></li>
+    <br>
+    <li><code><b>&lt;=</b></code></td><td> - outgoing finished call - icon: <code><b>outgoing.done</b></code></li>
+    <li><code><b>=&gt;</b></code></td><td> - incoming finished call - icon: <code><b>incoming.done</b></code></li>
   </ul>
   <br>
   The default icon mapping for all states can be changed by the corresponding attribute.
@@ -1214,7 +1215,6 @@ sub FB_CALLLIST_returnTableHeader($)
 <a name="FB_CALLLIST"></a>
 <h3>FB_CALLLIST</h3>
 <ul>
-  <tr><td>
   Das FB_CALLLIST Modul erstellt eine Anrufliste f&uuml;r eine konfigurierte <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a> Definition.
   Es speichert alle Anrufe und zeigt sie in einer historischen Tabelle an.
   <br><br>
@@ -1231,17 +1231,20 @@ sub FB_CALLLIST_returnTableHeader($)
   <br>
   Falls keine Icons verwendet werden sollen (siehe Attribut <a href="#FB_CALLLIST_show-icons">show-icons</a>), wird der Status wie folgt angezeigt:<br><br>
   <ul>
-  <table>
-    <tr><td><code>&lt;= ((o))</code></td><td> - Ausgehender Anruf (klingelt)</td></tr>
-    <tr><td><code>=&gt; ((o))</code></td><td> - Eingehender Anruf (klingelt)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;= [=]</code></td><td> - Ausgehender Anruf (laufendes Gespr&auml;ch)</td></tr>
-    <tr><td><code>=&gt; [=]</code></td><td> - Eingehender Anruf (laufendes Gespr&auml;ch)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;= X</code></td><td> - Ausgehender, erfolgloser Anruf (Gegenseite nicht abgenommen)</td></tr>
-    <tr><td><code>=&gt; X</code></td><td> - Eingehender, erfolgloser Anruf (Verpasster Anruf)</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>=&gt; O_O</code></td><td> - Eingehender Anruf, der durch einen Anrufbeantworter entgegen genommen wurde</td></tr><tr><td colspan="2">&nbsp;</td></tr>
-    <tr><td><code>&lt;=</code></td><td> - Ausgehender Anruf (beendet)</td></tr>
-    <tr><td><code>=&gt;</code></td><td> - Eingehender Anruf (beendet)</td></tr>
-    </table>
+  
+    <li><code><b>&lt;= ((o))</b></code></td><td> - Ausgehender Anruf (klingelt)</li>
+    <li><code><b>=&gt; ((o))</b></code></td><td> - Eingehender Anruf (klingelt)</li>
+    <br>
+    <li><code><b>&lt;= [=]</b></code></td><td> - Ausgehender Anruf (laufendes Gespr&auml;ch)</li>
+    <li><code><b>=&gt; [=]</b></code></td><td> - Eingehender Anruf (laufendes Gespr&auml;ch)</li>
+    <br>
+    <li><code><b>&lt;= X</b></code></td><td> - Ausgehender, erfolgloser Anruf (Gegenseite nicht abgenommen)</li>
+    <li><code><b>=&gt; X</b></code></td><td> - Eingehender, erfolgloser Anruf (Verpasster Anruf)</li>
+    <br>
+    <li><code><b>=&gt; O_O</b></code></td><td> - Eingehender Anruf, der durch einen Anrufbeantworter entgegen genommen wurde</li>
+    <br>
+    <li><code><b>&lt;=</b></code></td><td> - Ausgehender Anruf (beendet)</li>
+    <li><code><b>=&gt;</b></code></td><td> - Eingehender Anruf (beendet)</li>
   </ul>
   <br>
   <a name="FB_CALLLIST_define"></a>
