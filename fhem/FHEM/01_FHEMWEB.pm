@@ -218,10 +218,22 @@ FW_SecurityCheck($$)
             !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
   my $motd = AttrVal("global", "motd", "");
   if($motd =~ "^SecurityCheck") {
-    my @list = grep { !AttrVal($_, "basicAuth", undef) }
-               devspec2array("TYPE=FHEMWEB");
-    $motd .= (join(",", sort @list)." has no basicAuth attribute.\n")
-        if(@list);
+    my @list1 = devspec2array("TYPE=FHEMWEB");
+    my @list2 = devspec2array("TYPE=allowed");
+    my @list3;
+    for my $l (@list1) { # This is a hack, as hardcoded to basicAuth
+      next if(!$defs{$l});
+      my $fnd = 0;
+      for my $a (@list2) {
+        next if(!$defs{$a});
+        my $vf = AttrVal($a, "validFor","");
+        $fnd = 1 if((!$vf || $vf =~ m/\b$l\b/) && AttrVal($a, "basicAuth",""));
+      }
+      push @list3, $l if(!$fnd);
+    }
+    $motd .= (join(",", sort @list3).
+              " has no associated allowed device with basicAuth.\n")
+        if(@list3);
     $attr{global}{motd} = $motd;
   }
   $modules{FHEMWEB}{NotifyFn}= "FW_Notify";
@@ -362,44 +374,24 @@ FW_Read($$)
 
 
   #############################
-  # BASIC HTTP AUTH
-  my @headerOptions = grep /OPTIONS/, @FW_httpheader; # Need example
-  my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
-  if($basicAuth) {
-    my $secret = $FW_httpheader{Authorization};
-    $secret =~ s/^Basic //i if($secret);
-    my $pwok = ($secret && $secret eq $basicAuth);
-    if($secret && $basicAuth =~ m/^{.*}$/ || $headerOptions[0]) {
-      eval "use MIME::Base64";
-      if($@) {
-        Log3 $FW_wname, 1, $@;
+  # AUTH
+  if(!defined($FW_chash->{Authenticated})) {
+    my $ret = Authenticate($FW_chash, \%FW_httpheader);
+    if($ret == 0) {
+      $FW_chash->{Authenticated} = 0; # not needed
 
-      } else {
-        my ($user, $password) = split(":", decode_base64($secret));
-        $pwok = eval $basicAuth;
-        Log3 $FW_wname, 1, "basicAuth expression: $@" if($@);
-      }
+    } elsif($ret == 1) {
+      $FW_chash->{Authenticated} = 1; # ok
+
+    } else {
+      TcpServer_WriteBlocking($hash,
+             $FW_chash->{".httpAuthHeader"}.
+             $FW_headercors.
+             "Content-Length: 0\r\n\r\n");
+      delete $hash->{CONTENT_LENGTH};
+      FW_Read($hash, 1) if($hash->{BUF});
+      return;
     }
-    if($headerOptions[0]) {
-      TcpServer_WriteBlocking($hash,
-             "HTTP/1.1 200 OK\r\n".
-             $FW_headercors.
-             "Content-Length: 0\r\n\r\n");
-      delete $hash->{CONTENT_LENGTH};
-      FW_Read($hash, 1) if($hash->{BUF});
-      return;
-    };
-    if(!$pwok) {
-      my $msg = AttrVal($FW_wname, "basicAuthMsg", "Fhem: login required");
-      TcpServer_WriteBlocking($hash,
-             "HTTP/1.1 401 Authorization Required\r\n".
-             "WWW-Authenticate: Basic realm=\"$msg\"\r\n".
-             $FW_headercors.
-             "Content-Length: 0\r\n\r\n");
-      delete $hash->{CONTENT_LENGTH};
-      FW_Read($hash, 1) if($hash->{BUF});
-      return;
-    };
   }
   #############################
 
@@ -1847,8 +1839,7 @@ FW_style($$)
   my ($cmd, $msg) = @_;
   my @a = split(" ", $cmd);
 
-  my $ac = AttrVal($FW_wname,"allowedCommands","");
-  return if($ac && $ac !~ m/\b$a[0]\b/);
+  return if(!Authorized($FW_chash, "cmd", $a[0]));
 
   my $start = "<div id=\"content\"><table><tr><td>";
   my $end   = "</td></tr></table></div>";
@@ -2173,11 +2164,9 @@ FW_fC($@)
   my ($cmd, $unique) = @_;
   my $ret;
   if($unique) {
-    $ret = AnalyzeCommand($FW_chash, $cmd,
-                AttrVal($FW_wname,"allowedCommands",undef));
+    $ret = AnalyzeCommand($FW_chash, $cmd);
   } else {
-    $ret = AnalyzeCommandChain($FW_chash, $cmd,
-                AttrVal($FW_wname,"allowedCommands",undef));
+    $ret = AnalyzeCommandChain($FW_chash, $cmd);
   }
   return $ret;
 }
@@ -2185,52 +2174,65 @@ FW_fC($@)
 sub
 FW_Attr(@)
 {
-  my @a = @_;
-  my $hash = $defs{$a[1]};
-  my $name = $hash->{NAME};
+  my ($type, $devName, $attrName, @param) = @_;
+  my $hash = $defs{$devName};
   my $sP = "stylesheetPrefix";
   my $retMsg;
 
-  if($a[0] eq "set" && $a[2] eq "HTTPS") {
+  if($type eq "set" && $attrName eq "HTTPS") {
     TcpServer_SetSSL($hash);
   }
 
-  if($a[0] eq "set") { # Converting styles
-   if($a[2] eq "smallscreen" || $a[2] eq "touchpad") {
-     $attr{$name}{$sP} = $a[2];
-     $retMsg="$name: attribute $a[2] deprecated, converted to $sP";
-     $a[3] = $a[2]; $a[2] = $sP;
-   }
-  }
-  if($a[2] eq $sP) {
-    # AttrFn is called too early, we have to set/del the attr here
-    if($a[0] eq "set") {
-      $attr{$name}{$sP} = (defined($a[3]) ? $a[3] : "default");
-      FW_readIcons($attr{$name}{$sP});
-    } else {
-      delete $attr{$name}{$sP};
+  if($type eq "set") { # Converting styles
+    if($attrName eq "smallscreen" || $attrName eq "touchpad") {
+      $attr{$devName}{$sP} = $attrName;
+      $retMsg="$devName: attribute $attrName deprecated, converted to $sP";
+      $param[0] = $attrName; $attrName = $sP;
     }
   }
 
-  if($a[2] eq "iconPath" && $a[0] eq "set") {
-    foreach my $pe (split(":", $a[3])) {
+  if($attrName eq $sP) {
+    # AttrFn is called too early, we have to set/del the attr here
+    if($type eq "set") {
+      $attr{$devName}{$sP} = (defined($param[0]) ? $param[0] : "default");
+      FW_readIcons($attr{$devName}{$sP});
+    } else {
+      delete $attr{$devName}{$sP};
+    }
+  }
+
+  if(($attrName eq "allowedCommands" ||
+      $attrName eq "basicAuth" ||
+      $attrName eq "basicAuthMsg")
+      && $type eq "set") {
+    my $aName = "allowed_$devName";
+    my $exists = ($defs{$aName} ? 1 : 0);
+    AnalyzeCommand(undef, "defmod $aName allowed");
+    AnalyzeCommand(undef, "attr $aName validFor $devName");
+    AnalyzeCommand(undef, "attr $aName $attrName ".join(" ",@param));
+    return "$devName: ".($exists ? "modifying":"creating").
+                " device $aName for attribute $attrName";
+  }
+
+  if($attrName eq "iconPath" && $type eq "set") {
+    foreach my $pe (split(":", $param[0])) {
       $pe =~ s+\.\.++g;
       FW_readIcons($pe);
     }
   }
 
-  if($a[2] eq "JavaScripts" && $a[0] eq "set") { # create some attributes
+  if($attrName eq "JavaScripts" && $type eq "set") { # create some attributes
     my (%a, @add);
     map { $a{$_} = 1 } split(" ", $modules{FHEMWEB}{AttrList});
     map {
       $_ =~ s+.*/++; $_ =~ s/.js$//; $_ =~ s/fhem_//; $_ .= "Param";
       push @add, $_ if(!$a{$_} && $_ !~ m/^-/);
-    } split(" ", $a[3]);
+    } split(" ", $param[0]);
     $modules{FHEMWEB}{AttrList} .= " ".join(" ",@add) if(@add);
   }
 
-  if($a[2] eq "csrfToken" && $a[0] eq "set") {
-    my $csrf = $a[3];
+  if($attrName eq "csrfToken" && $type eq "set") {
+    my $csrf = $param[0];
     if($csrf eq "random") {
       my ($x,$y) = gettimeofday();
       $csrf = rand($y)*rand($x);
@@ -2238,7 +2240,7 @@ FW_Attr(@)
     $hash->{CSRFTOKEN} = $csrf;
   }
 
-  if($a[2] eq "csrfToken" && $a[0] eq "del") {
+  if($attrName eq "csrfToken" && $type eq "del") {
     delete($hash->{CSRFTOKEN});
   }
 
@@ -2937,50 +2939,13 @@ FW_widgetOverride($$)
   <ul>
     <li><a href="#addStateEvent">addStateEvent</a></li>
 
-    <a name="allowedCommands"></a>
-    <li>allowedCommands<br>
-        A comma separated list of commands allowed from this FHEMWEB
-        instance.<br> If set to an empty list <code>, (i.e. comma only)</code>
-        then this FHEMWEB instance will be read-only.<br> If set to
-        <code>get,set</code>, then this FHEMWEB instance will only allow
-        regular usage of the frontend by clicking the icons/buttons/sliders but
-        not changing any configuration.<br>
-
-
-        This attribute intended to be used together with hiddenroom/hiddengroup
-        <br>
-
-        <b>Note:</b>allowedCommands should work as intended, but no guarantee
-        can be given that there is no way to circumvent it.  If a command is
-        allowed it can be issued by URL manipulation also for devices that are
-        hidden.</li><br>
-
     <li><a href="#allowfrom">allowfrom</a></li>
     </li><br>
 
-    <a name="basicAuth"></a>
-    <li>basicAuth, basicAuthMsg<br>
-        request a username/password authentication for access. You have to set
-        the basicAuth attribute to the Base64 encoded value of
-        &lt;user&gt;:&lt;password&gt;, e.g.:<ul>
-        # Calculate first the encoded string with the commandline program<br>
-        $ echo -n fhemuser:secret | base64<br>
-        ZmhlbXVzZXI6c2VjcmV0<br>
-        fhem.cfg:<br>
-        attr WEB basicAuth ZmhlbXVzZXI6c2VjcmV0
-        </ul>
-        You can of course use other means of base64 encoding, e.g. online
-        Base64 encoders. If basicAuthMsg is set, it will be displayed in the
-        popup window when requesting the username/password.<br>
-        <br>
-        If the argument of basicAuth is enclosed in {}, then it will be
-        evaluated, and the $user and $password variable will be set to the
-        values entered. If the return value is true, then the password will be
-        accepted.
-        Example:<br>
-        <code>
-          attr WEB basicAuth { "$user:$password" eq "admin:secret" }<br>
-        </code>
+    <li>allowedCommands, basicAuth, basicAuthMsg<br>
+        Please create these attributes for the corresponding <a
+        href="#allowed">allowed</a> device, they are deprecated for the FHEMWEB
+        instance from now on.
     </li><br>
 
     <a name="closeConn"></a>
@@ -3647,52 +3612,13 @@ FW_widgetOverride($$)
   <ul>
     <li><a href="#addStateEvent">addStateEvent</a></li>
 
-    <a name="allowedCommands"></a>
-    <li>allowedCommands<br>
-        Eine Komma getrennte Liste der erlaubten Befehle. Bei einer leeren
-        Liste (, dh. nur ein Komma)  wird dieser FHEMWEB-Instanz "read-only".
-        <br> Falls es auf <code>get,set</code> gesetzt ist, dann sind in dieser
-        FHEMWEB Instanz keine Konfigurations&auml;nderungen m&ouml;glich, nur
-        "normale" Bedienung der Schalter/etc.<br>
-
-        Dieses Attribut sollte zusammen mit dem hiddenroom/hiddengroup
-        Attributen verwendet werden.  <br>
-
-        <b>Achtung:</b> allowedCommands sollte wie hier beschrieben
-        funktionieren, allerdings k&ouml;nnen wir keine Garantie geben,
-        da&szlig; man sie nicht &uuml;berlisten, und Schaden anrichten kann.
-        </li><br>
-
     <li><a href="#allowfrom">allowfrom</a>
         </li><br>
 
-    <a name="basicAuth"></a>
-    <li>basicAuth, basicAuthMsg<br>
-        Fragt username/password zur Autentifizierung ab. Es gibt mehrere
-        Varianten:
-        <ul>
-        <li>falls das Argument <b>nicht</b> in {} eingeschlossen ist, dann wird
-          es als base64 kodiertes benutzername:passwort interpretiert.
-          Um sowas zu erzeugen kann man entweder einen der zahlreichen
-          Webdienste verwenden, oder das base64 Programm. Beispiel:
-          <ul><code>
-            $ echo -n fhemuser:secret | base64<br>
-            ZmhlbXVzZXI6c2VjcmV0<br>
-            fhem.cfg:<br>
-            attr WEB basicAuth ZmhlbXVzZXI6c2VjcmV0
-          </code></ul>
-          </li>
-        <li>Werden die Argumente in {} angegeben, wird es als perl-Ausdruck
-          ausgewertet, die Variablen $user and $password werden auf die
-          eingegebenen Werte gesetzt. Falls der R&uuml;ckgabewert wahr ist,
-          wird die Anmeldung akzeptiert.
-
-          Beispiel:<br>
-          <code>
-            attr WEB basicAuth { "$user:$password" eq "admin:secret" }<br>
-          </code>
-          </li>
-        </ul>
+    <li>allowedCommands, basicAuth, basicAuthMsg<br>
+        Diese Attribute m&uuml;ssen ab sofort bei dem passenden <a
+        href="#allowed">allowed</a> Ger&auml;t angelegt werden, und sind
+        f&uuml;r eine FHEMWEB Instanz unerw&uuml;nscht.
     </li><br>
 
      <a name="closeConn"></a>
