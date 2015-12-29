@@ -1258,8 +1258,6 @@ SWAP_Attr(@)
 <a name="SWAP"></a>
 <h3>SWAP</h3>
 <ul>
-
-  <tr><td>
   The SWAP protocoll is used by panStamps (<a href="http://www.panstamp.com">panstamp.com</a>).<br><br>
 
   This is a generic module that will handle all SWAP devices with known device description files via

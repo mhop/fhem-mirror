@@ -75,8 +75,6 @@ SWAP_0000002200000008_Get($@)
 <a name="SWAP_0000002200000008"></a>
 <h3>SWAP_0000002200000008</h3>
 <ul>
-
-  <tr><td>
   Module for the justme version of the panstamp indoor multi sensor board (sketch product code 0000002200000008).
 
   <br><br>
