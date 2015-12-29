@@ -392,5 +392,5 @@ watchdog_Attr(@)
   <br>
 </ul>
 
-=end html
+=end html_DE
 =cut
