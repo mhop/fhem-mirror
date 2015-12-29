@@ -1727,7 +1727,6 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
 <a name="FB_CALLMONITOR"></a>
 <h3>FB_CALLMONITOR</h3>
 <ul>
-  <tr><td>
   The FB_CALLMONITOR module connects to a AVM FritzBox Fon and listens for telephone
   <a href="#FB_CALLMONITOR_events">events</a> (Receiving incoming call, Making a call)
   <br><br>
@@ -1878,7 +1877,6 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
 <a name="FB_CALLMONITOR"></a>
 <h3>FB_CALLMONITOR</h3>
 <ul>
-  <tr><td>
   Das Modul FB_CALLMONITOR verbindet sich zu einer AVM FritzBox Fon und verarbeitet
   Telefonie-<a href="#FB_CALLMONITOR_events">Ereignisse</a>.(eingehende & ausgehende Telefonate)
   <br><br>
