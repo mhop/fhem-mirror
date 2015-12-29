@@ -8,7 +8,7 @@ use strict;
 use warnings;
 
 # $Id$
-use constant TAGS => qw{ul li code b i u};
+use constant TAGS => qw{ul li code b i u table tr td};
 my %mods;
 my @modDir = ("FHEM");
 foreach my $modDir (@modDir) {
