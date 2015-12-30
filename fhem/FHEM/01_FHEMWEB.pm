@@ -108,7 +108,7 @@ my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
 my $FW_id="";      # id of current page
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
-my $FW_headercors; #
+my $FW_headerlines; #
 my $FW_chash;      # client fhem hash
 my $FW_encoding="UTF-8";
 
@@ -365,7 +365,7 @@ FW_Read($$)
 
   $FW_userAgent = $FW_httpheader{"User-Agent"};
   my @origin = grep /Origin/, @FW_httpheader;
-  $FW_headercors = (AttrVal($FW_wname, "CORS", 0) ?
+  $FW_headerlines = (AttrVal($FW_wname, "CORS", 0) ?
               (($#origin<0) ? "": "Access-Control-Allow-".$origin[0]."\r\n").
               "Access-Control-Allow-Methods: GET OPTIONS\r\n".
               "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
@@ -384,14 +384,18 @@ FW_Read($$)
       $FW_chash->{Authenticated} = 1; # ok
 
     } else {
+      my $ah = $FW_chash->{".httpAuthHeader"};
       TcpServer_WriteBlocking($hash,
-             $FW_chash->{".httpAuthHeader"}.
-             $FW_headercors.
+             ($ah ? $ah : "").
+             $FW_headerlines.
              "Content-Length: 0\r\n\r\n");
       delete $hash->{CONTENT_LENGTH};
       FW_Read($hash, 1) if($hash->{BUF});
       return;
     }
+  } else {
+    my $ah = $FW_chash->{".httpAuthHeader"};
+    $FW_headerlines .= $ah if($ah);
   }
   #############################
 
@@ -462,7 +466,7 @@ FW_Read($$)
   if( ! addToWritebuffer($hash,
            "HTTP/1.1 200 OK\r\n" .
            "Content-Length: $length\r\n" .
-           $expires . $compressed . $FW_headercors .
+           $expires . $compressed . $FW_headerlines .
            "Content-Type: $FW_RETTYPE\r\n\r\n" .
            $FW_RET, "FW_closeConn") ){
     Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
@@ -617,7 +621,7 @@ FW_answerCall($)
     TcpServer_WriteBlocking($me,
              "HTTP/1.1 302 Found\r\n".
              "Content-Length: 0\r\n".
-             $FW_headercors.
+             $FW_headerlines.
              "Location: $FW_ME\r\n\r\n");
     FW_closeConn($FW_chash);
     return -1;
@@ -670,7 +674,7 @@ FW_answerCall($)
     my $sinceTimestamp = FmtDateTime($me->{inform}{since});
     TcpServer_WriteBlocking($me,
        "HTTP/1.1 200 OK\r\n".
-       $FW_headercors.
+       $FW_headerlines.
        "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n".
        FW_roomStatesForInform($me, $sinceTimestamp));
 
@@ -752,7 +756,7 @@ FW_answerCall($)
     else              { $tgt .= "?fw_id=$FW_id" }
     TcpServer_WriteBlocking($me,
              "HTTP/1.1 302 Found\r\n".
-             "Content-Length: 0\r\n". $FW_headercors.
+             "Content-Length: 0\r\n". $FW_headerlines.
              "Location: $tgt\r\n".
              "\r\n");
     return -1;
@@ -1663,7 +1667,7 @@ FW_returnFileAsStream($$$$$)
                 "Expires: ".FmtDateTimeRFC1123($now+900)."\r\n";
       Log3 $FW_wname, 4, "$FW_chash->{NAME} => 304 Not Modified";
       TcpServer_WriteBlocking($FW_chash,"HTTP/1.1 304 Not Modified\r\n".
-                    $rsp . $FW_headercors . "\r\n");
+                    $rsp . $FW_headerlines . "\r\n");
       return -1;
     }
   }
@@ -1685,7 +1689,7 @@ FW_returnFileAsStream($$$$$)
                $FW_httpheader{"Accept-Encoding"} =~ m/gzip/ && $FW_use_zlib) ?
                 "Content-Encoding: gzip\r\n" : "";
   TcpServer_WriteBlocking($FW_chash, "HTTP/1.1 200 OK\r\n".
-                  $compr . $expires . $FW_headercors . $etag .
+                  $compr . $expires . $FW_headerlines . $etag .
                   "Transfer-Encoding: chunked\r\n" .
                   "Content-Type: $type; charset=$FW_encoding\r\n\r\n");
 
