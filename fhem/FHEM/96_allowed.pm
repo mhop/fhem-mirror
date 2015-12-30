@@ -185,9 +185,10 @@ allowed_Attr(@)
     Authorize execution of commands and modification of devices based on the
     frontend used and/or authenticate users.<br><br>
 
-    If there are multiple instances defined, which are valid for a given
+    If there are multiple instances defined which are valid for a given
     frontend device, then all authorizations must succeed. For authentication
-    it is sufficient when one of the instances succeeds.<br><br>
+    it is sufficient when one of the instances succeeds. The checks are
+    executed in alphabetical order of the allowed instance names.<br><br>
 
     <b>Note:</b> this module should work as intended, but no guarantee
     can be given that there is no way to circumvent it.<br><br>
