@@ -56,7 +56,8 @@ SWAP_0000002200000003_Initialize($)
   $hash->{SWAP_SetFn}     = "SWAP_0000002200000003_Set";
   $hash->{SWAP_SetList}   = { off => 0, on => 0, "on-for-timer" => 1, fadeTo => undef,
                               "rgb:colorpicker,RGB" => 1,
-                              "hue:colorpicker,HUE,0,1,360" => 1,
+                              "hue:colorpicker,HUE,0,1,359" => 1,
+                              "pct:slider,0,1,100" => 1,
                               toggle => 0,
                               dimUp => 0, dimDown => 0,
                               getIR => 1, setIR => 2, learnIR => 1, storeIR => 3,
@@ -180,7 +181,18 @@ SWAP_0000002200000003_Parse($$$$)
       }
     }
   } elsif( $reg == 0x0B ) {
-    CommandTrigger( "", "$name RGB: $data" );
+    my $rgb = ReadingsVal( $name, "0B-RGBlevel", undef );
+    if( $rgb =~ m/([\da-f]{2})([\da-f]{2})([\da-f]{2})/i ) {
+      my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
+      my ($h, $s, $v) = Color::rgb2hsv($r,$g,$b);
+      my $hue = int($h*359);
+      my $pct = int($v*100);
+
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, 'hue', $hue);
+      readingsBulkUpdate($hash, 'pct', $pct);
+      readingsEndUpdate($hash,1);
+    }
   }
 
   RemoveInternalTimer($hash);
@@ -235,16 +247,31 @@ SWAP_0000002200000003_Set($@)
     }
     return (undef, "$arg is not a valid color" );
 
-  } elsif( $cmd eq "hue" ) {
+  } elsif( $cmd eq 'hue' ) {
     return (undef, "$arg is not a valid color" ) if( $arg !~ /^\d{1,3}$/ );
-    return (undef, "$arg is not a valid color" ) if( $arg > 360 );
-    my $h = $arg/360;
+    return (undef, "$arg is not a valid color" ) if( $arg > 359 );
+    my $h = $arg/359;
     my $s = 1;
     my ($v,undef) = SWAP_0000002200000003_rgbToPct(ReadingsVal( $name, "0B-RGBlevel", undef));
     $v /= 100;
 
     my ($r,$g,$b) = Color::hsv2rgb($h,$s,$v);
     my $rgb = Color::rgb2hex( $r*255, $g*255, $b*255 );
+
+    return SWAP_0000002200000003_Set( $hash, $name, 'rgb', $rgb );
+
+  } elsif( $cmd eq 'pct' ) {
+    return (undef, "$arg is not a dim level" ) if( $arg !~ /^\d{1,3}$/ );
+    return (undef, "$arg is not a valid dim level" ) if( $arg > 100 );
+    my $rgb = ReadingsVal( $name, "0B-RGBlevel", undef );
+    if( $rgb =~ m/([\da-f]{2})([\da-f]{2})([\da-f]{2})/i ) {
+      my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
+      my ($h, $s, $v) = Color::rgb2hsv($r,$g,$b);
+      my $v = $arg/100;
+
+      ($r,$g,$b) = Color::hsv2rgb($h,$s,$v);
+      $rgb = Color::rgb2hex( $r*255, $g*255, $b*255 );
+    }
 
     return SWAP_0000002200000003_Set( $hash, $name, 'rgb', $rgb );
 
