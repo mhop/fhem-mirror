@@ -81,10 +81,10 @@ CommandJsonList2($$)
   if($param) {
     my @arg = split(" ", $param);
     $attr = $arg[1];
-    @d = devspec2array($arg[0]);
+    @d = devspec2array($arg[0],$cl);
 
   } else {
-    @d = keys %defs;
+    @d = devspec2array(".*", $cl);      # Needed for Authorization
     $param="";
 
   }

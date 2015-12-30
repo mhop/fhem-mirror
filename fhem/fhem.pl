@@ -2115,7 +2115,7 @@ CommandList($$)
     for my $d (sort { my $x=$modules{$defs{$a}{TYPE}}{ORDER}.$defs{$a}{TYPE} cmp
                             $modules{$defs{$b}{TYPE}}{ORDER}.$defs{$b}{TYPE};
                          $x=($a cmp $b) if($x == 0); $x; } keys %defs) {
-      next if(IsIgnored($d));
+      next if(IsIgnored($d) || ($cl && !Authorized($cl,"devicename",$d)));
       my $t = $defs{$d}{TYPE};
       $str .= "\n$t:\n" if($t ne $lt);
       $str .= sprintf("  %-20s (%s)\n", $d, $defs{$d}{STATE});
@@ -4537,6 +4537,7 @@ Each($$;$)      # can be used e.g. in at, Forum #40022
 
 ##################
 # Return 1 if Authorized, else 0
+# Note: AuthorizeFn's returning 1 are not stackable.
 sub
 Authorized($$$)
 {
@@ -4555,6 +4556,7 @@ Authorized($$$)
 
 ##################
 # Return 0 if not needed, 1 if authenticated, 2 if authentication failed
+# Loop until one Authenticate is ok
 sub
 Authenticate($$)
 {
@@ -4563,11 +4565,13 @@ Authenticate($$)
   return 1 if(!$init_done || !$cl || !$cl->{SNAME}); # Safeguarding
   RefreshAuthList() if($auth_refresh);
 
+  my $needed = 0;
   foreach my $a (@authenticate) {
     my $r = CallFn($a, "AuthenticateFn", $defs{$a}, $cl, $arg);
-    return $r if($r);
+    $needed = $r if($r);
+    return $r if($r == 1);
   }
-  return 0;
+  return $needed;
 }
 
 sub

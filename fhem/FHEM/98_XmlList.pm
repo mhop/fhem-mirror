@@ -47,17 +47,14 @@ CommandXmlList($$)
   my $lt = "";
   my %filter;
 
-  if($param) {
-   my @arr = devspec2array($param);
-   map { $filter{$_} = 1 } @arr;
-  }
-  delete($modules{""}) if(defined($modules{""})); # ???
+  my @arr = devspec2array($param ? $param : ".*", $cl); # for Authorize
+  map { $filter{$_} = 1 } @arr;
 
   for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER}.$defs{$a}{TYPE} cmp
     		            $modules{$defs{$b}{TYPE}}{ORDER}.$defs{$b}{TYPE};
     		    $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
 
-      next if(IsIgnored($d) || (%filter && !$filter{$d}));
+      next if(IsIgnored($d) || !$filter{$d});
       my $p = $defs{$d};
       my $t = $p->{TYPE};
       if($t ne $lt) {

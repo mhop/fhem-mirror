@@ -59,12 +59,13 @@ allowed_Authorize($$$$)
 
   if($type eq "cmd") {
     return 0 if(!$me->{allowedCommands});
-    return ($me->{allowedCommands} =~ m/\b$arg\b/) ? 1 : 2;
+    # Return 0: allow stacking with other instances, see Forum#46380
+    return ($me->{allowedCommands} =~ m/\b$arg\b/) ? 0 : 2;
   }
 
   if($type eq "devicename") {
     return 0 if(!$me->{allowedDevices});
-    return ($me->{allowedDevices} =~ m/\b$arg\b/) ? 1 : 2;
+    return ($me->{allowedDevices} =~ m/\b$arg\b/) ? 0 : 2;
   }
 
   return 0;
@@ -182,7 +183,12 @@ allowed_Attr(@)
     <code>define &lt;name&gt; allowed &lt;deviceList&gt;</code>
     <br><br>
     Authorize execution of commands and modification of devices based on the
-    frontend used.<br>
+    frontend used and/or authenticate users.<br><br>
+
+    If there are multiple instances defined, which are valid for a given
+    frontend device, then all authorizations must succeed. For authentication
+    it is sufficient when one of the instances succeeds.<br><br>
+
     <b>Note:</b> this module should work as intended, but no guarantee
     can be given that there is no way to circumvent it.<br><br>
     Examples:
@@ -316,10 +322,17 @@ allowed_Attr(@)
     Authorisiert das Ausf&uuml;hren von Kommandos oder das &Auml;ndern von
     Ger&auml;ten abh&auml;ngig vom verwendeten Frontend.<br>
 
+    Falls man mehrere allowed Instanzen definiert hat, die f&uuml;r dasselbe
+    Frontend verantwortlich sind, dann m&uuml;ssen alle Authorisierungen
+    genehmigt sein, um das Befehl ausf&uuml;hren zu k&ouml;nnen. Auf der
+    anderen Seite reicht es, wenn einer der Authentifizierungen positiv
+    entschieden wird.  Die Pr&uuml;fungen werden in alphabetischer Reihenfolge
+    der Instanznamen ausgef&uuml;hrt.  <br><br>
+
     <b>Achtung:</b> das Modul sollte wie hier beschrieben funktionieren,
     allerdings k&ouml;nnen wir keine Garantie geben, da&szlig; man sie nicht
-    &uuml;berlisten, und Schaden anrichten kann.
-    <br>
+    &uuml;berlisten, und Schaden anrichten kann.<br><br>
+
     Beispiele:
     <ul><code>
       define allowedWEB allowed<br>
