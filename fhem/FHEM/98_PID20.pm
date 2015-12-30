@@ -49,7 +49,9 @@
 #  27.11.2014   Change: all readings are updated cyclically
 # V 1.0.0.5
 #  06.11.2015   Fix: reg expression in sub PID20_Notify modifed. Thanks to user gero
-
+# V 1.0.0.6
+#  12.11.2015   Fix: wrong evaluation of Sensor String, when value was 0 than sensor timeout was detected
+#               Feature: added <Internal> VERSION
 ####################################################################################################
 package main;
 
@@ -61,7 +63,7 @@ use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
 
-my $PID20_Version = "1.0.0.5";
+my $PID20_Version = "1.0.0.6";
 sub PID20_Calc($);
 ########################################
 sub PID20_Log($$$)
@@ -156,7 +158,7 @@ sub PID20_Define($$$)
     return $msg;
   }
   $hash->{helper}{sensor} = $sensor;
-
+  $hash->{VERSION} = $PID20_Version;
   # defaults for regexp
   if ( !$regexp )
   {
@@ -174,13 +176,13 @@ sub PID20_Define($$$)
     return $msg;
   }
   $hash->{helper}{actor}         = $actor;
-  $hash->{helper}{actorCommand}  = ( defined($cmd) ) ? $cmd : "";
+  $hash->{helper}{actorCommand}  = ( defined($cmd) ) ? $cmd : '';
   $hash->{helper}{stopped}       = 0;
-  $hash->{helper}{adjust}        = "";
+  $hash->{helper}{adjust}        = '';
   $modules{PID20}{defptr}{$name} = $hash;
   readingsSingleUpdate( $hash, 'state', 'initializing', 1 );
   RemoveInternalTimer($name);
-  InternalTimer( gettimeofday() + 10, "PID20_Calc", $name, 0 );
+  InternalTimer( gettimeofday() + 10, 'PID20_Calc', $name, 0 );
   return undef;
 }
 ########################################
@@ -204,7 +206,7 @@ sub PID20_Notify($$)
   # no action if disabled
   if ( $disable eq '1' )
   {
-    return "";
+    return '';
   }
   return if ( $dev->{NAME} ne $sensorName );
   my $sensorReadingName = $hash->{helper}{reading};
@@ -219,7 +221,7 @@ sub PID20_Notify($$)
     my $s = $dev->{CHANGED}[$i];
 
     # continue, if no match with reading-name
-    $s = "" if ( !defined($s) );
+    $s = '' if ( !defined($s) );
     PID20_Log $hash, 5, "check event:<$s>";
     next if ( $s !~ m/^$sensorReadingName:.*$/ );
 
@@ -254,9 +256,9 @@ sub PID20_Notify($$)
     my $deltaGradient = $deltaDiff / $tsDiff
       if ( defined($deltaDiff) && defined($tsDiff) && ( $tsDiff > 0 ) );
     $deltaGradient = 0 if ( !defined($deltaGradient) );
-    my $sdeltaDiff     = ($deltaDiff)     ? sprintf( "%.2f", $deltaDiff )     : "";
-    my $sTSDiff        = ($tsDiff)        ? sprintf( "%.2f", $tsDiff )        : "";
-    my $sDeltaGradient = ($deltaGradient) ? sprintf( "%.6f", $deltaGradient ) : "";
+    my $sdeltaDiff     = ($deltaDiff)     ? sprintf( "%.2f", $deltaDiff )     : '';
+    my $sTSDiff        = ($tsDiff)        ? sprintf( "%.2f", $tsDiff )        : '';
+    my $sDeltaGradient = ($deltaGradient) ? sprintf( "%.6f", $deltaGradient ) : '';
     PID20_Log $hash, 5,
       "deltaGradient: (Diff[$sdeltaDiff]" . "/tsDiff[$sTSDiff]" . "=deltaGradient per sec [$sDeltaGradient]"
       if ($DEBUG);
@@ -267,7 +269,7 @@ sub PID20_Notify($$)
     $hash->{helper}{deltaOldTS}    = TimeNow();
     last;
   }
-  return "";
+  return '';
 }
 ########################################
 sub PID20_Get($@)
@@ -313,7 +315,7 @@ sub PID20_Set($@)
   #PID20_Log $hash, 3, "name:$name cmd:$cmd $desired:$desired";
   given ($cmd)
   {
-    when ("?")
+    when ('?')
     {
       return $usage;
     }
@@ -328,22 +330,22 @@ sub PID20_Set($@)
       readingsSingleUpdate( $hash, $cmd, $value, 1 );
       PID20_Log $hash, 3, "set $name $cmd $a[2]";
     }
-    when ("start")
+    when ('start')
     {
-      return "Set start needs a <value> parameter"
+      return 'Set start needs a <value> parameter'
         if ( @a != 2 );
       $hash->{helper}{stopped} = 0;
     }
-    when ("stop")
+    when ('stop')
     {
-      return "Set stop needs a <value> parameter"
+      return 'Set stop needs a <value> parameter'
         if ( @a != 2 );
       $hash->{helper}{stopped} = 1;
       PID20_Calc($name);
     }
-    when ("restart")
+    when ('restart')
     {
-      return "Set restart needs a <value> parameter"
+      return 'Set restart needs a <value> parameter'
         if ( @a != 3 );
       my $value = $a[2];
       $value = ( $value =~ m/$reFloat/ ) ? $1 : undef;
@@ -394,26 +396,26 @@ sub PID20_Calc($)
   my $DEBUG_Update    = AttrVal( $name, 'pidDebugUpdate',    '0' ) eq '1';
   my $DEBUG = $DEBUG_Sensor || $DEBUG_Actuation || $DEBUG_Calc || $DEBUG_Delta || $DEBUG_Update;
 
-  my $actuation        = "";
-  my $actuationDone    = ReadingsVal( $name, 'actuation', "" );
-  my $actuationCalc    = ReadingsVal( $name, 'actuationCalc', "" );
+  my $actuation        = '';
+  my $actuationDone    = ReadingsVal( $name, 'actuation', '' );
+  my $actuationCalc    = ReadingsVal( $name, 'actuationCalc', '' );
   my $actuationCalcOld = $actuationCalc;
   my $actorTimestamp =
     ( $hash->{helper}{actorTimestamp} )
     ? $hash->{helper}{actorTimestamp}
     : FmtDateTime( gettimeofday() - 3600 * 24 );
 
-  my $sensorStr     = ReadingsVal( $sensor, $reading, "" );
-  my $sensorValue   = "";
+  my $sensorStr     = ReadingsVal( $sensor, $reading, '' );
+  my $sensorValue   = '';
   my $sensorTS      = ReadingsTimestamp( $sensor, $reading, undef );
   my $sensorIsAlive = 0;
 
   my $iPortion = ReadingsVal( $name, 'p_i',   0 );
-  my $pPortion = ReadingsVal( $name, 'p_p',   "" );
-  my $dPortion = ReadingsVal( $name, 'p_d',   "" );
-  my $stateStr = "";
+  my $pPortion = ReadingsVal( $name, 'p_p',   '' );
+  my $dPortion = ReadingsVal( $name, 'p_d',   '' );
+  my $stateStr = '';
   my $deltaOld = ReadingsVal( $name, 'delta', 0 );
-  my $delta    = "";
+  my $delta    = '';
   my $deltaGradient    = ( $hash->{helper}{deltaGradient} ) ? $hash->{helper}{deltaGradient} : 0;
   my $calcReq          = 0;
   my $readingUpdateReq = '';
@@ -447,33 +449,33 @@ sub PID20_Calc($)
 
     if ( $hash->{helper}{disable} )
     {
-      $stateStr = "disabled";
+      $stateStr = 'disabled';
       last;
     }
 
     if ( $hash->{helper}{stopped} )
     {
-      $stateStr = "stopped";
+      $stateStr = 'stopped';
       last;
     }
 
-    my $desired = ReadingsVal( $name, $hash->{helper}{desiredName}, "" );
+    my $desired = ReadingsVal( $name, $hash->{helper}{desiredName}, '' );
 
     # sensor found
-    PID20_Log $hash, 2, "--------------------------" if ($DEBUG);
+    PID20_Log $hash, 2, '--------------------------' if ($DEBUG);
     PID20_Log $hash, 2, "S1 sensorStr:$sensorStr sensorTS:$sensorTS" if ($DEBUG_Sensor);
-    $stateStr = "alarm - no $reading yet for $sensor" if ( !$sensorStr && !$stateStr );
+    $stateStr = "alarm - no $reading yet for $sensor" if ( $sensorStr eq '' && $stateStr eq '' );
 
     # sensor alive
-    if ( $sensorStr && $sensorTS )
+    if ( $sensorStr ne ''  && $sensorTS )
     {
       my $timeDiff = PID20_TimeDiff($sensorTS);
       $sensorIsAlive = 1 if ( $timeDiff <= $hash->{helper}{sensorTimeout} );
       $sensorStr =~ m/$regexp/;
       $sensorValue = $1;
-      $sensorValue = "" if ( !defined($sensorValue) );
+      $sensorValue = '' if ( !defined($sensorValue) );
       PID20_Log $hash, 2,
-          "S2 timeOfDay:"
+          'S2 timeOfDay:'
         . gettimeofday()
         . " timeDiff:$timeDiff sensorTimeout:"
         . $hash->{helper}{sensorTimeout}
@@ -482,18 +484,18 @@ sub PID20_Calc($)
     }
 
     # sensor dead
-    $stateStr = "alarm - dead sensor" if ( !$sensorIsAlive && !$stateStr );
+    $stateStr = 'alarm - dead sensor' if ( !$sensorIsAlive && $stateStr eq '' );
 
     # missing desired
-    $stateStr = "alarm - missing desired" if ( $desired eq "" && !$stateStr );
+    $stateStr = 'alarm - missing desired' if ( $desired eq '' && $stateStr eq '' );
 
     # check delta threshold
-    $delta = ( $desired ne "" && $sensorValue ne "" ) ? $desired - $sensorValue : "";
-    $calcReq = 1 if ( !$stateStr && $delta ne "" && ( abs($delta) >= abs( $hash->{helper}{deltaTreshold} ) ) );
+    $delta = ( $desired ne '' && $sensorValue ne '' ) ? $desired - $sensorValue : '';
+    $calcReq = 1 if ( $stateStr eq '' && $delta ne '' && ( abs($delta) >= abs( $hash->{helper}{deltaTreshold} ) ) );
 
     PID20_Log $hash, 2,
-        "D1 desired[" . ( $desired ne "" ) ? sprintf( "%.1f", $desired )
-      : "" . "] - sensorValue: [" . ( $sensorValue ne "" ) ? sprintf( "%.1f", $sensorValue )
+        "D1 desired[" . ( $desired ne '' ) ? sprintf( "%.1f", $desired )
+      : "" . "] - sensorValue: [" . ( $sensorValue ne '' ) ? sprintf( "%.1f", $sensorValue )
       : "" . "] = delta[" .         ( $delta ne "" )       ? sprintf( "%.2f", $delta )
       : "" . "] calcReq:$calcReq"
       if ($DEBUG_Delta);
@@ -518,13 +520,13 @@ sub PID20_Calc($)
         && ( ( $workDelta > 0 && $actuationCalcOld > $actorLimitUpper )
         || ( $workDelta < 0 && $actuationCalcOld < $actorLimitLower ) );
 
-      if ( $hash->{helper}{adjust} ne "" )
+      if ( $hash->{helper}{adjust} ne '' )
       {
         $iPortion = $hash->{helper}{adjust} - ( $pPortion + $dPortion );
         $iPortion = $actorLimitUpper if ( $iPortion > $actorLimitUpper );
         $iPortion = $actorLimitLower if ( $iPortion < $actorLimitLower );
         PID20_Log $hash, 5, "adjust request with:" . $hash->{helper}{adjust} . " ==> p_i:$iPortion";
-        $hash->{helper}{adjust} = "";
+        $hash->{helper}{adjust} = '';
       } elsif ( !$isWindup )    # integrate only if no windUp
       {
         # normalize the intervall to minute=60 seconds
@@ -537,10 +539,10 @@ sub PID20_Calc($)
       # calc actuation
       $actuationCalc = $pPortion + $iPortion + $dPortion;
 
-      PID20_Log $hash, 2, "P1 delta:" . sprintf( "%.2f", $delta ) . " isWindup:$isWindup" if ($DEBUG_Calc);
+      PID20_Log $hash, 2, 'P1 delta:' . sprintf( "%.2f", $delta ) . " isWindup:$isWindup" if ($DEBUG_Calc);
 
       PID20_Log $hash, 2,
-          "P2 pPortion:"
+          'P2 pPortion:'
         . sprintf( "%.2f", $pPortion )
         . " iPortion:"
         . sprintf( "%.2f", $iPortion )
@@ -559,23 +561,23 @@ sub PID20_Calc($)
     # check actor fallback in case of sensor fault
     if ( !$sensorIsAlive && ( $hash->{helper}{actorErrorAction} eq "errorPos" ) )
     {
-      $stateStr .= "- force pid-output to errorPos";
+      $stateStr .= '- force pid-output to errorPos';
       $actuationCalc = $hash->{helper}{actorErrorPos};
-      $actuationCalc = "" if ( !defined($actuationCalc) );
+      $actuationCalc = '' if ( !defined($actuationCalc) );
     }
 
     # check acutation diff
     $actuation = $actuationCalc;
 
     # limit $actuation
-    $actuation = $actorLimitUpper if ( $actuation ne "" && ( $actuation > $actorLimitUpper ) );
-    $actuation = $actorLimitLower if ( $actuation ne "" && ( $actuation < $actorLimitLower ) );
+    $actuation = $actorLimitUpper if ( $actuation ne '' && ( $actuation > $actorLimitUpper ) );
+    $actuation = $actorLimitLower if ( $actuation ne '' && ( $actuation < $actorLimitLower ) );
 
     # check if round request
     my $fmt = "%." . $hash->{helper}{actorValueDecPlaces} . "f";
-    $actuation = sprintf( $fmt, $actuation ) if ( $actuation ne "" );
+    $actuation = sprintf( $fmt, $actuation ) if ( $actuation ne '' );
     my $actuationDiff = abs( $actuation - $actuationDone )
-      if ( $actuation ne "" && $actuationDone ne "" );
+      if ( $actuation ne '' && $actuationDone ne '' );
     PID20_Log $hash, 2,
         "A1 act:$actuation actDone:$actuationDone "
       . " actThreshold:"
@@ -584,25 +586,25 @@ sub PID20_Calc($)
       if ($DEBUG_Actuation);
 
     # check threshold-condition for actuation
-    my $rsTS = $actuationDone ne "" && $actuationDiff >= $hash->{helper}{actorThreshold};
+    my $rsTS = $actuationDone ne '' && $actuationDiff >= $hash->{helper}{actorThreshold};
 
     # ...... special handling if acutation is in the black zone between actorLimit and (actorLimit - actorThreshold)
     # upper range
     my $rsUp =
-         $actuationDone ne ""
+         $actuationDone ne ''
       && $actuation > $actorLimitUpper - $hash->{helper}{actorThreshold}
       && $actuationDiff != 0
       && $actuation >= $actorLimitUpper;
 
     # low range
     my $rsDown =
-         $actuationDone ne ""
+         $actuationDone ne ''
       && $actuation < $actorLimitLower + $hash->{helper}{actorThreshold}
       && $actuationDiff != 0
       && $actuation <= $actorLimitLower;
 
     # upper or lower limit are exceeded
-    my $rsLimit = $actuationDone ne "" && ( $actuationDone < $actorLimitLower || $actuationDone > $actorLimitUpper );
+    my $rsLimit = $actuationDone ne '' && ( $actuationDone < $actorLimitLower || $actuationDone > $actorLimitUpper );
 
     my $actuationByThreshold = ( ( $rsTS || $rsUp || $rsDown ) && $noTrouble );
     PID20_Log $hash, 2, "A2 rsTS:$rsTS rsUp:$rsUp rsDown:$rsDown noTrouble:$noTrouble"
@@ -629,8 +631,8 @@ sub PID20_Calc($)
       ( $actuationByThreshold && $actuationByTime )
         || $actuationKeepAliveReq    # request by keep alive
         || $rsLimit                  # upper or lower limit are exceeded
-        || $actuationDone eq ""      # startup condition
-    ) && $actuation ne "";           # acutation is initialized
+        || $actuationDone eq ''      # startup condition
+    ) && $actuation ne '';           # acutation is initialized
 
     PID20_Log $hash, 2,
         "A4 (actByTh:$actuationByThreshold && actByTime:$actuationByTime)"
@@ -645,11 +647,11 @@ sub PID20_Calc($)
 
       #build command for fhem
       PID20_Log $hash, 5,
-          "actor:"
+          'actor:'
         . $hash->{helper}{actor}
-        . " actorCommand:"
+        . ' actorCommand:'
         . $hash->{helper}{actorCommand}
-        . " actuation:"
+        . ' actuation:'
         . $actuation;
       my $cmd = sprintf( "set %s %s %g", $hash->{helper}{actor}, $hash->{helper}{actorCommand}, $actuation );
 
@@ -660,11 +662,11 @@ sub PID20_Calc($)
       # note timestamp
       $hash->{helper}{actorTimestamp} = TimeNow();
       $actuationDone = $actuation;
-      my $retStr = "";
-      $retStr = " with return-value:" . $ret if ( defined($ret) && ( $ret ne '' ) );
+      my $retStr = '';
+      $retStr = ' with return-value:' . $ret if ( defined($ret) && ( $ret ne '' ) );
       PID20_Log $hash, 3, "<$cmd> " . $retStr;
     }
-    my $updateAlive = ( $actuation ne "" )
+    my $updateAlive = ( $actuation ne '' )
       && PID20_TimeDiff( ReadingsTimestamp( $name, 'actuation', gettimeofday() ) ) >= $hash->{helper}{updateInterval};
 
   # my $updateReq = ( ( $actuationReq || $updateAlive ) && $actuation ne "" );
@@ -674,14 +676,14 @@ sub PID20_Calc($)
     if ($readingUpdateReq)
     {
       readingsBeginUpdate($hash);
-      readingsBulkUpdate( $hash, $hash->{helper}{desiredName},  $desired )       if ( $desired ne "" );
-      readingsBulkUpdate( $hash, $hash->{helper}{measuredName}, $sensorValue )   if ( $sensorValue ne "" );
-      readingsBulkUpdate( $hash, 'p_p',                         $pPortion )      if ( $pPortion ne "" );
-      readingsBulkUpdate( $hash, 'p_d',                         $dPortion )      if ( $dPortion ne "" );
-      readingsBulkUpdate( $hash, 'p_i',                         $iPortion )      if ( $iPortion ne "" );
-      readingsBulkUpdate( $hash, 'actuation',                   $actuationDone ) if ( $actuationDone ne "" );
-      readingsBulkUpdate( $hash, 'actuationCalc',               $actuationCalc ) if ( $actuationCalc ne "" );
-      readingsBulkUpdate( $hash, 'delta',                       $delta )         if ( $delta ne "" );
+      readingsBulkUpdate( $hash, $hash->{helper}{desiredName},  $desired )       if ( $desired ne '' );
+      readingsBulkUpdate( $hash, $hash->{helper}{measuredName}, $sensorValue )   if ( $sensorValue ne '' );
+      readingsBulkUpdate( $hash, 'p_p',                         $pPortion )      if ( $pPortion ne '' );
+      readingsBulkUpdate( $hash, 'p_d',                         $dPortion )      if ( $dPortion ne '' );
+      readingsBulkUpdate( $hash, 'p_i',                         $iPortion )      if ( $iPortion ne '' );
+      readingsBulkUpdate( $hash, 'actuation',                   $actuationDone ) if ( $actuationDone ne '' );
+      readingsBulkUpdate( $hash, 'actuationCalc',               $actuationCalc ) if ( $actuationCalc ne '' );
+      readingsBulkUpdate( $hash, 'delta',                       $delta )         if ( $delta ne '' );
       readingsEndUpdate( $hash, 1 );
       PID20_Log $hash, 5, "readings updated";
     }
@@ -690,15 +692,15 @@ sub PID20_Calc($)
   }    # end while
 
   # ........ update statePID.
-  $stateStr = "idle"       if ( !$stateStr && !$calcReq );
-  $stateStr = "processing" if ( !$stateStr && $calcReq );
+  $stateStr = 'idle'      if ( $stateStr eq ''  && !$calcReq );
+  $stateStr = 'processing' if ( $stateStr eq '' && $calcReq );
   readingsSingleUpdate( $hash, 'state', $stateStr, 0 );
   PID20_Log $hash, 2, "C1 stateStr:$stateStr calcReq:$calcReq" if ($DEBUG_Calc);
 
   #......... timer setup
   my $next = gettimeofday() + $hash->{helper}{calcInterval};
   RemoveInternalTimer($name);    # prevent multiple timers for same hash
-  InternalTimer( $next, "PID20_Calc", $name, 1 );
+  InternalTimer( $next, 'PID20_Calc', $name, 1 );
 
   #PID20_Log $hash, 2, "InternalTimer next:".FmtDateTime($next)." PID20_Calc name:$name DEBUG_Calc:$DEBUG_Calc";
   return;
