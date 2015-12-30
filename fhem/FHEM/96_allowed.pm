@@ -84,6 +84,7 @@ allowed_Authenticate($$$$)
 
   if($cl->{TYPE} eq "FHEMWEB") {
     my $basicAuth = AttrVal($aName, "basicAuth", undef);
+    delete $cl->{".httpAuthHeader"};
     return 0 if(!$basicAuth);
 
     my $FW_httpheader = $param;
