@@ -25,8 +25,19 @@ use vars qw($FW_ME $FW_tp $FW_ss);
 use vars qw(%zwave_id2class);
 
 my %zwave_class = (
-  NO_OPERATION             => { id => '00' },
-  NEIGHBOR_UPDATE          => { id => '01' }, # reported by ZWCUL
+  NO_OPERATION             => { id => '00' }, # lowlevel
+  ZWAVE                    => { id => '01',   # lowlevel
+    set   => { zwaveAssignId => "03%02x%08x" },
+    parse => { "..0101(....)..(..)..(.*)" =>
+                              '"zwaveNIF:baseClass:$2 flags:$1 classes:$3"',
+               "..0103(..)(........)" =>
+                              '"zwaveAssignId:homeId:$2 nodeIdHex:$1"',
+               "..0104(.*)"=> '"zwaveFindNodesInRange:$1"',
+               "..0105"    => '"zwaveGetNodesInRange:noarg"',
+               "..0106(.*)"=> '"zwaveNodeRangeInfo:$1"',
+               "..0107(.*)"=> '"zwaveCommandComplete:$1"',
+               "..010801"  => '"zwaveTransferPresentation"'
+               }},
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x",
                basicSet    => "01%02x"  }, # Alias, Forum #38200
