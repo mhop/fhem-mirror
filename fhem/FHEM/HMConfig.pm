@@ -1997,7 +1997,7 @@ $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
         foreach (grep /^$md/,keys %culHmChanSets){
           $culHmChanSets{$ds.substr($_,-2,2)}    = $culHmChanSets{$_};
         }
-        $culHmRegModel{$ds}       = $culHmRegModel{$ds} if ($culHmRegModel{$ds});
+        $culHmRegModel{$ds}     = $culHmRegModel{$md}   if ($culHmRegModel{$md});
         foreach(grep  /^$md/,keys %culHmRegChan){
           $culHmRegChan{$ds.substr($_,-2,2)}    = $culHmRegChan{$_};
         }

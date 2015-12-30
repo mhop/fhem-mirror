@@ -369,7 +369,7 @@ sub CUL_HM_updateConfig($){
     # --- set default attributes if missing ---
     if ($hash->{helper}{role}{dev}){
       if( $st ne "virtual"){
-        $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_full");
+        $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_raw");
         $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
         CUL_HM_hmInitMsg($hash);
       }
@@ -1344,8 +1344,10 @@ sub CUL_HM_Parse($$) {#########################################################
     my $chn = $mI[1];
     if(    $mh{mTp} eq "70") { # weather event
       $chn = '01'; # fix definition
-      my (    $t,      $h) =  (hex($mI[0].$mI[1]), hex($mI[2]));# temp is 15 bit signed
-      $t = sprintf("%2.1f",($t & 0x3fff)/10*(($t & 0x4000)?-1:1));
+      my ($t,$h) = (hex($mI[0].$mI[1]), hex($mI[2]));# temp is 15 bit signed
+      $t &= 0x7fff;
+      $t = -1 - ($t ^ 0x7FFF) if ($t & 0x4000);
+      $t /= 10;
       my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}.$chn};
       if ($chnHash){
         push @evtEt,[$chnHash,1,"state:T: $t H: $h"];
@@ -9384,7 +9386,11 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           <ul>
           0_off: standart level. Display commonly used parameter<br>
           1_on: enhanced level. Display all decoded device parameter<br>
-          2_full: display all parameter plus raw register information as well. <br>
+          2_raw: raw register information as well.<br>
+          4_none: hide all register information.<br>
+          8_templ+default: display templates plus default regs.<br>
+          12_templOnly: display templates only (finally preferred). <br>
+          251_anything: display all possible parameter. <br>
           </ul>
           If expert is applied a device it is used for assotiated channels.
           It can be overruled if expert attibute is also applied to the channel device.<br>
@@ -10660,6 +10666,11 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           0_off: Standard. Zeigt die h&auml;ufigst benutzten Paramter<br>
           1_on: Erweitert. Zeigt alle dekodierten Ger&auml;teparameter<br>
           2_full: Alles. Zeigt alle Parameter sowie Registerinformationen im Rohformat. <br>
+          2_raw: zeige roh Register.<br>
+          4_none:verstecke alle Register information.<br>
+          8_templ+default:zeige Templates und default Register.<br>
+          12_templOnly: Zeige nur templates (Empfohlen). <br>
+          251_anything: Zeige alle Register inforamtion. <br>
         </ul>
         Wird 'expert' auf ein Ger&auml;t angewendet so gilt dies auch f&uuml;r alle verkn&uuml;pften Kan&auml;le.
         Kann &uuml;bergangen werden indem das Attribut ' expert' auch f&uuml;r den Ger&auml;tekanal gesetzt wird.<br>
