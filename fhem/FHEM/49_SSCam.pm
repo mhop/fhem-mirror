@@ -1408,16 +1408,16 @@ return;
    <br>
    <br>    
     
-    <table>
+  <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
-    <tr><td>name   :</td><td>the name of the new device to use in FHEM</td></tr>
-    <tr><td>Servername   :</td><td>the name or IP-address of Synology Surveillance Station Host. If Servername is used, make sure the name can be discovered in network by DNS </td></tr>
-    <tr><td>Port   :</td><td>the Port Synology surveillance Station Host, normally 5000 (HTTP only)</td></tr>
-    <tr><td>Username   :</td><td>Username defined in the Diskstation. Has to be a member of Admin-group</td></tr>
-    <tr><td>Password   :</td><td>the Password for the User</td></tr>
-    <tr><td>Cameraname   :</td><td>Cameraname as defined in Synology Surveillance Station, Spaces are not allowed in Cameraname !</td></tr>
-    <tr><td>Recordtime   :</td><td>it's the time for recordings </td></tr>
-    </table>
+    <tr><td>name:         </td><td>the name of the new device to use in FHEM</td></tr>
+    <tr><td>Servername:   </td><td>the name or IP-address of Synology Surveillance Station Host. If Servername is used, make sure the name can be discovered in network by DNS </td></tr>
+    <tr><td>Port:         </td><td>the Port Synology surveillance Station Host, normally 5000 (HTTP only)</td></tr>
+    <tr><td>Username:     </td><td>Username defined in the Diskstation. Has to be a member of Admin-group</td></tr>
+    <tr><td>Password:     </td><td>the Password for the User</td></tr>
+    <tr><td>Cameraname:   </td><td>Cameraname as defined in Synology Surveillance Station, Spaces are not allowed in Cameraname !</td></tr>
+    <tr><td>Recordtime:   </td><td>it's the time for recordings </td></tr>
+  </table>
 
     <br><br>
 
@@ -1442,7 +1442,6 @@ return;
       <tr><td>"snap":        </td><td>triggers a snapshot of the relevant camera and store it into Synology Surveillance Station</td></tr>
       <tr><td>"disable":     </td><td>deactivates a camera in Synology Surveillance Station</td></tr>
       <tr><td>"enable":      </td><td>activates a camera in Synology Surveillance Station</td></tr>
-
   </table>
   <br><br>
         
@@ -1518,11 +1517,11 @@ return;
    <table>  
    <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> 0  </td><td> Start/Stop-Event will be logged </td></tr>
-     <tr><td> 1  </td><td> Error messages will be logged <td></tr>
-     <tr><td> 3  </td><td> sended commands will be logged <td></tr> 
-     <tr><td> 4  </td><td> sended and received informations will be logged <td></tr>
-     <tr><td> 5  </td><td> all outputs will be logged for error-analyses. <b>Caution:</b> a lot of data could be written into the logfile ! <td></tr>
-   <table>  
+     <tr><td> 1  </td><td> Error messages will be logged </td></tr>
+     <tr><td> 3  </td><td> sended commands will be logged </td></tr> 
+     <tr><td> 4  </td><td> sended and received informations will be logged </td></tr>
+     <tr><td> 5  </td><td> all outputs will be logged for error-analyses. <b>Caution:</b> a lot of data could be written into the logfile ! </td></tr>
+   </table>  
 
    <br><br>
   
@@ -1582,7 +1581,7 @@ return;
    <br>
    <br>    
     
-    <table>
+  <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:           </td><td>der Name des neuen Gerätes in FHEM</td></tr>
     <tr><td>Servername:     </td><td>der Name oder die IP-Addresse des Synology Surveillance Station Host. Wenn der Servername benutzt wird ist sicherzustellen dass der Name im Netzwerk aufgelöst werden kann.</td></tr>
@@ -1591,7 +1590,7 @@ return;
     <tr><td>Password:       </td><td>das Passwort des Nutzers</td></tr>
     <tr><td>Cameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist. Leerzeichen im Namen sind nicht erlaubt !</td></tr>
     <tr><td>Recordtime:     </td><td>die definierte Aufnahmezeit</td></tr>
-    </table>
+  </table>
 
     <br><br>
 
@@ -1686,14 +1685,14 @@ return;
    Es werden verschiedene Verbose-Level unterstützt.<br>
    Dies sind im Einzelnen:<br><br>
    
-   <table>  
+ <table>  
    <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> 0  </td><td> Start/Stop-Ereignisse werden geloggt </td></tr>
      <tr><td> 1  </td><td> Fehlermeldungen werden geloggt </td></tr>
      <tr><td> 3  </td><td> gesendete Kommandos werden geloggt </td></tr>
      <tr><td> 4  </td><td> gesendete und empfangene Daten werden geloggt </td></tr>
      <tr><td> 5  </td><td> alle Ausgaben zur Fehleranalyse werden geloggt. <b>ACHTUNG:</b> möglicherweise werden sehr viele Daten in das Logfile geschrieben! </td></tr>
-   </table>
+  </table>
 
    <br><br>
         
