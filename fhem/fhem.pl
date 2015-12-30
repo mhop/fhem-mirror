@@ -4545,9 +4545,15 @@ Authorized($$$)
 
   return 1 if(!$init_done || !$cl || !$cl->{SNAME}); # Safeguarding
   RefreshAuthList() if($auth_refresh);
+  my $sname = $cl->{SNAME};
+  my $verbose = AttrVal($sname, "verbose", 1); # Speedup?
 
   foreach my $a (@authorize) {
     my $r = CallFn($a, "AuthorizeFn", $defs{$a}, $cl, $type, $arg);
+    if($verbose >= 4) {
+      Log3 $sname, 4, "authorize $sname/$type/$arg: $a returned ".
+          ($r == 0 ? "dont care" : $r == 1 ? "allowed" : "prohibited");
+    }
     return 1 if($r == 1);
     return 0 if($r == 2);
   }
