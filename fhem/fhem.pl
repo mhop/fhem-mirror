@@ -1542,6 +1542,7 @@ ReplaceSetMagic($$@)       # Forum #38276
   my $hash = shift;
   my $nsplit = shift;
   my $a = join(" ", @_);
+  my $oa = $a;
 
   $a =~ s/\[([a-z0-9._]+):([A-z0-9._]+)\]/{
     my $x = ReadingsVal($1,$2,""); $x eq "" ? "[$1:$2]" : $x
@@ -1549,7 +1550,8 @@ ReplaceSetMagic($$@)       # Forum #38276
 
   $a =~ s/{\((.*)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/eg;
 
-  return (undef, split(" ", $a, $nsplit));
+  return (undef, @_) if($oa eq $a);
+  return (undef, split(/ /, $a, $nsplit));
 }
 
 #####################################
