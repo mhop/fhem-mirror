@@ -42,7 +42,7 @@ use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
 
-use Data::Dumper;
+#use Data::Dumper;
 
 eval "use GDSweblink";
 
@@ -301,7 +301,9 @@ sub GDS_Define($$$) {
 	Log3($name, 4, "GDS $name: tempDir=".$tempDir);
 
     _GDS_addExtension("GDS_CGI","gds","GDS Files");
+	$hash->{firstrun} = 1;
 	retrieveData($hash,'conditions');
+	delete $hash->{firstrun};
 	readingsSingleUpdate($hash, 'state', 'active',1);
 
 	return undef;
@@ -388,7 +390,8 @@ sub GDS_Set($@) {
 			}
 
 		when("conditions"){
-            $attr{$name}{gdsSetCond} = $parameter; #ReadingsVal($name,'c_stationName',undef);
+			CommandAttr(undef, "$name gdsSetCond $parameter");
+#            $attr{$name}{gdsSetCond} = $parameter; #ReadingsVal($name,'c_stationName',undef);
 			GDS_GetUpdate($hash,'set conditions');
 			break;
 			}
@@ -616,13 +619,24 @@ sub GDS_Attr(@){
 	my @a = @_;
 	my $hash = $defs{$a[1]};
 	my ($cmd, $name, $attrName, $attrValue) = @a;
+	$attrValue //= '';
 	my $useUpdate = 0;
 
 	given($attrName){
  		when("gdsSetCond"){
 			unless ($attrValue eq '' || $cmd eq 'del') {
 				$attr{$name}{$attrName} = $attrValue;
-				retrieveData($hash,'conditions');
+				my $diff = time - InternalVal($name,'GDS_CONDITIONS_READ',0);
+				if ( $diff < 300) {
+					my @b;
+					push @b, undef;
+					push @b, undef;
+					push @b, $attrValue;
+					getConditions($hash, "c", @b);
+					DoTrigger($name,"REREADCONDITIONS",1);
+				} else {
+					retrieveData($hash,'conditions');
+				}
 				$useUpdate = 1;
 			}
 		}
@@ -901,7 +915,6 @@ sub getConditions($$@){
 	return unless $searchLen;
 	
 	my ($line, $item, %pos, %alignment, %wx, %cread, $k, $v);
-
     foreach my $l (@allConditionsData) {
         $line = $l;                 # save line for further use
  		if ($l =~ /Station/) {		# Header line... find out data positions
@@ -915,7 +928,8 @@ sub getConditions($$@){
 
 	%alignment = ("Station" => "l", "H\xF6he" => "r", "Luftd." => "r", "TT" => "r", "Tn12" => "r", "Tx12" => "r", 
 	"Tmin" => "r", "Tmax" => "r", "Tg24" => "r", "Tn24" => "r", "Tm24" => "r", "Tx24" => "r", "SSS24" => "r", "SGLB24" => "r", 
-	"RR1" => "r", "RR12" => "r", "RR24" => "r", "SSS" => "r", "DD" => "r", "FF" => "r", "FX" => "r", "Wetter/Wolken" => "l", "B\xF6en" => "l");
+	"RR1" => "r", "RR12" => "r", "RR24" => "r", "RR30" => "r", "SSS" => "r", "DD" => "r", 
+	"FF" => "r", "FX" => "r", "Wetter/Wolken" => "l", "B\xF6en" => "l");
 	
 	foreach $item (@a) {
 		Log3($hash, 4, "conditions item: $item");
@@ -1319,7 +1333,6 @@ sub _finishedCONDITIONS {
 	$hash->{GDS_CONDITIONS_READ}	= int(time());
 	my $cf = AttrVal($name,'gdsSetCond',0);
 	return unless $cf;
-#	GDS_GetUpdate($hash,1) if $cf; 
 	my @b;
 	push @b, undef;
 	push @b, undef;
@@ -1341,7 +1354,6 @@ sub _abortedCONDITIONS {
 	delete $hash->{GDS_CONDITIONS_READ};
 	$hash->{GDS_CONDITIONS_ABORTED} = localtime(time());
 }
-
 
 # 	CapData
 sub _retrieveCAPDATA {
@@ -1926,6 +1938,8 @@ sub getListForecastStations($) {
 #	Changelog
 #
 ###################################################################################################
+#
+#	2015-12-31	fixed		conditions retrieval on startup
 #
 #	2015-11-26	fixed		wrong region handling
 #				added		gdsAlertsHeadlines()
