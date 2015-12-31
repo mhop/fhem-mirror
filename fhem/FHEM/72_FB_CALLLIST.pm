@@ -41,6 +41,7 @@ FB_CALLLIST_Initialize($)
     $hash->{SetFn}     = "FB_CALLLIST_Set";
     $hash->{DefFn}     = "FB_CALLLIST_Define";
     $hash->{NotifyFn}  = "FB_CALLLIST_Notify";
+    $hash->{DeleteFn}  = "FB_CALLLIST_Delete";
     $hash->{AttrFn}    = "FB_CALLLIST_Attr";
     $hash->{AttrList}  =  "number-of-calls:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
                           "internal-number-filter ".
@@ -65,7 +66,6 @@ FB_CALLLIST_Initialize($)
     $hash->{FW_atPageEnd} = 1;
 } 
 
-
 #####################################
 # Define function
 sub FB_CALLLIST_Define($$)
@@ -74,8 +74,8 @@ sub FB_CALLLIST_Define($$)
     my @a = split("[ \t][ \t]*", $def);
     my $retval = undef;
     my $name = $a[0];
-
-    if(!defined($a[2]))
+    my $callmonitor = $a[2];
+    if(!defined($callmonitor))
     {
         return "FB_CALLLIST_define: you must specify a device name for using FB_CALLLIST";
     }
@@ -85,25 +85,25 @@ sub FB_CALLLIST_Define($$)
         return "wrong define syntax: define <name> FB_CALLLIST <name>";
     }
     
-    unless(defined($defs{$a[2]}))
+    unless(defined($defs{$callmonitor}))
     {
-        return "FB_CALLLIST_define: the selected device ".$a[2]." does not exist.";
+        return "FB_CALLLIST_define: the selected device $callmonitor does not exist.";
     }
     
-    unless($defs{$a[2]}->{TYPE} eq "FB_CALLMONITOR")
+    unless($defs{$callmonitor}->{TYPE} eq "FB_CALLMONITOR")
     {
-        Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device ".$a[2]." ist not of type FB_CALLMONITOR";
+        Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR";
     }
 
-    $hash->{FB} = $a[2];
-    $hash->{NOTIFYDEV} = $a[2];
+    $hash->{FB} = $callmonitor;
+    $hash->{NOTIFYDEV} = $callmonitor;
     $hash->{STATE} = 'Initialized';
     $hash->{helper}{DEFAULT_COLUMN_ORDER} = "row,state,timestamp,name,number,internal,external,connection,duration";
+    
     FB_CALLLIST_loadList($hash);
     
     return undef;
 } 
-
 
 #####################################
 # AttrFn for importing filter expressions and cleanup list when user set an attribute
@@ -273,6 +273,17 @@ sub FB_CALLLIST_Set($@)
 }
 
 #####################################
+# If Device is deleted, delete stored list data
+sub FB_CALLLIST_Delete($)
+{
+    my ($hash, $name) = @_;
+    
+    my $err = setKeyValue("FB_CALLLIST-$name", undef);
+
+    Log3 $name, 3, "FB_CALLLIST ($name) - error while deleting the current call list: $err" if(defined($err));
+}
+
+#####################################
 # NotifyFn is trigger upon changes on FB_CALLMONITOR device. Imports the call data into call list
 sub FB_CALLLIST_Notify($$)
 {
@@ -398,6 +409,12 @@ sub FB_CALLLIST_Notify($$)
     FB_CALLLIST_saveList($hash);
 }  
 
+############################################################################################################
+#
+#   Begin of helper functions
+#
+############################################################################################################
+
 
 #####################################
 # returns a hash reference to the data set of a specific running call
@@ -501,7 +518,6 @@ sub FB_CALLLIST_returnIcon($$$)
     return $text;
 }
 
-
 #####################################
 #  returns the call state of a specific call as icon or text
 sub FB_CALLLIST_returnCallState($$;$)
@@ -561,7 +577,6 @@ sub FB_CALLLIST_returnCallState($$;$)
   
     return $state;
 }
-
 
 #####################################
 # FW_detailFn & FW_summaryFn handler for creating the html output in FHEMWEB
@@ -630,28 +645,19 @@ sub FB_CALLLIST_list2html($;$)
         foreach my $index (@list)
         {
             my $data = \%{$hash->{helper}{DATA}{$index}};
-         
-            my $state = FB_CALLLIST_returnCallState($hash, $index);
-            my $time = strftime(AttrVal($name, "time-format-string", "%a, %d %b %Y %H:%M:%S"), localtime($index));
-            my $name = ($data->{external_name} eq "unknown" ? "-" : $data->{external_name});
-            my $number = $data->{external_number};
-            my $external = ($data->{external_connection} ? ((exists($hash->{helper}{EXTERNAL_MAP}) and exists($hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}})) ? $hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}} : $data->{external_connection} ) : "-");
-            my $internal = ((exists($hash->{helper}{INTERNAL_FILTER}) and exists($hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}})) ? $hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}} : $data->{internal_number} );
-            my $connection = ($data->{internal_connection} ? ((exists($hash->{helper}{CONNECTION_MAP}) and exists($hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}})) ? $hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}} : $data->{internal_connection} ) : "-");
-            my $duration = FB_CALLLIST_formatDuration($hash, $index);
             
             $line = { 
                         index => $index,
                         line => $count,
                         row => $count,
-                        state => $state,
-                        timestamp => $time,
-                        name => $name,
-                        number => $number,
-                        external => $external,
-                        internal => $internal,
-                        connection => $connection,
-                        duration => $duration
+                        state =>  FB_CALLLIST_returnCallState($hash, $index),
+                        timestamp => strftime(AttrVal($name, "time-format-string", "%a, %d %b %Y %H:%M:%S"), localtime($index)),
+                        name => ($data->{external_name} eq "unknown" ? "-" : $data->{external_name}),
+                        number => $data->{external_number},
+                        external => ($data->{external_connection} ? ((exists($hash->{helper}{EXTERNAL_MAP}) and exists($hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}})) ? $hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}} : $data->{external_connection} ) : "-"),
+                        internal => ((exists($hash->{helper}{INTERNAL_FILTER}) and exists($hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}})) ? $hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}} : $data->{internal_number} ),
+                        connection => ($data->{internal_connection} ? ((exists($hash->{helper}{CONNECTION_MAP}) and exists($hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}})) ? $hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}} : $data->{internal_connection} ) : "-"),
+                        duration => FB_CALLLIST_formatDuration($hash, $index)
                     };
 
             
@@ -847,7 +853,6 @@ sub FB_CALLLIST_returnOrderedHTMLOutput($$$$)
     return join("",@ret)."</tr>";
 }
 
-
 #####################################
 # produce a JSON Output for a specific data set depending on visible-columns setting
 sub FB_CALLLIST_returnOrderedJSONOutput($$)
@@ -865,14 +870,15 @@ sub FB_CALLLIST_returnOrderedJSONOutput($$)
     foreach my $col (@order)
     {
         my $val = $line->{$col};
-        $val =~ s,",\",g;
+        $val =~ s,",\\",g;
         push @ret, '"'.$col.'":"'.$val.'"';
     }
     
     return "{".join(",",@ret)."}";
 }
 
-
+#####################################
+# generate Readings for all list entries
 sub FB_CALLLIST_updateReadings($$)
 {
     my ($hash,$line) = @_;
