@@ -46,6 +46,7 @@ use warnings;
 use URI::Escape;
 use Thread::Queue;
 use Encode;
+use Scalar::Util qw(reftype looks_like_number);
 
 # SmartMatch-Fehlermeldung unterdrücken...
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -122,9 +123,9 @@ my %sets = (
 	'Track' => 'tracknumber|Random',
 	'currentTrack' => 'tracknumber',
 	'Alarm' => 'create|update|delete ID valueHash',
-	'SnoozeAlarm' => 'time',
-	'DailyIndexRefreshTime' => 'time',
-	'SleepTimer' => 'time',
+	'SnoozeAlarm' => 'timestring|seconds',
+	'DailyIndexRefreshTime' => 'timestring',
+	'SleepTimer' => 'timestring|seconds',
 	'AddMember' => 'member_devicename',
 	'RemoveMember' => 'member_devicename',
 	'MakeStandaloneGroup' => '',
@@ -802,12 +803,16 @@ sub SONOSPLAYER_Set($@) {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
 		
+		$value = SONOS_ConvertSecondsToTime($value) if (looks_like_number($value));
+		
 		SONOS_DoWork($udn, 'setSnoozeAlarm', $value);
 	} elsif (lc($key) eq 'dailyindexrefreshtime') {
 		SONOS_DoWork($udn, 'setDailyIndexRefreshTime', $value);
 	} elsif (lc($key) eq 'sleeptimer') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
+		
+		$value = SONOS_ConvertSecondsToTime($value) if (looks_like_number($value));
 		
 		SONOS_DoWork($udn, 'setSleepTimer', $value);
 	} elsif (lc($key) eq 'addmember') {
@@ -1115,7 +1120,7 @@ sub SONOSPLAYER_Log($$$) {
 <b><code>AudioDelayRightRear &lt;Level&gt;</code></b></a>
 <br /> Sets the audiodelayrightrear of the player to the given value. The value can range from 0 to 2. The values has the following meanings: 0: >3m, 1: >0.6m und <3m, 2: <0.6m</li>
 <li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
-<b><code>DailyIndexRefreshTime &lt;time&gt;</code></b></a>
+<b><code>DailyIndexRefreshTime &lt;Timestring&gt;</code></b></a>
 <br />Sets the current DailyIndexRefreshTime for the whole bunch of Zoneplayers.</li>
 <li><a name="SONOSPLAYER_setter_DialogLevel">
 <b><code>DialogLevel &lt;State&gt;</code></b></a>
@@ -1142,7 +1147,7 @@ sub SONOSPLAYER_Log($$$) {
 <b><code>RoomIcon &lt;Iconname&gt;</code></b></a>
 <br />Sets the Icon for this Zone</li>
 <li><a name="SONOSPLAYER_setter_SnoozeAlarm">
-<b><code>SnoozeAlarm &lt;Time&gt;</code></b></a>
+<b><code>SnoozeAlarm &lt;Timestring|Seconds&gt;</code></b></a>
 <br />Snoozes a currently playing alarm for the given time</li>
 <li><a name="SONOSPLAYER_setter_SubEnable">
 <b><code>SubEnable &lt;State&gt;</code></b></a>
@@ -1251,7 +1256,7 @@ sub SONOSPLAYER_Log($$$) {
 <b><code>ShuffleT</code></b></a>
 <br /> Toggles the shuffle-state. Retrieves the new state as the result.</li>
 <li><a name="SONOSPLAYER_setter_SleepTimer">
-<b><code>SleepTimer &lt;Time&gt;</code></b></a>
+<b><code>SleepTimer &lt;Timestring|Seconds&gt;</code></b></a>
 <br /> Sets the Sleeptimer to the given Time. It must be in the full format of "HH:MM:SS". Deactivate with "00:00:00" or "off".</li>
 <li><a name="SONOSPLAYER_setter_Treble">
 <b><code>Treble &lt;TrebleValue&gt;</code></b></a>
@@ -1337,7 +1342,6 @@ sub SONOSPLAYER_Log($$$) {
 <br /> Save the current volume-relation of all players of the same group. It's neccessary for the use of "GroupVolume" and is stored until the next call of "SnapshotGroupVolume".</li>
 </ul></li>
 </ul>
-<br />
 <a name="SONOSPLAYERget"></a> 
 <h4>Get</h4>
 <ul>
@@ -1384,7 +1388,6 @@ sub SONOSPLAYER_Log($$$) {
 <br /> Retrieves the current timeposition inside a title</li>
 </ul></li>
 </ul>
-<br />
 <a name="SONOSPLAYERattr"></a>
 <h4>Attributes</h4>
 '''Attention'''<br />The attributes can only be used after a restart of fhem, because it must be initially transfered to the subprocess.
@@ -1477,7 +1480,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <b><code>AudioDelayRightRear &lt;Level&gt;</code></b></a>
 <br /> Setzt den AudioDelayRightRear des Players auf den angegebenen Wert. Der Wert kann zwischen 0 und 2 liegen. Wobei die Werte folgende Bedeutung haben: 0: >3m, 1: >0.6m und <3m, 2: <0.6m</li>
 <li><a name="SONOSPLAYER_setter_DailyIndexRefreshTime">
-<b><code>DailyIndexRefreshTime &lt;time&gt;</code></b></a>
+<b><code>DailyIndexRefreshTime &lt;Timestring&gt;</code></b></a>
 <br />Setzt die aktuell gültige DailyIndexRefreshTime für alle Zoneplayer.</li>
 <li><a name="SONOSPLAYER_setter_DialogLevel">
 <b><code>DialogLevel &lt;State&gt;</code></b></a>
@@ -1504,7 +1507,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <b><code>RoomIcon &lt;Iconname&gt;</code></b></a>
 <br />Legt das Icon für die Zone fest</li>
 <li><a name="SONOSPLAYER_setter_SnoozeAlarm">
-<b><code>SnoozeAlarm &lt;Time&gt;</code></b></a>
+<b><code>SnoozeAlarm &lt;Timestring|Seconds&gt;</code></b></a>
 <br />Unterbricht eine laufende Alarmwiedergabe für den übergebenen Zeitraum.</li>
 <li><a name="SONOSPLAYER_setter_SubEnable">
 <b><code>SubEnable &lt;State&gt;</code></b></a>
@@ -1613,7 +1616,7 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <b><code>ShuffleT</code></b></a>
 <br /> Schaltet den Zustand des Shuffle-Zustands um. Liefert den aktuell gültigen Shuffle-Zustand.</li>
 <li><a name="SONOSPLAYER_setter_SleepTimer">
-<b><code>SleepTimer &lt;Time&gt;</code></b></a>
+<b><code>SleepTimer &lt;Timestring|Seconds&gt;</code></b></a>
 <br /> Legt den aktuellen SleepTimer fest. Der Wert muss ein kompletter Zeitstempel sein (HH:MM:SS). Zum Deaktivieren darf der Zeitstempel nur Nullen enthalten oder das Wort 'off'.</li>
 <li><a name="SONOSPLAYER_setter_Treble">
 <b><code>Treble &lt;TrebleValue&gt;</code></b></a>
@@ -1699,7 +1702,6 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <br /> Legt das Lautstärkeverhältnis der aktuellen Player der Gruppe für folgende '''GroupVolume'''-Aufrufe fest. Dieses festgelegte Verhältnis wird bis zum nächsten Aufruf von '''SnapshotGroupVolume''' beibehalten.</li>
 </ul></li>
 </ul>
-<br />
 <a name="SONOSPLAYERget"></a> 
 <h4>Get</h4>
 <ul>
@@ -1746,7 +1748,6 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <br /> Liefert die aktuelle Position innerhalb des Titels.</li>
 </ul></li>
 </ul>
-<br />
 <a name="SONOSPLAYERattr"></a>
 <h4>Attribute</h4>
 '''Hinweis'''<br />Die Attribute werden erst bei einem Neustart von Fhem verwendet, da diese dem SubProzess initial zur Verfügung gestellt werden müssen.
