@@ -224,7 +224,8 @@ watchdog_Attr(@)
     # 15 Minutes.<br>
     define w watchdog FHT80 00:15:00 SAME set FHT80 date<br>
 
-    # Request data from the FHT80 _each_ time we do not receive any message for<br>
+    # Request data from the FHT80 _each_ time we do not receive any message for
+    <br>
     # 15 Minutes, i.e. reactivate the watchdog after it triggered.  Might be<br>
     # dangerous, as it can trigger in a loop.<br>
     define w watchdog FHT80 00:15:00 SAME set FHT80 date;; trigger w .<br>
@@ -233,7 +234,8 @@ watchdog_Attr(@)
     define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"<br>
 
     # Send mail if the window is left open<br>
-    define w watchdog contact1:open 00:15 contact1:closed "mail_me close window1"<br>
+    define w watchdog contact1:open 00:15 contact1:closed
+        "mail_me close window1"<br>
     attr w regexp1WontReactivate<br>
     </ul></code>
 
@@ -327,9 +329,9 @@ watchdog_Attr(@)
     kann.<br>
     define w watchdog FHT80 00:15:00 SAME set FHT80 date;; trigger w .<br><br>
 
-    # Alarmiere einmalig wenn vom FHT80 f&uuml;r 15 Minuten keine Nachricht
-    # emfpangen wurde.<br>
-    define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"<br><br>
+    # Alarmiere einmalig wenn vom HMS100-FIT f&uuml;r eine Stunde keine
+    Nachricht empfangen wurde.<br>
+    define w watchdog HMS100-FIT 01:00 SAME "alarm-fit.sh"<br><br>
 
     # Sende eine Mail wenn das Fenster offen gelassen wurde<br>
     define w watchdog contact1:open 00:15 contact1:closed "mail_me close
