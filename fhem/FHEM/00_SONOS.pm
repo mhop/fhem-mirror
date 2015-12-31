@@ -49,6 +49,10 @@
 # Cover von Amazon funktionieren nicht
 #
 # SVN-History:
+# 31.12.2015
+#	Das Reading ZoneGroupID wurde immer länger (mit ":__"), wenn Gruppierungen anderer Player verändert wurden.
+#	Bei den Settern von "SleepTimer" und "SnoozeAlarm" kann man jetzt auch eine Zahl als Dauer in Sekunden angeben. Dazu wurde auch die Doku entsprechend angepasst.
+#	In der ControlPoint.pm wurde eine Fehlermeldung korrigiert
 # 24.12.2015
 #	Wenn ein Player ein "ß" (oder auch andere besondere Zeichen, wie Smilies o.ä.) im Namen hatte, funktionierte die Erkennung nicht mehr, und der SubThread verstarb.
 #	Man kann nun mittels dem Setter "Name" auch "ß" und Smilies o.ä. im Playernamen setzen.
@@ -67,23 +71,6 @@
 #	Bei der Verwendung von "set Sonos Groups Reset" tauchte eine Fehlermeldung wegen eines Leerstrings auf.
 #	Es wurde ein neuer Setter "LoadFavourite" eingebaut, der einem StartFavourite mit der Angabe von NoStart entspricht.
 #	Man kann bei LoadSearchList nun auch an das Ende der aktuellen Abspielliste anhängen lassen. Dazu muss man an den Parameter maxElem ein "+" anhängen.
-# 07.12.2015
-#	Zwei neue Setter "DialogLevel" und "NightMode", die an einer PlayBar ausgeführt werden können.
-#	"Set Sonos Groups" hat eine neue Option "Reset", mit der alle Gruppen in einem Rutsch aufgelöst werden können.
-#	ControlPoint.pm: Bei einem Fehler beim Verbindungsaufbau zum Player wurde aus dem "carp" ein "croak" gemacht. Dadurch greifen die Auffangmechanismen.
-#	Beim Verlieren des Gruppenmaster stand der TransportState bei allen zukünftigen NICHT-Gruppenmastern bis zum nächsten Titelwechsel auf "ERROR".
-#	Man kann bei einer Speak-Definition nun auch den Parameter %textescaped% verwenden, um den URL-Enkodierten Text einzufügen.
-#	Die Smartmatch-Fehlermeldung wird nun unterdrückt
-#	Die Fehlerausgabe bei fehlenden Set- oder Get-Parametern enthält jetzt auch den zulässigen Wertebereich des Parameters (z.B. '(0..100)' für die Lautstärke), sowie die optionalen Parameter
-#	StartSearchList hat die Wiedergabe immer neu gestartet, obwohl das u.U. gar nicht nötig war.
-#	Die Attribute für die Lautstärke (minVolume, maxVolume, minVolumeHeadphone und maxVolumeHeadphone) können nun im laufenden Betrieb geändert werden und die neuen Grenzen werden sofort sichergestellt.
-#	Es gibt einen neuen Setter 'MakeStandaloneGroup', mit dem man einen Player aus seiner Gruppe lösen kann.
-#	Es wird der Provider Amazon nun mit angezeigt.
-#	Es gibt nun ein Attribut usedonlyIPs, mit dem man die IP-Adressen der zu verwendenden Player angeben kann. Damit ist man manchmal besser dran, als mit dem Ausschluss von einzelnen Adressen
-#	Es gibt einen neuen Setter "TruePlay".
-#	Es gibt ein neues Attribut 'SpeakGoogleURL' für die Definition der zu verwendenden Google-URL für die Sprachausgabe
-#	Die Standard-Google-URL wurde nach neuen Hinweisen angepasst.
-#	Es gibt neue Setter "AudioDelayLeftRear" (Abstand hinterer linker Lautsprecher), "AudioDelayRightRear" (Abstand hinterer rechter Lautsprecher) und "SubPolarity" (Sub Aufstellung) bei einem 5.1 Surroundsystem.
 #
 ########################################################################################
 #
@@ -7294,6 +7281,8 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 		$zoneGroupID = $2;
 		my $member = $3;
 		
+		$zoneGroupID .= ':__' if ($zoneGroupID !~ m/:/);
+		
 		my $topoType = '';
 		# Ist dieser Player in einem ChannelMapSet (also einer Paarung) enthalten?
 		if ($member =~ m/ChannelMapSet=".*?$udnShort:(.*?),(.*?)[;"]/is) {
@@ -7324,9 +7313,10 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 		
 		my $roomName = SONOS_Client_Data_Retreive($udn, 'reading', 'roomName', '');
 		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'roomNameAlias', $roomName.$aliasSuffix);
+		
+		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'ZoneGroupID', $zoneGroupID);
+		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'fieldType', $fieldType);
 	}
-	SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'ZoneGroupID', $zoneGroupID.':__');
-	SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'fieldType', $fieldType);
 	
 	# ZoneGroupName: Welchen Namen hat die aktuelle Gruppe?
 	my $zoneGroupName = SONOS_Client_Data_Retreive($udn, 'reading', 'ZoneGroupName', '');
@@ -8997,7 +8987,6 @@ You can start this client on your own (to let it run instantly and independent f
 <br />Sets the current groups on the whole Sonos-System. The format is the same as retreived by getter 'Groups'.<br >A reserved word is <i>Reset</i>. It can be used to directly extract all players out of their groups.</li>
 </ul></li>
 </ul>
-<br />
 <a name="SONOSget"></a> 
 <h4>Get</h4>
 <ul>
@@ -9008,7 +8997,6 @@ You can start this client on your own (to let it run instantly and independent f
 The order in the sublists are important, because the first entry defines the so-called group-coordinator (in this case <code>Sonos_Wohnzimmer</code>), from which the current playlist and the current title playing transferred to the other member(s).</li>
 </ul></li>
 </ul>
-<br />
 <a name="SONOSattr"></a>
 <h4>Attributes</h4>
 '''Attention'''<br />The most of the attributes can only be used after a restart of fhem, because it must be initially transfered to the subprocess.
@@ -9167,7 +9155,6 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 <br />Setzt die aktuelle Gruppierungskonfiguration der Sonos-Systemlandschaft. Das Format ist jenes, welches auch von dem Get-Befehl 'Groups' geliefert wird.<br >Hier kann als GroupDefinition das Wort <i>Reset</i> verwendet werden, um alle Player aus ihren Gruppen zu entfernen.</li>
 </ul></li>
 </ul>
-<br />
 <a name="SONOSget"></a> 
 <h4>Get</h4>
 <ul>
@@ -9178,7 +9165,6 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 Dabei ist die Reihenfolge innerhalb der Unterlisten wichtig, da der erste Eintrag der sogenannte Gruppenkoordinator ist (in diesem Fall also <code>Sonos_Wohnzimmer</code>), von dem die aktuelle Abspielliste un der aktuelle Titel auf die anderen Gruppenmitglieder übernommen wird.</li>
 </ul></li>
 </ul>
-<br />
 <a name="SONOSattr"></a>
 <h4>Attribute</h4>
 '''Hinweis'''<br />Die Attribute werden erst bei einem Neustart von Fhem verwendet, da diese dem SubProzess initial zur Verfügung gestellt werden müssen.

@@ -279,10 +279,8 @@ sub _createDevice {
 		($device, $base) = $self->parseDeviceDescription($response->content,
 													  {Location => $location},
 													  {ControlPoint => $self});
-	}
-	else {
-		carp("Loading device description failed with error: " . 
-			 $response->code . " " . $response->message);
+	} else {
+		carp("Loading device description failed with error: " . $response->code . " " . $response->message) if ($response->code != 200);
 	}
 	pop(@LWP::Protocol::http::EXTRA_SOCK_OPTS);
 
