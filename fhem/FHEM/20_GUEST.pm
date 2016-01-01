@@ -22,20 +22,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.2.1
-#
-# Major Version History:
-# - 1.2.0 - 2015-03-11
-# -- add RESIDENTStoolkit support
-#
-# - 1.1.0 - 2014-04-07
-# -- new readings in computer readable format (*_cr)
-# -- format of readings durTimer readings changed from minutes to HH:MM:ss
-#
-# - 1.0.0 - 2014-02-08
-# -- First release
-#
 ##############################################################################
 
 package main;
@@ -62,7 +48,7 @@ sub GUEST_Initialize($) {
     $hash->{NotifyFn} = "GUEST_Notify";
     $hash->{UndefFn}  = "GUEST_Undefine";
     $hash->{AttrList} =
-"rg_locationHome rg_locationWayhome rg_locationUnderway rg_autoGoneAfter:12,16,24,26,28,30,36,48,60 rg_showAllStates:0,1 rg_realname:group,alias rg_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rg_locations rg_moods rg_moodDefault rg_moodSleepy rg_noDuration:0,1 rg_wakeupDevice "
+"rg_locationHome rg_locationWayhome rg_locationUnderway rg_autoGoneAfter:12,16,24,26,28,30,36,48,60 rg_showAllStates:0,1 rg_realname:group,alias rg_states:multiple-strict,home,gotosleep,asleep,awoken,absent,gone rg_locations rg_moods rg_moodDefault rg_moodSleepy rg_noDuration:0,1 rg_wakeupDevice rg_geofenceUUIDs "
       . $readingFnAttributes;
 }
 
@@ -132,6 +118,9 @@ sub GUEST_Define($$) {
         $modified = 0;
     }
 
+    # set reverse pointer
+    $modules{GUEST}{defptr}{$name} = \$hash;
+
     readingsBeginUpdate($hash);
 
     # set default settings on first define
@@ -169,7 +158,9 @@ sub GUEST_Define($$) {
     }
     elsif ( $modules{dummy}{AttrFn} ne "RESIDENTStk_AttrFnDummy" ) {
         Log3 $name, 4,
-"RESIDENTStk $name: concurrent AttrFn already defined for dummy module (".$modules{dummy}{AttrFn}."). Some attribute based functions like auto-creations will not be available.";
+"RESIDENTStk $name: concurrent AttrFn already defined for dummy module ("
+          . $modules{dummy}{AttrFn}
+          . "). Some attribute based functions like auto-creations will not be available.";
     }
 
     return undef;
@@ -197,6 +188,9 @@ sub GUEST_Undefine($$) {
             }
         }
     }
+
+    # release reverse pointer
+    delete $modules{GUEST}{defptr}{$name};
 
     return undef;
 }
@@ -682,91 +676,13 @@ sub GUEST_Set($@) {
     # location
     elsif ( $a[1] eq "location" ) {
         if ( defined( $a[2] ) && $a[2] ne "" ) {
-            Log3 $name, 2, "GUEST set $name location " . $a[2] if ( !$silent );
+            shift @a;
+            shift @a;
+            my $location = join( " ", @a );
+            Log3 $name, 2, "ROOMMATE set $name location " . $location
+              if ( !$silent );
 
-            if ( $location ne $a[2] ) {
-                my $searchstring;
-
-                readingsBeginUpdate($hash) if ( !$silent );
-
-                # read attributes
-                my @location_home =
-                  ( defined( $attr{$name}{"rg_locationHome"} ) )
-                  ? split( ' ', $attr{$name}{"rg_locationHome"} )
-                  : ("home");
-
-                my @location_underway =
-                  ( defined( $attr{$name}{"rg_locationUnderway"} ) )
-                  ? split( ' ', $attr{$name}{"rg_locationUnderway"} )
-                  : ("underway");
-
-                my @location_wayhome =
-                  ( defined( $attr{$name}{"rg_locationWayhome"} ) )
-                  ? split( ' ', $attr{$name}{"rg_locationWayhome"} )
-                  : ("wayhome");
-
-                $searchstring = quotemeta($location);
-                readingsBulkUpdate( $hash, "lastLocation", $location )
-                  if ( $location ne "wayhome"
-                    && !grep( m/^$searchstring$/, @location_underway ) );
-                readingsBulkUpdate( $hash, "location", $a[2] )
-                  if ( $a[2] ne "wayhome" );
-
-                # wayhome detection
-                $searchstring = quotemeta($location);
-                if (
-                    (
-                        $a[2] eq "wayhome"
-                        || grep( m/^$searchstring$/, @location_wayhome )
-                    )
-                    && ( $presence eq "absent" )
-                  )
-                {
-                    Log3 $name, 3,
-                      "GUEST $name: on way back home from $location";
-                    readingsBulkUpdate( $hash, "wayhome", "1" )
-                      if ( !defined( $hash->{READINGS}{wayhome}{VAL} )
-                        || $hash->{READINGS}{wayhome}{VAL} ne "1" );
-                }
-
-                readingsEndUpdate( $hash, 1 ) if ( !$silent );
-
-                # auto-updates
-                $searchstring = quotemeta( $a[2] );
-                if (
-                    (
-                        $a[2] eq "home"
-                        || grep( m/^$searchstring$/, @location_home )
-                    )
-                    && $state ne "home"
-                    && $state ne "gotosleep"
-                    && $state ne "asleep"
-                    && $state ne "awoken"
-                    && $state ne "initialized"
-                  )
-                {
-                    Log3 $name, 4,
-                      "GUEST $name: implicit state change caused by location "
-                      . $a[2];
-                    GUEST_Set( $hash, $name, "silentSet", "state", "home" );
-                }
-                elsif (
-                    (
-                        $a[2] eq "underway"
-                        || grep( m/^$searchstring$/, @location_underway )
-                    )
-                    && $state ne "gone"
-                    && $state ne "none"
-                    && $state ne "absent"
-                    && $state ne "initialized"
-                  )
-                {
-                    Log3 $name, 4,
-                      "GUEST $name: implicit state change caused by location "
-                      . $a[2];
-                    GUEST_Set( $hash, $name, "silentSet", "state", "absent" );
-                }
-            }
+            GUEST_SetLocation( $name, $location, 1, undef );
         }
         else {
             return "Invalid 2nd argument, choose one of location ";
@@ -795,7 +711,7 @@ sub GUEST_Set($@) {
                     fhem
 "attr $wakeuptimerName comment Auto-created by GUEST module for use with RESIDENTS Toolkit";
                     fhem
-"attr $wakeuptimerName devStateIcon OFF:general_aus\@red:reset running:general_an\@blue:stop .*:general_an\@green:nextRun%20OFF";
+"attr $wakeuptimerName devStateIcon OFF:general_aus\@red:reset running:general_an\@green:stop .*:general_an\@orange:nextRun%20OFF";
                     fhem "attr $wakeuptimerName group " . $attr{$name}{group}
                       if ( defined( $attr{$name}{group} ) );
                     fhem "attr $wakeuptimerName icon time_timer";
@@ -1003,6 +919,85 @@ sub GUEST_DurationTimer($;$) {
 }
 
 ###################################
+sub GUEST_SetLocation($$$;$$$$$$) {
+    my ( $name, $location, $trigger, $id, $time, $lat, $long, $address,
+        $device ) = @_;
+    my $hash         = $defs{$name};
+    my $state        = ReadingsVal( $name, "state", "initialized" );
+    my $presence     = ReadingsVal( $name, "presence", "present" );
+    my $lastLocation = ReadingsVal( $name, "location", undef );
+    $location = "underway" if ( $trigger eq "0" );
+
+    Log3 $name, 5,
+"GUEST $name: received location information: id=$id name=$location trig=$trigger date=$time lat=$lat long=$long address:$address device=$device";
+
+    my $searchstring;
+
+    readingsBeginUpdate($hash);
+
+    # read attributes
+    my @location_home =
+      split( ' ', AttrVal( $name, "rr_locationHome", "home" ) );
+    my @location_underway =
+      split( ' ', AttrVal( $name, "rr_locationUnderway", "underway" ) );
+    my @location_wayhome =
+      split( ' ', AttrVal( $name, "rr_locationWayhome", "wayhome" ) );
+
+    $searchstring = quotemeta($location);
+    readingsBulkUpdate( $hash, "lastLocation", $lastLocation )
+      if ( $lastLocation
+        && $location ne "wayhome"
+        && !grep( m/^$searchstring$/, @location_underway ) );
+    readingsBulkUpdate( $hash, "location", $location )
+      if ( $location ne "wayhome" );
+
+    # wayhome detection
+    $searchstring = quotemeta($location);
+    if (
+        (
+            $location eq "wayhome"
+            || grep( m/^$searchstring$/, @location_wayhome )
+        )
+        && ( $presence eq "absent" )
+      )
+    {
+        Log3 $name, 3, "GUEST $name: on way back home from $location";
+        readingsBulkUpdate( $hash, "wayhome", "1" )
+          if ( ReadingsVal( $name, "wayhome", "0" ) ne "1" );
+    }
+
+    readingsEndUpdate( $hash, 1 );
+
+    # auto-updates
+    $searchstring = quotemeta($location);
+    if (   ( $location eq "home" || grep( m/^$searchstring$/, @location_home ) )
+        && $state ne "home"
+        && $state ne "gotosleep"
+        && $state ne "asleep"
+        && $state ne "awoken" )
+    {
+        Log3 $name, 4,
+          "GUEST $name: implicit state change caused by location " . $location;
+        GUEST_Set( $hash, $name, "silentSet", "state", "home" );
+    }
+    elsif (
+        (
+            $location eq "underway"
+            || grep( m/^$searchstring$/, @location_underway )
+        )
+        && $state ne "gone"
+        && $state ne "none"
+        && $state ne "absent"
+      )
+    {
+        Log3 $name, 4,
+          "GUEST $name: implicit state change caused by location " . $location;
+        GUEST_Set( $hash, $name, "silentSet", "state", "absent" );
+    }
+
+}
+
+###################################
 sub GUEST_StartInternalTimers($$) {
     my ($hash) = @_;
 
@@ -1165,6 +1160,9 @@ sub GUEST_StartInternalTimers($$) {
         <ul>
           <li>
             <b>rg_autoGoneAfter</b> - hours after which state should be auto-set to 'gone' when current state is 'absent'; defaults to 16 hours
+          </li>
+          <li>
+            <b>rg_geofenceUUIDs</b> - comma separated list of device UUIDs updating their location via <a href="#GEOFANCY">GEOFANCY</a>. Avoids necessity for additional notify/DOIF/watchdog devices and can make GEOFANCY attribute <i>devAlias</i> obsolete. (using more than one UUID/device might not be a good idea as location my leap)
           </li>
           <li>
             <b>rg_locationHome</b> - locations matching these will be treated as being at home; first entry reflects default value to be used with state correlation; separate entries by space; defaults to 'home'
@@ -1462,6 +1460,9 @@ sub GUEST_StartInternalTimers($$) {
         <ul>
           <li>
             <b>rg_autoGoneAfter</b> - Anzahl der Stunden, nach denen sich der Status automatisch auf 'gone' ändert, wenn der aktuellen Status 'absent' ist; Standard ist 36 Stunden
+          </li>
+          <li>
+            <b>rg_geofenceUUIDs</b> - Mit Komma getrennte Liste von Ger&auml;te UUIDs, die ihren Standort &uuml;ber <a href="#GEOFANCY">GEOFANCY</a> aktualisieren. Vermeidet zus&auml;tzliche notify/DOIF/watchdog Ger&auml;te und kann als Ersatz für das GEOFANCY attribute <i>devAlias</i> dienen. (hier ehr als eine UUID/Device zu hinterlegen ist eher keine gute Idee da die Lokation dann wom&ouml;glich anfängt zu springen)
           </li>
           <li>
             <b>rg_locationHome</b> - hiermit übereinstimmende Lokationen werden als zu Hause gewertet; der erste Eintrag wird für das Zusammenspiel bei Statusänderungen benutzt; mehrere Einträge durch Leerzeichen trennen; Standard ist 'home'

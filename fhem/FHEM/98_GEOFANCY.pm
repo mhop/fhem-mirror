@@ -24,16 +24,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.1.2
-#
-# Major Version History:
-# - 1.1.0 - 2014-02-06
-# -- Support for both apps: Geofency and Locative
-#
-# - 1.0.0 - 2014-01-09
-# -- First release
-#
 ##############################################################################
 
 package main;
@@ -166,27 +156,28 @@ sub GEOFANCY_Set($@) {
 ###################################
 sub GEOFANCY_CGI() {
 
-# Locative
+# Locative.app
 # /$infix?device=UUIDdev&id=UUIDloc&latitude=xx.x&longitude=xx.x&trigger=(enter|exit)
 #
-# Geofency
+# Geofency.app
 # /$infix?id=UUIDloc&name=locName&entry=(1|0)&date=DATE&latitude=xx.x&longitude=xx.x&device=UUIDdev
     my ($request) = @_;
 
     my $hash;
-    my $name    = "";
-    my $link    = "";
-    my $URI     = "";
-    my $device  = "";
-    my $id      = "";
-    my $lat     = "";
-    my $long    = "";
-    my $address = "-";
-    my $entry   = "";
-    my $msg     = "";
-    my $date    = "";
-    my $time    = "";
-    my $locName = "";
+    my $name        = "";
+    my $link        = "";
+    my $URI         = "";
+    my $device      = "";
+    my $deviceAlias = "-";
+    my $id          = "";
+    my $lat         = "";
+    my $long        = "";
+    my $address     = "-";
+    my $entry       = "";
+    my $msg         = "";
+    my $date        = "";
+    my $time        = "";
+    my $locName     = "";
 
     # data received
     if ( $request =~ m,^(/[^/]+?)(?:\&|\?)(.*)?$, ) {
@@ -331,8 +322,9 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
             $date    = $webArgs->{date};
             $lat     = $webArgs->{latitude};
             $long    = $webArgs->{longitude};
-            $address = $webArgs->{address} if (defined($webArgs->{address}));
-            $device  = $webArgs->{device};
+            $address = $webArgs->{address}
+              if ( defined( $webArgs->{address} ) );
+            $device = $webArgs->{device};
         }
         else {
             return "fatal error";
@@ -341,7 +333,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
     # no data received
     else {
-        Log3 undef, 3, "GEOFANCY: No data received";
+        Log3 undef, 5, "GEOFANCY: No data received";
 
         return ( "text/plain; charset=utf-8", "NOK No data received" );
     }
@@ -355,6 +347,66 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         && $entry ne "test" );
 
     $hash = $defs{$name};
+
+    # update ROOMMATE devices associated with this device UUID
+    my $matchingResident = 0;
+    if ( defined( $modules{ROOMMATE}{defptr} ) ) {
+        Log3 $name, 5, "GEOFANCY $name: found defptr for ROOMMATE\n"
+          . Dumper( $modules{ROOMMATE}{defptr} );
+
+        while ( my ( $key, $value ) = each %{ $modules{ROOMMATE}{defptr} } ) {
+            Log3 $name, 5, "GEOFANCY $name: Checking rr_geofenceUUIDs for $key";
+
+            my $geofenceUUIDs = AttrVal( $key, "rr_geofenceUUIDs", undef );
+            next if !$geofenceUUIDs;
+
+            Log3 $name, 5,
+"GEOFANCY $name: ROOMMATE device $key has assigned UUIDs: $geofenceUUIDs";
+
+            my @UUIDs = split( ',', $geofenceUUIDs );
+
+            if (@UUIDs) {
+                foreach (@UUIDs) {
+                    if ( $_ eq $device ) {
+                        Log3 $name, 4,
+"GEOFANCY $name: Found matching UUID at ROOMMATE device $key";
+                        $deviceAlias      = $key;
+                        $matchingResident = 1;
+                        last;
+                    }
+                }
+            }
+
+            last if $matchingResident eq "1";
+        }
+    }
+
+    # update GUEST devices associated with this device UUID
+    if ( $matchingResident == 0 && defined( $modules{GUEST}{defptr} ) ) {
+        while ( my ( $key, $value ) = each %{ $modules{GUEST}{defptr} } ) {
+            my $geofenceUUIDs = AttrVal( $key, "rg_geofenceUUIDs", undef );
+            next if !$geofenceUUIDs;
+
+            Log3 $name, 5,
+"GEOFANCY $name: GUEST device $key has assigned UUIDs: $geofenceUUIDs";
+
+            my @UUIDs = split( ',', $geofenceUUIDs );
+
+            if (@UUIDs) {
+                foreach (@UUIDs) {
+                    if ( $_ eq $device ) {
+                        Log3 $name, 4,
+"GEOFANCY $name: Found matching UUID at GUEST device $key";
+                        $deviceAlias      = $key;
+                        $matchingResident = 1;
+                        last;
+                    }
+                }
+            }
+
+            last if $matchingResident eq "1";
+        }
+    }
 
     # Device alias handling
     #
@@ -377,11 +429,15 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         }
     }
 
-    $device = $hash->{helper}{device_aliases}{$device}
-      if $hash->{helper}{device_aliases}{$device};
+    $deviceAlias = $hash->{helper}{device_aliases}{$device}
+      if ( $hash->{helper}{device_aliases}{$device} && $matchingResident == 0 );
 
     Log3 $name, 4,
-"GEOFANCY $name: id=$id name=$locName entry=$entry date=$date lat=$lat long=$long dev=$device";
+"GEOFANCY $name: id=$id name=$locName trig=$entry date=$date lat=$lat long=$long address:$address dev=$device devAlias=$deviceAlias";
+
+    Log3 $name, 3,
+"GEOFANCY $name: Unknown device UUID $device: Set attribute devAlias for $name or assign $device to any ROOMMATE or GUEST device using attribute r*_geofenceUUIDs"
+      if ( $deviceAlias eq "-" );
 
     readingsBeginUpdate($hash);
 
@@ -399,62 +455,90 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
     # General readings
     readingsBulkUpdate( $hash, "state",
-"id:$id name:$locName trig:$entry date:$date lat:$lat long:$long address:$address dev:$device"
+"id:$id trig:$entry date:$date lat:$lat long:$long dev:$device devAlias=$deviceAlias"
     );
+    readingsBulkUpdate( $hash, "lastDeviceUUID", $device );
+    readingsBulkUpdate( $hash, "lastDevice",     $deviceAlias );
 
-    $id = $locName if ( defined($locName) && $locName ne "" );
+    # update local device readings if
+    # - UUID was not assigned to any resident device
+    # - UUID has a defined devAlias
+    if ( $matchingResident == 0 && $deviceAlias ne "-" ) {
 
-    readingsBulkUpdate( $hash, "lastDevice", $device );
-    readingsBulkUpdate( $hash, "lastArr",    $device . " " . $id )
-      if ( $entry eq "enter" || $entry eq "1" );
-    readingsBulkUpdate( $hash, "lastDep", $device . " " . $id )
-      if ( $entry eq "exit" || $entry eq "0" );
+        $id = $locName if ( defined($locName) && $locName ne "" );
 
-    if ( $entry eq "enter" || $entry eq "1" || $entry eq "test" ) {
-        Log3 $name, 4, "GEOFANCY $name: $device arrived at $id";
-        readingsBulkUpdate( $hash, $device,                  "arrived " . $id );
-        readingsBulkUpdate( $hash, "currLoc_" . $device,     $id );
-        readingsBulkUpdate( $hash, "currLocLat_" . $device,  $lat );
-        readingsBulkUpdate( $hash, "currLocLong_" . $device, $long );
-        readingsBulkUpdate( $hash, "currLocAddr_" . $device, $address );
-        readingsBulkUpdate( $hash, "currLocTime_" . $device, $time );
-    }
-    elsif ( $entry eq "exit" || $entry eq "0" ) {
-        my $currReading;
-        my $lastReading;
+        readingsBulkUpdate( $hash, "lastArr", $deviceAlias . " " . $id )
+          if ( $entry eq "enter" || $entry eq "1" );
+        readingsBulkUpdate( $hash, "lastDep", $deviceAlias . " " . $id )
+          if ( $entry eq "exit" || $entry eq "0" );
 
-        Log3 $name, 4, "GEOFANCY $name: $device left $id and is underway";
-
-        # backup last known location if not "underway"
-        $currReading = "currLoc_" . $device;
-        if ( defined( $hash->{READINGS}{$currReading}{VAL} )
-            && $hash->{READINGS}{$currReading}{VAL} ne "underway" )
-        {
-            foreach ( 'Loc', 'LocLat', 'LocLong' ) {
-                $currReading = "curr" . $_ . "_" . $device;
-                $lastReading = "last" . $_ . "_" . $device;
-                readingsBulkUpdate( $hash, $lastReading,
-                    $hash->{READINGS}{$currReading}{VAL} )
-                  if ( defined( $hash->{READINGS}{$currReading}{VAL} ) );
-            }
-            $currReading = "currLocTime_" . $device;
-            readingsBulkUpdate(
-                $hash,
-                "lastLocArr_" . $device,
-                $hash->{READINGS}{$currReading}{VAL}
-            ) if ( defined( $hash->{READINGS}{$currReading}{VAL} ) );
-            readingsBulkUpdate( $hash, "lastLocDep_" . $device, $time );
+        if ( $entry eq "enter" || $entry eq "1" || $entry eq "test" ) {
+            Log3 $name, 4, "GEOFANCY $name: $deviceAlias arrived at $id";
+            readingsBulkUpdate( $hash, $deviceAlias, "arrived " . $id );
+            readingsBulkUpdate( $hash, "currLoc_" . $deviceAlias,     $id );
+            readingsBulkUpdate( $hash, "currLocLat_" . $deviceAlias,  $lat );
+            readingsBulkUpdate( $hash, "currLocLong_" . $deviceAlias, $long );
+            readingsBulkUpdate( $hash, "currLocAddr_" . $deviceAlias,
+                $address );
+            readingsBulkUpdate( $hash, "currLocTime_" . $deviceAlias, $time );
         }
+        elsif ( $entry eq "exit" || $entry eq "0" ) {
+            my $currReading;
+            my $lastReading;
 
-        readingsBulkUpdate( $hash, $device,                  "left " . $id );
-        readingsBulkUpdate( $hash, "currLoc_" . $device,     "underway" );
-        readingsBulkUpdate( $hash, "currLocLat_" . $device,  "-" );
-        readingsBulkUpdate( $hash, "currLocLong_" . $device, "-" );
-        readingsBulkUpdate( $hash, "currLocAddr_" . $device, "-" );
-        readingsBulkUpdate( $hash, "currLocTime_" . $device, $time );
+            Log3 $name, 4,
+              "GEOFANCY $name: $deviceAlias left $id and is in transit";
+
+            # backup last known location if not "underway"
+            $currReading = "currLoc_" . $deviceAlias;
+            if ( defined( $hash->{READINGS}{$currReading}{VAL} )
+                && $hash->{READINGS}{$currReading}{VAL} ne "underway" )
+            {
+                foreach ( 'Loc', 'LocLat', 'LocLong', 'LocAddr' ) {
+                    $currReading = "curr" . $_ . "_" . $deviceAlias;
+                    $lastReading = "last" . $_ . "_" . $deviceAlias;
+                    readingsBulkUpdate( $hash, $lastReading,
+                        $hash->{READINGS}{$currReading}{VAL} )
+                      if ( defined( $hash->{READINGS}{$currReading}{VAL} ) );
+                }
+                $currReading = "currLocTime_" . $deviceAlias;
+                readingsBulkUpdate(
+                    $hash,
+                    "lastLocArr_" . $deviceAlias,
+                    $hash->{READINGS}{$currReading}{VAL}
+                ) if ( defined( $hash->{READINGS}{$currReading}{VAL} ) );
+                readingsBulkUpdate( $hash, "lastLocDep_" . $deviceAlias,
+                    $time );
+            }
+
+            readingsBulkUpdate( $hash, $deviceAlias, "left " . $id );
+            readingsBulkUpdate( $hash, "currLoc_" . $deviceAlias, "underway" );
+            readingsBulkUpdate( $hash, "currLocLat_" . $deviceAlias,  "-" );
+            readingsBulkUpdate( $hash, "currLocLong_" . $deviceAlias, "-" );
+            readingsBulkUpdate( $hash, "currLocAddr_" . $deviceAlias, "-" );
+            readingsBulkUpdate( $hash, "currLocTime_" . $deviceAlias, $time );
+        }
     }
 
     readingsEndUpdate( $hash, 1 );
+
+    # trigger update of resident device readings
+    if ( $matchingResident == 1 ) {
+        my $trigger = 0;
+        $trigger = 1
+          if ( $entry eq "enter" || $entry eq "1" || $entry eq "test" );
+        $locName = $id if ( $locName eq "" );
+
+        ROOMMATE_SetLocation(
+            $deviceAlias, $locName, $trigger, $id, $time,
+            $lat,         $long,    $address, $device
+        ) if ( $defs{$deviceAlias}{TYPE} eq "ROOMMATE" );
+
+        GUEST_SetLocation(
+            $deviceAlias, $locName, $trigger, $id, $time,
+            $lat,         $long,    $address, $device
+        ) if ( $defs{$deviceAlias}{TYPE} eq "GUEST" );
+    }
 
     $msg = "$entry OK";
     $msg .= "\ndevice=$device id=$id lat=$lat long=$long trig=$entry"
@@ -534,17 +618,22 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
         <a name="GEOFANCYattr" id="GEOFANCYattr"></a> <b>Attributes</b><br>
         <br>
         <ul>
-          <li>devAlias: can be used to rename device names in the format DEVICEUUID:Aliasname. Separate using blank to rename multiple devices.
+          <li>devAlias: Mandatory attribute to assign device name alias to an UUID in the format DEVICEUUID:Aliasname (most readings will only be created if devAlias was defined).<br>
+                        Separate using <i>blank</i> to rename multiple device UUIDs.<br>
+                        <br>
+                        Should you be using GEOFANCY together with <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> you might consider using attribute r*_geofenceUUIDs directly at those devices instead.
           </li>
         </ul><br>
         <br>
-        <b>Usage information</b><br>
+        <b>Usage information / Hints on Security</b><br>
         <br>
         <div style="margin-left: 2em">
           Likely your FHEM installation is not reachable directly from the internet (good idea!).<br>
-          It is recommended to have a reverse proxy like nginx or Apache in front of FHEM where you can make sure access is only possible to specific subdirectories like /fhem/geo.<br>
-          You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via SSL.<br>
-          Also the definition of a dedicated FHEMWEB instance for that purpose might help to restrict FHEM's functionality (note that the 'hidden' attributes of FHEMWEB currently do NOT protect from just guessing/knowing the correct URL!)<br>
+          It is recommended to have a reverse proxy like <a href="http://loredo.me/post/116633549315/geeking-out-with-haproxy-on-pfsense-the-ultimate">HAproxy</a>, <a href="http://www.apsis.ch/pound/">Pound</a> or <a href="https://www.varnish-cache.org/">Varnish</a> in front of FHEM where you can make sure access is only possible to a specific URI like /fhem/geo. Apache or Nginx might do as well. However, in case you have Apache or Nginx running already you should still consider one of the named reverse proxies in front of it for fine-grain security configuration.<br>
+          <br>
+          You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via TLS/SSL. Using TLS offloading in the reverse proxy software is highly recommended and software like HAproxy provides high control of data flow for TLS.<br>
+          <br>
+          Also the definition of a dedicated FHEMWEB instance for that purpose together with <a href="#alllowed">allowed</a> might help to restrict FHEM's functionality (e.g. set attributes allowedCommands and allowedDevices to ",". Note that attributes <i>hiddengroup</i> and <i>hiddenroom</i> of FHEMWEB do NOT protect from just guessing/knowing the correct URI but would help tremendously to prevent easy inspection of your FHEM setup.)<br>
           <br>
           To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.<br>
           <br>
