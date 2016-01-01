@@ -584,7 +584,7 @@ sub RESIDENTS_Set($@) {
                     fhem
 "attr $wakeuptimerName comment Auto-created by RESIDENTS module for use with RESIDENTS Toolkit";
                     fhem
-"attr $wakeuptimerName devStateIcon OFF:general_aus\@red:reset running:general_an\@blue:stop .*:general_an\@green:nextRun%20OFF";
+"attr $wakeuptimerName devStateIcon OFF:general_aus\@red:reset running:general_an\@green:stop .*:general_an\@orange:nextRun%20OFF";
                     fhem "attr $wakeuptimerName group " . $attr{$name}{group}
                       if ( defined( $attr{$name}{group} ) );
                     fhem "attr $wakeuptimerName icon time_timer";
