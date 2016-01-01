@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 49_SSCam: documentation changed
+             HINT: use IP-Adresses instead of hostnames in SSCAM-Define! 
   - bugfix:  FB_CALLLIST: fix not working longpoll update in FHEMWEB
   - change:  FB_CALLLIST: saved list will be deleted from filesystem
               when delete <name> is executed

@@ -36,9 +36,9 @@
 #                  LWP is not needed anymore
 #
 #
-# Definition: define <name> SSCam <servername> <serverport> <username> <password> <camname> <rectime> 
+# Definition: define <name> SSCam <serverIP> <serverport> <username> <password> <camname> <rectime> 
 # 
-# Beispiel: define CamCP1 SSCAM dd.myds.net 5000 apiuser apipw Carport 5
+# Beispiel: define CamCP1 SSCAM 192.168.2.20 5000 apiuser apipw Carport 5
 #
 # Parameters:
 #       
@@ -77,7 +77,7 @@ sub SSCam_Initialize($) {
 sub SSCam_Define {
   # Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Gerät ausgeführt wird 
   # Welche und wie viele Parameter akzeptiert werden ist Sache dieser Funktion. Die Werte werden nach dem übergebenen Hash in ein Array aufgeteilt
-  # define CamCP1 SSCAM sds1.myds.me 5000 apiuser Support4me Carport 5
+  # define CamCP1 SSCAM 192.168.2.20 5000 apiuser Support4me Carport 5
   #        ($hash) [1]     [2]        [3]   [4]     [5]       [6]   [7]  
   #
   my ($hash, $def) = @_;
@@ -1370,7 +1370,7 @@ return;
     <ul>
      <ul>
         <li>Start a Rocording</li>
-        <li>Stop a Recording</li>
+        <li>Stop a Recording (using command or automatically after the &lt;RecordTime&gt; period</li>
         <li>Trigger a Snapshot </li>
         <li>Deaktivate a Camera in Synology Surveillance Station</li>
         <li>Activate a Camera in Synology Surveillance Station</li><br>
@@ -1392,12 +1392,12 @@ return;
   <b>Define</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;Servername&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; &lt;RecordTime&gt;</code><br>
+    <code>define &lt;name&gt; SSCam &lt;ServerIP&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; &lt;RecordTime&gt;</code><br>
     <br>
     Defines a new camera device for SSCam. At first the devices have to be set up and operable in Synology Surveillance Station 7.0 and above. <br><br>
     
     The parameter &lt;RecordTime&gt; describes the minimum Recordtime. Dependend on other factors like the performance of your Synology Diskstation and <br>
-    Surveillance Station the effective Recordtime could be longer.
+    Surveillance Station the effective Recordtime could be a little bit longer.
     
     The Modul SSCam ist based on functions of Synology Surveillance Station API. <br>
     Please refer the <a href="http://global.download.synology.com/download/Document/DeveloperGuide/Surveillance_Station_Web_API_v2.0.pdf">Web API Guide</a>. <br><br>
@@ -1411,7 +1411,7 @@ return;
   <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:         </td><td>the name of the new device to use in FHEM</td></tr>
-    <tr><td>Servername:   </td><td>the name or IP-address of Synology Surveillance Station Host. If Servername is used, make sure the name can be discovered in network by DNS </td></tr>
+    <tr><td>ServerIP:     </td><td>IP-address of Synology Surveillance Station Host. Caution: avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
     <tr><td>Port:         </td><td>the Port Synology surveillance Station Host, normally 5000 (HTTP only)</td></tr>
     <tr><td>Username:     </td><td>Username defined in the Diskstation. Has to be a member of Admin-group</td></tr>
     <tr><td>Password:     </td><td>the Password for the User</td></tr>
@@ -1423,7 +1423,7 @@ return;
 
     <b>Examples:</b>
      <pre>
-      define CamDoor SSCAM ds1.myds.ds 5000 apiuser apipass Door 10      
+      define CamCP SSCAM 192.168.2.20 5000 apiuser apipass Carport 10      
     </pre>
   </ul>
   <br>
@@ -1543,7 +1543,7 @@ return;
     <ul>
      <ul>
       <li>Start einer Aufnahme</li>
-      <li>Stop einer Aufnahme</li>
+      <li>Stop einer Aufnahme (per Befehl bzw. automatisch nach Ablauf der Aufnahmedauer) </li>
       <li>Aufnehmen eines Schnappschusses und Ablage in der Synology Surveillance Station </li>
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li><br>
@@ -1564,7 +1564,7 @@ return;
 <b>Define</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;Servername&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Kameraname in SS&gt; &lt;RecordTime&gt;</code><br>
+    <code>define &lt;name&gt; SSCam &lt;ServerIP&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Kameraname in SS&gt; &lt;RecordTime&gt;</code><br>
     <br>
     
     Definiert eine neue Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
@@ -1581,22 +1581,22 @@ return;
    <br>
    <br>    
     
-  <table>
+    <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:           </td><td>der Name des neuen Gerätes in FHEM</td></tr>
-    <tr><td>Servername:     </td><td>der Name oder die IP-Addresse des Synology Surveillance Station Host. Wenn der Servername benutzt wird ist sicherzustellen dass der Name im Netzwerk aufgelöst werden kann.</td></tr>
+    <tr><td>ServerIP:       </td><td>die IP-Addresse des Synology Surveillance Station Host. Achtung: Es sollte kein Servername verwendet werden weil DNS-Aufrufe in FHEM blockierend sind.</td></tr>
     <tr><td>Port:           </td><td>der Port des Synology Surveillance Station Host. Normalerweise ist das 5000 (nur HTTP)</td></tr>
     <tr><td>Username:       </td><td>Name des in der Diskstation definierten Nutzers. Er muß ein Mitglied der Admin-Gruppe sein</td></tr>
     <tr><td>Password:       </td><td>das Passwort des Nutzers</td></tr>
     <tr><td>Cameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist. Leerzeichen im Namen sind nicht erlaubt !</td></tr>
     <tr><td>Recordtime:     </td><td>die definierte Aufnahmezeit</td></tr>
-  </table>
+    </table>
 
     <br><br>
 
     <b>Beispiel:</b>
      <pre>
-      define CamTür SSCAM ds1.myds.ds 5000 apiuser apipass Tür 10      
+      define CamCP SSCAM 192.168.2.20 5000 apiuser apipass Carport 10      
      </pre>
   </ul>
   
@@ -1685,14 +1685,14 @@ return;
    Es werden verschiedene Verbose-Level unterstützt.<br>
    Dies sind im Einzelnen:<br><br>
    
- <table>  
+   <table>  
    <colgroup> <col width=5%> <col width=95%> </colgroup>
      <tr><td> 0  </td><td> Start/Stop-Ereignisse werden geloggt </td></tr>
      <tr><td> 1  </td><td> Fehlermeldungen werden geloggt </td></tr>
      <tr><td> 3  </td><td> gesendete Kommandos werden geloggt </td></tr>
      <tr><td> 4  </td><td> gesendete und empfangene Daten werden geloggt </td></tr>
      <tr><td> 5  </td><td> alle Ausgaben zur Fehleranalyse werden geloggt. <b>ACHTUNG:</b> möglicherweise werden sehr viele Daten in das Logfile geschrieben! </td></tr>
-  </table>
+   </table>
 
    <br><br>
         
@@ -1703,4 +1703,3 @@ return;
 
 =end html_DE
 =cut
-
