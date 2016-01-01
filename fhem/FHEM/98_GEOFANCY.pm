@@ -29,7 +29,7 @@
 #
 # Major Version History:
 # - 1.1.0 - 2014-02-06
-# -- Support for both apps: Geofency and Geofancy
+# -- Support for both apps: Geofency and Locative
 #
 # - 1.0.0 - 2014-01-09
 # -- First release
@@ -166,7 +166,7 @@ sub GEOFANCY_Set($@) {
 ###################################
 sub GEOFANCY_CGI() {
 
-# Geofancy
+# Locative
 # /$infix?device=UUIDdev&id=UUIDloc&latitude=xx.x&longitude=xx.x&trigger=(enter|exit)
 #
 # Geofency
@@ -314,7 +314,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
           if ( defined( $webArgs->{device} )
             && $webArgs->{device} =~ m/(?:\s)/ );
 
-        # Geofancy.app
+        # Locative.app
         if ( defined $webArgs->{trigger} ) {
             $id     = $webArgs->{id};
             $entry  = $webArgs->{trigger};
@@ -501,10 +501,10 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
         <br>
       </li>
       <li>
-        <a href="https://itunes.apple.com/de/app/geofency-time-tracking-automatic/id615538630?l=en&amp;mt=8">Geofency (iOS - the original app)</a>
+        <a href="https://itunes.apple.com/app/id615538630">Geofency</a>
       </li>
       <li>
-        <a href="https://itunes.apple.com/de/app/geofancy/id725198453?l=en&amp;mt=8">Geofancy (iOS)</a>
+        <a href="https://itunes.apple.com/app/id725198453">Locative (iOS)</a>
       </li>
       <li>
         <a href="http://www.egigeozone.de">EgiGeoZone (Android)</a>
@@ -548,7 +548,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
           <br>
           To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.<br>
           <br>
-          The actual solution on how you can securely make your Geofancy webhook available to the internet is not part of this documentation and depends on your own skills.
+          The actual solution on how you can securely make your GEOFANCY webhook available to the internet is not part of this documentation and depends on your own skills.
         </div><br>
         <br>
         <b>Integration with Home Automation</b><br>
