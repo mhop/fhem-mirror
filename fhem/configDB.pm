@@ -115,6 +115,7 @@ use DBI;
 # Forward declarations for functions in fhem.pl
 #
 sub AnalyzeCommandChain($$;$);
+sub Log($$);
 sub Log3($$$);
 sub createUniqueId();
 
@@ -146,7 +147,6 @@ sub _cfgDB_Fileexport($;$);
 sub _cfgDB_Filelist(;$);
 sub _cfgDB_Info();
 sub _cfgDB_Migrate();
-sub _cfgDB_Move();
 sub _cfgDB_ReadCfg(@);
 sub _cfgDB_ReadState(@);
 sub _cfgDB_Recover($);
@@ -190,7 +190,7 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 }
 
 $configDB{attr}{nostate} = 1 if($ENV{'cfgDB_nostate'});
-
+$configDB{attr}{rescue} = 1 if($ENV{'cfgDB_rescue'});
 
 ##################################################
 # Basic functions needed for DB configuration
@@ -242,30 +242,9 @@ sub cfgDB_Init() {
 		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content BLOB)");
 	}
 
-	$fhem_dbh->commit();
-
-#	check if we need to move files from text to binary
-	my $needmove;
-	
-	if($cfgDB_dbtype eq "SQLITE") {
-		$needmove = $fhem_dbh->selectrow_array( "SELECT count(1) FROM sqlite_master WHERE name='fhemfilesave'" );
-	}
-
-	if($cfgDB_dbtype eq "MYSQL") {
-		my $result = $fhem_dbh->do("SHOW TABLES LIKE 'fhemfilesave'"); 
-		$needmove = ($result > 0) ? 1 : 0; 
-	}
-
-	if($cfgDB_dbtype eq "POSTGRESQL") {
-		$needmove = $fhem_dbh->selectrow_array("SELECT count(1) from pg_catalog.pg.tables where tablename = 'fhemfilesave'"); 
-	}
-
-#	close database connection
+# close database connection
 	$fhem_dbh->commit();
 	$fhem_dbh->disconnect();
-
-#	move all files from text filesave to binary if not already done
-	_cfgDB_Move if($needmove);
 
 	return;
 }
@@ -356,10 +335,21 @@ sub cfgDB_FileUpdate($) {
 sub cfgDB_ReadAll($) {
 	my ($cl) = @_;
 	my ($ret, @dbconfig);
-	# add Config Rows to commandfile
-	@dbconfig = _cfgDB_ReadCfg(@dbconfig);
-	# add State Rows to commandfile
-	@dbconfig = _cfgDB_ReadState(@dbconfig) unless $configDB{attr}{nostate};
+
+	if ($configDB{attr}{rescue} == 1) {
+		Log (0, 'configDB starting in rescue mode!');
+		push (@dbconfig, 'attr global modpath .');
+		push (@dbconfig, 'attr global verbose 3');
+		push (@dbconfig, 'define telnetPort telnet 7072 global');
+		push (@dbconfig, 'define WEB FHEMWEB 8083 global');
+		push (@dbconfig, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log fakelog');
+	} else {
+		# add Config Rows to commandfile
+		@dbconfig = _cfgDB_ReadCfg(@dbconfig);
+		# add State Rows to commandfile
+		@dbconfig = _cfgDB_ReadState(@dbconfig) unless $configDB{attr}{nostate};
+	}
+
 	# AnalyzeCommandChain for all entries
 	$ret = _cfgDB_Execute($cl, @dbconfig);
 	return $ret if($ret);
