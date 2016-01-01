@@ -2467,7 +2467,7 @@ sub CUL_HM_Parse($$) {#########################################################
       $error = 'none'           if ($stErr == 0);
       my %dir = (0=>"none",1=>"up",2=>"down",3=>"undef");
       my $state = "";
-      RemoveInternalTimer ($mh{devN}."uncertain:permanent");
+      RemoveInternalTimer ($mh{devN}.":uncertain:permanent");
       CUL_HM_unQEntity($mh{devN},"qReqStat");
       if ($err & 0x30) { # uncertain - we have to check
         CUL_HM_stateUpdatDly($mh{devN},13) if(ReadingsVal($mh{devN},"uncertain","no") eq "no");
@@ -7877,7 +7877,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
     unshift @ios,@{$hash->{helper}{io}{prefIO}} if ($hash->{helper}{io}{prefIO});# set prefIO to first choice
     foreach my $iom (@ios){
       if (  !$defs{$iom}
-          || ReadingsVal($iom,"state","") =~ m/(disconnected|overload)/
+          || ReadingsVal($iom,"state","") eq "disconnected"
           || InternalVal($iom,"XmitOpen",1) == 0){# HMLAN/HMUSB?
         next;
       }
