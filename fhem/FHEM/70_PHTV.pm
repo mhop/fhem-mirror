@@ -23,21 +23,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.3.1
-#
-# Major Version History:
-# - 1.2.0 - 2014-03-12
-# -- extended AmbiHue support
-#
-# - 1.1.0 - 2014-03-07
-# -- bugfixes
-# -- additional commands: ambiMode,rgb,pause,play,record,volumeStraight
-# -- additional readings for Ambilight state
-#
-# - 1.0.0 - 2014-03-06
-# -- First release
-#
 ##############################################################################
 
 package main;
@@ -78,7 +63,7 @@ sub PHTV_Initialize($) {
     $hash->{UndefFn} = "PHTV_Undefine";
 
     $hash->{AttrList} =
-"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5,6 macaddr:textField wakeupCmd:textField "
+"disable:0,1 timeout sequentialQuery:0,1 drippyFactor:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs ambiHueLeft ambiHueRight ambiHueTop ambiHueBottom ambiHueLatency:150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1100,1200,1300,1400,1500,1600,1700,1800,1900,2000 jsversion:1,5,6 macaddr:textField wakeupCmd:textField channelsMax:slider,30,1,200 "
       . $readingFnAttributes;
 
     $data{RC_layout}{PHTV_SVG} = "PHTV_RClayout_SVG";
@@ -327,7 +312,8 @@ sub PHTV_Set($@) {
     {
         my $i     = 1;
         my $count = scalar( keys %{ $hash->{helper}{device}{channelPreset} } );
-        $count = 80 if ( $count > 80 );
+        my $channelsMax = AttrVal( $name, "channelsMax", "80" );
+        $count = $channelsMax if ( $count > $channelsMax );
         while ( $i <= $count ) {
             if ( defined( $hash->{helper}{device}{channelPreset}{$i}{name} )
                 && $hash->{helper}{device}{channelPreset}{$i}{name} ne "" )
@@ -3812,6 +3798,7 @@ sub PHTV_min {
     <li><b>ambiHueRight</b> - HUE devices that should get the color from right Ambilight.</li>
     <li><b>ambiHueBottom</b> - HUE devices that should get the color from bottom Ambilight.</li>
     <li><b>ambiHueLatency</b> - Controls the update interval for HUE devices in milliseconds; defaults to 200 ms.</li>
+    <li><b>channelsMax</b> - Maximum amount of channels shown in FHEMWEB. Defaults to 80.</li>
     <li><b>disable</b> - Disable polling (true/false)</li>
     <li><b>drippyFactor</b> - Adds some delay in seconds after low-performance devices came up to allow more time to become responsive (default=0)</li>
     <li><b>inputs</b> - Presents the inputs read from device. Inputs can be renamed by adding <code>,NewName</code> right after the original name.</li>
