@@ -33,38 +33,37 @@ BlockingCall($$@)
 {
   my ($blockingFn, $arg, $finishFn, $timeout, $abortFn, $abortArg) = @_;
 
-  # Look for the telnetport
-  # must be done before forking to be able to create a temporary device
-  my $tName = "telnetForBlockingFn";
-  $telnetDevice = $tName if($defs{$tName});
+  # Look for the telnetport. Must be done before forking to be able to create a
+  # temporary device. Do it each time, as the old telnet may got a password
 
-  if(!$telnetDevice) {
-    foreach my $d (sort keys %defs) {
-      my $h = $defs{$d};
-      next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
-      next if($attr{$d}{SSL} || $attr{$d}{password} ||
-              AttrVal($d, "allowfrom", "127.0.0.1") ne "127.0.0.1");
-      next if($h->{DEF} !~ m/^\d+( global)?$/);
-      
-      next if($h->{DEF} =~ m/IPV6/);
-      $telnetDevice = $d;
-      last;
-    }
+  $telnetDevice = undef;
+  foreach my $d (sort keys %defs) { # 
+    my $h = $defs{$d};
+    next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
+    next if($attr{$d}{SSL} ||
+            AttrVal($d, "allowfrom", "127.0.0.1") ne "127.0.0.1");
+    next if($h->{DEF} !~ m/^\d+( global)?$/);
+    next if($h->{DEF} =~ m/IPV6/);
+
+    my %cDev = ( SNAME=>$d, TYPE=>$h->{TYPE}, NAME=>$d.time() );
+    next if(Authenticate(\%cDev, undef) == 2);    # Needs password
+    $telnetDevice = $d;
+    last;
   }
 
   # If not suitable telnet device found, create a temporary one
   if(!$telnetDevice) {
-    my $ret = CommandDefine(undef, "$tName telnet 0");
+    $telnetDevice = "telnetForBlockingFn_".time();
+    my $ret = CommandDefine(undef, "$telnetDevice telnet 0");
     if($ret) {
       $ret = "BlockingCall ($blockingFn): ".
                 "No telnet port found and cannot create one: $ret";
       Log 1, $ret;
       return $ret;
     }
-    CommandAttr(undef, "$tName room hidden");
-    $telnetDevice = $tName;
-    $defs{$tName}{TEMPORARY} = 1;
-    $attr{$tName}{allowfrom} = "127.0.0.1";
+    CommandAttr(undef, "$telnetDevice room hidden");
+    $defs{$telnetDevice}{TEMPORARY} = 1;
+    $attr{$telnetDevice}{allowfrom} = "127.0.0.1";
   }
 
   # do fork
@@ -75,8 +74,8 @@ BlockingCall($$@)
   }
 
   if($pid) {
-    Log 4, "BlockingCall ($blockingFn) created child ($pid), ".
-                "uses $tName to connect back";
+    Log 4, "BlockingCall ($blockingFn): created child ($pid), ".
+                "uses $telnetDevice to connect back";
     my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn, 
               abortFn=>$abortFn, abortArg=>$abortArg );
     if($timeout) {
