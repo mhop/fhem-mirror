@@ -925,7 +925,14 @@ sub GUEST_SetLocation($$$;$$$$$$) {
     my $hash         = $defs{$name};
     my $state        = ReadingsVal( $name, "state", "initialized" );
     my $presence     = ReadingsVal( $name, "presence", "present" );
-    my $lastLocation = ReadingsVal( $name, "location", undef );
+    my $currLocation = ReadingsVal( $name, "location", "-" );
+    my $currLat      = ReadingsVal( $name, "locationLat", "-" );
+    my $currLong     = ReadingsVal( $name, "locationLong", "-" );
+    my $currAddr     = ReadingsVal( $name, "locationAddr", "-" );
+    $id      = "-" if ( !$id      || $id eq "" );
+    $lat     = "-" if ( !$lat     || $lat eq "" );
+    $long    = "-" if ( !$long    || $long eq "" );
+    $address = "-" if ( !$address || $address eq "" );
     $location = "underway" if ( $trigger eq "0" );
 
     Log3 $name, 5,
@@ -944,12 +951,26 @@ sub GUEST_SetLocation($$$;$$$$$$) {
       split( ' ', AttrVal( $name, "rr_locationWayhome", "wayhome" ) );
 
     $searchstring = quotemeta($location);
-    readingsBulkUpdate( $hash, "lastLocation", $lastLocation )
-      if ( $lastLocation
-        && $location ne "wayhome"
-        && !grep( m/^$searchstring$/, @location_underway ) );
-    readingsBulkUpdate( $hash, "location", $location )
-      if ( $location ne "wayhome" );
+    if ( $location ne "wayhome" ) {
+        if (
+            !grep( m/^$searchstring$/, @location_underway )
+            && (   $currLocation ne $location
+                || $currLat ne $lat
+                || $currLong ne $long
+                || $currAddr ne $address )
+          )
+        {
+            readingsBulkUpdate( $hash, "lastLocation",     $currLocation );
+            readingsBulkUpdate( $hash, "lastLocationLat",  $currLat );
+            readingsBulkUpdate( $hash, "lastLocationLong", $currLong );
+            readingsBulkUpdate( $hash, "lastLocationAddr", $currAddr );
+        }
+
+        readingsBulkUpdate( $hash, "location",     $location );
+        readingsBulkUpdate( $hash, "locationLat",  $lat );
+        readingsBulkUpdate( $hash, "locationLong", $long );
+        readingsBulkUpdate( $hash, "locationAddr", $address );
+    }
 
     # wayhome detection
     $searchstring = quotemeta($location);
