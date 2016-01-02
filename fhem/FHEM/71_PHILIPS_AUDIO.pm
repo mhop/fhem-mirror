@@ -8,10 +8,10 @@
 #     such as MCi, Streamium and Fidelio devices.
 #     The module provides basic functionality accessible through the port 8889 of the device:
 #     (http://<device_ip>:8889/index).
-#     It seems the 3000 family e.g. NP3500, NP3700, NP3900 use that port. 
+#     e.g. NP3500, NP3700, NP3900. 
 #
 #     Copyright by Radoslaw Watroba
-#     (e-mail: ra666ack at googlemail dot com)
+#     (e-mail: ra666ack at g**glemail d*t c*m)
 #
 #     This file is part of fhem.
 #
@@ -92,7 +92,7 @@ sub PHILIPS_AUDIO_Get
   {
     return "Please provide the model information as argument.";    
   }  
-  
+
   $what = $a[1];
   
   if(exists($hash->{READINGS}{$what}))
@@ -131,7 +131,18 @@ sub PHILIPS_AUDIO_Set
     return "Please provide the model information as argument.";
   }
   
-  return "No Argument given" if(!defined($a[1]));     
+  return "No Argument given" if(!defined($a[1])); 
+
+  if (not defined($hash->{helper}{PRESETS}) or length($hash->{helper}{PRESETS}) == 0)
+  {
+    PHILIPS_AUDIO_updatePresets($hash);
+  }
+
+  if (not defined($hash->{helper}{FAVORITES}) or length($hash->{helper}{FAVORITES}) == 0)
+  {
+    PHILIPS_AUDIO_updateFavorites($hash);
+  }
+
   
   my $what = $a[1];
   
@@ -151,9 +162,13 @@ sub PHILIPS_AUDIO_Set
            "shuffle:on,off ".
            "aux:noArg ".
            #"input:aux,internetRadio,mediaLibrary,onlineServices ".
-           "inetRadioPreset:1,2,3,4,5,6,7,8,9,10 ".
-           "inetRadioFavorite:1,2,3,4,5,6,7,8,9,10 ".
+           "inetRadioPreset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 ".
+           "inetRadioFavorite:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 ".
            "statusRequest:noArg ".
+           "getInetRadioPresets:noArg ".
+           "getInetRadioFavorites:noArg ".
+           ((exists($hash->{helper}{PRESETS}))? "inetRadioPresetByName:".($hash->{helper}{PRESETS})." ":"").
+           ((exists($hash->{helper}{FAVORITES}))? "inetRadioFavoriteByName:".($hash->{helper}{FAVORITES})." ":"").
            #"addToFavourites:noArg ".
            #"removeFromFavourites:noArg ".
            "repeat:single,all,off ".
@@ -263,11 +278,27 @@ sub PHILIPS_AUDIO_Set
     $hash->{helper}{inetRadioPreset} = $a[2];
     PHILIPS_AUDIO_SendCommand($hash, "/index", "", $what, $a[2]);    
   }
+  elsif($what eq "inetRadioPresetByName")
+  {
+    # Hierarchichal navigation through the contents mandatory
+    $hash->{helper}{cmdStep} = 1;
+    my ($presetNumber, $presetName) = split(/:/, $a[2], 2);
+    $hash->{helper}{inetRadioPresetNumber} = $presetNumber;
+    PHILIPS_AUDIO_SendCommand($hash, "/index", "", $what, $a[2]);            
+  }  
   elsif($what eq "inetRadioFavorite")
   {
     # Hierarchichal navigation through the contents mandatory
     $hash->{helper}{cmdStep} = 1;
     $hash->{helper}{inetRadioFavorite} = $a[2];
+    PHILIPS_AUDIO_SendCommand($hash, "/index", "", $what, $a[2]);
+  }
+  elsif($what eq "inetRadioFavoriteByName")
+  {
+    # Hierarchichal navigation through the contents mandatory
+    $hash->{helper}{cmdStep} = 1;
+    my ($favoriteNumber, $favoriteName) = split(/:/, $a[2], 2);
+    $hash->{helper}{inetRadioFavoriteNumber} = $favoriteNumber;
     PHILIPS_AUDIO_SendCommand($hash, "/index", "", $what, $a[2]);
   }
   elsif($what eq "volumeStraight")
@@ -297,7 +328,22 @@ sub PHILIPS_AUDIO_Set
   elsif($what eq "nowplay")
   {
     PHILIPS_AUDIO_SendCommand($hash, "/nowplay", "",$what, "noArg");
-  }  
+  }
+  elsif($what eq "getInetRadioPresets")
+  {
+    
+    delete($hash->{helper}{PRESETS});
+
+    # Hierarchichal navigation through the contents mandatory
+    $hash->{helper}{cmdStep} = 1;
+    PHILIPS_AUDIO_SendCommand($hash, "/index", "", $what, "noArg");    
+  }
+  elsif($what eq "getInetRadioFavorites")
+  {
+    # Hierarchichal navigation through the contents mandatory
+    $hash->{helper}{cmdStep} = 1;
+    PHILIPS_AUDIO_SendCommand($hash, "/index", "", $what, "noArg");
+  }
   else  
   {
     return $usage;
@@ -545,6 +591,28 @@ sub PHILIPS_AUDIO_ParseResponse
           PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$03\$".sprintf("%03d", $hash->{helper}{inetRadioPreset})."\$1", "","inetRadioPreset", $hash->{helper}{inetRadioPreset});
         }               
       }
+      elsif($cmd eq "inetRadioPresetByName")
+      {        
+        # This command must be processed hierarchicaly through the navigation path
+        if($hash->{helper}{cmdStep} == 1)
+        {
+          $hash->{helper}{cmdStep} = 2;
+          # Internet radio
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$01\$001\$0", "", "inetRadioPresetByName", $hash->{helper}{inetRadioPresetNumber});
+        }
+        elsif($hash->{helper}{cmdStep} == 2)
+        {
+          $hash->{helper}{cmdStep} = 3;
+          # Presets
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$02\$001\$0", "","inetRadioPresetByName", $hash->{helper}{inetRadioPresetNumber});
+        }
+        elsif($hash->{helper}{cmdStep} == 3)
+        {
+          $hash->{helper}{cmdStep} = 4;
+          # Preset select
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$03\$". sprintf("%03d", $hash->{helper}{inetRadioPresetNumber}) . "\$1", "", "inetRadioPresetByName", $hash->{helper}{inetRadioPresetNumber});
+        }               
+      }
       elsif($cmd eq "inetRadioFavorite")
       {
       # This command must be processed hierarchicaly through the navigation path
@@ -566,6 +634,27 @@ sub PHILIPS_AUDIO_ParseResponse
           # Favorite Preset select
           PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$03\$".sprintf("%03d", $hash->{helper}{inetRadioFavorite})."\$1", "","inetRadioFavorite", $hash->{helper}{inetRadioFavorite});
         }
+      }
+      elsif($cmd eq "inetRadioFavoriteByName")
+      {        
+        # This command must be processed hierarchicaly through the navigation path
+        if($hash->{helper}{cmdStep} == 1)
+        {
+          $hash->{helper}{cmdStep} = 2;
+          # Internet radio
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$01\$001\$0", "", "inetRadioFavoriteByName", $hash->{helper}{inetRadioFavoriteNumber});
+        }
+        elsif($hash->{helper}{cmdStep} == 2)
+        {
+          $hash->{helper}{cmdStep} = 3;
+          # Favorites
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$02\$002\$0", "","inetRadioFavoriteByName", $hash->{helper}{inetRadioFavoriteNumber});
+        }
+        elsif($hash->{helper}{cmdStep} == 3)
+        {
+          $hash->{helper}{cmdStep} = 4;
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$03\$". sprintf("%03d", $hash->{helper}{inetRadioFavoriteNumber}) . "\$1", "", "inetRadioFavoriteByName", $hash->{helper}{inetRadioFavoriteNumber});
+        }               
       }
       elsif($cmd eq "play_pause")
       {
@@ -753,12 +842,204 @@ sub PHILIPS_AUDIO_ParseResponse
             $hash->{"NP_ICON_$i"} = "http://".$address.":".$arg."/".$1;            
             $i++;
           }
+        }      
+      }
+      elsif ($cmd eq "getInetRadioPresets")
+      {
+        # This command must be processed hierarchicaly through the navigation path
+        if($hash->{helper}{cmdStep} == 1)
+        {
+          $hash->{helper}{cmdStep} = 2;
+          # Internet radio
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$01\$001\$0", "","getInetRadioPresets", "noArg");
+        }
+        elsif($hash->{helper}{cmdStep} == 2)
+        {
+          $hash->{helper}{cmdStep} = 3;
+          # Presets
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$02\$001\$0", "","getInetRadioPresets", "noArg");
+        }
+        elsif($hash->{helper}{cmdStep} == 3)
+        {
+          
+          my $listedItems;       # Visible Items in the display. Max 8
+          my $nextreqURL;
+          my $i;
+          my $presetID;
+          my $presetName;
+
+          # Parse first 8 Presets
+          if($data =~ /<title>Error<\/title>/)
+          {
+            # In case on presets defined the player returns an Error
+            # Do nothing
+          }
+          else
+          {
+            if ($data =~ /'nextrequrl':'(.+?)',/)
+            {
+              $nextreqURL = $1;
+              #Log3 $name, 5, "NextreqURL: $nextreqURL";
+            }
+
+            if ($data =~ /'totalListCount':(.+),/)
+            {
+              $hash->{helper}{TOTALINETRADIOPRESETS} = $1;
+              readingsBulkUpdate($hash, "totalInetRadioPresets", $1);
+              #Log3 $name, 5, "ListedItems: $listedItems";
+            }
+            
+            #if ($data =~ /'totalitems':(.+),/)
+            #{
+            #  $listedItems = $1;
+            #} 
+            
+            $data =~ s/\R//g;        # Remove new lines
+
+            for(;;)
+            {            
+              if($data =~ /{'title':'(.+?)',/g)
+              {            
+                $presetName = $1;
+                #Log3 $name, 5, "PresetName: $presetName";
+                
+                if($data =~ /'id':(.+?),/g)
+                {
+                  $presetID = $1;
+                  #Log3 $name, 5, "PresetIDLoop: $presetID"; 
+                }
+                if ($presetID ne "" and $presetName ne "")
+                {
+                  readingsBulkUpdate($hash, "inetRadioPreset$presetID", $presetName);
+                }
+              }
+              else
+              {
+                last;
+              }                                            
+            }
+
+            #Log3 $name, 5, "PresetIDNachLoop: $presetID"; 
+
+            if($presetID < ($hash->{helper}{TOTALINETRADIOPRESETS})) # Maximum listed items = 8. Get the next items by sending the nextreqURL
+            {
+              PHILIPS_AUDIO_SendCommand($hash, $nextreqURL, "","getInetRadioPresets", "noArg"); 
+            }
+            else
+            {
+              $hash->{helper}{cmdStep} = 4;
+              if (exists($hash->{helper}{PRESETS}))
+              {
+                $hash->{helper}{PRESETS} = ""; # Reset the pull-down menue
+              }
+              PHILIPS_AUDIO_updatePresets($hash);
+              #my $debug = $hash->{helper}{PRESETS};
+              #Log3 $name, 5, "Presets: $debug";
+            }
+          }
         }
       }
-      
+      elsif ($cmd eq "getInetRadioFavorites")
+      { 
+        
+        # This command must be processed hierarchicaly through the navigation path
+        if($hash->{helper}{cmdStep} == 1)
+        {
+          $hash->{helper}{cmdStep} = 2;
+          # Internet radio
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$01\$001\$0", "","getInetRadioFavorites", "noArg");
+        }
+        elsif($hash->{helper}{cmdStep} == 2)
+        {
+          $hash->{helper}{cmdStep} = 3;
+          # Favorites
+          PHILIPS_AUDIO_SendCommand($hash, "/nav\$03\$02\$002\$0", "","getInetRadioFavorites", "noArg");
+        }
+        elsif($hash->{helper}{cmdStep} == 3)
+        {
+          if($data =~ /<title>Error<\/title>/)
+          {
+            # In case on presets defined the player returns an Error
+            # Do nothing
+          }
+          else
+          {
+            my $listedItems;       # Visible Items in the display. Max 8
+            my $nextreqURL;
+            my $i;
+            my $favoriteID;
+            my $favoriteName;
+
+            # Parse first 8 Presets
+
+            if ($data =~ /'nextrequrl':'(.+?)',/)
+            {
+              $nextreqURL = $1;
+              #Log3 $name, 5, "NextreqURL: $nextreqURL";
+            }
+
+            if ($data =~ /'totalListCount':(.+),/)
+            {
+              $hash->{helper}{TOTALINETRADIOFAVORITES} = $1;
+              readingsBulkUpdate($hash, "totalInetRadioFavorites", $1);
+              #Log3 $name, 5, "ListedItems: $listedItems";
+            }
+            
+            #if ($data =~ /'totalitems':(.+),/)
+            #{
+            #  $listedItems = $1;
+            #} 
+            
+            $data =~ s/\R//g;        # Remove new lines
+
+            for(;;)
+            {            
+              if($data =~ /{'title':'(.+?)',/g)
+              {            
+                $favoriteName = $1;
+                #Log3 $name, 5, "FavoriteName: $favoriteName";
+                
+                if($data =~ /'id':(.+?),/g)
+                {
+                  $favoriteID = $1;
+                  #Log3 $name, 5, "FavoriteIDLoop: $favoriteID"; 
+                }
+                if ($favoriteID ne "" and $favoriteName ne "")
+                {
+                  readingsBulkUpdate($hash, "inetRadioFavorite$favoriteID", $favoriteName);
+                }
+              }
+              else
+              {
+                last;
+              }                                            
+            }
+
+            #Log3 $name, 5, "FavoriteIDNachLoop: $favoriteID"; 
+
+            if($favoriteID < ($hash->{helper}{TOTALINETRADIOFAVORITES})) # Maximum listed items = 8. Get the next items by sending the nextreqURL
+            {
+              PHILIPS_AUDIO_SendCommand($hash, $nextreqURL, "","getInetRadioFavorites", "noArg"); 
+            }
+            else
+            {
+              $hash->{helper}{cmdStep} = 4;
+              if (exists($hash->{helper}{FAVORITES}))
+              {
+                $hash->{helper}{FAVORITES} = ""; # Reset the pull-down menue
+              }
+              PHILIPS_AUDIO_updateFavorites($hash);
+              #my $debug = $hash->{helper}{FAVORITES};
+              #Log3 $name, 5, "Favorites: $debug";
+            }
+          }  
+        }
+      }
+
       readingsEndUpdate($hash, 1);
+
+      return;
     }
-    return;
 }
 
 #############################
@@ -813,6 +1094,74 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
 
   $string =~ s/\\'//g;
   return $string;
+}
+
+#############################
+# Updates the pull-down menue
+sub PHILIPS_AUDIO_updatePresets
+{
+  my ($hash) = @_;
+
+  if((not defined($hash->{helper}{PRESETS}) or length($hash->{helper}{PRESETS}) == 0))
+  {
+    my $presetName;
+    
+    for(my $i = 1; $i < 11; $i++)
+    {
+      if(exists($hash->{READINGS}{"inetRadioPreset$i"}))
+      {
+        if($i != 1)
+        {
+          $presetName = ",";
+        }
+        $presetName .= $i . ":";
+        $presetName .= $hash->{READINGS}{"inetRadioPreset$i"}{VAL};
+        $presetName =~ s/ /_/g; # Replace blank by underscore
+        $hash->{helper}{PRESETS} .= $presetName;      
+      }
+      else
+      {
+        last;
+      }      
+    }    
+  }
+  else
+  {
+    $hash->{helper}{PRESETS} = "";  
+  }
+
+  return;
+}
+
+#############################
+# Updates the pull-down menue
+sub PHILIPS_AUDIO_updateFavorites
+{
+  my ($hash) = @_;
+
+  if((not defined($hash->{helper}{FAVORITES}) or length($hash->{helper}{FAVORITES}) == 0))
+  {
+    my $favoriteName;
+    
+    for(my $i = 1; $i < 11; $i++)
+    {
+      if(exists($hash->{READINGS}{"inetRadioFavorite$i"}))
+      {
+        if($i != 1)
+        {
+          $favoriteName = ",";
+        }
+        $favoriteName .= $i . ":";
+        $favoriteName .= $hash->{READINGS}{"inetRadioFavorite$i"}{VAL};
+        $favoriteName =~ s/ /_/g; # Replace blank by underscore
+        $hash->{helper}{FAVORITES} .= $favoriteName;               
+      }
+      else
+      {
+        last;
+      }
+    }
+  }
 }
 
 1;
@@ -883,8 +1232,12 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
       <ul><br><br>
       <u>Available commands:</u><br><br>
       <li><b>aux</b>&nbsp;&nbsp;-&nbsp;&nbsp; Switches to the AUX input (MP3 Link or similar).</li>
-      <li><b>inetRadioPreset</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio preset (May take some seconds...).</li>
-      <li><b>inetRadioFavorite</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio favorite (May take some seconds...).</li>
+      <li><b>getInetRadioFavorites</b> &nbsp;&nbsp;-&nbsp;&nbsp; Reads the favorites. (May take some seconds...).</li>
+      <li><b>getInetRadioPresets</b> &nbsp;&nbsp;-&nbsp;&nbsp; Reads the presets. (May take some seconds...).</li>
+      <li><b>inetRadioFavorite</b> [1..24] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio favorite (May take some seconds...).</li>
+      <li><b>inetRadioPreset</b> [1..24] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio preset (May take some seconds...).</li>
+      <li><b>inetRadioFavoriteByName</b> [name] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio favorite by name. (getInetRadioFavorites must be run previously for the command to become available.) (May take some seconds...).</li>
+      <li><b>inetRadioPresetByName</b> [name] &nbsp;&nbsp;-&nbsp;&nbsp; Selects an internet radio preset by name. (getInetRadioPresets must be run previously for the command to become available.) (May take some seconds...).</li>
       <li><b>mute</b>&nbsp;&nbsp;-&nbsp;&nbsp; Mutes the device.</li>
       <li><b>unmute</b>&nbsp;&nbsp;-&nbsp;&nbsp; Unmutes the device.</li>
       <li><b>next</b> &nbsp;&nbsp;-&nbsp;&nbsp; Selects the next song, preset etc.</li>
@@ -956,12 +1309,16 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
     <ul>
       <li><b>albumArt</b> - Link to current album art or radio station.</li>
       <li><b>elapseTime</b> - Elapse time of the played audio.</li>
+      <li><b>inetRadioFavorite[value]</b> - Name of the stored favorite.</li>
+      <li><b>inetRadioPreset[value]</b> - Name of the stored preset.</li>
       <li><b>mute</b> - Reports the mute status (on|off).</li>
       <li><b>playing</b> - Reports the current playier status (yes|no).</li>
       <li><b>power</b> - Reports the current power status (on|absent).</li>
       <li><b>presence</b> - Reports the current presence (present|absent).</li>
       <li><b>state</b> - Reports the current state status (on|absent).</li>
       <li><b>subtitle</b> - Reports the current subtitle of played audio.</li>
+      <li><b>totalInetRadioFavorites</b> - Number of stored favorites.</li>
+      <li><b>totalInetRadioPresets</b> - Number of stored presets.</li>
       <li><b>title</b> - Reports the current title of played audio.</li>
       <li><b>totalTime</b> - Reports the total time of the played audio.</li>
       <li><b>volume</b> - Reports current relative volume (0..100).</li>
@@ -1036,8 +1393,12 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
     <i>Bemerkung: Bitte bei den Befehlen und Parametern die Gro&szlig;- und Kleinschreibung beachten.</i><br>
     <ul><br><br>
       <li><b>aux</b>&nbsp;&nbsp;-&nbsp;&nbsp; Schaltet auf den AUX Eingang um (MP3 Link oder &auml;hnlich.).</li>
-      <li><b>inetRadioPreset</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt die Internetradio Voreinstellung (Das Umschalten kann einige Sekunden dauern...).</li>
-      <li><b>inetRadioFavorite</b> [1..10] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Internetradio-Lieblingssender (Das Umschalten kann einige Sekunden dauern...).</li>
+      <li><b>getInetRadioFavorites</b> &nbsp;&nbsp;-&nbsp;&nbsp; Liest die Favoriten. (Kann einige Sekunden dauern...).</li>
+      <li><b>getInetRadioPresets</b> &nbsp;&nbsp;-&nbsp;&nbsp; Liest die Presets. (Kann einige Sekunden dauern...).</li>
+      <li><b>inetRadioFavorite</b> [1..24] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Internetradio-Lieblingssender (Das Umschalten kann einige Sekunden dauern...).</li>
+      <li><b>inetRadioPreset</b> [1..24] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt die Internetradio Voreinstellung (Das Umschalten kann einige Sekunden dauern...).</li>
+      <li><b>inetRadioFavoriteByName</b> [name] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt einen Internetradio Favoriten mit Hilfe seines Names. (getInetRadioFavorites muss zuvor ausgef&uuml;hrt werden, damit der Befehl verf&uuml;gbar wird. (Kann einige Sekunden dauern...).</li>
+      <li><b>inetRadioPresetByName</b> [name] &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine Internetradio Voreinstellung mit Hilfe ihres Names. (getInetRadioPresets muss zuvor ausgef&uuml;hrt werden, damit der Befehl verf&uuml;gbar wird. (Kann einige Sekunden dauern...).</li>
       <li><b>mute</b>&nbsp;&nbsp;-&nbsp;&nbsp; Stummschaltung des Players.</li>
       <li><b>unmute</b>&nbsp;&nbsp;-&nbsp;&nbsp; Deaktivierung der Stummschaltung.</li>
       <li><b>next</b> &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den n&auml;chten Titel, Voreinstellung etc.</li>
@@ -1105,6 +1466,8 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
       <ul>
         <li><b>albumArt</b> - Link zum aktuellen Album art oder Radiostation.</li>
         <li><b>elapseTime</b> - Aktuelle Zeit des abgespielten Audiost&uuml;ckes.</li>
+        <li><b>inetRadioFavorite[Wert]</b> - Name des/der gespeicherten Favoriten.</li>
+        <li><b>inetRadioPreset[Wert]</b> - Name des/der gespeicherten Presets.</li> 
         <li><b>mute</b> - Abfrage des Stummschaltungstatus (on|off).</li>
         <li><b>playing</b> - Abfrage des aktuelle Playierstatus (yes|no).</li>
         <li><b>power</b> - Abfrage des aktuellen Ger&auml;tezustands (on|absent).</li>
@@ -1112,6 +1475,8 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
         <li><b>state</b> - Abfrage des aktuellen 'state'-Status (on|absent).</li>
         <li><b>subtitle</b> - Untertiltel des abgespielten Audiost&uuml;ckes.</li>
         <li><b>title</b> - Titel des abgespielten Audiost&uuml;ckes.</li>
+        <li><b>totalInetRadioFavorites</b> - Anzahl der gespeicherten Favoriten.</li>
+        <li><b>totalInetRadioPresets</b> - Anzahl der gespeicherten Presets.</li>
         <li><b>totalTime</b> Gesamtspieldauer des Audiost&uuml;ckes.</li>
         <li><b>volume</b> - Aktuelle relative Lautst&auml;rke (0..100).</li>
         <li><b>volumeStraight</b> - Aktuelle absolute Lautst&auml;rke (0..64).</li>  
