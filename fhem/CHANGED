@@ -1,6 +1,5 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - feature: pre-commit for checking very long CHANGED lines. YES YES YES YES YES YES YES YES
   - feature: 50_TelegramBot: alias for commands, new readings, 
                              support for sending media files; plus fixes
   - feature: 20_ROOMMATE,
@@ -210,13 +209,13 @@
              several models
   - feature: PRESENCE: support for Solaris ping (mode: lan-ping)
   - feature: HUEbridge: added support for HUE scenes
-                          (get: scenes; set: savescene, modifyscene, scene)
-                        new unified syntax for multiple lights
-                          in group and scene commands
-                        don't query status after set: use bridge response instead
-                        added queryAfterSet attribute
+             (get: scenes; set: savescene, modifyscene, scene)
+             new unified syntax for multiple lights
+             in group and scene commands
+             don't query status after set: use bridge response instead
+             added queryAfterSet attribute
   - feature: HUEDevice: added support for HUE scenes (set: savescene, scene)
-                        new unified syntax for multiple lights in lights command
+             new unified syntax for multiple lights in lights command
   - feature: LightScene: support HUE scenes
                          added asyncDelay attribute
   - bugfix:  10_IT: Fix wrong V3 dimm/off code
@@ -1244,8 +1243,8 @@
              meter with a JeeLabs JeeLink as RF modem. The matching JeeNode
              sketch can be found in .../contrib/36_PCA301-pcaSerial.zip
              (by ohweh&justme1968)
-  - change:  PRESENCE: using ping command line utility to check presence on Windows
-             based machines.
+  - change:  PRESENCE: using ping command line utility to check presence
+             on Windows based machines.
   - feature: install FHEM as Windows service by T.E., see docs/HOWTO_Windows.txt
   - feature: new module 33_readingsGroup to display a collection of readings
              from one or more devices. this will replace weblink readings.
