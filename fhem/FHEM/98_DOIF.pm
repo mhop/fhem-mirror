@@ -1099,7 +1099,7 @@ DOIF_SetSleepTimer($$$$$$$)
     #delete ($defs{$hash->{NAME}}{READINGS}{wait_timer});
     readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
     $hash->{helper}{sleeptimer}=-1;
-    $subnr=$hash->{helper}{sleepsubtimer} if ($hash->{helper}{sleepsubtimer}!=-1);
+    $subnr=$hash->{helper}{sleepsubtimer} if ($hash->{helper}{sleepsubtimer}!=-1 and $sleeptimer == $nr);
     return 0 if ($sleeptimer == $nr and $waitdelsubnr[$subnr]);
   }
     
