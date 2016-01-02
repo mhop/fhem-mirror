@@ -350,6 +350,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
     # update ROOMMATE devices associated with this device UUID
     my $matchingResident = 0;
+    delete $hash->{ROOMMATES};
     if ( defined( $modules{ROOMMATE}{defptr} ) ) {
         Log3 $name, 5, "GEOFANCY $name: found defptr for ROOMMATE\n"
           . Dumper( $modules{ROOMMATE}{defptr} );
@@ -362,6 +363,9 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
             Log3 $name, 5,
 "GEOFANCY $name: ROOMMATE device $key has assigned UUIDs: $geofenceUUIDs";
+
+            $hash->{ROOMMATES} .= ",$key" if $hash->{ROOMMATES};
+            $hash->{ROOMMATES} = $key if !$hash->{ROOMMATES};
 
             my @UUIDs = split( ',', $geofenceUUIDs );
 
@@ -376,10 +380,10 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
                     }
                 }
             }
-
-            last if $matchingResident eq "1";
         }
     }
+
+    delete $hash->{GUESTS};
 
     # update GUEST devices associated with this device UUID
     if ( $matchingResident == 0 && defined( $modules{GUEST}{defptr} ) ) {
@@ -389,6 +393,9 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
             Log3 $name, 5,
 "GEOFANCY $name: GUEST device $key has assigned UUIDs: $geofenceUUIDs";
+
+            $hash->{GUESTS} .= ",$key" if $hash->{GUESTS};
+            $hash->{GUESTS} = $key if !$hash->{GUESTS};
 
             my @UUIDs = split( ',', $geofenceUUIDs );
 
@@ -403,8 +410,6 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
                     }
                 }
             }
-
-            last if $matchingResident eq "1";
         }
     }
 
