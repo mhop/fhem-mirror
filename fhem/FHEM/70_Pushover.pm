@@ -488,7 +488,7 @@ sub Pushover_ReceiveCommand($$$) {
         if ( $service eq "messages.json" ) {
 
             readingsBulkUpdate( $hash, "lastTitle",    $values->{title} );
-            readingsBulkUpdate( $hash, "lastMessage",  $values->{message} );
+            readingsBulkUpdate( $hash, "lastMessage",  urlDecode($values->{message}) );
             readingsBulkUpdate( $hash, "lastPriority", $values->{priority} );
             readingsBulkUpdate( $hash, "lastAction",   $values->{action} )
               if ( $values->{action} ne "" );
@@ -508,7 +508,7 @@ sub Pushover_ReceiveCommand($$$) {
                     readingsBulkUpdate( $hash, "cbTitle_" . $values->{cbNr},
                         $values->{title} );
                     readingsBulkUpdate( $hash, "cbMsg_" . $values->{cbNr},
-                        $values->{message} );
+                        urlDecode($values->{message}) );
                     readingsBulkUpdate( $hash, "cbPrio_" . $values->{cbNr},
                         $values->{priority} );
                     readingsBulkUpdate( $hash, "cbAck_" . $values->{cbNr},
