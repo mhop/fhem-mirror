@@ -13,6 +13,7 @@ my $arg="-t $txn";
 my @lang = ("EN", "DE");
 my $exitCode = 0;
 use constant TAGS => qw{ul li code b i u table tr td};
+use constant LINECHECK => qw{CHANGED};
 
 
 my $log = `$svnlook log $arg $repos`;
@@ -31,9 +32,23 @@ foreach my $row (split("\n", $fList)) {
   chomp($row);
   my ($type, $fName) = split(" ", $row);
   next if($type eq "D");
-  next if(!$fName || $fName !~ m+FHEM/\d\d_(.*).pm$+);
+  next if(!$fName || !grep($fName, LINECHECK) || $fName !~ m+FHEM/\d\d_(.*).pm$+);
   my $modName = $1;
 
+  # check for 80 chars per line conformity
+  if(grep($fName, LINECHECK)) {
+    my $cCount = 0;
+    open(FILE, "$svnlook $arg cat $repos $fName|") ||
+        die("Cant svnlook cat $fName:$!\n");
+    while(my $l = <FILE>) {
+      chomp $l;
+      $cCount = length($l) if(length($l) > $cCount);
+    }
+    close(FILE);
+    err $fName, "$fName: file has over 80 chars/line" if($cCount > 80);
+    next;
+  }
+  
   foreach my $lang (@lang) {
     my $suffix = ($lang eq "EN" ? "" : "_$lang");
     my $tag;
