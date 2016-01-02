@@ -378,7 +378,7 @@ sub ENIGMA2_Set($@) {
             }
             elsif ( $macAddr ne "" && $macAddr ne "-" ) {
                 $result = ENIGMA2_wake( $name, $macAddr );
-                return "wake-up command sent";
+                return "wake-up command sent to MAC $macAddr";
             }
             else {
                 return
