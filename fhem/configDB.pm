@@ -336,7 +336,7 @@ sub cfgDB_ReadAll($) {
 	my ($cl) = @_;
 	my ($ret, @dbconfig);
 
-	if ($configDB{attr}{rescue} == 1) {
+	if (defined($configDB{attr}{rescue}) && ($configDB{attr}{rescue} == 1)) {
 		Log (0, 'configDB starting in rescue mode!');
 		push (@dbconfig, 'attr global modpath .');
 		push (@dbconfig, 'attr global verbose 3');
