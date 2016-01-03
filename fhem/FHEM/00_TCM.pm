@@ -1,5 +1,6 @@
 ##############################################
 # $Id$
+# 2016-01-01
 
 # by r.koenig at koeniglich.de
 #
@@ -224,6 +225,7 @@ TCM_Read($)
 
   my $name = $hash->{NAME};
   my $blockSenderID = AttrVal($name, "blockSenderID", "own");
+  my $chipID = exists($hash->{ChipID}) ? hex $hash->{ChipID} : 0;
   my $baseID = hex $hash->{BaseID};
   my $lastID = hex $hash->{LastID};
 
@@ -259,8 +261,8 @@ TCM_Read($)
           # extract db_0
           $d1 = substr($d1, 0, 2);
         }
-        if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
-          Log3 $name, 4, "TCM $name Telegram from $id blocked.";
+        if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
+          Log3 $name, 4, "TCM $name own telegram from $id blocked.";
         } else {
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef);
         }
@@ -282,8 +284,8 @@ TCM_Read($)
             # extract db_0
             $d1 = substr($d1, 0, 2);
           }
-          if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
-            Log3 $name, 4, "TCM $name Telegram from $id blocked.";
+          if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
+            Log3 $name, 4, "TCM $name own telegram from $id blocked.";
           } else {
             Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef);
           }
@@ -349,8 +351,8 @@ TCM_Read($)
         );
         $hash->{RSSI} = -$RSSI;
         
-        if ($blockSenderID eq "own" && (hex $id) >= $baseID && (hex $id) <= $lastID) {
-          Log3 $name, 4, "TCM $name Telegram from $id blocked.";
+        if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
+          Log3 $name, 4, "TCM $name own telegram from $id blocked.";
         } else {
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
         }
@@ -408,8 +410,8 @@ TCM_Read($)
         $hash->{RSSI} = -hex($RSSI);
         $packetType = sprintf "%01X", $packetType;
         
-        if ($blockSenderID eq "own" && (hex $2) >= $baseID && (hex $2) <= $lastID) {
-          Log3 $name, 4, "TCM $name Telegram from $2 blocked.";
+        if ($blockSenderID eq "own" && ((hex($2) >= $baseID && hex($2) <= $lastID) || $chipID == hex($2))) {
+          Log3 $name, 4, "TCM $name own telegram from $2 blocked.";
         } else {
           #EnOcean:PacketType:RORG:MessageData:SourceID:DestinationID:FunctionNumber:ManufacturerID:RSSI:Delay
           Dispatch($hash, "EnOcean:$packetType:C5:$messageData:$2:$1:$function:$manufID:$RSSI:$4", \%addvals);
@@ -601,25 +603,23 @@ TCM_Get($@)
   if($hash->{MODEL} eq "ESP2") {
     # TCM 120
     my $rawcmd = $gets120{$cmd};
-    return "Unknown argument $cmd, choose one of " .
-        join(" ", sort keys %gets120) if(!defined($rawcmd));
+    return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets120) . ':noArg' if(!defined($rawcmd));
     Log3 $name, 3, "TCM get $name $cmd";
     $rawcmd .= "000000000000000000";
     TCM_Write($hash, "", $rawcmd);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
-
     $msg = TCM_Parse120($hash, $msg, 1) if(!$err);
+    
   } else {
     # TCM 310
     my $cmdhash = $gets310{$cmd};
-    return "Unknown argument $cmd, choose one of " .
-        join(" ", sort keys %gets310) if(!defined($cmdhash));
+    return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets310) . ':noArg' if(!defined($cmdhash));
     Log3 $name, 3, "TCM get $name $cmd";
     my $cmdHex = $cmdhash->{cmd};
     TCM_Write($hash, sprintf("%04X0005", length($cmdHex)/2), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
-
     $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
+    
   }
   if($err) {
     Log3 undef, 2, "TCM $name $err";
@@ -942,13 +942,20 @@ sub TCM_Notify(@) {
       $hash->{LastID} = sprintf "%08X", (hex $baseID) + 127;    
     } elsif ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
       my @getBaseID = ("get", "baseID");
-      if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/ ) {
+      if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/) {
         $hash->{BaseID} = sprintf "%08X", hex $&;
         $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
       } else {
         $hash->{BaseID} = "00000000";
         $hash->{LastID} = "00000000";
       }
+    }
+    if ($hash->{MODEL} eq "ESP3" && $comType ne "RS485" && $hash->{DeviceName} ne "none") {
+      # get chipID
+      my @getChipID = ('get', 'version');
+      if (TCM_Get($hash, @getChipID) =~ m/ChipID:.([\dA-Fa-f]{8})/) {
+        $hash->{ChipID} = sprintf "%08X", hex $1;
+      } 
     }
     #CommandSave(undef, undef);
     readingsSingleUpdate($hash, "state", "initialized", 1);
