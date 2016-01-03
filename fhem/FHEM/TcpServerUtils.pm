@@ -109,7 +109,7 @@ TcpServer_Accept($$)
     }
   }
 
-  my $cname = "$type:$caddr:$port";
+  my $cname = "${name}_${caddr}_${port}";
   my %nhash;
   $nhash{NR}    = $devcount++;
   $nhash{NAME}  = $cname;
