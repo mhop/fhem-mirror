@@ -1705,7 +1705,7 @@ CommandDefine($$)
     @a = split("[ \t][ \t]*", $def, 3);
     $ignoreErr = 1;
   }
-  if($a[0] && $a[0] eq "-temporary") { # Forum #39610
+  if($a[0] && $a[0] eq "-temporary") { # Forum #39610, 46640
     $def =~ s/\s*-temporary\s*//;
     @a = split("[ \t][ \t]*", $def, 3);
     $temporary = 1;
@@ -1715,8 +1715,13 @@ CommandDefine($$)
   return "Usage: define <name> <type> <type dependent arguments>"
                 if(int(@a) < 2);
   return "$name already defined, delete it first" if(defined($defs{$name}));
-  return "Invalid characters in name (not A-Za-z0-9.:_): $name"
+  return "Invalid characters in name (not A-Za-z0-9._): $name"
                         if($name !~ m/^[a-z0-9.:_]*$/i);
+  if($name =~ m/:/) { # Forum #45788
+    my $msg = "unsupported character (:) in devicename $name";
+    return $msg if($init_done);
+    Log 3, "WARNING: $msg";
+  }
 
   my $m = $a[1];
   if(!$modules{$m}) {                           # Perhaps just wrong case?
@@ -2578,9 +2583,9 @@ CommandSetstate($$)
         next;
       }
 
-#      Log3 $d, 3, "WARNING: unsupported character in reading $sname ".
-#             "(not A-Za-z\\d_\\.-), notify the $d->{TYPE} module maintainer."
-#        if($sname !~ m/^[A-Za-z\d_\.-]+$/);
+      Log3 $d, 3, "WARNING: unsupported character in reading $sname ".
+             "(not A-Za-z\\d_\\.-), notify the $d->{TYPE} module maintainer."
+        if($sname !~ m/^[A-Za-z\d_\.-]+$/);
 
       if(!defined($d->{READINGS}{$sname}) ||
          !defined($d->{READINGS}{$sname}{TIME}) ||
