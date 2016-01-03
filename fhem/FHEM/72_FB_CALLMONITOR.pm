@@ -344,11 +344,11 @@ FB_CALLMONITOR_Read($)
             
             if(not $external_number =~ /^0/ and $area_code ne "")
             {
-                if($area_code =~ /^0[1-9]\d+$/)
+                if($area_code =~ /^0[1-9]\d+$/ and $external_number =~ /^[1-9]\d+$/)
                 {
                     $external_number = $area_code.$external_number;
                 }
-                else
+                elsif(not $area_code =~ /^0[1-9]\d+$/)
                 {
                     Log3 $name, 2, "FB_CALLMONITOR ($name) - given local area code '$area_code' is not an area code. therefore will be ignored";
                 }
