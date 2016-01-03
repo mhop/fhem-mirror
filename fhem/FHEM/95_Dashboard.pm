@@ -866,7 +866,7 @@ sub BuildGroup
 				} else {
 					my $nCmd = $cmdIcon{$cmd} ?
                             				FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
-					$ret .= FW_pH "cmd.$d=set $d $cmd$rf", $cmd, 1, "col3", 1;
+					$ret .= FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 1, "col3", 1;
 				}
 			}
 		}
