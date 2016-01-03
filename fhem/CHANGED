@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: SYSMON: end of support for barcharts
+  - fix:    SYSMON: html
   - feature: 98_weekprofile: new attribute 'widgetEditOnNewPage' to edit
              weekprofile on new web page
   - change:  89_HEATRONIC: new feature: set heating mode, set temperature
