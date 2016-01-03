@@ -54,15 +54,14 @@ BlockingCall($$@)
   # If not suitable telnet device found, create a temporary one
   if(!$telnetDevice) {
     $telnetDevice = "telnetForBlockingFn_".time();
-    my $ret = CommandDefine(undef, "$telnetDevice telnet 0");
+    my $ret = CommandDefine(undef, "-temporary $telnetDevice telnet 0");
     if($ret) {
       $ret = "BlockingCall ($blockingFn): ".
                 "No telnet port found and cannot create one: $ret";
       Log 1, $ret;
       return $ret;
     }
-    CommandAttr(undef, "$telnetDevice room hidden");
-    $defs{$telnetDevice}{TEMPORARY} = 1;
+    $attr{$telnetDevice}{room} = "hidden"; # no red ?, Forum #46640
     $attr{$telnetDevice}{allowfrom} = "127.0.0.1";
   }
 
