@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  95_Dashboard: fixed issue when using cmdIcon attribute
+                           for devices.
   - feature: 71_PHILIPS_AUDIO: select presets and favorites by name.
   - feature: 50_TelegramBot: alias for commands, new readings, 
                              support for sending media files; plus fixes
