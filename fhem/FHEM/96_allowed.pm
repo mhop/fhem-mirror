@@ -16,7 +16,8 @@ allowed_Initialize($)
   $hash->{AuthenticateFn} = "allowed_Authenticate";
   $hash->{AttrFn}   = "allowed_Attr";
   $hash->{AttrList} = "disable:0,1 validFor allowedCommands allowedDevices ".
-                        "basicAuth basicAuthMsg password globalpassword";
+                        "basicAuth basicAuthMsg password globalpassword ".
+                        "basicAuthExpiry";
   $hash->{UndefFn} = "allowed_Undef";
 }
 
@@ -90,6 +91,17 @@ allowed_Authenticate($$$$)
     my $FW_httpheader = $param;
     my $secret = $FW_httpheader->{Authorization};
     $secret =~ s/^Basic //i if($secret);
+    
+    # Check for Cookie in headers if no basicAuth header is set
+    my $authcookie;
+    if ( ( ! $secret ) && ( $FW_httpheader->{Cookie} ) ) {
+      if ( AttrVal($aName, "basicAuthExpiry", 0)) {  
+        my $cookie = "; ".$FW_httpheader->{Cookie}.";"; 
+        $authcookie = $1 if ( $cookie =~ /; AuthToken=([^;]+);/ ); 
+        $secret = $authcookie;
+      }
+    }
+    
     my $pwok = ($secret && $secret eq $basicAuth);      # Base64
     if($secret && $basicAuth =~ m/^{.*}$/) {
       eval "use MIME::Base64";
@@ -102,7 +114,27 @@ allowed_Authenticate($$$$)
         Log3 $aName, 1, "basicAuth expression: $@" if($@);
       }
     }
-    
+
+    # Add Cookie header ONLY if 
+    #   authentication with basic auth was succesful 
+    #   (meaning if no or wrong authcookie set)
+    if ( ( $pwok ) &&  
+         ( ( ! defined($authcookie) ) || ( $secret ne $authcookie ) ) ) {
+      # no cookie set but authorization succesful
+      # check if cookie should be set --> Cookie Attribute != 0 
+      my $time = int(AttrVal($aName, "basicAuthExpiry", 0));
+      if ( $time ) {
+        # time specified in days until next expiry (but timestamp is in seconds)
+        $time *= 86400;
+        $time += time();
+        # generate timestamp according to RFC-1130 in Expires
+        my $expires = "Expires=".FmtDateTimeRFC1123($time);
+        # set header with expiry
+        $cl->{".httpAuthHeader"} = "Set-Cookie: AuthToken=".$secret.
+                "; Path=/ ; ".$expires."\r\n" ;
+      }
+    } 
+
     return 1 if($pwok);
 
     my $msg = AttrVal($aName, "basicAuthMsg", "FHEM: login required");
@@ -260,6 +292,16 @@ allowed_Attr(@)
         <ul><code>
           attr allowedWEB basicAuth { "$user:$password" eq "admin:secret" }<br>
         </code></ul>
+    </li><br>
+
+    <a name="basicAuthExpiry"></a>
+    <li>basicAuthExpiry<br>
+        allow the basicAuth to be kept valid for a given number of days. 
+        So username/password as specified in basicAuth are only requested 
+        after a certain period. 
+        This is achieved by sending a cookie to the browser that will expire 
+        after the given period.
+        Only valid if basicAuth is set.
     </li><br>
 
     <a name="password"></a>

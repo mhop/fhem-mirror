@@ -382,7 +382,11 @@ FW_Read($$)
 
     } elsif($ret == 1) {
       $FW_chash->{Authenticated} = 1; # ok
-
+      # Need to send set-cookie (if set) after succesful authentication
+      my $ah = $FW_chash->{".httpAuthHeader"};
+      $FW_headerlines .= $ah if($ah);
+      delete $FW_chash->{".httpAuthHeader"}; 
+      
     } else {
       my $ah = $FW_chash->{".httpAuthHeader"};
       TcpServer_WriteBlocking($hash,
