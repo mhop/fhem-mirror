@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  FB_CALLMONITOR: empty phonebooks will be recognized correctly,
+             phonebook processing continues, when error occurs
+  - change:  FB_CALLMONITOR:  attr fritzbox-remote-phonebook-exclude allows
+             phonebook names additional to ID's
   - bugfix:  95_Dashboard: fixed issue when using cmdIcon attribute
                            for devices.
   - feature: 71_PHILIPS_AUDIO: select presets and favorites by name.
