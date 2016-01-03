@@ -3,11 +3,7 @@
 #
 # Usage
 # 
-# define <name> weekprofile <device>
-#
-# Changelog
-#
-# V 0.01 2015-12-23 - first version
+# define <name> weekprofile [device]
 ############################################## 
 
 package main;
@@ -313,6 +309,7 @@ sub weekprofile_Initialize($)
   $hash->{SetFn}    = "weekprofile_Set";
   $hash->{StateFn}  = "weekprofile_State";
   $hash->{NotifyFn} = "weekprofile_Notify";
+  $hash->{AttrFn}   = "weekprofile_Attr";
   $hash->{AttrList} = "widgetWeekdays configFile ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
@@ -529,6 +526,8 @@ sub weekprofile_State($$$$)
 {
   my ($hash, $time, $name, $val) = @_;
   my $me = $hash->{NAME};
+  #do nothing we do not restore readings from statefile
+  return undef;
 }
 ############################################## 
 sub weekprofile_Notify($$)
@@ -556,24 +555,40 @@ sub weekprofile_Notify($$)
   return undef;
 }
 ############################################## 
+sub weekprofile_Attr($$$)
+{
+  my ($cmd, $me, $attrName, $attrVal) = @_;
+  
+  my $hash = $defs{$me};
+  
+  Log3 $me, 5, "$me(weekprofile_Attr): $cmd, $attrName, $attrVal";
+  
+  $attr{$me}{$attrName} = $attrVal;
+  weekprofile_writeProfilesToFile($hash) if ($attrName eq 'configFile');
+  return undef;
+  
+}
+############################################## 
 sub weekprofile_writeProfilesToFile(@)
 {
   my ($hash) = @_;
   my $me = $hash->{NAME};
+  
+  my $start = (defined($hash->{MASTERDEV}->{NAME})) ? 1:0;
+  my $prfCnt = scalar(@{$hash->{PROFILES}});
+  return if ($prfCnt <= $start);
 
   my $filename = "./log/weekprofile-$me.cfg";
   $filename = AttrVal($me,"configFile",$filename);
-  
-  Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename";
+
   my $ret = open(my $fh, '>', $filename);
   if (!$ret){
-    Log3 $me, 1, "Could not open file '$filename' $!";
+    Log3 $me, 1, "$me(writeProfileToFile): Could not open file '$filename' $!";
     return;
   }
   
-  my $json = JSON->new;    
-  my $start = (defined($hash->{MASTERDEV}->{NAME})) ? 1:0;
-  my $prfCnt = scalar(@{$hash->{PROFILES}});
+  Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename";
+  my $json = JSON->new;
   for (my $i = $start; $i < $prfCnt; $i++) {
     print $fh $hash->{PROFILES}[$i]->{NAME}."=".$json->encode($hash->{PROFILES}[$i]->{DATA})."\n";
   }  
@@ -588,8 +603,6 @@ sub weekprofile_readProfilesFromFile(@)
   my $filename = "./log/weekprofile-$me.cfg";
   $filename = AttrVal($me,"configFile",$filename);
   
-  Log3 $me, 5, "$me(readProfilesFromFile): read profiles from $filename";
-  
   unless (-e $filename) {
      Log3 $me, 5, "$me(readProfilesFromFile): file do not exist '$filename'";
      return;
@@ -600,6 +613,9 @@ sub weekprofile_readProfilesFromFile(@)
     Log3 $me, 1, "$me(readProfilesFromFile): Could not open file '$filename' $!";
     return;
   }
+  
+  Log3 $me, 5, "$me(readProfilesFromFile): read profiles from $filename";
+  
   my $json = JSON->new;  
   my $rowCnt = 0;
   while (my $row = <$fh>) {
