@@ -310,7 +310,7 @@ sub weekprofile_Initialize($)
   $hash->{StateFn}  = "weekprofile_State";
   $hash->{NotifyFn} = "weekprofile_Notify";
   $hash->{AttrFn}   = "weekprofile_Attr";
-  $hash->{AttrList} = "widgetWeekdays configFile ".$readingFnAttributes;
+  $hash->{AttrList} = "widgetWeekdays widgetEditOnNewPage:0,1 configFile ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
@@ -659,11 +659,13 @@ sub weekprofile_SummaryFn()
   my $html;
   
   my $iconName = AttrVal($d, "icon", "edit_settings");
-  my $icon = FW_iconName($iconName) ? FW_makeImage($iconName,$iconName,"icon") : "";
-  $icon = "<a name=\"$d.edit\" onclick=\"weekprofile_DoEditWeek('$d')\" href=\"javascript:void(0)\">$icon</a>";
+  my $editNewpage = AttrVal($d, "widgetEditOnNewPage", 0);
   
-  my $lnk = AttrVal($d, "alias", $d);
-  $lnk = "<a name=\"$d.detail\" href=\"$FW_ME$FW_subdir?detail=$d\">$lnk</a>" if($show_links);
+  my $editIcon = FW_iconName($iconName) ? FW_makeImage($iconName,$iconName,"icon") : "";
+  $editIcon = "<a name=\"$d.edit\" onclick=\"weekprofile_DoEditWeek('$d','$editNewpage')\" href=\"javascript:void(0)\">$editIcon</a>";
+  
+  my $lnkDetails = AttrVal($d, "alias", $d);
+  $lnkDetails = "<a name=\"$d.detail\" href=\"$FW_ME$FW_subdir?detail=$d\">$lnkDetails</a>" if($show_links);
   
   my $args = "weekprofile";
   my $curr = undef;
@@ -673,13 +675,37 @@ sub weekprofile_SummaryFn()
   $html .= "<tr><td>";
   $html .= "<div class=\"devType\" id=\"weekprofile.$d.header\">";
   $html .= "<div class=\"devType\" id=\"weekprofile.menu.base\">";
-  $html .= $icon."&nbsp;".$lnk;
+  $html .= $editIcon."&nbsp;".$lnkDetails;
   $html .= "</di></div></td></tr>";
   $html .= "<tr><td>";
   $html .= "<div class=\"fhemWidget\" informId=\"$d\" cmd=\"\" arg=\"$args\" current=\"$curr\" dev=\"$d\">"; # div tag to support inform updates
   $html .= "</div>";
   $html .= "</td></tr>";
   $html .= "</table>";
+  return $html;
+}
+############################################## 
+sub weekprofile_editOnNewpage(@)
+{
+  my ($device, $prf,$backurl) = @_;
+  my $hash = $defs{$device};
+  
+  $backurl="?"  if(!defined($backurl));
+  my $args = "weekprofile,EDIT,$backurl";
+  
+  my $html;
+  $html .= "<html>";
+  $html .= "<table>";
+  $html .= "<tr><td>";
+  $html .= "<div class=\"devType\" id=\"weekprofile.$device.header\">";
+  $html .= "<div class=\"devType\" id=\"weekprofile.menu.base\">";
+  $html .= "</di></div></td></tr>";
+  $html .= "<tr><td>";
+  $html .= "<div class=\"fhemWidget\" informId=\"$device\" cmd=\"\" arg=\"$args\" current=\"$prf\" dev=\"$device\">"; # div tag to support inform updates
+  $html .= "</div>";
+  $html .= "</td></tr>";
+  $html .= "</table>";
+  $html .= "</html>";
   return $html;
 }
 1;
@@ -764,6 +790,9 @@ sub weekprofile_SummaryFn()
       Liste von Wochentagen getrennt durch ',' welche im Widget angzeigt werden. 
       Beginnend bei Montag. z.B.
       <code>attr name widgetWeekdays Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag</code>
+    </li>
+    <li>widgetEditOnNewPage<br>
+      Wenn gesetzt ('1'), dann wird die Bearbeitung auf einer separaten\neuen Webseite gestartet.
     </li>
      <li>configFile<br>
       Pfad und Dateiname wo die Profile gespeichert werden sollen.

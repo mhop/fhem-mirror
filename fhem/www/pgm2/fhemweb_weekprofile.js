@@ -39,14 +39,23 @@ function FW_weekprofileInputDialog(title,inp,parent, callback)
     });
 }
 
-function weekprofile_DoEditWeek(devName)
+function weekprofile_DoEditWeek(devName,newPage)
 {
   var widget = $('div[informid="'+devName+'"]').get(0);
-  widget.MODE = 'EDIT';
-  
-  $(widget.MENU.BASE).hide();
-
-  widget.setValueFn("REUSEPRF");
+ 
+  if (newPage == 1) {
+    var url = location.href;
+    var pos = url.indexOf('?');
+    if (pos >=0)
+        url = url.substr(pos);
+    else
+        url='';
+    window.location.assign(FW_root+'?cmd={weekprofile_editOnNewpage("'+widget.DEVICE+'","'+widget.CURPRF+'","'+url+'");;}');
+  } else {
+    widget.MODE = 'EDIT';
+    $(widget.MENU.BASE).hide();
+    widget.setValueFn("REUSEPRF");
+  }
 }
 
 function FW_weekprofilePRFChached(devName,select)
@@ -357,15 +366,24 @@ function FW_weekprofilePrepAndSendProf(devName)
       widget.PROFILE[day] = prf[day];
     }
   }
-  widget.MODE = "SHOW";
-  widget.setValueFn("REUSEPRF");  
+  FW_weekprofileBack(widget);
+}
+
+function FW_weekprofileBack(widget)
+{
+  if (widget.SHOWURL){
+    window.location.assign(FW_root+widget.SHOWURL);
+  }
+  else {
+    widget.MODE = "SHOW";
+    widget.setValueFn("REUSEPRF");
+  }
 }
 
 function FW_weekprofileEditAbort(devName)
 {
   var widget = $('div[informid="'+devName+'"]').get(0);
-  widget.MODE = "SHOW";
-  widget.setValueFn("REUSEPRF");
+  FW_weekprofileBack(widget);
 }
 
 function FW_weekprofileSetValue(devName,data)
@@ -383,7 +401,7 @@ function FW_weekprofileSetValue(devName,data)
   }
   
   widget.PROFILE = prf;
-  if (widget.MODE == 'SHOW' || widget.MODE == 'CREATE')
+  if (widget.MODE == 'SHOW')
   {
     FW_weekprofileShow(widget);
   }
@@ -416,14 +434,15 @@ function FW_weekprofileGetValues(devName,what,data)
 function
 FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
 {
+  // called from FW_replaceWidget fhemweb.js 
   if( 0 ) {
-    console.log( "elName: "+elName );
-    console.log( "devName: "+devName );
-    console.log( "vArr: "+vArr );
-    console.log( "currVal: "+currVal );
-    console.log( "set: "+set );
-    console.log( "params: "+params );
-    console.log( "cmd: "+cmd );
+    console.log( "elName: "+elName );   
+    console.log( "devName: "+devName ); // attr dev
+    console.log( "vArr: "+vArr );       // attr arg split ','
+    console.log( "currVal: "+currVal ); // attr current 
+    console.log( "set: "+set );         // attr cmd split ' ' first entry
+    console.log( "params: "+params );   // attr cmd list split ' ' without first entry
+    console.log( "cmd: "+cmd );         // function for ToDo
   }
 
   if(!vArr.length || vArr[0] != "weekprofile")
@@ -451,7 +470,13 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
     }  
   $(widget.HEADER).append(prfCnt);
   
-  widget.MODE = 'CREATE';
+  widget.SHOWURL = null;
+  widget.MODE = 'SHOW';
+  if (vArr.length > 1) {
+    widget.MODE = vArr[1];
+    if (vArr.length > 2)
+      widget.SHOWURL = vArr[2];
+  }
   widget.DEVICE = devName;
   widget.WEEKDAYS = shortDays.slice();
   widget.CURPRF = currVal;
