@@ -1694,8 +1694,8 @@ YAMAHA_AVR_ParseResponse ($$$)
                     {
                         Log3 $name, 5 ,"YAMAHA_AVR ($name) - return to start of menu to begin menu browsing";
                         
-                        # RX-Vx71's series models use a different command to return back to menu root
-                        my $back_cmd = ((exists($hash->{MODEL}) and $hash->{MODEL} =~ /^RX-A\d{1,2}10|RX-V\d{1,2}71$/) ? "Back to Home" : "Return to Home");
+                        # RX-Vx71's series models and older use a different command to return back to menu root                       
+                        my $back_cmd = ((exists($hash->{MODEL}) and $hash->{MODEL} =~ /^(?:RX-A\d{1,2}10|RX-A\d{1,2}00|RX-V\d{1,2}(?:71|67|65))$/) ? "Back to Home" : "Return to Home");
                         
                         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><List_Control><Cursor>$back_cmd</Cursor></List_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg);
                         YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $cmd, $arg,  {options => {init => 1}});
