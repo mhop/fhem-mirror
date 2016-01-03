@@ -189,7 +189,7 @@ weblink_FwFn($$$$)
       <ul>
         <code>
         define yw weblink iframe http://weather.yahooapis.com/forecastrss?w=650272&u=c<br>
-        attr yw weblink htmlattr width="480" height="560"<br>
+        attr yw htmlattr width="480" height="560"<br>
         </code>
       </ul></li>
 
