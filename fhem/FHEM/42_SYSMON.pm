@@ -4154,544 +4154,6 @@ sub SYSMON_Log($$$) {
    Log3 $hash, $loglevel, "SYSMON $instName: $sub.$xline " . $text;
 }
 
-#sub trim($)
-#{ 
-#   my $string = shift;
-#   $string =~ s/^\s+//;
-#   $string =~ s/\s+$//;
-#   return $string;
-#}
-
-
-# --- SNX ---------------------------------------------------------------------
-
-# SYSMON_ShowBarChartHtml(<device>,<options>);
-# device: name of the linked sysmon instance
-# options: perl hash { key=>value, key=>value, .. } containing options. possible keys are:
-# - bars: comma separated list of bars to show. possible bars are:
-#   - us: uptime system
-#   - uf: uptime fhem
-#   - cf[|<core>]: cpu frequency - <core> is the target cpu core number [0..n]
-#   - cl[|<core>]: cpu load - <core> is the target cpu core number [0..n]
-#   - ct: cpu temperature
-#   - mr: memory ram
-#   - ms: memory swap
-#   - fs|<name> file system - <name> is the target reading name
-#   the default value (if you do not provide bars option) is: us,uf,cl,ct,cf,mr,ms,fs:fs_root
-#   a bar won't displayed if the appropriate reading doesn't exist (e.g. cpu_freq @ fritzbox) or is empty (e.g. cpu_temp @ fritz box), even if you defined the bar to show.
-# - title_<bar>: bar title. if you use a bar in the bars option, but do not provide a title the default title will be displayed. possible bar names and their default title are:
-#   - us: uptime
-#   - uf: uptime fhem
-#   - cf: cpu% freq
-#   - cl: cpu% load
-#   - ct: cpu temp
-#   - mr: mem ram
-#   - ms: mem swap
-#   - fs: fs %
-#   - fsx: {fs_root=>"fs root"}
-#   - cfx: 
-#   - clx: 
-#   you can use the variable % within:
-#   - cf,cl: % will be replaced by the cpu core number
-#   - fs: % will be replaced by the reading name
-#   using bar names ending with x you can provide title for specific bars (e.g. cpu1, cpu2, fs_root, fs_boot).
-#   it has to be a perl hash too, where key is depending of the type:
-#   - fsx: name of the filesystem reading (e.g. fs_root, fs_boot)
-#   - cfx: cpu core number
-#   - clx: cpu core number
-#   - ctx: cpu core number
-#   if you provide a title for a specific bar (e.g title_cfx=>{1=>"cpu1 freq"}), this will be prefered and 'override' the general title (e.g. title_cf=>"cpu freq")
-# - stat: display of statistic data [min, max, avg]. possible values:
-#   - 0: no statistic data
-#   - 1: colored ranges (min to avg, avg to max) as bar overlay, hover-info  for pc, click-info for tablet/mobile
-# - weblink: name of a weblink instance. if you use this method inside a weblink you can provide the name if the weblink instance. due to that the title will appear as a link targeting the weblink instance detail page.
-# - title: the title of the chart. the default title is the name of the linked sysmon instance. if you supplied the weblink option this will be the default title.
-#     supply empty value to prevent title output. 
-# - color<type>: html/css color definition. possible type names and their default colors are:
-#   - Border: bar border (black)
-#   - Fill: bar content (tan)
-#   - Text: bar text (empty -> css style default) 
-#   - Stat: statistic data [min, max, avg] indicatator (=border -> if you change border, this will changed as well)
-#   - MinAvg: statistic data range1 - min to avg
-#   - AvgMax: staristic data range2 - avg to max
-#   color can be any html/css color definition:
-#   - name: red
-#   - hex: #ff0000
-#   - rgb: rgb(255,0,0)
-#          rgba(255,0,0,.5)
-#
-# example usage inside a weblink instance:
-# - no customization..
-#   define wlRasPi1 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi")}
-# - define which bars to show (cpu load, cpu temperature and filesystem fs_root)..
-#   define wlRasPi2 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{bars=>"cl,ct,fs|fs_root"})}
-# - show bars for each cpu core (in this case we've got 4 cores)..
-#   define wlRasPi3 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{bars=>"ct,cl,cl|0,cl|1,cl|2,cl|3"})}
-# - customize bar titles (cpu load => CPULoad, uptime system => System Uptime, common filesystem FileSystem <readingName> and the specific root filesystem (reading fs_root) => Root)..
-#   define wlRasPi4 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{title_cl=>"CPULoad",title_us=>"System Uptime",title_fs=>"FileSystem %",title_fs2=>{fs_root=>"Root"}})}
-# - customize colors (bar will be filled red, the text will be white)
-#   define wlRasPi5 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{colorFill=>"red",colorText=>"#fff"})}
-# - let the chart title become a link to the weblink instance
-#   define wlRasPi6 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{weblink=>"wlRasPi6"})}
-# - customize chart title
-#   define wlRasPi7 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{title=>"This is my Chart"})}
-# - disable statistical data
-#   define wlRasPi8 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{stat=>0})}
-# - mix previous options
-#   define wlRasPi9 weblink htmlCode {SYSMON_ShowBarChartHtml("sysRaspi",{weblink=>"wlRasPi9", title=>"Rasperry Pi", stat=>0, bars=>"cl,ct,us,fs|fs_root,fs|fs_boot", title_cl=>"CPU load", title_ct=>"CPU temperature", title_fs=>"FileSystem %", title_fsx=>{fs_root=>"Root"}, colorBorder=>"blue", colorFill=>"lightgray" ,colorText=>"blue"})}
-
-
-sub SYSMON_ShowBarChartHtml($;$) {
-  my ($dev,$opt) = @_;
-  # extend with default options..
-  $opt->{colorBorder} = $opt->{colorBorder} || 'black';
-  $opt->{colorFill} = $opt->{colorFill} || 'tan';
-  $opt->{colorText} = $opt->{colorText} || ''; # use font color by style..
-  $opt->{colorStat} = $opt->{colorStat} || $opt->{colorBorder};
-  $opt->{colorMinAvg} = $opt->{colorMinAvg} || 'lightsalmon';
-  $opt->{colorAvgMax} = $opt->{colorAvgMax} || 'lightgreen';
-  $opt->{title} = defined($opt->{title}) ? $opt->{title} : ( $opt->{weblink} || $dev );
-  $opt->{weblink} = $opt->{weblink} || '';
-  $opt->{bars} = $opt->{bars} || 'uf,us,cl,ct,cf,mr,ms,fs|fs_root';
-  $opt->{title_uf} = $opt->{title_uf} || 'uptime fhem';
-  $opt->{title_us} = $opt->{title_us} || 'uptime';
-  $opt->{title_ct} = $opt->{title_ct} || 'cpu temp';
-  $opt->{title_cf} = $opt->{title_cf} || 'cpu% freq';
-  $opt->{title_cl} = $opt->{title_cl} || 'cpu% load';
-  $opt->{title_mr} = $opt->{title_mr} || 'mem ram';
-  $opt->{title_ms} = $opt->{title_ms} || 'mem swap';
-  $opt->{title_fs} = $opt->{title_fs} || 'fs %';
-  $opt->{title_fsx} = $opt->{title_fsx} || {fs_root=>'fs root'};
-  $opt->{stat} = defined($opt->{stat}) ? $opt->{stat} : 1;
-  # bar string to array/hash..
-  $opt->{barList} = ();
-  foreach my $bar (split(/\s*,+\s*/,$opt->{bars})){
-    my ($type,$param) = split(/\|/,$bar);
-    #push(@{$opt->{barList}},{id=>Data::GUID->new->as_string,type=>$type,param=>$param},);
-    push(@{$opt->{barList}},{id=>time=~s/[^0-9]//gr,type=>$type,param=>$param},);
-  }
-  # html templates..
-  my $htmlTitleSimple = '<div><b>#TITLE#</b></div>';
-  my $htmlTitleWeblink = '<div><a href="?detail=#WEBLINK#"><b>#TITLE#</b></a></div>';
-  my $htmlRow = ''
-  . '<tr>'
-  . '  <td>#NAME#</td>'
-  . '  <td>#VALUE#</td>'
-  . '</tr>';
-  my $htmlBarSimple = ''
-  . '<div style="position:relative;min-width:200px;border:1px solid '.$opt->{colorBorder}.';cursor:default;">' 
-  . '  <div style="overflow:hidden;">'
-  . '    <div style="height:1.5em;background:'.$opt->{colorFill}.';width:#CURP#%;"></div>'
-  . '    <div style="position:absolute;top:.2em;height:1.3em;width:100%;text-align:center;color:'.$opt->{colorText}.'">#CURT#</div>'
-  . '  </div>'
-  . '</div>';
-  my $htmlBarStat = ''
-  . '<div id="#ID#" onclick="tgl(this)" style="position:relative;min-width:200px;border:1px solid '.$opt->{colorBorder}.';cursor:default;">' 
-  . '  <div id="#ID#Cur" style="overflow:hidden;transition:height .4s, opacity .4s;">'
-  . '    <div style="height:1.5em;background:'.$opt->{colorFill}.';width:#CURP#%;"></div>'
-  . '    <div style="position:absolute;top:.2em;height:1.3em;width:100%;text-align:center;color:'.$opt->{colorText}.'" title="min: #MINT# | avg: #AVGT# | max: #MAXT#">#CURT#</div>'
-  . '    <div style="position:absolute;top:0;height:.3em;background:'.$opt->{colorAvgMax}.';border-right:1px solid '.$opt->{colorStat}.';width:#MAXP#%;"></div>'
-  . '    <div style="position:absolute;top:0;height:.3em;background:'.$opt->{colorMinAvg}.';border-right:1px solid '.$opt->{colorStat}.';width:#AVGP#%;"></div>'
-  . '    <div style="position:absolute;top:0;height:.3em;background:'.$opt->{colorFill}.';border-right:1px solid '.$opt->{colorStat}.';width:#MINP#%;"></div>'
-  . '  </div>'
-  . '  <div id="#ID#MAM" style="height:0;opacity:0;overflow:hidden;transition:height .4s, opacity .4s;">'
-  . '    <div style="position:relative;">'
-  . '      <div style="height:.5em;background:tan;width:#MINP#%;"></div>'
-  . '    </div>'
-  . '    <div style="position:relative;">'
-  . '      <div style="height:.5em;background:tan;width:#AVGP#%;"></div>'
-  . '    </div>'
-  . '    <div style="position:relative;">'
-  . '      <div style="height:.5em;background:tan;width:#MAXP#%;"></div>'
-  . '    </div>'
-  . '    <div style="position:absolute;top:0;height:1.5em;width:100%;text-align:center;color:'.$opt->{colorText}.'" title="min: #MINT# | avg: #AVGT# | max: #MAXT#">#MINT# < #AVGT# < #MAXT#</div>'
-  . '  </div>'
-  . '</div>';
-  my $htmlScript .= ''
-  . '<script>'
-  . 'function tgl(o) {'
-  . '  var c=document.getElementById(o.id+"Cur");'
-  . '  var m=document.getElementById(o.id+"MAM");'
-  . '  var s,h;'
-  . '  if (o.mam=="yes") { o.mam=""; s=c.style; h=m.style; } else { o.mam="yes"; s=m.style; h=c.style; }'
-  . '  s.height="auto"; s.opacity=1; h.height=0; h.opacity=0;'
-  . '}'
-  . '</script>';
-  # access sysmon data..
-  #my $sysmon = SYSMON_getValues($dev);
-  my $sysmon = {};
-  my $html='';
-  if(defined($main::defs{$dev}{READINGS})) {
-    foreach my $r (keys %{$main::defs{$dev}->{READINGS}}){
-      $sysmon->{$r} = $main::defs{$dev}{READINGS}{$r}{VAL};
-    }
-  } else {
-    $html = 'Unknown device: '.$dev;
-  }
-  # build bar chart html..
-
-  # ..title
-  if (defined($opt->{title}) and $opt->{title} ne ''){
-    if (defined($opt->{weblink}) and $opt->{weblink} ne ''){
-      $html .= $htmlTitleWeblink =~ s/#TITLE#/$opt->{title}/r =~ s/#WEBLINK#/$opt->{weblink}/r;
-    }
-    else{
-      $html .= $htmlTitleSimple =~ s/#TITLE#/$opt->{title}/r;
-    }
-  }
-  # ..bars
-  my $htmlBar = ($opt->{stat} eq 1) ? $htmlBarStat : $htmlBarSimple;
-  $html .= '<table>';
-  foreach my $bar (@{$opt->{barList}}){
-  	$bar->{param} = $bar->{param} || '';
-    my $title = $opt->{'title_'.$bar->{type}.'x'}{$bar->{param}} || $opt->{'title_'.$bar->{type}};
-    if ($bar->{type} eq 'us'){
-      # uptime system / idle..
-      if (defined($sysmon->{uptime})){
-        my $upSystem = SYSMON_secsToReadable($sysmon->{uptime});
-         # idle..
-        if (defined($sysmon->{idletime})){
-          #25386 99.32 %
-          my (undef,$idleP,undef) = split(/\s+/,$sysmon->{idletime});
-          $upSystem .= " ($idleP % idle)";
-        }
-        $html .= $htmlRow
-                    =~ s/#NAME#/$title/gr
-                    =~ s/#VALUE#/$upSystem/gr;
-      }
-    }
-    elsif ($bar->{type} eq 'uf'){
-      # uptime fhem..
-      if (defined($sysmon->{fhemuptime})){
-        my $upFhem = SYSMON_secsToReadable($sysmon->{fhemuptime});
-        $html .= $htmlRow
-                    =~ s/#NAME#/$title/gr
-                    =~ s/#VALUE#/$upFhem/gr;
-      }
-    }
-    elsif ($bar->{type} eq 'cf'){
-      my $name = 'cpu'.$bar->{param}.'_freq';
-      my $nameS = $name.'_stat';
-      # cpu freq..
-      if (defined($sysmon->{$name})){
-        my %cf = ();
-        # min max avg..
-        if (defined($sysmon->{$nameS})){
-          #600.00 900.00 845.36
-          ($cf{min}, $cf{max}, $cf{avg}) = split(/\s+/,$sysmon->{$nameS});
-        }
-        $cf{curP} = sprintf("%.1f",$sysmon->{$name}/10);
-        $cf{curT} = sprintf("%.0f",$sysmon->{$name})." MHz";
-        $cf{minP} = sprintf("%.1f",($cf{min}/10));
-        $cf{minT} = sprintf("%.0f",$cf{min})." MHz";
-        $cf{maxP} = sprintf("%.1f",($cf{max}/10));
-        $cf{maxT} = sprintf("%.0f",$cf{max})." MHz";
-        $cf{avgP} = sprintf("%.1f",($cf{avg}/10));
-        $cf{avgT} = sprintf("%.0f",$cf{avg})." MHz";
-        $cf{title} = $title =~ s/%/$bar->{param}/gr;
-        $html .= $htmlRow
-                    =~ s/#NAME#/$cf{title}/gr
-                    =~ s/#VALUE#/$htmlBar/gr
-                                    =~ s/#ID#/$bar->{id}/gr
-                                    =~ s/#CURP#/$cf{curP}/gr =~ s/#CURT#/$cf{curT}/gr
-                                    =~ s/#MINP#/$cf{minP}/gr =~ s/#MINT#/$cf{minT}/gr
-                                    =~ s/#MAXP#/$cf{maxP}/gr =~ s/#MAXT#/$cf{maxT}/gr
-                                    =~ s/#AVGP#/$cf{avgP}/gr =~ s/#AVGT#/$cf{avgT}/gr;
-      }
-    }
-    elsif ($bar->{type} eq 'ct'){
-      # cpu temp..
-      if (defined($sysmon->{cpu_temp}) and $sysmon->{cpu_temp} > 0){
-        my %ct = ();
-        # min max avg..
-        if (defined($sysmon->{cpu_temp_stat})){
-          #40.62 42.24 41.54
-          ($ct{min}, $ct{max}, $ct{avg}) = split(/\s+/,$sysmon->{cpu_temp_stat});
-        }
-        $ct{curP} = sprintf("%.1f",$sysmon->{cpu_temp});
-        $ct{curT} = $ct{curP}." &deg;C";
-        $ct{minP} = sprintf("%.1f",$ct{min});
-        $ct{minT} = $ct{minP}." &deg;C";
-        $ct{maxP} = sprintf("%.1f",$ct{max});
-        $ct{maxT} = $ct{maxP}." &deg;C";
-        $ct{avgP} = sprintf("%.1f",$ct{avg});
-        $ct{avgT} = $ct{avgP}." &deg;C";
-        $ct{title} = $title =~ s/%/$bar->{param}/gr;
-        $html .= $htmlRow
-                    =~ s/#NAME#/$ct{title}/gr
-                    =~ s/#VALUE#/$htmlBar/gr
-                                    =~ s/#ID#/$bar->{id}/gr
-                                    =~ s/#CURP#/$ct{curP}/gr =~ s/#CURT#/$ct{curT}/gr
-                                    =~ s/#MINP#/$ct{minP}/gr =~ s/#MINT#/$ct{minT}/gr
-                                    =~ s/#MAXP#/$ct{maxP}/gr =~ s/#MAXT#/$ct{maxT}/gr
-                                    =~ s/#AVGP#/$ct{avgP}/gr =~ s/#AVGT#/$ct{avgT}/gr;
-      }
-    }
-    elsif ($bar->{type} eq 'cl'){
-      my $name = 'stat_cpu'.$bar->{param}.'_percent';
-      my $nameS = 'cpu'.$bar->{param}.'_idle_stat';
-      # cpu load..
-      if (defined($sysmon->{$name})){
-        my %cl = ();
-        #0.28 0.00 0.20 99.43 0.02 0.00 0.07
-        (undef,undef,undef,$cl{I},undef,undef,undef) = split(/\s+/,$sysmon->{$name});
-        # min max avg..
-        if ($opt->{stat} eq 1 and defined($sysmon->{$nameS})){
-          #92.53 99.75 98.84
-          ($cl{min},$cl{max},$cl{avg}) = split(/\s+/,$sysmon->{$nameS});
-        }
-        $cl{curP} = sprintf("%.1f",100-$cl{I});
-        $cl{curT} = $cl{curP}." %";
-        $cl{minP} = sprintf("%.1f",100-$cl{max});
-        $cl{minT} = $cl{minP}." %";
-        $cl{maxP} = sprintf("%.1f",100-$cl{min});
-        $cl{maxT} = $cl{maxP}." %";
-        $cl{avgP} = sprintf("%.1f",100-$cl{avg});
-        $cl{avgT} = $cl{avgP}." %";
-        $cl{title} = $title =~ s/%/$bar->{param}/gr;
-        $html .= $htmlRow
-                    =~ s/#NAME#/$cl{title}/gr
-                    =~ s/#VALUE#/$htmlBar/gr
-                                    =~ s/#ID#/$bar->{id}/gr
-                                    =~ s/#CURP#/$cl{curP}/gr =~ s/#CURT#/$cl{curT}/gr
-                                    =~ s/#MINP#/$cl{minP}/gr =~ s/#MINT#/$cl{minT}/gr
-                                    =~ s/#MAXP#/$cl{maxP}/gr =~ s/#MAXT#/$cl{maxT}/gr
-                                    =~ s/#AVGP#/$cl{avgP}/gr =~ s/#AVGT#/$cl{avgT}/gr;
-      }
-    }
-    elsif ($bar->{type} =~ /^m[r|s]$/){
-      my $name = ($bar->{type} eq 'mr') ? 'ram' : 'swap';
-      my $nameS = $name.'_used_stat';
-      #mem ram / swap..
-      if (defined($sysmon->{$name})){
-        my %mx = ();
-        #Total: 927.08 MB, Used: 47.86 MB, 5.16 %, Free: 879.22 MB
-        if($sysmon->{$name} ne 'n/a') {
-          (undef,$mx{T},$mx{Un},undef,$mx{U},undef,$mx{P},undef,undef,$mx{F},undef) = split(/[\s,]+/,$sysmon->{$name});
-          # min max avg..
-          if (defined($sysmon->{$nameS})){
-            #..
-            ($mx{min},$mx{max},$mx{avg}) = split(/\s+/,$sysmon->{$nameS});
-          }
-          #if ($mx{T} gt 1024){ # geht ned..
-          #if (int($mx{T}) gt 1024){ # geht ned..
-          if (length($mx{T}) gt 6){
-            $mx{U} /= 1024;
-            $mx{T} /= 1024;
-            $mx{min} /= 1024;
-            $mx{max} /= 1024;
-            $mx{avg} /= 1024;
-            $mx{Un} = 'GB';
-          }
-          $mx{curP} = sprintf("%.1f",$mx{U}/$mx{T}*100);
-          $mx{curT} = sprintf("%.0f",$mx{U})." / ".sprintf("%.0f",$mx{T})." ".$mx{Un};
-          $mx{minP} = sprintf("%.1f",$mx{min}/$mx{T}*100);
-          $mx{minT} = sprintf("%.0f",$mx{min})." ".$mx{Un};
-          $mx{maxP} = sprintf("%.1f",$mx{max}/$mx{T}*100);
-          $mx{maxT} = sprintf("%.0f",$mx{max})." ".$mx{Un};
-          $mx{avgP} = sprintf("%.1f",$mx{avg}/$mx{T}*100);
-          $mx{avgT} = sprintf("%.0f",$mx{avg})." ".$mx{Un};
-          $html .= $htmlRow
-                      =~ s/#NAME#/$title/gr
-                      =~ s/#VALUE#/$htmlBar/gr
-                                      =~ s/#ID#/$bar->{id}/gr
-                                      =~ s/#CURP#/$mx{curP}/gr    =~ s/#CURT#/$mx{curT}/gr
-                                      =~ s/#MINP#/$mx{minP}/gr =~ s/#MINT#/$mx{minT}/gr
-                                      =~ s/#MAXP#/$mx{maxP}/gr =~ s/#MAXT#/$mx{maxT}/gr
-                                      =~ s/#AVGP#/$mx{avgP}/gr =~ s/#AVGT#/$mx{avgT}/gr;
-        }
-      }
-    }
-    elsif ($bar->{type} eq 'fs'){
-      #storage..
-      if (defined($sysmon->{$bar->{param}})){
-        my %fs = ();
-        #Total: 14831 MB, Used: 2004 MB, 15 %, Available: 12176 MB at /
-        (undef,$fs{T},$fs{Un},undef,$fs{U},undef,$fs{P},undef,undef,$fs{F},undef) = split(/[\s,]+/,$sysmon->{$bar->{param}});
-        if ($fs{T} gt 0){
-          if (scalar($fs{T}) > 10000){ # geht ned..
-          #if (int($fs{T}) gt 1024){ # geht ned..
-          #if (length($fs{T}) gt 4){
-            $fs{U} /= 1024;
-            $fs{T} /= 1024;
-            $fs{Un} = 'GB';
-          }
-          $fs{curP} = sprintf("%.1f",$fs{U}/$fs{T}*100);
-          $fs{curT} = sprintf("%.1f",$fs{U})." / ".sprintf("%.1f",$fs{T})." ".$fs{Un};
-          #$fs{minP} = sprintf("%.1f",($fs{min}/$fs{T}*100));
-          #$fs{minT} = sprintf("%.0f",$fs{min})." ".$fs{Un};
-          #$fs{maxP} = sprintf("%.1f",$fs{max}/$fs{T}*100);
-          #$fs{maxT} = sprintf("%.0f",$fs{max})." ".$fs{Un};
-          #$fs{avgP} = sprintf("%.1f",$fs{avg}/$fs{T}*100);
-          #$fs{avgT} = sprintf("%.0f",$fs{avg})." ".$fs{Un};
-          $fs{title} = $title =~ s/%/$bar->{param}/gr;
-          $html .= $htmlRow
-                      =~ s/#NAME#/$fs{title}/gr
-                      =~ s/#VALUE#/$htmlBarSimple/gr
-                                      =~ s/#ID#/$bar->{id}/gr
-                                      =~ s/#CURP#/$fs{curP}/gr    =~ s/#CURT#/$fs{curT}/gr;
-                                      #=~ s/#MINP#/$fs{minP}/gr =~ s/#MINT#/$fs{minT}/gr
-                                      #=~ s/#MAXP#/$fs{maxP}/gr =~ s/#MAXT#/$fs{maxT}/gr
-                                      #=~ s/#AVGP#/$fs{avgP}/gr =~ s/#AVGT#/$fs{avgT}/gr;
-        }
-      }
-    }
-  }
-  $html .= '</table>';
-  $html .= $htmlScript if ($opt->{stat} eq 1);
-  return $html;
-}
-
-
-#sub SYSMON_secsToReadable($){
-#  my $secs = shift;
-#  my $y = floor($secs / 60/60/24/365);
-#  my $d = floor($secs/60/60/24) % 365;
-#  my $h = floor(($secs / 3600) % 24);
-#  my $m = floor(($secs / 60) % 60);
-#  my $s = $secs % 60;
-#  my $string = '';
-#  $string .= $y.'y ' if ($y > 0);
-#  $string .= $d.'d ' if ($d > 0);
-#  $string .= $h.'h ' if ($h > 0);
-#  $string .= $m.'m ' if ($m > 0);
-#  $string .= $s.'s' if ($s > 0);
-#  return $string;
-#}
-
-# --- SNX ---------------------------------------------------------------------
-
-## -----------------------------------------------------------------------------
-## Visualisation module. provided by snx.
-##
-## usage:
-##   SYSMON_weblinkHeader(<weblink device>[,<text>]) : create a clickable device header
-##   SYSMON_ShowBarChartHtml(<sysmon device>[,<bar color>[,<border color>]]) : create a bar chart for sysmon device
-## 
-## example:
-##   define wlSysmon weblink htmlCode {SYSMON_weblinkHeader('wlSysmon').SYSMON_ShowBarChartHtml('sysmon')}
-##   define wlSysmon weblink htmlCode {SYSMON_weblinkHeader('wlSysmon','Cubietruck').SYSMON_ShowBarChartHtml('sysmon','steelblue','gray')}
-##
-## -----------------------------------------------------------------------------
-sub SYSMON_weblinkHeader_alt($;$){
-  my $dev = shift;
-  my $text = shift||$dev;
-  return '<div><a href="?detail='.$dev.'"><b>'.$text.'</b></a></div>';
-}
-
-sub SYSMON_ShowBarChartHtml_alt($;$$){
-  my $dev = shift;
-  
-  my $colFill = shift || 'lightCoral';
-  my $colBorder = shift || 'black';
-  
-  my $htmlRow .= ''
-  . '<tr>'
-  . '  <td>#NAME#</td>'
-  . '  <td>#VALUE#</td>'
-  . '</tr>';
-  my $htmlBar .= ''
-  . '<div style="position:relative;height:1.1em;min-width:200px;border:1px solid '.$colBorder.';overflow:hidden;">' 
-  . '  <div style="position:absolute;height:1.1em;background:'.$colFill.';width:#PERC#%;">'
-  . '  </div>'
-  . '  <p style="position:absolute;height:1.1em;width:100%;text-align:center;margin:0">#TEXT#</p>'
-  . '</div>';
-
-  # access sysmon data..
-  #my $sysmon = SYSMON_getValues($dev);
-  my $sysmon = {};  
-  foreach my $r (keys %{$main::defs{$dev}->{READINGS}}){
-    $sysmon->{$r} = $main::defs{$dev}{READINGS}{$r}{VAL};
-  }
-  
-  my $html = '<table>';
-
-  # cpu load..
-  if (defined($sysmon->{'stat_cpu_percent'})){
-    #0.28 0.00 0.20 99.43 0.02 0.00 0.07
-    my (undef,undef,undef,$cpuI,undef,undef,undef) = split(/\s+/,$sysmon->{'stat_cpu_percent'});
-    my $cpuLoadP = sprintf("%.1f",(100-$cpuI));
-    my $cpuLoadT = $cpuLoadP." %";
-    $html .= $htmlRow =~ s/#NAME#/cpu load/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$cpuLoadP/r =~ s/#TEXT#/$cpuLoadT/r;
-  }
-  
-  # cpu temp..
-  if (defined($sysmon->{'cpu_temp'})){
-    my $cpuTempT = $sysmon->{'cpu_temp'}." &deg;C";
-    my $cpuTempP = $sysmon->{'cpu_temp'};
-    $html .= $htmlRow =~ s/#NAME#/cpu temp/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$cpuTempP/r =~ s/#TEXT#/$cpuTempT/r;
-  }
-
-  # cpu freq..
-  if (defined($sysmon->{'cpu_freq'})){
-    my $cpuFreqT = $sysmon->{'cpu_freq'}." MHz";
-    my $cpuFreqP = $sysmon->{'cpu_freq'}/10;
-    $html .= $htmlRow =~ s/#NAME#/cpu freq/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$cpuFreqP/r =~ s/#TEXT#/$cpuFreqT/r;
-  }
-
-  #mem ram..
-  if (defined($sysmon->{'ram'})){
-    #Total: 927.08 MB, Used: 47.86 MB, 5.16 %, Free: 879.22 MB
-    my (undef,$ramT,$ramUn,undef,$ramU,undef,$ramP,undef,undef,$ramF,undef) = split(/[\s,]+/,$sysmon->{'ram'});
-    $ramT = sprintf("%.0f",$ramU)." / ".sprintf("%.0f",$ramT)." ".$ramUn;
-    $html .= $htmlRow =~ s/#NAME#/mem ram/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$ramP/r =~ s/#TEXT#/$ramT/r;
-  }
-
-  #mem swap..
-  if (defined($sysmon->{'swap'})){
-    #Total: 100.00 MB, Used: 0.00 MB, 0.00 %, Free: 100.00 MB
-    my (undef,$swapT,$swapUn,undef,$swapU,undef,$swapP,undef,undef,$swapF,undef) = split(/[\s,]+/,$sysmon->{'swap'});
-    $swapT = sprintf("%.0f",$swapU)." / ".sprintf("%.0f",$swapT)." ".$swapUn;
-    $html .= $htmlRow =~ s/#NAME#/mem swap/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$swapP/r =~ s/#TEXT#/$swapT/r;
-  }
-
-  #sd-card..
-  if (defined($sysmon->{'fs_root'})){
-    #Total: 14831 MB, Used: 2004 MB, 15 %, Available: 12176 MB at /
-    #my $sd = R("$dev:fs_root");
-    my (undef,$sdT,undef,undef,$sdU,undef,$sdP,undef,undef,$sdF,undef) = split(/[\s,]+/,$sysmon->{'fs_root'});
-    $sdT = sprintf("%.1f",($sdU/1024))." / ".sprintf("%.1f",($sdT/1024))." GB";
-    $html .= $htmlRow =~ s/#NAME#/root fs/r =~ s/#VALUE#/$htmlBar/r =~ s/#PERC#/$sdP/r =~ s/#TEXT#/$sdT/r;
-  }
-  
-  # uptime system / idle..
-  if (defined($sysmon->{'uptime'})){
-    my $upSystem = SYSMON_secsToReadable($sysmon->{'uptime'});
-    if (defined($sysmon->{uptime})){
-      #25386 99.32 %
-      my (undef,$idle,undef) = split(/\s+/,$sysmon->{'idletime'});
-      $upSystem .= " ($idle % idle)";
-    }
-    $html .= $htmlRow =~ s/#NAME#/system uptime/r =~ s/#VALUE#/$upSystem/r;
-  }
-  
-  # uptime fhem..
-  if (defined($sysmon->{'fhemuptime'})){
-    my $upFhem = SYSMON_secsToReadable($sysmon->{'fhemuptime'});
-    $html .= $htmlRow =~ s/#NAME#/fhem uptime/r =~ s/#VALUE#/$upFhem/r;
-  }
- 
-  $html .= '</table>';
-  return $html;
-}
-
-
-sub SYSMON_secsToReadable($){
-  my $secs = shift;
-  my $y = floor($secs / 60/60/24/365);
-  my $d = floor($secs/60/60/24) % 365;
-  my $h = floor(($secs / 3600) % 24);
-  my $m = floor(($secs / 60) % 60);
-  my $s = $secs % 60;
-  my $string = '';
-  $string .= $y.'y ' if ($y > 0);
-  $string .= $d.'d ' if ($d > 0);
-  $string .= $h.'h ' if ($h > 0);
-  $string .= $m.'m ' if ($m > 0);
-  $string .= $s.'s' if ($s > 0);
-  return $string;
-}
-
 # -----------------------------------------------------------------------------
 
 1;
@@ -4704,555 +4166,456 @@ sub SYSMON_secsToReadable($){
 <h3>SYSMON</h3>
 (en | <a href="commandref_DE.html#SYSMON">de</a>)
 <ul>
-This module provides statistics about the system running FHEM server. Furthermore, remote systems can be accessed (Telnet). Only Linux-based systems are supported. 
-Some informations are hardware specific and are not available on every platform. 
-So far, this module has been tested on the following systems: 
-Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390, WR703N under OpenWrt, CubieTruck and some others.
-  <br><br>
-  For more information on a FritzBox check other moduls: <a href="#FRITZBOX">FRITZBOX</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
-  <br>
+   This module provides statistics about the system running FHEM server. Furthermore, remote systems can be accessed (Telnet). Only Linux-based systems are supported.
+   Some informations are hardware specific and are not available on every platform.
+   So far, this module has been tested on the following systems:
+   Raspberry Pi (Debian Wheezy), BeagleBone Black, FritzBox 7390, WR703N under OpenWrt, CubieTruck and some others.
+   <br><br>
+   For more information on a FritzBox check other moduls: <a href="#FRITZBOX">FRITZBOX</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
+   <br>
    <i>The modul uses the Perl modul 'Net::Telnet' for remote access. Please make sure that this module is installed.</i>
-  <br><br>
-  <b>Define</b>
-  <br><br>
-    <code>define &lt;name&gt; SYSMON [MODE[:[USER@]HOST][:PORT]] [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
-    <br>
-    
-This statement creates a new SYSMON instance. The parameters M1 to M4 define the refresh interval for various Readings (statistics). The parameters are to be understood as multipliers for the time defined by INTERVAL_BASE. Because this time is fixed at 60 seconds, the Mx-parameter can be considered as time intervals in minutes.<br>
-If one (or more) of the multiplier is set to zero, the corresponding readings is deactivated.
-    <br>
-    <br>
-    The parameters are responsible for updating the readings according to the following scheme:
-    <ul>
-     <li>M1: (Default: 1)<br>
-     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text, power readings<br><br>
-     </li>
-     <li>M2: (Default: M1)<br>
-     ram, swap<br>
-     </li>
-     <li>M3: (Default: M1)<br>
-     eth0, eth0_diff, wlan0, wlan0_diff<br><br>
-     </li>
-     <li>M4: (Default: 10*M1)<br>
-     Filesystem informations<br><br>
-     </li>
-     <li>The following parameters are always updated with the base interval (regardless of the Mx-parameter):<br>
-     fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text, starttime, starttime_text<br><br>
-     </li>
-    </ul>
-    To query a remote system at least the address (HOST) must be specified. Accompanied by the port and / or user name, if necessary. The password (if needed) has to be defined once with the command 'set password <password>'. For MODE parameter are 'telnet' and 'local' only allowed. 'local' does not require any other parameters and can also be omitted.
-    <br>
-  <br>
+   <br><br>
+   <b>Define</b>
+   <br><br>
+   <code>define &lt;name&gt; SYSMON [MODE[:[USER@]HOST][:PORT]] [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+   <br>
+   This statement creates a new SYSMON instance. The parameters M1 to M4 define the refresh interval for various Readings (statistics). The parameters are to be understood as multipliers for the time defined by INTERVAL_BASE. Because this time is fixed at 60 seconds, the Mx-parameter can be considered as time intervals in minutes.<br>
+   If one (or more) of the multiplier is set to zero, the corresponding readings is deactivated.
+   <br>
+   <br>
+   The parameters are responsible for updating the readings according to the following scheme:
+   <ul>
+      <li>M1: (Default: 1)<br>
+         cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text, power readings<br><br>
+      </li>
+      <li>M2: (Default: M1)<br>
+         ram, swap<br>
+      </li>
+      <li>M3: (Default: M1)<br>
+         eth0, eth0_diff, wlan0, wlan0_diff<br><br>
+      </li>
+      <li>M4: (Default: 10*M1)<br>
+         Filesystem informations<br><br>
+      </li>
+      <li>The following parameters are always updated with the base interval (regardless of the Mx-parameter):<br>
+         fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text, starttime, starttime_text<br><br>
+      </li>
+   </ul>
+   To query a remote system at least the address (HOST) must be specified. Accompanied by the port and / or user name, if necessary. The password (if needed) has to be defined once with the command 'set password &lt;password&gt;'. For MODE parameter are 'telnet' and 'local' only allowed. 'local' does not require any other parameters and can also be omitted.
+   <br>
+   <br>
+   <b>Readings:</b>
+   <br><br>
+   <ul>
+      <li>cpu_core_count<br>
+         CPU core count
+      </li>
+      <li>cpu_model_name<br>
+         CPU model name
+      </li>
+      <li>cpu_bogomips<br>
+         CPU Speed: BogoMIPS
+      </li>
+      <li>cpu_freq (and cpu1_freq for dual core systems)<br>
+         CPU frequency
+      </li>
+      <br>
+      <li>cpu_temp<br>
+         CPU temperature
+      </li>
+      <br>
+      <li>cpu_temp_avg<br>
+         Average of the CPU temperature, formed over the last 4 values.
+      </li>
+      <br>
+      <li>fhemuptime<br>
+         Time (in seconds) since the start of FHEM server.
+      </li>
+      <br>
+      <li>fhemuptime_text<br>
+         Time since the start of the FHEM server: human-readable output (text representation).
+      </li>
+      <br>
+      <li>fhemstarttime<br>
+         Start time (in seconds since 1.1.1970 1:00:00) of FHEM server.
+      </li>
+      <br>
+      <li>fhemstarttime_text<br>
+         Start time of the FHEM server: human-readable output (text representation).
+      </li>
+      <br>
+      <li>idletime<br>
+         Time spent by the system since the start in the idle mode (period of inactivity).
+      </li>
+      <br>
+      <li>idletime_text<br>
+         The inactivity time of the system since system start in human readable form.
+      </li>
+      <br>
+      <li>loadavg<br>
+         System load (load average): 1 minute, 5 minutes and 15 minutes.
+      </li>
+      <br>
+      <li>ram<br>
+         memory usage.
+      </li>
+      <br>
+      <li>swap<br>
+         swap usage.
+      </li>
+      <br>
+      <li>uptime<br>
+         System uptime.
+      </li>
+      <br>
+      <li>uptime_text<br>
+         System uptime (human readable).
+      </li>
+      <br>
+      <li>starttime<br>
+         System starttime.
+      </li>
+      <br>
+      <li>starttime_text<br>
+         System starttime (human readable).
+      </li>
+      <br>
+      <li>Network statistics<br>
+         Statistics for the specified network interface about the data volumes transferred and the difference since the previous measurement.
+         <br>
+         Examples:<br>
+         Amount of the transmitted data via interface eth0.<br>
+         <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
+         Change of the amount of the transferred data in relation to the previous call (for eth0).<br>
+         <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
+         IP and IP v6 adresses
+         <code>eth0_ip 192.168.0.15</code><br>
+         <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
+      </li>
+      <br>
+      <li>Network Speed (if avialable)<br>
+         speed of the network connection.
+         <br>
+         Examples:<br>
+         <code>eth0_speed 100</code><br>
+      </li>
+      <br>
+      <li>File system information<br>
+         Usage of the desired file systems.<br>
+         Example:<br>
+         <code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
+      </li>
+      <br>
+      <li>CPU utilization<br>
+         Information about the utilization of CPUs.<br>
+         Example:<br>
+         <code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
+         <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
+         <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
+         <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
+      </li>
+      <br>
+      <li>user defined<br>
+         These readings provide output of commands, which are passed to the operating system or delivered by user defined functions.
+      </li>
+      <br>
+      <b>FritzBox specific Readings</b>
+      <li>wlan_state<br>
+         WLAN state: on/off
+      </li>
+      <br>
+      <li>wlan_guest_state<br>
+         GuestWLAN state: on/off
+      </li>
+      <br>
+      <li>internet_ip<br>
+         current IP-Adresse
+      </li>
+      <br>
+      <li>internet_state<br>
+         state of the Internet connection: connected/disconnected
+      </li>
+      <br>
+      <li>night_time_ctrl<br>
+         state night time control (do not disturb): on/off
+      </li>
+      <br>
+      <li>num_new_messages<br>
+         Number of new Voice Mail messages
+      </li>
+      <br>
+      <li>fw_version_info<br>
+         Information on the installed firmware version: &lt;VersionNum&gt; &lt;creation date&gt; &lt;time&gt;
+      </li>
+      <br>
+      <b>DSL Informations (FritzBox)</b>
+      <li>dsl_rate<br>
+         Information about the down und up stream rate
+      </li>
+      <br>
+      <li>dsl_synctime<br>
+         sync time with DSLAM
+      </li>
+      <br>
+      <li>dsl_crc_15<br>
+         number of uncorrectable errors (CRC) for the last 15 minutes
+      </li>
+      <br>
+      <li>dsl_fec_15<br>
+         number of correctable errors (FEC) for the last 15 minutes
+      </li>
+      <br>
+      <b>Power Supply Readings</b>
+      <li>power_ac_stat<br>
+         status information to the AC socket: online (0|1), present (0|1), voltage, current<br>
+         Example:<br>
+         <code>power_ac_stat: 1 1 4.807 264</code><br>
+      </li>
+      <br>
+      <li>power_ac_text<br>
+         human readable status information to the AC socket<br>
+         Example:<br>
+         <code>power_ac_text ac: present / online, voltage: 4.807 V, current: 264 mA</code><br>
+      </li>
+      <br>
+      <li>power_usb_stat<br>
+         status information to the USB socket
+      </li>
+      <br>
+      <li>power_usb_text<br>
+         human readable status information to the USB socket
+      </li>
+      <br>
+      <li>power_battery_stat<br>
+         status information to the battery (if installed): online (0|1), present (0|1), voltage, current, actual capacity<br>
+         Example:<br>
+         <code>power_battery_stat: 1 1 4.807 264 100</code><br>
+      </li>
+      <br>
+      <li>power_battery_text<br>
+         human readable status information to the battery (if installed)
+      </li>
+      <br>
+      <li>power_battery_info<br>
+         human readable additional information to the battery (if installed): technology, capacity, status, health, total capacity<br>
+         Example:<br>
+         <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
+         The capacity must be defined in script.bin (e.g. ct-hdmi.bin). Parameter name pmu_battery_cap. Convert with bin2fex (bin2fex -> script.fex -> edit -> fex2bin -> script.bin).<br>
+      </li>
+      <br>
+      <li>cpuX_freq_stat<br>
+         Frequency statistics for CPU X: minimum,  maximum and average values<br>
+         Example:<br>
+         <code>cpu0_freq_stat: 100 1000 900</code><br>
+      </li>
+      <br>
+      <li>cpuX_idle_stat<br>
+         Idle statistik for CPU X: minimum,  maximum and average values<br>
+         Example:<br>
+         <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
+      </li>
+      <br>
+      <li>cpu[X]_temp_stat<br>
+         Temperature statistik for CPU: minimum,  maximum and average values<br>
+         Example:<br>
+         <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
+      </li>
+      <br>
+      <li>ram_used_stat<br>
+         RAM usage statistics: minimum,  maximum and average values<br>
+         Example:<br>
+         <code>ram_used_stat: 267.55 1267.75 855.00</code><br>
+      </li>
+      <br>
+      <li>swap_used_stat<br>
+         SWAP usage statistics: minimum,  maximum and average values<br>
+         Example:<br>
+         <code>swap_used_stat: 0 1024.00 250.00</code><br>
+      </li>
+      <br>
+      <br>
+   </ul>
 
-  <b>Readings:</b>
-  <br><br>
-  <ul>
-    <li>cpu_core_count<br>
-        CPU core count
-    </li>
-    <li>cpu_model_name<br>
-        CPU model name
-    </li>
-    <li>cpu_bogomips<br>
-        CPU Speed: BogoMIPS
-    </li>
-    <li>cpu_freq (and cpu1_freq for dual core systems)<br>
-        CPU frequency
-    </li>
-    <br>
-    <li>cpu_temp<br>
-        CPU temperature
-    </li>
-    <br>
-    <li>cpu_temp_avg<br>
-        Average of the CPU temperature, formed over the last 4 values.
-    </li>
-    <br>
-    <li>fhemuptime<br>
-      Time (in seconds) since the start of FHEM server.
-    </li>
-    <br>
-    <li>fhemuptime_text<br>
-      Time since the start of the FHEM server: human-readable output (text representation).
-    </li>
-    <br>
-    <li>fhemstarttime<br>
-      Start time (in seconds since 1.1.1970 1:00:00) of FHEM server.
-    </li>
-    <br>
-    <li>fhemstarttime_text<br>
-      Start time of the FHEM server: human-readable output (text representation).
-    </li>
-    <br>
-    <li>idletime<br>
-      Time spent by the system since the start in the idle mode (period of inactivity).
-    </li>
-    <br>
-    <li>idletime_text<br>
-      The inactivity time of the system since system start in human readable form.
-    </li>
-    <br>
-    <li>loadavg<br>
-        System load (load average): 1 minute, 5 minutes and 15 minutes.
-    </li>
-    <br>
-    <li>ram<br>
-       memory usage.
-    </li>
-    <br>
-    <li>swap<br>
-      swap usage.
-    </li>
-    <br>
-    <li>uptime<br>
-      System uptime.
-    </li>
-    <br>
-    <li>uptime_text<br>
-      System uptime (human readable).
-    </li>
-    <br>
-    <li>starttime<br>
-      System starttime.
-    </li>
-    <br>
-    <li>starttime_text<br>
-      System starttime (human readable).
-    </li>
-    <br>
-    <li>Network statistics<br>
-    Statistics for the specified network interface about the data volumes transferred and the difference since the previous measurement.
-    <br>
-    Examples:<br>
-    Amount of the transmitted data via interface eth0.<br>
-    <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
-    Change of the amount of the transferred data in relation to the previous call (for eth0).<br>
-    <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
-    IP and IP v6 adresses
-    <code>eth0_ip 192.168.0.15</code><br>
-    <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
-    </li>
-    <br>
-    <li>Network Speed (if avialable)<br>
-    speed of the network connection.
-    <br>
-    Examples:<br>
-    <code>eth0_speed 100</code><br>
-    </li>
-    <br>
-    <li>File system information<br>
-      Usage of the desired file systems.<br>
-      Example:<br>
-        <code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
-    </li>
-    <br>
-    <li>CPU utilization<br>
-        Information about the utilization of CPUs.<br>
-        Example:<br>
-        <code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
-        <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
-        <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
-        <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
-    </li>
-    <br>
-    <li>user defined<br>
-        These readings provide output of commands, which are passed to the operating system or delivered by user defined functions. 
-    </li>
-    <br>
-    <b>FritzBox specific Readings</b>
-    <li>wlan_state<br>
-        WLAN state: on/off
-    </li>
-    <br>
-    <li>wlan_guest_state<br>
-        GuestWLAN state: on/off
-    </li>
-    <br>
-    <li>internet_ip<br>
-        current IP-Adresse
-    </li>
-    <br>
-    <li>internet_state<br>
-        state of the Internet connection: connected/disconnected
-    </li>
-    <br>
-    <li>night_time_ctrl<br>
-        state night time control (do not disturb): on/off
-    </li>
-    <br>
-    <li>num_new_messages<br>
-        Number of new Voice Mail messages
-    </li>
-    <br>
-    <li>fw_version_info<br>
-        Information on the installed firmware version: <VersionNum> <creation date> <time>
-    </li>
-    <br>
-    <b>DSL Informations (FritzBox)</b>
-    <li>dsl_rate<br>
-        Information about the down und up stream rate
-    </li>
-    <br>
-    <li>dsl_synctime<br>
-        sync time with DSLAM
-    </li>
-    <br>
-    <li>dsl_crc_15<br>
-        number of uncorrectable errors (CRC) for the last 15 minutes
-    </li>
-    <br>
-    <li>dsl_fec_15<br>
-        number of correctable errors (FEC) for the last 15 minutes
-    </li>
-    <br>
-    <b>Power Supply Readings</b>
-    <li>power_ac_stat<br>
-        status information to the AC socket: online (0|1), present (0|1), voltage, current<br>
-        Example:<br>
-        <code>power_ac_stat: 1 1 4.807 264</code><br>
-    </li>
-    <br>
-    <li>power_ac_text<br>
-        human readable status information to the AC socket<br>
-        Example:<br>
-        <code>power_ac_text ac: present / online, voltage: 4.807 V, current: 264 mA</code><br>
-    </li>
-    <br>
-    <li>power_usb_stat<br>
-        status information to the USB socket
-    </li>
-    <br>
-    <li>power_usb_text<br>
-        human readable status information to the USB socket
-    </li>
-    <br>
-    <li>power_battery_stat<br>
-        status information to the battery (if installed): online (0|1), present (0|1), voltage, current, actual capacity<br>
-        Example:<br>
-        <code>power_battery_stat: 1 1 4.807 264 100</code><br>
-    </li>
-    <br>
-    <li>power_battery_text<br>
-        human readable status information to the battery (if installed)
-    </li>
-    <br>
-    <li>power_battery_info<br>
-        human readable additional information to the battery (if installed): technology, capacity, status, health, total capacity<br>
-        Example:<br>
-        <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
-        The capacity must be defined in script.bin (e.g. ct-hdmi.bin). Parameter name pmu_battery_cap. Convert with bin2fex (bin2fex -> script.fex -> edit -> fex2bin -> script.bin).<br>
-    </li>
-    <br>
-    <li>cpuX_freq_stat<br>
-        Frequency statistics for CPU X: minimum,  maximum and average values<br>
-        Example:<br>
-        <code>cpu0_freq_stat: 100 1000 900</code><br>
-    </li>
-    <br>    
-        <li>cpuX_idle_stat<br>
-        Idle statistik for CPU X: minimum,  maximum and average values<br>
-        Example:<br>
-        <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
-    </li>
-    <br>       
-        <li>cpu[X]_temp_stat<br>
-        Temperature statistik for CPU: minimum,  maximum and average values<br>
-        Example:<br>
-        <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
-    </li>
-    <br>       
-    <li>ram_used_stat<br>
-        RAM usage statistics: minimum,  maximum and average values<br>
-        Example:<br>
-        <code>ram_used_stat: 267.55 1267.75 855.00</code><br>
-    </li>
-    <br>
-    <li>swap_used_stat<br>
-        SWAP usage statistics: minimum,  maximum and average values<br>
-        Example:<br>
-        <code>swap_used_stat: 0 1024.00 250.00</code><br>
-    </li>
-    <br>
-  <br>
-  </ul>
-
-  Sample output:<br>
-  <ul>
-
-<table style="border: 1px solid black;">
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">cpu_freq</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>900</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">cpu_temp</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>49.77</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">cpu_temp_avg</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>49.7</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">eth0</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 2954.22 MB, TX: 3469.21 MB, Total: 6423.43 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">eth0_diff</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 6.50 MB, TX: 0.23 MB, Total: 6.73 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>11231</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime_text&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>0 days, 03 hours, 07 minutes</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">idletime</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>931024 88.35 %</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">idletime_text</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>10 days, 18 hours, 37 minutes (88.35 %)</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">loadavg</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>0.14 0.18 0.22</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">ram</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 485 MB, Used: 140 MB, 28.87 %, Free: 345 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">swap</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>n/a</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">uptime</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>1053739</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">uptime_text</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>12 days, 04 hours, 42 minutes</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">wlan0</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">wlan0_diff</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0.00 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fs_root</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB at /</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fs_boot</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">fs_usb1</div></td>
-<td style="border-bottom: 1px solid black;"><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu</div></td>
-<td style="border-bottom: 1px solid black;"><div>10145283 0 2187286 90586051 542691 69393 400342&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_diff</div></td>
-<td style="border-bottom: 1px solid black;"><div>2151 0 1239 2522 10 3 761&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_percent</div></td>
-<td style="border-bottom: 1px solid black;"><div>4.82 0.00 1.81 93.11 0.05 0.00 0.20&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td><div class="dname">stat_cpu_text</div></td>
-<td><div>user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %&nbsp;&nbsp;</div></td>
-<td><div>2013-11-27 00:05:36</div></td>
-</tr>
-</table>
-  </ul><br>
-
-  <b>Get:</b><br><br>
-    <ul>
-    <li>interval_base<br>
-    Lists the specified polling intervalls.
-    </li>
-    <br>
-    <li>interval_multipliers<br>
-    Displays update intervals.
-    </li>
-    <br>
-    <li>list<br>
-    Lists all readings.
-    </li>
-    <br>
-    <li>update<br>
-    Refreshs all readings.
-    </li>
-    <br>
-    <li>version<br>
-    Displays the version of SYSMON module.
-    </li>
-    <br>
-    <li>list_lan_devices<br>
-    Displays known LAN Devices (FritzBox only).
-    </li>
-    <br>
-    
-    </ul><br>
-
-  <b>Set:</b><br><br>
-    <ul>
-    <li>interval_multipliers<br>
-       Defines update intervals (as in the definition of the device).
-    </li>
-    <br>
-    <li>clean<br>
-      Clears user-definable Readings. After an update (manual or automatic) new readings are generated.<br>
-    </li>
-    <br>
-    <li>clear &lt;reading name&gt;<br>
-     Deletes the Reading entry with the given name. After an update this entry is possibly re-created (if defined). This mechanism allows the selective deleting unnecessary custom entries.<br>
-    </li>
-    <br>
-    <li>password &lt;Passwort&gt;<br>
-    Specify the password for remote access (usually only necessary once).
-    </li>
-    <br>
-    </ul><br>
-
-  <b>Attributes:</b><br><br>
-    <ul>
-    <li>filesystems &lt;reading name&gt;[:&lt;mountpoint&gt;[:&lt;comment&gt;]],...<br>
-    Specifies the file system to be monitored (a comma-separated list). <br>
-    Reading-name is used in the display and logging, the mount point is the basis of the evaluation, comment is relevant to the HTML display (see SYSMON_ShowValuesHTML)<br>
-    Examples: <br>
-    <code>/boot,/,/media/usb1</code><br>
-    <code>fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick</code><br>
-    </li>
-    <br>
-    <li>network-interfaces &lt;name&gt;[:&lt;interface&gt;[:&lt;comment&gt;]],...<br>
-    Comma-separated list of network interfaces that are to be monitored. Each entry consists of the Reading-name, the name of the Netwerk adapter and a comment for the HTML output (see SYSMON_ShowValuesHTML). If no colon is used, the value is used simultaneously as a Reading-name and interface name.<br>
-    Example <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
-    </li>
-    <br>
-    <li>user-defined &lt;readingsName&gt;:&lt;Interval_Minutes&gt;:&lt;Comment&gt;:&lt;Cmd&gt;,...<br>
-    This comma-separated list defines user defined Readings with the following data: Reading name, refresh interval (in minutes), a Comment, and operating system command.
-    <br>The os commands are executed according to the specified Intervals and are noted as Readings with the specified name. Comments are used for the HTML output (see SYSMON_ShowValuesHTML)..
-    <br>All parameter parts are required!
-    <br>It is important that the specified commands are executed quickly, because at this time the entire FHEM server is blocked!<br>
-    If results of the long-running operations required, these should be set up as a CRON job and store results as a text file.<br><br>
-    Example: Display of package updates for the operating system:<br>
-    cron-Job:<br>
-    <code> sudo apt-get update 2>/dev/null >/dev/null</code>
-    <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
-    <br>
-    <code>uder-defined</code> attribute<br><code>sys_updates:1440:System Aktualisierungen:cat /opt/fhem/data/updatestatus.txt</code><br>
-    the number of available updates is daily recorded as 'sys_updates'.
-    </li>
-    <br>
-    <li>user-fn &lt;fn_name&gt;:&lt;interval_minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;], ...<br>
-    List of perl user subroutines.<br>
-    As &lt;fn_name&gt; can be used either the name of a Perl subroutine or a Perl expression.
-    The perl function gets the device hash as parameter and must provide an array of values.
-    These values are taken according to the parameter &lt;reading_nameX&gt; in Readings.<br>
-    A Perl expression must be enclosed in curly braces and can use the following parameters: $ HASH (device hash) and $ NAME (device name). 
-    Return is expected analogous to a Perl subroutine.<br>
-    Important! The separation between multiple user functions must be done with a comma AND a space! Within the function definition commas may not be followed by spaces.
-    </li>
-    <br>
-    <li>disable<br>
-      Possible values: 0 and 1. '1' means that the update is stopped.
-    </li>
-    <br>
-    <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
-    RegExp to detect login and command line prompt. (Only for access via Telnet.)
-    </li>
-    <br>
-    <li>exclude<br>
-    Allows to suppress reading certain information. <br>
-    supported values: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
-    loadavg, cputemp, cpufreq, cpuinfo, diskstat, cpustat, ramswap, filesystem, network, 
-    fbwlan, fbnightctrl, fbnewmessages, fbdecttemp, fbversion, fbdsl, powerinfo
-    </li>
-    <br>
-    </ul><br>
-
-  <b>Plots:</b><br><br>
-    <ul>
-    predefined gplot files:<br>
-     <ul>
-      FileLog versions:<br>
+   <br>
+   <b>Get:</b><br><br>
+   <ul>
+      <li>interval_base<br>
+         Lists the specified polling intervalls.
+      </li>
+      <br>
+      <li>interval_multipliers<br>
+         Displays update intervals.
+      </li>
+      <br>
+      <li>list<br>
+         Lists all readings.
+      </li>
+      <br>
+      <li>update<br>
+         Refreshs all readings.
+      </li>
+      <br>
+      <li>version<br>
+         Displays the version of SYSMON module.
+      </li>
+      <br>
+      <li>list_lan_devices<br>
+         Displays known LAN Devices (FritzBox only).
+      </li>
+      <br>
+   </ul>
+   <br>
+   <b>Set:</b><br><br>
+   <ul>
+      <li>interval_multipliers<br>
+         Defines update intervals (as in the definition of the device).
+      </li>
+      <br>
+      <li>clean<br>
+         Clears user-definable Readings. After an update (manual or automatic) new readings are generated.<br>
+      </li>
+      <br>
+      <li>clear &lt;reading name&gt;<br>
+         Deletes the Reading entry with the given name. After an update this entry is possibly re-created (if defined). This mechanism allows the selective deleting unnecessary custom entries.<br>
+      </li>
+      <br>
+      <li>password &lt;Passwort&gt;<br>
+         Specify the password for remote access (usually only necessary once).
+      </li>
+      <br>
+   </ul>
+   <br>
+   <b>Attributes:</b><br><br>
+   <ul>
+      <li>filesystems &lt;reading name&gt;[:&lt;mountpoint&gt;[:&lt;comment&gt;]],...<br>
+         Specifies the file system to be monitored (a comma-separated list). <br>
+         Reading-name is used in the display and logging, the mount point is the basis of the evaluation, comment is relevant to the HTML display (see SYSMON_ShowValuesHTML)<br>
+         Examples: <br>
+         <code>/boot,/,/media/usb1</code><br>
+         <code>fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick</code><br>
+      </li>
+      <br>
+      <li>network-interfaces &lt;name&gt;[:&lt;interface&gt;[:&lt;comment&gt;]],...<br>
+         Comma-separated list of network interfaces that are to be monitored. Each entry consists of the Reading-name, the name of the Netwerk adapter and a comment for the HTML output (see SYSMON_ShowValuesHTML). If no colon is used, the value is used simultaneously as a Reading-name and interface name.<br>
+         Example <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
+      </li>
+      <br>
+      <li>user-defined &lt;readingsName&gt;:&lt;Interval_Minutes&gt;:&lt;Comment&gt;:&lt;Cmd&gt;,...<br>
+         This comma-separated list defines user defined Readings with the following data: Reading name, refresh interval (in minutes), a Comment, and operating system command.
+         <br>The os commands are executed according to the specified Intervals and are noted as Readings with the specified name. Comments are used for the HTML output (see SYSMON_ShowValuesHTML)..
+         <br>All parameter parts are required!
+         <br>It is important that the specified commands are executed quickly, because at this time the entire FHEM server is blocked!<br>
+         If results of the long-running operations required, these should be set up as a CRON job and store results as a text file.<br><br>
+         Example: Display of package updates for the operating system:<br>
+         cron-Job:<br>
+         <code> sudo apt-get update 2>/dev/null >/dev/null</code>
+         <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
+         <br>
+         <code>uder-defined</code> attribute<br><code>sys_updates:1440:System Aktualisierungen:cat /opt/fhem/data/updatestatus.txt</code><br>
+         the number of available updates is daily recorded as 'sys_updates'.
+      </li>
+      <br>
+      <li>user-fn &lt;fn_name&gt;:&lt;interval_minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;], ...<br>
+         List of perl user subroutines.<br>
+         As &lt;fn_name&gt; can be used either the name of a Perl subroutine or a Perl expression.
+         The perl function gets the device hash as parameter and must provide an array of values.
+         These values are taken according to the parameter &lt;reading_nameX&gt; in Readings.<br>
+         A Perl expression must be enclosed in curly braces and can use the following parameters: $ HASH (device hash) and $ NAME (device name).
+         Return is expected analogous to a Perl subroutine.<br>
+         Important! The separation between multiple user functions must be done with a comma AND a space! Within the function definition commas may not be followed by spaces.
+      </li>
+      <br>
+      <li>disable<br>
+         Possible values: 0 and 1. '1' means that the update is stopped.
+      </li>
+      <br>
+      <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
+         RegExp to detect login and command line prompt. (Only for access via Telnet.)
+      </li>
+      <br>
+      <li>exclude<br>
+         Allows to suppress reading certain information. <br>
+         supported values: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
+         loadavg, cputemp, cpufreq, cpuinfo, diskstat, cpustat, ramswap, filesystem, network,
+         fbwlan, fbnightctrl, fbnewmessages, fbdecttemp, fbversion, fbdsl, powerinfo
+      </li>
+      <br>
+   </ul>
+   <br>
+   <b>Plots:</b><br><br>
+   <ul>
+      predefined gplot files:<br>
+      <ul>
+         FileLog versions:<br>
+         <code>
+         SM_RAM.gplot<br>
+         SM_CPUTemp.gplot<br>
+         SM_FS_root.gplot<br>
+         SM_FS_usb1.gplot<br>
+         SM_Load.gplot<br>
+         SM_Network_eth0.gplot<br>
+         SM_Network_eth0t.gplot<br>
+         SM_Network_wlan0.gplot<br>
+         SM_CPUStat.gplot<br>
+         SM_CPUStatSum.gplot<br>
+         SM_CPUStatTotal.gplot<br>
+         SM_power_ac.gplot<br>
+         SM_power_usb.gplot<br>
+         SM_power_battery.gplot<br>
+         </code>
+         DbLog versions:<br>
+         <code>
+         SM_DB_all.gplot<br>
+         SM_DB_CPUFreq.gplot<br>
+         SM_DB_CPUTemp.gplot<br>
+         SM_DB_Load.gplot<br>
+         SM_DB_Network_eth0.gplot<br>
+         SM_DB_RAM.gplot<br>
+         </code>
+      </ul>
+   </ul>
+   <br>
+   <b>HTML output method (see Weblink): SYSMON_ShowValuesHTML(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
+   <ul>
+      The module provides a function that returns selected Readings as HTML.<br>
+      As a parameter the name of the defined SYSMON device is expected.<br>
+      It can also Reading Group, Clone dummy or other modules be used. Their readings are simple used for display. <br>
+      The second parameter is optional and specifies a list of readings to be displayed in the format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;[:&lt;FormatString&gt;]]]</code>.<br>
+      <code>ReadingName</code> is the Name of desired Reading, <code>Comment</code> is used as the display name and postfix is displayed after the value (such as units or as MHz can be displayed).
+      If FormatString is specified, the output is formatted with sprintf (s. sprintf in Perl documentation).<br>
+      If no <code>Comment</code> is specified, an internally predefined description is used.<br>
+      If no list specified, a predefined selection is used (all values are displayed).<br><br>
+      <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
+      <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C:%.1f'', 'cpu_freq:CPU Frequenz: MHz'))}</code>
+   </ul>
+   <br>
+   <b>Text output method (see Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
+   <ul>
+      According to SYSMON_ShowValuesHTML, but with a Title text above. If no title provided, device alias will be used (if any)<br>
+   </ul>
+   <br>
+   <b>Text output method (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
+   <ul>
+      According to SYSMON_ShowValuesHTML, but formatted as plain text.<br>
+   </ul>
+   <br>
+   <b>Text output method (see Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
+   <ul>
+      According to SYSMON_ShowValuesHTMLTitled, but formatted as plain text.<br>
+   </ul>
+   <br>
+   <b>Reading values with perl: SYSMON_getValues(&lt;name&gt;[, &lt;array of desired keys&gt;])</b><br><br>
+   <ul>
+      Returns a hash ref with desired values. If no array is passed, all values are returned.<br>
+      {(SYSMON_getValues("sysmon"))->{'cpu_temp'}}<br>
+      {(SYSMON_getValues("sysmon",("cpu_freq","cpu_temp")))->{"cpu_temp"}}<br>
+      {join(" ", values (SYSMON_getValues("sysmon")))}<br>
+      {join(" ", values (SYSMON_getValues("sysmon",("cpu_freq","cpu_temp"))))}<br>
+   </ul>
+   <br>
+   <b>Examples:</b><br><br>
+   <ul>
       <code>
-       SM_RAM.gplot<br>
-       SM_CPUTemp.gplot<br>
-       SM_FS_root.gplot<br>
-       SM_FS_usb1.gplot<br>
-       SM_Load.gplot<br>
-       SM_Network_eth0.gplot<br>
-       SM_Network_eth0t.gplot<br>
-       SM_Network_wlan0.gplot<br>
-       SM_CPUStat.gplot<br>
-       SM_CPUStatSum.gplot<br>
-       SM_CPUStatTotal.gplot<br>
-       SM_power_ac.gplot<br>
-       SM_power_usb.gplot<br>
-       SM_power_battery.gplot<br>
-      </code>
-      DbLog versions:<br>
-      <code>
-       SM_DB_all.gplot<br>
-       SM_DB_CPUFreq.gplot<br>
-       SM_DB_CPUTemp.gplot<br>
-       SM_DB_Load.gplot<br>
-       SM_DB_Network_eth0.gplot<br>
-       SM_DB_RAM.gplot<br>
-      </code>
-     </ul>
-    </ul><br>
-
-  <b>HTML output method (see Weblink): SYSMON_ShowValuesHTML(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
-    <ul>
-    The module provides a function that returns selected Readings as HTML.<br>
-    As a parameter the name of the defined SYSMON device is expected.<br>
-    It can also Reading Group, Clone dummy or other modules be used. Their readings are simple used for display. <br>
-    The second parameter is optional and specifies a list of readings to be displayed in the format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;[:&lt;FormatString&gt;]]]</code>.<br>
-    <code>ReadingName</code> is the Name of desired Reading, <code>Comment</code> is used as the display name and postfix is displayed after the value (such as units or as MHz can be displayed).
-    If FormatString is specified, the output is formatted with sprintf (s. sprintf in Perl documentation).<br>
-    If no <code>Comment</code> is specified, an internally predefined description is used.<br>
-    If no list specified, a predefined selection is used (all values are displayed).<br><br>
-    <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
-    <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C:%.1f'', 'cpu_freq:CPU Frequenz: MHz'))}</code>
-    </ul><br>
-  <b>Text output method (see Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
-    <ul>
-    According to SYSMON_ShowValuesHTML, but with a Title text above. If no title provided, device alias will be used (if any)<br>
-    </ul><br>
-    
-  <b>Text output method (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
-    <ul>
-    According to SYSMON_ShowValuesHTML, but formatted as plain text.<br>
-    </ul><br>
-  <b>Text output method (see Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
-    <ul>
-    According to SYSMON_ShowValuesHTMLTitled, but formatted as plain text.<br>
-    </ul><br>
-    
-  <b>Reading values with perl: SYSMON_getValues(&lt;name&gt;[, &lt;array of desired keys&gt;])</b><br><br>
-    <ul>
-    Returns a hash ref with desired values. If no array is passed, all values are returned.<br>
-    {(SYSMON_getValues("sysmon"))->{'cpu_temp'}}<br>
-    {(SYSMON_getValues("sysmon",("cpu_freq","cpu_temp")))->{"cpu_temp"}}<br>
-    {join(" ", values (SYSMON_getValues("sysmon")))}<br>
-    {join(" ", values (SYSMON_getValues("sysmon",("cpu_freq","cpu_temp"))))}<br>
-    </ul><br>
-
-  <b>Examples:</b><br><br>
-    <ul>
-    <code>
       # Modul-Definition<br>
       define sysmon SYSMON 1 1 1 10<br>
       #attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
@@ -5342,12 +4705,10 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_power_bat label "Stromversorgung (bat) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"<br>
       attr wl_sysmon_power_bat room Technik<br>
       attr wl_sysmon_power_bat group system<br>
-    </code>
-    </ul>
-
-  </ul>
+      </code>
+   </ul>
+</ul>
 <!-- ================================ -->
-
 =end html
 =begin html_DE
 
@@ -5355,579 +4716,480 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
 <h3>SYSMON</h3>
 (<a href="commandref.html#SYSMON">en</a> | de)
 <ul>
-  Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
-  Weiterhin k&ouml;nnen auch Remote-Systeme abgefragt werden (Telnet).
-  Es werden nur Linux-basierte Systeme unterst&uuml;tzt. Manche Informationen sind hardwarespezifisch und sind daher nicht auf jeder Plattform 
-  verf&uuml;gbar.
-  Bis jetzt wurde dieses Modul auf folgenden Systemen getestet: Raspberry Pi (Debian Wheezy), BeagleBone Black, 
-  FritzBox 7390, WR703N unter OpenWrt, CubieTruck und einige andere.
-  <br>
-  <br>
-  F&uuml;r Informationen zu einer FritzBox beachten Sie bitte auch Module: <a href="#FRITZBOX">FRITZBOX</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
-  <i>Das Modul nutzt das Perlmodule 'Net::Telnet' f&uuml;r den Fernzugriff. Dieses muss ggf. nachinstalliert werden.</i>
-  <br><br>
-  <b>Define</b>
-  <br><br>
-    <code>define &lt;name&gt; SYSMON [MODE[:[USER@]HOST][:PORT]] [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
-    <br>
-    Diese Anweisung erstellt eine neue SYSMON-Instanz.
-    Die Parameter M1 bis M4 legen die Aktualisierungsintervalle f&uuml;r verschiedenen Readings (Statistiken) fest.
-    Die Parameter sind als Multiplikatoren f&uuml;r die Zeit, die durch INTERVAL_BASE definiert ist, zu verstehen.
-    Da diese Zeit fest auf 60 Sekunden gesetzt ist, k&ouml;nnen die Mx-Parameters als Zeitintervalle in Minuten angesehen werden.<br>
-    Wird einer (oder mehrere) Multiplikatoren auf Null gesetzt werden, wird das entsprechende Readings deaktiviert.<br>
-    <br>
-    Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
-    <ul>
-     <li>M1: (Default-Wert: 1)<br>
-     cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text, power readings<br><br>
-     </li>
-     <li>M2: (Default-Wert: M1)<br>
-     ram, swap<br>
-     </li>
-     <li>M3: (Default-Wert: M1)<br>
-     eth0, eth0_diff, wlan0, wlan0_diff<br><br>
-     </li>
-     <li>M4: (Default-Wert: 10*M1)<br>
-     Filesystem-Informationen<br><br>
-     </li>
-     <li>folgende Parameter werden immer anhand des Basisintervalls (unabh&auml;ngig von den Mx-Parameters) aktualisiert:<br>
-     fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text, starttime, starttime_text<br><br>
-     </li>
-    </ul>
-    F&uuml;r Abfrage eines entfernten Systems muss mindestens deren Adresse (HOST) angegeben werden, bei Bedarf erg&auml;nzt durch den Port und/oder den Benutzernamen. 
-    Das eventuell ben&ouml;tigte Passwort muss einmalig mit dem Befehl 'set password &lt;pass&gt;' definiert werden.
-    Als MODE sind derzeit 'telnet' und 'local' erlaubt. 'local' erfordert keine weiteren Angaben und kann auch ganz weggelassen werden.
-    <br>
-  <br>
+   Dieses Modul liefert diverse Informationen und Statistiken zu dem System, auf dem FHEM-Server ausgef&uuml;hrt wird.
+   Weiterhin k&ouml;nnen auch Remote-Systeme abgefragt werden (Telnet).
+   Es werden nur Linux-basierte Systeme unterst&uuml;tzt. Manche Informationen sind hardwarespezifisch und sind daher nicht auf jeder Plattform
+   verf&uuml;gbar.
+   Bis jetzt wurde dieses Modul auf folgenden Systemen getestet: Raspberry Pi (Debian Wheezy), BeagleBone Black,
+   FritzBox 7390, WR703N unter OpenWrt, CubieTruck und einige andere.
+   <br>
+   <br>
+   F&uuml;r Informationen zu einer FritzBox beachten Sie bitte auch Module: <a href="#FRITZBOX">FRITZBOX</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
+   <i>Das Modul nutzt das Perlmodule 'Net::Telnet' f&uuml;r den Fernzugriff. Dieses muss ggf. nachinstalliert werden.</i>
+   <br><br>
+   <b>Define</b>
+   <br><br>
+   <code>define &lt;name&gt; SYSMON [MODE[:[USER@]HOST][:PORT]] [&lt;M1&gt;[ &lt;M2&gt;[ &lt;M3&gt;[ &lt;M4&gt;]]]]</code><br>
+   <br>
+   Diese Anweisung erstellt eine neue SYSMON-Instanz.
+   Die Parameter M1 bis M4 legen die Aktualisierungsintervalle f&uuml;r verschiedenen Readings (Statistiken) fest.
+   Die Parameter sind als Multiplikatoren f&uuml;r die Zeit, die durch INTERVAL_BASE definiert ist, zu verstehen.
+   Da diese Zeit fest auf 60 Sekunden gesetzt ist, k&ouml;nnen die Mx-Parameters als Zeitintervalle in Minuten angesehen werden.<br>
+   Wird einer (oder mehrere) Multiplikatoren auf Null gesetzt werden, wird das entsprechende Readings deaktiviert.<br>
+   <br>
+   Die Parameter sind f&uuml;r die Aktualisierung der Readings nach folgender Schema zust&auml;ndig:
+   <ul>
+      <li>M1: (Default-Wert: 1)<br>
+         cpu_freq, cpu_temp, cpu_temp_avg, loadavg, stat_cpu, stat_cpu_diff, stat_cpu_percent, stat_cpu_text, power readings<br><br>
+      </li>
+      <li>M2: (Default-Wert: M1)<br>
+         ram, swap<br>
+      </li>
+      <li>M3: (Default-Wert: M1)<br>
+         eth0, eth0_diff, wlan0, wlan0_diff<br><br>
+      </li>
+      <li>M4: (Default-Wert: 10*M1)<br>
+         Filesystem-Informationen<br><br>
+      </li>
+      <li>folgende Parameter werden immer anhand des Basisintervalls (unabh&auml;ngig von den Mx-Parameters) aktualisiert:<br>
+         fhemuptime, fhemuptime_text, idletime, idletime_text, uptime, uptime_text, starttime, starttime_text<br><br>
+      </li>
+   </ul>
+   F&uuml;r Abfrage eines entfernten Systems muss mindestens deren Adresse (HOST) angegeben werden, bei Bedarf erg&auml;nzt durch den Port und/oder den Benutzernamen.
+   Das eventuell ben&ouml;tigte Passwort muss einmalig mit dem Befehl 'set password &lt;pass&gt;' definiert werden.
+   Als MODE sind derzeit 'telnet' und 'local' erlaubt. 'local' erfordert keine weiteren Angaben und kann auch ganz weggelassen werden.
+   <br>
+   <br>
+   <b>Readings:</b>
+   <br><br>
+   <ul>
+      <li>cpu_core_count<br>
+         Anzahl der CPU Kerne
+      </li>
+      <li>cpu_model_name<br>
+         CPU Modellname
+      </li>
+      <li>cpu_bogomips<br>
+         CPU Speed: BogoMIPS
+      </li>
+      <li>cpu_freq (auf den DualCore-Systemen wie Cubietruck auch cpu1_freq)<br>
+         CPU-Frequenz
+      </li>
+      <br>
+      <li>cpu_temp<br>
+         CPU-Temperatur
+      </li>
+      <br>
+      <li>cpu_temp_avg<br>
+         Durchschnitt der CPU-Temperatur, gebildet &uuml;ber die letzten 4 Werte.
+      </li>
+      <br>
+      <li>fhemuptime<br>
+         Zeit (in Sekunden) seit dem Start des FHEM-Servers.
+      </li>
+      <br>
+      <li>fhemuptime_text<br>
+         Zeit seit dem Start des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
+      </li>
+      <br>
+      <li>fhemstarttime<br>
+         Startzeit (in Sekunden seit 1.1.1970 1:00:00) des FHEM-Servers.
+      </li>
+      <br>
+      <li>fhemstarttime_text<br>
+         Startzeit des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
+      </li>
+      <br>
+      <li>idletime<br>
+         Zeit (in Sekunden und in Prozent), die das System (nicht der FHEM-Server!)
+         seit dem Start in dem Idle-Modus verbracht hat. Also die Zeit der Inaktivit&auml;t.
+      </li>
+      <br>
+      <li>idletime_text<br>
+         Zeit der Inaktivit&auml;t des Systems seit dem Systemstart in menschenlesbarer Form.
+      </li>
+      <br>
+      <li>loadavg<br>
+         Ausgabe der Werte f&uuml;r die Systemauslastung (load average): 1 Minute-, 5 Minuten- und 15 Minuten-Werte.
+      </li>
+      <br>
+      <li>ram<br>
+         Ausgabe der Speicherauslastung.
+      </li>
+      <br>
+      <li>swap<br>
+         Benutzung und Auslastung der SWAP-Datei (bzw. Partition).
+      </li>
+      <br>
+      <li>uptime<br>
+         Zeit (in Sekenden) seit dem Systemstart.
+      </li>
+      <br>
+      <li>uptime_text<br>
+         Zeit seit dem Systemstart in menschenlesbarer Form.
+      </li>
+      <br>
+      <li>starttime<br>
+         Systemstart (Sekunden seit Thu Jan  1 01:00:00 1970).
+      </li>
+      <br>
+      <li>starttime_text<br>
+         Systemstart in menschenlesbarer Form.
+      </li>
+      <br>
+      <li>Netzwerkinformationen<br>
+         Informationen zu den &uuml;ber die angegebene Netzwerkschnittstellen &uuml;bertragene Datenmengen
+         und der Differenz zu der vorherigen Messung.
+         <br>
+         Beispiele:<br>
+         Menge der &uuml;bertragenen Daten &uuml;ber die Schnittstelle eth0.<br>
+         <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
+         &Auml;nderung der &uuml;bertragenen Datenmenge in Bezug auf den vorherigen Aufruf (f&uuml;r eth0).<br>
+         <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
+         IP and IP v6 Adressen
+         <code>eth0_ip 192.168.0.15</code><br>
+         <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
+      </li>
+      <br>
+      <li>Network Speed (wenn verf&uuml;gbar)<br>
+         Geschwindigkeit der aktuellen Netzwerkverbindung.
+         <br>
+         Beispiel:<br>
+         <code>eth0_speed 100</code><br>
+      </li>
+      <br>
+      <li>Dateisysteminformationen<br>
+         Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
+         Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
+         In diesem Fall werden f&uuml;r die diese Readings die angegebenen Namen verwendet.<br>
+         Dies soll die &Uuml;bersicht verbessern und die Erstellung von Plots erleichten.<br>
+         Beispiel:<br>
+         <code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
+      </li>
+      <br>
+      <li>CPU Auslastung<br>
+         Informationen zu der Auslastung der CPU(s).<br>
+         Beispiel:<br>
+         <code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
+         <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
+         <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
+         <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
+      </li>
+      <br>
+      <li>Benutzerdefinierte Eintr&auml;ge<br>
+         Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
+         Die entsprechende Angaben werden durch Attributen <code>user-defined</code> und <code>user-fn</code> definiert.
+      </li>
+      <br>
+      <b>FritzBox-spezifische Readings</b>
+      <li>wlan_state<br>
+         WLAN-Status: on/off
+      </li>
+      <br>
+      <li>wlan_guest_state<br>
+         Gast-WLAN-Status: on/off
+      </li>
+      <br>
+      <li>internet_ip<br>
+         aktuelle IP-Adresse
+      </li>
+      <br>
+      <li>internet_state<br>
+         Status der Internetverbindung: connected/disconnected
+      </li>
+      <br>
+      <li>night_time_ctrl<br>
+         Status der Klingelsperre on/off
+      </li>
+      <br>
+      <li>num_new_messages<br>
+         Anzahl der neuen Anrufbeantworter-Meldungen
+      </li>
+      <br>
+      <li>fw_version_info<br>
+         Angaben zu der installierten Firmware-Version: &lt;VersionNr&gt; &lt;Erstelldatum&gt; &lt;Zeit&gt;
+      </li>
+      <br>
+      <b>DSL Informationen (FritzBox)</b>
+      <li>dsl_rate<br>
+         Down/Up Verbindungsgeschwindigkeit
+      </li>
+      <br>
+      <li>dsl_synctime<br>
+         Sync-Zeit mit Vermittlungsstelle
+      </li>
+      <br>
+      <li>dsl_crc_15<br>
+         Nicht behebbare &Uuml;bertragungsfehler in den letzten 15 Minuten
+      </li>
+      <br>
+      <li>dsl_fec_15<br>
+         Behebbare &Uuml;bertragungsfehler in den letzten 15 Minuten
+      </li>
+      <br>
+      <b>Readings zur Stromversorgung</b>
+      <li>power_ac_stat<br>
+         Statusinformation f&uuml;r die AC-Buchse: online (0|1), present (0|1), voltage, current<br>
+         Beispiel:<br>
+         <code>power_ac_stat: 1 1 4.807 264</code><br>
+      </li>
+      <br>
+      <li>power_ac_text<br>
+         Statusinformation f&uuml;r die AC-Buchse in menschenlesbarer Form<br>
+         Beispiel:<br>
+         <code>power_ac_text ac: present / online, Voltage: 4.807 V, Current: 264 mA</code><br>
+      </li>
+      <br>
+      <li>power_usb_stat<br>
+         Statusinformation f&uuml;r die USB-Buchse
+      </li>
+      <br>
+      <li>power_usb_text<br>
+         Statusinformation f&uuml;r die USB-Buchse in menschenlesbarer Form
+      </li>
+      <br>
+      <li>power_battery_stat<br>
+         Statusinformation f&uuml;r die Batterie (wenn vorhanden): online (0|1), present (0|1), voltage, current, actual capacity<br>
+         Beispiel:<br>
+         <code>power_battery_stat: 1 1 4.807 264 100</code><br>
+      </li>
+      <br>
+      <li>power_battery_text<br>
+         Statusinformation f&uuml;r die Batterie (wenn vorhanden) in menschenlesbarer Form
+      </li>
+      <br>
+      <li>power_battery_info<br>
+         Menschenlesbare Zusatzinformationen  f&uuml;r die Batterie (wenn vorhanden): Technologie, Kapazit&auml;t, Status, Zustand, Gesamtkapazit&auml;t<br>
+         Beispiel:<br>
+         <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
+         Die Kapazit&auml;t soll in script.bin (z.B. ct-hdmi.bin) eingestellt werden (Parameter pmu_battery_cap). Mit bin2fex konvertieren (bin2fex -> script.fex -> edit -> fex2bin -> script.bin)<br>
+      </li>
+      <br>
+      <li>cpuX_freq_stat<br>
+         Frequenz-Statistik f&uuml;r die CPU X: Minimum, Maximum und Durchschnittswert<br>
+         Beispiel:<br>
+         <code>cpu0_freq_stat: 100 1000 900</code><br>
+      </li>
+      <br>
+      <li>cpuX_idle_stat<br>
+         Leerlaufzeit-Statistik f&uuml;r die CPU X: Minimum, Maximum und Durchschnittswert<br>
+         Beispiel:<br>
+         <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
+      </li>
+      <br>
+      <li>cpu[X]_temp_stat<br>
+         Temperatur-Statistik f&uuml;r CPU: Minimum, Maximum und Durchschnittswert<br>
+         Beispiel:<br>
+         <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
+      </li>
+      <br>
+      <li>ram_used_stat<br>
+         Statistik der RAM-Nutzung: Minimum, Maximum und Durchschnittswert<br>
+         Example:<br>
+         <code>ram_used_stat: 267.55 1267.75 855.00</code><br>
+      </li>
+      <br>
+      <li>swap_used_stat<br>
+         Statistik der SWAP-Nutzung: Minimum, Maximum und Durchschnittswert<br>
+         Example:<br>
+         <code>swap_used_stat: 0 1024.00 250.00</code><br>
+      </li>
+      <br>
+      <br>
+   </ul>
 
-  <b>Readings:</b>
-  <br><br>
-  <ul>
-    <li>cpu_core_count<br>
-        Anzahl der CPU Kerne
-    </li>
-    <li>cpu_model_name<br>
-        CPU Modellname
-    </li>
-    <li>cpu_bogomips<br>
-        CPU Speed: BogoMIPS
-    </li>
-    <li>cpu_freq (auf den DualCore-Systemen wie Cubietruck auch cpu1_freq)<br>
-        CPU-Frequenz
-    </li>
-    <br>
-    <li>cpu_temp<br>
-        CPU-Temperatur
-    </li>
-    <br>
-    <li>cpu_temp_avg<br>
-        Durchschnitt der CPU-Temperatur, gebildet &uuml;ber die letzten 4 Werte.
-    </li>
-    <br>
-    <li>fhemuptime<br>
-        Zeit (in Sekunden) seit dem Start des FHEM-Servers.
-    </li>
-    <br>
-    <li>fhemuptime_text<br>
-        Zeit seit dem Start des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
-    </li>
-    <br>
-    <li>fhemstarttime<br>
-        Startzeit (in Sekunden seit 1.1.1970 1:00:00) des FHEM-Servers.
-    </li>
-    <br>
-    <li>fhemstarttime_text<br>
-        Startzeit des FHEM-Servers: Menschenlesbare Ausgabe (texttuelle Darstellung).
-    </li>
-    <br>
-    <li>idletime<br>
-        Zeit (in Sekunden und in Prozent), die das System (nicht der FHEM-Server!)
-        seit dem Start in dem Idle-Modus verbracht hat. Also die Zeit der Inaktivit&auml;t.
-    </li>
-    <br>
-    <li>idletime_text<br>
-        Zeit der Inaktivit&auml;t des Systems seit dem Systemstart in menschenlesbarer Form.
-    </li>
-    <br>
-    <li>loadavg<br>
-        Ausgabe der Werte f&uuml;r die Systemauslastung (load average): 1 Minute-, 5 Minuten- und 15 Minuten-Werte.
-    </li>
-    <br>
-    <li>ram<br>
-       Ausgabe der Speicherauslastung.
-    </li>
-    <br>
-    <li>swap<br>
-        Benutzung und Auslastung der SWAP-Datei (bzw. Partition).
-    </li>
-    <br>
-    <li>uptime<br>
-        Zeit (in Sekenden) seit dem Systemstart.
-    </li>
-    <br>
-    <li>uptime_text<br>
-        Zeit seit dem Systemstart in menschenlesbarer Form.
-    </li>
-    <br>
-    <li>starttime<br>
-        Systemstart (Sekunden seit Thu Jan  1 01:00:00 1970).
-    </li>
-    <br>
-    <li>starttime_text<br>
-        Systemstart in menschenlesbarer Form.
-    </li>
-    <br>
-    <li>Netzwerkinformationen<br>
-    Informationen zu den &uuml;ber die angegebene Netzwerkschnittstellen &uuml;bertragene Datenmengen 
-    und der Differenz zu der vorherigen Messung.
-    <br>
-    Beispiele:<br>
-    Menge der &uuml;bertragenen Daten &uuml;ber die Schnittstelle eth0.<br>
-    <code>eth0: RX: 940.58 MB, TX: 736.19 MB, Total: 1676.77 MB</code><br>
-    &Auml;nderung der &uuml;bertragenen Datenmenge in Bezug auf den vorherigen Aufruf (f&uuml;r eth0).<br>
-    <code>eth0_diff: RX: 0.66 MB, TX: 0.06 MB, Total: 0.72 MB</code><br>
-    IP and IP v6 Adressen
-    <code>eth0_ip 192.168.0.15</code><br>
-    <code>eth0_ip6 fe85::49:4ff:fe85:f885/64</code><br>
-    </li>
-    <br>
-    <li>Network Speed (wenn verf&uuml;gbar)<br>
-    Geschwindigkeit der aktuellen Netzwerkverbindung.
-    <br>
-    Beispiel:<br>
-    <code>eth0_speed 100</code><br>
-    </li>
-    <br>
-    <li>Dateisysteminformationen<br>
-        Informationen zu der Gr&ouml;&szlig;e und der Belegung der gew&uuml;nschten Dateisystemen.<br>
-        Seit Version 1.1.0 k&ouml;nnen Dateisysteme auch benannt werden (s.u.). <br>
-        In diesem Fall werden f&uuml;r die diese Readings die angegebenen Namen verwendet.<br>
-        Dies soll die &Uuml;bersicht verbessern und die Erstellung von Plots erleichten.<br>
-        Beispiel:<br>
-        <code>fs_root: Total: 7340 MB, Used: 3573 MB, 52 %, Available: 3425 MB at /</code>
-    </li>
-    <br>
-    <li>CPU Auslastung<br>
-        Informationen zu der Auslastung der CPU(s).<br>
-        Beispiel:<br>
-        <code>stat_cpu: 10145283 0 2187286 90586051 542691 69393 400342</code><br>
-        <code>stat_cpu_diff: 2151 0 1239 2522 10 3 761</code><br>
-        <code>stat_cpu_percent: 4.82 0.00 1.81 93.11 0.05 0.00 0.20</code><br>
-        <code>stat_cpu_text: user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %</code>
-    </li>
-    <br>
-    <li>Benutzerdefinierte Eintr&auml;ge<br>
-        Diese Readings sind Ausgaben der Kommanden, die an das Betriebssystem &uuml;bergeben werden.
-        Die entsprechende Angaben werden durch Attributen <code>user-defined</code> und <code>user-fn</code> definiert.
-    </li>
-    <br>
-    <b>FritzBox-spezifische Readings</b>
-    <li>wlan_state<br>
-        WLAN-Status: on/off
-    </li>
-    <br>
-    <li>wlan_guest_state<br>
-        Gast-WLAN-Status: on/off
-    </li>
-    <br>
-    <li>internet_ip<br>
-        aktuelle IP-Adresse
-    </li>
-    <br>
-    <li>internet_state<br>
-        Status der Internetverbindung: connected/disconnected
-    </li>
-    <br>
-    <li>night_time_ctrl<br>
-        Status der Klingelsperre on/off
-    </li>
-    <br>
-    <li>num_new_messages<br>
-        Anzahl der neuen Anrufbeantworter-Meldungen
-    </li>
-    <br>
-    <li>fw_version_info<br>
-        Angaben zu der installierten Firmware-Version: <VersionNr> <Erstelldatum> <Zeit>
-    </li>
-    <br>
-    <b>DSL Informationen (FritzBox)</b>
-    <li>dsl_rate<br>
-        Down/Up Verbindungsgeschwindigkeit
-    </li>
-    <br>
-    <li>dsl_synctime<br>
-        Sync-Zeit mit Vermittlungsstelle
-    </li>
-    <br>
-    <li>dsl_crc_15<br>
-        Nicht behebbare &Uuml;bertragungsfehler in den letzten 15 Minuten
-    </li>
-    <br>
-    <li>dsl_fec_15<br>
-        Behebbare &Uuml;bertragungsfehler in den letzten 15 Minuten
-    </li>
-    <br>
-    <b>Readings zur Stromversorgung</b>
-    <li>power_ac_stat<br>
-        Statusinformation f&uuml;r die AC-Buchse: online (0|1), present (0|1), voltage, current<br>
-        Beispiel:<br>
-        <code>power_ac_stat: 1 1 4.807 264</code><br>
-    </li>
-    <br>
-    <li>power_ac_text<br>
-        Statusinformation f&uuml;r die AC-Buchse in menschenlesbarer Form<br>
-        Beispiel:<br>
-        <code>power_ac_text ac: present / online, Voltage: 4.807 V, Current: 264 mA</code><br>
-    </li>
-    <br>
-    <li>power_usb_stat<br>
-        Statusinformation f&uuml;r die USB-Buchse
-    </li>
-    <br>
-    <li>power_usb_text<br>
-        Statusinformation f&uuml;r die USB-Buchse in menschenlesbarer Form
-    </li>
-    <br>
-    <li>power_battery_stat<br>
-        Statusinformation f&uuml;r die Batterie (wenn vorhanden): online (0|1), present (0|1), voltage, current, actual capacity<br>
-        Beispiel:<br>
-        <code>power_battery_stat: 1 1 4.807 264 100</code><br>
-    </li>
-    <br>
-    <li>power_battery_text<br>
-        Statusinformation f&uuml;r die Batterie (wenn vorhanden) in menschenlesbarer Form
-    </li>
-    <br>
-    <li>power_battery_info<br>
-        Menschenlesbare Zusatzinformationen  f&uuml;r die Batterie (wenn vorhanden): Technologie, Kapazit&auml;t, Status, Zustand, Gesamtkapazit&auml;t<br>
-        Beispiel:<br>
-        <code>power_battery_info: battery info: Li-Ion , capacity: 100 %, status: Full , health: Good , total capacity: 2100 mAh</code><br>
-        Die Kapazit&auml;t soll in script.bin (z.B. ct-hdmi.bin) eingestellt werden (Parameter pmu_battery_cap). Mit bin2fex konvertieren (bin2fex -> script.fex -> edit -> fex2bin -> script.bin)<br>
-    </li>
-    <br>    
-    <li>cpuX_freq_stat<br>
-        Frequenz-Statistik f&uuml;r die CPU X: Minimum, Maximum und Durchschnittswert<br>
-        Beispiel:<br>
-        <code>cpu0_freq_stat: 100 1000 900</code><br>
-    </li>
-    <br>    
-        <li>cpuX_idle_stat<br>
-        Leerlaufzeit-Statistik f&uuml;r die CPU X: Minimum, Maximum und Durchschnittswert<br>
-        Beispiel:<br>
-        <code>cpu0_freq_stat: 23.76 94.74 90.75</code><br>
-    </li>
-    <br>    
-        <li>cpu[X]_temp_stat<br>
-        Temperatur-Statistik f&uuml;r CPU: Minimum, Maximum und Durchschnittswert<br>
-        Beispiel:<br>
-        <code>cpu_temp_stat: 41.00 42.50 42.00</code><br>
-    </li>
-    <br>
-        <li>ram_used_stat<br>
-        Statistik der RAM-Nutzung: Minimum, Maximum und Durchschnittswert<br>
-        Example:<br>
-        <code>ram_used_stat: 267.55 1267.75 855.00</code><br>
-    </li>
-    <br>
-    <li>swap_used_stat<br>
-        Statistik der SWAP-Nutzung: Minimum, Maximum und Durchschnittswert<br>
-        Example:<br>
-        <code>swap_used_stat: 0 1024.00 250.00</code><br>
-    </li>
-    <br>
-  <br>
-  </ul>
-
-  Beispiel-Ausgabe:<br>
-  <ul>
-
-<table style="border: 1px solid black;">
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">cpu_freq</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>900</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">cpu_temp</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>49.77</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">cpu_temp_avg</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>49.7</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">eth0</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 2954.22 MB, TX: 3469.21 MB, Total: 6423.43 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">eth0_diff</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 6.50 MB, TX: 0.23 MB, Total: 6.73 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>11231</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fhemuptime_text&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>0 days, 03 hours, 07 minutes</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">idletime</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>931024 88.35 %</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">idletime_text</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>10 days, 18 hours, 37 minutes (88.35 %)</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">loadavg</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>0.14 0.18 0.22</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">ram</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 485 MB, Used: 140 MB, 28.87 %, Free: 345 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">swap</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>n/a</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">uptime</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>1053739</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">uptime_text</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>12 days, 04 hours, 42 minutes</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">wlan0</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">wlan0_diff</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>RX: 0.00 MB, TX: 0.00 MB, Total: 0.00 MB</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fs_root</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 7404 MB, Used: 3533 MB, 50 %, Available: 3545 MB at /</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname"><div class="dname">fs_boot</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>Total: 56 MB, Used: 19 MB, 33 %, Available: 38 MB at /boot</div></td>
-<td style="border-bottom: 1px solid black;"><div class="dname"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">fs_usb1</div></td>
-<td style="border-bottom: 1px solid black;"><div>Total: 30942 MB, Used: 6191 MB, 21 %, Available: 24752 MB at /media/usb1&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu</div></td>
-<td style="border-bottom: 1px solid black;"><div>10145283 0 2187286 90586051 542691 69393 400342&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_diff</div></td>
-<td style="border-bottom: 1px solid black;"><div>2151 0 1239 2522 10 3 761&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td style="border-bottom: 1px solid black;"><div class="dname">stat_cpu_percent</div></td>
-<td style="border-bottom: 1px solid black;"><div>4.82 0.00 1.81 93.11 0.05 0.00 0.20&nbsp;&nbsp;</div></td>
-<td style="border-bottom: 1px solid black;"><div>2013-11-27 00:05:36</div></td>
-</tr>
-<tr><td><div class="dname">stat_cpu_text</div></td>
-<td><div>user: 32.17 %, nice: 0.00 %, sys: 18.53 %, idle: 37.72 %, io: 0.15 %, irq: 0.04 %, sirq: 11.38 %&nbsp;&nbsp;</div></td>
-<td><div>2013-11-27 00:05:36</div></td>
-</tr>
-</table>
-  </ul><br>
-
-  <b>Get:</b><br><br>
-    <ul>
-    <li>interval<br>
-    Listet die bei der Definition angegebene Polling-Intervalle auf.
-    </li>
-    <br>
-    <li>interval_multipliers<br>
-    Listet die definierten Multipliers.
-    </li>
-    <br>
-    <li>list<br>
-    Gibt alle Readings aus.
-    </li>
-    <br>
-    <li>update<br>
-    Aktualisiert alle Readings. Alle Werte werden neu abgefragt.
-    </li>
-    <br>
-    <li>version<br>
-    Zeigt die Version des SYSMON-Moduls.
-    </li>
-    <br>
-    <br>
-    <li>list_lan_devices<br>
-    Listet bekannte Ger&auml;te im LAN (nur FritzBox).
-    </li>
-    </ul><br>
-
-  <b>Set:</b><br><br>
-    <ul>
-    <li>interval_multipliers<br>
-    Definiert Multipliers (wie bei der Definition des Ger&auml;tes).
-    </li>
-    <br>
-    <li>clean<br>
-    L&ouml;scht benutzerdefinierbare Readings. Nach einem Update (oder nach der automatischen Aktualisierung) werden neue Readings generiert.<br>
-    </li>
-    <br>
-    <li>clear &lt;reading name&gt;<br>
-    L&ouml;scht den Reading-Eintrag mit dem gegebenen Namen. Nach einem Update (oder nach der automatischen Aktualisierung) 
-    wird dieser Eintrag ggf. neu erstellt (falls noch definiert). Dieses Mechanismus erlaubt das gezielte L&ouml;schen nicht mehr ben&ouml;tigter 
-    benutzerdefinierten Eintr&auml;ge.<br>
-    </li>
-    <br>
-    <li>password &lt;Passwort&gt;<br>
-    Definiert das Passwort f&uuml;r den Remote-Zugriff (i.d.R. nur einmalig notwendig).
-    </li>
-    <br>
-    </ul><br>
-
-  <b>Attributes:</b><br><br>
-    <ul>
-    <li>filesystems &lt;reading name&gt;[:&lt;mountpoint&gt;[:&lt;comment&gt;]],...<br>
-    Gibt die zu &uuml;berwachende Dateisysteme an. Es wird eine kommaseparierte Liste erwartet.<br>
-    Reading-Name wird bei der Anzeige und Logging verwendet, Mount-Point ist die Grundlage der Auswertung, 
-    Kommentar ist relevant f&uuml;r die HTML-Anzeige (s. SYSMON_ShowValuesHTML)<br>
-    Beispiel: <code>/boot,/,/media/usb1</code><br>
-    oder: <code>fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick</code><br>
-    Im Sinne der besseren &Uuml;bersicht sollten zumindest Name und MountPoint angegeben werden.
-    </li>
-    <br>
-    <li>network-interfaces &lt;name&gt;[:&lt;interface&gt;[:&lt;comment&gt;]],...<br>
-    Kommaseparierte Liste der Netzwerk-Interfaces, die &uuml;berwacht werden sollen.
-    Jeder Eintrag besteht aus dem Reading-Namen, dem Namen 
-    des Netwerk-Adapters und einem Kommentar f&uuml;r die HTML-Anzeige (s. SYSMON_ShowValuesHTML). Wird kein Doppelpunkt verwendet, 
-    wird der Wert gleichzeitig als Reading-Name und Interface-Name verwendet.<br>
-    Beispiel <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
-    </li>
-    <br>
-    <li>user-defined &lt;readingsName&gt;:&lt;Interval_Minutes&gt;:&lt;Comment&gt;:&lt;Cmd&gt;,...<br>
-    Diese kommaseparierte Liste definiert Eintr&auml;ge mit jeweils folgenden Daten: 
-    Reading-Name, Aktualisierungsintervall in Minuten, Kommentar und Betriebssystem-Commando.
-    <br>Die BS-Befehle werden entsprechend des angegebenen Intervalls ausgef&uuml;hrt und als Readings mit den angegebenen Namen vermerkt.
-    Kommentare werden f&uuml;r die HTML-Ausgaben (s. SYSMON_ShowValuesHTML) ben&ouml;tigt.
-    <br>Alle Parameter sind nicht optional!
-    <br>Es ist wichtig, dass die angegebenen Befehle schnell ausgef&uuml;hrt werden, denn in dieser Zeit wird der gesamte FHEM-Server blockiert!
-    <br>Werden Ergebnisse der lang laufenden Operationen ben&ouml;tigt, sollten diese z.B als CRON-Job eingerichtet werden 
-    und in FHEM nur die davor gespeicherten Ausgaben visualisiert.<br><br>
-    Beispiel: Anzeige der vorliegenden Paket-Aktualisierungen f&uuml;r das Betriebssystem:<br>
-    In einem cron-Job wird folgendes t&auml;glich ausgef&uuml;hrt: <br>
-    <code> sudo apt-get update 2>/dev/null >/dev/null</code>
-    <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
-    <br>
-    Das Attribute <code>uder-defined</code> wird auf <br><code>sys_updates:1440:System Aktualisierungen:cat /opt/fhem/data/updatestatus.txt</code><br> gesetzt.
-    Danach wird die Anzahl der verf&uuml;gbaren Aktualisierungen t&auml;glich als Reading 'sys_updates' protokolliert.
-    </li>
-    <br>
-    <li>user-fn &lt;fn_name&gt;:&lt;Interval_Minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;],...<br>
-    Liste der benutzerdefinierten Perlfunktionen.<br>
-    Als &lt;fn_name&gt; k&ouml;nnen entweder Name einer Perlfunktion oder ein Perlausdruck verwendet werden.
-    Die Perlfunktion bekommt den Device-Hash als &Uuml;bergabeparameter und muss ein Array mit Werte liefern. 
-    Diese Werte werden entsprechend den Parameter &lt;reading_nameX&gt; in Readings &uuml;bernommen.<br>
-    Ein Perlausdruck muss in geschweifte Klammer eingeschlossen werden und kann folgende Paramter verwenden: $HASH (Device-Hash) und $NAME (Device-Name).
-    R&uuml;ckgabe wird analog einer Perlfunktion erwartet.<br>
-    Wichtig! Die Trennung zwischen mehreren Benutzerfunktionen muss mit einem Komma UND einem Leerzeichen erfolgen! Innerhalb der Funktiondefinition d&uuml;rfen Kommas nicht durch Leerzeichen gefolgt werden.
-    </li>
-    <br>
-    <li>disable<br>
-    M&ouml;gliche Werte: <code>0,1</code>. Bei <code>1</code> wird die Aktualisierung gestoppt.
-    </li>
-    <br>
-    <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
-    RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur f&uuml;r Zugriffe &uuml;ber Telnet relevant.)
-    </li>
-    <br>
-    <li>exclude<br>
-    Erlaubt das Abfragen bestimmten Informationen zu unterbinden. <br>
-    Mögliche Werte: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
-    loadavg, cputemp, cpufreq, cpuinfo, diskstat, cpustat, ramswap, filesystem, network, 
-    fbwlan, fbnightctrl, fbnewmessages, fbdecttemp, fbversion, fbdsl, powerinfo
-    </li>
-    <br>
-    </ul><br>
-
-  <b>Plots:</b><br><br>
-    <ul>
-    F&uuml;r dieses Modul sind bereits einige gplot-Dateien vordefiniert:<br>
-     <ul>
-      FileLog-Versionen:<br>
+   <br>
+   <b>Get:</b><br><br>
+   <ul>
+      <li>interval<br>
+         Listet die bei der Definition angegebene Polling-Intervalle auf.
+      </li>
+      <br>
+      <li>interval_multipliers<br>
+         Listet die definierten Multipliers.
+      </li>
+      <br>
+      <li>list<br>
+         Gibt alle Readings aus.
+      </li>
+      <br>
+      <li>update<br>
+         Aktualisiert alle Readings. Alle Werte werden neu abgefragt.
+      </li>
+      <br>
+      <li>version<br>
+         Zeigt die Version des SYSMON-Moduls.
+      </li>
+      <br>
+      <br>
+      <li>list_lan_devices<br>
+         Listet bekannte Ger&auml;te im LAN (nur FritzBox).
+      </li>
+   </ul>
+   <br>
+   <b>Set:</b><br><br>
+   <ul>
+      <li>interval_multipliers<br>
+         Definiert Multipliers (wie bei der Definition des Ger&auml;tes).
+      </li>
+      <br>
+      <li>clean<br>
+         L&ouml;scht benutzerdefinierbare Readings. Nach einem Update (oder nach der automatischen Aktualisierung) werden neue Readings generiert.<br>
+      </li>
+      <br>
+      <li>clear &lt;reading name&gt;<br>
+         L&ouml;scht den Reading-Eintrag mit dem gegebenen Namen. Nach einem Update (oder nach der automatischen Aktualisierung)
+         wird dieser Eintrag ggf. neu erstellt (falls noch definiert). Dieses Mechanismus erlaubt das gezielte L&ouml;schen nicht mehr ben&ouml;tigter
+         benutzerdefinierten Eintr&auml;ge.<br>
+      </li>
+      <br>
+      <li>password &lt;Passwort&gt;<br>
+         Definiert das Passwort f&uuml;r den Remote-Zugriff (i.d.R. nur einmalig notwendig).
+      </li>
+      <br>
+   </ul>
+   <br>
+   <b>Attributes:</b><br><br>
+   <ul>
+      <li>filesystems &lt;reading name&gt;[:&lt;mountpoint&gt;[:&lt;comment&gt;]],...<br>
+         Gibt die zu &uuml;berwachende Dateisysteme an. Es wird eine kommaseparierte Liste erwartet.<br>
+         Reading-Name wird bei der Anzeige und Logging verwendet, Mount-Point ist die Grundlage der Auswertung,
+         Kommentar ist relevant f&uuml;r die HTML-Anzeige (s. SYSMON_ShowValuesHTML)<br>
+         Beispiel: <code>/boot,/,/media/usb1</code><br>
+         oder: <code>fs_boot:/boot,fs_root:/:Root,fs_usb1:/media/usb1:USB-Stick</code><br>
+         Im Sinne der besseren &Uuml;bersicht sollten zumindest Name und MountPoint angegeben werden.
+      </li>
+      <br>
+      <li>network-interfaces &lt;name&gt;[:&lt;interface&gt;[:&lt;comment&gt;]],...<br>
+         Kommaseparierte Liste der Netzwerk-Interfaces, die &uuml;berwacht werden sollen.
+         Jeder Eintrag besteht aus dem Reading-Namen, dem Namen
+         des Netwerk-Adapters und einem Kommentar f&uuml;r die HTML-Anzeige (s. SYSMON_ShowValuesHTML). Wird kein Doppelpunkt verwendet,
+         wird der Wert gleichzeitig als Reading-Name und Interface-Name verwendet.<br>
+         Beispiel <code>ethernet:eth0:Ethernet,wlan:wlan0:WiFi</code><br>
+      </li>
+      <br>
+      <li>user-defined &lt;readingsName&gt;:&lt;Interval_Minutes&gt;:&lt;Comment&gt;:&lt;Cmd&gt;,...<br>
+         Diese kommaseparierte Liste definiert Eintr&auml;ge mit jeweils folgenden Daten:
+         Reading-Name, Aktualisierungsintervall in Minuten, Kommentar und Betriebssystem-Commando.
+         <br>Die BS-Befehle werden entsprechend des angegebenen Intervalls ausgef&uuml;hrt und als Readings mit den angegebenen Namen vermerkt.
+         Kommentare werden f&uuml;r die HTML-Ausgaben (s. SYSMON_ShowValuesHTML) ben&ouml;tigt.
+         <br>Alle Parameter sind nicht optional!
+         <br>Es ist wichtig, dass die angegebenen Befehle schnell ausgef&uuml;hrt werden, denn in dieser Zeit wird der gesamte FHEM-Server blockiert!
+         <br>Werden Ergebnisse der lang laufenden Operationen ben&ouml;tigt, sollten diese z.B als CRON-Job eingerichtet werden
+         und in FHEM nur die davor gespeicherten Ausgaben visualisiert.<br><br>
+         Beispiel: Anzeige der vorliegenden Paket-Aktualisierungen f&uuml;r das Betriebssystem:<br>
+         In einem cron-Job wird folgendes t&auml;glich ausgef&uuml;hrt: <br>
+         <code> sudo apt-get update 2>/dev/null >/dev/null</code>
+         <code> apt-get upgrade --dry-run| perl -ne '/(\d*)\s[upgraded|aktualisiert]\D*(\d*)\D*install|^ \S+.*/ and print "$1 aktualisierte, $2 neue Pakete"' 2>/dev/null &gt; /opt/fhem/data/updatestatus.txt</code>
+         <br>
+         Das Attribute <code>uder-defined</code> wird auf <br><code>sys_updates:1440:System Aktualisierungen:cat /opt/fhem/data/updatestatus.txt</code><br> gesetzt.
+         Danach wird die Anzahl der verf&uuml;gbaren Aktualisierungen t&auml;glich als Reading 'sys_updates' protokolliert.
+      </li>
+      <br>
+      <li>user-fn &lt;fn_name&gt;:&lt;Interval_Minutes&gt;:&lt;reading_name1&gt;:&lt;reading_name2&gt;...[:&lt;reading_nameX&gt;],...<br>
+         Liste der benutzerdefinierten Perlfunktionen.<br>
+         Als &lt;fn_name&gt; k&ouml;nnen entweder Name einer Perlfunktion oder ein Perlausdruck verwendet werden.
+         Die Perlfunktion bekommt den Device-Hash als &Uuml;bergabeparameter und muss ein Array mit Werte liefern.
+         Diese Werte werden entsprechend den Parameter &lt;reading_nameX&gt; in Readings &uuml;bernommen.<br>
+         Ein Perlausdruck muss in geschweifte Klammer eingeschlossen werden und kann folgende Paramter verwenden: $HASH (Device-Hash) und $NAME (Device-Name).
+         R&uuml;ckgabe wird analog einer Perlfunktion erwartet.<br>
+         Wichtig! Die Trennung zwischen mehreren Benutzerfunktionen muss mit einem Komma UND einem Leerzeichen erfolgen! Innerhalb der Funktiondefinition d&uuml;rfen Kommas nicht durch Leerzeichen gefolgt werden.
+      </li>
+      <br>
+      <li>disable<br>
+         M&ouml;gliche Werte: <code>0,1</code>. Bei <code>1</code> wird die Aktualisierung gestoppt.
+      </li>
+      <br>
+      <li>telnet-prompt-regx, telnet-login-prompt-regx<br>
+         RegExp zur Erkennung von Login- und Kommandozeile-Prompt. (Nur f&uuml;r Zugriffe &uuml;ber Telnet relevant.)
+      </li>
+      <br>
+      <li>exclude<br>
+         Erlaubt das Abfragen bestimmten Informationen zu unterbinden. <br>
+         Mögliche Werte: user-defined (s. user-defined und user-fn), cpucount, uptime, fhemuptime,
+         loadavg, cputemp, cpufreq, cpuinfo, diskstat, cpustat, ramswap, filesystem, network,
+         fbwlan, fbnightctrl, fbnewmessages, fbdecttemp, fbversion, fbdsl, powerinfo
+      </li>
+      <br>
+   </ul>
+   <br>
+   <b>Plots:</b><br><br>
+   <ul>
+      F&uuml;r dieses Modul sind bereits einige gplot-Dateien vordefiniert:<br>
+      <ul>
+         FileLog-Versionen:<br>
+         <code>
+         SM_RAM.gplot<br>
+         SM_CPUTemp.gplot<br>
+         SM_FS_root.gplot<br>
+         SM_FS_usb1.gplot<br>
+         SM_Load.gplot<br>
+         SM_Network_eth0.gplot<br>
+         SM_Network_eth0t.gplot<br>
+         SM_Network_wlan0.gplot<br>
+         SM_CPUStat.gplot<br>
+         SM_CPUStatSum.gplot<br>
+         SM_CPUStatTotal.gplot<br>
+         SM_power_ac.gplot<br>
+         SM_power_usb.gplot<br>
+         SM_power_battery.gplot<br>
+         </code>
+         DbLog-Versionen:<br>
+         <code>
+         SM_DB_all.gplot<br>
+         SM_DB_CPUFreq.gplot<br>
+         SM_DB_CPUTemp.gplot<br>
+         SM_DB_Load.gplot<br>
+         SM_DB_Network_eth0.gplot<br>
+         SM_DB_RAM.gplot<br>
+         </code>
+      </ul>
+   </ul>
+   <br>
+   <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTML(&lt;SYSMON-Instanz&gt;[,&lt;Liste&gt;])</b><br><br>
+   <ul>
+      Das Modul definiert eine Funktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
+      Als Parameter wird der Name des definierten SYSMON-Ger&auml;ts erwartet.<br>
+      Es kann auch ReadingsGroup, CloneDummy oder andere Module genutzt werden, dann werden einfach deren Readings verwendet.<br>
+      Der zweite Parameter ist optional und gibt eine Liste der anzuzeigende Readings
+      im Format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;[:&lt;FormatString&gt;]]]</code> an.<br>
+      Dabei gibt <code>ReadingName</code> den anzuzeigenden Reading an, der Wert aus <code>Comment</code> wird als der Anzeigename verwendet
+      und <code>Postfix</code> wird nach dem eihentlichen Wert angezeigt (so k&ouml;nnen z.B. Einheiten wie MHz angezeigt werden). 
+      Mit Hilfe von FormatString kann die Ausgabe beeinflusst werden (s. sprintf in PerlDoku).<br>
+      Falls kein <code>Comment</code> angegeben ist, wird eine intern vordefinierte Beschreibung angegeben.
+      Bei benutzerdefinierbaren Readings wird ggf. <code>Comment</code> aus der Definition verwendet.<br>
+      Wird keine Liste angegeben, wird eine vordefinierte Auswahl verwendet (alle Werte).<br><br>
+      <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
+      <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
+   </ul>
+   <br>
+   <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
+   <ul>
+      Wie SYSMON_ShowValuesHTML, aber mit einer &Uuml;berschrift dar&uuml;ber. Wird keine &Uuml;berschrift angegeben, wird alias des Moduls genutzt (falls definiert).<br>
+   </ul>
+   <br>
+   <b>Text-Ausgabe-Methode (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
+   <ul>
+      Analog SYSMON_ShowValuesHTML, jedoch formatiert als reines Text.<br>
+   </ul>
+   <br>
+   <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
+   <ul>
+      Wie SYSMON_ShowValuesText, aber mit einer &Uuml;berschrift dar&uuml;ber.<br>
+   </ul>
+   <br>
+   <b>Readings-Werte mit Perl lesen: SYSMON_getValues(&lt;name&gt;[, &lt;Liste der gew&uuml;nschten Schl&uuml;ssel&gt;])</b><br><br>
+   <ul>
+      Liefert ein Hash-Ref mit den gew&uuml;nschten Werten. Wenn keine Liste (array) &uuml;bergeben wird, werden alle Werte geliefert.<br>
+      {(SYSMON_getValues("sysmon"))->{'cpu_temp'}}<br>
+      {(SYSMON_getValues("sysmon",("cpu_freq","cpu_temp")))->{"cpu_temp"}}<br>
+      {join(" ", values (SYSMON_getValues("sysmon")))}<br>
+      {join(" ", values (SYSMON_getValues("sysmon",("cpu_freq","cpu_temp"))))}<br>
+   </ul>
+   <br>
+   <b>Beispiele:</b><br><br>
+   <ul>
       <code>
-       SM_RAM.gplot<br>
-       SM_CPUTemp.gplot<br>
-       SM_FS_root.gplot<br>
-       SM_FS_usb1.gplot<br>
-       SM_Load.gplot<br>
-       SM_Network_eth0.gplot<br>
-       SM_Network_eth0t.gplot<br>
-       SM_Network_wlan0.gplot<br>
-       SM_CPUStat.gplot<br>
-       SM_CPUStatSum.gplot<br>
-       SM_CPUStatTotal.gplot<br>
-       SM_power_ac.gplot<br>
-       SM_power_usb.gplot<br>
-       SM_power_battery.gplot<br>
-      </code>
-      DbLog-Versionen:<br>
-      <code>
-       SM_DB_all.gplot<br>
-       SM_DB_CPUFreq.gplot<br>
-       SM_DB_CPUTemp.gplot<br>
-       SM_DB_Load.gplot<br>
-       SM_DB_Network_eth0.gplot<br>
-       SM_DB_RAM.gplot<br>
-      </code>
-     </ul>
-    </ul><br>
-
-  <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTML(&lt;SYSMON-Instanz&gt;[,&lt;Liste&gt;])</b><br><br>
-    <ul>
-    Das Modul definiert eine Funktion, die ausgew&auml;hlte Readings in HTML-Format ausgibt. <br>
-    Als Parameter wird der Name des definierten SYSMON-Ger&auml;ts erwartet.<br>
-    Es kann auch ReadingsGroup, CloneDummy oder andere Module genutzt werden, dann werden einfach deren Readings verwendet.<br>
-    Der zweite Parameter ist optional und gibt eine Liste der anzuzeigende Readings 
-    im Format <code>&lt;ReadingName&gt;[:&lt;Comment&gt;[:&lt;Postfix&gt;[:&lt;FormatString&gt;]]]</code> an.<br>
-    Dabei gibt <code>ReadingName</code> den anzuzeigenden Reading an, der Wert aus <code>Comment</code> wird als der Anzeigename verwendet
-    und <code>Postfix</code> wird nach dem eihentlichen Wert angezeigt (so k&ouml;nnen z.B. Einheiten wie MHz angezeigt werden). Mit Hilfe von FormatString kann die Ausgabe beeinflusst werden (s. sprintf in PerlDoku).<br>
-    Falls kein <code>Comment</code> angegeben ist, wird eine intern vordefinierte Beschreibung angegeben. 
-    Bei benutzerdefinierbaren Readings wird ggf. <code>Comment</code> aus der Definition verwendet.<br>
-    Wird keine Liste angegeben, wird eine vordefinierte Auswahl verwendet (alle Werte).<br><br>
-    <code>define sysv1 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon')}</code><br>
-    <code>define sysv2 weblink htmlCode {SYSMON_ShowValuesHTML('sysmon', ('date:Datum', 'cpu_temp:CPU Temperatur: &deg;C', 'cpu_freq:CPU Frequenz: MHz'))}</code>
-    </ul><br>
-    
-    <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesHTMLTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
-    <ul>
-    Wie SYSMON_ShowValuesHTML, aber mit einer &Uuml;berschrift dar&uuml;ber. Wird keine &Uuml;berschrift angegeben, wird alias des Moduls genutzt (falls definiert).<br>
-    </ul><br>
-    
-    
-    <b>Text-Ausgabe-Methode (see Weblink): SYSMON_ShowValuesText(&lt;SYSMON-Instance&gt;[,&lt;Liste&gt;])</b><br><br>
-    <ul>
-    Analog SYSMON_ShowValuesHTML, jedoch formatiert als reines Text.<br>
-    </ul><br>
-    
-    <b>HTML-Ausgabe-Methode (f&uuml;r ein Weblink): SYSMON_ShowValuesTextTitled(&lt;SYSMON-Instance&gt;[,&lt;Title&gt;,&lt;Liste&gt;])</b><br><br>
-    <ul>
-    Wie SYSMON_ShowValuesText, aber mit einer &Uuml;berschrift dar&uuml;ber.<br>
-    </ul><br>
-    
-    <b>Readings-Werte mit Perl lesen: SYSMON_getValues(&lt;name&gt;[, &lt;Liste der gew&uuml;nschten Schl&uuml;ssel&gt;])</b><br><br>
-    <ul>
-    Liefert ein Hash-Ref mit den gew&uuml;nschten Werten. Wenn keine Liste (array) &uuml;bergeben wird, werden alle Werte geliefert.<br>
-    {(SYSMON_getValues("sysmon"))->{'cpu_temp'}}<br>
-    {(SYSMON_getValues("sysmon",("cpu_freq","cpu_temp")))->{"cpu_temp"}}<br>
-    {join(" ", values (SYSMON_getValues("sysmon")))}<br>
-    {join(" ", values (SYSMON_getValues("sysmon",("cpu_freq","cpu_temp"))))}<br>
-    </ul><br>
-
-  <b>Beispiele:</b><br><br>
-    <ul>
-    <code>
       # Modul-Definition<br>
       define sysmon SYSMON 1 1 1 10<br>
       #attr sysmon event-on-update-reading cpu_temp,cpu_temp_avg,cpu_freq,eth0_diff,loadavg,ram,^~ /.*usb.*,~ /$<br>
@@ -6017,10 +5279,12 @@ If one (or more) of the multiplier is set to zero, the corresponding readings is
       attr wl_sysmon_power_bat label "Stromversorgung (bat) Spannung: $data{min1} - $data{max1} V,  Strom: $data{min2} - $data{max2} mA"<br>
       attr wl_sysmon_power_bat room Technik<br>
       attr wl_sysmon_power_bat group system<br>
-    </code>
-    </ul>
+      </code>
+   </ul>
+</ul>
 
-  </ul>
+
+
 
 =end html_DE
 =cut
