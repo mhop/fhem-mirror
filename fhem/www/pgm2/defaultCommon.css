@@ -11,6 +11,7 @@ select   { font-family:Arial, sans-serif; font-size:16px;}
 a        { color:#278727; }
 img      { border-style:none; }
 .wide    { width:100%; }
+table.readings td:nth-child(2) { word-break: break-all; }
 
 table.block { border:1px solid gray; background: #F8F8E0; }
 table.block tr.odd { background: #F0F0D8; }
