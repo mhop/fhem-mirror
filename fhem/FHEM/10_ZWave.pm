@@ -1509,16 +1509,21 @@ ZWave_DoorLockOperationSet($$)
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   
-  my $rt="01";
+  my $rt;
+  $rt = ($arg eq 'open')  ? "00" :
+        ($arg eq 'close') ? "FF" :
+        ($arg eq "00")    ? "00" :
+        ($arg eq "01")    ? "01" :
+        ($arg eq "10")    ? "10" :
+        ($arg eq "11")    ? "11" :
+        ($arg eq "20")    ? "20" :
+        ($arg eq "21")    ? "21" :
+        ($arg eq "FF")    ? "FF" : "";
   
-  if ($arg eq 'open') {
-    $rt .= "00";
-  } elsif ($arg eq 'close') {
-    $rt .= "FF";
-  } else {
-    $rt .= $arg;
-  }
-  return ("", $rt);
+  return ("DoorLockOperationSet: wrong parameter, see commandref")
+    if ($rt eq "");
+  
+  return ("", "01".$rt);
 }
 
 sub
