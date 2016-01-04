@@ -44,7 +44,8 @@
 #				new intenal functions 'WriteHC_Trequested', 'WriteHC_mode' 
 #               new: proxy server handling
 #               fixed negative values of sol_Tcollector
-#	2016-01-03  new: ch_operationcode
+#	2016-01-03  new: ch_code
+#   2016-01-04  fixed bug in define
 
 
 
@@ -132,21 +133,21 @@ my $fh;
 #my $debug;
 my $interval_ch_time;
 
-+#define serial device (0) or proxy-server  (1)
-+my $PROXY_SERVER = 0;
+#define serial device (0) or proxy-server  (1)
+my $PROXY_SERVER = 0;
  
-+# set telegramms and values
-+my %HEATRONIC_sets = (
-+  "hc1_mode_requested" => {OPT => ""}, # values are set in 'HEATRONIC_Initialize'
-+  "hc1_Trequested"     => {OPT => ":slider,10,0.5,30,1"}, # min 10, 0.5 celsius stepwith, max 30 celsius
-+);
+# set telegramms and values
+my %HEATRONIC_sets = (
+  "hc1_mode_requested" => {OPT => ""}, # values are set in 'HEATRONIC_Initialize'
+  "hc1_Trequested"     => {OPT => ":slider,10,0.5,30,1"}, # min 10, 0.5 celsius stepwith, max 30 celsius
+);
  
-+my %HEATRONIC_set_mode_requested = (
-+  "frost"     => 1,
-+  "eco"       => 2,
-+  "comfort"   => 3,
-+  "auto"      => 4
-+);
+my %HEATRONIC_set_mode_requested = (
+  "frost"     => 1,
+  "eco"       => 2,
+  "comfort"   => 3,
+  "auto"      => 4
+);
 
 
 sub
@@ -250,7 +251,7 @@ HEATRONIC_DoInit($)
     #Send 'RX'-client registration to proxy
     DevIo_SimpleWrite($hash, $init, 0);
   }
-  $defs{$name}{STATE} = "Initialized";
+  $defs{$name}{STATE} = "initialized";
 
   return undef;
 }
@@ -584,7 +585,7 @@ HEATRONIC_Set($@)
     Log3 ($name, 5, $log_str);
   }
   elsif($a[1] =~ m/_mode_requested/) {
-    $val = $HEATRONIC_set_mode{$val};
+    $val = $HEATRONIC_set_mode_requested{$val};
     $log_str = "Unknown parameter for $a[1], use one of ".join(" ", sort keys %HEATRONIC_set_mode_requested);
 
     # do error-handling if any
@@ -705,6 +706,12 @@ HEATRONIC_DecodeMsg_CH1($$$)
     my $ch_burner_fan       = (hex(substr($string,11*2,2)) & 0x01) ? 1 : 0;
     my $ch_mode             = (hex(substr($string,9*2,2)) & 0x03);
 	my $ch_code             = hex(substr($string,24*2,4));
+    my $ch_22_num           = hex(substr($string,22*2,2));
+    my $ch_23_num           = hex(substr($string,23*2,2));
+    my $ch_22_char          = ($ch_22_num == 0) ? "0" : chr($ch_22_num);
+    my $ch_23_char          = ($ch_23_num == 0) ? "0" : chr($ch_23_num);
+    my $ch_error            = $ch_22_char . $ch_23_char;
+	
 	
     my $ch_Tflow_measuredTS     = ReadingsTimestamp( $name, "ch_Tflow_measured", undef );
     my $interval_ch_Tflow_measured = AttrVal($name, "interval_ch_Tflow_measured", -1);
@@ -740,7 +747,8 @@ HEATRONIC_DecodeMsg_CH1($$$)
     readingsBulkUpdate($hash, "ch_pump_cylinder", $ch_pump_cylinder);
     readingsBulkUpdate($hash, "ch_pump_circulation", $ch_pump_circulation);
     readingsBulkUpdate($hash, "ch_burner_power", $ch_burner_power);
-	readingsBulkUpdate($hash, "ch_code", $ch_operationcode);
+	readingsBulkUpdate($hash, "ch_code", $ch_code);
+    readingsBulkUpdate($hash, "ch_error", $ch_error);
     readingsEndUpdate($hash,1);
 
     return 1;
@@ -1167,6 +1175,9 @@ HEATRONIC_timeDiff($) {
 		 <li><B>ch_code</B><br/>
 		   current operation code or extended error code (see manual of boiler)
 		 </li><br/>
+		 <li><B>ch_code</B><br/>
+		   error code (see manual of boiler)
+		 </li><br/>
 	     <li><B>ch_burner_fan</B><br/>
 		   status of burner fan (0=off, 1=running)
 		 </li><br/>
@@ -1337,6 +1348,9 @@ HEATRONIC_timeDiff($) {
 		 </li><br/>
 		 <li><B>ch_code</B><br/>
 		   aktueller Betriebs-Code oder erweiterter Störungs-Code (siehe Heizungs-Anleitung) 
+		 </li><br/>
+		 <li><B>ch_code</B><br/>
+		   Störungs-Code (siehe Heizungs-Anleitung) 
 		 </li><br/>
 	     <li><B>ch_burner_fan</B><br/>
 		   Status Brenner-Gebl&auml;se (0=aus, 1=l&auml;uft)
