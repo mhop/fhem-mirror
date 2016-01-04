@@ -258,7 +258,8 @@ my %zwave_class = (
   ZIP_PORTAL               => { id => '61' },
   DOOR_LOCK                => { id => '62', # V2
     set   => { doorLockOperation   => 'ZWave_DoorLockOperationSet($hash, "%s")',
-               doorLockConfiguration =>'ZWave_DoorLockConfigSet($hash, "%s")' },
+               doorLockConfiguration =>
+                  'ZWave_DoorLockConfigSet($hash, "%s")' },
     get   => { doorLockOperation      => '02',
                doorLockConfiguration  => '05'},
     parse => { "..6203(.*)" => 'ZWave_DoorLockOperationReport($hash, $1)',
@@ -1524,22 +1525,33 @@ sub
 ZWave_DoorLockConfigSet($$)
 {
   # 0x62 V1, V2
-  # userinput: operationType_dez, handles, seconds_dez
+  # userinput: operationType, ohandles, ihandles, seconds_dez
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   
-  my @param = split (" ", $arg);
-  return ("wrong arg, need: operationType handles timeoutSeconds","")
-                        if(@param != 3);
-
-  return ("wrong operationType: only 1 or 2 allowed","")
-    if (($param[0] < 1) || ($param[0] > 2));
-
-  return("wrong timeout: 1 - 15239 seconds allowed","")
-    if ((($param[2]) < 1) || ($param[2]) > 253*60+59);
+  if ($arg !~ m/\b(.+)\b \b([01]{4})\b \b([01]{4})\b \b([0-9]+)$/) {
+    #~ Log3 $name, 1, "$name: doorLockConfigurationSet wrong ".
+                    #~ "format, see commandref: $arg";
+    return ("doorLockConfigurationSet: wrong format, see commandref","");
+  }
   
+  my $oT;
+  if (lc($1) eq "constant") {
+    $oT = 1;
+  } elsif (lc($1) eq "timed") {
+    $oT = 2;
+  } else {
+    return ("wrong operationType: only [constant|timed] is allowed","");
+  }
+  
+  my $handles = ((oct("0b".$2))<<4 | oct("0b".$3));
+    
+  if (($4 < 1) || ($4) > 15239) { # max. 253 * 60 + 59 seconds
+    return ("doorLockConfigurationSet: 1-15238 seconds allowed","");
+  }
+
   return ("", sprintf("04%02x%02x%02x%02x", 
-    $param[0],$param[1], int($param[2] / 60) ,($param[2] % 60)));
+    $oT,$handles, int($4 / 60) ,($4 % 60)));
 }
 
 sub
@@ -3604,13 +3616,15 @@ s2Hex($)
     FF = Door secured<br>
     Note: open/close can be used as an alias for 00/FF.
     </li>
-  <li>doorLockConfiguration operationType handles timeoutSeconds<br>
+  <li>doorLockConfiguration operationType outsidehandles
+      insidehandles timeoutSeconds<br>
     Set the configuration for the door lock.<br>
-    operationType: 1=constant operation, 2=timed operation<br>
-    handles: 1 byte: bit 0..3 = outside door handle 1-4,
-        bit 4..7 = inside door handle 1-4,
-        bit=0:handle disabled, bit=1:handle enabled.<br>
-    timeoutSeconds: time out for timed operation (in seconds).
+    operationType: [constant|timed]<br>
+    outsidehandle/insidehandle: 4-bit binary field for handle 1-4,
+      bit=0:handle disabled, bit=1:handle enabled, highest bit is for
+      handle 4, lowest bit for handle 1. Example 0110 0001
+      = outside handles 3 and 2 are active, inside handle 1 is active<br>
+    timeoutSeconds: time out for timed operation (in seconds) [1-15239].
     </li>
 
   <br><br><b>Class INDICATOR</b>
