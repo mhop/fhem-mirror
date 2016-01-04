@@ -400,8 +400,10 @@ sub FRITZBOX_Set($$@)
       }
    } 
    elsif ( lc $cmd eq 'diversity') {
-      if ( int @val == 2 && defined( $hash->{READINGS}{"diversity".$val[0]} ) && $val[1] =~ /^(on|off)$/ ) {
+      if ( int @val == 2 && $val[1] =~ /^(on|off)$/ ) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
+         return "Error, no diversity".$val[0]." to set."   
+               unless defined $hash->{READINGS}{"diversity".$val[0]};
          my $state = $val[1];
          $state =~ s/on/1/;
          $state =~ s/off/0/;
