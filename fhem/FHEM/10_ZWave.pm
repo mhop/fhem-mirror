@@ -2322,17 +2322,39 @@ sub
 ZWave_secStart($)
 {
   my ($hash) = @_;
+  #~ Log3 $hash->{NAME}, 5, "$hash->{NAME}: secStart called";
+
+  my $dt = gettimeofday();
+  $hash->{secTime} = $dt;
+  InternalTimer($dt+7, "ZWave_secUnlock", $hash, 0);
+  #~ Log3 $hash->{NAME}, 5, "Timer for secUnlock set ($dt+7)";
+  
   return if($hash->{secInProgress});
+  #~ Log3 $hash->{NAME}, 5, "$hash->{NAME}: setting secInProgress";
   $hash->{secInProgress} = 1;
   my @empty;
   $hash->{secStack} = \@empty;
 }
 
 sub
+ZWave_secUnlock($)
+{
+  my ($hash)= @_;
+  #~ Log3 $hash->{NAME}, 5, "secUnlock triggert";
+  my $dt = gettimeofday();
+  if ($dt > ($hash->{secTime} + 6)) {
+    Log3 $hash->{NAME}, 3, "secUnlock will call Zwave_secEnd";
+    ZWave_secEnd($hash);
+  }
+}
+
+sub
 ZWave_secEnd($)
 {
   my ($hash) = @_;
+  #~ Log3 $hash->{NAME}, 5, "$hash->{NAME}: secEnd called";
   return if(!$hash->{secInProgress});
+  #~ Log3 $hash->{NAME}, 5, "$hash->{NAME}: secEnd removing secInProgress";
   my $secStack = $hash->{secStack};
   delete $hash->{secInProgress};
   delete $hash->{secStack};
@@ -2756,6 +2778,7 @@ ZWave_secDecrypt($$$)
     if ($sequenced && $secondFrame){
       ZWave_secRetrieveFirstFrame ($hash, $sequenceCounter);
     }
+    ZWave_secEnd($hash);
   }
 
   if ($newnonce == 1) {
@@ -2976,7 +2999,13 @@ ZWave_processSendStack($)
 
   if(index($ss->[0],"sent") == 0) {
     shift @{$ss};
-    RemoveInternalTimer($hash) if(!ZWave_isWakeUp($hash));
+    if(!ZWave_isWakeUp($hash)) {
+      RemoveInternalTimer($hash);
+
+      if($hash->{secInProgress}) {
+        InternalTimer(gettimeofday()+7, "ZWave_secUnlock", $hash, 0);
+      }
+    }
   }
 
   if(@{$ss} == 0) {
