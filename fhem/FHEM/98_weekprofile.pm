@@ -708,6 +708,48 @@ sub weekprofile_editOnNewpage(@)
   $html .= "</html>";
   return $html;
 }
+############################################## 
+#search device weekprofile from a assoziated master device
+sub weekprofile_findPRFDev($)
+{
+  my ($device) = @_;
+  
+  foreach my $d (keys %defs)   
+  {
+    my $module   = $defs{$d}{TYPE};
+    
+    next if ("$module" ne "weekprofile");     
+    
+    my $masterDev = $defs{$d}->{MASTERDEV}->{NAME};
+    next unless(defined($masterDev));
+    next if ($masterDev ne $device);
+    
+    return $defs{$d}{NAME};
+  }
+  return undef;
+}
+##############################################
+# get a web link to edit a profile from weekprofile from a assoziated master device
+sub weekprofile_getEditLNK_MasterDev($$)
+{
+  my ($aszDev, $prf) = @_;
+  
+  my $device = weekprofile_findPRFDev($aszDev);
+  return "" if (!defined($device));
+  
+  my $iconName = AttrVal($device, "icon", "edit_settings");
+   
+  my $editIcon = FW_iconName($iconName) ? FW_makeImage($iconName,$iconName,"icon") : "";
+  my $script = '<script type="text/javascript">';
+  $script.= "function jump_edit_weekprofile_$aszDev() {";
+  $script.= 'var url;var pos = location.href.indexOf("?"); if (pos>=0) {url = location.href.substr(pos);}';
+  $script.= "window.location.assign('$FW_ME?cmd={weekprofile_editOnNewpage(";
+  $script.= "\"$device\",\"$prf\",\"'+url+'\");;}')};";
+  $script.= "</script>";
+  
+  my $lnk = "$script<a onclick=\"jump_edit_weekprofile_$aszDev()\" href=\"javascript:void(0)\">$editIcon</a>";
+  return ($lnk,0);
+}
 1;
 
 =pod
