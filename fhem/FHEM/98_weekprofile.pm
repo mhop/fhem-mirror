@@ -16,6 +16,7 @@ use vars qw(%defs);
 use vars qw($FW_ME);
 use vars qw($FW_wname);
 use vars qw($FW_subdir);
+use vars qw($init_done);
 
 my @shortDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun");
 
@@ -536,20 +537,55 @@ sub weekprofile_Notify($$)
   my $me = $own->{NAME}; # own name / hash
   my $devName = $dev->{NAME}; # Device that created the events
 
-  return undef if ($devName ne "global");
-  
   my $max = int(@{$dev->{CHANGED}}); # number of events / changes
-  for (my $i = 0; $i < $max; $i++) {
-    my $s = $dev->{CHANGED}[$i];
+  
+  if ($devName eq "global"){
+    for (my $i = 0; $i < $max; $i++) {
+      my $s = $dev->{CHANGED}[$i];
+      
+      next if(!defined($s));
+      my ($what,$who) = split(' ',$s);
+      
+      if ($what =~ m/INITIALIZED/) {
+        splice($own->{PROFILES});
+        weekprofile_assignDev($own);
+        weekprofile_readProfilesFromFile($own);
+        weekprofile_updateReadings($own);
+      }
+    }
+  }
+  
+  if ($init_done && defined($own->{MASTERDEV}->{NAME}) && 
+      ($own->{MASTERDEV}->{NAME} eq $devName) && 
+      (@{$own->{PROFILES}} > 0) ) {
     
-    next if(!defined($s));
-    my ($what,$who) = split(' ',$s);
+    my $readprf=0;
     
-    if ($what =~ m/INITIALIZED/) {
-      splice($own->{PROFILES});
-      weekprofile_assignDev($own);
-      weekprofile_readProfilesFromFile($own);
-      weekprofile_updateReadings($own);
+    for (my $i = 0; $i < $max; $i++) {
+      my $s = $dev->{CHANGED}[$i];
+      
+      next if(!defined($s));
+      my ($what,$who) = split(' ',$s);
+  
+      Log3 $me, 5, "$me(Notify): $devName, $what";
+      
+      if ($own->{MASTERDEV}->{NAME} eq 'MAX') {
+        $readprf =1 if ($what=~m/weekprofile/); #reading weekprofile
+      } else {
+         # toDo nur auf spezielle notify bei anderen typen reagieren!!
+        $readprf = 1;
+      }
+      
+      last if ($readprf);
+    }
+    
+    if ($readprf) {
+      Log3 $me, 4, "$me(Notify): reread master profile from $devName";
+      my $prfDev = weekprofile_readDevProfile($own->{MASTERDEV}->{NAME},$own->{MASTERDEV}->{TYPE}, $me);
+      if(defined($prfDev)) {
+        $own->{PROFILES}[0]->{DATA} = $prfDev;
+        weekprofile_updateReadings($own);
+      }
     }
   }
   return undef;
