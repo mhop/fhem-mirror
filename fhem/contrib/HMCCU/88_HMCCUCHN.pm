@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 2.3
+#  Version 2.4
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -22,6 +22,7 @@
 #  get <name> channel <datapoint-expr>
 #  get <name> config
 #  get <name> configdesc
+#  get <name> update
 #
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingfilter <datapoint-expr>
@@ -286,6 +287,11 @@ sub HMCCUCHN_Get ($@)
 		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
+	elsif ($opt eq 'update') {
+		$rc = HMCCU_GetUpdate ($hash, $hash->{ccuaddr});
+		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return undef;
+	}
 	elsif ($opt eq 'config') {
 		my $ccuobj = $hash->{ccuaddr};
 
@@ -301,7 +307,7 @@ sub HMCCUCHN_Get ($@)
 		return $res;
 	}
 	else {
-		return "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg datapoint channel config:noArg configdesc:noArg";
+		return "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg datapoint channel update:noArg config:noArg configdesc:noArg";
 	}
 }
 
@@ -415,6 +421,10 @@ sub HMCCUCHN_SetError ($$)
       <li>get &lt;name&gt; configdesc
          <br/>
          Get description of configuration parameters of CCU channel.
+      </li><br/>
+      <li>get &lt;name&gt; update
+         <br/>
+         Update all datapoints / readings of channel.
       </li>
    </ul>
    <br/>
