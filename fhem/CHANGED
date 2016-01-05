@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 98_weekprofile: detect profile changes in master device
   - feature: 49_SSCam: Function "Get" for retrieval Camera-Readings added,
                        Attributs pollcaminfoall, pollnologging  added,
                        Function for Polling Cam-Infos added.
