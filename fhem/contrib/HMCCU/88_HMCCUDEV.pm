@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 2.3
+#  Version 2.4
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -22,6 +22,7 @@
 #  get <name> channel <channel>[.<datapoint-expr>]
 #  get <name> config [<channel>]
 #  get <name> configdesc [<channel>]
+#  get <name> update
 #
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address | name }
@@ -344,6 +345,12 @@ sub HMCCUDEV_Get ($@)
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $ccureadings ? undef : $result;
 	}
+	elsif ($opt eq 'update') {
+		$rc = HMCCU_GetUpdate ($hash, $hash->{ccuaddr});
+		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+
+		return undef;
+	}
 	elsif ($opt eq 'deviceinfo') {
 		$result = HMCCU_GetDeviceInfo ($hash, $hash->{ccuaddr});
 		return HMCCUDEV_SetError ($hash, -2) if ($result eq '');
@@ -370,7 +377,7 @@ sub HMCCUDEV_Get ($@)
                 return $res;
 	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint channel config configdesc deviceinfo:noArg";
+		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint channel update:noArg config configdesc deviceinfo:noArg";
 		if ($statechannel ne '') {
 			$retmsg .= ' devstate:noArg';
 		}
@@ -494,6 +501,10 @@ sub HMCCUDEV_SetError ($$)
          <br/>
          Get description of configuration parameters for CCU device.
       </li><br/>
+      <li>get &lt;name&gt; update
+         <br/>
+         Update datapoints / readings of device.
+      </li>
    </ul>
    <br/>
    
