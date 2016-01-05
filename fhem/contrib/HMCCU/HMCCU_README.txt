@@ -3,9 +3,9 @@
    *** HMCCU/HMCCUDEV - Modules for FHEM - Homematic CCU integration ***
   =======================================================================
 
-* Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.3
+* Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.4
 * Please read carefully before using the modules.
-* Last modified: 28.12.2015
+* Last modified: 05.01.2016
 
 ----------------------------------------------
  Content
@@ -220,6 +220,13 @@ Get state of channel:
    Specified channel must contain the datapoint 'STATE'. This default datapoint
    can be modified by setting attribute 'statedatapoint'.
 
+Update all client device datapoints / readings:
+
+   get <name> update [<devexp>]
+
+   If parameter <devexp> is specified only client devices with device name
+   matching regular expression will be updated.
+
 Get multiple channels and datapoints:
 
    get <name> parfile [<parfile>]
@@ -234,6 +241,11 @@ Get CCU variable values:
    Variable name can be a regular expression. Variables are stored as readings
    with same name as in CCU.
 
+Check if RPC server process is running:
+
+   get <name> rpcstate
+
+
 ------------------------------------
  2.3 HMCCU Attributes
 ------------------------------------
@@ -243,7 +255,8 @@ Set filter for datapoint readings (default is '.*'):
    attr <name> ccureadingfilter <datapoint-expr>
 
    Only datapoints matching the specified expression will be stored as
-   readings.
+   readings. Filter is ignored by commands 'get datapoint' and 'get channel'.
+   Filter is used by command 'get update' and for RPC server events.
 
 Set reading name format (default is 'name'):
 
@@ -461,6 +474,10 @@ Get state of device:
    "STATE" by using attribute 'statechannel'. The default datapoint "STATE"
    can be modified by setting attribute 'statedatapoint'.
    
+Update all datapoints / readings of channel:
+
+   get <name> update
+
 ------------------------------------
  4.3 HMCCUDEV Attributes
 ------------------------------------
@@ -472,7 +489,8 @@ Set filter for datapoint readings (default is '.*'):
    attr <name> ccureadingfilter <datapoint-expr>
 
    Only datapoints matching the specified expression will be stored as
-   readings.
+   readings. Filter is ignored by commands 'get datapoint' and 'get channel'.
+   Filter is used by command 'get update' and for RPC server events.
 
 Set reading name format (default is 'name'):
 
@@ -585,6 +603,10 @@ Get state of device:
    
    The default datapoint "STATE" can be modified by setting attribute
    'statedatapoint'.
+
+Update all datapoints / readings of channel:
+
+   get <name> update
    
 ------------------------------------
  4.3 HMCCUCHN Attributes
@@ -597,7 +619,8 @@ Set filter for datapoint readings (default is '.*'):
    attr <name> ccureadingfilter <datapoint-expr>
 
    Only datapoints matching the specified expression will be stored as
-   readings.
+   readings. Filter is ignored by commands 'get datapoint' and 'get channel'.
+   Filter is used by command 'get update' and for RPC server events.
 
 Set reading name format (default is 'name'):
 
