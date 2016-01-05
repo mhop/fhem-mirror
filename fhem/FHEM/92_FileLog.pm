@@ -964,6 +964,7 @@ FileLog_seekTo($$$$$)
       ($upper, $next) = ($next, int(($lower+$next)/2));
     }
   }
+  $last = 0 if($last < 0); # Forum #46512
   $hash->{pos}{"$fname:$ts"} = $last;
 }
 
