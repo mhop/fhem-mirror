@@ -4834,13 +4834,6 @@ sub FRITZBOX_fritztris($)
          If the attribute is set, the server file "m3uFileLocal" (local address of the FritzFon URL) will be filled with the URL of the text2speech engine (say:) or a MP3-File (play:). The FritzFon will then play this URL.
       </li><br>
 
-      <li><code>telnetUser &lt;user name&gt;</code>
-         <br>
-         User name that is used for telnet access. By default no user name is required to login.
-         <br>
-         If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
-      </li><br>
-
       <li><code>ringWithIntern &lt;1 | 2 | 3&gt;</code>
          <br>
          To ring a fon a caller must always be specified. Default of this modul is 50 "ISDN:W&auml;hlhilfe".
@@ -4852,6 +4845,18 @@ sub FRITZBOX_fritztris($)
       <li><code>telnetTimeOut &lt;seconds&gt;</code>
          <br>
          Maximal time to wait for an answer during a telnet session. Default is 10 s.
+      </li><br>
+
+      <li><code>telnetUser &lt;user name&gt;</code>
+         <br>
+         User name that is used for telnet access. By default no user name is required to login.
+         <br>
+         If the Fritz!Box is configured differently, the user name has to be defined with this attribute.
+      </li><br>
+
+      <li><code>useGuiHack &lt;0 | 1&gt;</code>
+         <br>
+         If the APIs do not allow the change of the ring tone (Fritz!OS >6.24), check the <a href="http://www.fhemwiki.de/wiki/FRITZBOX#Klingelton-Einstellung_und_Abspielen_von_Sprachnachrichten_bei_Fritz.21OS-Versionen_.3E6.24">WIKI</a> (German) to understand the use of this attribute.
       </li><br>
 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -5174,12 +5179,6 @@ sub FRITZBOX_fritztris($)
          Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste m&ouml;gliche Wert ist 60.
       </li><br>
 
-      <li><code>telnetUser &lt;user name&gt;</code>
-         <br>
-         Benutzername f&uuml;r den Telnetzugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
-         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
-      </li><br>
-    
       <li><code>ringWithIntern &lt;1 | 2 | 3&gt;</code>
          <br>
          Um ein Telefon klingeln zu lassen, muss in der Fritzbox eine Anrufer (W&auml;hlhilfe, Wert 'box_stdDialPort') spezifiziert werden.
@@ -5191,6 +5190,17 @@ sub FRITZBOX_fritztris($)
       <li><code>telnetTimeOut &lt;Sekunden&gt;</code>
          <br>
          Maximale Zeit, bis zu der w&auml;hrend einer Telnet-Sitzung auf Antwort gewartet wird. Standard ist 10 s.
+      </li><br>
+
+      <li><code>telnetUser &lt;user name&gt;</code>
+         <br>
+         Benutzername f&uuml;r den Telnetzugang. Normalerweise wird keine Benutzername f&uuml;r das Login ben&ouml;tigt.
+         Wenn die Fritz!Box anders konfiguriert ist, kann der Nutzer &uuml;ber dieses Attribut definiert werden.
+      </li><br>
+    
+      <li><code>useGuiHack &lt;0 | 1&gt;</code>
+         <br>
+         Falls die APIs der Box nicht mehr die &Auml;nderung des Klingeltones unterst&uuml;tzen (Fritz!OS >6.24), kann dieses Attribute entsprechend der <a href="http://www.fhemwiki.de/wiki/FRITZBOX#Klingelton-Einstellung_und_Abspielen_von_Sprachnachrichten_bei_Fritz.21OS-Versionen_.3E6.24">WIKI-Anleitung</a> genutzt werden.
       </li><br>
 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -5240,10 +5250,10 @@ sub FRITZBOX_fritztris($)
       <li><b>fon</b><i>1</i><b>_intern</b> - Interne Nummer des analogen Telefonanschlusses <i>1</i></li>
       <li><b>fon</b><i>1</i><b>_out</b> - ausgehende Nummer des Anschlusses <i>1</i></li>
       <br>
-      <li><b>gsm_internet</b> - Internetverbindung errichtet über Mobilfunk-Stick </li>
-      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalstärke (0-100)</li>
+      <li><b>gsm_internet</b> - Internetverbindung errichtet &uuml;ber Mobilfunk-Stick </li>
+      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalst&auml;rke (0-100)</li>
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
-      <li><b>gsm_technology</b> - GSM-Technologie, die für die Datenübertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
+      <li><b>gsm_technology</b> - GSM-Technologie, die f&uuml;r die Daten&uuml;bertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
       <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
       <br>
