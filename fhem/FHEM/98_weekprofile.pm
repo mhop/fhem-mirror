@@ -754,7 +754,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
 
 =pod
 
-=begin html
+=begin html_de
 
 <a name="weekprofile"></a>
 <h3>weekprofile</h3>
@@ -762,19 +762,19 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <b>ToDo: Übersetzung</b><br>
   
   Mit dem Modul 'weekprofile' können mehrere Wochenprofile verwaltet und an unterschiedliche Geräte 
-  übertragen werden. Aktuell werden folgende Hardware unterstützt:
+  übertragen werden. Aktuell wird folgende Hardware unterstützt:
   <li>alle MAX Thermostate</li>
   <li>Homatic HM-CC-RT-DN </li>
   <li>Homatic HM-CC-TC    </li>
   <li>Homatic HM-TC-IT-WM-W-EU</li>
   
   Im Standardfall wird das Modul mit einem Geräte = 'Master-Gerät' assoziiert,
-  um das Wochenprofil vom Gerät grafisch bearbeiten zu können und andere Profile auf das Gerät zu bringen.
+  um das Wochenprofil vom Gerät grafisch bearbeiten zu können und andere Profile auf das Gerät zu übertragen.
   <br>
   <b>Achtung:</b> Das Übertragen von Wochenprofilen erfordet eine Menge an Credits. 
   Dies wird vom Modul nicht berücksichtigt. So kann es sein, dass nach dem 
-  Setzen\Aktualisieren eines Profils das Proil im Modul nicht mit dem Profil im Gerät 
-  übereinstimmt.
+  Setzen\Aktualisieren eines Profils das Profil im Modul nicht mit dem Profil im Gerät 
+  übereinstimmt solange das komplette Profil übertragen wurde.
   <br><br>
   <a name="weekprofiledefine"></a>
   <b>Define</b>
@@ -788,7 +788,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>Bei Ändern\Setzen des Proils wird es automatisch an das 'Master-Geräte' gesendet</li>
     <li>Es wird sind mit abgespeicht</li>
     <br>
-    Wird kein 'Master-Gerätes' angegeben, wird ein 'default' Profil angelegt.
+    Wird kein 'Master-Geräte' angegeben, wird ein 'default' Profil angelegt.
   </ul>
   
   <a name="weekprofileset"></a>
@@ -842,6 +842,101 @@ sub weekprofile_getEditLNK_MasterDev($$)
     </li>
     <li>icon<br>
       Änders des Icons zum Bearbeiten
+      Default: edit_settings
+    </li>
+  </ul>
+  
+</ul>
+=end html_de
+
+=begin html
+
+<a name="weekprofile"></a>
+<h3>weekprofile</h3>
+<ul>
+  With this module you can manage and edit different weekprofiles. You can send the profiles to different devices.<br>
+  Currently the following devices will by supported:<br>
+  <li>MAX</li>
+  <li>Homatic HM-CC-RT-DN </li>
+  <li>Homatic HM-CC-TC    </li>
+  <li>Homatic HM-TC-IT-WM-W-EU</li>
+  
+  In the normal case the module is assoziated with a master device.
+  So a profile 'master' will be created automatically. This profile correnspond to the current active
+  profile on the master device.
+  You can also use this module without a master device. In this case a default profile will be created.
+  <br>
+  <b>Attention:</b> 
+  To transfer a profile to a device it needs a lot of Credits. 
+  This is not taken into account from this module. So it could be happend that the profile in the module 
+  and on the device are not equal until the whole profile is transfered completly.
+  <br><br>
+  <a name="weekprofiledefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; weekprofile [master device]</code><br>
+    <br>
+    Activate the module with or without an assoziated master device. The master device is an optional parameter.
+    With a master device a spezial profile 'master' will be created.<br>
+    Special master' profile handling:<br>
+    <li>Can't be deleted</li>
+    <li>Will be automatically transfered to the master device if it was modified</li>
+    <li>Will not be saved</li>
+    <br>
+    Without a master device a 'default' profile will be created
+  </ul>
+  
+  <a name="weekprofileset"></a>
+  <b>Set</b>
+  <ul>
+    <li>profile_data<br>
+       <code>set &lt;name&gt; profile_data &lt;profilename&gt; &lt;json data&gt; </code><br>
+       The profile 'profilename' will be changed. The data have to be in json format.
+    </li>
+    <li>send_to_device<br>
+      <code>set &lt;name&gt; send_to_device &lt;profilename&gt; [device] </code><br>
+      The profile 'profilename' will be transfered to the device. Without the parameter device the profile 
+      will be transferd to the master device.
+    </li>
+    <li>copy_profile<br>
+      <code>set &lt;name&gt; copy_profile &lt;source&gt; &lt;destination&gt; </code><br>
+      Copy from source to destination. The destination will be overwritten
+    </li>
+    <li>remove_profile<br>
+      <code>set &lt;name&gt; remove_profile &lt;profilename&gt; </code><br>
+      Delete profile 'profilename'.
+    </li>
+  </ul>
+  
+  <a name="weekprofileget"></a>
+  <b>Get</b>
+  <ul>
+    <li>profile_data<br>
+       <code>get &lt;name&gt; profile_data &lt;profilename&gt; </code><br>
+       Get the profile date from 'profilename' in json-Format
+    </li>
+    <li>profile_names<br>
+      <code>set &lt;name&gt; profile_names</code><br>
+      Get a comma seperated list of profile names
+    </li>
+  </ul>
+  
+  <a name="weekprofileattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>widgetWeekdays<br>
+      Comma seperated list od week days starting at Monday
+      <code>attr name widgetWeekdays Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday</code>
+    </li>
+    <li>widgetEditOnNewPage<br>
+      Editing the profile on a new html page if it is set to '1'
+    </li>
+     <li>configFile<br>
+      Path and filename of the configuration file where the profiles will be stored
+      Default: ./log/weekprofile-<name>.cfg
+    </li>
+    <li>icon<br>
+      icon for edit
       Default: edit_settings
     </li>
   </ul>
