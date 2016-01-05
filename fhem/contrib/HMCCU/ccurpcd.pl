@@ -56,6 +56,8 @@ sub CheckProcess ($)
 	my $pdump = `ps -ef | grep $prcname | grep -v grep`;
 	my @plist = split "\n", $pdump;
 	foreach my $proc (@plist) {
+		# Remove leading blanks, fix for MacOS. Thanks to mcdeck
+		$proc =~ s/^\s+//;
 		my @procattr = split /\s+/, $proc;
 		if ($procattr[1] != $$ && $procattr[7] =~ /perl$/ && $procattr[8] eq $prcname) {
 			Log "Process $proc is running";
