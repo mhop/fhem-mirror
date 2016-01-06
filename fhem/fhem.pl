@@ -2585,7 +2585,7 @@ CommandSetstate($$)
 
       Log3 $d, 3, "WARNING: unsupported character in reading $sname ".
              "(not A-Za-z/\\d_\\.-), notify the $d->{TYPE} module maintainer."
-        if($sname !~ m/^[A-Za-z\d_\.\-\/]+$/);
+        if($sname !~ m/^[A-Za-z\d_\.\-\/]+$/ && $sname !~ m/^\./);
 
       if(!defined($d->{READINGS}{$sname}) ||
          !defined($d->{READINGS}{$sname}{TIME}) ||
