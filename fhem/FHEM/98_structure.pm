@@ -363,7 +363,7 @@ structure_Set($@)
 
   my $filter;
   if($list[1] ne "?") {
-    $hash->{STATE} = join(" ", @list[1..@list-1]);
+    readingsSingleUpdate($hash, "state", @list[1..@list-1], 1);
 
     if( $hash->{STATE} =~ /^\[(FILTER=.*)]/ ) {
       delete($hash->{INSET}); # Experimental, Forum #35382
