@@ -87,12 +87,27 @@ sub RESIDENTStk_wakeupSet($$) {
 
     my $wakeupUserdeviceRealname = "Bewohner";
 
-    if (defined($defs{$wakeupUserdevice})) {
-      if ($defs{$wakeupUserdevice}{TYPE} eq "ROOMMATE") {
-        $wakeupUserdeviceRealname = AttrVal( AttrVal($NAME,"wakeupUserdevice",""), AttrVal( AttrVal($NAME,"wakeupUserdevice",""), "rr_realname", "group" ), $wakeupUserdeviceRealname );
-      } elsif ($defs{$wakeupUserdevice}{TYPE} eq "GUEST") {
-        $wakeupUserdeviceRealname = AttrVal( AttrVal($NAME,"wakeupUserdevice",""), AttrVal( AttrVal($NAME,"wakeupUserdevice",""), "rg_realname", "group" ), $wakeupUserdeviceRealname );
-      }
+    if ( defined( $defs{$wakeupUserdevice} ) ) {
+        if ( $defs{$wakeupUserdevice}{TYPE} eq "ROOMMATE" ) {
+            $wakeupUserdeviceRealname = AttrVal(
+                AttrVal( $NAME, "wakeupUserdevice", "" ),
+                AttrVal(
+                    AttrVal( $NAME, "wakeupUserdevice", "" ), "rr_realname",
+                    "group"
+                ),
+                $wakeupUserdeviceRealname
+            );
+        }
+        elsif ( $defs{$wakeupUserdevice}{TYPE} eq "GUEST" ) {
+            $wakeupUserdeviceRealname = AttrVal(
+                AttrVal( $NAME, "wakeupUserdevice", "" ),
+                AttrVal(
+                    AttrVal( $NAME, "wakeupUserdevice", "" ), "rg_realname",
+                    "group"
+                ),
+                $wakeupUserdeviceRealname
+            );
+        }
     }
 
     # check for required userattr attribute
@@ -1553,6 +1568,13 @@ sub RESIDENTStk_wakeupGetNext($) {
 sub RESIDENTStk_TimeDiff ($$;$) {
     my ( $datetimeNow, $datetimeOld, $format ) = @_;
 
+    if ( $datetimeNow eq "" || $datetimeOld eq "" ) {
+        Log3 $name, 5,
+"RESIDENTStk $name: empty data: datetimeNow='$datetimeNow' datetimeOld='$datetimeOld'";
+        $datetimeNow = "1970-01-01 00:00:00";
+        $datetimeOld = "1970-01-01 00:00:00";
+    }
+
     my $timestampNow = RESIDENTStk_Datetime2Timestamp($datetimeNow);
     my $timestampOld = RESIDENTStk_Datetime2Timestamp($datetimeOld);
     my $timeDiff     = $timestampNow - $timestampOld;
@@ -1571,14 +1593,29 @@ sub RESIDENTStk_TimeDiff ($$;$) {
 
 sub RESIDENTStk_Datetime2Timestamp($) {
     my ($datetime) = @_;
+    my $timestamp;
 
-    my ( $date, $time, $y, $m, $d, $hour, $min, $sec, $timestamp );
+    if ( $datetime =~
+/.*([0-9]{4})-([0-9]{1}|[0-9]{2})-([0-9]{1}|[0-9]{2}).([0-9]{1}|[0-9]{2}):([0-9]{1}|[0-9]{2}):([0-9]{1}|[0-9]{2}).*/
+      )
+    {
+        my ( $date, $time, $y, $m, $d, $hour, $min, $sec );
 
-    ( $date, $time ) = split( ' ', $datetime );
-    ( $y,    $m,   $d )   = split( '-', $date );
-    ( $hour, $min, $sec ) = split( ':', $time );
-    $m -= 01;
-    $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
+        $sec  = $6;
+        $min  = $5;
+        $hour = $4;
+        $d    = $3;
+        $m    = $2;
+        $y    = $1;
+
+        $m -= 01 if ( $m > 0 );
+        $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
+    }
+    else {
+        Log3 $name, 5,
+          "RESIDENTStk $name: timestamp '$datetime' has wrong format.";
+        $timestamp = timelocal( "00", "00", "00", "01", "01", "1970" );
+    }
 
     return $timestamp;
 }
