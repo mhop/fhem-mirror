@@ -43,7 +43,7 @@ use warnings;
 use SetExtensions;
 # use Data::Dumper;
 
-use Time::HiRes qw( usleep );
+use Time::HiRes qw( gettimeofday usleep );
 
 sub HMCCUDEV_Define ($@);
 sub HMCCUDEV_Set ($@);
