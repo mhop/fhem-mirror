@@ -1744,7 +1744,7 @@ foreach (chnid, odev.Channels())
 		next if ($reading eq '');
                  
 		my $value = (defined ($dpdata[2]) && $dpdata[2] ne '') ? $dpdata[2] : 'N/A';
-		my $value = HMCCU_Substitute ($value, $substitute, 0, $reading);
+		$value = HMCCU_Substitute ($value, $substitute, 0, $reading);
 		$value = HMCCU_FormatReadingValue ($cl_hash, $value);
 		if ($ccureadings) {
 			readingsBulkUpdate ($cl_hash, $reading, $value); 
