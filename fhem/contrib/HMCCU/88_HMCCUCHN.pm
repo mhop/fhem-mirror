@@ -40,7 +40,7 @@ use strict;
 use warnings;
 use SetExtensions;
 
-use Time::HiRes;
+use Time::HiRes qw( usleep );
 
 sub HMCCUCHN_Define ($@);
 sub HMCCUCHN_Set ($@);
