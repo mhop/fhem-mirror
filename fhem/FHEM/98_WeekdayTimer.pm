@@ -141,7 +141,11 @@ sub WeekdayTimer_Define($$) {
 
   WeekdayTimer_GlobalDaylistSpec ($hash, \@a);
    
-  my @switchingtimes       = WeekdayTimer_gatherSwitchingTimes (\@a);
+  $hash->{TYPE}            = $type;  
+  $hash->{NAME}            = $name;
+  $hash->{DEVICE}          = $device;
+  
+  my @switchingtimes       = WeekdayTimer_gatherSwitchingTimes ($hash, \@a);
   my $conditionOrCommand   = join (" ", @a);
 
   # test if device is defined
@@ -150,9 +154,6 @@ sub WeekdayTimer_Define($$) {
   # wenn keine switchintime angegeben ist, dann Fehler
   Log3 ($hash, 3, "[$name] no valid Switchingtime found in <$conditionOrCommand>, check first parameter")  if (@switchingtimes == 0);
 
-  $hash->{TYPE}           = $type;  
-  $hash->{NAME}           = $name;
-  $hash->{DEVICE}         = $device;
   $hash->{STILLDONETIME}  = 0;
   $hash->{SWITCHINGTIMES} = \@switchingtimes;
   $attr{$name}{verbose}   = 5 if (!defined $attr{$name}{verbose} && $name =~ m/^tst.*/ );
@@ -160,6 +161,7 @@ sub WeekdayTimer_Define($$) {
 
   $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}} = $hash;
   
+  $hash->{CONDITION}  = ""; $hash->{COMMAND}    = "";
   if($conditionOrCommand =~  m/^\(.*\)$/g) {         #condition (*)
      $hash->{CONDITION} = $conditionOrCommand;
   } elsif(length($conditionOrCommand) > 0 ) {
@@ -402,8 +404,10 @@ sub WeekdayTimer_zeitErmitteln  ($$$$$) {
 }
 ################################################################################
 sub WeekdayTimer_gatherSwitchingTimes {
-  my $a = shift;
+  my $hash = shift;
+  my $a    = shift;
 
+  my $name = $hash->{NAME};
   my @switchingtimes = ();
   my $conditionOrCommand;
   
@@ -411,18 +415,51 @@ sub WeekdayTimer_gatherSwitchingTimes {
   while (@$a > 0) {
 
     #pruefen auf Angabe eines Schaltpunktes
-    my $element = shift @$a;
+    my $element = "";
+    my @restoreElemets = ();
+E:  while (@$a > 0) {
+      
+       my $actualElement = shift @$a;
+       push @restoreElemets, $actualElement; 
+       $element = $element . $actualElement . " ";
+       Log3 $hash, 5, "[$name] $element - trying to accept as a switchtime";
+       
+       # prüfen ob Anführungszeichen paarig sind
+       my @quotes = ('"', "'" ); 
+       foreach my $quote (@quotes){
+          my $balancedSign = eval "((\$element =~ tr/$quote//))";         
+          if ($balancedSign % 2) { # ungerade Anzahl quotes, dann verlängern
+            Log3 $hash, 5, "[$name] $element - unbalanced quotes: $balancedSign $quote found";
+            next E;
+          }
+       }
+
+       # prüfen ob öffnende/schliessende Klammern paarig sind
+       my %signs = ('('=>')', '{'=>'}'); 
+       foreach my $signOpened (keys(%signs)) {
+          my $signClosed  = $signs{$signOpened};
+          my $balancedSign = eval "((\$element =~ tr/$signOpened//) - (\$element =~ tr/$signClosed//))";         
+          if ($balancedSign) { # öffnende/schließende Klammern nicht gleich, dann verlängern
+            Log3 $hash, 5, "[$name] $element - unbalanced brackets $signOpened$signClosed:$balancedSign";
+            next E;
+          }
+       }
+       last;
+    }
+    
     my @t = split(/\|/, $element);
     my $anzahl = @t;
     if ( $anzahl >= 2 && $anzahl <= 3) {
+      Log3 $hash, 4, "[$name] $element - accepted";
       push(@switchingtimes, $element);
     } else {
-      unshift @$a, $element; 
+      Log3 $hash, 4, "[$name] $element - NOT accepted, must be command or condition";
+      unshift @$a, @restoreElemets; 
       last;
     }
   }
   return (@switchingtimes);
-}    
+}
 ################################################################################
 sub WeekdayTimer_Language {
   my ($hash, $a) = @_;
@@ -550,6 +587,8 @@ sub WeekdayTimer_SetTimer($) {
      
   readingsSingleUpdate ($hash,  "nextUpdate", FmtDateTime($nextTime), 1);
   readingsSingleUpdate ($hash,  "nextValue",  $nextParameter,         1);  
+  readingsSingleUpdate ($hash,  "currValue",  $aktParameter,          1); # HB  
+
   
   if ($switchInThePast) {  
      # Fensterkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
@@ -559,7 +598,7 @@ sub WeekdayTimer_SetTimer($) {
      
      myInternalTimer ("$aktIdx", $aktTime, "$hash->{TYPE}_Update", $hash, 0);
      my $active = 1;
-     if (defined $hash->{CONDITION}) {
+     if ($hash->{CONDITION} gt "") {
         $active = AnalyzeCommandChain(undef, "{".$hash->{CONDITION}."}");
      }
      readingsSingleUpdate ($hash,  "state", $aktParameter, 1) if ($active);
@@ -677,6 +716,7 @@ sub WeekdayTimer_Update($) {
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", FmtDateTime($nextTime));
   readingsBulkUpdate ($hash,  "nextValue",  $nextParameter);
+  readingsBulkUpdate ($hash,  "currValue",  $aktParameter); # HB
   readingsBulkUpdate ($hash,  "state",      $newParam )   if($activeTimer);
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
 
@@ -758,12 +798,12 @@ sub WeekdayTimer_FensterOffen ($$$) {
          '%WEEKDAYTIMER'     => $hash->{NAME},
          '%NAME'             => $hash->{DEVICE},
          '%EVENT'            => $event,
-         '%TIME'             => $time,
+         '%TIME'             => $hash->{profil}{$time}{TIME},
          '$HEATING_CONTROL'  => $hash->{NAME},
          '$WEEKDAYTIMER'     => $hash->{NAME},
          '$NAME'             => $hash->{DEVICE},
          '$EVENT'            => $event,
-         '$TIME'             => $time,
+         '$TIME'             => $hash->{profil}{$time}{TIME},
   );
   
   my $verzoegerteAusfuehrungCond = AttrVal($hash->{NAME}, "delayedExecutionCond", "0");
@@ -861,7 +901,7 @@ sub WeekdayTimer_Device_Schalten($$$) {
   my $setModifier = WeekdayTimer_isHeizung($hash);
   
   $command = 'set $NAME ' . $setModifier . ' $EVENT';
-  $command = $hash->{COMMAND}   if (defined $hash->{COMMAND});
+  $command = $hash->{COMMAND}   if ($hash->{COMMAND} gt "");
 
   my $activeTimer = 1;
   
@@ -902,7 +942,7 @@ sub WeekdayTimer_Condition($$) {
   my ($hash, $tage)  = @_;
   
   my $condition  = "( ";
-  $condition .= (defined $hash->{CONDITION}) ? $hash->{CONDITION}  : 1 ; 
+  $condition .= ($hash->{CONDITION} gt "") ? $hash->{CONDITION}  : 1 ; 
   $condition .= " && " . WeekdayTimer_TageAsCondition($tage);
   $condition .= ")";
   
