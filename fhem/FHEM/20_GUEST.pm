@@ -144,7 +144,7 @@ sub GUEST_Define($$) {
 
     # trigger for modified objects
     unless ( $modified == 0 ) {
-        readingsBulkUpdate( $hash, "state", $hash->{READINGS}{state}{VAL} );
+        readingsBulkUpdate( $hash, "state", ReadingsVal( $name, "state", "" ) );
     }
 
     readingsEndUpdate( $hash, 1 );
@@ -256,24 +256,12 @@ sub GUEST_Notify($$) {
 ###################################
 sub GUEST_Set($@) {
     my ( $hash, @a ) = @_;
-    my $name = $hash->{NAME};
-    my $state =
-      ( defined( $hash->{READINGS}{state}{VAL} ) )
-      ? $hash->{READINGS}{state}{VAL}
-      : "initialized";
-    my $presence =
-      ( defined( $hash->{READINGS}{presence}{VAL} ) )
-      ? $hash->{READINGS}{presence}{VAL}
-      : "undefined";
-    my $mood =
-      ( defined( $hash->{READINGS}{mood}{VAL} ) )
-      ? $hash->{READINGS}{mood}{VAL}
-      : "-";
-    my $location =
-      ( defined( $hash->{READINGS}{location}{VAL} ) )
-      ? $hash->{READINGS}{location}{VAL}
-      : "undefined";
-    my $silent = 0;
+    my $name     = $hash->{NAME};
+    my $state    = ReadingsVal( $name, "state", "initialized" );
+    my $presence = ReadingsVal( $name, "presence", "undefined" );
+    my $mood     = ReadingsVal( $name, "mood", "-" );
+    my $location = ReadingsVal( $name, "location", "undefined" );
+    my $silent   = 0;
 
     Log3 $name, 5, "GUEST $name: called function GUEST_Set()";
 
@@ -441,21 +429,22 @@ sub GUEST_Set($@) {
 
             # if prior state was asleep, update sleep statistics
             if ( $state eq "asleep"
-                && defined( $hash->{READINGS}{lastSleep}{VAL} ) )
+                && ReadingsVal( $name, "lastSleep", "" ) ne "" )
             {
                 readingsBulkUpdate( $hash, "lastAwake", $datetime );
                 readingsBulkUpdate(
                     $hash,
                     "lastDurSleep",
                     RESIDENTStk_TimeDiff(
-                        $datetime, $hash->{READINGS}{lastSleep}{VAL}
+                        $datetime, ReadingsVal( $name, "lastSleep", "" )
                     )
                 );
                 readingsBulkUpdate(
                     $hash,
                     "lastDurSleep_cr",
                     RESIDENTStk_TimeDiff(
-                        $datetime, $hash->{READINGS}{lastSleep}{VAL}, "min"
+                        $datetime, ReadingsVal( $name, "lastSleep", "" ),
+                        "min"
                     )
                 );
             }
@@ -517,7 +506,8 @@ sub GUEST_Set($@) {
                     }
                 }
                 else {
-                    if ( !grep( m/^$searchstring$/, @location_underway )
+                    if (   !$silent
+                        && !grep( m/^$searchstring$/, @location_underway )
                         && $location ne $location_underway[0] )
                     {
                         Log3 $name, 4,
@@ -529,9 +519,7 @@ sub GUEST_Set($@) {
                 }
 
                 # reset wayhome
-                if ( !defined( $hash->{READINGS}{wayhome}{VAL} )
-                    || $hash->{READINGS}{wayhome}{VAL} ne "0" )
-                {
+                if ( ReadingsVal( $name, "wayhome", 1 ) > 0 ) {
                     readingsBulkUpdate( $hash, "wayhome", "0" );
                 }
 
@@ -540,14 +528,13 @@ sub GUEST_Set($@) {
                     readingsBulkUpdate( $hash, "lastArrival", $datetime );
 
                     # absence duration
-                    if ( defined( $hash->{READINGS}{lastDeparture}{VAL} )
-                        && $hash->{READINGS}{lastDeparture}{VAL} ne "-" )
-                    {
+                    if ( ReadingsVal( $name, "lastDeparture", "-" ) ne "-" ) {
                         readingsBulkUpdate(
                             $hash,
                             "lastDurAbsence",
                             RESIDENTStk_TimeDiff(
-                                $datetime, $hash->{READINGS}{lastDeparture}{VAL}
+                                $datetime,
+                                ReadingsVal( $name, "lastDeparture", "-" )
                             )
                         );
                         readingsBulkUpdate(
@@ -555,7 +542,8 @@ sub GUEST_Set($@) {
                             "lastDurAbsence_cr",
                             RESIDENTStk_TimeDiff(
                                 $datetime,
-                                $hash->{READINGS}{lastDeparture}{VAL}, "min"
+                                ReadingsVal( $name, "lastDeparture", "-" ),
+                                "min"
                             )
                         );
                     }
@@ -564,22 +552,21 @@ sub GUEST_Set($@) {
                     readingsBulkUpdate( $hash, "lastDeparture", $datetime );
 
                     # presence duration
-                    if ( defined( $hash->{READINGS}{lastArrival}{VAL} )
-                        && $hash->{READINGS}{lastArrival}{VAL} ne "-" )
-                    {
+                    if ( ReadingsVal( $name, "lastArrival", "-" ) ne "-" ) {
                         readingsBulkUpdate(
                             $hash,
                             "lastDurPresence",
                             RESIDENTStk_TimeDiff(
-                                $datetime, $hash->{READINGS}{lastArrival}{VAL}
+                                $datetime,
+                                ReadingsVal( $name, "lastArrival", "-" )
                             )
                         );
                         readingsBulkUpdate(
                             $hash,
                             "lastDurPresence_cr",
                             RESIDENTStk_TimeDiff(
-                                $datetime, $hash->{READINGS}{lastArrival}{VAL},
-                                "min"
+                                $datetime,
+                                ReadingsVal( $name, "lastArrival", "-" ), "min"
                             )
                         );
                     }
@@ -599,9 +586,8 @@ sub GUEST_Set($@) {
                             && defined( $defs{$object}{TYPE} )
                             && (   $defs{$object}{TYPE} eq "ROOMMATE"
                                 || $defs{$object}{TYPE} eq "GUEST" )
-                            && defined( $defs{$object}{READINGS}{state}{VAL} )
-                            && $defs{$object}{READINGS}{state}{VAL} ne "gone"
-                            && $defs{$object}{READINGS}{state}{VAL} ne "none"
+                            && ReadingsVal( $object, "state", "" ) ne "gone"
+                            && ReadingsVal( $object, "state", "" ) ne "none"
                           )
                         {
                             fhem("set $object $newstate");
@@ -613,23 +599,23 @@ sub GUEST_Set($@) {
             # clear readings if guest is gone
             if ( $newstate eq "none" ) {
                 readingsBulkUpdate( $hash, "lastArrival", "-" )
-                  if ( defined( $hash->{READINGS}{lastArrival}{VAL} ) );
+                  if ( ReadingsVal( $name, "lastArrival", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "lastAwake", "-" )
-                  if ( defined( $hash->{READINGS}{lastAwake}{VAL} ) );
+                  if ( ReadingsVal( $name, "lastAwake", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "lastDurAbsence", "-" )
-                  if ( defined( $hash->{READINGS}{lastDurAbsence}{VAL} ) );
+                  if ( ReadingsVal( $name, "lastDurAbsence", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "lastDurSleep", "-" )
-                  if ( defined( $hash->{READINGS}{lastDurSleep}{VAL} ) );
+                  if ( ReadingsVal( $name, "lastDurSleep", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "lastLocation", "-" )
-                  if ( defined( $hash->{READINGS}{lastLocation}{VAL} ) );
+                  if ( ReadingsVal( $name, "lastLocation", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "lastSleep", "-" )
-                  if ( defined( $hash->{READINGS}{lastSleep}{VAL} ) );
+                  if ( ReadingsVal( $name, "lastSleep", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "lastMood", "-" )
-                  if ( defined( $hash->{READINGS}{lastMood}{VAL} ) );
+                  if ( ReadingsVal( $name, "lastMood", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "location", "-" )
-                  if ( defined( $hash->{READINGS}{location}{VAL} ) );
+                  if ( ReadingsVal( $name, "location", "-" ) ne "-" );
                 readingsBulkUpdate( $hash, "mood", "-" )
-                  if ( defined( $hash->{READINGS}{mood}{VAL} ) );
+                  if ( ReadingsVal( $name, "mood", "-" ) ne "-" );
             }
 
             # calculate duration timers
@@ -653,12 +639,12 @@ sub GUEST_Set($@) {
             Log3 $name, 2, "GUEST set $name mood " . $a[2] if ( !$silent );
             readingsBeginUpdate($hash) if ( !$silent );
 
-            if ( $a[2] eq "toggle" ) {
-                if ( defined( $hash->{READINGS}{lastMood}{VAL} ) ) {
-                    readingsBulkUpdate( $hash, "mood",
-                        $hash->{READINGS}{lastMood}{VAL} );
-                    readingsBulkUpdate( $hash, "lastMood", $mood );
-                }
+            if ( $a[2] eq "toggle"
+                && ReadingsVal( $name, "lastMood", "" ) ne "" )
+            {
+                readingsBulkUpdate( $hash, "mood",
+                    ReadingsVal( $name, "lastMood", "" ) );
+                readingsBulkUpdate( $hash, "lastMood", $mood );
             }
             elsif ( $mood ne $a[2] ) {
                 readingsBulkUpdate( $hash, "lastMood", $mood )
@@ -676,13 +662,91 @@ sub GUEST_Set($@) {
     # location
     elsif ( $a[1] eq "location" ) {
         if ( defined( $a[2] ) && $a[2] ne "" ) {
-            shift @a;
-            shift @a;
-            my $location = join( " ", @a );
-            Log3 $name, 2, "ROOMMATE set $name location " . $location
-              if ( !$silent );
+            Log3 $name, 2, "GUEST set $name location " . $a[2] if ( !$silent );
 
-            GUEST_SetLocation( $name, $location, 1, undef );
+            if ( $location ne $a[2] ) {
+                my $searchstring;
+
+                readingsBeginUpdate($hash) if ( !$silent );
+
+                # read attributes
+                my @location_home =
+                  ( defined( $attr{$name}{"rg_locationHome"} ) )
+                  ? split( ' ', $attr{$name}{"rg_locationHome"} )
+                  : ("home");
+
+                my @location_underway =
+                  ( defined( $attr{$name}{"rg_locationUnderway"} ) )
+                  ? split( ' ', $attr{$name}{"rg_locationUnderway"} )
+                  : ("underway");
+
+                my @location_wayhome =
+                  ( defined( $attr{$name}{"rg_locationWayhome"} ) )
+                  ? split( ' ', $attr{$name}{"rg_locationWayhome"} )
+                  : ("wayhome");
+
+                $searchstring = quotemeta($location);
+                readingsBulkUpdate( $hash, "lastLocation", $location )
+                  if ( $location ne "wayhome"
+                    && !grep( m/^$searchstring$/, @location_underway ) );
+                readingsBulkUpdate( $hash, "location", $a[2] )
+                  if ( $a[2] ne "wayhome" );
+
+                # wayhome detection
+                $searchstring = quotemeta($location);
+                if (
+                    (
+                        $a[2] eq "wayhome"
+                        || grep( m/^$searchstring$/, @location_wayhome )
+                    )
+                    && ( $presence eq "absent" )
+                  )
+                {
+                    Log3 $name, 3,
+                      "GUEST $name: on way back home from $location";
+                    readingsBulkUpdate( $hash, "wayhome", "1" )
+                      if ( !defined( $hash->{READINGS}{wayhome}{VAL} )
+                        || $hash->{READINGS}{wayhome}{VAL} ne "1" );
+                }
+
+                readingsEndUpdate( $hash, 1 ) if ( !$silent );
+
+                # auto-updates
+                $searchstring = quotemeta( $a[2] );
+                if (
+                    (
+                        $a[2] eq "home"
+                        || grep( m/^$searchstring$/, @location_home )
+                    )
+                    && $state ne "home"
+                    && $state ne "gotosleep"
+                    && $state ne "asleep"
+                    && $state ne "awoken"
+                    && $state ne "initialized"
+                  )
+                {
+                    Log3 $name, 4,
+                      "GUEST $name: implicit state change caused by location "
+                      . $a[2];
+                    GUEST_Set( $hash, $name, "silentSet", "state", "home" );
+                }
+                elsif (
+                    (
+                        $a[2] eq "underway"
+                        || grep( m/^$searchstring$/, @location_underway )
+                    )
+                    && $state ne "gone"
+                    && $state ne "none"
+                    && $state ne "absent"
+                    && $state ne "initialized"
+                  )
+                {
+                    Log3 $name, 4,
+                      "GUEST $name: implicit state change caused by location "
+                      . $a[2];
+                    GUEST_Set( $hash, $name, "silentSet", "state", "absent" );
+                }
+            }
         }
         else {
             return "Invalid 2nd argument, choose one of location ";
@@ -774,9 +838,7 @@ sub GUEST_AutoGone($;$) {
 
     RESIDENTStk_RemoveInternalTimer( "AutoGone", $hash );
 
-    if ( defined( $hash->{READINGS}{state}{VAL} )
-        && $hash->{READINGS}{state}{VAL} eq "absent" )
-    {
+    if ( ReadingsVal( $name, "state", "home" ) eq "absent" ) {
         my ( $date, $time, $y, $m, $d, $hour, $min, $sec, $timestamp,
             $timeDiff );
         my $timestampNow = gettimeofday();
@@ -812,13 +874,10 @@ sub GUEST_AutoGone($;$) {
 ###################################
 sub GUEST_DurationTimer($;$) {
     my ( $mHash, @a ) = @_;
-    my $hash = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
-    my $name = $hash->{NAME};
-    my $state =
-      ( $hash->{READINGS}{state}{VAL} )
-      ? $hash->{READINGS}{state}{VAL}
-      : "initialized";
-    my $silent = ( defined( $a[0] ) && $a[0] eq "1" ) ? 1 : 0;
+    my $hash         = ( $mHash->{HASH} ) ? $mHash->{HASH} : $mHash;
+    my $name         = $hash->{NAME};
+    my $state        = ReadingsVal( $name, "state", "initialized" );
+    my $silent       = ( defined( $a[0] ) && $a[0] eq "1" ) ? 1 : 0;
     my $timestampNow = gettimeofday();
     my $diff;
     my $durPresence = "0";
@@ -832,47 +891,33 @@ sub GUEST_DurationTimer($;$) {
     {
 
         # presence timer
-        if ( defined( $hash->{READINGS}{presence}{VAL} )
-            && $hash->{READINGS}{presence}{VAL} eq "present" )
+        if (   ReadingsVal( $name, "presence", "absent" ) eq "present"
+            && ReadingsVal( $name, "lastArrival", "-" ) ne "-" )
         {
-            if ( defined( $hash->{READINGS}{lastArrival}{VAL} )
-                && $hash->{READINGS}{lastArrival}{VAL} ne "-" )
-            {
-                $durPresence =
-                  $timestampNow -
-                  RESIDENTStk_Datetime2Timestamp(
-                    $hash->{READINGS}{lastArrival}{VAL} );
-            }
+            $durPresence =
+              $timestampNow -
+              RESIDENTStk_Datetime2Timestamp(
+                ReadingsVal( $name, "lastArrival", "-" ) );
         }
 
         # absence timer
-        if (   defined( $hash->{READINGS}{presence}{VAL} )
-            && $hash->{READINGS}{presence}{VAL} eq "absent"
-            && defined( $hash->{READINGS}{state}{VAL} )
-            && $hash->{READINGS}{state}{VAL} eq "absent" )
+        if (   ReadingsVal( $name, "presence", "present" ) eq "absent"
+            && ReadingsVal( $name, "lastDeparture", "-" ) ne "-" )
         {
-            if ( defined( $hash->{READINGS}{lastDeparture}{VAL} )
-                && $hash->{READINGS}{lastDeparture}{VAL} ne "-" )
-            {
-                $durAbsence =
-                  $timestampNow -
-                  RESIDENTStk_Datetime2Timestamp(
-                    $hash->{READINGS}{lastDeparture}{VAL} );
-            }
+            $durAbsence =
+              $timestampNow -
+              RESIDENTStk_Datetime2Timestamp(
+                ReadingsVal( $name, "lastDeparture", "-" ) );
         }
 
         # sleep timer
-        if ( defined( $hash->{READINGS}{state}{VAL} )
-            && $hash->{READINGS}{state}{VAL} eq "asleep" )
+        if (   ReadingsVal( $name, "state", "home" ) eq "asleep"
+            && ReadingsVal( $name, "lastSleep", "-" ) ne "-" )
         {
-            if ( defined( $hash->{READINGS}{lastSleep}{VAL} )
-                && $hash->{READINGS}{lastSleep}{VAL} ne "-" )
-            {
-                $durSleep =
-                  $timestampNow -
-                  RESIDENTStk_Datetime2Timestamp(
-                    $hash->{READINGS}{lastSleep}{VAL} );
-            }
+            $durSleep =
+              $timestampNow -
+              RESIDENTStk_Datetime2Timestamp(
+                ReadingsVal( $name, "lastSleep", "-" ) );
         }
 
         my $durPresence_hr =
@@ -891,23 +936,20 @@ sub GUEST_DurationTimer($;$) {
 
         readingsBeginUpdate($hash) if ( !$silent );
         readingsBulkUpdate( $hash, "durTimerPresence_cr", $durPresence_cr )
-          if ( !defined( $hash->{READINGS}{durTimerPresence_cr}{VAL} )
-            || $hash->{READINGS}{durTimerPresence_cr}{VAL} ne $durPresence_cr );
+          if ( ReadingsVal( $name, "durTimerPresence_cr", "" ) ne
+            $durPresence_cr );
         readingsBulkUpdate( $hash, "durTimerPresence", $durPresence_hr )
-          if ( !defined( $hash->{READINGS}{durTimerPresence}{VAL} )
-            || $hash->{READINGS}{durTimerPresence}{VAL} ne $durPresence_hr );
+          if (
+            ReadingsVal( $name, "durTimerPresence", "" ) ne $durPresence_hr );
         readingsBulkUpdate( $hash, "durTimerAbsence_cr", $durAbsence_cr )
-          if ( !defined( $hash->{READINGS}{durTimerAbsence_cr}{VAL} )
-            || $hash->{READINGS}{durTimerAbsence_cr}{VAL} ne $durAbsence_cr );
+          if (
+            ReadingsVal( $name, "durTimerAbsence_cr", "" ) ne $durAbsence_cr );
         readingsBulkUpdate( $hash, "durTimerAbsence", $durAbsence_hr )
-          if ( !defined( $hash->{READINGS}{durTimerAbsence}{VAL} )
-            || $hash->{READINGS}{durTimerAbsence}{VAL} ne $durAbsence_hr );
+          if ( ReadingsVal( $name, "durTimerAbsence", "" ) ne $durAbsence_hr );
         readingsBulkUpdate( $hash, "durTimerSleep_cr", $durSleep_cr )
-          if ( !defined( $hash->{READINGS}{durTimerSleep_cr}{VAL} )
-            || $hash->{READINGS}{durTimerSleep_cr}{VAL} ne $durSleep_cr );
+          if ( ReadingsVal( $name, "durTimerSleep_cr", "" ) ne $durSleep_cr );
         readingsBulkUpdate( $hash, "durTimerSleep", $durSleep_hr )
-          if ( !defined( $hash->{READINGS}{durTimerSleep}{VAL} )
-            || $hash->{READINGS}{durTimerSleep}{VAL} ne $durSleep_hr );
+          if ( ReadingsVal( $name, "durTimerSleep", "" ) ne $durSleep_hr );
         readingsEndUpdate( $hash, 1 ) if ( !$silent );
     }
 
@@ -933,7 +975,8 @@ sub GUEST_SetLocation($$$;$$$$$$) {
     $lat     = "-" if ( !$lat     || $lat eq "" );
     $long    = "-" if ( !$long    || $long eq "" );
     $address = "-" if ( !$address || $address eq "" );
-    $location = "underway" if ( $trigger eq "0" );
+    $time    = ""  if ( !$time );
+    $device  = ""  if ( !$device );
 
     Log3 $name, 5,
 "GUEST $name: received location information: id=$id name=$location trig=$trigger date=$time lat=$lat long=$long address:$address device=$device";
@@ -944,63 +987,41 @@ sub GUEST_SetLocation($$$;$$$$$$) {
 
     # read attributes
     my @location_home =
-      split( ' ', AttrVal( $name, "rr_locationHome", "home" ) );
+      split( ' ', AttrVal( $name, "rg_locationHome", "home" ) );
     my @location_underway =
-      split( ' ', AttrVal( $name, "rr_locationUnderway", "underway" ) );
+      split( ' ', AttrVal( $name, "rg_locationUnderway", "underway" ) );
     my @location_wayhome =
-      split( ' ', AttrVal( $name, "rr_locationWayhome", "wayhome" ) );
+      split( ' ', AttrVal( $name, "rg_locationWayhome", "wayhome" ) );
 
     $searchstring = quotemeta($location);
-    if ( $location ne "wayhome" ) {
-        if (
-            !grep( m/^$searchstring$/, @location_underway )
-            && (   $currLocation ne $location
-                || $currLat ne $lat
-                || $currLong ne $long
-                || $currAddr ne $address )
-          )
-        {
-            readingsBulkUpdate( $hash, "lastLocation",     $currLocation );
-            readingsBulkUpdate( $hash, "lastLocationLat",  $currLat );
-            readingsBulkUpdate( $hash, "lastLocationLong", $currLong );
-            readingsBulkUpdate( $hash, "lastLocationAddr", $currAddr );
-        }
 
-        readingsBulkUpdate( $hash, "location",     $location );
-        readingsBulkUpdate( $hash, "locationLat",  $lat );
-        readingsBulkUpdate( $hash, "locationLong", $long );
-        readingsBulkUpdate( $hash, "locationAddr", $address );
-    }
+    # check for implicit state change
+    #
+    my $stateChange = 0;
 
-    # wayhome detection
-    $searchstring = quotemeta($location);
-    if (
-        (
-            $location eq "wayhome"
-            || grep( m/^$searchstring$/, @location_wayhome )
-        )
-        && ( $presence eq "absent" )
-      )
-    {
-        Log3 $name, 3, "GUEST $name: on way back home from $location";
-        readingsBulkUpdate( $hash, "wayhome", "1" )
-          if ( ReadingsVal( $name, "wayhome", "0" ) ne "1" );
-    }
-
-    readingsEndUpdate( $hash, 1 );
-
-    # auto-updates
-    $searchstring = quotemeta($location);
+    # home/1
     if (   ( $location eq "home" || grep( m/^$searchstring$/, @location_home ) )
         && $state ne "home"
         && $state ne "gotosleep"
         && $state ne "asleep"
-        && $state ne "awoken" )
+        && $state ne "awoken"
+        && $trigger eq "1" )
     {
-        Log3 $name, 4,
-          "GUEST $name: implicit state change caused by location " . $location;
-        GUEST_Set( $hash, $name, "silentSet", "state", "home" );
+        $stateChange = 1;
     }
+
+    # home/0
+    elsif (
+           ( $location eq "home" || grep( m/^$searchstring$/, @location_home ) )
+        && $state ne "gone"
+        && $state ne "none"
+        && $state ne "absent"
+        && $trigger eq "0" )
+    {
+        $stateChange = 2;
+    }
+
+    # absent
     elsif (
         (
             $location eq "underway"
@@ -1011,9 +1032,87 @@ sub GUEST_SetLocation($$$;$$$$$$) {
         && $state ne "absent"
       )
     {
+        $stateChange = 2;
+    }
+
+    # wayhome
+    my $wayhome;
+    if (
+        (
+            $location eq "wayhome"
+            || ( grep( m/^$searchstring$/, @location_wayhome )
+                && $trigger eq "0" )
+        )
+        && $presence eq "absent"
+      )
+    {
+        Log3 $name, 5, "GUEST $name: wayhome signal received";
+        if (
+            (
+                   ( $location eq "wayhome" && $trigger eq "1" )
+                || ( $location ne "wayhome" && $trigger eq "0" )
+            )
+            && ReadingsVal( $name, "wayhome", "0" ) ne "1"
+          )
+        {
+            Log3 $name, 3, "GUEST $name: on way back home from $location";
+            readingsBulkUpdate( $hash, "wayhome", "1" );
+            $wayhome = 1;
+        }
+        elsif ($location eq "wayhome"
+            && $trigger eq "0"
+            && ReadingsVal( $name, "wayhome", "0" ) ne "0" )
+        {
+            Log3 $name, 3,
+              "GUEST $name: seems not to be on way back home anymore";
+            readingsBulkUpdate( $hash, "wayhome", "0" );
+            $wayhome  = 1;
+            $location = "underway";
+        }
+    }
+
+    if ( !grep( m/^$searchstring$/, @location_underway )
+        && ( $stateChange > 0 || $currLocation ne $location ) )
+    {
+        Log3 $name, 5, "GUEST $name: archiving last known location";
+        readingsBulkUpdate( $hash, "lastLocationLat",  $currLat );
+        readingsBulkUpdate( $hash, "lastLocationLong", $currLong );
+        readingsBulkUpdate( $hash, "lastLocationAddr", $currAddr );
+        readingsBulkUpdate( $hash, "lastLocation",     $currLocation );
+    }
+
+    if (   $wayhome
+        || $stateChange > 0
+        || ( $lat ne "-" && $long ne "-" ) )
+    {
+        Log3 $name, 5, "GUEST $name: Using new lat/long/addr information";
+        readingsBulkUpdate( $hash, "locationLat",  $lat );
+        readingsBulkUpdate( $hash, "locationLong", $long );
+        readingsBulkUpdate( $hash, "locationAddr", $address );
+    }
+
+    else {
+        Log3 $name, 5,
+          "GUEST $name: keeping last known lat/long/addr information";
+        readingsBulkUpdate( $hash, "locationLat",  $currLat );
+        readingsBulkUpdate( $hash, "locationLong", $currLong );
+        readingsBulkUpdate( $hash, "locationAddr", $currAddr );
+    }
+
+    readingsBulkUpdate( $hash, "location", $location )
+      if ( $location ne "wayhome" );
+
+    readingsEndUpdate( $hash, 1 );
+
+    # trigger state change
+    if ( $stateChange > 0 ) {
         Log3 $name, 4,
           "GUEST $name: implicit state change caused by location " . $location;
-        GUEST_Set( $hash, $name, "silentSet", "state", "absent" );
+
+        GUEST_Set( $hash, $name, "silentSet", "state", "home" )
+          if $stateChange == 1;
+        GUEST_Set( $hash, $name, "silentSet", "state", "absent" )
+          if $stateChange == 2;
     }
 
 }
