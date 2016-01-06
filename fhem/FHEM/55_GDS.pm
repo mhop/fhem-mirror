@@ -1295,7 +1295,7 @@ sub _retrieveCONDITIONS {
 			if(@files) {
  				Log3($name, 4, "GDS $name: filelist found.");
  				@files			= sort(@files);
-				my $datafile	= $files[-1];
+				my $datafile	= $files[-2];
 				Log3($name, 5, "GDS $name: retrieving $datafile");
 				my ($file_content,$file_handle);
 				open($file_handle, '>', \$file_content);
@@ -1938,6 +1938,8 @@ sub getListForecastStations($) {
 #	Changelog
 #
 ###################################################################################################
+#
+#	2016-01-01	fixed		use txt file instead html for conditions (adopt DWD changes)
 #
 #	2015-12-31	fixed		conditions retrieval on startup
 #
