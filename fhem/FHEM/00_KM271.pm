@@ -1162,7 +1162,7 @@ KM271_SetReading($$$$)
     <li>HK1_Betriebswerte1</li>
     <li>HK1_Betriebswerte2</li>
     <li>HK1_Einschaltoptimierung</li>
-    <li>HK1_Heizkennlinie_+10_Grad</li>
+    <li>HK1_Heizkennlinie_10_Grad</li>
     <li>HK1_Heizkennlinie_-10_Grad</li>
     <li>HK1_Heizkennlinie_0_Grad</li>
     <li>HK1_Mischerstellung</li>
@@ -1175,7 +1175,7 @@ KM271_SetReading($$$$)
     <li>HK2_Betriebswerte1</li>
     <li>HK2_Betriebswerte2</li>
     <li>HK2_Einschaltoptimierung</li>
-    <li>HK2_Heizkennlinie_+10_Grad</li>
+    <li>HK2_Heizkennlinie_10_Grad</li>
     <li>HK2_Heizkennlinie_-10_Grad</li>
     <li>HK2_Heizkennlinie_0_Grad</li>
     <li>HK2_Mischerstellung</li>
