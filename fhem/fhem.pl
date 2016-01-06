@@ -4064,9 +4064,8 @@ readingsBulkUpdate($$$@)
         } else {
           $hash->{".attreocr-threshold$reading"} = $value;
         }
-      } else {
-        $value = $ov;
       }
+      $value = $ov;
     }
 
     # determine if an event should be created:
@@ -4129,7 +4128,7 @@ readingsBulkUpdate($$$@)
       # If no event-aggregator attribute, then remove stale series if any.
       delete $readings->{".ts"};
     }
-  }  
+  }
   
   
   setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"}); 
