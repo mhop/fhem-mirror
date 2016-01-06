@@ -4654,7 +4654,7 @@ sub FRITZBOX_fritztris($)
          Switches the call diversity number (1, 2 ...) on or off.
          A call diversity for an incoming number has to be created with the Fritz!Box web interface. Requires the API: Telnet, webcm or TR064 (>=6.50).
          <br>
-         Note! The Fritz!Box allows also forwarding in accordance to the calling number. This is not included in this feature. 
+         Note! Only a diversity for a concret home number and <u>without</u> filter for the calling number can be set. Hence, an approbriate <i>diversity</i>-reading must exist.
       </li><br>
 
       <li><code>set &lt;name&gt; guestWLAN &lt;on|off&gt;</code>
@@ -5011,7 +5011,8 @@ sub FRITZBOX_fritztris($)
          <br>
          Die Rufumleitung muss zuvor auf der Fritz!Box eingerichtet werden. Ben&ouml;tigt die API: Telnet oder webcm.
          <br>
-         Achtung! Die Fritz!Box erm&ouml;glicht auch eine Weiterleitung in Abh&auml;ngigkeit von der anrufenden Nummer. Diese Art der Weiterleitung kann hiermit nicht geschaltet werden. 
+         Achtung! Es lassen sich nur Rufumleitungen f&uuml;r einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abh&auml;ngigkeit von der anrufenden Nummer schalten. 
+         Es muss also ein <i>diversity</i>-Ger&auml;wert geben.
          <br>
          Ben&ouml;tigt die API: Telnet, webcm oder TR064 (>=6.50).
       </li><br>
