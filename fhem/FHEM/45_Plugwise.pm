@@ -160,7 +160,7 @@ sub PW_GetUpdate($)
 	$n=$_;
 	if (defined $hash->{helper}->{circles}->{$n}->{lastContact}) {
 		if (time>$hash->{helper}->{circles}->{$n}->{lastContact} +960) {
-			Log 3,"Set Circle $n offline";
+			Log3 $hash,3,"Set Circle $n offline";
 			my %xplmsg = ( schema => 'plugwise.basic', );
 			my $saddr=$hash->{helper}->{circles}->{$n}->{name};
 			$xplmsg{dest}=$self->{_plugwise}->{circles}->{$saddr}->{type};
@@ -178,12 +178,9 @@ sub PW_GetUpdate($)
   foreach ( keys %{ $self->{_plugwise}->{circles} } ) {
     $n=$_;
     if (!defined $self->{_plugwise}->{circles}->{$n}->{type}) {$self->{_plugwise}->{circles}->{$n}->{type}=""};
-#    	if ($self->{_plugwise}->{circles}->{$n}->{type} eq "PW_Circle" || 
-#        	$self->{_plugwise}->{circles}->{$n}->{type} eq "" ||
         if ($self->{_plugwise}->{circles}->{$n}->{type} eq "" ||
         	!defined $self->{_plugwise}->{circles}->{$n}->{type}) {
     			command($hash,'status',$n);
-#    			command($hash,'livepower',$n) if($self->{_plugwise}->{circles}->{$n}->{type} eq "PW_Circle");
         	}
     	if (defined $attr{$name}{autosync}) {
     		if ($attr{$name}{autosync}>0 && time > $lastSync+$attr{$name}{autosync}) {
@@ -281,6 +278,10 @@ sub PW_Set($@)
         return undef;        
     } 
     elsif ($reading eq "pwPairForSec") {
+    	
+  		# 	RemoveInternalTimer("pairTimer");
+        #	InternalTimer(gettimeofday()+$value, "PW_Circle_OnOffTimer", 'pairTimer'), 1);
+    
     	Mywrite( $hash, "000701" . _addr_s2l( $self->{_plugwise}->{coordinator_MAC} ) ,1 );
     }
 }
@@ -335,13 +336,9 @@ sub PW_Read($)
     $buf2=~s/\r\n/\|/g;
     return "" if ( !defined($buf) );
     $hash->{helper}{buffer} .=  $buf;	
-#    $hash->{helper}{buffer} =~ s/\x83*//g;
-# did we already get a full frame?
-#Log 3,$hash->{helper}{buffer};
     return unless ( $hash->{helper}{buffer} =~ s/(.+)\r\n// );
     do {
 		my $v=$1;
-#		if ($v=~/\x05\x05\x03\x03(\w+)/ || $v=~/\x83\x05\x05\x03\x03(\w+)/) {
  		if ($v=~/\x83?\x05\x05\x03\x03(\w+)/) {
     		$body = process_response($hash,$1);
 			if($body ne undef) {
@@ -360,11 +357,6 @@ sub PW_Read($)
 	 	        if ($body->{type} =~ /output|power|sense|humtemp|energy|ping/)    {
 	 	        	if ($body->{dest} eq "PW_Switch" && $Make2Channels==1) {
 	 	        		my $dest=$body->{short};
-#	 	        		$body->{short}=$dest . "_Ch1";
-#	 	        		MyRead($hash,$body);
-#	 	        		$body->{short}=$dest . "_Ch2";
-#	 	        		$body->{val1}=$body->{val3};
-#	 	        		MyRead($hash,$body);
 						$body->{short}=$dest . "_Ch".$body->{val3};
 						MyRead($hash,$body);
 	 	        	} else {
@@ -402,10 +394,6 @@ sub PW_Read($)
 		{
 			Log3 $hash,3,"Not processed: $v";
 		}
-#		Log 3,"Try to read new Data.....";
-#	    my $buf3 = DevIo_SimpleRead($hash);
-#    	$hash->{helper}{buffer} .=  $buf3 if ( defined($buf3) );
-#		last unless ( $hash->{helper}{buffer} =~ /(.+)\r\n/ );	
 		
     } while ( $hash->{helper}{buffer} =~  s/(.+)\r\n// );
     $self->{_awaiting_stick_response} = 0;
@@ -1369,8 +1357,6 @@ sub _pulsecorrection {
 <a name="Plugwise"></a>
 <h3>Plugwise</h3>
 <ul>
-  <table>
-  <tr><td>
   This module is for the Plugwise-System.
   <br>
   Note: this module requires the Device::SerialPort or Win32::SerialPort module
@@ -1392,8 +1378,7 @@ sub _pulsecorrection {
       <br>
      </ul>
     <br>
-  </table>
-
+ 
   <a name="PLUGWISEset"></a>
   <b>Set</b>
   <ul>
