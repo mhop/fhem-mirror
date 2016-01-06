@@ -106,8 +106,6 @@ sub RandomTimer_Define($$)
   $hash->{S_REL}          = $srel;
   $hash->{COMMAND}        = Value($hash->{DEVICE});
   
-  Log3 $hash, 4, "[".$hash->{NAME}."]"." IstZustand Start------------>$hash->{COMMAND}";
-  
   myRemoveInternalTimer("SetTimer", $hash);
   myInternalTimer      ("SetTimer", time()+1, "RandomTimer_SetTimer", $hash, 0);
 
@@ -192,7 +190,7 @@ sub RandomTimer_Exec($) {
          $hash->{active} = 0;
       }
       if ($stopTimeReached) {
-         Log3 $hash, 4, "[".$hash->{NAME}."]"." defintion RandomTimer on $hash->{DEVICE}: "
+         Log3 $hash, 4, "[".$hash->{NAME}."]"." definition RandomTimer on $hash->{DEVICE}: "
             . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
             . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
          RandomTimer_setState($hash);
@@ -230,7 +228,6 @@ sub RandomTimer_down($) {
    my ($hash) = @_;
 
    $hash->{COMMAND} = AttrVal($hash->{NAME}, "keepDeviceAlive", 0) ? "on" : "off";
-   Log3 $hash, 4, "[".$hash->{NAME}."]"." SollZustand-down----------->$hash->{COMMAND}";
    RandomTimer_device_switch($hash);
 }
 ########################################################################
@@ -372,15 +369,16 @@ sub RandomTimer_device_toggle ($) {
     my ($hash) = @_;
 
     my $status = Value($hash->{DEVICE});
+    if ($status ne "on" && $status ne "off" ) {
+       Log3 $hash, 3, "[".$hash->{NAME}."]"." result of function Value($hash->{DEVICE}) must be 'on' or 'off'";
+    }
     my $sigma = ($status eq "on") ? $hash->{SIGMAON} : $hash->{SIGMAOFF};
-    Log3 $hash, 4, "[".$hash->{NAME}."]"." IstZustand------------>$status";
 
     my $zufall = int(rand(1000));
     Log3 $hash, 4,  "[".$hash->{NAME}."]"." IstZustand:$status sigma-$status:$sigma random:$zufall->" . (($zufall < $sigma)?"true":"false");
 
     if ($zufall < $sigma ) {
        $hash->{COMMAND}  = ($status eq "on") ? "off" : "on";
-       Log3 $hash, 4, "[".$hash->{NAME}."]"." SollZustand------------>$hash->{COMMAND}";
        RandomTimer_device_switch($hash); 
     }
 }
@@ -399,7 +397,9 @@ sub RandomTimer_device_switch ($) {
    Log3 $hash, 4, "[".$hash->{NAME}. "]"." command: $command";
 
    my $ret  = AnalyzeCommandChain(undef, $command);
-   Log3 ($hash, 3, "[$hash->{NAME}] ERROR: " . $ret . " SENDING " . $command) if($ret)
+   Log3 ($hash, 3, "[$hash->{NAME}] ERROR: " . $ret . " SENDING " . $command) if($ret);
+  #Log3  $hash, 3, "[$hash->{NAME}] Value($hash->{COMMAND})=".Value($hash->{DEVICE});
+  #$hash->{"$hash->{COMMAND}Value"} = Value($hash->{DEVICE});
 }
 ########################################################################
 sub RandomTimer_isDisabled($) {
