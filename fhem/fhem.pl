@@ -1012,7 +1012,7 @@ AnalyzeCommand($$;$)
   }
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
-    return "Forbidden command $cmd." if($cl || !Authorized($cl,"cmd","shell"));
+    return "Forbidden command $cmd." if($cl && !Authorized($cl,"cmd","shell"));
     if($evalSpecials) {
       map { $ENV{substr($_,1)} = $evalSpecials->{$_}; } keys %{$evalSpecials};
     }
