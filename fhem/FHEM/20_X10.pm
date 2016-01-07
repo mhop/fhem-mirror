@@ -80,7 +80,7 @@ my %functions_snd = qw(  ON  0010
 
 my %housecodes_snd = qw(A 0110  B 1110  C 0010  D 1010
                         E 0001  F 1001  G 0101  H 1101
-                        I 0111  J 1111  K 0011  K 1011
+                        I 0111  J 1111  K 0011  L 1011
                         M 0000  N 1000  O 0100  P 1100);
 
 my %unitcodes_snd  = qw( 1 0110   2 1110   3 0010   4 1010
