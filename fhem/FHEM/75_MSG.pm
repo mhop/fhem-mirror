@@ -149,10 +149,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
     }
 
     # check for given message title
-    if ( $msg =~
-s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
-      )
-    {
+    if ( $msg =~ s/^[\s\t]*\|(.*?)\|[\s\t]*// ) {
         Log3 $globalDevName, 5, "msg: found title=$1";
         $title = $1;
     }
@@ -1670,7 +1667,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                               ? "fhemMsgMail"
                               : $defs{$gatewayDev}{TYPE};
 
-                            my $defTitle;
+                            my $defTitle = "";
                             $defTitle =
                               $cmdSchema->{ $type[$i] }{$gatewayType}
                               {defaultValues}{$priorityCat}{TITLE}
@@ -1696,8 +1693,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 "msg $device: Determined default title: $defTitle";
 
                             # use title from device, global or internal default
-                            my $loopTitle;
-                            $loopTitle = $title;
+                            my $loopTitle = $title;
                             $loopTitle =
 
                               # look for direct high
