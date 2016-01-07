@@ -129,6 +129,7 @@ sub CommandMsg($$;$$) {
 s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
       )
     {
+        Log3 $globalDevName, 5, "msg: found types=$1";
         $types = $1;
     }
 
@@ -137,11 +138,13 @@ s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
 s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
       )
     {
+        Log3 $globalDevName, 5, "msg: found recipient=$1";
         $recipients = $1;
     }
 
     # check for given priority
     if ( $msg =~ s/^[\s\t]*([-+]{0,1}\d+[.\d]*)[\s\t]*// ) {
+        Log3 $globalDevName, 5, "msg: found priority=$1";
         $priority = $1;
     }
 
@@ -150,6 +153,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
 s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
       )
     {
+        Log3 $globalDevName, 5, "msg: found title=$1";
         $title = $1;
     }
 
@@ -1743,9 +1747,9 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
                                     )
                                 )
                               ) if ( $title eq "-" );
-                            $loopTitle = undef
-                              if ( $loopTitle eq ""
-                                || $loopTitle eq "none"
+
+                            $loopTitle = ""
+                              if ( $loopTitle eq "none"
                                 || $loopTitle eq "-" );
 
                             my $loopMsg = $msg;
@@ -1859,7 +1863,7 @@ s/^[\s\t]*\|([\w\süöäß^°!"§$%&\/\\()<>=?´`"+\[\]#*@€]+)\|[\s\t]+//
 
                             $cmd =~ s/%DEVICE%/$gatewayDev/gi;
                             $cmd =~ s/%PRIORITY%/$loopPriority/gi;
-                            $cmd =~ s/%TITLE%/$loopTitle/gi if ($loopTitle);
+                            $cmd =~ s/%TITLE%/$loopTitle/gi;
                             $cmd =~ s/%MSG%/$loopMsg/gi;
 
                             $cmd =~ s/%RECIPIENT%/$subRecipient/gi

@@ -180,15 +180,12 @@ my $db = {
             'defaultValues' => {
                 'Normal' => {
                     'RECIPIENT' => '',
-                    'TITLE'     => '',
                 },
                 'High' => {
                     'RECIPIENT' => '',
-                    'TITLE'     => '',
                 },
                 'Low' => {
                     'RECIPIENT' => '',
-                    'TITLE'     => '',
                 },
             },
         },
@@ -213,7 +210,6 @@ my $db = {
                     'EXPIRE'         => '',
                     'URLTITLE'       => '',
                     'ACTION'         => '',
-                    'TITLE'          => 'System Message',
                     'Pushover_SOUND' => '',
                 },
                 'High' => {
@@ -222,7 +218,6 @@ my $db = {
                     'EXPIRE'         => '600',
                     'URLTITLE'       => '',
                     'ACTION'         => '',
-                    'TITLE'          => 'System Message',
                     'Pushover_SOUND' => '',
                 },
                 'Low' => {
@@ -231,7 +226,6 @@ my $db = {
                     'EXPIRE'         => '',
                     'URLTITLE'       => '',
                     'ACTION'         => '',
-                    'TITLE'          => 'System Message',
                     'Pushover_SOUND' => '',
                 },
             },
