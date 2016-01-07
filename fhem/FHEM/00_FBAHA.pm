@@ -70,7 +70,7 @@ FBAHA_Notify($$)
   my ($ntfy, $dev) = @_;
   return if($dev->{NAME} ne "global" ||
             !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
-  delete $modules{telnet}{NotifyFn};
+  delete $modules{FBAHA}{NotifyFn};
   FBAHA_reassign($ntfy);
   return;
 }

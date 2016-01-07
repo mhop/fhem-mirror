@@ -227,7 +227,7 @@ FW_SecurityCheck($$)
       for my $a (@list2) {
         next if(!$defs{$a});
         my $vf = AttrVal($a, "validFor","");
-        $fnd = 1 if((!$vf || $vf =~ m/\b$l\b/) && AttrVal($a, "basicAuth",""));
+        $fnd = 1 if($vf && ($vf =~ m/\b$l\b/) && AttrVal($a, "basicAuth",""));
       }
       push @list3, $l if(!$fnd);
     }

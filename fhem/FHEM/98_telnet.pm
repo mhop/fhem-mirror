@@ -28,7 +28,8 @@ telnet_Initialize($)
 
   my %lhash = ( Fn=>"CommandTelnetEncoding",
                 ClientFilter => "telnet",
-                Hlp=>"[utf8|latin1],query and set the character encoding for the current telnet session" );
+                Hlp=>"[utf8|latin1],query and set the character encoding ".
+                                "for the current telnet session" );
   $cmds{encoding} = \%lhash;
 }
 
@@ -70,7 +71,7 @@ telnet_SecurityCheck($$)
       for my $a (@list2) {
         next if(!$defs{$a});
         my $vf = AttrVal($a, "validFor","");
-        $fnd = 1 if((!$vf || $vf =~ m/\b$l\b/) && 
+        $fnd = 1 if(($vf && $vf =~ m/\b$l\b/) && 
                     (AttrVal($a, "password","") ||
                      AttrVal($a, "globalpassword","")));
       }

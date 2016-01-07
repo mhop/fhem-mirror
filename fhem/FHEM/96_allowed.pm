@@ -56,7 +56,7 @@ allowed_Authorize($$$$)
   my ($me, $cl, $type, $arg) = @_;
 
   return 0 if($me->{disabled});
-  return 0 if($me->{validFor} && $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
+  return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
 
   if($type eq "cmd") {
     return 0 if(!$me->{allowedCommands});
@@ -80,7 +80,7 @@ allowed_Authenticate($$$$)
   my ($me, $cl, $param) = @_;
 
   return 0 if($me->{disabled});
-  return 0 if($me->{validFor} && $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
+  return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
   my $aName = $me->{NAME};
 
   if($cl->{TYPE} eq "FHEMWEB") {
@@ -339,9 +339,8 @@ allowed_Attr(@)
     <li>validFor<br>
         A comma separated list of frontend names. Currently supported frontends
         are all devices connected through the FHEM TCP/IP library, e.g. telnet
-        and FHEMWEB. If set, the rules specified via the other attributes will
-        only apply to the frontends in the list. If not set, the rules apply to
-        all frontends.
+        and FHEMWEB. <b>Note: changed behaviour:</b>The allowed instance is
+        only active, if this attribute is set.
         </li>
 
   </ul>
@@ -487,11 +486,10 @@ allowed_Attr(@)
 
     <a name="validFor"></a>
     <li>validFor<br>
-        Komma separierte Liste von Forntend-Instanznamen.  Aktuell werden nur
-        Frontends unterst&uuml;tzt, die das FHEM TCP/IP Bibliothek verwenden.
-        Falls gesetzt, dann gelten die mit den anderen Attributen
-        spezifizierten Regeln nur f&uuml;r diese Instanzen. Falls nicht
-        gesetzt, dann sind alle Frontends betroffen.
+        Komma separierte Liste von Frontend-Instanznamen.  Aktuell werden nur
+        Frontends unterst&uuml;tzt, die das FHEM TCP/IP Bibliothek verwenden,
+        z.Bsp. telnet und FHEMWEB. <b>Achtung, &Auml;nderung:</b> falls nicht
+        gesetzt, ist die allowed Instanz nicht aktiv.
         </li>
 
   </ul>
