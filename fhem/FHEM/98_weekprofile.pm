@@ -100,7 +100,7 @@ sub weekprofile_readDayProfile($@)
   if($type eq "MAX") {
     @temps = split('/',ReadingsVal($device,"$reading-temp",""));
     @times = split('/',ReadingsVal($device,"$reading-time",""));
-    # only use to to interval 'from-to'
+    # only use to from interval 'from-to'
     for(my $i = 0; $i < scalar(@times); $i+=1){
       my $interval =  $times[$i];
       my @parts = split('-',$interval);      
@@ -139,13 +139,18 @@ sub weekprofile_readDevProfile(@)
   my $prf = {};
   foreach my $day (@shortDays){
     my ($dayTimes, $dayTemps) = weekprofile_readDayProfile($device,$day,$type,$me);
+    if (scalar(@{$dayTemps})==0) {
+      push(@{$dayTimes}, "24:00");
+      push(@{$dayTemps}, "18.0");
+      Log3 $me, 3, "WARNING master device $device has no day profile for $day - create default";
+    }
     $prf->{$day}->{"temp"} = $dayTemps;
-    $prf->{$day}->{"time"} = $dayTimes;  
+    $prf->{$day}->{"time"} = $dayTimes;
   }
   return $prf;
 }
 ############################################## 
-sub weekprofile_createDefaultPofile(@)
+sub weekprofile_createDefaultProfile(@)
 {
   my ($hash) = @_;
   my $prf = {};
@@ -256,14 +261,18 @@ sub weekprofile_assignDev($)
     
     my $prfDev = weekprofile_readDevProfile($hash->{MASTERDEV}->{NAME},$type, $me);
   
+    $prf = {};
+    $prf->{NAME} = 'master';
+        
     if(defined($prfDev)) {
-      $prf = {};
       $prf->{DATA} = $prfDev;
-      $prf->{NAME} = 'master';
+    } else {
+      Log3 $me, 3, "WARNING master device $hash->{MASTERDEV}->{NAME} has no week profile - create default profile";
+      $prf->{DATA} = weekprofile_createDefaultProfile($hash); 
     }
     $hash->{STATE} = "assigned";
   } else {
-    my $prfDev = weekprofile_createDefaultPofile($hash);  
+    my $prfDev = weekprofile_createDefaultProfile($hash);  
     if(defined($prfDev)) {
       $prf = {};
       $prf->{DATA} = $prfDev;
@@ -340,8 +349,10 @@ sub weekprofile_Define($$)
   
   #$attr{$me}{verbose} = 5;
   
-  weekprofile_assignDev($hash);
-  weekprofile_updateReadings($hash);
+  if ($init_done) {
+    weekprofile_assignDev($hash);
+    weekprofile_updateReadings($hash);
+  }
 
   return undef;
 }
