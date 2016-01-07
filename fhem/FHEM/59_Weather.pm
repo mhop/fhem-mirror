@@ -176,7 +176,7 @@ sub Weather_ParseDateTime($) {
         # 12 AM= 0, 12 PM= 12
         $h+=12 if($h==12); if($p eq "pm") { $h= ($h+12) % 24 } else { $h%= 12 };
         my $m= $monthindex{$mon};
-        return undef unless $m;
+        return undef unless defined($m);
         #main::Debug "######  $value -> $wd $d $m $y $h:$n $tz";
         # $mday= 1.. 
         # $month= 0..11
