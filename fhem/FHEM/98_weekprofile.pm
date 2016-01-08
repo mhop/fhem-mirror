@@ -295,7 +295,7 @@ sub weekprofile_assignDev($)
   my $me = $hash->{NAME};
   
   my $prf = undef;
-  if ($hash->{MASTERDEV}->{NAME}) {
+  if (defined($hash->{MASTERDEV})) {
     
     Log3 $me, 5, "$me(assignDev): assign to device $hash->{MASTERDEV}->{NAME}";
     
@@ -388,8 +388,12 @@ sub weekprofile_Define($$)
 
   my $me = $a[0];
   
-  $hash->{MASTERDEV}->{NAME} = undef;
-  $hash->{MASTERDEV}->{NAME} = $a[2] if (@a > 1);
+  my $devName = undef;
+  if (@a > 1) {
+    $devName = $a[2];
+    $devName =~ s/(^\s+|\s+$)//g;
+  }
+  $hash->{MASTERDEV}->{NAME} = $devName if (defined($devName));
   
   $hash->{STATE} = "defined";
   my @profiles = ();
@@ -496,7 +500,7 @@ sub weekprofile_Set($$@)
       if ( $prf->{NAME} eq $params[0]){
         $prf->{DATA} = $data;
         # automatic we send master profile to master device
-        if ($params[0] eq "master"){
+        if ( ($params[0] eq "master") && defined($hash->{MASTERDEV}) ){
           weekprofile_sendDevProfile($hash->{MASTERDEV}->{NAME},$prf,$me);
         } else {
           weekprofile_writeProfilesToFile($hash);
@@ -579,7 +583,7 @@ sub weekprofile_Set($$@)
   $list.= " remove_profile";
   if ($cmd eq 'remove_profile') {
     return 'usage: remove_profile <name>' if(@params < 1);
-    return 'Error master profile can not removed' if($params[0] eq "master");
+    return 'Error master profile can not removed' if( ($params[0] eq "master") && defined($hash->{MASTERDEV}) );
     return 'Error Remove last profile is not allowed' if(scalar(@{$hash->{PROFILES}}) == 1);
     
     my ($delprf,$idx)  = weekprofile_findPRF($hash,$params[0]);
@@ -631,7 +635,7 @@ sub weekprofile_Notify($$)
     }
   }
   
-  if ($init_done && defined($own->{MASTERDEV}->{NAME}) && 
+  if ($init_done && defined($own->{MASTERDEV}) && 
       ($own->{MASTERDEV}->{NAME} eq $devName) && 
       (@{$own->{PROFILES}} > 0) ) {
     
@@ -686,7 +690,7 @@ sub weekprofile_writeProfilesToFile(@)
   my ($hash) = @_;
   my $me = $hash->{NAME};
   
-  my $start = (defined($hash->{MASTERDEV}->{NAME})) ? 1:0;
+  my $start = (defined($hash->{MASTERDEV})) ? 1:0;
   my $prfCnt = scalar(@{$hash->{PROFILES}});
   return if ($prfCnt <= $start);
 
@@ -749,7 +753,7 @@ sub weekprofile_readProfilesFromFile(@)
     $prfNew->{NAME} = $data[0];
     $prfNew->{DATA} = $prfData;
     
-    if (!$hash->{MASTERDEV}->{NAME} && $rowCnt == 0) {
+    if (!$hash->{MASTERDEV} && $rowCnt == 0) {
       $hash->{PROFILES}[0] = $prfNew; # replace default
     } else {
       push @{$hash->{PROFILES}}, $prfNew;
@@ -836,6 +840,7 @@ sub weekprofile_findPRFDev($)
     
     next if ("$module" ne "weekprofile");     
     
+    next if (!defined($defs{$d}->{MASTERDEV}));
     my $masterDev = $defs{$d}->{MASTERDEV}->{NAME};
     next unless(defined($masterDev));
     next if ($masterDev ne $device);
