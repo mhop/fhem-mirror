@@ -3781,7 +3781,7 @@ s2Hex($)
     This class needs the installation of the perl module Crypt::Rijndael
     and a defined networkkey in the attributes of the ZWDongle device<br>
     Currently a secure inclusion can only be started from the command input
-    with "set &lt;ZWDongle_device_name&gt; addNode &lt;On|nwOn&gt; sec"<br>
+    with "set &lt;ZWDongle_device_name&gt; addNode [onSec|onNwSec]"<br>
     These commands are only described here for completeness of the
     documentation, but are not intended for manual usage. These commands
     will be removed from the interface in future version.</li>
@@ -4082,7 +4082,7 @@ s2Hex($)
     This class needs the installation of the perl module Crypt::Rijndael and
     a defined networkkey in the attributes of the ZWDongle device<br>
     Currently a secure inclusion can only be started from the command input
-    with "set &lt;ZWDongle_device_name&gt; addNode &lt;On|nwOn&gt; sec"<br>
+    with "set &lt;ZWDongle_device_name&gt; addNode [onSec|onNwSec]"<br>
     These commands are only described here for completeness of the
     documentation, but are not intended for manual usage. These commands
     will be removed from the interface in future version.</li>
