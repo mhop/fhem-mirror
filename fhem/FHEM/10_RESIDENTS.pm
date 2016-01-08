@@ -909,7 +909,7 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
         if ( ReadingsVal( $roommate, "wakeup", "0" ) > 0 ) {
-            $wakeup += ReadingsVal( $name, "wakeup", "0" );
+            $wakeup += ReadingsVal( $roommate, "wakeup", "0" );
             $residentsDevs_wakeup .= "," . $roommate
               if ( $residentsDevs_wakeup ne "-" );
             $residentsDevs_wakeup = $roommate
@@ -921,10 +921,11 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
         if ( ReadingsVal( $roommate, "wayhome", "0" ) > 0 ) {
-            $wayhome += ReadingsVal( $name, "wayhome", "0" );
-            $residents_wayhome .= "," . $roommate
-              if ( $residents_wayhome ne "-" );
-            $residents_wayhome = $roommate if ( $residents_wayhome eq "-" );
+            $wayhome += ReadingsVal( $roommate, "wayhome", "0" );
+            $residentsDevs_wayhome .= "," . $roommate
+              if ( $residentsDevs_wayhome ne "-" );
+            $residentsDevs_wayhome = $roommate
+              if ( $residentsDevs_wayhome eq "-" );
             $residents_wayhome .= ", " . $roommateName
               if ( $roommateName ne "" && $residents_wayhome ne "-" );
             $residents_wayhome = $roommateName
