@@ -54,7 +54,7 @@ sub MQTT_Initialize($) {
   $hash->{SetFn}    = "MQTT::Set";
   $hash->{NotifyFn} = "MQTT::Notify";
 
-  $hash->{AttrList} = "keep-alive";
+  $hash->{AttrList} = "keep-alive ".$main::readingFnAttributes;
 }
 
 package MQTT;
