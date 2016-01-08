@@ -22,7 +22,8 @@ sub ZWDongle_ProcessSendStack($);
 # https://bitbucket.org/bradsjm/aeonzstickdriver
 my %sets = (
   "addNode"          => { cmd => "4a%02x@",    # ZW_ADD_NODE_TO_NETWORK'
-                          param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
+                          param => { nwOn=>0xc1, on=>0x81, off=>0x05,
+                                     secNwOn=>0xc1, secOn=>0x81 } },
   "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
                           param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
@@ -171,6 +172,14 @@ ZWDongle_Set($@)
     return "$type is unsupported by this controller";
   }
 
+  if($type eq "addNode") {
+    if($a[0] && $a[0] =~ m/sec/i) {
+      $hash->{addSecure} = 1;
+    } else {
+      delete($hash->{addSecure});
+    }
+  }
+
   my $par = $sets{$type}{param};
   if($par && !$par->{noArg}) {
     return "Unknown argument for $type, choose one of ".join(" ",keys %{$par})
@@ -186,13 +195,6 @@ ZWDongle_Set($@)
     $cmd =~ s/\@/$c/g;
   }
 
-  if($type eq "addNode") {
-    if(@a == 2 && $a[1] =~ m/^sec/i) {
-      $hash->{addSecure} = pop(@a);
-    } else {
-      delete($hash->{addSecure});
-    }
-  }
 
   my @ca = split("%", $cmd, -1);
   my $nargs = int(@ca)-1;
@@ -740,7 +742,7 @@ ZWDongle_Ready($)
   <b>Set</b>
   <ul>
 
-  <li>addNode [nwOn|on|off] [sec]<br>
+  <li>addNode [on|nwOn|secOn|secNwOn|off]<br>
     Activate (or deactivate) inclusion mode. The controller (i.e. the dongle)
     will accept inclusion (i.e. pairing/learning) requests only while in this
     mode. After activating inclusion mode usually you have to press a switch
@@ -748,14 +750,15 @@ ZWDongle_Ready($)
     of the controller. If autocreate is active, a fhem device will be created
     after inclusion. "on" activates standard inclusion. "nwOn" activates network
     wide inclusion (only SDK 4.5-4.9, SDK 6.x and above).<br>
-    If sec is specified, the ZWDongle networkKey ist set, and the device
-    supports the SECURITY class, then a secure inclusion is attempted.
+    If secOn/secNwOn is specified, the ZWDongle networkKey ist set, and the
+    device supports the SECURITY class, then a secure inclusion is attempted.
     </li>
 
   <li>removeNode [nwOn|on|off]<br>
     Activate (or deactivate) exclusion mode. "on" activates standard exclusion. 
-    "nwOn" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and above). 
-    Note: the corresponding fhem device have to be deleted manually.</li>
+    "nwOn" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and
+    above).  Note: the corresponding fhem device have to be deleted
+    manually.</li>
 
   <li>createNode id<br>
     Request the class information for the specified node, and create a fhem
