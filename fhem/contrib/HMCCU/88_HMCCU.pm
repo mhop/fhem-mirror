@@ -151,7 +151,7 @@ sub HMCCU_Initialize ($)
 	$hash->{AttrFn} = "HMCCU_Attr";
 	$hash->{ShutdownFn} = "HMCCU_Shutdown";
 
-	$hash->{AttrList} = "stripchar stripnumber:0,1,2 ccureadings:0,1 ccureadingfilter ccureadingformat:name,address rpcinterval:3,5,10 rpcqueue rpcport rpcserver:on,off parfile statedatapoint statevals substitute updatemode:client,both,hmccu loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "stripchar stripnumber:0,1,2 ccureadings:0,1 ccureadingfilter ccureadingformat:name,address rpcinterval:3,5,10 rpcqueue rpcport rpcserver:on,off parfile statedatapoint statevals substitute updatemode:client,both,hmccu ccutrace loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
@@ -1095,6 +1095,8 @@ sub HMCCU_GetDeviceInfo ($$)
 		$hmccu_hash = $hash;
 	}
 
+	my $ccutrace = AttrVal ($hmccu_hash->{NAME}, 'ccutrace', '');
+
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($device, 0);
 	if ($flags == $HMCCU_FLAG_ADDRESS) {
 		$devname = HMCCU_GetDeviceName ($add, '');
@@ -1120,7 +1122,13 @@ foreach (chnid, odev.Channels())
 }
 	);
 
-	return HMCCU_HMScript ($hmccu_hash->{host}, $script);
+	my $response = HMCCU_HMScript ($hmccu_hash->{host}, $script);
+	if ($ccutrace ne '' && ($device =~ /$ccutrace/ || $devname =~ /$ccutrace/)) {
+		Log 1, "HMCCU: Device=$device Devname=$devname";
+		Log 1, "HMCCU: Script response = ".$response;
+		Log 1, "HMCCU: Script = ".$script;
+	}
+	return $response;
 }
 
 ####################################################
@@ -1522,6 +1530,8 @@ sub HMCCU_GetDatapoint ($@)
 		$hmccu_hash = $hash;
 	}
 
+	my $ccutrace = AttrVal ($hmccu_hash->{NAME}, 'ccutrace', '');
+
 	my $url = 'http://'.$hmccu_hash->{host}.':8181/do.exe?r1=dom.GetObject("';
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($param, $HMCCU_FLAG_INTERFACE);
 	if ($flags == $HMCCU_FLAGS_IACD) {
@@ -1535,7 +1545,8 @@ sub HMCCU_GetDatapoint ($@)
 		return (-1, $value);
 	}
 
-	my $response = GetFileFromURL ($url);
+	my $rawresponse = GetFileFromURL ($url);
+	my $response = $rawresponse;
 	$response =~ m/<r1>(.*)<\/r1>/;
 	$value = $1;
 
@@ -1564,6 +1575,9 @@ sub HMCCU_GetDatapoint ($@)
 	}
 	else {
 		Log 1,"HMCCU: Error URL = ".$url;
+		if ($ccutrace ne '' && $param =~ /$ccutrace/) {
+			Log 1,"HMCCU: Response = ".$rawresponse;
+		}
 		return (-2, '');
 	}
 }
@@ -1681,6 +1695,7 @@ sub HMCCU_GetUpdate ($$)
 	my $script;
 
 	my $cn = $cl_hash->{NAME};
+	my $ccutrace = AttrVal ($hmccu_hash->{NAME}, 'ccutrace', '');
 	my $ccureadings = AttrVal ($cn, 'ccureadings', 1);
 	my $ccureadingfilter = AttrVal ($cn, 'ccureadingfilter', '.*');
 	my $readingformat = AttrVal ($cn, 'ccureadingformat', 'name');
@@ -1727,6 +1742,11 @@ foreach (chnid, odev.Channels())
 	}
 
 	my $response = HMCCU_HMScript ($hmccu_hash->{host}, $script);
+	if ($ccutrace ne '' && ($addr =~ /$ccutrace/ || $nam =~ /$ccutrace/)) {
+		Log 1, "HMCCU: Addr=$addr Name=$nam";
+		Log 1, "HMCCU: Script response = ".$response;
+		Log 1, "HMCCU: Script = ".$script;
+	}
 	return -2 if ($response eq '');
 
 	readingsBeginUpdate ($cl_hash) if ($ccureadings);
