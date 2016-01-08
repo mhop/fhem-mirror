@@ -2327,15 +2327,12 @@ sub
 ZWave_secStart($)
 {
   my ($hash) = @_;
-  #~ Log3 $hash->{NAME}, 5, "$hash->{NAME}: secStart called";
 
   my $dt = gettimeofday();
   $hash->{secTime} = $dt;
   InternalTimer($dt+7, "ZWave_secUnlock", $hash, 0);
-  #~ Log3 $hash->{NAME}, 5, "Timer for secUnlock set ($dt+7)";
   
   return if($hash->{secInProgress});
-  #~ Log3 $hash->{NAME}, 5, "$hash->{NAME}: setting secInProgress";
   $hash->{secInProgress} = 1;
   my @empty;
   $hash->{secStack} = \@empty;
@@ -2345,10 +2342,10 @@ sub
 ZWave_secUnlock($)
 {
   my ($hash)= @_;
-  #~ Log3 $hash->{NAME}, 5, "secUnlock triggert";
   my $dt = gettimeofday();
-  if ($dt > ($hash->{secTime} + 6)) {
-    Log3 $hash->{NAME}, 3, "secUnlock will call Zwave_secEnd";
+  if (($hash->{secInProgress}) && ($dt > ($hash->{secTime} + 6))) {
+    Log3 $hash->{NAME}, 3, "secStart is older than 6 seconds, "
+      ."secUnlock will call Zwave_secEnd";
     ZWave_secEnd($hash);
   }
 }
@@ -2357,9 +2354,8 @@ sub
 ZWave_secEnd($)
 {
   my ($hash) = @_;
-  #~ Log3 $hash->{NAME}, 5, "$hash->{NAME}: secEnd called";
   return if(!$hash->{secInProgress});
-  #~ Log3 $hash->{NAME}, 5, "$hash->{NAME}: secEnd removing secInProgress";
+
   my $secStack = $hash->{secStack};
   delete $hash->{secInProgress};
   delete $hash->{secStack};
