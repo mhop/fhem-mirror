@@ -20,6 +20,8 @@ use vars qw($init_done);
 
 my @shortDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun");
 
+my @DEVLIST_SEND = ("MAX","CUL_HM","weekprofile","dummy");
+
 my %DEV_READINGS;
 # MAX
 $DEV_READINGS{"Mon"}{"MAX"} = "weekprofile-2-Mon";
@@ -58,9 +60,11 @@ $DEV_READINGS{"Sat"}{"HM-TC-IT-WM-W-EU"} = "R_P1_0_tempListSat";
 $DEV_READINGS{"Sun"}{"HM-TC-IT-WM-W-EU"} = "R_P1_1_tempListSun";
 
 ############################################## 
-sub weekprofile_getDeviceType($)
+sub weekprofile_getDeviceType($;$)
 {
-  my ($device) = @_;
+  my ($device,$sndrcv) = @_;
+  
+  $sndrcv = "RCV" if (!defined($sndrcv));
 
   # determine device type
   my $devHash = $main::defs{$device};
@@ -79,6 +83,13 @@ sub weekprofile_getDeviceType($)
   elsif ($devHash->{TYPE} =~ /dummy/){
     $type = "MAX" if ($device =~ /.*MAX.*/); #dummy (FAKE WT) with name MAX inside for testing
   }
+  
+  return $type if ($sndrcv eq "RCV");
+  
+  if ($devHash->{TYPE} =~ /weekprofile/){
+    $type = "WEEKPROFILE";
+  }
+  
   return $type;
 }
 
@@ -168,15 +179,21 @@ sub weekprofile_createDefaultProfile(@)
 sub weekprofile_sendDevProfile(@)
 {
   my ($device,$prf,$me) = @_;
-  my $type = weekprofile_getDeviceType($device);
+  my $type = weekprofile_getDeviceType($device,"SND");
   return "Error device type not supported" if (!defined ($type));
-  
+
+  if ($type eq "WEEKPROFILE") {
+      my $json = JSON->new;
+      my $json_text = $json->encode($prf->{DATA});
+      return fhem("set $device profile_data $prf->{NAME} $json_text");
+  }
+
   my $devPrf = weekprofile_readDevProfile($device,$type,$me);
   
   # only send changed days
   my @dayToTransfer = ();
   foreach my $day (@shortDays){
-    my $tmpCnt =  scalar(@{$prf->{$day}->{"temp"}});
+    my $tmpCnt =  scalar(@{$prf->{DATA}->{$day}->{"temp"}});
     next if ($tmpCnt <= 0);
     
     if ($tmpCnt != scalar(@{$devPrf->{$day}->{"temp"}})) {
@@ -186,8 +203,8 @@ sub weekprofile_sendDevProfile(@)
     
     my $equal = 1;
     for (my $i = 0; $i < $tmpCnt; $i++) {
-      if ( ($prf->{$day}->{"temp"}[$i] ne $devPrf->{$day}->{"temp"}[$i] ) ||
-            $prf->{$day}->{"time"}[$i] ne $devPrf->{$day}->{"time"}[$i] ) {        
+      if ( ($prf->{DATA}->{$day}->{"temp"}[$i] ne $devPrf->{$day}->{"temp"}[$i] ) ||
+            $prf->{DATA}->{$day}->{"time"}[$i] ne $devPrf->{$day}->{"time"}[$i] ) {        
         $equal = 0; 
         last;
       }
@@ -208,15 +225,15 @@ sub weekprofile_sendDevProfile(@)
   if($type eq "MAX") {
     $cmd = "set $device weekProfile ";
     foreach my $day (@dayToTransfer){
-      my $tmpCnt =  scalar(@{$prf->{$day}->{"temp"}});
+      my $tmpCnt =  scalar(@{$prf->{DATA}->{$day}->{"temp"}});
       
       $cmd.=$day.' ';
       
       for (my $i = 0; $i < $tmpCnt; $i++) {
-        my $endTime = $prf->{$day}->{"time"}[$i];
+        my $endTime = $prf->{DATA}->{$day}->{"time"}[$i];
         
         $endTime = ($endTime eq "24:00") ? ' ' : ','.$endTime.',';
-        $cmd.=$prf->{$day}->{"temp"}[$i].$endTime;
+        $cmd.=$prf->{DATA}->{$day}->{"temp"}[$i].$endTime;
       }
     }
   } else { #Homatic
@@ -227,9 +244,9 @@ sub weekprofile_sendDevProfile(@)
       $cmd .= $day;
       $cmd .= ($k < $dayCnt-1) ? " prep": " exec";
       
-      my $tmpCnt =  scalar(@{$prf->{$day}->{"temp"}});      
+      my $tmpCnt =  scalar(@{$prf->{DATA}->{$day}->{"temp"}});      
       for (my $i = 0; $i < $tmpCnt; $i++) {
-        $cmd .= " ".$prf->{$day}->{"time"}[$i]." ".$prf->{$day}->{"temp"}[$i];
+        $cmd .= " ".$prf->{DATA}->{$day}->{"time"}[$i]." ".$prf->{DATA}->{$day}->{"temp"}[$i];
       }
       $cmd .= ($k < $dayCnt-1) ? ";;": "";
       $k++;
@@ -240,6 +257,37 @@ sub weekprofile_sendDevProfile(@)
   fhem($cmd);
   return undef;
 }
+
+##############################################
+sub weekprofile_refreshSendDevList($)
+{
+  my ($hash) = @_;
+  my $me = $hash->{NAME};
+  
+  splice($hash->{SNDDEVLIST});
+  
+  foreach my $d (keys %defs)   
+  {
+    next if ($defs{$d}{NAME} eq $me);
+    
+    my $module   = $defs{$d}{TYPE};
+    
+    my %sndHash;
+    @sndHash{@DEVLIST_SEND}=();
+    next if (!exists $sndHash{$module});
+    
+    my $type = weekprofile_getDeviceType($defs{$d}{NAME},"SND");
+    next if (!defined($type));
+    
+    my $dev = {};
+    $dev->{NAME} = $defs{$d}{NAME};
+    $dev->{ALIAS} = AttrVal($dev->{NAME},"alias",$dev->{NAME});
+    
+    push @{$hash->{SNDDEVLIST}} , $dev;
+  }
+  return undef;
+}
+
 ############################################## 
 sub weekprofile_assignDev($)
 {
@@ -345,11 +393,15 @@ sub weekprofile_Define($$)
   
   $hash->{STATE} = "defined";
   my @profiles = ();
+  my @sendDevList = ();
+   
   $hash->{PROFILES} = \@profiles;
+  $hash->{SNDDEVLIST} = \@sendDevList;
   
   #$attr{$me}{verbose} = 5;
   
   if ($init_done) {
+    weekprofile_refreshSendDevList($hash);
     weekprofile_assignDev($hash);
     weekprofile_updateReadings($hash);
   }
@@ -374,17 +426,9 @@ sub weekprofile_Get($$@)
 
   if($cmd eq "profile_data") {
     return "no profile" if ($prfCnt <= 0);
-    
-    my $prf = undef;
-    my $idx=0;
-    if($params[0]){
-      foreach my $prf (@{$hash->{PROFILES}}){
-        last if ( $prf->{NAME} eq $params[0]);
-        $idx++;
-      }
-      return "profile $params[0] not found" if ($idx >= $prfCnt);
-    }
-    $prf = $hash->{PROFILES}[$idx]; 
+
+    my ($prf,$idx) = weekprofile_findPRF($hash,$params[0]);
+    return "profile $params[0] not found" unless ($prf);
     
     my $json = JSON->new;    
     my $json_text = $json->encode($prf->{DATA});
@@ -401,9 +445,32 @@ sub weekprofile_Get($$@)
     return $names;
   }
   
+  if($cmd eq "sndDevList") {
+    my $json = JSON->new;
+    my $json_text = $json->encode($hash->{SNDDEVLIST});
+    return $json_text;
+  }
   
   $list =~ s/ $//;
   return "Unknown argument $cmd choose one of $list"; 
+}
+############################################## 
+sub weekprofile_findPRF(@)
+{
+  my ($hash, $profile) = @_;
+  
+  my $found = undef;
+  my $idx = 0;
+  foreach my $prf (@{$hash->{PROFILES}}){
+    if ( $prf->{NAME} eq $profile){
+      $found = $prf;
+      last;
+    }
+    $idx++;
+  }
+  $idx = -1 if (!defined($found));
+  
+  return ($found,$idx);
 }
 ############################################## 
 sub weekprofile_Set($$@)
@@ -430,7 +497,7 @@ sub weekprofile_Set($$@)
         $prf->{DATA} = $data;
         # automatic we send master profile to master device
         if ($params[0] eq "master"){
-          weekprofile_sendDevProfile($hash->{MASTERDEV}->{NAME},$prf->{DATA},$me);
+          weekprofile_sendDevProfile($hash->{MASTERDEV}->{NAME},$prf,$me);
         } else {
           weekprofile_writeProfilesToFile($hash);
         }
@@ -450,33 +517,34 @@ sub weekprofile_Set($$@)
   $list.= ' send_to_device' if ($prfCnt > 0);
   
   if ($cmd eq 'send_to_device') {
-    return 'usage: send_to_device <profile name> [device]' if(@params < 1);
+    return 'usage: send_to_device <profile name> [device(s)]' if(@params < 1);
     
     my $profile = $params[0];
-    my $device = $hash->{MASTERDEV}->{NAME};
     
-    if (@params == 2){
-      $device = $params[1];
+    my @devices = ();
+    if (@params == 2) {
+      @devices = split(',',$params[1]);
+    } else {
+      push @devices, $hash->{MASTERDEV}->{NAME} if (defined($hash->{MASTERDEV}));
     }
     
-    return "Error no master device" unless (defined($device));
+    return "Error no devices given and no master device" if (@devices == 0);
     
-    my $found = undef;
-    foreach my $prf (@{$hash->{PROFILES}}){
-      if ( $prf->{NAME} eq $profile){
-        $found = $prf;
-        last;
-      }
-    }
-    
-    if (!$found) {
+    my ($found,$idx) = weekprofile_findPRF($hash,$profile);
+    if (!defined($found)) {
       Log3 $me, 1, "$me(Set): Error unknown profile $profile";
       return "Error unknown profile $profile";
     }
     
-    my $ret = weekprofile_sendDevProfile($device,$found->{DATA},$me);
-    Log3 $me, 1, "$me(Set): $ret" if ($ret);
-    return $ret;
+    my $err = '';
+    foreach my $device (@devices){
+      my $ret = weekprofile_sendDevProfile($device,$found,$me);
+      if ($ret) {
+        Log3 $me, 1, "$me(Set): $ret" if ($ret);
+        $err .= $ret . "\n";
+      }
+    }
+    return $err;
   }
   #----------------------------------------------------------
   $list.= " copy_profile";
@@ -514,15 +582,7 @@ sub weekprofile_Set($$@)
     return 'Error master profile can not removed' if($params[0] eq "master");
     return 'Error Remove last profile is not allowed' if(scalar(@{$hash->{PROFILES}}) == 1);
     
-    my $delprf = undef;
-    my $idx = 0;
-    foreach my $prf (@{$hash->{PROFILES}}){
-      if ( $prf->{NAME} eq $params[0]){
-        $delprf = $prf;
-        last;
-      }
-      $idx++;
-    }
+    my ($delprf,$idx)  = weekprofile_findPRF($hash,$params[0]);
     return "Error unknown profile $params[0]" unless($delprf);
     
     splice(@{$hash->{PROFILES}},$idx, 1);
@@ -559,9 +619,14 @@ sub weekprofile_Notify($$)
       
       if ($what =~ m/INITIALIZED/) {
         splice($own->{PROFILES});
+        weekprofile_refreshSendDevList($own);
         weekprofile_assignDev($own);
         weekprofile_readProfilesFromFile($own);
         weekprofile_updateReadings($own);
+      }
+      
+      if ($what =~ m/DEFINED/ || $what =~ m/DELETED/) {
+        weekprofile_refreshSendDevList($own);
       }
     }
   }
@@ -714,7 +779,11 @@ sub weekprofile_SummaryFn()
   my $lnkDetails = AttrVal($d, "alias", $d);
   $lnkDetails = "<a name=\"$d.detail\" href=\"$FW_ME$FW_subdir?detail=$d\">$lnkDetails</a>" if($show_links);
   
-  my $args = "weekprofile";
+  my $masterDev = defined($hash->{MASTERDEV}) ? $hash->{MASTERDEV}->{NAME} : undef; 
+  
+  my $args = "weekprofile,MODE:SHOW";
+  $args .= ",MASTERDEV:$masterDev" if (defined($masterDev));
+  
   my $curr = undef;
   $curr = $hash->{PROFILES}[0]->{NAME} if (@{$hash->{PROFILES}} > 0 );
   
@@ -738,7 +807,7 @@ sub weekprofile_editOnNewpage(@)
   my $hash = $defs{$device};
   
   $backurl="?"  if(!defined($backurl));
-  my $args = "weekprofile,EDIT,$backurl";
+  my $args = "weekprofile,MODE:EDIT,BACKURL:$backurl";
   
   my $html;
   $html .= "<html>";
@@ -811,6 +880,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   Mit dem Modul 'weekprofile' können mehrere Wochenprofile verwaltet und an unterschiedliche Geräte 
   übertragen werden. Aktuell wird folgende Hardware unterstützt:
   <li>alle MAX Thermostate</li>
+  <li>andere weekprofile module</li>
   <li>Homatic HM-CC-RT-DN </li>
   <li>Homatic HM-CC-TC    </li>
   <li>Homatic HM-TC-IT-WM-W-EU</li>
@@ -846,8 +916,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
        Es wird das Profil 'profilname' geändert. Die Profildaten müssen im json-Format übergeben werden.
     </li>
     <li>send_to_device<br>
-      <code>set &lt;name&gt; send_to_device &lt;profilname&gt; [device] </code><br>
-      Das Profil wird an ein Gerät übertragen. Wird kein Gerät angegeben, wird das 'Master-Gerät' verwendet.
+      <code>set &lt;name&gt; send_to_device &lt;profilname&gt; [devices] </code><br>
+      Das Profil wird an ein oder mehrere Geräte übertragen. Wird kein Gerät angegeben, wird das 'Master-Gerät' verwendet.
+      'Devices' ist eine kommagetrennte Auflistung von Geräten
     </li>
     <li>copy_profile<br>
       <code>set &lt;name&gt; copy_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
@@ -904,6 +975,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   With this module you can manage and edit different weekprofiles. You can send the profiles to different devices.<br>
   Currently the following devices will by supported:<br>
   <li>MAX</li>
+  <li>other weekprofile modules</li>
   <li>Homatic HM-CC-RT-DN </li>
   <li>Homatic HM-CC-TC    </li>
   <li>Homatic HM-TC-IT-WM-W-EU</li>
@@ -941,9 +1013,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
        The profile 'profilename' will be changed. The data have to be in json format.
     </li>
     <li>send_to_device<br>
-      <code>set &lt;name&gt; send_to_device &lt;profilename&gt; [device] </code><br>
-      The profile 'profilename' will be transfered to the device. Without the parameter device the profile 
-      will be transferd to the master device.
+      <code>set &lt;name&gt; send_to_device &lt;profilename&gt; [devices] </code><br>
+      The profile 'profilename' will be transfered to one or more the devices. Without the parameter device the profile 
+      will be transferd to the master device. 'devices' is a comma seperated list of device names
     </li>
     <li>copy_profile<br>
       <code>set &lt;name&gt; copy_profile &lt;source&gt; &lt;destination&gt; </code><br>

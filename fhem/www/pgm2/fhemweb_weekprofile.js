@@ -7,7 +7,7 @@ $(document).ready(function(){
 
 var shortDays = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
-function FW_weekprofileInputDialog(title,inp,parent, callback)
+function FW_weekprofileInputDialog(title,inp,parent,callback)
 {
   var div = $("<div id='FW_weekprofileInputDiolog'>");
   var content = $('<input type="'+inp+'">').get(0);
@@ -32,6 +32,65 @@ function FW_weekprofileInputDialog(title,inp,parent, callback)
     }}]
   });
 
+  if(parent)
+    $(div).dialog( "option", "position", {
+      my: "left top", at: "right bottom",
+      of: parent, collision: "flipfit"
+    });
+}
+
+function FW_weekprofileMultiSelDialog(title, elementNames, elementLabels, selected,parent,callback)
+{
+  var table = "<table>";
+  if (elementNames) {
+    for(var i1=0; i1<elementNames.length; i1++){
+      var n = elementNames[i1];
+      var l = n;
+      if (elementLabels && elementLabels.length == elementNames.length)
+        l = elementLabels[i1];
+        
+      var sel = 0;
+      if (selected && selected.indexOf(n)>=0) 
+        sel=1;
+                    
+      table += '<tr><td><div class="checkbox"><input name="'+n+'" type="checkbox"';
+      table += (sel ? " checked" : "")+'/><label for="'+n+'"><span></span></label></div></td>';
+      table += '<td><label for="' +n+'">'+l+'</label></td></tr>';
+    }
+  }
+  table += "</table>";
+  
+  var div = $("<div id='FW_weekprofileMultiSelDiolog'>");
+  $(div).append(title);
+  $(div).append(table);
+  $(div).append('<input id="FW_weekprofileMultiSelDiologFreeText" />');
+  $("body").append(div);
+  
+   $(div).dialog({
+    dialogClass:"no-close",modal:true, width:"auto", closeOnEscape:true, 
+    maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
+    title: title,
+    buttons: [{text:"OK", click:function(){
+      var res=[];
+      if($("#FW_weekprofileMultiSelDiologFreeText").val())
+        res.push($("#FW_weekprofileMultiSelDiologFreeText").val());
+      
+      $("#FW_weekprofileMultiSelDiolog table input").each(function(){
+        if($(this).prop("checked"))
+          res.push($(this).attr("name"));
+      });
+      $(this).dialog("close");
+      $(div).remove();
+      if(callback)
+        callback(res);
+    }},{text:"CANCEL", click:function(){
+      $(this).dialog("close");
+      $(div).remove();
+      if(callback)
+        callback(null);
+    }}]
+  });
+  
   if(parent)
     $(div).dialog( "option", "position", {
       my: "left top", at: "right bottom",
@@ -68,16 +127,39 @@ function FW_weekprofilePRFChached(devName,select)
   FW_queryValue('get '+devName+' profile_data '+prfName, widget);
 }
 
-function FW_weekprofileSendToDev(devName,lnk)
+function FW_weekprofileSendToDev(devName,bnt)
 {
   var widget = $('div[informid="'+devName+'"]').get(0)
   
-  FW_weekprofileInputDialog("<span>Device:</span>","text",lnk,function(device,ok){
-    if (!device || device.length <=0)
-      return;  
-    FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" send_to_device "+widget.CURPRF+" "+device+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
-    });
-}
+  var deviceLst = null;
+  bnt.setValueFn = function(data) {
+    try {
+      deviceLst=JSON.parse(data);
+      var devicesNames = [];
+      var devicesAlias = [];
+      for (var k=0; k < deviceLst.length; k++) {
+        devicesNames.push(deviceLst[k]['NAME']);
+        devicesAlias.push(deviceLst[k]['ALIAS']);
+      }
+      var selected = [];
+      if (widget.MASTERDEV)
+            selected.push(widget.MASTERDEV);
+      FW_weekprofileMultiSelDialog("<span>Device(s):</span>",devicesNames,devicesAlias,selected,bnt, 
+        function(sndDevs) {
+          if (!sndDevs || sndDevs.length==0)
+            return;
+          FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" send_to_device "+widget.CURPRF+" "+sndDevs.join(',')+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
+        });
+      
+    } catch(e){
+      console.log(devName+" error parsing json '" +data+"'");
+      FW_errmsg(devName+" Parameter "+e,5000);
+      return;
+    }
+  }
+
+  FW_queryValue('get '+devName+' sndDevList', bnt);
+ }
 
 function FW_weekprofileCopyPrf(devName,lnk)
 {
@@ -472,11 +554,16 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   
   widget.SHOWURL = null;
   widget.MODE = 'SHOW';
-  if (vArr.length > 1) {
-    widget.MODE = vArr[1];
-    if (vArr.length > 2)
-      widget.SHOWURL = vArr[2];
+
+  for (var i = 1; i < vArr.length; ++i) {
+    var arg = vArr[i].split(':');
+    switch (arg[0]) {
+      case "MODE":      widget.MODE = arg[1];       break;
+      case "BACKURL":   widget.SHOWURL = arg[1];    break;
+      case "MASTERDEV": widget.MASTERDEV = arg[1];  break;
+    }
   }
+  
   widget.DEVICE = devName;
   widget.WEEKDAYS = shortDays.slice();
   widget.CURPRF = currVal;
