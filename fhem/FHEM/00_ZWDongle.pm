@@ -22,10 +22,10 @@ sub ZWDongle_ProcessSendStack($);
 # https://bitbucket.org/bradsjm/aeonzstickdriver
 my %sets = (
   "addNode"          => { cmd => "4a%02x@",    # ZW_ADD_NODE_TO_NETWORK'
-                          param => { nwOn=>0xc1, on=>0x81, off=>0x05,
-                                     secNwOn=>0xc1, secOn=>0x81 } },
+                          param => { onNw   =>0xc1, on   =>0x81, off=>0x05,
+                                     onNwSec=>0xc1, onSec=>0x81 } },
   "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
-                          param => {nwOn=>0xc1, on=>0x81, off=>0x05 } },
+                          param => {onNw=>0xc1, on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
   "removeFailedNode" => { cmd => "61%02x@" },   # ZW_REMOVE_FAILED_NODE_ID
   "replaceFailedNode"=> { cmd => "63%02x@" },   # ZW_REPLACE_FAILED_NODE
@@ -742,21 +742,21 @@ ZWDongle_Ready($)
   <b>Set</b>
   <ul>
 
-  <li>addNode [on|nwOn|secOn|secNwOn|off]<br>
+  <li>addNode [on|onNw|onSec|onNwSec|off]<br>
     Activate (or deactivate) inclusion mode. The controller (i.e. the dongle)
     will accept inclusion (i.e. pairing/learning) requests only while in this
     mode. After activating inclusion mode usually you have to press a switch
     three times within 1.5 seconds on the node to be included into the network
     of the controller. If autocreate is active, a fhem device will be created
-    after inclusion. "on" activates standard inclusion. "nwOn" activates network
+    after inclusion. "on" activates standard inclusion. "onNw" activates network
     wide inclusion (only SDK 4.5-4.9, SDK 6.x and above).<br>
-    If secOn/secNwOn is specified, the ZWDongle networkKey ist set, and the
+    If onSec/onNwSec is specified, the ZWDongle networkKey ist set, and the
     device supports the SECURITY class, then a secure inclusion is attempted.
     </li>
 
-  <li>removeNode [nwOn|on|off]<br>
+  <li>removeNode [onNw|on|off]<br>
     Activate (or deactivate) exclusion mode. "on" activates standard exclusion. 
-    "nwOn" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and
+    "onNw" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and
     above).  Note: the corresponding fhem device have to be deleted
     manually.</li>
 
