@@ -28,7 +28,10 @@ sub HMLAN_relOvrLd($);
 sub HMLAN_condUpdate($$);
 sub HMLAN_getVerbLvl ($$$$);
 
-my %sets = ( "hmPairForSec" => "HomeMatic"
+my %sets = ( "open"         => ""
+            ,"close"        => ""
+            ,"reopen"       => ""
+            ,"hmPairForSec" => "HomeMatic"
             ,"hmPairSerial" => "HomeMatic"
             ,"reassignIDs"  => ""
 );
@@ -42,10 +45,6 @@ my %HMcond = ( 0  =>'ok'
               ,253=>'disconnected'
               ,254=>'Overload-released'
               ,255=>'init');
-
-#my %HM STATE= (  =>'opened'
-#                 =>'disconnected'
-#                 =>'overload');
 
 my $HMmlSlice = 12; # number of messageload slices per hour (10 = 6min)
 
@@ -407,7 +406,7 @@ sub HMLAN_Set($@) {############################################################
   my $name = shift @a;
   my $cmd = shift @a;
   my $arg = join("", @a);
-  if($cmd eq "hmPairForSec") { ####################################
+  if   ($cmd eq "hmPairForSec") { #################################
     $arg = 60    if(!$arg || $arg !~ m/^\d+$/);
     HMLAN_RemoveHMPair("hmPairForSec:$name");
     $hash->{hmPair} = 1;
@@ -427,10 +426,23 @@ sub HMLAN_Set($@) {############################################################
     $hash->{hmPairSerial} = $arg;
     InternalTimer(gettimeofday()+20, "HMLAN_RemoveHMPair", "hmPairForSec:".$name, 1);
   }
-  elsif($cmd eq "reassignIDs") { ##################################
+  elsif($cmd eq "reassignIDs")  { #################################
     return "set $name $cmd doesn't support parameter" if(scalar(@a));
     HMLAN_assignIDs($hash);
   }
+  elsif($cmd eq "reopen")       { #################################
+    DevIo_CloseDev($hash);
+    HMLAN_condUpdate($hash,253);#set disconnected
+    DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
+  }
+  elsif($cmd eq "close")        { #################################
+    DevIo_CloseDev($hash);
+    HMLAN_condUpdate($hash,253);#set disconnected
+  }
+  elsif($cmd eq "open")         { #################################
+    DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
+  }
+
   return ("",1);# no not generate trigger outof command
 }
 
@@ -1062,11 +1074,15 @@ sub HMLAN_condUpdate($$) {#####################################################
   $hash->{helper}{cnd}{$HMcnd} = 0 if (!$hash->{helper}{cnd} || 
                                        !$hash->{helper}{cnd}{$HMcnd});
   $hash->{helper}{cnd}{$HMcnd}++;
+  readingsBeginUpdate($hash);
   if ($HMcnd == 4){#HMLAN needs a rest. Supress all sends exept keep alive
-    readingsSingleUpdate($hash,"state","overload",1);
+    readingsBulkUpdate($hash,"state","overload");
   }
-  else{
-    readingsSingleUpdate($hash,"state","opened",1)
+  elsif ($HMcnd == 251 || $HMcnd == 253){#HMLAN dummy/disconnected
+    readingsBulkUpdate($hash,"state","disconnected");
+  }
+  else{# revert from overload
+    readingsBulkUpdate($hash,"state","opened")
           if (InternalVal($name,"STATE","") eq "overload");
   }
 
@@ -1076,14 +1092,13 @@ sub HMLAN_condUpdate($$) {#####################################################
   $txt .= $HMcond{$_}.":".$hash->{helper}{cnd}{$_}." "
                             foreach (keys%{$hash->{helper}{cnd}});
 
-  readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"cond",$HMcndTxt);
   readingsBulkUpdate($hash,"Xmit-Events",$txt);
   readingsBulkUpdate($hash,"prot_".$HMcndTxt,"last");
 
   $hashQ->{HMcndN} = $HMcnd;
 
-  if ($HMcnd == 4 || $HMcnd == 253) {#transmission down
+  if ($HMcnd == 4 || $HMcnd == 251|| $HMcnd == 253 || $HMcnd == 255) {#transmission down
     $hashQ->{answerPend} = 0;
     @{$hashQ->{apIDs}} = ();       #clear Q-status
     $hash->{XmitOpen} = 0;         #deny transmit
@@ -1091,11 +1106,6 @@ sub HMLAN_condUpdate($$) {#####################################################
         if (   $HMcnd == 253
             && $hash->{helper}{k}{Start}
             &&(gettimeofday() - 29) > $hash->{helper}{k}{Start});
-  }
-  elsif ($HMcnd == 255) {#reset counter after init
-    $hashQ->{answerPend} = 0;
-    @{$hashQ->{apIDs}} = ();       #clear Q-status
-    $hash->{XmitOpen} = 0;         #deny transmit
   }
   else{
     $hash->{XmitOpen} = ($hashQ->{answerPend} < $hashQ->{hmLanQlen})?"1":"2";#allow transmit
