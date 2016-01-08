@@ -164,7 +164,7 @@ sub CUL_HM_Initialize($) {
                        ."levelRange levelMap ";
   $hash->{Attr}{glb} =  "do_not_notify:1,0 showtime:1,0 "
                        ."rawToReadable unit "#"KFM-Sensor" only
-                       ."expert:0_off,1_on,2_raw,3_all,4_none,8_templ+default,12_templOnly,251_anything "
+                       ."expert:0_defReg,1_allReg,2_defReg+raw,3_allReg+raw,4_off,8_templ+default,12_templOnly,251_anything "
                        ."param "
                        ."actAutoTry:0_off,1_on "
                        ."aesCommReq:1,0 "      # IO will request AES if 
@@ -6909,6 +6909,7 @@ sub CUL_HM_setTmplDisp($){ # remove register i outdated
   if ($tHash->{helper}{expert}{tpl}){
     foreach (keys %{$tHash->{helper}{tmpl}}){
       my ($p,$t) = split(">",$_);
+      $t .= ":".$tHash->{helper}{tmpl}{$_} if($tHash->{helper}{tmpl}{$_});
       $tHash->{READINGS}{"tmpl_".$p}{VAL} .= $t.",";#could be more than one!
       $tHash->{READINGS}{"tmpl_".$p}{TIME} .= "-";# time does not make sense
     }
@@ -8205,8 +8206,6 @@ sub CUL_HM_complConfigTest($){# Q - check register consistancy some time later
 }
 sub CUL_HM_complConfigTestRm($){# Q - check register consistancy some time later
   my $name = shift;
-  my $devN = CUL_HM_getDeviceName($name);
-  return if (AttrVal($devN,"subType","") eq "virtual");
   my $mQ = $modules{CUL_HM}{helper}{confCheckArr};
   @{$mQ} = grep !/^$name$/,@{$mQ};
 }
@@ -8217,26 +8216,32 @@ sub CUL_HM_complConfigTO($)  {# now perform consistancy check of register
 }
 sub CUL_HM_complConfig($;$)  {# read config if enabled and not complete
   my ($name,$dly) = @_;
+  my $devN = CUL_HM_getDeviceName($name);
+  return if (AttrVal($devN,"subType","") eq "virtual");
   return if ($modules{CUL_HM}{helper}{hmManualOper});#no autoaction when manual
   return if ((CUL_HM_getAttrInt($name,"autoReadReg") & 0x07) < 5);
-  if (CUL_HM_peerUsed($name) == 2){
+  if ($defs{$devN}{helper}{prt}{sProc} != 0){# we wait till device is idle. 
+    CUL_HM_complConfigTest($name);           # requeue and wait patient
+  }
+  elsif (CUL_HM_peerUsed($name) == 2){
     CUL_HM_qAutoRead($name,0) if(!$dly);
     CUL_HM_complConfigTest($name);
     delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
     Log3 $name,5,"CUL_HM $name queue configRead, peers incomplete";
-    return;
   }
-  my @regList = CUL_HM_reglUsed($name);
-  foreach (@regList){
-    if (ReadingsVal($name,$_,"") !~ m /00:00/){
-      CUL_HM_qAutoRead($name,0) if(!$dly);
-      CUL_HM_complConfigTest($name);
-      delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
-      Log3 $name,5,"CUL_HM $name queue configRead, register incomplete";
-      last;
+  else{
+    my @regList = CUL_HM_reglUsed($name);
+    foreach (@regList){
+      if (ReadingsVal($name,$_,"") !~ m /00:00/){
+        CUL_HM_qAutoRead($name,0) if(!$dly);
+        CUL_HM_complConfigTest($name);
+        delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
+        Log3 $name,5,"CUL_HM $name queue configRead, register incomplete";
+        last;
+      }
     }
+    $modules{CUL_HM}{helper}{cfgCmpl}{$name} = 1;#mark config as complete
   }
-  $modules{CUL_HM}{helper}{cfgCmpl}{$name} = 1;#mark config as complete
 }
 sub CUL_HM_configUpdate($)   {# mark entities with changed data
   my $name = shift;
