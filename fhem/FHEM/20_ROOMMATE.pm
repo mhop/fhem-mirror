@@ -487,13 +487,13 @@ sub ROOMMATE_Set($@) {
 
                 # update location
                 my @location_home =
-                  ( defined( $attr{$name}{"rr_locationHome"} ) )
-                  ? split( ' ', $attr{$name}{"rr_locationHome"} )
-                  : ("home");
+                  split( ' ', AttrVal( $name, "rr_locationHome", "home" ) );
                 my @location_underway =
-                  ( defined( $attr{$name}{"rr_locationUnderway"} ) )
-                  ? split( ' ', $attr{$name}{"rr_locationUnderway"} )
-                  : ("underway");
+                  split( ' ',
+                    AttrVal( $name, "rr_locationUnderway", "underway" ) );
+                my @location_wayhome =
+                  split( ' ',
+                    AttrVal( $name, "rr_locationWayhome", "wayhome" ) );
                 my $searchstring = quotemeta($location);
 
                 if ( !$silent && $newpresence eq "present" ) {
@@ -652,19 +652,13 @@ sub ROOMMATE_Set($@) {
 
                 # read attributes
                 my @location_home =
-                  ( defined( $attr{$name}{"rr_locationHome"} ) )
-                  ? split( ' ', $attr{$name}{"rr_locationHome"} )
-                  : ("home");
-
+                  split( ' ', AttrVal( $name, "rr_locationHome", "home" ) );
                 my @location_underway =
-                  ( defined( $attr{$name}{"rr_locationUnderway"} ) )
-                  ? split( ' ', $attr{$name}{"rr_locationUnderway"} )
-                  : ("underway");
-
+                  split( ' ',
+                    AttrVal( $name, "rr_locationUnderway", "underway" ) );
                 my @location_wayhome =
-                  ( defined( $attr{$name}{"rr_locationWayhome"} ) )
-                  ? split( ' ', $attr{$name}{"rr_locationWayhome"} )
-                  : ("wayhome");
+                  split( ' ',
+                    AttrVal( $name, "rr_locationWayhome", "wayhome" ) );
 
                 $searchstring = quotemeta($location);
                 readingsBulkUpdate( $hash, "lastLocation", $location )
@@ -686,8 +680,7 @@ sub ROOMMATE_Set($@) {
                     Log3 $name, 3,
                       "ROOMMATE $name: on way back home from $location";
                     readingsBulkUpdate( $hash, "wayhome", "1" )
-                      if ( !defined( $hash->{READINGS}{wayhome}{VAL} )
-                        || $hash->{READINGS}{wayhome}{VAL} ne "1" );
+                      if ( ReadingsVal( $name, "wayhome", "0" ) ne "1" );
                 }
 
                 readingsEndUpdate( $hash, 1 ) if ( !$silent );
@@ -948,6 +941,7 @@ sub ROOMMATE_SetLocation($$$;$$$$$$) {
     my $state        = ReadingsVal( $name, "state", "initialized" );
     my $presence     = ReadingsVal( $name, "presence", "present" );
     my $currLocation = ReadingsVal( $name, "location", "-" );
+    my $currWayhome  = ReadingsVal( $name, "wayhome", "0" );
     my $currLat      = ReadingsVal( $name, "locationLat", "-" );
     my $currLong     = ReadingsVal( $name, "locationLong", "-" );
     my $currAddr     = ReadingsVal( $name, "locationAddr", "-" );
@@ -975,58 +969,67 @@ sub ROOMMATE_SetLocation($$$;$$$$$$) {
 
     $searchstring = quotemeta($location);
 
+    # update locationPresence
+    readingsBulkUpdate( $hash, "locationPresence", "present" )
+      if ( $trigger == 1 );
+    readingsBulkUpdate( $hash, "locationPresence", "absent" )
+      if ( $trigger == 0 );
+
     # check for implicit state change
     #
     my $stateChange = 0;
+    my $wayhome;
 
-    # home/1
-    if (   ( $location eq "home" || grep( m/^$searchstring$/, @location_home ) )
-        && $state ne "home"
-        && $state ne "gotosleep"
-        && $state ne "asleep"
-        && $state ne "awoken"
-        && $trigger eq "1" )
-    {
-        $stateChange = 1;
+    # home
+    if ( $location eq "home" || grep( m/^$searchstring$/, @location_home ) ) {
+        Log3 $name, 5, "ROOMMATE $name: received signal from home location";
+
+        # home
+        if (   $state ne "home"
+            && $state ne "gotosleep"
+            && $state ne "asleep"
+            && $state ne "awoken"
+            && $trigger eq "1" )
+        {
+            $stateChange = 1;
+        }
+
+        # absent
+        elsif ($state ne "gone"
+            && $state ne "none"
+            && $state ne "absent"
+            && $trigger eq "0" )
+        {
+            $stateChange = 2;
+        }
+
     }
 
-    # home/0
-    elsif (
-           ( $location eq "home" || grep( m/^$searchstring$/, @location_home ) )
-        && $state ne "gone"
-        && $state ne "none"
-        && $state ne "absent"
-        && $trigger eq "0" )
+    # underway
+    elsif ($location eq "underway"
+        || $location eq "wayhome"
+        || grep( m/^$searchstring$/, @location_underway )
+        || grep( m/^$searchstring$/, @location_wayhome ) )
     {
-        $stateChange = 2;
-    }
+        Log3 $name, 5, "ROOMMATE $name: received signal from underway location";
 
-    # absent
-    elsif (
-        (
-            $location eq "underway"
-            || grep( m/^$searchstring$/, @location_underway )
-        )
-        && $state ne "gone"
-        && $state ne "none"
-        && $state ne "absent"
-      )
-    {
-        $stateChange = 2;
+        # absent
+        $stateChange = 2
+          if ( $state ne "gone"
+            && $state ne "none"
+            && $state ne "absent" );
     }
 
     # wayhome
-    my $wayhome;
     if (
-        (
-            $location eq "wayhome"
-            || ( grep( m/^$searchstring$/, @location_wayhome )
-                && $trigger eq "0" )
-        )
-        && $presence eq "absent"
+        $location eq "wayhome"
+        || ( grep( m/^$searchstring$/, @location_wayhome )
+            && $trigger eq "0" )
       )
     {
         Log3 $name, 5, "ROOMMATE $name: wayhome signal received";
+
+        # wayhome=true
         if (
             (
                    ( $location eq "wayhome" && $trigger eq "1" )
@@ -1039,6 +1042,8 @@ sub ROOMMATE_SetLocation($$$;$$$$$$) {
             readingsBulkUpdate( $hash, "wayhome", "1" );
             $wayhome = 1;
         }
+
+        # wayhome=false
         elsif ($location eq "wayhome"
             && $trigger eq "0"
             && ReadingsVal( $name, "wayhome", "0" ) ne "0" )
@@ -1046,14 +1051,28 @@ sub ROOMMATE_SetLocation($$$;$$$$$$) {
             Log3 $name, 3,
               "ROOMMATE $name: seems not to be on way back home anymore";
             readingsBulkUpdate( $hash, "wayhome", "0" );
-            $wayhome  = 1;
-            $location = "underway";
+            $wayhome = 1;
         }
+
     }
 
-    if ( !grep( m/^$searchstring$/, @location_underway )
-        && ( $stateChange > 0 || $currLocation ne $location ) )
-    {
+    # activate wayhome tracing when reaching another location while wayhome=1
+    elsif ( $stateChange == 0 && $trigger == 1 && $currWayhome == 1 ) {
+        Log3 $name, 3,
+          "ROOMMATE $name: seems to stay at $location before coming home";
+        readingsBulkUpdate( $hash, "wayhome", "2" );
+        $wayhome = 1;
+    }
+
+    # revert wayhome during active wayhome tracing
+    elsif ( $stateChange == 0 && $trigger == 0 && $currWayhome == 2 ) {
+        Log3 $name, 3,
+          "ROOMMATE $name: finally on way back home from $location";
+        readingsBulkUpdate( $hash, "wayhome", "1" );
+        $wayhome = 1;
+    }
+
+    if ( $trigger == 1 ) {
         Log3 $name, 5, "ROOMMATE $name: archiving last known location";
         readingsBulkUpdate( $hash, "lastLocationLat",  $currLat );
         readingsBulkUpdate( $hash, "lastLocationLong", $currLong );
