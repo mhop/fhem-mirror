@@ -163,6 +163,12 @@ sub FRM_Notify {
 }
 
 #####################################
+sub FRM_is_firmata_connected {
+  my ($hash) = @_;
+  return defined($hash->{FirmataDevice}) && defined ($hash->{FirmataDevice}->{io});
+}
+
+#####################################
 sub FRM_Set($@) {
   my ($hash, @a) = @_;
   return "Need at least one parameters" if(@a < 2);
@@ -173,7 +179,7 @@ sub FRM_Set($@) {
 
   COMMAND_HANDLER: {
     $command eq "reset" and do {
-      return $hash->{NAME}." is not connected" unless (defined $hash->{FirmataDevice} and (defined $hash->{FD} or ($^O=~/Win/ and defined $hash->{USBDev})));
+      return $hash->{NAME}." is not connected" unless (FRM_is_firmata_connected($hash) && (defined $hash->{FD} or ($^O=~/Win/ and defined $hash->{USBDev})));
       $hash->{FirmataDevice}->system_reset();
       if (defined $hash->{SERVERSOCKET}) {
         # dispose preexisting connections
@@ -210,20 +216,20 @@ sub FRM_Get($@) {
   my $cmd = shift @a;
   ARGUMENT_HANDLER: {
     $cmd eq "firmware" and do {
-      if (defined $hash->{FirmataDevice}) {
+      if (FRM_is_firmata_connected($hash)) {
         return $hash->{FirmataDevice}->{metadata}->{firmware};
       } else {
         return "not connected to FirmataDevice";
       }
-		};
-		$cmd eq "version" and do {
-  		if (defined $hash->{FirmataDevice}) {
-  		  return $hash->{FirmataDevice}->{metadata}->{firmware_version};
-  		} else {
-  		  return "not connected to FirmataDevice";
-		  }
-		};
-	}
+    };
+    $cmd eq "version" and do {
+      if (FRM_is_firmata_connected($hash)) {
+        return $hash->{FirmataDevice}->{metadata}->{firmware_version};
+      } else {
+        return "not connected to FirmataDevice";
+      }
+    };
+  }
 }
 
 #####################################
@@ -278,7 +284,10 @@ sub FRM_Tcp_Connection_Close($) {
 	TcpServer_Close($hash);
 	if ($hash->{SNAME}) {
 		my $shash = $main::defs{$hash->{SNAME}};
-		$hash->{SocketDevice} = undef if (defined $shash);
+		if (defined $shash) {
+			$shash->{STATE}="listening";
+			delete $shash->{SocketDevice} if (defined $shash->{SocketDevice});
+		}
 	}
 	my $dev = $hash->{DeviceName};
 	my $name = $hash->{NAME};
@@ -354,7 +363,7 @@ sub FRM_DoInit($) {
 	
 	my $name = $shash->{NAME};
 	
-  	my $firmata_io = Firmata_IO->new($hash,$name);
+	my $firmata_io = Firmata_IO->new($hash,$name);
 	my $device = Device::Firmata::Platform->attach($firmata_io) or return 1;
 
 	$shash->{FirmataDevice} = $device;
@@ -667,7 +676,8 @@ sub FRM_I2C_Write
 {
   my ($hash,$package)  = @_;
 
-  if (defined (my $firmata = $hash->{FirmataDevice})) {
+  if (FRM_is_firmata_connected($hash)) {
+    my $firmata = $hash->{FirmataDevice};
     COMMANDHANDLER: {
       $package->{direction} eq "i2cwrite" and do {
         if (defined $package->{reg}) {
@@ -730,36 +740,36 @@ sub FRM_string_observer
 
 sub FRM_poll
 {
-	my ($hash) = @_;
-	if (defined $hash->{SocketDevice} and defined $hash->{SocketDevice}->{FD}) {
-		my ($rout, $rin) = ('', '');
-    	vec($rin, $hash->{SocketDevice}->{FD}, 1) = 1;
-    	my $nfound = select($rout=$rin, undef, undef, 0.1);
-    	my $mfound = vec($rout, $hash->{SocketDevice}->{FD}, 1); 
-		if($mfound && defined $hash->{FirmataDevice}) {
-			$hash->{FirmataDevice}->poll();
-		}
-		return $mfound;
-	} elsif (defined $hash->{FD}) {
-		my ($rout, $rin) = ('', '');
-    	vec($rin, $hash->{FD}, 1) = 1;
-    	my $nfound = select($rout=$rin, undef, undef, 0.1);
-    	my $mfound = vec($rout, $hash->{FD}, 1); 
-		if($mfound && defined $hash->{FirmataDevice}) {
-			$hash->{FirmataDevice}->poll();
-		}
-		return $mfound;
-	} else {
-		# This is relevant for windows/USB only
-  		my $po = $hash->{USBDev};
-  		my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
-  		if($po) {
-  			($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-  		}
-  		if ($InBytes && $InBytes>0 && defined $hash->{FirmataDevice}) {
-			$hash->{FirmataDevice}->poll();
-  		}
-	}
+  my ($hash) = @_;
+  if (defined $hash->{SocketDevice} and defined $hash->{SocketDevice}->{FD}) {
+    my ($rout, $rin) = ('', '');
+      vec($rin, $hash->{SocketDevice}->{FD}, 1) = 1;
+      my $nfound = select($rout=$rin, undef, undef, 0.1);
+      my $mfound = vec($rout, $hash->{SocketDevice}->{FD}, 1);
+    if($mfound && FRM_is_firmata_connected($hash)) {
+      $hash->{FirmataDevice}->poll();
+    }
+    return $mfound;
+  } elsif (defined $hash->{FD}) {
+    my ($rout, $rin) = ('', '');
+    vec($rin, $hash->{FD}, 1) = 1;
+    my $nfound = select($rout=$rin, undef, undef, 0.1);
+    my $mfound = vec($rout, $hash->{FD}, 1);
+    if($mfound && FRM_is_firmata_connected($hash)) {
+      $hash->{FirmataDevice}->poll();
+    }
+    return $mfound;
+  } else {
+    # This is relevant for windows/USB only
+    my $po = $hash->{USBDev};
+    my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+    if($po) {
+      ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+    }
+    if ($InBytes && $InBytes>0 && FRM_is_firmata_connected($hash)) {
+      $hash->{FirmataDevice}->poll();
+    }
+  }
 }
 
 ######### following is code to be called from OWX: ##########
@@ -1020,6 +1030,24 @@ sub FRM_OWX_Discover ($) {
 1;
 
 =pod
+  CHANGES
+
+  18.12.2015 jensb
+    o added sub FRM_is_firmata_connected
+      - extended connection check including {FirmataDevice}->{io} (gets
+        deleted by FRM_FirmataDevice_Close on TCP disconnect while FHEM
+        has still a valid reference to {FirmataDevice} when calling
+        I2CWrtFn)
+    o modified sub FRM_Set, FRM_Get, FRM_I2C_Write, FRM_poll:
+      - use sub FRM_is_firmata_connected to check if Firmata is still
+        connected before performing IO operations (to prevent FHEM crash)
+    o modified sub FRM_Tcp_Connection_Close:
+      - set STATE to listening and delete SocketDevice (to present same
+        idle state as FRM_Start)
+    o help updated
+=cut
+
+=pod
 =begin html
 
 <a name="FRM"></a>
@@ -1079,8 +1107,7 @@ sub FRM_OWX_Discover ($) {
       
       The Arduino has to run either 'StandardFirmata' or 'ConfigurableFirmata'.
       StandardFirmata supports Digital and Analog-I/O, Servo and I2C. In addition
-      to that ConfigurableFirmata supports 1-Wire, Stepper-motors and allows to
-      connect via ethernet in client mode. <br><br>
+      to that ConfigurableFirmata supports 1-Wire and Stepper-motors.<br><br>
       
       You can find StandardFirmata in the Arduino-IDE under 'Examples->Firmata->StandardFirmata<br><br>
       ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
@@ -1089,14 +1116,20 @@ sub FRM_OWX_Discover ($) {
   <br>
   <li>Network-connected devices:<br><br>
       <code>&lt;port&gt;</code> specifies the port the FRM device listens on. If <code>global</code> is
-      specified the socket is bound to all local ip-addresses, otherwise to localhost
-      only.<br>
-      The Arduino must ConfigurableFirmata. The connection is initiated by the arduino
-      in client-mode. Therefor the ip-address and port of the fhem-server has to be 
-      configured an the arduino, so it knows where to connect to.<br>
+      specified the socket is bound to all local IP addresses, otherwise to localhost
+      only.<br><br>
+
+      The Arduino has to run either 'StandardFirmataEthernet' or 'ConfigurableFirmata'.
+      StandardFirmataEthernet supports Digital and Analog-I/O, Servo and I2C. In addition
+      to that ConfigurableFirmata supports 1-Wire and Stepper-motors.<br><br>
+
+      The connection is initiated by the Arduino in client-mode. Therefore the IP address and port
+      of the fhem-server has to be configured in the Arduino, so it knows where to connect to.<br>
       As of now only a single Arduino per FRM-device configured is supported. Multiple
-      Arduinos may connect to different FRM-devices configured for different ports.<br>
-      ConfigurableFirmata has to be installed manualy. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
+      Arduinos may connect to different FRM-devices configured for different ports.<br><br>
+
+      You can find StandardFirmataEthernet in the Arduino-IDE under 'Examples->Firmata->StandardFirmataEthernet<br><br>
+      ConfigurableFirmata has to be installed manually. See <a href="https://github.com/firmata/arduino/tree/configurable/examples/ConfigurableFirmata">
       ConfigurableFirmata</a> on GitHub or <a href="http://www.fhemwiki.de/wiki/Arduino_Firmata#Installation_ConfigurableFirmata">FHEM-Wiki</a><br> 
   </li>
   <br>
@@ -1125,14 +1158,18 @@ sub FRM_OWX_Discover ($) {
   <b>Attributes</b><br>
   <ul>
       <li>i2c-config<br>
-      Configure the arduino for ic2 communication. This will enable i2c on the
+      Configure the Arduino for ic2 communication. This will enable i2c on the
       i2c_pins received by the capability-query issued during initialization of FRM.<br>
-      As of Firmata 2.3 you can set a delay-time (in microseconds) that will be inserted into i2c
-      protocol when switching from write to read.<br>
+      As of Firmata 2.3 you can set a delay-time (in microseconds, max. 65535, default 0) that will be
+      inserted into i2c protocol when switching from write to read. This may be necessary because Firmata
+      i2c write does not block on the fhem side so consecutive i2c write/read operations get queued and
+      will be executed on the Firmata device in a different time sequence. Use the maximum operation
+      time required by the connected i2c devices (e.g. 30000 for the BMP180 with triple oversampling,
+      see i2c device manufacturer documentation for details). <br>
       See: <a href="http://www.firmata.org/wiki/Protocol#I2C">Firmata Protocol details about I2C</a><br>
       </li><br>
       <li>sampling-interval<br>
-      Configure the interval Firmata reports data to FRM. Unit is milliseconds.<br>
+      Configure the interval Firmata reports analog data to FRM (in milliseconds, max. 65535). <br>
       See: <a href="http://www.firmata.org/wiki/Protocol#Sampling_Interval">Firmata Protocol details about Sampling Interval</a></br>
       </li>
     </ul>
