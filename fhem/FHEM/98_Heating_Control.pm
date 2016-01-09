@@ -467,9 +467,9 @@ sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
     <br><br>
     <b>Beispiel:</b>    
     <pre>
-    attr wd delayedExecutionCond isDelayed("%HEATING_CONTROL","%WEEKDAYTIMER","%TIME","%NAME","%EVENT")  
+    attr wd delayedExecutionCond isDelayed("$HEATING_CONTROL","$WEEKDAYTIMER","$TIME","$NAME","$EVENT")  
     </pre>
-    Die Parameter %HEATING_CONTROL(timer Name) %TIME %NAME(device Name) %EVENT werden zur Laufzeit durch die echten Werte ersetzt.
+    Die Parameter $HEATING_CONTROL(timer Name) $TIME $NAME(device Name) $EVENT werden zur Laufzeit durch die echten Werte ersetzt.
     
     <br><br>
     <b>Beispielfunktion:</b>    
