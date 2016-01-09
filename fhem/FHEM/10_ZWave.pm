@@ -2327,10 +2327,10 @@ sub
 ZWave_secStart($)
 {
   my ($hash) = @_;
-
   my $dt = gettimeofday();
   $hash->{secTime} = $dt;
-  InternalTimer($dt+7, "ZWave_secUnlock", $hash, 0);
+  $hash->{secTimer} = { hash => $hash };
+  InternalTimer($dt+7, "ZWave_secUnlock", $hash->{secTimer}, 0);
   
   return if($hash->{secInProgress});
   $hash->{secInProgress} = 1;
@@ -2341,11 +2341,12 @@ ZWave_secStart($)
 sub
 ZWave_secUnlock($)
 {
-  my ($hash)= @_;
+  my ($p) = @_;
+  my $hash= $p->{hash};
   my $dt = gettimeofday();
   if (($hash->{secInProgress}) && ($dt > ($hash->{secTime} + 6))) {
-    Log3 $hash->{NAME}, 3, "secStart is older than 6 seconds, "
-      ."secUnlock will call Zwave_secEnd";
+    Log3 $hash->{NAME}, 3, "$hash->{NAME}: secStart older than "
+      ."6 seconds detected, secUnlock will call Zwave_secEnd";
     ZWave_secEnd($hash);
   }
 }
@@ -2356,9 +2357,11 @@ ZWave_secEnd($)
   my ($hash) = @_;
   return if(!$hash->{secInProgress});
 
+  RemoveInternalTimer($hash->{secTimer});
   my $secStack = $hash->{secStack};
   delete $hash->{secInProgress};
   delete $hash->{secStack};
+  delete $hash->{secTimer};
   foreach my $cmd (@{$secStack}) {
     ZWave_SCmd($cmd->{T}, $hash, @{$cmd->{A}});
   }
@@ -2500,7 +2503,8 @@ ZWave_secNonceReceived($$)
     Log3 $name, 5, "$name: SECURITY initializing, networkkey sent";
 
     # start timer here to check state if networkkey was not verified
-    InternalTimer(gettimeofday()+25, "ZWave_secTestNetworkkeyVerify", $hash, 0);
+    $hash->{networkkeyTimer} = { hash => $hash };
+    InternalTimer(gettimeofday()+25, "ZWave_secTestNetworkkeyVerify", $hash->{networkkeyTimer}, 0);
     return undef;
   }
 
@@ -2617,7 +2621,7 @@ ZWave_secGetNonce()
 sub
 ZWave_secNetWorkKeyVerify ($)
 {
-  my($hash) = @_;
+  my ($hash) = @_;
   my $name = $hash->{NAME};
   my $iodev = $hash->{IODev};
 
@@ -2625,7 +2629,8 @@ ZWave_secNetWorkKeyVerify ($)
     return;
   }
 
-  #Log3 $iodev, 4, "$name: NetworkKeyVerify received, SECURITY is enabled";
+  RemoveInternalTimer($hash->{networkkeyTimer});
+  delete $hash->{networkkeyTimer};
   readingsSingleUpdate($hash, "SECURITY", 'ENABLED', 0);
   Log3 $name, 3, "$name: SECURITY enabled, networkkey was verified";
   ZWave_Cmd("get", $hash, $name, ("secSupported"));
@@ -2634,9 +2639,12 @@ ZWave_secNetWorkKeyVerify ($)
 sub
 ZWave_secTestNetworkkeyVerify ($)
 {
-  my($hash) = @_;
+  my ($p) = @_;
+  my $hash = $p->{hash};
   my $name = $hash->{NAME};
   my $sec_status = ReadingsVal($name, "SECURITY", undef);
+  
+  delete $hash->{networkkeyTimer};
   if ($sec_status !~ m/ENABLED/) {
     readingsSingleUpdate($hash, "SECURITY",
         'DISABLED (networkkey not verified and timer expired)', 0);
@@ -3000,13 +3008,7 @@ ZWave_processSendStack($)
 
   if(index($ss->[0],"sent") == 0) {
     shift @{$ss};
-    if(!ZWave_isWakeUp($hash)) {
-      RemoveInternalTimer($hash);
-
-      if($hash->{secInProgress}) {
-        InternalTimer(gettimeofday()+7, "ZWave_secUnlock", $hash, 0);
-      }
-    }
+    RemoveInternalTimer($hash) if(!ZWave_isWakeUp($hash));
   }
 
   if(@{$ss} == 0) {
