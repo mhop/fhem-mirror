@@ -66,7 +66,7 @@ telnet_SecurityCheck($$)
     my @list2 = devspec2array("TYPE=allowed");
     my @list3;
     for my $l (@list1) { # This is a hack, as hardcoded to basicAuth
-      next if(!$defs{$l});
+      next if(!$defs{$l} || $defs{$l}{TEMPORARY}); # Blocking.pm /Forum #47022
       my $fnd = 0;
       for my $a (@list2) {
         next if(!$defs{$a});
