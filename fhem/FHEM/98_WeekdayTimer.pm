@@ -1156,9 +1156,9 @@ sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
     <br><br>
     <b>Example:</b>    
     <pre>
-    attr wd delayedExecutionCond isDelayed("%HEATING_CONTROL","%WEEKDAYTIMER","%TIME","%NAME","%EVENT")  
+    attr wd delayedExecutionCond isDelayed("$HEATING_CONTROL","$WEEKDAYTIMER","$TIME","$NAME","$EVENT")  
     </pre>
-    the parameter %WEEKDAYTIMER(timer name) %TIME %NAME(device name) %EVENT are replaced at runtime by the correct value.
+    the parameter $WEEKDAYTIMER(timer name) $TIME $NAME(device name) $EVENT are replaced at runtime by the correct value.
     
     <br><br>
     <b>Example of a function:</b>    
