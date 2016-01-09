@@ -248,7 +248,7 @@ sub weekprofile_sendDevProfile(@)
       for (my $i = 0; $i < $tmpCnt; $i++) {
         $cmd .= " ".$prf->{DATA}->{$day}->{"time"}[$i]." ".$prf->{DATA}->{$day}->{"temp"}[$i];
       }
-      $cmd .= ($k < $dayCnt-1) ? ";;": "";
+      $cmd .= ($k < $dayCnt-1) ? "; ": "";
       $k++;
     }
   }
