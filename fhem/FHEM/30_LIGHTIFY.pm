@@ -412,6 +412,8 @@ LIGHTIFY_Parse($$)
     my $size = length($hex)/2;
     my $nr_lights = hex(substr($hex,2*9,2*1));
 
+    return undef if( !$nr_lights );
+
     my $offset = ($size-11) / $nr_lights;
 
     my $autocreated = 0;
