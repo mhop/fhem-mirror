@@ -77,7 +77,8 @@ sub weekprofile_getDeviceType($;$)
   if ($devHash->{TYPE} =~ /CUL_HM/){
     $type = AttrVal($device,"model","");
   }
-  elsif ($devHash->{TYPE} =~ /MAX/){
+  #avoid max shutter contact
+  elsif ( ($devHash->{TYPE} =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
     $type = "MAX";
   }
   elsif ($devHash->{TYPE} =~ /dummy/){
@@ -252,7 +253,7 @@ sub weekprofile_sendDevProfile(@)
       $k++;
     }
   }
-  $cmd =~ s/^\s+|\s+$//g;
+  $cmd =~ s/^\s+|\s+$//g if ($cmd);
   Log3 $me, 4, "$me(sendDevProfile): $cmd";
   fhem($cmd);
   return undef;
@@ -391,7 +392,7 @@ sub weekprofile_Define($$)
   my $devName = undef;
   if (@a > 1) {
     $devName = $a[2];
-    $devName =~ s/(^\s+|\s+$)//g;
+    $devName =~ s/(^\s+|\s+$)//g if ($devName);
   }
   $hash->{MASTERDEV}->{NAME} = $devName if (defined($devName));
   
