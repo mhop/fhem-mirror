@@ -140,8 +140,7 @@ sub WeekdayTimer_Define($$) {
   $hash->{helper}{daysRegExp}   =~ s/\!/\\\!/g; 
 
   WeekdayTimer_GlobalDaylistSpec ($hash, \@a);
-   
-  $hash->{TYPE}            = $type;  
+
   $hash->{NAME}            = $name;
   $hash->{DEVICE}          = $device;
   
@@ -416,11 +415,11 @@ sub WeekdayTimer_gatherSwitchingTimes {
 
     #pruefen auf Angabe eines Schaltpunktes
     my $element = "";
-    my @restoreElemets = ();
+    my @restoreElements = ();
 E:  while (@$a > 0) {
       
        my $actualElement = shift @$a;
-       push @restoreElemets, $actualElement; 
+       push @restoreElements, $actualElement; 
        $element = $element . $actualElement . " ";
        Log3 $hash, 5, "[$name] $element - trying to accept as a switchtime";
        
@@ -447,6 +446,8 @@ E:  while (@$a > 0) {
        last;
     }
     
+    # ein space am Ende wieder abschneiden
+    $element = substr ($element, 0, length($element)-1);
     my @t = split(/\|/, $element);
     my $anzahl = @t;
     if ( $anzahl >= 2 && $anzahl <= 3) {
@@ -454,7 +455,7 @@ E:  while (@$a > 0) {
       push(@switchingtimes, $element);
     } else {
       Log3 $hash, 4, "[$name] $element - NOT accepted, must be command or condition";
-      unshift @$a, @restoreElemets; 
+      unshift @$a, @restoreElements; 
       last;
     }
   }
