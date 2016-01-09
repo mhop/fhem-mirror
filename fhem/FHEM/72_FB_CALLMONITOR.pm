@@ -60,6 +60,7 @@ FB_CALLMONITOR_Initialize($)
                          "local-area-code ".
                          "country-code ".
                          "remove-leading-zero:0,1 ".
+                         "answMachine-is-missed-call:0,1 ".
                          "reverse-search-cache-file ".
                          "reverse-search:sortable-strict,phonebook,textfile,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at ".
                          "reverse-search-cache:0,1 ".
@@ -370,6 +371,10 @@ FB_CALLMONITOR_Read($)
             {
                 $hash->{helper}{TEMP}{$array[2]}{call_id} = Digest::MD5::md5_hex($data);
             }
+            else
+            {
+                $hash->{helper}{TEMP}{$array[2]}{call_id} = $array[2];
+            }
         }
 
         if($array[1] eq "CALL")
@@ -378,7 +383,7 @@ FB_CALLMONITOR_Read($)
             $hash->{helper}{TEMP}{$array[2]}{external_name} = (defined($reverse_search) ? $reverse_search : "unknown");
             $hash->{helper}{TEMP}{$array[2]}{internal_number} = $array[4];
             $hash->{helper}{TEMP}{$array[2]}{external_connection} = $array[6];
-            $hash->{helper}{TEMP}{$array[2]}{internal_connection} =  $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
+            $hash->{helper}{TEMP}{$array[2]}{internal_connection} = $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
             $hash->{helper}{TEMP}{$array[2]}{direction} = "outgoing";
         }
        
@@ -393,35 +398,31 @@ FB_CALLMONITOR_Read($)
        
         if($array[1] eq "CONNECT" and not exists($hash->{helper}{TEMP}{$array[2]}{internal_connection}))
         {
-            $hash->{helper}{TEMP}{$array[2]}{internal_connection} =  $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
+            $hash->{helper}{TEMP}{$array[2]}{internal_connection} = $connection_type{$array[3]} if(defined($connection_type{$array[3]}));
+            $hash->{helper}{TEMP}{$array[2]}{".internal_connection_id"} = $array[3] if(defined($connection_type{$array[3]}));
         }    
         
         if($array[1] eq "DISCONNECT")
         {
             $hash->{helper}{TEMP}{$array[2]}{call_duration} = $array[3];
         
-            if(exists($hash->{helper}{TEMP}{$array[2]}{direction}) and exists($hash->{helper}{TEMP}{$array[2]}{external_number}) and $hash->{helper}{TEMP}{$array[2]}{direction} eq "incoming" and $array[3] eq "0")
+            if(exists($hash->{helper}{TEMP}{$array[2]}{direction}) and $hash->{helper}{TEMP}{$array[2]}{direction} eq "incoming")
             {
-                $hash->{helper}{TEMP}{$array[2]}{missed_call} = $hash->{helper}{TEMP}{$array[2]}{external_number}.(exists($hash->{helper}{TEMP}{$array[2]}{external_name}) and $hash->{helper}{TEMP}{$array[2]}{external_name} ne "unknown" ? " (".$hash->{helper}{TEMP}{$array[2]}{external_name}.")" : "");
-                $hash->{helper}{TEMP}{$array[2]}{missed_call_line} = $hash->{helper}{TEMP}{$array[2]}{internal_number};
+                if(($hash->{helper}{TEMP}{$array[2]}{".last-event"} eq "RING") or (AttrVal($name, "answMachine-is-missed-call", "0") eq "1" and exists($hash->{helper}{TEMP}{$array[2]}{internal_connection}) and $hash->{helper}{TEMP}{$array[2]}{".internal_connection_id"} =~/^4[0-4]$/))
+                {
+                    $hash->{helper}{TEMP}{$array[2]}{missed_call} = $hash->{helper}{TEMP}{$array[2]}{external_number}.(exists($hash->{helper}{TEMP}{$array[2]}{external_name}) and $hash->{helper}{TEMP}{$array[2]}{external_name} ne "unknown" ? " (".$hash->{helper}{TEMP}{$array[2]}{external_name}.")" : "");
+                }
             }
         }    
+        
+        $hash->{helper}{TEMP}{$array[2]}{".last-event"} = $array[1];
         
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash, "event", lc($array[1]));
         
         foreach my $key (keys %{$hash->{helper}{TEMP}{$array[2]}})
         {
-            readingsBulkUpdate($hash, $key, $hash->{helper}{TEMP}{$array[2]}{$key}) unless($key eq "call_id");
-        }   
-        
-        if(AttrVal($name, "unique-call-ids", "0") eq "1" and exists($hash->{helper}{TEMP}{$array[2]}{call_id}))
-        {
-            readingsBulkUpdate($hash, "call_id", $hash->{helper}{TEMP}{$array[2]}{call_id});
-        }
-        else
-        {
-            readingsBulkUpdate($hash, "call_id", $array[2]);
+            readingsBulkUpdate($hash, $key, $hash->{helper}{TEMP}{$array[2]}{$key}) unless($key =~ /^\./);
         }
         
         if($array[1] eq "DISCONNECT")
@@ -1790,6 +1791,11 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     <br><br>To specify an interval spawning midnight, you have to specify two intervals, e.g.:
     <pre>23:00-24:00 00:00-01:00</pre>
     Default Value is <i>empty</i> (no intervals defined, FB_CALLMONITOR is always active)<br><br>
+    <li><a name="FB_CALLMONITOR_answMachine-is-missed-call">answMachine-is-missed-call</a></li>
+    If activated, a incoming call, which is answered by an answering machine, will be treated as missed call (see <a href="#FB_CALLMONITOR_events">Generated Events</a>).
+    <br><br>
+    Possible values: 0 => disabled, 1 => enabled (answering machine calls will be treated as "missed call").<br>
+    Default Value is 0 (disabled)<br><br>
     <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,textfile,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
     Enables the reverse searching of the external number (at dial and call receiving).
     This attribute contains a comma separated list of providers which should be used to reverse search a name to a specific phone number. 
@@ -1858,8 +1864,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
   <li><b>external_connection</b> - The external connection (fixed line, VoIP account) which is used to take or perform the call</li>
   <li><b>call_duration</b> - The call duration in seconds. Is only generated at a disconnect event. The value 0 means, the call was not taken by anybody.</li>
   <li><b>call_id</b> - The call identification number to separate events of two or more different calls at the same time. This id number is equal for all events relating to one specific call.</li>
-  <li><b>missed_call</b> - This event will be raised in case of a missing incoming call. If available, also the name of the calling number will be displayed.</li>
-  <li><b>missed_call_line</b> - Will be raised together with "missed_call". It shows the number of the internal line which received the missed call.</li> 
+  <li><b>missed_call</b> - This event will be raised in case of a incoming call, which is not answered. If available, also the name of the calling number will be displayed.</li>
   </ul>
   <br>
   <b>Legal Notice:</b><br><br>
@@ -1940,6 +1945,11 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     Um einen Intervall um Mitternacht zu spezifizieren, muss man zwei einzelne Intervalle angeben, z.Bsp.:
     <pre>23:00-24:00 00:00-01:00</pre>
     Standardwert ist <i>nicht gesetzt</i> (dauerhaft aktiv)<br><br>
+    <li><a name="FB_CALLMONITOR_answMachine-is-missed-call">answMachine-is-missed-call</a></li>
+    Sofern aktiviert, werden Anrufe, welche durch einen internen Anrufbeantworter beantwortet werden, als "unbeantworteter Anruf" gewertet (siehe Reading "missed_call" unter <a href="#FB_CALLMONITOR_events">Generated Events</a>).
+    <br><br>
+    M&ouml;gliche Werte: 0 => deaktiviert, 1 => aktiviert (Anrufbeantworter gilt als "unbeantworteter Anruf").<br>
+    Standardwert ist 0 (deaktiviert)<br><br>
     <li><a name="FB_CALLMONITOR_reverse-search">reverse-search</a> (phonebook,klicktel.de,dasoertliche.de,search.ch,dasschnelle.at)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer (bei eingehenden/ausgehenden Anrufen).
     Dieses Attribut enth&auml;lt eine komma-separierte Liste mit allen Anbietern die f&uuml;r eine R&uuml;ckw&auml;rtssuche benutzt werden sollen.
@@ -2010,14 +2020,13 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
   <li><b>event</b> (call|ring|connect|disconnect) - Welches Event wurde genau ausgel&ouml;st. ("call" =&gt; ausgehender Rufversuch, "ring" =&gt; eingehender Rufversuch, "connect" =&gt; Gespr&auml;ch ist zustande gekommen, "disconnect" =&gt; es wurde aufgelegt)</li>
   <li><b>direction</b> (incoming|outgoing) - Die Anruf-Richtung ("incoming" =&gt; eingehender Anruf, "outgoing" =&gt; ausgehender Anruf)</li>
   <li><b>external_number</b> - Die Rufnummer des Gegen&uuml;bers, welcher anruft (event: ring) oder angerufen wird (event: call)</li>
-  <li><b>external_name</b> - Das Ergebniss der R&uuml;ckw&auml;rtssuche (sofern aktiviert). Im Fehlerfall kann diese Reading auch den Inhalt "unknown" (keinen Eintrag gefunden) oder "timeout" (Zeit&uuml;berschreitung bei der Abfrage) enthalten. Im Falle einer Zeit&uuml;berschreitung und aktiviertem Caching, wird die Rufnummer beim n&auml;chsten Mal erneut gesucht.</li>
+  <li><b>external_name</b> - Das Ergebniss der R&uuml;ckw&auml;rtssuche (sofern aktiviert). Im Fehlerfall kann diese Reading auch den Inhalt "unknown" (keinen Eintrag gefunden) enthalten. Im Falle einer Zeit&uuml;berschreitung bei der R&uuml;ckw&auml;rtssuche und aktiviertem Caching, wird die Rufnummer beim n&auml;chsten Mal erneut gesucht.</li>
   <li><b>internal_number</b> - Die interne Rufnummer (Festnetz, VoIP-Nummer, ...) auf welcher man angerufen wird (event: ring) oder die man gerade nutzt um jemanden anzurufen (event: call)</li>
   <li><b>internal_connection</b> - Der interne Anschluss an der Fritz!Box welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren (FON1, FON2, ISDN, DECT, ...)</li>
   <li><b>external_connection</b> - Der externe Anschluss welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren  (Festnetz, VoIP Nummer, ...)</li>
   <li><b>call_duration</b> - Die Gespr&auml;chsdauer in Sekunden. Dieser Wert wird nur bei einem disconnect-Event erzeugt. Ist der Wert 0, so wurde das Gespr&auml;ch von niemandem angenommen.</li>
   <li><b>call_id</b> - Die Identifizierungsnummer eines einzelnen Gespr&auml;chs. Dient der Zuordnung bei zwei oder mehr parallelen Gespr&auml;chen, damit alle Events eindeutig einem Gespr&auml;ch zugeordnet werden k&ouml;nnen</li>
   <li><b>missed_call</b> - Dieses Event wird nur generiert, wenn ein eingehender Anruf nicht beantwortet wird. Sofern der Name dazu bekannt ist, wird dieser ebenfalls mit angezeigt.</li>
-  <li><b>missed_call_line</b> - Analog zu "missed_call" wird dieses Event nur generiert, wenn ein eingehender Anruf nicht beantwortet wird. Es zeigt die Rufnummer an &uuml;ber, den dieser unbeantwortete Anruf eingegangen ist.</li>
   </ul>
   <br>
   <b>Rechtlicher Hinweis:</b><br><br>
