@@ -434,7 +434,7 @@ EOF
     define a13 at *07:00 set lamp1,lamp2 on-till {sunrise(+600)}
 
     # Switch the lamp off 2 minutes after sunrise each day
-    define a14 at +{sunrise(+120)} set lamp on
+    define a14 at *{sunrise(+120)} set lamp on
 
     # Switch lamp1 on at sunset, not before 18:00 and not after 21:00
     define a15 at *{sunset(0,"18:00","21:00")} set lamp1 on
@@ -600,7 +600,7 @@ EOF
     define a13 at *07:00 set lamp1,lamp2 on-till {sunrise(+600)}
 
     # Schalte lamp jeden Tag 2 Minuten nach Sonnenaufgang aus
-    define a14 at +{sunrise(+120)} set lamp on
+    define a14 at *{sunrise(+120)} set lamp on
 
     # Schalte lamp1 zum Sonnenuntergang ein, aber nicht vor 18:00 und nicht nach 21:00
     define a15 at *{sunset(0,"18:00","21:00")} set lamp1 on
