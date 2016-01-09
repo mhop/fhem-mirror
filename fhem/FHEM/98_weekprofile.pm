@@ -149,16 +149,29 @@ sub weekprofile_readDevProfile(@)
   return "" if (!defined ($type));
   
   my $prf = {};
+  my $logDaysWarning="";
+  my $logDaysCnt=0;
   foreach my $day (@shortDays){
     my ($dayTimes, $dayTemps) = weekprofile_readDayProfile($device,$day,$type,$me);
     if (scalar(@{$dayTemps})==0) {
       push(@{$dayTimes}, "24:00");
       push(@{$dayTemps}, "18.0");
-      Log3 $me, 3, "WARNING master device $device has no day profile for $day - create default";
+      $logDaysWarning .= "\n" if ($logDaysCnt>0);
+      $logDaysWarning .= "WARNING master device $device has no day profile for $day - create default";
+      $logDaysCnt++;
     }
     $prf->{$day}->{"temp"} = $dayTemps;
     $prf->{$day}->{"time"} = $dayTimes;
   }
+  
+  if ( ($logDaysCnt>0) && ($logDaysCnt<(@shortDays)) ) {
+    Log3 $me, 3, $logDaysWarning;
+  }  else {
+    if ($logDaysCnt == (@shortDays)) {
+      Log3 $me, 3, "WARNING master device $device has no week profile - create default";
+    }
+  }
+  
   return $prf;
 }
 ############################################## 
@@ -205,7 +218,7 @@ sub weekprofile_sendDevProfile(@)
     my $equal = 1;
     for (my $i = 0; $i < $tmpCnt; $i++) {
       if ( ($prf->{DATA}->{$day}->{"temp"}[$i] ne $devPrf->{$day}->{"temp"}[$i] ) ||
-            $prf->{DATA}->{$day}->{"time"}[$i] ne $devPrf->{$day}->{"time"}[$i] ) {        
+            $prf->{DATA}->{$day}->{"time"}[$i] ne $devPrf->{$day}->{"time"}[$i] ) {
         $equal = 0; 
         last;
       }
@@ -253,10 +266,14 @@ sub weekprofile_sendDevProfile(@)
       $k++;
     }
   }
-  $cmd =~ s/^\s+|\s+$//g if ($cmd);
-  Log3 $me, 4, "$me(sendDevProfile): $cmd";
-  fhem($cmd);
-  return undef;
+  
+  my $ret = undef;
+  if ($cmd) {
+    $cmd =~ s/^\s+|\s+$//g; 
+    Log3 $me, 4, "$me(sendDevProfile): $cmd";
+    $ret = fhem($cmd);
+  }
+  return $ret;
 }
 
 ##############################################
