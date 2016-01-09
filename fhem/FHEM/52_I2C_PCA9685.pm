@@ -118,10 +118,10 @@ sub I2C_PCA9685_Init($$) {													#
 	I2C_PCA9685_Attr(undef, $name, "modreg1", AttrVal($name, "modreg1", ""));
 	I2C_PCA9685_Attr(undef, $name, "modreg2", AttrVal($name, "modreg2", ""));
 	#alternative I2C Adressen wiederherstellen
-	I2C_PCA9685_I2CSet($hash,AttrVal($name, "subadr1", $defaultreg{'sub1'})		<< 1, 2) if defined AttrVal($name, "subadr1", undef);
-	I2C_PCA9685_I2CSet($hash,AttrVal($name, "subadr2", $defaultreg{'sub2'})		<< 1, 3) if defined AttrVal($name, "subadr2", undef);
-	I2C_PCA9685_I2CSet($hash,AttrVal($name, "subadr3", $defaultreg{'sub3'})		<< 1, 4) if defined AttrVal($name, "subadr3", undef);
-	I2C_PCA9685_I2CSet($hash,AttrVal($name, "allcalladr", $defaultreg{'allc'})	<< 1, 5) if defined AttrVal($name, "allcalladr", undef);
+	I2C_PCA9685_i2cwrite($hash,AttrVal($name, $defaultreg{'sub1'}, "subadr1")		<< 1, 2) if defined AttrVal($name, "subadr1", undef);
+	I2C_PCA9685_i2cwrite($hash,AttrVal($name, $defaultreg{'sub2'}, "subadr2")		<< 1, 3) if defined AttrVal($name, "subadr2", undef);
+	I2C_PCA9685_i2cwrite($hash,AttrVal($name, $defaultreg{'sub3'}, "subadr3")		<< 1, 4) if defined AttrVal($name, "subadr3", undef);
+	I2C_PCA9685_i2cwrite($hash,AttrVal($name, $defaultreg{'allc'}, "allcalladr")	<< 1, 5) if defined AttrVal($name, "allcalladr", undef);
 	#PWM Frequenz wiederherstellen
 	I2C_PCA9685_Attr(undef, $name, "prescale", AttrVal($name, "prescale", $defaultreg{'presc'})) if defined AttrVal($name, "prescale", undef);
 	#Portzustände wiederherstellen
@@ -131,9 +131,6 @@ sub I2C_PCA9685_Init($$) {													#
 	$hash->{STATE} = 'Initialized';
 	return;
 }
-
-{"RX: ". ReadingsVal($name,'RX',"-") . " / TX: ". ReadingsVal($name,'TX',"-")}
-
 #############################################################################
 sub I2C_PCA9685_Catch($) {													#
 	my $exception = shift;
@@ -183,16 +180,16 @@ sub I2C_PCA9685_Attr(@) {													#
 			unless(looks_like_number($val) && $val >= 0 && $val < 256);
 		my $modereg1 = defined $hash->{confregs}{0} ? $hash->{confregs}{0} : $defaultreg{'modreg1'};
 		my $modereg1mod = ( $modereg1 & 0x7F ) | $mr1{ "SLEEP" };
-		$msg = I2C_PCA9685_I2CSet($hash,$modereg1mod, 0);	#sleep Mode aktivieren
-		$msg .= I2C_PCA9685_I2CSet($hash,$val, 254);		#Frequenz aktualisieren
-		$msg .= I2C_PCA9685_I2CSet($hash,$modereg1, 0);		#sleep Mode wieder aus
+		$msg = I2C_PCA9685_i2cwrite($hash, 0, $modereg1mod);	#sleep Mode aktivieren
+		$msg .= I2C_PCA9685_i2cwrite($hash, 254 ,$val);			#Frequenz aktualisieren
+		$msg .= I2C_PCA9685_i2cwrite($hash, 0 ,$modereg1);		#sleep Mode wieder aus
 		#Log3 $hash, 1, "testprescale: $modereg1 | $modereg1mod | $val";
 	} elsif ($attr && $attr =~ m/^(subadr[1-3])|allcalladr$/i) {
 		substr($attr,0,6,"");										#weitere I2C Adressen
 		my $regaddr = ($attr =~ m/^l/i) ? 5 : $attr + 1;
 		my $subadr  = $val =~ /^0.*$/ ? oct($val) : $val;
 		return "I2C Address not valid" if $subadr > 127;
-		$msg = I2C_PCA9685_I2CSet($hash,$subadr << 1,$regaddr);
+		$msg = I2C_PCA9685_i2cwrite($hash, $regaddr ,$subadr << 1);
 	} elsif ($attr && $attr =~ m/^modreg1$/i) {						#Mode register 1
 		my @inp = split(/,/, $val) if defined($val);
 		my $data = 32; 				# Auto increment soll immer gesetzt sein
@@ -204,16 +201,16 @@ sub I2C_PCA9685_Attr(@) {													#
 				my $modereg1 = defined $hash->{confregs}{0} ? $hash->{confregs}{0} : $defaultreg{'modreg1'};
 				my $modereg1mod = ( $modereg1 & 0x7F ) | $mr1{ "SLEEP" };
 				Log3 $hash, 5, "$hash->{NAME}: sleep Mode aktivieren (Vorbereitung fuer EXTCLK)";
-				$msg = I2C_PCA9685_I2CSet($hash,$modereg1mod, 0);	#sleep Mode aktivieren
+				$msg = I2C_PCA9685_i2cwrite($hash, 0 ,$modereg1mod);	#sleep Mode aktivieren
 				$data += $mr1{"SLEEP"};
 			}
 		}
 		#my $modereg1 = defined $hash->{confregs}{0} ? $hash->{confregs}{0} : $defaultreg{'modreg1'};
 		#Log3 $hash, 1, "test1: " . ($hash->{confregs}{0} & $mr1{"EXTCLK"}) . "|" . $hash->{confregs}{0} ."|". $mr1{"EXTCLK"} . " test2: ". ($data & $mr1{"EXTCLK"}) ."|" . $data ."|". $mr1{"EXTCLK"};
 		if ( defined $hash->{confregs}{0} && ($hash->{confregs}{0} & $mr1{"EXTCLK"}) == $mr1{"EXTCLK"} && ($data & $mr1{"EXTCLK"}) == 0 ) {  #reset wenn EXTCLK abgeschaltet wird
-			$msg = I2C_PCA9685_I2CSet($hash, $data | 0x80, 0);
+			$msg = I2C_PCA9685_i2cwrite($hash, 0 , $data | 0x80);
 		}
-		$msg = I2C_PCA9685_I2CSet($hash, $data, 0);
+		$msg = I2C_PCA9685_i2cwrite($hash, 0 , $data);
 	} elsif ($attr && $attr =~ m/^modreg2$/i) {						#Mode register 2
 		my @inp = split(/,/, $val) if defined($val);
 		my $data = 0; 						# Auto increment soll immer gesetzt sein
@@ -222,7 +219,7 @@ sub I2C_PCA9685_Attr(@) {													#
 				unless(exists($mr2{$_}));
 			$data += $mr2{$_};
 		}
-		$msg = I2C_PCA9685_I2CSet($hash, $data, 1);
+		$msg = I2C_PCA9685_i2cwrite($hash, 1, $data);
 	} elsif ($attr && $attr eq "OnStartup") {
 	# Das muss noch angepasst werden !!!!!!!!!!!!!!!!!!!!
 	if (defined $val) {
@@ -240,61 +237,57 @@ sub I2C_PCA9685_Attr(@) {													#
 }
 #############################################################################
 sub I2C_PCA9685_Set($@) {													#
-	my ($hash, @a) = @_;
-	my $name = $a[0];
-	my $port = $a[1];
-	my $val  = $a[2];
-	unless (@a == 3) {
-	
-	}
-	my $msg;
+	my ($hash, $name, @a) = @_;
+	my $port = $a[0];
+	my $val  = $a[1];
+
 	my $dimstep = AttrVal($name, "dimstep", "1");
 	my $dimcount = AttrVal($name, "dimcount", "4095");
+	my $msg;
+
+	#my $str = join(" ",@a);
+	#if ($str $$ $str =~ m/^(P(ort|)((0|)[0-9]|1[0-5])) $/i) {														# mehrere Port (unfertig)
+	#	
+	#	if (index($str, ',') != -1) {											# wenn mehrere Kanaele gesetzt werden sollen
+	#		my @einzel = split(',', $str);
+	#		my (undef, $tval, $tdval) = split(' ', $einzel[$#einzel]);			# Dimmwerte von letztem Eintrag sichern 
+	#		Log3 $hash, 1, "Tempval: $tval | $tdval";
+	#		foreach (reverse @einzel) {
+	#			my @cmd = split(' ', $_);
+	#			my ($dim, $delay);
+	#			my $port = $cmd[0];
+	#			$port =~ tr/P(ort|)//d;
+	#			if (defined($cmd[1])) {
+	#				$dim  = $cmd[1];
+	#				$delay = $cmd[2];
+	#			} else {
+	#				$dim  = $tval;
+	#				$delay = $tdval;
+	#			}
+	#			Log3 $hash, 1, "Werte fuer $port: $dim | $delay";
+	#			#hier
+	#			
+	#			
+	#		}
+	#	}
+	#}
 	
-	if ( $port && $port =~ m/^(Port((0|)[0-9]|1[0-5]))|(All)$/i) {		#wenn ein Port oder alle
+	if ( $port && $port =~ m/^(P(ort|)((0|)[0-9]|1[0-5]))|(All)$/i) {			# wenn ein Port oder alle
 		return "wrong value: $val for \"set $name $port\" use one of: " . 
 			join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) .
 			" 0..$dimcount"
 			unless(exists($setsP{$val}) || ($val >= 0 && $val <= $dimcount));
-		($port =~ m/^All$/i) ? $port = 61 : substr($port,0,4,"");		#Portnummer extrahieren oder 61 für All setzen
-		my $reg = 6 + 4 * $port;								#Nummer des entspechenden LEDx_ON_L Registers (LED0_ON_L = 0x06) jede LED hat 4 Register
-		my $data;
-		if ($val eq "on") {
-			$data = "0 16 0 0";
-		} elsif ($val eq "off") {
-			$data = "0 0 0 16";
-		} else {
-			my $delaytime = 0;
-			if ($dimcount < 4095) {				#DimmWert anpassen bei anderem Faktor
-				$val = int($val * 4095 / $dimcount);
-			}
-			if (defined $a[3]) {					#Delaytime angegeben?
-				return "wrong delay value: $a[3] for \"set $name Port$port $val $a[3]\" use value between 0 and $dimcount"
-					unless ($a[3] >= 0 && $a[3] <= $dimcount);
-				if ($dimcount < 4095) {			#DelayWert anpassen bei anderem Faktor
-					$a[3] = int($a[3] * 4095 / $dimcount);
-				}
-				$delaytime = $a[3]
-			} else {							#...wenn nicht aus Reading holen (für all kommt immer 0 raus)
-				$delaytime = ReadingsVal($name,'Port_d'.sprintf ('%02d', $port),"0");
-			}
-			my $LEDx_OFF = $delaytime + $val - (( $val + $delaytime < 4096 ) ? 0 : 4096);
-			if ($LEDx_OFF == $delaytime) { 		#beide Register dürfen nicht gleichen Inhalt haben, das entpricht "aus"
-				$data = "0 0 0 16";
-			} else {
-				my @LEDx = unpack("C*", pack("S", $delaytime));
-				push @LEDx, unpack("C*", pack("S", $LEDx_OFF));		#Array $LEDx[0] = LEDx_ON_L, $LEDx[1] = LEDx_ON_H, $LEDx[2] = LEDx_OFF_L, $LEDx[3] = LEDx_OFF_H
-				$data = sprintf "%01d " x 4, @LEDx;
-			}
-		}
-		$msg = I2C_PCA9685_I2CSet($hash,$data,$reg);
+		($port =~ m/^All$/i) ? $port = 61 : $port =~ tr/P(ort|)//d;			# Portnummer extrahieren oder 61 für All setzen (All Startreg ist 250)
+		my $reg = 6 + 4 * $port;											# Nummer des entspechenden LEDx_ON_L Registers (LED0_ON_L = 0x06) jede LED hat 4 Register
+		my $data = I2C_PCA9685_CalcRegs($hash, $port, $val, $a[2]);			# Registerinhalte berechnen
+		$msg = I2C_PCA9685_i2cwrite($hash,$reg, $data);						# Rausschicken
 	} else {	
 		my $list = undef;
 		foreach (0..15) {
 			$list .= "Port" . sprintf ('%02d', $_) . ":slider,0,$dimstep,$dimcount ";
 		}
 		$list .= "all:slider,0,$dimstep,$dimcount";
-		$msg = "Unknown argument $a[1], choose one of " . $list;
+		$msg = "Unknown argument $a[0], choose one of " . $list;
 	}
 	return defined $msg ? $msg : undef 
 }
@@ -313,34 +306,93 @@ sub I2C_PCA9685_Set($@) {													#
 		#sprintf "%02X " x 4 . "\n", @octets;
 		# prints: 00 00 07 D1
 #############################################################################
-sub I2C_PCA9685_I2CSet {													# I2CWrtFn vom IODev aufrufen !!!!!wieder auf IODev umleiten!!!
-	my ($hash, $data, $reg) = @_;
-	
-	if (defined (my $iodev = $hash->{IODev})) {
-			CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-				direction  	=> "i2cwrite",
-				i2caddress 	=> $hash->{I2C_Address},
-				reg 		=> $reg,
-				data 		=> $data,
-				}) if (defined $hash->{I2C_Address});
+sub I2C_PCA9685_CalcRegs($$$$) {											# Registerinhalte berechnen
+	my ($hash, $port, $val, $del) = @_;
+	my $dimcount = AttrVal($hash->{NAME}, "dimcount", "4095");
+	my $data;
+	if ($val eq "on") {
+		$data = "0 16 0 0";
+	} elsif ($val eq "off") {
+		$data = "0 0 0 16";
 	} else {
-		I2C_PCA9685_UpdReadings($hash, $reg, $data);		# Zeile zum testen (Werte werden direkt zu I2CRec umgeleitet)
-		#return "no IODev assigned to '$hash->{NAME}'";
+		my $delaytime = 0;
+		if ($dimcount < 4095) {				#DimmWert anpassen bei anderem Faktor
+			$val = int($val * 4095 / $dimcount);
+		}
+		if (defined $del) {					#Delaytime angegeben?
+			return "wrong delay value: $del for \"set $hash->{NAME} Port$port $val $del\" use value between 0 and $dimcount"
+				unless ($del >= 0 && $del <= $dimcount);
+			if ($dimcount < 4095) {			#DelayWert anpassen bei anderem Faktor
+				$del = int($del * 4095 / $dimcount);
+			}
+			$delaytime = $del
+		} else {							#...wenn nicht aus Reading holen (für all kommt immer 0 raus)
+			$delaytime = ReadingsVal($hash->{NAME},'Port_d'.sprintf ('%02d', $port),"0");
+		}
+		my $LEDx_OFF = $delaytime + $val - (( $val + $delaytime < 4096 ) ? 0 : 4096);
+		if ($LEDx_OFF == $delaytime) { 		#beide Register dürfen nicht gleichen Inhalt haben, das entpricht "aus"
+			$data = "0 0 0 16";
+		} else {
+			my @LEDx = unpack("C*", pack("S", $delaytime));
+			push @LEDx, unpack("C*", pack("S", $LEDx_OFF));		#Array $LEDx[0] = LEDx_ON_L, $LEDx[1] = LEDx_ON_H, $LEDx[2] = LEDx_OFF_L, $LEDx[3] = LEDx_OFF_H
+			$data = sprintf "%01d " x 4, @LEDx;
+		}
 	}
+	return $data;
 }
 #############################################################################
-sub I2C_PCA9685_Get($@) {													# ---- wie beim reload der Detailseite ausführen
+sub I2C_PCA9685_Get($@) {													# Portwerte bei laden der Datailseite aktualisieren
 	my ($hash, @a) = @_;
-	my $name =$a[0];
 
-	my %sendpackage = ( i2caddress => $hash->{I2C_Address}, direction => "i2cread" );
-	$sendpackage{reg} = 0x6; 						#startadresse zum lesen
-	$sendpackage{nbyte} = 63;
-	return "$name: no IO device defined" unless ($hash->{IODev});
-	my $phash = $hash->{IODev};
-	my $pname = $phash->{NAME};
-	CallFn($pname, "I2CWrtFn", $phash, \%sendpackage);
+
+	I2C_PCA9685_i2cread($hash, 0x6, 64);
+	return;
 	
+	#my $name =$a[0];
+	#my %sendpackage = ( i2caddress => $hash->{I2C_Address}, direction => "i2cread" );
+	#$sendpackage{reg} = 0x6; 						#startadresse zum lesen
+	#$sendpackage{nbyte} = 64;
+	#return "$name: no IO device defined" unless ($hash->{IODev});
+	#my $phash = $hash->{IODev};
+	#my $pname = $phash->{NAME};
+	#CallFn($pname, "I2CWrtFn", $phash, \%sendpackage);
+	
+}
+#############################################################################
+sub I2C_PCA9685_i2cread($$$) {												# Lesebefehl an Hardware absetzen (antwort kommt in I2C_*****_I2CRec an)
+	my ($hash, $reg, $nbyte) = @_;
+	if (defined (my $iodev = $hash->{IODev})) {
+		Log3 $hash, 5, "$hash->{NAME}: $hash->{I2C_Address} read $nbyte Byte from Register $reg";
+		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
+		direction 	=> "i2cread",
+		i2caddress	=> $hash->{I2C_Address},
+		reg 		=> $reg,
+		nbyte 		=> $nbyte
+		});
+	} else {
+		if (AttrVal($hash->{NAME}, "dummy", 0) == 1) {
+			Log3 $hash, 1, "attr dummy -> kann nix lesen"; 
+		} else {
+			return "no IODev assigned to '$hash->{NAME}'";
+		}	}
+}
+#############################################################################
+sub I2C_PCA9685_i2cwrite($$$) {												# Schreibbefehl an Hardware absetzen
+	my ($hash, $reg, @data) = @_;
+	if (defined (my $iodev = $hash->{IODev})) {
+		Log3 $hash, 5, "$hash->{NAME}: $hash->{I2C_Address} write join (' ',@data) to Register $reg";
+		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
+		direction  	=> "i2cwrite",
+		i2caddress 	=> $hash->{I2C_Address},
+		reg 		=> $reg,
+		data => join (' ',@data),
+		});
+	} else {
+		if (AttrVal($hash->{NAME}, "dummy", 0) == 1) {
+			I2C_PCA9685_UpdReadings($hash, $reg, @data);		# Zeile zum testen (Werte werden direkt zu I2CRec umgeleitet)
+		} else {
+			return "no IODev assigned to '$hash->{NAME}'";
+		}	}
 }
 #############################################################################
 sub I2C_PCA9685_I2CRec($@) {												# vom IODev aufgerufen
@@ -353,11 +405,7 @@ sub I2C_PCA9685_I2CRec($@) {												# vom IODev aufgerufen
 	} 
 	if ($clientmsg->{direction} && defined($clientmsg->{reg}) && $clientmsg->{$pname . "_SENDSTAT"} && $clientmsg->{$pname . "_SENDSTAT"} eq "Ok") {
 		if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) {
-			my @rec = split(" ",$clientmsg->{received});
-			Log3 $hash, 3, "$name: wrong amount of registers transmitted from $pname" unless (@rec == $clientmsg->{nbyte});
-			foreach (reverse 0..$#rec) {															#reverse, damit Inputs (Register 0 und 1 als letztes geschrieben werden)
-				I2C_PCA9685_UpdReadings($hash, $_ + $clientmsg->{reg} , $rec[$_]);
-			}
+			I2C_PCA9685_UpdReadings($hash, $clientmsg->{reg} , $clientmsg->{received});
 			readingsSingleUpdate($hash,"state", "Ok", 1);
 		} elsif ( $clientmsg->{direction} eq "i2cwrite" && defined($clientmsg->{data}) ) { 			#readings aktualisieren wenn uebertragung ok
 			I2C_PCA9685_UpdReadings($hash, $clientmsg->{reg} , $clientmsg->{data});
@@ -403,10 +451,9 @@ sub I2C_PCA9685_CalcVal($@) {												# Readings aus Registerwerten berechnen
 	return $dimval, $delay;
 }
 ############################################################################# 
-sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Readings/Internals schreiben ---- WAS IST WENN MEHRERE PORTS AM STÜCK ABGEFRAGT WERDEN??? (evtl mit einzelabfrage zusammen)
+sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Readings/Internals schreiben
 	my ($hash, $reg, $inh) = @_;
 	my $name = $hash->{NAME};
-	#$inh = hex($inh);
 	#Log3 $hash, 1, "$name UpdReadings Start Register: " .sprintf("0x%.2X", $reg).", Inhalt: $inh";
 	my @reginh = split(" ", $inh);
 	my $dimstep = AttrVal($name, "dimstep", "1");
@@ -425,17 +472,17 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 		($dimval, $delay) = I2C_PCA9685_CalcVal($dimcount, @reginh);
 		readingsBulkUpdate($hash, 'Port'.$port , $dimval) if (ReadingsVal($name, 'Port'.$port, "failure") ne $dimval); #nur wenn Wert geaendert
 		readingsBulkUpdate($hash, 'Port_d'.$port , $delay) if (defined $delay && ReadingsVal($name, 'Port_d'.$port, "failure") ne $delay); #nur wenn Wert geaendert
+		Log3 $hash, 5, "$name: lese einen Port - Reg: $reg ; Inh: @reginh";
 	
-	# WAS IST WENN MEHRERE PORTS AM STÜCK ABGEFRAGT WERDEN???
-	} elsif ( $reg < 70 && $reg > 5 && @reginh > 4 ) {	
+	} elsif ( $reg < 70 && $reg > 5 && @reginh > 4 ) {					#Wenn alle Ports abgefragt werden
 		for (my $i = 0; $i < @reginh; $i++) {
 			next unless ( ($reg + $i - 2) / 4  =~ m/^\d+$/ );
-			my @regpart = [ $reginh[$i], $reginh[$i + 1], $reginh[$i + 2], $reginh[$i + 3] ];
+			my @regpart = ( $reginh[$i], $reginh[$i + 1], $reginh[$i + 2], $reginh[$i + 3] );
 			my $port = sprintf ('%02d', ($reg + $i - 6) / 4);
 			($dimval, $delay) = I2C_PCA9685_CalcVal($dimcount, @regpart);
 			readingsBulkUpdate($hash, 'Port'.$port , $dimval) if (ReadingsVal($name, 'Port'.$port, "failure") ne $dimval); #nur wenn Wert geaendert
 			readingsBulkUpdate($hash, 'Port_d'.$port , $delay) if (defined $delay && ReadingsVal($name, 'Port_d'.$port, "failure") ne $delay); #nur wenn Wert geaendert
-			Log3 $hash, 5, "$name: lese mehrere Ports - Reg: $reg ; i: $i; |$regpart[0]|$regpart[1]|$regpart[2]|$regpart[3]|";
+			Log3 $hash, 5, "$name: lese mehrere Ports - Reg: $reg ; i: $i; Inh: @regpart";
 			$i += 3;
 		}
 	} elsif ($reg == 254) { 											#wenn Frequenz Register
@@ -444,12 +491,12 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 	} elsif ( $reg >= 0 && $reg < 6 ) {									#Konfigurations Register
 		$hash->{confregs}{$reg} = $inh;
 		#folgendes evtl noch weg
-		$hash->{CONF} = (defined $hash->{confregs}{0} ? sprintf('0x%.2X ', $hash->{confregs}{0}) : "0x__ ") . 
-						(defined $hash->{confregs}{1} ? sprintf('0x%.2X ', $hash->{confregs}{1}) : "0x__ ") .
-						(defined $hash->{confregs}{2} ? sprintf('0x%.2X ', $hash->{confregs}{2}) : "0x__ ") .
-						(defined $hash->{confregs}{3} ? sprintf('0x%.2X ', $hash->{confregs}{3}) : "0x__ ") .
-						(defined $hash->{confregs}{4} ? sprintf('0x%.2X ', $hash->{confregs}{4}) : "0x__ ") .
-						(defined $hash->{confregs}{5} ? sprintf('0x%.2X ', $hash->{confregs}{5}) : "0x__ ");
+		#$hash->{CONF} = (defined $hash->{confregs}{0} ? sprintf('0x%.2X ', $hash->{confregs}{0}) : "0x__ ") . 
+		#				(defined $hash->{confregs}{1} ? sprintf('0x%.2X ', $hash->{confregs}{1}) : "0x__ ") .
+		#				(defined $hash->{confregs}{2} ? sprintf('0x%.2X ', $hash->{confregs}{2}) : "0x__ ") .
+		#				(defined $hash->{confregs}{3} ? sprintf('0x%.2X ', $hash->{confregs}{3}) : "0x__ ") .
+		#				(defined $hash->{confregs}{4} ? sprintf('0x%.2X ', $hash->{confregs}{4}) : "0x__ ") .
+		#				(defined $hash->{confregs}{5} ? sprintf('0x%.2X ', $hash->{confregs}{5}) : "0x__ ");
 	}
 	readingsEndUpdate($hash, 1);
 	return;
@@ -508,6 +555,7 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 		<br><br>
 		refreshes all readings
 	</ul><br>
+
 
 	<a name="I2C_PCA9685Attr"></a>
 	<b>Attributes</b>
@@ -634,6 +682,7 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 		<br><br>
 		Aktualisierung aller Werte
 	</ul><br>
+
 
 	<a name="I2C_PCA9685Attr"></a>
 	<b>Attribute</b>
