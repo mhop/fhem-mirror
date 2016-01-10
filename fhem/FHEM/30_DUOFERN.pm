@@ -5,6 +5,7 @@ package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 my %devices = (
     "40"    => "RolloTron Standard",
@@ -340,7 +341,8 @@ sub
 DUOFERN_Set($@)
 {
   my ($hash, @a) = @_;
-
+  my @b = @a;
+  
   return "set $hash->{NAME} needs at least one parameter" if(@a < 2);
 
   my $me   = shift @a;
@@ -368,8 +370,8 @@ DUOFERN_Set($@)
   my $blindsMode=ReadingsVal($name, "blindsMode", "off");
   %sets = (%sets, %setsBlinds)    if ($blindsMode eq "on");
   
-  return join(" ", sort keys %sets) if ($cmd eq "?");
-
+  my $list =  join(" ", sort keys %sets);
+   
   if (exists $commandsStatus{$cmd}) { 
     my $buf = $duoStatusRequest;
     $buf =~ s/nn/$commandsStatus{$cmd}/;
@@ -480,8 +482,8 @@ DUOFERN_Set($@)
        
     return undef;
   }
-
-  return "Unknown argument $cmd, choose one of ". join(" ", sort keys %sets); 
+  
+  return SetExtensions($hash, $list, @b); 
 }
 
 #####################################
@@ -951,11 +953,15 @@ DUOFERN_Parse($$)
     if($msg =~ m/0FFF070801FF.*/) {
       readingsSingleUpdate($hash, "event", "beginnSun", 1);
     } elsif($msg =~ m/0FFF070901FF.*/) {
-         readingsSingleUpdate($hash, "event", "dusk", 1);
+      readingsSingleUpdate($hash, "event", "dusk", 1);
     } elsif($msg =~ m/0FFF070A0100.*/) {
-         readingsSingleUpdate($hash, "event", "endSun", 1);
+      readingsSingleUpdate($hash, "event", "endSun", 1);
     } elsif($msg =~ m/0FFF071301FF.*/) {
-         readingsSingleUpdate($hash, "event", "dawn", 1);
+      readingsSingleUpdate($hash, "event", "dawn", 1);
+    } elsif($msg =~ m/0FFF071E01FF.*/) {
+      readingsSingleUpdate($hash, "state", "off", 1);
+    } elsif($msg =~ m/0FFF071F01FF.*/) {
+      readingsSingleUpdate($hash, "state", "on", 1);
          
     } elsif($msg =~ m/0FFF07(1A|18|19|01|02|03).*/) {
       my $button = substr($msg, 6, 2);
@@ -1017,7 +1023,7 @@ DUOFERN_Parse($$)
     my $sunHeight       =  hex(substr($msg, 16, 2)) - 90 ;
     my $temperature     = (hex(substr($msg, 18, 4)) & 0x7FFF)/10 - 40 ;
     my $isRaining       = (hex(substr($msg, 18, 4)) & 0x8000 ? 1 : 0);
-    my $wind            =  hex(substr($msg, 22, 4));
+    my $wind            =  hex(substr($msg, 22, 4)) & 0x02FF;
     
     my $state = "T: ".$temperature;
     $state .= " W: ".$wind;
@@ -1055,6 +1061,15 @@ DUOFERN_Parse($$)
     readingsBulkUpdate($hash, "time",   $hour.":".$minute.":".$second,      1);
     readingsEndUpdate($hash, 1); # Notify is done by Dispatch
   
+  } elsif ($msg =~ m/0FFF1323.{36}/) {
+    my $battery      = (hex(substr($msg,  8, 2)) <= 10 ? "low" : "ok");
+    my $batteryLevel =  hex(substr($msg,  8, 2));
+    
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "battery",          $battery,       1);
+    readingsBulkUpdate($hash, "batteryLevel",     $batteryLevel,  1);
+    readingsEndUpdate($hash, 1); # Notify is done by Dispatch
+
   } elsif ($msg =~ m/810003CC.{36}/) {
     $hash->{helper}{timeout}{t} = AttrVal($hash->{NAME}, "timeout", "60");    
     InternalTimer(gettimeofday()+$hash->{helper}{timeout}{t}, "DUOFERN_StatusTimeout", $hash, 0);
@@ -1168,6 +1183,9 @@ DUOFERN_StatusTimeout($)
     <li><b>off [timer]</b><br>
         Switch off the actor. If parameter <b>timer</b> is used the command will
         only be executed if timeAutomatic is activated.
+        </li><br>
+    <li>
+        <a href="#setExtensions">set extensions</a> are supported.
         </li><br>
     <li><b>level &lt;value&gt; [timer]</b><br>
         Set actor to a desired absolut level. If parameter <b>timer</b> is used the 
