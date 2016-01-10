@@ -27,6 +27,7 @@
 =head1 AUTHOR - Dirk Hoffmann
 	dirk@FHEM_Forum (forum.fhem.de)
 	modified for use with physical I2C devices by Klaus Wittstock (klausw)
+	modified to prevent division by zero when calibration data is invalid by Jens Beyer (jensb)
 =cut
 
 package main;
@@ -243,7 +244,7 @@ sub I2C_BMP180_Set($@) {
 	if ($cmd eq 'readValues') {
 		my $overSamplingSettings = AttrVal($hash->{NAME}, 'oversampling_settings', 3);
 		
-		if (defined($hash->{calibrationData}{ac1})) {	# query sensor
+		if (defined($hash->{calibrationData}{md}) && $hash->{calibrationData}{md} != 0 && $hash->{calibrationData}{ac4} != 0) {	# query sensor
 			I2C_BMP180_readUncompensatedTemperature($hash);
 			I2C_BMP180_readUncompensatedPressure($hash, $overSamplingSettings);
 		} else {																			#..but get calibration variables first
@@ -337,13 +338,15 @@ sub I2C_BMP180_GetPress ($$) {
 	
 	my $ut = $hash->{uncompTemp};
 	delete $hash->{uncompTemp};
-	my $up = ( ( ($raw[0] << 16) | ($raw[1] << 8) | $raw[2] ) >> (8 - $overSamplingSettings) );
+
+	return undef unless defined($hash->{calibrationData}{md}) && $hash->{calibrationData}{md} != 0 && $hash->{calibrationData}{ac4} != 0;
 
 	my $temperature = sprintf(
 		'%.' . AttrVal($hash->{NAME}, 'roundTemperatureDecimal', 1) . 'f',
 		I2C_BMP180_calcTrueTemperature($hash, $ut) / 10
 	);
 		
+	my $up = ( ( ($raw[0] << 16) | ($raw[1] << 8) | $raw[2] ) >> (8 - $overSamplingSettings) );
 	my $pressure = sprintf(
 		'%.' . AttrVal($hash->{NAME}, 'roundPressureDecimal', 1) . 'f',
 		I2C_BMP180_calcTruePressure($hash, $up, $overSamplingSettings) / 100
@@ -647,7 +650,19 @@ sub I2C_BMP180_DbLog_splitFn($) {
         attr global altitude 220
       </ul>
     </li>
-</ul>
+  </ul>
+  <br>
+
+  <b>Notes</b>
+  <ul>
+    <li>I2C bus timing<br>
+      For all sensor operations an I2C interface with blocking IO is assumed (e.g. RPII2C).
+      If you use an I2C interface with non-blocking IO (e.g. FRM over ethernet) operation errors may occur, 
+      especially if setting the attribute oversampling_settings to a value higher than 1.
+      This may be compensated depending on I2C interface used. For Firmata try setting the attribute
+      i2c-config in the FRM module to a value of about 30000 microseconds.<br><br>
+    </li>
+  </ul>
   <br>
 </ul>
 
@@ -695,7 +710,7 @@ sub I2C_BMP180_DbLog_splitFn($) {
   <b>Define</b>
   <ul>
     <code>define BMP180 &lt;BMP180_name&gt; &lt;I2C_device&gt;</code><br><br>
-    &lt;I2C device&gt; darf nicht verwendet werden, wenn der I2C Bus &uuml;ber das RPII2C Modul angesprochen wird. For HiPi ist es allerdings notwendig. <br>
+    &lt;I2C device&gt; darf nicht verwendet werden, wenn der I2C Bus &uuml;ber das RPII2C Modul angesprochen wird. F&uuml;r HiPi ist es allerdings notwendig. <br>
     <br>
     Beispiel:
     <pre>
@@ -750,12 +765,24 @@ sub I2C_BMP180_DbLog_splitFn($) {
       Default: 1, valid values: 0, 1, 2<br><br>
     </li>
     <li>altitude<br>
-      Wenn dieser Wert definiert ist, wird diese Angabe zus&auml; f&uuml;r die Berechnung des 
+      Wenn dieser Wert definiert ist, wird diese Angabe zus&auml;tzlich f&uuml;r die Berechnung des 
       Luftdrucks bezogen auf Meeresh&ouml;he (Normalnull) NN herangezogen.<br>
       Bemerkung: Dies ist ein globales Attribut.<br><br>
       <code>attr global altitude 220</code>
     </li>
-</ul>
+  </ul>
+  <br>
+  
+  <b>Hinweise</b>
+  <ul>
+    <li>I2C-Bustiming<br>
+      Zur Abfrage des Sensors wird von einer I2C-Schnittstelle mit blockierendem IO-Zugriff (z.B. RPII2C) ausgegangen. 
+      Bei I2C-Schnittstellen, die nicht-blockierend arbeiten (z.B. FRM mit Ethernet), kann es zu Verarbeitungsfehlern kommen, 
+      insbesondere wenn das Attribut oversampling_settings auf einen Wert gr&ouml;&szlig;er 1 eingestellt wird. 
+      Dies l&auml;sst sich je nach I2C-Schnittstelle kompensieren. Bei Firmata empfiehlt es sich,
+      das Attribut i2c-config im Modul FRM auf einen Wert von ca. 30000 Mikrosekunden einzustellen.<br><br>
+    </li>
+  </ul>
   <br>
 </ul>
 
