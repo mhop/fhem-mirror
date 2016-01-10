@@ -3,18 +3,12 @@
 package main;
 
 # TODO
-#   inclusion/exclusion
 #   resend in firmware
-#   neighborUpdate Class: 010404010c0001 010604000c0040 010700 0105
 #   static routing
+#   neighborUpdate Class: 010404010c0001 010604000c0040 010700 0105
 #   explorer frames
-#   implement security
+#   check security
 #   multicast
-# NIF:
-#zwcul:        0101 d3 9c01 10 01 5e25263370273281855972867a73ef5a82 (zwcul)
-#zme reporting:     1404    10 01 5e25263370273281855972867a73ef5a82
-#zme nodeInfo: 0141 d3 9c01 041001 
-
 
 use strict;
 use warnings;
@@ -34,13 +28,18 @@ sub ZWCUL_ProcessSendStack($);
 use vars qw(%zwave_id2class);
 
 my %sets = (
-  "reopen"     => "",
+  "reopen"     => { cmd=>"" },
+  "led"        => { cmd=>"l%02x", param=>{ on=>1, off=>0, blink=>2 } },
+  "addNode"    => { cmd=>"x%x", param => { on=>1, off=>0, onSec=>2 } },
+  "addNodeId"  => { cmd=>"x%x" },
+  "removeNode" => { cmd=>"x%x", param => { on=>1, off=>0 } },
   "raw"        => { cmd=> "%s" },
 );
 
 my %gets = (
   "homeId"     => { cmd=> "zi", regex => "^. [A-F0-9]{8} [A-F0-9]{2}\$" },
   "version"    => { cmd=> "V",  regex => "^V " },
+  "nodeInfo"   => { cmd=> "x%x" },
   "raw"        => { cmd=> "%s", regex => ".*" }
 );
 
@@ -83,8 +82,11 @@ ZWCUL_Define($$)
   $hash->{homeId} = lc($a[3]);
   $hash->{homeIdSet} = lc($a[3]);
   $hash->{nodeIdHex} = lc($a[4]);
-  $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm":"zr");
+  $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm4":"zr4");
+  $hash->{baudRate} = "40k";
   $hash->{monitor} = 1 if($hash->{homeIdSet} eq "00000000");
+  setReadingsVal($hash, "homeId",       # ZWDongle compatibility
+            "HomeId:$hash->{homeId} CtrlNodeId:$hash->{nodeIdHex}", TimeNow());
 
   $hash->{Clients} = ":ZWave:STACKABLE_CC:";
   my %matchList = ( "1:ZWave" => ".*",
@@ -156,6 +158,14 @@ ZWCUL_Undef($$)
   return undef;
 }
 
+sub
+ZWCUL_tmp9600($$)
+{
+  my ($hash, $on) = @_;
+  $hash->{baudRate} = ($on ? "9600" : AttrVal($hash->{NAME},"dataRate","40k"));
+  ZWCUL_SimpleWrite($hash, $on ? $on : $hash->{initString});
+}
+
 #####################################
 sub
 ZWCUL_cmd($$@)
@@ -167,8 +177,11 @@ ZWCUL_cmd($$@)
   my $cmdName = shift @a;
 
   if(!defined($cmdList->{$cmdName})) {
-    return "Unknown argument $cmdName, choose one of " .
-                join(" ",sort keys %{$cmdList});
+    my @r;
+    map { my $p = $cmdList->{$_}{param};
+          push @r,($p ? "$_:".join(",",sort keys %{$p}) : $_) }
+          sort keys %{$cmdList};
+    return "Unknown argument $cmdName, choose one of ".join(" ",@r);
   }
 
   Log3 $hash, 4, "ZWCUL $type $name $cmdName ".join(" ",@a);
@@ -185,6 +198,45 @@ ZWCUL_cmd($$@)
   my @ca = split("%", $cmd, -1);
   my $nargs = int(@ca)-1;
   return "$type $name $cmdName needs $nargs arguments" if($nargs != int(@a));
+
+  my $param = $cmdList->{$cmdName}{param};
+  if($param) {
+    return "invalid parameter $a[0] for $cmdName" if(!defined($param->{$a[0]}));
+    $a[0] = $param->{$a[0]};
+  }
+
+  if($cmdName =~ m/^addNode/) {
+    delete $hash->{removeNode};
+    delete $hash->{addNode};
+    if($cmdName eq "addNodeId") {
+      $hash->{addNode} = sprintf("%02x", $a[0]);
+    } else {
+      $hash->{addNode} = ZWCUL_getNextNodeId($hash) if($a[0]);
+      $hash->{addSecure} = 1 if($a[0] == 2);
+    }
+    Log3 $hash, 3, "ZWCUL going to assigning new node id $hash->{addNode}";
+    ZWCUL_tmp9600($hash, $a[0] ? "zm9" : 0); # expect random homeId
+    return;
+  }
+  if($cmdName eq "removeNode") {
+    delete $hash->{addNode};
+    delete $hash->{removeNode};
+    $hash->{removeNode} = $a[0] if($a[0]);
+    ZWCUL_tmp9600($hash, $a[0] ? "zr9" : 0);
+    return;
+  }
+  if($cmdName eq "nodeInfo") {
+    my $node = ZWCUL_getNode($hash, sprintf("%02x", $a[0]));
+    return "Node with decimal id $a[0] not found" if(!$node);
+    my $ni = ReadingsVal($node->{NAME}, "nodeInfo", undef);
+    return "No nodeInfo present" if(!$ni);
+    $ni = "0141${ni}041001";    # TODO: Remove fixed values
+    my @r = map { ord($_) } split("", pack('H*', $ni));
+    my $msg = zwlib_parseNodeInfo(@r);
+    setReadingsVal($hash, "nodeInfo_".$a[0], $msg, TimeNow());
+    return $msg;
+  }
+
   $cmd = sprintf($cmd, @a);
   ZWCUL_SimpleWrite($hash,  $cmd);
   
@@ -237,7 +289,7 @@ ZWCUL_Write($$$)
     $th->{sentIdx} = 0 if(!$th->{sentIdx} || $th->{sentIdx} == 15);
     $th->{sentIdx}++;
 
-    my $s100 = (AttrVal($hash->{NAME}, "dataRate", "40k") eq "100k");
+    my $s100 = ($hash->{baudRate} eq "100k");
 
     $msg = sprintf("%s%s41%02x%02x%s%s", 
                     $fn, $hash->{nodeIdHex}, $th->{sentIdx},
@@ -278,6 +330,46 @@ ZWCUL_Read($@)
 }
 
 sub
+ZWCUL_getNode($$)
+{
+  my ($hash, $id) = @_;
+  my @l = devspec2array(sprintf("TYPE=ZWave:".
+                "FILTER=homeId=%s:FILTER=nodeIdHex=%s", $hash->{homeId}, $id));
+  return undef if(!int(@l));
+  return $defs{$l[0]};
+}
+
+sub
+ZWCUL_getNextNodeId($)
+{
+  my ($hash) = @_;
+  my @l = devspec2array(sprintf(".*:FILTER=homeId=%s",$hash->{homeId}));
+  my %h = map { $defs{$_}{nodeIdHex} => 1 } @l;
+  for(my $i = 1; $i <= 232; $i++) {
+    my $s = sprintf("%02x", $i);
+    return $s if(!$h{$s});
+  }
+  Log 1, "NOTE: NO MORE nodeIDs available";
+  return "ff";
+}
+
+sub
+ZWCUL_assignId($$$$)
+{
+  my ($hash, $oldNodeId, $newHomeId, $newNodeId) = @_;
+
+  my $myHash;
+  my $key = "$hash->{homeIdSet} $oldNodeId";
+  if(!defined($modules{ZWave}{defptr}{$key})) {
+    $modules{ZWave}{defptr}{$key} = { nodeIdHex => $oldNodeId };
+    $myHash = 1;
+  }
+  ZWCUL_Write($hash, $hash->{homeIdSet}, 
+          sprintf("0013%s080103%s%s####", $oldNodeId, $newNodeId, $newHomeId));
+  delete $modules{ZWave}{defptr}{$key} if($myHash);
+}
+
+sub
 ZWCUL_Parse($$$$$)
 {
   my ($hash, $iohash, $name, $rmsg, $nodispatch) = @_;
@@ -298,7 +390,7 @@ ZWCUL_Parse($$$$$)
 
   $rmsg = lc($rmsg);
   my $me = $hash->{NAME};
-  my $s100 = (AttrVal($me, "dataRate", "40k") eq "100k");
+  my $s100 = ($hash->{baudRate} eq "100k");
 
   if($rmsg =~ m/^za(..)$/) {
     Log3 $hash, 5, "$me sent ACK to $1";
@@ -358,6 +450,20 @@ ZWCUL_Parse($$$$$)
   $hash->{homeId} = $H; # Fake homeId for monitor mode
 
   if(length($P)) {
+
+    if($hash->{removeNode} && $T eq "ff") {
+      ZWCUL_assignId($hash, $S, "00000000", "00");
+      $hash->{removeNode} = $S;
+      return;
+    }
+
+    if($hash->{addNode} && $T eq "ff" && $S eq "00" &&
+       $P =~ m/^0101(......)(..)..(.*)/) {
+      ZWCUL_assignId($hash, "00", $hash->{homeIdSet}, $hash->{addNode});
+      $hash->{addNodeParam} = $P;
+      return;
+    }
+
     $rmsg = sprintf("0004%s%s%02x%s", $S, $S, length($P)/2, $P);
     my $th = $modules{ZWave}{defptr}{"$H $S"};
 
@@ -366,7 +472,42 @@ ZWCUL_Parse($$$$$)
       $th = $modules{ZWave}{defptr}{"$H $S"};
     }
 
-  } else {
+
+  } else {      # ACK
+    if($hash->{removeNode} && $hash->{removeNode} eq $S) { #############
+      Log3 $hash, 3, "Node $S excluded from network";
+      delete $hash->{removeNode};
+      ZWCUL_tmp9600($hash, 0);
+      return;
+    }
+
+    if($hash->{addNode} && $S eq "00") {                   #############
+      $hash->{addNodeParam} =~ m/^0101(......)(..)..(.*)/;
+      my ($nodeInfo, $type6, $classes) = ($1, $2, $3);
+
+      ZWCUL_tmp9600($hash, 0);
+      $hash->{homeId} = $hash->{homeIdSet};
+      Dispatch($hash, sprintf("004a0003%s####%s##%s",
+                        $hash->{addNode}, $type6, $classes), \%addvals);
+
+      my $node = ZWCUL_getNode($hash, $hash->{addNode});
+      if($node) { # autocreated a node
+        readingsSingleUpdate($node, "nodeInfo", $nodeInfo, 0);
+        Dispatch($hash, sprintf("004a0005%s##", $hash->{addNode}), \%addvals);
+      }
+
+      delete $hash->{addNode};
+      delete $hash->{addNodeParam};
+      return;
+    }
+
+    if($hash->{addNode} && $hash->{addNode} eq $S) { # Another hack
+      Log3 $hash, 3, "ZWCUL node ".hex($S)." excluded from network";
+      delete $hash->{removeNode};
+      ZWCUL_tmp9600($hash, 0);
+      return;
+    }
+
     $rmsg = sprintf("0013%s00", $S);
 
   }
@@ -472,7 +613,8 @@ ZWCUL_Attr($$$$)
     my $sfx = ($value eq "100k" ? "1" :
               ($value eq "9600" ? "9" : "4"));
     $hash->{initString} = ($hash->{homeIdSet} =~ m/^0*$/ ? "zm$sfx":"zr$sfx");
-    ZWCUL_DoInit($hash);
+    $hash->{baudRate} = $value;
+    ZWCUL_SimpleWrite($hash, $hash->{initString});
 
   }
 
@@ -542,10 +684,31 @@ ZWCUL_Ready($)
     First close and then open the device. Used for debugging purposes.
     </li>
 
+  <li>led [on|off|blink]<br>
+    Set the LED on the CUL.
+    </li>
+
   <li>raw<br>
     send a raw string to culfw
     </li>
 
+  <li>addNode [on|onSec|off]<br>
+    Activate (or deactivate) inclusion mode. The CUL will switch to dataRate
+    9600 until terminating this mode with off, or a node is included. If onSec
+    is specified, the ZWCUL networkKey ist set, and the device supports the
+    SECURITY class, then a secure inclusion is attempted.
+    </li>
+
+  <li>addNodeId &lt;decimalNodeId&gt;<br>
+    Activate inclusion mode, and assign decimalNodeId to the next node.
+    To deactivate this mode, use addNode off.
+    </li>
+
+  <li>removeNode [onNw|on|off]<br>
+    Activate (or deactivate) exclusion mode. Like with addNode, the CUL will
+    switch temporarily to dataRate 9600, potentially missing some packets sent
+    on higher dataRates.  Note: the corresponding fhem device have to be
+    deleted manually.</li>
 
   </ul>
   <br>
@@ -555,7 +718,8 @@ ZWCUL_Ready($)
   <ul>
   <li>homeId<br>
     return the homeId and the ctrlId of the controller.</li>
-
+  <li>nodeInfo<br>
+    return node specific information. Needed by developers only.</li>
   <li>raw<br>
     Send raw data to the controller.</li>
   </ul>
