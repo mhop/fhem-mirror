@@ -74,14 +74,22 @@
     I2C auto address mode added for IODev to compensate floating address selection
     improved I2C read error handling for RPII2C IODev
   16.04.2015 jensb
-    make scaling of readings 'broadband' and 'ir' dependend on new attribute 'normalizeRawValues'
+    make scaling of readings 'broadband' and 'ir' depended on new attribute 'normalizeRawValues'
   18.04.2015 jensb
     new readings 'gain' and 'integrationTime'
   20.04.2015 jensb
-    update reading 'state' in bulk along with luminusity when toggling between 'Initialized' and 'Saturated'
+    update reading 'state' in bulk along with luminosity when toggling between 'Initialized' and 'Saturated'
+  17.11.2015 jensb
+    register InitFn for IODev post initialization and do not init IOdev in Define if FHEM is not initialized
+  19.12.2015 jensb
+    constants renamed with module specific prefix
+    state machines modified to become I2C read driven for Firmata compatibility (non-blocking I2C I/O)
+    changing gain/integrationTime attributes will no longer write to device but will be used at next poll
+  26.12.2015 kaihs
+    CalculateLux float arithmetics formula fix
+    
     
 =head1 TODO
-  HiPi, FRM and NetzerI2C I2C error detection (optional)
   manual integration time (optional)
   
 =head1 CREDITS
@@ -131,7 +139,7 @@ use constant {
   TSL2561_REGISTER_CHAN1_LOW        => 0x0E,
   TSL2561_REGISTER_CHAN1_HIGH       => 0x0F,
    
-  # I2C values
+  # I2C register values
   TSL2561_COMMAND_BIT                  => 0x80,   # Must be 1,
   TSL2561_CLEAR_BIT                    => 0x40,   # Clears any pending interrupt (write 1 to clear)
   TSL2561_WORD_BIT                     => 0x20,   # 1 = read/write word (rather than byte)
@@ -145,8 +153,8 @@ use constant {
   TSL2561_INTEGRATIONTIME_13MS         => 0x00,   # 13.7ms
   TSL2561_INTEGRATIONTIME_101MS        => 0x01,   # 101ms
   TSL2561_INTEGRATIONTIME_402MS        => 0x02,   # 402ms
-  TSL2561_INTEGRATIONTIME_MANUAL_STOP  => 0x03,   # stop manual integration cycle
-  TSL2561_INTEGRATIONTIME_MANUAL_START => 0x0b,   # start manual integration cycle
+  TSL2561_INTEGRATIONTIME_MANUAL_STOP  => 0x03,   # stop manual integration cycle (not implemented)
+  TSL2561_INTEGRATIONTIME_MANUAL_START => 0x0b,   # start manual integration cycle (not implemented)
 
   # Auto-gain thresholds
   TSL2561_AGC_THI_13MS              => 4850,    # Max value at Ti 13.7ms = 5047,
@@ -220,28 +228,30 @@ use constant {
   TSL2561_LUX_B8C           =>0x0000,  # 0.000 * 2^LUX_SCALE
   TSL2561_LUX_M8C           =>0x0000,  # 0.000 * 2^LUX_SCALE
 
-  TSL2561_VISIBLE           =>2,       # channel 0 - channel 1
-  TSL2561_INFRARED          =>1,       # channel 1
-  TSL2561_FULLSPECTRUM      =>0,       # channel 0
+  TSL2561_STATE_UNDEFINED   => 'Undefined',
+  TSL2561_STATE_DEFINED     => 'Defined',
+  TSL2561_STATE_INITIALIZED => 'Initialized',
+  TSL2561_STATE_SATURATED   => 'Saturated',
+  TSL2561_STATE_I2C_ERROR   => 'I2C Error',
+  TSL2561_STATE_DISABLED    => 'Disabled',
   
-  STATE_UNDEFINED   => 'Undefined',
-  STATE_DEFINED     => 'Defined',
-  STATE_INITIALIZED => 'Initialized',
-  STATE_SATURATED   => 'Saturated',
-  STATE_I2C_ERROR   => 'I2C Error',
-  STATE_DISABLED    => 'Disabled',
-  
-  ACQUI_STATE_DISABLED          => 0,
-  ACQUI_STATE_ENABLED           => 1,
-  ACQUI_STATE_DATA_AVAILABLE    => 2,
-  ACQUI_STATE_DATA_CH0_RECEIVED => 3,
-  ACQUI_STATE_DATA_CH1_RECEIVED => 4,
-  ACQUI_STATE_ERROR             => 5,
+  TSL2561_ACQUI_STATE_IDLE              => 0,
+  TSL2561_ACQUI_STATE_SETUP             => 1,
+  TSL2561_ACQUI_STATE_ENABLE_REQUESTED  => 2,
+  TSL2561_ACQUI_STATE_ENABLED           => 3,
+  TSL2561_ACQUI_STATE_DATA_AVAILABLE    => 4,
+  TSL2561_ACQUI_STATE_DATA_REQUESTED    => 5,
+  TSL2561_ACQUI_STATE_DATA_CH0_RECEIVED => 6,
+  TSL2561_ACQUI_STATE_DATA_CH1_RECEIVED => 7,
+  TSL2561_ACQUI_STATE_ERROR             => 8,
 
-  CALC_STATE_IDLE           => 0,
-  CALC_STATE_DATA_REQUESTED => 1,
-  CALC_STATE_DATA_RECEIVED  => 2,
-  CALC_STATE_ERROR          => 3,
+  TSL2561_CALC_STATE_IDLE           => 0,
+  TSL2561_CALC_STATE_DATA_REQUESTED => 1,
+  TSL2561_CALC_STATE_DATA_RECEIVED  => 2,
+  TSL2561_CALC_STATE_ERROR          => 3,
+  TSL2561_CALC_STATE_COMPLETED      => 4,
+  
+  TSL2561_MAX_CONSECUTIVE_OPERATIONS => 20,
 };
 
 ##################################################
@@ -257,6 +267,7 @@ sub I2C_TSL2561_Undef($$);
 sub I2C_TSL2561_Enable($);
 sub I2C_TSL2561_Disable($);
 sub I2C_TSL2561_GetData($);
+sub I2C_TSL2561_SetTimingRegister($);
 sub I2C_TSL2561_SetIntegrationTime($$);
 sub I2C_TSL2561_SetGain($$);
 sub I2C_TSL2561_GetLuminosity($);
@@ -300,6 +311,7 @@ sub I2C_TSL2561_Initialize($) {
   $libcheck_hasHiPi = 0 if($@);    
 
   $hash->{DefFn}    = 'I2C_TSL2561_Define';
+  $hash->{InitFn}   = 'I2C_TSL2561_Init';
   $hash->{AttrFn}   = 'I2C_TSL2561_Attr';
   $hash->{SetFn}    = 'I2C_TSL2561_Set';
   $hash->{UndefFn}  = 'I2C_TSL2561_Undef';
@@ -319,7 +331,7 @@ sub I2C_TSL2561_Define($$) {
   my $name = $a[0];
   my $device;
   
-  readingsSingleUpdate($hash, 'state', STATE_UNDEFINED, 1);
+  readingsSingleUpdate($hash, 'state', TSL2561_STATE_UNDEFINED, 1);
 
   Log3 $name, 1, "I2C_TSL2561_Define start: " . @a . "/" . join(' ', @a);
   
@@ -354,16 +366,17 @@ sub I2C_TSL2561_Define($$) {
     return $msg;
   }
   
-  $hash->{I2C_Address} = hex($address);
-  if (!$hash->{HiPi_used}) {
-    if ($address eq TSL2561_ADDR_AUTO) {
-      # start with lowest address in auto mode
-      $hash->{autoAddress} = 1;
-      $address = TSL2561_ADDR_LOW;
-    } else {
-      $hash->{autoAddress} = 0;
-    }
+  if ($address eq TSL2561_ADDR_AUTO) {
+    # start with lowest address in auto mode
+    $hash->{autoAddress} = 1;
+    $address = TSL2561_ADDR_LOW;
+  } else {
+    $hash->{autoAddress} = 0;
   }
+  if ($hash->{HiPi_used}) {
+    $hash->{autoAddress} = 0;
+  }
+  $hash->{I2C_Address} = hex($address);
   
   # create default attributes
   if (AttrVal($name, 'poll_interval', '?') eq '?') {  
@@ -391,18 +404,26 @@ sub I2C_TSL2561_Define($$) {
     $hash->{tsl2561Gain} = $attrVal == 16? TSL2561_GAIN_16X : TSL2561_GAIN_1X;
   }
   if (!defined($hash->{acquiState})) {
-    $hash->{acquiState} = ACQUI_STATE_DISABLED;
+    $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
   }
   if (!defined($hash->{calcState})) {
-    $hash->{calcState} = CALC_STATE_IDLE;
+    $hash->{calcState} = TSL2561_CALC_STATE_IDLE;
+  }
+  if (!defined($hash->{operationCounter})) {
+    $hash->{operationCounter} = 0;
+  }
+  if (!defined($hash->{blockingIO})) {
+    $hash->{blockingIO} = 0;
   }
 
-  readingsSingleUpdate($hash, 'state', STATE_DEFINED, 1);
+  readingsSingleUpdate($hash, 'state', TSL2561_STATE_DEFINED, 1);
   
-  eval { 
-    I2C_TSL2561_Init($hash, $device); 
-  };
-  Log3 ($hash, 1, $hash->{NAME} . ': ' . I2C_TSL2561_Catch($@)) if $@;;
+  if ($main::init_done || $hash->{HiPi_used}) {
+    eval { 
+      I2C_TSL2561_Init($hash, [ $device ]); 
+    };
+    Log3 ($hash, 1, $hash->{NAME} . ': ' . I2C_TSL2561_Catch($@)) if $@;;
+  }
 
   Log3 $name, 5, "I2C_TSL2561_Define end";
   return undef;
@@ -435,8 +456,13 @@ sub I2C_TSL2561_Init($$) {
   } else {
     AssignIoPort($hash);
   }
+
+  # clear package identification to force device reinitialization (device may have been powered off)
+  $hash->{tsl2561Package} = undef;
   
-  readingsSingleUpdate($hash, 'state', STATE_INITIALIZED, 1);
+  # start new measurement cycle
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday() + 10, 'I2C_TSL2561_Poll', $hash, 0);
   
   return undef;
 }
@@ -466,9 +492,9 @@ sub I2C_TSL2561_Attr (@) {
 
   Log3 $name, 5, "I2C_TSL2561_Attr: start cmd=$cmd attr=$attr"; 
   if ($attr eq 'poll_interval') {
-    my $pollInterval = (defined($val) && looks_like_number($val) && $val > 0) ? $val : 0;
-    
+    my $pollInterval = (defined($val) && looks_like_number($val) && $val > 0) ? $val : 0;    
     if ($val > 0) {
+      # start new measurement cycle
       RemoveInternalTimer($hash);
       InternalTimer(gettimeofday() + 1, 'I2C_TSL2561_Poll', $hash, 0);
     } elsif (defined($val)) {
@@ -499,16 +525,10 @@ sub I2C_TSL2561_Attr (@) {
     }
   } elsif ($attr eq 'autoGain') {
     my $autoGain = (defined($val) && looks_like_number($val) && $val > 0) ? $val : 0;
-    
-    if (!$autoGain) {
-      I2C_TSL2561_Attr($hash, $name, 'gain', AttrVal($name, 'gain', 1));
-    }
+    $hash->{timingModified} = 1;    
   } elsif ($attr eq 'autoIntegrationTime') {
     my $autoIntegrationTime = (defined($val) && looks_like_number($val) && $val > 0) ? $val : 0;
-
-    if (!$autoIntegrationTime) {
-      I2C_TSL2561_Attr($hash, $name, 'integrationTime', AttrVal($name, 'integrationTime', 13));
-    }
+    $hash->{timingModified} = 1;    
   } elsif ($attr eq 'normalizeRawValues') {
     my $normalizeRawValues = (defined($val) && looks_like_number($val) && $val > 0) ? $val : 0;
   } elsif ($attr eq 'floatArithmetics') {
@@ -522,71 +542,68 @@ sub I2C_TSL2561_Attr (@) {
 
 =head2 I2C_TSL2561_Poll
   Title:    I2C_TSL2561_Poll
-  Function:  Start polling the sensor at interval defined in attribute
+  Function: Start polling the sensor at interval defined in attribute
   Returns:  -
-  Args:    named arguments:
-        -argument1 => hash
-
+  Args:     named arguments:
+            - argument1 => hash
 =cut
 
 sub I2C_TSL2561_Poll($) {
   my ($hash) =  @_;
   my $name = $hash->{NAME};
+  RemoveInternalTimer($hash);
   
   Log3 $name, 5, "I2C_TSL2561_Poll: start";
   
   my $pollDelay = 60*AttrVal($hash->{NAME}, 'poll_interval', 0); # seconds polling
   if (!AttrVal($hash->{NAME}, "disable", 0)) {
-    # Read new values
-    my $state = ReadingsVal($name, 'state', '');
-    if ($state eq STATE_I2C_ERROR) {
-      # try to turn off the device to check I2C communication (hotplug and error recovery)
-      if (I2C_TSL2561_Disable($hash)) {
-        $state = STATE_INITIALIZED;
-        readingsSingleUpdate($hash, 'state', $state, 1);
-      } elsif ($hash->{autoAddress}) {
-        # auto address mode, scan bus for device
-        if ($hash->{I2C_Address} == hex(TSL2561_ADDR_LOW)) {
-          $hash->{I2C_Address} = hex(TSL2561_ADDR_FLOAT);
-        } elsif ($hash->{I2C_Address} == hex(TSL2561_ADDR_FLOAT)) {
-          $hash->{I2C_Address} = hex(TSL2561_ADDR_HIGH);
-        } else {
-          $hash->{I2C_Address} = hex(TSL2561_ADDR_LOW);
+    # Request new samples from TSL2561 and calculate luminosity
+    my $lux = I2C_TSL2561_GetLuminosity($hash);
+    if ($hash->{calcState} == TSL2561_CALC_STATE_DATA_REQUESTED) {
+      # Measurement in progress
+      if ($hash->{acquiState} == TSL2561_ACQUI_STATE_ENABLED) {
+        $pollDelay = I2C_TSL2561_GetIntegrationTime($hash) + 0.003; # seconds measurement time
+        if (!$hash->{blockingIO}) {
+          $pollDelay += 0.200; # extra time for async transport jitter compensation
         }
-        $pollDelay = 10; # seconds retry delay
-      }
-      $hash->{tsl2561Package} = undef;
-    }
-    if ($state ne STATE_I2C_ERROR) {
-      # Request new samples from TSL2561 and calculate luminosity
-      my $lux = I2C_TSL2561_GetLuminosity($hash);
-      if ($hash->{calcState} == CALC_STATE_DATA_REQUESTED) {
-        $pollDelay = I2C_TSL2561_GetIntegrationTime($hash) + 0.001; # seconds integration time
       } else {
-        if ($hash->{calcState} == CALC_STATE_IDLE) {
-          my $chScale = 1;
-          if (AttrVal($hash->{NAME}, "normalizeRawValues", 0)) {
-            $chScale = I2C_TSL2561_GetChannelScale($hash);
-          }
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash, "gain",            I2C_TSL2561_GetGain($hash));
-          readingsBulkUpdate($hash, "integrationTime", I2C_TSL2561_GetIntegrationTime($hash));
-          readingsBulkUpdate($hash, "broadband",       ceil($chScale*$hash->{broadband}));
-          readingsBulkUpdate($hash, "ir",              ceil($chScale*$hash->{ir}));
-          if (defined($lux)) {
-            readingsBulkUpdate($hash, "luminosity", $lux);
-          }
-          if ($state eq STATE_INITIALIZED && $hash->{saturated}) {
-            readingsBulkUpdate($hash, 'state', STATE_SATURATED, 1);
-          } elsif ($state eq STATE_SATURATED && !$hash->{saturated}) {
-            readingsBulkUpdate($hash, 'state', STATE_INITIALIZED, 1);
-          }
-          readingsEndUpdate($hash, 1);
-        }
+        $pollDelay = 0.400; # seconds async I2C read reply timeout
       }
+    } else {
+      # Measurement completed
+      if ($hash->{calcState} == TSL2561_CALC_STATE_COMPLETED) {
+        # success, update readings based on new data
+        my $chScale = 1;
+        if (AttrVal($hash->{NAME}, "normalizeRawValues", 0)) {
+          $chScale = I2C_TSL2561_GetChannelScale($hash);
+        }
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "gain",            I2C_TSL2561_GetGain($hash));
+        readingsBulkUpdate($hash, "integrationTime", I2C_TSL2561_GetIntegrationTime($hash));
+        readingsBulkUpdate($hash, "broadband",       ceil($chScale*$hash->{broadband}));
+        readingsBulkUpdate($hash, "ir",              ceil($chScale*$hash->{ir}));
+        if (defined($lux)) {
+          readingsBulkUpdate($hash, "luminosity", $lux);
+        }
+        my $state = ReadingsVal($name, 'state', '');
+        if ($state ne TSL2561_STATE_SATURATED && $hash->{saturated}) {
+          readingsBulkUpdate($hash, 'state', TSL2561_STATE_SATURATED, 1);
+        } elsif ($state ne TSL2561_STATE_INITIALIZED && !$hash->{saturated}) {
+          readingsBulkUpdate($hash, 'state', TSL2561_STATE_INITIALIZED, 1);
+        }
+        readingsEndUpdate($hash, 1);
+      }
+
+      # backup required operations (for diagnostics)
+      $hash->{requiredOperations} = $hash->{operationCounter};
+      
+      # Reset state
+      $hash->{calcState} = TSL2561_CALC_STATE_IDLE;
+      $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
+      $hash->{operationCounter} = 0;
     }
   } else {
-    readingsSingleUpdate($hash, 'state', STATE_DISABLED, 1);
+    readingsSingleUpdate($hash, 'state', TSL2561_STATE_DISABLED, 1);
   }
   
   # Schedule next polling
@@ -594,6 +611,8 @@ sub I2C_TSL2561_Poll($) {
   if ($pollDelay > 0) {
     InternalTimer(gettimeofday() + $pollDelay, 'I2C_TSL2561_Poll', $hash, 0);
   }
+  
+  return undef;
 }
 
 sub I2C_TSL2561_Set($@) {
@@ -606,7 +625,6 @@ sub I2C_TSL2561_Set($@) {
     return 'Unknown argument ' . $cmd . ', choose one of ' . join(' ', keys %sets)
   }
   
-  RemoveInternalTimer($hash);
   I2C_TSL2561_Poll($hash);
   return undef;
 }
@@ -632,15 +650,17 @@ sub I2C_TSL2561_I2CRcvControl($$) {
   my $enabled = $control & 0x3;
   if ($enabled == TSL2561_CONTROL_POWERON) {
     Log3 $name, 5, "I2C_TSL2561_I2CRcvControl: is enabled";
-    $hash->{sensorEnabled} = 1;
-    $hash->{acquiState} = ACQUI_STATE_ENABLED;
+    $hash->{acquiState} = TSL2561_ACQUI_STATE_ENABLED;
     $hash->{acquiStarted} = [gettimeofday];
   } else {
     Log3 $name, 5, "I2C_TSL2561_I2CRcvControl: is disabled";
-    $hash->{sensorEnabled} = 0;
-    $hash->{acquiState} = ACQUI_STATE_DISABLED;
+    $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
   }
   
+  if (!$hash->{blockingIO}) {
+    I2C_TSL2561_Poll($hash);
+  }
+  return undef;
 }
 
 #
@@ -662,8 +682,22 @@ sub I2C_TSL2561_I2CRcvID($$) {
     $package = 'T/FN/CL';
   }
   $hash->{sensorType} = 'TSL2561 Package ' . $package . ' Rev. ' . ( $sensorId & 0x0f );
-
   Log3 $name, 5, 'I2C_TSL2561_I2CRcvID: sensorId ' . $hash->{sensorType}; 
+  
+  # init state
+  $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
+  readingsSingleUpdate($hash, 'state', TSL2561_STATE_INITIALIZED, 1);
+  
+  # force preset of integration time and gain (device may have been powered off)
+  $hash->{timingModified} = 1;
+
+  # I2C-API blocking/non-blocking detection
+  $hash->{blockingIO} = $hash->{operationInProgress};
+  
+  if (!$hash->{blockingIO}) {
+    I2C_TSL2561_Poll($hash);
+  }
+  return undef;
 }
 
 #
@@ -674,9 +708,14 @@ sub I2C_TSL2561_I2CRcvTiming ($$) {
   my $name = $hash->{NAME};
   
   $hash->{tsl2561IntegrationTime} = $timing & 0x03;
-  $hash->{tsl2561Gain}            = $timing & 0x10;        
+  $hash->{tsl2561Gain}            = $timing & 0x10;          
+  Log3 $name, 5, "I2C_TSL2561_I2CRcvTiming: time $hash->{tsl2561IntegrationTime}, gain $hash->{tsl2561Gain}";
   
-  Log3 $name, 5, "I2C_TSL2561_I2CRcvTiming: $timing,  $hash->{tsl2561IntegrationTime}, $hash->{tsl2561Gain}";
+  $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
+  if (!$hash->{blockingIO}) {
+    I2C_TSL2561_Poll($hash);
+  }
+  return undef;
 }
 
 #
@@ -685,11 +724,12 @@ sub I2C_TSL2561_I2CRcvTiming ($$) {
 sub I2C_TSL2561_I2CRcvChan0 ($$) {
   my ($hash, $broadband) = @_;
   my $name = $hash->{NAME};
-  
+    
+  $hash->{broadband} = $broadband;
   Log3 $name, 5, 'I2C_TSL2561_I2CRcvChan0 ' . $broadband; 
   
-  $hash->{broadband} = $broadband;
-  $hash->{acquiState} = ACQUI_STATE_DATA_CH0_RECEIVED;
+  $hash->{acquiState} = TSL2561_ACQUI_STATE_DATA_CH0_RECEIVED;
+  return undef;
 }
 
 #
@@ -699,10 +739,14 @@ sub I2C_TSL2561_I2CRcvChan1 ($$) {
   my ($hash, $ir) = @_;
   my $name = $hash->{NAME};
   
-  Log3 $name, 5, 'I2C_TSL2561_I2CRcvChan1 ' . $ir; 
-  
   $hash->{ir} = $ir;
-  $hash->{acquiState} = ACQUI_STATE_DATA_CH1_RECEIVED;
+  Log3 $name, 5, 'I2C_TSL2561_I2CRcvChan1 ' . $ir;   
+
+  $hash->{acquiState} = TSL2561_ACQUI_STATE_DATA_CH1_RECEIVED;
+  if (!$hash->{blockingIO}) {
+    I2C_TSL2561_Poll($hash);
+  }
+  return undef;
 }
 
 #
@@ -750,60 +794,37 @@ sub I2C_TSL2561_I2CRec ($$) {
       }
     }
   }
+  return undef;
 }
 
 =head2 I2C_TSL2561_Enable
   Title:    I2C_TSL2561_Enable
-  Function:  Enables the device
-  Returns:  1 if sensor was enabled, 0 if enabling sensor failed
-  Args:    named arguments:
-        -argument1 => hash:  $hash      hash of device
-
+  Function: Enables the device
+  Returns:  1 if enabling sensor was initiated, 0 if enabling sensor failed
+  Args:     named arguments:
+            - argument1 => hash:  $hash      hash of device
 =cut
 
 sub I2C_TSL2561_Enable($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   
-  Log3 $name, 5, 'I2C_TSL2561_Enable: start ';
-  
-  # Detect TLS2561 package type and init integration time and gain
-  my $initialized = 1;
-  if (!defined($hash->{tsl2561Package})) {
-    # Get TLS2561 package type
-    $initialized = 0;
-    if (I2C_TSL2561_i2cread($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_ID, 1)) {
-      # Preset integration time and gain
-      if (I2C_TSL2561_SetGain($hash, $hash->{tsl2561Gain})) {
-        $initialized = 1;
-      }
-    }
+  Log3 $name, 5, 'I2C_TSL2561_Enable: start ';  
+  my $success = 0;
+  if (I2C_TSL2561_i2cwrite($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_CONTROL, TSL2561_CONTROL_POWERON)) {
+    $success = I2C_TSL2561_i2cread($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_CONTROL, 1);
   }
+  Log3 $name, 5, 'I2C_TSL2561_Enable: end '; 
   
-  # Enable TLS2561
-  $hash->{sensorEnabled} = 0;
-  if ($initialized) {
-    if (I2C_TSL2561_i2cwrite($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_CONTROL, TSL2561_CONTROL_POWERON)) {
-      I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_REGISTER_CONTROL, 1);
-    }
-    if (!$hash->{sensorEnabled}) {
-      # Enable failed (no sensor at address or wrong I2C device)
-      $hash->{tsl2561Package} = undef;
-    }
-  }
-  
-  Log3 $name, 5, 'I2C_TSL2561_Enable: end ';
-  
-  return $hash->{sensorEnabled};
+  return $success;
 }
 
 =head2 I2C_TSL2561_Disable
   Title:    I2C_TSL2561_Disable
-  Function:  Enables the device
-  Returns:  1 if write was successful, 0 if write failed
-  Args:    named arguments:
-        -argument1 => hash:  $hash      hash of device
-
+  Function: Disables the device
+  Returns:  1 if disabling sensor was initiated, 0 if disabling sensor failed
+  Args:     named arguments:
+            - argument1 => hash:  $hash      hash of device
 =cut
 
 sub I2C_TSL2561_Disable($) {
@@ -812,7 +833,6 @@ sub I2C_TSL2561_Disable($) {
 
   Log3 $name, 5, 'I2C_TSL2561_Disable: start ';
   my $success = I2C_TSL2561_i2cwrite($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_CONTROL, TSL2561_CONTROL_POWEROFF);
-  $hash->{sensorEnabled} = 0;
   Log3 $name, 5, 'I2C_TSL2561_Disable: end ';
   
   return $success;
@@ -820,11 +840,10 @@ sub I2C_TSL2561_Disable($) {
 
 =head2 I2C_TSL2561_GetData
   Title:    I2C_TSL2561_GetData
-  Function:  Private function to read luminosity on both channels
+  Function: Private function to read luminosity on both channels
   Returns:  -
-  Args:    named arguments:
-        -argument1 => hash:  $hash      hash of device
-
+  Args:     named arguments:
+            - argument1 => hash:  $hash      hash of device
 =cut
 
 sub I2C_TSL2561_GetData($) {
@@ -836,54 +855,121 @@ sub I2C_TSL2561_GetData($) {
   my $operations = 0;
   while (1) {
     $operations++;
-    if ($hash->{acquiState} == ACQUI_STATE_ERROR) {
-      $hash->{calcState} = CALC_STATE_ERROR;
-      readingsSingleUpdate($hash, 'state', STATE_I2C_ERROR, 1);
-      # Turn the device off to save power 
-      I2C_TSL2561_Disable($hash);
-      $hash->{acquiState} = ACQUI_STATE_DISABLED;
+    if ($hash->{acquiState} == TSL2561_ACQUI_STATE_ERROR) {
       $success = 0;
       last; # Abort, Start again at next slow poll
     } elsif ($operations > 10) {
       # Too many consecutive operations, abort
-      $hash->{acquiState} = ACQUI_STATE_ERROR;
+      $hash->{acquiState} = TSL2561_ACQUI_STATE_ERROR;
       Log3 $name, 5, "I2C_TSL2561_GetData: state machine stuck, aborting";
-    } elsif ($hash->{acquiState} == ACQUI_STATE_DISABLED) {
-      # Enable the device by setting the control bit to 0x03
-      if (!I2C_TSL2561_Enable($hash)) {
-        $hash->{acquiState} = ACQUI_STATE_ERROR;
+    } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_IDLE) {
+      if (!defined($hash->{tsl2561Package})) {
+        # Choose an address to scan the I2C bus for device in auto address mode
+        if ($hash->{autoAddress}) {
+          if ($hash->{I2C_Address} == hex(TSL2561_ADDR_LOW)) {
+            $hash->{I2C_Address} = hex(TSL2561_ADDR_FLOAT);
+          } elsif ($hash->{I2C_Address} == hex(TSL2561_ADDR_FLOAT)) {
+            $hash->{I2C_Address} = hex(TSL2561_ADDR_HIGH);
+          } else {
+            $hash->{I2C_Address} = hex(TSL2561_ADDR_LOW);
+          }      
+        }
+        # Detect TLS2561 package type and init integration time and gain
+        Log3 $name, 5, "I2C_TSL2561_GetData: request device id";
+        $hash->{acquiState} = TSL2561_ACQUI_STATE_SETUP;
+        if (I2C_TSL2561_i2cread($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_ID, 1)) {
+          last; # Wait for id confirmation, check again after next fast poll
+        } else {
+          $hash->{acquiState} = TSL2561_ACQUI_STATE_ERROR;
+        }
+      } elsif ($hash->{timingModified}) {
+        $hash->{acquiState} = TSL2561_ACQUI_STATE_SETUP;
+        if (I2C_TSL2561_SetTimingRegister($hash)) {
+          last; # Wait new timing to be confirmed, check again after next fast poll
+        } else {
+          $hash->{acquiState} = TSL2561_ACQUI_STATE_ERROR;
+        }
+      } else {
+        # Enable the device
+        $hash->{acquiState} = TSL2561_ACQUI_STATE_ENABLE_REQUESTED;
+        if (I2C_TSL2561_Enable($hash)) {
+          last; # Wait for enable confirmation, check again after next fast poll
+        } else {
+          $hash->{acquiState} = TSL2561_ACQUI_STATE_ERROR;
+        }
       }
-    } elsif ($hash->{acquiState} == ACQUI_STATE_ENABLED) {
+    } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_SETUP) {
+      last; # Wait for setup confirmation, check again after next fast poll
+    } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_ENABLE_REQUESTED) {
+      last; # Wait for enable confirmation, check again after next fast poll
+    } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_ENABLED) {
       # Wait x ms for ADC to complete
-      $hash->{calcState} = CALC_STATE_DATA_REQUESTED;
       my $now = [gettimeofday];
       if (tv_interval($hash->{acquiStarted}, $now) >= I2C_TSL2561_GetIntegrationTime($hash)) {
-        $hash->{acquiState} = ACQUI_STATE_DATA_AVAILABLE;
+        $hash->{acquiState} = TSL2561_ACQUI_STATE_DATA_AVAILABLE;
       } else {
-        last; # Wait, check again after next fast poll
+        last; # Wait for measurement to complete, check again after next fast poll
       }
-    } elsif ($hash->{acquiState} == ACQUI_STATE_DATA_AVAILABLE) {
-      # Reads a two byte value from channel 0 (visible + infrared) 
-      if (!I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_WORD_BIT | TSL2561_REGISTER_CHAN0_LOW, 2)) {
-        $hash->{acquiState} = ACQUI_STATE_ERROR;
+    } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_DATA_AVAILABLE) {
+      # Read a two byte value from channel 0 and channel 1 (visible + infrared) 
+      $hash->{acquiState} = TSL2561_ACQUI_STATE_DATA_REQUESTED;
+      if (I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_WORD_BIT | TSL2561_REGISTER_CHAN0_LOW, 2)) {
+        if (!I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_WORD_BIT | TSL2561_REGISTER_CHAN1_LOW, 2)) {
+          $hash->{acquiState} = TSL2561_ACQUI_STATE_ERROR;
+        }
+      } else {
+        $hash->{acquiState} = TSL2561_ACQUI_STATE_ERROR;
       }
-    } elsif ($hash->{acquiState} == ACQUI_STATE_DATA_CH0_RECEIVED) {
-      # Reads a two byte value from channel 1 (infrared) 
-      if (!I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_WORD_BIT | TSL2561_REGISTER_CHAN1_LOW, 2)) {
-        $hash->{acquiState} = ACQUI_STATE_ERROR;
-      }
-    } elsif ($hash->{acquiState} == ACQUI_STATE_DATA_CH1_RECEIVED) {
-      $hash->{calcState} = CALC_STATE_DATA_RECEIVED;
-      # Done, turn the device off to save power 
+    } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_DATA_REQUESTED) {
+      last; # Wait for channel 0 or channel 1 data to be read
+    } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_DATA_CH0_RECEIVED) {
+      # Read a two byte value from channel 1 (infrared) 
+      $hash->{acquiState} = TSL2561_ACQUI_STATE_DATA_REQUESTED;
+      last; # Wait for channel 1 data to be read
+    } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_DATA_CH1_RECEIVED) {
+      $hash->{calcState} = TSL2561_CALC_STATE_DATA_RECEIVED;
+      # Try to turn the device off to save power 
       I2C_TSL2561_Disable($hash);
-      $hash->{acquiState} = ACQUI_STATE_DISABLED;
+      $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
       last; # Done, start again at next slow poll
     } else {
       # Undefined state
-      $hash->{acquiState} = ACQUI_STATE_ERROR;
+      $hash->{acquiState} = TSL2561_ACQUI_STATE_ERROR;
     }
   }
   
+  return $success;
+}
+
+#
+# write integration time and gain to device
+#
+sub I2C_TSL2561_SetTimingRegister($) {
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $success = 0;
+  if (!AttrVal($hash->{NAME}, "disable", 0) && defined($hash->{tsl2561Package})) {
+    # Update the timing register 
+    my $autoGain = AttrVal($name, 'autoGain', 1);      
+    if (!$autoGain) {
+      my $attrVal = AttrVal($name, 'gain', 1);
+      $hash->{tsl2561Gain} = $attrVal == 16? TSL2561_GAIN_16X : TSL2561_GAIN_1X;
+    }
+    my $autoIntegrationTime = AttrVal($name, 'autoIntegrationTime', 0);
+    if (!$autoIntegrationTime) {
+      my $attrVal = AttrVal($name, 'integrationTime', 13);  
+      $hash->{tsl2561IntegrationTime} = $attrVal == 402? TSL2561_INTEGRATIONTIME_402MS : $attrVal == 101? TSL2561_INTEGRATIONTIME_101MS : TSL2561_INTEGRATIONTIME_13MS;
+    }
+    Log3 $name, 5, "I2C_TSL2561_SetTimingRegister: time $hash->{tsl2561IntegrationTime}, gain $hash->{tsl2561Gain}";
+    if (I2C_TSL2561_i2cwrite($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING, $hash->{tsl2561IntegrationTime} | $hash->{tsl2561Gain})) {
+      if (I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING, 1)) {
+        $success = 1;
+      }
+    }
+  }
+  $hash->{timingModified} = 0;  
+ 
   return $success;
 }
 
@@ -901,26 +987,12 @@ sub I2C_TSL2561_SetIntegrationTime($$) {
   my ($hash, $time) = @_;
   my $name = $hash->{NAME};
  
-  # store the value even if $hash->{tsl2561Package} ist not set (yet). That happens
+  # store the value even if $hash->{tsl2561Package} is not set (yet). That happens
   # during fhem startup.
-  $hash->{tsl2561IntegrationTime} = $time;
-  # Enable the device by setting the control bit to 0x03
-  my $success = 0;
-  if (!AttrVal($hash->{NAME}, "disable", 0) && defined($hash->{tsl2561Package})) {
-    my $state = ReadingsVal($name, 'state', '');
-    if ($state ne STATE_I2C_ERROR) {
-      # Update the timing register 
-      Log3 $name, 5, "I2C_TSL2561_SetIntegrationTime: time " . $time ;
-      Log3 $name, 5, "I2C_TSL2561_SetIntegrationTime: gain " . $hash->{tsl2561Gain};
-      if (I2C_TSL2561_i2cwrite($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING, $time | $hash->{tsl2561Gain})) {
-        if (I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING, 1)) {
-          $success = 1;
-        }
-      }
-    }
-  }
+  $hash->{tsl2561IntegrationTime} = $time;  
+  $hash->{timingModified} = 1;  
   
-  return $success;
+  return undef;
 }
 
 #
@@ -944,38 +1016,23 @@ sub I2C_TSL2561_GetIntegrationTime($) {
 
 =head2 I2C_TSL2561_SetGain
   Title:    I2C_TSL2561_SetGain
-  Function:   Adjusts the gain on the TSL2561 (adjusts the sensitivity to light)
+  Function: Adjusts the gain on the TSL2561 (adjusts the sensitivity to light)
   Returns:  -
-  Args:    named arguments:
-        -argument1 => hash:  $hash    hash of device
-        -argument1 => number:  $gain    constant for gain
-
+  Args:     named arguments:
+            - argument1 => hash:   $hash    hash of device
+            - argument1 => number: $gain    constant for gain
 =cut
 
 sub I2C_TSL2561_SetGain($$) {
   my ($hash, $gain) = @_;
   my $name = $hash->{NAME};
 
-  # store the value even if $hash->{tsl2561Package} ist not set (yet). That happens
+  # store the value even if $hash->{tsl2561Package} is not set (yet). That happens
   # during fhem startup.
   $hash->{tsl2561Gain} = $gain;
-  # Enable the device by setting the control bit to 0x03
-  my $success = 0;
-  if (!AttrVal($hash->{NAME}, "disable", 0) && defined($hash->{tsl2561Package})) {
-    my $state = ReadingsVal($name, 'state', '');
-    if ($state ne STATE_I2C_ERROR) {
-      # Update the timing register 
-      Log3 $name, 5, "I2C_TSL2561_SetGain: gain " . $gain ;
-      Log3 $name, 5, "I2C_TSL2561_SetGain: time " . $hash->{tsl2561IntegrationTime};
-      if (I2C_TSL2561_i2cwrite($hash, TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING, $gain | $hash->{tsl2561IntegrationTime})) {
-        if (I2C_TSL2561_i2cread($hash,  TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING, 1)) {
-          $success = 1;
-        }
-      }
-    }
-  }
-  
-  return $success;
+  $hash->{timingModified} = 1;  
+
+  return undef;
 }
 
 #
@@ -1009,37 +1066,51 @@ sub I2C_TSL2561_GetLuminosity($) {
   my $name = $hash->{NAME};
 
 #  Log3 $name, 5, "I2C_TSL2561_GetLuminosity: start";
-  
+
+  $hash->{operationInProgress} = 1;
+
   # Luminosity calculation state machine
   my $lux = undef;
-  my $operations = 0;
   while(1) {
-    $operations++;
+    $hash->{operationCounter}++;
     Log3 $name, 5, "I2C_TSL2561_GetLuminosity: calc state $hash->{calcState} acqui state $hash->{acquiState}";
-    if ($hash->{calcState} == CALC_STATE_ERROR) {
-      $hash->{calcState} = CALC_STATE_IDLE;
+    if ($hash->{calcState} == TSL2561_CALC_STATE_ERROR) {
       Log3 $name, 5, "I2C_TSL2561_GetLuminosity: error, aborting";
+      # Try to turn the device off to save power 
+      I2C_TSL2561_Disable($hash);
+      # Reset package to force device reinitialization
+      $hash->{tsl2561Package} = undef;
+      # Claim I2C error
+      readingsSingleUpdate($hash, 'state', TSL2561_STATE_I2C_ERROR, 1);      
       last; # Abort, start again at next slow poll
-    } elsif ($operations > 10) {
+    } elsif ($hash->{operationCounter} > TSL2561_MAX_CONSECUTIVE_OPERATIONS) {
       # Too many consecutive operations, abort
-      $hash->{calcState} = CALC_STATE_ERROR;
+      $hash->{calcState} = TSL2561_CALC_STATE_ERROR;
       Log3 $name, 5, "I2C_TSL2561_GetLuminosity: state machine stuck, aborting";
-    } elsif ($hash->{calcState} == CALC_STATE_IDLE) {
-      # Request data
+    } elsif ($hash->{calcState} == TSL2561_CALC_STATE_IDLE) {
+      # Enable device and request data
       Log3 $name, 5, "I2C_TSL2561_GetLuminosity: starting new measurement";
-      if (!I2C_TSL2561_GetData($hash)) {
-        $hash->{calcState} = CALC_STATE_ERROR;
-      }
-    } elsif ($hash->{calcState} == CALC_STATE_DATA_REQUESTED) {
-      # Wait for data
       if (I2C_TSL2561_GetData($hash)) {
-        if ($hash->{acquiState} == ACQUI_STATE_ENABLED) {
-          last; # Wait for data to arrive, check again at next fast poll
+        $hash->{calcState} = TSL2561_CALC_STATE_DATA_REQUESTED;
+      } else {      
+        $hash->{calcState} = TSL2561_CALC_STATE_ERROR;
+      }      
+    } elsif ($hash->{calcState} == TSL2561_CALC_STATE_DATA_REQUESTED) {
+      # Wait for device
+      if (I2C_TSL2561_GetData($hash)) {
+        if ($hash->{acquiState} == TSL2561_ACQUI_STATE_SETUP) {
+          last; # Wait for setup confirmation, check again after next fast poll
+        } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_ENABLE_REQUESTED) {
+          last; # Wait for enable to be confirmed, check again at next fast poll
+        } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_ENABLED) {
+          last; # Wait for measurement to complete, check again at next fast poll
+        } elsif ($hash->{acquiState} == TSL2561_ACQUI_STATE_DATA_REQUESTED) {
+          last; # Wait for data to be read, check again at next fast poll
         }
       } else {
-        $hash->{calcState} = CALC_STATE_ERROR;
+        $hash->{calcState} = TSL2561_CALC_STATE_ERROR;
       }
-    } elsif ($hash->{calcState} == CALC_STATE_DATA_RECEIVED) {
+    } elsif ($hash->{calcState} == TSL2561_CALC_STATE_DATA_RECEIVED) {
       # Data was received, optimize gain
       my $autoGain = AttrVal($name, 'autoGain', 1);
       if ($autoGain) {
@@ -1047,24 +1118,24 @@ sub I2C_TSL2561_GetLuminosity($) {
         my $it = $hash->{tsl2561IntegrationTime};
         my $hi = TSL2561_AGC_THI_402MS;
         my $lo = TSL2561_AGC_TLO_402MS;
-        if ($it==TSL2561_INTEGRATIONTIME_13MS) {
+        if ($it == TSL2561_INTEGRATIONTIME_13MS) {
           $hi = TSL2561_AGC_THI_13MS;
           $lo = TSL2561_AGC_TLO_13MS;
-        } elsif ( $it==TSL2561_INTEGRATIONTIME_101MS) {
+        } elsif ($it == TSL2561_INTEGRATIONTIME_101MS) {
           $hi = TSL2561_AGC_THI_101MS;
           $lo = TSL2561_AGC_TLO_101MS;
         } 
         if (($hash->{broadband} < $lo) && ($hash->{tsl2561Gain} == TSL2561_GAIN_1X)) {
           # Increase gain and try again 
           I2C_TSL2561_SetGain($hash, TSL2561_GAIN_16X);
-          # Drop the previous conversion results 
-          $hash->{calcState} = CALC_STATE_IDLE;
+          $hash->{calcState} = TSL2561_CALC_STATE_IDLE;
+          $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
           next;
         } elsif (($hash->{broadband} > $hi) && ($hash->{tsl2561Gain} == TSL2561_GAIN_16X)) {
           # Drop gain and try again 
           I2C_TSL2561_SetGain($hash, TSL2561_GAIN_1X);
-          # Drop the previous conversion results 
-          $hash->{calcState} = CALC_STATE_IDLE;
+          $hash->{calcState} = TSL2561_CALC_STATE_IDLE;
+          $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
           next;
         } else {
           # Reading is either valid, or we're already at the chips limits 
@@ -1086,10 +1157,10 @@ sub I2C_TSL2561_GetLuminosity($) {
       if (($hash->{broadband} > $clipThreshold) || ($hash->{ir} > $clipThreshold)) {
         # ADC saturated, try to decrease integration time
         if ($autoIntegrationTime && $hash->{tsl2561IntegrationTime} == TSL2561_INTEGRATIONTIME_402MS) {
-          # Drop integration time and try again 
+          # Drop integration time and try again
           I2C_TSL2561_SetIntegrationTime($hash, TSL2561_INTEGRATIONTIME_101MS);
-          # Drop the previous conversion results 
-          $hash->{calcState} = CALC_STATE_IDLE;
+          $hash->{calcState} = TSL2561_CALC_STATE_IDLE;
+          $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
           next;
         } else {
           # Integration time fixed or already below 402 ms, give up
@@ -1098,10 +1169,10 @@ sub I2C_TSL2561_GetLuminosity($) {
       } elsif ($autoIntegrationTime
            && ($hash->{broadband} < ($clipThreshold >> 2) && $hash->{ir} < ($clipThreshold >> 2)) 
            && ($hash->{tsl2561IntegrationTime} == TSL2561_INTEGRATIONTIME_13MS || $hash->{tsl2561IntegrationTime} == TSL2561_INTEGRATIONTIME_101MS)) {
-        # Integration time below 178 ms, maximize
+        # Integration time below 178 ms, maximize and try again
         I2C_TSL2561_SetIntegrationTime($hash, TSL2561_INTEGRATIONTIME_402MS);
-        # Drop the previous conversion results 
-        $hash->{calcState} = CALC_STATE_IDLE;
+        $hash->{calcState} = TSL2561_CALC_STATE_IDLE;
+        $hash->{acquiState} = TSL2561_ACQUI_STATE_IDLE;
         next;
       } else {
         # Readings are not saturated or auto integration time is disabled
@@ -1110,20 +1181,24 @@ sub I2C_TSL2561_GetLuminosity($) {
 
       # Received data is valid, calculate luminosity
       $lux = I2C_TSL2561_CalculateLux($hash);
-      $hash->{calcState} = CALC_STATE_IDLE;
+      $hash->{calcState} = TSL2561_CALC_STATE_COMPLETED;
       last; # Done, start again at next slow poll
     } else {
       # Undefined state
-      $hash->{calcState} = CALC_STATE_ERROR;
+      $hash->{calcState} = TSL2561_CALC_STATE_ERROR;
     }
   }
+  
+  $hash->{operationInProgress} = 0;
   
 #  Log3 $name, 5, "I2C_TSL2561_GetLuminosity: end";
   
   return $lux;
 }
 
+#
 # get channel scale
+#
 sub I2C_TSL2561_GetChannelScale($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -1167,11 +1242,10 @@ sub I2C_TSL2561_GetChannelScale($) {
 
 =head2 I2C_TSL2561_CalculateLux
   Title:    I2C_TSL2561_CalculateLux
-  Function:  Converts the raw sensor values to the standard SI lux equivalent. Returns 0 if the sensor is saturated and the values are unreliable.
+  Function: Converts the raw sensor values to the standard SI lux equivalent. Returns 0 if the sensor is saturated and the values are unreliable.
   Returns:  number
-  Args:    named arguments:
-        -argument1 => hash:    $hash      hash of device
-
+  Args:     named arguments:
+            - argument1 => hash:    $hash      hash of device
 =cut
 
 sub I2C_TSL2561_CalculateLux($) {
@@ -1322,6 +1396,15 @@ sub I2C_TSL2561_CalculateLux($) {
   }
 }
 
+=head2 I2C_TSL2561_i2cread
+  Title:     I2C_TSL2561_i2cread
+  Function:  implements I2C read operation abstraction
+  Returns:   1 on success, 0 on error
+  Args:      - argument1 => hash
+             - argument2 => I2C register
+             - argument3 => number of bytes to read
+=cut
+
 sub I2C_TSL2561_i2cread($$$) {
   my ($hash, $reg, $nbyte) = @_;
   my $success = 1;
@@ -1357,8 +1440,10 @@ sub I2C_TSL2561_i2cread($$$) {
       nbyte => $nbyte
       });
     };
-    if ($hash->{$iodev->{NAME}.'_SENDSTAT'} eq 'error') {
-      readingsSingleUpdate($hash, 'state', STATE_I2C_ERROR, 1);
+    my $sendStat = $hash->{$iodev->{NAME}.'_SENDSTAT'};
+    if (defined($sendStat) && $sendStat eq 'error') {
+      readingsSingleUpdate($hash, 'state', TSL2561_STATE_I2C_ERROR, 1);
+      Log3 ($hash, 5, $hash->{NAME} . ": i2cread on $iodev->{NAME} failed");
       $success = 0;
     } 
   } else {
@@ -1393,8 +1478,10 @@ sub I2C_TSL2561_i2cwrite($$$) {
       data => join (' ',@data), 
       });
     };
-    if ($hash->{$iodev->{NAME}.'_SENDSTAT'} eq 'error') {
-      readingsSingleUpdate($hash, 'state', STATE_I2C_ERROR, 1);
+    my $sendStat = $hash->{$iodev->{NAME}.'_SENDSTAT'};
+    if (defined($sendStat) && $sendStat eq 'error') {
+      readingsSingleUpdate($hash, 'state', TSL2561_STATE_I2C_ERROR, 1);
+      Log3 ($hash, 5, $hash->{NAME} . ": i2cwrite on $iodev->{NAME} failed");
       $success = 0;
     }
   } else {
@@ -1525,7 +1612,8 @@ sub I2C_TSL2561_i2cwrite($$$) {
             Default: undefined<br>
         </li>
         <li>poll_interval<br>
-            Set the polling interval in minutes to query the sensor for new measured  values.<br>
+            Set the polling interval in minutes to query the sensor for new measured  values.
+            By changing this attribute a new illumination measurement will be triggered.<br>
             Default: 5, valid values: 1, 2, 5, 10, 20, 30<br>
         </li>
         <li>gain<br>
@@ -1560,6 +1648,24 @@ sub I2C_TSL2561_i2cwrite($$$) {
             Disable I2C bus access.<br>
             Default: 0, valid values: 0, 1
         </li>
+    </ul>
+    <p>
+
+    <b>Notes</b>
+    <ul>
+      <li>Because the measurement may take several 100 milliseconds a measurement cycle will be executed asynchronously, so
+          do not expect to have new values immediately available after "set update" returns. If autoGain or autoIntegrationTime
+          are enabled, more than one measurement cycle will be required if light conditions change.
+      </li>
+      <li>With HiPi and especially IODev there are several I2C interfaces available, some blocking, some non-blocking and 
+          some with different physical layers. The module has no knowledge of the specific properties of an interface and
+          therefore module operation and timing may not be exactly the same with each interface type.
+      </li>
+      <li>If AUTO is used as device address, one address per measurement cycle will be tested. Depending on your device address 
+          it may be necessary to execute "set update" several times to find your device.
+      </li>
+      <li>When using Firmata the I2C write/read delay attribute "i2c-config" of the FRM module can be set to any value.
+      </li>
     </ul>
     <br>
 </ul>
