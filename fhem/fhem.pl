@@ -4316,18 +4316,20 @@ createNtfyHash()
   my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
                  grep { $defs{$_}{NTFY_ORDER} } keys %defs;
   foreach my $d (@ntfyList) {
-    my $nd = $defs{$d}{NOTIFYDEV};
-    #Log 1, "Created notify class for $nd / $d" if($nd);
-    $ntfyHash{$nd} = [] if($nd && !defined($ntfyHash{$nd}));
+    if($defs{$d}{NOTIFYDEV}) {
+      foreach my $nd (split(",",$defs{$d}{NOTIFYDEV})) {
+        $ntfyHash{$nd} = [] if($nd && !defined($ntfyHash{$nd}));
+      }
+    }
   }
   $ntfyHash{"*"} = [];
   foreach my $d (@ntfyList) {
-    my $nd = $defs{$d}{NOTIFYDEV};
-    if($nd) {
-      push @{$ntfyHash{$nd}}, $d;
-
+    if($defs{$d}{NOTIFYDEV}) {
+      foreach my $nd (split(",",$defs{$d}{NOTIFYDEV})) {
+        push @{$ntfyHash{$nd}}, $d;
+      }
     } else {
-      foreach $nd (keys %ntfyHash) {
+      foreach my $nd (keys %ntfyHash) {
         push @{$ntfyHash{$nd}}, $d;
       }
     }
