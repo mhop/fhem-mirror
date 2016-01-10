@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLLIST: new attribute answMachine-is-missed-call to treat
+                          treat incoming calls, which were taken by an
+                          an answering machine, as "missed call". Only 
+                          relevant for list-type "missed-call".
   - change:  FB_CALLMONITOR: reading "missed_call_line" will not be triggered
                              anymore. Use internal_number instead, which
                              contains the same content
