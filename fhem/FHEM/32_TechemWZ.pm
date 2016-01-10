@@ -13,8 +13,6 @@ package main;
 use strict;
 use warnings;
 
-# TODO remove if debug ok
-use Data::Dumper;
 use Time::HiRes qw(time);
 
 my %typeText = (
@@ -119,6 +117,7 @@ TechemWZ_Notify (@) {
   return unless (($ntfyDev->{TYPE} eq 'CUL') || ($ntfyDev->{TYPE} eq 'Global'));
   foreach my $event (@{$ntfyDev->{CHANGED}}) {
     my @e = split(' ', $event);
+    next unless defined($e[0]);
     TechemWZ_Run($hash) if ($e[0] eq 'INITIALIZED');
     # patch CUL.pm
     TechemWZ_IOPatch($hash, $e[1]) if (($e[0] eq 'ATTR') && ($e[2] eq 'rfmode') && ($e[3] eq 'WMBus_T'));
