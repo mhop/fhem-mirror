@@ -115,8 +115,11 @@ sub I2C_PCA9685_Init($$) {													#
 	}
 	AssignIoPort($hash);
 	#Mode register wiederherstellen
+	I2C_PCA9685_i2cread($hash, 1, 1);		# Modreg2 schonmal lesen
+	I2C_PCA9685_i2cread($hash, 254, 1);		# Frequenz fuer Internal
+	select(undef, undef, undef, 0.1);
 	I2C_PCA9685_Attr(undef, $name, "modreg1", AttrVal($name, "modreg1", ""));
-	I2C_PCA9685_Attr(undef, $name, "modreg2", AttrVal($name, "modreg2", ""));
+	I2C_PCA9685_Attr(undef, $name, "modreg2", AttrVal($name, "modreg2", "OUTDRV"));
 	#alternative I2C Adressen wiederherstellen
 	I2C_PCA9685_i2cwrite($hash,AttrVal($name, $defaultreg{'sub1'}, "subadr1")		<< 1, 2) if defined AttrVal($name, "subadr1", undef);
 	I2C_PCA9685_i2cwrite($hash,AttrVal($name, $defaultreg{'sub2'}, "subadr2")		<< 1, 3) if defined AttrVal($name, "subadr2", undef);
@@ -126,7 +129,8 @@ sub I2C_PCA9685_Init($$) {													#
 	I2C_PCA9685_Attr(undef, $name, "prescale", AttrVal($name, "prescale", $defaultreg{'presc'})) if defined AttrVal($name, "prescale", undef);
 	#Portzustände wiederherstellen
 	foreach (0..15) {
-		I2C_PCA9685_Set($hash, $name,"Port".sprintf ('%02d', $_), ReadingsVal($name,"Port".$_,0) );
+		my $port = "Port".sprintf ('%02d', $_);
+		I2C_PCA9685_Set($hash, $name, $port, ReadingsVal($name,$port ,0) );
 	}
 	$hash->{STATE} = 'Initialized';
 	return;
@@ -175,29 +179,36 @@ sub I2C_PCA9685_Attr(@) {													#
 			my @def = split (' ',$hash->{DEF});
 			I2C_PCA9685_Init($hash,\@def) if (defined ($hash->{IODev}));
 		}
-	} elsif ($attr && $attr =~ m/^prescale$/i) {					#Frequenz
+	} elsif ($attr && $attr =~ m/^prescale$/i) {					# Frequenz
+		return undef unless ($main::init_done);
+		$val = 30 unless (defined($val)); 						#beim loeschen wieder auf Standard setzen
 		return "wrong value: $val for \"set $name $attr\" use 0-255"
 			unless(looks_like_number($val) && $val >= 0 && $val < 256);
 		my $modereg1 = defined $hash->{confregs}{0} ? $hash->{confregs}{0} : $defaultreg{'modreg1'};
 		my $modereg1mod = ( $modereg1 & 0x7F ) | $mr1{ "SLEEP" };
 		$msg = I2C_PCA9685_i2cwrite($hash, 0, $modereg1mod);	#sleep Mode aktivieren
-		$msg .= I2C_PCA9685_i2cwrite($hash, 254 ,$val);			#Frequenz aktualisieren
-		$msg .= I2C_PCA9685_i2cwrite($hash, 0 ,$modereg1);		#sleep Mode wieder aus
-		#Log3 $hash, 1, "testprescale: $modereg1 | $modereg1mod | $val";
-	} elsif ($attr && $attr =~ m/^(subadr[1-3])|allcalladr$/i) {
-		substr($attr,0,6,"");										#weitere I2C Adressen
+		$msg = I2C_PCA9685_i2cwrite($hash, 254 ,$val);			#Frequenz aktualisieren
+		$msg = I2C_PCA9685_i2cwrite($hash, 0 ,$modereg1);		#sleep Mode wieder aus
+		foreach (0..15) {										#Portzustände wiederherstellen
+			my $port = "Port".sprintf ('%02d', $_);
+			I2C_PCA9685_Set($hash, $name, $port, ReadingsVal($name,$port ,0) );
+		}
+	} elsif ($attr && $attr =~ m/^(subadr[1-3])|allcalladr$/i) {	# weitere I2C Adressen
+		return undef unless ($main::init_done);
+		substr($attr,0,6,"");										
 		my $regaddr = ($attr =~ m/^l/i) ? 5 : $attr + 1;
 		my $subadr  = $val =~ /^0.*$/ ? oct($val) : $val;
 		return "I2C Address not valid" if $subadr > 127;
 		$msg = I2C_PCA9685_i2cwrite($hash, $regaddr ,$subadr << 1);
-	} elsif ($attr && $attr =~ m/^modreg1$/i) {						#Mode register 1
+	} elsif ($attr && $attr =~ m/^modreg1$/i) {						# Mode register 1
+		return undef unless ($main::init_done);
 		my @inp = split(/,/, $val) if defined($val);
-		my $data = 32; 				# Auto increment soll immer gesetzt sein
+		my $data = 32; 											# Auto increment soll immer gesetzt sein
 		foreach (@inp) {
 			return "wrong value: $_ for \"attr $name $attr\" use comma separated list of " . join(',', (sort { $mr1{ $a } <=> $mr1{ $b } } keys %setsP) )
 				unless(exists($mr1{$_}));
 			$data |= $mr1{$_};
-			if ($_ eq "EXTCLK") {		#wenn externer Oszillator genutzt werden soll, zuerst den sleep mode aktivieren (wenn er gelöscht wird dann noch reset machen)
+			if ($_ eq "EXTCLK") {								#wenn externer Oszillator genutzt werden soll, zuerst den sleep mode aktivieren (wenn er gelöscht wird dann noch reset machen)
 				my $modereg1 = defined $hash->{confregs}{0} ? $hash->{confregs}{0} : $defaultreg{'modreg1'};
 				my $modereg1mod = ( $modereg1 & 0x7F ) | $mr1{ "SLEEP" };
 				Log3 $hash, 5, "$hash->{NAME}: sleep Mode aktivieren (Vorbereitung fuer EXTCLK)";
@@ -205,29 +216,28 @@ sub I2C_PCA9685_Attr(@) {													#
 				$data += $mr1{"SLEEP"};
 			}
 		}
-		#my $modereg1 = defined $hash->{confregs}{0} ? $hash->{confregs}{0} : $defaultreg{'modreg1'};
-		#Log3 $hash, 1, "test1: " . ($hash->{confregs}{0} & $mr1{"EXTCLK"}) . "|" . $hash->{confregs}{0} ."|". $mr1{"EXTCLK"} . " test2: ". ($data & $mr1{"EXTCLK"}) ."|" . $data ."|". $mr1{"EXTCLK"};
 		if ( defined $hash->{confregs}{0} && ($hash->{confregs}{0} & $mr1{"EXTCLK"}) == $mr1{"EXTCLK"} && ($data & $mr1{"EXTCLK"}) == 0 ) {  #reset wenn EXTCLK abgeschaltet wird
 			$msg = I2C_PCA9685_i2cwrite($hash, 0 , $data | 0x80);
 		}
 		$msg = I2C_PCA9685_i2cwrite($hash, 0 , $data);
 	} elsif ($attr && $attr =~ m/^modreg2$/i) {						#Mode register 2
+		return undef unless ($main::init_done);
 		my @inp = split(/,/, $val) if defined($val);
-		my $data = 0; 						# Auto increment soll immer gesetzt sein
+		my $data = 0; 											# Auto increment soll immer gesetzt sein
 		foreach (@inp) {
 			return "wrong value: $_ for \"attr $name $attr\" use comma separated list of " . join(',', (sort { $mr2{ $a } <=> $mr2{ $b } } keys %setsP) )
 				unless(exists($mr2{$_}));
 			$data += $mr2{$_};
 		}
-		$msg = I2C_PCA9685_i2cwrite($hash, 1, $data);
+		$msg = I2C_PCA9685_i2cwrite($hash, 1, $data) if ($hash->{confregs}{1} !=  $data);
 	} elsif ($attr && $attr eq "OnStartup") {
-	# Das muss noch angepasst werden !!!!!!!!!!!!!!!!!!!!
 	if (defined $val) {
 		foreach (split (/,/,$val)) {
 			my @pair = split (/=/,$_);
 			$msg = "wrong value: $_ for \"attr $hash->{NAME} $attr\" use comma separated <port>=on|off|0..4095|last where <port> = 0 - 15 " 
 				unless ( scalar(@pair) == 2 &&
-								(($pair[0] =~ m/^[0-9]|1[0-5]$/i && ( $pair[1] eq "last" || exists($setsP{$pair[1]}) || 
+								(($pair[0] =~ m/(^[0-9]|1[0-5])$/i && 
+								( $pair[1] eq "last" || exists($setsP{$pair[1]}) || 
 								( $pair[1] =~ m/^\d+$/ && $pair[1] < 4095 ) ) ) )
 								);		
 		}
@@ -237,59 +247,54 @@ sub I2C_PCA9685_Attr(@) {													#
 }
 #############################################################################
 sub I2C_PCA9685_Set($@) {													#
-	my ($hash, $name, @a) = @_;
-	my $port = $a[0];
-	my $val  = $a[1];
-
+	my ($hash, $name, @rest) = @_;
+    
 	my $dimstep = AttrVal($name, "dimstep", "1");
 	my $dimcount = AttrVal($name, "dimcount", "4095");
 	my $msg;
+	my $str = join(' ',@rest);
+	if ($str && $str =~ m/^(P(ort|)((0|)[0-9]|1[0-5]))/i) {						# (mehrere) Ports ( regex unfertig)	
+		#Log3 undef, 1, "$name: empfangen: $str";
+		if (index($str, ',') == -1) {											# Nur ein Port
+			my ($port, $dim, $delay) = split(' ', $str);
+			#Log3 undef, 1, "$name: ein Wert: $port, $dim, $delay";
+			$msg = I2C_PCA9685_SetPort($hash, $port, $dim, $delay);
+		} elsif ($str =~ m/^(P(ort|)((0|)[0-9]|1[0-5]))(( ){0,3},( ){0,3}(P(ort|)((0|)[0-9]|1[0-5])){1,})( ){1,3}\d*(( ){1,3}\d*)?( ){0,3}$/i ) { # Format P[ort]x,P[ort]y[,P..] Dimwert[ Delay]
+			my @einzel = split(',', $str);
+			my (undef, $dim, $delay) = split(' ', $einzel[$#einzel]);
+			foreach (reverse @einzel) {
+				my ($port) = split(' ', $_);
+				#Log3 undef, 1, "$name: mehrere Ports gleich: $port, $dim" . (defined $delay ? ", $delay" : "" );
+				$msg = I2C_PCA9685_SetPort($hash, $port, $dim, $delay);
+				last if defined($msg);
+			}
 
-	#my $str = join(" ",@a);
-	#if ($str $$ $str =~ m/^(P(ort|)((0|)[0-9]|1[0-5])) $/i) {														# mehrere Port (unfertig)
-	#	
-	#	if (index($str, ',') != -1) {											# wenn mehrere Kanaele gesetzt werden sollen
-	#		my @einzel = split(',', $str);
-	#		my (undef, $tval, $tdval) = split(' ', $einzel[$#einzel]);			# Dimmwerte von letztem Eintrag sichern 
-	#		Log3 $hash, 1, "Tempval: $tval | $tdval";
-	#		foreach (reverse @einzel) {
-	#			my @cmd = split(' ', $_);
-	#			my ($dim, $delay);
-	#			my $port = $cmd[0];
-	#			$port =~ tr/P(ort|)//d;
-	#			if (defined($cmd[1])) {
-	#				$dim  = $cmd[1];
-	#				$delay = $cmd[2];
-	#			} else {
-	#				$dim  = $tval;
-	#				$delay = $tdval;
-	#			}
-	#			Log3 $hash, 1, "Werte fuer $port: $dim | $delay";
-	#			#hier
-	#			
-	#			
-	#		}
-	#	}
-	#}
+		} elsif ($str =~ m/^(P(ort|)((0|)[0-9]|1[0-5]))( ){1,3}\d*(( ){1,3}\d*)?(( ){0,3},( ){0,3}(P(ort|)((0|)[0-9]|1[0-5]))( ){1,3}\d*(( ){1,3}\d*)?){1,}( ){0,3}$/i ) { # Mehrere Ports auf versch. Werte setzen
+			my @einzel = split(',', $str);
+			foreach (@einzel) {
+				my ($port, $dim, $delay) = split(' ', $_);
+				#Log3 undef, 1, "$name: mehrere Ports: $port, $dim" . (defined $delay ? ", $delay" : "" );	
+				$msg = I2C_PCA9685_SetPort($hash, $port, $dim, $delay);
+				last if defined($msg);
+			}
 	
-	if ( $port && $port =~ m/^(P(ort|)((0|)[0-9]|1[0-5]))|(All)$/i) {			# wenn ein Port oder alle
-		return "wrong value: $val for \"set $name $port\" use one of: " . 
-			join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) .
-			" 0..$dimcount"
-			unless(exists($setsP{$val}) || ($val >= 0 && $val <= $dimcount));
-		($port =~ m/^All$/i) ? $port = 61 : $port =~ tr/P(ort|)//d;			# Portnummer extrahieren oder 61 für All setzen (All Startreg ist 250)
-		my $reg = 6 + 4 * $port;											# Nummer des entspechenden LEDx_ON_L Registers (LED0_ON_L = 0x06) jede LED hat 4 Register
-		my $data = I2C_PCA9685_CalcRegs($hash, $port, $val, $a[2]);			# Registerinhalte berechnen
-		$msg = I2C_PCA9685_i2cwrite($hash,$reg, $data);						# Rausschicken
+		}
+	} elsif ($str =~ m/(a(ll|) \d{1,4}( \d{1,4})?)( ){0,3}$/i) {									# Alle Ports gleichzeitig
+		my ($port, $dim, $delay) = split(' ', $str);
+		$port = 61;											# Portnummer auf 61 für All setzen (All Startreg ist 250)
+		#Log3 undef, 1, "$name: alle Ports: $port, $dim" . (defined $delay ? ", $delay" : "" );	
+		$msg = I2C_PCA9685_SetPort($hash, $port, $dim, $delay);
 	} else {	
 		my $list = undef;
 		foreach (0..15) {
 			$list .= "Port" . sprintf ('%02d', $_) . ":slider,0,$dimstep,$dimcount ";
 		}
 		$list .= "all:slider,0,$dimstep,$dimcount";
-		$msg = "Unknown argument $a[0], choose one of " . $list;
+		$msg = "Unknown argument $str, choose one of " . $list;
 	}
-	return defined $msg ? $msg : undef 
+		
+	return (defined($msg) ? $msg."--" : undef);
+ 
 }
 		#my $string = 'AA55FF0102040810204080';
 		#my @hex    = ($string =~ /(..)/g);
@@ -305,6 +310,26 @@ sub I2C_PCA9685_Set($@) {													#
 		#@octets = unpack("C4", $bint);
 		#sprintf "%02X " x 4 . "\n", @octets;
 		# prints: 00 00 07 D1
+#############################################################################
+sub I2C_PCA9685_SetPort($$$$) {											#
+	my ($hash, $port, $dim, $delay) = @_;
+	my $name = $hash->{NAME};
+	my $dimcount = AttrVal($name, "dimcount", "4095");
+	$port =~ tr/P(ort|)//d;			#Nummer aus Port extrahieren
+	return "wrong dimvalue: $dim for \"set $name $port\" use one of: " . 
+			join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) .
+			" 0..$dimcount"
+			unless(exists($setsP{$dim}) || ($dim >= 0 && $dim <= $dimcount));
+	
+	return "wrong delayvalue: $delay for \"set $name $port $dim\" use one of: " . 
+			join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) .
+			" 0..$dimcount"
+			unless( not defined($delay) && ( exists($setsP{$delay}) || ($delay >= 0 && $delay <= $dimcount) ));
+	
+	my ($data, $reg) = I2C_PCA9685_CalcRegs($hash, $port, $dim, $delay);		# Registerinhalte berechnen
+	my $msg = I2C_PCA9685_i2cwrite($hash,$reg, $data);							# Rausschicken
+	return defined $msg ? $msg : undef	
+}
 #############################################################################
 sub I2C_PCA9685_CalcRegs($$$$) {											# Registerinhalte berechnen
 	my ($hash, $port, $val, $del) = @_;
@@ -338,7 +363,8 @@ sub I2C_PCA9685_CalcRegs($$$$) {											# Registerinhalte berechnen
 			$data = sprintf "%01d " x 4, @LEDx;
 		}
 	}
-	return $data;
+	my $reg = 6 + 4 * $port;									# Nummer des entspechenden LEDx_ON_L Registers (LED0_ON_L = 0x06) jede LED hat 4 Register
+	return $data, $reg;
 }
 #############################################################################
 sub I2C_PCA9685_Get($@) {													# Portwerte bei laden der Datailseite aktualisieren
@@ -380,7 +406,7 @@ sub I2C_PCA9685_i2cread($$$) {												# Lesebefehl an Hardware absetzen (ant
 sub I2C_PCA9685_i2cwrite($$$) {												# Schreibbefehl an Hardware absetzen
 	my ($hash, $reg, @data) = @_;
 	if (defined (my $iodev = $hash->{IODev})) {
-		Log3 $hash, 5, "$hash->{NAME}: $hash->{I2C_Address} write join (' ',@data) to Register $reg";
+		Log3 $hash, 5, "$hash->{NAME}: $hash->{I2C_Address} write " . join (' ',@data) . " to Register $reg";
 		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
 		direction  	=> "i2cwrite",
 		i2caddress 	=> $hash->{I2C_Address},
@@ -487,7 +513,7 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 		}
 	} elsif ($reg == 254) { 											#wenn Frequenz Register
 		my $clock = AttrVal($name, "extClock", 25);
-		$hash->{Frequency} = sprintf( "0x%.1f", $clock * 1000000 / (4096 * ($inh + 1)) ) . " Hz";
+		$hash->{Frequency} = sprintf( "%.1f", $clock * 1000000 / (4096 * ($inh + 1)) ) . " Hz";
 	} elsif ( $reg >= 0 && $reg < 6 ) {									#Konfigurations Register
 		$hash->{confregs}{$reg} = $inh;
 		#folgendes evtl noch weg
@@ -528,7 +554,7 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 	<b>Set</b>
 	<ul>
 		<code>set &lt;name&gt; &lt;port&gt; &lt;value&gt; [&lt;delay&gt;]</code><br><br>
-			<li>where <code>&lt;port&gt;</code> is one of Port00 to Port15<br>
+			<li>where <code>&lt;port&gt;</code> is one of Port0 to Port15<br>
 			and <code>&lt;value&gt;</code> one of<br>
 			<ul>
 			<code>
@@ -538,13 +564,19 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 			</code>
 			</ul>
 			<code>&lt;delay&gt;</code> defines the switch on time inside the PWM counting loop. It does not have an influence to the duty cycle. Default value is 0 and, possible values are 0..4095<br>	
-		</li>
-
+			</li><br>
+			<li>
+			It is also possible to change more than one port at the same time with comma separated values.<br>
+			Also P instead of Port is Possible. 
+			</li><br>
+		
 		<br>
 		Examples:
 		<ul>
 			<code>set mod1 Port04 543</code><br>
 			<code>set mod1 Port14 434 765</code><br>
+			<code>set mod1 Port1, Port14 434 765</code><br>
+			<code>set mod1 Port1 on, P14 434 765</code><br>
 		</ul><br>
 	</ul>
 
@@ -665,13 +697,19 @@ sub I2C_PCA9685_UpdReadings($$$) {											# vom IODev gesendete Werte in Read
 			</ul>
 			<code>&lt;delay&gt;</code> gibt den Wert innerhalb der Z&auml;hlschleife an, an dem der Ausgang eingeschaltet wird. Damit lassen sich die 16 Ausg&auml;nge zu unterschiedlichen Zeiten einschalten um Stromspitzen zu minimieren.
 			Dieser Wert hat keinerlei Einfluss auf die Pulsbreite. Stardartwert ist 0, m&ouml;gliche Werte sind 0..4095<br>	
-		</li>
+			</li>
+			<li>
+			Um mehrer Ports mit einem Befehl zu &auml;ndern k&ouml;nnen mehrere Befehle per Komma getrennt eingegeben werden.
+			Anstelle von Port kann auch einfach ein P verwendet werden.
+			</li>
 
 		<br>
 		Examples:
 		<ul>
 			<code>set mod1 Port04 543</code><br>
 			<code>set mod1 Port14 434 765</code><br>
+			<code>set mod1 Port1, Port14 434 765</code><br>
+			<code>set mod1 Port1 on, P14 434 765</code><br>
 		</ul><br>
 	</ul>
 
