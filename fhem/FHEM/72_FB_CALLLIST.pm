@@ -32,7 +32,6 @@ use warnings;
 use MIME::Base64;
 use Data::Dumper;
 
-
 sub 
 FB_CALLLIST_Initialize($)
 {
@@ -63,7 +62,7 @@ FB_CALLLIST_Initialize($)
                           $readingFnAttributes;
 
     $hash->{FW_detailFn}  = "FB_CALLLIST_makeTable";
-    $hash->{FW_summaryFn}  = "FB_CALLLIST_makeTable";
+    $hash->{FW_summaryFn} = "FB_CALLLIST_makeTable";
     $hash->{FW_atPageEnd} = 1;
 } 
 
@@ -76,21 +75,11 @@ sub FB_CALLLIST_Define($$)
     my $retval = undef;
     my $name = $a[0];
     my $callmonitor = $a[2];
-    if(!defined($callmonitor))
-    {
-        return "FB_CALLLIST_define: you must specify a device name for using FB_CALLLIST";
-    }
     
-    if(@a != 3) 
-    {
-        return "wrong define syntax: define <name> FB_CALLLIST <name>";
-    }
-    
-    unless(defined($defs{$callmonitor}))
-    {
-        return "FB_CALLLIST_define: the selected device $callmonitor does not exist.";
-    }
-    
+    return "FB_CALLLIST_define: you must specify a device name for using FB_CALLLIST" if(!defined($callmonitor));
+    return "wrong define syntax: define <name> FB_CALLLIST <name>" if(@a != 3);
+    return "FB_CALLLIST_define: the selected device $callmonitor does not exist." unless(defined($defs{$callmonitor}));
+
     unless($defs{$callmonitor}->{TYPE} eq "FB_CALLMONITOR")
     {
         Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR";
@@ -272,8 +261,7 @@ sub FB_CALLLIST_Notify($$)
     my ($hash,$d) = @_;
     
     return undef if(!defined($hash) or !defined($d));
-    return undef if(IsDisabled($hash->{NAME})); 
-    
+
     my $name = $hash->{NAME};
     
     if($d->{NAME} eq "global")
@@ -294,6 +282,7 @@ sub FB_CALLLIST_Notify($$)
 
     my $fb = $d->{NAME};
     
+    return undef if(IsDisabled($name)); 
     return undef if($fb ne $hash->{FB});
     return undef if(!grep(m/^event:/, @{$d->{CHANGED}}));
  
@@ -704,14 +693,8 @@ sub FB_CALLLIST_formatDuration($$)
     my $minute = ($data->{call_duration} / 60) % 60;
     my $seconds = int($data->{call_duration} % 60);
     
-    if($data->{missed_call})
-    {
-        return "-";
-    }
-    else
-    {
-        return sprintf("%02d:%02d:%02d", $hour, $minute, $seconds);
-    }
+    return "-"  if($data->{missed_call});
+    return sprintf("%02d:%02d:%02d", $hour, $minute, $seconds);
 }
 
 #####################################
