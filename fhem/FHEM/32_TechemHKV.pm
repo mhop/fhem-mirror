@@ -13,6 +13,12 @@ package main;
 use strict;
 use warnings;
 
+use Time::HiRes qw(time);
+
+my %typeText = (
+  '80' => 'Funkheizkostenverteiler data IIl'
+);
+
 sub 
 TechemHKV_Initialize(@) {
   my ($hash) = @_;
@@ -46,8 +52,11 @@ TechemHKV_Define(@) {
   $id = (length($id) == 8)?substr($id,-4):$id;
 
   $modules{TechemHKV}{defptr}{$id} = $hash;
-  $hash->{friendly} = $def if (defined($def));
-  $hash->{lid} = $id if (length($id) == 8);
+  $hash->{FRIENDLY} = $def if (defined($def));
+  $hash->{LID} = $id if (length($id) == 8);
+  
+  # create crc table if required
+  $data{WMBUS}{crc_table_13757} = TechemHKV_createCrcTable() unless (exists($data{WMBUS}{crc_table_13757}));
 
   # subscribe broadcast channels 
   # TechemHKV_subscribe($hash, 'foo');
@@ -82,6 +91,7 @@ TechemHKV_Notify (@) {
   return unless (($ntfyDev->{TYPE} eq 'CUL') || ($ntfyDev->{TYPE} eq 'Global'));
   foreach my $event (@{$ntfyDev->{CHANGED}}) {
     my @e = split(' ', $event);
+    next unless defined($e[0]);
     TechemHKV_Run($hash) if ($e[0] eq 'INITIALIZED');
     # patch CUL.pm
     TechemHKV_IOPatch($hash, $e[1]) if (($e[0] eq 'ATTR') && ($e[2] eq 'rfmode') && ($e[3] eq 'WMBus_T'));
@@ -106,6 +116,10 @@ TechemHKV_Receive(@) {
 
   my @t = localtime(time);
   my ($ats, $ts);
+  
+  $hash->{VERSION} = $msg->{version};
+  $hash->{METER} = $typeText{$msg->{type}};
+  
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "temp1", $msg->{temp1});
   readingsBulkUpdate($hash, "temp2", $msg->{temp2});
@@ -113,7 +127,7 @@ TechemHKV_Receive(@) {
 
   # day period changed
   $ats = ReadingsTimestamp($hash->{NAME},"current_period", "0");
-  $ts = "20".($msg->{last}->{year} + $msg->{actual}->{year})."-".$msg->{actual}->{month}."-".$msg->{actual}->{day}." 00:00:00";
+  $ts = sprintf ("%02d-%02d-%02d 00:00:00", $msg->{actual}->{year}, $msg->{actual}->{month}, $msg->{actual}->{day});
   if ($ats ne $ts) {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
@@ -125,7 +139,7 @@ TechemHKV_Receive(@) {
 
   # billing period changed
   $ats = ReadingsTimestamp($hash->{NAME},"previous_period", "0");
-  $ts = "20".$msg->{last}->{year}."-".$msg->{last}->{month}."-".$msg->{last}->{day}." 00:00:00";
+  $ts = sprintf ("20%02d-%02d-%02d 00:00:00", $msg->{last}->{year}, $msg->{last}->{month}, $msg->{last}->{day});
   if ($ats ne $ts) {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
@@ -167,11 +181,16 @@ TechemHKV_Parse(@) {
 
   my ($iohash, $msg) = @_;
   my ($message, $rssi);
-  ($msg, $rssi) = split (/::/, $msg); 
-  my @m = ((substr $msg,1) =~ m/../g);
+  ($msg, $rssi) = split (/::/, $msg);
+  $msg = TechemHKV_SanityCheck($msg);
+  return '' unless $msg;
+  
+  my @m = ($msg =~ m/../g);
 
   # parse
   ($message->{long}, $message->{short}) = TechemHKV_ParseID(@m);
+  $message->{type} = TechemHKV_ParseSubType(@m);
+  $message->{version} = TechemHKV_ParseSubVersion(@m);
   $message->{lastVal} = TechemHKV_ParseLastPeriod(@m);
   $message->{actualVal} = TechemHKV_ParseActualPeriod(@m);
   $message->{temp1} = TechemHKV_ParseT1(@m);
@@ -191,53 +210,160 @@ TechemHKV_Parse(@) {
 }
 
 sub
+TechemHKV_SanityCheck(@) {
+
+  my ($msg) = @_;
+  my $rssi;
+  my $t;
+  my $dbg = 4;
+    
+  #($msg, $rssi) = split (/::/, $msg); 
+  my @m = ((substr $msg,1) =~ m/../g);
+  # at least 3 chars
+  if (length($msg) < 3) {
+    Log3 ("TechemHKV", $dbg, "msg incomplete $msg");
+    return undef;
+  }
+  # msg length without crc blocks
+  my $l = hex(substr $msg, 1, 2) + 1;
+  # full crc payload blocks 
+  my $fb = int(($l - 10) / 16);
+  # remaining bytes ?
+  my $rb = ($l - 10) % 16;
+  # required len
+  my $rl = $l + 2 + ($fb * 2) + (($rb)?2:0);
+
+  if (($rl * 2) > (length($msg) -1)) {
+    Log3 ("TechemHKV", $dbg, "msg incomplete $msg");
+    return undef;
+  }
+
+  # CRC first 10 byte, then chunks of 16 byte then remaining
+  if ((substr $msg, 21, 4) ne TechemHKV_crc16_13757(substr $msg, 1, 20)) {
+    Log3 ("TechemHKV", $dbg, "crc error $msg");
+    return undef;
+  } else {
+    $t = substr $msg, 3, 18;
+  }
+  for (my $i = 0; $i<$fb; $i++) {
+    if ((substr $msg, 57 + ($i * 36), 4) ne TechemHKV_crc16_13757(substr $msg, 25 + ($i * 36), 32)) {
+      Log3 ("TechemHKV", $dbg, "crc error $msg");
+      return undef;
+    } else {
+      $t .= substr $msg, 25 + ($i * 36), 32;
+    }
+  }
+  if ($rb) {
+    if ((substr $msg, 25 + ($fb * 36) + ($rb * 2), 4) ne TechemHKV_crc16_13757(substr $msg, 25 + ($fb * 36), $rb * 2)) {
+      Log3 ("TechemHKV", $dbg, "crc error $msg");
+      return undef;
+    } else {
+      $t .= substr $msg, 25 + ($fb * 36), ($rb * 2);
+    }
+  }
+  return $t;
+}
+
+sub
 TechemHKV_ParseID(@) {
   my @m = @_;
-  return ("$m[7]$m[6]$m[5]$m[4]", "$m[5]$m[4]"); 
+  return ("$m[6]$m[5]$m[4]$m[3]", "$m[4]$m[3]");
+}
+
+sub
+TechemHKV_ParseSubType(@) {
+  my @m = @_;
+  return "$m[8]"; 
+}
+
+sub
+TechemHKV_ParseSubVersion(@) {
+  my @m = @_;
+  return "$m[7]"; 
 }
 
 sub
 TechemHKV_ParseLastPeriod(@) {
   my @m = @_;
-  return hex("$m[17]$m[16]"); 
+  return hex("$m[14]$m[13]"); 
 }
 
 sub
 TechemHKV_ParseActualPeriod(@) {
   my @m = @_;
-  return hex("$m[21]$m[20]"); 
+  return hex("$m[18]$m[17]"); 
 }
 
 sub
 TechemHKV_ParseT1(@) {
   my @m = @_;
-  return sprintf "%.2f", (hex("$m[23]$m[22]") / 100); 
+  return sprintf "%.2f", (hex("$m[20]$m[19]") / 100); 
 }
 
 sub
 TechemHKV_ParseT2(@) {
   my @m = @_;
-  return sprintf "%.2f", (hex("$m[25]$m[24]") / 100); 
+  return sprintf "%.2f", (hex("$m[22]$m[21]") / 100); 
 }
 
 sub
 TechemHKV_ParseActualDate(@) {
   my @m = @_;
-  my $b = hex("$m[19]$m[18]");
+  my @t = localtime(time);
+  my $b = hex("$m[16]$m[15]");
   my $d = ($b >> 4) & 0x1F;
   my $m = ($b >> 9) & 0x0F;
-  my $y = ($b >> 13) & 0x07;
+  my $y = $t[5] + 1900;
   return ($y, $m, $d);
 }
 
 sub
 TechemHKV_ParseLastDate(@) {
   my @m = @_;
-  my $b = hex("$m[15]$m[14]");
+  my $b = hex("$m[12]$m[11]");
   my $d = ($b >> 0) & 0x1F;
   my $m = ($b >> 5) & 0x0F;
   my $y = ($b >> 9) & 0x3F;
   return ($y, $m, $d);
+}
+
+sub 
+TechemHKV_createCrcTable(@) {
+
+  my $poly = 0x3D65;
+  my $c;
+  my @table;
+  
+  for (my $i=0; $i<256; $i++) {
+    $c = ($i << 8); 
+
+    for (my $j=0; $j<8; $j++) {
+      if (($c & 0x8000) != 0) {
+        $c = 0xFFFF & (($c << 1) ^ $poly);
+
+      } else {
+        $c <<= 1;
+
+      }
+    }
+    $table[$i] = $c;
+  }
+  return \@table;
+}
+
+sub
+TechemHKV_crc16_13757(@) {
+
+  my ($msg) = @_;
+  my @table = @{$data{WMBUS}{crc_table_13757}};
+
+  my @in = split '', pack 'H*', $msg;
+  my $crc = 0x0000;
+  for (my $i=0; $i<int(@in); $i++) {
+    $crc  = 0xffff & ( ($crc << 8) ^ $table[(($crc >> 8) ^ ord($in[$i]))] );
+
+  }
+  return sprintf ("%04lX", $crc ^ 0xFFFF);
 }
 
 # message bus ahead
