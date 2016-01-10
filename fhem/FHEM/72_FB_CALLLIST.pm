@@ -1271,12 +1271,12 @@ sub FB_CALLLIST_returnTableHeader($)
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
-    <li><a name="FB_CALLLIST_disable">disable</a></li>
+    <li><a name="FB_CALLLIST_disable">disable</a> 0,1</li>
     Optionales Attribut zur Deaktivierung der Anrufliste. Es werden dann keine Anruf-Events mehr verarbeitet und die Liste nicht weiter aktualisiert.
     <br><br>
     M&ouml;gliche Werte: 0 => Anrufliste ist aktiv, 1 => Anrufliste ist deaktiviert.<br>
     Standardwert ist 0 (aktiv)<br><br>
-    <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a></li>
+    <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...</li>
     Optionales Attribut zur Deaktivierung der Anrufliste innerhalb von bestimmten Zeitintervallen.
     Das Argument ist eine Leerzeichen-getrennte Liste von Minuszeichen-getrennten HH:MM Paaren (Stunde : Minute).
     Falls die aktuelle Uhrzeit zwischen diese Werte f&auml;llt, dann wird die Ausf&uuml;hrung, wie bei <a href="#FB_CALLLIST_disable">disable</a>, ausgesetzt.
