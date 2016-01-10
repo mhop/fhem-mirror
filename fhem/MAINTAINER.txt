@@ -331,6 +331,7 @@ FHEM/98_statistics.pm        tupol                http://forum.fhem.de Unterstue
 FHEM/98_structure.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_telnet.pm            rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/98_update.pm            rudolfkoenig         http://forum.fhem.de Sonstiges
+FHEM/98_version.pm           markusbloch          http://forum.fhem.de Sonstiges
 FHEM/98_weblink.pm           rudolfkoenig         http://forum.fhem.de Frontends
 FHME/98_weekprofile.pm       risiko               http://forum.fhem.de Frontends
 FHEM/99_SUNRISE_EL.pm        rudolfkoenig         http://forum.fhem.de Automatisierung
