@@ -132,8 +132,8 @@ HUEDevice_devStateIcon($)
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB004" );
 
 
-  return ".*:$s@#".CommandGet("","$name RGB").":ct:hue:pct" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
-  return ".*:on@#".CommandGet("","$name rgb").":ct:hue:pct" if( AttrVal($name, "color-icons", 0) != 0 );
+  return ".*:$s@#".CommandGet("","$name RGB").":toggle" if( $percent < 100 && AttrVal($name, "color-icons", 0) == 2 );
+  return ".*:on@#".CommandGet("","$name rgb").":toggle" if( AttrVal($name, "color-icons", 0) != 0 );
 
   return '<div style="width:32px;height:19px;'.
          'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
@@ -358,6 +358,33 @@ HUEDevice_SetParam($$@)
       #$obj->{'transitiontime'} = $value * 10 if( defined($value) );
       $defs{$name}->{helper}->{update_timeout} = 0;
     }
+
+  } elsif($cmd eq "satUp") {
+      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'sat_inc'}  = 25;
+      $obj->{'sat_inc'} = 0+$value if( defined($value) );
+  } elsif($cmd eq "satDown") {
+      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'sat_inc'}  = -25;
+      $obj->{'sat_inc'} = 0+$value if( defined($value) );
+
+  } elsif($cmd eq "hueUp") {
+      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'hue_inc'}  = 6553;
+      $obj->{'hue_inc'} = 0+$value if( defined($value) );
+  } elsif($cmd eq "hueDown") {
+      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'hue_inc'}  = -6553;
+      $obj->{'hue_inc'} = 0+$value if( defined($value) );
+
+  } elsif($cmd eq "ctUp") {
+      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'ct_inc'}  = 16;
+      $obj->{'ct_inc'} = 0+$value if( defined($value) );
+  } elsif($cmd eq "ctDown") {
+      $obj->{'on'}  = JSON::true if( !$defs{$name}->{helper}{on} );
+      $obj->{'ct_inc'}  = -16;
+      $obj->{'ct_inc'} = 0+$value if( defined($value) );
 
   } elsif($cmd eq "ct") {
     $obj->{'on'}  = JSON::true;
@@ -600,6 +627,7 @@ HUEDevice_Set($@)
   my $list = "off:noArg on:noArg toggle:noArg statusRequest:noArg";
   $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( $subtype =~ m/dimmer/ );
   $list .= " dimUp:noArg dimDown:noArg" if( !$hash->{helper}->{devtype} && $subtype =~ m/dimmer/ );
+  $list .= " satUp:noArg satDown:noArg hueUp:noArg hueDown:noArg ctUp:noArg ctDown:noArg " if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (7<<8) );
   $list .= " rgb:colorpicker,RGB" if( $subtype =~ m/color/ );
   $list .= " color:colorpicker,CT,2000,1,6500 ct:colorpicker,CT,154,1,500" if( $subtype =~ m/ct|ext/ );
   $list .= " hue:colorpicker,HUE,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( $subtype =~ m/color/ );
@@ -1132,10 +1160,16 @@ HUEDevice_Parse($$)
       <li>dimDown [delta]</li>
       <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set colortemperature to &lt;value&gt; in mireds (range is 154-500) or kelvin (rankge is 2000-6493).</li>
+      <li>ctUp [delta]</li>
+      <li>ctDown [delta]</li>
       <li>hue &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set hue to &lt;value&gt;; range is 0-65535.</li>
+      <li>humUp [delta]</li>
+      <li>humDown [delta]</li>
       <li>sat &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
+      <li>satUp [delta]</li>
+      <li>satDown [delta]</li>
       <li>xy &lt;x&gt;,&lt;y&gt; [&lt;ramp-time&gt;]<br>
         set the xy color coordinates to &lt;x&gt;,&lt;y&gt;</li>
       <li>alert [none|select|lselect]</li>
