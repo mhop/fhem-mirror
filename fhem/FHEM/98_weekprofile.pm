@@ -889,10 +889,8 @@ sub weekprofile_getEditLNK_MasterDev($$)
   Mit dem Modul 'weekprofile' können mehrere Wochenprofile verwaltet und an unterschiedliche Geräte 
   übertragen werden. Aktuell wird folgende Hardware unterstützt:
   <li>alle MAX Thermostate</li>
-  <li>andere weekprofile module</li>
-  <li>Homatic HM-CC-RT-DN </li>
-  <li>Homatic HM-CC-TC    </li>
-  <li>Homatic HM-TC-IT-WM-W-EU</li>
+  <li>andere weekprofile Module</li>
+  <li>Homatic (Kanal _Clima bzw. _Climate)</li>
   
   Im Standardfall wird das Modul mit einem Geräte = 'Master-Gerät' assoziiert,
   um das Wochenprofil vom Gerät grafisch bearbeiten zu können und andere Profile auf das Gerät zu übertragen.
@@ -901,6 +899,8 @@ sub weekprofile_getEditLNK_MasterDev($$)
   Dies wird vom Modul nicht berücksichtigt. So kann es sein, dass nach dem 
   Setzen\Aktualisieren eines Profils das Profil im Modul nicht mit dem Profil im Gerät 
   übereinstimmt solange das komplette Profil übertragen wurde.
+  <br>
+  Beim Homatic HM-TC-IT-WM-W-EU wird nur das 1. Profil (R_P1_...) genommen!
   <br><br>
   <a name="weekprofiledefine"></a>
   <b>Define</b>
@@ -985,9 +985,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   Currently the following devices will by supported:<br>
   <li>MAX</li>
   <li>other weekprofile modules</li>
-  <li>Homatic HM-CC-RT-DN </li>
-  <li>Homatic HM-CC-TC    </li>
-  <li>Homatic HM-TC-IT-WM-W-EU</li>
+  <li>Homatic channel _Clima or _Climate</li>
   
   In the normal case the module is assoziated with a master device.
   So a profile 'master' will be created automatically. This profile correnspond to the current active
@@ -998,6 +996,8 @@ sub weekprofile_getEditLNK_MasterDev($$)
   To transfer a profile to a device it needs a lot of Credits. 
   This is not taken into account from this module. So it could be happend that the profile in the module 
   and on the device are not equal until the whole profile is transfered completly.
+  <br>
+  If the maste device is Homatic HM-TC-IT-WM-W-EU then only the first profile (R_P1_...) will be used!
   <br><br>
   <a name="weekprofiledefine"></a>
   <b>Define</b>
