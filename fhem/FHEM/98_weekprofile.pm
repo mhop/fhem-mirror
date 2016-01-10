@@ -32,32 +32,14 @@ $DEV_READINGS{"Fri"}{"MAX"} = "weekprofile-6-Fri";
 $DEV_READINGS{"Sat"}{"MAX"} = "weekprofile-0-Sat";
 $DEV_READINGS{"Sun"}{"MAX"} = "weekprofile-1-Sun";
 
-# HM-CC-RT-DN
-$DEV_READINGS{"Mon"}{"HM-CC-RT-DN"} = "R_2_tempListMon";
-$DEV_READINGS{"Tue"}{"HM-CC-RT-DN"} = "R_3_tempListTue";
-$DEV_READINGS{"Wed"}{"HM-CC-RT-DN"} = "R_4_tempListWed";
-$DEV_READINGS{"Thu"}{"HM-CC-RT-DN"} = "R_5_tempListThu";
-$DEV_READINGS{"Fri"}{"HM-CC-RT-DN"} = "R_6_tempListFri";
-$DEV_READINGS{"Sat"}{"HM-CC-RT-DN"} = "R_0_tempListSat";
-$DEV_READINGS{"Sun"}{"HM-CC-RT-DN"} = "R_1_tempListSun";
-
-# HM-CC-TC
-$DEV_READINGS{"Mon"}{"HM-CC-TC"} = "R_2_tempListMon";
-$DEV_READINGS{"Tue"}{"HM-CC-TC"} = "R_3_tempListTue";
-$DEV_READINGS{"Wed"}{"HM-CC-TC"} = "R_4_tempListWed";
-$DEV_READINGS{"Thu"}{"HM-CC-TC"} = "R_5_tempListThu";
-$DEV_READINGS{"Fri"}{"HM-CC-TC"} = "R_6_tempListFri";
-$DEV_READINGS{"Sat"}{"HM-CC-TC"} = "R_0_tempListSat";
-$DEV_READINGS{"Sun"}{"HM-CC-TC"} = "R_1_tempListSun";
-
-# HM-TC-IT-WM-W-EU
-$DEV_READINGS{"Mon"}{"HM-TC-IT-WM-W-EU"} = "R_P1_2_tempListMon";
-$DEV_READINGS{"Tue"}{"HM-TC-IT-WM-W-EU"} = "R_P1_3_tempListTue";
-$DEV_READINGS{"Wed"}{"HM-TC-IT-WM-W-EU"} = "R_P1_4_tempListWed";
-$DEV_READINGS{"Thu"}{"HM-TC-IT-WM-W-EU"} = "R_P1_5_tempListThu";
-$DEV_READINGS{"Fri"}{"HM-TC-IT-WM-W-EU"} = "R_P1_6_tempListFri";
-$DEV_READINGS{"Sat"}{"HM-TC-IT-WM-W-EU"} = "R_P1_0_tempListSat";
-$DEV_READINGS{"Sun"}{"HM-TC-IT-WM-W-EU"} = "R_P1_1_tempListSun";
+# CUL_HM
+$DEV_READINGS{"Mon"}{"CUL_HM"} = "2_tempListMon";
+$DEV_READINGS{"Tue"}{"CUL_HM"} = "3_tempListTue";
+$DEV_READINGS{"Wed"}{"CUL_HM"} = "4_tempListWed";
+$DEV_READINGS{"Thu"}{"CUL_HM"} = "5_tempListThu";
+$DEV_READINGS{"Fri"}{"CUL_HM"} = "6_tempListFri";
+$DEV_READINGS{"Sat"}{"CUL_HM"} = "0_tempListSat";
+$DEV_READINGS{"Sun"}{"CUL_HM"} = "1_tempListSun";
 
 ############################################## 
 sub weekprofile_getDeviceType($;$)
@@ -75,14 +57,16 @@ sub weekprofile_getDeviceType($;$)
   my $type = undef;
 
   if ($devHash->{TYPE} =~ /CUL_HM/){
-    $type = AttrVal($device,"model","");
+    my $model = AttrVal($device,"model","");
+    $type = "CUL_HM" if ($model =~ m/.*(HM-CC|HM-TC).*/);
   }
   #avoid max shutter contact
   elsif ( ($devHash->{TYPE} =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
     $type = "MAX";
   }
   elsif ($devHash->{TYPE} =~ /dummy/){
-    $type = "MAX" if ($device =~ /.*MAX.*/); #dummy (FAKE WT) with name MAX inside for testing
+    $type = "MAX"     if ($device =~ m/.*MAX.*FAKE.*/);    #dummy (FAKE WT) with name MAX inside for testing
+    $type = "CUL_HM"  if ($device =~ m/.*CUL_HM.*FAKE.*/); #dummy (FAKE WT) with name CUL_HM inside for testing
   }
   
   return $type if ($sndrcv eq "RCV");
@@ -118,10 +102,11 @@ sub weekprofile_readDayProfile($@)
       my @parts = split('-',$interval);      
       $times[$i] = ($parts[1] ne "00:00") ? $parts[1] : "24:00";
     }
-  } else {
-    # Homatic
+  } elsif ($type eq "CUL_HM") {    
     # get temp list for the day
-    my $prf = ReadingsVal($device,$reading,"");
+    my $prf = ReadingsVal($device,"R_$reading","");
+    $prf = ReadingsVal($device,"R_P1_$reading","") if (!$prf); #HM-TC-IT-WM-W-EU
+    
     # split into time temp time temp etc.
     # 06:00 17.0 22:00 21.0 24:00 17.0
     my @timeTemp = split(' ', $prf);
@@ -199,7 +184,7 @@ sub weekprofile_sendDevProfile(@)
   if ($type eq "WEEKPROFILE") {
       my $json = JSON->new;
       my $json_text = $json->encode($prf->{DATA});
-      return fhem("set $device profile_data $prf->{NAME} $json_text");
+      return fhem("set $device profile_data $prf->{NAME} $json_text",1);
   }
 
   my $devPrf = weekprofile_readDevProfile($device,$type,$me);
@@ -271,7 +256,7 @@ sub weekprofile_sendDevProfile(@)
   if ($cmd) {
     $cmd =~ s/^\s+|\s+$//g; 
     Log3 $me, 4, "$me(sendDevProfile): $cmd";
-    $ret = fhem($cmd);
+    $ret = fhem($cmd,1);
   }
   return $ret;
 }
@@ -320,24 +305,25 @@ sub weekprofile_assignDev($)
     my $type     = weekprofile_getDeviceType($hash->{MASTERDEV}->{NAME});
     if (!defined($type)) {
       Log3 $me, 2, "$me(assignDev): device $hash->{MASTERDEV}->{NAME} not supported or defined";
-      return;
+    } else {    
+      $hash->{MASTERDEV}->{TYPE} = $type;
+      
+      my $prfDev = weekprofile_readDevProfile($hash->{MASTERDEV}->{NAME},$type, $me);
+    
+      $prf = {};
+      $prf->{NAME} = 'master';
+          
+      if(defined($prfDev)) {
+        $prf->{DATA} = $prfDev;
+      } else {
+        Log3 $me, 3, "WARNING master device $hash->{MASTERDEV}->{NAME} has no week profile - create default profile";
+        $prf->{DATA} = weekprofile_createDefaultProfile($hash); 
+      }
+      $hash->{STATE} = "assigned";
     }
-    
-    $hash->{MASTERDEV}->{TYPE} = $type;
-    
-    my $prfDev = weekprofile_readDevProfile($hash->{MASTERDEV}->{NAME},$type, $me);
+  }
   
-    $prf = {};
-    $prf->{NAME} = 'master';
-        
-    if(defined($prfDev)) {
-      $prf->{DATA} = $prfDev;
-    } else {
-      Log3 $me, 3, "WARNING master device $hash->{MASTERDEV}->{NAME} has no week profile - create default profile";
-      $prf->{DATA} = weekprofile_createDefaultProfile($hash); 
-    }
-    $hash->{STATE} = "assigned";
-  } else {
+  if (!defined($prf)) {
     my $prfDev = weekprofile_createDefaultProfile($hash);  
     if(defined($prfDev)) {
       $prf = {};
@@ -806,7 +792,7 @@ sub weekprofile_SummaryFn()
   my $args = "weekprofile,MODE:SHOW";
   $args .= ",MASTERDEV:$masterDev" if (defined($masterDev));
   
-  my $curr = undef;
+  my $curr = "";
   $curr = $hash->{PROFILES}[0]->{NAME} if (@{$hash->{PROFILES}} > 0 );
   
   $html .= "<table>";
