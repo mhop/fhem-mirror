@@ -1711,7 +1711,8 @@ FW_returnFileAsStream($$$$$)
     FW_outputChunk($FW_chash, $buf, $d);
   }
   close(FH);
-  FW_outputChunk($FW_chash, "<a name='end_of_file'></a>", $d)
+  FW_outputChunk($FW_chash, "<br/><a name='end_of_file'></a>".
+        "<a href='#top'>jump to the top</a><br/><br/>", $d)
     if($doEsc && $sz > 2048);
   FW_outputChunk($FW_chash, $suffix, $d);
 
