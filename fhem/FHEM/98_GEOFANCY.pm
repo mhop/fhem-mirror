@@ -274,7 +274,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
           )
           if (
             defined $webArgs->{latitude}
-            && (   $webArgs->{latitude} !~ m/^[0-9]+([.][0-9]+)?$/
+            && (   $webArgs->{latitude} !~ m/^-?\d+(\.\d+)?$/
                 || $webArgs->{latitude} < -90
                 || $webArgs->{latitude} > 90 )
           );
@@ -288,7 +288,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
           )
           if (
             defined $webArgs->{longitude}
-            && (   $webArgs->{longitude} !~ m/^[0-9]+([.][0-9]+)?$/
+            && (   $webArgs->{longitude} !~ m/^-?\d+(\.\d+)?$/
                 || $webArgs->{longitude} < -180
                 || $webArgs->{longitude} > 180 )
           );
