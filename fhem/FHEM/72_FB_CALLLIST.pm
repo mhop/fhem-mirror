@@ -280,7 +280,6 @@ sub FB_CALLLIST_Notify($$)
     {
         if(grep(m/^(?:ATTR $name .*|DELETEATTR $name .*|INITIALIZED|REREADCFG)$/, @{$d->{CHANGED}}))
         {
-            Log 3, "checked";
             # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
             FB_CALLLIST_cleanupList($hash);
 
