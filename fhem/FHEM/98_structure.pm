@@ -363,13 +363,13 @@ structure_Set($@)
 
   my $filter;
   if($list[1] ne "?") {
-    readingsSingleUpdate($hash, "state", @list[1..@list-1], 1);
+    my $state = join(" ", @list[1..@list-1]);
+    readingsSingleUpdate($hash, "state", $state, 1);
 
-    if( $hash->{STATE} =~ /^\[(FILTER=.*)]/ ) {
+    if($state =~ /^\[(FILTER=.*)]/) {
       delete($hash->{INSET}); # Experimental, Forum #35382
       $filter = $1;
-      @list = split(" ",
-                    $list[0] ." ". substr($hash->{STATE}, length($filter)+2));
+      @list = split(" ", $list[0] ." ". substr($state, length($filter)+2));
     }
   }
 
