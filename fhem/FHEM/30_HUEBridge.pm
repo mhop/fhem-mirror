@@ -367,9 +367,17 @@ HUEBridge_Set($@)
                 'lights' => HUEBridge_string2array($args[@args-1]),
     };
 
-    my $result = HUEBridge_Call($hash, undef, "scenes/$arg", $obj, 'PUT');
+    my $result;
+    if( 0 && $hash->{helper}{apiversion} && $hash->{helper}{apiversion} >= (1<<16) + (11<<8) ) {
+      #FIXME: currently not supported. LightScene needs scene id.
+      $obj->{recycle} = JSON::true if( $arg );
+      $result = HUEBridge_Call($hash, undef, "scenes", $obj, 'POST');
+    } else {
+      $result = HUEBridge_Call($hash, undef, "scenes/$arg", $obj, 'PUT');
+    }
 
     if( $result->{success} ) {
+      return "created $result->{success}{id}" if( $result->{success}{id} );
       return "created $arg";
     }
 
@@ -395,6 +403,14 @@ HUEBridge_Set($@)
     }
 
     my $result = HUEBridge_Call($hash, undef, "scenes/$arg/lights/$light/state", \%obj, 'PUT');
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef;
+
+  } elsif($cmd eq 'deletescene') {
+    return "usage: deletescene <id>" if( @args != 1 );
+
+    my $result = HUEBridge_Call($hash, undef, "scenes/$arg", undef, 'DELETE');
     return $result->{error}{description} if( $result->{error} );
 
     return undef;
@@ -433,7 +449,7 @@ HUEBridge_Set($@)
 
 
   } else {
-    my $list = "delete creategroup deletegroup savescene modifyscene scene deletewhitelist touchlink:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene deletewhitelist touchlink:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -442,7 +458,8 @@ HUEBridge_Set($@)
 sub
 HUEBridge_Get($@)
 {
-  my ($hash, $name, $cmd) = @_;
+  my ($hash, $name, $cmd, @args) = @_;
+  my ($arg, @params) = @args;
 
   return "$name: get needs at least one parameter" if( !defined($cmd) );
 
@@ -479,9 +496,16 @@ HUEBridge_Get($@)
     my $result =  HUEBridge_Call($hash, undef, 'scenes', undef);
     my $ret = "";
     foreach my $key ( sort {$a cmp $b} keys %{$result} ) {
-      $ret .= sprintf( "%-20s %-20s %s\n", $key, $result->{$key}{name}, join( ",", @{$result->{$key}{lights}} ) );
+      $ret .= sprintf( "%-20s %-20s", $key, $result->{$key}{name} );
+      $ret .= sprintf( "%i %i %i %-20s %-20s", $result->{$key}{recycle}, $result->{$key}{locked},$result->{$key}{version}, $result->{$key}{owner}, $result->{$key}{lastupdated} ) if( $arg eq 'detail' );
+      $ret .= sprintf( " %s\n", join( ",", @{$result->{$key}{lights}} ) );
     }
-    $ret = sprintf( "%-20s %-20s %s\n", "ID", "NAME", "LIGHTS" ) .$ret if( $ret );
+    if( $ret ) {
+      my $header = sprintf( "%-20s %-20s", "ID", "NAME" );
+      $header .= sprintf( "%s %s %s %-20s %-20s", "R", "L", "V", "OWNER", "LAST UPDATE" ) if( $arg eq 'detail' );
+      $header .= sprintf( " %s\n", "LIGHTS" );
+      $ret = $header . $ret;
+    }
     return $ret;
 
   } elsif($cmd eq 'sensors') {
@@ -1186,7 +1210,7 @@ HUEBridge_HTTP_Request($$$@)
       list the devices known to the bridge.</li>
     <li>groups<br>
       list the groups known to the bridge.</li>
-    <li>scenes<br>
+    <li>scenes [detail]<br>
       list the scenes known to the bridge.</li>
     <li>sensors<br>
       list the sensors known to the bridge.</li>
