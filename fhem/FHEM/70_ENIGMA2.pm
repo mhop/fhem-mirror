@@ -23,28 +23,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.4.5
-#
-# Major Version History:
-# - 1.4.0 - 2014-11-27
-# -- enhanced timerlist readings
-#
-# - 1.3.0 - 2013-12-21
-# -- rewrite for NonBlocking
-# -- add recordings indicator
-# -- add new command record
-#
-# - 1.2.0 - 2013-12-21
-# -- Add bouquet support e.g. for named channels
-#
-# - 1.1.0 - 2013-12-16
-# -- Improved logging & debugging
-# -- added default attributes for webCmd and devStateIcon
-#
-# - 1.0.0 - 2013-09-23
-# -- First release
-#
 ##############################################################################
 
 package main;
@@ -153,8 +131,8 @@ sub ENIGMA2_Get($@) {
 /^(power|input|volume|mute|channel|currentMedia|currentTitle|nextTitle|providername|servicevideosize)$/
       )
     {
-        if ( defined( $hash->{READINGS}{$what} ) ) {
-            return $hash->{READINGS}{$what}{VAL};
+        if ( ReadingsVal( $name, $what, "" ) ne "" ) {
+            return ReadingsVal( $name, $what, "" );
         }
         else {
             return "no such reading: $what";
@@ -169,7 +147,7 @@ sub ENIGMA2_Get($@) {
               . $hash->{helper}{ADDRESS} . ":"
               . $hash->{helper}{PORT}
               . "/web/stream.m3u?ref="
-              . urlEncode( $hash->{READINGS}{servicereference}{VAL} )
+              . urlEncode( ReadingsVal( $name, "servicereference", "-" ) )
               . "&device=phone";
         }
         else {
@@ -178,7 +156,7 @@ sub ENIGMA2_Get($@) {
               . $hash->{helper}{ADDRESS} . ":"
               . $hash->{helper}{PORT}
               . "/web/stream.m3u?ref="
-              . urlEncode( $hash->{READINGS}{servicereference}{VAL} )
+              . urlEncode( ReadingsVal( $name, "servicereference", "-" ) )
               . "&device=etc";
         }
     }
@@ -191,22 +169,12 @@ sub ENIGMA2_Get($@) {
 ###################################
 sub ENIGMA2_Set($@) {
     my ( $hash, @a ) = @_;
-    my $name    = $hash->{NAME};
-    my $state   = $hash->{READINGS}{state}{VAL};
-    my $channel = $hash->{READINGS}{channel}{VAL}
-      if ( defined( $hash->{READINGS}{channel}{VAL} ) );
+    my $name     = $hash->{NAME};
+    my $state    = ReadingsVal( $name, "state", "absent" );
+    my $presence = ReadingsVal( $name, "presence", "absent" );
+    my $input    = ReadingsVal( $name, "input", "" );
+    my $channel  = ReadingsVal( $name, "channel", "" );
     my $channels = "";
-
-    if ( defined( $hash->{READINGS}{input}{VAL} )
-        && $hash->{READINGS}{input}{VAL} ne "-" )
-    {
-        $hash->{helper}{lastInput} = $hash->{READINGS}{input}{VAL};
-    }
-    elsif ( !defined( $hash->{helper}{lastInput} ) ) {
-        $hash->{helper}{lastInput} = "";
-    }
-
-    my $input = $hash->{helper}{lastInput};
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Set()";
 
@@ -253,23 +221,19 @@ sub ENIGMA2_Set($@) {
       . ", choose one of toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg msg remoteControl channelUp:noArg channelDown:noArg play:noArg pause:noArg stop:noArg record:noArg showText channel:"
       . $channels;
     $usage .= " mute:-,on,off"
-      if ( defined( $hash->{READINGS}{mute}{VAL} )
-        && $hash->{READINGS}{mute}{VAL} eq "-" );
+      if ( ReadingsVal( $name, "mute", "-" ) eq "-" );
     $usage .= " mute:on,off"
-      if ( defined( $hash->{READINGS}{mute}{VAL} )
-        && $hash->{READINGS}{mute}{VAL} ne "-" );
+      if ( ReadingsVal( $name, "mute", "-" ) ne "-" );
     $usage .= " input:-,tv,radio"
-      if ( defined( $hash->{READINGS}{input}{VAL} )
-        && $hash->{READINGS}{input}{VAL} eq "-" );
+      if ( ReadingsVal( $name, "input", "-" ) eq "-" );
     $usage .= " input:tv,radio"
-      if ( defined( $hash->{READINGS}{input}{VAL} )
-        && $hash->{READINGS}{input}{VAL} ne "-" );
+      if ( ReadingsVal( $name, "input", "-" ) ne "-" );
 
     if ($adminMode) {
-        $usage .= " statusRequest:noArg";
-        $usage .= "	reboot:noArg";
+        $usage .= " reboot:noArg";
         $usage .= " restartGui:noArg";
         $usage .= " shutdown:noArg";
+        $usage .= " statusRequest:noArg";
     }
 
     my $cmd = '';
@@ -291,25 +255,22 @@ sub ENIGMA2_Set($@) {
 
     # toggle
     elsif ( lc( $a[1] ) eq "toggle" ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
-
-        if ( $hash->{READINGS}{state}{VAL} ne "on" ) {
+        if ( $state ne "on" ) {
             return ENIGMA2_Set( $hash, $name, "on" );
         }
         else {
             return ENIGMA2_Set( $hash, $name, "off" );
         }
-
     }
 
     # shutdown
     elsif ( lc( $a[1] ) eq "shutdown" ) {
+        return "Recordings running"
+          if ( ReadingsVal( $name, "recordings", "0" ) ne "0" );
+
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        return "Recordings running"
-          if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
-
-        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+        if ( $state ne "absent" ) {
             $cmd = "newstate=1";
             $result =
               ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "shutdown" );
@@ -321,12 +282,12 @@ sub ENIGMA2_Set($@) {
 
     # reboot
     elsif ( lc( $a[1] ) eq "reboot" ) {
+        return "Recordings running"
+          if ( ReadingsVal( $name, "recordings", "0" ) ne "0" );
+
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        return "Recordings running"
-          if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
-
-        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+        if ( $state ne "absent" ) {
             $cmd = "newstate=2";
             $result =
               ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "reboot" );
@@ -338,12 +299,12 @@ sub ENIGMA2_Set($@) {
 
     # restartGui
     elsif ( lc( $a[1] ) eq "restartgui" ) {
+        return "Recordings running"
+          if ( ReadingsVal( $name, "recordings", "0" ) ne "0" );
+
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        return "Recordings running"
-          if ( $hash->{READINGS}{recordings}{VAL} ne "0" );
-
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        if ( $state eq "on" ) {
             $cmd = "newstate=3";
             $result =
               ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "restartGui" );
@@ -355,7 +316,7 @@ sub ENIGMA2_Set($@) {
 
     # on
     elsif ( lc( $a[1] ) eq "on" ) {
-        if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
+        if ( $state eq "absent" ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " (wakeup)";
             my $wakeupCmd = AttrVal( $name, "wakeupCmd", "" );
             my $macAddr =
@@ -395,9 +356,8 @@ sub ENIGMA2_Set($@) {
 
     # off
     elsif ( lc( $a[1] ) eq "off" ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
-
-        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+        if ( $state ne "absent" ) {
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
             $cmd = "newstate=5";
             $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "off" );
         }
@@ -408,11 +368,11 @@ sub ENIGMA2_Set($@) {
 
     # volume
     elsif ( lc( $a[1] ) eq "volume" ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
-
         return "No argument given" if ( !defined( $a[2] ) );
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+
+        if ( $state eq "on" ) {
             my $_ = $a[2];
             if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
                 $cmd = "set=set" . $a[2];
@@ -430,9 +390,9 @@ sub ENIGMA2_Set($@) {
 
     # volumeUp/volumeDown
     elsif ( lc( $a[1] ) =~ /^(volumeup|volumedown)$/ ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
+        if ( $state eq "on" ) {
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( lc( $a[1] ) eq "volumeup" ) {
                 $cmd = "set=up";
             }
@@ -448,24 +408,24 @@ sub ENIGMA2_Set($@) {
 
     # mute
     elsif ( lc( $a[1] ) eq "mute" || lc( $a[1] ) eq "mutet" ) {
-        if ( defined( $a[2] ) ) {
-            Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
-        }
-        else {
-            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
-        }
+        if ( $state eq "on" ) {
+            if ( defined( $a[2] ) ) {
+                Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
+            }
+            else {
+                Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
+            }
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             if ( !defined( $a[2] ) || $a[2] eq "toggle" ) {
                 $cmd = "set=mute";
             }
             elsif ( lc( $a[2] ) eq "off" ) {
-                if ( $hash->{READINGS}{mute}{VAL} ne "off" ) {
+                if ( ReadingsVal( $name, "mute", "" ) ne "off" ) {
                     $cmd = "set=mute";
                 }
             }
             elsif ( lc( $a[2] ) eq "on" ) {
-                if ( $hash->{READINGS}{mute}{VAL} ne "on" ) {
+                if ( ReadingsVal( $name, "mute", "" ) ne "on" ) {
                     $cmd = "set=mute";
                 }
             }
@@ -482,9 +442,7 @@ sub ENIGMA2_Set($@) {
 
     # msg
     elsif ( lc( $a[1] ) eq "msg" ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
-
-        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+        if ( $state ne "absent" ) {
             return
 "No 1st argument given, choose one of yesno info message attention "
               if ( !defined( $a[2] ) );
@@ -502,6 +460,8 @@ sub ENIGMA2_Set($@) {
               . $_
               . " is not a valid integer between 0 and 49680"
               if ( !m/^\d+$/ || $_ < 0 || $_ > 49680 );
+
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
             my $i    = 4;
             my $text = $a[$i];
@@ -541,12 +501,14 @@ sub ENIGMA2_Set($@) {
 
     # remoteControl
     elsif ( lc( $a[1] ) eq "remotecontrol" ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2]
-          if !defined( $a[3] );
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2] . " " . $a[3]
-          if defined( $a[3] );
+        if ( $state ne "absent" ) {
 
-        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2]
+              if !defined( $a[3] );
+            Log3 $name, 3,
+              "ENIGMA2 set $name " . $a[1] . " " . $a[2] . " " . $a[3]
+              if defined( $a[3] );
+
             if ( !defined( $a[2] ) ) {
                 my $commandKeys = "";
                 for (
@@ -573,8 +535,8 @@ sub ENIGMA2_Set($@) {
             }
             elsif ( $request ne "" ) {
                 $cmd = "command=" . $request;
-                $cmd .= "&rcu=" . $attr{$name}{remotecontrol}
-                  if defined( $attr{$name}{remotecontrol} );
+                $cmd .= "&rcu=" . AttrVal( $name, "remotecontrol", "" )
+                  if ( AttrVal( $name, "remotecontrol", "" ) ne "" );
                 $cmd .= "&type=long"
                   if ( defined( $a[3] ) && lc( $a[3] ) eq "long" );
             }
@@ -605,9 +567,14 @@ sub ENIGMA2_Set($@) {
 
     # channel
     elsif ( lc( $a[1] ) eq "channel" ) {
+
+        return
+"No argument given, choose one of channel channelNumber servicereference "
+          if ( !defined( $a[2] ) );
+
         if (   defined( $a[2] )
-            && $hash->{READINGS}{presence}{VAL} eq "present"
-            && $hash->{READINGS}{state}{VAL} ne "on" )
+            && $presence eq "present"
+            && $state ne "on" )
         {
             Log3 $name, 4, "ENIGMA2 $name: indirect switching request to ON";
             ENIGMA2_Set( $hash, $name, "on" );
@@ -615,11 +582,7 @@ sub ENIGMA2_Set($@) {
 
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
-        return
-"No argument given, choose one of channel channelNumber servicereference "
-          if ( !defined( $a[2] ) );
-
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        if ( $state eq "on" ) {
             my $_ = $a[2];
             if ( defined( $hash->{helper}{bouquet}{$input}{$_}{sRef} ) ) {
                 $result = ENIGMA2_SendCommand( $hash, "zap",
@@ -662,7 +625,7 @@ sub ENIGMA2_Set($@) {
     elsif ( lc( $a[1] ) =~ /^(channelup|channeldown)$/ ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        if ( $state eq "on" ) {
             if ( lc( $a[1] ) eq "channelup" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RIGHT");
             }
@@ -678,27 +641,26 @@ sub ENIGMA2_Set($@) {
 
     # input
     elsif ( lc( $a[1] ) eq "input" ) {
+
+        return "No argument given, choose one of tv radio "
+          if ( !defined( $a[2] ) );
+
         if (   defined( $a[2] )
-            && $hash->{READINGS}{presence}{VAL} eq "present"
-            && $hash->{READINGS}{state}{VAL} ne "on" )
+            && $presence eq "present"
+            && $state ne "on" )
         {
             Log3 $name, 4, "ENIGMA2 $name: indirect switching request to ON";
             ENIGMA2_Set( $hash, $name, "on" );
         }
 
-        return "No argument given, choose one of tv radio "
-          if ( !defined( $a[2] ) );
-
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        if ( $state eq "on" ) {
             if ( lc( $a[2] ) eq "tv" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("TV");
-                $hash->{helper}{lastInput} = "tv";
             }
             elsif ( lc( $a[2] ) eq "radio" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RADIO");
-                $hash->{helper}{lastInput} = "radio";
             }
             else {
                 return
@@ -715,9 +677,9 @@ sub ENIGMA2_Set($@) {
 
     # play / pause
     elsif ( lc( $a[1] ) =~ /^(play|pause)$/ ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
+        if ( $state eq "on" ) {
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("PLAYPAUSE");
             $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
         }
@@ -728,9 +690,9 @@ sub ENIGMA2_Set($@) {
 
     # stop
     elsif ( lc( $a[1] ) eq "stop" ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
+        if ( $state eq "on" ) {
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
             $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("STOP");
             $result = ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
         }
@@ -741,9 +703,8 @@ sub ENIGMA2_Set($@) {
 
     # record
     elsif ( lc( $a[1] ) eq "record" ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
-
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
+        if ( $state eq "on" ) {
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
             $result = ENIGMA2_SendCommand( $hash, "recordnow" );
         }
         else {
@@ -753,11 +714,12 @@ sub ENIGMA2_Set($@) {
 
     # showText
     elsif ( lc( $a[1] ) eq "showtext" ) {
-        Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
-
-        if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
+        if ( $state ne "absent" ) {
             return "No argument given, choose one of messagetext "
               if ( !defined( $a[2] ) );
+
+            Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
+
             my $i    = 2;
             my $text = $a[$i];
             $i++;
@@ -862,9 +824,8 @@ sub ENIGMA2_SendCommand($$;$$) {
     my $name            = $hash->{NAME};
     my $address         = $hash->{helper}{ADDRESS};
     my $port            = $hash->{helper}{PORT};
-    my $http_method     = $attr{$name}{"http-method"};
-    my $http_noshutdown = ( defined( $attr{$name}{"http-noshutdown"} )
-          && $attr{$name}{"http-noshutdown"} eq "0" ) ? 0 : 1;
+    my $http_method     = AttrVal( $name, "http-method", "GET" );
+    my $http_noshutdown = AttrVal( $name, "http-noshutdown", "1" );
     my $timeout;
     $cmd = ( defined($cmd) ) ? $cmd : "";
 
@@ -873,18 +834,35 @@ sub ENIGMA2_SendCommand($$;$$) {
     my $http_proto;
     if ( $port eq "443" ) {
         $http_proto = "https";
+        Log3 $name, 5, "ENIGMA2 $name: port 443 implies using HTTPS";
     }
-    elsif ( defined( $attr{$name}{https} ) && $attr{$name}{https} eq "1" ) {
+    elsif ( AttrVal( $name, "https", "0" ) eq "1" ) {
+        Log3 $name, 5, "ENIGMA2 $name: explicit use of HTTPS";
         $http_proto = "https";
-        $port = "443" if ( $port eq "80" );
+        if ( $port eq "80" ) {
+            $port = "443";
+            Log3 $name, 5,
+              "ENIGMA2 $name: implicit change of from port 80 to 443";
+        }
     }
     else {
+        Log3 $name, 5, "ENIGMA2 $name: using unencrypted connection via HTTP";
         $http_proto = "http";
     }
-    my $http_user = $hash->{helper}{USER}
-      if ( defined( $hash->{helper}{USER} ) );
-    my $http_passwd = $hash->{helper}{PASSWORD}
-      if ( defined( $hash->{helper}{PASSWORD} ) );
+
+    my $http_user   = "";
+    my $http_passwd = "";
+    if (   defined( $hash->{helper}{USER} )
+        && defined( $hash->{helper}{PASSWORD} ) )
+    {
+        Log3 $name, 5, "ENIGMA2 $name: using BasicAuth";
+        $http_user   = $hash->{helper}{USER};
+        $http_passwd = $hash->{helper}{PASSWORD};
+    }
+    if ( defined( $hash->{helper}{USER} ) ) {
+        Log3 $name, 5, "ENIGMA2 $name: using BasicAuth (username only)";
+        $http_user = $hash->{helper}{USER};
+    }
     my $URL;
     my $response;
     my $return;
@@ -898,7 +876,7 @@ sub ENIGMA2_SendCommand($$;$$) {
         Log3 $name, 4, "ENIGMA2 $name: REQ $service/" . urlDecode($cmd);
     }
 
-    if ( defined($http_user) && defined($http_passwd) ) {
+    if ( $http_user ne "" && $http_passwd ne "" ) {
         $URL =
             $http_proto . "://"
           . $http_user . ":"
@@ -908,7 +886,7 @@ sub ENIGMA2_SendCommand($$;$$) {
           . $service;
         $URL .= $cmd if ( $http_method eq "GET" || $http_method eq "" );
     }
-    elsif ( defined($http_user) ) {
+    elsif ( $http_user ne "" ) {
         $URL =
             $http_proto . "://"
           . $http_user . "@"
@@ -923,12 +901,11 @@ sub ENIGMA2_SendCommand($$;$$) {
         $URL .= $cmd if ( $http_method eq "GET" || $http_method eq "" );
     }
 
-    if ( defined( $attr{$name}{timeout} )
-        && $attr{$name}{timeout} =~ /^\d+$/ )
-    {
-        $timeout = $attr{$name}{timeout};
+    if ( AttrVal( $name, "timeout", "3" ) =~ /^\d+$/ ) {
+        $timeout = AttrVal( $name, "timeout", "3" );
     }
     else {
+        Log3 $name, 3, "ENIGMA2 $name: wrong format in attribute 'timeout'";
         $timeout = 3;
     }
 
@@ -995,15 +972,13 @@ sub ENIGMA2_SendCommand($$;$$) {
 ###################################
 sub ENIGMA2_ReceiveCommand($$$) {
     my ( $param, $err, $data ) = @_;
-    my $hash    = $param->{hash};
-    my $name    = $hash->{NAME};
-    my $service = $param->{service};
-    my $cmd     = $param->{cmd};
-    my $state =
-      ( $hash->{READINGS}{state}{VAL} )
-      ? $hash->{READINGS}{state}{VAL}
-      : "";
-    my $type = ( $param->{type} ) ? $param->{type} : "";
+    my $hash     = $param->{hash};
+    my $name     = $hash->{NAME};
+    my $service  = $param->{service};
+    my $cmd      = $param->{cmd};
+    my $state    = ReadingsVal( $name, "state", "off" );
+    my $presence = ReadingsVal( $name, "presence", "absent" );
+    my $type     = ( $param->{type} ) ? $param->{type} : "";
     my $return;
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_ReceiveCommand()";
@@ -1025,29 +1000,17 @@ sub ENIGMA2_ReceiveCommand($$$) {
                   "ENIGMA2 $name: RCV TIMEOUT $service/" . urlDecode($cmd);
             }
 
-            if (
-                ( !defined( $hash->{helper}{AVAILABLE} ) )
-                or ( defined( $hash->{helper}{AVAILABLE} )
-                    and $hash->{helper}{AVAILABLE} eq 1 )
-              )
-            {
-                $hash->{helper}{AVAILABLE} = 0;
-                readingsBulkUpdate( $hash, "presence", "absent" );
-            }
+            $presence = "absent";
+            readingsBulkUpdate( $hash, "presence", $presence )
+              if ( readingsBulkUpdate( $hash, "presence", "" ) ne $presence );
         }
     }
 
     # data received
     elsif ($data) {
-        if (
-            ( !defined( $hash->{helper}{AVAILABLE} ) )
-            or ( defined( $hash->{helper}{AVAILABLE} )
-                and $hash->{helper}{AVAILABLE} eq 0 )
-          )
-        {
-            $hash->{helper}{AVAILABLE} = 1;
-            readingsBulkUpdate( $hash, "presence", "present" );
-        }
+        $presence = "present";
+        readingsBulkUpdate( $hash, "presence", $presence )
+          if ( readingsBulkUpdate( $hash, "presence", "" ) ne $presence );
 
         if ( !defined($cmd) || $cmd eq "" ) {
             Log3 $name, 4, "ENIGMA2 $name: RCV $service";
@@ -1129,14 +1092,17 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                             # trigger cache update
                             if (
-                                defined( $attr{$name}{ "bouquet-" . $input } ) )
+                                AttrVal( $name, "bouquet-" . $input, "" ) ne
+                                "" )
                             {
                                 ENIGMA2_SendCommand(
                                     $hash,
                                     "getservices",
                                     "sRef="
                                       . urlEncode(
-                                        $attr{$name}{ "bouquet-" . $input }
+                                        AttrVal(
+                                            $name, "bouquet-" . $input, ""
+                                        )
                                       ),
                                     "services-" . $input
                                 );
@@ -1150,7 +1116,6 @@ sub ENIGMA2_ReceiveCommand($$$) {
                                     "defBouquet-" . $input
                                 );
                             }
-
                         }
                     }
                 }
@@ -1193,9 +1158,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                       if ( !AttrVal( $name, "lightMode", 0 ) );
                 }
             }
-            elsif ( defined( $hash->{helper}{AVAILABLE} )
-                && $hash->{helper}{AVAILABLE} == 1 )
-            {
+            elsif ( $state ne "undefined" ) {
                 Log3 $name, 2,
                   "ENIGMA2 $name: ERROR: Undefined state of device";
 
@@ -1239,7 +1202,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                 $attr{$name}{ "bouquet-" . $input } =
                   $return->{e2service}{e2servicereference};
             }
-            elsif ( !defined( $attr{$name}{ "bouquet-" . $input } ) ) {
+            elsif ( AttrVal( $name, "bouquet-" . $input, "" ) eq "" ) {
                 Log3 $name, 3,
                     "ENIGMA2 $name: ERROR: Unable to read any "
                   . $input
@@ -1247,14 +1210,13 @@ sub ENIGMA2_ReceiveCommand($$$) {
             }
 
             # trigger cache update
-            if ( defined( $attr{$name}{ "bouquet-" . $input } ) ) {
-                ENIGMA2_SendCommand(
-                    $hash,
-                    "getservices",
-                    "sRef=" . urlEncode( $attr{$name}{ "bouquet-" . $input } ),
-                    "services-" . $input
-                );
-            }
+            ENIGMA2_SendCommand(
+                $hash,
+                "getservices",
+                "sRef="
+                  . urlEncode( AttrVal( $name, "bouquet-" . $input, "" ) ),
+                "services-" . $input
+            ) if ( AttrVal( $name, "bouquet-" . $input, "" ) ne "" );
         }
 
         # update cache of tv and radio channels
@@ -1358,7 +1320,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     "ENIGMA2 $name: ERROR: Unable to read "
                   . $input
                   . " bouquet '"
-                  . $attr{$name}{ "bouquet-" . $input }
+                  . AttrVal( $name, "bouquet-" . $input, "" )
                   . "' from device";
             }
             else {
@@ -1366,7 +1328,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     "ENIGMA2 $name: ERROR: Unable to read "
                   . $input
                   . " bouquet '"
-                  . $attr{$name}{ "bouquet-" . $input }
+                  . AttrVal( $name, "bouquet-" . $input, "" )
                   . "' from device";
             }
         }
@@ -1390,8 +1352,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         if (   $return->{e2about}{$e2reading} eq "False"
                             || $return->{e2about}{$e2reading} eq "True" )
                         {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne
+                            if ( ReadingsVal( $name, $reading, "" ) ne
                                 lc( $return->{e2about}{$e2reading} ) )
                             {
                                 readingsBulkUpdate( $hash, $reading,
@@ -1399,8 +1360,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             }
                         }
                         else {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne
+                            if ( ReadingsVal( $name, $reading, "" ) ne
                                 $return->{e2about}{$e2reading} )
                             {
                                 readingsBulkUpdate( $hash, $reading,
@@ -1409,19 +1369,18 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         }
 
                         # model
-                        if ( $reading eq "model" && $reading ne "" ) {
-                            my $model = $hash->{READINGS}{model}{VAL};
+                        if ( $reading eq "model"
+                            && ReadingsVal( $name, "model", "" ) ne "" )
+                        {
+                            my $model = ReadingsVal( $name, "model", "" );
                             $model =~ s/\s/_/g;
                             $hash->{model} = $model;
                         }
                     }
 
                     else {
-                        if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                            || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                        {
-                            readingsBulkUpdate( $hash, $reading, "-" );
-                        }
+                        readingsBulkUpdate( $hash, $reading, "-" )
+                          if ( ReadingsVal( $name, $reading, "" ) ne "-" );
                     }
                 }
 
@@ -1430,57 +1389,36 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                     # multiple
                     if ( ref( $return->{e2about}{e2hddinfo} ) eq "ARRAY" ) {
+                        Log3 $name, 5, "ENIGMA2 $name: multiple HDDs detected";
+
                         my $i        = 0;
                         my $arr_size = @{ $return->{e2about}{e2hddinfo} };
 
                         while ( $i < $arr_size ) {
                             my $counter     = $i + 1;
                             my $readingname = "hdd" . $counter . "_model";
-                            if (
-                                !defined(
-                                    $hash->{READINGS}{$readingname}{VAL}
-                                )
-                                || $hash->{READINGS}{$readingname}{VAL} ne
-                                $return->{e2about}{e2hddinfo}[$i]{model}
-                              )
-                            {
-                                readingsBulkUpdate( $hash, $readingname,
-                                    $return->{e2about}{e2hddinfo}[$i]{model} );
-                            }
+                            readingsBulkUpdate( $hash, $readingname,
+                                $return->{e2about}{e2hddinfo}[$i]{model} )
+                              if ( ReadingsVal( $name, $readingname, "" ) ne
+                                $return->{e2about}{e2hddinfo}[$i]{model} );
 
                             $readingname = "hdd" . $counter . "_capacity";
                             my @value =
                               split( / /,
                                 $return->{e2about}{e2hddinfo}[$i]{capacity} );
-                            if (
-                                !defined(
-                                    $hash->{READINGS}{$readingname}{VAL}
-                                )
-                                || (   @value
-                                    && $hash->{READINGS}{$readingname}{VAL} ne
-                                    $value[0] )
-                              )
-                            {
-                                readingsBulkUpdate( $hash, $readingname,
-                                    $value[0] );
-                            }
+                            readingsBulkUpdate( $hash, $readingname, $value[0] )
+                              if ( @value
+                                && ReadingsVal( $name, $readingname, "" ) ne
+                                $value[0] );
 
                             $readingname = "hdd" . $counter . "_free";
                             @value =
                               split( / /,
                                 $return->{e2about}{e2hddinfo}[$i]{free} );
-                            if (
-                                !defined(
-                                    $hash->{READINGS}{$readingname}{VAL}
-                                )
-                                || (   @value
-                                    && $hash->{READINGS}{$readingname}{VAL} ne
-                                    $value[0] )
-                              )
-                            {
-                                readingsBulkUpdate( $hash, $readingname,
-                                    $value[0] );
-                            }
+                            readingsBulkUpdate( $hash, $readingname, $value[0] )
+                              if ( @value
+                                && ReadingsVal( $name, $readingname, "" ) ne
+                                $value[0] );
 
                             $i++;
                         }
@@ -1488,42 +1426,33 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                     #  single
                     elsif ( ref( $return->{e2about}{e2hddinfo} ) eq "HASH" ) {
+                        Log3 $name, 5, "ENIGMA2 $name: single HDD detected";
+
                         my $readingname = "hdd1_model";
-                        if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
-                            || $hash->{READINGS}{$readingname}{VAL} ne
+                        readingsBulkUpdate( $hash, $readingname,
                             $return->{e2about}{e2hddinfo}{model} )
-                        {
-                            readingsBulkUpdate( $hash, $readingname,
-                                $return->{e2about}{e2hddinfo}{model} );
-                        }
+                          if ( ReadingsVal( $name, $readingname, "" ) ne
+                            $return->{e2about}{e2hddinfo}{model} );
 
                         $readingname = "hdd1_capacity";
                         my @value =
                           split( / /, $return->{e2about}{e2hddinfo}{capacity} );
-                        if (
-                            !defined( $hash->{READINGS}{$readingname}{VAL} )
-                            || (   @value
-                                && $hash->{READINGS}{$readingname}{VAL} ne
-                                $value[0] )
-                          )
-                        {
-                            readingsBulkUpdate( $hash, $readingname,
-                                $value[0] );
-                        }
+                        readingsBulkUpdate( $hash, $readingname, $value[0] )
+                          if ( @value
+                            && ReadingsVal( $name, $readingname, "" ) ne
+                            $value[0] );
 
                         $readingname = "hdd1_free";
                         @value =
                           split( / /, $return->{e2about}{e2hddinfo}{free} );
-                        if (
-                            !defined( $hash->{READINGS}{$readingname}{VAL} )
-                            || (   @value
-                                && $hash->{READINGS}{$readingname}{VAL} ne
-                                $value[0] )
-                          )
-                        {
-                            readingsBulkUpdate( $hash, $readingname,
-                                $value[0] );
-                        }
+                        readingsBulkUpdate( $hash, $readingname, $value[0] )
+                          if ( @value
+                            && ReadingsVal( $name, $readingname, "" ) ne
+                            $value[0] );
+                    }
+                    else {
+                        Log3 $name, 5,
+                          "ENIGMA2 $name: no HDD seems to be installed";
                     }
                 }
 
@@ -1535,19 +1464,19 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         ref( $return->{e2about}{e2tunerinfo}{e2nim} ) eq
                         "ARRAY" )
                     {
+                        Log3 $name, 5,
+                          "ENIGMA2 $name: multi-tuner configuration detected";
+
                         foreach my $tuner (
                             @{ $return->{e2about}{e2tunerinfo}{e2nim} } )
                         {
                             my $tuner_name = lc( $tuner->{name} );
                             $tuner_name =~ s/\s/_/g;
 
-                            if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
-                                || $hash->{READINGS}{$tuner_name}{VAL} ne
+                            readingsBulkUpdate( $hash, $tuner_name,
                                 $tuner->{type} )
-                            {
-                                readingsBulkUpdate( $hash, $tuner_name,
-                                    $tuner->{type} );
-                            }
+                              if ( ReadingsVal( $name, $tuner_name, "" ) ne
+                                $tuner->{type} );
                         }
                     }
 
@@ -1556,19 +1485,27 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         ref( $return->{e2about}{e2tunerinfo}{e2nim} ) eq
                         "HASH" )
                     {
+                        Log3 $name, 5,
+                          "ENIGMA2 $name: single-tuner configuration detected";
+
                         my $tuner_name =
                           lc( $return->{e2about}{e2tunerinfo}{e2nim}{name} );
                         $tuner_name =~ s/\s/_/g;
 
-                        if ( !defined( $hash->{READINGS}{$tuner_name}{VAL} )
-                            || $hash->{READINGS}{$tuner_name}{VAL} ne
+                        readingsBulkUpdate( $hash, $tuner_name,
                             $return->{e2about}{e2tunerinfo}{e2nim}{type} )
-                        {
-                            readingsBulkUpdate( $hash, $tuner_name,
-                                $return->{e2about}{e2tunerinfo}{e2nim}{type} );
-                        }
+                          if ( ReadingsVal( $name, $tuner_name, "" ) ne
+                            $return->{e2about}{e2tunerinfo}{e2nim}{type} );
+                    }
+                    else {
+                        Log3 $name, 5,
+                          "ENIGMA2 $name: no tuner could be detected";
                     }
                 }
+            }
+            else {
+                Log3 $name, 2,
+"ENIGMA2 $name: ERROR: boxinfo could not be read - /about sent malformed response";
             }
         }
 
@@ -1601,35 +1538,30 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         if (   $return->{e2service}{$e2reading} eq "False"
                             || $return->{e2service}{$e2reading} eq "True" )
                         {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne
-                                lc( $return->{e2service}{$e2reading} ) )
-                            {
-                                readingsBulkUpdate( $hash, $reading,
-                                    lc( $return->{e2service}{$e2reading} ) );
-                            }
+                            Log3 $name, 5,
+"ENIGMA2 $name: transforming value of $reading to lower case";
+
+                            $return->{e2service}{$e2reading} =
+                              lc( $return->{e2service}{$e2reading} );
                         }
-                        else {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne
-                                $return->{e2service}{$e2reading} )
-                            {
-                                readingsBulkUpdate( $hash, $reading,
-                                    $return->{e2service}{$e2reading} );
 
-                                # channel
-                                if ( $reading eq "servicename" ) {
-                                    my $val = $return->{e2service}{$e2reading};
-                                    $val =~ s/\s/_/g;
-                                    readingsBulkUpdate( $hash, "channel",
-                                        $val );
-                                }
+                        if ( ReadingsVal( $name, $reading, "" ) ne
+                            $return->{e2service}{$e2reading} )
+                        {
+                            readingsBulkUpdate( $hash, $reading,
+                                $return->{e2service}{$e2reading} );
 
-                                # currentMedia
-                                readingsBulkUpdate( $hash, "currentMedia",
-                                    $return->{e2service}{$e2reading} )
-                                  if $reading eq "servicereference";
+                            # channel
+                            if ( $reading eq "servicename" ) {
+                                my $val = $return->{e2service}{$e2reading};
+                                $val =~ s/\s/_/g;
+                                readingsBulkUpdate( $hash, "channel", $val );
                             }
+
+                            # currentMedia
+                            readingsBulkUpdate( $hash, "currentMedia",
+                                $return->{e2service}{$e2reading} )
+                              if $reading eq "servicereference";
                         }
 
                         # input
@@ -1637,30 +1569,40 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             my @servicetype =
                               split( /:/, $return->{e2service}{$e2reading} );
 
-                            if (
+                            if (   defined( $servicetype[2] )
+                                && $servicetype[2] ne "2"
+                                && $servicetype[2] ne "10" )
+                            {
+                                Log3 $name, 5,
+"ENIGMA2 $name: detected servicereference type: tv";
+                                readingsBulkUpdate( $hash, "input", "tv" )
+                                  if (
+                                    ReadingsVal( $name, "input", "" ) ne "tv" );
+
+                            }
+                            elsif (
                                 defined( $servicetype[2] )
                                 && (   $servicetype[2] eq "2"
                                     || $servicetype[2] eq "10" )
-                                && ( !defined( $hash->{READINGS}{input}{VAL} )
-                                    || $hash->{READINGS}{input}{VAL} ne
-                                    "radio" )
                               )
                             {
-                                $hash->{helper}{lastInput} = "radio";
-                                readingsBulkUpdate( $hash, "input", "radio" );
+                                Log3 $name, 5,
+"ENIGMA2 $name: detected servicereference type: radio";
+                                readingsBulkUpdate( $hash, "input", "radio" )
+                                  if ( ReadingsVal( $name, "input", "" ) ne
+                                    "radio" );
                             }
-                            elsif ( !defined( $hash->{READINGS}{input}{VAL} )
-                                || $hash->{READINGS}{input}{VAL} ne "tv" )
-                            {
-                                $hash->{helper}{lastInput} = "tv";
-                                readingsBulkUpdate( $hash, "input", "tv" );
+                            else {
+                                Log3 $name, 2,
+"ENIGMA2 $name: ERROR: servicereference type could not be detected (neither 'tv' nor 'radio')";
                             }
                         }
                     }
                     else {
-                        if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                            || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                        {
+                        Log3 $name, 5,
+"ENIGMA2 $name: received no value for reading $reading";
+
+                        if ( ReadingsVal( $name, $reading, "" ) ne "-" ) {
                             readingsBulkUpdate( $hash, $reading, "-" );
 
                             # channel
@@ -1681,11 +1623,16 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     my $eventNext;
 
                     if ( ref( $return->{e2eventlist}{e2event} ) eq "ARRAY" ) {
+                        Log3 $name, 5,
+                          "ENIGMA2 $name: detected multiple event details";
+
                         $eventNow  = $return->{e2eventlist}{e2event}[0];
                         $eventNext = $return->{e2eventlist}{e2event}[1]
                           if ( defined( $return->{e2eventlist}{e2event}[1] ) );
                     }
                     else {
+                        Log3 $name, 5,
+                          "ENIGMA2 $name: detected single event details";
                         $eventNow = $return->{e2eventlist}{e2event};
                     }
 
@@ -1705,8 +1652,10 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             && $eventNow->{$e2reading} ne "0"
                             && $eventNow->{$e2reading} ne "" )
                         {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne
+                            Log3 $name, 5,
+"ENIGMA2 $name: detected valid reading $e2reading for current event";
+
+                            if ( ReadingsVal( $name, $reading, "" ) ne
                                 $eventNow->{$e2reading} )
                             {
                                 readingsBulkUpdate( $hash, $reading,
@@ -1719,9 +1668,10 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             }
                         }
                         else {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                            {
+                            Log3 $name, 5,
+"ENIGMA2 $name: no valid reading $e2reading found for current event";
+
+                            if ( ReadingsVal( $name, $reading, "" ) ne "-" ) {
                                 readingsBulkUpdate( $hash, $reading, "-" );
 
                                 # currentTitle
@@ -1737,8 +1687,10 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             && $eventNext->{$e2reading} ne "0"
                             && $eventNext->{$e2reading} ne "" )
                         {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne
+                            Log3 $name, 5,
+"ENIGMA2 $name: detected valid reading $e2reading for next event";
+
+                            if ( ReadingsVal( $name, $reading, "" ) ne
                                 $eventNext->{$e2reading} )
                             {
                                 readingsBulkUpdate( $hash, $reading,
@@ -1751,9 +1703,10 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             }
                         }
                         else {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                            {
+                            Log3 $name, 5,
+"ENIGMA2 $name: no valid reading $e2reading found for next event";
+
+                            if ( ReadingsVal( $name, $reading, "" ) ne "-" ) {
                                 readingsBulkUpdate( $hash, $reading, "-" );
 
                                 # nextTitle
@@ -1787,24 +1740,19 @@ sub ENIGMA2_ReceiveCommand($$$) {
                                     $t[1], $t[0] );
                             }
                             else {
-                                $timestring = substr(
+                                $timestring =
+                                  substr(
                                     FmtDateTime( $eventNow->{$e2reading} ),
                                     11 );
                             }
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne
-                                $timestring )
-                            {
-                                readingsBulkUpdate( $hash, $reading,
-                                    $timestring );
-                            }
+
+                            readingsBulkUpdate( $hash, $reading, $timestring )
+                              if ( ReadingsVal( $name, $reading, "" ) ne
+                                $timestring );
                         }
                         else {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                            {
-                                readingsBulkUpdate( $hash, $reading, "-" );
-                            }
+                            readingsBulkUpdate( $hash, $reading, "-" )
+                              if ( ReadingsVal( $name, $reading, "" ) ne "-" );
                         }
 
                         # next event
@@ -1823,28 +1771,28 @@ sub ENIGMA2_ReceiveCommand($$$) {
                                     $t[1], $t[0] );
                             }
                             else {
-                                $timestring = substr(
+                                $timestring =
+                                  substr(
                                     FmtDateTime( $eventNext->{$e2reading} ),
                                     11 );
                             }
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne
-                                $timestring )
-                            {
-                                readingsBulkUpdate( $hash, $reading,
-                                    $timestring );
-                            }
+
+                            readingsBulkUpdate( $hash, $reading, $timestring )
+                              if ( ReadingsVal( $name, $reading, "" ) ne
+                                $timestring );
                         }
                         else {
-                            if ( !defined( $hash->{READINGS}{$reading}{VAL} )
-                                || $hash->{READINGS}{$reading}{VAL} ne "-" )
-                            {
-                                readingsBulkUpdate( $hash, $reading, "-" );
-                            }
+                            readingsBulkUpdate( $hash, $reading, "-" )
+                              if ( ReadingsVal( $name, $reading, "" ) ne "-" );
                         }
                     }
                 }
             }
+            else {
+                Log3 $name, 2,
+"ENIGMA2 $name: ERROR: current service info could not be read - /getcurrent sent malformed response";
+            }
+
         }
 
         # timerlist
@@ -1864,6 +1812,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
             if ( ref($return) eq "HASH" ) {
                 if ( ref( $return->{e2timer} ) eq "HASH" ) {
+                    Log3 $name, 5,
+                      "ENIGMA2 $name: detected single event in timerlist";
 
                     # queued recording
                     if (   defined( $return->{e2timer}{e2state} )
@@ -1931,6 +1881,10 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     }
                 }
                 elsif ( ref( $return->{e2timer} ) eq "ARRAY" ) {
+
+                    Log3 $name, 5,
+                      "ENIGMA2 $name: detected multiple events in timerlist";
+
                     my $i        = 0;
                     my $arr_size = @{ $return->{e2timer} };
 
@@ -2008,17 +1962,16 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     }
                 }
             }
+            else {
+                Log3 $name, 5, "ENIGMA2 $name: timerlist seems to be empty";
+            }
 
             my $recordingsElementsCount = scalar( keys %recordings );
             my $readingname;
 
-            if ( !defined( $hash->{READINGS}{recordings}{VAL} )
-                || $hash->{READINGS}{recordings}{VAL} ne
-                $recordingsElementsCount )
-            {
-                readingsBulkUpdate( $hash, "recordings",
-                    $recordingsElementsCount );
-            }
+            readingsBulkUpdate( $hash, "recordings", $recordingsElementsCount )
+              if ( ReadingsVal( $name, "recordings", "" ) ne
+                $recordingsElementsCount );
 
             if ( $recordingsElementsCount > 0 ) {
                 my $i = 0;
@@ -2027,131 +1980,92 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     $i++;
 
                     $readingname = "recordings" . $i . "_servicename";
-                    if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
-                        || $hash->{READINGS}{$readingname}{VAL} ne
+                    readingsBulkUpdate( $hash, $readingname,
                         $recordings{$i}{servicename} )
-                    {
-                        readingsBulkUpdate( $hash, $readingname,
-                            $recordings{$i}{servicename} );
-                    }
+                      if ( ReadingsVal( $name, $readingname, "" ) ne
+                        $recordings{$i}{servicename} );
 
                     $readingname = "recordings" . $i . "_name";
-                    if ( !defined( $hash->{READINGS}{$readingname}{VAL} )
-                        || $hash->{READINGS}{$readingname}{VAL} ne
+                    readingsBulkUpdate( $hash, $readingname,
                         $recordings{$i}{name} )
-                    {
-                        readingsBulkUpdate( $hash, $readingname,
-                            $recordings{$i}{name} );
-                    }
-
+                      if ( ReadingsVal( $name, $readingname, "" ) ne
+                        $recordings{$i}{name} );
                 }
             }
 
             # clear inactive recordingsX_* readings
-            my $i = $recordingsElementsCount + 1;
-            while ( $i < 21 ) {
-                $readingname = "recordings" . $i . "_name";
-                if ( defined( $hash->{READINGS}{$readingname}{VAL} )
-                    && $hash->{READINGS}{$readingname}{VAL} ne "-" )
-                {
-                    readingsBulkUpdate( $hash, $readingname, "-" );
-                }
-
-                $readingname = "recordings" . $i . "_servicename";
-                if ( defined( $hash->{READINGS}{$readingname}{VAL} )
-                    && $hash->{READINGS}{$readingname}{VAL} ne "-" )
-                {
-                    readingsBulkUpdate( $hash, $readingname, "-" );
-                }
-
-                $i++;
-            }
-
-            if ( !defined( $hash->{READINGS}{recordings_next}{VAL} )
-                || $hash->{READINGS}{recordings_next}{VAL} ne
-                $recordingsNext_time )
+            foreach my $recReading (
+                grep { /recordings\d_.*/ }
+                keys %{ $defs{$name}{READINGS} }
+              )
             {
-                readingsBulkUpdate( $hash, "recordings_next",
-                    $recordingsNext_time );
+                Log3 $name, 5,
+                  "ENIGMA2 $name: old reading $recReading was deleted";
+                delete( $defs{$name}{READINGS}{$recReading} );
             }
 
-            if ( !defined( $hash->{READINGS}{recordings_next_hr}{VAL} )
-                || $hash->{READINGS}{recordings_next_hr}{VAL} ne
+            readingsBulkUpdate( $hash, "recordings_next", $recordingsNext_time )
+              if ( ReadingsVal( $name, "recordings_next", "" ) ne
+                $recordingsNext_time );
+
+            readingsBulkUpdate( $hash, "recordings_next_hr",
                 $recordingsNext_time_hr )
-            {
-                readingsBulkUpdate( $hash, "recordings_next_hr",
-                    $recordingsNext_time_hr );
-            }
+              if ( ReadingsVal( $name, "recordings_next_hr", "" ) ne
+                $recordingsNext_time_hr );
 
-            if ( !defined( $hash->{READINGS}{recordings_next_counter}{VAL} )
-                || $hash->{READINGS}{recordings_next_counter}{VAL} ne
+            readingsBulkUpdate( $hash, "recordings_next_counter",
                 $recordingsNext_counter )
-            {
-                readingsBulkUpdate( $hash, "recordings_next_counter",
-                    $recordingsNext_counter );
-            }
+              if ( ReadingsVal( $name, "recordings_next_counter", "" ) ne
+                $recordingsNext_counter );
 
-            if ( !defined( $hash->{READINGS}{recordings_next_counter_hr}{VAL} )
-                || $hash->{READINGS}{recordings_next_counter_hr}{VAL} ne
+            readingsBulkUpdate( $hash, "recordings_next_counter_hr",
                 $recordingsNext_counter_hr )
-            {
-                readingsBulkUpdate( $hash, "recordings_next_counter_hr",
-                    $recordingsNext_counter_hr );
-            }
+              if ( ReadingsVal( $name, "recordings_next_counter_hr", "" ) ne
+                $recordingsNext_counter_hr );
 
-            if ( !defined( $hash->{READINGS}{recordings_next_servicename}{VAL} )
-                || $hash->{READINGS}{recordings_next_servicename}{VAL} ne
+            readingsBulkUpdate( $hash, "recordings_next_servicename",
                 $recordingsNextServicename )
-            {
-                readingsBulkUpdate( $hash, "recordings_next_servicename",
-                    $recordingsNextServicename );
-            }
+              if ( ReadingsVal( $name, "recordings_next_servicename", "" ) ne
+                $recordingsNextServicename );
 
-            if ( !defined( $hash->{READINGS}{recordings_next_name}{VAL} )
-                || $hash->{READINGS}{recordings_next_name}{VAL} ne
+            readingsBulkUpdate( $hash, "recordings_next_name",
                 $recordingsNextName )
-            {
-                readingsBulkUpdate( $hash, "recordings_next_name",
-                    $recordingsNextName );
-            }
+              if ( ReadingsVal( $name, "recordings_next_name", "" ) ne
+                $recordingsNextName );
 
-            if ( !defined( $hash->{READINGS}{recordings_error}{VAL} )
-                || $hash->{READINGS}{recordings_error}{VAL} ne
-                $recordingsError )
-            {
-                readingsBulkUpdate( $hash, "recordings_error",
-                    $recordingsError );
-            }
+            readingsBulkUpdate( $hash, "recordings_error", $recordingsError )
+              if ( ReadingsVal( $name, "recordings_error", "" ) ne
+                $recordingsError );
 
-            if ( !defined( $hash->{READINGS}{recordings_finished}{VAL} )
-                || $hash->{READINGS}{recordings_finished}{VAL} ne
+            readingsBulkUpdate( $hash, "recordings_finished",
                 $recordingsFinished )
-            {
-                readingsBulkUpdate( $hash, "recordings_finished",
-                    $recordingsFinished );
-            }
-
+              if ( ReadingsVal( $name, "recordings_finished", "" ) ne
+                $recordingsFinished );
         }
 
         # volume
         elsif ( $service eq "vol" ) {
             if ( ref($return) eq "HASH" && defined( $return->{e2current} ) ) {
-                if ( !defined( $hash->{READINGS}{volume}{VAL} )
-                    || $hash->{READINGS}{volume}{VAL} ne $return->{e2current} )
-                {
-                    readingsBulkUpdate( $hash, "volume", $return->{e2current} );
-                }
+                readingsBulkUpdate( $hash, "volume", $return->{e2current} )
+                  if (
+                    ReadingsVal( $name, "volume", "" ) ne $return->{e2current}
+                  );
             }
+            else {
+                Log3 $name, 5,
+                  "ENIGMA2 $name: ERROR: no volume could be extracted";
+            }
+
             if ( ref($return) eq "HASH" && defined( $return->{e2ismuted} ) ) {
                 my $muteState = "on";
-                if ( lc( $return->{e2ismuted} ) eq "false" ) {
-                    $muteState = "off";
-                }
-                if ( !defined( $hash->{READINGS}{mute}{VAL} )
-                    || $hash->{READINGS}{mute}{VAL} ne $muteState )
-                {
-                    readingsBulkUpdate( $hash, "mute", $muteState );
-                }
+                $muteState = "off"
+                  if ( lc( $return->{e2ismuted} ) eq "false" );
+                readingsBulkUpdate( $hash, "mute", $muteState )
+                  if ( ReadingsVal( $name, "mute", "" ) ne $muteState );
+            }
+            else {
+                Log3 $name, 5,
+                  "ENIGMA2 $name: ERROR: no mute state could be extracted";
             }
         }
 
@@ -2182,6 +2096,10 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     }
                 }
             }
+            else {
+                Log3 $name, 5,
+                  "ENIGMA2 $name: ERROR: no signal information could be found";
+            }
         }
 
         # all other command results
@@ -2193,22 +2111,15 @@ sub ENIGMA2_ReceiveCommand($$$) {
     # Set reading for power
     #
     my $readingPower = "off";
-    if ( $state eq "on" ) {
-        $readingPower = "on";
-    }
-    if ( !defined( $hash->{READINGS}{power}{VAL} )
-        || $hash->{READINGS}{power}{VAL} ne $readingPower )
-    {
-        readingsBulkUpdate( $hash, "power", $readingPower );
-    }
+    $readingPower = "on"
+      if ( $state eq "on" );
+    readingsBulkUpdate( $hash, "power", $readingPower )
+      if ( ReadingsVal( $name, "power", "" ) ne $readingPower );
 
     # Set reading for state
     #
-    if ( !defined( $hash->{READINGS}{state}{VAL} )
-        || $hash->{READINGS}{state}{VAL} ne $state )
-    {
-        readingsBulkUpdate( $hash, "state", $state );
-    }
+    readingsBulkUpdate( $hash, "state", $state )
+      if ( ReadingsVal( $name, "state", "" ) ne $state );
 
     # Set ENIGMA2 online-only readings to "-" in case box is in
     # offline or in standby mode
@@ -2241,72 +2152,22 @@ sub ENIGMA2_ReceiveCommand($$$) {
             'eventname_next',
           )
         {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne "-" )
-            {
-                readingsBulkUpdate( $hash, $_, "-" );
-            }
+            readingsBulkUpdate( $hash, $_, "-" )
+              if ( ReadingsVal( $name, $_, "" ) ne "-" );
         }
 
         # special handling for signal values
         foreach ( 'acg', 'ber', 'snr', 'snrdb', ) {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne "0" )
-            {
-                readingsBulkUpdate( $hash, $_, "0" );
-            }
+            readingsBulkUpdate( $hash, $_, "0" )
+              if ( ReadingsVal( $name, $_, "" ) ne "0" );
         }
     }
 
     # Set ENIGMA2 online+standby readings to "-" in case box is in
     # offline mode
     if ( $state eq "absent" || $state eq "undefined" ) {
-        foreach (
-            'input',              'recordings_next_counter_hr',
-            'recordings_next_hr', 'recordings_next_name',
-            'recordings_next_servicename'
-          )
-        {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne "-" )
-            {
-                readingsBulkUpdate( $hash, $_, "-" );
-            }
-        }
-
-        # special handling for recordingsX_* readings
-        my $i = 1;
-        while ( $i < 21 ) {
-            my $readingname = "recordings" . $i . "_name";
-            if ( defined( $hash->{READINGS}{$readingname}{VAL} )
-                && $hash->{READINGS}{$readingname}{VAL} ne "-" )
-            {
-                readingsBulkUpdate( $hash, $readingname, "-" );
-            }
-
-            $readingname = "recordings" . $i . "_servicename";
-            if ( defined( $hash->{READINGS}{$readingname}{VAL} )
-                && $hash->{READINGS}{$readingname}{VAL} ne "-" )
-            {
-                readingsBulkUpdate( $hash, $readingname, "-" );
-            }
-
-            $i++;
-        }
-
-        # special handling some scalar values
-        foreach (
-            'recordings',              'recordings_next',
-            'recordings_next_counter', 'recordings_error',
-            'recordings_finished'
-          )
-        {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne "0" )
-            {
-                readingsBulkUpdate( $hash, $_, "0" );
-            }
-        }
+        readingsBulkUpdate( $hash, "input", "-" )
+          if ( ReadingsVal( $name, "input", "" ) ne "-" );
     }
 
     readingsEndUpdate( $hash, 1 );
