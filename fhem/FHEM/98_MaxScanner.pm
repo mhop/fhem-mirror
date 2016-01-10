@@ -1,4 +1,4 @@
-# $Id: 98_MaxScanner.pm 10439 2016-01-10 18:00:00Z john $
+# $Id: 98_MaxScanner.pm 10453 2016-01-11 00:00:00Z john $
 ####################################################################################################
 #
 #   98_MaxScanner.pm
@@ -40,6 +40,8 @@
 #      *  fixed : erreous initial scenario
 #      *  new   : get associatedDevices
 #      *  change. scanTemp substitues scnEnabled
+#   11.01.16 - 1.0.0.0
+#      *  change: limit logging, when window open detected
 #
 ####################################################################################################
 package main;
@@ -50,7 +52,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
-my $MaxScanner_Version   = "1.0.0.0 - 10.01.2016";
+my $MaxScanner_Version   = "1.0.0.1 - 11.01.2016";
 my $MaxScanner_ModulName = "MaxScanner";
 
 # minimal poll-rate for thermostat in minutes given by firmware
@@ -988,9 +990,10 @@ sub MaxScanner_Work($$$)
     # don't touch the thermostat, if windowOpen is recognized
     if ( $boolWinIsOpenByFK || $boolWinIsOpenByTempFall )
     {
-      $hash->{helper}{WinWasOpen} = 1;
       MaxScanner_Log $hash, 3,
-        '<<stage 1>> no action due open window; desi-temp before window open:' . $hash->{helper}{TempBeforeWindOpen};
+        '<<stage 1>> no action due open window; desi-temp before window open:' . $hash->{helper}{TempBeforeWindOpen}
+        if ($hash->{helper}{WinWasOpen} == 0);
+      $hash->{helper}{WinWasOpen} = 1;
       $dontChangeMe = 1;
 
       #next;
