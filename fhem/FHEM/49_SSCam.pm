@@ -27,26 +27,30 @@
 ##########################################################################################################
 #  Versions History:
 #
-#  1.5  04.01.2016 Function "Get" for creating Camera-Readings integrated,
-#                  Attributs pollcaminfoall, pollnologging  added,
-#                  Function for Polling Cam-Infos added.
-#  1.4  23.12.2015 function "enable" and "disable" for SS-Cams added,
-#                  changed timout of Http-calls to a higher value
-#  1.3  19.12.2015 function "snap" for taking snapshots added,
-#                  fixed a bug that functions may impact each other 
-#  1.2  14.12.2015 improve usage of verbose-modes
-#  1.1  13.12.2015 use of InternalTimer instead of fhem(sleep)
-#  1.0  12.12.2015 changed completly to HttpUtils_NonblockingGet for calling websites nonblocking, 
-#                  LWP is not needed anymore
+#  1.5.1  11.01.2016   Vars "USERNAME" and "RECTIME" removed from internals,
+#                      Var (Internals) "SERVERNAME" changed to "SERVERADDR",
+#                      minor change of Log messages,
+#                      Note: use rereadcfg in order to activate the changes
+#  1.5    04.01.2016   Function "Get" for creating Camera-Readings integrated,
+#                      Attributs pollcaminfoall, pollnologging  added,
+#                      Function for Polling Cam-Infos added.
+#  1.4    23.12.2015   function "enable" and "disable" for SS-Cams added,
+#                      changed timout of Http-calls to a higher value
+#  1.3    19.12.2015   function "snap" for taking snapshots added,
+#                      fixed a bug that functions may impact each other 
+#  1.2    14.12.2015   improve usage of verbose-modes
+#  1.1    13.12.2015   use of InternalTimer instead of fhem(sleep)
+#  1.0    12.12.2015   changed completly to HttpUtils_NonblockingGet for calling websites nonblocking, 
+#                      LWP is not needed anymore
 #
 #
-# Definition: define <name> SSCam <serverIP> <serverport> <username> <password> <camname> <rectime> 
+# Definition: define <name> SSCam <ServerAddr> <ServerPort> <username> <password> <camname> <rectime> 
 # 
 # Example: define CamCP1 SSCAM 192.168.2.20 5000 apiuser apipw Carport 5
 #
 # Parameters:
 #       
-# $servername = "";          # DS-Sername oder IP
+# $serveraddr = "";          # DS-IP-Address
 # $serverport = "";          # DS Port
 # $username   = "";          # User für login auf DS
 # $password   = "";          # Passwort für User login
@@ -94,10 +98,10 @@ sub SSCam_Define {
   my @a = split("[ \t][ \t]*", $def);
   
   if(int(@a) < 8) {
-        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <Servername> <Port> <User> <Password> <Cameraname> <Recordtime>";
+        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <ServerAddress> <Port> <User> <Password> <Cameraname> <Recordtime>";
         }
         
-  my $servername = $a[2];
+  my $serveraddr = $a[2];
   my $serverport = $a[3];
   my $username   = $a[4];  
   my $password   = $a[5];
@@ -109,15 +113,15 @@ sub SSCam_Define {
   # führende Nullen entfernen
   $rectime =~ s/^0+//;
   
-  $hash->{SERVERNAME} = $servername;
-  $hash->{SERVERPORT} = $serverport;
-  $hash->{USERNAME} = $username;
+  $hash->{SERVERADDR}       = $serveraddr;
+  $hash->{SERVERPORT}       = $serverport;
+  $hash->{HELPER}{USERNAME} = $username;
   $hash->{HELPER}{PASSWORD} = $password;
-  $hash->{CAMNAME} = $camname;
-  $hash->{RECTIME} = $rectime;
+  $hash->{CAMNAME}          = $camname;
+  $hash->{HELPER}{RECTIME}  = $rectime;
   # für später
   # Standard für rectime setzen, überschreibbar durch Attribut "rectime"
-  # $hash->{RECTIME} = 15; 
+  # $hash->{HELPER}{RECTIME} = 15; 
   # $attr{$name}{rectime} = $rectime;
   
   # benötigte API's in $hash einfügen
@@ -129,9 +133,9 @@ sub SSCam_Define {
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
   
   # Anfangswerte setzen
-  $hash->{HELPER}{ACTIVE} = "off";                                               # Funktionstoken "off", Funktionen können sofort starten
-  $hash->{HELPER}{OLDVALPOLLNOLOGGING} ="0";                                     # Loggingfunktion für Polling ist an
-  $hash->{STATE} = "initialized";                                                # Anfangsstatus der Geräte
+  $hash->{HELPER}{ACTIVE}              = "off";                                  # Funktionstoken "off", Funktionen können sofort starten
+  $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                    # Loggingfunktion für Polling ist an
+  $hash->{STATE}                       = "initialized";                          # Anfangsstatus der Geräte
   readingsSingleUpdate($hash,"Record","Stop",0);                                 # Recordings laufen nicht
   readingsSingleUpdate($hash,"Availability", "", 0);                             # Verfügbarkeit ist unbekannt
   readingsSingleUpdate($hash,"PollState","Inactive",0);                          # es ist keine Gerätepolling aktiv
@@ -263,7 +267,7 @@ sub watchdogpollcaminfo ($) {
         # Polling ist jetzt aktiv
         readingsSingleUpdate($hash,"PollState","Active",0);
             
-        $logstr = "Polling Camera $camname is activated now - Pollinginterval: ".AttrVal($name, "pollcaminfoall", undef)."s";
+        $logstr = "Polling Camera $camname is currently activated - Pollinginterval: ".AttrVal($name, "pollcaminfoall", undef)."s";
         &printlog($hash,$logstr,"2");
         
         # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
@@ -287,12 +291,12 @@ sub watchdogpollcaminfo ($) {
     if (defined(AttrVal($name, "pollnologging", undef))) {
         if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} ne AttrVal($name, "pollnologging", undef)) {
             if (AttrVal($name, "pollnologging", undef) == "1") {
-                $logstr = "Log of Polling Camera $camname is deactivated now";
+                $logstr = "Log of Polling Camera $camname is currently deactivated";
                 &printlog($hash,$logstr,"2");
                 # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
                 $hash->{HELPER}{OLDVALPOLLNOLOGGING} = AttrVal($name, "pollnologging", undef);
             } else {
-                $logstr = "Log of Polling Camera $camname is activated now";
+                $logstr = "Log of Polling Camera $camname is currently activated";
                 &printlog($hash,$logstr,"2");
                 # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
                 $hash->{HELPER}{OLDVALPOLLNOLOGGING} = AttrVal($name, "pollnologging", undef);
@@ -301,7 +305,7 @@ sub watchdogpollcaminfo ($) {
     } else {
         # alter Wert von "pollnologging" war 1 -> Logging war deaktiviert
         if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} == "1") {
-            $logstr = "Log of Polling Camera $camname is activated now";
+            $logstr = "Log of Polling Camera $camname is currently activated";
             &printlog($hash,$logstr,"2");
             # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
             $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";            
@@ -680,7 +684,7 @@ sub getptzlistpatrol ($) {
 
 sub getapisites_nonbl {
    my ($hash) = @_;
-   my $servername  = $hash->{SERVERNAME};
+   my $serveraddr  = $hash->{SERVERADDR};
    my $serverport  = $hash->{SERVERPORT};
    my $apiinfo     = $hash->{HELPER}{APIINFO};                         # Info-Seite für alle API's, einzige statische Seite !
    my $apiauth     = $hash->{HELPER}{APIAUTH};                         # benötigte API-Pfade für Funktionen,  
@@ -698,7 +702,7 @@ sub getapisites_nonbl {
    &printlog($hash,$logstr,"4");
    
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$servername:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz";
    
    $param = {
                url      => $url,
@@ -722,9 +726,9 @@ sub login_nonbl ($) {
    my ($param, $err, $myjson) = @_;
    my $hash        = $param->{hash};
    my $device      = $hash->{NAME};
-   my $servername  = $hash->{SERVERNAME};
+   my $serveraddr  = $hash->{SERVERADDR};
    my $serverport  = $hash->{SERVERPORT};
-   my $username    = $hash->{USERNAME};
+   my $username    = $hash->{HELPER}{USERNAME};
    my $password    = $hash->{HELPER}{PASSWORD};
    my $apiauth     = $hash->{HELPER}{APIAUTH};
    my $apiextrec   = $hash->{HELPER}{APIEXTREC};
@@ -900,7 +904,7 @@ sub login_nonbl ($) {
   $logstr = "--- Begin Function serverlogin nonblocking ---";
   &printlog($hash,$logstr,"4");  
  
-  $url = "http://$servername:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=\"sid\""; 
+  $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=\"sid\""; 
   
   $param = {
                url      => $url,
@@ -925,9 +929,9 @@ sub getcamid_nonbl ($) {
   
    my ($param, $err, $myjson) = @_;
    my $hash         = $param->{hash};
-   my $servername   = $hash->{SERVERNAME};
+   my $serveraddr   = $hash->{SERVERADDR};
    my $serverport   = $hash->{SERVERPORT};
-   my $username     = $hash->{USERNAME};
+   my $username     = $hash->{HELPER}{USERNAME};
    my $apicam       = $hash->{HELPER}{APICAM};
    my $apicampath   = $hash->{HELPER}{APICAMPATH};
    my $apicammaxver = $hash->{HELPER}{APICAMMAXVER};
@@ -1030,7 +1034,7 @@ sub getcamid_nonbl ($) {
   &printlog($hash,$logstr,"4");
   
   # einlesen aller Kameras - Auswertung in Rückkehrfunktion "camop_nonbl"
-  $url = "http://$servername:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&_sid=\"$sid\"";
+  $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&_sid=\"$sid\"";
 
   $param = {
                url      => $url,
@@ -1054,10 +1058,10 @@ sub getcamid_nonbl ($) {
 sub camop_nonbl ($) {  
    my ($param, $err, $myjson) = @_;
    my $hash              = $param->{hash};
-   my $servername        = $hash->{SERVERNAME};
+   my $serveraddr        = $hash->{SERVERADDR};
    my $serverport        = $hash->{SERVERPORT};
    my $camname           = $hash->{CAMNAME};
-   my $username          = $hash->{USERNAME};
+   my $username          = $hash->{HELPER}{USERNAME};
    my $apicam            = $hash->{HELPER}{APICAM};
    my $apicampath        = $hash->{HELPER}{APICAMPATH};
    my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER};
@@ -1202,49 +1206,49 @@ sub camop_nonbl ($) {
    if ($OpMode eq "Start") 
    {
       # die Aufnahme wird gestartet, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\""; 
+      $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\""; 
    } 
    elsif ($OpMode eq "Stop")
    {
       # die Aufnahme wird gestoppt, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&_sid=\"$sid\"";
+      $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&_sid=\"$sid\"";
    }
    elsif ($OpMode eq "Snap")
    {
       # ein Schnappschuß wird ausgelöst und in SS gespeichert, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=0&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=$camid&blSave=true&_sid=\"$sid\"";
+      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=0&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=$camid&blSave=true&_sid=\"$sid\"";
       $hash->{STATE} = "snap";
       readingsSingleUpdate($hash, "LastSnapId", "", 1);
    }
    elsif ($OpMode eq "Enable")
    {
       # eine Kamera wird aktiviert, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
    }
    elsif ($OpMode eq "Disable")
    {
       # eine Kamera wird aktiviert, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
    }
    elsif ($OpMode eq "Getcaminfo")
    {
       # Infos einer Kamera werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=true&streamInfo=true&ptz=true&basic=true&camAppInfo=true&optimize=true&fisheye=true&eventDetection=true&_sid=\"$sid\"";   
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=true&streamInfo=true&ptz=true&basic=true&camAppInfo=true&optimize=true&fisheye=true&eventDetection=true&_sid=\"$sid\"";   
    }
    elsif ($OpMode eq "Getptzlistpreset")
    {
       # PTZ-ListPresets werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
+      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
    } 
    elsif ($OpMode eq "Getcapabilities")
    {
       # Capabilities einer Cam werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=GetCapabilityByCamId&cameraId=$camid&_sid=\"$sid\"";   
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=GetCapabilityByCamId&cameraId=$camid&_sid=\"$sid\"";   
    }
    elsif ($OpMode eq "Getptzlistpatrol")
    {
       # PTZ-ListPatrol werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$servername:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
+      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
    }    
 
    
@@ -1272,10 +1276,10 @@ sub camret_nonbl ($) {
    my ($param, $err, $myjson) = @_;
    my $hash             = $param->{hash};
    my $name             = $hash->{NAME};
-   my $servername       = $hash->{SERVERNAME};
+   my $serveraddr       = $hash->{SERVERADDR};
    my $serverport       = $hash->{SERVERPORT};
    my $camname          = $hash->{CAMNAME};
-   my $rectime          = AttrVal($name, "rectime",undef) ? AttrVal($name, "rectime",undef) : $hash->{RECTIME};
+   my $rectime          = AttrVal($name, "rectime",undef) ? AttrVal($name, "rectime",undef) : $hash->{HELPER}{RECTIME};
    my $apiauth          = $hash->{HELPER}{APIAUTH};
    my $apiauthpath      = $hash->{HELPER}{APIAUTHPATH};
    my $apiauthmaxver    = $hash->{HELPER}{APIAUTHMAXVER};
@@ -1738,7 +1742,7 @@ sub camret_nonbl ($) {
     $logstr = "--- Begin Function logout nonblocking ---";
     &printlog($hash,$logstr,"4");
   
-    $url = "http://$servername:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid"; 
+    $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid"; 
 
     $param = {
                 url      => $url,
@@ -1761,7 +1765,7 @@ sub camret_nonbl ($) {
 sub logout_nonbl ($) {  
    my ($param, $err, $myjson) = @_;
    my $hash            = $param->{hash};
-   my $username        = $hash->{USERNAME};
+   my $username        = $hash->{HELPER}{USERNAME};
    my $sid             = $hash->{HELPER}{SID};
    my $data;
    my $logstr;
