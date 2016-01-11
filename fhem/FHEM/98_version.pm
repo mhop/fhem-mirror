@@ -54,8 +54,9 @@ CommandVersion($$)
   @ret = sort {version_sortModules($a, $b)} @ret;
   return "no loaded modules found that match: $param" if($param && !@ret);
   return sprintf("%-".$max."s %s","File","Rev   Last Change\n\n").
-         join("\n",  grep (($_ =~ /^fhem.pl|\d\d_/), @ret)).(!$param ? "\n\n":"").
-         join("\n",  grep (($_ !~ /^fhem.pl|\d\d_/), @ret));
+         trim(join("\n",  grep (($_ =~ /^fhem.pl|\d\d_/), @ret))."\n\n".
+              join("\n",  grep (($_ !~ /^fhem.pl|\d\d_/), @ret))
+             );
 }
 
 #####################################
