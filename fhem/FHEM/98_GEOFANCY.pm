@@ -259,6 +259,19 @@ sub GEOFANCY_CGI() {
 m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])Z/
           );
 
+        # validate timestamp
+        return (
+            "text/plain; charset=utf-8",
+            "NOK Specified timestamp '"
+              . $webArgs->{timestamp} . "'"
+              . " does not seem to be a valid Unix timestamp"
+          )
+          if (
+            defined( $webArgs->{timestamp} )
+            && (   $webArgs->{timestamp} !~ m/^\d+(\.\d+)?$/
+                || $webArgs->{timestamp} > time() + 300 )
+          );
+
         # validate locName
         return ( "text/plain; charset=utf-8",
             "NOK No whitespace allowed in id '" . $webArgs->{locName} . "'" )
@@ -312,6 +325,12 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
             $lat    = $webArgs->{latitude};
             $long   = $webArgs->{longitude};
             $device = $webArgs->{device};
+
+            if ( defined( $webArgs->{timestamp} ) ) {
+                my ( $sec, $min, $hour, $d, $m, $y ) =
+                  localtime( $webArgs->{timestamp} );
+                $date = timelocal( $sec, $min, $hour, $d, $m, $y );
+            }
         }
 
         # Geofency.app
@@ -319,7 +338,7 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
             $id      = $webArgs->{id};
             $locName = $webArgs->{name};
             $entry   = $webArgs->{entry};
-            $date    = $webArgs->{date};
+            $date    = GEOFANCY_ISO8601UTCtoLocal( $webArgs->{date} );
             $lat     = $webArgs->{latitude};
             $long    = $webArgs->{longitude};
             $address = $webArgs->{address}
@@ -446,9 +465,9 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
     readingsBeginUpdate($hash);
 
-    # validate date
+    # use date for readings
     if ( $date ne "" ) {
-        $hash->{".updateTime"}      = GEOFANCY_ISO8601UTCtoLocal($date);
+        $hash->{".updateTime"}      = $date;
         $hash->{".updateTimestamp"} = FmtDateTime( $hash->{".updateTime"} );
         $time                       = $hash->{".updateTimestamp"};
     }
