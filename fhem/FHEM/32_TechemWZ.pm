@@ -71,8 +71,6 @@ TechemWZ_Define(@) {
   # subscribe broadcast channels 
   # TechemWZ_subscribe($hash, 'foo');
   TechemWZ_Run($hash) if $init_done;
-  # DEBUG
-  TechemWZ_Parse($hash, "b364468501081015045438837A1009F1FD31400085101008015152AA87AB81C64DB1BBA64614101000400000009083C48A04105101C92CA4635CD47E179B47731::-35.5");
   return undef;
 }
 
