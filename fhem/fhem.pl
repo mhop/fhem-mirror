@@ -153,7 +153,6 @@ sub CommandSetstate($$);
 sub CommandShutdown($$);
 sub CommandSleep($$);
 sub CommandTrigger($$);
-sub CommandVersion($$);
 
 # configDB special
 sub cfgDB_Init;
@@ -164,7 +163,6 @@ sub cfgDB_AttrRead($);
 sub cfgDB_ReadFile($);
 sub cfgDB_UpdateFile($);
 sub cfgDB_WriteFile($@);
-sub cfgDB_svnId;
 
 ##################################################
 # Variables:
@@ -228,12 +226,13 @@ use vars qw($featurelevel);
 use vars qw(@authorize);        # List of authorization devices
 use vars qw(@authenticate);     # List of authentication devices
 use vars qw($auth_refresh);
+use vars qw($cvsid);            # used in 98_version.pm
+$cvsid = '$Id$';
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment:textField-long alias ".
                 "eventMap userReadings:textField-long";
 my $currcfgfile="";             # current config/include file
 my $currlogfile;                # logfile, without wildcards
-my $cvsid = '$Id$';
 my $duplidx=0;                  # helper for the above pool
 my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand
 my $intAtCnt=0;
@@ -378,8 +377,6 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
                                       "[http://.../controlfile],update FHEM" },
   "updatefhem" => { ReplacedBy => "update" },
   "usb"     => { ModuleName => "autocreate" },
-  "version" => { Fn => "CommandVersion",
-            Hlp=>"[filter],print SVN version of loaded modules" },
 );
 
 ###################################################
@@ -2748,43 +2745,6 @@ CommandSleep($$)
 
   }
   return undef;
-}
-
-#####################################
-sub
-CommandVersion($$)
-{
-  my ($cl, $param) = @_;
-
-  my @ret = ("# $cvsid");
-  push @ret, cfgDB_svnId if(configDBUsed());
-  my $max = 7 ; # length("fhem.pl") = 7
-  
-  foreach my $m (sort {uc($a) cmp uc($b)} keys %modules) {
-    next if(!$modules{$m}{LOADED} ||
-             $modules{$m}{ORDER} < 0 ||
-             ($param && $m !~ /$param/));
-    Log 4, "Looking for SVN Id in module $m";
-    my $fn = "$attr{global}{modpath}/FHEM/".$modules{$m}{ORDER}."_$m.pm"; 
-    if($max < length($modules{$m}{ORDER}."_$m.pm")) {
-      $max = length($modules{$m}{ORDER}."_$m.pm")
-    }
-    if(!open(FH, $fn)) {
-      my $ret = "$fn: $!";
-      if(configDBUsed()){
-        Log 4, "Looking for module $m in configDB to find SVN Id";
-        $ret = cfgDB_Fileversion($fn,$ret);
-      }
-      push @ret, $ret;
-    } else {
-      push @ret, grep(/\$Id. [^\$\n\r].+\$/, <FH>);
-    }
-  }
-  @ret = map {/\$Id. (\S+) (\d+) (.+?)\$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_}
-        @ret; 
-  
-  return sprintf("%-".$max."s %s","File","Rev   Last Change\n\n").
-         join("\n", grep((defined($param) ? ($_ =~ /$param/) : 1), @ret));
 }
 
 #####################################
