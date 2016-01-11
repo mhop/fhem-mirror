@@ -964,13 +964,13 @@ sub GUEST_SetLocation($$$;$$$$$$) {
     my $currWayhome  = ReadingsVal( $name, "wayhome", "0" );
     my $currLat      = ReadingsVal( $name, "locationLat", "-" );
     my $currLong     = ReadingsVal( $name, "locationLong", "-" );
-    my $currAddr     = ReadingsVal( $name, "locationAddr", "-" );
-    $id      = "-" if ( !$id      || $id eq "" );
-    $lat     = "-" if ( !$lat     || $lat eq "" );
-    $long    = "-" if ( !$long    || $long eq "" );
-    $address = "-" if ( !$address || $address eq "" );
-    $time    = ""  if ( !$time );
-    $device  = ""  if ( !$device );
+    my $currAddr     = ReadingsVal( $name, "locationAddr", "" );
+    $id   = "-" if ( !$id   || $id eq "" );
+    $lat  = "-" if ( !$lat  || $lat eq "" );
+    $long = "-" if ( !$long || $long eq "" );
+    $address = "" if ( !$address );
+    $time    = "" if ( !$time );
+    $device  = "" if ( !$device );
 
     Log3 $name, 5,
 "GUEST $name: received location information: id=$id name=$location trig=$trigger date=$time lat=$lat long=$long address:$address device=$device";
@@ -998,7 +998,6 @@ sub GUEST_SetLocation($$$;$$$$$$) {
     # check for implicit state change
     #
     my $stateChange = 0;
-    my $wayhome;
 
     # home
     if ( $location eq "home" || grep( m/^$searchstring$/, @location_home ) ) {
@@ -1060,7 +1059,6 @@ sub GUEST_SetLocation($$$;$$$$$$) {
         {
             Log3 $name, 3, "GUEST $name: on way back home from $location";
             readingsBulkUpdate( $hash, "wayhome", "1" );
-            $wayhome = 1;
         }
 
         # wayhome=false
@@ -1071,7 +1069,6 @@ sub GUEST_SetLocation($$$;$$$$$$) {
             Log3 $name, 3,
               "GUEST $name: seems not to be on way back home anymore";
             readingsBulkUpdate( $hash, "wayhome", "0" );
-            $wayhome = 1;
         }
 
     }
@@ -1081,44 +1078,52 @@ sub GUEST_SetLocation($$$;$$$$$$) {
         Log3 $name, 3,
           "GUEST $name: seems to stay at $location before coming home";
         readingsBulkUpdate( $hash, "wayhome", "2" );
-        $wayhome = 1;
     }
 
     # revert wayhome during active wayhome tracing
     elsif ( $stateChange == 0 && $trigger == 0 && $currWayhome == 2 ) {
         Log3 $name, 3, "GUEST $name: finally on way back home from $location";
         readingsBulkUpdate( $hash, "wayhome", "1" );
-        $wayhome = 1;
     }
 
-    if ( $trigger == 1 ) {
+    my $currLongDiff = 0;
+    my $currLatDiff  = 0;
+    $currLongDiff =
+      maxNum( ReadingsVal( $name, "lastLocationLong", 0 ), $currLong ) -
+      minNum( ReadingsVal( $name, "lastLocationLong", 0 ), $currLong )
+      if ( $currLong ne "-" );
+    $currLatDiff =
+      maxNum( ReadingsVal( $name, "lastLocationLat", 0 ), $currLat ) -
+      minNum( ReadingsVal( $name, "lastLocationLat", 0 ), $currLat )
+      if ( $currLat ne "-" );
+
+    if (
+        $trigger == 1
+        && (   $stateChange > 0
+            || ReadingsVal( $name, "lastLocation", "-" ) ne $currLocation
+            || $currLongDiff > 0.00002
+            || $currLatDiff > 0.00002 )
+      )
+    {
         Log3 $name, 5, "GUEST $name: archiving last known location";
         readingsBulkUpdate( $hash, "lastLocationLat",  $currLat );
         readingsBulkUpdate( $hash, "lastLocationLong", $currLong );
-        readingsBulkUpdate( $hash, "lastLocationAddr", $currAddr );
-        readingsBulkUpdate( $hash, "lastLocation",     $currLocation );
+        readingsBulkUpdate( $hash, "lastLocationAddr", $currAddr )
+          if ( $currAddr ne "" );
+        readingsBulkUpdate( $hash, "lastLocation", $currLocation );
     }
 
-    if (   $wayhome
-        || $stateChange > 0
-        || ( $lat ne "-" && $long ne "-" ) )
-    {
-        Log3 $name, 5, "GUEST $name: Using new lat/long/addr information";
-        readingsBulkUpdate( $hash, "locationLat",  $lat );
-        readingsBulkUpdate( $hash, "locationLong", $long );
+    readingsBulkUpdate( $hash, "locationLat",  $lat );
+    readingsBulkUpdate( $hash, "locationLong", $long );
+
+    if ( $address ne "" ) {
         readingsBulkUpdate( $hash, "locationAddr", $address );
     }
-
-    else {
-        Log3 $name, 5,
-          "GUEST $name: keeping last known lat/long/addr information";
-        readingsBulkUpdate( $hash, "locationLat",  $currLat );
-        readingsBulkUpdate( $hash, "locationLong", $currLong );
-        readingsBulkUpdate( $hash, "locationAddr", $currAddr );
+    elsif ( $currAddr ne "" ) {
+        readingsBulkUpdate( $hash, "locationAddr", "-" );
     }
 
-    readingsBulkUpdate( $hash, "location", $location )
-      if ( $location ne "wayhome" );
+    readingsBulkUpdate( $hash, "location", $location );
 
     readingsEndUpdate( $hash, 1 );
 
