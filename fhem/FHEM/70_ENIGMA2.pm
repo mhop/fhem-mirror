@@ -225,9 +225,9 @@ sub ENIGMA2_Set($@) {
     $usage .= " mute:on,off"
       if ( ReadingsVal( $name, "mute", "-" ) ne "-" );
     $usage .= " input:-,tv,radio"
-      if ( ReadingsVal( $name, "input", "-" ) eq "-" );
+      if ( $input eq "-" );
     $usage .= " input:tv,radio"
-      if ( ReadingsVal( $name, "input", "-" ) ne "-" );
+      if ( $input ne "-" );
 
     if ($adminMode) {
         $usage .= " reboot:noArg";
