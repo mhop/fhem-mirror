@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 70_VIERA: Using non blocking for status update.
+                       Added color button for remoteControl and SVG layout
+                       Some new SVG icons for remoteControl layout
   - change:  73_km200: New attribute "disabled" and default values changed.
   - feature: HUEbridge: added set deletescene and get scenes detail
   - feature: HUEDevice: added (hue|sat|ct)(Up|Down) commands
