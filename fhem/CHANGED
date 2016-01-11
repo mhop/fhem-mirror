@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: version: version command shows also internal helper modules that
+                      are loaded (HttpUtils, Blocking, ...)
   - feature: 70_VIERA: Using non blocking for status update.
                        Added color button for remoteControl and SVG layout
                        Some new SVG icons for remoteControl layout
