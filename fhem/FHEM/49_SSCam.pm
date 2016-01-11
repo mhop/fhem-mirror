@@ -1993,7 +1993,7 @@ return;
   <b>Define</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;ServerIP&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; &lt;RecordTime&gt;</code><br>
+    <code>define &lt;name&gt; SSCam &lt;ServerAddr&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; &lt;RecordTime&gt;</code><br>
     <br>
     Defines a new camera device for SSCam. At first the devices have to be set up and operable in Synology Surveillance Station 7.0 and above. <br><br>
     
@@ -2012,7 +2012,7 @@ return;
   <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:         </td><td>the name of the new device to use in FHEM</td></tr>
-    <tr><td>ServerIP:     </td><td>IP-address of Synology Surveillance Station Host. <b>Note:</b> avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
+    <tr><td>ServerAddr:   </td><td>IP-address of Synology Surveillance Station Host. <b>Note:</b> avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
     <tr><td>Port:         </td><td>the Port Synology surveillance Station Host, normally 5000 (HTTP only)</td></tr>
     <tr><td>Username:     </td><td>Username defined in the Diskstation. Has to be a member of Admin-group</td></tr>
     <tr><td>Password:     </td><td>the Password for the User</td></tr>
@@ -2261,7 +2261,7 @@ return;
 <b>Definition</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;ServerIP&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Kameraname in SS&gt; &lt;RecordTime&gt;</code><br>
+    <code>define &lt;name&gt; SSCam &lt;ServerAddr&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Kameraname in SS&gt; &lt;RecordTime&gt;</code><br>
     <br>
     
     Definiert eine neue Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
@@ -2281,7 +2281,7 @@ return;
     <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:           </td><td>der Name des neuen Gerätes in FHEM</td></tr>
-    <tr><td>ServerIP:       </td><td>die IP-Addresse des Synology Surveillance Station Host. Hinweis: Es sollte kein Servername verwendet werden weil DNS-Aufrufe in FHEM blockierend sind.</td></tr>
+    <tr><td>ServerAddr:     </td><td>die IP-Addresse des Synology Surveillance Station Host. Hinweis: Es sollte kein Servername verwendet werden weil DNS-Aufrufe in FHEM blockierend sind.</td></tr>
     <tr><td>Port:           </td><td>der Port des Synology Surveillance Station Host. Normalerweise ist das 5000 (nur HTTP)</td></tr>
     <tr><td>Username:       </td><td>Name des in der Diskstation definierten Nutzers. Er muß ein Mitglied der Admin-Gruppe sein</td></tr>
     <tr><td>Password:       </td><td>das Passwort des Nutzers</td></tr>
