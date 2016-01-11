@@ -71,6 +71,8 @@ TechemWZ_Define(@) {
   # subscribe broadcast channels 
   # TechemWZ_subscribe($hash, 'foo');
   TechemWZ_Run($hash) if $init_done;
+  # DEBUG
+  TechemWZ_Parse($hash, "b364468501081015045438837A1009F1FD31400085101008015152AA87AB81C64DB1BBA64614101000400000009083C48A04105101C92CA4635CD47E179B47731::-35.5");
   return undef;
 }
 
@@ -209,18 +211,22 @@ TechemWZ_Parse(@) {
   ($message->{long}, $message->{short}) = TechemWZ_ParseID(@m);
   $message->{type} = TechemWZ_ParseSubType(@m);
   $message->{version} = TechemWZ_ParseSubVersion(@m);
-  $message->{lastVal} = TechemWZ_ParseLastPeriod(@m);
-  $message->{actualVal} = TechemWZ_ParseActualPeriod(@m);
-  ($message->{actual}->{year}, $message->{actual}->{month}, $message->{actual}->{day}) = TechemWZ_ParseActualDate(@m);
-  ($message->{last}->{year}, $message->{last}->{month}, $message->{last}->{day}) = TechemWZ_ParseLastDate(@m);
   $message->{rssi} = ($rssi)?$rssi:"?";
   
   # metertype specific adjustment
   if ($message->{type} =~ /62|72/) {
+    $message->{lastVal} = TechemWZ_ParseLastPeriod(@m);
+    $message->{actualVal} = TechemWZ_ParseActualPeriod(@m);
+    ($message->{actual}->{year}, $message->{actual}->{month}, $message->{actual}->{day}) = TechemWZ_ParseActualDate(@m);
+    ($message->{last}->{year}, $message->{last}->{month}, $message->{last}->{day}) = TechemWZ_ParseLastDate(@m);
     $message->{lastVal} /= 10;
     $message->{actualVal} /= 10;
     $message->{meter} = $message->{lastVal} + $message->{actualVal};
   } elsif ($message->{type} =~ /43/) {
+    $message->{lastVal} = TechemWZ_WMZ_Type1_ParseLastPeriod(@m);
+    $message->{actualVal} = TechemWZ_WMZ_Type1_ParseActualPeriod(@m);
+    ($message->{actual}->{year}, $message->{actual}->{month}, $message->{actual}->{day}) = TechemWZ_WMZ_Type1_ParseActualDate(@m);
+    ($message->{last}->{year}, $message->{last}->{month}, $message->{last}->{day}) = TechemWZ_ParseLastDate(@m);
     $message->{meter} = $message->{lastVal} + $message->{actualVal};
   }
   
@@ -346,6 +352,35 @@ TechemWZ_ParseLastDate(@) {
   my $d = ($b >> 0) & 0x1F;
   my $m = ($b >> 5) & 0x0F;
   my $y = ($b >> 9) & 0x3F;
+  return ($y, $m, $d);
+}
+
+###############################################################################
+#
+# Vario 5 heatmeter
+#
+###############################################################################
+
+sub
+TechemWZ_WMZ_Type1_ParseLastPeriod(@) {
+  my @m = @_;
+  return hex("$m[15]$m[14]$m[13]"); 
+}
+
+sub
+TechemWZ_WMZ_Type1_ParseActualPeriod(@) {
+  my @m = @_;
+  return hex("$m[19]$m[18]$m[17]"); 
+}
+
+sub
+TechemWZ_WMZ_Type1_ParseActualDate(@) {
+  my @m = @_;
+  my @t = localtime(time);
+  my $b = hex("$m[21]$m[20]");
+  my $d = ($b >> 7) & 0x1F;
+  my $m = (hex("$m[16]") >> 3) & 0x0F;
+  my $y =   my $y = $t[5] + 1900;
   return ($y, $m, $d);
 }
 
