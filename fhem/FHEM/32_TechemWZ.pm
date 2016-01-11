@@ -378,7 +378,7 @@ TechemWZ_WMZ_Type1_ParseActualDate(@) {
   my $b = hex("$m[21]$m[20]");
   my $d = ($b >> 7) & 0x1F;
   my $m = (hex("$m[16]") >> 3) & 0x0F;
-  my $y =   my $y = $t[5] + 1900;
+  my $y = $t[5] + 1900;
   return ($y, $m, $d);
 }
 
