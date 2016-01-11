@@ -41,9 +41,14 @@ CommandVersion($$)
         $line = cfgDB_Fileversion($fn,$line);
       }
     } else {
-      ($line) = grep(/#.*\$Id\:[^\$\n\r].+\$/, <FH>);
+      while(<FH>) {
+         if(/#.*\$Id\:[^\$\n\r].+\$/) {
+           $line = $_;
+           last;
+         }
+      }
+      close(FH);
     }
-
     $line = "No Id found for $mod_name" unless($line);
     push @ret, $line;
   }
