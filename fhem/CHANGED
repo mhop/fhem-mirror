@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change: 49_SSCam: Vars "USERNAME" and "RECTIME" removed from Internals,
+                      Var (Internals) "SERVERNAME" changed to "SERVERADDR",
+                      minor change of Log messages,
+                      Note: use rereadcfg in order to activate the changes
   - feature: version: version command shows also internal helper modules that
                       are loaded (HttpUtils, Blocking, ...)
   - feature: 70_VIERA: Using non blocking for status update.
