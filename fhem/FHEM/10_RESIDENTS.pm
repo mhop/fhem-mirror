@@ -662,6 +662,7 @@ sub RESIDENTS_UpdateReadings (@) {
     my $residentsDevs_gotosleep             = "-";
     my $residentsDevs_wakeup                = "-";
     my $residentsDevs_wayhome               = "-";
+    my $residentsDevs_wayhomeDelayed        = "-";
     my $residentsDevs_totalAbsent           = "-";
     my $residentsDevs_totalPresent          = "-";
     my $residentsDevs_totalAbsentGuest      = "-";
@@ -676,6 +677,7 @@ sub RESIDENTS_UpdateReadings (@) {
     my $residents_gotosleep                 = "-";
     my $residents_wakeup                    = "-";
     my $residents_wayhome                   = "-";
+    my $residents_wayhomeDelayed            = "-";
     my $residents_totalAbsent               = "-";
     my $residents_totalPresent              = "-";
     my $residents_totalAbsentGuest          = "-";
@@ -683,6 +685,7 @@ sub RESIDENTS_UpdateReadings (@) {
     my $residents_totalAbsentRoommates      = "-";
     my $residents_totalPresentRoommates     = "-";
     my $wayhome                             = 0;
+    my $wayhomeDelayed                      = 0;
     my $wakeup                              = 0;
     my $newstate;
 
@@ -909,7 +912,7 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
         if ( ReadingsVal( $roommate, "wakeup", "0" ) > 0 ) {
-            $wakeup += ReadingsVal( $roommate, "wakeup", "0" );
+            $wakeup++;
             $residentsDevs_wakeup .= "," . $roommate
               if ( $residentsDevs_wakeup ne "-" );
             $residentsDevs_wakeup = $roommate
@@ -921,7 +924,7 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
         if ( ReadingsVal( $roommate, "wayhome", "0" ) > 0 ) {
-            $wayhome += ReadingsVal( $roommate, "wayhome", "0" );
+            $wayhome++;
             $residentsDevs_wayhome .= "," . $roommate
               if ( $residentsDevs_wayhome ne "-" );
             $residentsDevs_wayhome = $roommate
@@ -930,6 +933,21 @@ sub RESIDENTS_UpdateReadings (@) {
               if ( $roommateName ne "" && $residents_wayhome ne "-" );
             $residents_wayhome = $roommateName
               if ( $roommateName ne "" && $residents_wayhome eq "-" );
+
+            if ( ReadingsVal( $roommate, "wayhome", "0" ) == 2 ) {
+                $wayhomeDelayed++;
+
+                $residentsDevs_wayhomeDelayed .= "," . $roommate
+                  if ( $residentsDevs_wayhomeDelayed ne "-" );
+                $residentsDevs_wayhomeDelayed = $roommate
+                  if ( $residentsDevs_wayhomeDelayed eq "-" );
+                $residents_wayhomeDelayed .= ", " . $roommateName
+                  if ( $roommateName ne ""
+                    && $residents_wayhomeDelayed ne "-" );
+                $residents_wayhomeDelayed = $roommateName
+                  if ( $roommateName ne ""
+                    && $residents_wayhomeDelayed eq "-" );
+            }
         }
     }
 
@@ -1093,7 +1111,7 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
         if ( ReadingsVal( $guest, "wakeup", "0" ) > 0 ) {
-            $wakeup += ReadingsVal( $guest, "wakeup", "0" );
+            $wakeup++;
             $residentsDevs_wakeup .= "," . $guest
               if ( $residentsDevs_wakeup ne "-" );
             $residentsDevs_wakeup = $guest
@@ -1105,7 +1123,7 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
         if ( ReadingsVal( $guest, "wayhome", "0" ) > 0 ) {
-            $wayhome += ReadingsVal( $guest, "wakeup", "0" );
+            $wayhome++;
             $residents_wayhome .= "," . $guest
               if ( $residents_wayhome ne "-" );
             $residents_wayhome = $guest if ( $residents_wayhome eq "-" );
@@ -1114,16 +1132,20 @@ sub RESIDENTS_UpdateReadings (@) {
             $residents_wayhome = $guestName
               if ( $guestName ne "" && $residents_wayhome eq "-" );
 
-            $residentsDevs_totalAbsent .= "," . $guest
-              if ( $residentsDevs_totalAbsent ne "-" );
-            $residentsDevs_totalAbsent = $guest
-              if ( $residentsDevs_totalAbsent eq "-" );
-            $residents_totalAbsent .= ", " . $guestName
-              if ( $guestName ne ""
-                && $residents_totalAbsent ne "-" );
-            $residents_totalAbsent = $guestName
-              if ( $guestName ne ""
-                && $residents_totalAbsent eq "-" );
+            if ( ReadingsVal( $guest, "wayhome", "0" ) == 2 ) {
+                $wayhomeDelayed++;
+
+                $residentsDevs_wayhomeDelayed .= "," . $guest
+                  if ( $residentsDevs_wayhomeDelayed ne "-" );
+                $residentsDevs_wayhomeDelayed = $guest
+                  if ( $residentsDevs_wayhomeDelayed eq "-" );
+                $residents_wayhomeDelayed .= ", " . $guestName
+                  if ( $guestName ne ""
+                    && $residents_wayhomeDelayed ne "-" );
+                $residents_wayhomeDelayed = $guestName
+                  if ( $guestName ne ""
+                    && $residents_wayhomeDelayed eq "-" );
+            }
         }
     }
 
@@ -1337,6 +1359,20 @@ sub RESIDENTS_UpdateReadings (@) {
         $residents_wayhome )
       if ( ReadingsVal( $name, "residentsTotalWayhomeNames", "" ) ne
         $residents_wayhome );
+
+    readingsBulkUpdate( $hash, "residentsTotalWayhomeDelayed", $wayhomeDelayed )
+      if ( ReadingsVal( $name, "residentsTotalWayhomeDelayed", "" ) ne
+        $wayhomeDelayed );
+
+    readingsBulkUpdate( $hash, "residentsTotalWayhomeDelayedDevs",
+        $residentsDevs_wayhomeDelayed )
+      if ( ReadingsVal( $name, "residentsTotalWayhomeDelayedDevs", "" ) ne
+        $residentsDevs_wayhomeDelayed );
+
+    readingsBulkUpdate( $hash, "residentsTotalWayhomeDelayedNames",
+        $residents_wayhomeDelayed )
+      if ( ReadingsVal( $name, "residentsTotalWayhomeDelayedNames", "" ) ne
+        $residents_wayhomeDelayed );
 
     #
     # state calculation
@@ -1841,6 +1877,15 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>residentsTotalWayhomeNames</b> - device alias of all active residents who are currently on their way back home
           </li>
           <li>
+            <b>residentsTotalWayhomeDelayed</b> - number of all residents who are delayed on their way back home
+          </li>
+          <li>
+            <b>residentsTotalWayhomeDelayedDevs</b> - device name of all delayed residents who are currently on their way back home
+          </li>
+          <li>
+            <b>residentsTotalWayhomeDelayedNames</b> - device alias of all delayed residents who are currently on their way back home
+          </li>
+          <li>
             <b>state</b> - reflects the current state
           </li>
           <li>
@@ -2198,6 +2243,15 @@ sub RESIDENTS_UpdateReadings (@) {
           </li>
           <li>
             <b>residentsTotalWayhomeNames</b> - Gerätealias aller aktiven Bewohner, die momentan auf dem Weg zurück nach Hause sind
+          </li>
+          <li>
+            <b>residentsTotalWayhomeDelayed</b> - Summe aller Bewohner, die momentan mit Versp&auml;tung auf dem Weg zur&uuml;ck nach Hause sind
+          </li>
+          <li>
+            <b>residentsTotalWayhomeDelayedDevs</b> - Gerätename aller Bewohner, die momentan versp&auml;tet auf dem Weg zurück nach Hause sind
+          </li>
+          <li>
+            <b>residentsTotalWayhomeDelayedNames</b> - Gerätealias aller Bewohner, die momentan versp&auml;tet auf dem Weg zurück nach Hause sind
           </li>
           <li>
             <b>state</b> - gibt den aktuellen Status wieder
