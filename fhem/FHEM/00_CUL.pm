@@ -52,6 +52,7 @@ my $clientsSlowRF    = ":FS20:FHT.*:KS300:USF1000:BS:HMS: ".
 my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:STACKABLE_CC:";
 my $clientsMAX       = ":CUL_MAX:HMS:CUL_IR:STACKABLE_CC:";
 my $clientsWMBus     = ":WMBUS:HMS:CUL_IR:STACKABLE_CC:";
+my $clientsKOPP_FC   = ":KOPP_FC:HMS:CUL_IR:STACKABLE_CC:";
 
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
@@ -76,6 +77,7 @@ my %matchListSlowRF = (
     "K:CUL_TCM97001"  => "^s[A-F0-9]+",
     "L:CUL_REDIRECT"  => "^o+",
 );
+
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A....................",
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
@@ -89,12 +91,21 @@ my %matchListMAX = (
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
 );
+
 my %matchListWMBus = (
     "J:WMBUS"     => "^b.*",
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
     "H:STACKABLE_CC"=>"^\\*",
 );
+
+my %matchListKOPP_FC = (
+    "1:Kopp_FC"   => "^kr..................",
+    "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
+    "D:CUL_IR"    => "^I............",
+    "H:STACKABLE_CC"=>"^\\*",
+);
+
 
 sub
 CUL_Initialize($)
@@ -117,7 +128,7 @@ CUL_Initialize($)
   $hash->{AttrFn}  = "CUL_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN sendpool addvaltrigger ".
-                     "rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S ".
+                     "rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S,KOPP_FC ".
                      "hmId longids ".
                      "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger " .
                      $readingFnAttributes;
@@ -919,6 +930,8 @@ CUL_Parse($$$$@)
     ;
   } elsif($fn eq "o" && $len >= 5)  {              # CUL_REDIRECT
     ;
+  } elsif($fn eq "k" && $len >= 20) {              # KOPP_FC
+    ;
   } else {
     DoTrigger($name, "UNKNOWNCODE $dmsg");
     Log3 $name, 2, "$name: unknown message $dmsg";
@@ -1002,10 +1015,11 @@ CUL_Attr(@)
     my $hash = $defs{$name};
 
     $aVal = "SlowRF" if(!$aVal ||
-                         ($aVal ne "HomeMatic" &&
-                          $aVal ne "MAX" &&
-                          $aVal ne "WMBus_T" &&
-                          $aVal ne "WMBus_S"));
+                         ($aVal ne "HomeMatic" 
+                          && $aVal ne "MAX" 
+                          && $aVal ne "WMBus_T" 
+                          && $aVal ne "WMBus_S" 
+                          && $aVal ne "KOPP_FC"));
     my $msg = $hash->{NAME} . ": Mode $aVal not supported";
 
     if($aVal eq "HomeMatic") {
@@ -1036,31 +1050,41 @@ CUL_Attr(@)
         return $msg;
       }
 
-   } elsif($aVal eq "WMBus_S") {
+    } elsif($aVal eq "WMBus_S") {
       return if($hash->{initString} =~ m/brs/);
       if($hash->{CMDS} =~ m/b/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
         $hash->{Clients} = $clientsWMBus;
         $hash->{MatchList} = \%matchListWMBus;
-        $hash->{initString} = "X21\nbrs"; # Use S-Mode, X21 is needed for RSSI reporting
+        $hash->{initString} = "X21\nbrs"; # Use S-Mode
         CUL_WriteInit($hash);
-
+   
       } else {
         Log3 $name, 2, $msg;
         return $msg;
       }
-   } elsif($aVal eq "WMBus_T") {
+    } elsif($aVal eq "WMBus_T") {
       return if($hash->{initString} =~ m/brt/);
       if($hash->{CMDS} =~ m/b/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
         $hash->{Clients} = $clientsWMBus;
         $hash->{MatchList} = \%matchListWMBus;
-        $hash->{initString} = "X21\nbrt"; # Use T-Mode, X21 is needed for RSSI reporting
+        $hash->{initString} = "X21\nbrt"; # Use T-Mode
+        CUL_WriteInit($hash);
+   
+      } else {
+        Log3 $name, 2, $msg;
+        return $msg;
+      }
+    } elsif($aVal eq "KOPP_FC") {
+      if($hash->{CMDS} =~ m/k/ || IsDummy($hash->{NAME}) || !$hash->{FD}) {
+        $hash->{Clients} = $clientsKOPP_FC;
+        $hash->{MatchList} = \%matchListKOPP_FC;
+        $hash->{initString} = "krS"; # krS: start Kopp receive Mode
         CUL_WriteInit($hash);
 
       } else {
         Log3 $name, 2, $msg;
         return $msg;
       }
-
 
     } else {
       return if($hash->{initString} eq "X21");
