@@ -4,8 +4,8 @@ package main;
 
 # TODO
 #   resend in firmware
-#   static routing
-#   neighborUpdate Class: 010404010c0001 010604000c0040 010700 0105
+#   static routing: to and from the device
+#   automatic routing via neighborUpdate
 #   explorer frames
 #   check security
 #   multicast
