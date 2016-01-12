@@ -29,9 +29,8 @@ CommandVersion($$)
     next if(grep(/$mod_name/, @ret));
     Log 4, "Looking for SVN Id in module $mod_name";
 
-    if($max < length($mod_name)) {
-      $max = length($mod_name)
-    }
+    $max = length($mod_name) if($max < length($mod_name))
+
     my $line;
     
     if(!open(FH, $fn)) {
@@ -53,10 +52,8 @@ CommandVersion($$)
     push @ret, $line;
   }
   
-  @ret = map {/\$Id\: (\S+) (\S+) (.+?) \$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_}
-        @ret; 
-  @ret = grep {(defined($param) ? $_ =~ /$param/ : 1)} @ret;
-  @ret = sort {version_sortModules($a, $b)} @ret;
+  @ret = map {/\$Id\: (\S+) (\S+) (.+?) \$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_} @ret; 
+  @ret = sort {version_sortModules($a, $b)} grep {(defined($param) ? $_ =~ /$param/ : 1)} @ret;
   return "no loaded modules found that match: $param" if($param && !@ret);
   return sprintf("%-".$max."s %s","File","Rev   Last Change\n\n").
          trim(join("\n",  grep (($_ =~ /^fhem.pl|\d\d_/), @ret))."\n\n".
