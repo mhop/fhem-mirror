@@ -16,14 +16,14 @@ CommandVersion($$)
 {
   my ($cl, $param) = @_;
 
-  my @ret = ("# $cvsid") ;
-  push @ret, cfgDB_svnId() if(configDBUsed());
-  my $max = 7 ; # length("fhem.pl") = 7
+  my @ret;
+  my $max = 0; 
   my $modpath = (exists($attr{global}{modpath}) ? $attr{global}{modpath} : "");
-  foreach my $m (keys %INC)
-  {
-    next unless($INC{$m} =~ /^$modpath.FHEM/ or $INC{$m} =~ /^FHEM/); # configDB 
-    my $fn = $INC{$m};
+  my @files = map {$INC{$_}} keys %INC;
+  push @files, $0; # path to fhem.pl
+  push @ret, cfgDB_svnId() if(configDBUsed());
+  foreach my $fn (@files) {
+    next unless($fn =~ /^$modpath.?FHEM/ or $fn =~ /(?:^FHEM|fhem.pl$)/); # configDB 
     my $mod_name = ($fn=~ /[\/\\]([^\/\\]+)$/ ? $1 : $fn);
     next if($param && $mod_name !~ /$param/);
     next if(grep(/$mod_name/, @ret));
@@ -37,7 +37,7 @@ CommandVersion($$)
     if(!open(FH, $fn)) {
       $line = "$fn: $!";
       if(configDBUsed()){
-        Log 4, "Looking for module $m in configDB to find SVN Id";
+        Log 4, "Looking for module $mod_name in configDB to find SVN Id";
         $line = cfgDB_Fileversion($fn,$line);
       }
     } else {
@@ -75,8 +75,10 @@ sub version_sortModules($$)
     my @a_vals  = split(' ', $a);
     my @b_vals  = split(' ', $b);
 
-    return -1 if($a_vals[0] eq "fhem.pl"); # fhem.pl always at top
-
+    # fhem.pl always at top
+    return -1 if($a_vals[0] eq "fhem.pl"); 
+    return  1 if($b_vals[0] eq "fhem.pl");
+    
     $a_vals[0] =~ s/^\d\d_//;
     $b_vals[0] =~ s/^\d\d_//;
 
