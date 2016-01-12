@@ -384,8 +384,8 @@ doUpdate($$$$)
 
   if($canJoin && $upd_needJoin && $curr == $max) {
     chdir($root);
-    uLog(1, "Calling $^X $cj, this may take a while");
-    my $ret = `$^X $cj`;
+    uLog(1, "Calling $^X $cj -noWarnings, this may take a while");
+    my $ret = `$^X $cj -noWarnings`;
     foreach my $l (split(/[\r\n]+/, $ret)) {
       uLog(1, $l);
     }

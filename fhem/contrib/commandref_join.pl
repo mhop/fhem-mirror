@@ -8,7 +8,10 @@ use strict;
 use warnings;
 
 # $Id$
+
+my $noWarnings = grep $_ eq '-noWarnings', @ARGV;
 use constant TAGS => qw{ul li code b i u table tr td};
+
 my %mods;
 my @modDir = ("FHEM");
 foreach my $modDir (@modDir) {
@@ -115,12 +118,12 @@ EOF
       }
     }
     print "$lang $mods{$mod}: No a-tag with name=\"$mod\" \n"
-        if(!$suffix && $docCount && !$hasLink);
+        if(!$suffix && $docCount && !$hasLink && !$noWarnings);
 
     foreach $tag (TAGS) {
       print("$lang $mods{$mod}: Unbalanced $tag ".
                 "($tagcount{$tag}, last line ok: $llwct{$tag})\n")
-        if($tagcount{$tag});
+        if($tagcount{$tag} && !$noWarnings);
     }
   }
 
