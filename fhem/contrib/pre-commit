@@ -46,9 +46,31 @@ foreach my $row (split("\n", $fList)) {
       }
     }
     close(FILE);
-    err $fName, "$fName: file has over 80 chars/line in line $cLineNo"
+    err $fName, "file has over 80 chars/line in line $cLineNo"
 	 if($cCount > 80);
     next;
+  }
+  
+  next unless($fName =~ /\.pm$/);
+
+  # check for SVN Id
+  if($fName =~ m,trunk/fhem/FHEM/[^/]+\.pm$,) {
+    my $hasId = 0;
+    open(FILE, "$svnlook $arg cat $repos $fName|") ||
+        die("Cant svnlook cat $fName:$!\n");
+
+    while(my $l = <FILE>) {
+       $hasId = ($l =~ /#.*?\$Id(?:\:.+)?\$/);
+       last if($hasId);
+    }
+    close(FILE);
+    err $fName, "file has no SVN Id as comment" unless($hasId);
+
+    # check for activated Id property in svn:keywords
+    my $props = `$svnlook $arg propget $repos svn:keywords $fName`;
+
+    err $fName, "Id property not set in svn:keywords"
+      unless($props =~ /Id/);
   }
 
   next if($fName !~ m+FHEM/\d\d_(.*).pm$+);
