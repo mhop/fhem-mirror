@@ -54,6 +54,7 @@ FHEM/10_FS20.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/00_HXBDevice.pm         borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/10_IT.pm                dancer0705/bjoernh   http://forum.fhem.de InterTechno
 FHEM/10_Itach_IR             ulimaass             http://forum.fhem.de Sonstige Systeme
+FHEM/10_KOPP_FC.pm           raspii               http://forum.fhem.de/index.php/topic,32048.30.html#lastPost
 FHEM/10_MAX.pm               mgehre               http://forum.fhem.de MAX
 FHEM/10_MQTT_BRIDGE          ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/10_MQTT_DEVICE          ntruchsess           http://forum.fhem.de Sonstige Systeme
