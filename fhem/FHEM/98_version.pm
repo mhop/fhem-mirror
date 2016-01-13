@@ -29,7 +29,7 @@ CommandVersion($$)
     next if(grep(/$mod_name/, @ret));
     Log 4, "Looking for SVN Id in module $mod_name";
 
-    $max = length($mod_name) if($max < length($mod_name))
+    $max = length($mod_name) if($max < length($mod_name));
 
     my $line;
     
