@@ -22,7 +22,7 @@
 # The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 ###################################
 #
-# $Id: 46_PW_Circle.pm 0038 2015-11-11 16:18:38Z sguttmann $ 
+# # $Id$
 package main;
 
 use strict;
