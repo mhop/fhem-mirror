@@ -22,7 +22,7 @@
 # The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 ###################################
 #
-# $Id: 46_PW_Sense.pm 0037 2015-11-09 19:18:38Z sguttmann $ 
+# $Id$ 
 package main;
 
 use strict;
