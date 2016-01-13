@@ -1,4 +1,4 @@
-# $Id: 98_MaxScanner.pm 10453 2016-01-11 00:00:00Z john $
+# $Id$
 ####################################################################################################
 #
 #   98_MaxScanner.pm
@@ -42,7 +42,8 @@
 #      *  change. scanTemp substitues scnEnabled
 #   11.01.16 - 1.0.0.0
 #      *  change: limit logging, when window open detected
-#
+#   13.01.16 - 1.0.0.1
+#      *  change: FIND, minor changes
 ####################################################################################################
 package main;
 use strict;
@@ -52,7 +53,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
-my $MaxScanner_Version   = "1.0.0.1 - 11.01.2016";
+my $MaxScanner_Version   = "1.0.0.1 - 13.01.2016";
 my $MaxScanner_ModulName = "MaxScanner";
 
 # minimal poll-rate for thermostat in minutes given by firmware
@@ -424,24 +425,32 @@ sub MaxScanner_Find($)
   foreach my $aaa ( sort keys %{ $modules{MAX}{defptr} } )
   {
     my $hash = $modules{MAX}{defptr}{$aaa};
-
+    
+    # type must exist
+    # it seems, that maxlan environment holds some foreign entries
+    # see http://forum.fhem.de/index.php/topic,11624.msg390975.html#msg390975
+    if ( !defined( $hash->{type} ) )
+    {
+      MaxScanner_Log $modHash, 5, 'missing property type for device: ' . $aaa;
+      next;
+    }
+    
+    # exit if it is not a HeatingThermostat
+    next if $hash->{type} !~ m/^HeatingThermostat.*/;
+    
     # basic properties  are reqired
     if ( !defined( $hash->{IODev} )
-      || !defined( $hash->{NAME} )
-      || !defined( $hash->{type} ) )
+      || !defined( $hash->{NAME} ) )
     {
-      MaxScanner_Log $modHash, 1, 'missing basic property for device: ' . $aaa;
+      MaxScanner_Log $modHash, 1, 'missing property IODEV or NAME for device: ' . $aaa;
       next;
     }
 
     #.
     # name of the max device
     my $name = $hash->{NAME};
-    MaxScanner_Log $modHash, 5, "$name has type " . $hash->{type};
 
-    # exit if it is not a HeatingThermostat
-    next if $hash->{type} !~ m/^HeatingThermostat.*/;
-    MaxScanner_Log $modHash, 5, $name . " is HeatingThermostat";
+    # MaxScanner_Log $modHash, 5, $name . " is HeatingThermostat";
 
     # thermostat must be enabled for the scanner
     if ( AttrVal( $name, $MaxScanner_AttrEnabled, '?' ) ne '1' )
@@ -451,7 +460,7 @@ sub MaxScanner_Find($)
       next;
     }
 
-    MaxScanner_Log $modHash, 5, $name . ' is enabled for scanner';
+    # MaxScanner_Log $modHash, 5, $name . ' is enabled for scanner';
 
     # check special user attributes, if not exists, create them
     my $xattr = AttrVal( $name, 'userattr', '' );
