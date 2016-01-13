@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 7015 2015-12-23 13:30:00Z chris1284 $
+# $Id$
 ###########################
 #	CALVIEW
 #	
@@ -138,14 +138,14 @@ sub CALVIEW_GetUpdate($){
 				readingsBulkUpdate($hash, "today_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode}); 
 				$todaycounter ++;}
 			elsif ($date eq $termin->{bdate} && $termin->{mode} eq "modeStart"){
-				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_bdate", "heute"); 
-				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_btime", $termin->{btime}); 
-				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_summary", $termin->{summary}); 
-				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_source", $termin->{source}); 
-				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_location", $termin->{location});
-				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_edate", $termin->{edate}); 
-				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_etime", $termin->{etime}); 
-				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $todaycounter)."_mode", $termin->{mode});
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $runningcounter)."_bdate", "heute"); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $runningcounter)."_btime", $termin->{btime}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $runningcounter)."_summary", $termin->{summary}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $runningcounter)."_source", $termin->{source}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $runningcounter)."_location", $termin->{location});
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $runningcounter)."_edate", $termin->{edate}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $runningcounter)."_etime", $termin->{etime}); 
+				readingsBulkUpdate($hash, "started_".sprintf ('%03d', $runningcounter)."_mode", $termin->{mode});
 				$runningcounter ++;}
 			#check ob termin morgen
 			elsif ($datenext eq $termin->{bdate}){
