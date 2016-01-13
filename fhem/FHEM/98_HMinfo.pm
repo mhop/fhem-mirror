@@ -128,6 +128,24 @@ sub HMinfo_Attr(@) {###########################################################
       }
     }
   }
+  elsif($attrName eq "configDir"){
+    if ($cmd eq "set"){
+      $attr{$name}{configDir}=$attrVal;
+    }
+    else{
+      delete $attr{$name}{configDir};
+    }
+    HMinfo_listOfTempTemplates();
+  }
+  elsif($attrName eq "configTempFile"){
+    if ($cmd eq "set"){
+      $attr{$name}{configTempFile}=$attrVal;
+    }
+    else{
+      delete $attr{$name}{configTempFile};
+    }
+    HMinfo_listOfTempTemplates();
+  }
   return;
 }
 
@@ -200,18 +218,9 @@ sub HMinfo_status($){##########################################################
         $k =~ s/^prot//;
         $protC{$k} = 0 if(!defined $protC{$_});
       }
-      foreach (grep {$ehash->{"prot".$_}} keys %protC){#protocol critical alarms
-        $protC{$_}++;
-        push @protNamesC,$eName;
-      }
-      foreach (grep {$ehash->{"prot".$_}} keys %protE){#protocol errors
-        $protE{$_}++;
-        push @protNamesE,$eName;
-      }
-      foreach (grep {$ehash->{"prot".$_}} keys %protW){#protocol events reported
-        $protW{$_}++;
-        push @protNamesW,$eName;
-      }
+      foreach (grep {$ehash->{"prot".$_}} keys %protC){ $protC{$_}++; push @protNamesC,$eName;}#protocol critical alarms
+      foreach (grep {$ehash->{"prot".$_}} keys %protE){ $protE{$_}++; push @protNamesE,$eName;}#protocol errors
+      foreach (grep {$ehash->{"prot".$_}} keys %protW){ $protW{$_}++; push @protNamesW,$eName;}#protocol events reported
       $rssiMin{$eName} = 0;
       foreach (keys %{$ehash->{helper}{rssi}}){
         next if($_ !~ m /at_.*$ehash->{IODev}->{NAME}/ );#ignore unused IODev
@@ -221,7 +230,6 @@ sub HMinfo_status($){##########################################################
     }
   }
   #====== collection finished - start data preparation======
-  delete $hash->{$_} foreach (grep(/^(ERR|W_|I_|C_)/,keys%{$hash}));# remove old
   my @updates;
   foreach my $read(grep {defined $sum{$_}} @info){       #--- disp crt count
     my $d;
@@ -256,35 +264,22 @@ sub HMinfo_status($){##########################################################
   # ------- what about protocol events ------
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
-  my @tpc;
-  my @tpe;
-  my @tpw;
+
+  push @updates,"CRIT__protocol:"  .join(",",map {"$_:$protC{$_}"} grep {$protC{$_}} keys(%protC));
+  push @updates,"ERR__protocol:"   .join(",",map {"$_:$protE{$_}"} grep {$protE{$_}} keys(%protE));
+  push @updates,"W__protocol:"     .join(",",map {"$_:$protW{$_}"} grep {$protW{$_}} keys(%protW));
+
   my @tpu = devspec2array("TYPE=CUL_HM:FILTER=state=unreachable");
-  push @tpc,"$_:$protC{$_}"   foreach (grep {$protC{$_}} keys(%protC));
-  push @tpe,"$_:$protE{$_}"   foreach (grep {$protE{$_}} keys(%protE));
-  push @tpw,"$_:$protW{$_}"   foreach (grep {$protW{$_}} keys(%protW));
-  if(@tpc){push @updates,"CRIT__protocol:"  .join",",@tpc;} else{ delete $hash->{READINGS}{CRIT__protocol} };
-  if(@tpe){push @updates,"ERR__protocol:"   .join",",@tpe;} else{ delete $hash->{READINGS}{ERR__protocol} };
-  if(@tpw){push @updates,"W__protocol:"     .join",",@tpw;} else{ delete $hash->{READINGS}{W__protocol} };
-  if(@tpu){push @updates,"ERR__unreachable:".scalar(@tpu);} else{ delete $hash->{READINGS}{ERR__unreachable} };
+  push @updates,"ERR__unreachable:".scalar(@tpu);
+  push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{qReqConf}};
 
-  @protNamesC = grep !/^$/,HMinfo_noDup(@protNamesC);
-  $hash->{CRI__protoNames} = join",",@protNamesC if(@protNamesC);
-  @protNamesE = grep !/^$/,HMinfo_noDup(@protNamesE);
-  $hash->{ERR__protoNames} = join",",@protNamesE if(@protNamesE);
-  @protNamesW = grep !/^$/,HMinfo_noDup(@protNamesW);
-  $hash->{W__protoNames} = join",",@protNamesW if(@protNamesW);
-  $hash->{W__unreachNames} = join(",",@tpu) if(@tpu);
-
-  if (defined $modules{CUL_HM}{helper}{qReqConf} &&
-      @{$modules{CUL_HM}{helper}{qReqConf}}>0){
-    $hash->{I_autoReadPend} = join ",",@{$modules{CUL_HM}{helper}{qReqConf}};
-    push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{qReqConf}};
-  }
-#  else{
-#    delete $hash->{I_autoReadPend};
-#  }
-
+  $hash->{W__unreachNames} = join(",",@tpu);
+  $hash->{CRI__protoNames} = join(",",grep !/^$/,HMinfo_noDup(@protNamesC));
+  $hash->{ERR__protoNames} = join(",",grep !/^$/,HMinfo_noDup(@protNamesE));
+  $hash->{W__protoNames}   = join(",",grep !/^$/,HMinfo_noDup(@protNamesW));
+  $hash->{I_autoReadPend}  = join(",",@{$modules{CUL_HM}{helper}{qReqConf}});
+  $hash->{W_unConfRegs}    = join(",",@shdwNames);
+  
   # ------- what about rssi low readings ------
   foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
     if    ($rssiMin{$_}> -60) {$rssiMinCnt{"59<"}++;}
@@ -297,15 +292,14 @@ sub HMinfo_status($){##########################################################
   my $d ="";
   $d .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
   push @updates,"I_rssiMinLevel:".$d;
-  $hash->{ERR___rssiCrit} = join(",",@rssiNames) if (@rssiNames);
-  # ------- what about others ------
-  $hash->{W_unConfRegs} = join(",",@shdwNames) if (@shdwNames > 0);
+  $hash->{ERR___rssiCrit} = join(",",@rssiNames);
   # ------- update own status ------
   $hash->{STATE} = "updated:".TimeNow();
-  my $updt = join",",@updates;
-  foreach (grep /^(W_|I_|ERR)/,keys%{$hash->{READINGS}}){
-    delete $hash->{READINGS}{$_} if ($updt !~ m /$_/);
+  
+  foreach (grep(/^(ERR|W_|I_|C_|CRI_)/,keys%{$hash})){# remove empty entries
+    delete $hash->{$_} if(!$hash->{$_});
   }
+  
   readingsBeginUpdate($hash);
   foreach my $rd (@updates){
     next if (!$rd);
@@ -802,9 +796,44 @@ sub HMinfo_tempListDefFn(@) { ###########################################
   my ($n) =devspec2array("TYPE=HMinfo");
   $ret .= "$attr{global}{modpath}/"                  if (!$fn || $fn !~ m/^\//);  #no path? add modpath
   $ret .= AttrVal($n,"configDir",".")."/"            if (!$fn || $fn !~ m/..*\//);#no dir?  add defDir
-  $ret .= AttrVal($n,"configTempFile","tempList.cfg")if (!$fn);                   #set filename
-
+  if (!$fn){                                                                      #set filename
+    my ($f) = split(",",AttrVal($n,"configTempFile","tempList.cfg"));
+    $ret .= $f;
+  }
   return $ret.$fn;
+}
+sub HMinfo_listOfTempTemplates() { ###########################################
+  # search all entries in tempListFile
+  my ($n) =devspec2array("TYPE=HMinfo");
+  my $dir = AttrVal($n,"configDir","$attr{global}{modpath}/")."/"; #no dir?  add defDir
+  $dir = "./".$dir if ($dir !~ m/^(\.|\/)/);
+  my @tFiles = split(";",AttrVal($n,"configTempFile","tempList.cfg"));
+  my $tDefault = $dir.$tFiles[0].":";
+  my @tmpl;
+  foreach my $fn (map{$dir.$_}@tFiles){
+    if (!(-r $fn)){
+      next;
+    }
+    open(aSave, "$fn") || return("Can't open $fn: $!");
+    while(<aSave>){
+      chomp;
+      my $line = $_;
+      $line =~ s/\r//g;
+      if($line =~ m/^entities:(.*)/){
+        $1 =~s/.*://;
+        push @tmpl,map{"$fn:$_"}split(",",$1);
+      }  
+    }
+    close (aSave);
+  }
+  @tmpl = map{s/$tDefault//;$_} @tmpl;
+  $defs{$n}{helper}{weekplanList}     = \@tmpl;
+  my $at=$modules{CUL_HM};
+  if ($modules{CUL_HM}{AttrList}){
+    my $l = "none,".join(",",@tmpl);
+    $modules{CUL_HM}{AttrList} =~ s/ tempListTmpl(.* )*?/ tempListTmpl:$l/;
+  }
+  return ;
 }
 
 sub HMinfo_tempListTmplGenLog($$) { ###########################################
@@ -1104,9 +1133,12 @@ sub HMinfo_GetFn($@) {#########################################################
   elsif($cmd eq "msgStat")    {##print message statistics----------------------
     $ret = HMinfo_getMsgStat();
   }
-  elsif($cmd eq "rssi")       {##print RSSI protocol-events--------------------
-    my @rssiList;
-    foreach my $dName (HMinfo_getEntities($opt."d",$filter)){
+  elsif($cmd =~ m/^(rssi|rssiG)$/){##print RSSI protocol-events-----------------
+    my ($type) = @a;
+    my @rssiList = ();
+    my %rssiH;
+    my @io;
+    foreach my $dName (HMinfo_getEntities($opt."dv",$filter)){
       foreach my $dest (keys %{$defs{$dName}{helper}{rssi}}){
         my $dispName = $dName;
         my $dispDest = $dest;
@@ -1118,19 +1150,55 @@ sub HMinfo_GetFn($@) {#########################################################
           my $h = InternalVal($dName,"IODev","");
           $dispDest .= "/$h->{NAME}";
         }
-        push @rssiList,sprintf("%-15s %-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
-                               ,$dName,$dispName,$dispDest
-                               ,$defs{$dName}{helper}{rssi}{$dest}{lst}
-                               ,$defs{$dName}{helper}{rssi}{$dest}{avg}
-                               ,$defs{$dName}{helper}{rssi}{$dest}{min}
-                               ,$defs{$dName}{helper}{rssi}{$dest}{max}
-                               ,$defs{$dName}{helper}{rssi}{$dest}{cnt}
-                               );
+        if ($type eq "full"){
+          push @rssiList,sprintf("%-15s %-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
+                                ,$dName,$dispName,$dispDest
+                                ,$defs{$dName}{helper}{rssi}{$dest}{lst}
+                                ,$defs{$dName}{helper}{rssi}{$dest}{avg}
+                                ,$defs{$dName}{helper}{rssi}{$dest}{min}
+                                ,$defs{$dName}{helper}{rssi}{$dest}{max}
+                                ,$defs{$dName}{helper}{rssi}{$dest}{cnt}
+                                );
+        }
+        else{
+          my $dir = ($dName eq $dispName)?$dispDest." >":$dispName." <";
+          push @io,$dir;
+          $rssiH{$dName}{$dir}{min} = $defs{$dName}{helper}{rssi}{$dest}{min};
+          $rssiH{$dName}{$dir}{avg} = $defs{$dName}{helper}{rssi}{$dest}{avg};
+          $rssiH{$dName}{$dir}{max} = $defs{$dName}{helper}{rssi}{$dest}{max};
+        }
       }
     }
-    $ret = $cmd." done:"."\n    "."Device          receive         from             last   avg      min<max    count"
+    if ($type eq "reduced"){
+      @io = HMinfo_noDup(@io);
+      my $s = sprintf("    %15s "," ");
+      $s .= sprintf(" %12s",$_)foreach (@io);
+      push @rssiList, $s;
+      
+      foreach my $d(keys %rssiH){
+        my $str = sprintf("%-15s  ",$d);
+        foreach my $i(@io){
+#          $str .= sprintf("  %6.1f/%6.1f/%6.1f"
+#                           ,($rssiH{$d}{$i}{min} ? $rssiH{$d}{$i}{min} : 0)
+#                           ,($rssiH{$d}{$i}{avg} ? $rssiH{$d}{$i}{avg} : 0)
+#                           ,($rssiH{$d}{$i}{max} ? $rssiH{$d}{$i}{max} : 0)
+#                           );
+          $str .= sprintf(" %12.1f"
+#                           ,($rssiH{$d}{$i}{min} ? $rssiH{$d}{$i}{min} : 0)
+                           ,($rssiH{$d}{$i}{avg} ? $rssiH{$d}{$i}{avg} : 0)
+#                           ,($rssiH{$d}{$i}{max} ? $rssiH{$d}{$i}{max} : 0)
+                           );
+        }
+        push @rssiList, $str;
+      }
+      $ret = "\n rssi average \n"
+             .(join "\n   ",sort @rssiList);
+    }
+    elsif($type eq "full"){
+      $ret = $cmd." done:"."\n    "."Device          receive         from             last   avg      min_max    count"
                         ."\n    ".(join "\n    ",sort @rssiList)
                          ;
+    }
   }
   #------------ checks ---------------
   elsif($cmd eq "regCheck")   {##check register--------------------------------
@@ -1296,7 +1364,8 @@ sub HMinfo_GetFn($@) {#########################################################
     my @cmdLst =     
            ( "help"
             ,"configCheck","param","peerCheck","peerXref"
-            ,"protoEvents","msgStat","rssi"
+            ,"protoEvents","msgStat"
+            ,"rssi rssiG:full,reduced"
             ,"models"
 #            ,"overview"
             ,"regCheck","register"
@@ -1387,6 +1456,7 @@ sub HMinfo_SetFn($@) {#########################################################
       my $fn = HMinfo_tempListDefFn($a[1]);
       $ret = HMinfo_tempList($name,$filter,$action,$fn);
     }
+    HMinfo_listOfTempTemplates(); # execute post command - maybe there are new entries in the files. 
   }
   elsif($cmd eq "templateExe"){##template: see if it applies ------------------
     return HMinfo_templateExe($opt,$filter,@a);
@@ -1992,6 +2062,7 @@ sub HMinfo_bpAbort($) {#bp timeout ############################################
 sub HMinfo_templateChk_Get ($){ ###############################################
   my ($param) = shift;
   my ($id,$opt,$filter,@a) = split ",",$param;
+  $opt = "" if(!defined $opt);
   my $ret;
   if(@a){
     foreach my $dName (HMinfo_getEntities($opt."v",$filter)){
@@ -2108,7 +2179,8 @@ sub HMinfo_templateSet(@){#####################################################
                  :""))                  # could be "both"
                  :"";
   my $aHash = $defs{$aName};
-
+#blindActuator - confBtnTime range:1 to 255min special:permanent : 255=permanent 
+#blindActuator - intKeyVisib literal:visib,invisib : visibility of internal channel 
   my @regCh;
   foreach (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
     my $regN = $pSet.$_;
@@ -2121,10 +2193,13 @@ sub HMinfo_templateSet(@){#####################################################
     return "Device doesn't support $regN - template $tmpl not applicable" if ($ret =~ m/failed:/);
     return "peer necessary for template"                                  if ($ret =~ m/peer required/ && !$pName);
     return "Device doesn't support literal $regV for reg $regN"           if ($ret =~ m/literal:/ && $ret !~ m/\b$regV\b/);
-    my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (.*) :/);
-    $max = 0 if (!$max);
-    $max =~ s/([0-9\.]+).*/$1/;
-    return "$regV out of range:  $min to $max"                            if ($min && ($regV < $min || ($max && $regV > $max)));
+    
+    if ($ret =~ m/special:/ && $ret !~ m/\b$regV\b/){# if covered by "special" we are good
+      my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (.*) :/);
+      $max = 0 if (!$max);
+      $max =~ s/([0-9\.]+).*/$1/;
+      return "$regV out of range:  $min to $max"                            if ($min && ($regV < $min || ($max && $regV > $max)));
+    }
     push @regCh,"$regN,$regV";
   }
   foreach (@regCh){#Finally write to shadow register.
@@ -2832,6 +2907,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        <a ref="#HMinfoloadConfig">loadConfig</a><br>
        <a ref="#HMinfoverifyConfig">verifyConfig</a><br>
      </li>
+    <li><a name="#HMinfoconfigTempFile">configTempFile&lt;,configTempFile2&gt;&lt;,configTempFile2&gt; </a>
+        Liste of Templfiles (weekplan) which are considered in HMInfo and CUL_HM<br>
+        Files are comma separated. The first file is default. Its name may be skipped when setting a tempalte.<br>
+    </li>
      <li><a name="#HMinfohmManualOper">hmManualOper</a>
        set to 1 will prevent any automatic operation, update or default settings
        in CUL_HM.<br>
@@ -2886,7 +2965,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
 <a name="HMinfo"></a>
 <h3>HMinfo</h3>
 <ul>
-  <tr><td>
+
   Das Modul HMinfo erm&ouml;glicht einen &Uuml;berblick &uuml;ber eQ-3 HomeMatic Ger&auml;te, die mittels <a href="#CUL_HM">CUL_HM</a> definiert sind.<br><br>
   <B>Status Informationen und Z&auml;hler</B><br>
   HMinfo gibt einen &Uuml;berlick &uuml;ber CUL_HM Installationen einschliesslich aktueller Zust&auml;nde.
@@ -3253,6 +3332,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         <a ref="#HMinfosaveConfig">saveConfig</a>, 
         <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
         <a ref="#HMinfoloadConfig">loadConfig</a><br>
+    </li>
+    <li><a name="#HMinfoconfigTempFile">configTempFile&lt;,configTempFile2&gt;&lt;,configTempFile2&gt; </a>
+        Liste der Templfiles (weekplan) welche in HM berücksichtigt werden<br>
+        Die Files werden kommasepariert eingegeben. Das erste File ist der Default. Dessen Name muss beim Template nicht eingegeben werden.<br>
     </li>
     <li><a name="#HMinfohmManualOper">hmManualOper</a>
         auf 1 gesetzt, verhindert dieses Attribut jede automatische Aktion oder Aktualisierung seitens CUL_HM.<br>
