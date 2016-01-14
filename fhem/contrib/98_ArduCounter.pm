@@ -21,7 +21,8 @@
 #
 #   2014-2-4    initial version
 #   2014-3-12   added documentation
-#	2015-02-08	renamed ACNT to ArduCounter
+#   2015-02-08  renamed ACNT to ArduCounter
+#   2016-01-01  added attributes for reading names
 #
 
 package main;
@@ -60,6 +61,8 @@ sub ArduCounter_Initialize($)
         'pin.* ' .
         "interval " .
         "factor " .
+        "readingNameCount[0-9]+ " .
+        "readingNamePower[0-9]+ " .
         "do_not_notify:1,0 " . $readingFnAttributes;
 }
 
@@ -99,10 +102,10 @@ sub ArduCounter_InitDev($)
     # send attributes to arduino device. Just call ArduCounter_Attr again,
     # now with state "Initialized"
     while (my ($attr, $val) = each(%{$attr{$name}})) {
-		if ($attr =~ "pin|del|interval") {
-			Log3 $name, 3, "$name: InitDev calls Attr with $attr $val";
-			ArduCounter_Attr("set", $name, $attr, $val); 
-		}
+        if ($attr =~ "pin|del|interval") {
+            Log3 $name, 3, "$name: InitDev calls Attr with $attr $val";
+            ArduCounter_Attr("set", $name, $attr, $val); 
+        }
     }
 }
 
@@ -305,10 +308,12 @@ sub ArduCounter_Read($)
                 $factor = 1000;
             }
             Log3 $name, 4, "$name: Read match msg: Pin $pin count $count (diff $diff) in $time Millis";
-            readingsBulkUpdate($hash, "pin$pin", sprintf ("%.3f", $count) );
-			if ($time) {
-				readingsBulkUpdate($hash, "power$pin", sprintf ("%.3f", $diff/$time/1000*3600*$factor) );
-			}
+            my $rcname = AttrVal($name, "readingNameCount$pin", "pin$pin");
+            my $rpname = AttrVal($name, "readingNamePower$pin", "power$pin");
+            readingsBulkUpdate($hash, $rcname, sprintf ("%.3f", $count) );
+            if ($time) {
+                readingsBulkUpdate($hash, $rpname, sprintf ("%.3f", $diff/$time/1000*3600*$factor) );
+            }
         } elsif ($line =~ '(ArduCounter V[\d\.]+.?) Setup done') {
             readingsBulkUpdate($hash, "version", $1);
             Log3 $name, 3, "$name: Arduino reported setup done - sending init cmds";
@@ -350,12 +355,9 @@ sub ArduCounter_Ready($)
 <h3>ArduCounter</h3>
 
 <ul>
-    This module implements an Interface to an Arduino based counter for pulses on any input pin of an Arduino Uno, 
-	Nano or similar device like a Jeenode. The typical use case is an S0-Interface on an energy meter<br>
-    Counters are configured with attributes that define which Arduino pins should count pulses and in which intervals 
-    the Arduino board should report the current counts.<br>
-	The Arduino sketch that works with this module uses pin change interrupts so it can efficiently count pulses 
-	on all available input pins.
+    This module implements an Interface to an Arduino based counter for pulses on any input pin of an Arduino Uno, Nano or similar device like a Jeenode. The typical use case is an S0-Interface on an energy meter<br>
+    Counters are configured with attributes that define which Arduino pins should count pulses and in which intervals the Arduino board should report the current counts.<br>
+    The Arduino sketch that works with this module uses pin change interrupts so it can efficiently count pulses on all available input pins.
     <br><br>
     <b>Prerequisites</b>
     <ul>
@@ -372,8 +374,8 @@ sub ArduCounter_Ready($)
         <br>
         <code>define &lt;name&gt; ArduCounter &lt;device&gt;</code>
         <br>
-	    &lt;device&gt; specifies the serial port to communicate with the Arduino.<br>
-		
+        &lt;device&gt; specifies the serial port to communicate with the Arduino.<br>
+        
         The name of the serial-device depends on your distribution.
         You can also specify a baudrate if the device name contains the @
         character, e.g.: /dev/ttyUSB0@9600<br>
@@ -403,7 +405,7 @@ sub ArduCounter_Ready($)
         this defines two counters connected to the pins D4 and D5, each with the pullup resistor activated. 
         Impulses will be counted when the signal changes from 0 to 1.
         The ArduCounter sketch which must be loaded on the Arduino implements this using pin change interrupts,
-		so all avilable input pins can be used.
+        so all avilable input pins can be used.
     </ul>
     <br>
 
@@ -411,16 +413,16 @@ sub ArduCounter_Ready($)
     <b>Set-Commands</b><br>
     <ul>
         <li><b>raw</b></li> 
-            send the value to the Arduino board so you can directly talk to the sketch using its commands<br>
-            this is not needed for normal operation but might be useful sometimes for debugging<br>
+            send the value to the Arduino board so you can directly talk to the sketch using its commands.<br>
+            This is not needed for normal operation but might be useful sometimes for debugging<br>
     </ul>
     <br>
     <a name="ArduCounterget"></a>
     <b>Get-Commands</b><br>
     <ul>
         <li><b>info</b></li> 
-            send the internal command <code>show</code> to the Arduino board to get current counts<br>
-            this is not needed for normal operation but might be useful sometimes for debugging<br>
+            send the internal command <code>show</code> to the Arduino board to get current counts.<br>
+            This is not needed for normal operation but might be useful sometimes for debugging<br>
     </ul>
     <br>
     <a name="ArduCounterattr"></a>
@@ -434,7 +436,7 @@ sub ArduCounter_Ready($)
             <code>rising</code>, <code>falling</code> or <code>change</code> as value, followed by 
             on optional <code>pullup</code>.<br>
         <li><b>interval</b></li> 
-            Define the reporting interval after which the Arduino board should hand over the count and the time from first to last impulse per pin<br>
+            Define the reporting interval after which the Arduino board should hand over the count and the time from first to last impulse per pin.<br>
             This Attribute expects two numbers as value. The first is the minimal interval, the second the maximal interval. 
             Nothing is reported during the minimal interval. The Arduino board just counts and reemembers the time between the first impulse and the last impulse for each pin.
             After the minimal interval the Arduino board reports count and time for those pins where impulses were encountered. 
@@ -442,6 +444,12 @@ sub ArduCounter_Ready($)
             The default intervals are 60 seconds as minimal time and 5 minutes as maximum interval.
         <li><b>factor</b></li> 
             Define a multiplicator for calculating the power from the impulse count and the time between the first and the last impulse
+            
+        <li><b>readingNameCount[0-9]+</b></li> 
+            Change the name of the counter reading pinX to something more meaningful.
+        <li><b>readingNamePower[0-9]+</b></li> 
+            Change the name of the power reading powerX to something more meaningful.
+        
     </ul>
     <br>
     <b>Readings / Events</b><br>
