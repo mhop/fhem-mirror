@@ -167,7 +167,7 @@ TechemHKV_Run(@) {
 sub
 TechemHKV_IOPatch(@) {
   my ($hash, $iodev) = @_;
-  return undef unless (AttrVal($iodev, "rfmode", undef) eq "WMBus_T");
+  return undef unless (AttrVal($iodev, "rfmode", '') eq "WMBus_T");
   # see if already patched
   readingsSingleUpdate($hash, "state", "listening", 1);
   return undef if ($defs{$iodev}{Clients} =~ /TechemHKV/ );
