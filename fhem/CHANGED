@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  57_CALVIEW: bugfix for started terms
   - feature: 10_KOPP_FC: Receive Mode for dimmer implemented, 
     change:  10_KOPP_FC: removed "toggle" command, use "on" or "off" instead
   - change: 49_SSCam: Vars "USERNAME" and "RECTIME" removed from Internals,
