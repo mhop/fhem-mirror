@@ -132,7 +132,7 @@ TechemHKV_Receive(@) {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
     readingsBulkUpdate($hash, "current_period", $msg->{actualVal});
-    $hash->{CHANGETIME}[0] = $ts;
+    $hash->{CHANGETIME}->[0] = $ts;
     readingsEndUpdate($hash, 1);
     delete $hash->{CHANGETIME};
   }
@@ -144,7 +144,7 @@ TechemHKV_Receive(@) {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
     readingsBulkUpdate($hash, "previous_period", $msg->{lastVal});
-    $hash->{CHANGETIME}[0] = $ts;
+    $hash->{CHANGETIME}->[0] = $ts;
     readingsEndUpdate($hash, 1);
     delete $hash->{CHANGETIME};
   }
