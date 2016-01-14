@@ -149,7 +149,7 @@ TechemWZ_Receive(@) {
     $hash->{".updateTimestamp"} = $ts;
     readingsBulkUpdate($hash, "meter", $msg->{meter});
     readingsBulkUpdate($hash, "current_period", $msg->{actualVal});
-    $hash->{CHANGETIME}[0] = $ts;
+    $hash->{CHANGETIME}->[0] = $ts;
     readingsEndUpdate($hash, 1);
     delete $hash->{CHANGETIME};
   }
@@ -161,7 +161,7 @@ TechemWZ_Receive(@) {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
     readingsBulkUpdate($hash, "previous_period", $msg->{lastVal});
-    $hash->{CHANGETIME}[0] = $ts;
+    $hash->{CHANGETIME}->[0] = $ts;
     readingsEndUpdate($hash, 1);
     delete $hash->{CHANGETIME};
   }
@@ -355,7 +355,7 @@ TechemWZ_ParseLastDate(@) {
 
 ###############################################################################
 #
-# Vario 5 heatmeter
+# Compact 5 heatmeter
 #
 ###############################################################################
 
