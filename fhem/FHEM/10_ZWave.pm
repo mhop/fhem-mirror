@@ -419,14 +419,13 @@ my %zwave_class = (
   AV_RENDERER_STATUS       => { id => '96' },
   AV_CONTENT_SEARCH_MD     => { id => '97' },
   SECURITY                 => { id => '98',
-    set   => { "secScheme"    => 'ZWave_sec($hash, "0400")',
-               "sendNonce"    => 'ZWave_secCreateNonce($hash)',
-               "secEnd"       => 'ZWave_secEnd($hash)',
-               "secEncap"     => 'ZWave_sec($hash, "%s")' },
-    get   => { "secSupported" => 'ZWave_sec($hash, "02")' ,
-               "secNonce"     => 'ZWave_sec($hash, "40")'},
-    parse => { "..9803(.*)"   => 'ZWave_secSupported($hash, $1)',
-               "..9805(.*)"   => 'ZWave_secInit($hash, $1)', # secScheme
+    set   => { "secScheme"      => 'ZWave_sec($hash, "0400")',
+               "secNonce"       => 'ZWave_secCreateNonce($hash)',
+               "secNonceReport" => 'ZWave_sec($hash, "40")',
+               "secSupportedReport"   => 'ZWave_sec($hash, "02")',
+               "secEncap"       => 'ZWave_sec($hash, "%s")' },
+     parse => { "..9803(.*)"   => 'ZWave_secSupported($hash, $1)',
+               "..9805(.*)"   => 'ZWave_secInit($hash, $1)',
                "..9807"       => 'ZWave_secNetWorkKeyVerify($hash)',
                "..9840"       => 'ZWave_secNonceRequestReceived($hash)',
                "..9880(.*)"   => 'ZWave_secNonceReceived($hash, $1)',
@@ -448,10 +447,10 @@ my %zwave_class = (
 
 my %zwave_quietCmds = (
   secScheme=>1,
-  sendNonce=>1,
+  secNonce=>1,
   secEncap=>1,
 
-  secNonce=>1
+  secNonceReport=>1
 );
 
 my %zwave_cmdArgs = (
@@ -802,10 +801,10 @@ ZWave_Cmd($$@)
     #check message here for needed encryption (SECURITY)
     if(ZWave_secIsSecureClass($hash, $cc_cmd)) {
       ZWave_secStart($hash);
-      # message stored in reading, will be processed when nonce arrives
+      # message stored in hash, will be processed when nonce arrives
       my $cmd2 = "$type $name $cmd ".join(" ", @a);
       ZWave_secPutMsg($hash, $cc_cmd . $payload, $cmd2);
-      return ZWave_Cmd("get", $hash, $name, "secNonce");
+      return ZWave_Cmd("set", $hash, $name, "secNonceReport");
     }
   }
 
@@ -2315,7 +2314,7 @@ ZWave_secInit(@)
     ZWave_Cmd("set", $hash, $name, "secScheme");
     return ""; # not evaluated
   } elsif($status == 2) {
-    ZWave_Cmd("get", $hash, $name, "secNonce");
+    ZWave_Cmd("set", $hash, $name, "secNonceReport");
     return undef;
   } else {
     Log3 $name, 5, "$name: secureInit called with invalid status";
@@ -2573,7 +2572,7 @@ ZWave_secNonceRequestReceived ($)
     return;
   }
   ZWave_secStart($hash);
-  return ZWave_Cmd("set", $hash, $hash->{NAME}, "sendNonce");
+  return ZWave_Cmd("set", $hash, $hash->{NAME}, "secNonce");
 }
 
 sub
@@ -2633,7 +2632,7 @@ ZWave_secNetWorkKeyVerify ($)
   delete $hash->{networkkeyTimer};
   readingsSingleUpdate($hash, "SECURITY", 'ENABLED', 0);
   Log3 $name, 3, "$name: SECURITY enabled, networkkey was verified";
-  ZWave_Cmd("get", $hash, $name, ("secSupported"));
+  ZWave_Cmd("set", $hash, $name, ("secSupportedReport"));
 }
 
 sub
@@ -2791,7 +2790,7 @@ ZWave_secDecrypt($$$)
   }
 
   if ($newnonce == 1) {
-    ZWave_Cmd("set", $hash, $hash->{NAME}, "sendNonce");
+    ZWave_Cmd("set", $hash, $hash->{NAME}, "secNonce");
   }
 
   return "";
@@ -3773,8 +3772,11 @@ s2Hex($)
   <li>secScheme<br>
     (internaly used to) set the security scheme '00'
     </li>
-  <li>sendNonce<br>
+  <li>secNonce<br>
     (internaly used to) send a security NONCE to the device
+    </li>
+  <li>secNonceReport<br>
+    (internaly used to) request a security NONCE from the device
     </li>
   <li>secEncap<br>
     (internaly used to) send an encrypted message to the device
@@ -4070,12 +4072,9 @@ s2Hex($)
     </li>
 
   <br><br><b>Class SECURITY</b>
-  <li>secSupported<br>
+  <li>secSupportedReport<br>
     (internaly used to) request the command classes that are supported
     with SECURITY
-    </li>
-  <li>secNonce<br>
-    (internaly used to) request a security NONCE from the device
     </li>
   <li>secEncap<br>
     (internaly used to) send an encrypted message to the device
@@ -4203,9 +4202,9 @@ s2Hex($)
       class names (capital letters).
       </li>
     <li><a href="#secure_classes">secure_classes</a>
-      This attribute is the result of the "get DEVICE secSupported" command. It
-      contains a space seperated list of the the command classes that are
-      supported with SECURITY.
+      This attribute is the result of the "set DEVICE secSupportedReport"
+      command. It contains a space seperated list of the the command classes
+      that are supported with SECURITY.
       </li>
     <li><a href="#vclasses">vclasses</a>
       This is the result of the "set DEVICE versionClassRequest" command, and
