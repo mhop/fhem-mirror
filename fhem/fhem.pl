@@ -3124,6 +3124,7 @@ DoTrigger($$@)
 
   if(!defined($hash->{INTRIGGER})) {
     delete($hash->{CHANGED});
+    delete($hash->{CHANGETIME});
     delete($hash->{CHANGEDWITHSTATE});
   }
 
