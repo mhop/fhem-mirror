@@ -1607,24 +1607,34 @@ sub HMCCU_GetDatapoint ($@)
 
 	my $ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value');
 	my $ccutrace = AttrVal ($hmccu_hash->{NAME}, 'ccutrace', '');
+	my $tf = ($ccutrace ne '' && $param =~ /$ccutrace/) ? 1 : 0;
 
 	my $url = 'http://'.$hmccu_hash->{host}.':8181/do.exe?r1=dom.GetObject("';
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($param, $HMCCU_FLAG_INTERFACE);
 	if ($flags == $HMCCU_FLAGS_IACD) {
-		$url .= $int.'.'.$add.':'.$chn.'.'.$dpt.'").$ccuget()';
+		$url .= $int.'.'.$add.':'.$chn.'.'.$dpt.'").'.$ccuget.'()';
 	}
 	elsif ($flags == $HMCCU_FLAGS_NCD) {
-		$url .= $nam.'").DPByHssDP("'.$dpt.'").$ccuget()';
+		$url .= $nam.'").DPByHssDP("'.$dpt.'").'.$ccuget.'()';
 		($add, $chn) = HMCCU_GetAddress ($nam, '', '');
 	}
 	else {
 		return (-1, $value);
 	}
 
+	if ($tf) {
+		Log 1, "HMCCU: GetDatapoint()";
+		Log 1, "HMCCU:   URL=$url";
+		Log 1, "HMCCU:   param=$param";
+		Log 1, "HMCCU:   ccuget=$ccuget";
+	}
+
 	my $rawresponse = GetFileFromURL ($url);
 	my $response = $rawresponse;
 	$response =~ m/<r1>(.*)<\/r1>/;
 	$value = $1;
+
+	Log (1, "HMCCU: Response = ".$rawresponse) if ($tf);
 
 	if (defined ($value) && $value ne '' && $value ne 'null') {
 		if (!defined ($reading) || $reading eq '') {
@@ -1651,9 +1661,6 @@ sub HMCCU_GetDatapoint ($@)
 	}
 	else {
 		Log 1,"HMCCU: Error URL = ".$url;
-		if ($ccutrace ne '' && $param =~ /$ccutrace/) {
-			Log 1,"HMCCU: Response = ".$rawresponse;
-		}
 		return (-2, '');
 	}
 }
