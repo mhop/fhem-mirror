@@ -119,6 +119,7 @@ TechemHKV_Receive(@) {
   
   $hash->{VERSION} = $msg->{version};
   $hash->{METER} = $typeText{$msg->{type}};
+  delete $hash->{CHANGETIME}; # clean up, workaround for fhem prior http://forum.fhem.de/index.php/topic,47474.msg391964.html#msg391964
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "temp1", $msg->{temp1});
@@ -132,9 +133,8 @@ TechemHKV_Receive(@) {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
     readingsBulkUpdate($hash, "current_period", $msg->{actualVal});
-    $hash->{CHANGETIME}->[0] = $ts;
+    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts;
     readingsEndUpdate($hash, 1);
-    delete $hash->{CHANGETIME};
   }
 
   # billing period changed
@@ -144,9 +144,8 @@ TechemHKV_Receive(@) {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
     readingsBulkUpdate($hash, "previous_period", $msg->{lastVal});
-    $hash->{CHANGETIME}->[0] = $ts;
+    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts;
     readingsEndUpdate($hash, 1);
-    delete $hash->{CHANGETIME};
   }
 
   return undef;
