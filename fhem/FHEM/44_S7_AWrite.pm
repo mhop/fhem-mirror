@@ -1,0 +1,571 @@
+# $Id$
+##############################################
+package main;
+
+use strict;
+use warnings;
+
+#use Switch;
+require "44_S7_Client.pm";
+
+my %gets = (
+	"reading" => "",
+	"STATE"   => ""
+);
+
+#####################################
+sub S7_AWrite_Initialize($) {
+	my $hash = shift @_;
+
+	# Consumer
+	$hash->{Match} = "^AW";
+
+	$hash->{DefFn}   = "S7_AWrite_Define";
+	$hash->{UndefFn} = "S7_AWrite_Undef";
+
+	#	$hash->{GetFn} = "S7_AWrite_Get";
+	$hash->{SetFn}   = "S7_AWrite_Set";
+	$hash->{ParseFn} = "S7_AWrite_Parse";
+
+	$hash->{AttrFn}   = "S7_AWrite_Attr";
+	$hash->{AttrList} = "IODev " . $readingFnAttributes;
+
+	main::LoadModule("S7");
+}
+
+#####################################
+sub S7_AWrite_Define($$) {
+	my ( $hash, $def ) = @_;
+	my @a = split( "[ \t][ \t]*", $def );
+
+	my ( $name, $area, $DB, $start, $datatype, $length );
+
+	$name     = $a[0];
+	$area     = lc $a[2];
+	$DB       = $a[3];
+	$start    = $a[4];
+	$datatype = lc $a[5];
+
+	Log3 $name, 5, "$name S7_AWrite_Define called";
+
+	if (   $area ne "inputs"
+		&& $area ne "outputs"
+		&& $area ne "flags"
+		&& $area ne "db" )
+	{
+		my $msg =
+"$name wrong syntax: define <name> S7_AWrite {inputs|outputs|flags|db} <DB> <start> {u8|s8|u16|s16|u32|s32|float}";
+
+		Log3 $name, 2, $msg;
+		return $msg;
+	}
+
+	if (   $datatype ne "u8"
+		&& $datatype ne "s8"
+		&& $datatype ne "u16"
+		&& $datatype ne "s16"
+		&& $datatype ne "u32"
+		&& $datatype ne "s32"
+		&& $datatype ne "float" )
+	{
+		my $msg =
+"$name wrong syntax: define <name> S7_AWrite {inputs|outputs|flags|db} <DB>  <start> {u8|s8|u16|s16|u32|s32|float}";
+
+		Log3 $name, 2, $msg;
+		return $msg;
+	}
+
+	AssignIoPort($hash);    # logisches modul an physikalisches binden !!!
+
+	my $sname = $hash->{IODev}{NAME};
+
+	if ( $datatype eq "u16" || $datatype eq "s16" ) {
+		$length = 2;
+	}
+	elsif ( $datatype eq "u32" || $datatype eq "s32" || $datatype eq "float" ) {
+		$length = 4;
+	}
+	else {
+		$length = 1;
+	}
+
+	$hash->{AREA}     = $area;
+	$hash->{DB}       = $DB;
+	$hash->{ADDRESS}  = $start;
+	$hash->{DATATYPE} = $datatype;
+	$hash->{LENGTH}   = $length;
+
+	my $ID = "$area $DB";
+
+	if ( !defined( $modules{S7_AWrite}{defptr}{$ID} ) ) {
+		my @b = ();
+		push( @b, $hash );
+		$modules{S7_AWrite}{defptr}{$ID} = \@b;
+
+	}
+	else {
+		push( @{ $modules{S7_AWrite}{defptr}{$ID} }, $hash );
+	}
+
+	Log3 $name, 4,
+	  "S7_AWrite (" . $hash->{IODev}{NAME} . "): define $name Adress:$start";
+
+	$hash->{IODev}{dirty} = 1;
+	return undef;
+}
+
+#####################################
+
+sub S7_AWrite_Undef($$) {
+	my ( $hash, $name ) = @_;
+
+	Log3 $name, 4,
+	    "S7_AWrite ("
+	  . $hash->{IODev}{NAME}
+	  . "): undef "
+	  . $hash->{NAME}
+	  . " Adress:"
+	  . $hash->{ADDRESS};
+	delete( $modules{S7_AWrite}{defptr} );
+
+	return undef;
+}
+
+#####################################
+
+sub S7_AWrite_Set($@) {
+	my ( $hash, @a ) = @_;
+	my $name = $hash->{NAME};
+
+	Log3 $name, 5, "$name S7_AWrite_Set";
+
+	my $minValue;
+	my $maxValue;
+
+	my $datatype = $hash->{DATATYPE};
+
+#note I have used a SIEMENS Logo for testing here just the following range was supported.
+#  $minValue = 0;
+#  $maxValue = 32767;
+
+	if ( $datatype eq "u16" ) {
+		$minValue = 0;
+		$maxValue = 65535;
+	}
+	elsif ( $datatype eq "s16" ) {
+		$minValue = -32768;
+		$maxValue = 32767;
+	}
+	elsif ( $datatype eq "u32" ) {
+		$minValue = 0;
+		$maxValue = 4294967295;
+	}
+	elsif ( $datatype eq "s32" ) {
+		$minValue = -2147483648;
+		$maxValue = 2147483647;
+	}
+	elsif ( $datatype eq "float" ) {
+		$minValue = -3.402823e38;
+		$maxValue = 3.402823e38;
+	}
+	elsif ( $datatype eq "u8" ) {
+		$minValue = 0;
+		$maxValue = 255;
+	}
+	elsif ( $datatype eq "s8" ) {
+		$minValue = -128;
+		$maxValue = 127;
+	}
+	else {    #should never happen
+		$minValue = -1;
+		$maxValue = 0;
+	}
+
+	return "$name Need at least one parameter" if ( int(@a) < 2 );
+	return " : " if ( $a[1] eq "?" );
+
+	if ( $a[1] ne int( $a[1] ) && $datatype ne "float" ) {
+		return "$name You have to enter a numeric value: $minValue - $maxValue";
+	}
+
+	my $newValue;
+	if ( $datatype ne "float" ) {
+		$newValue = int( $a[1] );
+	}
+	else {
+		$newValue = $a[1];
+	}
+
+	if ( $newValue < $minValue || $newValue > $maxValue ) {
+		return "$name Out of range: $minValue - $maxValue";
+	}
+
+	my $sname = $hash->{IODev}{NAME};
+
+	#find the rigth config
+	my $area = $hash->{AREA};
+
+	my $length = $hash->{LENGTH};
+	my $start  = $hash->{ADDRESS};
+	my $dbNR   = $hash->{DB};
+	my $shash  = $defs{$sname};
+
+	if ( !defined( $shash->{S7TCPClient} ) ) {
+		my $err = "$name S7_AWrite_Set: not connected to PLC ";
+		Log3 $name, 3, $err;
+		return $err;
+	}
+
+	if ( $shash->{STATE} ne "connected to PLC" ) {
+		my $err = "$name S7_AWrite_Set: not connected to PLC";
+		Log3 $name, 3, $err;
+		return $err;
+	}
+
+	my $b;
+
+	my $WordLen;
+
+	if ( $datatype eq "u8" ) {
+		$b = $shash->{S7TCPClient}->setByteAt( "X", 0, $newValue );
+		$WordLen = &S7Client::S7WLByte;
+	}
+	elsif ( $datatype eq "s8" ) {
+		$b = $shash->{S7TCPClient}->setShortAt( "X", 0, $newValue );
+		$WordLen = &S7Client::S7WLByte;
+	}
+	elsif ( $datatype eq "u16" ) {
+		$b = $shash->{S7TCPClient}->setWordAt( "XX", 0, $newValue );
+		$WordLen = &S7Client::S7WLInt;
+
+		#		$WordLen = &S7Client::S7WLWord;
+	}
+	elsif ( $datatype eq "s16" ) {
+		$b = $shash->{S7TCPClient}->setIntegerAt( "XX", 0, $newValue );
+		$WordLen = &S7Client::S7WLInt;
+
+		#		$WordLen = &S7Client::S7WLWord;
+	}
+	elsif ( $datatype eq "u32" ) {
+		$b = $shash->{S7TCPClient}->setDWordAt( "XXXX", 0, $newValue );
+		$WordLen = &S7Client::S7WLDInt;
+
+		#		$WordLen = &S7Client::S7WLDWord;
+	}
+	elsif ( $datatype eq "s32" ) {
+		$b = $shash->{S7TCPClient}->setDintAt( "XXXX", 0, $newValue );
+		$WordLen = &S7Client::S7WLDInt;
+
+		#		$WordLen = &S7Client::S7WLDWord;
+	}
+	elsif ( $datatype eq "float" ) {
+		$b = $shash->{S7TCPClient}->setFloatAt( "XXXX", 0, $newValue );
+		$WordLen = &S7Client::S7WLReal;
+	}
+	else {
+		my $err = "$name S7_AWrite: Parse unknown type : (" . $datatype . ")";
+		Log3 $name, 3, $err;
+		return $err;
+	}
+
+	my $bss = join( ", ", unpack( "H2" x $length, $b ) );
+	Log3 $name, 5, "$name S7_AWrite_Set: Write Bytes to PLC: $bss";
+
+	my $writeAreaIndex = S7_getAreaIndex4AreaName($area);
+	return $writeAreaIndex if ( $writeAreaIndex ne int($writeAreaIndex) );
+
+	#	my $res = S7_WriteBlockToPLC($shash,$writeAreaIndex,$dbNR,$start,$b);
+
+	my $res =
+	  S7_WriteToPLC( $shash, $writeAreaIndex, $dbNR, $start, $WordLen, $b );
+
+	if ( $res == 0 ) {
+		main::readingsSingleUpdate( $hash, "state", $newValue, 1 );
+
+	}
+	else {
+		main::readingsSingleUpdate( $hash, "state", "", 1 );
+
+	}
+
+	return undef;
+
+}
+
+#####################################
+sub S7_AWrite_Parse($$) {
+	my ( $hash, $rmsg ) = @_;
+	my $name = $hash->{NAME};
+	my @list;
+	my @a = split( "[ \t][ \t]*", $rmsg );
+
+	my ( $area, $DB, $start, $length, $datatype, $s7name, $hexbuffer,
+		$clientNames );
+
+	$area        = lc $a[1];
+	$DB          = $a[2];
+	$start       = $a[3];
+	$length      = $a[4];
+	$s7name      = $a[5];
+	$hexbuffer   = $a[6];
+	$clientNames = $a[7];
+
+	my $ID = "$area $DB";
+
+	Log3 $name, 6, "$name S7_AWrite_Parse $rmsg";
+	my @clientList = split( ",", $clientNames );
+
+	if ( int(@clientList) > 0 ) {
+		my @Writebuffer = unpack( "C" x $length,
+			pack( "H2" x $length, split( ",", $hexbuffer ) ) );
+
+		#my $b = pack( "C" x $length, @Writebuffer );
+		foreach my $clientName (@clientList) {
+
+			my $h = $defs{$clientName};
+
+			if (   $h->{TYPE} eq "S7_AWrite"
+				&& $start <= $h->{ADDRESS}
+				&& $start + $length >= $h->{ADDRESS} + $h->{LENGTH} )
+			{
+
+				my $n = $h->{NAME};   #damit die werte im client gesetzt werden!
+				push( @list, $n );
+
+				#Aktualisierung des wertes
+
+				my $s = $h->{ADDRESS} - $start;
+				my $myI;
+
+				if ( $h->{DATATYPE} eq "u8" ) {
+					$myI = $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+				}
+				elsif ( $h->{DATATYPE} eq "s8" ) {
+					$myI = $hash->{S7TCPClient}->ShortAt( \@Writebuffer, $s );
+				}
+				elsif ( $h->{DATATYPE} eq "u16" ) {
+					$myI = $hash->{S7TCPClient}->WordAt( \@Writebuffer, $s );
+				}
+				elsif ( $h->{DATATYPE} eq "s16" ) {
+					$myI = $hash->{S7TCPClient}->IntegerAt( \@Writebuffer, $s );
+				}
+				elsif ( $h->{DATATYPE} eq "u32" ) {
+					$myI = $hash->{S7TCPClient}->DWordAt( \@Writebuffer, $s );
+				}
+				elsif ( $h->{DATATYPE} eq "s32" ) {
+					$myI = $hash->{S7TCPClient}->DintAt( \@Writebuffer, $s );
+				}
+				elsif ( $h->{DATATYPE} eq "float" ) {
+					$myI = $hash->{S7TCPClient}->FloatAt( \@Writebuffer, $s );
+				}
+				else {
+					Log3 $name, 3, "$name S7_AWrite: Parse unknown type : ("
+					  . $h->{DATATYPE} . ")";
+				}
+
+				main::readingsSingleUpdate( $h, "state", $myI, 1 );
+			}
+		}
+	}
+	else {
+
+		Log3 $name, 3, "$name S7_AWrite_Parse going the save way ";
+		if ( defined( $modules{S7_AWrite}{defptr}{$ID} ) ) {
+
+			foreach my $h ( @{ $modules{S7_AWrite}{defptr}{$ID} } ) {
+				if ( defined( $main::attr{ $h->{NAME} }{IODev} )
+					&& $main::attr{ $h->{NAME} }{IODev} eq $name )
+				{
+					if (   $start <= $h->{ADDRESS}
+						&& $start + $length >= $h->{ADDRESS} + $h->{LENGTH} )
+					{
+
+						my $n =
+						  $h->{NAME}; #damit die werte im client gesetzt werden!
+						push( @list, $n );
+
+						#Aktualisierung des wertes
+
+						my @Writebuffer = unpack( "C" x $length,
+							pack( "H2" x $length, split( ",", $hexbuffer ) ) );
+						my $s = $h->{ADDRESS} - $start;
+
+						#	my $b = pack( "C" x $length, @Writebuffer );
+						my $myI;
+
+						if ( $h->{DATATYPE} eq "u8" ) {
+							$myI =
+							  $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+						}
+						elsif ( $h->{DATATYPE} eq "s8" ) {
+							$myI =
+							  $hash->{S7TCPClient}
+							  ->ShortAt( \@Writebuffer, $s );
+						}
+						elsif ( $h->{DATATYPE} eq "u16" ) {
+							$myI =
+							  $hash->{S7TCPClient}->WordAt( \@Writebuffer, $s );
+						}
+						elsif ( $h->{DATATYPE} eq "s16" ) {
+							$myI =
+							  $hash->{S7TCPClient}
+							  ->IntegerAt( \@Writebuffer, $s );
+						}
+						elsif ( $h->{DATATYPE} eq "u32" ) {
+							$myI =
+							  $hash->{S7TCPClient}
+							  ->DWordAt( \@Writebuffer, $s );
+						}
+						elsif ( $h->{DATATYPE} eq "s32" ) {
+							$myI =
+							  $hash->{S7TCPClient}->DintAt( \@Writebuffer, $s );
+						}
+						elsif ( $h->{DATATYPE} eq "float" ) {
+							$myI =
+							  $hash->{S7TCPClient}
+							  ->FloatAt( \@Writebuffer, $s );
+						}
+						else {
+							Log3 $name, 3,
+							  "$name S7_AWrite: Parse unknown type : ("
+							  . $h->{DATATYPE} . ")";
+						}
+
+						main::readingsSingleUpdate( $h, "state", $myI, 1 );
+					}
+				}
+
+			}
+		}
+	}
+	if ( int(@list) == 0 ) {
+		Log3 $name, 6, "S7_AWrite: Parse no client found ($name) ...";
+		push( @list, "" );
+
+		#		return undef;
+	}
+
+	return @list;
+
+}
+
+#####################################
+	sub S7_AWrite_Attr(@) {
+		my ( $cmd, $name, $aName, $aVal ) = @_;
+
+		# $cmd can be "del" or "set"
+		# $name is device name
+		# aName and aVal are Attribute name and value
+		my $hash = $defs{$name};
+		if ( $cmd eq "set" ) {
+
+			if ( $aName eq "IODev" ) {
+				if ( defined( $hash->{IODev} ) ) {  #set old master device dirty
+					$hash->{IODev}{dirty} = 1;
+				}
+				if ( defined( $defs{$aVal} ) ) {    #set new master device dirty
+					$defs{$aVal}{dirty} = 1;
+				}
+				Log3 $name, 4, "S7_AWrite: IODev for $name is $aVal";
+			}
+
+		}
+		return undef;
+	}
+
+	1;
+
+=pod
+=begin html
+
+<a name="S7_AWrite"></a>
+<h3>S7_AWrite</h3>
+<ul>
+	This module is a logical module of the physical module S7.<br />
+	This module provides sending analog data (unsigned integer Values) to the PLC.<br />
+	Note: you have to configure a PLC writing at the physical modul (S7) first.<br />
+	<br />
+	<b>Define</b>
+
+	<ul>
+		<li><code>define &lt;name&gt; S7_AWrite {inputs|outputs|flags|db} &lt;DB&gt; &lt;start&gt; {u8|s8|u16|s16|u32|s32|float}</code><br />
+		&nbsp;
+		<ul>
+			<li>db &hellip; defines where to read. Note currently only writing in to DB are supported.</li>
+			<li>DB &hellip; Number of the DB</li>
+			<li>start &hellip; start byte of the reading</li>
+			<li>{u8|s8|u16|s16|u32|s32} &hellip; defines the datatype:
+			<ul>
+				<li>u8 &hellip;. unsigned 8 Bit integer</li>
+				<li>s8 &hellip;. signed 8 Bit integer</li>
+				<li>u16 &hellip;. unsigned 16 Bit integer</li>
+				<li>s16 &hellip;. signed 16 Bit integer</li>
+				<li>u32 &hellip;. unsigned 32 Bit integer</li>
+				<li>s32 &hellip;. signed 32 Bit integer</li>
+				<li>float &hellip;. 4 byte float</li>
+			</ul>
+			</li>
+		</ul>
+		Note: the required memory area (start &ndash; start + datatypelength) need to be with in the configured PLC writing of the physical module.</li>
+	</ul>
+	<b>Set</b><br />
+	&nbsp;
+	<ul>
+		<li><code>set &lt;name&gt; S7_AWrite &lt;value&gt;</code>
+
+		<ul>
+			<li>value &hellip; an numeric value</li>
+		</ul>
+		</li>
+	</ul>
+</ul>
+=end html
+
+=begin html_DE
+
+<a name="S7_AWrite"></a>
+<h3>S7_AWrite</h3>
+<ul>
+	This module is a logical module of the physical module S7.<br />
+	This module provides sending analog data (unsigned integer Values) to the PLC.<br />
+	Note: you have to configure a PLC writing at the physical modul (S7) first.<br />
+	<br />
+	<b>Define</b>
+
+	<ul>
+		<li><code>define &lt;name&gt; S7_AWrite {inputs|outputs|flags|db} &lt;DB&gt; &lt;start&gt; {u8|s8|u16|s16|u32|s32|float}</code><br />
+		&nbsp;
+		<ul>
+			<li>db &hellip; defines where to read. Note currently only writing in to DB are supported.</li>
+			<li>DB &hellip; Number of the DB</li>
+			<li>start &hellip; start byte of the reading</li>
+			<li>{u8|s8|u16|s16|u32|s32} &hellip; defines the datatype:
+			<ul>
+				<li>u8 &hellip;. unsigned 8 Bit integer</li>
+				<li>s8 &hellip;. signed 8 Bit integer</li>
+				<li>u16 &hellip;. unsigned 16 Bit integer</li>
+				<li>s16 &hellip;. signed 16 Bit integer</li>
+				<li>u32 &hellip;. unsigned 32 Bit integer</li>
+				<li>s32 &hellip;. signed 32 Bit integer</li>
+				<li>float &hellip;. 4 byte float</li>
+			</ul>
+			</li>
+		</ul>
+		Note: the required memory area (start &ndash; start + datatypelength) need to be with in the configured PLC writing of the physical module.</li>
+	</ul>
+	<b>Set</b><br />
+	&nbsp;
+	<ul>
+		<li><code>set &lt;name&gt; S7_AWrite &lt;value&gt;</code>
+
+		<ul>
+			<li>value &hellip; an numeric value</li>
+		</ul>
+		</li>
+	</ul>
+
+</ul>
+
+=end html_DE
+
+=cut

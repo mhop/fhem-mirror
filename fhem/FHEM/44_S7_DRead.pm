@@ -1,0 +1,508 @@
+# $Id$
+##############################################
+package main;
+
+use strict;
+use warnings;
+
+#use Switch;
+#use 44_S7_Client;
+
+my %gets = (
+
+	#  "libnodaveversion"   => ""
+);
+
+#####################################
+sub S7_DRead_Initialize($) {
+	my $hash = shift @_;
+
+	# Provider
+
+	# Consumer
+	$hash->{Match} = "^DR";
+
+	$hash->{DefFn}   = "S7_DRead_Define";
+	$hash->{UndefFn} = "S7_DRead_Undef";
+
+	$hash->{ParseFn} = "S7_DRead_Parse";
+
+	$hash->{AttrFn}   = "S7_DRead_Attr";
+	$hash->{AttrList} = "IODev " . $readingFnAttributes;
+
+	main::LoadModule("S7");
+}
+
+#####################################
+sub S7_DRead_Define($$) {
+	my ( $hash, $def ) = @_;
+	my @a = split( "[ \t][ \t]*", $def );
+
+	my ( $name, $area, $DB, $start, $position );
+
+	$name = $a[0];
+
+	AssignIoPort($hash);    # logisches modul an physikalisches binden !!!
+	my $sname = $hash->{IODev}{NAME};
+
+	my $byte;
+	my $bit;
+
+	if ( uc $a[2] =~ m/^[QIMN](\d*)/ ) {
+		my $Offset;
+		$area = "db";
+		$DB   = 0;
+		my $startposition;
+
+		if ( uc $a[2] =~ m/^Q(\d*)/ ) {
+			$startposition = 1;
+			if ( $hash->{IODev}{S7TYPE} eq "LOGO7" ) {
+				$Offset = 942;
+			}
+			elsif ( $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1064;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_DRead {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {I|Q|M|NI|NQ}1..24";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+
+		}
+		elsif ( uc $a[2] =~ m/^I(\d*)/ ) {
+			$startposition = 1;
+			if ( $hash->{IODev}{S7TYPE} eq "LOGO7" ) {
+				$Offset = 923;
+			}
+			elsif ( $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1024;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_DRead {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {I|Q|M|NI|NQ}1..24";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+		}
+		elsif ( uc $a[2] =~ m/^NI(\d*)/ ) {
+			$startposition = 2;
+			if ( $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1246;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_DRead {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {I|Q|M|NI|NQ}1..24";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+		}
+		elsif ( uc $a[2] =~ m/^NQ(\d*)/ ) {
+			$startposition = 2;
+			if ( $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1390;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_DRead {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {I|Q|M|NI|NQ}1..24";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+		}
+		elsif ( uc $a[2] =~ m/^M(\d*)/ ) {
+			$startposition = 1;
+			if ( $hash->{IODev}{S7TYPE} eq "LOGO7" ) {
+				$Offset = 948;
+			}
+			elsif ( $hash->{IODev}{S7TYPE} eq "LOGO8" ) {
+				$Offset = 1104;
+			}
+			else {
+				my $msg =
+"wrong syntax : define <name> S7_DRead {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {I|Q|M|NI|NQ}1..24";
+
+				Log3 undef, 2, $msg;
+				return $msg;
+			}
+		}
+		else {
+			my $msg =
+"wrong syntax : define <name> S7_DRead {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {I|Q|M|NI|NQ}1..24";
+
+			Log3 undef, 2, $msg;
+			return $msg;
+		}
+
+		$position =
+		  ( $Offset * 8 ) + int( substr( $a[2], $startposition ) ) - 1;
+		$byte = int( $position / 8 );
+		$bit  = ( $position % 8 );
+
+	}
+	else {
+
+		$area     = lc $a[2];
+		$DB       = $a[3];
+		$position = $a[4];
+
+		if (   $area ne "inputs"
+			&& $area ne "outputs"
+			&& $area ne "flags"
+			&& $area ne "db" )
+		{
+			my $msg =
+"wrong syntax : define <name> S7_DRead {inputs|outputs|flags|db} <DB> <address> \n Only for Logo7 or Logo8:\n define <name> S7_DRead {I|Q|M|NI|NQ}1..24";
+
+			Log3 undef, 2, $msg;
+			return $msg;
+		}
+
+		my @address = split( /\./, $position );
+		if ( int(@address) == 2 ) {
+			$byte = $address[0];
+			$bit  = $address[1];
+		}
+		else {
+
+			$byte = int( $address[0] / 8 );
+			$bit  = ( $address[0] % 8 );
+		}
+	}
+
+	$hash->{AREA}     = $area;
+	$hash->{DB}       = $DB;
+	$hash->{POSITION} = ( $byte * 8 ) + $bit;
+	$hash->{ADDRESS}  = "$byte.$bit";
+	$hash->{LENGTH}   = 1;
+
+	my $ID = "$area $DB";
+
+	if ( !defined( $modules{S7_DRead}{defptr}{$ID} ) ) {
+		my @b = ();
+		push( @b, $hash );
+		$modules{S7_DRead}{defptr}{$ID} = \@b;
+
+	}
+	else {
+		push( @{ $modules{S7_DRead}{defptr}{$ID} }, $hash );
+	}
+
+	$hash->{IODev}{dirty} = 1;
+
+	Log3 $name, 4, "S7_DRead ($sname): define $name Adress:$byte.$bit";
+	return undef;
+}
+
+#####################################
+sub S7_DRead_Undef($$) {
+	my ( $hash, $name ) = @_;
+
+	Log3 $name, 4,
+	    "S7_DRead ("
+	  . $hash->{IODev}{NAME}
+	  . "): undef "
+	  . $hash->{NAME}
+	  . " Adress:"
+	  . $hash->{ADDRESS};
+
+	delete( $modules{S7_DRead}{defptr} );
+
+	return undef;
+}
+
+#####################################
+
+sub S7_DRead_Parse_new($$) {
+	my ( $hash, $rmsg ) = @_;
+	my $name;
+
+	if ( defined( $hash->{NAME} ) ) {
+		$name = $hash->{NAME};
+	}
+	else {
+		Log3 undef, 2, "S7_DRead: Error ...";
+		return undef;
+	}
+
+	my @a = split( "[ \t][ \t]*", $rmsg );
+
+	my @list;
+
+	my ( $area, $DB, $start, $length, $datatype, $s7name, $hexbuffer );
+
+	$area      = lc $a[1];
+	$DB        = $a[2];
+	$start     = $a[3];
+	$length    = $a[4];
+	$s7name    = $a[5];
+	$hexbuffer = $a[6];
+	my $ID = "$area $DB";
+
+	Log3 $name, 6, "$name S7_DRead_Parse $rmsg";
+
+	my @Writebuffer =
+	  unpack( "C" x $length, pack( "H2" x $length, split( ",", $hexbuffer ) ) );
+
+	#	my $b = pack( "C" x $length, @Writebuffer );
+
+	my $clientArray = $hash->{"Clients"};
+	foreach my $h ( @{$clientArray} ) {
+		if (   $start <= int( $h->{POSITION} / 8 )
+			&& $start + $length >= int( $h->{POSITION} / 8 ) )
+		{
+
+			#die Nachricht ist für den client
+
+			my $n = $h->{NAME};    #damit die werte im client gesetzt werden!
+			push( @list, $n );
+
+			#aktualisierung des wertes
+
+			my $s = int( $h->{POSITION} / 8 ) - $start;
+			my $myI = $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+
+			Log3 $name, 6, "$name S7_DRead_Parse update $n ";
+
+			if ( ( int($myI) & ( 1 << ( $h->{POSITION} % 8 ) ) ) > 0 ) {
+				main::readingsSingleUpdate( $h, "state", "on", 1 );
+			}
+			else {
+				main::readingsSingleUpdate( $h, "state", "off", 1 );
+			}
+		}
+	}
+
+	if ( int(@list) == 0 ) {
+		Log3 $name, 6, "S7_DRead: Parse no client found ($name) ...";
+		push( @list, "" );
+	}
+
+	return @list;
+
+}
+
+#####################################
+
+sub S7_DRead_Parse($$) {
+	my ( $hash, $rmsg ) = @_;
+	my $name;
+
+	if ( defined( $hash->{NAME} ) ) {
+		$name = $hash->{NAME};
+	}
+	else {
+		Log3 undef, 2, "S7_DRead: Error ...";
+		return undef;
+	}
+
+	my @a = split( "[ \t][ \t]*", $rmsg );
+
+	my @list;
+
+	my ( $area, $DB, $start, $length, $datatype, $s7name, $hexbuffer,
+		$clientNames );
+
+	$area        = lc $a[1];
+	$DB          = $a[2];
+	$start       = $a[3];
+	$length      = $a[4];
+	$s7name      = $a[5];
+	$hexbuffer   = $a[6];
+	$clientNames = $a[7];
+	my $ID = "$area $DB";
+
+	Log3 $name, 5, "$name S7_DRead_Parse $rmsg";
+
+	# 	         main::readingsBeginUpdate($h);
+	#			main::readingsBulkUpdate($h,"reading",$res,1);
+	#			main::readingsEndUpdate($h, 1);
+
+	my @clientList = split( ",", $clientNames );
+
+	if ( int(@clientList) > 0 ) {
+
+		my @Writebuffer = unpack( "C" x $length,
+			pack( "H2" x $length, split( ",", $hexbuffer ) ) );
+
+		foreach my $clientName (@clientList) {
+
+			my $h = $defs{$clientName};
+
+			#			if ( defined( $main::attr{ $h->{NAME} }{IODev} )
+			#				&& $main::attr{ $h->{NAME} }{IODev} eq $name )
+			#			{
+
+			if (   $h->{TYPE} eq "S7_DRead"
+				&& $start <= int( $h->{POSITION} / 8 )
+				&& $start + $length >= int( $h->{POSITION} / 8 ) )
+			{
+				push( @list, $clientName )
+				  ;    #damit die werte im client gesetzt werden!
+
+				#aktualisierung des wertes
+				my $s = int( $h->{POSITION} / 8 ) - $start;
+
+				my $myI = $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+
+				Log3 $name, 6, "$name S7_DRead_Parse update $clientName ";
+
+				if ( ( int($myI) & ( 1 << ( $h->{POSITION} % 8 ) ) ) > 0 ) {
+
+					main::readingsSingleUpdate( $h, "state", "on", 1 );
+
+				}
+				else {
+					main::readingsSingleUpdate( $h, "state", "off", 1 );
+
+				}
+			}
+
+			#			}
+		}
+	}
+	else {
+		Log3 $name, 3, "$name S7_DRead_Parse going the save way ";
+
+		if ( defined( $modules{S7_DRead}{defptr}{$ID} ) ) {
+
+			foreach my $h ( @{ $modules{S7_DRead}{defptr}{$ID} } ) {
+
+				if ( defined( $main::attr{ $h->{NAME} }{IODev} )
+					&& $main::attr{ $h->{NAME} }{IODev} eq $name )
+				{
+					if (   $start <= int( $h->{POSITION} / 8 )
+						&& $start + $length >= int( $h->{POSITION} / 8 ) )
+					{
+
+						my $n =
+						  $h->{NAME}; #damit die werte im client gesetzt werden!
+						push( @list, $n );
+
+						#aktualisierung des wertes
+						my @Writebuffer = unpack( "C" x $length,
+							pack( "H2" x $length, split( ",", $hexbuffer ) ) );
+						my $s = int( $h->{POSITION} / 8 ) - $start;
+
+						#my $b = pack( "C" x $length, @Writebuffer );
+
+						my $myI =
+						  $hash->{S7TCPClient}->ByteAt( \@Writebuffer, $s );
+
+						Log3 $name, 6, "$name S7_DRead_Parse update $n ";
+
+						if ( ( int($myI) & ( 1 << ( $h->{POSITION} % 8 ) ) ) >
+							0 )
+						{
+
+							main::readingsSingleUpdate( $h, "state", "on", 1 );
+
+						}
+						else {
+							main::readingsSingleUpdate( $h, "state", "off", 1 );
+
+						}
+					}
+				}
+
+			}
+		}
+	}
+
+	if ( int(@list) == 0 ) {
+		Log3 $name, 6, "S7_DRead: Parse no client found ($name) ...";
+		push( @list, "" );
+	}
+
+	return @list;
+
+}
+
+#####################################
+sub S7_DRead_Attr(@) {
+	my ( $cmd, $name, $aName, $aVal ) = @_;
+
+	# $cmd can be "del" or "set"
+	# $name is device name
+	# aName and aVal are Attribute name and value
+
+	my $hash = $defs{$name};
+
+	if ( $cmd eq "set" ) {
+
+		if ( $aName eq "IODev" ) {
+			if ( defined( $hash->{IODev} ) ) { #set old master device dirty
+				$hash->{IODev}{dirty} = 1;
+			}
+			if ( defined( $defs{$aVal} ) ) { #set new master device dirty
+				$defs{$aVal}{dirty} = 1;
+			}
+
+			Log3 $name, 4, "S7_DRead: IODev for $name is $aVal";
+		}
+
+	}
+	return undef;
+}
+
+#####################################
+1;
+
+=pod
+=begin html
+
+<a name="S7_DRead"></a>
+<h3>S7_DRead</h3>
+<ul>
+	This module is a logical module of the physical module S7.<br />
+	This module provides digital data (ON/OFF).<br />
+	Note: you have to configure a PLC reading at the physical modul (S7) first.<br />
+	<br />
+	<br />
+	<b>Define</b>
+
+	<ul>
+		<li><code>define &lt;name&gt; S7_DRead {inputs|outputs|flags|db} &lt;DB&gt; &lt;address&gt;</code>
+
+		<ul>
+			<li>inputs|outputs|flags|db &hellip; defines where to read.</li>
+			<li>DB &hellip; Number of the DB</li>
+			<li>address &hellip; address you want to read. bit number to read. Example: 10.3</li>
+		</ul>
+		Note: the required memory area need to be with in the configured PLC reading of the physical module.</li>
+	</ul>
+</ul>
+
+=end html
+
+=begin html_DE
+
+<a name="S7_DRead"></a>
+<h3>S7_DRead</h3>
+<ul>
+	This module is a logical module of the physical module S7.<br />
+	This module provides digital data (ON/OFF).<br />
+	Note: you have to configure a PLC reading at the physical modul (S7) first.<br />
+	<br />
+	<br />
+	<b>Define</b>
+
+	<ul>
+		<li><code>define &lt;name&gt; S7_DRead {inputs|outputs|flags|db} &lt;DB&gt; &lt;address&gt;</code>
+
+		<ul>
+			<li>inputs|outputs|flags|db &hellip; defines where to read.</li>
+			<li>DB &hellip; Number of the DB</li>
+			<li>address &hellip; address you want to read. bit number to read. Example: 10.3</li>
+		</ul>
+		Note: the required memory area need to be with in the configured PLC reading of the physical module.</li>
+	</ul>
+</ul>
+
+=end html_DE
+
+=cut
+
