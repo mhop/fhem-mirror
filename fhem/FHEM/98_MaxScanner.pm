@@ -44,6 +44,8 @@
 #      *  change: limit logging, when window open detected
 #   13.01.16 - 1.0.0.1
 #      *  change: FIND, minor changes
+#   15.01.16 - 1.0.0.2
+#      *  fixed : Work- check of external change of desired was incorrect
 ####################################################################################################
 package main;
 use strict;
@@ -53,7 +55,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
-my $MaxScanner_Version   = "1.0.0.1 - 13.01.2016";
+my $MaxScanner_Version   = "1.0.0.2 - 14.01.2016";
 my $MaxScanner_ModulName = "MaxScanner";
 
 # minimal poll-rate for thermostat in minutes given by firmware
@@ -691,7 +693,7 @@ sub MaxScanner_Work($$$)
 {
   my $reUINT = '^([\\+]?\\d+)$';    # uint without whitespaces
   my ( $modHash, $thermi_sort, $numWorkIntervall ) = @_;
-  my $scanDynamic = '';
+  my $isCul = '';
   my $settingDone = '';             # end loop if a set command was performed
   my @scan_time;
   my $modName = $modHash->{NAME};
@@ -788,7 +790,7 @@ sub MaxScanner_Work($$$)
       $numCulCredits = ReadingsVal( $strCulName, 'credit10ms', 0 );
 
       # force dynamic scanning for CUL
-      $scanDynamic = 1;
+      $isCul = 1;
     }
 
     # because cube not knows msgcnt, we fix the timestamp
@@ -887,8 +889,8 @@ sub MaxScanner_Work($$$)
       . $numCulCredits
       . ' Credits:'
       . int($numCredit)
-      . ' scanDynamic:'
-      . $scanDynamic
+      . ' isCul:'
+      . $isCul
       . ' CreditThreshold:'
       . $numCreditThreshold;
 
@@ -899,7 +901,7 @@ sub MaxScanner_Work($$$)
     my $nextPlan = $sdNextScan;
 
     # if dynamic scanning
-    if ($scanDynamic)
+    if ($isCul)
     {
       # 17 secs before next scan time
       $nextPlan = $sdTempTime + $numWorkIntervall * 60 - 17;
@@ -930,7 +932,7 @@ sub MaxScanner_Work($$$)
       $hash->{helper}{desiredOffset} = ($boolDesiChange) ? $numDesiTemp - $normDesiTemp : 0;
       $hash->{helper}{switchDate}    = undef;
       $hash->{helper}{LastCmdDate}   = $sdCurTime;
-      $hash->{helper}{gotTempTS}     = 0;
+      $hash->{helper}{gotTempTS}     = '';
     }
 
     # gather the timestamp for next profile switch
@@ -943,7 +945,7 @@ sub MaxScanner_Work($$$)
     # if switchDate is changed, then adjust leading desired
     if ( $hash->{helper}{switchDate} != $switchDate )
     {
-      $hash->{helper}{gotTempTS}          = 0;
+      $hash->{helper}{gotTempTS}          = '';
       $hash->{helper}{switchDate}         = $switchDate;
       $hash->{helper}{leadDesiTemp}       = $normDesiTemp;
       $hash->{helper}{TempBeforeWindOpen} = $normDesiTemp;    # MrHeat
@@ -972,7 +974,7 @@ sub MaxScanner_Work($$$)
     }
 
     # determine nextScan for CUL-like devices
-    if ($scanDynamic)
+    if ($isCul)
     {
       # if temperature time is younger than old time, then determine nextScan
       if ( $sdTempTime != $hash->{helper}{TemperatureTime} )
@@ -1067,8 +1069,9 @@ sub MaxScanner_Work($$$)
         MaxScanner_Log $hash, 4, "normDesiTemp:$normDesiTemp desiredOffset:" . $hash->{helper}{desiredOffset};
 
         # if the expected value does not match, than desired was changed outside
-        # but only, if we got temperature after a desired change by w-profile
-        if ( $expectedDesiTemp != $numDesiTemp && $hash->{helper}{gotTempTS} == 1 )
+        # but when CUL than only, if we got temperature after a desired change by w-profile
+        if ( $expectedDesiTemp != $numDesiTemp 
+           && ( ($hash->{helper}{gotTempTS} && $isCul) || !$isCul) )
         {
           $hash->{helper}{leadDesiTemp}  = $numDesiTemp;
           $hash->{helper}{desiredOffset} = 0;
@@ -1194,7 +1197,7 @@ sub MaxScanner_Work($$$)
         }
 
         # if we are using CUL, then dynamic scanning
-        if ($scanDynamic)
+        if ($isCul)
         {
           $hash->{helper}{NextScan} = int( $sdCurTime + 60 );
         } else    # if CUBE
