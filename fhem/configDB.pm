@@ -1055,7 +1055,7 @@ sub _cfgDB_Filelist(;$) {
 1;
 
 =pod
-
+=item helper
 =begin html
 
 <a name="configDB"></a>

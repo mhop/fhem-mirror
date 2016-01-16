@@ -201,6 +201,7 @@ sub cref_search_cmd {
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="help"></a>

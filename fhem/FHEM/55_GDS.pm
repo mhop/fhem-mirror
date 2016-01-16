@@ -2136,6 +2136,7 @@ sub getListForecastStations($) {
 
 # commandref documentation
 =pod
+=item device
 =begin html
 
 <a name="GDS"></a>

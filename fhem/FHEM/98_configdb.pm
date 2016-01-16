@@ -209,6 +209,7 @@ sub CommandConfigdb($$) {
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="configdb"></a>
