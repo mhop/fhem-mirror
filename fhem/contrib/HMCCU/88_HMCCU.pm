@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 2.5
+#  Version 2.6
 #
 #  (c) 2015 zap (zap01 <at> t-online <dot> de)
 #
@@ -29,11 +29,13 @@
 #  get <name> configdesc {<device>|<channel>}
 #  get <name> deviceinfo <device>
 #  get <name> rpcstate
-#  get <name> update [<devexp>]
+#  get <name> update [<devexp> [{ State | Value }]]
 #
+#  attr <name> ccuget { State | Value }
 #  attr <name> ccureadingfilter <datapoint_exp>
 #  attr <name> ccureadingformat { name | address }
 #  attr <name> ccureadings { 0 | 1 }
+#  attr <name> ccutrace {<ccudevname_exp>|<ccudevaddr_exp>}
 #  attr <name> parfile <parfile>
 #  attr <name> rpcinterval { 3 | 5 | 10 }
 #  attr <name> rpcport <ccu_rpc_port>
@@ -107,6 +109,7 @@ sub HMCCU_Substitute ($$$$);
 sub HMCCU_SubstRule ($$$);
 sub HMCCU_UpdateClients ($$$);
 sub HMCCU_UpdateClientReading ($@);
+sub HMCCU_DeleteDevices ($);
 sub HMCCU_StartRPCServer ($);
 sub HMCCU_StopRPCServer ($);
 sub HMCCU_IsRPCServerRunning ($$$);
@@ -117,13 +120,13 @@ sub HMCCU_GetAddress ($$$);
 sub HMCCU_GetCCUObjectAttribute ($$);
 sub HMCCU_GetHash ($@);
 sub HMCCU_GetAttribute ($$$$);
+sub HMCCU_IsValidDevice ($);
 sub HMCCU_GetDeviceName ($$);
 sub HMCCU_GetChannelName ($$);
 sub HMCCU_GetDeviceType ($$);
 sub HMCCU_GetDeviceChannels ($);
 sub HMCCU_GetDeviceInterface ($$);
 sub HMCCU_ReadRPCQueue ($);
-sub HMCCU_HTTPRequest ($@);
 sub HMCCU_HMScript ($$);
 sub HMCCU_GetDatapoint ($@);
 sub HMCCU_SetDatapoint ($$$);
@@ -171,6 +174,7 @@ sub HMCCU_Define ($$)
 	$hash->{Clients} = ':HMCCUDEV:HMCCUCHN:';
 
 	$hash->{DevCount} = HMCCU_GetDeviceList ($hash);
+	$hash->{NewDevices} = 0;
 
 	return undef;
 }
@@ -751,7 +755,8 @@ sub HMCCU_SetError ($$)
 	my %errlist = (
 	   -1 => 'Channel name or address invalid',
 	   -2 => 'Execution of CCU script or command failed',
-	   -3 => 'Cannot detect IO device'
+	   -3 => 'Cannot detect IO device',
+	   -4 => 'Device deleted in CCU'
 	);
 
 	$msg = exists ($errlist{$text}) ? $errlist{$text} : $text;
@@ -963,6 +968,36 @@ sub HMCCU_UpdateClientReading ($@)
 }
 
 ####################################################
+# Mark client devices deleted in CCU as invalid
+####################################################
+
+sub HMCCU_DeleteDevices ($)
+{
+	my ($devlist) = @_;
+
+	foreach my $a (@$devlist) {
+		my $cc = $HMCCU_Devices{$a}{channels};
+		$HMCCU_Devices{$a}{valid} = 0;
+		$HMCCU_Addresses{$HMCCU_Devices{$a}{name}}{valid} = 0;
+		for (my $i=0; $i<$cc; $i++) {
+			$HMCCU_Devices{$a.':'.$i}{valid} = 0;
+			$HMCCU_Addresses{$HMCCU_Devices{$a.':'.$i}{name}}{valid} = 0;
+		}
+		foreach my $d (keys %defs) {
+			my $ch = $defs{$d};
+			if ($ch->{TYPE} eq 'HMCCUDEV' && $ch->{ccuaddr} eq $a) {
+				$ch->{ccudevstate} = 'Deleted';
+				readingsSingleUpdate ($ch, 'state', 'Deleted', 1);
+			}
+			elsif ($ch->{TYPE} eq 'HMCCUCHN' && $ch->{ccuaddr} =~ /^$a:[0-9]+/) {
+				$ch->{ccudevstate} = 'Deleted';
+				readingsSingleUpdate ($ch, 'state', 'Deleted', 1);
+			}
+		}
+	}
+}
+
+####################################################
 # Start RPC server
 ####################################################
 
@@ -1149,15 +1184,17 @@ sub HMCCU_GetDeviceInfo ($$$)
 string chnid;
 string sDPId;
 object odev = dom.GetObject ("$devname");
-foreach (chnid, odev.Channels())
-{
-   object ochn = dom.GetObject(chnid);
-   WriteLine("Channel " # ochn.Address() # " " # ochn.Name());
-   foreach(sDPId, ochn.DPs().EnumUsedIDs())
-   {
+if (odev) {
+  foreach (chnid, odev.Channels()) {
+    object ochn = dom.GetObject(chnid);
+    WriteLine("Channel " # ochn.Address() # " " # ochn.Name());
+    foreach(sDPId, ochn.DPs()) {
       object oDP = dom.GetObject(sDPId);
-      WriteLine ("  DP " # oDP.Name() # " = " # oDP.$ccuget());
-   }
+      if (oDP) {
+        WriteLine ("  DP " # oDP.Name() # " = " # oDP.$ccuget());
+      }
+    }
+  }
 }
 	);
 
@@ -1183,14 +1220,12 @@ sub HMCCU_GetDeviceList ($)
 	my $script = qq(
 string devid;
 string chnid;
-foreach(devid, root.Devices().EnumUsedIDs())
-{
+foreach(devid, root.Devices().EnumUsedIDs()) {
    object odev=dom.GetObject(devid);
    string intid=odev.Interface();
    string intna=dom.GetObject(intid).Name();
    integer cc=0;
-   foreach (chnid, odev.Channels())
-   {
+   foreach (chnid, odev.Channels()) {
       object ochn=dom.GetObject(chnid);
       WriteLine("C;" # ochn.Address() # ";" # ochn.Name());
       cc=cc+1;
@@ -1215,8 +1250,10 @@ foreach(devid, root.Devices().EnumUsedIDs())
 			$HMCCU_Devices{$hmdata[2]}{interface} = $hmdata[1];
 			$HMCCU_Devices{$hmdata[2]}{channels} = $hmdata[5];
 			$HMCCU_Devices{$hmdata[2]}{addtype} = 'dev';
+			$HMCCU_Devices{$hmdata[2]}{valid} = 1;
 			$HMCCU_Addresses{$hmdata[3]}{address} = $hmdata[2];
 			$HMCCU_Addresses{$hmdata[3]}{addtype} = 'dev';
+			$HMCCU_Addresses{$hmdata[3]}{valid} = 1;
 			$count++;
 		}
 		elsif ($hmdata[0] eq 'C') {
@@ -1224,8 +1261,10 @@ foreach(devid, root.Devices().EnumUsedIDs())
 			$HMCCU_Devices{$hmdata[1]}{name} = $hmdata[2];
 			$HMCCU_Devices{$hmdata[1]}{channels} = 1;
 			$HMCCU_Devices{$hmdata[1]}{addtype} = 'chn';
+			$HMCCU_Devices{$hmdata[1]}{valid} = 1;
 			$HMCCU_Addresses{$hmdata[2]}{address} = $hmdata[1];
 			$HMCCU_Addresses{$hmdata[2]}{addtype} = 'chn';
+			$HMCCU_Addresses{$hmdata[2]}{valid} = 1;
 			$count++;
 		}
 	}
@@ -1250,7 +1289,27 @@ foreach(devid, root.Devices().EnumUsedIDs())
 		   if (!defined ($ch->{channels}) || $ch->{channels} != $HMCCU_Devices{$add}{channels});
 	}
 
+	$hash->{NewDevices} = 0;
+
 	return $count;
+}
+
+####################################################
+# Check if device/channel name or address is valid
+####################################################
+
+sub HMCCU_IsValidDevice ($)
+{
+	my ($param) = @_;
+
+	if ($param =~ /^[A-Z]{3,3}[0-9]{7,7}$/ || $param =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]+$/) {
+		return 0 if (! exists ($HMCCU_Devices{$param}));
+		return $HMCCU_Devices{$param}{valid};
+	}
+	else {
+		return 0 if (! exists ($HMCCU_Addresses{$param}));
+		return $HMCCU_Addresses{$param}{valid};
+	}
 }
 
 ####################################################
@@ -1444,39 +1503,6 @@ sub HMCCU_GetAttribute ($$$$)
 }
 
 ####################################################
-# Submit HTTP request to CCU.
-# If parameter $val is specified datapoint wil be
-# set to value.
-####################################################
-
-sub HMCCU_HTTPRequest ($@)
-{
-	my ($hash, $int, $add, $chn, $dpt, $val) = @_;
-
-	my $ccuget = AttrVal ($hash->{NAME}, 'ccuget', 'Value');
-	my $host = $hash->{host};
-	my $addr = $int.'.'.$add.':'.$chn.'.'.$dpt;
-	my $url = 'http://'.$host.':8181/do.exe?r1=dom.GetObject("'.$addr.'")';
-
-	if (defined ($val)) {
-		$url .= '.State("'.$val.'")';
-	}
-	else {
-		$url .= '.$ccuget()';
-	}
-
-	my $response = GetFileFromURL ($url);
-	if (defined ($response) && $response =~ /<r1>(.+)<\/r1>/) {
-		my $retval = $1;
-		if ($retval ne 'null') {
-			return defined ($val) ? 1 : $retval;
-		}
-	}
-
-	return 0;
-}
-
-####################################################
 # Timer function for reading RPC queue
 ####################################################
 
@@ -1504,7 +1530,6 @@ sub HMCCU_ReadRPCQueue ($)
 			$HMCCU_EventTime = time () if ($eventno == 0);
 			my @Tokens = split (/\|/, $element);
 			if ($Tokens[0] eq 'EV') {
-#				Log 2, "HMCCU: Event from ".$Tokens[1]." dp=".$Tokens[2]." val=".$Tokens[3];
 				my ($add, $chn) = split (/:/, $Tokens[1]);
 				my $reading = HMCCU_GetReadingName ('', $add, $chn, $Tokens[2], '',
 				   $ccureadingformat);
@@ -1513,10 +1538,13 @@ sub HMCCU_ReadRPCQueue ($)
 				last if ($eventno == $maxevents);
 			}
 			elsif ($Tokens[0] eq 'ND') {
-#				push (@newdevices, $Tokens[1]);
+				if (! exists ($HMCCU_Devices{$Tokens[1]})) {
+					$hash->{NewDevices} = 0 if (!exists ($hash->{NewDevices}));
+					$hash->{NewDevices}++;
+				}
 			}
 			elsif ($Tokens[0] eq 'DD') {
-#				push (@deldevices, $Tokens[1]);
+				push (@deldevices, $Tokens[1]);
 			}
 			elsif ($Tokens[0] eq 'EX') {
 				Log 1, "HMCCU: Received EX event. RPC server terminated.";
@@ -1535,8 +1563,7 @@ sub HMCCU_ReadRPCQueue ($)
 		Log 1, "HMCCU: Received no events from CCU since 300 seconds";
 	}
 
-#	HMCCU_DeleteDevices (\@deldevices) if (@deldevices > 0);
-#	HMCCU_NewDevices (\@newdevices) if (@newdevices > 0);
+	HMCCU_DeleteDevices (\@deldevices) if (@deldevices > 0);
 
 	my @hm_pids;
 	my @ex_pids;
@@ -1593,11 +1620,13 @@ sub HMCCU_GetDatapoint ($@)
 {
 	my ($hash, $param, $reading) = @_;
 	my $name = $hash->{NAME};
+	my $type = $hash->{TYPE};
 	my $hmccu_hash;
 	my $value = '';
 
 	$hmccu_hash = HMCCU_GetHash ($hash);
 	return (-3, $value) if (!defined ($hmccu_hash));
+	return (-4, $value) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
 
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
 	my $readingformat = AttrVal ($name, 'ccureadingformat', 'name');
@@ -1642,7 +1671,7 @@ sub HMCCU_GetDatapoint ($@)
 		}
 		return (0, $value) if ($reading eq '');
 
-		if ($hash->{TYPE} eq 'HMCCU') {
+		if ($type eq 'HMCCU') {
 			$value = HMCCU_UpdateClientReading ($hmccu_hash, $add, $chn, $reading,
 			   $value);
 		}
@@ -1672,9 +1701,11 @@ sub HMCCU_GetDatapoint ($@)
 sub HMCCU_SetDatapoint ($$$)
 {
 	my ($hash, $param, $value) = @_;
+	my $type = $hash->{TYPE};
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);;
 	return -3 if (!defined ($hmccu_hash));
+	return -4 if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
 
 	my $url = 'http://'.$hmccu_hash->{host}.':8181/do.exe?r1=dom.GetObject("';
 	my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($param, $HMCCU_FLAG_INTERFACE);
@@ -1764,9 +1795,11 @@ sub HMCCU_SetVariable ($$$)
 sub HMCCU_GetUpdate ($$$)
 {
 	my ($cl_hash, $addr, $ccuget) = @_;
+	my $type = $cl_hash->{TYPE};
 
 	my $hmccu_hash = HMCCU_GetHash ($cl_hash);
 	return -3 if (!defined ($hmccu_hash));
+	return -4 if ($type ne 'HMCCU' && $cl_hash->{ccudevstate} eq 'Deleted');
 
 	my $nam = '';
 	my $script;
@@ -1789,10 +1822,13 @@ sub HMCCU_GetUpdate ($$$)
 string sDPId;
 string sChnName = "$nam";
 object oChannel = dom.GetObject (sChnName);
-foreach(sDPId, oChannel.DPs().EnumUsedIDs())
-{
-   object oDP = dom.GetObject(sDPId);
-   WriteLine (sChnName # "=" # oDP.Name() # "=" # oDP.$ccuget());
+if (oChannel) {
+  foreach(sDPId, oChannel.DPs()) {
+    object oDP = dom.GetObject(sDPId);
+    if (oDP) {
+      WriteLine (sChnName # "=" # oDP.Name() # "=" # oDP.$ccuget());
+    }
+  }
 }
 		);
 	}
@@ -1804,14 +1840,18 @@ foreach(sDPId, oChannel.DPs().EnumUsedIDs())
 string chnid;
 string sDPId;
 object odev = dom.GetObject ("$nam");
-foreach (chnid, odev.Channels())
-{
-   object ochn = dom.GetObject(chnid);
-   foreach(sDPId, ochn.DPs().EnumUsedIDs())
-   {
-      object oDP = dom.GetObject(sDPId);
-      WriteLine (ochn.Name() # "=" # oDP.Name() # "=" # oDP.$ccuget());
-   }
+if (odev) {
+  foreach (chnid, odev.Channels()) {
+    object ochn = dom.GetObject(chnid);
+    if (ochn) {
+      foreach(sDPId, ochn.DPs()) {
+        object oDP = dom.GetObject(sDPId);
+        if (oDP) {
+          WriteLine (ochn.Name() # "=" # oDP.Name() # "=" # oDP.$ccuget());
+        }
+      }
+    }
+  }
 }
 		);
 	}
@@ -1872,6 +1912,7 @@ sub HMCCU_GetChannel ($$)
 {
 	my ($hash, $chnref) = @_;
 	my $name = $hash->{NAME};
+	my $type = $hash->{TYPE};
 	my $count = 0;
 	my %chnpars;
 	my $chnlist = '';
@@ -1879,6 +1920,7 @@ sub HMCCU_GetChannel ($$)
 
 	my $hmccu_hash = HMCCU_GetHash ($hash);
 	return (-3, $result) if (!defined ($hmccu_hash));;
+	return (-4, $result) if ($type ne 'HMCCU' && $hash->{ccudevstate} eq 'Deleted');
 
 	my $ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value');
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
@@ -1915,21 +1957,23 @@ sub HMCCU_GetChannel ($$)
 string sDPId;
 string sChannel;
 string sChnList = "$chnlist";
-foreach (sChannel, sChnList.Split(","))
-{
-   object oChannel = dom.GetObject (sChannel);
-   foreach(sDPId, oChannel.DPs().EnumUsedIDs())
-   {
+foreach (sChannel, sChnList.Split(",")) {
+  object oChannel = dom.GetObject (sChannel);
+  if (oChannel) {
+    foreach(sDPId, oChannel.DPs()) {
       object oDP = dom.GetObject(sDPId);
-      WriteLine (sChannel # "=" # oDP.Name() # "=" # oDP.$ccuget());
-   }
+      if (oDP) {
+        WriteLine (sChannel # "=" # oDP.Name() # "=" # oDP.$ccuget());
+      }
+    }
+  }
 }
 	);
 
 	my $response = HMCCU_HMScript ($hmccu_hash->{host}, $script);
 	return (-2, $result) if ($response eq '');
   
-	readingsBeginUpdate ($hash) if ($hash->{TYPE} ne 'HMCCU' && $ccureadings);
+	readingsBeginUpdate ($hash) if ($type ne 'HMCCU' && $ccureadings);
 
 	foreach my $dpdef (split /\n/, $response) {
 		my @dpdata = split /=/, $dpdef;
@@ -1961,7 +2005,7 @@ foreach (sChannel, sChnList.Split(","))
 		$count++;
 	}
 
-	readingsEndUpdate ($hash, 1) if ($hash->{TYPE} ne 'HMCCU' && $ccureadings);
+	readingsEndUpdate ($hash, 1) if ($type ne 'HMCCU' && $ccureadings);
 
 	return ($count, $result);
 }
