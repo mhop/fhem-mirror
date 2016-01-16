@@ -10,24 +10,39 @@ use warnings;
 # $Id$
 
 my $noWarnings = grep $_ eq '-noWarnings', @ARGV;
+my ($verify) = grep $_ =~ /\.pm$/ , @ARGV;
+
 use constant TAGS => qw{ul li code b i u table tr td};
+
+sub generateModuleCommandref($$;$);
 
 my %mods;
 my @modDir = ("FHEM");
-foreach my $modDir (@modDir) {
-  opendir(DH, $modDir) || die "Cant open $modDir: $!\n";
-  while(my $l = readdir DH) {
-    next if($l !~ m/^\d\d_.*\.pm$/);
-    my $of = $l;
-    $l =~ s/.pm$//;
-    $l =~ s/^[0-9][0-9]_//;
-    $mods{$l} = "$modDir/$of";
-  }
-}
-$mods{configDB} = "configDB.pm" if(-f "configDB.pm");
-
-
 my @lang = ("EN", "DE");
+
+if(!$verify) {
+  foreach my $modDir (@modDir) {
+    opendir(DH, $modDir) || die "Cant open $modDir: $!\n";
+    while(my $l = readdir DH) {
+      next if($l !~ m/^\d\d_.*\.pm$/);
+      my $of = $l;
+      $l =~ s/.pm$//;
+      $l =~ s/^[0-9][0-9]_//;
+      $mods{$l} = "$modDir/$of";
+    }
+  }
+  $mods{configDB} = "configDB.pm" if(-f "configDB.pm");
+} else { # check for syntax only
+  my $modname = $verify;
+  $modname =~ s/^.*[\/\\](?:\d\d_)?(.+).pm$/$1/;
+  $mods{$modname} = $verify;
+  foreach my $lang (@lang) {
+    generateModuleCommandref($modname, $lang);
+  }
+  exit;
+}
+
+
 
 foreach my $lang (@lang) {
   my $suffix = ($lang eq "EN" ? "" : "_$lang");
@@ -67,7 +82,24 @@ foreach my $lang (@lang) {
 
   # Copy the doc part from the module
   foreach my $mod (sort keys %mods) {
+    generateModuleCommandref($mod,$lang, \*OUT);
+  }
+
+  # Copy the tail
+  print OUT '<a name="perl"></a>',"\n";
+  while(my $l = <IN>) {
+    print OUT $l;
+  }
+  close(OUT);
+}
+
+#############################
+# read a module file and check/print the commandref
+sub generateModuleCommandref($$;$)
+{
+    my ($mod, $lang, $fh) = @_; 
     my $tag;
+    my $suffix = ($lang eq "EN" ? "" : "_$lang");
     my %tagcount= ();
     my %llwct = (); # Last line with closed tag
     open(MOD, $mods{$mod}) || die("Cant open $mods{$mod}:$!\n");
@@ -90,7 +122,7 @@ foreach my $lang (@lang) {
         $skip = 1;
 
       } elsif(!$skip) {
-        print OUT $l;
+        print $fh $l if($fh);
         $docCount++;
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
@@ -106,8 +138,8 @@ foreach my $lang (@lang) {
     print "*** $lang $mods{$mod}: No document text found\n"
         if(!$suffix && !$docCount && !$dosMode && $mods{$mod} !~ m,/99_,);
     if($suffix && !$docCount && !$dosMode) {
-      if($lang eq "DE") {
-        print OUT << "EOF";
+      if($lang eq "DE" && $fh) {
+        print $fh <<EOF;
 <a name="$mod"></a>
 <h3>$mod</h3>
 <ul>
@@ -125,12 +157,4 @@ EOF
                 "($tagcount{$tag}, last line ok: $llwct{$tag})\n")
         if($tagcount{$tag} && !$noWarnings);
     }
-  }
-
-  # Copy the tail
-  print OUT '<a name="perl"></a>',"\n";
-  while(my $l = <IN>) {
-    print OUT $l;
-  }
-  close(OUT);
 }
