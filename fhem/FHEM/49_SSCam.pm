@@ -27,7 +27,10 @@
 ##########################################################################################################
 #  Versions History:
 #
-#  1.5.1  11.01.2016   Vars "USERNAME" and "RECTIME" removed from internals,
+# 1.6    16.01.2016    Change the define-string related to rectime.
+#                      Note: See all changes to rectime usage in commandref or here:
+#                      http://forum.fhem.de/index.php/topic,45671.msg391664.html#msg391664
+# 1.5.1  11.01.2016    Vars "USERNAME" and "RECTIME" removed from internals,
 #                      Var (Internals) "SERVERNAME" changed to "SERVERADDR",
 #                      minor change of Log messages,
 #                      Note: use rereadcfg in order to activate the changes
@@ -44,19 +47,11 @@
 #                      LWP is not needed anymore
 #
 #
-# Definition: define <name> SSCam <ServerAddr> <ServerPort> <username> <password> <camname> <rectime> 
+# Definition: define <name> SSCam <ServerAddr> <ServerPort> <username> <password> <camname>
 # 
-# Example: define CamCP1 SSCAM 192.168.2.20 5000 apiuser apipw Carport 5
+# Example: define CamCP1 SSCAM 192.168.2.20 5000 apiuser apipw Carport
 #
-# Parameters:
-#       
-# $serveraddr = "";          # DS-IP-Address
-# $serverport = "";          # DS Port
-# $username   = "";          # User für login auf DS
-# $password   = "";          # Passwort für User login
-# $camname    = "";          # Name der Kamera
-# $rectime    = "";          # Dauer der Aufnahme in Sekunden 
-  
+
 
 package main;
 
@@ -80,6 +75,7 @@ sub SSCam_Initialize($) {
  $hash->{AttrList} = 
          "pollcaminfoall ".
          "pollnologging:1,0 ".
+         "rectime ".
          "webCmd ".
          $readingFnAttributes;
 
@@ -89,16 +85,16 @@ sub SSCam_Initialize($) {
 sub SSCam_Define {
   # Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Gerät ausgeführt wird 
   # Welche und wie viele Parameter akzeptiert werden ist Sache dieser Funktion. Die Werte werden nach dem übergebenen Hash in ein Array aufgeteilt
-  # define CamCP1 SSCAM 192.168.2.20 5000 apiuser Support4me Carport 5
-  #       ($hash)  [1]     [2]        [3]   [4]     [5]       [6]   [7]  
+  # define CamCP1 SSCAM 192.168.2.20 5000 apiuser Support4me Carport
+  #       ($hash)  [1]     [2]        [3]   [4]     [5]       [6]   
   #
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   
   my @a = split("[ \t][ \t]*", $def);
   
-  if(int(@a) < 8) {
-        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <ServerAddress> <Port> <User> <Password> <Cameraname> <Recordtime>";
+  if(int(@a) < 7) {
+        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <ServerAddress> <Port> <User> <Password> <Cameraname>";
         }
         
   my $serveraddr = $a[2];
@@ -106,24 +102,14 @@ sub SSCam_Define {
   my $username   = $a[4];  
   my $password   = $a[5];
   my $camname    = $a[6];
-  my $rectime    = $a[7];
-  
-  
-  unless ($rectime =~ /^\d+$/) { return " The given Recordtime is not valid. Use only figures 0-9 without decimal places !";}
-  # führende Nullen entfernen
-  $rectime =~ s/^0+//;
+
   
   $hash->{SERVERADDR}       = $serveraddr;
   $hash->{SERVERPORT}       = $serverport;
   $hash->{HELPER}{USERNAME} = $username;
   $hash->{HELPER}{PASSWORD} = $password;
   $hash->{CAMNAME}          = $camname;
-  $hash->{HELPER}{RECTIME}  = $rectime;
-  # für später
-  # Standard für rectime setzen, überschreibbar durch Attribut "rectime"
-  # $hash->{HELPER}{RECTIME} = 15; 
-  # $attr{$name}{rectime} = $rectime;
-  
+ 
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
   $hash->{HELPER}{APIAUTH}        = "SYNO.API.Auth";                                                  
@@ -133,14 +119,16 @@ sub SSCam_Define {
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
   
   # Anfangswerte setzen
-  $hash->{HELPER}{ACTIVE}              = "off";                                  # Funktionstoken "off", Funktionen können sofort starten
-  $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                    # Loggingfunktion für Polling ist an
-  $hash->{STATE}                       = "initialized";                          # Anfangsstatus der Geräte
-  readingsSingleUpdate($hash,"Record","Stop",0);                                 # Recordings laufen nicht
-  readingsSingleUpdate($hash,"Availability", "", 0);                             # Verfügbarkeit ist unbekannt
-  readingsSingleUpdate($hash,"PollState","Inactive",0);                          # es ist keine Gerätepolling aktiv
+  $attr{$name}{webCmd}                 = "on:off:snap:enable:disable";                            # initiale Webkommandos setzen
+  $hash->{HELPER}{ACTIVE}              = "off";                                                   # Funktionstoken "off", Funktionen können sofort starten
+  $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                                     # Loggingfunktion für Polling ist an
+  $hash->{STATE}                       = "initialized";                                           # Anfangsstatus der Geräte
+  $hash->{HELPER}{RECTIME_DEF}         = "15";                                                    # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
+  readingsSingleUpdate($hash,"Record","Stop",0);                                                  # Recordings laufen nicht
+  readingsSingleUpdate($hash,"Availability", "", 0);                                              # Verfügbarkeit ist unbekannt
+  readingsSingleUpdate($hash,"PollState","Inactive",0);                                           # es ist keine Gerätepolling aktiv
   
-  RemoveInternalTimer($hash);                                                    # alle evtl. noch laufenden Timer löschen
+  RemoveInternalTimer($hash);                                                                     # alle evtl. noch laufenden Timer löschen
   
   
   # Subroutine Watchdog-Timer für Polling Kamera-Infos starten, verzögerter zufälliger Start 0-60s (Vermeidung v. Überschneidungen)
@@ -166,33 +154,42 @@ sub SSCam_Attr {
         if ($aName eq "pollcaminfoall") {
            unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 0-9 without decimal places !";}
            }
+        if ($aName eq "rectime") {
+           unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 0-9 without decimal places !";}
+           }            
    }
 return undef;
 }
  
 sub SSCam_Set {
-        my ( $hash, @a ) = @_;
+        my ($hash, @a) = @_;
         return "\"set X\" needs at least an argument" if ( @a < 2 );
-        my $name = shift @a;
-        my $opt = shift @a;
+        my $name = $a[0];
+        my $opt  = $a[1];
+        my $prop = $a[2];
         
         my %SSCam_sets = (
-                         on        => "on",
-                         off       => "off",
-                         snap      => "snap",
-                         enable    => "enable",
-                         disable   => "disable",
-                         # presets   => "presets",
+                         "on"                => "on",
+                         "off"               => "off",
+                         "snap"              => "snap:",
+                         "enable"            => "enable",
+                         "disable"           => "disable",
+                         # presets         => "presets",
                          );
 
+#        my $list .= "on off snap enable disable on-for-timer";
+#        return SetExtensions($hash, $list, $name, $opt) if( $opt eq "?" );
+#        return SetExtensions($hash, $list, $name, $opt) if( !grep( $_ =~ /^\Q$opt\E($|:)/, split( ' ', $list ) ) );
+        
+        
         my $camname = $hash->{CAMNAME};  
         my $logstr;
         my @cList;
- 
+        
         # ist die angegebene Option verfügbar ?
         if(!defined($SSCam_sets{$opt})) 
                 {
-                    @cList = keys %SSCam_sets; 
+                    @cList = keys(%SSCam_sets); 
                     return "Unknown argument $opt, choose one of " . join(" ", @cList);
                   
                 } 
@@ -200,7 +197,14 @@ sub SSCam_Set {
                 {
                     if ($opt eq "on") 
                     {
+                        
+                        if (defined($prop)) {
+                            unless ($prop =~ /^\d+$/) { return " The Value for \"$opt\" is not valid. Use only figures 0-9 without decimal places !";}
+                            $hash->{HELPER}{RECTIME_TEMP} = $prop;
+                            }
+                        
                         &camstartrec($hash);
+ 
                     }
                     elsif ($opt eq "off") 
                     {
@@ -1279,12 +1283,12 @@ sub camret_nonbl ($) {
    my $serveraddr       = $hash->{SERVERADDR};
    my $serverport       = $hash->{SERVERPORT};
    my $camname          = $hash->{CAMNAME};
-   my $rectime          = AttrVal($name, "rectime",undef) ? AttrVal($name, "rectime",undef) : $hash->{HELPER}{RECTIME};
    my $apiauth          = $hash->{HELPER}{APIAUTH};
    my $apiauthpath      = $hash->{HELPER}{APIAUTHPATH};
    my $apiauthmaxver    = $hash->{HELPER}{APIAUTHMAXVER};
    my $sid              = $hash->{HELPER}{SID};
    my $OpMode           = $hash->{OPMODE};
+   my $rectime;
    my $url;
    my $data;
    my $logstr;
@@ -1298,6 +1302,17 @@ sub camret_nonbl ($) {
    my $camStatus;
    my ($presetcnt,$cnt,%allpresets,$presid,$presname,@preskeys,$presetlist);
    my $verbose;
+   
+   # Die Aufnahmezeit setzen
+   # wird "set <name> on-for-timer [rectime]" verwendet -> dann [rectime] nutzen, 
+   # sonst Attribut "rectime" wenn es gesetzt ist, falls nicht -> "RECTIME_DEF"
+   if (defined($hash->{HELPER}{RECTIME_TEMP})) {
+       $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
+       }
+       else
+       {
+       $rectime = AttrVal($name, "rectime",undef) ? AttrVal($name, "rectime",undef) : $hash->{HELPER}{RECTIME_DEF};
+       }
    
   
    # Verarbeitung der asynchronen Rückkehrdaten aus sub "camop_nonbl"
@@ -1351,7 +1366,7 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                $logstr = "Camera $camname Recording with Recordtime $rectime"."s started";
+                $logstr = $rectime != "0" ? "Camera $camname Recording with Recordtime $rectime"."s started" : "Camera $camname endless Recording started  - stop it manually or by stop-command !";
                 &printlog($hash,$logstr,"2");  
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");                
@@ -1360,9 +1375,10 @@ sub camret_nonbl ($) {
                 $logstr = "Time for Recording is set to: $rectime";
                 &printlog($hash,$logstr,"4");
                 
-                # Stop der Aufnahme nach Ablauf $rectime
-                InternalTimer(gettimeofday()+$rectime, "camstoprec", $hash, 0);
-                                  
+                if ($rectime != "0") {
+                    # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
+                    InternalTimer(gettimeofday()+$rectime, "camstoprec", $hash, 0);
+                    }              
 
             }
             elsif ($OpMode eq "Stop") 
@@ -1966,7 +1982,7 @@ return;
 <a name="SSCam"></a>
 <h3>SSCam</h3>
 <ul>
-  Using this Module you are able to operate with cameras which are defined in Synology Surveillance Station. <br>
+  Using this Module you are able to operate with cameras which are defined in Synology Surveillance Station (SVS). <br>
   At present the following functions are available: <br><br>
    <ul>
     <ul>
@@ -1974,10 +1990,11 @@ return;
        <li>Stop a Recording (using command or automatically after the &lt;RecordTime&gt; period</li>
        <li>Trigger a Snapshot </li>
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
-       <li>Activate a Camera in Synology Surveillance Station</li><br>
+       <li>Activate a Camera in Synology Surveillance Station</li>
+       <li>Retrieval of Camera Properties (Polling)</li><br>
     </ul>
    </ul>
-   The recordings and snapshots will be stored in Synology Surveillance Station and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
+   The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
    For example the recordings are stored for a defined time in Surveillance Station and will be deleted after that period.<br><br>
     
    If you like to discuss or help to improve this module please use FHEM-Forum with link: <br>
@@ -1993,12 +2010,9 @@ return;
   <b>Define</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;ServerAddr&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; &lt;RecordTime&gt;</code><br>
+    <code>define &lt;name&gt; SSCam &lt;ServerAddr&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; </code><br>
     <br>
     Defines a new camera device for SSCam. At first the devices have to be set up and operable in Synology Surveillance Station 7.0 and above. <br><br>
-    
-    The parameter &lt;RecordTime&gt; describes the minimum Recordtime. Dependend on other factors like the performance of your Synology Diskstation and <br>
-    Surveillance Station the effective Recordtime could be a little bit longer.
     
     The Modul SSCam ist based on functions of Synology Surveillance Station API. <br>
     Please refer the <a href="http://global.download.synology.com/download/Document/DeveloperGuide/Surveillance_Station_Web_API_v2.0.pdf">Web API Guide</a>. <br><br>
@@ -2008,8 +2022,8 @@ return;
     The parameters are in detail:
    <br>
    <br>    
-    
-  <table>
+     
+   <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:         </td><td>the name of the new device to use in FHEM</td></tr>
     <tr><td>ServerAddr:   </td><td>IP-address of Synology Surveillance Station Host. <b>Note:</b> avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
@@ -2017,41 +2031,57 @@ return;
     <tr><td>Username:     </td><td>Username defined in the Diskstation. Has to be a member of Admin-group</td></tr>
     <tr><td>Password:     </td><td>the Password for the User</td></tr>
     <tr><td>Cameraname:   </td><td>Cameraname as defined in Synology Surveillance Station, Spaces are not allowed in Cameraname !</td></tr>
-    <tr><td>Recordtime:   </td><td>it's the time for recordings </td></tr>
-  </table>
+   </table>
 
     <br><br>
 
     <b>Examples:</b>
      <pre>
-      define CamCP SSCAM 192.168.2.20 5000 apiuser apipass Carport 10      
+      define CamCP SSCAM 192.168.2.20 5000 apiuser apipass Carport     
     </pre>
+    
+    
+    When a new Camera is defined, as a start the recordingtime of 15 seconds will be assigned to the device.<br>
+    Using the <a href="#SSCamattr">attribute</a> "rectime" you can adapt the recordingtime for every camera individually.<br>
+    The value of "0" for rectime will lead to an endless recording which has to be stopped by a "set &lt;name&gt; off" command.<br>
+    Due to a Log-Entry with a hint to that circumstance will be written. <br><br>
+    
+    If the <a href="#SSCamattr">attribute</a> "rectime" would be deleted again, the default-value for recording-time (15s) become active.<br><br>
+
+    With <a href="#SSCamset">command</a> <b>"set &lt;name&gt; on [rectime]"</b> a temporary recordingtime is determinded which would overwrite the dafault-value of recordingtime <br>
+    and the attribute "rectime" (if it is set) uniquely. <br><br>
+
+    In that case the command <b>"set &lt;name&gt; on 0"</b> leads also to an endless recording.<br><br>
+    
+    If you have specified a pre-recording time in SVS it will be considered too.<br>  
+    
   </ul>
-  <br>
+  <br><br><br>
   
   
 <a name="SSCamset"></a>
 <b>Set </b>
   <ul>
     
-    There are the following options for "Set" at present: <br><br>
+  Currently there are the following options for "Set &lt;name&gt; ..."  : <br><br>
 
   <table>
   <colgroup> <col width=15%> <col width=85%> </colgroup>
-      <tr><td>"on":          </td><td>starts a recording. The recording will be stopped automatically after a period of &lt;RecordTime&gt; as determined</td></tr>
-      <tr><td>"off" :        </td><td>stopps a running recording manually or using other events (e.g. with at, notify)</td></tr>
-      <tr><td>"snap":        </td><td>triggers a snapshot of the relevant camera and store it into Synology Surveillance Station</td></tr>
-      <tr><td>"disable":     </td><td>deactivates a camera in Synology Surveillance Station</td></tr>
-      <tr><td>"enable":      </td><td>activates a camera in Synology Surveillance Station</td></tr>
+      <tr><td>"on [rectime]":  </td><td>starts a recording. The recording will be stopped automatically after a period of [rectime] </td></tr>
+      <tr><td>                 </td><td>if [rectime] = 0 an endless recording will be started </td></tr>
+      <tr><td>"off" :          </td><td>stopps a running recording manually or using other events (e.g. with at, notify)</td></tr>
+      <tr><td>"snap":          </td><td>triggers a snapshot of the relevant camera and store it into Synology Surveillance Station</td></tr>
+      <tr><td>"disable":       </td><td>deactivates a camera in Synology Surveillance Station</td></tr>
+      <tr><td>"enable":        </td><td>activates a camera in Synology Surveillance Station</td></tr>
   </table>
   <br><br>
         
-  Example for simple <b>Start/Stop of a Recording</b>: <br><br>
+  Examples for simple <b>Start/Stop a Recording</b>: <br><br>
 
   <table>
-  <colgroup> <col width=15%> <col width=85%> </colgroup>
-      <tr><td>set &lt;name&gt; on   </td><td>starts a recording of camera &lt;name&gt;, stops automatically after the time &lt;RecordTime&gt; as determined in device-definition </td></tr>
-      <tr><td>set &lt;name&gt; off   </td><td>stops the recording of camera &lt;name&gt;</td></tr>
+  <colgroup> <col width=20%> <col width=80%> </colgroup>
+      <tr><td>set &lt;name&gt; on [rectime]  </td><td>starts a recording of camera &lt;name&gt;, stops automatically after [rectime] (default 15s or defined by <a href="#SSCamattr">attribute</a>) </td></tr>
+      <tr><td>set &lt;name&gt; off           </td><td>stops the recording of camera &lt;name&gt;</td></tr>
   </table>
   <br>
 
@@ -2067,7 +2097,7 @@ return;
   When the recording of camera "CamHE1" starts (Attribut event-on-change-reading -> "Record" has to be set), then 3 snapshots at intervals of 2 seconds are triggered.
 
   <pre>
-     define he1_snap_3 notify CamHE1:Record.*Start define h3 at +*{3}00:00:02 set CamHE1 snap 
+     define he1_snap_3 notify CamHE1:Record.*on define h3 at +*{3}00:00:02 set CamHE1 snap 
   </pre>
 
   Release of 2 Snapshots of camera "CamHE1" at intervals of 6 seconds after the motion sensor "MelderHE1" has sent an event, <br>
@@ -2119,7 +2149,7 @@ return;
   For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further <br>
   processing like crearing events. <br><br>
 
-  <b>Polling of Camera-Preperties:</b><br><br>
+  <b>Polling of Camera-Properties:</b><br><br>
 
   Retrieval of Camera-Properties can be done automatically if the attribute "pollcaminfoall" will be set to a value > 10. <br>
   As default that attribute "pollcaminfoall" isn't be set and the automatic polling isn't be active. <br>
@@ -2199,11 +2229,13 @@ return;
   <br><br>
   <ul>
   <ul>
-  <li>pollcaminfoall - Interval of automatic polling the Camera properties (if < 10: no polling, if > 10: polling with interval) </li>
+  <li><b>pollcaminfoall</b> - Interval of automatic polling the Camera properties (if < 10: no polling, if > 10: polling with interval) </li>
 
-  <li>pollnologging - "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li>
-
-  <li>verbose</li><br>
+  <li><b>pollnologging</b> - "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li>
+  
+  <li><b>rectime</b> - the determined recordtime when a recording starts. If rectime = 0 an endless recording will be started. If it isn't defined, the default recordtime of 15s is activated </li>
+  
+  <li><b>verbose</b></li><br>
   
   <ul>
      Different Verbose-Level are supported.<br>
@@ -2235,7 +2267,7 @@ return;
 <a name="SSCam"></a>
 <h3>SSCam</h3>
 <ul>
-    Mit diesem Modul können Operationen von in der Synology Surveillance Station definierten Kameras ausgeführt werden. <br>
+    Mit diesem Modul können Operationen von in der Synology Surveillance Station (SVS) definierten Kameras ausgeführt werden. <br>
     Zur Zeit werden folgende Funktionen unterstützt: <br><br>
     <ul>
      <ul>
@@ -2243,11 +2275,12 @@ return;
       <li>Stop einer Aufnahme (per Befehl bzw. automatisch nach Ablauf der Aufnahmedauer) </li>
       <li>Aufnehmen eines Schnappschusses und Ablage in der Synology Surveillance Station </li>
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
-      <li>Aktivieren einer Kamera in Synology Surveillance Station</li><br>
+      <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
+      <li>Abfrage von Kameraeigenschaften (Polling)</li><br>
      </ul> 
     </ul>
-    Die Aufnahmen stehen in der Synology Surveillance Station zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
-    So werden zum Beispiel die Aufnahmen entsprechend ihrer Archivierungsfrist gehalten und dann gelöscht. <br><br>
+    Die Aufnahmen stehen in der Synology Surveillance Station (SVS) zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
+    So werden zum Beispiel die Aufnahmen entsprechend ihrer Archivierungsfrist gespeichert und dann gelöscht. <br><br>
     
     Wenn sie über dieses Modul diskutieren oder zur Verbesserung des Moduls beitragen möchten, ist im FHEM-Forum ein Sammelplatz unter:<br>
     <a href="http://forum.fhem.de/index.php/topic,45671.msg374390.html#msg374390">49_SSCam: Fragen, Hinweise, Neuigkeiten und mehr rund um dieses Modul</a>.<br><br>
@@ -2261,14 +2294,10 @@ return;
 <b>Definition</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;ServerAddr&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Kameraname in SS&gt; &lt;RecordTime&gt;</code><br>
+    <code>define &lt;name&gt; SSCam &lt;ServerAddr&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Kameraname in SVS&gt; </code><br>
     <br>
     
     Definiert eine neue Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
-    
-    Der Parameter "&lt;RecordTime&gt; beschreibt die Mindestaufnahmezeit. Abhängig von Faktoren wie Performance der Synology Diskstation und der Surveillance Station <br>
-    kann die effektive Aufnahmezeit geringfügig länger sein.<br><br>
-    
     Das Modul SSCam basiert auf Funktionen der Synology Surveillance Station API. <br>
     Weitere Informationen unter: <a href="http://global.download.synology.com/download/Document/DeveloperGuide/Surveillance_Station_Web_API_v2.0.pdf">Web API Guide</a>. <br><br>
     
@@ -2286,44 +2315,56 @@ return;
     <tr><td>Username:       </td><td>Name des in der Diskstation definierten Nutzers. Er muß ein Mitglied der Admin-Gruppe sein</td></tr>
     <tr><td>Password:       </td><td>das Passwort des Nutzers</td></tr>
     <tr><td>Cameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist. Leerzeichen im Namen sind nicht erlaubt !</td></tr>
-    <tr><td>Recordtime:     </td><td>die definierte Aufnahmezeit</td></tr>
     </table>
 
     <br><br>
 
     <b>Beispiel:</b>
      <pre>
-      define CamCP SSCAM 192.168.2.20 5000 apiuser apipass Carport 10      
+      define CamCP SSCAM 192.168.2.20 5000 apiuser apipass Carport     
      </pre>
+     
+    
+    Wird eine neue Kamera definiert, wird diesem Device zunächst eine Standardaufnahmedauer von 15 zugewiesen. <br>
+    Über das <a href="#SSCamattr">Attribut</a> "rectime" kann die Aufnahmedauer für jede Kamera individuell angepasst werden. Der Wert "0" für "rectime" führt zu einer Endlosaufnahme, die durch "set &lt;name&gt; off" wieder gestoppt werden muß. <br>
+    Ein Logeintrag mit einem entsprechenden Hinweis auf diesen Umstand wird geschrieben. <br><br>
+
+    Wird das <a href="#SSCamattr">Attribut</a> "rectime" gelöscht, greift wieder der Default-Wert (15s) für die Aufnahmedauer. <br><br>
+
+    Mit dem <a href="#SSCamset">Befehl</a> <b>"set &lt;name&gt; on [rectime]"</b> wird die Aufnahmedauer temporär festgelegt und überschreibt einmalig sowohl den Defaultwert als auch den Wert des gesetzten Attributs "rectime". <br>
+    Auch in diesem Fall führt <b>"set &lt;name&gt; on 0"</b> zu einer Daueraufnahme. <br><br>
+
+    Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br>
   </ul>
-  
+  <br><br><br>
   
 <a name="SSCamset"></a>
 <b>Set </b>
 <ul>
     
-    Es gibt zur Zeit folgende Optionen für "Set": <br><br>
+    Es gibt zur Zeit folgende Optionen für "Set &lt;name&gt; ...": <br><br>
 
   <table>
   <colgroup> <col width=15%> <col width=85%> </colgroup>
-      <tr><td>"on":          </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit &lt;RecordTime&gt; gestoppt.</td></tr>
-      <tr><td>"off" :        </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
-      <tr><td>"snap":        </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
-      <tr><td>"disable":     </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
-      <tr><td>"enable":      </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"on [rectime]": </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit [rectime] gestoppt.</td></tr>
+      <tr><td>                </td><td>Mit rectime = 0 wird eine Daueraufnahme gestartet die durch "set &lt;name&gt; off" wieder gestoppt werden muß.</td></tr>
+      <tr><td>"off" :         </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
+      <tr><td>"snap":         </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
+      <tr><td>"disable":      </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"enable":       </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
   </table>
   <br><br>
         
   Beispiele für einfachen <b>Start/Stop einer Aufnahme</b>: <br><br>
 
   <table>
-  <colgroup> <col width=15%> <col width=85%> </colgroup>
-      <tr><td>set &lt;name&gt; on   </td><td>startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit &lt;RecordTime&gt; wie im define angegeben</td></tr>
+  <colgroup> <col width=20%> <col width=80%> </colgroup>
+      <tr><td>set &lt;name&gt; on [rectime]  </td><td>startet die Aufnahme der Kamera &lt;name&gt;, automatischer Stop der Aufnahme nach Ablauf der Zeit [rectime] (default 15s oder wie im <a href="#SSCamattr">Attribut</a> "rectime" angegeben)</td></tr>
       <tr><td>set &lt;name&gt; off   </td><td>stoppt die Aufnahme der Kamera &lt;name&gt;</td></tr>
   </table>
   <br>
 
-  Ein <b>Schnappschuß</b> kann ausgelöst werden durch:
+  Ein <b>Schnappschuß</b> kann ausgelöst werden mit:
   <pre> 
      set &lt;name&gt; snap 
   </pre>
@@ -2465,11 +2506,13 @@ return;
   <br><br>
   <ul>
   <ul>
-  <li>pollcaminfoall - Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein Polling, größer 10: Polling mit Intervall) </li>
+  <li><b>pollcaminfoall</b> - Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein Polling, größer 10: Polling mit Intervall) </li>
 
-  <li>pollnologging - "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging Gerätepolling inaktiv</li>
+  <li><b>pollnologging</b> - "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging Gerätepolling inaktiv </li>
+  
+  <li><b>rectime</b> - festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s verwendet.</li>
 
-  <li>verbose</li><br>
+  <li><b>verbose</b> </li><br>
   
   <ul>
    Es werden verschiedene Verbose-Level unterstützt.
