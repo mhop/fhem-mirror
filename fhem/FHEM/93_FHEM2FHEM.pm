@@ -327,6 +327,7 @@ FHEM2FHEM_Set($@)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="FHEM2FHEM"></a>

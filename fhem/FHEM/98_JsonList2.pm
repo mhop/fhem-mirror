@@ -127,7 +127,7 @@ CommandJsonList2($$)
 1;
 
 =pod
-
+=item command
 =begin html
 
 <a name="JsonList2"></a>

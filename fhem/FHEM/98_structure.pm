@@ -509,6 +509,7 @@ structure_Attr($@)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="structure"></a>

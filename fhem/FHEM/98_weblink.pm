@@ -137,6 +137,7 @@ weblink_FwFn($$$$)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="weblink"></a>

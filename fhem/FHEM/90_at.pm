@@ -371,6 +371,7 @@ EOF
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="at"></a>

@@ -243,6 +243,7 @@ notify_fhemwebFn($$$$)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="notify"></a>

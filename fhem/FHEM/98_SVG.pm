@@ -2274,6 +2274,7 @@ plotAsPng(@)
 ##################
 
 =pod
+=item helper
 =begin html
 
 <a name="SVG"></a>

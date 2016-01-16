@@ -609,6 +609,7 @@ upd_initRestoreDirs($)
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="update"></a>

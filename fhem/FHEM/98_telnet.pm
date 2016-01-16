@@ -364,6 +364,7 @@ telnet_ActivateInform($;$)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="telnet"></a>

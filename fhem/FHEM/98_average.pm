@@ -190,6 +190,7 @@ average_Notify($$)
 
 
 =pod
+=item helper
 =begin html
 
 <a name="average"></a>

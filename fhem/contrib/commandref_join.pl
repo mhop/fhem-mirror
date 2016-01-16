@@ -17,6 +17,7 @@ use constant TAGS => qw{ul li code b i u table tr td};
 sub generateModuleCommandref($$;$);
 
 my %mods;
+my %modIdx;
 my @modDir = ("FHEM");
 my @lang = ("EN", "DE");
 
@@ -29,6 +30,12 @@ if(!$verify) {
       $l =~ s/.pm$//;
       $l =~ s/^[0-9][0-9]_//;
       $mods{$l} = "$modDir/$of";
+      $modIdx{$l} = "device";
+      open(MOD, "$modDir/$of") || die("Cant open $modDir/$l");
+      while(my $cl = <MOD>) {
+        $modIdx{$l} = $1 if($cl =~ m/^=item\s*(helper|command|device)/);
+      }
+      close(MOD);
     }
   }
   $mods{configDB} = "configDB.pm" if(-f "configDB.pm");
@@ -42,7 +49,19 @@ if(!$verify) {
   exit;
 }
 
-
+sub
+printList($)
+{
+  for my $i (sort { "\L$a" cmp "\L$b" } keys %modIdx) {
+    print OUT "      <a href=\"#$i\">$i</a> &nbsp;\n"
+        if($modIdx{$i} eq $_[0]);
+  }
+  while(my $l = <IN>) {
+    next if($l =~ m/href=/);
+    print OUT $l;
+    last;
+  }
+}
 
 foreach my $lang (@lang) {
   my $suffix = ($lang eq "EN" ? "" : "_$lang");
@@ -52,32 +71,23 @@ foreach my $lang (@lang) {
   open(IN, "$docIn")    || die "Cant open $docIn: $!\n";
   open(OUT, ">$docOut") || die "Cant open $docOut: $!\n";
 
-  # First run: check what is a command and what is a helper module
-  my $status;
-  my %noindex;
-  while(my $l = <IN>) {
-    last if($l =~ m/<h3>Introduction/);
-    $noindex{$1} = 1 if($l =~ m/href="#(.*)"/);
+  if(!$suffix) { # First run: remember commands/helper module
+    my $modType;
+    while(my $l = <IN>) {
+      $modType = "command" if($l =~ m/>Fhem commands</);
+      $modType = "device"  if($l =~ m/>Devices</);
+      $modType = "helper"  if($l =~ m/>Helper modules</);
+      $modIdx{$1} = $modType if($modType && $l =~ m/href="#(.*?)">/);
+      last if($l =~ m/<!-- header end -->/);
+    }
+    seek(IN,0,0);
   }
-  seek(IN,0,0);
 
   # Second run: create the file
-  # Header
-  while(my $l = <IN>) {
-    print OUT $l;
-    last if($l =~ m/#global/);
-  }
-
-  # index for devices.
-  foreach my $mod (sort keys %mods) {
-    next if($noindex{$mod});
-    print OUT "      <a href='#$mod'>$mod</a> &nbsp;\n";
-  }
-
-  # Copy the middle part
-  while(my $l = <IN>) {
+  while(my $l = <IN>) { # Header
     last if($l =~ m/name="perl"/);
     print OUT $l;
+    printList($1) if($l =~ m/<!-- header:(.*) -->/);
   }
 
   # Copy the doc part from the module

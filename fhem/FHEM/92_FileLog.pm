@@ -1050,6 +1050,7 @@ FileLog_regexpFn($$)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="FileLog"></a>
