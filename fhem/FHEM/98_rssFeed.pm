@@ -552,6 +552,7 @@ return;
 #======================================================================
 #======================================================================
 =pod
+=item helper
 =begin html
 
 <a name="rssFeed"></a>
@@ -581,7 +582,7 @@ return;
       <br/>
       Example:
       <ul>
-          <code>http://www.gea.de/rss?cat=Region%20Reutlingen&amp;main=true 3600</code>
+          <code>define rssGEA rssFeed http://www.gea.de/rss?cat=Region%20Reutlingen&amp;main=true 3600</code>
           <br/><br/>
           The example will retrieve the data from the rss feed every hour
       </ul>
@@ -787,7 +788,7 @@ return;
       <br>
       Beispiel:
       <ul>
-          <code>http://www.gea.de/rss?cat=Region%20Reutlingen&main=true 3600</code>
+          <code>define rssGEA rssFeed http://www.gea.de/rss?cat=Region%20Reutlingen&main=true 3600</code>
           <br><br>
           Damit wird st&uuml;ndlich der RSS-Feed des Reutlinger Generalanzeigers 
           abgerufen.
