@@ -468,6 +468,7 @@ mailcheck_Read($)
 1;
 
 =pod
+=item device
 =begin html
 
 <a name="mailcheck"></a>
