@@ -23,7 +23,7 @@ CommandVersion($$)
   push @files, $0; # path to fhem.pl
   push @ret, cfgDB_svnId() if(configDBUsed());
   foreach my $fn (@files) {
-    next unless($fn =~ /^$modpath.?FHEM/ or $fn =~ /(?:^FHEM|fhem.pl$)/); # configDB 
+    next unless($fn =~ /^(?:$modpath.?)?FHEM/ or $fn =~ /fhem.pl$/); # configDB 
     my $mod_name = ($fn=~ /[\/\\]([^\/\\]+)$/ ? $1 : $fn);
     next if($param && $mod_name !~ /$param/);
     next if(grep(/$mod_name/, @ret));
@@ -85,6 +85,7 @@ sub version_sortModules($$)
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="version"></a>
