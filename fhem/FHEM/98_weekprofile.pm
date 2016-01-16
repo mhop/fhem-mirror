@@ -884,8 +884,6 @@ sub weekprofile_getEditLNK_MasterDev($$)
 <a name="weekprofile"></a>
 <h3>weekprofile</h3>
 <ul>
-  <b>ToDo: Übersetzung</b><br>
-  
   Mit dem Modul 'weekprofile' können mehrere Wochenprofile verwaltet und an unterschiedliche Geräte 
   übertragen werden. Aktuell wird folgende Hardware unterstützt:
   <li>alle MAX Thermostate</li>
@@ -901,6 +899,8 @@ sub weekprofile_getEditLNK_MasterDev($$)
   übereinstimmt solange das komplette Profil übertragen wurde.
   <br>
   Beim Homatic HM-TC-IT-WM-W-EU wird nur das 1. Profil (R_P1_...) genommen!
+  <br>
+  <b>Für das Module wird libjson-perl benötigt</b>
   <br><br>
   <a name="weekprofiledefine"></a>
   <b>Define</b>
@@ -998,6 +998,8 @@ sub weekprofile_getEditLNK_MasterDev($$)
   and on the device are not equal until the whole profile is transfered completly.
   <br>
   If the maste device is Homatic HM-TC-IT-WM-W-EU then only the first profile (R_P1_...) will be used!
+  <br>
+  <b>For this module libjson-perl have to be installed</b>
   <br><br>
   <a name="weekprofiledefine"></a>
   <b>Define</b>
