@@ -1346,6 +1346,7 @@ SYSSTAT_getStatSNMP($)
 1;
 
 =pod
+=item device
 =begin html
 
 <a name="SYSSTAT"></a>
