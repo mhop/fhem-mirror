@@ -241,7 +241,7 @@ TechemWZ_Parse(@) {
     push @d, $deviceHash->{NAME};
   }
   
-  if defined($d[0]) {
+  if (defined($d[0])) {
     return (@d);
   } else {
     return (''); # discard neighbor devices
