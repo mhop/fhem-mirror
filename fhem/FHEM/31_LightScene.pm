@@ -498,6 +498,7 @@ LightScene_SaveDevice($$;$)
       if( $scene ) {
         my $id = "FHEM-$hash->{NAME}-$scene";
         $state = "scene $id";
+        #FIXME: id too long, new POST api does not use id
         fhem( "set $d savescene $id" );
       } else {
         $state = "<unknown>";
@@ -936,6 +937,7 @@ LightScene_editTable($) {
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="LightScene"></a>

@@ -936,6 +936,7 @@ logProxy_Get($@)
 
       next;
     } elsif( $fld[0] eq "ConstX" && $fld[1] ) {
+      $fld[1] = join( ':', @fld[1..@fld-1]);
       my ($t,$y,$y2) = eval $fld[1];
       if( $@ ) {
         Log3 $hash->{NAME}, 1, "$hash->{NAME}: $fld[1]: $@";
@@ -969,6 +970,7 @@ logProxy_Get($@)
       next;
 
     } elsif( $fld[0] eq "ConstY" && defined($fld[1]) ) {
+      $fld[1] = join( ':', @fld[1..@fld-1]);
       my ($y,$f,$t) = eval $fld[1];
       if( $@ ) {
         Log3 $hash->{NAME}, 1, "$hash->{NAME}: $fld[1]: $@";
@@ -1004,6 +1006,7 @@ logProxy_Get($@)
       next;
 
     } elsif( $fld[0] eq "Func" && $fld[1] ) {
+      $fld[1] = join( ':', @fld[1..@fld-1]);
       #my $fromsec = SVG_time_to_sec($from);
       #my $tosec   = SVG_time_to_sec($to);
       my ($r,$min,$max,$last) = eval $fld[1];
@@ -1026,6 +1029,7 @@ logProxy_Get($@)
       my $noaxis;
       my $range;
       my $segments;
+      my $isolines = "10|20|30";
       my @options = split( ',', $fld[1] );
       foreach my $option ( @options[0..@options-1] ) {
         my ($name,$value) = split( '=', $option, 2 );
@@ -1046,12 +1050,14 @@ logProxy_Get($@)
         } elsif( $name eq "noaxis" ) {
           $noaxis = 1;
 
-        } elsif( 0 && $name eq "range" && defined($value) ) {
-          $range = $value;
+        } elsif( 0 && $name eq "isolines" && defined($value) ) {
+          $isolines = $value;
 
         } elsif( $name eq "segments" && defined($value) ) {
           $segments = $value;
 
+        } elsif( $name eq "range" && defined($value) ) {
+          $range = $value;
 
         } else {
           Log3 $hash->{NAME}, 2, "$hash->{NAME}: line $i: $fld[0]: unknown option >$option<";
@@ -1061,6 +1067,7 @@ logProxy_Get($@)
 
       my $values;
       if( defined( $fld[2] ) ) {
+        $fld[2] = join( ':', @fld[2..@fld-1]);
         $values = eval $fld[2];
         if( $@ ) {
           Log3 $hash->{NAME}, 1, "$hash->{NAME}: $fld[2]: $@";
@@ -1071,13 +1078,14 @@ logProxy_Get($@)
       next if( $values && ref($values) ne "ARRAY" );
 
       $segments = scalar @{$values} if( !$segments );
+      next if( !$segments );
       my $isText = $values && @{$values}[0] !~ m/^[.\d+-]*$/;
 
       $axis = 1 if( $isText );
       $axis = 1 if( !defined($values) && $segments );
 
       my $f = 3.14159265 / 180;
-      if( defined( $values ) ) {
+      if( $segments && defined( $values ) ) {
         my $segment = 0;
         my $first;
         $ret .= ";c 0\n";
@@ -1120,7 +1128,7 @@ logProxy_Get($@)
         my $axis;
         $ret .= ";\n" if( $ret );
         $ret .= ";ls l7\n";
-        foreach my $r (10,20,30) {
+        foreach my $r (split( '\|', $isolines)) {
           $ret .= ";\n"; #FIXME: this is one to many at the end...
           my $first;
           for( my $a = 0; $a < 360; $a += (360/$segments) ) {
@@ -1179,6 +1187,7 @@ logProxy_Get($@)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="logProxy"></a>
@@ -1322,6 +1331,8 @@ logProxy_Get($@)
             the range to use for the radial axis</li>
           <li>segments=&lt;value&gt;<br>
             the number of circle/spiderweb segments to use for the plot</li>
+          <li>isolines=&lt;value&gt;<br>
+            a | separated list of values for which an isoline shoud be drawn. defaults to 10|20|30.</li>
         </ul>
       </li><br>
 

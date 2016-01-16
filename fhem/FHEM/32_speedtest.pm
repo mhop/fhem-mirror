@@ -180,6 +180,7 @@ speedtest_SpeedtestAborted($)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="speedtest"></a>

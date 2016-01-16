@@ -297,6 +297,7 @@ readingsProxy_Get($@)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="readingsProxy"></a>
