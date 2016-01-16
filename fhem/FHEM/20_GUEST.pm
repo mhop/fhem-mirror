@@ -889,8 +889,8 @@ sub GUEST_DurationTimer($;$) {
         {
             $durPresence =
               $timestampNow -
-              RESIDENTStk_Datetime2Timestamp(
-                ReadingsVal( $name, "lastArrival", "-" ) );
+              time_str2num(
+                ReadingsVal( $name, "lastArrival", "" ) );
         }
 
         # absence timer
@@ -899,8 +899,8 @@ sub GUEST_DurationTimer($;$) {
         {
             $durAbsence =
               $timestampNow -
-              RESIDENTStk_Datetime2Timestamp(
-                ReadingsVal( $name, "lastDeparture", "-" ) );
+              time_str2num(
+                ReadingsVal( $name, "lastDeparture", "" ) );
         }
 
         # sleep timer
@@ -909,8 +909,8 @@ sub GUEST_DurationTimer($;$) {
         {
             $durSleep =
               $timestampNow -
-              RESIDENTStk_Datetime2Timestamp(
-                ReadingsVal( $name, "lastSleep", "-" ) );
+              time_str2num(
+                ReadingsVal( $name, "lastSleep", "" ) );
         }
 
         my $durPresence_hr =
