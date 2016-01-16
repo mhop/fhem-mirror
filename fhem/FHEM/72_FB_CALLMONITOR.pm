@@ -1721,6 +1721,7 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="FB_CALLMONITOR"></a>
