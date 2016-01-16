@@ -1133,8 +1133,8 @@ sub HMinfo_GetFn($@) {#########################################################
   elsif($cmd eq "msgStat")    {##print message statistics----------------------
     $ret = HMinfo_getMsgStat();
   }
-  elsif($cmd =~ m/^(rssi|rssiG)$/){##print RSSI protocol-events-----------------
-    my ($type) = @a;
+  elsif($cmd =~ m/^(rssi|rssiG)$/){##print RSSI protocol-events----------------
+    my ($type) = (@a,"full");# ugly way to set "full" as default
     my @rssiList = ();
     my %rssiH;
     my @io;
