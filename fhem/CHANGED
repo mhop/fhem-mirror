@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCam: Change of define-string related to rectime.
+                       Note: see all changes of rectime usage in commandref 
+                       or in Forum:
+                       .../index.php/topic,45671.msg391664.html#msg391664
   - added:   98_count: count devices specified by devspec or all
   - bugfix:  57_CALVIEW: bugfix for started terms
   - feature: 10_KOPP_FC: Receive Mode for dimmer implemented, 
