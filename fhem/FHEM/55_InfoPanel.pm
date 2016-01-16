@@ -1457,6 +1457,7 @@ sub btIP_getURL {
 #
 
 =pod
+=item device
 =begin html
 
 <a name="InfoPanel"></a>

@@ -35,6 +35,7 @@ sub CommandCount($$)
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="count"></a>
