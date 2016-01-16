@@ -1052,6 +1052,7 @@ PRESENCE_ProcessAbortedScan($)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="PRESENCE"></a>
