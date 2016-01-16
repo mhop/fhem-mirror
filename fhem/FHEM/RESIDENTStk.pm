@@ -969,11 +969,14 @@ sub RESIDENTStk_wakeupRun($;$) {
     }
 
     my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
-      localtime( time + $wakeupOffset * 60 );
-    $mon += 01;
+      localtime( time() + $wakeupOffset * 60 );
 
-    $hour = "0" . $hour if ( $hour < 10 );
-    $min  = "0" . $min  if ( $min < 10 );
+    $year += 1900;
+    $mon++;
+    $mon   = "0" . $mon if ( $mon < 10 );
+    $mday  = "0" . $mday  if ( $mday < 10 );
+    $hour  = "0" . $hour if ( $hour < 10 );
+    $min   = "0" . $min  if ( $min < 10 );
 
     my $nowRun = $hour . ":" . $min;
     my $nowRunSec =
@@ -1593,7 +1596,7 @@ sub RESIDENTStk_TimeDiff ($$;$) {
 
 sub RESIDENTStk_Datetime2Timestamp($) {
     my ($datetime) = @_;
-    my $timestamp;
+    my $timestamp = 0;
 
     if ( $datetime =~
 /.*([0-9]{4})-([0-9]{1}|[0-9]{2})-([0-9]{1}|[0-9]{2}).([0-9]{1}|[0-9]{2}):([0-9]{1}|[0-9]{2}):([0-9]{1}|[0-9]{2}).*/
@@ -1612,9 +1615,8 @@ sub RESIDENTStk_Datetime2Timestamp($) {
         $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
     }
     else {
-        Log3 $name, 5,
-          "RESIDENTStk $name: timestamp '$datetime' has wrong format.";
-        $timestamp = timelocal( "00", "00", "00", "01", "01", "1970" );
+        Log3 undef, 5,
+          "RESIDENTStk: timestamp '$datetime' has wrong format.";
     }
 
     return $timestamp;
