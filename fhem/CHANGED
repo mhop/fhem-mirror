@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  FB_CALLLIST: fix "Use of uninitialized value" warnings on startup
   - feature: 2016-01-17 - *** 
                           *** Do not worry about a lot of updates. Many 
                           *** modules were modified only to support the
