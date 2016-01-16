@@ -977,10 +977,11 @@ sub RESIDENTStk_wakeupRun($;$) {
     $mday  = "0" . $mday  if ( $mday < 10 );
     $hour  = "0" . $hour if ( $hour < 10 );
     $min   = "0" . $min  if ( $min < 10 );
+    $sec   = "0" . $sec  if ( $sec < 10 );
 
     my $nowRun = $hour . ":" . $min;
     my $nowRunSec =
-      RESIDENTStk_Datetime2Timestamp( $year . "-"
+      time_str2num( $year . "-"
           . $mon . "-"
           . $mday . " "
           . $hour . ":"
@@ -998,10 +999,10 @@ sub RESIDENTStk_wakeupRun($;$) {
 
     # do not run if wakeupWaitPeriod expiration was not reached yet
     my $expLastRun =
-      RESIDENTStk_Datetime2Timestamp($lastRunTimestamp) - 1 +
+      time_str2num($lastRunTimestamp) - 1 +
       $wakeupOffset * 60 +
       $wakeupWaitPeriod * 60;
-    my $expNextRun = RESIDENTStk_Datetime2Timestamp($nextRunTimestamp) - 1 +
+    my $expNextRun = time_str2num($nextRunTimestamp) - 1 +
       $wakeupWaitPeriod * 60;
     if (   $expLastRun > $nowRunSec
         && $expNextRun < time() )
@@ -1578,8 +1579,8 @@ sub RESIDENTStk_TimeDiff ($$;$) {
         $datetimeOld = "1970-01-01 00:00:00";
     }
 
-    my $timestampNow = RESIDENTStk_Datetime2Timestamp($datetimeNow);
-    my $timestampOld = RESIDENTStk_Datetime2Timestamp($datetimeOld);
+    my $timestampNow = time_str2num($datetimeNow);
+    my $timestampOld = time_str2num($datetimeOld);
     my $timeDiff     = $timestampNow - $timestampOld;
 
     # return seconds
@@ -1592,34 +1593,6 @@ sub RESIDENTStk_TimeDiff ($$;$) {
 
     # return human readable format
     return RESIDENTStk_sec2time( int( $timeDiff + 0.5 ) );
-}
-
-sub RESIDENTStk_Datetime2Timestamp($) {
-    my ($datetime) = @_;
-    my $timestamp = 0;
-
-    if ( $datetime =~
-/.*([0-9]{4})-([0-9]{1}|[0-9]{2})-([0-9]{1}|[0-9]{2}).([0-9]{1}|[0-9]{2}):([0-9]{1}|[0-9]{2}):([0-9]{1}|[0-9]{2}).*/
-      )
-    {
-        my ( $date, $time, $y, $m, $d, $hour, $min, $sec );
-
-        $sec  = $6;
-        $min  = $5;
-        $hour = $4;
-        $d    = $3;
-        $m    = $2;
-        $y    = $1;
-
-        $m -= 01 if ( $m > 0 );
-        $timestamp = timelocal( $sec, $min, $hour, $d, $m, $y );
-    }
-    else {
-        Log3 undef, 5,
-          "RESIDENTStk: timestamp '$datetime' has wrong format.";
-    }
-
-    return $timestamp;
 }
 
 sub RESIDENTStk_sec2time($) {
