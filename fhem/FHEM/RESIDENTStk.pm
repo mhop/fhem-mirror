@@ -945,8 +945,6 @@ sub RESIDENTStk_wakeupRun($;$) {
     my $lastRunTimestamp =
       ReadingsTimestamp( $NAME, "lastRun", "1970-01-01 00:00:00" );
     my $nextRun = ReadingsVal( $NAME, "nextRun", "06:00" );
-    my $nextRunTimestamp =
-      ReadingsTimestamp( $NAME, "nextRun", "1970-01-01 00:00:00" );
     my $wakeupUserdeviceState  = ReadingsVal( $wakeupUserdevice, "state",  0 );
     my $wakeupUserdeviceWakeup = ReadingsVal( $wakeupUserdevice, "wakeup", 0 );
     my $room         = AttrVal( $NAME, "room", 0 );
@@ -995,24 +993,6 @@ sub RESIDENTStk_wakeupRun($;$) {
     else {
         $lastRun = $nextRun;
         Log3 $NAME, 4, "RESIDENTStk $NAME: lastRun = nextRun = $lastRun";
-    }
-
-    # do not run if wakeupWaitPeriod expiration was not reached yet
-    my $expLastRun =
-      time_str2num($lastRunTimestamp) - 1 +
-      $wakeupOffset * 60 +
-      $wakeupWaitPeriod * 60;
-    my $expNextRun = time_str2num($nextRunTimestamp) - 1 +
-      $wakeupWaitPeriod * 60;
-    if (   $expLastRun > $nowRunSec
-        && $expNextRun < time() )
-    {
-        $preventRun = 1;
-    }
-    else {
-        Log3 $NAME, 5,
-"RESIDENTStk $NAME: wakeupWaitPeriod threshold reached (expLastRun=$expLastRun nowRunSec=$nowRunSec expNextRun=$expNextRun localtime="
-          . time() . ")";
     }
 
     my @days = ($wday);
@@ -1100,6 +1080,12 @@ sub RESIDENTStk_wakeupRun($;$) {
 
     #  general conditions to trigger program fulfilled
     else {
+
+      my $expLastRun =
+        time_str2num($lastRunTimestamp) - 1 +
+        $wakeupOffset * 60 +
+        $wakeupWaitPeriod * 60;
+
         if ( !$wakeupMacro ) {
             return "$NAME: missing attribute wakeupMacro";
         }
@@ -1114,10 +1100,9 @@ sub RESIDENTStk_wakeupRun($;$) {
             Log3 $NAME, 3,
 "RESIDENTStk $NAME: Another wake-up program is already being executed for device $wakeupUserdevice, won't trigger $wakeupMacro";
         }
-        elsif ( $preventRun && !$forceRun ) {
+        elsif ( $expLastRun > $nowRunSec && !$forceRun ) {
             Log3 $NAME, 4,
-"RESIDENTStk $NAME: won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastRun (expLastRun=$expLastRun nowRunSec=$nowRunSec expNextRun=$expNextRun localtime="
-              . time() . ")";
+"RESIDENTStk $NAME: won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastRun (expLastRun=$expLastRun > nowRunSec=$nowRunSec)";
         }
         else {
             # conditional enforced wake-up:
