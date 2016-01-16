@@ -989,6 +989,7 @@ sub FB_CALLLIST_returnTableHeader($)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="FB_CALLLIST"></a>
