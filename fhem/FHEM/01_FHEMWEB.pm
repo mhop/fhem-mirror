@@ -2889,6 +2889,7 @@ FW_widgetOverride($$)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="FHEMWEB"></a>

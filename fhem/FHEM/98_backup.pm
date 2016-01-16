@@ -210,6 +210,7 @@ createArchiv($$)
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="backup"></a>

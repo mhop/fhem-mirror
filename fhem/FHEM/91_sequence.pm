@@ -130,6 +130,7 @@ sequence_Undef($$)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="sequence"></a>

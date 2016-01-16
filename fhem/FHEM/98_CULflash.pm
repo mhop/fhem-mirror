@@ -96,6 +96,7 @@ CommandCULflash($$)
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="CULflash"></a>

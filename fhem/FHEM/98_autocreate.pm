@@ -653,6 +653,7 @@ autocreate_Attr(@)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="autocreate"></a>
