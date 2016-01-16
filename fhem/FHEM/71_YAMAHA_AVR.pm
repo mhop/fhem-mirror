@@ -2055,6 +2055,7 @@ YAMAHA_AVR_isModel_DSP($)
 1;
 
 =pod
+=item device
 =begin html
 
 <a name="YAMAHA_AVR"></a>
