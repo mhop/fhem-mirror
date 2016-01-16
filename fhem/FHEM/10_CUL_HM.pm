@@ -5818,7 +5818,6 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
                                 ,"reSent:=$rss");
         #--- remove channel entries that will be replaced
 
-        $peer ="" if($list !~ m/^0[347]$/);
         #empty val since reading will be cumulative
         my $rlName = ($chnhash->{helper}{expert}{raw}?"":".")."RegL_".$list.".".$peer;
         $chnhash->{READINGS}{$rlName}{VAL}="";
