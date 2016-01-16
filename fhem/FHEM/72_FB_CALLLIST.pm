@@ -272,7 +272,7 @@ sub FB_CALLLIST_Notify($$)
             FB_CALLLIST_cleanupList($hash);
 
             # Inform all FHEMWEB clients
-            FB_CALLLIST_updateFhemWebClients($hash);
+            FB_CALLLIST_updateFhemWebClients($hash) if(grep(m/^(?:ATTR|DELETEATTR)$/, @{$d->{CHANGED}}));
             
             # save current list state to file/configDB
             FB_CALLLIST_saveList($hash);
@@ -587,7 +587,7 @@ sub FB_CALLLIST_list2html($;$)
     
     my $ret .= "<table>";
     
-    if(AttrVal($name, "no-heading", "0") eq "0")
+    if(AttrVal($name, "no-heading", "0") eq "0" and defined($FW_ME) and defined($FW_subdir))
     {
         $ret .=" <tr><td>";
         $ret .= '<div class="devType"><a href="'.$FW_ME.$FW_subdir.'?detail='.$name.'">'.$alias.'</a>'.(IsDisabled($name) ? " (disabled)" : "").'</div>' unless($FW_webArgs{"detail"});
