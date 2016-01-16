@@ -5359,6 +5359,7 @@ sub CUL_HM_valvePosUpdt(@) {#update valve position periodically to please valve
 # int32_t result = (((_address << 8) | messageCounter) * 1103515245 + 12345) >> 16;
 #                          4e6d = 20077                        12996205 = C64E6D
 # return (result & 0xFF) + 480;
+Log 1,"General valveUpdate $name";
   if ($tn > ($nextF + 3000)){# missed 20 periods;
     Log3 $name,3,"CUL_HM $name virtualTC timer off by:".int($tn - $nextF);
     $nextF = $tn;
