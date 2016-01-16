@@ -80,6 +80,8 @@ sub HMCCUCHN_Define ($@)
 	my $devtype = shift @a;
 	my $devspec = shift @a;
 
+	return "Invalid or unknown CCU channel name or address" if (! HMCCU_IsValidDevice ($devspec));
+
 	if ($devspec =~ /^(.+)\.([A-Z]{3,3}[0-9]{7,7}:[0-9]+)$/) {
 		# CCU Channel address with interface
 		$hash->{ccuif} = $1;
@@ -116,6 +118,7 @@ sub HMCCUCHN_Define ($@)
 	AssignIoPort ($hash);
 
 	readingsSingleUpdate ($hash, "state", "Initialized", 1);
+	$hash->{ccudevstate} = 'Active';
 
 	return undef;
 }
@@ -328,7 +331,8 @@ sub HMCCUCHN_SetError ($$)
 	my %errlist = (
 	   -1 => 'Channel name or address invalid',
 	   -2 => 'Execution of CCU script failed',
-	   -3 => 'Cannot detect IO device'
+	   -3 => 'Cannot detect IO device',
+	   -4 => 'Device deleted in CCU'
 	);
 
 	if (exists ($errlist{$text})) {
