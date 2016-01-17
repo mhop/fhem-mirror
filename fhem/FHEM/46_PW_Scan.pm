@@ -144,6 +144,7 @@ sub PW_Scan_Parse($$)
 "Cogito, ergo sum.";
 
 =pod
+=item device
 =begin html
 
 <a name="PW_Scan"></a>
@@ -168,6 +169,30 @@ See <a href="#PW_Scan">PW_Scan</a>.
       <br>
   </ul>
   <br>
+</ul>
+
+=end html
+
+=begin html_DE
+
+<a name="PW_Scan"></a>
+<h3>PW_Scan</h3>
+<ul>
+  Das PW_Scan Modul setzt auf das Plugwise-System auf. Es muss zuerst ein Plugwise-Stick angelegt werden. 
+  Siehe <a href="#Plugwise">Plugwise</a>.
+  <br>
+  <a name="PW_Scan define"></a>
+  <br>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; PW_Scan &lt;ShortAddress&gt;</code> <br>
+    <br>
+    <code>&lt;ShortAddress&gt;</code>
+    <ul>
+      gibt die Kurzadresse (die letzten 4 Bytes) des Gerätes an. <br>
+    </ul>
+  <br><br>    
+  </ul>
 </ul>
 
 =end html
