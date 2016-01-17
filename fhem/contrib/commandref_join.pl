@@ -33,7 +33,10 @@ if(!$verify) {
       $modIdx{$l} = "device";
       open(MOD, "$modDir/$of") || die("Cant open $modDir/$l");
       while(my $cl = <MOD>) {
-        $modIdx{$l} = $1 if($cl =~ m/^=item\s*(helper|command|device)/);
+        if($cl =~ m/^=item\s+(helper|command|device)/) {
+          $modIdx{$l} = $1;
+          last;
+        }
       }
       close(MOD);
     }
@@ -124,7 +127,7 @@ sub generateModuleCommandref($$;$)
       $dosMode = 1 if($l =~ m/^=begin html$suffix.*\r/);
       if($l =~ m/^=begin html$suffix$/) {
         $l = <MOD>;    # skip one line, to be able to repeat join+split
-        print "$lang $mod: nonempty line after =begin html ignored\n"
+        print "*** $lang $mod: nonempty line after =begin html ignored\n"
           if($l =~ m/^...*$/);
         $skip = 0; $line++;
 
@@ -159,11 +162,11 @@ sub generateModuleCommandref($$;$)
 EOF
       }
     }
-    print "$lang $mods{$mod}: No a-tag with name=\"$mod\" \n"
+    print "*** $lang $mods{$mod}: No a-tag with name=\"$mod\" \n"
         if(!$suffix && $docCount && !$hasLink && !$noWarnings);
 
     foreach $tag (TAGS) {
-      print("$lang $mods{$mod}: Unbalanced $tag ".
+      print("*** $lang $mods{$mod}: Unbalanced $tag ".
                 "($tagcount{$tag}, last line ok: $llwct{$tag})\n")
         if($tagcount{$tag} && !$noWarnings);
     }
