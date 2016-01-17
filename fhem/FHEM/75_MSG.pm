@@ -157,12 +157,21 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
     # check for advanced options
     if ( $msg =~ s/[\s\t]*O(\[\{.*\}\])[\s\t]*$// ) {
 
+        Log3 $globalDevName, 5, "msg: found options=$1";
+
         # Use JSON module if possible
         eval 'use JSON qw( decode_json ); 1';
         if ( !$@ ) {
-            $advanced = decode_json( Encode::encode_utf8($1) );
-            Log3 $globalDevName, 5,
-              "msg: Advanced options\n" . Dumper($advanced);
+            eval '$advanced = decode_json( Encode::encode_utf8($1) ); 1';
+            if (!$@) {
+                Log3 $globalDevName, 5,
+                  "msg: Decoded advanced options\n" . Dumper($advanced);
+            }
+            else {
+                Log3 $globalDevName, 5,
+                  "msg: Error decoding JSON for advanced options";
+                $advanced = "";
+            }
         }
         else {
             Log3 $globalDevName, 3,
