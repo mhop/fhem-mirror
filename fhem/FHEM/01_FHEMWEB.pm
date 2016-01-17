@@ -2597,7 +2597,8 @@ FW_directNotify($@) # Notify without the event overhead (Forum #31293)
     next if(!$ntfy->{TYPE} ||
             $ntfy->{TYPE} ne "FHEMWEB" ||
             !$ntfy->{inform} ||
-            !$ntfy->{inform}{devices}{$dev});
+            !$ntfy->{inform}{devices}{$dev} ||
+            $ntfy->{inform}{type} ne "status");
     if(!addToWritebuffer($ntfy, 
         FW_longpollInfo($ntfy->{inform}{fmt}, @_)."\n")) {
       my $name = $ntfy->{NAME};
