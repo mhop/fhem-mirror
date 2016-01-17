@@ -41,7 +41,12 @@ if(!$verify) {
       close(MOD);
     }
   }
-  $mods{configDB} = "configDB.pm" if(-f "configDB.pm");
+ 
+  if(-f "configDB.pm") {
+    $mods{configDB}   = "configDB.pm";
+    $modIdx{configDB} = "helper";
+  }
+   
 } else { # check for syntax only
   my $modname = $verify;
   $modname =~ s/^.*[\/\\](?:\d\d_)?(.+).pm$/$1/;
