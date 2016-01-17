@@ -25,6 +25,7 @@ my $updArg;
 my $mainPgm = "/fhem.pl\$";
 my %upd_connecthash;
 my $upd_needJoin;
+my $upd_nChanged;
 
 
 ########################################
@@ -64,11 +65,11 @@ CommandUpdate($$)
         if($arg =~ m/^[-\?\*]/ || $ret);
   $arg = lc($arg) if($arg =~ m/^(check|all|force)$/i);
 
-  $updateInBackground = AttrVal("global","updateInBackground",undef);
+  $updateInBackground = AttrVal("global","updateInBackground",1);
   $updateInBackground = 0 if($arg ne "all");                                   
   $updArg = $arg;
   if($updateInBackground) {
-    CallFn($cl->{NAME}, "ActivateInformFn", $cl, "global");
+    CallFn($cl->{NAME}, "ActivateInformFn", $cl, "log");
     BlockingCall("doUpdateInBackground", {src=>$src,arg=>$arg});
     return "Executing the update the background.";
 
@@ -167,7 +168,6 @@ update_Log2Event($$)
   return if($inLog || $level > $attr{global}{verbose});
   $inLog = 1;
   $text =~ s/\n/ /g; # Multiline text causes havoc in Analyze
-  BlockingInformParent("DoTrigger", ["global", $text, 1], 0);
   BlockingInformParent("Log", [$level, $text], 0);
   $inLog = 0;
 }
@@ -189,6 +189,7 @@ doUpdateLoop($$)
   my ($src, $arg) = @_;
 
   $upd_needJoin = 0;
+  $upd_nChanged = 0;
   if($src =~ m/^http.*/) {
     doUpdate(1,1, $src, $arg);
     HttpUtils_Close(\%upd_connecthash);
@@ -233,7 +234,8 @@ doUpdate($$$$)
   $ctrlFileName =~ m/controls_(.*).txt/;
   my $srcName = $1;
 
-  if(AttrVal("global", "backup_before_update", 0) && $arg ne "check" && $curr==1) {
+  if(AttrVal("global", "backup_before_update", 0) &&
+     $arg ne "check" && $curr==1) {
     my $cmdret = AnalyzeCommand(undef, "backup");
     if ($cmdret !~ m/backup done.*/) {
       uLog 1, "Something went wrong during backup: $cmdret";
@@ -391,7 +393,8 @@ doUpdate($$$$)
     }
   }
 
-  return "" if(!$nChanged);
+  $upd_nChanged += $nChanged;
+  return "" if(!$upd_nChanged);
 
   uLog(1, "");
   if($curr == $max) {
@@ -658,7 +661,7 @@ upd_initRestoreDirs($)
         If this attribute is set (to 1), the update will be executed in a
         background process. The return message is communicated via events, and
         in telnet the inform command is activated, in FHEMWEB the Event
-        Monitor.
+        Monitor. Default is set. Set it to 0 to switch it off.
         </li><br>
 
     <a name="updateNoFileCheck"></a>
@@ -760,7 +763,8 @@ upd_initRestoreDirs($)
         Wenn dieses Attribut gesetzt ist, wird das update Befehl in einem
         separaten Prozess ausgef&uuml;hrt, und alle Meldungen werden per Event
         &uuml;bermittelt. In der telnet Sitzung wird inform, in FHEMWEB wird
-        das Event Monitor aktiviert.
+        das Event Monitor aktiviert. Die Voreinstellung ist an, zum
+        Deaktivieren bitte Attribut auf 0 setzen.
         </li><br>
 
     <a name="updateNoFileCheck"></a>
