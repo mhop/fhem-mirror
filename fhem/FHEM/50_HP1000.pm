@@ -260,7 +260,7 @@ sub HP1000_CGI() {
 1;
 
 =pod
-
+=item device
 =begin html
 
     <p>

@@ -1578,7 +1578,7 @@ sub RESIDENTS_UpdateReadings (@) {
 1;
 
 =pod
-
+=item helper
 =begin html
 
     <p>

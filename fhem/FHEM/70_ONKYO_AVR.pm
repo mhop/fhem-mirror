@@ -1676,7 +1676,7 @@ sub ONKYO_AVR_RClayout() {
 1;
 
 =pod
-
+=item device
 =begin html
 
     <p>

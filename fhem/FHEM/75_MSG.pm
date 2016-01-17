@@ -2351,6 +2351,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="MSG"></a>

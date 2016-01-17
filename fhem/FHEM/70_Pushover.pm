@@ -1184,6 +1184,7 @@ sub Pushover_CGI() {
 ###############################################################################
 
 =pod
+=item device
 =begin html
 
 <a name="Pushover"></a>
