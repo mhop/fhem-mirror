@@ -2819,7 +2819,7 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
 1;
 
 =pod
-
+=item device
 =begin html
 
     <p>

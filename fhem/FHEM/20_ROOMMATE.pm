@@ -1133,7 +1133,7 @@ sub ROOMMATE_StartInternalTimers($$) {
 1;
 
 =pod
-
+=item helper
 =begin html
 
     <p>

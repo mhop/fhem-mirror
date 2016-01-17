@@ -3628,6 +3628,7 @@ sub PHTV_min {
 1;
 
 =pod
+=item device
 =begin html
 
 <a name="PHTV"></a>

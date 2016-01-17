@@ -595,7 +595,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
 1;
 
 =pod
-
+=item helper
 =begin html
 
     <p>
