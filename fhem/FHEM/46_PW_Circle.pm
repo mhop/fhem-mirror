@@ -273,6 +273,7 @@ if ($msg->{type} eq "err") {return undef};
 "Cogito, ergo sum.";
 
 =pod
+=item device
 =begin html
 
 <a name="PW_Circle"></a>
@@ -332,6 +333,73 @@ See <a href="#Plugwise">Plugwise</a>.
     </ul>
     <br><br>
       <b>Example</b> <br>
+    	<ul><code>define Circle_2907CC9 PW_Circle 2907CC9</code></ul>
+      <br>
+  
+  <br>
+</ul>
+
+=end html
+
+=begin html_DE
+
+<a name="PW_Circle"></a>
+<h3>PW_Circles</h3>
+<ul>
+  Das PW_Circles Modul setzt auf das Plugwise-System auf. Es muss zuerst ein Plugwise-Stick angelegt werden. 
+  Siehe <a href="#Plugwise">Plugwise</a>.
+  <br>
+  <a name="PW_Circle define"></a>
+  <br>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; PW_Circle &lt;ShortAddress&gt;</code> <br>
+    <br>
+    <code>&lt;ShortAddress&gt;</code>
+    <ul>
+      gibt die Kurzadresse (die letzten 4 Bytes) des Circles an. <br>
+    </ul>
+  <br><br>    
+  </ul>
+  <b>Set</b>
+  <ul>
+    <code>on / off</code> <br>
+    <ul>
+      Schaltet den Circle ein oder aus<br><br>
+    </ul>
+    <code>on-for-timer / off-for-timer sec</code> <br>
+    <ul>
+      Schaltet den Circle für n Sekunden an oder aus<br><br>
+    </ul>
+    <code>syncTime</code> <br>
+    <ul>
+      Synchronisiert die interne Uhr des Circles mit der lokalen Systemzeit<br><br>
+    </ul>
+    <code>removeNode</code> <br>
+    <ul>
+      Entfernt den Circle aus dem Plugwise-Netzwerk<br><br>
+    </ul>
+    <code>ping</code> <br>
+    <ul>
+      Sendet ein Ping an den Circle und setzt das Reading "ping" im Format "q_in - q_out - pingZeit"<br><br>
+    </ul>
+    <code>status</code> <br>
+    <ul>
+      Liest den aktuellen Status des Circles aus<br><br>
+    </ul>
+    </ul>
+    
+  <br><br>
+  
+  <b>Attribute</b>
+  <ul>
+    <code>interval</code> <br>
+    <ul>
+      Setzt das Abruf-Intervall speziell für diesen einen Circle<br>
+    </ul>
+    </ul>
+    <br><br>
+      <b>Beispiel</b> <br>
     	<ul><code>define Circle_2907CC9 PW_Circle 2907CC9</code></ul>
       <br>
   

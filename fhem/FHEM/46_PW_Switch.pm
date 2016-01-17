@@ -155,6 +155,7 @@ sub PW_Switch_Parse($$)
 "Cogito, ergo sum.";
 
 =pod
+=item device
 =begin html
 
 <a name="PW_Switch"></a>
@@ -178,6 +179,64 @@ See <a href="#PW_Switch">PW_Switch</a>.
     	<code>define PW_Switch_2907CC9 PW_Switch 2907CC9</code>
       <br>
   </ul>
+  <b>Set</b>
+  <ul>
+    <code>syncTime</code> <br>
+    <ul>
+      Syncronises the internal clock of the Circle with your PC's clock<br><br>
+    </ul>
+    <code>removeNode</code> <br>
+    <ul>
+      Removes this device from your Plugwise-network<br><br>
+    </ul>
+    <code>ping</code> <br>
+    <ul>
+      Ping the circle and write the Ping-Runtime to reading "ping" in format "q_in - q_out - pingTime"<br><br>
+    </ul>
+    </ul>
+  <br>
+</ul>
+
+=end html
+
+=begin html_DE
+
+<a name="PW_Switch"></a>
+<h3>PW_Switch</h3>
+<ul>
+  Das PW_Switch Module basiert auf dem Plugwise-System. Es muss zuerst ein Plugwise-Stick angelegt werden. 
+Siehe <a href="#PW_Switch">PW_Switch</a>.
+  <br>
+  <a name="PW_Switch define"></a>
+  <br>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; PW_Switch &lt;ShortAddress&gt;</code> <br>
+    <br>
+    <code>&lt;ShortAddress&gt;</code>
+    <ul>
+      gibt die Kurzadresse (die letzten 4 Bytes) des Circles an. <br>
+    </ul>
+    <br>
+      Beispiel: <br>
+    	<code>define PW_Switch_2907CC9 PW_Switch 2907CC9</code>
+      <br>
+  </ul><br>
+    <b>Set</b>
+  <ul>
+    <code>syncTime</code> <br>
+    <ul>
+      Synchronisiert die interne Uhr des Circles mit der lokalen Systemzeit<br><br>
+    </ul>
+    <code>removeNode</code> <br>
+    <ul>
+      Entfernt den Circle aus dem Plugwise-Netzwerk<br><br>
+    </ul>
+    <code>ping</code> <br>
+    <ul>
+      Sendet ein Ping an den Circle und setzt das Reading "ping" im Format "q_in - q_out - pingZeit"<br><br>
+    </ul>
+    </ul>
   <br>
 </ul>
 

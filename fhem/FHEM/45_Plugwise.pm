@@ -1352,6 +1352,7 @@ sub _pulsecorrection {
 "Cogito, ergo sum.";
 
 =pod
+=item device
 =begin html
 
 <a name="Plugwise"></a>
@@ -1417,6 +1418,78 @@ sub _pulsecorrection {
    <code>showCom</code><br>
       <ul>Writes the complete communication matching a RegEx into the reading "communication"
       (can be viewed in EventMonitor or used with a FileLog)
+      </ul><br><br>      
+  
+  <br>
+</ul>
+
+=end html
+
+=begin html_DE
+
+<a name="Plugwise"></a>
+<h3>Plugwise</h3>
+<ul>
+  Modul für das Plugwise-System.
+  <br>
+  Achtung: Dieses Modul benötigt folgende Perl-Module:
+  <ul><li>Device::SerialPort oder Win32::SerialPort</li>
+  <li>digest:CRC</li></ul>
+  <br><br>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; Plugwise &lt;device&gt; </code><br>
+  </ul>
+    <br>
+      &lt;device&gt; Gibt den COM-Port des Plugwise-Stick an.
+      Unter Linux ist dies im Normalfall /dev/ttyUSBx, wobei x eine fortlaufende Nummer ist. (zB /dev/ttyUSB0)
+      Wobei es unter Linux sinnvoller ist, den Port mittels UDEV-Regeln oder mittels /dev/by-id/ anzugeben.
+      Der Plugwise-Stick läuft fix auf 115200 Baud<br>
+      <br>
+      Beispiel: <br>
+    <code>define myPlugwise Plugwise /dev/ttyPlugwise</code>
+      <br>
+     </ul>
+    <br>
+ 
+  <a name="PLUGWISEset"></a>
+  <b>Set</b>
+  <ul>
+    <code>Scan_Circles</code>
+    <ul>
+        Startet eine Suche nach neuen Geräten und legt diese per Autocreate an.
+    </ul><br><br>
+    <code>syncTime</code>
+    <ul>
+        Syncronisiert die internen RTCs der Geräte mit der aktuellen Systemzeit.
+    </ul><br><br>
+    <code>reOpen</code>
+    <ul>
+        Öffnet den COM-Port neu (zB bei zu vielen Fehlern, nach deren Behebung)
+    </ul><br><br>
+  </ul>
+  <br><br>
+
+  <b>Attribute</b>
+  <ul>
+    <code>circlecount</code><br>
+    <ul>
+      Maximale Anzahl der Geräte, nach denengesucht wird.
+      <br><br>
+      </ul>
+   <code>interval</code><br>
+      <ul>Standard-Abfrageintervall der Circles
+      </ul><br><br>
+   <code>autosync</code><br>
+      <ul>Sendet alle >n< Sekunden ein "syncTime" an alle Geräte
+      </ul><br><br>
+   <code>WattFormat</code><br>
+      <ul>String, mit welchem die Power-Readings formatiert werden 
+      Standard: %0.f
+      </ul><br><br>
+   <code>showCom</code><br>
+      <ul>Schreibt die gesamte Kommunikation (gefiltern nach >regEx<) in das Reading "communication"
+      (Am besten mit FileLog oder dem Eventmonitor anzusehen)
       </ul><br><br>      
   
   <br>
