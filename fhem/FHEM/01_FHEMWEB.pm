@@ -2001,10 +2001,11 @@ FW_style($$)
     FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\">".
           "</script>";
     FW_pO "<div id=\"content\">";
-    my $filter = ($a[2] && $a[2] ne "1") ? $a[2] : ".*";
+    my $filter = ($a[2] && $a[2] ne "log") ? $a[2] : ".*";
     FW_pO "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
-          "&nbsp;&nbsp;<span class='changed'>FHEM log ".
-                "<input id='eventWithLog' type='checkbox'></span>".
+          "&nbsp;&nbsp;<span class='fhemlog'>FHEM log ".
+                "<input id='eventWithLog' type='checkbox'".
+                ($a[2] && $a[2] eq "log" ? " checked":"")."></span>".
           "&nbsp;&nbsp;<button id='eventReset'>Reset</button><br><br>\n";
     FW_pO "<div id=\"console\"></div>";
     FW_pO "</div>";
@@ -2482,7 +2483,7 @@ FW_logInform($$)
     return;
   }
   $msg = FW_htmlEscape($msg);
-  if(!addToWritebuffer($ntfy, "<div class='changed'>$msg</div>") ){
+  if(!addToWritebuffer($ntfy, "<div class='fhemlog'>$msg</div>") ){
     TcpServer_Close($ntfy);
     delete $logInform{$me};
     delete $defs{$me};

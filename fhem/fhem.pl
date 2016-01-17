@@ -139,7 +139,6 @@ sub CommandDisplayAttr($$);
 sub CommandGet($$);
 sub CommandIOWrite($$);
 sub CommandInclude($$);
-sub CommandInform($$);
 sub CommandList($$);
 sub CommandModify($$);
 sub CommandQuit($$);
@@ -333,9 +332,6 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
             Hlp=>"<devspec> <type dependent>,request data from <devspec>" },
   "include" => { Fn=>"CommandInclude",
             Hlp=>"<filename>,read the commands from <filenname>" },
-  "inform" => { Fn=>"CommandInform",
-            ClientFilter => "telnet",
-            Hlp=>"{on|off|raw|timer|status},echo all events to this client" },
   "iowrite" => { Fn=>"CommandIOWrite",
             Hlp=>"<iodev> <data>,write raw data with iodev" },
   "list"    => { Fn=>"CommandList",
@@ -498,7 +494,7 @@ if(time() < 2*3600) {
 require RTypes;
 RTypes_Initialize();
 
-my $cfgErrMsg = "Error messages while initializing FHEM:";
+my $cfgErrMsg = "Messages collected while initializing FHEM:";
 my $cfgRet="";
 if(configDBUsed()) {
   my $ret = cfgDB_ReadAll(undef);
@@ -838,7 +834,11 @@ Log3($$$)
 
   no strict "refs";
   foreach my $li (keys %logInform) {
-    &{$logInform{$li}}($li, "$tim $loglevel : $text");
+    if($defs{$li}) {
+      &{$logInform{$li}}($li, "$tim $loglevel : $text");
+    } else {
+      delete $logInform{$li};
+    }
   }
   use strict "refs";
 
@@ -2635,40 +2635,6 @@ CommandTrigger($$)
     }
   }
   return join("\n", @rets);
-}
-
-#####################################
-sub
-CommandInform($$)
-{
-  my ($cl, $param) = @_;
-
-  return if(!$cl);
-  my $name = $cl->{NAME};
-
-  return "Usage: inform {on|timer|raw|off} [regexp]"
-        if($param !~ m/^(on|off|raw|timer|status)/);
-
-  if($param eq "status") {
-    my $i = $inform{$name};
-    return $i ? ($i->{type} . ($i->{regexp} ? " ".$i->{regexp} : "")) : "off";
-  }
-
-  delete($inform{$name});
-  if($param !~ m/^off/) {
-    my ($type, $regexp) = split(" ", $param);
-    $inform{$name}{NR} = $cl->{NR};
-    $inform{$name}{type} = $type;
-    if($regexp) {
-      eval { "Hallo" =~ m/$regexp/ };
-      return "Bad regexp: $@" if($@);
-      $inform{$name}{regexp} = $regexp;
-    }
-    Log 4, "Setting inform to $param";
-
-  }
-
-  return undef;
 }
 
 #####################################

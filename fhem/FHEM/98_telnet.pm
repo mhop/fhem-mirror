@@ -26,11 +26,14 @@ telnet_Initialize($)
                         "encoding:utf8,latin1 sslVersion";
   $hash->{ActivateInformFn} = "telnet_ActivateInform";
 
-  my %lhash = ( Fn=>"CommandTelnetEncoding",
-                ClientFilter => "telnet",
-                Hlp=>"[utf8|latin1],query and set the character encoding ".
-                                "for the current telnet session" );
-  $cmds{encoding} = \%lhash;
+  $cmds{encoding} = { Fn=>"CommandTelnetEncoding",
+            ClientFilter => "telnet",
+            Hlp=>"[utf8|latin1],query and set the character encoding ".
+                            "for the current telnet session" };
+
+  $cmds{inform} = { Fn=>"CommandTelnetInform",
+          ClientFilter => "telnet",
+          Hlp=>"{on|off|log|raw|timer|status},echo all events to this client" };
 }
 
 sub
@@ -348,16 +351,59 @@ sub
 telnet_Undef($$)
 {
   my ($hash, $arg) = @_;
+  delete($logInform{$hash->{NAME}});
+  delete($inform{$hash->{NAME}});
   return TcpServer_Close($hash);
 }
 
+#####################################
 sub
-telnet_ActivateInform($;$)
+CommandTelnetInform($$)
 {
-  my ($cl, $arg) = @_;
+  my ($cl, $param) = @_;
+
+  return if(!$cl);
   my $name = $cl->{NAME};
-  $arg = "" if(!defined($arg));
-  CommandInform($cl, "timer $arg") if(!$inform{$name});
+
+  return "Usage: inform {on|off|raw|timer|log|status} [regexp]"
+        if($param !~ m/^(on|off|raw|timer|log|status)/);
+
+  if($param eq "status") {
+    my $i = $inform{$name};
+    return $i ? ($i->{type} . ($i->{regexp} ? " ".$i->{regexp} : "")) : "off";
+  }
+
+  if($param eq "off") {
+    delete($logInform{$name});
+    delete($inform{$name});
+
+  } elsif($param eq "log") {
+    $logInform{$name} = sub($$){
+      my ($me, $msg) = @_; # _NO_ Log3 here!
+      telnet_Output($defs{$me}, $msg."\n");
+    }
+    
+  } elsif($param ne "off") {
+    my ($type, $regexp) = split(" ", $param);
+    $inform{$name}{NR} = $cl->{NR};
+    $inform{$name}{type} = $type;
+    if($regexp) {
+      eval { "Hallo" =~ m/$regexp/ };
+      return "Bad regexp: $@" if($@);
+      $inform{$name}{regexp} = $regexp;
+    }
+    Log 4, "Setting inform to $param";
+
+  }
+
+  return undef;
+}
+
+sub
+telnet_ActivateInform($)
+{
+  my ($cl) = @_;
+  CommandTelnetInform($cl, "log");
 }
 
 

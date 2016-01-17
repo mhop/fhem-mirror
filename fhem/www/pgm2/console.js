@@ -65,6 +65,7 @@ consStart()
   if(consFilter == undefined)
     consFilter = ".*";
   oldFilter = consFilter;
+  withLog = ($("#eventWithLog").is(':checked') ? 1 : 0);
   setTimeout(consFill, 1000);
   
    $("#eventReset").click(function(evt){  // Event Monitor Reset
