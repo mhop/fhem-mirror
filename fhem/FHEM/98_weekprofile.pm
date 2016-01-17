@@ -22,6 +22,8 @@ my @shortDays = ("Mon","Tue","Wed","Thu","Fri","Sat","Sun");
 
 my @DEVLIST_SEND = ("MAX","CUL_HM","weekprofile","dummy");
 
+my $CONFIG_VERSION = "1.1";
+
 my %DEV_READINGS;
 # MAX
 $DEV_READINGS{"Mon"}{"MAX"} = "weekprofile-2-Mon";
@@ -312,6 +314,7 @@ sub weekprofile_assignDev($)
     
       $prf = {};
       $prf->{NAME} = 'master';
+      $prf->{TOPIC} = 'default';
           
       if(defined($prfDev)) {
         $prf->{DATA} = $prfDev;
@@ -329,6 +332,7 @@ sub weekprofile_assignDev($)
       $prf = {};
       $prf->{DATA} = $prfDev;
       $prf->{NAME} = 'default';
+      $prf->{TOPIC} = 'default';
     }
     $hash->{STATE} = "created";
   }
@@ -433,12 +437,20 @@ sub weekprofile_Get($$@)
   $list = substr($list, 0, -1) if ($prfCnt > 0);
 
   if($cmd eq "profile_data") {
+    return 'usage: profile_data <name>' if(@params < 1);
     return "no profile" if ($prfCnt <= 0);
-
-    my ($prf,$idx) = weekprofile_findPRF($hash,$params[0]);
-    return "profile $params[0] not found" unless ($prf);
     
-    my $json = JSON->new;    
+    my ($topic, $name) = weekprofile_splitName($params[0]);
+
+    my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic);
+    return "profile $params[0] not found" unless ($prf);
+
+    if (defined($prf->{REF})) {
+      ($topic, $name) = weekprofile_splitName($prf->{REF});
+      ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic);
+    }
+    
+    my $json = JSON->new;
     my $json_text = $json->encode($prf->{DATA});
     return $json_text;
   } 
@@ -465,12 +477,15 @@ sub weekprofile_Get($$@)
 ############################################## 
 sub weekprofile_findPRF(@)
 {
-  my ($hash, $profile) = @_;
+  my ($hash, $name, $topic) = @_;
+  
+  $topic = 'default' if (!$topic);
   
   my $found = undef;
   my $idx = 0;
+    
   foreach my $prf (@{$hash->{PROFILES}}){
-    if ( $prf->{NAME} eq $profile){
+    if ( ($prf->{NAME} eq $name) && ($prf->{TOPIC} eq $topic) ){
       $found = $prf;
       last;
     }
@@ -479,6 +494,17 @@ sub weekprofile_findPRF(@)
   $idx = -1 if (!defined($found));
   
   return ($found,$idx);
+}
+
+############################################## 
+sub weekprofile_splitName($)
+{
+  my ($in) = @_;
+  
+  my @parts = split(':',$in);
+  
+  return ($parts[0],$parts[1]) if (@parts == 2);
+  return ('default',$in);
 }
 ############################################## 
 sub weekprofile_Set($$@)
@@ -492,30 +518,34 @@ sub weekprofile_Set($$@)
   if ($cmd eq 'profile_data') {
     return 'usage: profile_data <name> <json data>' if(@params < 2);
     
+    my ($topic, $name) = weekprofile_splitName($params[0]);
+    my $jsonData = $params[1];
+
     my $json = JSON->new;
     my $data = undef;
-    eval { $data = $json->decode($params[1]); };
+    eval { $data = $json->decode($jsonData); };
     if ($@) {
       Log3 $me, 1, "$me(Set): Error parsing profile data.";
       return "Error parsing profile data. No valid json format";
     };
     
-    foreach my $prf (@{$hash->{PROFILES}}){
-      if ( $prf->{NAME} eq $params[0]){
-        $prf->{DATA} = $data;
-        # automatic we send master profile to master device
-        if ( ($params[0] eq "master") && defined($hash->{MASTERDEV}) ){
-          weekprofile_sendDevProfile($hash->{MASTERDEV}->{NAME},$prf,$me);
-        } else {
-          weekprofile_writeProfilesToFile($hash);
-        }
-        return undef;
+    my ($found,$idx) = weekprofile_findPRF($hash,$name,$topic);
+    if (defined($found)) {
+      $found->{DATA} = $data;
+      # automatic we send master profile to master device
+      if ( ($name eq "master") && defined($hash->{MASTERDEV}) ){
+        weekprofile_sendDevProfile($hash->{MASTERDEV}->{NAME},$found,$me);
+      } else {
+        weekprofile_writeProfilesToFile($hash);
       }
+      return undef;
     }
-    
+
     my $prfNew = {};
-    $prfNew->{NAME} = $params[0];
+    $prfNew->{NAME} = $name;
     $prfNew->{DATA} = $data;
+    $prfNew->{TOPIC} = $topic;
+    
     push @{$hash->{PROFILES}}, $prfNew;
     weekprofile_updateReadings($hash);
     weekprofile_writeProfilesToFile($hash);
@@ -525,9 +555,9 @@ sub weekprofile_Set($$@)
   $list.= ' send_to_device' if ($prfCnt > 0);
   
   if ($cmd eq 'send_to_device') {
-    return 'usage: send_to_device <profile name> [device(s)]' if(@params < 1);
+    return 'usage: send_to_device <name> [device(s)]' if(@params < 1);
     
-    my $profile = $params[0];
+    my ($topic, $name) = weekprofile_splitName($params[0]);
     
     my @devices = ();
     if (@params == 2) {
@@ -538,10 +568,10 @@ sub weekprofile_Set($$@)
     
     return "Error no devices given and no master device" if (@devices == 0);
     
-    my ($found,$idx) = weekprofile_findPRF($hash,$profile);
+    my ($found,$idx) = weekprofile_findPRF($hash,$name,$topic);
     if (!defined($found)) {
-      Log3 $me, 1, "$me(Set): Error unknown profile $profile";
-      return "Error unknown profile $profile";
+      Log3 $me, 1, "$me(Set): Error unknown profile $params[0]";
+      return "Error unknown profile $params[0]";
     }
     
     my $err = '';
@@ -559,13 +589,14 @@ sub weekprofile_Set($$@)
   if ($cmd eq 'copy_profile') {
     return 'usage: copy_profile <source> <target>' if(@params < 2);
     
-    my $srcName = $params[0];
-    my $destName= $params[1];
+    my ($srcTopic, $srcName) = weekprofile_splitName($params[0]);
+    my ($destTopic, $destName) = weekprofile_splitName($params[1]);
+    
     my $prfSrc = undef;
     my $prfDest = undef;
     foreach my $prf (@{$hash->{PROFILES}}){
-      $prfSrc = $prf if ($prf->{NAME} eq $srcName);
-      $prfDest = $prf if ($prf->{NAME} eq $destName);
+      $prfSrc = $prf if ( ($prf->{NAME} eq $srcName) && ($prf->{TOPIC} eq $srcTopic) );
+      $prfDest = $prf if ( ($prf->{NAME} eq $destName) && ($prf->{TOPIC} eq $destTopic) );
     }
     return "Error unknown profile $srcName" unless($prfSrc);
     Log3 $me, 4, "$me(Set): override profile $destName" if ($prfDest);
@@ -576,6 +607,40 @@ sub weekprofile_Set($$@)
       $prfDest = {};
       $prfDest->{NAME} = $destName;
       $prfDest->{DATA} = $prfSrc->{DATA};
+      $prfDest->{TOPIC} = $destTopic;
+      push @{$hash->{PROFILES}}, $prfDest;
+    }
+    weekprofile_writeProfilesToFile($hash);
+    weekprofile_updateReadings($hash);
+    return undef;
+  }
+  
+  #----------------------------------------------------------
+  $list.= " reference_profile";
+  if ($cmd eq 'reference_profile') {
+    return 'usage: copy_profile <source> <target>' if(@params < 2);
+    
+    my ($srcTopic, $srcName) = weekprofile_splitName($params[0]);
+    my ($destTopic, $destName) = weekprofile_splitName($params[1]);
+    
+    my $prfSrc = undef;
+    my $prfDest = undef;
+    foreach my $prf (@{$hash->{PROFILES}}){
+      $prfSrc = $prf if ( ($prf->{NAME} eq $srcName) && ($prf->{TOPIC} eq $srcTopic) );
+      $prfDest = $prf if ( ($prf->{NAME} eq $destName) && ($prf->{TOPIC} eq $destTopic) );
+    }
+    return "Error unknown profile $srcName" unless($prfSrc);
+    Log3 $me, 4, "$me(Set): override profile $destName" if ($prfDest);
+    
+    if ($prfDest){
+      $prfDest->{DATA} = undef;
+      $prfDest->{REF} = "$destTopic:$destName";
+    } else {
+      $prfDest = {};
+      $prfDest->{NAME} = $destName;
+      $prfDest->{DATA} = undef;
+      $prfDest->{TOPIC} = $destTopic;
+      $prfDest->{REF} = "$destTopic:$destName";
       push @{$hash->{PROFILES}}, $prfDest;
     }
     weekprofile_writeProfilesToFile($hash);
@@ -590,7 +655,9 @@ sub weekprofile_Set($$@)
     return 'Error master profile can not removed' if( ($params[0] eq "master") && defined($hash->{MASTERDEV}) );
     return 'Error Remove last profile is not allowed' if(scalar(@{$hash->{PROFILES}}) == 1);
     
-    my ($delprf,$idx)  = weekprofile_findPRF($hash,$params[0]);
+    my ($topic, $name) = weekprofile_splitName($params[0]);
+    
+    my ($delprf,$idx)  = weekprofile_findPRF($hash,$name,$topic);
     return "Error unknown profile $params[0]" unless($delprf);
     
     splice(@{$hash->{PROFILES}},$idx, 1);
@@ -707,10 +774,12 @@ sub weekprofile_writeProfilesToFile(@)
     return;
   }
   
+  print $fh "__version__=".$CONFIG_VERSION."\n";  
+  
   Log3 $me, 5, "$me(writeProfileToFile): write profiles to $filename";
   my $json = JSON->new;
   for (my $i = $start; $i < $prfCnt; $i++) {
-    print $fh $hash->{PROFILES}[$i]->{NAME}."=".$json->encode($hash->{PROFILES}[$i]->{DATA})."\n";
+    print $fh "entry=".$json->encode($hash->{PROFILES}[$i])."\n";
   }  
   close $fh;
 }
@@ -738,6 +807,7 @@ sub weekprofile_readProfilesFromFile(@)
   
   my $json = JSON->new;  
   my $rowCnt = 0;
+  my $version = undef;
   while (my $row = <$fh>) {
     chomp $row;    
     Log3 $me, 5, "$me(readProfilesFromFile): data row $row";
@@ -746,23 +816,52 @@ sub weekprofile_readProfilesFromFile(@)
       Log3 $me, 1, "$me(readProfilesFromFile): incorrect data row";
       next;
     }
-    my $prfData=undef;
-    eval { $prfData = $json->decode($data[1]); };
-    if ($@) {
-      Log3 $me, 1, "$me(readProfilesFromFile): Error parsing profile data $data[1]";
+    
+    if ($rowCnt == 0 && $data[0]=~/__version__/) {
+      $version=$data[1] * 1;
+      Log3 $me, 5, "$me(readProfilesFromFile): detect version $version";
       next;
-    };
-    
-    my $prfNew = {};
-    $prfNew->{NAME} = $data[0];
-    $prfNew->{DATA} = $prfData;
-    
-    if (!$hash->{MASTERDEV} && $rowCnt == 0) {
-      $hash->{PROFILES}[0] = $prfNew; # replace default
-    } else {
-      push @{$hash->{PROFILES}}, $prfNew;
     }
-    $rowCnt++;
+    
+    if (!$version || $version < 1.1) {
+      my $prfData=undef;
+      eval { $prfData = $json->decode($data[1]); };
+      if ($@) {
+        Log3 $me, 1, "$me(readProfilesFromFile): Error parsing profile data $data[1]";
+        next;
+      };
+          
+      my $prfNew = {};
+      $prfNew->{NAME} = $data[0];
+      $prfNew->{DATA} = $prfData;
+      $prfNew->{TOPIC} = 'default';
+      
+      if (!$hash->{MASTERDEV} && $rowCnt == 0) {
+        $hash->{PROFILES}[0] = $prfNew; # replace default
+      } else {
+        push @{$hash->{PROFILES}}, $prfNew;
+      }
+      $rowCnt++;
+    } #----------------------------------------------------- 1.1
+    elsif ($version = 1.1) {
+      my $prfNew=undef;
+      eval { $prfNew = $json->decode($data[1]); };
+      if ($@) {
+        Log3 $me, 1, "$me(readProfilesFromFile): Error parsing profile data $data[1]";
+        next;
+      };
+      
+      if (!$hash->{MASTERDEV} && $rowCnt == 0) {
+        $hash->{PROFILES}[0] = $prfNew; # replace default
+      } else {
+        push @{$hash->{PROFILES}}, $prfNew;
+      }
+      $rowCnt++;
+    } else {
+      Log3 $me, 1, "$me(readProfilesFromFile): Error unknown version $version";
+      close $fh;
+      return;
+    }
   }  
   close $fh;
 }
@@ -878,6 +977,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
 1;
 
 =pod
+=item helper
 
 =begin html_de
 
