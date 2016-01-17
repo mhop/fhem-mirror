@@ -634,13 +634,13 @@ sub weekprofile_Set($$@)
     
     if ($prfDest){
       $prfDest->{DATA} = undef;
-      $prfDest->{REF} = "$destTopic:$destName";
+      $prfDest->{REF} = "$srcTopic:$srcName";
     } else {
       $prfDest = {};
       $prfDest->{NAME} = $destName;
       $prfDest->{DATA} = undef;
       $prfDest->{TOPIC} = $destTopic;
-      $prfDest->{REF} = "$destTopic:$destName";
+      $prfDest->{REF} = "$srcTopic:$srcName";
       push @{$hash->{PROFILES}}, $prfDest;
     }
     weekprofile_writeProfilesToFile($hash);
@@ -1037,6 +1037,11 @@ sub weekprofile_getEditLNK_MasterDev($$)
       <code>set &lt;name&gt; remove_profile &lt;profilname&gt; </code><br>
       Das Profil 'profilname' wird gelöscht.
     </li>
+    <li>reference_profile<br>
+      <code>set &lt;name&gt; reference_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
+      Referenziert das Profil 'ziel'auf 'quelle'. 'ziel' wird überschrieben oder neu angelegt.
+      <b>Noch in Entwicklung !!!</b>
+    </li>
   </ul>
   
   <a name="weekprofileget"></a>
@@ -1135,6 +1140,11 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>remove_profile<br>
       <code>set &lt;name&gt; remove_profile &lt;profilename&gt; </code><br>
       Delete profile 'profilename'.
+    </li>
+    <li>reference_profile<br>
+      <code>set &lt;name&gt; reference_profile &lt;source&gt; &lt;destination&gt; </code><br>
+      Create a reference from destination to source. The destination will be overwritten if it exits.
+      <b>Still in devolopment!!!</b>
     </li>
   </ul>
   
