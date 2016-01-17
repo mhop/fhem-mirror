@@ -429,6 +429,7 @@ LIGHTIFY_Parse($$)
       my $g = (substr($hex,$i*$offset*2+2*34,2*1));
       my $b = (substr($hex,$i*$offset*2+2*35,2*1));
       my $alias = pack('H*', substr($hex,$i*$offset*2+2*37,2*16));
+      $alias =~ s/\x00//g;
 
       my $has_w = (hex($type) & 0x02) ? 1: 0;
       my $has_rgb = (hex($type) & 0x08) ? 1 : 0;
