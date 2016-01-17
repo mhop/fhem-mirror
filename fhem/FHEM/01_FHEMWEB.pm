@@ -111,6 +111,7 @@ my $FW_jsonp;      # jasonp answer (sending function calls to the client)
 my $FW_headerlines; #
 my $FW_chash;      # client fhem hash
 my $FW_encoding="UTF-8";
+my $FW_styleStamp=time();
 
 
 #####################################
@@ -806,7 +807,7 @@ FW_answerCall($)
   ########################
   # CSS
   my $cssTemplate = "<link href=\"$FW_ME/%s\" rel=\"stylesheet\"/>";
-  FW_pO sprintf($cssTemplate, "pgm2/style.css");
+  FW_pO sprintf($cssTemplate, "pgm2/style.css?v=$FW_styleStamp");
   FW_pO sprintf($cssTemplate, "pgm2/jquery-ui.min.css");
   map { FW_pO sprintf($cssTemplate, $_); }
                         split(" ", AttrVal($FW_wname, "CssFiles", ""));
@@ -1904,6 +1905,8 @@ FW_style($$)
     } else {
       CommandAttr(undef, "$FW_wname stylesheetPrefix $a[2]");
     }
+    $FW_styleStamp = time();
+    $FW_RET =~ s,/style.css\?v=\d+,/style.css?v=$FW_styleStamp,;
     FW_pO "${start}Reload the page in the browser.$end";
 
   } elsif($a[1] eq "edit") {
