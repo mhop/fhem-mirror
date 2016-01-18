@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.7    18.01.2016    Attribute "httptimeout" added
 # 1.6    16.01.2016    Change the define-string related to rectime.
 #                      Note: See all changes to rectime usage in commandref or here:
 #                      http://forum.fhem.de/index.php/topic,45671.msg391664.html#msg391664
@@ -72,7 +73,8 @@ sub SSCam_Initialize($) {
  $hash->{AttrFn}    = "SSCam_Attr";
  
  
- $hash->{AttrList} = 
+ $hash->{AttrList} =
+         "httptimeout ".
          "pollcaminfoall ".
          "pollnologging:1,0 ".
          "rectime ".
@@ -131,7 +133,7 @@ sub SSCam_Define {
   RemoveInternalTimer($hash);                                                                     # alle evtl. noch laufenden Timer löschen
   
   
-  # Subroutine Watchdog-Timer für Polling Kamera-Infos starten, verzögerter zufälliger Start 0-60s (Vermeidung v. Überschneidungen)
+  # Subroutine Watchdog-Timer starten (sollen Cam-Infos abgerufen werden ?), verzögerter zufälliger Start 0-60s 
   InternalTimer(gettimeofday()+int(rand(60)), "watchdogpollcaminfo", $hash, 0);
 
   
@@ -156,6 +158,9 @@ sub SSCam_Attr {
            }
         if ($aName eq "rectime") {
            unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 0-9 without decimal places !";}
+           }
+        if ($aName eq "httptimeout") {
+           unless ($aVal =~ /^[0-9]+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
            }            
    }
 return undef;
@@ -414,7 +419,7 @@ sub camstoprec ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.1, "camstoprec", $hash, 0);
+    InternalTimer(gettimeofday()+0.2, "camstoprec", $hash, 0);
     }
 }
 
@@ -459,7 +464,7 @@ sub camsnap ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.1, "camsnap", $hash, 0);
+    InternalTimer(gettimeofday()+0.3, "camsnap", $hash, 0);
     }    
 }
 
@@ -486,7 +491,7 @@ sub camenable ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.2, "camenable", $hash, 0);
+    InternalTimer(gettimeofday()+0.4, "camenable", $hash, 0);
     }    
 }
 
@@ -513,7 +518,7 @@ sub camdisable ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.2, "camdisable", $hash, 0);
+    InternalTimer(gettimeofday()+0.4, "camdisable", $hash, 0);
     }    
 }
 
@@ -536,7 +541,7 @@ sub getcaminfoall ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.3, "getcaminfoall", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "getcaminfoall", $hash, 0);
     }
     
     if (defined(AttrVal($name, "pollcaminfoall", undef)) and AttrVal($name, "pollcaminfoall", undef) > 10) {
@@ -575,7 +580,7 @@ sub getcaminfo ($) {
       }
     else
     {
-        InternalTimer(gettimeofday()+0.5, "getcaminfo", $hash, 0);
+        InternalTimer(gettimeofday()+0.6, "getcaminfo", $hash, 0);
     }
     
 }
@@ -601,7 +606,7 @@ sub getcapabilities ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.5, "getcapabilities", $hash, 0);
+        InternalTimer(gettimeofday()+0.7, "getcapabilities", $hash, 0);
     }
     
 }
@@ -633,7 +638,7 @@ sub getptzlistpreset ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.5, "getptzlistpreset", $hash, 0);
+        InternalTimer(gettimeofday()+0.8, "getptzlistpreset", $hash, 0);
     }
     
 }
@@ -666,7 +671,7 @@ sub getptzlistpatrol ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.5, "getptzlistpatrol", $hash, 0);
+        InternalTimer(gettimeofday()+0.9, "getptzlistpatrol", $hash, 0);
     }
     
 }
@@ -690,6 +695,7 @@ sub getapisites_nonbl {
    my ($hash) = @_;
    my $serveraddr  = $hash->{SERVERADDR};
    my $serverport  = $hash->{SERVERPORT};
+   my $name        = $hash->{NAME};
    my $apiinfo     = $hash->{HELPER}{APIINFO};                         # Info-Seite für alle API's, einzige statische Seite !
    my $apiauth     = $hash->{HELPER}{APIAUTH};                         # benötigte API-Pfade für Funktionen,  
    my $apiextrec   = $hash->{HELPER}{APIEXTREC};                       # in der Abfrage-Url an Parameter "&query="
@@ -699,18 +705,25 @@ sub getapisites_nonbl {
    my $logstr;
    my $url;
    my $param;
+   my $httptimeout;
   
    #### API-Pfade und MaxVersions ermitteln #####
    # Logausgabe
    $logstr = "--- Begin Function getapisites nonblocking ---";
    &printlog($hash,$logstr,"4");
    
+   $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+   # Logausgabe
+   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
+   &printlog($hash,$logstr,"5");
+
+   
    # URL zur Abfrage der Eigenschaften der  API's
    $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz";
    
    $param = {
                url      => $url,
-               timeout  => 10,
+               timeout  => $httptimeout,
                hash     => $hash,
                method   => "GET",
                header   => "Accept: application/json",
@@ -729,7 +742,7 @@ sub getapisites_nonbl {
 sub login_nonbl ($) {
    my ($param, $err, $myjson) = @_;
    my $hash        = $param->{hash};
-   my $device      = $hash->{NAME};
+   my $name        = $hash->{NAME};
    my $serveraddr  = $hash->{SERVERADDR};
    my $serverport  = $hash->{SERVERPORT};
    my $username    = $hash->{HELPER}{USERNAME};
@@ -754,6 +767,7 @@ sub login_nonbl ($) {
    my $apiptzpath;
    my $apiptzmaxver;
    my $error;
+   my $httptimeout;
   
     # Verarbeitung der asynchronen Rückkehrdaten aus sub "getapisites_nonbl"
     if ($err ne "")                                                                                    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -822,12 +836,10 @@ sub login_nonbl ($) {
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apicampath =~ tr/_//d if (defined($apicampath));
                         $apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
-                        # um 1 verringern - Fehlerprävention
-                        if (defined $apicammaxver) {$apicammaxver -= 1};
-       
+                               
                         $logstr = defined($apicampath) ? "Path of $apicam selected: $apicampath" : "Path of $apicam undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4");
-                        $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apicam (optimized): $apicammaxver" : "MaxVersion of $apicam undefined - Surveillance Station may be stopped";
+                        $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apicam: $apicammaxver" : "MaxVersion of $apicam undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4");
        
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.SnapShot" ermitteln
@@ -906,13 +918,18 @@ sub login_nonbl ($) {
   # Login und SID ermitteln
   # Logausgabe
   $logstr = "--- Begin Function serverlogin nonblocking ---";
-  &printlog($hash,$logstr,"4");  
+  &printlog($hash,$logstr,"4");
+  
+  $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+  # Logausgabe
+  $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
+  &printlog($hash,$logstr,"5");  
  
-  $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=\"sid\""; 
+  $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\""; 
   
   $param = {
                url      => $url,
-               timeout  => 10,
+               timeout  => $httptimeout,
                hash     => $hash,
                method   => "GET",
                header   => "Accept: application/json",
@@ -933,6 +950,7 @@ sub getcamid_nonbl ($) {
   
    my ($param, $err, $myjson) = @_;
    my $hash         = $param->{hash};
+   my $name         = $hash->{NAME};
    my $serveraddr   = $hash->{SERVERADDR};
    my $serverport   = $hash->{SERVERPORT};
    my $username     = $hash->{HELPER}{USERNAME};
@@ -946,8 +964,7 @@ sub getcamid_nonbl ($) {
    my $sid;
    my $error;
    my $errorcode;
-   
-   
+   my $httptimeout;  
   
    # Verarbeitung der asynchronen Rückkehrdaten aus sub "login_nonbl"
    if ($err ne "")                                                                                      # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -1037,12 +1054,19 @@ sub getcamid_nonbl ($) {
   $logstr = "--- Begin Function getcamid nonblocking ---";
   &printlog($hash,$logstr,"4");
   
+  $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+  # Logausgabe
+  $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
+  &printlog($hash,$logstr,"5");  
+  
   # einlesen aller Kameras - Auswertung in Rückkehrfunktion "camop_nonbl"
+  # $apicammaxver um 1 verringern - Issue in API !
+  if (defined $apicammaxver) {$apicammaxver -= 1};
   $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&_sid=\"$sid\"";
 
   $param = {
                url      => $url,
-               timeout  => 10,
+               timeout  => $httptimeout,
                hash     => $hash,
                method   => "GET",
                header   => "Accept: application/json",
@@ -1062,6 +1086,7 @@ sub getcamid_nonbl ($) {
 sub camop_nonbl ($) {  
    my ($param, $err, $myjson) = @_;
    my $hash              = $param->{hash};
+   my $name              = $hash->{NAME};
    my $serveraddr        = $hash->{SERVERADDR};
    my $serverport        = $hash->{SERVERPORT};
    my $camname           = $hash->{CAMNAME};
@@ -1090,8 +1115,9 @@ sub camop_nonbl ($) {
    my $camcount;
    my $i;
    my %allcams;
-   my $name;
+   my $n;
    my $id;
+   my $httptimeout;
   
    # Verarbeitung der asynchronen Rückkehrdaten aus sub "getcamid_nonbl"
    if ($err ne "")                                                                         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -1112,8 +1138,6 @@ sub camop_nonbl ($) {
    {
         $logstr = "URL-Call: ".$param->{url};                                                          
         &printlog($hash,$logstr,"4");                                          
-         
-        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson 
         
         # Evaluiere ob Daten im JSON-Format empfangen wurden, Achtung: sehr viele Daten mit verbose=5
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
@@ -1136,9 +1160,9 @@ sub camop_nonbl ($) {
              %allcams = ();
              while ($i < $camcount) 
                  {
-                 $name = $data->{'data'}->{'cameras'}->[$i]->{'name'};
+                 $n = $data->{'data'}->{'cameras'}->[$i]->{'name'};
                  $id = $data->{'data'}->{'cameras'}->[$i]->{'id'};
-                 $allcams{"$name"} = "$id";
+                 $allcams{"$n"} = "$id";
                  $i += 1;
                  }
              
@@ -1207,6 +1231,11 @@ sub camop_nonbl ($) {
    $logstr = "--- Begin Function cam: $OpMode nonblocking ---";
    &printlog($hash,$logstr,"4");
 
+   $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+   # Logausgabe
+   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
+   &printlog($hash,$logstr,"5");
+   
    if ($OpMode eq "Start") 
    {
       # die Aufnahme wird gestartet, Rückkehr wird mit "camret_nonbl" verarbeitet
@@ -1236,7 +1265,7 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "Getcaminfo")
    {
-      # Infos einer Kamera werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
+      # Infos einer Kamera werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet  
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=true&streamInfo=true&ptz=true&basic=true&camAppInfo=true&optimize=true&fisheye=true&eventDetection=true&_sid=\"$sid\"";   
    }
    elsif ($OpMode eq "Getptzlistpreset")
@@ -1258,7 +1287,7 @@ sub camop_nonbl ($) {
    
    $param = {
                 url      => $url,
-                timeout  => 10,
+                timeout  => $httptimeout,
                 hash     => $hash,
                 method   => "GET",
                 header   => "Accept: application/json",
@@ -1302,6 +1331,7 @@ sub camret_nonbl ($) {
    my $camStatus;
    my ($presetcnt,$cnt,%allpresets,$presid,$presname,@preskeys,$presetlist);
    my $verbose;
+   my $httptimeout;
    
    # Die Aufnahmezeit setzen
    # wird "set <name> on-for-timer [rectime]" verwendet -> dann [rectime] nutzen, 
@@ -1757,12 +1787,17 @@ sub camret_nonbl ($) {
     # Logausgabe
     $logstr = "--- Begin Function logout nonblocking ---";
     &printlog($hash,$logstr,"4");
+    
+    $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+    # Logausgabe
+    $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
+    &printlog($hash,$logstr,"5");    
   
     $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid"; 
 
     $param = {
                 url      => $url,
-                timeout  => 10,
+                timeout  => $httptimeout,
                 hash     => $hash,
                 method   => "GET",
                 header   => "Accept: application/json",
@@ -2053,7 +2088,11 @@ return;
 
     In that case the command <b>"set &lt;name&gt; on 0"</b> leads also to an endless recording.<br><br>
     
-    If you have specified a pre-recording time in SVS it will be considered too.<br>  
+    If you have specified a pre-recording time in SVS it will be considered too.<br><br>  
+    
+    <b>HTTP-Timeout Settings</b><br><br>
+    All functions of the SSCam-Module are using HTTP-Calls to the SVS Web API. <br>
+    The Default-Value of the HTTP-Timeout amounts 4 seconds. You can set the <a href="#SSCamattr">Attribute</a> "httptimeout" > 0 to adjust the value as needed in your technical environment. <br>
     
   </ul>
   <br><br><br>
@@ -2175,7 +2214,9 @@ return;
 
   If polling is used, the interval should be adjusted only as short as needed due to the detected camera values are predominantly static. <br>
   A feasible guide value for attribute "pollcaminfoall" could be between 600 - 1800 (s). <br>
-  Per polling call and camera approximately 10 - 20 Http-calls will are stepped against Surveillance Station. <br><br>
+  Per polling call and camera approximately 10 - 20 Http-calls will are stepped against Surveillance Station. <br>
+  Because of that if HTTP-Timeout (pls. refer <a href="#SSCamattr">Attribut</a> "httptimeout") is set to 4 seconds, the theoretical processing time couldn't be higher than 80 seconds. <br>
+  Considering a safety margin, in that example you shouldn't set the polling interval lower than 160 seconds. <br><br>
 
   If several Cameras are defined in SSCam, attribute "pollcaminfoall" of every Cameras shouldn't be set exactly to the same value to avoid processing bottlenecks <br>
   and thereby caused potential source of errors during request Synology Surveillance Station. <br>
@@ -2229,6 +2270,8 @@ return;
   <br><br>
   <ul>
   <ul>
+  <li><b>httptimeout</b> - Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" or not set) </li>
+  
   <li><b>pollcaminfoall</b> - Interval of automatic polling the Camera properties (if < 10: no polling, if > 10: polling with interval) </li>
 
   <li><b>pollnologging</b> - "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li>
@@ -2334,7 +2377,13 @@ return;
     Mit dem <a href="#SSCamset">Befehl</a> <b>"set &lt;name&gt; on [rectime]"</b> wird die Aufnahmedauer temporär festgelegt und überschreibt einmalig sowohl den Defaultwert als auch den Wert des gesetzten Attributs "rectime". <br>
     Auch in diesem Fall führt <b>"set &lt;name&gt; on 0"</b> zu einer Daueraufnahme. <br><br>
 
-    Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br>
+    Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br><br>
+    
+    <b>HTTP-Timeout setzen</b><br><br>
+    Alle Funktionen dieses Moduls verwenden HTTP-Aufrufe gegenüber der SVS Web API. <br>
+    Der Standardwert für den HTTP-Timeout beträgt 4 Sekunden. Durch Setzen des <a href="#SSCamattr">Attributes</a> "httptimeout" > 0 kann dieser Wert bei Bedarf entsprechend den technischen Gegebenheiten angepasst werden. <br>
+     
+    
   </ul>
   <br><br><br>
   
@@ -2451,8 +2500,11 @@ return;
   <b>Hinweise:</b> <br><br>
 
   Wird Polling eingesetzt, sollte das Intervall nur so kurz wie benötigt eingestellt werden da die ermittelten Werte überwiegend statisch sind. <br>
-  Ein praktikabler Richtwert könnte zwischen 600 - 1800 (s) liegen. <br>
+  Das eingestellte Intervall sollte nicht kleiner sein als die Summe aller HTTP-Verarbeitungszeiten.
   Pro Pollingaufruf und Kamera werden ca. 10 - 20 Http-Calls gegen die Surveillance Station abgesetzt.<br><br>
+  Bei einem eingestellten HTTP-Timeout (siehe <a href="#SSCamattr">Attribut</a>) "httptimeout") von 4 Sekunden kann die theoretische Verarbeitungszeit Zeit nicht höher als 80 Sekunden betragen. <br>
+  In dem Beispiel sollte man das Pollingintervall mit einem Sicherheitszuschlag auf nicht weniger 160 Sekunden setzen. <br>
+  Ein praktikabler Richtwert könnte zwischen 600 - 1800 (s) liegen. <br>
 
   Sind mehrere Kameras in SSCam definiert, sollte "pollcaminfoall" nicht bei allen Kameras auf exakt den gleichen Wert gesetzt werden um Verarbeitungsengpässe <br>
   und dadurch versursachte potentielle Fehlerquellen bei der Abfrage der Synology Surveillance Station zu vermeiden. <br>
@@ -2506,6 +2558,8 @@ return;
   <br><br>
   <ul>
   <ul>
+  <li><b>httptimeout</b> - Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn httptimeout = "0" oder nicht gesetzt) </li>
+  
   <li><b>pollcaminfoall</b> - Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein Polling, größer 10: Polling mit Intervall) </li>
 
   <li><b>pollnologging</b> - "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging Gerätepolling inaktiv </li>
