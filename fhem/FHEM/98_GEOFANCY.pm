@@ -657,7 +657,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
           <br>
           You might also want to think about protecting the access by using HTTP Basic Authentication and encryption via TLS/SSL. Using TLS offloading in the reverse proxy software is highly recommended and software like HAproxy provides high control of data flow for TLS.<br>
           <br>
-          Also the definition of a dedicated FHEMWEB instance for that purpose together with <a href="#alllowed">allowed</a> might help to restrict FHEM's functionality (e.g. set attributes allowedCommands and allowedDevices to ",". Note that attributes <i>hiddengroup</i> and <i>hiddenroom</i> of FHEMWEB do NOT protect from just guessing/knowing the correct URI but would help tremendously to prevent easy inspection of your FHEM setup.)<br>
+          Also the definition of a dedicated FHEMWEB instance for that purpose together with <a href="#allowed">allowed</a> might help to restrict FHEM's functionality (e.g. set attributes allowedCommands and allowedDevices to ",". Note that attributes <i>hiddengroup</i> and <i>hiddenroom</i> of FHEMWEB do NOT protect from just guessing/knowing the correct URI but would help tremendously to prevent easy inspection of your FHEM setup.)<br>
           <br>
           To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.<br>
           <br>
