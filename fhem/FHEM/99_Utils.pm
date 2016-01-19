@@ -247,6 +247,7 @@ round($$)
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="Utils"></a>

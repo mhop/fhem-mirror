@@ -586,6 +586,7 @@ notice_Read($$$)
 }
 
 =pod
+=item command
 =begin html
 
 <a name="notice"></a>
