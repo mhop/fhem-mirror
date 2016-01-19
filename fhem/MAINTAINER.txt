@@ -396,6 +396,8 @@ www/frontend/*               johannnes            http://forum.fhem.de Frontends
 docs/fhem-floorplan-*        ulimaass             http://forum.fhem.de Sonstiges
 docs/*                       rudolfkoenig         http://forum.fhem.de Sonstiges
 
+http://debian.fhem.de        betateilchen         http://forum.fhem.de Sonstiges
+
 Files that every developer should modify/extend
   MAINTAINER.txt
   CHANGED
