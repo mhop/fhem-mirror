@@ -76,15 +76,16 @@ sub FB_CALLLIST_Define($$)
     my $name = $a[0];
     my $callmonitor = $a[2];
     
-    return "FB_CALLLIST_define: you must specify a device name for using FB_CALLLIST" if(!defined($callmonitor));
+    return "wrong define syntax: you must specify a device name for using FB_CALLLIST" if(!defined($callmonitor));
     return "wrong define syntax: define <name> FB_CALLLIST <name>" if(@a != 3);
-    return "FB_CALLLIST_define: the selected device $callmonitor does not exist." unless(defined($defs{$callmonitor}));
-
-    unless($defs{$callmonitor}->{TYPE} eq "FB_CALLMONITOR")
+    
+    if($init_done)
     {
-        Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR";
-    }
+        return "define error: the selected device $callmonitor does not exist." unless(defined($defs{$callmonitor}));
 
+        Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR" unless($defs{$callmonitor}->{TYPE} eq "FB_CALLMONITOR");
+    }
+    
     $hash->{FB} = $callmonitor;
     $hash->{NOTIFYDEV} = "global,".$callmonitor;
     $hash->{STATE} = 'Initialized';
@@ -268,6 +269,11 @@ sub FB_CALLLIST_Notify($$)
     {
         if(grep(m/^(?:ATTR $name .*|DELETEATTR $name .*|INITIALIZED|REREADCFG)$/, @{$d->{CHANGED}}))
         {
+            my $callmonitor = $hash->{FB};
+            
+            Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - the selected device $callmonitor does not exist" unless(defined($defs{$callmonitor}));
+            Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR" if(defined($defs{$callmonitor}) and $defs{$callmonitor}->{TYPE} ne "FB_CALLMONITOR");
+
             # delete all outdated calls according to attribute list-type, internal-number-filter and number-of-calls
             FB_CALLLIST_cleanupList($hash);
 
