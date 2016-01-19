@@ -234,6 +234,7 @@ _myDiv($$)
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="fheminfo"></a>

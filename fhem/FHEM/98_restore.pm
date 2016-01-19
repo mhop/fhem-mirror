@@ -90,6 +90,7 @@ restoreDir($$)
 1;
 
 =pod
+=item command
 =begin html
 
 <a name="restore"></a>
