@@ -400,6 +400,7 @@ sub sunset_abs_dat (@) {
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="SUNRISE_EL"></a>
