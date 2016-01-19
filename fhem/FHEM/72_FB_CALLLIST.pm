@@ -59,6 +59,7 @@ FB_CALLLIST_Initialize($)
                           "disabledForIntervals ".
                           "do_not_notify:0,1 ".
                           "no-heading:0,1 ".
+                          "no-table-header:0,1 ".
                           $readingFnAttributes;
 
     $hash->{FW_detailFn}  = "FB_CALLLIST_makeTable";
@@ -604,7 +605,8 @@ sub FB_CALLLIST_list2html($;$)
     $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">'; # div tag to support inform updates
     $ret .= '<table class="block fbcalllist">';
     
-    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"','');
+    
+    $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"','') if(AttrVal($name, "no-table-header", "0") eq "0");
     
     if(exists($hash->{helper}{DATA}) and (scalar keys %{$hash->{helper}{DATA}}) > 0)
     {
@@ -1189,6 +1191,10 @@ sub FB_CALLLIST_returnTableHeader($)
     If activated the headline with a link to the detail page of the current definition will be hidden.<br><br>
     Possible values: 0 => the heading line will be shown , 1 => the heading line will not be shown<br>
     Default Value is 0 (the heading line will be shown)<br><br>
+    <li><a name="FB_CALLLIST_no-table-header">no-table-header</a> 0,1</li>
+    If activated the table header containing the name of each column for the current definition will be hidden.<br><br>
+    Possible values: 0 => the table header will be shown , 1 => the table header will not be shown<br>
+    Default Value is 0 (the table header will be shown)<br><br>
     </ul>
   <br>
   <a name="FB_CALLLIST_events"></a>
@@ -1397,6 +1403,10 @@ sub FB_CALLLIST_returnTableHeader($)
     Sofern aktiviert, wird die &Uuml;berschriftenzeile ausserhalb der Liste inkl. Link auf die Detail-Seite der aktuellen Definition ausgeblendet.<br><br>
     M&ouml;gliche Werte: 0 => &Uuml;berschriftenzeile wird angezeigt , 1 => &Uuml;berschriftenzeile wird ausgeblendet<br>
     Standardwert ist 1 (&Uuml;berschriftenzeile wird angezeigt)<br><br>
+    <li><a name="FB_CALLLIST_no-table-header">no-table-header</a> 0,1</li>
+    Sofern aktiviert, wird die Kopfzeile der Tabelle f&uuml;r die aktuelle Definition ausgeblendet.<br><br>
+    M&ouml;gliche Werte: 0 => Kopfzeile wird angezeigt , 1 => Kopfzeilewird ausgeblendet<br>
+    Standardwert ist 1 (Kopfzeile wird angezeigt)<br><br>
     </ul>
   <br>
   <a name="FB_CALLLIST_events"></a>
