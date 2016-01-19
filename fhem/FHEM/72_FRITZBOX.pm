@@ -1232,7 +1232,7 @@ sub FRITZBOX_Readout_Run_Web($)
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
-   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,name,mac,active)"; # LAN devices
+   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,name,mac,active,wlan)"; # LAN devices
    $queryStr .= "&wlanList=wlan:settings/wlanlist/list(state,is_guest,mac)"; # WLAN devices
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
    $queryStr .= "&box_stdDialPort=telcfg:settings/DialPort"; #Dial Port
@@ -1371,13 +1371,14 @@ sub FRITZBOX_Readout_Run_Web($)
    foreach ( @{ $result->{lanDevice} } ) {
       my $dIp = $_->{ip};
       my $dName = $_->{name};
+      $dName .= " (WLAN)"  if $_->{wlan} == 1;
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
       $landevice{$dIp}=$dName;
       my $rName = "mac_".$_->{mac};
       $rName =~ s/:/_/g;
 # Create a reading if a landevice is connected
       if ($_->{active} == 1) {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $_->{name};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
       }
    # if the device is not online anymore, set the mac readings to 'inactive' and delete at next readout
       elsif (exists $hash->{READINGS}{$rName}) {
