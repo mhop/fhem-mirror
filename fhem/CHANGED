@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: FB_CALLLIST: new attribute "no-table-header" added, to hide the
+             table header for the whole list
   - feature: 49_SSCam: Attribute "httptimeout" added
   - feature: update is executed per default in the background
   - bugfix:  FB_CALLLIST: fix "Use of uninitialized value" warnings on startup
