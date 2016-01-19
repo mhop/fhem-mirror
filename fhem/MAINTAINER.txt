@@ -383,6 +383,7 @@ www/codemirror/*             rapster              http://forum.fhem.de Frontends
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends
 www/images/*                 ulimaass             http://forum.fhem.de Frontends
 www/pgm2/dashboard/*         svenson08            http://forum.fhem.de Frontends
+www/pgm2/fhemweb_readingsGroup.js  justme1968     http://forum.fhem.de Frontends
 www/pgm2/fhemweb_readingsHistory.js  justme1968   http://forum.fhem.de Frontends
 www/pgm2/fhemweb_sortable.js markusbloch          http://forum.fhem.de Frontends
 www/pgm2/fhemweb_fbcalllist.js markusbloch        http://forum.fhem.de Frontends
