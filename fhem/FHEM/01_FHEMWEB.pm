@@ -667,6 +667,7 @@ FW_answerCall($)
     $filter = "room!=.+" if($filter eq "room=Unsorted");
 
     my %h = map { $_ => 1 } devspec2array($filter);
+    $h{global} = 1 if( $me->{inform}{addglobal} );
     $h{"#FHEMWEB:$FW_wname"} = 1;
     $me->{inform}{devices} = \%h;
     %FW_visibleDeviceHash = FW_visibleDevices();
@@ -2554,7 +2555,12 @@ FW_Notify($$)
       my $tn = TimeNow();
       my $max = int(@{$events});
       for(my $i = 0; $i < $max; $i++) {
-        if( $events->[$i] !~ /: /) {
+        if($events->[$i] !~ /: /) {
+          if($dev->{NAME} eq 'global') { # Forum #47634
+            my($type,$args) = split(' ', $events->[$i], 2);
+            push @data, FW_longpollInfo($h->{fmt}, "$dn-$type", $args, $args);
+          }
+
           next; #ignore 'set' commands
         }
         my ($readingName,$readingVal) = split(": ",$events->[$i],2);
