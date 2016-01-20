@@ -29,6 +29,7 @@
 #	2015-02-22	V1.01 add attr read-only, fix attr interval, update command.ref
 #	2015-03-07	V1.02 fix schedule
 #       2015-09-12	V1.03 fix errorcount and interval
+#       2016-01-20      V1.04 add Reading onoff for SP2101W
 #
 ################################################################
 
@@ -227,6 +228,7 @@ sub EDIPLUG_Read($$$)
         if ($hash->{MODEL} eq "SP2101W")
         {
           $hash->{POWER} = uc($xmlres->{CMD}->{'Device.System.Power.State'});
+          readingsBulkUpdate($hash, "onoff", lc($hash->{POWER}));
           $state = ($hash->{POWER} ne "OFF") ? $hash->{POWER}." / ".$hash->{helper}{power}. " W / ".$hash->{helper}{current}." A" : $hash->{POWER};
         }
         else
@@ -261,7 +263,7 @@ sub EDIPLUG_Read($$$)
      readingsBulkUpdate($hash, "power_day", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Day'}." kWh");
      readingsBulkUpdate($hash, "power_week", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Week'}." kWh");
      readingsBulkUpdate($hash, "power_month", $xmlres->{CMD}->{NOW_POWER}->{'Device.System.Power.NowEnergy.Month'}." kWh");
-
+     
      $state = ($hash->{POWER} ne "OFF") ? $hash->{POWER}." / ".$hash->{helper}{power}. " W / ".$hash->{helper}{current}." A" : $hash->{POWER};
     }
 
