@@ -592,6 +592,15 @@ sub FB_CALLLIST_list2html($;$)
     
     my $old_locale = setlocale(LC_ALL);
     
+    if(AttrVal($name, "language", "en") eq "de")
+    {
+        setlocale(LC_ALL, "de_DE.utf8");
+    }
+    else
+    {
+        setlocale(LC_ALL, "en_US.utf8");
+    }
+    
     my $ret .= "<table>";
     
     if(AttrVal($name, "no-heading", "0") eq "0" and defined($FW_ME) and defined($FW_subdir))
@@ -960,8 +969,6 @@ sub FB_CALLLIST_returnTableHeader($)
 
     if(AttrVal($name, "language", "en") eq "de")
     {
-        setlocale(LC_ALL, "de_DE.utf8");
-        
         $line = { 
             row => "",
             state => "Status",
@@ -976,8 +983,6 @@ sub FB_CALLLIST_returnTableHeader($)
     }
     else
     {
-        setlocale(LC_ALL, "en_US.utf8");
-        
         $line = { 
             row => "",
             state => "State",
