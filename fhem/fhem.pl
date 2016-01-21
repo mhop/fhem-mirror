@@ -2133,23 +2133,38 @@ CommandList($$)
     if($arg[1]) {
       foreach my $sdev (@list) { # Show a Hash-Entry or Reading for each device
 
-        if($defs{$sdev}) {
-          if(defined($defs{$sdev}{$arg[1]})) {
-            my $val = $defs{$sdev}{$arg[1]};
-            $val = $val->{NAME} if(ref($val) eq 'HASH' && $val->{NAME});
-            $str .= sprintf("%-20s %s\n", $sdev, $val);
+        my $first = 1;
+        foreach  my $n (@arg[1..@arg-1]) {
+          my $fType="";
+          if($n =~ m/^(.:)(.*$)/) {
+            $fType = $1;
+            $n = $2;
+          }    
 
-          } elsif($defs{$sdev}{READINGS} &&
-                  defined($defs{$sdev}{READINGS}{$arg[1]})) {
-            $str .= sprintf("%-20s %s %s\n", $sdev,
-                    $defs{$sdev}{READINGS}{$arg[1]}{TIME},
-                    $defs{$sdev}{READINGS}{$arg[1]}{VAL});
+          if($defs{$sdev}) {
+            if(defined($defs{$sdev}{$n}) && (!$fType || $fType eq "i:")) {
+              my $val = $defs{$sdev}{$n};
+              $val = $val->{NAME} if(ref($val) eq 'HASH' && $val->{NAME});
+              $str .= sprintf("%-20s %*s   %*s %s\n", $first?$sdev:'', $arg[2]?19:0, '',
+                      $arg[2]?-15:0, $arg[2]?$n:'', $val);
 
-          } elsif($attr{$sdev} && 
-                  defined($attr{$sdev}{$arg[1]})) {
-            $str .= sprintf("%-20s %s\n", $sdev, $attr{$sdev}{$arg[1]});
+            } elsif($defs{$sdev}{READINGS} &&
+                    defined($defs{$sdev}{READINGS}{$n})
+                    && (!$fType || $fType eq "r:")) {
+              $str .= sprintf("%-20s %s   %*s %s\n", $first?$sdev:'',
+                      $defs{$sdev}{READINGS}{$n}{TIME},
+                      $arg[2]?-15:0, $arg[2]?$n:'', 
+                      $defs{$sdev}{READINGS}{$n}{VAL});
 
+            } elsif($attr{$sdev} && 
+                    defined($attr{$sdev}{$n})
+                    && (!$fType || $fType eq "a:")) {
+              $str .= sprintf("%-20s %*s   %*s %s\n", $first?$sdev:'', $arg[2]?19:0, '',
+                      $arg[2]?-15:0, $arg[2]?$n:'', $attr{$sdev}{$n});
+
+            }
           }
+          $first = 0;
         }
       }
 
