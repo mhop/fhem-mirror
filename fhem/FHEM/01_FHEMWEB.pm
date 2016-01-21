@@ -2005,7 +2005,7 @@ FW_style($$)
     FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/console.js\">".
           "</script>";
     FW_pO "<div id=\"content\">";
-    my $filter = ($a[2] && $a[2] ne "log") ? $a[2] : ".*";
+    my $filter = $a[2] ? ($a[2] eq "log" ? "global" : $a[2]) : ".*";
     FW_pO "Events (Filter: <a href=\"#\" id=\"eventFilter\">$filter</a>) ".
           "&nbsp;&nbsp;<span class='fhemlog'>FHEM log ".
                 "<input id='eventWithLog' type='checkbox'".
@@ -4250,16 +4250,19 @@ FW_widgetOverride($$)
         <ul>
           attr FS20dev widgetOverride on-till:time<br>
           attr WEB widgetOverride room:textField<br>
-          attr dimmer widgetOverride dim:knob,min:1,max:100,step:1,linecap:round<br>
+          attr dimmer widgetOverride dim:knob,min:1,max:100,step:1,linecap:round
+          <br>
           <br>
           attr myToggle widgetOverride state:uzsuToggle,123,xyz<br>
           attr mySelect widgetOverride state:uzsuSelect,abc,123,456,xyz<br>
-          attr myTemp widgetOverride state:uzsuDropDown,18,18.5,19,19.5,20,20.5,21,21.5,22,22.5,23<br>
+          attr myTemp widgetOverride
+            state:uzsuDropDown,18,18.5,19,19.5,20,20.5,21,21.5,22,22.5,23<br>
           attr myTimerEntry widgetOverride state:uzsuTimerEntry<br>
           attr myTimer widgetOverride state:uzsu<br>
           <br>
-          Im Folgenden wird die Verwendung des modifier2 parameters von uzsuTimerEntry und uzsu gezeigt um
-          die Auswahl des Schaltzeitpunktes mit der Auswahl des Schaltwertes zu kombinieren:
+          Im Folgenden wird die Verwendung des modifier2 parameters von
+          uzsuTimerEntry und uzsu gezeigt um die Auswahl des Schaltzeitpunktes
+          mit der Auswahl des Schaltwertes zu kombinieren:
           <pre>
 ... widgetOverride state:uzsu,slider,0,5,100                                         -> ein slider
 ... widgetOverride state:uzsu,uzsuToggle,off,on                                      -> ein on/off button
