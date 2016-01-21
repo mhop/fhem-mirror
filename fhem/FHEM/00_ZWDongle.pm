@@ -689,6 +689,10 @@ ZWDongle_Ready($)
   my $po = $hash->{USBDev};
   if($po) {
     my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+    if(!defined($InBytes)) {
+      DevIo_Disconnected($hash);
+      return 0;
+    }
     return ($InBytes>0);
   }
   return 0;
