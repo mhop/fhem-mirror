@@ -186,7 +186,7 @@ sub weekprofile_sendDevProfile(@)
   if ($type eq "WEEKPROFILE") {
       my $json = JSON->new;
       my $json_text = $json->encode($prf->{DATA});
-      return fhem("set $device profile_data $prf->{NAME} $json_text",1);
+      return fhem("set $device profile_data $prf->{TOPIC}:$prf->{NAME} $json_text",1);
   }
 
   my $devPrf = weekprofile_readDevProfile($device,$type,$me);
@@ -376,7 +376,7 @@ sub weekprofile_Initialize($)
   $hash->{StateFn}  = "weekprofile_State";
   $hash->{NotifyFn} = "weekprofile_Notify";
   $hash->{AttrFn}   = "weekprofile_Attr";
-  $hash->{AttrList} = "widgetWeekdays widgetEditOnNewPage:0,1 configFile ".$readingFnAttributes;
+  $hash->{AttrList} = "useTopics:0,1 widgetWeekdays widgetEditOnNewPage:0,1 configFile ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
@@ -427,14 +427,17 @@ sub weekprofile_Get($$@)
   
   my $list = '';
   
-  my $prfCnt = scalar(@{$hash->{PROFILES}});   
-  $list.= 'profile_data:' if ($prfCnt > 0);
+  my $prfCnt = scalar(@{$hash->{PROFILES}});
   
-  foreach my $prf (@{$hash->{PROFILES}}){
-    $list.= $prf->{NAME}.",";
-  }
+  my $useTopics = AttrVal($name,"useTopics",0);
   
-  $list = substr($list, 0, -1) if ($prfCnt > 0);
+  if (!$useTopics) {
+    $list.= 'profile_data:' if ($prfCnt > 0);  
+    foreach my $prf (@{$hash->{PROFILES}}){
+      $list.= $prf->{NAME}.",";
+    }
+    $list = substr($list, 0, -1) if ($prfCnt > 0);
+  } else {$list.= 'profile_data' if ($prfCnt > 0);}
 
   if($cmd eq "profile_data") {
     return 'usage: profile_data <name>' if(@params < 1);
@@ -455,14 +458,30 @@ sub weekprofile_Get($$@)
     return $json_text;
   } 
   
-  $list.= ' profile_names:noArg';
+  $list.= ' profile_names';
   if($cmd eq "profile_names") {
     my $names = '';
+    my $topic = 'default';
+    $topic = $params[0] if(@params == 1);
+    
     foreach my $prf (@{$hash->{PROFILES}}){
-      $names .=$prf->{NAME}.",";
+      $names .=$prf->{NAME}.","               if ($topic eq $prf->{TOPIC});
+      $names .="$prf->{TOPIC}:$prf->{NAME},"  if ($topic eq '*');
     }
     $names = substr($names, 0, -1);
     return $names;
+  }
+  
+  $list.= ' profile_references:noArg';
+  if($cmd eq "profile_references") {
+    my $refs = '';
+    
+    foreach my $prf (@{$hash->{PROFILES}}){
+      next if (!defined($prf->{REF}));
+      $refs .= "$prf->{TOPIC}:$prf->{NAME} -> $prf->{REF},"; 
+    }
+    $refs = substr($refs, 0, -1);
+    return $refs;
   }
   
   if($cmd eq "sndDevList") {
@@ -495,7 +514,20 @@ sub weekprofile_findPRF(@)
   
   return ($found,$idx);
 }
-
+############################################## 
+sub weekprofile_hasREF(@)
+{
+  my ($hash, $refPrf) = @_;
+  
+  my $refName = "$refPrf->{TOPIC}:$refPrf->{NAME}";
+  
+  foreach my $prf (@{$hash->{PROFILES}}){
+    if ( defined($prf->{REF}) && ($prf->{REF} eq $refName) ) {
+      return "$prf->{TOPIC}:$prf->{NAME}";
+    }
+  }
+  return undef;
+}
 ############################################## 
 sub weekprofile_splitName($)
 {
@@ -513,12 +545,17 @@ sub weekprofile_Set($$@)
 
   my $prfCnt = scalar(@{$hash->{PROFILES}});
   my $list = '';
+
+  my $useTopics = AttrVal($me,"useTopics",0);
   
-  $list.= "profile_data";  
+  $list.= "profile_data";
   if ($cmd eq 'profile_data') {
     return 'usage: profile_data <name> <json data>' if(@params < 2);
     
     my ($topic, $name) = weekprofile_splitName($params[0]);
+    
+    return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
+    
     my $jsonData = $params[1];
 
     my $json = JSON->new;
@@ -559,6 +596,8 @@ sub weekprofile_Set($$@)
     
     my ($topic, $name) = weekprofile_splitName($params[0]);
     
+    return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
+    
     my @devices = ();
     if (@params == 2) {
       @devices = split(',',$params[1]);
@@ -592,6 +631,8 @@ sub weekprofile_Set($$@)
     my ($srcTopic, $srcName) = weekprofile_splitName($params[0]);
     my ($destTopic, $destName) = weekprofile_splitName($params[1]);
     
+    return "Error topics not enabled" if (!$useTopics && ( ($srcTopic ne 'default') || ($destTopic ne 'default')) );
+    
     my $prfSrc = undef;
     my $prfDest = undef;
     foreach my $prf (@{$hash->{PROFILES}}){
@@ -602,12 +643,14 @@ sub weekprofile_Set($$@)
     Log3 $me, 4, "$me(Set): override profile $destName" if ($prfDest);
     
     if ($prfDest){
-      $prfDest->{DATA} = $prfSrc->{DATA}
+      $prfDest->{DATA} = $prfSrc->{DATA};
+      $prfDest->{REF} = undef;
     } else {
       $prfDest = {};
       $prfDest->{NAME} = $destName;
       $prfDest->{DATA} = $prfSrc->{DATA};
       $prfDest->{TOPIC} = $destTopic;
+      $prfDest->{REF} = undef;
       push @{$hash->{PROFILES}}, $prfDest;
     }
     weekprofile_writeProfilesToFile($hash);
@@ -622,6 +665,8 @@ sub weekprofile_Set($$@)
     
     my ($srcTopic, $srcName) = weekprofile_splitName($params[0]);
     my ($destTopic, $destName) = weekprofile_splitName($params[1]);
+    
+    return "Error topics not enabled" if (!$useTopics && ( ($srcTopic ne 'default') || ($destTopic ne 'default')) );
     
     my $prfSrc = undef;
     my $prfDest = undef;
@@ -657,14 +702,54 @@ sub weekprofile_Set($$@)
     
     my ($topic, $name) = weekprofile_splitName($params[0]);
     
+     return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
+    
     my ($delprf,$idx)  = weekprofile_findPRF($hash,$name,$topic);
     return "Error unknown profile $params[0]" unless($delprf);
+    my $ref = weekprofile_hasREF($hash,$delprf);
+    return "Error profile $params[0] is referenced from $ref" if ($ref);
     
     splice(@{$hash->{PROFILES}},$idx, 1);
     weekprofile_writeProfilesToFile($hash);
     weekprofile_updateReadings($hash);
     return undef;
   }
+  
+  
+  #----------------------------------------------------------
+  $list.= " change_topic" if ($useTopics);
+  if ($cmd eq 'change_topic') {
+    return 'usage: change_topic <name>' if(@params < 1);
+    my $restore = 1;
+    my $topic = $params[0];
+    my $err = "";
+    
+    $restore = $params[1] if(@params == 2);
+    
+    if ($restore) {      
+      foreach my $dev (@{$hash->{SNDDEVLIST}}){
+        my $prfName = AttrVal($dev->{NAME},"weekprofile",undef);        
+        next if (!defined($prfName));
+        
+        Log3 $me, 5, "$me(Set): found device $dev->{NAME}";
+        
+        my ($prf,$idx)  = weekprofile_findPRF($hash,$prfName,$topic);
+        next if (!defined($prf));
+        
+        Log3 $me, 4, "$me(Set): Send profile $topic:$prfName to $dev->{NAME}";
+         
+        my $ret = weekprofile_sendDevProfile($dev->{NAME},$prf,$me);
+        if ($ret) {
+          Log3 $me, 1, "$me(Set): $ret" if ($ret);
+          $err .= $ret . "\n";
+        }
+      }
+    }
+    readingsSingleUpdate($hash,"active_topic",$topic,1);
+    return $err if ($err);
+    return undef;
+  }
+  
   $list =~ s/ $//;
   return "Unknown argument $cmd, choose one of $list"; 
 }
@@ -1055,6 +1140,28 @@ sub weekprofile_getEditLNK_MasterDev($$)
       <code>set &lt;name&gt; profile_names</code><br>
       Liefert alle Profilnamen getrennt durch ','
     </li>
+    <li>profile_references<br>
+      Liefert eine Liste von Referenzen der Form <br>
+      <code>
+      ref_topic:ref_profile -> dest_topic:dest_profile
+      </code>
+    </li>
+  </ul>
+  
+  <a name="weekprofilereadings"></a>
+  <p><b>Readings</b></p>
+  <ul>
+    <li>active_topic<br>
+      Aktive Topic. 
+    </li>
+  </ul>
+  <ul>
+    <li>active_topic<br>
+      Aktive Topic. 
+    </li>
+    <li>profile_count<br>
+      Anzahl aller Profile mit Referenzen.
+    </li>
   </ul>
   
   <a name="weekprofileattr"></a>
@@ -1075,6 +1182,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>icon<br>
       Änders des Icons zum Bearbeiten
       Default: edit_settings
+    </li>
+    <li>useTopics<br>
+      Verwendung von Topic aktivieren.
     </li>
   </ul>
   
@@ -1144,7 +1254,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>reference_profile<br>
       <code>set &lt;name&gt; reference_profile &lt;source&gt; &lt;destination&gt; </code><br>
       Create a reference from destination to source. The destination will be overwritten if it exits.
-      <b>Still in devolopment!!!</b>
+      <b>Still under development!!!</b>
     </li>
   </ul>
   
@@ -1158,6 +1268,28 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>profile_names<br>
       <code>set &lt;name&gt; profile_names</code><br>
       Get a comma seperated list of profile names
+    </li>
+    <li>profile_references<br>
+      Get a list of references in the following syntax
+      <code>
+      ref_topic:ref_profile -> dest_topic:dest_profile
+      </code>
+    </li>
+  </ul>
+  
+  <a name="weekprofilereadings"></a>
+  <p><b>Readings</b></p>
+  <ul>
+    <li>active_topic<br>
+      Active topic. 
+    </li>
+  </ul>
+  <ul>
+    <li>active_topic<br>
+      Aktive Topic. 
+    </li>
+    <li>profile_count<br>
+      Count of all profiles including references.
     </li>
   </ul>
   
@@ -1178,6 +1310,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>icon<br>
       icon for edit
       Default: edit_settings
+    </li>
+    <li>useTopics<br>
+      Enable topics.
+      Default: 0
     </li>
   </ul>
   
