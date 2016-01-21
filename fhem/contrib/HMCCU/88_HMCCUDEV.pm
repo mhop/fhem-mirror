@@ -64,7 +64,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address ccureadings:0,1 ccustate ccuget:State,Value statevals substitute statechannel statedatapoint stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address ccureadings:0,1 ccustate ccuget:State,Value statevals substitute statechannel statedatapoint controldatapoint stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
@@ -195,6 +195,7 @@ sub HMCCUDEV_Set ($@)
 	my $statechannel = AttrVal ($name, "statechannel", '');
 	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
 	my $statevals = AttrVal ($name, "statevals", '');
+	my $controldatapoint = AttrVal ($name, "controldatapoint", '');
 
 	my $hmccu_hash = $hash->{IODev};
 	my $hmccu_name = $hash->{IODev}->{NAME};
@@ -219,6 +220,16 @@ sub HMCCUDEV_Set ($@)
 
 		usleep (100000);
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
+		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+
+		HMCCU_SetState ($hash, "OK");
+		return undef;
+	}
+	elsif ($opt eq 'control') {
+		return HMCCUDEV_SetError ($hash, "Attribute control datapoint not set") if ($controldatapoint eq '');
+		my $objvalue = shift @a;
+		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$controldatapoint;
+		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
 
 		HMCCU_SetState ($hash, "OK");
@@ -258,7 +269,7 @@ sub HMCCUDEV_Set ($@)
 		return undef;
 	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of config datapoint";
+		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of config control datapoint";
 		return undef if ($hash->{statevals} eq 'readonly');
 
 		if ($statechannel ne '') {
