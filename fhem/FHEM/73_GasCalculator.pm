@@ -44,6 +44,7 @@
 #		X0005	18.01.2016	Sailor				All								Implementing the choice of destination for the calculated readings via attribute
 #		X0006	21.01.2016	Sailor				=pod							Description updated with description for the readings
 #		10588	22.01.2016	Sailor				Comments						First check-in
+#		10590	22.01.2016	Sailor				Define							Deleting version code from define
 ########################################################################################################################
 
 
@@ -90,7 +91,6 @@ sub GasCalculator_Define($$$)
 {
 	my ($hash, $def)              = @_;
 	my ($name, $type, $RegEx, $RegExst) = split("[ \t]+", $def, 4);
-	my $ModuleVersion           = "0007";
 
 	### Check whether regular expression has correct syntax
 	if(!$RegEx || $RegExst) 
@@ -108,10 +108,9 @@ sub GasCalculator_Define($$$)
 	$hash->{NAME}							= $name;
 	$hash->{STATE}              			= "active";
 	$hash->{REGEXP}             			= $RegEx;
-    $hash->{VERSION}            			= $ModuleVersion;
     	
 	### Writing log entry
-	Log3 $name, 5, $name. " : GasCalculator - Starting to define module with version: " . $ModuleVersion;
+	Log3 $name, 5, $name. " : GasCalculator - Starting to define module";
 
 	return undef;
 }
