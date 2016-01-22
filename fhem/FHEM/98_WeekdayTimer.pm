@@ -450,7 +450,8 @@ E:  while (@$a > 0) {
     $element = substr ($element, 0, length($element)-1);
     my @t = split(/\|/, $element);
     my $anzahl = @t;
-    if ( $anzahl >= 2 && $anzahl <= 3) {
+    
+    if ( ($anzahl == 2 || $anzahl == 3) && $t[0] gt "" && $t[1] gt "" ) {
       Log3 $hash, 4, "[$name] $element - accepted";
       push(@switchingtimes, $element);
     } else {
