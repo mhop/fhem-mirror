@@ -1575,10 +1575,15 @@ sub FRITZBOX_Readout_Process($$)
    # Statistics
       if ( defined $values{".box_TodayBytesReceivedLow"} && defined $hash->{READINGS}{".box_TodayBytesReceivedLow"}) {
          my $valueHigh = $values{".box_TodayBytesReceivedHigh"} - $hash->{READINGS}{".box_TodayBytesReceivedHigh"}{VAL};
+         my $valueLow = $values{".box_TodayBytesReceivedLow"} - $hash->{READINGS}{".box_TodayBytesReceivedLow"}{VAL};
+      # Consider reset of day counter
+         if ($valueHigh < 0 || $valueHigh == 0 && $valueLow < 0) {
+            $valueLow = $values{".box_TodayBytesReceivedLow"};
+            $valueHigh = $values{".box_TodayBytesReceivedHigh"};
+         }
          # FRITZBOX_Log $hash, 5, "valueHigh $valueHigh";
          $valueHigh *= 2**22;
          # FRITZBOX_Log $hash, 5, "valueHigh $valueHigh";
-         my $valueLow = $values{".box_TodayBytesReceivedLow"} - $hash->{READINGS}{".box_TodayBytesReceivedLow"}{VAL};;
          # FRITZBOX_Log $hash, 5, "valueLow $valueLow";
          $valueLow /= 2**10;
          # FRITZBOX_Log $hash, 5, "valueLow $valueLow";
