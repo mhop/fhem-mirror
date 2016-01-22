@@ -236,31 +236,23 @@ sub S7_AWrite_Set($@) {
 	}
 	elsif ( $datatype eq "u16" ) {
 		$b = $shash->{S7TCPClient}->setWordAt( "XX", 0, $newValue );
-		$WordLen = &S7Client::S7WLInt;
-
-		#		$WordLen = &S7Client::S7WLWord;
+		$WordLen = &S7Client::S7WLByte;
 	}
 	elsif ( $datatype eq "s16" ) {
 		$b = $shash->{S7TCPClient}->setIntegerAt( "XX", 0, $newValue );
-		$WordLen = &S7Client::S7WLInt;
-
-		#		$WordLen = &S7Client::S7WLWord;
+		$WordLen = &S7Client::S7WLByte;
 	}
 	elsif ( $datatype eq "u32" ) {
 		$b = $shash->{S7TCPClient}->setDWordAt( "XXXX", 0, $newValue );
-		$WordLen = &S7Client::S7WLDInt;
-
-		#		$WordLen = &S7Client::S7WLDWord;
+		$WordLen = &S7Client::S7WLByte;
 	}
 	elsif ( $datatype eq "s32" ) {
 		$b = $shash->{S7TCPClient}->setDintAt( "XXXX", 0, $newValue );
-		$WordLen = &S7Client::S7WLDInt;
-
-		#		$WordLen = &S7Client::S7WLDWord;
+		$WordLen = &S7Client::S7WLByte;
 	}
 	elsif ( $datatype eq "float" ) {
 		$b = $shash->{S7TCPClient}->setFloatAt( "XXXX", 0, $newValue );
-		$WordLen = &S7Client::S7WLReal;
+		$WordLen = &S7Client::S7WLByte;
 	}
 	else {
 		my $err = "$name S7_AWrite: Parse unknown type : (" . $datatype . ")";
