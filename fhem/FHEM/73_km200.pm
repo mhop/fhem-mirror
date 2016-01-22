@@ -1,4 +1,4 @@
-# $Id: 73_km200.pm 0056 2016-01-10 20:00:00Z Matthias_Deeke $
+# $Id$
 ########################################################################################################################
 #
 #     73_km200.pm
@@ -220,6 +220,7 @@
 #		0056    08.01.2016	Sailor				km200_Define					New attribute "disable"
 #		0056    08.01.2016	Sailor				km200_Attr						New attribute "disable"
 #		0056    10.01.2016	Sailor				=pod							Removing alls formats to fulfill new commandref rules
+#		????    22.01.2016	Sailor				Define							Removing version internal
 ########################################################################################################################
 
 
@@ -289,12 +290,11 @@ sub km200_Define($$)
 	my $url						= $a[2];
 	my $km200_gateway_password	= $a[3];
 	my $km200_private_password	= $a[4];
-	my $ModuleVersion           = "0056";
 
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
 
-	Log3 $name, 5, $name. " : km200 - Starting to define module with version: " . $ModuleVersion;
+	Log3 $name, 5, $name. " : km200 - Starting to define module";
 		
 	###START###### Define known services of gateway ###########################################################START####
 	my @KM200_AllServices = (
@@ -433,7 +433,6 @@ sub km200_Define($$)
 	###START###### Writing values to global hash ###############################################################START####
 	  $hash->{NAME}                             = $name;
 	  $hash->{URL}                              = $url;
-      $hash->{VERSION}                          = $ModuleVersion;
 	  $hash->{INTERVALDYNVAL}                   = 300;
 	  $hash->{DELAYDYNVAL}                      = 60;
 	  $hash->{POLLINGTIMEOUT}                   = 5;
