@@ -777,7 +777,7 @@ sub weekprofile_Notify($$)
       next if(!defined($s));
       my ($what,$who) = split(' ',$s);
       
-      if ($what =~ m/INITIALIZED/) {
+      if ($what =~ m/INITIALIZED/ || $what =~ m/REREADCFG/) {
         splice($own->{PROFILES});
         weekprofile_refreshSendDevList($own);
         weekprofile_assignDev($own);
