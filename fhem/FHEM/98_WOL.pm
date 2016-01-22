@@ -106,11 +106,13 @@ sub WOL_Define($$) {
   $hash->{IP}       = $ip;
   $hash->{REPEAT}   = $repeat;
   $hash->{MODE}     = $mode;
+  
+  delete $hash->{helper}{RUNNING_PID};
 
   readingsSingleUpdate($hash, "packet_via_EW",  "none",0);
   readingsSingleUpdate($hash, "packet_via_UDP", "none",0);
   readingsSingleUpdate($hash, "state",          "none",0);
-  readingsSingleUpdate($hash, "active",         "off",0);
+  readingsSingleUpdate($hash, "active",         "off", 0);
 
   RemoveInternalTimer($hash);
   
@@ -135,11 +137,10 @@ sub WOL_UpdateReadings($) {
    return if (!defined($hash));
    my $name = $hash->{NAME};
    
-   
-   my $blockingFn = "WOL_Ping";
-   my $arg        = $hash->{NAME}."|".$hash->{IP};
-   my $finishFn   = "WOL_PingDone";
    my $timeout    = 4;
+   my $arg        = $hash->{NAME}."|".$hash->{IP};
+   my $blockingFn = "WOL_Ping";
+   my $finishFn   = "WOL_PingDone";
    my $abortFn    = "WOL_PingAbort";
    
    if (!(exists($hash->{helper}{RUNNING_PID}))) {
@@ -157,10 +158,11 @@ sub WOL_Ping($){
    my $hash = $defs{$name};
    
    my $ping = "ping -c 1 -w 2 $ip"; 
+   Log3 $hash, 4, "[$name] executing: $ping";
    my $res = qx ($ping);
       $res = ""   if (!defined($res));
   
-   Log3 $hash, 5, "[$name] executing: $ping";
+   Log3 $hash, 4, "[$name] result executing ping: $res";
   
    my $erreichbar = !($res =~ m/100%/);
    my $return = "$name|$erreichbar";
@@ -175,11 +177,11 @@ sub WOL_PingDone($){
    readingsBeginUpdate ($hash);
 
    if ($erreichbar) {
-      Log3 $hash, 5, "[$name] ping succesful - state = on";
+      Log3 $hash, 4, "[$name] ping succesful - state = on";
       readingsBulkUpdate   ($hash, "isRunning", "true");
       readingsBulkUpdate   ($hash, "state",     "on");
    } else {
-      Log3 $hash, 5, "[$name] ping not succesful - state = off";
+      Log3 $hash, 4, "[$name] ping not succesful - state = off";
       readingsBulkUpdate   ($hash, "isRunning", "false");
       readingsBulkUpdate   ($hash, "state",     "off");
    }
