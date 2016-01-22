@@ -36,14 +36,14 @@
 #                                               CHANGELOG
 #
 #     Version	Date		Programmer			Subroutine						Description of Change
-#		0001	12.01.2016	Sailor				All								Initial Test Version
-#		0002	13.01.2016	Sailor				All								Switched from Internals to $attr{$name}
-#		0003	14.01.2016	Sailor				GasCalculator_Notify			Calculations for Volume, Power and Energy
-#		0004	18.01.2016	Sailor				GasCalculator_Notify			Destination of Readings can be chosen between calculator or counter device
-#		0004	21.01.2016	Sailor				=pod							Description added
-#		0005	18.01.2016	Sailor				All								Implementing the choice of destination for the calculated readings via attribute
-#		0006	21.01.2016	Sailor				=pod							Description updated with description for the readings
-#		0007	22.01.2016	Sailor				=pod							Description updated
+#		X0001	12.01.2016	Sailor				All								Initial Test Version
+#		X0002	13.01.2016	Sailor				All								Switched from Internals to $attr{$name}
+#		X0003	14.01.2016	Sailor				GasCalculator_Notify			Calculations for Volume, Power and Energy
+#		X0004	18.01.2016	Sailor				GasCalculator_Notify			Destination of Readings can be chosen between calculator or counter device
+#		X0004	21.01.2016	Sailor				=pod							Description added
+#		X0005	18.01.2016	Sailor				All								Implementing the choice of destination for the calculated readings via attribute
+#		X0006	21.01.2016	Sailor				=pod							Description updated with description for the readings
+#		10588	22.01.2016	Sailor				Comments						First check-in
 ########################################################################################################################
 
 
