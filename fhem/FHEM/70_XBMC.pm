@@ -9,6 +9,7 @@
 #
 ##############################################
 
+# $Id$
 
 package main;
 
@@ -310,13 +311,16 @@ sub XBMC_Update($)
   $obj  = {
     "method" => "GUI.GetProperties",
     "params" => { 
-      "properties" => ["skin","fullscreen"]
+      "properties" => ["skin","fullscreen", "stereoscopicmode"]
     }
   };
   XBMC_Call($hash,$obj,1);
-  
-  #-1 -> update all existing players
-  XBMC_PlayerUpdate($hash,-1); 
+
+  # the playerId in the message is not reliable
+  #   xbmc is not able to assign the correct player so the playerid might be wrong
+  #   http://forum.kodi.tv/showthread.php?tid=174872
+  # so we ask for the acutally running players by passing -1
+  XBMC_PlayerUpdate($hash, -1);
   
   XBMC_UpdatePlayerItem($hash);
 }
@@ -557,12 +561,6 @@ sub XBMC_PlayerOnPlay($$)
     $hash->{PendingEvents}{$id} = $event;
     XBMC_Call($hash, $req,1);
   }
-
-  # the playerId in the message is not reliable
-  #   xbmc is not able to assign the correct player so the playerid might be wrong
-  #   http://forum.kodi.tv/showthread.php?tid=174872
-  # so we ask for the acutally running players by passing -1
-  XBMC_PlayerUpdate($hash, -1);
 }
 
 sub XBMC_ProcessNotification($$) 
@@ -594,6 +592,11 @@ sub XBMC_ProcessNotification($$)
   }
   elsif($obj->{method} eq "Player.OnStop") {
     readingsSingleUpdate($hash,"playStatus",'stopped',1);
+	
+	#HACK: We want to fetch GUI.Properties here to update for example stereoscopicmode.
+	# When doing this here we still get the in-movie stereo mode. So we define a timer
+	# to invoke the update in some (tm) seconds
+	InternalTimer(time() + 2, "XBMC_Check", $hash, 0);
   }
   elsif($obj->{method} eq "Player.OnPause") {
     readingsSingleUpdate($hash,"playStatus",'paused',1);
@@ -601,6 +604,7 @@ sub XBMC_ProcessNotification($$)
   elsif($obj->{method} eq "Player.OnPlay") {
     XBMC_ResetMediaReadings($hash);
     XBMC_PlayerOnPlay($hash, $obj);
+	XBMC_Update($hash);
   }
   elsif($obj->{method} =~ /(Playlist|AudioLibrary|VideoLibrary|System).On(.*)/) {
     readingsSingleUpdate($hash,lc($1),lc($2),1);
@@ -763,6 +767,10 @@ sub XBMC_CreateReading($$$) {
     # we dont want to create a "streamdetails" reading
     $key = undef; 
   }
+  elsif($key eq 'stereoscopicmode') {
+    $value = $value->{mode};
+  }
+  
   if(ref($value) eq 'ARRAY') {
     $value = join(',',@$value);
   }
