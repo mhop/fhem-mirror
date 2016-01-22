@@ -86,6 +86,7 @@ sub getMAC4IP($)
   my $IP = shift;
   my @interfaces = IO::Interface::Simple->interfaces;
   foreach my $if (@interfaces) {
+    next unless defined ($if->address);
     if ($if->address eq $IP) {
         return $if->hwaddr;
     }
