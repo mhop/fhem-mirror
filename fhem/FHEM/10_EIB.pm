@@ -20,6 +20,9 @@
 # ABU 20151207 added dpt3, fixed doku-section myDimmer
 # ABU 20151213 added dpt13
 # ABU 20151221 added multiple group support for get according thread 45954
+# ABU 20160111 added feature EIBreadingRegex, EIBwritingRegex, Fixed some doku
+# ABU 20160116 fixed motd-error due to debug-mode
+# ABU 20160122 fixed doku, changed return value for EIB_Set from undef to "", reintegrated multiple group sending
 
 package main;
 
@@ -144,6 +147,8 @@ EIB_Initialize($) {
 							"EIBreadingX:1,0 " .
 							"EIBreadingSender:1,0 " .
 							"EIBanswerReading:1,0 " .
+							"EIBreadingRegex " .
+							"EIBwritingRegex " .
 							"$readingFnAttributes " .
 							"model:".join(",", keys %eib_dpttypes);
 }
@@ -270,7 +275,8 @@ EIB_Get($@) {
 sub
 EIB_Set($@) {
 	my ($hash, @a, $str) = @_;
-	my $ret = undef;
+	#my $ret = undef;
+	my $ret = "";
 	my $na = int(@a);
 
 	#return, if no set value specified
@@ -299,6 +305,19 @@ EIB_Set($@) {
 	}
   
   	my $groupnr = 1;
+	
+	# the command can be send to any of the defined groups indexed starting by 1
+	# optional last argument starting with g indicates the group
+	# execute only for non-strings. Otherwise a "g" is interpreted to execute this group-send-mechanism...
+	if ($value ne "string")
+	{
+		$groupnr = $1 if($na>2 && $a[$na-1]=~ m/g([0-9]*)/);
+		#return, if unknown group
+		return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
+	}
+	my $v = join(" ", @a);
+	Log3 $name, 5, "EIB set $v";
+	(undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 	
 	# the command can be send to any of the defined groups indexed starting by 1
 	# optional last argument starting with g indicates the group
@@ -420,10 +439,38 @@ EIB_Set($@) {
 	my $defptr = $modules{EIB}{defptr}{$code};
 	foreach my $n (keys %{ $defptr })
 	{
+		my $regAttr = $attr{$n}{"EIBwritingRegex"};
+		if ($regAttr)
+		{
+			#substitute contents of state, if desired
+			#
+			#get array of given attributes
+			my @reg = split("[ ]", $regAttr);
+			#format reading as input for regex
+			my $tempVal = "setG$groupnr:$v";
+								
+			#loop over all regex
+			for (my $i = 0; $i < int(@reg); $i++)
+			{
+				#get search / replaye parts
+				my @regInner = split("\/", $reg[$i]);
+				$tempVal =~ s/$regInner[0]/$regInner[1]/g;
+									
+				#log it
+				Log (5, "modified set with regex s/$regInner[0]/$regInner[1]/g to value $tempVal");
+				print ("modified set with regex s/$regInner[0]/$regInner[1]/g to value $tempVal\n") if ($debug eq 1);
+			}
+			
+			#process result
+			readingsSingleUpdate($defptr->{$n},"state",$tempVal,1);
+		} else
+		{
+			#process regular reading
+			readingsSingleUpdate($defptr->{$n},"state",$v,1);
+		}
+
 		#debug
 		print "setg = $defptr->{$n}{NAME} , $groupnr , attr = AttrVal($defptr->{$n}{NAME},'EIBreadingX',0)n" if ($debug eq 1);
-		#process regular reading
-		readingsSingleUpdate($defptr->{$n}, "state", $v, 1);
 		#process extended reading - mark as set
 		readingsSingleUpdate($defptr->{$n},"setG" . $groupnr,$v,1) if (AttrVal($defptr->{$n}{NAME},'EIBreadingX',0) == 1);    
 	}
@@ -481,11 +528,39 @@ EIB_Parse($$) {
 							# parse/translate by datapoint type
 							$v = EIB_ParseByDatapointType($lh,$n,$rawv,$gnr); # MH added optional groupnr
 							$lh->{RAWSTATE} = $rawv;
-							$lh->{LASTGROUP} = $dev;
-				  
-							#process regular reading
-							readingsSingleUpdate($lh,"state",$v,1);
-
+							$lh->{LASTGROUP} = $dev;							
+							
+							my $regAttr = $attr{$n}{"EIBreadingRegex"};
+							if ($regAttr)
+							{
+								#substitute contents of state, if desired
+								#
+								#get array of given attributes
+								my @reg = split("[ ]", $regAttr);
+								#format reading as input for regex
+								my $tempVal = "getG$gnr:$v";
+								
+								#loop over all regex
+								for (my $i = 0; $i < int(@reg); $i++)
+								{
+									#get search / replaye parts
+									my @regInner = split("\/", $reg[$i]);
+									$tempVal =~ s/$regInner[0]/$regInner[1]/g;
+									
+									#log it
+									Log (5, "modified set with regex s/$regInner[0]/$regInner[1]/g to value $tempVal");
+									print ("modified set with regex s/$regInner[0]/$regInner[1]/g to value $tempVal\n") if ($debug eq 1);
+								}
+								
+								#process result
+								readingsSingleUpdate($lh,"state",$tempVal,1);
+							}
+							else
+							{
+								#process regular reading
+								readingsSingleUpdate($lh,"state",$v,1);
+							}
+	
 							#debug
 							print "getg = $n , group= $gnr , EIBreadingX = AttrVal($def->{$n}{NAME},'EIBreadingX',0)\n"  if ($debug eq 1);
 							#process extended reading - mark as "get"
@@ -1214,14 +1289,12 @@ eib_name2hex($)
   <div style="margin-left: 2em">
     <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt; g&lt;groupnr&gt;]</code>
     <p>where value one of:</p>
-    <ul>
 	  <li><b>on</b> switch on device</li>
 	  <li><b>off</b> switch off device</li>
 	  <li><b>on-for-timer</b> &lt;secs&gt; switch on the device for the given time. After the specified seconds a switch off command is sent.</li>
 	  <li><b>on-till</b> &lt;time spec&gt; switches the device on. The device will be switched off at the given time.</li>
       <li><b>raw</b> &lt;hexvalue&gt; sends the given value as raw data to the device.</li>
       <li><b>value</b> &lt;decimal value&gt; transforms the value according to the chosen model and send the result to the device.</li>
-    </ul>
     <p>Example:</p>
     <pre>
       set lamp1 on
@@ -1249,12 +1322,12 @@ eib_name2hex($)
 	<p>The current date and time can be sent to the bus by the following settings:</p>
 	<pre>
       define timedev EIB 0/0/7
-      attr timedev model dpt10
+      attr timedev model time
       attr timedev eventMap /value now:now/
       attr timedev webCmd now
       
       define datedev EIB 0/0/8
-      attr datedev model dpt11
+      attr datedev model date
       attr datedev eventMap /value now:now/
       attr datedev webCmd now
       
@@ -1269,91 +1342,40 @@ eib_name2hex($)
   <p><a name="EIBget"></a> <b>Get</b></p>
   <div style="margin-left: 2em">  
   <p>If you execute get for a EIB/KNX-Element there will be requested a state from the device. The device has to be able to respond to a read - this is not given for all devices.<br>
-	This function is not available for dummies.<br>
 	The answer from the bus-device is not shown in the toolbox, but is treated like a regular telegram.</p>
   </div>
-    
+  
   <p><a name="EIBattr"></a> <b>Attributes</b></p>
-  <div style="margin-left: 2em">   
-  <ul>
-    <li><a href="#IODev">IODev</a></li>
-    <li><a href="#alias">alias</a></li>
-    <li><a href="#comment">comment</a></li>
-    <li><a href="#devStateIcon">devStateIcon</a></li>
-    <li><a href="#devStateStyle">devStateStyle</a></li>
-<!--    <li><a href="#do_not_notify">do_not_notify</a></li> -->
-    <li><a href="#dummy">dummy</a></li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>    
-<!--    <li><a href="#event-aggregator">event-aggregator</a></li>
-    <li><a href="#event-min-interval">event-min-interval</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
--->
-    <li><a href="#eventMap">eventMap</a></li>
-    <li><a href="#group">group</a></li>
-    <li><a href="#icon">icon</a></li>
-    <li><a href="#ignore">ignore</a></li>
-<!--    <li><a href="#loglevel">loglevel</a></li> -->
-    <li><a href="#room">room</a></li>
-    <li><a href="#showtime">showtime</a></li>
-    <li><a href="#sortby">sortby</a></li>
-<!--    <li><a href="#stateFormat">stateFormat</a></li>
-    <li><a href="#userReadings">userReadings</a></li>
--->
-    <li><a href="#userattr">userattr</a></li>
-    <li><a href="#verbose">verbose</a></li>
-    <li><a href="#webCmd">webCmd</a></li>
-    <li><a href="#widgetOverride">widgetOverride</a></li>
-    <li><b>model</b> - 
-      set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>). The device state in FHEM is interpreted and shown according to the specification. 
-      <ul>
-        <li>dpt1   -> will be interpreted as on/off</li>
-      	<li>dpt5</li>
-      	<li>dpt5.003</li>
-      	<li>angle</li>
-      	<li>percent</li>
-		<li>dpt3 -> usage: set value to +/-0..100. -54 means dim down by 50%</li>
-      	<li>dpt5.004</li>
-      	<li>percent255</li>
-      	<li>dpt6</li>
-      	<li>dpt6.001</li>
-      	<li>dpt6.010</li>		
-      	<li>dpt7</li>
-      	<li>length-mm</li>
-      	<li>current-mA</li>
-      	<li>brightness</li>
-      	<li>timeperiod-ms</li>
-      	<li>timeperiod-min</li>
-      	<li>timeperiod-h</li>
-      	<li>dpt9</li>
-      	<li>tempsensor</li>
-      	<li>lightsensor</li>
-      	<li>speedsensor</li>
-      	<li>speedsensor-km/h</li>
-      	<li>pressuresensor</li>
-      	<li>rainsensor</li>
-      	<li>time1sensor</li>
-      	<li>time2sensor</li>
-      	<li>humiditysensor</li>
-      	<li>airqualitysensor</li>
-      	<li>voltage-mV</li>
-      	<li>current-mA2</li>
-      	<li>current-mA2</li>
-      	<li>power</li>
-      	<li>powerdensity</li>
-      	<li>dpt10  -> transferred from and to state, format hh:mm:ss</li>
-		<li>dpt10_ns  -> same as DPT10, seconds always 0</li>
-      	<li>time  -> receiving has no effect, sending any value contains actual system time</li>
-      	<li>dpt11  -> transferred from and to state, format hh:mm:ss</li>
-      	<li>date  -> receiving has no effect, sending any value contains actual system date</li>
-      	<li>dpt12</li>
-		<li>dpt13</li>
-      	<li>dpt14</li>
-      	<li>dpt16  -> has to be used with "set string"</li>
-      </ul>      
-    </li>
-
-    <li><b>EIBreadingX</b> - 
+  <div style="margin-left: 2em"><br> 
+    <a href="#IODev">IODev</a><br>
+    <a href="#alias">alias</a><br>
+    <a href="#comment">comment</a><br>
+    <a href="#devStateIcon">devStateIcon</a><br>
+    <a href="#devStateStyle">devStateStyle</a><br>
+    <a href="#do_not_notify">do_not_notify</a><br>
+    <a href="#dummy">dummy</a><br>
+    <a href="#readingFnAttributes">readingFnAttributes</a><br>
+    <a href="#event-aggregator">event-aggregator</a><br>
+    <a href="#event-min-interval">event-min-interval</a><br>
+    <a href="#event-on-change-reading">event-on-change-reading</a><br>
+    <a href="#event-on-update-reading">event-on-update-reading</a><br>
+    <a href="#eventMap">eventMap</a><br>
+    <a href="#group">group</a><br>
+    <a href="#icon">icon</a><br>
+    <a href="#ignore">ignore</a><br>
+    <a href="#room">room</a><br>
+    <a href="#showtime">showtime</a><br>
+    <a href="#sortby">sortby</a><br>
+    <a href="#stateFormat">stateFormat</a><br>
+    <a href="#userReadings">userReadings</a><br>
+    <a href="#userattr">userattr</a><br>
+    <a href="#verbose">verbose</a><br>
+    <a href="#webCmd">webCmd</a><br>
+    <a href="#widgetOverride">widgetOverride</a><br>
+	<br>
+	
+	<p><a name="EIBreadingX"></a> <b>EIBreadingX</b></p>
+	<div style="margin-left: 2em"> 
     Enable additional readings for this EIB-device. With this Attribute set, a reading setG&lt;x&gt; will be updated when a set command is issued from FHEM, a reading getG&lt;x&gt; will be updated as soon a Value is received from EIB-Bus (&lt;x&gt; stands for the groupnr. - see define statement). The logic for the state reading remains unchanged. This is especially useful when the define statement contains more than one group parameter. 
     <p>If set to 1, the following additional readings will be available:</p>
       <pre>
@@ -1364,43 +1386,124 @@ eib_name2hex($)
       <pre>
       define myDimmer EIB 0/1/1 0/1/2
       attr myDimmer EIBreadingX 1
-      attr myDimmer model dpt1 dpt5.Slider # GA 0/1/1 will be interpreted as on/off, GA 0/1/2 will be handled as dpt5 and show a slider on FHEMWEB
-      attr myDimmer eventMap /on:An/off:Aus/value g2:dim/
-      attr myDimmer webCmd on:off:dim
-      attr myDimmer stateFormat getG2 % # copies actual dim-level (as sent/received to/from dimmer) into STATE 
+      attr myDimmer model dpt1 dpt5 # GA 0/1/1 will be interpreted as on/off, GA 0/1/2 will be handled as dpt5
+      attr myDimmer stateFormat getG2 % # copies actual dim-level (as received from dimmer) into STATE 
       </pre>    
-     </li>
 	 <p>If the EIBreadingX is set, you can specify multiple blank separated models to cope with multiple groups in the define statement. The setting cannot be done thru the pulldown-menu, you have to specify them with <code>attr &lt;device&gt; model &lt;dpt1&gt; &lt;dpt2&gt; &lt;dpt3&gt;</code></p> 
-
-    <li><b>EIBreadingSender</b> - 
+	</div>
+	
+	<p><a name="EIBreadingSender"></a> <b>EIBreadingSender</b></p>
+	<div style="margin-left: 2em"> 
     Enable an additional reading for this EIB-device. With this Attribute set, a reading sender will be updated any time a new telegram arrives.
-    <p>If set to 1, the following additional reading will be available:</p>
+    <p>If set to 1, the following additional reading will be available: <pre>sender</pre></p>
       <pre>
       sender will be updated any time a new telegram arrives at this group-adress
       </pre>
       <p>Example:</p>
       <pre>
-      define myDimmer EIB 0/1/1 0/1/2
+      define myDimmer EIB 0/1/1
       attr myDimmer EIBreadingSender 1
       </pre>    
-     </li>	 
-	 
-    <li><b>EIBreadOnStart</b> - 
+	</div>
+
+	<p><a name="EIBanswerReading"></a> <b>EIBanswerReading</b></p>
+	<div style="margin-left: 2em"> 
     If enabled, FHEM answers on read requests. The content of state is send to the bus as answer.
     <p>If set to 1, read-requests are answered</p>
-      <pre>
-      FHEM will respond
-      </pre>
       <p>Example:</p>
       <pre>
-      define myDimmer EIB 0/1/1 0/1/2
-      attr myDimmer EIBanswerReading 1
+      define myValue EIB 0/1/1
+      attr myValue EIBanswerReading 1
       </pre>    
-     </li>
-	 
-  </ul>   
-  </div>
+	</div>
+
+	<p><a name="EIBreadingRegex"></a> <b>EIBreadingRegex</b></p>
+	<div style="margin-left: 2em"> 
+    You can pass n pairs of regex-pattern and string to replace, seperated by a slash. Internally the "new" state is always in the format getG[n]:[state]. The substitution is done every time, a new object is received. You can use this function for converting, adding units, having more fun with icons, ... 
+	This function has only an impact on the content of state - no other functions are disturbed.
+      <p>Example:</p>
+      <pre>
+      define myLamp EIB 0/1/1 0/1/2 0/1/2
+      attr myLamp EIBreadingRegex getG[1]:/steuern: getG[2]:/status: getG[3]:/sperre:
+	  attr myLamp EIBreadingRegex devStateIcon status.on:general_an status.off:general_aus sperre.on:lock
+      </pre>    
+    </div>	 
+
+	<p><a name="EIBwritingRegex"></a> <b>EIBwritingRegex</b></p>
+	<div style="margin-left: 2em"> 
+    You can pass n pairs of regex-pattern and string to replace, seperated by a slash. Internally the "new" state is always in the format setG1:[state]. The substitution is done every time, after an object is send. You can use this function for converting, adding units, having more fun with icons, ... 
+	This function has only an impact on the content of state - no other functions are disturbed.
+      <p>Example:</p>
+      <pre>
+      define myLockObject EIB 0/1/1
+      attr myLamp EIBwritingRegex setG1:on/LOCKED setG1:/UNLOCKED
+      </pre>    
+    </div>	 
+
+	<p><a name="model"></a> <b>model</b></p>
+	<div style="margin-left: 2em"> 
+	<p>This attribute is mandatory!</p>
+	Set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>). The device state in FHEM is interpreted and shown according to the specification.<br>
+        <br>
+		<U>dpt1</U> - 1 bit<br>
+		Will be interpreted as on/off, 1=on 0=off and vice versa<br>
+		<br>
+		<U>dpt3</U> - Discrete Dim-Message<br>
+		Usage: set value to +/-0..100. -54 means dim down by 50%<br>
+      	<br>
+		<U>dpt5</U> - 1 byte unsigned<br>
+      	dpt5.003 - angle in degrees<br>
+      	angle - same as dpt5.003<br>
+      	dpt5.004 - percent<br>
+      	percent - same as above<br>
+      	percent255 - scaled percentage: 255=100%<br>
+		<br>
+      	<U>dpt6</U> - 1 byte signed <br>
+		dpt6.001 - percent<br>
+      	dpt6.010<br>		
+		<br>
+      	<U>dpt7</U> - 2 byte unsigned<br>
+      	length - mm<br>
+      	current - mA<br>
+      	brightness<br>
+      	timeperiod - ms<br>
+      	timeperiod - min<br>
+      	timeperiod - h<br>
+		<br>
+      	<U>dpt9</U> - 2 byte float<br>
+      	tempsensor<br>
+      	lightsensor<br>
+      	speedsensor<br>
+      	speedsensor-km/h<br>
+      	pressuresensor<br>
+      	rainsensor<br>
+      	time1sensor<br>
+      	time2sensor<br>
+      	humiditysensor<br>
+      	airqualitysensor<br>
+      	voltage-mV<br>
+      	current-mA2<br>
+      	current-mA2<br>
+      	power<br>
+      	powerdensity<br>
+		<br>
+      	<U>dpt10</U> - time hh:mm:ss<br>
+		dpt10_ns - same as DPT10, seconds always 0<br>
+      	time - receiving has no effect, sending any value contains actual system time. For examle use set timedev value now<br>
+		<br>
+      	<U>dpt11</U> - date dd.mm.yyyy<br>
+      	date - receiving has no effect, sending any value contains actual system date. For examle use set timedev value now<br>
+		<br>
+      	<U>dpt12</U> - 4 byte unsigned<br>
+		<br>
+		<U>dpt13</U> - 4 byte signed<br>
+      	<br>
+		<U>dpt14</U> - 4 byte float<br>
+      	<br>
+		<U>dpt16</U>  - text, use with "string": set textdev string Hallo Welt<br>
+	</div>
 </div>
+
 
 =end html
 =cut
