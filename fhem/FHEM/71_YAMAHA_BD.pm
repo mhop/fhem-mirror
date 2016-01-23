@@ -81,6 +81,9 @@ YAMAHA_BD_GetStatus($;$)
 
     Log3 $name, 4, "YAMAHA_BD ($name) - Requesting system status";
     YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Service_Info>GetParam</Service_Info></System></YAMAHA_AV>", "statusRequest","systemStatus");
+    
+    Log3 $name, 4, "YAMAHA_BD ($name) - Requesting input info";
+    YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Input_Info>GetParam</Input_Info></Main_Zone></YAMAHA_AV>", "statusRequest","inputInfo");
 
     Log3 $name, 4, "YAMAHA_BD ($name) - Requesting power state";
     YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Power_Control><Power>GetParam</Power></Power_Control></Main_Zone></YAMAHA_AV>", "statusRequest","powerStatus");
@@ -430,7 +433,11 @@ YAMAHA_BD_Set($@)
     {
             YAMAHA_BD_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Play_Control><Play>Stop</Play></Play_Control></Main_Zone></YAMAHA_AV>", "play",undef);
     }
-    elsif($what ne "statusRequest")
+    elsif($what eq "statusRequest")
+    {
+        YAMAHA_BD_GetStatus($hash, 1);
+    }
+    else
     {
         return $usage;
     }
@@ -699,6 +706,17 @@ YAMAHA_BD_ParseResponse($$$)
                 readingsBulkUpdate($hash, "trickPlay", $1);    
             }       
         }
+        elsif($cmd eq "statusRequest" and $arg eq "inputInfo")
+        {
+            if($data =~ /<Input_Info><Status>(.+?)<\/Status><\/Input_Info/)
+            {
+                readingsBulkUpdate($hash, "input", $1);    
+            }
+            elsif($data =~ /<Input_Info>(.+?)<\/Input_Info/)
+            {
+                readingsBulkUpdate($hash, "input", $1);
+            }
+        }
         elsif($cmd eq "statusRequest" and $arg eq "playInfo")
         {
             if($data =~ /<Status>(.+?)<\/Status>/)
@@ -739,15 +757,6 @@ YAMAHA_BD_ParseResponse($$$)
             if($data =~ /<Disc_Type>(.+?)<\/Disc_Type>/)
             {
                 readingsBulkUpdate($hash, "discType", $1);
-            }
-            
-            if($data =~ /<Input_Info><Status>(.+?)<\/Status><\/Input_Info/)
-            {
-                readingsBulkUpdate($hash, "input", $1);    
-            }
-            elsif($data =~ /<Input_Info>(.+?)<\/Input_Info/)
-            {
-                readingsBulkUpdate($hash, "input", $1);
             }
             
             if($data =~ /<Tray>(.+?)<\/Tray>/)
@@ -1018,8 +1027,8 @@ sub YAMAHA_BD_formatTimestamp($)
   </ul>
   <b>Generated Readings/Events:</b><br>
   <ul>
-  <li><b>input</b> - The current playback source (can be "DISC", "USB" or "Network")</li>
-  <li><b>discType</b> - The current type of disc, which is inserted (e.g. "No Disc", "CD", "DVD", "BD",...)</li>
+  <li><b>input</b> - The current playback source (e.g. "DISC", "USB", "Network", "YouTube", ...)</li>
+  <li><b>discType</b> - The current type of disc, which is inserted (e.g. "No Disc", "CD", "DVD", "BD", ...)</li>
   <li><b>contentType</b> - The current type of content, which is played (e.g. "audio", "video", "photo" or "no contents")</li>
   <li><b>error</b> - indicates an hardware error of the player (can be "none", "fan error" or "usb overcurrent")</li>
   <li><b>power</b> - Reports the power status of the player or zone (can be "on" or "off")</li>
@@ -1198,8 +1207,8 @@ sub YAMAHA_BD_formatTimestamp($)
   </ul>
   <b>Generierte Readings/Events:</b><br>
   <ul>
-  <li><b>input</b> - Die aktuelle Wiedergabequelle ("DISC", "USB" oder "Network")</li>
-  <li><b>discType</b> - Die Art der eingelegten Disc (z.B "No Disc" => keine Disc eingelegt, "CD", "DVD", "BD",...)</li>
+  <li><b>input</b> - Die aktuelle Wiedergabequelle (z.B. "DISC", "USB", "Network", "YouTube", ...)</li>
+  <li><b>discType</b> - Die Art der eingelegten Disc (z.B "No Disc" => keine Disc eingelegt, "CD", "DVD", "BD", ...)</li>
   <li><b>contentType</b> - Die Art des Inhaltes, der gerade abgespielt wird ("audio", "video", "photo" oder "no contents")</li>
   <li><b>error</b> - zeigt an, ob ein interner Fehler im Player vorliegt ("none" => kein Fehler, "fan error" => L&uuml;fterdefekt, "usb overcurrent" => USB Spannungsschutz)</li>
   <li><b>power</b> - Der aktuelle Betriebsstatus ("on" => an, "off" => aus)</li>
