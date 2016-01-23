@@ -23,6 +23,7 @@
 # ABU 20160111 added feature EIBreadingRegex, EIBwritingRegex, Fixed some doku
 # ABU 20160116 fixed motd-error due to debug-mode
 # ABU 20160122 fixed doku, changed return value for EIB_Set from undef to "", reintegrated multiple group sending
+# ABU 20160123 fixed issue for sending with additional groups
 
 package main;
 
@@ -280,7 +281,7 @@ EIB_Set($@) {
 	my $na = int(@a);
 
 	#return, if no set value specified
-	return "no set value specified" if($na < 2 || $na > 4);
+	return "no set value specified" if($na < 2);# || $na > 4);
 	#return, if this is a readonly-device
 	return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
 	#return, if this is a dummy device
@@ -305,34 +306,23 @@ EIB_Set($@) {
 	}
   
   	my $groupnr = 1;
+	my $extGroupNr = undef;
 	
 	# the command can be send to any of the defined groups indexed starting by 1
 	# optional last argument starting with g indicates the group
-	# execute only for non-strings. Otherwise a "g" is interpreted to execute this group-send-mechanism...
-	if ($value ne "string")
-	{
-		$groupnr = $1 if($na>2 && $a[$na-1]=~ m/g([0-9]*)/);
-		#return, if unknown group
-		return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
-	}
-	my $v = join(" ", @a);
-	Log3 $name, 5, "EIB set $v";
-	(undef, $v) = split(" ", $v, 2);	# Not interested in the name...
+	$extGroupNr = $1 if($na>2 && $a[$na-1]=~ m/g([0-9]*)/);
 	
-	# the command can be send to any of the defined groups indexed starting by 1
-	# optional last argument starting with g indicates the group
-	# execute only for non-strings. Otherwise a "g" is interpreted to execute this group-send-mechanism...
-	if ($value ne "string")
+	if (defined ($extGroupNr))
 	{
-		$groupnr = $1 if($na>2 && $a[$na-1]=~ m/g([0-9]*)/);
-		#return, if unknown group
-		return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
+		$groupnr = $extGroupNr;
+		print ("Found supplied group-no.: $extGroupNr\n") if ($debug eq 1);
 	}
-	
-	my $v = join(" ", @a);
-	Log3 $name, 5, "EIB set $v";
-	(undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
+	return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
+		
+	my $v = join(" ", @a);
+	Log3 $name, 5, "EIB set $v";
+	(undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
 	if($value eq "raw" && defined($arg1)) 
 	{ 
@@ -352,8 +342,13 @@ EIB_Set($@) {
 	{
 		my $str = "";
 		
-		#append all following args
-		for (my $i=2;$i<$na;$i++)
+		#append all following args...
+		my $argLen = $na;
+		#...except the last argument is a group-no
+		$argLen -= 1 if (defined $extGroupNr);
+		
+		#join string
+		for (my $i=2;$i<$argLen;$i++)
 		{
 		  $str.= $a[$i]." ";		  
 		}
@@ -361,6 +356,10 @@ EIB_Set($@) {
 		#trim whitespaces at the end
 		$str =~ s/^\s+|\s+$//g;
 
+		return "String too long, max. 14 chars allowed" if(length($str) > 14); 
+		
+		Log3 $name, 5, "set string $str";
+		
 		# value to be translated according to datapoint type
 		$c = EIB_EncodeByDatapointType($hash,$name,$str,$groupnr);
   	
@@ -620,15 +619,7 @@ EIB_EncodeByDatapointType($$$$) {
 		Log3 $hash, 3,"EIB encode: no model defined for $name. Replaced with DPT1.";
 	}
 	
-	my $code = $eib_dpttypes{"$model"}{"CODE"};
-	
-	#invalid model defined
-	if (!defined($code)) 
-	{
-		Log3 $hash, 1,"EIB encode: invalid model defined for $name. Breaking up...";
-		return undef;	
-	}
-
+	#no gnr defined
 	if (defined($gnr)) 
 	{
 		$model = $model_array[$gnr-1] if (defined($model_array[$gnr-1]));
@@ -637,6 +628,15 @@ EIB_EncodeByDatapointType($$$$) {
 	{
 		Log3 $hash, 2,"EIB encode no gnr defined";
 		return undef;
+	}
+	
+	my $code = $eib_dpttypes{"$model"}{"CODE"};
+	
+	#invalid model defined
+	if (!defined($code)) 
+	{
+		Log3 $hash, 1,"EIB encode: invalid model defined for $name. Breaking up...";
+		return undef;	
 	}
 	
 	if (!defined($value)) 
