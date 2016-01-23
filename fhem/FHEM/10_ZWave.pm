@@ -2189,6 +2189,7 @@ ZWave_associationRequest($$)
   return if($grp >= $nGrp);
   $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationRequest;
   ZWave_Set($hash, $hash->{NAME}, "associationRequest", $grp+1);
+  return undef; # No veto for further parsing
 }
 
 
@@ -3358,26 +3359,28 @@ ZWave_Parse($$@)
       next;
     }
 
-    my $matched = 0;
-    foreach my $k (keys %{$ptr}) {
-      if($arg =~ m/^$k/) {
-        my $val = $ptr->{$k};
-        my @val = ($val);
-        @val = eval $val if(index($val, '$') >= 0);
-        push @event, @val if(defined($val[0]));
-        $matched++;
-      }
-    }
-
+    my $hookVeto = 0;
     foreach my $h (keys %zwave_parseHook) {
       if("$id:$arg" =~ m/$h/) {
         my $fn = $zwave_parseHook{$h};
         delete $zwave_parseHook{$h};
-        $fn->($hash, $arg);
+        $hookVeto++ if($fn->($hash, $arg));
       }
     }
 
-    push @event, "UNPARSED:$className $arg" if(!$matched);
+    if(!$hookVeto) {
+      my $matched = 0;
+      foreach my $k (keys %{$ptr}) {
+        if($arg =~ m/^$k/) {
+          my $val = $ptr->{$k};
+          my @val = ($val);
+          @val = eval $val if(index($val, '$') >= 0);
+          push @event, @val if(defined($val[0]));
+          $matched++;
+        }
+      }
+      push @event, "UNPARSED:$className $arg" if(!$matched);
+    }
   }
 
   if($arg =~ m/^028407/) { # wakeup:notification
