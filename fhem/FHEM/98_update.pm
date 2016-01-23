@@ -218,6 +218,12 @@ doUpdateLoop($$)
     doUpdate(++$curr, $max, $srcLine, $arg);
     HttpUtils_Close(\%upd_connecthash);
   }
+
+  if($updateInBackground) {
+    BlockingInformParent("DoTrigger", ["global", "UPDATE", 0 ], 0)
+  } else {
+    DoTrigger("global","UPDATE", 0);
+  }
 }
 
 sub
@@ -627,7 +633,8 @@ upd_initRestoreDirs($)
   Update the FHEM installation. Technically this means update will download
   the controlfile(s) first, compare it to the local version of the file in the
   moddir/FHEM directory, and download each file where the attributes (timestamp
-  and filelength) are different.
+  and filelength) are different. Upon completion it triggers the global:UPDATE
+  event.
   <br>
   With the commands add/delete/list/reset you can manage the list of
   controlfiles, e.g. for thirdparty packages.
@@ -725,7 +732,8 @@ upd_initRestoreDirs($)
   Kontroll-Datei(en) heruntergeladen, und mit der lokalen Version dieser Datei
   in moddir/FHEM verglichen. Danach werden alle in der  Kontroll-Datei
   spezifizierten Dateien heruntergeladen, deren Gr&ouml;&szlig;e oder
-  Zeitstempel sich unterscheidet.
+  Zeitstempel sich unterscheidet. Wenn dieser Ablauf abgeschlossen ist, wird
+  das globale UPDATE Ereignis ausgel&ouml;st.
   <br>
   Mit den Befehlen add/delete/list/reset kann man die Liste der Kontrolldateien 
   pflegen.
