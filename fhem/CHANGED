@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: YAMAHA_BD: input reading indicates now Netflix, YouTube, and all
+             other online apps.
   - feature: 73_GasCalculator: New module for calc. around the gas consumption
   - feature: FB_CALLLIST: new attribute "no-table-header" added, to hide the
              table header for the whole list
