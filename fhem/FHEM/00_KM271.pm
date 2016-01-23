@@ -13,17 +13,17 @@ use warnings;
 use Time::HiRes qw( time );
 
 my %km271_sets = (
-  "hk1_nachtsoll"   => {SET => "07006565%02x656565:0700%02x", # 0.5 celsius
+  "hk1_nachtsoll"   => {SET => "07006565%02x656565:0702%02x", # 0.5 celsius
                         OPT => ":slider,10,0.5,30,1"},
-  "hk1_tagsoll"     => {SET => "0700656565%02x6565:0701%02x", # 0.5 celsius
+  "hk1_tagsoll"     => {SET => "0700656565%02x6565:0703%02x", # 0.5 celsius
                         OPT => ":slider,10,0.5,30,1"},
-  "hk1_betriebsart" => {SET => "070065656565%02x65:0702%02x",
+  "hk1_betriebsart" => {SET => "070065656565%02x65:0704%02x",
                         OPT => ""},
-  "hk2_nachtsoll"   => {SET => "08006565%02x656565:0800%02x", # 0.5 celsius
+  "hk2_nachtsoll"   => {SET => "08006565%02x656565:0802%02x", # 0.5 celsius
                         OPT => ":slider,10,0.5,30,1"},
-  "hk2_tagsoll"     => {SET => "0800656565%02x6565:0801%02x", # 0.5 celsius
+  "hk2_tagsoll"     => {SET => "0800656565%02x6565:0803%02x", # 0.5 celsius
                         OPT => ":slider,10,0.5,30,1"},
-  "hk2_betriebsart" => {SET => "080065656565%02x65:0802%02x",
+  "hk2_betriebsart" => {SET => "080065656565%02x65:0804%02x",
                         OPT => ""},
 
   "ww_soll"         => {SET => "0C07656565%02x6565:0c07%02x", # 1.0 celsius
@@ -44,6 +44,9 @@ my %km271_sets = (
   "hk2_timer"       => {SET => "12%s",
                         OPT => ""},
 
+  "sommer_ab"       => {SET => "070065%02x65656565:0701%02x",
+                        OPT => ":slider,9,1,31"},
+
   "logmode"         => {SET => "EE0000",
                         OPT => ":noArg"}
 );
@@ -61,12 +64,13 @@ my %km271_gets = (
 #   t (timer - special handling), eh (error history - special handling)
 my %km271_tr = (
   "CFG_Sommer_ab"                   => "0000:1,p:-9,a:8",
+  "cFG_Sommer_ab"                   => "0701:0,p:-9,a:8",  # fake reading for internal notify
   "CFG_HK1_Nachttemperatur"         => "0000:2,d:2",
-  "cFG_HK1_Nachttemperatur"         => "0700:0,d:2",  # fake reading for internal notify
+  "cFG_HK1_Nachttemperatur"         => "0702:0,d:2",  # fake reading for internal notify
   "CFG_HK1_Tagtemperatur"           => "0000:3,d:2",
-  "cFG_HK1_Tagtemperatur"           => "0701:0,d:2",  # fake reading for internal notify
+  "cFG_HK1_Tagtemperatur"           => "0703:0,d:2",  # fake reading for internal notify
   "CFG_HK1_Betriebsart"             => "0000:4,a:4",
-  "cFG_HK1_Betriebsart"             => "0702:0,a:4",  # fake reading for internal notify
+  "cFG_HK1_Betriebsart"             => "0704:0,a:4",  # fake reading for internal notify
   "CFG_HK1_Max_Temperatur"          => "000e:2",
   "CFG_HK1_Auslegung"               => "000e:4",
   "CFG_HK1_Aufschalttemperatur"     => "0015:0,a:9",
@@ -76,11 +80,11 @@ my %km271_tr = (
   "CFG_HK1_Temperatur_Offset"       => "0031:3,s,d:2",
   "CFG_HK1_Fernbedienung"           => "0031:4,a:0",
   "CFG_HK2_Nachttemperatur"         => "0038:2,d:2",
-  "cFG_HK2_Nachttemperatur"         => "0800:0,d:2",  # fake reading for internal notify
+  "cFG_HK2_Nachttemperatur"         => "0802:0,d:2",  # fake reading for internal notify
   "CFG_HK2_Tagtemperatur"           => "0038:3,d:2",
-  "cFG_HK2_Tagtemperatur"           => "0801:0,d:2",  # fake reading for internal notify
+  "cFG_HK2_Tagtemperatur"           => "0803:0,d:2",  # fake reading for internal notify
   "CFG_HK2_Betriebsart"             => "0038:4,a:4",
-  "cFG_HK2_Betriebsart"             => "0802:0,a:4",  # fake reading for internal notify
+  "cFG_HK2_Betriebsart"             => "0804:0,a:4",  # fake reading for internal notify
   "CFG_HK2_Max_Temperatur"          => "0046:2",
   "CFG_HK2_Auslegung"               => "0046:4",
   "CFG_HK2_Aufschalttemperatur"     => "004d:0,a:9",
@@ -472,10 +476,15 @@ KM271_Set($@)
   elsif($a[0] =~ m/^ww.*zirkulation$/) {
     return "Argument must be numeric (between 0 and 7)" if(!$numeric_val || $val < 0 || $val > 7);
   }
+  elsif($a[0] eq 'sommer_ab') {
+    return "Argument must be numeric (between 9 and 31)" if(!$numeric_val || $val < 9 || $val > 31);
+	# Two updates needed, here additionally HK2
+    push @{$hash->{SENDBUFFER}}, sprintf("080065%02x65656565", $val);
+  }
   elsif($a[0] =~ m/^hk.*timer$/) {  # Timer calculation
     return "\"set KM271 $a[0]\" needs typically 5 parameters (position on-day on-time off-day off-time)" if(@a < 3);
     $val = $a[1];
-    $numeric_val = ($val =~ m/^[.0-9]+$/);
+    $numeric_val = ($val =~ m/^[0-9]+$/);
     # 42 slots for a timer, but each interval uses two of them (on and off)
     return "Position must be numeric (between 1 and 21)" if(!$numeric_val || $val < 1 || $val > 21);
     my $pos = $val;
@@ -575,8 +584,7 @@ KM271_Set($@)
     # Dirty trick: Changes of the timer are not notified by the heater, so internal notification is added after the colon
     $val = sprintf("%02x%s:%s%s", $offset, $val, $key, $val);
   }
-  my $data = sprintf($cmd, $val, $val);
-  push @{$hash->{SENDBUFFER}}, $data;
+  push @{$hash->{SENDBUFFER}}, sprintf($cmd, $val, $val);
 
   END_SET:
   Log3 $name, 3, "$name: set " . join(" ", @a);
@@ -1052,6 +1060,13 @@ KM271_SetReading($$$$)
           <ul>
             <li>0: no circulation at all</li>
             <li>7: circulation is always on</li>
+          </ul></li>
+      <li>sommer_ab &lt;temp&gt;<br>
+          temp defines the threshold for switching between summer or winter mode of the heater<br>
+          temp must be between 9 and 31 with special meaning for<br>
+          <ul>
+            <li> 9: fixed summer mode (only hot water and frost protection)</li>
+            <li>31: fixed winter mode</li>
           </ul></li>
       <li>hk1_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
           sets the timer program for heating circuit 1<br>
