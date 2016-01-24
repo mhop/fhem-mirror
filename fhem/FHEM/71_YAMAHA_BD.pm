@@ -158,7 +158,17 @@ YAMAHA_BD_Set($@)
     return "No Argument given" if(!defined($a[1]));  
    
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on:noArg off:noArg statusRequest:noArg tray:open,close remoteControl:eject,up,down,left,right,return,enter,OSDonScreen,OSDstatus,topMenu,popupMenu,red,green,blue,yellow,0,1,2,3,4,5,6,7,8,9,setup,home,clear,program,search,repeat,repeat-AB,subtitle,angle,audio,pictureInPicture,secondVideo,secondAudio,power fast:forward,reverse slow:forward,reverse skip:forward,reverse play:noArg pause:noArg stop:noArg trickPlay:normal,repeatChapter,repeatTitle,repeatFolder,repeat-AB,randomChapter,randomTitle,randomAll,shuffleChapter,shuffleTitle,shuffleAll,setApoint";
+    my $usage = "Unknown argument $what, choose one of on:noArg ".
+                                                      "off:noArg ".
+                                                      "statusRequest:noArg ".
+                                                      "tray:open,close ".
+                                                      "remoteControl:power,eject,up,down,left,right,return,enter,OSDonScreen,OSDstatus,topMenu,popupMenu,red,green,blue,yellow,0,1,2,3,4,5,6,7,8,9,setup,home,clear,program,search,repeat,repeat-AB,subtitle,angle,audio,pictureInPicture,secondVideo,secondAudio".(exists($hash->{MODEL}) && $hash->{MODEL} eq "BD-S673" ? ",netflix" : "")." ".
+                                                      "fast:forward,reverse ".
+                                                      "slow:forward,reverse ".
+                                                      "skip:forward,reverse ".
+                                                      "play:noArg pause:noArg ".
+                                                      "stop:noArg ".
+                                                      "trickPlay:normal,repeatChapter,repeatTitle,repeatFolder,repeat-AB,randomChapter,randomTitle,randomAll,shuffleChapter,shuffleTitle,shuffleAll,setApoint";
 
     if($what eq "on")
     {        
@@ -320,11 +330,15 @@ YAMAHA_BD_Set($@)
         }
         elsif($a[2] eq "power")
         {
-            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7C80</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","repeat-AB");
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7C80</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","power");
         }
         elsif($a[2] eq "eject")
         {
-            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7C81</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","repeat-AB");
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7C81</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","eject");
+        }
+        elsif($a[2] eq "netflix")
+        {
+            YAMAHA_BD_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Remote_Control><RC_Code>7CFA</RC_Code></Remote_Control></Main_Zone></YAMAHA_AV>","remoteControl","netflix");
         }
         else
         {
