@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 04/2015
-my $thzversion = "0.147";
+# by immi 01/2016
+my $thzversion = "0.148";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -502,6 +502,7 @@ my %sets206 = (
   "p10RoomTempManual"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
   "p11DHWsetTempManual"	=> {parent=>"p01-p12", argMin =>  "10", argMax =>   "65",	unit =>" °C"},
   "p12FanStageManual"  => {parent=>"p01-p12", argMin =>   "0", argMax =>   "3",        unit =>""},
+  "p80EnableSolar"  => {parent=>"pSolar", argMin =>   "0", argMax =>   "1",        unit =>""},
   "pClockDay"          => {parent=>"sTimedate", argMin =>  "1", argMax =>  "31", unit =>""},
   "pClockMonth"        => {parent=>"sTimedate", argMin =>  "1", argMax =>  "12", unit =>""},
   "pClockYear"         => {parent=>"sTimedate", argMin =>  "12", argMax =>  "20",  unit =>""},
@@ -708,6 +709,7 @@ sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
  # unlink("data.txt");
   THZ_RemoveInternalTimer("THZ_GetRefresh");
+  Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
   #readingsSingleUpdate($hash, "state", "opened", 1); # copied from cul 26.11.2014
   my $timedelay= 5; 						#start after 5 seconds
   foreach  my $cmdhash  (keys %gets) {
@@ -903,6 +905,7 @@ sub THZ_Set($@){
   if(defined($parent) ) {
       my $parenthash=$gets{$parent};
       $cmdHex2 = $parenthash->{cmd2};	#overwrite $cmdHex2 with the parent
+	  Log3 $hash->{NAME}, 5, "searching for parent; parenthash= $parenthash, parent = $parent, cmdHex2 = $cmdHex2  ";
       $cmdHex2=THZ_encodecommand($cmdHex2, "get");  #read before write the register
       ($err, $msg) = THZ_Get_Comunication($hash,  $cmdHex2);
       if (defined($err))     {
@@ -1928,6 +1931,12 @@ sub THZ_backup_readings($){
      <br>
      If no attribute firmware is set, it is assumed your firmware is compatible with 4.39.
      <br>
+     A backup function has been implemented
+     <ul><code>
+     get Mythz zBackupParameters implemented
+     </code></ul> 
+    The command saves all pXXX in a backupfile with a special text format.
+    All (or some) parameters can be easily restored with one copy&paste from the backupfile in a telnet fhem session.
   </ul>
   <br>
 </ul>
