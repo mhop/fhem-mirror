@@ -7,12 +7,36 @@ $(document).ready(function(){
 
 var shortDays = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
-function FW_weekprofileInputDialog(title,inp,parent,callback)
+function FW_weekprofileInputDialog(title,inp,def,parent,callback)
 {
   var div = $("<div id='FW_weekprofileInputDiolog'>");
-  var content = $('<input type="'+inp+'">').get(0);
-  $(div).append(title);
-  $(div).append(content);
+  var table = $("<table>");
+  var content = [];
+  
+  for(var i=0; i<title.length; i++){
+    var tr = 
+    content[i] = $('<input type="'+inp[i]+'">').get(0);
+    if (def)
+      content[i].value = def[i];
+        
+    var tr = $("<tr>");
+    var td1 = $("<td>");
+    
+    $(td1).append(title[i]);
+    if (inp[i] == 'hidden') {
+      $(td1).attr("colspan","2");
+      $(td1).attr("align","center");
+    }
+      
+    var td2 = $("<td>");
+    
+    $(td2).append(content[i]);
+    $(tr).append(td1);
+    $(tr).append(td2);
+    table.append(tr);
+  }
+  $(div).append(table);
+  
   $("body").append(div);
   $(div).dialog({
     dialogClass:"no-close",modal:true, width:"auto", closeOnEscape:true, 
@@ -21,14 +45,21 @@ function FW_weekprofileInputDialog(title,inp,parent,callback)
     buttons: [{text:"OK", click:function(){
       $(this).dialog("close");
       $(div).remove();
-      if(callback)
-        callback(content.value,1);
+      if(callback) {
+        var backCont = [];
+        for(var i=0; i<content.length; i++){
+          backCont[i] = content[i].value;
+          if (inp[i] == 'checkbox') 
+            backCont[i] = content[i].checked;
+        }
+        callback(backCont,1);
+      }
     }},{text:"CANCEL", click:function(){
       $(this).dialog("close");
       $(div).remove();
       content.value = null;
       if(callback)
-        callback(content.value,0);
+        callback(null,0);
     }}]
   });
 
@@ -52,7 +83,7 @@ function FW_weekprofileMultiSelDialog(title, elementNames, elementLabels, select
       var sel = 0;
       if (selected && selected.indexOf(n)>=0) 
         sel=1;
-                    
+
       table += '<tr><td><div class="checkbox"><input name="'+n+'" type="checkbox"';
       table += (sel ? " checked" : "")+'/><label for="'+n+'"><span></span></label></div></td>';
       table += '<td><label for="' +n+'">'+l+'</label></td></tr>';
@@ -109,7 +140,7 @@ function weekprofile_DoEditWeek(devName,newPage)
         url = url.substr(pos);
     else
         url='';
-    window.location.assign(FW_root+'?cmd={weekprofile_editOnNewpage("'+widget.DEVICE+'","'+widget.CURPRF+'","'+url+'");;}');
+    window.location.assign(FW_root+'?cmd={weekprofile_editOnNewpage("'+widget.DEVICE+'","'+widget.CURTOPIC+':'+widget.CURPRF+'","'+url+'");;}');
   } else {
     widget.MODE = 'EDIT';
     $(widget.MENU.BASE).hide();
@@ -117,14 +148,49 @@ function weekprofile_DoEditWeek(devName,newPage)
   }
 }
 
-function FW_weekprofilePRFChached(devName,select)
+function FW_weekprofilePRF_chached(devName,select)
 {
   var widget = $('div[informid="'+devName+'"]').get(0)
   
   var prfName = select.options[select.selectedIndex].value;
   widget.CURPRF = prfName;
   widget.PROFILE = null;  
-  FW_queryValue('get '+devName+' profile_data '+prfName, widget);
+  FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF, widget);
+}
+
+function FW_weekprofileTOPIC_chached(devName,select)
+{
+  var widget = $('div[informid="'+devName+'"]').get(0)
+  
+  var topicName = select.options[select.selectedIndex].value;
+  widget.CURTOPIC = topicName;
+  widget.CURPRF = null;
+  widget.PROFILE = null;
+  FW_cmd(FW_root+'?cmd=get '+devName+' profile_names '+widget.CURTOPIC+'&XHR=1',function(data){FW_weekprofileGetValues(devName,"PROFILENAMES",data);});
+}
+
+function FW_weekprofileChacheTo(devName,topicName,profileName)
+{
+  var widget = $('div[informid="'+devName+'"]').get(0)
+  
+  widget.CURTOPIC = topicName;
+  widget.CURPRF = profileName;
+  widget.PROFILE = null;
+  FW_cmd(FW_root+'?cmd=get '+devName+' profile_names '+widget.CURTOPIC+'&XHR=1',function(data){FW_weekprofileGetValues(devName,"PROFILENAMES",data);});
+}
+
+function FW_weekprofileRestoreTopic(devName,bnt)
+{
+  var widget = $('div[informid="'+devName+'"]').get(0)
+  
+  FW_weekprofileInputDialog(["<p>Restore topic: '"+widget.CURTOPIC+"'&nbsp;?</p>"],["hidden"],null,bnt,function(name,ok){
+    if (ok == 1)
+        FW_cmd(FW_root+'?cmd=set '+devName+' restore_topic '+widget.CURTOPIC+'&XHR=1',function(data){
+        console.log(devName+" error restore topic '" +data+"'");
+        FW_errmsg(devName+" error restore topic '" +data+"'",5000);
+        return;
+      });
+    });
 }
 
 function FW_weekprofileSendToDev(devName,bnt)
@@ -143,12 +209,12 @@ function FW_weekprofileSendToDev(devName,bnt)
       }
       var selected = [];
       if (widget.MASTERDEV)
-            selected.push(widget.MASTERDEV);
+        selected.push(widget.MASTERDEV);
       FW_weekprofileMultiSelDialog("<span>Device(s):</span>",devicesNames,devicesAlias,selected,bnt, 
         function(sndDevs) {
           if (!sndDevs || sndDevs.length==0)
             return;
-          FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" send_to_device "+widget.CURPRF+" "+sndDevs.join(',')+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
+          FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" send_to_device "+widget.CURTOPIC+':'+widget.CURPRF+" "+sndDevs.join(',')+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
         });
       
     } catch(e){
@@ -165,10 +231,53 @@ function FW_weekprofileCopyPrf(devName,lnk)
 {
   var widget = $('div[informid="'+devName+'"]').get(0)
   
-  FW_weekprofileInputDialog("<span>Name:</span>","text",lnk,function(name,ok){
-    if (!name || name.length <=0)
+  var title = [];
+  var inp = [];
+  var def = [];
+  var idx = 0;
+  
+  var topic = '';
+  if (widget.USETOPICS==1) {
+    topic=widget.CURTOPIC+":";
+  }
+  
+  title[idx] = "<p>Create new entry from: "+topic+widget.CURPRF+"</p>";
+  inp[idx] = "hidden";
+  def[idx] = '';
+  idx++;
+  
+  if (widget.USETOPICS==1) {
+     title[idx] = "<p>Reference:</p>";
+     inp[idx] = "checkbox";
+     def[idx] = '';
+     idx++;
+    
+     title[idx] = "<p>Topic:</p>";
+     inp[idx] = "text";
+     def[idx] = widget.CURTOPIC;
+     idx++;
+  }
+    
+  title[idx] = "<p>Name:</p>";
+  inp[idx] = "text";
+  def[idx] = '';
+  
+  FW_weekprofileInputDialog(title,inp,def,lnk,function(names,ok){
+    if (ok < 1)
       return;
-    FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" copy_profile "+widget.CURPRF+" "+name+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
+    var topic = widget.CURTOPIC;
+    var name = names[names.length-1].trim();
+    var ref = 0;
+    if (widget.USETOPICS==1) {
+      topic = names[names.length-2].trim();
+      ref = names[names.length-3];
+    }    
+    if (topic.length < 1 || name.length < 1)
+      return;
+    if (ref != 0)
+      FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" reference_profile "+widget.CURTOPIC+':'+widget.CURPRF+" "+topic+':'+name+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
+    else
+      FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" copy_profile "+widget.CURTOPIC+':'+widget.CURPRF+" "+topic+':'+name+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
     });
 }
 
@@ -176,10 +285,10 @@ function FW_weekprofileRemovePrf(devName,lnk)
 {
   var widget = $('div[informid="'+devName+'"]').get(0)
   
-  FW_weekprofileInputDialog("<p>Delete Profile: '"+widget.CURPRF+"'&nbsp;?</p>","hidden",lnk,function(name,ok){
+  FW_weekprofileInputDialog(["<p>Delete Profile: '"+widget.CURTOPIC+':'+widget.CURPRF+"'&nbsp;?</p>"],["hidden"],null,lnk,function(name,ok){
     if (ok < 1)
       return;
-    FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" remove_profile "+widget.CURPRF+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
+    FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" remove_profile "+widget.CURTOPIC+':'+widget.CURPRF+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
     });
 }
 
@@ -187,42 +296,90 @@ function FW_weekprofileRemovePrf(devName,lnk)
 function FW_weekprofileShow(widget)
 {
   $(widget.MENU.BASE).show();
+  
+  var editIcon = $(widget.MENU.BASE).find('a[name="'+widget.DEVICE+'.edit"]').get(0);
+  $(editIcon).css("visibility", "visible"); //hide() remove the element
+  
   $(widget.MENU.CONTENT).empty();
   
-  var html='';
+  var selMargin=0;
+  var tdStyle="style=\"padding-left:0px;padding-right:0px\"";
+  
+  if (widget.USETOPICS == 1) {
+    selMargin = 2;
+    tdStyle = "style=\"padding:0px\"";
+  }
   
   if (widget.PROFILENAMES) {
-    html += "&nbsp;"
-    html += "<select name=\"PROFILES\" onchange=\"FW_weekprofilePRFChached('"+widget.DEVICE+"',this)\">";
-    for (var k=0; k < widget.PROFILENAMES.length; k++)
-    {
-        var selected = (widget.CURPRF == widget.PROFILENAMES[k]) ? "selected " : "";
-        html += "<option "+selected+"value=\""+widget.PROFILENAMES[k]+"\">"+widget.PROFILENAMES[k]+"</option>";
+    var html='';
+    html += '<table style="padding-bottom:0">';
+    html += "<tr><td style=\"padding:0px\">";
+    if (widget.USETOPICS == 1 && widget.TOPICNAMES) {
+        
+        html += "<select style=\"margin-bottom:"+selMargin+"px\" name=\"TOPICS\" onchange=\"FW_weekprofileTOPIC_chached('"+widget.DEVICE+"',this)\">";
+        for (var k=0; k < widget.TOPICNAMES.length; k++)
+        {
+            var name = widget.TOPICNAMES[k].trim();
+            var selected = (widget.CURTOPIC == name) ? "selected " : "";
+            html += "<option "+selected+"value=\""+name+"\">"+name+"</option>";
+        }
+        html += "</select>";
     }
-    html += "</select>";
     
-    html += "&nbsp;"
+    html += "</td>";
+    html += "<td rowspan=\"2\" "+tdStyle+">";
+    
     html += "<button type=\"button\"onclick=\"FW_weekprofileCopyPrf('"+widget.DEVICE+"',this)\" data-toggle=\"tooltip\" title=\"copy profile\">+</button>";   
     
     html += "&nbsp;"
     html += "<button type=\"button\" onclick=\"FW_weekprofileRemovePrf('"+widget.DEVICE+"',this)\" data-toggle=\"tooltip\" title=\"remove profile\">-</button>";   
     
     html += "&nbsp;"
-    html += "<button type=\"button\" onclick=\"FW_weekprofileSendToDev('"+widget.DEVICE+"',this)\" data-toggle=\"tooltip\" title=\"send to device\">--></button>";   
+    if (widget.USETOPICS == 0) {
+      html += "<button type=\"button\" onclick=\"FW_weekprofileSendToDev('"+widget.DEVICE+"',this)\" data-toggle=\"tooltip\" title=\"send to device\">--></button>";   
+    } else {
+      html += "<button type=\"button\" onclick=\"FW_weekprofileRestoreTopic('"+widget.DEVICE+"',this)\" data-toggle=\"tooltip\" title=\"restore topic\">T</button>";
+    }
+    
+    html += "</td></tr>";
+    html += "<tr><td "+tdStyle+">";    
+    html += "<select style=\"margin-top:"+selMargin+"px\" name=\"PROFILES\" onchange=\"FW_weekprofilePRF_chached('"+widget.DEVICE+"',this)\">";    
+    for (var k=0; k < widget.PROFILENAMES.length; k++)
+    {
+        var name = widget.PROFILENAMES[k];
+        var selected = (widget.CURPRF == name) ? "selected " : "";
+        html += "<option "+selected+"value=\""+name+"\">"+name+"</option>";
+    }
+    html += "</select>";
+    html += "</td></tr>";
+    
+    if (widget.PRFREF) {
+      $(editIcon).css("visibility", "hidden");
+      var names =  widget.PRFREF.split(':');
+      names[0] = names[0].trim();
+      names[1] = names[1].trim();
+      html += "<tr><td colspan=\"2\" align=\"left\" "+tdStyle+">";
+      html += "&nbsp;"
+      html += "<a href=\"javascript:void(0)\" onclick=\"FW_weekprofileChacheTo('"+widget.DEVICE+"','"+names[0]+"','"+names[1]+"')\">REF: "+names[0]+":"+names[1]+"</a>";
+      html += "</td></tr>";
+    }
+    html += "</table>";
     
     $(widget.MENU.CONTENT).append(html);
     
     var select = $(widget.MENU.CONTENT).find('select[name="PROFILES"]').get(0);
     var prfName = select.options[select.selectedIndex].value;
+    
     if (widget.CURPRF != prfName)
-      FW_weekprofilePRFChached(widget.DEVICE,select);
+      FW_weekprofilePRF_chached(widget.DEVICE,select);
   }
   
   if (!widget.PROFILE) {
     return;
   }
   
-  var table = widget.CONTENT;    
+  var table = widget.CONTENT;
+  $(table).empty();
   for (var i = 0; i < shortDays.length; ++i) {
     $(table).append('<tr class="'+ ( (i+1)%2==0 ? 'even':'odd')+ '"><td>'+widget.WEEKDAYS[i]+'</td></tr>');
     
@@ -242,7 +399,7 @@ function FW_weekprofileShow(widget)
   }
 }
 
-function FW_weekprofileEditTimeChanged(inp)
+function FW_weekprofileEditTime_changed(inp)
 {
   if (inp == null) {return;}
   var times = inp.value.split(':');
@@ -275,7 +432,7 @@ function FW_weekprofileEditRowStyle(table)
     inp.removeAttr('style');
     inp.removeAttr('readonly');
     
-    FW_weekprofileEditTimeChanged(inp.get(0));
+    FW_weekprofileEditTime_changed(inp.get(0));
     
     if (i==0){
       $(alltr[i]).find('span[name="STARTTIME"]').get(0).innerHTML = "00:00";
@@ -348,7 +505,7 @@ function FW_weekprofileEditDay(widget,day)
    
     html += "<td>-</td>";
     //to
-    html += "<td><input type=\"text\" name=\"ENDTIME\" size=\"5\" maxlength=\"5\" align=\"center\" value=\""+endTime+"\" onblur=\"FW_weekprofileEditTimeChanged(this)\"/></td>"; 
+    html += "<td><input type=\"text\" name=\"ENDTIME\" size=\"5\" maxlength=\"5\" align=\"center\" value=\""+endTime+"\" onblur=\"FW_weekprofileEditTime_changed(this)\"/></td>"; 
     
     //temp
     html += "<td><select name=\"TEMP\" size=\"1\">";
@@ -372,6 +529,8 @@ function FW_weekprofileEditDay(widget,day)
 
 function FW_weekprofileEditWeek(widget)
 {
+  $(widget.MENU.CONTENT).empty();
+  
   var table = widget.CONTENT; 
   var daysInRow = 2;
   
@@ -436,7 +595,7 @@ function FW_weekprofilePrepAndSendProf(devName)
   }
   try {
     var data=JSON.stringify(prf);
-    FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" profile_data "+widget.CURPRF+" "+data+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
+    FW_cmd(FW_root+"?cmd=set "+widget.DEVICE+" profile_data "+widget.CURTOPIC+':'+widget.CURPRF+" "+data+"&XHR=1",function(arg) {FW_weekprofileSendCallback(widget.DEVICE,arg);});
   } catch(e){
     FW_errmsg(devName+" Parameter "+e,5000);
     return;
@@ -468,14 +627,15 @@ function FW_weekprofileEditAbort(devName)
   FW_weekprofileBack(widget);
 }
 
-function FW_weekprofileSetValue(devName,data)
+function FW_weekprofileGetProfileData(devName,data)
 { 
   var widget = $('div[informid="'+devName+'"]').get(0);
   $(widget.CONTENT).empty();
   
+  var reuse = (data == "REUSEPRF") ? 1 : 0;
   var prf={};
   try {
-    (data == "REUSEPRF") ? prf = widget.PROFILE :  prf=JSON.parse(data);
+    (reuse) ? prf = widget.PROFILE :  prf=JSON.parse(data);
   } catch(e){
     console.log(devName+" error parsing json '" +data+"'");
     FW_errmsg(devName+" Parameter "+e,5000);
@@ -483,9 +643,25 @@ function FW_weekprofileSetValue(devName,data)
   }
   
   widget.PROFILE = prf;
+  widget.PRFREF = null;
   if (widget.MODE == 'SHOW')
   {
-    FW_weekprofileShow(widget);
+    if (reuse == 0 && widget.USETOPICS != 0) {
+      //check if data is a reference
+      FW_cmd(FW_root+'?cmd=get '+devName+' profile_references '+widget.CURTOPIC+':'+widget.CURPRF+'&XHR=1',function(data){
+          if (data != 0) {
+            var name = data.split(':');
+            if (name.length == 2) {
+              widget.PRFREF = data;
+            } else {
+              console.log(devName+" error get references '" +data+"'");
+            }
+          }
+          FW_weekprofileShow(widget);
+        });
+    } else  {
+      FW_weekprofileShow(widget);
+    }
   }
   else if (widget.MODE == 'EDIT')
   {
@@ -499,6 +675,7 @@ function FW_weekprofileSetValue(devName,data)
 
 function FW_weekprofileGetValues(devName,what,data)
 {
+  data = data.trim();
   if(data.match(/^[\r\n]*$/)) {return;}
   
   var widget = $('div[informid="'+devName+'"]').get(0);
@@ -507,9 +684,28 @@ function FW_weekprofileGetValues(devName,what,data)
     widget.WEEKDAYS = data.split(',');
   } else if (what == "PROFILENAMES") {
     widget.PROFILENAMES = data.split(',');
-    if (widget.MODE != 'EDIT') {      
-      widget.setValueFn("REUSEPRF");
+    
+    if (widget.MODE != 'EDIT') {
+      if (widget.CURPRF == null && widget.PROFILENAMES) {
+          widget.CURPRF = widget.PROFILENAMES[0]; 
+      }
+      FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF, widget);
+    } else {
+        widget.setValueFn("REUSEPRF");
     }
+  } else if (what == "TOPICNAMES") {
+      widget.TOPICNAMES = data.split(',');
+      var found = 0;
+      for (var k = 0; k < widget.TOPICNAMES.length; ++k) {
+        widget.TOPICNAMES[k] = widget.TOPICNAMES[k].trim();
+        if (widget.CURTOPIC == widget.TOPICNAMES[k]) {
+          found=1;
+        }
+      }
+      if (found==0) {
+        widget.CURTOPIC = widget.TOPICNAMES[0];
+      }
+      FW_weekprofileChacheTo(devName,widget.CURTOPIC,null);
   }
 }
 
@@ -541,19 +737,13 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   widget.MENU = new Object();
   widget.MENU.BASE = $(widget.HEADER).find('div[id*="menu.base"]').get(0);  
   
-  var menu = $('<div class="devType" id="weekprofile.menu.content" style="display:inline;padding:0px;margin:0px;">').get(0);
-  $(widget.MENU.BASE).append(menu);
-  widget.MENU.CONTENT = menu;
-  
-  //inform profile_count changed
-  var prfCnt = $('<div informid="'+devName+'-profile_count" style="display:none">').get(0);
-  prfCnt.setValueFn = function(arg){
-    FW_cmd(FW_root+'?cmd=get '+devName+' profile_names&XHR=1',function(data){FW_weekprofileGetValues(devName,"PROFILENAMES",data);});
-    }  
-  $(widget.HEADER).append(prfCnt);
+  var menuContent = '<td style="display:inline;padding:0px;margin:0px;"><div id="weekprofile.menu.content"></td>';
+  $(widget.MENU.BASE.parentElement.parentElement).append(menuContent);
+  widget.MENU.CONTENT = $(widget.HEADER).find('div[id*="menu.content"]').get(0);
   
   widget.SHOWURL = null;
   widget.MODE = 'SHOW';
+  widget.USETOPICS = 0;
 
   for (var i = 1; i < vArr.length; ++i) {
     var arg = vArr[i].split(':');
@@ -561,19 +751,38 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
       case "MODE":      widget.MODE = arg[1];       break;
       case "BACKURL":   widget.SHOWURL = arg[1];    break;
       case "MASTERDEV": widget.MASTERDEV = arg[1];  break;
+      case "USETOPICS": widget.USETOPICS = arg[1];  break;
     }
   }
   
   widget.DEVICE = devName;
   widget.WEEKDAYS = shortDays.slice();
-  widget.CURPRF = currVal;
   
-  widget.setValueFn = function(arg){FW_weekprofileSetValue(devName,arg);}
+  var current = currVal.split(':');
+  widget.CURTOPIC = current[0];
+  widget.CURPRF = current[1];
+  
+  widget.setValueFn = function(arg){FW_weekprofileGetProfileData(devName,arg);}
   widget.activateFn = function(arg){
-    FW_queryValue('get '+devName+' profile_data '+widget.CURPRF, widget);
+    FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF, widget);
     FW_cmd(FW_root+'?cmd={AttrVal("'+devName+'","widgetWeekdays","")}&XHR=1',function(data){FW_weekprofileGetValues(devName,"WEEKDAYS",data);});
-    FW_cmd(FW_root+'?cmd=get '+devName+' profile_names&XHR=1',function(data){FW_weekprofileGetValues(devName,"PROFILENAMES",data);});
+    if (widget.USETOPICS == 1) {
+      FW_cmd(FW_root+'?cmd=get '+devName+' topic_names&XHR=1',function(data){FW_weekprofileGetValues(devName,"TOPICNAMES",data);});
+    } else {
+      FW_cmd(FW_root+'?cmd=get '+devName+' profile_names '+widget.CURTOPIC+'&XHR=1',function(data){FW_weekprofileGetValues(devName,"PROFILENAMES",data);});
+    }
   };
+  
+  //inform profile_count changed
+  var prfCnt = $('<div informid="'+devName+'-profile_count" style="display:none">').get(0);
+  prfCnt.setValueFn = function(arg){
+    if (widget.USETOPICS == 1) {
+      FW_cmd(FW_root+'?cmd=get '+devName+' topic_names&XHR=1',function(data){FW_weekprofileGetValues(devName,"TOPICNAMES",data);});
+    } else {
+      FW_cmd(FW_root+'?cmd=get '+devName+' profile_names '+widget.CURTOPIC+'&XHR=1',function(data){FW_weekprofileGetValues(devName,"PROFILENAMES",data);});
+    }
+  }
+  $(widget.HEADER).append(prfCnt);
   return widget;
 }
 

@@ -60,7 +60,10 @@ sub weekprofile_getDeviceType($;$)
 
   if ($devHash->{TYPE} =~ /CUL_HM/){
     my $model = AttrVal($device,"model","");
-    $type = "CUL_HM" if ($model =~ m/.*(HM-CC|HM-TC).*/);
+    return undef if (!defined($devHash->{chanNo})); #no channel device
+    
+    $type = "CUL_HM" if ( ($model =~ m/.*(HM-CC).*/) && ($devHash->{chanNo} == 4) );
+    $type = "CUL_HM" if ( ($model =~ m/.*(HM-TC).*/) && ($devHash->{chanNo} == 2) );
   }
   #avoid max shutter contact
   elsif ( ($devHash->{TYPE} =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
@@ -362,6 +365,13 @@ sub weekprofile_updateReadings($)
     #readingsBulkUpdate($hash,$str,$prf->{NAME});
     #$idx++;
   #}
+  
+  splice(@{$hash->{TOPICS}});
+  foreach my $prf (@{$hash->{PROFILES}}) {
+    if ( !grep( /^$prf->{TOPIC}$/, @{$hash->{TOPICS}}) ) {
+      push @{$hash->{TOPICS}}, $prf->{TOPIC};
+    }
+  }
   readingsEndUpdate($hash, 1);
 }
 ############################################## 
@@ -406,9 +416,11 @@ sub weekprofile_Define($$)
   $hash->{STATE} = "defined";
   my @profiles = ();
   my @sendDevList = ();
+  my @topics = ();
    
-  $hash->{PROFILES} = \@profiles;
+  $hash->{PROFILES}   = \@profiles;
   $hash->{SNDDEVLIST} = \@sendDevList;
+  $hash->{TOPICS}     = \@topics;
   
   #$attr{$me}{verbose} = 5;
   
@@ -431,14 +443,15 @@ sub weekprofile_Get($$@)
   
   my $useTopics = AttrVal($name,"useTopics",0);
   
-  if (!$useTopics) {
-    $list.= 'profile_data:' if ($prfCnt > 0);  
-    foreach my $prf (@{$hash->{PROFILES}}){
-      $list.= $prf->{NAME}.",";
-    }
-    $list = substr($list, 0, -1) if ($prfCnt > 0);
-  } else {$list.= 'profile_data' if ($prfCnt > 0);}
+  $list.= 'profile_data:' if ($prfCnt > 0);
+  foreach my $prf (@{$hash->{PROFILES}}){
+    $list.= $prf->{TOPIC}.":" if ($useTopics);
+    $list.= $prf->{NAME}.","  if ($useTopics || (!$useTopics && ($prf->{TOPIC} eq 'default')));
+  }
+  $list = substr($list, 0, -1) if ($prfCnt > 0);
+  
 
+  #-----------------------------------------------------------------------------
   if($cmd eq "profile_data") {
     return 'usage: profile_data <name>' if(@params < 1);
     return "no profile" if ($prfCnt <= 0);
@@ -457,7 +470,7 @@ sub weekprofile_Get($$@)
     my $json_text = $json->encode($prf->{DATA});
     return $json_text;
   } 
-  
+  #-----------------------------------------------------------------------------
   $list.= ' profile_names';
   if($cmd eq "profile_names") {
     my $names = '';
@@ -468,20 +481,47 @@ sub weekprofile_Get($$@)
       $names .=$prf->{NAME}.","               if ($topic eq $prf->{TOPIC});
       $names .="$prf->{TOPIC}:$prf->{NAME},"  if ($topic eq '*');
     }
-    $names = substr($names, 0, -1);
+    if ($names) {
+      $names = substr($names, 0, -1);
+      $names =~ s/ $//;
+    }
     return $names;
   }
-  
-  $list.= ' profile_references:noArg';
+  #-----------------------------------------------------------------------------
+  $list.= ' profile_references' if ($useTopics);
   if($cmd eq "profile_references") {
+    return 'usage: profile_references <name>' if(@params < 1);
     my $refs = '';
+    my $topic = 'default';
     
-    foreach my $prf (@{$hash->{PROFILES}}){
-      next if (!defined($prf->{REF}));
-      $refs .= "$prf->{TOPIC}:$prf->{NAME} -> $prf->{REF},"; 
+    if ($params[0] eq '*') {
+      foreach my $prf (@{$hash->{PROFILES}}){
+        next if (!defined($prf->{REF}));
+        $refs .= "$prf->{TOPIC}:$prf->{NAME}>$prf->{REF},";
+      }
+      $refs = substr($refs, 0, -1);
+    } else {
+      my ($topic, $name) = weekprofile_splitName($params[0]);
+      my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic);
+      return "profile $params[0] not found" unless ($prf);
+      $refs = '0';
+      $refs = "$prf->{REF}" if ($prf->{REF});
     }
-    $refs = substr($refs, 0, -1);
     return $refs;
+  }
+  
+  #-----------------------------------------------------------------------------
+  $list.= ' topic_names:noArg' if ($useTopics);
+  if($cmd eq "topic_names") {
+    my $names = '';
+    foreach my $topic (@{$hash->{TOPICS}}) {
+      $names .= "$topic,";
+    }
+    if ($names) {
+      $names = substr($names, 0, -1);
+      $names =~ s/ $//;
+    }
+    return $names;
   }
   
   if($cmd eq "sndDevList") {
@@ -643,14 +683,14 @@ sub weekprofile_Set($$@)
     Log3 $me, 4, "$me(Set): override profile $destName" if ($prfDest);
     
     if ($prfDest){
-      $prfDest->{DATA} = $prfSrc->{DATA};
-      $prfDest->{REF} = undef;
+        $prfDest->{DATA} = $prfSrc->{DATA};
+        $prfDest->{REF} = $prfSrc->{REF};
     } else {
       $prfDest = {};
       $prfDest->{NAME} = $destName;
       $prfDest->{DATA} = $prfSrc->{DATA};
       $prfDest->{TOPIC} = $destTopic;
-      $prfDest->{REF} = undef;
+      $prfDest->{REF} = $prfSrc->{REF};
       push @{$hash->{PROFILES}}, $prfDest;
     }
     weekprofile_writeProfilesToFile($hash);
@@ -659,7 +699,7 @@ sub weekprofile_Set($$@)
   }
   
   #----------------------------------------------------------
-  $list.= " reference_profile";
+  $list.= " reference_profile" if ($useTopics);
   if ($cmd eq 'reference_profile') {
     return 'usage: copy_profile <source> <target>' if(@params < 2);
     
@@ -717,32 +757,28 @@ sub weekprofile_Set($$@)
   
   
   #----------------------------------------------------------
-  $list.= " change_topic" if ($useTopics);
-  if ($cmd eq 'change_topic') {
-    return 'usage: change_topic <name>' if(@params < 1);
-    my $restore = 1;
+  $list.= " restore_topic" if ($useTopics);
+  if ($cmd eq 'restore_topic') {
+    return 'usage: restore_topic <name>' if(@params < 1);
+    
     my $topic = $params[0];
-    my $err = "";
+    my $err='';
     
-    $restore = $params[1] if(@params == 2);
-    
-    if ($restore) {      
-      foreach my $dev (@{$hash->{SNDDEVLIST}}){
-        my $prfName = AttrVal($dev->{NAME},"weekprofile",undef);        
-        next if (!defined($prfName));
-        
-        Log3 $me, 5, "$me(Set): found device $dev->{NAME}";
-        
-        my ($prf,$idx)  = weekprofile_findPRF($hash,$prfName,$topic);
-        next if (!defined($prf));
-        
-        Log3 $me, 4, "$me(Set): Send profile $topic:$prfName to $dev->{NAME}";
-         
-        my $ret = weekprofile_sendDevProfile($dev->{NAME},$prf,$me);
-        if ($ret) {
-          Log3 $me, 1, "$me(Set): $ret" if ($ret);
-          $err .= $ret . "\n";
-        }
+    foreach my $dev (@{$hash->{SNDDEVLIST}}){
+      my $prfName = AttrVal($dev->{NAME},"weekprofile",undef);        
+      next if (!defined($prfName));
+      
+      Log3 $me, 5, "$me(Set): found device $dev->{NAME}";
+      
+      my ($prf,$idx)  = weekprofile_findPRF($hash,$prfName,$topic);
+      next if (!defined($prf));
+      
+      Log3 $me, 4, "$me(Set): Send profile $topic:$prfName to $dev->{NAME}";
+       
+      my $ret = weekprofile_sendDevProfile($dev->{NAME},$prf,$me);
+      if ($ret) {
+        Log3 $me, 1, "$me(Set): $ret" if ($ret);
+        $err .= $ret . "\n";
       }
     }
     readingsSingleUpdate($hash,"active_topic",$topic,1);
@@ -873,6 +909,8 @@ sub weekprofile_readProfilesFromFile(@)
 {
   my ($hash) = @_;
   my $me = $hash->{NAME};
+  
+  my $useTopics = AttrVal($me,"useTopics",0);
 
   my $filename = "./log/weekprofile-$me.cfg";
   $filename = AttrVal($me,"configFile",$filename);
@@ -936,6 +974,8 @@ sub weekprofile_readProfilesFromFile(@)
         next;
       };
       
+      next if (!$useTopics && ($prfNew->{TOPIC} ne 'default')); # remove topics!!
+      
       if (!$hash->{MASTERDEV} && $rowCnt == 0) {
         $hash->{PROFILES}[0] = $prfNew; # replace default
       } else {
@@ -964,6 +1004,7 @@ sub weekprofile_SummaryFn()
   
   my $iconName = AttrVal($d, "icon", "edit_settings");
   my $editNewpage = AttrVal($d, "widgetEditOnNewPage", 0);
+  my $useTopics = AttrVal($d, "useTopics", 0);
   
   my $editIcon = FW_iconName($iconName) ? FW_makeImage($iconName,$iconName,"icon") : "";
   $editIcon = "<a name=\"$d.edit\" onclick=\"weekprofile_DoEditWeek('$d','$editNewpage')\" href=\"javascript:void(0)\">$editIcon</a>";
@@ -974,17 +1015,30 @@ sub weekprofile_SummaryFn()
   my $masterDev = defined($hash->{MASTERDEV}) ? $hash->{MASTERDEV}->{NAME} : undef; 
   
   my $args = "weekprofile,MODE:SHOW";
+  $args .= ",USETOPICS:$useTopics";
   $args .= ",MASTERDEV:$masterDev" if (defined($masterDev));
   
   my $curr = "";
-  $curr = $hash->{PROFILES}[0]->{NAME} if (@{$hash->{PROFILES}} > 0 );
+  if (@{$hash->{PROFILES}} > 0)
+  {
+    $curr = "$hash->{PROFILES}[0]->{TOPIC}:$hash->{PROFILES}[0]->{NAME}";
+    my $currTopic = ReadingsVal($d, "active_topic", undef);
+    if ($currTopic) {
+      foreach my $prf (@{$hash->{PROFILES}}){
+        if ($prf->{TOPIC} eq $currTopic){
+          $curr = "$prf->{TOPIC}:$prf->{NAME}";
+          last;
+        }
+      }
+    }
+  }
   
   $html .= "<table>";
   $html .= "<tr><td>";
   $html .= "<div class=\"devType\" id=\"weekprofile.$d.header\">";
-  $html .= "<div class=\"devType\" id=\"weekprofile.menu.base\">";
+  $html .= "<table style=\"padding:0\"><tr><td style=\"padding-right:0;padding-bottom:0\"><div id=\"weekprofile.menu.base\">";
   $html .= $editIcon."&nbsp;".$lnkDetails;
-  $html .= "</di></div></td></tr>";
+  $html .= "</div></td></tr></table></div></td></tr>";
   $html .= "<tr><td>";
   $html .= "<div class=\"fhemWidget\" informId=\"$d\" cmd=\"\" arg=\"$args\" current=\"$curr\" dev=\"$d\">"; # div tag to support inform updates
   $html .= "</div>";
@@ -1077,7 +1131,16 @@ sub weekprofile_getEditLNK_MasterDev($$)
   
   Im Standardfall wird das Modul mit einem Geräte = 'Master-Gerät' assoziiert,
   um das Wochenprofil vom Gerät grafisch bearbeiten zu können und andere Profile auf das Gerät zu übertragen.
+  Wird kein 'Master-Gerät' angegeben, wird erstmalig ein Default-Profil angelegt.
   <br>
+  Ein weiterer Anwendungsfall ist die Verwendung von Rubriken 'Topics'.
+  Hier sollte kein 'Master-Gerät' angegeben werden. Dieses Feature muss erst über das Attribut 'useTopics' aktiviert werden.
+  Topics sind z.B. Winter, Sommer, Urlaub, Party, etc.  
+  Innerhalb einer Topic kann es mehrere Wochenprofile geben. Sinnvollerweise sollten es soviele wie Thermostate sein.
+  Über ein Userattribut 'weekprofile' im Thermostat wird ein Wochenprofile ohne Topicname angegeben.
+  Mittels 'restore_topic' wird dann das angebene Wochenprofil der Topic an das Thermostat übertragen.
+  Somit kann man einfach zwischen den Topics wechseln und die Thermostate bekommen das passende Wochenprofil.
+  <br><br>
   <b>Achtung:</b> Das Übertragen von Wochenprofilen erfordet eine Menge an Credits. 
   Dies wird vom Modul nicht berücksichtigt. So kann es sein, dass nach dem 
   Setzen\Aktualisieren eines Profils das Profil im Modul nicht mit dem Profil im Gerät 
@@ -1125,7 +1188,11 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>reference_profile<br>
       <code>set &lt;name&gt; reference_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
       Referenziert das Profil 'ziel'auf 'quelle'. 'ziel' wird überschrieben oder neu angelegt.
-      <b>Noch in Entwicklung !!!</b>
+    </li>
+    <li>restore_topic<br>
+      <code>set &lt;name&gt; restore_topic &lt;topic&gt;</code><br>
+      Alle Wochenpläne in der Topic werden zu den entsprechenden Geräten übertragen.
+      Dazu muss im Gerät ein Userattribut 'weekprofile' mit dem Namen des Wochenplans <b>ohne</b> Topic gesetzt sein.
     </li>
   </ul>
   
@@ -1203,10 +1270,18 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <li>Homatic channel _Clima or _Climate</li>
   
   In the normal case the module is assoziated with a master device.
-  So a profile 'master' will be created automatically. This profile correnspond to the current active
+  So a profile 'master' will be created automatically. This profile corrensponds to the current active
   profile on the master device.
   You can also use this module without a master device. In this case a default profile will be created.
   <br>
+  An other use case is the usage of categories 'Topics'.
+  To enable the feature the attribute 'useTopics' have to be set.
+  Topics are e.q. winter, summer, holidays, party, and so on.
+  A topic consists of different week profiles. Normally one profile for each thermostat.
+  The connection between the thermostats and the profile is an user attribute 'weekprofile' without the topic name.
+  With 'restore_topic' the defined profile in the attribute will be transfered to the thermostat.
+  So it is possible to change the topic easily and all thermostats will be updated with the correndponding profile.
+  <br><br>
   <b>Attention:</b> 
   To transfer a profile to a device it needs a lot of Credits. 
   This is not taken into account from this module. So it could be happend that the profile in the module 
@@ -1256,6 +1331,11 @@ sub weekprofile_getEditLNK_MasterDev($$)
       Create a reference from destination to source. The destination will be overwritten if it exits.
       <b>Still under development!!!</b>
     </li>
+    <li>restore_topic<br>
+      <code>set &lt;name&gt; restore_topic &lt;topic&gt;</code><br>
+      All weekprofiles from the topic will be transfered to the correcponding devices.
+      Therefore a user attribute 'weekprofile' with the weekprofile name <b>without the topic name</b> have to exist in the device.
+    </li>
   </ul>
   
   <a name="weekprofileget"></a>
@@ -1266,14 +1346,19 @@ sub weekprofile_getEditLNK_MasterDev($$)
        Get the profile date from 'profilename' in json-Format
     </li>
     <li>profile_names<br>
-      <code>set &lt;name&gt; profile_names</code><br>
-      Get a comma seperated list of profile names
+      <code>set &lt;name&gt; profile_names [topicname]</code><br>
+      Get a comma seperated list of weekprofile profile names from the topic 'topicname'
+      If topicname is not set, 'default' will be used
+      If topicname is '*', all weekprofile profile names are returned.
     </li>
-    <li>profile_references<br>
-      Get a list of references in the following syntax
-      <code>
-      ref_topic:ref_profile -> dest_topic:dest_profile
-      </code>
+    <li>profile_references [name]<br>
+      If name is '*', a comma seperated list of all references in the following syntax
+      <code>ref_topic:ref_profile>dest_topic:dest_profile</code>
+      are returned
+      If name is 'topicname:profilename', '0' or the reference name is returned.
+    </li>
+    <li>topic_names<br>
+     Return a list of topic names.
     </li>
   </ul>
   
@@ -1286,7 +1371,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   </ul>
   <ul>
     <li>active_topic<br>
-      Aktive Topic. 
+      Active\restored topic name
     </li>
     <li>profile_count<br>
       Count of all profiles including references.
@@ -1308,11 +1393,11 @@ sub weekprofile_getEditLNK_MasterDev($$)
       Default: ./log/weekprofile-<name>.cfg
     </li>
     <li>icon<br>
-      icon for edit
+      icon for edit<br>
       Default: edit_settings
     </li>
     <li>useTopics<br>
-      Enable topics.
+      Enable topics.<br>
       Default: 0
     </li>
   </ul>
