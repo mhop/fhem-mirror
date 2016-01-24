@@ -3382,5 +3382,5 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
     </ul>
    </ul>
 </ul>
-=end html
+=end html_DE
 =cut
