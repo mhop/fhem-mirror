@@ -3,9 +3,9 @@
    *** HMCCU/HMCCUDEV - Modules for FHEM - Homematic CCU integration ***
   =======================================================================
 
-* Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.4
+* Document covers HMCCU/HMCCUDEV/HMCCUCHN version 2.6
 * Please read carefully before using the modules.
-* Last modified: 05.01.2016
+* Last modified: 25.01.2016
 
 ----------------------------------------------
  Content
@@ -222,10 +222,12 @@ Get state of channel:
 
 Update all client device datapoints / readings:
 
-   get <name> update [<devexp>]
+   get <name> update [<devexp> [{ State | Value }]]
 
    If parameter <devexp> is specified only client devices with device name
    matching regular expression will be updated.
+   For more information about 'State' and 'Value' see description of attribute
+   'ccuget' in HMCCU section.
 
 Get multiple channels and datapoints:
 
@@ -258,9 +260,30 @@ Set filter for datapoint readings (default is '.*'):
    readings. Filter is ignored by commands 'get datapoint' and 'get channel'.
    Filter is used by command 'get update' and for RPC server events.
 
+Set query method for CCU device datapoints (default is 'Value'):
+
+   attr <name> ccuget { State | Value }
+
+   Datapoint values can be queried by State() or Value(). The Value() method
+   returns the datapoint value stored in the CCU. The State() method queries
+   the device directly. The response time of State() is slightly higher and
+   it will consume battery power of the queried device because a connection
+   is established. But in some cases it can be necessary to use State(). In
+   those cases one should set the 'ccuget' attribute in the affected client
+   device. Setting this attribute in the IO device will slow down the
+   communication between FHEM and CCU.
+
 Set reading name format (default is 'name'):
 
    attr <name> ccureadingformat { name | address }
+
+Enable tracing of get commands:
+
+   attr <name> ccutrace <expression>
+
+   Enable tracing (loglevel 1) for devices / channels where CCU device name
+   or device address matches specified expression. Using '.*' as expression
+   is not a good idea ;-)
 
 Control reading update in IO and client devices (default is 'hmccu'):
 
@@ -431,6 +454,12 @@ only devices no set command is available.
  4.1 HMCCUDEV Set Commands
 ------------------------------------
 
+Set value of control datapoint:
+
+   set <name> control <value>
+
+   Attribute 'controldatapoint' must be set.
+
 Set value of datapoint:
 
    set <name> datapoint <channel-number>.<datapoint-name> <value> [...]
@@ -476,13 +505,22 @@ Get state of device:
    
 Update all datapoints / readings of channel:
 
-   get <name> update
+   get <name> update [{ State | Value }]
+
+   For more information about 'State' and 'Value' see description of attribute
+   'ccuget' in HMCCU section.
 
 ------------------------------------
  4.3 HMCCUDEV Attributes
 ------------------------------------
 
 Client device attributes overwrite corresponding HMCCU attributes!
+
+Set query method for CCU device datapoints (default is 'Value'):
+
+   attr <name> ccuget { State | Value }
+
+   For more information see description of attribute 'ccuget' in HMCCU section.
 
 Set filter for datapoint readings (default is '.*'):
 
@@ -501,6 +539,21 @@ Set reading name format (default is 'name'):
 Control reading creation (default is 1):
 
    attr <name> ccureadings { 0 | 1 }
+
+Enable support for FHEM UI widgets like sliders:
+
+   attr <name> controldatapoint <channel-number>.<datapoint-name>
+
+   The following example demonstrates how to define a slider for setting the
+   destination temperature of a thermostat device in range from 10 up to 25
+   degrees:
+
+      attr mythermodev controldatapoint 2.SET_TEMPERATURE
+      attr mythermodev webCmd control
+      attr mythermodev widgetOverride control:slider,10,1,25
+
+   When this attribute is set HMCCU inserts a new reading 'control'. This is
+   necessary to set widget to current value of the datapoint.
 
 Set datapoint for 'devstate' command (default is "STATE"):
    
@@ -568,6 +621,12 @@ a sensor). For read only channels no set command is available.
  5.1 HMCCUCHN Set Commands
 ------------------------------------
 
+Set value of control datapoint:
+
+   set <name> control <value>
+
+   Attribute 'controldatapoint' must be set.
+
 Set value of datapoint:
 
    set <name> datapoint <datapoint-name> <value> [...]
@@ -606,13 +665,22 @@ Get state of device:
 
 Update all datapoints / readings of channel:
 
-   get <name> update
+   get <name> update [{ State | Value }]
+
+   For more information about 'State' and 'Value' see description of attribute
+   'ccuget' in HMCCU section.
    
 ------------------------------------
  4.3 HMCCUCHN Attributes
 ------------------------------------
 
 Client device attributes overwrite corresponding HMCCU attributes!
+
+Set query method for CCU device datapoints (default is 'Value'):
+
+   attr <name> ccuget { State | Value }
+
+   For more information see description of attribute 'ccuget' in HMCCU section.
 
 Set filter for datapoint readings (default is '.*'):
 
@@ -631,6 +699,21 @@ Set reading name format (default is 'name'):
 Control reading creation (default is 1):
 
    attr <name> ccureadings { 0 | 1 }
+
+Enable support for FHEM UI widgets like sliders:
+
+   attr <name> controldatapoint <datapoint-name>
+
+   The following example demonstrates how to define a slider for setting the
+   destination temperature of a thermostat device in range from 10 up to 25
+   degrees:
+
+      attr mythermodev controldatapoint SET_TEMPERATURE
+      attr mythermodev webCmd control
+      attr mythermodev widgetOverride control:slider,10,1,25
+
+   When this attribute is set HMCCU inserts a new reading 'control'. This is
+   necessary to set widget to current value of the datapoint.
 
 Set datapoint for "devstate" command (default is "STATE"):
    
