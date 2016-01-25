@@ -159,7 +159,7 @@ TRX_LIGHT_Initialize($)
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
   $hash->{ParseFn}   = "TRX_LIGHT_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 ".
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 repeat ".
                         $readingFnAttributes;
 
 }
@@ -509,7 +509,9 @@ TRX_LIGHT_Set($@)
 	return "No set implemented for $device_type . Unknown protocol type";	
   }
 
-  IOWrite($hash, $hex_prefix, $hex_command);
+  for (my $repeat = $attr{$name}{repeat} || 1; $repeat >= 1; $repeat = $repeat - 1) {
+    IOWrite($hash, $hex_prefix, $hex_command);
+  }
 
   my $tn = TimeNow();
   $hash->{CHANGED}[0] = $command_state;
