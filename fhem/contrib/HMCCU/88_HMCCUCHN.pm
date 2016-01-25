@@ -4,14 +4,15 @@
 #
 #  $Id:$
 #
-#  Version 2.5
+#  Version 2.6
 #
-#  (c) 2015 zap (zap01 <at> t-online <dot> de)
+#  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
 ################################################################
 #
 #  define <name> HMCCUCHN <ccudev> [readonly]
 #
+#  set <name> control <value>
 #  set <name> datapoint <datapoint> <value> [...]
 #  set <name> devstate <value> [...]
 #  set <name> <stateval_cmds>
@@ -27,11 +28,12 @@
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingfilter <datapoint-expr>
 #  attr <name> ccureadingformat { name | address | datapoint }
+#  attr <name> controldatapoint <datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
 #  attr <name> substitute <subst-rule>[;...]
 #
 ################################################################
-#  Requires module 88_HMCCU
+#  Requires module 88_HMCCU.pm
 ################################################################
 
 package main;
@@ -61,7 +63,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccustate ccuget:State,Value statedatapoint statevals substitute stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccustate ccuget:State,Value controldatapoint statedatapoint statevals substitute stripnumber:0,1,2 loglevel:0,1,2,3,4,5,6 ". $readingFnAttributes;
 }
 
 #####################################
@@ -176,6 +178,7 @@ sub HMCCUCHN_Set ($@)
 
 	my $statevals = AttrVal ($name, "statevals", '');
 	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
+	my $controldatapoint = AttrVal ($name, "controldatapoint", '');
 
 	my $result = '';
 	my $rc;
@@ -199,6 +202,16 @@ sub HMCCUCHN_Set ($@)
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
 		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
 
+		return undef;
+	}
+	elsif ($opt eq 'control') {
+		return HMCCUCHN_SetError ($hash, "Attribute control datapoint not set") if ($controldatapoint eq '');
+		my $objvalue = shift @a;
+		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$controldatapoint;
+		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
+		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+
+		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
 	elsif ($opt =~ /^($hash->{statevals})$/) {
@@ -450,6 +463,15 @@ sub HMCCUCHN_SetError ($$)
       </li><br/>
       <li>ccureadingfilter &lt;datapoint-expr&gt;<br/>
          Only datapoints matching specified expression are stored as readings.
+      </li><br/>
+      <li>controldatapoint &lt;datapoint&gt;<br/>
+         Set datapoint for device control. Can be use to realize user defined control elements for
+         setting control datapoint. For example if datapoint of thermostat control is 
+         SET_TEMPERATURE one can define a slider for setting the destination temperature with
+         following attributes:<br/><br/>
+         attr mydev controldatapoint SET_TEMPERATURE
+         attr mydev webCmd control
+         attr mydev widgetOverride control:slider,10,1,25
       </li><br/>
       <li>statedatapoint &lt;datapoint&gt;<br/>
          Set datapoint for devstate commands.
