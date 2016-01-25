@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  49_SSCAM: changed DEF in order to remove credentials from string,
+             added "set credentials" command to save username/password,
+             added Attribute "session" to make login-session selectable,
+             NOTE: You have to adapt your define-strings after update !!
+             look at commandref or forum-post for details: 
+             forum.fhem.de/index.php/topic,45671.msg397449.html#msg397449
   - bugfix:  73_GasCalculator: Bugfix in Commandref and 2 attributes renamed.
   - feature: 98_weekprofile: including topics\categories
   - change:  98_weekprofile: filter for homatic channel devices
