@@ -45,6 +45,7 @@
 #		X0006	21.01.2016	Sailor				=pod							Description updated with description for the readings
 #		10588	22.01.2016	Sailor				Comments						First check-in
 #		10590	22.01.2016	Sailor				Define							Deleting version code from define
+#		10591	22.01.2016	Sailor				=pod							Spelling mistakes corrected
 ########################################################################################################################
 
 
@@ -73,11 +74,11 @@ sub GasCalculator_Initialize($)
 
 	$hash->{AttrList}       	= "disable:0,1 " .
 								  "GasCounterOffset " .
-								  "GasCountsPerCubic " .
+								  "GasCubicPerCounts " .
 								  "GaszValue " .
 								  "GasNominalHeatingValue " .
 								  "BasicPricePerAnnum " .
-								  "GasPricePerCubic " .
+								  "GasPricePerKWh " .
 								  "MonthlyPayment " .
 								  "MonthOfAnnualReading " .
 								  "ReadingDestination:CalculatorDevice,CounterDevice " .
@@ -86,7 +87,7 @@ sub GasCalculator_Initialize($)
 }
 ####END####### Initialize module ###############################################################################END#####
 
-###START######  Activate module after module has been used via fhem command "define" ##########################START####
+###START###### Activate module after module has been used via fhem command "define" ##########################START####
 sub GasCalculator_Define($$$)
 {
 	my ($hash, $def)              = @_;
@@ -190,13 +191,13 @@ sub GasCalculator_Notify($$)
 		### Writing log entry
 		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute GasCounterOffset was missing and has been set to 0";
 	}
-	if(!defined($attr{$GasCalcName}{GasCountsPerCubic}))
+	if(!defined($attr{$GasCalcName}{GasCubicPerCounts}))
 	{
 		### Set attribute with standard value since it is not available
-		$attr{$GasCalcName}{GasCountsPerCubic} 		= 0.01;
+		$attr{$GasCalcName}{GasCubicPerCounts} 		= 0.01;
 
 		### Writing log entry
-		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute GasCountsPerCubic was missing and has been set to 0.01 counts/voulume-unit";
+		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute GasCubicPerCounts was missing and has been set to 0.01 counts/voulume-unit";
 
 	}
 	if(!defined($attr{$GasCalcName}{GasNominalHeatingValue}))
@@ -207,13 +208,13 @@ sub GasCalculator_Notify($$)
 		### Writing log entry
 		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute GasNominalHeatingValue was missing and has been set to 10 kWh/volume-unit";
 	}
-	if(!defined($attr{$GasCalcName}{GasPricePerCubic}))
+	if(!defined($attr{$GasCalcName}{GasPricePerKWh}))
 	{
 		### Set attribute with standard value since it is not available
-		$attr{$GasCalcName}{GasPricePerCubic} 		= 0.0654;
+		$attr{$GasCalcName}{GasPricePerKWh} 		= 0.0654;
 
 		### Writing log entry
-		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute GasPricePerCubic was missing and has been set to 0.0654 currency-unit/volume-unit";
+		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute GasPricePerKWh was missing and has been set to 0.0654 currency-unit/volume-unit";
 	}
 	if(!defined($attr{$GasCalcName}{GaszValue}))
 	{
@@ -320,7 +321,7 @@ sub GasCalculator_Notify($$)
 		}
 		
 		###Get current Counter and transform in Volume (cubic) as read on mechanic gas meter
-		   $GasCountReadingValueCurrent      = $1 * $attr{$GasCalcName}{GasCountsPerCubic} + $attr{$GasCalcName}{GasCounterOffset};
+		   $GasCountReadingValueCurrent      = $1 * $attr{$GasCalcName}{GasCubicPerCounts} + $attr{$GasCalcName}{GasCounterOffset};
 		my $GasCountReadingTimestampCurrent  = ReadingsTimestamp($GasCountName,$GasCountReadingName,0);		
 
 		
@@ -526,13 +527,13 @@ sub GasCalculator_Notify($$)
 		my $GasCalcEnergyMeter     = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMeter", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
 
 		### Calculate pure gas cost since first day of month
-		my $GasCalcEnergyCostMonth = $GasCalcEnergyMonth * $attr{$GasCalcName}{GasPricePerCubic};
+		my $GasCalcEnergyCostMonth = $GasCalcEnergyMonth * $attr{$GasCalcName}{GasPricePerKWh};
 		
 		### Calculate pure gas cost since first day of calendar year
-		my $GasCalcEnergyCostYear  = $GasCalcEnergyYear * $attr{$GasCalcName}{GasPricePerCubic};
+		my $GasCalcEnergyCostYear  = $GasCalcEnergyYear * $attr{$GasCalcName}{GasPricePerKWh};
 		
 		### Calculate pure gas cost since first day of gas meter reading year
-		my $GasCalcEnergyCostMeter = $GasCalcEnergyMeter * $attr{$GasCalcName}{GasPricePerCubic};
+		my $GasCalcEnergyCostMeter = $GasCalcEnergyMeter * $attr{$GasCalcName}{GasPricePerKWh};
 		
 		### Calculate the payment month since the year of gas meter reading started
 		my $GasCalcMeterYearMonth=0;
@@ -656,7 +657,7 @@ sub GasCalculator_Notify($$)
 ###START###### Description for fhem commandref ################################################################START####
 =pod
 
-=item device
+=item helper
 
 =begin html
 
@@ -816,8 +817,8 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>GasCountsPerCubic</code> : </li></td><td>	A valid float number of the ammount of volume per ticks.<BR>
-																		The value is given by the mechanical trigger of the mechanical gas meter. E.g. GasCountsPerCubic = 0.01 means each count is a hundredth of the volume basis unit.<BR>
+			<tr><td><li><code>GasCubicPerCounts</code> : </li></td><td>	A valid float number of the ammount of volume per ticks.<BR>
+																		The value is given by the mechanical trigger of the mechanical gas meter. E.g. GasCubicPerCounts = 0.01 means each count is a hundredth of the volume basis unit.<BR>
 																		The default value is 0.01<BR>
 			</td></tr>
 			</td>
@@ -842,7 +843,7 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>GaszValue</code> : </li></td><td>	A valid float number for the gas condition based on the local installation of the mechganical gas meter in relation of the gas providers main supply station.<BR>
+			<tr><td><li><code>GaszValue</code> : </li></td><td>	A valid float number for the gas condition based on the local installation of the mechanical gas meter in relation of the gas providers main supply station.<BR>
 																The value is provided by your local gas provider is shown on your gas bill.<BR>
 																The default value is 1.00<BR>
 			</td></tr>
@@ -855,7 +856,7 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>GasPricePerCubic</code> : </li></td><td>	A valid float number for gas price in the chosen currency per chosen volume for the gas.<BR>
+			<tr><td><li><code>GasPricePerKWh</code> : </li></td><td>	A valid float number for gas price in the chosen currency per kWh for the gas.<BR>
 																		The value is provided by your local gas provider is shown on your gas bill.<BR>
 																		The default value is 0.0654<BR>
 			</td></tr>
@@ -1182,7 +1183,7 @@ sub GasCalculator_Notify($$)
 	<tr>
 		<td>
 			Das GasCalculator Modul berechnet den Gas - Verbrauch und den verbundenen Kosten von einem oder mehreren Gas-Z&auml;hlern.<BR>
-			Es ist kein eigenes Zählermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hl-Impulse von einem oder mehreren Gasz&auml;hlern zu finden.<BR>
+			Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hl-Impulse von einem oder mehreren Gasz&auml;hlern zu finden.<BR>
 			<BR>
 			Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>
 			<BR>
@@ -1274,7 +1275,7 @@ sub GasCalculator_Notify($$)
 	<tr><td>
 		<ul>
 				Sollten die unten ausfeg&auuml;hrten Attribute bei der Definition eines entsprechenden Ger&auml;tes nicht gesetzt sein, so werden sie vom Modul mit Standard Werten automatisch gesetzt<BR>
-				Zus&auml;tzlich k&aouml;nnen die globalen Attribute wie <a href="#room">room</a> verwendet werden.<BR>
+				Zus&auml;tzlich k&ouml;nnen die globalen Attribute wie <a href="#room">room</a> verwendet werden.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -1333,8 +1334,8 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>GasCountsPerCubic</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die Menge an Z&auml;hlimpulsen pro gew&auml;hlter Volumen-Grundeinheit.<BR>
-																		Der Wert ist durch das mechanische Z&auml;hlwerk des Gasz&auml;hlers vorgegeben. GasCountsPerCubic = 0.01 bedeutet, dass jeder Z&auml;hlimpuls ein hunderstel der gew&auml;hlten Volumengrundeinheit.<BR>
+			<tr><td><li><code>GasCubicPerCounts</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die Menge an Z&auml;hlimpulsen pro gew&auml;hlter Volumen-Grundeinheit.<BR>
+																		Der Wert ist durch das mechanische Z&auml;hlwerk des Gasz&auml;hlers vorgegeben. GasCubicPerCounts = 0.01 bedeutet, dass jeder Z&auml;hlimpuls ein hunderstel der gew&auml;hlten Volumengrundeinheit.<BR>
 																		Der Standard-Wert ist 0.01<BR>
 			</td></tr>
 			</td>
@@ -1372,7 +1373,7 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>GasPricePerCubic</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Gas Preis in der gew&auml;hlten W&auml;hrung pro gew&auml;hltem Volumen.<BR>
+			<tr><td><li><code>GasPricePerKWh</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Gas Preis in der gew&auml;hlten W&auml;hrung pro kWh.<BR>
 																		Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>
 																		Der Standard-Wert ist 0.0654<BR>
 			</td></tr>
