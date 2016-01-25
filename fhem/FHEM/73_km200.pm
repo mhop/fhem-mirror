@@ -38,191 +38,6 @@
 #     define myKm200 km200 192.168.178.200 R2F0ZXdheUdlaGVpbQ== UHJpdmF0ZUdlaGVpbQ==
 #
 ########################################################################################################################
-#                                               CHANGELOG
-#
-#     Version	Date		Programmer			Subroutine						Description of Change
-#		0010	28.08.2014	Sailor				All								Initial Release for collaborative programming work
-#		0011	13.10.2014	Furban				km200_Define					Correcting "if (int(@a) == 6))" into "if (int(@a) == 6)"
-#		0011	13.10.2014	Furban				km200_Define					Changing "if ($url =~ m/^((\d\d\d[01]\d\d2[0-4]\d25[0-5])\.){3}(\d\d\d[01]\d\d2[0-4]\d25[0-5])$/)" into "if ($url =~ m/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/)"
-#		0012	20.10.2014	Sailor              km200_Encrypt       			Swapping over to Crypt::Rijndael
-#		0012	20.10.2014	Sailor              km200_Decrypt       			Swapping over to Crypt::Rijndael
-#		0013	21.10.2014	Sailor              All                 			Improving log3 functions for debugging
-#		0014	22.10.2014	Sailor              All                 			New function for get status and implementing export to Readings
-#		0015	23.10.2014	Sailor              km200_Define					Minimum interval changed to 20s since polling procedure lasts about 10s
-#		0015	23.10.2014	Sailor              km200_Get						New subroutine to receive individual data adhoc
-#		0016	25.10.2014	Sailor              km200_Set						First try
-#		0017	26.10.2014	Nobody0472          ALL           					Add FailSafe & Error Handling + KM50 + Interval in Definition
-#		0018    27.10.2014	Sailor				km200_GetData					Trying out whether 	"my $options = HTTP::Headers->new("Accept" => "application/json","User-Agent" => "TeleHeater/2.2.3", "agent" => "TeleHeater/2.2.3");" is the same as "$ua->agent('TeleHeater/2.2.3');"
-#		0018    27.10.2014	Sailor				km200_Define					Lot's of commenting in order to improve readability	:-)
-#		0018    27.10.2014	Sailor				km200_CompleteDataInit			Improvement of console output for easier debugging
-#		0018    27.10.2014	Sailor				=pod							First Issue of description added
-#		0019    27.10.2014	Sailor				km200_GetData					Try-out Failed and original code re enabled for: "Trying out whether "my $options = HTTP::Headers->new("Accept" => "application/json","User-Agent" => "TeleHeater/2.2.3", "agent" => "TeleHeater/2.2.3");" is the same as "$ua->agent('TeleHeater/2.2.3');""
-#		0019    27.10.2014	Nobody0472			km200_Attr						First Issue
-#		0019    27.10.2014	Sailor				km200_Attr						Adapted to double interval attributes "IntervalDynVal" and "IntervalStatVal"
-#		0019    27.10.2014	Sailor				km200_Define					Adapted to double interval attributes "IntervalDynVal" and "IntervalStatVal" and deleted interval of being imported from the define line.
-#		0019    27.10.2014	Sailor				km200_Define					Created list of known static services
-#		0019    27.10.2014	Sailor				km200_Define					Calculated a list of responding services which are not static = responding dynamic services
-#		0019    27.10.2014	Sailor				km200_CompleteDynData			Subroutine km200_CompleteData renamed to "km200_CompleteDynData" and only downloading responding dynamic services
-#		0019    27.10.2014	Sailor				km200_CompleteStatData			Subroutine "km200_CompleteStatData" created only downloading responding static services
-#		0020    28.10.2014	Sailor				km200_Define					Attribute check moved to km200_Attr
-#		0020    28.10.2014	Sailor				km200_Attr						Attribute check included
-#		0020    28.10.2014	Sailor				All								Clear-ups for comments and unused debug - print commands
-#		0020    28.10.2014	Sailor				km200_Define					Decoding of passwords with base64 implemented to avoid bare passwords in fhem.cfg
-#		0021    31.10.2014	Sailor				km200_Define					Added "/heatingCircuits/hc2" and subordinates 
-#		0021    31.10.2014	Sailor				km200_CompleteDynData			First try-outs with fork() command - FAILED! All fork() commands deleted
-#		0022	04.11.2014	Sailor	----------- Nearly all subroutines renamed! -----------------------------------------------------------------------------------------------------------------------
-#		0022    04.11.2014	Sailor				All								Integration of  HttpUtils_NonblockingGet(). Nearly all Subroutines renamed due to new functionality
-#		0023    05.11.2014	Sailor				All								Clearing up "print" and "log" command
-#		0023    05.11.2014	Sailor				km200_ParseHttpResponseInit		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
-#		0023    05.11.2014	Sailor				km200_ParseHttpResponseDyn		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
-#		0023    05.11.2014	Sailor				km200_ParseHttpResponseStat		encode_utf8() command added to avoid crashes with "/heatSources/flameCurrent" or "/system/appliance/flameCurrent"
-#		0023    05.11.2014	Sailor				km200_GetSingleService			New function used to obtain single value: HttpUtils_BlockingGet()
-#		0023    05.11.2014	Sailor				km200_PostSingleService			New function used to write  single value: HttpUtils_BlockingGet() (Yes, even called "get" in the end, it allows to write (POST) as well
-#		0024    06.11.2014	Sailor				km200_PostSingleService			Set value works! But only if no background download of dynamic or static values is active the same time
-#		0025    06.11.2014	Sailor				km200_Get						Creating proper hash out of array of responding services
-#		0025    07.11.2014	Sailor				km200_Set						Creating proper hash out of array of writeable services
-#		0025    07.11.2014	Sailor				km200_Initialize				Adding DbLog_splitFn
-#		0025    07.11.2014	Sailor				km200_DbLog_splitFn				First try-out. print function temporarily disabled
-#		0025    07.11.2014	Sailor				All								Adding some print-commands for debugging
-#		0025    07.11.2014	Sailor				km200_Set						Starting with blocking flags
-#		0026    09.11.2014	Sailor				km200_GetDynService				Additional Log for debugging added
-#		0026    09.11.2014	Sailor				km200_GetStatService			Additional Log for debugging added
-#		0027    10.11.2014	Sailor				km200_Initialize				Corrected DbLog entry to $hash->{DbLog_splitFn}  = "km200_DbLog_splitFn";
-#		0027    10.11.2014	Sailor				km200_Define					Password logging deleted. Too dangerous as soon a user posts its log seeking for help since gateway password cannot be changed
-#		0027    10.11.2014	Sailor				km200_Define					Adding $hash->{DELAYDYNVAL} and $hash->{DELAYSTATVAL} to delay start of timer
-#		0027    10.11.2014	Sailor				km200_Attr						Adding $hash->{DELAYDYNVAL} and $hash->{DELAYSTATVAL} to delay start of timer
-#		0027    10.11.2014	Sailor				km200_PostSingleService			Error handling 
-#		0027    10.11.2014	Sailor				km200_GetSingleService			Error handling 
-#		0027    10.11.2014	Sailor				km200_Define					Added additional STATE information
-#		0027    10.11.2014	Sailor				km200_GetDynService				Added additional STATE information
-#		0027    10.11.2014	Sailor				km200_GetStatService			Added additional STATE information
-#		0028    10.11.2014	Sailor				km200_Initialize				Implementing polling time-out attribute in $hash
-#		0028    10.11.2014	Sailor				km200_Define					Implementing polling time-out attribute in $hash
-#		0028    10.11.2014	Sailor				km200_Attr						Implementing polling time-out attribute in $hash
-#		0028    10.11.2014	Sailor				km200_PostSingleService			Implementing polling time-out attribute in $hash
-#		0028    10.11.2014	Sailor				km200_GetSingleService			Implementing polling time-out attribute in $hash
-#		0028    10.11.2014	Sailor				km200_GetInitService			Implementing polling time-out attribute in $hash
-#		0028    10.11.2014	Sailor				km200_GetDynService				Implementing polling time-out attribute in $hash
-#		0028    10.11.2014	Sailor				km200_GetStatService			Implementing polling time-out attribute in $hash
-#		0029    14.11.2014	Sailor				km200_GetInitService			Log Level for data not being available downgraded to Level 4		
-#		0029    14.11.2014	Sailor				km200_GetSingleService			Log Level for data not being available downgraded to Level 4
-#		0029    14.11.2014	Sailor				=pod							Description updated
-#		0030    14.11.2014	Sailor				All							    Implement Console-Printouts only if attribute "ConsoleMessage" is set
-#		0031    09.12.2014	Sailor				km200_GetDynService				Catching JSON parsing errors in order to prevent fhem crashes
-#		0031    09.12.2014	Sailor				km200_GetStatService			Catching JSON parsing errors in order to prevent fhem crashes
-#		0031    09.12.2014	Sailor				km200_GetInitService			Catching JSON parsing errors in order to prevent fhem crashes
-#		0031    09.12.2014	Sailor				km200_GetSingleService			Catching JSON parsing errors in order to prevent fhem crashes
-#		0032    09.12.2014	Sailor				All								Small format corrections
-#		0033    12.12.2014	Sailor				km200_Define					Swapping service for test of communication from "/system/brand" to "/gateway/DateTime"
-#		0034    12.12.2014	Sailor				km200_Initialize				Deactivating $hash->{DbLog_splitFn}
-#		0035    07.01.2015	Sailor				Comments						Updating comments based on created WIKI
-#		0035    07.01.2015	Sailor				km200_Attr						BugFix around ConsoleMessage Attribute
-#		0035    07.01.2015	Sailor				All								Log Message of verbose level 2 improved
-#		0035    07.01.2015	Sailor				=pod							Bug-fix to be joined in commandref
-#		0036    13.01.2015	Sailor				Comments						Switched version system to fhem 4-digit version number scheme
-#		0036    13.01.2015	Sailor				km200_Define					Switched version system to fhem 4-digit version number scheme
-#		0036    13.01.2015	Sailor				km200_Define					Implementing DoNotPoll attribute
-#		0036    13.01.2015	Sailor				km200_Attribute					Implementing DoNotPoll attribute
-#		0036    13.01.2015	Sailor				km200_GetInitService			Implementing DoNotPoll attribute
-#		0036    13.01.2015	Sailor				km200_ParseHttpResponseInit		Implementing DoNotPoll attribute
-#		0036    13.01.2015	Sailor				km200_Initialize				Try-out DbLog Split (DbLog_Split is currently disabled)
-#		0036    13.01.2015	Sailor				km200_Define					Preparing DbLog Split
-#		0036    13.01.2015	Sailor				km200_DbLog_splitFn				Try-out DbLog Split
-#		0036    13.01.2015	Sailor				km200_GetSingleService			Preparing DbLog Split
-#		0036    13.01.2015	Sailor				km200_GetInitService			Preparing DbLog Split
-#		0036    13.01.2015	Sailor				km200_GetDynService				Preparing DbLog Split
-#		0036    13.01.2015	Sailor				km200_GetStatService			Preparing DbLog Split
-#		0036    13.01.2015	Sailor				=pod							Correction of errors and German description added
-#		0037    14.01.2015	Sailor				km200_DbLog_splitFn				Try-out DbLog Split (Failed... no name of device handed over in event)
-#		0037    14.01.2015	Sailor				=pod							Correction of errors
-#		0037    14.01.2015	Sailor				km200_Attr						Readings are being deleted if set not to be polled by attribute
-#		0038    16.01.2015	Sailor				km200_Attr						Implementing hierarchy top-down in DoNotPoll 
-#		0038    16.01.2015	Sailor				km200_ParseHttpResponseInit		Implementing hierarchy top-down in DoNotPoll 
-#		0038    16.01.2015	Sailor				=pod							Implementing hierarchy top-down in DoNotPoll
-#		0038    16.01.2015	Sailor				del_double						Adding a helper to delete double entries in arrays
-#		0039    19.01.2015	Sailor				km200_Attr						Bugfix:   Handling of unknown attributes
-#		0039    19.01.2015	Sailor				km200_Define					Added:    SC2 as copy of SC1
-#		0039    19.01.2015	Sailor				km200_Define					Added:    More services since apparently forgotten due to update on IP-Symcon site
-#		0039    19.01.2015	Sailor				km200_Get						Changed:  get-command is able to return raw data if valid json dataset is not existing to be returned
-#		0039    19.01.2015	Sailor				km200_GetSingleService			Changed:  get-command is able to return raw data if valid json dataset is not existing to be returned
-#		0040    20.01.2015	Sailor				km200_Define					Added /system/holidayModes
-#		0041    21.02.2015	Sailor				km200_Define					Added /heatingCircuits/hc1/heatingCurveSetting
-#		0041    21.02.2015	Sailor				km200_Define					Added /heatingCircuits/hc2/heatingCurveSetting
-#		0041    21.02.2015	Sailor				km200_Define					Added /heatingCircuits/hc1/holidayMode
-#		0041    21.02.2015	Sailor				km200_Define					Added /heatingCircuits/hc2/holidayMode
-#		0041    21.02.2015	Sailor				km200_Define					Added /gateway/language
-#		0041    21.02.2015	Sailor				km200_Define					Added /recordings/system/sensors/outdoorTemperatures
-#		0041    24.02.2015	Sailor				km200_Define					Added /dhwCircuits/*
-#		0042    03.03.2015	Sailor				km200_Define					Added more services
-#		0042    03.03.2015	Sailor				km200_Set						Re-read of written value bug fixed.
-#		0042    04.03.2015	Sailor				km200_Set						Correction of type change for numeric values
-#		0043    09.03.2015	Sailor				km200_ParseHttpResponseInit		Read of "switchPrograms" implemented
-#		0043    09.03.2015	Sailor				km200_ParseHttpResponseDyn		Read of "switchPrograms" implemented
-#		0043    09.03.2015	Sailor				km200_ParseHttpResponseStat		Read of "switchPrograms" implemented
-#		0043    14.03.2015	Sailor				All								My 41st birthday version.
-#		0044    15.03.2015	Sailor				km200_Define					Added /system/appliance/type
-#		0044    18.03.2015	Sailor				km200_Define					Added additional services below /dhwCircuits/dhw...
-#		0044    15.03.2015	Sailor				km200_Set						First try-outs for switchProgram writings
-#		0044    18.03.2015	Sailor				km200_ParseHttpResponseInit		fullResponde = ERROR - bug corrected
-#		0044    18.03.2015	Sailor				km200_ParseHttpResponseDyn		fullResponde = ERROR - bug corrected
-#		0044    18.03.2015	Sailor				km200_ParseHttpResponseStat		fullResponde = ERROR - bug corrected
-#		0045    26.03.2015	Sailor				km200_ParseHttpResponseInit		Automatic Service Search
-#		0045    26.03.2015	Sailor				km200_Attr						Changes for Automatic Service Search
-#		0046    27.03.2015	Sailor				km200_ParseHttpResponseInit		"my $json -> {type}" - bug corrected
-#		0046    27.03.2015	Sailor				km200_ParseHttpResponseDyn		"my $json -> {type}" - bug corrected
-#		0046    07.04.2015	Sailor				km200_Get						Changes for SwitchProgram writings - WORKING IN PROGRESS
-#		0046    07.04.2015	Sailor				km200_Set						Changes for SwitchProgram writings - WORKING IN PROGRESS
-#		0046    07.04.2015	Sailor				km200_GetSingleService			Changes for SwitchProgram writings - WORKING IN PROGRESS
-#		0046    07.04.2015	Sailor				km200_SetSingleService			Changes for SwitchProgram writings - WORKING IN PROGRESS
-#		0046    07.04.2015	Sailor				km200_SetSingleService			Introduction of delay-attribute between push and re-reading
-#		0046    07.04.2015	Sailor				km200_Attr						Introduction of delay-attribute between push and re-reading
-#		0046    07.04.2015	Sailor				=pod							Introduction of delay-attribute between push and re-reading
-#		0047    08.04.2015	Sailor				km200_Get						Implementation of optional return of Json-string
-#		0047    08.04.2015	Sailor				km200_GetSingleService			Implementation of optional return of Json-string
-#		0047    08.04.2015	Sailor				=pod							Implementation of optional return of Json-string
-#		0047    09.04.2015	Sailor				km200_Get						Blocking get-command during initialisation phase
-#		0047    09.04.2015	Sailor				km200_Set						Blocking set-command during initialisation phase
-#		0047    09.04.2015	Sailor				km200_SetSingleService			Bugfix for error message
-#		0048    09.04.2015	Sailor				km200_Attr						Improving DoNotPoll for root services
-#		0048    10.04.2015	Sailor				km200_GetSingleService			Handback of complete error list
-#		0048    14.04.2015	Sailor				km200_ParseHttpResponseInit		errorList missing service - bug corrected
-#		0048    14.04.2015	Sailor				km200_Get						"0" - floatvalue - bug corrected by formating number
-#		0049    14.04.2015	Sailor				km200_GetSingleService			Sorting error notifications descending by timestamps
-#		0049    14.04.2015	Sailor				km200_ParseHttpResponseInit		Sorting error notifications descending by timestamps
-#		0049    14.04.2015	Sailor				km200_ParseHttpResponseDyn		Sorting error notifications descending by timestamps
-#		0049    13.05.2015	Sailor				km200_ParseHttpResponseInit		Correcting bug about wrong schedule times
-#		0049    13.05.2015	Sailor				km200_ParseHttpResponseDyn		Correcting bug about wrong schedule times
-#		0049    13.05.2015	Sailor				km200_GetSingleService			Correcting bug about wrong schedule times
-#		0049    13.05.2015	Sailor				km200_PostSingleService			Correcting bug about wrong schedule times
-#		0049    13.05.2015	Sailor				km200_PostSingleService			Implementing writing of SwitchPrograms
-#		0049    13.05.2015	Sailor				km200_GetSingleService			Implementing re-writing of Readings for SwitchPrograms
-#		0050    18.05.2015	Sailor				km200_PostSingleService         Correcting bug of floating point errors
-#		0050    18.05.2015	Sailor				km200_ParseHttpResponseInit	    Correcting bug of floating point errors
-#		0050    18.05.2015	Sailor				km200_ParseHttpResponseDyn      Correcting bug of floating point errors
-#		0050    18.05.2015	Sailor				km200_PostSingleService         Implementing feature of posting complete "string of hash" to switchProgram
-#		0051    20.05.2015	Sailor				km200_GetSingleService          Correcting bug of floating point errors
-#		0051    21.05.2015	Sailor				km200_PostSingleService         Implementing switchPoint-hash by switchPoint-hash comparison
-#		0052    29.05.2015	Sailor				km200_PostSingleService         Correcting bug for post transmission comparison
-#		0052    29.05.2015	Sailor				km200_ParseHttpResponseInit     Correcting bug for error list sorting
-#		0052    29.05.2015	Sailor				km200_ParseHttpResponseDyn      Correcting bug for error list sorting
-#		0053    15.07.2015	Sailor				km200_Define					Delaying first sounding to 30s in order to reduce errors due to fhem starting phase
-#		0053    15.07.2015	Sailor				km200_Attr						Implementing new sounding-init after change attribute "DoNotPoll"
-#		0053    15.07.2015	Sailor				km200_Define					Static Service deleted
-#		0053    15.07.2015	Sailor				km200_Attr						Static Service deleted
-#		0053    15.07.2015	Sailor				km200_ParseHttpResponseInit		Static Service deleted
-#		0053    15.07.2015	Sailor				km200_GetStatService			Deleted
-#		0053    15.07.2015	Sailor				km200_ParseHttpResponseStat		Deleted
-#		0054    09.10.2015	Sailor				km200_ParseHttpResponseInit		Adding a timer to restart Initialisation process if first contact failed.
-#		0055    09.10.2015	Sailor				km200_ParseHttpResponseInit		Setting state accordingly if connection is failed
-#		0055    09.10.2015	Sailor				=pod							Correction of description for commandref implemented
-#		0056    19.10.2015	Sailor				km200_Define					New Standard Polling Intervall 300s since 60s was too short for some users
-#		0056    19.10.2015	Sailor				=pod							New Standard Polling Intervall 300s since 60s was too short for some users
-#		0056    08.01.2016	Sailor				km200_Define					New attribute "disable"
-#		0056    08.01.2016	Sailor				km200_Attr						New attribute "disable"
-#		0056    10.01.2016	Sailor				=pod							Removing alls formats to fulfill new commandref rules
-#		????    22.01.2016	Sailor				Define							Removing version internal
-########################################################################################################################
-
 
 ########################################################################################################################
 # List of open Problems:
@@ -933,6 +748,13 @@ sub km200_Decrypt($)
     # Remove additional encoding with base64
     $decryptData = decode_base64($decryptData);
 
+	# Check whether the length of the decryptData is NOT multiplies of 16
+	if (length($decryptData)&0xF != 0)
+	{
+		# Return nothing which will end this subroutine
+		return "";
+	}
+	
     # Create Rijndael decryption object and do the decryption
     my $cipher = Crypt::Rijndael->new($km200_crypt_key_private, Crypt::Rijndael::MODE_ECB() );
     my $deciphertext = $cipher->decrypt( $decryptData );
