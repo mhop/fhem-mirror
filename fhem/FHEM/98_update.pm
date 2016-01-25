@@ -218,11 +218,13 @@ doUpdateLoop($$)
     doUpdate(++$curr, $max, $srcLine, $arg);
     HttpUtils_Close(\%upd_connecthash);
   }
-
-  if($updateInBackground) {
-    BlockingInformParent("DoTrigger", ["global", "UPDATE", 0 ], 0)
-  } else {
-    DoTrigger("global","UPDATE", 0);
+  
+  if($upd_nChanged) {
+    if($updateInBackground) {
+      BlockingInformParent("DoTrigger", ["global", "UPDATE", 0 ], 0)
+    } else {
+      DoTrigger("global","UPDATE", 0);
+    }
   }
 }
 
