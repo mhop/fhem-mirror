@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use IO::Socket::INET;
 use MIME::Base64;
-use Digest::MD5;
+use Digest::MD5 qw(md5_hex);
 use vars qw($SSL_ERROR);
 
 my %ext2MIMEType= qw{
