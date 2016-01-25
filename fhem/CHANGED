@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_GasCalculator: Bugfix in Commandref and 2 attributes renamed.
   - feature: 98_weekprofile: including topics\categories
   - change:  98_weekprofile: filter for homatic channel devices
   - feature: YAMAHA_BD: input reading indicates now Netflix, YouTube, and all
