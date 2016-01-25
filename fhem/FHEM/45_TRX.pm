@@ -36,9 +36,13 @@ my $last_time = 1;
 my $trx_rssi = 0;
 
 sub TRX_Clear($);
-sub TRX_Read($);
+sub TRX_Read($@);
 sub TRX_Ready($);
 sub TRX_Parse($$$$);
+
+my %sets = (
+  "reopen"    => ""
+);
 
 sub
 TRX_Initialize($)
@@ -62,11 +66,13 @@ TRX_Initialize($)
   $hash->{MatchList} = \%mc;
 
   $hash->{ReadyFn} = "TRX_Ready";
+  $hash->{ReadAnswerFn} = "TRX_ReadAnswer";
 
 # Normal devices
   $hash->{DefFn}   = "TRX_Define";
   $hash->{UndefFn} = "TRX_Undef";
   $hash->{GetFn}   = "TRX_Get";
+  $hash->{SetFn}   = "TRX_Set";
   $hash->{StateFn} = "TRX_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 do_not_init:1,0 addvaltrigger:1,0 longids rssi:1,0";
   $hash->{ShutdownFn} = "TRX_Shutdown";
@@ -162,6 +168,16 @@ TRX_Shutdown($)
 
 #####################################
 sub
+TRX_Reopen($)
+{
+  my ($hash) = @_;
+  DevIo_CloseDev($hash);
+  sleep(1);
+  DevIo_OpenDev($hash, 0, "TRX_DoInit");
+}
+
+#####################################
+sub
 TRX_Get($@)
 {
   my ($hash, @a) = @_;
@@ -177,6 +193,26 @@ TRX_Get($@)
 
 #####################################
 sub
+TRX_Set($@)
+{
+  my ($hash, @a) = @_;
+
+  return "\"set TRX\" needs at least one parameter" if(@a < 1);
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
+  	if(!defined($sets{$a[1]}));
+
+  my $name = shift @a;
+  my $type = shift @a;
+
+  if($type eq "reopen") { ####################################
+    TRX_Reopen($hash);
+  }
+
+  return undef;
+}
+
+#####################################
+sub
 TRX_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
@@ -187,18 +223,16 @@ sub
 TRX_Clear($)
 {
   my $hash = shift;
-  my $buf;
 
-  # clear buffer:
-  if($hash->{USBDev}) {
-    while ($hash->{USBDev}->lookfor()) { 
-    	$buf = DevIo_SimpleRead($hash);
-    }
+  # Clear the pipe
+  $hash->{RA_Timeout} = 0.1;
+
+  for(;;) {
+    my ($err, undef) = TRX_ReadAnswer($hash, "Clear");
+    last if($err);
   }
-  if($hash->{TCPDev}) {
-   # TODO
-    return $buf;
-  }
+  delete($hash->{RA_Timeout});
+  $hash->{PARTIAL} = "";
 }
 
 #####################################
@@ -214,121 +248,171 @@ TRX_DoInit($)
 
 
   if(defined($attr{$name}) && defined($attr{$name}{"do_not_init"})) {
-    	Log3 $name, 1, "TRX: defined with noinit. Do not send init string to device.";
-  	$hash->{STATE} = "Initialized";
-
-        # Reset the counter
-        delete($hash->{XMIT_TIME});
-        delete($hash->{NR_CMD_LAST_H});
-
-	return undef;
+   	Log3 $name, 1, "TRX: defined with noinit. Do not send init string to device.";
   }
+  else
+  {
+    # Reset
+    my $init = pack('H*', "0D00000000000000000000000000");
+    DevIo_SimpleWrite($hash, $init, 0);
+    DevIo_TimeoutRead($hash, 0.5);
+    sleep(1);
 
-  # Reset
-  my $init = pack('H*', "0D00000000000000000000000000");
-  DevIo_SimpleWrite($hash, $init, 0);
-  DevIo_TimeoutRead($hash, 0.5);
+    TRX_Clear($hash);
 
-  TRX_Clear($hash);
+    sleep(1);
 
-  #
-  # Get Status
-  $init = pack('H*', "0D00000102000000000000000000");
-  DevIo_SimpleWrite($hash, $init, 0);
-  $buf = unpack('H*',DevIo_TimeoutRead($hash, 0.1));
+    #
+    # Get Status
+    $init = pack('H*', "0D00000102000000000000000000");
+    DevIo_SimpleWrite($hash, $init, 0);
+    $buf = unpack('H*',DevIo_TimeoutRead($hash, 0.1));
 
-  if (! $buf) {
-    	Log3 $name, 1, "TRX: Initialization Error: No character read";
-	return "TRX: Initialization Error $name: no char read";
-  } elsif ($buf !~ m/0d0100....................../) {
-    	Log3 $name, 1, "TRX: Initialization Error hexline='$buf', expected 0d0100......................";
-	return "TRX: Initialization Error %name expected 0D0100, but char=$char received.";
-  } else {
-    	Log3 $name,1, "TRX: Init OK";
-  	$hash->{STATE} = "Initialized";
-	# Analyse result and display it:
-	if ($buf =~ m/0d0100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/) {
-		my $status = "";
+    if (! $buf) {
+      Log3 $name, 1, "TRX: Initialization Error: No character read";
+      return "TRX: Initialization Error $name: no char read";
+    } elsif ($buf !~ m/0d0100....................../) {
+      Log3 $name, 1, "TRX: Initialization Error hexline='$buf', expected 0d0100......................";
+      return "TRX: Initialization Error %name expected 0D010, but buf=$buf received.";
+    } else {
+      Log3 $name,1, "TRX: Init OK";
 
-		my $seqnbr = $1;
-		my $cmnd = $2;
-		my $msg1 = $3;
-		my $msg2 = ord(pack('H*', $4));
-		my $msg3 = ord(pack('H*', $5));
-		my $msg4 = ord(pack('H*', $6));
-		my $msg5 = ord(pack('H*', $7));
-  		my $freq = { 
-			'50' => '310MHz',
-			'51' => '315MHz',
-			'52' => '433.92MHz receiver only',
-			'53' => '433.92MHz transceiver',
-			'55' => '868.00MHz',
-			'56' => '868.00MHz FSK',
-			'57' => '868.30MHz',
-			'58' => '868.30MHz FSK',
-			'59' => '868.35MHz',
-			'5a' => '868.35MHz FSK',
-			'5b' => '868.95MHz'
+      # Analyse result and display it:
+      if ($buf =~ m/0d0100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/) {
+        my $status = "";
+
+        my $seqnbr = $1;
+        my $cmnd = $2;
+        my $msg1 = $3;
+        my $msg2 = ord(pack('H*', $4));
+        my $msg3 = ord(pack('H*', $5));
+        my $msg4 = ord(pack('H*', $6));
+        my $msg5 = ord(pack('H*', $7));
+        my $freq = { 
+	        '50' => '310MHz',
+	        '51' => '315MHz',
+	        '52' => '433.92MHz receiver only',
+	        '53' => '433.92MHz transceiver',
+	        '55' => '868.00MHz',
+	        '56' => '868.00MHz FSK',
+	        '57' => '868.30MHz',
+	        '58' => '868.30MHz FSK',
+	        '59' => '868.35MHz',
+	        '5a' => '868.35MHz FSK',
+	        '5b' => '868.95MHz'
                  }->{$msg1} || 'unknown Mhz';
-		$status .= $freq;
-		$status .= ", " . sprintf "firmware=%d",$msg2;
-		$status .= ", protocols enabled: ";
-		$status .= "undecoded " if ($msg3 & 0x80); 
-		$status .= "RFU " if ($msg3 & 0x40); 
-		$status .= "ByronSX " if ($msg3 & 0x20); 
-		$status .= "RSL " if ($msg3 & 0x10); 
-		$status .= "Lighting4 " if ($msg3 & 0x08); 
-		$status .= "FineOffset/Viking " if ($msg3 & 0x04); 
-		$status .= "Rubicson " if ($msg3 & 0x02); 
-		$status .= "AE/Blyss " if ($msg3 & 0x01); 
-		$status .= "BlindsT1/T2/T3/T4 " if ($msg4 & 0x80); 
-		$status .= "BlindsT0  " if ($msg4 & 0x40); 
-		$status .= "ProGuard " if ($msg4 & 0x20); 
-		$status .= "FS20 " if ($msg4 & 0x10); 
-		$status .= "LaCrosse " if ($msg4 & 0x08); 
-		$status .= "Hideki " if ($msg4 & 0x04); 
-		$status .= "LightwaveRF " if ($msg4 & 0x02); 
-		$status .= "Mertik " if ($msg4 & 0x01); 
-		$status .= "Visonic " if ($msg5 & 0x80); 
-		$status .= "ATI " if ($msg5 & 0x40); 
-		$status .= "OREGON " if ($msg5 & 0x20); 
-		$status .= "KOPPLA " if ($msg5 & 0x10); 
-		$status .= "HOMEEASY " if ($msg5 & 0x08); 
-		$status .= "AC " if ($msg5 & 0x04); 
-		$status .= "ARC " if ($msg5 & 0x02); 
-		$status .= "X10 " if ($msg5 & 0x01); 
-		my $hexline = unpack('H*', $buf);
-    		Log3 $name, 4, "TRX: Init status hexline='$hexline'";
-    		Log3 $name, 1, "TRX: Init status: '$status'";
+        $status .= $freq;
+        $status .= ", " . sprintf "firmware=%d",$msg2;
+        $status .= ", protocols enabled: ";
+        $status .= "undecoded " if ($msg3 & 0x80); 
+        $status .= "RFU " if ($msg3 & 0x40); 
+        $status .= "ByronSX " if ($msg3 & 0x20); 
+        $status .= "RSL " if ($msg3 & 0x10); 
+        $status .= "Lighting4 " if ($msg3 & 0x08); 
+        $status .= "FineOffset/Viking " if ($msg3 & 0x04); 
+        $status .= "Rubicson " if ($msg3 & 0x02); 
+        $status .= "AE/Blyss " if ($msg3 & 0x01); 
+        $status .= "BlindsT1/T2/T3/T4 " if ($msg4 & 0x80); 
+        $status .= "BlindsT0  " if ($msg4 & 0x40); 
+        $status .= "ProGuard " if ($msg4 & 0x20); 
+        $status .= "FS20 " if ($msg4 & 0x10); 
+        $status .= "LaCrosse " if ($msg4 & 0x08); 
+        $status .= "Hideki " if ($msg4 & 0x04); 
+        $status .= "LightwaveRF " if ($msg4 & 0x02); 
+        $status .= "Mertik " if ($msg4 & 0x01); 
+        $status .= "Visonic " if ($msg5 & 0x80); 
+        $status .= "ATI " if ($msg5 & 0x40); 
+        $status .= "OREGON " if ($msg5 & 0x20); 
+        $status .= "KOPPLA " if ($msg5 & 0x10); 
+        $status .= "HOMEEASY " if ($msg5 & 0x08); 
+        $status .= "AC " if ($msg5 & 0x04); 
+        $status .= "ARC " if ($msg5 & 0x02); 
+        $status .= "X10 " if ($msg5 & 0x01); 
+        my $hexline = unpack('H*', $buf);
+        Log3 $name, 4, "TRX: Init status hexline='$hexline'";
+        Log3 $name, 1, "TRX: Init status: '$status'";
+      }
 	}
   }
-  #
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
   delete($hash->{NR_CMD_LAST_H});
 
+  readingsSingleUpdate($hash, "state", "Initialized", 1);
+
   return undef;
 }
 
+#####################################
+# This is a direct read for commands like get
+sub
+TRX_ReadAnswer($$)
+{
+  my ($hash, $arg) = @_;
+  return ("No FD (dummy device?)", undef)
+        if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
+#  my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
+  my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 9);
+  Log3 $hash, 4, "TRX_ReadAnswer arg:$arg";
+
+  for(;;) {
+
+    my $buf;
+    if($^O =~ m/Win/ && $hash->{USBDev}) {
+      $hash->{USBDev}->read_const_time($to*1000); # set timeout (ms)
+      # Read anstatt input sonst funzt read_const_time nicht.
+      $buf = $hash->{USBDev}->read(999);
+      return ("Timeout reading answer for get $arg", undef)
+        if(length($buf) == 0);
+
+    } else {
+      if(!$hash->{FD}) {
+        Log3 $hash, 1, "TRX_ReadAnswer: device lost";
+        return ("Device lost when reading answer for get $arg", undef);
+      }
+
+      my $rin = '';
+      vec($rin, $hash->{FD}, 1) = 1;
+      my $nfound = select($rin, undef, undef, $to);
+      if($nfound < 0) {
+        my $err = $!;
+        Log3 $hash, 5, "TRX_ReadAnswer: nfound < 0 / err:$err";
+        next if ($err == EAGAIN() || $err == EINTR() || $err == 0);
+        DevIo_Disconnected($hash);
+        return("TRX_ReadAnswer $arg: $err", undef);
+      }
+
+      if($nfound == 0){
+        Log3 $hash, 5, "TRX_ReadAnswer: select timeout";
+        return ("Timeout reading answer for get $arg", undef);
+      }
+
+      $buf = DevIo_SimpleRead($hash);
+      if(!defined($buf)){
+        Log3 $hash, 1,"TRX_ReadAnswer: no data read";
+        return ("No data", undef);
+      }
+    }
+
+    my $ret = TRX_Read($hash, $buf);
+    if(defined($ret)){
+      Log3 $hash, 4, "TRX_ReadAnswer for $arg: $ret";
+      return (undef, $ret);
+    }
+  }
+}
 
 #####################################
 # called from the global loop, when the select for hash->{FD} reports data
 sub
-TRX_Read($)
+TRX_Read($@)
 {
-  my ($hash) = @_;
+  my ($hash, $local) = @_;
 
+  my $mybuf = (defined($local) ? $local : DevIo_SimpleRead($hash));
+  return "" if(!defined($mybuf));
   my $name = $hash->{NAME};
-
-  my $char;
-
-  my $mybuf = DevIo_SimpleRead($hash);
-
-  if(!defined($mybuf) || length($mybuf) == 0) {
-    DevIo_Disconnected($hash);
-    return "";
-  }
 
   my $TRX_data = $hash->{PARTIAL};
   Log3 $name, 5, "TRX/RAW: $TRX_data/$mybuf";
@@ -365,6 +449,11 @@ TRX_Parse($$$$)
 
   #Log3 $hash, 5, "TRX_Parse() '$rmsg'";
 
+  if(!defined($hash->{STATE}) || $hash->{STATE} ne "Initialized"){
+    Log3 $hash, 4,"TRX_Parse $rmsg: dongle not yet initialized";
+    return;
+  }
+
   my %addvals;
   # Parse only if message is different within 2 seconds 
   # (some Oregon sensors always sends the message twice, X10 security sensors even sends the message five times)
@@ -391,7 +480,7 @@ TRX_Ready($)
 {
   my ($hash) = @_;
 
-  return DevIo_OpenDev($hash, 1, "TRX_Ready")
+  return DevIo_OpenDev($hash, 1, "TRX_DoInit")
                 if($hash->{STATE} eq "disconnected");
 
   # This is relevant for windows/USB only
@@ -409,7 +498,6 @@ TRX_Ready($)
 <h3>TRX</h3>
 <ul>
   <table>
-  <tr><td>
   This module is for the <a href="http://www.rfxcom.com">RFXCOM</a> RFXtrx433 USB based 433 Mhz RF transmitters.
 This USB based transmitter is able to receive and transmit many protocols like Oregon Scientific weather sensors, X10 security and lighting devices, ARC ((address code wheels) HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO,
 AB600, Duewi, DomiaLite, COCO) and others. <br>
