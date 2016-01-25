@@ -27,6 +27,12 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.8    25.01.2016    changed define in order to remove credentials from string,
+#                      added "set credentials" command to save username/password,
+#                      added Attribute "session" to make login-session selectable,
+#                      Note: You have to adapt your define-strings !!
+#                      Refere to commandref or look in forum at: 
+#                      http://forum.fhem.de/index.php/topic,45671.msg397449.html#msg397449
 # 1.7    18.01.2016    Attribute "httptimeout" added
 # 1.6    16.01.2016    Change the define-string related to rectime.
 #                      Note: See all changes to rectime usage in commandref or here:
@@ -48,9 +54,9 @@
 #                      LWP is not needed anymore
 #
 #
-# Definition: define <name> SSCam <ServerAddr> <ServerPort> <username> <password> <camname>
+# Definition: define <name> SSCam <camname> <ServerAddr> <ServerPort> 
 # 
-# Example: define CamCP1 SSCAM 192.168.2.20 5000 apiuser apipw Carport
+# Example: define CamCP1 SSCAM Carport 192.168.2.20 5000
 #
 
 
@@ -59,7 +65,8 @@ package main;
 use JSON qw( decode_json );            # From CPAN,, Debian libjson-perl 
 use Data::Dumper;                      # Perl Core module
 use strict;                           
-use warnings;                         
+use warnings;
+use MIME::Base64;
 use HttpUtils;
 
 
@@ -78,6 +85,7 @@ sub SSCam_Initialize($) {
          "pollcaminfoall ".
          "pollnologging:1,0 ".
          "rectime ".
+         "session:SurveillanceStation,DSM ".
          "webCmd ".
          $readingFnAttributes;
 
@@ -87,29 +95,24 @@ sub SSCam_Initialize($) {
 sub SSCam_Define {
   # Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Gerät ausgeführt wird 
   # Welche und wie viele Parameter akzeptiert werden ist Sache dieser Funktion. Die Werte werden nach dem übergebenen Hash in ein Array aufgeteilt
-  # define CamCP1 SSCAM 192.168.2.20 5000 apiuser Support4me Carport
-  #       ($hash)  [1]     [2]        [3]   [4]     [5]       [6]   
+  # define CamCP1 SSCAM Carport 192.168.2.20 5000 
+  #       ($hash)  [1]    [2]        [3]      [4]  
   #
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   
   my @a = split("[ \t][ \t]*", $def);
   
-  if(int(@a) < 7) {
-        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <ServerAddress> <Port> <User> <Password> <Cameraname>";
+  if(int(@a) < 5) {
+        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <Cameraname> <ServerAddress> <Port>";
         }
         
-  my $serveraddr = $a[2];
-  my $serverport = $a[3];
-  my $username   = $a[4];  
-  my $password   = $a[5];
-  my $camname    = $a[6];
-
+  my $camname    = $a[2];
+  my $serveraddr = $a[3];
+  my $serverport = $a[4];
   
   $hash->{SERVERADDR}       = $serveraddr;
   $hash->{SERVERPORT}       = $serverport;
-  $hash->{HELPER}{USERNAME} = $username;
-  $hash->{HELPER}{PASSWORD} = $password;
   $hash->{CAMNAME}          = $camname;
  
   # benötigte API's in $hash einfügen
@@ -120,7 +123,7 @@ sub SSCam_Define {
   $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
   
-  # Anfangswerte setzen
+  # Startwerte setzen
   $attr{$name}{webCmd}                 = "on:off:snap:enable:disable";                            # initiale Webkommandos setzen
   $hash->{HELPER}{ACTIVE}              = "off";                                                   # Funktionstoken "off", Funktionen können sofort starten
   $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                                     # Loggingfunktion für Polling ist an
@@ -129,8 +132,8 @@ sub SSCam_Define {
   readingsSingleUpdate($hash,"Record","Stop",0);                                                  # Recordings laufen nicht
   readingsSingleUpdate($hash,"Availability", "", 0);                                              # Verfügbarkeit ist unbekannt
   readingsSingleUpdate($hash,"PollState","Inactive",0);                                           # es ist keine Gerätepolling aktiv
-  
-  RemoveInternalTimer($hash);                                                                     # alle evtl. noch laufenden Timer löschen
+  getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)  
+  RemoveInternalTimer($hash);                                                                     # alle Timer löschen
   
   
   # Subroutine Watchdog-Timer starten (sollen Cam-Infos abgerufen werden ?), verzögerter zufälliger Start 0-60s 
@@ -169,11 +172,13 @@ return undef;
 sub SSCam_Set {
         my ($hash, @a) = @_;
         return "\"set X\" needs at least an argument" if ( @a < 2 );
-        my $name = $a[0];
-        my $opt  = $a[1];
-        my $prop = $a[2];
+        my $name  = $a[0];
+        my $opt   = $a[1];
+        my $prop  = $a[2];
+        my $prop1 = $a[3];
         
         my %SSCam_sets = (
+                         "credentials"       => "credentials",
                          "on"                => "on",
                          "off"               => "off",
                          "snap"              => "snap:",
@@ -187,10 +192,12 @@ sub SSCam_Set {
 #        return SetExtensions($hash, $list, $name, $opt) if( !grep( $_ =~ /^\Q$opt\E($|:)/, split( ' ', $list ) ) );
         
         
-        my $camname = $hash->{CAMNAME};  
+        my $camname = $hash->{CAMNAME}; 
+        my $success;
         my $logstr;
         my @cList;
-        
+       
+               
         # ist die angegebene Option verfügbar ?
         if(!defined($SSCam_sets{$opt})) 
                 {
@@ -200,6 +207,8 @@ sub SSCam_Set {
                 } 
                 else 
                 {
+                    if ($opt ne "credentials" and !$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+                    
                     if ($opt eq "on") 
                     {
                         
@@ -227,6 +236,14 @@ sub SSCam_Set {
                     {
                         &camdisable($hash);
                     }
+                    elsif ($opt eq "credentials") 
+                    {
+                        return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
+                        
+                        ($success) = setcredentials($hash,$prop,$prop1);
+                        return $success ? "Username and Password saved successfully" : "Error while saving Username / Password - see logfile for details";
+                    }
+
 
                 }  
 return undef;
@@ -261,6 +278,110 @@ sub SSCam_Get {
 return undef;
 }
 
+######################################################################################
+###  Username / Paßwort speichern
+
+sub setcredentials ($@) {
+    my ($hash, @credentials) = @_;
+    my $logstr;
+    my $success;
+    my $credstr;
+    my $index;
+    my $retcode;
+    my (@key,$len,$i);
+    
+    $credstr = encode_base64(join(':', @credentials));
+    
+    # Beginn Scramble-Routine
+    @key = qw(1 3 4 5 6 3 2 1 9);
+    $len = scalar @key;  
+    $i = 0;  
+    $credstr = join "",  
+            map { $i = ($i + 1) % $len;  
+            chr((ord($_) + $key[$i]) % 256) } split //, $credstr; 
+    # End Scramble-Routine    
+       
+    $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
+    $retcode = setKeyValue($index, $credstr);
+    
+    if ($retcode) { 
+        $logstr = "Error while saving the Credentials - $retcode";
+        &printlog($hash,$logstr,"1");
+        $success = 0;
+        }
+        else
+        {
+        getcredentials($hash,1);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1) 
+        $success = 1;
+        }
+
+return ($success);
+}
+
+######################################################################################
+###  Username / Paßwort abrufen
+
+sub getcredentials ($$) {
+    my ($hash,$boot) = @_;
+    my $logstr;
+    my $success;
+    my $username;
+    my $passwd;
+    my $index;
+    my ($retcode, $credstr);
+    my (@key,$len,$i);
+    
+    if ($boot eq 1) {
+        # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
+        $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
+        ($retcode, $credstr) = getKeyValue($index);
+    
+        if ($retcode) {
+            $logstr = "Unable to read password from file: $retcode";
+            &printlog($hash,$logstr,"1");
+            $success = 0;
+            }  
+
+        if ($credstr) {
+     
+            # beim Boot scrambled Credentials in den RAM laden
+            $hash->{HELPER}{CREDENTIALS} = $credstr;
+        
+            # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
+            $hash->{CREDENTIALS} = "Set";
+            $success = 1;
+            }
+    }
+    else
+    {
+    # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
+    $credstr = $hash->{HELPER}{CREDENTIALS};
+    
+    # Beginn Descramble-Routine
+    @key = qw(1 3 4 5 6 3 2 1 9); 
+    $len = scalar @key;  
+    $i = 0;  
+    $credstr = join "",  
+    map { $i = ($i + 1) % $len;  
+        chr((ord($_) - $key[$i] + 256) % 256) }  
+        split //, $credstr;   
+    # Ende Descramble-Routine
+    
+    ($username, $passwd) = split(":",decode_base64($credstr));
+    
+    $logstr = "Credentials read from RAM: $username $passwd";
+    &printlog($hash,$logstr,"4");
+    
+    $success = (defined($passwd)) ? 1 : 0;
+    }
+    
+return ($success, $username, $passwd);        
+}
+
+
+
+######################################################################################
+###  Polling Überwachung
 
 sub watchdogpollcaminfo ($) {
     # Überwacht die Wert von Attribut "pollcaminfoall" und Reading "PollState"
@@ -920,12 +1041,23 @@ sub login_nonbl ($) {
   $logstr = "--- Begin Function serverlogin nonblocking ---";
   &printlog($hash,$logstr,"4");
   
+  # Credentials abrufen
+  ($success, $username, $password) = getcredentials($hash,0);
+  unless ($success) {$logstr = "Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\""; &printlog($hash,$logstr,"1"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success)};
+  
   $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+  
   # Logausgabe
   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
   &printlog($hash,$logstr,"5");  
  
-  $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\""; 
+  if (AttrVal($name, "session", undef) eq "SurveillanceStation") {
+      $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\"";
+      }
+      else
+      {
+      $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=\"sid\""; 
+      }
   
   $param = {
                url      => $url,
@@ -938,9 +1070,9 @@ sub login_nonbl ($) {
    
    # login wird ausgeführt, $sid ermittelt und mit Routine "getcamid_nonbl" verarbeitet
    HttpUtils_NonblockingGet ($param);
-  
-  
 }  
+  
+  
   
 ###############################################################################  
 ####      Rückkehr aus Funktion login und $sid ermitteln,  
@@ -949,18 +1081,17 @@ sub login_nonbl ($) {
 sub getcamid_nonbl ($) {  
   
    my ($param, $err, $myjson) = @_;
-   my $hash         = $param->{hash};
-   my $name         = $hash->{NAME};
-   my $serveraddr   = $hash->{SERVERADDR};
-   my $serverport   = $hash->{SERVERPORT};
-   my $username     = $hash->{HELPER}{USERNAME};
-   my $apicam       = $hash->{HELPER}{APICAM};
-   my $apicampath   = $hash->{HELPER}{APICAMPATH};
-   my $apicammaxver = $hash->{HELPER}{APICAMMAXVER};
+   my $hash                            = $param->{hash};
+   my $name                            = $hash->{NAME};
+   my $serveraddr                      = $hash->{SERVERADDR};
+   my $serverport                      = $hash->{SERVERPORT};
+   my $apicam                          = $hash->{HELPER}{APICAM};
+   my $apicampath                      = $hash->{HELPER}{APICAMPATH};
+   my $apicammaxver                    = $hash->{HELPER}{APICAMMAXVER};
+   my ($success, $username)            = getcredentials($hash,0);   
    my $url;
    my $data;
    my $logstr;
-   my $success;
    my $sid;
    my $error;
    my $errorcode;
@@ -1061,8 +1192,8 @@ sub getcamid_nonbl ($) {
   
   # einlesen aller Kameras - Auswertung in Rückkehrfunktion "camop_nonbl"
   # $apicammaxver um 1 verringern - Issue in API !
-  if (defined $apicammaxver) {$apicammaxver -= 1};
-  $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&_sid=\"$sid\"";
+  # if (defined $apicammaxver) {$apicammaxver -= 1};
+  $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
 
   $param = {
                url      => $url,
@@ -1090,7 +1221,6 @@ sub camop_nonbl ($) {
    my $serveraddr        = $hash->{SERVERADDR};
    my $serverport        = $hash->{SERVERPORT};
    my $camname           = $hash->{CAMNAME};
-   my $username          = $hash->{HELPER}{USERNAME};
    my $apicam            = $hash->{HELPER}{APICAM};
    my $apicampath        = $hash->{HELPER}{APICAMPATH};
    my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER};
@@ -1190,7 +1320,7 @@ sub camop_nonbl ($) {
                  readingsEndUpdate($hash, 1);
                                   
                  # Logausgabe
-                 $logstr = "ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights ($username), Cameraname and Spelling.";
+                 $logstr = "ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling.";
                  &printlog($hash,$logstr,"1");
                  $logstr = "--- End Function getcamid nonblocking with error ---";
                  &printlog($hash,$logstr,"4");
@@ -1793,7 +1923,13 @@ sub camret_nonbl ($) {
     $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
     &printlog($hash,$logstr,"5");    
   
-    $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid"; 
+    if (AttrVal($name, "session", undef) eq "SurveillanceStation") {
+        $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
+        }
+        else
+        {
+        $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid";
+        }
 
     $param = {
                 url      => $url,
@@ -1815,12 +1951,11 @@ sub camret_nonbl ($) {
   
 sub logout_nonbl ($) {  
    my ($param, $err, $myjson) = @_;
-   my $hash            = $param->{hash};
-   my $username        = $hash->{HELPER}{USERNAME};
-   my $sid             = $hash->{HELPER}{SID};
+   my $hash                            = $param->{hash};
+   my $sid                             = $hash->{HELPER}{SID};
+   my ($success, $username)            = getcredentials($hash,0);
    my $data;
    my $logstr;
-   my $success;
    my $error;
    my $errorcode;
   
@@ -1940,7 +2075,7 @@ sub experrorauth {
   102 => "API does not exist",
   400 => "Invalid user or password",
   401 => "Guest or disabled account",
-  402 => "Permission denied",
+  402 => "Permission denied - make sure user is member of Admin-group if DSM-Session is used",
   403 => "One time password not specified",
   404 => "One time password authenticate failed",
   );
@@ -1972,6 +2107,7 @@ sub experror {
   105 => "Insufficient user privilege",
   106 => "Connection time out",
   107 => "Multiple login detected",
+  117 => "need manager rights in SurveillanceStation for operation",
   400 => "Execution failed",
   401 => "Parameter invalid",
   402 => "Camera disabled",
@@ -2021,7 +2157,7 @@ return;
   At present the following functions are available: <br><br>
    <ul>
     <ul>
-       <li>Start a Rocording</li>
+       <li>Start a Recording</li>
        <li>Stop a Recording (using command or automatically after the &lt;RecordTime&gt; period</li>
        <li>Trigger a Snapshot </li>
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
@@ -2038,21 +2174,22 @@ return;
 <b> Prerequisites </b> <br><br>
     This module uses the CPAN-module JSON. Please consider to install this package (Debian: libjson-perl).<br>
     You don't need to install LWP anymore, because of SSCam is completely using the nonblocking functions of HttpUtils respectively HttpUtils_NonblockingGet now. <br> 
-    You also need to add an user in Synology DSM as member of Administrators group. <br><br>
+    In DSM respectively in Synology Surveillance Station an User has to be created. The login credentials are needed later when using a set-command to assign the login-data to a device. <br> 
+    Further informations could be find among <a href="#Credentials">Credentials</a>.  <br><br>
     
 
   <a name="SCamdefine"></a>
   <b>Define</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;ServerAddr&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Cameraname&gt; </code><br>
+    <code>define &lt;name&gt; SSCAM &lt;Cameraname in SVS&gt; &lt;ServerAddr&gt; &lt;Port&gt;  </code><br>
     <br>
     Defines a new camera device for SSCam. At first the devices have to be set up and operable in Synology Surveillance Station 7.0 and above. <br><br>
     
     The Modul SSCam ist based on functions of Synology Surveillance Station API. <br>
     Please refer the <a href="http://global.download.synology.com/download/Document/DeveloperGuide/Surveillance_Station_Web_API_v2.0.pdf">Web API Guide</a>. <br><br>
     
-    At present only HTTP-protocol is supported to call Synology DS. <br><br>  
+    Currently only HTTP-protocol is supported to call Synology DS. <br><br>  
 
     The parameters are in detail:
    <br>
@@ -2061,18 +2198,16 @@ return;
    <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:         </td><td>the name of the new device to use in FHEM</td></tr>
+    <tr><td>Cameraname:   </td><td>Cameraname as defined in Synology Surveillance Station, Spaces are not allowed in Cameraname !</td></tr>
     <tr><td>ServerAddr:   </td><td>IP-address of Synology Surveillance Station Host. <b>Note:</b> avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
     <tr><td>Port:         </td><td>the Port Synology surveillance Station Host, normally 5000 (HTTP only)</td></tr>
-    <tr><td>Username:     </td><td>Username defined in the Diskstation. Has to be a member of Admin-group</td></tr>
-    <tr><td>Password:     </td><td>the Password for the User</td></tr>
-    <tr><td>Cameraname:   </td><td>Cameraname as defined in Synology Surveillance Station, Spaces are not allowed in Cameraname !</td></tr>
    </table>
 
     <br><br>
 
-    <b>Examples:</b>
+    <b>Example:</b>
      <pre>
-      define CamCP SSCAM 192.168.2.20 5000 apiuser apipass Carport     
+      define CamCP SSCAM Carport 192.168.2.20 5000  
     </pre>
     
     
@@ -2088,8 +2223,54 @@ return;
 
     In that case the command <b>"set &lt;name&gt; on 0"</b> leads also to an endless recording.<br><br>
     
-    If you have specified a pre-recording time in SVS it will be considered too.<br><br>  
+    If you have specified a pre-recording time in SVS it will be considered too. <br><br><br>
     
+    
+    <a name="Credentials"></a>
+    <b>Credentials </b><br><br>
+    
+    After a camera-device is defined, firstly it is needed to save the credentials. This will be done with command:
+   
+    <pre> 
+     set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt;
+    </pre>
+    
+    The operator can, dependend on what functions are planned to execute, create an user in DSM respectively in Synology Surveillance Station as well. <br>
+    If the user is member of admin-group, he has access to all module functions. Without this membership the user can only execute functions with lower need of rights. <br>
+    The required minimum rights to execute functions are listed in a table further down. <br>
+    
+    Alternatively to DSM-user a user created in SVS can be used. Also in that case a user of type "manager" has the right to execute all functions, <br>
+    whereat the access to particular cameras can be restricted by the privilege profile (please see help function in SVS for details).  <br>
+    As best practice it is proposed to create an user in DSM as well as in SVS too:  <br><br>
+    
+    <ul>
+    <li>DSM-User as member of admin group: unrestricted test of all module functions -&gt; session: DSM  </li>
+    <li>SVS-User as Manager or observer: adjusted privilege profile -&gt; session: SurveillanceStation  </li>
+    </ul>
+    <br>
+    
+    Using the <a href="#SSCamattr">Attribute</a> "session" can be selected, if the session should be established to DSM or the SVS instead. <br>
+    If the session will be established to DSM, SVS Web-API methods are available as well as further API methods of other API's what possibly needed for processing. <br><br>
+    
+    After device definition the default is "login to DSM", that means credentials with admin rights can be used to test all camera-functions firstly. <br>
+    After this the credentials can be switched to a SVS-session with a restricted privilege profile as needed on dependency what module functions are want to be executed. <br><br>
+    
+    The following list shows the minimum rights what the particular module function needs. <br><br>
+    <ul>
+      <table>
+      <colgroup> <col width=20%> <col width=80%> </colgroup>
+      <tr><td><li>set ... on                 </td><td> session: ServeillanceStation - observer with enhanced privilege "manual recording" </li></td></tr>
+      <tr><td><li>set ... off                </td><td> session: ServeillanceStation - observer with enhanced privilege "manual recording" </li></td></tr>
+      <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - manager       </li></td></tr>
+      <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
+      <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
+      <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      </table>
+    </ul>
+      <br><br>
+    
+
     <b>HTTP-Timeout Settings</b><br><br>
     All functions of the SSCam-Module are using HTTP-Calls to the SVS Web API. <br>
     The Default-Value of the HTTP-Timeout amounts 4 seconds. You can set the <a href="#SSCamattr">Attribute</a> "httptimeout" > 0 to adjust the value as needed in your technical environment. <br>
@@ -2190,10 +2371,10 @@ return;
 
   <b>Polling of Camera-Properties:</b><br><br>
 
-  Retrieval of Camera-Properties can be done automatically if the attribute "pollcaminfoall" will be set to a value > 10. <br>
+  Retrieval of Camera-Properties can be done automatically if the attribute "pollcaminfoall" will be set to a value &gt; 10. <br>
   As default that attribute "pollcaminfoall" isn't be set and the automatic polling isn't be active. <br>
-  The value of that attribute determines the interval of property-retrieval in seconds. If that attribute isn't be set or < 10 the automatic polling won't be started <br>
-  respectively stopped when the value was set to > 10 before. <br><br>
+  The value of that attribute determines the interval of property-retrieval in seconds. If that attribute isn't be set or &lt; 10 the automatic polling won't be started <br>
+  respectively stopped when the value was set to &gt; 10 before. <br><br>
 
   The attribute "pollcaminfoall" is monitored by a watchdog-timer. Changes of th attributevalue will be checked every 90 seconds and transact correspondig. <br>
   Changes of the pollingstate and pollinginterval will be reported in FHEM-Logfile. The reporting can be switched off by setting the attribute "pollnologging=1". <br>
@@ -2202,12 +2383,14 @@ return;
 
   If FHEM will be restarted, the first data retrieval will be done within 60 seconds after start. <br><br>
 
-  The state of automatic polling will be displayed by reading "PollState": <br>
-  <pre>
-    PollState = Active     -    automatic polling will be executed with interval correspondig value of attribute <pollcaminfoall>
-    PollState = Inactive   -    automatic polling won't be executed
-  </pre>
- 
+  The state of automatic polling will be displayed by reading "PollState": <br><br>
+  
+  <ul>
+    <li><b> PollState = Active </b>     -    automatic polling will be executed with interval correspondig value of attribute "pollcaminfoall" </li>
+    <li><b> PollState = Inactive </b>   -    automatic polling won't be executed </li>
+  </ul>
+  <br>
+  
   The meaning of reading values is described under <a href="#SSCamreadings">Readings</a> . <br><br>
 
   <b>Notes:</b> <br><br>
@@ -2222,6 +2405,23 @@ return;
   and thereby caused potential source of errors during request Synology Surveillance Station. <br>
   A marginal difference between the polling intervals of the defined cameras, e.g. 1 second, can already be faced as sufficient value. <br><br> 
 </ul>
+
+<a name="SSCaminternals"></a>
+<b>Internals</b> <br>
+ <ul>
+ The meaning of used Internals is depicted in following list: <br><br>
+  <ul>
+  <li><b>CAMID</b> - the ID of camera defined in SVS, the value will be retrieved automatically on the basis of SVS-cameraname </li>
+  <li><b>CAMNAME</b> - the name of the camera in SVS </li>
+  <li><b>CREDENTIALS</b> - the value is "Set" if Credentials are set </li> 
+  <li><b>NAME</b> - the cameraname in FHEM </li>
+  <li><b>OPMODE</b> - the last executed operation of the module </li>  
+  <li><b>SERVERADDR</b> - IP-Address of SVS Host </li>
+  <li><b>SERVERPORT</b> - SVS-Port </li>
+  
+  <br><br>
+  </ul>
+ </ul>
 
 <a name="SSCamreadings"></a>
 <b>Readings</b>
@@ -2272,11 +2472,13 @@ return;
   <ul>
   <li><b>httptimeout</b> - Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" or not set) </li>
   
-  <li><b>pollcaminfoall</b> - Interval of automatic polling the Camera properties (if < 10: no polling, if > 10: polling with interval) </li>
+  <li><b>pollcaminfoall</b> - Interval of automatic polling the Camera properties (if < 10: no polling, if &gt; 10: polling with interval) </li>
 
   <li><b>pollnologging</b> - "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li>
   
   <li><b>rectime</b> - the determined recordtime when a recording starts. If rectime = 0 an endless recording will be started. If it isn't defined, the default recordtime of 15s is activated </li>
+  
+  <li><b>session</b>  - selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). "SurveillanceStation" -&gt; session will be established to SVS </li><br>
   
   <li><b>verbose</b></li><br>
   
@@ -2286,11 +2488,12 @@ return;
    
    <table>  
    <colgroup> <col width=5%> <col width=95%> </colgroup>
-     <tr><td> 0  </td><td> Start/Stop-Event will be logged </td></tr>
-     <tr><td> 1  </td><td> Error messages will be logged </td></tr>
-     <tr><td> 3  </td><td> sended commands will be logged </td></tr> 
-     <tr><td> 4  </td><td> sended and received informations will be logged </td></tr>
-     <tr><td> 5  </td><td> all outputs will be logged for error-analyses. <b>Caution:</b> a lot of data could be written into logfile ! </td></tr>
+     <tr><td> 0  </td><td>- Start/Stop-Event will be logged </td></tr>
+     <tr><td> 1  </td><td>- Error messages will be logged </td></tr>
+     <tr><td> 2  </td><td>- messages according to important events were logged </td></tr>
+     <tr><td> 3  </td><td>- sended commands will be logged </td></tr> 
+     <tr><td> 4  </td><td>- sended and received informations will be logged </td></tr>
+     <tr><td> 5  </td><td>- all outputs will be logged for error-analyses. <b>Caution:</b> a lot of data could be written into logfile ! </td></tr>
    </table>
    </ul>     
    <br><br>
@@ -2331,13 +2534,14 @@ return;
 <b>Vorbereitung </b> <br><br>
     Dieses Modul nutzt das CPAN Module JSON. Bitte darauf achten dieses Paket zu installieren. (Debian: libjson-perl). <br>
     Das CPAN-Modul LWP wird für SSCam nicht mehr benötigt. Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br> 
-    Im DSM muß ebenfalls ein Nutzer als Mitglied der Administratorgruppe angelegt sein. Die Daten werden bei der Definition des Gerätes benötigt.<br><br>
+    Im DSM bzw. der Synology Surveillance Station muß ein Nutzer angelegt sein. Die Zugangsdaten werden später über ein Set-Kommando dem angelegten Gerät zugewiesen. <br>
+    Nähere Informationen dazu unter <a href="#Credentials">Credentials</a><br><br>
 
-<a name="SCamdefine"></a>
+<a name="SSCamdefine"></a>
 <b>Definition</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCam &lt;ServerAddr&gt; &lt;Port&gt; &lt;Username&gt; &lt;Password&gt; &lt;Kameraname in SVS&gt; </code><br>
+    <code>define &lt;name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; &lt;Port&gt; </code><br>
     <br>
     
     Definiert eine neue Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
@@ -2353,18 +2557,16 @@ return;
     <table>
     <colgroup> <col width=15%> <col width=85%> </colgroup>
     <tr><td>name:           </td><td>der Name des neuen Gerätes in FHEM</td></tr>
+    <tr><td>Kameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist. Leerzeichen im Namen sind nicht erlaubt !</td></tr>
     <tr><td>ServerAddr:     </td><td>die IP-Addresse des Synology Surveillance Station Host. Hinweis: Es sollte kein Servername verwendet werden weil DNS-Aufrufe in FHEM blockierend sind.</td></tr>
     <tr><td>Port:           </td><td>der Port des Synology Surveillance Station Host. Normalerweise ist das 5000 (nur HTTP)</td></tr>
-    <tr><td>Username:       </td><td>Name des in der Diskstation definierten Nutzers. Er muß ein Mitglied der Admin-Gruppe sein</td></tr>
-    <tr><td>Password:       </td><td>das Passwort des Nutzers</td></tr>
-    <tr><td>Cameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist. Leerzeichen im Namen sind nicht erlaubt !</td></tr>
     </table>
 
     <br><br>
 
     <b>Beispiel:</b>
      <pre>
-      define CamCP SSCAM 192.168.2.20 5000 apiuser apipass Carport     
+      define CamCP SSCAM Carport 192.168.2.20 5000      
      </pre>
      
     
@@ -2377,7 +2579,54 @@ return;
     Mit dem <a href="#SSCamset">Befehl</a> <b>"set &lt;name&gt; on [rectime]"</b> wird die Aufnahmedauer temporär festgelegt und überschreibt einmalig sowohl den Defaultwert als auch den Wert des gesetzten Attributs "rectime". <br>
     Auch in diesem Fall führt <b>"set &lt;name&gt; on 0"</b> zu einer Daueraufnahme. <br><br>
 
-    Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br><br>
+    Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br><br><br>
+    
+    
+    <a name="Credentials"></a>
+    <b>Credentials </b><br><br>
+    
+    Nach dem Definieren des Gerätes müssen zuerst die Zugangsrechte gespeichert werden. Das geschieht mit dem Befehl:
+   
+    <pre> 
+     set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt;
+    </pre>
+    
+    Der Anwender kann in Abhängigkeit der beabsichtigten einzusetzenden Funktionen einen Nutzer im DSM bzw. in der Surveillance Station einrichten. <br>
+    Ist der DSM-Nutzer der Gruppe Administratoren zugeordnet, hat er auf alle Funktionen Zugriff. Ohne diese Gruppenzugehörigkeit können nur Funktionen mit niedrigeren <br>
+    Rechtebedarf ausgeführt werden. Die benötigten Mindestrechte der Funktionen sind in der Tabelle weiter unten aufgeführt. <br>
+    
+    Alternativ zum DSM-Nutzer kann ein in der SVS angelegter Nutzer verwendet werden. Auch in diesem Fall hat ein Nutzer vom Typ Manager das Recht alle Funktionen  <br>
+    auszuführen, wobei der Zugriff auf bestimmte Kameras/ im Privilegienprofil beschränkt werden kann (siehe Hilfefunktion in SVS). <br>
+    Als Best Practice wird vorgeschlagen jeweils einen User im DSM und einen in der SVS anzulegen: <br><br>
+    
+    <ul>
+    <li>DSM-User als Mitglied der Admin-Gruppe: uneingeschränkter Test aller Modulfunktionen -> session:DSM  </li>
+    <li>SVS-User als Manager oder Betrachter: angepasstes Privilegienprofil -> session: SurveillanceStation  </li>
+    </ul>
+    <br>
+    
+    Über das <a href="#SSCamattr">Attribut</a> "session" kann ausgewählt werden, ob die Session mit dem DSM oder der SVS augebaut werden soll. <br>
+    Erfolgt der Session-Aufbau mit dem DSM, stehen neben der SVS Web-API auch darüber hinaus gehende API-Zugriffe zur Verfügung die unter Umständen zur Verarbeitung benötigt werden. <br><br>
+    
+    Nach der Gerätedefinition ist die Grundeinstellung "Login in das DSM", d.h. es können Credentials mit Admin-Berechtigungen genutzt werden um zunächst alle <br>
+    Funktionen der Kameras testen zu können. Danach können die Credentials z.B. in Abhängigkeit der benötigten Funktionen auf eine SVS-Session mit entsprechend beschränkten Privilegienprofil umgestellt werden. <br><br>
+    
+    Die nachfolgende Aufstellung zeigt die Mindestanforderungen der jeweiligen Modulfunktionen an die Nutzerrechte. <br><br>
+    <ul>
+      <table>
+      <colgroup> <col width=20%> <col width=80%> </colgroup>
+      <tr><td><li>set ... on                 </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
+      <tr><td><li>set ... off                </td><td> session: ServeillanceStation - Betrachter mit erweiterten Privileg "manuelle Aufnahme" </li></td></tr>
+      <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
+      <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
+      <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
+      <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      </table>
+    </ul>
+      <br><br>
+    
+    
     
     <b>HTTP-Timeout setzen</b><br><br>
     Alle Funktionen dieses Moduls verwenden HTTP-Aufrufe gegenüber der SVS Web API. <br>
@@ -2394,13 +2643,14 @@ return;
     Es gibt zur Zeit folgende Optionen für "Set &lt;name&gt; ...": <br><br>
 
   <table>
-  <colgroup> <col width=15%> <col width=85%> </colgroup>
-      <tr><td>"on [rectime]": </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit [rectime] gestoppt.</td></tr>
-      <tr><td>                </td><td>Mit rectime = 0 wird eine Daueraufnahme gestartet die durch "set &lt;name&gt; off" wieder gestoppt werden muß.</td></tr>
-      <tr><td>"off" :         </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
-      <tr><td>"snap":         </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
-      <tr><td>"disable":      </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
-      <tr><td>"enable":       </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+  <colgroup> <col width=30%> <col width=70%> </colgroup>
+      <tr><td>"on [rectime]":                        </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit [rectime] gestoppt.</td></tr>
+      <tr><td>                                       </td><td>Mit rectime = 0 wird eine Daueraufnahme gestartet die durch "set &lt;name&gt; off" wieder gestoppt werden muß.</td></tr>
+      <tr><td>"off" :                                </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
+      <tr><td>"snap":                                </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
+      <tr><td>"disable":                             </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"enable":                              </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"credentials &lt;username&gt; &lt;password&gt;":   </td><td>speichert die Zugangsinformationen</td></tr>
   </table>
   <br><br>
         
@@ -2477,10 +2727,10 @@ return;
 
   <b>Polling der Kameraeigenschaften:</b><br><br>
 
-  Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut "pollcaminfoall" (siehe Attribute) mit einem Wert > 10 gesetzt wird. <br>
+  Die Abfrage der Kameraeigenschaften erfolgt automatisch, wenn das Attribut "pollcaminfoall" (siehe Attribute) mit einem Wert &gt; 10 gesetzt wird. <br>
   Per Default ist das Attribut "pollcaminfoall" nicht gesetzt und das automatische Polling nicht aktiv. <br>
-  Der Wert dieses Attributes legt das Intervall der Abfrage in Sekunden fest. Ist das Attribut nicht gesetzt oder < 10 wird kein automatisches Polling <br>
-  gestartet bzw. gestoppt wenn vorher der Wert > 10 gesetzt war. <br><br>
+  Der Wert dieses Attributes legt das Intervall der Abfrage in Sekunden fest. Ist das Attribut nicht gesetzt oder &lt; 10 wird kein automatisches Polling <br>
+  gestartet bzw. gestoppt wenn vorher der Wert &gt; 10 gesetzt war. <br><br>
 
   Das Attribut "pollcaminfoall" wird durch einen Watchdog-Timer überwacht. Änderungen des Attributwertes werden alle 90 Sekunden ausgewertet und entsprechend umgesetzt. <br>
   Eine Änderung des Pollingstatus / Pollingintervalls wird im FHEM-Logfile protokolliert. Diese Protokollierung kann durch Setzen des Attributes "pollnologging=1" abgeschaltet werden.<br>
@@ -2489,11 +2739,13 @@ return;
 
   Wird FHEM neu gestartet, wird bei aktivierten Polling der ersten Datenabruf innerhalb 60s nach dem Start ausgeführt. <br><br>
 
-  Der Status des automatischen Pollings wird durch das Reading "PollState" signalisiert: <br>
-  <pre>
-    PollState = Active     -    automatisches Polling wird mit Intervall entsprechend <pollcaminfoall> ausgeführt
-    PollState = Inactive   -    automatisches Polling wird nicht ausgeführt
-  </pre>
+  Der Status des automatischen Pollings wird durch das Reading "PollState" signalisiert: <br><br>
+  
+  <ul>
+    <li><b> PollState = Active </b>    -    automatisches Polling wird mit Intervall entsprechend "pollcaminfoall" ausgeführt </li>
+    <li><b> PollState = Inactive </b>  -    automatisches Polling wird nicht ausgeführt </li>
+  </ul>
+  <br>
  
   Die Bedeutung der Readingwerte ist unter <a href="#SSCamreadings">Readings</a> beschrieben. <br><br>
 
@@ -2502,7 +2754,7 @@ return;
   Wird Polling eingesetzt, sollte das Intervall nur so kurz wie benötigt eingestellt werden da die ermittelten Werte überwiegend statisch sind. <br>
   Das eingestellte Intervall sollte nicht kleiner sein als die Summe aller HTTP-Verarbeitungszeiten.
   Pro Pollingaufruf und Kamera werden ca. 10 - 20 Http-Calls gegen die Surveillance Station abgesetzt.<br><br>
-  Bei einem eingestellten HTTP-Timeout (siehe <a href="#SSCamattr">Attribut</a>) "httptimeout") von 4 Sekunden kann die theoretische Verarbeitungszeit Zeit nicht höher als 80 Sekunden betragen. <br>
+  Bei einem eingestellten HTTP-Timeout (siehe <a href="#SSCamattr">Attribut</a>) "httptimeout") von 4 Sekunden kann die theoretische Verarbeitungszeit nicht höher als 80 Sekunden betragen. <br>
   In dem Beispiel sollte man das Pollingintervall mit einem Sicherheitszuschlag auf nicht weniger 160 Sekunden setzen. <br>
   Ein praktikabler Richtwert könnte zwischen 600 - 1800 (s) liegen. <br>
 
@@ -2510,6 +2762,24 @@ return;
   und dadurch versursachte potentielle Fehlerquellen bei der Abfrage der Synology Surveillance Station zu vermeiden. <br>
   Ein geringfügiger Unterschied zwischen den Pollingintervallen der definierten Kameras von z.B. 1s kann bereits als ausreichend angesehen werden. <br><br> 
 </ul>
+
+<a name="SSCaminternals"></a>
+<b>Internals</b> <br>
+ <ul>
+ Die Bedeutung der verwendeten Internals stellt die nachfolgende Liste dar: <br><br>
+  <ul>
+  <li><b>CAMID</b> - die ID der Kamera in der SVS, der Wert wird automatisch anhand des SVS-Kameranamens ermittelt. </li>
+  <li><b>CAMNAME</b> - der Name der Kamera in der SVS </li>
+  <li><b>CREDENTIALS</b> - der Wert ist "Set" wenn die Credentials gesetzt wurden </li>
+  <li><b>NAME</b> - der Kameraname in FHEM </li>
+  <li><b>OPMODE</b> - die zuletzt ausgeführte Operation des Moduls </li> 
+  <li><b>SERVERADDR</b> - IP-Adresse des SVS Hostes </li>
+  <li><b>SERVERPORT</b> - der SVS-Port </li>
+  
+  <br><br>
+  </ul>
+ </ul>
+
 
 <a name="SSCamreadings"></a>
 <b>Readings</b>
@@ -2566,6 +2836,8 @@ return;
   
   <li><b>rectime</b> - festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s verwendet.</li>
 
+  <li><b>session</b>  - Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li><br>
+  
   <li><b>verbose</b> </li><br>
   
   <ul>
@@ -2576,6 +2848,7 @@ return;
     <colgroup> <col width=5%> <col width=95%> </colgroup>
       <tr><td> 0  </td><td>- Start/Stop-Ereignisse werden geloggt </td></tr>
       <tr><td> 1  </td><td>- Fehlermeldungen werden geloggt </td></tr>
+      <tr><td> 2  </td><td>- Meldungen über wichtige Ereignisse oder Alarme </td></tr>
       <tr><td> 3  </td><td>- gesendete Kommandos werden geloggt </td></tr>
       <tr><td> 4  </td><td>- gesendete und empfangene Daten werden geloggt </td></tr>
       <tr><td> 5  </td><td>- alle Ausgaben zur Fehleranalyse werden geloggt. <b>ACHTUNG:</b> möglicherweise werden sehr viele Daten in das Logfile geschrieben! </td></tr>
