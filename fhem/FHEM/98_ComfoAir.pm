@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 98_ComfoAir.pm 
+# $Id$
 #
 # fhem Modul für ComfoAir Lüftungsanlagen von Zehnder mit 
 # serieller Schnittstelle (RS232) sowie dazu kompatible Anlagen wie 
