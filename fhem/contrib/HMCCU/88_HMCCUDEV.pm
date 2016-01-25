@@ -4,14 +4,15 @@
 #
 #  $Id:$
 #
-#  Version 2.5
+#  Version 2.6
 #
-#  (c) 2015 zap (zap01 <at> t-online <dot> de)
+#  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
 ################################################################
 #
 #  define <name> HMCCUDEV <ccudev> [readonly]
 #
+#  set <name> control <value>
 #  set <name> datapoint <channel>.<datapoint> <value>
 #  set <name> devstate <value>
 #  set <name> <stateval_cmds>
@@ -27,6 +28,7 @@
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address | name }
 #  attr <name> ccureadingfilter <regexp>
+#  attr <name> controldatapoint <channel>.<datapoint>
 #  attr <name> statechannel <channel>
 #  attr <name> statedatapoint <datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
@@ -551,9 +553,17 @@ sub HMCCUDEV_SetError ($$)
             Only datapoints matching specified expression are stored as
             readings.
       </li><br/>
-      <li>ccureadingformat &lt;address | name&gt;
-         <br/>
-            Set format of readings. Default is 'name'.
+      <li>ccureadingformat &lt;address | name&gt; <br/>
+         Set format of readings. Default is 'name'.
+      </li><br/>
+      <li>controldatapoint &lt;channel-number.datapoint&gt;<br/>
+         Set datapoint for device control. Can be use to realize user defined control elements for
+         setting control datapoint. For example if datapoint of thermostat control is
+         2.SET_TEMPERATURE one can define a slider for setting the destination temperature with
+         following attributes:<br/><br/>
+         attr mydev controldatapoint 2.SET_TEMPERATURE
+         attr mydev webCmd control
+         attr mydev widgetOverride control:slider,10,1,25
       </li><br/>
       <li>statechannel &lt;channel-number&gt;
          <br/>
