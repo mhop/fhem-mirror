@@ -125,7 +125,7 @@ my %light_device_commands = (	# HEXSTRING => commands
 	# 0x15: Lighting6
 	0x1500 => [ "on", "off", "all_on", "all_off"], # Blyss
 	# 0x16: Chime
-	0x1600 => [ "", "tubular3_1", "solo1", "bigben1", "", "tubular2_1", "tubular2_2", "", "", "solo2", " ", "", "", "tubular3_2"], # Byron SX
+	0x1600 => [ "", "tubular3_1", "solo1", "bigben1", "", "tubular2_1", "tubular2_2", "", "dingdong", "solo2", " ", "", "", "tubular3_2"], # Byron SX
 	# 0x17: Fan
 	0x1700 => [ "", "timer", "-", "learn", "+", "confirm", "light", "on", "off"], # Siemens SF01
 	# 0x18: Curtain1
