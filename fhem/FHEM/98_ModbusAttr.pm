@@ -1,6 +1,6 @@
 ##############################################
 ##############################################
-# $Id: 98_ModbusAttr.pm 
+# $Id$
 #
 # generisches fhem Modul für Geräte mit Modbus-Interface
 # verwendet Modbus.pm als Basismodul für die eigentliche Implementation des Protokolls.
