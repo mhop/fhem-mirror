@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 98_FReplacer.pm 
+# $Id$
 #
 # Basiert auf der Idee Fhem Daten auf einem Kindle anzuzeigen
 # wie im Forum beschrieben
