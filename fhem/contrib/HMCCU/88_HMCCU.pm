@@ -6,7 +6,7 @@
 #
 #  Version 2.6
 #
-#  (c) 2015 zap (zap01 <at> t-online <dot> de)
+#  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
 ####################################################################
 #
@@ -120,6 +120,7 @@ sub HMCCU_GetAddress ($$$);
 sub HMCCU_GetCCUObjectAttribute ($$);
 sub HMCCU_GetHash ($@);
 sub HMCCU_GetAttribute ($$$$);
+sub HMCCU_GetSpecialDatapoints ($$$$$);
 sub HMCCU_IsValidDevice ($);
 sub HMCCU_GetDeviceName ($$);
 sub HMCCU_GetChannelName ($$);
@@ -939,9 +940,8 @@ sub HMCCU_UpdateClientReading ($@)
 		my $upd = AttrVal ($cn, 'ccureadings', 1);
 		my $crf = AttrVal ($cn, 'ccureadingformat', 'name');
 		my $flt = AttrVal ($cn, 'ccureadingfilter', '.*');
-		my $st = AttrVal ($cn, 'statedatapoint', 'STATE');
-		my $sc = AttrVal ($cn, 'statechannel', '');
 		my $substitute = AttrVal ($cn, 'substitute', '');
+		my ($sc, $st, $cc, $cd) = HMCCU_GetSpecialDatapoints ($ch, 'STATE', '', '', '');
 		last if ($upd == 0);
 		next if ($dpt eq '' || $dpt !~ /$flt/);
 
@@ -959,6 +959,9 @@ sub HMCCU_UpdateClientReading ($@)
 		$cl_value = HMCCU_FormatReadingValue ($ch, $cl_value);
 
 		readingsSingleUpdate ($ch, $clreading, $cl_value, 1);
+		if ($cd ne '' && $dpt eq $cd && $channel eq $cc) {
+			readingsSingleUpdate ($ch, 'control', $cl_value, 1);
+		}
 		if ($clreading =~ /\.$st$/ && ($sc eq '' || $sc eq $channel)) {
 			HMCCU_SetState ($ch, $cl_value);
 		}
@@ -1503,6 +1506,34 @@ sub HMCCU_GetAttribute ($$$$)
 }
 
 ####################################################
+# Get channels and datapoints from attributes
+# statechannel, statedatapoint and controldatapoint.
+####################################################
+
+sub HMCCU_GetSpecialDatapoints ($$$$$)
+{
+	my ($hash, $defsd, $defsc, $defcd, $defcc) = @_;
+	my $name = $hash->{NAME};
+	my $type = $hash->{TYPE};
+
+	my $sd = AttrVal ($name, 'statedatapoint', $defsd);
+	my $sc = AttrVal ($name, 'statechannel', $defsc);
+	my $ccd = AttrVal ($name, 'controldatapoint', '');
+	if ($type eq 'HMCCUCHN') {
+		$ccd = $hash->{ccuaddr}.$ccd;
+		$ccd =~ s/^[A-Z]{3,3}[0-9]{7,7}://;
+	}
+	my $cd = $defcd;
+	my $cc = $defcc;
+
+	if ($ccd =~ /^([0-9]+)\.(.+)$/) {
+		($cc, $cd) = ($1, $2);
+	}
+
+	return ($sc, $sd, $cc, $cd);
+}
+
+####################################################
 # Timer function for reading RPC queue
 ####################################################
 
@@ -1631,8 +1662,8 @@ sub HMCCU_GetDatapoint ($@)
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
 	my $readingformat = AttrVal ($name, 'ccureadingformat', 'name');
 	my $substitute = AttrVal ($name, 'substitute', '');
-	my $statedpt = AttrVal ($name, 'statedatapoint', 'STATE');
-	my $statechn = AttrVal ($name, 'statechannel', '');
+	my ($statechn, $statedpt, $controlchn, $controldpt) = HMCCU_GetSpecialDatapoints (
+	   $hash, 'STATE', '', '', '');
 
 	my $ccuget = HMCCU_GetAttribute ($hmccu_hash, $hash, 'ccuget', 'Value');
 	my $ccutrace = AttrVal ($hmccu_hash->{NAME}, 'ccutrace', '');
@@ -1679,6 +1710,9 @@ sub HMCCU_GetDatapoint ($@)
 			$value = HMCCU_Substitute ($value, $substitute, 0, $reading);
 			$value = HMCCU_FormatReadingValue ($hash, $value);
 			readingsSingleUpdate ($hash, $reading, $value, 1) if ($ccureadings);
+			if ($controldpt ne '' && $dpt eq $controldpt && $chn eq $controlchn) {
+				readingsSingleUpdate ($hash, 'control', $value, 1);
+			}
 			if (($reading =~ /\.$statedpt$/ || $reading eq $statedpt) && $ccureadings) {
 				if ($statechn eq '' || $statechn eq $chn) {
 	                        	HMCCU_SetState ($hash, $value);
@@ -1811,8 +1845,8 @@ sub HMCCU_GetUpdate ($$$)
 	my $ccureadingfilter = AttrVal ($cn, 'ccureadingfilter', '.*');
 	my $readingformat = AttrVal ($cn, 'ccureadingformat', 'name');
 	my $substitute = AttrVal ($cn, 'substitute', '');
-	my $statedpt = AttrVal ($cn, 'statedatapoint', 'STATE');
-	my $statechn = AttrVal ($cn, 'statechannel', '');
+	my ($statechn, $statedpt, $controlchn, $controldpt) = HMCCU_GetSpecialDatapoints (
+	   $cl_hash, 'STATE', '', '', '');
 
 	if ($addr =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]{1,2}$/) {
 		$nam = HMCCU_GetChannelName ($addr, '');
@@ -1886,6 +1920,9 @@ if (odev) {
 		$value = HMCCU_FormatReadingValue ($cl_hash, $value);
 		if ($ccureadings) {
 			readingsBulkUpdate ($cl_hash, $reading, $value); 
+			if ($controldpt ne '' && $adrtoks[2] eq $controldpt && $chn eq $controlchn) {
+				readingsBulkUpdate ($cl_hash, 'control', $value);
+			}
 			if ($reading =~ /\.$statedpt$/ && ($statechn eq '' || $statechn eq $chn)) {
 				readingsBulkUpdate ($cl_hash, "state", $value);
 			}
@@ -1926,8 +1963,8 @@ sub HMCCU_GetChannel ($$)
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
 	my $readingformat = AttrVal ($name, 'ccureadingformat', 'name');
 	my $defsubstitute = AttrVal ($name, 'substitute', '');
-	my $statedpt = AttrVal ($name, 'statedatapoint', 'STATE');
-	my $statechn = AttrVal ($name, 'statechannel', '');
+	my ($statechn, $statedpt, $controlchn, $controldpt) = HMCCU_GetSpecialDatapoints (
+	   $hash, 'STATE', '', '', '');
 
 	# Build channel list
 	foreach my $chndef (@$chnref) {
@@ -1995,6 +2032,9 @@ foreach (sChannel, sChnList.Split(",")) {
 			$value = HMCCU_FormatReadingValue ($hash, $value);
 			if ($ccureadings) {
 				readingsBulkUpdate ($hash, $reading, $value); 
+				if ($controldpt ne '' && $adrtoks[2] eq $controldpt && $chn eq $controlchn) {
+					readingsBulkUpdate ($hash, 'control', $value);
+				}
 				if ($reading =~ /\.$statedpt$/ && ($statechn eq '' || $statechn eq $chn)) {
 					readingsBulkUpdate ($hash, "state", $value);
 				}
