@@ -25,6 +25,8 @@
 #                         ebusd may return a list of values like "52.0;43.0;8.000;41.0;45.0;error"
 #                         defining a reading "VL;RL;dummy;VLWW;RLWW" will create redings VL, RL, VLWW and RLWW
 # 04.12.2015 : A.Goebel : add event-min-interval to attributes
+# 05.01.2016 : A.Goebel : debugs added
+# 25.01.2016 : A.Goebel : fix duplicate log entries for readings
 
 package main;
 
@@ -939,6 +941,8 @@ GAEBUS_doEbusCmd($$$$$$$)
 
     $actMessage =~ s/\|$//;
 
+    # readings will be set in parent FHEM process
+    return $actMessage;
   }
 
   if ($action eq "r")
@@ -1017,6 +1021,7 @@ GAEBUS_GetUpdatesDoit($)
   my $ret = GAEBUS_OpenDev($hash, 0);
   if (($hash->{STATE} ne "Connected") or (!$hash->{TCPDev}->connected()) )
   {
+    Log3 ($name, 4, "$name: GetUpdatesDoit not connected to ebusd");
     return "$name";
   }
 
@@ -1066,6 +1071,7 @@ GAEBUS_GetUpdatesDoit($)
   }
 
   # returnvalue for BlockingCall ... done routine
+  Log3 ($name, 4, "$name: GetUpdatesDoit returnes $name$readingsToUpdate");
   return $name.$readingsToUpdate;
 
 
@@ -1076,6 +1082,8 @@ GAEBUS_GetUpdatesDone($)
 {
   my ($string) = @_;
 
+  Log (3, "98_GAEBUS: GetUpdatesDone called");
+
   return unless(defined($string));
 
   my @a = split("\\|",$string);
@@ -1084,7 +1092,7 @@ GAEBUS_GetUpdatesDone($)
 
   delete($hash->{helper}{RUNNING_PID});
 
-  #Log3 ($name, 2, "$name: GetUpdatesDoit returned $string");
+  Log3 ($name, 4, "$name: GetUpdatesDoit returned $string");
  
   readingsBeginUpdate ($hash);
   for (my $i = 1; $i < $#a; $i = $i + 2) 
