@@ -1,7 +1,7 @@
 ##############################################
 ##############################################
 ##############################################
-# $Id: 98_Modbus.pm 
+# $Id$
 #
 # fhem Modul für Geräte mit Modbus-Interface - 
 # Basis für logische Geräte-Module wie zum Beispiel ModbusSET.pm
@@ -57,6 +57,9 @@
 #   2015-08-17  allow register 0, delete unused variable assignments
 #
 #               TODO: revRegs und bswapRegs for writing values 
+#					set textarg mit @a ab 2,
+#					set noarg
+#					map mit spaces wie bei HTTPMOD
 #
 
 package main;
