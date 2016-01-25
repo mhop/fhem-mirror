@@ -1,4 +1,5 @@
 #########################################################################
+# $Id$
 # fhem Modul für Waterkotte Wärmepumpe mit Resümat CD4 Steuerung
 # Vorlage: Modul WHR962, diverse Foreneinträge sowie Artikel über Auswertung der 
 # Wärmepumpe mit Linux / Perl im Linux Magazin aus 2010
