@@ -1,6 +1,6 @@
 ##############################################
 ##############################################
-# $Id: 98_ModbusSET.pm 
+# $Id$
 #
 # fhem Modul für Wärmepumpen der Silent Serie von SET mit Modbus-Interface
 # verwendet Modbus.pm als Basismodul für die eigentliche Implementation des Protokolls.
