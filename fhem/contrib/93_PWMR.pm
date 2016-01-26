@@ -1,6 +1,6 @@
 #
 #
-# 94_PWMR.pm
+# 93_PWMR.pm
 # written by Andreas Goebel 2012-07-25
 # e-mail: ag at goebel-it dot de
 #
@@ -23,6 +23,8 @@
 # 22.11.15 GA fix error handling in SetRoom (thanks to cobra112)
 # 30.11.15 GA fix set reading of desired-temp-used to frost_protect if window is opened
 # 30.11.15 GA add call PWMR_Attr in PWMR_Define if already some attributes are defined
+# 26.01.16 GA fix don't call AssignIoPort
+# 26.01.16 GA fix assign IODev as reference to that hash (otherwise xmllist will crash fhem)
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -421,7 +423,7 @@ PWMR_Define($$)
   return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window>[,<window>][:<w_regexp>]]"
     if(int(@a) < 6 || int(@a) > 8);
 
-  my $iodev   = $a[2];
+  my $iodevname = $a[2];
   my $factor  = ((int(@a) > 2) ? $a[3] : 0.2);
   my $tsensor = ((int(@a) > 3) ? $a[4] : "");
   my $actor   = ((int(@a) > 4) ? $a[5] : "");
@@ -438,15 +440,16 @@ PWMR_Define($$)
   
   #$hash->{helper}{cycletime}  = 0;
 
-  if ( !$defs{$iodev} ) {
-    return "unknown device $iodev";
+  if ( !$iodevname ) {
+    return "unknown device $iodevname";
   }
 
-  if ( $defs{$iodev}->{TYPE} ne "PWM" ) {
-    return "wrong type of $iodev (not PWM)";
+  if ( $defs{$iodevname}->{TYPE} ne "PWM" ) {
+    return "wrong type of $iodevname (not PWM)";
   }
 
-  $hash->{IODev} = $iodev;
+  #$hash->{IODev} = $iodev;
+  $hash->{IODev} = $defs{$iodevname};
   
   ##########
   # calculage factoroffset 
@@ -556,7 +559,7 @@ PWMR_Define($$)
 
   $hash->{INTERVAL}           = 300;
 
-  AssignIoPort($hash);
+  #AssignIoPort($hash);
 
   # if attributes already defined then recall set for them
   foreach my $oneattr (sort keys %{$attr{$name}})
@@ -760,7 +763,8 @@ PWMR_ReadRoom(@)
   my $PWMOnTime    =  sprintf ("%02s:%02s", int ($newpulse * $cycletime / 60), ($newpulse * $cycletime) % 60);
 
   my $iodev = $room->{IODev};
-  if ($newpulse * $defs{$iodev}->{CYCLETIME} < $defs{$iodev}->{MINONOFFTIME}) {
+  #if ($newpulse * $defs{$iodev}->{CYCLETIME} < $defs{$iodev}->{MINONOFFTIME}) {
+  if ($newpulse * $iodev->{CYCLETIME} < $iodev->{MINONOFFTIME}) {
 	$PWMPulse = 0;
 	$PWMOnTime = "00:00";
   }
