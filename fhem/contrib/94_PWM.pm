@@ -13,6 +13,8 @@
 # 22.10.15 GA add new definition for overall heating switch. Decision now based on threshold for pulseMax
 # 30.11.15 GA add new definition for overall heating switch. based on pulseMax or roomsOn
 # 30.11.15 GA add new followUpTime can now delay switching of OverallHeatingSwitch from "on" to "off"
+# 26.01.16 GA fix don't call AssignIoPort
+# 26.01.16 GA fix IODev from PWMR object is now a reference to PWM object
 
 ##############################################
 # $Id: 
@@ -107,7 +109,9 @@ PWM_Calculate($)
   foreach my $d (sort keys %defs) {
     if ( (defined ($defs{$d}{TYPE})) && $defs{$d}{TYPE} eq "PWMR" ) {      # all PWMR objects
        if (!defined ($attr{$d}{disable}) or $attr{$d}{disable} == 0) {     # not disabled
-         if ($hash->{NAME} eq $defs{$d}{IODev}) {                          # referencing to this fb
+         #if ($hash->{NAME} eq $defs{$d}{IODev}) {                          # referencing to this fb
+         #if ($hash->{NAME} eq $defs{$d}{IODev}{NAME}) {                          # referencing to this fb
+         if ($hash->{NAME} eq $defs{$d}{IODev}->{NAME}) {                          # referencing to this fb
 
           Log3 ($hash, 4, "PWM_Calculate calc $name, room $d");
 
@@ -774,7 +778,7 @@ PWM_Define($$)
     readingsSingleUpdate ($hash,  "OverallHeatingSwitch", "", 0);
   }
 
-  AssignIoPort($hash);
+  #AssignIoPort($hash);
 
   if($hash->{INTERVAL} > 0) {
     InternalTimer(gettimeofday() + 10, "PWM_Calculate", $hash, 0);
