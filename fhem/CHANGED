@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new module 52_I2C_BME280.pm added (klausw)
+  - bugfix:  52_I2C_PCA9685: bugfix for interaction with FRM
   - change:  49_SSCAM: changed DEF in order to remove credentials from string,
              added "set credentials" command to save username/password,
              added Attribute "session" to make login-session selectable,
