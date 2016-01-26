@@ -25,7 +25,12 @@ sub CommandCount($$)
     $n       = 0;
     my @list = devspec2array($param,$cl);
     $n       = int(@list);
-    $fill    = "s" if $n != 1;
+    if ($n == 1) {
+       $n = (defined($defs{$list[0]})) ? 1 : "No";
+       $fill = "s" if ($n eq "No"); 
+    } else {
+       $fill    = "s" 
+    }
     $str     = "\nCount: $n device$fill for devspec $param\n";
   }
 
