@@ -109,16 +109,19 @@ sub I2C_SHT21_Attr (@) {# hier noch Werteueberpruefung einfuegen
 	my $hash = $defs{$name};
 	my $msg = '';
 	if ($command && $command eq "set" && $attr && $attr eq "IODev") {
-		if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $val)) {
-			main::AssignIoPort($hash,$val);
-			my @def = split (' ',$hash->{DEF});
-			I2C_SHT21_Init($hash,\@def) if (defined ($hash->{IODev}));
-		}
+		eval {
+			if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $val)) {
+				main::AssignIoPort($hash,$val);
+				my @def = split (' ',$hash->{DEF});
+				I2C_SHT21_Init($hash,\@def) if (defined ($hash->{IODev}));
+			}
+		};
+		return I2C_SHT21_Catch($@) if $@;
 	}
 	if ($attr eq 'poll_interval') {
 		if ($val > 0) {
 			RemoveInternalTimer($hash);
-			InternalTimer(1, 'I2C_SHT21_Poll', $hash, 0);
+			InternalTimer(gettimeofday() + 5, 'I2C_SHT21_Poll', $hash, 0);
 		} else {
 			$msg = 'Wrong poll intervall defined. poll_interval must be a number > 0';
 		}

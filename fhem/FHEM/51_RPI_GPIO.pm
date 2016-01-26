@@ -684,56 +684,8 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 	<b>Define</b>
 	<ul>
 		<code>define <name> RPI_GPIO &lt;GPIO number&gt;</code><br><br>
-		all usable <code>GPIO number</code> are in the following tables<br><br>
+		all usable <code>GPIO number</code> can be found <a href="http://www.panu.it/raspberry/">here</a><br><br>
 		
-	<table border="0" cellspacing="0" cellpadding="0">
-      <td> 
-        PCB Revision 1 P1 pin header
-        <table border="2" cellspacing="0" cellpadding="4" rules="all" style="margin:1em 1em 1em 0; border:solid 1px #000000; border-collapse:collapse; font-size:80%; empty-cells:show;">
-		<tr><td>Function</td>			 <td>Pin</td><td></td><td>Pin</td>	<td>Function</td></tr>
-		<tr><td>3,3V</td>    			 <td>1</td>  <td></td><td>2</td>  	<td>5V</td></tr>
-		<tr><td><b>GPIO 0 (SDA0)</b></td><td>3</td>  <td></td><td>4</td>	<td></td></tr>
-		<tr><td><b>GPIO 1 (SCL0)</b></td><td>5</td>  <td></td><td>6</td>	<td>GND</td></tr>
-		<tr><td>GPIO 4 (GPCLK0)</td>	 <td>7</td>  <td></td><td>8</td>	<td>GPIO 14 (TxD)</td></tr>
-		<tr><td></td>					 <td>9</td>  <td></td><td>10</td>	<td>GPIO 15 (RxD)</td></tr>
-		<tr><td>GPIO 17</td>			 <td>11</td> <td></td><td>12</td>	<td>GPIO 18 (PCM_CLK)</td></tr>
-		<tr><td><b>GPIO 21</b></td>	 	 <td>13</td> <td></td><td>14</td>	<td></td></tr>
-		<tr><td>GPIO 22</td>			 <td>15</td> <td></td><td>16</td>	<td>GPIO 23</td></tr>
-		<tr><td></td>					 <td>17</td> <td></td><td>18</td>	<td>GPIO 24</td></tr>
-		<tr><td>GPIO 10 (MOSI)</td>	 	 <td>19</td> <td></td><td>20</td>	<td></td></tr>
-		<tr><td>GPIO 9 (MISO)</td>		 <td>21</td> <td></td><td>22</td>	<td>GPIO 25</td></tr>
-		<tr><td>GPIO 11 (SCLK)</td>	 	 <td>23</td> <td></td><td>24</td>	<td>GPIO 8 (CE0)</td></tr>
-		<tr><td></td>					 <td>25</td> <td></td><td>26</td>	<td>GPIO 7 (CE1)</td></tr></table>
-	  </td>
-	  <td>
-	    PCB Revision 2 P1 pin header
-		<table border="2" cellspacing="0" cellpadding="4" rules="all" style="margin:1em 1em 1em 0; border:solid 1px #000000; border-collapse:collapse; font-size:80%; empty-cells:show;">
-		<tr><td>Function</td>			 <td>Pin</td><td></td><td>Pin</td>	<td>Function</td></tr>
-		<tr><td>3,3V</td>    			 <td>1</td>  <td></td><td>2</td>  	<td>5V</td></tr>
-		<tr><td><b>GPIO 2 (SDA1)</b></td><td>3</td>  <td></td><td>4</td>	<td></td></tr>
-		<tr><td><b>GPIO 3 (SCL1)</b></td><td>5</td>  <td></td><td>6</td>	<td>GND</td></tr>
-		<tr><td>GPIO 4 (GPCLK0)</td>	 <td>7</td>  <td></td><td>8</td>	<td>GPIO 14 (TxD)</td></tr>
-		<tr><td></td>					 <td>9</td>  <td></td><td>10</td>	<td>GPIO 15 (RxD)</td></tr>
-		<tr><td>GPIO 17</td>			 <td>11</td> <td></td><td>12</td>	<td>GPIO 18 (PCM_CLK)</td></tr>
-		<tr><td><b>GPIO 27</b></td>	 	 <td>13</td> <td></td><td>14</td>	<td></td></tr>
-		<tr><td>GPIO 22</td>			 <td>15</td> <td></td><td>16</td>	<td>GPIO 23</td></tr>
-		<tr><td></td>					 <td>17</td> <td></td><td>18</td>	<td>GPIO 24</td></tr>
-		<tr><td>GPIO 10 (MOSI)</td>	 	 <td>19</td> <td></td><td>20</td>	<td></td></tr>
-		<tr><td>GPIO 9 (MISO)</td>		 <td>21</td> <td></td><td>22</td>	<td>GPIO 25</td></tr>
-		<tr><td>GPIO 11 (SCLK)</td>	 	 <td>23</td> <td></td><td>24</td>	<td>GPIO 8 (CE0)</td></tr>
-		<tr><td></td>					 <td>25</td> <td></td><td>26</td>	<td>GPIO 7 (CE1)</td></tr></table>	
-	  </td>
-	  <td>
-	    PCB Revision 2 P5 pin header
-		<table border="2" cellspacing="0" cellpadding="4" rules="all" style="margin:1em 1em 1em 0; border:solid 1px #000000; border-collapse:collapse; font-size:80%; empty-cells:show;">
-		<tr><td>Function</td>	   <td>Pin</td><td></td><td>Pin</td><td>Function</td></tr>
-		<tr><td>5V</td>    		   <td>1</td>  <td></td><td>2</td>  <td>3,3V</td></tr>
-		<tr><td>GPIO 28 (SDA0)</td><td>3</td>  <td></td><td>4</td>	<td>GPIO 29 (SCL0)</td></tr>
-		<tr><td>GPIO 30</td>	   <td>5</td>  <td></td><td>6</td>	<td>GPOI 31</td></tr> 
-		<tr><td>GND</td>	 	   <td>7</td>  <td></td><td>8</td>	<td>GND</td></tr></table>
-	  </td>
-	</table>
-    
     Examples:
     <pre>
       define Pin12 RPI_GPIO 18
@@ -877,56 +829,8 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; RPI_GPIO &lt;GPIO number&gt;</code><br><br>
-    Alle verf&uuml;gbaren <code>GPIO number</code> sind in den folgenden Tabellen zu finden<br><br>
-    
-	<table border="0" cellspacing="0" cellpadding="0">    
-    <td> 
-    PCB Revision 1 P1 pin header
-    <table border="2" cellspacing="0" cellpadding="4" rules="all" style="margin:1em 1em 1em 0; border:solid 1px #000000; border-collapse:collapse; font-size:80%; empty-cells:show;">
-		<tr><td>Function</td>			 <td>Pin</td><td></td><td>Pin</td>	<td>Function</td></tr>
-		<tr><td>3,3V</td>    			 <td>1</td>  <td></td><td>2</td>  	<td>5V</td></tr>
-		<tr><td><b>GPIO 0 (SDA0)</b></td><td>3</td>  <td></td><td>4</td>	<td></td></tr>
-		<tr><td><b>GPIO 1 (SCL0)</b></td><td>5</td>  <td></td><td>6</td>	<td>GND</td></tr>
-		<tr><td>GPIO 4 (GPCLK0)</td>	 <td>7</td>  <td></td><td>8</td>	<td>GPIO 14 (TxD)</td></tr>
-		<tr><td></td>					 <td>9</td>  <td></td><td>10</td>	<td>GPIO 15 (RxD)</td></tr>
-		<tr><td>GPIO 17</td>			 <td>11</td> <td></td><td>12</td>	<td>GPIO 18 (PCM_CLK)</td></tr>
-		<tr><td><b>GPIO 21</b></td>	 	 <td>13</td> <td></td><td>14</td>	<td></td></tr>
-		<tr><td>GPIO 22</td>			 <td>15</td> <td></td><td>16</td>	<td>GPIO 23</td></tr>
-		<tr><td></td>					 <td>17</td> <td></td><td>18</td>	<td>GPIO 24</td></tr>
-		<tr><td>GPIO 10 (MOSI)</td>	 	 <td>19</td> <td></td><td>20</td>	<td></td></tr>
-		<tr><td>GPIO 9 (MISO)</td>		 <td>21</td> <td></td><td>22</td>	<td>GPIO 25</td></tr>
-		<tr><td>GPIO 11 (SCLK)</td>	 	 <td>23</td> <td></td><td>24</td>	<td>GPIO 8 (CE0)</td></tr>
-		<tr><td></td>					 <td>25</td> <td></td><td>26</td>	<td>GPIO 7 (CE1)</td></tr></table>
-	  </td>
-	  <td>
-	    PCB Revision 2 P1 pin header
-		<table border="2" cellspacing="0" cellpadding="4" rules="all" style="margin:1em 1em 1em 0; border:solid 1px #000000; border-collapse:collapse; font-size:80%; empty-cells:show;">
-		<tr><td>Function</td>			 <td>Pin</td><td></td><td>Pin</td>	<td>Function</td></tr>
-		<tr><td>3,3V</td>    			 <td>1</td>  <td></td><td>2</td>  	<td>5V</td></tr>
-		<tr><td><b>GPIO 2 (SDA1)</b></td><td>3</td>  <td></td><td>4</td>	<td></td></tr>
-		<tr><td><b>GPIO 3 (SCL1)</b></td><td>5</td>  <td></td><td>6</td>	<td>GND</td></tr>
-		<tr><td>GPIO 4 (GPCLK0)</td>	 <td>7</td>  <td></td><td>8</td>	<td>GPIO 14 (TxD)</td></tr>
-		<tr><td></td>					 <td>9</td>  <td></td><td>10</td>	<td>GPIO 15 (RxD)</td></tr>
-		<tr><td>GPIO 17</td>			 <td>11</td> <td></td><td>12</td>	<td>GPIO 18 (PCM_CLK)</td></tr>
-		<tr><td><b>GPIO 27</b></td>	 	 <td>13</td> <td></td><td>14</td>	<td></td></tr>
-		<tr><td>GPIO 22</td>			 <td>15</td> <td></td><td>16</td>	<td>GPIO 23</td></tr>
-		<tr><td></td>					 <td>17</td> <td></td><td>18</td>	<td>GPIO 24</td></tr>
-		<tr><td>GPIO 10 (MOSI)</td>	 	 <td>19</td> <td></td><td>20</td>	<td></td></tr>
-		<tr><td>GPIO 9 (MISO)</td>		 <td>21</td> <td></td><td>22</td>	<td>GPIO 25</td></tr>
-		<tr><td>GPIO 11 (SCLK)</td>	 	 <td>23</td> <td></td><td>24</td>	<td>GPIO 8 (CE0)</td></tr>
-		<tr><td></td>					 <td>25</td> <td></td><td>26</td>	<td>GPIO 7 (CE1)</td></tr></table>	
-	  </td>
-	  <td>
-	    PCB Revision 2 P5 pin header
-		<table border="2" cellspacing="0" cellpadding="4" rules="all" style="margin:1em 1em 1em 0; border:solid 1px #000000; border-collapse:collapse; font-size:80%; empty-cells:show;">
-		<tr><td>Function</td>	   <td>Pin</td><td></td><td>Pin</td><td>Function</td></tr>
-		<tr><td>5V</td>    		   <td>1</td>  <td></td><td>2</td>  <td>3,3V</td></tr>
-		<tr><td>GPIO 28 (SDA0)</td><td>3</td>  <td></td><td>4</td>	<td>GPIO 29 (SCL0)</td></tr>
-		<tr><td>GPIO 30</td>	   <td>5</td>  <td></td><td>6</td>	<td>GPOI 31</td></tr> 
-		<tr><td>GND</td>	 	   <td>7</td>  <td></td><td>8</td>	<td>GND</td></tr></table>
-	  </td>
-	</table>
-    
+    Alle verf&uuml;gbaren <code>GPIO number</code> sind z.B. <a href="http://www.panu.it/raspberry/">hier</a> zu finden<br><br>
+     
     Beispiele:
     <pre>
       define Pin12 RPI_GPIO 18

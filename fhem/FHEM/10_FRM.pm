@@ -51,6 +51,7 @@ my @clients = qw(
   I2C_PC.*
   I2C_MCP23.*
   I2C_SHT21
+  I2C_BME280
   I2C_BMP180
   I2C_TSL2561
   FRM_LCD
