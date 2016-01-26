@@ -2448,7 +2448,9 @@ CommandAttr($$)
     if(" $list " !~ m/ ${attrName}[ :;]/) {
        my $found = 0;
        foreach my $atr (split("[ \t]", $list)) { # is it a regexp?
-         if(${attrName} =~ m/^$atr$/) {
+         $atr =~ /^([^;:]+)(:.*)?$/;
+         my $base = $1;
+         if(${attrName} =~ m/^$base$/) {
            $found++;
            last;
          }
