@@ -40,6 +40,7 @@ FB_CALLLIST_Initialize($)
     $hash->{SetFn}     = "FB_CALLLIST_Set";
     $hash->{DefFn}     = "FB_CALLLIST_Define";
     $hash->{NotifyFn}  = "FB_CALLLIST_Notify";
+    $hash->{RenameFn}  = "FB_CALLLIST_Rename";
     $hash->{DeleteFn}  = "FB_CALLLIST_Delete";
     $hash->{AttrFn}    = "FB_CALLLIST_Attr";
     $hash->{AttrList}  =  "number-of-calls:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
@@ -254,6 +255,18 @@ sub FB_CALLLIST_Delete($)
     my $err = setKeyValue("FB_CALLLIST-$name", undef);
 
     Log3 $name, 3, "FB_CALLLIST ($name) - error while deleting the current call list: $err" if(defined($err));
+}
+
+#####################################
+# If Device is rename, copy the current data
+sub FB_CALLLIST_Rename($$)
+{
+    my ($new,$old) = @_;
+
+	setKeyValue("FB_CALLLIST-".$new, getKeyValue("FB_CALLLIST-".$old));
+	setKeyValue("FB_CALLLIST-".$old, undef);
+    
+ 	return undef;
 }
 
 #####################################
