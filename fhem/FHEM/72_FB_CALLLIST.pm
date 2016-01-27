@@ -263,10 +263,14 @@ sub FB_CALLLIST_Rename($$)
 {
     my ($new,$old) = @_;
 
-	setKeyValue("FB_CALLLIST-".$new, getKeyValue("FB_CALLLIST-".$old));
-	setKeyValue("FB_CALLLIST-".$old, undef);
+    my (undef, $data) = getKeyValue("FB_CALLLIST-".$old);
     
- 	return undef;
+    return undef unless(defined($data));
+    
+    setKeyValue("FB_CALLLIST-".$new, $data);
+    setKeyValue("FB_CALLLIST-".$old, undef);
+    
+    return undef;
 }
 
 #####################################
