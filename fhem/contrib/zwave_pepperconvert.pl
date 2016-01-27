@@ -11,7 +11,8 @@ if(@ARGV == 0) {
     "  perl <fhem>/contrib/zwave_pepperconvert.pl *.xml\n".
     "  sh getpics.sh\n".
     "  rm *.xml *.txt *.sh *.zip\n".
-    "  mv zwave_pepperlinks.csv <fhem>/FHEM/lib\n";
+    "  gzip zwave_pepperlinks.csv\n";
+    "  mv zwave_pepperlinks.csv.gz <fhem>/FHEM/lib\n";
   exit 1;
 }
 
