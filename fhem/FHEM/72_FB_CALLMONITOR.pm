@@ -49,6 +49,7 @@ FB_CALLMONITOR_Initialize($)
     $hash->{GetFn}     = "FB_CALLMONITOR_Get";
     $hash->{SetFn}     = "FB_CALLMONITOR_Set";
     $hash->{DefFn}     = "FB_CALLMONITOR_Define";
+    $hash->{RenameFn}  = "FB_CALLMONITOR_Rename";    
     $hash->{UndefFn}   = "FB_CALLMONITOR_Undef";
     $hash->{AttrFn}    = "FB_CALLMONITOR_Attr";
     $hash->{NotifyFn}  = "FB_CALLMONITOR_Notify";
@@ -112,7 +113,26 @@ FB_CALLMONITOR_Undef($$)
     return undef;
 }
 
-
+#####################################
+# If Device is renamed, copy the password data
+sub
+FB_CALLMONITOR_Rename($$)
+{
+    my ($new, $old) = @_;  
+    
+    my $old_index = "FB_CALLMONITOR_".$old."_passwd";
+    my $new_index = "FB_CALLMONITOR_".$new."_passwd";
+    
+    my $old_key =getUniqueId().$old_index;
+    my $new_key =getUniqueId().$new_index;
+    
+    my ($err, $old_pwd) = getKeyValue($old_index);
+    
+    return undef unless(defined($old_pwd));
+    
+    setKeyValue($new_index, FB_CALLMONITOR_encrypt(FB_CALLMONITOR_decrypt($old_pwd,$old_key), $new_key));
+    setKeyValue($old_index, undef);
+}
 
 #####################################
 # Get function for returning a reverse search name
@@ -1612,20 +1632,7 @@ sub FB_CALLMONITOR_storePassword($$)
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_passwd";
     my $key = getUniqueId().$index;
     
-    my $enc_pwd = "";
-    
-    if(eval "use Digest::MD5;1")
-    {
-        $key = Digest::MD5::md5_hex(unpack "H*", $key);
-        $key .= Digest::MD5::md5_hex($key);
-    }
-    
-    for my $char (split //, $password)
-    {
-        my $encode=chop($key);
-        $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
-        $key=$encode.$key;
-    }
+    my (undef, $enc_pwd) = FB_CALLMONITOR_encrypt($password, $key);
     
     my $err = FB_CALLMONITOR_readPhonebook($hash, $enc_pwd);
     
@@ -1668,20 +1675,7 @@ sub FB_CALLMONITOR_readPassword($;$)
     
     if(defined($password))
     {
-        if(eval "use Digest::MD5;1")
-        {
-            $key = Digest::MD5::md5_hex(unpack "H*", $key);
-            $key .= Digest::MD5::md5_hex($key);
-        }
-
-        my $dec_pwd = '';
-        
-        for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g))
-        {
-            my $decode=chop($key);
-            $dec_pwd.=chr(ord($char)^ord($decode));
-            $key=$decode.$key;
-        }
+        my (undef, $dec_pwd) = FB_CALLMONITOR_decrypt($password, $key);
         
         return $dec_pwd if($hash->{helper}{READ_PWD});
     }
@@ -1697,7 +1691,6 @@ sub FB_CALLMONITOR_readPassword($;$)
 # normalizes a formated phone number
 sub FB_CALLMONITOR_normalizePhoneNumber($$)
 {
-
     my ($hash, $number) = @_;
     my $name = $hash->{NAME};
     
@@ -1716,6 +1709,58 @@ sub FB_CALLMONITOR_normalizePhoneNumber($$)
     }
     
     return $number;
+}
+
+#####################################
+# decrypt an encrypted password
+sub FB_CALLMONITOR_decrypt($$)
+{
+    my ($password, $key) = @_;
+    
+    return undef unless(defined($password));
+    
+    if(eval "use Digest::MD5;1")
+    {
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }
+
+    my $dec_pwd = '';
+    
+    for my $char (map { pack('C', hex($_)) } ($password =~ /(..)/g))
+    {
+        my $decode=chop($key);
+        $dec_pwd.=chr(ord($char)^ord($decode));
+        $key=$decode.$key;
+    }
+    
+    return (undef, $dec_pwd);
+}
+
+#####################################
+# encrypts a password
+sub FB_CALLMONITOR_encrypt($$)
+{
+    my ($password, $key) = @_;
+   
+    return undef unless(defined($password));
+    
+    if(eval "use Digest::MD5;1")
+    {
+        $key = Digest::MD5::md5_hex(unpack "H*", $key);
+        $key .= Digest::MD5::md5_hex($key);
+    }
+    
+    my $enc_pwd = '';
+    
+    for my $char (split //, $password)
+    {
+        my $encode=chop($key);
+        $enc_pwd.=sprintf("%.2x",ord($char)^ord($encode));
+        $key=$encode.$key;
+    }
+    
+    return (undef, $enc_pwd);
 }
 
 1;
