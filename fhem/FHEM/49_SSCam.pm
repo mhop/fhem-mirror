@@ -27,6 +27,10 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.9    28.01.2016    fixed the problem a recording may still stay active if fhem
+#                      will be rebooted after a recording was triggered and
+#                      the recordtime wasn't be over,
+#                      Enhancement of readings.
 # 1.8    25.01.2016    changed define in order to remove credentials from string,
 #                      added "set credentials" command to save username/password,
 #                      added Attribute "session" to make login-session selectable,
@@ -77,8 +81,7 @@ sub SSCam_Initialize($) {
  $hash->{UndefFn}   = "SSCam_Undef";
  $hash->{SetFn}     = "SSCam_Set";
  $hash->{GetFn}     = "SSCam_Get";
- $hash->{AttrFn}    = "SSCam_Attr";
- 
+ $hash->{AttrFn}    = "SSCam_Attr"; 
  
  $hash->{AttrList} =
          "httptimeout ".
@@ -87,9 +90,9 @@ sub SSCam_Initialize($) {
          "rectime ".
          "session:SurveillanceStation,DSM ".
          "webCmd ".
-         $readingFnAttributes;
-
-         return undef;
+         $readingFnAttributes;   
+         
+return undef;   
 }
 
 sub SSCam_Define {
@@ -127,19 +130,17 @@ sub SSCam_Define {
   $attr{$name}{webCmd}                 = "on:off:snap:enable:disable";                            # initiale Webkommandos setzen
   $hash->{HELPER}{ACTIVE}              = "off";                                                   # Funktionstoken "off", Funktionen können sofort starten
   $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                                     # Loggingfunktion für Polling ist an
-  $hash->{STATE}                       = "initialized";                                           # Anfangsstatus der Geräte
   $hash->{HELPER}{RECTIME_DEF}         = "15";                                                    # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
-  readingsSingleUpdate($hash,"Record","Stop",0);                                                  # Recordings laufen nicht
   readingsSingleUpdate($hash,"Availability", "", 0);                                              # Verfügbarkeit ist unbekannt
   readingsSingleUpdate($hash,"PollState","Inactive",0);                                           # es ist keine Gerätepolling aktiv
   getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)  
   RemoveInternalTimer($hash);                                                                     # alle Timer löschen
   
-  
   # Subroutine Watchdog-Timer starten (sollen Cam-Infos abgerufen werden ?), verzögerter zufälliger Start 0-60s 
   InternalTimer(gettimeofday()+int(rand(60)), "watchdogpollcaminfo", $hash, 0);
-
   
+  recstoponboot($hash);                                                                           # check ob nach Reboot alle Recordings aus -> sonst stoppen                                
+
 return undef;
 }
 
@@ -243,8 +244,6 @@ sub SSCam_Set {
                         ($success) = setcredentials($hash,$prop,$prop1);
                         return $success ? "Username and Password saved successfully" : "Error while saving Username / Password - see logfile for details";
                     }
-
-
                 }  
 return undef;
 }
@@ -273,8 +272,30 @@ sub SSCam_Get {
                 {
                     &getcaminfoall($hash);
                 }
-
         }
+return undef;
+}
+
+
+######################################################################################
+###  check ob alle Recordings = Stop nach Reboot -> sonst stoppen
+
+sub recstoponboot ($) {
+  my ($hash) = @_;
+  my $logstr;
+  
+  if ($init_done == 1) {
+     if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
+     # if ($hash->{STATE} eq "on") {
+         $logstr = "Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now"; 
+         &printlog($hash,$logstr,"1"); 
+         &camstoprec($hash);
+         } 
+  }
+  else {
+  InternalTimer(gettimeofday(), "recstoponboot", $hash, 0);
+  }
+  
 return undef;
 }
 
@@ -1515,12 +1536,12 @@ sub camret_nonbl ($) {
                 
             if ($OpMode eq "Start") 
             {  
-                # bedingt Browseraktualisierung und Status der "Lampen" 
                 $hash->{STATE} = "on";
                                
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Record","Start");
+                # readingsBulkUpdate($hash,"state","on");
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -1671,17 +1692,29 @@ sub camret_nonbl ($) {
                     else {
                     $camStatus = "other";
                     }
+               
+                my $recStatus = $data->{'data'}->{'cameras'}->[0]->{'recStatus'};
+                if ($recStatus ne "0") {
+                    $recStatus = "Start";
+                    }
+                    else {
+                    $recStatus = "Stop";
+                    }
                 
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamLiveMode",$camLiveMode);
+                readingsBulkUpdate($hash,"CamModel",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camModel'});
                 readingsBulkUpdate($hash,"CamRecShare",$data->{'data'}->{'cameras'}->[0]->{'camRecShare'});
                 readingsBulkUpdate($hash,"CamRecVolume",$data->{'data'}->{'cameras'}->[0]->{'camRecVolume'});
                 readingsBulkUpdate($hash,"CamIP",$data->{'data'}->{'cameras'}->[0]->{'host'});
+                readingsBulkUpdate($hash,"CamVendor",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camVendor'});
+                readingsBulkUpdate($hash,"CamPreRecTime",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
                 readingsBulkUpdate($hash,"CamPort",$data->{'data'}->{'cameras'}->[0]->{'port'});
                 readingsBulkUpdate($hash,"Availability",$camStatus);
                 readingsBulkUpdate($hash,"DeviceType",$deviceType);
                 readingsBulkUpdate($hash,"LastUpdateTime",$update_time);
+                readingsBulkUpdate($hash,"Record",$recStatus);
                 readingsBulkUpdate($hash,"UsedSpaceMB",$data->{'data'}->{'cameras'}->[0]->{'volume_space'});
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
@@ -2435,9 +2468,12 @@ return;
     <tr><td><li>Availability</li>       </td><td>- Availability of Camera (disabled, enabled, disconnected, other)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
+    <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port of Camera  </td></tr>
+    <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume on disk station for recordings  </td></tr>
+    <tr><td><li>CamVendor</li>          </td><td>- Identifier of camera producer  </td></tr>
     <tr><td><li>CapAudioOut</li>        </td><td>- Capability to Audio Out over Surveillance Station (false/true)  </td></tr>
     <tr><td><li>CapChangeSpeed</li>     </td><td>- Capability to various motion speed  </td></tr>
     <tr><td><li>CapPTZAbs</li>          </td><td>- Capability to perform absolute PTZ action  </td></tr>
@@ -2793,9 +2829,12 @@ return;
     <tr><td><li>Availability</li>       </td><td>- Verfügbarkeit der Kamera (disabled, enabled, disconnected, other)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
+    <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port der Kamera  </td></tr>
+    <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume auf der DS für Aufnahmen  </td></tr>
+    <tr><td><li>CamVendor</li>          </td><td>- Kamerahersteller Bezeichnung  </td></tr>
     <tr><td><li>CapAudioOut</li>        </td><td>- Fähigkeit der Kamera zur Audioausgabe über Surveillance Station (false/true)  </td></tr>
     <tr><td><li>CapChangeSpeed</li>     </td><td>- Fähigkeit der Kamera verschiedene Bewegungsgeschwindigkeiten auszuführen  </td></tr>
     <tr><td><li>CapPTZAbs</li>          </td><td>- Fähigkeit der Kamera für absolute PTZ-Aktionen   </td></tr>
@@ -2810,7 +2849,7 @@ return;
     <tr><td><li>DeviceType</li>         </td><td>- Kameratyp (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
     <tr><td><li>Error</li>              </td><td>- Meldungstext des letzten Fehlers  </td></tr>
     <tr><td><li>Errorcode</li>          </td><td>- Fehlercode des letzten Fehlers   </td></tr>
-    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung der Kamera in der Surrveillance Station  </td></tr>   
+    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung der Kamera in der Synology Surveillance Station  </td></tr>   
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
