@@ -4,6 +4,8 @@
 #
 # History:
 #
+# 2016-01-27: Add MSGMail_send() to be used from perl
+#             Use Blocking_Call to deliver email
 # 2015-05-19: Add MSGMail_Attr()
 # 2015-05-15: Add attribute mailtype as suggested by Roger (forum #37206)
 # 2015-05-11: Improve error logging to assist problem solving
@@ -18,6 +20,8 @@ use strict;
 use warnings;
 use MIME::Lite;
 use Net::SMTP;    # libnet-3.06 has SSL included, so we need to check the version
+
+require 'Blocking.pm';
 
 my %sets = (
     "add"   => "MSGMail",
@@ -233,31 +237,90 @@ sub MSGMail_Set($@)
 
     elsif ($a[0] eq "send")
     {
-        # check all required data
-        my $from     = AttrVal($name, "from",     "");
-        my $to       = AttrVal($name, "to",       "");
-        my $subject  = AttrVal($name, "subject",  "");
-        my $authfile = AttrVal($name, "authfile", "");
-        my $smtphost = AttrVal($name, "smtphost", "");
-        my $smtpport = AttrVal($name, "smtpport", "465");     # 465 is the default port
-        my $cc       = AttrVal($name, "cc",       "");        # Carbon Copy
-        my $mtype    = AttrVal($name, "mailtype", "plain");
+        my $mess = "";
+        for (my $i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
+        {
+            $mess .= $data{$name}{$i};
+        }
 
-        my $mailtype = "text/plain";
-        $mailtype = "text/$mtype" if ($mtype =~ m/^(plain|html)$/);
+        return MSGMail_send($name, $mess, {});
+    }    ###>  END MSGMail
 
-        return "No <from> address specified, use  attr $name from <mail-address>"
-          if (!$from);
-        return "No <to> address specified, use  attr $name to <mail-address>"
-          if (!$to);
-        return "No <subject> specified, use  attr $name subject <text>"
-          if (!$subject);
-        return "No <authfile> specified, use  attr $name authfile <filename>"
-          if (!$authfile);
-        return "No <smtphost> name specified, use  attr $name sntphost <hostname>"
-          if (!$smtphost);
+    Log GetLogLevel($name, 2), "messenger set $name $v";
 
-        open(FHEMAUTHFILE, "<" . $authfile)
+    #   set stats
+    # $hash->{CHANGED}[0] = $v;
+    $hash->{READINGS}{state}{TIME} = TimeNow();
+    $hash->{READINGS}{state}{VAL}  = $v;
+    return undef;
+}
+
+my %MSGMail_params = (
+  'from'       => {'attr'=>'from',     'default'=>'',      'required'=>1, 'set'=>1},
+  'to'         => {'attr'=>'to',       'default'=>'',      'required'=>1, 'set'=>1},
+  'subject'    => {'attr'=>'subject',  'default'=>'',      'required'=>1, 'set'=>1},
+  'cc'         => {'attr'=>'cc',       'default'=>'',      'required'=>0, 'set'=>1},
+  'mtype'      => {'attr'=>'mtype',    'default'=>'plain', 'required'=>1, 'set'=>1},
+  'authfile'   => {'attr'=>'authfile', 'default'=>'',      'required'=>1, 'set'=>0},
+  'smtphost'   => {'attr'=>'smtphost', 'default'=>'',      'required'=>1, 'set'=>0},
+  'smtpport'   => {'attr'=>'smtpport', 'default'=>'465',   'required'=>1, 'set'=>0},
+);
+
+sub MSGMail_send($$;$)
+{
+  my ($name, $msgtext, $extparamref) = @_;
+  my %params = ();
+
+  return "unknown device $name." unless exists ($defs{$name});
+ 
+  foreach my $key (keys %MSGMail_params)
+  {
+    $params{$key} = AttrVal($name, $MSGMail_params{$key}->{attr}, $MSGMail_params{$key}->{default});
+    $params{$key} = $extparamref->{$key} if (exists $extparamref->{$key} && $MSGMail_params{$key}->{set}); 
+    #Log3 $name, 0, "param $key is now '".$params{$key}."'";
+  }
+  
+  my $mailtype = "text/plain";
+  $mailtype = "text/".$params{mtype} if ($params{mtype} =~ m/^(plain|html)$/);
+
+  $params{mailtype} = $mailtype;
+  $params{name} = $name;
+  $params{msgtext} = $msgtext;
+
+  my @err = ();
+  foreach my $key (keys(%MSGMail_params))
+  {
+     push(@err, $key) if ($MSGMail_params{$key}->{required} && !$params{$key});
+  }
+  return "Missing at least one required parameter or attribue: ".join(', ',@err) if ($#err >= 0);
+
+  BlockingCall("MSGMail_sendInBackground", \%params);
+
+  return "";
+}
+
+sub MSGMail_error($$$)
+{
+    my ($name, $msg, $error) = @_;
+    Log3 $name, 0, "$name: $msg: $error";
+    return $error;
+}
+
+sub MSGMail_sendInBackground($)
+{
+  my ($paref) = @_;
+
+  my $authfile = $paref->{authfile};
+  my $name = $paref->{name};
+  my $cc = $paref->{cc};
+  my $from = $paref->{from};
+  my $mailtype = $paref->{mailtype};
+  my $smtphost = $paref->{smtphost};
+  my $subject = $paref->{subject};
+  my $to = $paref->{to};
+  my $msgtext = $paref->{msgtext};
+
+  open(FHEMAUTHFILE, "<" . $authfile)
           || return "Can not open authfile $authfile: $!";
         my @auth = <FHEMAUTHFILE>;
         close(FHEMAUTHFILE);
@@ -265,20 +328,12 @@ sub MSGMail_Set($@)
 
         # Log 1, "MSG User = <" . @auth[0] . ">  Passwort = <" . @auth[1] . ">";
 
-        # compose message
-        my $i;
-        my $mess = "";
-        for ($i = 0 ; $i < ReadingsVal($name, "msgcount", 0) ; $i++)
-        {
-            $mess .= $data{$name}{$i};
-        }
-
         my $mailmsg = MIME::Lite->new(
             From    => $from,
             To      => $to,
             Subject => $subject,
             Type    => "$mailtype; charset=UTF-8",    #'multipart/mixed', # was 'text/plain'
-            Data    => $mess
+            Data    => $msgtext
         );
 
         # login to the SMTP Host using SSL and send the message
@@ -309,22 +364,7 @@ sub MSGMail_Set($@)
 
         Log3 $name, 1, "$name: successfully sent email w/ subject '$subject'";
 
-    }    ###>  END MSGMail
-
-    Log GetLogLevel($name, 2), "messenger set $name $v";
-
-    #   set stats
-    # $hash->{CHANGED}[0] = $v;
-    $hash->{READINGS}{state}{TIME} = TimeNow();
-    $hash->{READINGS}{state}{VAL}  = $v;
-    return undef;
-}
-
-sub MSGMail_error($$$)
-{
-    my ($name, $msg, $error) = @_;
-    Log3 $name, 0, "$name: $msg: $error";
-    return $error;
+  
 }
 
 ##############################################
