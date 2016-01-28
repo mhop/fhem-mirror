@@ -746,9 +746,11 @@ autocreate_Attr(@)
 
     <a name="ignoreTypes"></a>
     <li>ignoreTypes<br>
-        This is a regexp, to ignore certain devices, e.g. you neighbours FHT.
+        This is a regexp, to ignore certain devices, e.g. the neighbours FHT.
         You can specify more than one, with usual regexp syntax, e.g.<br>
-        attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7
+        attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7<br>
+        The word "Types" is somehow misleading, as it actually checks the
+        generated device name.
         </li><br>
 
     <a name="autocreateThreshold"></a>
@@ -909,12 +911,10 @@ autocreate_Attr(@)
         Dies ist ein Regexp, um bestimmte Ger&auml;te zu ignorieren, z.b. der
         Funk-Heizungsthermostat (FHT) des Nachbarn. In dem Ausdruck k&ouml;nnen
         mehr als ein Ger&auml;t &uuml;ber die normale Regexp-Syntax angegeben
-        werden.<br>
-
-        Beispiel:<br>
-        <code>
-        attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7
-        </code>
+        werden. Beispiel:<br>
+        attr autocreate ignoreTypes CUL_HOERMANN.*|FHT_1234|CUL_WS_7<br>
+        Das Wort "Types" ist etwas irref&uuml;hrend, da der Ger&auml;tename
+        gepr&uuml;ft wird, und nicht der Typ.
         </li><br>
 
     <a name="autocreateThreshold"></a>
