@@ -25,6 +25,8 @@
 # 30.11.15 GA add call PWMR_Attr in PWMR_Define if already some attributes are defined
 # 26.01.16 GA fix don't call AssignIoPort
 # 26.01.16 GA fix assign IODev as reference to that hash (otherwise xmllist will crash fhem)
+# 26.01.16 GA add implementation of PID regulation
+# 27.01.16 GA add add attribute desiredTempFrom to take desiredTemp from another object
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -100,6 +102,7 @@ PWMR_Initialize($)
   $hash->{AttrList}  = "disable:1,0 loglevel:0,1,2,3,4,5 event-on-change-reading ".
 			"frostProtect:0,1 ".
 			"autoCalcTemp:0,1 ".
+			"desiredTempFrom ".
                         "tempFrostProtect ".
 			"tempDay ".
 			"tempNight ".
@@ -114,6 +117,32 @@ PWMR_Initialize($)
 
 }
 
+sub
+PWMR_getDesiredTempFrom(@)
+{
+      my ($hash, $dt, $d_reading, $d_regexpTemp) = @_; 
+      my $newTemp;
+
+      my $d_readingVal  = defined($dt->{READINGS}{$d_reading}{VAL}) ? $dt->{READINGS}{$d_reading}{VAL} : "undef"; 
+
+      my $val           = $d_readingVal;
+      $val              =~ /$d_regexpTemp/;
+ 
+      if (defined($1)) { 
+        $newTemp  = $1;
+        Log3 ($hash, 4, "PWMR_getDesiredTempFrom $hash->{NAME}: from $dt->{NAME} reading($d_reading) VAL($d_readingVal) regexp($d_regexpTemp) regexpVal($val)");
+
+      } else {
+        $newTemp = $hash->{c_tempFrostProtect};
+        Log3 ($hash, 4, "PWMR_getDesiredTempFrom $hash->{NAME}: from $dt->{NAME} reading($d_reading) VAL($d_readingVal) regexp($d_regexpTemp) regexpVal($val) set to frostProtect");
+
+      }
+
+      Log3 ($hash, 4, "PWMR_getDesiredTempFrom $hash->{NAME}: from $dt->{NAME} reading($d_reading) VAL($d_readingVal) regexp($d_regexpTemp) regexpVal($val)");
+
+      return ($newTemp);
+
+}
 ###################################
 sub
 PWMR_CalcDesiredTemp($)
@@ -193,93 +222,106 @@ PWMR_CalcDesiredTemp($)
   ####################
   # rule based calculation
 
-  if ($hash->{c_autoCalcTemp} > 0) {
+  if ($hash->{c_autoCalcTemp} > 0 ) {
+    if ($hash->{c_desiredTempFrom} eq "") {
 
-    $hash->{STATE}     = "Calculating";
-
-    my @time = localtime();
-    my $wday = $time[6];
-    my $cmptime = sprintf ("%02d%02d", $time[2], $time[1]);
-    Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: wday $wday cmptime $cmptime");
-
-    foreach my $rule ($hash->{c_tempRule5}, 
-                      $hash->{c_tempRule4}, 
-                      $hash->{c_tempRule3}, 
-                      $hash->{c_tempRule2}, 
-                      $hash->{c_tempRule1} ) {
-      if ($rule ne "") {		# valid rule is 1-5 0600,D 1800,C 2200,N
-
-        Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: $rule");
-
-        my @points = split (" ", $rule);
-
-        my ($dayfrom, $dayto) = split ("-", $points[0]);
-        #Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: dayfrom $dayfrom dayto $dayto");
-
-        my $rulematch = 0;
-        if ($dayfrom <= $dayto ) {                    # rule 1-5 or 4-4
-          $rulematch = ($wday >= $dayfrom && $wday <= $dayto);
-        } else {                                      # rule  5-2
-          $rulematch = ($wday >= $dayfrom || $wday <= $dayto);
-        }
-
-        if ($rulematch) {
-
-          for (my $i=int(@points)-1; $i>0; $i--) {
-            Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: i:$i $points[$i]");
-
-            my ($ruletime, $tempV) = split (",", $points[$i]);
-
-            if ($cmptime >= $ruletime) {
-
-              my $temperature = $hash->{"c_tempN"};
-              $temperature = $hash->{"c_tempD"} if ($tempV eq "D");
-              $temperature = $hash->{"c_tempC"} if ($tempV eq "C");
-              $temperature = $hash->{"c_tempE"} if ($tempV eq "E");
-
-              Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: match i:$i $points[$i] ($tempV/$temperature)");
-               
-              if ($hash->{READINGS}{"desired-temp"}{VAL} ne $temperature 
-                  or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
-                readingsSingleUpdate ($hash,  "desired-temp", $temperature, 1);
-              } else {
-                readingsSingleUpdate ($hash,  "desired-temp", $temperature, 0);
-              }
-
-              #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
-              #$hash->{READINGS}{"desired-temp"}{VAL} = $temperature;
-
-              #push @{$hash->{CHANGED}}, "desired-temp $temperature";
-              #DoTrigger($name, undef);
-              return undef;
-            } 
-
+      $hash->{STATE}     = "Calculating";
+  
+      my @time = localtime();
+      my $wday = $time[6];
+      my $cmptime = sprintf ("%02d%02d", $time[2], $time[1]);
+      Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: wday $wday cmptime $cmptime");
+  
+      foreach my $rule ($hash->{c_tempRule5}, 
+                        $hash->{c_tempRule4}, 
+                        $hash->{c_tempRule3}, 
+                        $hash->{c_tempRule2}, 
+                        $hash->{c_tempRule1} ) {
+        if ($rule ne "") {		# valid rule is 1-5 0600,D 1800,C 2200,N
+  
+          Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: $rule");
+  
+          my @points = split (" ", $rule);
+  
+          my ($dayfrom, $dayto) = split ("-", $points[0]);
+          #Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: dayfrom $dayfrom dayto $dayto");
+  
+          my $rulematch = 0;
+          if ($dayfrom <= $dayto ) {                    # rule 1-5 or 4-4
+            $rulematch = ($wday >= $dayfrom && $wday <= $dayto);
+          } else {                                      # rule  5-2
+            $rulematch = ($wday >= $dayfrom || $wday <= $dayto);
           }
-          # no interval matched .. guess I am before the first one
-          # so I choose the temperature from yesterday :-)
-          # this should be the tempN
-          my $newTemp = $hash->{"c_tempN"};
-
-          my $act_dtemp = $hash->{READINGS}{"desired-temp"}{VAL};
-          Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: use last value ($act_dtemp)");
-
-          if ($act_dtemp ne $newTemp
-            or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
-            readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 1);
-          #} else {
-          #  readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 0);
+  
+          if ($rulematch) {
+  
+            for (my $i=int(@points)-1; $i>0; $i--) {
+              Log3 ($hash, 5, "PWMR_CalcDesiredTemp $name: i:$i $points[$i]");
+  
+              my ($ruletime, $tempV) = split (",", $points[$i]);
+  
+              if ($cmptime >= $ruletime) {
+  
+                my $temperature = $hash->{"c_tempN"};
+                $temperature = $hash->{"c_tempD"} if ($tempV eq "D");
+                $temperature = $hash->{"c_tempC"} if ($tempV eq "C");
+                $temperature = $hash->{"c_tempE"} if ($tempV eq "E");
+  
+                Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: match i:$i $points[$i] ($tempV/$temperature)");
+                 
+                if ($hash->{READINGS}{"desired-temp"}{VAL} ne $temperature 
+                    or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
+                  readingsSingleUpdate ($hash,  "desired-temp", $temperature, 1);
+                } else {
+                  readingsSingleUpdate ($hash,  "desired-temp", $temperature, 0);
+                }
+  
+                #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
+                #$hash->{READINGS}{"desired-temp"}{VAL} = $temperature;
+  
+                #push @{$hash->{CHANGED}}, "desired-temp $temperature";
+                #DoTrigger($name, undef);
+                return undef;
+              } 
+  
+            }
+            # no interval matched .. guess I am before the first one
+            # so I choose the temperature from yesterday :-)
+            # this should be the tempN
+            my $newTemp = $hash->{"c_tempN"};
+  
+            my $act_dtemp = $hash->{READINGS}{"desired-temp"}{VAL};
+            Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: use last value ($act_dtemp)");
+  
+            if ($act_dtemp ne $newTemp
+              or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
+              readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 1);
+            #} else {
+            #  readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 0);
+            }
+  
+            #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
+            #$hash->{READINGS}{"desired-temp"}{VAL} = $newTemp;
+  
+            #push @{$hash->{CHANGED}}, "desired-temp $newTemp";
+            #DoTrigger($name, undef);
+            return undef;
           }
-
-          #$hash->{READINGS}{"desired-temp"}{TIME} = TimeNow();
-          #$hash->{READINGS}{"desired-temp"}{VAL} = $newTemp;
-
-          #push @{$hash->{CHANGED}}, "desired-temp $newTemp";
-          #DoTrigger($name, undef);
-          return undef;
         }
       }
-    }
+    } else { # $hash->{c_desiredTempFrom} is set
+      $hash->{STATE}     = "From $hash->{d_name}";
 
+      my $newTemp = PWMR_getDesiredTempFrom ($hash, $defs{$hash->{d_name}}, $hash->{d_reading}, $hash->{d_regexpTemp});
+
+      if ($hash->{READINGS}{"desired-temp"}{VAL} ne $newTemp 
+         or substr(TimeNow(),1,8) ne substr($hash->{READINGS}{"desired-temp"}{TIME},1,8)) {
+           readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 1);
+      } else {
+         readingsSingleUpdate ($hash,  "desired-temp", $newTemp, 0);
+      }
+  
+    }
   } else {
     $hash->{STATE}     = "Manual";
   }
@@ -420,23 +462,25 @@ PWMR_Define($$)
 
   my $name = $hash->{NAME};
 
-  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window>[,<window>][:<w_regexp>]]"
-    if(int(@a) < 6 || int(@a) > 8);
+  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window|dummy>[,<window>][:<w_regexp>]] [<usePID 0|1>:<PFactor>:<IFactor>:<DFactor>]"
+    if(int(@a) < 6 || int(@a) > 9);
 
   my $iodevname = $a[2];
   my $factor  = ((int(@a) > 2) ? $a[3] : 0.2);
   my $tsensor = ((int(@a) > 3) ? $a[4] : "");
   my $actor   = ((int(@a) > 4) ? $a[5] : "");
   my $window  = ((int(@a) > 6) ? $a[6] : "");
+  my $pid     = ((int(@a) > 7) ? $a[7] : "");
 
   my ($f, $o) = split (",", $factor, 2);
   $o = 0.11 unless (defined ($o));       # if cycletime is 900 then this increases the on-time by 1:39 (=99 seconds)
  
   $hash->{TEMPSENSOR}         = $tsensor;
   $hash->{ACTOR}              = $actor;
-  $hash->{WINDOW}             = $window;
+  $hash->{WINDOW}             = ($window eq "dummy" ? "" : $window);
   $hash->{FACTOR}             = $f;		# pulse is calculated using the below formular
   $hash->{FOFFSET}            = $o;             # ( $deltaTemp * $factor) ** 2) + $factoroffset
+  $hash->{c_desiredTempFrom}  = "";
   
   #$hash->{helper}{cycletime}  = 0;
 
@@ -494,6 +538,31 @@ PWMR_Define($$)
     }
   }
 
+  ##########
+  # check pid definition
+
+  my ($usePID, $PFactor, $IFactor, $DFactor) = split (":", $pid, 4);
+
+  $hash->{c_PID_useit}   = !defined($usePID)  ? -1 : $usePID;
+  $hash->{c_PID_PFactor} = !defined($PFactor) ? 0  : $PFactor;
+  $hash->{c_PID_IFactor} = !defined($IFactor) ? 0  : $IFactor;
+  $hash->{c_PID_DFactor} = !defined($DFactor) ? 0  : $DFactor;
+
+  $hash->{h_deltaTemp}      = 0 unless defined ($hash->{h_deltaTemp});
+  $hash->{h_pid_integrator} = 0;
+
+  if ($pid eq "") {
+
+    delete ($hash->{READINGS}{PID_PVal})      if (defined($hash->{READINGS}{PID_PVal}));
+    delete ($hash->{READINGS}{PID_IVal})      if (defined($hash->{READINGS}{PID_IVal}));
+    delete ($hash->{READINGS}{PID_DVal})      if (defined($hash->{READINGS}{PID_DVal}));
+    delete ($hash->{READINGS}{PID_PWMPulse})  if (defined($hash->{READINGS}{PID_PWMPulse}));
+    delete ($hash->{READINGS}{PID_PWMOnTime}) if (defined($hash->{READINGS}{PID_PWMOnTime}));
+
+    #delete ($hash->{h_deltaTemp})            if (defined($hash->{h_deltaTemp}));
+    #delete ($hash->{h_pid_integrator})       if (defined($hash->{h_pid_integrator}));
+
+  }
   
 
   ##########
@@ -514,7 +583,7 @@ PWMR_Define($$)
   $hash->{t_reading}   = $reading;
   if ( !defined($t_regexp) ) 
   {  
-    $t_regexp = '([\\d\\.]*)'
+    $t_regexp = '([\\d\\.]+)'
   }
   $hash->{t_regexp}    = $t_regexp;
 
@@ -751,11 +820,12 @@ PWMR_ReadRoom(@)
     $desiredTemp    = $room->{READINGS}{"desired-temp"}{VAL};
   }
 
-  my $deltaTemp    = max (0, $desiredTemp - $temperaturV);
+  my $deltaTemp    = maxNum (0, $desiredTemp - $temperaturV);
+  my $deltaTempPID = $desiredTemp - $temperaturV;
   
   my $factoroffset = $room->{FOFFSET};
   
-  $newpulse        = min ($MaxPulse,  (( $deltaTemp * $factor) ** 2) + $factoroffset); # default 85% max ontime
+  $newpulse        = minNum ($MaxPulse,  (( $deltaTemp * $factor) ** 2) + $factoroffset); # default 85% max ontime
   $newpulse        = sprintf ("%.2f", $newpulse);
 
   
@@ -769,11 +839,55 @@ PWMR_ReadRoom(@)
 	$PWMOnTime = "00:00";
   }
 
+  # PID calculation
+
+  my $PVal = $room->{c_PID_PFactor} * $deltaTemp;
+  my $IVal = $room->{c_PID_IFactor} * $deltaTempPID + $room->{h_pid_integrator};
+  my $DVal = $room->{c_PID_DFactor} * ($deltaTemp + $room->{h_deltaTemp}); # h_deltaTemp was multiplied with -1
+
+  $PVal    = minNum (1, sprintf ("%.2f", $PVal));
+  $IVal    = minNum (1, sprintf ("%.2f", $IVal));
+  $DVal    = minNum (1, sprintf ("%.2f", $DVal));
+
+  $IVal    = maxNum (-1, $IVal);
+
+  $room->{h_deltaTemp} = sprintf ("%.1f", -1 * $deltaTempPID);
+  $room->{h_pid_integrator} = $IVal;
+
+  my $newpulsePID  = ($PVal + $IVal + $DVal);
+  $newpulsePID     = minNum ($MaxPulse, sprintf ("%.2f", $newpulsePID));
+  $newpulsePID     = maxNum (0,         sprintf ("%.2f", $newpulsePID));
+
+  my $PWMPulsePID  = $newpulsePID * 100;
+  my $PWMOnTimePID =  sprintf ("%02s:%02s", int ($newpulsePID * $cycletime / 60), ($newpulsePID * $cycletime) % 60);
+
+
+  if ($PWMPulsePID * $iodev->{CYCLETIME} < $iodev->{MINONOFFTIME}) {
+	$PWMPulsePID = 0;
+	$PWMOnTimePID = "00:00";
+  }
+  # end PID calculation
+
+  if ($room->{c_PID_useit} >= 1) {
+    $newpulse   = $newpulsePID;
+    #$PWMPulse   = $PWMPulsePID;
+    #$PWMOnTime  = $PWMOnTimePID;
+  }
+
   readingsBeginUpdate ($room);
   readingsBulkUpdate ($room,  "desired-temp-used", $desiredTemp);
   readingsBulkUpdate ($room,  "PWMOnTime", $PWMOnTime);
   readingsBulkUpdate ($room,  "PWMPulse", $PWMPulse);
   readingsBulkUpdate ($room,  "temperature", $temperaturV);
+
+  if ($room->{c_PID_useit} >= 0) {
+    readingsBulkUpdate ($room,  "PID_PVal", $PVal);
+    readingsBulkUpdate ($room,  "PID_IVal", $IVal);
+    readingsBulkUpdate ($room,  "PID_DVal", $DVal);
+    readingsBulkUpdate ($room,  "PID_PWMPulse", $PWMPulsePID);
+    readingsBulkUpdate ($room,  "PID_PWMOnTime", $PWMOnTimePID);
+  }
+
   readingsEndUpdate($room, 1);
 
   
@@ -931,6 +1045,11 @@ PWMR_Attr(@)
       $hash->{c_tempRule5} = "";
     } elsif ($attr eq "frostProtect") {
       $hash->{c_frostProtect} = 0;
+    } elsif ($attr eq "desiredTempFrom") {
+      $hash->{c_desiredTempFrom} = "";
+      delete($hash->{d_name});
+      delete($hash->{d_reading});
+      delete($hash->{d_regexpTemp});
     } elsif ($attr eq "autoCalcTemp") {
       $hash->{c_autoCalcTemp} = 1;
       $hash->{STATE}     = "Calculating";
@@ -966,6 +1085,22 @@ PWMR_Attr(@)
       $hash->{STATE}     = "Calculating";
     } else {
       return "valid values are 0 or 1";
+    }
+
+  } elsif ($attr eq "desiredTempFrom") {                   # desiredTempFrom
+    $hash->{c_desiredTempFrom} = $val;
+
+    my ( $d_name, $d_reading, $d_regexpTemp) = split (":", $val, 3);
+
+    # set defaults
+
+    $hash->{d_name}                = (defined($d_name)               ? $d_name                : "");
+    $hash->{d_reading}             = (defined($d_reading)            ? $d_reading             : "desired-temp");
+    $hash->{d_regexpTemp}          = (defined($d_regexpTemp)         ? $d_regexpTemp          : '(\d[\d\\.]+)');
+
+    # check if device exist 
+    unless (defined($defs{$hash->{d_name}})) {
+      return "error: $hash->{d_name} does not exist.";
     }
 
   } elsif ($attr eq "tempDay") {                           # tempDay
@@ -1089,7 +1224,7 @@ PWMR_Boost(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window&gt;[,&lt;window&gt;[:w_regexp]]<br></code>
+    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:w_regexp]] [&lt;usePID 0|1&gt;lt;PFactor&gt;lt;IFactor&gt;lt;DFactor&gt;br></code>
 
     <br>
     Define a calculation object with the following parameters:<br>
@@ -1107,7 +1242,7 @@ PWMR_Boost(@)
     <li>tsensor[:reading[:t_regexp]]<br>
       <i>tsensor</i> defines the temperature sensor for the actual room temperature.<br>
       <i>reading</i> defines the reading of the temperature sensor. Default is "temperature"<br>
-      <i>t_regexp</i> defines a regular expression to be applied to the reading. Default is '([\\d\\.]*)'.<br>
+      <i>t_regexp</i> defines a regular expression to be applied to the reading. Default is '(\d[\d\.]+)'.<br>
     </li>
 
     <li>actor[:&lt;a_regexp_on&gt;]<br>
@@ -1116,8 +1251,9 @@ PWMR_Boost(@)
     </li>
 
     <li>window[,window][:w_regexp]<br>
-      <i>window</i> defines several window devices that can prevent heating to be turned on. 
+      <i>window</i> defines several window devices that can prevent heating to be turned on.<br>
       If STATE matches the regular expression then the desired-temp will be decreased to frost-protect temperature.<br>
+      'dummy' can be used as a neutral value for window and will be ignored when processing the configuration.<br>
       <i>w_regexp</i> defines a regular expression to be applied to the reading. Default is '.*Open.*'.<br>
     </li>
 
@@ -1129,6 +1265,8 @@ PWMR_Boost(@)
     <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen</code><br>
     <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2</code><br>
     <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2:.*Open.*</code><br>
+    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2</code> 0:0.8:1:0<br>
+    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen dummy 1:0.8:1:0</code><br>
     <br>
        
 
