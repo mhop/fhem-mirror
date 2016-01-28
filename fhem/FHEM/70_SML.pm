@@ -317,15 +317,12 @@ sml_energy_energyDone($)
 # }
 
  if ( $success == 0){
-	$hash->{READINGS}{minPower}{VAL}  = $min;
-	$hash->{READINGS}{minPower}{TIME}  = $timenow;
-	$hash->{READINGS}{maxPower}{VAL}  = $max;
-	$hash->{READINGS}{maxPower}{TIME}  = $timenow;
-	$hash->{READINGS}{lastPower}{VAL}  = $last;
-	$hash->{READINGS}{lastPower}{TIME}  = $timenow;
-  	$hash->{READINGS}{avgPower}{VAL}  = $avg;
-  	$hash->{READINGS}{avgPower}{TIME}  = $timenow;
-	$log = "min: $min max: $max last: $last avg: $avg";
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "minPower" , $min );
+    readingsBulkUpdate($hash, "maxPower" , $max );
+    readingsBulkUpdate($hash, "lastPower" , $last );
+    readingsBulkUpdate($hash, "avgPower" , $avg );
+    $log = "min: $min max: $max last: $last avg: $avg";
     $hash->{STATE} = "min: $min max: $max last: $last avg: $avg";
     my $newpower = $avg/(3600/$interval);
     $newpower = $newpower/1000;
@@ -341,18 +338,21 @@ sml_energy_energyDone($)
     	$hash->{READINGS}{DAYPOWER}{TIME} = $timenow;
     	if ( $dayLast eq $day ){ # es ist der gleiche Tag
     		$powLast += $newpower ;
-    		$hash->{READINGS}{DAYPOWER}{VAL} = $powLast;
+    		#$hash->{READINGS}{DAYPOWER}{VAL} = $powLast;
+    		readingsBulkUpdate($hash, "DAYPOWER" , $powLast );
     		Log3 $hash, 4, "$hash->{NAME} same day timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " day: $powLast";
     	}else{					# es ist eine Tag vergangen
-    		$hash->{READINGS}{DAYPOWER}{VAL} = $newpower;
+    		readingsBulkUpdate($hash, "DAYPOWER" , $newpower );
+    		#$hash->{READINGS}{DAYPOWER}{VAL} = $newpower;
     		Log3 $hash, 4, "$hash->{NAME} new day timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " day: $newpower";
     	}
       }
 #    ######### MONTH
     if ( $hash->{READINGS}{MONTHPOWER}{VAL} eq "-1" ){
-    	$hash->{READINGS}{MONTHPOWER}{VAL}  = $newpower;
+    	#$hash->{READINGS}{MONTHPOWER}{VAL}  = $newpower;
+    	readingsBulkUpdate($hash, "MONTHPOWER" , $newpower );
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{MONTHPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{MONTHPOWER}{VAL} =~ /^(.*)$/;
@@ -360,18 +360,21 @@ sml_energy_energyDone($)
     	$hash->{READINGS}{MONTHPOWER}{TIME} = $timenow;
     	if ( $monthLast eq $month ){ # es ist der gleiche Monat
     		$powLast += $newpower ;
-    		$hash->{READINGS}{MONTHPOWER}{VAL} = $powLast;
+    		#$hash->{READINGS}{MONTHPOWER}{VAL} = $powLast;
+    		readingsBulkUpdate($hash, "MONTHPOWER" , $powLast );
     		Log3 $hash, 4, "$hash->{NAME} Gleicher Monat timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " month: $powLast";
     	}else{					# es ist eine Monat vergangen
-    		$hash->{READINGS}{MONTHPOWER}{VAL} = $newpower;
+    		#$hash->{READINGS}{MONTHPOWER}{VAL} = $newpower;
+    		readingsBulkUpdate($hash, "MONTHPOWER" , $newpower );
     		Log3 $hash, 4, "$hash->{NAME} Neuer Monat timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " month: $newpower";
     	}
       }    
 #	######### YEARPOWER
     if ( $hash->{READINGS}{YEARPOWER}{VAL} eq "-1" ){
-    	$hash->{READINGS}{YEARPOWER}{VAL}  = $newpower;
+    	readingsBulkUpdate($hash, "YEARPOWER" , $newpower );
+    	#$hash->{READINGS}{YEARPOWER}{VAL}  = $newpower;
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{YEARPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{YEARPOWER}{VAL} =~ /^(.*)$/;
@@ -379,11 +382,13 @@ sml_energy_energyDone($)
     	$hash->{READINGS}{YEARPOWER}{TIME} = $timenow;
     	if ( $dateLast eq $date ){ # es ist das gleiche Jahr
     		$powLast += $newpower ;
-    		$hash->{READINGS}{YEARPOWER}{VAL} = $powLast;
+    		readingsBulkUpdate($hash, "YEARPOWER" , $powLast );
+    		#$hash->{READINGS}{YEARPOWER}{VAL} = $powLast;
     		Log3 $hash, 4, "$hash->{NAME} Gleiches Jahr timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " year: $powLast";
     	}else{					# es ist eine Jahr vergangen
-    		$hash->{READINGS}{YEARPOWER}{VAL} = $newpower;
+    		#$hash->{READINGS}{YEARPOWER}{VAL} = $newpower;
+    		readingsBulkUpdate($hash, "YEARPOWER" , $newpower );
     		Log3 $hash, 4, "$hash->{NAME} Neues Jahr timenow: $timenow newpower $newpower powlast $powLast";
     		$log .= " year: $newpower";
     	}
@@ -391,13 +396,15 @@ sml_energy_energyDone($)
 #	######### TOTALPOWER
     	$hash->{READINGS}{TOTALPOWER}{TIME} = $timenow;
      if ( $hash->{READINGS}{TOTALPOWER}{VAL} eq "-1" ){
-    	$hash->{READINGS}{TOTALPOWER}{VAL}  = $newpower;
+    	#$hash->{READINGS}{TOTALPOWER}{VAL}  = $newpower;
+    	readingsBulkUpdate($hash, "TOTALPOWER" , $newpower );
      }else{   
     	my ($dateLast, $monthLast, $dayLast, $hourLast, $minLast, $secLast) = $hash->{READINGS}{TOTALPOWER}{TIME} =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
     	my ($powLast) = $hash->{READINGS}{TOTALPOWER}{VAL} =~ /^(.*)$/;
     	Log3 $hash, 5, "$hash->{NAME} total: $dateLast $monthLast $dayLast $hourLast $minLast $secLast $powLast";
     	$powLast += $newpower ;
-    	$hash->{READINGS}{TOTALPOWER}{VAL} = $powLast;
+    	#$hash->{READINGS}{TOTALPOWER}{VAL} = $powLast;
+    	readingsBulkUpdate($hash, "TOTALPOWER" , $powLast );
     	$log .= " total: $powLast";
      }
 
@@ -408,6 +415,7 @@ sml_energy_energyDone($)
      Log3 $hash, 4, "$hash->{NAME} write log file: $log";
      Log3 $hash, 4, "$hash->{NAME} STATE: $hash->{READINGS}{STATE}{VAL} timenow: $timenow";
 
+readingsEndUpdate ($hash, 1 );
  }else{
      $hash->{STATE}{VAL} = 'disconnected';
      Log3 $hash, 3, "$hash->{NAME} can't update - device send a error";
