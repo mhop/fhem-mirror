@@ -1224,7 +1224,7 @@ PWMR_Boost(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:w_regexp]] [&lt;usePID 0|1&gt;lt;PFactor&gt;lt;IFactor&gt;lt;DFactor&gt;br></code>
+    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:&lt;w_regexp&gt;]] [&lt;usePID 0|1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;]<br></code>
 
     <br>
     Define a calculation object with the following parameters:<br>
@@ -1250,11 +1250,21 @@ PWMR_Boost(@)
       <i>a_regexp_on</i> defines a regular expression to be applied to the state of the actor. Default is 'on". If state matches the regular expression it is handled as "on", otherwise "off"<br>
     </li>
 
-    <li>window[,window][:w_regexp]<br>
+    <li>&lt;window|dummy&gt;[,&lt;window&gt;[:&lt;w_regexp&gt;]<br>
       <i>window</i> defines several window devices that can prevent heating to be turned on.<br>
       If STATE matches the regular expression then the desired-temp will be decreased to frost-protect temperature.<br>
       'dummy' can be used as a neutral value for window and will be ignored when processing the configuration.<br>
       <i>w_regexp</i> defines a regular expression to be applied to the reading. Default is '.*Open.*'.<br>
+    </li>
+
+    <li>&lt;usePID 0|1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;<br>
+      <i>usePID 0|1</i>: 0 .. calculate Pulse based on PID but do not use it. 1 .. calculate Pulse based on PID and use it.<br>
+      <i>PFactor</i>: Konstant for P.<br>
+      <i>IFactor</i>: Konstant for I.<br>
+      <i>DFactor</i>: Konstant for D.<br>
+      Internals c_PID_PFactor, c_PID_IFactor, c_PID_DFactor and c_PID_useit will reflect the above configuration values.<br>
+      Internals h_deltaTemp and h_pid_integrator will store the values needed for calculation of the next PID value.<br>
+      Readings PID_DVal, PID_IVal, PID_PVal, PID_PWMOnTime and PID_PWMPulse will reflect the actual calculated PID values and Pulse.<br>
     </li>
 
     </ul>
@@ -1266,6 +1276,7 @@ PWMR_Boost(@)
     <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2</code><br>
     <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2:.*Open.*</code><br>
     <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen windowKitchen1,windowKitchen2</code> 0:0.8:1:0<br>
+    <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen dummy 0:0.8:1:0</code><br>
     <code>define roomKitchen PWMR fh 1,0 tempKitchen relaisKitchen dummy 1:0.8:1:0</code><br>
     <br>
        
@@ -1308,7 +1319,8 @@ PWMR_Boost(@)
         </li><br>
 
     <li>autoCalcTemp<br>
-        Switch on (1) of off (0) autoCalcMode. <i>desired-temp</i> will be set based on the below temperatures and rules in autoCalcMode.
+        Switch on (1) of off (0) autoCalcMode. <i>desired-temp</i> will be set based on the below temperatures and rules in autoCalcMode.<br>
+        Default is on.
         </li><br>
 
     <li>tempDay<br>
@@ -1343,6 +1355,20 @@ PWMR_Boost(@)
         tempRule2: Sa-So 8:00,D 22:00,N<br>
         This results in tempDay 6:00-22:00 from Monday to Friday and tempNight outside this time window.<br>
         </li><br>
+
+    <li>desiredTempFrom<br>
+        This can be used as an alternative to the calculation of desired-temp based on the tempRules when autoCalcTemp is set to '1'.<br>
+        If set correctly the desired-temp will be read from a reading of another device.<br>
+        Format is &lt;device&gt;[:&lt;reading&gt;[:&lt;regexp&gt;]]<br>
+        <i>device</i> defines the reference to the other object.<br>
+        <i>reading</i> defines the reading that contains the value for desired-temp. Default is 'desired-temp'.<br>
+        <i>regexp</i> defines a regular expression to extract the value used for 'desired-temp'. Default is '(\d[\d\.]+)'. 
+        If <i>regexp</i> does not match (e.g. reading is 'off') then tempFrostProtect is used.<br> 
+        Internals c_desiredTempFrom reflects the actual setting and d_name, d_reading und d_regexpTemp the values used.<br>
+        If this attribute is used then state will change from "Calculating" to "From &lt;device&gt;".<br>
+        Calculation of desired-temp is (like when using tempRules) based on the interval specified for this device (default is 300 seconds).
+        </li><br>
+
 
   </ul>
   <br>
