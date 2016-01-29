@@ -98,11 +98,11 @@ TechemHKV_Notify (@) {
     TechemHKV_IOPatch($hash, $e[1]) if (($e[0] eq 'ATTR') && ($e[2] eq 'rfmode') && ($e[3] eq 'WMBus_T'));
     # disable receiver
     if (($e[0] eq 'ATTR') && ($e[2] eq 'rfmode') && ($e[3] ne 'WMBus_T')) {
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, "state", "standby (IO missing)", 1);
-    readingsBulkUpdate($hash, "temp1", "--.--") if exists($hash->{READINGS}->{'temp1'}); # exlude versions without t1,t2
-    readingsBulkUpdate($hash, "temp2", "--.--") if exists($hash->{READINGS}->{'temp2'});
-    readingsEndUpdate($hash, 1);
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "state", "standby (IO missing)", 1);
+      readingsBulkUpdate($hash, "temp1", "--.--") if exists($hash->{READINGS}->{'temp1'}); # exlude versions without t1,t2
+      readingsBulkUpdate($hash, "temp2", "--.--") if exists($hash->{READINGS}->{'temp2'});
+      readingsEndUpdate($hash, 1);
     }
   }
   return undef;
@@ -133,10 +133,12 @@ TechemHKV_Receive(@) {
   $ats = ReadingsTimestamp($hash->{NAME},"current_period", "0");
   $ts = sprintf ("%02d-%02d-%02d 00:00:00", $msg->{actual}->{year}, $msg->{actual}->{month}, $msg->{actual}->{day});
   if ($ats ne $ts) {
+    my $i;
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
+    $i = $#{ $hash->{CHANGED} };
     readingsBulkUpdate($hash, "current_period", $msg->{actualVal});
-    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts;
+    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
     readingsEndUpdate($hash, 1);
   }
 
@@ -144,10 +146,12 @@ TechemHKV_Receive(@) {
   $ats = ReadingsTimestamp($hash->{NAME},"previous_period", "0");
   $ts = sprintf ("20%02d-%02d-%02d 00:00:00", $msg->{last}->{year}, $msg->{last}->{month}, $msg->{last}->{day});
   if ($ats ne $ts) {
+    my $i;
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
+    $i = $#{ $hash->{CHANGED} };
     readingsBulkUpdate($hash, "previous_period", $msg->{lastVal});
-    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts;
+    hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
     readingsEndUpdate($hash, 1);
   }
 
@@ -185,7 +189,7 @@ TechemHKV_Parse(@) {
   my ($message, $rssi);
   ($msg, $rssi) = split (/::/, $msg);
   $msg = TechemHKV_SanityCheck($msg);
-  return '' unless $msg;
+  return ('') unless $msg;
   
   my @m = ($msg =~ m/../g);
 
