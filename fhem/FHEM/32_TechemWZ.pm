@@ -146,11 +146,15 @@ TechemWZ_Receive(@) {
   $ats = ReadingsTimestamp($hash->{NAME},"current_period", "0");
   $ts = sprintf ("%02d-%02d-%02d 00:00:00", $msg->{actual}->{year}, $msg->{actual}->{month}, $msg->{actual}->{day});
   if ($ats ne $ts) {
+    my $i;
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
+    $i = $#{ $hash->{CHANGED} };
     readingsBulkUpdate($hash, "meter", $msg->{meter});
+    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
+    $i = $#{ $hash->{CHANGED} };
     readingsBulkUpdate($hash, "current_period", $msg->{actualVal});
-    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts;
+    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
     readingsEndUpdate($hash, 1);
   }
 
@@ -160,8 +164,9 @@ TechemWZ_Receive(@) {
   if ($ats ne $ts) {
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
+    $i = $#{ $hash->{CHANGED} };
     readingsBulkUpdate($hash, "previous_period", $msg->{lastVal});
-    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts;
+    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
     readingsEndUpdate($hash, 1);
   }
 
