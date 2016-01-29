@@ -208,7 +208,7 @@ FS20_Set($@)
 
   ####################################
   # following timers
-  if($a[1] eq "on" && $na == 2 && $onTime) {
+  if(($a[1] eq "on" || $a[1] =~ m/dim/) && $na == 2 && $onTime) {
     $newState = "off";
     $val = $onTime;
 
@@ -591,7 +591,7 @@ four2hex($$)
     this time for the time specified as argument in seconds to this attribute.
     This is used to follow the pre-programmed timer, which was set previously
     with the timer command or manually by pressing the button on the device,
-    see your manual for details.
+    see your manual for details. Works for on and dim commands.
     </li><br>
 
 
@@ -833,7 +833,7 @@ four2hex($$)
       diesmal als Argument in Sekunden zum Attribut.  Wird verwendet um dem
       vorprogrammierten Timer zu folgen welcher vorher durch den timer-Befehl,
       oder manuell durch Dr&uuml;cken des Buttons gesetzt wurde. Im Handbuch
-      finden sich noch mehr Informationen.
+      finden sich noch mehr Informationen. Beachtet bei on und dim Befehlen.
       </li><br>
 
 
