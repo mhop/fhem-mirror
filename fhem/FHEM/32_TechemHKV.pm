@@ -151,7 +151,7 @@ TechemHKV_Receive(@) {
     $hash->{".updateTimestamp"} = $ts;
     $i = $#{ $hash->{CHANGED} };
     readingsBulkUpdate($hash, "previous_period", $msg->{lastVal});
-    hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
+    $hash->{CHANGETIME}->[$#{ $hash->{CHANGED} }] = $ts if ($#{ $hash->{CHANGED} } != $i ); # only add ts if there is a event to
     readingsEndUpdate($hash, 1);
   }
 
