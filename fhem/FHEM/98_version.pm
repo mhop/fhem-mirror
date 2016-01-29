@@ -15,9 +15,9 @@ sub
 CommandVersion($$)
 {
   my ($cl, $param) = @_;
-
-  my $noheader = ($param =~ s/\s+noheader\s*$//);
   
+  my $noheader = ($param =~ s/(?:^\s*|\s+)noheader\s*$//);
+
   eval { "test" =~ /$param/ };
   return "invalid filter regexp" if($@);
   
@@ -30,7 +30,7 @@ CommandVersion($$)
   foreach my $fn (@files) {
     next unless($fn =~ /^(?:$modpath.?)?FHEM/ or $fn =~ /fhem.pl$/); # configDB 
     my $mod_name = ($fn=~ /[\/\\]([^\/\\]+)$/ ? $1 : $fn);
-    next if($param && $mod_name !~ /$param/);
+    next if($param ne "" && $mod_name !~ /$param/);
     next if(grep(/$mod_name/, @ret));
     Log 4, "Looking for SVN Id in module $mod_name";
 
@@ -58,8 +58,8 @@ CommandVersion($$)
   }
   
   @ret = map {/\$Id\: (\S+) (\S+) (.+?) \$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_} @ret; 
-  @ret = sort {version_sortModules($a, $b)} grep {(defined($param) ? $_ =~ /$param/ : 1)} @ret;
-  return "no loaded modules found that match: $param" if($param && !@ret);
+  @ret = sort {version_sortModules($a, $b)} grep {($param ne "" ? $_ =~ /$param/ : 1)} @ret;
+  return "no loaded modules found that match: $param" if($param ne "" && !@ret);
   return ($noheader ? "" : sprintf("%-".$max."s %s","File","Rev   Last Change\n\n")).
          trim(join("\n",  grep (($_ =~ /^fhem.pl|\d\d_/), @ret))."\n\n".
               join("\n",  grep (($_ !~ /^fhem.pl|\d\d_/), @ret))
