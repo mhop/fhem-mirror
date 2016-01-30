@@ -941,7 +941,7 @@ sub FB_CALLMONITOR_parsePhonebook($$)
     my $number;
     my $count_contacts = 0;
     
-    if($phonebook =~ /<phonebooks>/ and $phonebook =~ /<phonebook[^>]+>/ and $phonebook =~ m,</phonebook>, and $phonebook =~ m,</phonebooks>,) 
+    if($phonebook =~ /<phonebook/ and $phonebook =~ m,</phonebook>,) 
     {
         if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/)
         {
