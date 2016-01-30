@@ -6,7 +6,7 @@
 #
 # Prof. Dr. Peter A. Henning
 #
-# $Id: 95_Alarm.pm 2014-08 - pahenning $
+# $Id$
 #
 ########################################################################################
 #
@@ -40,7 +40,7 @@ my $alarmname       = "Alarms";    # link text
 my $alarmhiddenroom = "AlarmRoom"; # hidden room
 my $alarmpublicroom = "Alarm";     # public room
 my $alarmno         = 8;
-my $alarmversion    = "2.5";
+my $alarmversion    = "2.6";
 
 #########################################################################################
 #
@@ -83,7 +83,10 @@ sub Alarm_Define ($$) {
  my $now = time();
  my $name = $hash->{NAME}; 
  $hash->{VERSION} = $alarmversion;
- readingsSingleUpdate( $hash, "state", "Initialized", 0 ); 
+ readingsSingleUpdate( $hash, "state", "Initialized", 1 ); 
+ 
+ $alarmhiddenroom = defined($attr{$name}{"hiddenroom"})  ? $attr{$name}{"hiddenroom"} : $alarmhiddenroom;  
+ $alarmpublicroom = defined($attr{$name}{"publicroom"})  ? $attr{$name}{"publicroom"} : $alarmpublicroom; 
   
  RemoveInternalTimer($hash);
  InternalTimer      ($now + 5, 'Alarm_CreateEntry', $hash, 0);
@@ -152,7 +155,7 @@ sub Alarm_CreateEntry($) {
       }
    }
    my $mga = Alarm_getstate($hash)." Keine Störung";
-   readingsSingleUpdate( $hash, "state", $mga, 0 );
+   readingsSingleUpdate( $hash, "state", $mga, 1 );
 }
 
 #########################################################################################
@@ -289,7 +292,7 @@ sub Alarm_Exec($$$$$){
    return 
      if ($dev eq 'global');
 
-   #-- raising the alarmy 
+   #-- raising the alarm 
    if( $act eq "on" ){
       #-- only if this level is armed and not yet active
       if( ($xec eq "armed") && ($xac eq "off") ){ 
@@ -336,7 +339,7 @@ sub Alarm_Exec($$$$$){
               readingsSingleUpdate( $hash, "level".$level,$dev,0 );
               readingsSingleUpdate( $hash, "short", $mga, 0);
               $mga = Alarm_getstate($hash)." ".$mga;
-              readingsSingleUpdate( $hash, "state", $mga, 0 );
+              readingsSingleUpdate( $hash, "state", $mga, 1 );
               $msg = "[Alarm $level] raised from device $dev with event $evt";
               #-- calling actors AFTER state update
               $cmd = AttrVal($name, "level".$level."onact", 0);
@@ -377,7 +380,7 @@ sub Alarm_Exec($$$$$){
          $mga = " Level $level canceled";
          readingsSingleUpdate( $hash, "short", "", 0);
          $mga = Alarm_getstate($hash)." ".$mga;
-         readingsSingleUpdate( $hash, "state", $mga, 0 );
+         readingsSingleUpdate( $hash, "state", $mga, 1 );
          $msg = "[Alarm $level] canceled from device $dev";
          Log3 $hash,3,$msg;
      }
@@ -597,7 +600,7 @@ sub Alarm_CreateNotifiers($){
                  }
                  if( index($aval[0],"alarm".$level) != -1 ){
                     #-- activate without delay 
-                    if( $aval[3] eq "0" ){
+                    if(( $aval[3] eq "0" )||($aval[3] eq "00:00")){
                        $cmd  .= $aval[1].';';
                     #-- activate with delay
                     } else {
@@ -671,7 +674,7 @@ sub Alarm_Html($)
     my $id = $defs{$name}{NR};
     
     #-- 
-    readingsSingleUpdate( $hash, "state", Alarm_getstate($hash)." ".$hash->{READINGS}{"short"}{VAL}, 0 );
+    readingsSingleUpdate( $hash, "state", Alarm_getstate($hash)." ".$hash->{READINGS}{"short"}{VAL}, 1 );
  
     #--
     my $lockstate = ($hash->{READINGS}{lockstate}{VAL}) ? $hash->{READINGS}{lockstate}{VAL} : "unlocked";
@@ -806,35 +809,33 @@ sub Alarm_Html($)
 =pod
 =begin html
 
-<a name="Alarm"></a>
+   <a name="Alarm"></a>
         <h3>Alarm</h3>
         <p> FHEM module to set up a House Alarm System with 8 different alarm levels</p>
         <a name="Alarmdefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; Alarm</code> 
-            <br />Defines the Alarm system.
-        </p>
+            <code>define &lt;name&gt; Alarm</code>
+            <br />Defines the Alarm system. </p>
         <a name="Alarmset"></a>
         <h4>Set</h4>
         <ul>
             <li><a name="alarm_cancel">
                     <code>set &lt;name&gt; canceled &lt;level&gt;</code>
                 </a>
-                <br/>cancels an alarm of level &lt;level&gt;, where &lt;level&gt; = 0..7
-            </li>
+                <br />cancels an alarm of level &lt;level&gt;, where &lt;level&gt; = 0..7 </li>
             <li><a name="alarm_arm">
-                    <code>set &lt;name&gt; armed &lt;level&gt;</code><br/>
+                    <code>set &lt;name&gt; armed &lt;level&gt;</code><br />
                     <code>set &lt;name&gt; disarmed &lt;level&gt;</code>
                 </a>
-                <br/>sets the alarm of level &lt;level&gt; to armed (i.e., active) or disarmed (i.e., inactive), where &lt;level&gt; = 0..7
-            </li>
+                <br />sets the alarm of level &lt;level&gt; to armed (i.e., active) or disarmed
+                (i.e., inactive), where &lt;level&gt; = 0..7 </li>
             <li><a name="alarm_lock">
-                    <code>set &lt;name&gt; locked</code><br/>
+                    <code>set &lt;name&gt; locked</code><br />
                     <code>set &lt;name&gt; unlocked</code>
                 </a>
-                <br/>sets the lockstate of the alarm module to <i>locked</i> (i.e., alarm setups may not be changed)
-                resp. <i>unlocked</i> (i.e., alarm setups may be changed>)</li>
+                <br />sets the lockstate of the alarm module to <i>locked</i> (i.e., alarm setups
+                may not be changed) resp. <i>unlocked</i> (i.e., alarm setups may be changed>)</li>
         </ul>
         <a name="Alarmget"></a>
         <h4>Get</h4>
@@ -846,18 +847,30 @@ sub Alarm_Html($)
         <a name="Alarmattr"></a>
         <h4>Attributes</h4>
         <ul>
-            <li><a name="alarm_lockstate"><code>attr &lt;name&gt; lockstate locked|unlocked</code></a>
-                <br /><i>locked</i> means that alarm setups may not be changed, 
-                <i>unlocked</i> means that alarm setups may be changed></li>
-            <li><a name="alarm_statedisplay"><code>attr &lt;name&gt; statedisplay simple,color,table,none</code></a>
-                <br />defines how the state of all eight alarm levels is shown. Example for the case when only alarm no. 2 is raised:
-                <ul>
+            <li><a name="alarm_hiddenroom"><code>attr &lt;name&gt; hiddenroom
+                    &lt;string&gt;</code></a>
+                <br />Room name for hidden alarm room (containing only the Alarm device), default:
+                AlarmRoom</li>
+            <li><a name="alarm_hiddenroom"><code>attr &lt;name&gt; hiddenroom
+                    &lt;string&gt;</code></a>
+                <br />Room name for public alarm room (containing sensor/actor devices), default:
+                Alarm</li>
+            <li><a name="alarm_lockstate"><code>attr &lt;name&gt; lockstate
+                    locked|unlocked</code></a>
+                <br /><i>locked</i> means that alarm setups may not be changed, <i>unlocked</i>
+                means that alarm setups may be changed></li>
+            <li><a name="alarm_statedisplay"><code>attr &lt;name&gt; statedisplay
+                        simple,color,table,none</code></a>
+                <br />defines how the state of all eight alarm levels is shown. Example for the case
+                when only alarm no. 2 is raised: <ul>
                     <li> simple=OOXOOOOO</li>
-                    <li> color=<span style="color:green"> 0 1 <span style="width:1ex;color:red">2</span> 3 4 5 6 7</span></li>
-                    <li> table=<table><tr style="height:1ex"><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:red"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/><td style="width:1ex;background-color:green"/></tr></table> </li>
+                    <li> color=<span style="color:green"> 0 1 <span style="width:1ex;color:red"
+                                >2</span> 3 4 5 6 7</span></li>
+                    <li> table (ATTENTION: TABLE MOMENTARILY REMOVED)
+                    </li>
                     <li> none=no state display</li>
                 </ul>
-                </li>
+            </li>
             <li><a name="alarm_armdelay"><code>attr &lt;name&gt; armdelay <i>mm:ss</i></code></a>
                 <br />time until the arming of an alarm becomes operative (0:00 - 9:59 allowed)</li>
             <li><a name="alarm_armwait"><code>attr &lt;name&gt; armwait <i>action</i></code></a>
@@ -868,10 +881,11 @@ sub Alarm_Html($)
                 <br />FHEM action to be carried out on the disarming of an alarm</li>
             <li><a name="alarm_cancelact"><code>attr &lt;name&gt; cancelact <i>action</i></code></a>
                 <br />FHEM action to be carried out on the canceling of an alarm</li>
-            <li><a name="alarm_internals"/>For each of the 8 alarm levels, several attributes hold the alarm setup. 
-                They should not be changed by hand, but through the web interface to avoid confusion: 
-                <code>level&lt;level&gt;start, level&lt;level&gt;end, level&lt;level&gt;msg, level&lt;level&gt;xec, 
-                level&lt;level&gt;onact, level&lt;level&gt;offact</code></li>
+            <li><a name="alarm_internals"></a>For each of the 8 alarm levels, several attributes
+                hold the alarm setup. They should not be changed by hand, but through the web
+                interface to avoid confusion: <code>level&lt;level&gt;start, level&lt;level&gt;end,
+                    level&lt;level&gt;msg, level&lt;level&gt;xec, level&lt;level&gt;onact,
+                    level&lt;level&gt;offact</code></li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
