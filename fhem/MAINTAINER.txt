@@ -285,7 +285,7 @@ FHEM/98_Text2Speech.pm       tobiasfaust          http://forum.fhem.de Unterstue
 FHEM/98_apptime.pm           martinp876           http://forum.fhem.de Sonstiges
 FHEM/98_ComfoAir.pm          StefanStrobel        http://forum.fhem.de Sonstiges
 FHEM/98_CULflash.pm          rudolfkoenig         http://forum.fhem.de Sonstiges
-FHEM/98_DOIF.pm              damian-s             http://forum.fhem.de Automatisierung
+FHEM/98_DOIF.pm              damian-s             http://forum.fhem.de Automatisierung/DOIF
 FHEM/98_EDIPLUG.pm           Wzut                 http://forum.fhem.de Sonstige Systeme
 FHEM/98_FReplacer.pm         stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_GEOFANCY.pm          loredo               http://forum.fhem.de Unterstuetzende Dienste
