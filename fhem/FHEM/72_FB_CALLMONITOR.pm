@@ -1262,7 +1262,7 @@ EOD
     
     my ($err, $data)    = HttpUtils_BlockingGet($param);
 
-    if ($err ne "")
+    if($err ne "")
     {
         Log3 $name, 3, "FB_CALLMONITOR ($name) - error while requesting phonebooks: $err";
         return "error while requesting phonebooks: $err";
@@ -1274,15 +1274,14 @@ EOD
         return  "received no data after requesting available phonebooks via TR-064";
     }
     
+    Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 challenge response:\n$data";
+      
     unless($data =~ /<Nonce>/i and $data =~ /<Realm>/i)
     {
         Log3 $name, 3, "FB_CALLMONITOR ($name) - received no valid TR-064 challenge response. aborting";
-        Log3 $name, 5, "FB_CALLMONITOR ($name) - received no valid TR-064 challenge response: $data";
         return  "received no valid TR-064 challenge response. aborting";
     }
     
-    Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 challenge response:\n$data";
-
     my ($nonce, $realm);
     
     if($data =~ m,<Nonce>(.+?)</Nonce>,i)
