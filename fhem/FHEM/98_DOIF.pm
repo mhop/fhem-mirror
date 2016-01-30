@@ -920,7 +920,7 @@ sub CheckRegexpDoIf($$$$)
       if ($notifyExp eq "") {
         if ($cond ne "all") {
           $c=$cond+1;
-          readingsSingleUpdate ($hash, "machted_event_c".$c."_".($i+1),"$events",0);
+          readingsSingleUpdate ($hash, "matched_event_c".$c."_".($i+1),"$events",0);
         }
         return 1;
       }
@@ -934,7 +934,7 @@ sub CheckRegexpDoIf($$$$)
         if ($found) {
           if ($cond ne "all") {
             $c=$cond+1;
-          readingsSingleUpdate ($hash, "machted_event_c".$c."_".($i+1),$s,0);
+          readingsSingleUpdate ($hash, "matched_event_c".$c."_".($i+1),$s,0);
           }
           return 1
         }
