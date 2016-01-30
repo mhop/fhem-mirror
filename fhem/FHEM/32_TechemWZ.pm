@@ -162,6 +162,7 @@ TechemWZ_Receive(@) {
   $ats = ReadingsTimestamp($hash->{NAME},"previous_period", "0");
   $ts = sprintf ("20%02d-%02d-%02d 00:00:00", $msg->{last}->{year}, $msg->{last}->{month}, $msg->{last}->{day});
   if ($ats ne $ts) {
+    my $i;
     readingsBeginUpdate($hash);
     $hash->{".updateTimestamp"} = $ts;
     $i = $#{ $hash->{CHANGED} };
