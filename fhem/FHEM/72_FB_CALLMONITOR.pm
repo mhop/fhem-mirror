@@ -1243,8 +1243,8 @@ sub FB_CALLMONITOR_identifyPhoneBooksViaTR064($;$)
     </h:InitChallenge >
   </s:Header>
   <s:Body>
-    <u:SetEnable xmlns:u="urn:dslforum-org:service:X_AVM-DE_OnTel:1">
-    </u:SetEnable>
+   <u:$TR064_service_command xmlns:u="$TR064_service_type">
+   </u:$TR064_service_command>
   </s:Body>
 </s:Envelope>
 EOD
@@ -1272,6 +1272,13 @@ EOD
     {
         Log3 $name, 3, "FB_CALLMONITOR ($name) - received http code ".$param->{code}." without any data after requesting available phonebooks via TR-064";
         return  "received no data after requesting available phonebooks via TR-064";
+    }
+    
+    unless($data =~ /<Nonce>/i and $data =~ /<Realm>/i)
+    {
+        Log3 $name, 3, "FB_CALLMONITOR ($name) - received no valid TR-064 challenge response. aborting";
+        Log3 $name, 5, "FB_CALLMONITOR ($name) - received no valid TR-064 challenge response: $data";
+        return  "received no valid TR-064 challenge response. aborting";
     }
     
     Log3 $name, 5, "FB_CALLMONITOR ($name) - received TR-064 challenge response:\n$data";
