@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  44_TEK603: fixed wrong values.
   - bugfix:  49_SSCam: fixed the problem a recording may still stay active if 
              fhem will be restarted after a recording was triggered and
              the recordtime wasn't be over,

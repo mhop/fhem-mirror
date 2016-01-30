@@ -28,6 +28,8 @@ package main;
 use strict;
 use warnings;
 
+use Digest::CRC; # libdigest-crc-perl
+
 sub TEK603_Initialize($);
 sub TEK603_define($$);
 sub TEK603_doInit($);
@@ -159,7 +161,12 @@ sub TEK603_read($) {
 	#my $epromEnd       	= hex(substr($hash->{buffer},22,4));
 	my $payloadlenght	= $lenght - 26 - 4;
 	my $payload        	= substr($hash->{buffer},26,$payloadlenght);
-	#my $crc            	= substr($hash->{buffer},26 + $payloadlenght,4);
+	my $crc            	= substr($hash->{buffer},26 + $payloadlenght,4);
+
+	my $ctx = Digest::CRC->new(width=>16, init=>0x0, poly=>0x1021, refout=>0, xorout=>0);
+	$ctx->add(pack 'H*',(substr($hash->{buffer},0,26 + $payloadlenght)));
+	my $digest = $ctx->hexdigest;
+	return '' if($crc ne $digest);
 
 	# payload
         my $temp                = sprintf '%.2f', ((hex(substr($payload, 0,2)) - 40 - 32) / 1.8);
@@ -169,7 +176,6 @@ sub TEK603_read($) {
 
 	#Log3 $name, 5, $hash->{buffer};
 	Log3 $name, 5, "Time:$time Temp:$temp Ullage:$Ullage RemainingUsableLevel:$RemainingUsableLevel TotalUsableCapacity:$TotalUsableCapacity"; 
-
 
     	readingsBeginUpdate($hash);
     	readingsBulkUpdate($hash, "Time", $time);
@@ -195,6 +201,7 @@ sub TEK603_reconnect($) {
 	DevIo_OpenDev($hash, 0, 'TEK603_doInit');
 }
 
+
 1;
 
 =pod
@@ -208,6 +215,14 @@ sub TEK603_reconnect($) {
 
 
   <br />
+  <b>Prerequisites</b><br>
+  The module requires the perl module Digest::CRC<br>
+  On a debian based system the module can be installed with<br>
+  <code>
+  sudo apt-get install libdigest-crc-perl<br>
+  </code>
+  <br /><br />
+  
   <a name="TEK603_Define"></a>
   <b>Define</b>
   <ul>
@@ -234,7 +249,7 @@ sub TEK603_reconnect($) {
     <li>RemainingUsableLevel<br />
     This is the usable level, with deductions due to the sensor offset and outlet height. (Liters)</li>
     <li>TotalUsableCapacity<br />
-    This is the usable volume, with deductions due to the sensor offset and outlet height. (Litres)</li>
+    This is the usable volume, with deductions due to the sensor offset and outlet height. (Liters)</li>
   </ul><br />
 
 
