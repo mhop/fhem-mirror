@@ -1,7 +1,6 @@
 # $Id$
 ###########################
 #	CALVIEW
-#	
 #	needs a defined Device 57_Calendar
 ###########################
 package main;
