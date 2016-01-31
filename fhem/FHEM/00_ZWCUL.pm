@@ -61,7 +61,7 @@ ZWCUL_Initialize($)
   $hash->{AttrFn}  = "ZWCUL_Attr";
   $hash->{UndefFn} = "ZWCUL_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model disable:0,1 ".
-                     "networkKey noDispatch dataRate:40k,100k,9600";
+                     "networkKey intruderMode dataRate:40k,100k,9600";
 }
 
 #####################################
@@ -444,7 +444,7 @@ ZWCUL_Parse($$$$$)
   }
 
   return if($hc && !$hash->{monitor} && $hc == $hp);
-  return if(AttrVal($me, "noDispatch", 0));
+  return if($hash->{monitor} && !AttrVal($me, "intruderMode", 0));
 
 
   $hash->{homeId} = $H; # Fake homeId for monitor mode
@@ -670,7 +670,7 @@ ZWCUL_Ready($)
   <ul>
     <code>define ZWCUL_1 ZWCUL /dev/cu.usbmodemfa141@9600 12345678 01</code><br>
   </ul>
-  If the homeId is set to 0, then culfw will enter monitor mode, i.e. no
+  If the homeId is set to 00000000, then culfw will enter monitor mode, i.e. no
   checksum filtering will be done, and no acks for received messages will be
   sent.
   </ul>
@@ -736,15 +736,14 @@ ZWCUL_Ready($)
     <li><a href="#model">model</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#networkKey">networkKey</a></li>
-    <li><a name="#noDispatch">noDispatch</a><br>
-      prohibit dispatching messages or creating ZWave devices.
+    <li><a name="#intruderMode">intruderMode</a><br>
+      In monitor mode (see above) events are not dispatched to the ZWave module
+      per default. Setting this attribute will allow to get decoded messages,
+      and to send commands to devices not included by this controller.
       </li>
     <li>verbose<br>
       If the verbose attribute of this device (not global!) is set to 5 or
       higher, then detailed logging of the RF message will be done.
-      </li>
-    <li><a name="#noDispatch">noDispatch</a><br>
-      prohibit dispatching messages or creating ZWave devices
       </li>
   </ul>
   <br>
