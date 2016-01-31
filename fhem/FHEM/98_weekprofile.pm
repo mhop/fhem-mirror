@@ -1118,146 +1118,6 @@ sub weekprofile_getEditLNK_MasterDev($$)
 =pod
 =item helper
 
-=begin html_de
-
-<a name="weekprofile"></a>
-<h3>weekprofile</h3>
-<ul>
-  Mit dem Modul 'weekprofile' können mehrere Wochenprofile verwaltet und an unterschiedliche Geräte 
-  übertragen werden. Aktuell wird folgende Hardware unterstützt:
-  <li>alle MAX Thermostate</li>
-  <li>andere weekprofile Module</li>
-  <li>Homatic (Kanal _Clima bzw. _Climate)</li>
-  
-  Im Standardfall wird das Modul mit einem Geräte = 'Master-Gerät' assoziiert,
-  um das Wochenprofil vom Gerät grafisch bearbeiten zu können und andere Profile auf das Gerät zu übertragen.
-  Wird kein 'Master-Gerät' angegeben, wird erstmalig ein Default-Profil angelegt.
-  <br>
-  Ein weiterer Anwendungsfall ist die Verwendung von Rubriken 'Topics'.
-  Hier sollte kein 'Master-Gerät' angegeben werden. Dieses Feature muss erst über das Attribut 'useTopics' aktiviert werden.
-  Topics sind z.B. Winter, Sommer, Urlaub, Party, etc.  
-  Innerhalb einer Topic kann es mehrere Wochenprofile geben. Sinnvollerweise sollten es soviele wie Thermostate sein.
-  Über ein Userattribut 'weekprofile' im Thermostat wird ein Wochenprofile ohne Topicname angegeben.
-  Mittels 'restore_topic' wird dann das angebene Wochenprofil der Topic an das Thermostat übertragen.
-  Somit kann man einfach zwischen den Topics wechseln und die Thermostate bekommen das passende Wochenprofil.
-  <br><br>
-  <b>Achtung:</b> Das Übertragen von Wochenprofilen erfordet eine Menge an Credits. 
-  Dies wird vom Modul nicht berücksichtigt. So kann es sein, dass nach dem 
-  Setzen\Aktualisieren eines Profils das Profil im Modul nicht mit dem Profil im Gerät 
-  übereinstimmt solange das komplette Profil übertragen wurde.
-  <br>
-  Beim Homatic HM-TC-IT-WM-W-EU wird nur das 1. Profil (R_P1_...) genommen!
-  <br>
-  <b>Für das Module wird libjson-perl benötigt</b>
-  <br><br>
-  <a name="weekprofiledefine"></a>
-  <b>Define</b>
-  <ul>
-    <code>define &lt;name&gt; weekprofile [master device]</code><br>
-    <br>
-    Aktiviert das Modul. Bei der Angabe eines 'Master-Gerätes' wird das Profil 'master'
-    entprechende dem Wochenrofil vom Gerät angelegt.
-    Sonderbehandlung des 'master' Profils:
-    <li>Kann nicht gelöscht werden</li>
-    <li>Bei Ändern\Setzen des Proils wird es automatisch an das 'Master-Geräte' gesendet</li>
-    <li>Es wird sind mit abgespeicht</li>
-    <br>
-    Wird kein 'Master-Geräte' angegeben, wird ein 'default' Profil angelegt.
-  </ul>
-  
-  <a name="weekprofileset"></a>
-  <b>Set</b>
-  <ul>
-    <li>profile_data<br>
-       <code>set &lt;name&gt; profile_data &lt;profilname&gt; &lt;json data&gt; </code><br>
-       Es wird das Profil 'profilname' geändert. Die Profildaten müssen im json-Format übergeben werden.
-    </li>
-    <li>send_to_device<br>
-      <code>set &lt;name&gt; send_to_device &lt;profilname&gt; [devices] </code><br>
-      Das Profil wird an ein oder mehrere Geräte übertragen. Wird kein Gerät angegeben, wird das 'Master-Gerät' verwendet.
-      'Devices' ist eine kommagetrennte Auflistung von Geräten
-    </li>
-    <li>copy_profile<br>
-      <code>set &lt;name&gt; copy_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
-      Kopiert das Profil 'quelle' auf 'ziel'. 'ziel' wird überschrieben oder neu angelegt.
-    </li>
-    <li>remove_profile<br>
-      <code>set &lt;name&gt; remove_profile &lt;profilname&gt; </code><br>
-      Das Profil 'profilname' wird gelöscht.
-    </li>
-    <li>reference_profile<br>
-      <code>set &lt;name&gt; reference_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
-      Referenziert das Profil 'ziel'auf 'quelle'. 'ziel' wird überschrieben oder neu angelegt.
-    </li>
-    <li>restore_topic<br>
-      <code>set &lt;name&gt; restore_topic &lt;topic&gt;</code><br>
-      Alle Wochenpläne in der Topic werden zu den entsprechenden Geräten übertragen.
-      Dazu muss im Gerät ein Userattribut 'weekprofile' mit dem Namen des Wochenplans <b>ohne</b> Topic gesetzt sein.
-    </li>
-  </ul>
-  
-  <a name="weekprofileget"></a>
-  <b>Get</b>
-  <ul>
-    <li>profile_data<br>
-       <code>get &lt;name&gt; profile_data &lt;profilname&gt; </code><br>
-       Liefert die Profildaten von 'profilname' im json-Format
-    </li>
-    <li>profile_names<br>
-      <code>set &lt;name&gt; profile_names</code><br>
-      Liefert alle Profilnamen getrennt durch ','
-    </li>
-    <li>profile_references<br>
-      Liefert eine Liste von Referenzen der Form <br>
-      <code>
-      ref_topic:ref_profile -> dest_topic:dest_profile
-      </code>
-    </li>
-  </ul>
-  
-  <a name="weekprofilereadings"></a>
-  <p><b>Readings</b></p>
-  <ul>
-    <li>active_topic<br>
-      Aktive Topic. 
-    </li>
-  </ul>
-  <ul>
-    <li>active_topic<br>
-      Aktive Topic. 
-    </li>
-    <li>profile_count<br>
-      Anzahl aller Profile mit Referenzen.
-    </li>
-  </ul>
-  
-  <a name="weekprofileattr"></a>
-  <b>Attribute</b>
-  <ul>
-    <li>widgetWeekdays<br>
-      Liste von Wochentagen getrennt durch ',' welche im Widget angzeigt werden. 
-      Beginnend bei Montag. z.B.
-      <code>attr name widgetWeekdays Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag</code>
-    </li>
-    <li>widgetEditOnNewPage<br>
-      Wenn gesetzt ('1'), dann wird die Bearbeitung auf einer separaten\neuen Webseite gestartet.
-    </li>
-     <li>configFile<br>
-      Pfad und Dateiname wo die Profile gespeichert werden sollen.
-      Default: ./log/weekprofile-<name>.cfg
-    </li>
-    <li>icon<br>
-      Änders des Icons zum Bearbeiten
-      Default: edit_settings
-    </li>
-    <li>useTopics<br>
-      Verwendung von Topic aktivieren.
-    </li>
-  </ul>
-  
-</ul>
-=end html_de
-
 =begin html
 
 <a name="weekprofile"></a>
@@ -1404,5 +1264,147 @@ sub weekprofile_getEditLNK_MasterDev($$)
   
 </ul>
 =end html
+
+=begin html_DE
+
+<a name="weekprofile"></a>
+<h3>weekprofile</h3>
+<ul>
+  Beschreibung im Wiki: http://www.fhemwiki.de/wiki/Weekprofile
+  
+  Mit dem Modul 'weekprofile' können mehrere Wochenprofile verwaltet und an unterschiedliche Geräte 
+  übertragen werden. Aktuell wird folgende Hardware unterstützt:
+  <li>alle MAX Thermostate</li>
+  <li>andere weekprofile Module</li>
+  <li>Homatic (Kanal _Clima bzw. _Climate)</li>
+  
+  Im Standardfall wird das Modul mit einem Geräte = 'Master-Gerät' assoziiert,
+  um das Wochenprofil vom Gerät grafisch bearbeiten zu können und andere Profile auf das Gerät zu übertragen.
+  Wird kein 'Master-Gerät' angegeben, wird erstmalig ein Default-Profil angelegt.
+  <br>
+  Ein weiterer Anwendungsfall ist die Verwendung von Rubriken 'Topics'.
+  Hier sollte kein 'Master-Gerät' angegeben werden. Dieses Feature muss erst über das Attribut 'useTopics' aktiviert werden.
+  Topics sind z.B. Winter, Sommer, Urlaub, Party, etc.  
+  Innerhalb einer Topic kann es mehrere Wochenprofile geben. Sinnvollerweise sollten es soviele wie Thermostate sein.
+  Über ein Userattribut 'weekprofile' im Thermostat wird ein Wochenprofile ohne Topicname angegeben.
+  Mittels 'restore_topic' wird dann das angebene Wochenprofil der Topic an das Thermostat übertragen.
+  Somit kann man einfach zwischen den Topics wechseln und die Thermostate bekommen das passende Wochenprofil.
+  <br><br>
+  <b>Achtung:</b> Das Übertragen von Wochenprofilen erfordet eine Menge an Credits. 
+  Dies wird vom Modul nicht berücksichtigt. So kann es sein, dass nach dem 
+  Setzen\Aktualisieren eines Profils das Profil im Modul nicht mit dem Profil im Gerät 
+  übereinstimmt solange das komplette Profil übertragen wurde.
+  <br>
+  Beim Homatic HM-TC-IT-WM-W-EU wird nur das 1. Profil (R_P1_...) genommen!
+  <br>
+  <b>Für das Module wird libjson-perl benötigt</b>
+  <br><br>
+  <a name="weekprofiledefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; weekprofile [master device]</code><br>
+    <br>
+    Aktiviert das Modul. Bei der Angabe eines 'Master-Gerätes' wird das Profil 'master'
+    entprechende dem Wochenrofil vom Gerät angelegt.
+    Sonderbehandlung des 'master' Profils:
+    <li>Kann nicht gelöscht werden</li>
+    <li>Bei Ändern\Setzen des Proils wird es automatisch an das 'Master-Geräte' gesendet</li>
+    <li>Es wird sind mit abgespeicht</li>
+    <br>
+    Wird kein 'Master-Geräte' angegeben, wird ein 'default' Profil angelegt.
+  </ul>
+  
+  <a name="weekprofileset"></a>
+  <b>Set</b>
+  <ul>
+    <li>profile_data<br>
+       <code>set &lt;name&gt; profile_data &lt;profilname&gt; &lt;json data&gt; </code><br>
+       Es wird das Profil 'profilname' geändert. Die Profildaten müssen im json-Format übergeben werden.
+    </li>
+    <li>send_to_device<br>
+      <code>set &lt;name&gt; send_to_device &lt;profilname&gt; [devices] </code><br>
+      Das Profil wird an ein oder mehrere Geräte übertragen. Wird kein Gerät angegeben, wird das 'Master-Gerät' verwendet.
+      'Devices' ist eine kommagetrennte Auflistung von Geräten
+    </li>
+    <li>copy_profile<br>
+      <code>set &lt;name&gt; copy_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
+      Kopiert das Profil 'quelle' auf 'ziel'. 'ziel' wird überschrieben oder neu angelegt.
+    </li>
+    <li>remove_profile<br>
+      <code>set &lt;name&gt; remove_profile &lt;profilname&gt; </code><br>
+      Das Profil 'profilname' wird gelöscht.
+    </li>
+    <li>reference_profile<br>
+      <code>set &lt;name&gt; reference_profile &lt;quelle&gt; &lt;ziel&gt; </code><br>
+      Referenziert das Profil 'ziel'auf 'quelle'. 'ziel' wird überschrieben oder neu angelegt.
+    </li>
+    <li>restore_topic<br>
+      <code>set &lt;name&gt; restore_topic &lt;topic&gt;</code><br>
+      Alle Wochenpläne in der Topic werden zu den entsprechenden Geräten übertragen.
+      Dazu muss im Gerät ein Userattribut 'weekprofile' mit dem Namen des Wochenplans <b>ohne</b> Topic gesetzt sein.
+    </li>
+  </ul>
+  
+  <a name="weekprofileget"></a>
+  <b>Get</b>
+  <ul>
+    <li>profile_data<br>
+       <code>get &lt;name&gt; profile_data &lt;profilname&gt; </code><br>
+       Liefert die Profildaten von 'profilname' im json-Format
+    </li>
+    <li>profile_names<br>
+      <code>set &lt;name&gt; profile_names</code><br>
+      Liefert alle Profilnamen getrennt durch ','
+    </li>
+    <li>profile_references<br>
+      Liefert eine Liste von Referenzen der Form <br>
+      <code>
+      ref_topic:ref_profile -> dest_topic:dest_profile
+      </code>
+    </li>
+  </ul>
+  
+  <a name="weekprofilereadings"></a>
+  <p><b>Readings</b></p>
+  <ul>
+    <li>active_topic<br>
+      Aktive Topic. 
+    </li>
+  </ul>
+  <ul>
+    <li>active_topic<br>
+      Aktive Topic. 
+    </li>
+    <li>profile_count<br>
+      Anzahl aller Profile mit Referenzen.
+    </li>
+  </ul>
+  
+  <a name="weekprofileattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li>widgetWeekdays<br>
+      Liste von Wochentagen getrennt durch ',' welche im Widget angzeigt werden. 
+      Beginnend bei Montag. z.B.
+      <code>attr name widgetWeekdays Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag</code>
+    </li>
+    <li>widgetEditOnNewPage<br>
+      Wenn gesetzt ('1'), dann wird die Bearbeitung auf einer separaten\neuen Webseite gestartet.
+    </li>
+     <li>configFile<br>
+      Pfad und Dateiname wo die Profile gespeichert werden sollen.
+      Default: ./log/weekprofile-<name>.cfg
+    </li>
+    <li>icon<br>
+      Änders des Icons zum Bearbeiten
+      Default: edit_settings
+    </li>
+    <li>useTopics<br>
+      Verwendung von Topic aktivieren.
+    </li>
+  </ul>
+  
+</ul>
+=end html_DE
 
 =cut
