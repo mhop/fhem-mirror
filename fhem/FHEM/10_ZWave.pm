@@ -249,12 +249,14 @@ my %zwave_class = (
                                 => 'ZWave_plusInfoParse($1,$2,$3,$4,$5)'} },
   ZIP_GATEWAY              => { id => '5f' },
   MULTI_CHANNEL            => { id => '60',  # Version 2, aka MULTI_INSTANCE
+    set   => { mcCreateAll => 'ZWave_mcCreateAll($hash,"")' },
     get   => { mcEndpoints => "07",
                mcCapability=> "09%02x"},
     parse => { "^046008(..)(..)" => '"mcEndpoints:total ".hex($2).'.
                                  '(hex($1)&0x80 ? ", dynamic":"").'.
                                  '(hex($1)&0x40 ? ", identical":", different")',
-               "^..600a(.*)"=> 'ZWave_mcCapability($hash, $1)' } },
+               "^..600a(.*)"=> 'ZWave_mcCapability($hash, $1)' },
+    init  => { ORDER=>49, CMD => '"set $NAME mcCreateAll"' } },
   ZIP_PORTAL               => { id => '61' },
   DOOR_LOCK                => { id => '62', # V2
     set   => { doorLockOperation   => 'ZWave_DoorLockOperationSet($hash, "%s")',
@@ -1602,6 +1604,22 @@ ZWave_mcCapability($$)
   }
 
   return "mcCapability_$chid:".join(" ", @classes);
+}
+
+sub
+ZWave_mcCreateAll($$)
+{
+  my ($hash, $data) = @_;
+  if(!$data) { # called by the user
+    $zwave_parseHook{"$hash->{nodeIdHex}:046008...."} = \&ZWave_mcCreateAll;
+    return("", "07");
+  }
+  $data =~ m/^046008(..)(..)/;
+  my $nGrp = hex($2);
+  for(my $c = 2; $c <= $nGrp; $c++) {
+    ZWave_Get($hash, $hash->{NAME}, "mcCapability", $c);
+  }
+  return undef;
 }
 
 sub
@@ -3708,6 +3726,12 @@ s2Hex($)
     value is supported by the device.<br>
     The command will reset ALL accumulated values, it is not possible to
     choose a single value.</li>
+
+  <br><br><b>Class MULTI_CHANNEL</b>
+  <li>mcCreateAll<br>
+    Create a FHEM device for all channels. This command is executed after
+    inclusion of a new device.
+    </li>
 
   <br><br><b>Class MULTI_CHANNEL_ASSOCIATION</b>
   <li>mcaAdd groupId node1 node2 ... 0 node1 endPoint1 node2 endPoint2 ...<br>
