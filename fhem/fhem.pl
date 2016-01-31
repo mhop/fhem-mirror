@@ -498,15 +498,15 @@ my $cfgErrMsg = "Messages collected while initializing FHEM:";
 my $cfgRet="";
 if(configDBUsed()) {
   my $ret = cfgDB_ReadAll(undef);
-  $cfgRet .= "configDB: $ret" if($ret);
+  $cfgRet .= "configDB: $ret\n" if($ret);
 
 } else {
   my $ret = CommandInclude(undef, $attr{global}{configfile});
-  $cfgRet .= "configfile: $ret" if($ret);
+  $cfgRet .= "configfile: $ret\n" if($ret);
 
   if($attr{global}{statefile} && -r $attr{global}{statefile}) {
     $ret = CommandInclude(undef, $attr{global}{statefile});
-    $cfgRet .= "statefile: $ret" if($ret);
+    $cfgRet .= "statefile: $ret\n" if($ret);
   }
 }
 
