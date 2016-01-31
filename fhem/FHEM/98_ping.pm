@@ -41,7 +41,7 @@ sub ping_Initialize($)
   $hash->{DefFn}    = "ping_Define";
   $hash->{UndefFn}  = "ping_Undefine";
   $hash->{AttrFn}   = "ping_Attr";
-  $hash->{AttrList} = "disable:0,1 checkInterval ".$readingFnAttributes;
+  $hash->{AttrList} = "disable:1 checkInterval minFailCount ".$readingFnAttributes;
 
   return undef;
 }
@@ -61,11 +61,14 @@ sub ping_Define($$)
   $hash->{HOST} = $host;
   $hash->{MODE} = lc($mode);
   $hash->{TIMEOUT} = $timeout;
+  $hash->{FAILCOUNT} = 0;
+  readingsSingleUpdate($hash, "state", "Initialized", 1);
   
   return "ERROR: mode must be one of tcp,udp,icmp" if ($hash->{MODE} !~ "tcp|udp|icmp");
   return "ERROR: timeout must be 0 or higher." if (($hash->{TIMEOUT} !~ /^\d*$/) || ($hash->{TIMEOUT} < 0));
   
   $attr{$name}{"checkInterval"} = 10 if (!defined($attr{$name}{"checkInterval"}));
+  $attr{$name}{"event-on-change-reading"} = "state" if (!defined($attr{$name}{"event-on-change-reading"}));
   
   ping_State($hash);
 
@@ -90,25 +93,28 @@ sub ping_Attr($$$$) {
   
   Log3 ($hash, 5, "$hash->{NAME}_Attr: Attr $attribute; Value $value");
 
-  if ($attribute eq "checkInterval")
-  {
-    if (($value !~ /^\d*$/) || ($value < 5))
+  if ($command eq "set") {
+
+    if ($attribute eq "checkInterval")
     {
-      $attr{$name}{"checkInterval"} = 10;
-      return "checkInterval is required in s (default: 10, min: 5)";
+      if (($value !~ /^\d*$/) || ($value < 5))
+      {
+        $attr{$name}{"checkInterval"} = 10;
+        return "checkInterval is required in s (default: 10, min: 5)";
+      }
     }
-  }
-  # Handle "disable" attribute by opening/closing connection to device
-  elsif ($attribute eq "disable")
-  {
-    # Disable on 1, enable on anything else.
-    if ($value eq "1")
+    # Handle "disable" attribute by opening/closing connection to device
+    elsif ($attribute eq "disable")
     {
-      readingsSingleUpdate($hash, "state", "disabled", 1);
-    }
-    else
-    {
-      readingsSingleUpdate($hash, "state", "Initialized", 1);
+      # Disable on 1, enable on anything else.
+      if ($value eq "1")
+      {
+        readingsSingleUpdate($hash, "state", "disabled", 1);
+      }
+      else
+      {
+        readingsSingleUpdate($hash, "state", "Initialized", 1);
+      }
     }
   }
 
@@ -121,24 +127,32 @@ sub ping_State(@)
 {
   # Update Bridge state
   my ($hash) = @_;
-  
+
   return undef if (IsDisabled($hash->{NAME}));
   
   Log3 ( $hash, 5, "$hash->{NAME}_State: Executing ping");
   
   # check via ping
-  my $pingstatus = "unreachable";
   my $p;
   $p = Net::Ping->new($hash->{MODE});
 
   my $alive = $p->ping($hash->{HOST}, $hash->{TIMEOUT});
   $p->close();
-  $pingstatus = "ok" if $alive;
 
-  # And update state
-  readingsSingleUpdate($hash, "state", $pingstatus, 1);
+  if ($alive) {
+    # State is ok
+    $hash->{FAILCOUNT} = 0;
+    readingsSingleUpdate($hash, "state", "ok", 1);
+  } else {
+    # Increment failcount and report unreachable if over limit
+    $hash->{FAILCOUNT} += 1;
+    if ($hash->{FAILCOUNT} >= AttrVal($hash->{NAME}, "minFailCount", 1)) {
+      readingsSingleUpdate($hash, "state", "unreachable", 1);
+    }
+  }
   
   # Check state every X seconds  
+  RemoveInternalTimer($hash);
   InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, "checkInterval", "10"), "ping_State", $hash, 0);
   
   return undef;
@@ -180,6 +194,10 @@ sub ping_State(@)
     <li>
       <b>checkInterval</b><br/>
          Default: 10s. Time after the bridge connection is re-checked.
+    </li>
+    <li>
+      <b>minFailCount</b><br/>
+         Default: 1. Number of failures before reporting "unreachable".
     </li>
   </ul>
 </ul>
