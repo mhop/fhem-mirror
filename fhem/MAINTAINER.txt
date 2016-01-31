@@ -208,6 +208,7 @@ FHEM/59_Twilight.pm          dietmar63            http://forum.fhem.de Unterstue
 FHEM/59_PROPLANTA.pm         tupol                http://forum.fhem.de Unterstuetzende Dienste (Link als PM an tupol)
 FHEM/59_WWO.pm               baumrasen            http://forum.fhem.de Sonstiges
 FHEM/59_Weather.pm           borisneubert         http://forum.fhem.de Unterstuetzende Dienste
+FHEM/60_allergy.pm           markus-m             http://forum.fhem.de Unterstuetzende Dienste
 FHEM/60_EM.pm                rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/61_EMWZ.pm              rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/62_EMEM.pm              rudolfkoenig         http://forum.fhem.de SlowRF
