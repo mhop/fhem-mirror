@@ -1366,8 +1366,9 @@ sub FRITZBOX_Readout_Run_Web($)
    }
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->radioCount", $runNo;
 
-# LanDevice-Liste erzeugen
+# Create LanDevice list
    %landevice = ();
+   my $wlanCount = 0;
    foreach ( @{ $result->{lanDevice} } ) {
       my $dIp = $_->{ip};
       my $dName = $_->{name};
@@ -1376,11 +1377,12 @@ sub FRITZBOX_Readout_Run_Web($)
       $landevice{$dIp}=$dName;
       my $rName = "mac_".$_->{mac};
       $rName =~ s/:/_/g;
-# Create a reading if a landevice is connected
+   # Create a reading if a landevice is connected
       if ($_->{active} == 1) {
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
+         $wlanCount++   if $_->{wlan} == 1;
       }
-   # if the device is not online anymore, set the mac readings to 'inactive' and delete at next readout
+   # else if the device is not online anymore, set the mac readings to 'inactive' and delete at next readout
       elsif (exists $hash->{READINGS}{$rName}) {
          if ($hash->{READINGS}{$rName}{VAL} ne "inactive") {
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "inactive";
@@ -1390,6 +1392,7 @@ sub FRITZBOX_Readout_Run_Web($)
          }
       }
    }
+   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_wlanCount", $wlanCount);
 
 # Remove Guest WLAN devices that are not online anymore
    foreach ( @{ $result->{wlanList} } ) {
@@ -1581,22 +1584,23 @@ sub FRITZBOX_Readout_Process($$)
             $valueLow = $values{".box_TodayBytesReceivedLow"};
             $valueHigh = $values{".box_TodayBytesReceivedHigh"};
          }
-         # FRITZBOX_Log $hash, 5, "valueHigh $valueHigh";
          $valueHigh *= 2**22;
-         # FRITZBOX_Log $hash, 5, "valueHigh $valueHigh";
-         # FRITZBOX_Log $hash, 5, "valueLow $valueLow";
          $valueLow /= 2**10;
-         # FRITZBOX_Log $hash, 5, "valueLow $valueLow";
-         # FRITZBOX_Log $hash, 5, "valueHigh+valueLow: ". ($valueHigh+$valueLow);
          my $time = time()-time_str2num($hash->{READINGS}{".box_TodayBytesReceivedLow"}{TIME});
-         # FRITZBOX_Log $hash, 5, "time: $time";
          $values{ "box_rateDown" } = sprintf ("%.3f", ($valueHigh+$valueLow) / $time ); 
       }
-      if ( defined $values{".box_TodayBytesSentLow"} && defined $hash->{READINGS}{".box_TodayBytesSentLow"}) {
+      if ( defined $values{".box_TodayBytesSentLow"} && defined $hash->{READINGS}{".box_TodayBytesSentLow"} ) {
          my $valueHigh = $values{".box_TodayBytesSentHigh"} - $hash->{READINGS}{".box_TodayBytesSentHigh"}{VAL};
+         my $valueLow = $values{".box_TodayBytesSentLow"} - $hash->{READINGS}{".box_TodayBytesSentLow"}{VAL};
+      # Consider reset of day counter
+         if ($valueHigh < 0 || $valueHigh == 0 && $valueLow < 0) {
+            $valueLow = $values{".box_TodayBytesSentLow"};
+            $valueHigh = $values{".box_TodayBytesSentHigh"};
+         }
+         $valueHigh *= 2**22;
+         $valueLow /= 2**10;
          my $time = time()-time_str2num($hash->{READINGS}{".box_TodayBytesSentLow"}{TIME});
-         my $valueLow = $values{".box_TodayBytesSentLow"} - $hash->{READINGS}{".box_TodayBytesSentLow"}{VAL};;
-         $values{ "box_rateUp" } = sprintf ("%.3f", ( $valueHigh * 2**22 + $valueLow / 2**10 ) / $time ); 
+         $values{ "box_rateUp" } = sprintf ("%.3f", ($valueHigh+$valueLow) / $time ); 
       }
 
    # Fill all handed over readings
@@ -4892,6 +4896,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_stdDialPort</b> - standard caller port when using the dial function of the box</li>
       <li><b>box_tr064</b> - application interface TR-064 (needed by this modul)</li>
       <li><b>box_tr069</b> - provider remote access TR-069 (safety issue!)</li>
+      <li><b>box_wlanCount</b> - Number of devices connected via WLAN</li>
       <li><b>box_wlan_2.4GHz</b> - Current state of the 2.4 GHz WLAN</li>
       <li><b>box_wlan_5GHz</b> - Current state of the 5 GHz WLAN</li>
       <br>
@@ -5236,8 +5241,10 @@ sub FRITZBOX_fritztris($)
       <li><b>box_stdDialPort</b> - Anschluss der ger&auml;teseitig von der W&auml;hlhilfe genutzt wird</li>
       <li><b>box_tr064</b> - Anwendungsschnittstelle TR-064 (wird auch von diesem Modul ben&ouml;tigt)</li>
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
+      <li><b>box_wlanCount</b> - Anzahl der Ger&auml;te die &uuml;ber WLAN verbunden sind</li>
       <li><b>box_wlan_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN</li>
       <li><b>box_wlan_5GHz</b> - Aktueller Status des 5-GHz-WLAN</li>
+      
       <br>
       <li><b>dect</b><i>1</i> - Name des DECT Telefons <i>1</i></li>
       <li><b>dect</b><i>1</i><b>_alarmRingTone</b> - Klingelton beim Wecken &uuml;ber das DECT Telefon <i>1</i></li>
