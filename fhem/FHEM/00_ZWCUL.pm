@@ -3,7 +3,6 @@
 package main;
 
 # TODO
-#   resend in firmware
 #   static routing: to and from the device
 #   automatic routing via neighborUpdate
 #   explorer frames
@@ -396,6 +395,12 @@ ZWCUL_Parse($$$$$)
     Log3 $hash, 5, "$me sent ACK to $1";
     return;
   }
+
+  if($rmsg =~ m/^zr(..)$/) {
+    Log3 $hash, 5, "$me fw-resend nr ".hex($1);
+    return;
+  }
+
 
   my ($H, $S, $F, $f, $sn, $L, $T, $P, $C);
   if($s100 && $rmsg =~ '^z(........)(..)(..)(.)(.)(..)(..)(.*)(....)$') {
