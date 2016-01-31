@@ -1681,7 +1681,7 @@ sub MilightDevice_HSV_Transition(@)
     $hueFrom = ReadingsVal($hash->{NAME}, "hue", 0);
     $satFrom = ReadingsVal($hash->{NAME}, "saturation", 0);
     $valFrom = ReadingsVal($hash->{NAME}, "brightness", 0);
-    $timeFrom = int(gettimeofday());
+    $timeFrom = gettimeofday();
     Log3 ($hash, 5, "$hash->{NAME}_HSV_Transition: Prepare Start (actual): $hueFrom,$satFrom,$valFrom@".$timeFrom);
 
 
@@ -1757,15 +1757,19 @@ sub MilightDevice_HSV_Transition(@)
     $maxSteps = MilightDevice_DimSteps($hash);
   }
   
+  # Calculate number of steps, limit to max number (no point running more if they are the same)
+  $steps = int($ramp * 1000 / $stepWidth);
+  if ($steps > $maxSteps)
+  {
+    $stepWidth *= ($steps/$maxSteps);
+    $steps = $maxSteps;
+  }
+
   # Calculate minimum stepWidth
   # Min bridge delay as specified by Bridge * 3 (eg. 100*3=300ms).
   # On average min 3 commands need to be sent per step (eg. Group On; Mode; Brightness;) so this gets it approximately right
   my $minStepWidth = $hash->{IODev}->{INTERVAL} * 3;
   $stepWidth = $minStepWidth if ($stepWidth < $minStepWidth); # Make sure we have min stepWidth
-  
-  # Calculate number of steps, limit to max number (no point running more if they are the same)
-  $steps = int($ramp * 1000 / $stepWidth);
-  $steps = $maxSteps if ($steps > $maxSteps);
   
   Log3 ($hash, 4, "$hash->{NAME}_HSV_Transition: Steps: $steps; Step Interval(ms): $stepWidth");  
   
@@ -1793,7 +1797,7 @@ sub MilightDevice_HSV_Transition(@)
   }
   # Set target time for completion of sequence. 
   # This may be slightly higher than what was requested since $stepWidth > minDelay (($steps * $stepWidth) > $ramp)
-  $hash->{helper}->{targetTime} = int($timeFrom + ($steps * $stepWidth / 1000));
+  $hash->{helper}->{targetTime} = $timeFrom + ($steps * $stepWidth / 1000);
   Log3 ($hash, 5, "$hash->{NAME}_HSV_Transition: TargetTime: $hash->{helper}->{targetTime}");
   return undef;
 }
@@ -2066,7 +2070,7 @@ sub MilightDevice_CmdQueue_Exec(@)
     MilightDevice_SetHSV($hash, $actualCmd->{hue}, $actualCmd->{sat}, $actualCmd->{val}, $repeat);
   }
   $actualCmd->{inProgess} = 1;
-  my $next = defined($nextCmd->{targetTime})?$nextCmd->{targetTime}:int(gettimeofday() + ($actualCmd->{delay} / 1000));
+  my $next = defined($nextCmd->{targetTime})?$nextCmd->{targetTime}:gettimeofday() + ($actualCmd->{delay} / 1000);
   
   Log3 ($hash, 5, "$hash->{NAME}_CmdQueue_Exec: Next Exec: $next");
   InternalTimer($next, "MilightDevice_CmdQueue_Exec", $hash, 0);
