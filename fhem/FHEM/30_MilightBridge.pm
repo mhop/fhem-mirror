@@ -125,6 +125,7 @@ sub MilightBridge_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
   my $hash = $defs{$name};
   
+  $value = "" if(!defined($value));
   Log3 ($hash, 5, "$hash->{NAME}_Attr: Attr $attribute; Value $value");
   
   # Handle "sendInterval" attribute which defaults to 100(ms)

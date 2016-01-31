@@ -190,6 +190,7 @@ sub MilightDevice_Define($$)
   }
 
   $hash->{helper}->{GAMMAMAP} = MilightDevice_CreateGammaMapping($hash, 1.0);
+  $hash->{helper}->{COLORMAP} = MilightDevice_ColorConverter($hash, split(',', "0,0,0,0,0,0"));
 
     
   # Define devStateIcon
@@ -237,7 +238,7 @@ sub MilightDevice_Init($)
   if (($hash->{LEDTYPE} eq 'RGBW') || ($hash->{LEDTYPE} eq 'RGB'))
   {
     my @a = split(',', "0,0,0,0,0,0");
-    if ( defined($hash->{".colorCast"} ) )
+    if ( defined( $attr{$name}{colorCast} ) )
     {
       @a = split(',', AttrVal($hash->{NAME}, "colorCast", "0,0,0,0,0,0"));
       @a = split(',', "0,0,0,0,0,0") unless (@a == 6);  
@@ -281,6 +282,7 @@ sub MilightDevice_Set(@)
   if ($hash->{IODev}->{STATE} ne "ok" && $hash->{IODev}->{STATE} ne "Initialized") {
     readingsSingleUpdate($hash, "state", "error", 1);
     $flags = "q";
+    $args[2] = "" if(!defined($args[2]));
     $args[2] .= "q" if ($args[2] !~ m/.*[qQ].*/);
     # return SetExtensions($hash, $hash->{helper}->{COMMANDSET}, $name, $cmd, @args);
     # IO error, we need to keep our current state settings!
@@ -1071,9 +1073,11 @@ sub MilightDevice_RGBW_SetHSV(@)
   
   $repeat = 1 if (!defined($repeat));
 
-  my $cv = 0;
-  $cv = $hash->{helper}->{COLORMAP}[$hue % 360];
-  $cv = 0 if(!defined($cv));
+  my $cv = $hash->{helper}->{COLORMAP}[$hue % 360];
+
+  #check dim levels to decide wether to change color or brightness first
+  my $dimup = 0;
+  $dimup = 1 if($val > ReadingsVal($hash->{NAME}, "brightness", 100));
 
   # apply gamma correction
   my $gammaVal = $hash->{helper}->{GAMMAMAP}[$val];
@@ -1094,7 +1098,7 @@ sub MilightDevice_RGBW_SetHSV(@)
     $sat = 100;
   }
   
-  Log3 ($hash, 5, "MilightDevice_RGBW_SetHSV: wl: $wl; cl: $cl; cv: $cv");
+  Log3 ($hash, 5, "MilightDevice_RGBW_SetHSV:  h:$hue s:$sat v:$val / cv:$cv wl:$wl cl:$cl ");
   # Set readings in FHEM
   MilightDevice_SetHSV_Readings($hash, $hue, $sat, $val);
 
@@ -1124,12 +1128,24 @@ sub MilightDevice_RGBW_SetHSV(@)
     elsif ($cl > 0) # color
     {
       IOWrite($hash, @RGBWCmdsOn[$hash->{SLOTID} -5]."\x00".$RGBWCmdEnd) if (($wl > 0) || ($cl > 0)); # group on
+      if($dimup)
+      {
       IOWrite($hash, $RGBWCmdCol.chr($cv).$RGBWCmdEnd); # color
       IOWrite($hash, $RGBWCmdBri.chr($cl).$RGBWCmdEnd); # brightness
+      } else {
+        IOWrite($hash, $RGBWCmdBri.chr($cl).$RGBWCmdEnd); # brightness
+        IOWrite($hash, $RGBWCmdCol.chr($cv).$RGBWCmdEnd); # color
+      }
       if ($repeat eq 1) {
         IOWrite($hash, @RGBWCmdsOn[$hash->{SLOTID} -5]."\x00".$RGBWCmdEnd) if (($wl > 0) || ($cl > 0)); # group on
+        if($dimup)
+        {
         IOWrite($hash, $RGBWCmdCol.chr($cv).$RGBWCmdEnd); # color
         IOWrite($hash, $RGBWCmdBri.chr($cl).$RGBWCmdEnd); # brightness
+        } else {
+          IOWrite($hash, $RGBWCmdBri.chr($cl).$RGBWCmdEnd); # brightness
+          IOWrite($hash, $RGBWCmdCol.chr($cv).$RGBWCmdEnd); # color
+        }
       }
     }
 
@@ -1665,7 +1681,7 @@ sub MilightDevice_HSV_Transition(@)
     $hueFrom = ReadingsVal($hash->{NAME}, "hue", 0);
     $satFrom = ReadingsVal($hash->{NAME}, "saturation", 0);
     $valFrom = ReadingsVal($hash->{NAME}, "brightness", 0);
-    $timeFrom = gettimeofday();
+    $timeFrom = int(gettimeofday());
     Log3 ($hash, 5, "$hash->{NAME}_HSV_Transition: Prepare Start (actual): $hueFrom,$satFrom,$valFrom@".$timeFrom);
 
 
@@ -1777,7 +1793,7 @@ sub MilightDevice_HSV_Transition(@)
   }
   # Set target time for completion of sequence. 
   # This may be slightly higher than what was requested since $stepWidth > minDelay (($steps * $stepWidth) > $ramp)
-  $hash->{helper}->{targetTime} = $timeFrom + ($steps * $stepWidth / 1000);
+  $hash->{helper}->{targetTime} = int($timeFrom + ($steps * $stepWidth / 1000));
   Log3 ($hash, 5, "$hash->{NAME}_HSV_Transition: TargetTime: $hash->{helper}->{targetTime}");
   return undef;
 }
@@ -2050,7 +2066,7 @@ sub MilightDevice_CmdQueue_Exec(@)
     MilightDevice_SetHSV($hash, $actualCmd->{hue}, $actualCmd->{sat}, $actualCmd->{val}, $repeat);
   }
   $actualCmd->{inProgess} = 1;
-  my $next = defined($nextCmd->{targetTime})?$nextCmd->{targetTime}:gettimeofday() + ($actualCmd->{delay} / 1000);
+  my $next = defined($nextCmd->{targetTime})?$nextCmd->{targetTime}:int(gettimeofday() + ($actualCmd->{delay} / 1000));
   
   Log3 ($hash, 5, "$hash->{NAME}_CmdQueue_Exec: Next Exec: $next");
   InternalTimer($next, "MilightDevice_CmdQueue_Exec", $hash, 0);
