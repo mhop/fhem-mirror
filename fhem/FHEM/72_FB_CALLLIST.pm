@@ -31,6 +31,7 @@ use warnings;
 
 use MIME::Base64;
 use Data::Dumper;
+use HttpUtils;
 
 sub 
 FB_CALLLIST_Initialize($)
@@ -57,6 +58,7 @@ FB_CALLLIST_Initialize($)
                           "answMachine-is-missed-call:0,1 ".                          
                           "language:de,en ".
                           "disable:0,1 ".
+                          "number-cmd ".
                           "disabledForIntervals ".
                           "do_not_notify:0,1 ".
                           "no-heading:0,1 ".
@@ -656,6 +658,16 @@ sub FB_CALLLIST_list2html($;$)
         {
             my $data = \%{$hash->{helper}{DATA}{$index}};
             
+            my $number = $data->{external_number};
+            
+            if(defined(my $cmd = AttrVal($name, "number-cmd", undef)))
+            {
+                $cmd =~ s/\$NUMBER/$number/g;
+                 
+                $number = '<a href=\'#\' onclick="FW_cmd(FW_root+\'?XHR=1&cmd='.urlEncode($cmd).'\');return false;">'.$number."</a>";
+            }
+            
+            
             $line = { 
                         index => $index,
                         line => $count,
@@ -663,7 +675,7 @@ sub FB_CALLLIST_list2html($;$)
                         state =>  FB_CALLLIST_returnCallState($hash, $index),
                         timestamp => strftime(AttrVal($name, "time-format-string", "%a, %d %b %Y %H:%M:%S"), localtime($index)),
                         name => ($data->{external_name} eq "unknown" ? "-" : $data->{external_name}),
-                        number => $data->{external_number},
+                        number => $number,
                         external => ($data->{external_connection} ? ((exists($hash->{helper}{EXTERNAL_MAP}) and exists($hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}})) ? $hash->{helper}{EXTERNAL_MAP}{$data->{external_connection}} : $data->{external_connection} ) : "-"),
                         internal => ((exists($hash->{helper}{INTERNAL_FILTER}) and exists($hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}})) ? $hash->{helper}{INTERNAL_FILTER}{$data->{internal_number}} : $data->{internal_number} ),
                         connection => ($data->{internal_connection} ? ((exists($hash->{helper}{CONNECTION_MAP}) and exists($hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}})) ? $hash->{helper}{CONNECTION_MAP}{$data->{internal_connection}} : $data->{internal_connection} ) : "-"),
@@ -1194,6 +1206,18 @@ sub FB_CALLLIST_returnTableHeader($)
     Defines the language of the table header, some keywords and the timestamp format. You need to have the selected locale installed and available in your operating system.<br><br>
     Possible values: en => English , de => German<br>
     Default Value is en (English)<br><br>
+    <li><a name="FB_CALLLIST_number-cmd">number-cmd</a> &lt;command&gt;</li>
+    Can be set, to execute a specific FHEM command, when clicking on a number in the list. The value can be any valid FHEM command or Perl code (in curly brackets: { ... } ).
+    The placeholder <code>$NUMBER</code> will be replaced with the current external number of each row.
+    <br><br>
+    This can be used for example to initiate a call to this number.
+    e.g.:<br><br>
+    <ul>
+    <li><code>set FRITZBOX call $NUMBER</code></li>
+    <li><code>{dialNumber("$NUMBER")}</code></li>
+    </ul>
+    <br>
+    If not set, no link will be shown in the list.<br><br>
     <li><a name="FB_CALLLIST_show-icons">show-icons</a> 0,1</li>
     Normally the call state is shown with icons (used from the openautomation icon set).
     You need to have openautomation in your iconpath attribute of your appropriate FHEMWEB definition to use this icons.
@@ -1407,6 +1431,18 @@ sub FB_CALLLIST_returnTableHeader($)
     Definiert die Sprache in der die Anrufliste angezeigt werden soll (Tabellenkopf, Datum). Die entsprechende Sprache muss auch im Betriebssystem installiert und unterst&uuml;tzt werden.<br><br>
     M&ouml;gliche Werte: en => Englisch , de => Deutsch<br>
     Standardwert ist en (Englisch)<br><br>
+    <li><a name="FB_CALLLIST_number-cmd">number-cmd</a> &lt;Befehl&gt;</li>
+    Kann gesetzt werden, um ein FHEM-Befehl oder Perl-Code (in geschweiften Klammern: { ... } ) auszuf&uuml;hren, wenn man auf eine Rufnummer in der Anrufliste klickt.
+    Der Platzhalter <code>$NUMBER</code> wird dabei mit der entsprechenden Rufnummer der jeweiligen Zeile ersetzt.
+    <br><br>
+    Damit kann man beispielsweise einen Rückruf starten.
+    e.g.:<br><br>
+    <ul>
+    <li><code>set FRITZBOX call $NUMBER</code></li>
+    <li><code>{dialNumber("$NUMBER")}</code></li>
+    </ul>
+    <br>
+    Sofern nicht gesetzt, wird kein Link angezeigt.<br><br>
     <li><a name="FB_CALLLIST_show-icons">show-icons</a> 0,1</li>
     Im Normalfall wird der Status eines jeden Anrufs mit einem Icon angezeigt. Dazu muss das openautomation Icon-Set im iconpath-Attribut der entsprechenden FHEMWEB Instanz konfiguriert sein. Sollte man keine Icons w&uuml;nschen, so kann man diese hiermit abschalten. Der Status wird dann mittels Textzeichen dargestellt.<br><br>
     M&ouml;gliche Werte: 0 => keine Icons , 1 => benutze Icons<br>
