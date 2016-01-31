@@ -270,7 +270,9 @@ sub _createDevice {
 	# We've found examples of where devices claim to do transfer
 	# encoding, but wind up sending chunks without chunk size headers.
 	# This code temporarily disables the TE header in the request.
-	push(@LWP::Protocol::http::EXTRA_SOCK_OPTS, SendTE => 0);
+	#push(@LWP::Protocol::http::EXTRA_SOCK_OPTS, SendTE => 0);
+	my @SOCK_OPTS_Backup = @LWP::Protocol::http::EXTRA_SOCK_OPTS;
+	_addSendTE();
 	my $ua = LWP::UserAgent->new(timeout => 20);
 	my $response = $ua->get($location);
 
@@ -280,9 +282,11 @@ sub _createDevice {
 													  {Location => $location},
 													  {ControlPoint => $self});
 	} else {
+		carp('400-URL-Absolute-Error! Location: "'.$location.'", Content: "'.$response->content.'"') if ($response->code == 400);
 		carp("Loading device description failed with error: " . $response->code . " " . $response->message) if ($response->code != 200);
 	}
-	pop(@LWP::Protocol::http::EXTRA_SOCK_OPTS);
+	#pop(@LWP::Protocol::http::EXTRA_SOCK_OPTS);
+	@LWP::Protocol::http::EXTRA_SOCK_OPTS = @SOCK_OPTS_Backup;
 
 	if ($device) {
 		$device->base($base ? $base : $location);
@@ -292,6 +296,12 @@ sub _createDevice {
 	}
 
 	return $device;
+}
+
+sub _addSendTE {
+	my %arg = @LWP::Protocol::http::EXTRA_SOCK_OPTS;
+	$arg{SendTE} = 0;
+	@LWP::Protocol::http::EXTRA_SOCK_OPTS = %arg;
 }
 
 sub _getDeviceFromHeaders {
@@ -740,7 +750,10 @@ sub _loadDescription {
 	}
 	my $parser = $cp->parser;
 
-	push(@LWP::Protocol::http::EXTRA_SOCK_OPTS, SendTE => 0);
+	#push(@LWP::Protocol::http::EXTRA_SOCK_OPTS, SendTE => 0);
+	my @SOCK_OPTS_Backup = @LWP::Protocol::http::EXTRA_SOCK_OPTS;
+	_addSendTE();
+	
 	my $ua = LWP::UserAgent->new(timeout => 20);
 	my $response = $ua->get($location);
 	
@@ -751,9 +764,16 @@ sub _loadDescription {
 		carp("Error loading SCPD document: $!");
 	}
 
-	pop(@LWP::Protocol::http::EXTRA_SOCK_OPTS);
+	#pop(@LWP::Protocol::http::EXTRA_SOCK_OPTS);
+	@LWP::Protocol::http::EXTRA_SOCK_OPTS = @SOCK_OPTS_Backup;
 
 	$self->{_loadedDescription} = 1;
+}
+
+sub _addSendTE {
+	my %arg = @LWP::Protocol::http::EXTRA_SOCK_OPTS;
+	$arg{SendTE} = 0;
+	@LWP::Protocol::http::EXTRA_SOCK_OPTS = %arg;
 }
 
 # ----------------------------------------------------------------------

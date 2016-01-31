@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, December 2015 
+# SONOSPLAYER.pm (c) by Reiner Leins, January 2016
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -996,7 +996,7 @@ sub SONOSPLAYER_GetSlavePlayerNames($) {
 	my ($name) = @_;
 	
 	my $hash = SONOS_getDeviceDefHash($name);
-	my $sonosHash = SONOS_getDeviceDefHash(undef);	
+	my $sonosHash = SONOS_getDeviceDefHash(undef);
 	
 	my @groups = SONOS_ConvertZoneGroupState(ReadingsVal($sonosHash->{NAME}, 'ZoneGroupState', ''));
 	
