@@ -667,3 +667,5 @@
 - Wed Dec 23 2015 (risiko)
   - added new module 98_weekprofile to manage week profiles
   
+- Sun Jan 31 2016 (markus-m)
+  - added new module 60_allergy to provide allergy forecast data for Germany
