@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  PRESENCE: fix log warning "use of uninitialized value ..." when 
+             using power set command without any argument.
   - added:   60_allergy: Allergy forecast data for Germany
   - feature: FB_CALLLIST: new attribute number-cmd to execute a FHEM command
              when clicking on a external number within the calllist. Can be any

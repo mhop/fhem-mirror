@@ -285,7 +285,7 @@ PRESENCE_Set($@)
         my %specials= (
         "%NAME" => $name,
         "%ADDRESS" => $hash->{ADDRESS},
-        "%ARGUMENT" => $a[2]
+        "%ARGUMENT" => (defined($a[2]) ? $a[2] : "")
         );
         
         $powerCmd= EvalSpecials($powerCmd, %specials);
