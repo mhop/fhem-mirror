@@ -1189,7 +1189,6 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>reference_profile<br>
       <code>set &lt;name&gt; reference_profile &lt;source&gt; &lt;destination&gt; </code><br>
       Create a reference from destination to source. The destination will be overwritten if it exits.
-      <b>Still under development!!!</b>
     </li>
     <li>restore_topic<br>
       <code>set &lt;name&gt; restore_topic &lt;topic&gt;</code><br>
@@ -1203,7 +1202,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <ul>
     <li>profile_data<br>
        <code>get &lt;name&gt; profile_data &lt;profilename&gt; </code><br>
-       Get the profile date from 'profilename' in json-Format
+       Get the profile data from 'profilename' in json-Format
     </li>
     <li>profile_names<br>
       <code>set &lt;name&gt; profile_names [topicname]</code><br>
@@ -1218,7 +1217,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
       If name is 'topicname:profilename', '0' or the reference name is returned.
     </li>
     <li>topic_names<br>
-     Return a list of topic names.
+     Return a comma seperated list of topic names.
     </li>
   </ul>
   
@@ -1226,12 +1225,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <p><b>Readings</b></p>
   <ul>
     <li>active_topic<br>
-      Active topic. 
-    </li>
-  </ul>
-  <ul>
-    <li>active_topic<br>
-      Active\restored topic name
+      Active\last restored topic name 
     </li>
     <li>profile_count<br>
       Count of all profiles including references.
@@ -1242,7 +1236,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <b>Attributes</b>
   <ul>
     <li>widgetWeekdays<br>
-      Comma seperated list od week days starting at Monday
+      Comma seperated list of week days starting at Monday
       <code>attr name widgetWeekdays Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday</code>
     </li>
     <li>widgetEditOnNewPage<br>
@@ -1282,7 +1276,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   um das Wochenprofil vom Gerät grafisch bearbeiten zu können und andere Profile auf das Gerät zu übertragen.
   Wird kein 'Master-Gerät' angegeben, wird erstmalig ein Default-Profil angelegt.
   <br>
-  Ein weiterer Anwendungsfall ist die Verwendung von Rubriken 'Topics'.
+  Ein weiterer Anwendungsfall ist die Verwendung von Rubriken\Kategorien 'Topics'.
   Hier sollte kein 'Master-Gerät' angegeben werden. Dieses Feature muss erst über das Attribut 'useTopics' aktiviert werden.
   Topics sind z.B. Winter, Sommer, Urlaub, Party, etc.  
   Innerhalb einer Topic kann es mehrere Wochenprofile geben. Sinnvollerweise sollten es soviele wie Thermostate sein.
@@ -1353,14 +1347,16 @@ sub weekprofile_getEditLNK_MasterDev($$)
        Liefert die Profildaten von 'profilname' im json-Format
     </li>
     <li>profile_names<br>
-      <code>set &lt;name&gt; profile_names</code><br>
-      Liefert alle Profilnamen getrennt durch ','
+      <code>set &lt;name&gt; profile_names [topic_name]</code><br>
+      Liefert alle Profilnamen getrennt durch ',' einer Topic 'topic_name'
+      Ist 'topic_name' gleich '*' werden alle Profilnamen zurück gegeben.
     </li>
-    <li>profile_references<br>
+    <li>profile_references [name]<br>
       Liefert eine Liste von Referenzen der Form <br>
       <code>
-      ref_topic:ref_profile -> dest_topic:dest_profile
+      ref_topic:ref_profile>dest_topic:dest_profile
       </code>
+      Ist name 'topicname:profilename' wird  '0' der Name der Referenz zurück gegeben.
     </li>
   </ul>
   
@@ -1368,12 +1364,7 @@ sub weekprofile_getEditLNK_MasterDev($$)
   <p><b>Readings</b></p>
   <ul>
     <li>active_topic<br>
-      Aktive Topic. 
-    </li>
-  </ul>
-  <ul>
-    <li>active_topic<br>
-      Aktive Topic. 
+      Aktive\zuletzt gesetzter Topicname. 
     </li>
     <li>profile_count<br>
       Anzahl aller Profile mit Referenzen.
