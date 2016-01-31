@@ -27,9 +27,10 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.9.1  31.01.2016    a little bit code optimization
 # 1.9    28.01.2016    fixed the problem a recording may still stay active if fhem
-#                      will be rebooted after a recording was triggered and
-#                      the recordtime wasn't be over,
+#                      will be restarted after a recording was triggered and
+#                      the recordingtime wasn't be over,
 #                      Enhancement of readings.
 # 1.8    25.01.2016    changed define in order to remove credentials from string,
 #                      added "set credentials" command to save username/password,
@@ -185,7 +186,8 @@ sub SSCam_Set {
                          "snap"              => "snap:",
                          "enable"            => "enable",
                          "disable"           => "disable",
-                         # presets         => "presets",
+                         # "expmode"           => "expmode",
+                         # "presets"         => "presets",
                          );
 
 #        my $list .= "on off snap enable disable on-for-timer";
@@ -244,6 +246,10 @@ sub SSCam_Set {
                         ($success) = setcredentials($hash,$prop,$prop1);
                         return $success ? "Username and Password saved successfully" : "Error while saving Username / Password - see logfile for details";
                     }
+                    elsif ($opt eq "expmode") 
+                    {
+                        &camexpmode($hash);
+                    }
                 }  
 return undef;
 }
@@ -286,7 +292,6 @@ sub recstoponboot ($) {
   
   if ($init_done == 1) {
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
-     # if ($hash->{STATE} eq "on") {
          $logstr = "Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now"; 
          &printlog($hash,$logstr,"1"); 
          &camstoprec($hash);
@@ -564,6 +569,53 @@ sub camstoprec ($) {
     InternalTimer(gettimeofday()+0.2, "camstoprec", $hash, 0);
     }
 }
+
+###############################################################################
+###   Kamera Nightmode setzen
+
+sub camexpmode ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    my $errorcode;
+    my $error;
+    
+    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {
+        # wenn Kamera disabled ist ....
+        $errorcode = "402";
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        $logstr = "ERROR - Setting exposure mode of Camera $camname can't be executed - $error" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
+    
+    if ($hash->{HELPER}{ACTIVE} ne "on" and ReadingsVal("$name", "Record", "Start") ne "Start") {
+        
+        $logstr = "Setting of exposure mode of Camera $camname will be started now";
+        &printlog($hash,$logstr,"4");
+                           
+        $hash->{OPMODE} = "ExpMode";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        &getapisites_nonbl($hash);
+    }
+    else
+    {
+    InternalTimer(gettimeofday()+0.1, "camstartrec", $hash, 0);
+    }
+}
+
+
 
 ###############################################################################
 ###   Kamera Schappschuß aufnehmen
@@ -1401,7 +1453,7 @@ sub camop_nonbl ($) {
    {
       # ein Schnappschuß wird ausgelöst und in SS gespeichert, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=0&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=$camid&blSave=true&_sid=\"$sid\"";
-      $hash->{STATE} = "snap";
+      readingsSingleUpdate($hash,"state", "snap", 0); 
       readingsSingleUpdate($hash, "LastSnapId", "", 1);
    }
    elsif ($OpMode eq "Enable")
@@ -1434,7 +1486,10 @@ sub camop_nonbl ($) {
       # PTZ-ListPatrol werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
    }    
-
+   elsif ($OpMode eq "ExpMode")
+   {
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=2&camParamChkList=1&_sid=\"$sid\"";   
+   }
    
    $param = {
                 url      => $url,
@@ -1535,13 +1590,11 @@ sub camret_nonbl ($) {
             &printlog($hash,$logstr,"4");
                 
             if ($OpMode eq "Start") 
-            {  
-                $hash->{STATE} = "on";
-                               
+            {                             
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Record","Start");
-                # readingsBulkUpdate($hash,"state","on");
+                readingsBulkUpdate($hash,"state","on");
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -1563,21 +1616,31 @@ sub camret_nonbl ($) {
 
             }
             elsif ($OpMode eq "Stop") 
-            {
-                # bedingt Browseraktualisierung und Status der "Lampen" 
-                $hash->{STATE} = "off";
-                
+            {                
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Record","Stop");
+                readingsBulkUpdate($hash,"state","off");
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
-            
-                # RemoveInternalTimer($hash);
        
                 # Logausgabe
                 $logstr = "Camera $camname Recording stopped";
+                &printlog($hash,$logstr,"2");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "ExpMode") 
+            {              
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+       
+                # Logausgabe
+                $logstr = "Camera $camname exposure mode was set";
                 &printlog($hash,$logstr,"2");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
@@ -1587,11 +1650,11 @@ sub camret_nonbl ($) {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> STATE = on setzen
                 if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                    $hash->{STATE} = "on";
+                    readingsSingleUpdate($hash,"state", "on", 0); 
                     }
                     else
                     {
-                    $hash->{STATE} = "off";
+                    readingsSingleUpdate($hash,"state", "off", 0); 
                     }
                 
                 $snapid = $data->{data}{'id'};
@@ -1611,12 +1674,11 @@ sub camret_nonbl ($) {
             }
             elsif ($OpMode eq "Enable") 
             {
-                # Kamera wurde aktiviert, sonst kann nichts laufen -> "off"
-                $hash->{STATE} = "off";
-                
+                # Kamera wurde aktiviert, sonst kann nichts laufen -> "off"                
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Availability","enabled");
+                readingsBulkUpdate($hash,"state","off");
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -1630,11 +1692,10 @@ sub camret_nonbl ($) {
             elsif ($OpMode eq "Disable") 
             {
                 # Kamera wurde deaktiviert
-                $hash->{STATE} = "disabled";
-                
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Availability","disabled");
+                readingsBulkUpdate($hash,"state","disabled");
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -1675,11 +1736,11 @@ sub camret_nonbl ($) {
                     
                     # falls Aufnahme noch läuft -> STATE = on setzen
                     if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                        $hash->{STATE} = "on";
+                        readingsSingleUpdate($hash,"state", "on", 0); 
                         }
                         else
                         {
-                        $hash->{STATE} = "off";
+                        readingsSingleUpdate($hash,"state", "off", 0); 
                         }
                     }
                     elsif ($camStatus eq "3") {
@@ -1687,7 +1748,7 @@ sub camret_nonbl ($) {
                     }
                     elsif ($camStatus eq "7") {
                     $camStatus = "disabled";
-                    $hash->{STATE} = "disable";
+                    readingsSingleUpdate($hash,"state", "disable", 0); 
                     }
                     else {
                     $camStatus = "other";
