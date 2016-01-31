@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, December 2015 
+# SONOS.pm (c) by Reiner Leins, January 2016
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -31,7 +31,7 @@
 #
 ########################################################################################
 # Configuration:
-# define <name> SONOS <host:port> [interval [waittime [delaytime]]]
+# define <name> SONOS [<host:port> [interval [waittime [delaytime]]]]
 #
 # where <name> may be replaced by any fhem-devicename string 
 # <host:port> is the connection identifier to the internal server. Normally "localhost" with a locally free port e.g. "localhost:4711".
@@ -41,7 +41,11 @@
 #
 ##############################################
 # Example:
-# define Sonos SONOS localhost:4711 30
+# Simplest way to define:
+# define Sonos SONOS
+#
+# Example with control over the used port and the isalive-checker-interval:
+# define Sonos SONOS localhost:4711 45
 #
 ########################################################################################
 # Changelog (last 4 entries only, see Wiki for complete changelog)
@@ -49,6 +53,11 @@
 # Cover von Amazon funktionieren nicht
 #
 # SVN-History:
+# 31.01.2016
+#	Im Modul ControlPoint.pm gab es eine fehlerhafte Bearbeitung des Arrays @LWP::Protocol::http::EXTRA_SOCK_OPTS, welche in manchen Fällen zu der Fehlermeldung "Odd number of elements in hash assignment" geführt hat.
+#	Der Anbieter SoundCloud wird als Quelle erkannt und angezeigt
+#	Es gibt drei neue Readings "MasterPlayer", "MasterPlayerPlaying" und "MasterPlayerNotPlaying" am Sonos-Device (zzgl. der jeweiligen Angabe der Anzahl)
+#	Die Ausgabe von "get Sonos Groups" liefert nun stets eine normalisierte Liste (also sortiert).
 # 31.12.2015
 #	Das Reading ZoneGroupID wurde immer länger (mit ":__"), wenn Gruppierungen anderer Player verändert wurden.
 #	Bei den Settern von "SleepTimer" und "SnoozeAlarm" kann man jetzt auch eine Zahl als Dauer in Sekunden angeben. Dazu wurde auch die Doku entsprechend angepasst.
@@ -62,15 +71,6 @@
 #	Es gibt jetzt einen neuen Setter "RescanNetwork" am Sonos-Device. Damit kann man den Erkennungsprozess des UPnP-Moduls neu anstarten.
 #	Es gibt jetzt eine Get-Anweisung "SupportLinks" am Playerdevice, die direkte Links (momentan zwei) zu den Player-Support-Seiten liefert.
 #	Ein Datei-Ordner als Favorit konnte nicht sauber gestartet werden. Es wurde nicht als Album in die aktuelle Abspielliste übertragen, sondern als ein Titel direkt abgespielt. Des Weiteren wurde dafür kein Coverbild ermittelt.
-# 15.12.2015
-#	Es gibt eine neue Funktionalität an den Sonosplayern: Repeat für einen einzelnen Titel. Durch diese Umstellung wurde der Repeat-Zustand nicht korrekt erkannt. Dafür gibt es jetzt noch einen zusätzlichen Setter und ein zusätzliches Reading: "RepeatOne".
-#	Es gibt eine neue Funktion "DeleteFromQueue", die Titel aus der aktuellen Abspielliste entfernen kann. Angegeben wird der Index des Elements / der Elemente.
-#	Das Reading "fieldType" wurde nicht ordnungsgemäß auf Leer gesetzt, wenn die Gruppierung aufgelöst wurde.
-# 08.12.2015
-#	Bei der Erkennung von Streams beim Restore von PlayURITemp wurde ein neues Format nicht berücksichtigt.
-#	Bei der Verwendung von "set Sonos Groups Reset" tauchte eine Fehlermeldung wegen eines Leerstrings auf.
-#	Es wurde ein neuer Setter "LoadFavourite" eingebaut, der einem StartFavourite mit der Angabe von NoStart entspricht.
-#	Man kann bei LoadSearchList nun auch an das Ende der aktuellen Abspielliste anhängen lassen. Dazu muss man an den Parameter maxElem ein "+" anhängen.
 #
 ########################################################################################
 #
@@ -214,11 +214,12 @@ my %SONOS_ProviderList = ('^http:(\/\/.*)' => 'Radio',
 						'^\/\/' => 'Bibliothek',
 						'^x-sonos-spotify:' => 'Spotify',
 						'^x-sonos-http:amz' => 'Amazon Music',
-						'^npsdy:' => 'Napster');
+						'^npsdy:' => 'Napster',
+						'^x-sonos-http:track%3a' => 'SoundCloud');
 
 my @SONOS_PossibleDefinitions = qw(NAME INTERVAL);
 my @SONOS_PossibleAttributes = qw(targetSpeakFileHashCache targetSpeakFileTimestamp targetSpeakDir targetSpeakURL targetSpeakMP3FileDir targetSpeakMP3FileConverter SpeakGoogleURL Speak0 Speak1 Speak2 Speak3 Speak4 SpeakCover Speak1Cover Speak2Cover Speak3Cover Speak4Cover minVolume maxVolume minVolumeHeadphone maxVolumeHeadphone getAlarms disable generateVolumeEvent buttonEvents generateProxyAlbumArtURLs proxyCacheTime bookmarkSaveDir bookmarkTitleDefinition bookmarkPlaylistDefinition);
-my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble TruePlay SurroundEnable SurroundLevel SubEnable SubGain SubPolarity AudioDelay AudioDelayLeftRear AudioDelayRightRear NightMode DialogLevel AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon LineInConnected presence currentAlbum currentArtist currentTitle GroupVolume GroupMute FavouritesVersion RadiosVersion PlaylistsVersion QueueVersion QueueHash);
+my @SONOS_PossibleReadings = qw(AlarmList AlarmListIDs UserID_Spotify UserID_Napster location SleepTimerVersion Mute OutputFixed HeadphoneConnected Balance Volume Loudness Bass Treble TruePlay SurroundEnable SurroundLevel SubEnable SubGain SubPolarity AudioDelay AudioDelayLeftRear AudioDelayRightRear NightMode DialogLevel AlarmListVersion ZonePlayerUUIDsInGroup ZoneGroupState ZoneGroupID fieldType ZoneGroupName roomName roomNameAlias roomIcon transportState TransportState LineInConnected presence currentAlbum currentArtist currentTitle GroupVolume GroupMute FavouritesVersion RadiosVersion PlaylistsVersion QueueVersion QueueHash GroupMasterPlayer);
 
 # Obsolete Einstellungen...
 my $SONOS_UseTelnetForQuestions = 1;
@@ -817,7 +818,7 @@ sub SONOS_Define($$) {
 	my @a = split("[ \t]+", $def);
   
 	# check syntax
-	return 'Usage: define <name> SONOS [[[[upnplistener] interval] waittime] delaytime]' if($#a < 2 || $#a > 5);
+	return 'Usage: define <name> SONOS [[[[upnplistener] interval] waittime] delaytime]' if($#a < 1 || $#a > 5);
 	my $name = $a[0];
 	
 	my $upnplistener;
@@ -835,7 +836,7 @@ sub SONOS_Define($$) {
 			$interval = 10;
 		}
 	} else {
-		$interval = 10;
+		$interval = 30;
 	}
 	
 	my $waittime;
@@ -1119,7 +1120,12 @@ sub SONOS_Read($) {
 				}
 			}
 		} elsif ($line =~ m/^ReadingsBulkUpdate:(.*?):(.*?):(.*)/) {
-			my $hash = SONOS_getSonosPlayerByUDN($1);
+			my $hash = undef;
+			if (lc($1) eq 'undef') {
+				$hash = SONOS_getDeviceDefHash(undef);
+			} else {
+				$hash = SONOS_getSonosPlayerByUDN($1);
+			}
 			
 			if ($hash) {
 				readingsBulkUpdate($hash, $2, $3);
@@ -1127,7 +1133,12 @@ sub SONOS_Read($) {
 				SONOS_Log undef, 0, "Fehlerhafter Aufruf von ReadingsBulkUpdate: $1:$2:$3";
 			}
 		} elsif ($line =~ m/^ReadingsBulkUpdateIfChanged:(.*?):(.*?):(.*)/) {
-			my $hash = SONOS_getSonosPlayerByUDN($1);
+			my $hash = undef;
+			if (lc($1) eq 'undef') {
+				$hash = SONOS_getDeviceDefHash(undef);
+			} else {
+				$hash = SONOS_getSonosPlayerByUDN($1);
+			}
 			
 			if ($hash) {
 				SONOS_readingsBulkUpdateIfChanged($hash, $2, $3);
@@ -1135,7 +1146,12 @@ sub SONOS_Read($) {
 				SONOS_Log undef, 0, "Fehlerhafter Aufruf von ReadingsBulkUpdateIfChanged: $1:$2:$3";
 			}
 		} elsif ($line =~ m/ReadingsBeginUpdate:(.*)/) {
-			my $hash = SONOS_getSonosPlayerByUDN($1);
+			my $hash = undef;
+			if (lc($1) eq 'undef') {
+				$hash = SONOS_getDeviceDefHash(undef);
+			} else {
+				$hash = SONOS_getSonosPlayerByUDN($1);
+			}
 			
 			if ($hash) {
 				readingsBeginUpdate($hash);
@@ -1143,7 +1159,12 @@ sub SONOS_Read($) {
 				SONOS_Log undef, 0, "Fehlerhafter Aufruf von ReadingsBeginUpdate: $1";
 			}
 		} elsif ($line =~ m/ReadingsEndUpdate:(.*)/) {
-			my $hash = SONOS_getSonosPlayerByUDN($1);
+			my $hash = undef;
+			if (lc($1) eq 'undef') {
+				$hash = SONOS_getDeviceDefHash(undef);
+			} else {
+				$hash = SONOS_getSonosPlayerByUDN($1);
+			}
 			
 			if ($hash) {
 				readingsEndUpdate($hash, 1);
@@ -1814,8 +1835,23 @@ sub SONOS_ConvertZoneGroupState($) {
 		}
 		
 		# Die Abspielgruppe hinzufügen, wenn sie nicht leer ist (kann bei Bridges passieren)
-		push @groups, \@group if ($#group >= 0);
+		if ($#group >= 0) {
+			# Playernamen einsetzen...
+			@group = map { SONOS_getSonosPlayerByUDN($_)->{NAME} } @group;
+			
+			# Die einzelne Gruppe sortieren, dabei den Masterplayer vorne lassen...
+			my @newgroup = ($group[0]);
+			push @newgroup, sort @group[1..$#group];
+			
+			# Zur großen Liste hinzufügen...
+			push @groups, \@newgroup;
+		}
 	}
+	
+	# Nach den Masterplayernamen sortieren
+	@groups = sort {
+		@{$a}[0] cmp @{$b}[0];
+	} @groups;
 	
 	return @groups;
 }
@@ -1831,11 +1867,11 @@ sub SONOS_ConvertZoneGroupStateToString($) {
 	# UDNs durch Devicenamen ersetzen und dabei gleich das Ergebnis zusammenbauen
 	my $result = '';
 	foreach my $gelem (@groups) {
-		$result .= '[';
-		foreach my $elem (@{$gelem}) {
-			$elem = SONOS_getSonosPlayerByUDN($elem)->{NAME};
-		}
-		$result .= join(', ', @{$gelem}).'], ';
+		#$result .= '[';
+		#foreach my $elem (@{$gelem}) {
+		#	$elem = SONOS_getSonosPlayerByUDN($elem)->{NAME};
+		#}
+		$result .= '['.join(', ', @{$gelem}).'], ';
 	}
 
 	return substr($result, 0, -2);
@@ -4393,7 +4429,7 @@ sub SONOS_RestoreOldPlaystate() {
 		# Wenn die Zeit noch nicht reif ist, dann doch wieder übergehen...
 		# Dabei die Schleife wieder von vorne beginnen lassen, da noch andere dazwischengeschoben werden könnten.
 		# Eine Weile in die Zukunft, da das ermitteln der Proxies Zeit benötigt.
-		next if ($old{RestoreTime} > time() + 1);
+		next if ($old{RestoreTime} > time() + 2);
 		
 		# ...sonst das Ding von der Queue nehmen...
 		$SONOS_PlayerRestoreQueue->dequeue();
@@ -4430,11 +4466,11 @@ sub SONOS_RestoreOldPlaystate() {
 		SONOS_Log $udn, 5, 'StoredURI: "'.$old{CurrentURI}.'"';
 		# Die Liste als aktuelles Abspielstück einstellen, oder den Stream wieder anwerfen
 		if ($old{CurrentURI} =~ /^x-.*?-(.*?stream|mp3radio)/) {
-			SONOS_Log $udn, 5, 'Restore Stream...';
+			SONOS_Log $udn, 4, 'Restore Stream...';
 			
 			$AVProxy->SetAVTransportURI(0, $old{CurrentURI}, $old{CurrentURIMetaData});
 		} else {
-			SONOS_Log $udn, 5, 'Restore Track #'.$old{Track}.', RelTime: "'.$old{RelTime}.'"...';
+			SONOS_Log $udn, 4, 'Restore Track #'.$old{Track}.', RelTime: "'.$old{RelTime}.'"...';
 			
 			my $queueMetadata = $CCProxy->Browse('Q:0', 'BrowseMetadata', '', 0, 0, '');
 			$AVProxy->SetAVTransportURI(0, SONOS_GetTagData('res', $queueMetadata->getValue('Result')), '');
@@ -6202,6 +6238,8 @@ sub SONOS_ServiceCallback($$) {
 	# Trigger/Transfer the whole bunch and generate InfoSummarize
 	SONOS_Client_Notifier('CurrentBulkUpdate:'.$udn);
 	
+	SONOS_AnalyzeTopologyForMasterPlayer(SONOS_Client_Data_Retreive('undef', 'reading', 'ZoneGroupState', ''));
+	
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of Transport-Event for Zone "'.$name.'".';
 	
@@ -7265,6 +7303,8 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 	if ($properties{ZoneGroupState}) {
 		$zoneGroupState = decode_entities($1) if ($properties{ZoneGroupState} =~ m/(.*)/);
 		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', 'undef', 'ZoneGroupState', $zoneGroupState);
+		
+		SONOS_AnalyzeTopologyForMasterPlayer($zoneGroupState);
 	}
 	
 	# ZonePlayerUUIDsInGroup: Welche Player befinden sich alle in der gleichen Gruppe wie ich?
@@ -7336,6 +7376,52 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 	}
 	
 	return 0;
+}
+
+########################################################################################
+#
+#  SONOS_AnalyzeTopologyForMasterPlayer - Topology analysieren, um das Reading "MasterPlayer" 
+#                                         sowie die Readings "MasterPlayerPlaying" und 
+#                                         "MasterPlayerNotPlaying" zu setzen.
+#
+########################################################################################
+sub SONOS_AnalyzeTopologyForMasterPlayer($) {
+	my ($zoneGroupState) = @_;
+	
+	my @playing = ();
+	my @notplaying = ();
+	while ($zoneGroupState =~ m/<ZoneGroup.*?Coordinator="(.*?)".*?>(.*?)<\/ZoneGroup>/gi) {
+		my $udn = $1.'_MR';
+		my $name = SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn);
+		if (defined($name)) {
+			my $transportState = SONOS_Client_Data_Retreive($udn, 'reading', 'TransportState', '-');
+			if ($transportState eq 'PLAYING') {
+				push(@playing, $name);
+			} else {
+				push(@notplaying, $name);
+			}
+		}
+	}
+	
+	# Die Listen normalisieren
+	@playing = sort @playing;
+	@notplaying = sort @notplaying;
+	
+	$Data::Dumper::Indent = 0;
+	SONOS_Client_Notifier('ReadingsBeginUpdate:undef');
+	
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerPlaying', Dumper(\@playing));
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerPlayingCount', scalar(@playing));
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerNotPlaying', Dumper(\@notplaying));
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerNotPlayingCount', scalar(@notplaying));
+	
+	push(@playing, @notplaying);
+	@playing = sort @playing;
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayer', Dumper(\@playing));
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerCount', scalar(@playing));
+	
+	SONOS_Client_Notifier('ReadingsEndUpdate:undef');
+	$Data::Dumper::Indent = 2;
 }
 
 ########################################################################################
@@ -8311,6 +8397,7 @@ if (defined($SONOS_ListenPort)) {
 					setsockopt($client, SOL_SOCKET, SO_LINGER, pack("ii", 1, 0));
 		 			my ($port, $iaddr) = sockaddr_in($addrinfo);
 		 			my $name = gethostbyaddr($iaddr, AF_INET);
+		 			$name = $iaddr if (!defined($name) || $name eq '');
 		 			
 		 			SONOS_Log undef, 3, "Connection accepted from $name:$port";
 		 			
@@ -8928,7 +9015,12 @@ You can start this client on your own (to let it run instantly and independent f
 <code>perl 00_SONOS.pm 4711</code>: Starts a UPnP-Client in an independant way who listens to connections on port 4711. This process can run a long time, FHEM can connect and disconnect to it.</p>
 <h4>Example</h4>
 <p>
-<code>define Sonos SONOS localhost:4711 30</code>
+Simplest way to define:<br />
+<b><code>define Sonos SONOS</code></b>
+</p>
+<p>
+Example with control over the used port and the isalive-checker-interval:<br />
+<b><code>define Sonos SONOS localhost:4711 45</code></b>
 </p>
 <a name="SONOSdefine"></a>
 <h4>Define</h4>
@@ -9096,7 +9188,12 @@ Man kann den Server unabhängig von FHEM selbst starten (um ihn dauerhaft und un
 <code>perl 00_SONOS.pm 4711</code>: Startet einen unabhängigen Server, der auf Port 4711 auf eingehende FHEM-Verbindungen lauscht. Dieser Prozess kann dauerhaft laufen, FHEM kann sich verbinden und auch wieder trennen.</p>
 <h4>Beispiel</h4>
 <p>
-<code>define Sonos SONOS localhost:4711 30</code>
+Einfachste Definition:<br />
+<b><code>define Sonos SONOS</code></b>
+</p>
+<p>
+Definition mit Kontrolle über den verwendeten Port und das Intervall der IsAlive-Prüfung:<br />
+<b><code>define Sonos SONOS localhost:4711 45</code></b>
 </p>
 <a name="SONOSdefine"></a>
 <h4>Definition</h4>
