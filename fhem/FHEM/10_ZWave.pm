@@ -1616,7 +1616,7 @@ ZWave_mcCreateAll($$)
   }
   $data =~ m/^046008(..)(..)/;
   my $nGrp = hex($2);
-  for(my $c = 2; $c <= $nGrp; $c++) {
+  for(my $c = 1; $c <= $nGrp; $c++) {
     ZWave_Get($hash, $hash->{NAME}, "mcCapability", $c);
   }
   return undef;
