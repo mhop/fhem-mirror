@@ -202,6 +202,7 @@ HttpUtils_Connect2($)
 {
   my ($hash) = @_;
 
+  $hash->{host} =~ s/:.*//;
   if($hash->{protocol} eq "https" && $hash->{conn} && !$hash->{hu_sslAdded}) {
     eval "use IO::Socket::SSL";
     if($@) {
@@ -213,6 +214,7 @@ HttpUtils_Connect2($)
       IO::Socket::SSL->start_SSL($hash->{conn}, {
           Timeout     => $hash->{timeout},
           SSL_version => $sslVersion,
+          SSL_hostname => $hash->{host},
           %{$hash->{sslargs}}
         }) || undef $hash->{conn};
       $hash->{hu_sslAdded} = 1 if($hash->{keepalive});
@@ -248,7 +250,6 @@ HttpUtils_Connect2($)
     }
   }
 
-  $hash->{host} =~ s/:.*//;
   my $method = $hash->{method};
   $method = ($data ? "POST" : "GET") if( !$method );
 
