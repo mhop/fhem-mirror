@@ -478,7 +478,7 @@ sub km200_Attr(@)
 		push @temp, "";
 		
 		### Transform string entries seperated by blank into array
-		@KM200_DONOTPOLL = split(/ /, $temp[0]);
+		@KM200_DONOTPOLL = split(/\s+/, $temp[0]);
 
 		### Remove trailing slash of each item if available
 		
@@ -749,7 +749,7 @@ sub km200_Decrypt($)
     $decryptData = decode_base64($decryptData);
 
 	# Check whether the length of the decryptData is NOT multiplies of 16
-	if (length($decryptData)&0xF != 0)
+	if ((length($decryptData)&0xF) != 0)
 	{
 		# Return nothing which will end this subroutine
 		return "";
@@ -799,7 +799,6 @@ sub km200_Decrypt($)
     }
 }
 ####END####### Subroutine Decrypt Data #########################################################################END#####
-
 
 ###START###### Subroutine set individual data value ###########################################################START####
 sub km200_PostSingleService($)
@@ -852,44 +851,44 @@ sub km200_PostSingleService($)
 			   $TempReadingVal		= ReadingsVal($name,($Service . "/1-Mo"),"");
 			   $TempReadingVal		=~ s/\s+/ /g;
 			   $TempReadingVal		=~ s/\s+$//g;
-			my @TempReadingMo 	    = split(/ /, $TempReadingVal,0);
+			my @TempReadingMo 	    = split(/\s+/, $TempReadingVal,0);
 			   
 			   $TempReadingVal		= ReadingsVal($name,($Service . "/2-Tu"),"");
 			   $TempReadingVal		=~ s/\s+/ /g;
 			   $TempReadingVal		=~ s/\s+$//g;
-			my @TempReadingTu 		= split(/ /, $TempReadingVal,0);
+			my @TempReadingTu 		= split(/\s+/, $TempReadingVal,0);
 			   
 			   $TempReadingVal		= ReadingsVal($name,($Service . "/3-We"),"");
 			   $TempReadingVal		=~ s/\s+/ /g;
 			   $TempReadingVal		=~ s/\s+$//g;
-			my @TempReadingWe 		= split(/ /, $TempReadingVal,0);
+			my @TempReadingWe 		= split(/\s+/, $TempReadingVal,0);
 
 			   $TempReadingVal		= ReadingsVal($name,($Service . "/4-Th"),"");
 			   $TempReadingVal		=~ s/\s+/ /g;
 			   $TempReadingVal		=~ s/\s+$//g;
-			my @TempReadingTh 		= split(/ /, $TempReadingVal,0);
+			my @TempReadingTh 		= split(/\s+/, $TempReadingVal,0);
 			
 			   $TempReadingVal		= ReadingsVal($name,($Service . "/5-Fr"),"");
 			   $TempReadingVal		=~ s/\s+/ /g;
 			   $TempReadingVal		=~ s/\s+$//g;
-			my @TempReadingFr 		= split(/ /, $TempReadingVal,0);
+			my @TempReadingFr 		= split(/\s+/, $TempReadingVal,0);
 			
 			   $TempReadingVal		= ReadingsVal($name,($Service . "/6-Sa"),"");
 			   $TempReadingVal		=~ s/\s+/ /g;
 			   $TempReadingVal		=~ s/\s+$//g;
-			my @TempReadingSa 		= split(/ /, $TempReadingVal,0);
+			my @TempReadingSa 		= split(/\s+/, $TempReadingVal,0);
 			
 			   $TempReadingVal		= ReadingsVal($name,($Service . "/7-Su"),"");
 			   $TempReadingVal		=~ s/\s+/ /g;
 			   $TempReadingVal		=~ s/\s+$//g;
-			my @TempReadingSu 		= split(/ /, $TempReadingVal,0);
+			my @TempReadingSu 		= split(/\s+/, $TempReadingVal,0);
 
 			
 			### For value to be written, delete all unnecessary blanks and transform to array and get length of array
 			my $ReturnString		= $hash->{temp}{postdata};
 			   $ReturnString 		=~ s/\s+/ /g;
 			   $ReturnString 		=~ s/\s+$//g;
-			my @TempReading			= split(/ /, $ReturnString);
+			my @TempReading			= split(/\s+/, $ReturnString);
 			my $TempReadingLength	= @TempReading;
 
 			
