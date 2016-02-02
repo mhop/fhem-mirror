@@ -3,9 +3,11 @@
 #
 #  60_allergy.pm
 #
-#  2015 Markus Moises < vorname at nachname . de >
+#  2016 Markus Moises < vorname at nachname . de >
 #
 #  This module provides allergy forecast data
+#
+#  http://forum.fhem.de/index.php/topic,37194.0.html
 #
 #
 ##############################################################################
@@ -25,7 +27,7 @@ use XML::Simple;
 use LWP::UserAgent;
 use HTTP::Request;
 
-
+use utf8;
 
 ##############################################################################
 
@@ -133,6 +135,7 @@ sub allergy_GetUpdate($) {
 
 
   my $url="http://www.allergie.hexal.de/pollenflug/xml-interface-neu/pollen_de_7tage.php?plz=".$hash->{helper}{ZIPCODE};
+  Log3 ($name, 4, "Getting URL $url");
 
 
   HttpUtils_NonblockingGet({
@@ -167,7 +170,6 @@ sub allergy_Parse($$$)
   Log3 $name, 5, "Received XML data ".$data;
 
   my $xml = new XML::Simple();
-  #my $xmldata = $xml->XMLin($data);
   my $xmldata = $xml->XMLin($data,forcearray => [qw( pollenbelastungen pollen )],keyattr => {pollen => 'name'});
 
   my @wdays = split(',',AttrVal($hash->{NAME}, "weekdaysFormat", "Sun,Mon,Tue,Wed,Thu,Fri,Sat" ));
@@ -175,12 +177,9 @@ sub allergy_Parse($$$)
 
   readingsBeginUpdate($hash); # Start update readings
 
-  my $city = Encode::encode('UTF-8',$xmldata->{'pollendaten'}->{'ort'});
-  readingsBulkUpdate($hash, "city", $city);
+  my $city = $xmldata->{'pollendaten'}->{'ort'};
+  readingsBulkUpdate($hash, "city", allergy_utf8clean($city));
   Log3 $name, 4, "Received data for postcode ".$xmldata->{'pollendaten'}->{'plz'};
-
-  my %umlaute = ( '�' => 'Ae', '�' => 'Oe', '�' => 'Ue', '�' => 'ae', '�' => 'oe', '�' => 'ue', '�' => 'ss' );
-  my $umlautkeys = join ("|", keys(%umlaute));
 
   foreach my $day (@{$xmldata->{'pollendaten'}{'pollenbelastungen'}})
   {
@@ -189,7 +188,6 @@ sub allergy_Parse($$$)
     my $daymax = 0;
     my $pollenkey='';
     my $pollenvalue='';
-    my $pollenname='';
     my $pollendata=0;
 
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time+($day->{'tag'}*86400));
@@ -200,11 +198,10 @@ sub allergy_Parse($$$)
     {
       while(($pollenkey, $pollenvalue) = each(%$pollenhash))
       {
-        # $pollenname = Encode::encode('UTF-8',$pollenkey);
-        $pollenkey =~ s/($umlautkeys)/$umlaute{$1}/g;
+        $pollenkey = allergy_utf8clean($pollenkey);
         $pollendata = $pollenvalue->{'belastung'};
 
-      if (( AttrVal($hash->{NAME}, "updateEmpty", 0 ) gt 0 or $pollendata gt 0) and ( AttrVal($hash->{NAME}, "updateIgnored", 0 ) gt 0 or ( index(AttrVal($hash->{NAME}, "ignoreList", ""), $pollenname ) == -1 )))
+      if (( AttrVal($hash->{NAME}, "updateEmpty", 0 ) gt 0 or $pollendata gt 0) and ( AttrVal($hash->{NAME}, "updateIgnored", 0 ) gt 0 or ( index(AttrVal($hash->{NAME}, "ignoreList", ""), $pollenkey ) == -1 )))
       {
         readingsBulkUpdate($hash, "fc".$daycode."_".$pollenkey, $levels[$pollendata]);
         $daymax = $pollendata if($pollendata gt $daymax);
@@ -237,7 +234,52 @@ sub allergy_Parse($$$)
 }
 
 
+sub allergy_utf8clean($) {
+  my ($string) = @_;
+  my $log = "";
+  if($string !~ m/^[A-Za-z\d_\.-]+$/)
+  {
+    $log .= $string."(standard) ";
+    $string =~ s/Ä/Ae/g;
+    $string =~ s/Ö/Oe/g;
+    $string =~ s/Ü/Ue/g;
+    $string =~ s/ä/ae/g;
+    $string =~ s/ö/oe/g;
+    $string =~ s/ü/ue/g;
+    $string =~ s/ß/ss/g;
+  }
+  if($string !~ m/^[A-Za-z\d_\.-]+$/)
+  {
+    $log .= $string."(single) ";
+    $string =~ s/Ã„/Ae/g;
+    $string =~ s/Ã–/Oe/g;
+    $string =~ s/Ãœ/Ue/g;
+    $string =~ s/Ã¤/ae/g;
+    $string =~ s/Ã¶/oe/g;
+    $string =~ s/Ã¼/ue/g;
+    $string =~ s/ÃŸ/ss/g;
+  }
+  if($string !~ m/^[A-Za-z\d_\.-]+$/)
+  {
+    $log .= $string."(double) ";
+    $string =~ s/Ãƒâ€ž/Ae/g;
+    $string =~ s/Ãƒâ€“/Oe/g;
+    $string =~ s/ÃƒÅ“/Ue/g;
+    $string =~ s/ÃƒÂ¤/ae/g;
+    $string =~ s/ÃƒÂ¶/oe/g;
+    $string =~ s/ÃƒÂ¼/ue/g;
+    $string =~ s/ÃƒÅ¸/ss/g;
+  }
+  if($string !~ m/^[A-Za-z\d_\.-]+$/)
+  {
+    $log .= $string."(unknown)";
+    #$string =~ s/[^!-~\s]//g;
+    $string =~ s/[^A-Za-z\d_\.-]//g;
+  }
+  Log3 "utf8clean", 5, "Cleaned $string // $log" if($log ne "");
 
+  return $string;
+}
 
 ##########################
 
@@ -248,13 +290,11 @@ sub allergy_Parse($$$)
 
 <a name="allergy"></a>
 <h3>allergy</h3>
-(en | <a href="commandref_DE.html#allergy">de</a>)
 <div style="width:800px">
 <ul>
   This modul provides allergy forecast data for Germany.<br/>
   It requires the Perl module XML::Simple to be installed
   <br/><br/>
-
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; allergy &lt;zipcode&gt;</code>
@@ -266,7 +306,6 @@ sub allergy_Parse($$$)
       German zipcode
     </li><br>
   </ul>
-
   <br>
   <b>Get</b>
    <ul>
@@ -275,7 +314,6 @@ sub allergy_Parse($$$)
       Manually trigger data update
       </li><br>
   </ul>
-
   <br>
   <b>Readings</b>
    <ul>
@@ -296,8 +334,6 @@ sub allergy_Parse($$$)
       Daily levels for all allergens that are not being ignored due to <i>ignoreList</i>
       </li><br>
   </ul>
-
-
   <br>
    <b>Attributes</b>
    <ul>
@@ -324,6 +360,87 @@ sub allergy_Parse($$$)
   </ul>
 </ul>
 </div>
-=end html
 
+=end html
+=begin html_DE
+
+<a name="allergy"></a>
+<h3>allergy</h3>
+<ul>
+  <br>Dieses Modul prognostiziert Allergie Daten für Deutschland.</br>
+  Es erfordert dass das Perlmodul XML:: Simple installiert ist.
+  <br/><br/>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; allergy &lt;Postleitzahl&gt;</code>
+    <br>
+    Beispiel: <code>define allergydata allergy 12345</code>
+    <br><br>
+    <li><code>Postleitzahl</code>
+      <br>
+      Deutsche Postleitzahl
+    </li><br>
+  </ul>
+  <br>
+  <b>Get</b>
+   <ul>
+      <li><code>data</code>
+      <br>
+      Manuelles Datenupdate
+      </li><br>
+  </ul>
+  <br>
+  <b>Readings</b>
+   <ul>
+      <li><code>city</code>
+      <br>
+      Name der Stadt, für die Prognosen gelesen werden.
+      </li><br>
+    <li><code>fc<i>n</i>_total</code>
+      <br>
+      Täglicher Höchstwerte für alle Allergene, die nicht aufgrund der Ignoreliste <i>(attr ignoreList)</i> ignoriert werden<br/>
+      </li><br>
+    <li><code>fc<i>n</i>_day_of_week</code>
+      <br>
+      Wochentag, kann durch <i>weekdaysFormat</i> lokalisiert werden.<br/>
+      </li><br>
+      <li><code>fc<i>n</i>_<i>allergen</i></code>
+      <br>
+      Tägliche Werte für alle Allergene, die nicht aufgrund der Ignoreliste <i>(attr ignoreList)</i> ignoriert werden.
+      </li><br>
+  </ul>
+  <br>
+   <b>Attribute</b>
+   <ul>
+      <li><code>ignoreList</code>
+         <br>
+         Kommagetrennte Liste von Allergen-Namen, die bei der Aktualisierung ignoriert werden sollen.
+    <br>
+      </li><br>
+      <li><code>updateEmpty (Standard: 0|1)</code>
+         <br>
+         Aktualisierung von Allergenen.
+    <code> <br>
+    0 = nur Allergene mit Belastung.
+    <br>
+    1 = auch Allergene die keine Belastung haben.
+    </code>
+      </li><br>
+      <li><code>updateIgnored (1)</code>
+         <br>
+         Aktualisierung von Allergenen, die sonst durch die ignoreList entfernt werden.
+      </li><br>
+      <li><code>levelsFormat (Standard: -, low, moderate, high)</code>
+         <br>
+         Lokalisierte Levels, durch Kommas getrennt.
+      </li><br>
+      <li><code>weekdaysFormat (Standard: Sun, Mon, Tue, Wed, Tue, Fri, Sat)</code>
+         <br>
+         Lokalisierte Wochentage, durch Kommas getrennt.
+      </li><br>
+  </ul>
+</ul>
+</div>
+
+=end html_DE
 =cut
