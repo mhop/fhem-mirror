@@ -27,6 +27,9 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.10   02.02.2016    added function "svsinfo" to get informations about installed SVS-package,
+#                      if Availability = "disconnected" then "state" will be "disconnected" too,
+#                      Credentials were deleted if a device will be deleted
 # 1.9.1  31.01.2016    a little bit code optimization
 # 1.9    28.01.2016    fixed the problem a recording may still stay active if fhem
 #                      will be restarted after a recording was triggered and
@@ -121,7 +124,8 @@ sub SSCam_Define {
  
   # benötigte API's in $hash einfügen
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
-  $hash->{HELPER}{APIAUTH}        = "SYNO.API.Auth";                                                  
+  $hash->{HELPER}{APIAUTH}        = "SYNO.API.Auth"; 
+  $hash->{HELPER}{APISVSINFO}     = "SYNO.SurveillanceStation.Info"; 
   $hash->{HELPER}{APIEXTREC}      = "SYNO.SurveillanceStation.ExternalRecording";                     
   $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";
   $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
@@ -140,7 +144,7 @@ sub SSCam_Define {
   # Subroutine Watchdog-Timer starten (sollen Cam-Infos abgerufen werden ?), verzögerter zufälliger Start 0-60s 
   InternalTimer(gettimeofday()+int(rand(60)), "watchdogpollcaminfo", $hash, 0);
   
-  recstoponboot($hash);                                                                           # check ob nach Reboot alle Recordings aus -> sonst stoppen                                
+  initonboot($hash);                                                                              # initiale Rotinen nach Restart ausführen                                
 
 return undef;
 }
@@ -148,9 +152,16 @@ return undef;
 
 sub SSCam_Undef {
     my ($hash, $arg) = @_;
+    my $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
+    
+    # gespeicherte Credentials löschen
+    setKeyValue($index, undef);
+    
     RemoveInternalTimer($hash);
+    
 return undef;
 }
+
 
 sub SSCam_Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
@@ -174,85 +185,86 @@ return undef;
 sub SSCam_Set {
         my ($hash, @a) = @_;
         return "\"set X\" needs at least an argument" if ( @a < 2 );
-        my $name  = $a[0];
-        my $opt   = $a[1];
-        my $prop  = $a[2];
-        my $prop1 = $a[3];
-        
-        my %SSCam_sets = (
-                         "credentials"       => "credentials",
-                         "on"                => "on",
-                         "off"               => "off",
-                         "snap"              => "snap:",
-                         "enable"            => "enable",
-                         "disable"           => "disable",
-                         # "expmode"           => "expmode",
-                         # "presets"         => "presets",
-                         );
+        my $name    = $a[0];
+        my $opt     = $a[1];
+        my $prop    = $a[2];
+        my $prop1   = $a[3];
+        my $camname = $hash->{CAMNAME}; 
+        my $success;
+        my $logstr;
+        my $setlist;
 
+                         
 #        my $list .= "on off snap enable disable on-for-timer";
 #        return SetExtensions($hash, $list, $name, $opt) if( $opt eq "?" );
 #        return SetExtensions($hash, $list, $name, $opt) if( !grep( $_ =~ /^\Q$opt\E($|:)/, split( ' ', $list ) ) );
         
-        
-        my $camname = $hash->{CAMNAME}; 
-        my $success;
-        my $logstr;
-        my @cList;
-       
-               
-        # ist die angegebene Option verfügbar ?
-        if(!defined($SSCam_sets{$opt})) 
-                {
-                    @cList = keys(%SSCam_sets); 
-                    return "Unknown argument $opt, choose one of " . join(" ", @cList);
-                  
-                } 
-                else 
-                {
-                    if ($opt ne "credentials" and !$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+        $setlist = "Unknown argument $opt, choose one of ".
+                   "credentials ".
+                   # "expmode ".
+                   "on ".
+                   "off ".
+                   "snap ".
+                   "enable ".
+                   "disable ".
+                   ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "presets:".ReadingsVal("$name", "Presets", "")." " : "");  
                     
-                    if ($opt eq "on") 
-                    {
-                        
-                        if (defined($prop)) {
-                            unless ($prop =~ /^\d+$/) { return " The Value for \"$opt\" is not valid. Use only figures 0-9 without decimal places !";}
-                            $hash->{HELPER}{RECTIME_TEMP} = $prop;
-                            }
-                        
-                        &camstartrec($hash);
+        
+        if ($opt eq "on") {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            if (defined($prop)) {
+                unless ($prop =~ /^\d+$/) { return " The Value for \"$opt\" is not valid. Use only figures 0-9 without decimal places !";}
+                $hash->{HELPER}{RECTIME_TEMP} = $prop;
+                }
+            &camstartrec($hash);
  
-                    }
-                    elsif ($opt eq "off") 
-                    {
-                        &camstoprec($hash);
-                    }
-                    elsif ($opt eq "snap") 
-                    {
-                        &camsnap($hash);
-                    }
-                    elsif ($opt eq "enable") 
-                    {
-                        &camenable($hash);
-                    }
-                    elsif ($opt eq "disable") 
-                    {
-                        &camdisable($hash);
-                    }
-                    elsif ($opt eq "credentials") 
-                    {
-                        return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
+        }
+        elsif ($opt eq "off") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            &camstoprec($hash);
+        }
+        elsif ($opt eq "snap") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            &camsnap($hash);
+        }
+        elsif ($opt eq "enable") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            &camenable($hash);
+        }
+        elsif ($opt eq "disable") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            &camdisable($hash);
+        }
+        elsif ($opt eq "credentials") 
+        {
+            return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
                         
-                        ($success) = setcredentials($hash,$prop,$prop1);
-                        return $success ? "Username and Password saved successfully" : "Error while saving Username / Password - see logfile for details";
-                    }
-                    elsif ($opt eq "expmode") 
-                    {
-                        &camexpmode($hash);
-                    }
-                }  
-return undef;
+            ($success) = setcredentials($hash,$prop,$prop1);
+            return $success ? "Username and Password saved successfully" : "Error while saving Username / Password - see logfile for details";
+        }
+        elsif ($opt eq "expmode") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            &camexpmode($hash);
+        }
+        elsif ($opt eq "presets") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            my $presetname = $prop;
+            my $presetid = $hash->{HELPER}{ALLPRESETS}{$presetname};
+            return "Function is coming soon ....(Presetid of $presetname is $presetid )";
+        }
+        else  
+        {
+            return $setlist;
+        }  
+return;
 }
+
 
 
 sub SSCam_Get {
@@ -262,9 +274,10 @@ sub SSCam_Get {
     my $opt = shift @a;
     my %SSCam_gets = (
                      caminfoall    => "caminfoall",
+                     svsinfo       => "svsinfo",
                      );
     my @cList;
-
+        
     # ist die angegebene Option verfügbar ?
     if(!defined($SSCam_gets{$opt})) 
         {
@@ -273,10 +286,17 @@ sub SSCam_Get {
         } 
         else 
         {
+            # sind die Credentials gesetzt ?
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            
             # hier die Verarbeitung starten
             if ($opt eq "caminfoall") 
                 {
                     &getcaminfoall($hash);
+                }
+            if ($opt eq "svsinfo") 
+                {
+                    &getsvsinfo($hash);
                 }
         }
 return undef;
@@ -284,21 +304,34 @@ return undef;
 
 
 ######################################################################################
-###  check ob alle Recordings = Stop nach Reboot -> sonst stoppen
+###  initiale Startroutinen nach Restart FHEM
 
-sub recstoponboot ($) {
+sub initonboot ($) {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
   my $logstr;
   
   if ($init_done == 1) {
+     
+     # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
          $logstr = "Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now"; 
          &printlog($hash,$logstr,"1"); 
          &camstoprec($hash);
-         } 
+         }
+         
+     # Konfiguration der Synology Surveillance Station abrufen
+     if (!$hash->{CREDENTIALS}) {
+         $logstr = "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";
+         &printlog($hash,$logstr,"1");
+         }
+         else {
+         &getsvsinfo($hash);
+         }
   }
-  else {
-  InternalTimer(gettimeofday(), "recstoponboot", $hash, 0);
+  else 
+  {
+      InternalTimer(gettimeofday(), "initonboot", $hash, 0);
   }
   
 return undef;
@@ -405,7 +438,6 @@ return ($success, $username, $passwd);
 }
 
 
-
 ######################################################################################
 ###  Polling Überwachung
 
@@ -491,9 +523,13 @@ sub camstartrec ($) {
     my $errorcode;
     my $error;
     
-    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {
-        # wenn Kamera disabled ist ....
-        $errorcode = "402";
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+            }
+            elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+            }
         
         # Fehlertext zum Errorcode ermitteln
         $error = &experror($hash,$errorcode);
@@ -536,9 +572,13 @@ sub camstoprec ($) {
     my $errorcode;
     my $error;
     
-    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {
-        # wenn Kamera disabled ist ....
-        $errorcode = "402";
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+            }
+            elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+            }
         
         # Fehlertext zum Errorcode ermitteln
         $error = &experror($hash,$errorcode);
@@ -581,9 +621,13 @@ sub camexpmode ($) {
     my $errorcode;
     my $error;
     
-    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {
-        # wenn Kamera disabled ist ....
-        $errorcode = "402";
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+            }
+            elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+            }
         
         # Fehlertext zum Errorcode ermitteln
         $error = &experror($hash,$errorcode);
@@ -611,7 +655,7 @@ sub camexpmode ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.1, "camstartrec", $hash, 0);
+    InternalTimer(gettimeofday()+0.25, "camexpmode", $hash, 0);
     }
 }
 
@@ -628,9 +672,13 @@ sub camsnap ($) {
     my $errorcode;
     my $error;
     
-    if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {
-        # wenn Kamera disabled ist ....
-        $errorcode = "402";
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+            }
+            elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+            }
         
         # Fehlertext zum Errorcode ermitteln
         $error = &experror($hash,$errorcode);
@@ -751,6 +799,32 @@ sub getcaminfoall ($) {
         &printlog($hash,$logstr,"2");
 
         }
+}
+
+###########################################################################
+###   allgemeine Infos über Synology Surveillance Station
+
+sub getsvsinfo ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    
+    if ($hash->{HELPER}{ACTIVE} ne "on") {
+        # Kamerainfos abrufen
+        $logstr = "Retrieval of Surveillance Station related informations starts now";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "Getsvsinfo";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        &getapisites_nonbl($hash);
+      }
+    else
+    {
+        InternalTimer(gettimeofday()+0.65, "getsvsinfo", $hash, 0);
+    }
+    
 }
 
 ###########################################################################
@@ -896,6 +970,7 @@ sub getapisites_nonbl {
    my $apicam      = $hash->{HELPER}{APICAM};                          # mit Komma getrennt angeben
    my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
    my $apiptz      = $hash->{HELPER}{APIPTZ};
+   my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
    my $logstr;
    my $url;
    my $param;
@@ -913,7 +988,7 @@ sub getapisites_nonbl {
 
    
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo";
    
    $param = {
                url      => $url,
@@ -946,6 +1021,7 @@ sub login_nonbl ($) {
    my $apicam      = $hash->{HELPER}{APICAM};
    my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
    my $apiptz      = $hash->{HELPER}{APIPTZ};
+   my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
    my $data;
    my $logstr;
    my $url;
@@ -960,6 +1036,8 @@ sub login_nonbl ($) {
    my $apitakesnapmaxver;
    my $apiptzpath;
    my $apiptzmaxver;
+   my $apisvsinfopath;
+   my $apisvsinfomaxver; 
    my $error;
    my $httptimeout;
   
@@ -1047,7 +1125,7 @@ sub login_nonbl ($) {
                         &printlog($hash, $logstr,"4");
                         $logstr = defined($apitakesnapmaxver) ? "MaxVersion of $apitakesnap: $apitakesnapmaxver" : "MaxVersion of $apitakesnap undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4");
-						
+
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ" ermitteln
               
                         $apiptzpath = $data->{'data'}->{$apiptz}->{'path'};
@@ -1060,6 +1138,17 @@ sub login_nonbl ($) {
                         $logstr = defined($apiptzmaxver) ? "MaxVersion of $apiptz: $apiptzmaxver" : "MaxVersion of $apiptz undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4");					
 
+                     # Pfad und Maxversion von "SYNO.SurveillanceStation.Info" ermitteln
+              
+                        $apisvsinfopath = $data->{'data'}->{$apisvsinfo}->{'path'};
+                        # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+                        $apisvsinfopath =~ tr/_//d if (defined($apisvsinfopath));
+                        $apisvsinfomaxver = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
+                            
+                        $logstr = defined($apisvsinfopath) ? "Path of $apisvsinfo selected: $apisvsinfopath" : "Path of $apisvsinfo undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
+                        $logstr = defined($apisvsinfomaxver) ? "MaxVersion of $apisvsinfo: $apisvsinfomaxver" : "MaxVersion of $apisvsinfo undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
        
                         # ermittelte Werte in $hash einfügen
                         $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
@@ -1072,6 +1161,8 @@ sub login_nonbl ($) {
                         $hash->{HELPER}{APITAKESNAPMAXVER} = $apitakesnapmaxver;
                         $hash->{HELPER}{APIPTZPATH}        = $apiptzpath;
                         $hash->{HELPER}{APIPTZMAXVER}      = $apiptzmaxver;
+                        $hash->{HELPER}{APISVSINFOPATH}    = $apisvsinfopath;
+                        $hash->{HELPER}{APISVSINFOMAXVER}  = $apisvsinfomaxver;
        
                         # Setreading 
                         readingsBeginUpdate($hash);
@@ -1124,7 +1215,7 @@ sub login_nonbl ($) {
   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
   &printlog($hash,$logstr,"5");  
  
-  if (AttrVal($name, "session", undef) eq "SurveillanceStation") {
+  if (defined(AttrVal($name, "session", undef)) and AttrVal($name, "session", undef) eq "SurveillanceStation") {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\"";
       }
       else
@@ -1264,8 +1355,6 @@ sub getcamid_nonbl ($) {
   &printlog($hash,$logstr,"5");  
   
   # einlesen aller Kameras - Auswertung in Rückkehrfunktion "camop_nonbl"
-  # $apicammaxver um 1 verringern - Issue in API !
-  # if (defined $apicammaxver) {$apicammaxver -= 1};
   $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
 
   $param = {
@@ -1306,6 +1395,9 @@ sub camop_nonbl ($) {
    my $apiptz            = $hash->{HELPER}{APIPTZ};
    my $apiptzpath        = $hash->{HELPER}{APIPTZPATH};
    my $apiptzmaxver      = $hash->{HELPER}{APIPTZMAXVER};
+   my $apisvsinfo        = $hash->{HELPER}{APISVSINFO};
+   my $apisvsinfopath    = $hash->{HELPER}{APISVSINFOPATH};
+   my $apisvsinfomaxver  = $hash->{HELPER}{APISVSINFOMAXVER};
    my $sid               = $hash->{HELPER}{SID};
    my $OpMode            = $hash->{OPMODE};
    my $url;
@@ -1466,6 +1558,11 @@ sub camop_nonbl ($) {
       # eine Kamera wird aktiviert, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
    }
+   elsif ($OpMode eq "Getsvsinfo")
+   {
+      # Infos bezüglich Synology Surveillance Station werden ermittelt
+      $url = "http://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
+   }
    elsif ($OpMode eq "Getcaminfo")
    {
       # Infos einer Kamera werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet  
@@ -1536,6 +1633,7 @@ sub camret_nonbl ($) {
    my $deviceType;
    my $camStatus;
    my ($presetcnt,$cnt,%allpresets,$presid,$presname,@preskeys,$presetlist);
+   my ($userPriv,%version);
    my $verbose;
    my $httptimeout;
    
@@ -1706,6 +1804,59 @@ sub camret_nonbl ($) {
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
+            elsif ($OpMode eq "Getsvsinfo") 
+            {
+                # Parse SVS-Infos
+                $userPriv = $data->{'data'}{'userPriv'};
+                if (defined($userPriv)) {
+                    if ($userPriv eq "0") {
+                        $userPriv = "No Accss";
+                        }
+                        elsif ($userPriv eq "1") {
+                        $userPriv = "Admin";
+                        }
+                        elsif ($userPriv eq "2") {
+                        $userPriv = "Manager";
+                        }
+                        elsif ($userPriv eq "4") {
+                        $userPriv = "Viewer";
+                        }
+                 }                    
+                
+                %version = (
+                              MAJOR => $data->{'data'}{'version'}{'major'},
+                              MINOR => $data->{'data'}{'version'}{'minor'},
+                              BUILD => $data->{'data'}{'version'}{'build'}
+                              );
+                
+                if (!exists($data->{'data'}{'customizedPortHttp'})) {
+                    delete $defs{$name}{READINGS}{SVScustomPortHttp};
+                    }             
+               
+                if (!exists($data->{'data'}{'customizedPortHttps'})) {
+                    delete $defs{$name}{READINGS}{SVScustomPortHttps};
+                    }
+                                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"SVScustomPortHttp",$data->{'data'}{'customizedPortHttp'});
+                readingsBulkUpdate($hash,"SVScustomPortHttps",$data->{'data'}{'customizedPortHttps'});
+                readingsBulkUpdate($hash,"SVSlicenseNumber",$data->{'data'}{'liscenseNumber'});
+                readingsBulkUpdate($hash,"SVSuserPriv",$userPriv);
+                readingsBulkUpdate($hash,"SVSversion",$data->{'data'}{'version'}{'major'}.".".$data->{'data'}{'version'}{'minor'}."-".$data->{'data'}{'version'}{'build'});
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                
+                # Werte in $hash zur späteren Auswertung einfügen 
+                $hash->{HELPER}{SVSVERSION} = \%version;
+                     
+                # Logausgabe
+                $logstr = "Informations related to Surveillance Station retrieved successfully";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
             elsif ($OpMode eq "Getcaminfo") 
             {
                 # Parse Caminfos
@@ -1745,10 +1896,11 @@ sub camret_nonbl ($) {
                     }
                     elsif ($camStatus eq "3") {
                     $camStatus = "disconnected";
+                    readingsSingleUpdate($hash,"state", "disconnected", 0);
                     }
                     elsif ($camStatus eq "7") {
                     $camStatus = "disabled";
-                    readingsSingleUpdate($hash,"state", "disable", 0); 
+                    readingsSingleUpdate($hash,"state", "disable ", 0); 
                     }
                     else {
                     $camStatus = "other";
@@ -2017,7 +2169,7 @@ sub camret_nonbl ($) {
     $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
     &printlog($hash,$logstr,"5");    
   
-    if (AttrVal($name, "session", undef) eq "SurveillanceStation") {
+    if (defined(AttrVal($name, "session", undef)) and AttrVal($name, "session", undef) eq "SurveillanceStation") {
         $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
         }
         else
@@ -2218,6 +2370,7 @@ sub experror {
   418 => "Object is not exist",
   419 => "Visualstation name repetition",
   439 => "Too many items selected",
+  502 => "Camera disconnected",  
   );
   unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
 
@@ -2256,7 +2409,7 @@ return;
        <li>Trigger a Snapshot </li>
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
        <li>Activate a Camera in Synology Surveillance Station</li>
-       <li>Retrieval of Camera Properties (Polling)</li><br>
+       <li>Retrieval of Camera Properties (also by Polling) as well as informations about the installed SVS-package</li><br>
     </ul>
    </ul>
    The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
@@ -2320,7 +2473,7 @@ return;
     If you have specified a pre-recording time in SVS it will be considered too. <br><br><br>
     
     
-    <a name="Credentials"></a>
+    <a name="SSCam_Credentials"></a>
     <b>Credentials </b><br><br>
     
     After a camera-device is defined, firstly it is needed to save the credentials. This will be done with command:
@@ -2360,6 +2513,7 @@ return;
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       </table>
     </ul>
       <br><br>
@@ -2457,11 +2611,15 @@ return;
   With SSCam the properties of defined Cameras could be retrieved. It could be done by using the command:
   <pre>
       get &lt;name&gt; caminfoall
+      get &lt;name&gt; svsinfo
   </pre>
   
-  Dependend from the type of Camera (e.g. Fix- or PTZ-Camera) the available properties will be retrieved and provided as Readings.<br>
-  For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further <br>
-  processing like crearing events. <br><br>
+  With command "get &lt;name&gt; caminfoall" dependend of the type of Camera (e.g. Fix- or PTZ-Camera) the available properties will be retrieved and provided as Readings.<br>
+  For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further 
+  processing like creating events. <br>
+  The command "get &lt;name&gt; svsinfo" is not really dependend on a camera, but rather a command to determine common informations about the installed SVS-version and other properties. <br>
+  This function will be executed automatically once-only after a restart of FHEM. Please consider to save the <a href="#SSCam_Credentials">credentials</a> what will be used for login to DSM or SVS !
+  <br><br>
 
   <b>Polling of Camera-Properties:</b><br><br>
 
@@ -2553,7 +2711,12 @@ return;
     <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Synology Surveillance Station predefined Presets (at PTZ-Cameras)  </td></tr>
-    <tr><td><li>Record</li>             </td><td>- if recording is running = Start, if no recording is running = Stop  </td></tr>   
+    <tr><td><li>Record</li>             </td><td>- if recording is running = Start, if no recording is running = Stop  </td></tr> 
+    <tr><td><li>SVScustomPortHttp</li>  </td><td>- Customized port of Surveillance Station (HTTP) (to get with "svsinfo")  </td></tr> 
+    <tr><td><li>SVScustomPortHttps</li> </td><td>- Customized port of Surveillance Station (HTTPS) (to get with "svsinfo")  </td></tr>
+    <tr><td><li>SVSlicenseNumber</li>   </td><td>- The total number of installed licenses (to get with "svsinfo")  </td></tr>
+    <tr><td><li>SVSuserPriv</li>        </td><td>- The effective rights of the user used for log in (to get with "svsinfo")  </td></tr>
+    <tr><td><li>SVSversion</li>         </td><td>- package version of the installed Surveillance Station (to get with "svsinfo")  </td></tr>
     <tr><td><li>UsedSpaceMB</li>        </td><td>- used disk space of recordings by Camera  </td></tr>
   </table>
   </ul>
@@ -2619,7 +2782,7 @@ return;
       <li>Aufnehmen eines Schnappschusses und Ablage in der Synology Surveillance Station </li>
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
-      <li>Abfrage von Kameraeigenschaften (Polling)</li><br>
+      <li>Abfrage von Kameraeigenschaften (auch mit Polling) sowie den Eigenschaften des installierten SVS-Paketes</li><br>
      </ul> 
     </ul>
     Die Aufnahmen stehen in der Synology Surveillance Station (SVS) zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
@@ -2679,7 +2842,7 @@ return;
     Eine eventuell in der SVS eingestellte Dauer der Voraufzeichnung wird weiterhin berücksichtigt. <br><br><br>
     
     
-    <a name="Credentials"></a>
+    <a name="SSCam_Credentials"></a>
     <b>Credentials </b><br><br>
     
     Nach dem Definieren des Gerätes müssen zuerst die Zugangsrechte gespeichert werden. Das geschieht mit dem Befehl:
@@ -2719,6 +2882,7 @@ return;
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       </table>
     </ul>
       <br><br>
@@ -2816,11 +2980,15 @@ return;
   Mit SSCam können die Eigenschaften der Kameras aus der Surveillance Station abgefragt werden. Dazu steht der Befehl zur Verfügung:
   <pre>
       get &lt;name&gt; caminfoall
+      get &lt;name&gt; svsinfo
   </pre>
   
-  Abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) werden die verfügbaren Eigenschaften ermittelt und als Readings zur Verfügung gestellt. <br>
+  Mit dem Befehl "get &lt;name&gt; caminfoall" werden abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die verfügbaren Eigenschaften ermittelt und als Readings zur Verfügung gestellt. <br>
   So wird zum Beispiel das Reading "Availability" auf "disconnected" gesetzt falls die Kamera von der Surveillance Station getrennt wird und kann für weitere <br>
-  Verarbeitungen genutzt werden. <br><br>
+  Verarbeitungen genutzt werden. <br>
+  Der Befehl "get &lt;name&gt; svsinfo" ist eigentlich nicht von der Kamera abhängig, sondern ermittelt vielmehr allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
+  Diese Funktion wird einmalig automatschisch nach einem Restart von FHEM ausgeführt. Es ist darauf zu achten dass die <a href="#SSCam_Credentials">Credentials</a> gespeichert wurden !
+  <br><br>
 
   <b>Polling der Kameraeigenschaften:</b><br><br>
 
@@ -2914,7 +3082,12 @@ return;
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
-    <tr><td><li>Record</li>             </td><td>- Aufnahme läuft = Start, keine Aufnahme = Stop  </td></tr>   
+    <tr><td><li>Record</li>             </td><td>- Aufnahme läuft = Start, keine Aufnahme = Stop  </td></tr> 
+    <tr><td><li>SVScustomPortHttp</li>  </td><td>- benutzerdefinierter Port der Surveillance Station (HTTP) im DSM-Anwendungsportal (get mit "svsinfo")  </td></tr> 
+    <tr><td><li>SVScustomPortHttps</li> </td><td>- benutzerdefinierter Port der Surveillance Station (HTTPS) im DSM-Anwendungsportal (get mit "svsinfo") </td></tr>
+    <tr><td><li>SVSlicenseNumber</li>   </td><td>- die Anzahl der installierten Kameralizenzen (get mit "svsinfo") </td></tr>
+    <tr><td><li>SVSuserPriv</li>        </td><td>- die effektiven Rechte des verwendeten Users nach dem Login (get mit "svsinfo") </td></tr>
+    <tr><td><li>SVSversion</li>         </td><td>- die Paketversion der installierten Surveillance Station (get mit "svsinfo") </td></tr>
     <tr><td><li>UsedSpaceMB</li>        </td><td>- durch Aufnahmen der Kamera belegter Plattenplatz auf dem Volume  </td></tr>
   </table>
   </ul>
