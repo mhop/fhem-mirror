@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 49_SSCAM: added function "svsinfo" to get informations about 
+             installed SVS-package
+  - bugfix:  49_SSCAM: saved Credentials were deleted if a device will be 
+             deleted
+  - change:  49_SSCAM: if Availability = "disconnected" then "state"-value 
+             will be "disconnected" too
   - feature: 70_Pushalot: added support for TimeToLive parameter.
   - bugfix:  60_allergy: fixed invalid readings names
   - bugfix:  73_km200: Little Bugfix with the use around Regular Expressions
