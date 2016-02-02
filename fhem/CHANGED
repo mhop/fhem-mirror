@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  60_allergy: fixed invalid readings names
   - bugfix:  73_km200: Little Bugfix with the use around Regular Expressions
   - feature: 91_notify: add readLog attribute
   - feature: 98_ping: Add attribute for minimum fails before reporting
