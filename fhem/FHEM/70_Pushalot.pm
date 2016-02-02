@@ -24,6 +24,7 @@
 # set PushNotification message "This is my message." "With Title" "http://www.xyz/image.png" "http://www.xyz.com""
 # set PushNotification message "This is my message." "With Title" "http://www.xyz/image.png" "http://www.xyz.com" "Link Title"
 # set PushNotification message "This is my message." "With Title" "http://www.xyz/image.png" "http://www.xyz.com" "Link Title"  True False
+# set PushNotification message "This is my message." "With Title" "http://www.xyz/image.png" "http://www.xyz.com" "Link Title"  True False 5
 #
 # Explantation:
 #
@@ -34,6 +35,8 @@
 #  - The fifth parameter is an optional link title for the message
 #  - The sixth parameter defines whether the message should be marked as important
 #  - The seventh parameter defines whether the message should be delivered silently
+#  - The eigth parameter defines the "time to live" in seconds for the message. After this time the message is automatically purged. Note: The Pushalot service is checking
+#    messages for purge every 5 minutes
 #
 # For further documentation
 # https://pushalot.com/api:
@@ -139,17 +142,18 @@ sub Pushalot_Build_Body($@)
   my ($hash, @args) = @_;
 
   my $string             = join(" ", @args);
-  my @matches            = ($string =~ /"[^"]*"| True| False/g);
+  my @matches            = ($string =~ /"[^"]*"| True| False| \d+/g);
 
-  my ($message, $title, $image, $link, $linkTitle, $important, $silent)  = @matches;
+  my ($message, $title, $image, $link, $linkTitle, $important, $silent, $timeToLive)  = @matches;
 
-  $message   =~ s/^[\s"]+|[\s"]+$//g;
-  $title     =~ s/^[\s"]+|[\s"]+$//g;
-  $image     =~ s/^[\s"]+|[\s"]+$//g;
-  $link      =~ s/^[\s"]+|[\s"]+$//g;
-  $linkTitle =~ s/^[\s"]+|[\s"]+$//g;
-  $important =~ s/^[\s"]+|[\s"]+$//g;
-  $silent    =~ s/^[\s"]+|[\s"]+$//g;
+  $message    =~ s/^[\s"]+|[\s"]+$//g;
+  $title      =~ s/^[\s"]+|[\s"]+$//g;
+  $image      =~ s/^[\s"]+|[\s"]+$//g;
+  $link       =~ s/^[\s"]+|[\s"]+$//g;
+  $linkTitle  =~ s/^[\s"]+|[\s"]+$//g;
+  $important  =~ s/^[\s"]+|[\s"]+$//g;
+  $silent     =~ s/^[\s"]+|[\s"]+$//g;
+  $timeToLive =~ s/^[\s"]+|[\s"]+$//g;
 
   if ($message eq "")
   {
@@ -162,11 +166,12 @@ sub Pushalot_Build_Body($@)
       . "&Source=" . $hash->{Source} 
       . "&Body=" . uri_escape($message) 
       . "&Title=" . uri_escape($title) 
-      . "&Image=" . uri_escape($image)
-      . "&Link=" . uri_escape($link) 
-      . "&LinkTitle=" . uri_escape($linkTitle)
+      . ($image ? "&Image=" . uri_escape($image) : "")
+      . ($link ? "&Link=" . uri_escape($link) : "")
+      . ($linkTitle ? "&LinkTitle=" . uri_escape($linkTitle) : "")
       . "&IsImportant=" . $important
-      . "&IsSilent=" . $silent;
+      . "&IsSilent=" . $silent
+      . "&TimeToLive=" . $timeToLive;
 }
 
 #------------------------------------------------------------------------------
@@ -317,6 +322,10 @@ sub Pushalot_Parse_Result($$$)
         <td>&lt;silent&gt;</td>
         <td>True|False: True if the message should be delivered silently (no notify sound is played), otherwise False (Default)</td>
       </tr>
+      <tr>
+        <td>&lt;time_to_live&gt;</td>
+        <td>The time in minutes after which the message is automatically purged</td>
+      </tr>
     </table>
     <br>
     Examples:
@@ -328,6 +337,7 @@ sub Pushalot_Parse_Result($$$)
       <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" </code><br>
       <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" True</code><br>
       <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" True False</code><br>
+      <code>set PushNotification message "This is my message." "With Title" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" True False 5</code><br>
     </ul>
     <br>
   </ul>
@@ -424,6 +434,10 @@ sub Pushalot_Parse_Result($$$)
         <td>&lt;silent&gt;</td>
         <td>True|False: True wenn die Nachricht 'still' ausgeliefert werden soll (kein Benachrichtigungssound wird abgespielt), ansonsten False  (Default)</td>
       </tr>
+      <tr>
+        <td>&lt;time_to_live&gt;</td>
+        <td>Zeit in Minuten nach der die Nachricht automatisch entfernt wird. Achtung: Der Pushalot Service prüft zu löschende Nachrichten alle 5 Minuten</td>
+      </tr>
     </table>
     <br>
     Beispiele:
@@ -435,6 +449,7 @@ sub Pushalot_Parse_Result($$$)
       <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Titel" </code><br>
       <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Titel" True</code><br>
       <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" True False</code><br>
+      <code>set PushNotification message "Das ist meine Nachricht." "Mit Titel" "http://www.xyz.com/image.png" "http://www.xyz.com" "Link Title" True False 5</code><br>
     </ul>
     <br>
     Notes:
