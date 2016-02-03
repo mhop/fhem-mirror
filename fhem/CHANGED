@@ -1,5 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Mijor Release 1.2.0
+                      !!! ATTENTION !!! Do not forget to to update the new
+                      Automagic Flowset !!!
+  - feature:  74_AMAD: shutown the Device, activate Airplanemode, control
+                       Notivicationvolume, vibrates the Device, Locked Device
+                       by PIN
+  - bugfix: 74_AMAD: modified Error handling, best practice for identify offline
+                     Mode
   - feature: New module 74_HOMBOT to control LG Hombot vacuum cleaner
   - bugfix:  49_SSCAM: credentials won't be deleted if "rereadcfg" is used
   - bugfix:  76_MSGMail: Make use of attribute mailtype again (enabling html)
