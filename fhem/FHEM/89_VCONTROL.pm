@@ -81,17 +81,18 @@ sub VCONTROL_1ByteU2Parse($$);
 sub VCONTROL_1ByteSParse($$);
 sub VCONTROL_2ByteSParse($$);
 sub VCONTROL_2ByteUParse($$);
+sub VCONTROL_1ByteHexParse($);
 sub VCONTROL_2ByteHexParse($);
 sub VCONTROL_2BytePercentParse($$);
 sub VCONTROL_4ByteParse($$);
 sub VCONTROL_timerParse($);
 sub VCONTROL_ModusParse($);
 sub VCONTROL_DateParse($);
-sub VCONTROL_1ByteUConv($);
-sub VCONTROL_1ByteSConv($);
+sub VCONTROL_1ByteUConv($$);
+sub VCONTROL_1ByteSConv($$);
 sub VCONTROL_1ByteUx10Conv($);
-sub VCONTROL_2ByteUConv($);
-sub VCONTROL_2ByteSConv($);
+sub VCONTROL_2ByteUConv($$);
+sub VCONTROL_2ByteSConv($$);
 sub VCONTROL_DateConv($);
 sub VCONTROL_TimerConv($$);
 sub VCONTROL_RegisterConv($);
@@ -576,6 +577,8 @@ VCONTROL_Parse($$$$)
         $value = VCONTROL_2ByteSParse($hexline,$cmd_list[$cmd][3]) if (length($hexline) > 3);
      } elsif ($cmd_list[$cmd][2] eq "2ByteU"){
         $value = VCONTROL_2ByteUParse($hexline,$cmd_list[$cmd][3]) if (length($hexline) > 3);   
+     } elsif ($cmd_list[$cmd][2] eq "1ByteH"){
+        $value = VCONTROL_1ByteHexParse($hexline) if (length($hexline) > 1);
      } elsif ($cmd_list[$cmd][2] eq "2ByteH"){
         $value = VCONTROL_2ByteHexParse($hexline) if (length($hexline) > 3);   
      } elsif ($cmd_list[$cmd][2] eq "2BytePercent"){
@@ -788,19 +791,19 @@ VCONTROL_Set($@)
         $send_now=$$_[5];
         
         if ($$_[3] eq "1ByteU"){
-           $send_additonal_param=VCONTROL_1ByteUConv($value);
+           $send_additonal_param=VCONTROL_1ByteUConv($value,$$_[4]);
         }
         elsif ($$_[3] eq "1ByteS"){
-           $send_additonal_param=VCONTROL_1ByteSConv($value);
+           $send_additonal_param=VCONTROL_1ByteSConv($value,$$_[4]);
         }
         elsif ($$_[3] eq "1ByteUx10"){
            $send_additonal_param=VCONTROL_1ByteUx10Conv($value);
         }
         elsif ($$_[3] eq "2ByteU"){
-           $send_additonal_param=VCONTROL_2ByteUConv($value);
+           $send_additonal_param=VCONTROL_2ByteUConv($value,$$_[4]);
         }
         elsif ($$_[3] eq "2ByteS"){
-           $send_additonal_param=VCONTROL_2ByteSConv($value);
+           $send_additonal_param=VCONTROL_2ByteSConv($value,$$_[4]);
         }
         elsif ($$_[3] eq "date"){
           my $strtemp = VCONTROL_DateConv($value);
@@ -969,6 +972,7 @@ sub VCONTROL_CmdConfig($)
                  && $cfgarray[2] ne "1ByteS" 
                  && $cfgarray[2] ne "2ByteS" 
                  && $cfgarray[2] ne "2ByteU" 
+                 && $cfgarray[2] ne "1ByteH"
                  && $cfgarray[2] ne "2ByteH" 
                  && $cfgarray[2] ne "2BytePercent" 
                  && $cfgarray[2] ne "4Byte" 
@@ -1074,6 +1078,13 @@ sub VCONTROL_1ByteSParse($$)
   my $divisor = shift;
 
   return unpack('c', pack('C',hex(substr($hexvalue,0,2))))/$divisor;
+}
+#####################################
+sub VCONTROL_1ByteHexParse($)
+{
+  my $hexvalue = shift;
+  
+  return (substr($hexvalue,0,2));
 }
 #####################################
 sub VCONTROL_2ByteUParse($$)
@@ -1183,16 +1194,28 @@ sub VCONTROL_DateParse($){
 ##  CONV ROUTINES
 ###########################################################################
 ###########################################################################
-sub VCONTROL_1ByteUConv($)
+sub VCONTROL_1ByteUConv($$)
 {
   my $convvalue = shift;
-  return (sprintf "%02X", $convvalue);
+  my $multiplicator = shift;
+
+  if ( $multiplicator =~ /^\d+$/) { 
+     return (sprintf "%02X", $convvalue*$multiplicator);
+     }
+  else
+     { return (sprintf "%02X", $convvalue); }
 }
 #####################################
-sub VCONTROL_1ByteSConv($)
+sub VCONTROL_1ByteSConv($$)
 {
   my $convvalue = shift;
-  my $cnvstrvalue = (sprintf "%02X", $convvalue);
+  my $multiplicator = shift;
+  my $cnvstrvalue;
+  if ( $multiplicator =~ /^\d+$/) { 
+    $cnvstrvalue = (sprintf "%02X", $convvalue*$multiplicator);
+    }
+    else
+    {$cnvstrvalue = (sprintf "%02X", $convvalue);}
   if ($convvalue <0){
      return substr($cnvstrvalue,length($cnvstrvalue)-2,2);
   }
@@ -1207,17 +1230,33 @@ sub VCONTROL_1ByteUx10Conv($)
   return (sprintf "%02X", $convvalue*10);
 }
 #####################################
-sub VCONTROL_2ByteUConv($)
+sub VCONTROL_2ByteUConv($$)
 {
   my $convvalue = shift;
-  my $hexstr = (sprintf "%04X", $convvalue);
+  my $multiplicator = shift;
+  my $hexstr;
+  if ( $multiplicator =~ /^\d+$/) { 
+     $hexstr = (sprintf "%04X", $convvalue*$multiplicator);
+  }
+  else {
+     $hexstr = (sprintf "%04X", $convvalue);
+  }
+
   return substr($hexstr,2,2).substr($hexstr,0,2);
 }
 #####################################
-sub VCONTROL_2ByteSConv($)
+sub VCONTROL_2ByteSConv($$)
 {
   my $convvalue = shift;
-  my $cnvstrvalue = (sprintf "%04X", $convvalue);
+  my $multiplicator = shift;
+  my $cnvstrvalue;
+
+  if ( $multiplicator =~ /^\d+$/) { 
+     $cnvstrvalue = (sprintf "%04X", $convvalue*$multiplicator);
+     }
+  else {
+     $cnvstrvalue = (sprintf "%04X", $convvalue);
+  }
   if ($convvalue <0){
     return substr($cnvstrvalue,6,2).substr($cnvstrvalue,4,2);
   }
@@ -1502,10 +1541,15 @@ sub VCONTROL_RegisterConv($)
         <br>
 
         <li><b>NEXT_CMD or DAY</b><br>
-        This column has two functions:
+        This column has three functions:
         <ul>
         <li> If this columns is configured with a name of another SETCMD, it will be processed directly afterwards.<br>
             Example: after setting Spar Mode on (S-ON), you have to set Party Mode off (P-OFF) <br></li> 
+        <li> Using a CONVMETHODE 1ByteU or 1ByteS or 2ByteS or 2ByteU , you can use the column as an multiplicator,<br>
+             which will be multiplied to the value in the SET command<br>
+             Example: <code>SET, TEMPNHK1 , 01F4200002 , 2ByteU      , 10</code>
+             With <code>SET DEVICE TEMPNHK1 21</code> 210 will be send to the heating.
+        </li>
         <li>Using timer as CONVMETHODE, so it has to be specified a week day in this columns.<br>
             possible values: MO DI MI DO FR SA SO<br></li>
         </li>
@@ -1708,10 +1752,16 @@ sub VCONTROL_RegisterConv($)
         <br>
 
         <li><b>NEXT_CMD or DAY</b><br>
-        Diese Spalte erf&uuml;llt zwei Funktionen:
+        Diese Spalte erf&uuml;llt drei Funktionen:
         <ul>
         <li>Gibt man in dieser Spalte ein anderes konfiguriertes SETCMD an, so wird dies anschließend ausgeführt.<br>
-            Beispiel: nach dem Spar Modus (S-ON) gesetzt wurde, muss der Party Modus (P-OFF) ausgeschaltet werden<br></li> 
+            Beispiel: nach dem Spar Modus (S-ON) gesetzt wurde, muss der Party Modus (P-OFF) ausgeschaltet werden<br>
+        </li>
+        <li> Ist als CONVMETHODE 1ByteU oder 1ByteS oder 2ByteS oder 2ByteU angegeben, so kann hier ein Faktor angegeben,<br>
+             der beim SET auf den angegeben multipliziert wird<br>
+             Beispiel: <code>SET, TEMPNHK1 , 01F4200002 , 2ByteU      , 10</code>
+             Bei <code>SET DEVICE TEMPNHK1 21</code> wird 210 an die Heizung gesendet.
+        </li>
         <li>Ist als CONVMETHODE timer angegeben, so muss man in dieser Spalte den Wochentag angeben, für den der Timer gilt.<br>
             M&ouml;gliche Werte: MO DI MI DO FR SA SO<br></li>
         </li>
