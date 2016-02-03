@@ -1463,7 +1463,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Standardwert ist 1 (&Uuml;berschriftenzeile wird angezeigt)<br><br>
     <li><a name="FB_CALLLIST_no-table-header">no-table-header</a> 0,1</li>
     Sofern aktiviert, wird die Kopfzeile der Tabelle f&uuml;r die aktuelle Definition ausgeblendet.<br><br>
-    M&ouml;gliche Werte: 0 =&gt; Kopfzeile wird angezeigt , 1 => Kopfzeile wird ausgeblendet<br>
+    M&ouml;gliche Werte: 0 =&gt; Kopfzeile wird angezeigt , 1 =&gt; Kopfzeile wird ausgeblendet<br>
     Standardwert ist 1 (Kopfzeile wird angezeigt)<br><br>
     </ul>
   <br>
