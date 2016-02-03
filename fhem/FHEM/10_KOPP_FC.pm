@@ -1,8 +1,5 @@
-##############################################################################################################################
-
-############################################################
 # $Id$
-# $Id: 10_KOPP_FC.pm 6183 2014-09-01 	Claus.M (RaspII)
+##########################################################################################################################################################################################
 #
 # Kopp Free Control protocol module for FHEM
 # (c) Claus M.
@@ -15,18 +12,19 @@
 #
 # Date		   Who				Comment																												   
 # ----------  -------------   	-------------------------------------------------------------------------------------------------------------------------------
-# 2016-01-12  Claus M.			Implemented Dimmer Commands for 1&3 key remote, removed toggle	
-# 2015-06-02  Claus M.			Now can also Handle multiple devices with same code, next step: implement all commands (on, off, toggle... for KOPP_FC_Parse)
+# 2016-01-30  RaspII			Now also Blinds and Switches are implemented (all actuators I have). 
+# 2016-01-12  RaspII			Implemented Dimmer Commands for 1&3 key remote, removed toggle	
+# 2015-06-02  RaspII			Now can also Handle multiple devices with same code, next step: implement all commands (on, off, toggle... for KOPP_FC_Parse)
 #								Missing is also 2 key commands (e.g. key1=on Key2=off for Dimmmers, key1=up key2=down for blinds)
-# 2015-05-21  Claus M.			Beim FS20 Modul sind die möglichen Set Commands abhängig vom "model" Attribute !! hier weitersuchen
+# 2015-05-21  RaspII			Beim FS20 Modul sind die möglichen Set Commands abhängig vom "model" Attribute !! hier weitersuchen
 #								Seit die Return SerExtensions eingebaut ist, lässt sich bei Taste2Rad4 dass Commando Off nicht mehr absetzen (hat was mit dem Modul SerExtensions zu tun)
-# 2015-05-02  Claus M.			Try now to receive Kopp Messages, also
-# 2015-04-13  Claus M. 			Modified some typos (help section)
-# 2015-02-01  Claus M.			use small "k" to start Kopp FW, "K" was already used for raw data
-# 2014-12-21  Claus M.			V6 (fits to my FHEM.cfg V6) Removed timeout from define command, will add later to set command (best guess yet). 
-# 2014-12-13  Claus M.			first version with command set: "on, off, toggle, dim, stop". Added new Parameter ("N" for do not print) 
-# 2014-12-08  Claus M.			direct usage of set command @ FHEM.cfg works fine, but buttoms on/off do not appear, seems to be a setup/initialize issue in this routine 
-# 2014-09-01  Claus M.			first Version
+# 2015-05-02  RaspII			Try now to receive Kopp Messages, also
+# 2015-04-13  RaspII 			Modified some typos (help section)
+# 2015-02-01  RaspII			use small "k" to start Kopp FW, "K" was already used for raw data
+# 2014-12-21  RaspII			V6 (fits to my FHEM.cfg V6) Removed timeout from define command, will add later to set command (best guess yet). 
+# 2014-12-13  RaspII			first version with command set: "on, off, toggle, dim, stop". Added new Parameter ("N" for do not print) 
+# 2014-12-08  RaspII			direct usage of set command @ FHEM.cfg works fine, but buttoms on/off do not appear, seems to be a setup/initialize issue in this routine 
+# 2014-09-01  RaspII			first Version
 #
 ##########################################################################################################################################################################################
 
@@ -45,6 +43,10 @@ my %codes = (					# This Sheet contains all allowed codes, indevpendtly from Mod
     "03" => "toggle",
 	"04" => "dimm",
 	"05" => "stop",
+	"06" => "up",
+	"07" => "down",
+	"08" => "top",
+	"09" => "bottom",
 );
 
 my %sets = (					# Do not know whether this list is needed (guess: no)
@@ -52,13 +54,19 @@ my %sets = (					# Do not know whether this list is needed (guess: no)
 	"off" => "",
 	"stop" => "",
 	"toggle" => "",
-	"dimm" => ""
-
+	"dimm" => "",
+	"up" => "",
+	"down" => "",
+	"top" => "",
+	"bottom" => ""
 );
 my %models = (
-    Dimm_8011_00  => 'Dimmer',
-	Dimm_8011_00_3Key  => 'Dimmer_3KeyMode',
-    Timer_8080_04   => 'TimerSwitch',
+    Switch_8080_01  	=> 'Switch',
+    Switch_8080_01_2Key => 'Switch_2KeyMode',
+    Blind_8080_02  		=> 'Blind',
+    Timer_8080_04  		=> 'TimerSwitch',
+    Dimm_8011_00  		=> 'Dimmer',
+	Dimm_8011_00_3Key  	=> 'Dimmer_3KeyMode',
 );
 
 my %kopp_fc_c2b;        # DEVICE_TYPE->hash (reverse of device_codes), ##Claus what does that mean?
@@ -78,7 +86,7 @@ sub KOPP_FC_Initialize($)
 	$hash->{Match}   = "^kr.*";  
 	$hash->{SetFn}   = "KOPP_FC_Set";
 	$hash->{DefFn}   = "KOPP_FC_Define";
-
+	$hash->{UndefFn}   = "KOPP_FC_Undef";
     $hash->{ParseFn}   = "KOPP_FC_Parse";
 	$hash->{AttrFn}  	= "KOPP_FC_Attr";		  # aus SOMFY Beispiel abgeleitet			
 
@@ -100,7 +108,8 @@ sub KOPP_FC_Initialize($)
 
 
 #############################
-sub KOPP_FC_Define($$) {
+sub KOPP_FC_Define($$) 
+{
 	my ( $hash, $def ) = @_;
 	my @a = split( "[ \t][ \t]*", $def );
 	
@@ -211,6 +220,34 @@ sub KOPP_FC_Define($$) {
 	AssignIoPort($hash);
 }
 
+
+#############################
+sub KOPP_FC_Undef($$)
+{
+  my ($hash, $name) = @_;
+
+  foreach my $c (keys %{ $hash->{CODE} } ) 
+  {
+    $c = $hash->{CODE}{$c};
+
+    # As after a rename the $name my be different from the $defptr{$c}{$n}
+    # we look for the hash.
+    foreach my $dname (keys %{ $modules{KOPP_FC}{defptr}{$c} }) 
+	{
+      delete($modules{KOPP_FC}{defptr}{$c}{$dname}) if($modules{KOPP_FC}{defptr}{$c}{$dname} == $hash);
+	
+# No entry to log file (only for test)
+#	 if($modules{KOPP_FC}{defptr}{$c}{$dname} == $hash)
+#     {
+#	  my $m=$modules{KOPP_FC}{defptr}{$c}{$dname}; 
+#      Log3 $name, 3, "KOPP_FC_Undef: Name: $name, Code: $c, $m deleted"; 
+#     } 
+
+    }
+  }
+  return undef;
+}
+
 ##############################
 sub KOPP_FC_Attr(@) {
 # write new Attributes to global $attr variable if attribute name is model
@@ -286,16 +323,19 @@ sub KOPP_FC_Set($@)
 
 
 	my $c = $kopp_fc_c2b{$args[0]};
-    if(!defined($c)) 														# if set command was not yet defined in %codes provide command list
-																			# $c contains the first argument of %codes, "01" for "on", "02" for "off" ..
+    if(!defined($c)) 																		# if set command was not yet defined in %codes provide command list
+																							# $c contains the first argument of %codes, "01" for "on", "02" for "off" ..
      {														
      my $list;
      if(defined($attr{$name}) && defined($attr{$name}{"model"})) 
 	  {
-       my $mt = $models{$attr{$name}{"model"}};								# Model specific set arguments will be defined here (maybe move later to variable above)
-       $list = "dimm stop on off" if($mt && $mt eq "Dimmer"); 				# --------------------------------------------------------------------------------------
-	   $list = "dimm stop on off" if($mt && $mt eq "Dimmer_3KeyMode");		# "$mt &&...", damit wird Inhalt von $mt nur geprüft wenn $mt initialisiert ist
-       $list = "on off short" if($mt && $mt eq "TimerSwitch"); 				# on means long key presure
+       my $mt = $models{$attr{$name}{"model"}};												# Model specific set arguments will be defined here (maybe move later to variable above)
+       $list = "dimm stop on off" if($mt && $mt eq "Dimmer"); 								# --------------------------------------------------------------------------------------
+	   $list = "dimm stop on off" if($mt && $mt eq "Dimmer_3KeyMode");						# "$mt &&...", damit wird Inhalt von $mt nur geprüft wenn $mt initialisiert ist
+       $list = "on off short" if($mt && $mt eq "TimerSwitch"); 								# on means long key presure
+       $list = "top bottom up down stop" if($mt && $mt eq "Blind"); 						# up/down means long key presure
+       $list = "on off" if($mt && $mt eq "Switch"); 										# (no difference between long/short preasure)
+       $list = "on off" if($mt && $mt eq "Switch_2KeyMode");								# (no difference between long/short preasure)
       }
 	   
 	 $list = (join(" ", sort keys %kopp_fc_c2b) . " Claus") if(!defined($list));			# if list not defined model specific, allow whole default list
@@ -305,10 +345,10 @@ sub KOPP_FC_Set($@)
 
     }
 																	
-	if(defined($attr{$name}) && defined($attr{$name}{"model"})) 							# Fall Model spezifiziert ist, Model ermitteln -> $mt
+	if(defined($attr{$name}) && defined($attr{$name}{"model"})) 							# Falls Model spezifiziert ist, Model ermitteln -> $mt
 	  {																						# ----------------------------------------------------
        $modl = $models{$attr{$name}{"model"}};								 
-	   Log3 $name, 2, "KOPP_FC_Set: Index auf codes: $c Model: $modl"; 								# kann wieder Raus !!!! ### Claus  	
+#	   Log3 $name, 2, "KOPP_FC_Set: Device Name: $name Index auf codes: $c Model: $modl"; 						# kann wieder Raus !!!! ### Claus  	
       }
 
 
@@ -317,8 +357,12 @@ sub KOPP_FC_Set($@)
 #	$hash->{STATE} = $cmd;								# update device state
 
 
-	# Look for all devices with the same code, and update readings (state), (timestamp, not yet)
-	# -------------------------------------------------------------------------------------------
+# Look for all devices with the same code, and update readings (state), (timestamp, not yet)
+# ------------------------------------------------------------------------------------------------------
+# some hints: if same code is used within config file for differen models update of state makes no sense
+# and may fail because command is not available for a different model. So we only update devices which are 
+# of the same model as the original one.
+#
 #	my $tn = TimeNow();
 #	my $defptr = $modules{KOPP_FC}{defptr}{transmittercode1}{keycode};
 #	foreach my $n (keys %{ $defptr }) 
@@ -327,19 +371,35 @@ sub KOPP_FC_Set($@)
 #	}
 
 
-	my $code  = $hash->{CODE}{1};						# Load Devices code1 (typically key code short preasure)
-	my $rhash = $modules{KOPP_FC}{defptr}{$code};		# Load Hash of Devices with same code 
+	my $code  = $hash->{CODE}{1};																# Load Devices code1 (typically key code short preasure)
+	my $rhash = $modules{KOPP_FC}{defptr}{$code};												# Load Hash of Devices with same code 
 
-#	my @list;											# Do (Why) I need this @lists (incl. return @list)? 
+#	my @list;																					# Do (Why) I need this @lists (incl. return @list)? 
 	foreach my $n (keys %{ $rhash }) 
     {
      $lh = $rhash->{$n};
-     $n = $lh->{NAME};        							# It may be renamed, n now contains name of defined device, e.g. Dimmer....  
-#    return "" if(IsIgnored($n));   					# Little strange.
-     $lh->{STATE} = $cmd;								# update device state
-     readingsSingleUpdate($lh, "state", $cmd, 1);		# update also Readings
+     $n = $lh->{NAME};        																	# It may be renamed, n now contains name of defined device, e.g. Dimmer....  
+#    return "" if(IsIgnored($n));   															# Little strange.
 
-     Log3 $name, 3, "KOPP_FC_Set: hash: $hash name: $n command: $cmd Code: $code";  # kann wieder Raus !!!! 
+
+	if(defined ($modl) && defined($attr{$n}) && defined($attr{$n}{"model"})) 					 
+	{
+	 my $m=$models{$attr{$n}{"model"}};															
+     Log3 $name, 3, "KOPP_FC_Set: Device Name: $n, command: $cmd, Model: $m, Transm.-/KeyCode: $code"; 
+	 
+																								# Falls auch dieses Model spezifiziert ist und Modell identisch dem Model aus Originalaufruf,
+	 if($m eq $modl) 																			# ------------------------------------------------------------------------------------------
+     {																							# dann den Status dieses Devices ebenfalls updaten	
+#	 Log3 $name, 2, "KOPP_FC_Set: Orig Model: $modl, Status Update also for Model: $m"; 		# kann wieder Raus !!!! ### Claus  	
+	 $lh->{STATE} = $cmd;																		# update device state
+     readingsSingleUpdate($lh, "state", $cmd, 1);												# update also Readings
+     }
+	 else
+	 {
+#	  Log3 $name, 2, "KOPP_FC_Set: Orig Model: $modl, wrong model: $m  no Status Update done"; 	# kann wieder Raus !!!! ### Claus  	
+#	  Log3 $name, 2, "             dont define same remote key for different actuators models"; # kann wieder Raus !!!! ### Claus  	
+	 }
+    }
 
 #	 push(@list, $n);
 	 
@@ -347,71 +407,102 @@ sub KOPP_FC_Set($@)
  #	return @list;
 #	return"";		
     		
-#	Log3 $name, 2, "KOPP_FC_Set: Model: $modl gefunden "; 		# kann wieder Raus !!!! ### Claus  	
-#	Log3 $name, 2, "KOPP_FC_Set: Code1: $lh->{CODE}{1} ";  			# kann wieder Raus !!!! ### Claus  	    
-#	Log3 $name, 2, "KOPP_FC_Set: Code2: $lh->{CODE}{2} ";  			# kann wieder Raus !!!! ### Claus  	    
-#	Log3 $name, 2, "KOPP_FC_Set: Code3: $lh->{CODE}{3} ";  			# kann wieder Raus !!!! ### Claus  	    
-#	Log3 $name, 2, "KOPP_FC_Set: Codex: $lh->{CODE}";  				# kann wieder Raus !!!! ### Claus  	    
-#	Log3 $name, 2, "KOPP_FC_Set: KeyCode1: $lh->{KEYCODE}";  		# kann wieder Raus !!!! ### Claus  	    
-#	Log3 $name, 2, "KOPP_FC_Set: KeyCode2: $lh->{KEYCODE2}";  		# kann wieder Raus !!!! ### Claus  	    
-#	Log3 $name, 2, "KOPP_FC_Set: KeyCode3: $lh->{KEYCODE3}";  		# kann wieder Raus !!!! ### Claus  	    
-	
 
-	$keycodehex = $hash->{KEYCODE};							# Default Key Code was given by definition of device
+ 
+	if($cmd eq 'stop')  																		# command = stop
+	{																							# --------------
+	  $keycodehex = "F7";																		# Stop means F7 will be sent several times										
+	}																							# (e.g. to end  "dimm" end or "up" / "down" )
 
 
-	if($cmd eq 'on')  										# Command = on
-	{
-      if($modl && $modl eq "Dimmer_3KeyMode")				# if model defined and equal 3-key Dimmer:
-	  {														# ----------------------------------------	
-   	    $keycodehex = $hash->{KEYCODE2};				    # -> use Keycode 2 to send "on" command
+ 	elsif($cmd eq 'dimm')																		# independent of Dimmer Type  									
+	{																							# ---------------------------
+	  $keycodehex = $hash->{KEYCODE};															# use Keycode+0x80 for long key pressure = dimmer up/down
+	  $keycodedez = hex $keycodehex ;															# without moving to $keycodehex and addition in second line it does not work !?	
+	  $keycodedez = $keycodedez + 128;															#
+	  $keycodehex = uc sprintf "%x", $keycodedez;												# 
+	}
+
+    elsif($modl && $modl eq "Dimmer")															# if model defined and equal Dimmer
+	{																							# ---------------------------------
+	  if($cmd eq 'on'||$cmd eq 'off')															# 														
+   	  {																							#
+	    $keycodehex = $hash->{KEYCODE};				    										# -> use Keycode to send "on" or "off" command (=toggle)
 	  }
-															# Else use Keycode to send "on" command
-
-#	return "## Claus ##  Command = on" ;
  	}
 
-	elsif($cmd eq 'toggle')  								# nothing to be done, yet (just use KeyCode)
-	{
-#	return "## Claus ##  Command = toggle" ;
-	}
-	
-	
-	elsif($cmd eq 'dimm')  									#+0x80 for long key pressure = dimmer up/down
-	{
-#	$keycodehex = $hash->{KEYCODE};							#without moving to $keycodehex and addition in second line it does not work !?
-	$keycodedez = hex $keycodehex ;							
-	$keycodedez = $keycodedez + 128;						
-	$keycodehex = uc sprintf "%x", $keycodedez;
-
-#    $hash->{KEYCODE} = sprintf "%x", $keycodehex;
-
-#   return $keycodehex
-#	return "## Claus ##  Command = dimm" ;
-	}
-
-	elsif($cmd eq 'stop')  									# Stop means F7 will be sent several times
-	{
-	$keycodehex = "F7";										
-
-#	return $keycodehex
-#	return "## Claus ##  Command = off" ;
-	}
-
-	elsif($cmd eq 'off')  									# Off: Single Key Mode: Keycode to be sent, Dual Key Mode: Keycode2 to be sent
-	{
-	  if($modl && $modl eq "Dimmer_3KeyMode")				# if model defined and equal 3-key Dimmer:
-	  {														# ----------------------------------------	
-   	    $keycodehex = $hash->{KEYCODE3};				    # -> use Keycode 3 to send "off" command
+															
+															
+    elsif($modl && $modl eq "Dimmer_3KeyMode")													# if model defined and equal 3-key Dimmer
+	{																							# ---------------------------------------
+	  if($cmd eq 'on' && $hash->{KEYCODE2} ne "")												# Command = on
+	  {																							#
+   	    $keycodehex = $hash->{KEYCODE2};				    									# -> use Keycode 2 to send "on" command
+	  }																							#
+	  if($cmd eq 'off' && $hash->{KEYCODE3} ne "") 												# Command = off
+	  {																							#														
+   	    $keycodehex = $hash->{KEYCODE3};				    									# -> use Keycode 3 to send "on" command
 	  }
-      else				
-	  {
-	   $keycodehex = $hash->{KEYCODE2} if($hash->{KEYCODE2} ne "");							
+									
+ 	}
+
+    elsif($modl && $modl eq "Switch")															# if model defined and equal Switch
+	{																							# ---------------------------------
+	  if($cmd eq 'on' || $cmd eq 'off')															# 														
+   	  {																							#
+	    $keycodehex = $hash->{KEYCODE};				    										# -> use Keycode to send "on" or "off" command (=toggle)
+	  }																							#
+ 	}
+
+    elsif($modl && $modl eq "Switch_2KeyMode") 													# if model defined and equal Switch controlled by 2 Keys
+	{																							# ------------------------------------------------------
+	  if($cmd eq 'on')																			# 														
+   	  {																							#
+	    $keycodehex = $hash->{KEYCODE};				    										# -> use Keycode to send "on" or "off" command (=toggle)
+	  }																							#
+	  elsif($cmd eq 'off' && $hash->{KEYCODE2} ne "")											# 														
+   	  {																							#
+	    $keycodehex = $hash->{KEYCODE2};				   										# -> use Keycode to send "on" or "off" command (=toggle)
+	  }			
+ 	}
+
+	elsif($modl && $modl eq "Blind")															# if model defined and equal  Blind:  									# 
+	{																							# ----------------------------------------	
+	  if($cmd eq 'top')																			#
+	  {																							# -> use Keycode to send "top" command
+   	    $keycodehex = $hash->{KEYCODE};					    									#
+	  }																							#
+	  elsif($cmd eq 'bottom' && $hash->{KEYCODE2} ne "")										# 
+	  {																							# -> use Keycode2 to send "bottom" command
+   	    $keycodehex = $hash->{KEYCODE2};				    									# 
+	  }																							#
+	  elsif($cmd eq 'up')																		# 
+	  {																							#
+   	    $keycodehex = $hash->{KEYCODE};					    									#
+  	    $keycodedez = hex $keycodehex ;															# -> use Keycode+0x80 to send "up" command	
+	    $keycodedez = $keycodedez + 128;														#	
+	    $keycodehex = uc sprintf "%x", $keycodedez;												# 
+																								# 
+	  }																							#
+	  elsif($cmd eq 'down' && $hash->{KEYCODE2} ne "")											# 
+	  {																							# -> use Keycode2+0x80 to send "dowm" command	
+	    $keycodehex = $hash->{KEYCODE2};														#
+        $keycodedez = hex $keycodehex ;															#	
+        $keycodedez = $keycodedez + 128;														#	
+	    $keycodehex = uc sprintf "%x", $keycodedez;												# 
 	  }
+	}      
+
+	elsif($cmd eq 'on'|| 'off' || 'toggle')														# If model not known just allow on, off, toggle
+	{																							# ---------------------------------------------
+	  $keycodehex = $hash->{KEYCODE};															# -> use Keycode
 	}
 
-	else 
-	{
+
+
+	
+	else																						# should never happen :-) 
+	{																							# -----------------------
 	return "unknown command" ;
 	}  
 
@@ -440,21 +531,21 @@ return undef;
 
 #############################
 # 
-sub KOPP_FC_Parse($$) {										# wird von fhem.pl dispatch getriggert
-															# Example receive Message: kr07FA5E7114CC0F02AD
-															# 07: block length; FA5E: Transmitter Code 1; 71: Key counter(next key pressed); 14: Key Code;
-															# CC0F: unknown, but always the same; 
-															#02: Transmiter Code 2; (content depends on transmitter, changed value seems not to change anything; AD: Checksum)
+sub KOPP_FC_Parse($$) {																			# wird von fhem.pl dispatch getriggert
+																								# Example receive Message: kr07FA5E7114CC0F02AD
+																								# 07: block length; FA5E: Transmitter Code 1; 71: Key counter(next key pressed); 14: Key Code;
+																								# CC0F: unknown, but always the same; 
+																								# 02: Transmiter Code 2; (content depends on transmitter, changed value seems not to change anything; AD: Checksum)
 	my ($hash, $msg) = @_;
-	my $name = $hash->{NAME};								# Here: Device Hash (e.g. to CUL), e.g. $name = "CUL_0" 
-	my $state;												# means receive command = new state
+	my $name = $hash->{NAME};																	# Here: Device Hash (e.g. to CUL), e.g. $name = "CUL_0" 
+	my $state;																					# means receive command = new state
 	my $keycodedez;
-	my $specialkey	= "short";								# Default: short key
+	my $specialkey	= "short";																	# Default: short key
 	my $code;
 	my $devicefound;
 
 
-if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right here (KOPP Message received)
+if( $msg =~ m/^kr/ ) {																			# if first two char's are "kr" then we are right here (KOPP Message received)
 
 	# Msg format:
 	# kr.. rest to be defined later
@@ -463,19 +554,19 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
 	  { 
 
         # get Transtmitter Code 1
-	    my $transmittercode1 = uc(substr($msg, 4, 4));								# Example above: FA5E
+	    my $transmittercode1 = uc(substr($msg, 4, 4));											# Example above: FA5E
 
         # get Transtmitter Code 2
-	    my $transmittercode2 = uc(substr($msg, 16, 2));								# Example above: 02
+	    my $transmittercode2 = uc(substr($msg, 16, 2));											# Example above: 02
 
         # get Key Code
-	    my $keycode = uc(substr($msg, 10, 2));										# Example above: 14
-		$keycodedez = hex $keycode ;												# If Keycode > 128 and not equal "long key end" (F7) then Long Key pressure
+	    my $keycode = uc(substr($msg, 10, 2));													# Example above: 14
+		$keycodedez = hex $keycode ;															# If Keycode > 128 and not equal "long key end" (F7) then Long Key pressure
 
 
 
-		if ($keycode eq "F7")														# If end of long keypressure (stop) we need special handling 
-		{																			# ----------------------------------------------------------
+		if ($keycode eq "F7")																	# If end of long keypressure (stop) we need special handling 
+		{																						# ----------------------------------------------------------
 	    $code  = uc("$transmittercode1 F7");
 		$specialkey = "stop";
 
@@ -484,21 +575,21 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
 		else
 		{										
 		  if ($keycodedez >= 128 && $keycode ne "F7")									
-		  {																			# If long key pressure:
-		    $keycodedez = ($keycodedez - 128);										# ---------------------
+		  {																						# If long key pressure:
+		    $keycodedez = ($keycodedez - 128);													# ---------------------
 		    $specialkey = "long";
-		    $keycode = uc sprintf "%x", $keycodedez;
+		    $keycode = uc sprintf "%02x", $keycodedez;											# %02 damit auch eine "0"... zweistellig wird
 		  }
 
 	    $code  = uc("$transmittercode1 $keycode");
 		}
 
-		my $rhash = $modules{KOPP_FC}{defptr}{$code};								## neu 30.5. rhash war nicht eindeutig 
+		my $rhash = $modules{KOPP_FC}{defptr}{$code};											# neu 30.5. rhash war nicht eindeutig 
 
-#		my $rname = $rhash->{NAME};													# $rhash is hash to corresponding device as calculated from receive data
+#		my $rname = $rhash->{NAME};																# $rhash is hash to corresponding device as calculated from receive data
 
-		Log3 $name, 2, "KOPP_FC_Parse: name: $name code: $code Specialkey:$specialkey"; # kann wieder Raus !!!! ### Claus rname wird müll, da Hash mehrere Namen verlinkt?
-																	 # rname funktioniert nur wenn $name in Zeile 149/150 nicht angehängt ist
+		Log3 $name, 2, "KOPP_FC_Parse: name: $name code: $code Specialkey:$specialkey"; 		# kann wieder Raus !!!! ### Claus rname wird müll, da Hash mehrere Namen verlinkt?
+																								# rname funktioniert nur wenn $name in Zeile 149/150 nicht angehängt ist
 
 
 
@@ -551,6 +642,8 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
 			  																	
 			
 		}
+# 1 Key Dimmer:
+#==============
 		elsif ($attr{$n}{model} && ($attr{$n}{model} eq 'Dimm_8011_00')) 						# Wenn Device = 1 Key Dimmer
 		{																						# ==========================
 			
@@ -573,10 +666,57 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
 			 
 			 
 		}
+# Blind:
+#=======
+		elsif ($attr{$n}{model} && ($attr{$n}{model} eq 'Blind_8080_02'))		 				# Wenn Device = Blind/Rolladen
+		{																						# ============================
+			
+			
+			 if ($specialkey eq 'short' && $keycode eq $lh->{KEYCODE}) 							# Taste 1 kurz gedrückt: dann Endzustand top/oben anfahren
+			 {																					# --------------------------------------------------------
+			   $state = "top";									 							 	# 	
+			 }
+			 elsif ($specialkey eq "long" && $keycode eq $lh->{KEYCODE}) 						# Taste 1 lang gedrückt: dann nach oben fahren (bis zu stop)
+			 {																					# ----------------------------------------------------------
+			   $state = "up";	
+			 }
+			 if ($specialkey eq 'short' && $keycode eq $lh->{KEYCODE2}) 						# Taste 2 kurz gedrückt: dann Endzustand bottom/unten anfahren
+			 {																					# ------------------------------------------------------------
+			   $state = "bottom";									 							 	# 	
+			 }
+			 elsif ($specialkey eq "long" && $keycode eq $lh->{KEYCODE2}) 						# Taste 2 lang gedrückt: dann nach runter fahren (bis zu stop)
+			 {																					# -----------------------------------------------------------
+			   $state = "down";	
+			 }
+			 elsif ($specialkey eq "stop") 														# Ende der lang gedrückten Taste dann Fahrt stoppen
+			 {																					# --------------------------------------------------
+			   $state = "stop" if($oldstate eq 'up' || $oldstate eq 'down' || $oldstate eq 'stop');	# falls fahrt aktiv war oder bereits gestoppt wurde  
+			 }
+			 
+			 else {}
+			  																	
+			
+		}		
 
-# Für alle anderen Modelle gilt: wir können erstmal den kurzen Tastendruck und zwar nur toggeln zwischen on und off !!!!
-# ====================================================================================================================== 
-	    elsif ($specialkey ne 'stop') 															# Ende der lang gedrückten Taste dann dimmen stoppen
+# 2 Key Switch:
+#==============
+		elsif ($attr{$n}{model} && ($attr{$n}{model} eq 'Switch_8080_01_2Key'))		 			# Wenn Device = 2 Key Switch
+		{																						# ==============================
+			
+			
+			 if ($keycode eq $lh->{KEYCODE}) 													# Taste 1 gedrückt (no matter if short or long) -> State = on
+			 {																					# -----------------------------------------------------------
+			   $state = "on";									 							 	# 	
+			 }
+			 elsif ($keycode eq $lh->{KEYCODE2}) 												# Taste 2 gedrückt (no matter if short or long) -> State = off
+			 {																					# ------------------------------------------------------------
+			   $state = "off";									 								# 	
+			 }
+			 else {}
+		}		
+# Für 1 Key Switch und alle anderen Modelle gilt: egal ob kurz oder langer Tastendruck: toggeln zwischen on und off !
+# =================================================================================================================== 
+	    elsif ($specialkey ne 'stop') 															# Bei Ende der lang gedrückten Taste: nothing to do in this case 
 		{
 			if($oldstate eq 'off') {$state = "on";}												# off -> on	
 			elsif($oldstate eq 'on') {$state = "off";}											# on -> off
@@ -611,7 +751,7 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
 	   }
 	   else 
 	   {
-	   	Log3 $name, 2, "KOPP_FC_Parse: Device not defined for message $msg";  # kann wieder Raus !!!! ### Claus
+	   	Log3 $name, 2, "KOPP_FC_Parse: Device not defined for message $msg";  
 	   }
 
 
@@ -642,13 +782,13 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
 <a name="KOPP_FC"></a>
 <h3>Kopp Free Control protocol</h3>
 <ul>
-  <b>Please take into account: this protocol is under construction. Commands may change till first official "10_KOPP_FC.pm" version is released</b>
+  <b>Please take into account: this protocol is under construction. Commands may change </b>
   <br><br>
 
   The Kopp Free Control protocol is used by Kopp receivers/actuators and senders.
-  As we right now are only able to send Kopp commands but can't receive them, this module currently only
-  supports devices like dimmers, switches and in futue also blinds through a <a href="#CUL">CUL</a> or compatible device (e.g. CCD...). 
-  This devices must be defined before using this protocol (e.g. "define CUL_0 CUL /dev/ttyAMA0@38400 1234" ).
+  This module is able to send commands to Kopp actuators and receive commands from Kopp transmitters. Currently supports devices: dimmers, switches and blinds.
+  The communication is done via a <a href="#CUL">CUL</a> or compatible device (e.g. CCD...). 
+  This devices must be defined before using this protocol (e.g. "define CUL_0 CUL /dev/ttyAMA0@38400 1234" and "attr CUL_0 rfmode KOPP_FC" ).
 
   <br><br>
   <a name="KOPP_FCdefine"></a>
@@ -658,7 +798,7 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
  
   <br>
    <br><li><code>&lt;name&gt;</code></li>
-   name is the identifier (name) you plan to assign to your specific device (actor) as done for any other FHEM device
+   name is the identifier (name) you plan to assign to your specific device (actuator) as done for any other FHEM device
    
    <br><br><li><code>&lt;Keycode&gt;</code></li>
    Keycode is a 2 digit hex code (1Byte) which reflects the transmitters key
@@ -689,42 +829,10 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
    <br>
    You are now able to control the receiver from FHEM, the receiver handles FHEM just linke another remote control.
 </ul>         
-     
-   
-   <br><br>Example: FHEM Config for Dimmer via 1 Key remote control:
-   <ul>
-      <code>define Dimmer KOPP_FC 65 FA5E 02</code><br>
-	  <code>attr Dimmer IODev CCD</code><br>
-	  <code>attr Dimmer devStateIcon OnOff:toggle:dimm dimm:dim50%:stop stop:on:dimm off:toggle:dimm</code><br>
-	  <code>attr Dimmer eventMap on:OnOff dimm:dimm stop:stop</code><br>
-	  <code>attr Dimmer group Dimmer_1KeyMode</code><br>
-  	  <code>attr Dimmer model Dimm_8011_00</code><br>
-	  <code>attr Dimmer room Test</code><br>
-	  <code>attr Dimmer webCmd OnOff:dimm:stop</code><br>
-   </ul>
- 
-   <br><br>Example: FHEM Config for Dimmer via 3 Key remote control:
-   <ul>
-	  <code>define DimmerDevice_OnOff KOPP_FC 65 FA5E 02 55 75</code><br>
-	  <code>attr DimmerDevice_OnOff IODev CCD</code><br>
-	  <code>attr DimmerDevice_OnOff devStateIcon dimm:dim50%:stop stop:on:off on:on:off off:off:on</code><br>
-	  <code>attr DimmerDevice_OnOff group Dimmer_Via_KOPP_FC_3TastenMode</code><br>
-	  <code>attr DimmerDevice_OnOff model Dimm_8011_00_3Key</code><br>
-	  <code>attr DimmerDevice_OnOff room Test</code><br>
-   <br>
-	  <code>define DimmerDevice_Dimm dummy</code><br>
-	  <code>attr DimmerDevice_Dimm devStateIcon dimm:dim50%:stop stop:off:dimm</code><br>
-	  <code>attr DimmerDevice_Dimm group Dimmer_Via_KOPP_FC_3TastenMode</code><br>
-	  <code>attr DimmerDevice_Dimm room Test</code><br>
-	  <code>attr DimmerDevice_Dimm webCmd dimm:stop</code><br>
-	  <code>define DimmerDevice_DimmInAction notify DimmerDevice_Dimm set DimmerDevice_OnOff $EVENT</code><br>
-   </ul>
-  <br>
 
   <a name="KOPP_FCset"></a>
   <b>Set</b>
   <ul>
-
     <code>set &lt;name&gt; &lt;value&gt</code>
     <br>
  
@@ -743,8 +851,36 @@ if( $msg =~ m/^kr/ ) {										# if first two char's are "kr" then we are right
     <code>set DimmerDevice stop</code>       	# will stop dimming process
    	</pre>
   </ul>
+  <br> 
+
+  <a name="KOPP_FCattrib"></a>
+  <b>Attributes</b>
+  <ul>
+    <code>attr CUL_0 rfmode KOPP_FC</code> 
+    <br>
+  	
+	This attribute will switch the Kopp protocol on for device CUL_0<br>
+	You can not use a second protocol on this device
+    
+  </ul>
   <br>
   
+  <br><br>Example: FHEM Config for Dimmer via 1 Key remote control:
+  <ul>
+      <code>define Dimmer KOPP_FC 65 FA5E 02</code><br>
+	  <code>attr Dimmer IODev CCD</code><br>
+	  <code>attr Dimmer devStateIcon OnOff:toggle:dimm dimm:dim50%:stop stop:on:dimm off:toggle:dimm</code><br>
+	  <code>attr Dimmer eventMap on:OnOff dimm:dimm stop:stop</code><br>
+	  <code>attr Dimmer group Dimmer_1KeyMode</code><br>
+  	  <code>attr Dimmer model Dimm_8011_00</code><br>
+	  <code>attr Dimmer room Test</code><br>
+	  <code>attr Dimmer webCmd OnOff:dimm:stop</code><br>
+  </ul>
+ 
+  <br><br>Example: FHEM Config for Dimmer via 3 Key remote control:
+
+  <br>
+
  </ul>
   
  
