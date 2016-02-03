@@ -1099,7 +1099,7 @@ sub FB_CALLLIST_returnTableHeader($)
     <li><a name="FB_CALLLIST_disable">disable</a> 0,1</li>
     Optional attribute to disable the call list update. When disabled, call events will be processed and the list wouldn't be updated accordingly.
     <br><br>
-    Possible values: 0 => FB_CALLLIST is activated, 1 => FB_CALLLIST is deactivated.<br>
+    Possible values: 0 =&gt; FB_CALLLIST is activated, 1 =&gt; FB_CALLLIST is deactivated.<br>
     Default Value is 0 (activated)<br><br>
     <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...</li>
     Optional attribute to disable the call list update during a specific time interval. The attribute contains a space separated list of HH:MM tupels.
@@ -1110,12 +1110,12 @@ sub FB_CALLLIST_returnTableHeader($)
     Default Value is <i>empty</i> (no intervals defined, calllist is always active)<br><br>
     <li><a name="FB_CALLLIST_create-readings">create-readings</a> 0,1</li>
     If enabled, for all visible calls in the list, readings and events will be created. It is recommended to set the attribute <a href="#event-on-change-reading">event-on-change-reading</a> to <code>.*</code> (all readings), to reduce the amount of generated readings for certain call events.<br><br>
-    Possible values: 0 => no readings will be created, 1 => readings and events will be created.<br>
+    Possible values: 0 =&gt; no readings will be created, 1 =&gt; readings and events will be created.<br>
     Default Value is 0 (no readings will be created)<br><br>
     <li><a name="FB_CALLLIST_answMachine-is-missed-call">answMachine-is-missed-call</a> 0,1</li>
     If activated, a incoming call, which is answered by an answering machine, will be treated as a missed call. This is only relevant if <a href="#FB_CALLLIST_list-type">list-type</a> is set to "missed-call".
     <br><br>
-    Possible values: 0 => disabled, 1 => enabled (answering machine calls will be treated as "missed call").<br>
+    Possible values: 0 =&gt; disabled, 1 =&gt; enabled (answering machine calls will be treated as "missed call").<br>
     Default Value is 0 (disabled)<br><br>
     <li><a name="FB_CALLLIST_number-of-calls">number-of-calls</a> 1..20</li>
     Defines the maximum number of displayed call entries in the list.<br><br>
@@ -1204,7 +1204,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Default value is "%a, %d %b %Y %H:%M:%S" ( = "Sun, 07 Jun 2015 12:50:09")<br><br>
     <li><a name="FB_CALLLIST_language">language</a> en,de</li>
     Defines the language of the table header, some keywords and the timestamp format. You need to have the selected locale installed and available in your operating system.<br><br>
-    Possible values: en => English , de => German<br>
+    Possible values: en =&gt; English , de =&gt; German<br>
     Default Value is en (English)<br><br>
     <li><a name="FB_CALLLIST_number-cmd">number-cmd</a> &lt;command&gt;</li>
     Can be set, to execute a specific FHEM command, when clicking on a number in the list. The value can be any valid FHEM command or Perl code (in curly brackets: { ... } ).
@@ -1222,7 +1222,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Normally the call state is shown with icons (used from the openautomation icon set).
     You need to have openautomation in your iconpath attribute of your appropriate FHEMWEB definition to use this icons.
     If you don't want to use icons you can deactivate them with this attribute.<br><br>
-    Possible values: 0 => no icons , 1 => use icons<br>
+    Possible values: 0 =&gt; no icons , 1 =&gt; use icons<br>
     Default Value is 1 (use icons)<br><br>
     <li><a name="FB_CALLLIST_visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,external,connection,duration</li>
     Defines the visible columns, as well as the order in which these columns are displayed in the call list (from left to right).
@@ -1235,11 +1235,11 @@ sub FB_CALLLIST_returnTableHeader($)
     Default Value is "row,state,timestamp,name,number,internal,external,connection,duration" (show all columns)<br><br>
     <li><a name="FB_CALLLIST_no-heading">no-heading</a> 0,1</li>
     If activated the headline with a link to the detail page of the current definition will be hidden.<br><br>
-    Possible values: 0 => the heading line will be shown , 1 => the heading line will not be shown<br>
+    Possible values: 0 =&gt; the heading line will be shown , 1 =&gt; the heading line will not be shown<br>
     Default Value is 0 (the heading line will be shown)<br><br>
     <li><a name="FB_CALLLIST_no-table-header">no-table-header</a> 0,1</li>
     If activated the table header containing the name of each column for the current definition will be hidden.<br><br>
-    Possible values: 0 => the table header will be shown , 1 => the table header will not be shown<br>
+    Possible values: 0 =&gt; the table header will be shown , 1 =&gt; the table header will not be shown<br>
     Default Value is 0 (the table header will be shown)<br><br>
     </ul>
   <br>
@@ -1315,7 +1315,7 @@ sub FB_CALLLIST_returnTableHeader($)
     <li><a name="FB_CALLLIST_disable">disable</a> 0,1</li>
     Optionales Attribut zur Deaktivierung der Anrufliste. Es werden dann keine Anruf-Events mehr verarbeitet und die Liste nicht weiter aktualisiert.
     <br><br>
-    M&ouml;gliche Werte: 0 => Anrufliste ist aktiv, 1 => Anrufliste ist deaktiviert.<br>
+    M&ouml;gliche Werte: 0 =&gt; Anrufliste ist aktiv, 1 =&gt; Anrufliste ist deaktiviert.<br>
     Standardwert ist 0 (aktiv)<br><br>
     <li><a name="FB_CALLLIST_disabledForIntervals">disabledForIntervals</a> HH:MM-HH:MM HH:MM-HH-MM...</li>
     Optionales Attribut zur Deaktivierung der Anrufliste innerhalb von bestimmten Zeitintervallen.
@@ -1328,12 +1328,12 @@ sub FB_CALLLIST_returnTableHeader($)
     <li><a name="FB_CALLLIST_create-readings">create-readings</a> 0,1</li>
     Sofern aktiviert, werden f&uuml;r alle sichtbaren Anrufe in der Liste entsprechende Readings und Events erzeugt.
     Es wird empfohlen das Attribut <a href="#event-on-change-reading">event-on-change-reading</a> auf den Wert <code>.*</code> zu stellen um die hohe Anzahl an Events in bestimmten F&auml;llen zu minimieren.<br><br>
-    M&ouml;gliche Werte: 0 => keine Readings erstellen, 1 => Readings und Events werden erzeugt.<br>
+    M&ouml;gliche Werte: 0 =&gt; keine Readings erstellen, 1 =&gt; Readings und Events werden erzeugt.<br>
     Standardwert ist 0 (keine Readings erstellen)<br><br>
     <li><a name="FB_CALLLIST_answMachine-is-missed-call">answMachine-is-missed-call</a> 0,1</li>
     Sofern aktiviert, werden Anrufe, welche durch einen internen Anrufbeantworter beantwortet werden, als "verpasster Anruf" gewertet. Diese Funktionalit&auml;t ist nur relevant, wenn <a href="#FB_CALLLIST_list-type">list-type</a> auf "missed-call" gesetzt ist.
     <br><br>
-    M&ouml;gliche Werte: 0 => deaktiviert, 1 => aktiviert (Anrufbeantworter gilt als "verpasster Anruf").<br>
+    M&ouml;gliche Werte: 0 =&gt; deaktiviert, 1 =&gt; aktiviert (Anrufbeantworter gilt als "verpasster Anruf").<br>
     Standardwert ist 0 (deaktiviert)<br><br>
     <li><a name="FB_CALLLIST_number-of-calls">number-of-calls</a> 1..20</li>
     Setzt die maximale Anzahl an Eintr&auml;gen in der Anrufliste. Sollte die Anrufliste voll sein, wird das &auml;lteste Gespr&auml;ch gel&ouml;scht.<br><br>
@@ -1373,7 +1373,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Definiert eine eigene Zuordnung der externen Anschlussbezeichnung (Reading: external_connection) zu eigenen Bezeichnungen. Die Zuordnung erfolgt &uuml;ber eine Hash-Struktur.<br><br>
     z.B.<br>
     <ul>
-    <code>attr &lt;name&gt; external-mapping {'ISDN' =&gt; 'Festnetz', 'SIP0' =&gt; 'Anbieter A', 'SIP1' => 'Anbieter B'}</code>
+    <code>attr &lt;name&gt; external-mapping {'ISDN' =&gt; 'Festnetz', 'SIP0' =&gt; 'Anbieter A', 'SIP1' =&gt; 'Anbieter B'}</code>
     </ul><br>   
     Die jeweils zugeordnete Bezeichnung wird in der Anrufliste dann entsprechend angezeigt anstatt des originalen Werten von FB_CALLMONITOR.
     <br><br>
@@ -1383,7 +1383,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Definiert eine eigene Zuordnung der Endger&auml;te (Reading: internal_connection) zu eigenen Bezeichnungen. Die Zuordnung erfolgt &uuml;ber eine Hash-Struktur.<br><br>
     z.B.<br>
     <ul>
-    <code>attr &lt;name&gt; connection-mapping {'DECT_1' =&gt; 'Mobilteil K&uuml;che', 'FON1' =&gt; 'Fax', 'Answering_Machine_1' => 'Anrufbeantworter'}</code>
+    <code>attr &lt;name&gt; connection-mapping {'DECT_1' =&gt; 'Mobilteil K&uuml;che', 'FON1' =&gt; 'Fax', 'Answering_Machine_1' =&gt; 'Anrufbeantworter'}</code>
     </ul><br>   
     Die jeweils zugeordnete Bezeichnung wird in der Anrufliste dann entsprechend angezeigt anstatt des originalen Werten von FB_CALLMONITOR.
     <br><br>
@@ -1429,7 +1429,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Standardwert ist "%a, %d %b %Y %H:%M:%S" (entspricht "So, 07 Jun 2015 12:50:09")<br><br>
     <li><a name="FB_CALLLIST_language">language</a> en,de</li>
     Definiert die Sprache in der die Anrufliste angezeigt werden soll (Tabellenkopf, Datum). Die entsprechende Sprache muss auch im Betriebssystem installiert und unterst&uuml;tzt werden.<br><br>
-    M&ouml;gliche Werte: en => Englisch , de => Deutsch<br>
+    M&ouml;gliche Werte: en =&gt; Englisch , de =&gt; Deutsch<br>
     Standardwert ist en (Englisch)<br><br>
     <li><a name="FB_CALLLIST_number-cmd">number-cmd</a> &lt;Befehl&gt;</li>
     Kann gesetzt werden, um ein FHEM-Befehl oder Perl-Code (in geschweiften Klammern: { ... } ) auszuf&uuml;hren, wenn man auf eine Rufnummer in der Anrufliste klickt.
@@ -1445,7 +1445,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Sofern nicht gesetzt, wird kein Link angezeigt.<br><br>
     <li><a name="FB_CALLLIST_show-icons">show-icons</a> 0,1</li>
     Im Normalfall wird der Status eines jeden Anrufs mit einem Icon angezeigt. Dazu muss das openautomation Icon-Set im iconpath-Attribut der entsprechenden FHEMWEB Instanz konfiguriert sein. Sollte man keine Icons w&uuml;nschen, so kann man diese hiermit abschalten. Der Status wird dann mittels Textzeichen dargestellt.<br><br>
-    M&ouml;gliche Werte: 0 => keine Icons , 1 => benutze Icons<br>
+    M&ouml;gliche Werte: 0 =&gt; keine Icons , 1 =&gt; benutze Icons<br>
     Standardwert ist 1 (benutze Icons)<br><br>
     <li><a name="FB_CALLLIST_visible-columns">visible-columns</a> row,state,timestamp,name,number,internal,external,connection,duration</li>
     Legt fest, welche Spalten in welcher Reihenfolge (von links nach rechts) in der Anrufliste angezeigt werden sollen.
@@ -1459,11 +1459,11 @@ sub FB_CALLLIST_returnTableHeader($)
     Standardwert ist "row,state,timestamp,name,number,internal,external,connection,duration" (Anzeige aller Spalten)<br><br>
     <li><a name="FB_CALLLIST_no-heading">no-heading</a> 0,1</li>
     Sofern aktiviert, wird die &Uuml;berschriftenzeile ausserhalb der Liste inkl. Link auf die Detail-Seite der aktuellen Definition ausgeblendet.<br><br>
-    M&ouml;gliche Werte: 0 => &Uuml;berschriftenzeile wird angezeigt , 1 => &Uuml;berschriftenzeile wird ausgeblendet<br>
+    M&ouml;gliche Werte: 0 =&gt; &Uuml;berschriftenzeile wird angezeigt , 1 =&gt; &Uuml;berschriftenzeile wird ausgeblendet<br>
     Standardwert ist 1 (&Uuml;berschriftenzeile wird angezeigt)<br><br>
     <li><a name="FB_CALLLIST_no-table-header">no-table-header</a> 0,1</li>
     Sofern aktiviert, wird die Kopfzeile der Tabelle f&uuml;r die aktuelle Definition ausgeblendet.<br><br>
-    M&ouml;gliche Werte: 0 => Kopfzeile wird angezeigt , 1 => Kopfzeile wird ausgeblendet<br>
+    M&ouml;gliche Werte: 0 =&gt; Kopfzeile wird angezeigt , 1 => Kopfzeile wird ausgeblendet<br>
     Standardwert ist 1 (Kopfzeile wird angezeigt)<br><br>
     </ul>
   <br>
