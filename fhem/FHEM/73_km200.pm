@@ -471,6 +471,9 @@ sub km200_Attr(@)
 		my @KM200_DONOTPOLL   = ();
 		my @temp              = @a;
 
+		### Stop the current timer
+		RemoveInternalTimer($hash);
+
 		### Delete the first 3 items of the array
 		splice @temp, 0, 3;
 
@@ -511,9 +514,6 @@ sub km200_Attr(@)
 		
 		### Message for debugging purposes
 		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". $a[3];
-
-		### Stop the current timer
-		RemoveInternalTimer($hash);
 		
 		### Interrupting all currently running Polling
 		@{$hash->{Secret}{KM200DYNSERVICES}} = "";
@@ -522,8 +522,8 @@ sub km200_Attr(@)
 		### Delete all Readings
 		fhem( "deletereading $name .*" );
 
-		### Re-start the sounding of  values from KM200 but wait the period of $hash->{POLLINGTIMEOUT} + 1s
-		InternalTimer(gettimeofday()+$hash->{POLLINGTIMEOUT}+1, "km200_GetInitService", $hash, 0);
+		### Re-start the sounding of  values from KM200 but wait the period of $hash->{POLLINGTIMEOUT} + 10s
+		InternalTimer(gettimeofday()+$hash->{POLLINGTIMEOUT}+10, "km200_GetInitService", $hash, 0);
 		Log3 $name, 5, $name. " : km200 - Sounding of services re-started after change of DoNotPoll attribute";
 	}
 	### Check whether time-out for Read-Back has been provided
