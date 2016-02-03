@@ -440,7 +440,6 @@ sub allergy_utf8clean($) {
       </li><br>
   </ul>
 </ul>
-</div>
 
 =end html_DE
 =cut
