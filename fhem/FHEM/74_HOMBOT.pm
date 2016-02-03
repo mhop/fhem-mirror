@@ -68,6 +68,10 @@ sub HOMBOT_Define($$) {
     my @a = split( "[ \t][ \t]*", $def );
 
     return "too few parameters: define <name> HOMBOT <HOST>" if( @a != 3 );
+    return "please check if ssh installed" unless( -X "/usr/bin/ssh" );
+    return "please check if /opt/fhem/.ssh/known_hosts exist" unless( -R "/opt/fhem/.ssh/known_hosts" );
+    return "please check if sshpass installed" unless( -X "/usr/bin/sshpass" );
+    
 
     my $name    	= $a[0];
     my $host    	= $a[2];
@@ -1068,7 +1072,8 @@ sub HOMBOT_Aborted_Bot_Alive($) {
     <li>Wochenprogramm einstellen</li>
     <li>Repeat und Turbo aktivieren</li>
   </ul>
-  
+  <br>
+  !!!Voraussetzungen schaffen!!! Ihr benötigt zum verwenden des Modules die Programme ssh und sshpass. Desweiteren muß im Homeverzeichnis des fhem Users das Verzeichniss .ssh existieren und darin die Datei known_hosts. Diese sollte eine Passphrass des Bots beinhalten. Am besten Ihr macht als normaler User eine ssh Session zum Bot und kopiert danach die known_hosts Eures normalen Users in das .ssh Verzeichnis des fhem Users. Rechte anpassen nicht vergessen.
   <br>
   Das Device für den Hombot legt Ihr wie folgt in FHEM an.
   <br><br>
