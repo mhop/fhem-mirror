@@ -1063,7 +1063,7 @@ sub HOMBOT_Aborted_Bot_Alive($) {
   Dieses Modul gibt Euch die M&ouml;glichkeit Euren Hombot nach erfolgreichen Hack in FHEM ein zu binden.
   Voraussetzung ist das Ihr den Hombot Hack gemacht und einen WLAN Stick eingebaut habt. Als Schnittstelle zwischen FHEM und Bot wird der Luigi HTTP Server verwendet. Was genau k&ouml;nnt Ihr nun mit dem Modul machen:
   <ul>
-    <li>Readings über den Status des Hombots werden angelegt</li>
+    <li>Readings &uuml;ber den Status des Hombots werden angelegt</li>
     <li>Auswahl des Reinigungsmodus ist m&ouml;glich</li>
     <li>Starten der Reinigung</li>
     <li>Beenden der Reinigung</li>
@@ -1073,9 +1073,10 @@ sub HOMBOT_Aborted_Bot_Alive($) {
     <li>Repeat und Turbo aktivieren</li>
   </ul>
   <br>
-  !!!Voraussetzungen schaffen!!! Ihr ben&ouml;tigt zum verwenden des Modules die Programme ssh und sshpass. Desweiteren mu&szlig; im Homeverzeichnis des fhem Users das Verzeichniss .ssh existieren und darin die Datei known_hosts. Diese sollte eine Passphrass des Bots beinhalten. Am besten Ihr macht als normaler User eine ssh Session zum Bot und kopiert danach die known_hosts Eures normalen Users in das .ssh Verzeichnis des fhem Users. Rechte anpassen nicht vergessen.
+  !!! Voraussetzungen schaffen !!!
+  <br>Ihr ben&ouml;tigt zum verwenden des Modules die Programme ssh und sshpass. Desweiteren mu&szlig; im Homeverzeichnis des fhem Users das Verzeichniss .ssh existieren und darin die Datei known_hosts. Diese sollte eine Passphrass des Bots beinhalten. Am besten Ihr macht als normaler User eine ssh Session zum Bot und kopiert danach die known_hosts Eures normalen Users in das .ssh Verzeichnis des fhem Users. Rechte anpassen nicht vergessen.
   <br>
-  Das Device für den Hombot legt Ihr wie folgt in FHEM an.
+  Das Device f&uuml;r den Hombot legt Ihr wie folgt in FHEM an.
   <br><br>
   <a name="HOMBOTdefine"></a>
   <b>Define</b>
@@ -1097,10 +1098,10 @@ sub HOMBOT_Aborted_Bot_Alive($) {
   <a name="HOMBOTreadings"></a>
   <b>Readings</b>
   <ul>
-    <li>at_* - Reading für das Wochenprogramm. Startzeit für den jeweiligen Tag</li>
+    <li>at_* - Reading f&uuml;r das Wochenprogramm. Startzeit f&uuml;r den jeweiligen Tag</li>
     <li>batteryPercent - Status der Batterie in %</li>
     <li>cleanMode - aktuell eingestellter Reinigungsmodus</li>
-    <li>cpu_* - Informationen über die Prozessorauslastung</li>
+    <li>cpu_* - Informationen &uuml;ber die Prozessorauslastung</li>
     <li>currentBumping - Anzahl der Zusammenst&ouml;&szlig;e mit Hindernissen</li>
     <li>firmware - aktuell installierte Firmwareversion</li>
     <li>hombotState - Status des Hombots</li>
@@ -1124,7 +1125,7 @@ sub HOMBOT_Aborted_Bot_Alive($) {
     <li>cleanStart - Reinigung starten</li>
     <li>homing - Beendet die Reinigung und l&auml;sst die Bot zur&uuml;ck zur Bases kommen</li>
     <li>nickname - setzt des Bot-Namens. Wird im Reading erst nach einem neustart des Luigiservers oder des Bots sichtbar</li>
-    <li>pause - lässt den Reinigungspro&szlig;ess pausieren</li>
+    <li>pause - l&auml;sst den Reinigungspro&szlig;ess pausieren</li>
     <li>repeat - Reinigung wiederholen? (true/false)</li>
     <li>schedule - setzen des Wochenprogrammes Bsp. set Roberta schedule Mo=13:30 Di= Mi=14:00,ZZ Do=15:20 Fr= Sa=11:20 So=  Man kann also auch den Modus mitgeben!</li>
     <li>statusRequest - Fordert einen neuen Statusreport beim Device an</li>
