@@ -175,6 +175,7 @@ FHEMWEB_Initialize($)
     smallscreen:unused
     smallscreenCommands:0,1
     stylesheetPrefix
+    title
     touchpad:unused
     webname
   );
@@ -774,7 +775,10 @@ FW_answerCall($)
     $FW_lastHashUpdate = $lastDefChange;
   }
 
-  my $t = AttrVal("global", "title", "Home, Sweet Home");
+  my $t = AttrVal($FW_wname, "title",
+          AttrVal("global", "title", "Home, Sweet Home"));
+  $t = eval $t if($t =~ m/^{.*}$/s); # Forum #48668
+
 
   FW_pO '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" '.
                 '"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
@@ -3426,6 +3430,11 @@ FW_widgetOverride($$)
         See also the clearSvgCache command for clearing the cache.
         </li><br>
 
+    <a name="title"></a>
+    <li>title<br>
+        Sets the title of the page. If enclosed in {} the content is evaluated.
+    </li><br>
+
     <a name="webCmd"></a>
     <li>webCmd<br>
         Colon separated list of commands to be shown in the room overview for a
@@ -4103,6 +4112,12 @@ FW_widgetOverride($$)
         Berechnung der Grafiken zu vermeiden. Default ist 0, d.h. aus.<br>
         Siehe den clearSvgCache Befehl um diese Daten zu l&ouml;schen.
         </li><br>
+
+    <a name="title"></a>
+    <li>title<br>
+       Setzt den Titel der Seite. Falls in {} eingeschlossen, dann wird es
+       als Perl Ausdruck evaluiert.
+    </li><br>
 
     <a name="webCmd"></a>
     <li>webCmd<br>
