@@ -28,8 +28,8 @@
 #  Versions History:
 #
 # 1.10   02.02.2016    added function "svsinfo" to get informations about installed SVS-package,
-#                      if Availability = "disconnected" then "state" will be "disconnected" too,
-#                      Credentials were deleted if a device will be deleted
+#                      if Availability = "disconnected" then "state"-value will be "disconnected" too,
+#                      saved Credentials were deleted from file if a device will be deleted
 # 1.9.1  31.01.2016    a little bit code optimization
 # 1.9    28.01.2016    fixed the problem a recording may still stay active if fhem
 #                      will be restarted after a recording was triggered and
@@ -83,9 +83,11 @@ sub SSCam_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}     = "SSCam_Define";
  $hash->{UndefFn}   = "SSCam_Undef";
+ $hash->{DeleteFn}  = "SSCam_Delete"; 
  $hash->{SetFn}     = "SSCam_Set";
  $hash->{GetFn}     = "SSCam_Get";
- $hash->{AttrFn}    = "SSCam_Attr"; 
+ $hash->{AttrFn}    = "SSCam_Attr";
+ 
  
  $hash->{AttrList} =
          "httptimeout ".
@@ -152,12 +154,18 @@ return undef;
 
 sub SSCam_Undef {
     my ($hash, $arg) = @_;
+   
+    RemoveInternalTimer($hash);
+    
+return undef;
+}
+
+sub SSCam_Delete {
+    my ($hash, $arg) = @_;
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
     
     # gespeicherte Credentials löschen
     setKeyValue($index, undef);
-    
-    RemoveInternalTimer($hash);
     
 return undef;
 }
