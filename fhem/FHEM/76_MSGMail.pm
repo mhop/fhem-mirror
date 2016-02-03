@@ -14,6 +14,13 @@
 # 2015-05-05: Remove dependency on Switch
 # 2012      : Created by rbente
 #
+##
+#
+# Further reading:
+#
+# http://search.cpan.org/~yves/MIME-Lite-3.01/lib/MIME/Lite.pm
+#
+#
 package main;
 
 use strict;
@@ -260,7 +267,7 @@ my %MSGMail_params = (
   'to'         => {'attr'=>'to',       'default'=>'',      'required'=>1, 'set'=>1},
   'subject'    => {'attr'=>'subject',  'default'=>'',      'required'=>1, 'set'=>1},
   'cc'         => {'attr'=>'cc',       'default'=>'',      'required'=>0, 'set'=>1},
-  'mtype'      => {'attr'=>'mtype',    'default'=>'plain', 'required'=>1, 'set'=>1},
+  'mtype'      => {'attr'=>'mailtype', 'default'=>'plain', 'required'=>1, 'set'=>1},
   'authfile'   => {'attr'=>'authfile', 'default'=>'',      'required'=>1, 'set'=>0},
   'smtphost'   => {'attr'=>'smtphost', 'default'=>'',      'required'=>1, 'set'=>0},
   'smtpport'   => {'attr'=>'smtpport', 'default'=>'465',   'required'=>1, 'set'=>0},
@@ -277,7 +284,7 @@ sub MSGMail_send($$;$)
   {
     $params{$key} = AttrVal($name, $MSGMail_params{$key}->{attr}, $MSGMail_params{$key}->{default});
     $params{$key} = $extparamref->{$key} if (exists $extparamref->{$key} && $MSGMail_params{$key}->{set}); 
-    #Log3 $name, 0, "param $key is now '".$params{$key}."'";
+    Log3 $name, 4, "$name: param $key is now '".$params{$key}."' (attribute '".$MSGMail_params{$key}->{attr}."')";
   }
   
   my $mailtype = "text/plain";
@@ -286,6 +293,7 @@ sub MSGMail_send($$;$)
   $params{mailtype} = $mailtype;
   $params{name} = $name;
   $params{msgtext} = $msgtext;
+  Log3 $name, 4, "$name: mailtype is $mailtype";
 
   my @err = ();
   foreach my $key (keys(%MSGMail_params))
