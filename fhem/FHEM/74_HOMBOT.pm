@@ -1060,20 +1060,20 @@ sub HOMBOT_Aborted_Bot_Alive($) {
 <ul>
   <u><b>HOMBOT - LG Homebot Staubsaugerroboter</b></u>
   <br>
-  Dieses Modul gibt Euch die Möglichkeit Euren Hombot nach erfolgreichen Hack in FHEM ein zu binden.
-  Voraussetzung ist das Ihr den Hombot Hack gemacht und einen WLAN Stick eingebaut habt. Als Schnittstelle zwischen FHEM und Bot wird der Luigi HTTP Server verwendet. Was genau könnt Ihr nun mit dem Modul machen:
+  Dieses Modul gibt Euch die M&ouml;glichkeit Euren Hombot nach erfolgreichen Hack in FHEM ein zu binden.
+  Voraussetzung ist das Ihr den Hombot Hack gemacht und einen WLAN Stick eingebaut habt. Als Schnittstelle zwischen FHEM und Bot wird der Luigi HTTP Server verwendet. Was genau k&ouml;nnt Ihr nun mit dem Modul machen:
   <ul>
     <li>Readings über den Status des Hombots werden angelegt</li>
-    <li>Auswahl des Reinigungsmodus ist möglich</li>
+    <li>Auswahl des Reinigungsmodus ist m&ouml;glich</li>
     <li>Starten der Reinigung</li>
     <li>Beenden der Reinigung</li>
-    <li>zurück zur Homebase schicken</li>
+    <li>zur&uuml;ck zur Homebase schicken</li>
     <li>Namen vergeben</li>
     <li>Wochenprogramm einstellen</li>
     <li>Repeat und Turbo aktivieren</li>
   </ul>
   <br>
-  !!!Voraussetzungen schaffen!!! Ihr benötigt zum verwenden des Modules die Programme ssh und sshpass. Desweiteren muß im Homeverzeichnis des fhem Users das Verzeichniss .ssh existieren und darin die Datei known_hosts. Diese sollte eine Passphrass des Bots beinhalten. Am besten Ihr macht als normaler User eine ssh Session zum Bot und kopiert danach die known_hosts Eures normalen Users in das .ssh Verzeichnis des fhem Users. Rechte anpassen nicht vergessen.
+  !!!Voraussetzungen schaffen!!! Ihr ben&ouml;tigt zum verwenden des Modules die Programme ssh und sshpass. Desweiteren mu&szlig; im Homeverzeichnis des fhem Users das Verzeichniss .ssh existieren und darin die Datei known_hosts. Diese sollte eine Passphrass des Bots beinhalten. Am besten Ihr macht als normaler User eine ssh Session zum Bot und kopiert danach die known_hosts Eures normalen Users in das .ssh Verzeichnis des fhem Users. Rechte anpassen nicht vergessen.
   <br>
   Das Device für den Hombot legt Ihr wie folgt in FHEM an.
   <br><br>
