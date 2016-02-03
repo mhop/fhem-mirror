@@ -251,7 +251,15 @@ sub ReplaceReadingDoIf($)
   my $tailBlock;
   my $err;
   my $regExp="";
-  my ($name,$reading,$format)=split(":",$element);
+  my $name;
+  my $reading;
+  my $format="";
+  if ($element =~ /([^\:]*):(".*")/) {
+    $name=$1;
+    $reading=$2;
+  } else {
+    ($name,$reading,$format)=split(":",$element);
+  }
   my $internal="";
   my $notifyExp="";
   if ($name) {
@@ -1821,8 +1829,11 @@ Weitere Möglichkeiten bei der Nutzung des Perl-Operators: <code>=~</code>, insb
 <a name="DOIF_Ereignissteuerung_ueber_Auswertung_von_Events"></a>
 <b>Ereignissteuerung über Auswertung von Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Eine Alternative zur Auswertung von Stati oder Readings ist das Auswerten von Ereignissen (Events) mit Hilfe von regulären Ausdrücken, wie beim notify. Eingeleitet wird die Angabe eines regulären Ausdrucks durch ein Fragezeichen.
+Eine Alternative zur Auswertung von Stati oder Readings ist das Auswerten von Ereignissen (Events) mit Hilfe von regulären Ausdrücken, wie beim notify.<br>
+<br>
 Die Syntax lautet: <code>[&lt;devicename&gt;:"&lt;regex&gt;"]</code><br>
+<br>
+Der reguläre Ausdruck, der das Suchmuster innerhalb einer Ereigniszeile definiert, wird in Anführungszeichen angegeben.<br>
 <br>
 <u>Anwendungsbeispiel</u>: wie oben, jedoch wird hier nur das Ereignis (welches im Eventmonitor erscheint) ausgewertet und nicht der Status von "remotecontrol" wie im vorherigen Beispiel<br>
 <br>
