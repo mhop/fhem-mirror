@@ -57,6 +57,8 @@
 # V 1.0.0.8     Feature: attribute handling accelerates some actions
 #               Fix:     update of state triggers force a notify
 #               Fix:     adjust commandref 
+# V 1.0.0.9     Feature: new attribute pidIPortionCallBeforeSetting for user specific callback 
+#               before setting a new value to p-portion
 ####################################################################################################
 package main;
 
@@ -68,7 +70,7 @@ use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
 
-my $PID20_Version = "1.0.0.8";
+my $PID20_Version = "1.0.0.9";
 sub PID20_Calc($);
 ########################################
 sub PID20_Log($$$)
@@ -101,6 +103,7 @@ sub PID20_Initialize($)
     . 'pidActorLimitLower '
     . 'pidActorLimitUpper '
     . 'pidActorCallBeforeSetting '
+    . 'pidIPortionCallBeforeSetting '
     . 'pidCalcInterval '
     . 'pidDeltaTreshold '
     . 'pidDesiredName '
@@ -558,6 +561,17 @@ sub PID20_Calc($)
 
       $hash->{helper}{isWindUP} = $isWindup;
 
+      # check callback for iPortion
+      my $iportionCallBeforeSetting = AttrVal( $name, 'pidIPortionCallBeforeSetting', undef );
+      if ( defined($iportionCallBeforeSetting) && exists &$iportionCallBeforeSetting )
+      {
+        PID20_Log $hash, 5, 'start callback ' . $iportionCallBeforeSetting . ' with iPortion:' . $iPortion;
+        no strict "refs";
+        $iPortion = &$iportionCallBeforeSetting( $name, $iPortion );
+        use strict "refs";
+        PID20_Log $hash, 5, 'return value of ' . $iportionCallBeforeSetting . ':' . $iPortion;
+      }
+
       # calc actuation
       $actuationCalc = $pPortion + $iPortion + $dPortion;
 
@@ -666,7 +680,8 @@ sub PID20_Calc($)
     if ($actuationReq)
     {
       $readingUpdateReq = 1;         # update the readings
-
+      
+      # check calback for actuation
       my $actorCallBeforeSetting = AttrVal( $name, 'pidActorCallBeforeSetting', undef );
       if ( defined($actorCallBeforeSetting) && exists &$actorCallBeforeSetting )
       {
@@ -855,7 +870,21 @@ sub PID20_Attr($$$$)
               return $actValue;
           }</pre>
 		  </li>
-
+		<li><b>pidIPortionCallBeforeSetting</b> - an optional callback-function, which can manipulate the value of I-Portion; default: not defined
+        <pre>
+        # Exampe for callback-function
+        # 1. argument = name of PID20
+        # 2. argument = current i-portion value
+          sub PIDIPortionSet($$)
+          {
+              my ( $name, $actValue ) = @_;
+              if ($actValue>70)
+              {
+                $actValue=70;
+              }
+              return $actValue;
+          }</pre>
+		  </li>
 	</ul>
 	<br/><br/>
 
