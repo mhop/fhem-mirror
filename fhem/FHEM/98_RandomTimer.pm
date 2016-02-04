@@ -93,18 +93,20 @@ sub RandomTimer_Define($$)
   return "invalid timeToSwitch <$timeToSwitch>, use 9999"
      if(!($timeToSwitch =~  m/^[0-9]{2,4}$/i));
 
-  RandomTimer_set_switchmode ($hash, "800/200") if (!defined $hash->{SWITCHMODE});
+  RandomTimer_setSwitchmode ($hash, "800/200") if (!defined $hash->{helper}{SWITCHMODE});
    
-  $hash->{NAME}           = $name;
-  $hash->{DEVICE}         = $device;
-  $hash->{TIMESPEC_START} = $timespec_start;
-  $hash->{TIMESPEC_STOP}  = $timespec_stop;
-  $hash->{TIMETOSWITCH}   = $timeToSwitch;
-  $hash->{REP}            = $rep;
-  $hash->{REL}            = $rel;
-  $hash->{S_REP}          = $srep;
-  $hash->{S_REL}          = $srel;
-  $hash->{COMMAND}        = Value($hash->{DEVICE});
+  $hash->{NAME}                   = $name;
+  $hash->{DEVICE}                 = $device;
+  $hash->{helper}{TIMESPEC_START} = $timespec_start;
+  $hash->{helper}{TIMESPEC_STOP}  = $timespec_stop;
+  $hash->{helper}{TIMETOSWITCH}   = $timeToSwitch;
+  $hash->{helper}{REP}            = $rep;
+  $hash->{helper}{REL}            = $rel;
+  $hash->{helper}{S_REP}          = $srep;
+  $hash->{helper}{S_REL}          = $srel;
+  $hash->{COMMAND}                = Value($hash->{DEVICE});
+  
+  readingsSingleUpdate ($hash,  "TimeToSwitch", $hash->{helper}{TIMETOSWITCH}, 1);
   
   myRemoveInternalTimer("SetTimer", $hash);
   myInternalTimer      ("SetTimer", time()+1, "RandomTimer_SetTimer", $hash, 0);
@@ -112,8 +114,7 @@ sub RandomTimer_Define($$)
   return undef;
 }
 ########################################################################
-sub RandomTimer_SetTimer($)
-{
+sub RandomTimer_SetTimer($) {
   my ($myHash) = @_;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
   return if (!defined($hash));
@@ -121,23 +122,23 @@ sub RandomTimer_SetTimer($)
   my $now = time();
   my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($now);
   
-  $hash->{active} = 0;
-
+  RandomTimer_setActive($hash, 0);
   RandomTimer_schaltZeitenErmitteln($hash, $now);
   RandomTimer_setState($hash);
   
   Log3 $hash, 4, "[".$hash->{NAME}."]" . " timings  RandomTimer on $hash->{DEVICE}: "
-   . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
-   . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
+   . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
+   . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
   
   my $secToMidnight = 24*3600 -(3600*$hour + 60*$min + $sec);
   
-  my $setExecTime = max($now, $hash->{startTime});
+  my $setExecTime = max($now, $hash->{helper}{startTime});
   myRemoveInternalTimer("Exec",     $hash);
   myInternalTimer      ("Exec",     $setExecTime, "RandomTimer_Exec", $hash, 0);
 
-  if ($hash->{REP} gt "") {
-     my $setTimerTime = max($now+$secToMidnight, $hash->{stopTime}) + $hash->{TIMETOSWITCH}+15;
+  if ($hash->{helper}{REP} gt "") {
+     my $setTimerTime = max($now+$secToMidnight + 15, 
+                            $hash->{helper}{stopTime}) + $hash->{helper}{TIMETOSWITCH}+15;
      myRemoveInternalTimer("SetTimer", $hash);
      myInternalTimer      ("SetTimer", $setTimerTime, "RandomTimer_SetTimer", $hash, 0);
   }
@@ -155,7 +156,7 @@ sub RandomTimer_Exec($) {
    return if (!defined($hash));
   
    # Wenn aktiv aber disabled, dann timer abschalten, Meldung ausgeben.
-   my $active          = RandomTimer_isAktiv($hash);
+   my $active          = RandomTimer_isAktive($hash);
    my $disabled        = RandomTimer_isDisabled($hash);
    my $stopTimeReached = RandomTimer_stopTimeReached($hash);
    
@@ -163,19 +164,18 @@ sub RandomTimer_Exec($) {
       # wenn temporär ausgeschaltet
       if ($disabled) {
        Log3 $hash, 3, "[".$hash->{NAME}."]"." ending   RandomTimer on $hash->{DEVICE}: "
-          . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
-          . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
-       #RandomTimer_down($hash);
-        RandomTimer_setState($hash);
-        $hash->{active} = 0;
+          . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
+          . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
+        RandomTimer_setState ($hash);
+        RandomTimer_setActive($hash,0);
       }
       # Wenn aktiv und Abschaltzeit erreicht, dann Gerät ausschalten, Meldung ausgeben und Timer schließen
       if ($stopTimeReached) {
          Log3 $hash, 3, "[".$hash->{NAME}."]"." ending   RandomTimer on $hash->{DEVICE}: "
-            . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
-            . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
+            . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
+            . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
          RandomTimer_down($hash);
-         $hash->{active} = 0;
+         RandomTimer_setActive($hash, 0);
          if ( AttrVal($hash->{NAME}, "runonce", -1) eq 1 ) {
             Log 3, "[".$hash->{NAME}. "]" ."runonceMode";
             fhem ("delete $hash->{NAME}") ;
@@ -187,21 +187,21 @@ sub RandomTimer_Exec($) {
       if ($disabled) {
          Log3 $hash, 4, "[".$hash->{NAME}. "] RandomTimer on $hash->{DEVICE} timer disabled - no switch";
          RandomTimer_setState($hash);
-         $hash->{active} = 0;
+         RandomTimer_setActive($hash,0);
       }
       if ($stopTimeReached) {
          Log3 $hash, 4, "[".$hash->{NAME}."]"." definition RandomTimer on $hash->{DEVICE}: "
-            . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
-            . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
-         RandomTimer_setState($hash);
-         $hash->{active} = 0;
+            . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
+            . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
+         RandomTimer_setState ($hash);
+         RandomTimer_setActive($hash,0);
          return;
       }
       if (!$disabled) { 
          Log3 $hash, 3, "[".$hash->{NAME}."]"." starting RandomTimer on $hash->{DEVICE}: "
-            . strftime("%H:%M:%S(%d)",localtime($hash->{startTime})) . " - "
-            . strftime("%H:%M:%S(%d)",localtime($hash->{stopTime}));
-         $hash->{active} = 1;      
+            . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{startTime})) . " - "
+            . strftime("%H:%M:%S(%d)",localtime($hash->{helper}{stopTime}));
+         RandomTimer_setActive($hash,1);
       }
    }
    
@@ -216,12 +216,18 @@ sub RandomTimer_Exec($) {
 ########################################################################
 sub RandomTimer_stopTimeReached($) {
    my ($hash) = @_;
-   return ( time()>$hash->{stopTime} );
+   return ( time()>$hash->{helper}{stopTime} );
 }
 ########################################################################
-sub RandomTimer_isAktiv ($) {
+sub RandomTimer_setActive() {
+   my ($hash, $value) = @_;
+   $hash->{helper}{active} = $value;
+   readingsSingleUpdate ($hash,  "active", $value, 1);
+}
+########################################################################
+sub RandomTimer_isAktive ($) {
    my ($hash) = @_;
-   return defined ($hash->{active}) ? $hash->{active}  : 0;
+   return defined ($hash->{helper}{active}) ? $hash->{helper}{active}  : 0;
 }
 ########################################################################
 sub RandomTimer_down($) {
@@ -235,9 +241,11 @@ sub RandomTimer_setState($) {
   my ($hash) = @_;
      
   if (RandomTimer_isDisabled($hash)) {
-     $hash->{STATE}  = "disabled";
+    #$hash->{STATE}  = "disabled";
+     readingsSingleUpdate ($hash,  "state",  "disabled", 1);
   } else {
-     $hash->{STATE}  = $hash->{active} ? "on" : "off";
+     my $state = $hash->{helper}{active} ? "on" : "off";
+     readingsSingleUpdate ($hash,  "state", $state,  1);
   }
   
 }
@@ -248,7 +256,7 @@ sub RandomTimer_Attr($$$) {
   my $hash = $defs{$name};
   
   if( $attrName ~~ ["switchmode"] ) {
-     RandomTimer_set_switchmode($hash, $attrVal);
+     RandomTimer_setSwitchmode($hash, $attrVal);
   }
   
   if( $attrName ~~ ["disable","disableCond"] ) {
@@ -260,7 +268,7 @@ sub RandomTimer_Attr($$$) {
   return undef;
 }
 ########################################################################
-sub RandomTimer_set_switchmode ($$) {
+sub RandomTimer_setSwitchmode ($$) {
 
    my ($hash, $attrVal) = @_;
    my $mod = "[".$hash->{NAME} ."] ";
@@ -269,10 +277,10 @@ sub RandomTimer_set_switchmode ($$) {
    if(!($attrVal =~  m/^([0-9]{1,3})\/([0-9]{1,3})$/i)) {
       Log3 undef, 3, $mod . "invalid switchMode <$attrVal>, use 999/999";
    } else {
-      my ($sigmaoff, $sigmaon) = ($1, $2);
-      $hash->{SWITCHMODE}   = $attrVal;
-      $hash->{SIGMAON}      = $sigmaon;
-      $hash->{SIGMAOFF}     = $sigmaoff;
+      my ($sigmaWhenOff, $sigmaWhenOn) = ($1, $2);
+      $hash->{helper}{SWITCHMODE}    = $attrVal;
+      $hash->{helper}{SIGMAWHENON}   = $sigmaWhenOn;
+      $hash->{helper}{SIGMAWHENOFF}  = $sigmaWhenOff;
       $attr{$hash->{NAME}}{switchmode} = $attrVal;
    }
 }
@@ -280,7 +288,7 @@ sub RandomTimer_set_switchmode ($$) {
 sub RandomTimer_getSecsToNextAbschaltTest($)
 {
     my ($hash) = @_;
-    my $intervall = $hash->{TIMETOSWITCH};
+    my $intervall = $hash->{helper}{TIMETOSWITCH};
 
     my $proz = 10;
     my $delta    = $intervall * $proz/100;
@@ -294,6 +302,11 @@ sub RandomTimer_schaltZeitenErmitteln ($$) {
 
   RandomTimer_startZeitErmitteln($hash, $now);
   RandomTimer_stopZeitErmitteln ($hash, $now);
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash,  "Startzeit", FmtDateTime($hash->{helper}{startTime}));
+  readingsBulkUpdate ($hash,  "Stoppzeit", FmtDateTime($hash->{helper}{stopTime}));
+  readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
 
 }
 ########################################################################
@@ -320,7 +333,7 @@ sub RandomTimer_addDays ($$) {
 sub RandomTimer_startZeitErmitteln  ($$) {
    my ($hash,$now) = @_;
 
-   my $timespec_start = $hash->{TIMESPEC_START};
+   my $timespec_start = $hash->{helper}{TIMESPEC_START};
 
    return "Wrong timespec_start <$timespec_start>, use \"[+][*]<time or func>\""
       if($timespec_start !~ m/^(\+)?(\*)?(.*)$/i);
@@ -335,14 +348,14 @@ sub RandomTimer_startZeitErmitteln  ($$) {
    } else {
       $startTime = RandomTimer_zeitBerechnen($now, $hour, $min, $sec);
    }
-   $hash->{startTime} = $startTime;
-   $hash->{STARTTIME} = strftime("%d.%m.%Y  %H:%M:%S",localtime($startTime));
+   $hash->{helper}{startTime} = $startTime;
+   $hash->{helper}{STARTTIME} = strftime("%d.%m.%Y  %H:%M:%S",localtime($startTime));
 }
 ########################################################################
 sub RandomTimer_stopZeitErmitteln  ($$) {
    my ($hash,$now) = @_;
 
-   my $timespec_stop = $hash->{TIMESPEC_STOP};
+   my $timespec_stop = $hash->{helper}{TIMESPEC_STOP};
 
    return "Wrong timespec_stop <$timespec_stop>, use \"[+][*]<time or func>\""
       if($timespec_stop !~ m/^(\+)?(\*)?(.*)$/i);
@@ -353,15 +366,15 @@ sub RandomTimer_stopZeitErmitteln  ($$) {
 
    my $stopTime;
    if($rel) {
-      $stopTime = $hash->{startTime} + 3600* $hour        + 60* $min       +  $sec;
+      $stopTime = $hash->{helper}{startTime} + 3600* $hour        + 60* $min       +  $sec;
    } else {
       $stopTime = RandomTimer_zeitBerechnen($now, $hour, $min, $sec);
    }
-   if ($hash->{startTime} > $stopTime) {
+   if ($hash->{helper}{startTime} > $stopTime) {
       $stopTime  = RandomTimer_addDays($stopTime, 1);
    }
-   $hash->{stopTime} = $stopTime;
-   $hash->{STOPTIME} = strftime("%d.%m.%Y  %H:%M:%S",localtime($stopTime));
+   $hash->{helper}{stopTime} = $stopTime;
+   $hash->{helper}{STOPTIME} = strftime("%d.%m.%Y  %H:%M:%S",localtime($stopTime));
 
 }
 ########################################################################
@@ -372,10 +385,13 @@ sub RandomTimer_device_toggle ($) {
     if ($status ne "on" && $status ne "off" ) {
        Log3 $hash, 3, "[".$hash->{NAME}."]"." result of function Value($hash->{DEVICE}) must be 'on' or 'off'";
     }
-    my $sigma = ($status eq "on") ? $hash->{SIGMAON} : $hash->{SIGMAOFF};
+    
+    my $sigma = ($status eq "on") 
+       ? $hash->{helper}{SIGMAWHENON} 
+       : $hash->{helper}{SIGMAWHENOFF};
 
     my $zufall = int(rand(1000));
-    Log3 $hash, 4,  "[".$hash->{NAME}."]"." IstZustand:$status sigma-$status:$sigma random:$zufall->" . (($zufall < $sigma)?"true":"false");
+    Log3 $hash, 4,  "[".$hash->{NAME}."]"." IstZustand:$status sigmaWhen-$status:$sigma random:$zufall<$sigma=>" . (($zufall < $sigma)?"true":"false");
 
     if ($zufall < $sigma ) {
        $hash->{COMMAND}  = ($status eq "on") ? "off" : "on";
