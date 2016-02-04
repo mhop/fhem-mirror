@@ -1,6 +1,6 @@
 ﻿##############################################
+# $Id$
 # 95_remotecontrol
-# $Id: $
 #
 ################################################################
 #
@@ -395,7 +395,7 @@ RC_layout_itunes() {
 <h3>remotecontrol</h3>
 <ul>
   Displays a graphical remote control. Buttons (=icons) can be chosen and arranged. Predefined layouts are available for e.g. Samsung-TV or iTunes.
-  Any buttonclick can be forwarded to the actual fhem-device. For further explanation, please check the <a href="http://www.fhemwiki.de/wiki/Remotecontrol">Wiki-Entry</<>.<br>
+  Any buttonclick can be forwarded to the actual fhem-device. For further explanation, please check the <a href="http://www.fhemwiki.de/wiki/Remotecontrol">Wiki-Entry</a>.<br>
 
   <a name="remotecontroldefine"></a><br>
   <b>Define</b>
@@ -407,7 +407,7 @@ RC_layout_itunes() {
     <tr><td><code>get rc1 layout</code></td><td><code># displays all available predefined layouts</code></td></tr>
     <tr><td><code>set rc1 layout samsung</code></td><td><code># assigns keys for a SamsungTV</code></td></tr>
     <tr><td><code>set rc1 makenotify myTV</code></td><td><code># creates notify_rc1 which forwards every buttonclick to myTV for execution</code></td></tr>
-    <tr><td colspan="2"><b>Note:</b> keys can be changed at any time, it is not necessary to redefine the weblink</td></tr>
+    <tr><td><b>Note:</b> keys can be changed at any time, it is not necessary to redefine the weblink</td></tr>
     <tr><td><code>attr rc1 row15 VOLUP,VOLDOWN</code></td></tr>
     </table>
   </ul>
@@ -481,7 +481,7 @@ RC_layout_itunes() {
 <ul>
   Erzeugt eine graphische Fernbedienung. Buttons (=icons) können frei ausgewählt und angeordnet werden. Vordefinierte layouts sind verfügbar für z.B. Samsung-TV und iTunes.
   Jeder "Knopfdruck" kann an das entsprechende fhem-Gerät weitergegeben werden.<br>
-  Weitere Erklaerungen finden sich im <a href="http://www.fhemwiki.de/wiki/Remotecontrol">Wiki-Eintrag</<>.<br>
+  Weitere Erklaerungen finden sich im <a href="http://www.fhemwiki.de/wiki/Remotecontrol">Wiki-Eintrag</a>.<br>
 
   <a name="remotecontroldefine"></a><br>
   <b>Define</b>
@@ -493,7 +493,7 @@ RC_layout_itunes() {
     <tr><td><code>get rc1 layout</code></td><td><code># zeigt alle vorhandenen vordefinierten layouts an</code></td></tr>
     <tr><td><code>set rc1 layout samsung</code></td><td><code># laedt das layout für SamsungTV</code></td></tr>
     <tr><td><code>set rc1 makenotify myTV</code></td><td><code># erzeugt notify_rc1, das jeden Tastendruck an myTV weitergibt</code></td></tr>
-    <tr><td colspan="2"><b>Hinweis:</b>die Tastenbelegung kann jederzeit geaendert werden, ohne dass der weblink erneut erzeugt werden muss.</td></tr>
+    <tr><td><b>Hinweis:</b>die Tastenbelegung kann jederzeit geaendert werden, ohne dass der weblink erneut erzeugt werden muss.</td></tr>
     <tr><td><code>attr rc1 row15 VOLUP,VOLDOWN</code></td></tr>
     </table>
   </ul>
