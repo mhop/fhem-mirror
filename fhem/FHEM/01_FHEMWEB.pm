@@ -2606,6 +2606,11 @@ FW_Notify($$)
 sub
 FW_directNotify($@) # Notify without the event overhead (Forum #31293)
 {
+  my $filter;
+  if($_[0] =~ m/^FILTER=(.*)/) {
+    $filter = "^$1\$";
+    shift;
+  }
   my $dev = $_[0];
   foreach my $ntfy (values(%defs)) {
     next if(!$ntfy->{TYPE} ||
@@ -2613,6 +2618,7 @@ FW_directNotify($@) # Notify without the event overhead (Forum #31293)
             !$ntfy->{inform} ||
             !$ntfy->{inform}{devices}{$dev} ||
             $ntfy->{inform}{type} ne "status");
+    next if($filter && $ntfy->{inform}{filter} !~ m/$filter/);
     if(!addToWritebuffer($ntfy, 
         FW_longpollInfo($ntfy->{inform}{fmt}, @_)."\n")) {
       my $name = $ntfy->{NAME};

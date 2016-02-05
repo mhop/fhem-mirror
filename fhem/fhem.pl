@@ -2144,9 +2144,12 @@ CommandList($$)
           if($defs{$sdev}) {
             if(defined($defs{$sdev}{$n}) && (!$fType || $fType eq "i:")) {
               my $val = $defs{$sdev}{$n};
-              $val = $val->{NAME} if(ref($val) eq 'HASH' && $val->{NAME});
-              $str .= sprintf("%-20s %*s   %*s %s\n", $first?$sdev:'', $arg[2]?19:0, '',
-                      $arg[2]?-15:0, $arg[2]?$n:'', $val);
+              if(ref($val) eq 'HASH') {
+                $val = ($val->{NAME} ? $val->{NAME} : # ???
+                        join(" ", map { "$_=$val->{$_}" } sort keys %{$val}));
+              }
+              $str .= sprintf("%-20s %*s   %*s %s\n", $first?$sdev:'',
+                        $arg[2]?19:0, '', $arg[2]?-15:0, $arg[2]?$n:'', $val);
 
             } elsif($defs{$sdev}{READINGS} &&
                     defined($defs{$sdev}{READINGS}{$n})
@@ -2159,8 +2162,9 @@ CommandList($$)
             } elsif($attr{$sdev} && 
                     defined($attr{$sdev}{$n})
                     && (!$fType || $fType eq "a:")) {
-              $str .= sprintf("%-20s %*s   %*s %s\n", $first?$sdev:'', $arg[2]?19:0, '',
-                      $arg[2]?-15:0, $arg[2]?$n:'', $attr{$sdev}{$n});
+              $str .= sprintf("%-20s %*s   %*s %s\n", $first?$sdev:'',
+                        $arg[2]?19:0, '', $arg[2]?-15:0, $arg[2]?$n:'',
+                        $attr{$sdev}{$n});
 
             }
           }
