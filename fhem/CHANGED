@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new events for home automation buttons and unassigned buttons
   - feature: 10_KOPP_FC: added blinds and switches
   - updated: 74_AMAD: New Mijor Release 1.2.0
                       !!! ATTENTION !!! Do not forget to to update the new
