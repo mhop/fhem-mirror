@@ -980,6 +980,12 @@ harmony_Read($)
           if( $content =~ m/type="harmony.engine\?startActivityFinished"/ ) {
             harmony_updateActivity($hash, $decoded->{activityId}) if( defined($decoded->{activityId}) );
 
+          } elsif( $content =~ m/type="vnd.logitech.harmony\/vnd.logitech.control.button\?pressType"/ ) {
+            DoTrigger( $name, "vnd.logitech.control.button: $decoded->{type}" );
+
+          } elsif( $content =~ m/type="automation.state\?notify"/ ) {
+            DoTrigger( $name, "automation.state: $cdata" );
+
           } else {
             Log3 $name, 4, "$name: unknown message: $content";
 
