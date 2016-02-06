@@ -42,9 +42,6 @@ sub YAMAHA_AVR_Attr(@);
 sub YAMAHA_AVR_ResetTimer($;$);
 sub YAMAHA_AVR_Undefine($$);
 
-
-
-
 ###################################
 sub
 YAMAHA_AVR_Initialize($)
@@ -217,7 +214,20 @@ YAMAHA_AVR_GetStatus($;$)
             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Sound_Video><Tone><Treble>GetParam</Treble></Tone></Sound_Video></$zone></YAMAHA_AV>", "statusRequest", "toneStatus", {options => {can_fail => 1}});
         }
     }
-    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Update><Status>GetParam</Status></Update></Network></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", {options => {can_fail => 1}});
+    
+    # check for FW update
+    if(defined($hash->{MODEL}))
+    {
+        if($hash->{MODEL} =~ /^RX-(?:A\d{1,2}10|V\d{1,2}71)$/) # RX-Vx71 / RX-Ax10 have different firmware status request
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Update><Status>GetParam</Status></Update></Network></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", {options => {can_fail => 1}});
+        }
+        elsif($hash->{MODEL} =~ /^RX-(?:A\d{1,2}20|V\d{1,2}73)$/) # RX-Vx73 / RX-Ax20 have different firmware status request
+        {
+            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Update><YAMAHA_Network_Site><Status>GetParam</Status></YAMAHA_Network_Site></Update></Misc></System></YAMAHA_AV>", "statusRequest", "fwUpdate", {options => {can_fail => 1}});
+        }
+    }
+    
     
     YAMAHA_AVR_ResetTimer($hash) unless($local == 1);
     
@@ -310,7 +320,7 @@ YAMAHA_AVR_Set($@)
                                                           (exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").
                                                           (exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")."enhancer:on,off " : "").
                                                           (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward ".
-                                                          (exists($hash->{helper}{PLAY_CONTROL}) ? "shuffle:on,off repeat:off,one,all " : "") : "").
+                                                          (($hash->{helper}{SUPPORT_SHUFFLE_REPEAT}) ? "shuffle:on,off repeat:off,one,all " : "") : "").
                                                           "sleep:off,30min,60min,90min,120min,last ".
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,1,10 treble:slider,-10,1,10 " : "").
@@ -1181,7 +1191,7 @@ YAMAHA_AVR_ParseResponse ($$$)
         {
             if($arg eq "playShuffle")
             {
-                delete($hash->{helper}{PLAY_CONTROL}) if(exists($hash->{helper}{PLAY_CONTROL}));
+                $hash->{helper}{SUPPORT_SHUFFLE_REPEAT} = 0;
             }
             elsif($arg eq "toneStatus")
             {
@@ -1441,16 +1451,23 @@ YAMAHA_AVR_ParseResponse ($$$)
                     
                     if($data =~ /<Src_Name>(.+?)<\/Src_Name>/)
                     {
+                        $hash->{helper}{LAST_INPUT_TAG} = $hash->{helper}{CURRENT_INPUT_TAG} if(exists($hash->{helper}{CURRENT_INPUT_TAG}));
                         $hash->{helper}{CURRENT_INPUT_TAG} = $1;
                         Log3 $name, 4, "YAMAHA_AVR ($name) - check for extended input informations on <$1>";
                     
                         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo", {options => {can_fail => 1}});
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat", {options => {can_fail => 1}});
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle", {options => {can_fail => 1}});
+                        
+                        if(!exists($hash->{helper}{LAST_INPUT_TAG}) or ($hash->{helper}{LAST_INPUT_TAG} ne $hash->{helper}{CURRENT_INPUT_TAG}) or $hash->{helper}{SUPPORT_SHUFFLE_REPEAT})
+                        {
+                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat", {options => {can_fail => 1}});
+                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle", {options => {can_fail => 1}});
+                        }            
                     }
                     else
                     {
                         delete($hash->{helper}{CURRENT_INPUT_TAG}) if(exists($hash->{helper}{CURRENT_INPUT_TAG}));
+                        delete($hash->{helper}{LAST_INPUT_TAG}) if(exists($hash->{helper}{LAST_INPUT_TAG}));
+                        $hash->{helper}{SUPPORT_SHUFFLE_REPEAT} = 0;
                         readingsBulkUpdate($hash, "currentAlbum", "", 0);
                         readingsBulkUpdate($hash, "currentTitle", "", 0);
                         readingsBulkUpdate($hash, "currentChannel", "", 0);
@@ -1607,7 +1624,7 @@ YAMAHA_AVR_ParseResponse ($$$)
             {
                 if($data =~ /<Shuffle>(.+?)<\/Shuffle>/)
                 {
-                    $hash->{helper}{PLAY_CONTROL} = 1;
+                    $hash->{helper}{SUPPORT_SHUFFLE_REPEAT} = 1;
                     readingsBulkUpdate($hash, "shuffle", lc($1));
                 }
             }
@@ -1615,7 +1632,7 @@ YAMAHA_AVR_ParseResponse ($$$)
             {
                 if($data =~ /<Repeat>(.+?)<\/Repeat>/)
                 {
-                    $hash->{helper}{PLAY_CONTROL} = 1;
+                    $hash->{helper}{SUPPORT_SHUFFLE_REPEAT} = 1;
                     readingsBulkUpdate($hash, "repeat", lc($1));
                 }
             }
@@ -2297,7 +2314,7 @@ So here are some examples:
   <li><b>input</b> - The selected input source according to the FHEM input commands</li>
   <li><b>inputName</b> - The input description as seen on the receiver display</li>
   <li><b>mute</b> - Reports the mute status of the receiver or zone (can be "on" or "off")</li>
-  <li><b>newFirmware</b> - indicates if a firmware update is available (can be "available" or "unavailable")</li>
+  <li><b>newFirmware</b> - indicates if a firmware update is available (can be "available" or "unavailable"; only available for RX-Vx71, RX-Vx73, RX-Ax10 or RX-Ax20)</li>
   <li><b>power</b> - Reports the power status of the receiver or zone (can be "on" or "off")</li>
   <li><b>presence</b> - Reports the presence status of the receiver or zone (can be "absent" or "present"). In case of an absent device, it cannot be controlled via FHEM anymore.</li>
   <li><b>partyMode</b> - indicates if the party mode is enabled/disabled for the whole device (in main zone) or if the current zone is enabled for party mode (other zones than main zone)</li>
@@ -2569,7 +2586,7 @@ Ein paar Beispiele:
   <li><b>input</b> - Der ausgew&auml;hlte Eingang entsprechend dem FHEM-Kommando</li>
   <li><b>inputName</b> - Die Eingangsbezeichnung, so wie sie am Receiver eingestellt wurde und auf dem Display erscheint</li>
   <li><b>mute</b> - Der aktuelle Stumm-Status ("on" =&gt; Stumm, "off" =&gt; Laut)</li>
-  <li><b>newFirmware</b> - Zeigt an, ob eine neue Firmware zum installieren bereit liegt ("available" =&gt; neue Firmware verf&uuml;gbar, "unavailable" =&gt; keine neue Firmware verf&uuml;gbar)</li>
+  <li><b>newFirmware</b> - Zeigt an, ob eine neue Firmware zum installieren bereit liegt ("available" =&gt; neue Firmware verf&uuml;gbar, "unavailable" =&gt; keine neue Firmware verf&uuml;gbar; Event wird nur generiert f&uuml;r RX-Vx71, RX-Vx73, RX-Ax10 oder RX-Ax20)</li>
   <li><b>power</b> - Der aktuelle Betriebsstatus ("on" =&gt; an, "off" =&gt; aus)</li>
   <li><b>presence</b> - Die aktuelle Empfangsbereitschaft ("present" =&gt; empfangsbereit, "absent" =&gt; nicht empfangsbereit, z.B. Stromausfall)</li>
   <li><b>partyMode</b> - Der Status des Party Modus ( "enabled" =&gt; aktiviert, "disabled" =&gt; deaktiviert). In der Main Zone stellt dies den ger&auml;teweiten Zustand des Party Modus dar. In den einzelnen Zonen zeigt es an, ob die jeweilige Zone f&uuml;r den Party Modus verwendet wird.</li>

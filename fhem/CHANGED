@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  YAMAHA_AVR: reading/event newFirmware will only be triggered for
+             RX-Vx71, RX-Vx73, RX-Ax10 or RX-Ax20 as newer models do not
+             support this information anymore
   - change:  57_Calendar: complete rewrite
              see http://forum.fhem.de/index.php/topic,48315.0.html
   - feature: new events for home automation buttons and unassigned buttons
