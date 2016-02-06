@@ -433,6 +433,11 @@ sub weekprofile_Define($$)
   return undef;
 }
 ############################################## 
+sub sort_by_name 
+{
+  return lc("$a->{TOPIC}:$a->{NAME}") cmp lc("$b->{TOPIC}:$b->{NAME}");
+}
+############################################## 
 sub weekprofile_Get($$@)
 {
   my ($hash, $name, $cmd, @params) = @_;
@@ -444,7 +449,7 @@ sub weekprofile_Get($$@)
   my $useTopics = AttrVal($name,"useTopics",0);
   
   $list.= 'profile_data:' if ($prfCnt > 0);
-  foreach my $prf (@{$hash->{PROFILES}}){
+  foreach my $prf (sort sort_by_name @{$hash->{PROFILES}}){
     $list.= $prf->{TOPIC}.":" if ($useTopics);
     $list.= $prf->{NAME}.","  if ($useTopics || (!$useTopics && ($prf->{TOPIC} eq 'default')));
   }
@@ -477,7 +482,7 @@ sub weekprofile_Get($$@)
     my $topic = 'default';
     $topic = $params[0] if(@params == 1);
     
-    foreach my $prf (@{$hash->{PROFILES}}){
+    foreach my $prf (sort sort_by_name @{$hash->{PROFILES}}){
       $names .=$prf->{NAME}.","               if ($topic eq $prf->{TOPIC});
       $names .="$prf->{TOPIC}:$prf->{NAME},"  if ($topic eq '*');
     }
@@ -495,7 +500,7 @@ sub weekprofile_Get($$@)
     my $topic = 'default';
     
     if ($params[0] eq '*') {
-      foreach my $prf (@{$hash->{PROFILES}}){
+      foreach my $prf (sort sort_by_name @{$hash->{PROFILES}}){
         next if (!defined($prf->{REF}));
         $refs .= "$prf->{TOPIC}:$prf->{NAME}>$prf->{REF},";
       }
@@ -514,7 +519,7 @@ sub weekprofile_Get($$@)
   $list.= ' topic_names:noArg' if ($useTopics);
   if($cmd eq "topic_names") {
     my $names = '';
-    foreach my $topic (@{$hash->{TOPICS}}) {
+    foreach my $topic (sort {lc($a) cmp lc($b)} @{$hash->{TOPICS}}) {
       $names .= "$topic,";
     }
     if ($names) {
@@ -526,7 +531,8 @@ sub weekprofile_Get($$@)
   
   if($cmd eq "sndDevList") {
     my $json = JSON->new;
-    my $json_text = $json->encode($hash->{SNDDEVLIST});
+    my @sortDevList = sort {lc($a->{ALIAS}) cmp lc($b->{ALIAS})} @{$hash->{SNDDEVLIST}};
+    my $json_text = $json->encode(\@sortDevList);
     return $json_text;
   }
   
