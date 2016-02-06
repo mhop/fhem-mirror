@@ -354,6 +354,8 @@ DUOFERNSTICK_DoInit($)
     push(@pairs, $code) if(length($code) == 6);
   }
 
+  $hash->{helper}{cmdEx} = 0;
+  @{$hash->{cmdStack}} = ();
   
   return undef if (!$init_done);
   
@@ -401,9 +403,6 @@ DUOFERNSTICK_DoInit($)
     ($err, $buf) = DUOFERNSTICK_ReadAnswer($hash, "statusRequest");
     next if($err);
     DUOFERNSTICK_SimpleWrite($hash, $duoACK);
-    
-    $hash->{helper}{cmdEx} = 0;
-    @{$hash->{cmdStack}} = ();
   
     readingsSingleUpdate($hash, "state", "Initialized", 1);
     return undef;
@@ -520,7 +519,7 @@ DUOFERNSTICK_Notify($$)
     next if(!defined($s));
     my ($what,$who) = split(' ',$s);
     
-    if ( $what =~ m/INITIALIZED/ ) {
+    if ($what && ($what =~ m/INITIALIZED/)) {
       DUOFERNSTICK_DoInit($own);
     }
   }
