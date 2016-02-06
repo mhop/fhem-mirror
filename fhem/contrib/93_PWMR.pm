@@ -26,7 +26,8 @@
 # 26.01.16 GA fix don't call AssignIoPort
 # 26.01.16 GA fix assign IODev as reference to that hash (otherwise xmllist will crash fhem)
 # 26.01.16 GA add implementation of PID regulation
-# 27.01.16 GA add add attribute desiredTempFrom to take desiredTemp from another object
+# 27.01.16 GA add attribute desiredTempFrom to take desiredTemp from another object
+# 04.02.16 GA add DLookBackCnt, buffer holding previouse temperatures used for PID D-Part calculation
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -462,7 +463,7 @@ PWMR_Define($$)
 
   my $name = $hash->{NAME};
 
-  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window|dummy>[,<window>][:<w_regexp>]] [<usePID 0|1>:<PFactor>:<IFactor>:<DFactor>]"
+  return "syntax: define <name> PWMR <IODev> <factor[,offset]> <tsensor[:reading[:t_regexp]]> <actor>[:<a_regexp_on>] [<window|dummy>[,<window>][:<w_regexp>]] [<usePID 0|1>:<PFactor>:<IFactor>:<DFactor>:<DLookBackCnt>]"
     if(int(@a) < 6 || int(@a) > 9);
 
   my $iodevname = $a[2];
@@ -541,26 +542,66 @@ PWMR_Define($$)
   ##########
   # check pid definition
 
-  my ($usePID, $PFactor, $IFactor, $DFactor) = split (":", $pid, 4);
+  my ($usePID, $PFactor, $IFactor, $DFactor, $DLookBackCnt) = split (":", $pid, 5);
 
-  $hash->{c_PID_useit}   = !defined($usePID)  ? -1 : $usePID;
-  $hash->{c_PID_PFactor} = !defined($PFactor) ? 0  : $PFactor;
-  $hash->{c_PID_IFactor} = !defined($IFactor) ? 0  : $IFactor;
-  $hash->{c_PID_DFactor} = !defined($DFactor) ? 0  : $DFactor;
+  $hash->{c_PID_useit}        = !defined($usePID)  ?      -1 : $usePID;
+  $hash->{c_PID_PFactor}      = !defined($PFactor) ?       0 : $PFactor;
+  $hash->{c_PID_IFactor}      = !defined($IFactor) ?       0 : $IFactor;
+  $hash->{c_PID_DFactor}      = !defined($DFactor) ?       0 : $DFactor;
+  $hash->{c_PID_DLookBackCnt} = !defined($DLookBackCnt) ?  1 : $DLookBackCnt;
 
   $hash->{h_deltaTemp}      = 0 unless defined ($hash->{h_deltaTemp});
+  $hash->{h_deltaTemp_prev} = 0 unless defined ($hash->{h_deltaTemp_prev});
   $hash->{h_pid_integrator} = 0;
 
   if ($pid eq "") {
 
-    delete ($hash->{READINGS}{PID_PVal})      if (defined($hash->{READINGS}{PID_PVal}));
-    delete ($hash->{READINGS}{PID_IVal})      if (defined($hash->{READINGS}{PID_IVal}));
-    delete ($hash->{READINGS}{PID_DVal})      if (defined($hash->{READINGS}{PID_DVal}));
-    delete ($hash->{READINGS}{PID_PWMPulse})  if (defined($hash->{READINGS}{PID_PWMPulse}));
-    delete ($hash->{READINGS}{PID_PWMOnTime}) if (defined($hash->{READINGS}{PID_PWMOnTime}));
+    delete ($hash->{READINGS}{PID_PVal})        if (defined($hash->{READINGS}{PID_PVal}));
+    delete ($hash->{READINGS}{PID_IVal})        if (defined($hash->{READINGS}{PID_IVal}));
+    delete ($hash->{READINGS}{PID_DVal})        if (defined($hash->{READINGS}{PID_DVal}));
+    delete ($hash->{READINGS}{PID_PWMPulse})    if (defined($hash->{READINGS}{PID_PWMPulse}));
+    delete ($hash->{READINGS}{PID_PWMOnTime})   if (defined($hash->{READINGS}{PID_PWMOnTime}));
+ 
+    delete ($hash->{helper}{PID_previousTemps}) if (defined (($hash->{helper}{PID_previousTemps})));
 
     #delete ($hash->{h_deltaTemp})            if (defined($hash->{h_deltaTemp}));
     #delete ($hash->{h_pid_integrator})       if (defined($hash->{h_pid_integrator}));
+
+  } else {
+
+    # initialize if not yet done 
+    $hash->{helper}{PID_previousTemps} = [] unless defined (($hash->{helper}{PID_previousTemps}));
+
+    # shorter reference to array
+    my $TBuffer = $hash->{helper}{PID_previousTemps};
+    my $cnt = ( @{$TBuffer} ); # or scalar @{$TBuffer}
+
+    # reference
+    Log3 ($hash, 3, "org reference is $hash->{helper}{PID_previousTemps} short is $TBuffer, cnt is ". scalar @{$TBuffer}." (starting from 0)");
+    Log3 ($hash, 3, "content of TBuffer is @{$TBuffer}");
+
+#    for my $i ( 0 .. $cnt -1 ) {
+#      Log3 ($hash, 3, "value $i $TBuffer->[$i]");
+#    }
+#
+#    push @{$TBuffer}, $TBuffer->[1] + $TBuffer->[0];
+#
+#    for my $i ( 0 .. @{$TBuffer} -1 ) {
+#      Log3 ($hash, 3, "value after push $i $TBuffer->[$i]");
+#    }
+#
+#    shift @{$TBuffer};
+#
+#    for my $i ( 0 .. @{$TBuffer} -1 ) {
+#      Log3 ($hash, 3, "value after shift $i $TBuffer->[$i]");
+#    }
+
+    # cut Buffer if it is too large
+    while (scalar @{$TBuffer} > $hash->{c_PID_DLookBackCnt}) {
+      my $v = shift @{$TBuffer};
+#      Log3 ($hash, 3, "shift $v from TBuffer");
+    }
+#    Log3 ($hash, 3, "TBuffer contains ".scalar @{$TBuffer}." elements");
 
   }
   
@@ -821,7 +862,6 @@ PWMR_ReadRoom(@)
   }
 
   my $deltaTemp    = maxNum (0, $desiredTemp - $temperaturV);
-  my $deltaTempPID = $desiredTemp - $temperaturV;
   
   my $factoroffset = $room->{FOFFSET};
   
@@ -840,10 +880,24 @@ PWMR_ReadRoom(@)
   }
 
   # PID calculation
+  my $TBuffer = $room->{helper}{PID_previousTemps};
+  push @{$TBuffer}, $temperaturV;
+
+  my $deltaTempPID = $desiredTemp - $temperaturV;
+  $room->{h_deltaTemp}      = sprintf ("%.1f", -1 * $deltaTempPID);
+  $room->{h_deltaTemp_prev} = sprintf ("%.1f", -1 * ($desiredTemp - $TBuffer->[0]));
+  
+  # cut Buffer if it is too large
+  while (scalar @{$TBuffer} > $room->{c_PID_DLookBackCnt}) {
+    my $v = shift @{$TBuffer};
+    #Log3 ($room, 3, "shift $v from TBuffer");
+  }
+  #Log3 ($room, 3, "TBuffer contains ".scalar @{$TBuffer}." elements");
+  $room->{h_PID_previousTemps} = join (" ", @{$TBuffer});
 
   my $PVal = $room->{c_PID_PFactor} * $deltaTemp;
   my $IVal = $room->{c_PID_IFactor} * $deltaTempPID + $room->{h_pid_integrator};
-  my $DVal = $room->{c_PID_DFactor} * ($deltaTemp + $room->{h_deltaTemp}); # h_deltaTemp was multiplied with -1
+  my $DVal = $room->{c_PID_DFactor} * ($room->{h_deltaTemp_prev} - $room->{h_deltaTemp});
 
   $PVal    = minNum (1, sprintf ("%.2f", $PVal));
   $IVal    = minNum (1, sprintf ("%.2f", $IVal));
@@ -851,7 +905,6 @@ PWMR_ReadRoom(@)
 
   $IVal    = maxNum (-1, $IVal);
 
-  $room->{h_deltaTemp} = sprintf ("%.1f", -1 * $deltaTempPID);
   $room->{h_pid_integrator} = $IVal;
 
   my $newpulsePID  = ($PVal + $IVal + $DVal);
@@ -1224,7 +1277,7 @@ PWMR_Boost(@)
 
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:&lt;w_regexp&gt;]] [&lt;usePID 0|1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;]<br></code>
+    <code>define &lt;name&gt; PWMR &lt;IODev&gt; &lt;factor[,offset]&gt; &lt;tsensor[:reading:[t_regexp]]&gt; &lt;actor&gt;[:&lt;a_regexp_on&gt;] [&lt;window|dummy&gt;[,&lt;window&gt;[:&lt;w_regexp&gt;]] [&lt;usePID 0|1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;:&lt;DLookBackCnt&gt;]<br></code>
 
     <br>
     Define a calculation object with the following parameters:<br>
@@ -1257,13 +1310,14 @@ PWMR_Boost(@)
       <i>w_regexp</i> defines a regular expression to be applied to the reading. Default is '.*Open.*'.<br>
     </li>
 
-    <li>&lt;usePID 0|1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;<br>
+    <li>&lt;usePID 0|1&gt;:&lt;PFactor&gt;:&lt;IFactor&gt;:&lt;DFactor&gt;:&lt;DLookBackCnt&gt;<br>
       <i>usePID 0|1</i>: 0 .. calculate Pulse based on PID but do not use it. 1 .. calculate Pulse based on PID and use it.<br>
       <i>PFactor</i>: Konstant for P.<br>
       <i>IFactor</i>: Konstant for I.<br>
-      <i>DFactor</i>: Konstant for D.<br>
+      <i>DFactor</i>: Konstant for D.<br> 
+      <i>DLookBackCnt</i>: Buffer size to store previous temperatures. For D calculation actual and oldest temperature will be used. Default is 1.<br> 
       Internals c_PID_PFactor, c_PID_IFactor, c_PID_DFactor and c_PID_useit will reflect the above configuration values.<br>
-      Internals h_deltaTemp and h_pid_integrator will store the values needed for calculation of the next PID value.<br>
+      Internals h_deltaTemp h_deltaTemp_prev, h_pid_integrator will store the values needed for calculation of the next PID value.<br>
       Readings PID_DVal, PID_IVal, PID_PVal, PID_PWMOnTime and PID_PWMPulse will reflect the actual calculated PID values and Pulse.<br>
     </li>
 
