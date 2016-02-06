@@ -996,7 +996,7 @@ DUOFERN_Parse($$)
       readingsSingleUpdate($hash, "channel$group", "$button", 1);
     }
     
-  } elsif ($msg =~ m/0FFF0E.{38}/) {
+  } elsif ($msg =~ m/0F..0E.{38}/) {
     my $button = substr($msg, 6, 2);
     my $group = substr($msg, 14, 2);
     
@@ -1023,7 +1023,7 @@ DUOFERN_Parse($$)
     my $sunHeight       =  hex(substr($msg, 16, 2)) - 90 ;
     my $temperature     = (hex(substr($msg, 18, 4)) & 0x7FFF)/10 - 40 ;
     my $isRaining       = (hex(substr($msg, 18, 4)) & 0x8000 ? 1 : 0);
-    my $wind            =  hex(substr($msg, 22, 4)) & 0x02FF;
+    my $wind            = (hex(substr($msg, 22, 4)) & 0x03FF) / 10;
     
     my $state = "T: ".$temperature;
     $state .= " W: ".$wind;
