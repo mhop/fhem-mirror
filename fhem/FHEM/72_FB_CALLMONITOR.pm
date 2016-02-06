@@ -287,26 +287,21 @@ FB_CALLMONITOR_Read($)
     my ($hash) = @_;
 
     my %connection_type = (
-        0 => "0",
-        1 => "FON1",
-        2 => "FON2",
-        3 => "FON3",
+        0 => "FON1",
+        1 => "FON2",
+        2 => "FON3",
+        3 => "Callthrough",
         4 => "ISDN",
         5 => "FAX",
-        6 => "not_defined",
-        7 => "not_defined",
-        8 => "not_defined",
-        9 => "not_defined",
+        6 => "Answering_Machine",
+        
         10 => "DECT_1",
         11 => "DECT_2",
         12 => "DECT_3",
         13 => "DECT_4",
         14 => "DECT_5",
         15 => "DECT_6",
-        16 => "FRITZMini_1",
-        17 => "FRITZMini_2",
-        18 => "FRITZMini_3",
-        19 => "FRITZMini_4",
+        
         20 => "VoIP_1",
         21 => "VoIP_2",
         22 => "VoIP_3",
@@ -317,6 +312,10 @@ FB_CALLMONITOR_Read($)
         27 => "VoIP_8",
         28 => "VoIP_9",
         29 => "VoIP_10",
+        
+        36 => "ISDN_data",
+        37 => "FAX_data",
+        
         40 => "Answering_Machine_1",
         41 => "Answering_Machine_2",
         42 => "Answering_Machine_3",

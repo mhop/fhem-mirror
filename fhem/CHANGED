@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  FB_CALLMONITOR: corrected internal_connection mapping.
+             especially FON1-FON3. Please check your configuration.
   - change:  98_weekprofile: return sorted lists
   - change:  YAMAHA_AVR: reading/event newFirmware will only be triggered for
              RX-Vx71, RX-Vx73, RX-Ax10 or RX-Ax20 as newer models do not
