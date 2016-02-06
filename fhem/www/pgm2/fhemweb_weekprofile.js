@@ -70,7 +70,7 @@ function FW_weekprofileInputDialog(title,inp,def,parent,callback)
     });
 }
 
-function FW_weekprofileMultiSelDialog(title, elementNames, elementLabels, selected,parent,callback)
+function FW_weekprofileMultiSelDialog(title, elementNames, elementLabels, selected,freeInp,parent,callback)
 {
   var table = "<table>";
   if (elementNames) {
@@ -94,7 +94,8 @@ function FW_weekprofileMultiSelDialog(title, elementNames, elementLabels, select
   var div = $("<div id='FW_weekprofileMultiSelDiolog'>");
   $(div).append(title);
   $(div).append(table);
-  $(div).append('<input id="FW_weekprofileMultiSelDiologFreeText" />');
+  if (freeInp && freeInp == 1)
+    $(div).append('<input id="FW_weekprofileMultiSelDiologFreeText" />');
   $("body").append(div);
   
    $(div).dialog({
@@ -210,7 +211,7 @@ function FW_weekprofileSendToDev(devName,bnt)
       var selected = [];
       if (widget.MASTERDEV)
         selected.push(widget.MASTERDEV);
-      FW_weekprofileMultiSelDialog("<span>Device(s):</span>",devicesNames,devicesAlias,selected,bnt, 
+      FW_weekprofileMultiSelDialog("<span>Device(s):</span>",devicesNames,devicesAlias,selected,1,bnt, 
         function(sndDevs) {
           if (!sndDevs || sndDevs.length==0)
             return;
@@ -482,16 +483,47 @@ function FW_weekprofileEditDelInterval(tr)
   FW_weekprofileEditRowStyle(parent)
 }
 
+function FW_weekprofileTransDay(devName,day,bnt)
+{
+  var widget = $('div[informid="'+devName+'"]').get(0)
+  var srcDay = $(widget.CONTENT).find("table[id*=\"weekprofile."+widget.DEVICE+"."+shortDays[day]+"\"]");
+  
+  var dayNames = [];
+  var dayAlias = [];
+  for (var k=0; k < shortDays.length; k++) {
+    if (k != day) { 
+      dayNames.push(shortDays[k]);
+      dayAlias.push(widget.WEEKDAYS[k]);
+    }
+  }
+  var selected = [];  
+  FW_weekprofileMultiSelDialog("<span>Days(s):</span>",dayNames,dayAlias,selected,0,bnt, 
+      function(selDays) {
+        if (!selDays || selDays.length==0)
+          return;
+        for (var k=0; k < selDays.length; k++) {
+          var destDay = $(widget.CONTENT).find("table[id*=\"weekprofile."+widget.DEVICE+"."+selDays[k]+"\"]");
+          destDay.empty();
+          destDay.append(srcDay.clone().contents());
+        }
+      });
+}
+
 function FW_weekprofileEditDay(widget,day)
 { 
   var div = $("<div>").get(0);
-  $(div).append("<div style=\"margin-left:10px;margin:5px\">"+widget.WEEKDAYS[day]+"</div>");
+  var html= '';
+  html += "<div style=\"padding:5px;\">";
+  html += "<span style=\"margin-right:10px;margin-left:10px\">"+widget.WEEKDAYS[day]+"</span>";
+  html += "<a href=\"javascript:void(0)\" onclick=\"FW_weekprofileTransDay('"+widget.DEVICE+"',"+day+",this)\" data-toggle=\"tooltip\" title=\"transfer day\">--></a>"; 
+  html += "</div>";
+  $(div).append(html);
   
   var table = $("<table>").get(0);
   $(table).attr('id',"weekprofile."+widget.DEVICE+"."+shortDays[day]);
   $(table).attr('class',"block wide weekprofile");
   
-  var html;
+  html = '';
   var times = widget.PROFILE[shortDays[day]]['time'];
   var temps = widget.PROFILE[shortDays[day]]['temp'];
   
