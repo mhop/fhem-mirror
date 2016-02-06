@@ -205,6 +205,7 @@ sub HTTPSRV_CGI() {
 
 
 =pod
+=item helper
 =begin html
 
 <a name="HTTPSRV"></a>

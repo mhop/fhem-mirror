@@ -912,6 +912,7 @@ plotFromUrl(@)
 
 
 =pod
+=item helper
 =begin html
 
 <a name="RSS"></a>

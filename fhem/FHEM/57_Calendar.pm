@@ -2409,6 +2409,7 @@ sub CalendarAsHtml($;$) {
 1;
 
 =pod
+=item device
 =begin html
 
 <a name="Calendar"></a>
