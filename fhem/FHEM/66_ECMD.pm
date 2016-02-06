@@ -138,6 +138,26 @@ ECMD_DoInit($)
 sub
 dq($) 
 {
+=for comment
+        '\a' => "\\a",
+      '\e' => "\\e",
+      '\f' => "\\f",
+      '\n' => "\\n",
+      '\r' => "\\r",
+      '\t' => "\\t",
+      );
+  
+  $s =~ s/\\/\\\\/g;
+  foreach my $regex (keys %escSequences) {
+    $s =~ s/$regex/$escSequences{$regex}/g;
+  }
+  $s =~ s/([\000-\037])/sprintf("\\%03o", ord($1))/eg;
+
+  
+  
+=cut
+  
+  
   my ($s)= @_;
   $s= "<nothing>" unless(defined($s));
   return "\"" . escapeLogLine($s) . "\"";

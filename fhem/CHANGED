@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  57_Calendar: complete rewrite
+             see http://forum.fhem.de/index.php/topic,48315.0.html
   - feature: new events for home automation buttons and unassigned buttons
   - feature: 10_KOPP_FC: added blinds and switches
   - updated: 74_AMAD: New Mijor Release 1.2.0
