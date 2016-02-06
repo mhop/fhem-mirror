@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, January 2016
+# SONOS.pm (c) by Reiner Leins, February 2016
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -53,6 +53,11 @@
 # Cover von Amazon funktionieren nicht
 #
 # SVN-History:
+# 06.02.2016
+#	Zusätzlich zu "Mute" (mit Parameter) am Sonos-Device gibt es jetzt auch "MuteOn" und "MuteOff" (jeweils ohne Parameter) zur Verwendung als WebCmd.
+#	Es gibt ein neues Reading "IsMaster" am Sonosplayer-Device, welches angibt, ob der Player gerade ein Masterplayer ist
+#	Es gibt ein neues Reading "MasterPlayer" am Sonosplayer-Device, welches angibt, wie der aktuelle MasterPlayer zu diesem Player heißt. Ist der Player selber der Master (also IsMaster = 1), so steht dort der eigene Name drin.
+#	Es gibt ein neues Reading "SlavePlayer" am Sonosplayer-Device, welches angibt, welche Slaveplayer zu diesem Player zugeordnet sind. Enthält nur Playerdevicenamen, wenn dieser Player ein Masterplayer ist, und dann auch nicht sich selber.
 # 31.01.2016
 #	Im Modul ControlPoint.pm gab es eine fehlerhafte Bearbeitung des Arrays @LWP::Protocol::http::EXTRA_SOCK_OPTS, welche in manchen Fällen zu der Fehlermeldung "Odd number of elements in hash assignment" geführt hat.
 #	Der Anbieter SoundCloud wird als Quelle erkannt und angezeigt
@@ -202,6 +207,8 @@ my %sets = (
 	'PauseAll' => '',
 	'Pause' => '',
 	'Mute' => 'state',
+	'MuteOn' => '',
+	'MuteOff' => '',
 	'RescanNetwork' => '',
 	'LoadBookmarks' => '[Groupname]',
 	'SaveBookmarks' => '[GroupName]',
@@ -1896,7 +1903,7 @@ sub SONOS_Set($@) {
 			$key = $key.':slider,0,1,100' if (lc($key) eq 'volume');
 			$key = $key.':slider,-100,1,100' if (lc($key) eq 'balance');
 			
-			$key = $key.':0,1' if ($key =~ m/mute(all|)/i);
+			$key = $key.':0,1' if ($key =~ m/^mute(all|)$/i);
 			
 			$setcopy{$key} = $sets{$oldkey};
 		}
@@ -2027,26 +2034,19 @@ sub SONOS_Set($@) {
 		#}
 		#SONOS_Log undef, 5, "Current after List: ".Dumper(\@current);
 		
-	} elsif (lc($key) =~ m/(Stop|Pause|Mute)(All|)/i) {
+	} elsif (lc($key) =~ m/^(Stop|Pause|Mute|MuteOn|MuteOff)(All|)$/i) {
 		my $commandType = lc($1);
 		my $commandValue = $value;
 		
 		$commandValue = 0 if ($commandType ne 'mute');
-		$commandType = 'setGroupMute' if ($commandType eq 'mute');
+		$commandValue = 1 if ($commandType eq 'muteon');
+		$commandValue = 0 if ($commandType eq 'muteoff');
 		
-		# Aktuellen Zustand holen
-		my @current;
-		my $current = SONOS_Get($hash, qw($hash->{NAME} Groups));
-		$current =~ s/ //g;
-		while ($current =~ m/(\[.*?\])/ig) {
-			my @tmp = split(/,/, substr($1, 1, -1));
-			push @current, \@tmp;
-		}
+		$commandType = 'setGroupMute' if (($commandType eq 'mute') || ($commandType eq 'muteon') || ($commandType eq 'muteoff'));
 		
 		# Alle Gruppenkoordinatoren zum Stoppen/Pausieren/Muten aufrufen
-		foreach my $cElem (@current) {
-			my @currentElem = @{$cElem};
-			SONOS_DoWork(SONOS_getDeviceDefHash($currentElem[0])->{UDN}, $commandType, $commandValue);
+		foreach my $cElem (@{eval(ReadingsVal($hash->{NAME}, 'MasterPlayer', '[]'))}) {
+			SONOS_DoWork(SONOS_getDeviceDefHash($cElem)->{UDN}, $commandType, $commandValue);
 		}
 	} elsif (lc($key) eq 'rescannetwork') {
 		SONOS_DoWork('SONOS', 'rescanNetwork');
@@ -2394,7 +2394,7 @@ sub SONOS_Discover() {
 						}
 						
 						# Notwendige Daten vom Player ermitteln...
-						my ($isZoneBridge, $topoType, $fieldType, $master, $aliasSuffix) = SONOS_AnalyzeZoneGroupTopology($udn, $udnShort);
+						my ($isZoneBridge, $topoType, $fieldType, $master, $masterPlayerName, $aliasSuffix, $zoneGroupState) = SONOS_AnalyzeZoneGroupTopology($udn, $udnShort);
 						
 						my $roomName = $SONOS_DevicePropertiesProxy{$udn}->GetZoneAttributes()->getValue('CurrentZoneName');
 						
@@ -5212,7 +5212,8 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Log undef, 4, 'ControlProxies wurden gesichert';
 		
 		# ZoneTopology laden, um die Benennung der Fhem-Devices besser an die Realität anpassen zu können
-		my ($isZoneBridge, $topoType, $fieldType, $master, $aliasSuffix) = SONOS_AnalyzeZoneGroupTopology($udn, $udnShort);
+		my ($isZoneBridge, $topoType, $fieldType, $master, $masterPlayerName, $aliasSuffix, $zoneGroupState) = SONOS_AnalyzeZoneGroupTopology($udn, $udnShort);
+		my @slavePlayerNames = SONOS_AnalyzeTopologyForSlavePlayer($udnShort, $zoneGroupState);
 		
 		# Wenn der aktuelle Player der Master ist, dann kein Kürzel anhängen, 
 		# damit gibt es immer einen Player, der den Raumnamen trägt, und die anderen enthalten Kürzel
@@ -5330,6 +5331,11 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'softwareRevision', $displayVersion);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'serialNum', $serialNum);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'fieldType', $fieldType);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'IsMaster', $master ? '1' : '0');
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'MasterPlayer', $masterPlayerName);
+		$Data::Dumper::Indent = 0;
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'SlavePlayer', Dumper(\@slavePlayerNames));
+		$Data::Dumper::Indent = 2;
 		
 		# Abspielreadings vorab ermitteln, um darauf prüfen zu können...
 		if (!$isZoneBridge) {
@@ -5578,14 +5584,18 @@ sub SONOS_AnalyzeZoneGroupTopology($$) {
 	my $topoType = '';
 	my $fieldType = '';
 	my $master = 1;
+	my $masterPlayerName;
 	my $isZoneBridge = 0;
+	my $zoneGroupState = '';
 	if ($SONOS_ZoneGroupTopologyProxy{$udn}) {
-		my $zoneGroupState = $SONOS_ZoneGroupTopologyProxy{$udn}->GetZoneGroupState()->getValue('ZoneGroupState');
+		$zoneGroupState = $SONOS_ZoneGroupTopologyProxy{$udn}->GetZoneGroupState()->getValue('ZoneGroupState');
 		SONOS_Log undef, 5, 'ZoneGroupState: '.$zoneGroupState;
 		
 		if ($zoneGroupState =~ m/.*(<ZoneGroup Coordinator="(RINCON_[0-9a-f]+)".*?>).*?(<(ZoneGroupMember|Satellite) UUID="$udnShort".*?(>|\/>))/is) {
 			my $coordinator = $2;
 			my $member = $3;
+			
+			$masterPlayerName = SONOS_Client_Data_Retreive($coordinator.'_MR', 'def', 'NAME', $coordinator.'_MR');
 			
 			# Ist dieser Player in einem ChannelMapSet (also einer Paarung) enthalten?
 			if ($member =~ m/ChannelMapSet=".*?$udnShort:(.*?),(.*?)[;"]/is) {
@@ -5619,7 +5629,7 @@ sub SONOS_AnalyzeZoneGroupTopology($$) {
 	$aliasSuffix = ' - Subwoofer' if ($topoType eq '_SW');
 	$aliasSuffix = ' - Mitte' if ($topoType eq '_LF_RF');
 	
-	return ($isZoneBridge, $topoType, $fieldType, $master, $aliasSuffix);
+	return ($isZoneBridge, $topoType, $fieldType, $master, $masterPlayerName, $aliasSuffix, $zoneGroupState);
 }
 
 ########################################################################################
@@ -7307,11 +7317,13 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 		SONOS_AnalyzeTopologyForMasterPlayer($zoneGroupState);
 	}
 	
+	SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
+	
 	# ZonePlayerUUIDsInGroup: Welche Player befinden sich alle in der gleichen Gruppe wie ich?
 	my $zonePlayerUUIDsInGroup = SONOS_Client_Data_Retreive($udn, 'reading', 'ZonePlayerUUIDsInGroup', '');
 	if ($properties{ZonePlayerUUIDsInGroup}) {
 		$zonePlayerUUIDsInGroup = $properties{ZonePlayerUUIDsInGroup};
-		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'ZonePlayerUUIDsInGroup', $zonePlayerUUIDsInGroup);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'ZonePlayerUUIDsInGroup', $zonePlayerUUIDsInGroup);
 	}
 	
 	# ZoneGroupID: Welcher Gruppe gehöre ich aktuell an, und hat sich meine Aufgabe innerhalb der Gruppe verändert?
@@ -7320,6 +7332,10 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 	if ($zoneGroupState =~ m/.*(<ZoneGroup Coordinator="(RINCON_[0-9a-f]+)".*?>).*?(<(ZoneGroupMember|Satellite) UUID="$udnShort".*?(>|\/>))/is) {
 		$zoneGroupID = $2;
 		my $member = $3;
+		
+		my $master = ($zoneGroupID eq $udnShort);
+		my $masterPlayerName = SONOS_Client_Data_Retreive($zoneGroupID.'_MR', 'def', 'NAME', $zoneGroupID.'_MR');
+		my @slavePlayerNames = SONOS_AnalyzeTopologyForSlavePlayer($udnShort, $zoneGroupState);
 		
 		$zoneGroupID .= ':__' if ($zoneGroupID !~ m/:/);
 		
@@ -7352,18 +7368,25 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 		$aliasSuffix = ' - Mitte' if ($topoType eq '_LF_RF');
 		
 		my $roomName = SONOS_Client_Data_Retreive($udn, 'reading', 'roomName', '');
-		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'roomNameAlias', $roomName.$aliasSuffix);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'roomNameAlias', $roomName.$aliasSuffix);
 		
-		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'ZoneGroupID', $zoneGroupID);
-		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'fieldType', $fieldType);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'ZoneGroupID', $zoneGroupID);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'fieldType', $fieldType);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'IsMaster', $master ? '1' : '0');
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'MasterPlayer', $masterPlayerName);
+		$Data::Dumper::Indent = 0;
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'SlavePlayer', Dumper(\@slavePlayerNames));
+		$Data::Dumper::Indent = 2;
 	}
 	
 	# ZoneGroupName: Welchen Namen hat die aktuelle Gruppe?
 	my $zoneGroupName = SONOS_Client_Data_Retreive($udn, 'reading', 'ZoneGroupName', '');
 	if ($properties{ZoneGroupName}) {
 		$zoneGroupName = $properties{ZoneGroupName};
-		SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'ZoneGroupName', $zoneGroupName);
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'ZoneGroupName', $zoneGroupName);
 	}
+	
+	SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
 	
 	$SONOS_Client_SendQueue_Suspend = 0;
 	SONOS_Log $udn, 3, 'Event: End of ZoneGroupTopology-Event for Zone "'.$name.'".';
@@ -7376,6 +7399,30 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 	}
 	
 	return 0;
+}
+
+########################################################################################
+#
+#  SONOS_AnalyzeTopologyForSlavePlayer - Topology analysieren, um die Slaveplayer zu 
+#                                        einem Masterplayer zu ermitteln
+#
+########################################################################################
+sub SONOS_AnalyzeTopologyForSlavePlayer($$) {
+	my ($masterUDNShort, $zoneGroupState) = @_;
+	
+	my @slavePlayer = ();
+	while ($zoneGroupState =~ m/<ZoneGroup.*?Coordinator="(.*?)".*?>(.*?)<\/ZoneGroup>/gi) {
+		next if ($1 ne $masterUDNShort);
+		
+		my $member = $2;
+		while ($member =~ m/<ZoneGroupMember.*?UUID="(.*?)".*?\/>/gi) {
+			next if ($1 eq $masterUDNShort); # Den Master selbst nicht in die Slaveliste reinpacken...
+			
+			push @slavePlayer, SONOS_Client_Data_Retreive($1.'_MR', 'def', 'NAME', $1.'_MR');
+		}
+	}
+	
+	return sort @slavePlayer;
 }
 
 ########################################################################################
