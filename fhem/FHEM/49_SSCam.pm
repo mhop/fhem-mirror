@@ -27,6 +27,11 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.11   05.02.2016    added function "goPreset" and "goAbsPTZ" to control the move of PTZ lense
+#                      to absolute positions
+#                      refere to commandref or have a look in forum at: 
+#                      http://forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275 ,
+#                      http://forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892
 # 1.10   02.02.2016    added function "svsinfo" to get informations about installed SVS-package,
 #                      if Availability = "disconnected" then "state"-value will be "disconnected" too,
 #                      saved Credentials were deleted from file if a device will be deleted
@@ -74,6 +79,7 @@ use JSON qw( decode_json );            # From CPAN,, Debian libjson-perl
 use Data::Dumper;                      # Perl Core module
 use strict;                           
 use warnings;
+use Time::HiRes qw(gettimeofday);
 use MIME::Base64;
 use HttpUtils;
 
@@ -141,12 +147,14 @@ sub SSCam_Define {
   readingsSingleUpdate($hash,"Availability", "", 0);                                              # Verfügbarkeit ist unbekannt
   readingsSingleUpdate($hash,"PollState","Inactive",0);                                           # es ist keine Gerätepolling aktiv
   getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)  
+  
   RemoveInternalTimer($hash);                                                                     # alle Timer löschen
   
-  # Subroutine Watchdog-Timer starten (sollen Cam-Infos abgerufen werden ?), verzögerter zufälliger Start 0-60s 
+  # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-60s 
   InternalTimer(gettimeofday()+int(rand(60)), "watchdogpollcaminfo", $hash, 0);
   
-  initonboot($hash);                                                                              # initiale Rotinen nach Restart ausführen                                
+  # initiale Rotinen nach Restart ausführen , verzögerter zufälliger Start   
+  InternalTimer(gettimeofday()+int(rand(20)), "initonboot", $hash, 0);
 
 return undef;
 }
@@ -201,6 +209,8 @@ sub SSCam_Set {
         my $success;
         my $logstr;
         my $setlist;
+        my @prop;
+        my $ptzaction;
 
                          
 #        my $list .= "on off snap enable disable on-for-timer";
@@ -215,37 +225,39 @@ sub SSCam_Set {
                    "snap ".
                    "enable ".
                    "disable ".
-                   ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "presets:".ReadingsVal("$name", "Presets", "")." " : "");  
+                   ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                   ((ReadingsVal("$name", "CapPTZAbs", "false") eq "true") ? "goAbsPTZ"." " : "");  
                     
         
         if ($opt eq "on") {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            
             if (defined($prop)) {
                 unless ($prop =~ /^\d+$/) { return " The Value for \"$opt\" is not valid. Use only figures 0-9 without decimal places !";}
                 $hash->{HELPER}{RECTIME_TEMP} = $prop;
                 }
-            &camstartrec($hash);
+            camstartrec($hash);
  
         }
         elsif ($opt eq "off") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            &camstoprec($hash);
+            camstoprec($hash);
         }
         elsif ($opt eq "snap") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            &camsnap($hash);
+            camsnap($hash);
         }
         elsif ($opt eq "enable") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            &camenable($hash);
+            camenable($hash);
         }
         elsif ($opt eq "disable") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            &camdisable($hash);
+            camdisable($hash);
         }
         elsif ($opt eq "credentials") 
         {
@@ -257,14 +269,50 @@ sub SSCam_Set {
         elsif ($opt eq "expmode") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            &camexpmode($hash);
+            camexpmode($hash);
         }
-        elsif ($opt eq "presets") 
+        elsif ($opt eq "goPreset") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            my $presetname = $prop;
-            my $presetid = $hash->{HELPER}{ALLPRESETS}{$presetname};
-            return "Function is coming soon ....(Presetid of $presetname is $presetid )";
+            if (!$prop) {return "Function \"goPreset\" needs a \"Preset\" as an argument";}
+            
+            @prop = split(/;/, $prop);
+            $prop = $prop[0];
+            @prop = split(/,/, $prop);
+            $prop = $prop[0];
+            $hash->{HELPER}{GOPRESETNAME} = $prop;
+            $ptzaction = "gopreset";
+            doptzaction($hash,$ptzaction);
+        }
+        elsif ($opt eq "goAbsPTZ") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+
+            if ($prop =~ /up/ || $prop =~ /down/ || $prop =~ /left/ || $prop =~ /right/) {
+                if ($prop eq "up")    {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 480;}
+                if ($prop eq "down")  {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 0;}
+                if ($prop eq "left")  {$hash->{HELPER}{GOPTZPOSX} = 0; $hash->{HELPER}{GOPTZPOSY} = 240;}    
+                if ($prop eq "right") {$hash->{HELPER}{GOPTZPOSX} = 640; $hash->{HELPER}{GOPTZPOSY} = 240;} 
+                $ptzaction = "goabsptz";
+                doptzaction($hash,$ptzaction);
+                return undef;
+            }               
+            else
+            {
+                if ($prop !~ /\d+/ || $prop1 !~ /\d+/ || abs($prop) > 640 || abs($prop1) > 480) {
+                return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
+                }
+                
+                $hash->{HELPER}{GOPTZPOSX} = abs($prop);
+                $hash->{HELPER}{GOPTZPOSY} = abs($prop1);
+                $ptzaction = "goabsptz";
+                doptzaction($hash,$ptzaction);
+                
+                return undef;
+                
+            } 
+            return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
+
         }
         else  
         {
@@ -334,12 +382,20 @@ sub initonboot ($) {
          &printlog($hash,$logstr,"1");
          }
          else {
-         &getsvsinfo($hash);
+         # allg. SVS-Eigenschaften abrufen
+         getsvsinfo($hash);
+         # Kameraspezifische Infos holen
+         getcaminfo($hash);
+         getcapabilities($hash);
+         # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
+         getptzlistpreset($hash);
+         getptzlistpatrol($hash);
+
          }
   }
   else 
   {
-      InternalTimer(gettimeofday(), "initonboot", $hash, 0);
+      InternalTimer(gettimeofday()+0.1, "initonboot", $hash, 0);
   }
   
 return undef;
@@ -456,14 +512,14 @@ sub watchdogpollcaminfo ($) {
     my $name     = $hash->{NAME};
     my $camname  = $hash->{CAMNAME};
     my $logstr;
-    my $watchdogtimer = 90;
+    my $watchdogtimer = 90.035;
     
-    if (defined(AttrVal($name, "pollcaminfoall", undef)) and AttrVal($name, "pollcaminfoall", undef) > 10 and ReadingsVal("$name", "PollState", "Active") eq "Inactive") {
+    if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10 and ReadingsVal("$name", "PollState", "Active") eq "Inactive") {
         
         # Polling ist jetzt aktiv
         readingsSingleUpdate($hash,"PollState","Active",0);
             
-        $logstr = "Polling Camera $camname is currently activated - Pollinginterval: ".AttrVal($name, "pollcaminfoall", undef)."s";
+        $logstr = "Polling Camera $camname is currently activated - Pollinginterval: ".$attr{$name}{pollcaminfoall}."s";
         &printlog($hash,$logstr,"2");
         
         # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
@@ -473,37 +529,43 @@ sub watchdogpollcaminfo ($) {
         &getcaminfoall($hash);           
     }
     
-    if (defined($hash->{HELPER}{OLDVALPOLL}) and defined(AttrVal($name, "pollcaminfoall", undef)) and AttrVal($name, "pollcaminfoall", undef) > 10) {
-        if ($hash->{HELPER}{OLDVALPOLL} != AttrVal($name, "pollcaminfoall", undef)) {
+    if (defined($hash->{HELPER}{OLDVALPOLL}) and defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
+        if ($hash->{HELPER}{OLDVALPOLL} != $attr{$name}{pollcaminfoall}) {
             
-            $logstr = "Polling Camera $camname was changed to new Pollinginterval: ".AttrVal($name, "pollcaminfoall", undef)."s";
+            $logstr = "Polling Camera $camname was changed to new Pollinginterval: ".$attr{$name}{pollcaminfoall}."s";
             &printlog($hash,$logstr,"2");
             
-            $hash->{HELPER}{OLDVALPOLL} = AttrVal($name, "pollcaminfoall", undef);
+            $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};
             &getcaminfoall($hash);
             }
     }
     
-    if (defined(AttrVal($name, "pollnologging", undef))) {
-        if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} ne AttrVal($name, "pollnologging", undef)) {
-            if (AttrVal($name, "pollnologging", undef) == "1") {
+    if (defined($attr{$name}{pollnologging})) {
+        if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} ne $attr{$name}{pollnologging}) {
+        
+            if ($attr{$name}{pollnologging} == "1") {
                 $logstr = "Log of Polling Camera $camname is currently deactivated";
                 &printlog($hash,$logstr,"2");
+                
                 # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
-                $hash->{HELPER}{OLDVALPOLLNOLOGGING} = AttrVal($name, "pollnologging", undef);
+                $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};
+                
             } else {
+            
                 $logstr = "Log of Polling Camera $camname is currently activated";
                 &printlog($hash,$logstr,"2");
+                
                 # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
-                $hash->{HELPER}{OLDVALPOLLNOLOGGING} = AttrVal($name, "pollnologging", undef);
+                $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};
             }
         }
     } else {
+    
         # alter Wert von "pollnologging" war 1 -> Logging war deaktiviert
         if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} == "1") {
             $logstr = "Log of Polling Camera $camname is currently activated";
             &printlog($hash,$logstr,"2");
-            # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
+            
             $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";            
         }
     }
@@ -553,7 +615,7 @@ sub camstartrec ($) {
         return;
         }
     
-    if ($hash->{HELPER}{ACTIVE} ne "on" and ReadingsVal("$name", "Record", "Start") ne "Start") {
+    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {
         # Aufnahme starten
         $logstr = "Recording of Camera $camname will be started now";
         &printlog($hash,$logstr,"4");
@@ -565,7 +627,7 @@ sub camstartrec ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.1, "camstartrec", $hash, 0);
+    InternalTimer(gettimeofday()+0.11, "camstartrec", $hash, 0);
     }
 }
 
@@ -602,7 +664,7 @@ sub camstoprec ($) {
         return;
         }
     
-    if ($hash->{HELPER}{ACTIVE} ne "on" and ReadingsVal("$name", "Record", "Stop") ne "Stop") {
+    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Stop") ne "Stop") {
         # Aufnahme stoppen
         $logstr = "Recording of Camera $camname will be stopped now";
         &printlog($hash,$logstr,"4");
@@ -614,7 +676,7 @@ sub camstoprec ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.2, "camstoprec", $hash, 0);
+    InternalTimer(gettimeofday()+0.12, "camstoprec", $hash, 0);
     }
 }
 
@@ -651,7 +713,7 @@ sub camexpmode ($) {
         return;
         }
     
-    if ($hash->{HELPER}{ACTIVE} ne "on" and ReadingsVal("$name", "Record", "Start") ne "Start") {
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
         
         $logstr = "Setting of exposure mode of Camera $camname will be started now";
         &printlog($hash,$logstr,"4");
@@ -663,7 +725,7 @@ sub camexpmode ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.25, "camexpmode", $hash, 0);
+    InternalTimer(gettimeofday()+0.21, "camexpmode", $hash, 0);
     }
 }
 
@@ -702,7 +764,7 @@ sub camsnap ($) {
         return;
         }
     
-    if ($hash->{HELPER}{ACTIVE} ne "on") {
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
         # einen Schnappschuß aufnehmen
         $logstr = "Take Snapshot of Camera $camname";
         &printlog($hash,$logstr,"4");
@@ -714,7 +776,97 @@ sub camsnap ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.3, "camsnap", $hash, 0);
+    InternalTimer(gettimeofday()+0.22, "camsnap", $hash, 0);
+    }    
+}
+
+
+###############################################################################
+###   PTZ-Kamera auf Presetposition fahren
+
+sub doptzaction ($$) {
+    my ($hash, $ptzaction) = @_;
+    my $camname            = $hash->{CAMNAME};
+    my $name               = $hash->{NAME};
+    my $logstr;
+    my $errorcode;
+    my $error;
+
+    if (ReadingsVal("$name", "DeviceType", "Camera") ne "PTZ") {
+        $logstr = "ERROR - Operation \"$ptzaction\" is only possible for cameras of DeviceType \"PTZ\" - please compare with device Readings" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
+    if ($ptzaction eq "goabsptz" && ReadingsVal("$name", "CapPTZAbs", "false") ne "true") {
+        $logstr = "ERROR - Operation \"$ptzaction\" is only possible if camera supports absolute PTZ action - please compare with device Reading \"CapPTZAbs\"" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
+    
+    if ($ptzaction eq "gopreset") {
+        if (!defined($hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}})) {
+            $errorcode = "600";
+            # Fehlertext zum Errorcode ermitteln
+            $error = &experror($hash,$errorcode);
+        
+            # Setreading 
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate($hash,"Errorcode",$errorcode);
+            readingsBulkUpdate($hash,"Error",$error);
+            readingsEndUpdate($hash, 1);
+    
+            $logstr = "ERROR - goPreset to position \"$hash->{HELPER}{GOPRESETNAME}\" of Camera $camname can't be executed - $error" ;
+            &printlog($hash,$logstr,"1");
+            return;        
+            }
+    }
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+            }
+            elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+            }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        $logstr = "ERROR - $ptzaction of Camera $camname can't be executed - $error" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        
+        if ($ptzaction eq "gopreset") {
+            $logstr = "Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\" now";
+            &printlog($hash,$logstr,"4");
+                        
+            $hash->{OPMODE} = $ptzaction;
+            $hash->{HELPER}{ACTIVE} = "on";
+        
+            &getapisites_nonbl($hash);
+            }
+            elsif ($ptzaction eq "goabsptz") {
+            $logstr = "Move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\"  now";
+            &printlog($hash,$logstr,"4");
+                        
+            $hash->{OPMODE} = $ptzaction;
+            $hash->{HELPER}{ACTIVE} = "on";
+        
+            &getapisites_nonbl($hash);
+            }
+    }
+    else
+    {
+    InternalTimer(gettimeofday()+0.31, "doptzaction", $hash, 0);
     }    
 }
 
@@ -729,7 +881,7 @@ sub camenable ($) {
     
     if (ReadingsVal("$name", "Availability", "disabled") eq "enabled") {return;}       # Kamera ist bereits enabled
     
-    if ($hash->{HELPER}{ACTIVE} ne "on") {
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
         # eine Kamera aktivieren
         $logstr = "Enable Camera $camname";
         &printlog($hash,$logstr,"4");
@@ -741,7 +893,7 @@ sub camenable ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.4, "camenable", $hash, 0);
+    InternalTimer(gettimeofday()+0.41, "camenable", $hash, 0);
     }    
 }
 
@@ -756,7 +908,7 @@ sub camdisable ($) {
     
     if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {return;}       # Kamera ist bereits disabled
     
-    if ($hash->{HELPER}{ACTIVE} ne "on" and ReadingsVal("$name", "Record", "Start") ne "Start") {
+    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {
         # eine Kamera deaktivieren
         $logstr = "Disable Camera $camname";
         &printlog($hash,$logstr,"4");
@@ -768,7 +920,7 @@ sub camdisable ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.4, "camdisable", $hash, 0);
+    InternalTimer(gettimeofday()+0.43, "camdisable", $hash, 0);
     }    
 }
 
@@ -781,7 +933,7 @@ sub getcaminfoall ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
-    if ($hash->{HELPER}{ACTIVE} ne "on") {
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
                         
         &getcaminfo($hash);
         &getcapabilities($hash);
@@ -791,12 +943,12 @@ sub getcaminfoall ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.5, "getcaminfoall", $hash, 0);
+        InternalTimer(gettimeofday()+0.53, "getcaminfoall", $hash, 0);
     }
     
-    if (defined(AttrVal($name, "pollcaminfoall", undef)) and AttrVal($name, "pollcaminfoall", undef) > 10) {
+    if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
         # Pollen wenn pollcaminfo > 10, sonst kein Polling
-        InternalTimer(gettimeofday()+AttrVal($name, "pollcaminfoall", undef), "getcaminfoall", $hash, 0); 
+        InternalTimer(gettimeofday()+$attr{$name}{pollcaminfoall}, "getcaminfoall", $hash, 0); 
         }
         else 
         {
@@ -805,7 +957,6 @@ sub getcaminfoall ($) {
         
         $logstr = "Polling of Camera $camname is deactivated now";
         &printlog($hash,$logstr,"2");
-
         }
 }
 
@@ -818,7 +969,7 @@ sub getsvsinfo ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
-    if ($hash->{HELPER}{ACTIVE} ne "on") {
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Kamerainfos abrufen
         $logstr = "Retrieval of Surveillance Station related informations starts now";
         &printlog($hash,$logstr,"4");
@@ -830,7 +981,7 @@ sub getsvsinfo ($) {
       }
     else
     {
-        InternalTimer(gettimeofday()+0.65, "getsvsinfo", $hash, 0);
+        InternalTimer(gettimeofday()+0.54, "getsvsinfo", $hash, 0);
     }
     
 }
@@ -844,7 +995,7 @@ sub getcaminfo ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
-    if ($hash->{HELPER}{ACTIVE} ne "on") {
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Kamerainfos abrufen
         $logstr = "Retrieval Camera-Informations of $camname starts now";
         &printlog($hash,$logstr,"4");
@@ -856,7 +1007,7 @@ sub getcaminfo ($) {
       }
     else
     {
-        InternalTimer(gettimeofday()+0.6, "getcaminfo", $hash, 0);
+        InternalTimer(gettimeofday()+0.55, "getcaminfo", $hash, 0);
     }
     
 }
@@ -870,7 +1021,7 @@ sub getcapabilities ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
-        if ($hash->{HELPER}{ACTIVE} ne "on") {
+        if ($hash->{HELPER}{ACTIVE} eq "off") {
         # PTZ-ListPresets abrufen
         $logstr = "Retrieval Capabilities of Camera $camname starts now";
         &printlog($hash,$logstr,"4");
@@ -882,7 +1033,7 @@ sub getcapabilities ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.7, "getcapabilities", $hash, 0);
+        InternalTimer(gettimeofday()+0.56, "getcapabilities", $hash, 0);
     }
     
 }
@@ -902,7 +1053,7 @@ sub getptzlistpreset ($) {
         return;
         }
 
-        if ($hash->{HELPER}{ACTIVE} ne "on") {
+        if ($hash->{HELPER}{ACTIVE} eq "off") {
         # PTZ-ListPresets abrufen
         $logstr = "Retrieval PTZ-ListPresets of $camname starts now";
         &printlog($hash,$logstr,"4");
@@ -914,7 +1065,7 @@ sub getptzlistpreset ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.8, "getptzlistpreset", $hash, 0);
+        InternalTimer(gettimeofday()+0.57, "getptzlistpreset", $hash, 0);
     }
     
 }
@@ -947,7 +1098,7 @@ sub getptzlistpatrol ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.9, "getptzlistpatrol", $hash, 0);
+        InternalTimer(gettimeofday()+0.58, "getptzlistpatrol", $hash, 0);
     }
     
 }
@@ -989,7 +1140,7 @@ sub getapisites_nonbl {
    $logstr = "--- Begin Function getapisites nonblocking ---";
    &printlog($hash,$logstr,"4");
    
-   $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+   $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
    # Logausgabe
    $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
    &printlog($hash,$logstr,"5");
@@ -1217,7 +1368,7 @@ sub login_nonbl ($) {
   ($success, $username, $password) = getcredentials($hash,0);
   unless ($success) {$logstr = "Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\""; &printlog($hash,$logstr,"1"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success)};
   
-  $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+  $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
   
   # Logausgabe
   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
@@ -1344,7 +1495,7 @@ sub getcamid_nonbl ($) {
              $logstr = "--- End Function serverlogin nonblocking with error ---";
              &printlog($hash,$logstr,"4"); 
              
-             # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+             # ausgeführte Funktion nicht erfolgreich, Freigabe Funktionstoken
              $hash->{HELPER}{ACTIVE} = "off"; 
              
              return;
@@ -1357,7 +1508,7 @@ sub getcamid_nonbl ($) {
   $logstr = "--- Begin Function getcamid nonblocking ---";
   &printlog($hash,$logstr,"4");
   
-  $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+  $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
   # Logausgabe
   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
   &printlog($hash,$logstr,"5");  
@@ -1534,7 +1685,7 @@ sub camop_nonbl ($) {
    $logstr = "--- Begin Function cam: $OpMode nonblocking ---";
    &printlog($hash,$logstr,"4");
 
-   $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+   $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
    # Logausgabe
    $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
    &printlog($hash,$logstr,"5");
@@ -1555,6 +1706,20 @@ sub camop_nonbl ($) {
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=0&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=$camid&blSave=true&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 0); 
       readingsSingleUpdate($hash, "LastSnapId", "", 1);
+   }
+   elsif ($OpMode eq "gopreset")
+   {
+      # mal wieder Maxversion der API funktioniert nicht ! Ticket bei Syno
+      $apiptzmaxver -= 1;
+      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&presetId=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      readingsSingleUpdate($hash,"state", "moving", 0); 
+   }
+   elsif ($OpMode eq "goabsptz")
+   {
+      # mal wieder Maxversion der API funktioniert nicht bei jedem !
+      # $apiptzmaxver -= 1;
+      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
+      readingsSingleUpdate($hash,"state", "moving", 0); 
    }
    elsif ($OpMode eq "Enable")
    {
@@ -1640,8 +1805,9 @@ sub camret_nonbl ($) {
    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst);
    my $deviceType;
    my $camStatus;
-   my ($presetcnt,$cnt,%allpresets,$presid,$presname,@preskeys,$presetlist);
-   my ($userPriv,%version);
+   my ($presetcnt,$cnt,$presid,$presname,@preskeys,$presetlist);
+   my ($patrolcnt,$patrolid,$patrolname,@patrolkeys,$patrollist);
+   my $userPriv;
    my $verbose;
    my $httptimeout;
    
@@ -1754,7 +1920,7 @@ sub camret_nonbl ($) {
             elsif ($OpMode eq "Snap") 
             {
                 # ein Schnapschuß wurde aufgenommen
-                # falls Aufnahme noch läuft -> STATE = on setzen
+                # falls Aufnahme noch läuft -> state = on setzen
                 if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
                     readingsSingleUpdate($hash,"state", "on", 0); 
                     }
@@ -1774,6 +1940,54 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 $logstr = "Snapshot of Camera $camname has been done successfully";
+                &printlog($hash,$logstr,"2");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "gopreset") 
+            {
+                # eine Presetposition wurde angefahren
+                # falls Aufnahme noch läuft -> state = on setzen
+                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
+                    readingsSingleUpdate($hash,"state", "on", 0); 
+                    }
+                    else
+                    {
+                    readingsSingleUpdate($hash,"state", "off", 0); 
+                    }
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                $logstr = "Camera $camname has been moved to position \"$hash->{HELPER}{GOPRESETNAME}\"";
+                &printlog($hash,$logstr,"2");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "goabsptz") 
+            {
+                # eine absolute PTZ-Position wurde angefahren
+                # falls Aufnahme noch läuft -> state = on setzen
+                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
+                    readingsSingleUpdate($hash,"state", "on", 0); 
+                    }
+                    else
+                    {
+                    readingsSingleUpdate($hash,"state", "off", 0); 
+                    }
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                $logstr = "Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"";
                 &printlog($hash,$logstr,"2");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
@@ -1830,12 +2044,12 @@ sub camret_nonbl ($) {
                         $userPriv = "Viewer";
                         }
                  }                    
-                
-                %version = (
-                              MAJOR => $data->{'data'}{'version'}{'major'},
-                              MINOR => $data->{'data'}{'version'}{'minor'},
-                              BUILD => $data->{'data'}{'version'}{'build'}
-                              );
+                # "my" nicht am Anfang deklarieren, sonst wird Hash %version wieder geleert !
+                my %version = (
+                            MAJOR => $data->{'data'}{'version'}{'major'},
+                            MINOR => $data->{'data'}{'version'}{'minor'},
+                            BUILD => $data->{'data'}{'version'}{'build'}
+                            );
                 
                 if (!exists($data->{'data'}{'customizedPortHttp'})) {
                     delete $defs{$name}{READINGS}{SVScustomPortHttp};
@@ -1937,6 +2151,7 @@ sub camret_nonbl ($) {
                 readingsBulkUpdate($hash,"LastUpdateTime",$update_time);
                 readingsBulkUpdate($hash,"Record",$recStatus);
                 readingsBulkUpdate($hash,"UsedSpaceMB",$data->{'data'}->{'cameras'}->[0]->{'volume_space'});
+                readingsBulkUpdate($hash,"VideoFolder",$data->{'data'}->{'cameras'}->[0]->{'folder'});
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -2051,7 +2266,9 @@ sub camret_nonbl ($) {
                 $cnt = 0;
          
                 # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
-                %allpresets = ();
+                
+                # "my" nicht am Anfang deklarieren, sonst wird Hash %allpresets wieder geleert !
+                my %allpresets;
                 while ($cnt < $presetcnt) 
                     {
                     $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
@@ -2065,9 +2282,6 @@ sub camret_nonbl ($) {
 
                 @preskeys = sort(keys(%allpresets));
                 $presetlist = join(",",@preskeys);
-                
-                # print "ID von Home ist : ". %allpresets->{"home"};
-                # print "aus Hash: ".$hash->{HELPER}{ALLPRESETS}{home};
 
                 # Setreading 
                 readingsBeginUpdate($hash);
@@ -2094,15 +2308,16 @@ sub camret_nonbl ($) {
             elsif ($OpMode eq "Getptzlistpatrol") 
             {
                 # Parse PTZ-ListPatrols
-                my $patrolcnt = $data->{'data'}->{'total'};
+                $patrolcnt = $data->{'data'}->{'total'};
                 $cnt = 0;
          
                 # alle Patrols der Kamera mit Id's in Assoziatives Array einlesen
+                # "my" nicht am Anfang deklarieren, sonst wird Hash %allpatrols wieder geleert !
                 my %allpatrols = ();
                 while ($cnt < $patrolcnt) 
                     {
-                    my $patrolid = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
-                    my $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
+                    $patrolid = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
+                    $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
                     $allpatrols{$patrolname} = $patrolid;
                     $cnt += 1;
                     }
@@ -2110,8 +2325,8 @@ sub camret_nonbl ($) {
                 # Presethash in $hash einfügen
                 $hash->{HELPER}{ALLPATROLS} = \%allpatrols;
 
-                my @patrolkeys = sort(keys(%allpatrols));
-                my $patrollist = join(",",@patrolkeys);
+                @patrolkeys = sort(keys(%allpatrols));
+                $patrollist = join(",",@patrolkeys);
                 
                 # print "ID von Tour1 ist : ". %allpatrols->{Tour1};
                 # print "aus Hash: ".$hash->{HELPER}{ALLPRESETS}{Tour1};
@@ -2142,7 +2357,7 @@ sub camret_nonbl ($) {
        }
        else 
        {
-            # die URL konnte nicht erfolgreich aufgerufen werden
+            # die API-Operation war fehlerhaft
             # Errorcode aus JSON ermitteln
             $errorcode = $data->{'error'}->{'code'};
 
@@ -2160,19 +2375,15 @@ sub camret_nonbl ($) {
             &printlog($hash,$logstr,"1");
             $logstr = "--- End Function cam: $OpMode nonblocking with error ---";
             &printlog($hash,$logstr,"4");
-            
-            # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-            $hash->{HELPER}{ACTIVE} = "off"; 
-           
-            return;
 
        }
+       
     # logout wird ausgeführt, Rückkehr wird mit "logout_nonbl" verarbeitet
     # Logausgabe
     $logstr = "--- Begin Function logout nonblocking ---";
     &printlog($hash,$logstr,"4");
     
-    $httptimeout = AttrVal($name, "httptimeout",undef) ? AttrVal($name, "httptimeout",undef) : "4";
+    $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
     # Logausgabe
     $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
     &printlog($hash,$logstr,"5");    
@@ -2221,6 +2432,9 @@ sub logout_nonbl ($) {
         &printlog($hash,$logstr,"4");
         
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen 
+        
+        # freigabe Funktionstoken
+        $hash->{HELPER}{ACTIVE} = "off";
 
    }
    elsif($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
@@ -2270,6 +2484,7 @@ sub logout_nonbl ($) {
              &printlog($hash,$logstr,"4");
          }
    }
+   
 # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
 $hash->{HELPER}{ACTIVE} = "off";   
 
@@ -2341,7 +2556,7 @@ return ($error);
 }
 
 ##############################################################################
-###  Auflösung Errorcodes SS API
+###  Auflösung Errorcodes SVS API
 
 sub experror {
   # Übernahmewerte sind $hash, $errorcode
@@ -2378,7 +2593,8 @@ sub experror {
   418 => "Object is not exist",
   419 => "Visualstation name repetition",
   439 => "Too many items selected",
-  502 => "Camera disconnected",  
+  502 => "Camera disconnected",
+  600 => "Presetname and PresetID not found in Hash",
   );
   unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
 
@@ -2417,7 +2633,9 @@ return;
        <li>Trigger a Snapshot </li>
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
        <li>Activate a Camera in Synology Surveillance Station</li>
-       <li>Retrieval of Camera Properties (also by Polling) as well as informations about the installed SVS-package</li><br>
+       <li>Retrieval of Camera Properties (also by Polling) as well as informations about the installed SVS-package</li>
+       <li>Move to a predefined Preset-position (at PTZ-cameras) </li>
+       <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li><br>
     </ul>
    </ul>
    The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
@@ -2519,6 +2737,8 @@ return;
       <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
+      <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
+      <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -2526,8 +2746,9 @@ return;
     </ul>
       <br><br>
     
-
+    <a name="SSCam_HTTPTimeout"></a>
     <b>HTTP-Timeout Settings</b><br><br>
+    
     All functions of the SSCam-Module are using HTTP-Calls to the SVS Web API. <br>
     The Default-Value of the HTTP-Timeout amounts 4 seconds. You can set the <a href="#SSCamattr">Attribute</a> "httptimeout" > 0 to adjust the value as needed in your technical environment. <br>
     
@@ -2542,16 +2763,21 @@ return;
   Currently there are the following options for "Set &lt;name&gt; ..."  : <br><br>
 
   <table>
-  <colgroup> <col width=15%> <col width=85%> </colgroup>
-      <tr><td>"on [rectime]":  </td><td>starts a recording. The recording will be stopped automatically after a period of [rectime] </td></tr>
-      <tr><td>                 </td><td>if [rectime] = 0 an endless recording will be started </td></tr>
-      <tr><td>"off" :          </td><td>stopps a running recording manually or using other events (e.g. with at, notify)</td></tr>
-      <tr><td>"snap":          </td><td>triggers a snapshot of the relevant camera and store it into Synology Surveillance Station</td></tr>
-      <tr><td>"disable":       </td><td>deactivates a camera in Synology Surveillance Station</td></tr>
-      <tr><td>"enable":        </td><td>activates a camera in Synology Surveillance Station</td></tr>
+  <colgroup> <col width=35%> <col width=65%> </colgroup>
+      <tr><td>"on [rectime]":                                      </td><td>starts a recording. The recording will be stopped automatically after a period of [rectime] </td></tr>
+      <tr><td>                                                     </td><td>if [rectime] = 0 an endless recording will be started </td></tr>
+      <tr><td>"off" :                                              </td><td>stopps a running recording manually or using other events (e.g. with at, notify)</td></tr>
+      <tr><td>"snap":                                              </td><td>triggers a snapshot of the relevant camera and store it into Synology Surveillance Station</td></tr>
+      <tr><td>"disable":                                           </td><td>deactivates a camera in Synology Surveillance Station</td></tr>
+      <tr><td>"enable":                                            </td><td>activates a camera in Synology Surveillance Station</td></tr>
+      <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
+      <tr><td>"goPreset &lt;Preset&gt;":                           </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
+      <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
   </table>
   <br><br>
-        
+  
+   <b> "set &lt;name&gt; [on] [off]" </b> <br><br>
+  
   Examples for simple <b>Start/Stop a Recording</b>: <br><br>
 
   <table>
@@ -2560,7 +2786,11 @@ return;
       <tr><td>set &lt;name&gt; off           </td><td>stops the recording of camera &lt;name&gt;</td></tr>
   </table>
   <br>
+  <br>
 
+  
+  <b> "set &lt;name&gt; snap" </b> <br><br>
+  
   A snapshot can be triggered with:
   <pre> 
      set &lt;name&gt; snap 
@@ -2585,6 +2815,8 @@ return;
 
   The ID of the last snapshot will be displayed as value of variable "LastSnapId" in the device-Readings. <br><br>
   
+  <b> "set &lt;name&gt; [enable] [disable]" </b> <br><br>
+  
   For <br>deactivating / activating</br> a list of cameras or all cameras using a Regex-expression, subsequent two examples using "at":
   <pre>
      define a13 at 21:46 set CamCP1,CamFL,CamHE1,CamTER disable (enable)
@@ -2608,6 +2840,75 @@ return;
      define all_cams_enable notify allcams:on set CamCP1,CamFL,CamHE1,CamTER enable
      attr all_cams_enable room Cams
   </pre>
+
+  <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
+  
+  Using this command you can move PTZ-c ameras to a predefined position. <br>
+  The Preset-positions have to be defined first of all in the Synology Surveillance Station. This usually happens in the PTZ-control of IP-camera setup in SVS.
+  The Presets will be read ito FHEM with command "set &lt;name&gt; getinfo" (happens automatically when FHEM restarts). The import process can be repeated regular by camera polling.
+  A long polling interval is recommendable in this case because of the Presets are only will be changed if the user change it in the IP-camera setup itself. 
+  <br><br>
+  
+  Here it is an example of a PTZ-control depended on IR-motiondetector event:
+  
+  <pre>
+    define CamFL.Preset.Wandschrank notify MelderTER:on.* set CamFL goPreset Wandschrank, ;; define CamFL.Preset.record at +00:00:10 set CamFL on 5 ;;;; define s3 at +*{3}00:00:05 set CamFL snap ;; define CamFL.Preset.back at +00:00:30 set CamFL goPreset Home
+  </pre>
+  
+  Operating Mode: <br>
+  
+  The IR-motiondetector registers a motion. Hereupon the camera "CamFL" moves to Preset-posion "Wandschrank". A recording with the length of 5 seconds starts 10 seconds later. 
+  Because of the prerecording time of the camera is set to 10 seconds (cf. Reading "CamPreRecTime"), the effectice recording starts when the camera move begins. <br>
+  When the recording starts 3 snapshots with an interval of 5 seconds will be taken as well. <br>
+  After a time of 30 seconds in position "Wandschrank" the camera moves back to postion "Home". <br><br>
+  
+  An extract of the log illustrates the process:
+  
+  <pre>  
+   2016.02.04 15:02:14 2: CamFL - Camera Flur_Vorderhaus has moved to position "Wandschrank"
+   2016.02.04 15:02:24 2: CamFL - Camera Flur_Vorderhaus Recording with Recordtime 5s started
+   2016.02.04 15:02:29 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:30 2: CamFL - Camera Flur_Vorderhaus Recording stopped
+   2016.02.04 15:02:34 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:39 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
+  </pre>
+  
+  <br><br>
+  
+  <b> "set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ]" </b> <br><br>
+  
+  This command can be used to move a PTZ-camera to an arbitrary absolute X/Y-coordinate, or to absolute position using up/down/left/right. 
+  The option is only available for cameras which are having the Reading "CapPTZAbs=true". The property of a camera can be requested with "get &lt;name&gt; caminfoall" .
+  <br><br>
+
+  Example for a control to absolute X/Y-coordinates: <br>
+
+  <pre>
+    set &lt;name&gt; goAbsPTZ 120 450
+  </pre>
+ 
+  In this example the camera lense moves to position X=120 und Y=450. <br>
+  The valuation is:
+
+  <pre>
+    X = 0 - 640      (0 - 319 moves lense left, 321 - 640 moves lense right, 320 don't move lense)
+    Y = 0 - 480      (0 - 239 moves lense down, 241 - 480 moves lense up, 240 don't move lense) 
+  </pre>
+
+  The lense can be moved in smallest steps to very large steps into the desired direction.
+  If necessary the procedure has to be repeated to bring the lense into the desired position. <br><br>
+
+  If the motion should be done with the largest possible increment the following command can be used for simplification:
+
+  <pre>
+   set &lt;name&gt; goAbsPTZ up [down ] [left] [right]
+  </pre>
+
+  In this case the lense will be moved with largest possible increment into the given absolute position.
+  Also in this case the procedure has to be repeated to bring the lense into the desired position if necessary. 
+
+  <br><br><br>
   
  </ul>
 <br>
@@ -2626,7 +2927,8 @@ return;
   For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further 
   processing like creating events. <br>
   The command "get &lt;name&gt; svsinfo" is not really dependend on a camera, but rather a command to determine common informations about the installed SVS-version and other properties. <br>
-  This function will be executed automatically once-only after a restart of FHEM. Please consider to save the <a href="#SSCam_Credentials">credentials</a> what will be used for login to DSM or SVS !
+  The functions "caminfoall" and "svsinfo" will be executed automatically once-only after FHEM restarts to collect some relevant informations for camera control. <br>
+  Please consider to save the <a href="#SSCam_Credentials">credentials</a> what will be used for login to DSM or SVS !
   <br><br>
 
   <b>Polling of Camera-Properties:</b><br><br>
@@ -2726,6 +3028,7 @@ return;
     <tr><td><li>SVSuserPriv</li>        </td><td>- The effective rights of the user used for log in (to get with "svsinfo")  </td></tr>
     <tr><td><li>SVSversion</li>         </td><td>- package version of the installed Surveillance Station (to get with "svsinfo")  </td></tr>
     <tr><td><li>UsedSpaceMB</li>        </td><td>- used disk space of recordings by Camera  </td></tr>
+    <tr><td><li>VideoFolder</li>        </td><td>- Path to the recorded video  </td></tr>
   </table>
   </ul>
   <br><br>    
@@ -2790,7 +3093,10 @@ return;
       <li>Aufnehmen eines Schnappschusses und Ablage in der Synology Surveillance Station </li>
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
-      <li>Abfrage von Kameraeigenschaften (auch mit Polling) sowie den Eigenschaften des installierten SVS-Paketes</li><br>
+      <li>Abfrage von Kameraeigenschaften (auch mit Polling) sowie den Eigenschaften des installierten SVS-Paketes</li>
+      <li>Bewegen an eine vordefinierte Preset-Position (bei PTZ-Kameras) </li>
+      <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li><br>
+     
      </ul> 
     </ul>
     Die Aufnahmen stehen in der Synology Surveillance Station (SVS) zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
@@ -2888,6 +3194,8 @@ return;
       <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
+      <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
+      <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
@@ -2896,8 +3204,9 @@ return;
       <br><br>
     
     
-    
+    <a name="SSCam_HTTPTimeout"></a>
     <b>HTTP-Timeout setzen</b><br><br>
+    
     Alle Funktionen dieses Moduls verwenden HTTP-Aufrufe gegenüber der SVS Web API. <br>
     Der Standardwert für den HTTP-Timeout beträgt 4 Sekunden. Durch Setzen des <a href="#SSCamattr">Attributes</a> "httptimeout" > 0 kann dieser Wert bei Bedarf entsprechend den technischen Gegebenheiten angepasst werden. <br>
      
@@ -2909,7 +3218,7 @@ return;
 <b>Set </b>
 <ul>
     
-    Es gibt zur Zeit folgende Optionen für "Set &lt;name&gt; ...": <br><br>
+    Es gibt zur Zeit folgende Optionen für "set &lt;name&gt; ...": <br><br>
 
   <table>
   <colgroup> <col width=30%> <col width=70%> </colgroup>
@@ -2920,9 +3229,14 @@ return;
       <tr><td>"disable":                             </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
       <tr><td>"enable":                              </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;":   </td><td>speichert die Zugangsinformationen</td></tr>
+      <tr><td>"goPreset &lt;Preset&gt;":                  </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
+      <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":  </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
   </table>
   <br><br>
-        
+  
+  
+  <b> "set &lt;name&gt; [on] [off]" </b> <br><br>
+  
   Beispiele für einfachen <b>Start/Stop einer Aufnahme</b>: <br><br>
 
   <table>
@@ -2931,7 +3245,11 @@ return;
       <tr><td>set &lt;name&gt; off   </td><td>stoppt die Aufnahme der Kamera &lt;name&gt;</td></tr>
   </table>
   <br>
+  <br>
 
+  
+  <b> "set &lt;name&gt; snap" </b> <br><br>
+  
   Ein <b>Schnappschuß</b> kann ausgelöst werden mit:
   <pre> 
      set &lt;name&gt; snap 
@@ -2955,6 +3273,8 @@ return;
 
   Es wird die ID des letzten Snapshots als Wert der Variable "LastSnapId" in den Readings der Kamera ausgegeben. <br><br>
   
+  <b> "set &lt;name&gt; [enable] [disable]" </b> <br><br>
+  
   Um eine Liste von Kameras oder alle Kameras (mit Regex) zum Beispiel um 21:46 zu <b>deaktivieren</b> / zu <b>aktivieren</b> zwei Beispiele mit at:
   <pre>
      define a13 at 21:46 set CamCP1,CamFL,CamHE1,CamTER disable (enable)
@@ -2977,7 +3297,75 @@ return;
      define all_cams_enable notify allcams:on set CamCP1,CamFL,CamHE1,CamTER enable
      attr all_cams_enable room Cams
   </pre>
+  <br><br>
+  
+  <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
+  
+  Mit diesem Kommando können PTZ-Kameras in eine vordefininierte Position bewegt werden. <br>
+  Die Preset-Positionen müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. Das geschieht in der PTZ-Steuerung im IP-Kamera Setup.
+  Die Presets werden über das Kommando "set &lt;name&gt; getinfo" eingelesen (geschieht bei restart von FHEM automatisch). Der Einlesevorgang kann durch ein Kamerapolling
+  regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert da die Presetpositionen sich nur im Fall der Neuanlage bzw. Änderung verändern werden. 
+  <br><br>
+  
+  Hier ein Beispiel einer PTZ-Steuerung in Abhängigkeit eines IR-Melder Events:
+  
+  <pre>
+    define CamFL.Preset.Wandschrank notify MelderTER:on.* set CamFL goPreset Wandschrank, ;; define CamFL.Preset.record at +00:00:10 set CamFL on 5 ;;;; define s3 at +*{3}00:00:05 set CamFL snap ;; define CamFL.Preset.back at +00:00:30 set CamFL goPreset Home
+  </pre>
+  
+  Funktionsweise: <br>
+  Der IR-Melder "MelderTER" registriert eine Bewegung. Daraufhin wird die Kamera CamFL in die Preset-Position "Wandschrank" gebracht. Eine Aufnahme mit Dauer von 5 Sekunden startet 10 Sekunden
+  später. Da die Voraufnahmezeit der Kamera 10s beträgt (vgl. Reading "CamPreRecTime"), startet die effektive Aufnahme wenn der Kameraschwenk beginnt. <br>
+  Mit dem Start der Aufnahme werden drei Schnappschüsse im Abstand von 5 Sekunden angefertigt. <br>
+  Nach einer Zeit von 30 Sekunden fährt die Kamera wieder zurück in die "Home"-Position. <br><br>
+  
+  Ein Auszug aus dem Log verdeutlicht den Ablauf:
+  
+  <pre>  
+   2016.02.04 15:02:14 2: CamFL - Camera Flur_Vorderhaus has moved to position "Wandschrank"
+   2016.02.04 15:02:24 2: CamFL - Camera Flur_Vorderhaus Recording with Recordtime 5s started
+   2016.02.04 15:02:29 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:30 2: CamFL - Camera Flur_Vorderhaus Recording stopped
+   2016.02.04 15:02:34 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:39 2: CamFL - Snapshot of Camera Flur_Vorderhaus has been done successfully
+   2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
+  </pre>
+  
+  <br><br>
+  
+  <b> "set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ]" </b> <br><br>
+  
+  Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen Absolutposition in Richtung up/down/left/right. 
+  Die Option ist nur für Kameras verfügbar die das Reading "CapPTZAbs=true" (die Fähigkeit für PTZAbs-Aktionen) besitzen. Die Eigenschaften der Kamera kann mit "get &lt;name&gt; caminfoall" abgefragt werden.
+  <br><br>
 
+  Beispiel für Ansteuerung absoluter X/Y-Koordinaten: <br>
+
+  <pre>
+    set &lt;name&gt; goAbsPTZ 120 450
+  </pre>
+ 
+  Dieses Beispiel bewegt die Kameralinse in die Position X=120 und Y=450. <br>
+  Der Wertebereich ist dabei:
+
+  <pre>
+    X = 0 - 640      (0 - 319 bewegt nach links, 321 - 640 bewegt nach rechts, 320 bewegt die Linse nicht)
+    Y = 0 - 480      (0 - 239 bewegt nach unten, 241 - 480 bewegt nach oben, 240 bewegt die Linse nicht) 
+  </pre>
+
+  Die Linse kann damit in kleinsten bis sehr großen Schritten in die gewünschte Richtung bewegt werden. 
+  Dieser Vorgang muß ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen. <br><br>
+
+  Soll die Bewegung mit der maximalen Schrittweite erfolgen, kann zur Vereinfachung der Befehl:
+
+  <pre>
+   set &lt;name&gt; goAbsPTZ up [down ] [left] [right]
+  </pre>
+
+  verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
+  Auch in diesem Fall muß der Vorgang ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen. 
+
+  <br><br><br>
 
 </ul>
   <br>
@@ -2995,7 +3383,8 @@ return;
   So wird zum Beispiel das Reading "Availability" auf "disconnected" gesetzt falls die Kamera von der Surveillance Station getrennt wird und kann für weitere <br>
   Verarbeitungen genutzt werden. <br>
   Der Befehl "get &lt;name&gt; svsinfo" ist eigentlich nicht von der Kamera abhängig, sondern ermittelt vielmehr allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
-  Diese Funktion wird einmalig automatschisch nach einem Restart von FHEM ausgeführt. Es ist darauf zu achten dass die <a href="#SSCam_Credentials">Credentials</a> gespeichert wurden !
+  Die Funktionen "caminfoall" und "svsinfo" werden einmalig automatisch beim Start von FHEM ausgeführt um steuerungsrelevante Informationen zu sammeln.<br>
+  Es ist darauf zu achten dass die <a href="#SSCam_Credentials">Credentials</a> gespeichert wurden !
   <br><br>
 
   <b>Polling der Kameraeigenschaften:</b><br><br>
@@ -3097,6 +3486,7 @@ return;
     <tr><td><li>SVSuserPriv</li>        </td><td>- die effektiven Rechte des verwendeten Users nach dem Login (get mit "svsinfo") </td></tr>
     <tr><td><li>SVSversion</li>         </td><td>- die Paketversion der installierten Surveillance Station (get mit "svsinfo") </td></tr>
     <tr><td><li>UsedSpaceMB</li>        </td><td>- durch Aufnahmen der Kamera belegter Plattenplatz auf dem Volume  </td></tr>
+    <tr><td><li>VideoFolder</li>        </td><td>- Pfad zu den aufgenommenen Videos  </td></tr>
   </table>
   </ul>
   <br><br>    
