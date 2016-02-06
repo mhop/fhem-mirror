@@ -759,7 +759,7 @@ FW_answerCall($)
   if($docmd && !$FW_cmdret && AttrVal($FW_wname, "redirectCmds", 1)) {
     my $tgt = $FW_ME;
        if($FW_detail) { $tgt .= "?detail=$FW_detail&fw_id=$FW_id" }
-    elsif($FW_room)   { $tgt .= "?room=$FW_room&fw_id=$FW_id" }
+    elsif($FW_room)   { $tgt .= "?room=".urlEncode($FW_room)."&fw_id=$FW_id" }
     else              { $tgt .= "?fw_id=$FW_id" }
     TcpServer_WriteBlocking($me,
              "HTTP/1.1 302 Found\r\n".
@@ -1336,10 +1336,9 @@ FW_roomOverview($)
         if(!$FW_room && $FW_ss);
     my $lr = $r;
     $lr =~ s/</&lt;/g;
-    $lr =~ s/>/&lt;/g;
+    $lr =~ s/>/&gt;/g;
     push @list1, $lr;
-    $lr =~ s/ /%20/g;
-    push @list2, "$FW_ME?room=$lr";
+    push @list2, "$FW_ME?room=".urlEncode($r);
   }
   my @list = (
      "Everything",    "$FW_ME?room=all",
