@@ -9,9 +9,9 @@ use strict;
 use warnings;
 use SetExtensions;
 
-sub
-CustomReadings_Initialize($)
-{
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
+sub CustomReadings_Initialize($) {
   my ($hash) = @_;
 
   $hash->{DefFn}         = "CustomReadings_Define";
@@ -22,8 +22,7 @@ CustomReadings_Initialize($)
 }
 
 sub
-CustomReadings_Define($$)
-{
+CustomReadings_Define($$) {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
 
@@ -32,8 +31,7 @@ CustomReadings_Define($$)
   return undef;
 }
 
-sub CustomReadings_read($)
-{
+sub CustomReadings_read($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   
@@ -120,9 +118,7 @@ sub CustomReadings_read($)
 }
 
 
-sub
-CustomReadings_Undef($$)
-{
+sub CustomReadings_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   
@@ -131,8 +127,7 @@ CustomReadings_Undef($$)
   return undef;
 }
 
-sub CustomReadings_GetHTML ($)
-{
+sub CustomReadings_GetHTML ($) {
 	my ($name) = @_;
   my $hash = $main::defs{$name};
   my $result = "";
