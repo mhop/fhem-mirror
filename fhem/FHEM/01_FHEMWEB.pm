@@ -2715,7 +2715,7 @@ FW_devState($$@)
       } else {
         $room =~ s/,.*//;
       }
-      $link .= "&room=$room";
+      $link .= "&room=".urlEncode($room);
     }
     $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf$FW_CSRF\">$txt</a>"
        if($link !~ m/ noFhemwebLink\b/);
