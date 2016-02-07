@@ -1,5 +1,14 @@
 ##############################################
 # $Id$
+##############################################
+# 06.02.2016 - added content:encoded to be selected as
+#              extractable reading
+# 06.02.2016 - setting encoding attribute to utf8 by default
+#              when device is defined for the first time
+# 06.02.2016 - allowing call of custom user function for
+#              text preparation of title, description and 
+#              content:encoded
+
 package main;
 
 use strict;
@@ -32,7 +41,9 @@ my $nb_indexlength=length($maximum_max_lines);
 my $rdHeadlines='.headlines';
 
 my $defaultReadings="title,description,pubDate";
-my $allReadings=$defaultReadings.",link,buildDate,imageTitle,imageURL";
+my $allReadings=$defaultReadings.",link,buildDate,imageTitle,imageURL,encodedContent";
+
+my $defaultEncoding='utf8';
 
 my $defaultDisabledText='this rssFeed ist currently disabled';
 
@@ -157,6 +168,7 @@ rssFeed_Initialize($)
 	. "rfDisplayTitle "		#display a title as first line in headlines (is perl special)
 	. "rfTickerChars "		#optional characters to display at the beginning and end of each headline
 	. "rfEncode "	        #optional encoding to use for setting the readings (e.g. utf8)
+	. "rfCustomTextPrepFn "  #optional preparation of Text readings before they_re set (funtion)
 	. "rfReadings:multiple-strict,".$allReadings." "   #readings to fill (comma separated list)
 	. "rfDisabledText "
 	#. "rfLatin1ToUtf8:1,0"  #optional encoding using latin1ToUtf8 for readings (TEST ONLY)
@@ -271,8 +283,19 @@ rssFeed_Define($$)
   $hash->{NEXTUPDATE}=localtime($nexttimer);
   InternalTimer($nexttimer, $modulename."_GetUpdate", $hash, 0);
   
-  my $attReadings=AttrVal($hash->{NAME},"rfReadings",undef);
-  $attr{$hash->{NAME}}{rfReadings}=$defaultReadings if (!$attReadings);
+  #Set default attributes
+  #Do this only at very first definition of the device.
+  #Prevent this during initialization of FHEM at startup.
+  if ($init_done) {
+	  #setting default readings to be extracted if attribute rfReadings is not set
+	  my $attReadings=AttrVal($hash->{NAME},"rfReadings",undef);
+	  $attr{$hash->{NAME}}{rfReadings}=$defaultReadings if (!$attReadings);
+
+	  #setting default encoding if attribute rfEncode is not set
+	  my $attEncoding=AttrVal($hash->{NAME},"rfEncode",undef);
+	  $attr{$hash->{NAME}}{rfEncode}=$defaultEncoding if (!$attEncoding);
+  }
+  
   return undef;
 }
 
@@ -366,8 +389,8 @@ rssFeed_update(@)
   #just 'defined'
   readingsSingleUpdate($dhash,'state',localtime(gettimeofday()),1) if(!IsDisabled($name));
 
-  #if the device is disabled then there will be no further update an only the
-  #information, that the ticke is deactivated will be stored to ticker headlines
+  #if the device is disabled then there will be no further update and only the
+  #information, that the ticker is deactivated will be stored to ticker headlines
   # -> ToDo: This point will currently never be automatically reached, as this update-Routine
   #          is not called by the timer event routine (rssFeed_GetUpdate) when the disable
   #          attribute is set. Shoud be called at least once, when attribute dsable is set.
@@ -386,6 +409,26 @@ rssFeed_update(@)
 
   rssFeed_Log3 $name,4,"rfMaxLines: $lines";
   
+  #Check if the function specified in the attribute rfCustomTextPrepFn exists
+  #and is callable:
+  my $custPrepFn=AttrVal($name,'rfCustomTextPrepFn',undef);
+  if(defined($custPrepFn)) {
+  	if (!defined(&$custPrepFn)) {
+      rssFeed_Log3 $name,3,"WARNING: specified custom function $custPrepFn doesn't exist!";
+	  $custPrepFn=undef;
+	} else {
+	  #Function exists, try to call it
+	  eval "$custPrepFn('x','x')";
+	  if ($@) {
+        rssFeed_Log3 $name,3,"WARNING: Error when calling $custPrepFn(\$\$)!";
+		rssFeed_Log3 $name,3,$@;
+		$custPrepFn=undef;
+	  } else {
+        rssFeed_Log3 $name,4,"Using specified custom function $custPrepFn later on";
+	  }
+	}
+  } 
+  
   my ($i,$nachrichten,$response,@ticker,$ua,$url,$xml);
 
   $i = 0;
@@ -394,7 +437,7 @@ rssFeed_update(@)
   $url=InternalVal($name,'URL',''); 
   if (!$url) {
   	#If there's no URL in internals, something is very wrong (see define)
-  	rssFeed_Log3 $name,3,'url not defined';
+  	rssFeed_Log3 $name,3,'ERROR: url not defined';
 	return;
   }
   rssFeed_Log3 $name,4,$url;
@@ -405,7 +448,7 @@ rssFeed_update(@)
   
   if(!$response) {
   	#Problem: no response was returned!
-  	rssFeed_Log3 $name,3,'no response getting rss data from url';
+  	rssFeed_Log3 $name,3,'ERROR: no response getting rss data from url';
 	return;
   }
   
@@ -417,6 +460,8 @@ rssFeed_update(@)
   gunzip \$response => \$runzipped;
   
   rssFeed_Log3 $name,5,"unzipError: $GunzipError";
+  rssFeed_Log3 $name,5,"unzipError:This is ok! It only means that response is not gzipped.";
+  
 
   #If the response was not zipped, the unzip-result is the original response data
   my $zipped=0;
@@ -432,96 +477,110 @@ rssFeed_update(@)
   #using unzipped responsedata if it was originally zipped
   $response=$runzipped if($zipped);
   
-  #Convert xml data from reponse to an array (hash?)
+  #Trying to convert xml data from reponse to an array
   $xml         = new XML::Simple;
-  
+    
   rssFeed_Log3 $name,5,'Trying to convert xml to array...';
-  eval {$xml->XMLin($response, ForceArray => ['item']);};
-  rssFeed_Log3 $name,5,"evalXMLerror: $@";
+  eval {$nachrichten=$xml->XMLin($response, ForceArray => ['item']);};
+  if($@) {
+  	rssFeed_Log3 $name,3,"ERROR can't convert feed response" if($@);
+  	rssFeed_Log3 $name,4,"$@";
+	return;
+  }
+
+  if(!$nachrichten->{channel}) {
+  	rssFeed_Log3 $name,4,'ERROR: no valid feed data available after conversion';
+    return;
+  }
+
+
+  #$nachrichten = $xml->XMLin($response, ForceArray => ['item']) if(!$@);
+    
+  #Now starting update of the readings
+  readingsBeginUpdate($dhash);
   
-  #rssFeed_Log3 $name,4,"evalXMLresult: $evResult";
+  #Extracting data from array and converting it to utf8 where necessary.
+  if($params{'title'}) {
+	  my $feedTitle=$nachrichten->{channel}{title};
+	  $feedTitle=encode($enc,$feedTitle) if($enc);
+	  $feedTitle=eval("$custPrepFn('feedTitle','$feedTitle')") if ($custPrepFn);	
+  	  readingsBulkUpdate($dhash,$feed_prefix.'title',$feedTitle) if ($feedTitle);
+  }
   
-  if(!$@) {
-  	$nachrichten = $xml->XMLin($response, ForceArray => ['item']);
+  
+  if ($params{'description'}) {
+	  my $feedDescription=$nachrichten->{channel}{description};
+	  $feedDescription=encode($enc,$feedDescription) if ($enc);
+	  $feedDescription=eval("$custPrepFn('feedDescription','$feedDescription')") if ($custPrepFn);
+  	  readingsBulkUpdate($dhash,$feed_prefix.'description',$feedDescription) if ($feedDescription);
+  }
+  
+  my $feedLink=$nachrichten->{channel}{link};
+  readingsBulkUpdate($dhash,$feed_prefix.'link',$feedLink) if ($feedLink && $params{'link'});
+
+  my $feedBuildDate=$nachrichten->{channel}{lastBuildDate};
+  readingsBulkUpdate($dhash,$feed_prefix.'buildDate',$feedBuildDate) if ($feedBuildDate && $params{'buildDate'});
+
+  my $feedPubDate=$nachrichten->{channel}{pubDate};
+  readingsBulkUpdate($dhash,$feed_prefix.'pubDate',$feedPubDate) if ($feedPubDate && $params{'pubDate'});
+  
+  my $feedImageURL=$nachrichten->{channel}{image}{url};
+  readingsBulkUpdate($dhash,$feed_prefix.'imageURL',$feedImageURL) if ($feedImageURL && $params{'imageURL'});
+
+  if ($params{'imageTitle'}) {
+ 	  my $feedImageTitle=$nachrichten->{channel}{image}{title};
+	  $feedImageTitle=encode($enc,$feedImageTitle) if ($enc);
+	  $feedImageTitle=eval("$custPrepFn('feedImageTitle','$feedImageTitle')") if ($custPrepFn);	
+  	  readingsBulkUpdate($dhash,$feed_prefix.'imageTitle',$feedImageTitle) if ($feedImageTitle);
   }
   
   
   
-  # -> ToDo: Add a title line to the ticker data e.g. to describe what's
-  #          displayed. This should be a perl-special to evaluate, so 
-  #          the data could possibly extracted from readings.
-  #my $title=AttrVal($name,'rnDisplayTitle',undef);
-  #$title=$urlbase if($title eq '@');
-  #push (@ticker,$title) if ($title);
-  
-  
-  #Extracting data from array and converting it to utf8 where necessary.
-  my $feedTitle=$nachrichten->{channel}{title};
-  #$feedTitle=latin1ToUtf8($feedTitle) if($lutf);
-  $feedTitle=encode($enc,$feedTitle) if($enc);
-  
-  my $feedDescription=$nachrichten->{channel}{description};
-  #$feedDescription=latin1ToUtf8($feedDescription) if($lutf);
-  $feedDescription=encode($enc,$feedDescription) if ($enc);
-  
-  my $feedLink=$nachrichten->{channel}{link};
-  my $feedBuildDate=$nachrichten->{channel}{lastBuildDate};
-  my $feedPubDate=$nachrichten->{channel}{pubDate};
-  
-  my $feedImageURL=$nachrichten->{channel}{image}{url};
-  
-  my $feedImageTitle=$nachrichten->{channel}{image}{title};
-  #$feedImageTitle=latin1ToUtf8($feedImageTitle) if ($lutf);
-  $feedImageTitle=encode($enc,$feedImageTitle) if ($enc);
-  
-  #Now starting update of the readings
-  readingsBeginUpdate($dhash);
-  
-  readingsBulkUpdate($dhash,$feed_prefix.'title',$feedTitle) if ($feedTitle && $params{'title'});
-  readingsBulkUpdate($dhash,$feed_prefix.'description',$feedDescription) if ($feedDescription && $params{'description'});
-  readingsBulkUpdate($dhash,$feed_prefix.'link',$feedLink) if ($feedLink && $params{'link'});
-  readingsBulkUpdate($dhash,$feed_prefix.'pubDate',$feedPubDate) if ($feedPubDate && $params{'pubDate'});
-  readingsBulkUpdate($dhash,$feed_prefix.'buildDate',$feedBuildDate) if ($feedBuildDate && $params{'buildDate'});
-  readingsBulkUpdate($dhash,$feed_prefix.'imageTitle',$feedImageTitle) if ($feedImageTitle && $params{'imageTitle'});
-  readingsBulkUpdate($dhash,$feed_prefix.'imageURL',$feedImageURL) if ($feedImageURL && $params{'imageURL'});
-  
   #Loop through the array to extract the data for each single news block in 
   #the feed data array
   while ($i < $lines) {
+  	#At least a title should exist
     if($nachrichten->{channel}{item}[$i]{title}) {
-	my $cline=$nachrichten->{channel}{item}[$i]{title};
-	#$cline=latin1ToUtf8($cline) if($lutf);
-	$cline=encode($enc,$cline) if ($enc);
-	
-	my $cdesc=$nachrichten->{channel}{item}[$i]{description};
-	#$cdesc=latin1ToUtf8($cdesc) if($lutf);
-	$cdesc=encode($enc,$cdesc) if ($enc);
-	
-	my $clink=$nachrichten->{channel}{item}[$i]{link};
-	#$clink=latin1ToUtf8($clink) if ($lutf);
-	$clink=encode($enc,$clink) if ($enc);
+		my $cline=$nachrichten->{channel}{item}[$i]{title};
+		last unless $cline;
+		$cline=encode($enc,$cline) if ($enc);
+		$cline=eval("$custPrepFn('title','$cline')") if ($custPrepFn);	
 
-	my $cdate=$nachrichten->{channel}{item}[$i]{pubDate};
-	#$cdate=latin1ToUtf8($cdate) if ($lutf);
-	$cdate=encode($enc,$cdate) if ($enc);
-	
-	#my $cenc=$nachrichten->{channel}{item}[$i]{enclosure}{url};
+		#store headlines tor ticker-array for later joining to healines string
+		my $h = $tt_start.$cline.$tt_end;
+		last unless $h;
+		push (@ticker,$h);
 
-	last unless $cline;
-	
-	#store headlines tor ticker-array for later joining to healines string
-    my $h = $tt_start.$cline.$tt_end;
-    last unless $h;
-    push (@ticker,$h);
-	
-	#Index for numbering each news-block
-	my $ndx=sprintf('%0'.$nb_indexlength.'s',$i);
+		#Index for numbering each news-block
+		my $ndx=sprintf('%0'.$nb_indexlength.'s',$i);
 
-	readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."title",$cline) if ($params{'title'}); 
-	readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."description", $cdesc) if ($cdesc && $params{'description'}); 
-	readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."link", $clink) if ($params{'link'}); 
-	readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."pubDate", $cdate) if ($params{'pubDate'}); 
-	#readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."image",$cenc) if ($cenc);
+		readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."title",$cline) if ($params{'title'}); 
+
+		if ($params{'description'}) {		
+			my $cdesc=$nachrichten->{channel}{item}[$i]{description};
+			$cdesc=encode($enc,$cdesc) if ($enc);	
+			$cdesc=eval("$custPrepFn('description','$cdesc')") if ($custPrepFn);	
+			readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."description", $cdesc); 
+		}
+
+		if ($params{'link'}) {
+			my $clink=$nachrichten->{channel}{item}[$i]{link};
+			$clink=encode($enc,$clink) if ($enc);
+			readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."link", $clink); 
+		}
+		
+		if ($params{'pubDate'}) {
+			my $cdate=$nachrichten->{channel}{item}[$i]{pubDate};
+			$cdate=encode($enc,$cdate) if ($enc);
+			readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator."pubDate", $cdate); 
+		}
+
+		if ($params{'encodedContent'}) {
+			my $econtent=$nachrichten->{channel}{item}[$i]{'content:encoded'};
+			$econtent=encode($enc,$econtent) if($enc);
+			$econtent=eval("$custPrepFn('encodedContent','$econtent')") if ($custPrepFn);	
+			readingsBulkUpdate($dhash,$nb_prefix.$ndx.$nb_separator.'encodedContent',$econtent);
+		}
 
 	}
     $i++;
@@ -647,7 +706,8 @@ return;
         Sometimes this is necessary when feeds contain wide characters that
         could sometimes lead to malfunction in FHEMWEB.
         Also the headlines data returned by rssFeedFunctions and get ticker
-        are encoded using this method.
+        are encoded using this method.<br/>
+		This will be set to utf8 by default on first define
         <br/>
     </li>
     <li><a name="rfReadings">rfReadings</a><br/>
@@ -663,6 +723,10 @@ return;
                 to a corresponding reading
                 <br/>
             </li>
+			<li>encodedContent = content:encoded section<br/>
+			    if present this contains a more detailed description
+				<br/>
+			</li>	
             <li>pubDate = Publication time of feed and of each news item will
                 be extracted to a corresponding reading.
                 <br/>
@@ -688,6 +752,50 @@ return;
         attribute will be automatically created with the default value.
         <br/>
     </li>
+    <li><a name="rfCustomTextPrepFn">rfCustomTextPrepFn</a><br>
+		Can specify a funtion located for example in 99_myUtils.pm
+		This function will be uses for further modification of extracted
+		feed data before setting it to the readings or the ticker list.
+		The function will receive an id for the text type and the text itself.
+		It must then return the modified Text.
+		<br/>
+		Possible text type ids are (s.a. rfReadings)<br>
+		<ul>
+			<li>feedTitle</li>
+			<li>feedDescription</li>
+			<li>imageTitle</li>
+			<li>desctiption</li>
+			<li>encodedContent</li>
+		</ul>
+		<br/>
+		Example for 99_myUtils.pm:
+		<pre>		
+#Text preparation for rssFeedDevices
+sub rssFeedPrep($$)
+{
+	my($texttype,$text) = @_;
+
+	#Cut the lenght of description texts to max 50 characters
+	my $tLn=length $text;
+	$text=substr($text,0,47).'...' if ($tLn >50 && ($texttype=~/description/));	
+
+	#filter Probably errorneous HASH(xxxxxx) from any texts	
+	return ' ' if ($text=~/HASH\(.*\)/);
+
+	#set a custom feed title reading
+	return 'My Special Title' if ($texttype =~/feedTitle/);
+
+	#returning modified text
+	return $text;
+}	
+		</pre>				
+		and then set the attribute to that function:<br/>
+		<code>attr &lt;rssFeedDevice&gt; rfCustomTextPrepFn rssFeedPrep</code>
+		<br/>
+		
+		
+		
+	</li>	
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br/>
@@ -856,7 +964,8 @@ return;
         Das kann u.U. notwendig sein, wenn in den zur&uuml;ckgelieferten Feed-Daten s.g. wide Characters
         enthalten sind. Dies kann evtl. dazu f&uuml;hren, das u.a. die Darstellung in FHEMWEB nicht mehr
         korrekt erfolgt.
-        Dies betrifft auch das Ergebnis von rssFeedFunctions, bzw. get ticker.
+        Dies betrifft auch das Ergebnis von rssFeedFunctions, bzw. get ticker.<br/>
+		Dieses Attribut wird beim ersten define per default auf utf8 gesetzt.
         <br>
     </li>
     <li><a name="rfReadings">rfReadings</a><br>
@@ -873,6 +982,11 @@ return;
                 Dies erzeugt ein Reading f&uuml;r die Feed-Beschreibung, bzw.
                 f&uuml;r den Beschreibungstext jeden Nachrichten-Eelements.<br>
             </li>
+			<li>encodedContent = content:encoded Abschnitt<br/>
+			    Sofern vorhanden ist in diesem Abschnitt quasi ein Langtext
+				der Nachrihtenmeldung enthalten.
+				<br/>
+			</li>	
             <li>pubDate = Zeitpunkt der Ver&ouml;ffentlichung des Feeds, bzw. der einzelnen 
                 Nachrichten-Elemente
                 <br>
@@ -900,6 +1014,48 @@ return;
             
         <br>
     </li>
+    <li><a name="rfCustomTextPrepFn">rfCustomTextPrepFn</a><br>
+		Hier kann eine Funktion angegeben werden, die bspw. in 99_myUtils.pm
+		definiert wird. In dieser Funktion k&ouml;nnen Textinhalte vor dem 
+		Setzen der Readings, bzw. Tickerzeilen beliebig modifiziert werden.
+		Der Funktion wird dabei zum Einen eine Kennung für den Text &uuml;bergeben und zum
+		Anderen der Text selbst. Zur&uuml;ckgegeben wird dann der modifizierte Text.
+		<br/>
+		M&ouml;gliche Kennungen sind dabei (s.a. rfReadings)<br>
+		<ul>
+			<li>feedTitle</li>
+			<li>feedDescription</li>
+			<li>imageTitle</li>
+			<li>desctiption</li>
+			<li>encodedContent</li>
+		</ul>
+		<br/>
+		Beispiel f&uuml;r 99_myUtils.pm:
+		<pre>		
+#Text-Modifikation für rssFeedDevices
+sub rssFeedPrep($$)
+{
+	my($texttype,$text) = @_;
+
+	#Länge von descriptions auf maximal 50 begrenzen
+	my $tLn=length $text;
+	$text=substr($text,0,47).'...' if ($tLn >50 && ($texttype=~/description/));	
+
+	#Filtern von texten, die fälschlicherweise auf HASH(xxxxxx) stehen
+	#von beliebigen Texten
+	return ' ' if ($text=~/HASH\(.*\)/);
+
+	#Setzen eines eigenen Titels für den Feed
+	return 'Mein eigener Feed-Titel' if ($texttype =~/feedTitle/);
+
+	#jetzt noch den modifizierten Text zurück geben
+	return $text;
+}	
+		</pre>				
+		zur Verwendung muss das Attribut noch entsprechend gesetzt werden:<br/>
+		<code>attr &lt;rssFeedDevice&gt; rfCustomTextPrepFn rssFeedPrep</code>
+		<br/>
+	</li>	
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
