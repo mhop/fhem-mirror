@@ -67,6 +67,7 @@ sub GDS_Initialize($) {
 
 	$hash->{DefFn}		=	"GDS_Define";
 	$hash->{UndefFn}	=	"GDS_Undef";
+	$hash->{DeleteFn}	=	"GDS_Delete";
 	$hash->{GetFn}		=	"GDS_Get";
 	$hash->{SetFn}		=	"GDS_Set";
 	$hash->{RenameFn}	=	"GDS_Rename";
@@ -325,10 +326,15 @@ sub GDS_Undef($$) {
 	RemoveInternalTimer($hash);
     my $url = '/gds';
     delete $data{FWEXT}{$url} if int(devspec2array('TYPE=GDS')) == 1;
+	return undef;
+}
+
+sub GDS_Delete() {
+	my ($hash, $arg) = @_;
+	my $name = $hash->{NAME};
 	setKeyValue($name."_user",undef);
 	setKeyValue($name."_pass",undef);
 	setKeyValue($name."_host",undef);
-	return undef;
 }
 
 sub GDS_Rename() {
