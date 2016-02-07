@@ -2461,39 +2461,34 @@ sub TelegramBot_BinaryFileWrite($$$) {
   <br><br>
   <ul>
 
-    <li>Send a telegram message if fhem has been newly started
+     <li>Send a telegram message if fhem has been newly started
       <p>
-      <code>ok fhem { plotAsPng('SVG_FileLog_Aussen') }</code>
+      <code>define notify_fhem_reload notify global:INITIALIZED set &lt;telegrambot&gt; message fhem started - just now </code>
       </p> 
+    </li> 
+  <br>
+
+  <li>A command, that will retrieve an SVG plot and send this as a message back (can be also defined as a favorite).
+      <p>
+      Send the following message as a command to the bot <code>ok fhem { plotAsPng('SVG_FileLog_Aussen') }</code> 
+      <br>assuming <code>ok fhem</code> is the command keyword)
+      </p> (
+      
       The png picture created by plotAsPng will then be send back in image format to the telegram client. This also works with other pictures returned and should also work with other media files (e.g. MP3 and doc files). The command can also be defined in a favorite.<br>
       Remark: Example requires librsvg installed
     </li> 
-  <br><br>
+  <br>
 
     <li>Allow telegram bot commands to be used<br>
-        If the keywords for commands are starting with a slash (/), the corresponding commands can be also defined with the <a href=http://botsfortelegram.com/project/the-bot-father/>Bot Father</a>. So if a slash is typed a list of the commands will be automatically shown.<br>
-        
-        Assuming that <code>cmdSentCommands</code> is set to <code>/History</code>. Then you can initiate the communication with the botfather, select the right bot and then with the command <code>/setcommands</code> define one or more commands like
+        If the keywords for commands are starting with a slash (/), the corresponding commands can be also defined with the 
+        <a href=http://botsfortelegram.com/project/the-bot-father/>Bot Father</a>. So if a slash is typed a list of the commands will be automatically shown. Assuming that <code>cmdSentCommands</code> is set to <code>/History</code>. Then you can initiate the communication with the botfather, select the right bot and then with the command <code>/setcommands</code> define one or more commands like
         <p>
           <code>History-Show a history of the last 10 executed commands</code>
         </p> 
         When typing a slash, then the text above will immediately show up in the client.
     </li> 
 
-  <br><br>
-
-    <li>Send a command to FHEM that produces an image as result and receive the image sent back to telegram
-      <p>
-      <code>define notify_fhem_reload notify global:INITIALIZED set &lt;telegrambot&gt; message fhem newly started - just now !  </code>
-      </p> 
-    </li> 
-  <br><br>
-
-
-
     </ul>
-  
-  <br><br>
 </ul>
 
 =end html
