@@ -182,11 +182,14 @@ my %zwave_class = (
   THERMOSTAT_OPERATING_STATE=>{ id => '42' },
   THERMOSTAT_SETPOINT      => { id => '43',
     set   => { setpointHeating => "010101%02x",
-               setpointCooling => "010201%02x"},
-    get   => { setpoint => "02" },
-    parse => { "064303(..)(..)(....)" => 'sprintf("setpointTemp:%0.1f %s %s", '.
-                 'hex($3)/(10**int(hex($2)/32)), '.
-                 'hex($2)&8 ? "F":"C", hex($1)==1 ? "heating":"cooling")' } },
+               setpointCooling => "010201%02x",
+               thermostatSetpointSet
+                  => 'ZWave_thermostatSetpointSet($hash, "%s")'},
+    get   => { setpoint => 'ZWave_thermostatSetpointGet("%s")',
+               thermostatSetpointSupported => '04' },
+    parse => {  "..4303(.*)" => 'ZWave_thermostatSetpointParse($hash, $1)',
+                "..4305(.*)" =>
+                        'ZWave_thermostatSetpointSupportedParse($hash, $1)' } },
   THERMOSTAT_FAN_MODE      => { id => '44' },
   THERMOSTAT_FAN_STATE     => { id => '45' },
   CLIMATE_CONTROL_SCHEDULE => { id => '46',
@@ -202,7 +205,37 @@ my %zwave_class = (
   TARIFF_TBL_MONITOR       => { id => '4b' },
   DOOR_LOCK_LOGGING        => { id => '4c' },
   NETWORK_MANAGEMANT_BASIC => { id => '4d' },
-  SCHEDULE_ENTRY_LOCK      => { id => '4e' },
+  SCHEDULE_ENTRY_LOCK      => { id => '4e', # V1, V2, V3
+    get   =>  { scheduleEntryLockTypeSupported  => '09',
+                scheduleEntryLockWeekDay        => "04%02x%02x",
+                scheduleEntryLockYearDay        => "07%02x%02x",
+                scheduleEntryLockDailyRepeating => "0e%02x%02x",
+                scheduleEntryLockTimeOffset     => '0b'
+              },
+    set   =>  { scheduleEntryLockSet => 
+                  'ZWave_scheduleEntryLockSet($hash, "%s")',
+                scheduleEntryLockAllSet => 
+                  'ZWave_scheduleEntryLockAllSet($hash, "%s")',
+                scheduleEntryLockWeekDaySet =>
+                  'ZWave_scheduleEntryLockWeekDaySet($hash, "%s")',
+                scheduleEntryLockYearDaySet =>
+                  'ZWave_scheduleEntryLockYearDaySet($hash, "%s")',
+                scheduleEntryLockTimeOffsetSet =>
+                  'ZWave_scheduleEntryLockTimeOffsetSet($hash, "%s")',
+                scheduleEntryLockYearDailyRepeatingSet =>
+                  'ZWave_scheduleEntryLockDailyRepeatingSet($hash, "%s")'
+              },
+    parse =>  { "..4e0a(.*)" => 
+                  'ZWave_scheduleEntryLockTypeSupportedParse($hash, $1)',
+                "..4e05(.{14})" =>
+                  'ZWave_scheduleEntryLockWeekDayParse($hash, $1)',
+                "..4e08(.{24})" =>
+                  'ZWave_scheduleEntryLockYearDayParse($hash, $1)',
+                "..4e0c(.{6})" =>
+                  'ZWave_scheduleEntryLockTimeOffsetParse($hash, $1)',
+                "..4e0f(.{14})" =>
+                  'ZWave_scheduleEntryLockDailyRepeatingParse($hash, $1)'
+              }},
   ZI_6LOWPAN               => { id => '4f' },
   BASIC_WINDOW_COVERING    => { id => '50',
     set   => { coveringClose => "0140",
@@ -290,11 +323,12 @@ my %zwave_class = (
     parse => { "..7105(..)(..)(.*)" => 'ZWave_alarmParse($1,$2,$3)'} },
   MANUFACTURER_SPECIFIC    => { id => '72',
     get   => { model       => "04" },
-    parse => { "087205(....)(....)(....)" =>'ZWave_mfsParse($hash,$1,$2,$3,0)',
-               "087205(....)(....)(.{4})" =>'ZWave_mfsParse($hash,$1,$2,$3,1)',
-               "087205(....)(.{4})(.{4})" =>'ZWave_mfsParse($hash,$1,$2,$3,2)',
-               "0a7205(....)(....)(....)(....)" =>
-                                'ZWave_mfsParse($hash,$1,$2,$3,0)' },
+    parse => { "0[8a]7205(....)(....)(....)(.*)"
+                          => 'ZWave_mfsParse($hash,$1,$2,$3,0)',
+               "0[8a]7205(....)(....)(.{4})(.*)"
+                          => 'ZWave_mfsParse($hash,$1,$2,$3,1)',
+               "0[8a]7205(....)(.{4})(.{4})(.*)"
+                          => 'ZWave_mfsParse($hash,$1,$2,$3,2)' },
     init  => { ORDER=>49, CMD => '"get $NAME model"' } },
   POWERLEVEL               => { id => '73',
     set   => { powerlevel     => "01%02x%02x",
@@ -481,6 +515,16 @@ my $zwave_cryptRijndael = 0;
 my $zwave_lastHashSent;
 my %zwave_pepperLink;
 my %zwave_pepperImg;
+
+# standard definitions for regular expression
+# naming scheme: p<number of returned groups>_name
+my $p1_m = "([0-5][0-9])"; # mm 00-59
+my $p2_hm = "([01][0-9]|2[0-3]):([0-5][0-9])"; # hh:mm
+my $p3_hms = "([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])"; # hh:mm:ss
+my $p1_b = "([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])"; # byte:0-255, 1-3 digits
+my $p1_wd = "(mon|tue|wed|thu|fri|sat|sun)"; # 3 letter weekday
+# ymd: yyyy-mm-dd, yyyy 4 digits, mm 2 digits 01-12, dd 2 digits 01-31
+my $p3_ymd = "([0-9]{4})-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])";
 
 sub
 ZWave_Initialize($)
@@ -873,6 +917,381 @@ ZWave_ccCapability($$)
 }
 
 sub
+ZWave_scheduleEntryLockSet ($$)
+{
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  return ("wrong format, see commandref", "")
+    if($arg !~ m/([0-2]?[0-9]?[0-9]) ((en|dis)abled)/);
+  return ("User Identifier: only 0-255 allowed", "") if (($1<0) || ($1>255));
+
+  my $rt = sprintf("01%02x%02x", $1, ($2 eq "enabled") ? "01" : "02");
+  return ("",$rt);
+
+}
+
+sub
+ZWave_scheduleEntryLockAllSet ($$)
+{
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  return ("wrong format, see commandref", "")
+    if($arg !~ m/((en|dis)abled)/);
+  
+  my $rt = sprintf("02%02x", ($1 eq "enabled") ? "01" : "02");
+  return ("",$rt);
+
+}
+
+sub
+ZWave_scheduleEntryLockWeekDayParse ($$)
+{
+  my ($hash, $val) = @_;
+  return if($val !~ m/^(..)(..)(..)(..)(..)(..)(..)/);
+
+  my $userId          = sprintf("userID: %d", hex($1));
+  my $scheduleSlotId  = sprintf("slotID: %d", hex($2));
+  
+  # Attention! scheduleEntryLock use different definition of weekday!
+  my @dow = ("sun","mon","tue","wed","thu","fri","sat");
+  my $dayOfWeek       = (hex($3) < 7) ? $dow[hex($3)] : "invalid";
+  
+  
+  my $start           = sprintf("%02d:%02d", hex($4), hex($5));
+  my $end             = sprintf("%02d:%02d", hex($6), hex($7));  
+  
+  my $rt1 = sprintf ("weekDaySchedule_%d:", hex($1));
+  $rt1 .= "$userId $scheduleSlotId $dayOfWeek $start $end";
+  return ($rt1);
+}
+  
+sub
+ZWave_scheduleEntryLockWeekDaySet ($$)
+{
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  
+  if($arg !~
+    m/([01]) $p1_b $p1_b $p1_wd $p2_hm $p2_hm/) {
+    return ("wrong format, see commandref", "");
+  }
+
+  if (($2>255) || ($3>255)) {
+    return ("values our of range, see commandref", "");
+  }
+
+  # Attention! scheduleEntryLock use different definition of weekday!
+  my @dow = ("sun","mon","tue","wed","thu","fri","sat");
+
+  my $wd;
+  map { $wd=sprintf("%02x",$_) if($dow[$_] eq $4) }(0..int($#dow));
+  return ("Unknown weekday $4, use one of ".join(" ", @dow), "")
+    if(!defined($wd));
+    
+  my $rt = sprintf("03%02x%02x%02x%02x%02x%02x%02x%02x",
+                    $1,$2,$3,$wd,$5,$6,$7,$8);
+
+  return ("",$rt);
+}
+
+sub
+ZWave_scheduleEntryLockDailyRepeatingParse ($$)
+{
+  my ($hash, $val) = @_;
+  return if($val !~ m/^(..)(..)(..)(..)(..)(..)(..)/);
+  
+  my $userID        = sprintf ("userID: %d", hex($1));
+  my $scheduleID    = sprintf ("slotID: %d", hex($2));
+  
+  # bit field for week day: b7 reserved, b6 sat, b5 fri, ..., b0 sun
+  my $w = hex($3);
+  #my $wd = sprintf("weekDaySchedule: %07b ", $w);
+  my $wd = "weekDaySchedule: ";
+  my $nu = "...";
+  $wd .= (($w & 0x02) == 0x02) ? "mon" : $nu;
+  $wd .= (($w & 0x04) == 0x04) ? "tue" : $nu;
+  $wd .= (($w & 0x08) == 0x08) ? "wed" : $nu;
+  $wd .= (($w & 0x10) == 0x10) ? "thu" : $nu;
+  $wd .= (($w & 0x20) == 0x20) ? "fri" : $nu;
+  $wd .= (($w & 0x40) == 0x40) ? "sat" : $nu;
+  $wd .= (($w & 0x01) == 0x01) ? "sun" : $nu;
+  
+  my $start     = sprintf("Start: %02d:%02d"    , hex($4), hex($5));
+  my $duration  = sprintf("Duration: %02d:%02d" , hex($6), hex($7));
+
+  my $rt1 = sprintf ("scheduleEntryLockDailyRepeating_%d:", hex($1));
+  $rt1 .= "$userID $scheduleID $wd $start $duration";
+  return ($rt1);
+}
+
+sub
+ZWave_scheduleEntryLockDailyRepeatingSet ($$)
+{ 
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+   
+  if($arg !~
+    m/([01]) $p1_b $p1_b ((?:[\.a-zA-Z]{3}){1,7}) $p2_hm $p2_hm/) {
+    return ("wrong format, see commandref", "");
+  }
+
+  my $rt1 = sprintf("%02x%02x%02x", $1, $2, $3);
+  my $rt2 = sprintf("%02x%02x%02x%02x", $5, $6, $7, $8);
+
+  my $w = $4;
+  my $wd = 0x00;
+  $wd |= 0x02 if ($w =~ /mon/i);
+  $wd |= 0x04 if ($w =~ /tue/i);
+  $wd |= 0x08 if ($w =~ /wed/i);
+  $wd |= 0x10 if ($w =~ /thu/i);
+  $wd |= 0x20 if ($w =~ /fri/i);
+  $wd |= 0x40 if ($w =~ /sat/i);
+  $wd |= 0x01 if ($w =~ /sun/i);
+
+  my $rt = sprintf("10$rt1%02x$rt2", $wd);
+  return ("",$rt);
+}
+
+sub
+ZWave_scheduleEntryLockYearDayParse ($$)
+{
+  my ($hash, $val) = @_;
+  return if($val !~ m/^(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/);
+  
+  my $userID        = sprintf ("userID: %d", hex($1));
+  my $scheduleID    = sprintf ("slotID: %d", hex($2));
+  my $startdate     = sprintf ("start: %4d-%02d-%02d %02d:%02d",
+                        2000+hex($3),hex($4),hex($5),hex($6),hex($7));
+  my $enddate       = sprintf ("end: %4d-%02d-%02d %02d:%02d",
+                        2000+hex($8),hex($9),hex($10),hex($11),hex($12));
+
+  my $rt1 = sprintf ("yearDaySchedule_%d:", hex($1));
+  $rt1 .= "$userID $scheduleID $startdate $enddate";
+  return ($rt1);
+}
+
+sub
+ZWave_scheduleEntryLockYearDaySet ($$)
+{ 
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+   
+  if($arg !~
+    m/([01]) $p1_b $p1_b $p3_ymd $p2_hm $p3_ymd $p2_hm/) {
+    return ("wrong format, see commandref", "");
+  }
+
+  my $sy = $4-2000;
+  my $ey = $9-2000;
+  if (($sy < 0) || ($sy > 255) || ($ey < 0) || ($ey > 255)) {
+    Log3 $name, 1, "$name: year out of range";
+    return ("wrong value for year, only 2000-2255 allowed","");
+  }; # no sanity check of date (e.g. 2016-02-31 will pass)
+
+  my $rt = sprintf("06%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+                    $1, $2, $3, $sy, $5, $6, $7, $8, $ey, $10, $11, $12, $13);
+  return ("",$rt);
+}
+
+sub
+ZWave_scheduleEntryLockTimeOffsetParse ($$)
+{ 
+  my ($hash, $val) = @_;
+  return if($val !~ m/^(..)(..)(..)/);
+  
+  my $sTZO  = ((hex($1) & 0x80) == 0x80) ? '-' : '+';
+  my $TZO   = sprintf("TZO: %s%02d:%02d", $sTZO, (hex($1) & 0x7f), hex($2));
+  
+  my $sDST  = ((hex($3) & 0x80) == 0x80) ? '-' : '+';
+  my $DST   = sprintf("DST: %s%02d", $sDST, (hex($3) & 0x7f));
+  
+  my $rt1 = "scheduleEntryLockTimeOffset: $TZO $DST";
+  return ($rt1);
+}
+
+sub
+ZWave_scheduleEntryLockTimeOffsetSet ($$)
+{ 
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  
+  if($arg !~ m/([\+\-])$p2_hm ([\+\-])$p1_b/) {
+    return ("wrong format, see commandref", "");
+  }
+
+  my $hTZO = $2 | (($1 eq '-') ? 0x80 : 0x00);
+  my $mTZO = $3;
+  my $mDST = $5 | (($4 eq '-') ? 0x80 : 0x00);
+
+  my $rt = sprintf("0d%02x%02x%02x", $hTZO, $mTZO, $mDST);
+
+  return ("",$rt);
+}
+
+sub
+ZWave_scheduleEntryLockTypeSupportedParse ($$)
+{
+  my ($hash, $val) = @_;
+  return if($val !~ m/^(..)(..)(.*)/);
+  
+  my $numWDslots = sprintf ("WeekDaySlots: %d", hex($1));
+  my $numYDslots = sprintf ("YearDaySlots: %d", hex($2));
+  
+  # only for V3
+  my $numDailySlots = '';
+  $numDailySlots = sprintf (" DailyRepeatingSlots: %d", hex($3)) if ($3);
+  
+  my $rt1 = "scheduleEntryLockEntryTypeSupported:"
+            ." $numWDslots $numYDslots$numDailySlots";
+  return ($rt1);
+}
+
+sub
+ZWave_thermostatSetpointGet($)
+{
+  my ($type) = @_;
+  
+  $type  = (($type eq "%s") ? "1" : $type);
+  return ("wrong format, only 1-15 allowed","")
+    if ($type !~ m/^(1[0-5]?|[0]?[1-9])$/);
+  return("",sprintf('02%02x', $type & 0x0f));
+}
+
+sub
+ZWave_thermostatSetpointSet ($$)
+{
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+
+  my $p1_temp   = "([\+\-]?(?:(?:[0-9]+(?:\.[0-9]*)?)|(?:\.[0-9]+)))";
+  my $p1_scale  = "([cC|fF])";
+  my $p1_type   = "(1[0-5]?|[0]?[1-9])";
+  my $p1_prec   = "([0-7])";
+  my $p1_size   = "([124])";
+  
+  if($arg !~
+    m/$p1_temp+ ?$p1_scale?+ ?$p1_type?+ ?$p1_prec?+ ?$p1_size?+/) {
+    return ("wrong format, see commandref", "");
+  }
+  
+  my $temp  = $1;
+  my $scale = (defined $2) ? $2 : "c";          # default to c = celsius
+  $scale    = (lc($scale) eq "f") ? 1 : 0;
+  my $type  = ((defined $3) ? $3 : 1) & 0x0f;   # default to 1 = heating
+  my $prec  = ((defined $4) ? $4 : 1) & 0x07;   # default to 1 decimal
+  my $size  = ((defined $5) ? $5 : 2) & 0x07;   # default to 2 byte size
+  
+  my $sp = int($temp * (10 ** $prec));
+  my $max = (2 ** (8*$size-1)) - 1;
+  my $min = -1 * (2 ** (8*$size-1)); 
+
+  if (($sp > $max) || ($sp < $min)) {
+    my $rt = sprintf("temperature value out of range for given "
+                      ."size and precision [%0.*f, %0.*f]", 
+                      $prec, $min/(10**$prec), $prec, $max/(10**$prec));
+    return ($rt, "");
+  }
+  
+  $sp   = ($sp < 0) ? $sp + 2**(8*$size) : $sp;
+  $sp   = sprintf("%0*x", 2*$size, $sp);
+  $type = sprintf("%02x", $type);
+  my $precScaleSize = sprintf("%02x", ($size | ($scale<<3) | ($prec<<5)));
+  my $rt = "01$type$precScaleSize$sp";
+  
+  return ("",$rt);  
+}
+
+sub
+ZWave_thermostatSetpointParse ($$)
+{ 
+  my ($hash, $val) = @_;
+  my $name = $hash->{NAME};
+  
+  return if($val !~ m/^(..)(..)(.*)/);
+  
+  my @setpointtype =  ( # definition from V3
+                        "notSupported",
+                        "heating",
+                        "cooling",
+                        "notSupported1",
+                        "notSupported2",
+                        "notSupported3",
+                        "notSupported4",
+                        "furnance",
+                        "dryAir",
+                        "moistAir",
+                        "autoChangeover",
+                        "energySaveHeating",
+                        "energySaveCooling",
+                        "awayHeating",
+                        "awayCooling",
+                        "fullPower"
+                      );
+  my $type  = $setpointtype[(hex($1) & 0x0f)];
+  my $prec  = (hex($2) & 0xe0)>>5;
+  my $scale = (((hex($2) & 0x18)>>3) == 1) ? "F": "C";
+  my $size  = (hex($2) & 0x07);
+  
+  if (length($3) != $size*2) {
+    Log3 $name, 1, "$name: THERMOSTAT_SETPOINT_REPORT "
+                        ."wrong number of bytes received";
+    return;
+  }
+  my $sp = hex($3);
+  $sp -= (2 ** ($size*8)) if $sp >= (2 ** ($size*8-1));
+  $sp = $sp / (10 ** $prec);
+  
+  # output temperature with variable decimals as reported (according to $prec)
+  my $rt = sprintf("setpointTemp:%0.*f %s %s", $prec, $sp, $scale, $type);
+
+  return ($rt);
+}
+
+sub
+ZWave_thermostatSetpointSupportedParse ($$)
+{
+  # only defined for version >= V3
+  my ($hash, $val) = @_;
+  my $name = $hash->{NAME};
+  
+  return if($val !~ m/^(.*)/);
+  
+  my $n = length($val)/2;
+  my @supportedType =  ( # definition from V3
+                        "none",                   # 0x00
+                        "heating",                # 0x01
+                        "cooling",                # 0x02
+                        "furnance",               # 0x07 !type 3 to 6 left out!
+                        "dryAir",                 # 0x08
+                        "moistAir",               # 0x09
+                        "autoChangeover",         # 0x0a
+                        "energySaveHeating",      # 0x0b
+                        "energySaveCooling",      # 0x0c
+                        "awayHeating",            # 0x0d
+                        "awayCooling",            # 0x0e
+                        "fullPower"               # 0x0f
+                      );
+  my $numTypes = @supportedType;
+  my $delimeter = '';
+  my $rt = "thermostatSetpointSupported:";
+
+  for (my $i=0; $i<$n; $i++) {
+    # loop over all supplied bytes
+    my $supported = hex(substr($val, $i*2, 2));
+    for (my $j=$i*8; $j<$i*8+8; $j++) {
+      # loop over all bits
+      last if $j >= $numTypes;
+      if ($supported & (2 ** ($j-$i*8))) { 
+        $rt .= sprintf("$delimeter$supportedType[$j]");
+        $delimeter = " ";
+      }
+    }
+  }
+
+  return ($rt);
+}
+
+sub
 ZWave_scheduleSupportedParse ($$)
 {
   my ($hash, $val) = @_;
@@ -901,9 +1320,10 @@ ZWave_scheduleSupportedParse ($$)
     }
 
   }
-  my $rt1 = "scheduleSupported:$numSupported $sTimeSupport $fbSupport ".
-    "$sEnaDis $numSupportedCC $OverrideTypes $overrideSupport";
-  my $rt2 = "scheduleSupportedCC:$supportedCCs";
+  my $rt1 = "scheduleEntryLockScheduleSupported:"
+    ."$numSupported $sTimeSupport $fbSupport "
+    ."$sEnaDis $numSupportedCC $OverrideTypes $overrideSupport";
+  my $rt2 = "scheduleEntryLockScheduleSupportedCC:$supportedCCs";
   return ($rt1, $rt2);
 }
 
@@ -1704,7 +2124,7 @@ ZWave_ccsSet($)
   my @arg = split(/[ ,]/, $spec);
   my $usage = "wrong arg, need: <weekday> HH:MM relTemp HH:MM relTemp ...";
 
-  return ($usage,"") if(@arg < 3 || int(@arg) > 19 || (int(@arg)-1)%2 != 0);
+  return ($usage,"") if(@arg < 1 || int(@arg) > 19 || (int(@arg)-1)%2 != 0);
   my $wds = shift(@arg);
   my $ret;
   map { $ret=sprintf("%02x",$_) if($zwave_wd[$_] eq $wds) }(1..int($#zwave_wd));
@@ -2306,7 +2726,7 @@ ZWave_secIncludeStart($$)
       my $key = AttrVal($ioName, "networkKey", "");
       if($key) {
         $iodev->{secInitName} = $name;
-        Log3 $ioName, 2, "ZWAVE Starting secure init";
+        Log3 $ioName, 2, "ZWAVE Starting secure init for $name";
 
         #~ ZWave_secIncludeStart($dh);
         #~ return "";
@@ -3578,7 +3998,7 @@ s2Hex($)
   </ul>
   <br>
 
-  Note: the sets/gets/generated events of a gven node depend on the classes
+  Note: the sets/gets/generated events of a given node depend on the classes
   supported by this node. If a node supports 3 classes, then the union of
   these sets/gets/events will be available for this node.<br>
   Commands for battery operated nodes will be queues internally, and sent when
@@ -3757,20 +4177,23 @@ s2Hex($)
     Set a schedule for a user. Due to lack of documentation,
       details for some parameters are not available. Command Class is
       used together with class USER_CODE.<br>
-      ID: id of schedule, refer to maximum number of supported schedules
-        reported by the scheduleSupported command.<br>
-      USER_ID: id of user, refer to the USER_CODE class description.<br>
-      YEAR-MONTH-DAY: start of schedule in the format yyyy-mm-dd.<br>
-      WDAY: weekday, 1=Monday, 7=Sunday.<br>
-      ACTIVE_ID: unknown parameter.<br>
-      DURATION_TYPE: unknown parameter.<br>
-      HOUR:MINUTE: start of schedule in the format hh:mm.<br>
-      DURATION: unknown parameter.<br>
-      NUM_REPORTS: number of reports to follow, must be 0.<br>
-      CMD: command(s) (as hexcode sequence) that the schedule executes,
-        see report of scheduleSupported command for supported command
-        class and mask. A list of space separated command can be
-        specified.<br>
+      <ul>
+        ID: id of schedule, refer to maximum number of supported schedules
+          reported by the scheduleSupported command.<br>
+        USER_ID: id of user, starting from 1 up to the number of supported
+        users, refer also to the USER_CODE class description.<br>
+        YEAR-MONTH-DAY: start of schedule in the format yyyy-mm-dd.<br>
+        WDAY: weekday, 1=Monday, 7=Sunday.<br>
+        ACTIVE_ID: unknown parameter.<br>
+        DURATION_TYPE: unknown parameter.<br>
+        HOUR:MINUTE: start of schedule in the format hh:mm.<br>
+        DURATION: unknown parameter.<br>
+        NUM_REPORTS: number of reports to follow, must be 0.<br>
+        CMD: command(s) (as hexcode sequence) that the schedule executes,
+          see report of scheduleSupported command for supported command
+          class and mask. A list of space separated command can be
+          specified.<br>
+      </ul>
       </li>
   <li>scheduleRemove ID<br>
     Remove the schedule with the id ID</li>
@@ -3819,6 +4242,84 @@ s2Hex($)
     set configuration for a specific scene.
     Parameters are: groupId, sceneId, dimmingDuration.
     </li>
+    
+  <br><br><b>Class SCHEDULE_ENTRY_LOCK, V1, V2, V3</b>
+  <li>scheduleEntryLockSet USER_ID ENABLED<br>
+    enables or disables schedules for a specified user ID (V1)<br>
+      <ul>
+      USER_ID: id of user, starting from 1 up to the number of supported users,
+      refer also to the USER_CODE class description.<br>
+      ENABLED: 0=disabled, 1=enabled<br>
+      </ul>
+    </li>
+  <li>scheduleEntryLockAllSet ENABLED<br>
+    enables or disables schedules for all users (V1)<br>
+      <ul>
+      ENABLED: 0=disabled, 1=enabled<br>
+      </ul>
+    </li>
+  <li>scheduleEntryLockWeekDaySet ACTION USER_ID SCHEDULE_ID WEEKDAY
+      STARTTIME ENDTIME<br>
+    erase or set a week day schedule for a specified user ID (V1)<br>
+      <ul>
+      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
+      USER_ID: id of user, starting from 1 up to the number of supported users,
+      refer also to the USER_CODE class description.<br>
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+                    schedule slots)<br>
+      WEEKDAY: day of week, choose one of:
+                    "sun","mon","tue","wed","thu","fri","sat"<br>
+      STARTTIME: time of schedule start, in the format HH:MM
+                    (leading 0 is mandatory)<br>
+      ENDTIME: time of schedule end in the format HH:MM
+                    (leading 0 is mandatory)<br>
+      </ul>
+    </li>
+  <li>scheduleEntryLockYearDaySet ACTION USER_ID SCHEDULE_ID 
+        STARTDATE STARTTIME ENDDATE ENDTIME<br>
+    erase or set a year day schedule for a specified user ID (V1)<br>
+      <ul>
+      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
+      USER_ID: id of user, starting from 1 up to the number of supported users,
+      refer also to the USER_CODE class description.<br>
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+                    schedule slots)<br>
+      STARTDATE: date of schedule start in the format YYYY-MM-DD<br>
+      STARTTIME: time of schedule start in the format HH:MM
+                    (leading 0 is mandatory)<br>
+      ENDDATE: date of schedule end in the format YYYY-MM-DD<br>
+      ENDTIME: time of schedule end in the format HH:MM
+                    (leading 0 is mandatory)<br>
+      </ul>
+    </li>
+  <li>scheduleEntryLockTimeOffsetSet TZO DST<br>
+    set the TZO and DST (V2)<br>  
+      <ul>
+      TZO: current local time zone offset in the format (+|-)HH:MM
+          (sign and leading 0 is mandatory)<br>
+      DST: daylight saving time offset in the format (+|-)[[m]m]m
+          (sign is mandatory, minutes: 0 to 127, 1-3 digits)<br>
+      </ul>
+    </li>
+  <li>scheduleEntryLockDailyRepeatingSet ACTION USER_ID SCHEDULE_ID WEEKDAYS
+        STARTTIME DURATION<br>
+    set a daily repeating schedule for the specified user (V3)<br>
+      <ul>
+      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
+      USER_ID: id of user, starting from 1 up to the number of supported users,
+      refer also to the USER_CODE class description.<br>
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+                    schedule slots)<br>
+      WEEKDAYS: concatenated string of weekdays (choose from:
+                    "sun","mon","tue","wed","thu","fri","sat");
+                    e.g. "montuewedfri" or "satsun", unused days can be
+                    specified as "..."<br>
+      STARTTIME: time of schedule start in the format HH:MM
+                    (leading 0 is mandatory)<br>
+      DURATION: duration of schedule in the format HH:MM
+                    (leading 0 is mandatory)<br>
+      </ul>
+    </li>
 
   <br><br><b>Class SWITCH_ALL</b>
   <li>swaIncludeNone<br>
@@ -3861,12 +4362,51 @@ s2Hex($)
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
   <li>setpointHeating value<br>
     set the thermostat to heat to the given value.
-    The value is a whole number and read as celsius.
+    The value is a whole number and read as celsius.<br>
+    See thermostatSetpointSet for a more enhanced method.
   </li>
   <li>setpointCooling value<br>
     set the thermostat to heat to the given value.
-    The value is a whole number and read as celsius.
+    The value is a whole number and read as celsius.<br>
+    See thermostatSetpointSet for a more enhanced method.
   </li>
+  <li>thermostatSetpointSet TEMP [SCALE [TYPE [PREC [SIZE]]]]<br>
+    set the setpoint of the thermostat to the given value.<br>
+      <ul>
+      TEMP: setpoint temperature value, by default the value is used
+              with 1 decimal, see PREC<br>
+      SCALE: (optional) scale of temperature; [cC]=celsius, [fF]=fahrenheit,
+            defaults to celsius<br>
+      TYPE: (optional) setpoint type; [1, 15], defaults to 1=heating<br>
+        <ul>
+        1=heating,
+        2=cooling,
+        7=furnance,
+        8=dryAir,
+        9=moistAir,
+        10=autoChangeover,
+        11=energySaveHeating,
+        12=energySaveCooling,
+        13=awayHeating,
+        14=awayCooling,
+        15=fullPower
+        </ul>
+      PREC: (optional) number of decimals to be used, [1-7], defaults to 1<br>
+      SIZE: (optional) number of bytes used, [1, 2, 4], defaults to 2<br>
+      Note: optinal parameters can be ommitted and are used with there default
+            values. If you need or want to specify an optional parameter, ALL
+            parameters in front of this parameter need to be also specified!<br>
+      Note: the number of decimals (defined by PREC) and the number of
+      bytes (defined by SIZE) used for the setpoint influence the usable
+      range for the temperature. Some device do not support all possible
+      values/combinations for PREC/SIZE.<br>
+        <ul>
+        1 byte: 0 decimals [-128, 127], 1 decimal [-12.8, 12.7], ...<br>
+        2 byte: 0 decimals [-32768, 32767], 1 decimal [-3276.8, 3276.7], ...<br>
+        4 byte: 0 decimals [-2147483648, 2147483647], ...<br>
+        </ul>
+      </ul>
+    </li>
 
   <br><br><b>Class TIME, V2</b>
   <li>timeOffset TZO DST_Offset DST_START DST_END<br>
@@ -4100,6 +4640,46 @@ s2Hex($)
   <li>groupConfig<br>
     returns the settings for a given group. Parameter is groupId
     </li>
+    
+  <br><br><b>Class SCHEDULE_ENTRY_LOCK, V1, V2, V3</b>
+  <li>scheduleEntryLockTypeSupported<br>
+    returns the number of available slots for week day and year day
+      schedules (V1), in V3 the number of available slots for the daily
+      repeating schedule is reported additionally
+    </li> 
+  <li>scheduleEntryLockWeekDay USER_ID SCHEDULE_ID<br>
+    returns the specified week day schedule for the specified user
+      (day of week, start time, end time) (V1)<br>
+      <ul>
+      USER_ID: id of user, starting from 1 up to the number of supported users,
+      refer also to the USER_CODE class description.<br>
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+                    schedule slots)<br>
+      </ul>
+    </li>
+  <li>scheduleEntryLockYearDay USER_ID SCHEDULE_ID<br>
+    returns the specified year day schedule for the specified user
+      (start date, start time, end date, end time) (V1)<br>
+      <ul>
+      USER_ID: id of user, starting from 1 up to the number of supported users,
+      refer also to the USER_CODE class description.<br>
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+                    schedule slots)<br>
+      </ul>
+    </li>
+  <li>scheduleEntryLockDailyRepeating USER_ID SCHEDULE_ID<br>
+    returns the specified daily schedule for the specified user
+      (weekdays, start date, duration) (V3)<br>
+      <ul>
+      USER_ID: id of user, starting from 1 up to the number of supported users,
+      refer also to the USER_CODE class description.<br>
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+                    schedule slots)<br>
+      </ul>
+    </li>
+  <li>scheduleEntryLockTimeOffset<br>
+    returns the time zone offset TZO and the daylight saving time offset (V2)
+    </li>
 
   <br><br><b>Class SECURITY</b>
   <li>secSupportedReport<br>
@@ -4153,8 +4733,25 @@ s2Hex($)
     </li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
-  <li>setpoint<br>
-    request the setpoint
+  <li>setpoint [TYPE]<br>
+    request the setpoint<br>
+      TYPE: (optional) setpoint type; [1, 15], defaults to 1=heating<br>
+        <ul>
+        1=heating,
+        2=cooling,
+        7=furnance,
+        8=dryAir,
+        9=moistAir,
+        10=autoChangeover,
+        11=energySaveHeating,
+        12=energySaveCooling,
+        13=awayHeating,
+        14=awayCooling,
+        15=fullPower
+        </ul>
+    </li>
+  <li>thermostatSetpointSupported<br>
+    requests the list of supported setpoint types
     </li>
 
   <br><br><b>Class TIME, V2</b>
@@ -4398,6 +4995,21 @@ s2Hex($)
   <br><br><b>Class SCENE_CONTROLLER_CONF</b>
   <li>group_Id:scene dimmingDuration</li>
 
+  <br><br><b>Class SCHEDULE_ENTRY_LOCK</b>
+  <li>scheduleEntryLockEntryTypeSupported:WeekDaySlots: $value 
+        YearDaySlots: $value</li>
+  <li>weekDaySchedule_$userId:userID: $value slotID: $value $weekday 
+        $starthour:$startminute $endhour:$endminute</li>
+  <li>yearDaySchedule_$userId:userID: $value slotID: $value
+        start: $year-$month-$day $hour:$minute
+        end: $year-$month-$day $hour:$minute</li>
+  <li>scheduleEntryLockDailyRepeating_$userId:userID: $value $weekdays
+        $hour:$minute $durationhour:$durationminute<br>
+        Note: $weekdays is a concatenated string with weekdaynames
+        ("sun","mon","tue","wed","thu","fri","sat") where inactive weekdays are
+        represented by "...", e.g. montue...wedfri</li>
+  <li>scheduleEntryLockTimeOffset:TZO: $sign$hour:$minute DST: $sign$minutes</li>
+
   <br><br><b>Class SECURITY</b>
   <li>none<br>
   Note: the class security should work transparent to the sytem and is not
@@ -4508,7 +5120,27 @@ s2Hex($)
   <li>setTmManual</li>
 
   <br><br><b>Class THERMOSTAT_SETPOINT</b>
-  <li>setpointTemp:$temp [C|F] [heating|cooling]</li>
+  <li>setpointTemp:$temp $scale $type<br>
+    <ul>
+    $temp: setpoint temperature with number of decimals as reported
+            by the device<br>
+    $scale: [C|F]; C=Celsius scale, F=Fahrenheit scale<br>
+    $type: setpoint type, one of:<br>
+      <ul>
+        heating,
+        cooling,
+        furnance,
+        dryAir,
+        moistAir,
+        autoChangeover,
+        energySaveHeating,
+        energySaveCooling,
+        awayHeating,
+        awayCooling,
+        fullPower
+      </ul>
+    </ul>
+    </li>
 
   <br><br><b>Class TIME, V2</b>
   <li>time:$time RTC: [failed|working]</li>
