@@ -1599,7 +1599,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                      ,"HM-Sen-RD-O00"     =>{ fwUpdate       =>"-filename- -bootTime- ..."}
                      ,"HM-MOD-Re-800"     =>{ fwUpdate       =>"-filename- -bootTime- ..."}
                      ,"HM-LC-Bl1PBU-FM00" =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-LC-Dim1TPBU-FM" =>{ fwUpdate       =>"-filename- -bootTime- ..."}
+                     ,"HM-LC-Dim1TPBU-FM00"=>{ fwUpdate       =>"-filename- -bootTime- ..."}
                      ,"HM-CC-RT-DN00"     =>{ sysTime        =>""
                                              ,fwUpdate       =>"-filename- -bootTime- ..."
                                             }
