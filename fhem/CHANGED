@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 02_RSS: continue image update sequence after error (HTML)
   - feature: 98_rssFeed: Possibility to modfy feed data via a custom function.
   - change:  49_SSCAM: entries with loglevl "2" reviewed,changed to loglevl "3"
   - feature: 50_TelegramBot  receive media files,

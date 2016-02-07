@@ -303,7 +303,11 @@ RSS_returnHTML($) {
   my $overflow= $noscroll ? "  style=\"overflow:hidden\"" : "";
   my $areas= AttrVal($name, 'areas', "");
   my $embed= $defs{$name}{".embed"};
-  my $r= (defined($refresh) && ($refresh> 0)) ? " onload=\"setTimeout(function(){reloadImage(\'img0\')},$refresh*1000);\"" : "";
+  my $r= "";
+  if(defined($refresh) && ($refresh> 0)) {
+    my $handler= "\"setTimeout(function(){reloadImage(\'img0\')},$refresh*1000);\"";
+    $r= " onload=$handler onerror=$handler";
+  }
   my $code= RSS_HTMLHead($name, $refresh) . 
                 "<body topmargin=\"0\" leftmargin=\"0\" margin=\"0\" padding=\"0\"$overflow>\n" .
                     "<div id=\"rss_$name\" style=\"z-index:1;\" >\n" .
