@@ -1,4 +1,4 @@
-##########################################################################################################
+ ##########################################################################################################
 # $Id$
 ##########################################################################################################
 #       49_SSCam.pm
@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.11.1 07.02.2016    entries with loglevel "2" to loglevel "3" changed
 # 1.11   05.02.2016    added function "goPreset" and "goAbsPTZ" to control the move of PTZ lense
 #                      to absolute positions
 #                      refere to commandref or have a look in forum at: 
@@ -520,7 +521,7 @@ sub watchdogpollcaminfo ($) {
         readingsSingleUpdate($hash,"PollState","Active",0);
             
         $logstr = "Polling Camera $camname is currently activated - Pollinginterval: ".$attr{$name}{pollcaminfoall}."s";
-        &printlog($hash,$logstr,"2");
+        &printlog($hash,$logstr,"3");
         
         # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
         $hash->{HELPER}{OLDVALPOLL} = AttrVal($name, "pollcaminfoall", undef);
@@ -533,7 +534,7 @@ sub watchdogpollcaminfo ($) {
         if ($hash->{HELPER}{OLDVALPOLL} != $attr{$name}{pollcaminfoall}) {
             
             $logstr = "Polling Camera $camname was changed to new Pollinginterval: ".$attr{$name}{pollcaminfoall}."s";
-            &printlog($hash,$logstr,"2");
+            &printlog($hash,$logstr,"3");
             
             $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};
             &getcaminfoall($hash);
@@ -545,7 +546,7 @@ sub watchdogpollcaminfo ($) {
         
             if ($attr{$name}{pollnologging} == "1") {
                 $logstr = "Log of Polling Camera $camname is currently deactivated";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 
                 # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
                 $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};
@@ -553,7 +554,7 @@ sub watchdogpollcaminfo ($) {
             } else {
             
                 $logstr = "Log of Polling Camera $camname is currently activated";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 
                 # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
                 $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};
@@ -564,7 +565,7 @@ sub watchdogpollcaminfo ($) {
         # alter Wert von "pollnologging" war 1 -> Logging war deaktiviert
         if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} == "1") {
             $logstr = "Log of Polling Camera $camname is currently activated";
-            &printlog($hash,$logstr,"2");
+            &printlog($hash,$logstr,"3");
             
             $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";            
         }
@@ -956,7 +957,7 @@ sub getcaminfoall ($) {
         readingsSingleUpdate($hash,"PollState","Inactive",0);
         
         $logstr = "Polling of Camera $camname is deactivated now";
-        &printlog($hash,$logstr,"2");
+        &printlog($hash,$logstr,"3");
         }
 }
 
@@ -1873,7 +1874,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 $logstr = $rectime != "0" ? "Camera $camname Recording with Recordtime $rectime"."s started" : "Camera $camname endless Recording started  - stop it manually or by stop-command !";
-                &printlog($hash,$logstr,"2");  
+                &printlog($hash,$logstr,"3");  
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");                
        
@@ -1899,7 +1900,7 @@ sub camret_nonbl ($) {
        
                 # Logausgabe
                 $logstr = "Camera $camname Recording stopped";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
@@ -1913,7 +1914,7 @@ sub camret_nonbl ($) {
        
                 # Logausgabe
                 $logstr = "Camera $camname exposure mode was set";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
@@ -1940,7 +1941,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 $logstr = "Snapshot of Camera $camname has been done successfully";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
@@ -1964,7 +1965,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 $logstr = "Camera $camname has been moved to position \"$hash->{HELPER}{GOPRESETNAME}\"";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
@@ -1988,7 +1989,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 $logstr = "Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
@@ -2005,7 +2006,7 @@ sub camret_nonbl ($) {
                    
                 # Logausgabe
                 $logstr = "Camera $camname has been enabled successfully";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
@@ -2022,7 +2023,7 @@ sub camret_nonbl ($) {
                    
                 # Logausgabe
                 $logstr = "Camera $camname has been disabled successfully";
-                &printlog($hash,$logstr,"2");
+                &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
