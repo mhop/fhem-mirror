@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 01/2016
-my $thzversion = "0.148";
+my $thzversion = "0.149";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -150,6 +150,10 @@ my %parsinghash = (
 	      [" fault1CODE: ",		20, 4, "faultmap", 1],	[" fault1TIME: ",	24, 4, "hex2time", 1],  [" fault1DATE: ",	28, 4, "hexdate", 1],
 	      [" fault2CODE: ",		32, 4, "faultmap", 1],	[" fault2TIME: ",	36, 4, "hex2time", 1],  [" fault2DATE: ",	40, 4, "hexdate", 1],
 	      [" fault3CODE: ",		44, 4, "faultmap", 1],	[" fault3TIME: ",	48, 4, "hex2time", 1],  [" fault3DATE: ",	52, 4, "hexdate", 1]
+	      ],
+  "EEprg206" => [["OpMode: ", 		4, 2, 	"hex", 1], 	[" ProgStateHC: ", 	10, 2, "opmodehc", 1], 	[" ProgStateDHW: ", 	12, 2, "opmodehc", 1],
+	      [" ProgStateFAN: ", 	14, 2, 	"opmodehc", 1], [" BaseTimeAP0: ", 	16, 8, "hex", 1], 	[" StatusAP0: ", 	24, 2, "hex", 1],
+	      [" StartTimeAP0: ", 	26, 8, 	"hex", 1], 	[" EndTimeAP0: ", 	34, 8, "hex", 1]
 	      ],
   "F3dhw"  => [["dhw_temp: ",		4, 4, "hex2int", 10],	[" outside_temp: ", 	8, 4, "hex2int", 10],
 	      [" dhw_set_temp: ",	12, 4, "hex2int", 10],  [" comp_block_time: ",	16, 4, "hex2int", 1],
