@@ -1099,7 +1099,7 @@ devspec2array($;$)
     my @res;
     foreach my $dName (split(":FILTER=", $l)) {
       my ($n,$op,$re) = ("NAME","=",$dName);
-      if($dName =~ m/^([^!<>]*)(=|!=|<=|>=|<|>)(.*)$/) {
+      if($dName =~ m/^(.*?)(=|!=|<=|>=|<|>)(.*)$/) {
         ($n,$op,$re) = ($1,$2,$3);
         $isAttr = 1;    # Compatibility: return "" instead of $name
       }
