@@ -257,9 +257,9 @@ hex2hsv($) {
 sub
 hsv2hex($$$) {
     my ( $h, $s, $v ) = @_;
-    my @rgb = Color::hsv2rgb( $h, $s, $v );
+    my ($r,$g,$b) = Color::hsv2rgb( $h, $s, $v );
 
-    return Color::rgb2hex( $rgb[0], $rgb[1], $rgb[2] );
+    return Color::rgb2hex( $r*255, $g*255, $b*255 );
 }
 
 
