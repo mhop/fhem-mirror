@@ -792,7 +792,7 @@ ZWave_Cmd($$@)
     my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
     return $err if($err);
     $cmdFmt = $ncmd if(defined($ncmd));
-    return "Scheduled for retrieval" if($ncmd && $ncmd eq "EMPTY"); # configAll
+    return "" if($ncmd && $ncmd eq "EMPTY"); # configAll
   }
 
   Log3 $name, 2, "ZWave $type $name $cmd ".join(" ", @a);
@@ -840,7 +840,7 @@ ZWave_Cmd($$@)
   }
 
   my $val;
-  if($type eq "get" && $hash->{CL}) { # Wait for result
+  if($type eq "get") { # Wait for result
     no strict "refs";
     my $iohash = $hash->{IODev};
     my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
@@ -2153,7 +2153,6 @@ sub
 ZWave_ccsAllGet ($)
 {
   my ($hash) = @_;
-  delete $hash->{CL}; # Make sure we wont block
   foreach my $idx (1..int($#zwave_wd)) {
     ZWave_Get($hash, $hash->{NAME}, "ccs", $zwave_wd[$idx]);
   }
@@ -2586,7 +2585,6 @@ ZWave_configAllGet($)
         if(!$mc || !$mc->{config});
   #use Data::Dumper;
   #Log 1, Dumper $mc;
-  delete $hash->{CL}; # Make sure we wont block
   foreach my $c (sort keys %{$mc->{get}}) {
     ZWave_Get($hash, $hash->{NAME}, $c);
   }
@@ -2600,7 +2598,6 @@ ZWave_associationAllGet($$)
 
   if(!$data) { # called by the user
     $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationAllGet;
-    delete $hash->{CL};   # Make sure it won't block.
     ZWave_Get($hash, $hash->{NAME}, "associationGroups");
     return("", "EMPTY");
   }
