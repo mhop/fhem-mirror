@@ -29,12 +29,9 @@ DOIF_delTimer($)
 {
   my ($hash) = @_;
   RemoveInternalTimer($hash);
-  my $max_timer=keys %{$hash->{timerfunc}};
-  for (my $i=0; $i<$max_timer;$i++) 
-  {
-    RemoveInternalTimer ($hash->{timerfunc}{$i});
+  foreach my $key (keys %{$hash->{triggertime}}) {
+    RemoveInternalTimer (\$hash->{triggertime}{$key}); 
   }
-  return undef;
 }
 
 sub
@@ -51,10 +48,13 @@ DOIF_delAll($)
   delete ($hash->{itimer});
   delete ($hash->{timeCond});
   delete ($hash->{realtime});
+  delete ($hash->{localtime});
   delete ($hash->{days});
   delete ($hash->{readings});
   delete ($hash->{internals});
   delete ($hash->{trigger});
+  delete ($hash->{triggertime});
+  delete ($hash->{interval});
   delete ($hash->{regexp});
   delete ($defs{$hash->{NAME}}{READINGS});
 }   
@@ -251,15 +251,7 @@ sub ReplaceReadingDoIf($)
   my $tailBlock;
   my $err;
   my $regExp="";
-  my $name;
-  my $reading;
-  my $format="";
-  if ($element =~ /([^\:]*):(".*")/) {
-    $name=$1;
-    $reading=$2;
-  } else {
-    ($name,$reading,$format)=split(":",$element);
-  }
+  my ($name,$reading,$format)=split(":",$element);
   my $internal="";
   my $notifyExp="";
   if ($name) {
@@ -355,7 +347,6 @@ sub ReplaceAllReadingsDoIf($$$$)
   my $cmd="";
   my $ret="";
   my $device="";
-  my @timerarray;
   my $nr;
   my $timer="";
   my $event=0;
@@ -414,7 +405,7 @@ sub ReplaceAllReadingsDoIf($$$$)
               $hash->{itimer}{all} = AddItemDoIf($hash->{itimer}{all},$device);
           }
         } elsif ($condition >= 0) {
-          ($timer,$err)=DOIF_CheckTimers($hash,$block,$condition,$trigger,\@timerarray);
+          ($timer,$err)=DOIF_CheckTimers($hash,$block,$condition,$trigger);
           return($timer,$err) if ($err);
           if ($timer) {
             $block=$timer;
@@ -511,7 +502,7 @@ ParseCommandsDoIf($$$)
 }
 
 sub
-DOIF_CheckTimers($$$$$)
+DOIF_CheckTimers($$$$)
 {
   my $i=0;
   my @nrs;
@@ -524,7 +515,7 @@ DOIF_CheckTimers($$$$$)
   my $time;
   my $block;
   my $result;
-  my ($hash,$timer,$condition,$trigger,$timerarray)=@_;
+  my ($hash,$timer,$condition,$trigger)=@_;
   $timer =~ s/\s//g;
   while ($timer ne "") {
      if ($timer=~ /^\+\(/) { 
@@ -589,16 +580,16 @@ DOIF_CheckTimers($$$$$)
     $hash->{time}{$nr}=$time;
     $hash->{timeCond}{$nr}=$condition;
     $hash->{days}{$nr}=$days if ($days ne "");
-    ${$timerarray}[$nr]={hash=>$hash,nr=>$nr};
     if ($init_done) {
-      $err=(DOIF_SetTimer("DOIF_TimerTrigger",\${$timerarray}[$nr]));
+      $err=(DOIF_SetTimer($hash,"DOIF_TimerTrigger",$nr));
       return($hash->{time}{$nr},$err) if ($err);
     }
     $hash->{timers}{$condition}.=" $nr " if ($trigger);
-    $hash->{timerfunc}{$nr}=\${$timerarray}[$nr];
   }
   if ($i == 2) {
     $block='DOIF_time($hash,$hash->{realtime}{'.$nrs[0].'},$hash->{realtime}{'.$nrs[1].'},$wday,$hms,"'.$days.'")';
+    $hash->{interval}{$nrs[0]}=-1;
+    $hash->{interval}{$nrs[1]}=$nrs[0];
   } else {
     $block='DOIF_time_once($hash,$hash->{timer}{'.$nrs[0].'},$wday,"'.$days.'")';
   }
@@ -953,9 +944,10 @@ sub CheckRegexpDoIf($$$$)
 } 
 
 sub
-DOIF_Trigger ($$$)
+DOIF_Trigger ($$)
 {
-  my ($hash,$device,$timerNr)= @_;
+  my ($hash,$device)= @_;
+  my $timerNr=-1;
   my $ret;
   my $err;
   my $doelse=0;
@@ -963,11 +955,25 @@ DOIF_Trigger ($$$)
   my $pn=$hash->{NAME};
   my $max_cond=keys %{$hash->{condition}};
   my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
+  my $j;
+  my @triggerEvents;
   for (my $i=0; $i<$max_cond;$i++) {
     if ($device eq "") {# timer
       next if (!defined ($hash->{timers}{$i}));
-      next if ($hash->{timers}{$i} !~ / $timerNr /);
+      my $found=0;
+      foreach $j (split(" ",$hash->{timers}{$i})) {
+        if ($hash->{timer}{$j} == 1) {
+          $found=1;
+          $timerNr=$j;
+          last;
+        }  
+      }
+      next if (!$found);
       $event="timer_".($timerNr+1);
+      @triggerEvents=($event);
+      $hash->{helper}{triggerEvents}=\@triggerEvents;
+      $hash->{helper}{triggerDev}="";
+      $hash->{helper}{event}=$event;
     } else { #event
       if (!CheckRegexpDoIf($hash, $device, $hash->{helper}{triggerEvents}, $i)) { 
         next if (!defined ($hash->{devices}{$i}));
@@ -1031,7 +1037,7 @@ DOIF_Notify($$)
     if ($hash->{helper}{last_timer} > 0){
       for (my $j=0; $j<$hash->{helper}{last_timer};$j++)
       {
-        DOIF_SetTimer("DOIF_TimerTrigger",$hash->{timerfunc}{$j});
+        DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j);
       }
     }
   }
@@ -1040,7 +1046,7 @@ DOIF_Notify($$)
     for (my $j=0; $j<$hash->{helper}{last_timer};$j++)
     {
       if ($hash->{time}{$j} =~ /\[$dev->{NAME}\]|\[$dev->{NAME}:/) {
-        DOIF_SetTimer("DOIF_TimerTrigger",$hash->{timerfunc}{$j});
+        DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j);
       } 
     }
   }
@@ -1074,7 +1080,7 @@ DOIF_Notify($$)
     $hash->{helper}{triggerEvents}=$eventa;
     $hash->{helper}{triggerDev}=$dev->{NAME};
     $hash->{helper}{event}=join(",",@{$eventa});
-    $ret=DOIF_Trigger($hash,$dev->{NAME},-1);
+    $ret=DOIF_Trigger($hash,$dev->{NAME});
   }
   if (($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / and !$ret) {
     $hash->{helper}{triggerEvents}=$eventa;
@@ -1089,24 +1095,36 @@ sub
 DOIF_TimerTrigger ($)
 {
   my ($timer)=@_;
-  my $nr=${$timer}->{nr};
   my $hash=${$timer}->{hash};
   my $pn = $hash->{NAME};
+  my $localtime=${$timer}->{localtime};
+  delete $hash->{triggertime}{$localtime};
   my $ret;
-  my @triggerEvents;
-# if (!AttrVal($hash->{NAME},"disable","")) {
   if (ReadingsVal($pn,"mode","") ne "disabled") {
-    $hash->{timer}{$nr}=1;
-    my $timer_nr=$nr+1;
-    @triggerEvents=("timer_$timer_nr");
-    $hash->{helper}{triggerEvents}=\@triggerEvents;
-    $hash->{helper}{triggerDev}="";
-    $hash->{helper}{event}="timer_$timer_nr";
-    $ret=DOIF_Trigger ($hash,"",$nr);
-    $hash->{timer}{$nr}=0;
+    for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
+      if ($hash->{localtime}{$j} == $localtime) {
+        $hash->{timer}{$j}=1;
+      }
+    }
+    $ret=DOIF_Trigger ($hash,"");
   }
-  DOIF_SetTimer("DOIF_TimerTrigger",$timer) if (!AttrVal($hash->{NAME},"disable",""));
-  return($ret);
+  for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
+    if ($hash->{localtime}{$j} == $localtime) {
+      $hash->{timer}{$j}=0;
+      if (!AttrVal($hash->{NAME},"disable","")) {
+        if (defined ($hash->{interval}{$j})) {
+          if ($hash->{interval}{$j} != -1) {
+            DOIF_SetTimer($hash,"DOIF_TimerTrigger",$hash->{interval}{$j}) ;
+            DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j) ;
+          }
+        } else {
+          DOIF_SetTimer($hash,"DOIF_TimerTrigger",$j) ;
+        }
+      }
+    }
+  }
+  return undef;
+  #return($ret);
 }
 
 sub
@@ -1248,11 +1266,9 @@ DOIF_CalcTime($$)
 }
 
 sub
-DOIF_SetTimer($$)
+DOIF_SetTimer($$$)
 {
-  my ($func, $timer) = @_;
-  my $nr=${$timer}->{nr};
-  my $hash=${$timer}->{hash};
+  my ($hash, $func, $nr) = @_;
   my $timeStr=$hash->{time}{$nr};
   my $cond=$hash->{timeCond}{$nr};
   my $next_time;
@@ -1261,7 +1277,7 @@ DOIF_SetTimer($$)
   if ($err)
   {
       readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"error: ".$err,0);
-      RemoveInternalTimer($timer);
+      #RemoveInternalTimer($timer);
       $hash->{realtime}{$nr}="00:00:00";
       return $err;
   }
@@ -1293,8 +1309,29 @@ DOIF_SetTimer($$)
     $next_time_str.="\|".$hash->{days}{$nr} if (defined ($hash->{days}{$nr}));
     readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),$next_time_str,0);
     $hash->{realtime}{$nr}=strftime("%H:%M:%S",localtime($next_time));
-    RemoveInternalTimer($timer);
-    InternalTimer($next_time, $func, $timer, 0);
+    
+    
+    if (defined ($hash->{localtime}{$nr})) {
+      my $old_lt=$hash->{localtime}{$nr};
+      my $found=0;
+      delete ($hash->{localtime}{$nr});
+      foreach my $lt (keys %{$hash->{localtime}}) {
+        if ($hash->{localtime}{$lt} == $old_lt) {
+          $found=1;
+          last;
+        }
+      }
+      if (!$found) {
+        RemoveInternalTimer(\$hash->{triggertime}{$old_lt});
+        delete ($hash->{triggertime}{$old_lt});
+      }    
+    }
+    $hash->{localtime}{$nr}=$next_time;
+    if (!defined ($hash->{triggertime}{$next_time})) {
+      $hash->{triggertime}{$next_time}{hash}=$hash;
+      $hash->{triggertime}{$next_time}{localtime}=$next_time;
+      InternalTimer($next_time, $func, \$hash->{triggertime}{$next_time}, 0);
+    }  
   }
   return undef;
 }
@@ -1829,11 +1866,8 @@ Weitere Möglichkeiten bei der Nutzung des Perl-Operators: <code>=~</code>, insb
 <a name="DOIF_Ereignissteuerung_ueber_Auswertung_von_Events"></a>
 <b>Ereignissteuerung über Auswertung von Events</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Eine Alternative zur Auswertung von Stati oder Readings ist das Auswerten von Ereignissen (Events) mit Hilfe von regulären Ausdrücken, wie beim notify.<br>
-<br>
+Eine Alternative zur Auswertung von Stati oder Readings ist das Auswerten von Ereignissen (Events) mit Hilfe von regulären Ausdrücken, wie beim notify. Eingeleitet wird die Angabe eines regulären Ausdrucks durch ein Fragezeichen.
 Die Syntax lautet: <code>[&lt;devicename&gt;:"&lt;regex&gt;"]</code><br>
-<br>
-Der reguläre Ausdruck, der das Suchmuster innerhalb einer Ereigniszeile definiert, wird in Anführungszeichen angegeben.<br>
 <br>
 <u>Anwendungsbeispiel</u>: wie oben, jedoch wird hier nur das Ereignis (welches im Eventmonitor erscheint) ausgewertet und nicht der Status von "remotecontrol" wie im vorherigen Beispiel<br>
 <br>
