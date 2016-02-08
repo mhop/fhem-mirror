@@ -195,6 +195,7 @@ my %zwave_class = (
   CLIMATE_CONTROL_SCHEDULE => { id => '46',
     set   => { ccs                => 'ZWave_ccsSet("%s")' },
     get   => { ccs                => 'ZWave_ccsGet("%s")',
+               ccsAll             => 'ZWave_ccsAllGet($hash)',
                ccsChanged         => "04",
                ccsOverride        => "07" },
     parse => { "..46(..)(.*)" => 'ZWave_ccsParse($1,$2)' }},
@@ -314,9 +315,9 @@ my %zwave_class = (
     set   => { configDefault=>"04%02x80",
                configByte  => "04%02x01%02x",
                configWord  => "04%02x02%04x",
-               configLong  => "04%02x04%08x",
-               configRequestAll => 'ZWave_configRequestAll($hash)' },
-    get   => { config      => "05%02x" },
+               configLong  => "04%02x04%08x" },
+    get   => { config      => "05%02x",
+               configAll   => 'ZWave_configAllGet($hash)' },
     parse => { "^..70..(..)(..)(.*)" => 'ZWave_configParse($hash,$1,$2,$3)'} },
   ALARM                    => { id => '71',
     get   => { alarm       => "04%02x" },
@@ -390,11 +391,10 @@ my %zwave_class = (
     init  => { ORDER=>11, CMD => '"set $NAME wakeupInterval 86400 $CTRLID"' } },
   ASSOCIATION              => { id => '85',
     set   => { associationAdd => "01%02x%02x*",
-               associationDel => "04%02x%02x*",
-               associationRequest => "02%02x",
-               associationRequestAll => 'ZWave_associationRequest($hash,"")' },
+               associationDel => "04%02x%02x*" },
     get   => { association          => "02%02x",
-               associationGroups    => "05" },
+               associationGroups    => "05",
+               associationAll       => 'ZWave_associationAllGet($hash,"")' },
     parse => { "..8503(..)(..)..(.*)" => 'ZWave_assocGroup($homeId,$1,$2,$3)',
                "..8506(..)"           => '"assocGroups:".hex($1)' },
     init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
@@ -690,10 +690,8 @@ ZWave_Cmd($$@)
   # Collect the commands from the distinct classes
   my %cmdList;
   my $classes = AttrVal($name, "classes", "");
-  my $cfgReq = ($type eq "set" && $cmd =~ m/^config/ && @a && $a[0] eq "request");
-  shift(@a) if($cfgReq);
   foreach my $cl (split(" ", $classes)) {
-    my $ptr = ZWave_getHash($hash, $cl, $cfgReq ? "get" : $type);
+    my $ptr = ZWave_getHash($hash, $cl, $type);
     next if(!$ptr);
 
     foreach my $k (keys %{$ptr}) {
@@ -703,8 +701,6 @@ ZWave_Cmd($$@)
       }
     }
   }
-
-  $type="get" if($cfgReq);
 
   my $id = $hash->{nodeIdHex};
   my $isMc = ($id =~ m/(....)/);
@@ -785,17 +781,18 @@ ZWave_Cmd($$@)
     }
   }
 
-  if($cmd =~ m/^config/ && $cmd ne "configRequestAll") {
+  if($cmd =~ m/^config/ && $cmd ne "configAll") {
     my ($err, $lcmd) =
-        ZWave_configCheckParam($hash, $cfgReq, $type, $cmd, $cmdFmt, @a);
+        ZWave_configCheckParam($hash, $type, $cmd, $cmdFmt, @a);
     return $err if($err);
     $cmdFmt = $lcmd;
+
   } else {
     $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
     my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
     return $err if($err);
     $cmdFmt = $ncmd if(defined($ncmd));
-    return "" if($ncmd && $ncmd eq "EMPTY"); # e.g. configRequestAll
+    return "Scheduled for retrieval" if($ncmd && $ncmd eq "EMPTY"); # configAll
   }
 
   Log3 $name, 2, "ZWave $type $name $cmd ".join(" ", @a);
@@ -843,7 +840,7 @@ ZWave_Cmd($$@)
   }
 
   my $val;
-  if($type eq "get") {
+  if($type eq "get" && $hash->{CL}) { # Wait for result
     no strict "refs";
     my $iohash = $hash->{IODev};
     my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
@@ -861,7 +858,6 @@ ZWave_Cmd($$@)
   } else {
     $cmd .= " ".join(" ", @a) if(@a);
     readingsSingleUpdate($hash, "state", $cmd, 1);
-
   }
 
   return $val;
@@ -2154,6 +2150,17 @@ ZWave_ccsGet($)
 }
 
 sub
+ZWave_ccsAllGet ($)
+{
+  my ($hash) = @_;
+  delete $hash->{CL}; # Make sure we wont block
+  foreach my $idx (1..int($#zwave_wd)) {
+    ZWave_Get($hash, $hash->{NAME}, "ccs", $zwave_wd[$idx]);
+  }
+  return ("","EMPTY");
+}
+  
+sub
 ZWave_ccsParse($$)
 {
   my ($t, $p) = @_;
@@ -2335,16 +2342,15 @@ ZWave_configGetHash($)
 }
 
 sub
-ZWave_configCheckParam($$$$$@)
+ZWave_configCheckParam($$$$@)
 {
-  my ($hash, $cfgReq, $type, $cmd, $fmt, @arg) = @_;
+  my ($hash, $type, $cmd, $fmt, @arg) = @_;
   my $mc = ZWave_configGetHash($hash);
   return ("", sprintf($fmt, @arg)) if(!$mc);
   my $h = $mc->{config}{$cmd};
   return ("", sprintf($fmt, @arg)) if(!$h);
 
-  # Support "set XX configYY request" for configRequestAll
-  return ("", sprintf("05%02x", $h->{index})) if($type eq "get" || $cfgReq);
+  return ("", sprintf("05%02x", $h->{index})) if($type eq "get");
 
   if($cmd eq "configRGBLedColorForTesting") {
     return ("6 digit hext number needed","") if($arg[0] !~ m/^[0-9a-f]{6}$/i);
@@ -2572,29 +2578,31 @@ ZWave_configParse($$$$)
 }
 
 sub
-ZWave_configRequestAll($)
+ZWave_configAllGet($)
 {
   my ($hash) = @_;
   my $mc = ZWave_configGetHash($hash);
-  return ("configRequestAll: no model specific configs found", undef)
+  return ("configAll: no model specific configs found", undef)
         if(!$mc || !$mc->{config});
   #use Data::Dumper;
   #Log 1, Dumper $mc;
+  delete $hash->{CL}; # Make sure we wont block
   foreach my $c (sort keys %{$mc->{get}}) {
-    my $r = ZWave_Set($hash, $hash->{NAME}, $c, "request");
-    Log 1, "$c: $r" if($r);
+    ZWave_Get($hash, $hash->{NAME}, $c);
   }
   return ("","EMPTY");
 }
 
 sub
-ZWave_associationRequest($$)
+ZWave_associationAllGet($$)
 {
   my ($hash, $data) = @_;
 
   if(!$data) { # called by the user
-    $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationRequest;
-    return("", "05");
+    $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationAllGet;
+    delete $hash->{CL};   # Make sure it won't block.
+    ZWave_Get($hash, $hash->{NAME}, "associationGroups");
+    return("", "EMPTY");
   }
 
   my $nGrp = ($data =~ m/..8506(..)/ ? hex($1) :
@@ -2602,9 +2610,9 @@ ZWave_associationRequest($$)
   my $grp = 0;
   $grp = hex($1) if($data =~ m/..8503(..)/);
   return if($grp >= $nGrp);
-  $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationRequest;
-  ZWave_Set($hash, $hash->{NAME}, "associationRequest", $grp+1);
-  return undef; # No veto for further parsing
+  $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationAllGet;
+  ZWave_Get($hash, $hash->{NAME}, "association", $grp+1);
+  return;
 }
 
 my %zwave_roleType = (
@@ -4030,10 +4038,6 @@ s2Hex($)
   controllerNodeId"</li>
   <li>associationDel groupId nodeId ...<br>
   Remove the specified list of nodeIds from the assotion group groupId.</li>
-  <li>associationRequest groupId<br>
-  corresponds to "get association", used by associationRequestAll</li>
-  <li>associationRequestAll<br>
-  request association info for all possibe groups.</li>
 
   <br><br><b>Class BASIC</b>
   <li>basicValue value<br>
@@ -4062,7 +4066,9 @@ s2Hex($)
     Up to 9 pairs of HH:MM tempDiff may be specified.<br>
     HH:MM must occur in increasing order.
     tempDiff is relative to the setpoint temperature, and may be between -12
-    and 12, with one decimal point, measured in Kelvin (or Centigrade).
+    and 12, with one decimal point, measured in Kelvin (or Centigrade).<br>
+    If only a weekday is specified without any time and tempDiff, then the
+    complete schedule for the specified day is removed and marked as unused.
     </li>
 
   <br><br><b>Class CLOCK</b>
@@ -4093,10 +4099,6 @@ s2Hex($)
   <li>configDefault cfgAddress<br>
     Reset the configuration parameter for the cfgAddress parameter to its
     default value.  See the device documentation to determine this value.</li>
-  <li>configRequestAll<br>
-    If the model of a device is set, and configuration descriptions are
-    available from the database for this device, then request the value of all
-    known configuration parameters.</li>
 
   <br><br><b>Class DOOR_LOCK, V2</b>
   <li>doorLockOperation DOOR_LOCK_MODE<br>
@@ -4475,6 +4477,8 @@ s2Hex($)
   <li>associationGroups<br>
     return the number of association groups<br>
     </li>
+  <li>associationAll<br>
+    request association info for all possibe groups.</li>
 
   <br><br><b>Class ASSOCIATION_GRP_INFO</b>
   <li>associationGroupName groupId<br>
@@ -4503,6 +4507,9 @@ s2Hex($)
   <li>ccs [mon|tue|wed|thu|fri|sat|sun]<br>
     request the climate control schedule for the given day.
     </li>
+  <li>ccsAll<br>
+    request the climate control schedule for all days. (runs in background)
+    </li>
 
   <br><br><b>Class CLOCK</b>
   <li>clock<br>
@@ -4523,6 +4530,10 @@ s2Hex($)
     Note: if the model is set (see MANUFACTURER_SPECIFIC get), then more
     specific config commands are available.
     </li>
+  <li>configAll<br>
+    If the model of a device is set, and configuration descriptions are
+    available from the database for this device, then request the value of all
+    known configuration parameters.</li>
 
   <br><br><b>Class DOOR_LOCK, V2</b>
   <li>doorLockConfiguration<br>
