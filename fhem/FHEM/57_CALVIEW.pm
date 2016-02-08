@@ -20,7 +20,7 @@ sub CALVIEW_Initialize($)
 	$hash->{AttrList} = "do_not_notify:1,0 " . 
 						"maxreadings " .
 						"oldStyledReadings:1,0 " .
-						"modes:multiple,all,modeAlarm,modeAlarmOrStart,modeAlarmed,modeChanged,modeEnd,modeEnded,modeStart,modeStarted,modeUpcoming,stateChanged,stateDeleted,stateNew,stateUpdated ".
+						"modes:next ".
 						$readingFnAttributes; 
 }
 sub CALVIEW_Define($$){
@@ -42,9 +42,9 @@ sub CALVIEW_Define($$){
 	$hash->{STATE}	= "Initialized";
 	$hash->{INTERVAL} = $inter;
 	$modes = 1 if (!defined($modes));
-	if($modes == 1)	{$attr{$name}{modes} = "modeAlarm,modeStart,modeStarted,modeUpcoming";}
-	elsif($modes == 0){$attr{$name}{modes} = "modeAlarm,modeStart,modeStarted";}
-	elsif($modes == 2){$attr{$name}{modes} = "all";}
+	if($modes == 1)	{$attr{$name}{modes} = "next";}
+	elsif($modes == 0){$attr{$name}{modes} = "next";}
+	elsif($modes == 2){$attr{$name}{modes} = "next";}
 	else {return "invalid mode \"$modes\", use 0,1 or 2!"}
 	InternalTimer(gettimeofday()+2, "CALVIEW_GetUpdate", $hash, 0);
 	return undef;
@@ -190,22 +190,39 @@ sub getsummery($)
 	my @terminliste ;
 	my $name = $hash->{NAME};
 	# my $calendername  = $hash->{KALENDER};
-	my @calendernamen = split( ",", $hash->{KALENDER});
+	my @calendernamen = split( ",", $hash->{KALENDER}); 
 	my $modi = $attr{$name}{modes};
 	my @modes = split(/,/,$modi);
 	foreach my $calendername (@calendernamen){
-		foreach my $mode (@modes){
-			my $all = ReadingsVal($calendername, $mode, "");
-			my @uids=split(/;/,$all);
+		#foreach my $mode (@modes){
+			my $all = CallFn($calendername, "GetFn", $defs{$calendername},(" ","full", "next"));
+			my @termine=split(/\n/,$all);
 			
-			foreach my $uid (@uids){
-				my $terminstart = CallFn($calendername, "GetFn", $defs{$calendername},(" ","start", $uid));
-				my $termintext = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","summary", $uid));
-				my $terminend = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","end", $uid));
-				my $terminort = CallFn($calendername, "GetFn", $defs{$calendername}, (" ","location", $uid));
-				push(@terminliste, [$terminstart, $termintext, $terminend, $calendername, $terminort, $mode]);
+			foreach my $termin (@termine){
+				my @uid=split(/\s+/,$termin);
+		
+				#für jedes event die einzelnen infos holen
+				my $tmpstarts = CallFn($calendername, "GetFn", $defs{$calendername},(" ","start", $uid[0]));
+				my @starts  = split(/\n/,$tmpstarts);
+				#my $tmptexts = CallFn($calendername, "GetFn", $defs{$calendername},(" ","text", $uid[0]));
+				#my @texts  = split(/\n/,$tmptexts);
+				my $tmpends = CallFn($calendername, "GetFn", $defs{$calendername},(" ","end", $uid[0]));
+				my @ends  = split(/\n/,$tmpends);
+				my $tmpsummarys = CallFn($calendername, "GetFn", $defs{$calendername},(" ","summary", $uid[0]));
+				my @summarys  = split(/\n/,$tmpsummarys);
+				my $tmplocations = CallFn($calendername, "GetFn", $defs{$calendername},(" ","location", $uid[0]));
+				my @locations = split(/\n/,$tmplocations);
+				
+				for(my $i = 1; $i <= (scalar(@starts)); $i++) {
+					my $internali = $i-1;
+					my $terminstart = $starts[$internali];
+					my $termintext = $summarys[$internali];
+					my $terminend = $ends[$internali];
+					my $terminort = $locations[$internali];
+					push(@terminliste, [$terminstart, $termintext, $terminend, $calendername, $terminort, "next"]);
+				}
 			};
-		};
+		#};
 	};
 	return @terminliste;
 }
