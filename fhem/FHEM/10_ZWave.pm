@@ -4031,13 +4031,13 @@ s2Hex($)
 
   <br><br><b>Class ASSOCIATION</b>
   <li>associationAdd groupId nodeId ...<br>
-  Add the specified list of nodeIds to the assotion group groupId.<br> Note:
+  Add the specified list of nodeIds to the association group groupId.<br> Note:
   upon creating a fhem-device for the first time fhem will automatically add
   the controller to the first association group of the node corresponding to
   the fhem device, i.e it issues a "set name associationAdd 1
   controllerNodeId"</li>
   <li>associationDel groupId nodeId ...<br>
-  Remove the specified list of nodeIds from the assotion group groupId.</li>
+  Remove the specified list of nodeIds from the association group groupId.</li>
 
   <br><br><b>Class BASIC</b>
   <li>basicValue value<br>
