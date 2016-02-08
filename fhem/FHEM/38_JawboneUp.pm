@@ -1,4 +1,4 @@
-# $Id: $
+# $Id$
 #
 # See: http://www.fhemwiki.de/wiki/Jawbone_Up
 # Forum: http://forum.fhem.de/index.php/topic,24889.msg179505.html#msg179505
@@ -68,18 +68,18 @@ jawboneUp_Define($$)
   my $name = $a[0];
   my $user = $a[2];
   my $password = $a[3];
-    
+
   $hash->{"module_version"} = "0.1.4";
-  
+
   $hash->{user}=$user;
   $hash->{password}=$password;
   $hash->{NAME} = $name;
-  
+
   $hash->{"API_Failures"} = 0;
   $hash->{"API_Timeouts"} = 0;
   $hash->{"API_Success"} = 0;
   $hash->{"API_Status"} = "Initializing...";
-  
+
   $hash->{INTERVAL} = 3600;
   if (defined($a[4])) {
 	  $hash->{INTERVAL} = $a[4];
@@ -88,15 +88,15 @@ jawboneUp_Define($$)
   if ($hash->{INTERVAL} < $min_poll) {
   	  $hash->{INTERVAL} = $min_poll;
   }
-  
+
   delete($hash->{helper}{RUNNING_PID});
   $hash->{STATE} = "Initialized";
 
   if( $init_done ) {
     jawboneUp_Connect($hash);
-  } 
-  
-  
+  }
+
+
   return undef;
 }
 
@@ -118,7 +118,7 @@ jawboneUp_Connect($)
   my $name = $hash->{NAME};
 
   return undef if( AttrVal($name, "disable", 0 ) == 1 );
-  
+
   jawboneUp_poll($hash);
 }
 
@@ -164,7 +164,7 @@ sub jawboneUp_DoBackground($)
   if (defined($up)) {
     # Expensive API-call:
     my $score = $up->score;
-    
+
     my $na=$hash->{NAME};
 
     my $st="0"; my $ca="0";
@@ -185,12 +185,12 @@ sub jawboneUp_DoBackground($)
     $at=$score->{"move"}{"active_time"};
     $li=$score->{"move"}{"longest_idle"};
 
-    $aw=$score->{"sleep"}{"awake"};    
+    $aw=$score->{"sleep"}{"awake"};
     $ak=$score->{"sleep"}{"awakenings"};
     $lt=$score->{"sleep"}{"light"};
     $ts=$score->{"sleep"}{"time_to_sleep"};
     $bt=$score->{"sleep"}{"goals"}{"bedtime"}[0];
-    $dp=$score->{"sleep"}{"goals"}{"deep"}[0];    
+    $dp=$score->{"sleep"}{"goals"}{"deep"}[0];
     $as=$score->{"sleep"}{"goals"}{"total"}[0];
 
     if (not defined($st)) { $st="0" }
@@ -200,7 +200,7 @@ sub jawboneUp_DoBackground($)
     if (not defined($bd)) { $bd="0" }
     if (not defined($at)) { $at="0" }
     if (not defined($li)) { $li="0" }
-    
+
     if (not defined($aw)) { $aw="0" }
     if (not defined($ak)) { $ak="0" }
     if (not defined($lt)) { $lt="0" }
@@ -208,16 +208,16 @@ sub jawboneUp_DoBackground($)
     if (not defined($bt)) { $bt="0" }
     if (not defined($dp)) { $dp="0" }
     if (not defined($as)) { $as="0" }
-    
+
     # Second expensive call for band events
     my $json=jawboneGetBandEvents($up);
 
     my $nr=0;
     $nr=$json->{"data"}->{"size"};
- 
+
  #my $json="";
  #my $nr=0;
- 
+
     my $sl=0; # sleep-mode
     my $sw=0; # stopwatch-mode
     for (my $i=0; $i<$nr; $i++) {
@@ -225,12 +225,12 @@ sub jawboneUp_DoBackground($)
 	    my $act="";
 	    $act = $json->{"data"}->{"items"}[$i]->{"action"};
 	    if (not defined($act)) { $act="" }
-	    if ($act eq "enter_sleep_mode") 
+	    if ($act eq "enter_sleep_mode")
 	        {
 	        $sl=1;
 	        last;
             }
-	    if ($act eq "exit_sleep_mode") 
+	    if ($act eq "exit_sleep_mode")
 	        {
 	        $sl=0;
 	        last;
@@ -241,12 +241,12 @@ sub jawboneUp_DoBackground($)
 		my $act="";
 	    $act = $json->{"data"}->{"items"}[$i]->{"action"};
 	    if (not defined($act)) { $act="" }
-	    if ($act eq "enter_stopwatch_mode") 
+	    if ($act eq "enter_stopwatch_mode")
 	        {
 	        $sw=1;
 	        last;
             }
-	    if ($act eq "exit_stopwatch_mode") 
+	    if ($act eq "exit_stopwatch_mode")
 	        {
 	        $sw=0;
 	        last;
@@ -254,7 +254,7 @@ sub jawboneUp_DoBackground($)
 	    }
 
     return "OK|$na|$st|$ca|$di|$bc|$bd|$at|$li|$aw|$as|$sl|$sw|$ak|$lt|$ts|$bt|$dp";
-  } 
+  }
   #Error: API doesn't return any information about errors...
   my $na=$hash->{NAME};
   return "ERR|$na";
@@ -287,7 +287,7 @@ sub jawboneUp_DoneBackground($)
   }
   my $hash = $defs{$a[1]};
   delete($hash->{helper}{RUNNING_PID});
-    
+
   if ($a[0] eq "ERR") {
     $hash->{"API_LastError"} = FmtDateTime(gettimeofday());
     $hash->{"API_Status"} = "API Failure. Check credentials and internet connectivity, retrying...";
@@ -302,7 +302,7 @@ sub jawboneUp_DoneBackground($)
     } else {
       $hash->{STATE} = "Connect-failure, retries: ".$hash->{"API_Failures"};
     }
-  } else {  
+  } else {
     if (@a < 18) {
       print ("Internal error at DoneBackground (0x003).\n");
       $hash->{STATE} = "Disconnected - disabled";
@@ -312,7 +312,7 @@ sub jawboneUp_DoneBackground($)
       $hash->{"API_Status"} = "API Failure. Unexpected format of return values: )".$string;
      return undef;
      }
-     
+
     readingsBeginUpdate($hash);
     updReading($hash,"bg_steps",$a[2]);
     updReading($hash,"calories",$a[3]);
@@ -327,15 +327,15 @@ sub jawboneUp_DoneBackground($)
 
     updReading($hash,"sleep_mode",$a[11]);
     updReading($hash,"stopwatch_mode",$a[12]);
-    
+
     updReading($hash,"awakenings",$a[13]);
     updReading($hash,"light",$a[14]);
     updReading($hash,"time_to_sleep",$a[15]);
     updReading($hash,"bedtime",$a[16]);
     updReading($hash,"deep",$a[17]);
-    
+
     readingsEndUpdate($hash, 1);
-    
+
     $hash->{LAST_POLL} = FmtDateTime( gettimeofday() );
 
     $hash->{STATE} = "Connected";
@@ -344,15 +344,15 @@ sub jawboneUp_DoneBackground($)
     $hash->{"API_LastSuccess"} = FmtDateTime(gettimeofday());
   }
   return undef;
-}   
+}
 
-############ Background Worker timeout #########################        
+############ Background Worker timeout #########################
 sub jawboneUp_AbortBackground($)
 {
   my ($hash) = @_;
   delete($hash->{helper}{RUNNING_PID});
   $hash->{"API_Timeouts"} = $hash->{"API_Timeouts"}+1;
-	
+
   $hash->{STATE} = "Timeout";
   $hash->{"API_Status"} = "Timeout, retrying...";
   $hash->{"API_LastError"} = FmtDateTime(gettimeofday());
@@ -362,8 +362,8 @@ sub jawboneUp_AbortBackground($)
   $hash->{"API_NextSchedule"} = FmtDateTime(gettimeofday()+$hash->{INTERVAL});
   return undef;
 }
-        
-# Request update from Jawbone servers by spawning a background task (via BlockingCall)                          
+
+# Request update from Jawbone servers by spawning a background task (via BlockingCall)
 sub
 jawboneUp_poll($)
 {
