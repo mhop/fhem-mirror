@@ -3621,6 +3621,7 @@ ReplaceEventMap2($$$)
       $nv = $emh->{$k};
 
     } elsif($nstr =~ m/$k/) {
+      my $NAME = $dev; # Compatibility, Forum #43023
       $nv = eval '"'.$emh->{$k}.'"';
 
     }
