@@ -23,7 +23,9 @@
 #
 ########################################################################################
 # Changelog
-# .02.2016
+# 08.02.2016
+#	Neuer MediaType "recording" hinzugefügt
+# 07.02.2016
 #	In das offizielle Fhem-Release übernommen
 #	Allgemein im Code aufgeräumt
 #	Dokumentation hinzugefügt
@@ -427,8 +429,11 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 				} elsif ($json->{MediaInfo}{MediaType} eq 'series') {
 					readingsBulkUpdate($hash, 'Title', $json->{MediaInfo}{Series}.' '.$json->{MediaInfo}{Season}.'x'.$json->{MediaInfo}{Episode}.' - '.$json->{MediaInfo}{Title});
 					readingsBulkUpdate($hash, 'Description', $json->{MediaInfo}{Plot});
+				} elsif ($json->{MediaInfo}{MediaType} eq 'recording') {
+					readingsBulkUpdate($hash, 'Title', $json->{MediaInfo}{ChannelName}.' - '.$json->{MediaInfo}{ProgramName});
+					readingsBulkUpdate($hash, 'Description', $json->{MediaInfo}{ProgramDescription});
 				} else {
-					MEDIAPORTAL_Log $hash->{NAME}, 0, 'MediaInfo für "'.$json->{MediaInfo}{MediaType}.'" geliefert, aber nicht verarbeitet. Bitte diese komplette Information ins Forum einstellen: '.Dumper($json->{MediaInfo});
+					MEDIAPORTAL_Log $hash->{NAME}, 0, 'Unbekannte MediaInfo für "'.$json->{MediaInfo}{MediaType}.'" geliefert, aber nicht verarbeitet. Bitte diese komplette Information ins Forum einstellen: '.Dumper($json->{MediaInfo});
 				}
 			} else {
 				# Die MediaInfos wurden nicht mitgeliefert...
