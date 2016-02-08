@@ -27,7 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
-# 1.11.1 07.02.2016    entries with loglevel "2" to loglevel "3" changed
+# 1.12   08.02.2016    added function "move" for continuous PTZ action
+# 1.11.1 07.02.2016    entries with loglevel "2" reviewed, changed to loglevel "3"
 # 1.11   05.02.2016    added function "goPreset" and "goAbsPTZ" to control the move of PTZ lense
 #                      to absolute positions
 #                      refere to commandref or have a look in forum at: 
@@ -152,10 +153,10 @@ sub SSCam_Define {
   RemoveInternalTimer($hash);                                                                     # alle Timer löschen
   
   # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-60s 
-  InternalTimer(gettimeofday()+int(rand(60)), "watchdogpollcaminfo", $hash, 0);
+  InternalTimer(gettimeofday()+int(srand(60)), "watchdogpollcaminfo", $hash, 0);
   
   # initiale Rotinen nach Restart ausführen , verzögerter zufälliger Start   
-  InternalTimer(gettimeofday()+int(rand(20)), "initonboot", $hash, 0);
+  InternalTimer(gettimeofday()+int(srand(10)), "initonboot", $hash, 0);
 
 return undef;
 }
@@ -211,7 +212,6 @@ sub SSCam_Set {
         my $logstr;
         my $setlist;
         my @prop;
-        my $ptzaction;
 
                          
 #        my $list .= "on off snap enable disable on-for-timer";
@@ -227,7 +227,8 @@ sub SSCam_Set {
                    "enable ".
                    "disable ".
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                   ((ReadingsVal("$name", "CapPTZAbs", "false") eq "true") ? "goAbsPTZ"." " : "");  
+                   ((ReadingsVal("$name", "CapPTZAbs", "false") eq "true") ? "goAbsPTZ"." " : ""). 
+                   ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
                     
         
         if ($opt eq "on") {
@@ -282,20 +283,21 @@ sub SSCam_Set {
             @prop = split(/,/, $prop);
             $prop = $prop[0];
             $hash->{HELPER}{GOPRESETNAME} = $prop;
-            $ptzaction = "gopreset";
-            doptzaction($hash,$ptzaction);
+            $hash->{HELPER}{PTZACTION}    = "gopreset";
+            doptzaction($hash);
         }
         elsif ($opt eq "goAbsPTZ") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 
-            if ($prop =~ /up/ || $prop =~ /down/ || $prop =~ /left/ || $prop =~ /right/) {
+            if ($prop eq "up" || $prop eq "down" || $prop eq "left" || $prop eq "right") {
                 if ($prop eq "up")    {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 480;}
                 if ($prop eq "down")  {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 0;}
                 if ($prop eq "left")  {$hash->{HELPER}{GOPTZPOSX} = 0; $hash->{HELPER}{GOPTZPOSY} = 240;}    
                 if ($prop eq "right") {$hash->{HELPER}{GOPTZPOSX} = 640; $hash->{HELPER}{GOPTZPOSY} = 240;} 
-                $ptzaction = "goabsptz";
-                doptzaction($hash,$ptzaction);
+                
+                $hash->{HELPER}{PTZACTION} = "goabsptz";
+                doptzaction($hash);
                 return undef;
             }               
             else
@@ -306,8 +308,9 @@ sub SSCam_Set {
                 
                 $hash->{HELPER}{GOPTZPOSX} = abs($prop);
                 $hash->{HELPER}{GOPTZPOSY} = abs($prop1);
-                $ptzaction = "goabsptz";
-                doptzaction($hash,$ptzaction);
+                
+                $hash->{HELPER}{PTZACTION}  = "goabsptz";
+                doptzaction($hash);
                 
                 return undef;
                 
@@ -315,13 +318,24 @@ sub SSCam_Set {
             return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
 
         }
+        elsif ($opt eq "move") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+
+            if (!defined($prop) || ($prop ne "up" && $prop ne "down" && $prop ne "left" && $prop ne "right" && $prop !~ m/dir_\d/)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
+            
+            $hash->{HELPER}{GOMOVEDIR} = $prop;
+            $hash->{HELPER}{GOMOVETIME} = defined($prop1) ? $prop1 : 1;
+            
+            $hash->{HELPER}{PTZACTION}  = "movestart";
+            doptzaction($hash);
+        }               
         else  
         {
             return $setlist;
         }  
 return;
 }
-
 
 
 sub SSCam_Get {
@@ -396,7 +410,7 @@ sub initonboot ($) {
   }
   else 
   {
-      InternalTimer(gettimeofday()+0.1, "initonboot", $hash, 0);
+      InternalTimer(gettimeofday()+0.14, "initonboot", $hash, 0);
   }
   
 return undef;
@@ -513,7 +527,7 @@ sub watchdogpollcaminfo ($) {
     my $name     = $hash->{NAME};
     my $camname  = $hash->{CAMNAME};
     my $logstr;
-    my $watchdogtimer = 90.035;
+    my $watchdogtimer = 90;
     
     if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10 and ReadingsVal("$name", "PollState", "Active") eq "Inactive") {
         
@@ -527,7 +541,7 @@ sub watchdogpollcaminfo ($) {
         $hash->{HELPER}{OLDVALPOLL} = AttrVal($name, "pollcaminfoall", undef);
         
         # Pollingroutine aufrufen
-        &getcaminfoall($hash);           
+        getcaminfoall($hash);           
     }
     
     if (defined($hash->{HELPER}{OLDVALPOLL}) and defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
@@ -537,7 +551,6 @@ sub watchdogpollcaminfo ($) {
             &printlog($hash,$logstr,"3");
             
             $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};
-            &getcaminfoall($hash);
             }
     }
     
@@ -783,10 +796,10 @@ sub camsnap ($) {
 
 
 ###############################################################################
-###   PTZ-Kamera auf Presetposition fahren
+###   PTZ-Kamera auf Position fahren
 
-sub doptzaction ($$) {
-    my ($hash, $ptzaction) = @_;
+sub doptzaction ($) {
+    my ($hash)             = @_;
     my $camname            = $hash->{CAMNAME};
     my $name               = $hash->{NAME};
     my $logstr;
@@ -794,17 +807,22 @@ sub doptzaction ($$) {
     my $error;
 
     if (ReadingsVal("$name", "DeviceType", "Camera") ne "PTZ") {
-        $logstr = "ERROR - Operation \"$ptzaction\" is only possible for cameras of DeviceType \"PTZ\" - please compare with device Readings" ;
+        $logstr = "ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible for cameras of DeviceType \"PTZ\" - please compare with device Readings" ;
         &printlog($hash,$logstr,"1");
         return;
         }
-    if ($ptzaction eq "goabsptz" && ReadingsVal("$name", "CapPTZAbs", "false") ne "true") {
-        $logstr = "ERROR - Operation \"$ptzaction\" is only possible if camera supports absolute PTZ action - please compare with device Reading \"CapPTZAbs\"" ;
+    if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && ReadingsVal("$name", "CapPTZAbs", "false") ne "true") {
+        $logstr = "ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with device Reading \"CapPTZAbs\"" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
+    if ( $hash->{HELPER}{PTZACTION} eq "movestart" && ReadingsVal("$name", "CapPTZDirections", "0") < 1) {
+        $logstr = "ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports \"Tilt\" and \"Pan\" operations - please compare with device Reading \"CapPTZDirections\"" ;
         &printlog($hash,$logstr,"1");
         return;
         }
     
-    if ($ptzaction eq "gopreset") {
+    if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
         if (!defined($hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}})) {
             $errorcode = "600";
             # Fehlertext zum Errorcode ermitteln
@@ -839,27 +857,36 @@ sub doptzaction ($$) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        $logstr = "ERROR - $ptzaction of Camera $camname can't be executed - $error" ;
+        $logstr = "ERROR - $hash->{HELPER}{PTZACTION} of Camera $camname can't be executed - $error" ;
         &printlog($hash,$logstr,"1");
         return;
         }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
-        if ($ptzaction eq "gopreset") {
+        if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
             $logstr = "Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\" now";
             &printlog($hash,$logstr,"4");
                         
-            $hash->{OPMODE} = $ptzaction;
+            $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
             $hash->{HELPER}{ACTIVE} = "on";
         
             &getapisites_nonbl($hash);
             }
-            elsif ($ptzaction eq "goabsptz") {
-            $logstr = "Move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\"  now";
+            elsif ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
+            $logstr = "Start move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\"  now";
             &printlog($hash,$logstr,"4");
                         
-            $hash->{OPMODE} = $ptzaction;
+            $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
+            $hash->{HELPER}{ACTIVE} = "on";
+        
+            &getapisites_nonbl($hash);
+            }
+            elsif ($hash->{HELPER}{PTZACTION} eq "movestart") {
+            $logstr = "Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s";
+            &printlog($hash,$logstr,"4");
+                        
+            $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
             $hash->{HELPER}{ACTIVE} = "on";
         
             &getapisites_nonbl($hash);
@@ -868,6 +895,30 @@ sub doptzaction ($$) {
     else
     {
     InternalTimer(gettimeofday()+0.31, "doptzaction", $hash, 0);
+    }    
+}
+
+###############################################################################
+###   stoppen continue move
+
+sub movestop ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    
+   if ($hash->{HELPER}{ACTIVE} eq "off") {
+            $logstr = "Stop Camera $camname moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now";
+            &printlog($hash,$logstr,"4");
+                        
+            $hash->{OPMODE} = "movestop";
+            $hash->{HELPER}{ACTIVE} = "on";
+        
+            &getapisites_nonbl($hash);
+    }
+    else
+    {
+    InternalTimer(gettimeofday()+0.121, "movestop", $hash, 0);
     }    
 }
 
@@ -959,6 +1010,7 @@ sub getcaminfoall ($) {
         $logstr = "Polling of Camera $camname is deactivated now";
         &printlog($hash,$logstr,"3");
         }
+return undef;
 }
 
 ###########################################################################
@@ -1717,10 +1769,16 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "goabsptz")
    {
-      # mal wieder Maxversion der API funktioniert nicht bei jedem !
-      # $apiptzmaxver -= 1;
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0); 
+   }
+   elsif ($OpMode eq "movestart")
+   {
+      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&speed=\"3\"&moveType=\"Start\"&_sid=\"$sid\"";
+   }
+   elsif ($OpMode eq "movestop")
+   {
+      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&moveType=\"Stop\"&_sid=\"$sid\"";
    }
    elsif ($OpMode eq "Enable")
    {
@@ -1808,6 +1866,7 @@ sub camret_nonbl ($) {
    my $camStatus;
    my ($presetcnt,$cnt,$presid,$presname,@preskeys,$presetlist);
    my ($patrolcnt,$patrolid,$patrolname,@patrolkeys,$patrollist);
+   my ($recStatus,$exposuremode);
    my $userPriv;
    my $verbose;
    my $httptimeout;
@@ -1993,6 +2052,50 @@ sub camret_nonbl ($) {
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
+            elsif ($OpMode eq "movestart") 
+            {
+                # ein "Move" in eine bestimmte Richtung wird durchgeführt                 
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"state","moving");
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                $logstr = "Camera $camname started move to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+                
+                 InternalTimer(gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "movestop", $hash, 0);
+            }
+            elsif ($OpMode eq "movestop") 
+            {
+                # ein "Move" in eine bestimmte Richtung wurde durchgeführt 
+                # falls Aufnahme noch läuft -> state = on setzen
+                
+                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
+                    readingsSingleUpdate($hash,"state", "on", 0); 
+                    }
+                    else
+                    {
+                    readingsSingleUpdate($hash,"state", "off", 0); 
+                    }
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                $logstr = "Camera $camname stopped move to direction \"$hash->{HELPER}{GOMOVEDIR}\"";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+        
+            }
             elsif ($OpMode eq "Enable") 
             {
                 # Kamera wurde aktiviert, sonst kann nichts laufen -> "off"                
@@ -2129,7 +2232,7 @@ sub camret_nonbl ($) {
                     $camStatus = "other";
                     }
                
-                my $recStatus = $data->{'data'}->{'cameras'}->[0]->{'recStatus'};
+                $recStatus = $data->{'data'}->{'cameras'}->[0]->{'recStatus'};
                 if ($recStatus ne "0") {
                     $recStatus = "Start";
                     }
@@ -2137,9 +2240,27 @@ sub camret_nonbl ($) {
                     $recStatus = "Stop";
                     }
                 
+                $exposuremode = $data->{'data'}->{'cameras'}->[0]->{'exposure_mode'};
+                if ($exposuremode == 0) {
+                    $exposuremode = "Auto";
+                    }
+                    elsif ($exposuremode == 1) {
+                    $exposuremode = "Day";
+                    }
+                    elsif ($exposuremode == 2) {
+                    $exposuremode = "Night";
+                    }
+                    elsif ($exposuremode == 3) {
+                    $exposuremode = "Schedule";
+                    }
+                    elsif ($exposuremode == 4) {
+                    $exposuremode = "Unknown";
+                    }
+                    
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamLiveMode",$camLiveMode);
+                readingsBulkUpdate($hash,"CamExposureMode",$exposuremode);
                 readingsBulkUpdate($hash,"CamModel",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camModel'});
                 readingsBulkUpdate($hash,"CamRecShare",$data->{'data'}->{'cameras'}->[0]->{'camRecShare'});
                 readingsBulkUpdate($hash,"CamRecVolume",$data->{'data'}->{'cameras'}->[0]->{'camRecVolume'});
@@ -2147,6 +2268,10 @@ sub camret_nonbl ($) {
                 readingsBulkUpdate($hash,"CamVendor",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camVendor'});
                 readingsBulkUpdate($hash,"CamPreRecTime",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
                 readingsBulkUpdate($hash,"CamPort",$data->{'data'}->{'cameras'}->[0]->{'port'});
+                readingsBulkUpdate($hash,"CamPtSpeed",$data->{'data'}->{'cameras'}->[0]->{'ptSpeed'});
+                readingsBulkUpdate($hash,"CamblPresetSpeed",$data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
+                readingsBulkUpdate($hash,"CamVideoMirror",$data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
+                readingsBulkUpdate($hash,"CamVideoFlip",$data->{'data'}->{'cameras'}->[0]->{'video_flip'});
                 readingsBulkUpdate($hash,"Availability",$camStatus);
                 readingsBulkUpdate($hash,"DeviceType",$deviceType);
                 readingsBulkUpdate($hash,"LastUpdateTime",$update_time);
@@ -2636,7 +2761,8 @@ return;
        <li>Activate a Camera in Synology Surveillance Station</li>
        <li>Retrieval of Camera Properties (also by Polling) as well as informations about the installed SVS-package</li>
        <li>Move to a predefined Preset-position (at PTZ-cameras) </li>
-       <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li><br>
+       <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
+       <li>continuous moving of PTZ-camera lense   </li><br>
     </ul>
    </ul>
    The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
@@ -2740,6 +2866,7 @@ return;
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
+      <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -2774,6 +2901,7 @@ return;
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
       <tr><td>"goPreset &lt;Preset&gt;":                           </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
+      <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>starts a continuous move of PTZ-camera to direction up/down/left/right or dir_X  </td></tr> 
   </table>
   <br><br>
   
@@ -2911,6 +3039,28 @@ return;
 
   <br><br><br>
   
+  <b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [seconds] </b> <br><br>
+  
+  With this command a continuous move of a PTZ-camera will be started. In addition to the four basic directions up/down/left/right is it possible to use angular dimensions 
+  "dir_X". The grain size of graduation depends on properties of the camera and can be identified by the Reading "CapPTZDirections". <br><br>
+
+  The radian measure of 360 degrees will be devided by the value of "CapPTZDirections" and describes the move drections starting with "0=right" counterclockwise. 
+  That means, if a camera Reading is "CapPTZDirections = 8" it starts with dir_0 = right, dir_2 = top, dir_4 = left, dir_6 = bottom and respectively dir_1, dir_3, dir_5 and dir_7 
+  the appropriate directions between. The possible moving directions of cameras with "CapPTZDirections = 32" are correspondingly divided into smaller sections. <br><br>
+
+  In opposite to the "set &lt;name&gt; goAbsPTZ"-command starts "set &lt;name&gt; move" a continuous move until a stop-command will be received.
+  The stop-command will be generated after the optional assignable time of [seconds]. If that retention period wouldn't be set by the command, a time of 1 second will be set implicit. <br><br>
+  
+  Examples: <br>
+  
+  <pre>
+    set &lt;name&gt; move up 0.5      : moves PTZ 0,5 Sek. (plus processing time) to the top
+    set &lt;name&gt; move dir_1 1.5   : moves PTZ 1,5 Sek. (plus processing time) to top-right 
+    set &lt;name&gt; move dir_20 0.7  : moves PTZ 1,5 Sek. (plus processing time) to left-bottom ("CapPTZDirections = 32)"
+  </pre>
+  
+  <br><br><br>
+  
  </ul>
 <br>
 
@@ -2996,6 +3146,7 @@ return;
   <table>  
   <colgroup> <col width=5%> <col width=95%> </colgroup>
     <tr><td><li>Availability</li>       </td><td>- Availability of Camera (disabled, enabled, disconnected, other)  </td></tr>
+    <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
@@ -3004,6 +3155,8 @@ return;
     <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume on disk station for recordings  </td></tr>
     <tr><td><li>CamVendor</li>          </td><td>- Identifier of camera producer  </td></tr>
+    <tr><td><li>CamVideoFlip</li>       </td><td>- Is the video flip  </td></tr>
+    <tr><td><li>CamVideoMirror</li>     </td><td>- Is the video mirror  </td></tr>
     <tr><td><li>CapAudioOut</li>        </td><td>- Capability to Audio Out over Surveillance Station (false/true)  </td></tr>
     <tr><td><li>CapChangeSpeed</li>     </td><td>- Capability to various motion speed  </td></tr>
     <tr><td><li>CapPTZAbs</li>          </td><td>- Capability to perform absolute PTZ action  </td></tr>
@@ -3096,8 +3249,8 @@ return;
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Abfrage von Kameraeigenschaften (auch mit Polling) sowie den Eigenschaften des installierten SVS-Paketes</li>
       <li>Bewegen an eine vordefinierte Preset-Position (bei PTZ-Kameras) </li>
-      <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li><br>
-     
+      <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
+      <li>kontinuierliche Bewegung von PTZ-Kameras   </li><br>
      </ul> 
     </ul>
     Die Aufnahmen stehen in der Synology Surveillance Station (SVS) zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
@@ -3197,6 +3350,7 @@ return;
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
+      <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
@@ -3223,15 +3377,16 @@ return;
 
   <table>
   <colgroup> <col width=30%> <col width=70%> </colgroup>
-      <tr><td>"on [rectime]":                        </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit [rectime] gestoppt.</td></tr>
-      <tr><td>                                       </td><td>Mit rectime = 0 wird eine Daueraufnahme gestartet die durch "set &lt;name&gt; off" wieder gestoppt werden muß.</td></tr>
-      <tr><td>"off" :                                </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
-      <tr><td>"snap":                                </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
-      <tr><td>"disable":                             </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
-      <tr><td>"enable":                              </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
-      <tr><td>"credentials &lt;username&gt; &lt;password&gt;":   </td><td>speichert die Zugangsinformationen</td></tr>
-      <tr><td>"goPreset &lt;Preset&gt;":                  </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
-      <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":  </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
+      <tr><td>"on [rectime]":                                  </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit [rectime] gestoppt.</td></tr>
+      <tr><td>                                                 </td><td>Mit rectime = 0 wird eine Daueraufnahme gestartet die durch "set &lt;name&gt; off" wieder gestoppt werden muß.</td></tr>
+      <tr><td>"off" :                                          </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
+      <tr><td>"snap":                                          </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
+      <tr><td>"disable":                                       </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"enable":                                        </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"credentials &lt;username&gt; &lt;password&gt;": </td><td>speichert die Zugangsinformationen</td></tr>
+      <tr><td>"goPreset &lt;Preset&gt;":                       </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
+      <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":   </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
+      <tr><td>"move [ up | down | left | right | dir_X ]":     </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
   </table>
   <br><br>
   
@@ -3332,7 +3487,7 @@ return;
    2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
   </pre>
   
-  <br><br>
+  <br>
   
   <b> "set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ]" </b> <br><br>
   
@@ -3364,7 +3519,29 @@ return;
   </pre>
 
   verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
-  Auch in diesem Fall muß der Vorgang ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen. 
+  Auch in diesem Fall muß der Vorgang ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen.
+  
+  <br><br><br>
+  
+  <b> set &lt;name&gt; move [ up | down | left | right | dir_X ] [Sekunden] </b> <br><br>
+  
+  Mit diesem Kommando wird eine kontinuierliche Bewegung der PTZ-Kamera gestartet. Neben den vier Grundrichtungen up/down/left/right stehen auch 
+  Zwischenwinkelmaße "dir_X" zur Verfügung. Die Feinheit dieser Graduierung ist von der Kamera abhängig und kann dem Reading "CapPTZDirections" entnommen werden. <br><br>
+
+  Das Bogenmaß von 360 Grad teilt sich durch den Wert von "CapPTZDirections" und beschreibt die Bewegungsrichtungen beginnend mit "0=rechts" entgegen dem 
+  Uhrzeigersinn. D.h. bei einer Kamera mit "CapPTZDirections = 8" bedeutet dir_0 = rechts, dir_2 = oben, dir_4 = links, dir_6 = unten bzw. dir_1, dir_3, dir_5 und dir_7 
+  die entsprechenden Zwischenrichtungen. Die möglichen Bewegungsrichtungen bei Kameras mit "CapPTZDirections = 32" sind dementsprechend kleinteliger. <br><br>
+
+  Im Gegensatz zum "set &lt;name&gt; goAbsPTZ"-Befehl startet der Befehl "set &lt;name&gt; move" eine kontinuierliche Bewegung bis ein Stop-Kommando empfangen wird. 
+  Das Stop-Kommando wird nach Ablauf der optional anzugebenden Zeit [Sekunden] ausgelöst. Wird diese Laufzeit nicht angegeben, wird implizit Sekunde = 1 gesetzt. <br><br>
+  
+  Beispiele: <br>
+  
+  <pre>
+    set &lt;name&gt; move up 0.5      : bewegt PTZ 0,5 Sek. (zzgl. Prozesszeit) nach oben
+    set &lt;name&gt; move dir_1 1.5   : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach rechts-oben 
+    set &lt;name&gt; move dir_20 0.7  : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach links-unten ("CapPTZDirections = 32)"
+  </pre>
 
   <br><br><br>
 
@@ -3454,6 +3631,7 @@ return;
   <table>  
   <colgroup> <col width=5%> <col width=95%> </colgroup>
     <tr><td><li>Availability</li>       </td><td>- Verfügbarkeit der Kamera (disabled, enabled, disconnected, other)  </td></tr>
+    <tr><td><li>CamExposureMode</li>    </td><td>- aktueller Belichtungsmodus (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
@@ -3462,6 +3640,8 @@ return;
     <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
     <tr><td><li>CamRecVolume</li>       </td><td>- Volume auf der DS für Aufnahmen  </td></tr>
     <tr><td><li>CamVendor</li>          </td><td>- Kamerahersteller Bezeichnung  </td></tr>
+    <tr><td><li>CamVideoFlip</li>       </td><td>- Ist das Video gedreht  </td></tr>
+    <tr><td><li>CamVideoMirror</li>     </td><td>- Ist das Video gespiegelt  </td></tr>
     <tr><td><li>CapAudioOut</li>        </td><td>- Fähigkeit der Kamera zur Audioausgabe über Surveillance Station (false/true)  </td></tr>
     <tr><td><li>CapChangeSpeed</li>     </td><td>- Fähigkeit der Kamera verschiedene Bewegungsgeschwindigkeiten auszuführen  </td></tr>
     <tr><td><li>CapPTZAbs</li>          </td><td>- Fähigkeit der Kamera für absolute PTZ-Aktionen   </td></tr>
