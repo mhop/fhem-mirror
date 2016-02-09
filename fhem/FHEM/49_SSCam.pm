@@ -1008,7 +1008,7 @@ sub getcaminfoall ($) {
         # Beenden Polling aller Caminfos
         readingsSingleUpdate($hash,"PollState","Inactive",0);
         
-        $logstr = "Polling of Camera $camname is deactivated now";
+        $logstr = "Polling of Camera $camname is currently deactivated";
         &printlog($hash,$logstr,"3");
         }
 return undef;
