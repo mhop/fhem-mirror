@@ -16,7 +16,7 @@ sub ZWave_Get($@);
 sub ZWave_Parse($$@);
 sub ZWave_Set($@);
 sub ZWave_SetClasses($$$$);
-sub ZWave_addToSendStack($$);
+sub ZWave_addToSendStack($$$);
 sub ZWave_secStart($);
 sub ZWave_secEnd($);
 sub ZWave_configParseModel($;$);
@@ -399,9 +399,9 @@ my %zwave_class = (
                "..8506(..)"           => '"assocGroups:".hex($1)' },
     init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
-    set   => { versionClassRequest => 'ZWave_versionClassRequest($hash,"%s")'},
     get   => { version      => "11",
-               versionClass => 'ZWave_versionClassGet("%s")' },
+               versionClass => 'ZWave_versionClassGet("%s")',
+               versionClassAll => 'ZWave_versionClassAllGet($hash)'},
     parse => { "028611"             => "cmdGet:version",
                "078612(..........)" => 'sprintf("version:Lib %d Prot '.
                 '%d.%d App %d.%d", unpack("C*",pack("H*","$1")))',
@@ -791,6 +791,7 @@ ZWave_Cmd($$@)
     $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
     my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
     return $err if($err);
+    return $@ if($@);
     $cmdFmt = $ncmd if(defined($ncmd));
     return "" if($ncmd && $ncmd eq "EMPTY"); # configAll
   }
@@ -834,13 +835,13 @@ ZWave_Cmd($$@)
     }
   }
 
-  my $r = ZWave_addToSendStack($baseHash, $data);
+  my $r = ZWave_addToSendStack($baseHash, $type, $data);
   if($r) {
     return (AttrVal($name,"verbose",3) > 2 ? $r : undef);
   }
 
   my $val;
-  if($type eq "get") { # Wait for result
+  if($type eq "get" && $hash->{CL}) { # Wait for the result for frontend cmd
     no strict "refs";
     my $iohash = $hash->{IODev};
     my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
@@ -853,9 +854,11 @@ ZWave_Cmd($$@)
     $data = "$cmd $id $data" if($re);
 
     $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
-    ZWave_processSendStack($hash) if($data && $cmd eq "neighborList");
 
-  } else {
+    ZWave_processSendStack($hash, "next") # No radio traffic for neighborList
+        if($data && $cmd eq "neighborList");
+
+  } elsif($type ne "get") {
     $cmd .= " ".join(" ", @a) if(@a);
     readingsSingleUpdate($hash, "state", $cmd, 1);
   }
@@ -1547,48 +1550,6 @@ ZWave_meterSupportedParse($$)
             " $meter_reset_text";
 }
 
-sub
-ZWave_versionClassRequest($$)
-{
-  my ($hash, $answer) = @_;
-  my $name = $hash->{NAME};
-
-  if($answer =~ m/^048614(..)(..)$/i) { # Parse part
-    my $v = $hash->{versionhash};
-    $v->{$zwave_id2class{lc($1)}} = $2;
-    foreach my $class (keys %{$v}) {
-      next if($v->{$class} ne "");
-      my $r = ZWave_Set($hash, $name, "versionClassRequest", $class);
-      return;
-    }
-    $attr{$hash->{NAME}}{vclasses} =
-        join(" ", map { "$_:$v->{$_}" } sort keys %{$v});
-    delete($hash->{versionhash});
-  }
-
-  if($answer ne "%s" && $hash->{versionhash}) { # get next
-    return("", sprintf('13%02x', hex($zwave_class{$answer}{id})))
-          if($zwave_class{$answer});
-    return("versionClassRequest needs no parameter", "");
-  }
-
-  return("versionClassRequest needs no parameter", "")
-        if($answer ne "%s" && !$hash->{versionhash});
-
-  return("another versionClassRequest is already running", "")
-        if(defined($hash->{versionhash}));
-
-  # User part: called with no parameters
-  my %h = map { $_ => "" }
-          grep { $_ !~ m/^MARK$/ && $_ !~ m/^UNKNOWN/ }
-          split(" ", AttrVal($name, "classes", ""));
-  $hash->{versionhash} = \%h;
-  foreach my $class (keys %h) {
-    next if($h{$class} ne "");
-    return("", sprintf('13%02x', hex($zwave_class{$class}{id})));
-  }
-  return("Should not happen", "");
-}
 
 sub
 ZWave_versionClassGet($)
@@ -1601,6 +1562,35 @@ ZWave_versionClassGet($)
         if($zwave_class{$class});
   return ("versionClass needs a class as parameter", "") if($class eq "%s");
   return ("Unknown class $class", "");
+}
+
+sub
+ZWave_versionClassAllGet($@)
+{
+  my ($hash, $data) = @_;
+  my $name = $hash->{NAME};
+  my $hname = ".versionClassAllGet";
+
+  if(!$data) { # called by the user
+    $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
+    delete($hash->{CL});
+    my @arr = split(" ", AttrVal($name, "classes", ""));
+    $hash->{$hname} = \@arr;
+    ZWave_Get($hash, $name, "versionClass", shift @{$hash->{$hname}});
+    $attr{$name}{vclasses} = "";
+    return("", "EMPTY");
+  }
+
+  return 0 if($data !~ m/^048614(..)(..)$/i); # ??
+  $attr{$name}{vclasses} .= " " if($attr{$name}{vclasses});
+  $attr{$name}{vclasses} .= $zwave_id2class{lc($1)}.":".hex($2);
+  if(!int(@{$hash->{$hname}})) {
+    delete($hash->{$hname});
+    return 1; # "veto" for parseHook
+  }
+  ZWave_Get($hash, $name, "versionClass", shift @{$hash->{$hname}});
+  $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
+  return 1; # "veto" for parseHook
 }
 
 sub
@@ -2583,8 +2573,7 @@ ZWave_configAllGet($)
   my $mc = ZWave_configGetHash($hash);
   return ("configAll: no model specific configs found", undef)
         if(!$mc || !$mc->{config});
-  #use Data::Dumper;
-  #Log 1, Dumper $mc;
+  delete($hash->{CL});
   foreach my $c (sort keys %{$mc->{get}}) {
     ZWave_Get($hash, $hash->{NAME}, $c);
   }
@@ -2598,6 +2587,7 @@ ZWave_associationAllGet($$)
 
   if(!$data) { # called by the user
     $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationAllGet;
+    delete($hash->{CL});
     ZWave_Get($hash, $hash->{NAME}, "associationGroups");
     return("", "EMPTY");
   }
@@ -2879,7 +2869,7 @@ ZWave_secAddToSendStack($$)
   my $len = sprintf("%02x", (length($cmd)-2)/2+1);
   my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
   my $data = "13$id$len$cmd$cmdEf$id"; # 13==SEND_DATA
-  ZWave_addToSendStack($hash, $data);  
+  ZWave_addToSendStack($hash, "set", $data);  
 }
 
 sub
@@ -3497,14 +3487,23 @@ ZWave_isWakeUp($)
   return $h->{isWakeUp};
 }
 
+# stack contains type:hexcode
+# type is: set / sentset, get / sentget / sentackget
+# sentset will be discarded after ack, sentget needs ack (->sentackget) then msg
+# next discards either state.
+# acktpye: next, ack or msg
 sub
-ZWave_processSendStack($)
+ZWave_processSendStack($$)
 {
-  my ($hash) = @_;
+  my ($hash,$ackType) = @_;
   my $ss = $hash->{SendStack};
   return if(!$ss);
 
-  if(index($ss->[0],"sent") == 0) {
+  if($ss->[0] =~ m/^sent(.*?):(.*)$/) {
+    if($1 eq "get" && $ackType eq "ack") {
+      $ss->[0] = "sentackget:$2";
+      return;
+    }
     shift @{$ss};
     RemoveInternalTimer($hash) if(!ZWave_isWakeUp($hash));
   }
@@ -3514,30 +3513,32 @@ ZWave_processSendStack($)
     return;
   }
 
-  IOWrite($hash, $hash->{homeId}, "00".$ss->[0]);
-  $ss->[0] = "sent:".$ss->[0];
+  $ss->[0] =~ m/^([^:]*?):(.*)$/;
+  my ($type, $msg) = ($1, $2);
+  IOWrite($hash, $hash->{homeId}, "00$msg");
+  $ss->[0] = "sent$type:$msg";
 
   $hash->{lastMsgSent} = gettimeofday();
   $zwave_lastHashSent = $hash;
 
   if(!ZWave_isWakeUp($hash)) {
-    InternalTimer($hash->{lastMsgSent}+10, sub {
-      Log 2, "ZWave: No ACK from $hash->{NAME} after 10s for $ss->[0]";
-      ZWave_processSendStack($hash);
+    InternalTimer($hash->{lastMsgSent}+3, sub {
+      Log 2, "ZWave: No ACK from $hash->{NAME} after 3s for $ss->[0]";
+      ZWave_processSendStack($hash, "next");
     }, $hash, 0);
   }
 }
 
 sub
-ZWave_addToSendStack($$)
+ZWave_addToSendStack($$$)
 {
-  my ($hash, $cmd) = @_;
+  my ($hash, $type, $cmd) = @_;
   if(!$hash->{SendStack}) {
     my @empty;
     $hash->{SendStack} = \@empty;
   }
   my $ss = $hash->{SendStack};
-  push @{$ss}, $cmd;
+  push @{$ss}, "$type:$cmd";
 
   if(ZWave_isWakeUp($hash)) {
     # SECURITY XXX and neighborList
@@ -3549,14 +3550,14 @@ ZWave_addToSendStack($$)
 
   } else { # clear commands without 0113 and 0013
     my $now = gettimeofday();
-    if(@{$ss} > 1 && $now-$hash->{lastMsgSent} > 10) {
+    if(@{$ss} > 1 && $now-$hash->{lastMsgSent} > 3) {
       Log3 $hash, 2,
-        "ERROR: $hash->{NAME}: cleaning commands without ack after 10s";
+        "ERROR: $hash->{NAME}: cleaning commands without ack after 3s";
       delete $hash->{SendStack};
-      return ZWave_addToSendStack($hash, $cmd);
+      return ZWave_addToSendStack($hash, $type, $cmd);
     }
   }
-  ZWave_processSendStack($hash) if(@{$ss} == 1);
+  ZWave_processSendStack($hash, "next") if(@{$ss} == 1);
   return undef;
 }
 
@@ -3598,7 +3599,7 @@ ZWave_Parse($$@)
           my $hash = $zwave_lastHashSent;
           readingsSingleUpdate($hash, "SEND_DATA", "failed:$arg", 1);
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA to $hash->{NAME}: $arg";
-          ZWave_processSendStack($hash);
+          ZWave_processSendStack($hash, "next");
 
         } else {
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg (unknown device)";
@@ -3674,7 +3675,7 @@ ZWave_Parse($$@)
     if($hash) {
       if(ZWave_isWakeUp($hash)) {
         ZWave_wakeupTimer($hash, 1);
-        ZWave_processSendStack($hash);
+        ZWave_processSendStack($hash, "next");
       }
 
       if(!$ret) {
@@ -3694,7 +3695,7 @@ ZWave_Parse($$@)
       Log3 $ioName, 4, "$ioName transmit $lmsg for $callbackid";
       if($hash) {
         readingsSingleUpdate($hash, "transmit", $lmsg, 0);
-        ZWave_processSendStack($hash);
+        ZWave_processSendStack($hash, "ack");
       }
       return "";
 
@@ -3816,11 +3817,6 @@ ZWave_Parse($$@)
        next;
     }
 
-    if($className eq "VERSION" && defined($hash->{versionhash})) {
-      ZWave_versionClassRequest($hash, $arg);
-      return "";
-    }
-
     my $ptr = ZWave_getHash($hash, $className, "parse");
     if(!$ptr) {
       push @event, "UNPARSED:$className $arg";
@@ -3853,7 +3849,11 @@ ZWave_Parse($$@)
 
   if($arg =~ m/^028407/) { # wakeup:notification
     ZWave_wakeupTimer($hash, 1);
-    ZWave_processSendStack($hash);
+    ZWave_processSendStack($hash, "next");
+
+  } else {
+    ZWave_processSendStack($hash, "msg");
+
   }
 
   return "" if(!@event);
@@ -4433,14 +4433,6 @@ s2Hex($)
     available (deleted) and 1 for set (occupied). code is a hexadecimal string.
     </li>
 
-  <br><br><b>Class VERSION</b>
-  <li>versionClassRequest<br>
-    executes "get devicename versionClass class" for each class from the
-    classes attribute in the background without generating events, and sets the
-    vclasses attribute at the end.
-    </li>
-
-
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value nodeId<br>
     Set the wakeup interval of battery operated devices to the given value in
@@ -4791,7 +4783,14 @@ s2Hex($)
     </li>
   <li>versionClass classId or className<br>
      return the supported command version for the requested class
-  </li>
+    </li>
+  <li>versionClassAll<br>
+    executes "get devicename versionClass class" for each class from the
+    classes attribute in the background without generating events, and sets the
+    vclasses attribute at the end.
+    </li>
+
+
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval<br>
@@ -4839,7 +4838,7 @@ s2Hex($)
       that are supported with SECURITY.
       </li>
     <li><a href="#vclasses">vclasses</a>
-      This is the result of the "set DEVICE versionClassRequest" command, and
+      This is the result of the "get DEVICE versionClassAll" command, and
       contains the version information for each of the supported classes.
       </li>
     <li><a href="#noExplorerFrames">noExplorerFrames</a>
