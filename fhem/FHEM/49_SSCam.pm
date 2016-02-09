@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.12.1 09.02.2016    bugfix: "goAbsPTZ" may be unavailable on Windows-systems
 # 1.12   08.02.2016    added function "move" for continuous PTZ action
 # 1.11.1 07.02.2016    entries with loglevel "2" reviewed, changed to loglevel "3"
 # 1.11   05.02.2016    added function "goPreset" and "goAbsPTZ" to control the move of PTZ lense
@@ -227,7 +228,7 @@ sub SSCam_Set {
                    "enable ".
                    "disable ".
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                   ((ReadingsVal("$name", "CapPTZAbs", "false") eq "true") ? "goAbsPTZ"." " : ""). 
+                   ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
                    ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
                     
         
@@ -811,7 +812,7 @@ sub doptzaction ($) {
         &printlog($hash,$logstr,"1");
         return;
         }
-    if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && ReadingsVal("$name", "CapPTZAbs", "false") ne "true") {
+    if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && !ReadingsVal("$name", "CapPTZAbs", "false")) {
         $logstr = "ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with device Reading \"CapPTZAbs\"" ;
         &printlog($hash,$logstr,"1");
         return;
