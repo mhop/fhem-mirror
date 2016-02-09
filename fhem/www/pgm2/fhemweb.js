@@ -386,6 +386,8 @@ FW_replaceLink(el)
   if(ma == null || ma.length == 0 || !ma[2].match(/=(save|set)/)) {
     ma = attr.match(new RegExp("^"+FW_root)); // Avoid "Connection lost" @iOS
     if(ma) {
+      $(el).removeAttr("href");
+      $(el).css("cursor", "pointer");
       $(el).click(function(e) {
         // Open link in window/tab, Forum #39154
         if(e.shiftKey || e.ctrlKey || e.metaKey || e.button == 1)
