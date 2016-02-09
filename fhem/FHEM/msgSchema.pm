@@ -286,22 +286,25 @@ my $db = {
 
         'XBMC' => {
             'Normal' =>
-'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
             'High' =>
-'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
             'Low' =>
-'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg $msg $timeout %XBMC_ICON%"; }',
+'{ my $dev=\'%DEVICE%\'; my $msg=\'%MSG%\'; my $title=\'%TITLE%\'; my $timeout=%TIMEOUT%*1000; fhem "set $dev msg \'$title\' \'$msg\' $timeout %XBMC_ICON%"; }',
             'defaultValues' => {
                 'Normal' => {
                     'TIMEOUT'   => 8,
+                    'TITLE'     => 'Info',
                     'XBMC_ICON' => 'info',
                 },
                 'High' => {
                     'TIMEOUT'   => 12,
+                    'TITLE'     => 'Warning',
                     'XBMC_ICON' => 'warning',
                 },
                 'Low' => {
                     'TIMEOUT'   => 8,
+                    'TITLE'     => 'Notice',
                     'XBMC_ICON' => '',
                 },
             },
