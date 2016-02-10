@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.13                 feature for retrieval snapfilename added
 # 1.12.1 09.02.2016    bugfix: "goAbsPTZ" may be unavailable on Windows-systems
 # 1.12   08.02.2016    added function "move" for continuous PTZ action
 # 1.11.1 07.02.2016    entries with loglevel "2" reviewed, changed to loglevel "3"
@@ -330,7 +331,7 @@ sub SSCam_Set {
             
             $hash->{HELPER}{PTZACTION}  = "movestart";
             doptzaction($hash);
-        }               
+        }  
         else  
         {
             return $setlist;
@@ -347,6 +348,7 @@ sub SSCam_Get {
     my %SSCam_gets = (
                      caminfoall    => "caminfoall",
                      svsinfo       => "svsinfo",
+                     snapfileinfo  => "snapfileinfo",
                      );
     my @cList;
         
@@ -363,13 +365,18 @@ sub SSCam_Get {
             
             # hier die Verarbeitung starten
             if ($opt eq "caminfoall") 
-                {
-                    &getcaminfoall($hash);
-                }
-            if ($opt eq "svsinfo") 
-                {
-                    &getsvsinfo($hash);
-                }
+            {
+                &getcaminfoall($hash);
+            }
+            elsif ($opt eq "svsinfo") 
+            {
+                &getsvsinfo($hash);
+            }
+            elsif ($opt eq "snapfileinfo") 
+            {
+                if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+                getsnapfilename($hash);
+            }  
         }
 return undef;
 }
@@ -791,10 +798,34 @@ sub camsnap ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.22, "camsnap", $hash, 0);
+        InternalTimer(gettimeofday()+0.22, "camsnap", $hash, 0);
     }    
 }
 
+###############################################################################
+###   Filename zu Schappschuß ermitteln
+
+sub getsnapfilename ($) {
+    my ($hash)   = @_;
+    my $name     = $hash->{NAME};
+    my $logstr;
+    my $snapid   = ReadingsVal("$name", "LastSnapId", " ");
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        # den Filenamen zu einem Schnappschuß ermitteln
+        $logstr = "Get filename of present Snap-ID $snapid ";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "getsnapfilename";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        getapisites_nonbl($hash);
+    }
+    else
+    {
+        InternalTimer(gettimeofday()+0.22, "getsnapfilename", $hash, 0);
+    }    
+}
 
 ###############################################################################
 ###   PTZ-Kamera auf Position fahren
@@ -1615,6 +1646,7 @@ sub camop_nonbl ($) {
    my $OpMode            = $hash->{OPMODE};
    my $url;
    my $camid;
+   my $snapid;
    my $data;
    my $logstr;
    my $success;
@@ -1760,6 +1792,12 @@ sub camop_nonbl ($) {
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=0&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=$camid&blSave=true&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 0); 
       readingsSingleUpdate($hash, "LastSnapId", "", 1);
+   }
+   elsif ($OpMode eq "getsnapfilename")
+   {
+      # der Filename der aktuellen Schnappschuß-ID wird ermittelt
+      $snapid = ReadingsVal("$name", "LastSnapId", " ");
+      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
    }
    elsif ($OpMode eq "gopreset")
    {
@@ -2002,6 +2040,24 @@ sub camret_nonbl ($) {
                 # Logausgabe
                 $logstr = "Snapshot of Camera $camname has been done successfully";
                 &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "getsnapfilename") 
+            {
+                # den Filenamen eines Schnapschusses ermitteln
+                $snapid = ReadingsVal("$name", "LastSnapId", " ");
+                           
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsBulkUpdate($hash,"LastSnapFilename", $data->{'data'}{'data'}[0]{'fileName'});
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                 $logstr = "Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\" ";
+                &printlog($hash,$logstr,"4");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
@@ -2546,6 +2602,7 @@ sub logout_nonbl ($) {
    my $hash                            = $param->{hash};
    my $sid                             = $hash->{HELPER}{SID};
    my ($success, $username)            = getcredentials($hash,0);
+   my $OpMode                          = $hash->{OPMODE};
    my $data;
    my $logstr;
    my $error;
@@ -2614,6 +2671,12 @@ sub logout_nonbl ($) {
    
 # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
 $hash->{HELPER}{ACTIVE} = "off";   
+
+# nach Snap Aufnahme Filename des Snaps ermitteln
+if ($OpMode eq "Snap") {
+    return (getsnapfilename($hash));
+    }
+
 
 return;
 }
@@ -2871,6 +2934,7 @@ return;
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - observer    </li></td></tr>
       </table>
     </ul>
       <br><br>
@@ -2943,7 +3007,7 @@ return;
      define he1_snap_2 notify MelderHE1:on.* define h2 at +*{2}00:00:06 set CamHE1 snap 
   </pre>
 
-  The ID of the last snapshot will be displayed as value of variable "LastSnapId" in the device-Readings. <br><br>
+  The ID and the filename of the last snapshot will be displayed as value of variable "LastSnapId" respectively "LastSnapFilename" in the device-Readings. <br><br>
   
   <b> "set &lt;name&gt; [enable] [disable]" </b> <br><br>
   
@@ -3073,11 +3137,13 @@ return;
   <pre>
       get &lt;name&gt; caminfoall
       get &lt;name&gt; svsinfo
+      get &lt;name&gt; snapfileinfo
   </pre>
   
   With command "get &lt;name&gt; caminfoall" dependend of the type of Camera (e.g. Fix- or PTZ-Camera) the available properties will be retrieved and provided as Readings.<br>
   For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further 
   processing like creating events. <br>
+  Using "get &lt;name&gt; snapfileinfo" the filename of the last snapshot will be retrieved. This command will be executed with "get &lt;name&gt; snap" automatically. <br>
   The command "get &lt;name&gt; svsinfo" is not really dependend on a camera, but rather a command to determine common informations about the installed SVS-version and other properties. <br>
   The functions "caminfoall" and "svsinfo" will be executed automatically once-only after FHEM restarts to collect some relevant informations for camera control. <br>
   Please consider to save the <a href="#SSCam_Credentials">credentials</a> what will be used for login to DSM or SVS !
@@ -3172,6 +3238,8 @@ return;
     <tr><td><li>DeviceType</li>         </td><td>- device type (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
     <tr><td><li>Error</li>              </td><td>- message text of last error  </td></tr>
     <tr><td><li>Errorcode</li>          </td><td>- error code of last error  </td></tr>
+    <tr><td><li>LastSnapFilename</li>   </td><td>- the filename of the last snapshot   </td></tr>
+    <tr><td><li>LastSnapId</li>         </td><td>- the ID of the last snapshot   </td></tr>    
     <tr><td><li>LastUpdateTime</li>     </td><td>- date / time of last update of Camera in Synology Surrveillance Station  </td></tr>   
     <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
@@ -3355,6 +3423,7 @@ return;
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       </table>
     </ul>
       <br><br>
@@ -3428,7 +3497,7 @@ return;
      define he1_snap_2 notify MelderHE1:on.* define h2 at +*{2}00:00:06 set CamHE1 snap 
   </pre>
 
-  Es wird die ID des letzten Snapshots als Wert der Variable "LastSnapId" in den Readings der Kamera ausgegeben. <br><br>
+  Es wird die ID und der Filename des letzten Snapshots als Wert der Variable "LastSnapId" bzw. "LastSnapFilename" in den Readings der Kamera ausgegeben. <br><br>
   
   <b> "set &lt;name&gt; [enable] [disable]" </b> <br><br>
   
@@ -3556,11 +3625,13 @@ return;
   <pre>
       get &lt;name&gt; caminfoall
       get &lt;name&gt; svsinfo
+      get &lt;name&gt; snapfileinfo
   </pre>
   
   Mit dem Befehl "get &lt;name&gt; caminfoall" werden abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die verfügbaren Eigenschaften ermittelt und als Readings zur Verfügung gestellt. <br>
   So wird zum Beispiel das Reading "Availability" auf "disconnected" gesetzt falls die Kamera von der Surveillance Station getrennt wird und kann für weitere <br>
   Verarbeitungen genutzt werden. <br>
+  Mit "get &lt;name&gt; snapfileinfo" wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit "get &lt;name&gt; snap" ausgeführt. <br>
   Der Befehl "get &lt;name&gt; svsinfo" ist eigentlich nicht von der Kamera abhängig, sondern ermittelt vielmehr allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
   Die Funktionen "caminfoall" und "svsinfo" werden einmalig automatisch beim Start von FHEM ausgeführt um steuerungsrelevante Informationen zu sammeln.<br>
   Es ist darauf zu achten dass die <a href="#SSCam_Credentials">Credentials</a> gespeichert wurden !
@@ -3657,6 +3728,8 @@ return;
     <tr><td><li>DeviceType</li>         </td><td>- Kameratyp (Camera, Video_Server, PTZ, Fisheye)  </td></tr>
     <tr><td><li>Error</li>              </td><td>- Meldungstext des letzten Fehlers  </td></tr>
     <tr><td><li>Errorcode</li>          </td><td>- Fehlercode des letzten Fehlers   </td></tr>
+    <tr><td><li>LastSnapFilename</li>   </td><td>- der Filename des letzten Schnapschusses   </td></tr>
+    <tr><td><li>LastSnapId</li>         </td><td>- die ID des letzten Schnapschusses   </td></tr>
     <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung der Kamera in der Synology Surveillance Station  </td></tr>   
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
