@@ -37,3 +37,4 @@ MOV www/pgm2/ios7smallscreensvg_defs.svg unused
 MOV www/pgm2/ios7smallscreensvg_style.css unused
 MOV www/pgm2/iossmallscreensvg_defs.svg unused
 MOV www/pgm2/iossmallscreensvg_style.css unused
+MOV FHEM/firmware/LaCrosseGateway.bin unused
