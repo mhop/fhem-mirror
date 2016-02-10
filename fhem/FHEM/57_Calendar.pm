@@ -222,6 +222,10 @@ dates in the series created from the RRULE that need to be exempted. We
 therefore collect all events from records with same UID and RECURRENCE-ID set
 as they form the list of records with the exceptions for the UID.
 
+Before the regular creation is done, events for RDATEs are added as long as
+an RDATE is not superseded by an EXDATE. An RDATE takes precedence over a 
+regularly created recurring event.
+
 Starting with the start date of the series, one event is created after the
 other. Creation stops when the series ends or when an event more than 400 days
 in the future has been created. If the event is in the list of exceptions 
@@ -248,7 +252,7 @@ For all of the above:
     COUNT: recognized and honored
     WKST: recognized but ignored
     EXDATE: recognized and honored
-
+    RDATE: recognized and honored
 
 *** Step 4: The device readings related to updates are set
 
@@ -468,6 +472,11 @@ sub summary {
 sub location {
   my ($self)= @_;
   return $self->{location};
+}
+
+sub description {
+  my ($self)= @_;
+  return $self->{description};
 }
 
 sub ts($$) {
@@ -876,7 +885,7 @@ sub addproperty($$) {
   return if($key ~~ @ignores);
   return if($key =~ /^X-/);
 
-  if($key eq "EXDATE") {
+  if(($key eq "EXDATE") or ($key eq "RDATE")) {
         # handle multiple properties
         my @values;
         @values= @{$self->values($key)} if($self->hasKey($key));
@@ -1074,6 +1083,7 @@ sub makeEventDetails($$) {
   
   $event->{summary}= $self->valueOrDefault("SUMMARY", "");
   $event->{location}= $self->valueOrDefault("LOCATION", "");
+  $event->{description}= $self->valueOrDefault("DESCRIPTION", "");
   
   return $event;
 }
@@ -1160,7 +1170,9 @@ sub createSingleEvent($$$) {
     $self->makeEventDetails($event);
     $self->makeEventAlarms($event);
     
+    #main::Debug "createSingleEvent DTSTART=" . $self->value("DTSTART") . " DTEND=" . $self->value("DTEND");
     #main::Debug "createSingleEvent Start " . main::FmtDateTime($event->{start});
+    #main::Debug "createSingleEvent End   " . main::FmtDateTime($event->{end});
     
     # plug-in
     if(defined($onCreateEvent)) {
@@ -1168,7 +1180,7 @@ sub createSingleEvent($$$) {
         #main::Debug "Executing $onCreateEvent for " . $e->asDebug();
         eval $onCreateEvent;
         if($@) {
-            main::Log3 undef, 2, "Erronenous onCreateEvent $onCreateEvent: $@";
+            main::Log3 undef, 2, "Erroneous onCreateEvent $onCreateEvent: $@";
         } else {
             $event= $e;
         }
@@ -1195,17 +1207,21 @@ sub createEvents($$$%) {
         foreach my $k (keys %r) {
             if(not($k ~~ @keywords)) {
                 main::Log3 undef, 2, "Calendar: keyword $k in RRULE $rrule is not supported";
+            } else {
+                #main::Debug "keyword $k in RRULE $rrule has value $r{$k}";
             }
         }    
 
         # Valid values for freq: SECONDLY, MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
         my $freq =  $r{"FREQ"};
+        #main::Debug "FREQ= $freq";
         # According to RFC, interval defaults to 1
         my $interval = exists($r{"INTERVAL"}) ? $r{"INTERVAL"} : 1;
         my $until = exists($r{"UNTIL"}) ? $self->tm($r{"UNTIL"}) : 99999999999999999;
         my $count = exists($r{"COUNT"}) ? $r{"COUNT"} : 999999;  
         my $bymonthday = $r{"BYMONTHDAY"} if(exists($r{"BYMONTHDAY"})); # stored but ignored
-        my $byday = $r{"BYDAY"} if(exists($r{"BYDAY"})); # stored but ignored
+        my $byday = exists($r{"BYDAY"}) ? $r{"BYDAY"} : "";
+        #main::Debug "byday is $byday";
         my $bymonth = $r{"BYMONTH"} if(exists($r{"BYMONTH"})); # stored but ignored
         my $wkst = $r{"WKST"} if(exists($r{"WKST"})); # stored but ignored
 
@@ -1213,6 +1229,36 @@ sub createEvents($$$%) {
         
         
         #main::Debug "createEvents: " . $self->asString();
+
+        # 
+        # we first add all RDATEs
+        #
+        if($self->hasKey('RDATE')) {
+            foreach my $rdate (@{$self->values("RDATE")}) {
+                my $event= $self->createSingleEvent($self->tm($rdate), $onCreateEvent);
+                my $skip= 0;
+                if($self->hasKey('EXDATE')) {
+                    foreach my $exdate (@{$self->values("EXDATE")}) {
+                        if($self->tm($exdate) == $event->start()) {
+                            $event->setNote("EXDATE: $exdate for RDATE: $rdate");
+                            $self->addSkippedEvent($event);
+                            $skip++;
+                            last;
+                        }
+                    }
+                }
+                if(!$skip) {
+                    # add event
+                    # and return if we exceed storage limit 
+                    $event->setNote("RDATE: $rdate");
+                    $self->addEventLimited($t, $event); 
+                }
+            }
+        }
+        
+        #
+        # now we build the series
+        #
         
         # first event in the series
         my $event= $self->createSingleEvent(undef, $onCreateEvent);
@@ -1236,6 +1282,17 @@ sub createEvents($$$%) {
                     }
                 }
             }
+           
+            # RFC 5545 p. 120
+            # The final recurrence set is generated by gathering all of the
+            # start DATE-TIME values generated by any of the specified "RRULE"
+            # and "RDATE" properties, and then excluding any start DATE-TIME
+            # values specified by "EXDATE" properties.  This implies that start
+            # DATE-TIME values specified by "EXDATE" properties take precedence
+            # over those specified by inclusion properties (i.e., "RDATE" and
+            # "RRULE").  Where duplicate instances are generated by the "RRULE"
+            # and "RDATE" properties, only one recurrence is considered.
+            # Duplicate instances are ignored.
             
             # check if excluded by EXDATE
             if($self->hasKey('EXDATE')) {
@@ -1247,9 +1304,21 @@ sub createEvents($$$%) {
                         last;
                     }
                 }
-            
             }
-          
+
+            # check if excluded by a duplicate RDATE
+            # this is only to avoid duplicates from previously added RDATEs
+            if($self->hasKey('RDATE')) {
+                foreach my $rdate (@{$self->values("RDATE")}) {
+                    if($self->tm($rdate) == $event->start()) {
+                        $event->setNote("RDATE: $rdate");
+                        $self->addSkippedEvent($event);
+                        $skip++;
+                        last;
+                    }
+                }
+            }
+            
             return if($event->{start} > $until); # return if we are after end of series
             if(!$skip) {
                 # add event
@@ -1271,25 +1340,25 @@ sub createEvents($$$%) {
                 $nextstart = plusNSeconds($nextstart, 24*60*60, $interval);
             } elsif($freq  eq "WEEKLY") {
                 # special handling for WEEKLY and BYDAY
-                if(exists($self->{byday})) {
-                # BYDAY with prefix (e.g. -1SU or 2MO) is not recognized
-                #main::Debug "weekdays: " . $self->{byday};
-                my @bydays= split(',', $self->{byday});
-                # we skip interval-1 weeks
-                $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval-1);
-                #main::Debug "Fast forward to: start " . ts($nextstart);
-                my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
-                my $preventloop = 0;        
-                do {
-                    $nextstart = plusNSeconds($nextstart, 24*60*60, 1); # forward day by day
-                    ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) = gmtime($nextstart);
-                    #main::Debug "Skip to: start " . ts($nextstart) . " = " . $weekdays[$mwday];
-                    $preventloop ++;        
-                } until(($weekdays[$mwday] ~~ @bydays) or ($preventloop > 7));
+                #main::Debug "weekly event, BYDAY= $byday";
+                if($byday ne "") {
+                    # BYDAY with prefix (e.g. -1SU or 2MO) is not recognized
+                    my @bydays= split(',', $byday);
+                    # we skip interval-1 weeks
+                    $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval-1);
+                    my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
+                    my $preventloop = 0;        
+                    do {
+                        $nextstart = plusNSeconds($nextstart, 24*60*60, 1); # forward day by day
+                        ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) = gmtime($nextstart);
+                        #main::Debug "Skip to: start " . ts($nextstart) . " = " . $weekdays[$mwday];
+                        $preventloop ++;    
+                        #main::Debug "weekday= " . $weekdays[$mwday] . ", smartmatch " . join(" ",@bydays) ."= " . ($weekdays[$mwday] ~~ @bydays ? "yes" : "no");
+                    } until(($weekdays[$mwday] ~~ @bydays) or ($preventloop > 7));
                 }
                 else {
-                # default WEEKLY handling
-                $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval);
+                    # default WEEKLY handling
+                    $nextstart = plusNSeconds($nextstart, 7*24*60*60, $interval);
                 }
             } elsif($freq eq "MONTHLY") {
                 # here we ignore BYMONTHDAY as we consider the day of month of $self->{start}
@@ -1305,7 +1374,6 @@ sub createEvents($$$%) {
             $event= $self->createSingleEvent($nextstart, $onCreateEvent);
             
         }
-        
         
   
   } else {
@@ -1555,7 +1623,7 @@ sub Calendar_Get($@) {
 
   }
   
-  my @cmds2= qw/text full summary location alarm start end debug/;
+  my @cmds2= qw/text full summary location description alarm start end debug/;
   if($cmd ~~ @cmds2) {
 
     return "argument is missing" if($#a < 2);
@@ -2551,6 +2619,10 @@ sub CalendarAsHtml($;$) {
         calendar events that ended before t-hideOlderThan are not shown. If hideLaterThan is
         set, calendar events that will start after t+hideLaterThan are not shown.<p>
         
+        Please note that an action triggered by a change to mode "end" cannot access the calendar event 
+        if you set hideOlderThan to 0 because the calendar event will already be hidden at that time. Better set 
+        hideOlderThan to 10.<p>
+        
         <code>&lt;timespec&gt;</code> must have one of the following formats:<br>
         <table>
         <tr><th>format</th><th>description</th><th>example</th></tr>
@@ -2755,7 +2827,7 @@ sub CalendarAsHtml($;$) {
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
-    define LogActors notify MyCalendar:start|end:.* { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 $NAME, 1, "Actor: $actor, Reading $reading" }
+    define LogActors notify MyCalendar:(start|end):.* { my $reading= "$EVTPART0";; my $uid= "$EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 3 $NAME, 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
 
@@ -2921,6 +2993,10 @@ sub CalendarAsHtml($;$) {
         Die Zeit wird relativ zur aktuellen Zeit t angegeben.<br>
 		Wenn &lt;hideOlderThan&gt; gesetzt ist, werden Termine, die vor &lt;t-hideOlderThan&gt; enden, ingnoriert.<br>
         Wenn &lt;hideLaterThan&gt; gesetzt ist, werden Termine, die nach &lt;t+hideLaterThan&gt; anfangen, ignoriert.<p>
+
+        Bitte beachten, dass eine Aktion, die durch einen Wechsel in den Modus "end" ausgel&ouml;st wird, nicht auf den Termin
+        zugreifen kann, wenn hideOlderThan 0 ist, weil der Termin dann schon versteckt ist. Besser hideOlderThan auf 10 setzen.<p>
+        
         
         <code>&lt;timespec&gt;</code> muss einem der folgenden Formate entsprechen:<br>
         <table>
@@ -3113,7 +3189,7 @@ sub CalendarAsHtml($;$) {
     </code><br><br>
     Auch hier kann ein Logging aufgesetzt werden:<br><br>
     <code>
-    define LogActors notify MyCalendar:mode(start|end).* {}<br>
+    define LogActors notify MyCalendar:(start|end).* {}<br>
     </code>
 	Dann auf DEF klicken und im DEF-Editor folgendes zwischen die beiden geschweiften Klammern {} eingeben:
     <code>

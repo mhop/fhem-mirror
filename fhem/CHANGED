@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  57_Calendar: weekly recurring events on several weekdays,
+             missing description
+  - feature: 57_Calendar: RDATE enabled             
   - bugfix:  49:SSCAM: "goAbsPTZ" may be unavailable on Windows-systems
   - feature  49_SSCAM: added function "move" for continuous PTZ action
   - feature: 02_RSS: continue image update sequence after error (HTML)
