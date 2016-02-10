@@ -94,6 +94,12 @@ watchdog_Notify($$)
 
     if($watchdog->{STATE} =~ m/Next:/) {
 
+      if($dotTrigger) {
+        RemoveInternalTimer($watchdog);
+        $watchdog->{STATE} = "defined";
+        return;
+      }
+
       if($n =~ m/^$re2$/ || "$n:$s" =~ m/^$re2$/) {
         RemoveInternalTimer($watchdog);
 
@@ -112,8 +118,7 @@ watchdog_Notify($$)
       }
 
     } elsif($watchdog->{STATE} eq "defined") {
-      if($dotTrigger ||      # trigger w .
-         ($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/)) {
+      if($dotTrigger || ($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/)) {
         watchdog_Activate($watchdog)
       }
 
@@ -251,9 +256,10 @@ watchdog_Attr(@)
           regexp, and it will be reactivated, when it is received.
           </li>
       <li>trigger &lt;watchdogname&gt; . will activate the trigger if its state
-          is defined, and set it into state defined if its state is
-          triggered. You always have to reactivate the watchdog with this
-          command once it has triggered (unless you restart fhem)</li>
+          is defined, and set it into state defined if its state is active
+          (Next:...) or triggered. You always have to reactivate the watchdog
+          with this command once it has triggered (unless you restart
+          fhem)</li>
       <li>a generic watchdog (one watchdog responsible for more devices) is
           currently not possible.</li>
       <li>with modify all parameters are optional, and will not be changed if
@@ -354,7 +360,7 @@ watchdog_Attr(@)
 
       <li>trigger &lt;watchdogname&gt; . aktiviert den Trigger wenn dessen
       Status defined ist und setzt ihn in den Status defined wenn sein status
-      triggered ist.<br>
+      triggered oder aktiviert (Next:...) ist.<br>
 
       Der Watchdog musst immer mit diesem Befehl reaktiviert werden wenn er
       getriggert wurde.</li>
