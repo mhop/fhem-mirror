@@ -1907,7 +1907,7 @@ SVG_render($$$$$$$$$$)
             my @tvals = split("[ ,]", $ret);
             if (@tvals > 2) {
                 if ($tvals[0] ne "M") { # just points, no M/L
-                    $ret = sprintf("M %d %d $lt $ret", $tvals[1],$tvals[2]);
+                    $ret = sprintf("M %d,%d $lt $ret", $tvals[1],$tvals[2]);
                 }
             }
 
@@ -2054,7 +2054,7 @@ SVG_getControlPoints($)
   my $header = "";
   
   foreach my $i (0..int(@vals)-1) {
-    $header .= $vals[$i] . " ";
+    $header .= $vals[$i] . ($i == 1 ? "," : " ");
     if ($vals[$i] eq "C" || $vals[$i] eq "Q") {
       my $lt = $vals[$i];
       $i++;
