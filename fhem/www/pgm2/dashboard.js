@@ -673,7 +673,6 @@ function dashboard_buildDashboard(){
 }
 
 $(document).ready( function () {
-  svg_init();
   var dbattr = document.getElementById("dashboard_attr");
   if (dbattr) {
 	$("body").attr("longpollfilter", ".*") //need for longpoll
