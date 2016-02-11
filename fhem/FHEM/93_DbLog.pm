@@ -1572,7 +1572,7 @@ sub DbLog_Set($@) {
         
         if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd .= "datetime('now', '-$a[2] days')"; }
         elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-        elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd .= "NOW() - INTERVAL '$a[2] DAY"; }
+        elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd .= "NOW() - INTERVAL '$a[2]' DAY"; }
         else { $cmd = undef; $ret = 'Unknown database type. Maybe you can try userCommand anyway.'; }
 
         if(defined($cmd)) {
