@@ -269,15 +269,17 @@ CUL_WS_Parse($$)
       $NotifyIsRaining=$ir;
 
    } elsif(int(@a) > 8) {                       # WS7000 Temp/Hum sensors
-      $sgn = ($firstbyte&8) ? -1 : 1;
-      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
-      $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
-      $val = "T: $tmp  H: $hum";
-      $devtype = "TH".$sfirstbyte;
-      $family = "WS7000";
-      $NotifyType="T H";
-      $NotifyTemperature=$tmp;
-      $NotifyHumidity=$hum;
+      if(join("", @a[3..8]) =~ m/^\d*$/) {      # Forum 49125
+        $sgn = ($firstbyte&8) ? -1 : 1;
+        $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+        $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
+        $val = "T: $tmp  H: $hum";
+        $devtype = "TH".$sfirstbyte;
+        $family = "WS7000";
+        $NotifyType="T H";
+        $NotifyTemperature=$tmp;
+        $NotifyHumidity=$hum;
+      }
     }
 
   }
