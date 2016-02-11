@@ -117,6 +117,8 @@ use warnings;
 
 # Hex-Debugging into READING hexline? YES = 1, NO = 0
 my $TRX_HEX_debug = 0;
+# Max temperatute für Maverick BBQ
+my $TRX_MAX_TEMP_BBQ = 1000;
 
 my $time_old = 0;
 my $trx_rssi;
@@ -244,6 +246,8 @@ sub TRX_WEATHER_temperature_food {
 
   my $temp = $bytes->[$off]*256 + $bytes->[$off+1];
 
+  return if ($temp > $TRX_MAX_TEMP_BBQ);
+
   push @$res, {
        		device => $dev,
        		type => 'temp-food',
@@ -257,6 +261,8 @@ sub TRX_WEATHER_temperature_bbq {
   my ($bytes, $dev, $res, $off) = @_;
 
   my $temp = $bytes->[$off]*256 + $bytes->[$off+1];
+
+  return if ($temp > $TRX_MAX_TEMP_BBQ);
 
   push @$res, {
        		device => $dev,
