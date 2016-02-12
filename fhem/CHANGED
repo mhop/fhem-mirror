@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix   49_SSCAM: fixed a problem that a usersession won't be destroyed
+                       if a function couldn't be executed successfully
   - bugfix:  95_Dashboard: fixed javascript error because of changes
 		in fhemweb
   - feature: 49_SSCAM: feature for retrieval snapfilename added

@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.13.1 12.02.2016    fixed a problem that a usersession won't be destroyed if a
+#                      function couldn't be executed successfully
 # 1.13                 feature for retrieval snapfilename added
 # 1.12.1 09.02.2016    bugfix: "goAbsPTZ" may be unavailable on Windows-systems
 # 1.12   08.02.2016    added function "move" for continuous PTZ action
@@ -155,10 +157,10 @@ sub SSCam_Define {
   RemoveInternalTimer($hash);                                                                     # alle Timer löschen
   
   # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-60s 
-  InternalTimer(gettimeofday()+int(srand(60)), "watchdogpollcaminfo", $hash, 0);
+  InternalTimer(gettimeofday()+int(rand(60)), "watchdogpollcaminfo", $hash, 0);
   
   # initiale Rotinen nach Restart ausführen , verzögerter zufälliger Start   
-  InternalTimer(gettimeofday()+int(srand(10)), "initonboot", $hash, 0);
+  InternalTimer(gettimeofday()+int(rand(10)), "initonboot", $hash, 0);
 
 return undef;
 }
@@ -1221,18 +1223,20 @@ sub getapisites_nonbl {
    my $httptimeout;
   
    #### API-Pfade und MaxVersions ermitteln #####
-   # Logausgabe
+ 
    $logstr = "--- Begin Function getapisites nonblocking ---";
    &printlog($hash,$logstr,"4");
    
    $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
-   # Logausgabe
+
    $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
    &printlog($hash,$logstr,"5");
 
-   
    # URL zur Abfrage der Eigenschaften der  API's
    $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo";
+
+   $logstr = "Call-Out now: $url";
+   &printlog($hash,$logstr,"4");    
    
    $param = {
                url      => $url,
@@ -1242,8 +1246,7 @@ sub getapisites_nonbl {
                header   => "Accept: application/json",
                callback => \&login_nonbl
             };
-   
-   # API-Sites werden abgefragt und mit Routine "login_nonbl" verarbeitet
+
    HttpUtils_NonblockingGet ($param);  
 } 
     
@@ -1300,13 +1303,8 @@ sub login_nonbl ($) {
 
         return;
     }
-
     elsif ($myjson ne "")                                                                               # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-    {
-        $logstr = "URL-Call: ".$param->{url};                                                          
-        &printlog($hash,$logstr,"4");
-          
-        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson
+    {          
         
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
@@ -1445,7 +1443,7 @@ sub login_nonbl ($) {
     }
   
   # Login und SID ermitteln
-  # Logausgabe
+
   $logstr = "--- Begin Function serverlogin nonblocking ---";
   &printlog($hash,$logstr,"4");
   
@@ -1455,17 +1453,19 @@ sub login_nonbl ($) {
   
   $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
   
-  # Logausgabe
   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
   &printlog($hash,$logstr,"5");  
  
-  if (defined(AttrVal($name, "session", undef)) and AttrVal($name, "session", undef) eq "SurveillanceStation") {
+  if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\"";
       }
       else
       {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=\"sid\""; 
       }
+
+  $logstr = "Call-Out now: $url";
+  &printlog($hash,$logstr,"4");       
   
   $param = {
                url      => $url,
@@ -1521,21 +1521,16 @@ sub getcamid_nonbl ($) {
         return;
    }
    elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-   {
-        $logstr = "URL-Call: ".$param->{url};                                                          # Eintrag fürs Log
-        &printlog($hash,$logstr,"4");
-          
-        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson
-        
+   {          
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
-        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success)};
+        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success);}
         
         $data = decode_json($myjson);
    
         $success = $data->{'success'};
         
-        # Fall login war erfolgreich
+        # login war erfolgreich
         if ($success) 
         {
              # Logausgabe decodierte JSON Daten
@@ -1589,18 +1584,21 @@ sub getcamid_nonbl ($) {
   
   
   # die Kamera-Id wird aus dem Kameranamen (Surveillance Station) ermittelt und mit Routine "camop_nonbl" verarbeitet
-  # Logausgabe
+
   $logstr = "--- Begin Function getcamid nonblocking ---";
   &printlog($hash,$logstr,"4");
   
   $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
-  # Logausgabe
+
   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
   &printlog($hash,$logstr,"5");  
   
   # einlesen aller Kameras - Auswertung in Rückkehrfunktion "camop_nonbl"
   $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
 
+  $logstr = "Call-Out now: $url";
+  &printlog($hash,$logstr,"4");             
+  
   $param = {
                url      => $url,
                timeout  => $httptimeout,
@@ -1668,20 +1666,15 @@ sub camop_nonbl ($) {
         &printlog($hash,$logstr,"4");
         
         readingsSingleUpdate($hash, "Error", $err, 1);                                     # Readings erzeugen
- 
-        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-        $hash->{HELPER}{ACTIVE} = "off"; 
 
-        return;
+        return (logout_nonbl($hash));
    }
    elsif ($myjson ne "")                                                                   # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-   {
-        $logstr = "URL-Call: ".$param->{url};                                                          
-        &printlog($hash,$logstr,"4");                                          
+   {                             
         
         # Evaluiere ob Daten im JSON-Format empfangen wurden, Achtung: sehr viele Daten mit verbose=5
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
-        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success)};
+        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return (logout_nonbl($hash));}
         
         $data = decode_json($myjson);
    
@@ -1734,11 +1727,8 @@ sub camop_nonbl ($) {
                  &printlog($hash,$logstr,"1");
                  $logstr = "--- End Function getcamid nonblocking with error ---";
                  &printlog($hash,$logstr,"4");
-                 
-                 # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-                 $hash->{HELPER}{ACTIVE} = "off"; 
-           
-                 return;
+                        
+                 return (logout_nonbl($hash));
               }
        }
        else 
@@ -1755,24 +1745,19 @@ sub camop_nonbl ($) {
             readingsBulkUpdate($hash,"Error",$error);
             readingsEndUpdate($hash, 1);
 
-            # Logausgabe
             $logstr = "ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error";
             &printlog($hash,$logstr,"1");
             $logstr = "--- End Function getcamid nonblocking with error ---";
             &printlog($hash,$logstr,"4");
-            
-            # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-            $hash->{HELPER}{ACTIVE} = "off"; 
-            
-            return;
+                        
+            return (logout_nonbl($hash));
        }
        
-   # Logausgabe
    $logstr = "--- Begin Function cam: $OpMode nonblocking ---";
    &printlog($hash,$logstr,"4");
 
    $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
-   # Logausgabe
+   
    $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
    &printlog($hash,$logstr,"5");
    
@@ -1859,6 +1844,9 @@ sub camop_nonbl ($) {
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=2&camParamChkList=1&_sid=\"$sid\"";   
    }
    
+   $logstr = "Call-Out now: $url";
+   &printlog($hash,$logstr,"4");
+   
    $param = {
                 url      => $url,
                 timeout  => $httptimeout,
@@ -1921,8 +1909,6 @@ sub camret_nonbl ($) {
        $rectime = AttrVal($name, "rectime",undef) ? AttrVal($name, "rectime",undef) : $hash->{HELPER}{RECTIME_DEF};
        }
    
-  
-   # Verarbeitung der asynchronen Rückkehrdaten aus sub "camop_nonbl"
    if ($err ne "")                                                                                     # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
    {
         $logstr = "error while requesting ".$param->{url}." - $err";
@@ -1931,22 +1917,14 @@ sub camret_nonbl ($) {
         &printlog($hash,$logstr,"4");
         
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
-        
-        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-        $hash->{HELPER}{ACTIVE} = "off"; 
 
-        return;
+        return (logout_nonbl($hash));
    }
    elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-   {
-        $logstr = "URL-Call: ".$param->{url};                                                          
-        &printlog($hash,$logstr,"4");
-  
-        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson 
-      
+   {    
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
-        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success)};
+        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return (logout_nonbl($hash));}
         
         $data = decode_json($myjson);
    
@@ -2560,18 +2538,40 @@ sub camret_nonbl ($) {
             &printlog($hash,$logstr,"4");
 
        }
-       
-    # logout wird ausgeführt, Rückkehr wird mit "logout_nonbl" verarbeitet
-    # Logausgabe
+   }
+   
+return (logout_nonbl($hash));
+}
+
+
+###################################################################################  
+####      Funktion logout
+
+sub logout_nonbl ($) {
+   my ($hash) = @_;
+   my $name             = $hash->{NAME};
+   my $serveraddr       = $hash->{SERVERADDR};
+   my $serverport       = $hash->{SERVERPORT};
+   my $apiauth          = $hash->{HELPER}{APIAUTH};
+   my $apiauthpath      = $hash->{HELPER}{APIAUTHPATH};
+   my $apiauthmaxver    = $hash->{HELPER}{APIAUTHMAXVER};
+   my $sid              = $hash->{HELPER}{SID};
+   my $url;
+   my $param;
+   my $logstr;
+   my $httptimeout;
+    
+    # logout wird ausgeführt, Rückkehr wird mit "logoutret_nonbl" verarbeitet
+
     $logstr = "--- Begin Function logout nonblocking ---";
     &printlog($hash,$logstr,"4");
     
     $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
-    # Logausgabe
+    
     $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
     &printlog($hash,$logstr,"5");    
   
-    if (defined(AttrVal($name, "session", undef)) and AttrVal($name, "session", undef) eq "SurveillanceStation") {
+    if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
         $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
         }
         else
@@ -2585,19 +2585,18 @@ sub camret_nonbl ($) {
                 hash     => $hash,
                 method   => "GET",
                 header   => "Accept: application/json",
-                callback => \&logout_nonbl
+                callback => \&logoutret_nonbl
              };
    
     HttpUtils_NonblockingGet ($param);
-   }
+
 }
 
-
 ###################################################################################  
-####      Rückkehr aus Funktion camret_nonbl,  
+####      Rückkehr aus Funktion logout_nonbl,  
 ####      check Funktion logout
   
-sub logout_nonbl ($) {  
+sub logoutret_nonbl ($) {  
    my ($param, $err, $myjson) = @_;
    my $hash                            = $param->{hash};
    my $sid                             = $hash->{HELPER}{SID};
@@ -2669,13 +2668,13 @@ sub logout_nonbl ($) {
          }
    }
    
-# ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
-$hash->{HELPER}{ACTIVE} = "off";   
+   # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
+   $hash->{HELPER}{ACTIVE} = "off";   
 
-# nach Snap Aufnahme Filename des Snaps ermitteln
-if ($OpMode eq "Snap") {
-    return (getsnapfilename($hash));
-    }
+   # nach Snap Aufnahme Filename des Snaps ermitteln
+   if ($OpMode eq "Snap") {
+       return (getsnapfilename($hash));
+       }
 
 
 return;
@@ -2712,7 +2711,7 @@ sub evaljson {
       readingsEndUpdate($hash, 1);  
 
   };
-
+  
 return($hash,$success);
 }
 
