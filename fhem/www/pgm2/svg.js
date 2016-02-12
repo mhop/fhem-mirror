@@ -80,6 +80,20 @@ sv_menu(evt, embed)
   var hidden = $(svg).find(".hidden");
 
   function
+  myPathSegList(node)     // chrome 48+ removed the pathSegList interface
+  {
+    this.arr = $(node).attr("d").split(/  */);
+    this.arr.splice(0,1); // remove M
+    this.arr.splice(1,1); // remove L/Q/etc
+    this.numberOfItems = this.arr.length;
+    this.getItem = function(pos)
+    {
+      var xy = this.arr[pos].split(",");
+      return { x:parseFloat(xy[0]), y:parseFloat(xy[1]) };
+    }
+  }
+
+  function
   showValOff() {
     $(svg).find("[id]").each(function(){delete($(this).get(0).showVal)});
     $(svg).off("mousemove");
@@ -198,22 +212,8 @@ sv_menu(evt, embed)
           $("#content").append(par.div);
 
           var pl = selNode[arrName];
-          if(!pl) {     // chrome 48+ removed the pathSegList interface
-            function
-            myPathSegList(node)
-            {
-              this.arr = $(node).attr("d").split(/  */);
-              this.arr.splice(0,1); // remove M
-              this.arr.splice(1,1); // remove L/Q/etc
-              this.numberOfItems = this.arr.length;
-              this.getItem = function(pos)
-              {
-                var xy = this.arr[pos].split(",");
-                return { x:parseFloat(xy[0]), y:parseFloat(xy[1]) };
-              }
-            }
+          if(!pl)
             selNode[arrName] = pl = new myPathSegList(selNode);
-          }
           if(pl.numberOfItems > 2)
             mousemove({pageX:pl.getItem(pl.numberOfItems-2).x});
         }
