@@ -836,9 +836,7 @@ ZWave_Cmd($$@)
   }
 
   my $r = ZWave_addToSendStack($baseHash, $type, $data);
-  if($r) {
-    return (AttrVal($name,"verbose",3) > 2 ? $r : undef);
-  }
+  return (AttrVal($name,"verbose",3) > 2 ? $r : undef) if($r);
 
   my $val;
   if($type eq "get" && $hash->{CL}) { # Wait for the result for frontend cmd
@@ -859,8 +857,10 @@ ZWave_Cmd($$@)
         if($data && $cmd eq "neighborList");
 
   } elsif($type ne "get") {
+    ZWave_processSendStack($hash, "next") if($cmd eq "neighborUpdate");
     $cmd .= " ".join(" ", @a) if(@a);
     readingsSingleUpdate($hash, "state", $cmd, 1);
+
   }
 
   return $val;
