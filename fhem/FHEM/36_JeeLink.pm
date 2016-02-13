@@ -7,6 +7,8 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use Time::Local;
+use LWP::UserAgent;
+use HTTP::Request::Common;
 
 sub JeeLink_Attr(@);
 sub JeeLink_Clear($);
