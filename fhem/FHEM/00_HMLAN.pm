@@ -940,6 +940,7 @@ sub HMLAN_assignIDs($){
 sub HMLAN_writeAesKey($) {#####################################################
   my ($name) = @_;
   return if (!$name || !$defs{$name} || $defs{$name}{TYPE} ne "HMLAN");
+  return if (!$init_done);
   my %keys = ();
   my $vccu = InternalVal($name,"owner_CCU",$name);
   $vccu = $name if(!AttrVal($vccu,"hmKey",""));
