@@ -1185,7 +1185,7 @@ YAMAHA_AVR_ParseResponse ($$$)
     
     if(exists($param->{code}))
     {
-        Log3 $name, 5, "YAMAHA_AVR ($name) - received HTTP code ".$param->{code}." for command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
+        Log3 $name, 4, "YAMAHA_AVR ($name) - received HTTP code ".$param->{code}." for command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
         
         if($cmd eq "statusRequest" and $param->{code} ne "200")
         {
@@ -1206,7 +1206,7 @@ YAMAHA_AVR_ParseResponse ($$$)
     
     if($err ne "" and not $options->{can_fail})
     {
-        Log3 $name, 5, "YAMAHA_AVR ($name) - could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $err";
+        Log3 $name, 4, "YAMAHA_AVR ($name) - could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $err";
 
         if((not exists($hash->{helper}{AVAILABLE})) or (exists($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1))
         {
@@ -1220,7 +1220,7 @@ YAMAHA_AVR_ParseResponse ($$$)
     
     if($data ne "")
     {
-        Log3 $name, 5, "YAMAHA_AVR ($name) - got response for \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $data";
+        Log3 $name, 4, "YAMAHA_AVR ($name) - got response for \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $data";
     
          # add a dummy queue entry to wait a specific time before next command starts
         if($options->{wait_after_response})
