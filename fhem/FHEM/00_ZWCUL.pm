@@ -25,6 +25,7 @@ sub ZWCUL_Write($$$);
 sub ZWCUL_ProcessSendStack($);
 
 use vars qw(%zwave_id2class);
+my %sentIdx;
 
 my %sets = (
   "reopen"     => { cmd=>"" },
@@ -217,6 +218,7 @@ ZWCUL_cmd($$@)
     ZWCUL_tmp9600($hash, $a[0] ? "zm9" : 0); # expect random homeId
     return;
   }
+
   if($cmdName eq "removeNode") {
     delete $hash->{addNode};
     delete $hash->{removeNode};
@@ -224,6 +226,7 @@ ZWCUL_cmd($$@)
     ZWCUL_tmp9600($hash, $a[0] ? "zr9" : 0);
     return;
   }
+
   if($cmdName eq "nodeInfo") {
     my $node = ZWCUL_getNode($hash, sprintf("%02x", $a[0]));
     return "Node with decimal id $a[0] not found" if(!$node);
@@ -275,24 +278,23 @@ ZWCUL_Write($$$)
 
   Log3 $hash, 5, "ZWCUL_Write $fn $msg";
   if($msg =~ m/0013(..)(..)(.*)(....)/) {
-    my ($t,$l,$p) = ($1,$2,$3);
-    my $th = $modules{ZWave}{defptr}{"$fn $t"};
-    if(!$th) {
-      Log3 $hash, 1, "ZWCUL: no device found for $fn $t";
-      return;
-    }
+    my ($targetId,$l,$p) = ($1,$2,$3);
+    my ($homeId,$route) = split(",",$fn);
 
-    # Do not send wakeupNoMoreInformation in monitor mode
-    return if($p eq "8408" && $hash->{monitor});
-
-    $th->{sentIdx} = 0 if(!$th->{sentIdx} || $th->{sentIdx} == 15);
-    $th->{sentIdx}++;
+    $sentIdx{$targetId} = 0 if(!$sentIdx{$targetId} || $sentIdx{$targetId}==15);
+    $sentIdx{$targetId}++;
 
     my $s100 = ($hash->{baudRate} eq "100k");
 
-    $msg = sprintf("%s%s41%02x%02x%s%s", 
-                    $fn, $hash->{nodeIdHex}, $th->{sentIdx},
-                    length($p)/2+($s100 ? 11 : 10), $th->{nodeIdHex}, $p);
+    my $rf = 0x41;
+    if($route) {
+      $rf = 0x81;
+      $p = sprintf("00%d0%s%s",length($route)/2, $route, $p);
+    }
+
+    $msg = sprintf("%s%s%02x%02x%02x%s%s", 
+                    $homeId, $hash->{nodeIdHex}, $rf, $sentIdx{$targetId},
+                    length($p)/2+($s100 ? 11 : 10), $targetId, $p);
     $msg .= ($s100 ? zwlib_checkSum_16($msg) : zwlib_checkSum_8($msg));
 
     ZWCUL_SimpleWrite($hash, "zs".$msg);
@@ -462,21 +464,13 @@ ZWCUL_Parse($$$$$)
       return;
     }
 
-    if($hash->{addNode} && $T eq "ff" && $S eq "00" &&
-       $P =~ m/^0101(......)(..)..(.*)/) {
+    if($hash->{addNode} && $T eq "ff" && $S eq "00" && $P =~ m/^0101/) {
       ZWCUL_assignId($hash, "00", $hash->{homeIdSet}, $hash->{addNode});
       $hash->{addNodeParam} = $P;
       return;
     }
 
     $rmsg = sprintf("0004%s%s%02x%s", $S, $S, length($P)/2, $P);
-    my $th = $modules{ZWave}{defptr}{"$H $S"};
-
-    if(!($S eq $hash->{nodeIdHex} && $H eq $hash->{homeIdSet}) && !$th) {
-      DoTrigger("global", "UNDEFINED ZWNode_${H}_$S ZWave $H ".hex($S));
-      $th = $modules{ZWave}{defptr}{"$H $S"};
-    }
-
 
   } else {      # ACK
     if($hash->{removeNode} && $hash->{removeNode} eq $S) { #############
@@ -507,8 +501,8 @@ ZWCUL_Parse($$$$$)
     }
 
     if($hash->{addNode} && $hash->{addNode} eq $S) { # Another hack
-      Log3 $hash, 3, "ZWCUL node ".hex($S)." excluded from network";
-      delete $hash->{removeNode};
+      Log3 $hash, 3,"ZWCUL node ".hex($S)." (hex $S) included into the network";
+      delete $hash->{addNode};
       ZWCUL_tmp9600($hash, 0);
       return;
     }
@@ -701,13 +695,12 @@ ZWCUL_Ready($)
     Activate (or deactivate) inclusion mode. The CUL will switch to dataRate
     9600 until terminating this mode with off, or a node is included. If onSec
     is specified, the ZWCUL networkKey ist set, and the device supports the
-    SECURITY class, then a secure inclusion is attempted.
-    </li>
+    SECURITY class, then a secure inclusion is attempted. </li>
 
   <li>addNodeId &lt;decimalNodeId&gt;<br>
     Activate inclusion mode, and assign decimalNodeId to the next node.
-    To deactivate this mode, use addNode off.
-    </li>
+    To deactivate this mode, use addNode off. Note: addNode won't work for a
+    FHEM2FHEM:RAW attached ZWCUL, use addNodeId instead</li>
 
   <li>removeNode [onNw|on|off]<br>
     Activate (or deactivate) exclusion mode. Like with addNode, the CUL will

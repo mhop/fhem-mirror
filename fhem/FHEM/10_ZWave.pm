@@ -36,7 +36,8 @@ my %zwave_class = (
                "..0105"    => '"zwaveGetNodesInRange:noarg"',
                "..0106(.*)"=> '"zwaveNodeRangeInfo:$1"',
                "..0107(.*)"=> '"zwaveCommandComplete:$1"',
-               "..010801"  => '"zwaveTransferPresentation"'
+               "..010801"  => '"zwaveTransferPresentation"',
+               "..010c(.*)"=> '"zwaveAssignRoute:$1"'
                }},
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x",
@@ -535,10 +536,25 @@ ZWave_Initialize($)
   $hash->{GetFn}     = "ZWave_Get";
   $hash->{DefFn}     = "ZWave_Define";
   $hash->{UndefFn}   = "ZWave_Undef";
+  $hash->{AttrFn}    = "ZWave_Attr";
   $hash->{ParseFn}   = "ZWave_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 noExplorerFrames:1,0 ".
-    "ignore:1,0 dummy:1,0 showtime:1,0 classes vclasses ".
-    "secure_classes WNMI_delay $readingFnAttributes";
+  no warnings 'qw';
+  my @attrList = qw(
+    IODev
+    WNMI_delay
+    classes
+    do_not_notify:1,0
+    dummy:1,0
+    ignore:1,0
+    noExplorerFrames:1,0
+    secure_classes
+    showtime:1,0
+    vclasses
+    zwaveRoute
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
+
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 
   $hash->{FW_detailFn} = "ZWave_fhemwebFn";
@@ -3467,7 +3483,9 @@ ZWave_wakeupTimer($$)
       my $nodeId = $hash->{nodeIdHex};
       my $cmdEf  = (AttrVal($hash->{NAME},"noExplorerFrames",0)==0 ? "25":"05");
       # wakeupNoMoreInformation
-      IOWrite($hash, $hash->{homeId}, "0013${nodeId}028408${cmdEf}$nodeId");
+      IOWrite($hash,
+              $hash->{homeId}.($hash->{route} ? ",".$hash->{route} : ""),
+              "0013${nodeId}028408${cmdEf}$nodeId");
     }
     delete $hash->{wakeupAlive};
 
@@ -3515,15 +3533,17 @@ ZWave_processSendStack($$)
 
   $ss->[0] =~ m/^([^:]*?):(.*)$/;
   my ($type, $msg) = ($1, $2);
-  IOWrite($hash, $hash->{homeId}, "00$msg");
+  IOWrite($hash,
+          $hash->{homeId}.($hash->{route}?",".$hash->{route}:""),
+          "00$msg");
   $ss->[0] = "sent$type:$msg";
 
   $hash->{lastMsgSent} = gettimeofday();
   $zwave_lastHashSent = $hash;
 
   if(!ZWave_isWakeUp($hash)) {
-    InternalTimer($hash->{lastMsgSent}+3, sub {
-      Log 2, "ZWave: No ACK from $hash->{NAME} after 3s for $ss->[0]";
+    InternalTimer($hash->{lastMsgSent}+5, sub { # zme generates NO_ACK after 4s
+      Log 2, "ZWave: No ACK from $hash->{NAME} after 5s for $ss->[0]";
       ZWave_processSendStack($hash, "next");
     }, $hash, 0);
   }
@@ -3550,9 +3570,9 @@ ZWave_addToSendStack($$$)
 
   } else { # clear commands without 0113 and 0013
     my $now = gettimeofday();
-    if(@{$ss} > 1 && $now-$hash->{lastMsgSent} > 3) {
+    if(@{$ss} > 1 && $now-$hash->{lastMsgSent} > 5) {
       Log3 $hash, 2,
-        "ERROR: $hash->{NAME}: cleaning commands without ack after 3s";
+        "ERROR: $hash->{NAME}: cleaning commands without ack after 5s";
       delete $hash->{SendStack};
       return ZWave_addToSendStack($hash, $type, $cmd);
     }
@@ -3883,6 +3903,46 @@ ZWave_Undef($$)
   delete $modules{ZWave}{defptr}{"$homeId $id"};
   return undef;
 }
+
+#####################################
+sub
+ZWave_computeRoute($;$)
+{
+  my ($spec,$attrVal) = @_;
+  for my $dev (devspec2array($spec)) {
+    my $av = AttrVal($dev, "zwaveRoute", $attrVal);
+    next if(!$av);
+
+    my @h;
+    for my $r (split(" ", $av)) {
+      if(!$defs{$r} || $defs{$r}{TYPE} ne "ZWave") {
+        my $msg = "zwaveRoute: $r is not a ZWave device";
+        Log 1, $msg; 
+        return $msg;
+      }
+      push(@h, $defs{$r}{nodeIdHex});
+    }
+    $defs{$dev}{route} = join("",@h);
+  }
+  return undef;
+}
+
+sub
+ZWave_Attr(@)
+{
+  my ($type, $devName, $attrName, @param) = @_;
+
+  if($attrName eq "zwaveRoute") {
+    if($type eq "del") {
+      delete $defs{$devName}{route};
+      return undef;
+    }
+    return ZWave_computeRoute($devName,join(" ",@param)) if($init_done);
+    InternalTimer(1, "ZWave_computeRoute", "TYPE=ZWave", 0);
+  }
+  return undef;
+}
+
 
 #####################################
 # Show the help from the device.xml, if the correct entry is selected
@@ -4822,28 +4882,36 @@ s2Hex($)
       is in seconds, subseconds my be specified. Values outside of 0.2-5.0 are
       probably harmful.
       </li>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#ignore">ignore</a></li>
-    <li><a href="#dummy">dummy</a></li>
-    <li><a href="#showtime">showtime</a></li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a href="#classes">classes</a>
+    <li><a name="classes">classes</a>
       This attribute is needed by the ZWave module, as the list of the possible
       set/get commands depends on it. It contains a space separated list of
       class names (capital letters).
       </li>
-    <li><a href="#secure_classes">secure_classes</a>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#noExplorerFrames">noExplorerFrames</a>
+      turn off the use of Explorer Frames
+      </li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a name="secure_classes">secure_classes</a>
       This attribute is the result of the "set DEVICE secSupportedReport"
       command. It contains a space seperated list of the the command classes
       that are supported with SECURITY.
       </li>
-    <li><a href="#vclasses">vclasses</a>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a name="vclasses">vclasses</a>
       This is the result of the "get DEVICE versionClassAll" command, and
       contains the version information for each of the supported classes.
       </li>
-    <li><a href="#noExplorerFrames">noExplorerFrames</a>
-      turn off the use of Explorer Frames
-      </li>
+
+    <li><a name="zwaveRoute">zwaveRoute</a>
+      space separated list of (ZWave) device names. They will be used in the
+      given order to route messages from the controller to this device. Specify
+      them in the order from the controller to the device. Do not specify the
+      controller and the device itself, only the routers inbetween. Used only
+      if the IODev is a ZWCUL device. </li>
+
   </ul>
   <br>
 
