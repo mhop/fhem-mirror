@@ -482,156 +482,162 @@ sub GasCalculator_Notify($$)
 		}
 
 		###### Do calculations
-		### Calculate DtCurrent (time difference)   of previous and current timestamp / [s]
+		### Calculate DtCurrent (time difference) of previous and current timestamp / [s]
 		my $GasCountReadingTimestampDelta = $GasCountReadingTimestampCurrentRelative - $GasCountReadingTimestampPreviousRelative;
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingTimestampDelta            : " . $GasCountReadingTimestampDelta . " s";
 
-		
-		### Calculate DV (Volume difference) of previous and current value / [cubic]
-		my $GasCountReadingValueDelta = sprintf('%.3f', ($GasCountReadingValueCurrent - $GasCountReadingValuePrevious));
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValueDelta                : " . $GasCountReadingValueDelta . " " . $attr{$GasCalcName}{Volume};
-
-		### Calculate Current Power P = DV/Dt[cubic/s] * GaszValue * GasNominalHeatingValue[kWh/cubic] * 3600[s/h]
-		my $GasCalcPowerCurrent    = $GasCountReadingValueDelta / $GasCountReadingTimestampDelta * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue} * 3600;
-		
-		### Calculate daily sum of power measurements "SP" and measurement counts "n" and then calculate average Power "Paverage = SP/n"
-		my $GasCalcPowerDaySum     = ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_PowerDaySum",   "0") + $GasCalcPowerCurrent;
-		my $GasCalcPowerDayCount   = ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_PowerDayCount", "0") + 1;
-		my $GasCalcPowerDayAverage = $GasCalcPowerDaySum / $GasCalcPowerDayCount;
-		
-		### Calculate consumed Energy of current  day   W = (Vcurrent[cubic] - V1stReadDay[cubic])   * GaszValue * GasNominalHeatingValue[kWh/cubic]
-		my $GasCalcEnergyDay       = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stDay", "0"))   * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
-
-		### Calculate consumed Energy of current  month W = (Vcurrent[cubic] - V1stReadMonth[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic]
-		my $GasCalcEnergyMonth     = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMonth", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
-
-		### Calculate consumed Energy of current   year W = (Vcurrent[cubic] - V1stReadYear[cubic])  * GaszValue * GasNominalHeatingValue[kWh/cubic]
-		my $GasCalcEnergyYear      = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stYear", "0"))  * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
-
-		### Calculate consumed Energy of gas-meter year W = (Vcurrent[cubic] - V1stReadMeter[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic]
-		my $GasCalcEnergyMeter     = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMeter", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
-
-		### Calculate pure gas cost since first day of month
-		my $GasCalcEnergyCostMonth = $GasCalcEnergyMonth * $attr{$GasCalcName}{GasPricePerKWh};
-		
-		### Calculate pure gas cost since first day of calendar year
-		my $GasCalcEnergyCostYear  = $GasCalcEnergyYear * $attr{$GasCalcName}{GasPricePerKWh};
-		
-		### Calculate pure gas cost since first day of gas meter reading year
-		my $GasCalcEnergyCostMeter = $GasCalcEnergyMeter * $attr{$GasCalcName}{GasPricePerKWh};
-		
-		### Calculate the payment month since the year of gas meter reading started
-		my $GasCalcMeterYearMonth=0;
-		if (($GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1) < 1)
+		### Continue with calculations only if time difference is not 0 to avoid "Illegal division by zero"
+		if ($GasCountReadingTimestampDelta != 0)
 		{
-			$GasCalcMeterYearMonth  = 12 + $GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1;
+			### Calculate DV (Volume difference) of previous and current value / [cubic]
+			my $GasCountReadingValueDelta = sprintf('%.3f', ($GasCountReadingValueCurrent - $GasCountReadingValuePrevious));
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValueDelta                : " . $GasCountReadingValueDelta . " " . $attr{$GasCalcName}{Volume};
+
+			### Calculate Current Power P = DV/Dt[cubic/s] * GaszValue * GasNominalHeatingValue[kWh/cubic] * 3600[s/h]
+			my $GasCalcPowerCurrent    = ($GasCountReadingValueDelta / $GasCountReadingTimestampDelta) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue} * 3600;
+			
+			### Calculate daily sum of power measurements "SP" and measurement counts "n" and then calculate average Power "Paverage = SP/n"
+			my $GasCalcPowerDaySum     = ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_PowerDaySum",   "0") + $GasCalcPowerCurrent;
+			my $GasCalcPowerDayCount   = ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_PowerDayCount", "0") + 1;
+			my $GasCalcPowerDayAverage = $GasCalcPowerDaySum / $GasCalcPowerDayCount;
+			
+			### Calculate consumed Energy of current  day   W = (Vcurrent[cubic] - V1stReadDay[cubic])   * GaszValue * GasNominalHeatingValue[kWh/cubic]
+			my $GasCalcEnergyDay       = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stDay", "0"))   * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
+
+			### Calculate consumed Energy of current  month W = (Vcurrent[cubic] - V1stReadMonth[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic]
+			my $GasCalcEnergyMonth     = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMonth", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
+
+			### Calculate consumed Energy of current   year W = (Vcurrent[cubic] - V1stReadYear[cubic])  * GaszValue * GasNominalHeatingValue[kWh/cubic]
+			my $GasCalcEnergyYear      = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stYear", "0"))  * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
+
+			### Calculate consumed Energy of gas-meter year W = (Vcurrent[cubic] - V1stReadMeter[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic]
+			my $GasCalcEnergyMeter     = ($GasCountReadingValueCurrent - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMeter", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
+
+			### Calculate pure gas cost since first day of month
+			my $GasCalcEnergyCostMonth = $GasCalcEnergyMonth * $attr{$GasCalcName}{GasPricePerKWh};
+			
+			### Calculate pure gas cost since first day of calendar year
+			my $GasCalcEnergyCostYear  = $GasCalcEnergyYear * $attr{$GasCalcName}{GasPricePerKWh};
+			
+			### Calculate pure gas cost since first day of gas meter reading year
+			my $GasCalcEnergyCostMeter = $GasCalcEnergyMeter * $attr{$GasCalcName}{GasPricePerKWh};
+			
+			### Calculate the payment month since the year of gas meter reading started
+			my $GasCalcMeterYearMonth=0;
+			if (($GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1) < 1)
+			{
+				$GasCalcMeterYearMonth  = 12 + $GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1;
+			}
+			else
+			{
+				$GasCalcMeterYearMonth  =      $GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1;
+			}
+			
+			### Calculate reserves at gas provider based on monthly advance payments within year of gas meter reading 
+			my $GasCalcReserves        = ($GasCalcMeterYearMonth * $attr{$GasCalcName}{MonthlyPayment}) - ($attr{$GasCalcName}{BasicPricePerAnnum} / 12 * $GasCalcMeterYearMonth) - $GasCalcEnergyCostMeter;
+
+			### Create Log entries for debugging		
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Finance________________________________________";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Monthly Payment                          : " . $attr{$GasCalcName}{MonthlyPayment}        . " " . $attr{$GasCalcName}{Currency};
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Basic price per annum                    : " . $attr{$GasCalcName}{BasicPricePerAnnum}    . " " . $attr{$GasCalcName}{Currency};
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyCostMeter                   : " . sprintf('%.3f', ($GasCalcEnergyCostMeter)) . " " . $attr{$GasCalcName}{Currency};
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcReserves                          : " . sprintf('%.3f', ($GasCalcReserves))        . " " . $attr{$GasCalcName}{Currency};
+
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Times__________________________________________";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcMeterYearMonth                    : " . $GasCalcMeterYearMonth;
+
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Energy_________________________________________";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyDay                         : " . sprintf('%.3f', ($GasCalcEnergyDay))       . " kWh";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyMonth                       : " . sprintf('%.3f', ($GasCalcEnergyMonth))     . " kWh";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyYear                        : " . sprintf('%.3f', ($GasCalcEnergyYear))      . " kWh";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyMeter                       : " . sprintf('%.3f', ($GasCalcEnergyMeter))     . " kWh";
+
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Power___________________________________________";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcPowerCurrent                      : " . sprintf('%.3f', ($GasCalcPowerCurrent))    . " kW";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcPowerDayMin                       : " . ReadingsVal( $GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMin", 0) . " kW";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcPowerDayAverage                   : " . sprintf('%.3f', ($GasCalcPowerDayAverage)) . " kW";
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcPowerDayMax                       : " . ReadingsVal( $GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMax", 0) . " kW";
+			
+			###### Write readings to GasCalc device
+			### Initialize Bulkupdate
+			readingsBeginUpdate($GasCalcReadingDestinationDevice);
+
+			### Write current mechanic meter reading
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Meter",            sprintf('%.3f', ($GasCountReadingValueCurrent)));
+
+			### Write consumed volume (DV) since last measurement
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_LastDV",           sprintf('%.3f', ($GasCountReadingValueDelta)));
+
+			### Write timelap (Dt) since last measurement
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_LastDt",           sprintf('%.0f', ($GasCountReadingTimestampDelta)));
+		
+			### Write current Power = average Power over last measurement period
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerCurrent",     sprintf('%.3f', ($GasCalcPowerCurrent)));
+			
+			### Write daily   Power = average Power since midnight
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayAver",     sprintf('%.3f', ($GasCalcPowerDayAverage)));
+			
+			### Write Power measurement sum    since midnight for average calculation
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDaySum",      sprintf('%.3f', ($GasCalcPowerDaySum)));
+			
+			### Write Power measurement counts since midnight for average calculation
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayCount",    sprintf('%.0f', ($GasCalcPowerDayCount)));
+			
+			### Detect new daily minimum power value and write to reading
+			if (ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMin", 0) > $GasCalcPowerCurrent)
+			{
+				### Write new minimum Power value
+				readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMin",  sprintf('%.0f', ($GasCalcPowerCurrent)));
+				
+				### Create Log entries for debugging
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - New daily minimum power value detected   : " . sprintf('%.3f', ($GasCalcPowerCurrent));
+			}
+			
+			### Detect new daily maximum power value and write to reading
+			if (ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMax", 0) < $GasCalcPowerCurrent)
+			{
+				### Write new maximum Power value
+				readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMax",  sprintf('%.3f', ($GasCalcPowerCurrent)));
+				
+				### Create Log entries for debugging
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - New daily maximum power value detected   : " . sprintf('%.3f', ($GasCalcPowerCurrent));
+			}
+			
+			### Write energy consumption since midnight
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyDay",        sprintf('%.3f', ($GasCalcEnergyDay)));
+			
+			### Write energy consumption since beginning of month
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMonth",      sprintf('%.3f', ($GasCalcEnergyMonth)));
+
+			### Write energy consumption since beginning of year
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyYear",       sprintf('%.3f', ($GasCalcEnergyYear)));
+			
+			### Write energy consumption since last meter reading
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMeter",      sprintf('%.3f', ($GasCalcEnergyMeter)));
+			
+			### Write pure energy costs since beginning of month
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostMonth",  sprintf('%.3f', ($GasCalcEnergyCostMonth)));
+			
+			### Write pure energy costs since beginning of calendar year
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostYear",   sprintf('%.3f', ($GasCalcEnergyCostYear)));
+			
+			### Write pure energy costs since beginning of year of gas meter reading
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostMeter",  sprintf('%.3f', ($GasCalcEnergyCostMeter)));
+
+			### Write reserves at gas provider based on monthly advance payments within year of gas meter reading
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_FinanceReserve",   sprintf('%.3f', ($GasCalcReserves)));
+
+			### Finish and execute Bulkupdate
+			readingsEndUpdate($GasCalcReadingDestinationDevice, 1);
 		}
 		else
 		{
-			$GasCalcMeterYearMonth  =      $GasCountReadingTimestampCurrentMon + 1 - $attr{$GasCalcName}{MonthOfAnnualReading} + 1;
-		}
-		
-		### Calculate reserves at gas provider based on monthly advance payments within year of gas meter reading 
-		my $GasCalcReserves        = ($GasCalcMeterYearMonth * $attr{$GasCalcName}{MonthlyPayment}) - ($attr{$GasCalcName}{BasicPricePerAnnum} / 12 * $GasCalcMeterYearMonth) - $GasCalcEnergyCostMeter;
-
-		### Create Log entries for debugging		
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Finance________________________________________";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Monthly Payment                          : " . $attr{$GasCalcName}{MonthlyPayment}        . " " . $attr{$GasCalcName}{Currency};
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Basic price per annum                    : " . $attr{$GasCalcName}{BasicPricePerAnnum}    . " " . $attr{$GasCalcName}{Currency};
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyCostMeter                   : " . sprintf('%.3f', ($GasCalcEnergyCostMeter)) . " " . $attr{$GasCalcName}{Currency};
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcReserves                          : " . sprintf('%.3f', ($GasCalcReserves))        . " " . $attr{$GasCalcName}{Currency};
-
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Times__________________________________________";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcMeterYearMonth                    : " . $GasCalcMeterYearMonth;
-
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Energy_________________________________________";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyDay                         : " . sprintf('%.3f', ($GasCalcEnergyDay))       . " kWh";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyMonth                       : " . sprintf('%.3f', ($GasCalcEnergyMonth))     . " kWh";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyYear                        : " . sprintf('%.3f', ($GasCalcEnergyYear))      . " kWh";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcEnergyMeter                       : " . sprintf('%.3f', ($GasCalcEnergyMeter))     . " kWh";
-
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _______Power___________________________________________";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcPowerCurrent                      : " . sprintf('%.3f', ($GasCalcPowerCurrent))    . " kW";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcPowerDayMin                       : " . ReadingsVal( $GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMin", 0) . " kW";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcPowerDayAverage                   : " . sprintf('%.3f', ($GasCalcPowerDayAverage)) . " kW";
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcPowerDayMax                       : " . ReadingsVal( $GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMax", 0) . " kW";
-		
-		###### Write readings to GasCalc device
-		### Initialize Bulkupdate
-		readingsBeginUpdate($GasCalcReadingDestinationDevice);
-
-		### Write current mechanic meter reading
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Meter",            sprintf('%.3f', ($GasCountReadingValueCurrent)));
-
-		### Write consumed volume (DV) since last measurement
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_LastDV",           sprintf('%.3f', ($GasCountReadingValueDelta)));
-
-		### Write timelap (Dt) since last measurement
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_LastDt",           sprintf('%.0f', ($GasCountReadingTimestampDelta)));
-	
-		### Write current Power = average Power over last measurement period
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerCurrent",     sprintf('%.3f', ($GasCalcPowerCurrent)));
-		
-		### Write daily   Power = average Power since midnight
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayAver",     sprintf('%.3f', ($GasCalcPowerDayAverage)));
-		
-		### Write Power measurement sum    since midnight for average calculation
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDaySum",      sprintf('%.3f', ($GasCalcPowerDaySum)));
-		
-		### Write Power measurement counts since midnight for average calculation
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayCount",    sprintf('%.0f', ($GasCalcPowerDayCount)));
-		
-		### Detect new daily minimum power value and write to reading
-		if (ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMin", 0) > $GasCalcPowerCurrent)
-		{
-			### Write new minimum Power value
-			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMin",  sprintf('%.0f', ($GasCalcPowerCurrent)));
-			
 			### Create Log entries for debugging
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - New daily minimum power value detected   : " . sprintf('%.3f', ($GasCalcPowerCurrent));
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingTimestampDelta = $GasCountReadingTimestampDelta. Calculations skipped!";
 		}
 		
-		### Detect new daily maximum power value and write to reading
-		if (ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_PowerDayMax", 0) < $GasCalcPowerCurrent)
-		{
-			### Write new maximum Power value
-			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMax",  sprintf('%.3f', ($GasCalcPowerCurrent)));
-			
-			### Create Log entries for debugging
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - New daily maximum power value detected   : " . sprintf('%.3f', ($GasCalcPowerCurrent));
-		}
-		
-		### Write energy consumption since midnight
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyDay",        sprintf('%.3f', ($GasCalcEnergyDay)));
-		
-		### Write energy consumption since beginning of month
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMonth",      sprintf('%.3f', ($GasCalcEnergyMonth)));
-
-		### Write energy consumption since beginning of year
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyYear",       sprintf('%.3f', ($GasCalcEnergyYear)));
-		
-		### Write energy consumption since last meter reading
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyMeter",      sprintf('%.3f', ($GasCalcEnergyMeter)));
-		
-		### Write pure energy costs since beginning of month
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostMonth",  sprintf('%.3f', ($GasCalcEnergyCostMonth)));
-		
-		### Write pure energy costs since beginning of calendar year
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostYear",   sprintf('%.3f', ($GasCalcEnergyCostYear)));
-		
-		### Write pure energy costs since beginning of year of gas meter reading
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyCostMeter",  sprintf('%.3f', ($GasCalcEnergyCostMeter)));
-
-		### Write reserves at gas provider based on monthly advance payments within year of gas meter reading
-		readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_FinanceReserve",   sprintf('%.3f', ($GasCalcReserves)));
-
-
-		### Finish and execute Bulkupdate
-		readingsEndUpdate($GasCalcReadingDestinationDevice, 1);
-
 		### Create Log entries for debugging
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator End_________________________________________________________________________________________________________________________________";
-
 	}
 
 	return undef;
@@ -657,7 +663,7 @@ sub GasCalculator_Notify($$)
 			<BR>
 			As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>
 			<BR>
-			The GasCalculator module provides several current, historical, statistical predictabeable values around with respect to one or more cas-counter and creates respective readings.<BR>
+			The GasCalculator module provides several current, historical, statistical predictable values around with respect to one or more gas-counter and creates respective readings.<BR>
 			<BR>
 			To avoid waiting for max. 12 months to have realistic values, the readings <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear</code> and <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> must be corrected with real values by using the <code>setreading</code> - command.
 			These real values may be found on the last gas bill. Otherwise it will take 24h for the daily, 30days for the monthly and up to 12 month for the yearly values to become realistic.<BR>
@@ -754,6 +760,7 @@ sub GasCalculator_Notify($$)
 			<td>
 			<tr><td><li><code>BasicPricePerAnnum</code> : </li></td><td>	A valid float number for basic annual fee in the chosen currency for the gas supply to the home.<BR>
 																			The value is provided by your local gas provider is shown on your gas bill.<BR>
+																			For UK users it may known under "Standing Charge". Please make sure it is based on one year<BR>
 																			The default value is 0.00<BR>
 			</td></tr>
 			</td>
