@@ -641,7 +641,7 @@ sub CUL_HM_Attr(@) {#################################
 #    elsif ($st eq "blindActuator"){
     else{
       if ($cmd eq "set"){
-        if ($attrVal eq "levelInverse"){# no action
+        if ($attrVal =~ m/(levelInverse|ponRestore)/){# no action
         }
         else{
           return "attribut param $attrVal not valid for $name";
@@ -1857,7 +1857,7 @@ sub CUL_HM_Parse($$) {#########################################################
     }
     if ($pon){# we have power ON, perform action
       if($mh{devH}->{helper}{PONtest}){
-        push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+        push @evtEt,[$mh{devH},1,"powerOn:$tn",];
         $mh{devH}->{helper}{PONtest} = 0;
       }
       CUL_HM_Set($hHash,$hHash->{NAME},"off")
@@ -1905,13 +1905,13 @@ sub CUL_HM_Parse($$) {#########################################################
           }
         }
       }
-      my $pVal = $val;# necessary for roper 'off', not logical off
+      my $pVal = $val;# necessary for oper 'off', not logical off
       $val = (($val-$lvlMin)<=0 && $val)
                   ? 1
                   : int((($val-$lvlMin)*200)/($lvlMax - $lvlMin))/2;
 
       # blind option: reverse Level Meaning 0 = open, 100 = closed
-      if ("levelInverse" eq AttrVal($mh{cName}, "param", "")){;
+      if (AttrVal($mh{cName}, "param", "") =~ m/levelInverse/){;
         $pVal = $val = 100-$val;
       }
       $physLvl = ReadingsVal($mh{cName},"phyLevel",$val)
@@ -1974,7 +1974,7 @@ sub CUL_HM_Parse($$) {#########################################################
         delete $mh{cHash}->{helper}{stateUpdatDly};
       }
  
-      if    ($mh{st} eq "dimmer"){
+      if   ($mh{st} eq "dimmer"){
         push @evtEt,[$mh{cHash},1,"overload:".(($err&0x02)?"on":"off")];
         push @evtEt,[$mh{cHash},1,"overheat:".(($err&0x04)?"on":"off")];
         push @evtEt,[$mh{cHash},1,"reduced:" .(($err&0x08)?"on":"off")];
@@ -1986,6 +1986,45 @@ sub CUL_HM_Parse($$) {#########################################################
           push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
           $mh{devH}->{helper}{PONtest} = 0;
         }
+      }
+      elsif($mh{st} eq "blindActuator"){
+        my $param = AttrVal($mh{cName}, "param", "");
+        if ($param =~ m/ponRestoreSmart/){
+          if($parse eq "powerOn"){
+            my $level = ReadingsVal($mh{cName},"level",0);# still the old level
+            $mh{cHash}->{helper}{prePONlvl} = $level;
+            $level = ($level<50)?0:100;
+            CUL_HM_Set($mh{cHash},$mh{cName},"pct",$level);
+          }
+          elsif (   $mh{cHash}->{helper}{dir}{cur} eq "stop"
+                 && defined $mh{cHash}->{helper}{prePONlvl} ){
+            if ($val != 0 && $val != 100){
+              CUL_HM_Set($mh{cHash},$mh{cName},"pct",$mh{cHash}->{helper}{prePONlvl});
+            }
+            delete $mh{cHash}->{helper}{prePONlvl};
+          }
+        }
+        elsif ($param =~ m/ponRestoreForce/){
+          if($parse eq "powerOn"){
+            my $level = ReadingsVal($mh{cName},"level",0);# still the old level
+            $mh{cHash}->{helper}{prePONlvl} = $level;
+            CUL_HM_Set($mh{cHash},$mh{cName},"pct","0");
+          }
+          elsif (   $mh{cHash}->{helper}{dir}{cur} eq "stop"
+                 && defined $mh{cHash}->{helper}{prePONlvl}){
+            if ($val == 0){
+              CUL_HM_Set($mh{cHash},$mh{cName},"pct",100);
+            }
+            elsif($val == 100){
+              CUL_HM_Set($mh{cHash},$mh{cName},"pct",$mh{cHash}->{helper}{prePONlvl});
+              delete $mh{cHash}->{helper}{prePONlvl};
+            }
+            else{
+              delete $mh{cHash}->{helper}{prePONlvl};# some stop inbetween - maybe user action. stop processing
+            }
+          }
+        }
+
       }
       elsif ($mh{md} eq "HM-SEC-SFA-SM"){ 
         push @evtEt,[$mh{devH},1,"powerError:"   .(($err&0x02) ? "on":"off")];
@@ -4090,7 +4129,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                         sprintf("%02X%02s%02X",$lvl*2,$rLocDly,$speed*2));
   }
   elsif($cmd =~ m/^(on|off|toggle)$/) { #######################################
-    my $lvlInv = (AttrVal($name, "param", "") eq "levelInverse")?1:0;
+    my $lvlInv = (AttrVal($name, "param", "") =~m /levelInverse/)?1:0;
     $hash->{helper}{dlvl} = ( $cmd eq 'off'||
                              ($cmd eq 'toggle' &&CUL_HM_getChnLvl($name) != 0)) 
                                 ? ($lvlInv?'C8':'00')
@@ -4177,7 +4216,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
     my ($lvl,$tval,$rval,$duration) = (($a[2]?$a[2]:0),"","",0);
     my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
-    my $lvlInv = (AttrVal($name, "param", "") eq "levelInverse")?1:0;
+    my $lvlInv = (AttrVal($name, "param", "") =~ m /levelInverse/)?1:0;
 
     if ($lvl eq "old"){#keep it - it means "old value"
     }
@@ -9503,6 +9542,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         <B>levelInverse</B> while HM considers 100% as open and 0% as closed this may not be 
         intuitive to all user. Ny default 100%  is open and will be dislayed as 'on'. Setting this param the display will be inverted - 0% will be open and 100% is closed.<br>
         NOTE: This will apply to readings and set commands. <B>It does not apply to any register. </B><br>
+        <B>ponRestoreSmart</B> upon powerup of the device the Blind will drive to expected closest endposition followed by driving to the pre-PON level<br>
+        <B>ponRestoreForce</B> upon powerup of the device the Blind will drive to level 0, then to level 100 followed by driving to the pre-PON level<br>
       </li>
     </ul><br>
     <a name="CUL_HMevents"><b>Generated events:</b></a>
@@ -10785,7 +10826,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         offAtPon: nur Heizkan&auml;le: erzwingt Ausschalten der Heizung nach einem powerOn<br>
         onAtRain: nur Heizkan&auml;le: erzwingt Einschalten der Heizung bei Status 'rain' und Ausschalten bei Status 'dry'<br>
       </li>
-      <li><B>virtuals</B><br>
+      <li><B>virtuals</B><br> 
         noOnOff: eine virtuelle Instanz wird den Status nicht &auml;ndern wenn ein Trigger empfangen wird. Ist dieser Paramter
         nicht gegeben so toggled die Instanz ihren Status mit jedem trigger zwischen An und Aus<br>
         msgReduce: falls gesetzt und der Kanal wird f&uuml;r <a ref="CUL_HMvalvePos"></a> genutzt wird jede Nachricht
@@ -10796,6 +10837,8 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         intuitiv f&uuml;r den Nutzer. Defaut f&uuml;r 100% ist offen und wird als 'on'angezeigt. 
         Das Setzen des Parameters invertiert die Anzeige - 0% wird also offen und 100% ist geschlossen.<br>
         ACHTUNG: Die Anpassung betrifft nur Readings und Kommandos. <B>Register sind nicht betroffen.</B><br>
+        <B>ponRestoreSmart</B> bei powerup des Device fährt das Rollo in die vermeintlich nächstgelegene Endposition und anschliessend in die ursprüngliche Position.<br>
+        <B>ponRestoreForce</B> bei powerup des Device fährt das Rollo auf Level 0, dann auf Level 100 und anschliessend in die ursprüngliche Position.<br>
       </li>
     </ul><br>
     <a name="CUL_HMevents"><b>Erzeugte Events:</b></a>
