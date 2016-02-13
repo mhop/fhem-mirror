@@ -3872,7 +3872,8 @@ ZWave_Parse($$@)
     ZWave_processSendStack($hash, "next");
 
   } else {
-    ZWave_processSendStack($hash, "msg");
+    ZWave_processSendStack($hash, "msg")
+      if(!ZWave_isWakeUp($hash) || $hash->{wakeupAlive});
 
   }
 
