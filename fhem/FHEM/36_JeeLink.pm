@@ -221,70 +221,102 @@ JeeLink_Set($@)
     my $firmwareFolder = "./FHEM/firmware/";
     my $logFile = AttrVal("global", "logdir", "./log") . "/JeeLinkFlash.log";
 
-    my $detectedFirmware = $arg ? $args[0] : "";
+    my $detectedFirmware = $arg ? $args[0] . ($args[0] eq "LaCrosseGateway" ? ".bin" : ".hex") : "";
     if(!$detectedFirmware) {
       if($hash->{model} =~ /LaCrosse/ ) {
-        $detectedFirmware = "LaCrosse";
+        if($hash->{model} =~ /Gateway/ ) {
+          $detectedFirmware = "LaCrosseGateway.bin";
+        }
+        else {
+          $detectedFirmware = "LaCrosse.hex";
+        }
       }
       elsif($hash->{model} =~ /pcaSerial/ ) {
-        $detectedFirmware = "PCA301";
+        $detectedFirmware = "PCA301.hex";
       }
       elsif($hash->{model} =~ /ec3kSerial/ ) {
-        $detectedFirmware = "EC3000";
+        $detectedFirmware = "EC3000.hex";
       }
     }
-    $hexFile = $firmwareFolder . "JeeLink_$detectedFirmware.hex";
-
+    $hexFile = $firmwareFolder . "JeeLink_$detectedFirmware";
 
     return "No firmware detected. Please use the firmwareName parameter" if(!$detectedFirmware);
     return "The file '$hexFile' does not exist" if(!-e $hexFile);
 
-
     $log .= "flashing JeeLink $name\n";
     $log .= "detected Firmware: $detectedFirmware\n";
     $log .= "hex file: $hexFile\n";
-    $log .= "port: $port\n";
-    $log .= "log file: $logFile\n";
 
-    my $flashCommand = AttrVal($name, "flashCommand", "");
-
-    if($flashCommand ne "") {
-      if (-e $logFile) {
-        unlink $logFile;
-      }
-
+    if($detectedFirmware eq "LaCrosseGateway.bin") {
+      $log .= "Mode is LaCrosseGateway OTA-update\n";
       DevIo_CloseDev($hash);
       $hash->{STATE} = "disconnected";
       $log .= "$name closed\n";
 
-      my $avrdude = $flashCommand;
-      $avrdude =~ s/\Q[PORT]\E/$port/g;
-      $avrdude =~ s/\Q[HEXFILE]\E/$hexFile/g;
-      $avrdude =~ s/\Q[LOGFILE]\E/$logFile/g;
+      my @spl = split(':', $hash->{DeviceName});
+      my $targetIP = @spl[0];
+      my $targetURL = "http://" . $targetIP . "/ota/firmware.bin";
+      $log .= "target: $targetURL\n";
 
-      $log .= "command: $avrdude\n\n";
-      `$avrdude`;
-
-      local $/=undef;
-      if (-e $logFile) {
-        open FILE, $logFile;
-        my $logText = <FILE>;
-        close FILE;
-        $log .= "--- AVRDUDE ---------------------------------------------------------------------------------\n";
-        $log .= $logText;
-        $log .= "--- AVRDUDE ---------------------------------------------------------------------------------\n\n";
+      my $request = POST($targetURL, Content_Type => 'multipart/form-data', Content => [ file => [$hexFile, "firmware.bin"] ]);
+      my $userAgent = LWP::UserAgent->new;
+      $userAgent->timeout(60);
+      my $response = $userAgent->request($request);
+      if ($response->is_success) {
+	      $log .= "\n\nSketch reports:\n";
+        $log .= $response->decoded_content;
       }
       else {
-        $log .= "WARNING: avrdude created no log file\n\n";
+        $log .= "\nERROR: " . $response->code . " " . $response->decoded_content;
       }
 
+      DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
+      $log .= "$name opened\n";
     }
     else {
-      $log .= "\n\nNo flashCommand found. Please define this attribute.\n\n";
-    }
+      $log .= "port: $port\n";
+      $log .= "log file: $logFile\n";
 
-    DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
-    $log .= "$name opened\n";
+      my $flashCommand = AttrVal($name, "flashCommand", "");
+
+      if($flashCommand ne "") {
+        if (-e $logFile) {
+          unlink $logFile;
+        }
+
+        DevIo_CloseDev($hash);
+        $hash->{STATE} = "disconnected";
+        $log .= "$name closed\n";
+
+        my $avrdude = $flashCommand;
+        $avrdude =~ s/\Q[PORT]\E/$port/g;
+        $avrdude =~ s/\Q[HEXFILE]\E/$hexFile/g;
+        $avrdude =~ s/\Q[LOGFILE]\E/$logFile/g;
+
+        $log .= "command: $avrdude\n\n";
+        `$avrdude`;
+
+        local $/=undef;
+        if (-e $logFile) {
+          open FILE, $logFile;
+          my $logText = <FILE>;
+          close FILE;
+          $log .= "--- AVRDUDE ---------------------------------------------------------------------------------\n";
+          $log .= $logText;
+          $log .= "--- AVRDUDE ---------------------------------------------------------------------------------\n\n";
+        }
+        else {
+          $log .= "WARNING: avrdude created no log file\n\n";
+        }
+
+      }
+      else {
+        $log .= "\n\nNo flashCommand found. Please define this attribute.\n\n";
+      }
+
+      DevIo_OpenDev($hash, 0, "JeeLink_DoInit");
+      $log .= "$name opened\n";
+    }
 
     return $log;
   }
