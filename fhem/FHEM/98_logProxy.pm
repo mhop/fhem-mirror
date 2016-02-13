@@ -532,6 +532,8 @@ logProxy_clipData($$$$;$)
   my ($dp, $from, $to, $interpolate, $predict) = @_;
 
   my $ret = "";
+  my $min = 999999;
+  my $max = -999999;
   my $comment = "";
 
   my ($dpl,$dpoff,$l) = (length($$dp), 0, "");
@@ -569,10 +571,15 @@ logProxy_clipData($$$$;$)
           my $value = $prev_value;
           $value = logProxy_linearInterpolate( SVG_time_to_sec($prev_timestamp), $prev_value, SVG_time_to_sec($d), $v, $from ) if( $interpolate );
 
+          $min = $value if( $value < $min );
+          $max = $value if( $value > $max );
+
           my @t = localtime($from);
           my $timestamp = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
           $ret .= "$timestamp $value\n";
         }
+        $min = $v if( $v < $min );
+        $max = $v if( $v > $max );
 
         $ret .= "$l\n";
 
@@ -606,6 +613,8 @@ logProxy_clipData($$$$;$)
   if( defined($next_value) ) {
     my $value = $prev_value;
     $value = logProxy_linearInterpolate( SVG_time_to_sec($prev_timestamp), $prev_value, SVG_time_to_sec($next_timestamp), $next_value, $to ) if( $interpolate );
+    $min = $value if( $value < $min );
+    $max = $value if( $value > $max );
 
     my @t = localtime($to);
     my $timestamp = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
@@ -614,7 +623,7 @@ logProxy_clipData($$$$;$)
 
   $ret .= $comment;
 
-  return $ret;
+  return (\$ret, $min, $max);
 }
 
 #parse plot data to array
@@ -887,7 +896,7 @@ logProxy_Get($@)
 
       # clip extended query range to plot range
       if( $clip || defined($predict) ) {
-        $$internal_data = logProxy_clipData($internal_data,$fromsec,$tosec,$interpolate,$predict);
+        ($internal_data,$main::data{"min1"},$main::data{"max1"}) = logProxy_clipData($internal_data,$fromsec,$tosec,$interpolate,$predict);
       }
 
       #call postprocessing function
@@ -913,7 +922,7 @@ logProxy_Get($@)
         $data = $d;
 
         $comment = "#$a[$i]\n";
-        ($internal_data,$main::data{"min1"}, $main::data{"max1"},$main::data{"currval1"}) = logProxy_array2Data($data,$comment);
+        ($internal_data,$main::data{"min1"},$main::data{"max1"},$main::data{"currval1"}) = logProxy_array2Data($data,$comment);
       }
 
       if( $$internal_data ) {
