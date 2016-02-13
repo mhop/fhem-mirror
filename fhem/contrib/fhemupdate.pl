@@ -37,10 +37,12 @@ my @filelist2 = (
   "./CHANGED",
   "./configDB.pm",
   "FHEM/.*.pm",
+  "FHEM/.*.layout",
   "FHEM/FhemUtils/.*.pm",
   "FHEM/FhemUtils/update-.*",
   "FHEM/lib/.*.pm",
   "FHEM/lib/.*.xml",
+  "FHEM/lib/.*.csv",
   "FHEM/firmware/.*",
   "FHEM/lib/SWAP/.*.xml",
   "FHEM/lib/SWAP/panStamp/.*",
@@ -51,6 +53,7 @@ my @filelist2 = (
   "FHEM/lib/MP3/.*.pm",
   "FHEM/lib/MP3/Tag/.*",
   "FHEM/lib/UPnP/.*",
+  "contrib/commandref_join.pl.txt",
   "www/pgm2/.*",
   "www/pgm2/images/.*.png",
   "www/jscolor/.*",
@@ -61,12 +64,14 @@ my @filelist2 = (
   "www/images/openautomation/.*.txt",
   "www/images/default/.*",
   "www/images/default/remotecontrol/.*",
-  "docs/commandref(_..)?.html",
+  "docs/commandref.*.html",
   "docs/faq(_..)?.html",
   "docs/HOWTO(_..)?.html",
   "docs/fhem.*.png",
   "docs/.*.jpg",
   "docs/fhemdoc.js",
+  "demolog/.*",
+  "./fhem.cfg.demo",
 );
 
 
@@ -98,40 +103,21 @@ foreach my $fspec (@filelist2) {
 
 chdir("$homedir/fhem/$uploaddir2");
 my %oldtime;
-if(open FH, "filetimes.txt") {
-  while(my $l = <FH>) {
-    chomp($l);
-    my ($ts, $fs, $file) = split(" ", $l, 3);
-    $oldtime{"$file.txt"} = $ts if($file =~ m/fhem.pl/);
-    $oldtime{$file} = $ts;
-  }
-  close(FH);
-}
 
-open FH, ">filetimes.txt" || die "Can't open filetimes.txt: $!\n";
-
-my %controls = (fhem=>0);
-foreach my $k (keys %controls) {
-  my $fname = "controls_$k.txt";
-  $controls{$k} = new IO::File ">$fname" || die "Can't open $fname: $!\n";
-  if(open(ADD, "../../fhemupdate.control.$k")) {
-    while(my $l = <ADD>) {
-      my $fh = $controls{$k};
-      print $fh $l;
-    }
-    close ADD;
-  }
+my $fname = "controls_fhem.txt";
+my $cfh = new IO::File ">$fname" || die "Can't open $fname: $!\n";
+`svn info ..` =~ m/Revision: (\d+)/m;
+print $cfh "REV $1\n";
+if(open(ADD, "../../fhemupdate.control.fhem")) {
+  print $cfh join("",<ADD>);
+  close ADD;
 }
 
 my $cnt;
 foreach my $f (sort keys %filetime2) {
   my $fn = $f;
   $fn =~ s/.txt$// if($fn =~ m/.pl.txt$/);
-  print FH "$filetime2{$f} $filesize2{$f} $fn\n";
-  foreach my $k (keys %controls) {
-    my $fh = $controls{$k};
-    print $fh "UPD $filetime2{$f} $filesize2{$f} $fn\n"
-  }
+  print $cfh "UPD $filetime2{$f} $filesize2{$f} $fn\n";
   my $newfname = $f;
   if(!$oldtime{$f} || $oldtime{$f} ne $filetime2{$f}) {
     $f =~ m,^(.*)/([^/]*)$,;
@@ -141,23 +127,10 @@ foreach my $f (sort keys %filetime2) {
     $cnt++;
   }
 }
-close FH;
-
-foreach my $k (keys %controls) {
-  close $controls{$k};
-}
+close $cfh;
 
 $ENV{RSYNC_RSH}="ssh";
 chdir("$homedir/fhem");
-
-if(0) {
-  my $fname="controls_fhem.txt";
-  my @st = stat("fhemupdate4/$fname");
-  my @mt = localtime($st[9]);
-  my $ftime = sprintf "%04d-%02d-%02d_%02d:%02d:%02d",
-                    $mt[5]+1900, $mt[4]+1, $mt[3], $mt[2], $mt[1], $mt[0];
-  my $fsize = $st[7];
-}
 
 system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate4/FHEM");
 system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate4/FHEM/firmware");

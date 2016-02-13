@@ -1,22 +1,3 @@
-DIR unused
-DIR www/images/default
-DIR www/images/openautomation
-DIR www/images/fhemSVG
-DIR www/images/bright
-DIR www/images/darktouchpad
-DIR www/gplot
-DIR www/pgm2
-DIR www/pgm2/images
-DIR www/jscolor
-DIR docs
-DIR FHEM/lib
-DIR FHEM/lib/Device
-DIR FHEM/lib/SWAP
-DIR FHEM/lib/SWAP/panStamp
-DIR FHEM/lib/SWAP/justme
-DIR FHEM/lib/Device/Firmata
-DIR contrib
-DIR demolog
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
 MOV www/pgm2/fhemweb_slider.js unused
