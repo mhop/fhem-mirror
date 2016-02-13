@@ -34,7 +34,8 @@ my @valid_halign = qw(left center right justified);
 # use vars qw($FW_cname);  # Current connection name
 
 # http://blogs.perl.org/users/mike_b/2013/06/a-little-nicer-way-to-use-smartmatch-on-perl-518.html
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+#no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental';
 
 #########################
 sub
@@ -56,7 +57,7 @@ RSS_Initialize($) {
     $hash->{DefFn}    = "RSS_Define";
     $hash->{UndefFn}  = "RSS_Undefine";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList} = "size bg bgcolor tmin refresh areas autoreread:1,0 viewport noscroll";
+    $hash->{AttrList} = "size itemtitle bg bgcolor tmin refresh areas autoreread:1,0 viewport noscroll";
     $hash->{SetFn}    = "RSS_Set";
     $hash->{NotifyFn} = "RSS_Notify";
 
@@ -247,7 +248,9 @@ RSS_returnRSS($) {
   my $type = $defs{$name}{fhem}{style};
   my $mime = ($type eq 'png')? 'image/png' : 'image/jpeg';
   my $now  = time();
-  my $code = "<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><title>$name</title><ttl>1</ttl><item><media:content url='$url/rss/$name.$type' type='$mime'/><guid isPermaLink='false'>item_$now</guid></item></channel></rss>";
+  my $itemTitle = AttrVal($name, "itemtitle", "");
+  my $titleTag = ($itemTitle ne '')? '<title>'.$itemTitle.'</title>' : '';
+  my $code = "<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><title>$name</title><ttl>1</ttl><item>$titleTag<media:content url='$url/rss/$name.$type' type='$mime'/><guid isPermaLink='false'>item_$now</guid></item></channel></rss>";
   
   return ("application/xml; charset=utf-8", $code);
 }
@@ -1017,6 +1020,8 @@ plotFromUrl(@)
     </li><br>
     <li>areas<br>HTML code that goes into the image map.<br>
         Example: <code>attr FrameRSS areas &lt;area shape="rect" coords="0,0,200,200" href="http://fhem.de"/&gt;&lt;area shape="rect" coords="600,400,799,599" href="http://has:8083/fhem" target="_top"/&gt;</code>
+    </li><br>
+    <li>itemtitle</br>Adds a title tag to the RSS item that contains the specified text.
     </li><br>
   </ul>
   <br><br>
