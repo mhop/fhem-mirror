@@ -27,6 +27,9 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.13.2 13.02.2016    fixed a problem that manual updates using "getcaminfoall" are
+#                      leading to additional pollingloops if polling is used,
+#                      attribute "debugactivetoken" added for debugging-use 
 # 1.13.1 12.02.2016    fixed a problem that a usersession won't be destroyed if a
 #                      function couldn't be executed successfully
 # 1.13                 feature for retrieval snapfilename added
@@ -39,7 +42,7 @@
 #                      http://forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275 ,
 #                      http://forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892
 # 1.10   02.02.2016    added function "svsinfo" to get informations about installed SVS-package,
-#                      if Availability = "disconnected" then "state"-value will be "disconnected" too,
+#                      if Availability = " disconnected" then "state"-value will be "disconnected" too,
 #                      saved Credentials were deleted from file if a device will be deleted
 # 1.9.1  31.01.2016    a little bit code optimization
 # 1.9    28.01.2016    fixed the problem a recording may still stay active if fhem
@@ -105,6 +108,7 @@ sub SSCam_Initialize($) {
          "httptimeout ".
          "pollcaminfoall ".
          "pollnologging:1,0 ".
+         "debugactivetoken:1 ".
          "rectime ".
          "session:SurveillanceStation,DSM ".
          "webCmd ".
@@ -368,7 +372,8 @@ sub SSCam_Get {
             # hier die Verarbeitung starten
             if ($opt eq "caminfoall") 
             {
-                &getcaminfoall($hash);
+                # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
+                &getcaminfoall($hash,1);
             }
             elsif ($opt eq "svsinfo") 
             {
@@ -548,10 +553,9 @@ sub watchdogpollcaminfo ($) {
         &printlog($hash,$logstr,"3");
         
         # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
-        $hash->{HELPER}{OLDVALPOLL} = AttrVal($name, "pollcaminfoall", undef);
+        $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};
         
-        # Pollingroutine aufrufen
-        getcaminfoall($hash);           
+        &getcaminfoall($hash);           
     }
     
     if (defined($hash->{HELPER}{OLDVALPOLL}) and defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
@@ -647,6 +651,11 @@ sub camstartrec ($) {
         $hash->{OPMODE} = "Start";
         $hash->{HELPER}{ACTIVE} = "on";
         
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         &getapisites_nonbl($hash);
     }
     else
@@ -695,6 +704,11 @@ sub camstoprec ($) {
                         
         $hash->{OPMODE} = "Stop";
         $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
         
         &getapisites_nonbl($hash);
     }
@@ -745,11 +759,16 @@ sub camexpmode ($) {
         $hash->{OPMODE} = "ExpMode";
         $hash->{HELPER}{ACTIVE} = "on";
         
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         &getapisites_nonbl($hash);
     }
     else
     {
-    InternalTimer(gettimeofday()+0.21, "camexpmode", $hash, 0);
+    InternalTimer(gettimeofday()+1.1, "camexpmode", $hash, 0);
     }
 }
 
@@ -796,6 +815,11 @@ sub camsnap ($) {
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{ACTIVE} = "on";
         
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         &getapisites_nonbl($hash);
     }
     else
@@ -821,11 +845,16 @@ sub getsnapfilename ($) {
         $hash->{OPMODE} = "getsnapfilename";
         $hash->{HELPER}{ACTIVE} = "on";
         
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         getapisites_nonbl($hash);
     }
     else
     {
-        InternalTimer(gettimeofday()+0.22, "getsnapfilename", $hash, 0);
+        InternalTimer(gettimeofday()+0.23, "getsnapfilename", $hash, 0);
     }    
 }
 
@@ -922,7 +951,12 @@ sub doptzaction ($) {
                         
             $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
             $hash->{HELPER}{ACTIVE} = "on";
-        
+            
+            if ($attr{$name}{debugactivetoken}) {
+                $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+                &printlog($hash,$logstr,"3");
+            }
+
             &getapisites_nonbl($hash);
             }
     }
@@ -947,6 +981,11 @@ sub movestop ($) {
                         
             $hash->{OPMODE} = "movestop";
             $hash->{HELPER}{ACTIVE} = "on";
+            
+            if ($attr{$name}{debugactivetoken}) {
+                $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+                &printlog($hash,$logstr,"3");
+            }
         
             &getapisites_nonbl($hash);
     }
@@ -975,6 +1014,11 @@ sub camenable ($) {
         $hash->{OPMODE} = "Enable";
         $hash->{HELPER}{ACTIVE} = "on";
         
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         &getapisites_nonbl($hash);
     }
     else
@@ -1002,6 +1046,11 @@ sub camdisable ($) {
         $hash->{OPMODE} = "Disable";
         $hash->{HELPER}{ACTIVE} = "on";
         
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         &getapisites_nonbl($hash);
     }
     else
@@ -1013,38 +1062,44 @@ sub camdisable ($) {
 ###############################################################################
 ###   Kamera alle Informationen abrufen (Get) bzw. Einstieg Polling
 
-sub getcaminfoall ($) {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+sub getcaminfoall {
+    my ($hash,$mode)   = @_;
+    my $camname        = $hash->{CAMNAME};
+    my $name           = $hash->{NAME};
     my $logstr;
+    my ($now,$new);
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-                        
-        &getcaminfo($hash);
-        &getcapabilities($hash);
-        &getptzlistpreset($hash);
-        &getptzlistpatrol($hash);
-
-    }
-    else
-    {
-        InternalTimer(gettimeofday()+0.53, "getcaminfoall", $hash, 0);
-    }
+        getcaminfo($hash);
+        getcapabilities($hash);
+        getptzlistpreset($hash);
+        getptzlistpatrol($hash);
+    
+    # wenn gesetzt = manuelle Abfrage,
+    if ($mode) {return;}
     
     if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
         # Pollen wenn pollcaminfo > 10, sonst kein Polling
-        InternalTimer(gettimeofday()+$attr{$name}{pollcaminfoall}, "getcaminfoall", $hash, 0); 
+        
+        $new = gettimeofday()+$attr{$name}{pollcaminfoall};
+                    
+        InternalTimer($new, "getcaminfoall", $hash, 0);
+        
+        if (!$attr{$name}{pollnologging}) {
+            $now = FmtTime(gettimeofday());
+            $new = FmtTime(gettimeofday()+$attr{$name}{pollcaminfoall});
+            $logstr = "Polling now: $now , next Polling: $new";
+            &printlog($hash,$logstr,"3");
         }
-        else 
-        {
+    }
+    else 
+    {
         # Beenden Polling aller Caminfos
         readingsSingleUpdate($hash,"PollState","Inactive",0);
         
         $logstr = "Polling of Camera $camname is currently deactivated";
         &printlog($hash,$logstr,"3");
         }
-return undef;
+return;
 }
 
 ###########################################################################
@@ -1063,6 +1118,11 @@ sub getsvsinfo ($) {
                         
         $hash->{OPMODE} = "Getsvsinfo";
         $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
         
         &getapisites_nonbl($hash);
       }
@@ -1090,11 +1150,16 @@ sub getcaminfo ($) {
         $hash->{OPMODE} = "Getcaminfo";
         $hash->{HELPER}{ACTIVE} = "on";
         
-        &getapisites_nonbl($hash);
-      }
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
+        getapisites_nonbl($hash);
+    }
     else
     {
-        InternalTimer(gettimeofday()+0.55, "getcaminfo", $hash, 0);
+        InternalTimer(gettimeofday()+1.33 , "getcaminfo", $hash, 0);
     }
     
 }
@@ -1116,11 +1181,16 @@ sub getcapabilities ($) {
         $hash->{OPMODE} = "Getcapabilities";
         $hash->{HELPER}{ACTIVE} = "on";
         
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         &getapisites_nonbl($hash);
     }
     else
     {
-        InternalTimer(gettimeofday()+0.56, "getcapabilities", $hash, 0);
+        InternalTimer(gettimeofday()+1.56, "getcapabilities", $hash, 0);
     }
     
 }
@@ -1147,12 +1217,17 @@ sub getptzlistpreset ($) {
                         
         $hash->{OPMODE} = "Getptzlistpreset";
         $hash->{HELPER}{ACTIVE} = "on";
+
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
         
         &getapisites_nonbl($hash);
     }
     else
     {
-        InternalTimer(gettimeofday()+0.57, "getptzlistpreset", $hash, 0);
+        InternalTimer(gettimeofday()+1.57, "getptzlistpreset", $hash, 0);
     }
     
 }
@@ -1181,11 +1256,16 @@ sub getptzlistpatrol ($) {
         $hash->{OPMODE} = "Getptzlistpatrol";
         $hash->{HELPER}{ACTIVE} = "on";
         
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         &getapisites_nonbl($hash);
     }
     else
     {
-        InternalTimer(gettimeofday()+0.58, "getptzlistpatrol", $hash, 0);
+        InternalTimer(gettimeofday()+1 .58, "getptzlistpatrol", $hash, 0);
     }
     
 }
@@ -1300,6 +1380,11 @@ sub login_nonbl ($) {
 
         # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
         $hash->{HELPER}{ACTIVE} = "off"; 
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
 
         return;
     }
@@ -1438,6 +1523,11 @@ sub login_nonbl ($) {
                         # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
                         $hash->{HELPER}{ACTIVE} = "off"; 
                         
+                        if ($attr{$name}{debugactivetoken}) {
+                            $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+                            &printlog($hash,$logstr,"3");
+                        }
+                        
                         return;
                      }
     }
@@ -1517,7 +1607,12 @@ sub getcamid_nonbl ($) {
         
         # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
         $hash->{HELPER}{ACTIVE} = "off"; 
-
+   
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
         return;
    }
    elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
@@ -1577,6 +1672,11 @@ sub getcamid_nonbl ($) {
              
              # ausgeführte Funktion nicht erfolgreich, Freigabe Funktionstoken
              $hash->{HELPER}{ACTIVE} = "off"; 
+             
+             if ($attr{$name}{debugactivetoken}) {
+                 $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+                 &printlog($hash,$logstr,"3");
+             }
              
              return;
        }
@@ -1906,7 +2006,7 @@ sub camret_nonbl ($) {
        }
        else
        {
-       $rectime = AttrVal($name, "rectime",undef) ? AttrVal($name, "rectime",undef) : $hash->{HELPER}{RECTIME_DEF};
+       $rectime = $attr{$name}{rectime} ? $attr{$name}{rectime} : $hash->{HELPER}{RECTIME_DEF};
        }
    
    if ($err ne "")                                                                                     # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -2320,12 +2420,12 @@ sub camret_nonbl ($) {
                 # Logausgabe
                 $logstr = "Camera-Informations of $camname retrieved";
                 # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 2 
-                if (defined(AttrVal($name, "pollnologging", undef)) and AttrVal($name, "pollnologging", undef) eq "1") {
+                if (defined($attr{$name}{pollnologging}) and $attr{$name}{pollnologging} eq "1") {
                     $verbose = 4;
                     }
                     else
                     {
-                    $verbose = 2;
+                    $verbose = 3;
                     }
                 &printlog($hash,$logstr,$verbose);
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
@@ -2414,7 +2514,7 @@ sub camret_nonbl ($) {
                     }
                     else
                     {
-                    $verbose = 2;
+                    $verbose = 3;
                     }
                 &printlog($hash,$logstr,$verbose);
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
@@ -2460,7 +2560,7 @@ sub camret_nonbl ($) {
                     }
                     else
                     {
-                    $verbose = 2;
+                    $verbose = 3;
                     }
                 &printlog($hash,$logstr,$verbose);
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
@@ -2508,7 +2608,7 @@ sub camret_nonbl ($) {
                     }
                     else
                     {
-                    $verbose = 2;
+                    $verbose = 3;
                     }
                 &printlog($hash,$logstr,$verbose);
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
@@ -2598,10 +2698,11 @@ sub logout_nonbl ($) {
   
 sub logoutret_nonbl ($) {  
    my ($param, $err, $myjson) = @_;
-   my $hash                            = $param->{hash};
-   my $sid                             = $hash->{HELPER}{SID};
-   my ($success, $username)            = getcredentials($hash,0);
-   my $OpMode                          = $hash->{OPMODE};
+   my $hash                   = $param->{hash};
+   my $name                   = $hash->{NAME};
+   my $sid                    = $hash->{HELPER}{SID};
+   my ($success, $username)   = getcredentials($hash,0);
+   my $OpMode                 = $hash->{OPMODE};
    my $data;
    my $logstr;
    my $error;
@@ -2615,9 +2716,6 @@ sub logoutret_nonbl ($) {
         &printlog($hash,$logstr,"4");
         
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen 
-        
-        # freigabe Funktionstoken
-        $hash->{HELPER}{ACTIVE} = "off";
 
    }
    elsif($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
@@ -2669,7 +2767,12 @@ sub logoutret_nonbl ($) {
    }
    
    # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
-   $hash->{HELPER}{ACTIVE} = "off";   
+   $hash->{HELPER}{ACTIVE} = "off";  
+   
+   if ($attr{$name}{debugactivetoken}) {
+       $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+       &printlog($hash,$logstr,"3");
+   }
 
    # nach Snap Aufnahme Filename des Snaps ermitteln
    if ($OpMode eq "Snap") {
@@ -3155,9 +3258,9 @@ return;
   The value of that attribute determines the interval of property-retrieval in seconds. If that attribute isn't be set or &lt; 10 the automatic polling won't be started <br>
   respectively stopped when the value was set to &gt; 10 before. <br><br>
 
-  The attribute "pollcaminfoall" is monitored by a watchdog-timer. Changes of th attributevalue will be checked every 90 seconds and transact correspondig. <br>
+  The attribute "pollcaminfoall" is monitored by a watchdog-timer. Changes of the attribute-value will be checked every 90 seconds and transact corresponding. <br>
   Changes of the pollingstate and pollinginterval will be reported in FHEM-Logfile. The reporting can be switched off by setting the attribute "pollnologging=1". <br>
-  Thereby the needless growing of the logfile can be avoided. But if verbose is set to 4 or above even though the attribute "pollnologging" is set as well, the polling <br>
+  Thereby the needless growing of the logfile can be avoided. But if verbose level is set to 4 or above even though the attribute "pollnologging" is set as well, the polling <br>
   will be actived due to analysis purposes. <br><br>
 
   If FHEM will be restarted, the first data retrieval will be done within 60 seconds after start. <br><br>
@@ -3263,6 +3366,8 @@ return;
   <br><br>
   <ul>
   <ul>
+  <li><b>debugactivetoken</b> - if set the state of active token will be logged - only for debugging, don't use it in normal operation </li>
+  
   <li><b>httptimeout</b> - Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" or not set) </li>
   
   <li><b>pollcaminfoall</b> - Interval of automatic polling the Camera properties (if < 10: no polling, if &gt; 10: polling with interval) </li>
@@ -3753,6 +3858,8 @@ return;
   <br><br>
   <ul>
   <ul>
+  <li><b>debugactivetoken</b> - wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debuggung, nicht im normalen Betrieb benutzen </li>
+  
   <li><b>httptimeout</b> - Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn httptimeout = "0" oder nicht gesetzt) </li>
   
   <li><b>pollcaminfoall</b> - Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein Polling, größer 10: Polling mit Intervall) </li>

@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCAM: fixed a problem that manual updates using 
+                       "getcaminfoall" are leading to additional pollingloops 
+                       if polling is used,
+                       attribute "debugactivetoken" added for debugging-use
   - feature: version: version command shows latest revision since last update
   - feature: 02_RSS: new attribute itemtitle
   - bugfix:  57_Calendar: weekly recurring events on several weekdays, that
