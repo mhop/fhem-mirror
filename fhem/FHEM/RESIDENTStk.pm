@@ -1079,12 +1079,19 @@ sub RESIDENTStk_wakeupRun($;$) {
     #  general conditions to trigger program fulfilled
     else {
 
-        my $expLastRun = time_str2num(
+        my $expLastWakeup = time_str2num(
             ReadingsTimestamp(
                 $wakeupUserdevice, "lastWakeup", "1970-01-01 00:00:00"
             )
           ) - 1 +
           $wakeupOffset * 60 +
+          $wakeupWaitPeriod * 60;
+
+        my $expLastAwake = time_str2num(
+            ReadingsTimestamp(
+                $wakeupUserdevice, "lastAwake", "1970-01-01 00:00:00"
+            )
+          ) - 1 +
           $wakeupWaitPeriod * 60;
 
         if ( !$wakeupMacro ) {
@@ -1101,9 +1108,13 @@ sub RESIDENTStk_wakeupRun($;$) {
             Log3 $NAME, 3,
 "RESIDENTStk $NAME: Another wake-up program is already being executed for device $wakeupUserdevice, won't trigger $wakeupMacro";
         }
-        elsif ( $expLastRun > $nowRunSec && !$forceRun ) {
-            Log3 $NAME, 4,
-"RESIDENTStk $NAME: won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastWakeup (expLastRun=$expLastRun > nowRunSec=$nowRunSec)";
+        elsif ( $expLastWakeup > $nowRunSec && !$forceRun ) {
+            Log3 $NAME, 3,
+"RESIDENTStk $NAME: won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastWakeup (expLastWakeup=$expLastWakeup > nowRunSec=$nowRunSec)";
+        }
+        elsif ( $expLastAwake > $nowRunSec && !$forceRun ) {
+            Log3 $NAME, 3,
+"RESIDENTStk $NAME: won't trigger wake-up program due to non-expired wakeupWaitPeriod threshold since lastAwake (expLastAwake=$expLastAwake > nowRunSec=$nowRunSec)";
         }
         else {
             # conditional enforced wake-up:
