@@ -1170,9 +1170,9 @@ sub createSingleEvent($$$) {
     $self->makeEventDetails($event);
     $self->makeEventAlarms($event);
     
-    main::Debug "createSingleEvent DTSTART=" . $self->value("DTSTART") . " DTEND=" . $self->value("DTEND");
-    main::Debug "createSingleEvent Start " . main::FmtDateTime($event->{start});
-    main::Debug "createSingleEvent End   " . main::FmtDateTime($event->{end});
+    #main::Debug "createSingleEvent DTSTART=" . $self->value("DTSTART") . " DTEND=" . $self->value("DTEND");
+    #main::Debug "createSingleEvent Start " . main::FmtDateTime($event->{start});
+    #main::Debug "createSingleEvent End   " . main::FmtDateTime($event->{end});
     
     # plug-in
     if(defined($onCreateEvent)) {
@@ -1214,21 +1214,21 @@ sub createEvents($$$%) {
 
         # Valid values for freq: SECONDLY, MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
         my $freq =  $r{"FREQ"};
-        main::Debug "FREQ= $freq";
+        #main::Debug "FREQ= $freq";
         # According to RFC, interval defaults to 1
         my $interval = exists($r{"INTERVAL"}) ? $r{"INTERVAL"} : 1;
         my $until = exists($r{"UNTIL"}) ? $self->tm($r{"UNTIL"}) : 99999999999999999;
         my $count = exists($r{"COUNT"}) ? $r{"COUNT"} : 999999;  
         my $bymonthday = $r{"BYMONTHDAY"} if(exists($r{"BYMONTHDAY"})); # stored but ignored
         my $byday = exists($r{"BYDAY"}) ? $r{"BYDAY"} : "";
-        main::Debug "byday is $byday";
+        #main::Debug "byday is $byday";
         my $bymonth = $r{"BYMONTH"} if(exists($r{"BYMONTH"})); # stored but ignored
         my $wkst = $r{"WKST"} if(exists($r{"WKST"})); # stored but ignored
 
         my @weekdays = qw(SU MO TU WE TH FR SA);
         
         
-        main::Debug "createEvents: " . $self->asString();
+        #main::Debug "createEvents: " . $self->asString();
 
         # 
         # we first add all RDATEs
@@ -1340,7 +1340,7 @@ sub createEvents($$$%) {
                 $nextstart = plusNSeconds($nextstart, 24*60*60, $interval);
             } elsif($freq  eq "WEEKLY") {
                 # special handling for WEEKLY and BYDAY
-                main::Debug "weekly event, BYDAY= $byday";
+                #main::Debug "weekly event, BYDAY= $byday";
                 if($byday ne "") {
                     # BYDAY with prefix (e.g. -1SU or 2MO) is not recognized
                     my @bydays= split(',', $byday);
@@ -1352,7 +1352,7 @@ sub createEvents($$$%) {
                         $nextstart = plusNSeconds($nextstart, 24*60*60, 1); # forward day by day
                         ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) =
                             localtime($nextstart);
-                        main::Debug "Skip to: start " . $event->ts($nextstart) . " = " . $weekdays[$mwday];
+                        #main::Debug "Skip to: start " . $event->ts($nextstart) . " = " . $weekdays[$mwday];
                         $preventloop++;
                         if($preventloop > 7) {
                             main::Log3 undef, 2, 
@@ -1360,7 +1360,7 @@ sub createEvents($$$%) {
                                 $self->asString();
                             last;
                         }
-                        main::Debug "weekday= " . $weekdays[$mwday] . "($mwday), smartmatch " . join(" ",@bydays) ."= " . ($weekdays[$mwday] ~~ @bydays ? "yes" : "no");
+                        #main::Debug "weekday= " . $weekdays[$mwday] . "($mwday), smartmatch " . join(" ",@bydays) ."= " . ($weekdays[$mwday] ~~ @bydays ? "yes" : "no");
                     } until($weekdays[$mwday] ~~ @bydays);
                 }
                 else {
