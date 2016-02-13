@@ -256,7 +256,8 @@ HttpUtils_Connect2($)
   my $httpVersion = $hash->{httpversion} ? $hash->{httpversion} : "1.0";
   my $hdr = "$method $hash->{path} HTTP/$httpVersion\r\n";
   $hdr .= "Host: $hash->{host}\r\n";
-  $hdr .= "User-Agent: fhem\r\n";
+  $hdr .= "User-Agent: fhem\r\n"
+        if(!$hash->{header} || $hash->{header} !~ "User-Agent:");
   $hdr .= "Accept-Encoding: gzip,deflate\r\n" if($hash->{compress});
   $hdr .= "Connection: keep-alive\r\n" if($hash->{keepalive});
   $hdr .= "Connection: Close\r\n"
