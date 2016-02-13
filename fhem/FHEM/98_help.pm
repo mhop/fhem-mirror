@@ -133,6 +133,7 @@ sub CommandHelp {
 	    "----------------------------------------------------------------------\n";
 
     for my $cmd (sort keys %cmds) {
+      next if($cmd =~ m/header:command/);
       next if(!$cmds{$cmd}{Hlp});
       next if($cl && $cmds{$cmd}{ClientFilter} &&
            $cl->{TYPE} !~ m/$cmds{$cmd}{ClientFilter}/);
@@ -141,8 +142,8 @@ sub CommandHelp {
  #     $a[0] =~ s/>/&gt;/g;
       $a[1] //= "";
       $a[1]  = "               $a[1]";
-      $a[1] =~ s/</&lt;/g;
-      $a[1] =~ s/>/&gt;/g;
+#      $a[1] =~ s/</&lt;/g;
+#      $a[1] =~ s/>/&gt;/g;
       $str .= sprintf("%-15s%-50s\n%s\n", $cmd, $a[0], $a[1]);
     }
 
