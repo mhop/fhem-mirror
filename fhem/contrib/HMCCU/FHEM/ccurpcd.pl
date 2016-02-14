@@ -3,7 +3,9 @@
 #########################################################
 # ccurpcd.pl
 #
-# Version 1.5
+# $Id:
+#
+# Version 1.6
 #
 # RPC server for Homematic CCU.
 #
@@ -15,6 +17,7 @@
 #--------------------------------------------------------
 # Queue file entries:
 #
+#  IN|INIT|0
 #  ND|Address|Type
 #  UD|Address|Hint
 #  DD|Address
@@ -112,9 +115,9 @@ sub CCURPC_Shutdown ($)
 	my ($callbackurl) = @_;
 
 	if ($callbackurl && $shutdown == 0) {
-		Log ("Shutdown RPC server");
-		WriteQueue ("EX|SHUTDOWN|0");
+		Log ("Shutdown RPC server in progress");
 		$client->send_request("init", $callbackurl);
+		WriteQueue ("EX|SHUTDOWN|0");
 		$shutdown = 1;
 	}
 
@@ -213,6 +216,8 @@ sub CCURPC_Initialize ($$)
 
 	$client->send_request ("init",$callbackurl,"CB".$serverport);
 	Log "RPC callback with URL ".$callbackurl." initialized";
+
+	WriteQueue ("IN|INIT|1");
 
 	return $callbackurl;
 }
@@ -338,7 +343,7 @@ if (!defined ($callbackurl)) {
 	die "Error: Can't initialize RPC server\n";
 }
 
-# Server loop is interruptable bei SIGNINT
+# Server loop is interruptable bei signal SIGINT
 Log "Entering server loop. Use kill -SIGINT $$ to terminate program";
 $server->server_loop;
 
