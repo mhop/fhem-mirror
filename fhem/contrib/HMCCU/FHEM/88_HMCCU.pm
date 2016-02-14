@@ -2364,6 +2364,7 @@ sub HMCCU_Dewpoint ($$$$)
 
 1;
 
+
 =pod
 =begin html
 
@@ -2471,9 +2472,9 @@ sub HMCCU_Dewpoint ($$$$)
       <li>get &lt;name&gt; parfile [&lt;parfile&gt;]<br/>
          Get values of all channels / datapoints specified in &lt;parfile&gt;. &lt;parfile&gt; can also
          be defined as an attribute. The file must contain one channel / datapoint definition per line.
-         Datapoints are optional (for syntax see command get channel). After the channel definition
+         Datapoints are optional (for syntax see command 'get channel'). After the channel definition
          a list of string substitution rules for datapoint values can be specified (like attribute
-         substitute).<br/>
+         'substitute').<br/>
          The syntax of Parfile entries is:
          <br/><br/>
          {[&lt;interface&gt;.]&lt;channel-address&gt;[.&lt;datapoint-expr&gt;]|&lt;channel-name&gt;[.&lt;datapoint-expr&gt;]} &lt;regexp&gt;:&lt;subsstr&gt;[,...]
@@ -2488,6 +2489,63 @@ sub HMCCU_Dewpoint ($$$$)
       </li>
    </ul>
    <br/>
+   
+   <a name="HMCCUattr"></a>
+   <b>Attributes</b><br/>
+   <br/>
+   <ul>
+      <li>ccuget &lt;State | Value&gt;<br/>
+         Set read access method for CCU channel datapoints. Method 'State' is slower than 'Value' because
+         each request is sent to the device. With method 'Value' only CCU is queried. Default is 'Value'.
+      </li><br/>
+      <li>ccureadingformat &lt;name | address&gt;<br/>
+        Format of reading names (channel name or channel address)
+      </li><br/>
+      <li>ccureadings &lt;0 | 1&gt;<br/>
+         If set to 1 values read from CCU will be stored as readings. Otherwise output
+         is displayed in browser window.
+      </li><br/>
+      <li>ccutrace &lt;ccu-devname-exp|ccu-address-exp&gt;<br/>
+         Turn on trace mode for devices matching specified expression. Will write extended
+         information into FHEM log (level 1).
+      </li><br/>
+      <li>parfile &lt;filename&gt;<br/>
+         Define parameter file for command 'get parfile'.
+      </li><br/>
+      <li>rpcinterval &lt;3 | 5 | 10&gt;<br/>
+         Specifiy how often RPC queue is read. Default is 5 seconds.
+      </li><br/>
+      <li>rpcport &lt;value[,...]&gt;<br/>
+         Specify list of RPC ports on CCU. Default is 2001.
+      </li><br/>
+      <li>rpcqueue &lt;queue-file&gt;<br/>
+         Specify name of RPC queue file. This parameter is only a prefix for the
+         queue files with extension .idx and .dat. Default is /tmp/ccuqueue.
+      </li><br/>
+      <li>rpcserver &lt;on | off&gt;<br/>
+         Start or stop RPC server.
+      </li><br/>
+      <li>statedatapoint &lt;datapoint&gt;<br/>
+         Set datapoint for devstate commands. Default is 'STATE'.
+      </li><br/>
+      <li>statevals &lt;text:substext[,...]&gt;<br/>
+         Define substitutions for values in 'set devstate/datapoint' command.
+      </li><br/>
+      <li>substitude &lt;expression&gt;:&lt;substext&gt;[,...]<br/>
+         Define substitions for reading values. Substitutions for parfile values must
+         be specified in parfiles.
+      </li><br/>
+      <li>stripchar &lt;character&gt;<br/>
+         Strip the specified character from variable or device name in set commands. This
+         is useful if a variable should be set in CCU using the reading with trailing colon.
+      </li><br/>
+      <li>updatemode { client | both | hmccu }<br/>
+         Set update mode for readings.<br/>
+         'client' = update only readings of client devices<br/>
+         'both' = update readings of client devices and IO device<br/>
+         'hmccu' = update readings of IO device
+      </li>
+   </ul>
 </ul>
 
 =end html
