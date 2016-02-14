@@ -1,8 +1,10 @@
 // $Id$
 
+var language = 'de';
 //for tooltip
 $(document).ready(function(){
-    $('[data-toggle="tooltip"]').tooltip(); 
+    $('[data-toggle="tooltip"]').tooltip();
+    language = window.navigator.userLanguage || window.navigator.language;
 });
 
 var shortDays = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -509,6 +511,15 @@ function FW_weekprofileTransDay(devName,day,bnt)
       });
 }
 
+function FW_weekprofileTemp_chached(select)
+{
+  var val = select.options[select.selectedIndex].value;
+  
+  $(select).find("option").removeAttr('selected');
+  $(select).val(val);
+  $(select.options[select.selectedIndex]).attr("selected","selected");
+}
+
 function FW_weekprofileEditDay(widget,day)
 { 
   var div = $("<div>").get(0);
@@ -540,7 +551,7 @@ function FW_weekprofileEditDay(widget,day)
     html += "<td><input type=\"text\" name=\"ENDTIME\" size=\"5\" maxlength=\"5\" align=\"center\" value=\""+endTime+"\" onblur=\"FW_weekprofileEditTime_changed(this)\"/></td>"; 
     
     //temp
-    html += "<td><select name=\"TEMP\" size=\"1\">";
+    html += "<td><select name=\"TEMP\" size=\"1\" onchange=\"FW_weekprofileTemp_chached(this)\">";
     for (var k=5; k <= 30; k+=.5)
     {
         var selected = (k == temps[i]) ? "selected " : "";
