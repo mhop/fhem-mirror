@@ -7,8 +7,6 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use Time::Local;
-use LWP::UserAgent;
-use HTTP::Request::Common;
 
 sub JeeLink_Attr(@);
 sub JeeLink_Clear($);
@@ -250,13 +248,19 @@ JeeLink_Set($@)
     $log .= "hex file: $hexFile\n";
 
     if($detectedFirmware eq "LaCrosseGateway.bin") {
+      eval "use LWP::UserAgent";
+      return "\nERROR: Please install LWP::UserAgent" if($@);
+
+      eval "use HTTP::Request::Common";
+      return "\nERROR: Please install HTTP::Request::Common" if($@);
+
       $log .= "Mode is LaCrosseGateway OTA-update\n";
       DevIo_CloseDev($hash);
       $hash->{STATE} = "disconnected";
       $log .= "$name closed\n";
 
       my @spl = split(':', $hash->{DeviceName});
-      my $targetIP = @spl[0];
+      my $targetIP = $spl[0];
       my $targetURL = "http://" . $targetIP . "/ota/firmware.bin";
       $log .= "target: $targetURL\n";
 
