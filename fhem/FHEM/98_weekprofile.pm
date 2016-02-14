@@ -256,7 +256,7 @@ sub weekprofile_sendDevProfile(@)
       $k++;
     }
   }
-  
+
   my $ret = undef;
   if ($cmd) {
     $cmd =~ s/^\s+|\s+$//g; 
@@ -464,12 +464,14 @@ sub weekprofile_Get($$@)
     my ($topic, $name) = weekprofile_splitName($params[0]);
 
     my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic);
-    return "profile $params[0] not found" unless ($prf);
+    return "profile $params[0] not found" if (!defined($prf));
 
     if (defined($prf->{REF})) {
       ($topic, $name) = weekprofile_splitName($prf->{REF});
       ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic);
     }
+    
+    return "profile $params[0] has no data" if (!defined($prf->{DATA}));
     
     my $json = JSON->new;
     my $json_text = $json->encode($prf->{DATA});
