@@ -57,7 +57,7 @@ RSS_Initialize($) {
     $hash->{DefFn}    = "RSS_Define";
     $hash->{UndefFn}  = "RSS_Undefine";
     #$hash->{AttrFn}  = "RSS_Attr";
-    $hash->{AttrList} = "size itemtitle bg bgcolor tmin refresh areas autoreread:1,0 viewport noscroll";
+    $hash->{AttrList} = "size itemtitle bg bgcolor tmin refresh areas autoreread:1,0 viewport noscroll urlOverride";
     $hash->{SetFn}    = "RSS_Set";
     $hash->{NotifyFn} = "RSS_Notify";
 
@@ -165,7 +165,12 @@ RSS_Set() {
 # 
 sub
 RSS_getURL($) {
-  my ($hostname)= @_;
+  my ($name)= @_;
+
+  my $url= AttrVal($name, 'urlOverride', '');
+  return $url if($url ne "");
+  
+  my $hostname= $defs{$name}{fhem}{hostname};
   # http://hostname:8083/fhem
   my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
   return $proto."://$hostname:" . $defs{$FW_wname}{PORT} . $FW_ME;
@@ -201,7 +206,7 @@ RSS_Overview {
   foreach my $def (sort keys %defs) {
     if($defs{$def}{TYPE} eq "RSS") {
         $name= $defs{$def}{NAME};
-        $url= RSS_getURL($defs{$def}{fhem}{hostname});
+        $url= RSS_getURL($name);
         $html.= "$name<br>\n<ul>";
         $html.= "<a href='$url/rss/$name.rss' target='_blank' >RSS</a><br>\n";
         $html.= "<a href='$url/rss/$name.html' target='_blank' >HTML</a><br>\n";
@@ -244,7 +249,7 @@ sub
 RSS_returnRSS($) {
   my ($name) = @_;
 
-  my $url= RSS_getURL($defs{$name}{fhem}{hostname});
+  my $url= RSS_getURL($name);
   my $type = $defs{$name}{fhem}{style};
   my $mime = ($type eq 'png')? 'image/png' : 'image/jpeg';
   my $now  = time();
@@ -298,7 +303,7 @@ sub
 RSS_returnHTML($) {
   my ($name) = @_;
 
-  my $url= RSS_getURL($defs{$name}{fhem}{hostname});
+  my $url= RSS_getURL($name);
   my $type = $defs{$name}{fhem}{style};
   my $img= "$url/rss/$name.$type";
   my $refresh= AttrVal($name, 'refresh', 60);
@@ -1002,7 +1007,7 @@ plotFromUrl(@)
   <br><br>
   <ul>
     <li>autoreread<br>If set to 1, layout is automatically reread when layout file has been changed 
-    by FHEMWEB file editor.</li>
+    by FHEMWEB file editor.</li><br>
     <li>size<br>The dimensions of the picture in the format
     <code>&lt;width&gt;x&lt;height&gt;</code>.</li><br>
     <li>bg<br>The directory that contains the background pictures (must be in JPEG, GIF or PNG format, file 
@@ -1023,6 +1028,15 @@ plotFromUrl(@)
     </li><br>
     <li>itemtitle</br>Adds a title tag to the RSS item that contains the specified text.
     </li><br>
+    <li>urlOverride<br>Overrides the URL in the generated feed. 
+    If you specify
+    <code>attr &lt;name&gt; http://otherhost.example.org:8083/foo/bar</code>, the 
+    JPEG picture that is at
+    <code>http://host.example.org:8083/fhem/rss/FrameRSS.jpg</code> 
+    will be referenced as
+    <code>http://otherhost.example.org:8083/foo/bar/rss/FrameRSS.jpg</code>. This is useful when
+    your FHEM URLs are rewritten, e.g. if FHEM is accessed by a Reverse Proxy.</li>
+    <br>
   </ul>
   <br><br>
 
