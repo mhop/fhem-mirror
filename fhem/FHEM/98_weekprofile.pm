@@ -1057,11 +1057,10 @@ sub weekprofile_SummaryFn()
 ############################################## 
 sub weekprofile_editOnNewpage(@)
 {
-  my ($device, $prf,$backurl) = @_;
+  my ($device, $prf) = @_;
   my $hash = $defs{$device};
   
-  $backurl="?"  if(!defined($backurl));
-  my $args = "weekprofile,MODE:EDIT,BACKURL:$backurl";
+  my $args = "weekprofile,MODE:EDIT,JMPBACK:1";
   
   my $html;
   $html .= "<html>";
@@ -1113,9 +1112,8 @@ sub weekprofile_getEditLNK_MasterDev($$)
   my $editIcon = FW_iconName($iconName) ? FW_makeImage($iconName,$iconName,"icon") : "";
   my $script = '<script type="text/javascript">';
   $script.= "function jump_edit_weekprofile_$aszDev() {";
-  $script.= 'var url;var pos = location.href.indexOf("?"); if (pos>=0) {url = location.href.substr(pos);}';
   $script.= "window.location.assign('$FW_ME?cmd={weekprofile_editOnNewpage(";
-  $script.= "\"$device\",\"$prf\",\"'+url+'\");;}')};";
+  $script.= "\"$device\",\"$prf\");;}')};";
   $script.= "</script>";
   
   my $lnk = "$script<a onclick=\"jump_edit_weekprofile_$aszDev()\" href=\"javascript:void(0)\">$editIcon</a>";
