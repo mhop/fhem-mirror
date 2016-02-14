@@ -137,13 +137,7 @@ function weekprofile_DoEditWeek(devName,newPage)
   var widget = $('div[informid="'+devName+'"]').get(0);
  
   if (newPage == 1) {
-    var url = location.href;
-    var pos = url.indexOf('?');
-    if (pos >=0)
-        url = url.substr(pos);
-    else
-        url='';
-    window.location.assign(FW_root+'?cmd={weekprofile_editOnNewpage("'+widget.DEVICE+'","'+widget.CURTOPIC+':'+widget.CURPRF+'","'+url+'");;}');
+    window.location.assign(FW_root+'?cmd={weekprofile_editOnNewpage("'+widget.DEVICE+'","'+widget.CURTOPIC+':'+widget.CURPRF+'");;}');
   } else {
     widget.MODE = 'EDIT';
     $(widget.MENU.BASE).hide();
@@ -655,8 +649,12 @@ function FW_weekprofilePrepAndSendProf(devName)
 
 function FW_weekprofileBack(widget)
 {
-  if (widget.SHOWURL){
-    window.location.assign(FW_root+widget.SHOWURL);
+  if (widget.JMPBACK){
+    var isInIframe = (window.location != window.parent.location) ? true : false;
+    if (isInIframe) {
+      parent.history.back();
+    } else
+      window.history.back();
   }
   else {
     widget.MODE = "SHOW";
@@ -784,7 +782,7 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   $(widget.MENU.BASE.parentElement.parentElement).append(menuContent);
   widget.MENU.CONTENT = $(widget.HEADER).find('div[id*="menu.content"]').get(0);
   
-  widget.SHOWURL = null;
+  widget.JMPBACK = null;
   widget.MODE = 'SHOW';
   widget.USETOPICS = 0;
 
@@ -792,7 +790,7 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
     var arg = vArr[i].split(':');
     switch (arg[0]) {
       case "MODE":      widget.MODE = arg[1];       break;
-      case "BACKURL":   widget.SHOWURL = arg[1];    break;
+      case "JMPBACK":   widget.JMPBACK = arg[1];    break;
       case "MASTERDEV": widget.MASTERDEV = arg[1];  break;
       case "USETOPICS": widget.USETOPICS = arg[1];  break;
     }
