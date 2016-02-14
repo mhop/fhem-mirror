@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.14                 the port in DEF-String is optional now,
+#                      if not given, default port 5000 is used
 # 1.13.2 13.02.2016    fixed a problem that manual updates using "getcaminfoall" are
 #                      leading to additional pollingloops if polling is used,
 #                      attribute "debugactivetoken" added for debugging-use 
@@ -78,7 +80,7 @@
 #
 # Definition: define <name> SSCam <camname> <ServerAddr> <ServerPort> 
 # 
-# Example: define CamCP1 SSCAM Carport 192.168.2.20 5000
+# Example: define CamCP1 SSCAM Carport 192.168.2.20 [5000]
 #
 
 
@@ -120,7 +122,7 @@ return undef;
 sub SSCam_Define {
   # Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Gerät ausgeführt wird 
   # Welche und wie viele Parameter akzeptiert werden ist Sache dieser Funktion. Die Werte werden nach dem übergebenen Hash in ein Array aufgeteilt
-  # define CamCP1 SSCAM Carport 192.168.2.20 5000 
+  # define CamCP1 SSCAM Carport 192.168.2.20 [5000] 
   #       ($hash)  [1]    [2]        [3]      [4]  
   #
   my ($hash, $def) = @_;
@@ -128,13 +130,13 @@ sub SSCam_Define {
   
   my @a = split("[ \t][ \t]*", $def);
   
-  if(int(@a) < 5) {
+  if(int(@a) < 4) {
         return "You need to specify more parameters.\n". "Format: define <name> SSCAM <Cameraname> <ServerAddress> <Port>";
         }
         
   my $camname    = $a[2];
   my $serveraddr = $a[3];
-  my $serverport = $a[4];
+  my $serverport = $a[4] ? $a[4] : 5000;
   
   $hash->{SERVERADDR}       = $serveraddr;
   $hash->{SERVERPORT}       = $serverport;
@@ -768,7 +770,7 @@ sub camexpmode ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+1.1, "camexpmode", $hash, 0);
+    InternalTimer(gettimeofday()+0.13, "camexpmode", $hash, 0);
     }
 }
 
@@ -1393,7 +1395,17 @@ sub login_nonbl ($) {
         
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
-        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success)};
+        
+        unless ($success) {
+            $logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); 
+            $hash->{HELPER}{ACTIVE} = "off";
+            
+            if ($attr{$name}{debugactivetoken}) {
+                $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+                &printlog($hash,$logstr,"3");
+            }
+            return;
+        }
         
         $data = decode_json($myjson);
    
@@ -1527,7 +1539,6 @@ sub login_nonbl ($) {
                             $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
                             &printlog($hash,$logstr,"3");
                         }
-                        
                         return;
                      }
     }
@@ -1539,7 +1550,19 @@ sub login_nonbl ($) {
   
   # Credentials abrufen
   ($success, $username, $password) = getcredentials($hash,0);
-  unless ($success) {$logstr = "Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\""; &printlog($hash,$logstr,"1"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success)};
+  
+  unless ($success) {
+      $logstr = "Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\""; 
+      &printlog($hash,$logstr,"1"); 
+      
+      $hash->{HELPER}{ACTIVE} = "off";
+      
+      if ($attr{$name}{debugactivetoken}) {
+          $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+          &printlog($hash,$logstr,"3");
+      }      
+      return;
+  }
   
   $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
   
@@ -1596,14 +1619,14 @@ sub getcamid_nonbl ($) {
    my $httptimeout;  
   
    # Verarbeitung der asynchronen Rückkehrdaten aus sub "login_nonbl"
-   if ($err ne "")                                                                                      # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   if ($err ne "")                                                                # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
    {
         $logstr = "error while requesting ".$param->{url}." - $err";
-        &printlog($hash,$logstr,"1");		                                                       # Eintrag fürs Log
+        &printlog($hash,$logstr,"1");		                                                       
         $logstr = "--- End Function serverlogin nonblocking with error ---";
         &printlog($hash,$logstr,"4");
         
-        readingsSingleUpdate($hash, "Error", $err, 1);                                      	       # Readings erzeugen
+        readingsSingleUpdate($hash, "Error", $err, 1);                               
         
         # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
         $hash->{HELPER}{ACTIVE} = "off"; 
@@ -1615,11 +1638,21 @@ sub getcamid_nonbl ($) {
         
         return;
    }
-   elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+   elsif ($myjson ne "")                                                          # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
    {          
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
-        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success);}
+        
+        unless ($success) {
+            $logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); 
+            $hash->{HELPER}{ACTIVE} = "off";
+            
+            if ($attr{$name}{debugactivetoken}) {
+                $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+                &printlog($hash,$logstr,"3");
+            }
+            return;
+        }
         
         $data = decode_json($myjson);
    
@@ -1774,7 +1807,11 @@ sub camop_nonbl ($) {
         
         # Evaluiere ob Daten im JSON-Format empfangen wurden, Achtung: sehr viele Daten mit verbose=5
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
-        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return (logout_nonbl($hash));}
+        
+        unless ($success) {
+            $logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); 
+            return (logout_nonbl($hash));
+        }
         
         $data = decode_json($myjson);
    
@@ -1921,8 +1958,8 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "Getcaminfo")
    {
-      # Infos einer Kamera werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet  
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=true&streamInfo=true&ptz=true&basic=true&camAppInfo=true&optimize=true&fisheye=true&eventDetection=true&_sid=\"$sid\"";   
+      # Infos einer Kamera werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet 
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
    }
    elsif ($OpMode eq "Getptzlistpreset")
    {
@@ -2024,7 +2061,11 @@ sub camret_nonbl ($) {
    {    
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
-        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return (logout_nonbl($hash));}
+        
+        unless ($success) {
+            $logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); 
+            return (logout_nonbl($hash));
+         }
         
         $data = decode_json($myjson);
    
@@ -2727,7 +2768,20 @@ sub logoutret_nonbl ($) {
         
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
-        unless ($success) {$logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); $hash->{HELPER}{ACTIVE} = "off"; return($hash,$success)};
+        
+        unless ($success) {
+            $logstr = "Data returned: ".$myjson; 
+            &printlog($hash,$logstr,"4");
+            
+            $hash->{HELPER}{ACTIVE} = "off";
+            
+            if ($attr{$name}{debugactivetoken}) {
+                $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
+                &printlog($hash,$logstr,"3");
+            }
+            
+            return;
+        }
         
         $data = decode_json($myjson);
    
@@ -2948,7 +3002,7 @@ return;
   <b>Define</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCAM &lt;Cameraname in SVS&gt; &lt;ServerAddr&gt; &lt;Port&gt;  </code><br>
+    <code>define &lt;name&gt; SSCAM &lt;Cameraname in SVS&gt; &lt;ServerAddr&gt; [Port]  </code><br>
     <br>
     Defines a new camera device for SSCam. At first the devices have to be set up and operable in Synology Surveillance Station 7.0 and above. <br><br>
     
@@ -2966,14 +3020,14 @@ return;
     <tr><td>name:         </td><td>the name of the new device to use in FHEM</td></tr>
     <tr><td>Cameraname:   </td><td>Cameraname as defined in Synology Surveillance Station, Spaces are not allowed in Cameraname !</td></tr>
     <tr><td>ServerAddr:   </td><td>IP-address of Synology Surveillance Station Host. <b>Note:</b> avoid using hostnames because of DNS-Calls are not unblocking in FHEM </td></tr>
-    <tr><td>Port:         </td><td>the Port Synology surveillance Station Host, normally 5000 (HTTP only)</td></tr>
+    <tr><td>Port:         </td><td>optional - the port of synology surveillance station, if not set the default of 5000 (HTTP only) is used</td></tr>
    </table>
 
     <br><br>
 
     <b>Example:</b>
      <pre>
-      define CamCP SSCAM Carport 192.168.2.20 5000  
+      define CamCP SSCAM Carport 192.168.2.20 [5000]  
     </pre>
     
     
@@ -3442,7 +3496,7 @@ return;
 <b>Definition</b>
   <ul>
   <br>
-    <code>define &lt;name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; &lt;Port&gt; </code><br>
+    <code>define &lt;name&gt; SSCAM &lt;Kameraname in SVS&gt; &lt;ServerAddr&gt; [Port] </code><br>
     <br>
     
     Definiert eine neue Kamera für SSCam. Zunächst muß diese Kamera in der Synology Surveillance Station 7.0 oder höher eingebunden sein und entsprechend funktionieren.<br><br>
@@ -3460,14 +3514,14 @@ return;
     <tr><td>name:           </td><td>der Name des neuen Gerätes in FHEM</td></tr>
     <tr><td>Kameraname:     </td><td>Kameraname wie er in der Synology Surveillance Station angegeben ist. Leerzeichen im Namen sind nicht erlaubt !</td></tr>
     <tr><td>ServerAddr:     </td><td>die IP-Addresse des Synology Surveillance Station Host. Hinweis: Es sollte kein Servername verwendet werden weil DNS-Aufrufe in FHEM blockierend sind.</td></tr>
-    <tr><td>Port:           </td><td>der Port des Synology Surveillance Station Host. Normalerweise ist das 5000 (nur HTTP)</td></tr>
+    <tr><td>Port:           </td><td>optional - der Port der Synology Surveillance Station. Wenn nicht angegeben wird der Default-Port 5000 (nur HTTP) gesetzt </td></tr>
     </table>
 
     <br><br>
 
     <b>Beispiel:</b>
      <pre>
-      define CamCP SSCAM Carport 192.168.2.20 5000      
+      define CamCP SSCAM Carport 192.168.2.20 [5000]      
      </pre>
      
     
