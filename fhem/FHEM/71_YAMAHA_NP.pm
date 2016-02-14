@@ -11,7 +11,7 @@
 #     NP-S2000, CD-N500, CD-N301, R-N500, R-N301 controlled by the
 #     Yamaha Network Player App.
 #
-#     *OS:
+#     i*S:
 #     https://itunes.apple.com/us/app/network-player-controller-us/id467502483?mt=8
 #
 #     Andr*id:
@@ -59,7 +59,7 @@ sub YAMAHA_NP_Initialize
   $hash->{AttrFn}    = "YAMAHA_NP_Attr";
   $hash->{UndefFn}   = "YAMAHA_NP_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 ".$readingFnAttributes;
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 auto_update_player_readings:1,0 auto_update_tuner_readings:1,0 ".$readingFnAttributes;
   
   return;
 }
@@ -96,7 +96,20 @@ sub YAMAHA_NP_GetStatus
     return;
   }
   
-  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", "statusRequest", "basicStatus");  
+  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", "statusRequest", "basicStatus");
+
+  if(defined($hash->{READINGS}{input}))
+  {
+    if((AttrVal($name, "auto_update_tuner_readings","1") eq "1") and ($hash->{READINGS}{input}{VAL} eq "tuner") and ($hash->{READINGS}{power}{VAL} eq "on"))
+    {
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Info>GetParam<\/Play_Info><\/Tuner><\/YAMAHA_AV>", "statusRequest", "tunerStatus");
+    }
+    elsif(AttrVal($name, "auto_update_player_readings", "1") eq "1" and ($hash->{READINGS}{input}{VAL} ne "tuner") and ($hash->{READINGS}{power}{VAL} eq "on"))
+    {
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><Play_Info>GetParam<\/Play_Info><\/Player><\/YAMAHA_AV>", "statusRequest", "playerStatus");      
+    }  
+  }  
+
   YAMAHA_NP_ResetTimer($hash) unless($local == 1);
   return;
 }
@@ -884,7 +897,7 @@ sub YAMAHA_NP_SendCommand
   if($blocking == 1)
   {
     Log3 $name, 5, "YAMAHA_NP ($name) - execute blocking \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\" on $name: $data";
-    
+
     my $param =
     {
       url        => "http://".$address."/YamahaRemoteControl/ctrl",
@@ -1757,7 +1770,12 @@ sub YAMAHA_NP_html2txt
       <br>Possible values: 1...5 seconds. Default value is 4 seconds.<br><br>
       <li><b><a name="disable">disable</a></b></li>
       <br>Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
-      <br>Possible values: 0 &rarr; perform cyclic status update, 1 &rarr; don't perform cyclic status updates.<br><br><br>
+      <br>Possible values: 0 &rarr; perform cyclic status update, 1 &rarr; don't perform cyclic status updates.<br><br>
+      <li><b><a name="auto_update_player_readings">auto_update_player_readings</a></b></li>
+      <br>Optional attribute for auto refresh of player related readings. Default is 1.<br><br>
+      <li><b><a name="auto_update_tuner_readings">auto_update_tuner_readings</a></b></li>
+      <br>Optional attribute for auto refresh of tuner related readings. Default is 1.<br><br>
+      <br><br>
     </ul>
   </ul>
   <b>Readings</b><br>
@@ -2006,7 +2024,13 @@ sub YAMAHA_NP_html2txt
         M&ouml;gliche Werte: 1...5 Sekunden. Default Wert ist 4 Sekunden.<br><br>
         <li><b><a name="disable">disable</a></b></li><br>
         Optionales Attribut zum Deaktivieren des internen zyklischen Timers zum Aktualisieren des NP-Status. Manuelles Update ist nach wie vor m&ouml;glich.<br>
-        M&ouml;gliche Werte: 0 &rarr; Zyklisches Update aktiv., 1 &rarr; Zyklisches Update inaktiv.<br><br><br>
+        M&ouml;gliche Werte: 0 &rarr; Zyklisches Update aktiv., 1 &rarr; Zyklisches Update inaktiv.<br><br>
+        <li><b><a name="auto_update_player_readings">auto_update_player_readings</a></b></li>
+        <br>Optionales Attribut zum automtischen aktualisieren der Player-Readings. Default-Wert ist 1.<br><br>
+        <li><b><a name="auto_update_tuner_readings">auto_update_tuner_readings</a></b></li>
+        <br>Optionales Attribut zum automtischen aktualisieren der Tuner-Readings. Default-Wert ist 1.<br>
+        <br><br>
+        <br>
       </ul>
     </ul>
     <b>Readings</b><br>
