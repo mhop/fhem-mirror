@@ -459,8 +459,8 @@ sub GUEST_Set($@) {
               : "absent";
 
             # stop any running wakeup-timers in case state changed
-            my $wakeupState = AttrVal( $name, "wakeup", 0 );
-            if ($wakeupState) {
+            my $wakeupState = ReadingsVal( $name, "wakeup", 0 );
+            if ($wakeupState > 0) {
                 my $wakeupDeviceList = AttrVal( $name, "rg_wakeupDevice", 0 );
 
                 for my $wakeupDevice ( split /,/, $wakeupDeviceList ) {
@@ -471,9 +471,11 @@ sub GUEST_Set($@) {
                     {
                         # forced-stop only if resident is not present anymore
                         if ( $newpresence eq "present" ) {
+                            Log3 $name, 4, "ROOMMATE $name: ending wakeup-timer $wakeupDevice";
                             fhem "set $wakeupDevice:FILTER=running!=0 end";
                         }
                         else {
+                            Log3 $name, 4, "ROOMMATE $name: stopping wakeup-timer $wakeupDevice";
                             fhem "set $wakeupDevice:FILTER=running!=0 stop";
                         }
                     }
@@ -822,14 +824,14 @@ sub GUEST_Set($@) {
 
                 # create new weblink device
                 fhem "define $locationmapName weblink htmlCode {
-'<div style=\"width: 400px;; overflow: hidden;; height: 300px;;\">
+'<ul style=\"width: 400px;; overflow: hidden;; height: 300px;;\">
 <iframe name=\"$locationmapName\" src=\"https://www.google.com/maps/embed/v1/place?key=AIzaSyB66DvcpbXJ5eWgIkzxpUN2s_9l3_6fegM&q='
 .ReadingsVal('$name','locationLat','')
 .','
 .ReadingsVal('$name','locationLong','')
 .'&zoom=13\" width=\"480\" height=\"480\" frameborder=\"0\" style=\"border:0;; margin-top: -165px;; margin-left: -135px;;\">
 </iframe>
-</div>'
+</ul>'
 }";
                 fhem "attr $locationmapName alias Current Location";
                 fhem
@@ -1186,15 +1188,11 @@ sub GUEST_StartInternalTimers($$) {
 =item helper
 =begin html
 
-    <p>
-      <a name="GUEST" id="GUEST"></a>
-    </p>
-    <h3>
-      GUEST
-    </h3>
-    <div style="margin-left: 2em">
+    <a name="GUEST" id="GUEST"></a>
+    <h3>GUEST</h3>
+    <ul>
       <a name="GUESTdefine" id="GUESTdefine"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>define &lt;rg_GuestName&gt; GUEST [&lt;device name(s) of resident group(s)&gt;]</code><br>
         <br>
         Provides a special virtual device to represent a guest of your home.<br>
@@ -1205,7 +1203,7 @@ sub GUEST_StartInternalTimers($$) {
         Use comma separated list of resident device names for multi-membership (see example below).<br />
         <br>
         Example:<br>
-        <div style="margin-left: 2em">
+        <ul>
           <code># Standalone<br>
           define rg_Guest GUEST<br>
           <br>
@@ -1214,15 +1212,15 @@ sub GUEST_StartInternalTimers($$) {
           <br>
           # Member of multiple groups<br>
           define rg_Guest GUEST rgr_Residents,rgr_Guests # to be member of resident group rgr_Residents and rgr_Guests</code>
-        </div>
-      </div><br>
-      <div style="margin-left: 2em">
+        </ul>
+      </ul><br>
+      <ul>
         Please note the RESIDENTS group device needs to be existing before a GUEST device can become a member of it.
-      </div><br>
+      </ul><br>
       <br>
       <br>
       <a name="GUESTset" id="GUESTset"></a> <b>Set</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>set &lt;rg_GuestName&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
         <br>
         Currently, the following commands are defined.<br>
@@ -1246,12 +1244,12 @@ sub GUEST_StartInternalTimers($$) {
             <u>Note:</u> If you would like to restrict access to admin set-commands (-> create) you may set your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
             The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
         </ul>
-      </div><br>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Possible states and their meaning</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           This module differs between 6 states:<br>
           <br>
           <ul>
@@ -1274,47 +1272,47 @@ sub GUEST_StartInternalTimers($$) {
               <b>none</b> - guest device is disabled
             </li>
           </ul>
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Presence correlation to location</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Under specific circumstances, changing state will automatically change reading 'location' as well.<br>
           <br>
           Whenever presence state changes from 'absent' to 'present', the location is set to 'home'. If attribute rg_locationHome was defined, first location from it will be used as home location.<br>
           <br>
           Whenever presence state changes from 'present' to 'absent', the location is set to 'underway'. If attribute rg_locationUnderway was defined, first location from it will be used as underway location.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Auto Gone</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Whenever an individual is set to 'absent', a trigger is started to automatically change state to 'gone' after a specific timeframe.<br>
           Default value is 16 hours.<br>
           <br>
           This behaviour can be customized by attribute rg_autoGoneAfter.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Synchronizing presence with other ROOMMATE or GUEST devices</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           If you always leave or arrive at your house together with other roommates or guests, you may enable a synchronization of your presence state for certain individuals.<br>
           By setting attribute rg_passPresenceTo, those individuals will follow your presence state changes to 'home', 'absent' or 'gone' as you do them with your own device.<br>
           <br>
           Please note that individuals with current state 'none' or 'gone' (in case of roommates) will not be touched.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Location correlation to state</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Under specific circumstances, changing location will have an effect on the actual state as well.<br>
           <br>
           Whenever location is set to 'home', the state is set to 'home' if prior presence state was 'absent'. If attribute rg_locationHome was defined, all of those locations will trigger state change to 'home' as well.<br>
@@ -1329,11 +1327,11 @@ sub GUEST_StartInternalTimers($$) {
           <code>define n_rg_Guest.location notify geofancy:currLoc_Guest.* set rg_Guest:FILTER=location!=$EVTPART1 location $EVTPART1</code><br>
           <br>
           By defining geofencing zones called 'home' and 'wayhome' in the iOS app, you automatically get all the features of automatic state changes described above.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="GUESTattr" id="GUESTattr"></a> <b>Attributes</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>rg_autoGoneAfter</b> - hours after which state should be auto-set to 'gone' when current state is 'absent'; defaults to 16 hours
@@ -1381,11 +1379,11 @@ sub GUEST_StartInternalTimers($$) {
             <b>rg_wakeupDevice</b> - reference to enslaved DUMMY devices used as a wake-up timer (part of RESIDENTS Toolkit's wakeuptimer)
           </li>
         </ul>
-      </div><br>
+      </ul><br>
       <br>
       <br>
       <b>Generated Readings/Events:</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>durTimerAbsence</b> - timer to show the duration of absence from home in human readable format (hours:minutes:seconds)
@@ -1481,22 +1479,18 @@ sub GUEST_StartInternalTimers($$) {
             lastArrival, lastDurAbsence, lastLocation, lastMood, location, mood
           </li>
         </ul>
-      </div>
-    </div>
+      </ul>
+    </ul>
 
 =end html
 
 =begin html_DE
 
-    <p>
-      <a name="GUEST" id="GUEST"></a>
-    </p>
-    <h3>
-      GUEST
-    </h3>
-    <div style="margin-left: 2em">
+    <a name="GUEST" id="GUEST"></a>
+    <h3>GUEST</h3>
+    <ul>
       <a name="GUESTdefine" id="GUESTdefine"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>define &lt;rg_FirstName&gt; GUEST [&lt;Device Name(n) der Bewohnergruppe(n)&gt;]</code><br>
         <br>
         Stellt ein spezielles virtuelles Device bereit, welches einen Gast repräsentiert.<br>
@@ -1507,7 +1501,7 @@ sub GUEST_StartInternalTimers($$) {
         Bei Mitgliedschaft mehrerer Bewohnergruppen werden diese durch Komma getrennt angegeben (siehe Beispiel unten).<br />
         <br>
         Beispiele:<br>
-        <div style="margin-left: 2em">
+        <ul>
           <code># Einzeln<br>
           define rg_Guest GUEST<br>
           <br>
@@ -1516,15 +1510,15 @@ sub GUEST_StartInternalTimers($$) {
           <br>
           # Mitglied in mehreren Gruppen<br>
           define rg_Guest GUEST rgr_Residents,rgr_Guests # um Mitglied der Gruppen rgr_Residents und rgr_Guests zu sein</code>
-        </div>
-      </div><br>
-      <div style="margin-left: 2em">
+        </ul>
+      </ul><br>
+      <ul>
         Bitte beachten, dass das RESIDENTS Gruppen Device zunächst angelegt werden muss, bevor ein GUEST Objekt dort Mitglied werden kann.
-      </div><br>
+      </ul><br>
       <br>
       <br>
       <a name="GUESTset" id="GUESTset"></a> <b>Set</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>set &lt;rg_FirstName&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
         <br>
         Momentan sind die folgenden Kommandos definiert.<br>
@@ -1548,12 +1542,12 @@ sub GUEST_StartInternalTimers($$) {
             <u>Hinweis:</u> Sofern der Zugriff auf administrative set-Kommandos (-> create) eingeschr&auml;nkt werden soll, kann in einer FHEMWEB Instanz das Attribut allowedCommands &auml;hnlich wie 'set,set-user' erweitert werden.
             Die Zeichenfolge 'set-user' stellt dabei sicher, dass beim Zugriff auf FHEM &uuml;ber diese FHEMWEB Instanz nur nicht-administrative set-Kommandos ausgef&uuml;hrt werden k&ouml;nnen.
         </ul>
-      </div><br>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Mögliche Status und ihre Bedeutung</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Dieses Modul unterscheidet 6 verschiedene Status:<br>
           <br>
           <ul>
@@ -1576,47 +1570,47 @@ sub GUEST_StartInternalTimers($$) {
               <b>none</b> - Gast Device ist deaktiviert
             </li>
           </ul>
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Zusammenhang zwischen Anwesenheit/Presence und Aufenthaltsort/Location</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Unter bestimmten Umständen führt der Wechsel des Status auch zu einer Änderung des Readings 'location'.<br>
           <br>
           Wannimmer die Anwesenheit (bzw. das Reading 'presence') von 'absent' auf 'present' wechselt, wird 'location' auf 'home' gesetzt. Sofern das Attribut rg_locationHome gesetzt ist, wird die erste Lokation daraus anstelle von 'home' verwendet.<br>
           <br>
           Wannimmer die Anwesenheit (bzw. das Reading 'presence') von 'present' auf 'absent' wechselt, wird 'location' auf 'underway' gesetzt. Sofern das Attribut rg_locationUnderway gesetzt ist, wird die erste Lokation daraus anstelle von 'underway' verwendet.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Auto-Status 'gone'</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Immer wenn ein Mitbewohner auf 'absent' gesetzt wird, wird ein Zähler gestartet, der nach einer bestimmten Zeit den Status automatisch auf 'gone' setzt.<br>
           Der Standard ist nach 16 Stunden.<br>
           <br>
           Dieses Verhalten kann über das Attribut rg_autoGoneAfter angepasst werden.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Anwesenheit mit anderen GUEST oder ROOMMATE Devices synchronisieren</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Wenn Sie immer zusammen mit anderen Mitbewohnern oder Gästen das Haus verlassen oder erreichen, können Sie ihren Status ganz einfach auf andere Mitbewohner übertragen.<br>
           Durch das Setzen des Attributs rg_PassPresenceTo folgen die dort aufgeführten Mitbewohner ihren eigenen Statusänderungen nach 'home', 'absent' oder 'gone'.<br>
           <br>
           Bitte beachten, dass Mitbewohner mit dem aktuellen Status 'none' oder 'gone' (im Falle von ROOMMATE Devices) nicht beachtet werden.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Zusammenhang zwischen Aufenthaltsort/Location und Anwesenheit/Presence</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Unter bestimmten Umständen hat der Wechsel des Readings 'location' auch einen Einfluss auf den tatsächlichen Status.<br>
           <br>
           Immer wenn eine Lokation mit dem Namen 'home' gesetzt wird, wird auch der Status auf 'home' gesetzt, sofern die Anwesenheit bis dahin noch auf 'absent' stand. Sofern das Attribut rg_locationHome gesetzt wurde, so lösen alle dort angegebenen Lokationen einen Statuswechsel nach 'home' aus.<br>
@@ -1631,11 +1625,11 @@ sub GUEST_StartInternalTimers($$) {
           <code>define n_rg_Manfred.location notify geofancy:currLoc_Manfred.* set rg_Manfred:FILTER=location!=$EVTPART1 location $EVTPART1</code><br>
           <br>
           Durch das Anlegen von Geofencing-Zonen mit den Namen 'home' und 'wayhome' in der iOS App werden zukünftig automatisch alle Statusänderungen wie oben beschrieben durchgeführt.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="GUESTattr" id="GUESTattr"></a> <b>Attribute</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>rg_autoGoneAfter</b> - Anzahl der Stunden, nach denen sich der Status automatisch auf 'gone' ändert, wenn der aktuellen Status 'absent' ist; Standard ist 36 Stunden
@@ -1683,11 +1677,11 @@ sub GUEST_StartInternalTimers($$) {
             <b>rg_wakeupDevice</b> - Referenz zu versklavten DUMMY Ger&auml;ten, welche als Wecker benutzt werden (Teil von RESIDENTS Toolkit's wakeuptimer)
           </li>
         </ul>
-      </div><br>
+      </ul><br>
       <br>
       <br>
       <b>Generierte Readings/Events:</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>durTimerAbsence</b> - Timer, der die Dauer der Abwesenheit in normal lesbarem Format anzeigt (Stunden:Minuten:Sekunden)
@@ -1782,8 +1776,8 @@ sub GUEST_StartInternalTimers($$) {
             lastArrival, lastDurAbsence, lastLocation, lastMood, location, mood
           </li>
         </ul>
-      </div>
-    </div>
+      </ul>
+    </ul>
 
 =end html_DE
 
