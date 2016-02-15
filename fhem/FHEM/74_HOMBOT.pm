@@ -35,7 +35,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use Blocking;
 
-my $version = "0.2.1";
+my $version = "0.2.2";
 
 
 
@@ -48,6 +48,7 @@ sub HOMBOT_Initialize($) {
     $hash->{DefFn}	= "HOMBOT_Define";
     $hash->{UndefFn}	= "HOMBOT_Undef";
     $hash->{AttrFn}	= "HOMBOT_Attr";
+    $hash->{FW_detailFn}  = "HOMBOT_DetailFn";
     
     $hash->{AttrList} 	= "interval ".
 			  "disable:1 ".
@@ -961,6 +962,16 @@ sub HOMBOT_Aborted_Bot_Alive($) {
 
     delete($hash->{helper}{RUNNING_PID});
     Log3 $name, 3, "HOMBOT ($name) - The BlockingCall Process terminated unexpectedly. Timedout";
+}
+
+sub HOMBOT_DetailFn() {         # Patch von Andre (justme1968)
+
+    my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+    my $hash = $defs{$d};
+
+    return if( !defined( $hash->{HOST} ) );
+
+    return "<b><u><a href=\"http://$hash->{HOST}:6260\" target=\"_blank\">Control Center</a></u></b><br>"
 }
 
 
