@@ -34,7 +34,7 @@ mailcheck_Initialize($)
   $hash->{DefFn}    = "mailcheck_Define";
   $hash->{NotifyFn} = "mailcheck_Notify";
   $hash->{UndefFn}  = "mailcheck_Undefine";
-  #$hash->{SetFn}    = "mailcheck_Set";
+  $hash->{SetFn}    = "mailcheck_Set";
   $hash->{GetFn}    = "mailcheck_Get";
   $hash->{AttrFn}   = "mailcheck_Attr";
   $hash->{AttrList} = "debug:1 ".
@@ -240,7 +240,23 @@ mailcheck_Set($$@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  my $list = "";
+  my $list = "active:noArgs inactive:noArgs";
+
+  if( $cmd eq 'active' ) {
+    mailcheck_Disconnect($hash);
+    $hash->{STATE} = "Initialized";
+    mailcheck_Connect($hash);
+
+    return undef;
+
+  } elsif( $cmd eq 'inactive' ) {
+    mailcheck_Disconnect($hash);
+    $hash->{STATE} = 'inactive';
+
+    return undef;
+
+  }
+
   return "Unknown argument $cmd, choose one of $list";
 }
 
@@ -513,6 +529,15 @@ mailcheck_Read($)
       the subject of the last mail received</li>
     <li>From<br>
       the mail address of the last sender</li>
+  </ul><br>
+
+  <a name="mailcheck_Set"></a>
+  <b>Set</b>
+  <ul>
+    <li>inactive<br>
+      temporarily deactivates the device</li>
+    <li>active<br>
+      reenables the device</li>
   </ul><br>
 
   <a name="mailcheck_Get"></a>
