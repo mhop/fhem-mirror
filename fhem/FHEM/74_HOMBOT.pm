@@ -35,7 +35,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use Blocking;
 
-my $version = "0.2.0";
+my $version = "0.2.1";
 
 
 
@@ -548,8 +548,8 @@ sub HOMBOT_Set($$@) {
 	$list .= "cleanMode:SB,ZZ,SPOT ";
 	$list .= "repeat:true,false ";
 	$list .= "turbo:true,false ";
-	$list .= "nickname " ;
-	$list .= "schedule " ;
+	$list .= "nickname ";
+	$list .= "schedule ";
 	
 
 	if( lc $cmd eq 'cleanstart'
@@ -572,7 +572,7 @@ sub HOMBOT_Set($$@) {
 	    return "set command only works if state not equal initialized, please wait for next interval run" if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "initialized");
 	    return "to many character for Nickname" if(( $wordlenght < 2 || $wordlenght > 16 ) && lc $cmd eq 'nickname' );
 
-	    return HOMBOT_SelectSetCmd( $hash, $cmd, @val ) if( ( ( @val ) && lc $cmd eq 'statusrequest' || lc $cmd eq 'cleanstart'|| lc $cmd eq 'homing' || lc $cmd eq 'pause' ) );
+	    return HOMBOT_SelectSetCmd( $hash, $cmd, @val ) if( ( ( @val ) || lc $cmd eq 'cleanstart'|| lc $cmd eq 'homing' || lc $cmd eq 'pause' ) );
 	}
 
 	return "Unknown argument $cmd, bearword as argument or wrong parameter(s), choose one of $list";
