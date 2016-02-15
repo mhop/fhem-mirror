@@ -138,6 +138,7 @@ SetExtensions($$@)
     }
     
   } elsif($cmd eq "toggle") {
+    $value = ($1==0 ? "off" : "on") if($value =~ m/dim (\d+)/); # Forum #49391
     DoSet($name, $value =~ m/^on/ ? "off" : "on");
 
   }
