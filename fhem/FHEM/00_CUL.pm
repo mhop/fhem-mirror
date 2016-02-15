@@ -591,7 +591,7 @@ CUL_XmitLimitCheck($$$)
   my @b = grep { $_ > $nowM1h } @{$hash->{XMIT_TIME}};
 
   # Maximum nr of transmissions per hour, but not for HM and MAX
-  if(@b > 163 && $fn !~ m/^[AZ]/) {
+  if(@b > 163 && $fn !~ m/^A/) {
     my $name = $hash->{NAME};
     Log3 $name, 2, "CUL TRANSMIT LIMIT EXCEEDED";
     DoTrigger($name, "TRANSMIT LIMIT EXCEEDED");
