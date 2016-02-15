@@ -771,6 +771,7 @@ JeeLink_Parse($$$$)
 
   $hash->{"${name}_MSGCNT"}++;
   $hash->{"${name}_TIME"} = TimeNow();
+  readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 0);
   $hash->{RAWMSG} = $rmsg;
   my %addvals = (RAWMSG => $rmsg);
   if(defined($rssi)) {
