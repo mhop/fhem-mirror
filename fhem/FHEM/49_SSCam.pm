@@ -1,4 +1,4 @@
- ##########################################################################################################
+  ##########################################################################################################
 # $Id$
 ##########################################################################################################
 #       49_SSCam.pm
@@ -27,7 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
-# 1.14                 the port in DEF-String is optional now,
+# 1.15   15.02.2016    control of exposure mode day, night & auto is possible now
+# 1.14   14.02.2016    The port in DEF-String is optional now,
 #                      if not given, default port 5000 is used
 # 1.13.2 13.02.2016    fixed a problem that manual updates using "getcaminfoall" are
 #                      leading to additional pollingloops if polling is used,
@@ -131,7 +132,7 @@ sub SSCam_Define {
   my @a = split("[ \t][ \t]*", $def);
   
   if(int(@a) < 4) {
-        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <Cameraname> <ServerAddress> <Port>";
+        return "You need to specify more parameters.\n". "Format: define <name> SSCAM <Cameraname> <ServerAddress> [Port]";
         }
         
   my $camname    = $a[2];
@@ -150,6 +151,7 @@ sub SSCam_Define {
   $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";
   $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
+  $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
   
   # Startwerte setzen
   $attr{$name}{webCmd}                 = "on:off:snap:enable:disable";                            # initiale Webkommandos setzen
@@ -230,9 +232,10 @@ sub SSCam_Set {
         
         $setlist = "Unknown argument $opt, choose one of ".
                    "credentials ".
-                   # "expmode ".
+                   "expmode:auto,day,night ".
                    "on ".
                    "off ".
+                   # "motdetsc:disable,by_camera,by_SVS ".
                    "snap ".
                    "enable ".
                    "disable ".
@@ -271,6 +274,14 @@ sub SSCam_Set {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             camdisable($hash);
         }
+        elsif ($opt eq "motdetsc") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            unless ($prop) { return " \"$opt\" needs one of those arguments: disable, by_camera, by_SVS !";}
+            
+            $hash->{HELPER}{MOTDETSC} = $prop;
+            cammotdetsc($hash);
+        }
         elsif ($opt eq "credentials") 
         {
             return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
@@ -281,6 +292,9 @@ sub SSCam_Set {
         elsif ($opt eq "expmode") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            unless ($prop) { return " \"$opt\" needs one of those arguments: auto, day, night !";}
+            
+            $hash->{HELPER}{EXPMODE} = $prop;
             camexpmode($hash);
         }
         elsif ($opt eq "goPreset") 
@@ -771,6 +785,61 @@ sub camexpmode ($) {
     else
     {
     InternalTimer(gettimeofday()+0.13, "camexpmode", $hash, 0);
+    }
+}
+
+
+###############################################################################
+###   Art der Bewegungserkennung setzen
+
+sub cammotdetsc ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    my $errorcode;
+    my $error;
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+            }
+            elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+            }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        $logstr = "ERROR - Setting of motion detection source of Camera $camname can't be executed - $error" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        
+        $logstr = "Setting of motion detection source of Camera $camname will be started now";
+        &printlog($hash,$logstr,"4");
+                           
+        $hash->{OPMODE} = "MotDetSc";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
+        &getapisites_nonbl($hash);
+    }
+    else
+    {
+    InternalTimer(gettimeofday()+0.14, "cammotdetsc", $hash, 0);
     }
 }
 
@@ -1299,6 +1368,7 @@ sub getapisites_nonbl {
    my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
    my $apiptz      = $hash->{HELPER}{APIPTZ};
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
+   my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $logstr;
    my $url;
    my $param;
@@ -1315,7 +1385,7 @@ sub getapisites_nonbl {
    &printlog($hash,$logstr,"5");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent";
 
    $logstr = "Call-Out now: $url";
    &printlog($hash,$logstr,"4");    
@@ -1351,6 +1421,7 @@ sub login_nonbl ($) {
    my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
    my $apiptz      = $hash->{HELPER}{APIPTZ};
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
+   my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $data;
    my $logstr;
    my $url;
@@ -1366,7 +1437,9 @@ sub login_nonbl ($) {
    my $apiptzpath;
    my $apiptzmaxver;
    my $apisvsinfopath;
-   my $apisvsinfomaxver; 
+   my $apisvsinfomaxver;
+   my $apicameventpath;
+   my $apicameventmaxver;
    my $error;
    my $httptimeout;
   
@@ -1488,6 +1561,18 @@ sub login_nonbl ($) {
                         &printlog($hash, $logstr,"4");
                         $logstr = defined($apisvsinfomaxver) ? "MaxVersion of $apisvsinfo: $apisvsinfomaxver" : "MaxVersion of $apisvsinfo undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4");
+                        
+                     # Pfad und Maxversion von "SYNO.Surveillance.Camera.Event" ermitteln
+              
+                        $apicameventpath = $data->{'data'}->{$apicamevent}->{'path'};
+                        # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+                        $apicameventpath =~ tr/_//d if (defined($apicameventpath));
+                        $apicameventmaxver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
+                            
+                        $logstr = defined($apicameventpath) ? "Path of $apicamevent selected: $apicameventpath" : "Path of $apicamevent undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
+                        $logstr = defined($apicameventmaxver) ? "MaxVersion of $apicamevent: $apicameventmaxver" : "MaxVersion of $apicamevent undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");                        
        
                         # ermittelte Werte in $hash einfügen
                         $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
@@ -1502,6 +1587,8 @@ sub login_nonbl ($) {
                         $hash->{HELPER}{APIPTZMAXVER}      = $apiptzmaxver;
                         $hash->{HELPER}{APISVSINFOPATH}    = $apisvsinfopath;
                         $hash->{HELPER}{APISVSINFOMAXVER}  = $apisvsinfomaxver;
+                        $hash->{HELPER}{APICAMEVENTPATH}   = $apicameventpath;
+                        $hash->{HELPER}{APICAMEVENTMAXVER} = $apicameventmaxver;
        
                         # Setreading 
                         readingsBeginUpdate($hash);
@@ -1773,6 +1860,9 @@ sub camop_nonbl ($) {
    my $apisvsinfo        = $hash->{HELPER}{APISVSINFO};
    my $apisvsinfopath    = $hash->{HELPER}{APISVSINFOPATH};
    my $apisvsinfomaxver  = $hash->{HELPER}{APISVSINFOMAXVER};
+   my $apicamevent       = $hash->{HELPER}{APICAMEVENT};
+   my $apicameventpath   = $hash->{HELPER}{APICAMEVENTPATH};
+   my $apicameventmaxver = $hash->{HELPER}{APICAMEVENTMAXVER};
    my $sid               = $hash->{HELPER}{SID};
    my $OpMode            = $hash->{OPMODE};
    my $url;
@@ -1789,6 +1879,8 @@ sub camop_nonbl ($) {
    my $n;
    my $id;
    my $httptimeout;
+   my $expmode;
+   my $motdetsc;
   
    # Verarbeitung der asynchronen Rückkehrdaten aus sub "getcamid_nonbl"
    if ($err ne "")                                                                         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -1978,7 +2070,30 @@ sub camop_nonbl ($) {
    }    
    elsif ($OpMode eq "ExpMode")
    {
-      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=2&camParamChkList=1&_sid=\"$sid\"";   
+      if ($hash->{HELPER}{EXPMODE} eq "auto") {
+          $expmode = "0";
+      }
+      elsif ($hash->{HELPER}{EXPMODE} eq "day") {
+          $expmode = "1";
+      }
+      elsif ($hash->{HELPER}{EXPMODE} eq "night") {
+          $expmode = "2";
+      }
+      $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
+   }
+   elsif ($OpMode eq "MotDetSc")
+   {
+      if ($hash->{HELPER}{MOTDETSC} eq "disable") {
+          $motdetsc = "-1";
+      }
+      elsif ($hash->{HELPER}{MOTDETSC} eq "by_camera") {
+          $motdetsc = "0";
+      }
+      elsif ($hash->{HELPER}{MOTDETSC} eq "by_SVS") {
+          $motdetsc = "1";
+      }
+      
+      $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"ADParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";   
    }
    
    $logstr = "Call-Out now: $url";
@@ -2130,7 +2245,21 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                $logstr = "Camera $camname exposure mode was set";
+                $logstr = "Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "MotDetSc") 
+            {              
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+       
+                # Logausgabe
+                $logstr = "Camera $camname motion detection source was set to \"$hash->{HELPER}{MOTDETSC}\"";
                 &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
@@ -2979,6 +3108,7 @@ return;
        <li>Trigger a Snapshot </li>
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
        <li>Activate a Camera in Synology Surveillance Station</li>
+       <li>Control of the exposure modes day, night and automatic </li>
        <li>Retrieval of Camera Properties (also by Polling) as well as informations about the installed SVS-package</li>
        <li>Move to a predefined Preset-position (at PTZ-cameras) </li>
        <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
@@ -3084,6 +3214,7 @@ return;
       <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
+      <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
@@ -3120,6 +3251,7 @@ return;
       <tr><td>"disable":                                           </td><td>deactivates a camera in Synology Surveillance Station</td></tr>
       <tr><td>"enable":                                            </td><td>activates a camera in Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
+      <tr><td>"expmode [ day | night | auto ]":                    </td><td>set the exposure mode to day, night or auto </td></tr>
       <tr><td>"goPreset &lt;Preset&gt;":                           </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>starts a continuous move of PTZ-camera to direction up/down/left/right or dir_X  </td></tr> 
@@ -3190,7 +3322,15 @@ return;
      define all_cams_enable notify allcams:on set CamCP1,CamFL,CamHE1,CamTER enable
      attr all_cams_enable room Cams
   </pre>
-
+  <br><br>
+  
+  <b> "set &lt;name&gt; expmode [day] [night] [auto]" </b> <br><br>
+  
+  With this command you are able to control the exposure mode and can set it to day, night or automatic mode. 
+  Thereby, for example, the behavior of camera LED's will be suitable controlled. 
+  The successful switch will be reported by the reading CamExposureMode (command "get ... caminfoall"). 
+  <br><br>
+  
   <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
   
   Using this command you can move PTZ-c ameras to a predefined position. <br>
@@ -3474,6 +3614,7 @@ return;
       <li>Aufnehmen eines Schnappschusses und Ablage in der Synology Surveillance Station </li>
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
+      <li>Steuerung der Belichtungsmodi Tag, Nacht bzw. Automatisch </li>
       <li>Abfrage von Kameraeigenschaften (auch mit Polling) sowie den Eigenschaften des installierten SVS-Paketes</li>
       <li>Bewegen an eine vordefinierte Preset-Position (bei PTZ-Kameras) </li>
       <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
@@ -3575,6 +3716,7 @@ return;
       <tr><td><li>set ... snap               </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
+      <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
@@ -3612,6 +3754,7 @@ return;
       <tr><td>"disable":                                       </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
       <tr><td>"enable":                                        </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;": </td><td>speichert die Zugangsinformationen</td></tr>
+      <tr><td>"expmode [ day | night | auto ]":                </td><td>aktiviert den Belichtungsmodus Tag, Nacht oder Automatisch </td></tr>
       <tr><td>"goPreset &lt;Preset&gt;":                       </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":   </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":     </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
@@ -3681,6 +3824,12 @@ return;
      define all_cams_enable notify allcams:on set CamCP1,CamFL,CamHE1,CamTER enable
      attr all_cams_enable room Cams
   </pre>
+  <br><br>
+  
+  <b> "set &lt;name&gt; expmode [day] [night] [auto]" </b> <br><br>
+  
+  Mit diesem Befehl kann der Belichtungsmodus der Kameras gesetzt werden. Dadurch wird z.B. das Verhalten der Kamera-LED's entsprechend gesteuert. 
+  Die erfolgreiche Umschaltung wird durch das Reading CamExposureMode ("get ... caminfoall") reportet. 
   <br><br>
   
   <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
