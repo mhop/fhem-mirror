@@ -2828,9 +2828,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <h3>
       ENIGMA2
     </h3>
-    <div style="margin-left: 2em">
+    <ul>
       <a name="ENIGMA2define" id="ENIGMA2define"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>define &lt;name&gt; ENIGMA2 &lt;ip-address-or-hostname&gt; [&lt;port&gt;] [&lt;poll-interval&gt;] [&lt;http-user&gt;] [&lt;http-password&gt;]</code><br>
         <br>
         This module controls ENIGMA2 based devices like Dreambox or VUplus via network connection.<br>
@@ -2838,7 +2838,7 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
         Defining an ENIGMA2 device will schedule an internal task (interval can be set with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 45 seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br>
         <br>
         Example:<br>
-        <div style="margin-left: 2em">
+        <ul>
           <code>define SATReceiver ENIGMA2 192.168.0.10<br>
           <br>
           # With custom port<br>
@@ -2849,11 +2849,11 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           <br>
           # With HTTP user credentials<br>
           define SATReceiver ENIGMA2 192.168.0.10 80 20 root secret</code>
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="ENIGMA2set" id="ENIGMA2set"></a> <b>Set</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
         <br>
         Currently, the following commands are defined.<br>
@@ -2930,36 +2930,36 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
             <u>Note:</u> If you would like to restrict access to admin set-commands (-> statusRequest, reboot, restartGui, shutdown) you may set your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
             The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
         </ul>
-      </div><br>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Messaging</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           showText has predefined settings. If you would like to send more individual messages to your TV screen, the function msg can be used. For this application the following commands are available:<br>
           <br>
           <u>Type Selection:</u><br>
-          <div style="margin-left: 2em">
+          <ul>
             <code>msg yesno<br>
             msg info<br>
             msg message<br>
             msg attention<br></code>
-          </div><br>
+          </ul><br>
           <br>
           The following parameter are essentially needed after type specification:
-          <div style="margin-left: 2em">
+          <ul>
             <code>msg &lt;TYPE&gt; &lt;TIMEOUT&gt; &lt;YOUR MESSAGETEXT&gt;<br></code>
-          </div>
-        </div>
-      </div><br>
+          </ul>
+        </ul>
+      </ul><br>
       <br>
       <a name="ENIGMA2get" id="ENIGMA2get"></a> <b>Get</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>get &lt;name&gt; &lt;what&gt;</code><br>
         <br>
         Currently, the following commands are defined:<br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           <code>channel<br>
           currentMedia<br>
           currentTitle<br>
@@ -2971,11 +2971,11 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           input<br>
           streamUrl<br>
           volume<br></code>
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="ENIGMA2attr" id="ENIGMA2attr"></a> <b>Attributes</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>bouquet-tv</b> - service reference address where the favorite television bouquet can be found (initially set automatically during define)
@@ -3011,11 +3011,11 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
             <b>wakeupCmd</b> - Set a command to be executed when turning on an absent device. Can be an FHEM command or Perl command in {}. Available variables: ENIGMA2 device name -> $DEVICE, ENIGMA2 device MAC address -> $MACADDR  (default=Wake-on-LAN)
           </li>
         </ul>
-      </div><br>
+      </ul><br>
       <br>
       <br>
       <b>Generated Readings/Events:</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>acg</b> - Shows Automatic Gain Control value in percent; reflects overall signal quality strength
@@ -3234,8 +3234,8 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
             <b>webifversion</b> - Type and version of the used web interface
           </li>
         </ul>
-      </div>
-    </div>
+      </ul>
+    </ul>
 
 =end html
 
@@ -3247,12 +3247,12 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <h3>
       ENIGMA2
     </h3>
-    <div style="margin-left: 2em">
+    <ul>
       Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
-    </div>
-    <div style="margin-left: 2em">
+    </ul>
+    <ul>
       <a href='http://fhem.de/commandref.html#ENIGMA2'>ENIGMA2</a>
-    </div>
+    </ul>
 
 =end html_DE
 

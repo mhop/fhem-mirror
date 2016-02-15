@@ -1685,9 +1685,9 @@ sub ONKYO_AVR_RClayout() {
     <h3>
       ONKYO_AVR
     </h3>
-    <div style="margin-left: 2em">
+    <ul>
       <a name="ONKYO_AVRdefine" id="ONKYO_AVRdefine"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>define &lt;name&gt; ONKYO_AVR &lt;ip-address-or-hostname&gt; [&lt;protocol-version&gt;] [&lt;zone&gt;] [&lt;poll-interval&gt;]</code><br>
         <br>
         This module controls ONKYO A/V receivers via network connection.<br>
@@ -1695,7 +1695,7 @@ sub ONKYO_AVR_RClayout() {
         Defining an ONKYO device will schedule an internal task (interval can be set with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 75 seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br>
         <br>
         Example:<br>
-        <div style="margin-left: 2em">
+        <ul>
           <code>define avr ONKYO_AVR 192.168.0.10<br>
           <br>
           # With explicit protocol version 2013 and later<br>
@@ -1712,11 +1712,11 @@ sub ONKYO_AVR_RClayout() {
           <br>
           # With zone2 and custom interval of 60 seconds<br>
           define avr ONKYO_AVR 192.168.0.10 pre2013 zone2 60</code>
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="ONKYO_AVRset" id="ONKYO_AVRset"></a> <b>Set</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
         <br>
         Currently, the following commands are defined (may vary depending on zone).<br>
@@ -1759,22 +1759,22 @@ sub ONKYO_AVR_RClayout() {
             <u>Note:</u> If you would like to restrict access to admin set-commands (-> statusRequest, remoteControl) you may set your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
             The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
         </ul>
-      </div><br>
+      </ul><br>
       <br>
       <a name="ONKYO_AVRget" id="ONKYO_AVRget"></a> <b>Get</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>get &lt;name&gt; &lt;what&gt;</code><br>
         <br>
         Currently, the following commands are defined (may vary depending on zone):<br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           <code>power<br>
           input<br>
           volume<br>
           mute<br>
           sleep<br></code>
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <b>Generated Readings/Events (may vary depending on zone):</b><br>
       <ul>
@@ -1800,7 +1800,7 @@ sub ONKYO_AVR_RClayout() {
           <b>volume</b> - Reports current volume level of the receiver in percentage values (between 0 and 100 %)
         </li>
       </ul>
-    </div>
+    </ul>
 
 =end html
 
@@ -1812,12 +1812,12 @@ sub ONKYO_AVR_RClayout() {
     <h3>
       ONKYO_AVR
     </h3>
-    <div style="margin-left: 2em">
+    <ul>
       Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
-    </div>
-    <div style="margin-left: 2em">
+    </ul>
+    <ul>
       <a href='http://fhem.de/commandref.html#ONKYO_AVR'>ONKYO_AVR</a>
-    </div>
+    </ul>
 
 =end html_DE
 

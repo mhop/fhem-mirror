@@ -3698,17 +3698,17 @@ sub PHTV_min {
   <br>
   <br>
 
-      <div style="margin-left: 2em">
+      <ul>
         <u>Advanced Ambilight Control</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           If you would like to specificly control color for individual sides or even individual LEDs, you may use special addressing to be used with set command 'rgb':<br>
           <br><br>
           LED addressing format:<br>
           <code>&lt;Layer&gt;&lt;Side&gt;&lt;LED number&gt;</code>
           <br><br>
           <u>Examples:</u><br>
-          <div style="margin-left: 2em">
+          <ul>
             <code># set LED 0 on left side within layer 1 to color RED<br>
             set PhilipsTV rgb L1L0:FF0000
             <br><br>
@@ -3720,19 +3720,19 @@ sub PHTV_min {
             <br><br>
             # set complete layer 1 to color BLUE
             set PhilipsTV rgb L1:0000FF</code>
-          </div><br>
-        </div>
-      </div>
+          </ul><br>
+        </ul>
+      </ul>
       <br>
       <br>
 
   <br>
   <br>
 
-      <div style="margin-left: 2em">
+      <ul>
         <u>Advanced Ambilight+HUE Control</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Linking to your HUE devices within attributes ambiHueLeft, ambiHueTop, ambiHueRight and ambiHueBottom uses some defaults to calculate the actual color.<br>
           More than one HUE device may be added using blank.<br>
           The following settings can be fine tuned for each HUE device:<br>
@@ -3746,7 +3746,7 @@ sub PHTV_min {
           <code>devicename:&lt;LEDs$gt;:&lt;saturation$gt;:&lt;brightness$gt;</code>
           <br><br>
           <u>Examples:</u><br>
-          <div style="margin-left: 2em">
+          <ul>
             <code># to push color from top to 2 HUE devices<br>
             attr PhilipsTV ambiHueTop HUEDevice0 HUEDevice1
             <br><br>
@@ -3767,9 +3767,9 @@ sub PHTV_min {
             <br><br>
             # to use default LED settings but only adjust their brightness to 50%<br>
             attr PhilipsTV ambiHueTop HUEDevice0:::50</code>
-          </div><br>
-        </div>
-      </div>
+          </ul><br>
+        </ul>
+      </ul>
       <br>
       <br>
 
