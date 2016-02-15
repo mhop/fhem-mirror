@@ -1587,9 +1587,9 @@ sub RESIDENTS_UpdateReadings (@) {
     <h3>
       RESIDENTS
     </h3>
-    <div style="margin-left: 2em">
+    <ul>
       <a name="RESIDENTSdefine" id="RESIDENTSdefine"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code><br>
         <br>
         Provides a special dummy device to represent a group of individuals living at your home.<br>
@@ -1597,14 +1597,14 @@ sub RESIDENTS_UpdateReadings (@) {
         Based on the current state and other readings, you may trigger other actions within FHEM.<br>
         <br>
         Example:<br>
-        <div style="margin-left: 2em">
+        <ul>
           <code># Standalone<br>
           define rgr_Residents RESIDENTS</code>
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="RESIDENTSset" id="RESIDENTSset"></a> <b>Set</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>set &lt;rgr_ResidentsName&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
         <br>
         Currently, the following commands are defined.<br>
@@ -1632,12 +1632,12 @@ sub RESIDENTS_UpdateReadings (@) {
             <u>Note:</u> If you would like to restrict access to admin set-commands (-> addGuest, addRoommate, removeGuest, create) you may set your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
             The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
         </ul>
-      </div><br>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Possible states and their meaning</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           This module differs between 7 states:<br>
           <br>
           <ul>
@@ -1665,11 +1665,11 @@ sub RESIDENTS_UpdateReadings (@) {
           </ul><br>
           <br>
           Note: State 'none' cannot explicitly be set. Setting state to 'gone' will be handled as 'none' for GUEST member devices.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="RESIDENTSattr" id="RESIDENTSattr"></a> <b>Attributes</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>rgr_showAllStates</b> - states 'asleep' and 'awoken' are hidden by default to allow simple gotosleep process via devStateIcon; defaults to 0
@@ -1681,11 +1681,11 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>rgr_wakeupDevice</b> - reference to enslaved DUMMY devices used as a wake-up timer (part of RESIDENTS Toolkit's wakeuptimer)
           </li>
         </ul>
-      </div><br>
+      </ul><br>
       <br>
       <br>
       <b>Generated Readings/Events:</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>lastActivity</b> - the last state change of one of the group members
@@ -1892,11 +1892,11 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>wakeup</b> - becomes '1' while a wake-up program of this resident group is being executed
           </li>
         </ul>
-      </div>
+      </ul>
       <br>
       <br>
       <b>RESIDENTS Toolkit</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
 					Using set-command <code>create</code> you may add pre-configured configurations to your RESIDENTS, <a href="#ROOMMATE">ROOMMATE</a> or <a href="#GUEST">GUEST</a> devices for your convenience.<br>
 					The following commands are currently available:<br>
@@ -1943,8 +1943,8 @@ sub RESIDENTS_UpdateReadings (@) {
 						</ul>
 					</li>
         </ul>
-      </div>
-    </div>
+      </ul>
+    </ul>
 
 =end html
 
@@ -1956,23 +1956,23 @@ sub RESIDENTS_UpdateReadings (@) {
     <h3>
       RESIDENTS
     </h3>
-    <div style="margin-left: 2em">
+    <ul>
       <a name="RESIDENTSdefine" id="RESIDENTSdefine"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>define &lt;rgr_ResidentsName&gt; RESIDENTS</code><br>
         <br>
         Stellt ein spezielles Dummy-Device bereit, um eine Gruppe von Personen zu repräsentieren, die zusammen wohnen.<br>
         Es kombiniert dabei logisch die individuellen Status von <a href="#ROOMMATE">ROOMMATE</a> und <a href="#GUEST">GUEST</a> Devices und erlaubt den Status für alle Mitglieder zeitgleich zu ändern. Basierend auf dem aktuellen Status und anderen Readings können andere Aktionen innerhalb von FHEM angestoßen werden.<br>
         <br>
         Beispiele:<br>
-        <div style="margin-left: 2em">
+        <ul>
           <code># Einzeln<br>
           define rgr_Residents RESIDENTS</code>
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="RESIDENTSset" id="RESIDENTSset"></a> <b>Set</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>set &lt;rgr_ResidentsName&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
         <br>
         Momentan sind die folgenden Kommandos definiert.<br>
@@ -2000,12 +2000,12 @@ sub RESIDENTS_UpdateReadings (@) {
             <u>Hinweis:</u> Sofern der Zugriff auf administrative set-Kommandos (-> addGuest, addRoommate, removeGuest, create) eingeschr&auml;nkt werden soll, kann in einer FHEMWEB Instanz das Attribut allowedCommands &auml;hnlich wie 'set,set-user' erweitert werden.
             Die Zeichenfolge 'set-user' stellt dabei sicher, dass beim Zugriff auf FHEM &uuml;ber diese FHEMWEB Instanz nur nicht-administrative set-Kommandos ausgef&uuml;hrt werden k&ouml;nnen.
         </ul>
-      </div><br>
+      </ul><br>
       <br>
-      <div style="margin-left: 2em">
+      <ul>
         <u>Mögliche Status und ihre Bedeutung</u><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Dieses Modul unterscheidet 7 verschiedene Status:<br>
           <br>
           <ul>
@@ -2033,11 +2033,11 @@ sub RESIDENTS_UpdateReadings (@) {
           </ul><br>
           <br>
           Hinweis: Der Status 'none' kann nicht explizit gesetzt werden. Das setzen von 'gone' wird bei Mitgliedern vom Typ GUEST als 'none' behandelt.
-        </div>
-      </div><br>
+        </ul>
+      </ul><br>
       <br>
       <a name="RESIDENTSattr" id="RESIDENTSattr"></a> <b>Attribute</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>rgr_showAllStates</b> - die Status 'asleep' und 'awoken' sind normalerweise nicht immer sichtbar, um einen einfachen Zubettgeh-Prozess über das devStateIcon Attribut zu ermöglichen; Standard ist 0
@@ -2049,11 +2049,11 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>rgr_wakeupDevice</b> - Referenz zu versklavten DUMMY Ger&auml;ten, welche als Wecker benutzt werden (Teil von RESIDENTS Toolkit's wakeuptimer)
           </li>
         </ul>
-      </div><br>
+      </ul><br>
       <br>
       <br>
       <b>Generierte Readings/Events:</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>lastActivity</b> - der letzte Status Wechsel eines Gruppenmitglieds
@@ -2260,11 +2260,11 @@ sub RESIDENTS_UpdateReadings (@) {
             <b>wakeup</b> - hat den Wert '1' w&auml;hrend ein Weckprogramm dieser Bewohner-Gruppe ausgef&uuml;hrt wird
           </li>
         </ul>
-      </div>
+      </ul>
       <br>
       <br>
       <b>RESIDENTS Toolkit</b><br>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
 					Mit dem set-Kommando <code>create</code> k&ouml;nnen zur Vereinfachung vorkonfigurierte Konfigurationen zu RESIDENTS, <a href="#ROOMMATE">ROOMMATE</a> oder <a href="#GUEST">GUEST</a> Ger&auml;ten hinzugef&uuml;gt werden.<br>
 					Die folgenden Kommandos sind momentan verf&uuml;gbar:<br>
@@ -2311,8 +2311,8 @@ sub RESIDENTS_UpdateReadings (@) {
 						</ul>
 					</li>
         </ul>
-      </div>
-    </div>
+      </ul>
+    </ul>
 
 =end html_DE
 

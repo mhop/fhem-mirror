@@ -621,18 +621,18 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
         <p>
           Note: GEOFANCY is an extension to <a href="FHEMWEB">FHEMWEB</a>. You need to install FHEMWEB to use GEOFANCY.
         </p><a name="GEOFANCYdefine" id="GEOFANCYdefine"></a> <b>Define</b>
-        <div style="margin-left: 2em">
+        <ul>
           <code>define &lt;name&gt; GEOFANCY &lt;infix&gt;</code><br>
           <br>
           Defines the webhook server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually <code>http://hostname:8083/fhem</code>)<br>
           <br>
           Example:
-          <div style="margin-left: 2em">
+          <ul>
             <code>define geofancy GEOFANCY geo</code><br>
-          </div><br>
+          </ul><br>
           The webhook will be reachable at http://hostname:8083/fhem/geo in that case.<br>
           <br>
-        </div><a name="GEOFANCYset" id="GEOFANCYset"></a> <b>Set</b>
+        </ul><a name="GEOFANCYset" id="GEOFANCYset"></a> <b>Set</b>
         <ul>
           <li>
             <b>clear</b> &nbsp;&nbsp;readings&nbsp;&nbsp; can be used to cleanup auto-created readings from deprecated devices.
@@ -651,7 +651,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
         <br>
         <b>Usage information / Hints on Security</b><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           Likely your FHEM installation is not reachable directly from the internet (good idea!).<br>
           It is recommended to have a reverse proxy like <a href="http://loredo.me/post/116633549315/geeking-out-with-haproxy-on-pfsense-the-ultimate">HAproxy</a>, <a href="http://www.apsis.ch/pound/">Pound</a> or <a href="https://www.varnish-cache.org/">Varnish</a> in front of FHEM where you can make sure access is only possible to a specific URI like /fhem/geo. Apache or Nginx might do as well. However, in case you have Apache or Nginx running already you should still consider one of the named reverse proxies in front of it for fine-grain security configuration.<br>
           <br>
@@ -662,13 +662,13 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
           To make that reverse proxy available from the internet, just forward the appropriate port via your internet router.<br>
           <br>
           The actual solution on how you can securely make your GEOFANCY webhook available to the internet is not part of this documentation and depends on your own skills.
-        </div><br>
+        </ul><br>
         <br>
         <b>Integration with Home Automation</b><br>
         <br>
-        <div style="margin-left: 2em">
+        <ul>
           You might want to have a look to the module family of <a href="#ROOMMATE">ROOMMATE</a>, <a href="#GUEST">GUEST</a> and <a href="#RESIDENTS">RESIDENTS</a> for an easy processing of GEOFANCY events.
-        </div>
+        </ul>
       </li>
     </ul>
 
@@ -682,12 +682,12 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
     <h3>
       GEOFANCY
     </h3>
-    <div style="margin-left: 2em">
+    <ul>
       Eine deutsche Version der Dokumentation ist derzeit nicht vorhanden. Die englische Version ist hier zu finden:
-    </div>
-    <div style="margin-left: 2em">
+    </ul>
+    <ul>
       <a href='http://fhem.de/commandref.html#GEOFANCY'>GEOFANCY</a>
-    </div>
+    </ul>
 
 =end html_DE
 

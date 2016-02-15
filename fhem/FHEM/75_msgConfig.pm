@@ -623,12 +623,12 @@ sub msgConfig_Get($@) {
       The device name can be renamed and reconfigured afterwards if desired.<br>
       <br>
       <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>define &lt;name&gt; msgConfig</code><br>
-      </div><br>
+      </ul><br>
       <br>
       <a name="msgConfigset" id="msgConfigset"></a> <b>Set</b>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>addLocation</b> &nbsp;&nbsp;<Location Name>&nbsp;&nbsp;<br>
@@ -650,7 +650,7 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
             
           </li>
         </ul>
-      </div>
+      </ul>
     </ul>
 
 =end html
@@ -669,19 +669,19 @@ This next step is basically to set attribute msgResidentsDevice to refer to this
       Der Device Name kann anschlie&szlig;end beliebig umbenannt und umkonfiguriert werden.<br>
       <br>
       <a name="msgConfigdefine" id="msgConfigdefine"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <ul>
         <code>define &lt;name&gt; msgConfig</code><br>
-      </div><br>
+      </ul><br>
       <br>
       <a name="msgConfigset" id="msgConfigset"></a> <b>Set</b>
-      <div style="margin-left: 2em">
+      <ul>
         <ul>
           <li>
             <b>addLocation</b> &nbsp;&nbsp;<Name der Lokation>&nbsp;&nbsp;<br>
             Erstellt auf einfache Weise ein Dummy Device basierend auf dem &uuml;bergebenen Lokationsnamen. Es wird for die lokations-basierte Verwendung mit dem msg-Kommando vorkonfiguriert. Das Dummy Device wird automatisch zum Attribut msgLocationDevs hinzugef&uuml;gt. Anschlie&szlig;end ist eine weitere Konfiguration &uuml;ber die Attribute msgContact* oder msgRecipient* notwendig, die auf entsprechende Gateway Devices verweisen, die an dieser Lokation stehen.
           </li>
         </ul>
-      </div>
+      </ul>
     </ul>
 
 =end html_DE
