@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_HOMBOT: some set commands not work
   - feature: 32_mailcheck: added set active/inactive commands
   - feature: 02_RSS: new attribute urlOverride
   - feature: 71_YAMAHA_NP: Added auto reading update for tuner and player
