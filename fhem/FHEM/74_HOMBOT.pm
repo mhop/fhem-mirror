@@ -35,7 +35,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use Blocking;
 
-my $version = "0.2.2";
+my $version = "0.2.3";
 
 
 
@@ -457,10 +457,17 @@ sub HOMBOT_RetrieveHomebotInfoFinished($$$) {
             $t =~ s/JSON_TURBO/turbo/g;
             $t =~ s/JSON_ROBOT_STATE/hombotState/g;
             $t =~ s/CLREC_CURRENTBUMPING/currentBumping/g;
-            $t =~ s/CLREC_LAST_CLEAN/lastClean/g;
+            
+            if( $t eq "CLREC_LAST_CLEAN" ) {
+                my @lctime = split( '/' , $v );
+                $v = $lctime[2].".".$lctime[1].".".$lctime[0]." ".$lctime[3].":".$lctime[4];
+                $t = "lastClean";
+            }
+            
             $t =~ s/JSON_BATTPERC/batteryPercent/g;
             $t =~ s/JSON_VERSION/firmware/g;
             $t =~ s/LGSRV_VERSION/luigiSrvVersion/g;
+            
             
             readingsBulkUpdate( $hash, $t, $v ) if( $t =~ m/[a-z]/s && defined( $t ) && defined( $v ) );
         }
