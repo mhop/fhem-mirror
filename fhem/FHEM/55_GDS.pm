@@ -423,6 +423,7 @@ sub GDS_Set($@) {
 		when("conditions"){
 			CommandAttr(undef, "$name gdsSetCond $parameter");
 #            $attr{$name}{gdsSetCond} = $parameter; #ReadingsVal($name,'c_stationName',undef);
+			return "conditions no longer available after 15.03.2016" if (time > 1457996400);
 			GDS_GetUpdate($hash,'set conditions');
 			break;
 			}
@@ -568,6 +569,7 @@ sub GDS_Get($@) {
 			}
 
 		when("conditions"){
+			return "conditions no longer available after 15.03.2016" if (time >  1457996400);
 			getConditions($hash, "g", @a);
 			break;
 			}

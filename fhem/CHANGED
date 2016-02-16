@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature  55_GDS: disable conditions after 15.03.2016
   - feature  74_HOMBOT: formated Value for Reading lastClean
   - feature  74_HOMBOT: include Detail_Fn link to Luigi Contro Center
   - feature  49_SSCAM: control of exposure mode day, night & auto is 
