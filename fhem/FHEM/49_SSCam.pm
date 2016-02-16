@@ -3,13 +3,13 @@
 ##########################################################################################################
 #       49_SSCam.pm
 #
-#       written by Heiko Maaz
+#       (c) 2015-2016 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
-#       It's based on Synology Surveillance Station API Guide 2.0
+#       It's based on and it's using Synology Surveillance Station API 
 # 
-#       This file is part of fhem.
+#       This script is part of fhem.
 #
 #       Fhem is free software: you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.16   16.02.2016    set up of motion detection source now possible
 # 1.15   15.02.2016    control of exposure mode day, night & auto is possible now
 # 1.14   14.02.2016    The port in DEF-String is optional now,
 #                      if not given, default port 5000 is used
@@ -235,7 +236,7 @@ sub SSCam_Set {
                    "expmode:auto,day,night ".
                    "on ".
                    "off ".
-                   # "motdetsc:disable,by_camera,by_SVS ".
+                   "motdetsc:disable,by_camera,by_SVS ".
                    "snap ".
                    "enable ".
                    "disable ".
@@ -2093,7 +2094,7 @@ sub camop_nonbl ($) {
           $motdetsc = "1";
       }
       
-      $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"ADParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";   
+      $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";   
    }
    
    $logstr = "Call-Out now: $url";
@@ -3109,6 +3110,7 @@ return;
        <li>Deaktivate a Camera in Synology Surveillance Station</li>
        <li>Activate a Camera in Synology Surveillance Station</li>
        <li>Control of the exposure modes day, night and automatic </li>
+       <li>switchover the motion detection by camera, by SVS or to deactivate  </li>
        <li>Retrieval of Camera Properties (also by Polling) as well as informations about the installed SVS-package</li>
        <li>Move to a predefined Preset-position (at PTZ-cameras) </li>
        <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
@@ -3215,6 +3217,7 @@ return;
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - manager       </li></td></tr>
+      <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
@@ -3252,6 +3255,7 @@ return;
       <tr><td>"enable":                                            </td><td>activates a camera in Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
       <tr><td>"expmode [ day | night | auto ]":                    </td><td>set the exposure mode to day, night or auto </td></tr>
+      <tr><td>"motdetsc [ by_camera | by_SVS | disable ]":         </td><td>set motion detection to the desired mode </td></tr>
       <tr><td>"goPreset &lt;Preset&gt;":                           </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>starts a continuous move of PTZ-camera to direction up/down/left/right or dir_X  </td></tr> 
@@ -3328,7 +3332,20 @@ return;
   
   With this command you are able to control the exposure mode and can set it to day, night or automatic mode. 
   Thereby, for example, the behavior of camera LED's will be suitable controlled. 
-  The successful switch will be reported by the reading CamExposureMode (command "get ... caminfoall"). 
+  The successful switch will be reported by the reading CamExposureMode (command "get ... caminfoall"). <br><br>
+  
+  <b> Hint: </b> <br>
+  The successfully execution of this function depends on if SVS supports that functionality of the connected camera.
+  Is the field for the Day/Night-mode shown greyed in SVS -&gt; IP-camera -&gt; optimization -&gt; exposure mode, this function will be probably unsupported.  
+  
+  <br><br>
+  
+  <b> "set &lt;name&gt; motdetsc [by_camera] [by_SVS] [disable]" </b> <br><br>
+  
+  The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
+  The successful execution of that opreration you can retrace by the state in SVS -&gt; IP-camera -&gt; event detection -&gt; motion.
+  An appropriate reading shall follow at later point in time.
+  
   <br><br>
   
   <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
@@ -3615,6 +3632,7 @@ return;
       <li>Deaktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Steuerung der Belichtungsmodi Tag, Nacht bzw. Automatisch </li>
+      <li>Umschaltung der Ereigniserkennung durch Kamera, durch SVS oder deaktiviert  </li>
       <li>Abfrage von Kameraeigenschaften (auch mit Polling) sowie den Eigenschaften des installierten SVS-Paketes</li>
       <li>Bewegen an eine vordefinierte Preset-Position (bei PTZ-Kameras) </li>
       <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
@@ -3717,6 +3735,7 @@ return;
       <tr><td><li>set ... disable            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... enable             </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
+      <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
@@ -3755,6 +3774,7 @@ return;
       <tr><td>"enable":                                        </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;": </td><td>speichert die Zugangsinformationen</td></tr>
       <tr><td>"expmode [ day | night | auto ]":                </td><td>aktiviert den Belichtungsmodus Tag, Nacht oder Automatisch </td></tr>
+      <tr><td>"motdetsc [ by_camera | by_SVS | disable ]":     </td><td>schaltet die Bewegungserkennung in den gewünschten Modus (durch Kamera, SVS, oder deaktiviert) </td></tr>
       <tr><td>"goPreset &lt;Preset&gt;":                       </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":   </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":     </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
@@ -3829,7 +3849,20 @@ return;
   <b> "set &lt;name&gt; expmode [day] [night] [auto]" </b> <br><br>
   
   Mit diesem Befehl kann der Belichtungsmodus der Kameras gesetzt werden. Dadurch wird z.B. das Verhalten der Kamera-LED's entsprechend gesteuert. 
-  Die erfolgreiche Umschaltung wird durch das Reading CamExposureMode ("get ... caminfoall") reportet. 
+  Die erfolgreiche Umschaltung wird durch das Reading CamExposureMode ("get ... caminfoall") reportet. <br><br>
+  
+  <b> Hinweis: </b> <br>
+  Die erfolgreiche Ausführung dieser Funktion ist davon abhängig ob die SVS diese Funktionalität der Kamera unterstützt. 
+  Ist in SVS -&gt; IP-Kamera -&gt; Optimierung -&gt; Belichtungsmodus das Feld für den Tag/Nachtmodus grau hinterlegt, ist nicht von einer lauffähigen Unterstützung dieser 
+  Funktion auszugehen. 
+  <br><br>
+  
+  <b> "set &lt;name&gt; motdetsc [by_camera] [by_SVS] [disable]" </b> <br><br>
+  
+  Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
+  Die erfolgreiche Ausführung der Operation lässt sich u.a anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; Bewegung nachvollziehen.
+  Zu einem späteren Zeitpunkt soll noch ein entsprechendes Reading folgen.
+  
   <br><br>
   
   <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
@@ -4061,7 +4094,7 @@ return;
   <br><br>
   <ul>
   <ul>
-  <li><b>debugactivetoken</b> - wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debuggung, nicht im normalen Betrieb benutzen </li>
+  <li><b>debugactivetoken</b> - wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im normalen Betrieb benutzen </li>
   
   <li><b>httptimeout</b> - Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn httptimeout = "0" oder nicht gesetzt) </li>
   
