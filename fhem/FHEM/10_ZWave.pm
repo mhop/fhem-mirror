@@ -805,6 +805,7 @@ ZWave_Cmd($$@)
 
   } else {
     $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
+    $@ = undef;
     my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
     return $err if($err);
     return $@ if($@);
