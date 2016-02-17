@@ -1,14 +1,9 @@
 
 ##############################################
 # $Id$
-# 2016-02-13
+# 2016-02-17
 
-# Added new EEP: A5-20-04 (hvac.04), A5-06-04 (lightSensor.04)
-#                A5-10-22, A5-10-23 (roomSensorControl.22), A5-11-05 (switch.05)
-#                D2-01-0C, D2-01-0D, D2-01-0E, D2-01-0F, D2-01-12 (actuator.01)
-#                D2-50-00 (heatRecovery.00)
-# PID-controller: new functions (attributes) pidActorCallBeforeSetting, pidIPortionCallBeforeSetting
-# EEP changed: A5-20-01
+# EEP changed:
 # EnOcean_Notify():
 # EnOcean_Attr():
 # Remote Management (incomplete, experimental)
@@ -655,7 +650,7 @@ EnOcean_Initialize($)
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir" .
                       "secCode secLevel:encapsulation,encryption,off sendDevStatus:no,yes sensorMode:switch,pushbutton " .
                       "serviceOn:no,yes setpointRefDev setpointTempRefDev shutTime shutTimeCloses subDef " .
-                      "subDef0 subDefI subDefA subDefB subDefC subDefD " .
+                      "subDef0 subDefI subDefA subDefB subDefC subDefD subDefH subDefW " .
                       "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
                       "summerMode:off,on switchMode:switch,pushbutton " .
                       "switchHysteresis switchType:direction,universal,channel,central temperatureRefDev " .
@@ -805,6 +800,11 @@ EnOcean_Define($$) {
             $attr{$name}{eep} = "F6-03-01";
             readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-03-01 Manufacturer: no ID", 1);
             Log3 $name, 2, "EnOcean $name teach-in EEP F6-03-01 Manufacturer: no ID";
+          } elsif ($t21 && !$nu) {
+            $attr{$name}{subType} = "windowHandle";
+            $attr{$name}{eep} = "F6-10-00";
+            readingsSingleUpdate($hash, "teach", "RPS teach-in accepted EEP F6-10-00 Manufacturer: no ID", 1);
+            Log3 $name, 2, "EnOcean $name teach-in EEP F6-10-00 Manufacturer: no ID";
           }      
         } elsif ($attr{$name}{subType} eq "contact" && hex($data) & 8) {
           $attr{$name}{eep} = "D5-00-01";
@@ -4471,8 +4471,49 @@ sub EnOcean_Set($@)
             return "Usage: $a[1] is not numeric or out of range";
           }
         }
+      } elsif ($cmd eq "teachSlave") {
+        # teach slave
+        $updateState = 0;
+        $destinationID = "FFFFFFFF";
+        if (defined $a[1]) {
+          if ($a[1] =~ m/^contact$/) {
+            $rorg = "D5";
+            $data = '00';
+            ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDefW", "biDir");
+            readingsSingleUpdate($hash, "teachSlave", '1BS teach-in sent', 1);
+            Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
+            shift(@a);
+          } elsif ($a[1] =~ m/^windowHandleOpen$/) {
+            $rorg = "F6";
+            $data = 'C0';
+            $status = '20';
+            ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDefH", "biDir");
+            readingsSingleUpdate($hash, "teachSlave", 'RPS teach-in sent', 1);
+            Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
+            shift(@a);
+          } elsif ($a[1] =~ m/^windowHandleClosed$/) {
+            $rorg = "F6";
+            $data = 'F0';
+            $status = '20';
+            ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDefH", "biDir");
+            readingsSingleUpdate($hash, "teachSlave", 'RPS teach-in sent', 1);
+            Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
+            shift(@a);
+          } elsif ($a[1] =~ m/^windowHandleTilted$/) {
+            $rorg = "F6";
+            $data = 'D0';
+            $status = '20';
+            ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDefH", "biDir");
+            readingsSingleUpdate($hash, "teachSlave", 'RPS teach-in sent', 1);
+            Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
+            shift(@a);
+          } else {
+            return "Usage: $a[1] is wrong";
+          }
+        }
       } else {
-        $cmdList .= "presence:absent,present handleClosedClick:enable,disable batteryLowClick:enable,disable updateInterval blinkInterval";
+        $cmdList .= "presence:absent,present handleClosedClick:enable,disable batteryLowClick:enable,disable " .
+                    "updateInterval blinkInterval teachSlave:contact,windowHandleClosed,windowHandleOpen,windowHandleTilted";
         return "Unknown argument $cmd, choose one of $cmdList";
       }      
 
@@ -8648,12 +8689,22 @@ sub EnOcean_Parse($$)
           14 => "invalid",
           15 => "not_supported"
         );
+        my %handleRPS = (
+          1 => 'D0',
+          2 => 'F0',
+          3 => 'C0',
+          4 => 'C0'
+        );
         my $handlePosition = $db[7] >> 4;
         if (exists $handlePosition{$handlePosition}) {
           push @event, "3:handle:$handlePosition{$handlePosition}";
         } else {
           push @event, "3:handle:unknown";
         }
+        # forward handle position (RPS telegam) 
+        if (exists($handleRPS{$handlePosition}) && defined(AttrVal($name, "subDefH", undef))) {
+          EnOcean_SndRadio(undef, $hash, $packetType, "F6", $handleRPS{$handlePosition}, AttrVal($name, "subDefH", "00000000"), '20', 'FFFFFFFF');
+        }        
         my %windowState = (
           0 => "undef",
           1 => "not_tilted",
@@ -8661,12 +8712,20 @@ sub EnOcean_Parse($$)
           14 => "invalid",
           15 => "not_supported"
         );
+        my %window1BS = (
+          1 => '01',
+          2 => '00'
+        );
         my $windowState = $db[7] & 15;
         if (exists $windowState{$windowState}) {
           push @event, "3:window:$windowState{$windowState}";
         } else {
           push @event, "3:window:unknown";
         }
+        # forward window state (1BS telegam) 
+        if (exists($window1BS{$windowState}) && defined(AttrVal($name, "subDefW", undef))) {
+          EnOcean_SndRadio(undef, $hash, $packetType, "D5", $window1BS{$windowState}, AttrVal($name, "subDefW", "00000000"), '00', 'FFFFFFFF');
+        }        
         my %button = (
           0 => "no_change",
           1 => "pressed",
@@ -12117,6 +12176,8 @@ sub EnOcean_CheckSenderID($$$)
       push(@listID, $attr{$dev}{subDefC}) if ($attr{$dev}{subDefC});
       push(@listID, $attr{$dev}{subDefD}) if ($attr{$dev}{subDefD});
       push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI});
+      push(@listID, $attr{$dev}{subDefH}) if ($attr{$dev}{subDefH});
+      push(@listID, $attr{$dev}{subDefW}) if ($attr{$dev}{subDefW});
       push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0});
     }
     $senderID = join(" ", sort grep(!$listID{$_}++, @listID));
@@ -12136,6 +12197,8 @@ sub EnOcean_CheckSenderID($$$)
       push(@listID, $attr{$dev}{subDefC}) if ($attr{$dev}{subDefC} && $attr{$dev}{subDefC} ne "00000000");
       push(@listID, $attr{$dev}{subDefD}) if ($attr{$dev}{subDefD} && $attr{$dev}{subDefD} ne "00000000");
       push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI} && $attr{$dev}{subDefI} ne "00000000");
+      push(@listID, $attr{$dev}{subDefH}) if ($attr{$dev}{subDefH} && $attr{$dev}{subDefH} ne "00000000");
+      push(@listID, $attr{$dev}{subDefW}) if ($attr{$dev}{subDefW} && $attr{$dev}{subDefW} ne "00000000");
       push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0} && $attr{$dev}{subDef0} ne "00000000");
     }
     @listID = sort grep(!$listID{$_}++, @listID);
@@ -12162,6 +12225,8 @@ sub EnOcean_CheckSenderID($$$)
       push(@listID, $attr{$dev}{subDefC}) if ($attr{$dev}{subDefC} && $attr{$dev}{subDefC} ne "00000000");
       push(@listID, $attr{$dev}{subDefD}) if ($attr{$dev}{subDefD} && $attr{$dev}{subDefD} ne "00000000");
       push(@listID, $attr{$dev}{subDefI}) if ($attr{$dev}{subDefI} && $attr{$dev}{subDefI} ne "00000000");
+      push(@listID, $attr{$dev}{subDefH}) if ($attr{$dev}{subDefH} && $attr{$dev}{subDefH} ne "00000000");
+      push(@listID, $attr{$dev}{subDefW}) if ($attr{$dev}{subDefW} && $attr{$dev}{subDefW} ne "00000000");
       push(@listID, $attr{$dev}{subDef0}) if ($attr{$dev}{subDef0} && $attr{$dev}{subDef0} ne "00000000");
     }
     @listID = sort grep(!$listID{$_}++, @listID);
@@ -15068,6 +15133,10 @@ EnOcean_Delete($$)
         set handle closed click feature</li>
       <li>batteryLowClick disable|enable<br>
         set battery low click feature</li>
+      <li>teachSlave contact|windowHandleClosed|windowHandleOpen|windowHandleTilted<br>
+        sent teach-in to the slave devices (contact: EEP: D5-00-01, windowHandle: EEP F6-10-00)<br>
+        The events window or handle will get forwarded once a slave-device contact or windowHandle is taught in.
+        </li>
       <li>updateInterval t/s<br>
         set sensor update interval</li>
       <li>blinkInterval t/s<br>
@@ -15075,6 +15144,11 @@ EnOcean_Delete($$)
     </ul><br>
       sensor update interval Range: updateInterval = 5 ... 65535<br>
       vacation blick interval Range: blinkInterval = 3 ... 255<br>
+      The multisensor window handle is configured using the following attributes:<br>
+      <ul>
+        <li><a href="#EnOcean_subDefH">subDefH</a></li>
+        <li><a href="#EnOcean_subDefW">subDefW</a></li>
+      </ul>
       The attr subType must be multisensor.01. This is done if the device was
       created by autocreate. To control the device, it must be bidirectional paired,
       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
@@ -15390,6 +15464,11 @@ EnOcean_Delete($$)
       <li>log<br>
         get log data</li>
     </ul><br>
+      The multisensor window handle is configured using the following attributes:<br>
+      <ul>
+        <li><a href="#EnOcean_subDefH">subDefH</a></li>
+        <li><a href="#EnOcean_subDefW">subDefW</a></li>
+      </ul>
       The attr subType must be multisensor.01. This is done if the device was
       created by autocreate. To control the device, it must be bidirectional paired,
       see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
@@ -15836,14 +15915,14 @@ EnOcean_Delete($$)
       seconds. Select a delay time that is at least as long as the shading element
       or roller shutter needs to move from its end position to the other position.<br>
       Notice subType blindsCrtl.00: The attribute can only be set while the actuator is online.
-      </li>
+    </li>
     <li><a name="shutTimeCloses">shutTimeCloses</a> t/s, [shutTimeCloses] = 1 ... 255,
       [shutTimeCloses] = [shutTime] is default.<br>
       Set the attr shutTimeCloses to define the runtime used by the commands opens and closes.
       Select a runtime that is at least as long as the value set by the delay switch of the actuator.
       <br>
       shutTimeCloses is supported for shutter.
-      </li>
+    </li>
     <li><a name="subDef">subDef</a> &lt;EnOcean SenderID&gt;,
       [subDef] = [DEF] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) to control a bidirectional switch or actor.<br>
@@ -15855,7 +15934,7 @@ EnOcean_Delete($$)
       If [subDef] = getNextID FHEM can assign a free SenderID alternatively. The system configuration
       needs to be reloaded. The assigned SenderID will only displayed after the system configuration
       has been reloaded, e.g. Fhem command rereadcfg.
-      </li>
+    </li>
     <li><a name="subDefA">subDefA</a> &lt;EnOcean SenderID&gt;,
       [subDefA] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = A0|AI|released<br>
@@ -15864,7 +15943,7 @@ EnOcean_Delete($$)
       Second action is not sent.<br>
       If [subDefA] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
-      </li>
+    </li>
     <li><a name="subDefB">subDefB</a> &lt;EnOcean SenderID&gt;,
       [subDefB] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = B0|BI|released<br>
@@ -15873,7 +15952,7 @@ EnOcean_Delete($$)
       Second action is not sent.<br>
       If [subDefB] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
-      </li>
+    </li>
     <li><a name="subDefC">subDefC</a> &lt;EnOcean SenderID&gt;,
       [subDefC] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = C0|CI|released<br>
@@ -15882,7 +15961,7 @@ EnOcean_Delete($$)
       Second action is not sent.<br>
       If [subDefC] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
-      </li>
+    </li>
     <li><a name="subDefD">subDefD</a> &lt;EnOcean SenderID&gt;,
       [subDefD] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = D0|DI|released<br>
@@ -15891,7 +15970,7 @@ EnOcean_Delete($$)
       Second action is not sent.<br>
       If [subDefD] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
-      </li>
+    </li>
     <li><a name="subDef0">subDef0</a> &lt;EnOcean SenderID&gt;,
       [subDef0] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = A0|B0|C0|D0|released<br>
@@ -15901,7 +15980,7 @@ EnOcean_Delete($$)
       Second action is not sent.<br>
       If [subDef0] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
-      </li>
+    </li>
     <li><a name="subDefI">subDefI</a> &lt;EnOcean SenderID&gt;,
       [subDefI] = [subDef] is default.<br>
       SenderID (<a href="#TCM">TCM</a> BaseID + offset) for [value] = AI|BI|CI|DI<br>
@@ -15911,7 +15990,23 @@ EnOcean_Delete($$)
       Second action is not sent.<br>
       If [subDefI] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
       displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
-      </li>
+    </li>
+    <li><a name="subDefH">subDefH</a> &lt;EnOcean SenderID&gt;,
+      [subDefH] = undef is default.<br>
+      SenderID (<a href="#TCM">TCM</a> BaseID + offset)<br>
+      Used with subType "multisensor.00". If the attribute subDefH is set, the position of the window handle as EEP F6-10-00
+      (windowHandle) telegram is forwarded.<br>
+      If [subDefH] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
+      displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
+    </li>
+    <li><a name="subDefW">subDefW</a> &lt;EnOcean SenderID&gt;,
+      [subDefW] = undef is default.<br>
+      SenderID (<a href="#TCM">TCM</a> BaseID + offset)<br>
+      Used with subType "multisensor.00". If the attribute subDefW is set, the window state as EEP D5-00-01
+      (contact) telegram is forwarded.<br>
+      If [subDefW] = getNextID FHEM can assign a free SenderID alternatively. The assigned SenderID will only
+      displayed after the system configuration has been reloaded, e.g. Fhem command rereadcfg.
+    </li>
     <li><a href="#subType">subType</a></li>
     <li><a name="subTypeSet">subTypeSet</a> &lt;type of device&gt;, [subTypeSet] = [subType] is default.<br>
       Type of device (EEP Profile) used for sending commands. Set the Attribute manually.
