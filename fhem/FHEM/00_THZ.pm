@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 01/2016
-my $thzversion = "0.149";
+my $thzversion = "0.150";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -347,8 +347,8 @@ my %sets439 = (
   "p78DualModePoint"			=> {cmd2=>"0A01AC", argMin => "-10", argMax =>   "20",	type =>"5temp",  unit =>" °C"},
   "p54MinPumpCycles"			=> {cmd2=>"0A05B8", argMin =>  "1",  argMax =>   "24",	type =>"1clean",  unit =>""},
   "p55MaxPumpCycles"			=> {cmd2=>"0A05B7", argMin =>  "25", argMax =>  "200",	type =>"1clean",  unit =>""},
-  "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "1",  argMax =>   "20",	type =>"5temp",  unit =>" °C"},
-  "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "1",  argMax =>   "25",	type =>"5temp",  unit =>" °C"},
+  "p56OutTempMaxPumpCycles"		=> {cmd2=>"0A05B9", argMin =>  "0",  argMax =>   "20",	type =>"5temp",  unit =>" °C"},
+  "p57OutTempMinPumpCycles"		=> {cmd2=>"0A05BA", argMin =>  "0",  argMax =>   "25",	type =>"5temp",  unit =>" °C"},
   "p76RoomThermCorrection"		=> {cmd2=>"0A0109", argMin =>  "-5", argMax =>    "5", 	type =>"4temp",  unit =>" K"},
   "p77OutThermFilterTime"		=> {cmd2=>"0A010C", argMin =>  "1",  argMax =>   "24", 	type =>"0clean",  unit =>" h"},
   "p35PasteurisationInterval"		=> {cmd2=>"0A0586", argMin =>  "1",  argMax =>   "30", 	type =>"1clean",  unit =>""},
