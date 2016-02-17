@@ -313,7 +313,7 @@ sub GDS_Define($$$) {
 
     _GDS_addExtension("GDS_CGI","gds","GDS Files");
 	$hash->{firstrun} = 1;
-	retrieveData($hash,'conditions');
+	retrieveData($hash,'conditions') unless (time > 1457996400);
 	delete $hash->{firstrun};
 	readingsSingleUpdate($hash, 'state', 'active',1);
 
