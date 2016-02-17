@@ -1,4 +1,4 @@
-  ##########################################################################################################
+##########################################################################################################
 # $Id$
 ##########################################################################################################
 #       49_SSCam.pm
@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.16.1 17.02.2016    Reading "CamExposureControl" added
 # 1.16   16.02.2016    set up of motion detection source now possible
 # 1.15   15.02.2016    control of exposure mode day, night & auto is possible now
 # 1.14   14.02.2016    The port in DEF-String is optional now,
@@ -2146,7 +2147,7 @@ sub camret_nonbl ($) {
    my $camStatus;
    my ($presetcnt,$cnt,$presid,$presname,@preskeys,$presetlist);
    my ($patrolcnt,$patrolid,$patrolname,@patrolkeys,$patrollist);
-   my ($recStatus,$exposuremode);
+   my ($recStatus,$exposuremode,$exposurecontrol);
    my $userPriv;
    my $verbose;
    my $httptimeout;
@@ -2563,10 +2564,34 @@ sub camret_nonbl ($) {
                     $exposuremode = "Unknown";
                     }
                     
+                $exposurecontrol = $data->{'data'}->{'cameras'}->[0]->{'exposure_control'};
+                if ($exposurecontrol == 0) {
+                    $exposurecontrol = "Auto";
+                    }
+                    elsif ($exposurecontrol == 1) {
+                    $exposurecontrol = "50HZ";
+                    }
+                    elsif ($exposurecontrol == 2) {
+                    $exposurecontrol = "60HZ";
+                    }
+                    elsif ($exposurecontrol == 3) {
+                    $exposurecontrol = "Hold";
+                    }
+                    elsif ($exposurecontrol == 4) {
+                    $exposurecontrol = "Outdoor";
+                    }
+                    elsif ($exposurecontrol == 5) {
+                    $exposurecontrol = "None";
+                    }
+                    elsif ($exposurecontrol == 6) {
+                    $exposurecontrol = "Unknown";
+                    }
+                    
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamLiveMode",$camLiveMode);
                 readingsBulkUpdate($hash,"CamExposureMode",$exposuremode);
+                readingsBulkUpdate($hash,"CamExposureControl",$exposurecontrol);
                 readingsBulkUpdate($hash,"CamModel",$data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camModel'});
                 readingsBulkUpdate($hash,"CamRecShare",$data->{'data'}->{'cameras'}->[0]->{'camRecShare'});
                 readingsBulkUpdate($hash,"CamRecVolume",$data->{'data'}->{'cameras'}->[0]->{'camRecVolume'});
@@ -3343,6 +3368,8 @@ return;
   <b> "set &lt;name&gt; motdetsc [by_camera] [by_SVS] [disable]" </b> <br><br>
   
   The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
+  If motion detection will be tuned by camera, the original camera settings are kept.
+  Wird die Bewegungserkennung durch die Kamera eingestellt, werden die originalen Kameraeinstellungen beibehalten.
   The successful execution of that opreration you can retrace by the state in SVS -&gt; IP-camera -&gt; event detection -&gt; motion.
   An appropriate reading shall follow at later point in time.
   
@@ -3526,6 +3553,7 @@ return;
   <table>  
   <colgroup> <col width=5%> <col width=95%> </colgroup>
     <tr><td><li>Availability</li>       </td><td>- Availability of Camera (disabled, enabled, disconnected, other)  </td></tr>
+    <tr><td><li>CamExposureControl</li> </td><td>- indicating type of exposure control  </td></tr>
     <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
@@ -3860,6 +3888,7 @@ return;
   <b> "set &lt;name&gt; motdetsc [by_camera] [by_SVS] [disable]" </b> <br><br>
   
   Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
+  Wird die Bewegungserkennung durch die Kamera eingestellt, werden die originalen Kameraeinstellungen beibehalten.
   Die erfolgreiche Ausführung der Operation lässt sich u.a anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; Bewegung nachvollziehen.
   Zu einem späteren Zeitpunkt soll noch ein entsprechendes Reading folgen.
   
@@ -4043,6 +4072,7 @@ return;
   <table>  
   <colgroup> <col width=5%> <col width=95%> </colgroup>
     <tr><td><li>Availability</li>       </td><td>- Verfügbarkeit der Kamera (disabled, enabled, disconnected, other)  </td></tr>
+    <tr><td><li>CamExposureControl</li> </td><td>- zeigt den aktuell eingestellten Typ der Belichtungssteuerung  </td></tr>
     <tr><td><li>CamExposureMode</li>    </td><td>- aktueller Belichtungsmodus (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
