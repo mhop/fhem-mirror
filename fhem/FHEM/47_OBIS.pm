@@ -10,20 +10,22 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
 
-my %OBIS_channels = ( "21"=>"energy_L1",
-                 "41"=>"energy_L2",
-                 "61"=>"energy_L3",
+my %OBIS_channels = ( "21"=>"power_L1",
+                 "41"=>"power_L2",
+                 "61"=>"power_L3",
                  "32"=>"voltage_L1",
                  "52"=>"voltage_L2",
                  "72"=>"voltage_L3",
-                 "31"=>"power_L1",
-                 "51"=>"power_L2",
-                 "71"=>"power_L3",
+                 "31"=>"current_L1",
+                 "51"=>"current_L2",
+                 "71"=>"current_L3",
+                 "8.1"=>"total_consumption",
+                 "8.2"=>"total_feed",
                  "2"=>"feed_L1",
                  "4"=>"feed_L2",
                  "6"=>"feed_L3",
-                 "1"=>"energy_current");
-
+                 "1"=>"power");
+#{"21"=>"energy_L1","41"=>"energy_L2","61"=>"energy_L3","31"=>"power_L1","51"=>"power_L2","71"=>"power_L3","1"=>"energy_current","8.1"=>"energy_total","8.2"=>"feed_total"}
     
 #####################################
 sub OBIS_Initialize($)
@@ -87,18 +89,21 @@ sub OBIS_Define($$)
     "Unknown"=>[ "", -1,""],
     "MT681"=>[ "", -1,""],
     # Voltcraft VSM 102
-    "VSM102"=>["/?!".chr(13).chr(10), 1,chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "VSM102"=>["/?!".chr(13).chr(10), 600,chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     # Landis & Gyr E110
-    "E110"=>["/?!".chr(13).chr(10), 1,chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "E110"=>["/?!".chr(13).chr(10), 600,chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "Hager"=>["",60,""]
     );
       Log3 $hash,4,"OBIS ($name) - Baudrate is $baudrate";
     $hash->{helper}{DEVICES} =$devs{$type};
 #    Log 3,Dumper($hash->{helper}{DEVICES});
-  InternalTimer(gettimeofday()+2, "GetUpdate", $hash, 0) if (exists $hash->{helper}{DEVICES}[1]);
-    Log3 ($hash,4,"OBIS ($name) - Internal timer set.") if (exists $hash->{helper}{DEVICES}[1]);
+    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".AttrVal($name,"interval",$hash->{helper}{DEVICES}[1])) if (AttrVal($name,"interval",0)>0 || $hash->{helper}{DEVICES}[1]>0);
+  InternalTimer(gettimeofday()+AttrVal($name,"interval",$hash->{helper}{DEVICES}[1]), "GetUpdate", $hash, 0) if (AttrVal($name,"interval",0)>0 || $hash->{helper}{DEVICES}[1]>0);
+	$hash->{helper}{EoM}=-1;
   
   	Log3 $hash,4,"OBIS ($name) - Opening device...";
-    return DevIo_OpenDev($hash, 0, "OBIS_Init");
+    $hash->{helper}{FD}= DevIo_OpenDev($hash, 0, "OBIS_Init");
+  return undef;
 }
 
 # Update-Routine
@@ -107,9 +112,15 @@ sub GetUpdate($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $type= $hash->{MeterType};
+# Open dev
+#	if (!$hash->{helper}{FD}) {$hash->{helper}{FD}= DevIo_OpenDev($hash, 0, "OBIS_Init");
+#		readingsSingleUpdate($hash, "state","opened",1); 
+#	} 
+    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".AttrVal($name,"interval",$hash->{helper}{DEVICES}[1])) if (AttrVal($name,"interval",0)>0 || $hash->{helper}{DEVICES}[1]>0);
+	InternalTimer(gettimeofday()+AttrVal($name,"interval",$hash->{helper}{DEVICES}[1]), "GetUpdate", $hash, 1)  if (AttrVal($name,"interval",0)>0 || $hash->{helper}{DEVICES}[1]>0);
+	$hash->{helper}{EoM}=-1;
 	if (!exists $hash->{helper}{DEVICES}[1]) {return undef;}
 	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
-	InternalTimer(gettimeofday()+AttrVal($name,"interval",600), "GetUpdate", $hash, 1) if ($hash->{helper}{DEVICES}[1]!=-1);
 }
 
 sub OBIS_Init($)
@@ -120,6 +131,8 @@ sub OBIS_Init($)
 	my $type= $hash->{MeterType};
 	my $dev=  $hash->{DeviceName};
   ($dev, undef) = split("@", $dev);
+	if (!exists $hash->{helper}{DEVICES}[1]) {return undef;}
+	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
   return undef;
 }
 #####################################
@@ -128,6 +141,7 @@ sub OBIS_Undef($$)
   my ($hash, $arg) = @_;
   RemoveInternalTimer($hash);  
   DevIo_CloseDev($hash) if $hash->{DeviceName} != "none";
+  $hash->{helper}{FD}=undef;
   return undef;
 }
 
@@ -139,7 +153,7 @@ sub OBIS_Read($)
 	my $tn = TimeNow();
 
     my $buf = DevIo_SimpleRead($hash);
-	OBIS_Parse($hash,$buf);
+    if ($hash->{helper}{EoM}!=1) {OBIS_Parse($hash,$buf);}
     return(undef);
 }
 
@@ -156,62 +170,72 @@ sub OBIS_Parse($$)
       my $rmsg="";
       $rmsg = substr($hash->{helper}{BUFFER}, 0, index($hash->{helper}{BUFFER},chr(13).chr(10)));
 		Log3 $hash,5,"OBIS ($name) - Msg-Parse: $rmsg";
-		if ($rmsg=~ /.*\/(.*)/) {
-		  	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[2],undef) if (!$hash->{helper}{DEVICES}[2] eq "");
-	  	}
-	  	
+
 		if($rmsg=~/^([23456789]+)-.*/) {
 			Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Message, please report: $rmsg";
 		}
-# Summe eingespeister Phase: 1-0:2.1.7*255(07568.01*kWh)
-      	if ($rmsg=~ /1-0:([246])\.1\.7\*255\((-?\d+\.?\d*).*/) {
-      		my $L=$1;
-    		if (exists $OBIS_channels{$1}) {$L="sum_".$OBIS_channels{$1}} else {$L="Unknown_Channel"};
-			Log3 $hash,5,"OBIS ($name) - Set reading ".$L." to value ".($2+0);
-  			readingsBulkUpdate($hash, $L,$2+0); 
-		};
-      	
-# Einspeisung und Bezug der einzelnen Phasen
-      	if ($rmsg=~ /1-0:(\d+)\.7\.\d*\*\d*\((-?\d+\.?\d*).*/) {
-      		my $L=$1;
-    		if (exists $OBIS_channels{$1}) {$L=$OBIS_channels{$1}} else {$L="Unknown_Channel"};
-			Log3 $hash,5,"OBIS ($name) - Set reading ".$L." to value ".($2+0);
-  			readingsBulkUpdate($hash, $L,$2+0); 
-      	};
 
-# Seriennummer
-	  	if ($rmsg=~ /0-0:96\.1\.255\*255\((.*?)\).*/)   {  
-	  		Log3 $hash,5,"OBIS ($name) - Set reading Serial to value ".$1;
-	  		readingsBulkUpdate($hash, "Serial"  ,$1); }
-      	
-# Eigentumsnummer --> 1-0:0.0.0*255(GETTONE)
-	  	if ($rmsg=~ /1-0:0\.0\.0\*255\((.*?)\).*/)   {  
-	  		Log3 $hash,5,"OBIS ($name) - Set reading Owner to value ".$1;
-	  		readingsBulkUpdate($hash, "Owner"  ,$1); }
-
-# Statusbyte
-	  	if ($rmsg=~ /1-0:96\.5\.5\*255\((.*?)\).*/)   {  
-	  		Log3 $hash,5,"OBIS ($name) - Set reading Status to value ".$1;
-	  		readingsBulkUpdate($hash, "Status"  ,$1); }
+# End of Message
+		if ($rmsg=~/!.*/) {
+			if ($type eq "Hager") {
+				$rmsg="1-0:1.7.255*255(".$hash->{helper}{PHSUM}."*kW)"; 
+				$hash->{helper}{PHSUM}=0;
+			};
+			$hash->{helper}{EoM}+=1;
+		}
 
 #Version
-		if ($rmsg=~ /\/(.*)/) {  
-  			Log3 $hash,5,"OBIS ($name) - Set reading Version to value ".$1;
-			readingsBulkUpdate($hash, "Version"  ,$1); }
-
-# Zählerstand --> 1-0:1.8.0*255(17483.88*kWh)
-		if ($rmsg=~ /1-0:([12])\.8\.\d\*255\((-?\d+\.?\d*).*/) {
-			if($1==1) {
-  				Log3 $hash,5,"OBIS ($name) - Set reading energy_total to value ".$2." with offset ".AttrVal($name,"offset_energy",0);
-				readingsBulkUpdate($hash, "energy_total"  ,$2 +AttrVal($name,"offset_energy",0)); 
-			} elsif ($1==2) {
-  				Log3 $hash,5,"OBIS ($name) - Set reading feed_total to value ".$2." with offset ".AttrVal($name,"offset_energy",0);
-				readingsBulkUpdate($hash, "feed_total"  ,$2 +AttrVal($name,"offset_feed",0)); 				
+		if ($rmsg=~ /.*\/(.*)/) {
+		  	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[2],undef) if (!$hash->{helper}{DEVICES}[2] eq "");
+	  		if (ReadingsVal($name,"Version","") ne $1) {readingsBulkUpdate($hash, "Version"  ,$1); }
+ 			$hash->{helper}{EoM}=0;
+	  	}
+	  	if ($hash->{helper}{EoM}!=-1) {
+	# Summe eingespeister Phase: 1-0:2.1.7*255(07568.01*kWh)
+	      	if ($rmsg=~ /1-0:([246])\.1\.7\*255\(([-+]?\d+\.?\d*).*/) {
+	    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
+	  			readingsBulkUpdate($hash, "sum_$L",$2+0); 
+			};
+	      	
+	# Einspeisung und Bezug der einzelnen Phasen
+	      	if ($rmsg=~ /1-0:(\d+)\.7\.\d*\*\d*\(([-+]?\d+\.?\d*).*/) {
+	    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
+	  			readingsBulkUpdate($hash, $L,$2+0); 
+	    		if ($type eq "Hager") {
+	    			my $a=$2;
+	    			if ($1 =~ /(?:21|41|61)/) {$hash->{helper}{PHSUM} += ($a+0)}
+	    		}
+	      	};
+	
+	# Seriennummer
+		  	if ($rmsg=~ /0-0:96\.1\.255\*255\((.*?)\).*/)   {  
+		  		if (ReadingsVal($name,"Serial","") ne $1) {readingsBulkUpdate($hash, "Serial"  ,$1); }
+		  	}
+	      	
+	# Eigentumsnummer --> 1-0:0.0.0*255(GETTONE)
+		  	if ($rmsg=~ /1-0:0\.0\.0\*255\((.*?)\).*/)   {  
+		  		if (ReadingsVal($name,"Owner","") ne $1) {readingsBulkUpdate($hash, "Owner"  ,$1); }
+		  	}
+	
+	# Statusbyte
+		  	if ($rmsg=~ /1-0:96\.5\.5\*255\((.*?)\).*/)   {  
+		  		if (ReadingsVal($name,"Status","") ne $1) {readingsBulkUpdate($hash, "Status"  ,$1); }
+		  	}
+	
+	# Zählerstand --> 1-0:1.8.0*255(17483.88*kWh)
+			if ($rmsg=~ /1-0:([12])\.(8)\.\d\*255\((-?\d+\.?\d*).*/) {
+				my $L=$hash->{helper}{Channels}{$2.".".$1} // $OBIS_channels{$2.".".$1} // "Unknown_Channel_$2.$1";
+				if($1==1) {
+					readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_energy",0)); 
+				} elsif ($1==2) {
+					readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_feed",0)); 				
+				}
 			}
-		}
+	  	}
        $hash->{helper}{BUFFER} = substr($hash->{helper}{BUFFER}, index($hash->{helper}{BUFFER},chr(13).chr(10))+2);;
     }
     readingsEndUpdate($hash,1);
+	if($hash->{helper}{EoM}==1) { $hash->{helper}{BUFFER}="";}
     return $name;
 }
 
@@ -239,16 +263,17 @@ sub OBIS_Attr(@)
 	
 	if ($cmd eq "set") {
 		if ($aName eq "channels") {
-	      %OBIS_channels = eval $aVal;
+	      $hash->{helper}{Channels}=eval $aVal;
 			if ($@) {
 				Log3 $name, 3, "OBIS ($name) - X: Invalid regex in attr $name $aName $aVal: $@";
+				$hash->{helper}{Channels}=undef;
 			}
 		}
 		if ($aName eq "interval") {
 			if ($aVal=~/^[1-9][0-9]*$/) {
 		  		RemoveInternalTimer($hash);
 				my $type= $hash->{MeterType};
-  				InternalTimer(gettimeofday()+2, "GetUpdate", $hash, 1) if ($hash->{helper}{DEVICES}[1]!=-1);
+  				InternalTimer(gettimeofday()+2, "GetUpdate", $hash, 1) if ($aVal>0);
 			} else {
 				Log3 $name, 3, "OBIS ($name) - $name: attr interval must be a number -> $aVal";
 			}
@@ -279,7 +304,8 @@ sub OBIS_Attr(@)
       <br><br>
       Optional:MeterType can be of
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
-      <li>E110 -&gt; Landis&&;Gyr E110</li></ul>
+      <li>E110 -&gt; Landis&&;Gyr E110</li>
+      <li>Hager -&gt; Hager-Family</li></ul>
       <br>
       Example: <br>
     <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
@@ -303,10 +329,10 @@ sub OBIS_Attr(@)
       <li>41-->Phase 2</li> 
       <li>61-->Phase 3</li></ul>
       You can change that for example to:
-      <code>attr myOBIS channels "2"=>"L1", "4"=>"L2", "6"=>"L3"></code>
+      <code>attr myOBIS channels {"2"=>"L1", "4"=>"L2", "6"=>"L3"}></code>
       <br><br></li><li>
    <code>interval</code><br>
-      The polling-interval in seconds (only if metertype is set) 
+      The polling-interval in seconds 
       </li>
   <br>
 </ul>
@@ -327,7 +353,8 @@ sub OBIS_Attr(@)
       <br><br>
       Optional:MeterType kann sein:
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
-      <li>E110 -&gt; Landis&&;Gyr E110</li></ul>
+      <li>E110 -&gt; Landis&&;Gyr E110</li>
+      <li>Hager -&gt; Smartmeter der Hager-Familie</li></ul>
       <br>
       Beispiel: <br>
     <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
@@ -351,10 +378,10 @@ sub OBIS_Attr(@)
       <li>41-->Phase 2</li> 
       <li>61-->Phase 3</li></ul>
       Beispiel:
-      <code>attr myOBIS channels "2"=>"L1", "4"=>"L2", "6"=>"L3"></code>
+      <code>attr myOBIS channels {"2"=>"L1", "4"=>"L2", "6"=>"L3"}></code>
       <br><br></li><li>
    <code>interval</code><br>
-      Abrufinterval der Daten. (greift nur, wenn ein metertype angegeben wurde) 
+      Abrufinterval der Daten. 
       </li>
   <br>
 </ul>
