@@ -743,13 +743,20 @@ ZWave_Cmd($$@)
 
   if(!$cmdList{$cmd}) {
     my @list;
+    my $mc = ReadingsVal($hash->{NAME}, "modelConfig", "");
     foreach my $lcmd (sort keys %cmdList) {
-      if($zwave_cmdArgs{$type}{$lcmd}) {
+      if($mc && $zwave_cmdArgs{$type}{"$mc$lcmd"}) {
+        push @list, "$lcmd:".$zwave_cmdArgs{$type}{"$mc$lcmd"};
+
+      } elsif($zwave_cmdArgs{$type}{$lcmd}) {
         push @list, "$lcmd:$zwave_cmdArgs{$type}{$lcmd}";
+
       } elsif($cmdList{$lcmd}{fmt} !~ m/%/) {
         push @list, "$lcmd:noArg";
+
       } else {
         push @list, $lcmd;
+
       }
     }
     my $list = join(" ",@list);
@@ -2326,9 +2333,10 @@ ZWave_configParseModel($;$)
     $mc{set}{$cmd} = $arg if(!$h->{read_only} || $h->{read_only} ne "true");
     $mc{get}{$cmd} ="noArg" if(!$h->{write_only} || $h->{write_only} ne "true");
     $mc{config}{$cmd} = $h;
-    $zwave_cmdArgs{set}{$cmd} = join(",", keys %{$h->{Item}}) if($h->{Item});
-    $zwave_cmdArgs{set}{$cmd} = "noArg" if($h->{type} eq "button");
-    $zwave_cmdArgs{get}{$cmd} = "noArg";
+    my $caName = "$cfg$cmd";
+    $zwave_cmdArgs{set}{$caName} = join(",", keys %{$h->{Item}}) if($h->{Item});
+    $zwave_cmdArgs{set}{$caName} = "noArg" if($h->{type} eq "button");
+    $zwave_cmdArgs{get}{$caName} = "noArg";
   }
 
   $zwave_modelConfig{$cfg} = \%mc;
