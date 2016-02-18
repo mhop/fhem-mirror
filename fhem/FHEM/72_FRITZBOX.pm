@@ -2972,7 +2972,12 @@ sub FRITZBOX_Ring_Run_Web($)
    elsif (int (@FritzFons) && $ttsLink && $hash->{fhem}{radio}{$fhemRadioStation} ne "FHEM") {
       push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Name" => "FHEM";
       push @webCmdArray, "configd:settings/WEBRADIO".$fhemRadioStation."/Bitmap" => "1023";
-         FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech";
+      if (int @webCmdArray) {
+         FRITZBOX_Log $hash, 3, "Create new internet radio station $fhemRadioStation: 'FHEM' for ringing with text-to-speech"
+      }
+      else {
+         FRITZBOX_Log $hash, 3, "Your Fritz!OS version has limited interfaces. Cannot create radio station 'FHEM' for ringing with text-to-speech."
+      }
    }
    
    #Execute command array
@@ -4700,18 +4705,23 @@ sub FRITZBOX_fritztris($)
          Rings the internal numbers for "duration" seconds and (on Fritz!Fons) with the given "ring tone" name.
          Different internal numbers have to be separated by a comma (without spaces).
          <br>
-         Default duration is 5 seconds. Default ring tone is the internal ring tone of the device.
+         Default duration is 5 seconds. The Fritz!Box can create delays. Default ring tone is the internal ring tone of the device.
          Ring tone will be ignored for collected calls (9 or 50). 
          <br>
-         If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'show:' will be shown as the callers name. (only for Fritz!OS<=6.24)
+         If the call is taken the callee hears the "music on hold" which can also be used to transmit messages.
+         <br>
+         The parameter <i>ringtone, show:, say:</i> and <i>play:</i> need the API Telnet or webcm.
+         <br>
+         <br>
+         If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'show:' will be shown as the callers name.
          Maximal 30 characters are allowed.
          <br>
-         On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (max. 100 characters). 
-         Alternatively a MP3 link can be played with 'play:'. This creates the  internet radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
          <br>
+         On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (max. 100 characters) instead of using the ringtone. 
+         Alternatively a MP3 link can be played with 'play:'. This creates the internet radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
          Say and play works only with a single Fritz!Fon.
-        <br>
-         If the call is taken the callee hears the "music on hold" which can also be used to transmit messages.
+         <br>
+         This behaviour may vary depending on the Fritz!OS.
       </li><br>
 
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
@@ -5052,6 +5062,7 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><code>set &lt;name&gt; ring &lt;intNummern&gt; [Dauer [Klingelton]] [show:Text] [say:Text | play:Link]</code>
+         <br>
          Beispiel:
          <br>
          <code>set fritzbox ring 611,612 5 Budapest show:Es regnet</code>
@@ -5061,21 +5072,28 @@ sub FRITZBOX_fritztris($)
          <code>set fritzbox ring 610 10 play:http://raspberrypi/sound.mp3</code>
          <br>
          L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
+         <br>
          Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
          <br>
-         Standard-Dauer ist 5 Sekunden. Standard-Klingelton ist der interne Klingelton des Ger&auml;tes.
+         Standard-Dauer ist 5 Sekunden. Es kann aber zu Verz&ouml;gerungen in der Fritz!Box kommen. Standard-Klingelton ist der interne Klingelton des Ger&auml;tes.
          Der Klingelton wird f&uuml;r Rundrufe (9 oder 50) ignoriert. 
          <br>
-         Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt. (nur bei Fritz!OS<=6.24)
+         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichten&uuml;bermittlung genutzt werden kann.
+         <br>
+         Die Parameter <i>Klingelton, show:, say:</i> und <i>play:</i> ben&ouml;tigen die API Telnet oder webcm.
+         <br>
+         <br>
+         Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
          <br>
-         Auf Fritz!Fons wird der Text (max. 100 Zeichen) hinter dem Parameter 'say:' direkt angesagt.
+         <br>
+         Auf Fritz!Fons wird der Text (max. 100 Zeichen) hinter dem Parameter 'say:' direkt angesagt und ersetzt den Klingelton.
          <br>
          Alternativ kann mit 'play:' auch ein MP3-Link abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com f&uuml;r Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
+         Das Abspielen ist nur auf einem einzelnen Fritz!Fon m&oouml;glich.
          <br>
-         Das Abspielen ist nur auf einem einzelnen Fritz!Fon möglich.
+         Je nach Fritz!OS kann das beschriebene Verhalten abweichen.
          <br>
-         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichten&uuml;bermittlung genutzt werden kann.
       </li><br>
 
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
