@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature  49_SSCAM: function "runPatrol" added that starts predefined 
+                       patrols of PTZ-cameras,
+                       Reading "CamDetMotSc" added
   - feature: LightScene: added nextScene and previousScene commands
   - feature  49_SSCAM: Reading "CamExposureControl" added
   - feature  49_SSCAM: set up of motion detection source now possible

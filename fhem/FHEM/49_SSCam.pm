@@ -27,6 +27,9 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.17   19.02.2016    function "runPatrol" added that starts predefined patrols
+#                      of PTZ-cameras,
+#                      Reading "CamDetMotSc" added
 # 1.16.1 17.02.2016    Reading "CamExposureControl" added
 # 1.16   16.02.2016    set up of motion detection source now possible
 # 1.15   15.02.2016    control of exposure mode day, night & auto is possible now
@@ -241,6 +244,7 @@ sub SSCam_Set {
                    "snap ".
                    "enable ".
                    "disable ".
+                   ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                    ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
                    ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
@@ -302,7 +306,7 @@ sub SSCam_Set {
         elsif ($opt eq "goPreset") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            if (!$prop) {return "Function \"goPreset\" needs a \"Preset\" as an argument";}
+            if (!$prop) {return "Function \"goPreset\" needs a \"Presetname\" as an argument";}
             
             @prop = split(/;/, $prop);
             $prop = $prop[0];
@@ -310,6 +314,19 @@ sub SSCam_Set {
             $prop = $prop[0];
             $hash->{HELPER}{GOPRESETNAME} = $prop;
             $hash->{HELPER}{PTZACTION}    = "gopreset";
+            doptzaction($hash);
+        }
+        elsif ($opt eq "runPatrol") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            if (!$prop) {return "Function \"runPatrol\" needs a \"Patrolname\" as an argument";}
+            
+            @prop = split(/;/, $prop);
+            $prop = $prop[0];
+            @prop = split(/,/, $prop);
+            $prop = $prop[0];
+            $hash->{HELPER}{GOPATROLNAME} = $prop;
+            $hash->{HELPER}{PTZACTION}    = "runpatrol";
             doptzaction($hash);
         }
         elsif ($opt eq "goAbsPTZ") 
@@ -976,6 +993,24 @@ sub doptzaction ($) {
             }
     }
     
+    if ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
+        if (!defined($hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}})) {
+            $errorcode = "600";
+            # Fehlertext zum Errorcode ermitteln
+            $error = &experror($hash,$errorcode);
+        
+            # Setreading 
+            readingsBeginUpdate($hash);
+            readingsBulkUpdate($hash,"Errorcode",$errorcode);
+            readingsBulkUpdate($hash,"Error",$error);
+            readingsEndUpdate($hash, 1);
+    
+            $logstr = "ERROR - runPatrol to patrol \"$hash->{HELPER}{GOPATROLNAME}\" of Camera $camname can't be executed - $error" ;
+            &printlog($hash,$logstr,"1");
+            return;        
+            }
+    }
+    
     if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
         if (ReadingsVal("$name", "state", "") eq "disabled") {
             $errorcode = "402";
@@ -1003,35 +1038,30 @@ sub doptzaction ($) {
         if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
             $logstr = "Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\" now";
             &printlog($hash,$logstr,"4");
-                        
-            $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
-            $hash->{HELPER}{ACTIVE} = "on";
-        
-            &getapisites_nonbl($hash);
+            }
+            elsif ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
+            $logstr = "Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now";
+            &printlog($hash,$logstr,"4");
             }
             elsif ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
             $logstr = "Start move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\"  now";
             &printlog($hash,$logstr,"4");
-                        
-            $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
-            $hash->{HELPER}{ACTIVE} = "on";
-        
-            &getapisites_nonbl($hash);
             }
             elsif ($hash->{HELPER}{PTZACTION} eq "movestart") {
             $logstr = "Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s";
             &printlog($hash,$logstr,"4");
-                        
-            $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
-            $hash->{HELPER}{ACTIVE} = "on";
-            
-            if ($attr{$name}{debugactivetoken}) {
-                $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-                &printlog($hash,$logstr,"3");
             }
-
-            &getapisites_nonbl($hash);
-            }
+ 
+        if ($attr{$name}{debugactivetoken}) {
+             $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+             &printlog($hash,$logstr,"3");
+        }
+    
+    $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
+    $hash->{HELPER}{ACTIVE} = "on";
+ 
+    &getapisites_nonbl($hash);
+ 
     }
     else
     {
@@ -1143,6 +1173,7 @@ sub getcaminfoall {
     my ($now,$new);
     
         getcaminfo($hash);
+        getmotionenum($hash);
         getcapabilities($hash);
         getptzlistpreset($hash);
         getptzlistpatrol($hash);
@@ -1233,6 +1264,36 @@ sub getcaminfo ($) {
     else
     {
         InternalTimer(gettimeofday()+1.33 , "getcaminfo", $hash, 0);
+    }
+    
+}
+
+###########################################################################
+###   Enumerate motion detection parameters, sub von getcaminfoall
+
+sub getmotionenum ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        $logstr = "Enumerate motion detection parameters of $camname starts now";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "getmotionenum";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
+        getapisites_nonbl($hash);
+    }
+    else
+    {
+        InternalTimer(gettimeofday()+1.38 , "getmotionenum", $hash, 0);
     }
     
 }
@@ -2022,6 +2083,11 @@ sub camop_nonbl ($) {
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&presetId=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0); 
    }
+   elsif ($OpMode eq "runpatrol")
+   {
+      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"RunPatrol\"&patrolId=\"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      readingsSingleUpdate($hash,"state", "moving", 0);
+   }
    elsif ($OpMode eq "goabsptz")
    {
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
@@ -2097,6 +2163,10 @@ sub camop_nonbl ($) {
       
       $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";   
    }
+   elsif ($OpMode eq "getmotionenum")
+   {
+      $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
+   }
    
    $logstr = "Call-Out now: $url";
    &printlog($hash,$logstr,"4");
@@ -2151,6 +2221,7 @@ sub camret_nonbl ($) {
    my $userPriv;
    my $verbose;
    my $httptimeout;
+   my $motdetsc;
    
    # Die Aufnahmezeit setzen
    # wird "set <name> on-for-timer [rectime]" verwendet -> dann [rectime] nutzen, 
@@ -2271,7 +2342,7 @@ sub camret_nonbl ($) {
                 # ein Schnapschuß wurde aufgenommen
                 # falls Aufnahme noch läuft -> state = on setzen
                 if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                    readingsSingleUpdate($hash,"state", "on", 0); 
+                    readingsSingleUpdate( $hash,"state", "on", 0); 
                     }
                     else
                     {
@@ -2331,6 +2402,30 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 $logstr = "Camera $camname has been moved to position \"$hash->{HELPER}{GOPRESETNAME}\"";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "runpatrol") 
+            {
+                # eine Tour wurde gestartet
+                # falls Aufnahme noch läuft -> state = on setzen
+                if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
+                    readingsSingleUpdate($hash,"state", "on", 0); 
+                    }
+                    else
+                    {
+                    readingsSingleUpdate($hash,"state", "off", 0); 
+                    }
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+                                
+                # Logausgabe
+                $logstr = "Patrol \"$hash->{HELPER}{GOPATROLNAME}\" of camera $camname has been started successfully";
                 &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
@@ -2615,6 +2710,41 @@ sub camret_nonbl ($) {
                             
                 # Logausgabe
                 $logstr = "Camera-Informations of $camname retrieved";
+                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 2 
+                if (defined($attr{$name}{pollnologging}) and $attr{$name}{pollnologging} eq "1") {
+                    $verbose = 4;
+                    }
+                    else
+                    {
+                    $verbose = 3;
+                    }
+                &printlog($hash,$logstr,$verbose);
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "getmotionenum") 
+            {              
+                $motdetsc = $data->{'data'}{'MDParam'}{'source'};
+                
+                if ($motdetsc == -1) {
+                    $motdetsc = "disabled";
+                }
+                elsif ($motdetsc == 0) {
+                    $motdetsc = "by_camera";
+                }
+                elsif ($motdetsc == 1) {
+                    $motdetsc = "by_SVS";
+                }
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"CamMotDetSc",$motdetsc);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+       
+                # Logausgabe
+                $logstr = "Enumerate motion detection parameters of $camname successfully done";
                 # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 2 
                 if (defined($attr{$name}{pollnologging}) and $attr{$name}{pollnologging} eq "1") {
                     $verbose = 4;
@@ -3138,6 +3268,7 @@ return;
        <li>switchover the motion detection by camera, by SVS or to deactivate  </li>
        <li>Retrieval of Camera Properties (also by Polling) as well as informations about the installed SVS-package</li>
        <li>Move to a predefined Preset-position (at PTZ-cameras) </li>
+       <li>Start a predefined Patrol (at PTZ-cameras) </li>
        <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
        <li>continuous moving of PTZ-camera lense   </li><br>
     </ul>
@@ -3244,6 +3375,7 @@ return;
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
+      <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
@@ -3281,7 +3413,8 @@ return;
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
       <tr><td>"expmode [ day | night | auto ]":                    </td><td>set the exposure mode to day, night or auto </td></tr>
       <tr><td>"motdetsc [ by_camera | by_SVS | disable ]":         </td><td>set motion detection to the desired mode </td></tr>
-      <tr><td>"goPreset &lt;Preset&gt;":                           </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
+      <tr><td>"goPreset &lt;Presetname&gt;":                       </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
+      <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>starts a predefinied patrol (PTZ-cameras)  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>starts a continuous move of PTZ-camera to direction up/down/left/right or dir_X  </td></tr> 
   </table>
@@ -3371,15 +3504,15 @@ return;
   If motion detection will be tuned by camera, the original camera settings are kept.
   Wird die Bewegungserkennung durch die Kamera eingestellt, werden die originalen Kameraeinstellungen beibehalten.
   The successful execution of that opreration you can retrace by the state in SVS -&gt; IP-camera -&gt; event detection -&gt; motion.
-  An appropriate reading shall follow at later point in time.
+  The state of motion detection source will also be shown by the <a href="#SSCamreadings">Reading</a> "CamMotDetSc".
   
   <br><br>
   
   <b> "set &lt;name&gt; goPreset &lt;Preset&gt;" </b> <br><br>
   
-  Using this command you can move PTZ-c ameras to a predefined position. <br>
+  Using this command you can move PTZ-cameras to a predefined position. <br>
   The Preset-positions have to be defined first of all in the Synology Surveillance Station. This usually happens in the PTZ-control of IP-camera setup in SVS.
-  The Presets will be read ito FHEM with command "set &lt;name&gt; getinfo" (happens automatically when FHEM restarts). The import process can be repeated regular by camera polling.
+  The Presets will be read ito FHEM with command "get &lt;name&gt; caminfoall" (happens automatically when FHEM restarts). The import process can be repeated regular by camera polling.
   A long polling interval is recommendable in this case because of the Presets are only will be changed if the user change it in the IP-camera setup itself. 
   <br><br>
   
@@ -3408,6 +3541,16 @@ return;
    2016.02.04 15:02:44 2: CamFL - Camera Flur_Vorderhaus has moved to position "Home"
   </pre>
   
+  <br><br>
+  
+  <b> "set &lt;name&gt; runPatrol &lt;Patrolname&gt;" </b> <br><br>
+  
+  This commans starts a predefined patrol (tour) of a PTZ-camera. <br>
+  At first the patrol has to be predefined in the Synology Surveillance Station. It can be done in the PTZ-control of IP-Kamera Setup -&gt; PTZ-control -&gt; patrol.
+  The patrol tours will be read with command "get &lt;name&gt; caminfoall" which is be executed automatically when FHEM restarts.
+  The import process can be repeated regular by camera polling. A long polling interval is recommendable in this case because of the patrols are only will be changed 
+  if the user change it in the IP-camera setup itself. 
+  Further informations for creating patrols you can get in the online-help of Surveillance Station.
   <br><br>
   
   <b> "set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ]" </b> <br><br>
@@ -3558,6 +3701,7 @@ return;
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
+    <tr><td><li>CamMotDetSc</li>        </td><td>- state of motion detection source (disabled, by camera, by SVS)  </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port of Camera  </td></tr>
     <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
@@ -3663,6 +3807,7 @@ return;
       <li>Umschaltung der Ereigniserkennung durch Kamera, durch SVS oder deaktiviert  </li>
       <li>Abfrage von Kameraeigenschaften (auch mit Polling) sowie den Eigenschaften des installierten SVS-Paketes</li>
       <li>Bewegen an eine vordefinierte Preset-Position (bei PTZ-Kameras) </li>
+      <li>Start einer vordefinierten Überwachungstour (bei PTZ-Kameras)  </li>
       <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
       <li>kontinuierliche Bewegung von PTZ-Kameras   </li><br>
      </ul> 
@@ -3765,6 +3910,7 @@ return;
       <tr><td><li>set ... expmode            </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... motdetsc           </td><td> session: ServeillanceStation - Manager       </li></td></tr>
       <tr><td><li>set ... goPreset           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
+      <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
@@ -3803,7 +3949,8 @@ return;
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;": </td><td>speichert die Zugangsinformationen</td></tr>
       <tr><td>"expmode [ day | night | auto ]":                </td><td>aktiviert den Belichtungsmodus Tag, Nacht oder Automatisch </td></tr>
       <tr><td>"motdetsc [ by_camera | by_SVS | disable ]":     </td><td>schaltet die Bewegungserkennung in den gewünschten Modus (durch Kamera, SVS, oder deaktiviert) </td></tr>
-      <tr><td>"goPreset &lt;Preset&gt;":                       </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
+      <tr><td>"goPreset &lt;Presetname&gt;":                   </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
+      <tr><td>"runPatrol &lt;Patrolname&gt;":                  </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":   </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":     </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
   </table>
@@ -3890,7 +4037,7 @@ return;
   Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
   Wird die Bewegungserkennung durch die Kamera eingestellt, werden die originalen Kameraeinstellungen beibehalten.
   Die erfolgreiche Ausführung der Operation lässt sich u.a anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; Bewegung nachvollziehen.
-  Zu einem späteren Zeitpunkt soll noch ein entsprechendes Reading folgen.
+  Den Status der Bewegungserkennung  wird ebenfalls durch das <a href="#SSCamreadings">Reading</a> "CamMotDetSc" angezeigt.
   
   <br><br>
   
@@ -3898,8 +4045,8 @@ return;
   
   Mit diesem Kommando können PTZ-Kameras in eine vordefininierte Position bewegt werden. <br>
   Die Preset-Positionen müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. Das geschieht in der PTZ-Steuerung im IP-Kamera Setup.
-  Die Presets werden über das Kommando "set &lt;name&gt; getinfo" eingelesen (geschieht bei restart von FHEM automatisch). Der Einlesevorgang kann durch ein Kamerapolling
-  regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert da die Presetpositionen sich nur im Fall der Neuanlage bzw. Änderung verändern werden. 
+  Die Presets werden über das Kommando "get &lt;name&gt; caminfoall" eingelesen (geschieht bei restart von FHEM automatisch). Der Einlesevorgang kann durch ein Kamerapolling
+  regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert, da sich die Presetpositionen nur im Fall der Neuanlage bzw. Änderung verändern werden. 
   <br><br>
   
   Hier ein Beispiel einer PTZ-Steuerung in Abhängigkeit eines IR-Melder Events:
@@ -3927,6 +4074,17 @@ return;
   </pre>
   
   <br>
+  
+  <b> "set &lt;name&gt; runPatrol &lt;Patrolname&gt;" </b> <br><br>
+  
+  Dieses Kommando startet die vordefinierterte Überwachungstour einer PTZ-Kamera. <br>
+  Die Überwachungstouren müssen dazu zunächst in der Synology Surveillance Station angelegt worden sein. 
+  Das geschieht in der PTZ-Steuerung im IP-Kamera Setup -&gt; PTZ-Steuerung -&gt; Überwachung.
+  Die Überwachungstouren (Patrols) werden über das Kommando "get &lt;name&gt; caminfoall" eingelesen, welches beim Restart von FHEM automatisch abgearbeitet wird. 
+  Der Einlesevorgang kann durch ein Kamerapolling regelmäßig wiederholt werden. Ein langes Pollingintervall ist in diesem Fall empfehlenswert, da sich die 
+  Überwachungstouren nur im Fall der Neuanlage bzw. Änderung verändern werden.
+  Nähere Informationen zur Anlage von Überwachungstouren sind in der Hilfe zur Surveillance Station enthalten. 
+  <br><br>
   
   <b> "set &lt;name&gt; goAbsPTZ [ X Y | up | down | left | right ]" </b> <br><br>
   
@@ -4077,6 +4235,7 @@ return;
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
+    <tr><td><li>CamMotDetSc</li>        </td><td>- Status der Bewegungserkennung (disabled, durch Kamera, durch SVS)  </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port der Kamera  </td></tr>
     <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
