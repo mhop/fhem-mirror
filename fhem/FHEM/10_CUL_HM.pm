@@ -4355,8 +4355,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
            if (!defined($light{$blk}));
     my $beepBack = $snd | $light{$blk}*4;
 
-    $symbAdd |= 0x0004 if ($c eq "comma");
-    $symbAdd |= $unit{$u};
+    $symbAdd |= 0x0008 if ($c eq "comma");
+    $symbAdd |= ($unit{$u} * 16);
 
     my $text = sprintf("%5.5s",$t);#pad left with space
     $text = uc(unpack("H*",$text));
