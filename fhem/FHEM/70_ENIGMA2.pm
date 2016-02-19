@@ -31,7 +31,6 @@ use 5.012;
 use strict;
 use warnings;
 use Data::Dumper;
-use XML::Simple;
 use IO::Socket;
 use HttpUtils;
 use Encode;
@@ -56,6 +55,10 @@ sub ENIGMA2_Initialize($) {
     my ($hash) = @_;
 
     Log3 $hash, 5, "ENIGMA2_Initialize: Entering";
+
+    eval 'use XML::Simple; 1';
+    return "Please install XML::Simple to use this module."
+      if ($@);
 
     $hash->{GetFn}   = "ENIGMA2_Get";
     $hash->{SetFn}   = "ENIGMA2_Set";
@@ -1038,7 +1041,28 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     SuppressEmpty  => 1,
                     KeyAttr        => {}
                 );
-                $return = $parser->XMLin( Encode::encode_utf8($data) );
+
+                eval
+                  '$return = $parser->XMLin( Encode::encode_utf8($data) ); 1';
+                if ($@) {
+
+                    if ( !defined($cmd) || $cmd eq "" ) {
+                        Log3 $name, 5,
+"ENIGMA2 $name: RES ERROR $service - unable to parse malformed XML\n"
+                          . $data;
+                    }
+                    else {
+                        Log3 $name, 5,
+                            "ENIGMA2 $name: RES ERROR $service/"
+                          . urlDecode($cmd)
+                          . " - unable to parse malformed XML\n"
+                          . $data;
+
+                    }
+
+                    return undef;
+                }
+
                 undef $parser;
             }
             else {
@@ -1059,7 +1083,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
             }
         }
 
-        $return = Encode::encode_utf8($data) if ( ref($return) ne "HASH" );
+        $return = Encode::encode_utf8($data)
+          if ( $return && ref($return) ne "HASH" );
 
         #######################
         # process return data
