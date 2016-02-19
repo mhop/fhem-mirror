@@ -2031,7 +2031,7 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{devH},1,"sabotageError:".(($err&0x04) ? "on":"off")];
         push @evtEt,[$mh{devH},1,"battery:".(($err&0x08)?"critical":($err&0x80?"low":"ok"))];
       }
-      elsif ($mh{md} =~ m /HM-LC-SW.-BA-PCB/){
+      elsif ($mh{md} =~ m /(HM-LC-SW.-BA-PCB|HM-Dis-TD-T)/){
         push @evtEt,[$mh{devH},1,"battery:" . (($err&0x80) ? "low" : "ok" )];
       }
     }
@@ -4998,6 +4998,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "fwUpdate") { #################################################
+    if ($a[2] eq "onlyEnterBootLoader") {
+      Log3 $name,2,"CUL_HM entering bootloader for $name";
+      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+                                  ."3011$id${dst}CA");
+      return ("",1);
+    }
     return "no filename given" if (!$a[2]);
 #    return "only thru CUL " if (!$hash->{IODev}->{TYPE}
 #                                 ||($hash->{IODev}->{TYPE} ne "CUL"));
@@ -8743,6 +8749,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         <li><B>deviceRename &lt;newName&gt;</B><a name="CUL_HMdeviceRename"></a><br>
           rename the device and all its channels.
         </li>
+        <li><B>fwUpdate [onlyEnterBootLoader] &lt;filename&gt; [&lt;waitTime&gt;]</B><br>
+          update Fw of the device. User must provide the appropriate file.
+          waitTime can be given optionally. In case the device needs to be set to
+          FW update mode manually this is the time the system will wait.<br>
+          "onlyEnterBootLoader" tells the device to enter the boot loader so it can be
+          flashed using the eq3 firmware update tool. Mainly useful for flush-mounted devices
+          in FHEM environments solely using HM-LAN adapters.
+        </li>
       </ul>
   
       <br>
@@ -9038,10 +9052,6 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         </li>
         <li>Climate-Control (HM-CC-RT-DN|HM-CC-RT-DN-BoM)
           <ul>
-            <li><B>fwUpdate &lt;filename&gt; [&lt;waitTime&gt;] </B><br>
-                update Fw of the device. User must provide the appropriate file. 
-                waitTime can be given optional. In case the device needs to be set to 
-                FW update mode manually this is the time the system will wait. </li>
             <li><B>controlMode &lt;auto|boost|day|night&gt;</B><br></li>
             <li><B>controlManu &lt;temp&gt;</B><br></li>
             <li><B>controlParty &lt;temp&gt;&lt;startDate&gt;&lt;startTime&gt;&lt;endDate&gt;&lt;endTime&gt;</B><br>
@@ -10078,7 +10088,16 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           siehe auch <a href="#CUL_HMpress">press</a>
         </li>
         <li><B>deviceRename &lt;newName&gt;</B><a name="CUL_HMdeviceRename"></a><br>
-          benennt das Device und alle seine Kanäle um.
+          benennt das Device und alle seine Kan&auml;le um.
+        </li>
+
+        <li><B>fwUpdate [onlyEnterBootLoader] &lt;filename&gt; [&lt;waitTime&gt;]</B><br>
+          update Fw des Device. Der User muss das passende FW file bereitstellen.
+          waitTime ist optional. Es ist die Wartezeit, um das Device manuell in den FW-update-mode
+          zu versetzen.<br>
+          "onlyEnterBootLoader" schickt das Device in den Booloader so dass es vom eq3 Firmware Update 
+          Tool geflashed werden kann. Haupts&auml;chlich f&uuml;r Unterputz-Aktoren in Verbindung mit 
+          FHEM Installationen die ausschliesslich HM-LANs nutzen interessant.
         </li>
 
       </ul>
@@ -10293,10 +10312,6 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         </li>
         <li>Climate-Control (HM-CC-TC)
           <ul>
-            <li><B>fwUpdate &lt;filename&gt; [&lt;waitTime&gt;] </B><br>
-                update Fw des Device. Der User muss das passende FW file bereitstellen. 
-                waitTime ist optional. Es ist die Wartezeit, um das Device manuell in den FW-update-mode
-                zu versetzen.</li>
             <li><B>desired-temp &lt;temp&gt;</B><br>
               Setzt verschiedene Temperaturen. &lt;temp&gt; muss zwischen 6°C und 30°C liegen, die Aufl&ouml;sung betr&auml;gt 0.5°C.</li>
             <li><B>tempListSat [prep|exec] HH:MM temp ... 24:00 temp</B><br></li>
