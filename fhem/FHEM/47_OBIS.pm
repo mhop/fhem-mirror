@@ -160,7 +160,7 @@ sub OBIS_Read($)
 	my $tn = TimeNow();
 
     my $buf = DevIo_SimpleRead($hash);
-    if ($hash->{helper}{EoM}!=1) {OBIS_Parse($hash,$buf);}
+    if ($hash->{helper}{EoM}!=1 && $hash->{helper}{DEVICES}[1]>0) {OBIS_Parse($hash,$buf);}
     return(undef);
 }
 
