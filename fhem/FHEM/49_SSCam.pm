@@ -240,7 +240,7 @@ sub SSCam_Set {
                    "expmode:auto,day,night ".
                    "on ".
                    "off ".
-                   "motdetsc:disable,by_camera,by_SVS ".
+                   "motdetsc:disable,camera,SVS ".
                    "snap ".
                    "enable ".
                    "disable ".
@@ -283,7 +283,7 @@ sub SSCam_Set {
         elsif ($opt eq "motdetsc") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            unless ($prop) { return " \"$opt\" needs one of those arguments: disable, by_camera, by_SVS !";}
+            unless ($prop) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
             
             $hash->{HELPER}{MOTDETSC} = $prop;
             cammotdetsc($hash);
@@ -2154,10 +2154,10 @@ sub camop_nonbl ($) {
       if ($hash->{HELPER}{MOTDETSC} eq "disable") {
           $motdetsc = "-1";
       }
-      elsif ($hash->{HELPER}{MOTDETSC} eq "by_camera") {
+      elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
           $motdetsc = "0";
       }
-      elsif ($hash->{HELPER}{MOTDETSC} eq "by_SVS") {
+      elsif ($hash->{HELPER}{MOTDETSC} eq "SVS") {
           $motdetsc = "1";
       }
       
@@ -2730,10 +2730,10 @@ sub camret_nonbl ($) {
                     $motdetsc = "disabled";
                 }
                 elsif ($motdetsc == 0) {
-                    $motdetsc = "by_camera";
+                    $motdetsc = "Camera";
                 }
                 elsif ($motdetsc == 1) {
-                    $motdetsc = "by_SVS";
+                    $motdetsc = "SVS";
                 }
                 
                 # Setreading 
@@ -3412,7 +3412,7 @@ return;
       <tr><td>"enable":                                            </td><td>activates a camera in Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
       <tr><td>"expmode [ day | night | auto ]":                    </td><td>set the exposure mode to day, night or auto </td></tr>
-      <tr><td>"motdetsc [ by_camera | by_SVS | disable ]":         </td><td>set motion detection to the desired mode </td></tr>
+      <tr><td>"motdetsc [ camera | SVS | disable ]":               </td><td>set motion detection to the desired mode </td></tr>
       <tr><td>"goPreset &lt;Presetname&gt;":                       </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>starts a predefinied patrol (PTZ-cameras)  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
@@ -3498,7 +3498,7 @@ return;
   
   <br><br>
   
-  <b> "set &lt;name&gt; motdetsc [by_camera] [by_SVS] [disable]" </b> <br><br>
+  <b> "set &lt;name&gt; motdetsc [camera] [SVS] [disable]" </b> <br><br>
   
   The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
   If motion detection will be tuned by camera, the original camera settings are kept.
@@ -3948,7 +3948,7 @@ return;
       <tr><td>"enable":                                        </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;": </td><td>speichert die Zugangsinformationen</td></tr>
       <tr><td>"expmode [ day | night | auto ]":                </td><td>aktiviert den Belichtungsmodus Tag, Nacht oder Automatisch </td></tr>
-      <tr><td>"motdetsc [ by_camera | by_SVS | disable ]":     </td><td>schaltet die Bewegungserkennung in den gewünschten Modus (durch Kamera, SVS, oder deaktiviert) </td></tr>
+      <tr><td>"motdetsc [ camera | SVS | disable ]":           </td><td>schaltet die Bewegungserkennung in den gewünschten Modus (durch Kamera, SVS, oder deaktiviert) </td></tr>
       <tr><td>"goPreset &lt;Presetname&gt;":                   </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
       <tr><td>"runPatrol &lt;Patrolname&gt;":                  </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":   </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
@@ -4032,7 +4032,7 @@ return;
   Funktion auszugehen. 
   <br><br>
   
-  <b> "set &lt;name&gt; motdetsc [by_camera] [by_SVS] [disable]" </b> <br><br>
+  <b> "set &lt;name&gt; motdetsc [camera] [SVS] [disable]" </b> <br><br>
   
   Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
   Wird die Bewegungserkennung durch die Kamera eingestellt, werden die originalen Kameraeinstellungen beibehalten.
