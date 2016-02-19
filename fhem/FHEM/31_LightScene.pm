@@ -89,6 +89,7 @@ sub LightScene_Undefine($$)
 {
   my ($hash,$arg) = @_;
 
+  delete $hash->{SCENES};
   LightScene_Save();
 
   return undef;
@@ -581,7 +582,9 @@ LightScene_Set($@)
 
   if( !defined($cmd) ){ return "$name: set needs at least one parameter" };
 
-  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", sort keys %{$hash->{SCENES}}) ." rename save set setcmd scene:".join(",", sort keys %{$hash->{SCENES}})};
+  my @sorted = sort keys %{$hash->{SCENES}};
+
+  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove:".join(",", @sorted) ." rename save set setcmd scene:".join(",", @sorted) ." nextScene:noArg previousScene:noArg"};
 
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
   if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
@@ -589,10 +592,12 @@ LightScene_Set($@)
   if( $cmd eq "rename" && !defined( $scene ) ) { return "Usage: set $name rename <scene_alt> <scene_neu>" };
 
   if( $cmd eq "remove" ) {
+    return "no such scene $scene" if( !defined $hash->{SCENES}{$scene} );
     delete( $hash->{SCENES}{$scene} );
     return undef;
 
   } elsif( $cmd eq "rename" ) {
+    return "no such scene $scene" if( !defined $hash->{SCENES}{$scene} );
     my ($new) = @a;
     if( !( $new ) ) { return "Usage: set $name rename <scene_alt> <scene_neu>" };
 
@@ -616,6 +621,7 @@ LightScene_Set($@)
     LightScene_updateHelper( $hash, AttrVal($name,"switchingOrder",undef) );
 
     return undef;
+
   } elsif( $cmd eq "updateToJson" && $LightScene_hasDataDumper && $LightScene_hasJSON ) {
     $LightScene_hasJSON = 0;
     LightScene_Load($hash);
@@ -623,6 +629,20 @@ LightScene_Set($@)
     $LightScene_hasJSON = 1;
     LightScene_Save();
     return undef;
+
+  } elsif( $cmd eq 'nextScene' || $cmd eq 'previousScene' ) {
+    return "no scenes defined" if( $#sorted < 0 );
+    my $current = ReadingsVal( $name, 'state', '' );
+    my( $index )= grep { $sorted[$_] eq $current } 0..$#sorted;
+    $index = -1 if( !defined($index) );
+
+    ++$index if( $cmd eq 'nextScene' );
+    --$index if( $cmd eq 'previousScene' );
+    $index = 0 if( $index > $#sorted );
+    $index = $#sorted if( $index < 0 );
+
+    $cmd = 'scene';
+    $scene = $sorted[$index];
   }
 
 
