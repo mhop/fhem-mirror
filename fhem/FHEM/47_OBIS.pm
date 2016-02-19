@@ -9,6 +9,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
+use POSIX qw{strftime};
 
 my %OBIS_channels = ( "21"=>"power_L1",
                  "41"=>"power_L2",
@@ -41,7 +42,7 @@ sub OBIS_Initialize($)
   $hash->{ParseFn}   = "OBIS_Parse";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels alignTime ".
   					  $readingFnAttributes;
   Log3 $hash,4,"OBIS - Initialize done...";
 }
@@ -96,9 +97,13 @@ sub OBIS_Define($$)
     );
       Log3 $hash,4,"OBIS ($name) - Baudrate is $baudrate";
     $hash->{helper}{DEVICES} =$devs{$type};
+    $hash->{DevioText}="";
+    $hash->{helper}{TRIGGERTIME}=gettimeofday();
 #    Log 3,Dumper($hash->{helper}{DEVICES});
-    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".AttrVal($name,"interval",$hash->{helper}{DEVICES}[1])) if (AttrVal($name,"interval",0)>0 || $hash->{helper}{DEVICES}[1]>0);
-  InternalTimer(gettimeofday()+AttrVal($name,"interval",$hash->{helper}{DEVICES}[1]), "GetUpdate", $hash, 0) if (AttrVal($name,"interval",0)>0 || $hash->{helper}{DEVICES}[1]>0);
+	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime","00:00"),$hash->{helper}{DEVICES}[1]);
+    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
+#  InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
+ InternalTimer(gettimeofday()+$hash->{helper}{DEVICES}[1], "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
 	$hash->{helper}{EoM}=-1;
   
   	Log3 $hash,4,"OBIS ($name) - Opening device...";
@@ -116,8 +121,10 @@ sub GetUpdate($)
 #	if (!$hash->{helper}{FD}) {$hash->{helper}{FD}= DevIo_OpenDev($hash, 0, "OBIS_Init");
 #		readingsSingleUpdate($hash, "state","opened",1); 
 #	} 
-    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".AttrVal($name,"interval",$hash->{helper}{DEVICES}[1])) if (AttrVal($name,"interval",0)>0 || $hash->{helper}{DEVICES}[1]>0);
-	InternalTimer(gettimeofday()+AttrVal($name,"interval",$hash->{helper}{DEVICES}[1]), "GetUpdate", $hash, 1)  if (AttrVal($name,"interval",0)>0 || $hash->{helper}{DEVICES}[1]>0);
+	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime","00:00"),$hash->{helper}{DEVICES}[1]);
+    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
+#	InternalTimer($t, "GetUpdate", $hash, 1)  if ($hash->{helper}{DEVICES}[1]>0);
+ InternalTimer(gettimeofday()+$hash->{helper}{DEVICES}[1], "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
 	$hash->{helper}{EoM}=-1;
 	if (!exists $hash->{helper}{DEVICES}[1]) {return undef;}
 	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
@@ -179,9 +186,9 @@ sub OBIS_Parse($$)
 		if ($rmsg=~/!.*/) {
 			if ($type eq "Hager") {
 				$rmsg="1-0:1.7.255*255(".$hash->{helper}{PHSUM}."*kW)"; 
-				$hash->{helper}{PHSUM}=0;
+				$hash->{helper}{PHSUM}=0 if ($hash->{helper}{DEVICES}[1]>0);
 			};
-			$hash->{helper}{EoM}+=1;
+			$hash->{helper}{EoM}+=1 if ($hash->{helper}{DEVICES}[1]>0);
 		}
 
 #Version
@@ -272,15 +279,45 @@ sub OBIS_Attr(@)
 		if ($aName eq "interval") {
 			if ($aVal=~/^[1-9][0-9]*$/) {
 		  		RemoveInternalTimer($hash);
-				my $type= $hash->{MeterType};
+				$hash->{helper}{DEVICES}[1]=$aVal;
   				InternalTimer(gettimeofday()+2, "GetUpdate", $hash, 1) if ($aVal>0);
 			} else {
 				Log3 $name, 3, "OBIS ($name) - $name: attr interval must be a number -> $aVal";
 			}
 		}
+		if ($aName eq "alignTime") {
+		  		RemoveInternalTimer($hash);
+				my $t=OBIS_adjustAlign($hash,$aVal,$hash->{helper}{DEVICES}[1]);
+			    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
+				InternalTimer($t, "GetUpdate", $hash, 1)  if ($hash->{helper}{DEVICES}[1]>0);
+			
+		}
 		
 	}
 	return undef;
+}
+
+sub OBIS_adjustAlign($$$)
+{
+  my($hash, $attrVal, $interval) = @_;
+
+  my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal);
+  return "$hash->{NAME} alignTime: $alErr" if($alErr);
+  my $tspec=strftime("\%H:\%M:\%S", gmtime($interval));
+  my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
+  my $now = time();
+  my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);	
+  
+  my $ttime = int($hash->{helper}{TRIGGERTIME});
+  my $off = ($ttime % 86400) - 86400;
+  while($off < $alTime) {
+    $off += $interval;
+  }
+  $ttime += ($alTime-$off);
+  $ttime += $interval if($ttime < $now);
+
+  $hash->{helper}{TRIGGERTIME} = $ttime;
+  return $ttime;
 }
 
 #####################################
@@ -339,8 +376,7 @@ sub OBIS_Attr(@)
 
 =end html
 
-=begin html
-
+=begin html_DE
 
 <a name="OBIS"></a>
 <h3>OBIS</h3>
