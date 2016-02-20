@@ -70,6 +70,8 @@ my %zwave_class = (
     parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" :
                                ($1 eq "ff" ? "state:on" :
                                              "state:dim ".hex($1)))',
+               "..260100.."=> "state:setOff",
+               "..2601ff.."=> "state:setOn",
                "..260420"  => "state:swmBeginUp",
                "..260460"  => "state:swmBeginDown",
                "..2605"    => "state:swmEnd" } },
@@ -3796,6 +3798,7 @@ ZWave_Parse($$@)
   }
 
   my ($baseHash, $baseId, $ep) = ("",$id,"");
+               056008 00  0200
   if($arg =~ /^..6006(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP, V1, Forum #36126
     $ep = $1;
     $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
@@ -5199,6 +5202,8 @@ s2Hex($)
   <br><br><b>Class SWITCH_MULTILEVEL</b>
   <li>state:on</li>
   <li>state:off</li>
+  <li>state:setOn</li>
+  <li>state:setOff</li>
   <li>state:dim value</li>
   <li>state:swmBeginUp</li>
   <li>state:swmBeginDown</li>
