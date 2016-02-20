@@ -3798,7 +3798,6 @@ ZWave_Parse($$@)
   }
 
   my ($baseHash, $baseId, $ep) = ("",$id,"");
-               056008 00  0200
   if($arg =~ /^..6006(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP, V1, Forum #36126
     $ep = $1;
     $baseHash = $modules{ZWave}{defptr}{"$homeId $id"};
