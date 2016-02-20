@@ -1048,14 +1048,14 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                     if ( !defined($cmd) || $cmd eq "" ) {
                         Log3 $name, 5,
-"ENIGMA2 $name: RES ERROR $service - unable to parse malformed XML\n"
+"ENIGMA2 $name: RES ERROR $service - unable to parse malformed XML: $@\n"
                           . $data;
                     }
                     else {
                         Log3 $name, 5,
                             "ENIGMA2 $name: RES ERROR $service/"
                           . urlDecode($cmd)
-                          . " - unable to parse malformed XML\n"
+                          . " - unable to parse malformed XML: $@\n"
                           . $data;
 
                     }
