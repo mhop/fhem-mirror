@@ -59,7 +59,7 @@ BlockingCall($$@)
       $ret = "BlockingCall ($blockingFn): ".
                 "No telnet port found and cannot create one: $ret";
       Log 1, $ret;
-      return $ret;
+      return undef;
     }
     $attr{$telnetDevice}{room} = "hidden"; # no red ?, Forum #46640
     $attr{$telnetDevice}{allowfrom} = "127.0.0.1";
