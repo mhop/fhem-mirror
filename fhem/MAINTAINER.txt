@@ -135,8 +135,8 @@ FHEM/32_TechemSD.pm          herrmannj            http://forum.fhem.de Sonstiges
 FHEM/32_WifiLight.pm         herrmannj            http://forum.fhem.de Beleuchtung
 FHEM/32_yowsup.pm            justme1968           http://forum.fhem.de Unterstuetzende Dienste
 FHEM/32_withings.pm          markus-m             http://forum.fhem.de Sonstiges
-FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends/readingsGroup
-FHEM/33_readingsHistory.pm   justme1968           http://forum.fhem.de Frontends/readingsGroup
+FHEM/33_readingsGroup.pm     justme1968           http://forum.fhem.de Frontends/readingsGroup readingsHistory
+FHEM/33_readingsHistory.pm   justme1968           http://forum.fhem.de Frontends/readingsGroup readingsHistory
 FHEM/33_readingsProxy.pm     justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_speedtest.pm         justme1968           http://forum.fhem.de Sonstiges
 FHEM/34_NUT.pm               creideiki            http://forum.fhem.de Sonstige Systeme
@@ -306,7 +306,7 @@ FHEM/98_ModbusAttr.pm        stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_ModbusSET.pm         stefanstrobel        http://forum.fhem.de Sonstiges
 FHEM/98_PID20.pm             John                 http://forum.fhem.de Automatisierung
 FHEM/98_RandomTimer.pm       dietmar63            http://forum.fhem.de Unterstuetzende Dienste
-FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends/SVG Plots
+FHEM/98_SVG.pm               rudolfkoenig         http://forum.fhem.de Frontends/SVG Plots logProxy
 FHEM/98_THRESHOLD.pm         damian-s             http://forum.fhem.de Automatisierung
 FHEM/98_UbiquitiPM.pm        Wzut                 http://forum.fhem.de Sonstige Systeme
 FHEM/98_UbiquitiOut.pm       Wzut                 http://forum.fhem.de Sonstige Systeme
@@ -328,7 +328,7 @@ FHEM/98_dummy.pm             rudolfkoenig         http://forum.fhem.de Automatis
 FHEM/98_fheminfo.pm          mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_help.pm              betateilchen         http://forum.fhem.de Sonstiges
 FHEM/98_HourCounter.pm       john                 http://forum.fhem.de MAX
-FHEM/98_logProxy.pm          justme1968           http://forum.fhem.de Frontends
+FHEM/98_logProxy.pm          justme1968           http://forum.fhem.de Frontends/SVG Plots logProxy
 FHEM/98_MaxScanner.pm        john                 http://forum.fhem.de MAX
 FHEM/98_notice.pm            mfr69bs              http://forum.fhem.de Sonstiges
 FHEM/98_pilight.pm           andreas-fey          http://forum.fhem.de Unterstuetzende Dienste
