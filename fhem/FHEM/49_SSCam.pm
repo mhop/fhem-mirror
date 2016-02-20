@@ -27,6 +27,10 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.18   20.02.2016    function "get ... eventlist" added,
+#                      Reading "CamEventNum" added which containes total number of
+#                      camera events,
+#                      change usage of reading "LastUpdateTime"
 # 1.17   19.02.2016    function "runPatrol" added that starts predefined patrols
 #                      of PTZ-cameras,
 #                      Reading "CamDetMotSc" added
@@ -84,7 +88,7 @@
 #                      LWP is not needed anymore
 #
 #
-# Definition: define <name> SSCam <camname> <ServerAddr> <ServerPort> 
+# Definition: define <name> SSCam <camname> <ServerAddr> [ServerPort] 
 # 
 # Example: define CamCP1 SSCAM Carport 192.168.2.20 [5000]
 #
@@ -152,6 +156,7 @@ sub SSCam_Define {
   $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
   $hash->{HELPER}{APIAUTH}        = "SYNO.API.Auth"; 
   $hash->{HELPER}{APISVSINFO}     = "SYNO.SurveillanceStation.Info"; 
+  $hash->{HELPER}{APIEVENT}       = "SYNO.SurveillanceStation.Event"; 
   $hash->{HELPER}{APIEXTREC}      = "SYNO.SurveillanceStation.ExternalRecording";                     
   $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";
   $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
@@ -390,6 +395,7 @@ sub SSCam_Get {
                      caminfoall    => "caminfoall",
                      svsinfo       => "svsinfo",
                      snapfileinfo  => "snapfileinfo",
+                     eventlist     => "eventlist",
                      );
     my @cList;
         
@@ -418,6 +424,11 @@ sub SSCam_Get {
             {
                 if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
                 getsnapfilename($hash);
+            } 
+            elsif ($opt eq "eventlist") 
+            {
+                if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+                geteventlist ($hash);
             }  
         }
 return undef;
@@ -1172,6 +1183,7 @@ sub getcaminfoall {
     my $logstr;
     my ($now,$new);
     
+        geteventlist($hash);
         getcaminfo($hash);
         getmotionenum($hash);
         getcapabilities($hash);
@@ -1264,6 +1276,37 @@ sub getcaminfo ($) {
     else
     {
         InternalTimer(gettimeofday()+1.33 , "getcaminfo", $hash, 0);
+    }
+    
+}
+
+###########################################################################
+###   query SVS-Event information , sub von getcaminfoall
+
+sub geteventlist ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        # Kamerainfos abrufen
+        $logstr = "Query event informations of $camname starts now";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "geteventlist";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
+        getapisites_nonbl($hash);
+    }
+    else
+    {
+        InternalTimer(gettimeofday()+0.55 , "geteventlist", $hash, 0);
     }
     
 }
@@ -1399,7 +1442,7 @@ sub getptzlistpatrol ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+1 .58, "getptzlistpatrol", $hash, 0);
+        InternalTimer(gettimeofday()+1.58, "getptzlistpatrol", $hash, 0);
     }
     
 }
@@ -1432,6 +1475,7 @@ sub getapisites_nonbl {
    my $apiptz      = $hash->{HELPER}{APIPTZ};
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
+   my $apievent    = $hash->{HELPER}{APIEVENT};
    my $logstr;
    my $url;
    my $param;
@@ -1448,7 +1492,7 @@ sub getapisites_nonbl {
    &printlog($hash,$logstr,"5");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent";
 
    $logstr = "Call-Out now: $url";
    &printlog($hash,$logstr,"4");    
@@ -1485,6 +1529,7 @@ sub login_nonbl ($) {
    my $apiptz      = $hash->{HELPER}{APIPTZ};
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
+   my $apievent    = $hash->{HELPER}{APIEVENT};
    my $data;
    my $logstr;
    my $url;
@@ -1503,6 +1548,8 @@ sub login_nonbl ($) {
    my $apisvsinfomaxver;
    my $apicameventpath;
    my $apicameventmaxver;
+   my $apieventpath;
+   my $apieventmaxver;
    my $error;
    my $httptimeout;
   
@@ -1635,7 +1682,19 @@ sub login_nonbl ($) {
                         $logstr = defined($apicameventpath) ? "Path of $apicamevent selected: $apicameventpath" : "Path of $apicamevent undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4");
                         $logstr = defined($apicameventmaxver) ? "MaxVersion of $apicamevent: $apicameventmaxver" : "MaxVersion of $apicamevent undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");                        
+                        &printlog($hash, $logstr,"4"); 
+                        
+                     # Pfad und Maxversion von "SYNO.Surveillance.Event" ermitteln
+              
+                        $apieventpath = $data->{'data'}->{$apievent}->{'path'};
+                        # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+                        $apieventpath =~ tr/_//d if (defined($apieventpath));
+                        $apieventmaxver = $data->{'data'}->{$apievent}->{'maxVersion'};
+                            
+                        $logstr = defined($apieventpath) ? "Path of $apievent selected: $apieventpath" : "Path of $apievent undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
+                        $logstr = defined($apieventmaxver) ? "MaxVersion of $apievent: $apieventmaxver" : "MaxVersion of $apievent undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4"); 
        
                         # ermittelte Werte in $hash einfügen
                         $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
@@ -1652,6 +1711,8 @@ sub login_nonbl ($) {
                         $hash->{HELPER}{APISVSINFOMAXVER}  = $apisvsinfomaxver;
                         $hash->{HELPER}{APICAMEVENTPATH}   = $apicameventpath;
                         $hash->{HELPER}{APICAMEVENTMAXVER} = $apicameventmaxver;
+                        $hash->{HELPER}{APIEVENTPATH}      = $apieventpath;
+                        $hash->{HELPER}{APIEVENTMAXVER}    = $apieventmaxver;
        
                         # Setreading 
                         readingsBeginUpdate($hash);
@@ -1926,6 +1987,9 @@ sub camop_nonbl ($) {
    my $apicamevent       = $hash->{HELPER}{APICAMEVENT};
    my $apicameventpath   = $hash->{HELPER}{APICAMEVENTPATH};
    my $apicameventmaxver = $hash->{HELPER}{APICAMEVENTMAXVER};
+   my $apievent          = $hash->{HELPER}{APIEVENT};
+   my $apieventpath      = $hash->{HELPER}{APIEVENTPATH};
+   my $apieventmaxver    = $hash->{HELPER}{APIEVENTMAXVER};
    my $sid               = $hash->{HELPER}{SID};
    my $OpMode            = $hash->{OPMODE};
    my $url;
@@ -2055,12 +2119,10 @@ sub camop_nonbl ($) {
    
    if ($OpMode eq "Start") 
    {
-      # die Aufnahme wird gestartet, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\""; 
    } 
    elsif ($OpMode eq "Stop")
    {
-      # die Aufnahme wird gestoppt, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&_sid=\"$sid\"";
    }
    elsif ($OpMode eq "Snap")
@@ -2103,37 +2165,37 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "Enable")
    {
-      # eine Kamera wird aktiviert, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
    }
    elsif ($OpMode eq "Disable")
    {
-      # eine Kamera wird aktiviert, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
    }
    elsif ($OpMode eq "Getsvsinfo")
    {
-      # Infos bezüglich Synology Surveillance Station werden ermittelt
       $url = "http://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
    }
    elsif ($OpMode eq "Getcaminfo")
    {
-      # Infos einer Kamera werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet 
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
+   }
+   elsif ($OpMode eq "geteventlist")
+   {
+      # Abruf der Events einer Kamera
+      $url = "http://$serveraddr:$serverport/webapi/$apieventpath?api=\"$apievent\"&version=\"$apieventmaxver\"&method=\"List\"&cameraIds=\"$camid\"&locked=\"0\"&blIncludeSnapshot=\"false\"&reason=\"\"&limit=\"2\"&includeAllCam=\"false\"&_sid=\"$sid\"";   
    }
    elsif ($OpMode eq "Getptzlistpreset")
    {
-      # PTZ-ListPresets werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
    } 
    elsif ($OpMode eq "Getcapabilities")
    {
-      # Capabilities einer Cam werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
+      # Capabilities einer Cam werden abgerufen
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=GetCapabilityByCamId&cameraId=$camid&_sid=\"$sid\"";   
    }
    elsif ($OpMode eq "Getptzlistpatrol")
    {
-      # PTZ-ListPatrol werden abgerufen, Rückkehr wird mit "camret_nonbl" verarbeitet
+      # PTZ-ListPatrol werden abgerufen
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
    }    
    elsif ($OpMode eq "ExpMode")
@@ -2591,8 +2653,8 @@ sub camret_nonbl ($) {
                 $camLiveMode = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};
                 if ($camLiveMode eq "0") {$camLiveMode = "Liveview from DS";}elsif ($camLiveMode eq "1") {$camLiveMode = "Liveview from Camera";}
                 
-                $update_time = $data->{'data'}->{'cameras'}->[0]->{'update_time'};
-                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($update_time);
+                # $update_time = $data->{'data'}->{'cameras'}->[0]->{'update_time'};
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
                 $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
                 
                 $deviceType = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};
@@ -2606,7 +2668,7 @@ sub camret_nonbl ($) {
                     $deviceType = "PTZ";
                     }
                     elsif ($deviceType eq "8") {
-                    $deviceType = "Fisheye";
+                    $deviceType = "Fisheye"; 
                     }
                 
                 $camStatus = $data->{'data'}->{'cameras'}->[0]->{'camStatus'};
@@ -2710,7 +2772,32 @@ sub camret_nonbl ($) {
                             
                 # Logausgabe
                 $logstr = "Camera-Informations of $camname retrieved";
-                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 2 
+                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 3 
+                if (defined($attr{$name}{pollnologging}) and $attr{$name}{pollnologging} eq "1") {
+                    $verbose = 4;
+                    }
+                    else
+                    {
+                    $verbose = 3;
+                    }
+                &printlog($hash,$logstr,$verbose);
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }
+            elsif ($OpMode eq "geteventlist") 
+            {              
+                my $eventnum = $data->{'data'}{'total'};
+                
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"CamEventNum",$eventnum);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+       
+                # Logausgabe
+                $logstr = "Query event list of $camname successfully done";
+                # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 3 
                 if (defined($attr{$name}{pollnologging}) and $attr{$name}{pollnologging} eq "1") {
                     $verbose = 4;
                     }
@@ -3380,6 +3467,7 @@ return;
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
+      <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - observer    </li></td></tr>
       </table>
@@ -3616,18 +3704,21 @@ return;
 <a name="SSCamget"></a>
 <b>Get</b>
  <ul>
-  With SSCam the properties of defined Cameras could be retrieved. It could be done by using the command:
+  With SSCam the properties of SVS and defined Cameras could be retrieved. Actually it could be done by using the following commands:
   <pre>
       get &lt;name&gt; caminfoall
+      get &lt;name&gt; eventlist
       get &lt;name&gt; svsinfo
       get &lt;name&gt; snapfileinfo
   </pre>
   
-  With command "get &lt;name&gt; caminfoall" dependend of the type of Camera (e.g. Fix- or PTZ-Camera) the available properties will be retrieved and provided as Readings.<br>
+  With command <b>"get &lt;name&gt; caminfoall"</b> dependend of the type of Camera (e.g. Fix- or PTZ-Camera) the available properties will be retrieved and provided as Readings.<br>
   For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further 
   processing like creating events. <br>
-  Using "get &lt;name&gt; snapfileinfo" the filename of the last snapshot will be retrieved. This command will be executed with "get &lt;name&gt; snap" automatically. <br>
-  The command "get &lt;name&gt; svsinfo" is not really dependend on a camera, but rather a command to determine common informations about the installed SVS-version and other properties. <br>
+  By command <b>"get &lt;name&gt; eventlist"</b> the <a href="#SSCamreadings">Reading</a> "CamEventNum" will be refreshed which containes the total number of in SVS registered camera events. 
+  This command will be implicit executed when "get ... caminfoall" is running. <br>
+  Using <b>"get &lt;name&gt; snapfileinfo"</b> the filename of the last snapshot will be retrieved. This command will be executed with <b>"get &lt;name&gt; snap"</b> automatically. <br>
+  The command <b>"get &lt;name&gt; svsinfo"</b> is not really dependend on a camera, but rather a command to determine common informations about the installed SVS-version and other properties. <br>
   The functions "caminfoall" and "svsinfo" will be executed automatically once-only after FHEM restarts to collect some relevant informations for camera control. <br>
   Please consider to save the <a href="#SSCam_Credentials">credentials</a> what will be used for login to DSM or SVS !
   <br><br>
@@ -3696,6 +3787,7 @@ return;
   <table>  
   <colgroup> <col width=5%> <col width=95%> </colgroup>
     <tr><td><li>Availability</li>       </td><td>- Availability of Camera (disabled, enabled, disconnected, other)  </td></tr>
+    <tr><td><li>CamEventNum</li>        </td><td>- delivers the total number of in SVS registered events of the camera  </td></tr>
     <tr><td><li>CamExposureControl</li> </td><td>- indicating type of exposure control  </td></tr>
     <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
@@ -3725,7 +3817,7 @@ return;
     <tr><td><li>Errorcode</li>          </td><td>- error code of last error  </td></tr>
     <tr><td><li>LastSnapFilename</li>   </td><td>- the filename of the last snapshot   </td></tr>
     <tr><td><li>LastSnapId</li>         </td><td>- the ID of the last snapshot   </td></tr>    
-    <tr><td><li>LastUpdateTime</li>     </td><td>- date / time of last update of Camera in Synology Surrveillance Station  </td></tr>   
+    <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall"  </td></tr>   
     <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Synology Surveillance Station predefined Presets (at PTZ-Cameras)  </td></tr>
@@ -3915,6 +4007,7 @@ return;
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
+      <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... snapfileinfo       </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       </table>
@@ -4148,18 +4241,21 @@ return;
 <a name="SSCamget"></a>
 <b>Get</b>
  <ul>
-  Mit SSCam können die Eigenschaften der Kameras aus der Surveillance Station abgefragt werden. Dazu steht der Befehl zur Verfügung:
+  Mit SSCam können die Eigenschaften der Surveillance Station und der Kameras abgefragt werden. ZUr Zeit stehen dazu folgende Befehle zur Verfügung:
   <pre>
       get &lt;name&gt; caminfoall
+      get &lt;name&gt; eventlist
       get &lt;name&gt; svsinfo
       get &lt;name&gt; snapfileinfo
   </pre>
   
-  Mit dem Befehl "get &lt;name&gt; caminfoall" werden abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die verfügbaren Eigenschaften ermittelt und als Readings zur Verfügung gestellt. <br>
-  So wird zum Beispiel das Reading "Availability" auf "disconnected" gesetzt falls die Kamera von der Surveillance Station getrennt wird und kann für weitere <br>
-  Verarbeitungen genutzt werden. <br>
-  Mit "get &lt;name&gt; snapfileinfo" wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit "get &lt;name&gt; snap" ausgeführt. <br>
-  Der Befehl "get &lt;name&gt; svsinfo" ist eigentlich nicht von der Kamera abhängig, sondern ermittelt vielmehr allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
+  Mit dem Befehl <b>"get &lt;name&gt; caminfoall"</b> werden abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die verfügbaren Eigenschaften ermittelt und als Readings zur Verfügung gestellt. <br>
+  So wird zum Beispiel das Reading "Availability" auf "disconnected" gesetzt falls die Kamera von der Surveillance Station getrennt wird und kann für weitere Verarbeitungen genutzt werden. <br>
+  Durch <b>"get &lt;name&gt; eventlist"</b> wird das <a href="#SSCamreadings">Reading</a> "CamEventNum" aktualisiert, welches die Gesamtanzahl der registrierten Kameraevents enthält.
+  Dieser Befehl wird implizit mit "get ... caminfoall" ausgeführt. <br>
+  
+  Mit <b>"get &lt;name&gt; snapfileinfo"</b> wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit <b>"get &lt;name&gt; snap"</b> ausgeführt. <br>
+  Der Befehl <b>"get &lt;name&gt; svsinfo"</b> ist eigentlich nicht von der Kamera abhängig, sondern ermittelt vielmehr allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
   Die Funktionen "caminfoall" und "svsinfo" werden einmalig automatisch beim Start von FHEM ausgeführt um steuerungsrelevante Informationen zu sammeln.<br>
   Es ist darauf zu achten dass die <a href="#SSCam_Credentials">Credentials</a> gespeichert wurden !
   <br><br>
@@ -4230,6 +4326,7 @@ return;
   <table>  
   <colgroup> <col width=5%> <col width=95%> </colgroup>
     <tr><td><li>Availability</li>       </td><td>- Verfügbarkeit der Kamera (disabled, enabled, disconnected, other)  </td></tr>
+    <tr><td><li>CamEventNum</li>        </td><td>- liefert die Gesamtanzahl der in SVS registrierten Events der Kamera  </td></tr>
     <tr><td><li>CamExposureControl</li> </td><td>- zeigt den aktuell eingestellten Typ der Belichtungssteuerung  </td></tr>
     <tr><td><li>CamExposureMode</li>    </td><td>- aktueller Belichtungsmodus (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
@@ -4259,7 +4356,7 @@ return;
     <tr><td><li>Errorcode</li>          </td><td>- Fehlercode des letzten Fehlers   </td></tr>
     <tr><td><li>LastSnapFilename</li>   </td><td>- der Filename des letzten Schnapschusses   </td></tr>
     <tr><td><li>LastSnapId</li>         </td><td>- die ID des letzten Schnapschusses   </td></tr>
-    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung der Kamera in der Synology Surveillance Station  </td></tr>   
+    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" </td></tr>   
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
