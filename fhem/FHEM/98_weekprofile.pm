@@ -386,7 +386,7 @@ sub weekprofile_Initialize($)
   $hash->{StateFn}  = "weekprofile_State";
   $hash->{NotifyFn} = "weekprofile_Notify";
   $hash->{AttrFn}   = "weekprofile_Attr";
-  $hash->{AttrList} = "useTopics:0,1 widgetWeekdays widgetEditOnNewPage:0,1 configFile ".$readingFnAttributes;
+  $hash->{AttrList} = "useTopics:0,1 widgetWeekdays widgetEditOnNewPage:0,1 widgetEditDaysInRow:1,2,3,4,5,6,7 configFile ".$readingFnAttributes;
   
   $hash->{FW_summaryFn}  = "weekprofile_SummaryFn";
 
@@ -1013,6 +1013,7 @@ sub weekprofile_SummaryFn()
   my $iconName = AttrVal($d, "icon", "edit_settings");
   my $editNewpage = AttrVal($d, "widgetEditOnNewPage", 0);
   my $useTopics = AttrVal($d, "useTopics", 0);
+  my $editDaysInRow = AttrVal($d, "widgetEditDaysInRow", undef);
   
   my $editIcon = FW_iconName($iconName) ? FW_makeImage($iconName,$iconName,"icon") : "";
   $editIcon = "<a name=\"$d.edit\" onclick=\"weekprofile_DoEditWeek('$d','$editNewpage')\" href=\"javascript:void(0)\">$editIcon</a>";
@@ -1025,6 +1026,7 @@ sub weekprofile_SummaryFn()
   my $args = "weekprofile,MODE:SHOW";
   $args .= ",USETOPICS:$useTopics";
   $args .= ",MASTERDEV:$masterDev" if (defined($masterDev));
+  $args .= ",DAYINROW:$editDaysInRow" if (defined($editDaysInRow));
   
   my $curr = "";
   if (@{$hash->{PROFILES}} > 0)
@@ -1057,10 +1059,14 @@ sub weekprofile_SummaryFn()
 ############################################## 
 sub weekprofile_editOnNewpage(@)
 {
-  my ($device, $prf) = @_;
+  my ($device, $prf, $daysInRow) = @_;
   my $hash = $defs{$device};
   
-  my $args = "weekprofile,MODE:EDIT,JMPBACK:1";
+  my $editDaysInRow = AttrVal($device, "widgetEditDaysInRow", undef);
+  $editDaysInRow = $daysInRow if (defined($daysInRow));
+  
+  my $args = "weekprofile,MODE:EDIT,JMPBACK:1";  
+  $args .= ",DAYINROW:$editDaysInRow" if (defined($editDaysInRow));
   
   my $html;
   $html .= "<html>";
@@ -1248,7 +1254,10 @@ sub weekprofile_getEditLNK_MasterDev($$)
     <li>widgetEditOnNewPage<br>
       Editing the profile on a new html page if it is set to '1'
     </li>
-     <li>configFile<br>
+    <li>widgetEditDaysInRow<br>
+    Count of visible days in on row during Edit. Default 2.<br>
+    </li>
+    <li>configFile<br>
       Path and filename of the configuration file where the profiles will be stored
       Default: ./log/weekprofile-<name>.cfg
     </li>
@@ -1384,6 +1393,9 @@ sub weekprofile_getEditLNK_MasterDev($$)
       Liste von Wochentagen getrennt durch ',' welche im Widget angzeigt werden. 
       Beginnend bei Montag. z.B.
       <code>attr name widgetWeekdays Montag,Dienstag,Mittwoch,Donnerstag,Freitag,Samstag,Sonntag</code>
+    </li>
+    <li>widgetEditDaysInRow<br>
+    Anzahl in der in einer Reihe dargestellten Tage während der Bearbeitung. Default 2.<br>
     </li>
     <li>widgetEditOnNewPage<br>
       Wenn gesetzt ('1'), dann wird die Bearbeitung auf einer separaten\neuen Webseite gestartet.
