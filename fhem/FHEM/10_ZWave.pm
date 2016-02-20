@@ -547,6 +547,7 @@ ZWave_Initialize($)
     dummy:1,0
     ignore:1,0
     noExplorerFrames:1,0
+    eventForRaw
     secure_classes
     showtime:1,0
     vclasses
@@ -3671,7 +3672,9 @@ ZWave_Parse($$@)
   # Controller commands
   my $evt;
 
-  Log3 $ioName, 4, "$ioName CMD:$cmd ID:$id ARG:$arg";
+  my $rawMsg = "CMD:$cmd ID:$id ARG:$arg"; # No fmt change, Forum #49165
+  Log3 $ioName, 4, $rawMsg;
+
   if($cmd eq 'ZW_ADD_NODE_TO_NETWORK' ||
      $cmd eq 'ZW_REMOVE_NODE_FROM_NETWORK') {
     my @vals = ("learnReady", "nodeFound", "slave",
@@ -3896,6 +3899,8 @@ ZWave_Parse($$@)
     readingsBulkUpdate($hash, "reportedState", $vv)
         if($vn eq "state");     # different from set
   }
+  readingsBulkUpdate($hash, "rawMsg", $rawMsg)
+        if(AttrVal($name, "eventForRaw", undef));
   readingsEndUpdate($hash, 1);
 
   return join("\n", @event) if($srcCmd);
@@ -4885,37 +4890,42 @@ s2Hex($)
   <b>Attributes</b>
   <ul>
     <li><a href="#IODev">IODev</a></li>
-    <li><a name="WNMI_delay">WNMI_delay</a>
+    <li><a name="WNMI_delay">WNMI_delay</a><br>
       This attribute set the time delay between the last message sent to an
       WakeUp device and the sending of the WNMI Message
       (WakeUpNoMoreInformation) that will set the device to sleep mode.  Value
       is in seconds, subseconds my be specified. Values outside of 0.2-5.0 are
       probably harmful.
       </li>
-    <li><a name="classes">classes</a>
+    <li><a name="classes">classes</a><br>
       This attribute is needed by the ZWave module, as the list of the possible
       set/get commands depends on it. It contains a space separated list of
       class names (capital letters).
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#dummy">dummy</a></li>
+    <li><a name="#eventForRaw">eventForRaw</a><br>
+      Generate an an additional event for the RAW message.  Can be used if
+      someone fears that critical notifies wont work, if FHEM changes the event
+      text after an update.  </li>
+
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#noExplorerFrames">noExplorerFrames</a>
+    <li><a href="#noExplorerFrames">noExplorerFrames</a><br>
       turn off the use of Explorer Frames
       </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><a name="secure_classes">secure_classes</a>
+    <li><a name="secure_classes">secure_classes</a><br>
       This attribute is the result of the "set DEVICE secSupportedReport"
       command. It contains a space seperated list of the the command classes
       that are supported with SECURITY.
       </li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a name="vclasses">vclasses</a>
+    <li><a name="vclasses">vclasses</a><br>
       This is the result of the "get DEVICE versionClassAll" command, and
       contains the version information for each of the supported classes.
       </li>
 
-    <li><a name="zwaveRoute">zwaveRoute</a>
+    <li><a name="zwaveRoute">zwaveRoute</a><br>
       space separated list of (ZWave) device names. They will be used in the
       given order to route messages from the controller to this device. Specify
       them in the order from the controller to the device. Do not specify the
