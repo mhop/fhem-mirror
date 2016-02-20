@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   79_BDKM: new module for Buderus KM Gateways
   - feature: 57_Calendar: get ... uid ...
   - feature  49_SSCAM: function "runPatrol" added that starts predefined 
                        patrols of PTZ-cameras,
