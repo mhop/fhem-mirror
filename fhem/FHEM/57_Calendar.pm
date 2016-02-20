@@ -1630,7 +1630,7 @@ sub Calendar_Get($@) {
 
   }
   
-  my @cmds2= qw/text full summary location description alarm start end debug/;
+  my @cmds2= qw/text full summary location description alarm start end uid debug/;
   if($cmd ~~ @cmds2) {
 
     return "argument is missing" if($#a < 2);
@@ -1692,6 +1692,7 @@ sub Calendar_Get($@) {
     
     if(@events) {
       foreach my $event (sort { $a->start() <=> $b->start() } @events) {
+        push @texts, $event->uid() if $cmd eq "uid";
         push @texts, $event->asText() if $cmd eq "text";
         push @texts, $event->asFull() if $cmd eq "full";
         push @texts, $event->asDebug() if $cmd eq "debug";
@@ -2553,6 +2554,7 @@ sub CalendarAsHtml($;$) {
     
     <table>
     <tr><th>&lt;format&gt;</th><th>content</th></tr>
+    <tr><td>uid</td><td>the UID of the event</td></tr>
     <tr><td>text</td><td>a user-friendly textual representation, best suited for display</td></tr>
     <tr><td>summary</td><td>the content of the summary field (subject, title)</td></tr>
     <tr><td>location</td><td>the content of the location field</td></tr>
@@ -2930,6 +2932,7 @@ sub CalendarAsHtml($;$) {
     
     <table>
     <tr><th>&lt;format&gt;</th><th>Inhalt</th></tr>
+    <tr><td>uid</td><td>UID des Termins</td></tr>
     <tr><td>text</td><td>Benutzer-/Monitorfreundliche Textausgabe.</td></tr>
     <tr><td>summary</td><td>&Uuml;bersicht (Betreff, Titel)</td></tr>
     <tr><td>location</td><td>Ort</td></tr>
