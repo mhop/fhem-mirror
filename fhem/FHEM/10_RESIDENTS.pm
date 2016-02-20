@@ -149,6 +149,8 @@ sub RESIDENTS_Notify($$) {
             return
               if ( !$dev->{CHANGED} ); # Some previous notify deleted the array.
 
+            readingsBeginUpdate($hash);
+
             foreach my $change ( @{ $dev->{CHANGED} } ) {
 
                 Log3 $hash, 5,
@@ -198,14 +200,16 @@ sub RESIDENTS_Notify($$) {
                     );
 
                     # update statistics
-                    readingsBeginUpdate($hash);
                     readingsBulkUpdate( $hash, "lastActivity",
                         ReadingsVal( $devName, "state", $change ) );
                     readingsBulkUpdate( $hash, "lastActivityBy",    $realname );
                     readingsBulkUpdate( $hash, "lastActivityByDev", $devName );
-                    readingsEndUpdate( $hash, 1 );
+
                 }
+
             }
+
+            readingsEndUpdate( $hash, 1 );
 
             return;
         }
@@ -552,7 +556,9 @@ sub RESIDENTS_Set($@) {
             return "No Argument given, choose one of ROOMMATE GUEST ";
         }
 
+        readingsBeginUpdate($hash);
         RESIDENTS_UpdateReadings($hash);
+        readingsEndUpdate( $hash, 1 );
     }
 
     # create
@@ -1150,8 +1156,6 @@ sub RESIDENTS_UpdateReadings (@) {
     }
 
     # update counter
-    readingsBeginUpdate($hash);
-
     readingsBulkUpdate( $hash, "residentsTotal", $state_total )
       if ( ReadingsVal( $name, "residentsTotal", "" ) ne $state_total );
 
@@ -1571,8 +1575,6 @@ sub RESIDENTS_UpdateReadings (@) {
         }
 
     }
-
-    readingsEndUpdate( $hash, 1 );
 }
 
 1;
@@ -1905,6 +1907,7 @@ sub RESIDENTS_UpdateReadings (@) {
 						<b>wakeuptimer</b> &nbsp;&nbsp;-&nbsp;&nbsp; adds a wake-up timer dummy device with enhanced functions to start with wake-up automations
 						<ul>
 							A notify device is created to be used as a Macro to carry out your actual automations. The macro is triggered by a normal at device you may customize as well. However, a special RESIDENTS Toolkit function is handling the wake-up trigger event for you.<br>
+              The time of activated wake-up timers may be relatively increased or decreased by using +<MINUTES> or -<MINUTES> respectively. +HH:MM can be used as well.<br>
 							<br>
 							The wake-up behaviour may be influenced by the following device attributes:<br>
 							<li>
@@ -2273,6 +2276,7 @@ sub RESIDENTS_UpdateReadings (@) {
 						<b>wakeuptimer</b> &nbsp;&nbsp;-&nbsp;&nbsp; f&uuml;gt ein Dummy Ger&auml;t mit erweiterten Funktionen als Wecker hinzu, um darauf Weck-Automationen aufzubauen.
 						<ul>
 							Ein notify Ger&auml;t wird als Makro erstellt, um die eigentliche Automation auszuf&uuml;hren. Das Makro wird durch ein normales at-Ger&auml;t ausgel&ouml;st und kann ebenfalls angepasst werden. Die Hauptfunktion wird dabei trotzdem von einer speziellen RESIDENTS Toolkit funktion gehandhabt.<br>
+              Die Zeit aktiver Wecker kann mittels +<MINUTEN> oder -<MINUTEN> relativ erh&ouml;ht bzw. verringert werden. Die Angabe als +HH:MM ist auch m&ouml;glich.<br>
 							<br>
 							Die Weckfunktion kann wie folgt &uuml;ber Attribute beinflusst werden:<br>
 							<li>
