@@ -571,6 +571,9 @@ function FW_weekprofileEditWeek(widget)
   var table = widget.CONTENT; 
   var daysInRow = 2;
   
+  if (widget.EDIT_DAYSINROW)
+    daysInRow = widget.EDIT_DAYSINROW;
+    
   $(table).append('<tr>');
   var tr = $(table).find("tr:last");
   
@@ -789,10 +792,11 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   for (var i = 1; i < vArr.length; ++i) {
     var arg = vArr[i].split(':');
     switch (arg[0]) {
-      case "MODE":      widget.MODE = arg[1];       break;
-      case "JMPBACK":   widget.JMPBACK = arg[1];    break;
-      case "MASTERDEV": widget.MASTERDEV = arg[1];  break;
-      case "USETOPICS": widget.USETOPICS = arg[1];  break;
+      case "MODE":      widget.MODE = arg[1];           break;
+      case "JMPBACK":   widget.JMPBACK = arg[1];        break;
+      case "MASTERDEV": widget.MASTERDEV = arg[1];      break;
+      case "USETOPICS": widget.USETOPICS = arg[1];      break;
+      case "DAYINROW":  widget.EDIT_DAYSINROW = arg[1]; break;
     }
   }
   
