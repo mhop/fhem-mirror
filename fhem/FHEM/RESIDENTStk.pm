@@ -42,7 +42,7 @@ sub RESIDENTStk_wakeupSet($$) {
     my @notify = split / /, $notifyValue;
     if (
         lc( $notify[0] ) !~
-        /^(off|nextrun|trigger|start|stop|end|reset|auto|([0-9]{2}:[0-9]{2}))$/
+/^(off|nextrun|trigger|start|stop|end|reset|auto|[\+\-][1-9]*[0-9]*|[\+\-]?[0-9]{2}:[0-9]{2})$/
       )
     {
         Log3 $NAME, 5,
@@ -801,10 +801,22 @@ if (\$EVTPART0 eq \"stop\") {\
     }
 
     # set new wakeup value
-    elsif (( lc($VALUE) eq "off" || $VALUE =~ /^([0-9]{2}:[0-9]{2})$/ )
+    elsif (
+        (
+               lc($VALUE) eq "off"
+            || $VALUE =~ /^[\+\-][1-9]*[0-9]*$/
+            || $VALUE =~ /^[\+\-]?([0-9]{2}):([0-9]{2})$/
+        )
         && defined( $defs{$wakeupAtdevice} )
-        && $defs{$wakeupAtdevice}{TYPE} eq "at" )
+        && $defs{$wakeupAtdevice}{TYPE} eq "at"
+      )
     {
+
+        if ( $VALUE =~ /^[\+\-]/ ) {
+            $VALUE =
+              RESIDENTStk_TimeSum( ReadingsVal( $NAME, "nextRun", 0 ), $VALUE );
+        }
+
         # Update wakeuptimer device
         #
         readingsBeginUpdate( $defs{$NAME} );
@@ -1565,6 +1577,43 @@ sub RESIDENTStk_wakeupGetNext($) {
 # GENERAL FUNCTIONS USED IN RESIDENTS, ROOMMATE, GUEST
 #------------------------------------
 #
+
+#
+# Make a summary of two time designations
+#
+sub RESIDENTStk_TimeSum($$) {
+    my ( $val1, $val2 ) = @_;
+    my ( $timestamp1, $timestamp2, $math );
+
+    if ( $val1 !~ /^([0-9]{2}):([0-9]{2})$/ ) {
+        return $val1;
+    }
+    else {
+        $timestamp1 = RESIDENTStk_time2sec($val1);
+    }
+
+    if ( $val2 =~ /^([\+\-])([0-9]{2}):([0-9]{2})$/ ) {
+        $math       = $1;
+        $timestamp2 = RESIDENTStk_time2sec("$2:$3");
+    }
+    elsif ( $val2 =~ /^([\+\-])([0-9]*)$/ ) {
+        $math       = $1;
+        $timestamp2 = $2 * 60;
+    }
+    else {
+        return $val1;
+    }
+
+    if ( $math eq "-" ) {
+        return
+          substr( RESIDENTStk_sec2time( $timestamp1 - $timestamp2 ), 0, -3 );
+    }
+    else {
+        return
+          substr( RESIDENTStk_sec2time( $timestamp1 + $timestamp2 ), 0, -3 );
+    }
+
+}
 
 sub RESIDENTStk_TimeDiff ($$;$) {
     my ( $datetimeNow, $datetimeOld, $format ) = @_;
