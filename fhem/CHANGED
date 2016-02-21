@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: TimeSeries: median, holdtime for event-aggregator 
   - feature: 57_CALVIEW: added internal notify-fn for calendar-devices,
                          added attr disable for internal notify-fn,
                          removed ts state and started_* reading,

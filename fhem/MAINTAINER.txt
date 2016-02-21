@@ -365,7 +365,7 @@ FHEM/SHC_datafields.pm       rr2000               http://forum.fhem.de Sonstige 
 FHEM/SHC_parser.pm           rr2000               http://forum.fhem.de Sonstige Systeme
 FHEM/SubProcess.pm           borisneubert         http://forum.fhem.de FHEM Development
 FHEM/TcpServerUtils.pm       rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/TimeSeries.pm           borisneubert         http://forum.fhem.de FHEM Development
+FHEM/TimeSeries.pm           borisneubert/jensb   http://forum.fhem.de FHEM Development
 FHEM/lib/Device/Firmata/*    ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/lib/Device/MySensors/*  ntruchsess           http://forum.fhem.de Sonstige Systeme
 FHEM/lib/MP3/*               Reinerlein           http://forum.fhem.de Multimedia
