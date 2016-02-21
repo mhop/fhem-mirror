@@ -27,10 +27,12 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.18.1 21.02.2016    fixed a problem that the state is "disable" instead of
+#                      "disabled" if a camera is disabled and FHEM will be restarted
 # 1.18   20.02.2016    function "get ... eventlist" added,
 #                      Reading "CamEventNum" added which containes total number of
 #                      camera events,
-#                      change usage of reading "LastUpdateTime"
+#                      change usage of reading "LastUpdateTime" 
 # 1.17   19.02.2016    function "runPatrol" added that starts predefined patrols
 #                      of PTZ-cameras,
 #                      Reading "CamDetMotSc" added
@@ -162,6 +164,7 @@ sub SSCam_Define {
   $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
   $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
+  $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";
   
   # Startwerte setzen
   $attr{$name}{webCmd}                 = "on:off:snap:enable:disable";                            # initiale Webkommandos setzen
@@ -249,6 +252,7 @@ sub SSCam_Set {
                    "snap ".
                    "enable ".
                    "disable ".
+                   # "runLiveview ".
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                    ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
@@ -377,7 +381,12 @@ sub SSCam_Set {
             
             $hash->{HELPER}{PTZACTION}  = "movestart";
             doptzaction($hash);
-        }  
+        }
+        elsif ($opt eq "runLiveview") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            runliveview($hash);
+        }
         else  
         {
             return $setlist;
@@ -930,6 +939,60 @@ sub camsnap ($) {
 }
 
 ###############################################################################
+###   Kamera Liveview starten
+
+sub runliveview ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    my $errorcode;
+    my $error;
+    
+    if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
+        if (ReadingsVal("$name", "state", "") eq "disabled") {
+            $errorcode = "402";
+            }
+            elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
+            $errorcode = "502";
+            }
+        
+        # Fehlertext zum Errorcode ermitteln
+        $error = &experror($hash,$errorcode);
+
+        # Setreading 
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash,"Errorcode",$errorcode);
+        readingsBulkUpdate($hash,"Error",$error);
+        readingsEndUpdate($hash, 1);
+    
+        $logstr = "ERROR - Liveview of Camera $camname can't be started - $error" ;
+        &printlog($hash,$logstr,"1");
+        return;
+        }
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        # Liveview starten
+        $logstr = "Start Liveview of Camera $camname";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "runliveview";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
+        &getapisites_nonbl($hash);
+    }
+    else
+    {
+        InternalTimer(gettimeofday()+0.23, "runliveview", $hash, 0);
+    }    
+}
+
+###############################################################################
 ###   Filename zu Schappschuß ermitteln
 
 sub getsnapfilename ($) {
@@ -1476,6 +1539,7 @@ sub getapisites_nonbl {
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
+   my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
    my $logstr;
    my $url;
    my $param;
@@ -1492,7 +1556,7 @@ sub getapisites_nonbl {
    &printlog($hash,$logstr,"5");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm";
 
    $logstr = "Call-Out now: $url";
    &printlog($hash,$logstr,"4");    
@@ -1530,6 +1594,7 @@ sub login_nonbl ($) {
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
+   my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
    my $data;
    my $logstr;
    my $url;
@@ -1550,6 +1615,8 @@ sub login_nonbl ($) {
    my $apicameventmaxver;
    my $apieventpath;
    my $apieventmaxver;
+   my $apivideostmpath;
+   my $apivideostmmaxver;
    my $error;
    my $httptimeout;
   
@@ -1695,6 +1762,18 @@ sub login_nonbl ($) {
                         &printlog($hash, $logstr,"4");
                         $logstr = defined($apieventmaxver) ? "MaxVersion of $apievent: $apieventmaxver" : "MaxVersion of $apievent undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4"); 
+                        
+                     # Pfad und Maxversion von "SYNO.Surveillance.VideoStream" ermitteln
+              
+                        $apivideostmpath = $data->{'data'}->{$apivideostm}->{'path'};
+                        # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+                        $apivideostmpath =~ tr/_//d if (defined($apivideostmpath));
+                        $apivideostmmaxver = $data->{'data'}->{$apivideostm}->{'maxVersion'};
+                            
+                        $logstr = defined($apivideostmpath) ? "Path of $apivideostm selected: $apivideostmpath" : "Path of $apivideostm undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
+                        $logstr = defined($apivideostmmaxver) ? "MaxVersion of $apivideostm: $apivideostmmaxver" : "MaxVersion of $apivideostm undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4"); 
        
                         # ermittelte Werte in $hash einfügen
                         $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
@@ -1713,6 +1792,8 @@ sub login_nonbl ($) {
                         $hash->{HELPER}{APICAMEVENTMAXVER} = $apicameventmaxver;
                         $hash->{HELPER}{APIEVENTPATH}      = $apieventpath;
                         $hash->{HELPER}{APIEVENTMAXVER}    = $apieventmaxver;
+                        $hash->{HELPER}{APIVIDEOSTMPATH}   = $apivideostmpath;
+                        $hash->{HELPER}{APIVIDEOSTMMAXVER} = $apivideostmmaxver;
        
                         # Setreading 
                         readingsBeginUpdate($hash);
@@ -1990,6 +2071,9 @@ sub camop_nonbl ($) {
    my $apievent          = $hash->{HELPER}{APIEVENT};
    my $apieventpath      = $hash->{HELPER}{APIEVENTPATH};
    my $apieventmaxver    = $hash->{HELPER}{APIEVENTMAXVER};
+   my $apivideostm       = $hash->{HELPER}{APIVIDEOSTM};
+   my $apivideostmpath   = $hash->{HELPER}{APIVIDEOSTMPATH};
+   my $apivideostmmaxver = $hash->{HELPER}{APIVIDEOSTMMAXVER};
    my $sid               = $hash->{HELPER}{SID};
    my $OpMode            = $hash->{OPMODE};
    my $url;
@@ -2147,6 +2231,7 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "runpatrol")
    {
+      # eine Überwachungstour starten
       $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"RunPatrol\"&patrolId=\"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0);
    }
@@ -2228,6 +2313,10 @@ sub camop_nonbl ($) {
    elsif ($OpMode eq "getmotionenum")
    {
       $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
+   }
+   elsif ($OpMode eq "runliveview")
+   {
+      $url = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=\"$apivideostm\"&version=\"$apivideostmmaxver\"&method=\"Stream\"&cameraId=\"$camid\"&format=\"mjpeg\"&_sid=\"$sid\"";   
    }
    
    $logstr = "Call-Out now: $url";
@@ -2385,6 +2474,20 @@ sub camret_nonbl ($) {
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
+            elsif ($OpMode eq "runliveview") 
+            {              
+                # Setreading 
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate($hash,"Errorcode","none");
+                readingsBulkUpdate($hash,"Error","none");
+                readingsEndUpdate($hash, 1);
+       
+                # Logausgabe
+                $logstr = "Camera $camname liveview was started successfully";
+                &printlog($hash,$logstr,"3");
+                $logstr = "--- End Function cam: $OpMode nonblocking ---";
+                &printlog($hash,$logstr,"4");
+            }            
             elsif ($OpMode eq "MotDetSc") 
             {              
                 # Setreading 
@@ -2690,7 +2793,7 @@ sub camret_nonbl ($) {
                     }
                     elsif ($camStatus eq "7") {
                     $camStatus = "disabled";
-                    readingsSingleUpdate($hash,"state", "disable ", 0); 
+                    readingsSingleUpdate($hash,"state", "disabled ", 0); 
                     }
                     else {
                     $camStatus = "other";
@@ -3266,7 +3369,7 @@ sub experrorauth {
   403 => "One time password not specified",
   404 => "One time password authenticate failed",
   );
-  unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle oben ermitteln
   $error = $errorlist {$errorcode};
@@ -3314,7 +3417,7 @@ sub experror {
   502 => "Camera disconnected",
   600 => "Presetname and PresetID not found in Hash",
   );
-  unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorcode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
 
   # Fehlertext aus Hash-Tabelle oben ermitteln
   $error = $errorlist {$errorcode};
@@ -4220,14 +4323,14 @@ return;
 
   Das Bogenmaß von 360 Grad teilt sich durch den Wert von "CapPTZDirections" und beschreibt die Bewegungsrichtungen beginnend mit "0=rechts" entgegen dem 
   Uhrzeigersinn. D.h. bei einer Kamera mit "CapPTZDirections = 8" bedeutet dir_0 = rechts, dir_2 = oben, dir_4 = links, dir_6 = unten bzw. dir_1, dir_3, dir_5 und dir_7 
-  die entsprechenden Zwischenrichtungen. Die möglichen Bewegungsrichtungen bei Kameras mit "CapPTZDirections = 32" sind dementsprechend kleinteliger. <br><br>
+  die entsprechenden Zwischenrichtungen. Die möglichen Bewegungsrichtungen bei Kameras mit "CapPTZDirections = 32" sind dementsprechend kleinteiliger. <br><br>
 
   Im Gegensatz zum "set &lt;name&gt; goAbsPTZ"-Befehl startet der Befehl "set &lt;name&gt; move" eine kontinuierliche Bewegung bis ein Stop-Kommando empfangen wird. 
   Das Stop-Kommando wird nach Ablauf der optional anzugebenden Zeit [Sekunden] ausgelöst. Wird diese Laufzeit nicht angegeben, wird implizit Sekunde = 1 gesetzt. <br><br>
   
   Beispiele: <br>
   
-  <pre>
+  <pre> 
     set &lt;name&gt; move up 0.5      : bewegt PTZ 0,5 Sek. (zzgl. Prozesszeit) nach oben
     set &lt;name&gt; move dir_1 1.5   : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach rechts-oben 
     set &lt;name&gt; move dir_20 0.7  : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach links-unten ("CapPTZDirections = 32)"

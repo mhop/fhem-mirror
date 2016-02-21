@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix   49_SSCam: fixed a problem that the state is "disable" instead of
+                       "disabled" if a camera is disabled and FHEM will be 
+                       restarted
   - feature: 98_weekprofile: attribute widgetEditDaysInRow to control 
                              visible days in one row
   - feature  49_SSCAM: function "get ... eventlist" added,
