@@ -4437,12 +4437,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "brightAuto") { ###############################################
     my (undef,undef,$bright,$colProg,$min,$max,$duration,$ramp) = @a; #date prepared extention to entdate
     return "please enter the duration in seconds"
-          if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
-    my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
-    $ramp = CUL_HM_encodeTime16($ramp);
+          if (defined $duration && $duration !~ m/^[+-]?\d+(\.\d+)?$/);
+    return "at least bright and colorprogramm need to be set" if (!defined $colProg);
+    
+    my $tval;
+    $tval = (!defined $duration) ? "" : CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
+    $ramp = (!defined $ramp)     ? "" : CUL_HM_encodeTime16($ramp)    ;
+    $min  = (!defined $min)      ? "" : sprintf("%02X",$min)          ;
+    $max  = (!defined $max)      ? "" : sprintf("%02X",$max)          ;
 
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
-                           sprintf("%02X%02X%02X%02X",$bright,$colProg,$min,$max).$ramp.$tval);
+                           sprintf("%02X%02X",$bright,$colProg).$min.$max.$ramp.$tval);
   }
   elsif($cmd eq "playTone") { #################################################
     my $msg;
