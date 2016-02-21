@@ -37,6 +37,13 @@
 #     23.07.2015 Jens Beyer (jensb at forum dot fhem dot de)
 #       new: method getValue
 #
+#     24.01.2016 knxhm at forum dot fhem dot de & Jens Beyer (jensb at forum dot fhem dot de)
+#       new: property median (out)
+#
+#     29.01.2016 Jens Beyer (jensb at forum dot fhem dot de)
+#       modified: method elapsed reverted to version from 2015-01-31 to provide downsampling and buffering through fhem.pl
+#       modified: method _housekeeping does not reset time series if hold time is specified
+#
 ##############################################################################
 
 package TimeSeries;
@@ -89,7 +96,8 @@ sub new() {
     n => 0,		# size of sample (non time weighted) or number of intervals (time weighted)
     mean => undef,	# arithmetic mean of values
     sd => undef,	# standard deviation of values
-    integral => undef,  # integral area of all values in the series 
+    integral => undef,  # sum (holdTime undefined) or integral area (holdTime defined) of all values
+    median => undef, # median of all values (method must be "none" and holdTime must be defined)
     _t0 => undef,	# same as t0; moved to _t on reset
     _t => undef,	# same as t but survives a reset
     _v => undef,	# same as v but survives a reset
@@ -112,6 +120,7 @@ sub reset() {
   $self->{mean}= undef;	
   $self->{sd}= undef;	
   $self->{integral}= 0;	
+  $self->{median}= undef;	
   $self->{_M}= undef;	
   $self->{_S}= undef;
   $self->{_t0}= $self->{_t};
@@ -248,21 +257,12 @@ sub _updatestat($$) {
 }  
   
 #
-# has autoreset or holdTime period elapsed?
+# has autoreset period elapsed?
+# used by fhem.pl for downsampling
 #
 sub elapsed($$) {
   my ($self, $t)= @_;
-  
-  my $duration;
-  if (defined($self->{autoreset})) { 
-    $duration = $self->{autoreset};
-    #main::Debug("TimeSeries::elapsed: autoreset=$duration\n");
-  } elsif (defined($self->{holdTime})) { 
-    $duration = $self->{holdTime};
-    #main::Debug("TimeSeries::elapsed: holdTime=$duration\n");
-  }
-  
-  return defined($duration) && defined($self->{_t0}) && ($t - $self->{_t0} >= $duration);
+  return defined($self->{autoreset}) && defined($self->{_t0}) && ($t - $self->{_t0} >= $self->{autoreset});
 }
 
 #
@@ -271,14 +271,12 @@ sub elapsed($$) {
 sub _housekeeping($) {
   my ($self, $t)= @_;
 
-  if ($self->elapsed($t)) {
-    if (defined($self->{autoreset})) {
-      #main::Debug("TimeSeries::_housekeeping: reset\n");
-      $self->reset(); 
-    } else { 
-      #main::Debug("TimeSeries::_housekeeping: trimToHoldTime\n");
-      $self->trimToHoldTime();
-    }
+  if($self->elapsed($t) && !defined($self->{holdTime})) {
+    #main::Debug("TimeSeries::_housekeeping: reset\n");
+    $self->reset(); 
+  } elsif(defined($self->{holdTime}) && defined($self->{_t0}) && ($t - $self->{_t0} >= $self->{holdTime})) { 
+    #main::Debug("TimeSeries::_housekeeping: trimToHoldTime\n");
+    $self->trimToHoldTime();
   } 
 }
 
@@ -312,6 +310,17 @@ sub add($$$) {
   if($self->{method} eq "none") {
     # no time-weighting
     $self->_updatestat($v);
+    
+    # median
+    if(defined($self->{holdTime})) {    
+      my @sortedVSeries = sort {$TimeSeries::a <=> $TimeSeries::b} @{$self->{vSeries}}; 
+      my $center = int($self->{count} / 2);
+      if($self->{count} % 2 == 0) {
+        $self->{median} = ($sortedVSeries[$center - 1] + $sortedVSeries[$center]) / 2;
+      } else {
+        $self->{median} = $sortedVSeries[$center];
+      }
+    }
   } else {
     # time-weighting
     if(defined($self->{_t})) {
@@ -356,6 +365,7 @@ sub add($$$) {
       $self->{sd}= sqrt($self->{_S}/ ($n-1)) / $T if($n> 1); 
     }  
   }
+
   #main::Debug(Dumper($self)); ###  
 }
 
@@ -425,6 +435,7 @@ sub selftest() {
   if ($tsb->{mean} != 1.0)     { $success = 0; main::Debug("unweighed block autoreset test failed: mean mismatch $tsb->{mean}/1.0\n"); }
   if (!defined($tsb->{sd}) || $tsb->{sd} ne "0.4") { $success = 0; main::Debug("unweighed block autoreset test failed: sd mismatch $tsb->{sd}/0.4\n"); }
   if ($tsb->{integral} != 2.0) { $success = 0; main::Debug("unweighed block autoreset test failed: sum mismatch $tsb->{integral}/2.0\n"); }
+
   $tsb->reset();
   $tsb->{_t0} = undef;
   $tsb->{_t} = undef;
@@ -465,6 +476,7 @@ sub selftest() {
   if ($tsm->{mean} != 1.0)     { $success = 0; main::Debug("unweighed moving add test failed: mean mismatch $tsm->{mean}/1.0\n"); }
   if (!defined($tsm->{sd}) || $tsm->{sd} ne sqrt(0.13/2)) { $success = 0; main::Debug("unweighed moving add test failed: sd mismatch $tsm->{sd}/0.254950975679639\n"); }
   if ($tsm->{integral} != 3.0) { $success = 0; main::Debug("unweighed moving add test failed: sum mismatch $tsm->{integral}/3.0\n"); }
+  if ($tsm->{median} != 1.0)   { $success = 0; main::Debug("unweighed moving add test failed: median mismatch $tsm->{median}/1.0\n"); }
   sleep(3);  
   $tsm->add($now+1, 1.0);
   $tsm->add($now+2, 0.8);
@@ -480,6 +492,8 @@ sub selftest() {
   if ($tsm->{mean} != 1.0)     { $success = 0; main::Debug("unweighed moving holdTime test failed: mean mismatch $tsm->{mean}/1.0\n"); }
   if (!defined($tsm->{sd}) || $tsm->{sd} ne sqrt(0.13/2)) { $success = 0; main::Debug("unweighed moving holdTime test failed: sd mismatch $tsm->{sd}/0.254950975679639\n"); }
   if ($tsm->{integral} != 3.0) { $success = 0; main::Debug("unweighed moving holdTime test failed: sum mismatch $tsm->{integral}/3.0\n"); }
+  if ($tsm->{median} != 1.0)   { $success = 0; main::Debug("unweighed block autoreset test failed: median mismatch $tsm->{median}/1.0\n"); }
+
   $tsm->reset();
   $tsm->{method} = 'const';
   $tsm->{holdTime} = 5;
@@ -546,7 +560,7 @@ B<TimeSeries> is a perl module to feed time/value data points and get some stati
       
   Mean, standard deviation and integral calculation also depends on the property method. You may choose from
   none (no time weighting), const (time weighted, step) or linear (time weighted, linear interpolation).
-      
+  
   The statistics may be reset manually using
   $ts->reset();
   
@@ -557,6 +571,8 @@ B<TimeSeries> is a perl module to feed time/value data points and get some stati
   re-evaluated each time a data point is added. Note that this may require significant amounts
   of memory depending on the sample rate and the holdTime.
   
+  If method is none and holdtime is defined then the median of the values will be calculated additionally.
+      
   It is also possible to define autoreset and holdtime at the same time. In this case the data buffer 
   is enabled and will be cleared each time an autoreset occurs, independent of the value of holdtime.
       
