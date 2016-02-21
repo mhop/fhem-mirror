@@ -4056,13 +4056,13 @@ readingsBulkUpdate($$$@)
                   ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attraggr"}};
     if(@v) {
       # e.g. power:20:linear:avg
-      my (undef, $duration, $method, $function) = split(":", $v[0], 4);
+      my (undef, $duration, $method, $function, $holdTime) = split(":", $v[0], 5);
       my $ts;
       if(defined($readings->{".ts"})) {
         $ts= $readings->{".ts"};
       } else {
         require "TimeSeries.pm";
-        $ts= TimeSeries->new( { method => $method, autoreset => $duration } );
+        $ts= TimeSeries->new( { method => $method, autoreset => $duration, holdTime => $holdTime } );
         $readings->{".ts"}= $ts;
         # access from command line:
         # { $defs{"myClient"}{READINGS}{"myValue"}{".ts"}{max} }

@@ -456,10 +456,10 @@ Ger&auml;t dokumentiert.
     readings over time periods and to throttle the update rate of readings and thus 
     the amount of data written to the logs.<p>
 
-    This attribute takes a comma-separated list of <code>reading:interval:method:function</code>
-    quadruples. You may use regular expressions for <code>reading</code>. If set, updates for the 
+    This attribute takes a comma-separated list of <code>reading:interval:method:function:holdTime</code>
+    quintuples. You may use regular expressions for <code>reading</code>. If set, updates for the 
     listed readings are ignored and associated events are suppressed for a black-out period of at 
-    least <code>interval</code> seconds.  After the black-out period has expired, the reading is 
+    least <code>interval</code> seconds (downsampling). After the black-out period has expired, the reading is 
     updated with a value that is calculated from the values and timestamps of the previously ignored 
     updates within the black-out period as follows: 
     
@@ -471,7 +471,11 @@ Ger&auml;t dokumentiert.
     <tr><td>max</td><td>the largest value encountered</td></tr>
     <tr><td>mean</td><td>the arithmetic mean of all values</td></tr>
     <tr><td>sd</td><td>the standard deviation from the mean</td></tr>
+    <tr><td>median</td><td>the median of all values (requires holdTime and function none)</td></tr>
     <tr><td>integral</td><td>the arithmetic sum (if not time-weighted) or integral area (if time-weighted) of all values</td></tr>
+    <tr><td>n</td><td>number of samples</td></tr>
+    <tr><td>t</td><td>timestamp of the last value</td></tr>
+    <tr><td>t0</td><td>timestamp of the first value</td></tr>
     </table>
     <p>
 
@@ -489,14 +493,26 @@ Ger&auml;t dokumentiert.
     the <code>none</code> method with the <code>v</code> function is used. The <code>constant</code> 
     method is for discrete quantities that stay constant until the corresponding reading is updated, 
     e.g. counters, switches and the like.<p>
-
+    
+    If the <code>holdTime</code> in seconds is defined, the samples will be kept in memory allowing
+    the calculation of floating statistics instead of blocked statistics. With <code>holdTime</code>
+    defined the <code>interval</code> can be kept undefined so that the readings update rate is unchanged
+    or it can be set to a value less then <code>holdTime</code> for downsampling as described above 
+    with a full history of the readings in memory. Note that the historic samples are not persistent 
+    and will be lost when restarting FHEM.<p>
+    
     The event aggregator only takes into consideration those updates that remain after preprocessing 
     according to the <code>event-on-update-reading</code> and <code>event-on-change-reading</code> 
     directives. Besides which, any update of a reading that occurs within a timespan from the preceding 
     update that is smaller than the resolution of FHEM's time granularity is ditched.<p>
+    
+    When more than one function should be calculated for the same reading, the original reading must be
+    multiplied (e.g. by using a notify) before applying the event-aggregator to the derived readings.<p>
 
-    Example:<br>
-    <code>attr myPowerMeter event-aggregator EP_POWER_METER:300:linear:mean,EP_ENERGY_METER:300:none:v</code>
+    Examples:<br>
+    <code>attr myPowerMeter event-aggregator EP_POWER_METER:300:linear:mean,EP_ENERGY_METER:300:none:v</code><br>
+    <code>attr myBadSensor event-aggregator TEMP::none:median:300</code><br>
+    <code>attr mySunMeter event-aggregator SUN_INTENSITY_24H::const:integral:86400</code>
     </li>
     
     <a name="event-min-interval"></a>
