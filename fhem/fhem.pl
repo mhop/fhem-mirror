@@ -2479,8 +2479,7 @@ CommandAttr($$)
       # matches myReading1[:trigger2] { codecode1 }
       my $regexi= '\s*([\w.-]+)(:\S*)?\s+((\w+)\s+)?({.*?})\s*';
       my $regexo= '^(' . $regexi . ')(,\s*(.*))*$';
-
-      #Log 1, "arg is $arg";
+      my $rNo=0;
 
       while($arg =~ /$regexo/s) {
         my $userReading= $2;
@@ -2495,6 +2494,7 @@ CommandAttr($$)
           $userReadings{$userReading}{trigger}= $trigger;
           $userReadings{$userReading}{modifier}= $modifier;
           $userReadings{$userReading}{perlCode}= $perlCode;
+          $userReadings{$userReading}{readingNo}= $rNo++;
         } else {
           push @rets, "$sdev: unknown modifier $modifier for ".
                 "userReading $userReading, this userReading will be ignored";
@@ -3870,7 +3870,9 @@ readingsEndUpdate($$)
   # process user readings
   if(defined($hash->{'.userReadings'})) {
     my %userReadings= %{$hash->{'.userReadings'}};
-    foreach my $userReading (keys %userReadings) {
+    foreach my $userReading (sort { $userReadings{$a}{readingNo} <=> 
+                                    $userReadings{$b}{readingNo} }
+                             keys %userReadings) {
 
       my $trigger = $userReadings{$userReading}{trigger};
       if(defined($trigger)) {
