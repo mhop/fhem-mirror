@@ -32,6 +32,7 @@ sub HMinfo_Initialize($$) {####################################################
                        ."hmAutoReadScan hmIoMaxDly "
                        ."hmManualOper:0_auto,1_manual "
                        ."configDir configFilename configTempFile "
+                       ."hmDefaults "
                        .$readingFnAttributes;
 
 }
@@ -145,6 +146,34 @@ sub HMinfo_Attr(@) {###########################################################
       delete $attr{$name}{configTempFile};
     }
     HMinfo_listOfTempTemplates();
+  }
+  elsif($attrName eq "hmDefaults"){
+    if ($cmd eq "set"){
+      delete $modules{CUL_HM}{AttrListDef};
+      my @defpara = ( "hmProtocolEvents"
+                     ,"rssiLog"         
+                     ,"autoReadReg"
+                     ,"msgRepeat"
+                     ,"expert"
+                     ,"actAutoTry"
+                     );
+      my %culAH;
+      foreach (split" ",$modules{CUL_HM}{AttrList}){
+        my ($p,$v) = split(":",$_);
+        $culAH{$p} = ",$v,";
+      }
+      
+      foreach (split(",",$attrVal)){
+        my ($para,$val) = split(":",$_,2);
+        return "no value defined for $para" if (!defined "val");
+        return "param $para not allowed" if (!grep /$para/,@defpara);
+        return "param $para :$val not allowed, use $culAH{$para}" if ($culAH{$para} !~ m/,$val,/);
+        $modules{CUL_HM}{AttrListDef}{$para} = $val;
+      } 
+    }
+    else{
+      delete $modules{CUL_HM}{AttrListDef};
+    }
   }
   return;
 }
@@ -392,6 +421,7 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsNoPeer;
   my @peerIDsTrigUnp;
   my @peerIDsTrigUnd;
+  my @peerIDsTeamRT;
   my @peeringStrange; # devices likely should not be peered 
   my @peerIDsAES;
   foreach my $eName (@entities){
@@ -463,7 +493,12 @@ sub HMinfo_peerCheck(@) { #####################################################
             elsif($chn eq "04"){
               # compare templist template are identical and boost is same
               my $rtCn = CUL_HM_id2Name(substr($pId,0,6)."04");
-              Log 1,"General $eName peered with $rtCn rt/rt";
+              my $ob = CUL_HM_Get($defs{$eName},$eName,"regVal","boostPeriod");
+              my $pb = CUL_HM_Get($defs{$rtCn} ,$rtCn ,"regVal","boostPeriod");
+              my $ot = AttrVal($eName,"tempListTmpl","--");
+              my $pt = AttrVal($rtCn ,"tempListTmpl","--");
+              push @peerIDsTeamRT,$eName." team:$rtCn  boost differ  $ob / $pb"        if ($ob ne $pb);
+              push @peerIDsTeamRT,$eName." team:$rtCn  tempListTmpl differ  $ot / $pt" if ($ot ne $pt);
             }
           }
           elsif($chn eq "02"){
@@ -480,7 +515,12 @@ sub HMinfo_peerCheck(@) { #####################################################
             else{
               # compare templist template are identical and boost is same
               my $rtCn = CUL_HM_id2Name(substr($pId,0,6)."04");
-              Log 1,"General $eName peered with $rtCn tc/rt";
+              my $ob = CUL_HM_Get($defs{$eName},$eName,"regVal","boostPeriod");
+              my $pb = CUL_HM_Get($defs{$rtCn} ,$rtCn ,"regVal","boostPeriod");
+              my $ot = AttrVal($eName,"tempListTmpl","--");
+              my $pt = AttrVal($rtCn ,"tempListTmpl","--");
+              push @peerIDsTeamRT,$eName." team:$rtCn  boost differ $ob / $pb" if ($ob ne $pb);
+              push @peerIDsTeamRT,$eName." team:$rtCn  tempListTmpl differ $ot / $pt" if ($ot ne $pt);
             }
           }
         }
@@ -495,6 +535,7 @@ sub HMinfo_peerCheck(@) { #####################################################
   $ret .="\n\n trigger sent to unpeered device"                        ."\n    ".(join "\n    ",sort @peerIDsTrigUnp)if(@peerIDsTrigUnp);
   $ret .="\n\n trigger sent to undefined device"                       ."\n    ".(join "\n    ",sort @peerIDsTrigUnd)if(@peerIDsTrigUnd);
   $ret .="\n\n aesComReq set but virtual peer is not vccu - won't work"."\n    ".(join "\n    ",sort @peerIDsAES    )if(@peerIDsAES);
+  $ret .="\n\n boost or template differ in team"                       ."\n    ".(join "\n    ",sort @peerIDsTeamRT )if(@peerIDsTeamRT);
   
   return  $ret;
 }
@@ -2919,14 +2960,20 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        <a ref="#HMinfoloadConfig">loadConfig</a><br>
        <a ref="#HMinfoverifyConfig">verifyConfig</a><br>
      </li>
-    <li><a name="#HMinfoconfigTempFile">configTempFile&lt;,configTempFile2&gt;&lt;,configTempFile2&gt; </a>
+     <li><a name="#HMinfoconfigTempFile">configTempFile&lt;,configTempFile2&gt;&lt;,configTempFile2&gt; </a>
         Liste of Templfiles (weekplan) which are considered in HMInfo and CUL_HM<br>
         Files are comma separated. The first file is default. Its name may be skipped when setting a tempalte.<br>
-    </li>
+     </li>
      <li><a name="#HMinfohmManualOper">hmManualOper</a>
        set to 1 will prevent any automatic operation, update or default settings
        in CUL_HM.<br>
      </li>
+     <li><a name="#HMinfohmDefaults">hmDefaults</a>
+       set default params for HM devices. Multiple attributes are possible, comma separated.<br>
+       example:<br>
+       attr hm hmDefaults hmProtocolEvents:0_off,rssiLog:0<br>
+     </li>
+     
 
    </ul>
    <br>
@@ -3351,6 +3398,11 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
     </li>
     <li><a name="#HMinfohmManualOper">hmManualOper</a>
         auf 1 gesetzt, verhindert dieses Attribut jede automatische Aktion oder Aktualisierung seitens CUL_HM.<br>
+    </li>
+    <li><a name="#HMinfohmDefaults">hmDefaults</a>
+       setzt default Atribute fuer HM devices. Mehrere Attribute sind moeglich, Komma separiert.<br>
+       Beispiel:<br>
+       attr hm hmDefaults hmProtocolEvents:0_off,rssiLog:0<br>
     </li>
 
    </ul>

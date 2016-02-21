@@ -144,7 +144,6 @@ sub CUL_HM_Initialize($) {
 
   $hash->{Attr}{dev} =  "ignore:1,0 dummy:1,0 "  # -- device only attributes
                        ."IODev IOList IOgrp "        
-                       ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        ."actCycle "            # also for action detector    
                        ."hmKey hmKey2 hmKey3 "                       
@@ -8172,7 +8171,8 @@ sub CUL_HM_getAttr($$$){#return attrValue - consider device if empty
       my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
       $val = (defined $attr{$devN}{$attrName})
                  ? $attr{$devN}{$attrName}
-                 : $default;
+                 : ($modules{CUL_HM}{AttrListDef} && $modules{CUL_HM}{AttrListDef}{$attrName})?$modules{CUL_HM}{AttrListDef}{$attrName}
+                 :$default;
     }
   }
   return $val;
@@ -8180,9 +8180,16 @@ sub CUL_HM_getAttr($$$){#return attrValue - consider device if empty
 sub CUL_HM_getAttrInt($@){#return attrValue as integer
   my ($name,$attrName,$default) = @_;
   $default = 0 if (!defined $default);
+  
+  if($modules{CUL_HM}{AttrListDef} && $modules{CUL_HM}{AttrListDef}{$attrName}){
+  }
+  
   if($name && $defs{$name}){
     my $devN = $defs{$name}{device}?$defs{$name}{device}:$name;
-    my $val = "0".AttrVal($name,$attrName,AttrVal($devN,$attrName,$default));
+    my $val = "0".AttrVal($name,$attrName
+                 ,AttrVal($devN,$attrName
+                 ,($modules{CUL_HM}{AttrListDef} && $modules{CUL_HM}{AttrListDef}{$attrName})?$modules{CUL_HM}{AttrListDef}{$attrName}
+                 :$default));
     $val =~s/(\d*).*/$1/;
     return int($val);
   }
