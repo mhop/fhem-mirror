@@ -1671,14 +1671,10 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                              ,inhibit        =>"[on|off]"
                                              ,statusRequest  =>""
                                              ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
-                                             ,brightCol      =>"-bright- -colVal- -duration- -ramp-" 
-                                             ,brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp-"
                                             }
-                     ,"HM-LC-RGBW-WM02"   =>{ brightCol      =>"-bright- -colVal- -duration- -ramp-" #General rework
-                                             ,brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp-"
+                     ,"HM-LC-RGBW-WM02"   =>{ brightCol      =>"-bright- -colVal- -duration- -ramp- ..."
                                             }
-                     ,"HM-LC-RGBW-WM03"   =>{ brightCol      =>"-bright- -colVal- -duration- -ramp-" 
-                                             ,brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp-"
+                     ,"HM-LC-RGBW-WM03"   =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."
                                             }
                                             
  );
