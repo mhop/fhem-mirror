@@ -160,14 +160,14 @@ sub HMinfo_Attr(@) {###########################################################
       my %culAH;
       foreach (split" ",$modules{CUL_HM}{AttrList}){
         my ($p,$v) = split(":",$_);
-        $culAH{$p} = ",$v,";
+        $culAH{$p} = $v?",$v,":"";
       }
       
       foreach (split(",",$attrVal)){
         my ($para,$val) = split(":",$_,2);
         return "no value defined for $para" if (!defined "val");
         return "param $para not allowed" if (!grep /$para/,@defpara);
-        return "param $para :$val not allowed, use $culAH{$para}" if ($culAH{$para} !~ m/,$val,/);
+        return "param $para :$val not allowed, use $culAH{$para}" if ($culAH{$para} && $culAH{$para} !~ m/,$val,/);
         $modules{CUL_HM}{AttrListDef}{$para} = $val;
       } 
     }

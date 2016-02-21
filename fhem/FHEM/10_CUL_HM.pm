@@ -1076,7 +1076,7 @@ sub CUL_HM_Parse($$) {#########################################################
   }
 
   #----------CUL aesCommReq handling---------
-  if (   $mh{devH}->{IODev}->{TYPE} eq "CUL"
+  if (   AttrVal($mh{devH}{IODev}{NAME},"rfmode","") eq "HomeMatic" # $mh{devH}->{IODev}->{TYPE} eq "CUL"
       && $cryptFunc == 1 
       && $ioId eq $mh{dst}
       && AttrVal($mh{devN},"aesCommReq",0)) { #aesCommReq enabled for device
@@ -2769,7 +2769,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       my (undef,$challenge,$aesKeyNbr) = unpack'A2A12A2',$mhp->{p};
       push @evtEt,[$mhp->{devH},1,"aesKeyNbr:".$aesKeyNbr] if (defined $aesKeyNbr);# if   ($mh{msgStat} =~ m/AESKey/)
 
-      if ($mhp->{devH}{IODev}->{TYPE} eq "CUL" &&    #IO is CUL
+      if (AttrVal($mhp->{devH}{IODev}{NAME},"rfmode","") eq "HomeMatic" &&
           defined($aesKeyNbr)) {
         if ($cryptFunc == 1 &&                    #AES is available
 	    $mhp->{devH}{helper}{prt}{rspWait}{cmd}){ #There is a previously executed command
@@ -4212,8 +4212,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_UpdtReadSingle($hash,"inhibit","set_$a[2]",1);
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.$chn);  # SET_LOCK
   }
-  elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
-    my ($lvl,$tval,$rval,$duration) = (($a[2]?$a[2]:0),"","",0);
+  elsif($cmd =~ m/^(up|down|pct|old)$/) { #####################################
+    my ($lvl,$tval,$rval,$duration) = (($cmd eq "old"?"old":($a[2]?$a[2]:0))
+                                        ,"","",0);
     my($lvlMin,$lvlMax) = split",",AttrVal($name, "levelRange", "0,100");
     my $lvlInv = (AttrVal($name, "param", "") =~ m /levelInverse/)?1:0;
 
@@ -5331,7 +5332,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     my ($key1,$key2);
 
-    if ($hash->{IODev}->{TYPE} eq "CUL") {
+    if (AttrVal($hash->{IODev}{NAME},"rfmode","") eq "HomeMatic" ) {
       return "$cmd needs Crypt::Rijndael for updating keys with CUL"
             if ($cryptFunc != 1);
 
@@ -6338,7 +6339,7 @@ sub CUL_HM_FWupdateEnd($){#end FW update
 sub CUL_HM_FWupdateSpeed($$){#set IO speed
   my ($name,$speed) = @_;
   my $hash = $defs{$name};
-  if ($hash->{IODev}->{TYPE} ne "CUL"){
+  if (AttrVal($hash->{IODev}{NAME},"rfmode","") ne "HomeMatic"){
     my $msg = sprintf("G%02X",$speed);
     IOWrite($hash, "cmd",$msg);
   }
