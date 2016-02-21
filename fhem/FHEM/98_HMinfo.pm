@@ -460,16 +460,28 @@ sub HMinfo_peerCheck(@) { #####################################################
             if ($pMd !~ m/HM-CC-RT-DN/ ||$pChn !~ m/(0[45])$/ ){
               push @peeringStrange,$eName." pID: Model $pMd should be HM-CC-RT-DN ClimatTeam Channel";
             }
+            elsif($chn eq "04"){
+              # compare templist template are identical and boost is same
+              my $rtCn = CUL_HM_id2Name(substr($pId,0,6)."04");
+              Log 1,"General $eName peered with $rtCn rt/rt";
+            }
           }
-          elsif($chn eq "02" && 
-                ($pChn ne "02" ||$pMd ne "HM-TC-IT-WM-W-EU" )){
-            push @peeringStrange,$eName." pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
+          elsif($chn eq "02"){
+            if($pChn ne "02" ||$pMd ne "HM-TC-IT-WM-W-EU" ){
+              push @peeringStrange,$eName." pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
+            }
           }
         }
         elsif ($md eq "HM-TC-IT-WM-W-EU"){
-          if($chn eq "02" && 
-                ($pChn ne "02" ||$pMd ne "HM-CC-RT-DN" )){
-            push @peeringStrange,$eName." pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
+          if($chn eq "02"){
+            if($pChn ne "02" ||$pMd ne "HM-CC-RT-DN" ){
+              push @peeringStrange,$eName." pID: Model $pMd should be HM-TC-IT-WM-W-EU Climate Channel";
+            }
+            else{
+              # compare templist template are identical and boost is same
+              my $rtCn = CUL_HM_id2Name(substr($pId,0,6)."04");
+              Log 1,"General $eName peered with $rtCn tc/rt";
+            }
           }
         }
       }
