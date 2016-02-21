@@ -111,7 +111,7 @@ GetBlockDoIf ($$)
   }
 }
 sub 
-GetCommand ($)
+GetCommandDoIf ($)
 {
   my ($tailBlock) = @_;
   my $char;
@@ -138,6 +138,8 @@ GetCommand ($)
   }
   if ($cmd eq "") {
     $cmd=$tailBlock;
+  } else {
+    $cmd=$cmd.$tailBlock
   }
   return ($cmd,"");
 }
@@ -541,7 +543,7 @@ ParseCommandsDoIf($$$)
           return ($currentBlock,$err) if ($err);
           #$tailBlock=substr($tailBlock,pos($tailBlock)) if ($tailBlock =~ /^\s*,/g);
       } else {
-        ($currentBlock,$tailBlock)=GetCommand($tailBlock);
+        ($currentBlock,$tailBlock)=GetCommandDoIf($tailBlock);
       } 
       if ($currentBlock ne "") {
        ($currentBlock,$err)=ReplaceAllReadingsDoIf($hash,$currentBlock,-1,$eval);
