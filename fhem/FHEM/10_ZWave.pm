@@ -74,6 +74,7 @@ my %zwave_class = (
                "..2601ff.."=> "state:setOn",
                "..260420"  => "state:swmBeginUp",
                "..260460"  => "state:swmBeginDown",
+               "..2604(..)(..)(..)(..)"  => 'ZWave_swmParse($1,$2,$3,$4)',
                "..2605"    => "state:swmEnd" } },
   SWITCH_ALL               => { id => '27',
     set   => { swaIncludeNone  => "0100",
@@ -1993,6 +1994,18 @@ ZWave_SetClasses($$$$)
         if(@classes && !$attr{$name}{classes});
   $def->{DEF} = "$homeId ".hex($id);
   return "";
+}
+
+sub
+ZWave_swmParse($$$$)
+{
+  my ($fl, $sl, $dur, $step)=@_;
+  my $fl1 = (hex($fl) & 0x18)>>3;
+  my $fl2 = (hex($fl) & 0xc0)>>6;
+  $fl = ($fl1==0 ? "Increment": $fl1==1 ? "Decrement" : "")." ".
+        ($fl2==0 ? "Up":  $fl1==1 ? "Down" : "");
+  return sprintf("state:swm %s Start: %d Duration: %d Step: %d", 
+        $fl, hex($sl), hex($dur), hex($step));
 }
 
 sub
@@ -5206,6 +5219,8 @@ s2Hex($)
   <li>state:dim value</li>
   <li>state:swmBeginUp</li>
   <li>state:swmBeginDown</li>
+  <li>state:swm [Decrement|Increment] [Up|Down] 
+                Start: $sl Duration: $dur Step: $step</li>
   <li>state:swmEnd</li>
 
   <br><br><b>Class THERMOSTAT_MODE</b>
