@@ -2472,7 +2472,7 @@ CommandAttr($$)
 
     if($attrName eq "userReadings") {
 
-      my %userReadings;
+      my @userReadings;
       # myReading1[:trigger1] [modifier1] { codecodecode1 }, ...
       my $arg= $a[2];
 
@@ -2482,7 +2482,7 @@ CommandAttr($$)
       my $rNo=0;
 
       while($arg =~ /$regexo/s) {
-        my $userReading= $2;
+        my $reading= $2;
         my $trigger= $3 ? $3 : undef;
         my $modifier= $5 ? $5 : "none";
         my $perlCode= $6;
@@ -2491,17 +2491,15 @@ CommandAttr($$)
         if(grep { /$modifier/ }
                 qw(none difference differential offset monotonic integral)) {
           $trigger =~ s/^:// if($trigger);
-          $userReadings{$userReading}{trigger}= $trigger;
-          $userReadings{$userReading}{modifier}= $modifier;
-          $userReadings{$userReading}{perlCode}= $perlCode;
-          $userReadings{$userReading}{readingNo}= $rNo++;
+          my %userReading = ( reading => $reading, trigger => $trigger, modifier => $modifier, perlCode => $perlCode );
+          push @userReadings, \%userReading;
         } else {
           push @rets, "$sdev: unknown modifier $modifier for ".
-                "userReading $userReading, this userReading will be ignored";
+                "userReading $reading, this userReading will be ignored";
         }
         $arg= defined($8) ? $8 : "";
       }
-      $hash->{'.userReadings'}= \%userReadings;
+      $hash->{'.userReadings'}= \@userReadings;
     } 
 
     if($attrName eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
@@ -3869,29 +3867,27 @@ readingsEndUpdate($$)
 
   # process user readings
   if(defined($hash->{'.userReadings'})) {
-    my %userReadings= %{$hash->{'.userReadings'}};
-    foreach my $userReading (sort { $userReadings{$a}{readingNo} <=> 
-                                    $userReadings{$b}{readingNo} }
-                             keys %userReadings) {
+    foreach my $userReading (@{$hash->{'.userReadings'}}) {
 
-      my $trigger = $userReadings{$userReading}{trigger};
+      my $trigger = $userReading->{trigger};
       if(defined($trigger)) {
         my @fnd = grep { $_ && $_ =~ m/^$trigger/ } @{$hash->{CHANGED}};
         next if(!@fnd);
       }
 
-      my $modifier= $userReadings{$userReading}{modifier};
-      my $perlCode= $userReadings{$userReading}{perlCode};
-      my $oldvalue= $userReadings{$userReading}{value};
-      my $oldt= $userReadings{$userReading}{t};
-      #Debug "Evaluating " . $userReadings{$userReading};
+      my $reading= $userReading->{reading};
+      my $modifier= $userReading->{modifier};
+      my $perlCode= $userReading->{perlCode};
+      my $oldvalue= $userReading->{value};
+      my $oldt= $userReading->{t};
+      #Debug "Evaluating " . $reading;
       $cmdFromAnalyze = $perlCode;      # For the __WARN__ sub
       my $value= eval $perlCode;
       $cmdFromAnalyze = undef;
       my $result;
       # store result
       if($@) {
-        $value = "Error evaluating $name userReading $userReading: $@";
+        $value = "Error evaluating $name userReading $reading: $@";
         Log 1, $value;
         $result= $value;
       } elsif($modifier eq "none") {
@@ -3908,25 +3904,25 @@ readingsEndUpdate($$)
         if(defined($oldt) && defined($oldvalue)) {
           my $deltat= $hash->{".updateTime"} - $oldt if(defined($oldt));
           my $avgval= ($value + $oldvalue) / 2;
-          $result = ReadingsVal($name,$userReading,$value);
+          $result = ReadingsVal($name,$reading,$value);
           if(defined($deltat) && $deltat>= 1.0) {
             $result+= $avgval*$deltat;
           }
         }
       } elsif($modifier eq "offset") {
         $oldvalue = $value if( !defined($oldvalue) );
-        $result = ReadingsVal($name,$userReading,0);
+        $result = ReadingsVal($name,$reading,0);
         $result += $oldvalue if( $value < $oldvalue );
       } elsif($modifier eq "monotonic") {
         $oldvalue = $value if( !defined($oldvalue) );
-        $result = ReadingsVal($name,$userReading,$value);
+        $result = ReadingsVal($name,$reading,$value);
         $result += $value - $oldvalue if( $value > $oldvalue );
       } 
-      readingsBulkUpdate($hash,$userReading,$result,1) if(defined($result));
+      readingsBulkUpdate($hash,$reading,$result,1) if(defined($result));
       # store value
-      $hash->{'.userReadings'}{$userReading}{TIME}= $hash->{".updateTimestamp"};
-      $hash->{'.userReadings'}{$userReading}{t}= $hash->{".updateTime"};
-      $hash->{'.userReadings'}{$userReading}{value}= $value;
+      $userReading->{TIME}= $hash->{".updateTimestamp"};
+      $userReading->{t}= $hash->{".updateTime"};
+      $userReading->{value}= $value;
     }
   }
   evalStateFormat($hash);
