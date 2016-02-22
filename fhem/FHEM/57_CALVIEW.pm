@@ -272,8 +272,8 @@ sub CALVIEW_Notify($$)
 <ul>this will manually update all readings from the given CALENDAR Devices</ul>
 <b>Attribute</b>
 <li>disable<br>
-        0 - disable the internal notify-function of CALVIEW wich is triggered when one of the given CALENDAR devices has updated
-		1 / not set - internal notify function enabled (default)
+        0 / not set - internal notify function enabled (default)
+		1 - disable the internal notify-function of CALVIEW wich is triggered when one of the given CALENDAR devices has updated
 </li><br>
 <li>maxreadings<br>
         defines the number of max term as readings
@@ -304,8 +304,8 @@ sub CALVIEW_Notify($$)
 <ul><code>set myView update</code></ul><br>
 <b>Attributes</b>
 <li>disable<br>
-        0 - deaktiviert die interne Notify-Funktion welche ausgelöst wird wenn sich einer der Kalender aktualisiert hat
-		1 / nicht gesetzt - aktiviert die interne Notify-Funktion (Standard)
+        0 / nicht gesetzt - aktiviert die interne Notify-Funktion (Standard)
+		1 - deaktiviert die interne Notify-Funktion welche ausgelöst wird wenn sich einer der Kalender aktualisiert hat
 </li><br>
 <li>maxreadings<br>
         bestimmt die Anzahl der Termine als Readings
