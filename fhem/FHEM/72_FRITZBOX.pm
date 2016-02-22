@@ -4817,6 +4817,8 @@ sub FRITZBOX_fritztris($)
          This is done by temporarily changing the name of the calling internal number during the ring.
          <br>
          Maximal 30 characters are allowed. The attribute "ringWithIntern" must also be specified.
+         <br>
+         Required API: Telnet or webcmd
       </li><br>
 
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
@@ -5182,7 +5184,9 @@ sub FRITZBOX_fritztris($)
          Dies erfolgt, indem w&auml;hrend des Klingelns tempor&auml;r der Name der internen anrufenden Nummer ge&auml;ndert wird.
          <br>
          Es sind maximal 30 Zeichen erlaubt. Das Attribute "ringWithIntern" muss ebenfalls spezifiziert sein.
-      </li><br>
+         <br>
+         Ben&ouml;tigt die API: Telnet oder webcmd      
+         </li><br>
       
       <li><code>defaultUploadDir &lt;fritzBoxPath&gt;</code>
          <br>
