@@ -1866,7 +1866,7 @@ sub FRITZBOX_Set_Cmd_Start($)
 # Preparing SET guestWLAN
    elsif ($val[0] eq "guestwlan") {
       shift @val;
-      $timeout = 10;
+      $timeout = 20;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_GuestWlan_Run_Web";
@@ -1875,7 +1875,7 @@ sub FRITZBOX_Set_Cmd_Start($)
 # Preparing SET RING
    elsif ($val[0] eq "ring") {
       shift @val;
-      $timeout = 5;
+      $timeout = 20;
       if ($val[2]) {
          $timeout = $val[2] if $val[2] =~/^\d+$/; 
       }
@@ -4693,30 +4693,27 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><code>set &lt;name&gt; ring &lt;intNumbers&gt; [duration [ringTone]] [show:Text]  [say:Text | play:MP3URL]</code>
-         <br>
-         Example:
-         <br>
+         <dt>Example:</dt>
+         <dd>
          <code>set fritzbox ring 611,612 5 Budapest show:It is raining</code>
          <br>
          <code>set fritzbox ring 611 8 say:(en)It is raining</code>
          <br>
          <code>set fritzbox ring 610 10 play:http://raspberrypi/sound.mp3</code>
-         <br>
+         </dd>
          Rings the internal numbers for "duration" seconds and (on Fritz!Fons) with the given "ring tone" name.
          Different internal numbers have to be separated by a comma (without spaces).
          <br>
-         Default duration is 5 seconds. The Fritz!Box can create delays. Default ring tone is the internal ring tone of the device.
+         Default duration is 5 seconds. The Fritz!Box can create further delays. Default ring tone is the internal ring tone of the device.
          Ring tone will be ignored for collected calls (9 or 50). 
          <br>
          If the call is taken the callee hears the "music on hold" which can also be used to transmit messages.
          <br>
-         The parameter <i>ringtone, show:, say:</i> and <i>play:</i> need the API Telnet or webcm.
-         <br>
-         <br>
+         The parameter <i>ringtone, show:, say:</i> and <i>play:</i> require the API Telnet or webcm.
+         <br/><br/>
          If the <a href=#FRITZBOXattr>attribute</a> 'ringWithIntern' is specified, the text behind 'show:' will be shown as the callers name.
          Maximal 30 characters are allowed.
-         <br>
-         <br>
+         <br/><br/>
          On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (max. 100 characters) instead of using the ringtone. 
          Alternatively a MP3 link can be played with 'play:'. This creates the internet radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
          Say and play works only with a single Fritz!Fon.
@@ -5062,15 +5059,14 @@ sub FRITZBOX_fritztris($)
       </li><br>
 
       <li><code>set &lt;name&gt; ring &lt;intNummern&gt; [Dauer [Klingelton]] [show:Text] [say:Text | play:Link]</code>
-         <br>
-         Beispiel:
-         <br>
+         <dt>Beispiel:</dt>
+         <dd>
          <code>set fritzbox ring 611,612 5 Budapest show:Es regnet</code>
          <br>
          <code>set fritzbox ring 610 8 say:Es regnet</code>
          <br>
          <code>set fritzbox ring 610 10 play:http://raspberrypi/sound.mp3</code>
-         <br>
+         </dd>
          L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem angegebenen "Klingelton" klingeln.
          <br>
          Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
@@ -5081,16 +5077,14 @@ sub FRITZBOX_fritztris($)
          Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold), welche ebenfalls zur Nachrichten&uuml;bermittlung genutzt werden kann.
          <br>
          Die Parameter <i>Klingelton, show:, say:</i> und <i>play:</i> ben&ouml;tigen die API Telnet oder webcm.
-         <br>
-         <br>
+         <br/><br/>
          Wenn das <a href=#FRITZBOXattr>Attribut</a> 'ringWithIntern' existiert, wird der Text hinter 'show:' als Name des Anrufers angezeigt.
          Er darf maximal 30 Zeichen lang sein.
-         <br>
-         <br>
+         <br/><br/>
          Auf Fritz!Fons wird der Text (max. 100 Zeichen) hinter dem Parameter 'say:' direkt angesagt und ersetzt den Klingelton.
          <br>
          Alternativ kann mit 'play:' auch ein MP3-Link abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com f&uuml;r Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
-         Das Abspielen ist nur auf einem einzelnen Fritz!Fon m&oouml;glich.
+         Das Abspielen ist nur auf jeweils einem einzelnen Fritz!Fon m&ouml;glich.
          <br>
          Je nach Fritz!OS kann das beschriebene Verhalten abweichen.
          <br>
