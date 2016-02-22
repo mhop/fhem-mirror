@@ -841,6 +841,7 @@ harmony_updateActivity($$;$)
     readingsSingleUpdate( $hash, "activity", $activity, 1 );
 
     harmony_sendEngineGet($hash, "changeChannel", "channel=$hash->{channelAfterStart}:timestamp=0") if( $hash->{channelAfterStart} );
+    delete $hash->{channelAfterStart};
   }
 
   delete $hash->{hidDevice} if( $id == -1 );
