@@ -1,10 +1,9 @@
 ##############################################
-##############################################
 # $Id$
 # 
 # The purpose of this module is to support serval eurochron
 # weather sensors like eas8007 which use the same protocol
-# Sidey79 & Ralf9  2015  
+# Sidey79 & Ralf9  2015-2016
 #
 
 package main;
@@ -81,7 +80,6 @@ SD_WS07_Parse($$)
   my $hlen = length($rawData);
   my $blen = $hlen * 4;
   my $bitData = unpack("B$blen", pack("H$hlen", $rawData)); 
-  
 
   Log3 $name, 4, "SD_WS07_Parse  $model ($msg) length: $hlen";
   
@@ -117,23 +115,24 @@ SD_WS07_Parse($$)
     }
     
     if ($hum > 100) {
-      return undef;  # Eigentlich müsste sowas wie ein skip rein, damit ggf. später noch weitre Sensoren dekodiert werden können.
+      return undef;  # Eigentlich muesste sowas wie ein skip rein, damit ggf. spaeter noch weitre Sensoren dekodiert werden koennen.
     }
     
     if ($temp > 700 && $temp < 3840) {
       return undef;
-    } elsif ($temp >= 3840) {        # negative Temperaturen, muÃŸ noch ueberprueft und optimiert werden 
+    } elsif ($temp >= 3840) {        # negative Temperaturen, muss noch ueberprueft und optimiert werden 
       $temp -= 4095;
     }  
     $temp /= 10;
     
-    Log3 $iohash, 4, "$model decoded protocolid: 7 sensor id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat" ;
+    Log3 $iohash, 4, "$model decoded protocolid: 7 sensor id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat";
+
     my $deviceCode;
     
 	my $longids = AttrVal($iohash->{NAME},'longids',0);
-	if ( ($longids != 0) && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))
+	if ( ($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))
 	{
-		$deviceCode=$model."_".$id.$channel;
+		$deviceCode=$model.'_'.$id.$channel;
 		Log3 $iohash,4, "$name using longid: $longids model: $model";
 	} else {
 		$deviceCode = $model . "_" . $channel;
@@ -150,10 +149,9 @@ SD_WS07_Parse($$)
     }
         #Log3 $iohash, 3, 'SD_WS07: ' . $def->{NAME} . ' ' . $id;
 	
-	
 	my $hash = $def;
 	$name = $hash->{NAME};
-	Log3 $name, 5, "SD_WS07: $name ($rawData)";  
+	Log3 $name, 4, "SD_WS07: $name ($rawData)";  
 
 	if (!defined(AttrVal($hash->{NAME},"event-min-interval",undef)))
 	{
@@ -164,9 +162,9 @@ SD_WS07_Parse($$)
 		}
 	}
 
-
-	$def->{lastMSG} = $rawData;
-	$def->{bitMSG} = $bitData2; 
+	$hash->{lastReceive} = time();
+	$hash->{lastMSG} = $rawData;
+	$hash->{bitMSG} = $bitData2; 
 
     my $state = "T: $temp". ($hum>0 ? " H: $hum":"");
     
@@ -261,12 +259,14 @@ sub SD_WS07_Attr(@)
 <a name="SD_WS07"></a>
 <h3>SD_WS07</h3>
 <ul>
-  Das SD_WS07 Module verarbeitet von einem IO Gerät (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur-Sensoren.<br>
+  Das SD_WS07 Module verarbeitet von einem IO Geraet (CUL, CUN, SIGNALDuino, etc.) empfangene Nachrichten von Temperatur-Sensoren.<br>
   <br>
-  <b>Unterstütze Modelle:</b>
+  <b>Unterstuetze Modelle:</b>
   <ul>
     <li>Eurochon EAS800z</li>
     <li>Technoline WS6750/TX70DTH</li>
+    <li>TFA 30320902</li>
+    <li>FreeTec Aussenmodul fuer Wetterstation NC-7344</li>
   </ul>
   <br>
   Neu empfangene Sensoren werden in FHEM per autocreate angelegt.
@@ -275,7 +275,7 @@ sub SD_WS07_Attr(@)
   <a name="SD_WS07_Define"></a>
   <b>Define</b> 
   <ul>Die empfangenen Sensoren werden automatisch angelegt.<br>
-  Die ID der angelgten Sensoren ist entweder der Kanal des Sensors, oder wenn das Attribut longid gesetzt ist, dann wird die ID aus dem Kanal und einer Reihe von Bits erzeugt, welche der Sensor beim Einschalten zufällig vergibt.<br>
+  Die ID der angelgten Sensoren ist entweder der Kanal des Sensors, oder wenn das Attribut longid gesetzt ist, dann wird die ID aus dem Kanal und einer Reihe von Bits erzeugt, welche der Sensor beim Einschalten zufaellig vergibt.<br>
   </ul>
   <br>
   <a name="SD_WS07 Events"></a>

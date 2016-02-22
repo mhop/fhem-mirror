@@ -81,6 +81,7 @@ FHEM/16_CUL_RFR.pm           rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/16_STACKABLE_CC.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/17_EGPM2LAN.pm          alexus               http://forum.fhem.de Sonstiges
 FHEM/14_SD_WS07.pm           Sidey/Ralf9          http://forum.fhem.de Sonstige Systeme
+FHEM/14_SD_WS09.pm           Sidey/pejonp         http://forum.fhem.de Sonstige Systeme
 FHEM/17_SIS_PMS.pm           painseeker           http://forum.fhem.de Sonstiges
 FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/19_Revolt.pm            martinppp/mehf       http://forum.fhem.de SlowRF

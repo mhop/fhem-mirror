@@ -188,13 +188,16 @@ SIGNALduino_un_Parse($$)
 		
 		Log3 $hash, 4, "$name found ctw600 syncpos at $syncpos message is: $sensdata - sensor id:$id, bat:$bat, temp=$temp, hum=$hum, wind=$wind, rain=$rain, winddir=$winddir";
 
-	} elsif ($protocol == "13"  && length($bitData)>=14)  ## RF20 Protocol 
+	} elsif ($protocol == "13"  && length($bitData)>=14)  ## RF21 Protocol 
 	{  
-		my $model=$a[3];
-		my $deviceCode = $a[5].$a[6].$a[7].$a[8].$a[9];
-		my  $Freq = $a[10].$a[11].$a[12].$a[13].$a[14];
+		#my $model=$a[3];
+		#my $deviceCode = $a[5].$a[6].$a[7].$a[8].$a[9];
+		#my  $Freq = $a[10].$a[11].$a[12].$a[13].$a[14];
+		my $deviceCode = substr($bitData,0,23);
+		my $unit= substr($bitData,23,1);
+		
 
-		Log3 $hash, 4, "$name found RF21 protocol. model=$model, devicecode=$deviceCode, freq=$Freq ";
+		Log3 $hash, 4, "$name found RF21 protocol. devicecode=$deviceCode, unit=$unit";
 	}
 	elsif ($protocol == "14" && length($bitData)>=12)  ## Heidman HX 
 	{  
@@ -218,20 +221,21 @@ SIGNALduino_un_Parse($$)
 	{
 		Log3 $hash, 4, "$name / shutter Dooya $bitData received";
 		
+		Log3 $hash,4, substr($bitData,0,23)." ".substr($bitData,24,4)." ".substr($bitData,28,4)." ".substr($bitData,32,4)." ".substr($bitData,36,4);
+		my $id = SIGNALduino_un_binaryToNumber($bitData,0,23);
+		my $remote = SIGNALduino_un_binaryToNumber($bitData,24,27);
+		my $channel = SIGNALduino_un_binaryToNumber($bitData,28,31);
 		
-		my $id = oct("0b".substr($bitData,0,29));
-		my $channel = oct("0b".substr($bitData,29,3));
-		
-		my $all = ($channel == 0) ? 1 : 0;
- 	    my $commandcode = oct("0b".substr($bitData,33,4));
+		my $all = ($channel == 0) ? "true" : "false";
+ 	    my $commandcode = SIGNALduino_un_binaryToNumber($bitData,32,35);
  	    my $direction="";
  	    
- 	    if ($commandcode == 0b001) {$direction="up";}
- 	    elsif ($commandcode == 0b011) {$direction="down";}
-  	    elsif ($commandcode == 0b101) {$direction="stop";}
+ 	    if ($commandcode == 0b0001) {$direction="up";}
+ 	    elsif ($commandcode == 0b0011) {$direction="down";}
+  	    elsif ($commandcode == 0b0101) {$direction="stop";}
+  	    elsif ($commandcode == 0b1100) {$direction="learn";}
 		else  { $direction="unknown";}
- 	    
-		Log3 $hash, 4, "$name found shutter from Dooya. id=$id, channel=$channel, direction=$direction, all_shutters=$all";
+		Log3 $hash, 4, "$name found shutter from Dooya. id=$id, remotetype=$remote,  channel=$channel, direction=$direction, all_shutters=$all";
 	} 
 	elsif ($protocol == "21" && length($bitData)>=32)  ##Einhell doorshutter
 	{
@@ -259,6 +263,50 @@ SIGNALduino_un_Parse($$)
 		Log3 $hash, 4, "$name decoded protocolid: 7 ($SensorTyp / type=$type) mode=$sendMode, sensor id=$id, channel=$channel, temp=$temp, bat=$bat\n" ;
 
 
+	} elsif ($protocol == "33" && length($bitData)>=42)  ## S014 or tcm sensor
+	{
+		my $SensorTyp = "s014/TFA 30.3200/TCM/Conrad";
+		
+		my $id = SIGNALduino_un_binaryToNumber($bitData,0,9);  
+		#my $unknown1 = SIGNALduino_un_binaryToNumber($bitData,8,10);  
+		my $sendMode = SIGNALduino_un_binaryToNumber($bitData,10,11) eq "1" ? "manual" : "auto";  
+		
+		my $channel = SIGNALduino_un_binaryToNumber($bitData,12,13)+1; 
+		#my $temp = (((oct("0b".substr($bitData,22,4))*256) + (oct("0b".substr($bitData,18,4))*16) + (oct("0b".substr($bitData,14,4)))/10) - 90 - 32) * (5/9);
+		my $temp = (((SIGNALduino_un_binaryToNumber($bitData,22,25)*256 +  SIGNALduino_un_binaryToNumber($bitData,18,21)*16 + SIGNALduino_un_binaryToNumber($bitData,14,17)) *10 -12200) /18)/10;
+		
+		my $hum=SIGNALduino_un_binaryToNumber($bitData,30,33)*16 + SIGNALduino_un_binaryToNumber($bitData,26,29);
+		my $bat = SIGNALduino_un_binaryToBoolean($bitData,34) eq "1" ? "ok" : "critical";  # Eventuell falsch!
+		my $sync = SIGNALduino_un_binaryToBoolean($bitData,35,35) eq "1" ? "true" : "false";  
+		my $unknown3 =SIGNALduino_un_binaryToNumber($bitData,36,37);  
+		
+		my $crc=substr($bitData,36,4);
+		
+		
+		Log3 $hash, 4, "$name decoded protocolid: $protocol ($SensorTyp ) mode=$sendMode, sensor id=$id, channel=$channel, temp=$temp, hum=$hum, bat=$bat, crc=$crc, sync=$sync, unkown3=$unknown3\n" ;
+	} elsif ($protocol == "37" && length($bitData)>=40)  ## Bresser 7009993
+	{
+		
+		# 0      7 8 9 10 12        22   25    31
+		# 01011010 0 0 01 01100001110 10 0111101 11001010
+		# ID      B? T Kan Temp       ?? Hum     Pruefsumme?
+		#
+		
+		my $SensorTyp = "Bresser 7009994";
+		
+		my $id = SIGNALduino_un_binaryToNumber($bitData,0,7);  
+		my $channel = SIGNALduino_un_binaryToNumber($bitData,10,11);
+		my $hum=SIGNALduino_un_binaryToNumber($bitData,25,31);
+		my $rawTemp = SIGNALduino_un_binaryToNumber($bitData,12,22);
+		my $temp = ($rawTemp - 609.93) / 9.014;
+		$temp = sprintf("%.2f", $temp);
+		
+		my $bitData2 = substr($bitData,0,8) . ' ' . substr($bitData,8,4) . ' ' . substr($bitData,12,11);
+		$bitData2 = $bitData2 . ' ' . substr($bitData,23,2) . ' ' . substr($bitData,25,7) . ' ' . substr($bitData,32,8);
+		Log3 $hash, 4, "$name converted to bits: " . $bitData2;
+		Log3 $hash, 4, "$name decoded protocolid: $protocol ($SensorTyp) sensor id=$id, channel=$channel, rawTemp=$rawTemp, temp=$temp, hum=$hum";
+
+	
 	} else {
 		return $dummyreturnvalue;
 	}
@@ -285,6 +333,28 @@ SIGNALduino_un_Attr(@)
   return undef;
 }
 
+
+# binary string,  fistbit #, lastbit #
+
+sub
+SIGNALduino_un_binaryToNumber
+{
+	my $binstr=shift;
+	my $fbit=shift;
+	my $lbit=$fbit;
+	$lbit=shift if @_;
+	
+	
+	return oct("0b".substr($binstr,$fbit,($lbit-$fbit)+1));
+	
+}
+
+
+sub
+SIGNALduino_un_binaryToBoolean
+{
+	return int(SIGNALduino_un_binaryToNumber(@_));
+}
 
 
 sub
@@ -355,8 +425,8 @@ SIGNALduino_un_binflip($)
 <a name="SIGNALduino_un"></a>
 <h3>SIGNALduino_un</h3>
 <ul>
-  Das SIGNALduino_un module ist ein Hilfsmodul um unbekannte Nachrichten debuggen und analysieren zu können.
-  Das Modul legt keinerlei Geräte oder ähnliches an.
+  Das SIGNALduino_un module ist ein Hilfsmodul um unbekannte Nachrichten debuggen und analysieren zu koennen.
+  Das Modul legt keinerlei Geraete oder aehnliches an.
   <br><br>
 
   <a name="SIGNALduino_undefine"></a>
@@ -364,10 +434,10 @@ SIGNALduino_un_binflip($)
     <code>define &lt;name&gt; SIGNALduino_un &lt;code&gt; </code> <br>
 
     <br>
-    Es ist möglich ein Gerät manuell zu definieren, aber damit passiert überhaupt nichts.
-    Autocreate wird auch keinerlei Geräte aus diesem Modul anlegen.
+    Es ist moeglich ein Geraet manuell zu definieren, aber damit passiert ueberhaupt nichts.
+    Autocreate wird auch keinerlei Geraete aus diesem Modul anlegen.
     <br>
-    Die einzgeste Funktion dieses Modules ist, ab Verbose 4 Logmeldungen über die Empfangene Nachricht ins Log zu schreiben. Dabei kann man sich leider nicht darauf verlassen, dass die Nachricht korrekt dekodiert wurde.<br>
+    Die einzgeste Funktion dieses Modules ist, ab Verbose 4 Logmeldungen ueber die Empfangene Nachricht ins Log zu schreiben. Dabei kann man sich leider nicht darauf verlassen, dass die Nachricht korrekt dekodiert wurde.<br>
     Dieses Modul wird alle Nachrichten verarbeiten, welche von anderen Modulen nicht verarbeitet wurden.
   <a name="SIGNALduino_unset"></a>
   <b>Set</b> <ul>N/A</ul><br>
