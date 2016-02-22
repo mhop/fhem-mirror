@@ -1,3 +1,4 @@
+DIR unused
 MOV www/pgm2/fhemweb_multiple.js unused
 MOV www/pgm2/fhemweb_noArg.js unused
 MOV www/pgm2/fhemweb_slider.js unused

@@ -29,8 +29,7 @@ die "SVN failed, exiting\n" if($?);
 #################################
 # new Style
 chdir("$homedir/fhem");
-my $uploaddir2 = "fhemupdate4";
-system("mkdir -p $uploaddir2");
+system("mkdir -p fhemupdate");
 
 my @filelist2 = (
   "./fhem.pl.txt",
@@ -101,10 +100,22 @@ foreach my $fspec (@filelist2) {
   closedir(DH);
 }
 
-chdir("$homedir/fhem/$uploaddir2");
+chdir("$homedir/fhem/fhemupdate");
 my %oldtime;
-
 my $fname = "controls_fhem.txt";
+
+if(open FH, $fname) {
+  while(my $l = <FH>) {
+    chomp($l);
+    next if($l !~ m/^UPD ([^ ]*) ([^ ]*) (.*)$/);
+    my ($ts, $fs, $file) = ($1, $2, $3);
+    $oldtime{"$file.txt"} = $ts if($file =~ m/\.pl$/);
+    $oldtime{$file} = $ts;
+  }
+  close(FH);
+}
+
+
 my $cfh = new IO::File ">$fname" || die "Can't open $fname: $!\n";
 `svn info ..` =~ m/Revision: (\d+)/m;
 print $cfh "REV $1\n";
@@ -132,19 +143,23 @@ close $cfh;
 $ENV{RSYNC_RSH}="ssh";
 chdir("$homedir/fhem");
 
-system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate4/FHEM");
-system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate4/FHEM/firmware");
-system("cp -p FHEM/firmware/*.hex        fhemupdate4/FHEM/firmware");
+system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate/FHEM");
+system("cp -p ../culfw/Devices/CUL/*.hex fhemupdate/FHEM/firmware");
+system("cp -p FHEM/firmware/*.hex        fhemupdate/FHEM/firmware");
+
 
 my $rsyncopts="-a --delete --compress --verbose";
-system("rsync $rsyncopts fhemupdate4/. fhem.de:fhem/fhemupdate4/svn");
+system("rsync $rsyncopts fhemupdate/. fhem.de:fhem/fhemupdate/.");
 if(-f "commandref_changed") {
   system("scp docs/commandref.html docs/commandref_DE.html fhem.de:fhem");
 }
 
 system("scp CHANGED MAINTAINER.txt fhem.de:fhem");
 system("scp fhem.de:fhem/stats/data/fhem_statistics_db.sqlite ..");
+
 chdir("$homedir");
+system("grep -v '^REV' fhem/fhemupdate/controls_fhem.txt > controls_fhem_5.5.txt");
+system("scp controls_fhem_5.5.txt fhem.de:fhem/fhemupdate4/svn/controls_fhem.txt");
 
 system("sh stats/dostats.sh");
 system("sh mksvnlog.sh > SVNLOG");
