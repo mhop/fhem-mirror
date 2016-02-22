@@ -1,5 +1,17 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix: 00_SIGNALduino: Version 3.2.0 Module & Firmware
+                            serval fixes and enhacements
+                            improved stability
+                            supports many new protocol 
+                            Supports ITv3 sockets and switches
+                            new sendMsg Function
+                            You need to flash your SIGNALduino
+                            with the new firmware.
+  - bugfix: 14_Hideki:      support rain sensors
+  - bugfix: 14_SD_WS07:     Fixed some wordings   
+  - feature: 14_SD_WS09     Module for WH1080 
+							(WS-0101, TFA30.3189) & CTW600 868MHz OOK/AS
   - feature: TimeSeries: median, holdtime for event-aggregator 
   - feature: 57_CALVIEW: added internal notify-fn for calendar-devices,
                          added attr disable for internal notify-fn,

@@ -4,7 +4,7 @@
 # see http://www.fhemwiki.de/wiki/SIGNALduino
 # and was modified by a few additions
 # to support Hideki Sensors
-# S. Butzek & HJGode &Ralf9 2015
+# S. Butzek & HJGode & Ralf9 2015-2016
 #
 
 package main;
@@ -22,7 +22,7 @@ Hideki_Initialize($)
   my ($hash) = @_;
 
 
-  $hash->{Match}     = "^P12#75[A-F0-9]{17,30}";   # Länge (Anhahl nibbles nach 0x75 )noch genauer zpezifiieren
+  $hash->{Match}     = "^P12#75[A-F0-9]{17,30}";   # Laenge (Anhahl nibbles nach 0x75 )noch genauer spezifizieren
   $hash->{DefFn}     = "Hideki_Define";
   $hash->{UndefFn}   = "Hideki_Undef";
   $hash->{AttrFn}    = "Hideki_Attr";
@@ -91,42 +91,51 @@ Hideki_Parse($$)
 		Log3 $iohash, 4, "$name decrypt failed";
 		return undef;
 	}
+	
+	my $sensorTyp=getSensorType($decodedBytes[3]);
+	Log3 $iohash, 4, "Hideki_Parse SensorTyp = $sensorTyp decodedString = $decodedString";		
+
 	if (!Hideki_crc(\@decodedBytes))
 	{
 		Log3 $iohash, 4, "$name crc failed";
 		return undef;
 	}
-	my $sensorTyp=getSensorType($decodedBytes[3]);
-	Log3 $iohash, 4, "Hideki_Parse SensorTyp = $sensorTyp decodedString = $decodedString";
+
 	my $id=substr($decodedString,2,2);      # get the random id from the data
 	my $channel=0;
 	my $temp=0;
 	my $hum=0;
+	my $rain=0;
 	my $rc;
 	my $val;
 	my $bat;
 	my $deviceCode;
 	my $model= "Hideki_$sensorTyp";
 
-	## 1. Detect what type of sensor we have, then calll specific function to decode
+	## 1. Detect what type of sensor we have, then call specific function to decode
 	if ($sensorTyp==0x1E){
 		($channel, $temp, $hum) = decodeThermoHygro(\@decodedBytes); # decodeThermoHygro($decodedString);
 		$bat = ($decodedBytes[2] >> 6 == 3) ? 'ok' : 'low';			 # decode battery
 		$val = "T: $temp H: $hum Bat: $bat";
-	}else{
+	}elsif($sensorTyp==0x0E){
+		($channel, $rain) = decodeRain(\@decodedBytes); # decodeThermoHygro($decodedString);
+		$bat = ($decodedBytes[2] >> 6 == 3) ? 'ok' : 'low';			 # decode battery
+		$val = "R: $rain Bat: $bat";
+	}
+	else{
 		Log3 $iohash, 4, "$name Sensor Typ $sensorTyp not supported, please report sensor information!";
 		return "$name Sensor Typ $sensorTyp not supported, please report sensor information!";
 	}
 	my $longids = AttrVal($iohash->{NAME},'longids',0);
-	if ( ($longids != 0) && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))
+	if ( ($longids ne "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/)))
 	{
-		$deviceCode = $model . "_" . $id;
+		$deviceCode=$model . "_" . $id . "." . $channel;
 		Log3 $iohash,4, "$name using longid: $longids model: $model";
 	} else {
 		$deviceCode = $model . "_" . $channel;
 	}
 
-	Log3 $iohash, 4, "$name decoded Hideki protocol model=$model, sensor id=$id, channel=$channel, temp=$temp, humidity=$hum, bat=$bat";
+	Log3 $iohash, 4, "$name decoded Hideki protocol model=$model, sensor id=$id, channel=$channel, temp=$temp, humidity=$hum, bat=$bat, rain=$rain";
 	Log3 $iohash, 5, "deviceCode: $deviceCode";
 
 	my $def = $modules{Hideki}{defptr}{$iohash->{NAME} . "." . $deviceCode};
@@ -161,8 +170,14 @@ Hideki_Parse($$)
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, "state", $val);
 	readingsBulkUpdate($hash, "battery", $bat)   if ($bat ne "");
-	readingsBulkUpdate($hash, "humidity", $hum) if ($hum ne "");
-	readingsBulkUpdate($hash, "temperature", $temp) if ($temp ne "");
+	readingsBulkUpdate($hash, "channel", $channel) if ($channel ne "");
+	if ($sensorTyp==0x1E){
+	  readingsBulkUpdate($hash, "humidity", $hum) if ($hum ne "");
+	  readingsBulkUpdate($hash, "temperature", $temp) if ($temp ne "");
+	}
+	elsif($sensorTyp==0x0E){
+	  readingsBulkUpdate($hash, "rain", $rain) if ($rain ne "");
+	}
 	readingsEndUpdate($hash, 1); # Notify is done by Dispatch
 
 	return $name;
@@ -276,6 +291,46 @@ sub decodeThermoHygro {
 	return ($channel, $temp, $humi);
 }
 
+# decode byte array and return channel and total rain in mm
+# input: decrypted byte array starting with 0x75, passed by reference as in mysub(\@array);
+# output <return code>, <channel>, <totalrain>
+# was unable to get this working with an array ref as input, so switched to hex string input
+sub decodeRain {
+	my @Hidekibytes = @{$_[0]};
+
+	#my $Hidekihex = shift;
+	#my @Hidekibytes=();
+	#for (my $i=0; $i<(length($Hidekihex))/2; $i++){
+	#	my $hex=hex(substr($Hidekihex, $i*2, 2)); ## Mit split und map geht es auch ... $str =~ /(..?)/g;
+	#	push (@Hidekibytes, $hex);
+	#}
+	my $channel=0;
+	my $rain=0;
+
+	my $tests=0;
+	#additional checks?
+	if($Hidekibytes[2]==0xCC){
+	  $tests+=1;
+	}
+	if($Hidekibytes[6]==0x66){
+	  $tests+=1;
+	}
+	# possibly test if $tests==2 for sanity check
+	#printf("SANITY CHECK tests=%i\n", $tests);
+	
+	$channel = $Hidekibytes[1] >> 5;
+	# //Internally channel 4 is used for the other sensor types (rain, uv, anemo).
+	# //Therefore, if channel is decoded 5 or 6, the real value set on the device itself is 4 resp 5.
+	if ($channel >= 5) {
+		$channel--;
+	}
+	my $sensorId = $Hidekibytes[1] & 0x1f;  		# Extract random id from sensor
+	
+	$rain = ($Hidekibytes[4] + $Hidekibytes[5]*0xff)*0.7;
+
+	return ($channel, $rain);
+}
+
 sub
 Hideki_Attr(@)
 {
@@ -337,6 +392,7 @@ Hideki_Attr(@)
 	<li>temperature (&deg;C)</li>
 	<li>humidity (0-100)</li>
 	<li>battery (ok or low)</li>
+	<li>channel (The Channelnumber (number if)</li>
   </ul>
   
   
@@ -369,7 +425,7 @@ Hideki_Attr(@)
   <br><br>
   
   <a name="Hideki_define"></a>
-  <b>Unterstützte Hersteller</b>
+  <b>Unterstuetzte Hersteller</b>
   <ul>
   	<li>Hama</li>
   	<li>Bresser</li>
@@ -390,7 +446,7 @@ Hideki_Attr(@)
     &lt;code&gt; besteht aus dem Sensortyp und der Kanalnummer (1..5) oder wenn das Attribut longid im IO Device gesetzt ist aus einer Zufallsadresse, die durch den Sensor beim einlegen der
 	Batterie generiert wird (Die Adresse aendert sich bei jedem Batteriewechsel).<br>
     </li>
-    <li>Wenn autocreate aktiv ist, dann wird der Sensor automatisch in FHEM angelegt. Das ist der empfohlene Weg, neue Sensoren hinzuzufügen.</li>
+    <li>Wenn autocreate aktiv ist, dann wird der Sensor automatisch in FHEM angelegt. Das ist der empfohlene Weg, neue Sensoren hinzuzufuegen.</li>
    
   </ul>
   <br>
@@ -402,6 +458,7 @@ Hideki_Attr(@)
 	<li>temperature (&deg;C)</li>
 	<li>humidity (0-100)</li>
 	<li>battery (ok or low)</li>
+	<li>channel (Der Sensor Kanal)</li>
   </ul>
   <a name="Hideki_unset"></a>
   <b>Set</b> <ul>N/A</ul><br>
