@@ -272,7 +272,7 @@ sub CALVIEW_Notify($$)
 <ul>this will manually update all readings from the given CALENDAR Devices</ul>
 <b>Attribute</b>
 <li>disable<br>
-        0 / not set - internal notify function enabled (default)
+        0 / not set - internal notify function enabled (default) <br>
 		1 - disable the internal notify-function of CALVIEW wich is triggered when one of the given CALENDAR devices has updated
 </li><br>
 <li>maxreadings<br>
@@ -282,7 +282,7 @@ sub CALVIEW_Notify($$)
 		here the CALENDAR modes can be selected , to be displayed in the view
 </li><br>
 <li>oldStyledReadings<br>
-		1 readings look like "2015.06.21-00:00" with value "Start of Summer"
+		1 readings look like "2015.06.21-00:00" with value "Start of Summer" <br>
 		0 the default style of readings
 </li><br>
 =end html
@@ -304,7 +304,7 @@ sub CALVIEW_Notify($$)
 <ul><code>set myView update</code></ul><br>
 <b>Attributes</b>
 <li>disable<br>
-        0 / nicht gesetzt - aktiviert die interne Notify-Funktion (Standard)
+        0 / nicht gesetzt - aktiviert die interne Notify-Funktion (Standard) <br>
 		1 - deaktiviert die interne Notify-Funktion welche ausgelöst wird wenn sich einer der Kalender aktualisiert hat
 </li><br>
 <li>maxreadings<br>
@@ -314,7 +314,7 @@ sub CALVIEW_Notify($$)
         hier können die CALENDAR modi gewählt werden, welche in der View angezeigt werden sollen
 </li><br>
 <li>oldStyledReadings<br>
-		1 aktiviert die Termindarstellung im "alten" Format "2015.06.21-00:00" mit Wert "Start of Summer"
+		1 aktiviert die Termindarstellung im "alten" Format "2015.06.21-00:00" mit Wert "Start of Summer" <br>
 		0 aktivert die Standarddarstellung bdate, btime, usw 
 </li><br>
 =end html_DE
