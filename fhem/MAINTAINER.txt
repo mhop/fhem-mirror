@@ -388,7 +388,7 @@ contrib/WebViewControl/*     Dirk                 http://forum.fhem.de Mobile De
 contrib/GDS/GDSweblink.pm    jensb                http://forum.fhem.de Unterstuetzende Dienste
 
 www/codemirror/*             rapster              http://forum.fhem.de Frontends
-www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends/FHEMWEB
+www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends/SVG/Plots/logProxy
 www/images/*                 ulimaass             http://forum.fhem.de Frontends
 www/pgm2/dashboard/*         svenson08            http://forum.fhem.de Frontends
 www/pgm2/fhemweb_readingsGroup.js  justme1968     http://forum.fhem.de Frontends/readingsGroup readingsHistory
