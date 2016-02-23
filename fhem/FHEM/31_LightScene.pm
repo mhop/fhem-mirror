@@ -90,7 +90,6 @@ sub LightScene_Undefine($$)
   my ($hash,$arg) = @_;
 
   delete $hash->{SCENES};
-  LightScene_Save();
 
   return undef;
 }
