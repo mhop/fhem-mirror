@@ -168,9 +168,20 @@ my $db = {
         },
 
         'Jabber' => {
-            'Normal' => 'set %DEVICE% msg %RECIPIENT% %MSG%',
-            'High'   => 'set %DEVICE% msg %RECIPIENT% %MSG%',
-            'Low'    => 'set %DEVICE% msg %RECIPIENT% %MSG%',
+            'Normal' => 'set %DEVICE% msg%JabberMsgType% %RECIPIENT% %MSG%',
+            'High'   => 'set %DEVICE% msg%JabberMsgType% %RECIPIENT% %MSG%',
+            'Low'    => 'set %DEVICE% msg%JabberMsgType% %RECIPIENT% %MSG%',
+            'defaultValues' => {
+                'Normal' => {
+                    'JabberMsgType' => '',
+                },
+                'High' => {
+                    'JabberMsgType' => '',
+                },
+                'Low' => {
+                    'JabberMsgType' => '',
+                },
+            },
         },
 
         'Pushbullet' => {
