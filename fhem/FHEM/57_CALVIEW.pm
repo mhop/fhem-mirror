@@ -45,10 +45,12 @@ sub CALVIEW_Define($$){
 	$hash->{STATE}	= "Initialized";
 	$hash->{INTERVAL} = $inter;
 	$modes = "next" if (!defined($modes));
-	if($modes == 1)	{$attr{$name}{modes} = "next";}
-	elsif($modes == 0){$attr{$name}{modes} = "next";}
-	elsif($modes == 2){$attr{$name}{modes} = "next";}
-	elsif($modes == 3){$attr{$name}{modes} = "next";}
+	if ( $modes =~ /^\d+$/) {
+		if($modes == 1)	{$attr{$name}{modes} = "next";}
+		elsif($modes == 0){$attr{$name}{modes} = "next";}
+		elsif($modes == 2){$attr{$name}{modes} = "next";}
+		elsif($modes == 3){$attr{$name}{modes} = "next";}
+	}
 	elsif($modes eq "next"){$attr{$name}{modes} = "next";}
 	else {return "invalid mode \"$modes\", use 0,1,2 or next!"}
 	InternalTimer(gettimeofday()+2, "CALVIEW_GetUpdate", $hash, 0);
