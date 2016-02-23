@@ -355,7 +355,7 @@ KM271_Initialize($)
   $hash->{SetFn}    = "KM271_Set";
   $hash->{GetFn}    = "KM271_Get";
   $hash->{AttrFn}   = "KM271_Attr";
-  $hash->{AttrList} = "do_not_notify:1,0 all_km271_events:1,0 ww_timermode:automatik,tag readingsFilter $readingFnAttributes";
+  $hash->{AttrList} = "do_not_notify:1,0 all_km271_events:1,0 ww_timermode:automatik,tag readingsFilter additionalNotify $readingFnAttributes";
 
   %km271_rev = ();
   foreach my $k (sort keys %km271_tr) {      # Reverse map
@@ -760,7 +760,8 @@ KM271_Read($)
   # Analyze the data
   my ($fn, $arg) = ($1, $2);
   my $msghash = $km271_rev{$fn};
-  my $all_events = AttrVal($name, "all_km271_events", "");
+  my $all_events = AttrVal($name, 'all_km271_events', '');
+  my $notifyFilter = AttrVal($name, 'additionalNotify', '');
 
   if($msghash) {
     my $km271Timer = $hash->{PRG_TIMER};
@@ -776,7 +777,7 @@ KM271_Read($)
 
            if($f eq "d")  { $val /= $farg; }
         elsif($f eq "p")  { $val += $farg; }
-        elsif($f eq "ne") { $ntfy = $all_events; }
+        elsif($f eq "ne") { $ntfy = ($notifyFilter && $key =~ m/$notifyFilter/s) ? 1 : $all_events; }
         elsif($f eq "s")  { $val = $val-256 if($val > 127); }
         elsif($f eq "bf") { $val = KM271_setbits($val, $farg); }
         elsif($f eq "a")  { $val = $km271_arrays[$farg][$val]; }
@@ -829,7 +830,7 @@ KM271_Attr(@)
   if($cmd eq 'set') {
     if($attrName eq 'ww_timermode') {
       return "Invalid $attrName <$attrVal>" if(!$km271_set_betriebsart{$attrVal});
-    } elsif($attrName eq 'readingsFilter') {
+    } elsif($attrName eq 'readingsFilter' || $attrName eq 'additionalNotify') {
       eval {qr/$attrVal/};
       if($@) {
         Log3 $name, 1, "$name: Invalid Regex for $attrName <$attrVal> '$@'";
@@ -1148,9 +1149,14 @@ KM271_SetReading($$$$)
         Only readings which will match the regular expression will be used. All other readings are
         suppressed in the device and even in the logfile.
         </li>
+    <a name="additionalNotify"></a>
+    <li>additionalNotify<br>
+        Regular expression for activation of notify for readings with normally suppressed events.<br>
+        Useful for *_Vorlaufisttemperatur readings if notification should be activated only for a specific reading
+        and not for all like all_km271_events.
+        </li>
   </ul>
   <br>
-
 
   <a name="KM271events"></a>
   <b>Generated events:</b>
