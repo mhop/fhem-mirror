@@ -60,10 +60,19 @@ sub weekprofile_getDeviceType($;$)
 
   if ($devHash->{TYPE} =~ /CUL_HM/){
     my $model = AttrVal($device,"model","");
-    return undef if (!defined($devHash->{chanNo})); #no channel device
+    if (!defined($devHash->{chanNo})) { #no channel device
+      #Log 2, "weekprofile_getDeviceType: $devHash->{NAME}, $model, has no chanNo";
+      return undef;
+    }
     
-    $type = "CUL_HM" if ( ($model =~ m/.*(HM-CC).*/) && ($devHash->{chanNo} == 4) );
-    $type = "CUL_HM" if ( ($model =~ m/.*(HM-TC).*/) && ($devHash->{chanNo} == 2) );
+    my $channel = $devHash->{chanNo} + 0;
+    #Log 2, "weekprofile_getDeviceType: $devHash->{NAME}, $model, $channel";
+    
+    $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-RT.*/) && ($channel == 4) );
+    $type = "CUL_HM" if ( ($model =~ m/.*HM-TC.*/)    && ($channel == 2) );
+    $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-TC.*/) && ($channel == 2) );
+    
+    #Log 2, "weekprofile_getDeviceType: $devHash->{NAME}, $model, $channel unknown";
   }
   #avoid max shutter contact
   elsif ( ($devHash->{TYPE} =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
