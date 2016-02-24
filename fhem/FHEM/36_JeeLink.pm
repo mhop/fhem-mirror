@@ -256,7 +256,7 @@ JeeLink_Set($@)
 
       $log .= "Mode is LaCrosseGateway OTA-update\n";
       DevIo_CloseDev($hash);
-      $hash->{STATE} = "disconnected";
+      readingsSingleUpdate($hash, "state", "disconnected", 1);
       $log .= "$name closed\n";
 
       my @spl = split(':', $hash->{DeviceName});
@@ -291,7 +291,7 @@ JeeLink_Set($@)
         }
 
         DevIo_CloseDev($hash);
-        $hash->{STATE} = "disconnected";
+        readingsSingleUpdate($hash, "state", "disconnected", 1);
         $log .= "$name closed\n";
 
         my $avrdude = $flashCommand;
@@ -417,29 +417,30 @@ JeeLink_Get($@)
       JeeLink_SimpleWrite($hash, "h");
     } else {
       JeeLink_SimpleWrite($hash, "l");
-        }
+    }
+
   } elsif( $cmd eq "initJeeLink" ) {
+    readingsSingleUpdate($hash, "state", "opened", 1);
 
-        $hash->{STATE} = "Opened";
+    if($hash->{model} =~m/JeeNode -- HomeControl -/ ) {
+            JeeLink_SimpleWrite($hash, "o");
+    } else {
+      JeeLink_SimpleWrite($hash, "0c");
+      JeeLink_SimpleWrite($hash, "2c");
+    }
 
-        if($hash->{model} =~m/JeeNode -- HomeControl -/ ) {
-                JeeLink_SimpleWrite($hash, "o");
-        } else {
-            JeeLink_SimpleWrite($hash, "0c");
-        JeeLink_SimpleWrite($hash, "2c");
-                }
+  } elsif ($cmd eq "raw" ) {
+    return "raw => 01" if($arg =~ m/^Ir/);  ## Needed for CUL_IR usage (IR-Receive is always on for JeeLinks
 
-        } elsif ($cmd eq "raw" ) {
-                return "raw => 01" if($arg =~ m/^Ir/);  ## Needed for CUL_IR usage (IR-Receive is always on for JeeLinks
+  } elsif ($cmd eq "RFMconfig" ) {
+    JeeLink_SimpleWrite($hash, "f");
 
-        } elsif ($cmd eq "RFMconfig" ) {
-                JeeLink_SimpleWrite($hash, "f");
-
-        } elsif ($cmd eq "updateAvailRam" ) {
-                        JeeLink_SimpleWrite($hash, "m");
+  } elsif ($cmd eq "updateAvailRam" ) {
+    JeeLink_SimpleWrite($hash, "m");
 
   } else {
     return "Unknown argument $cmd, choose one of ".$list;
+
   }
 
   return undef;
@@ -472,7 +473,7 @@ JeeLink_DoInit($)
 
   JeeLink_Clear($hash);
 
-  $hash->{STATE} = "Opened";
+  readingsSingleUpdate($hash, "state", "opened", 1);
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -708,7 +709,7 @@ JeeLink_Parse($$$$)
   if($dmsg =~ m/^\[/ ) {
     $hash->{model} = $dmsg;
 
-    if( $hash->{STATE} eq "Opened" ) {
+    if( ReadingsVal($name,"state","" ) eq "opened" ) {
       if( my $initCommandsString = AttrVal($name, "initCommands", undef) ) {
         my @initCommands = split(' ', $initCommandsString);
         foreach my $command (@initCommands) {
@@ -740,7 +741,7 @@ JeeLink_Parse($$$$)
         JeeLink_SimpleWrite($hash, "m");   # show used ram on jeenode
       }
 
-      $hash->{STATE} = "Initialized";
+      readingsSingleUpdate($hash, "state", "initialized", 1);
       $hash->{initMessages} = '';
     }
 

@@ -254,7 +254,7 @@ panStamp_DoInit($)
 
   panStamp_SimpleWrite($hash, "00".$hash->{address}."0000010000" );
 
-  $hash->{STATE} = "Initialized";
+  readingsSingleUpdate($hash, "state", "initialized", 1);
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
