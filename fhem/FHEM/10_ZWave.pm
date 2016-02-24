@@ -3587,7 +3587,7 @@ ZWave_addToSendStack($$$)
 
   if(ZWave_isWakeUp($hash)) {
     # SECURITY XXX and neighborList
-    if ($cmd =~ m/^......988[01].*/ || $cmd =~ m/^80..0101$/) {
+    if ($cmd =~ m/^......988[01].*/ || $cmd =~ m/^80..0100$/) {
       Log3 $hash->{NAME}, 5, "$hash->{NAME}: Sendstack bypassed for $cmd";
     } else {
       return "Scheduled for sending after WAKEUP" if(!$hash->{wakeupAlive});
