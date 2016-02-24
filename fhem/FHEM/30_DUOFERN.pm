@@ -1021,7 +1021,7 @@ DUOFERN_Parse($$)
     my $brightness      = (hex(substr($msg,  8, 4)) & 0x01FF) * $brightnessExp;
     my $sunDirection    =  hex(substr($msg, 14, 2)) * 1.5 ;
     my $sunHeight       =  hex(substr($msg, 16, 2)) - 90 ;
-    my $temperature     = (hex(substr($msg, 18, 4)) & 0x7FFF)/10 - 40 ;
+    my $temperature     = ((hex(substr($msg, 18, 4)) & 0x7FFF)-400)/10 ;
     my $isRaining       = (hex(substr($msg, 18, 4)) & 0x8000 ? 1 : 0);
     my $wind            = (hex(substr($msg, 22, 4)) & 0x03FF) / 10;
     
