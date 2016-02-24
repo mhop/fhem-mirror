@@ -204,21 +204,21 @@ sub getsummery($)
 	my @modes = split(/,/,$modi);
 	foreach my $calendername (@calendernamen){
 		#foreach my $mode (@modes){
-			my $all = CallFn($calendername, "GetFn", $defs{$calendername},(" ","full", "next"));
+			my $all = CallFn($calendername, "GetFn", $defs{$calendername},(" ","uid", "next"));
 			my @termine=split(/\n/,$all);
 			
-			foreach my $termin (@termine){
-				my @uid=split(/\s+/,$termin);
+			foreach my $uid (@termine){
+				#my @uid=split(/\s+/,$termin);
 				#für jedes event die einzelnen infos holen
-				my $tmpstarts = CallFn($calendername, "GetFn", $defs{$calendername},(" ","start", $uid[0]));
+				my $tmpstarts = CallFn($calendername, "GetFn", $defs{$calendername},(" ","start", $uid));
 				my @starts  = split(/\n/,$tmpstarts);
 				#my $tmptexts = CallFn($calendername, "GetFn", $defs{$calendername},(" ","text", $uid[0]));
 				#my @texts  = split(/\n/,$tmptexts);
-				my $tmpends = CallFn($calendername, "GetFn", $defs{$calendername},(" ","end", $uid[0]));
+				my $tmpends = CallFn($calendername, "GetFn", $defs{$calendername},(" ","end", $uid));
 				my @ends  = split(/\n/,$tmpends);
-				my $tmpsummarys = CallFn($calendername, "GetFn", $defs{$calendername},(" ","summary", $uid[0]));
+				my $tmpsummarys = CallFn($calendername, "GetFn", $defs{$calendername},(" ","summary", $uid));
 				my @summarys  = split(/\n/,$tmpsummarys);
-				my $tmplocations = CallFn($calendername, "GetFn", $defs{$calendername},(" ","location", $uid[0]));
+				my $tmplocations = CallFn($calendername, "GetFn", $defs{$calendername},(" ","location", $uid));
 				my @locations = split(/\n/,$tmplocations);
 				
 				for(my $i = 1; $i <= (scalar(@starts)); $i++) {
