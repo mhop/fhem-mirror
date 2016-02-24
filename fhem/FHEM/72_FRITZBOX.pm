@@ -773,7 +773,11 @@ sub FRITZBOX_API_Check_Run($)
    # Check if m3u can be created and the URL tested
       my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", "./www/images/".$name.".m3u" );
       if (open my $fh, '>', $m3uFileLocal) {
-         print $fh "http://translate.google.com/translate_tts?ie=UTF-8&tl=fr&q=Lirumlaruml%C3%B6ffelstielwerdasnichtkannderkannnichtviel";
+         my $ttsText = uri_escape("Lirumlarumlöffelstielwerdasnichtkannderkannnichtviel");
+         my $ttsLink = $ttsLinkTemplate;
+         $ttsLink =~ s/\[TEXT\]/$ttsText/;
+         $ttsLink =~ s/\[SPRACHE\]/fr/;
+         print $fh $ttsLink;
          close $fh;
          FRITZBOX_Log $hash, 4, "Created m3u file '$m3uFileLocal'.";
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_LOCAL", $m3uFileLocal;
@@ -815,34 +819,50 @@ sub FRITZBOX_API_Check_Run($)
          FRITZBOX_Log $hash, 4, "Error: Cannot create save file '$m3uFileLocal' because $!\n";
       }
 
-   # Box model
+   # Box model per jason
       FRITZBOX_Log $hash, 5, "Read 'jason_boxinfo'";
-      # FRITZBOX_Log $hash, 5, "Read 'system_status'";
-      # my $url = "http://$host/cgi-bin/system_status";
-      my $url = "http://$host/jason_boxinfo.xml";
+      my $url = "http://".$host."/jason_boxinfo.xml";
       
       $response = $agent->get( $url );
       my $content  = $response->content;
-      # $content=$1    if $content =~ /<body>(.*)<\/body>/;
-      
-      # my @result = split /-/, $content;
-      # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
-      # 0 FritzBox-Modell
-      # 1 Annex/Erweiterte Kennzeichnung
-      # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
-      # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
-      # 4+5 Hashcode
-      # 6 Status
-      # 7 Firmwareversion
-      # 8 Sub-Version/Unterversion der Firmware
-      # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
-      # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-      # FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+      # FRITZBOX_Log $hash, 5, "jason_boxinfo returned: $content";
 
       FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1)    if $content =~ /<j:Name>(.*)<\/j:Name>/;
       FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)    if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
       FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1)    if $content =~ /<j:Version>(.*)<\/j:Version>/;
+    
+    # Ansonsten Box-Model per system_status einlesen
+      unless ($content =~ /<j:Name>/) {
+      # Muss nochmal neu gesetzt werden, sonst gibt es einen Fehler (keine Ahnung warum)
+         $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+         $url = "http://".$host."/cgi-bin/system_status";
+         FRITZBOX_Log $hash, 5, "Read 'system_status'";
          
+         $response = $agent->get( $url );
+         $content  = $response->content;
+         # FRITZBOX_Log $hash, 5, "system_status returned: $content";
+         if ($response->is_success) {
+            $content=$1    if $content =~ /<body>(.*)<\/body>/;
+            
+            my @result = split /-/, $content;
+            # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
+            # 0 FritzBox-Modell
+            # 1 Annex/Erweiterte Kennzeichnung
+            # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
+            # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
+            # 4+5 Hashcode
+            # 6 Status
+            # 7 Firmwareversion
+            # 8 Sub-Version/Unterversion der Firmware
+            # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $result[7];
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+         }
+         else {
+            FRITZBOX_Log $hash, 4, "Error: ".$response->status_line;
+         };
+      };
    }
    
 # Check if telnet modul exists
@@ -2056,8 +2076,7 @@ sub FRITZBOX_Call_Run_Shell($)
    @cmdArray = ();
    
 # Creation fhemRadioStation for ttsLink
-   if ($ttsLink)
-   {
+   if ($ttsLink) {
 #Preparing 1st command array
       push @cmdArray, '[ -f "'.$mohUpload.'" ] && rm "'.$mohUpload.'"';
       push @cmdArray, '[ -f "'.$mohOld.'" ] && rm "'.$mohOld.'"';
@@ -2844,7 +2863,7 @@ sub FRITZBOX_Ring_Run_Web($)
     }
 
 # build message to show
-    my $msg = AttrVal( $name, "defaultCallerName", "FHEM" );
+   my $msg = AttrVal( $name, "defaultCallerName", "FHEM" );
    if ( $field{show} ) {
       chop $field{show};
       $msg = $field{show};
@@ -3042,7 +3061,7 @@ sub FRITZBOX_Ring_Run_Web($)
             $ttsLink = $hash->{M3U_URL}      if $hash->{M3U_URL} ne "undefined";
          } 
          else {
-            my $msg = "Error: Cannot create save file '".$hash->{M3U_LOCAL}."' because: ".$!."\n";
+            my $msg = "Error: Cannot create file '".$hash->{M3U_LOCAL}."' because: ".$!."\n";
             FRITZBOX_Log $hash, 4, $msg;
          }
       }
@@ -3050,7 +3069,7 @@ sub FRITZBOX_Ring_Run_Web($)
    }
 #Execute command array
    $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray )
-      if int( @webCmdArray ) > 0;
+      if $hash->{WEBCM}==1 && int( @webCmdArray ) > 0;
 
    $result = FRITZBOX_Web_CmdGet( $hash, \@getCmdArray )
       if int( @getCmdArray ) > 0;
@@ -4715,7 +4734,7 @@ sub FRITZBOX_fritztris($)
          Maximal 30 characters are allowed.
          <br/><br/>
          On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (max. 100 characters) instead of using the ringtone. 
-         Alternatively a MP3 link can be played with 'play:'. This creates the internet radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
+         Alternatively, a MP3 link (from a web server) can be played with 'play:'. This creates the internet radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
          Say and play works only with a single Fritz!Fon.
          <br>
          This behaviour may vary depending on the Fritz!OS.
@@ -5085,7 +5104,7 @@ sub FRITZBOX_fritztris($)
          <br/><br/>
          Auf Fritz!Fons wird der Text (max. 100 Zeichen) hinter dem Parameter 'say:' direkt angesagt und ersetzt den Klingelton.
          <br>
-         Alternativ kann mit 'play:' auch ein MP3-Link abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com f&uuml;r Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
+         Alternativ kann mit 'play:' auch ein MP3-Link (vom einem Webserver) abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com f&uuml;r Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
          Das Abspielen ist nur auf jeweils einem einzelnen Fritz!Fon m&ouml;glich.
          <br>
          Je nach Fritz!OS kann das beschriebene Verhalten abweichen.
