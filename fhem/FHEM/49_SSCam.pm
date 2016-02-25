@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.19   25.02.2016    functions for cam-livestream added
 # 1.18.1 21.02.2016    fixed a problem that the state is "disable" instead of
 #                      "disabled" if a camera is disabled and FHEM will be restarted
 # 1.18   20.02.2016    function "get ... eventlist" added,
@@ -110,16 +111,20 @@ use HttpUtils;
 sub SSCam_Initialize($) {
  # die Namen der Funktionen, die das Modul implementiert und die fhem.pl aufrufen soll
  my ($hash) = @_;
- $hash->{DefFn}     = "SSCam_Define";
- $hash->{UndefFn}   = "SSCam_Undef";
- $hash->{DeleteFn}  = "SSCam_Delete"; 
- $hash->{SetFn}     = "SSCam_Set";
- $hash->{GetFn}     = "SSCam_Get";
- $hash->{AttrFn}    = "SSCam_Attr";
- 
+ $hash->{DefFn}        = "SSCam_Define";
+ $hash->{UndefFn}      = "SSCam_Undef";
+ $hash->{DeleteFn}     = "SSCam_Delete"; 
+ $hash->{SetFn}        = "SSCam_Set";
+ $hash->{GetFn}        = "SSCam_Get";
+ $hash->{AttrFn}       = "SSCam_Attr";
+ # Aufrufe aus FHEMWEB
+ $hash->{FW_summaryFn} = "SSCam_liveview";
+ $hash->{FW_detailFn}  = "SSCam_liveview";
  
  $hash->{AttrList} =
          "httptimeout ".
+         "htmlattr ".
+         "livestreamprefix ".
          "pollcaminfoall ".
          "pollnologging:1,0 ".
          "debugactivetoken:1 ".
@@ -171,8 +176,13 @@ sub SSCam_Define {
   $hash->{HELPER}{ACTIVE}              = "off";                                                   # Funktionstoken "off", Funktionen können sofort starten
   $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";                                                     # Loggingfunktion für Polling ist an
   $hash->{HELPER}{RECTIME_DEF}         = "15";                                                    # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
-  readingsSingleUpdate($hash,"Availability", "", 0);                                              # Verfügbarkeit ist unbekannt
-  readingsSingleUpdate($hash,"PollState","Inactive",0);                                           # es ist keine Gerätepolling aktiv
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"Availability", "");                                                   # Verfügbarkeit ist unbekannt
+  readingsBulkUpdate($hash,"PollState","Inactive");                                               # es ist keine Gerätepolling aktiv
+  readingsBulkUpdate($hash,"LiveStreamUrl", "");                                                  # LiveStream URL zurücksetzen
+  readingsEndUpdate($hash,1);                                          
+  
   getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)  
   
   RemoveInternalTimer($hash);                                                                     # alle Timer löschen
@@ -252,7 +262,8 @@ sub SSCam_Set {
                    "snap ".
                    "enable ".
                    "disable ".
-                   # "runLiveview ".
+                   "runView:image,link ".
+                   "stopView:noArg ".
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                    ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
@@ -382,11 +393,16 @@ sub SSCam_Set {
             $hash->{HELPER}{PTZACTION}  = "movestart";
             doptzaction($hash);
         }
-        elsif ($opt eq "runLiveview") 
+        elsif ($opt eq "runView") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            $hash->{HELPER}{WLTYPE} = $prop;
             runliveview($hash);
         }
+        elsif ($opt eq "stopView") 
+        {
+            stopliveview($hash);            
+        }        
         else  
         {
             return $setlist;
@@ -419,7 +435,6 @@ sub SSCam_Get {
             # sind die Credentials gesetzt ?
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
-            # hier die Verarbeitung starten
             if ($opt eq "caminfoall") 
             {
                 # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
@@ -443,6 +458,37 @@ sub SSCam_Get {
 return undef;
 }
 
+######################################################################################
+###  Kamera Liveview Anzeige in FHEMWEB
+
+sub SSCam_liveview ($$$$) {
+
+  my ($FW_wname, $d, $room, $pageHash) = @_;            # pageHash für summaryFn in FHEMWEB
+  my $hash          = $defs{$d};
+  my $name          = $hash->{NAME};
+  my $link          = $hash->{HELPER}{LINK};
+  my $wltype        = $hash->{HELPER}{WLTYPE};
+  my $ret;
+  my $alias;
+    
+  return if(!$hash->{HELPER}{LINK} || ReadingsVal("$name", "state", "") =~ /^dis.*/);
+  
+  my $attr = AttrVal($d, "htmlattr", "");
+  
+  if($wltype eq "image") {
+    $ret = "<img src=$link $attr><br>";
+  
+  } elsif($wltype eq "iframe") {
+    $ret = "<iframe src=$link $attr>Iframes disabled</iframe>";
+           
+  } elsif($wltype eq "link") {
+    # $alias = AttrVal($d, "alias", $d)."_liveview";
+    $alias = "LiveCam";
+    $ret = "<a href=$link $attr>$alias</a><br>";        # wenn attr target=_blank neuer Browsertab
+  }
+
+return $ret;
+}
 
 ######################################################################################
 ###  initiale Startroutinen nach Restart FHEM
@@ -485,6 +531,8 @@ sub initonboot ($) {
   
 return undef;
 }
+
+
 
 ######################################################################################
 ###  Username / Paßwort speichern
@@ -984,11 +1032,67 @@ sub runliveview ($) {
             &printlog($hash,$logstr,"3");
         }
         
+        readingsSingleUpdate($hash,"state","startview",1); 
+        
         &getapisites_nonbl($hash);
     }
     else
     {
         InternalTimer(gettimeofday()+0.23, "runliveview", $hash, 0);
+    }    
+}
+
+###############################################################################
+###   Kamera Liveview stoppen
+
+sub stopliveview ($) {
+    my ($hash)   = @_;
+    my $camname  = $hash->{CAMNAME};
+    my $name     = $hash->{NAME};
+    my $logstr;
+    my $errorcode;
+    my $error;
+   
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        
+        return if (!$hash->{HELPER}{SID_STRM});  # runView ist nicht ausgeführt
+        
+        # kurzer state-switch -> Browser aktualisieren
+        readingsSingleUpdate($hash,"state","stopview",1); 
+        
+        # Liveview stoppen
+        $logstr = "Stop Liveview of Camera $camname now";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "stopliveview";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
+        $hash->{HELPER}{SID} = $hash->{HELPER}{SID_STRM};
+        
+        # Liveview-SID und Link aus Helper-hash löschen
+        delete $hash->{HELPER}{SID_STRM};
+        delete $hash->{HELPER}{LINK};
+        
+        readingsSingleUpdate($hash,"LiveStreamUrl", "", 1);
+        
+        if (ReadingsVal("$name", "Record", "") eq "Start") {
+            readingsSingleUpdate( $hash,"state", "on", 1); 
+            }
+            else
+            {
+            readingsSingleUpdate($hash,"state", "off", 1); 
+            }        
+        
+        logout_nonbl($hash);
+    }
+    else
+    {
+        InternalTimer(gettimeofday()+0.23, "stopliveview", $hash, 0);
     }    
 }
 
@@ -2316,7 +2420,34 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "runliveview")
    {
-      $url = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=\"$apivideostm\"&version=\"$apivideostmmaxver\"&method=\"Stream\"&cameraId=\"$camid\"&format=\"mjpeg\"&_sid=\"$sid\"";   
+      # SID nach SID_STRM sichern und nutzen (für stopLiveview-Routine)
+      $hash->{HELPER}{SID_STRM} = $sid;
+      # externe URL
+      my $livestream = !AttrVal($name, "livestreamprefix", undef) ? "http://$serveraddr:$serverport" : AttrVal($name, "livestreamprefix", undef);
+      $livestream .= "/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\"";
+      # interne URL
+      $url = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\""; 
+      
+      # Liveview-Link in Hash speichern -> Anzeige über SSCam_liveview, in Reading setzen für Linkversand
+      $hash->{HELPER}{LINK} = $url;
+      readingsSingleUpdate($hash,"LiveStreamUrl", $livestream, 1);
+         
+      $logstr = "Set Livestream-URL: $url";
+      &printlog($hash,$logstr,"4");
+ 
+      $logstr = "--- End Function cam: $OpMode nonblocking ---";
+      &printlog($hash,$logstr,"4");
+      
+      if (ReadingsVal("$name", "Record", "") eq "Start") {
+                    readingsSingleUpdate( $hash,"state", "on", 1); 
+                    }
+                    else
+                    {
+                    readingsSingleUpdate($hash,"state", "off", 1); 
+                    }
+                    
+      $hash->{HELPER}{ACTIVE} = "off";   
+      return;
    }
    
    $logstr = "Call-Out now: $url";
@@ -2474,20 +2605,6 @@ sub camret_nonbl ($) {
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
             }
-            elsif ($OpMode eq "runliveview") 
-            {              
-                # Setreading 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-       
-                # Logausgabe
-                $logstr = "Camera $camname liveview was started successfully";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
-            }            
             elsif ($OpMode eq "MotDetSc") 
             {              
                 # Setreading 
@@ -3460,7 +3577,8 @@ return;
        <li>Move to a predefined Preset-position (at PTZ-cameras) </li>
        <li>Start a predefined Patrol (at PTZ-cameras) </li>
        <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
-       <li>continuous moving of PTZ-camera lense   </li><br>
+       <li>continuous moving of PTZ-camera lense   </li>
+       <li>start and stop of camera livestreams  </li><br>
     </ul>
    </ul>
    The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
@@ -3568,7 +3686,9 @@ return;
       <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
-      <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
+      <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - observer with privilege liveview of camera </li></td></tr>
+      <tr><td><li>set ... stopView           </td><td> -                                          </li></td></tr>
+      <tr><td><li>set ... credentials        </td><td> -                                          </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - observer    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -3608,6 +3728,8 @@ return;
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>starts a predefinied patrol (PTZ-cameras)  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>starts a continuous move of PTZ-camera to direction up/down/left/right or dir_X  </td></tr> 
+      <tr><td>"runView [image | link]":                            </td><td>starts a livestream as embedded image or link  </td></tr> 
+      <tr><td>"stopView":                                          </td><td>stops a camera livestream  </td></tr> 
   </table>
   <br><br>
   
@@ -3798,6 +3920,30 @@ return;
     set &lt;name&gt; move dir_20 0.7  : moves PTZ 1,5 Sek. (plus processing time) to left-bottom ("CapPTZDirections = 32)"
   </pre>
   
+  <br>
+  
+  <b> set &lt;name&gt; runView [ image | link ] </b> <br><br>
+  
+  A livestream of a camera will be started, either as embedded image or as a generated link.
+  The behavior of livestream in FHEMWEB can be affected by statements in <a href="#SSCamattr">attribute</a> "htmlattr". <br><br>
+  
+  <b>Example:</b><br>
+  <pre>
+    attr &lt;name&gt; htmlattr target=_blank width="500" height="375"
+  </pre>
+  
+  With these attribute values a streaming link will be opened in a new browser tab. If the stream will be started as an image, the size changes appropriately the
+  values of width and hight. <br>
+  The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrite the data for protocol, servername and port in <a href="#SSCamreadings">reading</a> "LiveStreamUrl".
+  With it the LivestreamURL can be modified and used for distribution and external access to SVS livestream. <br><br>
+  
+  <b>Example:</b><br>
+  <pre>
+    attr &lt;name&gt; livestreamprefix https://&lt;Servername&gt;:&lt;Port&gt;
+  </pre>
+  
+  The livestream will be stopped again using command <b>"set &lt;name&gt; stopView"</b> .
+  
   <br><br><br>
   
  </ul>
@@ -3920,7 +4066,8 @@ return;
     <tr><td><li>Errorcode</li>          </td><td>- error code of last error  </td></tr>
     <tr><td><li>LastSnapFilename</li>   </td><td>- the filename of the last snapshot   </td></tr>
     <tr><td><li>LastSnapId</li>         </td><td>- the ID of the last snapshot   </td></tr>    
-    <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall"  </td></tr>   
+    <tr><td><li>LastUpdateTime</li>     </td><td>- date / time the last update of readings by "caminfoall"  </td></tr> 
+    <tr><td><li>LiveStreamUrl </li>     </td><td>- the livestream URL if stream is started  </td></tr> 
     <tr><td><li>Patrols</li>            </td><td>- in Synology Surveillance Station predefined patrols (at PTZ-Cameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- shows the state of automatic polling  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Synology Surveillance Station predefined Presets (at PTZ-Cameras)  </td></tr>
@@ -3947,6 +4094,10 @@ return;
   <li><b>debugactivetoken</b> - if set the state of active token will be logged - only for debugging, don't use it in normal operation </li>
   
   <li><b>httptimeout</b> - Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" or not set) </li>
+  
+  <li><b>htmlattr</b> - additional specifications to livestream-Url to manipulate the behavior of stream, e.g. size of the image </li>
+  
+  <li><b>livestreamprefix</b> - overwrites the specifications of protocol, servername and port for further use of the livestream address, e.g. as an link for external use  </li>
   
   <li><b>pollcaminfoall</b> - Interval of automatic polling the Camera properties (if < 10: no polling, if &gt; 10: polling with interval) </li>
 
@@ -4004,7 +4155,8 @@ return;
       <li>Bewegen an eine vordefinierte Preset-Position (bei PTZ-Kameras) </li>
       <li>Start einer vordefinierten Überwachungstour (bei PTZ-Kameras)  </li>
       <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
-      <li>kontinuierliche Bewegung von PTZ-Kameras   </li><br>
+      <li>kontinuierliche Bewegung von PTZ-Kameras   </li>
+      <li>starten und beenden von Kamera-Livestreams  </li><br>
      </ul> 
     </ul>
     Die Aufnahmen stehen in der Synology Surveillance Station (SVS) zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
@@ -4108,6 +4260,8 @@ return;
       <tr><td><li>set ... runPatrol          </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - Betrachter mit Privileg Objektivsteuerung der Kamera  </li></td></tr>
+      <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - Betrachter mit Privileg Liveansicht für Kamera        </li></td></tr>
+      <tr><td><li>set ... stopView           </td><td> -                                            </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
@@ -4149,6 +4303,8 @@ return;
       <tr><td>"runPatrol &lt;Patrolname&gt;":                  </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":   </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":     </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
+      <tr><td>"runView [image | link]":                        </td><td>startet einen Livestream als eingbettetes Image oder als Link  </td></tr>
+      <tr><td>"stopView":                                      </td><td>stoppt einen Kamera-Livestream  </td></tr>
   </table>
   <br><br>
   
@@ -4328,7 +4484,7 @@ return;
   Im Gegensatz zum "set &lt;name&gt; goAbsPTZ"-Befehl startet der Befehl "set &lt;name&gt; move" eine kontinuierliche Bewegung bis ein Stop-Kommando empfangen wird. 
   Das Stop-Kommando wird nach Ablauf der optional anzugebenden Zeit [Sekunden] ausgelöst. Wird diese Laufzeit nicht angegeben, wird implizit Sekunde = 1 gesetzt. <br><br>
   
-  Beispiele: <br>
+  <b>Beispiele: </b><br>
   
   <pre> 
     set &lt;name&gt; move up 0.5      : bewegt PTZ 0,5 Sek. (zzgl. Prozesszeit) nach oben
@@ -4336,6 +4492,30 @@ return;
     set &lt;name&gt; move dir_20 0.7  : bewegt PTZ 1,5 Sek. (zzgl. Prozesszeit) nach links-unten ("CapPTZDirections = 32)"
   </pre>
 
+  <br>
+  
+  <b> set &lt;name&gt; runView [ image | link ] </b> <br><br>
+  
+  Es wird ein Livestream der Kamera, entweder als eingebettetes Image oder als generierter Link, gestartet. 
+  Das Verhalten des Livestreams im FHEMWEB kann durch Angaben im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden. <br><br>
+  
+  <b>Beispiel:</b><br>
+  <pre>
+    attr &lt;name&gt; htmlattr target=_blank width="500" height="375"
+  </pre>
+  
+  Mit diesen Attributwerten öffnet der Link als weiteres Fenster/Browsertab. Wird der Stream als Image gestartet, ändert sich die Größe entsprechend der 
+  Angaben von Width und Hight. <br>
+  Das gesetzte <a href="#SSCamattr">Attribut</a> "livestreamprefix" überschreibt im <a href="#SSCamreadings">Reading</a> "LiveStreamUrl" die Angaben für Protokoll, Servername und Port. 
+  Damit kann z.B. die LiveStreamUrl für den Versand und externen Zugriff auf die SVS modifiziert werden. <br><br>
+  
+  <b>Beispiel:</b><br>
+  <pre>
+    attr &lt;name&gt; livestreamprefix https://&lt;Servername&gt;:&lt;Port&gt;
+  </pre>
+  
+  Der Livestream wird über das Kommando <b>"set &lt;name&gt; stopView"</b> wieder beendet. 
+  
   <br><br><br>
 
 </ul>
@@ -4459,7 +4639,8 @@ return;
     <tr><td><li>Errorcode</li>          </td><td>- Fehlercode des letzten Fehlers   </td></tr>
     <tr><td><li>LastSnapFilename</li>   </td><td>- der Filename des letzten Schnapschusses   </td></tr>
     <tr><td><li>LastSnapId</li>         </td><td>- die ID des letzten Schnapschusses   </td></tr>
-    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" </td></tr>   
+    <tr><td><li>LastUpdateTime</li>     </td><td>- Datum / Zeit der letzten Aktualisierung durch "caminfoall" </td></tr> 
+    <tr><td><li>LiveStreamUrl </li>     </td><td>- die LiveStream-Url wenn der Stream gestartet ist </td></tr> 
     <tr><td><li>Patrols</li>            </td><td>- in Surveillance Station voreingestellte Überwachungstouren (bei PTZ-Kameras)  </td></tr>
     <tr><td><li>PollState</li>          </td><td>- zeigt den Status des automatischen Pollings an  </td></tr>    
     <tr><td><li>Presets</li>            </td><td>- in Surveillance Station voreingestellte Positionen (bei PTZ-Kameras)  </td></tr>
@@ -4486,6 +4667,10 @@ return;
   <li><b>debugactivetoken</b> - wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im normalen Betrieb benutzen </li>
   
   <li><b>httptimeout</b> - Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn httptimeout = "0" oder nicht gesetzt) </li>
+  
+  <li><b>htmlattr</b> - ergänzende Angaben zur Livestream-Url um das Verhalten wie Bildgröße zu beeinflussen  </li>
+  
+  <li><b>livestreamprefix</b> - überschreibt die Angaben zu Protokoll, Servernamen und Port zur Weiterverwendung der Livestreamadresse als z.B. externer Link   </li>
   
   <li><b>pollcaminfoall</b> - Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein Polling, größer 10: Polling mit Intervall) </li>
 
