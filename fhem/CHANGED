@@ -1,65 +1,54 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - bugfix: 98_weekprofile: detect channel of HM-CC-TC as correct thermostat 
-  - bugfix: 00_SIGNALduino: Version 3.2.0 Module & Firmware
-                            serval fixes and enhacements
-                            improved stability
-                            supports many new protocol 
-                            Supports ITv3 sockets and switches
-                            new sendMsg Function
-                            You need to flash your SIGNALduino
-                            with the new firmware.
-  - bugfix: 14_Hideki:      support rain sensors
-  - bugfix: 14_SD_WS07:     Fixed some wordings   
-  - feature: 14_SD_WS09     Module for WH1080 
-							(WS-0101, TFA30.3189) & CTW600 868MHz OOK/AS
+  - bugfix:  pre-coomit-hook test
+  - bugfix:  98_weekprofile: detect channel of HM-CC-TC as correct thermostat 
+  - bugfix:  00_SIGNALduino: Version 3.2.0 Module & Firmware
+             serval fixes and enhacements, improved stability, supports many
+             new protocols, ITv3 sockets and switches, new sendMsg Function.
+             You need to flash your SIGNALduino with the new firmware.
+  - bugfix:  14_Hideki: support rain sensors
+  - bugfix:  14_SD_WS07: Fixed some wordings   
+  - feature: 14_SD_WS09  Module for WH1080
+             (WS-0101, TFA30.3189) & CTW600 868MHz OOK/AS
   - feature: TimeSeries: median, holdtime for event-aggregator 
   - feature: 57_CALVIEW: added internal notify-fn for calendar-devices,
-                         added attr disable for internal notify-fn,
-                         removed ts state and started_* reading,
-                         removed old mode-attributes /def modes,
-                         changed commandref
-  - bugfix   49_SSCam: fixed a problem that the state is "disable" instead of
-                       "disabled" if a camera is disabled and FHEM will be 
-                       restarted
-  - feature: 98_weekprofile: attribute widgetEditDaysInRow to control 
-                             visible days in one row
-  - feature  49_SSCAM: function "get ... eventlist" added,
-                       Reading "CamEventNum" added which containes total 
-                       number of camera events,
-                       change usage of reading "LastUpdateTime"
+             added attr disable for internal notify-fn, removed ts state and 
+             started_* reading, removed old mode-attributes /def modes,
+             changed commandref
+  - bugfix:  49_SSCam: fixed a problem that the state is "disable" instead of
+             "disabled" if a camera is disabled and FHEM will be restarted
+  - feature: 98_weekprofile: attribute widgetEditDaysInRow to control visible
+             days in one row
+  - feature: 49_SSCAM: function "get ... eventlist" added, Reading CamEventNum 
+             added which containes total number of camera events, change usage
+             of reading "LastUpdateTime"
   - added:   79_BDKM: new module for Buderus KM Gateways
   - feature: 57_Calendar: get ... uid ...
   - feature  49_SSCAM: function "runPatrol" added that starts predefined 
-                       patrols of PTZ-cameras,
-                       Reading "CamDetMotSc" added
+             patrols of PTZ-cameras, Reading "CamDetMotSc" added
   - feature: LightScene: added nextScene and previousScene commands
   - feature  49_SSCAM: Reading "CamExposureControl" added
   - feature  49_SSCAM: set up of motion detection source now possible
   - feature  55_GDS: disable conditions after 15.03.2016
   - feature  74_HOMBOT: formated Value for Reading lastClean
   - feature  74_HOMBOT: include Detail_Fn link to Luigi Contro Center
-  - feature  49_SSCAM: control of exposure mode day, night & auto is 
-                       possible now
+  - feature  49_SSCAM: control of exposure mode day, night & auto
   - bugfix:  74_HOMBOT: some set commands not work
   - feature: 32_mailcheck: added set active/inactive commands
   - feature: 02_RSS: new attribute urlOverride
   - feature: 71_YAMAHA_NP: Added auto reading update for tuner and player
-  - feature  49_SSCAM: The port in DEF-String is optional now,
-                       if not given, default port 5000 is used
+  - feature  49_SSCAM: The port in DEF-String is optional
   - bugfix:  98_weekprofile: transfer day settings to other days
-  - bugfix:  49_SSCAM: fixed a problem that manual updates using 
-                       "getcaminfoall" are leading to additional pollingloops 
-                       if polling is used,
-                       attribute "debugactivetoken" added for debugging-use
+  - bugfix:  49_SSCAM: fixed a problem that manual updates using
+             "getcaminfoall" are leading to additional pollingloops if polling
+             is used, attribute "debugactivetoken" added for debugging-use
   - feature: version: version command shows latest revision since last update
   - feature: 02_RSS: new attribute itemtitle
   - bugfix:  57_Calendar: weekly recurring events on several weekdays, that
              start around midnight
   - bugfix   49_SSCAM: fixed a problem that a usersession won't be destroyed
-                       if a function couldn't be executed successfully
-  - bugfix:  95_Dashboard: fixed javascript error because of changes
-		in fhemweb
+             if a function couldn't be executed successfully
+  - bugfix:  95_Dashboard: fixed javascript error because of changes in fhemweb
   - feature: 49_SSCAM: feature for retrieval snapfilename added
   - bugfix:  57_Calendar: weekly recurring events on several weekdays,
              missing description
@@ -69,12 +58,10 @@
   - feature: 02_RSS: continue image update sequence after error (HTML)
   - feature: 98_rssFeed: Possibility to modfy feed data via a custom function.
   - change:  49_SSCAM: entries with loglevl "2" reviewed,changed to loglevl "3"
-  - feature: 50_TelegramBot  receive media files,
-                send media files directly invocation (PNG, JPG, MP3, PDF, etc)
-                etc (see change log in file)
-  - feature: 49_SSCAM: added function "goPreset" and "goAbsPTZ" to control the 
-                       move of PTZ lense,
-             refere to commandref or have a look in forum at: 
+  - feature: 50_TelegramBot  receive media files, send media files directly
+             invocation (PNG, JPG, MP3, PDF, etc) etc (see change log in file)
+  - feature: 49_SSCAM: added function "goPreset" and "goAbsPTZ" to control the
+             move of PTZ lense, refer to commandref or have a look in forum at: 
              forum.fhem.de/index.php/topic,45671.msg404275.html#msg404275 ,
              forum.fhem.de/index.php/topic,45671.msg404892.html#msg404892
   - feature: 98_weekprofile: widget: transfer day settings to other days
@@ -88,14 +75,12 @@
              see http://forum.fhem.de/index.php/topic,48315.0.html
   - feature: new events for home automation buttons and unassigned buttons
   - feature: 10_KOPP_FC: added blinds and switches
-  - updated: 74_AMAD: New Mijor Release 1.2.0
-                      !!! ATTENTION !!! Do not forget to to update the new
-                      Automagic Flowset !!!
-  - feature:  74_AMAD: shutown the Device, activate Airplanemode, control
-                       Notivicationvolume, vibrates the Device, Locked Device
-                       by PIN
-  - bugfix: 74_AMAD: modified Error handling, best practice for identify offline
-                     Mode
+  - updated: 74_AMAD: New Minor Release 1.2.0
+             Do not forget to to update the new Automagic Flowset !!!
+  - feature: 74_AMAD: shutdown the Device, activate Airplanemode, control
+             Notivicationvolume, vibrates the Device, Locked Device by PIN
+  - bugfix:  74_AMAD: modified Error handling, best practice for identify
+             offline Mode
   - feature: New module 74_HOMBOT to control LG Hombot vacuum cleaner
   - bugfix:  49_SSCAM: credentials won't be deleted if "rereadcfg" is used
   - bugfix:  76_MSGMail: Make use of attribute mailtype again (enabling html)
@@ -331,18 +316,17 @@
              and the KeyValueProtocol module
   - feature: new module 36_KeyValueProtocol
   - bugfix:  95_Dashboard: the fhem root url is not hardcoded any more 
-                but read from the $FW_ME variable.
-		Fixed a problem that causes drag&drop being still activated
-		when the dashboard was locked. (resize/move)
+             but read from the $FW_ME variable. Fixed a problem that causes
+             drag&drop being still activated when the dashboard was locked.
+             (resize/move)
   - bugfix:  14_SD_WS07 - corrected syntax error and raised loglevels
   - bugfix:  55_GDS.pm - correct wrong cumulation in alerts (1st try)
   - feature: new module 10_DUOFERNSTICK and 30_DUOFERN added
   - feature: 59_Weather: prevent retrieval of older forecasts than the
              one previously retrieved
-  - fhem 5.7 released.
   - IMPORTANT: featurelevel is now 5.7, rendering @ and % non-functional
   
-- 2015-11-15 (5.6)
+- 2015-11-15 (5.7)
   - change: 30_MilightBridge/31_MilightDevice: Allow to disable ping check.
                             Add state "Initialized".
   - feature: 50_HP1000: new module to support HP1000 weather station
@@ -505,8 +489,8 @@
   - feature: 70_Pushover: Rewrite for Non-Blocking HttpUtils
                - much more readings
                - Support for emergency callback via push
-               - Support for supplementary URLs incl. push callback
-			     (e.g. for priority < 2)
+               - Support for supplementary URLs incl. push callback (e.g. for
+                 priority < 2)
                - Added readingFnAttributes to AttrList
                - Added support for HTML formatted text
                - Added user/group token validation
@@ -576,8 +560,8 @@
   - change:  59_Weather: removed empty header row from WeatherAsHtmlV
   - feature: 02_HTTPSRV: support tabletui (Forum #37232)
   - bugfix:  SOMFY: Only send stop if position changed
-                    improved timing for position update
-		    fix typos (go-my instead of go_my)
+             improved timing for position update fix typos (go-my instead of
+             go_my)
   - feature: ios6touchpadstyle: style adjustments for the Dashboard 
              module version 3.0
   - bugfix:  10_IT: Correct command parsing (forum id 38467)
@@ -1055,8 +1039,7 @@
   - FHEMWEB: JavaScripts and CssFiles attributes added
   - change:  avoid updating weather information on get (59_Weather.pm)
   - change:  removed noshutdown=0 for HTTP connections made in 57_Calendar.pm
-	     and 59_Weather.pm to address issues when FHEM is behind
-	     a web proxy
+             and 59_Weather.pm to address issues when FHEM is behind a web proxy
   - feature: update rewritten, restore added
   - feature: enabled JavaScript in 02_RSS to support WebViewControl
   - added:   new module 36_WMBUS.pm (kaihs) Wireless M-Bus
@@ -1066,9 +1049,8 @@
   - feature: SYSMON: power supply informations (ac, usb, battery)
   - feature: added 70_PushNotifier.pm
   - feature: 70_VIERA: Add parameter "HDMI1" - "HDMI4" for command remoteControl
-                      to select HDMI input directly.
-                      Add command "input" to select a HDMI port, TV or SD-Card
-                      as source
+             to select HDMI input directly. Add command "input" to select a
+             HDMI port, TV or SD-Card as source
   - bugfix:  LevelSender: Version 1.0.5: Could not get compiled by the Arduino
              IDE
   - feature: PRESENCE: new event "error" and "timeout" for state reading to
@@ -1106,14 +1088,12 @@
   - bugfix:  37_SHC.pm: Move xml file under subdir lib, otherwise it won't be
              deployed during update
   - bugfix:  70_PIONEERAVR.pm: player commands are now available for more inputs
-	     "play" was not in the drop down list of available set commands
+             "play" was not in the drop down list of available set commands
              check every 120s if the data connection to the Pioneer AV
-             receiver is still up
-             check if we get a reply from the Pioneer AV receiver not later
-             than 3s after a command was sent
-	     fix for alias names of inputs
-             more input presets (spotify, mhl, hdmi7, hdmi8), inputs are now
-             queried from 1 - 59
+             receiver is still up check if we get a reply from the Pioneer AV
+             receiver not later than 3s after a command was sent fix for alias
+             names of inputs more input presets (spotify, mhl, hdmi7, hdmi8),
+             inputs are now queried from 1 - 59
              71_PIONEERAVRZONE.pm: bugfix:logging, set input
   - change:  00_RPII2C.pm: hardware access changed to ioctl and syswrite/read
              SMBus module not needed anymore but still usable, see attribute
@@ -1314,18 +1294,16 @@
              creating a folder under fhem/images with the flooplan-name
   - feature: DASHBOARD:  Tabs can set on top, bottom or hidden.
   - bugfix:  SYSMON: another format for ifconfig output
-  - feature: DASHBOARD: Use longpoll to update content.
-			 rowcentercolwidth can now be defined per column.
-                         Dashboard can hide FHEMWEB Roomliste and Header =>
-                         Fullsizemode.
+  - feature: DASHBOARD: Use longpoll to update content. rowcentercolwidth can
+             now be defined per column.  Dashboard can hide FHEMWEB Roomliste
+             and Header => Fullsizemode.
   - bugfix:  SYSMON: null reading for absent mount points
   - feature: DbLog: jokers "%" in device/reading definition are now possible
   - feature: SYSMON: new CPU Statistics and Plots
   - feature: changed 10_OWServer.pm and 11_OWDevice.pm to use
              NOTIFYDEV (justme1968)
   - feature: LightScene: added setcmd command
-  - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group
-			 positioning.
+  - feature: DASHBOARD: Dashboard get Tabs. Redesign saving of Group positioning
   - bugfix:  SYSMON: Log Warnings, unnoetige Readings erkenen und entfernen
   - feature: LUXTRONIK2: Setting of controller parameter and internal clock
   - feature: new module 71_YAMAHA_BD.pm to control Yamaha Blu-Ray
@@ -1355,8 +1333,7 @@
              top or bottom of the Dashboard. Dashboard is always edited out
              the Room Dashboard.
   - bugfix:  VIERA: fixed bug related to set command remoteControl
-  - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old
-  	         Webif versions
+  - bugfix:  ENIGMA2: improved compatibility for Fritzbox and old Webif versions
   - feature: readingsGroup: process events only if visible in browser,
              allow <br> for line breaks in multi-reading lines
   - feature: FLOORPLAN: Style4 (S300TH specific) now keeps its formatting
@@ -1509,8 +1486,8 @@
   - feature: LightScene: add html overview of all configured scenes in
              detail view. allow usage of overview in a weblink.
   - feature: FLOORPLAN: enhanced detail-screen for floorplans in fhemweb,
-             arrange-mode has delete-button, new command
-			 "get <floorplan-name> config"
+             arrange-mode has delete-button, new command "get <floorplan-name>
+             config"
   - feature: readings type added to weblink (justme1968)
   - feature: offset and monotonic added to userReadings modifier (justme1968)
   - feature: HUEDevice: support SVG icons for LWB001 living whites bulb
@@ -1875,8 +1852,8 @@
   - feature: autocreate.pm (create undefined RF devices, logs and plots)
   - feature: on-for-timer added for X10 modules (Boris)
   - bugfix:  pgm3: Better check of availability of google-weather (MartinH)
-  - feature: pgm3: DBLog added for everything except UserDefs
-  	     (Gerhard Pfeffer / MartinH)
+  - feature: pgm3: DBLog added for everything except UserDefs (Gerhard Pfeffer
+             / MartinH)
   - feature: pgm2 style changes, SVG in background, optional compression
 
 - 2009-11-28 (4.8)
@@ -2157,9 +2134,9 @@
   - bugfix:  delete checks the arg first "exactly", then as a regexp
   - bugfix:  sun*_rel does not work correctly with offset (Martin)
   - feature: FAQ entry on how to install the sunrise stuff.
-  - feature: the inner core is modified to be able to handle
-             more than one "IO" device, i.e multiple FHZ at the same time,
-	     or FHZ + FS10 + WS300. Consequences:
+  - feature: the inner core is modified to be able to handle more than one "IO"
+             device, i.e multiple FHZ at the same time, or FHZ + FS10 + WS300.
+             Consequences:
     - "fhzdev <usbdevice>" replaced with "define <FHZNAME> FHZ <usbdevice>"
     - "sendraw <fn> <code>" replaced with "set <FHZNAME> raw <fn> <code>"
     - module function parameters changed (for module developers)
@@ -2204,7 +2181,7 @@
   - feature: updated ws300pc (from martin klerx, Nov 08)
   - bugfix:  parsing timed commands implemented => thermo-off,thermo-on and
              activate replaced with timed off-for-timer,on-for-timer and
-	     on-old-for-timer (reported by martin klerx, Nov 08)
+             on-old-for-timer (reported by martin klerx, Nov 08)
   - feature: pidfile (requested by peter, Nov 10)
   - bugfix:  function 81 is not allowed
 
@@ -2245,9 +2222,8 @@
   - bugfix:  the FHT > 25.5 problem. Needs to be tested.
   - feature: log unknown devices (peters idea, see notifyon description)
   - feature: HMS wildcard device id for all HMS devices. See the define/HMS
-             section in the commandref.html for details.
-	     NOTE: the wildcard for RM100-2 changed from 1001 to 1003.
-	     (peters idea)
+             section in the commandref.html for details.  NOTE: the wildcard
+             for RM100-2 changed from 1001 to 1003.  (peters idea)
   - feature: rolwzo_no_off.sh contrib file (for those who were already closed
              out by automatically closing rollades, by Martin)
   - feature: the current version (0.4.5) of the pgm3 from Martin.

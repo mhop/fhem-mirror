@@ -34,20 +34,22 @@ foreach my $row (split("\n", $fList)) {
 
   # check for 80 chars per line conformity
   if($fName =~ m/CHANGED/) {
-    my ($cCount, $cLineNo, $lineNo) = (0,0,0);
+    my ($cCount, $cLineNo, $tLineNo, $lineNo) = (0,0,0,0,0);
     open(FILE, "$svnlook $arg cat $repos $fName|") ||
         die("Cant svnlook cat $fName:$!\n");
     while(my $l = <FILE>) {
       chomp $l;
       $lineNo++;
-      if(length($l) > $cCount) {
+      $tLineNo = $lineNo if(!$tLineNo && $l =~ /\t/) ;
+      if(length($l) > 80 && !$cLineNo) {
         $cCount = length($l);
         $cLineNo = $lineNo;
       }
+      last if($cLineNo && $tLineNo);
     }
     close(FILE);
-    err $fName, "file has over 80 chars/line in line $cLineNo"
-	 if($cCount > 80);
+    err $fName, "file contains tabulators in line $tLineNo" if($tLineNo);
+    err $fName, "file has over 80 chars/line in line $cLineNo" if($cLineNo);
     next;
   }
   
