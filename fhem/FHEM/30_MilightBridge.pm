@@ -3,7 +3,7 @@
 #
 #     30_MilightBridge.pm (Use with 31_MilightDevice.pm)
 #     FHEM module for Milight Wifi bridges which control Milight lightbulbs.
-#     
+#
 #     Author: Matthew Wire (mattwire)
 #
 #     This file is part of fhem.
@@ -27,6 +27,7 @@ package main;
 
 use strict;
 use warnings;
+use Blocking;
 
 use IO::Handle;
 use IO::Socket;
@@ -47,7 +48,7 @@ sub MilightBridge_Initialize($)
   $hash->{UndefFn}  = "MilightBridge_Undefine";
   $hash->{NotifyFn} = "MilightBridge_Notify";
   $hash->{AttrFn}   = "MilightBridge_Attr";
-  $hash->{AttrList} = "port sendInterval disable:0,1 tcpPing:1 checkInterval ".$readingFnAttributes;
+  $hash->{AttrList} = "port protocol sendInterval disable:0,1 tcpPing:1 checkInterval ".$readingFnAttributes;
 
   return undef;
 }
@@ -57,7 +58,7 @@ sub MilightBridge_Initialize($)
 sub MilightBridge_Define($$)
 {
   my ($hash, $def) = @_;
-  my @args = split("[ \t][ \t]*", $def); 
+  my @args = split("[ \t][ \t]*", $def);
 
   return "Usage: define <name> MilightBridge <host/ip>"  if(@args < 3);
 
@@ -73,12 +74,13 @@ sub MilightBridge_Define($$)
   $attr{$name}{"port"} = "8899" if (!defined($attr{$name}{"port"}));
   $hash->{PORT} = $attr{$name}{"port"};
 
-  # Create local socket    
+  $attr{$name}{"protocol"} = "udp" if (!defined($attr{$name}{"protocol"}));
+
+  # Create local socket
   my $sock = IO::Socket::INET-> new (
       PeerPort => 48899,
       Blocking => 0,
-      Proto => 'udp',
-      Broadcast => 1) or return "can't bind: $@";
+      Proto => $attr{$name}{"protocol"}) or return "can't bind: $@";
   my $select = IO::Select->new($sock);
   $hash->{SOCKET} = $sock;
   $hash->{SELECT} = $select;
@@ -87,7 +89,7 @@ sub MilightBridge_Define($$)
   # Define sendInterval
   $attr{$name}{"sendInterval"} = 100 if (!defined($attr{$name}{"sendInterval"}));
   $hash->{INTERVAL} = $attr{$name}{"sendInterval"};
-  
+
   # Create command queue to hold commands
   my @cmdQueue = ();
   $hash->{cmdQueue} = \@cmdQueue;
@@ -98,13 +100,15 @@ sub MilightBridge_Define($$)
   $attr{$name}{"event-on-change-reading"} = "state" if (!defined($attr{$name}{"event-on-change-reading"}));
   $attr{$name}{"checkInterval"} = 10 if (!defined($attr{$name}{"checkInterval"}));
 
+  delete $hash->{helper}{RUNNING_PID};
+
   readingsSingleUpdate($hash, "state", "Initialized", 1);
 
   # Set state
   $hash->{SENDFAIL} = 0;
-  
+
   # Get initial bridge state
-  MilightBridge_State($hash);
+  MilightBridge_SetNextTimer($hash);
 
   return undef;
 }
@@ -115,7 +119,7 @@ sub MilightBridge_Undefine($$)
 {
   my ($hash,$arg) = @_;
   RemoveInternalTimer($hash);
-  
+  BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
   return undef;
 }
 
@@ -124,10 +128,10 @@ sub MilightBridge_Undefine($$)
 sub MilightBridge_Attr($$$$) {
   my ($command,$name,$attribute,$value) = @_;
   my $hash = $defs{$name};
-  
+
   $value = "" if(!defined($value));
   Log3 ($hash, 5, "$hash->{NAME}_Attr: Attr $attribute; Value $value");
-  
+
   # Handle "sendInterval" attribute which defaults to 100(ms)
   if ($attribute eq "sendInterval")
   {
@@ -150,6 +154,7 @@ sub MilightBridge_Attr($$$$) {
       return "checkInterval is required in s (default: 10, min: 0)";
     }
     readingsSingleUpdate($hash, "state", "Initialized", 1);
+    MilightBridge_SetNextTimer($hash);
   }
   elsif ($attribute eq "port")
   {
@@ -162,8 +167,21 @@ sub MilightBridge_Attr($$$$) {
     else
     {
       $hash->{PORT} = $attr{$name}{"port"};
-    }  
+    }
   }
+  elsif ($attribute eq "protocol")
+  {
+    if (($value eq "tcp" || $value eq "udp"))
+    {
+      $attr{$name}{"protocol"} = $value;
+      return "You need to restart fhem or modify to enable new protocol.";
+    }
+    else
+    {
+      return "protocol must be one of 'tcp|udp'";
+    }
+  }
+
   # Handle "disable" attribute by opening/closing connection to device
   elsif ($attribute eq "disable")
   {
@@ -178,7 +196,7 @@ sub MilightBridge_Attr($$$$) {
     }
   }
 
-  return undef;  
+  return undef;
 }
 
 #####################################
@@ -187,58 +205,101 @@ sub MilightBridge_Notify($$)
 {
   my ($hash,$dev) = @_;
   Log3 ($hash, 5, "$hash->{NAME}_Notify: Triggered by $dev->{NAME}; @{$dev->{CHANGED}}");
-  
+
   return if($dev->{NAME} ne "global");
-  
+
   if(grep(m/^(INITIALIZED|REREADCFG|DEFINED.*|MODIFIED.*|DELETED.*)$/, @{$dev->{CHANGED}}))
   {
     MilightBridge_SlotUpdate($hash);
-  }  
+  }
 
   return undef;
 }
 
 #####################################
-# Update readings to show status of bridge
-sub MilightBridge_State(@)
+# Set next timer for ping check
+sub MilightBridge_SetNextTimer($)
 {
-  # Update Bridge state
   my ($hash) = @_;
-  
-  if (AttrVal($hash->{NAME}, "checkInterval", "10") == 0)
-  {
-    Log3 ( $hash, 5, "$hash->{NAME}_State: Bridge status disabled");
-    return undef;
+  # Check state every X seconds
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, "checkInterval", "10"), "MilightBridge_DoPingStart", $hash, 0);
+}
+
+#####################################
+# Prepare and start the blocking call in new thread
+sub MilightBridge_DoPingStart($)
+{
+  my ($hash) = @_;
+
+  return undef if (IsDisabled($hash->{NAME}));
+
+  my $timeout = 2;
+  my $mode = 'udp';
+  $mode = 'tcp' if(defined($attr{$hash->{NAME}}{tcpPing}));
+
+  my $arg = $hash->{NAME}."|".$hash->{HOST}."|".$mode."|".$timeout;
+  my $blockingFn = "MilightBridge_DoPing";
+  my $finishFn = "MilightBridge_DoPingDone";
+  my $abortFn = "MilightBridge_DoPingAbort";
+
+  if (!(exists($hash->{helper}{RUNNING_PID}))) {
+    $hash->{helper}{RUNNING_PID} =
+          BlockingCall($blockingFn, $arg, $finishFn, $timeout, $abortFn, $hash);
+  } else {
+    Log3 $hash, 3, "$hash->{NAME} Blocking Call running no new started";
+    MilightBridge_SetNextTimer($hash);
   }
-  
-  Log3 ( $hash, 5, "$hash->{NAME}_State: Checking Bridge Status");
-  
-  # Do a ping check to see if bridge is reachable
+}
+
+#####################################
+# BlockingCall DoPing in separate thread
+sub MilightBridge_DoPing(@)
+{
+  my ($string) = @_;
+  my ($name, $host, $mode, $timeout) = split("\\|", $string);
+
+  Log3 ($name, 5, $name."_DoPing: Executing ping");
+
   # check via ping
-  my $pingstatus = "unreachable";
   my $p;
-  if(defined($attr{$hash->{NAME}}{tcpPing}))
-  {
-    $p = Net::Ping->new('tcp');
-  }
-  else
-  {
-    $p = Net::Ping->new('udp');
-  }
-  my $alive = $p->ping($hash->{HOST}, 2);
+  $p = Net::Ping->new($mode);
+  my $result = $p->ping($host, $timeout);
   $p->close();
-  $pingstatus = "ok" if $alive;
+
+  $result="" if !(defined($result));
+  return "$name|$result";
+}
+
+#####################################
+# Ping thread completed
+sub MilightBridge_DoPingDone($)
+{
+  my ($string) = @_;
+  my ($name, $result) = split("\\|", $string);
+  my $hash = $defs{$name};
+
+  my $status = "ok";
+  $status = "unreachable" if !($result);
 
   # Update readings
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "state", $pingstatus);
+  readingsBulkUpdate($hash, "state", $status);
   readingsBulkUpdate( $hash, "sendFail", $hash->{SENDFAIL});
   readingsEndUpdate($hash, 1);
 
-  # Check state every X seconds  
-  InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, "checkInterval", "10"), "MilightBridge_State", $hash, 0);
-  
-  return undef;
+  delete($hash->{helper}{RUNNING_PID});
+  MilightBridge_SetNextTimer($hash);
+}
+
+#####################################
+# Ping thread timeout
+sub MilightBridge_DoPingAbort($)
+{
+  my ($hash) = @_;
+  delete($hash->{helper}{RUNNING_PID});
+  Log3 $hash->{NAME}, 3, "BlockingCall for ".$hash->{NAME}." was aborted";
+  MilightBridge_SetNextTimer($hash);
 }
 
 #####################################
@@ -247,7 +308,7 @@ sub MilightBridge_SlotUpdate(@)
 {
   # Update readings to show what is connected to which slot
   my ($hash) = @_;
-  
+
   Log3 ( $hash, 5, "$hash->{NAME}_State: Updating Slot readings");
 
   readingsBeginUpdate($hash);
@@ -261,7 +322,7 @@ sub MilightBridge_SlotUpdate(@)
   readingsBulkUpdate($hash, "slot7", (defined($hash->{7}->{NAME}) ? $hash->{7}->{NAME} : ""));
   readingsBulkUpdate($hash, "slot8", (defined($hash->{8}->{NAME}) ? $hash->{8}->{NAME} : ""));
   readingsEndUpdate($hash, 1);
-  
+
   return undef;
 }
 
@@ -271,11 +332,11 @@ sub MilightBridge_Write(@)
 {
   # Client sent a new command
   my ($hash, $cmd) = @_;
-  
+
   Log3 ($hash, 3, "$hash->{NAME}_Write: Command not defined") if (!defined($cmd));
   my $hexStr = unpack("H*", $cmd || '');
   Log3 ($hash, 4, "$hash->{NAME}_Write: Command: $hexStr");
-  
+
   # Add command to queue
   push @{$hash->{cmdQueue}}, $cmd;
 
@@ -287,14 +348,14 @@ sub MilightBridge_Write(@)
 sub MilightBridge_CmdQueue_Send(@)
 {
   my ($hash) = @_;
-  
+
   # Check that queue is not locked. If it is we should just return because another instance of this function has locked it.
   if ($hash->{cmdQueueLock} != 0)
   {
     Log3 ($hash, 5, "$hash->{NAME}_cmdQueue_Send: Send Queue Locked: cmdQueueLock = $hash->{cmdQueueLock}. Return.");
-    return undef;    
+    return undef;
   }
-  
+
   # Check if we are called again before send interval has elapsed
   my $now = gettimeofday();
   if ((($hash->{cmdLastSent} + ($hash->{INTERVAL} / 1000)) < $now) && $init_done)
@@ -352,7 +413,7 @@ sub MilightBridge_CmdQueue_Send(@)
     # We were called again before send interval elapsed
     Log3 ($hash, 5, "$hash->{NAME}_cmdQueue_Send: Waiting for send interval. cmdLastSent: $hash->{cmdLastSent}. Now: $now");
   }
-  
+
   # Unlock cmdQueue
   $hash->{cmdQueueLock} = 0;
 
@@ -363,7 +424,7 @@ sub MilightBridge_CmdQueue_Send(@)
     #Log3 ($hash, 5, "$hash->{NAME}_cmdQueue_Send: cmdLastSent: $hash->{cmdLastSent}; Next: ".(gettimeofday()+($hash->{INTERVAL}/1000)));
 
     # Remove any existing timers and trigger a new one
-    foreach my $args (keys %intAt) 
+    foreach my $args (keys %intAt)
     {
       if (($intAt{$args}{ARG} eq $hash) && ($intAt{$args}{FN} eq 'MilightBridge_CmdQueue_Send'))
       {
@@ -373,7 +434,7 @@ sub MilightBridge_CmdQueue_Send(@)
     }
     InternalTimer(gettimeofday()+($hash->{INTERVAL}/1000), "MilightBridge_CmdQueue_Send", $hash, 0);
   }
-  
+
   return undef;
 
 }
@@ -428,6 +489,10 @@ sub MilightBridge_CmdQueue_Send(@)
     <li>
       <b>port</b><br/>
          Default: 8899. Older bridges (V2) used port 50000 so change this value if you have an old bridge.
+    </li>
+    <li>
+      <b>protocol</b><br/>
+         Default: udp. Change to tcp if you have enabled tcp mode on your bridge.
     </li>
     <li>
       <b>tcpPing</b><br/>
