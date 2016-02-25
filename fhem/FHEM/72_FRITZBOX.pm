@@ -4662,6 +4662,7 @@ sub FRITZBOX_fritztris($)
       <li><code>set &lt;name&gt; call &lt;number&gt; [duration] [say:text|play:MP3URL]</code>
          <br>
          Calls for 'duration' seconds (default 60) the given number from an internal port (default 1 or attribute 'ringWithIntern'). If the call is taken a text or sound can be played as music on hold (moh). The internal port will also ring.
+         Say and play requires the API: Telnet or webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; checkAPIs</code>
@@ -5024,7 +5025,7 @@ sub FRITZBOX_fritztris($)
          Ruf f&uuml;r 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1 oder das Attribut 'ringWithIntern'). Wenn der Angerufene abnimmt, h&ouml;rt er die Wartemusik oder den angegebenen Text oder Klang.
          Der interne Telefonanschluss klingelt ebenfalls.
          <br>
-         Ben&ouml;tigt die API: Telnet oder webcm.
+         "say:" und "play:" ben&ouml;tigen die API: Telnet oder webcm.
       </li><br>
 
       <li><code>set &lt;name&gt; checkAPIs</code>
