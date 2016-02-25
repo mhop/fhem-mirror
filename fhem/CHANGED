@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 30_MilightBridge: Support tcp bridge.
+  - bugfix:  30_MilightBridge/98_ping: Use Blocking.pm for ping checks so 
+             it does not block main thread.
   - feature  49_SSCAM: functions for cam-livestream added
   - bugfix:  73_km200.pm: Bugfix InternalTimer; Improvement Log Level
   - bugfix:  pre-coomit-hook test
