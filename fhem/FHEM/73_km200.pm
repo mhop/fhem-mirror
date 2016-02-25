@@ -109,7 +109,7 @@ sub km200_Define($$)
 	$hash->{NAME}				= $name;
 	$hash->{STATE}              = "define";
 
-	Log3 $name, 5, $name. " : km200 - Starting to define module";
+	Log3 $name, 4, $name. " : km200 - Starting to define module";
 		
 	###START###### Define known services of gateway ###########################################################START####
 	my @KM200_AllServices = (
@@ -132,7 +132,7 @@ sub km200_Define($$)
 		###START### Check whether IPv4 address is valid
 		if ($url =~ m/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/)
 		{
-			Log3 $name, 5, $name. " : km200 - IPv4-address is valid                 : " . $url;
+			Log3 $name, 4, $name. " : km200 - IPv4-address is valid                  : " . $url;
 		}
 		else
 		{
@@ -149,7 +149,7 @@ sub km200_Define($$)
 		if ( length($EvalPassWord) == 16)
 		{
 			$km200_gateway_password = $EvalPassWord;
-			Log3 $name, 5, $name. " : km200 - Provided GatewayPassword provided as bareword has the correct length at least.";		
+			Log3 $name,4, $name. " : km200 - Provided GatewayPassword provided as bareword has the correct length at least.";		
 		}
 		else # Check whether the password is eventually base64 encoded 
 		{
@@ -161,7 +161,7 @@ sub km200_Define($$)
 			{
 				$km200_gateway_password = $decryptData;
 				$PasswordEncrypted = true;
-				Log3 $name, 5, $name. " : km200 - Provided GatewayPassword encoded with base64 has the correct length at least.";
+				Log3 $name, 4, $name. " : km200 - Provided GatewayPassword encoded with base64 has the correct length at least.";
 			}
 			else
 			{
@@ -183,7 +183,7 @@ sub km200_Define($$)
 			if (length($decryptData) > 0)
 			{
 				$km200_private_password = $decryptData;
-				Log3 $name, 5, $name. " : km200 - Provided PrivatePassword exists at least";
+				Log3 $name, 4, $name. " : km200 - Provided PrivatePassword exists at least";
 			}
 			else
 			{
@@ -196,7 +196,7 @@ sub km200_Define($$)
 		{
 			if (length($km200_private_password) > 0)
 			{
-					Log3 $name, 5, $name. " : km200 - Provided PrivatePassword exists at least";		
+					Log3 $name, 4, $name. " : km200 - Provided PrivatePassword exists at least";		
 			}
 			else
 			{
@@ -275,11 +275,11 @@ sub km200_Define($$)
 	####END####### Reset fullResponse error message #############################################################END#####	
 	
 	###START###### For Debugging purpose only ##################################################################START####  
-	Log3 $name, 5, $name. " : km200 - Define H                              : " .$hash;
-	Log3 $name, 5, $name. " : km200 - Define D                              : " .$def;
-	Log3 $name, 5, $name. " : km200 - Define A                              : " .@a;
-	Log3 $name, 5, $name. " : km200 - Define Name                           : " .$name;
-	Log3 $name, 5, $name. " : km200 - Define Adr                            : " .$url;
+	Log3 $name, 4, $name. " : km200 - Define H                               : " .$hash;
+	Log3 $name, 4, $name. " : km200 - Define D                               : " .$def;
+	Log3 $name, 4, $name. " : km200 - Define A                               : " .@a;
+	Log3 $name, 4, $name. " : km200 - Define Name                            : " .$name;
+	Log3 $name, 4, $name. " : km200 - Define Adr                             : " .$url;
 	####END####### For Debugging purpose only ###################################################################END#####
 
 	
@@ -300,17 +300,17 @@ sub km200_Define($$)
 	} 
 	elsif ($Km200Info eq "SERVICE NOT AVAILABLE") ## Communication OK but service not available ##
 	{
-		Log3 $name, 5, $name. " : km200 -  /gateway/DateTime             : NOT AVAILABLE";
+		Log3 $name, 4, $name. " : km200 -  /gateway/DateTime                     : NOT AVAILABLE";
 	} 
 	else ## Communication OK and service is available ##
 	{
-		Log3 $name, 5, $name. " : km200 - /gateway/DateTime              : AVAILABLE";				
+		Log3 $name, 4, $name. " : km200 - /gateway/DateTime                      : AVAILABLE";				
 	}
 	####END####### Check whether communication to the physical unit is possible ################################END#####
 
 	###START###### Initiate the timer for first time polling of  values from KM200 but wait 10s ###############START####
-	InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 5);
-	Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services started for the first time.";
+	InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 1);
+	Log3 $name, 4, $name. " : km200 - Internal timer for Initialisation of services started for the first time.";
 	####END####### Initiate the timer for first time polling of  values from KM200 but wait 60s ################END#####
 	
 	return undef;
@@ -394,6 +394,7 @@ sub km200_Attr(@)
 			
 			### Stop the current timer
 			RemoveInternalTimer($hash);
+			Log3 $name, 4, $name. " : km200 - InternalTimer has been removed.";
 
 			### Delete all Readings
 			fhem( "deletereading $name .*" );
@@ -406,12 +407,13 @@ sub km200_Attr(@)
 		else
 		{
 			### Initiate the timer for first time polling of  values from KM200 but wait 10s
-			InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 5);
+			InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 1);
+			Log3 $name, 4, $name. " : km200 - Internal timer for Initialisation of services re-started.";
 
 			### Set new status
 			$hash->{STATE} = "Initiating Sounding...";
 			
-			Log3 $name, 5, $name. " : km200 - Device enabled as per attribute.";
+			Log3 $name, 4, $name. " : km200 - Device enabled as per attribute.";
 		}
 		####END#### Check whether device shall be disabled
 	}
@@ -424,7 +426,7 @@ sub km200_Attr(@)
 		if ($IntervalDynVal > 19)
 		{
 			$hash->{INTERVALDYNVAL} = $IntervalDynVal;
-			Log3 $name, 5, $name. " : km200 - IntervalDynVal set to attribute value:" . $IntervalDynVal ." s";
+			Log3 $name, 4, $name. " : km200 - IntervalDynVal set to attribute value:" . $IntervalDynVal ." s";
 		}
 		else
 		{
@@ -439,11 +441,11 @@ sub km200_Attr(@)
 		if ($a[3] >= 5)
 		{
 			$hash->{POLLINGTIMEOUT} = $a[3];
-			Log3 $name, 5, $name. " : km200 - Polling timeout set to attribute value:" . $a[3] ." s";
+			Log3 $name, 4, $name. " : km200 - Polling timeout set to attribute value:" . $a[3] ." s";
 		}
 		else
 		{
-			Log3 $name, 5, $name. " : km200 - Error - Gateway polling timeout attribute too small: " . $a[3] ." s";
+			Log3 $name, 4, $name. " : km200 - Error - Gateway polling timeout attribute too small: " . $a[3] ." s";
 			return $name .": Error - Gateway polling timeout attribute is too small - server response time is 5s minimum, default is 5";
 		}
 		####END#### Check whether timeout is not too short
@@ -455,14 +457,14 @@ sub km200_Attr(@)
 		if ($a[3] == 1)
 		{
 			$hash->{CONSOLEMESSAGE}	= true;
-			Log3 $name, 5, $name. " : km200 - Console printouts enabled";
+			Log3 $name, 4, $name. " : km200 - Console printouts enabled";
 			print("\n");
 		}
 		### If messages on console shall NOT be visible
 		else
 		{
 			$hash->{CONSOLEMESSAGE}	= false;
-			Log3 $name, 5, $name. " : km200 - Console printouts disabled";
+			Log3 $name, 4, $name. " : km200 - Console printouts disabled";
 		}
 	}
 	### Check whether DoNotPoll attribute have been provided
@@ -473,7 +475,8 @@ sub km200_Attr(@)
 
 		### Stop the current timer
 		RemoveInternalTimer($hash);
-
+		Log3 $name, 4, $name. " : km200 - InternalTimer has been removed.";
+		
 		### Delete the first 3 items of the array
 		splice @temp, 0, 3;
 
@@ -509,11 +512,11 @@ sub km200_Attr(@)
 			}
 		}
 		### ConsoleMessages
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200 module is only polling the following services!\n  @{$hash->{Secret}{KM200ALLSERVICES}} \n");}
+		if ($hash->{CONSOLEMESSAGE} == true) {print("km200 module is only polling the following services! \n @{$hash->{Secret}{KM200ALLSERVICES}} \n");}
 		if ($hash->{CONSOLEMESSAGE} == true) {print("km200 module is NOT  polling the following services! \n @{$hash->{Secret}{KM200DONOTPOLL}}   \n");}
 		
 		### Message for debugging purposes
-		Log3 $name, 5, $name. " : km200 - The following services will not be polled: ". $a[3];
+		Log3 $name, 4, $name. " : km200 - The following services will not be polled: ". $a[3];
 		
 		### Interrupting all currently running Polling
 		@{$hash->{Secret}{KM200DYNSERVICES}} = "";
@@ -523,8 +526,8 @@ sub km200_Attr(@)
 		fhem( "deletereading $name .*" );
 
 		### Re-start the sounding of  values from KM200 but wait the period of $hash->{POLLINGTIMEOUT} + 10s
-		InternalTimer(gettimeofday()+$hash->{POLLINGTIMEOUT}+10, "km200_GetInitService", $hash, 0);
-		Log3 $name, 5, $name. " : km200 - Sounding of services re-started after change of DoNotPoll attribute";
+		InternalTimer(gettimeofday()+$hash->{POLLINGTIMEOUT}+10, "km200_GetInitService", $hash, 1);
+		Log3 $name, 4, $name. " : km200 - Sounding of services re-started after change of DoNotPoll attribute";
 	}
 	### Check whether time-out for Read-Back has been provided
 	if($a[2] eq "ReadBackDelay") 
@@ -534,7 +537,7 @@ sub km200_Attr(@)
 		if ($ReadBackDelay >= 0)
 		{
 			$hash->{READBACKDELAY} = $ReadBackDelay;
-			Log3 $name, 5, $name. " : km200 - ReadBackDelay set to attribute value:" . $ReadBackDelay ." s";
+			Log3 $name, 4, $name. " : km200 - ReadBackDelay set to attribute value:" . $ReadBackDelay ." s";
 		}
 		else
 		{
@@ -1499,7 +1502,7 @@ sub km200_PostSingleService($)
 	else
 	{
 		### Log entries for debugging purposes
-		Log3 $name, 4, $name. " : km200_SetSingleService - type is unknown for: " .$Service;
+		Log3 $name, 4, $name. " : km200_SetSingleService - type unknown for : " .$Service;
 
 		### Console outputs for debugging purposes
 		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Type is unknown for $Service\n");}		
@@ -1597,9 +1600,9 @@ sub km200_GetSingleService($)
 				my $JsonType       = $json->{type};
 
 				### Log entries for debugging purposes
-				Log3 $name, 4, $name. " : km200_ParseHttpResponseDyn: value found for  : " .$Service;
-				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: id               : " .$JsonId;
-				Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: type             : " .$JsonType;
+				Log3 $name, 4, $name. " : km200_parseHttpResponseDyn  - value found for  : " .$Service;
+				Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - id               : " .$JsonId;
+				Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - type             : " .$JsonType;
 				
 				### Set up variables
 				my $TempReturnVal = "";
@@ -1853,7 +1856,7 @@ sub km200_GetSingleService($)
 			else
 			{
 				### Log entries for debugging purposes
-				Log3 $name, 4, $name. " : km200_GetSingleService - type is unknown for: " .$Service;
+				Log3 $name, 4, $name. " : km200_GetSingleService - type unknown for : " .$Service;
 				### Log entries for debugging purposes
 			}
 		}
@@ -1946,7 +1949,7 @@ sub km200_ParseHttpResponseInit($)
 		$hash->{STATE} = "ERROR - Initial Connection failed... Try to re-connect in 10s";
 		
 		### Start the timer for polling again but wait 10s
-		InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 0);
+		InternalTimer(gettimeofday()+10, "km200_GetInitService", $hash, 1);
 		
 		### Create Log entry
 		Log3 $name, 2, $name . " : km200_ParseHttpResponseInit - ERROR - Timer restarted to try again in 10s";
@@ -1967,7 +1970,7 @@ sub km200_ParseHttpResponseInit($)
 		}
 		or do 
 		{
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: ". $Service . " CANNOT be parsed";
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - CANNOT be parsed : ". $Service;
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be parsed by JSON         : $Service \n";}
 		};
 
@@ -1979,10 +1982,10 @@ sub km200_ParseHttpResponseInit($)
 			my $JsonValue      = $json->{value};
 
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: value found for  : " .$Service;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: value            : " .$JsonValue;
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - type             : " .$JsonType;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - value            : " .$JsonValue;
 
 			### Add service to the list of responding services
 			push (@KM200_RespondingServices, $Service);
@@ -2020,10 +2023,10 @@ sub km200_ParseHttpResponseInit($)
 			my @JsonValues     = $json->{switchPoints};
 
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: value found for  : " .$Service;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: value            : " .@JsonValues;
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - type             : " .$JsonType;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - value            : " .@JsonValues;
 
 			### Add service to the list of responding services
 			push (@KM200_RespondingServices, $Service);
@@ -2252,9 +2255,9 @@ sub km200_ParseHttpResponseInit($)
 			my $JsonType       = $json->{type};
 
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: value found for  : " .$Service;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: id               : " .$JsonId;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit: type             : " .$JsonType;
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - type             : " .$JsonType;
 
 			### Add service to the list of responding services
 			push (@KM200_RespondingServices, $Service);
@@ -2346,8 +2349,8 @@ sub km200_ParseHttpResponseInit($)
 		else
 		{
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - type is unknown for:" .$Service;
-			
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - type unknown for : " .$Service;
+
 			### Console Message if enabled
 			if ($hash->{CONSOLEMESSAGE} == true) {print "The data type is unknown for the following Service     : $Service \n";}
 		}
@@ -2356,8 +2359,8 @@ sub km200_ParseHttpResponseInit($)
 	else 
 	{
 		### Log entries for debugging purposes
-		Log3 $name, 4, $name. " : km200_ParseHttpResponseInit: ". $Service . " NOT available";
-		
+		Log3 $name, 4, $name. " : km200_ParseHttpResponseInit -  NOT available   : ". $Service;
+
 		### Console Message if enabled
 		if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read                   : $Service \n";}
 	}
@@ -2394,7 +2397,7 @@ sub km200_ParseHttpResponseInit($)
 		
 		
 		###START###### Initiate the timer for continuous polling of dynamical values from KM200 ###################START####
-		InternalTimer(gettimeofday()+($hash->{INTERVALDYNVAL}), "km200_GetDynService", $hash, 0);
+		InternalTimer(gettimeofday()+($hash->{INTERVALDYNVAL}), "km200_GetDynService", $hash, 1);
 		Log3 $name, 4, $name. " : km200 - Define: InternalTimer for dynamic values started with interval of: ".($hash->{INTERVALDYNVAL});
 		####END####### Initiate the timer for continuous polling of dynamical values from KM200 ####################END#####
 
@@ -2417,7 +2420,7 @@ sub km200_ParseHttpResponseInit($)
 		readingsSingleUpdate( $hash, "fullResponse", "Restarted after ERROR", 1);
 		
 		### Reset timer for init procedure and start over again until it works
-		InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 0);
+		InternalTimer(gettimeofday()+5, "km200_GetInitService", $hash, 1);
 		Log3 $name, 5, $name. " : km200 - Internal timer for Initialisation of services restarted after fullResponse - error.";
 	}
 	
@@ -2517,7 +2520,7 @@ sub km200_ParseHttpResponseDyn($)
 		}
 		or do 
 		{
-			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
+			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
 			if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
 		};
 		
@@ -2529,10 +2532,10 @@ sub km200_ParseHttpResponseDyn($)
 			my $JsonValue      = $json->{value};
 			
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_parseHttpResponseDyn: value found for  : " .$Service;
-			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn: id               : " .$JsonId;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: type             : " .$JsonType;
-			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn: value            : " .$JsonValue;
+			Log3 $name, 4, $name. " : km200_parseHttpResponseDyn  - value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - type             : " .$JsonType;
+			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - value            : " .$JsonValue;
 			### Log entries for debugging purposes
 
 			### Save json-hash for DbLog-Split
@@ -2550,9 +2553,9 @@ sub km200_ParseHttpResponseDyn($)
 			my $JsonType       = $json->{type};
 
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseDyn: value found for  : " .$Service;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: id               : " .$JsonId;
-			Log3 $name, 5, $name. " : km200_ParseHttpResponseDyn: type             : " .$JsonType;
+			Log3 $name, 4, $name. " : km200_parseHttpResponseDyn  - value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - id               : " .$JsonId;
+			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - type             : " .$JsonType;
 			
 			### Set up variables
 			my $TempJsonId    = "";
@@ -2760,12 +2763,12 @@ sub km200_ParseHttpResponseDyn($)
 		else
 		{
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseDyn - type is unknown for:" .$Service;
+			Log3 $name, 4, $name. " : km200_parseHttpResponseDyn  - type unknown for : " .$Service;
 		}
 	}
 	else 
 	{
-		Log3 $name, 5, $name. " : km200_parseHttpResponseDyn - Data not available on km200 for http://" . $param->{url};
+		Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - Data not available on km200 for http://" . $param->{url};
 		if ($hash->{CONSOLEMESSAGE} == true) {print("Data not available on km200 for " . $param->{url} . "\n");}
 	}
 
