@@ -546,8 +546,8 @@ FW_serveSpecial($$$$)
 
   $file = "$FW_sp$file" if($ext eq "css" && -f "$dir/$FW_sp$file.$ext");
   $FW_RETTYPE = ext2MIMEType($ext);
-  return FW_returnFileAsStream("$dir/$file.$ext", "",
-                                        $FW_RETTYPE, 0, $cacheable);
+  my $fname = ($ext ? "$file.$ext" : $file);
+  return FW_returnFileAsStream("$dir/$fname", "", $FW_RETTYPE, 0, $cacheable);
 }
 
 sub
@@ -614,7 +614,8 @@ FW_answerCall($)
 
     # pgm2 check is for jquery-ui images
     my $static = ($ext =~ m/(css|js|png|jpg)/i || $dir =~ m/^pgm2/);
-    if(-r "$ldir/$file.$ext" || $static) {  # no return for FLOORPLAN
+    my $fname = ($ext ? "$file.$ext" : $file);
+    if(-r "$ldir/$fname" || $static) {  # no return for FLOORPLAN
       return FW_serveSpecial($file, $ext, $ldir, ($arg =~ m/nocache/) ? 0 : 1);
     }
     $arg = "/$dir/$ofile";
