@@ -95,22 +95,84 @@ sub YAMAHA_NP_GetStatus
     YAMAHA_NP_ResetTimer($hash) unless($local == 1);    
     return;
   }
-  
-  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", "statusRequest", "basicStatus");
+
+  # Timer readings available?
+  if(not defined($hash->{READINGS}{timerVolume}))
+  {
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Mode>GetParam</Mode></Timer></Misc></System></YAMAHA_AV>", "statusRequest", "getTimer");
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Param>GetParam</Param></Timer></Misc></System></YAMAHA_AV>", "statusRequest", "timerStatus");  
+  }
+
+  # Standby mode readings available?
+  if(not defined($hash->{READINGS}{standbyMode}))
+  {
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Power_Control><Saving>GetParam</Saving></Power_Control></System></YAMAHA_AV>", "statusRequest", "standbyMode"); 
+  }
+
+  # DAB preset readings available? Only for the DAB model.
+  if (defined $hash->{MODEL})
+  {
+    my $model = $hash->{MODEL};
+    if ($model eq "CRX-N560D")
+    {
+      if(not defined($hash->{READINGS}{tunerPresetDABItem_01}))
+      {
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetDAB"); 
+      } 
+    }
+  }
+
+  # FM preset readings available?
+  if(not defined($hash->{READINGS}{tunerPresetFMItem_01}))
+  {
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><FM><Preset_Sel_Item>GetParam</Preset_Sel_Item></FM></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetFM");
+  }
+
+  # Basic status request
+  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", "statusRequest", "basicStatus");  
 
   if(defined($hash->{READINGS}{input}))
   {
+    # Get dynamic tuner readings
     if((AttrVal($name, "auto_update_tuner_readings","1") eq "1") and ($hash->{READINGS}{input}{VAL} eq "tuner") and ($hash->{READINGS}{power}{VAL} eq "on"))
     {
       YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Info>GetParam<\/Play_Info><\/Tuner><\/YAMAHA_AV>", "statusRequest", "tunerStatus");
+      if($hash->{READINGS}{tunerBand}{VAL} eq "FM")
+      {
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><FM><Preset_Sel_Item>GetParam</Preset_Sel_Item></FM></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetFM");
+        blankTunerDABReadings($hash); 
+      }
+      elsif($hash->{READINGS}{tunerBand}{VAL} eq "DAB")
+      {
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetDAB"); 
+        blankTunerFMReadings($hash); 
+      }
+      # Reset player readings
+      blankPlayerReadings($hash);
     }
     elsif(AttrVal($name, "auto_update_player_readings", "1") eq "1" and ($hash->{READINGS}{input}{VAL} ne "tuner") and ($hash->{READINGS}{power}{VAL} eq "on"))
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><Play_Info>GetParam<\/Play_Info><\/Player><\/YAMAHA_AV>", "statusRequest", "playerStatus");      
+      # Inputs don't use any player readings. Get player readings.
+      if($hash->{READINGS}{input}{VAL} eq "aux1"     or
+         $hash->{READINGS}{input}{VAL} eq "aux2"     or
+         $hash->{READINGS}{input}{VAL} eq "digital1" or
+         $hash->{READINGS}{input}{VAL} eq "digital2" or
+         $hash->{READINGS}{input}{VAL} eq "airplay")
+      {
+        blankPlayerReadings($hash);  
+      }
+      else
+      {
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><Play_Info>GetParam<\/Play_Info><\/Player><\/YAMAHA_AV>", "statusRequest", "playerStatus");        
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><List_Info>GetParam</List_Info></Player></YAMAHA_AV>", "playerListGetList", "playerListGetList");       
+      }
+      # Reset tuner readings                   
+      readingsSingleUpdate($hash, "tunerBand", "", 1);
+      blankTunerDABReadings($hash);   
+      blankTunerFMReadings($hash);
     }  
-  }  
-
-  YAMAHA_NP_ResetTimer($hash) unless($local == 1);
+  }
+  YAMAHA_NP_ResetTimer($hash) unless($local == 1);  
   return;
 }
 
@@ -361,6 +423,21 @@ sub YAMAHA_NP_Set
       if(($what eq "volume") and ($a[2] >= 0) and ($a[2] <= 100))
       {
           $target_volume = YAMAHA_NP_volume_rel2abs($hash, $a[2]);
+          
+          $hash->{helper}{targetVolume} = $a[2];
+          
+          if($hash->{READINGS}{volumeStraight}{VAL} < $target_volume)
+          {
+            $hash->{helper}{targetVolumeDir} = "down";
+          }
+          elsif($hash->{READINGS}{volumeStraight}{VAL} > $target_volume)
+          {
+            $hash->{helper}{targetVolumeDir} = "up";
+          }
+          else
+          {
+            $hash->{helper}{targetVolumeDir} = "equal";  
+          }
       }
       elsif($what eq "volumeDown")
       {
@@ -490,7 +567,7 @@ sub YAMAHA_NP_Set
     }
     elsif($what eq "playerListGetList")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><List_Info>GetParam</List_Info></Player></YAMAHA_AV>", $what, "playerGetList");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><List_Info>GetParam</List_Info></Player></YAMAHA_AV>", $what, "playerListGetList");
     }
     elsif($what eq "playerListCursorReturn")
     {
@@ -696,7 +773,7 @@ sub YAMAHA_NP_Set
     {
         if($a[2] >= 1 and $a[2] <= 30 and $hash->{MODEL} eq "CRX-N560D")
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><DAB><Preset_Sel>".$a[2]."<\/Preset_Sel><\/DAB><\/Preset><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerPresetDAB", $a[2]);
+         YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><DAB><Preset_Sel>".$a[2]."<\/Preset_Sel><\/DAB><\/Preset><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerPresetDAB", $a[2]);
         }
         else
         {
@@ -730,7 +807,7 @@ sub YAMAHA_NP_Set
     						my $frequency = $a[2];
     						$frequency =~ s/\.//; 			# Remove decimal point
     						YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><FM><Freq>".$frequency."<\/Freq><\/FM><\/Tuning><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerFMFrequency", $a[2]);
-    					}
+              }
     					else
     					{
     						return "Last digit must be '0' or '5'";
@@ -1059,47 +1136,102 @@ sub YAMAHA_NP_ParseResponse
           if($data =~ /<Playback_Info>(.+)<\/Playback_Info>/)
           {
             readingsBulkUpdate($hash, "playerPlaybackInfo", lc($1));
+          }
+          else
+          {
+            readingsBulkUpdate($hash, "playerPlaybackInfo", "");  
           }                
+          
           if($data =~ /<Device_Type>(.+)<\/Device_Type>/)
           {
             readingsBulkUpdate($hash, "playerDeviceType", lc($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerDeviceType", ""); 
+          }
+
           if($data =~ /<iPod_Mode>(.+)<\/iPod_Mode>/)
           {
             readingsBulkUpdate($hash, "playerIpodMode", lc($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerIpodMode", "");  
+          }
+          
           if($data =~ /<Repeat>(.+)<\/Repeat>/)
           {
             readingsBulkUpdate($hash, "playerRepeat", lc($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerRepeat", "");  
+          }
+          
           if($data =~ /<Shuffle>(.+)<\/Shuffle>/)
           {
             readingsBulkUpdate($hash, "playerShuffle", lc($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerShuffle", "");  
+          }
+
           if($data =~ /<Play_Time>(.+)<\/Play_Time>/)
           {
             readingsBulkUpdate($hash, "playerPlayTime", strftime("\%H:\%M:\%S", gmtime($1)));                  
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerPlayTime", ""); 
+          }
+
           if($data =~ /<Track_Number>(.+)<\/Track_Number>/)
           {
             readingsBulkUpdate($hash, "playerTrackNumber", lc($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerTrackNumber", ""); 
+          }
+
           if($data =~ /<Total_Tracks>(.+)<\/Total_Tracks>/)
           {
             readingsBulkUpdate($hash, "playerTotalTracks", lc($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerTotalTracks", ""); 
+          }
+
           if($data =~ /<Artist>(.+)<\/Artist>/)
           {
             readingsBulkUpdate($hash, "playerArtist", YAMAHA_NP_html2txt($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerArtist", "");  
+          }
+
           if($data =~ /<Album>(.+)<\/Album>/)
           {
             readingsBulkUpdate($hash, "playerAlbum", YAMAHA_NP_html2txt($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerAlbum", "");
+          }
+
           if($data =~ /<Song>(.+)<\/Song>/)
           {
             readingsBulkUpdate($hash, "playerSong", YAMAHA_NP_html2txt($1));
           }
+          else
+          {
+            readingsBulkUpdate($hash, "playerSong", ""); 
+          }
+
           if($data =~ /<Album_ART><URL>(.+)<\/URL><ID>(.+)<\/ID><Format>(.+)<\/Format><\/Album_ART>/)
           {
             my $address = $hash->{helper}{ADDRESS};
@@ -1107,7 +1239,13 @@ sub YAMAHA_NP_ParseResponse
             readingsBulkUpdate($hash, "playerAlbumArtURL", "http://".$address."".YAMAHA_NP_html2txt($1));
             readingsBulkUpdate($hash, "playerAlbumArtID", YAMAHA_NP_html2txt($2));
             readingsBulkUpdate($hash, "playerAlbumArtFormat", YAMAHA_NP_html2txt($3));
-          }            
+          }
+          else
+          {
+            readingsBulkUpdate($hash, "playerAlbumArtURL", "");
+            readingsBulkUpdate($hash, "playerAlbumArtID", "");
+            readingsBulkUpdate($hash, "playerAlbumArtFormat", "");  
+          }           
         }
         elsif($arg eq "tunerStatus")
         {
@@ -1115,73 +1253,80 @@ sub YAMAHA_NP_ParseResponse
           {
             readingsBulkUpdate($hash, "tunerBand", ($1));
           }
-          if($data =~ /<FM><Preset><Preset_Sel>(.+)<\/Preset_Sel><\/Preset>(.*)<\/FM/)
+
+          if($hash->{READINGS}{tunerBand}{VAL} eq "FM")
           {
-            readingsBulkUpdate($hash, "tunerPresetFM", ($1));
-          }
-          if($data =~ /<Tuning><Freq>(.+)<\/Freq><\/Tuning>/)
-          {
-            my $frequency = $1;
-            $frequency =~ s/(\d{2})$/.$1/; # Insert '.' to frequency
-            readingsBulkUpdate($hash, "tunerFrequencyFM", $frequency." MHz");
-          }
-          if($data =~ /<Program_Service>(.+)<\/Program_Service>/)
-          {
-            readingsBulkUpdate($hash, "tunerProgramServiceFM", YAMAHA_NP_html2txt($1));
-          }
-          if($data =~ /<Radio_Text_A>(.+)<\/Radio_Text_A>/)
-          {
-            readingsBulkUpdate($hash, "tunerRadioTextAFM", YAMAHA_NP_html2txt($1));
-          }
-          if($data =~ /<Radio_Text_B>(.+)<\/Radio_Text_B>/)
-          {
-            readingsBulkUpdate($hash, "tunerRadioTextBFM", YAMAHA_NP_html2txt($1));
-          }
-          if($data =~ /<DAB><Preset><Preset_Sel>(.+)<\/Preset_Sel><\/Preset>(.*)<\/DAB>/)
-          {
-            readingsBulkUpdate($hash, "tunerPresetDAB", ($1));
-          }
-          if($data =~ /<Service_Label>(.+)<\/Service_Label>/)
-          {
-            readingsBulkUpdate($hash, "tunerServiceLabelDAB", YAMAHA_NP_html2txt($1));
-          }
-          if($data =~ /<Ch_Label>(.+)<\/Ch_Label>/)
-          {
-            readingsBulkUpdate($hash, "tunerChannelLabelDAB", ($1));
-          }
-          if($data =~ /<DLS>(.+)<\/DLS>/)
-          {
-            readingsBulkUpdate($hash, "tunerDLSDAB", YAMAHA_NP_html2txt($1));
-          }
-          if($data =~ /<Ensemble_Label>(.+)<\/Ensemble_Label>/)
-          {
-            readingsBulkUpdate($hash, "tunerEnsembleLabelDAB", YAMAHA_NP_html2txt($1));
-          }
-          if($data =~ /<Bit_Rate>(.+)<\/Bit_Rate>/)
-          {
-            readingsBulkUpdate($hash, "tunerBitRateDAB", $1." kbit\/s");
-          }
-          if($data =~ /<Audio_Mode>(.+)<\/Audio_Mode>/)
-          {
-            readingsBulkUpdate($hash, "tunerAudioModeDAB", $1);
-          }
-          if($data =~ /<DAB_PLUS>(.+)<\/DAB_PLUS>/)
-          {
-            if($1 eq "Negate")
+            if($data =~ /<FM><Preset><Preset_Sel>(.+)<\/Preset_Sel><\/Preset>(.*)<\/FM/)
             {
-              readingsBulkUpdate($hash, "tunerModeDAB", "DAB");
+              readingsBulkUpdate($hash, "tunerPresetFM", ($1));
             }
-            elsif($1 eq "Assert")
+            if($data =~ /<Tuning><Freq>(.+)<\/Freq><\/Tuning>/)
             {
-              readingsBulkUpdate($hash, "tunerModeDAB", "DAB+");
+              my $frequency = $1;
+              $frequency =~ s/(\d{2})$/.$1/; # Insert '.' to frequency
+              readingsBulkUpdate($hash, "tunerFrequencyFM", $frequency." MHz");
             }
+            if($data =~ /<Program_Service>(.+)<\/Program_Service>/)
+            {
+              readingsBulkUpdate($hash, "tunerProgramServiceFM", YAMAHA_NP_html2txt($1));
+            }
+            if($data =~ /<Radio_Text_A>(.+)<\/Radio_Text_A>/)
+            {
+              readingsBulkUpdate($hash, "tunerRadioTextAFM", YAMAHA_NP_html2txt($1));  
+            }
+            if($data =~ /<Radio_Text_B>(.+)<\/Radio_Text_B>/)
+            {
+              readingsBulkUpdate($hash, "tunerRadioTextBFM", YAMAHA_NP_html2txt($1));
+            } 
           }
-          if($data =~ /<Signal_Info><Freq>(.+)<\/Freq>/)
+          if($hash->{READINGS}{tunerBand}{VAL} eq "DAB")
           {
-            my $frequency = $1;
-            $frequency =~ s/(\d{3})$/.$1/; # Insert '.' to frequency
-            readingsBulkUpdate($hash, "tunerFrequencyDAB", $frequency." MHz");
-          }
+            if($data =~ /<DAB><Preset><Preset_Sel>(.+)<\/Preset_Sel><\/Preset>(.*)<\/DAB>/)
+            {
+              readingsBulkUpdate($hash, "tunerPresetDAB", ($1));
+            }
+            if($data =~ /<Service_Label>(.+)<\/Service_Label>/)
+            {
+              readingsBulkUpdate($hash, "tunerServiceLabelDAB", YAMAHA_NP_html2txt($1));            
+            }
+            if($data =~ /<Ch_Label>(.+)<\/Ch_Label>/)
+            {
+              readingsBulkUpdate($hash, "tunerChannelLabelDAB", ($1));
+            }
+            if($data =~ /<DLS>(.+)<\/DLS>/)
+            { 
+              readingsBulkUpdate($hash, "tunerDLSDAB", YAMAHA_NP_html2txt($1));
+            }
+            if($data =~ /<Ensemble_Label>(.+)<\/Ensemble_Label>/)
+            {
+              readingsBulkUpdate($hash, "tunerEnsembleLabelDAB", YAMAHA_NP_html2txt($1));
+            }
+            if($data =~ /<Bit_Rate>(.+)<\/Bit_Rate>/)
+            {
+              readingsBulkUpdate($hash, "tunerBitRateDAB", $1." kbit\/s");            
+            }
+            if($data =~ /<Audio_Mode>(.+)<\/Audio_Mode>/)
+            {
+              readingsBulkUpdate($hash, "tunerAudioModeDAB", $1);
+            }
+            if($data =~ /<DAB_PLUS>(.+)<\/DAB_PLUS>/)
+            {
+              if($1 eq "Negate")
+              {
+                readingsBulkUpdate($hash, "tunerModeDAB", "DAB");
+              }
+              elsif($1 eq "Assert")
+              {
+                readingsBulkUpdate($hash, "tunerModeDAB", "DAB+");
+              }            
+            }
+            if($data =~ /<Signal_Info><Freq>(.+)<\/Freq>/)
+            {
+              my $frequency = $1;
+              $frequency =~ s/(\d{3})$/.$1/; # Insert '.' to frequency
+              readingsBulkUpdate($hash, "tunerFrequencyDAB", $frequency." MHz");
+            }
+          }          
         }
         elsif($arg eq "timerStatus")
         {
@@ -1314,12 +1459,12 @@ sub YAMAHA_NP_ParseResponse
         # Delete old List listLines
         my $i = 1;    
         
-        while(exists($hash->{READINGS}{"playerListLine_$i"}))
-        {
-          delete($hash->{READINGS}{"playerListLine_$i"});
-          delete($hash->{READINGS}{"playerListLine_Attribute_$i"});
-          $i++;
-        }     
+        #while(exists($hash->{READINGS}{"playerListLine_$i"}))
+        #{
+        #  delete($hash->{READINGS}{"playerListLine_$i"});
+        #  delete($hash->{READINGS}{"playerListLine_Attribute_$i"});
+        #  $i++;
+        #}     
         
         if($data =~ /<Menu_Status>(.*)<\/Menu_Status>/)
         {
@@ -1337,7 +1482,6 @@ sub YAMAHA_NP_ParseResponse
         {
           # <Line_X><Txt>****</Txt><Attribute>Container|Item|Unselectable</Attribute></Line_X>
           
-          $i = 1;
           while($data =~ /<Line_$i><Txt>(.*?)<\/Txt><Attribute>(.*?)<\/Attribute><\/Line_$i>/gc)
           {
             readingsBulkUpdate($hash, "playerListLine_$i", $1);
@@ -1374,7 +1518,7 @@ sub YAMAHA_NP_ParseResponse
           readingsBulkUpdate($hash, "state","off");
           
           readingsEndUpdate($hash, 1);
-          
+ 
           YAMAHA_NP_ResetTimer($hash, 3);
           
           return;
@@ -1394,15 +1538,6 @@ sub YAMAHA_NP_ParseResponse
           readingsBulkUpdate($hash, "standbyMode", lc($arg));
         }
       }
-      #elsif($cmd eq "netRadioSelectBookmark")
-      #{
-      #  if($data =~ /RC="0"/)
-      #  {
-      #    Log3 $name, 5, "ParseListInfo\n";
-      #    YAMAHA_NP_Parse_List_Info($hash, $data);
-      #    
-      #  }
-      #}
       elsif($cmd eq "volume" or $cmd eq "volumeStraight" or $cmd eq "volumeUp" or $cmd eq "volumeDown")
       {        
         if($data =~ /RC="0"/)
@@ -1415,12 +1550,94 @@ sub YAMAHA_NP_ParseResponse
         }
       }
       
-      readingsEndUpdate($hash, 1);
-      
-      YAMAHA_NP_ResetTimer($hash, 0) if($cmd ne "statusRequest" and $cmd ne "on" and $cmd ne "volume");
+      readingsEndUpdate($hash, 1);      
+      #YAMAHA_NP_ResetTimer($hash, 0) if($cmd ne "statusRequest" and $cmd ne "on" and $cmd ne "volume");
     }
     return;
 }
+
+#############################
+# Blanks dynamic DAB tuner readings
+sub blankTunerDABReadings
+{
+  my ($hash) = @_;
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "tunerDLSDAB", "");
+  readingsBulkUpdate($hash, "tunerEnsembleLabelDAB", "");
+  readingsBulkUpdate($hash, "tunerFrequencyDAB", "");
+  readingsBulkUpdate($hash, "tunerModeDAB", "");
+  readingsBulkUpdate($hash, "tunerServiceLabelDAB", "");
+  readingsBulkUpdate($hash, "tunerAudioModeDAB", "");
+  readingsBulkUpdate($hash, "tunerBitRateDAB", "");
+  readingsBulkUpdate($hash, "tunerChannelLabelDAB", "");
+  readingsBulkUpdate($hash, "tunerPresetDAB", "");
+  readingsEndUpdate($hash, 1);
+  return;
+}
+
+#############################
+# Blanks dynamic FM tuner readings
+sub blankTunerFMReadings
+{
+  my ($hash) = @_;
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "tunerFrequencyFM", "");
+  readingsBulkUpdate($hash, "tunerProgramServiceFM", "");
+  readingsBulkUpdate($hash, "tunerRadioTextAFM", "");
+  readingsBulkUpdate($hash, "tunerRadioTextBFM", "");
+  readingsBulkUpdate($hash, "tunerPresetFM", "");  
+  readingsEndUpdate($hash, 1);
+  return;
+}
+
+#############################
+# Blanks dynamic Tuner readings
+sub blankPlayerReadings
+{
+  my ($hash) = @_;
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "playerAlbum", "");
+  readingsBulkUpdate($hash, "playerAlbumArtFormat", "");
+  readingsBulkUpdate($hash, "playerAlbumArtID", "");
+  readingsBulkUpdate($hash, "playerAlbumArtURL", "");
+  readingsBulkUpdate($hash, "playerArtist", "");
+  readingsBulkUpdate($hash, "playerDeviceType", "");
+  readingsBulkUpdate($hash, "playerIpodMode", "");
+  readingsBulkUpdate($hash, "playerListCurrentLine", "");
+  readingsBulkUpdate($hash, "playerListLine_1", "");
+  readingsBulkUpdate($hash, "playerListLine_2", "");
+  readingsBulkUpdate($hash, "playerListLine_3", "");
+  readingsBulkUpdate($hash, "playerListLine_4", "");
+  readingsBulkUpdate($hash, "playerListLine_5", "");
+  readingsBulkUpdate($hash, "playerListLine_6", "");
+  readingsBulkUpdate($hash, "playerListLine_7", "");
+  readingsBulkUpdate($hash, "playerListLine_8", "");
+  readingsBulkUpdate($hash, "playerListLine_Attribute_1", "");
+  readingsBulkUpdate($hash, "playerListLine_Attribute_2", "");
+  readingsBulkUpdate($hash, "playerListLine_Attribute_3", "");
+  readingsBulkUpdate($hash, "playerListLine_Attribute_4", "");
+  readingsBulkUpdate($hash, "playerListLine_Attribute_5", "");
+  readingsBulkUpdate($hash, "playerListLine_Attribute_6", "");
+  readingsBulkUpdate($hash, "playerListLine_Attribute_7", "");
+  readingsBulkUpdate($hash, "playerListLine_Attribute_8", "");
+  readingsBulkUpdate($hash, "playerListMaxLine", "");
+  readingsBulkUpdate($hash, "playerListMenuLayer", "");
+  readingsBulkUpdate($hash, "playerListMenuName", "");
+  readingsBulkUpdate($hash, "playerListMenuStatus", "");
+  readingsBulkUpdate($hash, "playerPlayTime", "");
+  readingsBulkUpdate($hash, "playerPlaybackInfo", "");
+  readingsBulkUpdate($hash, "playerRepeat", "");
+  readingsBulkUpdate($hash, "playerShuffle", "");
+  readingsBulkUpdate($hash, "playerSong", "");  
+  readingsBulkUpdate($hash, "playerTotalTracks", "");
+  readingsBulkUpdate($hash, "playerTrackNumber", "");
+  readingsEndUpdate($hash, 1);
+  return;
+}
+
 
 #############################
 # Converts all Values to FHEM usable command lists
