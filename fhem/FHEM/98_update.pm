@@ -500,7 +500,7 @@ upd_getUrl($)
   my ($url) = @_;
   $url =~ s/%/%25/g;
   $upd_connecthash{url} = $url;
-  $upd_connecthash{keepalive} = 1;
+  $upd_connecthash{keepalive} = ($url =~ m/localUpdate/ ? 0 : 1); # Forum #49798
   # $upd_connecthash{compress} = 1; # fhem.de does not support compression
   my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
   if($err) {
