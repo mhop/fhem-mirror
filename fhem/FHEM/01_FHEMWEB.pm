@@ -786,6 +786,7 @@ FW_answerCall($)
   FW_pO "<head root=\"$FW_ME\">\n<title>$t</title>";
   FW_pO '<link rel="shortcut icon" href="'.FW_IconURL("favicon").'" />';
   FW_pO "<meta charset=\"$FW_encoding\">"; # Forum 28666
+  FW_pO "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">";#Forum 18316
 
   # Enable WebApps
   if($FW_tp || $FW_ss) {
