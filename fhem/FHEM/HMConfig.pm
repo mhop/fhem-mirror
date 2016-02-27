@@ -1574,6 +1574,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                              ,tempListWed    =>"[prep|exec] HH:MM temp ..."
                                              ,tempListFri    =>"[prep|exec] HH:MM temp ..."
                                              ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
+                                             ,tempTmplSet    =>"[[-file-:]templateName] ..."
                                              ,partyMode      =>"[prep|exec] HH:MM durationDays ..."
                                              ,displayMode    =>"[temp-only|temp-hum]"
                                              ,displayTemp    =>"[actual|setpoint]"
@@ -1615,6 +1616,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                              ,tempListWed    =>"[prep|exec] HH:MM temp ..."
                                              ,tempListFri    =>"[prep|exec] HH:MM temp ..."
                                              ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
+                                             ,tempTmplSet    =>"[[-file-:]templateName] ..."
                                              ,"desired-temp" =>"[on|off|5.0..30.0]"
                                              ,sysTime        =>""
                                             }
@@ -1635,6 +1637,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                              ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
                                              ,"desired-temp" =>"[on|off|5.0..30.0]"
                                              ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
+                                             ,tempTmplSet    =>"[[-file-:]templateName] ..."
                                              ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"
                                             }
                      ,"HM-TC-IT-WM-W-EU07"=>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}

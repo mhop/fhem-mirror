@@ -590,6 +590,7 @@ sub CUL_HM_Attr(@) {#################################
   return $chk if ($chk);
   
   my $updtReq = 0;
+
   if   ($attrName eq "expert"){#[0,1,2]
     $attr{$name}{$attrName} = $attrVal;
     CUL_HM_chgExpLvl($_) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
@@ -3647,7 +3648,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr1);
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
-
+	if ($usg =~ m/ tempTmplSet/){
+      my $tl = $modules{CUL_HM}{AttrList};;
+      my $ok = ($tl =~ s/.* (tempListTmpl)(\:.*? ).*/$2/);
+	  $tl = $ok?$tl:"";
+      $usg =~ s/ tempTmplSet/ tempTmplSet$tl/;
+	}
     return $usg;
   }
   elsif($h eq "" && @a != 2) {
@@ -4755,6 +4761,22 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $ret = CUL_HM_tempListTmpl($name,$action,$template);
     $ret = "verifed with no faults" if (!$ret && $action eq "verify");
     return $ret;
+  }
+  elsif($cmd eq "tempTmplSet") { #############################################
+    $state= "";
+	return "tempate missing" if (!defined $a[2]);
+	CommandAttr(undef, "$name tempListTmpl $a[2]");
+
+    my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
+    if ($modules{HMinfo}){
+      if (!$template){ $template = HMinfo_tempListDefFn()   .":$fn"      ;}
+      else{            $template = HMinfo_tempListDefFn($fn).":$template";}
+    }
+    else{
+      if (!$template){ $template = "./tempList.cfg:$fn";}
+      else{            $template = "$fn:$template"     ;}
+    }
+    CUL_HM_tempListTmpl($name,"restore",$template);
   }
   elsif($cmd eq "sysTime") { ##################################################
     $state = "";
@@ -9055,6 +9077,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                  tempListFri>07:00 14.0 13:00 16.0 16:00 18.0 21:00 19.0 24:00 14.0
               </code>
             </li>
+            <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
+              Set the attribut and apply the change to the device
+            </li>
             <li><B>partyMode &lt;HH:MM&gt;&lt;durationDays&gt;</B><br>
               set control mode to party and device ending time. Add the time it ends
               and the <b>number of days</b> it shall last. If it shall end next day '1'
@@ -10409,6 +10434,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                  tempListThu>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0
                  tempListFri>07:00 14.0 13:00 16.0 16:00 18.0 21:00 19.0 24:00 14.0
               </code>
+            </li>
+            <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
+              Setzt das Attribut und sendet die Änderungen an das Device.
             </li>
           </ul><br>
         </li>
