@@ -338,6 +338,8 @@ autocreate_Notify($$)
           }
           close(IN); close(OUT);
           unlink($oldfile);
+          my $fh = new IO::File ">>$hash->{currentlogfile}";
+          $hash->{FH} = $fh;
         } else {
           Log 1, "$oldfile or $hash->{currentfile}: $!";
           close(IN); 
