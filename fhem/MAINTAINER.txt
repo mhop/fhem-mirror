@@ -263,6 +263,7 @@ FHEM/80_M232.pm              borisneubert         http://forum.fhem.de Sonstige 
 FHEM/80_xxLG7000.pm          markusbloch          http://forum.fhem.de Multimedia
 FHEM/81_M232Counter.pm       borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/82_LGTV.pm              markusbloch          http://forum.fhem.de Multimedia
+FHEM/82_LGTV_IP12.pm         markusbloch          http://forum.fhem.de Multimedia
 FHEM/82_M232Voltage.pm       borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/87_WS2000.pm            tdressler            http://forum.fhem.de Sonstiges
 FHEM/88_ALL4000T.pm          sachag               http://forum.fhem.de Sonstiges

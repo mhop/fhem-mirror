@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new module LGTV_IP12 for controlling LG SmartTV's manufactured
+             between 2012-2014 via network connection
   - feature: 30_MilightBridge: Support tcp bridge.
   - bugfix:  30_MilightBridge/98_ping: Use Blocking.pm for ping checks so 
              it does not block main thread.
