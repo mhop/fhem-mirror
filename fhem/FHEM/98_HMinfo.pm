@@ -884,7 +884,7 @@ sub HMinfo_listOfTempTemplates() { ###########################################
   my $at=$modules{CUL_HM};
   if ($modules{CUL_HM}{AttrList}){
     my $l = "none,".join(",",@tmpl);
-    $modules{CUL_HM}{AttrList} =~ s/ tempListTmpl(.* )*?/ tempListTmpl:$l/;
+    $modules{CUL_HM}{AttrList} =~ s/ tempListTmpl(.*? )/ tempListTmpl:$l /;
   }
   return ;
 }
