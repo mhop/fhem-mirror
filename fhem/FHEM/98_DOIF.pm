@@ -1,5 +1,5 @@
-##############################################
-# $Id$
+#############################################
+# $Id: 98_DOIF.pm$
 # 
 # This file is part of fhem.
 # 
@@ -916,7 +916,6 @@ DOIF_cmd ($$$$)
     }
   }
   if ($hash->{do}{$nr}{$subnr}) { 
-     $hash->{helper}{cur_cmd_nr}="cmd_".($nr+1)."_".($subnr+1);
      $cmd=$hash->{do}{$nr}{$subnr};
      
      my $eventa=$hash->{helper}{triggerEvents};
@@ -938,7 +937,6 @@ DOIF_cmd ($$$$)
      ($cmd,$err)=ParseCommandsDoIf($hash,$cmd,1);
   }
   DOIF_SetState ($hash,$nr,$subnr,$event,$err);
-  delete $hash->{helper}{cur_cmd_nr};
   if (defined $hash->{do}{$nr}{++$subnr}) {
     my $last_cond=ReadingsVal($pn,"cmd_nr",0)-1;
     if (DOIF_SetSleepTimer($hash,$last_cond,$nr,$subnr,$event,-1,undef)) {
@@ -1118,8 +1116,9 @@ DOIF_Notify($$)
   return "" if (!$hash->{helper}{globalinit});
   return "" if (defined $hash->{helper}{cur_cmd_nr});
   return "" if (!$hash->{devices}{all} and !$hash->{state}{device} and !$hash->{regexp}{all});
-  
+    
   if ((($hash->{devices}{all}) and $hash->{devices}{all} =~ / $dev->{NAME} /) or CheckRegexpDoIf($hash,$dev->{NAME},$eventa,-1)){
+    $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}";
     readingsSingleUpdate ($hash, "Device",$dev->{NAME},0);
     #my $events = deviceEvents($dev, AttrVal($dev->{NAME}, "addStateEvent", 0));
     #readingsSingleUpdate ($hash, "Event","@{$events}",0);
@@ -1147,11 +1146,13 @@ DOIF_Notify($$)
     $ret=DOIF_Trigger($hash,$dev->{NAME});
   }
   if (($hash->{state}{device}) and $hash->{state}{device} =~ / $dev->{NAME} / and !$ret) {
+    $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}";
     $hash->{helper}{triggerEvents}=$eventa;
     $hash->{helper}{triggerDev}=$dev->{NAME};
     $hash->{helper}{event}=join(",",@{$eventa});
     DOIF_SetState($hash,"",0,"","");
   }
+  delete $hash->{helper}{cur_cmd_nr};
   return undef;
 } 
   
@@ -1164,6 +1165,7 @@ DOIF_TimerTrigger ($)
   my $localtime=${$timer}->{localtime};
   delete $hash->{triggertime}{$localtime};
   my $ret;
+  $hash->{helper}{cur_cmd_nr}="timer $localtime";
   if (ReadingsVal($pn,"mode","") ne "disabled") {
     for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
       if ($hash->{localtime}{$j} == $localtime) {
@@ -1173,7 +1175,7 @@ DOIF_TimerTrigger ($)
     $ret=DOIF_Trigger ($hash,"");
   }
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
-    if ($hash->{localtime}{$j} == $localtime) {
+    if ($hash->{timer}{$j} == 1) {
       $hash->{timer}{$j}=0;
       if (!AttrVal($hash->{NAME},"disable","")) {
         if (defined ($hash->{interval}{$j})) {
@@ -1187,6 +1189,7 @@ DOIF_TimerTrigger ($)
       }
     }
   }
+  delete ($hash->{helper}{cur_cmd_nr});
   return undef;
   #return($ret);
 }
@@ -1343,7 +1346,7 @@ DOIF_SetTimer($$$)
   my ($second,$err, $rel)=DOIF_CalcTime($hash,$timeStr);
   if ($err)
   {
-      readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"error: ".$err,0);
+      readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"error: ".$err,1);
       Log3 $hash->{NAME},4 , "$hash->{NAME} timer_".($nr+1)."_c".($cond+1)." error: ".$err;
       #RemoveInternalTimer($timer);
       $hash->{realtime}{$nr}="00:00:00";
@@ -1370,12 +1373,12 @@ DOIF_SetTimer($$$)
     }
   }
   if ($next_time < $now) {
-    readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"back to the past ist not allowed",0);
+    readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),"back to the past ist not allowed",1);
     return("timer_".($nr+1)."_c".($cond+1),"back to the past ist not allowed");
   } else {
     my $next_time_str=strftime("%d.%m.%Y %H:%M:%S",localtime($next_time));
     $next_time_str.="\|".$hash->{days}{$nr} if (defined ($hash->{days}{$nr}));
-    readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),$next_time_str,0);
+    readingsSingleUpdate ($hash,"timer_".($nr+1)."_c".($cond+1),$next_time_str,1);
     $hash->{realtime}{$nr}=strftime("%H:%M:%S",localtime($next_time));
     
     
@@ -1472,9 +1475,9 @@ DOIF_SetSleepTimer($$$$$$$)
       my $cmd_nr=$nr+1;
       if (defined $hash->{do}{$nr}{1}) {
         my $cmd_subnr=$subnr+1;
-        readingsSingleUpdate ($hash,"wait_timer",strftime("%d.%m.%Y %H:%M:%S cmd_$cmd_nr"."_$cmd_subnr $device",localtime($next_time)),0);
+        readingsSingleUpdate ($hash,"wait_timer",strftime("%d.%m.%Y %H:%M:%S cmd_$cmd_nr"."_$cmd_subnr $device",localtime($next_time)),1);
       } else {
-        readingsSingleUpdate ($hash,"wait_timer",strftime("%d.%m.%Y %H:%M:%S cmd_$cmd_nr $device",localtime($next_time)),0);
+        readingsSingleUpdate ($hash,"wait_timer",strftime("%d.%m.%Y %H:%M:%S cmd_$cmd_nr $device",localtime($next_time)),1);
       }
       InternalTimer($next_time, "DOIF_SleepTrigger",$hash, 0);
       return 0;
@@ -1497,15 +1500,16 @@ DOIF_SleepTrigger ($)
   $hash->{helper}{sleeptimer}=-1;
   $hash->{helper}{sleepsubtimer}=-1;
   my $pn = $hash->{NAME};
+  $hash->{helper}{cur_cmd_nr}="wait_timer";
   $hash->{helper}{triggerEvents}=$hash->{helper}{timerevents};
   $hash->{helper}{event}=$hash->{helper}{timerevent};
   $hash->{helper}{triggerDev}=$hash->{helper}{timerdev};
-  readingsSingleUpdate ($hash, "wait_timer", "no timer",0);
+  readingsSingleUpdate ($hash, "wait_timer", "no timer",1);
 # if (!AttrVal($hash->{NAME},"disable","")) {
   if (ReadingsVal($pn,"mode","") ne "disabled") {
     DOIF_cmd ($hash,$sleeptimer,$sleepsubtimer,$hash->{helper}{sleepdevice});
   }
-  
+  delete $hash->{helper}{cur_cmd_nr};
   return undef;
 }
 
