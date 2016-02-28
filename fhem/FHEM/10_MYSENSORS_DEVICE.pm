@@ -97,9 +97,9 @@ my %static_types = (
   S_RAIN                  => { receives => [], sends => [V_RAIN,V_RAINRATE] }, # Rain sensor
   S_UV                    => { receives => [], sends => [V_UV] }, # UV Sensor
   S_WEIGHT                => { receives => [], sends => [V_WEIGHT,V_IMPEDANCE] }, # Weight sensor for scales etc.
-  S_POWER                 => { receives => [], sends => [V_WATT,V_KWH] }, # Power measuring device, like power meters
+  S_POWER                 => { receives => [V_VAR1], sends => [V_WATT,V_KWH,VAR1] }, # Power measuring device, like power meters
   S_HEATER                => { receives => [], sends => [V_HVAC_SETPOINT_HEAT,V_HVAC_FLOW_STATE,V_TEMP] }, # Heater device
-  S_DISTANCE              => { receives => [], sends => [V_DISTANCE,V_UNIT_PREFIX] }, # Distance sensor
+  S_DISTANCE              => { receives => [], sends => [V_DISTANCE] }, # Distance sensor
   S_LIGHT_LEVEL           => { receives => [], sends => [V_LIGHT_LEVEL] }, # Light sensor
   S_ARDUINO_NODE          => { receives => [], sends => [] }, # Arduino node device
   S_ARDUINO_REPEATER_NODE => { receives => [], sends => [] }, # Arduino repeating node device
