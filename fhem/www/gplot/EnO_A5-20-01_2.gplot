@@ -26,7 +26,7 @@ set y2range [-30:150]
 #FileLog 4:p_d\x3a:0:
 
 plot "<IN>" using 1:2 ls l3 axes x1y1 title 'Temperature' with lines,\
-     "<IN>" using 1:2 ls l0 axes x1y1 title 'Setpoint Temperature' with lines,\     
+     "<IN>" using 1:2 ls l0 axes x1y1 title 'Setpoint Temperature' with steps,\     
      "<IN>" using 1:2 ls l2 axes x1y2 title 'Setpoint Set' with steps,\
      "<IN>" using 1:2 ls l4 axes x1y2 title 'Setpoint Calc' with steps,\
      "<IN>" using 1:2 ls l1 axes x1y2 title 'P-proportion' with lines,\
