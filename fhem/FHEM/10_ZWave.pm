@@ -751,7 +751,7 @@ ZWave_Cmd($$@)
       $cmdList{neighborUpdate}{fmt} = "48$id";
       $cmdList{neighborUpdate}{id} = "";
     }
-    $cmdList{neighborList}{id} = 1 if($type eq "get"); # Add meta command
+    $cmdList{neighborList}{fmt} = "x" if($type eq "get"); # Add meta command
   }
 
   if($type eq "set" && $cmd eq "rgb") {
