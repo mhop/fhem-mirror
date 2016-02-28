@@ -38,6 +38,11 @@ DevIo_DoSimpleRead($)
     $res = sysread($hash->{TCPDev}, $buf, 4096);
     $buf = "" if(!defined($res));
 
+  } elsif($hash->{IODev}) {
+    $buf = $hash->{IODevRxBuffer};
+    $hash->{IODevRxBuffer} = "";
+    $buf = "" if(!defined($buf));
+
   }
   return $buf;
 }
@@ -113,9 +118,19 @@ DevIo_SimpleWrite($$$)
   Log3 ($name, 5, $ishex ? "SW: $msg" : "SW: ".unpack("H*",$msg));
 
   $msg = pack('H*', $msg) if($ishex);
-  $hash->{USBDev}->write($msg)    if($hash->{USBDev});
-  syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
-  syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
+  if($hash->{USBDev}){
+    $hash->{USBDev}->write($msg);
+
+  } elsif($hash->{TCPDev}) {
+    syswrite($hash->{TCPDev}, $msg);
+
+  } elsif($hash->{DIODev}) { 
+    syswrite($hash->{DIODev}, $msg);
+
+  } elsif($hash->{IODev}) { 
+    CallFn($hash->{IODev}{NAME},"IOWriteFn",$hash,$msg);
+
+  }
   select(undef, undef, undef, 0.001);
 }
 
@@ -225,6 +240,22 @@ DevIo_OpenDev($$$)
     delete($readyfnlist{"$name.$dev"});
     $selectlist{"$name.$dev"} = $hash;
 
+  } elsif($dev =~ m/^FHEM:DEVIO:(.*)(:(.*))/) {      # Forum #46276
+    my ($devName, $devPort) = ($1, $3);
+    AssignIoPort($hash, $devName);
+    if (defined($hash->{IODev})) {
+      ($dev, $baudrate) = split("@", $hash->{DeviceName});
+      $hash->{IODevPort} = $devPort if (defined($devPort));
+      $hash->{IODevParameters} = $baudrate if (defined($baudrate));
+      if (!CallFn($devName, "IOOpenFn", $hash)) {
+        Log3 $name, 3, "Can't open $dev!";
+        DevIo_setStates($hash, "disconnected");
+        return "";
+      }
+    } else {
+      DevIo_setStates($hash, "disconnected");
+      return "";
+    }
   } elsif($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
 
     # This part is called every time the timeout (5sec) is expired _OR_
@@ -397,6 +428,15 @@ DevIo_CloseDev($@)
     close($hash->{DIODev});
     delete($hash->{DIODev});
 
+  } elsif($hash->{IODev}) {
+    eval {
+      CallFn($hash->{IODev}{NAME}, "IOCloseFn", $hash);
+    }; # ignore closing errors (e.g. caused by fork)
+    delete($hash->{IODevParameters});
+    delete($hash->{IODevPort});
+    delete($hash->{IODevRxBuffer});
+    delete($hash->{IODev});
+    
   }
   ($dev, undef) = split("@", $dev); # Remove the baudrate
   delete($selectlist{"$name.$dev"});
@@ -409,7 +449,10 @@ sub
 DevIo_IsOpen($)
 {
   my ($hash) = @_;
-  return ($hash->{TCPDev} || $hash->{USBDev} || $hash->{DIODev});
+  return ($hash->{TCPDev} || 
+          $hash->{USBDev} || 
+          $hash->{DIODev} || 
+          $hash->{IODevPort});
 }
 
 sub
