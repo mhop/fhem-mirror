@@ -120,7 +120,7 @@ use constant {
   S_DOOR                  => 0,
   S_MOTION                => 1,
   S_SMOKE                 => 2,
-  S_BINARY                => 3,
+  S_LIGHT                 => 3,
   S_DIMMER                => 4,
   S_COVER                 => 5,
   S_TEMP                  => 6,
@@ -155,7 +155,7 @@ use constant {
   S_MOISTURE              => 35,
 };
 
-use constant sensorTypes => qw{ S_DOOR S_MOTION S_SMOKE S_BINARY S_DIMMER S_COVER S_TEMP S_HUM S_BARO S_WIND
+use constant sensorTypes => qw{ S_DOOR S_MOTION S_SMOKE S_LIGHT S_DIMMER S_COVER S_TEMP S_HUM S_BARO S_WIND
         S_RAIN S_UV S_WEIGHT S_POWER S_HEATER S_DISTANCE S_LIGHT_LEVEL S_ARDUINO_NODE
         S_ARDUINO_REPEATER_NODE S_LOCK S_IR S_WATER S_AIR_QUALITY S_CUSTOM S_DUST S_SCENE_CONTROLLER
         S_RGB_LIGHT S_RGBW_LIGHT S_COLOR_SENSOR S_HVAC S_MULTIMETER S_SPRINKLER S_WATER_LEAK S_SOUND S_VIBRATION
