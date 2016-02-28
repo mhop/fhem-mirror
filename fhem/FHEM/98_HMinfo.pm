@@ -1446,8 +1446,8 @@ sub HMinfo_SetFn($@) {#########################################################
   }
 
   $cmd = "?" if(!$cmd);# by default print options
-  if   ($cmd eq "clear" )     {##actionImmediate: clear parameter--------------
-    my ($type) = @a;
+  if   ($cmd =~ m/^clear[G]?/ )     {##actionImmediate: clear parameter--------------
+    my ($type) = @a;                               
     return "please enter what to clear" if (! $type);
     if ($type eq "msgStat" || $type eq "all" ){
       foreach (keys %{$modules{CUL_HM}{stat}{r}}){
@@ -1458,18 +1458,20 @@ sub HMinfo_SetFn($@) {#########################################################
       }
     }
     if ($type ne "msgStat"){
-      return "unknown parameter - use Protocol, readings, msgStat, register, rssi or all"
-            if ($type !~ m/^(Protocol|readings|register|oldRegs|rssi|all|trigger)$/);
-      $opt .= "d" if ($type =~ m/(Protocol|rssi)/);# readings apply to all, others device only
+      return "unknown parameter - use msgEvents, readings, msgStat, register, rssi or all"
+            if ($type !~ m/^(msgEvents|readings|register|oldRegs|rssi|all|trigger)$/);
+      $opt .= "d" if ($type =~ m/(msgEvents|rssi)/);# readings apply to all, others device only
       my @entities;
-      $type = "msgEvents" if ($type eq "Protocol");# translate parameter
       foreach my $dName (HMinfo_getEntities($opt,$filter)){
         push @entities,$dName;
         CUL_HM_Set($defs{$dName},$dName,"clear",$type);
       }
-      return $cmd.$type." done:" ."\n cleared"  ."\n    ".(join "\n    ",sort @entities)
-                           ;
+      $ret = $cmd.$type." done:" 
+	                   ."\n cleared"  
+					   ."\n    ".(join "\n    ",sort @entities)
+             if($filter);#  no return if no filter 
     }
+	HMinfo_status($hash);
   }
   elsif($cmd eq "autoReadReg"){##actionImmediate: re-issue register Read-------
     my @entities;
@@ -1562,7 +1564,8 @@ sub HMinfo_SetFn($@) {#########################################################
   else{
     my @cmdLst =     
            ( "autoReadReg"
-            ,"clear"    #:msgStat,Protocol,all,rssi,register,trigger,readings"  
+            ,"clear"    #:msgStat,msgEvents,all,rssi,register,trigger,readings"  
+            ,"clearG:msgEvents,readings,register,oldRegs,rssi,msgStat,trigger,attack,all"
             ,"archConfig:-0,-a","saveConfig","verifyConfig","loadConfig","purgeConfig"
             ,"update"
             ,"cpRegs"
@@ -1603,13 +1606,17 @@ sub HMInfo_help(){ ############################################################
            ."\n          range: min to max value"
            ."\n          count: number of events in calculation"
            ."\n  ---clear status---"
-           ."\n set clear [-typeFilter-] [Protocol|readings|msgStat|register|rssi]"
-           ."\n          Protocol     # delete all protocol-events"
-           ."\n          readings     # delete all readings"
-           ."\n          register     # delete all register-readings"
-           ."\n          rssi         # delete all rssi data"
-           ."\n          msgStat      # delete message statistics"
-           ."\n          all          # delete all of the above"
+           ."\n set clear[G] [-typeFilter-] [msgEvents|readings|msgStat|register|rssi]"
+           ."\n                       # delete readings selective"
+           ."\n          msgEvents    # delete all protocol-events , msg events"
+           ."\n          readings     # all readings"
+           ."\n          register     # all register-readings"
+           ."\n          oldRegs      # outdated register (cleanup) "
+           ."\n          rssi         # all rssi data "
+           ."\n          msgStat      # message statistics"
+           ."\n          trigger      # trigger readings"
+           ."\n          attack       # attack related readings"
+           ."\n          all          # all of the above"
            ."\n ---help---"
            ."\n get help                            #"
            ."\n ***footnote***"
@@ -2673,7 +2680,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       </li>
       <li><a name="#HMinfoprotoEvents">protoEvents </a><a href="#HMinfoFilter">[filter]</a> <br>
           <B>important view</B> about pending commands and failed executions for all devices in a single table.<br>
-          Consider to clear this statistic use <a name="#HMinfoclear">clear Protocol</a>.<br>
+          Consider to clear this statistic use <a name="#HMinfoclear">clear msgEvents</a>.<br>
       </li>
       <li><a name="#HMinforssi">rssi </a><a href="#HMinfoFilter">[filter]</a><br>
           statistic over rssi data for HM entities.<br>
@@ -2711,10 +2718,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
           schedules a read of the configuration for the CUL_HM devices with attribut autoReadReg set to 1 or higher.
       </li>
-      <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [Protocol|readings|msgStat|register|rssi]<br>
+      <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [msgEvents|readings|msgStat|register|rssi]<br>
           executes a set clear ...  on all HM entities<br>
           <ul>
-          <li>Protocol relates to set clear msgEvents</li>
+          <li>protocol relates to set clear msgEvents</li>
           <li>readings relates to set clear readings</li>
           <li>rssi clears all rssi counters </li>
           <li>msgStat clear HM general message statistics</li>
@@ -3119,7 +3126,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
           vermutlich die <B>wichtigste Auflistung</B> f&uuml;r Meldungsprobleme.
           Informationen &uuml;ber ausstehende Kommandos und fehlgeschlagene Sendevorg&auml;nge
           f&uuml;r alle Ger&auml;te in Tabellenform.<br>
-          Mit <a name="#HMinfoclear">clear Protocol</a> kann die Statistik gel&ouml;scht werden.<br>
+          Mit <a name="#HMinfoclear">clear msgEvents</a> kann die Statistik gel&ouml;scht werden.<br>
       </li>
       <li><a name="#HMinforssi">rssi </a><a href="#HMinfoFilter">[filter]</a><br>
           Statistik &uuml;ber die RSSI Werte aller HM Instanzen.<br>
@@ -3156,7 +3163,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfoautoReadReg">autoReadReg</a> <a href="#HMinfoFilter">[filter]</a><br>
           Aktiviert das automatische Lesen der Konfiguration f&uuml;r ein CUL_HM Ger&auml;t, wenn das Attribut autoReadReg auf 1 oder h&ouml;her steht.
       </li>
-      <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [Protocol|readings|msgStat|register|rssi]<br>
+      <li><a name="#HMinfoclear">clear</a> <a href="#HMinfoFilter">[filter]</a> [msgEvents|readings|msgStat|register|rssi]<br>
           F&uuml;hrt ein set clear ... f&uuml;r alle HM Instanzen aus<br>
           <ul>
           <li>Protocol bezieht sich auf set clear msgEvents</li>
