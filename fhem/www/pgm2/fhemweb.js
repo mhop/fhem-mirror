@@ -196,7 +196,43 @@ FW_jqueryReadyFn()
     });
   });
 
+  FW_smallScreenCommands();
 
+}
+
+// Show the webCmd list in a dialog if: smallScreen & hiddenroom=detail & room
+function
+FW_smallScreenCommands()
+{
+  if($("div#menu select").length == 0 ||           // not SmallScreen
+     $("div#content").attr("room") == undefined || // not room Overview
+     $("div#content div.col1 a").length > 0)       // no hiddenroom=detail
+    return;
+
+  $("div#content div.col1").each(function(){
+    var tr = $(this).closest("tr");
+    if($(tr).find("> td").length <= 2)
+      return;
+    $(this).html("<a href='#'>"+$(this).html()+"</a>");
+    $(this).find("a").click(function(){
+      var t = $("<table></table>"), row=0;
+      $(tr).find("> td").each(function(){
+        $(t).append("<tr></tr>");
+        if(row++ == 0) {
+          $(t).find("tr:last").append($(this).find("a").html());
+        } else {
+          $(this).attr("data-orig", 1);
+          this.orig=$(this).parent();
+          $(t).find("tr:last").append($(this).detach());
+        }
+      });
+      FW_okDialog(t, this, function(){
+        $("#FW_okDialog [data-orig]").each(function(){
+          $(this).detach().appendTo(this.orig);
+        });
+      });
+    });
+  });
 }
 
 
@@ -282,16 +318,19 @@ FW_errmsg(txt, timeout)
 }
 
 function
-FW_okDialog(txt, parent)
+FW_okDialog(txt, parent, removeFn)
 {
   var div = $("<div id='FW_okDialog'>");
   $(div).html(txt);
   $("body").append(div);
+  var oldPos = $("body").scrollTop();
   $(div).dialog({
     dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
     maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
     buttons: [{text:"OK", click:function(){
       $(this).dialog("close");
+      if(removeFn)
+        removeFn();
       $(div).remove();
     }}]
   });
@@ -304,6 +343,7 @@ FW_okDialog(txt, parent)
       my: "left top", at: "right bottom",
       of: parent, collision: "flipfit"
     });
+  setTimeout(function(){$("body").scrollTop(oldPos);}, 1); // Not ideal.
 }
 
 function
