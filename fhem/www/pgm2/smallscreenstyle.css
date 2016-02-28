@@ -61,14 +61,14 @@ button.dist { margin:5px; }
 
 /* Landscape mode */
 @media all and (orientation:landscape) {
-  div.col1 { width: 282px; }
-  div.col2 { width: 108px; }
-  div.col3 { width: 108px; height: 30px; }
+  div.col1 { width:282px; }
+  div.col2 { width:108px; }
+  div.col3 { width:100%; min-width:108px; height:30px; }
 
   table.block input { text-align: center; }
   table.block tr td:nth-child(3) { text-align: center; }
 
-  table.block div.slider { width: 108px; text-align: center; }
+  table.block div.slider { min-width: 108px; text-align: center; }
   table.block slider { float: none; }
   table.block select { text-align: center; }
 }
