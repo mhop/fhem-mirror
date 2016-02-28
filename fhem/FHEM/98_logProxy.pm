@@ -597,6 +597,13 @@ logProxy_clipData($$$$;$)
   if( defined($predict) && !defined($next_value) ) {
     $next_value = $prev_value;
 
+    my $sec = SVG_time_to_sec($prev_timestamp);
+    if( !$ret && $sec < $from && defined($prev_value) ) {
+      my @t = localtime($from);
+      my $timestamp = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+      $ret .= "$timestamp $prev_value\n";
+    }
+
     #if $predict = 0 -> predict to end of plot
     my $time = $to;
     #else predict by $predict
