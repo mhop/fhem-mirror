@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.19.1 28.02.2016    enhanced command runView by option "link_open" to
+#                      open a streamlink immediately
 # 1.19   25.02.2016    functions for cam-livestream added
 # 1.18.1 21.02.2016    fixed a problem that the state is "disable" instead of
 #                      "disabled" if a camera is disabled and FHEM will be restarted
@@ -262,7 +264,7 @@ sub SSCam_Set {
                    "snap ".
                    "enable ".
                    "disable ".
-                   "runView:image,link ".
+                   "runView:image,link,link_open ".
                    "stopView:noArg ".
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
@@ -396,6 +398,15 @@ sub SSCam_Set {
         elsif ($opt eq "runView") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+            
+            if ($prop eq "link_open") {
+                $prop = "link";
+                if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
+                $hash->{HELPER}{OPENWINDOW} = 1;
+            } else {
+                $hash->{HELPER}{OPENWINDOW} = 0;
+            }
+            
             $hash->{HELPER}{WLTYPE} = $prop;
             runliveview($hash);
         }
@@ -2180,6 +2191,7 @@ sub camop_nonbl ($) {
    my $apivideostmmaxver = $hash->{HELPER}{APIVIDEOSTMMAXVER};
    my $sid               = $hash->{HELPER}{SID};
    my $OpMode            = $hash->{OPMODE};
+   my ($livestream,$winname,$attr,$room);
    my $url;
    my $camid;
    my $snapid;
@@ -2423,7 +2435,7 @@ sub camop_nonbl ($) {
       # SID nach SID_STRM sichern und nutzen (für stopLiveview-Routine)
       $hash->{HELPER}{SID_STRM} = $sid;
       # externe URL
-      my $livestream = !AttrVal($name, "livestreamprefix", undef) ? "http://$serveraddr:$serverport" : AttrVal($name, "livestreamprefix", undef);
+      $livestream = !AttrVal($name, "livestreamprefix", undef) ? "http://$serveraddr:$serverport" : AttrVal($name, "livestreamprefix", undef);
       $livestream .= "/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\"";
       # interne URL
       $url = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\""; 
@@ -2434,6 +2446,20 @@ sub camop_nonbl ($) {
          
       $logstr = "Set Livestream-URL: $url";
       &printlog($hash,$logstr,"4");
+      
+      # livestream sofort in neuem Browsertab öffnen
+      if ($hash->{HELPER}{OPENWINDOW}) {
+          $winname = $name."_view";
+          $attr = AttrVal($name, "htmlattr", "");
+          # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
+          
+          if ($hash->{HELPER}{VIEWOPENROOM}) {
+              $room = $hash->{HELPER}{VIEWOPENROOM};
+              map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("WEB.*");
+          } else {
+              map {FW_directNotify("#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("WEB.*");
+          }
+      }
  
       $logstr = "--- End Function cam: $OpMode nonblocking ---";
       &printlog($hash,$logstr,"4");
@@ -2445,7 +2471,7 @@ sub camop_nonbl ($) {
                     {
                     readingsSingleUpdate($hash,"state", "off", 1); 
                     }
-                    
+      
       $hash->{HELPER}{ACTIVE} = "off";   
       return;
    }
@@ -3728,7 +3754,7 @@ return;
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>starts a predefinied patrol (PTZ-cameras)  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>starts a continuous move of PTZ-camera to direction up/down/left/right or dir_X  </td></tr> 
-      <tr><td>"runView [image | link]":                            </td><td>starts a livestream as embedded image or link  </td></tr> 
+      <tr><td>"runView [image | link | link_open &lt;room&gt; ]":  </td><td>starts a livestream as embedded image or link  </td></tr> 
       <tr><td>"stopView":                                          </td><td>stops a camera livestream  </td></tr> 
   </table>
   <br><br>
@@ -3922,18 +3948,23 @@ return;
   
   <br>
   
-  <b> set &lt;name&gt; runView [ image | link ] </b> <br><br>
+  <b> set &lt;name&gt; runView [ image | link | link_open &lt;room&gt; ] </b> <br><br>
   
-  A livestream of a camera will be started, either as embedded image or as a generated link.
+  A livestream (mjpeg-stream) of a camera will be started, either as embedded image or as a generated link.
   The behavior of livestream in FHEMWEB can be affected by statements in <a href="#SSCamattr">attribute</a> "htmlattr". <br><br>
   
-  <b>Example:</b><br>
+  <b>Examples:</b><br>
   <pre>
     attr &lt;name&gt; htmlattr target=_blank width="500" height="375"
+    attr &lt;name&gt; htmlattr target=_blank width=500,height=375
+    attr &lt;name&gt; htmlattr width=700,height=525,top=200,left=300
   </pre>
   
-  With these attribute values a streaming link will be opened in a new browser tab. If the stream will be started as an image, the size changes appropriately the
-  values of width and hight. <br>
+  With these attribute values a streaming link will be opened (by click on) in a new browser tab or windows. If the stream will be started as an image, the size changes appropriately the
+  values of width and hight. <br> 
+  The command <b>"set &lt;name&gt; runView link_open"</b> starts the stream immediately in a new browser window (longpoll=1 must be set for WEB). 
+  A browser window will be initiated to open for every FHEM session which is active. If you want to change this, 
+  you can use command <b>"set &lt;name&gt; runView link_open &lt;room&gt;"</b> what initiates to open a browser window in that FHEM session that has just opend the room &lt;room&gt;.
   The settings of <a href="#SSCamattr">attribute</a> "livestreamprefix" overwrite the data for protocol, servername and port in <a href="#SSCamreadings">reading</a> "LiveStreamUrl".
   With it the LivestreamURL can be modified and used for distribution and external access to SVS livestream. <br><br>
   
@@ -4290,21 +4321,21 @@ return;
 
   <table>
   <colgroup> <col width=30%> <col width=70%> </colgroup>
-      <tr><td>"on [rectime]":                                  </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit [rectime] gestoppt.</td></tr>
-      <tr><td>                                                 </td><td>Mit rectime = 0 wird eine Daueraufnahme gestartet die durch "set &lt;name&gt; off" wieder gestoppt werden muß.</td></tr>
-      <tr><td>"off" :                                          </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
-      <tr><td>"snap":                                          </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
-      <tr><td>"disable":                                       </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
-      <tr><td>"enable":                                        </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
-      <tr><td>"credentials &lt;username&gt; &lt;password&gt;": </td><td>speichert die Zugangsinformationen</td></tr>
-      <tr><td>"expmode [ day | night | auto ]":                </td><td>aktiviert den Belichtungsmodus Tag, Nacht oder Automatisch </td></tr>
-      <tr><td>"motdetsc [ camera | SVS | disable ]":           </td><td>schaltet die Bewegungserkennung in den gewünschten Modus (durch Kamera, SVS, oder deaktiviert) </td></tr>
-      <tr><td>"goPreset &lt;Presetname&gt;":                   </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
-      <tr><td>"runPatrol &lt;Patrolname&gt;":                  </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
-      <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":   </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
-      <tr><td>"move [ up | down | left | right | dir_X ]":     </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
-      <tr><td>"runView [image | link]":                        </td><td>startet einen Livestream als eingbettetes Image oder als Link  </td></tr>
-      <tr><td>"stopView":                                      </td><td>stoppt einen Kamera-Livestream  </td></tr>
+      <tr><td>"on [rectime]":                                      </td><td>startet eine Aufnahme. Die Aufnahme wird automatisch nach Ablauf der Zeit [rectime] gestoppt.</td></tr>
+      <tr><td>                                                     </td><td>Mit rectime = 0 wird eine Daueraufnahme gestartet die durch "set &lt;name&gt; off" wieder gestoppt werden muß.</td></tr>
+      <tr><td>"off" :                                              </td><td>stoppt eine laufende Aufnahme manuell oder durch die Nutzung anderer Events (z.B. über at, notify)</td></tr>
+      <tr><td>"snap":                                              </td><td>löst einen Schnappschuß der entsprechenden Kamera aus und speichert ihn in der Synology Surveillance Station</td></tr>
+      <tr><td>"disable":                                           </td><td>deaktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"enable":                                            </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
+      <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>speichert die Zugangsinformationen</td></tr>
+      <tr><td>"expmode [ day | night | auto ]":                    </td><td>aktiviert den Belichtungsmodus Tag, Nacht oder Automatisch </td></tr>
+      <tr><td>"motdetsc [ camera | SVS | disable ]":               </td><td>schaltet die Bewegungserkennung in den gewünschten Modus (durch Kamera, SVS, oder deaktiviert) </td></tr>
+      <tr><td>"goPreset &lt;Presetname&gt;":                       </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
+      <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
+      <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
+      <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
+      <tr><td>"runView [image | link | link_open &lt;room&gt; ]":  </td><td>startet einen Livestream als eingbettetes Image oder als Link  </td></tr>
+      <tr><td>"stopView":                                          </td><td>stoppt einen Kamera-Livestream  </td></tr>
   </table>
   <br><br>
   
@@ -4494,18 +4525,23 @@ return;
 
   <br>
   
-  <b> set &lt;name&gt; runView [ image | link ] </b> <br><br>
+  <b> set &lt;name&gt; runView [ image | link | link_open &lt;room&gt; ] </b> <br><br>
   
-  Es wird ein Livestream der Kamera, entweder als eingebettetes Image oder als generierter Link, gestartet. 
+  Es wird ein Livestream (mjpeg-Stream) der Kamera, entweder als eingebettetes Image oder als generierter Link, gestartet. 
   Das Verhalten des Livestreams im FHEMWEB kann durch Angaben im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden. <br><br>
   
   <b>Beispiel:</b><br>
   <pre>
     attr &lt;name&gt; htmlattr target=_blank width="500" height="375"
+    attr &lt;name&gt; htmlattr target=_blank width=500,height=375
+    attr &lt;name&gt; htmlattr width=700,height=525,top=200,left=300
   </pre>
   
-  Mit diesen Attributwerten öffnet der Link als weiteres Fenster/Browsertab. Wird der Stream als Image gestartet, ändert sich die Größe entsprechend der 
+  Mit diesen Attributwerten öffnet der Link (mit Klick) als weiteres Fenster/Browsertab. Wird der Stream als Image gestartet, ändert sich die Größe entsprechend der 
   Angaben von Width und Hight. <br>
+  Das Kommando <b>"set &lt;name&gt; runView link_open"</b> startet den Livestreamlink sofort in einem neuen Browserfenster (longpoll=1 muß für WEB gesetzt sein).
+  Dabei wird für jede aktive FHEM-Session eine Fensteröffnung initiiert. Soll dieses Verhalten geändert werden, kann <b>"set &lt;name&gt; runView link_open &lt;room&gt;"</b>
+  verwendet werden um das Öffnen des Browserwindows in einem beliebigen in einer FHEM-Session angezeigten Raum &lt;room&gt; zu initiieren.<br>
   Das gesetzte <a href="#SSCamattr">Attribut</a> "livestreamprefix" überschreibt im <a href="#SSCamreadings">Reading</a> "LiveStreamUrl" die Angaben für Protokoll, Servername und Port. 
   Damit kann z.B. die LiveStreamUrl für den Versand und externen Zugriff auf die SVS modifiziert werden. <br><br>
   
