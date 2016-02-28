@@ -38,6 +38,8 @@
 # 2014-09-08 john  V2.05 : support of battery option; developed by  jannik_78
 # 2014-12-22 john  V2.06 : checked HTML
 # 2015-01-25 john  V2.07 : adjusted argument agent for http-request of proplanta (thanks to framller)
+# 2016-02-25 john  V2.08 : support of Piko 7 with only 2 strings instead of 3 (thanks to erwin)
+
 
 ####################################################################################################
 
@@ -290,7 +292,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL          = "KOSTALPIKO";
-my $KOSTAL_VERSION = "2.07";
+my $KOSTAL_VERSION = "2.08";
 
 ########################################
 sub KOSTALPIKO_Log($$$)
@@ -506,7 +508,7 @@ sub KOSTALPIKO_StatusHtmlAcquire($)
   return unless ( defined( $hash->{NAME} ) );
 
   my $err_log = '';
-
+  
   my $URL =
     "http://" . $hash->{helper}{User} . ":" . $hash->{helper}{Pass} . "\@" . $hash->{helper}{Host} . "/index.fhtml";
 
@@ -651,11 +653,16 @@ sub KOSTALPIKO_StatusDone($)
   my ($string) = @_;
   return unless ( defined($string) );
 
+  # need to do this before split !!!
+  my @nVoltages   = $string =~ m/Spannung/g;    ##MH how often did we find the word Spannung?
+  my $strangCount = int( @nVoltages / 2 );      # the number of strings
+
   # all term are separated by "|" , the first ist the name of the instance
   my ( $name, @values ) = split( "\\|", $string );
   my $hash = $defs{$name};
   return unless ( defined( $hash->{NAME} ) );
-  KOSTALPIKO_Log $hash, 3, "--- started ---";
+  
+  KOSTALPIKO_Log $hash, 3, '--- started --- with numStrings:' . $strangCount;
 
   # show the values
   KOSTALPIKO_Log $hash, 5, "values:" . join( ', ', @values );
@@ -668,7 +675,7 @@ sub KOSTALPIKO_StatusDone($)
   {
     my $tag    = "";    # der Name des parameters in der web site
     my $index  = 0;     # laufindex von 1..4 f. String x und Lx
-    my $strang = 1;
+    my $strang = 1;     # gruppe  String<n>/ L<n> 
     my $rdName = "";    # name for reading
     my $rdValue;        # value for reading
     my %hashValues = ();                             # hash for name,value
@@ -696,8 +703,10 @@ sub KOSTALPIKO_StatusDone($)
       {
         $tag = $text;    # remember the identifier
       } elsif ( $text eq "Spannung" || $text eq "Strom" || $text eq "Leistung" )
-      {
+      { 
         $index++;
+
+        # there are max 4 values per group
         if ( $index > 4 )
         {
           $strang++;
@@ -711,12 +720,27 @@ sub KOSTALPIKO_StatusDone($)
           $rdValue = $text;
 
           # translate the identifier of the html.page to internal identifiers
-          $rdName = "AC.Power"                  if ( $tag eq "aktuell" );
-          $rdName = "Total.Energy"              if ( $tag eq "Gesamtenergie" );
-          $rdName = "Daily.Energy"              if ( $tag eq "Tagesenergie" );
-          $rdName = "Mode"                      if ( $tag eq "Status" );
-          $rdName = "generator.$strang.voltage" if ( $tag eq "Spannung" && $index == 1 );
-          $rdName = "output.$strang.voltage"    if ( $tag eq "Spannung" && $index == 2 );
+          $rdName = "AC.Power"     if ( $tag eq "aktuell" );
+          $rdName = "Total.Energy" if ( $tag eq "Gesamtenergie" );
+          $rdName = "Daily.Energy" if ( $tag eq "Tagesenergie" );
+          $rdName = "Mode"         if ( $tag eq "Status" );
+
+          # MH change for PIKO7 (2 Strings only / should work for 3 string PIKO's
+          if ( $tag eq "Spannung" )
+          {
+            $rdName = "output.$strang.voltage" if ( $index == 2 );
+            if ( $index == 1 )
+            {
+              if ( $strang <= $strangCount )
+              {
+                $rdName = "generator.$strang.voltage";
+              } else
+              {
+                # useful for PIKO7 with 2 Strings only
+                $rdName = "output.$strang.voltage";
+              }
+            }
+          }
           $rdName = "generator.$strang.current" if ( $tag eq "Strom" );
           $rdName = "output.$strang.power"      if ( $tag eq "Leistung" );
           $rdName = "sensor.1"                  if ( $tag eq "1. analoger Eingang:" );
@@ -861,6 +885,7 @@ sub KOSTALPIKO_GrHtmlAcquire($)
   return "" if ( $URL eq "" );
 
   my $err_log = "";
+
   # my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 3 );
   my $agent = LWP::UserAgent->new(
     env_proxy         => 1,
@@ -869,7 +894,7 @@ sub KOSTALPIKO_GrHtmlAcquire($)
     timeout           => 10,
     agent             => "Mozilla/5.0 (Windows NT 5.1) [de-DE,de;q=0.8,en-US;q=0.6,en;q=0.4]"
   );
-  
+
   my $header = HTTP::Request->new( GET => $URL );
   my $request = HTTP::Request->new( 'GET', $URL, $header );
   my $response = $agent->request($request);
@@ -1055,14 +1080,14 @@ sub KOSTALPIKO_GrTimer($)
 =begin html
 
 
-  <a name="KOSTALPIKO" id="KOSTALPIKO"></a>
+  <a name="KOSTALPIKO"></a>
 
   <h3>KOSTALPIKO</h3>
 
-  <div style="margin-left: 2em">
+  <div>
     <a name="KOSTALPIKOdefine" id="KOSTALPIKOdefine"></a> <b>Define</b>
 
-    <div style="margin-left: 2em">
+    <div>
       <br />
       <code>define &lt;name&gt; KOSTALPIKO &lt;ip-address&gt; &lt;user&gt; &lt;password&gt;</code><br />
       <br />
@@ -1082,23 +1107,23 @@ sub KOSTALPIKO_GrTimer($)
       <br />
       <b>Example:</b><br />
 
-      <div style="margin-left: 2em">
+      <div>
         <code>define Kostal KOSTALPIKO 192.168.2.4 pvserver pvwr</code><br />
       </div>
     </div><br />
     <a name="KOSTALPIKOset" id="KOSTALPIKOset"></a> <b>Set-Commands</b>
 
-    <div style="margin-left: 2em">
+    <div>
       <br />
       <code>set &lt;name&gt; captureGlobalRadiation</code><br />
 
-      <div style="margin-left: 2em">
+      <div>
         The values for global radiation, UV-index and sunshine duration are immediately polled.
       </div><br />
       <br />
       <code>set &lt;name&gt; captureKostalData</code><br />
 
-      <div style="margin-left: 2em">
+      <div>
         All values of the inverter are immediately polled.
       </div><br />
     </div><a name="KOSTALPIKOattr" id="KOSTALPIKOattr"></a> <b>Attributes</b><br />
