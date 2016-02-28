@@ -698,6 +698,28 @@ ZWave_execInits($$)
 }
 
 
+sub
+ZWave_neighborList($)
+{
+  my ($hash) = @_;
+  my $id = $hash->{nodeIdHex};
+
+  # GET_ROUTING_TABLE_LINE, no dead links, include routing neighbors
+  IOWrite($hash, "", "0080${id}0100");
+
+  no strict "refs";
+  my $iohash = $hash->{IODev};
+  my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
+  my ($err, $data) = &{$fn}($iohash, "neighborList", "^0180") if($fn);
+  use strict "refs";
+
+  return $err if($err);
+  $data =~ s/^0180//;
+  $data = zwlib_parseNeighborList($iohash, $data);
+  readingsSingleUpdate($hash, "neighborList", $data, 1) if($hash);
+  return $data;
+}
+
 ###################################
 sub
 ZWave_Cmd($$@)
@@ -729,12 +751,7 @@ ZWave_Cmd($$@)
       $cmdList{neighborUpdate}{fmt} = "48$id";
       $cmdList{neighborUpdate}{id} = "";
     }
-    if($type eq "get") {
-      # GET_ROUTING_TABLE_LINE, no dead links, include routing neighbors
-      $cmdList{neighborList}{fmt} = "80${id}0100";
-      $cmdList{neighborList}{id} = "";
-      $cmdList{neighborList}{regexp} = "^0180";
-    }
+    $cmdList{neighborList}{id} = 1 if($type eq "get"); # Add meta command
   }
 
   if($type eq "set" && $cmd eq "rgb") {
@@ -773,6 +790,8 @@ ZWave_Cmd($$@)
     }
 
   }
+
+  return ZWave_neighborList($hash) if($cmd eq "neighborList");
 
   ################################
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
@@ -837,8 +856,7 @@ ZWave_Cmd($$@)
   }
 
   my $data;
-  if($cmd eq "neighborUpdate" ||
-     $cmd eq "neighborList") {
+  if($cmd eq "neighborUpdate") {
     $data = $cmdFmt;
 
   } else {
@@ -880,9 +898,6 @@ ZWave_Cmd($$@)
     $data = "$cmd $id $data" if($re);
 
     $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
-
-    ZWave_processSendStack($hash, "next") # No radio traffic for neighborList
-        if($data && $cmd eq "neighborList");
 
   } elsif($type ne "get") {
     ZWave_processSendStack($hash, "next") if($cmd eq "neighborUpdate");
@@ -3586,8 +3601,8 @@ ZWave_addToSendStack($$$)
   push @{$ss}, "$type:$cmd";
 
   if(ZWave_isWakeUp($hash)) {
-    # SECURITY XXX and neighborList
-    if ($cmd =~ m/^......988[01].*/ || $cmd =~ m/^80..0100$/) {
+    # SECURITY XXX 
+    if($cmd =~ m/^......988[01].*/) {
       Log3 $hash->{NAME}, 5, "$hash->{NAME}: Sendstack bypassed for $cmd";
     } else {
       return "Scheduled for sending after WAKEUP" if(!$hash->{wakeupAlive});
@@ -3620,18 +3635,6 @@ ZWave_Parse($$@)
     Log3 $ioName, 1, "ERROR: $ioName homeId is not set!"
         if(!$iodev->{errReported});
     $iodev->{errReported} = 1;
-    return "";
-  }
-
-  if($msg =~ m/^neighborList (..) 0180(.*)$/) {
-    my ($id, $data) = ($1, $2);
-    my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
-    my $name = ($hash ? $hash->{NAME} : "unknown");
-
-    $msg = zwlib_parseNeighborList($iodev, $data);
-
-    readingsSingleUpdate($hash, "neighborList", $msg, 1) if($hash);
-    return $msg if($srcCmd);
     return "";
   }
 

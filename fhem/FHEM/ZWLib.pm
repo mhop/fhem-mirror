@@ -157,7 +157,7 @@ zwlib_parseNeighborList($$)
   my $homeId = $iodev->{homeId};
   my $ioName = $iodev->{NAME};
   my @r = map { ord($_) } split("", pack('H*', $data));
-  return "Bogus neightborList $data" if(int(@r) != 29);
+  return "Bogus neighborList $data" if(int(@r) != 29);
 
   my @list;
   my $ioId = ReadingsVal($ioName, "homeId", "");
