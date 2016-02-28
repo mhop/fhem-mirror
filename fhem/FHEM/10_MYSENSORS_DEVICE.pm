@@ -87,7 +87,7 @@ my %static_types = (
   S_DOOR                  => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # Door and window sensors
   S_MOTION                => { receives => [], sends => [V_TRIPPED] }, # MotionSensor
   S_SMOKE                 => { receives => [], sends => [V_TRIPPED,V_ARMED] }, # Smoke sensor
-  S_BINARY                => { receives => [V_STATUS,V_WATT], sends => [V_STATUS,V_WATT] }, # Binary device (on/off), Alias for S_LIGHT
+  S_LIGHT                => { receives => [V_LIGHT,V_STATUS,V_WATT], sends => [V_LIGHT,V_STATUS,V_WATT] }, # Binary device (on/off), Alias for S_BINARY
   S_DIMMER                => { receives => [V_STATUS,V_PERCENTAGE,V_WATT], sends => [V_STATUS,V_PERCENTAGE,V_WATT] }, # Dimmable device of some kind
   S_COVER                 => { receives => [V_UP,V_DOWN,V_STOP,V_PERCENTAGE], sends => [V_PERCENTAGE] }, # Window covers or shades
   S_TEMP                  => { receives => [], sends => [V_TEMP] }, # Temperature sensor
