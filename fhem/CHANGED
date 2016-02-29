@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_Unifi.pm: Changed unsupported character for AP and UC readings
+                          from hash to hyphen.
   - feature  49_SSCAM: enhanced command runView by option "link_open" to
              open a streamlink immediately
   - feature: new module LGTV_IP12 for controlling LG SmartTV's manufactured
