@@ -243,6 +243,7 @@ sub XBMC_QueueIntervalUpdate($;$) {
   if (!defined($time)) {
     $time = AttrVal($hash->{NAME},'updateInterval',60);
   }
+  RemoveInternalTimer($hash);
   InternalTimer(time() + $time, "XBMC_Check", $hash, 0);
 }
 
@@ -596,7 +597,7 @@ sub XBMC_ProcessNotification($$)
 	#HACK: We want to fetch GUI.Properties here to update for example stereoscopicmode.
 	# When doing this here we still get the in-movie stereo mode. So we define a timer
 	# to invoke the update in some (tm) seconds
-	InternalTimer(time() + 2, "XBMC_Check", $hash, 0);
+    XBMC_QueueIntervalUpdate($hash, 2);
   }
   elsif($obj->{method} eq "Player.OnPause") {
     readingsSingleUpdate($hash,"playStatus",'paused',1);
