@@ -42,9 +42,8 @@ sub OBIS_Initialize($)
   $hash->{ParseFn}   = "OBIS_Parse";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels alignTime ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels alignTime pollingMode:on,off ".
   					  $readingFnAttributes;
-  Log3 $hash,4,"OBIS - Initialize done...";
 }
 
 #####################################
@@ -55,7 +54,7 @@ sub OBIS_Define($$)
 
   return 'wrong syntax: define <name> OBIS devicename@baudrate[,databits,parity,stopbits]|none [MeterType]'
     if(@a < 3);
-
+				Log 3,Dumper(%readyfnlist);
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);  
   my $name = $a[0];
@@ -86,29 +85,31 @@ sub OBIS_Define($$)
   if ($baudrate==4800) {$hash->{helper}{SPEED}="4"}
   if ($baudrate==9600) {$hash->{helper}{SPEED}="5"}
   my %devs= (
-#    Name, Init-String, repeat,2ndInit
-    "Unknown"=>[ "", -1,""],
-    "MT681"=>[ "", -1,""],
-    # Voltcraft VSM 102
-    "VSM102"=>["/?!".chr(13).chr(10), 600,chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
-    # Landis & Gyr E110
-    "E110"=>["/?!".chr(13).chr(10), 600,chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
-    "Hager"=>["",60,""]
+#    Name,      Init-String,           interval,  2ndInit
+    "Unknown"=>["",                        -1,    ""],
+    "VSM102"=> ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "E110"=>   ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
+    "Hager"=>  ["",                        60,    ""],
     );
       Log3 $hash,4,"OBIS ($name) - Baudrate is $baudrate";
+    if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, VSM102, E110, Hager'};
+    $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
     $hash->{helper}{DEVICES} =$devs{$type};
-    $hash->{DevioText}="";
     $hash->{helper}{TRIGGERTIME}=gettimeofday();
-#    Log 3,Dumper($hash->{helper}{DEVICES});
-	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime","00:00"),$hash->{helper}{DEVICES}[1]);
+	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
-#  InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
- InternalTimer(gettimeofday()+$hash->{helper}{DEVICES}[1], "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
+  InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
 	$hash->{helper}{EoM}=-1;
   
   	Log3 $hash,4,"OBIS ($name) - Opening device...";
-    $hash->{helper}{FD}= DevIo_OpenDev($hash, 0, "OBIS_Init");
-  return undef;
+  	  return DevIo_OpenDev($hash, 0, "OBIS_Init");
+#  	  my $fd;
+#  	Log 3,"FD: $fd";
+#    $hash->{FD}= $fd;
+#    $hash->{helper}{FD2}=$hash->{FD};
+#	delete($readyfnlist{"$name.$dev"});
+#    $selectlist{"$name.$dev"} = $hash;
+#  return $hash->{FD};
 }
 
 # Update-Routine
@@ -117,29 +118,30 @@ sub GetUpdate($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $type= $hash->{MeterType};
+	RemoveInternalTimer($hash);
 # Open dev
 #	if (!$hash->{helper}{FD}) {$hash->{helper}{FD}= DevIo_OpenDev($hash, 0, "OBIS_Init");
 #		readingsSingleUpdate($hash, "state","opened",1); 
 #	} 
-	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime","00:00"),$hash->{helper}{DEVICES}[1]);
+	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
-#	InternalTimer($t, "GetUpdate", $hash, 1)  if ($hash->{helper}{DEVICES}[1]>0);
- InternalTimer(gettimeofday()+$hash->{helper}{DEVICES}[1], "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
+	InternalTimer($t, "GetUpdate", $hash, 1)  if ($hash->{helper}{DEVICES}[1]>0);
+# InternalTimer(gettimeofday()+$hash->{helper}{DEVICES}[1], "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
 	$hash->{helper}{EoM}=-1;
-	if (!exists $hash->{helper}{DEVICES}[1]) {return undef;}
+	if ($hash->{helper}{DEVICES}[1] eq "") {return undef;}
 	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
 }
 
 sub OBIS_Init($)
 {
   #nothing here yet
-	my ($hash) = @_;
-	my $name = $hash->{NAME};
-	my $type= $hash->{MeterType};
-	my $dev=  $hash->{DeviceName};
-  ($dev, undef) = split("@", $dev);
-	if (!exists $hash->{helper}{DEVICES}[1]) {return undef;}
-	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
+#	my ($hash) = @_;
+#	my $name = $hash->{NAME};
+#	my $type= $hash->{MeterType};
+#	my $dev=  $hash->{DeviceName};
+#  ($dev, undef) = split("@", $dev);
+#	if ($hash->{helper}{DEVICES}[0] eq "") {return undef;}
+#	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
   return undef;
 }
 #####################################
@@ -157,8 +159,7 @@ sub OBIS_Read($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	my $tn = TimeNow();
-
+	
     my $buf = DevIo_SimpleRead($hash);
     if ($hash->{helper}{EoM}!=1 && $hash->{helper}{DEVICES}[1]>0) {OBIS_Parse($hash,$buf);}
     return(undef);
@@ -250,13 +251,16 @@ sub OBIS_Parse($$)
 sub OBIS_Ready($)
 {
   my ($hash) = @_;
-
   return DevIo_OpenDev($hash, 1, "OBIS_Init")
                 if($hash->{STATE} eq "disconnected");
 
+     my $name = $hash->{NAME}; 
+    my $dev=$hash->{DeviceName};
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
-  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+  return if (!$po);
+  ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   return ($InBytes>0);
 }
 
@@ -267,7 +271,19 @@ sub OBIS_Attr(@)
 	# $name is device name
 	# aName and aVal are Attribute name and value
     my $hash  = $defs{$name};
-	
+    my $dev=$hash->{DeviceName};
+	if ($cmd eq "del") {
+		if ($aName eq "channels") { $hash->{helper}{Channels}=undef;}
+		if ($aName eq "interval") {
+		  		RemoveInternalTimer($hash);
+				$hash->{helper}{DEVICES}[1]=0;
+		}
+		if ($aName eq "pollingMode") {
+				$hash->{FD}=$hash->{helper}{FD2};
+				delete($readyfnlist{"$name.$dev"});
+				$selectlist{"$name.$dev"} = $hash;
+		}		
+	}
 	if ($cmd eq "set") {
 		if ($aName eq "channels") {
 	      $hash->{helper}{Channels}=eval $aVal;
@@ -278,19 +294,36 @@ sub OBIS_Attr(@)
 		}
 		if ($aName eq "interval") {
 			if ($aVal=~/^[1-9][0-9]*$/) {
+			    $hash->{helper}{TRIGGERTIME}=gettimeofday();
 		  		RemoveInternalTimer($hash);
 				$hash->{helper}{DEVICES}[1]=$aVal;
-  				InternalTimer(gettimeofday()+2, "GetUpdate", $hash, 1) if ($aVal>0);
+#  				InternalTimer(gettimeofday()+2, "GetUpdate", $hash, 1) if ($aVal>0);
+				my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
+			    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
+				InternalTimer($t, "GetUpdate", $hash, 0)  if ($hash->{helper}{DEVICES}[1]>0);
 			} else {
-				Log3 $name, 3, "OBIS ($name) - $name: attr interval must be a number -> $aVal";
+				return $name, 3, "OBIS ($name) - $name: attr interval must be a number -> $aVal";
 			}
 		}
 		if ($aName eq "alignTime") {
+			 if ($hash->{helper}{DEVICES}[1]>0) {
 		  		RemoveInternalTimer($hash);
 				my $t=OBIS_adjustAlign($hash,$aVal,$hash->{helper}{DEVICES}[1]);
-			    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
-				InternalTimer($t, "GetUpdate", $hash, 1)  if ($hash->{helper}{DEVICES}[1]>0);
-			
+			    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t));
+				InternalTimer($t, "GetUpdate", $hash, 0);
+			 } else {
+ 				return $name, 3, "OBIS ($name) - $name: attr alignTime is useless, if no interval is specified";
+			 }			
+		}
+		if ($aName eq "pollingMode")
+		{
+			if ($aVal eq "on") {
+				delete($selectlist{"$name.$dev"});
+				$readyfnlist{"$name.$dev"} = $hash;
+			} elsif ($aVal eq "off") {
+				delete($readyfnlist{"$name.$dev"});
+				$selectlist{"$name.$dev"} = $hash;
+			} 
 		}
 		
 	}
@@ -300,24 +333,34 @@ sub OBIS_Attr(@)
 sub OBIS_adjustAlign($$$)
 {
   my($hash, $attrVal, $interval) = @_;
-
-  my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal);
+  return gettimeofday()+$interval;
+  if (!$attrVal) {return gettimeofday()+$interval;}
+  my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal); # "00:00"
   return "$hash->{NAME} alignTime: $alErr" if($alErr);
   my $tspec=strftime("\%H:\%M:\%S", gmtime($interval));
+  
   my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
   my $now = time();
+  my $step = ($hr*60+$min)*60+$sec;
   my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);	
   
   my $ttime = int($hash->{helper}{TRIGGERTIME});
   my $off = ($ttime % 86400) - 86400;
+  if ($off >= $alTime) {
+	  $ttime = gettimeofday();#-86400;
+	  $off -=  86400;
+  }
+  Log 4,$alTime." - $ttime - $off - $alTime - $step- ".FmtDateTime($ttime % 86400)." - ".FmtDateTime($off)." - ".fhemTzOffset($now);
+  my $off2=$off;
   while($off < $alTime) {
-    $off += $interval;
+    $off += $step;
   }
   $ttime += ($alTime-$off);
-  $ttime += $interval if($ttime < $now);
-
-  $hash->{helper}{TRIGGERTIME} = $ttime;
-  return $ttime;
+  $ttime += $step if($ttime < $now);
+  $hash->{NEXT} = FmtDateTime($ttime);
+  $hash->{helper}{TRIGGERTIME} = ($off2<=$alTime) ? $ttime : (gettimeofday());#-fhemTzOffset($now));
+  
+  return $hash->{helper}{TRIGGERTIME};
 }
 
 #####################################
@@ -418,6 +461,11 @@ sub OBIS_adjustAlign($$$)
       <br><br></li><li>
    <code>interval</code><br>
       Abrufinterval der Daten. 
+      </li><li>
+   <code>pollingMode</code><br>
+      Hiermit wird von Direktbenachrichtigung auf Polling umgestellt.
+      Bei Smartmetern, welche von selbst im Sekundentakt senden,
+      kann das zu einer spürbaren Senkung der Prozessorleistung führen.  
       </li>
   <br>
 </ul>
