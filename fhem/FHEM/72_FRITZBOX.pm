@@ -37,10 +37,10 @@ package main;
 use strict;
 use warnings;
 use Blocking;
-my $missingModul;
-my $missingModulTelnet;
-my $missingModulWeb;
-my $missingModulTR064;
+my $missingModul = "";
+my $missingModulTelnet = "";
+my $missingModulWeb = "";
+my $missingModulTR064 = "";
 our $FRITZBOX_TR064pwd;
 our $FRITZBOX_TR064user;
 
@@ -1403,7 +1403,7 @@ sub FRITZBOX_Readout_Run_Web($)
          $wlanCount++   if $_->{wlan} == 1;
       }
    # else if the device is not online anymore, set the mac readings to 'inactive' and delete at next readout
-      elsif (exists $hash->{READINGS}{$rName}) {
+      elsif (exists $hash->{READINGS}{$rName}{VAL}) {
          if ($hash->{READINGS}{$rName}{VAL} ne "inactive") {
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "inactive";
          }
@@ -1575,6 +1575,7 @@ sub FRITZBOX_Readout_Done($)
 sub FRITZBOX_Readout_Process($$)
 {
    my ($hash,$string) = @_;
+ # Fatal Error: no hash parameter handed over
    unless (defined $hash) {
       Log 1, "Fatal Error: no hash parameter handed over";
       return;
@@ -1653,7 +1654,7 @@ sub FRITZBOX_Readout_Process($$)
                readingsBulkUpdate( $hash, $rName, $rValue );
                FRITZBOX_Log $hash, 5, "SET $rName = '$rValue'";
             }
-            elsif ( exists( $hash->{READINGS}{$rName} ) ) {  
+            elsif ( exists $hash->{READINGS}{$rName} ) {  
                delete $hash->{READINGS}{$rName};
                FRITZBOX_Log $hash, 5, "Delete reading $rName.";
             }
