@@ -488,6 +488,7 @@ sub Unifi_GetClients_Send($) {
     
     HttpUtils_NonblockingGet( {
                  %{$hash->{httpParams}},
+        method   => "GET",
         url      => $hash->{unifi}->{url}."stat/sta",
         callback => $hash->{updateDispatch}->{$self}[2]
     } );
@@ -530,6 +531,7 @@ sub Unifi_GetWlans_Send($) {
     
     HttpUtils_NonblockingGet( {
                  %{$hash->{httpParams}},
+        method   => "GET",
         url      => $hash->{unifi}->{url}."list/wlanconf",
         callback => $hash->{updateDispatch}->{$self}[2],
     } );
@@ -572,6 +574,7 @@ sub Unifi_GetHealth_Send($) {
     
     HttpUtils_NonblockingGet( {
                  %{$hash->{httpParams}},
+        method   => "GET",
         url      => $hash->{unifi}->{url}."stat/health",
         callback => $hash->{updateDispatch}->{$self}[2],
     } );
@@ -615,6 +618,7 @@ sub Unifi_GetWlanGroups_Send($) {
     
     HttpUtils_NonblockingGet( {
                  %{$hash->{httpParams}},
+        method   => "GET",
         url      => $hash->{unifi}->{url}."list/wlangroup",
         callback => $hash->{updateDispatch}->{$self}[2],
     } );
@@ -834,12 +838,12 @@ sub Unifi_SetHealthReadings($) {
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
     
-    readingsBulkUpdate($hash,'#UC_wlan_state',$hash->{wlan_health}->{status});
-    readingsBulkUpdate($hash,'#UC_wlan_users',$hash->{wlan_health}->{num_user});
-    readingsBulkUpdate($hash,'#UC_wlan_accesspoints',$hash->{wlan_health}->{num_ap});
-    readingsBulkUpdate($hash,'#UC_wlan_guests',$hash->{wlan_health}->{num_guest});
-    readingsBulkUpdate($hash,'#UC_unarchived_alerts',scalar @{$hash->{alerts_unarchived}}) if(defined $hash->{alerts_unarchived});
-    readingsBulkUpdate($hash,'#UC_events',scalar(@{$hash->{events}}).' (last '.$hash->{unifi}->{eventPeriod}.'h)') if(defined $hash->{events});
+    readingsBulkUpdate($hash,'-UC_wlan_state',$hash->{wlan_health}->{status});
+    readingsBulkUpdate($hash,'-UC_wlan_users',$hash->{wlan_health}->{num_user});
+    readingsBulkUpdate($hash,'-UC_wlan_accesspoints',$hash->{wlan_health}->{num_ap});
+    readingsBulkUpdate($hash,'-UC_wlan_guests',$hash->{wlan_health}->{num_guest});
+    readingsBulkUpdate($hash,'-UC_unarchived_alerts',scalar @{$hash->{alerts_unarchived}});
+    readingsBulkUpdate($hash,'-UC_events',scalar(@{$hash->{events}}).' (last '.$hash->{unifi}->{eventPeriod}.'h)');
     
     return undef;
 }
@@ -864,12 +868,13 @@ sub Unifi_SetAccesspointReadings($) {
             my $essid = 'none';
         }
         
-        readingsBulkUpdate($hash,'#AP_'.$apName.'_state',($apRef->{state} == 1) ? 'ok' : 'error');
-        readingsBulkUpdate($hash,'#AP_'.$apName.'_clients',$apRef->{'num_sta'});
-        readingsBulkUpdate($hash,'#AP_'.$apName.'_essid',$essid);
-        # readingsBulkUpdate($hash,'#AP_'.$apName.'_guests',$apRef->{'guest-num_sta'});
-        # readingsBulkUpdate($hash,'#AP_'.$apName.'_users',$apRef->{'user-num_sta'});
-        # readingsBulkUpdate($hash,'#AP_'.$apName.'_last_seen',$apRef->{'last_seen'});
+        readingsBulkUpdate($hash,'-AP_'.$apName.'_state',($apRef->{state} == 1) ? 'ok' : 'error');
+        readingsBulkUpdate($hash,'-AP_'.$apName.'_clients',$apRef->{'num_sta'});
+        readingsBulkUpdate($hash,'-AP_'.$apName.'_essid',$essid);
+        readingsBulkUpdate($hash,'-AP_'.$apName.'_locate',(!defined $apRef->{locating}) ? 'unknown' : ($apRef->{locating}) ? 'on' : 'off');
+        # readingsBulkUpdate($hash,'-AP_'.$apName.'_guests',$apRef->{'guest-num_sta'});
+        # readingsBulkUpdate($hash,'-AP_'.$apName.'_users',$apRef->{'user-num_sta'});
+        # readingsBulkUpdate($hash,'-AP_'.$apName.'_last_seen',$apRef->{'last_seen'});
     }
     
     return undef;
