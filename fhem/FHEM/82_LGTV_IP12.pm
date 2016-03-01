@@ -686,7 +686,7 @@ sub LGTV_IP12_html2txt($)
     <br><br>
     Different status update intervals depending on the power state can be given also. 
     If two intervals are given to the define statement, the first interval statement represents the status update 
-    interval in seconds in case the device is off, absent or any other non-normal state. The second 
+    interval in seconds in case the device is off. The second 
     interval statement is used when the device is on.
    
     Example:<br><br>
@@ -757,7 +757,6 @@ sub LGTV_IP12_html2txt($)
   <li><b>input</b> - The current input source (e.g. Antenna, Sattelite, HDMI1, ...)</li>
   <li><b>inputLabel</b> - The user defined name of the current input source</li>
   <li><b>mute</b> - Reports the current mute state (can be "on" or "off")</li>
-  <li><b>presence</b> - Reports the presence state (can be "present" or "absent"). </li>
   <li><b>volume</b> - Reports the volume state.</li>
   </ul>
 </ul>
@@ -787,7 +786,7 @@ sub LGTV_IP12_html2txt($)
     den Status des TV abfragt und entsprechende Notify-/FileLog-Definitionen triggert.
     <br><br>
     Sofern 2 Interval-Argumente &uuml;bergeben werden, wird der erste Parameter <code>&lt;Off_Interval&gt;</code> genutzt
-    sofern der TV ausgeschaltet oder nicht erreichbar ist. Der zweiter Parameter <code>&lt;On_Interval&gt;</code> 
+    sofern der TV ausgeschaltet ist. Der zweiter Parameter <code>&lt;On_Interval&gt;</code> 
     wird verwendet, sofern der TV eingeschaltet ist. 
     <br><br>
     Beispiel:<br><br>
@@ -857,7 +856,6 @@ sub LGTV_IP12_html2txt($)
   <li><b>input</b> - Die aktuelle Eingangsquelle (z.B. Antenna, Sattelite, HDMI1, ...)</li>
   <li><b>inputLabel</b> - Die benutzerdefinierte Bezeichnung der aktuellen Eingangsquelle</li>
   <li><b>mute</b> on,off - Der aktuelle Stumm-Status ("on" =&gt; Stumm, "off" =&gt; Laut)</li>
-  <li><b>presence</b> - Zeigt an, ob das Ger&auml;t aktuell empfangsbereit ist ("present" =&gt; Ger&auml;t ist empfangsbereit, "absent" =&gt; Ger&auml;t ist nicht empfangsbereit). </li>
   <li><b>volume</b> - Der aktuelle Lautstärkepegel.</li>
   </ul>
 </ul>
