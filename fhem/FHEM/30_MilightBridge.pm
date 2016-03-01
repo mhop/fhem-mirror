@@ -173,8 +173,9 @@ sub MilightBridge_Attr($$$$) {
   {
     if (($value eq "tcp" || $value eq "udp"))
     {
+      my $protocolchanged = (defined($attr{$name}{"protocol"}) && $attr{$name}{"protocol"} ne $value);
       $attr{$name}{"protocol"} = $value;
-      return "You need to restart fhem or modify to enable new protocol.";
+      return "You need to restart fhem or modify to enable new protocol." if($protocolchanged);
     }
     else
     {
