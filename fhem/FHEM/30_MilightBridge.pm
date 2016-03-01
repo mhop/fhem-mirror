@@ -48,7 +48,7 @@ sub MilightBridge_Initialize($)
   $hash->{UndefFn}  = "MilightBridge_Undefine";
   $hash->{NotifyFn} = "MilightBridge_Notify";
   $hash->{AttrFn}   = "MilightBridge_Attr";
-  $hash->{AttrList} = "port protocol sendInterval disable:0,1 tcpPing:1 checkInterval ".$readingFnAttributes;
+  $hash->{AttrList} = "port protocol:udp,tcp sendInterval disable:0,1 tcpPing:1 checkInterval ".$readingFnAttributes;
 
   return undef;
 }
