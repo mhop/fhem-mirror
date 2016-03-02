@@ -109,15 +109,16 @@ sub Heating_Control_SetTemp($) {
   my $hash = $modules{Heating_Control}{defptr}{$name};
   if(defined $hash) {
      Heating_Control_SetTimer($hash);
-     Log3 undef, 3, "Heating_Control_SetTimer() for $hash->{NAME} done!";
   }   
 }
 ########################################################################
 sub Heating_Control_SetAllTemps() {  # {Heating_Control_SetAllTemps()}
-  foreach my $hcName ( sort keys %{$modules{Heating_Control}{defptr}} ) {
+
+  my @hcNamen = sort keys %{$modules{Heating_Control}{defptr}};
+  foreach my $hcName ( @hcNamen ) {
      Heating_Control_SetTemp($hcName);
   }
-  Log3 undef,  3, "Heating_Control_SetAllTemps() done!";
+  Log3 undef,  3, "Heating_Control_SetAllTemps() done on: ".join(" ",@hcNamen );
 }
 
 1;
