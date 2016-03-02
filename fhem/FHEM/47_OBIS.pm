@@ -26,6 +26,14 @@ my %OBIS_channels = ( "21"=>"power_L1",
                  "4"=>"feed_L2",
                  "6"=>"feed_L3",
                  "1"=>"power");
+                 
+my %OBIS_codes = (	"Serial" 		=> qr/0-0:96\.1\.255\*255\((.*?)\).*/,
+					"Owner" 		=> qr/1-0:0\.0\.0\*255\((.*?)\).*/,
+					"Status" 		=> qr/1-0:96\.5\.5\*255\((.*?)\).*/,
+					"Channels_sum" 	=> qr/1-0:([246])\.1\.7\*255\(([-+]?\d+\.?\d*).*/,
+					"Channels"		=> qr/1-0:(\d+)\.7\.\d*\*\d*\(([-+]?\d+\.?\d*).*/,
+					"Counter"		=> qr/1-0:([12])\.(8)\.\d\*255\((-?\d+\.?\d*).*/
+				);
 #{"21"=>"energy_L1","41"=>"energy_L2","61"=>"energy_L3","31"=>"power_L1","51"=>"power_L2","71"=>"power_L3","1"=>"energy_current","8.1"=>"energy_total","8.2"=>"feed_total"}
     
 #####################################
@@ -54,7 +62,7 @@ sub OBIS_Define($$)
 
   return 'wrong syntax: define <name> OBIS devicename@baudrate[,databits,parity,stopbits]|none [MeterType]'
     if(@a < 3);
-				Log 3,Dumper(%readyfnlist);
+#				Log 3,Dumper(%readyfnlist);
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);  
   my $name = $a[0];
@@ -103,13 +111,6 @@ sub OBIS_Define($$)
   
   	Log3 $hash,4,"OBIS ($name) - Opening device...";
   	  return DevIo_OpenDev($hash, 0, "OBIS_Init");
-#  	  my $fd;
-#  	Log 3,"FD: $fd";
-#    $hash->{FD}= $fd;
-#    $hash->{helper}{FD2}=$hash->{FD};
-#	delete($readyfnlist{"$name.$dev"});
-#    $selectlist{"$name.$dev"} = $hash;
-#  return $hash->{FD};
 }
 
 # Update-Routine
@@ -119,14 +120,10 @@ sub GetUpdate($)
 	my $name = $hash->{NAME};
 	my $type= $hash->{MeterType};
 	RemoveInternalTimer($hash);
-# Open dev
-#	if (!$hash->{helper}{FD}) {$hash->{helper}{FD}= DevIo_OpenDev($hash, 0, "OBIS_Init");
-#		readingsSingleUpdate($hash, "state","opened",1); 
-#	} 
+
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
 	InternalTimer($t, "GetUpdate", $hash, 1)  if ($hash->{helper}{DEVICES}[1]>0);
-# InternalTimer(gettimeofday()+$hash->{helper}{DEVICES}[1], "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
 	$hash->{helper}{EoM}=-1;
 	if ($hash->{helper}{DEVICES}[1] eq "") {return undef;}
 	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
@@ -134,14 +131,6 @@ sub GetUpdate($)
 
 sub OBIS_Init($)
 {
-  #nothing here yet
-#	my ($hash) = @_;
-#	my $name = $hash->{NAME};
-#	my $type= $hash->{MeterType};
-#	my $dev=  $hash->{DeviceName};
-#  ($dev, undef) = split("@", $dev);
-#	if ($hash->{helper}{DEVICES}[0] eq "") {return undef;}
-#	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
   return undef;
 }
 #####################################
@@ -149,8 +138,7 @@ sub OBIS_Undef($$)
 {
   my ($hash, $arg) = @_;
   RemoveInternalTimer($hash);  
-  DevIo_CloseDev($hash) if $hash->{DeviceName} != "none";
-  $hash->{helper}{FD}=undef;
+  DevIo_CloseDev($hash) if $hash->{DeviceName} ne "none";
   return undef;
 }
 
@@ -199,50 +187,39 @@ sub OBIS_Parse($$)
  			$hash->{helper}{EoM}=0;
 	  	}
 	  	if ($hash->{helper}{EoM}!=-1) {
-	# Summe eingespeister Phase: 1-0:2.1.7*255(07568.01*kWh)
-	      	if ($rmsg=~ /1-0:([246])\.1\.7\*255\(([-+]?\d+\.?\d*).*/) {
-	    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
-	  			readingsBulkUpdate($hash, "sum_$L",$2+0); 
-			};
-	      	
-	# Einspeisung und Bezug der einzelnen Phasen
-	      	if ($rmsg=~ /1-0:(\d+)\.7\.\d*\*\d*\(([-+]?\d+\.?\d*).*/) {
-	    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
-	  			readingsBulkUpdate($hash, $L,$2+0); 
-	    		if ($type eq "Hager") {
-	    			my $a=$2;
-	    			if ($1 =~ /(?:21|41|61)/) {$hash->{helper}{PHSUM} += ($a+0)}
-	    		}
-	      	};
-	
-	# Seriennummer
-		  	if ($rmsg=~ /0-0:96\.1\.255\*255\((.*?)\).*/)   {  
-		  		if (ReadingsVal($name,"Serial","") ne $1) {readingsBulkUpdate($hash, "Serial"  ,$1); }
-		  	}
-	      	
-	# Eigentumsnummer --> 1-0:0.0.0*255(GETTONE)
-		  	if ($rmsg=~ /1-0:0\.0\.0\*255\((.*?)\).*/)   {  
-		  		if (ReadingsVal($name,"Owner","") ne $1) {readingsBulkUpdate($hash, "Owner"  ,$1); }
-		  	}
-	
-	# Statusbyte
-		  	if ($rmsg=~ /1-0:96\.5\.5\*255\((.*?)\).*/)   {  
-		  		if (ReadingsVal($name,"Status","") ne $1) {readingsBulkUpdate($hash, "Status"  ,$1); }
-		  	}
-	
-	# Zählerstand --> 1-0:1.8.0*255(17483.88*kWh)
-			if ($rmsg=~ /1-0:([12])\.(8)\.\d\*255\((-?\d+\.?\d*).*/) {
-				my $L=$hash->{helper}{Channels}{$2.".".$1} // $OBIS_channels{$2.".".$1} // "Unknown_Channel_$2.$1";
-				if($1==1) {
-					readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_energy",0)); 
-				} elsif ($1==2) {
-					readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_feed",0)); 				
-				}
-			}
+			for my $code (keys %OBIS_codes) {
+				if ($rmsg =~ $OBIS_codes{$code}) {
+					if ($code eq "Channels_sum") {
+			    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
+	  					readingsBulkUpdate($hash, "sum_$L",$2+0); 
+					}
+					 
+					elsif ($code eq "Channels") {
+			    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
+			  			readingsBulkUpdate($hash, $L,$2+0); 
+			    		my $a=$2;
+			    		if ($1 =~ /(?:21|41|61)/) {$hash->{helper}{PHSUM} += ($a+0)}
+					}
+					
+					elsif ($code eq "Counter") {
+						my $L=$hash->{helper}{Channels}{$2.".".$1} // $OBIS_channels{$2.".".$1} // "Unknown_Channel_$2.$1";
+						if($1==1) {
+							readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_energy",0)); 
+						} elsif ($1==2) {
+							readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_feed",0)); 				
+						}
+						
+					} elsif (ReadingsVal($name,$code,"") ne $1) 
+						{readingsBulkUpdate($hash, $code  ,$1); }
+	     		}
+   			}
 	  	}
        $hash->{helper}{BUFFER} = substr($hash->{helper}{BUFFER}, index($hash->{helper}{BUFFER},chr(13).chr(10))+2);;
+#       $hash->{helper}{BUFFER} =~ s/^.*\r\n(.*)/$1/g;
+#		Log 3,"Buffer is now: $hash->{helper}{BUFFER}";
     }
     readingsEndUpdate($hash,1);
+#    Log 3,"Size of Buffer: ".length($hash->{helper}{BUFFER});
 	if($hash->{helper}{EoM}==1) { $hash->{helper}{BUFFER}="";}
     return $name;
 }
@@ -308,6 +285,7 @@ sub OBIS_Attr(@)
 		if ($aName eq "alignTime") {
 			 if ($hash->{helper}{DEVICES}[1]>0) {
 		  		RemoveInternalTimer($hash);
+			    $hash->{helper}{TRIGGERTIME}=gettimeofday();
 				my $t=OBIS_adjustAlign($hash,$aVal,$hash->{helper}{DEVICES}[1]);
 			    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t));
 				InternalTimer($t, "GetUpdate", $hash, 0);
@@ -323,6 +301,7 @@ sub OBIS_Attr(@)
 			} elsif ($aVal eq "off") {
 				delete($readyfnlist{"$name.$dev"});
 				$selectlist{"$name.$dev"} = $hash;
+				DevIo_OpenDev($hash, 1, "OBIS_Init");
 			} 
 		}
 		
@@ -333,7 +312,7 @@ sub OBIS_Attr(@)
 sub OBIS_adjustAlign($$$)
 {
   my($hash, $attrVal, $interval) = @_;
-  return gettimeofday()+$interval;
+#  return gettimeofday()+$interval;
   if (!$attrVal) {return gettimeofday()+$interval;}
   my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal); # "00:00"
   return "$hash->{NAME} alignTime: $alErr" if($alErr);
@@ -342,7 +321,7 @@ sub OBIS_adjustAlign($$$)
   my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
   my $now = time();
   my $step = ($hr*60+$min)*60+$sec;
-  my $alTime = ($alHr*60+$alMin)*60+$alSec-fhemTzOffset($now);	
+  my $alTime = ($alHr*60+$alMin)*60+$alSec;#-fhemTzOffset($now);	
   
   my $ttime = int($hash->{helper}{TRIGGERTIME});
   my $off = ($ttime % 86400) - 86400;
@@ -350,7 +329,6 @@ sub OBIS_adjustAlign($$$)
 	  $ttime = gettimeofday();#-86400;
 	  $off -=  86400;
   }
-  Log 4,$alTime." - $ttime - $off - $alTime - $step- ".FmtDateTime($ttime % 86400)." - ".FmtDateTime($off)." - ".fhemTzOffset($now);
   my $off2=$off;
   while($off < $alTime) {
     $off += $step;
@@ -461,6 +439,9 @@ sub OBIS_adjustAlign($$$)
       <br><br></li><li>
    <code>interval</code><br>
       Abrufinterval der Daten. 
+      </li><li>
+   <code>aglignTime</code><br>
+      Richtet den Zeitpunkt von <interval> nach einer bestimmten Uhrzeit aus. 
       </li><li>
    <code>pollingMode</code><br>
       Hiermit wird von Direktbenachrichtigung auf Polling umgestellt.
