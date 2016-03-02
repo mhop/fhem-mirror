@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: LGTV_IP12: new reading "power"
+  - change:  LGTV_IP12: changed values of mute reading from true/false to on/off
   - bugfix:  30_MilightBridge: suppress protocol change message on startup
   - bugfix:  74_Unifi.pm: Changed unsupported character for AP and UC readings
                           from hash to hyphen.
