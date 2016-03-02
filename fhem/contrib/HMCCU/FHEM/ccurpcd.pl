@@ -117,7 +117,7 @@ sub CCURPC_Shutdown ($)
 	if ($callbackurl && $shutdown == 0) {
 		Log ("Shutdown RPC server in progress");
 		$client->send_request("init", $callbackurl);
-		WriteQueue ("EX|SHUTDOWN|0");
+		WriteQueue ("EX|SHUTDOWN|$$");
 		$shutdown = 1;
 	}
 
