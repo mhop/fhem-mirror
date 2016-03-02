@@ -2563,6 +2563,7 @@ FW_Notify($$)
         if($events->[$i] !~ /: /) {
           if($dev->{NAME} eq 'global') { # Forum #47634
             my($type,$args) = split(' ', $events->[$i], 2);
+            $args = "" if(!defined($args)); # global SAVE
             push @data, FW_longpollInfo($h->{fmt}, "$dn-$type", $args, $args);
           }
 
