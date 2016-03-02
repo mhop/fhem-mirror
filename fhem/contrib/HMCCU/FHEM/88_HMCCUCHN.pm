@@ -65,7 +65,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccuverify:0,1 ccustate ccuget:State,Value controldatapoint statedatapoint statevals substitute stripnumber:0,1,2 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccuverify:0,1 ccuget:State,Value controldatapoint statedatapoint statevals substitute stripnumber:0,1,2 ". $readingFnAttributes;
 }
 
 #####################################
@@ -527,8 +527,10 @@ sub HMCCUCHN_SetError ($$)
       <li>ccureadings &lt;0 | 1&gt;<br/>
          If set to 1 values read from CCU will be stored as readings. Default is 1.
       </li><br/>
-      <li>ccureadingfilter &lt;datapoint-expr&gt;<br/>
-         Only datapoints matching specified expression are stored as readings.
+      <li>ccureadingfilter &lt;filter-rule[,...]&gt;<br/>
+         Only datapoints matching specified expression are stored as readings.<br/>
+         Syntax for filter rule is: [channel-no:]RegExp<br/>
+         If channel-no is specified the following rule applies only to this channel.
       </li><br/>
       <li>ccuverify &lt;0 | 1&gt;<br/>
          If set to 1 a datapoint is read for verification after set operation.
