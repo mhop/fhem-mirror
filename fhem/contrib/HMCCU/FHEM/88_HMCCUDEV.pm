@@ -1,16 +1,17 @@
-################################################################
+#####################################################################
 #
 #  88_HMCCUDEV.pm
 #
 #  $Id:$
 #
-#  Version 2.7
+#  Version 2.8
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
-################################################################
+#####################################################################
 #
-#  define <name> HMCCUDEV <ccudev> [readonly]
+#  define <name> HMCCUDEV {<ccudev>|virtual} [statechannel] [readonly]
+#     [{group={<device>|<channel>}[,...]|groupexp=<regexp>}]
 #
 #  set <name> control <value>
 #  set <name> datapoint <channel>.<datapoint> <value>
@@ -26,19 +27,21 @@
 #  get <name> configdesc [<channel>] [<rpcport>]
 #  get <name> update
 #
+#  attr <name> ccuget { State | Value }
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address | name }
-#  attr <name> ccureadingfilter <regexp>
+#  attr <name> ccureadingfilter <filter-rule>[,...]
 #  attr <name> ccuverify { 0 | 1 }
 #  attr <name> controldatapoint <channel>.<datapoint>
+#  attr <name> mapdatapoints <channel>.<datapoint>=<channel>.<datapoint>[,...]
 #  attr <name> statechannel <channel>
 #  attr <name> statedatapoint <datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
 #  attr <name> substitute <regexp1>:<subtext1>[,...]
 #
-################################################################
+#####################################################################
 #  Requires module 88_HMCCU
-################################################################
+#####################################################################
 
 package main;
 
@@ -68,7 +71,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address ccureadings:0,1 ccustate ccuget:State,Value ccuverify:0,1 statevals substitute statechannel statedatapoint controldatapoint stripnumber:0,1,2 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter:textField-long ccureadingformat:name,address ccureadings:0,1 ccuget:State,Value ccuverify:0,1 mapdatapoints:textField-long statevals substitute statechannel statedatapoint controldatapoint stripnumber:0,1,2 ". $readingFnAttributes;
 }
 
 #####################################
@@ -81,22 +84,41 @@ sub HMCCUDEV_Define ($@)
 	my $name = $hash->{NAME};
 	my @a = split("[ \t][ \t]*", $def);
 
-	my $usage = "Usage: define <name> HMCCUDEV {<device-name>|<device-address>} [<state-channel>] [readonly]";
+	my $usage = "Usage: define $name HMCCUDEV {device|'virtual'} [state-channel] ['readonly'] [{groupexp=regexp|group={device|channel}[,...]]";
 	return $usage if (@a < 3);
 
 	my $devname = shift @a;
 	my $devtype = shift @a;
 	my $devspec = shift @a;
 
-	return "Invalid or unknown CCU device name or address" if (! HMCCU_IsValidDevice ($devspec));
+	my $hmccu_hash = undef;
 
-	if ($devspec =~ /^(.+)\.([A-Z]{3,3}[0-9]{7,7})$/) {
+	if ($devspec ne 'virtual') {
+		return "Invalid or unknown CCU device name or address" if (!HMCCU_IsValidDevice ($devspec));
+	}
+
+	if ($devspec eq 'virtual') {
+		# Virtual device FHEM only
+		my $no = 0;
+		foreach my $d (sort keys %defs) {
+			my $ch = $defs{$d};
+			$hmccu_hash = $ch if ($ch->{TYPE} eq 'HMCCU' && !defined ($hmccu_hash));
+			next if ($ch->{TYPE} ne 'HMCCUDEV' || $ch->{ccuif} ne 'VirtualDevices' ||
+			   $ch->{ccuname} ne 'none');
+			$no++;
+		}
+		return "No IO device found" if (!defined ($hmccu_hash));
+		$hash->{ccuif} = "VirtualDevices";
+		$hash->{ccuaddr} = sprintf ("VIR%07d", $no+1);
+		$hash->{ccuname} = "none";
+	}
+	elsif (HMCCU_IsDevAddr ($devspec, 1)) {
 		# CCU Device address with interface
 		$hash->{ccuif} = $1;
 		$hash->{ccuaddr} = $2;
 		$hash->{ccuname} = HMCCU_GetDeviceName ($hash->{ccuaddr}, '');
 	}
-	elsif ($devspec =~ /^[A-Z]{3,3}[0-9]{7,7}$/) {
+	elsif (HMCCU_IsDevAddr ($devspec, 0)) {
 		# CCU Device address without interface
 		$hash->{ccuaddr} = $devspec;
 		$hash->{ccuname} = HMCCU_GetDeviceName ($devspec, '');
@@ -116,15 +138,60 @@ sub HMCCUDEV_Define ($@)
 
 	$hash->{ccutype} = HMCCU_GetDeviceType ($hash->{ccuaddr}, '');
 	$hash->{channels} = HMCCU_GetDeviceChannels ($hash->{ccuaddr});
-	$hash->{statevals} = 'devstate';
+
+	if ($hash->{ccuif} eq "VirtualDevices" && $hash->{ccuname} eq 'none') {
+		$hash->{statevals} = 'readonly';
+	}
+	else {
+		$hash->{statevals} = 'devstate';
+	}
 
 	my $n = 0;
 	my $arg = shift @a;
 	while (defined ($arg)) {
-		return $usage if ($n == 2);
+		return $usage if ($n == 3);
 		if ($arg eq 'readonly') {
 			$hash->{statevals} = $arg;
 			$n++;
+		}
+		elsif ($arg =~ /^groupexp=/ && $hash->{ccuif} eq "VirtualDevices") {
+			my ($g, $gdev) = split ("=", $arg);
+			return $usage if (!defined ($gdev));
+			my @devlist;
+			my $cnt = HMCCU_GetMatchingDevices ($hmccu_hash, $gdev, 'dev', \@devlist);
+			return "No matching CCU devices found" if ($cnt == 0);
+			$hash->{ccugroup} = shift @devlist;
+			foreach my $gd (@devlist) {
+				$hash->{ccugroup} .= ",".$gd;
+			}
+		}
+		elsif ($arg =~ /^group=/ && $hash->{ccuif} eq "VirtualDevices") {
+			my ($g, $gdev) = split ("=", $arg);
+			return $usage if (!defined ($gdev));
+			my @gdevlist = split (",", $gdev);
+			$hash->{ccugroup} = '' if (@gdevlist > 0);
+			foreach my $gd (@gdevlist) {
+				my ($gda, $gdc, $gdo) = ('', '', '', '');
+
+				return "Invalid device or channel $gd"
+				   if (!HMCCU_IsValidDevice ($gd));
+
+				if (HMCCU_IsDevAddr ($gd, 0) || HMCCU_IsChnAddr ($gd, 1)) {
+					$gdo = $gd;
+				}
+				else {
+					($gda, $gdc) = HMCCU_GetAddress ($gd, '', '');
+					$gdo = $gda;
+					$gdo .= ':'.$gdc if ($gdc ne '');
+				}
+
+				if (exists ($hash->{ccugroup}) && $hash->{ccugroup} ne '') {
+					$hash->{ccugroup} .= ",".$gdo;
+				}
+				else {
+					$hash->{ccugroup} = $gdo;
+				}
+			}
 		}
 		elsif ($arg =~ /^[0-9]+$/) {
 			$attr{$name}{statechannel} = $arg;
@@ -135,6 +202,9 @@ sub HMCCUDEV_Define ($@)
 		}
 		$arg = shift @a;
 	}
+
+	return "No devices in group" if ($hash->{ccuif} eq "VirtualDevices" && (
+	   !exists ($hash->{ccugroup}) || $hash->{ccugroup} eq ''));
 
 	# Inform HMCCU device about client device
 	AssignIoPort ($hash);
@@ -168,6 +238,9 @@ sub HMCCUDEV_Attr ($@)
 				return "value := text:substext[,...]" if (@statesubs != 2);
 				$hash->{statevals} .= '|'.$statesubs[0];
 			}
+		}
+		elsif ($attrname eq "mapdatapoints") {
+			return "Not a virtual device" if ($hash->{ccuif} ne "VirtualDevices");
 		}
 	}
 	elsif ($cmd eq "del") {
@@ -364,6 +437,10 @@ sub HMCCUDEV_Get ($@)
 	my $result = '';
 	my $rc;
 
+	if ($hash->{ccuif} eq "VirtualDevices" && $hash->{ccuname} eq "none" && $opt ne 'update') {
+		return "HMCCUDEV: Unknown argument $opt, choose one of update:noArg";
+	}
+
 	if ($opt eq 'devstate') {
 		if ($statechannel eq '') {
 			return HMCCUDEV_SetError ($hash, "No state channel specified");
@@ -420,8 +497,20 @@ sub HMCCUDEV_Get ($@)
 		if ($ccuget !~ /^(Attr|State|Value)$/) {
 			return HMCCUDEV_SetError ($hash, "Usage: get $name update [{'State'|'Value'}]");
 		}
-		$rc = HMCCU_GetUpdate ($hash, $hash->{ccuaddr}, $ccuget);
-		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+
+		if ($hash->{ccuname} ne 'none') {
+			$rc = HMCCU_GetUpdate ($hash, $hash->{ccuaddr}, $ccuget);
+			return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+		}
+
+		# Update other devices belonging to group
+		if ($hash->{ccuif} eq "VirtualDevices" && exists ($hash->{ccugroup})) {
+			my @vdevs = split (",", $hash->{ccugroup});
+			foreach my $vd (@vdevs) {
+				$rc = HMCCU_GetUpdate ($hash, $vd, $ccuget);
+				return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
+			}
+		}
 
 		return undef;
 	}
@@ -532,7 +621,7 @@ sub HMCCUDEV_SetError ($$)
    <b>Define</b>
    <ul>
       <br/>
-      <code>define &lt;name&gt; HMCCUDEV {&lt;device-name&gt;|&lt;device-address&gt;} [&lt;statechannel&gt;] [readonly]</code>
+      <code>define &lt;name&gt; HMCCUDEV {&lt;device-name&gt;|&lt;device-address&gt;} [&lt;statechannel&gt;] [readonly] [{group={device|channel}[,...]|groupexp=regexp]</code>
       <br/><br/>
       If <i>readonly</i> parameter is specified no set command will be available.
       <br/><br/>
@@ -624,10 +713,10 @@ sub HMCCUDEV_SetError ($$)
       <li>ccureadings &lt;0 | <u>1</u>&gt;<br/>
          If set to 1 values read from CCU will be stored as readings. Default is 1.
       </li><br/>
-      <li>ccureadingfilter &lt;datapoint-expr&gt;
-         <br/>
-            Only datapoints matching specified expression are stored as
-            readings.
+      <li>ccureadingfilter &lt;filter-rule[,...]&gt;<br/>
+         Only datapoints matching specified expression are stored as readings.
+         Syntax for filter rule is: [channel-no:]RegExp<br/>
+         If channel-no is specified the following rule applies only to this channel.
       </li><br/>
       <li>ccureadingformat &lt;address | name&gt; <br/>
          Set format of readings. Default is 'name'.
@@ -644,26 +733,25 @@ sub HMCCUDEV_SetError ($$)
          attr mydev webCmd control
          attr mydev widgetOverride control:slider,10,1,25
       </li><br/>
-      <li>statechannel &lt;channel-number&gt;
-         <br/>
-            Channel for setting device state by devstate command.
+      <li>mapdatapoints &lt;channel.datapoint&gt;=&lt;channel.datapoint&gt;[,...]
+         Map channel to other channel in virtual devices (groups). Readings will be duplicated.
       </li><br/>
-      <li>statedatapoint &lt;datapoint&gt;
-         <br/>
-            Datapoint for setting device state by devstate command.
+      <li>statechannel &lt;channel-number&gt;<br/>
+         Channel for setting device state by devstate command.
       </li><br/>
-      <li>statevals &lt;text&gt;:&lt;text&gt;[,...]
-         <br/>
-            Define substitution for set commands values. The parameters &lt;text&gt;
-            are available as set commands. Example:<br/>
-            <code>attr my_switch statevals on:true,off:false</code><br/>
-            <code>set my_switch on</code>
+      <li>statedatapoint &lt;datapoint&gt;<br/>
+         Datapoint for setting device state by devstate command.
       </li><br/>
-      <li>substitude &lt;subst-rule&gt;[;...]
-         <br/>
-            Define substitions for reading values. Substitutions for parfile values must
-            be specified in parfiles. Syntax of subst-rule is<br/><br/>
-            [datapoint!]&lt;regexp1&gt;:&lt;text1&gt;[,...]
+      <li>statevals &lt;text&gt;:&lt;text&gt;[,...]<br/>
+         Define substitution for set commands values. The parameters &lt;text&gt;
+         are available as set commands. Example:<br/>
+         <code>attr my_switch statevals on:true,off:false</code><br/>
+         <code>set my_switch on</code>
+      </li><br/>
+      <li>substitude &lt;subst-rule&gt;[;...]<br/>
+         Define substitions for reading values. Substitutions for parfile values must
+         be specified in parfiles. Syntax of subst-rule is<br/><br/>
+         [datapoint!]&lt;regexp&gt;:&lt;text&gt;[,...]
       </li><br/>
    </ul>
 </ul>
