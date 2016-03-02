@@ -771,7 +771,8 @@ sub FRITZBOX_API_Check_Run($)
 
    
    # Check if m3u can be created and the URL tested
-      my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", "./www/images/".$name.".m3u" );
+      my $globalModPath = AttrVal( "global", "modpath", "." );
+      my $m3uFileLocal = AttrVal( $name, "m3uFileLocal", $globalModPath."/www/images/".$name.".m3u" );
       if (open my $fh, '>', $m3uFileLocal) {
          my $ttsText = uri_escape("Lirumlarumlöffelstielwerdasnichtkannderkannnichtviel");
          my $ttsLink = $ttsLinkTemplate;
@@ -4781,6 +4782,7 @@ sub FRITZBOX_fritztris($)
    <b>Get</b>
    <ul>
       <br>
+
       <li><code>get &lt;name&gt; ringTones</code>
          <br>
          Shows the list of ring tones that can be used.
