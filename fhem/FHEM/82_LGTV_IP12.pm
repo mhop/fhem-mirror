@@ -404,16 +404,19 @@ LGTV_IP12_ParseHttpResponse($$$)
         {
             readingsSingleUpdate($hash, $cmd, $arg, 1);
             LGTV_IP12_ResetTimer($hash, 2);
+            return;
         }
     }
     
+    readingsBeginUpdate($hash);
     
     # if an error was occured, raise a log entry
     if($err ne "")
     {
         Log3 $name, 5, "LGTV_IP12 ($name) - could not execute command \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\" - $err";
         
-        readingsSingleUpdate($hash, "state", "off", 1);
+        readingsBulkUpdate($hash, "state", "off");
+        readingsBulkUpdate($hash, "power", "off");
     }
     
     # if the response contains data, examine it.
@@ -421,11 +424,12 @@ LGTV_IP12_ParseHttpResponse($$$)
     {
         Log3 $name, 5, "LGTV_IP12 ($name) - got response for \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\": $data";
 
-        readingsSingleUpdate($hash, "state", "on", 1);
+        readingsBulkUpdate($hash, "state", "on");
+        readingsBulkUpdate($hash, "power", "on");
         
         if($cmd eq "statusRequest")
         {
-            readingsBeginUpdate($hash);
+
             
             if($arg eq "volumeInfo")
             {
@@ -436,7 +440,7 @@ LGTV_IP12_ParseHttpResponse($$$)
                 
                 if($data =~ /<mute>(.+?)<\/mute>/)
                 {
-                    readingsBulkUpdate($hash, "mute", $1);
+                    readingsBulkUpdate($hash, "mute", ($1 eq "true" ? "on" : "off"));
                 }
             }
             
@@ -491,11 +495,11 @@ LGTV_IP12_ParseHttpResponse($$$)
                 }
             }
             
-            readingsEndUpdate($hash, 1);
-            
             LGTV_IP12_RetrieveChannelList($hash) if(not exists($hash->{helper}{CHANNEL_LIST}));
         }
     }
+    
+    readingsEndUpdate($hash, 1);
 }
 
 # executes a http request with or without data and starts the HTTP request non-blocking to avoid timing problems for other modules (e.g. HomeMatic)
@@ -757,6 +761,7 @@ sub LGTV_IP12_html2txt($)
   <li><b>input</b> - The current input source (e.g. Antenna, Sattelite, HDMI1, ...)</li>
   <li><b>inputLabel</b> - The user defined name of the current input source</li>
   <li><b>mute</b> - Reports the current mute state (can be "on" or "off")</li>
+  <li><b>power</b> - The power status (can be "on" or "off")</li>
   <li><b>volume</b> - Reports the volume state.</li>
   </ul>
 </ul>
@@ -856,6 +861,7 @@ sub LGTV_IP12_html2txt($)
   <li><b>input</b> - Die aktuelle Eingangsquelle (z.B. Antenna, Sattelite, HDMI1, ...)</li>
   <li><b>inputLabel</b> - Die benutzerdefinierte Bezeichnung der aktuellen Eingangsquelle</li>
   <li><b>mute</b> on,off - Der aktuelle Stumm-Status ("on" =&gt; Stumm, "off" =&gt; Laut)</li>
+  <li><b>power</b> on,off - Der aktuelle Power-Status ("on" =&gt; eingeschaltet, "off" =&gt; ausgeschaltet)</li>
   <li><b>volume</b> - Der aktuelle Lautstärkepegel.</li>
   </ul>
 </ul>
