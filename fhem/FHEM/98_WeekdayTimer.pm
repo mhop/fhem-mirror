@@ -539,7 +539,6 @@ sub WeekdayTimer_SetTimer($) {
   my $name = $hash->{NAME};
   
   my $now  = time();  
- #Log3 $hash, 3, "WeekdayTimer_SetTimer------------>WeekdayTimer_SetTimer";
   
   my $isHeating         = WeekdayTimer_isHeizung($hash);
   my $swip              = AttrVal($name, "switchInThePast", 0);
@@ -598,14 +597,51 @@ sub WeekdayTimer_SetTimer($) {
         return;
      }
      
-     myInternalTimer ("$aktIdx", $aktTime, "$hash->{TYPE}_Update", $hash, 0);
-     my $active = 1;
-     if ($hash->{CONDITION} gt "") {
-        $active = AnalyzeCommandChain(undef, "{".$hash->{CONDITION}."}");
-     }
-     readingsSingleUpdate ($hash,  "state", $aktParameter, 1) if ($active);
+     # alle in der Vergangenheit liegenden Schaltungen sammeln und 
+     # nach 5 Sekunden in der Reihenfolge der Schaltzeiten  
+     # durch WeekdayTimer_delayedTimerInPast() als Timer einstellen
+     # die Parameter merken wir uns kurzzeitig im hash 
+     #    modules{WeekdayTimer}{timerInThePast}
+     my $device = $hash->{DEVICE};
+     Log3 $hash, 4, "[$name] past timer on $hash->{DEVICE} at ". FmtDateTime($aktTime). " with  $aktParameter activated";     
+     
+     my $parameter = $modules{WeekdayTimer}{timerInThePast}{$device}{$aktTime};
+     $parameter = [] if (!defined $parameter);
+     push (@$parameter,["$aktIdx", $aktTime, "$hash->{TYPE}_Update", $hash, 0]);
+     $modules{WeekdayTimer}{timerInThePast}{$device}{$aktTime} = $parameter;
+     
+     my $tipHash = $modules{WeekdayTimer}{timerInThePastHash};
+     $tipHash    = $hash if (!defined $tipHash);
+     $modules{WeekdayTimer}{timerInThePastHash} = $tipHash;
+     
+     myRemoveInternalTimer("delayed", $tipHash);
+     myInternalTimer      ("delayed", time()+5, "WeekdayTimer_delayedTimerInPast", $tipHash, 0);
+    
   }     
 }
+################################################################################
+sub WeekdayTimer_delayedTimerInPast($) {
+  my ($myHash) = @_;
+  my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
+  return if (!defined($hash));
+  
+  my $tim = time();
+  my $tipIpHash = $modules{WeekdayTimer}{timerInThePast};
+
+  foreach my $device ( keys %$tipIpHash ) {
+     foreach my $time (         sort keys %{$tipIpHash->{$device}} ) {
+        Log3 $hash, 4, "$device ".FmtDateTime($time)." ".($tim-$time)."s ";
+        
+        foreach my $para ( @{$tipIpHash->{$device}{$time}} ) {
+          #myInternalTimer ("$aktIdx", $aktTime, "$hash->{TYPE}_Update", $hash, 0);
+           my $mHash =myInternalTimer (@$para[0],@$para[1],@$para[2],@$para[3],@$para[4]);
+           $mHash->{immerSchalten} = 1;
+        }
+     }
+  }
+  delete $modules{WeekdayTimer}{timerInThePast};
+  delete $modules{WeekdayTimer}{timerInThePastHash}
+}  
 ################################################################################
 sub WeekdayTimer_searchAktNext($$) {
   my ($hash, $now) = @_;
@@ -673,44 +709,32 @@ sub WeekdayTimer_Update($) {
   my $time        = $hash->{profil}{$idx}{TIME};
   my $newParam    = $hash->{profil}{$idx}{PARA};
   
- #Log3 $hash, 3, "[$name] $idx ".FmtDateTime($epoch) . " " . $newParam . " " . join("",@$tage);
-  
- #if ($hash->{STILLDONETIME} <= $sollZeit  ) {
- #    $hash->{STILLDONETIME}  = $sollZeit;
- #} else {
- #   Log3 $hash, 3, "[$name] Timer $time overwritten by " . FmtDateTime($hash->{STILLDONETIME});
- #   return;
- #}
-  
+ #Log3 $hash, 3, "[$name] $idx ". $time . " " . $newParam . " " . join("",@$tage);
+    
   # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
   if (WeekdayTimer_FensterOffen($hash, $newParam, $idx)) {
      readingsSingleUpdate ($hash,  "state", "open window", 1);
      return;
   }
   
-  my $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam);
-  Log3 $hash, 4, "[$name] Update   - timer seems to be active today: ".join("",@$tage)."|$time|$newParam" if($activeTimer);
-  
+  my $dieGanzeWoche = [7,8];
+  my ($activeTimer, $activeTimerState);
+  if (defined $myHash->{immerSchalten}) {
+     $activeTimer      = WeekdayTimer_isAnActiveTimer ($hash, $dieGanzeWoche, $newParam);
+     $activeTimerState = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam);
+     Log3 $hash, 4, "[$name] Update   - past timer activated";
+  } else {   
+     $activeTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $newParam);
+     $activeTimerState = $activeTimer;
+     Log3 $hash, 4, "[$name] Update   - timer seems to be active today: ".join("",@$tage)."|$time|$newParam" if($activeTimer);
+  }
+  #Log3 $hash, 3, "activeTimer------------>$activeTimer";
+  #Log3 $hash, 3, "activeTimerState------->$activeTimerState";
   my ($aktIdx, $aktTime,  $aktParameter, $nextTime, $nextParameter) =
      WeekdayTimer_searchAktNext($hash, time()+5);
      
   my $device   = $hash->{DEVICE}; 
   my $disabled = AttrVal($hash->{NAME}, "disable", 0);
-  if ($activeTimer && !$disabled && $defs{$device}) {
-  
-    #my $sollZeit = $myHash->{TIME};
-     
-    #Log3 $hash, 3, "[$name] $idx ". FmtDateTime($defs{$device}{STILLDONETIME}) . " " . $newParam . " " . join("",@$tage);
-    #Log3 $hash, 3, "[$name] $idx ". FmtDateTime($sollZeit)                     . " " . $newParam . " " . join("",@$tage);
-     
-    #$defs{$device}{STILLDONETIME} = 0 if (!defined($defs{$device}{STILLDONETIME}));
-    #if ($defs{$device}{STILLDONETIME} <= $sollZeit  ) {
-    #    $defs{$device}{STILLDONETIME}  = $sollZeit;
-    #} else {
-    #   Log3 $hash, 3, "[$name:$time] Timer ".FmtDateTime($sollZeit)." overwritten by " . FmtDateTime($defs{$device}{STILLDONETIME});
-    #   return;
-    #}
-  } 
   
   # ggf. Device schalten
   WeekdayTimer_Device_Schalten($hash, $newParam, $tage)   if($activeTimer);
@@ -719,7 +743,7 @@ sub WeekdayTimer_Update($) {
   readingsBulkUpdate ($hash,  "nextUpdate", FmtDateTime($nextTime));
   readingsBulkUpdate ($hash,  "nextValue",  $nextParameter);
   readingsBulkUpdate ($hash,  "currValue",  $aktParameter); # HB
-  readingsBulkUpdate ($hash,  "state",      $newParam )   if($activeTimer);
+  readingsBulkUpdate ($hash,  "state",      $newParam )   if($activeTimerState);
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
 
   return 1; 
@@ -739,6 +763,7 @@ sub WeekdayTimer_isAnActiveTimer ($$$) {
   Log3 $hash, 5, "[$name] condition: $xPression";
   
   my $ret = AnalyzeCommandChain(undef, $xPression);
+ #Log3 $hash, 3, "[$name] condition:>>>$ret<<< $xPression";
   Log3 $hash, 5, "[$name] result of condition:$ret";
   return  $ret;
 }
@@ -919,14 +944,14 @@ sub WeekdayTimer_Device_Schalten($$$) {
 
   #Kommando ausführen
   if ($command && !$disabled && $activeTimer 
-    && $aktParam ne $newParam 
+#   && $aktParam ne $newParam 
     ) {
     $newParam =~ s/:/ /g;
     
     my %specials = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => $newParam);
     $command= EvalSpecials($command, %specials);
     
-    Log3 $hash, 4, "[$name] command: $command executed";
+    Log3 $hash, 4, "[$name] command: '$command' executed with ".join(",", map { "$_=>$specials{$_}" } keys %specials);
     my $ret  = AnalyzeCommandChain(undef, $command);
     Log3 ($hash, 3, $ret) if($ret);
   } 
@@ -943,6 +968,9 @@ sub WeekdayTimer_tageAsHash($$) {
 ################################################################################
 sub WeekdayTimer_Condition($$) {  
   my ($hash, $tage)  = @_;
+  
+  my $name = $hash->{NAME};    
+  Log3 $hash, 4, "[$name] condition:$hash->{CONDITION} - Tage:".join(",",@$tage);
   
   my $condition  = "( ";
   $condition .= ($hash->{CONDITION} gt "") ? $hash->{CONDITION}  : 1 ; 
@@ -993,16 +1021,16 @@ sub WeekdayTimer_SetParm($) {
   if(defined $hash) {
      WeekdayTimer_DeleteTimer($hash);
      WeekdayTimer_SetTimer($hash);
-     Log3 undef, 3, "WeekdayTimer_SetParm() for $hash->{NAME} done!";
   }   
 }
 ################################################################################
 sub WeekdayTimer_SetAllParms() {            # {WeekdayTimer_SetAllParms()}
 
-  foreach my $wdName ( sort keys %{$modules{WeekdayTimer}{defptr}} ) {
+  my @wdNamen = sort keys %{$modules{WeekdayTimer}{defptr}}; 
+  foreach my $wdName ( @wdNamen ) {
      WeekdayTimer_SetParm($wdName);
   }
-  Log3 undef,  3, "WeekdayTimer_SetAllParms() done!";
+  Log3 undef,  3, "WeekdayTimer_SetAllParms() done on: ".join(" ",@wdNamen );
 }
 
 1;
