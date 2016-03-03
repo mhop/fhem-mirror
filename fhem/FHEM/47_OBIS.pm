@@ -149,7 +149,7 @@ sub OBIS_Read($)
 	my $name = $hash->{NAME};
 	
     my $buf = DevIo_SimpleRead($hash);
-    if ($hash->{helper}{EoM}!=1 && $hash->{helper}{DEVICES}[1]>0) {OBIS_Parse($hash,$buf);}
+    if ($hash->{helper}{EoM}!=1) {OBIS_Parse($hash,$buf);}
     return(undef);
 }
 
@@ -296,12 +296,14 @@ sub OBIS_Attr(@)
 		if ($aName eq "pollingMode")
 		{
 			if ($aVal eq "on") {
+				delete $hash->{FD};
 				delete($selectlist{"$name.$dev"});
 				$readyfnlist{"$name.$dev"} = $hash;
 			} elsif ($aVal eq "off") {
 				delete($readyfnlist{"$name.$dev"});
 				$selectlist{"$name.$dev"} = $hash;
-				DevIo_OpenDev($hash, 1, "OBIS_Init");
+				 DevIo_CloseDev($hash);
+				DevIo_OpenDev($hash, 0, "OBIS_Init");
 			} 
 		}
 		
