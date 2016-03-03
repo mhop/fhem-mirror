@@ -1166,14 +1166,12 @@ DOIF_TimerTrigger ($)
   delete $hash->{triggertime}{$localtime};
   my $ret;
   $hash->{helper}{cur_cmd_nr}="timer $localtime";
-  if (ReadingsVal($pn,"mode","") ne "disabled") {
-    for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
-      if ($hash->{localtime}{$j} == $localtime) {
-        $hash->{timer}{$j}=1;
-      }
+  for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
+    if ($hash->{localtime}{$j} == $localtime) {
+      $hash->{timer}{$j}=1;
     }
-    $ret=DOIF_Trigger ($hash,"");
   }
+  $ret=DOIF_Trigger ($hash,"") if (ReadingsVal($pn,"mode","") ne "disabled"); 
   for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
     if ($hash->{timer}{$j} == 1) {
       $hash->{timer}{$j}=0;
