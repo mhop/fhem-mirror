@@ -132,6 +132,42 @@ FS20_Initialize($)
                        "model:".join(",", sort keys %models);
 }
 
+sub
+FS20_Follow($$$$)
+{
+  my ($name, $arg, $na, $val) = @_;
+
+  ###########################################
+  # Set the state of a device to off if on-for-timer is called
+  if($modules{FS20}{ldata}{$name}) {
+    CommandDelete(undef, $name . "_timer");
+    delete $modules{FS20}{ldata}{$name};
+  }
+
+  my $newState="";
+  my $onTime = AttrVal($name, "follow-on-timer", undef);
+
+  ####################################
+  # following timers
+  if(($arg eq "on" || $arg =~ m/dim/) && $na == 2 && $onTime) {
+    $newState = "off";
+    $val = $onTime;
+
+  } elsif($arg =~ m/(on|off).*-for-timer/ && $na == 3 &&
+     AttrVal($name, "follow-on-for-timer", undef)) {
+    $newState = ($1 eq "on" ? "off" : "on");
+
+  }
+
+  if($newState) {
+    my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
+    $modules{FS20}{ldata}{$name} = $to;
+    Log3 $name, 4, "Follow: +$to setstate $name $newState";
+    CommandDefine(undef, $name."_timer at +$to ".
+      "{readingsSingleUpdate(\$defs{'$name'},'state','$newState', 1); undef}");
+  }
+}
+
 ###################################
 sub
 FS20_Set($@)
@@ -196,42 +232,12 @@ FS20_Set($@)
 
   IOWrite($hash, "04", "010101" . $hash->{XMIT} . $hash->{BTN} . $c);
 
-  ###########################################
-  # Set the state of a device to off if on-for-timer is called
-  if($modules{FS20}{ldata}{$name}) {
-    CommandDelete(undef, $name . "_timer");
-    delete $modules{FS20}{ldata}{$name};
-  }
-
-  my $newState="";
-  my $onTime = AttrVal($name, "follow-on-timer", undef);
-
-  ####################################
-  # following timers
-  if(($a[1] eq "on" || $a[1] =~ m/dim/) && $na == 2 && $onTime) {
-    $newState = "off";
-    $val = $onTime;
-
-  } elsif($a[1] =~ m/(on|off).*-for-timer/ && $na == 3 &&
-     AttrVal($name, "follow-on-for-timer", undef)) {
-    $newState = ($1 eq "on" ? "off" : "on");
-
-  }
-
-  if($newState) {
-    my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
-    $modules{FS20}{ldata}{$name} = $to;
-    Log3 $name, 4, "Follow: +$to setstate $name $newState";
-    CommandDefine(undef, $name."_timer at +$to ".
-      "{readingsSingleUpdate(\$defs{'$name'},'state','$newState', 1); undef}");
-  }
-
   ##########################
   # Look for all devices with the same code, and set state, timestamp
   my $code = "$hash->{XMIT} $hash->{BTN}";
-  my $tn = TimeNow();
   my $defptr = $modules{FS20}{defptr}{$code};
   foreach my $n (keys %{ $defptr }) {
+    FS20_Follow($defptr->{$n}->{NAME}, $a[1], $na, $val);
     readingsSingleUpdate($defptr->{$n}, "state", $v, 1);
   }
   return $ret;
