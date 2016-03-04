@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  00_SIGNALduino: updated firmware to 3.2.0-hf1
+                             solves MU and MC issue
   - bugfix:  PRESENCE/presenced: fixed crash of presenced when receiving an 
              invalid command, new deb packages released (see commandref)
   - bugfix:  44_TEK603: Fixed TankLevel=NO_DATA 
