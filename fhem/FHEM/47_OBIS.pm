@@ -67,7 +67,7 @@ sub OBIS_Define($$)
   RemoveInternalTimer($hash);  
   my $name = $a[0];
   my $dev = $a[2];
-  my $type = $a[3]//"Unknown";
+  my $type = $a[3]//"Standard";
   Log3 $hash,4,"OBIS ($name) - Define called...";
   $hash->{DeviceName} = $dev;
   $hash->{MeterType}=$type if (defined($type)); 
@@ -94,13 +94,12 @@ sub OBIS_Define($$)
   if ($baudrate==9600) {$hash->{helper}{SPEED}="5"}
   my %devs= (
 #    Name,      Init-String,           interval,  2ndInit
-    "Unknown"=>["",                        -1,    ""],
+    "Standard"=>["",                        -1,    ""],
     "VSM102"=> ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "E110"=>   ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
-    "Hager"=>  ["",                        60,    ""],
     );
       Log3 $hash,4,"OBIS ($name) - Baudrate is $baudrate";
-    if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, VSM102, E110, Hager'};
+    if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, VSM102, E110'};
     $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
     $hash->{helper}{DEVICES} =$devs{$type};
     $hash->{helper}{TRIGGERTIME}=gettimeofday();
@@ -173,10 +172,6 @@ sub OBIS_Parse($$)
 
 # End of Message
 		if ($rmsg=~/!.*/) {
-			if ($type eq "Hager") {
-				$rmsg="1-0:1.7.255*255(".$hash->{helper}{PHSUM}."*kW)"; 
-				$hash->{helper}{PHSUM}=0 if ($hash->{helper}{DEVICES}[1]>0);
-			};
 			$hash->{helper}{EoM}+=1 if ($hash->{helper}{DEVICES}[1]>0);
 		}
 
@@ -197,8 +192,6 @@ sub OBIS_Parse($$)
 					elsif ($code eq "Channels") {
 			    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
 			  			readingsBulkUpdate($hash, $L,$2+0); 
-			    		my $a=$2;
-			    		if ($1 =~ /(?:21|41|61)/) {$hash->{helper}{PHSUM} += ($a+0)}
 					}
 					
 					elsif ($code eq "Counter") {
@@ -256,9 +249,10 @@ sub OBIS_Attr(@)
 				$hash->{helper}{DEVICES}[1]=0;
 		}
 		if ($aName eq "pollingMode") {
-				$hash->{FD}=$hash->{helper}{FD2};
 				delete($readyfnlist{"$name.$dev"});
 				$selectlist{"$name.$dev"} = $hash;
+				 DevIo_CloseDev($hash);
+				DevIo_OpenDev($hash, 0, "OBIS_Init");
 		}		
 	}
 	if ($cmd eq "set") {
@@ -279,18 +273,20 @@ sub OBIS_Attr(@)
 			    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
 				InternalTimer($t, "GetUpdate", $hash, 0)  if ($hash->{helper}{DEVICES}[1]>0);
 			} else {
-				return $name, 3, "OBIS ($name) - $name: attr interval must be a number -> $aVal";
+				return "OBIS ($name) - $name: attr interval must be a number -> $aVal";
 			}
 		}
 		if ($aName eq "alignTime") {
 			 if ($hash->{helper}{DEVICES}[1]>0) {
-		  		RemoveInternalTimer($hash);
-			    $hash->{helper}{TRIGGERTIME}=gettimeofday();
-				my $t=OBIS_adjustAlign($hash,$aVal,$hash->{helper}{DEVICES}[1]);
-			    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t));
-				InternalTimer($t, "GetUpdate", $hash, 0);
+			 	if ($aVal=~/\d+/) {
+			  		RemoveInternalTimer($hash);
+				    $hash->{helper}{TRIGGERTIME}=gettimeofday();
+					my $t=OBIS_adjustAlign($hash,$aVal,$hash->{helper}{DEVICES}[1]);
+				    Log3 ($hash,4,"OBIS ($name) - Internal timer set to ".FmtDateTime($t));
+					InternalTimer($t, "GetUpdate", $hash, 0);
+			 	} else {return "OBIS ($name): attr alignTime must be a Value >0"}
 			 } else {
- 				return $name, 3, "OBIS ($name) - $name: attr alignTime is useless, if no interval is specified";
+ 				return "OBIS ($name): attr alignTime is useless, if no interval is specified";
 			 }			
 		}
 		if ($aName eq "pollingMode")
@@ -364,8 +360,7 @@ sub OBIS_adjustAlign($$$)
       <br><br>
       Optional:MeterType can be of
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
-      <li>E110 -&gt; Landis&&;Gyr E110</li>
-      <li>Hager -&gt; Hager-Family</li></ul>
+      <li>E110 -&gt; Landis&&;Gyr E110</li></ul>
       <br>
       Example: <br>
     <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
@@ -412,8 +407,7 @@ sub OBIS_adjustAlign($$$)
       <br><br>
       Optional:MeterType kann sein:
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
-      <li>E110 -&gt; Landis&&;Gyr E110</li>
-      <li>Hager -&gt; Smartmeter der Hager-Familie</li></ul>
+      <li>E110 -&gt; Landis&&;Gyr E110</li></ul>
       <br>
       Beispiel: <br>
     <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
