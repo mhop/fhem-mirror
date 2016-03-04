@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  44_TEK603: Fixed TankLevel=NO_DATA 
   - feature: LGTV_IP12: new reading "power"
   - change:  LGTV_IP12: changed values of mute reading from true/false to on/off
   - bugfix:  30_MilightBridge: suppress protocol change message on startup
