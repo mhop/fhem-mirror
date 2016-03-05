@@ -926,7 +926,7 @@ YAMAHA_AVR_Undefine($$)
 {
     my($hash, $name) = @_;
 
-    # Stop the internal GetStatus-Loop and exit
+    # Stop all timers and exit
     RemoveInternalTimer($hash);
     
     if(exists($hash->{SYSTEM_ID}) and exists($hash->{ACTIVE_ZONE}) and exists($modules{YAMAHA_AVR}{defptr}{$hash->{SYSTEM_ID}}{$hash->{ACTIVE_ZONE}}))
@@ -1018,13 +1018,6 @@ sub
 YAMAHA_AVR_HandleCmdQueue($)
 {
     my ($hash) = @_;
-    
-    if(ref($hash) ne "HASH")
-    {
-        my ($tmp,$name) = split(":", $hash,2);
-        $hash = $defs{$name};
-    }
-    
     my $name = $hash->{NAME};
     my $address = $hash->{helper}{ADDRESS};
     
@@ -1048,8 +1041,8 @@ YAMAHA_AVR_HandleCmdQueue($)
         {
             # still request in queue, but not mentioned to be executed now
             Log3 $name, 5, "YAMAHA_AVR ($name) - still requests in queue, but no command shall be executed at the moment. Retry in 1 second.";
-            RemoveInternalTimer("YAMAHA_AVR_HandleCmdQueue:$name");
-            InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", "YAMAHA_AVR_HandleCmdQueue:$name", 0);
+            RemoveInternalTimer($hash, "YAMAHA_AVR_HandleCmdQueue");
+            InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", $hash);
             return undef;
         }
         
@@ -1997,21 +1990,21 @@ sub YAMAHA_AVR_ResetTimer($;$)
 {
     my ($hash, $interval) = @_;
     
-    RemoveInternalTimer($hash);
+    RemoveInternalTimer($hash, "YAMAHA_AVR_GetStatus");
     
     unless(IsDisabled($hash->{NAME}))
     {
         if(defined($interval))
         {
-            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash, 0);
+            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash);
         }
         elsif((exists($hash->{READINGS}{presence}{VAL}) and $hash->{READINGS}{presence}{VAL} eq "present") and (exists($hash->{READINGS}{power}{VAL}) and $hash->{READINGS}{power}{VAL} eq "on"))
         {
-            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
         }
         else
         {
-            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
         }
     }
     
