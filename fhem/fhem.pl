@@ -82,7 +82,7 @@ sub ReadingsNum($$$);
 sub ReadingsTimestamp($$$);
 sub ReadingsVal($$$);
 sub RefreshAuthList();
-sub RemoveInternalTimer($);
+sub RemoveInternalTimer($;$);
 sub ReplaceEventMap($$$);
 sub ResolveDateWildcards($@);
 sub SemicolonEscape($);
@@ -2794,11 +2794,12 @@ InternalTimer($$$$)
 }
 
 sub
-RemoveInternalTimer($)
+RemoveInternalTimer($;$)
 {
-  my ($arg) = @_;
+  my ($arg, $fn) = @_;
   foreach my $a (keys %intAt) {
-    delete($intAt{$a}) if($intAt{$a}{ARG} eq $arg);
+    delete($intAt{$a}) if($intAt{$a}{ARG} eq $arg && 
+                          (!$fn || $intAt{$a}{FN} eq $fn));
   }
 }
 
