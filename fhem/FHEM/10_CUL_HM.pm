@@ -4652,16 +4652,23 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_PushCmdStack($hash,'++'.$flag."11$id$dst"."8604$temp");
 
       my $idTch = ($md =~ m/HM-CC-RT-DN/ ? $dst."05" : $dst."02");
-      my @teamList = ( split(",",InternalVal(CUL_HM_id2Name($dst."05"),"peerList","")) # peers of RT team
-                      ,split(",",InternalVal(CUL_HM_id2Name($dst."02"),"peerList","")) # peers RT/TC team
-                      ,$name                                                             # myself
+      my @teamList = ( split(",",AttrVal(CUL_HM_id2Name($dst."05"),"peerIDs","")) # peers of RT team
+                      ,split(",",AttrVal(CUL_HM_id2Name($dst."02"),"peerIDs","")) # peers RT/TC team
+                      ,$dst."02"                                                             # myself
                       );
 
-      foreach my $team (@teamList){
-        next if (!defined $defs{$team} );
-        my $tId = substr(CUL_HM_name2Id($team),0,6);
-        CUL_HM_PushCmdStack($defs{$team},'++'.$flag."11$id$tId"."8604$temp");
-        CUL_HM_UpdtReadSingle($defs{$team},"state",$state,1);
+      foreach my $tId (@teamList){
+        my $teamC = CUL_HM_id2Name($tId);
+        $tId = substr($tId,0,6);
+        my $teamD = CUL_HM_id2Name($tId);
+        next if (!defined $defs{$teamC} );
+        CUL_HM_PushCmdStack($defs{$teamD},'++'.$flag."11$id$tId"."8604$temp");
+        CUL_HM_UpdtReadSingle($defs{$teamC},"state",$state,1);
+        if (   $tId ne $dst 
+            && CUL_HM_getRxType($defs{$teamD}) & "02"){
+          # burst device - we need to send immediately
+          CUL_HM_SndCmd($defs{$teamD},"++B112$id".substr($tId,0,6));
+        }
       }
     }
     else{

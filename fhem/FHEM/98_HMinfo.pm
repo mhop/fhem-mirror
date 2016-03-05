@@ -240,7 +240,7 @@ sub HMinfo_status($){##########################################################
       $nbrD++;
       push @IOdev,$ehash->{IODev}{NAME} if($ehash->{IODev} && $ehash->{IODev}{NAME});
       $IOccu{(split ":",AttrVal($eName,"IOgrp","no"))[0]}=1;
-      push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} ne "alive");
+      push @Anames,$eName if ($attr{$eName}{actStatus} && $attr{$eName}{actStatus} eq "dead");
 
       foreach (grep /ErrIoId_/, keys %{$ehash}){# detect addtional critical entries
         my $k = $_;
@@ -265,11 +265,23 @@ sub HMinfo_status($){##########################################################
     $d .= "$_:$sum{$read}{$_},"foreach(keys %{$sum{$read}});
     push @updates,"I_sum_$read:".$d;
   }
-  foreach my $read(grep {defined $err{$_}} keys %errFlt){#--- disp err count
-    my $d;
-    $d .= "$_:$err{$read}{$_},"foreach(keys %{$err{$read}});
-    push @updates,"ERR_$read:".$d;
-  }
+  foreach my $read(keys %errFlt) {
+    if (defined $err{$read}) {
+      my $d;
+      $d .= "$_:$err{$read}{$_},"foreach(keys %{$err{$read}});
+      push @updates,"ERR_$read:".$d;
+    } 
+    elsif (defined $hash->{READINGS}{"ERR_$read"}) {
+      if ($hash->{READINGS}{"ERR_$read"}{VAL} ne '-') {
+        # Error condition has been resolved, push empty update
+        push @updates,"ERR_$read:";
+      } 
+      else {
+        # Delete reading again if it was already empty
+        delete $hash->{READINGS}{"ERR_$read"};	
+      }
+    }
+   }
 
   @errNames = grep !/^$/,HMinfo_noDup(@errNames);
   $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
@@ -294,9 +306,9 @@ sub HMinfo_status($){##########################################################
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
 
-  push @updates,"CRIT__protocol:"  .join(",",map {"$_:$protC{$_}"} grep {$protC{$_}} keys(%protC));
-  push @updates,"ERR__protocol:"   .join(",",map {"$_:$protE{$_}"} grep {$protE{$_}} keys(%protE));
-  push @updates,"W__protocol:"     .join(",",map {"$_:$protW{$_}"} grep {$protW{$_}} keys(%protW));
+  push @updates,"CRIT__protocol:"  .join(",",map {"$_:$protC{$_}"} grep {$protC{$_}} sort keys(%protC));
+  push @updates,"ERR__protocol:"   .join(",",map {"$_:$protE{$_}"} grep {$protE{$_}} sort keys(%protE));
+  push @updates,"W__protocol:"     .join(",",map {"$_:$protW{$_}"} grep {$protW{$_}} sort keys(%protW));
 
   my @tpu = devspec2array("TYPE=CUL_HM:FILTER=state=unreachable");
   push @updates,"ERR__unreachable:".scalar(@tpu);
@@ -327,6 +339,7 @@ sub HMinfo_status($){##########################################################
   
   foreach (grep(/^(ERR|W_|I_|C_|CRI_)/,keys%{$hash})){# remove empty entries
     delete $hash->{$_} if(!$hash->{$_});
+#    delete $hash->{READINGS}{$_};
   }
   
   readingsBeginUpdate($hash);
