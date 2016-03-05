@@ -279,7 +279,7 @@ ZWDongle_Get($@)
     $msg .= " ".join(" ",@list);
 
   } elsif($cmd eq "homeId") {                  ############################
-    $msg = sprintf("HomeId:%s CtrlNodeId:%s", 
+    $msg = sprintf("HomeId:%s CtrlNodeIdHex:%s", 
                 substr($ret,4,8), substr($ret,12,2));
     $hash->{homeId} = substr($ret,4,8);
     $hash->{nodeIdHex} = substr($ret,12,2);
