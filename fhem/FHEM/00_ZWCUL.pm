@@ -86,7 +86,7 @@ ZWCUL_Define($$)
   $hash->{baudRate} = "40k";
   $hash->{monitor} = 1 if($hash->{homeIdSet} eq "00000000");
   setReadingsVal($hash, "homeId",       # ZWDongle compatibility
-            "HomeId:$hash->{homeId} CtrlNodeId:$hash->{nodeIdHex}", TimeNow());
+          "HomeId:$hash->{homeId} CtrlNodeIdHex:$hash->{nodeIdHex}", TimeNow());
 
   $hash->{Clients} = ":ZWave:STACKABLE_CC:";
   my %matchList = ( "1:ZWave" => ".*",

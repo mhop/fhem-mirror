@@ -686,7 +686,7 @@ ZWave_execInits($$)
   my $NAME = $hash->{NAME};
   my $iodev = $hash->{IODev};
   my $homeReading = ReadingsVal($iodev->{NAME}, "homeId", "") if($iodev);
-  my $CTRLID = $1 if($homeReading && $homeReading =~ m/CtrlNodeId:(..)/);
+  my $CTRLID=hex($1) if($homeReading && $homeReading =~ m/CtrlNodeIdHex:(..)/);
 
   my @cmd;
   foreach my $i (sort { $a->{ORDER}<=>$b->{ORDER} } @initList) {
