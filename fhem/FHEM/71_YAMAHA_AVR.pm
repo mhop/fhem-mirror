@@ -1024,7 +1024,7 @@ YAMAHA_AVR_HandleCmdQueue($)
             # still request in queue, but not mentioned to be executed now
             Log3 $name, 5, "YAMAHA_AVR ($name) - still requests in queue, but no command shall be executed at the moment. Retry in 1 second.";
             RemoveInternalTimer($hash, "YAMAHA_AVR_HandleCmdQueue");
-            InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", $hash, 0);
+            InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", $hash);
             return undef;
         }
         
@@ -1979,15 +1979,15 @@ sub YAMAHA_AVR_ResetTimer($;$)
     {
         if(defined($interval))
         {
-            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash, 0);
+            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash);
         }
         elsif(ReadingsVal($name, "presence", "absent") eq "present" and ReadingsVal($name, "power", "off") eq "on")
         {
-            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
         }
         else
         {
-            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
+            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
         }
     }
     
