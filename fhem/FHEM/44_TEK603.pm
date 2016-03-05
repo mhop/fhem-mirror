@@ -174,7 +174,7 @@ sub TEK603_read($) {
 	my $RemainingUsableLevel= hex(substr($payload,6,2)) * 256 + hex(substr($payload,8,2));
 	my $TotalUsableCapacity = hex(substr($payload,10,2)) * 256 + hex(substr($payload,12,2));
 
-	return '' if($temp eq "-40" && $Ullage eq "0"); # TankLevel=NO_DATA
+	return '' if($temp eq "-40.00" && $Ullage eq "0"); # TankLevel=NO_DATA
 
 	#Log3 $name, 5, $hash->{buffer};
 	Log3 $name, 5, "Time:$time Temp:$temp Ullage:$Ullage RemainingUsableLevel:$RemainingUsableLevel TotalUsableCapacity:$TotalUsableCapacity"; 
