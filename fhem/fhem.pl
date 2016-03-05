@@ -65,7 +65,7 @@ sub GlobalAttr($$$$);
 sub HandleArchiving($;$);
 sub HandleTimeout();
 sub IOWrite($@);
-sub InternalTimer($$$$);
+sub InternalTimer($$$;$);
 sub InternalVal($$$);
 sub IsDisabled($);
 sub IsDummy($);
