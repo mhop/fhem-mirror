@@ -2775,7 +2775,7 @@ HandleTimeout()
 
 #####################################
 sub
-InternalTimer($$$$)
+InternalTimer($$$;$)
 {
   my ($tim, $fn, $arg, $waitIfInitNotDone) = @_;
 
