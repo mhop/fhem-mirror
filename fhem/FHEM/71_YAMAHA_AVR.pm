@@ -131,11 +131,6 @@ YAMAHA_AVR_Define($$)
         YAMAHA_AVR_getInputs($hash);
     }
 
-    # set the volume-smooth-change attribute only if it is not defined, so no user values will be overwritten
-    #
-    # own attribute values will be overwritten anyway when all attr-commands are executed from fhem.cfg
-    $attr{$name}{"volume-smooth-change"} = "1" unless(exists($attr{$name}{"volume-smooth-change"}));
-
     unless(exists($hash->{helper}{AVAILABLE}) and ($hash->{helper}{AVAILABLE} == 0))
     {
         $hash->{helper}{AVAILABLE} = 1;
@@ -246,28 +241,16 @@ YAMAHA_AVR_Get($@)
     
     $what = $a[1];
     
-    if(exists($hash->{READINGS}{$what}))
+    return ReadingsVal($hash->{NAME}, $what, "") if(defined(ReadingsVal($hash->{NAME}, $what, undef)));
+     
+    $return = "unknown argument $what, choose one of";
+    
+    foreach my $reading (keys %{$hash->{READINGS}})
     {
-        if(defined($hash->{READINGS}{$what}))
-        {
-            return $hash->{READINGS}{$what}{VAL};
-        }
-        else
-        {
-            return "no such reading: $what";
-        }
+        $return .= " $reading:noArg";
     }
-    else
-    {
-        $return = "unknown argument $what, choose one of";
-        
-        foreach my $reading (keys %{$hash->{READINGS}})
-        {
-            $return .= " $reading:noArg";
-        }
-        
-        return $return;
-    }
+    
+    return $return;
 }
 
 
@@ -310,8 +293,7 @@ YAMAHA_AVR_Set($@)
                                                           "off:noArg ".
                                                           "volumeStraight:slider,-80,1,16 ".
                                                           "volume:slider,0,1,100 ".
-                                                          "volumeUp ".
-                                                          "volumeDown ".
+                                                          (defined(ReadingsVal($name, "volume", undef)) ? "volumeUp volumeDown " : "").
                                                           (exists($hash->{helper}{INPUTS}) ? "input:".$inputs_comma." " : "").
                                                           "mute:on,off,toggle ".
                                                           "remoteControl:setup,up,down,left,right,return,option,display,tunerPresetUp,tunerPresetDown,enter ".
@@ -417,11 +399,11 @@ YAMAHA_AVR_Set($@)
         # Depending on the status response, use the short or long Volume command
         my $volume_cmd = (YAMAHA_AVR_isModel_DSP($hash) ? "Vol" : "Volume");
     
-        if( $a[2] eq "on" or ($a[2] eq "toggle" and ReadingsVal($hash->{NAME}, "mute", "off") eq "off"))
+        if( $a[2] eq "on" or ($a[2] eq "toggle" and ReadingsVal($name, "mute", "off") eq "off"))
         {
             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>On</Mute></$volume_cmd></$zone></YAMAHA_AV>", $what, "on");
         }
-        elsif($a[2] eq "off" or ($a[2] eq "toggle" and ReadingsVal($hash->{NAME}, "mute", "off") eq "on"))
+        elsif($a[2] eq "off" or ($a[2] eq "toggle" and ReadingsVal($name, "mute", "off") eq "on"))
         {
             YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><$volume_cmd><Mute>Off</Mute></$volume_cmd></$zone></YAMAHA_AV>", $what, "off"); 
         }
@@ -439,13 +421,13 @@ YAMAHA_AVR_Set($@)
         {
             $target_volume = YAMAHA_AVR_volume_rel2abs($a[2]);
         }
-        elsif($what eq "volumeDown")
+        elsif($what eq "volumeDown" and defined(ReadingsVal($name, "volume", undef)))
         {
-            $target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} - ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
+            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) - ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
         }
-        elsif($what eq "volumeUp")
+        elsif($what eq "volumeUp" and defined(ReadingsVal($name, "volume", undef)))
         {
-            $target_volume = YAMAHA_AVR_volume_rel2abs($hash->{READINGS}{volume}{VAL} + ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
+            $target_volume = YAMAHA_AVR_volume_rel2abs(ReadingsVal($name, "volume", -45) + ((defined($a[2]) and $a[2] =~ /^\d+$/) ? $a[2] : AttrVal($hash->{NAME}, "volumeSteps",5)));
         }
         elsif(defined($a[2]) and $a[2] =~ /^-?\d+(?:\.\d)?$/)
         {
@@ -467,7 +449,7 @@ YAMAHA_AVR_Set($@)
             # DSP based models use "Vol" instead of "Volume"
             my $volume_cmd = (YAMAHA_AVR_isModel_DSP($hash) ? "Vol" : "Volume");
             
-            if(AttrVal($name, "volume-smooth-change", "0") eq "1")
+            if(AttrVal($name, "volume-smooth-change", "1") eq "1")
             {
                 my $steps = AttrVal($name, "volume-smooth-steps", 5);
                 my $diff = int(($target_volume - ReadingsVal($name, "volumeStraight", $target_volume)) / $steps / 0.5) * 0.5;
@@ -1042,7 +1024,7 @@ YAMAHA_AVR_HandleCmdQueue($)
             # still request in queue, but not mentioned to be executed now
             Log3 $name, 5, "YAMAHA_AVR ($name) - still requests in queue, but no command shall be executed at the moment. Retry in 1 second.";
             RemoveInternalTimer($hash, "YAMAHA_AVR_HandleCmdQueue");
-            InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", $hash);
+            InternalTimer(gettimeofday()+1,"YAMAHA_AVR_HandleCmdQueue", $hash, 0);
             return undef;
         }
         
@@ -1434,7 +1416,7 @@ YAMAHA_AVR_ParseResponse ($$$)
                 else
                 {
                     # delete the reading if this information is not available
-                    delete($hash->{READINGS}{output}) if(defined($hash->{READINGS}{output}));
+                    delete($hash->{READINGS}{output}) if(exists($hash->{READINGS}{output}));
                 }
                 
                 # current input same as the corresponding set command name
@@ -1989,22 +1971,23 @@ sub YAMAHA_AVR_getInputs($)
 sub YAMAHA_AVR_ResetTimer($;$)
 {
     my ($hash, $interval) = @_;
+    my $name = $hash->{NAME};
     
     RemoveInternalTimer($hash, "YAMAHA_AVR_GetStatus");
     
-    unless(IsDisabled($hash->{NAME}))
+    unless(IsDisabled($name))
     {
         if(defined($interval))
         {
-            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash);
+            InternalTimer(gettimeofday()+$interval, "YAMAHA_AVR_GetStatus", $hash, 0);
         }
-        elsif((exists($hash->{READINGS}{presence}{VAL}) and $hash->{READINGS}{presence}{VAL} eq "present") and (exists($hash->{READINGS}{power}{VAL}) and $hash->{READINGS}{power}{VAL} eq "on"))
+        elsif(ReadingsVal($name, "presence", "absent") eq "present" and ReadingsVal($name, "power", "off") eq "on")
         {
-            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
+            InternalTimer(gettimeofday()+$hash->{helper}{ON_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
         }
         else
         {
-            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash);
+            InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0);
         }
     }
     
@@ -2071,7 +2054,7 @@ YAMAHA_AVR_isModel_DSP($)
 <a name="YAMAHA_AVR"></a>
 <h3>YAMAHA_AVR</h3>
 <ul>
-  <a name="YAMAHA_AVRdefine"></a>
+  <a name="YAMAHA_AVR_define"></a>
   <b>Define</b>
   <ul>
     <code>
@@ -2138,7 +2121,7 @@ YAMAHA_AVR_isModel_DSP($)
      <br><br>
   </ul>
   
-  <a name="YAMAHA_AVRset"></a>
+  <a name="YAMAHA_AVR_set"></a>
   <b>Set </b>
   <ul>
     <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
@@ -2163,7 +2146,7 @@ YAMAHA_AVR_isModel_DSP($)
 <li><b>3dCinemaDsp</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the CINEMA DSP 3D mode</li>
 <li><b>adaptiveDrc</b> auto|off &nbsp;&nbsp;-&nbsp;&nbsp; controls the Adaptive DRC</li>
 <li><b>partyMode</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp;controls the party mode. In Main Zone the whole party mode is enabled/disabled system wide. In each zone executed, it enables/disables the current zone from party mode.</li>
-<li><b>navigateListMenu</b> [item1]/[item2]/[itemN]/... &nbsp;&nbsp;-&nbsp;&nbsp; select a specific item within a menu structure. for menu-based inputs (e.g. Net Radio, USB, Server, ...) only. See chapter "Automatic Menu Navigation" for further details and examples.</li>
+<li><b>navigateListMenu</b> [item1]/[item2]/[itemN]/... &nbsp;&nbsp;-&nbsp;&nbsp; select a specific item within a menu structure. for menu-based inputs (e.g. Net Radio, USB, Server, ...) only. See chapter <a href="#YAMAHA_AVR_MenuNavigation">Automatic Menu Navigation</a> for further details and examples.</li>
 <li><b>tunerFrequency</b> [frequency] [AM|FM] &nbsp;&nbsp;-&nbsp;&nbsp; sets the tuner frequency. The first argument is the frequency, second parameter is optional to set the tuner band (AM or FM, default: FM). Depending which tuner band you select, the frequency is given in kHz (AM band) or MHz (FM band). If the second parameter is not set, the FM band will be used. This command can be used even the current input is not "tuner", the new frequency is set and will be played, when the tuner gets active.</li>
 <li><b>tunerPreset</b> 1...40 &nbsp;&nbsp;-&nbsp;&nbsp; selects a saved tuner frequency preset. This command can be used even the current input is not "tuner", the new frequency is set and will be played, when the tuner gets active.</li>
 <li><b>straight</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses the internal codec converter and plays the original sound codec</li>
@@ -2208,7 +2191,7 @@ YAMAHA_AVR_isModel_DSP($)
     The button names are the same as on your remote control.
   </ul>
   <br>
-<a name="YAMAHA_AVR-MenuNavigation"></a>
+<a name="YAMAHA_AVR_MenuNavigation"></a>
 <u>Automatic Menu Navigation (only for menu based inputs like Net Radio, Server, USB, ...)</u><br><br>
 <ul>
 For menu based inputs you have to select a specific item out of a complex menu structure to start playing music.
@@ -2262,7 +2245,7 @@ So here are some examples:
     
 <br><br>
 </ul>
-  <a name="YAMAHA_AVRget"></a>
+  <a name="YAMAHA_AVR_get"></a>
   <b>Get</b>
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code>
@@ -2270,29 +2253,29 @@ So here are some examples:
     Currently, the get command only returns the reading values. For a specific list of possible values, see section "Generated Readings/Events".
     <br><br>
   </ul>
-  <a name="YAMAHA_AVRattr"></a>
+  <a name="YAMAHA_AVR_attr"></a>
   <b>Attributes</b>
   <ul>
   
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
-    <li><a name="request-timeout">request-timeout</a></li>
+    <li><a name="YAMAHA_AVR_request-timeout">request-timeout</a></li>
     Optional attribute change the response timeout in seconds for all queries to the receiver.
     <br><br>
     Possible values: 1-5 seconds. Default value is 4 seconds.<br><br>
-    <li><a name="disable">disable</a></li>
+    <li><a name="YAMAHA_AVR_disable">disable</a></li>
     Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
     <br><br>
     Possible values: 0 => perform cyclic status update, 1 => don't perform cyclic status updates.<br><br>
-    <li><a name="volume-smooth-change">volume-smooth-change</a></li>
+    <li><a name="YAMAHA_AVR_volume-smooth-change">volume-smooth-change</a></li>
     Optional attribute to activate a smooth volume change.
     <br><br>
     Possible values: 0 => off , 1 => on<br><br>
-    <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
+    <li><a name="YAMAHA_AVR_volume-smooth-steps">volume-smooth-steps</a></li>
     Optional attribute to define the number of volume changes between the
     current and the desired volume. Default value is 5 steps<br><br>
-    <li><a name="volume-smooth-steps">volumeSteps</a></li>
+    <li><a name="YAMAHA_AVR_volume-steps">volumeSteps</a></li>
     Optional attribute to define the default increasing and decreasing level for the volumeUp and volumeDown set command. Default value is 5%<br>
   <br>
   </ul>
@@ -2346,7 +2329,7 @@ So here are some examples:
 <h3>YAMAHA_AVR</h3>
 <ul>
 
-  <a name="YAMAHA_AVRdefine"></a>
+  <a name="YAMAHA_AVR_define"></a>
   <b>Definition</b>
   <ul>
     <code>define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Status_Interval&gt;]
@@ -2408,7 +2391,7 @@ So here are some examples:
      <br><br>
   </ul>
   
-  <a name="YAMAHA_AVRset"></a>
+  <a name="YAMAHA_AVR_set"></a>
   <b>Set-Kommandos </b>
   <ul>
     <code>set &lt;Name&gt; &lt;Kommando&gt; [&lt;Parameter&gt;]</code>
@@ -2425,7 +2408,7 @@ So here are some examples:
 <li><b>3dCinemaDsp</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert den CINEMA DSP 3D Modus</li>
 <li><b>adaptiveDrc</b> auto,off &nbsp;&nbsp;-&nbsp;&nbsp; Aktiviert Adaptive DRC</li>
 <li><b>partyMode</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp;Aktiviert den Party Modus. In der Main Zone wird hierbei der Party Modus ger&auml;teweit aktiviert oder deaktiviert. In den anderen Zonen kann man damit die entsprechende Zone dem Party Modus zuschalten oder entziehen.</li>
-<li><b>navigateListMenu</b> [Element 1]/[Element 2]/[Element N]/... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt ein spezifisches Element aus einer Men&uuml;struktur aus. Nur verwendbar bei Men&uuml;-basierenden Eing&auml;ngen (z.B. Net Radio, USB, Server, etc.). Siehe nachfolgendes Kapitel "<a href="#YAMAHA_AVR-MenuNavigation">Automatische Men&uuml; Navigation</a>" f&uuml;r weitere Details und Beispiele.</li>
+<li><b>navigateListMenu</b> [Element 1]/[Element 2]/[Element N]/... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt ein spezifisches Element aus einer Men&uuml;struktur aus. Nur verwendbar bei Men&uuml;-basierenden Eing&auml;ngen (z.B. Net Radio, USB, Server, etc.). Siehe nachfolgendes Kapitel "<a href="#YAMAHA_AVR_MenuNavigation">Automatische Men&uuml; Navigation</a>" f&uuml;r weitere Details und Beispiele.</li>
 <li><b>tunerFrequency</b> [Frequenz] [AM|FM] &nbsp;&nbsp;-&nbsp;&nbsp; setzt die Radio-Frequenz. Das erste Argument ist die Frequenz, der zweite dient optional zu Angabe des Bandes (AM oder FM, standardm&auml;&szlig;ig FM). Abh&auml;ngig davon, welches Band man benutzt, wird die Frequenz in kHz (AM-Band) oder MHz (FM-Band) angegeben. Wenn im zweiten Argument kein Band angegeben ist, wird standardm&auml;&szlig;ig das FM-Band benutzt. Dieser Befehl kann auch benutzt werden, wenn der aktuelle Eingang nicht "tuner" ist. Die neue Frequenz wird dennoch gesetzt und bei der n&auml;chsten Benutzung abgespielt.</li>
 <li><b>tunerPreset</b> 1...40 &nbsp;&nbsp;-&nbsp;&nbsp; w&auml;hlt einen gespeicherten Radiosender-Preset aus. Dieser Befehl kann auch benutzt werden, wenn der aktuelle Eingang nicht "tuner" ist. Die neue Frequenz wird dennoch gesetzt und bei der n&auml;chsten Benutzung abgespielt.</li>
 <li><b>direct</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht alle internen soundverbessernden Ma&szlig;nahmen (Equalizer, Enhancer, Adaptive DRC,...) und gibt das Signal unverf&auml;lscht wieder</li>
@@ -2479,7 +2462,7 @@ So here are some examples:
     remoteControl tunerPresetDown<br>
     </code></ul><br>
   </ul>
-<a name="YAMAHA_AVR-MenuNavigation"></a>
+<a name="YAMAHA_AVR_MenuNavigation"></a>
 <u>Automatische Men&uuml; Navigation (nur f&uuml;r Men&uuml;-basierte Eing&auml;nge wie z.B. Net Radio, Server, USB, ...)</u><br><br>
 <ul>
 F&uuml;r Men&uuml;-basierte Eing&auml;nge muss man einen bestimmten Eintrag aus einer komplexen Struktur ausw&auml;hlen um die Wiedergabe zu starten.
@@ -2535,7 +2518,7 @@ Ein paar Beispiele:
     Das erste Element aus einer Listenebene (von oben nach unten), was auf eine Pfadangabe passt, wird ausgew&auml;hlt.
 <br><br>
 </ul>
-  <a name="YAMAHA_AVRget"></a>
+  <a name="YAMAHA_AVR_get"></a>
   <b>Get-Kommandos</b>
   <ul>
     <code>get &lt;Name&gt; &lt;Readingname&gt;</code>
@@ -2543,29 +2526,29 @@ Ein paar Beispiele:
     Aktuell stehen via GET lediglich die Werte der Readings zur Verf&uuml;gung. Eine genaue Auflistung aller m&ouml;glichen Readings folgen unter "Generierte Readings/Events".
   </ul>
   <br><br>
-  <a name="YAMAHA_AVRattr"></a>
+  <a name="YAMAHA_AVR_attr"></a>
   <b>Attribute</b>
   <ul>
   
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
-    <li><a name="request-timeout">request-timeout</a></li>
+    <li><a name="YAMAHA_AVR_request-timeout">request-timeout</a></li>
     Optionales Attribut. Maximale Dauer einer Anfrage in Sekunden zum Receiver.
     <br><br>
     M&ouml;gliche Werte: 1-5 Sekunden. Standardwert ist 4 Sekunden<br><br>
-    <li><a name="disable">disable</a></li>
+    <li><a name="YAMAHA_AVR_disable">disable</a></li>
     Optionales Attribut zur Deaktivierung des zyklischen Status-Updates. Ein manuelles Update via statusRequest-Befehl ist dennoch m&ouml;glich.
     <br><br>
     M&ouml;gliche Werte: 0 => zyklische Status-Updates, 1 => keine zyklischen Status-Updates.<br><br>
-    <li><a name="volume-smooth-change">volume-smooth-change</a></li>
+    <li><a name="YAMAHA_AVR_volume-smooth-change">volume-smooth-change</a></li>
     Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert..
     <br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br><br>
-    <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
+    <li><a name="YAMAHA_AVR_volume-smooth-steps">volume-smooth-steps</a></li>
     Optionales Attribut, welches angibt, wieviele Schritte zur weichen Lautst&auml;rkeanpassung
     durchgef&uuml;hrt werden sollen. Standardwert ist 5 Anpassungschritte<br><br>
-    <li><a name="volumeSteps">volumeSteps</a></li>
+    <li><a name="YAMAHA_AVR_volumeSteps">volumeSteps</a></li>
     Optionales Attribut, welches den Standardwert zur Lautst&auml;rkenerh&ouml;hung (volumeUp) und Lautst&auml;rkenveringerung (volumeDown) konfiguriert. Standardwert ist 5%<br>
   <br>
   </ul>
