@@ -206,7 +206,7 @@ sub FB_CALLLIST_Attr($@)
         }
         elsif($attrib eq "expire-calls-after")
         {
-            if($value !~ /^\s*\d+(?:\.\d+)?(?:\s+(?:minute|hour|day|month|year)s?)?\s*$/i)
+            if($value !~ /^\s*\d+(?:\.\d+)?(?:\s+(?:minute|hour|day|week|month|year)s?)?\s*$/i)
             {
                 return "not a valid time frame value. See commandref for the correct syntax.";
             }
