@@ -3036,15 +3036,19 @@ sub camret_nonbl ($) {
             {              
                 my $eventnum    = $data->{'data'}{'total'};
                 my $lastrecord  = $data->{'data'}{'events'}[0]{name};
-                my $lastrectime = $data->{'data'}{'events'}[0]{startTime};
-                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrectime);
-                $lastrectime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                my $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
+                $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                
+                my $lastrecstoptime = $data->{'data'}{'events'}[0]{stopTime};
+                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
+                $lastrecstoptime = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
                 
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamEventNum",$eventnum);
                 readingsBulkUpdate($hash,"CamLastRec",$lastrecord);
-                readingsBulkUpdate($hash,"CamLastRecTime",$lastrectime);                
+                readingsBulkUpdate($hash,"CamLastRecTime",$lastrecstarttime." - ". $lastrecstoptime);                
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -4081,7 +4085,7 @@ return;
     <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
     <tr><td><li>CamLastRec</li>         </td><td>- Path / name of the last recording   </td></tr>
-    <tr><td><li>CamLastRecTime</li>     </td><td>- date / time of the last recording   </td></tr>
+    <tr><td><li>CamLastRecTime</li>     </td><td>- date / starttime / endtime of the last recording   </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
     <tr><td><li>CamMotDetSc</li>        </td><td>- state of motion detection source (disabled, by camera, by SVS)  </td></tr>
@@ -4662,7 +4666,7 @@ return;
     <tr><td><li>CamExposureMode</li>    </td><td>- aktueller Belichtungsmodus (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
     <tr><td><li>CamLastRec</li>         </td><td>- Pfad / Name der letzten Aufnahme   </td></tr>
-    <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit der letzten Aufnahme   </td></tr>
+    <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit - Stopzeit der letzten Aufnahme   </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
     <tr><td><li>CamMotDetSc</li>        </td><td>- Status der Bewegungserkennung (disabled, durch Kamera, durch SVS)  </td></tr>
