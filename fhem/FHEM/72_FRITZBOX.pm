@@ -2223,89 +2223,96 @@ sub FRITZBOX_Call_Run_Web($)
       }
    }
    
-   $result = FRITZBOX_Telnet_OpenCon( $hash );
-   return "$name|0|$result" 
-      if $result;
+   if ( $hash->{TELNET} == 1 && $ttsLink ) {
+      $result = FRITZBOX_Telnet_OpenCon( $hash );
+      return "$name|0|$result"    if $result;
 
-   @shellCmdArray = ();
-   
-# Creation fhemRadioStation for ttsLink
-   if ($ttsLink) {
-#Preparing 1st command array
-      push @shellCmdArray, '[ -f "'.$mohUpload.'" ] && rm "'.$mohUpload.'"';
-      push @shellCmdArray, '[ -f "'.$mohOld.'" ] && rm "'.$mohOld.'"';
-      push @shellCmdArray, '[ -f "'.$mohNew.'" ] && rm "'.$mohNew.'"';
-      push @shellCmdArray, 'wget -U Mozilla -O "'.$mohUpload.'" "'.$ttsLink.'"';
-      push @shellCmdArray, '[ -f "'.$mohUpload.'" ] && echo 1 || echo 0';
-      push @shellCmdArray, '[ -e /var/flash/fx_moh ] && echo 1 || echo 0';
-# Execute 1st command array
-      $result = FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
-      return "$name|0|Could not access '$ttsLink'"
-         unless $result->[4] eq "1";
-      return "$name|0|Could locate '/var/flash/fx_moh'"
-         unless $result->[5] eq "1";
+      @shellCmdArray = ();
+      
+   # Creation MOH for ttsLink
+      if ($ttsLink) {
+   #Preparing 1st command array
+         push @shellCmdArray, '[ -f "'.$mohUpload.'" ] && rm "'.$mohUpload.'"';
+         push @shellCmdArray, '[ -f "'.$mohOld.'" ] && rm "'.$mohOld.'"';
+         push @shellCmdArray, '[ -f "'.$mohNew.'" ] && rm "'.$mohNew.'"';
+         push @shellCmdArray, 'wget -U Mozilla -O "'.$mohUpload.'" "'.$ttsLink.'"';
+         push @shellCmdArray, '[ -f "'.$mohUpload.'" ] && echo 1 || echo 0';
+         push @shellCmdArray, '[ -e /var/flash/fx_moh ] && echo 1 || echo 0';
+   # Execute 1st command array
+         $result = FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
+         return "$name|0|Could not access '$ttsLink'"
+            unless $result->[4] eq "1";
+         return "$name|0|Could locate '/var/flash/fx_moh'"
+            unless $result->[5] eq "1";
 
-   #Prepare 2nd command array
-      push @shellCmdArray, 'if [ ! -f "/var/tmp/ffmpeg_mp3.tables" ]; then playerd_tables; fi';
-      push @shellCmdArray, 'ffmpegconv -i "'.$mohUpload.'" -o "'.$mohNew.'" --limit 32 --type 6';
-      push @shellCmdArray, '[ -f "'.$mohNew.'" ] && echo 1 || echo 0';
-   # Execute 2nd command array
-      $result = FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
-      return "Could not convert '$ttsLink'"
-         unless $result->[2] eq "1";
+      #Prepare 2nd command array
+         push @shellCmdArray, 'if [ ! -f "/var/tmp/ffmpeg_mp3.tables" ]; then playerd_tables; fi';
+         push @shellCmdArray, 'ffmpegconv -i "'.$mohUpload.'" -o "'.$mohNew.'" --limit 32 --type 6';
+         push @shellCmdArray, '[ -f "'.$mohNew.'" ] && echo 1 || echo 0';
+      # Execute 2nd command array
+         $result = FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
+         return "Could not convert '$ttsLink'"
+            unless $result->[2] eq "1";
 
-   #Execute 3rd command array
-      FRITZBOX_Shell_Exec( $hash, \@shellCmdArray );
+      #Execute 3rd command array
+         FRITZBOX_Shell_Exec( $hash, \@shellCmdArray );
 
-   #Prepare 4th command array
-      push @shellCmdArray, 'cat /var/flash/fx_moh >"'.$mohOld.'"';
-      push @shellCmdArray, 'cat "'.$mohNew.'" >/var/flash/fx_moh';
-      push @shellCmdArray, 'killall -sigusr1 telefon';
-      push @shellCmdArray, 'rm "'.$mohUpload.'"';
-      push @shellCmdArray, 'rm "'.$mohNew.'"';
-   # Execute 4th command array
-      FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
+      #Prepare 4th command array
+         push @shellCmdArray, 'cat /var/flash/fx_moh >"'.$mohOld.'"';
+         push @shellCmdArray, 'cat "'.$mohNew.'" >/var/flash/fx_moh';
+         push @shellCmdArray, 'killall -sigusr1 telefon';
+         push @shellCmdArray, 'rm "'.$mohUpload.'"';
+         push @shellCmdArray, 'rm "'.$mohNew.'"';
+      # Execute 4th command array
+         FRITZBOX_Shell_Exec ( $hash, \@shellCmdArray );
+      }
    }
-   
+   elsif ( $hash->{TELNET} != 1 && $ttsLink ) {
+      FRITZBOX_Log $hash, 3, "play or say ignored";
+   }
 
 # Preparing 4th command array to switch to (dial port 1-3) to avoid ringing of internal phone
    my $ringWithIntern = AttrVal( $name, "ringWithIntern", 1 );
-   if ($ringWithIntern =~ /^([1-3])$/) {
+   if ($ringWithIntern =~ /^([1-3])$/ && $hash->{WEBCM} == 1 ) {
       push @webCmdArray, "telcfg:settings/DialPort" => $ringWithIntern;
       $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
    }
   
 #Preparing 5th command array to ring
       FRITZBOX_Log $hash, 4, "Call $extNo for $duration seconds";
-   if ($hash->{SECPORT}) { #ring with TR-064
-      push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", $extNo."#"];
-      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-   }
-   else { # ring with webcm
+   if ( $hash->{WEBCM} == 1 ) { # ring with webcm
       push @webCmdArray, "telcfg:command/Dial" => $extNo."#";
       $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
+   }
+   elsif ($hash->{SECPORT}) { #or ring with TR-064
+      push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", $extNo."#"];
+      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
    }
    
    sleep $duration; #+1; # 1s added because it takes sometime until it starts ringing
    
 #Preparing 5th and 6th command array to stop ringing and reset dial port
-   push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
-   $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )   if $hash->{SECPORT};
-   push (@webCmdArray, "telcfg:command/Hangup" => "")      unless $hash->{SECPORT};
-   push @webCmdArray, "telcfg:settings/DialPort" => 50;
-   $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
+   if ( $hash->{WEBCM} == 1 ) { # hangup with webcm
+      push (@webCmdArray, "telcfg:command/Hangup" => "")      unless $hash->{SECPORT};
+      push @webCmdArray, "telcfg:settings/DialPort" => 50;
+      $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
+   }
+   elsif ($hash->{SECPORT}) { #or hangup with TR-064
+      push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
+      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )   if $hash->{SECPORT};
+   }
    
 #Preparing 7th command array to reset everything
-   if ($ttsLink) {
+   if ( $hash->{TELNET} == 1 && $ttsLink ) {
       push @shellCmdArray, 'cat "'.$mohOld.'" >/var/flash/fx_moh';
       push @shellCmdArray, 'killall -sigusr1 telefon';
       push @shellCmdArray, 'rm "'.$mohOld.'"';
-   }
       
-# Execute command array
-   FRITZBOX_Shell_Exec( $hash, \@shellCmdArray );
+   # Execute command array
+      FRITZBOX_Shell_Exec( $hash, \@shellCmdArray );
 
-   FRITZBOX_Telnet_CloseCon( $hash );
+      FRITZBOX_Telnet_CloseCon( $hash );
+   }
 
    return $name."|1|Calling done";
 
