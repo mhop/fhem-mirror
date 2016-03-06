@@ -117,6 +117,7 @@ LGTV_IP12_Initialize($)
     
     $hash->{DefFn}     = "LGTV_IP12_Define";
     $hash->{DeleteFn}  = "LGTV_IP12_Delete";
+    $hash->{UndefFn}   = "LGTV_IP12_Undef";
     $hash->{SetFn}     = "LGTV_IP12_Set";
     $hash->{GetFn}     = "LGTV_IP12_Get";
     $hash->{AttrFn}    = "LGTV_IP12_Attr";
@@ -352,6 +353,16 @@ LGTV_IP12_Delete($$)
     # unpairing 
     LGTV_IP12_HttpGet($hash, "/udap/api/pairing", "removePairing", undef, "<api type=\"pairing\"><name>byebye</name><port>8080</port></api>") if(exists($hash->{helper}{PAIRED}) and $hash->{helper}{PAIRED} == 1);
 }
+
+#################################
+sub
+LGTV_IP12_Undef($$)
+{
+    my ($hash, $name) = @_;
+
+    RemoveInternalTimer($hash);
+}
+
 
 ############################################################################################################
 #
