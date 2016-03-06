@@ -2110,6 +2110,25 @@ sub CUL_HM_Parse($$) {#########################################################
     }
 
   }
+
+  elsif($mh{st} eq "senBright") { #############################################
+    if ($mh{mTp} =~ m/5[34]/){
+      #Channel ist fixed 1
+      my ($chn,undef,$dat) = unpack 'A2A2A8',$mh{p};
+      push @evtEt,[$mh{devH},1,"battery:".(hex($chn)&0x80?"low":"ok")];
+      $dat = sprintf("%0.1f",hex($dat)*100);
+
+      my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}."01"};#fixed channel
+      if ($chnHash){
+        push @evtEt,[$chnHash,1,"state:bright: $dat"];
+        push @evtEt,[$chnHash,1,"bright:$dat"];
+      }
+      else{
+        push @evtEt,[$mh{devH},1,"Chan_01:brigth: $dat"];
+      }
+    }
+  }
+
   elsif($mh{st} eq "powerSensor") {############################################
     if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
         ($mh{mTyp} eq "1006")) {  #    or Info_Status message here
@@ -4633,15 +4652,22 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $msg = '8'.($mCmd{$mode}).$chn;
     $msg .= sprintf("%02X",$temp) if ($temp);
     $msg .= $party if ($party);
-    my @teamList = ( split(",",InternalVal(CUL_HM_id2Name($dst."05"),"peerList","")) # peers of RT team
-                    ,split(",",InternalVal(CUL_HM_id2Name($dst."02"),"peerList","")) # peers RT/TC team
-                    ,$name                                                           # myself
+    my @teamList = ( split(",",AttrVal(CUL_HM_id2Name($dst."05"),"peerIDs","")) # peers of RT team
+                    ,split(",",AttrVal(CUL_HM_id2Name($dst."02"),"peerIDs","")) # peers RT/TC team
+                    ,CUL_HM_name2Id($name)                                                             # myself
                     );
-    foreach my $team (@teamList){
-      next if (!defined $defs{$team} );
-      my $tId = substr(CUL_HM_name2Id($team),0,6);
-      CUL_HM_UpdtReadSingle($defs{$team},"controlMode","set_".$mode,1);
-      CUL_HM_PushCmdStack($defs{$team},'++'.$flag.'11'.$id.$tId.$msg);
+    foreach my $tId (@teamList){
+      my $teamC = CUL_HM_id2Name($tId);
+      $tId = substr($tId,0,6);
+      my $teamD = CUL_HM_id2Name($tId);
+      next if (!defined $defs{$teamC} );
+      CUL_HM_UpdtReadSingle($defs{$teamC},"controlMode","set_".$mode,1);
+      CUL_HM_PushCmdStack($defs{$teamD},'++'.$flag.'11'.$id.$tId.$msg);
+      if (   $tId ne $dst 
+          && CUL_HM_getRxType($defs{$teamD}) & "02"){
+        # burst device - we need to send immediately
+        CUL_HM_SndCmd($defs{$teamD},"++B112$id".substr($tId,0,6));
+      }
     }
   }
   elsif($cmd eq "desired-temp") { #############################################
@@ -4654,7 +4680,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my $idTch = ($md =~ m/HM-CC-RT-DN/ ? $dst."05" : $dst."02");
       my @teamList = ( split(",",AttrVal(CUL_HM_id2Name($dst."05"),"peerIDs","")) # peers of RT team
                       ,split(",",AttrVal(CUL_HM_id2Name($dst."02"),"peerIDs","")) # peers RT/TC team
-                      ,$dst."02"                                                             # myself
+                      ,CUL_HM_name2Id($name)                                                              # myself
                       );
 
       foreach my $tId (@teamList){
