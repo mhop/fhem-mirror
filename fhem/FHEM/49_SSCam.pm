@@ -3036,13 +3036,17 @@ sub camret_nonbl ($) {
             {              
                 my $eventnum    = $data->{'data'}{'total'};
                 my $lastrecord  = $data->{'data'}{'events'}[0]{name};
-                my $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
-                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
-                $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                my ($lastrecstarttime,$lastrecstoptime);
                 
-                my $lastrecstoptime = $data->{'data'}{'events'}[0]{stopTime};
-                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
-                $lastrecstoptime = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
+                if ($eventnum > 0) {
+                    $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
+                    ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
+                    $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+                
+                    $lastrecstoptime = $data->{'data'}{'events'}[0]{stopTime};
+                    ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
+                    $lastrecstoptime = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
+                }
                 
                 # Setreading 
                 readingsBeginUpdate($hash);
