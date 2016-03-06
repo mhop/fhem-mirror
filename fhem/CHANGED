@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature  49_SSCAM: Reading "CamLastRec" added which contains Path/name
+             of last recording
   - feature: FB_CALLLIST: new attribute "expire-calls-after" to automatically
              delete call entries after a certain time frame. See commandref
              for details and syntax.

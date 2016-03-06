@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.19.2 06.03.2016    Reading "CamLastRec" added which contains Path/name
+#                      of last recording
 # 1.19.1 28.02.2016    enhanced command runView by option "link_open" to
 #                      open a streamlink immediately
 # 1.19   25.02.2016    functions for cam-livestream added
@@ -3033,10 +3035,12 @@ sub camret_nonbl ($) {
             elsif ($OpMode eq "geteventlist") 
             {              
                 my $eventnum = $data->{'data'}{'total'};
+                my $lastrecord = $data->{'data'}{'events'}[0]{name};
                 
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamEventNum",$eventnum);
+                readingsBulkUpdate($hash,"CamLastRec",$lastrecord);
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -3995,7 +3999,8 @@ return;
   With command <b>"get &lt;name&gt; caminfoall"</b> dependend of the type of Camera (e.g. Fix- or PTZ-Camera) the available properties will be retrieved and provided as Readings.<br>
   For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further 
   processing like creating events. <br>
-  By command <b>"get &lt;name&gt; eventlist"</b> the <a href="#SSCamreadings">Reading</a> "CamEventNum" will be refreshed which containes the total number of in SVS registered camera events. 
+  By command <b>"get &lt;name&gt; eventlist"</b> the <a href="#SSCamreadings">Reading</a> "CamEventNum" and "CamLastRecord" will be refreshed which containes the total number of in SVS 
+  registered camera events and the path / name of the last recording.. 
   This command will be implicit executed when "get ... caminfoall" is running. <br>
   Using <b>"get &lt;name&gt; snapfileinfo"</b> the filename of the last snapshot will be retrieved. This command will be executed with <b>"get &lt;name&gt; snap"</b> automatically. <br>
   The command <b>"get &lt;name&gt; svsinfo"</b> is not really dependend on a camera, but rather a command to determine common informations about the installed SVS-version and other properties. <br>
@@ -4071,6 +4076,7 @@ return;
     <tr><td><li>CamExposureControl</li> </td><td>- indicating type of exposure control  </td></tr>
     <tr><td><li>CamExposureMode</li>    </td><td>- current exposure mode (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Address of Camera  </td></tr>
+    <tr><td><li>CamLastRec</li>         </td><td>- Path / name of the last recording   </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
     <tr><td><li>CamMotDetSc</li>        </td><td>- state of motion detection source (disabled, by camera, by SVS)  </td></tr>
@@ -4570,7 +4576,8 @@ return;
   
   Mit dem Befehl <b>"get &lt;name&gt; caminfoall"</b> werden abhängig von der Art der Kamera (z.B. Fix- oder PTZ-Kamera) die verfügbaren Eigenschaften ermittelt und als Readings zur Verfügung gestellt. <br>
   So wird zum Beispiel das Reading "Availability" auf "disconnected" gesetzt falls die Kamera von der Surveillance Station getrennt wird und kann für weitere Verarbeitungen genutzt werden. <br>
-  Durch <b>"get &lt;name&gt; eventlist"</b> wird das <a href="#SSCamreadings">Reading</a> "CamEventNum" aktualisiert, welches die Gesamtanzahl der registrierten Kameraevents enthält.
+  Durch <b>"get &lt;name&gt; eventlist"</b> wird das <a href="#SSCamreadings">Reading</a> "CamEventNum" und "CamLastRec" aktualisiert, welches die Gesamtanzahl der 
+  registrierten Kameraevents und den Pfad / Namen der letzten Aufnahme enthält.
   Dieser Befehl wird implizit mit "get ... caminfoall" ausgeführt. <br>
   
   Mit <b>"get &lt;name&gt; snapfileinfo"</b> wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit <b>"get &lt;name&gt; snap"</b> ausgeführt. <br>
@@ -4649,6 +4656,7 @@ return;
     <tr><td><li>CamExposureControl</li> </td><td>- zeigt den aktuell eingestellten Typ der Belichtungssteuerung  </td></tr>
     <tr><td><li>CamExposureMode</li>    </td><td>- aktueller Belichtungsmodus (Day, Night, Auto, Schedule, Unknown)  </td></tr>
     <tr><td><li>CamIP</li>              </td><td>- IP-Adresse der Kamera  </td></tr>
+    <tr><td><li>CamLastRec</li>         </td><td>- Pfad / Name der letzten Aufnahme   </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
     <tr><td><li>CamMotDetSc</li>        </td><td>- Status der Bewegungserkennung (disabled, durch Kamera, durch SVS)  </td></tr>
