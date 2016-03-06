@@ -634,6 +634,9 @@ ZWDongle_Parse($$$)
   $hash->{"${name}_TIME"} = TimeNow();
   $hash->{RAWMSG} = $rmsg;
 
+  $hash->{SendTime} = 0       # Retry sending after a "real" msg from the dongle
+        if($hash->{WaitForAck} && $rmsg !~ m/^(0113|0013)/); 
+
   my %addvals = (RAWMSG => $rmsg);
 
   Dispatch($hash, $rmsg, \%addvals);

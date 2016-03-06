@@ -2073,7 +2073,8 @@ ZWave_mcCreateAll($$)
   my ($hash, $data) = @_;
   if(!$data) { # called by the user
     $zwave_parseHook{"$hash->{nodeIdHex}:046008...."} = \&ZWave_mcCreateAll;
-    return("", "07");
+    ZWave_Get($hash, $hash->{NAME}, "mcEndpoints");
+    return("", "EMPTY");
   }
   $data =~ m/^046008(..)(..)/;
   my $nGrp = hex($2);
@@ -3691,7 +3692,7 @@ ZWave_Parse($$@)
   my $evt;
 
   my $rawMsg = "CMD:$cmd ID:$id ARG:$arg"; # No fmt change, Forum #49165
-  Log3 $ioName, 4, $rawMsg;
+  Log3 $ioName, 4, $rawMsg ." CB:$callbackid";
 
   if($cmd eq 'ZW_ADD_NODE_TO_NETWORK' ||
      $cmd eq 'ZW_REMOVE_NODE_FROM_NETWORK') {
@@ -3723,10 +3724,10 @@ ZWave_Parse($$@)
 
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash) {
-      if(ZWave_isWakeUp($hash)) {
-        ZWave_wakeupTimer($hash, 1);
-        ZWave_processSendStack($hash, "next");
-      }
+      #if(ZWave_isWakeUp($hash)) { # Used to Debug Forum #50090 / CAN problems
+      #  ZWave_wakeupTimer($hash, 1);
+      #  ZWave_processSendStack($hash, "next");
+      #}
 
       if(!$ret) {
         readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
