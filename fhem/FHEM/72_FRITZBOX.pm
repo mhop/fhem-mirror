@@ -2268,7 +2268,7 @@ sub FRITZBOX_Call_Run_Web($)
       }
    }
    elsif ( $hash->{TELNET} != 1 && $ttsLink ) {
-      FRITZBOX_Log $hash, 3, "play or say ignored";
+      FRITZBOX_Log $hash, 3, "Your Fritz!OS version has limited interfaces. Parameter 'play:' and 'say:' ignored.";
    }
 
 # Preparing 4th command array to switch to (dial port 1-3) to avoid ringing of internal phone
@@ -2287,6 +2287,9 @@ sub FRITZBOX_Call_Run_Web($)
    elsif ($hash->{SECPORT}) { #or ring with TR-064
       push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", $extNo."#"];
       $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
+   }
+   else {
+      FRITZBOX_Log $hash, 3, "Your Fritz!OS version has limited interfaces. You cannot use call.";
    }
    
    sleep $duration; #+1; # 1s added because it takes sometime until it starts ringing
@@ -3087,14 +3090,17 @@ sub FRITZBOX_Ring_Run_Web($)
    
 #Preparing 3rd command array to ring
    FRITZBOX_Log $hash, 4, "Ringing $intNo for $duration seconds";
-   if ($hash->{SECPORT}) {
+   if ( $hash->{WEBCM}==1 ) {
+      push @webCmdArray, "telcfg:command/Dial" => "**".$intNo."#";
+      $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
+   }
+   elsif ($hash->{SECPORT}) {
       push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", "**".$intNo."#"];
       @tr064Result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray );
       return $name."|0|Error (set ring): ".$tr064Result[0]->{Error}     if $tr064Result[0]->{Error};
    }
    else {
-      push @webCmdArray, "telcfg:command/Dial" => "**".$intNo."#";
-      $result = FRITZBOX_Web_CmdPost( $hash, \@webCmdArray );
+      FRITZBOX_Log $hash, 3, "Your Fritz!OS version has limited interfaces. You cannot ring.";
    }
    
    sleep  5          if $duration <= 0; # always wait before reseting everything
@@ -3103,8 +3109,8 @@ sub FRITZBOX_Ring_Run_Web($)
 #Preparing 4th command array to stop ringing (but not when duration is 0 or play: and say: is used without duration)
    unless ( $duration == 0 || $duration == -1 && $ttsLink ) {
       push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
-      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )      if $hash->{SECPORT};
-      push( @webCmdArray, "telcfg:command/Hangup" => "" )   unless $hash->{SECPORT};
+      $result = FRITZBOX_TR064_Cmd( $hash, 0, \@tr064CmdArray )      if $hash->{SECPORT} && $hash->{WEBCM} != 1;
+      push( @webCmdArray, "telcfg:command/Hangup" => "" )   if $hash->{WEBCM}==1;
    }
       
 #Preparing 5th command array to reset everything
