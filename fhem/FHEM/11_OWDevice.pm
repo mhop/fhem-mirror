@@ -27,8 +27,11 @@ package main;
 
 use strict;
 use warnings;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 use vars qw(%owdevice);
+
+
 
 # 1-Wire devices (order by family code)
 # http://owfs.sourceforge.net/family.html
