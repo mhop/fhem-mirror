@@ -202,7 +202,7 @@ LGTV_IP12_Notify($$)
     
     return if($dev->{NAME} ne "global");
    
-    if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}))
+    if(grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}))
     {
         if(defined(AttrVal($name, "pairingcode", undef)) and AttrVal($name, "pairingcode", undef) =~/^\d{6}$/)
         {
@@ -212,7 +212,7 @@ LGTV_IP12_Notify($$)
         
         LGTV_IP12_ResetTimer($hash, 0);
     }
-    elsif(!grep(m/^(?:ATTR $name disable.*|DELETEATTR $name disable.*)$/, @{$dev->{CHANGED}}))
+    elsif(grep(m/^(?:ATTR $name disable.*|DELETEATTR $name disable.*)$/, @{$dev->{CHANGED}}))
     {
         LGTV_IP12_ResetTimer($hash, 0);
     }
@@ -662,6 +662,8 @@ sub LGTV_IP12_ResetTimer($;$)
             InternalTimer(gettimeofday()+$hash->{helper}{OFF_INTERVAL}, "LGTV_IP12_GetStatus", $hash, 0);
         }
     }
+    
+    return undef;
 }
 #############################
 # convert all HTML entities into UTF-8 aquivalents
