@@ -1532,7 +1532,7 @@ sub FB_CALLLIST_returnTableHeader($)
     <ul>
     <code>attr &lt;name&gt; icon-mapping {'incoming.connected' =&gt; 'phone_ring_in@yellow', 'outgoing.missed' =&gt; 'phone_missed_out@red'}</code>
     </ul><br>   
-    Das entsprechende Icon wird an Stelle des Original-Icons bzw. Text verwendet. Sofern SVG-basierte Icons verwendet werden, kann man die Farbe optional definieren durch das Anfügen via @ mit Name oder einem HTML Farbcode.
+    Das entsprechende Icon wird an Stelle des Original-Icons bzw. Text verwendet. Sofern SVG-basierte Icons verwendet werden, kann man die Farbe optional definieren durch das Anf&uuml;gen via @ mit Name oder einem HTML Farbcode.
     <br><br>
     M&ouml;gliche Werte und ihre Standard-Icons sind:<br><br>
     <ul>
@@ -1597,7 +1597,7 @@ sub FB_CALLLIST_returnTableHeader($)
     Kann gesetzt werden, um ein FHEM-Befehl oder Perl-Code (in geschweiften Klammern: { ... } ) auszuf&uuml;hren, wenn man auf eine Rufnummer in der Anrufliste klickt.
     Der Platzhalter <code>$NUMBER</code> wird dabei mit der entsprechenden Rufnummer der jeweiligen Zeile ersetzt.
     <br><br>
-    Damit kann man beispielsweise einen Rückruf starten.
+    Damit kann man beispielsweise einen R&uuml;ckruf starten.
     e.g.:<br><br>
     <ul>
     <li><code>set FRITZBOX call $NUMBER</code></li>
