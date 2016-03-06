@@ -465,7 +465,7 @@ sub Weather_RetrieveDataFinished($$$)
         $value =~/chill="(-?[0-9.]*?)" .*direction="([0-9.]*?)" .*speed="([0-9.]*?)" .*/;
         $urlResult->{"readings"}->{"wind_chill"} = $1 if (defined($1));
         $urlResult->{"readings"}->{"wind_direction"} = $2 if defined($2);
-        my $windspeed= defined($3) ? int($3+0.5) : "";
+        my $windspeed= defined($3) and ($3 ne "") ? int($3+0.5) : "";
         $urlResult->{"readings"}->{"wind_speed"} = $windspeed;
         $urlResult->{"readings"}->{"wind"} = $windspeed;# duplicate for compatibility
         if (defined($2) & defined($3)) {
