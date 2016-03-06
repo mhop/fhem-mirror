@@ -210,11 +210,13 @@ ZWCUL_cmd($$@)
     delete $hash->{addNode};
     if($cmdName eq "addNodeId") {
       $hash->{addNode} = sprintf("%02x", $a[0]);
+
     } else {
       $hash->{addNode} = ZWCUL_getNextNodeId($hash) if($a[0]);
       $hash->{addSecure} = 1 if($a[0] == 2);
     }
-    Log3 $hash, 3, "ZWCUL going to assigning new node id $hash->{addNode}";
+    Log3 $hash, 3, "ZWCUL going to assigning new node id $hash->{addNode}"
+        if($a[0]);
     ZWCUL_tmp9600($hash, $a[0] ? "zm9" : 0); # expect random homeId
     return;
   }
@@ -470,7 +472,14 @@ ZWCUL_Parse($$$$$)
       return;
     }
 
-    $rmsg = sprintf("0004%s%s%02x%s", $S, $S, length($P)/2, $P);
+    if($P =~ m/^0101(......)(..)..(.*)/) {
+      my ($nodeInfo, $type6, $classes) = ($1, $2, $3);
+      $rmsg = sprintf("004a0003%s####%s##%s", $S, $2, $3);
+
+    } else {
+      $rmsg = sprintf("0004%s%s%02x%s", $S, $S, length($P)/2, $P);
+
+    }
 
   } else {      # ACK
     if($hash->{removeNode} && $hash->{removeNode} eq $S) { #############
