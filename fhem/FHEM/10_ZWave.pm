@@ -3552,9 +3552,9 @@ ZWave_isWakeUp($)
 # next discards either state.
 # acktpye: next, ack or msg
 sub
-ZWave_processSendStack($$)
+ZWave_processSendStack($$;$)
 {
-  my ($hash,$ackType) = @_;
+  my ($hash,$ackType, $msg) = @_;
   my $ss = $hash->{SendStack};
   return if(!$ss);
 
@@ -3562,7 +3562,13 @@ ZWave_processSendStack($$)
     if($1 eq "get" && $ackType eq "ack") {
       $ss->[0] = "sentackget:$2";
       return;
+
+    } elsif($1 eq "ackget" && $ackType eq "msg") {# compare answer class for get
+      my $cs = substr($2, 6, 2);
+      my $cg = substr($msg, 2, 2);
+      return if($cs ne $cg);
     }
+
     shift @{$ss};
     RemoveInternalTimer($hash) if(!ZWave_isWakeUp($hash));
   }
@@ -3903,7 +3909,7 @@ ZWave_Parse($$@)
     ZWave_processSendStack($hash, "next");
 
   } else {
-    ZWave_processSendStack($hash, "msg")
+    ZWave_processSendStack($hash, "msg", $arg)
       if(!ZWave_isWakeUp($hash) || $hash->{wakeupAlive});
 
   }
