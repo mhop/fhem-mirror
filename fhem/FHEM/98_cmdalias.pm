@@ -43,7 +43,9 @@ cmdalias_Define($$$)
 
   $cmdalias{$alias}{Alias}{$name} = $hash;
   $cmdalias{$alias}{OrigFn} = $cmds{$alias}{Fn}
-    if($cmds{$alias} && $cmds{$alias}{Fn} ne "CommandCmdAlias");
+    if($cmds{$alias} && 
+       $cmds{$alias}{Fn} &&
+       $cmds{$alias}{Fn} ne "CommandCmdAlias");
   $cmds{$alias}{Fn} = "CommandCmdAlias";
 
   return undef;
