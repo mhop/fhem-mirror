@@ -290,7 +290,6 @@ sub allergy_utf8clean($) {
 
 <a name="allergy"></a>
 <h3>allergy</h3>
-<div style="width:800px">
 <ul>
   This modul provides allergy forecast data for Germany.<br/>
   It requires the Perl module XML::Simple to be installed
@@ -351,7 +350,7 @@ sub allergy_utf8clean($) {
       </li><br>
       <li><code>levelsFormat</code>
          <br>
-         Localize levels by adding them comma separated (default: -,low,moderate,high)
+         Localize levels by adding them comma separated (default: -,low,moderate,high,extreme)
       </li><br>
       <li><code>weekdaysFormat</code>
          <br>
@@ -359,7 +358,6 @@ sub allergy_utf8clean($) {
       </li><br>
   </ul>
 </ul>
-</div>
 
 =end html
 =begin html_DE
@@ -430,11 +428,11 @@ sub allergy_utf8clean($) {
          <br>
          Aktualisierung von Allergenen, die sonst durch die ignoreList entfernt werden.
       </li><br>
-      <li><code>levelsFormat (Standard: -, low, moderate, high)</code>
+      <li><code>levelsFormat (Standard: -,low,moderate,high,extreme)</code>
          <br>
          Lokalisierte Levels, durch Kommas getrennt.
       </li><br>
-      <li><code>weekdaysFormat (Standard: Sun, Mon, Tue, Wed, Tue, Fri, Sat)</code>
+      <li><code>weekdaysFormat (Standard: Sun,Mon,Tue,Wed,Thu,Fri,Sat)</code>
          <br>
          Lokalisierte Wochentage, durch Kommas getrennt.
       </li><br>

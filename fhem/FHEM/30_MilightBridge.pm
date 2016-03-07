@@ -80,7 +80,8 @@ sub MilightBridge_Define($$)
   my $sock = IO::Socket::INET-> new (
       PeerPort => 48899,
       Blocking => 0,
-      Proto => $attr{$name}{"protocol"}) or return "can't bind: $@";
+      Proto => $attr{$name}{"protocol"},
+      Broadcast => 1) or return "can't bind: $@";
   my $select = IO::Select->new($sock);
   $hash->{SOCKET} = $sock;
   $hash->{SELECT} = $select;

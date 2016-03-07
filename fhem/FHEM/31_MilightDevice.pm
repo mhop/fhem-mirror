@@ -135,7 +135,7 @@ sub MilightDevice_Define($$)
 
   # Validate parameters
   return "wrong syntax: define <name> MilightDevice <devType(RGB|RGBW|White)> <IODev> <slot>" if(@args < 5);
-  return "unknown LED type ($hash->{LEDTYPE}): choose one of RGB, RGBW, White" if !($hash->{LEDTYPE} ~~ ['RGB', 'RGBW', 'White']);
+  return "unknown LED type ($hash->{LEDTYPE}): choose one of RGB, RGBW, White" if ($hash->{LEDTYPE} !~ /RGBW|White|RGB/);
   return "Invalid slot: Select one of 1..4 / A for White" if (($hash->{SLOTID} !~ /^\d*$/) || (($hash->{SLOT} ne 'A') && (($hash->{SLOT} < 1) || ($hash->{SLOT} > 4))) && ($hash->{LEDTYPE} eq 'White'));
   return "Invalid slot: Select one of 5..8 / A for RGBW" if (($hash->{SLOTID} !~ /^\d*$/) || (($hash->{SLOT} ne 'A') && (($hash->{SLOT} < 5) || ($hash->{SLOT} > 8))) && ($hash->{LEDTYPE} eq 'RGBW'));
   return "Invalid slot: Select 0 for RGB" if (($hash->{SLOTID} !~ /^\d*$/) || ($hash->{SLOTID} != 0 && $hash->{LEDTYPE} eq 'RGB'));
@@ -168,14 +168,14 @@ sub MilightDevice_Define($$)
   
   my $baseCmds = "on off toggle dimup dimdown";
 
-  my $sharedCmds = "pair unpair";
-  my $rgbCmds = "hsv rgb:colorpicker,RGB hue:colorpicker,HUE,0,1,360 saturation:slider,0,100,100 restorePreviousState:noArg saveState:noArg restoreState:noArg preset";
+  my $sharedCmds = "pair unpair restorePreviousState:noArg saveState:noArg restoreState:noArg";
+  my $rgbCmds = "hsv rgb:colorpicker,RGB hue:colorpicker,HUE,0,1,360 saturation:slider,0,100,100 preset";
   $hash->{helper}->{COMMANDSET} = "$baseCmds discoModeUp:noArg discoSpeedUp:noArg discoSpeedDown:noArg night:noArg white:noArg toggleWhite:noArg $sharedCmds $rgbCmds"
         if ($hash->{LEDTYPE} eq 'RGBW');
   $hash->{helper}->{COMMANDSET} = "$baseCmds discoModeUp:noArg discoModeDown:noArg discoSpeedUp:noArg discoSpeedDown:noArg $sharedCmds $rgbCmds"
         if ($hash->{LEDTYPE} eq 'RGB');
         
-  $hash->{helper}->{COMMANDSET} = "$baseCmds ct:colorpicker,CT,3000,320,6500 night:noArg $sharedCmds"
+  $hash->{helper}->{COMMANDSET} = "$baseCmds hsv ct:colorpicker,CT,3000,350,6500 night:noArg $sharedCmds"
         if ($hash->{LEDTYPE} eq 'White');
   
   my $defaultcommandset = $hash->{helper}->{COMMANDSET};
@@ -342,10 +342,12 @@ sub MilightDevice_Set(@)
   elsif ($cmd eq 'hsv')
   {
     $usage = "Usage: set $name hsv <h(0..360)>,<s(0..100)>,<v(0..100)> [seconds(0..x)] [flags(l=long path|q=don't clear queue)]";
-    return $usage if ($args[0] !~ /^(\d{1,3}),(\d{1,3}),(\d{1,3})$/);
+    $usage = "Usage: set $name hsv <h(3000=Warm..6500=Cool)>,<s(-)>,<v(0..100)> [seconds(0..x)] [flags(q=don't clear queue)]" if ($hash->{LEDTYPE} eq 'White');
+    return $usage if ($args[0] !~ /^(\d{1,4}),(\d{1,3}),(\d{1,3})$/);
     my ($h, $s, $v) = ($1, $2, $3);
-    return "Invalid hue ($h): valid range 0..360" if !(($h >= 0) && ($h <= 360));
-    return "Invalid saturation ($s): valid range 0..100" if !(($s >= 0) && ($s <= 100));
+    return "Invalid hue ($h): valid range 0..360" if (!(($h >= 0) && ($h <= 360)) && ($hash->{LEDTYPE} ne 'White'));
+    return "Invalid color temperature ($h): valid range 3000..6500" if (!(($h >= 3000) && ($h <= 6500)) && ($hash->{LEDTYPE} eq 'White'));
+    return "Invalid saturation ($s): valid range 0..100" if (!(($s >= 0) && ($s <= 100)) && ($hash->{LEDTYPE} ne 'White'));
     return "Invalid brightness ($v): valid range 0..100" if !(($v >= 0) && ($v <= 100));
     if (defined($args[1]))
     {
@@ -357,6 +359,7 @@ sub MilightDevice_Set(@)
       return $usage if ($args[2] !~ m/.*[lLqQ].*/); # Flags l=Long way round for transition, q=don't clear queue (add to end)
       $flags = $args[2];
     }
+    return MilightDevice_White_Transition($hash, $h, 0, $v, $ramp, $flags) if($hash->{LEDTYPE} eq 'White');
     return MilightDevice_HSV_Transition($hash, $h, $s, $v, $ramp, $flags);
   }
 
@@ -364,7 +367,7 @@ sub MilightDevice_Set(@)
   elsif ($cmd eq 'dim' || $cmd eq 'brightness')
   {
     $usage = "Usage: set $name dim <percent(0..100)> [seconds(0..x)] [flags(l=long path|q=don't clear queue)]";
-    return $usage if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [0..100]))); # Decimal value for percent between 0..100
+    return $usage if (($args[0] !~ /^\d+$/) || ($args[0] < 0) || ($args[0] > 100)); # Decimal value for percent between 0..100
     if (defined($args[1]))
     {
       return $usage if (($args[1] !~ /^\d+$/) && ($args[1] > 0)); # Decimal value for ramp > 0
@@ -395,7 +398,7 @@ sub MilightDevice_Set(@)
   elsif ($cmd eq 'hue')
   {
     $usage = "Usage: set $name hue <h(0..360)> [seconds(0..x)] [flags(l=long path|q=don't clear queue)]";
-    return $usage if (($args[0] !~ /^(\d+)$/) || (!($args[0] ~~ [0..360])));
+    return $usage if (($args[0] !~ /^(\d+)$/) || ($args[0] < 0) || ($args[0] > 360));
     if (defined($args[1]))
     {
       return $usage if (($args[1] !~ /^\d+$/) && ($args[1] > 0)); # Decimal value for ramp > 0
@@ -416,7 +419,7 @@ sub MilightDevice_Set(@)
   {
     if (defined($args[0]))
     {
-      return "Usage: set $name ct <3000=Warm..6500=Cool>" if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [2500..7000])));
+      return "Usage: set $name ct <3000=Warm..6500=Cool>" if (($args[0] !~ /^\d+$/) || ($args[0] < 2500 || $args[0] > 7000));
     }
     if (defined($args[1]))
     {
@@ -436,7 +439,7 @@ sub MilightDevice_Set(@)
   {
     $usage = "Usage: set $name rgb RRGGBB [seconds(0..x)] [flags(l=long path|q=don't clear queue)]";
     return $usage if ($args[0] !~ /^([0-9A-Fa-f]{1,2})([0-9A-Fa-f]{1,2})([0-9A-Fa-f]{1,2})$/);
-    my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
+    my( $r, $g, $b ) = (hex($1), hex($2), hex($3)); #change to color.pm?
     my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
     $h = MilightDevice_roundfunc($h * 360);
     $s = MilightDevice_roundfunc($s * 100);
@@ -461,7 +464,7 @@ sub MilightDevice_Set(@)
     my $percentChange = MilightDevice_roundfunc(100 / MilightDevice_DimSteps($hash)); # Default one dimStep
     if (defined($args[0]))
     { # Percent change (0..100%)
-      return $usage if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [0..100]))); # Decimal value for percent between 0..100
+      return $usage if (($args[0] !~ /^\d+$/) || ($args[0] < 0) || ($args[0] > 100)); # Decimal value for percent between 0..100
       $percentChange = $args[0]; # Percentage to change, will be converted in dev specific function
     }
     if (defined($args[1]))
@@ -492,7 +495,7 @@ sub MilightDevice_Set(@)
     my $percentChange = MilightDevice_roundfunc(100 / MilightDevice_DimSteps($hash)); # Default one dimStep
     if (defined($args[0]))
     { # Percent change (0..100%)
-      return $usage if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [0..100]))); # Decimal value for percent between 0..100
+      return $usage if (($args[0] !~ /^\d+$/) || ($args[0] < 0) || ($args[0] > 100)); # Decimal value for percent between 0..100
       $percentChange = $args[0]; # Percentage to change, will be converted in dev specific function
     }
     if (defined($args[1]))
@@ -519,7 +522,7 @@ sub MilightDevice_Set(@)
   elsif ($cmd eq 'saturation')
   {
     $usage = "Usage: set $name saturation <h(0..100)> [seconds(0..x)] [flags(q=don't clear queue)]";
-    return $usage if (($args[0] !~ /^\d+$/) || (!($args[0] ~~ [0..100])));
+    return $usage if (($args[0] !~ /^\d+$/) || ($args[0] < 0) || ($args[0] > 100));
     if (defined($args[1]))
     {
       return $usage if (($args[1] !~ /^\d+$/) && ($args[1] > 0)); # Decimal value for ramp > 0
@@ -659,6 +662,7 @@ sub MilightDevice_Get(@)
     return ReadingsVal($name, "rgb", "FFFFFF");
   }
   elsif($cmd eq "hsv") {
+    return MilightDevice_HSVToStr($hash, ReadingsVal($hash->{NAME}, "ct", 3000), 0, ReadingsVal($hash->{NAME}, "brightness", 0)) if ($hash->{LEDTYPE} eq 'White');
     return MilightDevice_HSVToStr($hash, ReadingsVal($hash->{NAME}, "hue", 0), ReadingsVal($hash->{NAME}, "saturation", 0), ReadingsVal($hash->{NAME}, "brightness", 0));
   }
   
@@ -726,7 +730,7 @@ sub MilightDevice_Attr(@)
   }
   elsif ($cmd eq 'set' && $attribName eq 'defaultBrightness')
   {
-    return "defaultBrighness: has to be between ".MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash))." and 100" unless ($attribVal ~~ [MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash))..100]);
+    return "defaultBrighness: has to be between ".MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash))." and 100" if ($attribVal < MilightDevice_roundfunc(100/MilightDevice_DimSteps($hash)) || $attribVal > 100);
   }
 
   return undef;
@@ -1392,7 +1396,7 @@ sub MilightDevice_White_Dim(@)
 {
   my ($hash, $level, $ramp, $flags) = @_;
   Log3 ($hash, 4, "$hash->{NAME}_White_Dim: Brightness: $level; Ramp: $ramp; Flags: $flags"); 
-  return MilightDevice_HSV_Transition($hash, 0, 0, $level, $ramp, $flags);
+  return MilightDevice_HSV_Transition($hash, ReadingsVal($hash->{NAME}, "ct", 3000), 0, $level, $ramp, $flags);
 }
 
 #####################################
@@ -1408,11 +1412,58 @@ sub MilightDevice_White_SetHSV(@)
   # Validate brightness
   $val = 100 if ($val > 100);
   $val = 0 if ($val < 0);
+  # Validate colour temperature
+  $hue = 6500 if ($hue > 6500);
+  $hue = 3000 if ($hue < 3000);
+  my $oldHueStep = MilightDevice_White_ct_hwValue($hash, ReadingsVal($hash->{NAME}, "ct", 6500));
+  my $newHueStep = MilightDevice_White_ct_hwValue($hash, $hue);
+  $hue = MilightDevice_White_ct_hwValue($hash, $newHueStep);
+  # Set colour temperature
+  if ($oldHueStep != $newHueStep)
+  {
+    IOWrite($hash, @WhiteCmdsOn[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd); # group on
+    if ($oldHueStep > $newHueStep)
+    {
+      Log3 ($hash, 4, "$hash->{NAME}_setColourTemp: Decrease from $oldHueStep to $newHueStep");
+      for (my $i=$oldHueStep; $i > $newHueStep; $i--)
+      {
+        IOWrite($hash, @WhiteCmdColDn[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd); # Cooler (colourtemp up)
+      }
+    }
+    elsif ($oldHueStep < $newHueStep)
+    {
+      Log3 ($hash, 4, "$hash->{NAME}_setColourTemp: Increase from $oldHueStep to $newHueStep");
+      for (my $i=$oldHueStep; $i < $newHueStep; $i++)
+      {
+        IOWrite($hash, @WhiteCmdColUp[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd); # Warmer (colourtemp down)
+      }
+    }
+    if(AttrVal($hash->{NAME}, "dimOffWhite", 0) == 1)
+    {
+      if($newHueStep == 1)
+      {
+        IOWrite($hash, @WhiteCmdColDn[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+        IOWrite($hash, @WhiteCmdColDn[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+        IOWrite($hash, @WhiteCmdColDn[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+        IOWrite($hash, @WhiteCmdColDn[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+        IOWrite($hash, @WhiteCmdColDn[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+      }
+      elsif($newHueStep == 11)
+      {
+        IOWrite($hash, @WhiteCmdColUp[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+        IOWrite($hash, @WhiteCmdColUp[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+        IOWrite($hash, @WhiteCmdColUp[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+        IOWrite($hash, @WhiteCmdColUp[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+        IOWrite($hash, @WhiteCmdColUp[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd);
+      }
+    }
+  }
+
 
   # apply gamma correction
   my $gammaVal = $hash->{helper}->{GAMMAMAP}[$val];
   
-  # Calculate brightness hardware value (11 steps for white)
+  # Calculate brightness hardware value (10 steps / 11 positions for white)
   my $maxWl = (100 / MilightDevice_DimSteps($hash));
   my $wl = MilightDevice_roundfunc($gammaVal / $maxWl);
 
@@ -1426,7 +1477,7 @@ sub MilightDevice_White_SetHSV(@)
   }
 
   # Store new values for colourTemperature and Brightness
-  MilightDevice_SetHSV_Readings($hash, ReadingsVal($hash->{NAME}, "ct", 1), 0, $val);
+  MilightDevice_SetHSV_Readings($hash, $hue, 0, $val);
 
   # Make sure we actually send off command if we should be off
   if ($wl == 0)
@@ -1435,7 +1486,6 @@ sub MilightDevice_White_SetHSV(@)
     IOWrite($hash, @WhiteCmdsOff[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd) if ($repeat eq 1); # group off
     Log3 ($hash, 4, "$hash->{NAME}_White_setHSV: OFF");
   }
-
   elsif ($wl == $maxWl)
   {
     IOWrite($hash, @WhiteCmdsOn[$hash->{SLOTID} -1]."\x00".$WhiteCmdEnd); # group on
@@ -1446,7 +1496,6 @@ sub MilightDevice_White_SetHSV(@)
     }
     Log3 ($hash, 4, "$hash->{NAME}_White_setHSV: Full Brightness");
   }
-
   else
   {
     # Not off or MAX brightness, so make sure we are on
@@ -1463,7 +1512,6 @@ sub MilightDevice_White_SetHSV(@)
         $hash->{helper}->{whiteLevel} = $i - 1;
       }
     }
-
     elsif ($hash->{helper}->{whiteLevel} < $wl)
     {
       # Brightness level should be increased
@@ -1475,7 +1523,6 @@ sub MilightDevice_White_SetHSV(@)
         $hash->{helper}->{whiteLevel} = $i + 1;
       }
     }
-    
     else
     {
       Log3 ($hash, 4, "$hash->{NAME}_White_setHSV: ON");
@@ -1490,14 +1537,14 @@ sub MilightDevice_White_SetHSV(@)
 #####################################
 sub MilightDevice_White_SetColourTemp(@)
 {
-  # $hue is colourTemperature (1-10), $val is brightness (0-100%)
+  # $hue is colourTemperature (1-11), $val is brightness (0-100%)
   my ($hash, $hue) = @_;
   my $name = $hash->{NAME};
   
   MilightDevice_CmdQueue_Clear($hash);
 
   # Save old value of ct
-  my $oldHue = MilightDevice_White_ct_hwValue($hash, ReadingsVal($hash->{NAME}, "ct", 1));
+  my $oldHue = MilightDevice_White_ct_hwValue($hash, ReadingsVal($hash->{NAME}, "ct", 6500));
   # Store new values for colourTemperature and Brightness
   MilightDevice_SetHSV_Readings($hash, $hue, 0, ReadingsVal($hash->{NAME}, "brightness", AttrVal($hash->{NAME}, "defaultBrightness", 36) ) ); 
   # Validate colourTemperature (11 steps)
@@ -1557,17 +1604,28 @@ sub MilightDevice_White_ct_hwValue(@)
   my ($hash, $ct) = @_;
   
   # Couldn't get switch statement to work so using if
+  if ($ct == 11) { return 3000; }
+  elsif ($ct == 10) { return 3350; }
+  elsif ($ct == 9) { return 3700; }
+  elsif ($ct == 8) { return 4050; }
+  elsif ($ct == 7) { return 4400; }
+  elsif ($ct == 6) { return 4750; }
+  elsif ($ct == 5) { return 5100; }
+  elsif ($ct == 4) { return 5450; }
+  elsif ($ct == 3) { return 5800; }
+  elsif ($ct == 2) { return 6150; }
+  elsif ($ct == 1) { return 6500; }
   
-  if ($ct < 3320) { return 11; }
-  elsif ($ct < 3640) { return 10; }
-  elsif ($ct < 3960) { return 9; }
-  elsif ($ct < 4280) { return 8; }
-  elsif ($ct < 4600) { return 7; }
-  elsif ($ct < 4920) { return 6; }
-  elsif ($ct < 5240) { return 5; }
-  elsif ($ct < 5560) { return 4; }
-  elsif ($ct < 5880) { return 3; }
-  elsif ($ct < 6200) { return 2; }
+  elsif ($ct < 3350) { return 11; }
+  elsif ($ct < 3700) { return 10; }
+  elsif ($ct < 4050) { return 9; }
+  elsif ($ct < 4400) { return 8; }
+  elsif ($ct < 4750) { return 7; }
+  elsif ($ct < 5100) { return 6; }
+  elsif ($ct < 5450) { return 5; }
+  elsif ($ct < 5800) { return 4; }
+  elsif ($ct < 6150) { return 3; }
+  elsif ($ct < 6500) { return 2; }
   return 1;
 }
 
@@ -1579,7 +1637,7 @@ sub MilightDevice_HSVFromStr(@)
   # Convert HSV values from string in format "h,s,v"
   my ($hash, @args) = @_;
   
-  if ((!defined($args[0])) || ($args[0] !~ /^(\d{1,3}),(\d{1,3}),(\d{1,3})$/))
+  if ((!defined($args[0])) || ($args[0] !~ /^(\d{1,4}),(\d{1,3}),(\d{1,3})$/))
   {
     Log3 ($hash, 3, "MilightDevice_HSVFromStr: Could not parse h,s,v values from $args[0]");
     return (0, 0, 0);
@@ -1608,7 +1666,9 @@ sub MilightDevice_ValidateHSV(@)
   # Validate and return valid values for HSV
   my ($hash, $h, $s, $v) = @_;
   $h = 0 if ($h < 0);
-  $h = 360 if ($h > 360);
+  $h = 360 if ($h > 360 && $hash->{LEDTYPE} ne 'White');
+  $h = 3000 if ($h < 3000 && $hash->{LEDTYPE} eq 'White');
+  $h = 6500 if ($h > 6500);
   $s = 0 if ($s < 0);
   $s = 100 if ($s > 100);
   $v = 0 if ($v < 0);
@@ -1765,6 +1825,14 @@ sub MilightDevice_HSV_Transition(@)
     $steps = $maxSteps;
   }
 
+  # Calculate number of steps, limit to max number (no point running more if they are the same)
+  $steps = int($ramp * 1000 / $stepWidth);
+  if ($steps > $maxSteps)
+  {
+    $stepWidth *= ($steps/$maxSteps);
+    $steps = $maxSteps;
+  }
+
   # Calculate minimum stepWidth
   # Min bridge delay as specified by Bridge * 3 (eg. 100*3=300ms).
   # On average min 3 commands need to be sent per step (eg. Group On; Mode; Brightness;) so this gets it approximately right
@@ -1799,6 +1867,134 @@ sub MilightDevice_HSV_Transition(@)
   # This may be slightly higher than what was requested since $stepWidth > minDelay (($steps * $stepWidth) > $ramp)
   $hash->{helper}->{targetTime} = $timeFrom + ($steps * $stepWidth / 1000);
   Log3 ($hash, 5, "$hash->{NAME}_HSV_Transition: TargetTime: $hash->{helper}->{targetTime}");
+  return undef;
+}
+
+#####################################
+sub MilightDevice_White_Transition(@)
+{
+  my ($hash, $ct, $sat, $val, $ramp, $flags) = @_;
+  my ($ctFrom, $valFrom, $timeFrom)=0;
+
+  # Clear command queue if flag "q" not specified
+  MilightDevice_CmdQueue_Clear($hash) if ($flags !~ m/.*[qQ].*/);
+
+  # if queue in progress set start vals to last cached hsv target, else set start to actual hsv
+  if (@{$hash->{helper}->{cmdQueue}} > 0)
+  {
+    $ctFrom = $hash->{helper}->{targetCt};
+    $valFrom = $hash->{helper}->{targetVal};
+    $timeFrom = $hash->{helper}->{targetTime};
+    $ctFrom = 3000 if(!defined($ctFrom));
+    $valFrom = 0 if(!defined($valFrom));
+    $timeFrom = 0 if(!defined($timeFrom));
+    Log3 ($hash, 5, "$hash->{NAME}_White_Transition: Prepare Start (cached): $ctFrom,$valFrom@".$timeFrom);
+  }
+  else
+  {
+    $ctFrom = ReadingsVal($hash->{NAME}, "ct", 3000);
+    $valFrom = ReadingsVal($hash->{NAME}, "brightness", 0);
+    $timeFrom = gettimeofday();
+    Log3 ($hash, 5, "$hash->{NAME}_White_Transition: Prepare Start (actual): $ctFrom,$valFrom@".$timeFrom);
+
+
+    if ($flags !~ m/.*[pP].*/)
+    {
+      # Store previous state if different to requested state
+      if (($ctFrom != $ct) || ($valFrom != $val))
+      {
+        readingsSingleUpdate($hash, "previousState", MilightDevice_HSVToStr($hash, $ctFrom, 0, $valFrom),1);
+      }
+    }
+  }
+
+  Log3 ($hash, 4, "$hash->{NAME}_White_Transition: Current: $ctFrom,$valFrom");
+  Log3 ($hash, 4, "$hash->{NAME}_White_Transition: Set: $ct,$val; Ramp: $ramp; Flags: ". $flags);
+
+  # Store target vales
+  $hash->{helper}->{targetCt} = $ct;
+  $hash->{helper}->{targetVal} = $val;
+
+  # if there is no ramp we don't need transition
+  if (($ramp || 0) == 0)
+  {
+    Log3 ($hash, 4, "$hash->{NAME}_White_Transition: Set: $ct,$val; No Ramp");
+    $hash->{helper}->{targetTime} = $timeFrom;
+    return MilightDevice_CmdQueue_Add($hash, $ct, 0, $val, undef, 0, undef);
+  }
+
+  my $vFade = abs($val - $valFrom);
+  my $ctFade = abs($ct - $ctFrom);
+  Log3 ($hash, 4, "$hash->{NAME}_White_Transition: Colour temp: $ctFade, Brightness: $vFade;");
+
+  # No transition, so set immediately and ignore ramp setting
+  if ($ctFade == 0 && $vFade == 0)
+  {
+    Log3 ($hash, 4, "$hash->{NAME}_White_Transition: Unchanged. Set: $ct,0,$val; Ignoring Ramp");
+
+    $hash->{helper}->{targetTime} = $timeFrom;
+    return MilightDevice_CmdQueue_Add($hash, $ct, 0, $val, undef, 0, undef);
+  }
+
+  my ($stepWidth, $steps, $maxSteps, $ctToSet, $ctStep, $valToSet, $valStep);
+
+  # Calculate stepWidth
+  if ($ctFade >= $vFade)
+  {
+    # Transition based on ct, so max steps = colourSteps
+    $stepWidth = ($ramp * 1000 / $ctFade /100); # how long is one step (set hsv) in ms based on ct
+    $maxSteps = MilightDevice_ColourSteps($hash);
+  }
+  else
+  {
+    # Transition based on Brightness, so max steps = dimSteps
+    $stepWidth = ($ramp * 1000 / $vFade); # how long is one step (set hsv) in ms based on val
+    $maxSteps = MilightDevice_DimSteps($hash);
+  }
+
+  # Calculate number of steps, limit to max number (no point running more if they are the same)
+  $steps = int($ramp * 1000 / $stepWidth);
+  if ($steps > $maxSteps)
+  {
+    $stepWidth *= ($steps/$maxSteps);
+    $steps = $maxSteps;
+  }
+
+  # Calculate number of steps, limit to max number (no point running more if they are the same)
+  $steps = int($ramp * 1000 / $stepWidth);
+  if ($steps > $maxSteps)
+  {
+    $stepWidth *= ($steps/$maxSteps);
+    $steps = $maxSteps;
+  }
+
+  # Calculate minimum stepWidth
+  # Min bridge delay as specified by Bridge * 3 (eg. 100*3=300ms).
+  # On average min 3 commands need to be sent per step (eg. Group On; Mode; Brightness;) so this gets it approximately right
+  my $minStepWidth = $hash->{IODev}->{INTERVAL} * 3;
+  $stepWidth = $minStepWidth if ($stepWidth < $minStepWidth); # Make sure we have min stepWidth
+
+  Log3 ($hash, 4, "$hash->{NAME}_White_Transition: Steps: $steps; Step Interval(ms): $stepWidth");
+
+  # Calculate hue step
+  $ctToSet = $ctFrom; # Start at current hue
+  $ctStep = ($ct - $ctFrom) / $steps;
+
+  # Calculate brightness step
+  $valToSet = $valFrom;  # Start at current brightness
+  $valStep = ($val - $valFrom) / $steps;
+
+  for (my $i=1; $i <= $steps; $i++)
+  {
+    $ctToSet += $ctStep; # Increment new hue by step (negative step decrements)
+    $valToSet += $valStep; # Increment new brightness by step (negative step decrements)
+    Log3 ($hash, 4, "$hash->{NAME}_White_Transition: Add to Queue: ct:".(int($ctToSet)).", s:0, v:".(int($valToSet))." ($i/$steps)");
+    MilightDevice_CmdQueue_Add($hash, MilightDevice_roundfunc($ctToSet), 0, MilightDevice_roundfunc($valToSet), undef, $stepWidth, $timeFrom + (($i-1) * $stepWidth / 1000) );
+  }
+  # Set target time for completion of sequence.
+  # This may be slightly higher than what was requested since $stepWidth > minDelay (($steps * $stepWidth) > $ramp)
+  $hash->{helper}->{targetTime} = $timeFrom + ($steps * $stepWidth / 1000);
+  Log3 ($hash, 5, "$hash->{NAME}_White_Transition: TargetTime: $hash->{helper}->{targetTime}");
   return undef;
 }
 
@@ -1840,6 +2036,7 @@ sub MilightDevice_SetHSV_Readings(@)
   elsif ($hash->{LEDTYPE} eq 'White')
   {
     readingsBulkUpdate($hash, "ct", $hue); 
+    readingsBulkUpdate($hash, "hsv", MilightDevice_HSVToStr($hash, $hue,0,$val));
   }
   readingsBulkUpdate($hash, "state", "on $val") if ($val > 1);
   readingsBulkUpdate($hash, "state", "off") if ($val < 2);
