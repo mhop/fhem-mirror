@@ -97,16 +97,16 @@ my %zwave_class = (
                "042b01(..)ff" => 'ZWave_sceneParse($1)'} },
   SCENE_ACTUATOR_CONF      => { id => '2c',
     set   => { sceneConfig => "01%02x%02x80%02x" },
-    get   => { sceneConfig => "02%02x",          },
+    get   => { sceneConfig => "02%02x"           },
     parse => { "052c03(..)(..)(..)"   => '"scene_$1:level $2 duration $3"' } },
   SCENE_CONTROLLER_CONF    => { id => '2d',
     set   => { sceneConfig => "01%02x%02x%02x" },
-    get   => { sceneConfig => "02%02x",          },
+    get   => { sceneConfig => "02%02x"          },
     parse => { "052d03(..)(..)(..)"   => '"group_$1:scene $2 duration $3"' } },
   ZIP_CLIENT               => { id => '2e' },
   ZIP_ADV_SERVICES         => { id => '2f' },
   SENSOR_BINARY            => { id => '30',
-    get   => { sbStatus    => "02",       },
+    get   => { sbStatus    => "02"        },
     parse => { "03300300"  => "state:closed",
                "033003ff"  => "state:open",
                "043003(..)(..)"=> 'ZWave_sensorbinaryV2Parse($1,$2)' } },
@@ -404,7 +404,7 @@ my %zwave_class = (
     init  => { ORDER=>10, CMD=> '"set $NAME associationAdd 1 $CTRLID"' } },
   VERSION                  => { id => '86',
     get   => { version      => "11",
-               versionClass => 'ZWave_versionClassGet("%s")',
+               versionClass => 'ZWave_versionClassGet($hash, "%s")',
                versionClassAll => 'ZWave_versionClassAllGet($hash)'},
     parse => { "028611"             => "cmdGet:version",
                "078612(..........)" => 'sprintf("version:Lib %d Prot '.
@@ -592,6 +592,7 @@ ZWave_Initialize($)
   if(! -d $fn) { mkdir($fn) || Log 3, "Can't create $fn"; }
   $fn .= "/zwave";
   if(! -d $fn) { mkdir($fn) || Log 3, "Can't create $fn"; }
+
 }
 
 
@@ -1595,10 +1596,11 @@ ZWave_meterSupportedParse($$)
 
 
 sub
-ZWave_versionClassGet($)
+ZWave_versionClassGet($$)
 {
-  my ($class) = @_;
+  my ($hash, $class) = @_;
 
+  $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
   return("", sprintf('13%02x', $class))
         if($class =~ m/\d+/);
   return("", sprintf('13%02x', hex($zwave_class{$class}{id})))
@@ -1612,27 +1614,22 @@ ZWave_versionClassAllGet($@)
 {
   my ($hash, $data) = @_;
   my $name = $hash->{NAME};
-  my $hname = ".versionClassAllGet";
+
+  $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
 
   if(!$data) { # called by the user
-    $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
     delete($hash->{CL});
-    my @arr = split(" ", AttrVal($name, "classes", ""));
-    $hash->{$hname} = \@arr;
-    ZWave_Get($hash, $name, "versionClass", shift @{$hash->{$hname}});
-    $attr{$name}{vclasses} = "";
+    foreach my $c (sort split(" ", AttrVal($name, "classes", ""))) {
+      next if($c eq "MARK");
+      ZWave_Get($hash, $name, "versionClass", $c);
+    }
     return("", "EMPTY");
   }
 
+  my %h = map { $_=>1 } split(" ", AttrVal($name, "vclasses", ""));
   return 0 if($data !~ m/^048614(..)(..)$/i); # ??
-  $attr{$name}{vclasses} .= " " if($attr{$name}{vclasses});
-  $attr{$name}{vclasses} .= $zwave_id2class{lc($1)}.":".hex($2);
-  if(!int(@{$hash->{$hname}})) {
-    delete($hash->{$hname});
-    return 1; # "veto" for parseHook
-  }
-  ZWave_Get($hash, $name, "versionClass", shift @{$hash->{$hname}});
-  $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
+  $h{$zwave_id2class{lc($1)}.":".hex($2)} = 1;
+  $attr{$name}{vclasses} = join(" ", sort keys %h);
   return 1; # "veto" for parseHook
 }
 
@@ -3554,7 +3551,7 @@ ZWave_isWakeUp($)
 sub
 ZWave_processSendStack($$;$)
 {
-  my ($hash,$ackType, $msg) = @_;
+  my ($hash,$ackType, $omsg) = @_;
   my $ss = $hash->{SendStack};
   return if(!$ss);
 
@@ -3565,7 +3562,7 @@ ZWave_processSendStack($$;$)
 
     } elsif($1 eq "ackget" && $ackType eq "msg") {# compare answer class for get
       my $cs = substr($2, 6, 2);
-      my $cg = substr($msg, 2, 2);
+      my $cg = substr($omsg, 2, 2);
       return if($cs ne $cg);
     }
 
