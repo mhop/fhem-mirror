@@ -748,8 +748,14 @@ sub km200_Decrypt($)
 	my $name                    = $hash->{NAME};
 	my $decryptData             = $hash->{temp}{decodedcontent};
 
-    # Remove additional encoding with base64
-    $decryptData = decode_base64($decryptData);
+	### Log entries for debugging purposes
+    Log3 $name, 5, $name. " : km200 - decryptData2 - decryptData            : " .$decryptData;
+    
+	# Remove additional encoding with base64
+	$decryptData = decode_base64($decryptData);
+	
+	### Log entries for debugging purposes
+	Log3 $name, 5, $name. " : km200 - decryptData2 - base64decode           : " .$decryptData;
 
 	# Check whether the length of the decryptData is NOT multiplies of 16
 	if ((length($decryptData)&0xF) != 0)
@@ -1526,10 +1532,16 @@ sub km200_GetSingleService($)
 
 	### Console outputs for debugging purposes
 	if ($hash->{CONSOLEMESSAGE} == true) {print("Obtaining value of                                     : " . $Service . "\n");}
+
+	### Log entries for debugging purposes
+    Log3 $name, 5, $name. " : km200 - GetSingleService - service            : " .$Service;
 	
 	### Create full URL of the current Service to be read
 	my $url ="http://" . $km200_gateway_host . $Service;
 
+	### Log entries for debugging purposes
+    Log3 $name, 5, $name. " : km200 - GetSingleService - url                : " .$url;
+	
 	### Create parameter set for HttpUtils_BlockingGet
 	my $param = {
 					url        => $url,
@@ -1541,8 +1553,13 @@ sub km200_GetSingleService($)
 	### Block other scheduled and unscheduled routines
 	$hash->{status}{FlagGetRequest} = true;
 
+	### Retrieve data from km200
 	($err, $data) = HttpUtils_BlockingGet($param);
 
+	### Log entries for debugging purposes
+    Log3 $name, 5, $name. " : km200 - GetSingleService - err                : " .$err;
+	Log3 $name, 5, $name. " : km200 - GetSingleService - data               : " .$data;
+	
 	### Block other scheduled and unscheduled routines
 	$hash->{status}{FlagGetRequest} = false;
 	
