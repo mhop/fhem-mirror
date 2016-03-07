@@ -27,6 +27,9 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.19.3 07.03.2016    bugfix "uninitialized value $lastrecstarttime",
+#                      "uninitialized value $lastrecstoptime",
+#                      new attribute "videofolderMap"
 # 1.19.2 06.03.2016    Reading "CamLastRec" added which contains Path/name
 #                      of last recording
 # 1.19.1 28.02.2016    enhanced command runView by option "link_open" to
@@ -129,6 +132,7 @@ sub SSCam_Initialize($) {
          "httptimeout ".
          "htmlattr ".
          "livestreamprefix ".
+         "videofolderMap ".
          "pollcaminfoall ".
          "pollnologging:1,0 ".
          "debugactivetoken:1 ".
@@ -234,7 +238,7 @@ sub SSCam_Attr {
            }
         if ($aName eq "httptimeout") {
            unless ($aVal =~ /^[0-9]+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
-           }            
+           } 
    }
 return undef;
 }
@@ -408,14 +412,14 @@ sub SSCam_Set {
             } else {
                 $hash->{HELPER}{OPENWINDOW} = 0;
             }
-            
+                       
             $hash->{HELPER}{WLTYPE} = $prop;
             runliveview($hash);
         }
         elsif ($opt eq "stopView") 
         {
             stopliveview($hash);            
-        }        
+        }
         else  
         {
             return $setlist;
@@ -498,8 +502,9 @@ sub SSCam_liveview ($$$$) {
     # $alias = AttrVal($d, "alias", $d)."_liveview";
     $alias = "LiveCam";
     $ret = "<a href=$link $attr>$alias</a><br>";        # wenn attr target=_blank neuer Browsertab
+  
   }
-
+  
 return $ret;
 }
 
@@ -3013,7 +3018,7 @@ sub camret_nonbl ($) {
                 readingsBulkUpdate($hash,"LastUpdateTime",$update_time);
                 readingsBulkUpdate($hash,"Record",$recStatus);
                 readingsBulkUpdate($hash,"UsedSpaceMB",$data->{'data'}->{'cameras'}->[0]->{'volume_space'});
-                readingsBulkUpdate($hash,"VideoFolder",$data->{'data'}->{'cameras'}->[0]->{'folder'});
+                readingsBulkUpdate($hash,"VideoFolder",AttrVal($name, "videofolderMap", undef) ? AttrVal($name, "videofolderMap", undef) : $data->{'data'}->{'cameras'}->[0]->{'folder'});
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -3052,7 +3057,7 @@ sub camret_nonbl ($) {
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamEventNum",$eventnum);
                 readingsBulkUpdate($hash,"CamLastRec",$lastrecord);
-                readingsBulkUpdate($hash,"CamLastRecTime",$lastrecstarttime." - ". $lastrecstoptime);                
+                if ($lastrecstarttime) {readingsBulkUpdate($hash,"CamLastRecTime",$lastrecstarttime." - ". $lastrecstoptime);}                
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
@@ -4012,8 +4017,10 @@ return;
   For example the Reading "Availability" will be set to "disconnected" if the Camera would be disconnected from Synology Surveillance Station and can be used for further 
   processing like creating events. <br>
   By command <b>"get &lt;name&gt; eventlist"</b> the <a href="#SSCamreadings">Reading</a> "CamEventNum" and "CamLastRecord" will be refreshed which containes the total number of in SVS 
-  registered camera events and the path / name of the last recording.. 
+  registered camera events and the path / name of the last recording. 
   This command will be implicit executed when "get ... caminfoall" is running. <br>
+  The <a href="#SSCamattr">attribute</a> "videofolderMap" replaces the content of reading "VideoFolder". You can use it for example if you have mounted the videofolder of SVS 
+  under another name or path and want to access by your local pc.
   Using <b>"get &lt;name&gt; snapfileinfo"</b> the filename of the last snapshot will be retrieved. This command will be executed with <b>"get &lt;name&gt; snap"</b> automatically. <br>
   The command <b>"get &lt;name&gt; svsinfo"</b> is not really dependend on a camera, but rather a command to determine common informations about the installed SVS-version and other properties. <br>
   The functions "caminfoall" and "svsinfo" will be executed automatically once-only after FHEM restarts to collect some relevant informations for camera control. <br>
@@ -4156,6 +4163,8 @@ return;
   <li><b>rectime</b> - the determined recordtime when a recording starts. If rectime = 0 an endless recording will be started. If it isn't defined, the default recordtime of 15s is activated </li>
   
   <li><b>session</b>  - selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). "SurveillanceStation" -&gt; session will be established to SVS </li><br>
+  
+  <li><b>videofolderMap</b> - replaces the content of reading "VideoFolder", Usage if e.g. folders are mountet with different names than original (SVS) </li>
   
   <li><b>verbose</b></li><br>
   
@@ -4593,6 +4602,17 @@ return;
   registrierten Kameraevents und den Pfad / Namen der letzten Aufnahme enthält.
   Dieser Befehl wird implizit mit "get ... caminfoall" ausgeführt. <br>
   
+  Mit dem <a href="#SSCamattr">Attribut</a> "videofolderMap" kann der Inhalt des Readings "VideoFolder" überschrieben werden. 
+  Dies kann von Vortel sein wenn das Surveillance-Verzeichnis der SVS an dem lokalen PC unter anderem Pfadnamen gemountet ist und darüber der Zugriff auf die Aufnahmen
+  erfolgen soll (z.B. Verwendung Email-Versand). <br><br>
+  
+  Ein DOIF-Beispiel für den Email-Versand von Snapshot und Aufnahmelink per Non-blocking sendmail:
+  <pre>
+     define CamHE1.snap.email DOIF ([CamHE1:"LastSnapFilename"]) 
+     ({DebianMailnbl ('Recipient@Domain','Bewegungsalarm CamHE1','Eine Bewegung wurde an der Haustür registriert. Aufnahmelink: \  
+     \[CamHE1:VideoFolder]\[CamHE1:CamLastRec]','/media/sf_surveillance/@Snapshot/[CamHE1:LastSnapFilename]')})
+  </pre>
+  
   Mit <b>"get &lt;name&gt; snapfileinfo"</b> wird der Filename des letzten Schnapschusses ermittelt. Der Befehl wird implizit mit <b>"get &lt;name&gt; snap"</b> ausgeführt. <br>
   Der Befehl <b>"get &lt;name&gt; svsinfo"</b> ist eigentlich nicht von der Kamera abhängig, sondern ermittelt vielmehr allgemeine Informationen zur installierten SVS-Version und andere Eigenschaften. <br>
   Die Funktionen "caminfoall" und "svsinfo" werden einmalig automatisch beim Start von FHEM ausgeführt um steuerungsrelevante Informationen zu sammeln.<br>
@@ -4737,6 +4757,8 @@ return;
   <li><b>rectime</b> - festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s verwendet.</li>
 
   <li><b>session</b>  - Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li><br>
+  
+  <li><b>videofolderMap</b> - ersetzt den Inhalt des Readings "VideoFolder", Verwendung z.B. bei gemounteten Verzeichnissen </li>
   
   <li><b>verbose</b> </li><br>
   
