@@ -111,13 +111,13 @@ DevIo_TimeoutRead($$)
 sub
 DevIo_SimpleWrite($$$)
 {
-  my ($hash, $msg, $ishex) = @_;
+  my ($hash, $msg, $type) = @_; # Type: 0:binary, 1:hex, 2:ASCII
   return if(!$hash);
 
   my $name = $hash->{NAME};
-  Log3 ($name, 5, $ishex ? "SW: $msg" : "SW: ".unpack("H*",$msg));
+  Log3 ($name, 5, $type ? "SW: $msg" : "SW: ".unpack("H*",$msg));
 
-  $msg = pack('H*', $msg) if($ishex);
+  $msg = pack('H*', $msg) if($type && $type == 1);
   if($hash->{USBDev}){
     $hash->{USBDev}->write($msg);
 
