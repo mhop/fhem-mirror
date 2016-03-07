@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature  31_MilightDevice: added white "hsv" transitions, fixed RGB
   - feature  49_SSCAM: Reading "CamLastRec" added which contains Path/name
              of last recording
   - feature: FB_CALLLIST: new attribute "expire-calls-after" to automatically
