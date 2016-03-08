@@ -165,51 +165,50 @@ sub OBIS_Parse($$)
       my $rmsg="";
       $rmsg = substr($hash->{helper}{BUFFER}, 0, index($hash->{helper}{BUFFER},chr(13).chr(10)));
 		Log3 $hash,5,"OBIS ($name) - Msg-Parse: $rmsg";
-
-		if($rmsg=~/^([23456789]+)-.*/) {
-			Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Message, please report: $rmsg";
-		}
-
-# End of Message
-		if ($rmsg=~/!.*/) {
-			$hash->{helper}{EoM}+=1 if ($hash->{helper}{DEVICES}[1]>0);
-		}
-
-#Version
-		if ($rmsg=~ /.*\/(.*)/) {
-		  	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[2],undef) if (!$hash->{helper}{DEVICES}[2] eq "");
-	  		if (ReadingsVal($name,"Version","") ne $1) {readingsBulkUpdate($hash, "Version"  ,$1); }
- 			$hash->{helper}{EoM}=0;
-	  	}
-	  	if ($hash->{helper}{EoM}!=-1) {
-			for my $code (keys %OBIS_codes) {
-				if ($rmsg =~ $OBIS_codes{$code}) {
-					if ($code eq "Channels_sum") {
-			    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
-	  					readingsBulkUpdate($hash, "sum_$L",$2+0); 
-					}
-					 
-					elsif ($code eq "Channels") {
-			    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
-			  			readingsBulkUpdate($hash, $L,$2+0); 
-					}
-					
-					elsif ($code eq "Counter") {
-						my $L=$hash->{helper}{Channels}{$2.".".$1} // $OBIS_channels{$2.".".$1} // "Unknown_Channel_$2.$1";
-						if($1==1) {
-							readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_energy",0)); 
-						} elsif ($1==2) {
-							readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_feed",0)); 				
+		if($rmsg=~/\/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!/) {
+			if($rmsg=~/^([23456789]+)-.*/) {
+				Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Message, please report: $rmsg";
+			}
+	# End of Message
+			if ($rmsg=~/!.*/) {
+				$hash->{helper}{EoM}+=1 if ($hash->{helper}{DEVICES}[1]>0);
+			}
+	
+	#Version
+			if ($rmsg=~ /.*\/(.*)/) {
+			  	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[2],undef) if (!$hash->{helper}{DEVICES}[2] eq "");
+		  		if (ReadingsVal($name,"Version","") ne $1) {readingsBulkUpdate($hash, "Version"  ,$1); }
+	 			$hash->{helper}{EoM}=0;
+		  	}
+		  	if ($hash->{helper}{EoM}!=-1) {
+				for my $code (keys %OBIS_codes) {
+					if ($rmsg =~ $OBIS_codes{$code}) {
+						if ($code eq "Channels_sum") {
+				    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
+		  					readingsBulkUpdate($hash, "sum_$L",$2+0); 
+						}
+						 
+						elsif ($code eq "Channels") {
+				    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
+				  			readingsBulkUpdate($hash, $L,$2+0); 
 						}
 						
-					} elsif (ReadingsVal($name,$code,"") ne $1) 
-						{readingsBulkUpdate($hash, $code  ,$1); }
-	     		}
-   			}
-	  	}
+						elsif ($code eq "Counter") {
+							my $L=$hash->{helper}{Channels}{$2.".".$1} // $OBIS_channels{$2.".".$1} // "Unknown_Channel_$2.$1";
+							if($1==1) {
+								readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_energy",0)); 
+							} elsif ($1==2) {
+								readingsBulkUpdate($hash, $L  ,$3 +AttrVal($name,"offset_feed",0)); 				
+							}
+							
+						} elsif (ReadingsVal($name,$code,"") ne $1) 
+							{readingsBulkUpdate($hash, $code  ,$1); }
+		     		}
+	   			}
+		  	}
+		}
        $hash->{helper}{BUFFER} = substr($hash->{helper}{BUFFER}, index($hash->{helper}{BUFFER},chr(13).chr(10))+2);;
-#       $hash->{helper}{BUFFER} =~ s/^.*\r\n(.*)/$1/g;
-#		Log 3,"Buffer is now: $hash->{helper}{BUFFER}";
+	   if($hash->{helper}{EoM}==1) { last;}
     }
     readingsEndUpdate($hash,1);
 #    Log 3,"Size of Buffer: ".length($hash->{helper}{BUFFER});
