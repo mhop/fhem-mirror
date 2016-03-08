@@ -1,5 +1,5 @@
 ######################################################
-# $Id$
+# $Id: 10_SOMFY.pm 7988 2015-02-14 22:04:45Z thomyd $
 #
 # SOMFY RTS / Simu Hz protocol module for FHEM
 # (c) Thomas Dankert <post@thomyd.de>
@@ -42,6 +42,7 @@
 #  2015-07-06 viegener - send stop command only when real movement needs to be stopped (to avoid conflict with my-pos for stopped shutters)
 #  2015-07-09 viegener - FIX: typo in set go-my (was incorrectly spelled: go_my) 
 #  2015-07-09 viegener - FIX: log and set command helper corrections 
+#  2015-08-05 viegener - Remove setList (obsolete) and could be rather surprising for the module
 #
 #
 ######################################################
@@ -115,6 +116,7 @@ my $somfy_maxRuntime = 50;
 
 my %positions = (
 	"moving" => "50",  
+	"go-my" => "50",  
 	"open" => "0", 
 	"off" => "0", 
 	"down" => "150", 
@@ -183,7 +185,6 @@ sub SOMFY_Initialize($) {
 	  . " drive-up-time-to-open "
 	  . " additionalPosReading  "
 	  . " IODev"
-	  . " setList"
 	  . " symbol-length"
 	  . " enc-key"
 	  . " rolling-code"
@@ -346,7 +347,7 @@ sub SOMFY_SendCommand($@)
 
 
 	## Do we need to change frame repetition?
-	if (   defined( $attr{ $name } )
+	if ( defined( $attr{ $name } )
 		&& defined( $attr{ $name }{"repetition"} ) )
 	{
 		$message = "r" . $attr{ $name }{"repetition"};
@@ -525,7 +526,7 @@ sub SOMFY_Parse($$) {
 		return @list;
 
 	} else {
-		Log3 $hash, 3, "SOMFY Unknown device $address, please define it";
+		Log3 $hash, 1, "SOMFY Unknown device $address, please define it";
 		return "UNDEFINED SOMFY_$address SOMFY $address";
 	}
 }
@@ -634,14 +635,9 @@ sub SOMFY_InternalSet($@) {
 	if(!exists($sets{$cmd})) {
 		my @cList;
 
-    # overwrite %sets with setList
-    my $atts = AttrVal($name,'setList',"");
-    my %setlist = split("[: ][ ]*", $atts);
-
 		foreach my $k (sort keys %sets) {
 			my $opts = undef;
 			$opts = $sets{$k};
-      $opts = $setlist{$k} if(exists($setlist{$k}));
 
       if (defined($opts)) {
 				push(@cList,$k . ':' . $opts);
@@ -754,9 +750,13 @@ sub SOMFY_InternalSet($@) {
 				$updateState = 'moving';
 			}
 
-		} elsif($cmd =~m/stop|go-my/) { 
+		} elsif($cmd =~m/go-my/) { 
 			$move = 'stop';
-			$newState = $state
+			$newState = 'go-my';
+
+		} elsif($cmd =~m/stop/) { 
+			$move = 'stop';
+			$newState = $state;
 
 		} else {
 			$newState = $state;
@@ -879,7 +879,7 @@ sub SOMFY_InternalSet($@) {
 	}
 
 	### update hash / readings
-	Log3($name,3,"SOMFY_set: handled command $cmd --> move :$move:  newState :$newState: ");
+	Log3($name,4,"SOMFY_set: handled command $cmd --> move :$move:  newState :$newState: ");
 	if ( defined($updateState)) {
 		Log3($name,5,"SOMFY_set: handled for drive/udpate:  updateState :$updateState:  drivet :$drivetime: updatet :$updatetime: ");
 	} else {
@@ -1326,14 +1326,6 @@ sub SOMFY_CalcCurrentPos($$$$) {
         for this "logical" device. An example for the physical device is a CUL.<br>
         Note: The IODev has to be set, otherwise no commands will be sent!<br>
         If you have both a CUL868 and CUL433, use the CUL433 as IODev for increased range.
-		</li><br>
-
-    <a name="setList"></a>
-    <li>setList<br>
-        Space separated list of commands, which will be returned upon "set name ?", 
-        so the FHEMWEB frontend can construct the correct control and command dropdown. Specific controls can be added after a colon for each command
-        <br>
-        Example: <code>attr shutter setList open close pos:textField</code>
 		</li><br>
 
     <a name="additionalPosReading"></a>
