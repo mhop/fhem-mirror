@@ -1619,7 +1619,8 @@ ZWave_versionClassAllGet($@)
 
   if(!$data) { # called by the user
     delete($hash->{CL});
-    foreach my $c (sort split(" ", AttrVal($name, "classes", ""))) {
+    my %h = map { $_=>1 } split(" ", AttrVal($name, "classes", ""));
+    foreach my $c (sort keys %h) {
       next if($c eq "MARK");
       ZWave_Get($hash, $name, "versionClass", $c);
     }
