@@ -47,6 +47,7 @@ CommandVersion($$)
       }
     } else {
       while(<FH>) {
+         chomp;
          if(/#.*\$Id\:[^\$\n\r].+\$/) {
            $line = $_;
            last;
@@ -62,7 +63,7 @@ CommandVersion($$)
   
   $fhem_revision = "Latest Revision: $fhem_revision\n\n" if(defined($fhem_revision) && !$noheader);
   
-  @ret = map {/\$Id\: (\S+) (\S+) (.+?) \$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_} @ret; 
+  @ret = map {/\$Id\: (\S+?) (\d+?) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z \S+?) \$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_} @ret; 
   @ret = sort {version_sortModules($a, $b)} grep {($param ne "" ? /$param/ : 1)} @ret;
   return "no loaded modules found that match: $param" if($param ne "" && $param ne "revision" && !@ret);
   return (((!$param && !$noheader) || $param eq "revision") ? $fhem_revision : "").
@@ -77,8 +78,8 @@ sub version_sortModules($$)
 {
     my ($a, $b) = @_;
 
-    $a =~ s/^No Id found for //;
-    $b =~ s/^No Id found for //;
+    $a =~ s/^(?:No Id found for |#\s*\$Id\: )//;
+    $b =~ s/^(?:No Id found for |#\s*\$Id\: )//;
     
     my @a_vals  = split(' ', $a);
     my @b_vals  = split(' ', $b);
@@ -102,6 +103,7 @@ sub version_getRevFromControls(;$)
 
   if(open(FH, $control_file)) {
     while(<FH>) {
+      chomp;
       if(/^REV\s+(\S+.*)$/) {
         $revision = $1;
         last;
