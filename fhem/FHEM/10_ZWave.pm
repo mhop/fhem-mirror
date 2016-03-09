@@ -545,6 +545,7 @@ ZWave_Initialize($)
   my @attrList = qw(
     IODev
     WNMI_delay
+    noWakeupForApplicationUpdate:1,0
     classes
     do_not_notify:1,0
     dummy:1,0
@@ -3728,10 +3729,12 @@ ZWave_Parse($$@)
 
     my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
     if($hash) {
-      #if(ZWave_isWakeUp($hash)) { # Used to Debug Forum #50090 / CAN problems
-      #  ZWave_wakeupTimer($hash, 1);
-      #  ZWave_processSendStack($hash, "next");
-      #}
+      if(!AttrVal($hash->{NAME}, "noWakeupForApplicationUpdate", 0)) { # 50090
+        if(ZWave_isWakeUp($hash)) {
+          ZWave_wakeupTimer($hash, 1);
+          ZWave_processSendStack($hash, "next");
+        }
+      }
 
       if(!$ret) {
         readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
@@ -4936,6 +4939,14 @@ s2Hex($)
     <li><a href="#noExplorerFrames">noExplorerFrames</a><br>
       turn off the use of Explorer Frames
       </li>
+
+    <li><a href="#noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a><br>
+      some devices (notable the Aeotec Multisensor 6) are only wake after an
+      APPLICATION UPDATE telegrams for a very short time. If this attribute is
+      set (recommended for the Aeotec Multisensor 6), the WakeUp-Stack is not
+      processed after receiving such a message.
+      </li>
+
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="secure_classes">secure_classes</a><br>
       This attribute is the result of the "set DEVICE secSupportedReport"
