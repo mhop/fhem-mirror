@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.20   09.03.2016    command "extevent" added
 # 1.19.3 07.03.2016    bugfix "uninitialized value $lastrecstarttime",
 #                      "uninitialized value $lastrecstoptime",
 #                      new attribute "videofolderMap"
@@ -172,7 +173,8 @@ sub SSCam_Define {
   $hash->{HELPER}{APIAUTH}        = "SYNO.API.Auth"; 
   $hash->{HELPER}{APISVSINFO}     = "SYNO.SurveillanceStation.Info"; 
   $hash->{HELPER}{APIEVENT}       = "SYNO.SurveillanceStation.Event"; 
-  $hash->{HELPER}{APIEXTREC}      = "SYNO.SurveillanceStation.ExternalRecording";                     
+  $hash->{HELPER}{APIEXTREC}      = "SYNO.SurveillanceStation.ExternalRecording"; 
+  $hash->{HELPER}{APIEXTEVT}      = "SYNO.SurveillanceStation.ExternalEvent";
   $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";
   $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
@@ -272,6 +274,7 @@ sub SSCam_Set {
                    "disable ".
                    "runView:image,link,link_open ".
                    "stopView:noArg ".
+                   "extevent:1,2,3,4,5,6,7,8,9,10 ".
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                    ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
@@ -415,6 +418,13 @@ sub SSCam_Set {
                        
             $hash->{HELPER}{WLTYPE} = $prop;
             runliveview($hash);
+        }
+        elsif ($opt eq "extevent") 
+        {
+            if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+                                   
+            $hash->{HELPER}{EVENTID} = $prop;
+            extevent($hash);
         }
         elsif ($opt eq "stopView") 
         {
@@ -840,7 +850,7 @@ sub camstoprec ($) {
 }
 
 ###############################################################################
-###   Kamera Nightmode setzen
+###   Kamera Auto / Day / Nightmode setzen
 
 sub camexpmode ($) {
     my ($hash)   = @_;
@@ -1144,6 +1154,37 @@ sub getsnapfilename ($) {
     }    
 }
 
+
+###############################################################################
+###   external Event 1-10 auslösen
+
+sub extevent ($) {
+    my ($hash)   = @_;
+    my $name     = $hash->{NAME};
+    my $logstr;
+    
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        
+        $logstr = "trigger external event \"$hash->{HELPER}{EVENTID}\" ";
+        &printlog($hash,$logstr,"4");
+                        
+        $hash->{OPMODE} = "extevent";
+        $hash->{HELPER}{ACTIVE} = "on";
+        
+        if ($attr{$name}{debugactivetoken}) {
+            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+            &printlog($hash,$logstr,"3");
+        }
+        
+        getapisites_nonbl($hash);
+    }
+    else
+    {
+        InternalTimer(gettimeofday()+0.24, "extevent", $hash, 0);
+    }    
+}
+
 ###############################################################################
 ###   PTZ-Kamera auf Position fahren
 
@@ -1266,7 +1307,7 @@ sub doptzaction ($) {
 }
 
 ###############################################################################
-###   stoppen continue move
+###   stoppen continues move
 
 sub movestop ($) {
     my ($hash)   = @_;
@@ -1655,7 +1696,8 @@ sub getapisites_nonbl {
    my $apiinfo     = $hash->{HELPER}{APIINFO};                         # Info-Seite für alle API's, einzige statische Seite !
    my $apiauth     = $hash->{HELPER}{APIAUTH};                         # benötigte API-Pfade für Funktionen,  
    my $apiextrec   = $hash->{HELPER}{APIEXTREC};                       # in der Abfrage-Url an Parameter "&query="
-   my $apicam      = $hash->{HELPER}{APICAM};                          # mit Komma getrennt angeben
+   my $apiextevt   = $hash->{HELPER}{APIEXTEVT};                       # mit Komma getrennt angeben
+   my $apicam      = $hash->{HELPER}{APICAM};                          
    my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
    my $apiptz      = $hash->{HELPER}{APIPTZ};
    my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
@@ -1678,7 +1720,7 @@ sub getapisites_nonbl {
    &printlog($hash,$logstr,"5");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt";
 
    $logstr = "Call-Out now: $url";
    &printlog($hash,$logstr,"4");    
@@ -1710,6 +1752,7 @@ sub login_nonbl ($) {
    my $password    = $hash->{HELPER}{PASSWORD};
    my $apiauth     = $hash->{HELPER}{APIAUTH};
    my $apiextrec   = $hash->{HELPER}{APIEXTREC};
+   my $apiextevt   = $hash->{HELPER}{APIEXTEVT};
    my $apicam      = $hash->{HELPER}{APICAM};
    my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
    my $apiptz      = $hash->{HELPER}{APIPTZ};
@@ -1735,10 +1778,9 @@ sub login_nonbl ($) {
    my $apisvsinfomaxver;
    my $apicameventpath;
    my $apicameventmaxver;
-   my $apieventpath;
-   my $apieventmaxver;
-   my $apivideostmpath;
-   my $apivideostmmaxver;
+   my ($apieventpath,$apieventmaxver);
+   my ($apivideostmpath,$apivideostmmaxver);
+   my ($apiextevtpath,$apiextevtmaxver);
    my $error;
    my $httptimeout;
   
@@ -1896,6 +1938,18 @@ sub login_nonbl ($) {
                         &printlog($hash, $logstr,"4");
                         $logstr = defined($apivideostmmaxver) ? "MaxVersion of $apivideostm: $apivideostmmaxver" : "MaxVersion of $apivideostm undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4"); 
+                        
+                     # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalEvent" ermitteln
+       
+                        $apiextevtpath = $data->{'data'}->{$apiextevt}->{'path'};
+                        # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+                        $apiextevtpath =~ tr/_//d if (defined($apiextevtpath));
+                        $apiextevtmaxver = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
+       
+                        $logstr = defined($apiextevtpath) ? "Path of $apiextevt selected: $apiextevtpath" : "Path of $apiextevt undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
+                        $logstr = defined($apiextevtmaxver) ? "MaxVersion of $apiextevt selected: $apiextevtmaxver" : "MaxVersion of $apiextevt undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
        
                         # ermittelte Werte in $hash einfügen
                         $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
@@ -1916,6 +1970,8 @@ sub login_nonbl ($) {
                         $hash->{HELPER}{APIEVENTMAXVER}    = $apieventmaxver;
                         $hash->{HELPER}{APIVIDEOSTMPATH}   = $apivideostmpath;
                         $hash->{HELPER}{APIVIDEOSTMMAXVER} = $apivideostmmaxver;
+                        $hash->{HELPER}{APIEXTEVTPATH}     = $apiextevtpath;
+                        $hash->{HELPER}{APIEXTEVTMAXVER}   = $apiextevtmaxver;
        
                         # Setreading 
                         readingsBeginUpdate($hash);
@@ -2178,6 +2234,9 @@ sub camop_nonbl ($) {
    my $apiextrec         = $hash->{HELPER}{APIEXTREC};
    my $apiextrecpath     = $hash->{HELPER}{APIEXTRECPATH};
    my $apiextrecmaxver   = $hash->{HELPER}{APIEXTRECMAXVER};
+   my $apiextevt         = $hash->{HELPER}{APIEXTEVT};
+   my $apiextevtpath     = $hash->{HELPER}{APIEXTEVTPATH};
+   my $apiextevtmaxver   = $hash->{HELPER}{APIEXTEVTMAXVER};
    my $apitakesnap       = $hash->{HELPER}{APISNAPSHOT};
    my $apitakesnappath   = $hash->{HELPER}{APITAKESNAPPATH};
    my $apitakesnapmaxver = $hash->{HELPER}{APITAKESNAPMAXVER};
@@ -2436,6 +2495,10 @@ sub camop_nonbl ($) {
    elsif ($OpMode eq "getmotionenum")
    {
       $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
+   }
+   elsif ($OpMode eq "extevent")
+   {
+      $url = "http://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    }
    elsif ($OpMode eq "runliveview")
    {
@@ -3625,6 +3688,7 @@ return;
        <li>Start a predefined Patrol (at PTZ-cameras) </li>
        <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
        <li>continuous moving of PTZ-camera lense   </li>
+       <li>trigger of external events 1-10 (action rules in SVS)   </li>
        <li>start and stop of camera livestreams  </li><br>
     </ul>
    </ul>
@@ -3734,6 +3798,7 @@ return;
       <tr><td><li>set ... goAbsPTZ           </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... move               </td><td> session: ServeillanceStation - observer with privilege objective control of camera  </li></td></tr>
       <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - observer with privilege liveview of camera </li></td></tr>
+      <tr><td><li>set ... extevent           </td><td> session: DSM - user as member of admin-group   </li></td></tr>
       <tr><td><li>set ... stopView           </td><td> -                                          </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                          </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - observer    </li></td></tr>
@@ -3770,6 +3835,7 @@ return;
       <tr><td>"enable":                                            </td><td>activates a camera in Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>save a set of credentils </td></tr>
       <tr><td>"expmode [ day | night | auto ]":                    </td><td>set the exposure mode to day, night or auto </td></tr>
+      <tr><td>"extevent [ 1-10 ]":                                 </td><td>triggers the external event 1-10 (see actionrule editor in SVS) </td></tr>
       <tr><td>"motdetsc [ camera | SVS | disable ]":               </td><td>set motion detection to the desired mode </td></tr>
       <tr><td>"goPreset &lt;Presetname&gt;":                       </td><td>moves a PTZ-camera to a predefinied Preset-position  </td></tr>
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>starts a predefinied patrol (PTZ-cameras)  </td></tr>
@@ -3996,6 +4062,16 @@ return;
   
   The livestream will be stopped again using command <b>"set &lt;name&gt; stopView"</b> .
   
+  <br><br>
+  
+  <b> set &lt;name&gt; extevent [ 1-10 ] </b> <br><br>
+  
+  This command triggers an external event (1-10) in SVS. 
+  The actions which will are used have to be defined in the actionrule editor of SVS at first. There are the events 1-10 possible.
+  In the message application of SVS you may select Email, SMS or Mobil (DS-Cam) messages to release if an external event has been triggerd.
+  Further informations can be found in the online help of the actionrule editor.
+  The used user needs to be a member of the admin-group and DSM-session is needed too.
+  
   <br><br><br>
   
  </ul>
@@ -4215,6 +4291,7 @@ return;
       <li>Start einer vordefinierten Überwachungstour (bei PTZ-Kameras)  </li>
       <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
       <li>kontinuierliche Bewegung von PTZ-Kameras   </li>
+      <li>auslösen externer Ereignisse 1-10 (Aktionsregel SVS)   </li>
       <li>starten und beenden von Kamera-Livestreams  </li><br>
      </ul> 
     </ul>
@@ -4322,6 +4399,7 @@ return;
       <tr><td><li>set ... runView            </td><td> session: ServeillanceStation - Betrachter mit Privileg Liveansicht für Kamera        </li></td></tr>
       <tr><td><li>set ... stopView           </td><td> -                                            </li></td></tr>
       <tr><td><li>set ... credentials        </td><td> -                                            </li></td></tr>
+      <tr><td><li>set ... extevent           </td><td> session: DSM - Nutzer Mitglied von Admin-Gruppe     </li></td></tr>
       <tr><td><li>get ... caminfoall         </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... eventlist          </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
       <tr><td><li>get ... svsinfo            </td><td> session: ServeillanceStation - Betrachter    </li></td></tr>
@@ -4357,6 +4435,7 @@ return;
       <tr><td>"enable":                                            </td><td>aktiviert eine Kamera in der Synology Surveillance Station</td></tr>
       <tr><td>"credentials &lt;username&gt; &lt;password&gt;":     </td><td>speichert die Zugangsinformationen</td></tr>
       <tr><td>"expmode [ day | night | auto ]":                    </td><td>aktiviert den Belichtungsmodus Tag, Nacht oder Automatisch </td></tr>
+      <tr><td>"extevent [ 1-10 ]":                                 </td><td>löst das externe Ereignis 1-10 aus (Aktionsregel in SVS) </td></tr>
       <tr><td>"motdetsc [ camera | SVS | disable ]":               </td><td>schaltet die Bewegungserkennung in den gewünschten Modus (durch Kamera, SVS, oder deaktiviert) </td></tr>
       <tr><td>"goPreset &lt;Presetname&gt;":                       </td><td>bewegt eine PTZ-Kamera zu einer vordefinierten Preset-Position  </td></tr>
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
@@ -4578,7 +4657,17 @@ return;
     attr &lt;name&gt; livestreamprefix https://&lt;Servername&gt;:&lt;Port&gt;
   </pre>
   
-  Der Livestream wird über das Kommando <b>"set &lt;name&gt; stopView"</b> wieder beendet. 
+  Der Livestream wird über das Kommando <b>"set &lt;name&gt; stopView"</b> wieder beendet.
+  
+  <br><br>
+  
+  <b> set &lt;name&gt; extevent [ 1-10 ] </b> <br><br>
+  
+  Dieses Kommando triggert ein externes Ereignis (1-10) in der SVS. 
+  Die Aktionen, die dieses Ereignis auslöst, sind zuvor in dem Aktionsregeleditor der SVS einzustellen. Es stehen die Ereignisse 1-10 zur Verfügung.
+  In der Banchrichtigungs-App der SVS können auch Email, SMS oder Mobil (DS-Cam) Nachrichten ausgegeben werden wenn ein externes Ereignis ausgelöst wurde.
+  Nähere Informationen dazu sind in der Hilfe zum Aktionsregeleditor zu finden.
+  Der verwendete User benötigt Admin-Rechte in einer DSM-Session.
   
   <br><br><br>
 
