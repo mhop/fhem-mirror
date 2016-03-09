@@ -4941,7 +4941,7 @@ s2Hex($)
       </li>
 
     <li><a href="#noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a><br>
-      some devices (notable the Aeotec Multisensor 6) are only wake after an
+      some devices (notable the Aeotec Multisensor 6) are only awake after an
       APPLICATION UPDATE telegrams for a very short time. If this attribute is
       set (recommended for the Aeotec Multisensor 6), the WakeUp-Stack is not
       processed after receiving such a message.
