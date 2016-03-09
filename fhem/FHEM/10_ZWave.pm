@@ -1603,7 +1603,7 @@ ZWave_versionClassGet($$)
 
   $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
   return("", sprintf('13%02x', $class))
-        if($class =~ m/\d+/);
+        if($class =~ m/^\d+$/);
   return("", sprintf('13%02x', hex($zwave_class{$class}{id})))
         if($zwave_class{$class});
   return ("versionClass needs a class as parameter", "") if($class eq "%s");
@@ -3652,6 +3652,7 @@ ZWave_Parse($$@)
         if($zwave_lastHashSent) {
           my $hash = $zwave_lastHashSent;
           readingsSingleUpdate($hash, "SEND_DATA", "failed:$arg", 1);
+          $arg = "transmit queue overflow" if($arg == 0);
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA to $hash->{NAME}: $arg";
           ZWave_processSendStack($hash, "next");
 
@@ -4942,7 +4943,7 @@ s2Hex($)
 
     <li><a href="#noWakeupForApplicationUpdate">noWakeupForApplicationUpdate</a><br>
       some devices (notable the Aeotec Multisensor 6) are only awake after an
-      APPLICATION UPDATE telegrams for a very short time. If this attribute is
+      APPLICATION UPDATE telegram for a very short time. If this attribute is
       set (recommended for the Aeotec Multisensor 6), the WakeUp-Stack is not
       processed after receiving such a message.
       </li>
