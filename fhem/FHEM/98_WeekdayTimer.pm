@@ -512,8 +512,9 @@ sub WeekdayTimer_SetTimerForMidnightUpdate($) {
   my $midnightPlus5Seconds = WeekdayTimer_zeitErmitteln  ($now, 0, 0, 5, 1);
   #Log3 $hash, 3, "midnightPlus5Seconds------------>".FmtDateTime($midnightPlus5Seconds);
 
-   myRemoveInternalTimer("SetTimerOfDay", $hash);
-   myInternalTimer      ("SetTimerOfDay", $midnightPlus5Seconds, "$hash->{TYPE}_SetTimerOfDay", $hash, 0);
+                   myRemoveInternalTimer("SetTimerOfDay", $hash);
+   my $newMyHash = myInternalTimer      ("SetTimerOfDay", $midnightPlus5Seconds, "$hash->{TYPE}_SetTimerOfDay", $hash, 0);
+      $newMyHash->{SETTIMERATMIDNIGHT} = 1;
 
 }
 ################################################################################
@@ -525,7 +526,7 @@ sub WeekdayTimer_SetTimerOfDay($) {
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time());
     my $secSinceMidnight = 3600*$hour + 60*$min + $sec;    
     
-    $hash->{SETTIMERATMIDNIGHT} = 1  if ($secSinceMidnight <= 10);
+    $hash->{SETTIMERATMIDNIGHT} = $myHash->{SETTIMERATMIDNIGHT};
     WeekdayTimer_DeleteTimer($hash);
     WeekdayTimer_Profile    ($hash);
     WeekdayTimer_SetTimer   ($hash);
@@ -944,7 +945,7 @@ sub WeekdayTimer_Device_Schalten($$$) {
 
   #Kommando ausführen
   if ($command && !$disabled && $activeTimer 
-#   && $aktParam ne $newParam 
+    && $aktParam ne $newParam 
     ) {
     $newParam =~ s/:/ /g;
     
@@ -1008,7 +1009,6 @@ sub WeekdayTimer_Attr($$$$) {
      readingsSingleUpdate ($hash,  "disabled",  $attrVal, 1);
   } elsif ( $attrName eq "switchInThePast" ) {
      $attr{$name}{$attrName} = $attrVal;     
-####$hash->{TYPE}_SetTimerOfDay({ HASH => $hash});      
      WeekdayTimer_SetTimerOfDay({ HASH => $hash}); 
   }
   return undef;
