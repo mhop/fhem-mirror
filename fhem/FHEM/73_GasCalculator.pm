@@ -386,7 +386,8 @@ sub GasCalculator_Notify($$)
 		if(!defined(ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_Vol1stDay", undef)))
 		{
 			### Save current Volume as first reading of day = first after midnight and reset min, max value, value counter and value sum
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDaySum",   0, 1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayCount", 0, 1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMin",   0, 1);
@@ -399,7 +400,8 @@ sub GasCalculator_Notify($$)
 		if(!defined(ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_Vol1stMonth", undef)))
 		{
 			### Save current Volume as first reading of month
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMonth", $GasCountReadingValueCurrent, 1);	
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMonth",  $GasCountReadingValueCurrent,  1);	
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMonth", $GasCountReadingValuePrevious, 1);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - Reading for the first monthly value was not available and therfore reading has been written";
@@ -408,7 +410,8 @@ sub GasCalculator_Notify($$)
 		if(!defined(ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_Vol1stMeter", undef)))
 		{	
 			### Save current Volume as first reading of month where gas-meter is read
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMeter", $GasCountReadingValueCurrent, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMeter",  $GasCountReadingValueCurrent,  1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMeter", $GasCountReadingValuePrevious, 1);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - Reading for the first value of gas meter year was not available and therfore reading has been written";
@@ -417,7 +420,8 @@ sub GasCalculator_Notify($$)
 		if(!defined(ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_Vol1stYear", undef)))
 		{	
 			### Save current Volume as first reading of the calendar year
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stYear", $GasCountReadingValueCurrent, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stYear",  $GasCountReadingValueCurrent,  1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastYear", $GasCountReadingValuePrevious, 1);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - Reading for the first yearly value was not available and therfore reading has been written";
@@ -444,7 +448,8 @@ sub GasCalculator_Notify($$)
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of day detected";
 
 			### Save current Volume as first reading of day = first after midnight and reset min, max value, value counter and value sum
-			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDaySum",   0, 1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayCount", 0, 1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_PowerDayMin",   0, 1);
@@ -456,17 +461,19 @@ sub GasCalculator_Notify($$)
 				### Create Log entries for debugging
 				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of month detected";
 
-				### Save current Volume as first reading of month
-				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMonth", $GasCountReadingValueCurrent, 1);
-			
+				### Save current Volume as first reading of month and the last reading of the last month
+				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMonth",  $GasCountReadingValueCurrent,  1);
+				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMonth", $GasCountReadingValuePrevious, 1);
+				
 				### Check whether the current value is the first one of the meter-reading month
 				if ($GasCountReadingTimestampCurrentMon eq $attr{$GasCalcName}{MonthOfAnnualReading})
 				{
 					### Create Log entries for debugging
 					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of month for meter reading detected";
 
-					### Save current Volume as first reading of month where gas-meter is read
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMeter", $GasCountReadingValueCurrent, 1);
+					### Save current Volume as first reading of month where gas-meter is read and the last measured value of the last meter period
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMeter",  $GasCountReadingValueCurrent,  1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMeter", $GasCountReadingValuePrevious, 1);
 				}
 
 				### Check whether the current value is the first one of the calendar year
@@ -475,12 +482,14 @@ sub GasCalculator_Notify($$)
 					### Create Log entries for debugging
 					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of calendar year detected";
 
-					### Save current Volume as first reading of the calendar year
-					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stYear", $GasCountReadingValueCurrent, 1);
+					### Save current Volume as first reading of the calendar year and the last reading of the previous year
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stYear",  $GasCountReadingValueCurrent,  1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastYear", $GasCountReadingValuePrevious, 1);
 				}
 			}
 		}
 
+		
 		###### Do calculations
 		### Calculate DtCurrent (time difference) of previous and current timestamp / [s]
 		my $GasCountReadingTimestampDelta = $GasCountReadingTimestampCurrentRelative - $GasCountReadingTimestampPreviousRelative;
