@@ -405,6 +405,7 @@ ZWDongle_shiftSendStack($$$$)
     $hash->{WaitForAck}=0;
     $hash->{SendRetries}=0;
     $hash->{MaxSendRetries}=3;
+    delete($hash->{GotCAN});
   }
 }
 
@@ -450,6 +451,7 @@ ZWDongle_ProcessSendStack($)
   DevIo_SimpleWrite($hash, $msg, 1);
   $hash->{WaitForAck} = 1;
   $hash->{SendTime} = $ts;
+  delete($hash->{GotCAN});
 
   InternalTimer($ts+1, "ZWDongle_ProcessSendStack", $hash, 0);
 }
@@ -500,6 +502,7 @@ ZWDongle_Read($@)
       Log3 $name, 4, "ZWDongle_Read $name: CAN received";
       $hash->{MaxSendRetries}++ if($hash->{MaxSendRetries}<7);
       $data = substr($data, 2);
+      $hash->{GotCAN} = 1;
       if(!$init_done) { # InternalTimer wont work
         $hash->{WaitForAck} = 0;
         $hash->{SendRetries}++;
@@ -539,7 +542,7 @@ ZWDongle_Read($@)
       next;
     }
     $hash->{nrNAck} = 0;
-    Log3 $name, 4, "ZWDongle_Read $name: sending ACK, processing $msg";
+    Log3 $name, 4, "ZWDongle_Read $name: rcvd $msg, sending ACK";
     DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
     ZWDongle_shiftSendStack($hash, 1, 5, "device ack reveived")
         if($msg =~ m/^0013/);
@@ -634,8 +637,8 @@ ZWDongle_Parse($$$)
   $hash->{"${name}_TIME"} = TimeNow();
   $hash->{RAWMSG} = $rmsg;
 
-  $hash->{SendTime} = 0       # Retry sending after a "real" msg from the dongle
-        if($hash->{WaitForAck} && $rmsg !~ m/^(0113|0013)/); 
+  $hash->{SendTime}--       # Retry sending after a "real" msg from the dongle
+        if($hash->{GotCAN} && $rmsg !~ m/^(0113|0013)/); 
 
   my %addvals = (RAWMSG => $rmsg);
 
