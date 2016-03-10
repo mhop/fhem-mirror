@@ -1,13 +1,7 @@
 
 ##############################################
 # $Id$
-# 2016-02-17
-
-# EEP changed:
-# EnOcean_Notify():
-# EnOcean_Attr():
-# Remote Management (incomplete, experimental)
-# commandref: further explanations added
+# 2016-03-10
 
 # PID V1.0.0.9
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
@@ -688,10 +682,10 @@ EnOcean_Define($$) {
     while (($autocreateName, $autocreateHash) = each(%defs)) {
       last if ($defs{$autocreateName}{TYPE} eq "autocreate");
     }
-    $autocreateDeviceRoom = $attr{$autocreateName}{device_room} if (exists $attr{$autocreateName}{device_room});
+    $autocreateDeviceRoom = AttrVal($autocreateName, "device_room", $autocreateDeviceRoom);
     $autocreateDeviceRoom = 'EnOcean' if ($autocreateDeviceRoom eq '%TYPE');
     $autocreateDeviceRoom = $name if ($autocreateDeviceRoom eq '%NAME');
-    $autocreateDeviceRoom = $attr{$name}{room} if (exists $attr{$name}{room});
+    $autocreateDeviceRoom = AttrVal($name, "room", $autocreateDeviceRoom);
     if ($init_done) {
       Log3 $name, 2, "EnOcean define " . join(' ', @a);    
       if (!defined(AttrVal($autocreateName, "disable", undef)) && !exists($defs{$filelogName})) {
@@ -1456,7 +1450,7 @@ sub EnOcean_Set($@)
       ($cmd1, $cmd2) = split(",", $cmd, 2);
       # check values
       if (!defined($EnO_ptm200btn{$cmd1}) || ($cmd2 && !defined($EnO_ptm200btn{$cmd2}))) {
-        $cmdList .= join(":noArg ", sort keys %EnO_ptm200btn);
+        $cmdList .= join(":noArg ", sort keys %EnO_ptm200btn) . ':noArg';
         return SetExtensions($hash, $cmdList, $name, @a);
       }
       my $channelA = ReadingsVal($name, "channelA", undef);
@@ -1550,6 +1544,8 @@ sub EnOcean_Set($@)
       # convert and send first and second command
       my $switchCmd;
       ($switchCmd, $status) = split(':', $EnO_ptm200btn{$cmd1}, 2);
+      # reset T21 status flag if 4 rocker
+      $status = '10' if ($switchCmd > 3);
       $switchCmd <<= 5;
       if ($cmd1 ne "released") {
         # set the pressed flag
@@ -1562,6 +1558,8 @@ sub EnOcean_Set($@)
           $cmd = $cmd1;
         } else {
           my ($d2, undef) = split(':', $EnO_ptm200btn{$cmd2}, 2);
+          # reset T21 status flag if 4 rocker
+          $status = '10' if ($d2 > 3);
           $switchCmd |= ($d2 << 1) | 0x01;
         }
       }
@@ -12614,7 +12612,6 @@ sub EnOcean_observeRepeat($)
   return;
 }
 
-#####
 sub EnOcean_RLT($) {
   # Radio Link Test
   my ($rltParam) = @_;
@@ -13120,7 +13117,6 @@ sub EnOcean_convIntToBit($$) {
   return $data;
 }
 
-#####
 sub EnOcean_gpConvSelDataToSndData($$$$) {
   # Generic Profiles, make selective data in hex
   my ($header, $channel, $resolution, $data) = @_;
