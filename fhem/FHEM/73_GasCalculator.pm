@@ -1142,7 +1142,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastDay</code> : </li></td><td>Volume reading of the previous day.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code> : </li></td><td>First volume reading of the current month.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMonth</code> : </li></td><td>Volume reading of the previous month.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1164,7 +1186,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> : </li></td><td>First volume reading of the first day of the month of the currenrt meter reading period.<BR>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastYear</code> : </li></td><td>Volume reading of the previous year.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> : </li></td><td>First volume reading of the first day of the month of the current meter reading period.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMeter</code> : </li></td><td>Volume reading of the first day of the month of the last meter reading period.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1659,12 +1703,35 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastDay</code> : </li></td><td>Verbrauchtes Volumen des vorherigen Tages.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code> : </li></td><td>Erster Volumenmesswert des Monats (Mitternacht des 01.).<BR>
 			</td></tr>
 			</td>
 		</tr>
 	</table>
 </ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMonth</code> : </li></td><td>Verbrauchtes Volumen des vorherigen Monats.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
 
 <ul><ul>
 	<table>
@@ -1681,7 +1748,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastYear</code> : </li></td><td>Verbrauchtes Volumen des vorherigen Jahres.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> : </li></td><td>Erster Volumenmesswert des Zeitraums seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMeter</code> : </li></td><td>Verbrauchtes Volumen des vorherigen Abrechnungszeitraums.<BR>
 			</td></tr>
 			</td>
 		</tr>
