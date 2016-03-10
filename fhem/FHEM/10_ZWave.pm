@@ -3549,7 +3549,7 @@ ZWave_isWakeUp($)
 # type is: set / sentset, get / sentget / sentackget
 # sentset will be discarded after ack, sentget needs ack (->sentackget) then msg
 # next discards either state.
-# acktpye: next, ack or msg
+# acktpye: retry, next, ack or msg
 sub
 ZWave_processSendStack($$;$)
 {
@@ -3557,13 +3557,20 @@ ZWave_processSendStack($$;$)
   my $ss = $hash->{SendStack};
   return if(!$ss);
 
+  if($ackType eq "retry") {
+    $ss->[0] =~ m/^(.*)(set|get):(.*)$/;
+    $ss->[0] = "$2:$3";
+    return;
+  }
+
   if($ss->[0] =~ m/^sent(.*?):(.*)$/) {
-    if($1 eq "get" && $ackType eq "ack") {
-      $ss->[0] = "sentackget:$2";
+    my ($stype,$smsg) = ($1,$2);
+    if($stype =~ m/get/ && $ackType eq "ack") { # accept double-ACK
+      $ss->[0] = "sentackget:$smsg";
       return;
 
-    } elsif($1 eq "ackget" && $ackType eq "msg") {# compare answer class for get
-      my $cs = substr($2, 6, 2);
+    } elsif($stype eq "ackget" && $ackType eq "msg") {# compare answer class
+      my $cs = substr($smsg, 6, 2);
       my $cg = substr($omsg, 2, 2);
       return if($cs ne $cg);
     }
@@ -3654,7 +3661,7 @@ ZWave_Parse($$@)
           readingsSingleUpdate($hash, "SEND_DATA", "failed:$arg", 1);
           $arg = "transmit queue overflow" if($arg == 0);
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA to $hash->{NAME}: $arg";
-          ZWave_processSendStack($hash, "next");
+          ZWave_processSendStack($hash, "retry");
 
         } else {
           Log3 $ioName, 2, "ERROR: cannot SEND_DATA: $arg (unknown device)";
@@ -3758,7 +3765,7 @@ ZWave_Parse($$@)
       }
       return "";
 
-    } else {
+    } else { # Wait for the retry timer to remove this cmd from the stack.
       Log3 $ioName, 2, "$ioName transmit $lmsg for $callbackid";
       return "" if(!$hash);
       readingsSingleUpdate($hash, "state", "TRANSMIT_$lmsg", 1);
