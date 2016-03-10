@@ -1,5 +1,5 @@
 ###############################################
-#$Id: 70_PushNotifier.pm 2015-09-10 20:30:00 xusader
+#$Id$
 #
 #	regex part by pirmanji
 #
