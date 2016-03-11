@@ -85,7 +85,6 @@ my %openSpeeds = (
     0x30    => "19",
 );
 
-
 my %commands = (                             
   "remotePair"           => {"noArg"    => "06010000000000"},
   "remoteUnpair"         => {"noArg"    => "06020000000000"},
@@ -171,15 +170,50 @@ my %commands = (
   "backJump"             => {"on"       => "081B00FD000000",
                              "off"      => "081B00FE000000"},          
   "on"                   => {"noArg"    => "0E03tt00000000"},
-  "off"                  => {"noArg"    => "0E02tt00000000"},                          
-                                                                                      
+  "off"                  => {"noArg"    => "0E02tt00000000"},                                                                                                             
+);
+
+my %wCmds = (                             
+  "interval"              => {"enable"  => 0x80,    "min"     => 1,     "max"     => 100,   "offset"  => 0,
+                              "reg"     => 7,       "byte"    => 0,     "size"    => 1,     "count"   => 1,
+                              "mask"    => 0xff,    "shift"   =>0},
+  "DCF"                   => {"enable"  => 0x02,    "min"     => 0,     "max"     => 0,     "offset"  => 0,
+                              "reg"     => 7,       "byte"    => 1,     "size"    => 1,     "count"   => 1,
+                              "mask"    => 0x02,    "shift"   =>0},
+  "timezone"              => {"enable"  => 0x00,    "min"     => 0,     "max"     => 23,    "offset"  => 0,
+                              "reg"     => 7,       "byte"    => 4,     "size"    => 1,     "count"   => 1,
+                              "mask"    => 0xff,    "shift"   =>0},
+  "latitude"              => {"enable"  => 0x00,    "min"     => 0,     "max"     => 90,    "offset"  => 0,
+                              "reg"     => 7,       "byte"    => 5,     "size"    => 1,     "count"   => 1,
+                              "mask"    => 0xff,    "shift"   =>0},
+  "longitude"             => {"enable"  => 0x00,    "min"     => -90,   "max"     => 90,    "offset"  => 256,
+                              "reg"     => 7,       "byte"    => 7,     "size"    => 1,     "count"   => 1,
+                              "mask"    => 0xff,    "shift"   =>0},
+  "triggerWind"           => {"enable"  => 0x20,    "min"     => 1,     "max"     => 31,    "offset"  => 0,
+                              "reg"     => 6,       "byte"    => 0,     "size"    => 1,     "count"   => 5,
+                              "mask"    => 0x7f,    "shift"   =>0},
+  "triggerRain"           => {"enable"  => 0x80,    "min"     => 0,     "max"     => 0,     "offset"  => 0,
+                              "reg"     => 6,       "byte"    => 0,     "size"    => 1,     "count"   => 1,
+                              "mask"    => 0x80,    "shift"   =>0},
+  "triggerTemperature"    => {"enable"  => 0x80,    "min"     => -40,   "max"     => 80,    "offset"  => 40,
+                              "reg"     => 6,       "byte"    => 5,     "size"    => 1,     "count"   => 5,
+                              "mask"    => 0xff,    "shift"   =>0},
+  "triggerDawn"           => {"enable"  => 0x10000000,"min"   => 1,     "max"     => 100,   "offset"  => -1,
+                              "reg"     => 0,         "byte"  => 0,     "size"    => 4,     "count"   => 5,
+                              "mask"    => 0x1000007F,"shift" =>0},
+  "triggerDusk"           => {"enable"  => 0x20000000,"min"   => 1,     "max"     => 100,   "offset"  => -1,
+                              "reg"     => 0,         "byte"  => 0,     "size"    => 4,     "count"   => 5,
+                              "mask"    => 0x201FC000,"shift" => 14},
+  "triggerSun"            => {"enable"  => 0x20000000,"min"   => 1,     "max"     => 0x3FFFFFFF,   "offset"  => 0,
+                              "reg"     => 3,         "byte"  => 0,     "size"    => 4,     "count"   => 5,
+                              "mask"    => 0x3FFFFFC0,"shift" => 0},
 );
 
 my %commandsStatus = (
   "getStatus"       => "0F",
   "getWeather"      => "13",
   "getTime"         => "10",
-  );
+);
 
 my %setsDefaultRollerShutter = (
   "getStatus:noArg"                     => "",
@@ -250,6 +284,8 @@ my %setsSwitchActor = (
   "off:noArg"                           => "",
   "remotePair:noArg"                    => "",
   "remoteUnpair:noArg"                  => "",
+  "dusk:noArg"                          => "",
+  "dawn:noArg"                          => "",
 );
 
 my %setsUmweltsensor = (
@@ -260,7 +296,20 @@ my %setsUmweltsensor = (
 
 my %setsUmweltsensor00 = (
   "getWeather:noArg"                    => "",
-  "getTime:noArg"                       => "",   
+  "getTime:noArg"                       => "",
+  "getConfig:noArg"                     => "",
+  "writeConfig:noArg"                   => "",
+  "DCF:on,off"                          => "",
+  "interval:off,1,2,3,4,5,6,7,8,9,10,15,20,30,40,50,60,70,80,90,100"      => "",
+  "latitude"                            => "",
+  "longitude"                           => "",
+  "timezone"                            => "",
+  "triggerDawn"                         => "",
+  "triggerDusk"                         => "",
+  "triggerRain:on,off"                  => "",   
+  "triggerSun"                          => "",
+  "triggerTemperature"                  => "",
+  "triggerWind"                         => "",  
 );
 
 my %setsUmweltsensor01 = (
@@ -313,10 +362,14 @@ my %setsDimmer = (
   "saveIntermediateOnStop:on,off"       => "",                         
   "remotePair:noArg"                    => "",
   "remoteUnpair:noArg"                  => "",
+  "dusk:noArg"                          => "",
+  "dawn:noArg"                          => "",
 );
-
-my $duoStatusRequest     = "0DFFnn400000000000000000000000000000yyyyyy01";
-my $duoCommand           = "0Dccnnnnnnnnnnnnnn000000000000zzzzzzyyyyyy00";
+                        
+my $duoStatusRequest      = "0DFFnn400000000000000000000000000000yyyyyy01";
+my $duoCommand            = "0Dccnnnnnnnnnnnnnn000000000000zzzzzzyyyyyy00";
+my $duoWeatherConfig      = "0D001B400000000000000000000000000000yyyyyy00";
+my $duoWeatherWriteConfig = "0DFF1Brrnnnnnnnnnnnnnnnnnnnn00000000yyyyyy00";
 
 #####################################
 sub
@@ -385,6 +438,114 @@ DUOFERN_Set($@)
     delete $_->{READINGS} foreach (@cH);
     return undef;
 
+  } elsif ($cmd eq "getConfig") { 
+    my $buf = $duoWeatherConfig;
+    $buf =~ s/yyyyyy/$code/;
+    
+    IOWrite( $hash, $buf );
+    return undef;
+    
+  } elsif ($cmd eq "writeConfig") { 
+    my $buf;
+    
+    for(my $x=0; $x<8; $x++)  {
+      my $regV = ReadingsVal($name, ".reg$x", "00000000000000000000");
+      my $reg = sprintf("%02x",$x+0x81);
+      $buf= $duoWeatherWriteConfig;
+      $buf =~ s/yyyyyy/$code/;
+      $buf =~ s/rr/$reg/;
+      $buf =~ s/nnnnnnnnnnnnnnnnnnnn/$regV/;
+    
+      IOWrite( $hash, $buf );
+      
+    }
+    
+    delete $hash->{READINGS}{configModified};
+    return undef;
+  
+  } elsif (exists $wCmds{$cmd}) { 
+    return "This command is not allowed for this device." if ($hash->{CODE} !~ /^69....00/);  
+
+    my $regs;
+    my @regsA;
+    my @args = @b;
+    my $reg;
+            
+    splice(@args,0,2);
+    return "Missing argument" if(@args < 1);
+    splice(@args,@args,0,"off","off","off","off");
+    
+    if ($cmd eq "triggerSun") {
+      foreach (@args)  {
+        if ($_ ne "off") {
+          my @args2 = split(/:/, $_);
+          my $temp = $_;
+          return "Missing argument" if(@args2 < 3);
+          return "Wrong argument $_" if ($args2[0] !~ m/^\d+$/ || $args2[0] < 1 || $args2[0] > 100);
+          return "Wrong argument $_" if ($args2[1] !~ m/^\d+$/ || $args2[1] < 1 || $args2[1] > 30);
+          return "Wrong argument $_" if ($args2[2] !~ m/^\d+$/ || $args2[2] < 1 || $args2[2] > 30);
+          $_ = (($args2[0]-1)<<12) | (($args2[1]-1)<<19) | (($args2[2]-1)<<24);
+          
+          if(@args2 > 3) {
+            return "Wrong argument $temp" if ($args2[3] !~ m/^[-\d]+$/ || $args2[3] < -5 || $args2[3] > 26);
+            $_ |= ((($args2[3]+5)<<7) | 0x40);
+          };
+        }
+      }
+    }
+    
+    
+    for(my $x=0; $x<8; $x++)  {
+      $regs .= ReadingsVal($name, ".reg$x", "00000000000000000000");  
+    }  
+      
+    for (my $c = 0; $c<$wCmds{$cmd}{count}; $c++) {
+      my $pad = 0;
+      
+       
+      if ($wCmds{$cmd}{size} == 4) {
+        $pad = int($c / 2)*2;
+        $pad = $c if ($cmd eq "triggerSun");
+      };
+      my $regStart = ($wCmds{$cmd}{reg} * 10 + $wCmds{$cmd}{byte} + $pad + $c * $wCmds{$cmd}{size} )*2;
+      
+      $reg = hex(substr($regs, $regStart, $wCmds{$cmd}{size} * 2));
+      
+      if(($args[$c] =~ m/^[-\d]+$/) && ($args[$c] >=  $wCmds{$cmd}{min}) && ($args[$c] <=  $wCmds{$cmd}{max})) {
+        $reg &= ~($wCmds{$cmd}{mask});
+        $reg |= $wCmds{$cmd}{enable};
+        $reg |= (($args[$c] +  $wCmds{$cmd}{offset})<<$wCmds{$cmd}{shift}) & $wCmds{$cmd}{mask} ;
+      
+      } elsif (($args[$c] eq "off") && ($wCmds{$cmd}{enable} > 0)) {
+        $reg &= ~($wCmds{$cmd}{enable});
+        
+      } elsif (($args[$c] eq "on") && ($wCmds{$cmd}{min} == 0) && ($wCmds{$cmd}{max} == 0)) {
+        $reg |= $wCmds{$cmd}{enable};
+        
+      } else {
+        return "wrong argument ".$args[$c];
+        
+      }
+      
+      my $size = $wCmds{$cmd}{size}*2;
+      
+      substr($regs, $regStart ,$size, sprintf("%0".$size."x",$reg));
+      
+    }
+  
+    @regsA = unpack('(A20)*', $regs);
+    
+    readingsBeginUpdate($hash);
+    for(my $x=0; $x<8; $x++)  {
+      readingsBulkUpdate($hash, ".reg$x", $regsA[$x], 0);
+      #readingsBulkUpdate($hash, "reg$x", $regsA[$x], 0);
+    }
+    readingsBulkUpdate($hash, "configModified", 1, 0);
+    readingsEndUpdate($hash, 1);
+
+    DUOFERN_DecodeWeatherSensorConfig($hash);
+    return undef;
+      
   } elsif(exists $commands{$cmd}) {
     my $subCmd;
     my $chanNo = "01";
@@ -439,28 +600,31 @@ DUOFERN_Set($@)
     
     return "Wrong argument $arg" if (!exists $commands{$cmd}{$subCmd});
     
-    my $toggleUpDown  = AttrVal($name, "toggleUpDown", "0");
-    my $moving        = ReadingsVal($name, "moving", "stop");
-    my $position      = ReadingsVal($name, "position", 50);
-    my $timeAutomatic = ReadingsVal($name, "timeAutomatic", "on");
-    my $dawnAutomatic = ReadingsVal($name, "dawnAutomatic", "on");
-    my $duskAutomatic = ReadingsVal($name, "duskAutomatic", "on");
-    
-    readingsSingleUpdate($hash, "moving", "moving", 1) if (($cmd eq "toggle") && ($moving eq "stop"));
-    readingsSingleUpdate($hash, "moving", "up", 1)     if (($cmd eq "dawn") && ($dawnAutomatic eq "on"));
-    readingsSingleUpdate($hash, "moving", "down", 1)   if (($cmd eq "dusk") && ($duskAutomatic eq "on"));
-    
-    if ($timer eq "00" || $timeAutomatic eq "on") { 
-      if ($cmd =~ m/^(up|down)$/) {
-        $cmd = "stop" if (($moving ne "stop") && $toggleUpDown);
-        readingsSingleUpdate($hash, "moving", $cmd, 1);
-      } elsif ($cmd eq "position") {
-        if ($arg > $position) {
-          readingsSingleUpdate($hash, "moving", "down", 1);
-        } elsif ($arg < $position) {
-          readingsSingleUpdate($hash, "moving", "up", 1);
-        } else {
-          readingsSingleUpdate($hash, "moving", "stop", 1);
+    my $position      = ReadingsVal($name, "position", -1);
+   
+    if ($position > 0) {
+      my $toggleUpDown  = AttrVal($name, "toggleUpDown", "0");
+      my $moving        = ReadingsVal($name, "moving", "stop");
+      my $timeAutomatic = ReadingsVal($name, "timeAutomatic", "on");
+      my $dawnAutomatic = ReadingsVal($name, "dawnAutomatic", "on");
+      my $duskAutomatic = ReadingsVal($name, "duskAutomatic", "on");
+      
+      readingsSingleUpdate($hash, "moving", "moving", 1) if (($cmd eq "toggle") && ($moving eq "stop"));
+      readingsSingleUpdate($hash, "moving", "up", 1)     if (($cmd eq "dawn") && ($dawnAutomatic eq "on"));
+      readingsSingleUpdate($hash, "moving", "down", 1)   if (($cmd eq "dusk") && ($duskAutomatic eq "on"));
+      
+      if ($timer eq "00" || $timeAutomatic eq "on") { 
+        if ($cmd =~ m/^(up|down)$/) {
+          $cmd = "stop" if (($moving ne "stop") && $toggleUpDown);
+          readingsSingleUpdate($hash, "moving", $cmd, 1);
+        } elsif ($cmd eq "position") {
+          if ($arg > $position) {
+            readingsSingleUpdate($hash, "moving", "down", 1);
+          } elsif ($arg < $position) {
+            readingsSingleUpdate($hash, "moving", "up", 1);
+          } else {
+            readingsSingleUpdate($hash, "moving", "stop", 1);
+          }
         }
       }
     }
@@ -618,11 +782,13 @@ DUOFERN_Parse($$)
   $hash = $def;
   my $name = $hash->{NAME};  
   
+  #Device paired
   if ($msg =~ m/0602.{40}/) {
     readingsSingleUpdate($hash, "state", "paired", 1);
     delete $hash->{READINGS}{unpaired};
     Log3 $hash, 1, "DUOFERN device paired, code $code";
   
+  #Device unpaired
   } elsif ($msg =~ m/0603.{40}/) {
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "unpaired", 1  , 1);
@@ -630,6 +796,7 @@ DUOFERN_Parse($$)
     readingsEndUpdate($hash, 1); # Notify is done by Dispatch
     Log3 $hash, 1, "DUOFERN device unpaired, code $code";
   
+  #Status Nachricht Aktor
   } elsif ($msg =~ m/0FFF0F.{38}/) {
     my $format = substr($msg, 6, 2);
     my $ver    = substr($msg, 24, 1).".".substr($msg, 25, 1);
@@ -664,7 +831,8 @@ DUOFERN_Parse($$)
     
     $hash = $def01 if ($def01);
     
-    if ($format eq "21") {  #RolloTron
+    #RolloTron
+    if ($format eq "21") {
       my $pos         =  hex(substr($msg, 22, 2)) & 0x7F;
       my $ventPos     =  hex(substr($msg, 12, 2)) & 0x7F;
       my $ventMode    = (hex(substr($msg, 12, 2)) & 0x80 ? "on" : "off");
@@ -695,8 +863,8 @@ DUOFERN_Parse($$)
       readingsBulkUpdate($hash, "moving",               "stop"      , 1);
       readingsEndUpdate($hash, 1); # Notify is done by Dispatch
     
-    
-    } elsif ($format eq "22") {  #Universal Aktor,Steckdosenaktor
+    #Universal Aktor, Steckdosenaktor, Troll Comfort DuoFern (Lichtmodus) 
+    } elsif ($format eq "22") {  
       my $level             =  hex(substr($msg, 22, 2)) & 0x7F;
       my $modeChange        = (hex(substr($msg, 22, 2)) & 0x80 ? "on" : "off");
       my $sunMode           = (hex(substr($msg, 14, 2)) & 0x10 ? "on" : "off");
@@ -758,8 +926,8 @@ DUOFERN_Parse($$)
         readingsEndUpdate($hash, 1); # Notify is done by Dispatch	
       }
       
-         
-    } elsif ($format eq "23") {  #Troll,Rohrmotor-Aktor
+    #Troll, Rohrmotor-Aktor, Rohrmotor Steuerung, Connect-Aktor, Umweltsensor     
+    } elsif ($format eq "23") {
       my $pos               =  hex(substr($msg, 22, 2)) & 0x7F;
       my $reversal          = (hex(substr($msg, 22, 2)) & 0x80 ? "on" : "off");
       my $ventPos           =  hex(substr($msg, 16, 2)) & 0x7F;
@@ -836,8 +1004,8 @@ DUOFERN_Parse($$)
       readingsBulkUpdate($hash, "state",                $state      , 1);
       readingsEndUpdate($hash, 1); # Notify is done by Dispatch
       
-       
-    } elsif ($format eq "24") {  #RolloTube,SX5
+    #Rohrmotor, SX5   
+    } elsif ($format eq "24") {  
       my $pos         =  hex(substr($msg, 22, 2)) & 0x7F;
       my $reversal    = (hex(substr($msg, 22, 2)) & 0x80 ? "on" : "off");
       my $ventPos     =  hex(substr($msg, 16, 2)) & 0x7F;
@@ -907,7 +1075,8 @@ DUOFERN_Parse($$)
       
       readingsEndUpdate($hash, 1); # Notify is done by Dispatch
     
-    } elsif ($format eq "25") {  #Dimmer
+    #Dimmaktor
+    } elsif ($format eq "25") {  
       my $stairwellFunction = (hex(substr($msg, 10, 4)) & 0x8000 ? "on" : "off");
       my $stairwellTime     = (hex(substr($msg, 10, 4)) & 0x7FFF) / 10;
       my $timerAuto         = (hex(substr($msg, 14, 2)) & 0x01 ? "on" : "off");
@@ -948,7 +1117,8 @@ DUOFERN_Parse($$)
     } else {
       Log3 $hash, 2, "DUOFERN unknown msg: $msg";
     }
-        
+  
+  #Wandtaster, Funksender UP, Sensoren      
   } elsif ($msg =~ m/0FFF07.{38}/) {
     if($msg =~ m/0FFF070801FF.*/) {
       readingsSingleUpdate($hash, "event", "beginnSun", 1);
@@ -980,7 +1150,8 @@ DUOFERN_Parse($$)
     } else {
       Log3 $hash, 2, "DUOFERN unknown msg: $msg";
     }
-  	
+  
+  #Handsender
   } elsif ($msg =~ m/0F0107.{38}/) {
     my $button = substr($msg, 6, 2);
     my $group = substr($msg, 14, 2);
@@ -995,7 +1166,8 @@ DUOFERN_Parse($$)
     } else {
       readingsSingleUpdate($hash, "channel$group", "$button", 1);
     }
-    
+  
+  #Wandtaster(on,off), Funksender UP(on,off)  
   } elsif ($msg =~ m/0F..0E.{38}/) {
     my $button = substr($msg, 6, 2);
     my $group = substr($msg, 14, 2);
@@ -1008,6 +1180,7 @@ DUOFERN_Parse($$)
       readingsSingleUpdate($hash, "channel$group", "$button", 1);
     }
   
+  #Umweltsensor Wetter
   } elsif ($msg =~ m/0F011322.{36}/) {  
     $def01 = $modules{DUOFERN}{defptr}{$code."00"};
     if(!$def01) {
@@ -1040,6 +1213,7 @@ DUOFERN_Parse($$)
     readingsBulkUpdate($hash, "wind",           $wind,     1);
     readingsEndUpdate($hash, 1); # Notify is done by Dispatch
   
+  #Umweltsensor Zeit
   } elsif ($msg =~ m/0FFF1020.{36}/) {
     $def01 = $modules{DUOFERN}{defptr}{$code."00"};
     if(!$def01) {
@@ -1061,6 +1235,26 @@ DUOFERN_Parse($$)
     readingsBulkUpdate($hash, "time",   $hour.":".$minute.":".$second,      1);
     readingsEndUpdate($hash, 1); # Notify is done by Dispatch
   
+  #Umweltsensor Konfiguration
+  } elsif ($msg =~ m/0FFF1B2[1-8].{36}/) {
+    my $reg    = substr($msg, 6, 2)-21;
+    my $regVal = substr($msg, 8, 20);
+    
+    $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+    if(!$def01) {
+      DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
+      $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+    }
+      
+    $hash = $def01;
+    
+    delete $hash->{READINGS}{configModified};
+    readingsSingleUpdate($hash, ".reg$reg", "$regVal", 1);
+    #readingsSingleUpdate($hash, "reg$reg", "$regVal", 1);
+    DUOFERN_DecodeWeatherSensorConfig($hash);
+    
+  
+  #Rauchmelder Batterie
   } elsif ($msg =~ m/0FFF1323.{36}/) {
     my $battery      = (hex(substr($msg,  8, 2)) <= 10 ? "low" : "ok");
     my $batteryLevel =  hex(substr($msg,  8, 2));
@@ -1069,12 +1263,14 @@ DUOFERN_Parse($$)
     readingsBulkUpdate($hash, "battery",          $battery,       1);
     readingsBulkUpdate($hash, "batteryLevel",     $batteryLevel,  1);
     readingsEndUpdate($hash, 1); # Notify is done by Dispatch
-
+  
+  #ACK, Befehl vom Aktor empfangen
   } elsif ($msg =~ m/810003CC.{36}/) {
     $hash->{helper}{timeout}{t} = AttrVal($hash->{NAME}, "timeout", "60");    
     InternalTimer(gettimeofday()+$hash->{helper}{timeout}{t}, "DUOFERN_StatusTimeout", $hash, 0);
     $hash->{helper}{timeout}{count} = 4;
   
+  #NACK, Befehl nicht vom Aktor empfangen
   } elsif ($msg =~ m/810108AA.{36}/) {
     readingsSingleUpdate($hash, "state", "MISSING ACK", 1);
     foreach (grep (/^channel_/, keys%{$hash})){
@@ -1091,6 +1287,77 @@ DUOFERN_Parse($$)
   DoTrigger($def02->{NAME}, undef) if ($def02);
   
   return $name;
+}
+
+#####################################
+sub
+DUOFERN_DecodeWeatherSensorConfig($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my @regs;
+  
+  for(my $x=0; $x<8; $x++)  {
+    $regs[$x] = ReadingsVal($name, ".reg$x", "00000000000000000000");  
+  }
+  
+  my @tWind = map{hex($_)} unpack '(A2)*', substr($regs[6], 0,10);
+  my @tTemp = map{hex($_)} unpack '(A2)*', substr($regs[6], 10,10);
+  my @duskDawn = map{hex($_)} unpack '(A8)*', substr($regs[0],0,16).substr($regs[1],0,16).substr($regs[2],0,8);
+  my @tDawn;
+  my @tDusk;  
+  my @tSun = map{hex($_)} unpack 'A8x2A8x2A8x2A8x2A8x2', $regs[3].$regs[4].$regs[5];
+  
+  for(my $x=0; $x<5; $x++){   
+    $tWind[$x] = ($tWind[$x] & 0x20 ? ($tWind[$x] & 0x1F) : "off");
+    $tTemp[$x] = ($tTemp[$x] & 0x80 ? ($tTemp[$x] & 0x7F)-40 : "off");
+    
+    $tDawn[$x] = ($duskDawn[$x] & 0x7F) +1;
+    $tDusk[$x] = (($duskDawn[$x]>>14) & 0x7F) +1;
+    
+    $tDawn[$x] = "off" if(!($duskDawn[$x]>>28 & 0x1));
+    $tDusk[$x] = "off" if(!($duskDawn[$x]>>28 & 0x2));
+    
+    if((($tSun[$x])>>28) & 0x2) {
+      my @temp;
+      push(@temp,((($tSun[$x])>>12) & 0x7F) + 1);
+      push(@temp,((($tSun[$x])>>19) & 0x1F) + 1);
+      push(@temp,((($tSun[$x])>>24) & 0x1F) + 1);
+      if($tSun[$x] & 0x40) {
+        push(@temp,((($tSun[$x])>>7) & 0x1F) -5);
+      }
+      $tSun[$x]=join(":",@temp);
+    } else {
+      $tSun[$x]="off";
+    }
+    
+  }
+  
+  my $tRain           = (hex(substr($regs[6],  0, 2)) & 0x80 ? "on" : "off");
+  my $interval        = (hex(substr($regs[7],  0, 2)) & 0x80 ? (hex(substr($regs[7],  0, 2)) & 0x7F) : "off");
+  my $DCF             = (hex(substr($regs[7],  2, 2)) & 0x02 ? "on" : "off");
+  my $latitude        =  hex(substr($regs[7], 10, 2));
+  my $longitude       =  hex(substr($regs[7], 14, 2));
+  my $timezone        =  hex(substr($regs[7],  8, 2));
+  
+  $latitude -= 256 if($latitude > 127);
+  $longitude -= 256 if($longitude > 127);  
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "DCF",                $DCF,     1);
+  readingsBulkUpdate($hash, "interval",           $interval,     1);
+  readingsBulkUpdate($hash, "latitude",           $latitude,     1);
+  readingsBulkUpdate($hash, "longitude",          $longitude,     1);
+  readingsBulkUpdate($hash, "timezone",           $timezone,     1);
+  readingsBulkUpdate($hash, "triggerRain",        $tRain,     1);
+  readingsBulkUpdate($hash, "triggerTemperature", join(" ",@tTemp),     1);
+  readingsBulkUpdate($hash, "triggerWind",        join(" ",@tWind),     1);
+  readingsBulkUpdate($hash, "triggerDusk",        join(" ",@tDusk),     1);
+  readingsBulkUpdate($hash, "triggerDawn",        join(" ",@tDawn),     1);
+  readingsBulkUpdate($hash, "triggerSun",         join(" ",@tSun),     1);
+    
+  readingsEndUpdate($hash, 1);
+    
 }
 
 #####################################
@@ -1158,6 +1425,54 @@ DUOFERN_StatusTimeout($)
   <a name="DUOFERN_set"></a>
   <b>Set</b>
   <ul>
+    
+    <b>Universal commands (available to most actors):</b><br><br>
+    <ul>
+    
+    <li><b>remotePair</b><br>
+        Activates the pairing mode of the actor.<br>
+        Some actors accept this command in unpaired mode up to two hours afte power up.
+        </li><br>
+    <li><b>remoteUnpair</b><br>
+        Activates the unpairing mode of the actor.
+        </li><br>
+    <li><b>getStatus</b><br>
+        Sends a status request message to the DuoFern device.
+        </li><br>
+    <li><b>manualMode [on|off]</b><br>
+        Activates the manual mode. If manual mode is active 
+        all automatic functions will be ignored.
+        </li><br>
+    <li><b>timeAutomatic [on|off]</b><br>
+        Activates the timer automatic.
+        </li><br>
+    <li><b>sunAutomatic [on|off]</b><br>
+        Activates the sun automatic.
+        </li><br>
+    <li><b>dawnAutomatic [on|off]</b><br>
+        Activates the dawn automatic.
+        </li><br>
+    <li><b>duskAutomatic [on|off]</b><br>
+        Activates the dusk automatic.
+        </li><br> 
+    <li><b>dusk</b><br>
+        Move roller shutter downwards or switch on switch/dimming actor
+        if duskAutomatic is activated.
+        </li><br>
+    <li><b>dawn</b><br>
+        Move roller shutter upwards or switch off switch/dimming actor
+        if dawnAutomatic is activated.
+        </li><br>
+    <li><b>sunMode [on|off]</b><br>
+        Activates the sun mode. If sun automatic is activated, 
+        the roller shutter will move to the sunPosition or a switch/dimming 
+        actor will shut off.
+        </li><br>
+    
+    </ul>      
+    <b>Roller shutter actor commands:</b><br><br>
+    <ul>
+        
     <li><b>up [timer]</b><br>
         Move the roller shutter upwards. If parameter <b>timer</b> is used the command will
         only be executed if timeAutomatic is activated.
@@ -1176,55 +1491,11 @@ DUOFERN_StatusTimeout($)
     <li><b>toggle</b><br>
         Switch the roller shutter through the sequence up/stop/down/stop.
         </li><br>
-    <li><b>on [timer]</b><br>
-        Switch on the actor. If parameter <b>timer</b> is used the command will
-        only be executed if timeAutomatic is activated.
-        </li><br>
-    <li><b>off [timer]</b><br>
-        Switch off the actor. If parameter <b>timer</b> is used the command will
-        only be executed if timeAutomatic is activated.
-        </li><br>
-    <li>
-        <a href="#setExtensions">set extensions</a> are supported.
-        </li><br>
-    <li><b>level &lt;value&gt; [timer]</b><br>
-        Set actor to a desired absolut level. If parameter <b>timer</b> is used the 
-        command will only be executed if timeAutomatic is activated.
-        </li><br>
-    <li><b>getStatus</b><br>
-        Sends a status request message to the DuoFern device.
-        </li><br>
-    <li><b>dusk</b><br>
-        Move roller shutter downwards if duskAutomatic is activated.
-        </li><br>
-    <li><b>dawn</b><br>
-        Move roller shutter upwards if dawnAutomatic is activated.
-        </li><br>
-    <li><b>manualMode [on|off]</b><br>
-        Activates the manual mode. If manual mode is active 
-        all automatic functions will be ignored.
-        </li><br>
-    <li><b>timeAutomatic [on|off]</b><br>
-        Activates the timer automatic.
-        </li><br>
-    <li><b>sunAutomatic [on|off]</b><br>
-        Activates the sun automatic.
-        </li><br>
-    <li><b>dawnAutomatic [on|off]</b><br>
-        Activates the dawn automatic.
-        </li><br>
-    <li><b>duskAutomatic [on|off]</b><br>
-        Activates the dusk automatic.
-        </li><br>
     <li><b>rainAutomatic [on|off]</b><br>
         Activates the rain automatic.
         </li><br>
     <li><b>windAutomatic [on|off]</b><br>
         Activates the wind automatic.
-        </li><br>
-    <li><b>sunMode [on|off]</b><br>
-        Activates the sun mode. If sun automatic is activated, 
-        the roller shutter will move to the sunPosition.
         </li><br>
     <li><b>sunPosition &lt;value&gt;</b><br>
         Set the sun position.
@@ -1240,7 +1511,7 @@ DUOFERN_StatusTimeout($)
         Activates the wind mode. If wind automatic and wind mode is 
         activated, the roller shutter moves in windDirection and ignore any automatic
         or manual command.<br>
-        The wind mode ends 15 minutes after last activation automaticly.
+        The wind mode ends 15 minutes after last activation automatically.
         </li><br>
     <li><b>windDirection [up|down]</b><br>
         Movemet direction for wind mode.
@@ -1249,7 +1520,7 @@ DUOFERN_StatusTimeout($)
         Activates the rain mode. If rain automatic and rain mode is 
         activated, the roller shutter moves in rainDirection and ignore any automatic
         command.<br>
-        The rain mode ends 15 minutes after last activation automaticly.
+        The rain mode ends 15 minutes after last activation automatically.
         </li><br>
     <li><b>rainDirection [up|down]</b><br>
         Movemet direction for rain mode.
@@ -1260,15 +1531,27 @@ DUOFERN_StatusTimeout($)
     <li><b>motorDeadTime [off|short|long]</b><br>
         Set the motor dead time.
         </li><br>
-    <li><b>remotePair</b><br>
-        Activates the pairing mode of the actor.<br>
-        Some actors accept this command in unpaired mode up to two hours afte power up.
-        </li><br>
-    <li><b>remoteUnpair</b><br>
-        Activates the unpairing mode of the actor.
-        </li><br>
     <li><b>reversal [on|off]</b><br>
         Reversal of direction of rotation.
+        </li><br>
+    
+    </ul>  
+    <b>Switch/dimming actor commands:</b><br><br>
+    <ul>
+    
+    <li><b>on [timer]</b><br>
+        Switch on the actor. If parameter <b>timer</b> is used the command will
+        only be executed if timeAutomatic is activated.
+        </li><br>
+    <li><b>off [timer]</b><br>
+        Switch off the actor. If parameter <b>timer</b> is used the command will
+        only be executed if timeAutomatic is activated.
+        </li><br>
+    <li><a href="#setExtensions">set extensions</a> are supported.
+        </li><br>
+    <li><b>level &lt;value&gt; [timer]</b><br>
+        Set actor to a desired absolut level. If parameter <b>timer</b> is used the 
+        command will only be executed if timeAutomatic is activated.
         </li><br>
     <li><b>modeChange [on|off]</b><br>
         Inverts the on/off state of a switch actor or change then modus of a dimming actor.
@@ -1278,7 +1561,12 @@ DUOFERN_StatusTimeout($)
         </li><br>    
     <li><b>stairwellTime &lt;sec&gt;</b><br>
         Set the stairwell time.
-        </li><br>    
+        </li><br>
+        
+    </ul>    
+    <b>Blind actor commands:</b><br><br>
+    <ul>
+        
     <li><b>blindsMode [on|off]</b><br>
         Activates the blinds mode.
         </li><br>
@@ -1303,6 +1591,11 @@ DUOFERN_StatusTimeout($)
     <li><b>tiltAfterStopDown [on|off]</b><br>
         Tilt slat after stopping blind while moving down.
         </li><br>
+    
+    </ul>    
+    <b>SX5 commands:</b><br><br>
+    <ul>  
+    
     <li><b>10minuteAlarm [on|off]</b><br>
         Activates the alarm sound of the SX5 when the door is left open for longer than 10 minutes.
         </li><br>
@@ -1317,7 +1610,73 @@ DUOFERN_StatusTimeout($)
         </li><br>    
     <li><b>backJump [on|off]</b><br>
         If activated the SX5 moves briefly in the respective opposite direction after reaching the end point.
-        </li><br>     
+        </li><br>
+    <li><b>getConfig</b><br>
+        Sends a config request message to the weather sensor.
+        </li><br>
+    
+    </ul>
+    <b>Weather sensor commands:</b><br><br> 
+    <ul>
+        
+    <li><b>getConfig</b><br>
+        Sends a configuration request message.
+        </li><br>
+    <li><b>getTime</b><br>
+        Sends a time request message.
+        </li><br>
+    <li><b>getWeather</b><br>
+        Sends a weather data request message.
+        </li><br>    
+    <li><b>writeConfig</b><br>
+        Write the configuration back to the weather sensor.
+        </li><br> 
+    <li><b>DCF [on|off]</b><br>
+        Switch the DCF receiver on or off.
+        </li><br>
+    <li><b>interval &lt;value&gt;</b><br>
+        Set the interval time for automatic transmittion of the weather data.<br>
+        &lt;value&gt;: off or 1 to 100 minutes
+        </li><br>    
+    <li><b>latitude &lt;value&gt;</b><br>
+        Set the latitude of the weather sensor position<br>
+        &lt;value&gt;: 0 to 90
+        </li><br>        
+    <li><b>longitude &lt;value&gt;</b><br>
+        Set the longitude of the weather sensor position<br>
+        &lt;value&gt;: -90 to 90
+        </li><br>        
+     <li><b>timezone &lt;value&gt;</b><br>
+        Set the time zone of the weather sensor<br>
+        &lt;value&gt;: 0 to 23
+        </li><br>       
+     <li><b>triggerDawn &lt;value1&gt; ... [&lt;value5&gt;]</b><br>
+        Sets up to 5 trigger values for a dawn event.<br>
+        &lt;value[n]&gt;: off or 1 to 100 lux
+        </li><br>        
+     <li><b>triggerDusk &lt;value1&gt; ... [&lt;value5&gt;]</b><br>
+        Sets up to 5 trigger values for a dusk event.<br>
+        &lt;value[n]&gt;: off or 1 to 100 Lux
+        </li><br>
+     <li><b>triggerRain [on|off]</b><br>
+        Switch the trigger of the rain event on or off.
+        </li><br>
+    <li><b>triggerSun &lt;value1&gt;:&lt;sun1&gt;:&lt;shadow1&gt;[:&lt;temperature1&gt;] ... [&lt;value5&gt;:&lt;sun5&gt;:&lt;shadow5&gt;[:&lt;temperature5&gt;]]</b><br>
+        Sets up to 5 trigger values for a sun event.<br>
+        &lt;value[n]&gt;: off or 1 to 100 kLux<br>
+        &lt;sun[n]&gt;: time to detect sun, 1 to 30 minutes<br>
+        &lt;shadow[n]&gt;: time to detect shadow, 1 to 30 minutes<br>
+        &lt;temperature[n]&gt;: optional minimum temperature, -5 to 26 &deg;C
+        </li><br>        
+     <li><b>triggerTemperature &lt;value1&gt; ... [&lt;value5&gt;]</b><br>
+        Sets up to 5 trigger values for a temperature event.<br>
+        &lt;value[n]&gt;: off or -40 to 80 &deg;C
+        </li><br>
+     <li><b>triggerWind &lt;value1&gt; ... [&lt;value5&gt;]</b><br>
+        Sets up to 5 trigger values for a wind event.<br>
+        &lt;value[n]&gt;: off or 1 to 31 m/s
+        </li><br>
+      </ul><br>              
   </ul>
   <br>
 
