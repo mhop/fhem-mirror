@@ -1651,7 +1651,7 @@ YAMAHA_AVR_ParseResponse ($$$)
         {
             my @list_cmds = split("/", $arg);
             
-            if($data =~ /<Menu_Layer>(.+?)<\/Menu_Layer><Menu_Name>(.+?)<\/Menu_Name><Current_List>(.+?)<\/Current_List><Cursor_Position><Current_Line>(\d+)<\/Current_Line><Max_Line>(\d+)<\/Max_Line><\/Cursor_Position>/)
+            if($data =~ /<Menu_Layer>(.+?)<\/Menu_Layer><Menu_Name>(.*?)<\/Menu_Name><Current_List>(.+?)<\/Current_List><Cursor_Position><Current_Line>(\d+)<\/Current_Line><Max_Line>(\d+)<\/Max_Line><\/Cursor_Position>/)
             {
                
                 my $menu_layer = $1;
