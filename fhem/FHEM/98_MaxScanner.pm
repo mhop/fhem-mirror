@@ -1,7 +1,7 @@
 # $Id$
 ####################################################################################################
 #
-#   98_MaxScanner.pm
+#   98_MaxScanner.pm 
 #   The MaxScanner enables FHEM to capture temperature and valve-position of thermostats
 #   in regular intervals
 #
@@ -46,6 +46,8 @@
 #      *  change: FIND, minor changes
 #   15.01.16 - 1.0.0.2
 #      *  fixed : Work- check of external change of desired was incorrect
+#   07.03.16 - 1.0.0.3
+#      *  fixed : startup after initialization of fhem
 ####################################################################################################
 package main;
 use strict;
@@ -55,7 +57,7 @@ use vars qw(%defs);
 use vars qw($readingFnAttributes);
 use vars qw(%attr);
 use vars qw(%modules);
-my $MaxScanner_Version   = "1.0.0.2 - 14.01.2016";
+my $MaxScanner_Version   = "1.0.0.3 - 07.03.2016";
 my $MaxScanner_ModulName = "MaxScanner";
 
 # minimal poll-rate for thermostat in minutes given by firmware
@@ -162,11 +164,13 @@ sub MaxScanner_Define($$$)
 
   # create timer
   RemoveInternalTimer($name);
-  my $xsub = $MaxScanner_ModulName . "_Timer";
-  InternalTimer( gettimeofday() + 20, $xsub, $name, 0 );
+  
+  #my $xsub = $MaxScanner_ModulName . "_Timer";
+  #InternalTimer( gettimeofday() + 20, $xsub, $name, 0 );
 
   # MaxScanner_RestartTimer($hash,20);
-  MaxScanner_Log $hash, 2, 'timer started';
+  
+  # MaxScanner_Log $hash, 2, 'timer started';
 
   return undef;
 }
@@ -259,6 +263,13 @@ sub MaxScanner_Notify($$$)
   my ( $hash, $dev ) = @_;
   my $name = $hash->{NAME};
   my $disable = AttrVal( $name, 'disable', '0' );
+  
+  if ( grep( m/^(INITIALIZED)$/, @{ $dev->{CHANGED} } ) )
+  {
+    MaxScanner_Log( $hash, 4, 'INITIALIZED' );
+    MaxScanner_RestartTimer($hash,20);
+    return;
+  } 
 
   # no action if not initialized
   return if ( !$hash->{helper}{initDone} );
@@ -697,7 +708,8 @@ sub MaxScanner_Work($$$)
   my $settingDone = '';             # end loop if a set command was performed
   my @scan_time;
   my $modName = $modHash->{NAME};
-
+  my $boolSimulateJohn = '';
+  
   # loop the sorted list over enabled thermostats
   foreach my $therm (@$thermi_sort)
   {
@@ -724,7 +736,7 @@ sub MaxScanner_Work($$$)
     # get next scan serial date
     my $sdNextScan = $hash->{helper}{NextScan};
     MaxScanner_Log $hash, 4,
-      'ns:' . FmtDateTime($sdNextScan) . ' strDesiTime:' . $strDesiTime . ' ForceAuto:' . $boolDesiChange;
+      'ns:' . FmtDateTime($sdNextScan) . ' strDesiTime:' . $strDesiTime . ' Is Mode DesicChange:' . $boolDesiChange;
 
     # convert temperature time into serial format
     my $sdTempTime = time_str2num($strTempTime);
@@ -740,10 +752,9 @@ sub MaxScanner_Work($$$)
     my $strIOHash    = $defs{$therm}{IODev};    # CULMAX0, hash of IO-Devices
     my $strIOName    = $strIOHash->{NAME};
     my $strIOType    = $strIOHash->{TYPE};      # CUL_MAX,MAXLAN type des IO-Devices
-    my $isCUL        = 1;
 
     #.
-    MaxScanner_Log $hash, 4, "TYPE:$strIOType IOName:$strIOName";
+    MaxScanner_Log $hash, 4, 'TYPE:'.$strIOType.' IOName:'.$strIOName.' simCube:'.$boolSimulateJohn;
 
     # if com-device is a MAXLAN
     if ( $strIOType eq "MAXLAN" )
@@ -774,7 +785,7 @@ sub MaxScanner_Work($$$)
 
       # transform dutycycle to CulCredits
       $numCulCredits = ( 100 - $numDutyCycle ) * 10;
-      $isCUL         = '';
+      $isCul         = '';
     }
 
     # we got a CUL
@@ -790,12 +801,19 @@ sub MaxScanner_Work($$$)
       $numCulCredits = ReadingsVal( $strCulName, 'credit10ms', 0 );
 
       # force dynamic scanning for CUL
-      $isCul = 1;
+      $isCul = '1';
+    }
+
+    # simulate cube 
+    if ($boolSimulateJohn && $therm eq 'HT.JOHN')
+    {
+        $isCul = '';
+        MaxScanner_Log $hash, 4, '!! Simulate cube with HT.JOHN isCul:'.$isCul;
     }
 
     # because cube not knows msgcnt, we fix the timestamp
     my $strLastTransmit =
-      ($isCUL) ? ReadingsTimestamp( $therm, 'msgcnt', '' ) : FmtDateTime( gettimeofday() - 20 );
+      ($isCul) ? ReadingsTimestamp( $therm, 'msgcnt', '' ) : FmtDateTime( gettimeofday() - 20 );
 
     # msgcnt must exist
     if ( $strLastTransmit eq '' )
@@ -863,7 +881,7 @@ sub MaxScanner_Work($$$)
     }
 
     # don't change mode if the latency is active; only cul is affected
-    if ( $sdLastTransmit + 5 >= $sdCurTime && $isCUL )
+    if ( $sdLastTransmit + 5 >= $sdCurTime && $isCul )
     {
       MaxScanner_Log $hash, 4, 'no action due transmission latency';
       next;
@@ -950,7 +968,7 @@ sub MaxScanner_Work($$$)
       $hash->{helper}{leadDesiTemp}       = $normDesiTemp;
       $hash->{helper}{TempBeforeWindOpen} = $normDesiTemp;    # MrHeat
       $hash->{helper}{desiredOffset}      = 0;
-      MaxScanner_Log $hash, 3, "reset leadDesiTemp:" . $hash->{helper}{leadDesiTemp};
+      MaxScanner_Log $hash, 3, "reset leadDesiTemp:" . $hash->{helper}{leadDesiTemp}.' Mode:'.$strMode;
 
       # when triggermode ModeChange and mode is manual, we must switch to auto to force the new setpoint/desired
       if ( !$boolDesiChange && ( $strMode eq 'manual' ) && ( $normDesiTemp != $numDesiTemp ) )
@@ -962,6 +980,13 @@ sub MaxScanner_Work($$$)
         MaxScanner_Log $hash, 3, "switchTime: <<$cmd>>";
       }
 
+      # force wait time for Cube-devices, after switch date is changed
+      if (! $isCul) 
+      {
+        $sdNextScan = $sdCurTime +  $numWorkIntervall * 60;
+        $hash->{helper}{NextScan}        = int($sdNextScan);
+        MaxScanner_Log $hash, 3, 'forward NextScan for Cube-Devices ns:'.FmtDateTime($sdNextScan);
+      }
       # now stop further actions with this thermostat, and wait for activation by the weekprofile
       # next;
     }
@@ -988,6 +1013,15 @@ sub MaxScanner_Work($$$)
           FmtDateTime( $hash->{helper}{NextScan} );
         MaxScanner_Log $hash, 3, 'TEMPERATURE received at ' . $strTempTime . ', ==> new ns:' . FmtDateTime($sdNextScan);
       }
+    }
+    else 
+    {
+         # no wait time for cube devices
+        if ($sdCurTime >= $hash->{helper}{NextScan} && !$hash->{helper}{gotTempTS})
+        {
+           $hash->{helper}{gotTempTS} = 1; 
+           MaxScanner_Log $hash, 3, 'TEMPERATURE received is assumed (Cube)';
+        }
     }
 
     # get shutter's state
@@ -1070,8 +1104,7 @@ sub MaxScanner_Work($$$)
 
         # if the expected value does not match, than desired was changed outside
         # but when CUL than only, if we got temperature after a desired change by w-profile
-        if ( $expectedDesiTemp != $numDesiTemp 
-           && ( ($hash->{helper}{gotTempTS} && $isCul) || !$isCul) )
+        if ( $expectedDesiTemp != $numDesiTemp && $hash->{helper}{gotTempTS} )
         {
           $hash->{helper}{leadDesiTemp}  = $numDesiTemp;
           $hash->{helper}{desiredOffset} = 0;
@@ -1095,7 +1128,14 @@ sub MaxScanner_Work($$$)
       && $strMode eq 'auto'
       && $sdNextScan >= $weekProfile->{nextSwitchDate} - 60 )
     {
-      $hash->{helper}{NextScan} = $weekProfile->{nextSwitchDate} + 60;
+      if ($isCul)
+      {
+        $hash->{helper}{NextScan} = $weekProfile->{nextSwitchDate} + 60;
+      }
+      else {
+        $hash->{helper}{NextScan} = $weekProfile->{nextSwitchDate} + 60*3+10; 
+      }
+    
       my $ss = FmtDateTime( $hash->{helper}{NextScan} );
       $hash->{helper}{NextScanTimestamp} = $ss;
       MaxScanner_Log $hash, 3, 'no action due soon a week-profile switch point is reached ns:' . $ss;
