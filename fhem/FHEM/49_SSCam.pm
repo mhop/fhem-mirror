@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.20.1 12.03.2016    bugfix: default recordtime 15 s is used if attribute "rectime" is set to "0"
 # 1.20   09.03.2016    command "extevent" added
 # 1.19.3 07.03.2016    bugfix "uninitialized value $lastrecstarttime",
 #                      "uninitialized value $lastrecstoptime",
@@ -117,7 +118,6 @@ use HttpUtils;
 
 
 sub SSCam_Initialize($) {
- # die Namen der Funktionen, die das Modul implementiert und die fhem.pl aufrufen soll
  my ($hash) = @_;
  $hash->{DefFn}        = "SSCam_Define";
  $hash->{UndefFn}      = "SSCam_Undef";
@@ -2602,14 +2602,20 @@ sub camret_nonbl ($) {
    my $motdetsc;
    
    # Die Aufnahmezeit setzen
-   # wird "set <name> on-for-timer [rectime]" verwendet -> dann [rectime] nutzen, 
+   # wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
    # sonst Attribut "rectime" wenn es gesetzt ist, falls nicht -> "RECTIME_DEF"
    if (defined($hash->{HELPER}{RECTIME_TEMP})) {
        $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
        }
        else
        {
-       $rectime = $attr{$name}{rectime} ? $attr{$name}{rectime} : $hash->{HELPER}{RECTIME_DEF};
+       if (AttrVal($name, "rectime", undef) == 0) {
+           $rectime = 0;
+           }
+           else
+           {
+           $rectime = AttrVal($name, "rectime", undef) ? AttrVal($name, "rectime", undef) : $hash->{HELPER}{RECTIME_DEF};
+           }
        }
    
    if ($err ne "")                                                                                     # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -2665,7 +2671,7 @@ sub camret_nonbl ($) {
                 $logstr = "Time for Recording is set to: $rectime";
                 &printlog($hash,$logstr,"4");
                 
-                if ($rectime != "0") {
+                if ($rectime != 0) {
                     # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
                     InternalTimer(gettimeofday()+$rectime, "camstoprec", $hash, 0);
                     }              
