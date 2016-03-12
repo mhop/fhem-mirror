@@ -1692,7 +1692,8 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                              ,sysTime        =>""
                                             }
                      ,"HM-OU-CFM-PL01"    =>{ led            =>"[redL|greenL|orangeL|redS|greenS|orangeS|pause][,-color2-...] [-repeat-]"}
-                     ,"HM-OU-CFM-PL02"    =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [-repeat-]"}
+                     ,"HM-OU-CFM-PL02"    =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [-repeat-]"
+                                             ,pct            =>"[-value- ... [-ontime-]"}
                      ,"HM-SEC-WIN01"      =>{ stop           =>"",
                                              ,level          =>"-level- -relockDly- -speed-..."
                                              ,keydef         =>"-btn- -txt1- -txt2-"
