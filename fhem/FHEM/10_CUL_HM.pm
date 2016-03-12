@@ -303,7 +303,7 @@ sub CUL_HM_updateConfig($){
           my @chnPh = (grep{$_ =~ m/Sw:/ } split ',',$culHmModel->{$mId}{chn});
           @chnPh = split ':',$chnPh[0] if (@chnPh);
           my $chnPhyMax = $chnPh[2]?$chnPh[2]:1;         # max Phys channels
-          my $chnPhy    = int(($chn-$chnPhyMax+1)/2);    # assotiated phy chan
+          my $chnPhy    = ($chnPhyMax == 2 && $chn >  4)?2:1;    # assotiated phy chan( either 1 or 2)
           my $idPhy     = $devId.sprintf("%02X",$chnPhy);# ID assot phy chan
           my $pHash     = CUL_HM_id2Hash($idPhy);        # hash assot phy chan
           $idPhy        = $pHash->{DEF};                 # could be device!!!
