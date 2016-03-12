@@ -85,7 +85,8 @@ foreach my $lang (@lang) {
       $modType = "command" if($l =~ m/>Fhem commands</);
       $modType = "device"  if($l =~ m/>Devices</);
       $modType = "helper"  if($l =~ m/>Helper modules</);
-      $modIdx{$1} = $modType if($modType && $l =~ m/href="#(.*?)">/);
+      $modIdx{$1} = $modType
+        if($modType && $l =~ m/href="#(.*?)">/ && $1 ne "global");
       last if($l =~ m/<!-- header end -->/);
     }
     seek(IN,0,0);
