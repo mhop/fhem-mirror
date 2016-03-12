@@ -3624,7 +3624,7 @@ ReplaceEventMap2($$$)
       $nv = eval '"'.$emh->{$k}.'"';
 
     }
-    if($nv) {
+    if(defined($nv)) {
       my @arr = split(" ",$nv);
       unshift @arr, $dname;
       return @arr;
