@@ -381,7 +381,7 @@ devStateIcon($$@)
     my $percent;
     if( $pct ) {
       $percent = ::ReadingsVal($name,$pct, undef);
-      $percent = ::CommandGet("","$name $pct") if( !$percent );
+      $percent = ::CommandGet("","$name $pct") if( !defined($percent) );
 
     } else {
       $percent = ::Value($name);
