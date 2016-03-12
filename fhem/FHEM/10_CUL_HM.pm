@@ -423,8 +423,9 @@ sub CUL_HM_updateConfig($){
       }
       elsif($st eq "keyMatic"     ){   $webCmd="lock:inhibit on:inhibit off";
       }
-      elsif($md eq "HM-OU-CFM-PL" ){   $webCmd="press short:press long"
-                                          .($chn eq "02"?":playTone replay":"");
+      elsif(  $md eq "HM-OU-CFM-PL" 
+            ||$md eq "HM-OU-CFM-TW" ){ $webCmd="press short:press long"
+                                        .($chn eq "02"?":playTone replay":"");
       }
 
       if ($webCmd){

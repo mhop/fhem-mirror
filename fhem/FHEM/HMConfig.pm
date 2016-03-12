@@ -1148,8 +1148,11 @@ $culHmRegModel{"HM-RC-Key4-2"}        = $culHmRegModel{"HM-RC-4-2"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FWT"} = $culHmRegModel{"HM-CC-TC"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
 
+$culHmRegModel{"HM-OU-CFM-TW"}        = $culHmRegModel{"HM-OU-CFM-PL"};
+
 $culHmRegModel{"HM-PB-4DIS-WM-2"}     = $culHmRegModel{"HM-PB-4DIS-WM"};
 $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
+
 
 %culHmRegChan = (# if channelspecific then enter them here
   "HM-CC-TC02"        =>{ displayMode     =>1,displayTemp     =>1,displayTempUnit =>1
@@ -1297,6 +1300,8 @@ $culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegChan{"HM-CC-RT-DN06"};
 
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegChan{"HM-CC-TC02"};
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
+$culHmRegChan{"HM-OU-CFM-TW01"}= $culHmRegChan{"HM-OU-CFM-PL01"};
+$culHmRegChan{"HM-OU-CFM-TW02"}= $culHmRegChan{"HM-OU-CFM-PL02"};
 
 
 ##############################---templates---##################################
@@ -1649,6 +1654,7 @@ $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
 
 $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"HM-OU-CF-PL"}           = $culHmModelSets{"HM-OU-CFM-PL"};
+$culHmModelSets{"HM-OU-CFM-TW"}          = $culHmModelSets{"HM-OU-CFM-PL"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"}   = $culHmModelSets{"HM-CC-TC"};
 $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-PB-4DIS-WM-2"}       = $culHmModelSets{"HM-PB-4DIS-WM"};
@@ -1801,6 +1807,8 @@ $culHmChanSets{"HM-ES-PMSw1-Pl02"}      = $culHmSubTypeSets{outputUnit};
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
 
 $culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
+$culHmChanSets{"HM-OU-CFM-TW01"}        = $culHmChanSets{"HM-OU-CFM-PL01"};
+$culHmChanSets{"HM-OU-CFM-TW02"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
 
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN03"}         = $culHmChanSets{"HM-CC-RT-DN06"};
