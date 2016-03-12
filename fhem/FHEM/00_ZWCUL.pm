@@ -25,7 +25,8 @@ sub ZWCUL_Write($$$);
 sub ZWCUL_ProcessSendStack($);
 
 use vars qw(%zwave_id2class);
-my %sentIdx;
+my %ZWCUL_sentIdx;
+my %ZWCUL_sentIdx2cbid;
 
 my %sets = (
   "reopen"     => { cmd=>"" },
@@ -279,12 +280,14 @@ ZWCUL_Write($$$)
   my ($hash,$fn,$msg) = @_;
 
   Log3 $hash, 5, "ZWCUL_Write $fn $msg";
-  if($msg =~ m/0013(..)(..)(.*)(....)/) {
-    my ($targetId,$l,$p) = ($1,$2,$3);
+  if($msg =~ m/0013(..)(..)(.*)(..)(..)/) {
+    my ($targetId,$l,$p,$flags,$cbid) = ($1,$2,$3,$4,$5);
     my ($homeId,$route) = split(",",$fn);
 
-    $sentIdx{$targetId} = 0 if(!$sentIdx{$targetId} || $sentIdx{$targetId}==15);
-    $sentIdx{$targetId}++;
+    my $sn = $ZWCUL_sentIdx{$targetId};
+    $sn = (!$sn || $sn==15) ? 1 : ($sn+1);
+    $ZWCUL_sentIdx2cbid{"$targetId$sn"} = $cbid;
+    $ZWCUL_sentIdx{$targetId} = $sn;
 
     my $s100 = ($hash->{baudRate} eq "100k");
 
@@ -295,7 +298,7 @@ ZWCUL_Write($$$)
     }
 
     $msg = sprintf("%s%s%02x%02x%02x%s%s", 
-                    $homeId, $hash->{nodeIdHex}, $rf, $sentIdx{$targetId},
+                    $homeId, $hash->{nodeIdHex}, $rf, $sn,
                     length($p)/2+($s100 ? 11 : 10), $targetId, $p);
     $msg .= ($s100 ? zwlib_checkSum_16($msg) : zwlib_checkSum_8($msg));
 
@@ -516,7 +519,8 @@ ZWCUL_Parse($$$$$)
       return;
     }
 
-    $rmsg = sprintf("0013%s00", $S);
+    $rmsg = sprintf("0013%s00", 
+        $ZWCUL_sentIdx2cbid{"$S$sn"} ? $ZWCUL_sentIdx2cbid{"$S$sn"} : 00);
 
   }
   return $rmsg if($nodispatch);
