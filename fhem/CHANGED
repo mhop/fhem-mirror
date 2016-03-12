@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCAM: default recordtime 15 s is used if attribute "rectime" 
+             is set to "0"
   - bugfix:  YAMAHA_AVR: fix not working navigateListMenu under certain
              circumstances
   - feature  73_GasCalculator: Last Day/Month/Year/Meter - readings implemented
