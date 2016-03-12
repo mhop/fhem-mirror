@@ -20,6 +20,7 @@ sub ZWave_addToSendStack($$$);
 sub ZWave_secStart($);
 sub ZWave_secEnd($);
 sub ZWave_configParseModel($;$);
+sub ZWave_callbackId($);
 
 use vars qw($FW_ME $FW_tp $FW_ss);
 use vars qw(%zwave_id2class);
@@ -865,7 +866,7 @@ ZWave_Cmd($$@)
     my $len = sprintf("%02x", length($cmdFmt)/2+1);
     my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
     $data = "13$id$len$cmdId${cmdFmt}$cmdEf"; # 13==SEND_DATA
-    $data .= $id; # callback=>id
+    $data .= ZWave_callbackId($baseHash);
   }
 
   if ($data =~ m/(......)(....)(.*)(....)/) {
@@ -2924,7 +2925,7 @@ ZWave_secAddToSendStack($$)
   my $id = $hash->{nodeIdHex};  
   my $len = sprintf("%02x", (length($cmd)-2)/2+1);
   my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
-  my $data = "13$id$len$cmd$cmdEf$id"; # 13==SEND_DATA
+  my $data = "13$id$len$cmd$cmdEf" . ZWave_callbackId($hash);
   ZWave_addToSendStack($hash, "set", $data);  
 }
 
@@ -3506,6 +3507,20 @@ ZWave_getHash($$$)
   return $ptr;
 }
 
+my $zwave_cbid = 0;
+my %zwave_cbid2dev;
+sub
+ZWave_callbackId($)
+{
+  my ($p) = @_;
+  if(ref($p) eq "HASH") {
+    $zwave_cbid =  0 if($zwave_cbid == 255);
+    $zwave_cbid2dev{++$zwave_cbid} = $p;
+    return sprintf("%02x", $zwave_cbid);
+  }
+  return $zwave_cbid2dev{hex($p)};
+}
+
 sub
 ZWave_wakeupTimer($$)
 {
@@ -3525,7 +3540,7 @@ ZWave_wakeupTimer($$)
       # wakeupNoMoreInformation
       IOWrite($hash,
               $hash->{homeId}.($hash->{route} ? ",".$hash->{route} : ""),
-              "0013${nodeId}028408${cmdEf}$nodeId");
+              "0013${nodeId}028408${cmdEf}".ZWave_callbackId($hash));
     }
     delete $hash->{wakeupAlive};
 
@@ -3563,11 +3578,17 @@ ZWave_processSendStack($$;$)
     return;
   }
 
-  if($ss->[0] =~ m/^sent(.*?):(.*)$/) {
-    my ($stype,$smsg) = ($1,$2);
-    if($stype =~ m/get/ && $ackType eq "ack") { # accept double-ACK
-      $ss->[0] = "sentackget:$smsg";
-      return;
+  if($ss->[0] =~ m/^sent(.*?):(.*)(..)$/) {
+    my ($stype,$smsg, $cbid) = ($1,$2,$3);
+    if($ackType eq "ack") { 
+      if($cbid ne $omsg) {
+        Log 4, "ZWave: wrong callbackid $omsg received, expecting $cbid";
+        return;
+      }
+      if($stype eq "get") {
+        $ss->[0] = "sentackget:$smsg$cbid";
+        return;
+      }
 
     } elsif($stype eq "ackget" && $ackType eq "msg") {# compare answer class
       my $cs = substr($smsg, 6, 2);
@@ -3752,21 +3773,21 @@ ZWave_Parse($$@)
     return $ret;
 
   } elsif($cmd eq "ZW_SEND_DATA") { # 0013cb00....
-    my $hash = $modules{ZWave}{defptr}{"$homeId $callbackid"};
+    my $hash = ZWave_callbackId($callbackid);
     my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
                '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
     my $lmsg = ($msg{$id} ? $msg{$id} : "UNKNOWN_ERROR");
 
     if($id eq "00") {
-      Log3 $ioName, 4, "$ioName transmit $lmsg for $callbackid";
+      Log3 $ioName, 4, "$ioName transmit $lmsg for CB $callbackid";
       if($hash) {
         readingsSingleUpdate($hash, "transmit", $lmsg, 0);
-        ZWave_processSendStack($hash, "ack");
+        ZWave_processSendStack($hash, "ack", $callbackid);
       }
       return "";
 
     } else { # Wait for the retry timer to remove this cmd from the stack.
-      Log3 $ioName, 2, "$ioName transmit $lmsg for $callbackid";
+      Log3 $ioName, 2, "$ioName transmit $lmsg for CB $callbackid";
       return "" if(!$hash);
       readingsSingleUpdate($hash, "state", "TRANSMIT_$lmsg", 1);
       readingsSingleUpdate($hash, "transmit", $lmsg, 1);
