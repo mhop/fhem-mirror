@@ -2128,7 +2128,6 @@ sub CUL_HM_Parse($$) {#########################################################
       }
     }
   }
-
   elsif($mh{st} eq "powerSensor") {############################################
     if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
         ($mh{mTyp} eq "1006")) {  #    or Info_Status message here
@@ -3124,7 +3123,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       $level = $long;
       my $state = ucfirst($long);
 
-      if(!$mhp->{cHash}{helper}{BNO} || $mhp->{cHash}{helper}{BNO} ne $cnt){#cnt = event counter
+      if(!defined $mhp->{cHash}{helper}{BNO} || $mhp->{cHash}{helper}{BNO} ne $cnt){#cnt = event counter
         $mhp->{cHash}{helper}{BNO}    = $cnt;
         $mhp->{cHash}{helper}{BNOCNT} = 0; # message counter reset
       }
