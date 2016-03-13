@@ -3709,6 +3709,13 @@ ReadingsTimestamp($$$)
 }
 
 sub
+ReadingsAge($$$)
+{
+  my ($device,$reading,$default) = @_;
+  return time() - time_str2num(ReadingsTimestamp($device,$reading,$default));
+}
+
+sub
 Value($)
 {
   my ($d) = @_;
