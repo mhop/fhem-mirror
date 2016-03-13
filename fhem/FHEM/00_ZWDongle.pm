@@ -27,8 +27,8 @@ my %sets = (
   "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
                           param => {onNw=>0xc1, on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
-  "removeFailedNode" => { cmd => "61%02x@" },   # ZW_REMOVE_FAILED_NODE_ID
-  "replaceFailedNode"=> { cmd => "63%02x@" },   # ZW_REPLACE_FAILED_NODE
+  "removeFailedNode" => { cmd => "61%02x@" },  # ZW_REMOVE_FAILED_NODE_ID
+  "replaceFailedNode"=> { cmd => "63%02x@" },  # ZW_REPLACE_FAILED_NODE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
                                               # SERIAL_API_APPL_NODE_INFORMATION
@@ -823,10 +823,10 @@ ZWDongle_Ready($)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#disable">disable</a></li>
-    <li><a name="#homeId">homeId</a><br>
+    <li><a name="homeId">homeId</a><br>
       Stores the homeId of the dongle. Is a workaround for some buggy dongles,
       wich sometimes report a wrong/nonexisten homeId (Forum #35126)</li>
-    <li><a name="#networkKey">networkKey</a><br>
+    <li><a name="networkKey">networkKey</a><br>
       Needed for secure inclusion, hex string with length of 32
       </li>
   </ul>
