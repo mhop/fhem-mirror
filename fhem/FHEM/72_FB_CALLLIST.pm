@@ -769,13 +769,6 @@ sub FB_CALLLIST_list2html($;$)
             
             my $number = $data->{external_number};
             
-            if(defined(my $cmd = AttrVal($name, "number-cmd", undef)))
-            {
-                $cmd =~ s/\$NUMBER/$number/g;
-                 
-                $number = '<a href=\'#\' onclick="FW_cmd(FW_root+\'?XHR=1&cmd='.urlEncode($cmd).'\');return false;">'.$number."</a>";
-            }
-            
             $line = { 
                         index => $index,
                         line => $count,
@@ -790,8 +783,17 @@ sub FB_CALLLIST_list2html($;$)
                         duration => FB_CALLLIST_formatDuration($hash, $index)
                     };
 
-            push @json_output,  FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
             FB_CALLLIST_updateReadings($hash, $line) if($to_json and $create_readings eq "1");
+             
+            if(defined(my $cmd = AttrVal($name, "number-cmd", undef)))
+            {
+                $cmd =~ s/\$NUMBER/$number/g;
+                 
+                $line->{number} = '<a href=\'#\' onclick="FW_cmd(FW_root+\'?XHR=1&cmd='.urlEncode($cmd).'\');return false;">'.$number."</a>";
+            }
+             
+            push @json_output,  FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
+           
             $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, 'number="'.$count.'" class="fbcalllist '.($count % 2 == 1 ? "odd" : "even").'"', 'class="fbcalllist" '.$td_style);
         }
         
