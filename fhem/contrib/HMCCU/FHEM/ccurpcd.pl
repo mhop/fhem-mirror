@@ -5,24 +5,27 @@
 #
 # $Id:
 #
-# Version 1.6
+# Version 1.9
 #
-# RPC server for Homematic CCU.
+# FHEM RPC server for Homematic CCU.
 #
-# (C) 2015 by zap
+# (C) 2016 by zap
 #--------------------------------------------------------
 # Usage:
 #
 #   ccurpcd.pl Hostname Port QueueFile LogFile
+#   ccurpcd.pl shutdown Hostname Port PID
 #--------------------------------------------------------
 # Queue file entries:
 #
-#  IN|INIT|0
-#  ND|Address|Type
-#  UD|Address|Hint
-#  DD|Address
-#  EV|Address|Attribute|Value
-#  EX|SHUTDOWN|0
+#   Code|Data[|...]
+#
+#   Initialized:    IN|INIT|0
+#   New device:     ND|Address|Type
+#   Updated device: UD|Address|Hint
+#   Deleted device: DD|Address
+#   Event:          EV|Address|Attribute|Value
+#   Shutdown:       EX|SHUTDOWN|PID
 #########################################################
 
 use strict;
@@ -43,8 +46,12 @@ my $logfile;
 my $shutdown = 0;
 my $eventcount = 0;
 
+# Functions
 sub CheckProcess ($$);
 sub Log ($);
+sub WriteQueue ($);
+sub CCURPC_Shutdown ($$$);
+sub CCURPC_Initialize ($$);
 
 
 #####################################
@@ -110,16 +117,30 @@ sub WriteQueue ($)
 # Shutdown RPC connection
 #####################################
 
-sub CCURPC_Shutdown ($)
+sub CCURPC_Shutdown ($$$)
 {
-	my ($callbackurl) = @_;
+	my ($serveraddr, $serverport, $pid) = @_;
 
-	if ($callbackurl && $shutdown == 0) {
-		Log ("Shutdown RPC server in progress");
-		$client->send_request("init", $callbackurl);
-		WriteQueue ("EX|SHUTDOWN|$$");
-		$shutdown = 1;
+	# Detect local IP
+	my $socket = IO::Socket::INET->new (PeerAddr => $serveraddr, PeerPort => $serverport);
+	if (!$socket) {
+		print "Can't connect to CCU port $serverport";
+		return undef;
 	}
+	my $localaddr = $socket->sockhost ();
+	close ($socket);
+
+	my $ccurpcport = 5400+$serverport;
+	my $callbackurl = "http://".$localaddr.":".$ccurpcport."/fh".$serverport;
+	
+	$client = RPC::XML::Client->new ("http://$serveraddr:$serverport/");
+
+	print "Trying to deregister RPC server $callbackurl\n";
+	$client->send_request("init", $callbackurl);
+	sleep (3);
+	
+	print "Sending SIGINT to PID $pid\n";
+	kill ('INT', $pid);
 
 	return undef;
 }
@@ -133,26 +154,6 @@ sub CCURPC_Initialize ($$)
 	my ($serveraddr, $serverport) = @_;
 	my $callbackport = 5400+$serverport;
 	
-	# Detect local IP
-	my $socket = IO::Socket::INET->new (PeerAddr => $serveraddr, PeerPort => $serverport);
-	if (!$socket) {
-		Log "Can't connect to CCU port $serverport";
-		return undef;
-	}
-	my $localaddr = $socket->sockhost ();
-	close ($socket);
-
-	# Create RPC client
-	$client = RPC::XML::Client->new ("http://$serveraddr:$serverport/");
-
-	# Check if RPC daemon on CCU is running
-	my $resp = $client->send_request ('system.listMethods');
-	if (!ref($resp)) {
-		Log "No response from CCU on port $serverport. Error message follows in next line";
-		Log $resp;
-		return undef;
-	}
-
 	# Create RPC server
 	$server = RPC::XML::Server->new (port=>$callbackport);
 	if (!ref($server))
@@ -207,19 +208,8 @@ sub CCURPC_Initialize ($$)
 	     code=>\&CCURPC_ListDevicesCB
 	   }
 	);
-	
-	my $ccurpcport = $server->{__daemon}->sockport();
-	
-	# Register callback
-	my $callbackurl = "http://".$localaddr.":".$ccurpcport."/fh".$serverport;
-	Log "Registering callback $callbackurl with ID CB".$serverport;
 
-	$client->send_request ("init",$callbackurl,"CB".$serverport);
-	Log "RPC callback with URL ".$callbackurl." initialized";
-
-	WriteQueue ("IN|INIT|1");
-
-	return $callbackurl;
+	return "OK";
 }
 
 #####################################
@@ -297,6 +287,8 @@ sub CCURPC_EventCB ($$$$$)
 sub CCURPC_ListDevicesCB ()
 {
 	Log "ListDevices";
+	
+	WriteQueue ("IN|INIT|1");
 
 	return RPC::XML::array->new();
 }
@@ -309,9 +301,22 @@ my $name = $0;
 
 # Process command line arguments
 if ($#ARGV+1 != 4) {
-	die "Usage: $name CCU-Host Port QueueFile LogFile\n";
+	print "Usage: $name CCU-Host Port QueueFile LogFile\n";
+	print "       $name shutdown CCU-Host Port PID\n";
+	exit 1;
 }
 
+#
+# Manually shutdown RPC server
+#
+if ($ARGV[0] eq 'shutdown') {
+	CCURPC_Shutdown ($ARGV[1], $ARGV[2], $ARGV[3]);
+	exit 0;
+}
+
+#
+# Start RPC server
+#
 my $ccuhost = $ARGV[0];
 my $ccuport = $ARGV[1];
 my $queuefile = $ARGV[2];
@@ -347,7 +352,6 @@ if (!defined ($callbackurl)) {
 Log "Entering server loop. Use kill -SIGINT $$ to terminate program";
 $server->server_loop;
 
-# Shutdown RPC server
-CCURPC_Shutdown ($callbackurl);
+WriteQueue ("EX|SHUTDOWN|$$");
 Log "RPC server terminated";
 
