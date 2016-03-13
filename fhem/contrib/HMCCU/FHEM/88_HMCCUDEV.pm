@@ -103,8 +103,9 @@ sub HMCCUDEV_Define ($@)
 		foreach my $d (sort keys %defs) {
 			my $ch = $defs{$d};
 			$hmccu_hash = $ch if ($ch->{TYPE} eq 'HMCCU' && !defined ($hmccu_hash));
-			next if ($ch->{TYPE} ne 'HMCCUDEV' || $ch->{ccuif} ne 'VirtualDevices' ||
-			   $ch->{ccuname} ne 'none');
+			next if ($ch->{TYPE} ne 'HMCCUDEV');
+			next if ($d eq $name);
+			next if ($ch->{ccuif} ne 'VirtualDevices' || $ch->{ccuname} ne 'none');
 			$no++;
 		}
 		return "No IO device found" if (!defined ($hmccu_hash));
