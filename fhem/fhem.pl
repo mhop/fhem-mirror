@@ -3712,7 +3712,9 @@ sub
 ReadingsAge($$$)
 {
   my ($device,$reading,$default) = @_;
-  return time() - time_str2num(ReadingsTimestamp($device,$reading,$default));
+  my $ts = ReadingsTimestamp($device,$reading,undef);
+  return time() - time_str2num($ts) if(defined($ts));
+  return $default;
 }
 
 sub
