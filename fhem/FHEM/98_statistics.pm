@@ -922,8 +922,8 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
       $saveLast = 0;
       $lastState = $state;
       $hidden{"(since:"} = strftime ("%Y-%m-%d_%H:%M:%S)",localtime()  );
-      $hidden{$state} = 0;
-      $hidden{$state."_Count"} = 1; 
+      $hidden{$state.":"} = 0;
+      $hidden{$state."_Count:"} = 1; 
    } 
   # Do calculations if hidden reading exists
    else {
@@ -955,10 +955,10 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
             #Store current value for single readings
             $stat{$key} = $hidden{$key};
             # Reset hidden reading if period change
-            if ($saveLast && $key ne $state."_Count") {
+            if ($saveLast && $key ne $state."_Count:") {
                delete $hidden{$key};
             }
-            elsif ($saveLast && $key eq $state."_Count") {
+            elsif ($saveLast && $key eq $state."_Count:") {
                $hidden{$key} = 1;
             }
          }
