@@ -868,8 +868,10 @@ FW_createSlider(elName, devName, vArr, currVal, set, params, cmd)
   }
 
   $(newEl).keydown(function(e){
-    if(e.keyCode == 37) currVal -= stp;
-    if(e.keyCode == 39) currVal += stp;
+         if(e.keyCode == 37) currVal -= stp;
+    else if(e.keyCode == 39) currVal += stp;
+    else return;
+
     if(currVal < min) currVal = min;
     if(currVal > max) currVal = max;
     offX = (currVal-min)*maxX/(max-min);
