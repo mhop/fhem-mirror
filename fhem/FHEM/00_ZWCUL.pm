@@ -739,7 +739,7 @@ ZWCUL_Ready($)
   <a name="ZWCULattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a name="#dataRate">dataRate</a> [40k|100k|9600]<br>
+    <li><a name="dataRate">dataRate</a> [40k|100k|9600]<br>
       specify the data rate.
       </li>
     <li><a href="#dummy">dummy</a></li>
@@ -747,7 +747,7 @@ ZWCUL_Ready($)
     <li><a href="#model">model</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#networkKey">networkKey</a></li>
-    <li><a name="#intruderMode">intruderMode</a><br>
+    <li><a name="intruderMode">intruderMode</a><br>
       In monitor mode (see above) events are not dispatched to the ZWave module
       per default. Setting this attribute will allow to get decoded messages,
       and to send commands to devices not included by this controller.
