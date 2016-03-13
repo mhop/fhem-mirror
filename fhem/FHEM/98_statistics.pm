@@ -883,7 +883,9 @@ sub statistics_doStatisticDuration ($$$$)
   
   # Get reading
    my $state = $dev->{READINGS}{$readingName}{VAL};
-
+   
+   $state = "(null)" if $state eq "";
+   
    statistics_Log $hash, 4, "Calculating duration statistics for '".$dev->{NAME}.":$readingName = $state'";
   # Daily Statistic
    statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Day", $state, ($periodSwitch >= 2 || $periodSwitch <= -2);
@@ -1104,7 +1106,7 @@ sub statistics_UpdateDevReading($$$$)
 <a name="statistics"></a>
 <h3>statistics</h3>
 (en | <a href="http://fhem.de/commandref_DE.html#statistics">de</a>)
-<div style="width:800px">
+<div>
 <ul>
   This modul calculates for certain readings of given devices statistical values and adds them to the devices.
    <br>
@@ -1250,7 +1252,7 @@ sub statistics_UpdateDevReading($$$$)
 <a name="statistics"></a>
 <h3>statistics</h3>
 (<a href="http://fhem.de/commandref.html#statistics">en</a> | de)
-<div  style="width:800px">
+<div>
 <ul>
   Dieses Modul wertet von den angegebenen Ger&auml;ten (als regul&auml;rer Ausdruck) bestimmte Werte statistisch aus und f&uuml;gt das Ergebnis den jeweiligen Ger&auml;ten als neue Werte hinzu.
    <br>
