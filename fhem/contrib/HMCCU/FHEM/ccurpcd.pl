@@ -63,17 +63,17 @@ sub CheckProcess ($$)
 	my ($prcname, $port) = @_;
 
 	my $filename = $prcname;
-	my $pdump = `ps -ef | grep $prcname | grep -v grep`;
+	my $pdump = `ps ax | grep $prcname | grep -v grep`;
 	my @plist = split "\n", $pdump;
 	foreach my $proc (@plist) {
 		# Remove leading blanks, fix for MacOS. Thanks to mcdeck
 		$proc =~ s/^\s+//;
 		my @procattr = split /\s+/, $proc;
-		if ($procattr[1] != $$ && $procattr[7] =~ /perl$/ &&
-		    ($procattr[8] eq $prcname || $procattr[8] =~ /\/ccurpcd\.pl$/) &&
-		    $procattr[10] eq "$port") {
+		if ($procattr[0] != $$ && $procattr[4] =~ /perl$/ &&
+		    ($procattr[5] eq $prcname || $procattr[5] =~ /\/ccurpcd\.pl$/) &&
+		    $procattr[7] eq "$port") {
 			Log "Process $proc is running connected to CCU port $port";
-			return $procattr[1];
+			return $procattr[0];
 		}
 	}
 
