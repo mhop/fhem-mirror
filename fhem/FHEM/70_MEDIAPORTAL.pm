@@ -23,6 +23,9 @@
 #
 ########################################################################################
 # Changelog
+# 14.03.2016
+#	Es gibt nun ein Attribut "HeartbeatInterval", mit dem das Intervall für die Verbindungsprüfung festgelegt werden kann. Ein Wert von "0" deaktiviert die Prüfung.
+#	Es gibt nun das Attribut "disable", mit dem das Modul deaktiviert werden kann.
 # 08.02.2016
 #	Neuer MediaType "recording" hinzugefügt
 # 07.02.2016
@@ -58,7 +61,7 @@ use Data::Dumper;
 sub MEDIAPORTAL_Set($@);
 sub MEDIAPORTAL_Log($$$);
 
-my $MEDIAPORTAL_Interval = 15;
+my $MEDIAPORTAL_HeartbeatInterval = 15;
 
 ########################################################################################
 #
@@ -76,8 +79,8 @@ sub MEDIAPORTAL_Initialize($) {
 	$hash->{SetFn} = 'MEDIAPORTAL_Set';
 	$hash->{DefFn} = 'MEDIAPORTAL_Define';
 	$hash->{UndefFn} = 'MEDIAPORTAL_Undef';
-	#$hash->{AttrFn} = 'MEDIAPORTAL_Attr';
-	$hash->{AttrList} = 'authmethod:none,userpassword,passcode,both username password generateNowPlayingUpdateEvents:1,0 macaddress '.$readingFnAttributes;
+	$hash->{AttrFn} = 'MEDIAPORTAL_Attribute';
+	$hash->{AttrList} = 'authmethod:none,userpassword,passcode,both username password HeartbeatInterval generateNowPlayingUpdateEvents:1,0 macaddress '.$readingFnAttributes;
 	
 	$hash->{STATE} = 'Initialized';
 }
@@ -105,7 +108,8 @@ sub MEDIAPORTAL_Define($$) {
 	$hash->{DeviceName} = $dev;
 	$hash->{STATE} = 'Disconnected';
 	
-	my $ret = DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit');
+	my $ret = undef;
+	$ret = DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit') if AttrVal($hash->{NAME}, 'disable', 0);
 	
 	return $ret;
 }
@@ -126,6 +130,93 @@ sub MEDIAPORTAL_Undef($$) {
 
 ########################################################################################
 #
+#  MEDIAPORTAL_Attribute
+#
+########################################################################################
+sub MEDIAPORTAL_Attribute($@) {
+	my ($mode, $devName, $attrName, $attrValue) = @_;
+	my $hash = $defs{$devName};
+	
+	my $disableChange = 0;
+	if($mode eq 'set') {
+		if ($attrName eq 'disable') {
+			if ($attrValue && AttrVal($devName, $attrName, 0) != 1) {
+				MEDIAPORTAL_Log($devName, 5, 'Neu-Disabled');
+				$disableChange = 1;
+			}
+			
+			if (!$attrValue && AttrVal($devName, $attrName, 0) != 0) {
+				MEDIAPORTAL_Log($devName, 5, 'Neu-Enabled');
+				$disableChange = 1;
+			}
+		}
+	} elsif ($mode eq 'del') {
+		if ($attrName eq 'disable') {
+			if (AttrVal($devName, $attrName, 0) != 0) {
+				MEDIAPORTAL_Log($devName, 5, 'Deleted-Disabled');
+				$disableChange = 1;
+				$attrValue = 0;
+			}
+		}
+	}
+	
+	if ($disableChange) {
+		# Wenn die Verbindung beendet werden muss...
+		if ($attrValue) {
+			MEDIAPORTAL_Log $devName, 5, 'Call AttributeFn: Stop Connection...';
+			DevIo_CloseDev($hash);
+		}
+		
+		# Wenn die Verbindung gestartet werden muss...
+		if (!$attrValue) {
+			MEDIAPORTAL_Log $devName, 5, 'Call AttributeFn: Start Connection...';
+			DevIo_OpenDev($hash, 0, 'MEDIAPORTAL_DoInit');
+		}
+	}
+	
+	return undef;
+}
+
+########################################################################################
+#
+#  MEDIAPORTAL_DoInit
+#
+########################################################################################
+sub MEDIAPORTAL_DoInit($) {
+	my ($hash) = @_;
+	
+	$hash->{STATE} = 'Connecting...';
+	$hash->{helper}{buffer} = '';
+	$hash->{helper}{LastStatusTimestamp} = time();
+	
+	# Versuch, die MAC-Adresse des Ziels selber herauszufinden...
+	if (AttrVal($hash->{NAME}, 'macaddress', '') eq '') {
+		my $newmac = MEDIAPORTAL_GetMAC($hash);
+		
+		if (defined($newmac)) {
+			CommandAttr(undef, $hash->{NAME}.' macaddress '.$newmac);
+		}
+	}
+	
+	RemoveInternalTimer($hash);
+	InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0) if AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval);
+	
+	return undef;
+}
+
+########################################################################################
+#
+#  MEDIAPORTAL_Ready
+#
+########################################################################################
+sub MEDIAPORTAL_Ready($) {
+	my ($hash) = @_;
+	
+	return DevIo_OpenDev($hash, 1, 'MEDIAPORTAL_DoInit');
+}
+
+########################################################################################
+#
 #  MEDIAPORTAL_Get
 #
 ########################################################################################
@@ -134,6 +225,8 @@ sub MEDIAPORTAL_Get($@) {
 	
 	my $cname = $a[1];
 	my $cmd = '';
+	
+	return 'Module disabled!' if AttrVal($hash->{NAME}, 'disable', 0);
 	
 	if ($cname eq "status") {
 		$cmd = "{\"Type\":\"requeststatus\"}\r\n";
@@ -169,20 +262,21 @@ sub MEDIAPORTAL_GetIntervalStatus($) {
 	my ($hash) = @_;
 	
 	return undef if (ReadingsVal($hash->{NAME}, 'state', 'disconnected') eq 'disconnected');
+	return undef if (!AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval));
 	
 	# Prüfen, wann der letzte Status zugestellt wurde...
-	if (time() - $hash->{helper}{LastStatusTimestamp} > (2 * $MEDIAPORTAL_Interval + 5)) {
+	if (time() - $hash->{helper}{LastStatusTimestamp} > (2 * $MEDIAPORTAL_HeartbeatInterval + 5)) {
 		MEDIAPORTAL_Log $hash->{NAME}, 3, 'GetIntervalStatus hat festgestellt, dass Mediaportal sich seit '.(time() - $hash->{helper}{LastStatusTimestamp}).'s nicht zurückgemeldet hat. Die Verbindung wird neu aufgebaut!';
 		
 		MEDIAPORTAL_Set($hash, ($hash->{NAME}, 'reconnect'));
-		InternalTimer(gettimeofday() + $MEDIAPORTAL_Interval, 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
+		InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
 		
 		return undef;
 	}
 	
 	# Status anfordern...
 	MEDIAPORTAL_Get($hash, ($hash->{NAME}, 'status'));
-	InternalTimer(gettimeofday() + $MEDIAPORTAL_Interval, 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
+	InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, 'HeartbeatInterval', $MEDIAPORTAL_HeartbeatInterval), 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
 }
 
 ########################################################################################
@@ -212,6 +306,8 @@ sub MEDIAPORTAL_Set($@) {
 	
 	# Legacy Volume writing...
 	$cname = 'Volume' if (lc($cname) eq 'volume');
+	
+	return 'Module disabled!' if AttrVal($hash->{NAME}, 'disable', 0);
 	
 	if ($cname eq "command") {
 		if (!MEDIAPORTAL_isInList($a[2], split(/ /, $mpcommands))) { 
@@ -311,7 +407,9 @@ sub MEDIAPORTAL_Read($) {
 		$hash->{helper}{buffer} = '';
 		return undef;
 	}
-	   
+	
+	return undef if AttrVal($hash->{NAME}, 'disable', 0);
+	
 	MEDIAPORTAL_Log $hash->{NAME}, 5, "RAW MSG: $buf";
 	
 	# Zum Buffer hinzufügen
@@ -471,62 +569,6 @@ sub MEDIAPORTAL_ProcessMessage($$) {
 		MEDIAPORTAL_Log $hash->{NAME}, 1, 'Unhandled message received without any Messagetype: '.$msg;
 	}
 }
-
-########################################################################################
-#
-#  MEDIAPORTAL_DoInit
-#
-########################################################################################
-sub MEDIAPORTAL_DoInit($) {
-	my ($hash) = @_;
-	
-	$hash->{STATE} = 'Connecting...';
-	$hash->{helper}{buffer} = '';
-	$hash->{helper}{LastStatusTimestamp} = time();
-	
-	# Versuch, die MAC-Adresse des Ziels selber herauszufinden...
-	if (AttrVal($hash->{NAME}, 'macaddress', '') eq '') {
-		my $newmac = MEDIAPORTAL_GetMAC($hash);
-		
-		if (defined($newmac)) {
-			CommandAttr(undef, $hash->{NAME}.' macaddress '.$newmac);
-		}
-	}
-	
-	RemoveInternalTimer($hash);
-	InternalTimer(gettimeofday() + $MEDIAPORTAL_Interval, 'MEDIAPORTAL_GetIntervalStatus', $hash, 0);
-	
-	return undef;
-}
-
-########################################################################################
-#
-#  MEDIAPORTAL_Ready
-#
-########################################################################################
-sub MEDIAPORTAL_Ready($) {
-	my ($hash) = @_;
-	
-	return DevIo_OpenDev($hash, 1, 'MEDIAPORTAL_DoInit');
-}
-
-########################################################################################
-#
-#  MEDIAPORTAL_Attr
-#
-########################################################################################
-#sub MEDIAPORTAL_Attr($@) {
-#	my (@a) = @_;
-#	
-#	my $hash = $defs{$a[1]};
-#	my $name = $hash->{NAME};
-#	
-#	MEDIAPORTAL_Log $hash->{NAME}, 5,"********** 1 $a[1] 2 $a[2]";
-#	if($a[0] eq 'set') {
-#	}
-#	
-#	return undef;
-#}
 
 ########################################################################################
 #
@@ -768,8 +810,12 @@ sub MEDIAPORTAL_Log($$$) {
 <h4>Attributes</h4>
 <ul>
 <li><b>Common</b><ul>
+<li><a name="MEDIAPORTAL_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
+</a><br />One of (0, 1). With this attribute you can disable the module.</li>
 <li><a name="MEDIAPORTAL_attribut_generateNowPlayingUpdateEvents"><b><code>generateNowPlayingUpdateEvents &lt;value&gt;</code></b>
 </a><br />One of (0, 1). With this value you can disable (or enable) the generation of <code>NowPlayingUpdate</code>-Events. If set, Fhem generates an event per second with the updated time-values for the current playing. Defaults to "0".</li>
+<li><a name="MEDIAPORTAL_attribut_HeartbeatInterval"><b><code>HeartbeatInterval &lt;interval&gt;</code></b>
+</a><br />In seconds. Defines the heartbeat interval in seconds which is used for testing the correct work of the connection to Mediaportal. A value of 0 deactivate the heartbeat-check. Defaults to "15".</li>
 <li><a name="MEDIAPORTAL_attribut_macaddress"><b><code>macaddress &lt;address&gt;</code></b>
 </a><br />Sets the MAC-Address for the Player. This is needed for WakeUp-Function. e.g. "90:E6:BA:C2:96:15"</li>
 </ul></li>
@@ -859,8 +905,12 @@ sub MEDIAPORTAL_Log($$$) {
 <h4>Attribute</h4>
 <ul>
 <li><b>Grundsätzliches</b><ul>
+<li><a name="MEDIAPORTAL_attribut_disable"><b><code>disable &lt;value&gt;</code></b>
+</a><br />Eins aus (0, 1). Mit diesem Attribut kann das Modul deaktiviert werden.</li>
 <li><a name="MEDIAPORTAL_attribut_generateNowPlayingUpdateEvents"><b><code>generateNowPlayingUpdateEvents &lt;value&gt;</code></b>
 </a><br />Eins aus (0, 1). Mit diesem Attribut kann die Erzeugung eines <code>NowPlayingUpdate</code>-Events an- oder abgeschaltet werden. Wenn auf "1" gesetzt, generiert Fhem ein Event pro Sekunde mit den angepassten Zeitangaben. Standard ist "0".</li>
+<li><a name="MEDIAPORTAL_attribut_HeartbeatInterval"><b><code>HeartbeatInterval &lt;intervall&gt;</code></b>
+</a><br />In Sekunden. Legt das Intervall für die Prüfung der Verbindung zu Mediaportal fest. Mit "0" kann die Prüfung deaktiviert werden. Wenn kein Wert angeggeben wird, wird "15" verwendet.</li>
 <li><a name="MEDIAPORTAL_attribut_macaddress"><b><code>macaddress &lt;address&gt;</code></b>
 </a><br />Gibt die Mac-Adresse des Mediaportal-Rechners an. Das wird für die WakeUp-Funktionalität benötigt. z.B. "90:E6:BA:C2:96:15"</li>
 </ul></li>
