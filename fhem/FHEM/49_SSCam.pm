@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.20.2 14.03.2016    change: routine "initonboot" changed
 # 1.20.1 12.03.2016    bugfix: default recordtime 15 s is used if attribute "rectime" is set to "0"
 # 1.20   09.03.2016    command "extevent" added
 # 1.19.3 07.03.2016    bugfix "uninitialized value $lastrecstarttime",
@@ -194,14 +195,10 @@ sub SSCam_Define {
   readingsEndUpdate($hash,1);                                          
   
   getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)  
-  
   RemoveInternalTimer($hash);                                                                     # alle Timer löschen
   
-  # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-60s 
-  InternalTimer(gettimeofday()+int(rand(60)), "watchdogpollcaminfo", $hash, 0);
-  
   # initiale Rotinen nach Restart ausführen , verzögerter zufälliger Start   
-  InternalTimer(gettimeofday()+int(rand(10)), "initonboot", $hash, 0);
+  InternalTimer(gettimeofday()+int(rand(30)), "initonboot", $hash, 0);
 
 return undef;
 }
@@ -551,6 +548,10 @@ sub initonboot ($) {
          getptzlistpatrol($hash);
 
          }
+         
+     # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-60s 
+     InternalTimer(gettimeofday()+int(rand(30)), "watchdogpollcaminfo", $hash, 0);
+  
   }
   else 
   {
@@ -2609,7 +2610,7 @@ sub camret_nonbl ($) {
        }
        else
        {
-       if (AttrVal($name, "rectime", undef) == 0) {
+       if (defined($attr{$name}{rectime}) && AttrVal($name,"rectime", undef) == 0) {
            $rectime = 0;
            }
            else
@@ -2662,7 +2663,7 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                $logstr = $rectime != "0" ? "Camera $camname Recording with Recordtime $rectime"."s started" : "Camera $camname endless Recording started  - stop it manually or by stop-command !";
+                $logstr = $rectime != "0" ? "Camera $camname Recording with Recordtime $rectime"."s started" : "Camera $camname endless Recording started  - stop it by stop-command !";
                 &printlog($hash,$logstr,"3");  
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");                
