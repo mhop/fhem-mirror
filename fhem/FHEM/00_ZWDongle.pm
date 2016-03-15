@@ -158,11 +158,14 @@ ZWDongle_Set($@)
     return;
   }
 
-  if(($type eq "removeFailedNode" ||
-      $type eq "replaceFailedNode" ||
-      $type eq "sendNIF") &&
-     $defs{$a[0]} && $defs{$a[0]}{nodeIdHex}) {
-    $a[0] = hex($defs{$a[0]}{nodeIdHex});
+  if($type eq "removeFailedNode" ||
+     $type eq "replaceFailedNode" ||
+     $type eq "sendNIF") {
+
+    $a[0] =~ s/^UNKNOWN_//;
+
+    $a[0] = hex($defs{$a[0]}{nodeIdHex})
+      if($defs{$a[0]} && $defs{$a[0]}{nodeIdHex});
   }
 
   my $cmd = $sets{$type}{cmd};
@@ -241,11 +244,14 @@ ZWDongle_Get($@)
 
   return "No $cmd for dummies" if(IsDummy($name));
 
-  if(($cmd eq "neighborList" ||
-      $cmd eq "nodeInfo" ||
-      $cmd eq "isFailedNode") &&
-     $defs{$a[0]} && $defs{$a[0]}{nodeIdHex}) {
-    $a[0] = hex($defs{$a[0]}{nodeIdHex});
+  if($cmd eq "neighborList" ||
+     $cmd eq "nodeInfo" ||
+     $cmd eq "isFailedNode") {
+
+    $a[0] =~ s/^UNKNOWN_//;
+
+    $a[0] = hex($defs{$a[0]}{nodeIdHex})
+     if($defs{$a[0]} && $defs{$a[0]}{nodeIdHex});
   }
 
   my $out = sprintf($gets{$cmd}, @a);
