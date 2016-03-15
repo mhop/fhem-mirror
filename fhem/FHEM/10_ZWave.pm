@@ -3778,8 +3778,10 @@ ZWave_Parse($$@)
                '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
     my $lmsg = ($msg{$id} ? $msg{$id} : "UNKNOWN_ERROR");
 
+    Log3 $ioName, ($id eq "00" ? 4 : 2),
+        "$ioName transmit $lmsg for CB $callbackid, target ".
+        ($hash ? $hash->{NAME} : "unknown");
     if($id eq "00") {
-      Log3 $ioName, 4, "$ioName transmit $lmsg for CB $callbackid";
       if($hash) {
         readingsSingleUpdate($hash, "transmit", $lmsg, 0);
         ZWave_processSendStack($hash, "ack", $callbackid);
@@ -3787,7 +3789,6 @@ ZWave_Parse($$@)
       return "";
 
     } else { # Wait for the retry timer to remove this cmd from the stack.
-      Log3 $ioName, 2, "$ioName transmit $lmsg for CB $callbackid";
       return "" if(!$hash);
       readingsSingleUpdate($hash, "state", "TRANSMIT_$lmsg", 1);
       readingsSingleUpdate($hash, "transmit", $lmsg, 1);
