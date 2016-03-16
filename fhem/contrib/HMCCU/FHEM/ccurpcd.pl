@@ -5,7 +5,7 @@
 #
 # $Id:
 #
-# Version 1.9
+# Version 2.0
 #
 # FHEM RPC server for Homematic CCU.
 #
@@ -24,8 +24,10 @@
 #   New device:     ND|Address|Type
 #   Updated device: UD|Address|Hint
 #   Deleted device: DD|Address
+#   Replace device: RD|Address1|Address2
+#   Readd device:   RA|Address
 #   Event:          EV|Address|Attribute|Value
-#   Shutdown:       EX|SHUTDOWN|PID
+#   Shutdown:       EX|SHUTDOWN|pid
 #########################################################
 
 use strict;
@@ -162,7 +164,7 @@ sub CCURPC_Initialize ($$)
 		return undef;
 	}
 	else {
-		Log "callback server created listening on port $callbackport";
+		Log "Callback server created listening on port $callbackport";
 	}
 	
 	# Callback for events
@@ -201,6 +203,24 @@ sub CCURPC_Initialize ($$)
 	   }
 	);
 
+	# Callback for replaced devices
+	Log "Adding callback for replaced devices";
+	$server->add_method (
+	   { name=>"replaceDevice",
+	     signature=>["string string string string"],
+	     code=>\&CCURPC_ReplaceDeviceCB
+	   }
+	);
+
+	# Callback for readded devices
+	Log "Adding callback for readded devices";
+	$server->add_method (
+	   { name=>"replaceDevice",
+	     signature=>["string string array"],
+	     code=>\&CCURPC_ReaddDeviceCB
+	   }
+	);
+	
 	# Dummy implementation, always return an empty array
 	$server->add_method (
 	   { name=>"listDevices",
@@ -256,6 +276,36 @@ sub CCURPC_UpdateDeviceCB ($$$$)
 	my ($server, $cb, $devid, $hint) = @_;
 
 	WriteQueue ("UD|".$devid."|".$hint);
+
+	return;
+}
+
+#####################################
+# Callback for replaced devices
+#####################################
+
+sub CCURPC_ReplaceDeviceCB ($$$$)
+{
+	my ($server, $cb, $devid1, $devid2) = @_;
+
+	WriteQueue ("RD|".$devid1."|".$devid2);
+
+	return;
+}
+
+#####################################
+# Callback for readded devices
+#####################################
+
+sub CCURPC_ReaddDevicesCB ($$$)
+{
+	my ($server, $cb, $a) = @_;
+
+	Log "ReaddDevice: received ".scalar(@$a)." device addresses";
+
+	for my $dev (@$a) {
+		WriteQueue ("RA|".$dev);
+	}
 
 	return;
 }
