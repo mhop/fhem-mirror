@@ -291,7 +291,7 @@ my %zwave_class = (
     set   => { mcCreateAll => 'ZWave_mcCreateAll($hash,"")' },
     get   => { mcEndpoints => "07",
                mcCapability=> "09%02x"},
-    parse => { "^046008(..)(..)" => '"mcEndpoints:total ".hex($2).'.
+    parse => { "^0[45]6008(..)(..)" => '"mcEndpoints:total ".hex($2).'.
                                  '(hex($1)&0x80 ? ", dynamic":"").'.
                                  '(hex($1)&0x40 ? ", identical":", different")',
                "^..600a(.*)"=> 'ZWave_mcCapability($hash, $1)' },
@@ -2072,11 +2072,11 @@ ZWave_mcCreateAll($$)
 {
   my ($hash, $data) = @_;
   if(!$data) { # called by the user
-    $zwave_parseHook{"$hash->{nodeIdHex}:046008...."} = \&ZWave_mcCreateAll;
+    $zwave_parseHook{"$hash->{nodeIdHex}:0[45]6008...."} = \&ZWave_mcCreateAll;
     ZWave_Get($hash, $hash->{NAME}, "mcEndpoints");
     return("", "EMPTY");
   }
-  $data =~ m/^046008(..)(..)/;
+  $data =~ m/^0[45]6008(..)(..)/; # 4 vs. 5: Forum #50895
   my $nGrp = hex($2);
   for(my $c = 1; $c <= $nGrp; $c++) {
     ZWave_Get($hash, $hash->{NAME}, "mcCapability", $c);
