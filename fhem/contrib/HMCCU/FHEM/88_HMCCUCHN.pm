@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 2.7
+#  Version 3.0
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -31,6 +31,7 @@
 #  attr <name> ccureadingformat { name | address | datapoint }
 #  attr <name> ccuverify { 0 | 1 }
 #  attr <name> controldatapoint <datapoint>
+#  attr <name> disable { 0 | 1 }
 #  attr <name> statevals <text1>:<subtext1>[,...]
 #  attr <name> substitute <subst-rule>[;...]
 #
@@ -65,7 +66,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccuverify:0,1 ccuget:State,Value controldatapoint statedatapoint statevals substitute stripnumber:0,1,2 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccuverify:0,1 ccuget:State,Value controldatapoint disable:0,1 statedatapoint statevals substitute stripnumber:0,1,2 ". $readingFnAttributes;
 }
 
 #####################################
@@ -86,14 +87,14 @@ sub HMCCUCHN_Define ($@)
 
 	return "Invalid or unknown CCU channel name or address" if (! HMCCU_IsValidDevice ($devspec));
 
-	if ($devspec =~ /^(.+)\.([A-Z]{3,3}[0-9]{7,7}:[0-9]+)$/) {
+	if (HMCCU_IsChnAddr ($devspec, 1)) {
 		# CCU Channel address with interface
 		$hash->{ccuif} = $1;
 		$hash->{ccuaddr} = $2;
 		$hash->{ccuname} = HMCCU_GetChannelName ($hash->{ccuaddr}, '');
 		return "CCU device name not found for channel address $devspec" if ($hash->{ccuname} eq '');
 	}
-	elsif ($devspec =~ /^[A-Z]{3,3}[0-9]{7,7}:[0-9]+$/) {
+	elsif (HMCCU_IsChnAddr ($devspec, 0)) {
 		# CCU Channel address
 		$hash->{ccuaddr} = $devspec;
 		$hash->{ccuif} = HMCCU_GetDeviceInterface ($hash->{ccuaddr}, 'BidCos-RF');
@@ -101,7 +102,7 @@ sub HMCCUCHN_Define ($@)
 		return "CCU device name not found for channel address $devspec" if ($hash->{ccuname} eq '');
 	}
 	else {
-		# CCU Device name
+		# CCU Channel name
 		$hash->{ccuname} = $devspec;
 		my ($add, $chn) = HMCCU_GetAddress ($devspec, '', '');
 		return "Channel address not found for channel name $devspec" if ($add eq '' || $chn eq '');
@@ -171,15 +172,13 @@ sub HMCCUCHN_Set ($@)
 	my $name = shift @a;
 	my $opt = shift @a;
 
-	if (!defined ($hash->{IODev})) {
-		return HMCCUCHN_SetError ($hash, "No IO device defined");
-	}
-	if ($hash->{statevals} eq 'readonly' && $opt ne 'config') {
-		return undef;
-	}
+	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+	return undef if ($hash->{statevals} eq 'readonly' && $opt ne 'config');
+
+	my $disable = AttrVal ($name, "disable", 0);
+	return undef if ($disable == 1);	
 
 	my $hmccu_hash = $hash->{IODev};
-
 	if (HMCCU_IsRPCStateBlocking ($hmccu_hash)) {
 		return undef if ($opt eq '?');
 		return "HMCCUCHN: CCU busy";
@@ -197,32 +196,33 @@ sub HMCCUCHN_Set ($@)
 		my $objname = shift @a;
 		my $objvalue = join ('%20', @a);
 
-		if (!defined ($objname) || !defined ($objvalue)) {
-			return HMCCUCHN_SetError ($hash, "Usage: set <name> datapoint <datapoint> <value> [...]");
-		}
+		return HMCCU_SetError ($hash, "Usage: set $name datapoint {datapoint} {value} [...]")
+		   if (!defined ($objname) || !defined ($objvalue));
+		return HMCCU_SetError ($hash, -8) if (!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype},
+		   $hash->{ccuaddr}, $objname, 2));
+		   
 		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
 
 		# Build datapoint address
 		$objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$objname;
 
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
 		if ($ccuverify) {
 			usleep (100000);
 			($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-			return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		}
-
+		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
 	elsif ($opt eq 'control') {
-		return HMCCUCHN_SetError ($hash, "Attribute control datapoint not set") if ($controldatapoint eq '');
+		return HMCCU_SetError ($hash, "Attribute controldatapoint not set") if ($controldatapoint eq '');
 		my $objvalue = shift @a;
 		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$controldatapoint;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
-		return HMCCUDEV_SetError ($hash, $rc) if ($rc < 0);
-
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
@@ -230,27 +230,26 @@ sub HMCCUCHN_Set ($@)
 		my $cmd = $1;
 		my $objvalue = ($cmd ne 'devstate') ? $cmd : join ('%20', @a);
 
-		if (!defined ($objvalue)) {
-			return HMCCUCHN_SetError ($hash, "Usage: set <device> devstate <value>");
-		}
+		return HMCCU_SetError ($hash, "Usage: set $name devstate {value}") if (!defined ($objvalue));
+
 		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
 
 		# Build datapoint address
 		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$statedatapoint;
 
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
 		if ($ccuverify) {
 			usleep (100000);
 			($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-			return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		}
-
+		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
-        elsif ($opt eq 'toggle') {
-		return HMCCUCHN_SetError ($hash, "Attribute statevals not set")
+	elsif ($opt eq 'toggle') {
+		return HMCCU_SetError ($hash, "Attribute statevals not set")
 		   if ($statevals eq '' || !exists($hash->{statevals}));
 
 		my $tstates = $hash->{statevals};
@@ -260,7 +259,7 @@ sub HMCCUCHN_Set ($@)
 
 		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$statedatapoint;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
 		my $objvalue = '';
 		my $st = 0;
@@ -274,22 +273,22 @@ sub HMCCUCHN_Set ($@)
 			}
 		}
 
-		return HMCCUCHN_SetError ($hash, "Current device state doesn't match statevals")
+		return HMCCU_SetError ($hash, "Current device state doesn't match statevals")
 		   if ($objvalue eq '');
 
 		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
-
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
 	elsif ($opt eq 'config') {
-		return HMCCUCHN_SetError ($hash, "Usage: set $name config {parameter}={value} [...]") if (@a < 1);;
+		return HMCCU_SetError ($hash, "Usage: set $name config {parameter}={value} [...]") if (@a < 1);;
 
-                my $rc = HMCCU_RPCSetConfig ($hash, $hash->{ccuaddr}, \@a);
-                return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
-                return undef;
+		my $rc = HMCCU_RPCSetConfig ($hash, $hash->{ccuaddr}, \@a);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		HMCCU_SetState ($hash, "OK");
+		return undef;
 	}
 	else {
 		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of config datapoint devstate";
@@ -319,12 +318,12 @@ sub HMCCUCHN_Get ($@)
 	my $name = shift @a;
 	my $opt = shift @a;
 
-	if (!defined ($hash->{IODev})) {
-		return HMCCUCHN_SetError ($hash, "No IO device defined");
-	}
+	return HMCCU_SetError ($hash, -3) if (!defined ($hash->{IODev}));
+
+	my $disable = AttrVal ($name, "disable", 0);
+	return undef if ($disable == 1);	
 
 	my $hmccu_hash = $hash->{IODev};
-
 	if (HMCCU_IsRPCStateBlocking ($hmccu_hash)) {
 		return undef if ($opt eq '?');
 		return "HMCCUCHN: CCU busy";
@@ -339,16 +338,18 @@ sub HMCCUCHN_Get ($@)
 	if ($opt eq 'devstate') {
 		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$statedatapoint;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'datapoint') {
 		my $objname = shift @a;
-		return HMCCUCHN_SetError ($hash, "Usage: get <name> datapoint <datapoint>") if (!defined ($objname));
+		return HMCCU_SetError ($hash, "Usage: get $name datapoint {datapoint}") if (!defined ($objname));
+		return HMCCU_SetError ($hash, -8) if (!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype},
+		   $hash->{ccuaddr}, $objname, 1));
 
 		$objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$objname;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'channel') {
@@ -357,17 +358,17 @@ sub HMCCUCHN_Get ($@)
 		$objname .= '.'.$dptexpr if (defined ($dptexpr));
 		my @chnlist = ($objname);
 		($rc, $result) = HMCCU_GetChannel ($hash, \@chnlist);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $result;
 	}
 	elsif ($opt eq 'update') {
 		my $ccuget = shift @a;
 		$ccuget = 'Attr' if (!defined ($ccuget));
 		if ($ccuget !~ /^(Attr|State|Value)$/) {
-			return HMCCUCHN_SetError ($hash, "Usage: get $name update [{'State'|'Value'}]");
+			return HMCCU_SetError ($hash, "Usage: get $name update [{'State'|'Value'}]");
 		}
 		$rc = HMCCU_GetUpdate ($hash, $hash->{ccuaddr}, $ccuget);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return undef;
 	}
 	elsif ($opt eq 'config') {
@@ -376,7 +377,7 @@ sub HMCCUCHN_Get ($@)
 
 		$port = 2001 if (!defined ($port));
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $port);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $res;
 	}
 	elsif ($opt eq 'configdesc') {
@@ -385,11 +386,19 @@ sub HMCCUCHN_Get ($@)
 
 		$port = 2001 if (!defined ($port));
 		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", $port);
-		return HMCCUCHN_SetError ($hash, $rc) if ($rc < 0);
+		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $res;
 	}
 	else {
-		return "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg datapoint channel update:noArg config:noArg configdesc:noArg";
+		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of devstate:noArg datapoint";
+		
+		my ($a, $c) = split(":", $hash->{ccuaddr});
+		my @valuelist;
+		my $valuecount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 1, \@valuelist);	
+		$retmsg .= ":".join(",",@valuelist) if ($valuecount > 0);
+		$retmsg .= " channel update:noArg config:noArg configdesc:noArg";
+		
+		return $retmsg;
 	}
 }
 
@@ -403,12 +412,12 @@ sub HMCCUCHN_SetError ($$)
 	my $name = $hash->{NAME};
 	my $msg;
 	my %errlist = (
-	   -1 => 'Channel name or address invalid',
-	   -2 => 'Execution of CCU script failed',
-	   -3 => 'Cannot detect IO device',
-	   -4 => 'Device deleted in CCU',
-	   -5 => 'No response from CCU',
-	   -6 => 'Update of readings disabled. Set attribute ccureadings first'
+		-1 => 'Channel name or address invalid',
+		-2 => 'Execution of CCU script failed',
+		-3 => 'Cannot detect IO device',
+		-4 => 'Device deleted in CCU',
+		-5 => 'No response from CCU',
+		-6 => 'Update of readings disabled. Set attribute ccureadings first'
 	);
 
 	if (exists ($errlist{$text})) {
@@ -492,22 +501,18 @@ sub HMCCUCHN_SetError ($$)
    <b>Get</b><br/>
    <ul>
       <br/>
-      <li>get &lt;name&gt; devstate
-         <br/>
+      <li>get &lt;name&gt; devstate<br/>
          Get state of CCU device. Default datapoint STATE can be changed by setting
          attribute 'statedatapoint'.
       </li><br/>
-      <li>get &lt;name&gt; datapoint &lt;datapoint&gt;
-         <br/>
+      <li>get &lt;name&gt; datapoint &lt;datapoint&gt;<br/>
          Get value of a CCU device datapoint.
       </li><br/>
-      <li>get &lt;name&gt; config [&lt;rpcport&gt;]
-         <br/>
+      <li>get &lt;name&gt; config [&lt;rpcport&gt;]<br/>
          Get configuration parameters of CCU channel. If attribute ccureadings is 0 results will be
          displayed in browser window.
       </li><br/>
-      <li>get &lt;name&gt; configdesc [&lt;rpcport&gt;]
-         <br/>
+      <li>get &lt;name&gt; configdesc [&lt;rpcport&gt;]<br/>
          Get description of configuration parameters of CCU channel.
       </li><br/>
       <li>get &lt;name&gt; update [{'State'|'Value'}]<br/>
@@ -543,6 +548,9 @@ sub HMCCUCHN_SetError ($$)
          attr mydev controldatapoint SET_TEMPERATURE
          attr mydev webCmd control
          attr mydev widgetOverride control:slider,10,1,25
+      </li><br/>
+      <li>disable &lt;0 | 1&gt;<br/>
+      	Disable client device.
       </li><br/>
       <li>statedatapoint &lt;datapoint&gt;<br/>
          Set datapoint for devstate commands.
