@@ -161,7 +161,7 @@ zwlib_parseNeighborList($$)
 
   my @list;
   my $ioId = ReadingsVal($ioName, "homeId", "");
-  $ioId = $1 if($ioId =~ m/CtrlNodeId:(..)/);
+  $ioId = $1 if($ioId =~ m/CtrlNodeIdHex:(..)/);
   for my $byte (0..28) {
     my $bits = $r[$byte];
     for my $bit (0..7) {
