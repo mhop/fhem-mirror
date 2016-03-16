@@ -4470,9 +4470,7 @@ fhemFork()
   return $pid if($pid);
 
   # Child here
-  # Close all kind of FD. Reasons:
-  # - cannot restart FHEM if child keeps TCP Serverports open
-  # ...?
+  # Close FDs as we cannot restart FHEM if child keeps TCP Serverports open
   foreach my $d (sort keys %defs) {
     my $h = $defs{$d};
     $h->{DBH}->{InactiveDestroy} = 1 if($h->{TYPE} eq 'DbLog');
@@ -4482,6 +4480,7 @@ fhemFork()
       DevIo_CloseDev($h,1);
     }
   }
+  $SIG{CHLD} = 'DEFAULT';  # Forum #50898
   return 0;
 }
 
