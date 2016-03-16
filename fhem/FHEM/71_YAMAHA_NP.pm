@@ -4,12 +4,13 @@
 #
 #     71_YAMAHA_NP.pm
 #
-#     An FHEM Perl module for controlling the Yamaha CD-Receiver CRX-N560(D)
-#     (aka MCR-N560D) via Ethernet.
+#     Fhem Perl module for controlling the Yamaha PianoCraft(TM) HiFi
+#     Network Audiosystem MCR-N560(D) over Ethernet.
+#     The system is also marketed as CRX-N560(D).
 #
-#     The module might also work with devices such as
-#     NP-S2000, CD-N500, CD-N301, R-N500, R-N301 controlled by the
-#     Yamaha Network Player App.
+#     The module might also work with other devices such as
+#     NP-S2000, CD-N500, CD-N301, R-N500, R-N301 or any other device
+#     implementing the Yamaha Network Player Controller(TM) protocol:
 #
 #     i*S:
 #     https://itunes.apple.com/us/app/network-player-controller-us/id467502483?mt=8
@@ -17,9 +18,12 @@
 #     Andr*id:
 #     https://play.google.com/store/apps/details?id=com.yamaha.npcontroller
 #
-#     Copyright by Radoslaw Watroba (ra666ack@googlemail.com)
+#     Since the used communication protocol is undisclosed the module bases on
+#     entirely reverse engineered implementation.
+#     Some features may be unavailable.
+#     (Online check for new firmware was excluded intentionally.)
 #
-#     (Inspired by Markus Bloch and the module 71_YAMAHA_AVR)
+#     Copyright by Radoslaw Watroba (ra666ack @ t  9 m @ 1 l  d 0 t  c 0 m)
 #
 #     This file is part of fhem.
 #
@@ -59,7 +63,7 @@ sub YAMAHA_NP_Initialize
   $hash->{AttrFn}    = "YAMAHA_NP_Attr";
   $hash->{UndefFn}   = "YAMAHA_NP_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 auto_update_player_readings:1,0 auto_update_tuner_readings:1,0 ".$readingFnAttributes;
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 auto-update-player-readings:1,0 auto-update-tuner-readings:1,0 smooth-volume-change:1,0 ".$readingFnAttributes;
   
   return;
 }
@@ -71,6 +75,7 @@ sub YAMAHA_NP_GetStatus
   my $name = $hash->{NAME};
   my $power;
 
+  # Local means a timer reset by the module itself
   $local = 0 unless(defined($local));
 
   return "" if((!defined($hash->{helper}{ADDRESS})) or (!defined($hash->{helper}{OFF_INTERVAL})) or (!defined($hash->{helper}{ON_INTERVAL})));
@@ -82,9 +87,9 @@ sub YAMAHA_NP_GetStatus
   {
     YAMAHA_NP_getModel($hash);
     # Get network related information from the NP
-    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "networkInfo");
-    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "systemConfig");
-    YAMAHA_NP_ResetTimer($hash) unless($local == 1);    
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "networkInfo", 0);
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "systemConfig", 0);
+    YAMAHA_NP_ResetTimer($hash, 1);    
     return;
   }
   
@@ -92,21 +97,21 @@ sub YAMAHA_NP_GetStatus
   if((not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0))
   {
     YAMAHA_NP_getInputs($hash);
-    YAMAHA_NP_ResetTimer($hash) unless($local == 1);    
+    YAMAHA_NP_ResetTimer($hash, 1);    
     return;
   }
 
   # Timer readings available?
   if(not defined($hash->{READINGS}{timerVolume}))
   {
-    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Mode>GetParam</Mode></Timer></Misc></System></YAMAHA_AV>", "statusRequest", "getTimer");
-    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Param>GetParam</Param></Timer></Misc></System></YAMAHA_AV>", "statusRequest", "timerStatus");  
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Mode>GetParam</Mode></Timer></Misc></System></YAMAHA_AV>", "statusRequest", "getTimer", 0);
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Param>GetParam</Param></Timer></Misc></System></YAMAHA_AV>", "statusRequest", "timerStatus", 0);  
   }
 
   # Standby mode readings available?
   if(not defined($hash->{READINGS}{standbyMode}))
   {
-    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Power_Control><Saving>GetParam</Saving></Power_Control></System></YAMAHA_AV>", "statusRequest", "standbyMode"); 
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Power_Control><Saving>GetParam</Saving></Power_Control></System></YAMAHA_AV>", "statusRequest", "standbyMode", 0); 
   }
 
   # DAB preset readings available? Only for the DAB model.
@@ -117,7 +122,7 @@ sub YAMAHA_NP_GetStatus
     {
       if(not defined($hash->{READINGS}{tunerPresetDABItem_01}))
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetDAB"); 
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetDAB", 0); 
       } 
     }
   }
@@ -125,34 +130,34 @@ sub YAMAHA_NP_GetStatus
   # FM preset readings available?
   if(not defined($hash->{READINGS}{tunerPresetFMItem_01}))
   {
-    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><FM><Preset_Sel_Item>GetParam</Preset_Sel_Item></FM></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetFM");
+    YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><FM><Preset_Sel_Item>GetParam</Preset_Sel_Item></FM></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetFM", 0);
   }
 
   # Basic status request
-  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", "statusRequest", "basicStatus");  
+  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", "statusRequest", "basicStatus", 0);  
 
   if(defined($hash->{READINGS}{input}))
   {
     # Get dynamic tuner readings
-    if((AttrVal($name, "auto_update_tuner_readings","1") eq "1") and ($hash->{READINGS}{input}{VAL} eq "tuner") and ($hash->{READINGS}{power}{VAL} eq "on"))
+    if((AttrVal($name, "auto-update-tuner-readings","1") eq "1") and ($hash->{READINGS}{input}{VAL} eq "tuner") and ($hash->{READINGS}{power}{VAL} eq "on"))
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Info>GetParam<\/Play_Info><\/Tuner><\/YAMAHA_AV>", "statusRequest", "tunerStatus");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Info>GetParam<\/Play_Info><\/Tuner><\/YAMAHA_AV>", "statusRequest", "tunerStatus", 0);
       if($hash->{READINGS}{tunerBand}{VAL} eq "FM")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><FM><Preset_Sel_Item>GetParam</Preset_Sel_Item></FM></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetFM");
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><FM><Preset_Sel_Item>GetParam</Preset_Sel_Item></FM></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetFM", 0);
         blankTunerDABReadings($hash); 
       }
       elsif($hash->{READINGS}{tunerBand}{VAL} eq "DAB")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetDAB"); 
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", "statusRequest", "tunerPresetDAB", 0); 
         blankTunerFMReadings($hash); 
       }
       # Reset player readings
       blankPlayerReadings($hash);
     }
-    elsif(AttrVal($name, "auto_update_player_readings", "1") eq "1" and ($hash->{READINGS}{input}{VAL} ne "tuner") and ($hash->{READINGS}{power}{VAL} eq "on"))
+    elsif(AttrVal($name, "auto-update-player-readings", "1") eq "1" and ($hash->{READINGS}{input}{VAL} ne "tuner") and ($hash->{READINGS}{power}{VAL} eq "on"))
     {
-      # Inputs don't use any player readings. Get player readings.
+      # Inputs don't use any player readings. Blank them.
       if($hash->{READINGS}{input}{VAL} eq "aux1"     or
          $hash->{READINGS}{input}{VAL} eq "aux2"     or
          $hash->{READINGS}{input}{VAL} eq "digital1" or
@@ -163,8 +168,8 @@ sub YAMAHA_NP_GetStatus
       }
       else
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><Play_Info>GetParam<\/Play_Info><\/Player><\/YAMAHA_AV>", "statusRequest", "playerStatus");        
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><List_Info>GetParam</List_Info></Player></YAMAHA_AV>", "playerListGetList", "playerListGetList");       
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><Play_Info>GetParam<\/Play_Info><\/Player><\/YAMAHA_AV>", "statusRequest", "playerStatus", 0);        
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><List_Info>GetParam</List_Info></Player></YAMAHA_AV>", "playerListGetList", "playerListGetList", 0);       
       }
       # Reset tuner readings                   
       readingsSingleUpdate($hash, "tunerBand", "", 1);
@@ -172,6 +177,7 @@ sub YAMAHA_NP_GetStatus
       blankTunerFMReadings($hash);
     }  
   }
+  # Reset Timer for the next loop.
   YAMAHA_NP_ResetTimer($hash) unless($local == 1);  
   return;
 }
@@ -183,7 +189,7 @@ sub YAMAHA_NP_Get
   my $what;
   my $return;
 
-  return "argument is missing" if(int(@a) != 2);
+  return "Argument missing." if(int(@a) != 2);
   
   $what = $a[1];
   
@@ -200,13 +206,12 @@ sub YAMAHA_NP_Get
   }
   else
   {
-    $return = "unknown argument $what, choose one of";
+    $return = "Unknown argument $what, choose one of";
     
     foreach my $reading (keys %{$hash->{READINGS}})
     {
       $return .= " $reading:noArg";
-    }
-  
+    }  
     return $return;
   }
 }
@@ -221,17 +226,17 @@ sub YAMAHA_NP_Set
     # Get model info in case not defined
     if(not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "networkInfo");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "networkInfo",0);
       YAMAHA_NP_getModel($hash);
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "systemConfig");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "systemConfig", 0);
     }
     
     if(not defined($hash->{helper}{VOLUMESTRAIGHTMIN}) and not defined($hash->{helper}{VOLUMESTRAIGHTMAX}))
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "systemConfig");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", "statusRequest", "systemConfig", 0);
     }
 
-    # get all available inputs if nothing is available
+    # Get available inputs in case of empty list
     if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
     {
       YAMAHA_NP_getInputs($hash);
@@ -250,13 +255,11 @@ sub YAMAHA_NP_Set
     
     my $usage = "";
     
-    # DAB available? Suffix D stands for DAB.
+    # DAB available? Suffix D stands for DAB. "CRX-N560D"
     if (defined($hash->{MODEL}))
     {
-      my $model = $hash->{MODEL};
-      
-      if ($model eq "CRX-N560D")
-      {
+        my $model = $hash->{MODEL};
+      	  
         $usage = "Unknown argument $what, choose one of ".
                  "on:noArg ".
                  "off:noArg ".
@@ -270,11 +273,13 @@ sub YAMAHA_NP_Set
                  "timerVolume:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
                  "mute:on,off ".
                  (exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"").
-                 "statusRequest:basicStatus,mediaRendererDesc,playerStatus,standbyMode,systemConfig,timerStatus,tunerPresetDAB,tunerPresetFM,tunerStatus ".
                  "standbyMode:eco,normal ".
                  "cdTray:noArg ".
                  "timer:on,off ".
-                 "tuner:bandDAB,bandFM,presetUp,presetDown,tuneDown,tuneUp ".
+                 (($model eq "CRX-N560D") ? "statusRequest:basicStatus,mediaRendererDesc,playerStatus,standbyMode,systemConfig,timerStatus,tunerPresetDAB,tunerPresetFM,tunerStatus ":
+                                            "statusRequest:basicStatus,mediaRendererDesc,playerStatus,standbyMode,systemConfig,timerStatus,tunerPresetFM,tunerStatus ").
+				 (($model eq "CRX-N560D") ? "tuner:bandDAB,bandFM,presetUp,presetDown,tuneDown,tuneUp " : "tuner:bandFM,presetUp,presetDown,tuneDown,tuneUp ").
+				 (($model eq "CRX-N560D") ? "tunerPresetDAB:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 " : "").
                  "player:play,stop,pause,next,prev,shuffleToggle,repeatToggle ".
                  "clockUpdate:noArg ".
                  "dimmer:1,2,3 ".
@@ -284,60 +289,27 @@ sub YAMAHA_NP_Set
                  "playerListCursorReturn:noArg ".
                  "playerListCursorDown:noArg ".
                  "playerListCursorUp:noArg ".                 
-                 "tunerPresetDAB:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 ".
                  "tunerPresetFM:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 ".
                  "timerHour:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 ".
                  "tunerFMFrequency ".
-                 "timerMinute:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59 ";
-      }
-      else
-      {
-        $usage = "Unknown argument $what, choose one of ".
-                 "on:noArg ".
-                 "off:noArg ".
-                 "timerRepeat:once,every ".
-                 "timerSet:noArg ".
-                 "sleep:off,30min,60min,90min,120min ".
-                 "volumeStraight:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
-                 "volume:slider,0,1,100 ".
-                 "volumeUp:noArg ".
-                 "volumeDown:noArg ".
-                 "timerVolume:slider,".$volumeStraightMin.",1,".$volumeStraightMax." ".
-                 "mute:on,off ".
-                 (exists($hash->{helper}{INPUTS})?"input:".$inputs_comma." ":"").
-                 "statusRequest:basicStatus,mediaRendererDesc,networkInfo,playerStatus,standbyMode,systemConfig,timerStatus,tunerPresetFM,tunerStatus ".
-                 "standbyMode:eco,normal ".
-                 "cdTray:noArg ".
-                 "timer:on,off ".
-                 "tuner:bandFM,presetUp,presetDown,tuneDown,tuneUp ".
-                 "player:play,stop,pause,next,prev,shuffleToggle,repeatToggle ".
-                 "clockUpdate:noArg ".
-                 "dimmer:1,2,3 ".
-                 "playerListGetList:noArg ".
-                 "playerListJumpLine ".
-                 "playerListSelectLine ".
-                 "playerListCursorReturn:noArg ".
-                 "playerListCursorDown:noArg ".
-                 "playerListCursorUp:noArg ".
-                 "tunerPresetFM:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 ".
-                 "timerHour:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23 ".
-                 "tunerFMFrequency ".
-                 "timerMinute:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59 ";
-      }
-      Log3 $name, 5, "Model: $model.";
+                 "timerMinute:0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59 ";      
+		
+		Log3 $name, 5, "Model: $model.";
     }    
     
     Log3 $name, 5, "YAMAHA_NP ($name) - set ".join(" ", @a);
-    
-	# Processing of incoming commands.
-	
-    if($what eq "on")
+      
+  	# Processing of SET commands.
+  	
+  	# Device Power ON/OFF
+  	#
+	  if($what eq "on")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Power>On</Power></Power_Control></System></YAMAHA_AV>" ,$what, "On");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Power>On</Power></Power_Control></System></YAMAHA_AV>" ,$what, "On", 0);
     }
     elsif($what eq "off")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Power>Standby</Power></Power_Control></System></YAMAHA_AV>", $what, "Standby");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Power>Standby</Power></Power_Control></System></YAMAHA_AV>", $what, "Standby", 0);
     }
     elsif($what eq "input")
     {
@@ -353,7 +325,7 @@ sub YAMAHA_NP_Set
               
               if(defined($command) and length($command) > 0)
               {
-                YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Input><Input_Sel>".$command."</Input_Sel></Input></System></YAMAHA_AV>", $what, $a[2]);
+                YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Input><Input_Sel>".$command."</Input_Sel></Input></System></YAMAHA_AV>", $what, $a[2], 0);
               }
               else
               {
@@ -379,207 +351,223 @@ sub YAMAHA_NP_Set
       {
           return $inputs_piped eq "" ? "No inputs available. Please try an statusRequest first." : "No input parameter given.";
       }
-    }      
+    }
+  	#	
+  	# MUTE
+  	#	
     elsif($what eq "mute")
     {
-      if(defined($a[2]))
+      if($hash->{READINGS}{power}{VAL} ne "on")
       {
-        if($hash->{READINGS}{power}{VAL} eq "on")
-        {
-          if($a[2] eq "on")
-          {
-            YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Mute>On</Mute></Volume></System></YAMAHA_AV>", $what, "on");
-          }
-          elsif($a[2] eq "off")
-          {
-            YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Mute>Off</Mute></Volume></System></YAMAHA_AV>", $what, "off"); 
-          }
-          else
-          {
-              return $usage;
-          }   
-        }
+        return "Power on the device first.";
+      }
+	  
+  	  if(defined($a[2]))
+      {
+        if($a[2] =~ /^(on|off)$/)
+  		  {
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Mute>".ucfirst($a[2])."</Mute></Volume></System></YAMAHA_AV>", $what, ucfirst($a[2]), 0);
+        }          
         else
         {
-            return "Switch device on in order to mute it.";
-        }
-      }
+            return $usage;
+        }   
+      }        
     }
+    #
+	# DISPLAY DIMMER
+	#
     elsif($what eq "dimmer")
     {
       if($a[2] >= 1 and $a[2] <= 3)
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Display><FL_Dimmer>".$a[2]."</FL_Dimmer></Display></Misc></System></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Display><FL_Dimmer>".$a[2]."</FL_Dimmer></Display></Misc></System></YAMAHA_AV>", $what, $a[2], 0);
       }
       else
       {
         return "Dimmer value must be 1 .. 3";
       }
-    }    
+    }
+	#
+	# VOLUME
+	# 
+	# VolumeStraight is device specific e.g. 0...60, Volume 0...100, VolumeUp/Down one step
+	#
     elsif($what =~ /^(volumeStraight|volume|volumeUp|volumeDown)$/)
     {
       my $target_volume;
+      my $minVolume = $hash->{helper}{VOLUMESTRAIGHTMIN};
+      my $maxVolume = $hash->{helper}{VOLUMESTRAIGHTMAX};
       
-      if(($what eq "volume") and ($a[2] >= 0) and ($a[2] <= 100))
+      if($hash->{READINGS}{power}{VAL} ne "on")
       {
-          $target_volume = YAMAHA_NP_volume_rel2abs($hash, $a[2]);
-          
-          $hash->{helper}{targetVolume} = $a[2];
-          
-          if($hash->{READINGS}{volumeStraight}{VAL} < $target_volume)
-          {
-            $hash->{helper}{targetVolumeDir} = "down";
-          }
-          elsif($hash->{READINGS}{volumeStraight}{VAL} > $target_volume)
-          {
-            $hash->{helper}{targetVolumeDir} = "up";
-          }
-          else
-          {
-            $hash->{helper}{targetVolumeDir} = "equal";  
-          }
+        return "Power on the device first.";
       }
-      elsif($what eq "volumeDown")
+
+      if($what eq "volumeDown")
       {
+          $hash->{helper}{volumeChangeDir} = "DOWN";
           $target_volume = $hash->{READINGS}{volumeStraight}{VAL} - 1;
+          $hash->{helper}{targetVolume} = $target_volume;
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".$target_volume."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", $target_volume, 0); 
       }
       elsif($what eq "volumeUp")
       {
+          $hash->{helper}{volumeChangeDir} = "UP";
           $target_volume = $hash->{READINGS}{volumeStraight}{VAL} + 1;
+          $hash->{helper}{targetVolume} = $target_volume;
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".$target_volume."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", $target_volume, 0); 
       }
       else
       {
-        # volumeStraight
-        $target_volume = $a[2];
-      }
-            
-      # if lower than minimum VOLUMESTRAIGHTMIN or higher than max VOLUMESTRAIGHTMAX set target volume to the corresponding limts
-      $target_volume = $hash->{helper}{VOLUMESTRAIGHTMIN} if(defined($target_volume) and $target_volume < $hash->{helper}{VOLUMESTRAIGHTMIN});
-      $target_volume = $hash->{helper}{VOLUMESTRAIGHTMAX} if(defined($target_volume) and $target_volume > $hash->{helper}{VOLUMESTRAIGHTMAX});
-      
-      Log3 $name, 4, "YAMAHA_NP ($name) - new target volume: $target_volume";
-      
-      if(defined($target_volume) )
-      {
-        if($hash->{READINGS}{power}{VAL} eq "on")
+        if($what eq "volume")
         {
-          $hash->{helper}{targetVolume} = $target_volume;
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".($target_volume)."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", $a[2]);
+          if($a[2] >= 0 and $a[2] <= 100)
+          {
+            $target_volume = YAMAHA_NP_volume_rel2abs($hash, $a[2]);
+          }
+          else
+          {
+            return "Volume must be in the range 1...100."; 
+          }
+        }
+        elsif($what eq "volumeStraight")
+        {
+          if($a[2] >= $minVolume and $a[2] <= $maxVolume)
+          {
+            $target_volume = $a[2];          
+          }
+          else
+          {
+            return "Volume must be in the range $minVolume...$maxVolume.";
+          }
+        }
+        
+        $hash->{helper}{targetVolume} = $target_volume;
+
+        if(AttrVal($name, "smooth-volume-change", "1") eq "1" )
+        {
+          
+          if($target_volume < $hash->{READINGS}{volumeStraight}{VAL})
+          {
+            $hash->{helper}{volumeChangeDir} = "DOWN";
+            YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".($hash->{READINGS}{volumeStraight}{VAL} - 1)."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", ($hash->{READINGS}{volumeStraight}{VAL} - 1), 0);
+          }
+          elsif($target_volume > $hash->{READINGS}{volumeStraight}{VAL})
+          {
+            $hash->{helper}{volumeChangeDir} = "UP";
+            YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".($hash->{READINGS}{volumeStraight}{VAL} + 1)."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", ($hash->{READINGS}{volumeStraight}{VAL} + 1), 0);
+          }
+          elsif($target_volume eq $hash->{READINGS}{volumeStraight}{VAL})
+          {
+            $hash->{helper}{volumeChangeDir} = "EQUAL";
+            YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".($hash->{READINGS}{volumeStraight}{VAL})."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", ($hash->{READINGS}{volumeStraight}{VAL}), 0);
+          }
         }
         else
         {
-            return "Volume can only be changed when device is powered on";
+          $hash->{helper}{volumeChangeDir} = "EQUAL";
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".$target_volume."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", $a[2], 0);   
         }
       }
-    }    
+      
+      Log3 $name, 4, "YAMAHA_NP ($name) - new target volume: $target_volume";
+    }
+	#
+	# SLEEP
+	#	
     elsif($what eq "sleep")
     {
       if($a[2] eq "off")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Sleep>Off</Sleep></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Sleep>Off</Sleep></Power_Control></System></YAMAHA_AV>", $what, $a[2], 0);
       }
-      elsif($a[2] eq "30min")
+      elsif($a[2] =~ /^(30min|60min|90min|120min)$/)
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Sleep>30 min</Sleep></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "60min")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Sleep>60 min</Sleep></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "90min")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Sleep>90 min</Sleep></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "120min")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Sleep>120 min</Sleep></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
-      }
+        if($a[2] =~ /(.+)min/)
+		{
+			YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Sleep>".$1." min</Sleep></Power_Control></System></YAMAHA_AV>", $what, $a[2], 0);
+		}
+	  }      
       else
       {
           return $usage;
       } 
     }
+	#
+	# TUNER
+	#
     elsif($what eq "tuner")
     {
         if($a[2] eq "presetUp")
         {
-          YAMAHA_NP_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Next</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+          YAMAHA_NP_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Next</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], 0);
         }
         elsif($a[2] eq "presetDown")
         {
-          YAMAHA_NP_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Prev</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+          YAMAHA_NP_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>Prev</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], 0);
         }
         elsif($a[2] eq "tuneUp")
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Service>Next</Service></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Service>Next</Service></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], 0);
         }
         elsif($a[2] eq "tuneDown")
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Service>Prev</Service></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Service>Prev</Service></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], 0);
         }
         elsif($a[2] eq "bandDAB")
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Band>DAB</Band></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Band>DAB</Band></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], 0);
         }
         elsif($a[2] eq "bandFM")
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Band>FM</Band></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Band>FM</Band></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], 0);
         }  
         else
         {
           return $usage;
         }
     }
+	#
+	# Player
+	#
     elsif($what eq "player")
     {
-      if($a[2] eq "play")
+      if($a[2] =~ /^(play|pause|stop|next|prev)$/)
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Playback>Play</Playback></Play_Control></Player></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "pause")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Playback>Pause</Playback></Play_Control></Player></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "stop")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Playback>Stop</Playback></Play_Control></Player></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "next")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Playback>Next</Playback></Play_Control></Player></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "prev")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Playback>Prev</Playback></Play_Control></Player></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "shuffle")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Play_Mode><Shuffle>Toggle</Shuffle></Play_Mode></Play_Control></Player></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "repeat")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Play_Mode><Repeat>Toggle</Repeat></Play_Mode></Play_Control></Player></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Playback>".ucfirst($a[2])."</Playback></Play_Control></Player></YAMAHA_AV>", $what, $a[2], 0);
       }      
+      elsif($a[2] eq "shuffleToggle")
+      {
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Play_Mode><Shuffle>Toggle</Shuffle></Play_Mode></Play_Control></Player></YAMAHA_AV>", $what, $a[2], 0);
+      }
+      elsif($a[2] eq "repeatToggle")
+      {
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><Play_Control><Play_Mode><Repeat>Toggle</Repeat></Play_Mode></Play_Control></Player></YAMAHA_AV>", $what, $a[2], 0);
+      }           
       else
       {
-          return $usage;
+		    return $usage;
       }
     }
+	#
+	# PlayerGetList
+	#
     elsif($what eq "playerListGetList")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><List_Info>GetParam</List_Info></Player></YAMAHA_AV>", $what, "playerListGetList");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><List_Info>GetParam</List_Info></Player></YAMAHA_AV>", $what, "playerListGetList", 0);
     }
     elsif($what eq "playerListCursorReturn")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Cursor>Return</Cursor></List_Control></Player></YAMAHA_AV>", $what, "playerListCursorReturn");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Cursor>Return</Cursor></List_Control></Player></YAMAHA_AV>", $what, "playerListCursorReturn", 0);
     }
     elsif($what eq "playerListCursorDown")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Cursor>Down</Cursor></List_Control></Player></YAMAHA_AV>", $what, "playerListCursorDown");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Cursor>Down</Cursor></List_Control></Player></YAMAHA_AV>", $what, "playerListCursorDown", 0);
     }
     elsif($what eq "playerListCursorUp")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Cursor>Up</Cursor></List_Control></Player></YAMAHA_AV>", $what, "playerListCursorUp");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Cursor>Up</Cursor></List_Control></Player></YAMAHA_AV>", $what, "playerListCursorUp", 0);
     }    
     elsif($what eq "playerListJumpLine")
     {
@@ -587,7 +575,7 @@ sub YAMAHA_NP_Set
       {
         if($a[2] =~ /^\d+$/ and $a[2] >= 1)
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Jump_Line>".$a[2]."</Jump_Line></List_Control></Player></YAMAHA_AV>", $what, $a[2]);
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Jump_Line>".$a[2]."</Jump_Line></List_Control></Player></YAMAHA_AV>", $what, $a[2], 0);
         }
         else
         {
@@ -599,13 +587,16 @@ sub YAMAHA_NP_Set
         return "No argument given.";
       }
     }
+	#
+	# PlayerListSelectLine
+	#
     elsif($what eq "playerListSelectLine")
     {
       if($a[2] ne "")
       {
         if($a[2] =~ /^\d+$/ and $a[2] >= 1)
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Direct_Sel>Line_".$a[2]."</Direct_Sel></List_Control></Player></YAMAHA_AV>", $what, $a[2]);
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Player><List_Control><Direct_Sel>Line_".$a[2]."</Direct_Sel></List_Control></Player></YAMAHA_AV>", $what, $a[2], 0);
         }
         else
         {
@@ -617,68 +608,76 @@ sub YAMAHA_NP_Set
         return "No argument given.";
       }
     }
+	#
+	# Standby Mode
+	#
     elsif($what eq "standbyMode")
     {
-      if($a[2] eq "eco")
+      if(($a[2] eq "eco") or ($a[2] eq "normal"))
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Saving>Eco</Saving></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
-      }
-      elsif($a[2] eq "normal")
-      {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Saving>Normal</Saving></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
-      }
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Power_Control><Saving>".ucfirst($a[2])."</Saving></Power_Control></System></YAMAHA_AV>", $what, $a[2], 0);
+      }      
       else
       {
           return $usage;
       }
     }
+	#
+	# CD Tray
+	#
     elsif($what eq "cdTray")
     {
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Tray>Open/Close</Tray></Misc></System></YAMAHA_AV>", $what, "Open/Close");
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Tray>Open/Close</Tray></Misc></System></YAMAHA_AV>", $what, "Open/Close", 0);
     }
+	#
+	# Clock Update
+	#
     elsif($what eq "clockUpdate")
     {  
       my $clockUpdateCurrentTime = Time::Piece->new();
-      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Clock><Param>".($clockUpdateCurrentTime->strftime('%Y:%m:%d:%H:%M:%S'))."</Param></Clock></Misc></System></YAMAHA_AV>", $what, ($clockUpdateCurrentTime->strftime('%Y:%m:%d:%H:%M:%S')));
+      YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Clock><Param>".($clockUpdateCurrentTime->strftime('%Y:%m:%d:%H:%M:%S'))."</Param></Clock></Misc></System></YAMAHA_AV>", $what, ($clockUpdateCurrentTime->strftime('%Y:%m:%d:%H:%M:%S')), 0);
     }
+	#
+	# Status Request
+	#
     elsif($what eq "statusRequest")
     {
       if($a[2] eq "systemConfig")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "playerStatus")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><Play_Info>GetParam<\/Play_Info><\/Player><\/YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Player><Play_Info>GetParam<\/Play_Info><\/Player><\/YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "tunerStatus")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Info>GetParam<\/Play_Info><\/Tuner><\/YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Info>GetParam<\/Play_Info><\/Tuner><\/YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "basicStatus")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Basic_Status>GetParam</Basic_Status></System></YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "timerStatus")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Mode>GetParam</Mode></Timer></Misc></System></YAMAHA_AV>", $what, "getTimer");
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Param>GetParam</Param></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Mode>GetParam</Mode></Timer></Misc></System></YAMAHA_AV>", $what, "getTimer", 0);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Timer><Param>GetParam</Param></Timer></Misc></System></YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "networkInfo")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Misc><Network><Info>GetParam</Info></Network></Misc></System></YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "tunerPresetFM")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><FM><Preset_Sel_Item>GetParam</Preset_Sel_Item></FM></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><FM><Preset_Sel_Item>GetParam</Preset_Sel_Item></FM></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "tunerPresetDAB")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><Tuner><Play_Control><Preset><DAB><Preset_Sel_Item>GetParam</Preset_Sel_Item></DAB></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "standbyMode")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Power_Control><Saving>GetParam</Saving></Power_Control></System></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Power_Control><Saving>GetParam</Saving></Power_Control></System></YAMAHA_AV>", $what, $a[2], 0);
       }
       elsif($a[2] eq "mediaRendererDesc")
       {
@@ -689,6 +688,9 @@ sub YAMAHA_NP_Set
           return $usage;
       }
     }
+	#
+	# Timer
+	#
     elsif($what eq "timer")
     {
       if($a[2] eq "on")
@@ -696,7 +698,7 @@ sub YAMAHA_NP_Set
         # Check if standbyMode == 'Normal'
         if($hash->{READINGS}{standbyMode}{VAL} eq "normal")
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Mode>".ucfirst($a[2])."</Mode></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);        
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Mode>".ucfirst($a[2])."</Mode></Timer></Misc></System></YAMAHA_AV>", $what, $a[2], 0);        
         }
         else
         {
@@ -705,14 +707,17 @@ sub YAMAHA_NP_Set
       }
       elsif($a[2] eq "off")
       {
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Mode>".ucfirst($a[2])."</Mode></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Mode>".ucfirst($a[2])."</Mode></Timer></Misc></System></YAMAHA_AV>", $what, $a[2], 0);
       }
       else
       {
           return $usage;
       }
     }
-    elsif($what eq "timerHour")
+	#
+	# Timer Hour
+	#
+	elsif($what eq "timerHour")
     {
       if((int($a[2]) >= 0) and (int($a[2]) <= 23))
       {
@@ -723,6 +728,9 @@ sub YAMAHA_NP_Set
         return $usage;
       }
     }
+	#
+	# Timer Minute
+	#
     elsif($what eq "timerMinute")
     {
       if((int($a[2]) >= 0) and (int($a[2]) <= 59))
@@ -734,6 +742,9 @@ sub YAMAHA_NP_Set
         return $usage;
       }
     }
+	#
+	# Timer Repeat
+	#
     elsif($what eq "timerRepeat")
     {
         if($a[2] eq "once" or $a[2] eq "every")
@@ -745,6 +756,9 @@ sub YAMAHA_NP_Set
           return $usage;
         }
     }
+	#
+	# TimerVolume
+	#	
     elsif($what eq "timerVolume")
     {
         # if lower than minimum VOLUMESTRAIGHTMIN or higher than max VOLUMESTRAIGHTMAX set target volume to the corresponding limits
@@ -757,40 +771,52 @@ sub YAMAHA_NP_Set
           return "Please use straight device volume range :".$hash->{helper}{VOLUMESTRAIGHTMIN}."...".$hash->{helper}{VOLUMESTRAIGHTMAX}.".";
         }
     }
+	#
+	# TimerSet
+	#
     elsif($what eq "timerSet")
     {
       if(defined($hash->{helper}{timerHour}) and defined($hash->{helper}{timerMinute}) and defined($hash->{helper}{timerRepeat}) and defined($hash->{helper}{timerVolume}))
       {
         # Configure Timer according to provided parameters
-        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Param><Start_Time>".sprintf("%02d", $hash->{helper}{timerHour}).":".sprintf("%02d", $hash->{helper}{timerMinute})."</Start_Time><Volume>".$hash->{helper}{timerVolume}."</Volume><Repeat>".$hash->{helper}{timerRepeat}."</Repeat></Param></Timer></Misc></System></YAMAHA_AV>", $what, $a[2]);            
+        YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Misc><Timer><Param><Start_Time>".sprintf("%02d", $hash->{helper}{timerHour}).":".sprintf("%02d", $hash->{helper}{timerMinute})."</Start_Time><Volume>".$hash->{helper}{timerVolume}."</Volume><Repeat>".$hash->{helper}{timerRepeat}."</Repeat></Param></Timer></Misc></System></YAMAHA_AV>", $what, $a[2], 0);            
       }
       else
       {
         return "Please, define timerHour, timerMinute, timerRepeat and timerVolume first.";
       }
     }
+	#	
+	# Tuner Preset DAB
+	#
     elsif($what eq "tunerPresetDAB")
     {
         if($a[2] >= 1 and $a[2] <= 30 and $hash->{MODEL} eq "CRX-N560D")
         {
-         YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><DAB><Preset_Sel>".$a[2]."<\/Preset_Sel><\/DAB><\/Preset><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerPresetDAB", $a[2]);
+         YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><DAB><Preset_Sel>".$a[2]."<\/Preset_Sel><\/DAB><\/Preset><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerPresetDAB", $a[2], 0);
         }
         else
         {
           return $usage;
         }
     }
+	#	
+	# Tuner Preset FM
+	#
     elsif($what eq "tunerPresetFM")
     {
         if($a[2] >= 1 and $a[2] <= 30)
         {
-          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><FM><Preset_Sel>".$a[2]."<\/Preset_Sel><\/FM><\/Preset><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerPresetFM", $a[2]);
+          YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><FM><Preset_Sel>".$a[2]."<\/Preset_Sel><\/FM><\/Preset><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerPresetFM", $a[2], 0);
         }
         else
         {
           return $usage;
         }
     }
+	#	
+	# Tuner FM Frequency
+	#
     elsif($what eq "tunerFMFrequency")
     {
   		if(length($a[2]) <= 6 and length($a[2]) >= 5) 	# Check the string length (x)xx.xx
@@ -806,7 +832,7 @@ sub YAMAHA_NP_Set
     					{
     						my $frequency = $a[2];
     						$frequency =~ s/\.//; 			# Remove decimal point
-    						YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><FM><Freq>".$frequency."<\/Freq><\/FM><\/Tuning><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerFMFrequency", $a[2]);
+    						YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Tuning><FM><Freq>".$frequency."<\/Freq><\/FM><\/Tuning><\/Play_Control><\/Tuner></YAMAHA_AV>", "tunerFMFrequency", $a[2], 0);
               }
     					else
     					{
@@ -880,17 +906,12 @@ sub YAMAHA_NP_Define
     
     YAMAHA_NP_getInputs($hash);
     
-    # set the volume-smooth-change attribute only if it is not defined, so no user values will be overwritten
-    #
-    # own attribute values will be overwritten anyway when all attr-commands are executed from fhem.cfg
-    
     unless(exists($hash->{helper}{AVAILABLE}) and ($hash->{helper}{AVAILABLE} == 0))
     {
       $hash->{helper}{AVAILABLE} = 1;
       readingsSingleUpdate($hash, "presence", "present", 1);
     }
-    
-
+	
     # start the status update timer
     $hash->{helper}{DISABLED} = 0 unless(exists($hash->{helper}{DISABLED}));
     YAMAHA_NP_ResetTimer($hash,0);
@@ -930,6 +951,8 @@ sub YAMAHA_NP_Attr
 }
 
 #############################
+#
+#
 sub YAMAHA_NP_Undefine
 {
   my($hash, $name) = @_;
@@ -939,38 +962,21 @@ sub YAMAHA_NP_Undefine
   return;
 }
 
-############################################################################################################
-#
-#   Begin of helper functions
-#
-############################################################################################################
-
 #############################
 # sends a command to the receiver via HTTP
+#
 sub YAMAHA_NP_SendCommand
 {
   my ($hash,$data,$cmd,$arg,$blocking) = @_;
   my $name = $hash->{NAME};
   my $address = $hash->{helper}{ADDRESS};
 
-  # "Blocking" delivers most reliable results for updating the READINGS.
-  # However, should the NP suddenly disappear FHEM would be blocked until a timeout.
-  # Trade-off between sending command and getting status...
-
-  # Always use non-blocking http communication
-  if(not defined($blocking) and $cmd ne "statusRequest" and $hash->{helper}{AVAILABLE} == 1)
+  # Always use non-blocking http communication in case not specified
+  if(not defined($blocking))
   {
-    #1 for testing
-    $blocking = 0;
+	 $blocking = 0;
   }
-  else
-  {
-    #0 for testing
-    $blocking = 0;
-  }
-    
-  # In case any URL changes must be made, this part is separated in this function".
-
+  
   if($blocking == 1)
   {
     Log3 $name, 5, "YAMAHA_NP ($name) - execute blocking \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\" on $name: $data";
@@ -1013,7 +1019,9 @@ sub YAMAHA_NP_SendCommand
 }
 
 #############################
-# parses the receiver response
+# parses HTTP response
+# (HttpUtils_NonblockingGet) callback
+#
 sub YAMAHA_NP_ParseResponse
 {
     my ($param, $err, $data ) = @_;    
@@ -1040,6 +1048,7 @@ sub YAMAHA_NP_ParseResponse
       }  
 
       $hash->{helper}{AVAILABLE} = 0;
+
     }
     elsif($data ne "")
     {
@@ -1057,7 +1066,7 @@ sub YAMAHA_NP_ParseResponse
       {
         if(not $data =~ /RC="0"/)
         {
-          # if the returncode isn't 0, than the command was not successful
+          # if the returncode != 0 -> HTTP command unsuccessful
           Log3 $name, 3, "YAMAHA_NP ($name) - Could not execute \"$cmd".(defined($arg) ? " ".(split("\\|", $arg))[0] : "")."\"";
         }
       }
@@ -1427,7 +1436,8 @@ sub YAMAHA_NP_ParseResponse
           
           if($data =~ /<UDN>(.+)<\/UDN>/)
           {
-            $hash->{UNIQUE_DEVICE_NAME} = $1;
+            my @uuid = split(/:/, $1);
+            $hash->{UNIQUE_DEVICE_NAME} = uc(@uuid[1]);            
           }
           
           # Replace \n, \r, \t from the string for XML parsing
@@ -1458,13 +1468,6 @@ sub YAMAHA_NP_ParseResponse
       {         
         # Delete old List listLines
         my $i = 1;    
-        
-        #while(exists($hash->{READINGS}{"playerListLine_$i"}))
-        #{
-        #  delete($hash->{READINGS}{"playerListLine_$i"});
-        #  delete($hash->{READINGS}{"playerListLine_Attribute_$i"});
-        #  $i++;
-        #}     
         
         if($data =~ /<Menu_Status>(.*)<\/Menu_Status>/)
         {
@@ -1499,13 +1502,13 @@ sub YAMAHA_NP_ParseResponse
       {
         if($data =~ /RC="0"/ and $data =~ /<Power><\/Power>/)
         {
-          # As the NP startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
+          
           readingsBulkUpdate($hash, "power", "on");
           readingsBulkUpdate($hash, "state","on");
           
           readingsEndUpdate($hash, 1);
           
-          YAMAHA_NP_ResetTimer($hash, 5);
+          YAMAHA_NP_ResetTimer($hash);
           
           return;
         }
@@ -1516,10 +1519,13 @@ sub YAMAHA_NP_ParseResponse
         {
           readingsBulkUpdate($hash, "power", "off");
           readingsBulkUpdate($hash, "state","off");
-          
-          readingsEndUpdate($hash, 1);
+		  readingsEndUpdate($hash, 1);
+		  
+		  blankTunerDABReadings($hash);
+		  blankTunerFMReadings($hash);
+		  blankPlayerReadings($hash);
  
-          YAMAHA_NP_ResetTimer($hash, 3);
+          YAMAHA_NP_ResetTimer($hash);
           
           return;
         }
@@ -1542,11 +1548,47 @@ sub YAMAHA_NP_ParseResponse
       {        
         if($data =~ /RC="0"/)
         {
-          readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
-          readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
-          # New "volume"value: The CRX-N560D cannot provide the current volume in time after a volume change.
-          # Therefore updated locally.          
-          # Volume will be updated during the next statusRequest timer loop.
+		  if(AttrVal($name, "smooth-volume-change", "1") eq "1" )
+          {            
+            my $volumeStraight;
+            
+            $volumeStraight = $hash->{READINGS}{volumeStraight}{VAL};
+
+            if($hash->{helper}{targetVolume} eq $volumeStraight)
+            {
+              $hash->{helper}{volumeChangeDir} = "EQUAL";
+            }
+
+            if($hash->{helper}{volumeChangeDir} eq "EQUAL")
+            {
+              readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
+              readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
+            }
+            elsif($hash->{helper}{volumeChangeDir} eq "UP")
+            {
+              # Reset timer in order to avoid status request collisions
+		      # due to recursive volume change call
+		      YAMAHA_NP_ResetTimer($hash);
+			  readingsBulkUpdate($hash, "volumeStraight", $volumeStraight + 1);
+              readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $volumeStraight + 1));
+              YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".($volumeStraight + 1)."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", ($volumeStraight + 1), 0);  
+            }
+            elsif($hash->{helper}{volumeChangeDir} eq "DOWN")
+            {
+              # Reset timer in order to avoid status request collisions
+		      # due to recursive volume change call
+		      YAMAHA_NP_ResetTimer($hash);
+			  readingsBulkUpdate($hash, "volumeStraight", $volumeStraight - 1);
+              readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $volumeStraight - 1));
+              YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><System><Volume><Lvl>".($volumeStraight - 1)."</Lvl></Volume><\/System></YAMAHA_AV>", "volume", ($volumeStraight - 1), 0);  
+            }            
+          }
+          else
+          {
+            readingsBulkUpdate($hash, "volumeStraight", $hash->{helper}{targetVolume});
+            readingsBulkUpdate($hash, "volume", YAMAHA_NP_volume_abs2rel($hash, $hash->{helper}{targetVolume}));
+            $hash->{helper}{volumeChangeDir} = "EQUAL";  
+          }
         }
       }
       
@@ -1681,7 +1723,7 @@ sub YAMAHA_NP_getModel
 {
   my ($hash) = @_;
 
-  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig");
+  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","systemConfig", 0);
   YAMAHA_NP_getMediaRendererDesc($hash);
   return;
 }	
@@ -1746,12 +1788,12 @@ sub YAMAHA_NP_getInputs
   my $address = $hash->{helper}{ADDRESS};
 
   # query all inputs
-  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","getInputs");
+  YAMAHA_NP_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>", "statusRequest","getInputs", 0);
   return;
 }
 
 #############################
-# Restarts the internal status request timer according to the given interval or current receiver state
+# Restarts the internal status request timer according to the given interval or current NP state
 sub YAMAHA_NP_ResetTimer
 {
   my ($hash, $interval) = @_;
@@ -1762,7 +1804,7 @@ sub YAMAHA_NP_ResetTimer
   {
     if(defined($interval))
     {
-      InternalTimer(gettimeofday()+$interval, "YAMAHA_NP_GetStatus", $hash, 0);
+      InternalTimer(gettimeofday()+ $interval, "YAMAHA_NP_GetStatus", $hash, 0);
     }
     elsif((exists($hash->{READINGS}{presence}{VAL}) and $hash->{READINGS}{presence}{VAL} eq "present") and (exists($hash->{READINGS}{power}{VAL}) and $hash->{READINGS}{power}{VAL} eq "on"))
     {
@@ -1819,7 +1861,7 @@ sub YAMAHA_NP_html2txt
       define &lt;name&gt; YAMAHA_NP &lt;ip-address&gt; [&lt;off_status_interval&gt;] [&lt;on_status_interval&gt;]
     </code>
     <br><br>
-    This module controls a Yamaha Network Player (such as CRX-N560, CRX-N560D, CD-N500 or NP-S2000) via Ethernet.
+    This module controls a Yamaha Network Player (such as MCR-N560, MCR-N560D, CRX-N560, CRX-N560D, CD-N500 or NP-S2000) via Ethernet.
     Theoretically, any device understanding the communication protocol of the Yamaha Network Player App should work. 
     <br><br>
     Currently implemented features:
@@ -1988,10 +2030,12 @@ sub YAMAHA_NP_html2txt
       <li><b><a name="disable">disable</a></b></li>
       <br>Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
       <br>Possible values: 0 &rarr; perform cyclic status update, 1 &rarr; don't perform cyclic status updates.<br><br>
-      <li><b><a name="auto_update_player_readings">auto_update_player_readings</a></b></li>
+      <li><b><a name="auto-update-player-readings">auto-update-player-readings</a></b></li>
       <br>Optional attribute for auto refresh of player related readings. Default is 1.<br><br>
-      <li><b><a name="auto_update_tuner_readings">auto_update_tuner_readings</a></b></li>
+      <li><b><a name="auto-update-tuner-readings">auto-update-tuner-readings</a></b></li>
       <br>Optional attribute for auto refresh of tuner related readings. Default is 1.<br><br>
+	  <li><b><a name="smooth-volume-change">smooth-volume-change</a></b></li>
+      <br>Optional attribute for smooth volume change (more Ethernet traffic is generated during volume change). Default is 1.<br><br>
       <br><br>
     </ul>
   </ul>
@@ -2080,7 +2124,7 @@ sub YAMAHA_NP_html2txt
       define &lt;name&gt; YAMAHA_NP &lt;ip-address&gt; [&lt;off_status_interval&gt;] [&lt;on_status_interval&gt;]
     </code>
     <br><br>
-    Mit Hilfe dieses Moduls lassen sich Yamaha Network Player (z.B. CRX-N560, CRX-N560D, CD-N500 or NP-S2000) via Ethernet steuern.<br>
+    Mit Hilfe dieses Moduls lassen sich Yamaha Network Player (z.B. MCR-N560, MCR-N560D, CRX-N560, CRX-N560D, CD-N500 or NP-S2000) via Ethernet steuern.<br>
     Theoretisch sollten alle Ger&auml;te, die mit der Yamaha Network Player App kompatibel sind, bedient werden k&ouml;nnen.<br><br>
     Die aktuelle Implementierung erm&ouml;glicht u.a. den folgenden Funktionsumfang:<br><br>
     <ul>
@@ -2242,12 +2286,13 @@ sub YAMAHA_NP_html2txt
         <li><b><a name="disable">disable</a></b></li><br>
         Optionales Attribut zum Deaktivieren des internen zyklischen Timers zum Aktualisieren des NP-Status. Manuelles Update ist nach wie vor m&ouml;glich.<br>
         M&ouml;gliche Werte: 0 &rarr; Zyklisches Update aktiv., 1 &rarr; Zyklisches Update inaktiv.<br><br>
-        <li><b><a name="auto_update_player_readings">auto_update_player_readings</a></b></li>
+        <li><b><a name="auto-update-player-readings">auto-update-player-readings</a></b></li>
         <br>Optionales Attribut zum automtischen aktualisieren der Player-Readings. Default-Wert ist 1.<br><br>
-        <li><b><a name="auto_update_tuner_readings">auto_update_tuner_readings</a></b></li>
-        <br>Optionales Attribut zum automtischen aktualisieren der Tuner-Readings. Default-Wert ist 1.<br>
+        <li><b><a name="auto-update-tuner-readings">auto-update-tuner-readings</a></b></li>
+        <br>Optionales Attribut zum automtischen aktualisieren der Tuner-Readings. Default-Wert ist 1.<br><br>
+		<li><b><a name="smooth-volume-change">smooth-volume-change</a></b></li>
+        <br>Optionales Attribut zur sanften Lautst&auml;rke&auml;nderung (Erzeugt mehr Ethernetkommunikation w&auml;hrend der Lautst&auml;rke&auml;nderung). Default-Wert ist 1.<br><br>
         <br><br>
-        <br>
       </ul>
     </ul>
     <b>Readings</b><br>
