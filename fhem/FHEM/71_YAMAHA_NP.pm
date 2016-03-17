@@ -23,7 +23,7 @@
 #     Some features may be unavailable.
 #     (Online check for new firmware was excluded intentionally.)
 #
-#     Copyright by Radoslaw Watroba (ra666ack @ t  9 m @ 1 l  d 0 t  c 0 m)
+#     Copyright by Radoslaw Watroba (ra666ack a t  9 m a 1 l  d 0 t  c 0 m)
 #
 #     This file is part of fhem.
 #
@@ -1090,9 +1090,10 @@ sub YAMAHA_NP_ParseResponse
             $hash->{helper}{VOLUMESTRAIGHTMIN}  = $4;
             $hash->{helper}{VOLUMESTRAIGHTMAX}  = $5;
             $hash->{helper}{VOLUMESTRAIGHTSTEP} = $6;
-          }
-          
-          #$attr{$name}{"model"} = $hash->{MODEL};
+
+            # Used by 'fheminfo' command for statistics
+            $attr{$name}{"model"} = $hash->{MODEL};
+          }          
         }
         elsif($arg eq "getInputs")
         {

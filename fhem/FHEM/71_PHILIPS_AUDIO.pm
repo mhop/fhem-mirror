@@ -368,6 +368,9 @@ sub PHILIPS_AUDIO_Define
     if(defined($a[2]))
     {
       $hash->{MODEL} = $a[2];
+      
+      # Used by 'fheminfo' command for statistics
+      $attr{$name}{"model"} = $hash->{MODEL};
     }
     
     $hash->{IP_ADDRESS} = $a[3];
