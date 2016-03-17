@@ -157,7 +157,7 @@ sub statistics_Define($$)
   else {$hash->{PREFIX} = "stat";}
  
   eval { "Hallo" =~ m/^$devName$/ };
-  return "Bad regexp: $@" if($@);
+  return "Bad regexp: $@"  if($@);
   $hash->{DEV_REGEXP} = $devName;
 
   $hash->{STATE} = "Waiting for notifications";
@@ -166,7 +166,7 @@ sub statistics_Define($$)
   RemoveInternalTimer($hash);
   
   InternalTimer( gettimeofday() + 11, "statistics_PeriodChange", $hash, 0);
-
+  $hash->{fhem}{nextPeriodChangeTime} = gettimeofday() + 11;
   return undef;
 }
 
@@ -289,9 +289,12 @@ sub statistics_PeriodChange($)
    my $name = $hash->{NAME};
    my $dummy;
    my $val;
+   
+   my $curPeriodChangeTime = $hash->{fhem}{nextPeriodChangeTime};
+   $curPeriodChangeTime = gettimeofday() unless defined $curPeriodChangeTime;
    my $periodChangePreset = AttrVal($name, "periodChangePreset", 5);
    my $isDayChange = ( ReadingsVal($name, "nextPeriodChangeCalc", "") =~ /Day Change/ );
-
+   
   # Determine the next day change time
    my @th=localtime();
    my $dayChangeDelay = 0;
@@ -313,7 +316,10 @@ sub statistics_PeriodChange($)
    } 
    $val = strftime ("%Y-%m-%d %H:%M:%S", localtime($periodEndTime)) . $val;
    InternalTimer( $periodEndTime, "statistics_PeriodChange", $hash, 1);
+
    readingsSingleUpdate($hash, "nextPeriodChangeCalc", $val, 0);
+   $hash->{fhem}{nextPeriodChangeTime} = $periodEndTime;
+
    statistics_Log $hash, 4, "Next period change will be calculated at $val";
 
    return if( AttrVal($name, "disable", 0 ) == 1 );
@@ -332,12 +338,15 @@ sub statistics_PeriodChange($)
 
    if ($isDayChange) {
       statistics_Log $hash, 4, "Calculating day change";
-      ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime (gettimeofday() - $dayChangeDelay + $periodChangePreset - 59);
+     # get time values for 50 seconds before a new day
+      ($dummy, $dummy, $hourLast, $dayLast, $monthLast, $yearLast) = localtime ($curPeriodChangeTime - $dayChangeDelay + $periodChangePreset - 59);
+     # get time values for next day
       ($dummy, $dummy, $hourNow, $dayNow, $monthNow, $yearNow) = localtime (gettimeofday() + $periodChangePreset);
+      $periodSwitch = -2;
       if ($yearNow != $yearLast) { $periodSwitch = -4; }
       elsif ($monthNow != $monthLast) { $periodSwitch = -3; }
-      elsif ($dayNow != $dayLast) { $periodSwitch = -2; }
-      if ($dayChangeDelay % 3600 == 0) { $periodSwitch = abs($periodSwitch); }
+      # Positiv Value if periode changes at full hour
+      $periodSwitch = abs($periodSwitch)     if $dayChangeDelay % 3600 == 0;
    } else {
       ($dummy, $dummy, $hourLast, $dummy, $dummy, $dummy) = localtime (gettimeofday());
       ($dummy, $dummy, $hourNow, $dummy, $dummy, $dummy) = localtime (gettimeofday() + $periodChangePreset);
@@ -1216,7 +1225,7 @@ sub statistics_UpdateDevReading($$$$)
     </li><br>
     <li><code>periodChangePreset &lt;seconds&gt;</code>
       <br>
-      Preponed start of the calculation of periodical data. Default is 5 seconds before each full hour.
+      Preponed start of the calculation of periodical data. Default is 5 second before each full hour.
       <br>
       Allows thus the correct timely assignment within plots. Should be adapted to the CPU speed or load of the server.
       <br>
