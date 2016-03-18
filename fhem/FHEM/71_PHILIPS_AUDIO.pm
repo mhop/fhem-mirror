@@ -50,7 +50,7 @@ sub PHILIPS_AUDIO_Initialize
   $hash->{AttrFn}    = "PHILIPS_AUDIO_Attr";
   $hash->{UndefFn}   = "PHILIPS_AUDIO_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 ".$readingFnAttributes;
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 model request-timeout:1,2,3,4,5 ".$readingFnAttributes;
   
   return;
 }
