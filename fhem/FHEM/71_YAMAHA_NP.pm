@@ -63,7 +63,7 @@ sub YAMAHA_NP_Initialize
   $hash->{AttrFn}    = "YAMAHA_NP_Attr";
   $hash->{UndefFn}   = "YAMAHA_NP_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 auto-update-player-readings:1,0 auto-update-tuner-readings:1,0 smooth-volume-change:1,0 ".$readingFnAttributes;
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 request-timeout:1,2,3,4,5 model auto-update-player-readings:1,0 auto-update-tuner-readings:1,0 smooth-volume-change:1,0 ".$readingFnAttributes;
   
   return;
 }
