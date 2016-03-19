@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 50_TelegramBot  new option to retry for send &
+                             confirmation dialog for favorites 
   - fixed:   configDB.pm - fix filelist problem on perl >= 5.20
   - fixed:   configDB.pm - add modpath evaluation
   - feature  71_PHILIPS_AUDIO Added model attribute
