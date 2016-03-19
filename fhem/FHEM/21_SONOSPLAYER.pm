@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, February 2016
+# SONOSPLAYER.pm (c) by Reiner Leins, March 2016
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -122,7 +122,7 @@ my %sets = (
 	'CurrentTrackPosition' => 'timeposition',
 	'Track' => 'tracknumber|Random',
 	'currentTrack' => 'tracknumber',
-	'Alarm' => 'create|update|delete ID valueHash',
+	'Alarm' => 'create|update|delete ID,ID|All [valueHash]',
 	'SnoozeAlarm' => 'timestring|seconds',
 	'DailyIndexRefreshTime' => 'timestring',
 	'SleepTimer' => 'timestring|seconds',
@@ -796,7 +796,23 @@ sub SONOSPLAYER_Set($@) {
 			$text .= ' ' if ($i > 4);
 			$text .= $a[$i];
 		}
-		$text = decode('utf8', $text);
+		$text = decode('utf8', SONOS_Trim($text));
+		
+		# Optionalen Parameter für die Hashwerte ermöglichen
+		if ($text eq '') {
+			$text = '{}';
+		}
+		
+		# Neue Befehle auf die Standardvorgehensweise übersetzen
+		my %alarmHash = %{eval($text)};
+		if (lc($value) eq 'enable') {
+			$value = 'Update';
+			$alarmHash{Enabled} = 1;
+		} elsif (lc($value) eq 'disable') {
+			$value = 'Update';
+			$alarmHash{Enabled} = 0;
+		}
+		$text = SONOS_Dumper(\%alarmHash);
 		
 		SONOS_DoWork($udn, 'setAlarm', $value, $value2, $text);
 	} elsif (lc($key) eq 'snoozealarm') {
@@ -1108,8 +1124,8 @@ sub SONOSPLAYER_Log($$$) {
 <ul>
 <li><b>Common Tasks</b><ul>
 <li><a name="SONOSPLAYER_setter_Alarm">
-<b><code>Alarm (Create|Update|Delete) &lt;ID&gt; &lt;Datahash&gt;</code></b></a>
-<br />Can be used for working on alarms:<ul><li><b>Create:</b> Creates an alarm-entry with the given datahash.</li><li><b>Update:</b> Updates the alarm-entry with the given id and datahash.</li><li><b>Delete:</b> Deletes the alarm-entry with the given id.</li></ul><br /><b>The Datahash:</b><br />The Format is a perl-hash and is interpreted with the eval-function.<br />e.g.: { Repeat =&gt; 1 }<br /><br />The following entries are allowed/neccessary:<ul><li>StartTime</li><li>Duration</li><li>Recurrence_Once</li><li>Recurrence_Monday</li><li>Recurrence_Tuesday</li><li>Recurrence_Wednesday</li><li>Recurrence_Thursday</li><li>Recurrence_Friday</li><li>Recurrence_Saturday</li><li>Recurrence_Sunday</li><li>Enabled</li><li>ProgramURI</li><li>ProgramMetaData</li><li>Shuffle</li><li>Repeat</li><li>Volume</li><li>IncludeLinkedZones</li></ul><br />e.g.:<ul><li>set Sonos_Wohnzimmer Alarm Create 0 { Enabled =&gt; 1, Volume =&gt; 35, StartTime =&gt; '00:00:00', Duration =&gt; '00:15:00', Repeat =&gt; 0, Shuffle =&gt; 0, ProgramURI =&gt; 'x-rincon-buzzer:0', ProgramMetaData =&gt; '', Recurrence_Once =&gt; 0, Recurrence_Monday =&gt; 1, Recurrence_Tuesday =&gt; 1, Recurrence_Wednesday =&gt; 1, Recurrence_Thursday =&gt; 1, Recurrence_Friday =&gt; 1, Recurrence_Saturday =&gt; 0, Recurrence_Sunday =&gt; 0, IncludeLinkedZones =&gt; 0 }</li><li>set Sonos_Wohnzimmer Alarm Update 17 { Shuffle =&gt; 1 }</li><li>set Sonos_Wohnzimmer Alarm Delete 17 {}</li></ul></li>
+<b><code>Alarm (Create|Update|Delete|Enable|Disable) &lt;ID[,ID]|All&gt; &lt;Datahash&gt;</code></b></a>
+<br />Can be used for working on alarms:<ul><li><b>Create:</b> Creates an alarm-entry with the given datahash.</li><li><b>Update:</b> Updates the alarm-entry with the given id(s) and datahash.</li><li><b>Delete:</b> Deletes the alarm-entry with the given id(s).</li><li><b>Enable:</b> Enables the alarm-entry with the given id(s).</li><li><b>Disable:</b> Disables the alarm-entry with the gven id(s).</li></ul>If the Word 'All' is given as ID, all alarms of this player are changed.<br /><b>The Datahash:</b><br />The Format is a perl-hash and is interpreted with the eval-function.<br />e.g.: { Repeat =&gt; 1 }<br /><br />The following entries are allowed/neccessary:<ul><li>StartTime</li><li>Duration</li><li>Recurrence_Once</li><li>Recurrence_Monday</li><li>Recurrence_Tuesday</li><li>Recurrence_Wednesday</li><li>Recurrence_Thursday</li><li>Recurrence_Friday</li><li>Recurrence_Saturday</li><li>Recurrence_Sunday</li><li>Enabled</li><li>ProgramURI</li><li>ProgramMetaData</li><li>Shuffle</li><li>Repeat</li><li>Volume</li><li>IncludeLinkedZones</li></ul><br />e.g.:<ul><li>set Sonos_Wohnzimmer Alarm Create 0 { Enabled =&gt; 1, Volume =&gt; 35, StartTime =&gt; '00:00:00', Duration =&gt; '00:15:00', Repeat =&gt; 0, Shuffle =&gt; 0, ProgramURI =&gt; 'x-rincon-buzzer:0', ProgramMetaData =&gt; '', Recurrence_Once =&gt; 0, Recurrence_Monday =&gt; 1, Recurrence_Tuesday =&gt; 1, Recurrence_Wednesday =&gt; 1, Recurrence_Thursday =&gt; 1, Recurrence_Friday =&gt; 1, Recurrence_Saturday =&gt; 0, Recurrence_Sunday =&gt; 0, IncludeLinkedZones =&gt; 0 }</li><li>set Sonos_Wohnzimmer Alarm Update 17 { Shuffle =&gt; 1 }</li><li>set Sonos_Wohnzimmer Alarm Delete 17 {}</li></ul></li>
 <li><a name="SONOSPLAYER_setter_AudioDelay">
 <b><code>AudioDelay &lt;Level&gt;</code></b></a>
 <br /> Sets the audiodelay of the player to the given value. The value can range from 0 to 5.</li>
@@ -1468,8 +1484,8 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <ul>
 <li><b>Grundsätzliche Einstellungen</b><ul>
 <li><a name="SONOSPLAYER_setter_Alarm">
-<b><code>Alarm (Create|Update|Delete) &lt;ID&gt; &lt;Datahash&gt;</code></b></a>
-<br />Diese Anweisung wird für die Bearbeitung der Alarme verwendet:<ul><li><b>Create:</b> Erzeugt einen neuen Alarm-Eintrag mit den übergebenen Hash-Daten.</li><li><b>Update:</b> Aktualisiert den Alarm mit der übergebenen ID und den angegebenen Hash-Daten.</li><li><b>Delete:</b> Löscht den Alarm-Eintrag mit der übergebenen ID.</li></ul><br /><b>Die Hash-Daten:</b><br />Das Format ist ein Perl-Hash und wird mittels der eval-Funktion interpretiert.<br />e.g.: { Repeat =&gt; 1 }<br /><br />Die folgenden Schlüssel sind zulässig/notwendig:<ul><li>StartTime</li><li>Duration</li><li>Recurrence_Once</li><li>Recurrence_Monday</li><li>Recurrence_Tuesday</li><li>Recurrence_Wednesday</li><li>Recurrence_Thursday</li><li>Recurrence_Friday</li><li>Recurrence_Saturday</li><li>Recurrence_Sunday</li><li>Enabled</li><li>ProgramURI</li><li>ProgramMetaData</li><li>Shuffle</li><li>Repeat</li><li>Volume</li><li>IncludeLinkedZones</li></ul><br />z.B.:<ul><li>set Sonos_Wohnzimmer Alarm Create 0 { Enabled =&gt; 1, Volume =&gt; 35, StartTime =&gt; '00:00:00', Duration =&gt; '00:15:00', Repeat =&gt; 0, Shuffle =&gt; 0, ProgramURI =&gt; 'x-rincon-buzzer:0', ProgramMetaData =&gt; '', Recurrence_Once =&gt; 0, Recurrence_Monday =&gt; 1, Recurrence_Tuesday =&gt; 1, Recurrence_Wednesday =&gt; 1, Recurrence_Thursday =&gt; 1, Recurrence_Friday =&gt; 1, Recurrence_Saturday =&gt; 0, Recurrence_Sunday =&gt; 0, IncludeLinkedZones =&gt; 0 }</li><li>set Sonos_Wohnzimmer Alarm Update 17 { Shuffle =&gt; 1 }</li><li>set Sonos_Wohnzimmer Alarm Delete 17 {}</li></ul></li>
+<b><code>Alarm (Create|Update|Delete|Enable|Disable) &lt;ID[,ID]|All&gt; &lt;Datahash&gt;</code></b></a>
+<br />Diese Anweisung wird für die Bearbeitung der Alarme verwendet:<ul><li><b>Create:</b> Erzeugt einen neuen Alarm-Eintrag mit den übergebenen Hash-Daten.</li><li><b>Update:</b> Aktualisiert die Alarme mit den übergebenen IDs und den angegebenen Hash-Daten.</li><li><b>Delete:</b> Löscht die Alarm-Einträge mit den übergebenen IDs.</li><li><b>Enable:</b> Aktiviert die Alarm-Einträge mit den übergebenen IDs.</li><li><b>Disable:</b> Deaktiviert die Alarm-Einträge mit den übergebenen IDs.</li></ul>Bei Angabe des Wortes 'All' als ID, werden alle Alarme dieses Players bearbeitet.<br /><b>Die Hash-Daten:</b><br />Das Format ist ein Perl-Hash und wird mittels der eval-Funktion interpretiert.<br />e.g.: { Repeat =&gt; 1 }<br /><br />Die folgenden Schlüssel sind zulässig/notwendig:<ul><li>StartTime</li><li>Duration</li><li>Recurrence_Once</li><li>Recurrence_Monday</li><li>Recurrence_Tuesday</li><li>Recurrence_Wednesday</li><li>Recurrence_Thursday</li><li>Recurrence_Friday</li><li>Recurrence_Saturday</li><li>Recurrence_Sunday</li><li>Enabled</li><li>ProgramURI</li><li>ProgramMetaData</li><li>Shuffle</li><li>Repeat</li><li>Volume</li><li>IncludeLinkedZones</li></ul><br />z.B.:<ul><li>set Sonos_Wohnzimmer Alarm Create 0 { Enabled =&gt; 1, Volume =&gt; 35, StartTime =&gt; '00:00:00', Duration =&gt; '00:15:00', Repeat =&gt; 0, Shuffle =&gt; 0, ProgramURI =&gt; 'x-rincon-buzzer:0', ProgramMetaData =&gt; '', Recurrence_Once =&gt; 0, Recurrence_Monday =&gt; 1, Recurrence_Tuesday =&gt; 1, Recurrence_Wednesday =&gt; 1, Recurrence_Thursday =&gt; 1, Recurrence_Friday =&gt; 1, Recurrence_Saturday =&gt; 0, Recurrence_Sunday =&gt; 0, IncludeLinkedZones =&gt; 0 }</li><li>set Sonos_Wohnzimmer Alarm Update 17 { Shuffle =&gt; 1 }</li><li>set Sonos_Wohnzimmer Alarm Delete 17 {}</li></ul></li>
 <li><a name="SONOSPLAYER_setter_AudioDelay">
 <b><code>AudioDelay &lt;Level&gt;</code></b></a>
 <br /> Setzt den AudioDelay der Playbar auf den angegebenen Wert. Der Wert kann zwischen 0 und 5 liegen.</li>

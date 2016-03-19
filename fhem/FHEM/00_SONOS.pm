@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, February 2016
+# SONOS.pm (c) by Reiner Leins, March 2016
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -53,6 +53,9 @@
 # Cover von Amazon funktionieren nicht
 #
 # SVN-History:
+# 19.03.2016
+#	Bei der Alarmbearbeitung kann man nun mehrere Alarm-IDs mit Komma getrennt angeben, und das Schlüsselwort "All" verwenden, um alle Alarme dieses Players anzusprechen.
+#	Man kann bei der Alarmbearbeitung nun auch zwei neue, direkte und kürzere, Befehle für Standardaufgaben verwenden: "Enable", "Disable".
 # 06.02.2016
 #	Zusätzlich zu "Mute" (mit Parameter) am Sonos-Device gibt es jetzt auch "MuteOn" und "MuteOff" (jeweils ohne Parameter) zur Verwendung als WebCmd.
 #	Es gibt ein neues Reading "IsMaster" am Sonosplayer-Device, welches angibt, ob der Player gerade ein Masterplayer ist
@@ -67,15 +70,6 @@
 #	Das Reading ZoneGroupID wurde immer länger (mit ":__"), wenn Gruppierungen anderer Player verändert wurden.
 #	Bei den Settern von "SleepTimer" und "SnoozeAlarm" kann man jetzt auch eine Zahl als Dauer in Sekunden angeben. Dazu wurde auch die Doku entsprechend angepasst.
 #	In der ControlPoint.pm wurde eine Fehlermeldung korrigiert
-# 24.12.2015
-#	Wenn ein Player ein "ß" (oder auch andere besondere Zeichen, wie Smilies o.ä.) im Namen hatte, funktionierte die Erkennung nicht mehr, und der SubThread verstarb.
-#	Man kann nun mittels dem Setter "Name" auch "ß" und Smilies o.ä. im Playernamen setzen.
-#	Bei der Namensvergabe des Sonosplayer-Fhem-Device wird jetzt ein bißchen besser umgewandelt. Erst werden alle Sonderzeichen entfernt, dann Leerzeichen an den Rändern entfernt, und dann die restlichen Leerzeichen in "_" umgewandelt
-#	Das Attribut "characterDecoding" wurde entfernt, da es keine Funktion mehr hatte.
-#	Der UPnP-Teil verwendet nun einen beliebigen freien Port für die Kommunikation mit den Playern. Dadurch sind auch mehrere Instanzen auf ein und derselben Maschine möglich.
-#	Es gibt jetzt einen neuen Setter "RescanNetwork" am Sonos-Device. Damit kann man den Erkennungsprozess des UPnP-Moduls neu anstarten.
-#	Es gibt jetzt eine Get-Anweisung "SupportLinks" am Playerdevice, die direkte Links (momentan zwei) zu den Player-Support-Seiten liefert.
-#	Ein Datei-Ordner als Favorit konnte nicht sauber gestartet werden. Es wurde nicht als Album in die aktuelle Abspielliste übertragen, sondern als ein Titel direkt abgespielt. Des Weiteren wurde dafür kein Coverbild ermittelt.
 #
 ########################################################################################
 #
@@ -2111,7 +2105,7 @@ sub SONOS_DoWork($$;@) {
 	
 	my $hash = SONOS_getDeviceDefHash(undef);
 	
-	DevIo_SimpleWrite($hash, 'DoWork:'.$udn.':'.$method.':'.encode_utf8(join(',', @params))."\r\n", 0);
+	DevIo_SimpleWrite($hash, 'DoWork:'.$udn.':'.$method.':'.encode_utf8(join('£@£~', @params))."\r\n", 0);
 		
 	return undef;
 }
@@ -2576,9 +2570,7 @@ sub SONOS_Discover() {
 							$resultHash{$1} = $2;
 						}
 						
-						$Data::Dumper::Indent = 0;
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
-						$Data::Dumper::Indent = 2;
 					}
 				} elsif ($workType eq 'getPlaylistsWithCovers') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -2591,9 +2583,7 @@ sub SONOS_Discover() {
 							$resultHash{$1}->{Cover} = SONOS_MakeCoverURL($udn, $3);
 						}
 						
-						$Data::Dumper::Indent = 0;
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.Dumper(\%resultHash));
-						$Data::Dumper::Indent = 2;
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
 					}
 				} elsif ($workType eq 'getFavourites') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -2605,9 +2595,7 @@ sub SONOS_Discover() {
 							$resultHash{$1} = $2;
 						}
 						
-						$Data::Dumper::Indent = 0;
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
-						$Data::Dumper::Indent = 2;
 					}
 				} elsif ($workType eq 'getFavouritesWithCovers') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -2620,9 +2608,7 @@ sub SONOS_Discover() {
 							$resultHash{$1}->{Cover} = SONOS_MakeCoverURL($udn, $3);
 						}
 						
-						$Data::Dumper::Indent = 0;
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.Dumper(\%resultHash));
-						$Data::Dumper::Indent = 2;
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
 					}
 				} elsif ($workType eq 'getSearchlistCategories') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -2636,9 +2622,7 @@ sub SONOS_Discover() {
 							$resultHash{$1} = $2;
 						}
 						
-						$Data::Dumper::Indent = 0;
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
-						$Data::Dumper::Indent = 2;
 					}
 				} elsif ($workType eq 'exportSonosBibliothek') {
 					my $filename = $params[0];
@@ -2655,24 +2639,16 @@ sub SONOS_Discover() {
 						my $countTitles = scalar(keys %{$exports->{Titles}});
 						
 						# In Datei wegschreiben
-						$Data::Dumper::Indent = 0;
 						eval {
-							#$Data::Dumper::Indent = 2;
-							#open FILE, '>M:/Hausautomation/fhem-dev/fhem/structure.txt';
-							#print FILE Dumper($exports->{Structure});
-							#close FILE;
-							#$Data::Dumper::Indent = 0;
-							
 							open FILE, '>'.$filename;
 							binmode(FILE, ':encoding(utf-8)');
-							print FILE Dumper($exports);
+							print FILE SONOS_Dumper($exports);
 							close FILE;
 						};
 						if ($@) {
 							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': Error during filewriting: '.$@);
 							return;
 						}
-						$Data::Dumper::Indent = 2;
 						
 						$exports = undef;
 						
@@ -2981,9 +2957,7 @@ sub SONOS_Discover() {
 							$resultHash{$1} = $2;
 						}
 						
-						$Data::Dumper::Indent = 0;
 						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': "'.join('","', sort values %resultHash).'"');
-						$Data::Dumper::Indent = 2;
 					}
 				} elsif ($workType eq 'getRadiosWithCovers') {
 					if (SONOS_CheckProxyObject($udn, $SONOS_ContentDirectoryControlProxy{$udn})) {
@@ -2996,9 +2970,7 @@ sub SONOS_Discover() {
 							$resultHash{$1}->{Cover} = SONOS_MakeCoverURL($udn, $3);
 						}
 						
-						$Data::Dumper::Indent = 0;
-						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.Dumper(\%resultHash));
-						$Data::Dumper::Indent = 2;
+						SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_Dumper(\%resultHash));
 					}
 				} elsif ($workType eq 'loadRadio') {
 					my $regSearch = ($params[0] =~ m/^ *\/(.*)\/ *$/);
@@ -3238,27 +3210,41 @@ sub SONOS_Discover() {
 					}
 				} elsif ($workType eq 'setAlarm') {
 					my $create = $params[0];
-					my $id = $params[1];
-	
+					my @idParams = split(',', $params[1]);
+					
+					# Die passenden IDs heraussuchen...
+					my @idList = map { SONOS_Trim($_) } split(',', SONOS_Client_Data_Retreive($udn, 'reading', 'AlarmListIDs', ''));
+					my @id = ();
+					foreach my $elem (@idList) {
+						if ((lc($idParams[0]) eq 'all') || SONOS_isInList($elem, @idParams)) {
+							push @id, $elem;
+						}
+					}
+					
 					# Alle folgenden Parameter weglesen und an den letzten Parameter anhängen
 					my $values = {};
 					my $val = join(',', @params[2..$#params]);
 					if ($val ne '') {
-						SONOS_Log $udn, 5, 'Val: '.$val;
 						$values = \%{eval($val)};
 					}
 					
+					# Wenn keine passenden Elemente gefunden wurden...
+					if (scalar(@id) == 0) {
+						if ((lc($create) eq 'update') || (lc($create) eq 'delete')) {
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_AnswerMessage(0));
+						}
+					}
+					
+					# Hier die passenden Änderungen durchführen...
 					if (SONOS_CheckProxyObject($udn, $SONOS_AlarmClockControlProxy{$udn})) {
-						my @idList = split(',', SONOS_Client_Data_Retreive($udn, 'reading', 'AlarmListIDs', ''));
-						
 						# Die Room-ID immer fest auf den aktuellen Player eintragen. 
 						# Hiermit sollte es nicht mehr möglich sein, einen Alarm für einen anderen Player einzutragen. Das kann man auch direkt an dem anderen Player durchführen...
 						$values->{RoomUUID} = $1 if ($udn =~ m/(.*?)_MR/i);
 						
 						if (lc($create) eq 'update') {
-							if (!SONOS_isInList($id, @idList)) {
-								SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_AnswerMessage(0));
-							} else {
+							my $ret = '';
+							
+							foreach my $id (@id) {
 								my %alarm = %{eval(SONOS_Client_Data_Retreive($udn, 'reading', 'AlarmList', '{}'))->{$id}};
 								
 								# Replace old values with the given new ones...
@@ -3269,12 +3255,14 @@ sub SONOS_Discover() {
 								}
 								
 								if (!SONOS_CheckAndCorrectAlarmHash(\%alarm)) {
-									SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_AnswerMessage(0));
+									$ret .= '#'.$id.': '.SONOS_AnswerMessage(0).', ';
 								} else {
 									# Send to Zoneplayer
-									SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_UPnPAnswerMessage($SONOS_AlarmClockControlProxy{$udn}->UpdateAlarm($id, $alarm{StartTime}, $alarm{Duration}, $alarm{Recurrence}, $alarm{Enabled}, $alarm{RoomUUID}, $alarm{ProgramURI}, $alarm{ProgramMetaData}, $alarm{PlayMode}, $alarm{Volume}, $alarm{IncludeLinkedZones})));
+									$ret .= '#'.$id.': '.SONOS_UPnPAnswerMessage($SONOS_AlarmClockControlProxy{$udn}->UpdateAlarm($id, $alarm{StartTime}, $alarm{Duration}, $alarm{Recurrence}, $alarm{Enabled}, $alarm{RoomUUID}, $alarm{ProgramURI}, $alarm{ProgramMetaData}, $alarm{PlayMode}, $alarm{Volume}, $alarm{IncludeLinkedZones})).', ';
 								}
 							}
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$ret);
 						} elsif (lc($create) eq 'create') {
 							# Check if all parameters are given
 							if (!SONOS_CheckAndCorrectAlarmHash($values)) {
@@ -3284,11 +3272,13 @@ sub SONOS_Discover() {
 								SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$SONOS_AlarmClockControlProxy{$udn}->CreateAlarm($values->{StartTime}, $values->{Duration}, $values->{Recurrence}, $values->{Enabled}, $values->{RoomUUID}, $values->{ProgramURI}, $values->{ProgramMetaData}, $values->{PlayMode}, $values->{Volume}, $values->{IncludeLinkedZones})->getValue('AssignedID'));
 							}
 						} elsif (lc($create) eq 'delete') {
-							if (!SONOS_isInList($id, @idList)) {
-								SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_AnswerMessage(0).' ID is incorrect!');
-							} else {
-								SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_UPnPAnswerMessage($SONOS_AlarmClockControlProxy{$udn}->DestroyAlarm($id)));
+							my $ret = '';
+							
+							foreach my $id (@id) {
+								$ret .= '#'.$id.': '.SONOS_UPnPAnswerMessage($SONOS_AlarmClockControlProxy{$udn}->DestroyAlarm($id)).', ';
 							}
+							
+							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.$ret);
 						} else {
 							SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', ucfirst($workType).': '.SONOS_AnswerMessage(0));
 						}
@@ -4843,6 +4833,21 @@ sub SONOS_UPnPAnswerMessage($) {
 
 ########################################################################################
 #
+#  SONOS_Dumper - Returns the 'Dumpered' Output of the given Datastructure-Reference
+#
+########################################################################################
+sub SONOS_Dumper($) {
+	my ($varRef) = @_;
+	
+	$Data::Dumper::Indent = 0;
+	my $text = Dumper($varRef);
+	$Data::Dumper::Indent = 2;
+	
+	return $text;
+}
+
+########################################################################################
+#
 #  SONOS_Stringify - Converts a given Value (Array, Hash, Scalar) to a readable string version
 #
 # Parameter $varRef = The value to convert to a readable version
@@ -5333,9 +5338,7 @@ sub SONOS_Discover_Callback($$$) {
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'fieldType', $fieldType);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'IsMaster', $master ? '1' : '0');
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'MasterPlayer', $masterPlayerName);
-		$Data::Dumper::Indent = 0;
-		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'SlavePlayer', Dumper(\@slavePlayerNames));
-		$Data::Dumper::Indent = 2;
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'SlavePlayer', SONOS_Dumper(\@slavePlayerNames));
 		
 		# Abspielreadings vorab ermitteln, um darauf prüfen zu können...
 		if (!$isZoneBridge) {
@@ -5954,9 +5957,7 @@ sub SONOS_ServiceCallback($$) {
 					my $newTrackposition = $SONOS_BookmarkTitleHash{$gKey}{$bufferedURI}{TrackPosition};
 					my $result = $SONOS_AVTransportControlProxy{$udn}->Seek(0, 'REL_TIME', SONOS_ConvertSecondsToTime($newTrackposition));
 					
-					$Data::Dumper::Indent = 0;
-					SONOS_Log $udn, 3, 'Player "'.SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn).'" jumped to the bookmarked trackposition '.SONOS_ConvertSecondsToTime($newTrackposition).' (Group "'.$gKey.'") ~ Bookmarkdata: '.Dumper($SONOS_BookmarkTitleHash{$gKey}{$bufferedURI});
-					$Data::Dumper::Indent = 2;
+					SONOS_Log $udn, 3, 'Player "'.SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn).'" jumped to the bookmarked trackposition '.SONOS_ConvertSecondsToTime($newTrackposition).' (Group "'.$gKey.'") ~ Bookmarkdata: '.SONOS_Dumper($SONOS_BookmarkTitleHash{$gKey}{$bufferedURI});
 					
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', 'JumpToTrackPosition "'.SONOS_ConvertSecondsToTime($newTrackposition).'": '.SONOS_UPnPAnswerMessage($result));
 					
@@ -6814,11 +6815,7 @@ sub SONOS_SaveBookmarkValues(;$$) {
 				eval {
 					open FILE, '>'.$filename;
 					binmode(FILE, ':encoding(utf-8)');
-					
-					$Data::Dumper::Indent = 0;
-					print FILE Dumper($data);
-					$Data::Dumper::Indent = 2;
-					
+					print FILE SONOS_Dumper($data);
 					close FILE;
 					
 					SONOS_Log undef, 3, 'Successfully saved '.$type.'-Bookmarks of group "'.$group.'" to file "'.$filename.'"!';
@@ -6950,9 +6947,7 @@ sub SONOS_CalculateQueueHash($) {
 				if (($SONOS_BookmarkSpeicher{OldTracks}{$udn} != $newTrack) && SONOS_CheckProxyObject($udn, $SONOS_AVTransportControlProxy{$udn})) {
 					my $result = $SONOS_AVTransportControlProxy{$udn}->Seek(0, 'TRACK_NR', $newTrack);
 					
-					$Data::Dumper::Indent = 0;
-					SONOS_Log $udn, 3, 'Player "'.SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn).'" jumped to the bookmarked track #'.$newTrack.' (Group "'.$gKey.'") ~ Bookmarkdata: '.Dumper($SONOS_BookmarkQueueHash{$gKey}{$newHash});
-					$Data::Dumper::Indent = 2;
+					SONOS_Log $udn, 3, 'Player "'.SONOS_Client_Data_Retreive($udn, 'def', 'NAME', $udn).'" jumped to the bookmarked track #'.$newTrack.' (Group "'.$gKey.'") ~ Bookmarkdata: '.SONOS_Dumper($SONOS_BookmarkQueueHash{$gKey}{$newHash});
 					
 					SONOS_MakeSigHandlerReturnValue($udn, 'LastActionResult', 'JumpToTrack #'.$newTrack.': '.SONOS_UPnPAnswerMessage($result));
 					
@@ -7244,13 +7239,11 @@ sub SONOS_AlarmCallback($$) {
 		}
 		
 		# Sets the approbriate Readings-Value
-		$Data::Dumper::Indent = 0;
 		SONOS_Client_Notifier('ReadingsBeginUpdate:'.$udn);
-		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'AlarmList', Dumper(\%alarms));
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'AlarmList', SONOS_Dumper(\%alarms));
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'AlarmListIDs', join(',', @alarmIDs));
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'AlarmListVersion', $result->getValue('CurrentAlarmListVersion'));
 		SONOS_Client_Notifier('ReadingsEndUpdate:'.$udn);
-		$Data::Dumper::Indent = 2;
 	}
 	
 	if (defined($properties{DailyIndexRefreshTime})) {
@@ -7374,9 +7367,7 @@ sub SONOS_ZoneGroupTopologyCallback($$) {
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'fieldType', $fieldType);
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'IsMaster', $master ? '1' : '0');
 		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'MasterPlayer', $masterPlayerName);
-		$Data::Dumper::Indent = 0;
-		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'SlavePlayer', Dumper(\@slavePlayerNames));
-		$Data::Dumper::Indent = 2;
+		SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', $udn, 'SlavePlayer', SONOS_Dumper(\@slavePlayerNames));
 	}
 	
 	# ZoneGroupName: Welchen Namen hat die aktuelle Gruppe?
@@ -7454,21 +7445,19 @@ sub SONOS_AnalyzeTopologyForMasterPlayer($) {
 	@playing = sort @playing;
 	@notplaying = sort @notplaying;
 	
-	$Data::Dumper::Indent = 0;
 	SONOS_Client_Notifier('ReadingsBeginUpdate:undef');
 	
-	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerPlaying', Dumper(\@playing));
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerPlaying', SONOS_Dumper(\@playing));
 	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerPlayingCount', scalar(@playing));
-	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerNotPlaying', Dumper(\@notplaying));
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerNotPlaying', SONOS_Dumper(\@notplaying));
 	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerNotPlayingCount', scalar(@notplaying));
 	
 	push(@playing, @notplaying);
 	@playing = sort @playing;
-	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayer', Dumper(\@playing));
+	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayer', SONOS_Dumper(\@playing));
 	SONOS_Client_Data_Refresh('ReadingsBulkUpdateIfChanged', 'undef', 'MasterPlayerCount', scalar(@playing));
 	
 	SONOS_Client_Notifier('ReadingsEndUpdate:undef');
-	$Data::Dumper::Indent = 2;
 }
 
 ########################################################################################
@@ -8269,7 +8258,7 @@ sub SONOS_GetTimeFromString($) {
 	
 	eval {
 		use Time::Local;
-		if($timeStr =~ m/^(\d{4})-(\d{2})-(\d{2}) ([0-2]\d):([0-5]\d):([0-5]\d)$/) {
+		if($timeStr =~ m/^(\d{4})-(\d{2})-(\d{2})( |_)([0-2]\d):([0-5]\d):([0-5]\d)$/) {
 				return timelocal($6, $5, $4, $3, $2 - 1, $1 - 1900);
 		}
 	}
@@ -8891,7 +8880,7 @@ sub SONOS_Client_ConsumeMessage($$) {
 		$data{UDN} = $1;
 		
 		if (defined($3)) {
-			my @params = split(/,/, decode_utf8($3));
+			my @params = split(/£@£~/, decode_utf8($3));
 			$data{Params} = \@params;
 		} else {
 			my @params = ();
