@@ -997,6 +997,10 @@ LightScene_editTable($) {
       save current state for alle devices in this LightScene to &lt;scene_name&gt;</li>
       <li>scene &lt;scene_name&gt;<br>
       shows scene &lt;scene_name&gt; - all devices are switched to the previously saved state</li>
+      <li>nextScene<br>
+      activates the next scene in alphabetical order after the current scene or the first if no current scene is set.</li>
+      <li>previousScene<br>
+      activates the previous scene in alphabetical order before the current scene or the last if no current scene is set.</li>
       <li>set &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
       set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
       <li>setcmd &lt;scene_name&gt; &lt;device&gt; [&lt;cmd&gt;]<br>
