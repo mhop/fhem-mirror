@@ -495,6 +495,7 @@ sub cfgDB_SaveState() {
 sub cfgDB_MigrationImport() {
 
 	my ($ret, $filename, @files, @def);
+	my $modpath = AttrVal("global","modpath",".");
 
 # find eventTypes file
 	$filename = '';
@@ -506,16 +507,13 @@ sub cfgDB_MigrationImport() {
 	}
 
 # import templateDB.gplot
-	$filename  = $attr{global}{modpath};
-	$filename .= "/www/gplot/template.gplot";
+	$filename = "$modpath/www/gplot/template.gplot";
 	push @files, $filename;
-	$filename  = $attr{global}{modpath};
-	$filename .= "/www/gplot/templateDB.gplot";
+	$filename = "$modpath/www/gplot/templateDB.gplot";
 	push @files, $filename;
 
 # import template.layout
-	$filename  = $attr{global}{modpath};
-	$filename .= "/FHEM/template.layout";
+	$filename = "$modpath/FHEM/template.layout";
 	push @files, $filename;
 
 # find used gplot files
@@ -524,7 +522,7 @@ sub cfgDB_MigrationImport() {
 	@def = _cfgDB_findDef('TYPE=SVG','GPLOTFILE');
 	foreach $filename (@def) {
 		next unless $filename;
-		push @files, "./www/gplot/".$filename.".gplot";
+		push @files, "$modpath/www/gplot/".$filename.".gplot";
 	}
 
 # find DbLog configs
@@ -560,8 +558,13 @@ sub cfgDB_MigrationImport() {
 	@def = _cfgDB_findDef('TYPE=holiday','NAME');
 	foreach $filename (@def) {
 		next unless $filename;
-		push @files, "./FHEM/".$filename.".holiday";
+		push @files, "$modpath/FHEM/".$filename.".holiday";
 	}
+
+# import uniqueID file
+	$filename = "$modpath/FHEM/FhemUtils/uniqueID";
+	push @files,$filename if (-e $filename);   
+
 
 # do the import
 	$filename = '';
