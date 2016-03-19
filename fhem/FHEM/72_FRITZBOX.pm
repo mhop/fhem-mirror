@@ -291,7 +291,9 @@ sub FRITZBOX_Attr($@)
 
    if ($aName =~ /fritzBoxIP|m3uFileLocal|m3uFileURL/ && $hash->{APICHECKED} == 1) {
       $hash->{APICHECKED} = 0;
-      FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
+      RemoveInternalTimer($hash->{helper}{TimerReadout});
+      InternalTimer(gettimeofday(), "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
+      # FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
    }
 
    return undef;
@@ -944,7 +946,7 @@ sub FRITZBOX_Readout_Run_Shell($)
       push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/RefreshDiversity" ];
       push @readoutCmdArray, ["", "ctlmgr_ctl r telcfg settings/Diversity/count" ];
 
-# Box Features
+   # Box Features
       push @readoutCmdArray, [ "fhem->is_double_wlan", "ctlmgr_ctl r wlan settings/feature_flags/DBDC", "01" ];
 
    # Box model and firmware
@@ -1071,12 +1073,10 @@ sub FRITZBOX_Readout_Run_Shell($)
       $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
    
    # Handset and DECT user can be in different orders
-      for (0..$handsetCount)
-      {
+      for (0..$handsetCount) {
          my $offset = $_ * 4;
          my $dectUserID = $resultArray->[$offset];
-         if ($dectUserID)
-         {
+         if ($dectUserID) {
             my $dectUser = $dectFonID{$dectUserID}{User};
             push @roReadings, "dect".$dectUser."_manufacturer|" . $resultArray->[ $offset + 1 ];
             FRITZBOX_Log $hash, 5, "dect".$dectUser."_manufacturer: " . $resultArray->[ $offset + 1 ];
@@ -1091,24 +1091,21 @@ sub FRITZBOX_Readout_Run_Shell($)
       }
       
    # Analog Fons Name
-      for (1..$fonCount)
-      {
+      for (1..$fonCount) {
          push @readoutCmdArray, ["fon".$_, "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/Name" ];
          push @readoutCmdArray, ["fon".$_."_out", "ctlmgr_ctl r telcfg settings/MSN/Port".($_-1)."/MSN" ];
       }
       $resultArray = FRITZBOX_Shell_Query( $hash, \@readoutCmdArray, \@roReadings );
    
    # Number of analog Fons 
-      for (1..$fonCount)
-      {
+      for (1..$fonCount) {
          push @roReadings, "fon".$_."_intern|".$_
             if $resultArray->[($_-1)*2];
       }
 
 # Prepare new command array
    # Check if TAM is displayed
-      for (0..$tamCount-1)
-      {
+      for (0..$tamCount-1) {
          push @readoutCmdArray, [ "", "ctlmgr_ctl r tam settings/TAM".$_."/Display" ];
       }
    # Check if user (parent control) is not completely blocked
@@ -1122,8 +1119,7 @@ sub FRITZBOX_Readout_Run_Shell($)
 
 # Prepare new command array
    #Get TAM readings
-      for (0..$tamCount-1)
-      {
+      for (0..$tamCount-1) {
          $rName = "tam".($_+1);
          if ($resultArray->[$_] eq "1" || defined $hash->{READINGS}{$rName} )
          {
@@ -1421,7 +1417,7 @@ sub FRITZBOX_Readout_Run_Web($)
          my $rName = "mac_".$_->{mac};
          $rName =~ s/:/_/g;
       # set the mac readings to 'inactive' and delete at next readout
-         if ( exists $hash->{READINGS}{$rName} ) {
+         if ( exists $hash->{READINGS}{$rName}{VAL} ) {
             if ( $hash->{READINGS}{$rName}{VAL} ne "inactive" ) {
                FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "inactive";
             }
@@ -4639,7 +4635,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    The modul switches in local mode if FHEM runs on a Fritz!Box (as root user!). Otherwise, it tries to open a web or telnet connection to "fritz.box", so telnet (#96*7*) has to be enabled on the Fritz!Box. For remote access the password must <u>once</u> be set.
    <br/><br/>
-   The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel. The modul works best with Fritz!OS 6.24. AVM has removed internal interfaces from later Fritz!OS versions without replacement. For these versions, some modul functions are hence restricted or do not work at all (see remarks to required API).
+   The box is partly controlled via the official TR-064 interface but also via undocumented interfaces between web interface and firmware kernel. The modul works best with Fritz!OS 6.24. AVM has removed internal interfaces (telnet, webcm) from later Fritz!OS versions without replacement. <b>For these versions, some modul functions are hence restricted or do not work at all (see remarks to required API).</b>
    <br>
    The modul was tested on Fritz!Box 7390 and 7490 with Fritz!OS 6.20 and higher.
    <br>
@@ -4751,9 +4747,9 @@ sub FRITZBOX_fritztris($)
          <br/><br/>
          On Fritz!Fons the parameter 'say:' can be used to let the phone speak a message (max. 100 characters) instead of using the ringtone. 
          Alternatively, a MP3 link (from a web server) can be played with 'play:'. This creates the internet radio station 'FHEM' and uses translate.google.com for text2speech. It will <u>always</u> play the complete text/sound. It will than ring with standard ring tone until the end of the 'ring duration' is reached.
-         Say and play works only with a single Fritz!Fon.
+         Say and play <u>may</u> work only with one single Fritz!Fon at a time.
          <br>
-         This behaviour may vary depending on the Fritz!OS.
+         The behaviour may vary depending on the Fritz!OS.
       </li><br>
 
       <li><code>set &lt;name&gt; sendMail [to:&lt;Address&gt;] [subject:&lt;Subject&gt;] [body:&lt;Text&gt;]</code>
@@ -5003,7 +4999,7 @@ sub FRITZBOX_fritztris($)
    <br/><br/>
    Das Modul schaltet in den lokalen Modus, wenn FHEM auf einer Fritz!Box l&auml;uft (als root-Benutzer!). Ansonsten versucht es eine Web oder Telnet Verbindung zu "fritz.box" zu &ouml;ffnen. D.h. Telnet (#96*7*) muss auf der Fritz!Box erlaubt sein. F&uuml;r diesen Fernzugriff muss <u>einmalig</u> das Passwort gesetzt werden.
    <br/><br/>
-   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen ersatzlos gestrichen. Einige Modul-Funktionen sind dadurch nicht oder nur eingeschr&auml;nkt verf&uuml;gbar (siehe Anmerkungen zu ben&ouml;tigten API).
+   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern. Das Modul funktioniert am besten mit dem Fritz!OS 6.24. Bei den nachfolgenden Fritz!OS Versionen hat AVM einige interne Schnittstellen (telnet, webcm) ersatzlos gestrichen. <b>Einige Modul-Funktionen sind dadurch nicht oder nur eingeschr&auml;nkt verf&uuml;gbar (siehe Anmerkungen zu ben&ouml;tigten API).</b>
    <br>
    Bitte auch die anderen Fritz!Box-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
@@ -5122,7 +5118,7 @@ sub FRITZBOX_fritztris($)
          Auf Fritz!Fons wird der Text (max. 100 Zeichen) hinter dem Parameter 'say:' direkt angesagt und ersetzt den Klingelton.
          <br>
          Alternativ kann mit 'play:' auch ein MP3-Link (vom einem Webserver) abgespielt werden. Dabei wird die Internetradiostation 39 'FHEM' erzeugt und translate.google.com f&uuml;r Text2Speech genutzt. Es wird <u>immer</u> der komplette Text/Klang abgespielt. Bis zum Ende der 'Klingeldauer' klingelt das Telefon dann mit seinem Standard-Klingelton.
-         Das Abspielen ist nur auf jeweils einem einzelnen Fritz!Fon m&ouml;glich.
+         Das Abspielen ist eventuell nicht auf mehreren Fritz!Fons gleichzeitig m&ouml;glich.
          <br>
          Je nach Fritz!OS kann das beschriebene Verhalten abweichen.
          <br>
