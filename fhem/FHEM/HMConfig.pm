@@ -1667,129 +1667,128 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
 
 
 %culHmChanSets = (
-                      "HM-CC-TC00"        =>{ "desired-temp" =>"[on|off|6.0..30.0]"
-                                             ,statusRequest  =>""
-                                             ,sysTime        =>""
-                                             ,getSerial      => ""
-                                            }
-                     ,"HM-CC-TC02"        =>{ peerChan       =>" 0 -actChn- ... single [set|unset] [actor|remote|both]"
-                                             ,"desired-temp" =>"[on|off|6.0..30.0]"
-                                             ,tempListSat    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListSun    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListMon    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListTue    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListThu    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListWed    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListFri    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
-                                             ,tempTmplSet    =>"[[-file-:]templateName] ..."
-                                             ,partyMode      =>"[prep|exec] HH:MM durationDays ..."
-                                             ,displayMode    =>"[temp-only|temp-hum]"
-                                             ,displayTemp    =>"[actual|setpoint]"
-                                             ,displayTempUnit=>"[celsius|fahrenheit]"
-                                             ,controlMode    =>"[auto|manual|central|party]"
-                                             ,statusRequest  =>""
-                                             ,sysTime        =>""
-                                            }
-                     ,"HM-OU-CFM-PL01"    =>{ led            =>"[redL|greenL|orangeL|redS|greenS|orangeS|pause][,-color2-...] [-repeat-]"}
-                     ,"HM-OU-CFM-PL02"    =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [-repeat-]"
-                                             ,pct            =>"[-value- ... [-ontime-]"}
-                     ,"HM-SEC-WIN01"      =>{ stop           =>"",
-                                             ,level          =>"-level- -relockDly- -speed-..."
-                                             ,keydef         =>"-btn- -txt1- -txt2-"
-                                             ,inhibit        =>"[on|off]"
-                                             ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-]..."
-                                             ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
-                                            }
-                     ,"HM-Sen-RD-O02"     =>{ "on-for-timer" =>"-sec-"
-                                             ,"on-till"      =>"-time-"
-                                             ,on             =>""
-                                             ,off            =>""
-                                             ,toggle         =>""
-                                            }
-                     ,"HM-Sen-RD-O00"     =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-MOD-Re-800"     =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-LC-Bl1PBU-FM00" =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-LC-Dim1TPBU-FM00"=>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-Sen-LI-O00"     =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-CC-RT-DN00"     =>{ sysTime        =>""
-                                             ,fwUpdate       =>"-filename- -bootTime- ..."
-                                            }
-                     ,"HM-CC-RT-DN04"     =>{ controlMode    =>"[auto|manual|boost|day|night]"
-                                             ,controlManu    =>"[on|off|5.0..30.0]"
-                                             ,controlParty   =>"-temp- -startDate- -startTime- -enddate- -endTime-"
-                                             ,tempListSat    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListSun    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListMon    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListTue    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListThu    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListWed    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListFri    =>"[prep|exec] HH:MM temp ..."
-                                             ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
-                                             ,tempTmplSet    =>"[[-file-:]templateName] ..."
-                                             ,"desired-temp" =>"[on|off|5.0..30.0]"
-                                             ,sysTime        =>""
-                                            }
-                     ,"HM-TC-IT-WM-W-EU00"=>{ sysTime        =>""
-                                             ,getSerial      => ""
-                                             ,fwUpdate       =>"-filename- -bootTime- ..."
-                                            }
-                     ,"HM-TC-IT-WM-W-EU01"=>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
-                     ,"HM-TC-IT-WM-W-EU02"=>{ controlMode    =>"[auto|manual|boost|day|night]"
-                                             ,controlManu    =>"[on|off|5.0..30.0]"
-                                             ,controlParty   =>"-temp- -startDate- -startTime- -enddate- -endTime-"
-                                             ,tempListSat    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                             ,tempListSun    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                             ,tempListMon    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                             ,tempListTue    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                             ,tempListThu    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                             ,tempListWed    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                             ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                             ,"desired-temp" =>"[on|off|5.0..30.0]"
-                                             ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
-                                             ,tempTmplSet    =>"[[-file-:]templateName] ..."
-                                             ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"
-                                            }
-                     ,"HM-TC-IT-WM-W-EU07"=>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
-                     ,"HM-ES-PMSw1-Pl01"  =>{ "on-for-timer" =>"-sec-"
-                                             ,"on-till"      =>"-time-"
-                                             ,on             =>""
-                                             ,off            =>""
-                                             ,toggle         =>""
-                                             ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
-                                             ,inhibit        =>"[on|off]"
-                                             ,statusRequest  =>""
-                                            }
-                     ,"HM-ES-PMSw1-Pl00"  =>{ fwUpdate       =>"-filename- -bootTime- ..."
-                                             ,getSerial      => ""
-                                             ,getDevInfo     => ""
-                                            }
-                     ,"HM-CC-RT-DN06"     =>{ press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."}
-                     ,"HM-Dis-WM5501"     =>{ displayWM      =>"[long|short|help] -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "}
-                     ,"CCU-FHEM00"        =>{ update         =>""
-                                             ,hmPairForSec   =>"-sec- ..."
-                                             ,hmPairSerial   =>"-serial-"
-                                             ,defIgnUnknown  =>""
-                                             ,assignIO       =>"-IO- [set|unset]..."
-                                            }
-                     ,"HM-LC-RGBW-WM01"   =>{ "on-for-timer" =>"-ontime- [-ramptime-]..."
-                                             ,"on-till"      =>"-time- [-ramptime-]..."
-                                             ,on             =>""
-                                             ,off            =>""
-                                             ,toggle         =>""
-                                             ,pct            =>"-value- ... [-ontime-] [-ramptime-]"
-                                             ,stop           =>""
-                                             ,press          =>"[long|short] [on|off|-peer-] [-repCount(long only)-] [-repDelay-] ..."
-                                             ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                             ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                             ,inhibit        =>"[on|off]"
-                                             ,statusRequest  =>""
-                                             ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
-                                            }
-                     ,"HM-LC-RGBW-WM02"   =>{ brightCol      =>"-bright- -colVal- -duration- -ramp- ..."
-                                            }
-                     ,"HM-LC-RGBW-WM03"   =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."
-                                            }
+                      "HM-CC-TC00"           =>{ "desired-temp" =>"[on|off|6.0..30.0]"
+                                                ,statusRequest  =>""
+                                                ,sysTime        =>""
+                                                ,getSerial      => ""
+                                               }
+                     ,"HM-CC-TC02"           =>{ peerChan       =>" 0 -actChn- ... single [set|unset] [actor|remote|both]"
+                                                ,"desired-temp" =>"[on|off|6.0..30.0]"
+                                                ,tempListSat    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListSun    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListMon    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListTue    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListThu    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListWed    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListFri    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
+                                                ,tempTmplSet    =>"[[-file-:]templateName] ..."
+                                                ,partyMode      =>"[prep|exec] HH:MM durationDays ..."
+                                                ,displayMode    =>"[temp-only|temp-hum]"
+                                                ,displayTemp    =>"[actual|setpoint]"
+                                                ,displayTempUnit=>"[celsius|fahrenheit]"
+                                                ,controlMode    =>"[auto|manual|central|party]"
+                                                ,statusRequest  =>""
+                                                ,sysTime        =>""
+                                               }
+                     ,"HM-OU-CFM-PL01"       =>{ led            =>"[redL|greenL|orangeL|redS|greenS|orangeS|pause][,-color2-...] [-repeat-]"}
+                     ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [-repeat-]"
+                                                ,pct            =>"[-value- ... [-ontime-]"}
+                     ,"HM-SEC-WIN01"         =>{ stop           =>"",
+                                                ,level          =>"-level- -relockDly- -speed-..."
+                                                ,keydef         =>"-btn- -txt1- -txt2-"
+                                                ,inhibit        =>"[on|off]"
+                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-]..."
+                                                ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
+                                               }
+                     ,"HM-Sen-RD-O02"        =>{ "on-for-timer" =>"-sec-"
+                                                ,"on-till"      =>"-time-"
+                                                ,on             =>""
+                                                ,off            =>""
+                                                ,toggle         =>""
+                                               }
+                     ,"HM-Sen-RD-O00"        =>{ fwUpdate       =>"-filename- -bootTime- ..."}
+                     ,"HM-Sen-LI-O00"        =>{ fwUpdate       =>"-filename- -bootTime- ..."}
+                     ,"HM-Sen-MDIR-WM5500"   =>{ fwUpdate       =>"-filename- -bootTime- ..."}
+                     ,"HM-MOD-Re-800"        =>{ fwUpdate       =>"-filename- -bootTime- ..."}
+                     ,"HM-LC-Bl1PBU-FM00"    =>{ fwUpdate       =>"-filename- -bootTime- ..."}
+                     ,"HM-LC-Dim1TPBU-FM00"  =>{ fwUpdate       =>"-filename- -bootTime- ..."}
+                     ,"HM-CC-RT-DN00"        =>{ sysTime        =>""
+                                                ,fwUpdate       =>"-filename- -bootTime- ..."
+                                               }
+                     ,"HM-CC-RT-DN04"        =>{ controlMode    =>"[auto|manual|boost|day|night]"
+                                                ,controlManu    =>"[on|off|5.0..30.0]"
+                                                ,controlParty   =>"-temp- -startDate- -startTime- -enddate- -endTime-"
+                                                ,tempListSat    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListSun    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListMon    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListTue    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListThu    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListWed    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListFri    =>"[prep|exec] HH:MM temp ..."
+                                                ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
+                                                ,tempTmplSet    =>"[[-file-:]templateName] ..."
+                                                ,"desired-temp" =>"[on|off|5.0..30.0]"
+                                                ,sysTime        =>""
+                                               }
+                     ,"HM-CC-RT-DN06"        =>{ press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."}
+                     ,"HM-TC-IT-WM-W-EU00"   =>{ sysTime        =>""
+                                                ,getSerial      => ""
+                                                ,fwUpdate       =>"-filename- -bootTime- ..."
+                                               }
+                     ,"HM-TC-IT-WM-W-EU01"   =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
+                     ,"HM-TC-IT-WM-W-EU02"   =>{ controlMode    =>"[auto|manual|boost|day|night]"
+                                                ,controlManu    =>"[on|off|5.0..30.0]"
+                                                ,controlParty   =>"-temp- -startDate- -startTime- -enddate- -endTime-"
+                                                ,tempListSat    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                                                ,tempListSun    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                                                ,tempListMon    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                                                ,tempListTue    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                                                ,tempListThu    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                                                ,tempListWed    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                                                ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
+                                                ,"desired-temp" =>"[on|off|5.0..30.0]"
+                                                ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
+                                                ,tempTmplSet    =>"[[-file-:]templateName] ..."
+                                                ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"
+                                               }
+                     ,"HM-TC-IT-WM-W-EU07"   =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
+                     ,"HM-ES-PMSw1-Pl01"     =>{ "on-for-timer" =>"-sec-"
+                                                ,"on-till"      =>"-time-"
+                                                ,on             =>""
+                                                ,off            =>""
+                                                ,toggle         =>""
+                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
+                                                ,inhibit        =>"[on|off]"
+                                                ,statusRequest  =>""
+                                               }
+                     ,"HM-ES-PMSw1-Pl00"     =>{ fwUpdate       =>"-filename- -bootTime- ..."
+                                                ,getSerial      => ""
+                                                ,getDevInfo     => ""
+                                               }
+                     ,"HM-Dis-WM5501"        =>{ displayWM      =>"[long|short|help] -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "}
+                     ,"CCU-FHEM00"           =>{ update         =>""
+                                                ,hmPairForSec   =>"-sec- ..."
+                                                ,hmPairSerial   =>"-serial-"
+                                                ,defIgnUnknown  =>""
+                                                ,assignIO       =>"-IO- [set|unset]..."
+                                               }
+                     ,"HM-LC-RGBW-WM01"      =>{ "on-for-timer" =>"-ontime- [-ramptime-]..."
+                                                ,"on-till"      =>"-time- [-ramptime-]..."
+                                                ,on             =>""
+                                                ,off            =>""
+                                                ,toggle         =>""
+                                                ,pct            =>"-value- ... [-ontime-] [-ramptime-]"
+                                                ,stop           =>""
+                                                ,press          =>"[long|short] [on|off|-peer-] [-repCount(long only)-] [-repDelay-] ..."
+                                                ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
+                                                ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
+                                                ,inhibit        =>"[on|off]"
+                                                ,statusRequest  =>""
+                                                ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
+                                               }
+                     ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright- -colVal- -duration- -ramp- ..."}
+                     ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."}
                                             
  );
 # clones- - - - - - - - - - - - - - - - -
