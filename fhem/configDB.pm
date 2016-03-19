@@ -110,6 +110,7 @@ use strict;
 use warnings;
 use Text::Diff;
 use DBI;
+use Data::Dumper;
 
 ##################################################
 # Forward declarations for functions in fhem.pl
@@ -1035,22 +1036,17 @@ sub _cfgDB_binFileimport($$;$) {
 sub _cfgDB_Filelist(;$) {
 	my ($notitle) = @_;
 	my $ret =	"Files found in database:\n".
-						"------------------------------------------------------------\n";
+				"------------------------------------------------------------\n";
 	$ret = "" if $notitle;
 	my $fhem_dbh = _cfgDB_Connect;
-	my @dbtable = ('fhembinfilesave');
-	foreach (@dbtable) {
-		my $sth = $fhem_dbh->prepare( "SELECT filename FROM $_ group by filename order by filename" );  
-		$sth->execute();
-		while (my $line = $sth->fetchrow_array()) {
-			$ret .= "$line\n";
-		}
-		$sth->finish();
+	my $sql = "SELECT filename FROM fhembinfilesave group by filename order by filename";  
+	my $content = $fhem_dbh->selectall_arrayref($sql);
+	foreach my $row (@$content) {
+		$ret .= "@$row[0]\n" if(defined(@$row[0]));
 	}
 	$fhem_dbh->disconnect();
 	return $ret;
 }
-
 
 1;
 
