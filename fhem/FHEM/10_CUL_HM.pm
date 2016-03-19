@@ -9512,17 +9512,18 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           need to wait for the device to wake up. <br>
           Note that also the register burstRx needs to be set in the device.</li>
       <li><a name="#CUL_HMexpert">expert</a><br>
-          This attribut controls the visibility of the readings. This attibute controlls
+          This attribut controls the visibility of the register readings. This attibute controls
           the presentation of device parameter in the readings.<br>
-          3 level can be choosen:<br>
+          it is a binary coded number with following presets:<br>
           <ul>
-          0_off: standart level. Display commonly used parameter<br>
-          1_on: enhanced level. Display all decoded device parameter<br>
-          2_raw: raw register information as well.<br>
-          4_none: hide all register information.<br>
-          8_templ+default: display templates plus default regs.<br>
-          12_templOnly: display templates only (finally preferred). <br>
-          251_anything: display all possible parameter. <br>
+          0_defReg       : default register<br>
+          1_allReg       : all register<br>
+          2_defReg+raw   : default register and raw reading<br>
+          3_allReg+raw   : all register and raw reading<br>
+          4_off          : no register<br>
+          8_templ+default: templates and default register<br>
+          12_templOnly   : templates only<br>
+          251_anything   : anything available<br>
           </ul>
           If expert is applied a device it is used for assotiated channels.
           It can be overruled if expert attibute is also applied to the channel device.<br>
@@ -10793,34 +10794,35 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           Benutze das Attribut f&uuml;r das Device, nicht f&uuml;r jeden einzelnen Kanal<br>
           Das Setzen auf Level 5 wird f&uuml;r alle Devices und Typen empfohlen, auch wakeup Devices.<br>
         </ul>
-      </li>
+        </li>
       <li><a name="CUL_HMburstAccess">burstAccess</a><br>
         kann f&uuml;r eine Ger&auml;teinstanz gesetzt werden falls das Model bedingte Bursts erlaubt.
         Das Attribut deaktiviert den Burstbetrieb (0_off) was die Nachrichtenmenge des HMLAN reduziert
         und damit die Wahrscheinlichkeit einer &Uuml;berlast von HMLAN verringert.<br>
         Einschalten (1_auto) erlaubt k&uuml;rzere Reaktionszeiten eines Ger&auml;ts. Der Nutzer muss nicht warten
         bis das Ger&auml;t wach ist. <br>
-        Zu beacht ist dass das Register "burstRx" im Ger&auml;t ebenfalls gesetzt werden muss.</li>
+        Zu beacht ist dass das Register "burstRx" im Ger&auml;t ebenfalls gesetzt werden muss.
+        </li>
       <li><a name="CUL_HMexpert">expert</a><br>
-        Dieses Attribut steuert die Sichtbarkeit der Werte. Damit wird die Darstellung der Ger&auml;teparameter kontrolliert.<br>
-        3 Level k&ouml;nnen gew&auml;hlt werden:<br>
+        Dieses Attribut steuert die Sichtbarkeit der Register Readngs. Damit wird die Darstellung der Ger&auml;teparameter kontrolliert.<br>
+        Es handdelt sich um einen binaer kodierten Wert mit folgenden Empfehlungen:<br>
         <ul>
-          0_off: Standard. Zeigt die h&auml;ufigst benutzten Paramter<br>
-          1_on: Erweitert. Zeigt alle dekodierten Ger&auml;teparameter<br>
-          2_full: Alles. Zeigt alle Parameter sowie Registerinformationen im Rohformat. <br>
-          2_raw: zeige roh Register.<br>
-          4_none:verstecke alle Register information.<br>
-          8_templ+default:zeige Templates und default Register.<br>
-          12_templOnly: Zeige nur templates (Empfohlen). <br>
-          251_anything: Zeige alle Register inforamtion. <br>
+          0_defReg       : default Register<br>
+          1_allReg       : all Register<br>
+          2_defReg+raw   : default Register und raw Register<br>
+          3_allReg+raw   : alle Register und raw reading<br>
+          4_off          : no Register<br>
+          8_templ+default: templates und default Register<br>
+          12_templOnly   : nur templates<br>
+          251_anything   : alles verfügbare<br>
         </ul>
         Wird 'expert' auf ein Ger&auml;t angewendet so gilt dies auch f&uuml;r alle verkn&uuml;pften Kan&auml;le.
         Kann &uuml;bergangen werden indem das Attribut ' expert' auch f&uuml;r den Ger&auml;tekanal gesetzt wird.<br>
         Das Attribut "showInternalValues" bei den globalen Werten muss ebenfalls &uuml;berpr&uuml;ft werden.
         "expert" macht sich diese Implementierung zu Nutze.
         Gleichwohl setzt "showInternalValues" - bei Definition - 'expert' außer Kraft .
-      </li>
-    <li><a name="#CUL_HMIOgrp">IOgrp</a><br>
+        </li>
+      <li><a name="#CUL_HMIOgrp">IOgrp</a><br>
         kann an Devices vergeben werden udn zeigt auf eine virtuelle ccu. Danach wird die ccu
         beim Senden das passende IO für das Device auswählen. Es ist notwendig, dass die virtuelle ccu
         definiert und alle erlaubten IOs eingetragen sind. Beim Senden wird die ccu prüfen
@@ -10833,7 +10835,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           attr myDevice2 IOgrp vccu:prefIO1,prefIO2,prefIO3<br>
         </code></ul>
         </li>
-    <li><a name="#CUL_HMlevelRange">levelRange</a><br>
+      <li><a name="#CUL_HMlevelRange">levelRange</a><br>
         nur f&uuml;r Dimmer! Der Dimmbereich wird eingeschr&auml;nkt. 
         Es ist gedacht um z.B. LED Lichter unterst&uuml;tzen welche mit 10% beginnen und bei 40% bereits das Maximum haben.
         levelrange normalisiert den Bereich entsprechend. D.h. set 100 wird physikalisch den Dimmer auf 40%, 
@@ -10851,7 +10853,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           attr myChannel levelRange 10,80<br>
         </code></ul>
         </li>
-    <li><a name="#CUL_HMtempListTmpl">tempListTmpl</a><br>
+      <li><a name="#CUL_HMtempListTmpl">tempListTmpl</a><br>
         Setzt das Default f&uuml;r Heizungskontroller. Ist es nicht gesetzt wird der default filename genutzt und der name
         der entity als templatename. Z.B. ./tempList.cfg:RT_Clima<br> 
         Um das template nicht zu nutzen kann man es auf '0'setzen.<br>
