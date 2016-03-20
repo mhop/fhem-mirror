@@ -38,6 +38,7 @@
 # V 1.11 2015-09-06 - FIX: pressure, windavg, winddir, windgust from weather stations without temperature 
 # V 1.12 2015-09-11 - FIX: handling ContactAsSwitch befor white list check
 # V 1.13 2015-11-10 - FIX: POSIX isdigit is deprecated replaced by own isDigit
+# V 1.14 2016-03-20 - FIX: send delimiter to signal end of stream if length of data > 1024
 ############################################## 
 package main;
 
@@ -498,11 +499,12 @@ sub pilight_ctrl_Send($)
     if ( $ret != 1 ) {
       Log3 $me, 2, "$me(Send): ERROR. Connection rejected from pilight-daemon";
       $socket->close();
-      return return "$me|0";
+      return "$me|0";
     }
   }
-  
   Log3 $me, 5, "$me(Send): $data";
+  
+  $data = $data."\n\n"; # add delimiter to signel end off stream if length > 1024
   $socket->send($data);
   
   #6.0 we get a response message

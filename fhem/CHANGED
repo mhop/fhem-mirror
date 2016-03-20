@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - fixed:   10_pilight_ctrl send long raw codes
   - fixed:   98_weekprofile fix mutated vowels
   - feature: 50_TelegramBot  new option to retry for send &
                              confirmation dialog for favorites 
