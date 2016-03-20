@@ -495,7 +495,7 @@ my @usbtable = (
       matchList => ["cu.PL2303-0000(.*)", "cu.usbmodem(.*)",
                     "ttyUSB(.*)", "ttyACM(.*)" ],
       DeviceName=> "DEVICE\@115200",
-      request   => pack("H*", "01030020dc"),   # GetStatus 
+      request   => pack("H*", "01030020dc06"),   # GetStatus +ACK
       response  => "^\x06.*",
       define    => "ZWDongle_PARAM ZWDongle DEVICE\@115200", },
 
