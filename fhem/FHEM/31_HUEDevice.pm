@@ -432,6 +432,11 @@ HUEDevice_SetParam($$@)
 
         $Y = 1 if( $Y > 1 );
 
+        $x = 0 if( $x < 0);
+        $x = 1 if( $x > 1);
+        $y = 0 if( $y < 0);
+        $y = 1 if( $y > 1);
+
         my $bri  = maxNum($r,$g,$b);
         #my $bri  = $Y;
 
