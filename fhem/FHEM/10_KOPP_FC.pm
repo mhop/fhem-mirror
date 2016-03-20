@@ -12,6 +12,7 @@
 #
 # Date		   Who				Comment																												   
 # ----------  -------------   	-------------------------------------------------------------------------------------------------------------------------------
+# 2016-03-20  RaspII			Added some information to Commandref, now attrib contains correct information
 # 2016-01-30  RaspII			Now also Blinds and Switches are implemented (all actuators I have). 
 # 2016-01-12  RaspII			Implemented Dimmer Commands for 1&3 key remote, removed toggle	
 # 2015-06-02  RaspII			Now can also Handle multiple devices with same code, next step: implement all commands (on, off, toggle... for KOPP_FC_Parse)
@@ -788,9 +789,19 @@ if( $msg =~ m/^kr/ ) {																			# if first two char's are "kr" then we 
   The Kopp Free Control protocol is used by Kopp receivers/actuators and senders.
   This module is able to send commands to Kopp actuators and receive commands from Kopp transmitters. Currently supports devices: dimmers, switches and blinds.
   The communication is done via a <a href="#CUL">CUL</a> or compatible device (e.g. CCD...). 
-  This devices must be defined before using this protocol (e.g. "define CUL_0 CUL /dev/ttyAMA0@38400 1234" and "attr CUL_0 rfmode KOPP_FC" ).
+  This devices must be defined before using this protocol.
 
   <br><br>
+  <b>Assign the Kopp Free Control protocol to a CUL or compatible device</b>
+  <ul>
+   <code>define CUL_0 CUL /dev/ttyAMA0@38400 1234</code><br>
+   <code>attr CUL_0 rfmode KOPP_FC</code>
+   <br>
+   This attribute ("rfmode KOPP_FC") assigns the Kopp protocol to device CUL_0<br>
+   You may <b>not</b> assign/use a second protocol on this device
+   <br> 
+  </ul>
+  <br>
   <a name="KOPP_FCdefine"></a>
   <b>Define</b>
   <ul>
@@ -830,6 +841,7 @@ if( $msg =~ m/^kr/ ) {																			# if first two char's are "kr" then we 
    You are now able to control the receiver from FHEM, the receiver handles FHEM just linke another remote control.
 </ul>         
 
+  <br>
   <a name="KOPP_FCset"></a>
   <b>Set</b>
   <ul>
@@ -846,42 +858,68 @@ if( $msg =~ m/^kr/ ) {																			# if first two char's are "kr" then we 
 	</ul>    
 	
     <pre>Examples:
-    <code>set DimmerDevice on</code> 		# will toggle dimmer device (e.g. lamp) on/off
-    <code>set DimmerDevice dimm</code> 		# will start dimming process
-    <code>set DimmerDevice stop</code>       	# will stop dimming process
+    <code>set Dimmer on</code>          # will toggle dimmer device on/off for 1Key remote control, 
+    <code> </code>                        will switch on for 3 key remote control
+    <code>set Dimmer off</code>         # will switch dimmer device off (3 key remote control)
+    <code>set Dimmer dimm</code>        # will start dimming process
+    <code>set Dimmer stop</code>        # will stop dimming process
    	</pre>
   </ul>
-  <br> 
 
   <a name="KOPP_FCattrib"></a>
   <b>Attributes</b>
   <ul>
-    <code>attr CUL_0 rfmode KOPP_FC</code> 
+    <code>attr &lt;name&gt; model &lt;value&gt</code> 
     <br>
-  	
-	This attribute will switch the Kopp protocol on for device CUL_0<br>
-	You can not use a second protocol on this device
+    <br><li><code>&lt;value&gt;</code></li>
+	value is one of:
+    <ul>
+	<code>Switch_8080_01</code><br>
+    <code>Switch_8080_01_2Key</code><br>
+    <code>Blind_8080_02</code><br>
+    <code>Timer_8080_04</code><br>
+    <code>Dimm_8011_00</code><br>
+	<code>Dimm_8011_00_3Key</code><br>
+	</ul>    
     
   </ul>
   <br>
   
-  <br><br>Example: FHEM Config for Dimmer via 1 Key remote control:
+  <b>Examples</b>
+  
   <ul>
+   <br>FHEM Config for Dimmer via 1 Key remote control:
+   <ul>
       <code>define Dimmer KOPP_FC 65 FA5E 02</code><br>
-	  <code>attr Dimmer IODev CCD</code><br>
+	  <code>attr Dimmer IODev CUL_0</code><br>
 	  <code>attr Dimmer devStateIcon OnOff:toggle:dimm dimm:dim50%:stop stop:on:dimm off:toggle:dimm</code><br>
 	  <code>attr Dimmer eventMap on:OnOff dimm:dimm stop:stop</code><br>
-	  <code>attr Dimmer group Dimmer_1KeyMode</code><br>
+	  <code>attr Dimmer group TestGroup</code><br>
   	  <code>attr Dimmer model Dimm_8011_00</code><br>
-	  <code>attr Dimmer room Test</code><br>
+	  <code>attr Dimmer room TestRoom</code><br>
 	  <code>attr Dimmer webCmd OnOff:dimm:stop</code><br>
-  </ul>
+   </ul>
  
-  <br><br>Example: FHEM Config for Dimmer via 3 Key remote control:
+   <br>FHEM Config for Dimmer via 3 Key remote control:
+   <ul>
+	  <code>define SDimmer KOPP_FC 65 FA5E 02 55 75</code><br>
+	  <code>attr SDimmer IODev CUL_0</code><br>
+	  <code>attr SDimmer devStateIcon dimm:dim50%:stop stop:on:off on:on:off off:off:on</code><br>
+	  <code>attr SDimmer group TestGroup</code><br>
+	  <code>attr SDimmer icon light_pendant_light</code><br>
+	  <code>attr SDimmer model Dimm_8011_00_3Key</code><br>
+	  <code>attr SDimmer room TestRoom</code><br>
+	  <code>attr SDimmer webCmd on:dimm:stop:off</code><br>
+   </ul>	  
+ </ul>  
 
-  <br>
+ <br><br>
+ <b>Additional Information you can find in corresponding FHEM Wiki</b>
+ <ul><li><a href="http://www.fhemwiki.de/w/index.php?title=Kopp_Allgemein&redirect=no">Kopp Allgemein</a></li></ul>
+ <br><br>
 
- </ul>
+
+</ul>
   
  
 =end html
