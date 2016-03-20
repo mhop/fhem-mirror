@@ -38,7 +38,7 @@ use Data::Dumper;
 my $missingModulRemote;
 eval "use Net::Telnet;1" or $missingModulRemote .= "Net::Telnet ";
 
-my $VERSION = "2.2.7";
+my $VERSION = "2.2.8";
 
 use constant {
   PERL_VERSION    => "perl_version",
@@ -819,9 +819,12 @@ SYSMON_Attr($$$)
       if($attrName eq "disable")
       {
         RemoveInternalTimer($hash);
-        if($attrVal ne "0")
+        if($attrVal ne "1")
         {
           InternalTimer(gettimeofday()+$hash->{INTERVAL_BASE}, "SYSMON_Update", $hash, 0);
+          $hash->{STATE} = "Active";
+        } else {
+          $hash->{STATE} = "Inactive"; 
         }
         #$hash->{LOCAL} = 1;
         #SYSMON_Update($hash);
