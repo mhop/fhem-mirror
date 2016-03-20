@@ -148,7 +148,7 @@ ZWDongle_Set($@)
     return "Unknown argument $type, choose one of " . join(" ",@r);
   }
 
-  Log3 $hash, 4, "ZWDongle set $name $type ".join(" ",@a);
+  Log3 $hash, 4, "ZWDongle *** set $name $type ".join(" ",@a);
   if($type eq "reopen") {
     return if(AttrVal($name, "dummy",undef) || AttrVal($name, "disable",undef));
     delete $hash->{NEXT_OPEN};
@@ -227,7 +227,7 @@ ZWDongle_Get($@)
     return "$cmd is unsupported by this controller";
   }
 
-  Log3 $hash, 4, "ZWDongle get $name $cmd ".join(" ",@a);
+  Log3 $hash, 4, "ZWDongle *** get $name $cmd ".join(" ",@a);
 
   if($cmd eq "neighborList") {
     my @b;
@@ -547,9 +547,14 @@ ZWDongle_Read($@)
       $data="";
       next;
     }
+
     $hash->{nrNAck} = 0;
-    Log3 $name, 4, "ZWDongle_Read $name: rcvd $msg, sending ACK";
-    DevIo_SimpleWrite($hash, "06", 1);          # Send ACK
+    next if($msg !~ m/^(..)(..)/);
+    my $ztp = ($1 eq "00" ? "request" : ($1 eq "01" ? "answer" : "unknown $1"));
+    my $zfi = $zw_func_id{$2} ?  $zw_func_id{$2} : "unknown $2";
+    Log3 $name, 4, "ZWDongle_Read $name: rcvd $msg ($ztp $zfi), sending ACK";
+    DevIo_SimpleWrite($hash, "06", 1);
+
     ZWDongle_shiftSendStack($hash, 1, 5, "device ack reveived")
         if($msg =~ m/^0013/);
     
@@ -579,7 +584,7 @@ ZWDongle_ReadAnswer($$$)
   Log3 $hash, 4, "ZWDongle_ReadAnswer arg:$arg regexp:".($regexp ? $regexp:"");
   return ("No FD (dummy device?)", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
-  my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
+  my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 1);
 
   for(;;) {
 
@@ -610,6 +615,10 @@ ZWDongle_ReadAnswer($$$)
 
       if($nfound == 0){
         Log3 $hash, 5, "ZWDongle_ReadAnswer: select timeout";
+        if($hash->{GotCAN}) {
+          ZWDongle_ProcessSendStack($hash);
+          next;
+        }
         return ("Timeout reading answer for get $arg", undef);
       }
 
