@@ -638,12 +638,10 @@ ZWave_Define($$)
 }
 
 sub
-ZWave_initFromModelfile($$)
+ZWave_initFromModelfile($$$)
 {
-  my ($name, $ctrlId) = @_;
+  my ($name, $ctrlId, $cfg) = @_;
   my @res;
-  my $cfg = ReadingsVal($name, "modelConfig", "");
-  return @res if(!$cfg);
   ZWave_configParseModel($cfg) if(!$zwave_modelConfig{$cfg});
   my $mc = $zwave_modelConfig{$cfg};
   return @res if(!$mc);
@@ -656,26 +654,9 @@ ZWave_initFromModelfile($$)
 }
 
 sub
-ZWave_doExecInits($)
+ZWave_execInits($$;$)
 {
-  my ($param) = @_;
-  my $cmdArr = $param->{cmdArr};
-
-  my $cmd = shift @{$cmdArr};
-  my $ret = AnalyzeCommand(undef, $cmd);
-  Log 1, "ZWAVE INIT: $cmd: $ret" if ($ret);
-
-  push(@{$cmdArr}, ZWave_initFromModelfile($1, $param->{ctrlId}))
-                if($cmd =~ m/^get (.*) model$/);
-
-  InternalTimer(gettimeofday()+0.5, "ZWave_doExecInits", $param, 0)
-    if(@{$cmdArr});
-}
-
-sub
-ZWave_execInits($$)
-{
-  my ($hash, $min) = @_;  # min = 50 for model-specific stuff
+  my ($hash, $min, $cfg) = @_;  # min = 50 for model-specific stuff
   my @clList = split(" ", $attr{$hash->{NAME}}{classes});
   my (@initList, %seen);
 
@@ -696,8 +677,14 @@ ZWave_execInits($$)
     push @cmd, eval $i->{CMD};
   }
 
-  InternalTimer(gettimeofday()+0.5, "ZWave_doExecInits",
-        { cmdArr=>\@cmd, ctrlId=>$CTRLID }, 0) if(@cmd);
+  push @cmd, ZWave_initFromModelfile($hash->{NAME}, $CTRLID, $cfg)
+    if($cfg); # model specific init, called from "get model"
+
+  foreach my $cmd (@cmd) {
+    my $ret = AnalyzeCommand(undef, $cmd);
+    Log 1, "ZWAVE INIT: $cmd: $ret" if ($ret);
+  }
+
 }
 
 
@@ -2117,7 +2104,6 @@ ZWave_mfsParse($$$$$)
 
   if($config == 2) {
     setReadingsVal($hash, "modelId", "$mf-$prod-$id", TimeNow());
-    ZWave_execInits($hash, 50);
     return "modelId:$mf-$prod-$id";
   }
 
@@ -2136,10 +2122,10 @@ ZWave_mfsParse($$$$$)
       if($l =~ m/<Product type\s*=\s*"([^"]*)".*id\s*=\s*"([^"]*)".*name\s*=\s*"([^"]*)"/) {
         if($mf eq $lastMf && $prod eq lc($1) && $id eq lc($2)) {
           if($config) {
-            $ret = "modelConfig:".
-                (($l =~ m/config\s*=\s*"([^"]*)"/) ? $1 : "unknown");
+            $ret = (($l =~ m/config\s*=\s*"([^"]*)"/) ? $1 : "unknown");
             ZWave_mfsAddClasses($hash, $1);
-            return $ret;
+            ZWave_execInits($hash, 50, $ret);
+            return "modelConfig:$ret";
           } else {
             $ret = "model:$mName $3";
           }
@@ -3740,9 +3726,12 @@ ZWave_Parse($$@)
         if($cmd eq 'ZW_ADD_NODE_TO_NETWORK');
     }
 
-    if($evt eq "protocolDone" && $arg =~ m/(..)../) {# done comes at addNode off
+    if($evt eq "protocolDone" && $arg =~ m/(..)../) {
       my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
       return "" if(!$dh);
+
+      AnalyzeCommand(undef, "set $ioName addNode off")
+        if($cmd eq 'ZW_ADD_NODE_TO_NETWORK');
 
       ZWave_wakeupTimer($dh, 1) if(ZWave_isWakeUp($dh));
 
