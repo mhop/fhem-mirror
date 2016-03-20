@@ -57,6 +57,8 @@ package main;
 use strict;
 use warnings;
 
+use vars qw{%owg_family %gets %sets $owx_version $owx_debug};
+
 #-- unfortunately some things OS-dependent
 my $owgdevregexp;
 if( $^O =~ /Win/ ) {
@@ -97,7 +99,8 @@ my %attrs = (
 my $owx_baud=9600;
 my $owx_cmdlen;
 #-- Debugging 0,1,2,3
-my $owx_debug=0;
+$owx_debug=0;
+
 #-- 8 byte 1-Wire device address
 my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
 #-- 16 byte search string
@@ -122,7 +125,7 @@ my $owx_LastDeviceFlag = 0;
 sub OWX_Initialize ($) {
   my ($hash) = @_;
   #-- Provider
-  $hash->{Clients}     = ":OWAD:OWCOUNT:OWID:OWLCD:OWMULTI:OWSWITCH:OWTHERM:";
+  $hash->{Clients}     = ":OWAD:OWCOUNT:OWID:OWLCD:OWMULTI:OWSWITCH:OWTHERM:OWVAR";
 
   #-- Normal Devices
   $hash->{DefFn}   = "OWX_Define";
@@ -1096,6 +1099,29 @@ sub OWX_Verify ($$) {
     Log 1,"OWX: Verify called with unknown interface";
     return 0;
   }
+}
+
+#######################################################################################
+#
+# OWX_WDBG - Write a debug message
+#
+# Parameter $name= device name
+#           $msg = string message
+#           $bin = binary message
+#
+########################################################################################
+
+sub OWX_WDBG($$$) {
+  my ($name,$msg,$bin) = @_;
+  my ($i,$j,$k);
+    if( $bin ){ 
+      for($i=0;$i<length($bin);$i++){
+        $j=int(ord(substr($bin,$i,1))/16);
+        $k=ord(substr($bin,$i,1))%16;
+        $msg.=sprintf "0x%1x%1x ",$j,$k;
+      }
+    }
+    main::Log3($name, 1, $msg);
 }
 
 ########################################################################################
