@@ -937,7 +937,8 @@ sub weekprofile_readProfilesFromFile(@)
      return;
   }
   
-  my $ret = open(my $fh, '<:encoding(UTF-8)', $filename);
+  #my $ret = open(my $fh, '<:encoding(UTF-8)', $filename);
+  my $ret = open(my $fh, '<', $filename);
   if (!$ret){
     Log3 $me, 1, "$me(readProfilesFromFile): Could not open file '$filename' $!";
     return;
