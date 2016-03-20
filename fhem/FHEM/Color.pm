@@ -120,13 +120,15 @@ BrightnessToChannels($) {
 
 # COLOR SPACE: HSV & RGB(dec)
 # HSV > h=float(0, 1), s=float(0, 1), v=float(0, 1)
-# RGB > r=int(0, 255), g=int(0, 255), b=int(0, 255)
+# RGB > r=float(0, 1), g=float(0, 1), b=float(0, 1)
 #
 
 sub
 rgb2hsv($$$) {
   my( $r, $g, $b ) = @_;
   my( $h, $s, $v );
+
+  main::Log3 undef, 1, "Color::rgb2hsv value our of range [$r,$g,$b]. must be in 0..1." if( $r > 1 || $g > 1 || $b > 1 );
 
   my $M = ::maxNum( $r, $g, $b );
   my $m = ::minNum( $r, $g, $b );
