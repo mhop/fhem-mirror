@@ -421,9 +421,8 @@ sub GDS_Set($@) {
 			}
 
 		when("conditions"){
-			CommandAttr(undef, "$name gdsSetCond $parameter");
-#            $attr{$name}{gdsSetCond} = $parameter; #ReadingsVal($name,'c_stationName',undef);
 			return "conditions no longer available after 15.03.2016" if (time > 1457996400);
+			CommandAttr(undef, "$name gdsSetCond $parameter");
 			GDS_GetUpdate($hash,'set conditions');
 			break;
 			}
@@ -448,9 +447,10 @@ sub GDS_Get($@) {
 	my $name = $hash->{NAME};
 
 	my $usage = "Unknown argument $command, choose one of help:noArg rereadcfg:noArg ".
-				"list:stations,capstations,data ".
+#				"list:stations,capstations,data ".
+				"list:capstations,data ".
 				"alerts:".$aList." ".
-				"conditions:".$sList." ".
+#				"conditions:".$sList." ".
 				"conditionsmap:".$cmapList." ".
 				"forecasts:".$fcList." ".
 				"forecastsmap:".$fmapList." ".
@@ -532,6 +532,7 @@ sub GDS_Get($@) {
 					$result = getListCapStations($hash,$parameter); }
 				when("data")		{ $result = latin1ToUtf8(join("\n",@allConditionsData)); } # new
 				when("stations")	{
+					return "stations list no longer available after 15.03.2016" if (time >  1457996400);
 					my @a = map (latin1ToUtf8(substr($_,0,19)), @allConditionsData);    
          			unshift(@a, "Use one of the following stations:", sepLine(40));
 					$result = join("\n",@a);
