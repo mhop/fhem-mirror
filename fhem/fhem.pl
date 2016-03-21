@@ -3001,7 +3001,7 @@ GetTimeSpec($)
 sub
 deviceEvents($$)
 {
-  my ($hash, $withState) = @_;
+  my ($hash, $withState) = @_; # withState returns stateEvent as state:event
 
   return undef if(!$hash || !$hash->{CHANGED});
 
@@ -3009,9 +3009,12 @@ deviceEvents($$)
     my $cws = $hash->{CHANGEDWITHSTATE};
     if(defined($cws)){
       if(int(@{$cws}) == 0) {
-        @{$cws} = @{$hash->{CHANGED}};
-        push @{$cws}, "state: $hash->{READINGS}{state}{VAL}"
-                if($hash->{READINGS} && $hash->{READINGS}{state});
+        if($hash->{READINGS} && $hash->{READINGS}{state}) {
+          my $state = $hash->{READINGS}{state}{VAL};
+          @{$cws} = map { $_ eq $state ? "state: $_" : $_ } @{$hash->{CHANGED}};
+        } else {
+          @{$cws} = @{$hash->{CHANGED}};
+        }
       }
       return $cws;
     }

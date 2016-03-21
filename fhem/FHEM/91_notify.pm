@@ -405,9 +405,9 @@ notify_fhemwebFn($$$$)
     <li>addStateEvent<br>
       The event associated with the state Reading is special, as the "state: "
       string is stripped, i.e $EVENT is not "state: on" but just "on". In some
-      circumstances it is desireable to get an additional event where "state: "
-      is not stripped. In such a case the addStateEvent attribute should be
-      set to 1 (default is 0, i.e. do not generate an additional event).<br>
+      circumstances it is desireable to get the event without "state: "
+      stripped. In such a case the addStateEvent attribute should be set to 1
+      (default is 0, i.e. strip the "state: " string).<br>
 
       Note 1: you have to set this attribute for the event "receiver", i.e.
       notify, FileLog, etc.<br>
@@ -612,8 +612,8 @@ notify_fhemwebFn($$$$)
       Das mit dem state Reading verkn&uuml;pfte Event ist speziell, da das
       dazugeh&ouml;rige Prefix "state: " entfernt wird, d.h. $EVENT ist nicht
       "state: on", sondern nur "on". In manchen F&auml;llen ist es aber
-      erw&uuml;nscht ein zus&auml;tzliches Event zu bekommen, wo "state: " nicht
-      entfernt ist. F&uuml;r diese F&auml;lle sollte addStateEvent auf 1
+      erw&uuml;nscht das unmodifizierte Event zu bekommen, d.h. wo "state: "
+      nicht entfernt ist. F&uuml;r diese F&auml;lle sollte addStateEvent auf 1
       gesetzt werden, die Voreinstellung ist 0 (deaktiviert).<br>
 
       Achtung:
