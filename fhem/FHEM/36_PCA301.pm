@@ -340,7 +340,7 @@ PCA301_Attr(@)
     <li>forceOn<br>
       try to switch on the device whenever an off status is received.</li>
     <li>offLevel<br>
-      a power level less or equal <code>offLevel</code> is considered to be off.</li>
+      a power level less or equal <code>offLevel</code> is considered to be off. used only in conjunction with readonly.</li>
     <li>readonly<br>
       if set to a value != 0 all switching commands (on, off, toggle, ...) will be disabled.</li>
     <li>ignore<br>
