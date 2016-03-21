@@ -2559,13 +2559,6 @@ FW_Notify($$)
     if($events) {    # It gets deleted sometimes (?)
       my $tn = TimeNow();
       my $max = int(@{$events});
-
-      my $state = "";
-      if($max) {
-        my ($rn,$rv) = split(": ",$events->[$max-1],2);
-        $state = $rv if($rn eq "state");
-      }
-
       for(my $i = 0; $i < $max; $i++) {
         if($events->[$i] !~ /: /) {
           if($dev->{NAME} eq 'global') { # Forum #47634
@@ -2576,7 +2569,6 @@ FW_Notify($$)
 
           next; #ignore 'set' commands
         }
-        next if($events->[$i] eq $state);
         my ($readingName,$readingVal) = split(": ",$events->[$i],2);
         push @data, FW_longpollInfo($h->{fmt},
                                 "$dn-$readingName", $readingVal,$readingVal);
