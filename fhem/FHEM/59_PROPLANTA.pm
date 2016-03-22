@@ -3,7 +3,8 @@
 #
 #  59_PROPLANTA.pm 
 #
-#  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
+#  (c) 2014 Torsten Poitzsch
+#  (c) 2014-2016 tupol http://forum.fhem.de/index.php?action=profile;u=5432
 #  
 #  Weather forecast values for 12 days are captured from www.proplanta.de
 #  inspired by 23_KOSTALPIKO.pm
@@ -487,31 +488,23 @@ sub PROPLANTA_Undef($$)
 #####################################
 sub PROPLANTA_Set($@)
 {
-   my ( $hash, @a ) = @_;
-   my $name    = $hash->{NAME};
-   my $reUINT = '^([\\+]?\\d+)$';
-   my $usage   = "Unknown argument $a[1], choose one of update:noArg ";
+   my ($hash, $name, $cmd, @val) = @_;
+   # my $reUINT = '^([\\+]?\\d+)$';
+   my $usage   = "Unknown argument $cmd, choose one of update:noArg ";
  
-   return $usage if ( @a < 2 );
+   return $usage     unless defined $cmd;
    
-   my $cmd = lc( $a[1] );
-   given ($cmd)
-   {
-      when ("?")
-      {
-         return $usage;
-      }
-      when ("update")
-      {
-         PROPLANTA_Log $hash, 3, "set command: " . $a[1];
-         $hash->{fhem}{LOCAL} = 1;
-         PROPLANTA_Start($hash);
-         $hash->{fhem}{LOCAL} = 0;
-      }
-       default
-      {
-         return $usage;
-      }
+   if ( $cmd eq "?" ) {
+      return $usage;
+   }
+   elsif ( $cmd eq "update" ) {
+      Log3 $name, 3, "PROPLANTA: set $name $cmd ".join(" ", @val);
+      $hash->{fhem}{LOCAL} = 1;
+      PROPLANTA_Start($hash);
+      $hash->{fhem}{LOCAL} = 0;
+   } 
+   else {
+      return $usage;
    }
    return;
 }
@@ -797,7 +790,7 @@ PROPLANTA_Html($)
 
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
-<div  style="width:800px"> 
+<div> 
 <ul>
    The module extracts weather data from <a href="http://www.proplanta.de">www.proplanta.de</a>.
    <br>
@@ -903,7 +896,7 @@ PROPLANTA_Html($)
 
 <a name="PROPLANTA"></a>
 <h3>PROPLANTA</h3>
-<div  style="width:800px"> 
+<div> 
 <ul>
    <a name="PROPLANTAdefine"></a>
    Das Modul extrahiert Wetterdaten von der Website <a href="http://www.proplanta.de">www.proplanta.de</a>.
