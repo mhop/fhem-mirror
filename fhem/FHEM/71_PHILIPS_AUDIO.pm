@@ -50,7 +50,7 @@ sub PHILIPS_AUDIO_Initialize
   $hash->{AttrFn}    = "PHILIPS_AUDIO_Attr";
   $hash->{UndefFn}   = "PHILIPS_AUDIO_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 model request-timeout:1,2,3,4,5 ".$readingFnAttributes;
+  $hash->{AttrList}  = "do_not_notify:0,1 disable:0,1 model max-device-presets max-device-favorites request-timeout:1,2,3,4,5 ".$readingFnAttributes;
   
   return;
 }
@@ -68,6 +68,29 @@ sub PHILIPS_AUDIO_GetStatus
 
   my $device = $hash->{IP_ADDRESS};
   
+  
+  # Check for Presets availability
+  if(not defined($hash->{READINGS}{"totalInetRadioPresets"}))
+  {
+	 # Hierarchichal navigation through the contents mandatory
+    $hash->{helper}{cmdStep} = 1;
+    PHILIPS_AUDIO_SendCommand($hash, "/index", "", "getInetRadioPresets", "noArg");
+    # Wait 10 seconds for next http request due to slow command processing of the streamium devices.
+    PHILIPS_AUDIO_ResetTimer($hash, 10);
+    return;
+  }
+
+  # Check for Favorites availability
+  if(not defined($hash->{READINGS}{"totalInetRadioFavorites"}))
+  {
+   # Hierarchichal navigation through the contents mandatory
+    $hash->{helper}{cmdStep} = 1;
+    PHILIPS_AUDIO_SendCommand($hash, "/index", "", "getInetRadioFavorites", "noArg");
+    # Wait 10 seconds for next http request due to slow command processing of the streamium devices.
+    PHILIPS_AUDIO_ResetTimer($hash, 10);
+    return;
+  }
+
   PHILIPS_AUDIO_SendCommand($hash, "/nowplay", "","nowplay", "noArg");
   PHILIPS_AUDIO_ResetTimer($hash) unless($local == 1);
   
@@ -133,19 +156,25 @@ sub PHILIPS_AUDIO_Set
   
   return "No Argument given" if(!defined($a[1])); 
 
-  if (not defined($hash->{helper}{PRESETS}) or length($hash->{helper}{PRESETS}) == 0)
-  {
-    PHILIPS_AUDIO_updatePresets($hash);
-  }
-
-  if (not defined($hash->{helper}{FAVORITES}) or length($hash->{helper}{FAVORITES}) == 0)
-  {
-    PHILIPS_AUDIO_updateFavorites($hash);
-  }
-
-  
   my $what = $a[1];
+  my $index;
   
+  # Provide number of selectable presets according to the given attribute
+  my $inetRadioPreset = "inetRadioPreset:";
+  for ($index = 1; $index < AttrVal($name, "max-device-presets", "24"); $index++)
+  {
+	 $inetRadioPreset .= $index . ",";
+  }
+  $inetRadioPreset .= $index . " ";
+  
+  # Provide number of selectable favorites according to the given attribute
+  my $inetRadioFavorite = "inetRadioFavorite:";
+  for ($index = 1; $index < AttrVal($name, "max-device-favorites", "24"); $index++)
+  {
+	 $inetRadioFavorite .= $index . ",";
+  }
+  $inetRadioFavorite .= $index . " ";
+
   my $usage;
   
   $usage = "Unknown argument $what, choose one of ".
@@ -162,8 +191,8 @@ sub PHILIPS_AUDIO_Set
            "shuffle:on,off ".
            "aux:noArg ".
            #"input:aux,internetRadio,mediaLibrary,onlineServices ".
-           "inetRadioPreset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 ".
-           "inetRadioFavorite:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 ".
+           $inetRadioPreset.
+           $inetRadioFavorite.
            "statusRequest:noArg ".
            "getInetRadioPresets:noArg ".
            "getInetRadioFavorites:noArg ".
@@ -347,7 +376,10 @@ sub PHILIPS_AUDIO_Set
   else  
   {
     return $usage;
-  }  
+  }
+
+  PHILIPS_AUDIO_ResetTimer($hash);  
+  
   return;
 }
 
@@ -868,7 +900,7 @@ sub PHILIPS_AUDIO_ParseResponse
           my $listedItems;       # Visible Items in the display. Max 8
           my $nextreqURL;
           my $i;
-          my $presetID;
+          my $presetID = 0;
           my $presetName;
 
           # Parse first 8 Presets
@@ -876,6 +908,9 @@ sub PHILIPS_AUDIO_ParseResponse
           {
             # In case on presets defined the player returns an Error
             # Do nothing
+
+            $hash->{helper}{TOTALINETRADIOPRESETS} = 0;
+            readingsBulkUpdate($hash, "totalInetRadioPresets", "0");
           }
           else
           {
@@ -913,7 +948,7 @@ sub PHILIPS_AUDIO_ParseResponse
                 }
                 if ($presetID ne "" and $presetName ne "")
                 {
-                  readingsBulkUpdate($hash, "inetRadioPreset$presetID", $presetName);
+                  readingsBulkUpdate($hash, sprintf("inetRadioPreset%02d", $presetID), $presetName);
                 }
               }
               else
@@ -940,11 +975,10 @@ sub PHILIPS_AUDIO_ParseResponse
               #Log3 $name, 5, "Presets: $debug";
             }
           }
-        }
+        }  
       }
       elsif ($cmd eq "getInetRadioFavorites")
       { 
-        
         # This command must be processed hierarchicaly through the navigation path
         if($hash->{helper}{cmdStep} == 1)
         {
@@ -964,13 +998,15 @@ sub PHILIPS_AUDIO_ParseResponse
           {
             # In case on presets defined the player returns an Error
             # Do nothing
+            $hash->{helper}{TOTALINETRADIOFAVORITES} = 0;
+            readingsBulkUpdate($hash, "totalInetRadioFavorites", "0");
           }
           else
           {
             my $listedItems;       # Visible Items in the display. Max 8
             my $nextreqURL;
             my $i;
-            my $favoriteID;
+            my $favoriteID = 0;
             my $favoriteName;
 
             # Parse first 8 Presets
@@ -1009,7 +1045,7 @@ sub PHILIPS_AUDIO_ParseResponse
                 }
                 if ($favoriteID ne "" and $favoriteName ne "")
                 {
-                  readingsBulkUpdate($hash, "inetRadioFavorite$favoriteID", $favoriteName);
+                  readingsBulkUpdate($hash, sprintf("inetRadioFavorite%02d", $favoriteID), $favoriteName);
                 }
               }
               else
@@ -1036,7 +1072,7 @@ sub PHILIPS_AUDIO_ParseResponse
               #Log3 $name, 5, "Favorites: $debug";
             }
           }  
-        }
+        }        
       }
 
       readingsEndUpdate($hash, 1);
@@ -1104,21 +1140,22 @@ sub PHILIPS_AUDIO_STREAMIUMNP2txt
 sub PHILIPS_AUDIO_updatePresets
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   if((not defined($hash->{helper}{PRESETS}) or length($hash->{helper}{PRESETS}) == 0))
   {
     my $presetName;
     
-    for(my $i = 1; $i < 11; $i++)
+    for(my $i = 1; $i < (AttrVal($name, "max-device-presets", "24") + 1); $i++)
     {
-      if(exists($hash->{READINGS}{"inetRadioPreset$i"}))
+      if(exists($hash->{READINGS}{sprintf("inetRadioPreset%02d", $i)}))
       {
         if($i != 1)
         {
           $presetName = ",";
         }
-        $presetName .= $i . ":";
-        $presetName .= $hash->{READINGS}{"inetRadioPreset$i"}{VAL};
+        $presetName .= sprintf("%02d", $i) . ":";
+        $presetName .= $hash->{READINGS}{sprintf("inetRadioPreset%02d", $i)}{VAL};
         $presetName =~ s/ /_/g; # Replace blank by underscore
         $hash->{helper}{PRESETS} .= $presetName;      
       }
@@ -1141,21 +1178,22 @@ sub PHILIPS_AUDIO_updatePresets
 sub PHILIPS_AUDIO_updateFavorites
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   if((not defined($hash->{helper}{FAVORITES}) or length($hash->{helper}{FAVORITES}) == 0))
   {
     my $favoriteName;
     
-    for(my $i = 1; $i < 11; $i++)
+    for(my $i = 1; $i < (AttrVal($name, "max-device-favorites", "24") + 1); $i++)
     {
-      if(exists($hash->{READINGS}{"inetRadioFavorite$i"}))
+      if(exists($hash->{READINGS}{sprintf("inetRadioFavorite%02d", $i)}))
       {
         if($i != 1)
         {
           $favoriteName = ",";
         }
-        $favoriteName .= $i . ":";
-        $favoriteName .= $hash->{READINGS}{"inetRadioFavorite$i"}{VAL};
+        $favoriteName .= sprintf("%02d", $i) . ":";
+        $favoriteName .= $hash->{READINGS}{sprintf("inetRadioFavorite%02d" , $i)}{VAL};
         $favoriteName =~ s/ /_/g; # Replace blank by underscore
         $hash->{helper}{FAVORITES} .= $favoriteName;               
       }
@@ -1302,6 +1340,10 @@ sub PHILIPS_AUDIO_updateFavorites
       <li><b><a name="request-timeout">request-timeout</a></b></li>
       <br>Optional attribute change the response timeout in seconds for all queries to the receiver.
       <br>Possible values: 1...5 seconds. Default value is 4 seconds.<br><br>
+      <li><b><a name="max-device-presets">max-device-presets</a></b></li>
+      <br>Optional attribute defining maximum number of available preset slots in device's memory. Default value 24.<br><br>
+      <li><b><a name="max-device-favorites">max-device-favorites</a></b></li>
+      <br>Optional attribute defining maximum number of favorite slots in device's memory. Default value 24.<br><br>
       <li><b><a name="disable">disable</a></b></li>
       <br>Optional attribute to disable the internal cyclic status update of the receiver. Manual status updates via statusRequest command is still possible.
       <br>Possible values: 0 &rarr; perform cyclic status update, 1 &rarr; don't perform cyclic status updates.<br><br><br>
@@ -1459,6 +1501,10 @@ sub PHILIPS_AUDIO_updateFavorites
         <li><b><a name="request-timeout">request-timeout</a></b></li><br>
         Optionales Attribut, um das HTTP response timeout zu beeinflu&szlig;en.<br>
         M&ouml;gliche Werte: 1...5 Sekunden. Default Wert ist 4 Sekunden.<br><br>
+        <li><b><a name="max-device-presets">max-device-presets</a></b></li>
+        <br>Optionales Attribut zur Bestimmung der max. Anzahl von verf&uumlgbaren Preset-Speicherpl&aumltzen des Players. Default-Wert 24.<br><br>
+        <li><b><a name="max-device-favorites">max-device-favorites</a></b></li>
+        <br>Optionales Attribut zur Bestimmung der max. Anzahl von verf&uumlgbaren Favorite-Speicherpl&aumltzen des Players. Default-Wert 24.<br><br>
         <li><b><a name="disable">disable</a></b></li><br>
         Optionales Attribut zum Deaktivieren des internen zyklischen Timers zum Aktualisieren des NP-Status. Manuelles Update ist nach wie vor m&ouml;glich.<br>
         M&ouml;gliche Werte: 0 &rarr; Zyklisches Update aktiv., 1 &rarr; Zyklisches Update inaktiv.<br><br><br>
