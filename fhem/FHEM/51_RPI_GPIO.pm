@@ -22,27 +22,49 @@ use SetExtensions;
 
 sub RPI_GPIO_fileaccess($$;$);
 
+my $gpiodir = "";		#GPIO base directory
+my @gpiodirs = ("/sys/class/aml_gpio", "/sys/class/gpio" );
+
+my $gpioprg = "";		#WiringPi GPIO utility
+my @gpioprgs = ("/usr/local/bin/gpio", "/usr/bin/gpio");
+
 sub RPI_GPIO_Initialize($) {
 	my ($hash) = @_;
-	$hash->{DefFn}    = "RPI_GPIO_Define";
-	$hash->{GetFn}    = "RPI_GPIO_Get";
-	$hash->{SetFn}    = "RPI_GPIO_Set";
-	$hash->{StateFn}  = "RPI_GPIO_State";
-	$hash->{AttrFn}   = "RPI_GPIO_Attr";
-	$hash->{UndefFn}  = "RPI_GPIO_Undef";
-	$hash->{ExceptFn} = "RPI_GPIO_Except";
-	$hash->{AttrList} = "poll_interval" .
-											" direction:input,output pud_resistor:off,up,down" .
-											" interrupt:none,falling,rising,both" .
-											" toggletostate:no,yes active_low:no,yes" .
-											" debounce_in_ms restoreOnStartup:no,yes,on,off,last" .
-                                                                                        " unexportpin:no,yes" .
-											" longpressinterval " .
-											"$readingFnAttributes";
+	foreach (@gpioprgs) {
+		if(-x $_) {
+			$gpioprg = $_;
+			Log3 undef, 4, "RPI_GPIO: wiringpi gpio utility exists: $gpioprg";
+			last;
+		} elsif (-e $_) {
+			Log3 undef, 3, "RPI_GPIO: Attention, WiringPi gpio utility exists: $gpioprg but is not executable";
+		}
+	}
+	foreach (@gpiodirs) {
+		if(-e $_) {
+			$gpiodir = $_;
+			Log3 undef, 4, "RPI_GPIO: gpio directory exists: $gpiodir";
+			last;
+		} 
+	}
+	Log3 undef, 3, "RPI_GPIO: could not find gpio base directory, please add correct path in define" unless defined $gpiodir;
+	Log3 undef, 4, "RPI_GPIO: could not find/use WiringPi gpio utility base directory" unless defined $gpioprg;
+	
+	$hash->{DefFn}    	= "RPI_GPIO_Define";
+	$hash->{GetFn}    	= "RPI_GPIO_Get";
+	$hash->{SetFn}    	= "RPI_GPIO_Set";
+	$hash->{StateFn}  	= "RPI_GPIO_State";
+	$hash->{AttrFn}   	= "RPI_GPIO_Attr";
+	$hash->{ShutdownFn} = "RPI_GPIO_Shutdown";
+	$hash->{UndefFn}  	= "RPI_GPIO_Undef";
+	$hash->{ExceptFn} 	= "RPI_GPIO_Except";
+	$hash->{AttrList}	= "poll_interval" .
+						" direction:input,output pud_resistor:off,up,down" .
+						" interrupt:none,falling,rising,both" .
+						" toggletostate:no,yes active_low:no,yes" .
+						" debounce_in_ms restoreOnStartup:no,yes,on,off,last" .
+						" unexportpin:no,yes longpressinterval" .
+						" $readingFnAttributes";
 }
-
-my $gpiodir = "/sys/class/gpio";			#GPIO base directory
-my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
 
 my %setsoutp = (
 'on:noArg' => 0,
@@ -51,12 +73,11 @@ my %setsoutp = (
 );
 
 my %setsinpt = (
-'readValue' => 0,
+'readValue:noArg' => 0,
 );
 
 sub RPI_GPIO_Define($$) {
  my ($hash, $def) = @_;
-
  my @args = split("[ \t]+", $def);
  my $menge = int(@args);
  if (int(@args) < 3)
@@ -67,67 +88,87 @@ sub RPI_GPIO_Define($$) {
 
  #Pruefen, ob GPIO bereits verwendet
  foreach my $dev (devspec2array("TYPE=$hash->{TYPE}")) {
-	if ($args[2] eq InternalVal($dev,"RPI_pin","")) {
+	if ($args[2] eq InternalVal($dev,"RPI_pin","") && $hash->{NAME} ne InternalVal($dev,"NAME","") ) {
 		return "GPIO $args[2] already used by $dev";
   }
  }
  
- my $name = $args[0];
- $hash->{RPI_pin} = $args[2];
- $hash->{dir_not_set} = 1;
+	my $name = $args[0];
+	$hash->{RPI_pin} = $args[2];
  
- if(-e "$gpiodir/gpio$hash->{RPI_pin}" && -w "$gpiodir/gpio$hash->{RPI_pin}/value" && -w "$gpiodir/gpio$hash->{RPI_pin}/direction") {			#GPIO bereits exportiert?
-	Log3 $hash, 4, "$name: gpio$hash->{RPI_pin} already exists";
-	#nix tun...ist ja schon da
- } elsif (-w "$gpiodir/export") {																																																					#gpio export Datei mit schreibrechten?
-	Log3 $hash, 4, "$name: write access to file $gpiodir/export, use it to export GPIO";
-	my $exp = IO::File->new("> $gpiodir/export");																						#gpio ueber export anlegen 
-	print $exp "$hash->{RPI_pin}";
-	$exp->close;
- } else {
-	if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {							#Abbbruch da kein gpio utility vorhanden
-			Log3 $hash, 1, "$name: can't export gpio$hash->{RPI_pin}, no write access to $gpiodir/export and " . $ret;
-			return "$name: can't export gpio$hash->{RPI_pin}, no write access to $gpiodir/export and " . $ret;
-		} else {														#nutze GPIO Utility?
-		Log3 $hash, 4, "$name: using gpio utility to export pin";
-		RPI_GPIO_exuexpin($hash, "in");
+	if ( defined $args[3] ) {
+		return "unable to find gpio basedir $args[3]" unless (-e $args[3]);
+		$hash->{GPIO_Basedir} = $args[3];
+	} else {
+		return "unable to find gpio basedir $gpiodir" unless defined $gpiodir;
+		$hash->{GPIO_Basedir} = $gpiodir;
+	}
+ 
+	if ( defined $args[4] ) {
+		return "unable to find wiringpi gpio utility: $gpioprg" unless (-e $args[4]);
+		$hash->{WiringPi_gpio} = $args[4];
+	} else {
+		return "unable to find wiringpi gpio utility: $gpioprg" unless defined $gpioprg;
+		$hash->{WiringPi_gpio} = $gpioprg;
+	}
+ 
+	$hash->{dir_not_set} = 1;
+ 
+	if(-e "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}" && 
+	   -w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value" && 
+	   -w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction") {			#GPIO bereits exportiert?
+		Log3 $hash, 4, "$name: gpio$hash->{RPI_pin} already exists";
+		#nix tun...ist ja schon da
+	} elsif (-w "$hash->{GPIO_Basedir}/export") {																																																					#gpio export Datei mit schreibrechten?
+		Log3 $hash, 4, "$name: write access to file $hash->{GPIO_Basedir}/export, use it to export GPIO";
+		my $exp = IO::File->new("> $hash->{GPIO_Basedir}/export");													#gpio ueber export anlegen 
+		print $exp "$hash->{RPI_pin}";
+		$exp->close;
+	} else {
+		if ( defined $hash->{WiringPi_gpio} ) {																		#GPIO Utility Vorhanden?
+			Log3 $hash, 4, "$name: using gpio utility to export pin";
+			RPI_GPIO_exuexpin($hash, "in");
+		} else {																									#Abbbruch da kein gpio utility vorhanden
+			my $msg = "$name: can't export gpio$hash->{RPI_pin}, no write access to $hash->{GPIO_Basedir}/export and WiringPi gpio utility not (correct) installed";
+			Log3 $hash, 1, $msg;
+			return $msg;
 		}
- }
+	}
  
  # wait for Pin export (max 5s)
- my $checkpath = qq($gpiodir/gpio$hash->{RPI_pin}/value);
+ my $checkpath = qq($hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value);
  my $counter = 100;
  while( $counter ){
  	last if( -e $checkpath && -w $checkpath );
  	Time::HiRes::sleep( 0.05 );
  	$counter --;
  }
- unless( $counter ) {																												#abbrechen wenn export fehlgeschlagen
+ unless( $counter ) {																												# nur wenn export fehlgeschlagen
  	# nochmal probieren wenn keine Schreibrechte auf GPIO Dateien ##########
- 	if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {							#Abbbruch da kein gpio utility vorhanden
- 		if ( -e "$gpiodir/export") {
-  			Log3 $hash, 1, "$name: \"$gpiodir/export\" exists and is " . ( ( -w "$gpiodir/export") ? "" : "NOT " ) . "writable";
-		} else {
- 			Log3 $hash, 1, "$name: gpio$hash->{RPI_pin}/value doesnt exist";
-		}
-		if(-e "$gpiodir/gpio$hash->{RPI_pin}") {
-			Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}\" exported but define aborted:";
-			if ( -e "$gpiodir/gpio$hash->{RPI_pin}/value") {
-				Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}/value\" exists and is " . ( ( -w "$gpiodir/gpio$hash->{RPI_pin}/value") ? "" : "NOT " ) . "writable";
-			} else {
-				Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}/value\" doesnt exist";
-			}
-			if ( -e "$gpiodir/gpio$hash->{RPI_pin}/direction") {
-				Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}/direction\" exists and is " . ( ( -w "$gpiodir/gpio$hash->{RPI_pin}/direction") ? "" : "NOT " ) . "writable";
-			} else {
-				Log3 $hash, 1, "$name: \"$gpiodir/gpio$hash->{RPI_pin}/direction\" doesnt exist";
-			}
-			Log3 $hash, 1, "$name: second attempt to export gpio$hash->{RPI_pin} failed: " . $ret;
-		}
-       	return "$name: failed to export pin gpio$hash->{RPI_pin}, see logfile";
-	} else {																				#nutze GPIO Utility fuer zweiten Exportversuch
-		Log3 $hash, 4, "$name: using gpio utility to export pin (first export via $gpiodir/export failed)";
+ 	if ( defined $hash->{WiringPi_gpio} ) {							# nutze GPIO Utility fuer zweiten Exportversuch
+		Log3 $hash, 4, "$name: using gpio utility to export pin (first export via $hash->{GPIO_Basedir}/export failed)";
 		RPI_GPIO_exuexpin($hash, "in");
+	} else {														# Abbbruch da kein gpio utility vorhanden
+		Log3 $hash, 1, "$name: second attempt to export gpio$hash->{RPI_pin} also failed: WiringPi gpio utility not (correct) installed, possibly reasons for first fail:";
+ 		if ( -e "$hash->{GPIO_Basedir}/export") {
+  			Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/export\" exists and is " . ( ( -w "$hash->{GPIO_Basedir}/export") ? "" : "NOT " ) . "writable";
+		} else {
+ 			Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/export\" doesnt exist";
+		}
+		if(-e "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}") {
+			Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}\" exported but define aborted:";
+			if ( -e "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value") {
+				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value\" exists and is " . ( ( -w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value") ? "" : "NOT " ) . "writable";
+			} else {
+				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/value\" doesnt exist";
+			}
+			if ( -e "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction") {
+				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction\" exists and is " . ( ( -w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction") ? "" : "NOT " ) . "writable";
+			} else {
+				Log3 $hash, 1, "$name: \"$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/direction\" doesnt exist";
+			}
+		}
+       	return "$name: failed to export pin gpio$hash->{RPI_pin}, see logfile";						
 	}
  }
 
@@ -160,51 +201,33 @@ sub RPI_GPIO_Set($@) {
 	my ($hash, @a) = @_;
 	my $name =$a[0];
 	my $cmd = $a[1];
-	#my $val = $a[2];
-
-	if(defined($attr{$name}) && defined($attr{$name}{"direction"})) {
-		my $mt = $attr{$name}{"direction"};
-		if($mt && $mt eq "output") {
-			#if ($cmd eq 'toggle') {
-			#	my $val = RPI_GPIO_fileaccess($hash, "value");     #alten Wert des GPIO direkt auslesen
-			#	$cmd = $val eq "0" ? "on" :"off";
-			#}
-			if ($cmd eq 'on') {
-				RPI_GPIO_fileaccess($hash, "value", "1");
-				#$hash->{STATE} = 'on';
-				readingsBeginUpdate($hash);
-				#readingsBulkUpdate($hash, 'Pinlevel', $valalt);
-				readingsBulkUpdate($hash, 'state', "on");
-				readingsEndUpdate($hash, 1);
-			} elsif ($cmd eq 'off') {
-				RPI_GPIO_fileaccess($hash, "value", "0");
-				#$hash->{STATE} = 'off';
-				readingsBeginUpdate($hash);
-				#readingsBulkUpdate($hash, 'Pinlevel', $valalt);
-				readingsBulkUpdate($hash, 'state', "off");
-				readingsEndUpdate($hash, 1);
-			} else {
-				my $slist = join(' ', keys %setsoutp);
-                Log3 $hash, 5, "wird an setextensions gesendet: @a";
-				return SetExtensions($hash, $slist, @a);
-			}
+	my $mt = AttrVal($name, 'direction', 'input');
+	if($mt && $mt eq "output") {
+		if ($cmd eq 'on') {
+			RPI_GPIO_fileaccess($hash, "value", "1");
+			readingsSingleUpdate($hash, 'state', $cmd, 1);
+		} elsif ($cmd eq 'off') {
+			RPI_GPIO_fileaccess($hash, "value", "0");
+			readingsSingleUpdate($hash, 'state', $cmd, 1);
 		} else {
-			if(!defined($setsinpt{$cmd})) {
-				return 'Unknown argument ' . $cmd . ', choose one of ' . join(' ', keys %setsinpt)
-			} else {
-			}
+			my $slist = join(' ', keys %setsoutp);
+			Log3 $hash, 5, "wird an setextensions gesendet: @a";
+			return SetExtensions($hash, $slist, @a);
+		}
+	} elsif ($mt && $mt eq "input") {
+		if ($cmd eq 'readValue') {
+			RPI_GPIO_updatevalue($hash);
+		} else {
+			return 'Unknown argument ' . $cmd . ', choose one of ' . join(' ', keys %setsinpt)
 		}
 	}
-	if ($cmd eq 'readValue') { #noch bei input einpflegen
-		RPI_GPIO_updatevalue($hash);
-	} 
+	return undef;
 }
 
 sub RPI_GPIO_State($$$$) {	#reload readings at FHEM start
 	my ($hash, $tim, $sname, $sval) = @_;
 	Log3 $hash, 4, "$hash->{NAME}: $sname kann auf $sval wiederhergestellt werden $tim";
 
-	#if ( (AttrVal($hash->{NAME},"restoreOnStartup","yes") eq "yes") && ($sname ne "STATE") ) {
 	if ( $sname ne "STATE" && AttrVal($hash->{NAME},"restoreOnStartup","last") ne "no") {
 		if (AttrVal($hash->{NAME},"direction","") eq "output") {
 			$hash->{READINGS}{$sname}{VAL} = $sval;
@@ -220,7 +243,7 @@ sub RPI_GPIO_State($$$$) {	#reload readings at FHEM start
 			} 
 		} elsif ( AttrVal($hash->{NAME},"direction","") eq "input") {
 			if ($sname eq "Toggle") {
-        #wenn restoreOnStartup "on" oder "off" und der Wert mit dem im Statefile uebereinstimmt wird der Zeitstempel aus dem Statefile gesetzt
+				#wenn restoreOnStartup "on" oder "off" und der Wert mit dem im Statefile uebereinstimmt wird der Zeitstempel aus dem Statefile gesetzt
 				my $rval = AttrVal($hash->{NAME},"restoreOnStartup","last");
 				$rval = "last" if ( $rval ne "on" && $rval ne "off" );
 				$tim  = gettimeofday() if $rval ne "last" && $rval ne $sval;
@@ -254,7 +277,6 @@ sub RPI_GPIO_State($$$$) {	#reload readings at FHEM start
               		$hash->{READINGS}{$sname}{VAL} = $sval;
               		$hash->{READINGS}{$sname}{TIME} = $tim;
            		}
-          		#}
       		}
 		}
 	}
@@ -285,7 +307,7 @@ sub RPI_GPIO_Attr(@) {
 			}
 		} 
 	}
-  if ($attr eq 'direction') {
+	if ($attr eq 'direction') {
 		if (!$val) { #$val nicht definiert: Einstellungen loeschen
 			$msg = "$hash->{NAME}: no direction value. Use input output";
 		} elsif ($val eq "input") {
@@ -307,7 +329,7 @@ sub RPI_GPIO_Attr(@) {
 			$msg = "$hash->{NAME}: Wrong $attr value. Use input output";
 		}
 	}
-  if ($attr eq 'interrupt') {
+	if ($attr eq 'interrupt') {
     if ( !$val || ($val eq "none") ) {
       RPI_GPIO_fileaccess($hash, "edge", "none");
       RPI_GPIO_inthandling($hash, "stop");
@@ -330,51 +352,48 @@ sub RPI_GPIO_Attr(@) {
       $msg = "$hash->{NAME}: Wrong $attr value. Use none, falling, rising or both";
     }  
   }
-#Tastfunktion: bei jedem Tastendruck wird State invertiert
-  if ($attr eq 'toggletostate') {
-    unless ( !$val || ($val eq ("yes" || "no") ) ) {
-      $msg = "$hash->{NAME}: Wrong $attr value. Use yes or no";
-    }
-  }
-#invertierte Logik 
-  if ($attr eq 'active_low') {
-    if ( !$val || ($val eq "no" ) ) {
-      RPI_GPIO_fileaccess($hash, "active_low", "0");
-      Log3 $hash, 5, "$hash->{NAME}: set attr active_low: no"; 
-    } elsif ($val eq "yes") {
-      RPI_GPIO_fileaccess($hash, "active_low", "1");
-      Log3 $hash, 5, "$hash->{NAME}: set attr active_low: yes";
-    } else {
-      $msg = "$hash->{NAME}: Wrong $attr value. Use yes or no";
-    }
-  }
-#Entprellzeit
-  if ($attr eq 'debounce_in_ms') {
-    if ( $val && ( ($val > 250) || ($val < 0) ) ) {
-      $msg = "$hash->{NAME}: debounce_in_ms value to big. Use 0 to 250";
-    }
-  }
-  if ($attr eq "pud_resistor" && $val) {
-    if($val =~ /^(off|up|down)$/) {
-      if(-w "$gpiodir/gpio$hash->{RPI_pin}/pull") {
-        $val =~ s/off/disable/;
-        RPI_GPIO_fileaccess($hash, "pull", $val);
-      } else { #nur fuer Raspberry (ueber gpio utility)
-        my $pud;
-        if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {
-          Log3 $hash, 1, "$hash->{NAME}: unable to change pud resistor:" . $ret;
-          return "$hash->{NAME}: " . $ret;
-        } else {
-          $val =~ s/off/tri/;
-          $pud = $gpioprg." -g mode ".$hash->{RPI_pin}." ".$val;
-          $pud = `$pud`;
-        }
-      }
-    } else {
-      $msg = "$hash->{NAME}: Wrong $attr value. Use off, up or down";
-    }
-  }
-  return ($msg) ? $msg : undef; 
+	if ($attr eq 'toggletostate') {			# Tastfunktion: bei jedem Tastendruck wird State invertiert
+		unless ( !$val || ($val eq ("yes" || "no") ) ) {
+		$msg = "$hash->{NAME}: Wrong $attr value. Use yes or no";
+		}
+	}
+	if ($attr eq 'active_low') {			# invertierte Logik 
+		if ( !$val || ($val eq "no" ) ) {
+		  RPI_GPIO_fileaccess($hash, "active_low", "0");
+		  Log3 $hash, 5, "$hash->{NAME}: set attr active_low: no"; 
+		} elsif ($val eq "yes") {
+		  RPI_GPIO_fileaccess($hash, "active_low", "1");
+		  Log3 $hash, 5, "$hash->{NAME}: set attr active_low: yes";
+		} else {
+		  $msg = "$hash->{NAME}: Wrong $attr value. Use yes or no";
+		}
+	}
+	if ($attr eq 'debounce_in_ms') {		# Entprellzeit
+		if ( $val && ( ($val > 250) || ($val < 0) ) ) {
+		  $msg = "$hash->{NAME}: debounce_in_ms value to big. Use 0 to 250";
+		}
+	}
+	if ($attr eq "pud_resistor" && $val) {	# interner pullup/down Widerstand
+		if($val =~ /^(off|up|down)$/) {
+			if(-w "$hash->{GPIO_Basedir}/gpio$hash->{RPI_pin}/pull") {
+				$val =~ s/off/disable/;
+				RPI_GPIO_fileaccess($hash, "pull", $val);
+			} else { #nur fuer Raspberry (ueber gpio utility)
+				#my $pud;
+				if ( defined $hash->{WiringPi_gpio} ) {
+					$val =~ s/off/tri/;
+					RPI_GPIO_exuexpin($hash, $val);
+				} else {
+					my $ret = "$hash->{NAME}: unable to change pud resistor: WiringPi gpio utility not (correct) installed";
+					Log3 $hash, 1, $ret;
+					return $ret;
+				}
+			}
+		} else {
+			$msg = "$hash->{NAME}: Wrong $attr value. Use off, up or down";
+		}
+	}
+	return ($msg) ? $msg : undef; 
 }
 
 sub RPI_GPIO_Poll($) {		#for attr poll_intervall -> readout pin value
@@ -388,6 +407,33 @@ sub RPI_GPIO_Poll($) {		#for attr poll_intervall -> readout pin value
 	return;
 } 
 
+sub RPI_GPIO_Shutdown($$) {
+	my ($hash, $arg) = @_;
+	if ( defined (AttrVal($hash->{NAME}, "poll_interval", undef)) ) {			# remove internal timer
+		RemoveInternalTimer($hash);
+	}
+	if ( ( AttrVal($hash->{NAME}, "interrupt", "none") ) ne ( "none" ) ) {		# detach interrupt
+		delete $selectlist{$hash->{NAME}};
+		close($hash->{filehandle});
+		Log3 $hash, 5, "$hash->{NAME}: interrupt detached";	
+	}	
+	# to have a chance to externaly setup the GPIOs -
+	# leave GPIOs untouched if attr unexportpin is set to "no"
+	# only delete inputs (otherwise outputs will flicker during restart of FHEM)
+	if( AttrVal($hash->{NAME},"direction","") ne "output" and AttrVal($hash->{NAME},"unexportpin","") ne "no" ) {
+		if (-w "$hash->{GPIO_Basedir}/unexport") {# unexport if write access to unexport
+			my $uexp = IO::File->new("> $hash->{GPIO_Basedir}/unexport");
+			print $uexp "$hash->{RPI_pin}";
+			$uexp->close;
+		} else {# else use gpio utility
+			RPI_GPIO_exuexpin($hash, "unexport");
+		}
+		Log3 $hash, 5, "$hash->{NAME}: gpio$hash->{RPI_pin} removed";
+	}
+
+	return undef;	
+}
+
 sub RPI_GPIO_Undef($$) {
 	my ($hash, $arg) = @_;
 	if ( defined (AttrVal($hash->{NAME}, "poll_interval", undef)) ) {
@@ -397,18 +443,18 @@ sub RPI_GPIO_Undef($$) {
 		delete $selectlist{$hash->{NAME}};
 		close($hash->{filehandle});
 	}
-        # to have a chance to externaly setup the GPIOs -
-        # leave GPIOs untouched if attr unexportpin is set to "no"
-        if(AttrVal($hash->{NAME},"unexportpin","") ne "no") {
-            if (-w "$gpiodir/unexport") {#unexport Pin alte Version
-		my $uexp = IO::File->new("> $gpiodir/unexport");
-		print $uexp "$hash->{RPI_pin}";
-		$uexp->close;
-            } else {#alternative unexport Pin:
-		RPI_GPIO_exuexpin($hash, "unexport");
-            }
-        }
-	Log3 $hash, 1, "$hash->{NAME}: entfernt";
+	# to have a chance to externaly setup the GPIOs -
+	# leave GPIOs untouched if attr unexportpin is set to "no"
+	if(AttrVal($hash->{NAME},"unexportpin","") ne "no") {
+		if (-w "$hash->{GPIO_Basedir}/unexport") {#unexport Pin alte Version
+			my $uexp = IO::File->new("> $hash->{GPIO_Basedir}/unexport");
+			print $uexp "$hash->{RPI_pin}";
+			$uexp->close;
+		} else {#alternative unexport Pin:
+			RPI_GPIO_exuexpin($hash, "unexport");
+		}
+	}
+	Log3 $hash, 4, "$hash->{NAME}: entfernt";
 	return undef;
 }
 
@@ -437,7 +483,7 @@ sub RPI_GPIO_Except($) {	#called from main if an interrupt occured
 		$valalt = "low";
 	}
 	if ( ( ($eval eq "rising") && ( $val == 1 ) ) || ( ($eval eq "falling") && ( $val == 0 ) ) ) {	#nur bei Trigger auf steigende / fallende Flanke
-#Togglefunktion
+		#Togglefunktion
 		if (!defined($hash->{READINGS}{Toggle}{VAL})) {			#Togglewert existiert nicht -> anlegen
 			Log3 $hash, 5, "Toggle war nicht def";
 			$valto = "on";
@@ -452,29 +498,34 @@ sub RPI_GPIO_Except($) {	#called from main if an interrupt occured
 		if (( AttrVal($hash->{NAME}, "toggletostate", "no") ) eq ( "yes" )) {	#wenn Attr "toggletostate" gesetzt auch die Variable fuer den STATE wert setzen
 			$valst = $valto;
 		}
-#Zaehlfunktion
+		#Zaehlfunktion
 		if (!defined($hash->{READINGS}{Counter}{VAL})) {			#Zaehler existiert nicht -> anlegen
 			Log3 $hash, 5, "Zaehler war nicht def";
 			$valcnt = "1";
 		} else {
-		$valcnt = $hash->{READINGS}{Counter}{VAL} + 1;
-		Log3 $hash, 5, "Zaehler ist jetzt $valcnt";
+			$valcnt = $hash->{READINGS}{Counter}{VAL} + 1;
+			Log3 $hash, 5, "Zaehler ist jetzt $valcnt";
 		}
-#langer Testendruck
+		#Doppelklick (noch im Teststatus)
+		my $testtt = (gettimeofday() - $hash->{lasttrg} );
+		$hash->{lasttrg} = gettimeofday();
+		readingsSingleUpdate($hash, 'Dblclick', "on", 1) if $testtt < 2;
+	#langer Testendruck
 	} elsif ($eval eq "both") {
 		if ( $val == 1 ) {
 			my $lngpressInterval = AttrVal($hash->{NAME}, "longpressinterval", "1");
 			InternalTimer(gettimeofday() + $lngpressInterval, 'RPI_GPIO_longpress', $hash, 0);
-			#$hash->{Anzeit} = gettimeofday();
 		} else {
 			RemoveInternalTimer('RPI_GPIO_longpress');
 			$vallp = 'off';
-			#my $zeit = $acttime;
-			#$zeit -= $hash->{Anzeit};
-			#Log3 $hash, 5, "Anzeit: $zeit";
-			#readingsBeginUpdate($hash);
-			#readingsBulkUpdate($hash, 'Anzeit', $zeit);
-			#readingsEndUpdate($hash, 1);
+		}
+		#Doppelklick (noch im Teststatus)
+		if ( $val == AttrVal($hash->{NAME}, "dblclicklevel", "1") ) {
+			my $testtt = (gettimeofday() - $hash->{lasttrg} );
+			$hash->{lasttrg} = gettimeofday();
+			readingsSingleUpdate($hash, 'Dblclick', "on", 1) if $testtt < 2;
+		} else {
+			readingsSingleUpdate($hash, 'Dblclick', "off", 1);
 		}
 	}
 
@@ -495,9 +546,7 @@ sub RPI_GPIO_longpress($) {			#for reading longpress
 	my $name = $hash->{NAME};
 	my $val = RPI_GPIO_fileaccess($hash, "value");
 	if ($val == 1) {
-		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash, 'Longpress', 'on');
-		readingsEndUpdate($hash, 1);
+		readingsSingleUpdate($hash, 'Longpress', 'on', 1);
 	}
 }
 
@@ -505,7 +554,7 @@ sub RPI_GPIO_dblclick($) {
 
 }
 
-sub RPI_GPIO_updatevalue($) {		#update value for Input devices
+sub RPI_GPIO_updatevalue($) {						#update value for Input devices
 	my ($hash) = @_;
 	my $val = RPI_GPIO_fileaccess($hash, "value");
 	if ( defined ($val) ) {
@@ -527,10 +576,9 @@ sub RPI_GPIO_updatevalue($) {		#update value for Input devices
 }
 
 sub RPI_GPIO_fileaccess($$;$) {						#Fileaccess for GPIO base directory
- #my ($hash, $fname, $value) = @_;
 	my ($hash, @args) = @_;
 	my $fname = $args[0];
-	my $pinroot = qq($gpiodir/gpio$hash->{RPI_pin});
+	my $pinroot = qq($hash->{GPIO_Basedir}/gpio$hash->{RPI_pin});
 	my $file =qq($pinroot/$fname);
 	Log3 $hash, 5, "$hash->{NAME}, in fileaccess: $fname " . (defined($args[1])?$args[1]:"");
 
@@ -562,12 +610,6 @@ sub RPI_GPIO_fileaccess($$;$) {						#Fileaccess for GPIO base directory
 		if ($fname eq "direction" && (not -w $file)) {		#wenn direction und diese nicht schreibbar mit gpio utility versuchen
 			Log3 $hash, 4, "$hash->{NAME}: direction ueber gpio utility einstellen";
 			RPI_GPIO_exuexpin($hash, $value);
-			#if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {
-			#	Log3 $hash, 1, "$hash->{NAME}: " . $ret;
-			#} else {
-				#my $exp = $gpioprg.' -g mode '.$hash->{RPI_pin}. ' '.$value;
-				#$exp = `$exp`;
-			#}
 		} else {
 			my $fh = IO::File->new("> $file");
 			if (defined $fh) {
@@ -580,42 +622,27 @@ sub RPI_GPIO_fileaccess($$;$) {						#Fileaccess for GPIO base directory
 	}
 }
 	
-sub RPI_GPIO_exuexpin($$) {			#export, unexport and direction Pin via GPIO utility
+sub RPI_GPIO_exuexpin($$) {			#export, unexport, direction, pud_resistor via GPIO utility
 	my ($hash, $dir) = @_;
-	my $sw;
-	if ($dir eq "unexport") {
-		$sw = $dir;
-		$dir = "";
-	} else {
-		$sw = "export";
-        $dir = "out" if ( $dir eq "high" || $dir eq "low" );		#auf out zurueck, da gpio tool dies nicht unterst?tzt
-		$dir = " ".$dir;
-	}
-	if ( defined(my $ret = RPI_GPIO_CHECK_GPIO_UTIL($gpioprg)) ) {
-		Log3 $hash, 1, "$hash->{NAME}: " . $ret;
-	} else {
-		my $exp = $gpioprg.' '.$sw.' '.$hash->{RPI_pin}.$dir;
-		$exp = `$exp`;
-	}
- #######################
-}
-
-sub RPI_GPIO_CHECK_GPIO_UTIL {
-	my ($gpioprg) = @_;
-	my $ret = undef;
-	#unless (defined($hash->{gpio_util_exists})) {
-	if(-e $gpioprg) {
-		if(-x $gpioprg) {
-			unless(-u $gpioprg) {
-				$ret = "file $gpioprg is not setuid"; 
-			}
+	my $gpioutility = $hash->{WiringPi_gpio};
+	if ( defined $hash->{WiringPi_gpio} ) {
+		my $sw;
+		if ($dir eq "unexport") {
+			$sw = $dir;
+			$dir = "";
+		} elsif ($dir eq "up" || $dir eq "down"|| $dir eq "tri") {
+			$sw = "-g mode";
 		} else {
-			$ret = "file $gpioprg is not executable"; 
+			$sw = "export";
+			$dir = "out" if ( $dir eq "high" || $dir eq "low" );		#auf out zurueck, da gpio tool dies nicht unterst?tzt
 		}
+		my $exp = $gpioutility.' '.$sw.' '.$hash->{RPI_pin}. (defined $dir ? " " . $dir : "");
+		$exp = `$exp`;
 	} else {
-		$ret = "file $gpioprg doesnt exist"; 
+		my $ret = "WiringPi gpio utility not (correct) installed";
+		Log3 $hash, 1, "$hash->{NAME}: $ret";
+		return $ret;
 	}
-	return $ret;
 }
 
 sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
@@ -623,7 +650,7 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 	my $msg = '';
 	if ( $arg eq "start") {
 		#FH fuer value-datei
-		my $pinroot = qq($gpiodir/gpio$hash->{RPI_pin});
+		my $pinroot = qq($hash->{GPIO_Basedir}/gpio$hash->{RPI_pin});
 		my $valfile = qq($pinroot/value);
 		$hash->{filehandle} = IO::File->new("< $valfile"); 
 		if (!defined $hash->{filehandle}) {
@@ -683,13 +710,14 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 	<a name="RPI_GPIODefine"></a>
 	<b>Define</b>
 	<ul>
-		<code>define <name> RPI_GPIO &lt;GPIO number&gt;</code><br><br>
+		<code>define <name> RPI_GPIO &lt;GPIO number&gt;[ &lt;GPIO-Basedir&gt;[ &lt;WiringPi-gpio-utility&gt;]]</code><br><br>
 		all usable <code>GPIO number</code> can be found <a href="http://www.panu.it/raspberry/">here</a><br><br>
 		
     Examples:
     <pre>
       define Pin12 RPI_GPIO 18
       attr Pin12 poll_interval 5
+	  define Pin12 RPI_GPIO 18 /sys/class/gpio /usr/somewhere/bin/gpio
     </pre>
   </ul>
 
@@ -828,13 +856,14 @@ sub RPI_GPIO_inthandling($$) {		#start/stop Interrupthandling
 	<a name="RPI_GPIODefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; RPI_GPIO &lt;GPIO number&gt;</code><br><br>
+    <code>define &lt;name&gt; RPI_GPIO &lt;GPIO number&gt;[ &lt;GPIO-Basedir&gt;[ &lt;WiringPi-gpio-utility&gt;]]</code><br><br>
     Alle verf&uuml;gbaren <code>GPIO number</code> sind z.B. <a href="http://www.panu.it/raspberry/">hier</a> zu finden<br><br>
      
     Beispiele:
     <pre>
       define Pin12 RPI_GPIO 18
       attr Pin12 poll_interval 5
+	  define Pin12 RPI_GPIO 18 /sys/class/gpio /usr/somewhere/bin/gpio
     </pre>
   </ul>
 
