@@ -2076,6 +2076,7 @@ sub PHTV_ReceiveCommand($$$) {
                     $channel_name =~ s/\s+$//;
                     $channel_name =~ s/\s/_/g;
                     $channel_name =~ s/,/./g;
+                  	$channel_name =~ s///g;
                     if ( $channel_name ne "" ) {
                         $hash->{helper}{device}{channelName}{$channel}{name} =
                           $channel_name;
