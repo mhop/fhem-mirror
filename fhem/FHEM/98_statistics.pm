@@ -3,7 +3,7 @@
 #
 #  98_statistic.pm
 # 
-#  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
+#  (c) 2014-2016 tupol http://forum.fhem.de/index.php?action=profile;u=5432
 #
 #  This module computes statistic data of and for readings of other modules
 #
@@ -829,7 +829,7 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
    my $result = 0;
    foreach (@hidden) { $result += $_; }
    $result = sprintf "%.".$decPlaces."f", $result;
-   if ($#hidden != $specialPeriod) { $result .= " (".$#hidden.".hours)"; }
+   $result .= " (".$#hidden.".hours)"     if $#hidden != $specialPeriod-1;
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
    
   # Store hidden stack
