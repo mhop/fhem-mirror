@@ -27,6 +27,10 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.21   23.03.2016    added "lastrec","lastrec_open" to playback last recording 
+# 1.20.3 19.03.2016    change: delay of InternalTimer(s) changed
+#                      "ptzlistpresets" - "id" changed to "position" according to Synology-ticket
+#                      run "geteventlist" automatically after recording-stop
 # 1.20.2 14.03.2016    change: routine "initonboot" changed
 # 1.20.1 12.03.2016    bugfix: default recordtime 15 s is used if attribute "rectime" is set to "0"
 # 1.20   09.03.2016    command "extevent" added
@@ -181,6 +185,7 @@ sub SSCam_Define {
   $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
   $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
   $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";
+  $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";
   
   # Startwerte setzen
   $attr{$name}{webCmd}                 = "on:off:snap:enable:disable";                            # initiale Webkommandos setzen
@@ -269,7 +274,7 @@ sub SSCam_Set {
                    "snap ".
                    "enable ".
                    "disable ".
-                   "runView:image,link,link_open ".
+                   "runView:image,lastrec,lastrec_open,link,link_open ".
                    "stopView:noArg ".
                    "extevent:1,2,3,4,5,6,7,8,9,10 ".
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
@@ -411,8 +416,16 @@ sub SSCam_Set {
                 $hash->{HELPER}{OPENWINDOW} = 1;
             } else {
                 $hash->{HELPER}{OPENWINDOW} = 0;
+            }                      
+            
+            if ($prop eq "lastrec_open") {
+                $prop = "lastrec";
+                if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
+                $hash->{HELPER}{OPENWINDOW} = 1;
+            } else {
+                $hash->{HELPER}{OPENWINDOW} = 0;
             }
-                       
+            
             $hash->{HELPER}{WLTYPE} = $prop;
             runliveview($hash);
         }
@@ -510,6 +523,10 @@ sub SSCam_liveview ($$$$) {
     $alias = "LiveCam";
     $ret = "<a href=$link $attr>$alias</a><br>";        # wenn attr target=_blank neuer Browsertab
   
+  } elsif($wltype eq "lastrec") {
+    $alias = "LastRecording";
+    $ret = "<a href=$link $attr>$alias</a><br>";        # wenn attr target=_blank neuer Browsertab
+  
   }
   
 return $ret;
@@ -555,7 +572,7 @@ sub initonboot ($) {
   }
   else 
   {
-      InternalTimer(gettimeofday()+0.14, "initonboot", $hash, 0);
+      InternalTimer(gettimeofday()+1, "initonboot", $hash, 0);
   }
   
 return undef;
@@ -792,7 +809,7 @@ sub camstartrec ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.11, "camstartrec", $hash, 0);
+    InternalTimer(gettimeofday()+1, "camstartrec", $hash, 0);
     }
 }
 
@@ -846,7 +863,7 @@ sub camstoprec ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.12, "camstoprec", $hash, 0);
+    InternalTimer(gettimeofday()+1, "camstoprec", $hash, 0);
     }
 }
 
@@ -900,7 +917,7 @@ sub camexpmode ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.13, "camexpmode", $hash, 0);
+    InternalTimer(gettimeofday()+1, "camexpmode", $hash, 0);
     }
 }
 
@@ -955,10 +972,9 @@ sub cammotdetsc ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.14, "cammotdetsc", $hash, 0);
+    InternalTimer(gettimeofday()+1, "cammotdetsc", $hash, 0);
     }
 }
-
 
 
 ###############################################################################
@@ -1011,7 +1027,7 @@ sub camsnap ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.22, "camsnap", $hash, 0);
+        InternalTimer(gettimeofday()+1, "camsnap", $hash, 0);
     }    
 }
 
@@ -1067,7 +1083,7 @@ sub runliveview ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.23, "runliveview", $hash, 0);
+        InternalTimer(gettimeofday()+1, "runliveview", $hash, 0);
     }    
 }
 
@@ -1121,7 +1137,7 @@ sub stopliveview ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.23, "stopliveview", $hash, 0);
+        InternalTimer(gettimeofday()+1, "stopliveview", $hash, 0);
     }    
 }
 
@@ -1151,7 +1167,7 @@ sub getsnapfilename ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.23, "getsnapfilename", $hash, 0);
+        InternalTimer(gettimeofday()+1, "getsnapfilename", $hash, 0);
     }    
 }
 
@@ -1182,7 +1198,7 @@ sub extevent ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.24, "extevent", $hash, 0);
+        InternalTimer(gettimeofday()+1, "extevent", $hash, 0);
     }    
 }
 
@@ -1303,7 +1319,7 @@ sub doptzaction ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.31, "doptzaction", $hash, 0);
+    InternalTimer(gettimeofday()+1, "doptzaction", $hash, 0);
     }    
 }
 
@@ -1332,7 +1348,7 @@ sub movestop ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.121, "movestop", $hash, 0);
+    InternalTimer(gettimeofday()+1, "movestop", $hash, 0);
     }    
 }
 
@@ -1364,7 +1380,7 @@ sub camenable ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.41, "camenable", $hash, 0);
+    InternalTimer(gettimeofday()+1, "camenable", $hash, 0);
     }    
 }
 
@@ -1396,7 +1412,7 @@ sub camdisable ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+0.43, "camdisable", $hash, 0);
+    InternalTimer(gettimeofday()+1, "camdisable", $hash, 0);
     }    
 }
 
@@ -1471,7 +1487,7 @@ sub getsvsinfo ($) {
       }
     else
     {
-        InternalTimer(gettimeofday()+0.54, "getsvsinfo", $hash, 0);
+        InternalTimer(gettimeofday()+1, "getsvsinfo", $hash, 0);
     }
     
 }
@@ -1502,10 +1518,11 @@ sub getcaminfo ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+1.33 , "getcaminfo", $hash, 0);
+        InternalTimer(gettimeofday()+1, "getcaminfo", $hash, 0);
     }
     
 }
+
 
 ###########################################################################
 ###   query SVS-Event information , sub von getcaminfoall
@@ -1533,7 +1550,7 @@ sub geteventlist ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+0.55 , "geteventlist", $hash, 0);
+        InternalTimer(gettimeofday()+1, "geteventlist", $hash, 0);
     }
     
 }
@@ -1563,7 +1580,7 @@ sub getmotionenum ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+1.38 , "getmotionenum", $hash, 0);
+        InternalTimer(gettimeofday()+1, "getmotionenum", $hash, 0);
     }
     
 }
@@ -1594,7 +1611,7 @@ sub getcapabilities ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+1.56, "getcapabilities", $hash, 0);
+        InternalTimer(gettimeofday()+1, "getcapabilities", $hash, 0);
     }
     
 }
@@ -1631,7 +1648,7 @@ sub getptzlistpreset ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+1.57, "getptzlistpreset", $hash, 0);
+        InternalTimer(gettimeofday()+1, "getptzlistpreset", $hash, 0);
     }
     
 }
@@ -1669,11 +1686,11 @@ sub getptzlistpatrol ($) {
     }
     else
     {
-        InternalTimer(gettimeofday()+1.58, "getptzlistpatrol", $hash, 0);
+        InternalTimer(gettimeofday()+1, "getptzlistpatrol", $hash, 0);
     }
     
 }
-
+ 
 
 #############################################################################################################################
 #######    Begin Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                                 #######
@@ -1705,6 +1722,7 @@ sub getapisites_nonbl {
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
+   my $apistm      = $hash->{HELPER}{APISTM}; 
    my $logstr;
    my $url;
    my $param;
@@ -1721,7 +1739,7 @@ sub getapisites_nonbl {
    &printlog($hash,$logstr,"5");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt";
+   $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm";
 
    $logstr = "Call-Out now: $url";
    &printlog($hash,$logstr,"4");    
@@ -1761,6 +1779,7 @@ sub login_nonbl ($) {
    my $apicamevent = $hash->{HELPER}{APICAMEVENT};
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
+   my $apistm      = $hash->{HELPER}{APISTM};
    my $data;
    my $logstr;
    my $url;
@@ -1782,6 +1801,7 @@ sub login_nonbl ($) {
    my ($apieventpath,$apieventmaxver);
    my ($apivideostmpath,$apivideostmmaxver);
    my ($apiextevtpath,$apiextevtmaxver);
+   my ($apistmpath,$apistmmaxver);   
    my $error;
    my $httptimeout;
   
@@ -1951,6 +1971,18 @@ sub login_nonbl ($) {
                         &printlog($hash, $logstr,"4");
                         $logstr = defined($apiextevtmaxver) ? "MaxVersion of $apiextevt selected: $apiextevtmaxver" : "MaxVersion of $apiextevt undefined - Surveillance Station may be stopped";
                         &printlog($hash, $logstr,"4");
+                        
+                     # Pfad und Maxversion von "SYNO.SurveillanceStation.Streaming" ermitteln
+       
+                        $apistmpath = $data->{'data'}->{$apistm}->{'path'};
+                        # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
+                        $apistmpath =~ tr/_//d if (defined($apistmpath));
+                        $apistmmaxver = $data->{'data'}->{$apistm}->{'maxVersion'}; 
+       
+                        $logstr = defined($apistmpath) ? "Path of $apistm selected: $apistmpath" : "Path of $apistm undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
+                        $logstr = defined($apistmmaxver) ? "MaxVersion of $apistm selected: $apistmmaxver" : "MaxVersion of $apistm undefined - Surveillance Station may be stopped";
+                        &printlog($hash, $logstr,"4");
        
                         # ermittelte Werte in $hash einfügen
                         $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
@@ -1973,6 +2005,8 @@ sub login_nonbl ($) {
                         $hash->{HELPER}{APIVIDEOSTMMAXVER} = $apivideostmmaxver;
                         $hash->{HELPER}{APIEXTEVTPATH}     = $apiextevtpath;
                         $hash->{HELPER}{APIEXTEVTMAXVER}   = $apiextevtmaxver;
+                        $hash->{HELPER}{APISTMPATH}        = $apistmpath;
+                        $hash->{HELPER}{APISTMMAXVER}      = $apistmmaxver;
        
                         # Setreading 
                         readingsBeginUpdate($hash);
@@ -2256,6 +2290,9 @@ sub camop_nonbl ($) {
    my $apivideostm       = $hash->{HELPER}{APIVIDEOSTM};
    my $apivideostmpath   = $hash->{HELPER}{APIVIDEOSTMPATH};
    my $apivideostmmaxver = $hash->{HELPER}{APIVIDEOSTMMAXVER};
+   my $apistm            = $hash->{HELPER}{APISTM};
+   my $apistmpath        = $hash->{HELPER}{APISTMPATH};
+   my $apistmmaxver      = $hash->{HELPER}{APISTMMAXVER};
    my $sid               = $hash->{HELPER}{SID};
    my $OpMode            = $hash->{OPMODE};
    my ($livestream,$winname,$attr,$room);
@@ -2407,9 +2444,8 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "gopreset")
    {
-      # mal wieder Maxversion der API funktioniert nicht ! Ticket bei Syno
-      $apiptzmaxver -= 1;
-      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&presetId=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      # Presets werden abgerufen
+      $url = "http://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "moving", 0); 
    }
    elsif ($OpMode eq "runpatrol")
@@ -2505,17 +2541,26 @@ sub camop_nonbl ($) {
    {
       # SID nach SID_STRM sichern und nutzen (für stopLiveview-Routine)
       $hash->{HELPER}{SID_STRM} = $sid;
-      # externe URL
-      $livestream = !AttrVal($name, "livestreamprefix", undef) ? "http://$serveraddr:$serverport" : AttrVal($name, "livestreamprefix", undef);
-      $livestream .= "/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\"";
-      # interne URL
-      $url = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\""; 
       
+      if ($hash->{HELPER}{WLTYPE} ne "lastrec") {
+          # externe URL
+          $livestream = !AttrVal($name, "livestreamprefix", undef) ? "http://$serveraddr:$serverport" : AttrVal($name, "livestreamprefix", undef);
+          $livestream .= "/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\"";
+          # interne URL
+          $url = "http://$serveraddr:$serverport/webapi/$apivideostmpath?api=$apivideostm&version=$apivideostmmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=\"$sid\""; 
+      
+          readingsSingleUpdate($hash,"LiveStreamUrl", $livestream, 1);
+      }
+      else
+      {
+          # Abspielen der letzten Aufnahme (EventId) 
+          $url = "http://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$hash->{HELPER}{CAMLASTRECID}&_sid=$sid";   
+      }
+       
       # Liveview-Link in Hash speichern -> Anzeige über SSCam_liveview, in Reading setzen für Linkversand
       $hash->{HELPER}{LINK} = $url;
-      readingsSingleUpdate($hash,"LiveStreamUrl", $livestream, 1);
          
-      $logstr = "Set Livestream-URL: $url";
+      $logstr = "Set Streaming-URL: $url";
       &printlog($hash,$logstr,"4");
       
       # livestream sofort in neuem Browsertab öffnen
@@ -2545,7 +2590,7 @@ sub camop_nonbl ($) {
       
       $hash->{HELPER}{ACTIVE} = "off";   
       return;
-   }
+   }  
    
    $logstr = "Call-Out now: $url";
    &printlog($hash,$logstr,"4");
@@ -2693,6 +2738,9 @@ sub camret_nonbl ($) {
                 &printlog($hash,$logstr,"3");
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
+                
+                # Aktualisierung Eventlist der ketzten Aufnahme
+                geteventlist($hash);
             }
             elsif ($OpMode eq "ExpMode") 
             {              
@@ -3111,6 +3159,8 @@ sub camret_nonbl ($) {
             {              
                 my $eventnum    = $data->{'data'}{'total'};
                 my $lastrecord  = $data->{'data'}{'events'}[0]{name};
+                $hash->{HELPER}{CAMLASTRECID} = $data->{'data'}{'events'}[0]{'eventId'}; 
+                
                 my ($lastrecstarttime,$lastrecstoptime);
                 
                 if ($eventnum > 0) {
@@ -3126,7 +3176,7 @@ sub camret_nonbl ($) {
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"CamEventNum",$eventnum);
-                readingsBulkUpdate($hash,"CamLastRec",$lastrecord);
+                readingsBulkUpdate($hash,"CamLastRec",$lastrecord);               
                 if ($lastrecstarttime) {readingsBulkUpdate($hash,"CamLastRecTime",$lastrecstarttime." - ". $lastrecstoptime);}                
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
@@ -3283,6 +3333,7 @@ sub camret_nonbl ($) {
                 while ($cnt < $presetcnt) 
                     {
                     $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
+                    $presid = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
                     $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
                     $allpresets{$presname} = "$presid";
                     $cnt += 1;
@@ -3363,7 +3414,7 @@ sub camret_nonbl ($) {
                 &printlog($hash,$logstr,$verbose);
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
-            }            
+            }
             
        }
        else 
@@ -3696,7 +3747,8 @@ return;
        <li>Positioning of PTZ-cameras to absolute X/Y-coordinates  </li>
        <li>continuous moving of PTZ-camera lense   </li>
        <li>trigger of external events 1-10 (action rules in SVS)   </li>
-       <li>start and stop of camera livestreams  </li><br>
+       <li>start and stop of camera livestreams  </li>
+       <li>playback of the last recording  </li><br>
     </ul>
    </ul>
    The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
@@ -3848,7 +3900,7 @@ return;
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>starts a predefinied patrol (PTZ-cameras)  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>moves a PTZ-camera to a absolute X/Y-coordinate or to direction up/down/left/right  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>starts a continuous move of PTZ-camera to direction up/down/left/right or dir_X  </td></tr> 
-      <tr><td>"runView [image | link | link_open &lt;room&gt; ]":  </td><td>starts a livestream as embedded image or link  </td></tr> 
+      <tr><td>"runView [image | lastrec | lastrec_open | link | link_open &lt;room&gt; ]":  </td><td>starts a livestream as embedded image or link  </td></tr> 
       <tr><td>"stopView":                                          </td><td>stops a camera livestream  </td></tr> 
   </table>
   <br><br>
@@ -4042,9 +4094,10 @@ return;
   
   <br>
   
-  <b> set &lt;name&gt; runView [ image | link | link_open &lt;room&gt; ] </b> <br><br>
+  <b> set &lt;name&gt; runView [ image | lastrec | lastrec_open | link | link_open &lt;room&gt; ] </b> <br><br>
   
-  A livestream (mjpeg-stream) of a camera will be started, either as embedded image or as a generated link.
+  With "image, link, link_open" a livestream (mjpeg-stream) of a camera will be started, either as embedded image or as a generated link.
+  The access to the last recording of a camera can be done using "lastrec" respectively "lastrec_open". 
   The behavior of livestream in FHEMWEB can be affected by statements in <a href="#SSCamattr">attribute</a> "htmlattr". <br><br>
   
   <b>Examples:</b><br>
@@ -4299,7 +4352,8 @@ return;
       <li>Positionieren von PTZ-Kameras zu absoluten X/Y-Koordinaten  </li>
       <li>kontinuierliche Bewegung von PTZ-Kameras   </li>
       <li>auslösen externer Ereignisse 1-10 (Aktionsregel SVS)   </li>
-      <li>starten und beenden von Kamera-Livestreams  </li><br>
+      <li>starten und beenden von Kamera-Livestreams  </li>
+      <li>abspielen der letzten Aufnahme  </li><br>
      </ul> 
     </ul>
     Die Aufnahmen stehen in der Synology Surveillance Station (SVS) zur Verfügung und unterliegen, wie jede andere Aufnahme, den in der Synology Surveillance Station eingestellten Regeln. <br>
@@ -4448,7 +4502,7 @@ return;
       <tr><td>"runPatrol &lt;Patrolname&gt;":                      </td><td>startet eine vordefinierte Überwachungstour einer PTZ-Kamera  </td></tr>
       <tr><td>"goAbsPTZ [ X Y | up | down | left | right ]":       </td><td>positioniert eine PTZ-camera zu einer absoluten X/Y-Koordinate oder maximalen up/down/left/right-position  </td></tr>
       <tr><td>"move [ up | down | left | right | dir_X ]":         </td><td>startet kontinuerliche Bewegung einer PTZ-Kamera in Richtung up/down/left/right bzw. dir_X  </td></tr> 
-      <tr><td>"runView [image | link | link_open &lt;room&gt; ]":  </td><td>startet einen Livestream als eingbettetes Image oder als Link  </td></tr>
+      <tr><td>"runView [image | link | link_open | lastrec | lastrec_open | &lt;room&gt; ]":  </td><td>startet einen Livestream als eingbettetes Image oder als Link  </td></tr>
       <tr><td>"stopView":                                          </td><td>stoppt einen Kamera-Livestream  </td></tr>
   </table>
   <br><br>
@@ -4639,9 +4693,10 @@ return;
 
   <br>
   
-  <b> set &lt;name&gt; runView [ image | link | link_open &lt;room&gt; ] </b> <br><br>
+  <b> set &lt;name&gt; runView [ image | lastrec | lastrec_open | link | link_open &lt;room&gt; ] </b> <br><br>
   
-  Es wird ein Livestream (mjpeg-Stream) der Kamera, entweder als eingebettetes Image oder als generierter Link, gestartet. 
+  Mit "image, link, link_open" wird ein Livestream (mjpeg-Stream) der Kamera, entweder als eingebettetes Image oder als generierter Link, gestartet. 
+  Der Zugriff auf die letzte Aufnahme einer Kamera kann über die Zusätze "lastrec" bzw. "lastrec_open" erfolgen. 
   Das Verhalten des Livestreams im FHEMWEB kann durch Angaben im <a href="#SSCamattr">Attribut</a> "htmlattr" beeinflusst werden. <br><br>
   
   <b>Beispiel:</b><br>
@@ -4655,7 +4710,7 @@ return;
   Angaben von Width und Hight. <br>
   Das Kommando <b>"set &lt;name&gt; runView link_open"</b> startet den Livestreamlink sofort in einem neuen Browserfenster (longpoll=1 muß für WEB gesetzt sein).
   Dabei wird für jede aktive FHEM-Session eine Fensteröffnung initiiert. Soll dieses Verhalten geändert werden, kann <b>"set &lt;name&gt; runView link_open &lt;room&gt;"</b>
-  verwendet werden um das Öffnen des Browserwindows in einem beliebigen in einer FHEM-Session angezeigten Raum &lt;room&gt; zu initiieren.<br>
+  verwendet werden um das Öffnen des Browserwindows in einem beliebigen, in einer FHEM-Session angezeigten Raum &lt;room&gt;, zu initiieren.<br>
   Das gesetzte <a href="#SSCamattr">Attribut</a> "livestreamprefix" überschreibt im <a href="#SSCamreadings">Reading</a> "LiveStreamUrl" die Angaben für Protokoll, Servername und Port. 
   Damit kann z.B. die LiveStreamUrl für den Versand und externen Zugriff auf die SVS modifiziert werden. <br><br>
   
