@@ -1438,7 +1438,7 @@ sub YAMAHA_NP_ParseResponse
           if($data =~ /<UDN>(.+)<\/UDN>/)
           {
             my @uuid = split(/:/, $1);
-            $hash->{UNIQUE_DEVICE_NAME} = uc(@uuid[1]);            
+            $hash->{UNIQUE_DEVICE_NAME} = uc($uuid[1]);            
           }
           
           # Replace \n, \r, \t from the string for XML parsing
