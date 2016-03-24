@@ -2969,8 +2969,8 @@ sub HMCCU_QueueOpen ($$)
 	$hash->{hmccu}{queue}{queue_file} = $queue_file;
 	$hash->{hmccu}{queue}{idx_file} = $idx_file;
 
-	$hash->{hmccu}{queue}{queue} = new IO::File $queue_file, O_CREAT | O_RDWR, $mode or return 0;
-	$hash->{hmccu}{queue}{idx} = new IO::File $idx_file, O_CREAT | O_RDWR, $mode or return 0;
+	$hash->{hmccu}{queue}{queue} = new IO::File $queue_file, O_CREAT | O_RDWR, oct($mode) or return 0;
+	$hash->{hmccu}{queue}{idx} = new IO::File $idx_file, O_CREAT | O_RDWR, oct($mode) or return 0;
 
 	### Default ptr to 0, replace it with value in idx file if one exists
 	$hash->{hmccu}{queue}{idx}->sysseek(0, SEEK_SET); 
