@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   70_BRAVIA: new module for Sony Televisions
   - feature: 98_statistics: attr specialDeltaPeriod (new) enhanced for more 
              than one value and different periods
   - bugfix:  00_SIGNALduino: Replaced firmware with an old one.
