@@ -890,11 +890,11 @@ sub statistics_doStatisticSpecialPeriod2 ($$$$$$)
       $result += $_; 
       $counterHidden++;
       if ( $counterHidden == $periods[$counterPeriods] ) {
-         $counterPeriods++;
-         my $rName = $statReadingName.$counterHidden;
+         my $rName = $statReadingName.$periods[$counterPeriods];
          my $rValue = sprintf "%.".$decPlaces."f", $result;
          statistics_Log $hash, 4, "Set '$rName = $rValue'";
          readingsBulkUpdate($dev, $rName, $rValue, 1);
+         $counterPeriods++;
       }
    }
    
@@ -1280,17 +1280,17 @@ sub statistics_UpdateDevReading($$$$)
       <br>
       Creates for the given delta reading additional singular readings of the given numbers of a period (Hour, Day, Month)
       <br>
-      Regular expressions <u>cannot</u> be used. More readings and/or period can be added but have to be separated by comma (without spaces).
+      Regular expressions <u>cannot</u> be used. Additional readings or additional periods can be defined but have to be separated by a comma (without spaces).
       <br>
       <dt>Example:</dt>
       <dd>
-      <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48:72:96</code>
+      <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:06:72:96</code>
       <br>
-      This will add 3 additional readings for the rain of the last 48, 72, 96 hours.
+      This will create 3 additional readings for the rain of the last 6, 72 and 96 hours.
       <br>
       <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
       <br>
-      This will add 4 additional readings for the rain of the last 48 hours and the last 30 Days and the energy consumtion of the last 6 and 12 months.
+      This will create 4 additional readings for the rain of the last 48 hours and the last 30 Days and the energy consumtion of the last 6 and 12 months.
       </dd>
    </li><br>
    <li><code>specialDeltaPeriodHours</code>
@@ -1452,9 +1452,9 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          <dt>Beispiel:</dt>
          <dd>
-         <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48:72:96</code>
+         <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:06:72:96</code>
          <br>
-         Dies erzeugt 3 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 48, 72, 96 Stunden.
+         Dies erzeugt 3 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 6, 72, 96 Stunden.
          <br>
          <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
          <br>
