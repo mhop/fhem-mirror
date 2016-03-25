@@ -3,6 +3,7 @@
 #
 #  98_statistic.pm
 # 
+#  (c) 2014 Torsten Poitzsch
 #  (c) 2014-2016 tupol http://forum.fhem.de/index.php?action=profile;u=5432
 #
 #  This module computes statistic data of and for readings of other modules
@@ -135,7 +136,7 @@ sub statistics_Initialize($)
                    ."minAvgMaxReadings "
                    ."periodChangePreset "
                    ."specialDeltaPeriodHours "
-                   ."specialPeriod "
+                   ."specialDeltaPeriod "
                    ."singularReadings "
                    ."tendencyReadings "
                    .$readingFnAttributes;
@@ -727,16 +728,18 @@ sub statistics_doStatisticDelta ($$$$)
          if ($showDate >= 2) { $showDate = 1; $last[9] = $stat[9]; } # Shows the "since:" value for the first year change
          statistics_Log $hash, 4, "Shifting current year in last value of '$statReadingName'.";
       }
-    # If change of month, change monthly statistic 
+    # If change of month, change monthly statistic and check for special periods
       if ($periodSwitch >= 3 || $periodSwitch <= -3){
+         statistics_doStatisticSpecialPeriod2 ($hash, $dev, $readingName, "Month", $decPlaces, $stat[5]);
          $last[5] = sprintf "%.".$decPlaces."f", $stat[5];
          $stat[5] = 0;
          if ($showDate == 3) { $showDate = 2; } # Do not show the "since:" value for month changes anymore
          if ($showDate >= 4) { $showDate = 3; $last[9] = $stat[9]; } # Shows the "since:" value for the first month change
          statistics_Log $hash, 4, "Shifting current month in last value of '$statReadingName'.";
       }
-    # If change of day, change daily statistic
+    # If change of day, change daily statistic and check for special periods
       if ($periodSwitch >= 2 || $periodSwitch <= -2){
+         statistics_doStatisticSpecialPeriod2 ($hash, $dev, $readingName, "Day", $decPlaces, $stat[3]);
          $last[3] = sprintf "%.".$decPlaces."f", $stat[3];
          $stat[3] = 0;
          if ($showDate == 5) { $showDate = 4; } # Do not show the "since:" value for day changes anymore
@@ -753,8 +756,9 @@ sub statistics_doStatisticDelta ($$$$)
          } 
          statistics_Log $hash,4,"Shifting current day in last value of '$statReadingName'.";
       }
-    # If change of hour, change hourly statistic 
+    # If change of hour, change hourly statistic and check for special periods
       if ($periodSwitch >= 1){
+         statistics_doStatisticSpecialPeriod2 ($hash, $dev, $readingName, "Hour", $decPlaces, $stat[1]);
          $last[1] = sprintf "%.".$decPlaces."f", $stat[1];
          $stat[1] = 0;
          if ($showDate == 7) { $showDate = 6; } # Do not show the "since:" value for day changes anymore
@@ -787,13 +791,13 @@ sub statistics_doStatisticDelta ($$$$)
    if ($singularReadings ne "") {
       # statistics_storeSingularReadings $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
       my $statValue = sprintf  "%.".$decPlaces."f", $stat[1];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Hour",$statValue,$last[1],$periodSwitch >= 1);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName, $readingName, "Delta", "Hour", $statValue, $last[1], $periodSwitch >= 1);
       $statValue = sprintf  "%.".$decPlaces."f", $stat[3];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Day",$statValue,$last[3],$periodSwitch >= 2 || $periodSwitch <= -2);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName, $readingName, "Delta", "Day", $statValue, $last[3], $periodSwitch >= 2 || $periodSwitch <= -2);
       $statValue = sprintf  "%.".$decPlaces."f", $stat[5];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Month",$statValue,$last[5],$periodSwitch >= 3 || $periodSwitch <= -3);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName, $readingName, "Delta", "Month", $statValue, $last[5], $periodSwitch >= 3 || $periodSwitch <= -3);
       $statValue = sprintf  "%.".$decPlaces."f", $stat[7];
-      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,"Delta","Year",$statValue,$last[7],$periodSwitch == 4 || $periodSwitch == -4);
+      statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName, $readingName, "Delta", "Year", $statValue, $last[7], $periodSwitch == 4 || $periodSwitch == -4);
    }
 
    return ;
@@ -829,7 +833,8 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
    my $result = 0;
    foreach (@hidden) { $result += $_; }
    $result = sprintf "%.".$decPlaces."f", $result;
-   $result .= " (".$#hidden.".hours)"     if $#hidden != $specialPeriod-1;
+   $result .= " (".($#hidden+1).".hours)"     if $#hidden != $specialPeriod-1;
+      statistics_Log $hash, 4, "Set '$statReadingName = $result'";
    readingsBulkUpdate($dev, $statReadingName, $result, 1);
    
   # Store hidden stack
@@ -841,19 +846,29 @@ sub statistics_doStatisticSpecialPeriod ($$$$$)
 
 # Calculates deltas for period of several hours
 ######################################## 
-sub statistics_doStatisticSpecialPeriod2 ($$$$$) 
+sub statistics_doStatisticSpecialPeriod2 ($$$$$$) 
 {
-   my ($hash, $dev, $readingName,$statType, $period, $decPlaces, $value) = @_;
+   my ($hash, $dev, $readingName, $periodText, $decPlaces, $value) = @_;
    my $name = $hash->{NAME};
+   my $pattern;
    
-   my $specialPeriod = AttrVal($name, "specialPeriod", "");
+   my $specialDeltaPeriod = AttrVal($name, "specialDeltaPeriod", "");
+   return   unless $specialDeltaPeriod;
+
+#Check if reading occures in attribute specialDeltaPeriod, extract period numbers
+   my $devName = $dev->{NAME};
+   $pattern = $devName . ":" . $readingName . ":" . $periodText . ':([\d:]+)';
+   return   unless $specialDeltaPeriod =~ $pattern;
    
-   return   unless $specialPeriod;
-
-   # if ("$devName:$readingName:$statType:$period=([\d:]+)" =~ /^($specialPeriod)$/) {
-
-   my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . ucfirst($statType) . ucfirst($period);
-   my $hiddenReadingName = ".".$dev->{NAME} . ":" . $readingName . ":" . $statType . ":" . $period;
+#Determine number of periods and maximal number
+   my @periods = split /:/, $1;
+   my $maxNumber=0;
+   @periods = sort { $a <=> $b } @periods;
+   $maxNumber = $periods[$#periods];
+   
+#Determine reading names
+   my $statReadingName = $hash->{PREFIX} . ucfirst($readingName) . ucfirst($periodText);
+   my $hiddenReadingName = ".".$devName . ":" . $readingName . $periodText;
 
   # Update hidden stack
    my @hidden = ();
@@ -862,17 +877,34 @@ sub statistics_doStatisticSpecialPeriod2 ($$$$$)
 
    unshift @hidden, $value;
       statistics_Log $hash, 4, "Add $value to $hiddenReadingName";
-   while ( $#hidden > $specialPeriod ) { 
+   while ( $#hidden > $maxNumber ) { 
       my $lastValue = pop @hidden;
          statistics_Log $hash, 4, "Remove last value '$lastValue' from '$hiddenReadingName'";
    }
    
-  # Calculate specialPeriodValue
+#Calculate and write specialPeriodValues
    my $result = 0;
-   foreach (@hidden) { $result += $_; }
-   $result = sprintf "%.".$decPlaces."f", $result;
-   if ($#hidden != $specialPeriod) { $result .= " (".$#hidden.".hours)"; }
-   readingsBulkUpdate($dev, $statReadingName, $result, 1);
+   my $counterHidden = 0;
+   my $counterPeriods = 0;
+   foreach (@hidden) { 
+      $result += $_; 
+      $counterHidden++;
+      if ( $counterHidden == $periods[$counterPeriods] ) {
+         $counterPeriods++;
+         my $rName = $statReadingName.$counterHidden;
+         my $rValue = sprintf "%.".$decPlaces."f", $result;
+         statistics_Log $hash, 4, "Set '$rName = $rValue'";
+         readingsBulkUpdate($dev, $rName, $rValue, 1);
+      }
+   }
+   
+#write specialPeriodValues for periods not reached yet
+   for (my $i = $counterPeriods; $i <= $#periods; $i++) {
+      my $rName = $statReadingName . $periods[$i];
+      my $rValue = sprintf "%.".$decPlaces."f (%d %s)", $result, $#hidden+1, $periodText;
+         statistics_Log $hash, 4, "Set '$rName = $rValue'";
+      readingsBulkUpdate($dev, $rName, $rValue, 1);
+   }
    
   # Store hidden stack
    $result = join( " ", @hidden );
@@ -1237,15 +1269,33 @@ sub statistics_UpdateDevReading($$$$)
       </ul>
       <br>
       Regulare expression of statistic values, which for which singular readings are created <u>additionally</u> to the summary readings. Eases the creation of plots. For duration readings the name of the state has to be used as statTypes.
+      <dt>Example:</dt>
+      <dd>
+         <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
       <br>
-       Example: <code>Wettersensor:rain:Delta:(Hour|Day)|(FritzDect:(current|power):(Avg|Max|Delta):(Hour|Day)</code>
-      <br>
-       <code>Badfenster:Window:(Open|Open_Count):Month</code>
-      <br>
+         <code>Badfenster:Window:(Open|Open_Count):Month</code>
+      </dd>
     </li><br>
-   <li><code>specialDeltaPeriodHours &lt;hours&gt;</code>
+   <li><code>specialDeltaPeriod &lt;Device:Reading:Period:count1:count2:...&gt;</code>
       <br>
-      Adds, for readings of delta statistics, a singular reading for the given period of hours (e.g. for the rain of the last 72 hours)
+      Creates for the given delta reading additional singular readings of the given numbers of a period (Hour, Day, Month)
+      <br>
+      Regular expressions <u>cannot</u> be used. More readings and/or period can be added but have to be separated by comma (without spaces).
+      <br>
+      <dt>Example:</dt>
+      <dd>
+      <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48:72:96</code>
+      <br>
+      This will add 3 additional readings for the rain of the last 48, 72, 96 hours.
+      <br>
+      <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
+      <br>
+      This will add 4 additional readings for the rain of the last 48 hours and the last 30 Days and the energy consumtion of the last 6 and 12 months.
+      </dd>
+   </li><br>
+   <li><code>specialDeltaPeriodHours</code>
+      <br>
+      depreciated
    </li><br>
     <li><code>tendencyReadings &lt;readings&gt;</code>
       <br>
@@ -1387,12 +1437,29 @@ sub statistics_UpdateDevReading($$$$)
          Erleichtert die Erzeugung von Plots und anderer Auswertungen (notify).
          <br>
          F&uuml;r "duration"-Ger&auml;tewerte muss der Name des jeweiligen Statuswertes als <code>Statistiktyp</code> eingesetzt werden.
+         <dt>Beispiel:</dt>
+         <dd>
+            <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
          <br>
-          Beispiel:
+            <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
+         </dd>
+       </li><br>
+      <li><code>specialDeltaPeriod &lt;Ger&auml;t:Ger&auml;tewert:Zeitraum:Anzahl1:Anzahl2:...&gt;</code>
          <br>
-          <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
+         Erzeugt f&uuml;gt die angegebenen "delta"-Ger&auml;tewert zus&auml;tzliche Einzelwerte für den angegebene Zeitraum (Hour, Day, Month) und der angegebenen Anzahl.
          <br>
-          <code>Badfenster:Window:(Open|Open_Count):Month</code>
+         Regul&auml;re Ausdr&uuml;cke k&ouml;nnen <u>nicht</u> genutzt werden. Es k&ouml;nnen auch mehrere Ger&auml;tewert und/oder Zeitr&auml;ume hinzugef&uuml;gt werden. Diese m&uuml;ssen durch Kommas (ohne Leerzeichen) getrennt werden.
+         <br>
+         <dt>Beispiel:</dt>
+         <dd>
+         <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48:72:96</code>
+         <br>
+         Dies erzeugt 3 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 48, 72, 96 Stunden.
+         <br>
+         <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
+         <br>
+         Dies erzeugt 4 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 48 Stunden und den letzten 30 tagen und den Energieverbrauch der letzten 6 und 12 Monate.
+         </dd>
       </li><br>
       <li><code>specialDeltaPeriodHours &lt;Stunden&gt;</code>
          <br>
