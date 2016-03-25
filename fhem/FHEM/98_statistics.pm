@@ -890,7 +890,7 @@ sub statistics_doStatisticSpecialPeriod2 ($$$$$$)
       $result += $_; 
       $counterHidden++;
       if ( $counterHidden == $periods[$counterPeriods] ) {
-         my $rName = $statReadingName.$periods[$counterPeriods];
+         my $rName = $statReadingName . $periods[$counterPeriods];
          my $rValue = sprintf "%.".$decPlaces."f", $result;
          statistics_Log $hash, 4, "Set '$rName = $rValue'";
          readingsBulkUpdate($dev, $rName, $rValue, 1);
@@ -1446,7 +1446,7 @@ sub statistics_UpdateDevReading($$$$)
        </li><br>
       <li><code>specialDeltaPeriod &lt;Ger&auml;t:Ger&auml;tewert:Zeitraum:Anzahl1:Anzahl2:...&gt;</code>
          <br>
-         Erzeugt f&uuml;gt die angegebenen "delta"-Ger&auml;tewert zus&auml;tzliche Einzelwerte für den angegebene Zeitraum (Hour, Day, Month) und der angegebenen Anzahl.
+         Erzeugt f&uuml;r die angegebenen "delta"-Ger&auml;tewert zus&auml;tzliche Einzelwerte für den angegebene Zeitraum (Hour, Day, Month) und der angegebenen Anzahl.
          <br>
          Regul&auml;re Ausdr&uuml;cke k&ouml;nnen <u>nicht</u> genutzt werden. Es k&ouml;nnen auch mehrere Ger&auml;tewert und/oder Zeitr&auml;ume hinzugef&uuml;gt werden. Diese m&uuml;ssen durch Kommas (ohne Leerzeichen) getrennt werden.
          <br>
