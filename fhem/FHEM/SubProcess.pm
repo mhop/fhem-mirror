@@ -48,7 +48,9 @@ sub new() {
     return undef; # die "socketpair: $!";
   $child->autoflush(1);
   $parent->autoflush(1);
-  
+
+  # Buffers are not used in this version of SubProcess.pm
+  # Revision  8393 had it
   my %childBuffer= ();
   my %parentBuffer= ();
   
@@ -57,16 +59,39 @@ sub new() {
     onRun => $args->{onRun},
     onExit => $args->{onExit},
     timeout => $args->{timeout},
+    timeoutread => $args->{timeoutread},
+    timeoutwrite => $args->{timeoutwrite},
     child => $child,
     parent => $parent,
     pid => undef,
     childBufferRef => \%childBuffer,
     parentBufferRef => \%parentBuffer,
+    lasterror => ''
    
   };  # we are a hash reference
 
+  # Timeout must be defined and > 0
+  # 0 = Polling, undef = Block until data available
+  if(defined($self->{timeout})) {
+    $self->{timeout} = 0.001 if ($self->{timeout} <= 0.0);
+  }
+  else {
+    $self->{timeout} = 0.001;
+  }
+  if (!defined ($self->{timeoutread})) {
+    $self->{timeoutread} = $self->{timeout};
+  }
+  if (!defined ($self->{timeoutwrite})) {
+    $self->{timeoutwrite} = $self->{timeout};
+  }
+  
   return bless($self, $class); # make $self an object of class $class
  
+}
+
+sub lasterror() {
+  my $self = shift;
+  return exists ($self->{lasterror}) ? $self->{lasterror} : '';
 }
 
 #
@@ -150,52 +175,82 @@ sub parent() {
 }
 
 # this is a helper function for reading
+# returns 1 datagram or undef on error
+# this version does not handle split transmissions that result in short datagrams
+# Todo: buffer such datagrams
 sub readFrom() {
-  my ($self, $fh, $bufferRef)= @_;
-  my %buffer= %{$bufferRef};
-  
-  my $rin= '';
-  vec($rin, fileno($fh), 1)= 1;
-  return undef unless select($rin, undef, undef, 0.001);
-  my $result= undef;
+  my ($self, $fh) = @_;
+
+  my $header;
   my $data;
-  my $bytes= sysread($fh, $data, 1024);
-  return undef unless(defined($bytes) && $bytes);
-  #main::Debug "SUBPROCESS: read \"$data\"";
+
+  # Check if data is available
+  my $rin= '';
+  vec($rin, fileno($fh), 1) = 1;
+  my $nfound = select($rin, undef, undef, $self->{timeoutread});
+  if ($nfound < 0) {
+    $self->{lasterror} = $!;
+    return undef;
+  }
+  elsif ($nfound == 0) {
+    $self->{lasterror} = "read: no data";
+    return undef;
+  }
   
-  # prepend buffer if buffer is set
-  $data= $buffer{data} . $data if(defined($buffer{data}));
-  my $len= length($data);
-  #main::Debug "SUBPROCESS: data is now \"$data\" (length: $len)";
-  # get or set size (32bit unsigned integer in network byte order)
-  my $size= defined($buffer{size}) ? $buffer{size} : undef;
-  if(!defined($size) && $len>= 4) {
-    $size= unpack("N", $data);
-    $data= substr($data, 4);
-    $len-= 4;
-    #main::Debug "SUBPROCESS: got size: $size";
+  # Read datagram size	
+  my $sbytes = sysread ($fh, $header, 4);
+  if (!defined ($sbytes)) {
+    $self->{lasterror} = $!;
+    return undef;
   }
-  # get the datagram if size is set and data length is at least size
-  if(defined($size) && $len>= $size) {
-    $result= substr($data, 0, $size);
-    $size= undef;
-    #main::Debug "SUBPROCESS: data complete: \"$data\"";
+  elsif ($sbytes != 4) {
+    $self->{lasterror} = "read: short header";
+    return undef;
   }
-  # set buffer
-  $buffer{data}= $data;
-  $buffer{size}= $size;
-  # return result
-  return $result;
+
+  # Read datagram
+  my $size = unpack ('N', $header);	
+  my $bytes = sysread ($fh, $data, $size);
+  if (!defined ($bytes)) {
+    $self->{lasterror} = $!;
+    return undef;
+  }
+  elsif ($bytes != $size) {
+    $self->{lasterror} = "read: incomplete data";
+    return undef;
+  }
+
+  return $data;
 }
 
 # this is a helper function for writing
+# writes 4 byte datagram size + datagram
 sub writeTo() {
-  my ($self, $fh, $msg)= @_;
+  my ($self, $fh, $msg) = @_;
+
   my $win= '';
   vec($win, fileno($fh), 1)= 1;
-  return undef unless select(undef, $win, undef, 0.001);
+  my $nfound = select (undef, $win, undef, $self->{timeoutwrite});
+  if ($nfound < 0) {
+    $self->{lasterror} = $!;
+    return undef;
+  }
+  elsif ($nfound == 0) {
+    $self->{lasterror} = "write: no reader";
+    return undef;
+  }
+
   my $size= pack("N", length($msg));
-  my $bytes= syswrite($fh, $size . $msg);
+  my $bytes= syswrite ($fh, $size . $msg);
+  if (!defined ($bytes)) {
+    $self->{lasterror} = $!;
+    return undef;
+  }
+  elsif ($bytes != length ($size.$msg)) {
+    $self->{lasterror} = "write: incomplete data";
+    return undef;
+  }
+  
   return $bytes;
 }
 
@@ -207,7 +262,7 @@ sub readFromChild() {
 
   my $self= shift;
   
-  return $self->readFrom($self->child(), $self->{childBufferRef});
+  return $self->readFrom($self->child());
 }
 
 
@@ -225,7 +280,7 @@ sub writeToChild() {
 sub readFromParent() {
 
   my $self= shift;
-  return $self->readFrom($self->parent(), $self->{parentBufferRef});
+  return $self->readFrom($self->parent());
 }
 
 
