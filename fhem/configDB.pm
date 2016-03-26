@@ -103,6 +103,10 @@
 #
 # 2015-10-14 - changed   search conditions use ESCAPE, forum #42190
 #
+# 2016-03-19 - changed   use modpath, forum #51036
+#
+# 2016-03-26 - added     log entry for search (verbose=5)
+#
 ##############################################################################
 #
 
@@ -901,6 +905,7 @@ sub _cfgDB_Search($$;$) {
 	}
 	$sql .= "ORDER BY lower(device),command DESC";
 	$sth = $fhem_dbh->prepare( $sql);
+	Log 5,"configDB: $sql";
 	$sth->execute();
 	$text = " device" if($dsearch);
 	push @result, "search result for$text: $search in version: $searchversion";
