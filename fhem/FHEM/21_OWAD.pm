@@ -36,20 +36,16 @@
 #
 # attr <name> stateAL0  "<string>"     = character string for denoting low normal condition, default is empty
 # attr <name> stateAH0  "<string>"     = character string for denoting high normal condition, default is empty
-# attr <name> stateAL1  "<string>"     = character string for denoting low alarm condition, default is down triangle
-# attr <name> stateAH1  "<string>"     = character string for denoting high alarm condition, default is up triangle
+# attr <name> stateAL1  "<string>"     = character string for denoting low alarm condition, default is ↓
+# attr <name> stateAH1  "<string>"     = character string for denoting high alarm condition, default is ↑
 # attr <name> <channel>Name   <string>[|<string>] = name for the channel [|name used in state reading]
-# attr <name> <channel>Unit   <string>[|<string>] = unit of measurement for this channel [|unit used in state reading] 
-#
-# ATTENTION: Usage of Offset/Factor is deprecated, replace by Function attribute
-# attr <name> <channel>Offset <float>  = offset added to the reading in this channel 
-# attr <name> <channel>Factor <float>  = factor multiplied to (reading+offset) in this channel 
+# attr <name> <channel>Unit   <string> = unit of measurement for this channel used in state reading (default V, none for empty)
 # attr <name> <channel>Function <string>  = arbitrary functional expression involving the values V<channel>=VA,VB,VC,VD
 #                                         VA is replaced by the measured voltage in channel A, etc.
 #
 # attr <name> <channel>Alarm  <string> = alarm setting in this channel, either both, low, high or none (default) 
-# attr <name> <channel>Low    <float>  = measurement value (on the scale determined by offset and factor) for low alarm 
-# attr <name> <channel>High   <float>  = measurement value (on the scale determined by offset and factor) for high alarm 
+# attr <name> <channel>Low    <float>  = measurement value (on the scale determined by function) for low alarm 
+# attr <name> <channel>High   <float>  = measurement value (on the scale determined by function) for high alarm 
 #
 ########################################################################################
 #
@@ -88,9 +84,9 @@ BEGIN {
 
 use ProtoThreads;
 no warnings 'deprecated';
-sub Log($$);
+sub Log3($$$);
 
-my $owx_version="5.20";
+my $owx_version="6.0";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -161,15 +157,13 @@ sub OWAD_Initialize ($) {
   $hash->{InitFn}  = "OWAD_Init";
   $hash->{AttrFn}  = "OWAD_Attr";
  
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 verbose:0,1,2,3,4,5 ".
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 ".
                 "stateAL0 stateAL1 stateAH0 stateAH1 ".
                 "interval ".
                 $readingFnAttributes;
  
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
-    $attlist .= " ".$owg_fixed[$i]."Offset";
-    $attlist .= " ".$owg_fixed[$i]."Factor";
     $attlist .= " ".$owg_fixed[$i]."Function";
     $attlist .= " ".$owg_fixed[$i]."Unit";
     $attlist .= " ".$owg_fixed[$i]."Alarm:none,low,high,both";
@@ -276,7 +270,7 @@ sub OWAD_Define ($$) {
   $main::modules{OWAD}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
-  Log 3, "OWAD:    Device $name defined."; 
+  Log 3, "OWAD:     Device $name defined."; 
 
   $hash->{NOTIFYDEV} = "global";
   
@@ -391,11 +385,11 @@ sub OWAD_ChannelNames($) {
   my $name    = $hash->{NAME};
   my $state   = $hash->{READINGS}{"state"}{VAL};
  
-  my ($cname,@cnama,$unit,@unarr);
+  my ($cname,@cnama,$unit);
 
   for (my $i=0;$i<int(@owg_fixed);$i++){
     #-- name
-    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];
+    $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : "$owg_fixed[$i]";
     @cnama = split(/\|/,$cname);
     if( int(@cnama)!=2){
       push(@cnama,$cnama[0]);
@@ -403,16 +397,16 @@ sub OWAD_ChannelNames($) {
     $owg_channel[$i]=$cnama[0];
  
     #-- unit
-    $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "Volt|V";
-    @unarr= split(/\|/,$unit);
-    if( int(@unarr)!=2 ){
-      push(@unarr,$unarr[0]);  
+    $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "V";
+    if($unit eq "none"){
+      $unit = "";
+    }else{
+      $unit = " ".$unit;
     }
    
     #-- put into readings
     $hash->{READINGS}{$owg_channel[$i]}{ABBR}     = $cnama[1];  
-    $hash->{READINGS}{$owg_channel[$i]}{UNIT}     = $unarr[0];
-    $hash->{READINGS}{$owg_channel[$i]}{UNITABBR} = $unarr[1];
+    $hash->{READINGS}{$owg_channel[$i]}{UNIT}     = $unit;
   }
 }  
 
@@ -429,7 +423,7 @@ sub OWAD_FormatValues($) {
   
   my $name    = $hash->{NAME}; 
   my $interface = $hash->{IODev}->{TYPE};
-  my ($offset,$factor,$vval,$vlow,$vhigh,$vfunc,$ret);
+  my ($vval,$vlow,$vhigh,$vfunc,$ret);
   my $vfuncall = "";
   my $svalue = "";
   
@@ -445,8 +439,8 @@ sub OWAD_FormatValues($) {
   $hash->{ALARM} = 0; 
   
   #-- alarm signatures
-  my $stateal1 = defined($attr{$name}{stateAL1}) ? $attr{$name}{stateAL1} : "&#x25BE;";
-  my $stateah1 = defined($attr{$name}{stateAH1}) ? $attr{$name}{stateAH1} : "&#x25B4;";
+  my $stateal1 = defined($attr{$name}{stateAL1}) ? $attr{$name}{stateAL1} : "↓";
+  my $stateah1 = defined($attr{$name}{stateAH1}) ? $attr{$name}{stateAH1} : "↑";
   my $stateal0 = defined($attr{$name}{stateAL0}) ? $attr{$name}{stateAL0} : "";
   my $stateah0 = defined($attr{$name}{stateAH0}) ? $attr{$name}{stateAH0} : "";
   
@@ -463,13 +457,7 @@ sub OWAD_FormatValues($) {
   
   #-- formats for output
   for (my $i=0;$i<int(@owg_fixed);$i++){
-    #-- when offset and scale factor are defined, we cannot have a function and vice versa
-    if( defined($attr{$name}{$owg_fixed[$i]."Offset"}) && defined($attr{$name}{$owg_fixed[$i]."Factor"}) ){
-      my $offset  = $attr{$name}{$owg_fixed[$i]."Offset"};
-      my $factor  = $attr{$name}{$owg_fixed[$i]."Factor"};
-      $vfunc = "$factor*(V$owg_fixed[$i] + $offset)";
-    #-- attribute VFunction defined 
-    } elsif (defined($attr{$name}{$owg_fixed[$i]."Function"})){
+    if (defined($attr{$name}{$owg_fixed[$i]."Function"})){
       $vfunc = $attr{$name}{$owg_fixed[$i]."Function"};
     } else {
       $vfunc = "V$owg_fixed[$i]";
@@ -504,7 +492,7 @@ sub OWAD_FormatValues($) {
     $main::attr{$name}{$owg_fixed[$i]."High"}=$vhigh;            
         
     #-- string buildup for return value, STATE and alarm
-    $svalue .= sprintf( "%s: %5.3f %s", $hash->{READINGS}{$owg_channel[$i]}{ABBR}, $vval,$hash->{READINGS}{$owg_channel[$i]}{UNITABBR});
+    $svalue .= sprintf( "%s: %5.3f%s", $hash->{READINGS}{$owg_channel[$i]}{ABBR}, $vval,$hash->{READINGS}{$owg_channel[$i]}{UNIT});
              
     #-- Test for alarm condition
     $alarm = "none";
@@ -542,6 +530,7 @@ sub OWAD_FormatValues($) {
     }
       
     #-- put into READINGS
+    $vval = sprintf( "%5.3f", $vval);
     readingsBulkUpdate($hash,"$owg_channel[$i]",$vval);
     #-- insert space
     if( $i<int(@owg_fixed)-1 ){
@@ -578,8 +567,6 @@ sub OWAD_Get($@) {
   my $interface= $hash->{IODev}->{TYPE};
   my ($value,$value2,$value3)   = (undef,undef,undef);
   my $ret     = "";
-  my $offset;
-  my $factor;
 
   #-- check syntax
   return "OWAD: Get argument is missing @a"
@@ -642,17 +629,20 @@ sub OWAD_Get($@) {
       return "OWAD: Get with wrong IODev type $interface";
     }
   
-    #-- process results
-    if( defined($ret) ){
-      $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-      if( $hash->{ERRCOUNT} > 5 ){
-        $hash->{INTERVAL} = 9999;
+    #-- process result
+    if( $master->{ASYNCHRONOUS} ){
+      return "OWAD: $name getting reading, please wait for completion";
+    }else{
+      if( defined($ret) ){
+        $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
+        if( $hash->{ERRCOUNT} > 5 ){
+          $hash->{INTERVAL} = 9999;
+        }
+        return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
       }
-      return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
+      return "OWAD: $name.reading => ".$hash->{READINGS}{"state"}{VAL};
     }
-    return "OWAD: $name.reading => ".$hash->{READINGS}{"state"}{VAL};
   }
-  
   #-- get alarm values according to interface type
   if($a[1] eq "alarm") {
     #-- OWX interface
@@ -671,23 +661,27 @@ sub OWAD_Get($@) {
       return "OWAD: Get with wrong IODev type $interface";
     }
   
-    #-- process results
-    if( defined($ret) ){
-      $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-      if( $hash->{ERRCOUNT} > 5 ){
-        $hash->{INTERVAL} = 9999;
+    #-- process result
+    if( $master->{ASYNCHRONOUS} ){
+      return "OWAD: $name getting alarm values, please wait for completion";
+    }else{
+      if( defined($ret) ){
+        $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
+        if( $hash->{ERRCOUNT} > 5 ){
+          $hash->{INTERVAL} = 9999;
+        }
+        return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
       }
-      return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
-    }
     
-    #-- assemble ouput string
-    $value = "";
-    for (my $i=0;$i<int(@owg_fixed);$i++){
-      $value .= sprintf "%s:[%4.2f,%4.2f] ",$owg_channel[$i],
-      $main::attr{$name}{$owg_channel[$i]."Low"},
-      $main::attr{$name}{$owg_channel[$i]."High"}; 
+      #-- assemble ouput string
+      $value = "";
+      for (my $i=0;$i<int(@owg_fixed);$i++){
+        $value .= sprintf "%s:[%4.2f,%4.2f] ",$owg_channel[$i],
+        $main::attr{$name}{$owg_channel[$i]."Low"},
+        $main::attr{$name}{$owg_channel[$i]."High"}; 
+      }
+      return "OWAD: $name.alarm => $value";
     }
-    return "OWAD: $name.alarm => $value";
   }
   
    #-- get status values according to interface type
@@ -708,47 +702,51 @@ sub OWAD_Get($@) {
       return "OWAD: Get with wrong IODev type $interface";
     }
   
-    #-- process results
-    if( defined($ret) ){
-      $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
-      if( $hash->{ERRCOUNT} > 5 ){
-        $hash->{INTERVAL} = 9999;
-      }
-      return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
-    } 
+    #-- process result
+    if( $master->{ASYNCHRONOUS} ){
+      return "OWAD: $name getting status, please wait for completion";
+    }else{
+      if( defined($ret) ){
+        $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
+        if( $hash->{ERRCOUNT} > 5 ){
+          $hash->{INTERVAL} = 9999;
+        }
+        return "OWAD: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
+      } 
     
-    #-- assemble output string
-    $value = "\n";
-    for (my $i=0;$i<int(@owg_fixed);$i++){
-      $value  .= $owg_channel[$i].": ".$owg_mode[$i].", ";
-      #$value .= "disabled ," 
-      #  if ( !($sb2 && 128) );
-      $value .=  sprintf "raw range %3.2f V, ",$owg_range[$i]/1000;
-      $value .=  sprintf "resolution %d bit, ",$owg_resoln[$i];
-      if (!defined $hash->{owg_slow}->[$i]) {
-        $value .= "low alarm undefined, ";
-      } elsif( $hash->{owg_slow}->[$i]==0 ) { 
-        $value .= "low alarm disabled, ";
-      } elsif( $hash->{owg_slow}->[$i]==1 ) {
-        $value .= "low alarm enabled, ";
-      } elsif( $hash->{owg_slow}->[$i]==2 ) {
-        $value .= "alarmed low, ";
+      #-- assemble output string
+      $value = "\n";
+      for (my $i=0;$i<int(@owg_fixed);$i++){
+        $value  .= $owg_channel[$i].": ".$owg_mode[$i].", ";
+        #$value .= "disabled ," 
+        #  if ( !($sb2 && 128) );
+        $value .=  sprintf "raw range %3.2f V, ",$owg_range[$i]/1000;
+        $value .=  sprintf "resolution %d bit, ",$owg_resoln[$i];
+        if (!defined $hash->{owg_slow}->[$i]) {
+          $value .= "low alarm undefined, ";
+        } elsif( $hash->{owg_slow}->[$i]==0 ) { 
+          $value .= "low alarm disabled, ";
+        } elsif( $hash->{owg_slow}->[$i]==1 ) {
+          $value .= "low alarm enabled, ";
+        } elsif( $hash->{owg_slow}->[$i]==2 ) {
+          $value .= "alarmed low, ";
+        }
+        if (!defined $hash->{owg_shigh}) {
+          $value .= "high alarm undefined";
+        } elsif( $hash->{owg_shigh}->[$i]==0 ) {
+          $value .= "high alarm disabled";
+        } elsif( $hash->{owg_shigh}->[$i]==1 ) {
+          $value .= "high alarm enabled";
+        } elsif( $hash->{owg_shigh}->[$i]==2 ) {
+          $value .= "alarmed high";
+        }
+        #-- insert space
+        if( $i<int(@owg_fixed)-1 ){
+          $value .= "\n";
+        }
       }
-      if (!defined $hash->{owg_shigh}) {
-        $value .= "high alarm undefined";
-      } elsif( $hash->{owg_shigh}->[$i]==0 ) {
-        $value .= "high alarm disabled";
-      } elsif( $hash->{owg_shigh}->[$i]==1 ) {
-        $value .= "high alarm enabled";
-      } elsif( $hash->{owg_shigh}->[$i]==2 ) {
-        $value .= "alarmed high";
-      }
-      #-- insert space
-      if( $i<int(@owg_fixed)-1 ){
-        $value .= "\n";
-      }
+      return "OWAD: $name.status => ".$value;
     }
-    return "OWAD: $name.status => ".$value;
   }
 }
 
@@ -939,8 +937,6 @@ sub OWAD_Set($@) {
   my $ret     = undef;
   my $channon = undef;
   my $channo  = undef;
-  my $factor;
-  my $offset;
   my $condx;
   
   my $name    = $hash->{NAME};
@@ -1024,7 +1020,7 @@ sub OWAD_Set($@) {
   #-- set alarm values (alarm voltages)
   }elsif( $key =~ m/(.*)(Low|High)/ ) {
     
-    #-- find upper and lower boundaries for given offset/factor
+    #-- find upper and lower boundaries 
     my $mmin = 0.0;
     my $mmax = $owg_range[$channo]/1000;
 
@@ -1313,37 +1309,61 @@ sub OWFSAD_SetPage($$) {
 #
 ########################################################################################
 #
-# OWXAD_BinValues - Binary readings into clear values
+# OWXAD_BinValues - Process reading from one device - translate binary into raw
 #
 # Parameter hash = hash of device addressed
+#           context   = mode for evaluating the binary data
+#           proc      = processing instruction, also passed to OWX_Read.
+#                       bitwise interpretation !!
+#                       if 0, nothing special
+#                       if 1 = bit 0, a reset will be performed not only before, but also after
+#                       the last operation in OWX_Read
+#                       if 2 = bit 1, the initial reset of the bus will be suppressed
+#                       if 8 = bit 3, the fillup of the data with 0xff will be suppressed  
+#                       if 16= bit 4, the insertion will be at the top of the queue  
+#           owx_dev   = ROM ID of slave device
+#           crcpart   = part of the data that needs to be part of the CRC check
+#           numread   = number of bytes to receive
+#           res       = result string
+#
 #
 ########################################################################################
 
-sub OWXAD_BinValues($$$$$$$$) {
-  my ($hash, $context, $success, $reset, $owx_dev, $command, $numread, $res) = @_;
+sub OWXAD_BinValues($$$$$$$) {
+  my ($hash, $context, $proc, $owx_dev, $crcpart, $numread, $res) = @_;
   
-  #-- always check for success, unused are reset
-  return unless ($success and $context);
-  #Log 1,"OWXAD_BinValues context = $context";
-  my $final = ($context =~ /\.final$/ );
-  
-  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  my @data=[]; 
+  my $value;
+  my $msg;
+  OWX_WDBG($name,"OWXAD_BinValues called for device $name in context $context with ",$res)
+    if( $main::owx_debug>2 );
+
+  my $final = ($context =~ /\.final$/ );  
+  my ($ow_thn,$ow_tln);
   
   #-- process results
   @data=split(//,$res);
-  return "invalid data length, ".int(@data)." instead of 10 bytes"
-    if (@data != 10); 
-  return "invalid CRC"
-    if (OWX_CRC16($command.substr($res,0,8),$data[8],$data[9])==0);    
-      
+  if (@data != 10){
+     $msg="$name returns invalid data length, ".int(@data)." instead of 10 bytes ";
+  }elsif (OWX_CRC16($crcpart.substr($res,0,8),$data[8],$data[9])==0){
+     $msg="$name returns invalid CRC "
+  }else{
+     $msg="No error ";
+  }
+  OWX_WDBG($name,"OWXAD_BinValues: ".$msg,$crcpart)
+    if( $main::owx_debug>2 );
+        
   #=============== get the voltage reading ===============================
   if( $context =~ /^ds2450.getreading/ ){
-    for( $i=0;$i<int(@owg_fixed);$i++){
+    for( my $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_val}->[$i]= (ord($data[2*$i])+256*ord($data[1+2*$i]) )/(1<<$owg_resoln[$i]) * $owg_range[$i]/1000;
     }
   #=============== get the alarm reading ===============================
   } elsif ( $context =~ /^ds2450.getalarm/ ){
-    for( $i=0;$i<int(@owg_fixed);$i++){
+    for( my $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_vlow}->[$i]  = int(ord($data[2*$i])/256 * $owg_range[$i]+0.5)/1000;
       $hash->{owg_vhigh}->[$i] = int(ord($data[1+2*$i])/256 * $owg_range[$i]+0.5)/1000;
     }
@@ -1406,7 +1426,6 @@ sub OWXAD_BinValues($$$$$$$$) {
   $hash->{PRESENT}  = 1;
   if( $final ){
     my $value = OWAD_FormatValues($hash);
-    Log 5, $value;
   }
   return undef
 }
@@ -1465,16 +1484,25 @@ sub OWXAD_GetPage($$$@) {
     return "wrong memory page requested from $owx_dev";
   }
   my $context = "ds2450.get".$page.($final ? ".final" : "");
-  #-- reset the bus
-  OWX_Reset($master);
-  #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-  $res=OWX_Complex($master,$owx_dev,$select,10);
-  return "$owx_dev not accessible in reading page $page"
-    if( $res eq 0 );
-  return "$owx_dev has returned invalid data"
-    if( length($res)!=22);
-  #-- for processing we also need the 3 command bytes
-  return OWXAD_BinValues($hash,$context,1,undef,$owx_dev,$select,10,substr($res,12,10));
+  #-- OLD OWX interface
+  if( !$master->{ASYNCHRONOUS} ){
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+    $res=OWX_Complex($master,$owx_dev,$select,10);
+    return "$owx_dev not accessible in reading page $page"
+      if( $res eq 0 );
+    return "$owx_dev has returned invalid data"
+      if( length($res)!=22);
+    #-- for processing we also need the 3 command bytes
+    return OWXAD_BinValues($hash,$context,1,undef,$owx_dev,$select,substr($res,12,10));
+  #-- NEW OWX interface
+  }else{
+    ####        master   slave  context   proc  owx_dev   data     crcpart  numread  startread callback               delay
+    #                                     1 additional reset after last action
+    OWX_Qomplex($master, $hash, $context, 1,    $owx_dev, $select, $select, 10,      12,       \&OWXAD_BinValues,     0); 
+    return undef;
+  }   
 }
 
 ########################################################################################
@@ -1542,11 +1570,18 @@ sub OWXAD_SetPage($$) {
   } else {
     return "wrong memory page write attempt";
   } 
-  OWX_Reset($master);
-  $res=OWX_Complex($master,$owx_dev,$select,0);
-  if( $res eq 0 ){
-    return "device $owx_dev not accessible for writing"; 
-  }
+  #-- OLD OWX interface
+    if( !$master->{ASYNCHRONOUS} ){
+    OWX_Reset($master);
+    $res=OWX_Complex($master,$owx_dev,$select,0);
+    if( $res eq 0 ){
+      return "device $owx_dev not accessible for writing"; 
+    }
+  #-- NEW OWX interface
+  }else{
+    ####        master   slave  context proc  owx_dev   data     crcpart numread  startread callback delay
+    OWX_Qomplex($master, $hash, undef,  0,    $owx_dev, $select, 0,      0,       0,         undef,  0); 
+  }   
   return undef;
 }
 
@@ -1613,7 +1648,7 @@ sub OWXAD_PT_GetPage($$$) {
     PT_WAIT_THREAD($thread->{pt_execute});
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
     my $response = $thread->{pt_execute}->PT_RETVAL();
-    my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,1,$owx_dev,$thread->{'select'},10,$response);
+    my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,$owx_dev,$thread->{'select'},10,$response);
     if ($res) {
       die $res;
     }
@@ -1716,15 +1751,13 @@ sub OWXAD_PT_SetPage($$) {
             <br />
             <code>attr OWX_AD DAlarm high</code>
             <br />
-            <code>attr OWX_AD DFactor 31.907097</code>
+            <code>attr OWX_AD DName humidity</code>
+            <br />
+            <code>attr OWX_AD DUnit %</code>
+            <br />
+            <code>attr OWX_AD DFunction VD*31.907097-0.8088</code>
             <br />
             <code>attr OWX_AD DHigh 50.0</code>
-            <br />
-            <code>attr OWX_AD DName RelHumidity|humidity</code>
-            <br />
-            <code>attr OWX_AD DOffset -0.8088</code>
-            <br />
-            <code>attr OWX_AD DUnit percent|%</code>
             <br />
         </p><br />
         <a name="OWADdefine"></a>
@@ -1792,46 +1825,31 @@ sub OWXAD_PT_SetPage($$) {
             <li><a name="owad_stateAH0"><code>attr &lt;name&gt; stateAH0 &lt;string&gt;</code></a>
                 <br />character string for denoting high normal condition, default is empty </li>
             <li><a name="owad_stateAL1"><code>attr &lt;name&gt; stateAL1 &lt;string&gt;</code></a>
-                <br />character string for denoting low alarm condition, default is down triangle,
-                e.g. the code &amp;#x25BE; leading to the sign &#x25BE;</li>
+                <br />character string for denoting low alarm condition, default is ↓</li>
             <li><a name="owad_stateAH1"><code>attr &lt;name&gt; stateAH1 &lt;string&gt;</code></a>
-                <br />character string for denoting high alarm condition, default is upward
-                triangle, e.g. the code &amp;#x25B4; leading to the sign &#x25B4; </li>
+                <br />character string for denoting high alarm condition, default is ↑</li>
         </ul> For each of the following attributes, the channel identification A,B,C,D may be used. <ul>
             <li><a name="owad_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
                         &lt;string&gt;[|&lt;string&gt;]</code></a>
-                <br />name for the channel [|name used in state reading]. </li>
+                <br />name for the channel [|short name used in state reading]. </li>
             <li><a name="owad_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
-                        &lt;string&gt;[|&lt;string&gt;]</code></a>
-                <br />unit of measurement for this channel [|unit used in state reading]. </li>
-            <li><a name="owad_coffset"><b>deprecated</b>: <code>attr &lt;name&gt; &lt;channel&gt;Offset
-                        &lt;float&gt;</code></a>
-                <br />offset added to the reading in this channel. </li>
-            <li><a name="owad_cfactor"><b>deprecated</b>: <code>attr &lt;name&gt; &lt;channel&gt;Factor
-                        &lt;float&gt;</code></a>
-                <br />factor multiplied to (reading+offset) in this channel. </li>
+                        &lt;string&gt;</code></a>
+                <br />unit of measurement for this channel used in state reading (default "V", set to "none" for empty). </li>
             <li><a name="owad_cfunction">  <code>attr &lt;name&gt; &lt;channel&gt;Function
                         &lt;string&gt;</code></a>
-            <br />arbitrary functional expression involving the values VA,VB,VC,VD. VA is replaced by 
-                 the measured voltage in channel A, etc. This attribute allows linearization of measurement 
-                 curves as well as the mixing of various channels. <b>Replacement for Offset/Factor !</b></li>
+            <br />arbitrary functional expression involving the variables VA,VB,VC,VD. VA is replaced by 
+                 the (raw) measured voltage in channel A, etc. This attribute allows linearization of measurement 
+                 curves as well as the mixing of various channels. </li>
             <li><a name="owad_calarm"><code>attr &lt;name&gt; &lt;channel&gt;Alarm
                         &lt;string&gt;</code></a>
                 <br />alarm setting in this channel, either both, low, high or none (default). </li>
             <li><a name="owad_clow"><code>attr &lt;name&gt; &lt;channel&gt;Low
                     &lt;float&gt;</code></a>
-                <br />measurement value (on the scale determined by offset and factor) for low
-                alarm. </li>
+                <br />measurement value for low alarm. </li>
             <li><a name="owad_chigh"><code>attr &lt;name&gt; &lt;channel&gt;High
                         &lt;float&gt;</code></a>
-                <br />measurement value (on the scale determined by offset and factor) for high
-                alarm. </li>
-            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
-                    href="#event-on-update-reading">event-on-update-reading</a>, <a
-                    href="#event-on-change-reading">event-on-change-reading</a>, <a
-                    href="#stateFormat">stateFormat</a>, <a href="#room"
-                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#verbose">verbose</a>,
-                    <a href="#webCmd">webCmd</a></li>
+                <br />measurement value for highalarm. </li>
+            <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
         
 =end html

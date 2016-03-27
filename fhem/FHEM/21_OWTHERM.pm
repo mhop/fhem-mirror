@@ -35,8 +35,8 @@
 #
 # Additional attributes are defined in fhem.cfg
 #
-# attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is down triangle
-# attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is up triangle
+# attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is ↓
+# attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is ↑
 # attr <name> tempOffset <float>   = temperature offset in degree Celsius added to the raw temperature reading 
 # attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit, default is Celsius
 # attr <name> tempConv onkick|onread    =  determines, whether a temperature measurement will happen when "kicked" 
@@ -86,7 +86,7 @@ no warnings 'deprecated';
 sub Log3($$$);
 sub AttrVal($$$);
 
-my $owx_version="5.28";
+my $owx_version="6.0";
 
 my %gets = (
   "id"          => "",
@@ -141,7 +141,7 @@ sub OWTHERM_Initialize ($) {
   $hash->{NotifyFn}= "OWTHERM_Notify";
   $hash->{InitFn}  = "OWTHERM_Init";
   $hash->{AttrFn}  = "OWTHERM_Attr";
-  $hash->{AttrList}= "IODev model:DS1820,DS18B20,DS1822 loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrList}= "IODev model:DS1820,DS18B20,DS1822 ".
                      "stateAL stateAH ".
                      "tempOffset tempUnit:Celsius,Fahrenheit,Kelvin ".
                      "tempConv:onkick,onread tempLow tempHigh ".
@@ -254,7 +254,7 @@ sub OWTHERM_Define ($$) {
   $modules{OWTHERM}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
-  Log3 $name, 3, "OWTHERM: Device $name defined.";
+  Log3 $name, 3, "OWTHERM:  Device $name defined.";
 
   $hash->{NOTIFYDEV} = "global";
 
@@ -264,6 +264,16 @@ sub OWTHERM_Define ($$) {
   return undef;
 }
 
+#######################################################################################
+#
+# OWTHERM_Notify - Implements the Notify function
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
+
 sub OWTHERM_Notify ($$) {
   my ($hash,$dev) = @_;
   if( grep(m/^(INITIALIZED|REREADCFG)$/, @{$dev->{CHANGED}}) ) {
@@ -271,6 +281,16 @@ sub OWTHERM_Notify ($$) {
   } elsif( grep(m/^SAVE$/, @{$dev->{CHANGED}}) ) {
   }
 }
+
+#######################################################################################
+#
+# OWTHERM_Init - Implements the Init function
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
 
 sub OWTHERM_Init ($) {
   my ($hash)=@_;
@@ -355,28 +375,29 @@ sub OWTHERM_FormatValues($) {
   my $svalue = "";
   
   #-- attributes defined ?
-  $stateal = AttrVal($name,"stateAL","&#x25BE;");
-  $stateah = AttrVal($name,"stateAH","&#x25B4;");
+  $stateal = AttrVal($name,"stateAL","↓");
+  $stateah = AttrVal($name,"stateAH","↑");
   $unit    = AttrVal($name,"tempUnit","Celsius");
   $offset  = AttrVal($name,"tempOffset",0.0);
   $factor  = 1.0;
   
-  if( $unit eq "Celsius" ){
-    $abbr   = "°C";
+  if( $unit eq "none" ){
+    $abbr   = "";
+  }elsif( $unit eq "Celsius" ){
+    $abbr   = " °C";
   } elsif ($unit eq "Kelvin" ){
-    $abbr   = "K";
+    $abbr   = " K";
     $offset += "273.16"
   } elsif ($unit eq "Fahrenheit" ){
-    $abbr   = "°F";
+    $abbr   = " °F";
     $offset = ($offset+32)/1.8;
     $factor = 1.8;
   } else {
-    $abbr="?";
+    $abbr=" ?";
     Log3 $name, 3, "OWTHERM_FormatValues: Unknown temperature unit $unit";
   }
   #-- these values are rather complex to obtain, therefore save them in the hash
-  $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
-  $hash->{READINGS}{"temperature"}{UNITABBR} = $abbr;
+  $hash->{READINGS}{"temperature"}{UNIT}     = $abbr;
   $hash->{tempf}{offset}                     = $offset;
   $hash->{tempf}{factor}                     = $factor;
   
@@ -392,7 +413,7 @@ sub OWTHERM_FormatValues($) {
   $main::attr{$name}{"tempHigh"} = $vhigh;
          
   #-- formats for output
-  $statef = "T: %5.2f ".$abbr;
+  $statef = "T: %5.2f".$abbr;
   $svalue = sprintf($statef,$vval);
   
   #-- Test for alarm condition
@@ -431,6 +452,7 @@ sub OWTHERM_Get($@) {
   my $reading = $a[1];
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
+
   my $value   = undef;
   my $ret     = "";
 
@@ -450,6 +472,7 @@ sub OWTHERM_Get($@) {
   
   #-- hash of the busmaster
   my $master = $hash->{IODev};
+  
   #-- Get other values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   
@@ -503,19 +526,24 @@ sub OWTHERM_Get($@) {
   }
   
   #-- process results
-  if( defined($ret)  ){
-    return "OWTHERM: Could not get values from device $name, return was $ret";
+  if( $master->{ASYNCHRONOUS} ){
+    return "OWTHERM: $name getting values, please wait for completion";
+  }else{
+    #-- when we have a return code, we have an error
+    if( defined($ret)  ){
+      return "OWTHERM: Could not get values from device $name, return was $ret";
+    }
+    #-- return the special reading
+    if ($reading eq "temperature") {
+      return "OWTHERM: $name.temperature => ".
+        $hash->{READINGS}{"temperature"}{VAL};
+    } elsif ($reading eq "alarm") {
+      return "OWTHERM: $name.alarm => L ".$main::attr{$name}{"tempLow"}.
+        " H ".$main::attr{$name}{"tempHigh"};
+    } else {
+      return undef;
+    }
   }
-  
-  #-- return the special reading
-  if ($reading eq "temperature") {
-    return "OWTHERM: $name.temperature => ".
-      $hash->{READINGS}{"temperature"}{VAL};
-  } elsif ($reading eq "alarm") {
-    return "OWTHERM: $name.alarm => L ".$main::attr{$name}{"tempLow"}.
-      " H ".$main::attr{$name}{"tempHigh"};
-  }
-  return undef;
 }
 
 #######################################################################################
@@ -615,9 +643,8 @@ sub OWTHERM_InitializeDevice($) {
     Log3 $name, 3, "OWTHERM_InitializeDevice: unknown unit $unit";
   }
   #-- these values are rather complex to obtain, therefore save them in the hash
-  $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
-  $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
-  $hash->{READINGS}{"temperature"}{UNITABBR} = $abbr;
+  $hash->{READINGS}{"temperature"}{TYPE}     = "temperature";
+  $hash->{READINGS}{"temperature"}{UNIT}     = $abbr;
   $hash->{ERRCOUNT}                          = 0;
   $hash->{tempf}{offset}                     = $offset;
   $hash->{tempf}{factor}                     = $factor;
@@ -894,32 +921,53 @@ sub OWFSTHERM_SetValues($$) {
 #
 ########################################################################################
 #
-# OWXTHERM_BinValues - Binary readings into clear values
+# OWXTHERM_BinValues - Process reading from one device - translate binary into raw
 #
 # Parameter hash = hash of device addressed
+#           context   = mode for evaluating the binary data
+#           proc      = processing instruction, also passed to OWX_Read.
+#                       bitwise interpretation !!
+#                       if 0, nothing special
+#                       if 1 = bit 0, a reset will be performed not only before, but also after
+#                       the last operation in OWX_Read
+#                       if 2 = bit 1, the initial reset of the bus will be suppressed
+#                       if 8 = bit 3, the fillup of the data with 0xff will be suppressed  
+#                       if 16= bit 4, the insertion will be at the top of the queue  
+#           owx_dev   = ROM ID of slave device
+#           crcpart   = part of the data that needs to be part of the CRC check
+#           numread   = number of bytes to receive
+#           res       = result string
+#
 #
 ########################################################################################
 
-sub OWXTHERM_BinValues($$$$$$) {
-  my ($hash, $reset, $owx_dev, $command, $numread, $res) = @_;
-  
-  #Log3 $name, 1,"OWXTHERM_BinValues context = $context";
+sub OWXTHERM_BinValues($$$$$$$) {
+  my ($hash, $context, $reset, $owx_dev, $crcpart, $numread, $res) = @_;
   
   my ($i,$j,$k,@data,$ow_thn,$ow_tln);
   my $change = 0;
-
-  #Log3 $name, 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
-  #-- process results
-  die "$owx_dev not accessible in 2nd step" unless ( defined $res and $res ne 0 );
+  my $name   = $hash->{NAME};
+  my $msg;
+  OWX_WDBG($name,"OWTHERM_BinValues called for device $name with ",$res)
+    if( $main::owx_debug>2 );
   
   #-- process results
   @data=split(//,$res);
-  die "invalid data length, ".int(@data)." instead of 9 bytes"
-    if (@data != 9); 
-  die "invalid data"
-    if (ord($data[7])<=0); 
-  die "invalid CRC"
-    if (OWX_CRC8(substr($res,0,8),$data[8])==0);
+  if (@data != 9){
+    $msg="Error - $name returns invalid data length, ".int(@data)." instead of 9 bytes, ";
+  }elsif(ord($data[7])<=0){
+    $msg="Error - $name returns invalid data, ";
+  }elsif(OWX_CRC8(substr($res,0,8),$data[8])==0){
+    $msg="Error - invalid data from device $name, invalid CRC, ";
+  }else{
+    $msg="No error, ";
+    for(my $i=0;$i<8;$i++){
+      $hash->{owg_val}->[$i] = (ord($data[0])>>$i) & 1;
+      $hash->{owg_vax}->[$i] = (ord($data[1])>>$i) & 1;
+    };
+  }
+  OWX_WDBG($name,"OWXTHERM_BinValues: ".$msg,$res)
+    if( $main::owx_debug>2 );
   
   #-- this must be different for the different device types
   #   family = 10 => DS1820, DS18S20
@@ -967,7 +1015,7 @@ sub OWXTHERM_BinValues($$$$$$) {
     $ow_tln = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
     
   } else {
-    die "OWXTHERM: Unknown device family $hash->{OW_FAMILY}\n";
+    die "OWTHERM: $name: Unknown device family $hash->{OW_FAMILY}\n";
   }
   
   #-- process alarm settings
@@ -977,7 +1025,6 @@ sub OWXTHERM_BinValues($$$$$$) {
   #-- and now from raw to formatted values
   $hash->{PRESENT}  = 1;
   my $value = OWTHERM_FormatValues($hash);
-  Log3  $hash->{NAME}, 5, $value;
   return undef;
 }
 
@@ -1002,35 +1049,51 @@ sub OWXTHERM_GetValues($) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
+  
+  my $res;
  
   #-- check, if the conversion has been called before for all sensors
   if( defined($attr{$name}{tempConv}) && ( $attr{$name}{tempConv} eq "onkick") ){
     $con=0;
   }
-
   #-- if the conversion has not been called before
+  #-- issue the match ROM command \x55 and the start conversion command \x44
+  #-- conversion needs some 950 ms - but we may also do it in shorter time !
   if( $con==1 ){
-    #-- issue the match ROM command \x55 and the start conversion command \x44
-    OWX_Reset($master);     
-    if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
-      return "$owx_dev not accessible";
-    } 
-    #-- conversion needs some 950 ms - but we may also do it in shorter time !
-    select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)}*0.001);
+    #-- OLD OWX interface
+    if( !$master->{ASYNCHRONOUS} ){
+      OWX_Reset($master);     
+      if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
+        return "OWTHERM: $name not accessible";
+      } 
+      select(undef,undef,undef,$convtimes{AttrVal($name,"resolution",12)}*0.001);
+    #-- NEW OWX interface
+    }else{
+      ####        master   slave  context proc  owx_dev   data     crcpart numread startread callback delay
+      OWX_Qomplex($master, $hash, undef,  0,     $owx_dev, "\x44",  0,      0,      undef,    undef,   $convtimes{AttrVal($name,"resolution",12)}*0.001); 
+    }
   }
   #-- NOW ask the specific device
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
-  OWX_Reset($master);
-  my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
-  return "$owx_dev not accessible in reading"
-    if( $res eq 0 );
-  return "$owx_dev has returned invalid data"
-    if( length($res)!=19);
-  eval {
-    OWXTHERM_BinValues($hash,undef,$owx_dev,undef,undef,substr($res,10,9));
-  };
-  return $@ ? $@ : undef;
+  #-- OLD OWX interface
+  if( !$master->{ASYNCHRONOUS} ){
+    OWX_Reset($master);
+    my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
+    return "OWTHERM: $name not accessible in reading"
+      if( $res eq 0 );
+    return "OWTHERM: $name has returned invalid data"
+      if( length($res)!=19);
+    eval {
+      OWXTHERM_BinValues($hash,undef,$owx_dev,undef,undef,9,substr($res,10,9));
+    };
+    return $@ ? $@ : undef;
+  #-- NEW OWX interface
+  }else{
+    ####        master   slave  context proc owx_dev   data    crcpart numread startread callback              delay
+    OWX_Qomplex($master, $hash, undef,  0,   $owx_dev, "\xBE", 0,      9,      10,       \&OWXTHERM_BinValues, 0); 
+    return undef;
+  }
 }
 
 #######################################################################################
@@ -1044,8 +1107,6 @@ sub OWXTHERM_GetValues($) {
 
 sub OWXTHERM_SetValues($$) {
   my ($hash, $args) = @_;
-  
-  my ($i,$j,$k);
   
   my $name = $hash->{NAME};
   
@@ -1079,12 +1140,18 @@ sub OWXTHERM_SetValues($$) {
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
   my $select=sprintf("\x4E%c%c%c",$thp,$tlp,$cfg);
-  OWX_Reset($master);
-  my $res=OWX_Complex($master,$owx_dev,$select,3);
-  if( $res eq 0 ){
-    return "OWXTHERM: Device $owx_dev not accessible";
+  #-- OLD OWX interface
+  if( !$master->{ASYNCHRONOUS} ){
+    OWX_Reset($master);
+    my $res=OWX_Complex($master,$owx_dev,$select,3);
+    if( $res eq 0 ){
+      return "OWTHERM: $name not accessible for setting";
+    }
+  #-- NEW OWX interface
+  }else{
+    ####        master   slave  context proc owx_dev   data     crcpart numread startread callback delay
+    OWX_Qomplex($master, $hash, undef,  0,   $owx_dev, $select, 0,      3,      10,       undef,   0); 
   }
-  
   return undef;
 }
 
@@ -1137,7 +1204,7 @@ sub OWXTHERM_PT_GetValues($) {
     $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev,"\xBE",9);
     PT_WAIT_THREAD($thread->{pt_execute});
     die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    OWXTHERM_BinValues($hash,1,$owx_dev,undef,9,$thread->{pt_execute}->PT_RETVAL());
+    OWXTHERM_BinValues($hash,undef,1,$owx_dev,undef,9,$thread->{pt_execute}->PT_RETVAL());
     PT_END;
   });
 } 
@@ -1299,12 +1366,10 @@ sub OWXTHERM_PT_SetValues($$) {
         <ul>
             <li><a name="owtherm_stateAL"><code>attr &lt;name&gt; stateAL &lt;string&gt;</code>
                 </a>
-                <br />character string for denoting low alarm condition, default is down triangle,
-                e.g. the code &amp;#x25BE; leading to the sign &#x25BE; </li>
+                <br />character string for denoting low alarm condition, default is ↓</li>
             <li><a name="owtherm_stateAH"><code>attr &lt;name&gt; stateAH &lt;string&gt;</code>
                 </a>
-                <br />character string for denoting high alarm condition, default is upward
-                triangle, e.g. the code &amp;#x25B4; leading to the sign &#x25B4; </li>
+                <br />character string for denoting high alarm condition, default is ↑</li>
                 <li><a name="owtherm_tempConv">
                     <code>attr &lt;name&gt; tempConv onkick|onread</code>
                 </a>
@@ -1315,9 +1380,9 @@ sub OWXTHERM_PT_SetValues($$) {
                 </a>
                 <br />temperature offset in °C added to the raw temperature reading. </li>
             <li><a name="owtherm_tempUnit"><code>attr &lt;name&gt; tempUnit
-                        Celsius|Kelvin|Fahrenheit</code>
+                        none|Celsius|Kelvin|Fahrenheit</code>
                 </a>
-                <br />unit of measurement (temperature scale), default is Celsius = °C </li>
+                <br />unit of measurement (temperature scale) for state reading (default is Celsius = °C, use "none"  for empty).</li>
             <li><a name="owtherm_resolution">
                     <code>attr &lt;name&gt; resolution 9|10|11|12</code></a><br /> Temperature
                 resolution in bit, only relevant for DS18B20 </li>
@@ -1336,13 +1401,7 @@ sub OWXTHERM_PT_SetValues($$) {
                 </a>
                 <br /> low alarm temperature (on the temperature scale chosen by the attribute
                 value). </li>
-                
-            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
-                    href="#event-on-update-reading">event-on-update-reading</a>, <a
-                    href="#event-on-change-reading">event-on-change-reading</a>, <a
-                    href="#stateFormat">stateFormat</a>, <a href="#room"
-                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
-                    <a href="#webCmd">webCmd</a></li>
+            <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
         
 =end html
