@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.22   27.03.2016    bugfix "link_open" doesn't work after last update
 # 1.21   23.03.2016    added "lastrec","lastrec_open" to playback last recording 
 # 1.20.3 19.03.2016    change: delay of InternalTimer(s) changed
 #                      "ptzlistpresets" - "id" changed to "position" according to Synology-ticket
@@ -414,20 +415,18 @@ sub SSCam_Set {
                 $prop = "link";
                 if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
                 $hash->{HELPER}{OPENWINDOW} = 1;
-            } else {
-                $hash->{HELPER}{OPENWINDOW} = 0;
-            }                      
-            
-            if ($prop eq "lastrec_open") {
+                $hash->{HELPER}{WLTYPE} = $prop;           
+            } elsif ($prop eq "lastrec_open") {
                 $prop = "lastrec";
                 if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
                 $hash->{HELPER}{OPENWINDOW} = 1;
+                $hash->{HELPER}{WLTYPE} = $prop; 
             } else {
                 $hash->{HELPER}{OPENWINDOW} = 0;
+                $hash->{HELPER}{WLTYPE} = $prop;
             }
+            runliveview($hash); 
             
-            $hash->{HELPER}{WLTYPE} = $prop;
-            runliveview($hash);
         }
         elsif ($opt eq "extevent") 
         {
