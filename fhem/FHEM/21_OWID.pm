@@ -66,9 +66,9 @@ BEGIN {
 use GPUtils qw(:all);
 use ProtoThreads;
 no warnings 'deprecated';
-sub Log($$);
+sub Log3($$$);
 
-my $owx_version="5.15";
+my $owx_version="6.0beta6";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -107,8 +107,7 @@ sub OWID_Initialize ($) {
   $hash->{AttrFn}   = "OWID_Attr";
   $hash->{NotifyFn} = "OWID_Notify";
   $hash->{InitFn}   = "OWID_Init";
-  $hash->{AttrList} = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ".
-                      "interval ".
+  $hash->{AttrList} = "IODev do_not_notify:0,1 showtime:0,1 model interval".
                       $readingFnAttributes;
 
   #--make sure OWX is loaded so OWX_CRC is available if running with OWServer
@@ -212,7 +211,7 @@ sub OWID_Define ($$) {
   $modules{OWID}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","Defined",1);
-  Log 3, "OWID:    Device $name defined."; 
+  Log3 $name,1, "OWID:    Device $name defined."; 
 
   $hash->{NOTIFYDEV} = "global";
 
@@ -240,7 +239,7 @@ sub OWID_Notify ($$) {
 
 #########################################################################################
 #
-# OWID_Define - Implements InitFn function
+# OWID_Init - Implements InitFn function
 # 
 # Parameter hash = hash of device addressed
 #
@@ -530,6 +529,10 @@ sub OWID_Undef ($) {
                     <code>get &lt;name&gt; present</code>
                 </a>
                 <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+        </ul>
+                <h4>Attributes</h4>
+        <ul>
+            <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
         
 =end html
