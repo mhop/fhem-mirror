@@ -283,6 +283,7 @@ sub Weather_RetrieveDataFinished($$$) {
     readingsBulkUpdate($hash, "current_date_time", $date);
     readingsBulkUpdate($hash, "day_of_week", $wdays_txt_i18n{substr($date,0,3)});
     my $code= $item->{condition}{code};
+    readingsBulkUpdate($hash, "code", $code);
     readingsBulkUpdate($hash, "condition", $YahooCodes_i18n[$code]);
     readingsBulkUpdate($hash, "icon",  $iconlist[$code]);
     my $temp= $item->{condition}{temp};
