@@ -355,7 +355,6 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn}  = "OWDevice_Notify";
   $hash->{NotifyOrderPrefix}= "50b-";
   $hash->{UndefFn}   = "OWDevice_Undef";
@@ -666,6 +665,8 @@ OWDevice_Define($$)
         $hash->{fhem}{alerting}= $alerting;
         Log3 $name, 5, "$name: alerting: $alerting";
 
+        $hash->{NOTIFYDEV} = "global";
+        
         if( $init_done ) {
           OWDevice_InitValues($hash);
           OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));

@@ -107,7 +107,6 @@ OWServer_Initialize($)
 
 # Consumer
   $hash->{DefFn}   = "OWServer_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn}= "OWServer_Notify";
   $hash->{NotifyOrderPrefix}= "50a-";
   $hash->{UndefFn} = "OWServer_Undef";
@@ -134,6 +133,9 @@ OWServer_Define($$)
   my $protocol = $a[2];
 
   $hash->{fhem}{protocol}= $protocol;
+  
+  $hash->{NOTIFYDEV} = "global";
+ 
 
   if( $init_done ) {
     OWServer_OpenDev($hash);
