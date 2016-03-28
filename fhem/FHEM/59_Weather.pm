@@ -151,6 +151,7 @@ sub Weather_RetrieveDataFinished($$$) {
         readingsBulkUpdate($hash, "lastError", $err);
         readingsBulkUpdate($hash, "validity", "stale");
         readingsEndUpdate($hash, $doTrigger);
+        Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
         return;
     }
     
@@ -163,6 +164,7 @@ sub Weather_RetrieveDataFinished($$$) {
         readingsBulkUpdate($hash, "lastError", $err);
         readingsBulkUpdate($hash, "validity", "stale");
         readingsEndUpdate($hash, $doTrigger);
+        Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
         return;
     }
     
@@ -176,6 +178,7 @@ sub Weather_RetrieveDataFinished($$$) {
         readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
         readingsBulkUpdate($hash, "validity", "stale");
         readingsEndUpdate($hash, $doTrigger);
+        Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
         return;
     } else {
         my $ts= defined($hash->{READINGS}{pubDateTs}) ? $hash->{READINGS}{pubDateTs}{VAL} : 0;
@@ -188,6 +191,7 @@ sub Weather_RetrieveDataFinished($$$) {
             readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
             readingsBulkUpdate($hash, "validity", "stale");
             readingsEndUpdate($hash, $doTrigger);
+            Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
             return;
         }
     }
@@ -310,7 +314,7 @@ sub Weather_RetrieveDataFinished($$$) {
     readingsEndUpdate($hash, $doTrigger);
     
     Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
-
+    return;
     
 }
 
