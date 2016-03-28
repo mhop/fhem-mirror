@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 59_Weather: rewritten to use JSON API
   - bugfix:  49_SSCAM: "link_open" doesn't work after last update
   - added:   70_BRAVIA: new module for Sony Televisions
   - feature: 98_statistics: attr specialDeltaPeriod (new) enhanced for more 
