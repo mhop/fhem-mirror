@@ -20,14 +20,14 @@
 #
 #   Code|Data[|...]
 #
-#   Initialized:    IN|INIT|0
+#   Initialized:    IN|INIT|1|Server
 #   New device:     ND|Address|Type
 #   Updated device: UD|Address|Hint
 #   Deleted device: DD|Address
 #   Replace device: RD|Address1|Address2
 #   Readd device:   RA|Address
 #   Event:          EV|Address|Attribute|Value
-#   Shutdown:       EX|SHUTDOWN|pid
+#   Shutdown:       EX|SHUTDOWN|pid|Server
 #########################################################
 
 use strict;
@@ -47,6 +47,7 @@ my $queue;
 my $logfile;
 my $shutdown = 0;
 my $eventcount = 0;
+my $totalcount = 0;
 
 # Functions
 sub CheckProcess ($$);
@@ -240,6 +241,7 @@ sub CCURPC_NewDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 	
+	$totalcount++;
 	Log "NewDevice: received ".scalar(@$a)." device specifications";
 	
 	for my $dev (@$a) {
@@ -258,6 +260,7 @@ sub CCURPC_DeleteDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 
+	$totalcount++;
 	Log "DeleteDevice: received ".scalar(@$a)." device addresses";
 
 	for my $dev (@$a) {
@@ -275,6 +278,8 @@ sub CCURPC_UpdateDeviceCB ($$$$)
 {
 	my ($server, $cb, $devid, $hint) = @_;
 
+	$totalcount++;
+
 	WriteQueue ("UD|".$devid."|".$hint);
 
 	return;
@@ -287,6 +292,8 @@ sub CCURPC_UpdateDeviceCB ($$$$)
 sub CCURPC_ReplaceDeviceCB ($$$$)
 {
 	my ($server, $cb, $devid1, $devid2) = @_;
+
+	$totalcount++;
 
 	WriteQueue ("RD|".$devid1."|".$devid2);
 
@@ -301,6 +308,7 @@ sub CCURPC_ReaddDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 
+	$totalcount++;
 	Log "ReaddDevice: received ".scalar(@$a)." device addresses";
 
 	for my $dev (@$a) {
@@ -316,7 +324,9 @@ sub CCURPC_ReaddDevicesCB ($$$)
 
 sub CCURPC_EventCB ($$$$$)
 {
-	my ($server,$cb,$devid,$attr,$val)=@_;
+	my ($server,$cb,$devid,$attr,$val) = @_;
+
+	$totalcount++;
 	
 	WriteQueue ("EV|".$devid."|".$attr."|".$val);
 
@@ -336,9 +346,13 @@ sub CCURPC_EventCB ($$$$$)
 
 sub CCURPC_ListDevicesCB ()
 {
+	my ($server, $cb) = @_;
+
+	$totalcount++;
 	Log "ListDevices";
 	
-	WriteQueue ("IN|INIT|1");
+	$cb = "unknown" if (!defined ($cb));
+	WriteQueue ("IN|INIT|1|$cb");
 
 	return RPC::XML::array->new();
 }
@@ -402,6 +416,8 @@ if (!defined ($callbackurl)) {
 Log "Entering server loop. Use kill -SIGINT $$ to terminate program";
 $server->server_loop;
 
-WriteQueue ("EX|SHUTDOWN|$$");
+$totalcount++;
+WriteQueue ("EX|SHUTDOWN|$$|CB".$ccuport);
 Log "RPC server terminated";
 
+Log "RPC server received $eventcount ($totalcount) events";
