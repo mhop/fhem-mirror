@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 3.0
+#  Version 3.1
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -13,7 +13,7 @@
 #  define <name> HMCCUDEV {<ccudev>|virtual} [statechannel] [readonly]
 #     [{group={<device>|<channel>}[,...]|groupexp=<regexp>}]
 #
-#  set <name> config [<channel>] [<port>] <parameter>=<value> [...]
+#  set <name> config [<channel>] <parameter>=<value> [...]
 #  set <name> control <value>
 #  set <name> datapoint <channel>.<datapoint> <value>
 #  set <name> devstate <value>
@@ -24,8 +24,8 @@
 #  get <name> devstate
 #  get <name> datapoint <channel>.<datapoint>
 #  get <name> channel <channel>[.<datapoint-expr>]
-#  get <name> config [<channel>] [<rpcport>]
-#  get <name> configdesc [<channel>] [<rpcport>]
+#  get <name> config [<channel>]
+#  get <name> configdesc [<channel>]
 #  get <name> update
 #
 #  attr <name> ccuget { State | Value }
@@ -563,46 +563,30 @@ sub HMCCUDEV_Get ($@)
 	}
 	elsif ($opt eq 'config') {
 		my $channel = undef;
-		my $port = undef;
 		my $par = shift @a;
 		if (defined ($par)) {
-			if ($par =~ /^[0-9]$/) {
-				$channel = $par;
-				$port = shift @a;
-			}
-			else {
-				$port = $par;
-			}
+			$channel = $par if ($par =~ /^[0-9]{1,2}$/);
 		}
 
 		my $ccuobj = $hash->{ccuaddr};
 		$ccuobj .= ':'.$channel if (defined ($channel));
-		$port = 2001 if (!defined ($port));
 
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $port);
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset");
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $ccureadings ? undef : $res;
 	}
 	elsif ($opt eq 'configdesc') {
 		my $channel = undef;
-		my $port = undef;
 		my $par = shift @a;
 		if (defined ($par)) {
-			if ($par =~ /^[0-9]$/) {
-				$channel = $par;
-				$port = shift @a;
-			}
-			else {
-				$port = $par;
-			}
+			$channel = $par if ($par =~ /^[0-9]{1,2}$/);
 		}
 
 		my $ccuobj = $hash->{ccuaddr};
 		$ccuobj .= ':'.$channel if (defined ($channel));
-		$port = 2001 if (!defined ($port));
 
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", $port);
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription");
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $res;
@@ -718,7 +702,7 @@ sub HMCCUDEV_SetError ($$)
         Example:<br/>
         <code>set temp_control datapoint 1.SET_TEMPERATURE 21</code>
       </li><br/>
-      <li>set &lt;name&gt; config [&lt;channel-number&gt;] [&lt;port&gt;] &lt;parameter&gt;=&lt;value&gt; [...]<br/>
+      <li>set &lt;name&gt; config [&lt;channel-number&gt;] &lt;parameter&gt;=&lt;value&gt; [...]<br/>
         Set configuration parameter of CCU device or channel.
       </li>
    </ul>
@@ -728,21 +712,17 @@ sub HMCCUDEV_SetError ($$)
    <b>Get</b><br/>
    <ul>
       <br/>
-      <li>get &lt;name&gt; devstate
-         <br/>
+      <li>get &lt;name&gt; devstate<br/>
          Get state of CCU device. Attribute 'statechannel' must be set.
       </li><br/>
-      <li>get &lt;name&gt; datapoint &lt;channel-number&gt;.&lt;datapoint&gt;
-         <br/>
+      <li>get &lt;name&gt; datapoint &lt;channel-number&gt;.&lt;datapoint&gt;<br/>
          Get value of a CCU device datapoint.
       </li><br/>
-      <li>get &lt;name&gt; config [&lt;channel-number&gt;] [&lt;rpcport&gt;]
-         <br/>
+      <li>get &lt;name&gt; config [&lt;channel-number&gt;]<br/>
          Get configuration parameters of CCU device. If attribute ccureadings is set to 0
          parameters are displayed in browser window (no readings set).
       </li><br/>
-      <li>get &lt;name&gt; configdesc [&lt;channel-number&gt;] [&lt;rpcport&gt;]
-         <br/>
+      <li>get &lt;name&gt; configdesc [&lt;channel-number&gt;] [&lt;rpcport&gt;]<br/>
          Get description of configuration parameters for CCU device.
       </li><br/>
       <li>get &lt;name&gt; update [{'State'|'Value'}]<br/>

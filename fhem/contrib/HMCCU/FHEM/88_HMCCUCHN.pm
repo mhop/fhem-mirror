@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 3.0
+#  Version 3.1
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -17,13 +17,13 @@
 #  set <name> devstate <value> [...]
 #  set <name> <stateval_cmds>
 #  set <name> toggle
-#  set <name> config [<port>] <parameter>=<value> [...]
+#  set <name> config <parameter>=<value> [...]
 #
 #  get <name> devstate
 #  get <name> datapoint <datapoint>
 #  get <name> channel <datapoint-expr>
-#  get <name> config [<port>]
-#  get <name> configdesc [<port>]
+#  get <name> config
+#  get <name> configdesc
 #  get <name> update
 #
 #  attr <name> ccureadings { 0 | 1 }
@@ -372,20 +372,16 @@ sub HMCCUCHN_Get ($@)
 		return undef;
 	}
 	elsif ($opt eq 'config') {
-		my $port = shift @a;
 		my $ccuobj = $hash->{ccuaddr};
 
-		$port = 2001 if (!defined ($port));
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset", $port);
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamset");
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $ccureadings ? undef : $res;
 	}
 	elsif ($opt eq 'configdesc') {
-		my $port = shift @a;
 		my $ccuobj = $hash->{ccuaddr};
 
-		$port = 2001 if (!defined ($port));
-		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription", $port);
+		my ($rc, $res) = HMCCU_RPCGetConfig ($hash, $ccuobj, "getParamsetDescription");
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		return $res;
 	}
@@ -508,11 +504,11 @@ sub HMCCUCHN_SetError ($$)
       <li>get &lt;name&gt; datapoint &lt;datapoint&gt;<br/>
          Get value of a CCU device datapoint.
       </li><br/>
-      <li>get &lt;name&gt; config [&lt;rpcport&gt;]<br/>
+      <li>get &lt;name&gt; config<br/>
          Get configuration parameters of CCU channel. If attribute ccureadings is 0 results will be
          displayed in browser window.
       </li><br/>
-      <li>get &lt;name&gt; configdesc [&lt;rpcport&gt;]<br/>
+      <li>get &lt;name&gt; configdesc<br/>
          Get description of configuration parameters of CCU channel.
       </li><br/>
       <li>get &lt;name&gt; update [{'State'|'Value'}]<br/>
