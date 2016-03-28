@@ -1461,7 +1461,6 @@ sub Calendar_Initialize($) {
   $hash->{GetFn}   = "Calendar_Get";
   $hash->{SetFn}   = "Calendar_Set";
   $hash->{AttrFn}   = "Calendar_Attr";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn}= "Calendar_Notify";
   $hash->{AttrList}=  "hideOlderThan hideLaterThan onCreateEvent $readingFnAttributes";
 }
@@ -1480,6 +1479,7 @@ sub Calendar_Define($$) {
          "        define <name> Calendar ical file <FILENAME> [interval]"
     if(($#a < 4 && $#a > 5) || ($a[2] ne 'ical') || (($a[3] ne 'url') && ($a[3] ne 'file')));
 
+  $hash->{NOTIFYDEV} = "global";
   readingsSingleUpdate($hash, "state", "initialized", 1);
 
   my $name      = $a[0];

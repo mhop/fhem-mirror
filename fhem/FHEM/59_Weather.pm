@@ -87,7 +87,6 @@ sub Weather_Initialize($) {
   $hash->{GetFn}   = "Weather_Get";
   $hash->{SetFn}   = "Weather_Set";
   $hash->{AttrList}= $readingFnAttributes;
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn}= "Weather_Notify";
 
   #Weather_DebugCodes('de');                    
@@ -419,6 +418,7 @@ sub Weather_Define($$) {
   return "syntax: define <name> Weather <location> [interval [en|de|nl]]"
     if(int(@a) < 3 && int(@a) > 5); 
 
+  $hash->{NOTIFYDEV} = "global";
   $hash->{STATE} = "Initialized";
   $hash->{fhem}{interfaces}= "temperature;humidity;wind";
 
