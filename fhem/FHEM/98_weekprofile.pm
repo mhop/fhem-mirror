@@ -193,7 +193,9 @@ sub weekprofile_sendDevProfile(@)
 {
   my ($device,$prf,$me) = @_;
   my $type = weekprofile_getDeviceType($device,"SND");
-  return "Error device type not supported" if (!defined ($type));
+  
+  return "Error device type not supported" if (!defined ($type));  
+  return "profile has no data" if (!defined($prf->{DATA}));
 
   if ($type eq "WEEKPROFILE") {
       my $json = JSON->new;
@@ -472,14 +474,9 @@ sub weekprofile_Get($$@)
     
     my ($topic, $name) = weekprofile_splitName($params[0]);
 
-    my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic);
-    return "profile $params[0] not found" if (!defined($prf));
-
-    if (defined($prf->{REF})) {
-      ($topic, $name) = weekprofile_splitName($prf->{REF});
-      ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic);
-    }
+    my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic,1);
     
+    return "profile $params[0] not found" if (!defined($prf));    
     return "profile $params[0] has no data" if (!defined($prf->{DATA}));
     
     my $json = JSON->new;
@@ -518,7 +515,7 @@ sub weekprofile_Get($$@)
       $refs = substr($refs, 0, -1);
     } else {
       my ($topic, $name) = weekprofile_splitName($params[0]);
-      my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic);
+      my ($prf,$idx) = weekprofile_findPRF($hash,$name,$topic,0);
       return "profile $params[0] not found" unless ($prf);
       $refs = '0';
       $refs = "$prf->{REF}" if ($prf->{REF});
@@ -551,11 +548,12 @@ sub weekprofile_Get($$@)
   return "Unknown argument $cmd choose one of $list"; 
 }
 ############################################## 
-sub weekprofile_findPRF(@)
+sub weekprofile_findPRF($$$$)
 {
-  my ($hash, $name, $topic) = @_;
+  my ($hash, $name, $topic, $followRef) = @_;
   
-  $topic = 'default' if (!$topic);
+  $topic      = 'default' if (!$topic);
+  $followRef  = '0'       if (!$followRef);
   
   my $found = undef;
   my $idx = 0;
@@ -568,6 +566,11 @@ sub weekprofile_findPRF(@)
     $idx++;
   }
   $idx = -1 if (!defined($found));
+  
+  if ($followRef == 1 && defined($found) && defined($found->{REF})) {
+    ($topic, $name) = weekprofile_splitName($found->{REF});
+    ($found,$idx) = weekprofile_findPRF($hash,$name,$topic,0);
+  }
   
   return ($found,$idx);
 }
@@ -623,7 +626,7 @@ sub weekprofile_Set($$@)
       return "Error parsing profile data. No valid json format";
     };
     
-    my ($found,$idx) = weekprofile_findPRF($hash,$name,$topic);
+    my ($found,$idx) = weekprofile_findPRF($hash,$name,$topic,1);
     if (defined($found)) {
       $found->{DATA} = $data;
       # automatic we send master profile to master device
@@ -664,7 +667,7 @@ sub weekprofile_Set($$@)
     
     return "Error no devices given and no master device" if (@devices == 0);
     
-    my ($found,$idx) = weekprofile_findPRF($hash,$name,$topic);
+    my ($found,$idx) = weekprofile_findPRF($hash,$name,$topic,1);
     if (!defined($found)) {
       Log3 $me, 1, "$me(Set): Error unknown profile $params[0]";
       return "Error unknown profile $params[0]";
@@ -761,7 +764,7 @@ sub weekprofile_Set($$@)
     
      return "Error topics not enabled" if (!$useTopics && ($topic ne 'default'));
     
-    my ($delprf,$idx)  = weekprofile_findPRF($hash,$name,$topic);
+    my ($delprf,$idx)  = weekprofile_findPRF($hash,$name,$topic,0);
     return "Error unknown profile $params[0]" unless($delprf);
     my $ref = weekprofile_hasREF($hash,$delprf);
     return "Error profile $params[0] is referenced from $ref" if ($ref);
@@ -787,7 +790,7 @@ sub weekprofile_Set($$@)
       
       Log3 $me, 5, "$me(Set): found device $dev->{NAME}";
       
-      my ($prf,$idx)  = weekprofile_findPRF($hash,$prfName,$topic);
+      my ($prf,$idx)  = weekprofile_findPRF($hash,$prfName,$topic,1);
       next if (!defined($prf));
       
       Log3 $me, 4, "$me(Set): Send profile $topic:$prfName to $dev->{NAME}";
