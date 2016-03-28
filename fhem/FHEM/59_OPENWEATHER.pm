@@ -3,7 +3,8 @@
 #
 #  59_OPENWEATHER.pm 
 #
-#  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
+#  (c) 2014 Torsten Poitzsch
+#  (c) 2014-2016 tupol http://forum.fhem.de/index.php?action=profile;u=5432
 #
 #  This module reads weather forecast data via the openweather-api of www.wetter.com
 #
@@ -534,7 +535,7 @@ OPENWEATHER_Html($@)
 
 <a name="OPENWEATHER"></a>
 <h3>OPENWEATHER</h3>
-<div  style="width:800px"> 
+<div> 
 <ul>
    The module extracts weather data via the <a href="http://www.wetter.com/apps_und_mehr/website/api/dokumentation">openweather API</a> of <a href="http://www.wetter.com">www.wetter.com</a>.
    <br>
@@ -646,7 +647,7 @@ OPENWEATHER_Html($@)
 
 <a name="OPENWEATHER"></a>
 <h3>OPENWEATHER</h3>
-<div  style="width:800px"> 
+<div> 
 <ul>
    <a name="OPENWEATHERdefine"></a>
    Das Modul extrahiert  Wetterdaten &uuml;ber die <a href="http://www.wetter.com/apps_und_mehr/website/api/dokumentation">"openweather"-Schnittstelle (API)</a> von <a href="http://www.wetter.com">www.wetter.com</a>.
