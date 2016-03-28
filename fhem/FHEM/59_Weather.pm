@@ -581,7 +581,7 @@ WeatherAsHtmlD($;$)
 <a name="Weather"></a>
 <h3>Weather</h3>
 <ul>
-  You need the JSON perl module. Use <code>apt-get install libperl-JSON</code> on Debian and derivatives.<br><br>
+  You need the JSON perl module. Use <code>apt-get install libjson-perl</code> on Debian and derivatives.<br><br>
 
   <a name="Weatherdefine"></a>
   <b>Define</b>
@@ -699,7 +699,7 @@ WeatherAsHtmlD($;$)
 <a name="Weather"></a>
 <h3>Weather</h3>
 <ul>
-    Es wird das Perl-Modul JSON ben&ouml;tigt. Mit <code>apt-get install libperl-JSON</code> kann es unter Debian und Derivaten installiert werden.<br><br>
+    Es wird das Perl-Modul JSON ben&ouml;tigt. Mit <code>apt-get install libjson-perl</code> kann es unter Debian und Derivaten installiert werden.<br><br>
 
   <a name="Weatherdefine"></a>
   <b>Define</b>
