@@ -39,6 +39,7 @@
 # V 1.12 2015-09-11 - FIX: handling ContactAsSwitch befor white list check
 # V 1.13 2015-11-10 - FIX: POSIX isdigit is deprecated replaced by own isDigit
 # V 1.14 2016-03-20 - FIX: send delimiter to signal end of stream if length of data > 1024
+# V 1.15 2016-03-28 - NEW: protocol daycom (switch)
 ############################################## 
 package main;
 
@@ -399,9 +400,12 @@ sub pilight_ctrl_Write($@)
   my $proto = $defs{$cName}->{PROTOCOL};
   my $id = $defs{$cName}->{ID};
   my $unit = $defs{$cName}->{UNIT};
+  my $syscode = undef;
+  $syscode = $defs{$cName}->{SYSCODE} if defined($defs{$cName}->{SYSCODE});
   
-  $id = "\"".$id."\""     if (defined($id) && !isDigit($id));
-  $unit = "\"".$unit."\"" if (defined($unit) && !isDigit($unit));
+  $id = "\"".$id."\""           if (defined($id) && !isDigit($id));
+  $unit = "\"".$unit."\""       if (defined($unit) && !isDigit($unit));
+  $syscode = "\"".$syscode."\"" if (defined($syscode) && !isDigit($syscode));
         
   my $code;
   switch($cType){
@@ -415,6 +419,12 @@ sub pilight_ctrl_Write($@)
           case m/pollin/        {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/impuls/        {$code .= "\"systemcode\":$id,\"programcode\":$unit,";}
           case m/rsl366/        {$code .= "\"systemcode\":$id,\"programcode\":$unit,";}
+          case m/daycom/        { if (!defined($syscode)) {
+                                      Log3 $me, 1, "$me(Write): Error protocol daycom no systemcode defined";
+                                      return;
+                                  }
+                                  $code .= "\"id\":$id,\"systemcode\":$syscode,\"unit\":$unit,";
+                                }
           case m/cleverwatts/   { $code .= "\"id\":$id,"; 
                                   if ($unit eq "\"all\"") {
                                     $code .= "\"all\":1,";
@@ -756,6 +766,9 @@ sub pilight_ctrl_Parse($$)
     last if ($id ne "");
   }
   
+  #systemcode and id for protocol daycom (needs 3 id's, systemcode, id, unit
+  my $syscode = (defined($data->{$s}{"systemcode"}))   ? $data->{$s}{"systemcode"}  : ""; 
+  
   my $unit = "";
   foreach my $sunit (@unitList) {
     $unit          = (defined($data->{$s}{$sunit}))    ? $data->{$s}{$sunit}      : ""; 
@@ -804,6 +817,7 @@ sub pilight_ctrl_Parse($$)
     case m/mumbi/       {$protoID = 1;}
     case m/brennenstuhl/{$protoID = 1;}
     case m/pollin/      {$protoID = 1;}
+    case m/daycom/      {$protoID = 1;}
     case m/impuls/      {$protoID = 1;}
     case m/rsl366/      {$protoID = 1;}
     case m/cleverwatts/ {$protoID = 1;}
@@ -842,6 +856,8 @@ sub pilight_ctrl_Parse($$)
   switch($protoID){
     case 1 {
       my $msg = "PISWITCH,$proto,$id,$unit,$state";
+      $msg .= ",$syscode" if ($syscode ne "");
+      
       Log3 $me, 4, "$me(Dispatch): $msg";
       return Dispatch($hash, $msg,undef );
       }
