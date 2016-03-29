@@ -1613,7 +1613,7 @@ ZWave_versionClassAllGet($@)
       next if($c eq "MARK");
       ZWave_Get($hash, $name, "versionClass", $c);
     }
-    return("", "EMPTY");
+    return("working the background, check the vclasses attribute", "EMPTY");
   }
 
   my %h = map { $_=>1 } split(" ", AttrVal($name, "vclasses", ""));
@@ -2188,7 +2188,7 @@ ZWave_ccsAllGet ($)
   foreach my $idx (1..int($#zwave_wd)) {
     ZWave_Get($hash, $hash->{NAME}, "ccs", $zwave_wd[$idx]);
   }
-  return ("","EMPTY");
+  return ("working in the background","EMPTY");
 }
   
 sub
@@ -2620,7 +2620,7 @@ ZWave_configAllGet($)
   foreach my $c (sort keys %{$mc->{get}}) {
     ZWave_Get($hash, $hash->{NAME}, $c);
   }
-  return ("","EMPTY");
+  return ("working in the background","EMPTY");
 }
 
 sub
@@ -2632,7 +2632,7 @@ ZWave_associationAllGet($$)
     $zwave_parseHook{"$hash->{nodeIdHex}:..85"} = \&ZWave_associationAllGet;
     delete($hash->{CL});
     ZWave_Get($hash, $hash->{NAME}, "associationGroups");
-    return("", "EMPTY");
+    return("working in the background", "EMPTY");
   }
 
   my $nGrp = ($data =~ m/..8506(..)/ ? hex($1) :
@@ -3556,7 +3556,11 @@ ZWave_processSendStack($$;$)
 {
   my ($hash,$ackType, $omsg) = @_;
   my $ss = $hash->{SendStack};
-  return if(!$ss);
+  if(!$ss) {
+    $hash->{timeToAck} = sprintf("%0.3f", gettimeofday()-$hash->{lastMsgSent})
+      if($ackType eq "ack" && $hash->{lastMsgSent});
+    return;
+  }
 
   if($ackType eq "retry") {
     $ss->[0] =~ m/^(.*)(set|get):(.*)$/;
