@@ -3064,7 +3064,7 @@ DoTrigger($$@)
   # the inner loop.
   if($max && !defined($hash->{INTRIGGER})) {
     $hash->{INTRIGGER}=1;
-    Log 5, "Notify loop for $dev $hash->{CHANGED}->[0]";
+    Log 5, "Notify loop for $dev with first event $hash->{CHANGED}->[0]";
     createNtfyHash() if(!%ntfyHash);
     $hash->{NTFY_TRIGGERTIME} = $now; # Optimize FileLog
     my $ntfyLst = (defined($ntfyHash{$dev}) ? $ntfyHash{$dev} : $ntfyHash{"*"});
