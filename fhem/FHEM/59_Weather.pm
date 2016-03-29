@@ -228,7 +228,6 @@ sub Weather_RetrieveDataFinished($$$) {
     my @YahooCodes_i18n= YahooWeatherAPI_getYahooCodes($lang);
 
     my $item= $data->{item};
-    #my $units= YahooWeatherAPI_units($data); # units hash reference
     
     readingsBeginUpdate($hash);
     
@@ -239,6 +238,14 @@ sub Weather_RetrieveDataFinished($$$) {
     readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
     readingsBulkUpdate($hash, "pubDateTs", $pubDateTs);
     readingsBulkUpdate($hash, "validity", "up-to-date");
+    
+    # units
+    my $units= YahooWeatherAPI_units($data); # units hash reference
+    readingsBulkUpdate($hash, "unit_distance", $units->{distance});
+    readingsBulkUpdate($hash, "unit_speed", $units->{speed});
+    readingsBulkUpdate($hash, "unit_pressuree", $units->{pressure});
+    readingsBulkUpdate($hash, "unit_temperature", $units->{temperature});
+    
     
     # description
     readingsBulkUpdate($hash, "description", $data->{description});
