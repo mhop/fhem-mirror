@@ -3,7 +3,8 @@
 #
 #  70_JSONMETER.pm 
 #
-#  (c) 2014 Torsten Poitzsch < torsten . poitzsch at gmx . de >
+#  (c) 2014 Torsten Poitzsch
+#  (c) 2014-2016 tupol http://forum.fhem.de/index.php?action=profile;u=5432
 #
 #  This module reads data from devices that provide OBIS compatible data
 #  in json format (e.g. power meters)
@@ -113,6 +114,9 @@ sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
    ,[1, "010034070000", "electricityVoltagePhase2", 1, 0] # {"obis":"010034070000","value":236.28,"unit":"V"},               
    ,[1, "010048070000", "electricityVoltagePhase3", 1, 0] # {"obis":"010048070000","value":236.90,"unit":"V"},
    ,[1, "01000E070000", "electricityFrequency", 1, 0] # {"obis":"01000E070000","value":49.950,"unit":"Hz"}
+   ,[1, "31.7.0", "electricityCurrentPhase1", 1, 0] # {"obis":"31.7.0","value":2.28,"unit":"A"},
+   ,[1, "51.7.0", "electricityCurrentPhase2", 1, 0] # {"obis":"51.7.0","value":2.28,"unit":"A"},
+   ,[1, "71.7.0", "electricityCurrentPhase3", 1, 0] # {"obis":"71.7.0","value":0.360,"unit":"A"} 
    );
   ##############################################################
 
@@ -910,7 +914,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
-<div style="width:800px">
+<div>
 <ul>
   This module reads data from a measurement unit (so called smart meters for electricity, gas or heat)
   <br>
@@ -1040,7 +1044,7 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
 
 <a name="JSONMETER"></a>
 <h3>JSONMETER</h3>
-<div style="width:800px">
+<div>
 <ul>
   Dieses Modul liest Daten von Messger&auml;ten (z.B. Stromz&auml;hler, Gasz&auml;hler oder W&auml;rmez&auml;hler, so genannte Smartmeter),
   welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
