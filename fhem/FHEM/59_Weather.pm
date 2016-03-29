@@ -143,6 +143,9 @@ sub Weather_RetrieveDataFinished($$$) {
     my $name= $hash->{NAME};
     my $doTrigger= $argsRef->{blocking} ? 0 : 1;
 
+    
+    # the next 4 stanzas need to be rewritten, they are too repetitive for my taste
+    
     # check for error from retrieving data 
     if($err) {
         Log3 $hash, 3, "$name: $err";
@@ -195,6 +198,21 @@ sub Weather_RetrieveDataFinished($$$) {
         }
     }
   
+    # units
+    my $units= YahooWeatherAPI_units($data); # units hash reference
+    if($units->{temperature} ne "C") {
+        $err= "wrong units received";
+        Log3 $hash, 3, "$name: $err";
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "lastError", $err);
+        readingsBulkUpdate($hash, "pubDateComment", $pubDateComment);
+        readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
+        readingsBulkUpdate($hash, "validity", "stale");
+        readingsEndUpdate($hash, $doTrigger);
+        Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
+        return;
+    }
+  
     #
     # from here on we assume that $data is complete and correct
     #
@@ -240,7 +258,6 @@ sub Weather_RetrieveDataFinished($$$) {
     readingsBulkUpdate($hash, "validity", "up-to-date");
     
     # units
-    my $units= YahooWeatherAPI_units($data); # units hash reference
     readingsBulkUpdate($hash, "unit_distance", $units->{distance});
     readingsBulkUpdate($hash, "unit_speed", $units->{speed});
     readingsBulkUpdate($hash, "unit_pressuree", $units->{pressure});
