@@ -669,3 +669,6 @@
   
 - Sun Jan 31 2016 (markus-m)
   - added new module 60_allergy to provide allergy forecast data for Germany
+
+- Mon Mar 30 2016 (yoda_gh)
+  - added new module 52_I2C_K30 supporting the SenseAir K-30 CO2 sensor
