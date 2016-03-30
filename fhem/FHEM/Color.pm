@@ -128,7 +128,10 @@ rgb2hsv($$$) {
   my( $r, $g, $b ) = @_;
   my( $h, $s, $v );
 
-  main::Log3 undef, 1, "Color::rgb2hsv value our of range [$r,$g,$b]. must be in 0..1." if( $r > 1 || $g > 1 || $b > 1 );
+  main::Log3 undef, 1, "Color::rgb2hsv value our of range [$r,$g,$b]. should be in 0..1." if( $r > 1 || $g > 1 || $b > 1 );
+  $r /= 255.0 if( $r > 1 );
+  $g /= 255.0 if( $g > 1 );
+  $b /= 255.0 if( $b > 1 );
 
   my $M = ::maxNum( $r, $g, $b );
   my $m = ::minNum( $r, $g, $b );
@@ -158,6 +161,12 @@ rgb2hsv($$$) {
 sub
 hsv2rgb($$$) {
   my ( $h, $s, $v ) = @_;
+
+  main::Log3 undef, 1, "Color::hsv2rgb value our of range [$h,$s,$v]. should be in 0..1." if( $h > 1 || $s > 1 || $v > 1 );
+  $h /= 356.0 if( $h > 1 );
+  $s /= 100.0 if( $s > 1 );
+  $v /= 100.0 if( $v > 1 );
+
   my $r = 0.0;
   my $g = 0.0;
   my $b = 0.0;
