@@ -3767,6 +3767,11 @@ ZWave_Parse($$@)
           readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
           return $hash->{NAME};
         }
+      } else {
+        InternalTimer(1, sub(){  # execInits for createNode
+          $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+          ZWave_execInits($hash, 0) if($hash);
+        }, 0);
       }
       return $ret;
 
