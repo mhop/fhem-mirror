@@ -3772,7 +3772,7 @@ ZWave_Parse($$@)
 
     } else {
       Log3 $ioName, 2, "ZW_REQUEST_NODE_INFO ".
-        ($callbackid eq "81" ? "failed" : "unknown $calbackid");
+        ($callbackid eq "81" ? "failed" : "unknown $callbackid");
       return "";
 
     }
