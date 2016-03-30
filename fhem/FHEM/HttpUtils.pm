@@ -211,12 +211,13 @@ HttpUtils_Connect2($)
       $hash->{conn}->blocking(1);
       my $sslVersion = AttrVal($hash->{NAME}, "sslVersion", 
                        AttrVal("global", "sslVersion", "SSLv23:!SSLv3:!SSLv2"));
-      IO::Socket::SSL->start_SSL($hash->{conn}, {
-          Timeout     => $hash->{timeout},
-          SSL_version => $sslVersion,
-          SSL_hostname => $hash->{host},
-          %{$hash->{sslargs}}
-        }) || undef $hash->{conn};
+      my %par = %{$hash->{sslargs}};
+      $par{Timeout}      = $hash->{timeout};
+      $par{SSL_version}  = $sslVersion;
+      $par{SSL_hostname} = $hash->{host} 
+        if(IO::Socket::SSL->can('can_client_sni') &&
+           IO::Socket::SSL->can_client_sni());
+      IO::Socket::SSL->start_SSL($hash->{conn}, \%par) || undef $hash->{conn};
       $hash->{hu_sslAdded} = 1 if($hash->{keepalive});
     }
   }
