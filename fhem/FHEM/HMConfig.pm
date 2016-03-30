@@ -507,6 +507,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   paramSel        =>{a=> 27.0,s=>1.0,l=>0,min=>0    ,max=>4     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"data transfered to peer"              ,lit=>{off=>0,T1=>1,T2=>2,T1_T2=>3,T2_T1=>4}},
   RS485IdleTime   =>{a=> 29.0,s=>1.0,l=>0,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Idle Time"},
   speedMultiply   =>{a=> 30.0,s=>1.0,l=>0,min=>1    ,max=>5     ,c=>''         ,f=>''      ,u=>'x200Hz',d=>0,t=>"speed multiply"},
+  devRepeatCntMax =>{a=> 31.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Device max retry"},
   wakeupDefChan   =>{a=> 32.0,s=>1.0,l=>0,min=>0    ,max=>20    ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"wakeup default channel"},
   wakeupBehavior  =>{a=> 33.0,s=>0.1,l=>0,min=>0    ,max=>20    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior"                      ,lit=>{off=>0,on=>1}},
   alarmTimeMax    =>{a=> 34.0,s=>1.0,l=>0,min=>1    ,max=>900   ,c=>''         ,f=>1.6     ,u=>'s'   ,d=>0,t=>"maximum Alarm time"                   ,lit=>{unused=>0}},
@@ -1080,7 +1081,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          ,seqPulse5       =>1,seqTolerance    =>1
                          ,peerNeedsBurst  =>1
                         }
- );
+ ,"HM-SEC-SD-2"       =>{ devRepeatCntMax =>1}
+);
 
 #clones - - - - - - - - - - - - - - -
 
@@ -1807,8 +1809,9 @@ $culHmChanSets{"HM-ES-PMSw1-Pl02"}      = $culHmSubTypeSets{outputUnit};
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
 
 $culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
-$culHmChanSets{"HM-OU-CFM-TW01"}        = $culHmChanSets{"HM-OU-CFM-PL01"};
 $culHmChanSets{"HM-OU-CFM-TW02"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
+
+$culHmChanSets{"HM-OU-CFM-TW01"}        = $culHmChanSets{"HM-OU-CFM-PL01"};
 
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN03"}         = $culHmChanSets{"HM-CC-RT-DN06"};
