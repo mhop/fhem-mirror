@@ -3749,25 +3749,33 @@ ZWave_Parse($$@)
       return ZWave_execInits($dh, 0);
     }
 
-  } elsif($cmd eq "ZW_APPLICATION_UPDATE" && $arg =~ m/....(..)..(.*)$/) {
-    my ($type6,$classes) = ($1, $2);
-    my $ret = ZWave_SetClasses($homeId, $id, $type6, $classes);
+  } elsif($cmd eq "ZW_APPLICATION_UPDATE") {
+    if($arg =~ m/....(..)..(.*)$/) {
+      my ($type6,$classes) = ($1, $2);
+      my $ret = ZWave_SetClasses($homeId, $id, $type6, $classes);
 
-    my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
-    if($hash) {
-      if(!AttrVal($hash->{NAME}, "noWakeupForApplicationUpdate", 0)) { # 50090
-        if(ZWave_isWakeUp($hash)) {
-          ZWave_wakeupTimer($hash, 1);
-          ZWave_processSendStack($hash, "next");
+      my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+      if($hash) {
+        if(!AttrVal($hash->{NAME}, "noWakeupForApplicationUpdate", 0)) { # 50090
+          if(ZWave_isWakeUp($hash)) {
+            ZWave_wakeupTimer($hash, 1);
+            ZWave_processSendStack($hash, "next");
+          }
+        }
+
+        if(!$ret) {
+          readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
+          return $hash->{NAME};
         }
       }
+      return $ret;
 
-      if(!$ret) {
-        readingsSingleUpdate($hash, "CMD", $cmd, 1); # forum:20884
-        return $hash->{NAME};
-      }
+    } else {
+      Log3 $ioName, 2, "ZW_REQUEST_NODE_INFO ".
+        ($callbackid eq "81" ? "failed" : "unknown $calbackid");
+      return "";
+
     }
-    return $ret;
 
   } elsif($cmd eq "ZW_SEND_DATA") { # 0013cb00....
     my $hash = ZWave_callbackId($callbackid);
