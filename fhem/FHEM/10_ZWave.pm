@@ -3749,6 +3749,11 @@ ZWave_Parse($$@)
       return ZWave_execInits($dh, 0);
     }
 
+    if(($evt eq "failed" || $evt eq "done") &&
+       $cmd eq 'ZW_ADD_NODE_TO_NETWORK') {
+      AnalyzeCommand(undef, "set $ioName addNode off")
+    }
+
   } elsif($cmd eq "ZW_APPLICATION_UPDATE") {
     if($arg =~ m/....(..)..(.*)$/) {
       my ($type6,$classes) = ($1, $2);
