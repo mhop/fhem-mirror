@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new module 52_I2C_K30.pm added
   - bugfix:  98_weekprofile: send reference profile to device
   - feature: 10_pilight_ctrl | 30_pilight_switch: support protocol daycom 
   - feature: 59_Weather: rewritten to use JSON API
