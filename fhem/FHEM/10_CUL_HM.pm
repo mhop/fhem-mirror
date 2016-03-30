@@ -4445,6 +4445,33 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $msgBytes = substr($msgBytes."000000000000000000",0,(10+2)*2);
       CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes);
     }
+    elsif($md =~ m/HM-OU-CFM?-TW/){
+      my %color = (redL =>18,greenL =>34,yellowL =>50,blueL =>66, violettL => 82, cyanL => 98, whiteL =>114,
+                   redS =>17,greenS =>33,yellowS =>49,blueS =>65, violettS => 81, cyanS => 97, whiteS =>113,
+                   pause=>2);
+      my @itemList = split(',',$a[2]);
+      my $repeat   = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
+      my $duration = (defined $a[4] && $a[4] =~ m/^(\d+)$/)?$a[4]:10800;
+      my $itemCnt  = int(@itemList);
+      
+      return "enter at least one and up to 10 items"      if ($itemCnt  < 1 || $itemCnt  > 10);
+      return "repetition $repeat out of range [1..255]"   if ($repeat   < 1 || $repeat   > 255);
+      return "duration $duration out of range [1..10800]" if ($duration < 1 || $duration > 10800);
+      
+      my $msgBytes = sprintf("01%02X",$repeat);
+      foreach my $led (@itemList){        
+        return "'$led' unknown. use: ".join(" ",sort keys(%color)) if (!$color{$led} );# wrong parameter;
+        $msgBytes .= sprintf("%02X",$color{$led});
+      }
+      $msgBytes .= "01" if ($itemCnt == 1 && $repeat == 1);#add pause to term LED
+      # need to fill up empty locations  for LED channel
+      $msgBytes = substr($msgBytes."00000000000000000000",0,(10+2)*2);
+     
+      if	($duration < 10800) {
+        $msgBytes .= sprintf("%02X%02X",($duration & 0x00ff), ($duration & 0xff00)>>8);
+      }
+      CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes);
+    }
     else{
       return "device for command cannot be identified";
     }
@@ -4481,27 +4508,41 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     else{
       my @itemList = split(',',$a[2]);
-      my $repeat = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
-      my $itemCnt = int(@itemList);
-      my $volume = (defined $a[4] && $a[4] =~ m/^(\d+)$/)?$a[4]:10;
-      return "no more than 10 entries please"  if ($itemCnt>10);
-      return "repetition $repeat out of range [1..255]"
-            if($repeat < 1 || $repeat > 255);
-      return "volume $volume out of range [0..10]"
-            if($volume < 0 || $volume > 10);
+      my $repeat   = (defined $a[3] && $a[3] =~ m/^(\d+)$/)?$a[3]:1;
+      my $itemCnt  = int(@itemList);
+      my $volume   = (defined $a[4] && $a[4] =~ m/^(\d+)$/)?$a[4]:10;
+      my $duration = (defined $a[5] && $a[5] =~ m/^(\d+\.)?\d+$/)?$a[5]:108000;
+      return "no more than 10 entries please"                if ($itemCnt  > 10);
+      return "repetition $repeat out of range [1..255]"      if ($repeat   < 1   || $repeat > 255);
+      return "volume $volume out of range [0..10]"           if ($volume   < 0   || $volume > 10);
+      return "duration $duration out of range [0.1..108000]" if ($duration < 0.1 || $duration > 108000);
       #<volume><multiply><MP3><MP3>
       my $msgBytes = sprintf("%02X%02X",$volume*20,$repeat);
 
       foreach my $mp3 (@itemList){
-        return "input: $mp3 is not an integer below 255" 
+        return "input: $mp3 is not an integer below 255"
            if (!defined $mp3 || $mp3 !~ /^[+-]?\d+$/ || $mp3 > 255);
         $msgBytes .= sprintf("%02X",$mp3);
       }
+      # need to fill up empty locations  for MP3 numbers
+      $msgBytes = substr($msgBytes."00000000000000000000",0,(10+2)*2);
+
+      # add duration as a float value
+      #$duration = CUL_HM_decodeTime16($duration * 10);# need to be tested
+      my $exponent = 0;
+      my $mantisse = $duration * 10;
+      while ($mantisse >= 2048) {
+        $mantisse = $mantisse >> 1;
+        $exponent++;
+      }
+      $duration = $mantisse << 5 | $exponent;
+      $msgBytes .= sprintf("%04X", $duration);
       $msg = '++'.$flag.'11'.$id.$dst.'80'.$chn.$msgBytes;
       CUL_HM_UpdtReadSingle($chnHash,".lastTone",$msg,0);
     }
     CUL_HM_PushCmdStack($hash,$msg) if ($msg);
   }
+
   elsif($cmd eq "displayWM" ) { ###############################################
     $state = "";
     # textNo color icon
