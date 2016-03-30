@@ -362,7 +362,7 @@ return "<br>Timespec wizard:".
                "{"+$("[name=aw_pts]").val()+"}" : $("[name=aw_ts]").val();
       def = def.replace(/\+/g, "%2b");
       def = def.replace(/;/g, ";;");
-      location = location.pathname+"detail="+nm+"&cmd=modify "+def;
+      location = location.pathname+"?detail="+nm+"&cmd=modify "+def;
     });
   }
 </script>
