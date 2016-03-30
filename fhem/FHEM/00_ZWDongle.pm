@@ -776,8 +776,11 @@ ZWDongle_Ready($)
 
   <li>createNode id<br>
     Request the class information for the specified node, and create a fhem
-    device upon reception of the answer. Used for previously included nodes,
-    see the nodeList get command below.</li>
+    device upon reception of the answer. Used to create FHEM devices for nodes
+    included with another software or if the fhem.cfg got lost. For the node id
+    see the get nodeList command below.  Note: the node must be "alive", i.e.
+    for battery based devices you have to press the "wakeup" button 1-2 seconds
+    before entering this command in FHEM.</li>
 
   <li>removeFailedNode<br>
     Remove a non-responding node -that must be on the failed Node list- from 
