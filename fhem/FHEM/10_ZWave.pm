@@ -3737,12 +3737,12 @@ ZWave_Parse($$@)
       my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
       return "" if(!$dh);
 
-      my $addSecure = $iodev->{addSecure};      # addNode off deletes it
       AnalyzeCommand(undef, "set $ioName addNode off")
         if($cmd eq 'ZW_ADD_NODE_TO_NETWORK');
 
       ZWave_wakeupTimer($dh, 1) if(ZWave_isWakeUp($dh));
 
+      my $addSecure = $iodev->{addSecure};      # addNode off deletes it
       if($addSecure) {
         return "" if (ZWave_secIncludeStart($dh, $iodev) == 1);
       }
