@@ -483,7 +483,13 @@ VCONTROL_Read($)
   my $bufflen = length($hexline);
   my $buffhalflen = $bufflen/2;
   
-  if ( $bufflen > 2 && $hexline =~ /(05){$buffhalflen,}/ && $cmd_list[$last_cmd][2] ne "mode"){
+  if ( $bufflen > 2 && $hexline =~ /(05){$buffhalflen,}/ 
+     && $cmd_list[$last_cmd][2] ne "mode"
+     && $cmd_list[$last_cmd][2] ne "1ByteU"
+     && $cmd_list[$last_cmd][2] ne "1ByteU2"
+     && $cmd_list[$last_cmd][2] ne "1ByteS"
+     && $cmd_list[$last_cmd][2] ne "1ByteH"
+     ){
      Log3 $name, 5, "VCONTROL: exit if buffer just filled with 0x05";
      $hash->{PARTIAL} = "";
      $read_now = READ_UNDEF;
@@ -533,7 +539,15 @@ VCONTROL_Read($)
       }
       #if the mode is requestet and 0x05 is received 
       #try again to be sure that 0x05 is not the sync byte
-      elsif ($poll_now == POLL_ACTIVE && $cmd_list[$last_cmd][2] eq "mode" && substr("$hexline",0,2) eq "05" ){
+      elsif (  $poll_now == POLL_ACTIVE 
+            && substr("$hexline",0,2) eq "05"
+            && (  $cmd_list[$last_cmd][2] eq "mode" 
+               || $cmd_list[$last_cmd][2] eq "1ByteU"
+               || $cmd_list[$last_cmd][2] eq "1ByteU2"
+               || $cmd_list[$last_cmd][2] eq "1ByteS"
+               || $cmd_list[$last_cmd][2] eq "1ByteH"
+               ) 
+             ){
           Log3 $name, 5, "VCONTROL: check temp_mode";
           if ($temp_mode < 5){
              $temp_mode++;
