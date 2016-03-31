@@ -18,6 +18,7 @@ I2C_BME280
 I2C_BMP180
 I2C_SHT21
 I2C_TSL2561
+I2C_K30
 );
 
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
