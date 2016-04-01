@@ -3,6 +3,7 @@
 #
 #  72_FRITZBOX.pm 
 #
+#  (c) 2014 Torsten Poitzsch
 #  (c) 2014-2016 tupol http://forum.fhem.de/index.php?action=profile;u=5432
 #
 #  This module handles the Fritz!Box router and the Fritz!Phone MT-F and C4
@@ -786,9 +787,9 @@ sub FRITZBOX_API_Check_Run($)
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_LOCAL", $m3uFileLocal;
 
       # Get the m3u-URL
-         my $m3uFileURL = AttrVal( $name, "m3uFileURL", "undefined" );
-      # if not defined then try to build the correct URL for the file
-         if ( $m3uFileURL eq "undefined" ) {
+         my $m3uFileURL = AttrVal( $name, "m3uFileURL", "unknown" );
+      # if no URL and no local file defined, then try to build the correct URL 
+         if ( $m3uFileURL eq "unknown" && AttrVal( $name, "m3uFileLocal", "" ) eq "" ) {
          # Getting IP of FHEM host
             FRITZBOX_Log $hash, 4, "Try to get my IP address.";
             my $socket = IO::Socket::INET->new( Proto => 'tcp', PeerAddr => $host, PeerPort    => 'http(80)' );
@@ -807,12 +808,12 @@ sub FRITZBOX_API_Check_Run($)
             $m3uFileURL = "http://$ip:$port/fhem/images/$name.m3u"     if defined $ip && defined $port;
          }
       # Check if m3u can be accessed
-         unless ( $m3uFileURL eq "undefined" ) {
+         unless ( $m3uFileURL eq "unknown" ) {
             FRITZBOX_Log $hash, 4, "Try to get '$m3uFileURL'";
             $response = $agent->get( $m3uFileURL );
             if ($response->is_error) {
                FRITZBOX_Log $hash, 4, "Failed to get '$m3uFileURL': ".$response->status_line;
-               $m3uFileURL = "undefined"     ;
+               $m3uFileURL = "unknown"     ;
             }
          }
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->M3U_URL", $m3uFileURL;
@@ -1383,7 +1384,12 @@ sub FRITZBOX_Readout_Run_Web($)
    }
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->radioCount", $runNo;
 
-# Create LanDevice list
+# Create LanDevice list and delete inactive devices
+   my %oldLanDevice;
+   #collect current mac-readings (to delete the ones that disappeared)
+   foreach (keys $hash->{READINGS}) {
+      $oldLanDevice{$_} = $hash->{READINGS}{$_}     if $_ =~ /^mac_/;
+   }
    %landevice = ();
    my $wlanCount = 0;
    foreach ( @{ $result->{lanDevice} } ) {
@@ -1394,6 +1400,8 @@ sub FRITZBOX_Readout_Run_Web($)
       $landevice{$dIp}=$dName;
       my $rName = "mac_".$_->{mac};
       $rName =~ s/:/_/g;
+   # Remove mac address from oldLanDevice-List
+   delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
    # Create a reading if a landevice is connected
       if ($_->{active} == 1) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
@@ -1411,23 +1419,16 @@ sub FRITZBOX_Readout_Run_Web($)
    }
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_wlanCount", $wlanCount);
 
-# Remove Guest WLAN devices that are not online anymore
-   foreach ( @{ $result->{wlanList} } ) {
-      if ( $_->{is_guest} eq '1' && $_->{state} eq '0' ) {
-         my $rName = "mac_".$_->{mac};
-         $rName =~ s/:/_/g;
+# Remove non existing mac-readings in two steps
+   foreach ( keys %oldLanDevice ) {
       # set the mac readings to 'inactive' and delete at next readout
-         if ( exists $hash->{READINGS}{$rName}{VAL} ) {
-            if ( $hash->{READINGS}{$rName}{VAL} ne "inactive" ) {
-               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "inactive";
-            }
-            else {
-               FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "";
-            }
-         }
+      if ( $oldLanDevice{$_} ne "inactive" ) {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "inactive";
+      }
+      else {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $_, "";
       }
    }
-
 
 # WLANs
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "box_wlan_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
@@ -2831,8 +2832,7 @@ sub FRITZBOX_Ring_Run_Web($)
   
 # Create a hash for the DECT devices whose ring tone (or radio station) can be changed
    foreach ( split( /,/, $intNo ) ) {
-      if ("AVM" eq $hash->{fhem}{$_}{brand})
-      {
+      if (defined $hash->{fhem}{$_}{brand} && "AVM" eq $hash->{fhem}{$_}{brand}) {
          my $userId = $hash->{fhem}{$_}{userId};
          FRITZBOX_Log $hash, 5, "Internal number $_ (dect$userId) seems to be a Fritz!Fon.";
          push @FritzFons, $hash->{fhem}{$_}{userId};
@@ -4320,7 +4320,7 @@ sub FRITZBOX_Web_OpenCon ($)
    FRITZBOX_Log $hash, 2, "Web connection could not be established. Please check your credentials (password, user).";
    return undef;
 
-   }
+ }
 
 # Execute commands via the web connection
 ############################################
@@ -4966,7 +4966,7 @@ sub FRITZBOX_fritztris($)
       <li><b>gsm_state</b> - state of the connection to the GSM network</li>
       <li><b>gsm_technology</b> - GSM technology used for data transfer (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an <u>active</u> network device</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an active network device. The name contains the term "(WLAN)" if connect via WLAN. Inactive or removed devices get first the value "inactive" and will be deleted during the next update.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
       <br>
@@ -5322,7 +5322,7 @@ sub FRITZBOX_fritztris($)
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
       <li><b>gsm_technology</b> - GSM-Technologie, die f&uuml;r die Daten&uuml;bertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines <u>aktiven</u> Netzwerk-Ger&auml;tes</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes. Bei einer WLAN-Verbindung wird "(WLAN)" angeh&auml;ngt. Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
       <br>
