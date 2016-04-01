@@ -3749,8 +3749,8 @@ ZWave_Parse($$@)
       return ZWave_execInits($dh, 0);
     }
 
-    if(($evt eq "failed" || $evt eq "done") &&
-       $cmd eq 'ZW_ADD_NODE_TO_NETWORK') {
+    # addNode off generates ZW_ADD_NODE_TO_NETWORK:done sometimes (#51411)
+    if($evt eq "failed" && $cmd eq 'ZW_ADD_NODE_TO_NETWORK') {
       AnalyzeCommand(undef, "set $ioName addNode off")
     }
 
