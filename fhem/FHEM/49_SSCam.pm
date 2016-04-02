@@ -27,8 +27,9 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.23   02.04.2016    change to RemoveInternalTimer for functions
 # 1.22   27.03.2016    bugfix "link_open" doesn't work after last update
-# 1.21   23.03.2016    added "lastrec","lastrec_open" to playback last recording 
+# 1.21   23.03.2016    added "lastrec"," lastrec_open" to playback last recording 
 # 1.20.3 19.03.2016    change: delay of InternalTimer(s) changed
 #                      "ptzlistpresets" - "id" changed to "position" according to Synology-ticket
 #                      run "geteventlist" automatically after recording-stop
@@ -114,11 +115,10 @@
 
 package main;
 
-use JSON qw( decode_json );            # From CPAN,, Debian libjson-perl 
+use JSON qw( decode_json );            # from CPAN, Debian: apt-get install libperl-JSON 
 use Data::Dumper;                      # Perl Core module
 use strict;                           
 use warnings;
-use Time::HiRes qw(gettimeofday);
 use MIME::Base64;
 use HttpUtils;
 
@@ -201,9 +201,9 @@ sub SSCam_Define {
   readingsEndUpdate($hash,1);                                          
   
   getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)  
-  RemoveInternalTimer($hash);                                                                     # alle Timer löschen
   
-  # initiale Rotinen nach Restart ausführen , verzögerter zufälliger Start   
+  # initiale Routinen nach Restart ausführen   , verzögerter zufälliger Start
+  RemoveInternalTimer($hash, "initonboot");
   InternalTimer(gettimeofday()+int(rand(30)), "initonboot", $hash, 0);
 
 return undef;
@@ -541,6 +541,8 @@ sub initonboot ($) {
   
   if ($init_done == 1) {
      
+     RemoveInternalTimer($hash);                                                                     # alle Timer löschen
+     
      # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
          $logstr = "Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now"; 
@@ -565,16 +567,18 @@ sub initonboot ($) {
 
          }
          
-     # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-60s 
+     # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-30s 
+     RemoveInternalTimer($hash, "watchdogpollcaminfo");
      InternalTimer(gettimeofday()+int(rand(30)), "watchdogpollcaminfo", $hash, 0);
   
   }
   else 
   {
+      RemoveInternalTimer($hash, "initonboot");
       InternalTimer(gettimeofday()+1, "initonboot", $hash, 0);
   }
   
-return undef;
+return;
 }
 
 
@@ -745,6 +749,7 @@ sub watchdogpollcaminfo ($) {
             $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";            
         }
     }
+RemoveInternalTimer($hash, "watchdogpollcaminfo");
 InternalTimer(gettimeofday()+$watchdogtimer, "watchdogpollcaminfo", $hash, 0);
 return undef;
 }
@@ -808,12 +813,19 @@ sub camstartrec ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+1, "camstartrec", $hash, 0);
+    RemoveInternalTimer($hash, "camstartrec");
+    InternalTimer(gettimeofday()+1, "camstartrec", $hash);
     }
 }
 
 ###############################################################################
 ###   Kamera Aufnahme stoppen
+
+sub stoprec ($) {
+    # Hilfsroutine Rückkehr aus Webaufruf Stopfunktion
+    my ($hash)   = @_;
+    return camstoprec($hash);
+}
 
 sub camstoprec ($) {
     my ($hash)   = @_;
@@ -862,7 +874,8 @@ sub camstoprec ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+1, "camstoprec", $hash, 0);
+        RemoveInternalTimer($hash, "camstoprec");
+        InternalTimer(gettimeofday()+1, "camstoprec", $hash, 0);
     }
 }
 
@@ -916,6 +929,7 @@ sub camexpmode ($) {
     }
     else
     {
+    RemoveInternalTimer($hash, "camexpmode");
     InternalTimer(gettimeofday()+1, "camexpmode", $hash, 0);
     }
 }
@@ -971,7 +985,8 @@ sub cammotdetsc ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+1, "cammotdetsc", $hash, 0);
+        RemoveInternalTimer($hash, "cammotdetsc");
+        InternalTimer(gettimeofday()+1, "cammotdetsc", $hash, 0);
     }
 }
 
@@ -1026,6 +1041,7 @@ sub camsnap ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "camsnap");
         InternalTimer(gettimeofday()+1, "camsnap", $hash, 0);
     }    
 }
@@ -1082,6 +1098,7 @@ sub runliveview ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "runliveview");
         InternalTimer(gettimeofday()+1, "runliveview", $hash, 0);
     }    
 }
@@ -1136,6 +1153,7 @@ sub stopliveview ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "stopliveview");
         InternalTimer(gettimeofday()+1, "stopliveview", $hash, 0);
     }    
 }
@@ -1166,6 +1184,7 @@ sub getsnapfilename ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "getsnapfilename");
         InternalTimer(gettimeofday()+1, "getsnapfilename", $hash, 0);
     }    
 }
@@ -1197,6 +1216,7 @@ sub extevent ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "extevent");
         InternalTimer(gettimeofday()+1, "extevent", $hash, 0);
     }    
 }
@@ -1305,20 +1325,21 @@ sub doptzaction ($) {
             &printlog($hash,$logstr,"4");
             }
  
-        if ($attr{$name}{debugactivetoken}) {
-             $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-             &printlog($hash,$logstr,"3");
-        }
+            if ($attr{$name}{debugactivetoken}) {
+                $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
+                &printlog($hash,$logstr,"3");
+            }
     
-    $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
-    $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
+        $hash->{HELPER}{ACTIVE} = "on";
  
-    &getapisites_nonbl($hash);
+        &getapisites_nonbl($hash);
  
     }
     else
     {
-    InternalTimer(gettimeofday()+1, "doptzaction", $hash, 0);
+        RemoveInternalTimer($hash, "doptzaction");
+        InternalTimer(gettimeofday()+1, "doptzaction", $hash, 0);
     }    
 }
 
@@ -1347,7 +1368,8 @@ sub movestop ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+1, "movestop", $hash, 0);
+        RemoveInternalTimer($hash, "movestop");
+        InternalTimer(gettimeofday()+1, "movestop", $hash, 0);
     }    
 }
 
@@ -1379,7 +1401,8 @@ sub camenable ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+1, "camenable", $hash, 0);
+        RemoveInternalTimer($hash, "camenable");
+        InternalTimer(gettimeofday()+1, "camenable", $hash, 0);
     }    
 }
 
@@ -1411,7 +1434,8 @@ sub camdisable ($) {
     }
     else
     {
-    InternalTimer(gettimeofday()+1, "camdisable", $hash, 0);
+        RemoveInternalTimer($hash, "camdisable");
+        InternalTimer(gettimeofday()+1, "camdisable", $hash, 0);
     }    
 }
 
@@ -1486,6 +1510,7 @@ sub getsvsinfo ($) {
       }
     else
     {
+        RemoveInternalTimer($hash, "getsvsinfo");
         InternalTimer(gettimeofday()+1, "getsvsinfo", $hash, 0);
     }
     
@@ -1517,6 +1542,7 @@ sub getcaminfo ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "getcaminfo");
         InternalTimer(gettimeofday()+1, "getcaminfo", $hash, 0);
     }
     
@@ -1549,6 +1575,7 @@ sub geteventlist ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "geteventlist");
         InternalTimer(gettimeofday()+1, "geteventlist", $hash, 0);
     }
     
@@ -1579,6 +1606,7 @@ sub getmotionenum ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "getmotionenum");
         InternalTimer(gettimeofday()+1, "getmotionenum", $hash, 0);
     }
     
@@ -1610,6 +1638,7 @@ sub getcapabilities ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "getcapabilities");
         InternalTimer(gettimeofday()+1, "getcapabilities", $hash, 0);
     }
     
@@ -1647,6 +1676,7 @@ sub getptzlistpreset ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "getptzlistpreset");
         InternalTimer(gettimeofday()+1, "getptzlistpreset", $hash, 0);
     }
     
@@ -1685,6 +1715,7 @@ sub getptzlistpatrol ($) {
     }
     else
     {
+        RemoveInternalTimer($hash, "getptzlistpatrol");
         InternalTimer(gettimeofday()+1, "getptzlistpatrol", $hash, 0);
     }
     
@@ -2718,7 +2749,8 @@ sub camret_nonbl ($) {
                 
                 if ($rectime != 0) {
                     # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
-                    InternalTimer(gettimeofday()+$rectime, "camstoprec", $hash, 0);
+                    RemoveInternalTimer($hash, "stoprec");
+                    InternalTimer(gettimeofday()+$rectime, "stoprec", $hash );
                     }              
 
             }
@@ -2902,7 +2934,8 @@ sub camret_nonbl ($) {
                 $logstr = "--- End Function cam: $OpMode nonblocking ---";
                 &printlog($hash,$logstr,"4");
                 
-                 InternalTimer(gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "movestop", $hash, 0);
+                RemoveInternalTimer($hash, "movestop");
+                InternalTimer(gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "movestop", $hash);
             }
             elsif ($OpMode eq "movestop") 
             {
