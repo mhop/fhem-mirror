@@ -1471,8 +1471,8 @@ sub HMinfo_SetFn($@) {#########################################################
       }
     }
     if ($type ne "msgStat"){
-      return "unknown parameter - use msgEvents, readings, msgStat, register, rssi or all"
-            if ($type !~ m/^(msgEvents|readings|register|oldRegs|rssi|all|trigger)$/);
+      return "unknown parameter - use msgEvents, readings, msgStat, register, rssi, attack or all"
+            if ($type !~ m/^(msgEvents|readings|register|oldRegs|rssi|all|attack|trigger)$/);
       $opt .= "d" if ($type =~ m/(msgEvents|rssi)/);# readings apply to all, others device only
       my @entities;
       foreach my $dName (HMinfo_getEntities($opt,$filter)){
