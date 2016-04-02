@@ -58,9 +58,11 @@ my $curReadingType = 0;
   #   8 = MinMaxNummer Col 3
   #   9 = Date Col 2-5 / bold
   #   10 = alternative text of Col 3 (Wind direction)
+  #   11 = alternative text of image Col 3 (current weather state)
   my @knownNoneIDs = ( ["Temperatur", "temperature", 1] 
       ,["relative Feuchte", "humidity", 1]
       ,["Sichtweite", "visibility", 1]
+      ,["Wetterzustand", "weather", 11]
       ,["Windrichtung", "windDir", 10]
       ,["Windgeschwindigkeit", "wind", 1]
       ,["Luftdruck", "pressure", 1]
@@ -326,20 +328,21 @@ sub start
       $curTextPos = 0;
    }
    #wetterstate and icon - process immediately
-   elsif ($tagname eq "img" && $curReadingType == 7) {
-      if ( 2 <= $curCol && $curCol <= 5 ) {
-       # process alternative text
-         $readingName = "fc".($startDay+$curCol-2)."_".$curReadingName;
-         $text = $attr->{alt};
-         $text =~ s/Wetterzustand: //;
-         $text =~ s/ö/oe/;
-         $text =~ s/ä/ae/;
-         $text =~ s/ü/ue/;
-         $text =~ s/ß/ss/;
-         push( @texte, $readingName . "|" . $text ); 
-       # Image URL
-         push( @texte, $readingName."Icon" . "|" . $attr->{src} ); 
-      }
+   elsif ($tagname eq "img" 
+          &&  ( $curReadingType == 7 && 2 <= $curCol && $curCol <= 5
+               || $curReadingType == 11 && $curCol == 3) ) {
+    # process alternative text
+      $readingName = $curReadingName;
+      $readingName = "fc" . ($startDay+$curCol-2) . "_" . $readingName     if $curReadingType == 7;
+      $text = $attr->{alt};
+      $text =~ s/Wetterzustand: //;
+      $text =~ s/ö/oe/;
+      $text =~ s/ä/ae/;
+      $text =~ s/ü/ue/;
+      $text =~ s/ß/ss/;
+      push( @texte, $readingName . "|" . $text ); 
+    # Image URL
+      push( @texte, $readingName."Icon" . "|" . $attr->{src} ); 
    }
    #wind direction - process immediately
    elsif ($tagname eq "img" && $curReadingType == 10 && $curCol == 3 ) {
