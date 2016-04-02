@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: new module 52_I2C_MMA845X.pm added
   - change:  49_SSCAM: change to new RemoveInternalTimer for functions
   - feature: new module 52_I2C_K30.pm added
   - bugfix:  98_weekprofile: send reference profile to device
