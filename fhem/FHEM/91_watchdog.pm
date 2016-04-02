@@ -17,7 +17,8 @@ watchdog_Initialize($)
   $hash->{AttrFn}   = "watchdog_Attr";
   $hash->{NotifyFn} = "watchdog_Notify";
   $hash->{AttrList} = "disable:0,1 disabledForIntervals execOnReactivate ".
-                        "regexp1WontReactivate:0,1 addStateEvent:0,1";
+                        "regexp1WontReactivate:0,1 addStateEvent:0,1 ".
+                        "autoRestart:0,1";
 }
 
 
@@ -150,6 +151,10 @@ watchdog_Trigger($)
   
   my $ret = AnalyzeCommandChain(undef, $exec);
   Log3 $name, 3, $ret if($ret);
+
+  if(AttrVal($name, "autoRestart", 0)) {
+      $watchdog->{STATE} = "defined";       # auto trigger w . 
+  }
 }
 
 sub
@@ -289,6 +294,10 @@ watchdog_Attr(@)
       If set, its value will be executed as a FHEM command when the watchdog is
       reactivated (after triggering) by receiving an event matching regexp1.
       </li>
+    <li><a href="#autoRestart">autoRestart</a>
+      When the watchdog has triggered it will be automatically re-set to state
+      defined again (waiting for regexp1) if this attribute is set to 1.
+    </li>
   </ul>
   <br>
 </ul>
@@ -397,7 +406,13 @@ watchdog_Attr(@)
       Falls gesetzt, wird der Wert des Attributes als FHEM Befehl
       ausgef&uuml;hrt, wenn ein regexp1 Ereignis den Watchdog
       aktiviert nachdem er ausgel&ouml;st wurde.</li>
+
+    <li><a href="#autoRestart">autoRestart</a>
+      Wenn dieses Attribut gesetzt ist, wird der Watchdog nach dem er
+      getriggert wurde, automatisch wieder in den Zustand defined
+      gesetzt (Wartet also wieder auf Aktivierung durch regexp1)</li>
   </ul>
+
   <br>
 </ul>
 
