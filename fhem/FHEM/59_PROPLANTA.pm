@@ -1006,6 +1006,8 @@ PROPLANTA_Html($)
       <li><b>pressure</b> - Luftdruck in hPa</li>
       <li><b>temperature</b> - Temperature in &deg;C</li>
       <li><b>visibility</b> - Sichtweite in km</li>
+      <li><b>weather</b> - Wetterzustand</li>
+      <li><b>weatherIcon</b> - Icon Wetterzustand</li>
       <li><b>wind</b> - Windgeschwindigkeit in km/h</li>
       <li><b>windDir</b> - Windrichtung in &deg;</li>
    </ul>
