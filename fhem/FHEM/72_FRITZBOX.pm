@@ -1251,7 +1251,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
    $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,name,mac,active,wlan)"; # LAN devices
-   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(state,is_guest,mac)"; # WLAN devices
+   # $queryStr .= "&wlanList=wlan:settings/wlanlist/list(state,is_guest,mac)"; # WLAN devices
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
    $queryStr .= "&box_stdDialPort=telcfg:settings/DialPort"; #Dial Port
    $queryStr .= "&dectUser=telcfg:settings/Foncontrol/User/list(Id,Name,Intern,IntRingTone,AlarmRingTone0,RadioRingID,ImagePath,G722RingTone,G722RingToneName)"; # DECT Numbers
@@ -1386,40 +1386,31 @@ sub FRITZBOX_Readout_Run_Web($)
 
 # Create LanDevice list and delete inactive devices
    my %oldLanDevice;
-   #collect current mac-readings (to delete the ones that disappeared)
+   #collect current mac-readings (to delete the ones that are inactive or disappeared)
    foreach (keys $hash->{READINGS}) {
-      $oldLanDevice{$_} = $hash->{READINGS}{$_}     if $_ =~ /^mac_/;
+      $oldLanDevice{$_} = $hash->{READINGS}{$_}{VAL}     if $_ =~ /^mac_/ && defined $hash->{READINGS}{$_}{VAL};
    }
    %landevice = ();
    my $wlanCount = 0;
    foreach ( @{ $result->{lanDevice} } ) {
       my $dIp = $_->{ip};
       my $dName = $_->{name};
-      $dName .= " (WLAN)"  if $_->{wlan} == 1;
+      $dName .= " (WLAN)"     if $_->{wlan} == 1;
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
       $landevice{$dIp}=$dName;
-      my $rName = "mac_".$_->{mac};
-      $rName =~ s/:/_/g;
-   # Remove mac address from oldLanDevice-List
-   delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
    # Create a reading if a landevice is connected
       if ($_->{active} == 1) {
+         my $rName = "mac_".$_->{mac};
+         $rName =~ s/:/_/g;
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
-         $wlanCount++   if $_->{wlan} == 1;
-      }
-   # else if the device is not online anymore, set the mac readings to 'inactive' and delete at next readout
-      elsif (exists $hash->{READINGS}{$rName}{VAL}) {
-         if ($hash->{READINGS}{$rName}{VAL} ne "inactive") {
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "inactive";
-         }
-         else {
-            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, "";
-         }
+         $wlanCount++      if $_->{wlan} == 1;
+         # Remove mac address from oldLanDevice-List
+         delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
       }
    }
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_wlanCount", $wlanCount);
 
-# Remove non existing mac-readings in two steps
+# Remove inactive or non existing mac-readings in two steps
    foreach ( keys %oldLanDevice ) {
       # set the mac readings to 'inactive' and delete at next readout
       if ( $oldLanDevice{$_} ne "inactive" ) {
