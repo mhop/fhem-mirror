@@ -1755,6 +1755,8 @@ harmony_decrypt($)
   It is possible to: start and stop activities, send ir commands to devices, send keyboard input by bluetooth and
   smart keyboard usb dongles.<br><br>
 
+  You probably want to use it in conjunction with the <a href="#fakeRoku">fakeRoku</a> module.<br><br>
+
   Notes:
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
