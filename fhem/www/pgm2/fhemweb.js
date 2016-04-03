@@ -198,6 +198,7 @@ FW_jqueryReadyFn()
 
   FW_smallScreenCommands();
 
+  FW_inlineModify();
 }
 
 // Show the webCmd list in a dialog if: smallScreen & hiddenroom=detail & room
@@ -287,10 +288,10 @@ FW_cmd(arg, callback)
   req.open("POST", arg, true);
   req.send(null);
   req.onreadystatechange = function(){
-    if(req.readyState == 4 && req.responseText) {
+    if(req.readyState == 4) {
       if(callback)
         callback(req.responseText);
-      else
+      else if(req.responseText)
         FW_errmsg(req.responseText, 5000);
     }
   }
@@ -456,6 +457,26 @@ FW_replaceLink(el)
   $(el).css("cursor", "pointer");
 }
 
+function
+FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
+{
+  $("div#edit input.psc[type=submit]").click(function(e){
+    e.preventDefault();
+    var newDef = $(this).closest("form").find("textarea").val();
+    var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
+    FW_cmd(FW_root+"?"+encodeURIComponent(cmd)+"&XHR=1", function(resp){
+      if(resp)
+        return FW_okDialog(resp);
+      newDef = newDef.replace(/&/g, '&amp;')    // Same as in 01_FHEMWEB
+                     .replace(/</g, '&lt;')
+                     .replace(/>/g, '&gt;');
+      if(newDef.indexOf("\n") >= 0)
+        newDef = '<pre>'+newDef+'</pre>';
+      $("div#disp").html(newDef).css("display", "");
+      $("div#edit").css("display", "none");
+    });
+  });
+}
 
 /*************** LONGPOLL START **************/
 var FW_pollConn;

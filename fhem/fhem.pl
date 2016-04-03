@@ -117,6 +117,7 @@ sub getUniqueId();
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
+sub perlSyntaxCheck($%);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
 sub readingsEndUpdate($$);
@@ -284,6 +285,7 @@ my @globalAttrList = qw(
   mseclog:1,0
   nofork:1,0
   nrarchive
+  perlSyntaxCheck
   pidfilename
   port
   restartDelay
@@ -4560,6 +4562,20 @@ RefreshAuthList()
     push @authenticate, $d if($modules{$h->{TYPE}}{AuthenticateFn});
   }
   $auth_refresh = 0;
+}
+
+sub
+perlSyntaxCheck($%)
+{
+  my ($exec, %specials)= @_;
+
+  my $psc = AttrVal("global", "perlSyntaxCheck", ($featurelevel>5.7) ? 1 : 0);
+  return undef if(!$psc || !$init_done);
+  return undef if($exec !~ m/^{.*}$/s);
+
+  $exec = EvalSpecials("{return undef; $exec}", %specials);
+  my $r = AnalyzePerlCommand(undef, $exec);
+  return $r;
 }
 
 1;
