@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: perlSyntaxCheck global attribute (currently used by notify & at)
   - bugfix:  31_MilightDevice: Fixed incompatibility with Color::rgb2hsv
   - feature: new module 37_fakeRoku.pm to control fhem from a harmony hub
   - feature: new module 52_I2C_MMA845X.pm added
