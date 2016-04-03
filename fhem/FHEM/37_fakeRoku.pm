@@ -98,8 +98,6 @@ fakeRoku_Define($$)
     fakeRoku_startDiscovery($hash);
     fakeRoku_startListener($hash);
 
-    fakeRoku_Connect($hash);
-
   } elsif( $hash->{STATE} ne "???" ) {
     $hash->{STATE} = "Initialized";
 
