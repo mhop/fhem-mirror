@@ -79,6 +79,9 @@ at_Define($$)
   }
   return "datespec is not allowed with + or *" if($abstime && ($rel || $rep));
 
+  my $err = perlSyntaxCheck($command, ());
+  return $err if($err);
+
   $rel = "" if(!defined($rel));
   $rep = "" if(!defined($rep));
   $cnt = "" if(!defined($cnt));
@@ -87,6 +90,7 @@ at_Define($$)
   $hash->{PERIODIC} = ($rep ? "yes" : "no");
   $hash->{TIMESPEC} = $tspec;
   $hash->{COMMAND} = $command;
+
 
   my $ot = $data{AT_TRIGGERTIME} ? $data{AT_TRIGGERTIME} : gettimeofday();
   $ot = int($ot) if(!$rel);     # No way to specify subseconds
@@ -530,6 +534,8 @@ EOF
         </ul>
         </li><br>
 
+    <li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
+
   </ul>
   <br>
 </ul>
@@ -700,6 +706,8 @@ EOF
         attr at2 alignTime 00:00<br>
         </ul>
         </li><br>
+
+    <li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
 
   </ul>
   <br>

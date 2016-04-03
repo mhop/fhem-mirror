@@ -44,6 +44,14 @@ notify_Define($$)
   eval { "Hallo" =~ m/^$re$/ };
   return "Bad regexp: $@" if($@);
   $hash->{REGEXP} = $re;
+  my %specials= (
+    "%NAME" => $name,
+    "%TYPE" => $name,
+    "%EVENT" => "1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0",
+    "%SELF" => $name,
+  );
+  my $err = perlSyntaxCheck($command, %specials);
+  return $err if($err);
   $hash->{".COMMAND"} = $command;
 
   my $doTrigger = ($name !~ m/^$re$/);            # Forum #34516
@@ -435,6 +443,13 @@ notify_fhemwebFn($$$$)
         </code></ul>
         </li>
 
+    <a name="perlSyntaxCheck"></a>
+    <li>perlSyntaxCheck<br>
+        by setting the <b>global</b> attribute perlSyntaxCheck, a syntax check
+        will be executed upon definition or modification, if the command is
+        perl and FHEM is already started.
+        </li>
+
   </ul>
   <br>
 
@@ -645,6 +660,14 @@ notify_fhemwebFn($$$$)
           attr n readLog
         </code></ul>
         </li>
+
+    <a name="perlSyntaxCheck"></a>
+    <li>perlSyntaxCheck<br>
+        nach setzen des <b>global</b> Attributes perlSyntaxCheck wird eine 
+        Syntax-Pr&uuml;fung der Anweisung durchgef&uuml;hrt bei jeder
+        &Auml;nderung (define oder modify), falls die Anweisung Perl ist, und
+        FHEM bereits gestartet ist.  </li>
+
   </ul>
   <br>
 

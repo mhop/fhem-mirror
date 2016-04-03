@@ -2409,13 +2409,12 @@ FW_makeEdit($$$)
   my ($name, $n, $val) = @_;
 
   # Toggle Edit-Window visibility script.
-  my $pgm = "Javascript:" .
-             "s=document.getElementById('edit').style;".
-             "s.display = s.display=='none' ? 'block' : 'none';".
-             "s=document.getElementById('disp').style;".
-             "s.display = s.display=='none' ? 'block' : 'none';";
+  my $psc = AttrVal("global", "perlSyntaxCheck", ($featurelevel>5.7) ? 1 : 0);
+  my $pgm = "var old = \$('#edit').css('display');".
+            "\$('#edit').css('display', old=='none' ? 'block' : 'none');".
+            "\$('#disp').css('display', old=='none' ? 'none' : 'block');";
   FW_pO "<td>";
-  FW_pO "<a onClick=\"$pgm\">$n</a>";
+  FW_pO "<a onClick=\"$pgm\" style=\"cursor:pointer\">$n</a>";
   FW_pO "</td>";
 
   $val =~ s,\\\n,\n,g;
@@ -2435,7 +2434,7 @@ FW_makeEdit($$$)
   my $ncols = $FW_ss ? 30 : 60;
   FW_pO      "<textarea name=\"val.${cmd}$name\" ".
                 "cols=\"$ncols\" rows=\"10\">$val</textarea>";
-  FW_pO     "<br>" . FW_submit("cmd.${cmd}$name", "$cmd $name");
+  FW_pO     "<br>" . FW_submit("cmd.${cmd}$name", "$cmd $name",($psc?"psc":""));
   FW_pO   "</form></div>";
   FW_pO  "</td>";
 }
@@ -2791,7 +2790,7 @@ FW_Set($@)
   if($a[1] eq "clearSvgCache") {
     my $cDir = "$FW_dir/SVGcache";
     if(opendir(DH, $cDir)) {
-      map { my $n="$cDir/$_"; unlink($n) if(-f $n); } readdir(DH);;
+      map { my $n="$cDir/$_"; unlink($n) if(-f $n); } readdir(DH);
       closedir(DH);
     } else {
       return "Can't open $cDir: $!";
