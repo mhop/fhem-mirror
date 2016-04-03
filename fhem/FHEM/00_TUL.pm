@@ -4,6 +4,9 @@
 # ABU 20150918 fixed deprecated warning, fixed warning related to hex-conversion in simple-write
 # ABU 20151123 added error-label in getGroup. Responsible for error-handling, if knxd is not accesible
 # ABU 20151213 changed message-check in decode_tpuart() to avoid ignore while receiving repeated messages
+# ABU 20160308 remoced set, get. Changed loglevel to verbose. Added KNX/EIB-Split. Added EIB-backward-compatibility.
+# ABU 20160309 fixed log2
+# ABU 20160310 repaired dispatch events - inform EIB, only is useEIB is set
 
 package main;
 
@@ -33,9 +36,10 @@ my %sets = (
   "raw"       => "",
 );
 
-my $clients = ":EIB:";
+my $clients = ":KNX:EIB:";
 
 my %matchList = (
+    "2:KNX"      => "^C.*",
     "3:EIB"      => "^B.*",
 );
 
@@ -52,18 +56,16 @@ TUL_Initialize($)
 # Normal devices
   $hash->{DefFn}   = "TUL_Define";
   $hash->{UndefFn} = "TUL_Undef";
-  $hash->{GetFn}   = "TUL_Get";
-  $hash->{SetFn}   = "TUL_Set";
   $hash->{StateFn} = "TUL_SetState";
   $hash->{AttrFn}  = "TUL_Attr";
   #$hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
   #                   "showtime:1,0 model:TUL loglevel:0,1,2,3,4,5,6 ";
 					 
-  $hash->{AttrList}= "do_not_notify:1,0 "
-								."dummy:1,0 "
-								."showtime:1,0 "
-								."model:TUL "
-								."loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= 			"do_not_notify:1,0 " .
+								"dummy:1,0 " .
+								"showtime:1,0 " .
+								"verbose:0,1,2,3,4,5 " .
+								"useEIB:1,0 ";
 							   
   $hash->{ShutdownFn} = "TUL_Shutdown";
   
@@ -73,36 +75,42 @@ TUL_Initialize($)
 sub
 TUL_Define($$)
 {
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
+	my ($hash, $def) = @_;
+	my @a = split("[ \t][ \t]*", $def);
 
-  if(@a < 4) {
-    my $msg = "wrong syntax: define <name> TUL <devicename> <device addr> [<line def in hex>]";
-    Log(2, $msg);
-    return $msg;
-  }
+	if(@a < 4) 
+	{
+		my $msg = "wrong syntax: define <name> TUL <devicename> <device addr> [<line def in hex>]";
+		Log (2, $msg);
+		return $msg;
+	}
 
-  TUL_CloseDev($hash);
+	TUL_CloseDev($hash);
 
-  my $name = $a[0];
-  my $dev = $a[2];
-  my $devaddr = tul_str2hex($a[3]);
-  my $linedef = substr(tul_str2hex($a[4]),0,2) if(@a > 4);
+	my $name = $a[0];
+	my $dev = $a[2];
+	my $devaddr = tul_str2hex($a[3]);
+	my $linedef = substr(tul_str2hex($a[4]),0,2) if(@a > 4);
 
-  if($dev eq "none") {
-    Log(1, "$name device is none, commands will be echoed only");
-    $attr{$name}{dummy} = 1;
-    return undef;
-  }
+	if($dev eq "none") 
+	{
+		Log3 ($name, 1, "device is none, commands will be echoed only");
+		$attr{$name}{dummy} = 1;
+		return undef;
+	}
   
-  $hash->{DeviceName} = $dev;
-  $hash->{DeviceAddress} = $devaddr;
-  $hash->{Clients} = $clients;
-  $hash->{MatchList} = \%matchList;
-  $hash->{AckLineDef}= $linedef;
+	#Set attributes in order to control backward-compatibility
+	$attr{$name}{useEIB} = 1;
+	Log3 ($name, 1, "Using EIB is deprecated. Please migrate to KNX soon. Module 10_EIB is not maintained any longer.") if (AttrVal($name, "useEIB", 0) =~ m/1/);
   
-  my $ret = TUL_OpenDev($hash, 0);
-  return $ret;
+	$hash->{DeviceName} = $dev;
+	$hash->{DeviceAddress} = $devaddr;
+	$hash->{Clients} = $clients;
+	$hash->{MatchList} = \%matchList;
+	$hash->{AckLineDef}= $linedef;
+  
+	my $ret = TUL_OpenDev($hash, 0);
+	return $ret;
 }
 
 
@@ -110,143 +118,93 @@ TUL_Define($$)
 sub
 TUL_Undef($$)
 {
-  my ($hash, $arg) = @_;
-  my $name = $hash->{NAME};
+	my ($hash, $arg) = @_;
+	my $name = $hash->{NAME};
 
-  foreach my $d (sort keys %defs) {
-    if(defined($defs{$d}) &&
-       defined($defs{$d}{IODev}) &&
-       $defs{$d}{IODev} == $hash)
-      {
-        my $lev = ($reread_active ? 4 : 2);
-        Log(GetLogLevel($name,$lev), "deleting port for $d");
-        delete $defs{$d}{IODev};
-      }
-  }
+	foreach my $d (sort keys %defs) 
+	{
+		if(defined($defs{$d}) && defined($defs{$d}{IODev}) && $defs{$d}{IODev} == $hash)
+		{
+			my $lev = ($reread_active ? 4 : 2);
+			Log(GetLogLevel($name,$lev), "deleting port for $d");
+			delete $defs{$d}{IODev};
+		}
+	}
 
-  TUL_CloseDev($hash); 
-  return undef;
+	TUL_CloseDev($hash); 
+	return undef;
 }
 
 #####################################
 sub TUL_Shutdown($)
 {
-  my ($hash) = @_;
-  TUL_CloseDev($hash); 
-  return undef;
-}
-
-#####################################
-sub
-TUL_Set($@)
-{
-  my ($hash, @a) = @_;
-
-  return "\"set TUL\" needs at least one parameter" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
-  	if(!defined($sets{$a[1]}));
-
-  my $name = shift @a;
-  my $type = shift @a;
-  my $arg = join("", @a);
-  my $ll = GetLogLevel($name,3);
-
-  return "No $a[1] for dummies" if(IsDummy($name));
-
-  if($type eq "raw") {
-    Log $ll, "set $name $type $arg";
-    TUL_SimpleWrite($hash, $arg);
-  }
-  return undef;
-}
-
-#####################################
-sub
-TUL_Get($@)
-{
-  my ($hash, @a) = @_;
-  my $type = $hash->{TYPE};
-
-  return "\"get $type\" needs at least one parameter" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
-  	if(!defined($gets{$a[1]}));
-
-  my $arg = ($a[2] ? $a[2] : "");
-  my $rsp;
-  my $name = $a[0];
-
-  #return "No $a[1] for dummies" if(IsDummy($name));
-
-  TUL_SimpleWrite($hash, "B".$gets{$a[1]}[0] . $arg);
-  $rsp = TUL_SimpleRead($hash);
-  if(!defined($rsp)) {
-    TUL_Disconnected($hash);
-    $rsp = "No answer";
-  } 
-
-  $hash->{READINGS}{$a[1]}{VAL} = $rsp;
-  $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
-
-  return "$a[0] $a[1] => $rsp";
+	my ($hash) = @_;
+	TUL_CloseDev($hash); 
+	return undef;
 }
 
 #####################################
 sub
 TUL_SetState($$$$)
 {
-  my ($hash, $tim, $vt, $val) = @_;
-  return undef;
+	my ($hash, $tim, $vt, $val) = @_;
+	return undef;
 }
 
 sub
 TUL_Clear($)
 {
-  my $hash = shift;
+	my $hash = shift;
 
-  # Clear the pipe
-  # TUL has no pipe....
-  
-  #Log(1,"TUL_Clear not defined yet");
+	#Clear the pipe
+	#TUL has no pipe....
 }
 
 #####################################
 sub
 TUL_DoInit($)
 {
-  my $hash = shift;
-  my $name = $hash->{NAME};
-  my $err;
+	my $hash = shift;
+	my $name = $hash->{NAME};
+	my $err;
 
+	TUL_Clear($hash);
 
-  TUL_Clear($hash);
-
-  # send any initializing request if needed
-  # TODO move to device init 
-  return 1 unless openGroupSocket($hash);
+	# send any initializing request if needed
+	# TODO move to device init 
+	return 1 unless openGroupSocket($hash);
   
-  # reset buffer
-  purgeReceiverBuf($hash);
+	# reset buffer
+	purgeReceiverBuf($hash);
 
-  $hash->{STATE} = "Initialized" if(!$hash->{STATE});
+	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
-  # Reset the counter
-  delete($hash->{XMIT_TIME});
-  delete($hash->{NR_CMD_LAST_H});
-  return undef;
+	# Reset the counter
+	delete($hash->{XMIT_TIME});
+	delete($hash->{NR_CMD_LAST_H});
+	return undef;
 }
 
 #####################################
 sub
 TUL_Write($$$)
 {
+	my ($hash,$fn,$msg) = @_; 
+	my $name = $hash->{NAME};
+	
+	return if(!defined($fn));
+	
+	#Discard message, if not set to backward-compatibility
+	if ((AttrVal($name, "useEIB", 0) =~ m/0/) and ($fn =~ m/^B/))
+	{
+		Log3 ($name, 0, "EIB is no longer supported. Message discarded.");
+		return;
+	}
 
-  my ($hash,$fn,$msg) = @_;  
-  return if(!defined($fn));
+	Log3 ($name, 5, "sending $fn$msg");
+	my $bstring = "$fn$msg";
 
-  Log 5, "$hash->{NAME} sending $fn$msg";
-  my $bstring = "$fn$msg";
-
-  TUL_SimpleWrite($hash, $bstring);
+	TUL_SimpleWrite($hash, $bstring);
 }
 
 
@@ -255,54 +213,58 @@ TUL_Write($$$)
 sub
 TUL_Read($)
 {
-  my ($hash) = @_;
+	my ($hash) = @_;
 
-  #reset the refused flag, so we can check if a telegram was refused
-  # and therefor we did not get a response
-  $hash->{REFUSED} = undef;	
-  my $buf = TUL_SimpleRead($hash);
-  my $name = $hash->{NAME};
+	#reset the refused flag, so we can check if a telegram was refused
+	# and therefor we did not get a response
+	$hash->{REFUSED} = undef;	
+	my $buf = TUL_SimpleRead($hash);
+	my $name = $hash->{NAME};
 
-  # check if refused
-  if(defined($hash->{REFUSED}))
-  {
-  	Log(3,"TUL $name refused message: $hash->{REFUSED}");
-  	$hash->{REFUSED} = undef;
-  	return "";
-  }
+	# check if refused
+	if(defined($hash->{REFUSED}))
+	{
+		Log3 ($name, 3,"TUL $name refused message: $hash->{REFUSED}");
+		$hash->{REFUSED} = undef;
+		return "";
+	}
 
-  ###########
-  # Lets' try again: Some drivers return len(0) on the first read...
-  if(defined($buf) && length($buf) == 0) {
-    $buf = TUL_SimpleRead($hash);
-  }
+	###########
+	# Lets' try again: Some drivers return len(0) on the first read...
+	if(defined($buf) && length($buf) == 0) 
+	{
+		$buf = TUL_SimpleRead($hash);
+	}
 
-  if(!defined($buf) || length($buf) == 0) {
-    TUL_Disconnected($hash);
-    return "";
-  }
+	if(!defined($buf) || length($buf) == 0) 
+	{
+		TUL_Disconnected($hash);
+		return "";
+	}
 
-   TUL_Parse($hash, $hash, $name, $buf, $hash->{initString});
+	#place KNX-Message
+	TUL_Parse($hash, $hash, $name, "B".$buf, $hash->{initString}) if (AttrVal($name, "useEIB", 0) =~ m/1/);
+	#place EIB-Message
+	TUL_Parse($hash, $hash, $name, "C".$buf, $hash->{initString});
 }
 
 sub
 TUL_Parse($$$$$)
 {
-  my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
+	my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
 
-
-  # there is nothing specal to do at the moment.
-  # just dispatch
+	# there is nothing specal to do at the moment.
+	# just dispatch
 	
-  my $dmsg = $rmsg;
-  Log GetLogLevel($name,4), "$name: $dmsg";
+	my $dmsg = $rmsg;
+	Log3 ($name, 4, "$name: $dmsg");
 
-  $hash->{"${name}_MSGCNT"}++;
-  $hash->{"${name}_TIME"} = TimeNow();
-  $hash->{RAWMSG} = $rmsg;
-  my %addvals = (RAWMSG => $rmsg);
+	$hash->{"${name}_MSGCNT"}++;
+	$hash->{"${name}_TIME"} = TimeNow();
+	$hash->{RAWMSG} = $rmsg;
+	my %addvals = (RAWMSG => $rmsg);
 
-  Dispatch($hash, $dmsg, \%addvals);
+	Dispatch($hash, $dmsg, \%addvals);
 }
 
 
@@ -310,313 +272,341 @@ TUL_Parse($$$$$)
 sub
 TUL_Ready($)
 {
-  my ($hash) = @_;
+	my ($hash) = @_;
 
-  return TUL_OpenDev($hash, 1)
-                if($hash->{STATE} eq "disconnected");
+	return TUL_OpenDev($hash, 1) if($hash->{STATE} eq "disconnected");
 
-  # This is relevant for windows/USB only
-  my $po = $hash->{USBDev};
-  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-  return ($InBytes>0);
+	# This is relevant for windows/USB only
+	my $po = $hash->{USBDev};
+	my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+	return ($InBytes>0);
 }
 
 ########################
 sub
 TUL_SimpleWrite(@)
 {
-  my ($hash, $msg) = @_;
-  return if(!$hash);
+	my ($hash, $msg) = @_;
+	return if(!$hash);
 
-  # Msg must have the format B(w,r,p)g1g2g3v....
-  # w-> write, r-> read, p-> reply
-  # g1,g2,g3 are the hex parts of the group name
-  # v is a simple (1 Byte) or complex value (n bytes)	
+	# Msg must have the format B(w,r,p)g1g2g3v....
+	# w-> write, r-> read, p-> reply
+	# g1,g2,g3 are the hex parts of the group name
+	# v is a simple (1 Byte) or complex value (n bytes)	
 
-  # For eibd we need a more elaborate structure
-  if($msg =~ /^B(.)(.{4})(.*)$/)
-  {
-  	my $eibmsg;
-  	if($1 eq "w"){
-  		$eibmsg->{'type'} = 'write';
-  	}
-  	elsif ($1 eq "r") {
-  		$eibmsg->{'type'} = 'read';
-  	}
-  	elsif ($1 eq "p") {
-  		$eibmsg->{'type'} = 'reply';
-  	}
-
-    $eibmsg->{'dst'} = $2;
-    my $hexvalues = $3;
-    
-	#The array has to have a given length. During Hex-conversion Trailing
-	#0 are recognizes for warnings.
-	#Therefore we backup the length, trim, and reappend the 0
-	#
-	#save length and trim right side
-	my $strLen = length ($hexvalues) / 2;
-	$hexvalues =~ s/\s+$//;
-	#convert hex-string to array with dezimal values
-	my @data =  map hex($_), $hexvalues =~ /(..)/g;
-	#re-append 0x00
-	for (my $i=0; $strLen - scalar @data; $i++)
+	# For eibd we need a more elaborate structure
+	if($msg =~ /^[BC](.)(.{4})(.*)$/)
 	{
-		push (@data, 0);
-	}
-	
-    # check: first byte is only allowed to contain data in the lower 6bits
-    #        to make sure all is fine, we mask the first byte
-    $data[0] = $data[0] & 0x3f if(defined($data[0]));
-    
-    $eibmsg->{'data'} = \@data;
-    
-    sendGroup($hash, $eibmsg);
-  }
-  else
-  {
-  	Log(1,"Could not parse message $msg");
-  	return undef;
-  }
+		my $eibmsg;
+		if($1 eq "w")
+		{
+			$eibmsg->{'type'} = 'write';
+		}
+		elsif ($1 eq "r") 
+		{
+			$eibmsg->{'type'} = 'read';
+		}
+		elsif ($1 eq "p") 
+		{
+			$eibmsg->{'type'} = 'reply';
+		}
 
-  select(undef, undef, undef, 0.001);
+		$eibmsg->{'dst'} = $2;
+		my $hexvalues = $3;
+    
+		#The array has to have a given length. During Hex-conversion Trailing
+		#0 are recognizes for warnings.
+		#Therefore we backup the length, trim, and reappend the 0
+		#
+		#save length and trim right side
+		my $strLen = length ($hexvalues) / 2;
+		$hexvalues =~ s/\s+$//;
+		#convert hex-string to array with dezimal values
+		my @data =  map hex($_), $hexvalues =~ /(..)/g;
+		#re-append 0x00
+		for (my $i=0; $strLen - scalar @data; $i++)
+		{
+			push (@data, 0);
+		}
+	
+		# check: first byte is only allowed to contain data in the lower 6bits
+		#        to make sure all is fine, we mask the first byte
+		$data[0] = $data[0] & 0x3f if(defined($data[0]));
+    
+		$eibmsg->{'data'} = \@data;
+    
+		sendGroup($hash, $eibmsg);
+	}
+	else
+	{
+		Log3 ($hash->{NAME}, 1,"Could not parse message $msg");
+		return undef;
+	}
+
+	select(undef, undef, undef, 0.001);
 }
 
 ########################
 sub
 TUL_SimpleRead($)
 {
-  my ($hash) = @_;
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
 
-  my $msg = getGroup($hash);
-  if(!defined($msg)) {
-  	Log(4,"No data received.") ;
-  	return undef;
-  }
+	my $msg = getGroup($hash);
+	if(!defined($msg)) 
+	{
+		Log3 ($name, 4,"No data received.") ;
+		return undef;
+	}
   
-  my $type = $msg->{'type'};
-  my $dst = $msg->{'dst'};
-  my $src = $msg->{'src'};
-  my @bindata = @{$msg->{'data'}};
-  my $data = "";
+	my $type = $msg->{'type'};
+	my $dst = $msg->{'dst'};
+	my $src = $msg->{'src'};
+	my @bindata = @{$msg->{'data'}};
+	my $data = "";
   
-  # convert bin data to hex
-  foreach my $c (@bindata) {
-  	$data .= sprintf ("%02x", $c);
-  }
+	# convert bin data to hex
+	foreach my $c (@bindata) 
+	{
+		$data .= sprintf ("%02x", $c);
+	}
  
-  Log(5,"SimpleRead msg.type: $type, msg.src: $msg->{'src'}, msg.dst: $msg->{'dst'}");
-  Log(5,"SimpleRead data: $data");
+	Log3 ($name, 5, "SimpleRead msg.type: $type, msg.src: $msg->{'src'}, msg.dst: $msg->{'dst'}");
+	Log3 ($name, 5, "SimpleRead data: $data");
   
-  # we will build a string like:
-  # Bs1s2s3(w|r|p)g1g2g3v
-  # s -> src 
-  my $buf ="B$src";
-  if($type eq "write") {
-  	$buf .= "w";
-  }
-  elsif ($type eq "read") {
-  	$buf .= "r";
-  }
-  else {
-    $buf .= "p";
-  }
+	# we will build a string like:
+	# Bs1s2s3(w|r|p)g1g2g3v
+	# s -> src 
+	my $buf;
+	#$buf = "C$src";
+	$buf = $src;
+
+	if($type eq "write") 
+	{
+		$buf .= "w";
+	}
+	elsif ($type eq "read") 
+	{
+		$buf .= "r";
+	}
+	else 
+	{
+		$buf .= "p";
+	}
   
-  $buf .= $dst;
-  $buf .= $data;
+	$buf .= $dst;
+	$buf .= $data;
   
-  Log(4,"SimpleRead: $buf\n");
+	Log(4,"SimpleRead: $buf\n");
   
-  return $buf;
+	return $buf;
 }
 
 ########################
 sub
 TUL_CloseDev($)
 {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $dev = $hash->{DeviceName};
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	my $dev = $hash->{DeviceName};
 
-  return if(!$dev);
+	return if(!$dev);
   
-  if($hash->{TCPDev}) {
-    $hash->{TCPDev}->close();
-    delete($hash->{TCPDev});
-
-  } elsif($hash->{USBDev}) {
-    $hash->{USBDev}->close() ;
-    delete($hash->{USBDev});
-
-  }
-  delete($selectlist{"$name.$dev"});
-  delete($readyfnlist{"$name.$dev"});
-  delete($hash->{FD});
+	if($hash->{TCPDev}) 
+	{
+		$hash->{TCPDev}->close();
+		delete($hash->{TCPDev});
+	} 
+	elsif($hash->{USBDev}) 
+	{
+		$hash->{USBDev}->close() ;
+		delete($hash->{USBDev});
+	}
+	
+	delete($selectlist{"$name.$dev"});
+	delete($readyfnlist{"$name.$dev"});
+	delete($hash->{FD});
 }
 
 ########################
 sub
 TUL_OpenDev($$)
 {
-  my ($hash, $reopen) = @_;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-  my $po;
+	my ($hash, $reopen) = @_;
+	my $dev = $hash->{DeviceName};
+	my $name = $hash->{NAME};
+	my $po;
 
-  $hash->{PARTIAL} = "";
-  Log 3, "TUL opening $name device $dev"
-        if(!$reopen);
+	$hash->{PARTIAL} = "";
+	Log 3, "TUL opening $name device $dev" if(!$reopen);
 
-  if($dev =~ m/^(eibd):(.+)$/) { # eibd:host[:port]
-	my $host = $2;
-	my $port = 6720;
-	if($host =~ m/^(.+):([0-9]+)$/){ #host:port
-		$host = $1;
-		$port = $2;
+	# eibd:host[:port]
+	if($dev =~ m/^(eibd):(.+)$/) 
+	{
+		my $host = $2;
+		my $port = 6720;
+		
+		#host:port
+		if($host =~ m/^(.+):([0-9]+)$/)
+		{ 
+			$host = $1;
+			$port = $2;
+		}
+
+		# This part is called every time the timeout (5sec) is expired _OR_
+		# somebody is communicating over another TCP connection. As the connect
+		# for non-existent devices has a delay of 3 sec, we are sitting all the
+		# time in this connect. NEXT_OPEN tries to avoid this problem.
+		return if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN});
+
+		my $conn = IO::Socket::INET->new(PeerAddr => $host, PeerPort => $port,Proto => 'tcp');
+		if($conn) 
+		{
+			delete($hash->{NEXT_OPEN})
+		} 
+		else 
+		{
+			Log3 ($name, 3, "Can't connect to $dev: $!") if(!$reopen);
+			$readyfnlist{"$name.$dev"} = $hash;
+			$hash->{STATE} = "disconnected";
+			$hash->{NEXT_OPEN} = time()+60;
+			return "";
+		}
+
+		$hash->{DevType} = 'EIBD';
+		$hash->{TCPDev} = $conn;
+		$hash->{FD} = $conn->fileno();
+		delete($readyfnlist{"$name.$dev"});
+		$selectlist{"$name.$dev"} = $hash;
+	}
+	# tpuart:ttydev[@baudrate] / USB/Serial device
+	elsif ($dev =~ m/^(tul|tpuart):(.+)$/) 
+	{
+		my $dev = $2;
+		my $baudrate;
+		($dev, $baudrate) = split("@", $dev);
+		$baudrate = 19200 if(!$baudrate); # fix for TUL board
+  	
+		if ($^O=~/Win/) 
+		{
+			require Win32::SerialPort;
+			$po = new Win32::SerialPort ($dev);
+		} else  
+		{
+			require Device::SerialPort;
+			$po = new Device::SerialPort ($dev);
+		}
+
+		if(!$po) 
+		{
+			return undef if($reopen);
+			Log3 ($name, 3, "Can't open $dev: $!");
+			$readyfnlist{"$name.$dev"} = $hash;
+			$hash->{STATE} = "disconnected";
+			return "";
+		}
+		
+		$hash->{DevType} = 'TPUART';
+		$hash->{USBDev} = $po;
+		if( $^O =~ /Win/ ) 
+		{
+			$readyfnlist{"$name.$dev"} = $hash;
+		} 
+		else 
+		{
+			$hash->{FD} = $po->FILENO;
+			delete($readyfnlist{"$name.$dev"});
+			$selectlist{"$name.$dev"} = $hash;
+		}
+		
+		# assumed always available
+		if($baudrate) 
+		{
+			$po->reset_error();
+			Log3 ($name, 3, "TUL setting $name baudrate to $baudrate");
+			$po->baudrate($baudrate);
+			$po->databits(8);
+			$po->parity('even');
+			$po->stopbits(1);
+			$po->handshake('none');
+
+			# This part is for some Linux kernel versions which has strange default
+			# settings.  Device::SerialPort is nice: if the flag is not defined for your
+			# OS then it will be ignored.
+			$po->stty_icanon(0);
+			#$po->stty_parmrk(0); # The debian standard install does not have it
+			$po->stty_icrnl(0);
+			$po->stty_echoe(0);
+			$po->stty_echok(0);
+			$po->stty_echoctl(0);
+
+			# Needed for some strange distros
+			$po->stty_echo(0);
+			$po->stty_icanon(0);
+			$po->stty_isig(0);
+			$po->stty_opost(0);
+			$po->stty_icrnl(0);
+		}
+
+		$po->write_settings;
+	}
+	# No more devices supported now
+	else 
+	{                              
+		Log3 ($name, 1, "$dev protocol is not supported");
 	}
 
-    # This part is called every time the timeout (5sec) is expired _OR_
-    # somebody is communicating over another TCP connection. As the connect
-    # for non-existent devices has a delay of 3 sec, we are sitting all the
-    # time in this connect. NEXT_OPEN tries to avoid this problem.
-    if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-      return;
-    }
+	if($reopen) 
+	{
+		Log3 ($name, 1, "TUL $dev reappeared ($name)");
+	} 
+	else 
+	{
+		Log3 ($name, 3, "TUL device opened");
+	}
 
-    my $conn = IO::Socket::INET->new(PeerAddr => $host, PeerPort => $port,Proto => 'tcp');
-    if($conn) {
-      delete($hash->{NEXT_OPEN})
+	$hash->{STATE}="";       # Allow InitDev to set the state
+	my $ret  = TUL_DoInit($hash);
 
-    } else {
-      Log(3, "Can't connect to $dev: $!") if(!$reopen);
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      $hash->{NEXT_OPEN} = time()+60;
-      return "";
-    }
+	if($ret) 
+	{
+		TUL_CloseDev($hash);
+		Log 1, "Cannot init $dev, ignoring it";
+	}
 
-	$hash->{DevType} = 'EIBD';
-    $hash->{TCPDev} = $conn;
-    $hash->{FD} = $conn->fileno();
-    delete($readyfnlist{"$name.$dev"});
-    $selectlist{"$name.$dev"} = $hash;
-
-  }
-  elsif ($dev =~ m/^(tul|tpuart):(.+)$/) { # tpuart:ttydev[@baudrate] / USB/Serial device
-    
-    my $dev = $2;
-  	my $baudrate;
-  	($dev, $baudrate) = split("@", $dev);
-	$baudrate = 19200 if(!$baudrate); # fix for TUL board
-  	
-    if ($^O=~/Win/) {
-     require Win32::SerialPort;
-     $po = new Win32::SerialPort ($dev);
-    } else  {
-     require Device::SerialPort;
-     $po = new Device::SerialPort ($dev);
-    }
-
-    if(!$po) {
-      return undef if($reopen);
-      Log(3, "Can't open $dev: $!");
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      return "";
-    }
-    $hash->{DevType} = 'TPUART';
-    $hash->{USBDev} = $po;
-    if( $^O =~ /Win/ ) {
-      $readyfnlist{"$name.$dev"} = $hash;
-    } else {
-      $hash->{FD} = $po->FILENO;
-      delete($readyfnlist{"$name.$dev"});
-      $selectlist{"$name.$dev"} = $hash;
-    }
-
-    if($baudrate) { # assumed always available
-      $po->reset_error();
-      Log 3, "TUL setting $name baudrate to $baudrate";
-      $po->baudrate($baudrate);
-      $po->databits(8);
-      $po->parity('even');
-      $po->stopbits(1);
-      $po->handshake('none');
-
-      # This part is for some Linux kernel versions which has strange default
-      # settings.  Device::SerialPort is nice: if the flag is not defined for your
-      # OS then it will be ignored.
-      $po->stty_icanon(0);
-      #$po->stty_parmrk(0); # The debian standard install does not have it
-      $po->stty_icrnl(0);
-      $po->stty_echoe(0);
-      $po->stty_echok(0);
-      $po->stty_echoctl(0);
-
-      # Needed for some strange distros
-      $po->stty_echo(0);
-      $po->stty_icanon(0);
-      $po->stty_isig(0);
-      $po->stty_opost(0);
-      $po->stty_icrnl(0);
-    }
-
-    $po->write_settings;
-  	
-  	
-  }
-  else {                              # No more devices supported now
-	
-	Log(1, "$dev protocol is not supported");
-  }
-
-  if($reopen) {
-    Log 1, "TUL $dev reappeared ($name)";
-  } else {
-    Log 3, "TUL device opened";
-  }
-
-  $hash->{STATE}="";       # Allow InitDev to set the state
-  my $ret  = TUL_DoInit($hash);
-
-  if($ret) {
-    TUL_CloseDev($hash);
-    Log 1, "Cannot init $dev, ignoring it";
-  }
-
-  DoTrigger($name, "CONNECTED") if($reopen);
-  return $ret;
+	DoTrigger($name, "CONNECTED") if($reopen);
+	return $ret;
 }
 
+########################
 sub
 TUL_Disconnected($)
 {
-  my $hash = shift;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
+	my $hash = shift;
+	my $dev = $hash->{DeviceName};
+	my $name = $hash->{NAME};
 
-  return if(!defined($hash->{FD}));                 # Already deleted or RFR
+	return if(!defined($hash->{FD}));                 # Already deleted or RFR
 
-  Log 1, "$dev disconnected, waiting to reappear";
-  TUL_CloseDev($hash);
-  $readyfnlist{"$name.$dev"} = $hash;               # Start polling
-  $hash->{STATE} = "disconnected";
+	Log3 ($name, 1, "$dev disconnected, waiting to reappear");
+	TUL_CloseDev($hash);
+	$readyfnlist{"$name.$dev"} = $hash;               # Start polling
+	$hash->{STATE} = "disconnected";
 
-  # Without the following sleep the open of the device causes a SIGSEGV,
-  # and following opens block infinitely. Only a reboot helps.
-  sleep(5);
+	# Without the following sleep the open of the device causes a SIGSEGV,
+	# and following opens block infinitely. Only a reboot helps.
+	sleep(5);
 
-  DoTrigger($name, "DISCONNECTED");
+	DoTrigger($name, "DISCONNECTED");
 }
 
+########################
 sub
 TUL_Attr(@)
 {
-  my @a = @_;
-
-  Log 2, "Unsupported method TUL_Attr($a[0],$a[1],$a[2],$a[3])";
- 
-  return undef;
+	my @a = @_;
+	return undef;
 }
 
 
@@ -632,9 +622,11 @@ TUL_Attr(@)
 #
 
 # Utility functions
-sub tul_hex2addr {
+sub tul_hex2addr 
+{
 	my $str = lc($_[0]);
-    if ($str =~ /([0-9a-f])([0-9a-f])([0-9a-f]{2})/) {
+    if ($str =~ /([0-9a-f])([0-9a-f])([0-9a-f]{2})/) 
+	{
         return (hex($1) << 11) | (hex($2) << 8) | hex($3);
     }
     else
@@ -644,11 +636,13 @@ sub tul_hex2addr {
     }
 }
 
-sub tul_addr2hex {
+sub tul_addr2hex 
+{
 	my $a = $_[0];
 	my $b = $_[1];  # 1 if local (group) address, else physical address
     my $str ;
-    if ($b == 1) { # logical address used
+    if ($b == 1) 
+	{ # logical address used
         $str = sprintf "%01x%01x%02x", ($a >> 11) & 0xf, ($a >> 8) & 0x7, $a & 0xff;
     }
     else { # physical address used
@@ -657,13 +651,16 @@ sub tul_addr2hex {
     return $str;
 }
 
-sub tul_str2hex {
+sub tul_str2hex 
+{
 	my $str = $_[0];
-    if ($str =~ /(\d+)\/(\d+)\/(\d+)/) { # logical address
+    if ($str =~ /(\d+)\/(\d+)\/(\d+)/) 
+	{ # logical address
 		my $hex = sprintf("%01x%01x%02x",$1,$2,$3);
 		return $hex; 
     } 
-    elsif ($str =~ /(\d+)\.(\d+)\.(\d+)/) { # physical address
+    elsif ($str =~ /(\d+)\.(\d+)\.(\d+)/) 
+	{ # physical address
     	my $hex = sprintf("%01x%01x%02x",$1,$2,$3);
     	return $hex;
     }
@@ -691,10 +688,12 @@ sub decode_eibd($)
     $apci = vec($bytes, 3, 2);
 	# mask out apci bits, so we can use the whole byte as data:
     vec($bytes, 3, 2) = 0;
-    if ($apci >= 0 && $apci <= $#apcicodes) {
+    if ($apci >= 0 && $apci <= $#apcicodes) 
+	{
 		$msg{'type'} = $apcicodes[$apci];
     }
-    else {
+    else 
+	{
 		$msg{'type'} = 'apci ' . $apci;
     }
 
@@ -703,11 +702,12 @@ sub decode_eibd($)
 
     @data = unpack ("C" . length($bytes), $bytes);
     my $datalen = @data;
-    Log(5, "decode_eibd byte len: " . length($bytes) . " array size: $datalen");
+    Log (5, "decode_eibd byte len: " . length($bytes) . " array size: $datalen");
     
     # in case of data len > 1, the first byte (the one with apci) seems not to be used
     # and only the following byte are of interest.
-    if($datalen>1) {
+    if($datalen>1) 
+	{
     	shift @data;
     }
     
@@ -724,7 +724,8 @@ sub encode_eibd($)
     my @data;
 
     $APCI = $apcivalues{$mref->{'type'}};
-    if (!(defined $APCI)) {
+    if (!(defined $APCI)) 
+	{
 		Log(3,"Bad EIB message type $mref->{'type'}\n");
 		return;
     }
@@ -739,7 +740,8 @@ sub encode_eibd($)
 	    0x0 | ($APCI >> 2), 	# TPDU type, Sequence no, APCI (msb)
 	    (($APCI & 0x3) << 6) | $data[0],
 	    );
-    if ($datalen > 1) {
+    if ($datalen > 1) 
+	{
     	shift(@data);
 		push @msg, @data;
     }
@@ -785,7 +787,8 @@ sub decode_tpuart($)
    Log(5,"msg cmd: " . sprintf("0x%02x",$cmd) ." datalen: $len");
    
    my $apci = ($cmd >> 6) & 0x0F;
-   if($len == 2) { # 1 byte data
+   if($len == 2) 
+   { # 1 byte data
    	$bytes = pack("C",$cmd & 0x3F);
    }
 
@@ -793,10 +796,12 @@ sub decode_tpuart($)
    
     my %msg;
     my @data;
-    if ($apci >= 0 && $apci <= $#apcicodes) {
+    if ($apci >= 0 && $apci <= $#apcicodes) 
+	{
 		$msg{'type'} = $apcicodes[$apci];
     }
-    else {
+    else 
+	{
 		$msg{'type'} = 'apci ' . $apci;
     }
 
@@ -820,7 +825,8 @@ sub encode_tpuart($)
     my @data;
 
     $APCI = $apcivalues{$mref->{'type'}};
-    if (!(defined $APCI)) {
+    if (!(defined $APCI)) 
+	{
 		Log(3,"Bad EIB message type $mref->{'type'}\n");
 		return;
     }
@@ -841,7 +847,8 @@ sub encode_tpuart($)
 	    0x00,
 	    (($APCI & 0x3) << 6) | $data[0],
 	    );
-    if ($datalen > 1) {
+    if ($datalen > 1) 
+	{
     	shift(@data);
 		push @msg, @data;
     }
@@ -1138,12 +1145,10 @@ sub sendRequest($$)
   <table>
   <tr><td>
   The TUL module is the representation of a EIB / KNX connector in FHEM.
-  <a href="#EIB">EIB</a> instances represent the EIB / KNX devices and will need a TUL as IODev to communicate with the EIB / KNX network.<br>
+  <a href="#KNX">KNX</a> instances represent the EIB / KNX devices and will need a TUL as IODev to communicate with the EIB / KNX network.<br>
   The TUL module is designed to connect to EIB network either using EIBD or the <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> created by busware.de
 
-  Note: this module may require the Device::SerialPort or Win32::SerialPort
-  module if you attach the device via USB and the OS sets strange default
-  parameters for serial devices.
+  Note: this module may require the Device::SerialPort or Win32::SerialPort module if you attach the device via USB and the OS sets strange default parameters for serial devices.
 
   </td><td>
   <img src="IMG_0483.jpg" width="100%" height="100%"/>
@@ -1156,55 +1161,31 @@ sub sendRequest($$)
     <code>define &lt;name&gt; TUL &lt;device&gt; &lt;physical address&gt;</code> <br>
     <br>
     TUL usb stick / TPUART serial devices:<br><ul>
-      &lt;device&gt; specifies the serial port to communicate with the TUL.
-      The name of the serial-device depends on your distribution, under
-      linux the cdc_acm kernel module is responsible, and usually a
-      /dev/ttyACM0 device will be created. If your distribution does not have a
-      cdc_acm module, you can force usbserial to handle the TUL by the
-      following command:<ul>modprobe usbserial vendor=0x03eb
-      product=0x204b</ul>In this case the device is most probably
-      /dev/ttyUSB0.<br><br>
+      &lt;device&gt; specifies the serial port to communicate with the TUL. The name of the serial-device depends on your distribution, under linux the cdc_acm kernel module is responsible, and usually a
+      /dev/ttyACM0 device will be created. If your distribution does not have a cdc_acm module, you can force usbserial to handle the TUL by the following command:<ul>modprobe usbserial vendor=0x03eb
+      product=0x204b</ul>In this case the device is most probably /dev/ttyUSB0.<br><br>
 
-      You can also specify a baudrate if the device name contains the @
-      character, e.g.: /dev/ttyACM0@19200<br><br>
-	  Note: For TUL usb stick the baudrate 19200 is needed and this is the default
-	  when no baudrate is given.
+      You can also specify a baudrate if the device name contains the @ character, e.g.: /dev/ttyACM0@19200<br><br>
+	  Note: For TUL usb stick the baudrate 19200 is needed and this is the default when no baudrate is given.
 	  <br><br>
 
 	  Example:<br>
 	  <code>define tul TUL tul:/dev/ttyACM0 1.1.249</code>
     </ul>
+	
     EIBD:<br><ul>
-    &lt;device&gt; specifies the host:port of the eibd device. E.g.
-    eibd:192.168.0.244:2323. When using the standard port, the port can be omitted.
+    &lt;device&gt; specifies the host:port of the eibd device. E.g. eibd:192.168.0.244:2323. When using the standard port, the port can be omitted.
     <br><br>
 
 	  Example:<br>
 	  <code>define tul TUL eibd:localhost 1.1.249</code>
     </ul>
     <br>
-    If the device is called none, then no device will be opened, so you
-    can experiment without hardware attached.<br>
+    If the device is called none, then no device will be opened, so you can experiment without hardware attached.<br>
 
     The physical address is used as the source address of telegrams sent to EIB network.
   </ul>
   <br>
-
-  <a name="TULset"></a>
-  <b>Set </b>
-  <ul>
-    <li>raw<br>
-        Issue a TUL raw telegram message
-        </li><br>
-  </ul>
-
-  <a name="TULget"></a>
-  <b>Get</b>
-  <ul>
-    <li>raw<br>
-        sends a read telegram
-        </li><br>
-  </ul>
 
   <a name="TULattr"></a>
   <b>Attributes</b>
@@ -1212,10 +1193,83 @@ sub sendRequest($$)
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#verbose">verbose</a></li><br>
+	<li><a href="#useEIB">useEIB</a></li><br>
+	<ul> 
+		The device operates the module 10_EIB, if this flag is set to 1. This is used for backward compatibility only. Otherwise, only the client 10_KNX is used.
+	</ul>	
   </ul>
   <br>
 </ul>
 
 =end html
+
+=begin html_DE
+
+<a name="TUL"></a>
+<h3>TUL</h3>
+<ul>
+
+  <table>
+  <tr><td>
+  Das Modul TUL stellt die Verbindung von FHEM zum EIB / KNX dar.
+  <a href="#KNX">KNX</a> Instanzen stellen die Vrbindung zu den KNX-Gruppen dar und ben&Ouml;tigen ein TUL-Device als IO-Schnittstelle.<br>
+  Das Modul TUL kommuniziert mit dem KNX entweder &Uuml;ber den EIBD, den KNXD oder den TUL <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> hergestellt von busware.de
+
+  Anmerkung: das Modul ben&Ouml;tigt die Device::SerialPort oder Win32::SerialPort wenn der Stick &Uuml;ber USB angeschlossen wird, und das OS unrealistische Parameter f&Uuml;r das Device einstellt.
+
+  </td><td>
+  <img src="IMG_0483.jpg" width="100%" height="100%"/>
+  </td></tr>
+  </table>
+
+  <a name="TULdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; TUL &lt;device&gt; &lt;physical address&gt;</code> <br>
+    <br>
+    TUL usb stick / TPUART serial devices:<br><ul>
+      &lt;device&gt; enth&auml;lt die serielle Schnittstelle der TUL. Der name der Schnittstelle h&auml;ngt von Eurer Distribution ab. Unter linux wird f&Uuml;r gew&Ouml;hnlich /dev/ttyACM0 verwandt. 
+	  Wenn Eure Distribution das modul cdc_acm nicht enth&auml;lt, k&Ouml;nnt Ihr das Laden des handles der TUL mit dem folgenden Befehl erzwingen:<ul>modprobe usbserial vendor=0x03eb
+      product=0x204b</ul>Dann ist die Schnittstelle meist /dev/ttyUSB0.<br><br>
+
+	  Ihr k&Ouml;nnt dem Ger&auml;t eine Baudrate vorgeben. Dazu dem Ger&auml;tenamen das Zeichen @ hinzuf&Uuml;gen, z.B.: /dev/ttyACM0@19200<br><br>
+	  Anmerkung: F&Uuml;r den TUL-USB-Stick wird die Baudrate 19200 ben&Ouml;tigt. Dies entspricht der Defaulteinstellung.
+	  <br><br>
+
+	  Beispiel:<br>
+	  <code>define tul TUL tul:/dev/ttyACM0 1.1.249</code>
+    </ul>
+	
+    EIBD:<br><ul>
+    &lt;device&gt; entspricht dem host:port des eibd-servers. z.B. eibd:192.168.0.244:2323. Wenn der Standardport genutzt wird, muss dieser nicht angegeben werden.
+    <br><br>
+
+	  Beispiel:<br>
+	  <code>define tul TUL eibd:localhost 1.1.249</code>
+    </ul>
+    <br>
+	Wenn das Ger&auml;t none konfiguriert wird, wird kein device ge&Ouml;ffnet. So k&Ouml;nnt Ihr ohne angeschlossene Hardware experimentieren. <br>
+
+	Die physikalische Adresse wird als Absender f&Uuml;r KNX-Telegramme genutzt.
+  </ul>
+  <br>
+
+  <a name="TULattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#verbose">verbose</a></li><br>
+	<li><a href="#useEIB">useEIB</a></li><br>
+	<ul> 
+		Das Ger&auml;t kann das Modul 10_EIB bedienen, wenn das Flag auf 1 gesetzt ist. Dies ist nur f&Uuml;r R&Uuml;ckw&auml;rtskompatibili&auml;t genutzt. Andernfalls wird nur das Modul 10_KNX bedient.
+	</ul>	
+  </ul>
+  <br>
+</ul>
+
+=end html_DE
+
 =cut
