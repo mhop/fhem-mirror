@@ -88,6 +88,8 @@ allowed_Authenticate($$$$)
     delete $cl->{".httpAuthHeader"};
     return 0 if(!$basicAuth);
 
+    return 1 if($FW_httpheader[0] =~ m/^OPTIONS /); #Forum #51362
+
     my $FW_httpheader = $param;
     my $secret = $FW_httpheader->{Authorization};
     $secret =~ s/^Basic //i if($secret);
