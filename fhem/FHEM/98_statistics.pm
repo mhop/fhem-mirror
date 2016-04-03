@@ -136,7 +136,7 @@ sub statistics_Initialize($)
                    ."minAvgMaxReadings "
                    ."periodChangePreset "
                    ."specialDeltaPeriodHours "
-                   ."specialDeltaPeriod "
+                   ."specialDeltaPeriods "
                    ."singularReadings "
                    ."tendencyReadings "
                    .$readingFnAttributes;
@@ -852,13 +852,13 @@ sub statistics_doStatisticSpecialPeriod2 ($$$$$$)
    my $name = $hash->{NAME};
    my $pattern;
    
-   my $specialDeltaPeriod = AttrVal($name, "specialDeltaPeriod", "");
-   return   unless $specialDeltaPeriod;
+   my $specialDeltaPeriods = AttrVal($name, "specialDeltaPeriods", "");
+   return   unless $specialDeltaPeriods;
 
-#Check if reading occures in attribute specialDeltaPeriod, extract period numbers
+#Check if reading occures in attribute specialDeltaPeriods, extract period numbers
    my $devName = $dev->{NAME};
    $pattern = $devName . ":" . $readingName . ":" . $periodText . ':([\d:]+)';
-   return   unless $specialDeltaPeriod =~ $pattern;
+   return   unless $specialDeltaPeriods =~ $pattern;
    
 #Determine number of periods and maximal number
    my @periods = split /:/, $1;
@@ -1276,7 +1276,7 @@ sub statistics_UpdateDevReading($$$$)
          <code>Badfenster:Window:(Open|Open_Count):Month</code>
       </dd>
     </li><br>
-   <li><code>specialDeltaPeriod &lt;Device:Reading:Period:count1:count2:...&gt;</code>
+   <li><code>specialDeltaPeriods &lt;Device:Reading:Period:count1:count2:...&gt;</code>
       <br>
       Creates for the given delta reading additional singular readings of the given numbers of a period (Hour, Day, Month)
       <br>
@@ -1284,11 +1284,11 @@ sub statistics_UpdateDevReading($$$$)
       <br>
       <dt>Example:</dt>
       <dd>
-      <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:06:72:96</code>
+      <code>attr Statistik specialDeltaPeriods Wettersensor:rain:Hour:06:72:96</code>
       <br>
       This will create 3 additional readings for the rain of the last 6, 72 and 96 hours.
       <br>
-      <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
+      <code>attr Statistik specialDeltaPeriods Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
       <br>
       This will create 4 additional readings for the rain of the last 48 hours and the last 30 Days and the energy consumtion of the last 6 and 12 months.
       </dd>
@@ -1444,26 +1444,26 @@ sub statistics_UpdateDevReading($$$$)
             <code>Wettersensor:rain:Delta:(Hour|Day)|FritzDect:power:Delta:Day</code>
          </dd>
        </li><br>
-      <li><code>specialDeltaPeriod &lt;Ger&auml;t:Ger&auml;tewert:Zeitraum:Anzahl1:Anzahl2:...&gt;</code>
+      <li><code>specialDeltaPeriods &lt;Ger&auml;t:Ger&auml;tewert:Zeitraum:Anzahl1:Anzahl2:...&gt;</code>
          <br>
-         Erzeugt f&uuml;r die angegebenen "delta"-Ger&auml;tewert zus&auml;tzliche Einzelwerte für den angegebene Zeitraum (Hour, Day, Month) und der angegebenen Anzahl.
+         Erzeugt f&uuml;r die angegebenen "delta"-Ger&auml;tewerte zus&auml;tzliche Einzelwerte &uuml;ber die angegebene Anzahl eines Zeitraums (Hour, Day, Month).
          <br>
          Regul&auml;re Ausdr&uuml;cke k&ouml;nnen <u>nicht</u> genutzt werden. Es k&ouml;nnen auch mehrere Ger&auml;tewert und/oder Zeitr&auml;ume hinzugef&uuml;gt werden. Diese m&uuml;ssen durch Kommas (ohne Leerzeichen) getrennt werden.
          <br>
          <dt>Beispiel:</dt>
          <dd>
-         <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:06:72:96</code>
+         <code>attr Statistik specialDeltaPeriods Wettersensor:rain:Hour:06:72:96</code>
          <br>
          Dies erzeugt 3 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 6, 72, 96 Stunden.
          <br>
-         <code>attr Statistik specialDeltaPeriod Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
+         <code>attr Statistik specialDeltaPeriods Wettersensor:rain:Hour:48,Wettersensor:rain:Day:30,EZaehler:energy:Month:6:12</code>
          <br>
-         Dies erzeugt 4 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 48 Stunden und den letzten 30 tagen und den Energieverbrauch der letzten 6 und 12 Monate.
+         Dies erzeugt 4 zus&auml;tzliche Werte f&uuml;r die Regenmenge in den letzten 48 Stunden und den letzten 30 Tagen und den Energieverbrauch der letzten 6 und 12 Monate.
          </dd>
       </li><br>
-      <li><code>specialDeltaPeriodHours &lt;Stunden&gt;</code>
+      <li><code>specialDeltaPeriodHours</code>
          <br>
-         F&uuml;gt den Delta-Statistiken einen singul&auml;ren Ger&auml;tewert f&uuml;r die angegebenen Stunden hinzu (z.b. f&uuml;r den Regen in den letzten 72 Stunden)
+         veraltet
       </li><br>
       <li><code>tendencyReadings &lt;Ger&auml;tewerte&gt;</code>
          <br>
