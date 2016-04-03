@@ -440,7 +440,7 @@ sub MilightDevice_Set(@)
     $usage = "Usage: set $name rgb RRGGBB [seconds(0..x)] [flags(l=long path|q=don't clear queue)]";
     return $usage if ($args[0] !~ /^([0-9A-Fa-f]{1,2})([0-9A-Fa-f]{1,2})([0-9A-Fa-f]{1,2})$/);
     my( $r, $g, $b ) = (hex($1), hex($2), hex($3)); #change to color.pm?
-    my( $h, $s, $v ) = Color::rgb2hsv($r,$g,$b);
+    my( $h, $s, $v ) = Color::rgb2hsv($r/255.0,$g/255.0,$b/255.0);
     $h = MilightDevice_roundfunc($h * 360);
     $s = MilightDevice_roundfunc($s * 100);
     $v = MilightDevice_roundfunc($v * 100);
