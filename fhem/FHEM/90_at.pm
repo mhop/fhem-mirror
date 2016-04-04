@@ -79,7 +79,7 @@ at_Define($$)
   }
   return "datespec is not allowed with + or *" if($abstime && ($rel || $rep));
 
-  my $err = perlSyntaxCheck($command, ());
+  $err = perlSyntaxCheck($command, ());
   return $err if($err);
 
   $rel = "" if(!defined($rel));
