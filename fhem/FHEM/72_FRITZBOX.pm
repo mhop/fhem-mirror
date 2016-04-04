@@ -1387,7 +1387,7 @@ sub FRITZBOX_Readout_Run_Web($)
 # Create LanDevice list and delete inactive devices
    my %oldLanDevice;
    #collect current mac-readings (to delete the ones that are inactive or disappeared)
-   foreach (keys $hash->{READINGS}) {
+   foreach (keys %{ $hash->{READINGS} }) {
       $oldLanDevice{$_} = $hash->{READINGS}{$_}{VAL}     if $_ =~ /^mac_/ && defined $hash->{READINGS}{$_}{VAL};
    }
    %landevice = ();
