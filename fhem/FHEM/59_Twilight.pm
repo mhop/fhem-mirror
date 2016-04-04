@@ -118,6 +118,7 @@ sub Twilight_Define($$)
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
   $hash->{WEATHER}        = $weather;
+  $hash->{VERSUCHE}       = 0; 
   $hash->{DEFINE}         = 1;
   $hash->{SUNPOS_OFFSET}  = 5*60;
  
@@ -356,11 +357,14 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
   
   my $location = $hash->{WEATHER};
   my $verbose  = AttrVal($hash->{NAME}, "verbose", 3 );
-
+  
+  use constant URL => "http://query.yahooapis.com/v1/public/yql?q=select%%20*%%20from%%20weather.forecast%%20where%%20woeid=%s%%20and%%20u=%%27c%%27&format=%s&env=store%%3A%%2F%%2Fdatatables.org%%2Falltableswithkeys";
+  my $url = sprintf(URL, $location, "json");
+ #Log3 $hash, 3, "url------------>$url";
+  
   my $param = {
-     #noshutdown => 1,
-      url        => "http://weather.yahooapis.com/forecastrss?w=".$location."&u=c",
-      timeout    => defined($hash->{DEFINE}) ? 5 : 5,
+      url        => $url,
+      timeout    => defined($hash->{DEFINE}) ? 10 :10,
       hash       => $hash,
       method     => "GET",
       loglevel   => 4-($verbose-3),
@@ -370,8 +374,8 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
   
   if (defined($hash->{DEFINE})) {
     delete $param->{callback};
-    my ($err, $xml) = HttpUtils_BlockingGet($param);
-    Twilight_WeatherCallback($param, $err, $xml);
+    my ($err, $result) = HttpUtils_BlockingGet($param);
+    Twilight_WeatherCallback($param, $err, $result);
   } else {
     HttpUtils_NonblockingGet($param);
   }  
@@ -379,20 +383,45 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
 }
 ################################################################################
 sub Twilight_WeatherCallback(@) {
-  my ($param, $err, $xml) = @_;
+  my ($param, $err, $result) = @_;
   
   my $hash = $param->{hash};
   return if (!defined($hash));
   
   if ($err) {
     Log3 $hash, 3, "[$hash->{NAME}] got no weather info from yahoo. Error code: $err";
-    $xml = undef;
+    $result = undef;
   } else {
      Log3 $hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}";
   }
   
-  Twilight_TwilightTimes      ($hash, $param->{mode}, $xml);
+  Twilight_TwilightTimes      ($hash, $param->{mode}, $result);
+  
+  #$hash->{CONDITION} = 50; 
+  if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} < 10) {
+     $hash->{VERSUCHE} += 1;
+     Twilight_RepeatTimerSet($hash, $param->{mode});
+     return;
+  } 
+  
+  Log3 $hash, 3, "[$hash->{NAME}] " . $hash->{VERSUCHE} . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >= 0);
+  Log3 $hash, 3, "[$hash->{NAME}] " . $hash->{VERSUCHE} . " attempt(s) needed got NO valid weather data from yahoo"   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} >  0);
+  $hash->{VERSUCHE} = 0; 
+  
   Twilight_StandardTimerSet   ($hash);
+}
+################################################################################
+sub Twilight_RepeatTimerSet($$) {
+  my ($hash, $mode) = @_;
+  my $midnight = time() + 60;
+
+  myRemoveInternalTimer("Midnight", $hash);
+  if ($mode eq "Mid") {
+     myInternalTimer   ("Midnight", $midnight, "Twilight_Midnight", $hash, 0);
+  } else {
+     myInternalTimer   ("Midnight", $midnight, "Twilight_WeatherTimerUpdate", $hash, 0);
+  }  
+  
 }
 ################################################################################
 sub Twilight_StandardTimerSet($) {
@@ -427,7 +456,7 @@ sub Twilight_sunposTimerSet($) {
 ################################################################################
 sub Twilight_getWeatherHorizon(@)
 {
-  my ($hash, $xml) = @_;
+  my ($hash, $result) = @_;
   
   my $location=$hash->{WEATHER};
   if ($location == 0)  {
@@ -437,47 +466,59 @@ sub Twilight_getWeatherHorizon(@)
   } 
 
   my $mod = "[".$hash->{NAME} ."] ";
-  my @a_current = (25,25,25,25,20,10,10,10,10,10,
-                   10, 7, 7, 7, 5,10,10, 6, 6, 6,
-                   10, 6 ,6, 6, 6, 6, 6, 5, 5, 3,
-                    3, 0, 0, 0, 0, 7, 0,15,15,15,
-                    9,15, 8, 5,12, 6, 8, 8);
+  my @faktor_cond_code = (25,25,25,25,20,10,10,10,10,10,
+                          10, 7, 7, 7, 5,10,10, 6, 6, 6,
+                          10, 6 ,6, 6, 6, 6, 6, 5, 5, 3,
+                           3, 0, 0, 0, 0, 7, 0,15,15,15,
+                           9,15, 8, 5,12, 6, 8, 8, 0, 0,
+                           0);
 
   # condition codes are described in FHEM wiki and in the documentation of the yahoo weather API
 
-  my $current, my $cond, my $temp, my $aktTemp;
-  if (defined($xml)) {
-     if($xml=~/text="(.*)"(\ *)code="(.*)"(\ *)temp="(.*)"(\ *)date/){
-        if(defined($1)){
-          $cond   =$1;
-          $current=$3;
-          $temp   =$5;
-        }else{
-          $current=-1;
-        }
-     }  
-  }else{
-     $current=-1;
-  }   
-
-  if(($current>=0) && ($current <=47)) {
-    $hash->{WEATHER_CORRECTION} = $a_current[$current] / 25 * 20;
-    $hash->{WEATHER_HORIZON}    = $hash->{WEATHER_CORRECTION} + $hash->{INDOOR_HORIZON};
-    $hash->{CONDITION_TXT}      = $cond;
-    $hash->{CONDITION}          = $current;
-    $hash->{TEMPERATUR}         = $temp;
-    
-    my $doy         = strftime("%j",localtime);    
-    my $declination =  0.4095*sin(0.016906*($doy-80.086));
-    if($hash->{WEATHER_HORIZON} > (89-$hash->{LATITUDE}+$declination) ){
-       $hash->{WEATHER_HORIZON} =  89-$hash->{LATITUDE}+$declination;
-    }
-    
-    return 1;
+  my ($cond_code, $cond_txt, $temperatur, $aktTemp);
+  if (defined($result)) {
+  
+    # ersetze in result(json) ": durch "=>
+    # dadurch entsteht ein Perausdruck, der direkt geparst werden kann
+     
+     my $perlAusdruck = $result;
+        $perlAusdruck =~ s/\":/\"=>/g;
+        $perlAusdruck =~ s/null/undef/g;
+        $perlAusdruck =~ s/true/1/g;
+        $perlAusdruck =~ s/false/0/g;
+        $perlAusdruck = '$resHash = ' .$perlAusdruck;        
+     
+     my $resHash;
+     eval $perlAusdruck; 
+     Log3 $hash, 3, "[$hash->{NAME}] error $@ parsing $result"   if($@);
+    #Log3 $hash, 3, "jsonAsPerl". Dumper $resHash->{query}{results}{channel}{item}{condition};
+   
+     $cond_code  = $resHash->{query}{results}{channel}{item}{condition}{code};
+     $cond_txt   = $resHash->{query}{results}{channel}{item}{condition}{text};
+     $temperatur = $resHash->{query}{results}{channel}{item}{condition}{temp};
+     
   }
-
-  $hash->{WEATHER_HORIZON} = "0";
-  $hash->{CONDITION}       = "-1";
+  
+  # wenn kein code ermittelt werden kann, wird ein Pseudocode gesetzt
+  if (!defined($cond_code)) {
+     $cond_code  = "50";         # eigener neutraler Code
+     $cond_txt   = "undefined";
+     $temperatur = "undefined";
+  }  
+  
+  $hash->{WEATHER_CORRECTION} = $faktor_cond_code[$cond_code] / 25 * 20;
+  $hash->{WEATHER_HORIZON}    = $hash->{WEATHER_CORRECTION} + $hash->{INDOOR_HORIZON};
+  $hash->{CONDITION}          = $cond_code;
+  $hash->{CONDITION_TXT}      = $cond_txt;
+  $hash->{TEMPERATUR}         = $temperatur;
+  
+  my $doy         = strftime("%j",localtime);    
+  my $declination =  0.4095*sin(0.016906*($doy-80.086));
+  if($hash->{WEATHER_HORIZON} > (89-$hash->{LATITUDE}+$declination) ){
+     $hash->{WEATHER_HORIZON} =  89-$hash->{LATITUDE}+$declination;
+  }
+  
+  return 1;
   
 }
 ################################################################################
