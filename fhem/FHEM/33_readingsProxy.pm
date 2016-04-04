@@ -34,6 +34,7 @@ sub readingsProxy_Initialize($)
   $hash->{UndefFn}  = "readingsProxy_Undefine";
   $hash->{SetFn}    = "readingsProxy_Set";
   $hash->{GetFn}    = "readingsProxy_Get";
+  $hash->{AttrFn}   = "readingsProxy_Attr";
   $hash->{AttrList} = "disable:1 "
                       ."getList "
                       ."setList "
@@ -270,9 +271,9 @@ readingsProxy_Get($@)
   my $v = join(" ", @a);
   my $get_fn = AttrVal( $hash->{NAME}, "getFn", "" );
   if( $get_fn =~ m/^{.*}$/s ) {
+    my $CMD = $a[0];
     my $DEVICE = $hash->{DEVICE};
     my $READING = $hash->{READING};
-    my $CMD = $a[0];
     my $ARGS = join(" ", @a[1..$#a]);
 
     my ($get_fn,$direct_return) = eval $get_fn;
@@ -293,6 +294,33 @@ readingsProxy_Get($@)
   delete($hash->{INSET});
   return $ret;
 }
+
+sub
+readingsProxy_Attr($$$;$)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  if( $cmd eq "set" ) {
+    if( $attrName eq 'getFn' || $attrName eq 'setFn' || $attrName eq 'valueFn' ) {
+      my %specials= (
+        "%CMD" => $name,
+        "%DEVICE" => $name,
+        "%READING" => $name,
+        "%ARGS" => $name,
+        "%VALUE" => $name,
+        "%LASTCMD" => $name,
+      );
+
+      my $err = perlSyntaxCheck($attrVal, %specials);
+      my $value_fn = eval $attrVal;
+      Log3 $name, 3, $name .": attrVal: ". $@ if($@);
+      return $err if($err);
+    }
+  }
+
+}
+
+
 
 1;
 
@@ -371,6 +399,7 @@ readingsProxy_Get($@)
         Examples:<br>
           <code>attr myProxy valueFn {($VALUE == 0)?"off":"on"}</code>
       </li>
+      <br><li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
     </ul><br>
 </ul>
 
