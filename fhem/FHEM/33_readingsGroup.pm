@@ -271,8 +271,7 @@ lookup($$$$$$$$$)
       my $DEVICE = $name;
       my $READING = $reading;
       my $VALUE = $value;
-      my $NUM = $VALUE;
-      $NUM =~ s/[^-\.\d]//g if( defined($NUM) );
+      my $NUM = rgVal2Num($value);
       my $ROW = $row;
       my $m = eval $mapping;
       if( $@ ) {
@@ -297,6 +296,7 @@ lookup($$$$$$$$$)
       my $DEVICE = $name;
       my $READING = $reading;
       my $VALUE = $value;
+      my $NUM = rgVal2Num($value);
       my $ROW = $row;
       $default = eval $default;
       $default = "" if( $@ );
@@ -335,8 +335,7 @@ lookup2($$$$;$$)
     my $DEVICE = $name;
     my $READING = $reading;
     my $VALUE = $value;
-    my $NUM = $VALUE;
-    $NUM =~ s/[^-\.\d]//g if( defined($NUM) );
+    my $NUM = rgVal2Num($value);
     my $ROW = $row;
     my $COLUMN = $column;
     my $l = eval $lookup;
@@ -365,6 +364,7 @@ lookup2($$$$;$$)
     my $DEVICE = $name;
     my $READING = $reading;
     my $VALUE = $value;
+    my $NUM = rgVal2Num($value);
     my $ROW = $row;
     my $COLUMN = $column;
     $lookup = eval $lookup;
@@ -1488,7 +1488,21 @@ readingsGroup_Attr($$$;$)
 
     if( $cmd eq "set" ) {
       my $attrVal = $attrVal;
+
+      my %specials= (
+        "%DEVICE" => $name,
+        "%READING" => $name,
+        "%VALUE" => "1",
+        "%NUM" => "1",
+        "%ROW" => "1",
+        "%COLUMN" => "1",
+      );
+
+      my $err = perlSyntaxCheck($attrVal, %specials);
+      return $err if($err);
+
       if( $attrVal =~ m/^{.*}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
+
         my $av = eval $attrVal;
         if( $@ ) {
           Log3 $hash->{NAME}, 3, $hash->{NAME} .": ". $@;
@@ -1743,6 +1757,7 @@ readingsGroup_Attr($$$;$)
         collapsed -> default state is collapsed but can be expanded<br>
         collapsible -> default state is visible but can be collapsed </li>
         </ul>
+        <br><li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
     </ul><br>
 
       For the hash version of all mapping attributes it is possible to give a default value
