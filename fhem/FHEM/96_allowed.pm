@@ -4,6 +4,7 @@ package main;
 
 use strict;
 use warnings;
+use vars qw(@FW_httpheader); # HTTP header, line by line
 
 #####################################
 sub
