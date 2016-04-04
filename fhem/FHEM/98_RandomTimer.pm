@@ -28,6 +28,8 @@ package main;
 
 use strict;
 use warnings;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
 # use IO::Socket;
 use Time::HiRes qw(gettimeofday);
 use Time::Local 'timelocal_nocheck';
@@ -219,7 +221,7 @@ sub RandomTimer_stopTimeReached($) {
    return ( time()>$hash->{helper}{stopTime} );
 }
 ########################################################################
-sub RandomTimer_setActive() {
+sub RandomTimer_setActive($$) {
    my ($hash, $value) = @_;
    $hash->{helper}{active} = $value;
    readingsSingleUpdate ($hash,  "active", $value, 1);
