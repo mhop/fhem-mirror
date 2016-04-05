@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2016-01-01
+# 2016-03-28
 
 # by r.koenig at koeniglich.de
 #
@@ -31,7 +31,6 @@ sub TCM_Read($);
 sub TCM_ReadAnswer($$);
 sub TCM_Ready($);
 sub TCM_Write($$$);
-
 sub TCM_Parse120($$$);
 sub TCM_Parse310($$$);
 sub TCM_CRC8($);
@@ -63,12 +62,12 @@ TCM_Initialize($)
   $hash->{AttrFn}   = "TCM_Attr";
   $hash->{AttrList} = "baseID blockSenderID:own,no comType:TCM,RS485 do_not_notify:1,0 " .
                       "dummy:1,0 learningMode:always,demand,nearfield " .
-                      "sendInterval:0,25,40,50,100,150,200,250";
+                      "sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
+                      "smartAckLearnMode:simple,advance,advanceSelectRep";
 }
 
 # Define
-sub
-TCM_Define($$)
+sub TCM_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
@@ -354,12 +353,14 @@ TCM_Read($)
         if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
           Log3 $name, 4, "TCM $name own telegram from $id blocked.";
         } else {
+          #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals);
         }
 
       } elsif($packetType == 2) {
         # packet type RESPONSE
-        my $rc = substr($mdata, 0, 2);
+        $mdata =~ m/^(..)(.*)$/;
+        my $rc = $1;
         my %codes = (
           "00" => "OK",
           "01" => "ERROR",
@@ -370,8 +371,11 @@ TCM_Read($)
           "90" => "BASEID_OUT_OF_RANGE",
           "91" => "BASEID_MAX_REACHED",
         );
-        $rc = $codes{$rc} if($codes{$rc});
-        Log3 ($name, ($rc eq "OK") ? 5 : 2, "TCM $name RESPONSE: $rc");
+        my $rcTxt = $codes{$rc} if($codes{$rc});
+        Log3 $name, $rc eq "00" ? 5 : 2, "TCM $name RESPONSE: $rcTxt";
+        $packetType = sprintf "%01X", $packetType;
+        #EnOcean:PacketType:ResposeCode:MessageData:OptionalData
+        Dispatch($hash, "EnOcean:$packetType:$1:$2:$odata", undef);        
 
       } elsif($packetType == 3) {
         # packet type RADIO_SUB_TEL
@@ -379,7 +383,11 @@ TCM_Read($)
 
       } elsif($packetType == 4) {
         # packet type EVENT
-        Log3 $name, 2, "TCM $name packet type EVENT not supported: $data";
+        #Log3 $name, 2, "TCM $name packet type EVENT not supported: $data";
+        $mdata =~ m/^(..)(.*)$/;
+        $packetType = sprintf "%01X", $packetType;
+        #EnOcean:PacketType:eventCode:MessageData
+        Dispatch($hash, "EnOcean:$packetType:$1:$2", undef);
 
       } elsif($packetType == 5) {
         # packet type COMMON_COMMAND
@@ -387,13 +395,16 @@ TCM_Read($)
 
       } elsif($packetType == 6) {
         # packet type SMART_ACK_COMMAND
-        Log3 $name, 2, "TCM $name packet type SMART_ACK_COMMAND not supported: $data";
+        #Log3 $name, 2, "TCM $name packet type SMART_ACK_COMMAND not supported: $data";
+        $mdata =~ m/^(..)(.*)$/;
+        $packetType = sprintf "%01X", $packetType;
+        #EnOcean:PacketType:smartAckCode:MessageData
+        Dispatch($hash, "EnOcean:$packetType:$1:$2", undef);
 
       } elsif($packetType == 7) {
         # packet type REMOTE_MAN_COMMAND
-        #Log3 $name, 2, "TCM: $name packet type REMOTE_MAN_COMMAND not supported: $data";
         $mdata =~ m/^(....)(....)(.*)$/;
-        my ($function, $manufID, $messageData) = ($1,$2,$3);
+        my ($function, $manufID, $messageData) = ($1, $2, $3);
         $odata =~ m/^(........)(........)(..)(..)$/;
         my ($RSSI, $receivingQuality) = ($3, "excellent");
         if (hex($RSSI) > 87) {
@@ -521,15 +532,36 @@ TCM_Parse310($$$)
   } else {
     my @ans;
     foreach my $k (sort keys %{$ptr}) {
-      next if($k eq "cmd" || $k eq "arg");
+      next if($k eq "cmd" || $k eq "arg" || $k eq "packetType");
       my ($off, $len, $type) = split(",", $ptr->{$k});
-      my $data = substr($rawmsg, $off*2, $len*2);
-      if($type && $type eq "STR") {
-        $data = pack('H*', $data);
-        ####
-        # remove trailing 0x00 
-        #$data =~ s/[^A-Za-z0-9#\.\-_]//g;
-        $data =~ tr/A-Za-z0-9#.-_//cd;
+      my $data;
+      if ($len == 0) {
+        $data = substr($rawmsg, $off*2);
+      } else {
+        $data = substr($rawmsg, $off*2, $len*2);
+      }
+      if($type) {
+        if ($type eq "STR") {
+          $data = pack('H*', $data);
+          ####
+          # remove trailing 0x00 
+          #$data =~ s/[^A-Za-z0-9#\.\-_]//g;
+          $data =~ tr/A-Za-z0-9#.-_//cd;
+        } else {
+          my ($part1, $part2, $part3) = split(":", $type);
+          $part1 = $part1 * 2;
+          $part2 = $part2 * 2;
+          $part3 = $part3 * 2;
+          my $dataLen = length($data) / 2;
+          my $dataOut = '';
+          while ($dataLen > 0) {
+            $data =~ m/^(.{$part1})(.{$part2})(.{$part3})(.*)$/;
+            $dataOut .= $1 . ':' . $2 . ':' . $3 . ' ';
+            $data = $4;
+            $dataLen -= $part1 + $part2 + $part3;
+          }
+          $data = chop($dataOut);
+        }
       }
       push @ans, "$k: $data";
     }
@@ -570,23 +602,13 @@ my %gets120 = (
 
 # Get commands TCM 310
 my %gets310 = (
-  "version"      => {cmd         => "03",
-                     APPVersion  => "1,4",
-                     APIVersion  => "5,4",
-                     ChipID      => "9,4",
-                     ChipVersion => "13,4",
-                     Desc        => "17,16,STR",},
-  "baseID"       => {cmd                  => "08",
-                     BaseID               => "1,4",
-                     RemainingWriteCycles => "5,1",},
-  "repeater"     => {cmd       => "0A",
-                     RepEnable => "1,1",
-                     RepLevel  => "2,1",},
-#  "secureDev"    => {cmd       => "1B01",
-#                     SLF   => "1,1",
-#                     devID => "2,4",},
-  "numSecureDev" => {cmd    => "1D",
-                     Number => "1,1",},
+  "baseID" => {packetType => 5, cmd => "08", BaseID => "1,4", RemainingWriteCycles => "5,1"},
+  "numSecureDevicesIn" => {packetType => 5, cmd => "1D00", Number => "1,1"},
+  "numSecureDevicesOut" => {packetType => 5, cmd => "1D01", Number => "1,1"},
+  "repeater" => {packetType => 5, cmd => "0A", RepEnable => "1,1", RepLevel => "2,1"},
+  "smartAckLearnMode" => {packetType => 6, cmd => "02", Enable => "1,1", Extended => "2,1"},
+  "smartAckLearnedClients" => {packetType => 6, cmd => "06", "ClientID:CtrlID:Mailbox" => "1,0,4:4:1"},
+  "version" => {packetType => 5, cmd => "03", APPVersion => "1,4", APIVersion => "5,4", ChipID => "9,4", ChipVersion => "13,4", Desc => "17,16,STR"},
 );
 
 # Get
@@ -598,7 +620,7 @@ TCM_Get($@)
   return if (AttrVal($name, "comType", "TCM") eq "RS485" || $hash->{DeviceName} eq "none");
   return "\"get $name\" needs one parameter" if(@a != 2);
   my $cmd = $a[1];
-  my ($err, $msg);
+  my ($err, $msg, $packetType);
 
   if($hash->{MODEL} eq "ESP2") {
     # TCM 120
@@ -616,7 +638,7 @@ TCM_Get($@)
     return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets310) . ':noArg' if(!defined($cmdhash));
     Log3 $name, 3, "TCM get $name $cmd";
     my $cmdHex = $cmdhash->{cmd};
-    TCM_Write($hash, sprintf("%04X0005", length($cmdHex)/2), $cmdHex);
+    TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
     $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
     
@@ -629,42 +651,50 @@ TCM_Get($@)
   return $msg;
 }
 
-# RemovePair
-sub
-TCM_RemovePair($)
+# clear teach in flag
+sub TCM_ClearTeach($)
 {
   my $hash = shift;
   delete($hash->{Teach});
 }
 
+# clear Smart ACK teach in flag
+sub TCM_ClearSmartAckLearn($)
+{
+  my $hash = shift;
+  delete($hash->{SmartAckLearn});
+  readingsSingleUpdate($hash, "smartAckLearnMode", "Enable: 00 Extended: 00", 1);
+}
+
 # Set commands TCM 120
 my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
-  "teach"        => { cmd => "AB18", arg => "\\d+" },
-  "baseID"       => { cmd => "AB18", arg => "FF[8-9A-F][0-9A-F]{5}" },
-  "sensitivity"  => { cmd => "AB08", arg => "0[01]" },
-  "sleep"        => { cmd => "AB09" },
-  "wake"         => { cmd => "" }, # Special
-  "reset"        => { cmd => "AB0A" },
-  "modem_on"     => { cmd => "AB28", arg => "[0-9A-F]{4}" },
-  "modem_off"    => { cmd => "AB2A" },
+  "teach"  => {cmd => "AB18", arg => "\\d+"},
+  "baseID"  => {cmd => "AB18", arg => "FF[8-9A-F][0-9A-F]{5}"},
+  "sensitivity" => {cmd => "AB08", arg => "0[01]"},
+  "sleep" => {cmd => "AB09"},
+  "wake" => {cmd => ""}, # Special
+  "reset" => {cmd => "AB0A"},
+  "modem_on" => {cmd => "AB28", arg => "[0-9A-F]{4}"},
+  "modem_off" => {cmd => "AB2A"},
 );
 
 # Set commands TCM 310
 my %sets310 = (
-  "teach"        => { cmd => "AB18", arg=> "\\d+" },
-  "sleep"        => { cmd => "01", arg => "00[0-9A-F]{6}" },
-  "reset"        => { cmd => "02" },
-  "bist"         => { cmd => "06", BIST_Result => "1,1", },
-  "baseID"       => { cmd => "07", arg => "FF[8-9A-F][0-9A-F]{5}" },
-  "repeater"     => { cmd => "09", arg => "0[0-1]0[0-2]" },
-  "maturity"     => { cmd => "10", arg => "0[0-1]" },
-  "subtel"       => { cmd => "11", arg => "0[0-1]" },
-  "mode"         => { cmd => "1C", arg => "0[0-1]" },
+  "teach" => {packetType => 5, arg=> "\\d+"},
+  "sleep" => {packetType => 5, cmd => "01", arg => "00[0-9A-F]{6}"},
+  "reset" => {packetType => 5, cmd => "02"},
+  "bist" => {packetType => 5, cmd => "06", BIST_Result => "1,1"},
+  "baseID" => {packetType => 5, cmd => "07", arg => "FF[8-9A-F][0-9A-F]{5}"},
+  "repeater" => {packetType => 5, cmd => "09", arg => "0[0-1]0[0-2]"},
+  "maturity" => {packetType => 5, cmd => "10", arg => "0[0-1]"},
+  "subtel" => {packetType => 5, cmd => "11", arg => "0[0-1]"},
+  "mode" => {packetType => 5, cmd => "1C", arg => "0[0-1]"},
+  "smartAckLearn" => {packetType => 6, cmd => "01", arg => "\\d+"},
+  "smartAckMailboxMax" => {packetType => 6, cmd => "08", arg => "\\d+"},
 );
 
 # Set
-sub
-TCM_Set($@)
+sub TCM_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
@@ -680,18 +710,48 @@ TCM_Set($@)
 
   my $cmdHex = $cmdhash->{cmd};
   my $argre = $cmdhash->{arg};
+  my $logArg = $arg;
   if($argre) {
-    return "Argument needed for set $name $cmd ($argre)" if(!defined($arg));
-    return "Argument does not match the regexp ($argre)"
-      if($arg !~ m/$argre/i);
+    return "Argument needed for set $name $cmd ($argre)" if (!defined($arg));
+    return "Argument does not match the regexp ($argre)" if ($arg !~ m/$argre/i);
+    if ($cmd eq "smartAckLearn") {
+      if (($arg + 0) >= 0 && ($arg + 0) <= 4294967) {
+        if ($arg == 0) {
+          $arg = '0' x 12;
+          readingsSingleUpdate($hash, "smartAckLearnMode", "Enable: 00 Extended: 00", 1);
+        } else {
+          my $smartAckLearnMode = AttrVal($name, "smartAckLearnMode", "simple");
+          my %smartAckLearnMode = (simple => 0, advance => 1, advanceSelectRep => 2);
+          $arg = sprintf "01%02X%08X", $smartAckLearnMode{$smartAckLearnMode}, $arg * 1000;
+          readingsSingleUpdate($hash, "smartAckLearnMode", "Enable: 01 Extended: " . sprintf("%02X", $smartAckLearnMode{$smartAckLearnMode}), 1);
+        }
+      } else {
+        return "Argument wrong, choose 0...4294967";      
+      }    
+    } elsif ($cmd eq "smartAckMailboxMax") {
+      if (($arg + 0) >= 0 && ($arg + 0) <= 20) { 
+        $attr{$name}{smartAckMailboxMax} = $arg;
+        $arg = sprintf "%02X", $arg; 
+      } else {
+        return "Argument wrong, choose 0...20";      
+      }
+    }
+    
     $cmdHex .= $arg;
   }
-  Log3 $name, 3, "TCM set $name $cmd $arg";
+  Log3 $name, 3, "TCM set $name $cmd $logArg";
 
   if($cmd eq "teach") {
-    $hash->{Teach} = 1;
-    InternalTimer(gettimeofday()+$arg, "TCM_RemovePair", $hash, 1);
-    return;
+    if ($arg == 0) {
+      RemoveInternalTimer($hash, "TCM_ClearTeach");
+      delete $hash->{Teach};
+      return;
+    } else {
+      RemoveInternalTimer($hash, "TCM_ClearTeach");
+      InternalTimer(gettimeofday() + $arg, "TCM_ClearTeach", $hash, 1);
+      $hash->{Teach} = 1;
+      return;
+    }
   }
 
   if($hash->{MODEL} eq "ESP2") {
@@ -700,7 +760,6 @@ TCM_Set($@)
       DevIo_SimpleWrite($hash, "AA", 1);
       return "";
     }
-
     $cmdHex .= "0"x(22-length($cmdHex));  # Padding with 0
     TCM_Write($hash, "", $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
@@ -708,10 +767,22 @@ TCM_Set($@)
 
   } else {
     # TCM310
-    TCM_Write($hash, sprintf("%04X0005", length($cmdHex)/2), $cmdHex);
+    TCM_Write($hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "set $cmd");
-    $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
-
+    if(!$err) {
+      $msg = TCM_Parse310($hash, $msg, $cmdhash);
+      if ($cmd eq "smartAckLearn") {
+        if (substr($arg, 0, 2) eq '00') {
+          # end Smart ACK learnmode
+          RemoveInternalTimer($hash, "TCM_ClearSmartAckLearn");
+          delete $hash->{SmartAckLearn};          
+        } else {
+          RemoveInternalTimer($hash, "TCM_ClearSmartAckLearn");
+          InternalTimer(gettimeofday() + hex(substr($arg, 4, 8)) * 0.001, "TCM_ClearSmartAckLearn", $hash, 1);
+          $hash->{SmartAckLearn} = 1;
+        }
+      }
+    }
   }
   if($err) {
     Log3 undef, 2, "TCM $name $err";
@@ -730,10 +801,8 @@ TCM_Set($@)
   return $msg;
 }
 
-
 # ReadAnswer
-sub
-TCM_ReadAnswer($$)
+sub TCM_ReadAnswer($$)
 {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
@@ -814,10 +883,12 @@ TCM_ReadAnswer($$)
   }
 }
 
-sub
-TCM_Attr(@) {
+#
+sub TCM_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
+  # return if attribute list is incomplete
+  return undef if (!$init_done);
   
   if ($attrName eq "blockSenderID") {
     if (!defined $attrVal) {
@@ -862,10 +933,28 @@ TCM_Attr(@) {
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
+  } elsif ($attrName eq "smartAckLearnMode") {
+    if (!defined $attrVal){
+    
+    } elsif ($attrVal !~ m/^simple|advance|advanceSelectRep$/) {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+  } elsif ($attrName eq "smartAckMailboxMax") {
+    if (!defined $attrVal){
+    
+    } elsif (($attrVal + 0) >= 0 && ($attrVal + 0) <= 20) {
+      TCM_Set($hash, ("set", "smartAckMailboxMax", $attrVal));
+    } else {
+      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong or out of range";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
   }
   return undef;
 }
 
+#
 sub TCM_Notify(@) {
   my ($hash, $dev) = @_;
   my $name = $hash->{NAME};
@@ -891,8 +980,8 @@ sub TCM_Notify(@) {
     # default attributes
     my %setAttrInit;
     if ($comType eq "RS485" || $hash->{DeviceName} eq "none") {
-      %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 0},
-                      "learningMode" => {ESP2 => "always", ESP3 => "always"}      
+      %setAttrInit = (sendInterval => {ESP2 => 100, ESP3 => 0},
+                      learningMode => {ESP2 => "always", ESP3 => "always"}      
                      );
     }else {
       %setAttrInit = ("sendInterval" => {ESP2 => 100, ESP3 => 0});
@@ -906,12 +995,13 @@ sub TCM_Notify(@) {
     }
     # default transceiver parameter
     if ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
-      my %setCmdRestore = ("mode"     => "00",
-                           "maturity" => "01",
-                           "repeater" => "RepEnable: 00 RepLevel: 00"
+      my %setCmdRestore = (mode => "00",
+                           maturity => "01",
+                           repeater => "RepEnable: 00 RepLevel: 00",
+                           smartAckMailboxMax => 0
                           );
       foreach(keys %setCmdRestore) {
-        $setCmdVal = ReadingsVal($name, $_, undef);
+        $setCmdVal = ReadingsVal($name, $_, AttrVal($name, $_, undef));
         if (defined $setCmdVal) {
           if ($_ eq "repeater") {
             $setCmdVal = substr($setCmdVal, 11, 2) . substr($setCmdVal, 24, 2);
@@ -1089,11 +1179,16 @@ TCM_Undef($$)
       radio telegrams are send immediately = 00, after the maturity time is elapsed = 01</li>
     <li>mode [00|01]<br>
       mode = 00: Compatible mode - ERP1 - gateway uses Packet Type 1 to transmit and receive radio telegrams<br>
-      mode = 01: Advanced mode – ERP2 - gateway uses Packet Type 10 to transmit and receive radio telegrams
+      mode = 01: Advanced mode - ERP2 - gateway uses Packet Type 10 to transmit and receive radio telegrams
       (for FSK products with advanced protocol)</li>
+    <li>smartAckLearn &lt;t/s&gt;<br>
+      Set Fhem in Smart Ack learning mode.</li>
+    <li>smartAckMailboxMax 0..20<br>
+      Set amount of mailboxes available, 0 = disable post master functionality.
+      Maximum 28 mailboxes can be created. This upper limit is for each firmware restricted and may be smaller.</li>
     <li>teach &lt;t/s&gt;<br>
-      Set Fhem in learning mode, see <a href="#TCM_learningMode">learningMode</a>.<br>
-      The command is always required for UTE and to teach-in bidirectional actuators
+      Set Fhem in learning mode for RBS, 1BS, 4BS, GP, STE and UTE teach-in / teach-out, see <a href="#TCM_learningMode">learningMode</a>.<br>
+      The command is always required for STE, GB, UTE and to teach-in bidirectional actuators
       e. g. EEP 4BS (RORG A5-20-XX)</li>
     <li>reset<br>
       Reset the device</li>
@@ -1134,6 +1229,12 @@ TCM_Undef($$)
       Read number of teached in secure devices.</li>
     <li>repeater<br>
       Read Repeater Level: off = 0000, 1 = 0101, 2 = 0102.</li>
+    <li>smartAckLearnMode<br>
+      Get current smart ack learn mode<br>
+      Enable: 00|01 = off|on<br>
+      Extended: 00|01|02 = simple|advance|advanceSelectRep</li>
+    <li>smartAckLearnedClients<br>
+      Get information about the learned smart ack clients</li>
     <li>version<br>
       Read the device SW version / HW version, chip-ID, etc.</li>
     <br>
@@ -1170,6 +1271,13 @@ TCM_Undef($$)
       ESP2: [sendInterval] = 100 ms is default.<br>
       ESP3: [sendInterval] = 0 ms is default.<br>
       Smallest interval between two sending telegrams
+    </li>
+    <li><a name="TCM_smartAckLearnMode">smartAckLearnMode</a> &lt;simple|advance|advanceSelectRep&gt;<br>
+      select Smart Ack learn mode; only simple supported by Fhem
+    </li>
+    <li><a name="TCM_smartAckMailboxMax">smartAckMailboxMax</a> &lt;0 ... 28&gt;<br>
+      Amount of mailboxes available, 0 = disable post master functionality.
+      Maximum 28 mailboxes can be created. This upper limit is for each firmware restricted and may be smaller.
     </li>
     <li><a href="#verbose">verbose</a></li>
     <br><br>
