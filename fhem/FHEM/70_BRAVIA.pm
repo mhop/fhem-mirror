@@ -38,7 +38,7 @@ use SetExtensions;
 use Encode;
 use JSON qw(decode_json);
 use MIME::Base64;
-use XML::Simple;
+use XML::Simple qw(:strict);
 use IO::Socket;
 
 sub BRAVIA_Set($@);
@@ -938,7 +938,7 @@ sub BRAVIA_ReceiveCommand($$$) {
                 readingsBulkUpdate( $hash, "requestFormat", "xml" )
                   if ( $service eq "getStatus" && ReadingsVal($name , "requestFormat", "") eq "" );
 
-                $return = $parser->XMLin( Encode::encode_utf8($data) );
+                $return = $parser->XMLin( Encode::encode_utf8($data), KeyAttr => [ ] );
             }
 
             elsif ( $data =~ /^{/ || $data =~ /^\[/ ) {
