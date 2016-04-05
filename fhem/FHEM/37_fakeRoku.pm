@@ -40,7 +40,7 @@ fakeRoku_Initialize($)
   #$hash->{SetFn}    = "fakeRoku_Set";
   #$hash->{GetFn}    = "fakeRoku_Get";
   $hash->{AttrFn}   = "fakeRoku_Attr";
-  $hash->{AttrList} = "disable:1,0";
+  $hash->{AttrList} = "disable:1,0 httpPort";
 }
 
 #####################################
@@ -224,7 +224,8 @@ fakeRoku_startListener($)
 
   fakeRoku_stopListener($hash);
 
-  if( my $socket = IO::Socket::INET->new(LocalPort=>0, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  my $port = AttrVal($name, 'httpPort', 0);
+  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
 
     my $chash = fakeRoku_newChash( $hash, $socket, {NAME=>"$name:listener", STATE=>'accepting'} );
 
@@ -506,9 +507,9 @@ fakeRoku_Parse($$;$$$)
         #$body =~ s/\n/\r\n/g;
 
         $ret = "HTTP/1.1 200 OK\r\n";
-        $ret .= fakeRoku_hash2header( {        'Connection' => 'Close',
-                                            'Content-Type' => 'text/xml; charset=utf-8',
-                                          'Content-Length' => length($body), } );
+        $ret .= fakeRoku_hash2header( {     'Connection' => 'Close',
+                                          'Content-Type' => 'text/xml; charset=utf-8',
+                                        'Content-Length' => length($body), } );
         $ret .= "\r\n";
         $ret .= $body;
 
@@ -761,7 +762,8 @@ Log 1, "!!!!!!!!!!";
 
   <a name="fakeRoku_Attr"></a>
   <b>Attr</b>
-  <ul>none
+  <ul>
+    <li>httpPort</li>
   </ul>
 
 </ul><br>
