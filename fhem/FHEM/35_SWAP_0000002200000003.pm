@@ -267,7 +267,7 @@ SWAP_0000002200000003_Set($@)
     if( $rgb =~ m/([\da-f]{2})([\da-f]{2})([\da-f]{2})/i ) {
       my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
       my ($h, $s, $v) = Color::rgb2hsv($r,$g,$b);
-      my $v = $arg/100;
+      $v = $arg/100;
 
       ($r,$g,$b) = Color::hsv2rgb($h,$s,$v);
       $rgb = Color::rgb2hex( $r*255, $g*255, $b*255 );
