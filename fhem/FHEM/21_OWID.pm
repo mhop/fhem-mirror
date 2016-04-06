@@ -68,7 +68,7 @@ use ProtoThreads;
 no warnings 'deprecated';
 sub Log3($$$);
 
-my $owx_version="6.0beta6";
+my $owx_version="6.01";
 #-- declare variables
 my %gets = (
   "present"     => "",
@@ -211,7 +211,7 @@ sub OWID_Define ($$) {
   $modules{OWID}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","Defined",1);
-  Log3 $name,1, "OWID:    Device $name defined."; 
+  Log3 $name,1, "OWID:     Device $name defined."; 
 
   $hash->{NOTIFYDEV} = "global";
 

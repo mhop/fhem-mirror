@@ -99,13 +99,15 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="6.0";
+my $owx_version="6.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
 my @owg_rate    = ("A_rate","B_rate");
 #-- initially assume that both memory types (low, high) are present
 my @owg_memory  = (1,1,0);
+my $owgmodel;
+my $owgauto     = 0;
 
 my %gets = (
   "id"          => "",
@@ -208,7 +210,8 @@ sub OWCOUNT_Define ($$) {
   #-- no model, 12 characters
   if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS2423";
-    CommandAttr (undef,"$name model DS2423"); 
+    $owgauto       =1;
+    #CommandAttr (undef,"$name model DS2423"); 
     $fam           = "1D";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
@@ -219,7 +222,8 @@ sub OWCOUNT_Define ($$) {
     if(int(@a)>=4) { $interval = $a[3]; }
     if( $fam eq "1D" ){
       $model = "DS2423";
-      CommandAttr (undef,"$name model DS2423"); 
+      $owgauto       =1;
+      #CommandAttr (undef,"$name model DS2423"); 
     }else{
       return "OWCOUNT: Wrong 1-Wire device family $fam";
     }
@@ -230,23 +234,29 @@ sub OWCOUNT_Define ($$) {
     if(int(@a)>=5) { $interval = $a[4]; }
     if( $model eq "DS2423" ){
       $fam = "1D";
-      CommandAttr (undef,"$name model DS2423"); 
+      #CommandAttr (undef,"$name model DS2423"); 
+      #-- Check, if name might be from autocreate -> checking memory
+      if( $name =~ /OWX\_$fam\_$id/ ){
+        $owgauto=1;
+      }
       @owg_memory = (1,1,0);
     }elsif( $model eq "DS2423enew" ){
       $fam = "1D";
       @owg_memory = (1,1,0);
-      CommandAttr (undef,"$name model DS2423enew"); 
+      #CommandAttr (undef,"$name model DS2423enew"); 
     }elsif( $model eq "DS2423eold" ){
       $fam = "1D";
-      CommandAttr (undef,"$name model DS2423eold"); 
-      CommandAttr (undef,"$name nomemory 1"); 
-       @owg_memory = (0,0,0);
+      #CommandAttr (undef,"$name model DS2423eold"); 
+      #CommandAttr (undef,"$name nomemory 1"); 
+      @owg_memory = (0,0,0);
     }else{
       return "OWCOUNT: Wrong 1-Wire device model $model";
     }
   } else {    
     return "OWCOUNT: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
+  
+  $owgmodel=$model;
    
   #   determine CRC Code - only if this is a direct interface
   $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
@@ -267,6 +277,10 @@ sub OWCOUNT_Define ($$) {
   }
 
   $modules{OWCOUNT}{defptr}{$id} = $hash;
+  
+ 
+  
+  
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log3 $name, 3, "OWCOUNT:  Device $name defined."; 
@@ -333,6 +347,11 @@ sub OWCOUNT_InitializeDevice($) {
   my ($olddata1,$olddata2);
   my $newdata  = "OWCOUNT ".$owx_version;
   my $ret;
+  
+  #-- post-define: check model
+  if( !defined($attr{$hash->{NAME}}{"model"}) ){
+    CommandAttr (undef,$hash->{NAME}." model $owgmodel"); 
+  }
    
   #-- initial values
   for( my $i=0;$i<int(@owg_fixed);$i++) { 
@@ -341,19 +360,6 @@ sub OWCOUNT_InitializeDevice($) {
     $hash->{owg_midnight}->[$i] = "";
     $hash->{owg_str}->[$i]      = "";
   }
-    
-  #-- Check memory string
-  my $memory;
-  if( ($owg_memory[0]==1) && ($owg_memory[1]==1) ){
-    $memory="page 0..13 and midnight";
-  }elsif( ($owg_memory[0]==0) && ($owg_memory[1]==1) ){
-    $memory="midnight only";
-  }elsif( ($owg_memory[0]==1) && ($owg_memory[1]==0) ){
-    $memory="page 0..13 only";
-  }else{
-    $memory="no pages, no midnight";
-  }  
-  readingsSingleUpdate($hash,"memory","$memory",0);
   
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
@@ -524,29 +530,23 @@ sub OWCOUNT_FormatValues($) {
   #-- put into READING
   readingsBeginUpdate($hash);
   
-  #-- Check memory string
-  if( $owg_memory[2]==1 ){
-    my $memory;
-    my $model   = $hash->{OW_MODEL};
-    my $nomemory;
- 
-    if( ($owg_memory[0]==1) && ($owg_memory[1]==1) ){
-      $memory = "page 0..13 and midnight";
-      $model  = "DS2423";
-      $nomemory = 0;
-    }elsif( ($owg_memory[0]==0) && ($owg_memory[1]==1) ){
-      $memory="midnight only";
-      $model  = "DS2423enew";
-      $nomemory = 0;
-    }else{
-      $memory="no pages, no midnight";
-      $model  = "DS2423eold";
-     $nomemory = 1;
-    }  
-    CommandAttr (undef,"$name model ".$model); 
-    CommandAttr (undef,"$name nomemory ".$nomemory); 
-    readingsBulkUpdate($hash,"memory","$memory");
-    $owg_memory[2]=0;
+  #-- Check memory string only if model is defined automatically 
+  if( $owgauto ){
+    my $msg = "OWCOUNT: In device $name, ";
+    if( $owg_memory[2]==1 ){  
+      if( ($owg_memory[0]==1) && ($owg_memory[1]==1) ){
+        Log 1, $msg."memory pages 0..13 and midnight store present, model should be DS2423"
+          if( $attr{$name}{"model"} ne "DS2423");
+      }elsif( ($owg_memory[0]==0) && ($owg_memory[1]==1) ){
+        Log 1, $msg."midnight store only, model should be DS2423enew"
+          if( $attr{$name}{"model"} ne "DS2423enew");
+      }else{
+        Log 1, $msg."no memory pages and no midnight store found, model should be DS2423eold"
+          if( $attr{$name}{"model"} ne "DS2423eold");
+      }  
+      $owg_memory[2]=0;
+    }
+    $owgauto=0;
   }
   
   #-- formats for output
