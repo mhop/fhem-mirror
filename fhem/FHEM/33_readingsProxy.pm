@@ -312,8 +312,6 @@ readingsProxy_Attr($$$;$)
       );
 
       my $err = perlSyntaxCheck($attrVal, %specials);
-      my $value_fn = eval $attrVal;
-      Log3 $name, 3, $name .": attrVal: ". $@ if($@);
       return $err if($err);
     }
   }
