@@ -28,7 +28,7 @@
 # get <name> reading     => measurement value obtained from VFunction
 # get <name> temperature => temperature measurement
 # get <name> VDD         => supply voltage measurement
-# get <name> V|I|raw     => external voltage/external current/raw measurement
+# get <name> raw         => raw measurement voltages
 # get <name> version     => OWX version number
 #
 # set <name> interval    => set period for measurement
@@ -87,7 +87,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="6.0";
+my $owx_version="6.01";
 #-- flexible channel name
 my ($owg_channel,$owg_schannel);
 
@@ -1462,14 +1462,13 @@ sub OWXMULTI_PT_SetValues($@) {
                     <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval in
                 seconds. </li>
             <li><a name="owmulti_reading">
-                    <code>get &lt;name&gt; reading</code></a><br />Obtain the measurement values </li>
+                    <code>get &lt;name&gt; reading</code></a><br />Obtain all three measurement values. </li>
             <li><a name="owmulti_temperature">
                     <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature value. </li>
             <li><a name="owmulti_vdd">
                     <code>get &lt;name&gt; VDD</code></a><br />Obtain the current supply voltage. </li>
             <li><a name="owmulti_raw">
-                    <code>get &lt;name&gt; V</code> or <code>get &lt;name&gt;
-                raw</code></a><br />Obtain the raw external voltage and external sense measurement. </li>
+                    <code>get &lt;name&gt; raw</code></a><br />Obtain the raw readings for V and W.</li>
         </ul>
         <a name="OWMULTIattr"></a>
         <h4>Attributes</h4>

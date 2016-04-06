@@ -87,7 +87,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="6.0";
+my $owx_version="6.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -1101,18 +1101,16 @@ sub OWXSWITCH_BinValues($$$$$$$) {
     };
     #-- now only if data has to be overwritten
     if( $cmd eq "mod" ){
-      my $gpio = 0;
-      #-- 
+      my $gpio  = 0;
       for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
-        if( $outval==0 ){
-          $gpio += ($hash->{owg_vax}->[$i]<<$i) 
-            if( $i != $outfnd );
-        }else{
-          $gpio += ($hash->{owg_vax}->[$i]<<$i);
-          $gpio += (1<<$i) 
-            if( $i == $outfnd ); 
-        } 
-      }
+         $gpio += ($hash->{owg_vax}->[$i]<<$i) 
+      };
+      if( $outval==0 ){
+        $gpio &= ~(1<<$outfnd); 
+      }else{
+        $gpio |= (1<<$outfnd); 
+      } 
+      #Log 1,"DEBUGGING OWXNG : After reading old gpio as $old, with outval=$outval and outfnd=$outfnd we are setting a new gpio as $gpio";
       #-- re-set the state 
       OWXSWITCH_SetState($hash,$gpio);
     }

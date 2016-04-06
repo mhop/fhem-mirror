@@ -79,14 +79,13 @@ no warnings 'deprecated';
 
 sub Log3($$$);
 
-my $owx_version="6.0beta6";
+my $owx_version="6.01";
 #-- controller may be HD44780 or KS0073 
-#   these values have to be changed for different display 
+#   these values can be changed by attribute for different display 
 #   geometries or memory maps
 my $lcdcontroller = "KS0073";
 my $lcdlines      = 4;
 my $lcdchars      = 20;
-
 my @lcdpage       = (0,32,64,96); 
 
 #-- declare variables
@@ -139,7 +138,7 @@ sub OWLCD_Initialize ($) {
   $hash->{InitFn}   = "OWLCD_Init";
   $hash->{AttrFn}   = "OWLCD_Attr";
   my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 ".
-                      "lcdgeometry:0-32-64-96,0-64-20-84 ".
+                      "lcdgeometry:0-32-64-96,0-64-20-84 lcdcontroller:KS0073,HD44780 ".
                       $readingFnAttributes;
   $hash->{AttrList} = $attlist; 
 
@@ -295,10 +294,18 @@ sub OWLCD_Attr(@) {
         last;
       };
       $key eq "lcdgeometry" and do {
-        if( $value eq "0-32-64-96" ){
-          @lcdpage       = (0,32,64,96);
+        if( $value     eq "0-32-64-96" ){
+          @lcdpage      = (0,32,64,96);
         }elsif( $value eq "0-64-20-84" ){
-          @lcdpage       = (0,64,20,84);
+          @lcdpage      = (0,64,20,84);
+        }
+        last;
+      };
+      $key eq "lcdcontroller" and do {
+        if( $value      eq "KS0073," ){
+          $lcdcontroller = "KS0073";
+        }elsif( $value  eq "HD44780" ){
+          $lcdcontroller = "HD44780";
         }
         last;
       };
@@ -344,9 +351,6 @@ sub OWLCD_Get($@) {
     $value = $hash->{ROM_ID};
      return "$name.id => $value";
   } 
-
-  #-- hash of the busmaster
-  my $master       = $hash->{IODev};
 
   #-- get present
   if($a[1] eq "present") {
@@ -1467,21 +1471,30 @@ sub OWXLCD_Trans($) {
 
   my ($msg) = @_;
   
-  #-- replace umlaut chars for special codepage
-  $msg =~ s/ä/\x7B/g;
-  $msg =~ s/ö/\x7C/g;
-  $msg =~ s/ü/\x7E/g;
-  $msg =~ s/Ä/\x5B/g;
-  $msg =~ s/Ö/\x5C/g;
-  $msg =~ s/Ü/\x5E/g;
-  $msg =~ s/ß/\xBE/g;
+  #-- replace umlaut chars for special codepage of KS0073
+  if( $lcdcontroller eq "KS0073") {
+    $msg =~ s/ä/\x7B/g;
+    $msg =~ s/ö/\x7C/g;
+    $msg =~ s/ü/\x7E/g;
+    $msg =~ s/Ä/\x5B/g;
+    $msg =~ s/Ö/\x5C/g;
+    $msg =~ s/Ü/\x5E/g;
+    $msg =~ s/ß/\xBE/g;
+    $msg =~ s/°/\x80/g;
+  #-- replace umlaut chars for special codepage of HD44780
+  }elsif( $lcdcontroller eq "HD44780") {
+    $msg =~ s/ä/\xE1/g;
+    $msg =~ s/ö/\xEF/g;
+    $msg =~ s/ü/\xF5/g;
+    $msg =~ s/Ü/\x03/g;
+    $msg =~ s/Ö/\x02/g;
+    $msg =~ s/Ä/\x01/g;
+    $msg =~ s/ß/\xE2/g;
+    $msg =~ s/°/\xDF/g;
+  }
+  
   #-- replace other special chars 
   $msg =~s/_/\xC4/g;
-  #--take out HTML degree sign
-  if( $msg =~ m/.*\&deg\;.*/ ) {
-    my @ma = split(/\&deg\;/,$msg);
-    $msg = $ma[0]."\x80".$ma[1];
-  }
   return $msg;
 }
 
@@ -2122,7 +2135,10 @@ sub OWXLCD_PT_SetMemory($$$) {
         <ul>
             <li><a name="owlcd_lcdgeometry">
                     <code>attr &lt;name&gt; lcdgeometry &lt;string&gt;</code></a><br />
-                    LCD geometry, values are 0-32-64-96 or 0-64-20-84</li>
+                    LCD geometry, values are 0-32-64-96 (default) or 0-64-20-84</li>
+            <li><a name="owlcd_lcdgcontroller">
+                    <code>attr &lt;name&gt; lcdcontroller &lt;string&gt;</code></a><br />
+                    LCD geometry, values are KS0073 (default) HD44780</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
         
