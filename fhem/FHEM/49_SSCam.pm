@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.23.1 07.04.2016    command check for set cmd's don't work completely
 # 1.23   02.04.2016    change to RemoveInternalTimer for functions
 # 1.22   27.03.2016    bugfix "link_open" doesn't work after last update
 # 1.21   23.03.2016    added "lastrec"," lastrec_open" to playback last recording 
@@ -317,7 +318,7 @@ sub SSCam_Set {
         elsif ($opt eq "motdetsc") 
         {
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-            unless ($prop) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
+            if (!$prop || $prop !~ /^(disable|camera|SVS)$/) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
             
             $hash->{HELPER}{MOTDETSC} = $prop;
             cammotdetsc($hash);
@@ -441,7 +442,7 @@ sub SSCam_Set {
         }
         else  
         {
-            return $setlist;
+            return "$setlist";
         }  
 return;
 }
@@ -4019,7 +4020,6 @@ return;
   
   The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
   If motion detection will be tuned by camera, the original camera settings are kept.
-  Wird die Bewegungserkennung durch die Kamera eingestellt, werden die originalen Kameraeinstellungen beibehalten.
   The successful execution of that opreration you can retrace by the state in SVS -&gt; IP-camera -&gt; event detection -&gt; motion.
   The state of motion detection source will also be shown by the <a href="#SSCamreadings">Reading</a> "CamMotDetSc".
   
