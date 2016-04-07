@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2016-04-05
+# 2016-04-07
 
 # PID V1.0.0.9
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
@@ -7774,7 +7774,6 @@ sub EnOcean_Parse($$)
 
     } elsif ($st eq "roomSensorControl.22") {
       # Room Operation Panel (A5-10-22, A5-10-23)
-      # [untested]
       my $setpoint = $db[3];
       my $humi = sprintf "%d", $db[2] / 2.5;
       my $temp = sprintf "%0.1f", $db[1] * 40 / 250;
@@ -7785,7 +7784,7 @@ sub EnOcean_Parse($$)
         $fanSpeed = 2;
       } elsif ((($db[0] & 0xE0) >> 5) == 2) {
         $fanSpeed = 1;
-      } elsif ((($db[0] & 0xE0) >> 1) == 1){
+      } elsif ((($db[0] & 0xE0) >> 5) == 1){
         $fanSpeed = "off";
       } else {
         $fanSpeed = "auto";
