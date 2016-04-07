@@ -909,7 +909,9 @@ PROPLANTA_Html($)
    Dieses Modul erzeugt eine hohe CPU-Last. Es wird deshalb empfohlen, die auszulesenden Vorhersagetage zu reduzieren.
    <br>
    <i>Es nutzt die Perl-Module HTTP::Request, LWP::UserAgent und HTML::Parse</i>.
-   <br/><br/>
+   <br>
+   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/PROPLANTA"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+      <br/><br/>
    <b>Define</b>
    <ul>
       <br>

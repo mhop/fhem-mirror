@@ -655,7 +655,9 @@ OPENWEATHER_Html($@)
    Zuvor ist eine Registrierung auf der Webseite notwendig.
    <br/>
    Das Modul nutzt die Perlmodule HTTP::Request, LWP::UserAgent, HTML::Parse und Digest::MD5.
-   <br/><br/>
+   <br>
+   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/OPENWEATHER"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+      <br/><br/>
    <b>Define</b>
    <ul>
       <br>
