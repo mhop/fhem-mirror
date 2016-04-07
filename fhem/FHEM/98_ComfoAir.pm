@@ -35,6 +35,8 @@
 #   2014-05-25  added hide- attributes
 #   2014-07-07  corrected handling of 0xD2 Message (protocol is different than documented)
 #   2014-07-24  added max queue length checking and attribute
+#   2016-01-25  Reading Namen mit Umlauten korrigiert
+#   2016-04-06  Testmode Protokollbefehle hinzugefügt
 #
 
 package main;
@@ -71,6 +73,22 @@ sub ComfoAir_TimeoutSend($);
 # - msgHash - Rückverweis auf msgHash
 
 my %parseInfo = (
+    "0002"  =>  { unpack   => "C",
+                  name     => "Test-Modus-Ein",
+                  request => "0001", 
+                },                              
+                               
+    "001A"  =>  { unpack   => "C",
+                  name     => "Test-Modus-Aus",
+                  request => "0019", 
+                },  
+                 
+    "FF09"  =>  { unpack   => "C",   
+                  name     => "Klappen setzen",     
+                  readings => [ { name => "Bypass",
+                                  map => "1:offen, 0:geschlossen, 3:stop",
+                                  set => "0009:%02x03", }]},
+                                  
     "000c"  =>  { unpack   => "CCS>S>",
                   name     => "Ventilation-Status",     # PC Befehl
                   request  => "000b", 
@@ -136,11 +154,11 @@ my %parseInfo = (
                   readings => [ { name => "Verz_Bad_Einschalt"},
                                 { name => "Verz_Bad_Ausschalt"},
                                 { name => "Verz_L1_Ausschalt"},
-                                { name => "Verz_Stosslüftung"},
+                                { name => "Verz_Stosslueftung"},
                                 { name => "Verz_Filter_Wochen"},
                                 { name => "Verz_RF_Hoch_Kurz"},
                                 { name => "Verz_RF_Hoch_Lang"},
-                                { name => "Verz_Küchenhaube_Ausschalt"}]},
+                                { name => "Verz_Kuechenhaube_Ausschalt"}]},
 
     "00ce"  =>  { unpack   => "CCCCCCCCCCCC",
                   name     => "Ventilation-Levels",
