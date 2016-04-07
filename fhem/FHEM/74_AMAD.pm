@@ -37,7 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $version = "1.2.0";
+my $modulversion = "2.0.0";
+my $flowsetversion = "2.0.0";
 
 
 
@@ -56,18 +57,20 @@ sub AMAD_Initialize($) {
 			  "checkActiveTask ".
 			  "setFullscreen:0,1 ".
 			  "setScreenOrientation:0,1 ".
-			  "setScreenBrightness:0,1 ".
+			  "setScreenBrightness:noArg ".
 			  "setBluetoothDevice ".
 			  "setScreenlockPIN ".
+			  "setScreenOnForTimer ".
+			  "setOpenUrlBroswer ".
 			  "root:0,1 ".
-			  "interval ".
 			  "port ".
 			  "disable:1 ".
 			  $readingFnAttributes;
     
     foreach my $d(sort keys %{$modules{AMAD}{defptr}}) {
 	my $hash = $modules{AMAD}{defptr}{$d};
-	$hash->{VERSION} 	= $version;
+	$hash->{VERSIONMODUL}      = $modulversion;
+	$hash->{VERSIONFLOWSET}    = $flowsetversion;
     }
 }
 
@@ -77,27 +80,33 @@ sub AMAD_Define($$) {
     
     my @a = split( "[ \t][ \t]*", $def );
 
-    return "too few parameters: define <name> AMAD <HOST>" if( @a < 2 && @a > 3 );
+    return "too few parameters: define <name> AMAD <HOST-IP> <ACCESSPOINT-SSID> has the ACCESPOINT-SSID a space you must space replace @@" if( ( @a < 3 || @a > 4 ) && @a != 2 );
 
     my $name    	= $a[0];
-    my $host    	= $a[2];
+    my $host    	= $a[2] if( $a[2] );
+    $a[3] =~ s/@@/ /g if( $a[3] );
+    my $apssid          = $a[3] if( $a[3] );
     my $port		= 8090;
-    my $interval  	= 180;
 
     $hash->{HOST} 	= $host if( $host );
     $hash->{PORT} 	= $port;
-    $hash->{INTERVAL} 	= $interval if( $hash->{HOST} );
-    $hash->{VERSION} 	= $version;
+    $hash->{APSSID}     = $apssid if( $hash->{HOST} );
+    $hash->{VERSIONMODUL} 	= $modulversion;
+    $hash->{VERSIONFLOWSET} 	= $flowsetversion;
     $hash->{helper}{infoErrorCounter} = 0 if( $hash->{HOST} );
     $hash->{helper}{setCmdErrorCounter} = 0 if( $hash->{HOST} );
-    
+
+
+
+
     if( ! $hash->{HOST} ) {
-	return "there is already a AMAD Bridge, did you want to define a AMAD host use: define <name> AMAD <HOST>" if( $modules{AMAD}{defptr}{BRIDGE} );
+	return "there is already a AMAD Bridge, did you want to define a AMAD host use: define <name> AMAD <HOST-IP> <ACCESSPOINT-SSID>" if( $modules{AMAD}{defptr}{BRIDGE} );
 
 	$hash->{BRIDGE} = 1;
 	$modules{AMAD}{defptr}{BRIDGE} = $hash;
 	$attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
 	Log3 $name, 3, "AMAD ($name) - defined Bridge with Socketport $hash->{PORT}";
+	Log3 $name, 3, "AMAD ($name) - Attention!!! By the first run, dont forget to \"set $name fhemServerIP <IP-FHEM>\"";
 	AMAD_CommBridge_Open( $hash );
 
     } else {
@@ -105,16 +114,19 @@ sub AMAD_Define($$) {
 	    CommandDefine( undef, "AMADCommBridge AMAD" );    
 	}   
 
-	Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and interval $hash->{INTERVAL} (sec)";
+	Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and AccessPoint-SSID $hash->{APSSID}" if(  $hash->{APSSID} );
+	Log3 $name, 3, "AMAD ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and NONE AccessPoint-SSID" if( ! $hash->{APSSID} );
+	Log3 $name, 3, "AMAD ($name) - Attention!!! Your Device was defined without ACCESSPOINT-SSID, please modify the DEF to <HOST-IP> <ACCESSPOINT-SSID>" if( ! $hash->{APSSID} );
 	
 	$attr{$name}{room} = "AMAD" if( !defined( $attr{$name}{room} ) );
 	readingsSingleUpdate ( $hash, "state", "initialized", 1 ) if( $hash->{HOST} );
-	readingsSingleUpdate ( $hash, "deviceState", "online", 1 ) if( $hash->{HOST} );
+	#readingsSingleUpdate ( $hash, "deviceState", "online", 1 ) if( $hash->{HOST} );
         
-	InternalTimer( gettimeofday()+$hash->{INTERVAL}, "AMAD_GetUpdateTimer", $hash, 0 ) if( $hash->{HOST} );
+        RemoveInternalTimer($hash);
+	InternalTimer( gettimeofday()+15, "AMAD_GetUpdate", $hash, 0 ) if( ($hash->{HOST}) && ($hash->{APSSID}) );
 
 	$modules{AMAD}{defptr}{$hash->{HOST}} = $hash;
-	
+
 	return undef;
     }
 }
@@ -128,7 +140,8 @@ sub AMAD_Undef($$) {
 	TcpServer_Close( $hash );
 
     } else {
-        delete $modules{AMAD}{defptr}{$hash->{HOST}};
+
+        delete $modules{AMAD}{defptr}{$hash->{HOST}} if( defined($modules{AMAD}{defptr}{$hash->{HOST}}) );
 	RemoveInternalTimer( $hash );
     
 	foreach my $d(sort keys %{$modules{AMAD}{defptr}}) {
@@ -140,6 +153,8 @@ sub AMAD_Undef($$) {
               CommandDelete( undef, $name );
 	}
     }
+    
+    return undef;
 }
 
 sub AMAD_Attr(@) {
@@ -153,7 +168,7 @@ my ( $cmd, $name, $attrName, $attrVal ) = @_;
 	if( $cmd eq "set" ) {
 	    if( $attrVal eq "0" ) {
 		RemoveInternalTimer( $hash );
-		InternalTimer( gettimeofday()+2, "AMAD_GetUpdateTimer", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
+		InternalTimer( gettimeofday()+2, "AMAD_GetUpdate", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
 		readingsSingleUpdate ( $hash, "state", "active", 1 );
 		Log3 $name, 3, "AMAD ($name) - enabled";
 	    } else {
@@ -164,36 +179,41 @@ my ( $cmd, $name, $attrName, $attrVal ) = @_;
             
         } else {
 	    RemoveInternalTimer( $hash );
-	    InternalTimer( gettimeofday()+2, "AMAD_GetUpdateTimer", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
+	    InternalTimer( gettimeofday()+2, "AMAD_GetUpdate", $hash, 0 ) if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "disabled" );
 	    readingsSingleUpdate ( $hash, "state", "active", 1 );
 	    Log3 $name, 3, "AMAD ($name) - enabled";
         }
     }
     
-    elsif( $attrName eq "interval" ) {
-	if( $cmd eq "set" ) {
-	    if( $attrVal < 60 ) {
-		Log3 $name, 3, "AMAD ($name) - interval too small, please use something > 60 (sec), default is 180 (sec)";
-		return "interval too small, please use something > 60 (sec), default is 180 (sec)";
-	    } else {
-		$hash->{INTERVAL} = $attrVal;
-		Log3 $name, 3, "AMAD ($name) - set interval to $attrVal";
-	    }
-	    
-	} else {
-	    $hash->{INTERVAL} = 180;
-	    Log3 $name, 3, "AMAD ($name) - set interval to default";
-	}
+    elsif( $attrName eq "setScreenBrightness" ) {
+        Log3 $name, 1, "AMAD ($name) - !!!The Attribut \"setScreenBrightness\" is obsolete and will be remove in the future!!! Please delete the attribut description in your AMAD Device";
+        Log3 $name, 1, "AMAD ($name) - !!!Das Attribut \"setScreenBrightness\" wird nicht mehr benötigt und in zukünftigen Versionen entfernt!!! Bitte lösche die Attributszuweisung aus Deinem AMAD Device";
     }
     
     elsif( $attrName eq "port" ) {
 	if( $cmd eq "set" ) {
 	    $hash->{PORT} = $attrVal;
 	    Log3 $name, 3, "AMAD ($name) - set port to $attrVal";
+	    
+	    if( $hash->{BRIDGE} ) {
+                delete $modules{AMAD}{defptr}{BRIDGE};
+                TcpServer_Close( $hash );
+                Log3 $name, 3, "AMAD ($name) - CommBridge Port changed. CommBridge are closed and new open!";
+                
+                AMAD_CommBridge_Open( $hash );
+            }
 
         } else {
 	    $hash->{PORT} = 8090;
 	    Log3 $name, 3, "AMAD ($name) - set port to default";
+	    
+	    if( $hash->{BRIDGE} ) {
+                delete $modules{AMAD}{defptr}{BRIDGE};
+                TcpServer_Close( $hash );
+                Log3 $name, 3, "AMAD ($name) - CommBridge Port changed. CommBridge are closed and new open!";
+                
+                AMAD_CommBridge_Open( $hash );
+            }
         }
     }
     
@@ -211,34 +231,34 @@ my ( $cmd, $name, $attrName, $attrVal ) = @_;
             return $attrName ." set to ". $attrVal if( $init_done );
         }
     }
-
-    return;
+    
+    return undef;
 }
 
-sub AMAD_GetUpdateLocal($) {
+sub AMAD_GetUpdate($) {
 
 my ( $hash ) = @_;
     my $name = $hash->{NAME};
-
-    AMAD_RetrieveAutomagicInfo( $hash ) if( ReadingsVal( $name, "deviceState", "online" ) eq "online" && ReadingsVal( $hash->{NAME}, "state", 0 ) ne "initialized" && AttrVal( $name, "disable", 0 ) ne "1" );  ### deviceState muß von Hand online/offline gesetzt werden z.B. ueber RESIDENZ Modul
+    my $bhash = $modules{AMAD}{defptr}{BRIDGE};
+    my $bname = $bhash->{NAME};
     
-    return 1;
+    RemoveInternalTimer( $hash );
+
+    if( $init_done && ReadingsVal( $name, "deviceState", "online" ) eq "online" && AttrVal( $name, "disable", 0 ) ne "1" && ReadingsVal( $bname, "fhemServerIP", "not set" ) ne "not set" && $hash->{APSSID} ) {
+    
+        AMAD_statusRequest( $hash );
+        
+    } else {
+
+        Log3 $name, 4, "AMAD ($name) - GetUpdate, FHEM or Device not ready yet";
+        Log3 $name, 3, "AMAD ($bname) - GetUpdate, Please set $bname fhemServerIP <IP-FHEM> NOW!" if( ReadingsVal( $bname, "fhemServerIP", "none" ) eq "none" );
+        Log3 $name, 3, "AMAD ($name) - Attention!!! Your Device was defined without ACCESSPOINT-SSID, please modify the DEF to <HOST-IP> <ACCESSPOINT-SSID>" if( ! $hash->{APSSID} );
+
+        InternalTimer( gettimeofday()+15, "AMAD_GetUpdate", $hash, 0 );
+    }
 }
 
-sub AMAD_GetUpdateTimer($) {
-
-    my ( $hash ) = @_;
-    my $name = $hash->{NAME};
- 
-    AMAD_RetrieveAutomagicInfo( $hash ) if( ReadingsVal( $name, "deviceState", "online" ) eq "online" && AttrVal( $name, "disable", 0 ) ne "1" );  ### deviceState muss von Hand online/offline gesetzt werden z.B. ueber RESIDENZ Modul
-  
-    InternalTimer( gettimeofday()+$hash->{INTERVAL}, "AMAD_GetUpdateTimer", $hash, 1 );
-    Log3 $name, 4, "AMAD ($name) - Call AMAD_GetUpdateTimer";
-
-    return 1;
-}
-
-sub AMAD_RetrieveAutomagicInfo($) {
+sub AMAD_statusRequest($) {
 
     my ($hash) = @_;
     my $bhash = $modules{AMAD}{defptr}{BRIDGE};
@@ -246,6 +266,8 @@ sub AMAD_RetrieveAutomagicInfo($) {
     my $name = $hash->{NAME};
     my $host = $hash->{HOST};
     my $port = $hash->{PORT};
+    my $bport = $bhash->{PORT};
+    my $apssid = $hash->{APSSID};
     my $fhemip = ReadingsVal( $bname, "fhemServerIP", "none" );
     my $activetask = AttrVal( $name, "checkActiveTask", "none" );
     
@@ -255,47 +277,43 @@ sub AMAD_RetrieveAutomagicInfo($) {
     HttpUtils_NonblockingGet(
 	{
 	    url		=> $url,
-	    timeout	=> 60,
+	    timeout	=> 30,
 	    hash	=> $hash,
 	    method	=> "GET",
-	    header	=> "fhemIP: $fhemip\r\nfhemDevice: $name\r\nactiveTask: $activetask",
+	    header	=> "fhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport",
 	    doTrigger	=> 1,
-	    callback	=> \&AMAD_RetrieveAutomagicInfoFinished,
+	    callback	=> \&AMAD_statusRequestErrorHandling,
 	}
     );
-    Log3 $name, 4, "AMAD ($name) - NonblockingGet get URL";
-    Log3 $name, 4, "AMAD ($name) - AMAD_RetrieveAutomagicInfo: calling Host: $host";
+    
+    Log3 $name, 5, "AMAD ($name) - Send statusRequest with URL: \"$url\" and Header: \"fhemIP: $fhemip\r\nfhemDevice: $name\r\nactiveTask: $activetask\r\napSSID: $apssid\"";
 }
 
-sub AMAD_RetrieveAutomagicInfoFinished($$$) {
+sub AMAD_statusRequestErrorHandling($$$) {
     
     my ( $param, $err, $data ) = @_;
     my $hash = $param->{hash};
     my $doTrigger = $param->{doTrigger};
     my $name = $hash->{NAME};
     my $host = $hash->{HOST};
-
-    Log3 $name, 4, "AMAD ($name) - AMAD_RetrieveAutomagicInfoFinished: processed request data";
     
 
-
     ### Begin Error Handling
-    if( $hash->{helper}{infoErrorCounter} > 2 ) {
+    if( $hash->{helper}{infoErrorCounter} > 0 ) {
 	readingsBeginUpdate( $hash );
 	readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
 	
 	if( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
-	    readingsBulkUpdate( $hash, "lastStatusRequestError", "AMAD flows on your device inactive, please check your device" );
 	    
-	    Log3 $name, 5, "AMAD ($name) - CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
+	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
 	     
 	    readingsBulkUpdate( $hash, "deviceState", "offline" );
 	    readingsBulkUpdate ( $hash, "state", "AMAD Flows inactive, device set offline");
 	}
-	elsif( $hash->{helper}{infoErrorCounter} > 9 && $hash->{helper}{setCmdErrorCounter} > 4 ) {
-	    readingsBulkUpdate( $hash, "lastStatusRequestError", "unknown error, please contact the developer" );
+	
+	elsif( $hash->{helper}{infoErrorCounter} > 7 && $hash->{helper}{setCmdErrorCounter} > 4 ) {
 	    
-	    Log3 $name, 4, "AMAD ($name) - UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
+	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
 	    
 	    $attr{$name}{disable} = 1;
 	    readingsBulkUpdate ( $hash, "state", "Unknown Error, device disabled");
@@ -305,24 +323,24 @@ sub AMAD_RetrieveAutomagicInfoFinished($$$) {
 	    
 	    return;
 	}
+	
 	elsif( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" ) {
-	    readingsBulkUpdate( $hash, "lastStatusRequestError", "informations flow on your device is inactive, will try to reactivate" );
 	    
-	    Log3 $name, 4, "AMAD ($name) - Informations Flow on your Device is inactive, will try to reactivate";
+	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: Informations Flow on your Device is inactive, will try to reactivate";
 	}
-	elsif( $hash->{helper}{infoErrorCounter} > 9 ) {
-	    readingsBulkUpdate( $hash, "lastStatusRequestError", "to many errors, check your network or device configuration" );
+	
+	elsif( $hash->{helper}{infoErrorCounter} > 7 ) {
 	    
-	    Log3 $name, 4, "AMAD ($name) - To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
+	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
 	    
 	    readingsBulkUpdate( $hash, "deviceState", "offline" );
 	    readingsBulkUpdate ( $hash, "state", "To many Errors, device set offline");
 	    $hash->{helper}{infoErrorCounter} = 0;
 	}
-	elsif($hash->{helper}{infoErrorCounter} > 4 && ReadingsVal( $name, "flow_Informations", "active" ) eq "active" ){
-	    readingsBulkUpdate( $hash, "lastStatusRequestError", "check automagicApp on your device" );
+	
+	elsif($hash->{helper}{infoErrorCounter} > 2 && ReadingsVal( $name, "flow_Informations", "active" ) eq "active" ){
 	    
-	    Log3 $name, 4, "AMAD ($name) - Please check the AutomagicAPP on your Device";
+	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: Please check the AutomagicAPP on your Device";
 	}
 	
 	readingsEndUpdate( $hash, 1 );
@@ -337,22 +355,28 @@ sub AMAD_RetrieveAutomagicInfoFinished($$$) {
 	    readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
 	  
 	    if( $err =~ /timed out/ ) {
-		readingsBulkUpdate( $hash, "lastStatusRequestError", "connect to your device is timed out. check network ");
+	    
+		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: connect to your device is timed out. check network";
 	    }
+	    
 	    elsif( ( $err =~ /Keine Route zum Zielrechner/ ) && $hash->{helper}{infoErrorCounter} > 1 ) {
-		readingsBulkUpdate( $hash,"lastStatusRequestError", "no route to target. bad network configuration or network is down ");
+	    
+		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: no route to target. bad network configuration or network is down";
+		
 	    } else {
-		readingsBulkUpdate($hash, "lastStatusRequestError", $err );
+
+		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: $err";
 	    }
 
 	readingsEndUpdate( $hash, 1 );
 	
-	Log3 $name, 4, "AMAD ($name) - AMAD_RetrieveAutomagicInfoFinished: error while requesting AutomagicInfo: $err";
+	Log3 $name, 5, "AMAD ($name) - statusRequestERROR: AMAD_statusRequestErrorHandling: error while requesting AutomagicInfo: $err";
+	
 	return;
 	}
     }
 
-    if( $data eq "" and exists( $param->{code} ) ) {
+    if( $data eq "" and exists( $param->{code} ) && $param->{code} ne 200 ) {
 	readingsBeginUpdate( $hash );
 	readingsBulkUpdate ( $hash, "state", $param->{code} ) if( ReadingsVal( $name, "state", 1 ) ne "initialized" );
 	$hash->{helper}{infoErrorCounter} = ( $hash->{helper}{infoErrorCounter} + 1 );
@@ -360,13 +384,13 @@ sub AMAD_RetrieveAutomagicInfoFinished($$$) {
 	readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
     
 	if( $param->{code} ne 200 ) {
-	    readingsBulkUpdate( $hash," lastStatusRequestError", "http Error ".$param->{code} );
+
+	    Log3 $name, 5, "AMAD ($name) - statusRequestERROR: ".$param->{code};
 	}
-	
-	readingsBulkUpdate( $hash, "lastStatusRequestError", "empty response, check automagicApp on your device" );
+
 	readingsEndUpdate( $hash, 1 );
     
-	Log3 $name, 4, "AMAD ($name) - AMAD_RetrieveAutomagicInfoFinished: received http code ".$param->{code}." without any data after requesting AMAD AutomagicInfo";
+	Log3 $name, 5, "AMAD ($name) - statusRequestERROR: received http code ".$param->{code}." without any data after requesting AMAD AutomagicInfo";
 
 	return;
     }
@@ -379,17 +403,22 @@ sub AMAD_RetrieveAutomagicInfoFinished($$$) {
 	readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_error" );
     
 	    if( $param->{code} eq 404 && ReadingsVal( $name, "flow_Informations", "inactive" ) eq "inactive" ) {
-		readingsBulkUpdate( $hash, "lastStatusRequestError", "check the informations flow on your device" );
+
+		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: check the informations flow on your device";
 	    }
+	    
 	    elsif( $param->{code} eq 404 && ReadingsVal( $name, "flow_Informations", "active" ) eq "active" ) {
-		readingsBulkUpdate( $hash, "lastStatusRequestError", "check the automagicApp on your device" );
+	    
+		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: check the automagicApp on your device";
+		
 	    } else {
-		readingsBulkUpdate( $hash, "lastStatusRequestError", "http error ".$param->{code} );
+
+		Log3 $name, 5, "AMAD ($name) - statusRequestERROR: http error ".$param->{code};
 	    }
 	
 	readingsEndUpdate( $hash, 1 );
     
-	Log3 $name, 4, "AMAD ($name) - AMAD_RetrieveAutomagicInfoFinished: received http code ".$param->{code}." receive Error after requesting AMAD AutomagicInfo";
+	Log3 $name, 5, "AMAD ($name) - statusRequestERROR: received http code ".$param->{code}." receive Error after requesting AMAD AutomagicInfo";
 
 	return;
     }
@@ -397,11 +426,20 @@ sub AMAD_RetrieveAutomagicInfoFinished($$$) {
     ### End Error Handling
 
     $hash->{helper}{infoErrorCounter} = 0;
- 
+}
+
+sub AMAD_ResponseProcessing($$) {
+
+    my ( $hash, $data ) = @_;
+    
+    my $name = $hash->{NAME};
+    my $host = $hash->{HOST};
+
     ### Begin Response Processing
+    Log3 $name, 5, "AMAD ($name) - Processing data: $data";
     readingsSingleUpdate( $hash, "state", "active", 1) if( ReadingsVal( $name, "state", 0 ) ne "initialized" or ReadingsVal( $name, "state", 0 ) ne "active" );
     
-    my @valuestring = split( '@@@@',  $data );
+    my @valuestring = split( '@@@@', $data );
     my %buffer;
     foreach( @valuestring ) {
 	my @values = split( '@@' , $_ );
@@ -414,8 +452,17 @@ sub AMAD_RetrieveAutomagicInfoFinished($$$) {
     my $t;
     my $v;
     while( ( $t, $v ) = each %buffer ) {
-	$v =~ s/null//g;
-	readingsBulkUpdate( $hash, $t, $v ) if( defined( $v ) );
+        if( defined( $v ) ) {
+        
+            readingsBulkUpdate( $hash, "deviceState", "offline" ) if( $t eq "airplanemode" && $v eq "on" );
+            readingsBulkUpdate( $hash, "deviceState", "online" ) if( $t eq "airplanemode" && $v eq "off" );
+            $v =~ s/\bnull\b/off/g if( ($t eq "nextAlarmDay" || $t eq "nextAlarmTime") && $v eq "null" );
+            
+            
+            $v =~ s/\bnull\b//g;
+
+            readingsBulkUpdate( $hash, $t, $v );
+        }
     }
     
     readingsBulkUpdate( $hash, "lastStatusRequestState", "statusRequest_done" );
@@ -449,23 +496,26 @@ sub AMAD_Set($$@) {
 	$list .= "volume:slider,0,1,15 ";
 	$list .= "deviceState:online,offline ";
 	$list .= "mediaPlayer:play,stop,next,back " if( ReadingsVal( $bname, "fhemServerIP", "none" ) ne "none");
-	$list .= "screenBrightness:slider,0,1,255 " if( AttrVal( $name, "setScreenBrightness", "1" ) eq "1" );
-	$list .= "screen:on,off ";
-	$list .= "screenOrientation:auto,landscape,portrait " if( AttrVal( $name, "setScreenOrientation", "1" ) eq "1" );
-	$list .= "screenFullscreen:on,off " if( AttrVal( $name, "setFullscreen", "1" ) eq "1" );
+	$list .= "screenBrightness:slider,0,1,255 ";
+	$list .= "screen:on,off,lock,unlock ";
+	$list .= "screenOrientation:auto,landscape,portrait " if( AttrVal( $name, "setScreenOrientation", "0" ) eq "1" );
+	$list .= "screenFullscreen:on,off " if( AttrVal( $name, "setFullscreen", "0" ) eq "1" );
 	$list .= "openURL ";
 	$list .= "openApp:$apps " if( AttrVal( $name, "setOpenApp", "none" ) ne "none" );
 	$list .= "nextAlarmTime:time ";
+	$list .= "timer:slider,1,1,60 ";
 	$list .= "statusRequest:noArg ";
-	$list .= "system:reboot,shutdown,airplanemodeON " if( AttrVal( $name, "root", "1" ) eq "1" );
+	$list .= "system:reboot,shutdown,airplanemodeON " if( AttrVal( $name, "root", "0" ) eq "1" );
 	$list .= "bluetooth:on,off ";
 	$list .= "notifySndFile ";
 	$list .= "clearNotificationBar:All,Automagic ";
 	$list .= "changetoBTDevice:$btdev " if( AttrVal( $name, "setBluetoothDevice", "none" ) ne "none" );
 	$list .= "activateVoiceInput:noArg ";
-	$list .= "screenLock:on,off " if( AttrVal( $name, "setScreenlockPIN", "none" ) ne "none" );
 	$list .= "volumeNotification:slider,0,1,7 ";
-	$list .= "vibrate:noArg";
+	$list .= "vibrate:noArg ";
+	$list .= "sendIntent ";
+	$list .= "currentFlowsetUpdate:noArg ";
+	$list .= "installFlowSource ";
 
 	if( lc $cmd eq 'screenmsg'
 	    || lc $cmd eq 'ttsmsg'
@@ -479,6 +529,7 @@ sub AMAD_Set($$@) {
 	    || lc $cmd eq 'openurl'
 	    || lc $cmd eq 'openapp'
 	    || lc $cmd eq 'nextalarmtime'
+	    || lc $cmd eq 'timer'
 	    || lc $cmd eq 'bluetooth'
 	    || lc $cmd eq 'system'
 	    || lc $cmd eq 'notifysndfile'
@@ -488,23 +539,25 @@ sub AMAD_Set($$@) {
 	    || lc $cmd eq 'volumenotification'
 	    || lc $cmd eq 'screenlock'
 	    || lc $cmd eq 'statusrequest'
+	    || lc $cmd eq 'sendintent'
+	    || lc $cmd eq 'currentflowsetupdate'
+	    || lc $cmd eq 'installflowsource'
 	    || lc $cmd eq 'vibrate') {
 
 	    Log3 $name, 5, "AMAD ($name) - set $name $cmd ".join(" ", @val);
 	  
-	    return "set command only works if state not equal initialized, please wait for next interval run" if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "initialized");
+	    return "set command only works if state not equal initialized" if( ReadingsVal( $hash->{NAME}, "state", 0 ) eq "initialized");
 	    return "Cannot set command, FHEM Device is disabled" if( AttrVal( $name, "disable", "0" ) eq "1" );
 	    
 	    return AMAD_SelectSetCmd( $hash, $cmd, @val ) if( @val ) && ( ReadingsVal( $name, "deviceState", "online" ) eq "offline" ) && ( lc $cmd eq 'devicestate' );
 	    return "Cannot set command, FHEM Device is offline" if( ReadingsVal( $name, "deviceState", "online" ) eq "offline" );
 	  
-	    return AMAD_SelectSetCmd( $hash, $cmd, @val ) if( @val ) || ( lc $cmd eq 'statusrequest' ) || ( lc $cmd eq 'activatevoiceinput' ) || ( lc $cmd eq 'vibrate' );
+	    return AMAD_SelectSetCmd( $hash, $cmd, @val ) if( @val ) || ( lc $cmd eq 'statusrequest' ) || ( lc $cmd eq 'activatevoiceinput' ) || ( lc $cmd eq 'vibrate' ) || ( lc $cmd eq 'currentflowsetupdate' );
 	}
 
 	return "Unknown argument $cmd, bearword as argument or wrong parameter(s), choose one of $list";
     }
-    
-    #elsif( $name eq "$bname" ) {
+
     elsif( $modules{AMAD}{defptr}{BRIDGE} ) {
     
 	my $list = "";
@@ -545,6 +598,7 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'ttsmsg' ) {
+    
 	my $msg = join( " ", @data );
 	
 	$msg =~ s/%/%25/g;
@@ -556,26 +610,25 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'volume' ) {
+    
 	my $vol = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setVolume?volume=$vol";
-
-	readingsSingleUpdate( $hash, $cmd, $vol, 1 );
 	
 	return AMAD_HTTP_POST( $hash, $url );
     }
     
     elsif( lc $cmd eq 'volumenotification' ) {
+    
 	my $vol = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setNotifiVolume?notifivolume=$vol";
-
-	readingsSingleUpdate( $hash, $cmd, $vol, 1 );
 	
 	return AMAD_HTTP_POST( $hash, $url );
     }
     
     elsif( lc $cmd eq 'mediaplayer' ) {
+    
 	my $btn = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/mediaPlayer?button=$btn";
@@ -584,6 +637,7 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'devicestate' ) {
+    
 	my $v = join( " ", @data );
 
 	readingsSingleUpdate( $hash, $cmd, $v, 1 );
@@ -592,6 +646,7 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'screenbrightness' ) {
+    
 	my $bri = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setBrightness?brightness=$bri";
@@ -600,14 +655,32 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'screen' ) {
+    
 	my $mod = join( " ", @data );
+	my $scot = AttrVal( $name, "setScreenOnForTimer", undef );
+	$scot = 60 if( !$scot );
+	
+	if ($mod eq "on" || $mod eq "off") {
+            
+            my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setScreenOnOff?screen=".$mod."&screenontime=".$scot if ($mod eq "on" || $mod eq "off");
+            
+            return AMAD_HTTP_POST( $hash,$url );
+	}
+	
+	elsif ($mod eq "lock" || $mod eq "unlock") {
+	
+            return "Please set \"setScreenlockPIN\" Attribut first" if( AttrVal( $name, "setScreenlockPIN", "none" ) eq "none" );
+            my $PIN = AttrVal( $name, "setScreenlockPIN", undef );
+            $PIN = AMAD_decrypt($PIN);
 
-	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setScreenOnOff?screen=$mod";
+            my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/screenlock?lockmod=".$mod."&lockPIN=".$PIN;
 
-	return AMAD_HTTP_POST( $hash,$url );
+            return AMAD_HTTP_POST( $hash,$url );
+        }
     }
     
     elsif( lc $cmd eq 'screenorientation' ) {
+    
 	my $mod = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setScreenOrientation?orientation=$mod";
@@ -623,6 +696,7 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'screenfullscreen' ) {
+    
 	my $mod = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setScreenFullscreen?fullscreen=$mod";
@@ -633,28 +707,43 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'openurl' ) {
+    
 	my $openurl = join( " ", @data );
+	my $browser = AttrVal( $name, "setOpenUrlBroswer", "com.android.chrome|com.google.android.apps.chrome.Main" );
+	my @browserapp = split( /\|/, $browser );
 
-	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/openURL?url=$openurl";
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/openURL?url=".$openurl."&browserapp=".$browserapp[0]."&browserappclass=".$browserapp[1];
     
 	return AMAD_HTTP_POST( $hash, $url );
     }
     
     elsif (lc $cmd eq 'nextalarmtime') {
-	my $alarmTime = join( " ", @data );
-	my @alarm = split( ":", $alarmTime );
+    
+	my $value = join( " ", @data );
+	my @alarm = split( ":", $value );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setAlarm?hour=".$alarm[0]."&minute=".$alarm[1];
 	
 	return AMAD_HTTP_POST( $hash, $url );
     }
     
+    elsif (lc $cmd eq 'timer') {
+    
+	my $timer = join( " ", @data );
+
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setTimer?minute=$timer";
+	
+	return AMAD_HTTP_POST( $hash, $url );
+    }
+    
     elsif( lc $cmd eq 'statusrequest' ) {
-	AMAD_GetUpdateLocal( $hash );
+    
+	AMAD_GetUpdate( $hash );
 	return undef;
     }
     
     elsif( lc $cmd eq 'openapp' ) {
+    
 	my $app = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/openApp?app=$app";
@@ -663,17 +752,19 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'system' ) {
+    
 	my $systemcmd = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/systemcommand?syscmd=$systemcmd";
 
-	readingsSingleUpdate( $hash, $systemcmd, "on", 1 ) if( $systemcmd eq "airplanemodeON" );
+	readingsSingleUpdate( $hash, "airplanemode", "on", 1 ) if( $systemcmd eq "airplanemodeON" );
 	readingsSingleUpdate( $hash, "deviceState", "offline", 1 ) if( $systemcmd eq "airplanemodeON" || $systemcmd eq "shutdown" );
     
 	return AMAD_HTTP_POST( $hash,$url );
     }
     
     elsif( lc $cmd eq 'bluetooth' ) {
+    
 	my $mod = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setbluetooth?bluetooth=$mod";
@@ -682,6 +773,7 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'notifysndfile' ) {
+    
 	my $notify = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/playnotifysnd?notifyfile=$notify";
@@ -690,6 +782,7 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'changetobtdevice' ) {
+    
 	my $swToBtDevice = join( " ", @data );    
 	my @swToBtMac = split( /\|/, $swToBtDevice );
 	my $btDevices = AttrVal( $name, "setBluetoothDevice", "none" ) if( AttrVal( $name, "setBluetoothDevice", "none" ) ne "none" );
@@ -703,6 +796,7 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'clearnotificationbar' ) {
+    
 	my $appname = join( " ", @data );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/clearnotificationbar?app=$appname";
@@ -710,20 +804,39 @@ sub AMAD_SelectSetCmd($$@) {
 	return AMAD_HTTP_POST( $hash,$url );
     }
     
-    elsif( lc $cmd eq 'screenlock' ) {
-	my $lockmod = join( " ", @data );
-	my $PIN = AttrVal( $name, "setScreenlockPIN", undef );
-        $PIN = AMAD_decrypt($PIN);
-
-	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/screenlock?lockmod=".$lockmod."&lockPIN=".$PIN;
-
-        readingsSingleUpdate( $hash, $cmd, $lockmod, 1 );
-	return AMAD_HTTP_POST( $hash,$url );
-    }
-    
     elsif( lc $cmd eq 'vibrate' ) {
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setvibrate";
+	
+	return AMAD_HTTP_POST( $hash,$url );
+    }
+    
+    elsif( lc $cmd eq 'sendintent' ) {
+    
+        my $intentstring = join( " ", @data );
+        my ( $action, $exkey1, $exval1, $exkey2, $exval2 ) = split( "[ \t][ \t]*", $intentstring );
+        $exkey1 = "" if( !$exkey1 );
+        $exval1 = "" if( !$exval1 );
+        $exkey2 = "" if( !$exkey2 );
+        $exval2 = "" if( !$exval2 );
+
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/sendIntent?action=".$action."&exkey1=".$exkey1."&exval1=".$exval1."&exkey2=".$exkey2."&exval2=".$exval2;
+	
+	return AMAD_HTTP_POST( $hash,$url );
+    }
+    
+    elsif( lc $cmd eq 'installflowsource' ) {
+    
+        my $flowname = join( " ", @data );
+
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/installFlow?flowname=$flowname";
+	
+	return AMAD_HTTP_POST( $hash,$url );
+    }
+    
+    elsif( lc $cmd eq 'currentflowsetupdate' ) {
+
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/currentFlowsetUpdate";
 	
 	return AMAD_HTTP_POST( $hash,$url );
     }
@@ -770,16 +883,15 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
 	readingsBulkUpdate( $hash, "lastSetCommandState", "statusRequest_error" );
 	
 	if( ReadingsVal( $name, "flow_Informations", "active" ) eq "inactive" && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
-	    readingsBulkUpdate( $hash, "lastSetCommandError", "AMAD flows on your device inactive, please check your device" );
-	    Log3 $name, 5, "AMAD ($name) - CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
+	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: CHECK THE LAST ERROR READINGS FOR MORE INFO, DEVICE IS SET OFFLINE";
 	     
 	    readingsBulkUpdate( $hash, "deviceState", "offline" );
 	    readingsBulkUpdate( $hash, "state", "AMAD Flows inactive, device set offline" );
 	}
-	elsif( $hash->{helper}{infoErrorCounter} > 9 && $hash->{helper}{setCmdErrorCounter} > 4 ) {
-	    readingsBulkUpdate($hash, "lastSetCommandError", "unknown error, please contact the developer" );
+	
+	elsif( $hash->{helper}{infoErrorCounter} > 7 && $hash->{helper}{setCmdErrorCounter} > 4 ) {
 	    
-	    Log3 $name, 4, "AMAD ($name) - UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
+	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: UNKNOWN ERROR, PLEASE CONTACT THE DEVELOPER, DEVICE DISABLED";
 	    
 	    $attr{$name}{disable} = 1;
 	    readingsBulkUpdate( $hash, "state", "Unknown Error, device disabled" );
@@ -788,24 +900,24 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
 	    
 	    return;
 	}
+	
 	elsif( ReadingsVal( $name, "flow_SetCommands", "active" ) eq "inactive" ) {
-	    readingsBulkUpdate( $hash, "lastSetCommandError", "setCommands flow on your device is inactive, will try to reactivate" );
 	    
-	    Log3 $name, 4, "AMAD ($name) - Flow SetCommands on your Device is inactive, will try to reactivate";
+	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: Flow SetCommands on your Device is inactive, will try to reactivate";
 	}
+	
 	elsif( $hash->{helper}{setCmdErrorCounter} > 9 ) {
-	    readingsBulkUpdate( $hash, "lastSetCommandError", "to many errors, check your network or device configuration" );
 	    
-	    Log3 $name, 4, "AMAD ($name) - To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
+	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: To many Errors please check your Network or Device Configuration, DEVICE IS SET OFFLINE";
 	    
 	    readingsBulkUpdate( $hash, "deviceState", "offline" );
 	    readingsBulkUpdate( $hash, "state", "To many Errors, device set offline" );
 	    $hash->{helper}{setCmdErrorCounter} = 0;
 	}
+	
 	elsif( $hash->{helper}{setCmdErrorCounter} > 4 && ReadingsVal( $name, "flow_SetCommands", "active" ) eq "active" ){
-	    readingsBulkUpdate( $hash, "lastSetCommandError", "check automagicApp on your device" );
 	    
-	    Log3 $name, 4, "AMAD ($name) - Please check the AutomagicAPP on your Device";
+	    Log3 $name, 5, "AMAD ($name) - setCommandERROR: Please check the AutomagicAPP on your Device";
 	}
 	
 	readingsEndUpdate( $hash, 1 );
@@ -817,19 +929,25 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
 	  readingsBulkUpdate( $hash, "state", $err ) if( ReadingsVal( $name, "state", 0 ) ne "initialized" );
 	  $hash->{helper}{setCmdErrorCounter} = ($hash->{helper}{setCmdErrorCounter} + 1);
 	  
-	  readingsBulkUpdate( $hash, "lastSetCommandState", "cmd_error" );
+	  readingsBulkUpdate( $hash, "lastSetCommandState", "setCmd_error" );
 	  
 	  if( $err =~ /timed out/ ) {
-	      readingsBulkUpdate( $hash, "lastSetCommandError", "connect to your device is timed out. check network" );
+	  
+	      Log3 $name, 5, "AMAD ($name) - setCommandERROR: connect to your device is timed out. check network";
 	  }
+	  
 	  elsif( $err =~ /Keine Route zum Zielrechner/ ) {
-	      readingsBulkUpdate( $hash, "lastSetCommandError", "no route to target. bad network configuration or network is down" );
+	  
+	      Log3 $name, 5, "AMAD ($name) - setCommandERROR: no route to target. bad network configuration or network is down";
+	      
 	  } else {
-	      readingsBulkUpdate( $hash, "lastSetCommandError", "$err" );
+	  
+	      Log3 $name, 5, "AMAD ($name) - setCommandERROR: $err";
 	  }
+	  
 	  readingsEndUpdate( $hash, 1 );
 	  
-	  Log3 $name, 5, "AMAD ($name) - AMAD_HTTP_POST: error while POST Command: $err";
+	  Log3 $name, 5, "AMAD ($name) - setCommandERROR: error while POST Command: $err";
 	  
 	  return;
 	}
@@ -841,11 +959,11 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
 	
 	$hash->{helper}{setCmdErrorCounter} = ( $hash->{helper}{setCmdErrorCounter} + 1 );
 
-	readingsBulkUpdate($hash, "lastSetCommandState", "cmd_error" );
-	readingsBulkUpdate($hash, "lastSetCommandError", "http Error ".$param->{code} );
+	readingsBulkUpdate($hash, "lastSetCommandState", "setCmd_error" );
+
 	readingsEndUpdate( $hash, 1 );
     
-	Log3 $name, 5, "AMAD ($name) - AMAD_HTTP_POST: received http code ".$param->{code};
+	Log3 $name, 5, "AMAD ($name) - setCommandERROR: received http code ".$param->{code};
 
 	return;
     }
@@ -856,12 +974,16 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
 	
 	$hash->{helper}{setCmdErrorCounter} = ( $hash->{helper}{setCmdErrorCounter} + 1 );
 
-	readingsBulkUpdate( $hash, "lastSetCommandState", "cmd_error" );
+	readingsBulkUpdate( $hash, "lastSetCommandState", "setCmd_error" );
     
 	    if( $param->{code} eq 404 ) {
-		readingsBulkUpdate( $hash, "lastSetCommandError", "setCommands flow is inactive on your device!" );
+	    
+		readingsBulkUpdate( $hash, "lastSetCommandError", "" );
+		Log3 $name, 5, "AMAD ($name) - setCommandERROR: setCommands flow is inactive on your device!";
+		
 	    } else {
-		readingsBulkUpdate( $hash, "lastSetCommandError", "http error ".$param->{code} );
+	    
+		Log3 $name, 5, "AMAD ($name) - setCommandERROR: http error ".$param->{code};
 	    }
 	
 	return;
@@ -869,7 +991,7 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
     
     ### End Error Handling
     
-    readingsSingleUpdate( $hash, "lastSetCommandState", "cmd_done", 1 );
+    readingsSingleUpdate( $hash, "lastSetCommandState", "setCmd_done", 1 );
     $hash->{helper}{setCmdErrorCounter} = 0;
     
     return undef;
@@ -877,21 +999,23 @@ sub AMAD_HTTP_POSTerrorHandling($$$) {
 
 sub AMAD_CommBridge_Open($) {
 
-    my ( $bhash ) = @_;
-    my $bname = $bhash->{NAME};
+    my ( $hash ) = @_;
+    my $name = $hash->{NAME};
+    my $port = $hash->{PORT};
+    
 
     # Oeffnen des TCP Sockets
-    my $bret = TcpServer_Open( $bhash, "8090", "global" );
+    my $ret = TcpServer_Open( $hash, $port, "global" );
     
-    if( $bret && !$init_done ) {
-	Log3 $bname, 3, "$bret. Exiting.";
+    if( $ret && !$init_done ) {
+	Log3 $name, 3, "$ret. Exiting.";
 	exit(1);
     }
     
-    readingsSingleUpdate ( $bhash, "state", "opened", 1 );
-    Log3 $bname, 5, "Socket wird geöffnet.";
+    readingsSingleUpdate ( $hash, "state", "opened", 1 );
+    Log3 $name, 5, "Socket wird geöffnet.";
     
-    return $bret;
+    return $ret;
 }
 
 sub AMAD_CommBridge_Read($) {
@@ -920,12 +1044,13 @@ sub AMAD_CommBridge_Read($) {
     
     #### Verarbeitung der Daten welche über die AMADCommBridge kommen ####
 
+    Log3 $bname, 5, "AMAD ($bname) - Receive RAW Message in Debugging Mode: $buf";
     
     ###
     ## Consume Content
     ###
 
-    my @data = split( '\R\R',  $buf );
+    my @data = split( '\R\R', $buf );
     
     my $header = AMAD_Header2Hash( $data[0] );
     my $device = $header->{FHEMDEVICE};
@@ -934,38 +1059,41 @@ sub AMAD_CommBridge_Read($) {
     my $c;
     
     my $fhemcmd = $header->{FHEMCMD};
+    
 
-    if ( $fhemcmd =~ /setreading\b/ ) {
+    if ( $data[0] =~ /currentFlowsetUpdate.xml/ ) {
+
+        $response = qx(cat /opt/fhem/FHEM/lib/74_AMADautomagicFlowset_$flowsetversion.xml);
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
+
+        return;
+    }
+    
+    elsif ( $data[0] =~ /installFlow_([^.]*.xml)/ ) {
+
+        if( defined($1) ){
+            $response = qx(cat /tmp/$1);
+            $c = $hash->{CD};
+            print $c "HTTP/1.1 200 OK\r\n",
+                "Content-Type: text/plain\r\n",
+                "Content-Length: ".length($response)."\r\n\r\n",
+                $response;
+
+            return;
+        }
+    }
+    
+    elsif ( $fhemcmd =~ /setreading\b/ ) {
 	my $tv = $data[1];
-	
-	@data = split( '\R',  $data[0] );
 
-		### Begin Response Processing
-		Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: processing receive reading values";
+        Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: processing receive reading values - Device: $device Data: $tv";
     
-		my @valuestring = split( '@@@@',  $tv );
-		my %buffer;
-
-		foreach( @valuestring ) {
-		    my @values = split( '@@' , $_ );
-		    $buffer{$values[0]} = $values[1];
-		}
-    
-		my $t;
-		my $v;
-                    
-                while( ( $t, $v ) = each %buffer ) {
-                    $v =~ s/null//g;
-
-                    readingsBeginUpdate( $dhash );
-                    readingsBulkUpdate( $dhash, $t, $v ) if( defined( $v ) );
-                }
-                    
-                readingsBulkUpdate( $dhash, "lastStatusRequestState", "statusRequest_done" );
-                readingsEndUpdate( $dhash, 1 );
-                
-		### End Response Processing
-		
+        AMAD_ResponseProcessing($dhash,$tv);
+        
         $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM was processes\r\n";
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
@@ -981,7 +1109,7 @@ sub AMAD_CommBridge_Read($) {
         
         fhem ("set $fhemCmd") if( ReadingsVal( $bname, "expertMode", 0 ) eq "1" );
 	readingsSingleUpdate( $bhash, "receiveFhemCommand", "set ".$fhemCmd, 0 );
-	Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: set reading receive fhem command";
+	Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: set reading receive fhem command";
 	
 	$response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM execute set command now\r\n";
         $c = $hash->{CD};
@@ -994,13 +1122,13 @@ sub AMAD_CommBridge_Read($) {
     }
     
     elsif ( $fhemcmd =~ /voiceinputvalue\b/ ) {
-        my $fhemCmd = $data[1];
+        my $fhemCmd = lc $data[1];
         
         readingsBeginUpdate( $bhash);
 	readingsBulkUpdate( $bhash, "receiveVoiceCommand", $fhemCmd );
 	readingsBulkUpdate( $bhash, "receiveVoiceDevice", $device );
 	readingsEndUpdate( $bhash, 1 );
-	Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: set reading receive voice command";
+	Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: set reading receive voice command";
 	
 	$response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM was processes\r\n";
         $c = $hash->{CD};
@@ -1010,19 +1138,6 @@ sub AMAD_CommBridge_Read($) {
             $response;
             
 	return;
-    }
-    
-    elsif ( $fhemcmd eq "statusrequest" ) {
-    
-        $response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM was processes\r\n";
-        $c = $hash->{CD};
-        print $c "HTTP/1.1 200 OK\r\n",
-            "Content-Type: text/plain\r\n",
-            "Content-Length: ".length($response)."\r\n\r\n",
-            $response;
-
-        Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: Call statusRequest";
-        return AMAD_GetUpdateLocal( $dhash );
     }
     
     elsif ( $fhemcmd =~ /readingsval\b/ ) {
@@ -1036,14 +1151,14 @@ sub AMAD_CommBridge_Read($) {
             "Content-Length: ".length($response)."\r\n\r\n",
             $response;
         
-	Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: response ReadingsVal Value to Automagic Device";
+	Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: response ReadingsVal Value to Automagic Device";
 	return;
     }
     
     elsif ( $fhemcmd =~ /fhemfunc\b/ ) {
         my $fhemCmd = $data[1];
 	
-	Log3 $name, 4, "AMAD ($name) - AMAD_CommBridge: receive fhem-function command";
+	Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: receive fhem-function command";
 	
         if( $fhemcmd =~ /^{.*}$/ ) {
         
@@ -1133,222 +1248,145 @@ sub AMAD_decrypt($) {
 <a name="AMAD"></a>
 <h3>AMAD</h3>
 <ul>
-  <u><b>AMAD - Auto Magic Android Device</b></u>
+  <u><b>AMAD - Automagic Android Device</b></u>
   <br>
-  This module provides, <b><u>combination with the Android APP Auto Magic</u></b>, a variety of information from Android devices.
-  The AndroidAPP Auto Magic (this 3rd party app costs 2.90Euro) works better than Tasker and is more user-friendly.<br>
-  The following information can be displayed:
-  <ul>
-    <li>Android Version</li>
-    <li>State of Automagic on the device</li>
-    <li>Bluetooth on / off</li>
-    <li>Connected Bluetooth devices </li>
-    <li>Current music album that is played my the media player</li>
-    <li>Current music artist that is played my the media player</li>
-    <li>Current music title that is played my the media player</li>
-    <li>State of the Android device - Online / Offline</li>
-    <li>Next alarm (day)</li>
-    <li>Next alarm (time)</li>
-    <li>Battery state in %</li>
-    <li>Charging state - charger connected / disconnected</li>
-    <li>Screen state on / off</li>
-    <li>Screen brightness</li>
-    <li>Full screen mode on / off</li>
-    <li>Screen orientation auto / landscape / portrait</li>
-    <li>Default volume</li>
-    <li>Media volume device speaker</li>
-    <li>Media volume Bluetooth speaker</li>
-    <li>...</li>
-  </ul>
+  This module integrates Android devices into FHEM and displays several settings <b><u>using the Android app "Automagic"</u></b>.
+  Automagic is comparable to the "Tasker" app for automating tasks and configuration settings. But Automagic is more user-friendly. The "Automagic Premium" app currently costs EUR 2.90.
   <br>
-  With some experience lots of information from the Android device can be shown in FHEM. This requires only small adjustments of the "Informations" flow
-  <br><br>
-  With this module it is also possible to control an Android device as follows.
-  <ul>
-    <li>Activate Voice Input</li>
-    <li>Switch Bluetooth on/off</li>
-    <li>Set or change the connection to a specific Bluetooth device</li>
-    <li>State of the device (online, offline)</li>
-    <li>Media Player control ( play / stop / next track / previous track)</li>
-    <li>Set next alarm time</li>
-    <li>Play a notification sound</li>
-    <li>Open an app on the device</li>
-    <li>Open a URL in the browser on the device</li>
-    <li>Set Screen on/off</li>
-    <li>Adjust the screen brightness</li>
-    <li>Switch to fullscreen mode</li>
-    <li>Send a message which appears on the screen</li>
-    <li>Set screen orientation (auto / landscape / portrait)</li>
-    <li>Request new status report of the device</li>
-    <li>Set system commands (reboot)</li>
-    <li>Send a message which will be announced (TTS)</li>
-    <li>Default media volume</li>
-    <li>...</li>
-  </ul>
-  <br><br>
-  To trigger actions and to obtain information you need the Android App Automagic and a matching Flow. The App you need to get from the app store (google play), 
-  but the modul and the corresponding flow you get from me.
+  Any information retrievable by Automagic can be displayed in FHEM by this module. Just define your own Automagic-"flow" and send the data to the AMADCommBridge. One even can control several actions on Android devices.
+  <br>
+  To be able to make use of all these functions the Automagic app and additional flows need to be installed on the Android device. The flows can be retrieved from the FHEM directory, the app can be bought in Google Play Store.
   <br><br>
   <b>How to use AMAD?</b>
   <ul>
-    <li>installed the app "Auto Magic Premium" from the App Store or the trial version from <a href="https://automagic4android.com/de/testversion">here</a></li>
-    <li>installed the Flowset 74_AMADautomagicFlows$VERSION.xml from the folder $INSTALLFHEM/FHEM/lib/ to your Android device and first activates only the "information" flow.</li>
+    <li>install the "Automagic Premium" app from the Google Play store or use the test version from <a href="https://automagic4android.com/de/testversion">here</a></li>
+    <li>install the flowset 74_AMADautomagicFlowset$VERSION.xml from the directory $INSTALLFHEM/FHEM/lib/ on your Android device. Do not yet activate the flows.</li>
   </ul>
   <br>
-  Next you need to define a FHEM device.
+  Now you need to define a device in FHEM.
   <br><br>
   <a name="AMADdefine"></a>
   <b>Define</b>
   <ul><br>
-    <code>define &lt;name&gt; AMAD &lt;IP-ADDRESS&gt;</code>
+    <code>define &lt;name&gt; AMAD &lt;IP-ADDRESS&gt; &lt;WLANAP-SSID(s)&gt;</code>
     <br><br>
     Example:
     <ul><br>
-      <code>define TabletLivingRoom AMAD 192.168.0.23</code><br>
+      <code>define WandTabletWohnzimmer AMAD 192.168.0.23 TuxNetAP@@OpaZuHause</code><br>
     </ul>
     <br>
-    This statement creates a new AMAD device. The parameter &lt;IP-ADRESSE&lt; specifies the ip-address of the Android device.
-    The default communication interval is set to 180 seconds and can be changed via attribute "interval". If you want to change the port, 
-    you can do this via the attribute "port". 
-    <b>You should know what you are doing, because this port is set in the HTTP response trigger of the 2 flows. Consequently, 
-    this must also be changed there.</b><br>
+    With this command two new AMAD devices in a room called AMAD are created. The parameter &lt;IP-ADDRESS&lt; defines the IP address of your Android device, parameter WLANAP-SSID defines the SSID(s) of the WLAN(s) from which the FHEM server can be reached. More than one SSID can be defined which need to be joined by two consequent "@". The second device created is the AMADCommBridge which serves as a communication device from each Android device to FHEM.<br>
+    !!!Coming Soon!!! The communication port of each AMAD device may be set by the definition of the "port" attribute. <b>One needs background knowledge of Automagic and HTTP requests as this port will be set in the HTTP request trigger of both flows, therefore the port also needs to be set there.
+    <br>
+    The communication port of the AMADCommBridge device can easily be changed within the attribut "port".</b>
   </ul>
-  <br><br>
-  <b><u>Done! After connecting the device instance should already come in the first Readings within 3 minutes.</u></b>
-  <br><br><br>
-  <a name="AMADCommBridge"></a>
+  <br><a name="AMADCommBridge"></a>
   <b>AMAD Communication Bridge</b>
   <ul>
-    When you define the first AMAD device instance another device named AMADCommBridge will also be defined. Its room attribute is AMAD.
-    You need this device for the communication fom the Andoid unit to FHEM without having received any query from FHEM. The Android unit must know the IP address of FHEM, so you must enter the set command for the corresponding reading immediately after the definition of the bridge. This is extremly important to get the functionality working properly!
-    The command is
-    set AMADCommBridge fhemServerIP <FHEM-IP>.
-    There is another reading expertMode which allows a direct communication with FHEM without haviung to use a notify or being limited to set commands.
-  </ul>
-  <br><br>
+    Creating your first AMAD device automatically creates the AMADCommBridge device in the room AMAD. With the help  of the AMADCommBridge any Android device communicates initially to FHEM.<b>To make the IP addresse of the FHEM server known to the Android device, the FHEM server IP address needs to be configured in the AMADCommBridge. WITHOUT THIS STEP THE AMADCommBridge WILL NOT WORK PROPERLY.</b><br>
+    Please us the following command for configuration of the FHEM server IP address in the AMADCommBridge: <i>set AMADCommBridge fhemServerIP &lt;FHEM-IP&gt;.</i><br>
+    Additionally the <i>expertMode</i> may be configured. By this setting a direct communication with FHEM will be established without the restriction of needing to make use of a notify to execute set commands.
+  </ul><br>
+  <b><u>NOW please activate the flows in Automagic!!!</u></b><br>
+  <br>
+  <b><u>You are finished now! After 15 seconds latest the readings of your AMAD Android device should be updated. Consequently each 15 seconds a status request will be sent. If the state of your AMAD Android device does not change to "active" over a longer period of time one should take a look into the log file for error messages.</u></b>
+  <br><br><br>
   <a name="AMADreadings"></a>
   <b>Readings</b>
   <ul>
-    <li>airplanemode - state of Airplane</li>
-    <li>androidVersion - installed Android Version</li>
-    <li>automagic state - status messages from the AutomagicApp</li>
-    <li>bluetooth on / off - is Bluetooth switched on or off on the device</li>
-    <li>checkActiveTask - state of an app being defined before, 1=activ in the foreground, see the hint further down</li>
-    <li>connectedBTdevices - a list of the connected devices</li>
-    <li>connectedBTdevicesMAC – list f the MAC addresses of all connected BT devices</li>
-    <li>current Music Album - currently played music album of the media player used</li>
-    <li>current music artist - currently played music artist of the media player used</li>
-    <li>current Music Track - currently played music title of the media player used</li>
-    <li>deviceState - State of the Android device, must itself be set with setreading e.g. about the attendance check. When offline is set, the interval is set off for information retrieval.</li>
-    <li>flow_SetCommands active / inactive - indicates the status of SetCommands flow again</li>
-    <li>flow_informations active / inactive - indicates the status of the information flow again</li>
-    <li>lastSetCommandError - last error message from the set command successfully / not sent last status from the set command, command is successful - lastSetCommandState</li>
-    <li>lastSetCommandState cmd_done / cmd_error - state of last SetCommand command</li>
-    <li>lastStatusRequestError - last error message from the status request command successfully / not sent last status from the status request command, command is successful - load status RequestStateChange</li>
-    <li>lastStatusRequestState statusRequest_done / statusRequest_error - state of last statusRequest command</li>
-    <li>nextAlarmDay - active alarm day</li>
-    <li>next alarmTime - active alarm time</li>
-    <li>powerlevel - state of the battery in %</li>
-    <li>powerPlugged - connected power supply? 0=NO, 1|2=YES</li>
-    <li>screen - screen on/off</li>
-    <li>screenBrightness - Screen Brightness from 0-255</li>
-    <li>screenFullscreen - fullscreen mode (On, Off)</li>
-    <li>screenLock - Pin-Lock (On,Off)</li>
-    <li>screenOrientation - screen orientation (Auto, Landscape, Portrait)</li>
-    <li>state - state off Devices</li>
-    <li>volume - volume value which was set on "Set volume".</li>
-    <li>volumeMusicBluetooth - Media volume of the Bluetooth speakers</li>
-    <li>volumeMusicSpeaker - Media volume of the internal speakers</li>
-    <li>volumeNotification - Notification volume of Device</li>
+    <li>airplanemode - on/off, state of the aeroplane mode</li>
+    <li>androidVersion - currently installed version of Android</li>
+    <li>automagicState - state of the Automagic App <b>(prerequisite Android >4.3). In case you have Android >4.3 and the reading says "not supported", you need to enable Automagic inside Android / Settings / Sound & notification / Notification access</b></li>
+    <li>bluetooth - on/off, bluetooth state</li>
+    <li>checkActiveTask - state of an app (needs to be defined beforehand). 0=not active or not active in foreground, 1=active in foreground, <b>see note below</b></li>
+    <li>connectedBTdevices - list of all devices connected via bluetooth</li>
+    <li>connectedBTdevicesMAC - list of MAC addresses of all devices connected via bluetooth</li>
+    <li>currentMusicAlbum - currently playing album of mediaplayer</li>
+    <li>currentMusicArtist - currently playing artist of mediaplayer</li>
+    <li>currentMusicTrack - currently playing song title of mediaplayer</li>
+    <li>daydream - on/off, daydream currently active</li>
+    <li>deviceState - state of Android devices. !!!It does not show the real state!!! deviceState must be set manually by the command "set DEVICE deviceState" e.g. by your PRESENCE function.<br> In case deviceState is set to "offline" no set commands can be issued.</li>
+    <li>dockingState - undocked/docked, Android device in docking station</li>
+    <li>flow_SetCommands - active/inactive, state of SetCommands flow</li>
+    <li>flow_informations - active/inactive, state of Informations flow</li>
+    <li>flowsetVersionAtDevice - currently installed version of the flowsets on the Android device</li>
+    <li>intentRadioName - name of the most-recent streamed intent radio</li>
+    <li>intentRadioState - state of intent radio player</li>
+    <li>keyguardSet - 0/1 keyguard set, 0=no 1=yes, does not indicate whether it is currently active</li>
+    <li>lastSetCommandError - last error message of a set command</li>
+    <li>lastSetCommandState - last state of a set command, command send successful/command send unsuccessful</li>
+    <li>lastStatusRequestError - last error message of a statusRequest command</li>
+    <li>lastStatusRequestState - ast state of a statusRequest command, command send successful/command send unsuccessful</li>
+    <li>nextAlarmDay - currently set day of alarm</li>
+    <li>nextAlarmState - alert/done, current state of "Clock" stock-app</li>
+    <li>nextAlarmTime - currently set time of alarm</li>
+    <li>powerLevel - state of battery in %</li>
+    <li>powerPlugged - 0=no/1,2=yes, power supply connected</li>
+    <li>screen - on locked,unlocked/off locked,unlocked, state of display</li>
+    <li>screenBrightness - 0-255, level of screen-brightness</li>
+    <li>screenFullscreen - on/off, full screen mode</li>
+    <li>screenOrientation - Landscape/Portrait, screen orientation (horizontal,vertical)</li>
+    <li>screenOrientationMode - auto/manual, mode for screen orientation</li>
+    <li>state - current state of AMAD device</li>
+    <li>volume - media volume setting</li>
+    <li>volumeNotification - notification volume setting</li>
     <br>
-    The Readings volume Music Bluetooth and music speaker volume reflect the respective media volume of the closed border is Bluetooth speakers or the internal speaker again.
-    Unless one the respective volumes relies exclusively on the Set command, one of the two will always agree with the "volume" Reading a.<br><br>
-    Before using the Reading checkActivTask you must set the nme of the package name of te app to be checked innthe attribute checkActiveTask. Eample:
-    attr Nexus10Wohnzimmer checkActiveTask com.android.chrome for the Chrome browser.
-  </ul><br><br>
-  <b>Define user specific Readings in the AMAD device</b>
-  <ul>
-    You can specify your own reaqdings in the AMAD device and use them in combination with your Automagic flow. The transmission takes place immediately by means of the AMADCommBridge - so you should not update it too often. This is how you can do it:
-    <ul>
-    <br>
-      <li>first you need to define an Automagic flow for the information for the reading</li>
-      <li>diese Information speichert man nun mittels Automagic Action Script in eine globale Variable namens global_reading_<Readingname> (beim <Readingname> auf Gro&szlig;- und Kleinschreibung achten):</li>
-    <br>
-    <code>
-      this information needs to be stored with the help of an Automagic action in a global variable (case sensitiv!). Example:
-      The Reading Touch should get the value "yes"
-      Action Script: global_reading_Touch="yes"
-    </code>
+    Prerequisite for using the reading checkActivTask the package name of the application to be checked needs to be defined in the attribute <i>checkActiveTask</i>. Example: <i>attr Nexus10Wohnzimmer
+    checkActiveTask com.android.chrome</i> f&uuml;r den Chrome Browser.
     <br><br>
-      <li>abschlie&szlig;end muss noch die &Uuml;bertragung des Wertes initiiert werden. Dies erfolgt, indem der Wert der Variable global_own_reading auf den Wert <Zeitstempel>_<Readingname> gesetzt wird (auch hier auf Gro&szlig;- und Kleinschreibung achten):</li>
-    <br>
-      <code>
-	Finally you need to trigger the transmission of the value. This is dne by setting the the value of the variable global_own_reading to _ gesetzt wird (again: case sensitiv!):
-	Example: The Reading Touch should be transfered<br>
-	Action Script: global_own_reading="{getDate()}_Touch"<br>
-	Hint: you can put both actions in one script:
-	<ul>
-	  global_reading_Touch="ja";global_own_reading="{getDate()}_Touch"
-	</ul>
-      </code>
-      <br>
-	<li>Asume you want to get an immediate information when the display of your tablet has been switched on or off then you can define the following flows:
-      <br>
-	<code>
-	  Action Script when the display is activated: global_reading_Display="on";global_own_reading="{getDate()}_Display" 
-	  Action Script when the display is deactivated: global_reading_Display="off";global_own_reading="{getDate()}_Display"</li>
-	</code>
-    </ul>
   </ul>
   <br><br>
   <a name="AMADset"></a>
   <b>Set</b>
   <ul>
-    <li>activateVoiceInput - activat Voice Input on Android Device</li>
-    <li>bluetooth - set bluetooth on/off</li>
-    <li>clearNotificationBar - clear the notification on bar. All or Automagic Notofication only</li>
-    <li>Device State - sets the Device Status Online / Offline. See Readings</li>
-    <li>mediaPlayer - controls the default media player. Play, Stop, Back Route title, ahead of title.</li>
-    <li>NextAlarm time - sets the alarm time. only within the next 24hrs.</li>
-    <li>notifySndFile - plays the specified media file on the Android device. The file to be played must be in the folder /storage/emulated/0/Notifications/.</li>
-    <li>openURL - opens a URL in your default browser</li>
-    <li>screen - are sets the screen on / off with barrier in the car Magic settings must "Admin Function" set will not work "Screen off".</li>
-    <li>screenMsg - sends a message screen</li>
-    <li>Status Request - calls for a new Status Report in Device to</li>
-    <li>ttsMsg - sends a message which is output as a voice message</li>
-    <li>vibrate - vibrates the device</li>
-    <li>volume - sets the media volume. Either the internal speakers or when connected the Bluetooth speaker</li>
-    <li>volumeNotification - sets the notification volume.</li>
+    <li>activateVoiceInput - start voice input on Android device</li>
+    <li>bluetooth - on/off, switch bluetooth on/off</li>
+    <li>clearNotificationBar - All/Automagic, deletes all or only Automagic notifications in status bar</li>
+    <li>currentFlowsetUpdate - start flowset update on Android device</li>
+    <li>deviceState - online/offline, sets device state . <b>For more information see section Readings</b></li>
+    <li>installFlowSource - install a Automagic flow on device, <u>XML file must be stored in /tmp/ with extension xml</u>. <b>Example:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i></li>
+    <li>mediaPlayer - play/stop/next/back , controlling the standard media player</li>
+    <li>nextAlarmTime - sets the alarm time. Only valid for the next 24 hours.</li>
+    <li>notifySndFile - start playing the defined media file on the Android device <b>The media file must be stored in /storage/emulated/0/Notifications/</b></li>
+    <li>screenBrightness - 0-255, set screen brighness</li>
+    <li>screenMsg - display message on screen of Android device</li>
+    <li>sendintent - send intent string <u>Example:</u><i> set $AMADDEVICE sendIntent org.smblott.intentradio.PLAY url http://stream.klassikradio.de/live/mp3-192/stream.klassikradio.de/play.m3u name Klassikradio</i>, first parameter contains the action, second parameter contains the extra. At most two extras can be used.</li>
+    <li>statusRequest - Get a new status report of Android device. Not all readings can be updated using a statusRequest as some readings are only updated if the value of the reading changes.</li>
+    <li>timer - set a countdown timer in the "Clock" stock app. Only seconds are allowed as parameter.</li>
+    <li>ttsMsg - send a message which will be played as voice message</li>
+    <li>vibrate - vibrate Android device</li>
+    <li>volume - set media volume. Works on internal speaker or, if connected, bluetooth speaker or speaker connected via stereo jack</li>
+    <li>volumeNotification - set notifications volume</li>
   </ul>
   <br>
-  <b>Set depending on set attributes</b>
+  <b>Set (depending on attribute values)</b>
   <ul>
-    <li>changetoBtDevice - changes to another Bluetooth device. The attribute setBluetoothDevice must be set. See hint below!</li>
-    <li>openapp - opens a selected app. <b>Attribute setOpenApp</b></li>
-    <li>screen Brightness - sets the screen brightness, 0-255 <b>Attribute setScreenBrightness</b></li>
-    If you want to use the "set screen brightness", a small adjustment in the flow SetCommands must be made. Opens the action (one of the squares very bottom) Set System Settings: System and makes a check "I have checked the settings, I know what I'm doing".
-    <li>screen fullscreen - Switches to full screen mode on / off. <b>Attribute SetFullscreen </b></li>
-    <li>screenLock - locked Screen by set Pinlock. <b>Attribute setScreenlockPIN - There are only allowed numbers and it must be more than 4 and less as 16 character</b></li>
-    <li>screenOrientation - Switches the screen orientation Auto / Landscape / Portrait. <b>Attribute setScreenOrientation</b></li>
-    <li>system - set system commands from (only rooted devices). reboot,shutdown,airplanemodeON (activate only) <b>Attribut root</b>, in the Auto Magic Settings "root function" must be set</li>
-    In order to use openApp you need an attribute where separated by a comma, several app names are set in order to use openapp. The app name is arbitrary and only required for recognition. The same app name must be used in the flow in SetCommands on the left below the hash expression: "openapp" be in one of the 5 paths (one app per path) entered in both diamonds. Thereafter, in the quadrangle selected the app which app through the attribute names should be started.<br><br>
-    To switch between different Bluetooth devices, you need set the attribute setBluetoothDevice accordingly. 
-    attr <DEVICE> BTdeviceName1|MAC,BTDeviceName2|MAC 
-    There may never be a sapce in BTdeviceName. There must also be the colon(:) in the MAC address after every second sign!
-    Example: attr Nexus10Wohnzimmer setBluetoothDevice Logitech_BT_Adapter|AB:12:CD:34:EF:32,Anker_A3565|GH:56:IJ:78:KL:76
+    <li>changetoBtDevice - switch to another bluetooth device. <b>Attribute setBluetoothDevice needs to be set. See note below!</b></li>
+    <li>openApp - start an app. <b>attribute setOpenApp</b></li>
+    <li>openURL - opens a URLS in the standard browser as long as no other browser is set by the <b>attribute setOpenUrlBrowser</b>.<b>Example:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, first parameter: package name, second parameter: Class Name</i></li>
+    <li>screen - on/off/lock/unlock, switch screen on/off or lock/unlock screen. In Automagic "Preferences" the "Device admin functions" need to be enabled, otherwise "Screen off" does not work. <b>attribute setScreenOnForTimer</b> changes the time the display remains switched on!</li>
+    <li>screenFullscreen - on/off, activates/deactivates full screen mode. <b>attribute setFullscreen</b></li>
+    <li>screenLock - Locks screen with request for PIN. <b>attribute setScreenlockPIN - enter PIN here. Only use numbers, 4-16 numbers required.</b></li>
+    <li>screenOrientation - Auto,Landscape,Portait, set screen orientation (automatic, horizontal, vertical). <b>attribute setScreenOrientation</b></li>
+    <li>system - issue system command (only with rooted Android devices). reboot,shutdown,airplanemodeON (can only be switched ON) <b>attribute root</b>, in Automagic "Preferences" "Root functions" need to be enabled.</li>
+    <br>
+    To be able to use "openApp" the corresponding attribute "setOpenApp" needs to contain the app package name.
+    <br><br>
+    To be able to switch between bluetooth devices the attribute "setBluetoothDevice" needs to contain (a list of) bluetooth devices defined as follows: <b>attr &lt;DEVICE&gt; BTdeviceName1|MAC,BTDeviceName2|MAC</b> No spaces are allowed in any BTdeviceName. Defining MAC please make sure to use the character : (colon) after each  second digit/character.<br>
+    Example: <i>attr Nexus10Wohnzimmer setBluetoothDevice Logitech_BT_Adapter|AB:12:CD:34:EF:32,Anker_A3565|GH:56:IJ:78:KL:76</i> 
   </ul>
   <br><br>
   <a name="AMADstate"></a>
   <b>state</b>
   <ul>
-    <li>initialized - If the status shortly after a define.</li>
-    <li>active - the device instance is in active status.</li>
-    <li>disabled - the device instance has been disabled via the disable attribute</li>
+    <li>initialized - shown after initial define.</li>
+    <li>active - device is active.</li>
+    <li>disabled - device is disabled by the attribute "disable".</li>
   </ul>
   <br><br><br>
-  <u><b>Application examples:</b></u>
+  <u><b>Further examples and reading:</b></u>
   <ul><br>
-    <a href="http://www.fhemwiki.de/wiki/AMAD#Anwendungsbeispiele">Do you find in the Wiki entry for AMAD (german only)</a>
+    <a href="http://www.fhemwiki.de/wiki/AMAD#Anwendungsbeispiele">Wiki page for AMAD (german only)</a>
   </ul>
   <br><br><br>
 </ul>
@@ -1362,190 +1400,112 @@ sub AMAD_decrypt($) {
   <u><b>AMAD - Automagic Android Device</b></u>
   <br>
   Dieses Modul liefert, <b><u>in Verbindung mit der Android APP Automagic</u></b>, diverse Informationen von Android Ger&auml;ten.
-  Die AndroidAPP Automagic (welche nicht von mir stammt und 2.90Euro kostet) funktioniert wie Tasker, ist aber bei weitem User freundlicher.
-  Im Auslieferungszustand werden folgende Zust&auml;nde dargestellt:
-  <ul>
-    <li>Android Version</li>
-    <li>Zustand von Automagic auf dem Ger&auml;t</li>
-    <li>Bluetooth An/Aus</li>
-    <li>Zustand einer definierten App (l&auml;uft aktiv im Vordergrund oder nicht?)</li>
-    <li>verbundene Bluetoothger&auml;te, inklusive deren MAC Adresse</li>
-    <li>aktuell abgespieltes Musikalbum des verwendeten Mediaplayers</li>
-    <li>aktuell abgespielter Musikinterpret des verwendeten Mediaplayers</li>
-    <li>aktuell abgespielter Musiktitel des verwendeten Mediaplayers</li>
-    <li>Status des Androidger&auml;tes - Online/Offline</li>
-    <li>n&auml;chster Alarmtag</li>
-    <li>n&auml;chste Alarmzeit</li>
-    <li>Batteriestatus in %</li>
-    <li>Ladestatus - Netztei angeschlossen / nicht angeschlossen</li>
-    <li>Bildschirmstatus An/Aus</li>
-    <li>Bildschirmhelligkeit</li>
-    <li>Vollbildmodus An/Aus</li>
-    <li>Bildschirmausrichtung Auto/Landscape/Portrait</li>
-    <li>Standardlautst&auml;rke</li>
-    <li>Media Lautst&auml;rke des Lautsprechers am Ger&auml;t</li>
-    <li>Media Lautst&auml;rke des Bluetooth Lautsprechers</li>
-    <li>...</li>
-  </ul>
+  Die AndroidAPP Automagic (welche nicht von mir stammt und 2.90 Euro kostet) funktioniert wie Tasker, ist aber bei weitem User freundlicher.
   <br>
-  Mit etwas Einarbeitung k&ouml;nnen jegliche Informationen welche Automagic bereit stellt in FHEM angezeigt werden. Hierzu bedarf es lediglich
-  einer kleinen Anpassung des "Informations" Flows
-  <br><br>
-  Das Modul gibt Dir auch die M&ouml;glichkeit Deine Androidger&auml;te zu steuern. So k&ouml;nnen folgende Aktionen durchgef&uuml;hrt werden.
-  <ul>
-    <li>aktiviert Spracheingabe</li>
-    <li>Bluetooth Ein/Aus schalten</li>
-    <li>zu einem bestimmten Bluetoothger&auml;t wechseln/verbinden</li>
-    <li>Status des Ger&auml;tes (Online,Offline)</li>
-    <li>Mediaplayer steuern (Play, Stop, n&auml;chster Titel, vorheriger Titel)</li>
-    <li>n&auml;chste Alarmzeit setzen</li>
-    <li>ein Benachrichtigungston abspielen (Notificationsound)</li>
-    <li>eine App auf dem Ger&auml;t &ouml;ffnen</li>
-    <li>eine URL im Browser &ouml;ffnen</li>
-    <li>Bildschirm An/Aus machen</li>
-    <li>Bildschirmhelligkeit einstellen</li>
-    <li>Vollbildmodus einschalten</li>
-    <li>eine Nachricht senden welche am Bildschirm angezeigt wird</li>
-    <li>Bildschirmausrichtung einstellen (Auto,Landscape,Portrait)</li>
-    <li>neuen Statusreport des Ger&auml;tes anfordern</li>
-    <li>Systembefehle setzen (Reboot)</li>
-    <li>eine Nachricht senden welche <b>angesagt</b> wird (TTS)</li>
-    <li>Medienlautst&auml;rke regeln</li>
-    <li>...</li>
-  </ul>
-  <br><br> 
-  F&uuml;r all diese Aktionen und Informationen wird auf dem Androidger&auml;t Automagic und ein so genannter Flow ben&ouml;tigt. Die App ist über den Google PlayStore zu beziehen. Das benötigte Flowset bekommt Ihr aus dem FHEM Update.
+  Mit etwas Einarbeitung k&ouml;nnen jegliche Informationen welche Automagic bereit stellt in FHEM angezeigt werden. Hierzu bedarf es lediglich eines eigenen Flows welcher seine Daten an die AMADCommBridge sendet. Das Modul gibt auch die M&ouml;glichkeit Androidger&auml;te zu steuern.
+  <br>
+  F&uuml;r all diese Aktionen und Informationen wird auf dem Androidger&auml;t "Automagic" und ein so genannter Flow ben&ouml;tigt. Die App ist &uuml;ber den Google PlayStore zu beziehen. Das ben&ouml;tigte Flowset bekommt man aus dem FHEM Verzeichnis.
   <br><br>
   <b>Wie genau verwendet man nun AMAD?</b>
   <ul>
-    <li>installiert Euch die App "Automagic Premium" aus dem App Store oder die Testversion von <a href="https://automagic4android.com/de/testversion">hier</a></li>
-    <li>installiert das Flowset 74_AMADautomagicFlows$VERSION.xml aus dem Ordner $INSTALLFHEM/FHEM/lib/ auf Eurem Androidger&auml;t und aktiviert erstmal nur den "Informations" Flow.</li>
+    <li>man installiert die App "Automagic Premium" aus dem PlayStore oder die Testversion von <a href="https://automagic4android.com/de/testversion">hier</a></li>
+    <li>dann installiert man das Flowset 74_AMADautomagicFlowset$VERSION.xml aus dem Ordner $INSTALLFHEM/FHEM/lib/ auf dem Androidger&auml;t. NOCH NICHT die Flows aktivieren</li>
   </ul>
   <br>
-  Nun m&uuml;sst Ihr nur noch ein Device in FHEM anlegen.
+  Es mu&szlig; noch ein Device in FHEM anlegt werden.
   <br><br>
   <a name="AMADdefine"></a>
   <b>Define</b>
   <ul><br>
-    <code>define &lt;name&gt; AMAD &lt;IP-ADRESSE&gt;</code>
+    <code>define &lt;name&gt; AMAD &lt;IP-ADRESSE&gt; &lt;WLANAP-SSID('s)&gt;</code>
     <br><br>
     Beispiel:
     <ul><br>
-      <code>define WandTabletWohnzimmer AMAD 192.168.0.23</code><br>
+      <code>define WandTabletWohnzimmer AMAD 192.168.0.23 TuxNetAP@@OpaZuHause</code><br>
     </ul>
     <br>
-    Diese Anweisung erstellt ein neues AMAD-Device im Raum AMAD.Der Parameter &lt;IP-ADRESSE&lt; legt die IP Adresse des Android Ger&auml;tes fest.<br>
-    Das Standard Abfrageinterval ist 180 Sekunden und kann &uuml;ber das Attribut intervall ge&auml;ndert werden. Wer den Port &auml;ndern m&ouml;chte, kann dies &uuml;ber
-    das Attribut port tun. <b>Ihr solltet aber wissen was Ihr tut, da dieser Port im HTTP Response Trigger der beiden Flows eingestellt ist. Demzufolge mu&szlig; dieser dort
-    auch ver&auml;dert werden.</b><br>
+    Diese Anweisung erstellt zwei neue AMAD-Devices im Raum AMAD.Der Parameter &lt;IP-ADRESSE&lt; legt die IP Adresse des Android Ger&auml;tes fest und der Parameter WLANAP-SSID die SSID des WLAN's welches sich zum FHEM Server verbindet. Es k&ouml;nnen mehrere SSID's mit angegeben werden, welche dann getrennt durch zwei @ eingetragen werden. Das zweite Device ist die AMADCommBridge welche als Kommunikationsbr&uuml;cke vom Androidger&auml;t zu FHEM diehnt.<br>
+    !!!Comming Soon!!! Der Port eines jeden AMAD Devices kann &uuml;ber das Attribut "port" ge&auml;ndert werden. <b>Hier sollte Hintergrundwissen zu Automagic und HTTP Request vorhanden sein, da dieser Port im HTTP Request Trigger der beiden Flows eingestellt ist. Demzufolge mu&szlig; der Port dort auch ver&auml;dert werden.
+    <br>
+    Der Port f&uuml;r die Bridge kann ohne Probleme im Bridge Device mittels dem Attribut "port" ver&auml;ndert werden.</b>
   </ul>
-  <br><br> 
-  <b><u>Fertig! Nach anlegen der Ger&auml;teinstanz sollten nach sp&auml;testens 3 Minuten bereits die ersten Readings reinkommen.</u></b>
-  <br><br><br>
-  <a name="AMADCommBridge"></a>
+  <br><a name="AMADCommBridge"></a>
   <b>AMAD Communication Bridge</b>
   <ul>
-    Beim ersten anlegen einer AMAD Deviceinstanz wird automatisch ein Ger&auml;t Namens AMADCommBridge im Raum AMAD angelegt.
-    Alle anderen Eigenschaften k&ouml;nnen ge&auml;ndert werden. Dieses Ger&auml;t diehnt zur Kommunikation
-    vom Androidger&auml;t zu FHEM ohne das zuvor eine Anfrage von FHEM aus ging. <b>Damit das Androidger&auml;t die IP von FHEM kennt, muss diese sofort nach dem anlegen der Bridge
-    &uuml;ber den set Befehl in ein entsprechendes Reading in die Bridge  geschrieben werden. DAS IST SUPER WICHTIG UND F&Uuml;R DIE FUNKTION DER BRIDGE NOTWENDIG.</b><br>
-    Bitte f&uuml;hrt hierzu folgenden Befehl aus. <i>set AMADCommBridge fhemServerIP &lt;FHEM-IP&gt;.</i><br>
-    Als zweites Reading k&ouml;nnt Ihr <i>expertMode</i>setzen. Mit diesem Reading wird eine unmittelbare Komminikation mit FHEM erreicht ohne die Einschr&auml;nkung &uuml;ber ein
+    Beim ersten anlegen einer AMAD Deviceinstanz wird automatisch ein Ger&auml;t Namens AMADCommBridge im Raum AMAD mit angelegt. Dieses Ger&auml;t diehnt zur Kommunikation vom Androidger&auml;t zu FHEM ohne das zuvor eine Anfrage von FHEM aus ging. <b>Damit das Androidger&auml;t die IP von FHEM kennt, muss diese sofort nach dem anlegen der Bridge &uuml;ber den set Befehl in ein entsprechendes Reading in die Bridge  geschrieben werden. DAS IST SUPER WICHTIG UND F&Uuml;R DIE FUNKTION DER BRIDGE NOTWENDIG.</b><br>
+    Hierf&uuml;r mu&szlig; folgender Befehl ausgef&uuml;hrt werden. <i>set AMADCommBridge fhemServerIP &lt;FHEM-IP&gt;.</i><br>
+    Als zweites Reading kann <i>expertMode</i> gesetzen werden. Mit diesem Reading wird eine unmittelbare Komminikation mit FHEM erreicht ohne die Einschr&auml;nkung &uuml;ber ein
     Notify gehen zu m&uuml;ssen und nur reine set Befehle ausf&uuml;hren zu k&ouml;nnen.
-  </ul>
-  <br><br>
+  </ul><br>
+  <b><u>NUN bitte die Flows AKTIVIEREN!!!</u></b><br>
+  <br>
+  <b><u>Fertig! Nach anlegen der Ger&auml;teinstanz und dem eintragen der fhemServerIP in der CommBridge sollten nach sp&auml;testens 15 Sekunden bereits die ersten Readings reinkommen. Nun wird alle 15 Sekunden probiert einen Status Request erfolgreich ab zu schlie&szlig;en. Wenn der Status sich &uuml;ber einen l&auml;ngeren Zeitraum nicht auf "activ" &auml;ndert, sollte man im Log nach eventuellen Fehlern suchen.</u></b>
+  <br><br><br>
   <a name="AMADreadings"></a>
   <b>Readings</b>
   <ul>
     <li>airplanemode - Status des Flugmodus</li>
     <li>androidVersion - aktuell installierte Androidversion</li>
-    <li>automagicState - Statusmeldungen von der AutomagicApp <b>(Voraussetzung Android >4.3). Wer ein Android >4.3 hat und im Reading steht "wird nicht unterst&uuml;tzt", mu&szlig; in den Androideinstellungen unter Ton und Benachrichtigungen -> Benachrichtigungszugriff ein Haken setzen f&uuml;r Automagic</b></li>
-    <li>bluetooth on/off - ist auf dem Ger&auml;t Bluetooth an oder aus</li>
+    <li>automagicState - Statusmeldungen von der AutomagicApp <b>(Voraussetzung Android >4.3). Ist Android gr&ouml;&szlig;er 4.3 vorhanden und im Reading steht "wird nicht unterst&uuml;tzt", mu&szlig; in den Androideinstellungen unter Ton und Benachrichtigungen -> Benachrichtigungszugriff ein Haken f&uuml;r Automagic gesetzt werden</b></li>
+    <li>bluetooth - on/off, Bluetooth Status an oder aus</li>
     <li>checkActiveTask - Zustand einer zuvor definierten APP. 0=nicht aktiv oder nicht aktiv im Vordergrund, 1=aktiv im Vordergrund, <b>siehe Hinweis unten</b></li>
     <li>connectedBTdevices - eine Liste der verbundenen Ger&auml;t</li>
     <li>connectedBTdevicesMAC - eine Liste der MAC Adressen aller verbundender BT Ger&auml;te</li>
     <li>currentMusicAlbum - aktuell abgespieltes Musikalbum des verwendeten Mediaplayers</li>
     <li>currentMusicArtist - aktuell abgespielter Musikinterpret des verwendeten Mediaplayers</li>
     <li>currentMusicTrack - aktuell abgespielter Musiktitel des verwendeten Mediaplayers</li>
-    <li>deviceState - Status des Androidger&auml;tes, muss selbst mit setreading gesetzt werden z.B. &uuml;ber die Anwesenheitskontrolle.<br>
-    Ist Offline gesetzt, wird der Intervall zum Informationsabruf aus gesetzt.</li>
-    <li>flow_SetCommands active/inactive - gibt den Status des SetCommands Flow wieder</li>
-    <li>flow_informations active/inactive - gibt den Status des Informations Flow wieder</li>
+    <li>daydream - on/off, Daydream gestartet oder nicht</li>
+    <li>deviceState - Status des Androidger&auml;tes. !!!Gibt nicht den tats&auml;chlichen Status des Ger&auml;tes wieder!!! deviceState muss von Hand selbst  gesetzt werden. (set DEVICE deviceState) z.B. &uuml;ber die Anwesenheitskontrolle.<br> Ist Offline gesetzt, k&ouml;nnen keine set Befehle abgesetzt werden.</li>
+    <li>dockingState - undocked/docked Status ob sich das Ger&auml;t in einer Dockinstation befindet.</li>
+    <li>flow_SetCommands - active/inactive, Status des SetCommands Flow</li>
+    <li>flow_informations - active/inactive, Status des Informations Flow</li>
+    <li>flowsetVersionAtDevice - aktuell installierte Flowsetversion auf dem Device</li>
+    <li>intentRadioName - zuletzt gesrreamter Intent Radio Name</li>
+    <li>intentRadioState - Status des IntentRadio Players</li>
+    <li>keyguardSet - 0/1 Displaysperre gesetzt 0=nein 1=ja, bedeutet nicht das sie gerade aktiv ist</li>
     <li>lastSetCommandError - letzte Fehlermeldung vom set Befehl</li>
     <li>lastSetCommandState - letzter Status vom set Befehl, Befehl erfolgreich/nicht erfolgreich gesendet</li>
     <li>lastStatusRequestError - letzte Fehlermeldung vom statusRequest Befehl</li>
     <li>lastStatusRequestState - letzter Status vom statusRequest Befehl, Befehl erfolgreich/nicht erfolgreich gesendet</li>
     <li>nextAlarmDay - aktiver Alarmtag</li>
+    <li>nextAlarmState - aktueller Status des <i>"Androidinternen"</i> Weckers</li>
     <li>nextAlarmTime - aktive Alarmzeit</li>
     <li>powerLevel - Status der Batterie in %</li>
     <li>powerPlugged - Netzteil angeschlossen? 0=NEIN, 1|2=JA</li>
-    <li>screen - Bildschirm An oderAus</li>
+    <li>screen - on locked/unlocked, off locked/unlocked gibt an ob der Bildschirm an oder aus ist und gleichzeitig gesperrt oder nicht gesperrt</li>
     <li>screenBrightness - Bildschirmhelligkeit von 0-255</li>
-    <li>screenFullscreen - Vollbildmodus (On,Off)</li>
-    <li>screenLock - Pin-Sperre (On,Off)</li>
-    <li>screenOrientation - Bildschirmausrichtung (Auto,Landscape,Portrait)</li>
-    <li>state - aktueller Status des Devices</li>
-    <li>volume - Lautst&auml;rkewert welcher &uuml;ber "set volume" gesetzt wurde.</li>
-    <li>volumeMusikBluetooth - Media Lautst&auml;rke von angeschlossenden Bluetooth Lautsprechern</li>
-    <li>volumeMusikSpeaker - Media Lautst&auml;rke der internen Lautsprecher</li>
+    <li>screenFullscreen - on/off, Vollbildmodus (An,Aus)</li>
+    <li>screenOrientation - Landscape,Portrait, Bildschirmausrichtung (Horizontal,Vertikal)</li>
+    <li>screenOrientationMode - auto/manual, Modus f&uuml;r die Ausrichtung (Automatisch, Manuell)</li>
+    <li>state - aktueller Status</li>
+    <li>volume - Media Lautst&auml;rkewert</li>
     <li>volumeNotification - Benachrichtigungs Lautst&auml;rke</li>
     <br>
-    Die Readings volumeMusikBluetooth und volumeMusikSpeaker spiegeln die jeweilige Medialautst&auml;rke der angeschlossenden Bluetoothlautsprecher oder der internen Lautsprecher wieder.
-    Sofern man die jeweiligen Lautst&auml;rken ausschlie&szlig;lich &uuml;ber den Set Befehl setzt, wird eine der beiden immer mit dem "volume" Reading &uuml;ber ein stimmen.<br><br>
     Beim Reading checkActivTask mu&szlig; zuvor der Packagename der zu pr&uuml;fenden App als Attribut <i>checkActiveTask</i> angegeben werden. Beispiel: <i>attr Nexus10Wohnzimmer
     checkActiveTask com.android.chrome</i> f&uuml;r den Chrome Browser.
     <br><br>
-  </ul>
-  <b>Eigene Readings im AMAD-Device erstellen</b>
-  <ul>
-    Es ist m&ouml;glich, aus beliebigen eigenen Automagic-Flows eigene Readings im AMAD-Device zu erstellen und zu f&uuml;llen. Die &Uuml;bertragung zum FHEM AMAD-Device erfolgt umgehend &uuml;ber die AMADCommBridge - daher sollte auf eine zu h&auml;ufige Aktualisierung verzichtet werden. Die Vorgehensweise in Automagic hierf&uuml;r ist folgende:
-    <ul>
-    <br>
-      <li>zun&auml;chst erstellt man sich, soweit nicht bereits geschehen, einen Automagic-Flow der die Information, die in ein Reading &uuml;bernommen werden soll zur Verf&uuml;gung stellt</li>
-      <li>diese Information speichert man nun mittels Automagic Action Script in eine globale Variable namens global_reading_<Readingname> (beim <Readingname> auf Gro&szlig;- und Kleinschreibung achten):</li>
-    <br>
-    <code>
-      Beispiel: Das Reading Touch soll den Wert "ja" erhalten
-      Action Script: global_reading_Touch="ja"
-    </code>
-    <br><br>
-      <li>abschlie&szlig;end muss noch die &Uuml;bertragung des Wertes initiiert werden. Dies erfolgt, indem der Wert der Variable global_own_reading auf den Wert <Zeitstempel>_<Readingname> gesetzt wird (auch hier auf Gro&szlig;- und Kleinschreibung achten):</li>
-    <br>
-      <code>
-	Beispiel: Das Reading Touch soll &uuml;bertragen werden<br>
-	Action Script: global_own_reading="{getDate()}_Touch"<br>
-	Hinweis: man kann auch beide Aktionen in ein Script packen:
-	<ul>
-	  global_reading_Touch="ja";global_own_reading="{getDate()}_Touch"
-	</ul>
-      </code>
-      <br>
-	<li>M&ouml;chte man nun als n&auml;chstes z.B. eine sofortige Benachrichtigung, wenn das Display des Tablets an- oder ausgeschaltet wird, k&ouml;nnte man sich Flows bauen, welche beim De-/Aktivieren des Display ausgef&uuml;hrt werden:</li>
-      <br>
-	<code>
-	  Action Script beim Aktivieren des Displays: global_reading_Display="an";global_own_reading="{getDate()}_Display"
-	  Action Script beim Deaktivieren des Displays: global_reading_Display="aus";global_own_reading="{getDate()}_Display"
-	</code>
-    </ul>
   </ul>
   <br><br>
   <a name="AMADset"></a>
   <b>Set</b>
   <ul>
-    <li>activateVoiceInput - schaltet die Spracheingabe ein</li>
-    <li>bluetooth - Schaltet Bluetooth on/off</li>
-    <li>clearNotificationBar - (All,Automagic) l&ouml;scht alle Meldungen oder nur die Automagic Meldungen in der Statusleiste</li>
-    <li>deviceState - setzt den Device Status Online/Offline. Siehe Readings</li>
-    <li>mediaPlayer - steuert den Standard Mediaplayer. play, stop, Titel z&uuml;r&uuml;ck, Titel vor.</li>
-    <li>nextAlarmTime - setzt die Alarmzeit. Geht aber nur innerhalb der n&auml;chsten 24Std.</li>
-    <li>notifySndFile - spielt die angegebende Mediadatei auf dem Androidger&auml;t ab. <b>Die aufzurufende Mediadatei mu&szlig; sich im Ordner /storage/emulated/0/Notifications/ befinden.</b></li>
-    <li>openURL - &ouml;ffnet eine URL im Standardbrowser</li>
-    <li>screen - setzt den Bildschirm on/off mit Sperre, in den Automagic Einstellungen muss "Admin Funktion" gesetzt werden sonst funktioniert "Screen off" nicht.</li>
+    <li>activateVoiceInput - aktiviert die Spracheingabe</li>
+    <li>bluetooth - on/off, aktiviert/deaktiviert Bluetooth</li>
+    <li>clearNotificationBar - All,Automagic, l&ouml;scht alle Meldungen oder nur die Automagic Meldungen in der Statusleiste</li>
+    <li>currentFlowsetUpdate - f&uuml;rt ein Flowsetupdate auf dem Device durch</li>
+    <li>deviceState - online/offline, setzt den Device Status . <b>mehr Info unter Readings</b></li>
+    <li>installFlowSource - installiert einen Flow auf dem Device, <u>das XML File muss unter /tmp/ liegen und die Endung xml haben</u>. <b>Bsp:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i></li>
+    <li>mediaPlayer - play, stop, next, back  ,steuert den Standard Mediaplayer</li>
+    <li>nextAlarmTime - setzt die Alarmzeit. gilt aber nur innerhalb der n&auml;chsten 24Std.</li>
+    <li>notifySndFile - spielt die angegebene Mediadatei auf dem Androidger&auml;t ab. <b>Die aufzurufende Mediadatei mu&szlig; sich im Ordner /storage/emulated/0/Notifications/ befinden.</b></li>
+    <li>screenBrightness - setzt die Bildschirmhelligkeit, von 0-255.</li>
     <li>screenMsg - versendet eine Bildschirmnachricht</li>
-    <li>statusRequest - Fordert einen neuen Statusreport beim Device an</li>
+    <li>sendintent - sendet einen Intentstring <u>Bsp:</u><i> set $AMADDEVICE sendIntent org.smblott.intentradio.PLAY url http://stream.klassikradio.de/live/mp3-192/stream.klassikradio.de/play.m3u name Klassikradio</i>, der erste Befehl ist die Aktion und der zweite das Extra. Es k&ouml;nnen immer zwei Extras mitgegeben werden.</li>
+    <li>statusRequest - Fordert einen neuen Statusreport beim Device an. Es k&ouml;nnen nicht von allen Readings per statusRequest die Daten geholt werden. Einige wenige geben nur bei Status&auml;nderung ihren Status wieder.</li>
+    <li>timer - setzt einen Timer innerhalb der als Standard definierten ClockAPP auf dem Device. Es k&ouml;nnen nur Sekunden angegeben werden.</li>
     <li>ttsMsg - versendet eine Nachricht welche als Sprachnachricht ausgegeben wird</li>
     <li>vibrate - l&auml;sst das Androidger&auml;t vibrieren</li>
-    <li>volume - setzt die Medialautst&auml;rke. Entweder die internen Lautsprecher oder sofern angeschlossen die Bluetoothlautsprecher</li>
+    <li>volume - setzt die Medialautst&auml;rke. Entweder die internen Lautsprecher oder sofern angeschlossen die Bluetoothlautsprecher und per Klinkenstecker angeschlossene Lautsprecher</li>
     <li>volumeNotification - setzt die Benachrichtigungslautst&auml;rke.</li>
   </ul>
   <br>
@@ -1553,17 +1513,15 @@ sub AMAD_decrypt($) {
   <ul>
     <li>changetoBtDevice - wechselt zu einem anderen Bluetooth Ger&auml;t. <b>Attribut setBluetoothDevice mu&szlig; gesetzt sein. Siehe Hinweis unten!</b></li>
     <li>openApp - &ouml;ffnet eine ausgew&auml;hlte App. <b>Attribut setOpenApp</b></li>
-    <li>screenBrightness - setzt die Bildschirmhelligkeit, von 0-255 <b>Attribut setScreenBrightness</b></li>
-    Wenn Ihr das "set screenBrightness" verwenden wollt, muss eine kleine Anpassung im Flow SetCommands vorgenommen werden. &Ouml;ffnet die Aktion (eines der Vierecke ganz ganz unten)
-    SetzeSystemeinstellung:System und macht einen Haken bei "Ich habe die Einstellungen &uuml;berpr&uuml;ft, ich weiss was ich tue".
-    <li>screenFullscreen - Schaltet den Vollbildmodus on/off. <b>Attribut setFullscreen</b></li>
-    <li>screenLock - Sperrt den Bildschirm mit Pinabfrage. <b>Attribut setScreenlockPIN - hier die Pin daf&uuml;r eingeben. Erlaubt sind nur Zahlen. Es m&uuml;&szlig;en mindestens 4 bis max 16 Zeichen sein.</b></li>
-    <li>screenOrientation - Schaltet die Bildschirmausrichtung Auto/Landscape/Portait. <b>Attribut setScreenOrientation</b></li>
+    <li>openURL - &ouml;ffnet eine URL im Standardbrowser, sofern kein anderer Browser &uuml;ber das <b>Attribut setOpenUrlBrowser</b> ausgew&auml;hlt wurde.<b> Bsp:</b><i> attr Tablet setOpenUrlBrowser de.ozerov.fully|de.ozerov.fully.MainActivity, das erste ist der Package Name und das zweite der Class Name</i></li>
+    <li>screen - on/off/lock/unlock schaltet den Bildschirm ein/aus oder sperrt/entsperrt ihn, in den Automagic Einstellungen muss "Admin Funktion" gesetzt werden sonst funktioniert "Screen off" nicht. <b>Attribut setScreenOnForTimer</b> &auml;ndert die Zeit wie lange das Display an bleiben soll!</li>
+    <li>screenFullscreen - on/off, (aktiviert/deaktiviert) den Vollbildmodus. <b>Attribut setFullscreen</b></li>
+    <li>screenLock - Sperrt den Bildschirm mit Pinabfrage. <b>Attribut setScreenlockPIN - hier die Pin daf&uuml;r eingeben. Erlaubt sind nur Zahlen. Es m&uuml;&szlig;en mindestens 4, bis max 16 Zeichen verwendet werden.</b></li>
+    <li>screenOrientation - Auto,Landscape,Portait,  aktiviert die Bildschirmausrichtung (Automatisch,Horizontal,Vertikal). <b>Attribut setScreenOrientation</b></li>
     <li>system - setzt Systembefehle ab (nur bei gerootetet Ger&auml;en). reboot,shutdown,airplanemodeON (kann nur aktiviert werden) <b>Attribut root</b>, in den Automagic Einstellungen muss "Root Funktion" gesetzt werden</li>
     <br>
-    Um openApp verwenden zu k&ouml;nnen, muss als Attribut ein, oder durch Komma getrennt, mehrere App Namen gesetzt werden. Der App Name ist frei w&auml;hlbar und nur zur Wiedererkennung notwendig.
-    Der selbe App Name mu&szlig; im Flow SetCommands auf der linken Seite unterhalb der Raute Expression:"openApp" in einen der 5 Str&auml;nge (eine App pro Strang) in beide Rauten eingetragen werden. Danach wird
-    in das Viereck die App ausgew&auml;lt welche durch den Attribut App Namen gestartet werden soll.<br><br>
+    Um openApp verwenden zu k&ouml;nnen, muss als Attribut der Package Name der App angegeben werden.
+    <br><br>
     Um zwischen Bluetoothger&auml;ten wechseln zu k&ouml;nnen, mu&szlig; das Attribut setBluetoothDevice mit folgender Syntax gesetzt werden. <b>attr &lt;DEVICE&gt; BTdeviceName1|MAC,BTDeviceName2|MAC</b> Es muss
     zwingend darauf geachtet werden das beim BTdeviceName kein Leerzeichen vorhanden ist. Am besten zusammen oder mit Unterstrich. Achtet bei der MAC darauf das Ihr wirklich nach jeder zweiten Zahl auch
     einen : drin habt<br>
