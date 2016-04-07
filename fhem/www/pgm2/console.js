@@ -3,6 +3,8 @@ var consConn;
 var consFilter, oldFilter;
 var consLastIndex = 0;
 var withLog = 0;
+var mustScroll = 1;
+
 log("Console is opening");
 
 function
@@ -27,9 +29,11 @@ consUpdate()
   log("Console Rcvd: "+new_content);
   if(new_content.indexOf('<') != 0)
     new_content = new_content.replace(/ /g, "&nbsp;");
-  $("#console")
-    .append(new_content)
-    .scrollTop($("#console")[0].scrollHeight);
+  
+  $("#console").append(new_content);
+    
+  if(mustScroll)
+    $("#console").scrollTop($("#console")[0].scrollHeight);
 }
 
 function
@@ -105,6 +109,22 @@ consStart()
     withLog = ($("#eventWithLog").is(':checked') ? 1 : 0);
     consFill();
   });
+  
+  
+  $("#console").scroll(function() { // autoscroll check
+     if($("#console")[0].scrollHeight - $("#console").scrollTop() ==
+        $("#console").outerHeight()) {
+       if(!mustScroll) {
+         mustScroll = 1;
+         log("Console autoscroll restarted");
+       }
+     } else {
+      if(mustScroll) {
+        mustScroll = 0;  
+        log("Console autoscroll stopped");
+      }
+     }
+   });
 }
 
 window.onload = consStart;
