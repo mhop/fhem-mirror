@@ -90,9 +90,9 @@ sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
    ,[1, "0100000000FF", "meterID", 0, 0] #  #   { "obis":"0100000000FF","value":"xxxxx"},
    ,[2, "0.2.0", "firmware", 0, 0] # {"obis": "0.2.0", "scale": 0, "value": 0, "unit": "", "valueString": "V320090704" }, 
    ,[1, "1.7.0|0100010700FF", "electricityPower", 1, 0]  # {"obis": "1.7.0", "scale": 0, "value": 392, "unit": "W", "valueString": "0000392" }, 
-   ,[1, "0100150700FF", "electricityPowerPhase1", 1, 0] # {"obis":"0100150700FF","value":209.40,"unit":"W"},
-   ,[1, "0100290700FF", "electricityPowerPhase2", 1, 0] # {"obis":"0100290700FF","value":14.27,"unit":"W"},
-   ,[1, "01003D0700FF", "electricityPowerPhase3", 1, 0] # {"obis":"01003D0700FF","value":89.40,"unit":"W"},
+   ,[1, "21.7.0|0100150700FF", "electricityPowerPhase1", 1, 0] # {"obis":"0100150700FF","value":209.40,"unit":"W"},
+   ,[1, "41.7.0|0100290700FF", "electricityPowerPhase2", 1, 0] # {"obis":"0100290700FF","value":14.27,"unit":"W"},
+   ,[1, "61.7.0|01003D0700FF", "electricityPowerPhase3", 1, 0] # {"obis":"01003D0700FF","value":89.40,"unit":"W"},
    ,[1, "1.8.0|0101010800FF", "electricityConsumed", 3, 1] # {"obis": "1.8.0", "scale": 0, "value": 8802276, "unit": "Wh", "valueString": "0008802.276" }, 
    ,[1, "1.8.1|0101010801FF", "electricityConsumedTariff1", 2, 0] # {"obis":"0101010801FF","value":33.53,"unit":"kWh"},               
    ,[1, "1.8.2|0101010802FF", "electricityConsumedTariff2", 2, 0] # {"obis":"0101010802FF","value":33.53,"unit":"kWh"},               
@@ -110,9 +110,9 @@ sub JSONMETER_doStatisticDeltaSingle ($$$$$$);
    ,[1, "010002080083", "electricityProducedLastMonth", 0, 0] 
    ,[1, "010002080084", "electricityProducedLastYear", 0, 0] 
    ,[1, "0101020800FF", "electricityPowerOutput", 1, 0]
-   ,[1, "010020070000", "electricityVoltagePhase1", 1, 0] #{"obis":"010020070000","value":237.06,"unit":"V"},               
-   ,[1, "010034070000", "electricityVoltagePhase2", 1, 0] # {"obis":"010034070000","value":236.28,"unit":"V"},               
-   ,[1, "010048070000", "electricityVoltagePhase3", 1, 0] # {"obis":"010048070000","value":236.90,"unit":"V"},
+   ,[1, "32.7.0|010020070000", "electricityVoltagePhase1", 1, 0] #{"obis":"010020070000","value":237.06,"unit":"V"},               
+   ,[1, "52.7.0|010034070000", "electricityVoltagePhase2", 1, 0] # {"obis":"010034070000","value":236.28,"unit":"V"},               
+   ,[1, "72.7.0|010048070000", "electricityVoltagePhase3", 1, 0] # {"obis":"010048070000","value":236.90,"unit":"V"},
    ,[1, "01000E070000", "electricityFrequency", 1, 0] # {"obis":"01000E070000","value":49.950,"unit":"Hz"}
    ,[1, "31.7.0", "electricityCurrentPhase1", 1, 0] # {"obis":"31.7.0","value":2.28,"unit":"A"},
    ,[1, "51.7.0", "electricityCurrentPhase2", 1, 0] # {"obis":"51.7.0","value":2.28,"unit":"A"},
