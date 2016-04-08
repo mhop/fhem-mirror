@@ -1049,6 +1049,8 @@ JSONMETER_doStatisticDeltaSingle ($$$$$$)
   Dieses Modul liest Daten von Messger&auml;ten (z.B. Stromz&auml;hler, Gasz&auml;hler oder W&auml;rmez&auml;hler, so genannte Smartmeter),
   welche <a href="http://de.wikipedia.org/wiki/OBIS-Kennzahlen">OBIS</a> kompatible Daten im JSON-Format auf einem Webserver oder auf dem FHEM-Dateisystem zur Verf&uuml;gung stellen.
   <br>
+   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/JSONMETER"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+  <br>
   &nbsp;
   <br>
   
