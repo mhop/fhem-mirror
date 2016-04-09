@@ -333,7 +333,7 @@ while(1)
                             {
                                 Log 2, "sending thread ".$handle{$uuid}{threads}{$room}->tid()." new address $address for room $room";
                                 $queues{$handle{$uuid}{threads}{$room}->tid()}->enqueue("new|$address");
-                                $state{$uuid}{rooms}{$room} = ""
+                                $state{$uuid}{rooms}{$room} = "" if(exists($state{$uuid}{rooms}{$room}));
                             }
                             
                             $handle{$uuid}{timeout} = $timeout;
@@ -359,12 +359,11 @@ while(1)
                         
                             # create a new reqester thread for each configured room to perform the query
                             while (($room, $value) = each %config)
-                            {
-                                
+                            {                                
                                 $thread_counter++;
                                 $queues{$thread_counter} = Thread::Queue->new();
                                 my $new_thread = threads->new(\&doQuery, ($value, $room, $address, $uuid));
-                                    Log 1, "created thread ".$new_thread->tid()." for processing device $address in room $room for peer ".$client->peerhost()." (UUID: $uuid)";     
+                                Log 1, "created thread ".$new_thread->tid()." for processing device $address in room $room for peer ".$client->peerhost()." (UUID: $uuid)";     
                                 
                                 # detach from the thread, so the thread starts processing independantly
                                 $new_thread->detach();
