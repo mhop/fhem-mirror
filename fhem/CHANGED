@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  PRESENCE: new collectord script and .deb package fixing not 
+             working statusRequest when a room in collectord is disconnected
   - updated: 74_AMAD: New Minor Release 2.0 Please read the Wiki or Commandref
                       !!! ATTENTION !!! Modify Definition is necessary
   - feature: 77_UWZ: new Modules to receive Information about Unwetterwarnung
