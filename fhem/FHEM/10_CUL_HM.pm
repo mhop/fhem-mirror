@@ -924,8 +924,13 @@ sub CUL_HM_Notify(@){#################################
   return undef if(!$events); # Some previous notify deleted the array.
   return undef if (grep !/INITIALIZED/,@{$events});
   delete $modules{CUL_HM}{NotifyFn};
+  # execute some cleanup after init
   CUL_HM_updateConfig("startUp");
   InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+  
+  #we need to init the templist if HMInfo is in use
+  HMinfo_listOfTempTemplates() if (eval "defined(&HMinfo_listOfTempTemplates)");
+  
   return undef;
 }
 
@@ -3668,7 +3673,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $usg =~ s/ pct/ pct:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
 	if ($usg =~ m/ tempTmplSet/){
-      my $tl = $modules{CUL_HM}{AttrList};;
+      my $tl = $modules{CUL_HM}{AttrList};
       my $ok = ($tl =~ s/.* (tempListTmpl)(\:.*? ).*/$2/);
 	  $tl = $ok?$tl:"";
       $usg =~ s/ tempTmplSet/ tempTmplSet$tl/;
@@ -7849,6 +7854,7 @@ sub CUL_HM_UpdtReadBulk(@) { #update a bunch of readings and trigger the events
 }
 sub CUL_HM_UpdtReadSingle(@) { #update single reading and trigger the event
   my ($hash,$rName,$val,$doTrg) = @_;
+  return if (!defined $hash->{NAME});
   if($evtDly && $doTrg){#delay trigger if in parser and trigger ist requested
     push @evtEt,[$hash,1,"$rName:$val"];
   }
@@ -8436,67 +8442,110 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
   my @entryFail = ();
   my @exec = ();
 
-  while(<aSave>){
-    chomp;
-    my $line = $_;
-    $line =~ s/\r//g;
-    next if($line =~ m/#/);
-    if($line =~ m/^entities:/){
-      last if ($found != 0);
-      $line =~s/.*://;
-      foreach my $eN (split(",",$line)){
-        $eN =~ s/ //g;
-        $found = 1 if ($eN eq $tmpl);
-      }
-    }
-
-    elsif($found == 1 && $line =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
-      my $prg = $1 if($line =~ m/P(.)_/);
-      $prg = 1 if (!$prg);
-      my ($tln,$val) = ($1,$2)if($line =~ m/(.*)>(.*)/);
-      $tln =~ s/ //g;
-      $tln = "R_".$tln if($tln !~ m/^R_/);
-      my $dayTxt = $1 if ($tln =~ m/tempList(...)/);
-      if (!defined $dl{$dayTxt}){
-        push @entryFail," undefined daycode:$dayTxt";
-        next;
-      }
-      if ($dlf{$prg}{$dayTxt}){
-        push @entryFail," duplicate daycode:$dayTxt";        
-        next;
-      }
-      $dlf{$prg}{$dayTxt} = 1;
-      my $day = $dl{$dayTxt};
-      $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/_[0-6]_/);
-      if (AttrVal($name,"model","") =~ m/HM-TC-IT-WM-W/){
-        $tln =~ s/^R_/R_P1_/ if ($tln !~ m/^R_P/);# add P1 as default
-      }
-      else{
-        $tln =~ s/^R_P1_/R_/ if ($tln =~ m/^R_P/);# remove P1 default
-      }
-      $val =~ tr/ +/ /;
-      $val =~ s/^ //;
-      $val =~ s/ $//;
-      @exec = ();
-      foreach my $eN(@el){
-        if ($action eq "verify"){
-          $val = join(" ",split(" ",$val));
-          my $nv = ReadingsVal($eN,$tln,"empty");
+  if ($template =~ m/defaultWeekplan$/){
+    $found = 1;
+    foreach my $eN(@el){
+      if ($action eq "verify"){
+        my $val = "24:00 18.0";
+        foreach ( "R_0_tempListSat"
+                 ,"R_1_tempListSun"
+                 ,"R_2_tempListMon"
+                 ,"R_3_tempListTue"
+                 ,"R_4_tempListWed"
+                 ,"R_5_tempListThu"
+                 ,"R_6_tempListFri"){      
+          my $nv = ReadingsVal($eN,$_,"empty");
           $nv = join(" ",split(" ",$nv));
-          push @entryFail,$eN." :".$tln." mismatch $val ne $nv ##" if ($val ne $nv);
+          push @entryFail,$eN." :".$_." mismatch $val ne $nv ##" if ($val ne $nv);
         }
-        elsif($action eq "restore"){
-          $val = lc($1)." ".$val if ($tln =~ m/(P.)_._tempList/);
-          $tln =~ s/R_(P._)?._//;
-          my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
-          push @entryFail,$eN." :".$tln." respose:$x" if ($x ne "1");
-          push @exec,"$eN $tln exec $val";
+        $dlf{1}{Sat} = 1;
+        $dlf{1}{Sun} = 1;
+        $dlf{1}{Mon} = 1;
+        $dlf{1}{Tue} = 1;
+        $dlf{1}{Wed} = 1;
+        $dlf{1}{Thu} = 1;
+        $dlf{1}{Fri} = 1;
+     }
+      elsif($action eq "restore"){
+        foreach ( "tempListSat"
+                 ,"tempListSun"
+                 ,"tempListMon"
+                 ,"tempListTue"
+                 ,"tempListWed"
+                 ,"tempListThu"
+                 ,"tempListFri"){      
+          my $x = CUL_HM_Set($defs{$eN},$eN,$_,"prep",split(" "," 24:00 18.0"));
+          
+          push @entryFail,$eN." :".$_." respose:$x" if ($x ne "1");
+          push @exec,"$eN $_ exec 24:00 18.0";
         }
       }
     }
-
-    $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
   }
+  else{
+    while(<aSave>){
+      chomp;
+      my $line = $_;
+      $line =~ s/\r//g;
+      next if($line =~ m/#/);
+      if($line =~ m/^entities:/){
+        last if ($found != 0);
+        $line =~s/.*://;
+        foreach my $eN (split(",",$line)){
+          $eN =~ s/ //g;
+          $found = 1 if ($eN eq $tmpl);
+        }
+      }
+    
+      elsif($found == 1 && $line =~ m/(R_)?(P[123])?(_?._)?tempList[SMFWT].*\>/){
+        my $prg = $1 if($line =~ m/P(.)_/);
+        $prg = 1 if (!$prg);
+        my ($tln,$val) = ($1,$2)if($line =~ m/(.*)>(.*)/);
+        $tln =~ s/ //g;
+        $tln = "R_".$tln if($tln !~ m/^R_/);
+        my $dayTxt = $1 if ($tln =~ m/tempList(...)/);
+        if (!defined $dl{$dayTxt}){
+          push @entryFail," undefined daycode:$dayTxt";
+          next;
+        }
+        if ($dlf{$prg}{$dayTxt}){
+          push @entryFail," duplicate daycode:$dayTxt";        
+          next;
+        }
+        $dlf{$prg}{$dayTxt} = 1;
+        my $day = $dl{$dayTxt};
+        $tln =~s /tempList/${day}_tempList/ if ($tln !~ m/_[0-6]_/);
+        if (AttrVal($name,"model","") =~ m/HM-TC-IT-WM-W/){
+          $tln =~ s/^R_/R_P1_/ if ($tln !~ m/^R_P/);# add P1 as default
+        }
+        else{
+          $tln =~ s/^R_P1_/R_/ if ($tln =~ m/^R_P/);# remove P1 default
+        }
+        $val =~ tr/ +/ /;
+        $val =~ s/^ //;
+        $val =~ s/ $//;
+        @exec = ();
+        foreach my $eN(@el){
+          if ($action eq "verify"){
+            $val = join(" ",split(" ",$val));
+            my $nv = ReadingsVal($eN,$tln,"empty");
+            $nv = join(" ",split(" ",$nv));
+            push @entryFail,$eN." :".$tln." mismatch $val ne $nv ##" if ($val ne $nv);
+          }
+          elsif($action eq "restore"){
+            $val = lc($1)." ".$val if ($tln =~ m/(P.)_._tempList/);
+            $tln =~ s/R_(P._)?._//;
+            my $x = CUL_HM_Set($defs{$eN},$eN,$tln,"prep",split(" ",$val));
+            push @entryFail,$eN." :".$tln." respose:$x" if ($x ne "1");
+            push @exec,"$eN $tln exec $val";
+          }
+        }
+      }
+    
+      $ret = "failed Entries:\n     "   .join("\n     ",@entryFail) if (scalar@entryFail);
+    }
+  }
+
   if (!$found){
     $ret .= "$tmpl not found in file $fName";
   }
@@ -9150,6 +9199,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                  tempListThu>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0
                  tempListFri>07:00 14.0 13:00 16.0 16:00 18.0 21:00 19.0 24:00 14.0
               </code>
+              Specials:<br>
+              <li>none: template will be ignored</li>
+              <li>defaultWeekplan: as default each day is set to 18.0 degree. 
+                  useful if peered to a TC controller. Implicitely teh weekplan of TC will be used.</li>
             </li>
             <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
               Set the attribut and apply the change to the device
@@ -10483,7 +10536,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                 set th tempListTue exec 06:00 19 23:00 22.5 24:00 19<br></code>
             </li>
             <li><B>tempListTmpl   =>"[verify|restore] [[&lt;file&gt;:]templateName] ...</B><br>
-              Die Temperaturlisten fr ein oder mehrere Devices k&ouml;nnen in einem File hinterlegt 
+              Die Temperaturlisten f&uuml;r ein oder mehrere Devices k&ouml;nnen in einem File hinterlegt 
               werden. Es wird ein template f&uuml;r eine Woche hinterlegt. Der User kann dieses
               template in ein Device schreiben lassen (restore). Er kann auch pr&uuml;fen, ob das Device korrekt
               nach dieser Templist programmiert ist (verify). 
@@ -10509,6 +10562,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                  tempListThu>07:00 14.0 16:00 18.0 21:00 19.0 24:00 14.0
                  tempListFri>07:00 14.0 13:00 16.0 16:00 18.0 21:00 19.0 24:00 14.0
               </code>
+              Specials:<br>
+              <li>none: das Template wird ignoriert</li>
+              <li>defaultWeekplan: Es wird als Default jeden Tag 18.0 Grad eingestellt. 
+                  Sinnvoll nutzbar wenn man einen TC als Kontroller nutzt. Der Wochenplan des TC wird dann imlizit genutzt</li>
             </li>
             <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
               Setzt das Attribut und sendet die Änderungen an das Device.

@@ -533,7 +533,8 @@ sub HMinfo_peerCheck(@) { #####################################################
               my $ot = AttrVal($eName,"tempListTmpl","--");
               my $pt = AttrVal($rtCn ,"tempListTmpl","--");
               push @peerIDsTeamRT,$eName." team:$rtCn  boost differ $ob / $pb" if ($ob ne $pb);
-              push @peerIDsTeamRT,$eName." team:$rtCn  tempListTmpl differ $ot / $pt" if ($ot ne $pt);
+              # if templates differ AND RT template is not static then notify a difference
+              push @peerIDsTeamRT,$eName." team:$rtCn  tempListTmpl differ $ot / $pt" if ($ot ne $pt && $pt ne "defaultWeekplan");
             }
           }
         }
@@ -896,7 +897,7 @@ sub HMinfo_listOfTempTemplates() { ###########################################
   $defs{$n}{helper}{weekplanList}     = \@tmpl;
   my $at=$modules{CUL_HM};
   if ($modules{CUL_HM}{AttrList}){
-    my $l = "none,".join(",",@tmpl);
+    my $l = "none,defaultWeekplan,".join(",",@tmpl);
     $modules{CUL_HM}{AttrList} =~ s/ tempListTmpl(.*? )/ tempListTmpl:$l /;
   }
   return ;
