@@ -11,6 +11,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday usleep);
+use Scalar::Util qw(looks_like_number);
 use POSIX qw{strftime};
 
 my %OBIS_channels = ( "21"=>"power_L1",
@@ -139,7 +140,6 @@ sub OBIS_Define($$)
     $hash->{helper}{TRIGGERTIME}=gettimeofday();
     if( !$init_done ) {
 	    $attr{$name}{"event-on-change-reading"} = ".*";
-	    $attr{$name}{"event-min-interval"} = ".*:10";
     }
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
@@ -293,7 +293,6 @@ sub OBIS_Parse($$)
 	
 	my $remainingSML;
 	($buffer,$remainingSML) = OBIS_trySMLdecode($hash,$buffer) if ($hash->{MeterType}=~/SML|Ext|Unknown/);
-		return undef if(index($buffer,chr(13).chr(10)) == -1);
 	my $type= $hash->{MeterType};
 	my $name = $hash->{NAME};  
 	if(index($buffer,chr(13).chr(10)) ne -1){
@@ -329,13 +328,13 @@ sub OBIS_Parse($$)
 								if ($rmsg =~ $OBIS_codes{$code}) {
 									if ($code eq "Channels_sum") {
 							    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
-					  					readingsBulkUpdate($hash, "sum_$L",$3.(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+					  					readingsBulkUpdate($hash, "sum_$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
 					  					readingsBulkUpdate($hash, "dir_sum_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
 									}
 									 
 									elsif ($code eq "Channels") {
 							    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
-					  					readingsBulkUpdate($hash, "$L",$3.(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+					  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
 					  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
 									}
 									
@@ -343,9 +342,9 @@ sub OBIS_Parse($$)
 										my $L=$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // "Unknown_Channel_$1.$2";
 										my $chan=$3+0 > 0 ? "_Ch$3" : "";
 										if($1==1) {
-											readingsBulkUpdate($hash, $L.$chan  ,$5 +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
+											readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
 										} elsif ($1==2) {
-											readingsBulkUpdate($hash, $L.$chan  ,$5 +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
+											readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
 										}
 					  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
 										
