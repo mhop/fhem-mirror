@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.0.0";
-my $flowsetversion = "2.0.0";
+my $modulversion = "2.0.1";
+my $flowsetversion = "2.0.1";
 
 
 
@@ -61,7 +61,7 @@ sub AMAD_Initialize($) {
 			  "setBluetoothDevice ".
 			  "setScreenlockPIN ".
 			  "setScreenOnForTimer ".
-			  "setOpenUrlBroswer ".
+			  "setOpenUrlBrowser ".
 			  "root:0,1 ".
 			  "port ".
 			  "disable:1 ".
@@ -709,7 +709,7 @@ sub AMAD_SelectSetCmd($$@) {
     elsif( lc $cmd eq 'openurl' ) {
     
 	my $openurl = join( " ", @data );
-	my $browser = AttrVal( $name, "setOpenUrlBroswer", "com.android.chrome|com.google.android.apps.chrome.Main" );
+	my $browser = AttrVal( $name, "setOpenUrlBrowser", "com.android.chrome|com.google.android.apps.chrome.Main" );
 	my @browserapp = split( /\|/, $browser );
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/openURL?url=".$openurl."&browserapp=".$browserapp[0]."&browserappclass=".$browserapp[1];
@@ -1424,8 +1424,8 @@ sub AMAD_decrypt($) {
       <code>define WandTabletWohnzimmer AMAD 192.168.0.23 TuxNetAP@@OpaZuHause</code><br>
     </ul>
     <br>
-    Diese Anweisung erstellt zwei neue AMAD-Devices im Raum AMAD.Der Parameter &lt;IP-ADRESSE&lt; legt die IP Adresse des Android Ger&auml;tes fest und der Parameter WLANAP-SSID die SSID des WLAN's welches sich zum FHEM Server verbindet. Es k&ouml;nnen mehrere SSID's mit angegeben werden, welche dann getrennt durch zwei @ eingetragen werden. Das zweite Device ist die AMADCommBridge welche als Kommunikationsbr&uuml;cke vom Androidger&auml;t zu FHEM diehnt.<br>
-    !!!Comming Soon!!! Der Port eines jeden AMAD Devices kann &uuml;ber das Attribut "port" ge&auml;ndert werden. <b>Hier sollte Hintergrundwissen zu Automagic und HTTP Request vorhanden sein, da dieser Port im HTTP Request Trigger der beiden Flows eingestellt ist. Demzufolge mu&szlig; der Port dort auch ver&auml;dert werden.
+    Diese Anweisung erstellt zwei neues AMAD-Device im Raum AMAD.Der Parameter &lt;IP-ADRESSE&gt; legt die IP Adresse des Android Ger&auml;tes fest und der Parameter WLANAP-SSID die SSID Deines WLAN's. Es k&ouml;nnen mehrere SSID's mit angegeben werden, welche dann durch Komma getrennt sein m&uuml;ssen. Haben die SSID's Leerzeichen im Namen werde die Leerzeichen durch 2 @ aufgef&uuml;llt. Gibt es Androidger&auml;te welche nicht &uuml;ber WLAN sondern USB-Ethernet angeschlossen sind, ist die WLANAP-SSID mit "usb-ethernet" zu benennen<br>
+    Das zweite Device ist die AMADCommBridge welche als Kommunikationsbr&uuml;cke vom Androidger&auml;t zu FHEM diehnt. !!!Comming Soon!!! Wer den Port &auml;ndern m&ouml;chte, kann dies &uuml;ber das Attribut "port" tun. <b>Ihr solltet aber wissen was Ihr tut, da dieser Port im HTTP Request Trigger der beiden Flows eingestellt ist. Demzufolge mu&szlig; der Port dort auch ge&auml;ndert werden. Der Port f&uuml;r die Bridge kann ohne Probleme im Bridge Device mittels dem Attribut "port" ver&auml;ndert werden.
     <br>
     Der Port f&uuml;r die Bridge kann ohne Probleme im Bridge Device mittels dem Attribut "port" ver&auml;ndert werden.</b>
   </ul>
