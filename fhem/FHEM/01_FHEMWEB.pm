@@ -1061,14 +1061,7 @@ FW_makeTable($$$@)
       FW_makeEdit($name, $n, $val);
 
     } else {
-      if( $title eq "Attributes" ) {
-        my $id = "sel_attr$name"; $id =~ s/\./_/g;
-        FW_pO "<td><div class=\"dname\">".
-                "<a onClick='FW_querySetSelected(\"$id\",\"$n\")'>".
-              "$n</a></div></td>";
-      } else {
-         FW_pO "<td><div class=\"dname\">$n</div></td>";
-      }
+      FW_pO "<td><div class=\"dname\" data-name=\"$name\">$n</div></td>";
 
       if(ref($val)) { #handle readings
         my ($v, $t) = ($val->{VAL}, $val->{TIME});
@@ -1083,16 +1076,17 @@ FW_makeTable($$$@)
         }
       } else {
         $val = FW_htmlEscape($val);
+        my $tattr = "informId=\"$name-$n\" class=\"dval\"";
 
         # if possible provide some links
         if ($n eq "room"){
-          FW_pO "<td><div class=\"dval\">".
+          FW_pO "<td><div $tattr>".
                 join(",", map { FW_pH("room=$_",$_,0,"",1,1) } split(",",$val)).
                 "</div></td>";
 
         } elsif ($n eq "webCmd"){
           my $lc = "detail=$name&cmd.$name=set $name";
-          FW_pO "<td><div name=\"$name-$n\" class=\"dval\">".
+          FW_pO "<td><div name=\"$name-$n\" $tattr>".
                   join(":", map {FW_pH("$lc $_",$_,0,"",1,1)} split(":",$val) ).
                 "</div></td>";
 
@@ -1104,7 +1098,7 @@ FW_makeTable($$$@)
 
         } else {
            $val = "<pre>$val</pre>" if($val =~ m/\n/ && $title eq "Attributes");
-           FW_pO "<td><div class=\"dval\">".
+           FW_pO "<td><div $tattr>".
                    join(",", map { ($_ ne $name && $defs{$_}) ?
                      FW_pH( "detail=$_", $_ ,0,"",1,1) : $_ } split(",",$val)).
                  "</div></td>";
@@ -1138,13 +1132,14 @@ FW_detailSelect(@)
   $list =~ s/"/&quot;/g;
 
   my $ret ="";
+  my $psc = AttrVal("global", "perlSyntaxCheck", ($featurelevel>5.7) ? 1 : 0);
   $ret .= "<div class='makeSelect' dev=\"$d\" cmd=\"$cmd\" list=\"$list\">";
   $ret .= "<form method=\"$FW_formmethod\" ".
                   "action=\"$FW_ME$FW_subdir\" autocomplete=\"off\">";
   $ret .= FW_hidden("detail", $d);
   $ret .= FW_hidden("fwcsrf", $defs{$FW_wname}{CSRFTOKEN}) if($FW_CSRF);
   $ret .= FW_hidden("dev.$cmd$d", $d.($param ? " $param":""));
-  $ret .= FW_submit("cmd.$cmd$d", $cmd, $cmd);
+  $ret .= FW_submit("cmd.$cmd$d", $cmd, $cmd.($psc?" psc":""));
   $ret .= "<div class=\"$cmd downText\">&nbsp;$d&nbsp;".
                 ($param ? "&nbsp;$param":"")."</div>";
   $ret .= FW_select("sel_$cmd$d","arg.$cmd$d",\@al, $selEl, $cmd);
@@ -2505,6 +2500,7 @@ FW_Notify($$)
   my $h = $ntfy->{inform};
   return undef if(!$h);
   my $isStatus = ($h->{type} =~ m/status/);
+  my $events;
 
   my $dn = $dev->{NAME};
   if($dn eq "global" && $isStatus) {
@@ -2512,7 +2508,15 @@ FW_Notify($$)
     my $data = FW_longpollInfo($h->{fmt},
         "#FHEMWEB:$ntfy->{NAME}","\$('#saveCheck').css('visibility','$vs')","");
     addToWritebuffer($ntfy, $data."\n");
-    $dn = $1 if($dev->{CHANGED} && $dev->{CHANGED}->[0] =~ m/^MODIFIED (.*)$/);
+
+    if($dev->{CHANGED}) {
+      $dn = $1 if($dev->{CHANGED}->[0] =~ m/^MODIFIED (.*)$/);
+      if($dev->{CHANGED}->[0] =~ m/^ATTR ([^ ]+) ([^ ]+.*) (.*)$/) {
+        $dn = $1;
+        my @a = ("$2: $3");
+        $events = \@a;
+      }
+    }
   }
 
   if($dn eq $ntfy->{SNAME} &&
@@ -2530,7 +2534,9 @@ FW_Notify($$)
   my @data;
   my %extPage;
   my $isRaw = ($h->{type} =~ m/raw/);
-  my $events = deviceEvents($dev, AttrVal($FW_wname, "addStateEvent",!$isRaw));
+  $events = deviceEvents($dev, AttrVal($FW_wname, "addStateEvent",!$isRaw))
+        if(!$events);
+Log 1, "C: $dn $events->[0]";
 
   if($isStatus) {
     # Why is saving this stuff needed? FLOORPLAN?
