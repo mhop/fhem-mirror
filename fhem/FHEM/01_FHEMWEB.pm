@@ -2536,7 +2536,6 @@ FW_Notify($$)
   my $isRaw = ($h->{type} =~ m/raw/);
   $events = deviceEvents($dev, AttrVal($FW_wname, "addStateEvent",!$isRaw))
         if(!$events);
-Log 1, "C: $dn $events->[0]";
 
   if($isStatus) {
     # Why is saving this stuff needed? FLOORPLAN?
