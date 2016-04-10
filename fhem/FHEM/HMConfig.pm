@@ -610,7 +610,8 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
 
   waterUppThr     =>{a=>  6.0,s=>1  ,l=>1,min=>0    ,max=>256   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water upper threshold"},
   waterlowThr     =>{a=>  7.0,s=>1  ,l=>1,min=>0    ,max=>256   ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water lower threshold"},
-  caseDesign      =>{a=> 90.0,s=>1  ,l=>1,min=>1    ,max=>3     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"case desing"                          ,lit=>{verticalBarrel=>1,horizBarrel=>2,rectangle=>3}},
+    # change 90 to 91 due to log: reg 90 not available but 91 available...
+  caseDesign      =>{a=> 91.0,s=>1  ,l=>1,min=>1    ,max=>3     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"case desing"                          ,lit=>{verticalBarrel=>1,horizBarrel=>2,rectangle=>3}},
   caseHigh        =>{a=> 94.0,s=>2  ,l=>1,min=>100  ,max=>10000 ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case hight"},
   fillLevel       =>{a=> 98.0,s=>2  ,l=>1,min=>100  ,max=>300   ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"fill level"},
   caseWidth       =>{a=>102.0,s=>2  ,l=>1,min=>100  ,max=>10000 ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case width"},
