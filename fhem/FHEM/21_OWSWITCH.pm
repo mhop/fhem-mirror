@@ -87,7 +87,7 @@ no warnings 'deprecated';
 
 sub Log($$);
 
-my $owx_version="6.01";
+my $owx_version="6.02";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D","E","F","G","H");
 my @owg_channel = ("A","B","C","D","E","F","G","H");
@@ -783,19 +783,16 @@ sub OWSWITCH_Set($@) {
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret1  = OWFSSWITCH_GetState($hash);
-      my $gpio = 0;
-      #-- 
+      my $gpio  = 0;
       for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
-        if( $outval==0 ){
-          $gpio += ($hash->{owg_vax}->[$i]<<$i) 
-            if( $i != $outfnd );
-        }else{
-          $gpio += ($hash->{owg_vax}->[$i]<<$i);
-          $gpio += (1<<$i) 
-            if( $i == $outfnd ); 
-        } 
-      }
-      $ret2 = OWFSSWITCH_SetState($hash,$value);
+         $gpio += ($hash->{owg_vax}->[$i]<<$i) 
+      };
+      if( $outval==0 ){
+        $gpio &= ~(1<<$outfnd); 
+      }else{
+        $gpio |= (1<<$outfnd); 
+      } 
+      $ret2 = OWFSSWITCH_SetState($hash,$gpio);
     #-- Unknown interface
     }else{
       return "OWSWITCH: Get with wrong IODev type $interface";
