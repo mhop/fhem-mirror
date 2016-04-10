@@ -772,12 +772,12 @@ YAMAHA_AVR_Set($@)
     }
     elsif($what eq "navigateListMenu")
     {
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus", {options => {no_playinfo => 1}});
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, join(" ", @a[2..$#a]), {options => {init => 1}});
     }
     elsif($what eq "preset" and $a[2] =~ /^\d+$/ and $a[2] >= 1 and $a[2] <= 40)
     {
-        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus", {options => {no_playinfo => 1}});
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Preset><Preset_Sel>".$a[2]."</Preset_Sel></Preset></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2], {options => {can_fail => 1}});
     }
     elsif($what eq "skip" and defined($a[2]))
@@ -1425,15 +1425,23 @@ YAMAHA_AVR_ParseResponse ($$$)
                     {
                         $hash->{helper}{LAST_INPUT_TAG} = $hash->{helper}{CURRENT_INPUT_TAG} if(exists($hash->{helper}{CURRENT_INPUT_TAG}));
                         $hash->{helper}{CURRENT_INPUT_TAG} = $1;
-                        Log3 $name, 4, "YAMAHA_AVR ($name) - check for extended input informations on <$1>";
-                    
-                        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo", {options => {can_fail => 1}});
                         
-                        if(!exists($hash->{helper}{LAST_INPUT_TAG}) or ($hash->{helper}{LAST_INPUT_TAG} ne $hash->{helper}{CURRENT_INPUT_TAG}) or $hash->{helper}{SUPPORT_SHUFFLE_REPEAT})
+                        unless($options->{no_playinfo})
                         {
-                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat", {options => {can_fail => 1}});
-                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle", {options => {can_fail => 1}});
-                        }            
+                            Log3 $name, 4, "YAMAHA_AVR ($name) - check for extended input informations on <$1>";
+                        
+                            YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Info>GetParam</Play_Info></$1></YAMAHA_AV>", "statusRequest", "playInfo", {options => {can_fail => 1}});
+                            
+                            if(!exists($hash->{helper}{LAST_INPUT_TAG}) or ($hash->{helper}{LAST_INPUT_TAG} ne $hash->{helper}{CURRENT_INPUT_TAG}) or $hash->{helper}{SUPPORT_SHUFFLE_REPEAT})
+                            {
+                                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Repeat>GetParam</Repeat></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playRepeat", {options => {can_fail => 1}});
+                                YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$1><Play_Control><Play_Mode><Shuffle>GetParam</Shuffle></Play_Mode></Play_Control></$1></YAMAHA_AV>", "statusRequest", "playShuffle", {options => {can_fail => 1}});
+                            }
+                        }
+                        else
+                        {
+                            Log3 $name, 4, "YAMAHA_AVR ($name) - skipping check for extended input informations on <$1>";
+                        }
                     }
                     else
                     {
