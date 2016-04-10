@@ -301,7 +301,7 @@ YAMAHA_AVR_Set($@)
                                                           ((exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "straight:on,off 3dCinemaDsp:off,auto adaptiveDrc:off,auto ".
                                                           (exists($hash->{helper}{DIRECT_TAG}) ? "direct:on,off " : "").
                                                           (exists($hash->{helper}{DSP_MODES}) ? "dsp:".$dsp_modes_comma." " : "")."enhancer:on,off " : "").
-                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward ".
+                                                          (exists($hash->{helper}{CURRENT_INPUT_TAG}) ? "navigateListMenu play:noArg pause:noArg stop:noArg skip:reverse,forward preset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 ".
                                                           (($hash->{helper}{SUPPORT_SHUFFLE_REPEAT}) ? "shuffle:on,off repeat:off,one,all " : "") : "").
                                                           "sleep:off,30min,60min,90min,120min,last ".
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and $hash->{ACTIVE_ZONE} eq "mainzone") ? "bass:slider,-6,0.5,6 treble:slider,-6,0.5,6 " : "").
@@ -309,7 +309,6 @@ YAMAHA_AVR_Set($@)
                                                           (($hash->{helper}{SUPPORT_TONE_STATUS} and exists($hash->{ACTIVE_ZONE}) and ($hash->{ACTIVE_ZONE} ne "mainzone") and not YAMAHA_AVR_isModel_DSP($hash)) ? "bass:slider,-10,2,10 treble:slider,-10,2,10 " : "").
                                                           (($hash->{helper}{SUPPORT_PARTY_MODE}) ? "partyMode:on,off " : "").
                                                           "tunerFrequency ".
-                                                          "tunerPreset:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 ".
                                                           "statusRequest:noArg";
                            
     # number of seconds to wait after on/off was executed (DSP based: 3 sec, other models: 2 sec)
@@ -776,6 +775,11 @@ YAMAHA_AVR_Set($@)
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
         YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><[CURRENT_INPUT_TAG]><List_Info>GetParam</List_Info></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, join(" ", @a[2..$#a]), {options => {init => 1}});
     }
+    elsif($what eq "preset" and $a[2] =~ /^\d+$/ and $a[2] >= 1 and $a[2] <= 40)
+    {
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>", "statusRequest", "basicStatus");
+        YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><[CURRENT_INPUT_TAG]><Play_Control><Preset><Preset_Sel>".$a[2]."</Preset_Sel></Preset></Play_Control></[CURRENT_INPUT_TAG]></YAMAHA_AV>", $what, $a[2], {options => {can_fail => 1}});
+    }
     elsif($what eq "skip" and defined($a[2]))
     {
         if($a[2] eq "forward")
@@ -867,13 +871,6 @@ YAMAHA_AVR_Set($@)
         else
         {
             return "invalid tuner frequency value: ".$a[2];
-        }
-    }
-    elsif($what eq "tunerPreset" and defined($a[2]))
-    {
-        if($a[2] =~ /^\d+$/ and $a[2] >= 1 and $a[2] <= 40)
-        {
-            YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><Tuner><Play_Control><Preset><Preset_Sel>".$a[2]."</Preset_Sel></Preset></Play_Control></Tuner></YAMAHA_AV>", $what, $a[2], {options => {can_fail => 1}});
         }
     }
     elsif($what eq "statusRequest")
@@ -2148,7 +2145,7 @@ YAMAHA_AVR_isModel_DSP($)
 <li><b>partyMode</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp;controls the party mode. In Main Zone the whole party mode is enabled/disabled system wide. In each zone executed, it enables/disables the current zone from party mode.</li>
 <li><b>navigateListMenu</b> [item1]/[item2]/[itemN]/... &nbsp;&nbsp;-&nbsp;&nbsp; select a specific item within a menu structure. for menu-based inputs (e.g. Net Radio, USB, Server, ...) only. See chapter <a href="#YAMAHA_AVR_MenuNavigation">Automatic Menu Navigation</a> for further details and examples.</li>
 <li><b>tunerFrequency</b> [frequency] [AM|FM] &nbsp;&nbsp;-&nbsp;&nbsp; sets the tuner frequency. The first argument is the frequency, second parameter is optional to set the tuner band (AM or FM, default: FM). Depending which tuner band you select, the frequency is given in kHz (AM band) or MHz (FM band). If the second parameter is not set, the FM band will be used. This command can be used even the current input is not "tuner", the new frequency is set and will be played, when the tuner gets active.</li>
-<li><b>tunerPreset</b> 1...40 &nbsp;&nbsp;-&nbsp;&nbsp; selects a saved tuner frequency preset. This command can be used even the current input is not "tuner", the new frequency is set and will be played, when the tuner gets active.</li>
+<li><b>preset</b> 1...40 &nbsp;&nbsp;-&nbsp;&nbsp; selects a saved preset of the currently selected input.</li>
 <li><b>straight</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses the internal codec converter and plays the original sound codec</li>
 <li><b>direct</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp; bypasses all internal sound enhancement features and plays the sound straight directly</li> 
 <li><b>sleep</b> off,30min,60min,...,last &nbsp;&nbsp;-&nbsp;&nbsp; activates the internal sleep timer</li>
@@ -2410,7 +2407,7 @@ So here are some examples:
 <li><b>partyMode</b> on|off &nbsp;&nbsp;-&nbsp;&nbsp;Aktiviert den Party Modus. In der Main Zone wird hierbei der Party Modus ger&auml;teweit aktiviert oder deaktiviert. In den anderen Zonen kann man damit die entsprechende Zone dem Party Modus zuschalten oder entziehen.</li>
 <li><b>navigateListMenu</b> [Element 1]/[Element 2]/[Element N]/... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt ein spezifisches Element aus einer Men&uuml;struktur aus. Nur verwendbar bei Men&uuml;-basierenden Eing&auml;ngen (z.B. Net Radio, USB, Server, etc.). Siehe nachfolgendes Kapitel "<a href="#YAMAHA_AVR_MenuNavigation">Automatische Men&uuml; Navigation</a>" f&uuml;r weitere Details und Beispiele.</li>
 <li><b>tunerFrequency</b> [Frequenz] [AM|FM] &nbsp;&nbsp;-&nbsp;&nbsp; setzt die Radio-Frequenz. Das erste Argument ist die Frequenz, der zweite dient optional zu Angabe des Bandes (AM oder FM, standardm&auml;&szlig;ig FM). Abh&auml;ngig davon, welches Band man benutzt, wird die Frequenz in kHz (AM-Band) oder MHz (FM-Band) angegeben. Wenn im zweiten Argument kein Band angegeben ist, wird standardm&auml;&szlig;ig das FM-Band benutzt. Dieser Befehl kann auch benutzt werden, wenn der aktuelle Eingang nicht "tuner" ist. Die neue Frequenz wird dennoch gesetzt und bei der n&auml;chsten Benutzung abgespielt.</li>
-<li><b>tunerPreset</b> 1...40 &nbsp;&nbsp;-&nbsp;&nbsp; w&auml;hlt einen gespeicherten Radiosender-Preset aus. Dieser Befehl kann auch benutzt werden, wenn der aktuelle Eingang nicht "tuner" ist. Die neue Frequenz wird dennoch gesetzt und bei der n&auml;chsten Benutzung abgespielt.</li>
+<li><b>preset</b> 1...40 &nbsp;&nbsp;-&nbsp;&nbsp; w&auml;hlt ein gespeichertes Preset f&uuml;r den aktuellen Eingang aus.</li>
 <li><b>direct</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; Umgeht alle internen soundverbessernden Ma&szlig;nahmen (Equalizer, Enhancer, Adaptive DRC,...) und gibt das Signal unverf&auml;lscht wieder</li>
 <li><b>input</b> hdmi1,hdmiX,... &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt den Eingangskanal (es werden nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge angeboten)</li>
 <li><b>scene</b> scene1,sceneX &nbsp;&nbsp;-&nbsp;&nbsp; W&auml;hlt eine vorgefertigte Szene aus</li>

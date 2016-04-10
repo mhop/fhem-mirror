@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  YAMAHA_AVR: removed set command tunerPreset,
+             added new set command preset to select a configured preset for 
+             the currently selected input. Please change your configuration
+             to new command if you use tunerPreset in notify/at definitions
   - feature: PRESENCE: new attribute absenceThreshold to define a number of 
              checks that have to result in "absent" before the state of 
              PRESENCE is changed to absent. See commandref for details.
