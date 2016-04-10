@@ -126,15 +126,22 @@ CUL_Initialize($)
   $hash->{GetFn}   = "CUL_Get";
   $hash->{SetFn}   = "CUL_Set";
   $hash->{AttrFn}  = "CUL_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 model:CUL,CUN sendpool addvaltrigger ".
-                     "rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S,KOPP_FC ".
-                     "hmId longids ".
-                     "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger " .
-                     $readingFnAttributes;
-
+  no warnings 'qw';
+  my @attrList = qw(
+    addvaltrigger
+    connectCommand
+    do_not_notify:1,0
+    dummy:1,0 " .
+    hmId longids 
+    hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger 
+    model:CUL,CUN,CUNO,SCC,nanoCUL
+    rfmode:SlowRF,HomeMatic,MAX,WMBus_T,WMBus_S,KOPP_FC 
+    sendpool
+    showtime:1,0
+  );
+  use warnings 'qw';
+  $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
   $hash->{ShutdownFn} = "CUL_Shutdown";
-
 }
 
 sub
@@ -494,6 +501,9 @@ CUL_DoInit($)
       CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
     }
   }
+
+  my $cc = AttrVal($name, "connectCommand", undef);
+  CUL_SimpleWrite($hash, $cc) if($cc);
 
   readingsSingleUpdate($hash, "state", "Initialized", 1);
 
@@ -1010,9 +1020,10 @@ sub
 CUL_Attr(@)
 {
   my ($cmd,$name,$aName,$aVal) = @_;
+  my $hash = $defs{$name};
+
   if($aName eq "rfmode") {
 
-    my $hash = $defs{$name};
 
     $aVal = "SlowRF" if(!$aVal ||
                          ($aVal ne "HomeMatic" 
@@ -1106,6 +1117,10 @@ CUL_Attr(@)
       return "wrong syntax: hmId must be 6-digit-hex-code (3 byte)"
         if($aVal !~ m/^[A-F0-9]{6}$/i);
     }
+
+  } elsif($aName eq "connectCommand"){
+    CUL_SimpleWrite($hash, $aVal) if($cmd eq "set");
+
   }
 
   return undef;
@@ -1311,10 +1326,62 @@ CUL_prefix($$$)
   <a name="CULattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a name="addvaltrigger">addvaltrigger</a><br>
+        Create triggers for additional device values. Right now these are RSSI
+        and RAWMSG for the CUL family and RAWMSG for the FHZ.
+        </li><br>
+
+    <li><a name="#connectCommand">connectCommand</a><br>
+      raw culfw command sent to the CUL after a (re-)connect of the USB device,
+      and sending the usual initialization needed for the configured rfmode.
+      </li>
+
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
-    <li><a href="#showtime">showtime</a></li>
-    <li><a href="#model">model</a> (CUL,CUN)</li>
+    <li><a name="hmId">hmId</a><br>
+        Set the HomeMatic ID of this device. If this attribute is absent, the
+        ID will be F1&lt;FHTID&gt;. Note 1: After setting or changing this
+        attribute you have to relearn all your HomeMatic devices. Note 2: The
+        value <b>must</b> be a 6 digit hex number, and 000000 is not valid. FHEM
+        won't complain if it is not correct, but the communication won't work.
+        </li><br>
+
+    <li><a name="hmProtocolEvents">hmProtocolEvents</a><br>
+        Generate events for HomeMatic protocol messages. These are normally
+        used for debugging, by activating "inform timer" in a telnet session,
+        or looking at the Event Monitor window in the FHEMWEB frontend.<br>
+        Example:
+        <ul>
+        <code>
+        2012-05-17 09:44:22.515 CUL CULHM RCV L:0B N:81 CMD:A258 SRC:......
+          DST:...... 0000 (TYPE=88,WAKEMEUP,BIDI,RPTEN)
+        </code>
+        </ul>
+        </li><br>
+    
+    <li><a name="longids">longids</a><br>
+        Comma separated list of device-types for CUL that should be handled 
+        using long IDs. This additional ID allows it to differentiate some 
+        weather sensors, if they are sending on the same channel. 
+        Therefore a random generated id is added. If you choose to use longids, 
+        then you'll have to define a different device after battery change.
+        Default is not to use long IDs.<br>
+        Modules which are using this functionality are for e.g. :
+        14_Hideki, 41_OREGON, 14_CUL_TCM97001, 14_SD_WS07.<br>
+
+        Examples:<br>
+        <ul><code>
+        # Do not use any long IDs for any devices (this is default):<br>
+        attr cul longids 0<br>
+        # Use long IDs for all devices:<br>
+        attr cul longids 1<br>
+        # Use longids for SD_WS07 devices.<br>
+        # Will generate devices names like SD_WS07_TH_3 for channel 3.<br>
+        attr cul longids SD_WS07
+        </code></ul>
+        </li><br>
+
+    <li><a href="#model">model</a> (CUL,CUN,etc)</li>
     <li><a name="sendpool">sendpool</a><br>
         If using more than one CUL for covering a large area, sending
         different events by the different CUL's might disturb each other. This
@@ -1325,10 +1392,6 @@ CUL_prefix($$$)
         <code>attr CUN1 sendpool CUN1,CUN2,CUN3<br>
         attr CUN2 sendpool CUN1,CUN2,CUN3<br>
         attr CUN3 sendpool CUN1,CUN2,CUN3</code><br>
-        </li><br>
-    <li><a name="addvaltrigger">addvaltrigger</a><br>
-        Create triggers for additional device values. Right now these are RSSI
-        and RAWMSG for the CUL family and RAWMSG for the FHZ.
         </li><br>
     <li><a name="rfmode">rfmode</a><br>
         Configure the RF Transceiver of the CUL (the CC1101). Available
@@ -1354,48 +1417,8 @@ CUL_prefix($$$)
             </li>
         </ul>
         </li><br>
+    <li><a href="#showtime">showtime</a></li>
 
-    <li><a name="hmId">hmId</a><br>
-        Set the HomeMatic ID of this device. If this attribute is absent, the
-        ID will be F1&lt;FHTID&gt;. Note 1: After setting or changing this
-        attribute you have to relearn all your HomeMatic devices. Note 2: The
-        value <b>must</b> be a 6 digit hex number, and 000000 is not valid. FHEM
-        won't complain if it is not correct, but the communication won't work.
-        </li><br>
-
-    <li><a name="hmProtocolEvents">hmProtocolEvents</a><br>
-        Generate events for HomeMatic protocol messages. These are normally
-        used for debugging, by activating "inform timer" in a telnet session,
-        or looking at the Event Monitor window in the FHEMWEB frontend.<br>
-        Example:
-        <ul>
-        <code>
-        2012-05-17 09:44:22.515 CUL CULHM RCV L:0B N:81 CMD:A258 SRC:...... DST:...... 0000 (TYPE=88,WAKEMEUP,BIDI,RPTEN)
-        </code>
-        </ul>
-        </li><br>
-    
-    <li><a name="longids">longids</a><br>
-        Comma separated list of device-types for CUL that should be handled 
-        using long IDs. This additional ID allows it to differentiate some 
-        weather sensors, if they are sending on the same channel. 
-        Therefore a random generated id is added. If you choose to use longids, 
-        then you'll have to define a different device after battery change.
-        Default is not to use long IDs.<br>
-        Modules which are using this functionality are for e.g. :
-        14_Hideki, 41_OREGON, 14_CUL_TCM97001, 14_SD_WS07.<br>
-
-        Examples:<br>
-        <ul><code>
-        # Do not use any long IDs for any devices (this is default):<br>
-        attr cul longids 0<br>
-        # Use long IDs for all devices:<br>
-        attr cul longids 1<br>
-        # Use longids for SD_WS07 devices.<br>
-        # Will generate devices names like SD_WS07_TH_3 for channel 3.<br>
-        attr cul longids SD_WS07
-        </code></ul>
-    </li><br>
         
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
@@ -1519,9 +1542,9 @@ CUL_prefix($$$)
         <ul>
         <li>freq bestimmt sowohl die Empfangs- als auch die Sendefrequenz.<br>
             Bemerkung: Auch wenn der CC1101 zwischen den Frequenzen 315 und 915
-            MHz eingestellt werden kann, ist die Antennenanbindung bzw. die Antenne
-            des CUL exakt auf eine Frequenz eingestellt.
-            Standard ist 868.3 MHz (bzw. 433 MHz).</li>
+            MHz eingestellt werden kann, ist die Antennenanbindung bzw. die
+            Antenne des CUL exakt auf eine Frequenz eingestellt.  Standard ist
+            868.3 MHz (bzw. 433 MHz).</li>
 
         <li>bWidth kann zwischen 58 kHz und 812 kHz variiert werden.
             Gro&szlig;e Werte sind empfindlicher gegen Interferencen, aber
@@ -1613,53 +1636,19 @@ CUL_prefix($$$)
   <a name="CULattr"></a>
   <b>Attribute</b>
   <ul>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#attrdummy">dummy</a></li>
-    <li><a href="#showtime">showtime</a></li>
-    <li><a href="#model">model</a> (CUL,CUN)</li>
-    <li><a name="sendpool">sendpool</a><br>
-        Wenn mehr als ein CUL verwendet wird, um einen gr&ouml;&szlig;eren
-        Bereich abzudecken, k&ouml;nnen diese sich gegenseitig
-        beeinflussen. Dieses Ph&auml;nomen wird auch Palm-Beach-Resort Effekt
-        genannt.  Wenn man diese zu einen gemeinsamen Sende"pool"
-        zusammenschlie&szlig;t, wird das Senden der einzelnen Telegramme
-        seriell (d.h. hintereinander) durchgef&uuml;hrt.
-        Wenn z.B. drei CUN's zur
-        Verf&uuml;gung stehen, werden folgende Attribute gesetzt:<br>
-        <code>attr CUN1 sendpool CUN1,CUN2,CUN3<br>
-        attr CUN2 sendpool CUN1,CUN2,CUN3<br>
-        attr CUN3 sendpool CUN1,CUN2,CUN3</code><br>
-        </li><br>
-
     <li><a name="addvaltrigger">addvaltrigger</a><br>
         Generiert Trigger f&uuml;r zus&auml;tzliche Werte. Momentan sind dies
         RSSI und RAWMSG f&uuml;r die CUL Familie und RAWMSG f&uuml;r FHZ.
         </li><br>
 
-    <li><a name="rfmode">rfmode</a><br>
-        Konfiguriert den RF Transceiver des CULs (CC1101). Verf&uuml;gbare
-        Argumente sind:
-        <ul>
-        <li>SlowRF<br>
-            F&uuml;r die Kommunikation mit FS20/FHT/HMS/EM1010/S300/Hoermann
-            Ger&auml;ten @1 kHz Datenrate (Standardeinstellung).</li>
+    <li><a name="#connectCommand">connectCommand</a><br>
+      culfw Befehl, was nach dem Verbindungsaufbau mit dem USB-Ger&auml;t, nach
+      Senden der zum Initialisieren der konfigurierten rfmode ben&ouml;tigten
+      Befehle gesendet wird.
+      </li>
 
-        <li>HomeMatic<br>
-            F&uuml;r die Kommunikation mit HomeMatic Ger&auml;ten @10 kHz
-            Datenrate.</li>
-
-        <li>MAX<br>
-            F&uuml;r die Kommunikation mit MAX! Ger&auml;ten @10 kHz
-            Datenrate.</li>
-        <li>WMBus_S</li>
-        <li>WMBus_T<br>
-            F&uuml;r die Kommunikation mit Wireless M-Bus Ger&auml;ten wie
-            Wasser-, Gas- oder Elektroz&auml;hlern.  Wireless M-Bus verwendet
-            zwei unterschiedliche Kommunikationsarten, S-Mode und T-Mode.  In
-            diesem Modus ist der Empfang von anderen Protokollen wie SlowRF
-            oder HomeMatic nicht m&ouml;glich.</li>
-        </ul>
-        </li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
 
     <li><a name="hmId">hmId</a><br>
         Setzt die HomeMatic ID des Ger&auml;tes. Wenn dieses Attribut fehlt,
@@ -1678,7 +1667,8 @@ CUL_prefix($$$)
         Beispiel:
         <ul>
         <code>
-        2012-05-17 09:44:22.515 CUL CULHM RCV L:0B N:81 CMD:A258 SRC:...... DST:...... 0000 (TYPE=88,WAKEMEUP,BIDI,RPTEN)
+        2012-05-17 09:44:22.515 CUL CULHM RCV L:0B N:81 CMD:A258 SRC:......
+          DST:...... 0000 (TYPE=88,WAKEMEUP,BIDI,RPTEN)
         </code>
         </ul>
         </li><br>
@@ -1705,6 +1695,48 @@ CUL_prefix($$$)
         </code></ul>
     </li><br>
     
+    <li><a href="#model">model</a> (CUL,CUN)</li><br>
+
+    <li><a name="rfmode">rfmode</a><br>
+        Konfiguriert den RF Transceiver des CULs (CC1101). Verf&uuml;gbare
+        Argumente sind:
+        <ul>
+        <li>SlowRF<br>
+            F&uuml;r die Kommunikation mit FS20/FHT/HMS/EM1010/S300/Hoermann
+            Ger&auml;ten @1 kHz Datenrate (Standardeinstellung).</li>
+
+        <li>HomeMatic<br>
+            F&uuml;r die Kommunikation mit HomeMatic Ger&auml;ten @10 kHz
+            Datenrate.</li>
+
+        <li>MAX<br>
+            F&uuml;r die Kommunikation mit MAX! Ger&auml;ten @10 kHz
+            Datenrate.</li>
+        <li>WMBus_S</li>
+        <li>WMBus_T<br>
+            F&uuml;r die Kommunikation mit Wireless M-Bus Ger&auml;ten wie
+            Wasser-, Gas- oder Elektroz&auml;hlern.  Wireless M-Bus verwendet
+            zwei unterschiedliche Kommunikationsarten, S-Mode und T-Mode.  In
+            diesem Modus ist der Empfang von anderen Protokollen wie SlowRF
+            oder HomeMatic nicht m&ouml;glich.</li>
+        </ul>
+        </li><br>
+
+    <li><a name="sendpool">sendpool</a><br>
+        Wenn mehr als ein CUL verwendet wird, um einen gr&ouml;&szlig;eren
+        Bereich abzudecken, k&ouml;nnen diese sich gegenseitig
+        beeinflussen. Dieses Ph&auml;nomen wird auch Palm-Beach-Resort Effekt
+        genannt.  Wenn man diese zu einen gemeinsamen Sende"pool"
+        zusammenschlie&szlig;t, wird das Senden der einzelnen Telegramme
+        seriell (d.h. hintereinander) durchgef&uuml;hrt.
+        Wenn z.B. drei CUN's zur
+        Verf&uuml;gung stehen, werden folgende Attribute gesetzt:<br>
+        <code>attr CUN1 sendpool CUN1,CUN2,CUN3<br>
+        attr CUN2 sendpool CUN1,CUN2,CUN3<br>
+        attr CUN3 sendpool CUN1,CUN2,CUN3</code><br>
+        </li><br>
+
+    <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
