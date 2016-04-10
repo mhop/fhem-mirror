@@ -2259,12 +2259,12 @@ ZWave_clockParse($$)
 }
 
 sub
-ZWave_cleanString($$)
+ZWave_cleanString($$$)
 {
-  my ($c, $postfix) = @_;
+  my ($c, $postfix, $isValue) = @_;
   my $shortened = 0;
 
-  $c =~ s/^[0-9.]+ //g;
+  $c =~ s/^[0-9.]+ //g if(!$isValue);
   $c =~ s/Don.t/Dont/g; # Bugfix
   if($c =~ m/^(.+)\.(.+)$/ && $2 !~ m/^[ \d]+$/) { # delete second sentence
     $c = $1; $shortened++;
@@ -2324,7 +2324,7 @@ ZWave_configParseModel($;$)
       $h{index} = $1 if($line =~ m/index="([^"]*)"/i); # 1, 2, etc
       $h{read_only}  = $1 if($line =~ m/read_only="([^"]*)"/i); # true,false
       $h{write_only} = $1 if($line =~ m/write_only="([^"]*)"/i); # true,false
-      my ($cmd,$shortened) = ZWave_cleanString($h{label}, $h{index});
+      my ($cmd,$shortened) = ZWave_cleanString($h{label}, $h{index}, 0);
       $cmdName = "config$cmd";
       $h{Help} = "";
       $h{Help} .= "Full text for $cmdName is: $h{label}<br>" if($shortened);
@@ -2335,7 +2335,7 @@ ZWave_configParseModel($;$)
     if($line =~ m/^\s*<Item/) {
       my $label = $1 if($line =~ m/label="([^"]*)"/i);
       my $value = $1 if($line =~ m/value="([^"]*)"/i);
-      my ($item, $shortened) = ZWave_cleanString($label, $value);
+      my ($item, $shortened) = ZWave_cleanString($label, $value, 1);
       $hash{$cmdName}{Item}{$item} = $value;
       $hash{$cmdName}{type} = "list";   # Forum #42604
       $hash{$cmdName}{Help} .= "Full text for $item is $label<br>"
