@@ -196,6 +196,19 @@ FW_jqueryReadyFn()
     });
   });
 
+  $("table.attributes tr div.dname")    // Click on attribute fills input value
+    .each(function(){
+      $(this)
+        .html('<a href="#">'+$(this).html()+'</a>')
+        .css({cursor:"pointer"})
+        .click(function(){
+          var aname = "#sel_attr"+$(this).attr("data-name");
+          $(aname).val($(this).text());
+          FW_detailSelect(aname);
+        });
+    });
+
+
   FW_smallScreenCommands();
 
   FW_inlineModify();
@@ -460,10 +473,28 @@ FW_replaceLink(el)
 function
 FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
 {
-  $("div#edit input.psc[type=submit]").click(function(e){
+  $("div input.psc[type=submit]").click(function(e){
     e.preventDefault();
     var newDef = $(this).closest("form").find("textarea").val();
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
+
+    if( newDef == undefined ) {
+      var div = $(this).closest("div.makeSelect");
+      var devName = $(div).attr("dev"),
+          cmd = $(div).attr("cmd");
+      var sel = $(this).closest("form").find("select");
+      var arg = $(sel).val();
+      if($(".dval[informid="+devName+"-"+arg+"]").length == 0) {
+        console.log(this);
+        $(this).unbind('click').click();// No element found to replace
+        return;
+      }
+      newDef = $(this).closest("form").find("input:text").val();
+      if(newDef == undefined)
+        newDef = $(this).closest("form").find("select:last").val();
+      cmd = $(this).attr("name")+"="+cmd+" "+devName+" "+arg+" "+newDef;
+    }
+
     FW_cmd(FW_root+"?"+encodeURIComponent(cmd)+"&XHR=1", function(resp){
       if(resp)
         return FW_okDialog(resp);
@@ -723,13 +754,6 @@ FW_queryValue(cmd, el)
   }
   qConn.open("GET", query, true);
   qConn.send(null);
-}
-
-function
-FW_querySetSelected(el, val)    // called by the attribute links
-{
-  $("#"+el).val(val);
-  FW_detailSelect("#"+el);
 }
 
 /*************** TEXTFIELD **************/
