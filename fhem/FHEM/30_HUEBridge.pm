@@ -74,7 +74,8 @@ HUEBridge_Detect($)
 
   my $host = '';
   if( defined($ret) && $ret ne '' && $ret =~ m/^[\[{].*[\]}]$/ ) {
-    my $obj = from_json($ret);
+    my $obj = eval { from_json($ret) };
+    Log3 $name, 2, "$name: json error: $@ in $ret" if( $@ );
 
     if( defined($obj->[0])
         && defined($obj->[0]->{'internalipaddress'}) ) {
@@ -850,7 +851,7 @@ HUEBridge_HTTP_Call($$$;$)
     Log3 $name, 2, "$name: empty answer received for $uri";
     return undef;
   } elsif( $ret !~ m/^[\[{].*[\]}]$/ ) {
-    Log3 $name, 2, "$name: invalid json detected for $uri: ". Dumper $ret;
+    Log3 $name, 2, "$name: invalid json detected for $uri: $ret";
     return undef;
   }
 
@@ -910,7 +911,19 @@ HUEBridge_HTTP_Call2($$$$;$)
       data => $obj,
     });
 
-    return HUEBridge_ProcessResponse($hash,from_json($data));
+    if( !$data ) {
+      Log3 $name, 2, "$name: empty answer received for $url";
+      return undef;
+    } elsif( $data !~ m/^[\[{].*[\]}]$/ ) {
+      Log3 $name, 2, "$name: invalid json detected for $url: $data";
+      return undef;
+    }
+
+    my $json = eval { from_json($data) };
+    Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
+    return undef if( !$json );
+
+    return HUEBridge_ProcessResponse($hash, $json);
 
     HUEBridge_dispatch( {hash=>$hash,chash=>$chash,type=>$path},$err,$data );
   } else {
@@ -936,7 +949,7 @@ HUEBridge_HTTP_Call2($$$$;$)
 sub
 HUEBridge_dispatch($$$;$)
 {
-  my ($param, $err, $data,$json) = @_;
+  my ($param, $err, $data, $json) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
 
@@ -955,7 +968,12 @@ HUEBridge_dispatch($$$;$)
 
     my $queryAfterSet = AttrVal( $name,'queryAfterSet', 0 );
 
-    $json = from_json($data) if( !$json );
+    if( !$json ) {
+      $json = eval { from_json($data) } if( !$json );
+      Log3 $name, 2, "$name: json error: $@ in $data" if( $@ );
+    }
+    return undef if( !$json );
+
     my $type = $param->{type};
 
     if( ref($json) eq 'ARRAY' )
