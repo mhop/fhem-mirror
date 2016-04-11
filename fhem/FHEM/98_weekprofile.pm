@@ -65,7 +65,10 @@ sub weekprofile_getDeviceType($;$)
       return undef;
     }
     
-    my $channel = $devHash->{chanNo} + 0;
+    my $channel = $devHash->{chanNo};
+    return unless ($channel =~ /^\d+?$/);
+    
+    my $channel += 0;
     #Log 2, "weekprofile_getDeviceType: $devHash->{NAME}, $model, $channel";
     
     $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-RT.*/) && ($channel == 4) );
