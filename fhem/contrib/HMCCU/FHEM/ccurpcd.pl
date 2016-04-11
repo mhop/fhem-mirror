@@ -5,7 +5,7 @@
 #
 # $Id:
 #
-# Version 2.0
+# Version 2.1
 #
 # FHEM RPC server for Homematic CCU.
 #
@@ -20,6 +20,7 @@
 #
 #   Code|Data[|...]
 #
+#   Server Loop:    SL|pid|Server
 #   Initialized:    IN|INIT|1|Server
 #   New device:     ND|Address|Type
 #   Updated device: UD|Address|Hint
@@ -48,6 +49,8 @@ my $logfile;
 my $shutdown = 0;
 my $eventcount = 0;
 my $totalcount = 0;
+my $loglevel = 0;
+my %ev = ('total', 0, 'EV', 0, 'ND', 0, 'DD', 0, 'UD', 0, 'RD', 0, 'RA', 0, 'IN', 0, 'EX', 0);
 
 # Functions
 sub CheckProcess ($$);
@@ -241,7 +244,8 @@ sub CCURPC_NewDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 	
-	$totalcount++;
+	$ev{total}++;
+	$ev{ND}++;
 	Log "NewDevice: received ".scalar(@$a)." device specifications";
 	
 	for my $dev (@$a) {
@@ -260,7 +264,8 @@ sub CCURPC_DeleteDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 
-	$totalcount++;
+	$ev{total}++;
+	$ev{DD}++;
 	Log "DeleteDevice: received ".scalar(@$a)." device addresses";
 
 	for my $dev (@$a) {
@@ -278,8 +283,8 @@ sub CCURPC_UpdateDeviceCB ($$$$)
 {
 	my ($server, $cb, $devid, $hint) = @_;
 
-	$totalcount++;
-
+	$ev{total}++;
+	$ev{UD}++;
 	WriteQueue ("UD|".$devid."|".$hint);
 
 	return;
@@ -293,8 +298,8 @@ sub CCURPC_ReplaceDeviceCB ($$$$)
 {
 	my ($server, $cb, $devid1, $devid2) = @_;
 
-	$totalcount++;
-
+	$ev{total}++;
+	$ev{RD}++;
 	WriteQueue ("RD|".$devid1."|".$devid2);
 
 	return;
@@ -308,7 +313,8 @@ sub CCURPC_ReaddDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 
-	$totalcount++;
+	$ev{total}++;
+	$ev{RA}++;
 	Log "ReaddDevice: received ".scalar(@$a)." device addresses";
 
 	for my $dev (@$a) {
@@ -326,14 +332,13 @@ sub CCURPC_EventCB ($$$$$)
 {
 	my ($server,$cb,$devid,$attr,$val) = @_;
 
-	$totalcount++;
-	
+	$ev{total}++;
+	$ev{EV}++;
 	WriteQueue ("EV|".$devid."|".$attr."|".$val);
 
 	$eventcount++;
-	if ($eventcount == 250) {
+	if (($eventcount % 500) == 0 && $loglevel == 2) {
 		Log "Received $eventcount events from CCU since last check";
-		$eventcount++;
 	}
 
 	# Never remove this statement!
@@ -348,10 +353,10 @@ sub CCURPC_ListDevicesCB ()
 {
 	my ($server, $cb) = @_;
 
-	$totalcount++;
-	Log "ListDevices";
-	
+	$ev{total}++;
+	$ev{IN}++;
 	$cb = "unknown" if (!defined ($cb));
+	Log "ListDevices $cb. Sending init to HMCCU";
 	WriteQueue ("IN|INIT|1|$cb");
 
 	return RPC::XML::array->new();
@@ -364,8 +369,8 @@ sub CCURPC_ListDevicesCB ()
 my $name = $0;
 
 # Process command line arguments
-if ($#ARGV+1 != 4) {
-	print "Usage: $name CCU-Host Port QueueFile LogFile\n";
+if ($#ARGV+1 < 4) {
+	print "Usage: $name CCU-Host Port QueueFile LogFile LogLevel\n";
 	print "       $name shutdown CCU-Host Port PID\n";
 	exit 1;
 }
@@ -385,6 +390,7 @@ my $ccuhost = $ARGV[0];
 my $ccuport = $ARGV[1];
 my $queuefile = $ARGV[2];
 $logfile = $ARGV[3];
+$loglevel = $ARGV[4] if ($#ARGV+1 == 5);
 
 my $pid = CheckProcess ($name, $ccuport);
 if ($pid > 0) {
@@ -414,10 +420,17 @@ if (!defined ($callbackurl)) {
 
 # Server loop is interruptable bei signal SIGINT
 Log "Entering server loop. Use kill -SIGINT $$ to terminate program";
+# WriteQueue ("SL|$$|CB".$ccuport);
 $server->server_loop;
 
 $totalcount++;
 WriteQueue ("EX|SHUTDOWN|$$|CB".$ccuport);
+$ev{total}++;
+$ev{EX}++;
 Log "RPC server terminated";
 
-Log "RPC server received $eventcount ($totalcount) events";
+if ($loglevel == 2) {
+	foreach my $cnt (sort keys %ev) {
+		Log "Events $cnt = ".$ev{$cnt};
+	}
+}

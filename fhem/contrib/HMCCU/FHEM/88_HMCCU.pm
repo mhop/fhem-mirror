@@ -4,7 +4,7 @@
 #
 #  $Id$
 #
-#  Version 3.1
+#  Version 3.1b
 #
 #  Module for communication between FHEM and Homematic CCU2.
 #  Supports BidCos-RF, BidCos-Wired, HmIP-RF.
@@ -83,6 +83,19 @@ my %HMCCU_RPC_PORT = ('BidCos-Wired', 2000, 'BidCos-RF', 2001, 'HmIP-RF', 2010);
 # Initial interval for reading RPC queue
 my $HMCCU_INIT_INTERVAL = 10;
 
+# Initial intervals for registration of RPC callbacks and reading RPC queue
+#
+# Y                      = Start of FHEM finished
+# Y+HMCCU_INIT_INTERVAL0 = Start RPC server
+#
+# X                      = Start RPC server
+# X+HMCCU_INIT_INTERVAL1 = Register RPC callback
+# X+HMCCU_INIT_INTERVAL2 = Read RPC Queue
+#
+my $HMCCU_INIT_INTERVAL0 = 12;
+my $HMCCU_INIT_INTERVAL1 = 5;
+my $HMCCU_INIT_INTERVAL2 = 5;
+
 # CCU Device names, key = CCU device address
 my %HMCCU_Devices;
 # CCU Device addresses, key = CCU device name
@@ -143,6 +156,7 @@ sub HMCCU_SubstRule ($$$);
 sub HMCCU_UpdateClients ($$$$);
 sub HMCCU_UpdateClientReading ($@);
 sub HMCCU_DeleteDevices ($);
+sub HMCCU_RPCRegisterCallback ($);
 sub HMCCU_StartRPCServer ($);
 sub HMCCU_StopRPCServer ($);
 sub HMCCU_ForceStopRPCServer ($);
@@ -235,6 +249,7 @@ sub HMCCU_Define ($$)
 	$hash->{RPCState} = "stopped";
 	
 	$hash->{hmccu}{eventtime} = 0;
+	$hash->{hmccu}{evtimeout} = 0;
 	$hash->{hmccu}{updatetime} = 0;
 	$hash->{hmccu}{rpccount} = 0;
 
@@ -271,7 +286,7 @@ sub HMCCU_Notify ($$)
 	return if (!grep (m/^INITIALIZED$/, @{$dev->{CHANGED}}));
 
 	if ($rpcserver eq 'on') {
-		my $delay = 10;
+		my $delay = $HMCCU_INIT_INTERVAL0;
 		Log3 $name, 0, "HMCCU: Autostart of RPC server after FHEM initialization in $delay seconds";
 		InternalTimer (gettimeofday()+$delay, "HMCCU_StartRPCServer", $hash, 0) ;
 	}
@@ -331,8 +346,8 @@ sub HMCCU_Set ($@)
 	my $options = "devstate datapoint var execute hmscript config rpcserver:on,off restartrpc:noArg";
 	my $host = $hash->{host};
 
-	if (HMCCU_IsRPCStateBlocking ($hash)) {
-		return undef if ($opt eq '?');
+	if ($opt ne 'rpcserver' && HMCCU_IsRPCStateBlocking ($hash)) {
+		return "HMCCU: CCU busy, choose one of rpcserver:off" if ($opt eq '?');
 		return HMCCU_SetState ($hash, "busy");
 	}
 
@@ -487,8 +502,8 @@ sub HMCCU_Get ($@)
 	my $options = "devicelist:noArg devstate datapoint dump vars channel update updateccu parfile config configdesc rpcstate:noArg deviceinfo";
 	my $host = $hash->{host};
 
-	if (HMCCU_IsRPCStateBlocking ($hash)) {
-		return undef if ($opt eq '?');
+	if ($opt ne 'rpcstate' && HMCCU_IsRPCStateBlocking ($hash)) {
+		return "HMCCU: CCU busy, choose one of rpcstate:noArg" if ($opt eq '?');
 		return HMCCU_SetState ($hash, "busy");
 	}
 
@@ -497,7 +512,7 @@ sub HMCCU_Get ($@)
 	my $parfile = AttrVal ($name, "parfile", '');
 	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
 	my $substitute = AttrVal ($name, 'substitute', '');
-	my $rpcport = AttrVal ($name, 'rpcport', '2001');
+	my $rpcport = AttrVal ($name, 'rpcport', 2001);
 
 	my $readname;
 	my $readaddr;
@@ -1276,6 +1291,43 @@ sub HMCCU_DeleteDevices ($)
 }
 
 ####################################################
+# Register RPC callbacks at CCU
+####################################################
+
+sub HMCCU_RPCRegisterCallback ($)
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	my $serveraddr = $hash->{host};
+	my $localaddr = $hash->{hmccu}{localaddr};
+
+	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+	my $rpcinterval = AttrVal ($name, 'rpcinterval', $HMCCU_INIT_INTERVAL2);
+	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
+	
+	foreach my $port (split (',', $rpcport)) {
+		my $clkey = 'CB'.$port;
+		my $cburl = "http://".$localaddr.":".$hash->{hmccu}{rpc}{$clkey}{cbport}."/fh".$port;
+		my $url = "http://$serveraddr:$port/";
+#		$url .= $HMCCU_RPC_URL{$port} if (exists ($HMCCU_RPC_URL{$port}));
+		next if ($hash->{hmccu}{rpc}{$clkey}{loop} != 1);
+		
+		$hash->{hmccu}{rpc}{$clkey}{port} = $port;
+		$hash->{hmccu}{rpc}{$clkey}{clurl} = $url;
+		$hash->{hmccu}{rpc}{$clkey}{cburl} = $cburl;
+		$hash->{hmccu}{rpc}{$clkey}{loop} = 2;
+
+		Log3 $name, 1, "HMCCU: Registering callback $cburl with ID $clkey at $url";
+		my $rpcclient = RPC::XML::Client->new ($url);
+		$rpcclient->send_request ("init", $cburl, $clkey);
+		Log3 $name, 1, "HMCCU: RPC callback with URL $cburl initialized";
+	}
+	
+	# Schedule reading of RPC queue (for external process only)
+	InternalTimer (gettimeofday()+$rpcinterval, 'HMCCU_ReadRPCQueue', $hash, 0);
+}
+
+####################################################
 # Start RPC server
 ####################################################
 
@@ -1288,7 +1340,8 @@ sub HMCCU_StartRPCServer ($)
 	my $modpath = AttrVal ('global', 'modpath', '/opt/fhem');
 	my $logfile = $modpath."/log/ccurpcd";
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-	my $rpcport = AttrVal ($name, 'rpcport', '2001');
+	my $rpcport = AttrVal ($name, 'rpcport', 2001);
+	my $rpcinterval = AttrVal ($name, 'rpcinterval', $HMCCU_INIT_INTERVAL1);
 	
 	my $serveraddr = $hash->{host};
 	my $localaddr = '';
@@ -1363,8 +1416,8 @@ sub HMCCU_StartRPCServer ($)
 			}
 			
 			# Parent process
-			# Wait 2 seconds to ensure that RPC server is listening
-			sleep (2);
+			# Wait 1 second to ensure that RPC server is listening
+			# sleep (1);
 			
 			# Store PID
 			push (@hm_pids, $pid);
@@ -1381,22 +1434,35 @@ sub HMCCU_StartRPCServer ($)
 			$hash->{hmccu}{rpc}{$clkey}{queue} = '';
 		}
 
+		$hash->{hmccu}{rpc}{$clkey}{cbport} = $callbackport;
+		$hash->{hmccu}{rpc}{$clkey}{loop} = 0;
+
 		# Register callback in CCU
-		my $callbackurl = "http://".$localaddr.":".$callbackport."/fh".$port;
-		$hash->{hmccu}{rpc}{$clkey}{cburl} = $callbackurl;
-		$hash->{hmccu}{rpccount} = $fork_cnt;
-		Log3 $name, 1, "HMCCU: Registering callback $callbackurl with ID CB".$port;
-		$rpcclient->send_request ("init", $callbackurl, "CB".$port);
-		Log3 $name, 1, "HMCCU: RPC callback with URL ".$callbackurl." initialized";
+#		my $callbackurl = "http://".$localaddr.":".$callbackport."/fh".$port;
+#		$hash->{hmccu}{rpc}{$clkey}{cburl} = $callbackurl;
+#		$hash->{hmccu}{rpccount} = $fork_cnt;
+#		Log3 $name, 1, "HMCCU: Registering callback $callbackurl with ID CB".$port;
+#		$rpcclient->send_request ("init", $callbackurl, "CB".$port);
+#		Log3 $name, 1, "HMCCU: RPC callback with URL ".$callbackurl." initialized";
 	}
 
-	$hash->{RPCPID} = join (',', @hm_pids);
-	$hash->{RPCPRC} = $rpcserver;
-	$hash->{RPCState} = "starting";
-	readingsSingleUpdate ($hash, "rpcstate", "starting", 1);	
-	DoTrigger ($name, "RPC server starting");
+	$hash->{hmccu}{rpccount} = $fork_cnt;
+	$hash->{hmccu}{localaddr} = $localaddr;
 
-	InternalTimer (gettimeofday()+$HMCCU_INIT_INTERVAL, 'HMCCU_ReadRPCQueue', $hash, 0);
+	if ($fork_cnt > 0) {
+		$hash->{hmccu}{evtimeout} = 0;
+		$hash->{hmccu}{eventtime} = 0;
+		$hash->{RPCPID} = join (',', @hm_pids);
+		$hash->{RPCPRC} = $rpcserver;
+		$hash->{RPCState} = "starting";
+		readingsSingleUpdate ($hash, "rpcstate", "starting", 1);	
+		DoTrigger ($name, "RPC server starting");
+
+		InternalTimer (gettimeofday()+$rpcinterval, 'HMCCU_ReadRPCQueue', $hash, 0);
+	}
+	else {
+		Log3 $name, 1, "HMCCU: No RPC process started";
+	}
 
 	return scalar (@hm_pids);
 }
@@ -1411,7 +1477,7 @@ sub HMCCU_StopRPCServer ($)
 	my $name = $hash->{NAME};
 
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my $rpcport = AttrVal ($name, 'rpcport', '2001');
+	my $rpcport = AttrVal ($name, 'rpcport', 2001);
 	my $serveraddr = $hash->{host};
 
 	# Deregister callback URLs in CCU
@@ -1521,7 +1587,7 @@ sub HMCCU_IsRPCServerRunning ($$$)
 		@rpcpids = split (',', $hash->{RPCPID});
 	}
 
-	my $rpcport = AttrVal ($hash->{NAME}, 'rpcport', '2001');
+	my $rpcport = AttrVal ($hash->{NAME}, 'rpcport', 2001);
 	foreach my $port (split (',', $rpcport)) {
 		my $pid = HMCCU_CheckProcess ($hash, $port);
 		next if ($pid == 0);
@@ -2233,7 +2299,7 @@ sub HMCCU_ResetRPCQueue ($)
 	my $name = $hash->{NAME};
 
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-	my $rpcport = AttrVal ($name, 'rpcport', '2001');
+	my $rpcport = AttrVal ($name, 'rpcport', 2001);
 
 	my @portlist = split (',', $rpcport);
 	foreach my $port (@portlist) {
@@ -2270,7 +2336,7 @@ sub HMCCU_ReadRPCQueue ($)
 	my $rpcinterval = AttrVal ($name, 'rpcinterval', 5);
 	my $ccureadingformat = AttrVal ($name, 'ccureadingformat', 'name');
 	my $rpcqueue = AttrVal ($name, 'rpcqueue', '/tmp/ccuqueue');
-	my $rpcport = AttrVal ($name, 'rpcport', '2001');
+	my $rpcport = AttrVal ($name, 'rpcport', 2001);
 	my $rpctimeout = AttrVal ($name, 'rpctimeout', 300);
 	my $maxevents = $rpcinterval*10;
 	$maxevents = 50 if ($maxevents > 50);
@@ -2280,6 +2346,7 @@ sub HMCCU_ReadRPCQueue ($)
 	foreach my $port (@portlist) {
 		my $clkey = 'CB'.$port;
 		next if (!exists ($hash->{hmccu}{rpc}{$clkey}{queue}));
+		next if ($hash->{hmccu}{rpc}{$clkey}{loop} == 1);
 		my $queuename = $hash->{hmccu}{rpc}{$clkey}{queue};
 		next if ($queuename eq '');
 		if (!HMCCU_QueueOpen ($hash, $queuename)) {
@@ -2292,6 +2359,7 @@ sub HMCCU_ReadRPCQueue ($)
 		# my $element = $queue->deq();
 		while ($element) {
 #			Log3 $name, 2, "HMCCU: queueelement = $element";
+			$hash->{hmccu}{evtimeout} = 0 if ($hash->{hmccu}{evtimeout} == 1);
 
 			$hash->{hmccu}{eventtime} = time () if ($eventno == 0);
 			my @Tokens = split (/\|/, $element);
@@ -2323,6 +2391,13 @@ sub HMCCU_ReadRPCQueue ($)
 				push (@deldevices, $Tokens[1]);
 				$delcount++;
 			}
+			elsif ($Tokens[0] eq 'SL') {
+				#### RPC Server going to start server loop ###
+				Log3 $name, 0, "HMCCU: Received SL event. RPC server ".$Tokens[2]." starting server loop.";
+				$hash->{hmccu}{rpc}{$Tokens[2]}{loop} = 1;
+				InternalTimer (gettimeofday()+$HMCCU_INIT_INTERVAL1, 'HMCCU_RPCRegisterCallback', $hash, 0);
+				return;
+			}
 			elsif ($Tokens[0] eq 'IN') {
 				#### RPC Server initialized ####
 				Log3 $name, 0, "HMCCU: Received IN event. RPC server ".$Tokens[3]." initialized.";
@@ -2350,7 +2425,10 @@ sub HMCCU_ReadRPCQueue ($)
 					$hash->{hmccu}{rpc}{$Tokens[3]}{state} = "stopped";
 					$hash->{hmccu}{rpc}{$Tokens[3]}{pid} = 0;
 					$hash->{hmccu}{rpc}{$Tokens[3]}{cburl} = '';
+					$hash->{hmccu}{rpc}{$Tokens[3]}{clurl} = '';
 					$hash->{hmccu}{rpc}{$Tokens[3]}{queue} = '';
+					$hash->{hmccu}{rpc}{$Tokens[3]}{cbport} = 0;
+					$hash->{hmccu}{rpc}{$Tokens[3]}{loop} = 0;
 			
 					# Check if all RPC servers were terminated. Set overall status
 					my $run = 0;
@@ -2383,7 +2461,9 @@ sub HMCCU_ReadRPCQueue ($)
 	}
 
 	# Check if RPC server still running if events from CCU timed out
-	if ($hash->{hmccu}{eventtime} > 0 && time()-$hash->{hmccu}{eventtime} > $rpctimeout) {
+	if ($hash->{hmccu}{eventtime} > 0 && time()-$hash->{hmccu}{eventtime} > $rpctimeout &&
+	   $hash->{hmccu}{evtimeout} == 0) {
+		$hash->{hmccu}{evtimeout} = 1;
 		Log3 $name, 2, "HMCCU: Received no events from CCU since $rpctimeout seconds";
 		DoTrigger ($name, "No events from CCU since $rpctimeout seconds");
 	}
@@ -2409,7 +2489,7 @@ sub HMCCU_ReadRPCQueue ($)
 	my $nex_pids = scalar (@ex_pids);
 
 	if ($nex_pids > 0 && $ccuflags !~ /extrpc/) {
-		Log3 $name, 1, "HMCCU: Externally launched RPC server(s) detected. Kill process(es) manually with command kill -SIGINT pid for pids ".join (',', @ex_pids)." f=$f";
+		Log3 $name, 1, "HMCCU: Externally launched RPC server(s) detected. Kill process(es) manually with command kill -SIGINT pid for pids ".join (',', @ex_pids)." f=$f (1=Stop,2=Restart)";
 	}
 
 	if ($f > 0) {
@@ -2441,6 +2521,8 @@ sub HMCCU_ReadRPCQueue ($)
 				$hash->{hmccu}{rpc}{$clkey}{pid} = 0;
 				$hash->{hmccu}{rpc}{$clkey}{queue} = '';
 				$hash->{hmccu}{rpc}{$clkey}{cburl} = '';
+				$hash->{hmccu}{rpc}{$clkey}{cbport} = 0;
+				$hash->{hmccu}{rpc}{$clkey}{loop} = 0;
 			}
 			$hash->{hmccu}{rpccount} = 0;
 		}
