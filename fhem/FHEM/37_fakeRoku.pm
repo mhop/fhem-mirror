@@ -40,7 +40,7 @@ fakeRoku_Initialize($)
   #$hash->{SetFn}    = "fakeRoku_Set";
   #$hash->{GetFn}    = "fakeRoku_Get";
   $hash->{AttrFn}   = "fakeRoku_Attr";
-  $hash->{AttrList} = "disable:1,0 httpPort";
+  $hash->{AttrList} = "disable:1,0 favourites httpPort";
 }
 
 #####################################
@@ -513,6 +513,31 @@ fakeRoku_Parse($$;$$$)
         $ret .= "\r\n";
         $ret .= $body;
 
+      } elsif( $request =~ m'^/query/apps' ) {
+        $handled = 1;
+        #Log3 $name, 4, "$name: request: $msg";
+        Log3 $name, 4, "$name: answering $request";
+
+        my $xml = { app => [], };
+        if( my $favourites = AttrVal($name, "favourites", undef ) ) {
+          my @favourites = split( ',', $favourites );
+          for (my $i=0; $i<=$#favourites; $i++) {
+            $xml->{app}[$i] = { id => $i+1, content => $favourites[$i], };
+          }
+        }
+ 
+        #my $body = '<?xml version="1.0" encoding="utf-8" ?>';
+        my $body .= XMLout( $xml, KeyAttr => { }, RootName => 'apps' );
+        #$body =~ s/\n/\r\n/g;
+
+        $ret = "HTTP/1.1 200 OK\r\n";
+        $ret .= fakeRoku_hash2header( {     'Connection' => 'Close',
+                                          'Content-Type' => 'text/xml; charset=utf-8',
+                                        'Content-Length' => length($body), } );
+        $ret .= "\r\n";
+        $ret .= $body;
+Log 1, $ret;
+
       }
 
       if( !$handled ) {
@@ -543,6 +568,11 @@ fakeRoku_Parse($$;$$$)
       }
 
       DoTrigger( $name, "key$action: $key" );
+
+    } elsif( $request =~ '^/launch/(.*)' ) {
+      $handled = 1;
+
+      DoTrigger( $name, "launch: $1" );
     }
 
   }
@@ -763,6 +793,8 @@ Log 1, "!!!!!!!!!!";
   <a name="fakeRoku_Attr"></a>
   <b>Attr</b>
   <ul>
+    <li>favourites<br>
+      comma separated list of names to use as apps/channels/favourites. the list can be reloaded on the harmony with edit->reset.</li>
     <li>httpPort</li>
   </ul>
 
