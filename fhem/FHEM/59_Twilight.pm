@@ -358,6 +358,7 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
   my $location = $hash->{WEATHER};
   my $verbose  = AttrVal($hash->{NAME}, "verbose", 3 );
   
+  #                    http://api.met.no/weatherapi/locationforecast/1.9/?lat=52.44944;lon=10.00512
   use constant URL => "http://query.yahooapis.com/v1/public/yql?q=select%%20*%%20from%%20weather.forecast%%20where%%20woeid=%s%%20and%%20u=%%27c%%27&format=%s&env=store%%3A%%2F%%2Fdatatables.org%%2Falltableswithkeys";
   my $url = sprintf(URL, $location, "json");
  #Log3 $hash, 3, "url------------>$url";
@@ -398,14 +399,14 @@ sub Twilight_WeatherCallback(@) {
   Twilight_TwilightTimes      ($hash, $param->{mode}, $result);
   
   #$hash->{CONDITION} = 50; 
-  if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} < 10) {
+  if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} <= 10) {
      $hash->{VERSUCHE} += 1;
      Twilight_RepeatTimerSet($hash, $param->{mode});
      return;
   } 
   
-  Log3 $hash, 3, "[$hash->{NAME}] " . $hash->{VERSUCHE} . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >= 0);
-  Log3 $hash, 3, "[$hash->{NAME}] " . $hash->{VERSUCHE} . " attempt(s) needed got NO valid weather data from yahoo"   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} >  0);
+  Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >  0);
+  Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed got NO valid weather data from yahoo"   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} >  0);
   $hash->{VERSUCHE} = 0; 
   
   Twilight_StandardTimerSet   ($hash);
@@ -482,7 +483,7 @@ sub Twilight_getWeatherHorizon(@)
     # dadurch entsteht ein Perausdruck, der direkt geparst werden kann
      
      my $perlAusdruck = $result;
-        $perlAusdruck =~ s/\":/\"=>/g;
+        $perlAusdruck =~ s/("[\w ]+")(\s*)(:)/$1=>/g;
         $perlAusdruck =~ s/null/undef/g;
         $perlAusdruck =~ s/true/1/g;
         $perlAusdruck =~ s/false/0/g;
@@ -499,8 +500,8 @@ sub Twilight_getWeatherHorizon(@)
      
   }
   
-  # wenn kein code ermittelt werden kann, wird ein Pseudocode gesetzt
-  if (!defined($cond_code)) {
+  # wenn kein Code ermittelt werden kann, wird ein Pseudocode gesetzt
+  if (!defined($cond_code) && !defined $hash->{CONDITION} ) {
      $cond_code  = "50";         # eigener neutraler Code
      $cond_txt   = "undefined";
      $temperatur = "undefined";
