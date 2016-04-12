@@ -420,7 +420,7 @@ if (!defined ($callbackurl)) {
 
 # Server loop is interruptable bei signal SIGINT
 Log "Entering server loop. Use kill -SIGINT $$ to terminate program";
-# WriteQueue ("SL|$$|CB".$ccuport);
+WriteQueue ("SL|$$|CB".$ccuport);
 $server->server_loop;
 
 $totalcount++;
