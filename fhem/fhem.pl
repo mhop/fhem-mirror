@@ -1543,8 +1543,9 @@ ReplaceSetMagic($$@)       # Forum #38276
   my $a = join(" ", @_);
   my $oa = $a;
 
-  $a =~ s/\[([a-z0-9._]+):([A-z0-9._]+)\]/{
-    my $x = ReadingsVal($1,$2,""); $x eq "" ? "[$1:$2]" : $x
+  $a =~ s/\[([a-z0-9._]+):([A-z0-9._]+)(:d)?\]/{
+    my $x = $3 ? ReadingsNum($1,$2,"") : ReadingsVal($1,$2,"");
+    $x eq "" ? "[$1:$2$3]" : $x
   }/egi;
 
   $a =~ s/{\((.*)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/eg;
