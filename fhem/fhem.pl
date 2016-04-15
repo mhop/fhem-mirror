@@ -3888,7 +3888,7 @@ readingsEndUpdate($$)
 
       my $trigger = $userReading->{trigger};
       if(defined($trigger)) {
-        my @fnd = grep { $_ && $_ =~ m/^$trigger/ } @{$hash->{CHANGED}};
+        my @fnd = grep { $_ && $_ =~ m/^$trigger$/ } @{$hash->{CHANGED}};
         next if(!@fnd);
       }
 
