@@ -2816,10 +2816,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                $logstr = "Camera $camname has been moved to position \"$hash->{HELPER}{GOPRESETNAME}\"";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Camera $camname has been moved to position \"$hash->{HELPER}{GOPRESETNAME}\"");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "runpatrol") 
             {
@@ -2840,10 +2838,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                $logstr = "Patrol \"$hash->{HELPER}{GOPATROLNAME}\" of camera $camname has been started successfully";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Patrol \"$hash->{HELPER}{GOPATROLNAME}\" of camera $camname has been started successfully");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "goabsptz") 
             {
@@ -2864,10 +2860,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                $logstr = "Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "movestart") 
             {
@@ -2880,10 +2874,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                $logstr = "Camera $camname started move to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Camera $camname started move to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
                 
                 RemoveInternalTimer($hash, "movestop");
                 InternalTimer(gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "movestop", $hash);
@@ -2908,10 +2900,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                $logstr = "Camera $camname stopped move to direction \"$hash->{HELPER}{GOMOVEDIR}\"";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Camera $camname stopped move to direction \"$hash->{HELPER}{GOMOVEDIR}\"");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
         
             }
             elsif ($OpMode eq "Enable") 
@@ -2926,10 +2916,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                    
                 # Logausgabe
-                $logstr = "Camera $camname has been enabled successfully";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Camera $camname has been enabled successfully");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Disable") 
             {
@@ -2943,10 +2931,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                    
                 # Logausgabe
-                $logstr = "Camera $camname has been disabled successfully";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Camera $camname has been disabled successfully");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Getsvsinfo") 
             {
@@ -2996,10 +2982,8 @@ sub camret_nonbl ($) {
                 $hash->{HELPER}{SVSVERSION} = \%version;
                      
                 # Logausgabe
-                $logstr = "Informations related to Surveillance Station retrieved successfully";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Informations related to Surveillance Station retrieved successfully");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Getcaminfo") 
             {
@@ -3134,9 +3118,8 @@ sub camret_nonbl ($) {
                     {
                     $verbose = 3;
                     }
-                &printlog($hash,$logstr,$verbose);
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, $verbose, "$name - $logstr");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "geteventlist") 
             {              
@@ -3175,9 +3158,8 @@ sub camret_nonbl ($) {
                     {
                     $verbose = 3;
                     }
-                &printlog($hash,$logstr,$verbose);
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, $verbose, "$name - $logstr");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "getmotionenum") 
             {              
@@ -3210,9 +3192,8 @@ sub camret_nonbl ($) {
                     {
                     $verbose = 3;
                     }
-                &printlog($hash,$logstr,$verbose);
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, $verbose, "$name - $logstr");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Getcapabilities") 
             {
@@ -3299,9 +3280,8 @@ sub camret_nonbl ($) {
                     {
                     $verbose = 3;
                     }
-                &printlog($hash,$logstr,$verbose);
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, $verbose, "$name - $logstr");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }            
             elsif ($OpMode eq "Getptzlistpreset") 
             {
@@ -3346,9 +3326,8 @@ sub camret_nonbl ($) {
                     {
                     $verbose = 3;
                     }
-                &printlog($hash,$logstr,$verbose);
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, $verbose, "$name - $logstr");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Getptzlistpatrol") 
             {
@@ -3394,9 +3373,8 @@ sub camret_nonbl ($) {
                     {
                     $verbose = 3;
                     }
-                &printlog($hash,$logstr,$verbose);
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, $verbose, "$name - $logstr");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             
        }
@@ -3416,10 +3394,8 @@ sub camret_nonbl ($) {
             readingsEndUpdate($hash, 1);
        
             # Logausgabe
-            $logstr = "ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error";
-            &printlog($hash,$logstr,"1");
-            $logstr = "--- End Function cam: $OpMode nonblocking with error ---";
-            &printlog($hash,$logstr,"4");
+            Log3($name, 1, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
+            Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking with error ---");
 
        }
    }
@@ -3447,13 +3423,11 @@ sub logout_nonbl ($) {
     
     # logout wird ausgeführt, Rückkehr wird mit "logoutret_nonbl" verarbeitet
 
-    $logstr = "--- Begin Function logout nonblocking ---";
-    &printlog($hash,$logstr,"4");
+    Log3($name, 4, "$name - --- Begin Function logout nonblocking ---");
     
     $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
     
-    $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
-    &printlog($hash,$logstr,"5");    
+    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
     if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
         $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
@@ -3494,18 +3468,15 @@ sub logoutret_nonbl ($) {
   
    if($err ne "")                                                                                     # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
    {
-        $logstr = "error while requesting ".$param->{url}." - $err";
-        &printlog($hash,$logstr,"1");		                                                      # Eintrag fürs Log
-        $logstr = "--- End Function logout nonblocking with error ---";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 1, "$name - error while requesting ".$param->{url}." - $err");
+        Log3($name, 4, "$name - --- End Function logout nonblocking with error ---");
         
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen 
 
    }
    elsif($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
    {
-        $logstr = "URL-Call: ".$param->{url};                                                          
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - URL-Call: ".$param->{url});
         
         # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson 
         
@@ -3513,17 +3484,14 @@ sub logoutret_nonbl ($) {
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
         
         unless ($success) {
-            $logstr = "Data returned: ".$myjson; 
-            &printlog($hash,$logstr,"4");
+            Log3($name, 4, "$name - Data returned: ".$myjson);
             
             $hash->{HELPER}{ACTIVE} = "off";
             
             if ($attr{$name}{debugactivetoken}) {
-                $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-                &printlog($hash,$logstr,"3");
+                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
             }
-            
-            return;
+        return;
         }
         
         $data = decode_json($myjson);
@@ -3534,17 +3502,14 @@ sub logoutret_nonbl ($) {
         {
              # die Logout-URL konnte erfolgreich aufgerufen werden
              # Logausgabe decodierte JSON Daten
-             $logstr = "JSON returned: ". Dumper $data;                                                        
-             &printlog($hash,$logstr,"4");
+             Log3($name, 4, "$name - JSON returned: ". Dumper $data);
                         
              # Session-ID aus Helper-hash löschen
              delete $hash->{HELPER}{SID};
              
              # Logausgabe
-             $logstr = "Session of User $username has ended - SID: $sid has been deleted";
-             &printlog($hash,$logstr,"4");
-             $logstr = "--- End Function logout nonblocking ---";
-             &printlog($hash,$logstr,"4");
+             Log3($name, 4, "$name - Session of User $username has ended - SID: $sid has been deleted");
+             Log3($name, 4, "$name - --- End Function logout nonblocking ---");
              
         } 
         else 
@@ -3556,10 +3521,8 @@ sub logoutret_nonbl ($) {
              $error = &experrorauth($hash,$errorcode);
     
              # Logausgabe
-             $logstr = "ERROR - Logout of User $username was not successful. Errorcode: $errorcode - $error";
-             &printlog($hash,$logstr,"1");
-             $logstr = "--- End Function logout nonblocking with error ---";
-             &printlog($hash,$logstr,"4");
+             Log3($name, 1, "$name - ERROR - Logout of User $username was not successful. Errorcode: $errorcode - $error");
+             Log3($name, 4, "$name - --- End Function logout nonblocking with error ---");
          }
    }
    
@@ -3567,8 +3530,7 @@ sub logoutret_nonbl ($) {
    $hash->{HELPER}{ACTIVE} = "off";  
    
    if ($attr{$name}{debugactivetoken}) {
-       $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-       &printlog($hash,$logstr,"3");
+       Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
    }
    
 return;
