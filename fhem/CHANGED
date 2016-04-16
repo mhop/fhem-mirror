@@ -1,13 +1,15 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 74_AMAD: Flowinstaller and FlowsetUpdater - Support for older
+                      Androidversions
   - change:  59_Weather: included caching in YahooWeatherAPI
   - change:  49_SSCam: behavior of "set ... on" changed, Attr "recextend" added
              please have a look at commandref and Wiki
   - bugfix:  49_SSCam: setstate-warning if FHEM is restarted and SVS not 
              reachable (Forum: #308)
   - bugfix:  userReadings trigger is always $ terminated (Forum #52165)
-  - bugfix: 74_AMAD: fix checkActivTask
-  - bugfix: 74_AMAD: fix Commandref, APSSID for non WLAN Devices
+  - bugfix:  74_AMAD: fix checkActivTask
+  - bugfix:  74_AMAD: fix Commandref, APSSID for non WLAN Devices
   - change:  YAMAHA_AVR: removed set command tunerPreset,
              added new set command preset to select a configured preset for 
              the currently selected input. Please change your configuration
