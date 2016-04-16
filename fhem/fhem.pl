@@ -1691,6 +1691,67 @@ LoadModule($;$)
   return $m;
 }
 
+
+sub
+parseParams($)
+{
+  my($cmd) = @_;
+  my(@a, %h);
+
+  my @params = split(' ', $cmd);
+  while (@params) {
+    my $param = shift(@params);
+    my ($key, $value) = split( '=', $param, 2 );
+
+    if( !defined( $value ) ) {
+      $value = $key;
+      $key = undef;
+    }
+
+    #collect all parts until the closing ' or "
+    while( $param && $value =~ m/^('|")/ && $value !~ m/$1$/ ) {
+      my $next = shift(@params);
+      last if( !defined($next) );
+      $value .= " ". $next;
+    }
+    #remove matching ' or " from the start and end
+    if( $value =~ m/^('|")/ && $value =~ m/$1$/ ) {
+      $value =~ s/^.(.*).$/$1/;
+    }
+
+    #collext all parts until opening { and closing } are matched
+    if( $value =~ m/^{/ ) {
+      my $count = 0;
+      for my $i (0..length($value)-1) {
+        my $c = substr($value, $i, 1);
+        ++$count if( $c eq '{' );
+        --$count if( $c eq '}' );
+      }
+
+      while( $param && $count != 0 ) {
+        my $next = shift(@params);
+        last if( !defined($next) );
+        $value .= " ". $next;
+
+        for my $i (0..length($next)-1) {
+          my $c = substr($next, $i, 1);
+          ++$count if( $c eq '{' );
+          --$count if( $c eq '}' );
+        }
+      }
+    }
+
+    if( defined($key) ) {
+      $h{$key} = $value;
+    } else {
+      push @a, $value;
+    }
+
+  }
+
+  return(\@a, \%h);
+}
+
 #####################################
 sub
 CommandDefine($$)
