@@ -4573,7 +4573,7 @@ perlSyntaxCheck($%)
 
   my $psc = AttrVal("global", "perlSyntaxCheck", ($featurelevel>5.7) ? 1 : 0);
   return undef if(!$psc || !$init_done);
-  return undef if($exec !~ m/^\s*{/);
+  return undef if($exec !~ m/^\s*{.*}$/);
 
   $exec = EvalSpecials("{return undef; $exec}", %specials);
   my $r = AnalyzePerlCommand(undef, $exec);
