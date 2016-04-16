@@ -27,6 +27,11 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.24   16.04.2016    behavior of "set ... on" changed, Attr "recextend" added
+#                      please have a look at commandref and Wiki
+#                      bugfix: setstate-warning if FHEM will restarted and SVS is not reachable
+#                      (Forum: #308)
+# 1.23.2 12.04.2016    code review, no functional changes
 # 1.23.1 07.04.2016    command check for set cmd's don't work completely
 # 1.23   02.04.2016    change to RemoveInternalTimer for functions
 # 1.22   27.03.2016    bugfix "link_open" doesn't work after last update
@@ -113,7 +118,6 @@
 # Example: define CamCP1 SSCAM Carport 192.168.2.20 [5000]
 #
 
-
 package main;
 
 use JSON qw( decode_json );            # from CPAN, Debian: apt-get install libperl-JSON 
@@ -123,6 +127,47 @@ use warnings;
 use MIME::Base64;
 use HttpUtils;
 
+# Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
+my %SSCam_errauthlist = (
+  100 => "Unknown error",
+  101 => "The account parameter is not specified",
+  102 => "API does not exist",
+  400 => "Invalid user or password",
+  401 => "Guest or disabled account",
+  402 => "Permission denied - DSM-Session: make sure user is member of Admin-group, SVS-Session: make sure SVS package is started",
+  403 => "One time password not specified",
+  404 => "One time password authenticate failed",
+);
+
+my %SSCam_errlist = (
+  100 => "Unknown error",
+  101 => "Invalid parameters",
+  102 => "API does not exist",
+  103 => "Method does not exist",
+  104 => "This API version is not supported",
+  105 => "Insufficient user privilege",
+  106 => "Connection time out",
+  107 => "Multiple login detected",
+  117 => "need manager rights in SurveillanceStation for operation",
+  400 => "Execution failed",
+  401 => "Parameter invalid",
+  402 => "Camera disabled",
+  403 => "Insufficient license",
+  404 => "Codec activation failed",
+  405 => "CMS server connection failed",
+  407 => "CMS closed",
+  410 => "Service is not enabled",
+  412 => "Need to add license",
+  413 => "Reach the maximum of platform",
+  414 => "Some events not exist",
+  415 => "message connect failed",
+  417 => "Test Connection Error",
+  418 => "Object is not exist",
+  419 => "Visualstation name repetition",
+  439 => "Too many items selected",
+  502 => "Camera disconnected",
+  600 => "Presetname and PresetID not found in Hash",
+);
 
 sub SSCam_Initialize($) {
  my ($hash) = @_;
@@ -145,6 +190,7 @@ sub SSCam_Initialize($) {
          "pollnologging:1,0 ".
          "debugactivetoken:1 ".
          "rectime ".
+         "recextend:1,0 ".
          "session:SurveillanceStation,DSM ".
          "webCmd ".
          $readingFnAttributes;   
@@ -199,6 +245,7 @@ sub SSCam_Define {
   readingsBulkUpdate($hash,"Availability", "");                                                   # Verfügbarkeit ist unbekannt
   readingsBulkUpdate($hash,"PollState","Inactive");                                               # es ist keine Gerätepolling aktiv
   readingsBulkUpdate($hash,"LiveStreamUrl", "");                                                  # LiveStream URL zurücksetzen
+  readingsBulkUpdate($hash,"state", "off");                                                       # Init für "state" , Problemlösung für setstate, Forum #308
   readingsEndUpdate($hash,1);                                          
   
   getcredentials($hash,1);                                                                        # Credentials lesen und in RAM laden ($boot=1)  
@@ -546,15 +593,13 @@ sub initonboot ($) {
      
      # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
      if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
-         $logstr = "Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now"; 
-         &printlog($hash,$logstr,"1"); 
+         Log3($name, 1, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
          &camstoprec($hash);
          }
          
      # Konfiguration der Synology Surveillance Station abrufen
      if (!$hash->{CREDENTIALS}) {
-         $logstr = "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";
-         &printlog($hash,$logstr,"1");
+         Log3($name, 1, "$name - Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"");
          }
          else {
          # allg. SVS-Eigenschaften abrufen
@@ -589,6 +634,7 @@ return;
 
 sub setcredentials ($@) {
     my ($hash, @credentials) = @_;
+    my $name     = $hash->{NAME};
     my $logstr;
     my $success;
     my $credstr;
@@ -611,8 +657,7 @@ sub setcredentials ($@) {
     $retcode = setKeyValue($index, $credstr);
     
     if ($retcode) { 
-        $logstr = "Error while saving the Credentials - $retcode";
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - Error while saving the Credentials - $retcode");
         $success = 0;
         }
         else
@@ -629,6 +674,7 @@ return ($success);
 
 sub getcredentials ($$) {
     my ($hash,$boot) = @_;
+    my $name     = $hash->{NAME};
     my $logstr;
     my $success;
     my $username;
@@ -643,8 +689,7 @@ sub getcredentials ($$) {
         ($retcode, $credstr) = getKeyValue($index);
     
         if ($retcode) {
-            $logstr = "Unable to read password from file: $retcode";
-            &printlog($hash,$logstr,"1");
+            Log3($name, 1, "$name - Unable to read password from file: $retcode");
             $success = 0;
             }  
 
@@ -675,8 +720,7 @@ sub getcredentials ($$) {
     
     ($username, $passwd) = split(":",decode_base64($credstr));
     
-    $logstr = "Credentials read from RAM: $username $passwd";
-    &printlog($hash,$logstr,"4");
+    Log3($name, 4, "$name - Credentials read from RAM: $username $passwd");
     
     $success = (defined($passwd)) ? 1 : 0;
     }
@@ -702,8 +746,7 @@ sub watchdogpollcaminfo ($) {
         # Polling ist jetzt aktiv
         readingsSingleUpdate($hash,"PollState","Active",0);
             
-        $logstr = "Polling Camera $camname is currently activated - Pollinginterval: ".$attr{$name}{pollcaminfoall}."s";
-        &printlog($hash,$logstr,"3");
+        Log3($name, 3, "$name - Polling Camera $camname is currently activated - Pollinginterval: ".$attr{$name}{pollcaminfoall}."s");
         
         # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
         $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};
@@ -713,9 +756,8 @@ sub watchdogpollcaminfo ($) {
     
     if (defined($hash->{HELPER}{OLDVALPOLL}) and defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10) {
         if ($hash->{HELPER}{OLDVALPOLL} != $attr{$name}{pollcaminfoall}) {
-            
-            $logstr = "Polling Camera $camname was changed to new Pollinginterval: ".$attr{$name}{pollcaminfoall}."s";
-            &printlog($hash,$logstr,"3");
+        
+            Log3($name, 3, "$name - Polling Camera $camname was changed to new Pollinginterval: ".$attr{$name}{pollcaminfoall}."s");
             
             $hash->{HELPER}{OLDVALPOLL} = $attr{$name}{pollcaminfoall};
             }
@@ -725,16 +767,15 @@ sub watchdogpollcaminfo ($) {
         if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} ne $attr{$name}{pollnologging}) {
         
             if ($attr{$name}{pollnologging} == "1") {
-                $logstr = "Log of Polling Camera $camname is currently deactivated";
-                &printlog($hash,$logstr,"3");
+            
+                Log3($name, 3, "$name - Log of Polling Camera $camname is currently deactivated");
                 
                 # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
                 $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};
                 
             } else {
             
-                $logstr = "Log of Polling Camera $camname is currently activated";
-                &printlog($hash,$logstr,"3");
+                Log3($name, 3, "$name - Log of Polling Camera $camname is currently activated");
                 
                 # in $hash eintragen für späteren Vergleich (Changes von pollnologging)
                 $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $attr{$name}{pollnologging};
@@ -744,8 +785,8 @@ sub watchdogpollcaminfo ($) {
     
         # alter Wert von "pollnologging" war 1 -> Logging war deaktiviert
         if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} == "1") {
-            $logstr = "Log of Polling Camera $camname is currently activated";
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Log of Polling Camera $camname is currently activated");
             
             $hash->{HELPER}{OLDVALPOLLNOLOGGING} = "0";            
         }
@@ -792,41 +833,41 @@ sub camstartrec ($) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        $logstr = "ERROR - Start Recording of Camera $camname can't be executed - $error" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Start Recording of Camera $camname can't be executed - $error");
+        
         return;
         }
+        
+    if (ReadingsVal("$name", "Record", undef) eq "Start" and !AttrVal($name, "recextend", undef)) {
+
+        Log3($name, 3, "$name - another recording is already running - new start-command will be ignored");
+        return;
+    } 
     
-    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Aufnahme starten
-        $logstr = "Recording of Camera $camname will be started now";
-        &printlog($hash,$logstr,"4");
+
+        Log3($name, 4, "$name - Recording of Camera $camname will be started now");
                            
         $hash->{OPMODE} = "Start";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
     }
     else
     {
-    RemoveInternalTimer($hash, "camstartrec");
-    InternalTimer(gettimeofday()+1, "camstartrec", $hash);
+        RemoveInternalTimer($hash, "camstartrec");
+        InternalTimer(gettimeofday()+1, "camstartrec", $hash);
     }
 }
 
 ###############################################################################
 ###   Kamera Aufnahme stoppen
-
-sub stoprec ($) {
-    # Hilfsroutine Rückkehr aus Webaufruf Stopfunktion
-    my ($hash)   = @_;
-    return camstoprec($hash);
-}
 
 sub camstoprec ($) {
     my ($hash)   = @_;
@@ -853,24 +894,27 @@ sub camstoprec ($) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        $logstr = "ERROR - Stop Recording of Camera $camname can't be executed - $error" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Stop Recording of Camera $camname can't be executed - $error");
         return;
         }
+        
+    if (ReadingsVal("$name", "Record", undef) eq "Stop") {
+
+        Log3($name, 3, "$name - recording is already stopped - new stop-command will be ignored");
+        return;
+    } 
     
-    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Stop") ne "Stop") {
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Aufnahme stoppen
-        $logstr = "Recording of Camera $camname will be stopped now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Recording of Camera $camname will be stopped now");
                         
         $hash->{OPMODE} = "Stop";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
-        }
-        
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
+        }  
         &getapisites_nonbl($hash);
     }
     else
@@ -908,22 +952,20 @@ sub camexpmode ($) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        $logstr = "ERROR - Setting exposure mode of Camera $camname can't be executed - $error" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Setting exposure mode of Camera $camname can't be executed - $error");
         return;
         }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
-        $logstr = "Setting of exposure mode of Camera $camname will be started now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Setting of exposure mode of Camera $camname will be started now");
                            
         $hash->{OPMODE} = "ExpMode";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -964,22 +1006,20 @@ sub cammotdetsc ($) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        $logstr = "ERROR - Setting of motion detection source of Camera $camname can't be executed - $error" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Setting of motion detection source of Camera $camname can't be executed - $error");
         return;
         }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        
-        $logstr = "Setting of motion detection source of Camera $camname will be started now";
-        &printlog($hash,$logstr,"4");
+
+        Log3($name, 4, "$name - Setting of motion detection source of Camera $camname will be started now");
                            
         $hash->{OPMODE} = "MotDetSc";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -1020,22 +1060,21 @@ sub camsnap ($) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        $logstr = "ERROR - Snapshot of Camera $camname can't be executed - $error" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Snapshot of Camera $camname can't be executed - $error");
+        
         return;
         }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # einen Schnappschuß aufnehmen
-        $logstr = "Take Snapshot of Camera $camname";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Take Snapshot of Camera $camname");
                         
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -1075,22 +1114,22 @@ sub runliveview ($) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        $logstr = "ERROR - Liveview of Camera $camname can't be started - $error" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Liveview of Camera $camname can't be started - $error");
+        
         return;
         }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Liveview starten
-        $logstr = "Start Liveview of Camera $camname";
-        &printlog($hash,$logstr,"4");
+
+        Log3($name, 4, "$name - Start Liveview of Camera $camname");
                         
         $hash->{OPMODE} = "runliveview";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         readingsSingleUpdate($hash,"state","startview",1); 
@@ -1123,15 +1162,14 @@ sub stopliveview ($) {
         readingsSingleUpdate($hash,"state","stopview",1); 
         
         # Liveview stoppen
-        $logstr = "Stop Liveview of Camera $camname now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Stop Liveview of Camera $camname now");
                         
         $hash->{OPMODE} = "stopliveview";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         $hash->{HELPER}{SID} = $hash->{HELPER}{SID_STRM};
@@ -1170,15 +1208,14 @@ sub getsnapfilename ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # den Filenamen zu einem Schnappschuß ermitteln
-        $logstr = "Get filename of present Snap-ID $snapid ";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
                         
         $hash->{OPMODE} = "getsnapfilename";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         getapisites_nonbl($hash);
@@ -1202,15 +1239,14 @@ sub extevent ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
-        $logstr = "trigger external event \"$hash->{HELPER}{EVENTID}\" ";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
                         
         $hash->{OPMODE} = "extevent";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         getapisites_nonbl($hash);
@@ -1234,18 +1270,15 @@ sub doptzaction ($) {
     my $error;
 
     if (ReadingsVal("$name", "DeviceType", "Camera") ne "PTZ") {
-        $logstr = "ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible for cameras of DeviceType \"PTZ\" - please compare with device Readings" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible for cameras of DeviceType \"PTZ\" - please compare with device Readings");
         return;
         }
     if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && !ReadingsVal("$name", "CapPTZAbs", "false")) {
-        $logstr = "ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with device Reading \"CapPTZAbs\"" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with device Reading \"CapPTZAbs\"");
         return;
         }
     if ( $hash->{HELPER}{PTZACTION} eq "movestart" && ReadingsVal("$name", "CapPTZDirections", "0") < 1) {
-        $logstr = "ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports \"Tilt\" and \"Pan\" operations - please compare with device Reading \"CapPTZDirections\"" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports \"Tilt\" and \"Pan\" operations - please compare with device Reading \"CapPTZDirections\"");
         return;
         }
     
@@ -1261,8 +1294,7 @@ sub doptzaction ($) {
             readingsBulkUpdate($hash,"Error",$error);
             readingsEndUpdate($hash, 1);
     
-            $logstr = "ERROR - goPreset to position \"$hash->{HELPER}{GOPRESETNAME}\" of Camera $camname can't be executed - $error" ;
-            &printlog($hash,$logstr,"1");
+            Log3($name, 1, "$name - ERROR - goPreset to position \"$hash->{HELPER}{GOPRESETNAME}\" of Camera $camname can't be executed - $error");
             return;        
             }
     }
@@ -1279,8 +1311,7 @@ sub doptzaction ($) {
             readingsBulkUpdate($hash,"Error",$error);
             readingsEndUpdate($hash, 1);
     
-            $logstr = "ERROR - runPatrol to patrol \"$hash->{HELPER}{GOPATROLNAME}\" of Camera $camname can't be executed - $error" ;
-            &printlog($hash,$logstr,"1");
+            Log3($name, 1, "$name - ERROR - runPatrol to patrol \"$hash->{HELPER}{GOPATROLNAME}\" of Camera $camname can't be executed - $error");
             return;        
             }
     }
@@ -1302,33 +1333,27 @@ sub doptzaction ($) {
         readingsBulkUpdate($hash,"Error",$error);
         readingsEndUpdate($hash, 1);
     
-        $logstr = "ERROR - $hash->{HELPER}{PTZACTION} of Camera $camname can't be executed - $error" ;
-        &printlog($hash,$logstr,"1");
+        Log3($name, 1, "$name - ERROR - $hash->{HELPER}{PTZACTION} of Camera $camname can't be executed - $error");
         return;
         }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
         if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
-            $logstr = "Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\" now";
-            &printlog($hash,$logstr,"4");
+            Log3($name, 4, "$name - Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\" now");
             }
             elsif ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
-            $logstr = "Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now";
-            &printlog($hash,$logstr,"4");
+            Log3($name, 4, "$name - Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now");
             }
             elsif ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
-            $logstr = "Start move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\"  now";
-            &printlog($hash,$logstr,"4");
+            Log3($name, 4, "$name - Start move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\" now");
             }
             elsif ($hash->{HELPER}{PTZACTION} eq "movestart") {
-            $logstr = "Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s";
-            &printlog($hash,$logstr,"4");
+            Log3($name, 4, "$name - Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
             }
  
             if ($attr{$name}{debugactivetoken}) {
-                $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-                &printlog($hash,$logstr,"3");
+                Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
             }
     
         $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
@@ -1354,15 +1379,13 @@ sub movestop ($) {
     my $logstr;
     
    if ($hash->{HELPER}{ACTIVE} eq "off") {
-            $logstr = "Stop Camera $camname moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now";
-            &printlog($hash,$logstr,"4");
+            Log3($name, 4, "$name - Stop Camera $camname moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
                         
             $hash->{OPMODE} = "movestop";
             $hash->{HELPER}{ACTIVE} = "on";
             
             if ($attr{$name}{debugactivetoken}) {
-                $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-                &printlog($hash,$logstr,"3");
+                Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");;
             }
         
             &getapisites_nonbl($hash);
@@ -1387,15 +1410,13 @@ sub camenable ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # eine Kamera aktivieren
-        $logstr = "Enable Camera $camname";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Enable Camera $camname");
                         
         $hash->{OPMODE} = "Enable";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -1420,15 +1441,13 @@ sub camdisable ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {
         # eine Kamera deaktivieren
-        $logstr = "Disable Camera $camname";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Disable Camera $camname");
                         
         $hash->{OPMODE} = "Disable";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -1470,17 +1489,16 @@ sub getcaminfoall {
         if (!$attr{$name}{pollnologging}) {
             $now = FmtTime(gettimeofday());
             $new = FmtTime(gettimeofday()+$attr{$name}{pollcaminfoall});
-            $logstr = "Polling now: $now , next Polling: $new";
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Polling now: $now , next Polling: $new");
         }
     }
     else 
     {
         # Beenden Polling aller Caminfos
         readingsSingleUpdate($hash,"PollState","Inactive",0);
-        
-        $logstr = "Polling of Camera $camname is currently deactivated";
-        &printlog($hash,$logstr,"3");
+
+        Log3($name, 3, "$name - Polling of Camera $camname is currently deactivated");
         }
 return;
 }
@@ -1496,15 +1514,14 @@ sub getsvsinfo ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Kamerainfos abrufen
-        $logstr = "Retrieval of Surveillance Station related informations starts now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Retrieval of Surveillance Station related informations starts now");
                         
         $hash->{OPMODE} = "Getsvsinfo";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -1528,15 +1545,13 @@ sub getcaminfo ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Kamerainfos abrufen
-        $logstr = "Retrieval Camera-Informations of $camname starts now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Retrieval Camera-Informations of $camname starts now");
                         
         $hash->{OPMODE} = "Getcaminfo";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         getapisites_nonbl($hash);
@@ -1561,15 +1576,13 @@ sub geteventlist ($) {
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Kamerainfos abrufen
-        $logstr = "Query event informations of $camname starts now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Query event informations of $camname starts now");
                         
         $hash->{OPMODE} = "geteventlist";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         getapisites_nonbl($hash);
@@ -1592,15 +1605,13 @@ sub getmotionenum ($) {
     my $logstr;
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $logstr = "Enumerate motion detection parameters of $camname starts now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Enumerate motion detection parameters of $camname starts now");
                         
         $hash->{OPMODE} = "getmotionenum";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         getapisites_nonbl($hash);
@@ -1624,15 +1635,13 @@ sub getcapabilities ($) {
     
         if ($hash->{HELPER}{ACTIVE} eq "off") {
         # PTZ-ListPresets abrufen
-        $logstr = "Retrieval Capabilities of Camera $camname starts now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Retrieval Capabilities of Camera $camname starts now");
                         
         $hash->{OPMODE} = "Getcapabilities";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -1655,22 +1664,19 @@ sub getptzlistpreset ($) {
     my $logstr;
     
     if (defined(ReadingsVal("$name", "DeviceType", undef)) and ReadingsVal("$name", "DeviceType", undef) ne "PTZ") {
-        $logstr = "Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
         }
 
         if ($hash->{HELPER}{ACTIVE} eq "off") {
         # PTZ-ListPresets abrufen
-        $logstr = "Retrieval PTZ-ListPresets of $camname starts now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Retrieval PTZ-ListPresets of $camname starts now");
                         
         $hash->{OPMODE} = "Getptzlistpreset";
         $hash->{HELPER}{ACTIVE} = "on";
 
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -1694,22 +1700,19 @@ sub getptzlistpatrol ($) {
     my $logstr;
     
     if (defined(ReadingsVal("$name", "DeviceType", undef)) and ReadingsVal("$name", "DeviceType", undef) ne "PTZ") {
-        $logstr = "Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
         }
 
         if ($hash->{HELPER}{ACTIVE} ne "on") {
         # PTZ-ListPatrols abrufen
-        $logstr = "Retrieval PTZ-ListPatrols of $camname starts now";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 4, "$name - Retrieval PTZ-ListPatrols of $camname starts now");
                         
         $hash->{OPMODE} = "Getptzlistpatrol";
         $hash->{HELPER}{ACTIVE} = "on";
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token was set by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");
         }
         
         &getapisites_nonbl($hash);
@@ -1761,19 +1764,16 @@ sub getapisites_nonbl {
   
    #### API-Pfade und MaxVersions ermitteln #####
  
-   $logstr = "--- Begin Function getapisites nonblocking ---";
-   &printlog($hash,$logstr,"4");
+   Log3($name, 4, "$name - --- Begin Function getapisites nonblocking ---");
    
    $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
 
-   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
-   &printlog($hash,$logstr,"5");
+   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
    $url = "http://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm";
 
-   $logstr = "Call-Out now: $url";
-   &printlog($hash,$logstr,"4");    
+   Log3($name, 4, "$name - Call-Out now: $url");
    
    $param = {
                url      => $url,
@@ -1839,10 +1839,9 @@ sub login_nonbl ($) {
     # Verarbeitung der asynchronen Rückkehrdaten aus sub "getapisites_nonbl"
     if ($err ne "")                                                                                    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
     {
-        $logstr = "error while requesting ".$param->{url}." - $err";
-        &printlog($hash,$logstr,"1");	                                                             
-        $logstr = "--- End Function getapisites nonblocking with error ---";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 1, "$name - error while requesting ".$param->{url}." - $err");
+
+        Log3($name, 4, "$name - --- End Function getapisites nonblocking with error ---");
        
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
 
@@ -1850,8 +1849,7 @@ sub login_nonbl ($) {
         $hash->{HELPER}{ACTIVE} = "off"; 
         
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
         }
 
         return;
@@ -1863,12 +1861,12 @@ sub login_nonbl ($) {
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
         
         unless ($success) {
-            $logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); 
+
+            Log3($name, 4, "$name - Data returned: $myjson");
             $hash->{HELPER}{ACTIVE} = "off";
             
             if ($attr{$name}{debugactivetoken}) {
-                $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-                &printlog($hash,$logstr,"3");
+                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
             }
             return;
         }
@@ -1880,8 +1878,7 @@ sub login_nonbl ($) {
                 if ($success) 
                      {
                         # Logausgabe decodierte JSON Daten
-                        $logstr = "JSON returned: ". Dumper $data;                                                         
-                        &printlog($hash,$logstr,"4");
+                        Log3($name, 4, "$name - JSON returned: ". Dumper $data);
                         
                      # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
        
@@ -1891,9 +1888,9 @@ sub login_nonbl ($) {
                         $apiauthmaxver = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
        
                         $logstr = defined($apiauthpath) ? "Path of $apiauth selected: $apiauthpath" : "Path of $apiauth undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apiauthmaxver) ? "MaxVersion of $apiauth selected: $apiauthmaxver" : "MaxVersion of $apiauth undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
        
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
        
@@ -1903,9 +1900,9 @@ sub login_nonbl ($) {
                         $apiextrecmaxver = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
        
                         $logstr = defined($apiextrecpath) ? "Path of $apiextrec selected: $apiextrecpath" : "Path of $apiextrec undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apiextrec selected: $apiextrecmaxver" : "MaxVersion of $apiextrec undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
        
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.Camera" ermitteln
               
@@ -1915,9 +1912,9 @@ sub login_nonbl ($) {
                         $apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
                                
                         $logstr = defined($apicampath) ? "Path of $apicam selected: $apicampath" : "Path of $apicam undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apicam: $apicammaxver" : "MaxVersion of $apicam undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
        
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.SnapShot" ermitteln
               
@@ -1927,9 +1924,9 @@ sub login_nonbl ($) {
                         $apitakesnapmaxver = $data->{'data'}->{$apitakesnap}->{'maxVersion'};
                             
                         $logstr = defined($apitakesnappath) ? "Path of $apitakesnap selected: $apitakesnappath" : "Path of $apitakesnap undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apitakesnapmaxver) ? "MaxVersion of $apitakesnap: $apitakesnapmaxver" : "MaxVersion of $apitakesnap undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
 
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ" ermitteln
               
@@ -1939,9 +1936,9 @@ sub login_nonbl ($) {
                         $apiptzmaxver = $data->{'data'}->{$apiptz}->{'maxVersion'};
                             
                         $logstr = defined($apiptzpath) ? "Path of $apiptz selected: $apiptzpath" : "Path of $apiptz undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apiptzmaxver) ? "MaxVersion of $apiptz: $apiptzmaxver" : "MaxVersion of $apiptz undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");					
+                        Log3($name, 4, "$name - $logstr");				
 
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.Info" ermitteln
               
@@ -1951,9 +1948,9 @@ sub login_nonbl ($) {
                         $apisvsinfomaxver = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
                             
                         $logstr = defined($apisvsinfopath) ? "Path of $apisvsinfo selected: $apisvsinfopath" : "Path of $apisvsinfo undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apisvsinfomaxver) ? "MaxVersion of $apisvsinfo: $apisvsinfomaxver" : "MaxVersion of $apisvsinfo undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         
                      # Pfad und Maxversion von "SYNO.Surveillance.Camera.Event" ermitteln
               
@@ -1963,9 +1960,9 @@ sub login_nonbl ($) {
                         $apicameventmaxver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
                             
                         $logstr = defined($apicameventpath) ? "Path of $apicamevent selected: $apicameventpath" : "Path of $apicamevent undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apicameventmaxver) ? "MaxVersion of $apicamevent: $apicameventmaxver" : "MaxVersion of $apicamevent undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4"); 
+                        Log3($name, 4, "$name - $logstr");
                         
                      # Pfad und Maxversion von "SYNO.Surveillance.Event" ermitteln
               
@@ -1975,9 +1972,9 @@ sub login_nonbl ($) {
                         $apieventmaxver = $data->{'data'}->{$apievent}->{'maxVersion'};
                             
                         $logstr = defined($apieventpath) ? "Path of $apievent selected: $apieventpath" : "Path of $apievent undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apieventmaxver) ? "MaxVersion of $apievent: $apieventmaxver" : "MaxVersion of $apievent undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4"); 
+                        Log3($name, 4, "$name - $logstr");
                         
                      # Pfad und Maxversion von "SYNO.Surveillance.VideoStream" ermitteln
               
@@ -1987,9 +1984,9 @@ sub login_nonbl ($) {
                         $apivideostmmaxver = $data->{'data'}->{$apivideostm}->{'maxVersion'};
                             
                         $logstr = defined($apivideostmpath) ? "Path of $apivideostm selected: $apivideostmpath" : "Path of $apivideostm undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apivideostmmaxver) ? "MaxVersion of $apivideostm: $apivideostmmaxver" : "MaxVersion of $apivideostm undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4"); 
+                        Log3($name, 4, "$name - $logstr");
                         
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalEvent" ermitteln
        
@@ -1999,9 +1996,9 @@ sub login_nonbl ($) {
                         $apiextevtmaxver = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
        
                         $logstr = defined($apiextevtpath) ? "Path of $apiextevt selected: $apiextevtpath" : "Path of $apiextevt undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apiextevtmaxver) ? "MaxVersion of $apiextevt selected: $apiextevtmaxver" : "MaxVersion of $apiextevt undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.Streaming" ermitteln
        
@@ -2011,9 +2008,9 @@ sub login_nonbl ($) {
                         $apistmmaxver = $data->{'data'}->{$apistm}->{'maxVersion'}; 
        
                         $logstr = defined($apistmpath) ? "Path of $apistm selected: $apistmpath" : "Path of $apistm undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apistmmaxver) ? "MaxVersion of $apistm selected: $apistmmaxver" : "MaxVersion of $apistm undefined - Surveillance Station may be stopped";
-                        &printlog($hash, $logstr,"4");
+                        Log3($name, 4, "$name - $logstr");
        
                         # ermittelte Werte in $hash einfügen
                         $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
@@ -2046,8 +2043,7 @@ sub login_nonbl ($) {
                         readingsEndUpdate($hash,1);
 
                         # Logausgabe
-                        $logstr = "--- End Function getapisites nonblocking ---";
-                        &printlog($hash,$logstr,"4");
+                        Log3($name, 4, "$name - --- End Function getapisites nonblocking ---");
                         
                     } 
                     else 
@@ -2062,48 +2058,40 @@ sub login_nonbl ($) {
                         readingsEndUpdate($hash, 1);
 
                         # Logausgabe
-                        $logstr = "ERROR - the API-Query couldn't be executed successfully";
-                        &printlog($hash,$logstr,"1");
-
-                        $logstr = "--- End Function getapisites nonblocking with error ---";
-                        &printlog($hash,$logstr,"4");
+                        Log3($name, 1, "$name - ERROR - the API-Query couldn't be executed successfully");
+                        
+                        Log3($name, 4, "$name - --- End Function getapisites nonblocking with error ---");
                         
                         # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
                         $hash->{HELPER}{ACTIVE} = "off"; 
                         
                         if ($attr{$name}{debugactivetoken}) {
-                            $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-                            &printlog($hash,$logstr,"3");
+                            Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
                         }
                         return;
                      }
     }
   
   # Login und SID ermitteln
-
-  $logstr = "--- Begin Function serverlogin nonblocking ---";
-  &printlog($hash,$logstr,"4");
+  Log3($name, 4, "$name - --- Begin Function serverlogin nonblocking ---");
   
   # Credentials abrufen
   ($success, $username, $password) = getcredentials($hash,0);
   
   unless ($success) {
-      $logstr = "Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\""; 
-      &printlog($hash,$logstr,"1"); 
+      Log3($name, 1, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
       
       $hash->{HELPER}{ACTIVE} = "off";
       
       if ($attr{$name}{debugactivetoken}) {
-          $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-          &printlog($hash,$logstr,"3");
+          Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
       }      
       return;
   }
   
   $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
   
-  $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
-  &printlog($hash,$logstr,"5");  
+  Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
  
   if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\"";
@@ -2112,9 +2100,8 @@ sub login_nonbl ($) {
       {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=\"sid\""; 
       }
-
-  $logstr = "Call-Out now: $url";
-  &printlog($hash,$logstr,"4");       
+  
+  Log3($name, 4, "$name - Call-Out now: $url");
   
   $param = {
                url      => $url,
@@ -2157,10 +2144,9 @@ sub getcamid_nonbl ($) {
    # Verarbeitung der asynchronen Rückkehrdaten aus sub "login_nonbl"
    if ($err ne "")                                                                # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
    {
-        $logstr = "error while requesting ".$param->{url}." - $err";
-        &printlog($hash,$logstr,"1");		                                                       
-        $logstr = "--- End Function serverlogin nonblocking with error ---";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 1, "$name - error while requesting ".$param->{url}." - $err");
+        
+        Log3($name, 4, "$name - --- End Function serverlogin nonblocking with error ---");
         
         readingsSingleUpdate($hash, "Error", $err, 1);                               
         
@@ -2168,8 +2154,7 @@ sub getcamid_nonbl ($) {
         $hash->{HELPER}{ACTIVE} = "off"; 
    
         if ($attr{$name}{debugactivetoken}) {
-            $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-            &printlog($hash,$logstr,"3");
+            Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
         }
         
         return;
@@ -2180,12 +2165,11 @@ sub getcamid_nonbl ($) {
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
         
         unless ($success) {
-            $logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); 
+            Log3($name, 4, "$name - Data returned: ".$myjson);
             $hash->{HELPER}{ACTIVE} = "off";
             
             if ($attr{$name}{debugactivetoken}) {
-                $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-                &printlog($hash,$logstr,"3");
+                Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
             }
             return;
         }
@@ -2198,8 +2182,7 @@ sub getcamid_nonbl ($) {
         if ($success) 
         {
              # Logausgabe decodierte JSON Daten
-             $logstr = "JSON returned: ". Dumper $data;                                                         
-             &printlog($hash,$logstr,"4");
+             Log3($name, 4, "$name - JSON returned: ". Dumper $data);
              
              $sid = $data->{'data'}->{'sid'};
              
@@ -2213,10 +2196,8 @@ sub getcamid_nonbl ($) {
              readingsEndUpdate($hash, 1);
        
              # Logausgabe
-             $logstr = "Login of User $username successful - SID: $sid";
-             &printlog($hash,$logstr,"4");
-             $logstr = "--- End Function serverlogin nonblocking ---";
-             &printlog($hash,$logstr,"4");    
+             Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
+             Log3($name, 4, "$name - --- End Function serverlogin nonblocking ---");
        } 
        else 
        {
@@ -2233,18 +2214,14 @@ sub getcamid_nonbl ($) {
              readingsEndUpdate($hash, 1);
        
              # Logausgabe
-             $logstr = "ERROR - Login of User $username unsuccessful. Errorcode: $errorcode - $error";
-             &printlog($hash,$logstr,"1");
-             
-             $logstr = "--- End Function serverlogin nonblocking with error ---";
-             &printlog($hash,$logstr,"4"); 
+             Log3($name, 1, "$name - ERROR - Login of User $username unsuccessful. Errorcode: $errorcode - $error");
+             Log3($name, 4, "$name - --- End Function serverlogin nonblocking with error ---");
              
              # ausgeführte Funktion nicht erfolgreich, Freigabe Funktionstoken
              $hash->{HELPER}{ACTIVE} = "off"; 
              
              if ($attr{$name}{debugactivetoken}) {
-                 $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
-                 &printlog($hash,$logstr,"3");
+                 Log3($name, 3, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
              }
              
              return;
@@ -2254,19 +2231,16 @@ sub getcamid_nonbl ($) {
   
   # die Kamera-Id wird aus dem Kameranamen (Surveillance Station) ermittelt und mit Routine "camop_nonbl" verarbeitet
 
-  $logstr = "--- Begin Function getcamid nonblocking ---";
-  &printlog($hash,$logstr,"4");
+  Log3($name, 4, "$name - --- Begin Function getcamid nonblocking ---");
   
   $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
 
-  $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
-  &printlog($hash,$logstr,"5");  
+  Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
   # einlesen aller Kameras - Auswertung in Rückkehrfunktion "camop_nonbl"
   $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
-
-  $logstr = "Call-Out now: $url";
-  &printlog($hash,$logstr,"4");             
+ 
+  Log3($name, 4, "$name - Call-Out now: $url");
   
   $param = {
                url      => $url,
@@ -2347,10 +2321,8 @@ sub camop_nonbl ($) {
    # Verarbeitung der asynchronen Rückkehrdaten aus sub "getcamid_nonbl"
    if ($err ne "")                                                                         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
    {
-        $logstr = "error while requesting ".$param->{url}." - $err";
-        &printlog($hash,$logstr,"1");		                                           # Eintrag fürs Log
-        $logstr = "--- End Function getcamid nonblocking with error ---";
-        &printlog($hash,$logstr,"4");
+        Log3($name, 1, "$name - error while requesting ".$param->{url}." - $err");
+        Log3($name, 4, "$name - --- End Function getcamid nonblocking with error ---");
         
         readingsSingleUpdate($hash, "Error", $err, 1);                                     # Readings erzeugen
 
@@ -2363,7 +2335,8 @@ sub camop_nonbl ($) {
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
         
         unless ($success) {
-            $logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); 
+            Log3($name, 4, "$name - Data returned: ".$myjson);
+            
             return (logout_nonbl($hash));
         }
         
@@ -2374,8 +2347,7 @@ sub camop_nonbl ($) {
         if ($success)                                                                       # die Liste aller Kameras konnte ausgelesen werden, Anzahl der definierten Kameras ist in Var "total"
         {
              # lesbare Ausgabe der decodierten JSON-Daten
-             $logstr = "JSON returned: ". Dumper $data;                                     # Achtung: SEHR viele Daten !                                              
-             &printlog($hash,$logstr,"5");
+             Log3($name, 5, "$name - JSON returned: ". Dumper $data);
                     
              $camcount = $data->{'data'}->{'total'};
              $i = 0;
@@ -2398,10 +2370,8 @@ sub camop_nonbl ($) {
                  $hash->{CAMID} = $camid;
                  
                  # Logausgabe
-                 $logstr = "Detection Camid successful - $camname ID: $camid";
-                 &printlog($hash,$logstr,"4");
-                 $logstr = "--- End Function getcamid nonblocking ---";
-                 &printlog($hash,$logstr,"4");  
+                 Log3($name, 4, "$name - Detection Camid successful - $camname ID: $camid");
+                 Log3($name, 4, "$name - --- End Function getcamid nonblocking ---");
              } 
              else 
              {
@@ -2414,10 +2384,8 @@ sub camop_nonbl ($) {
                  readingsEndUpdate($hash, 1);
                                   
                  # Logausgabe
-                 $logstr = "ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling.";
-                 &printlog($hash,$logstr,"1");
-                 $logstr = "--- End Function getcamid nonblocking with error ---";
-                 &printlog($hash,$logstr,"4");
+                 Log3($name, 1, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");
+                 Log3($name, 4, "$name - --- End Function getcamid nonblocking with error ---");
                         
                  return (logout_nonbl($hash));
               }
@@ -2436,21 +2404,17 @@ sub camop_nonbl ($) {
             readingsBulkUpdate($hash,"Error",$error);
             readingsEndUpdate($hash, 1);
 
-            $logstr = "ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error";
-            &printlog($hash,$logstr,"1");
-            $logstr = "--- End Function getcamid nonblocking with error ---";
-            &printlog($hash,$logstr,"4");
+            Log3($name, 1, "$name - ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error");
+            Log3($name, 4, "$name - --- End Function getcamid nonblocking with error ---");
                         
             return (logout_nonbl($hash));
        }
        
-   $logstr = "--- Begin Function cam: $OpMode nonblocking ---";
-   &printlog($hash,$logstr,"4");
+   Log3($name, 4, "$name - --- Begin Function cam: $OpMode nonblocking ---");
 
    $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
    
-   $logstr = "HTTP-Call will be done with httptimeout-Value: $httptimeout s";
-   &printlog($hash,$logstr,"5");
+   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    
    if ($OpMode eq "Start") 
    {
@@ -2591,8 +2555,7 @@ sub camop_nonbl ($) {
       # Liveview-Link in Hash speichern -> Anzeige über SSCam_liveview, in Reading setzen für Linkversand
       $hash->{HELPER}{LINK} = $url;
          
-      $logstr = "Set Streaming-URL: $url";
-      &printlog($hash,$logstr,"4");
+      Log3($name, 4, "$name - Set Streaming-URL: $url");
       
       # livestream sofort in neuem Browsertab öffnen
       if ($hash->{HELPER}{OPENWINDOW}) {
@@ -2608,8 +2571,7 @@ sub camop_nonbl ($) {
           }
       }
  
-      $logstr = "--- End Function cam: $OpMode nonblocking ---";
-      &printlog($hash,$logstr,"4");
+      Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
       
       if (ReadingsVal("$name", "Record", "") eq "Start") {
                     readingsSingleUpdate( $hash,"state", "on", 1); 
@@ -2623,8 +2585,7 @@ sub camop_nonbl ($) {
       return;
    }  
    
-   $logstr = "Call-Out now: $url";
-   &printlog($hash,$logstr,"4");
+   Log3($name, 4, "$name - Call-Out now: $url");
    
    $param = {
                 url      => $url,
@@ -2678,41 +2639,24 @@ sub camret_nonbl ($) {
    my $httptimeout;
    my $motdetsc;
    
-   # Die Aufnahmezeit setzen
-   # wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
-   # sonst Attribut "rectime" wenn es gesetzt ist, falls nicht -> "RECTIME_DEF"
-   if (defined($hash->{HELPER}{RECTIME_TEMP})) {
-       $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
-       }
-       else
-       {
-       if (defined($attr{$name}{rectime}) && AttrVal($name,"rectime", undef) == 0) {
-           $rectime = 0;
-           }
-           else
-           {
-           $rectime = AttrVal($name, "rectime", undef) ? AttrVal($name, "rectime", undef) : $hash->{HELPER}{RECTIME_DEF};
-           }
-       }
-   
-   if ($err ne "")                                                                                     # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   if ($err ne "")                                                                                    
    {
-        $logstr = "error while requesting ".$param->{url}." - $err";
-        &printlog($hash,$logstr,"1");		                                                      # Eintrag fürs Log
-        $logstr = "--- End Function cam: $OpMode nonblocking with error ---";
-        &printlog($hash,$logstr,"4");
+        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+        Log3($name, 1, "$name - error while requesting ".$param->{url}." - $err");
+        Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking with error ---");
         
-        readingsSingleUpdate($hash, "Error", $err, 1);                                     	       # Readings erzeugen
+        readingsSingleUpdate($hash, "Error", $err, 1);                                     	       
 
         return (logout_nonbl($hash));
    }
-   elsif ($myjson ne "")                                                                                # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+   elsif ($myjson ne "")                                                                               
    {    
+        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
         
         unless ($success) {
-            $logstr = "Data returned: ".$myjson; &printlog($hash,$logstr,"4"); 
+            Log3($name, 4, "$name - Data returned: ".$myjson);
             return (logout_nonbl($hash));
          }
         
@@ -2720,16 +2664,37 @@ sub camret_nonbl ($) {
    
         $success = $data->{'success'};
 
-        if ($success) 
-        {       
+        if ($success) {       
             # Kameraoperation entsprechend "OpMode" war erfolgreich
             
             # Logausgabe decodierte JSON Daten
-            $logstr = "JSON returned: ". Dumper $data;                                                        
-            &printlog($hash,$logstr,"4");
+            Log3($name, 4, "$name - JSON returned: ". Dumper $data);
                 
-            if ($OpMode eq "Start") 
-            {                             
+            if ($OpMode eq "Start") {                             
+                # Die Aufnahmezeit setzen
+                # wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
+                # sonst Attribut "rectime" wenn es gesetzt ist, falls nicht -> "RECTIME_DEF"
+                if (defined($hash->{HELPER}{RECTIME_TEMP})) {
+                    $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
+                } else {
+                    if (defined($attr{$name}{rectime}) && AttrVal($name,"rectime", undef) == 0) {
+                        $rectime = 0;
+                    } else {
+                        $rectime = AttrVal($name, "rectime", undef) ? AttrVal($name, "rectime", undef) : $hash->{HELPER}{RECTIME_DEF};
+                    }
+                }
+                
+                if ($rectime == "0") {
+                    $logstr = "Camera $camname endless Recording started  - stop it by stop-command !";
+                } else {
+                    if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
+                        # Aufnahme läuft schon und wird verlängert
+                        Log3($name, 3, "$name - running recording renewed to $rectime s");
+                    } else {
+                        Log3($name, 3, "$name - Camera $camname Recording with Recordtime $rectime s started");
+                    }
+                }
+                       
                 # Setreading 
                 readingsBeginUpdate($hash);
                 readingsBulkUpdate($hash,"Record","Start");
@@ -2737,23 +2702,14 @@ sub camret_nonbl ($) {
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
-                                
-                # Logausgabe
-                $logstr = $rectime != "0" ? "Camera $camname Recording with Recordtime $rectime"."s started" : "Camera $camname endless Recording started  - stop it by stop-command !";
-                &printlog($hash,$logstr,"3");  
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");                
-       
-                # Logausgabe
-                $logstr = "Time for Recording is set to: $rectime";
-                &printlog($hash,$logstr,"4");
                 
                 if ($rectime != 0) {
                     # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
-                    RemoveInternalTimer($hash, "stoprec");
-                    InternalTimer(gettimeofday()+$rectime, "stoprec", $hash );
-                    }              
-
+                    RemoveInternalTimer($hash, "camstoprec");
+                    InternalTimer(gettimeofday()+$rectime, "camstoprec", $hash);
+                }      
+                
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Stop") 
             {                
@@ -2766,12 +2722,10 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                $logstr = "Camera $camname Recording stopped";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Camera $camname Recording stopped");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
                 
-                # Aktualisierung Eventlist der ketzten Aufnahme
+                # Aktualisierung Eventlist der letzten Aufnahme
                 geteventlist($hash);
             }
             elsif ($OpMode eq "ExpMode") 
@@ -2783,10 +2737,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                $logstr = "Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking --");
             }
             elsif ($OpMode eq "MotDetSc") 
             {              
@@ -2797,10 +2749,9 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-                $logstr = "Camera $camname motion detection source was set to \"$hash->{HELPER}{MOTDETSC}\"";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+
+                Log3($name, 3, "$name - Camera $camname motion detection source was set to \"$hash->{HELPER}{MOTDETSC}\"");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Snap") 
             {
@@ -2824,10 +2775,11 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                $logstr = "Snapshot of Camera $camname has been done successfully";
-                &printlog($hash,$logstr,"3");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                
+                # nach Snap Aufnahme Filename des Snaps ermitteln
+                getsnapfilename($hash);
             }
             elsif ($OpMode eq "getsnapfilename") 
             {
@@ -2842,10 +2794,8 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
                                 
                 # Logausgabe
-                 $logstr = "Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\" ";
-                &printlog($hash,$logstr,"4");
-                $logstr = "--- End Function cam: $OpMode nonblocking ---";
-                &printlog($hash,$logstr,"4");
+                Log3($name, 4, "$name - Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\"");
+                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "gopreset") 
             {
@@ -3620,13 +3570,7 @@ sub logoutret_nonbl ($) {
        $logstr = "Active-Token deleted by OPMODE: $hash->{OPMODE}" ;
        &printlog($hash,$logstr,"3");
    }
-
-   # nach Snap Aufnahme Filename des Snaps ermitteln
-   if ($OpMode eq "Snap") {
-       return (getsnapfilename($hash));
-       }
-
-
+   
 return;
 }
 
@@ -3649,7 +3593,7 @@ sub evaljson {
   my $e;
   my $logstr;
   
-  eval {decode_json($myjson);1;} or do 
+  eval {decode_json($myjson)} or do 
   {
       $success = 0;
       $e = $@;
@@ -3659,9 +3603,7 @@ sub evaljson {
       readingsBulkUpdate($hash,"Errorcode","none");
       readingsBulkUpdate($hash,"Error","malformed JSON string received");
       readingsEndUpdate($hash, 1);  
-
   };
-  
 return($hash,$success);
 }
 
@@ -3673,24 +3615,12 @@ sub experrorauth {
   my ($hash,@errorcode) = @_;
   my $device = $hash->{NAME};
   my $errorcode = shift @errorcode;
-  my %errorlist;
   my $error;
   
-  # Aufbau der Errorcode-Liste (siehe Surveillance_Station_Web_API_v2.0.pdf)
-  %errorlist = (
-  100 => "Unknown error",
-  101 => "The account parameter is not specified",
-  102 => "API does not exist",
-  400 => "Invalid user or password",
-  401 => "Guest or disabled account",
-  402 => "Permission denied - make sure user is member of Admin-group if DSM-Session is used",
-  403 => "One time password not specified",
-  404 => "One time password authenticate failed",
-  );
-  unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists($SSCam_errauthlist{"$errorcode"})) {$error = "Message for Errorcode \"$errorcode\" not found. Please turn to Synology Web API-Guide."; return ($error);}
 
-  # Fehlertext aus Hash-Tabelle oben ermitteln
-  $error = $errorlist {$errorcode};
+  # Fehlertext aus Hash-Tabelle %errorauthlist ermitteln
+  $error = $SSCam_errauthlist{"$errorcode"};
 return ($error);
 }
 
@@ -3702,43 +3632,12 @@ sub experror {
   my ($hash,@errorcode) = @_;
   my $device = $hash->{NAME};
   my $errorcode = shift @errorcode;
-  my %errorlist;
   my $error;
   
-  # Aufbau der Errorcode-Liste (siehe Surveillance_Station_Web_API_v2.0.pdf)
-  %errorlist = (
-  100 => "Unknown error",
-  101 => "Invalid parameters",
-  102 => "API does not exist",
-  103 => "Method does not exist",
-  104 => "This API version is not supported",
-  105 => "Insufficient user privilege",
-  106 => "Connection time out",
-  107 => "Multiple login detected",
-  117 => "need manager rights in SurveillanceStation for operation",
-  400 => "Execution failed",
-  401 => "Parameter invalid",
-  402 => "Camera disabled",
-  403 => "Insufficient license",
-  404 => "Codec activation failed",
-  405 => "CMS server connection failed",
-  407 => "CMS closed",
-  410 => "Service is not enabled",
-  412 => "Need to add license",
-  413 => "Reach the maximum of platform",
-  414 => "Some events not exist",
-  415 => "message connect failed",
-  417 => "Test Connection Error",
-  418 => "Object is not exist",
-  419 => "Visualstation name repetition",
-  439 => "Too many items selected",
-  502 => "Camera disconnected",
-  600 => "Presetname and PresetID not found in Hash",
-  );
-  unless (exists ($errorlist {$errorcode})) {$error = "Message for Errorcode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
+  unless (exists($SSCam_errlist{"$errorcode"})) {$error = "Message for Errorcode $errorcode not found. Please turn to Synology Web API-Guide."; return ($error);}
 
-  # Fehlertext aus Hash-Tabelle oben ermitteln
-  $error = $errorlist {$errorcode};
+  # Fehlertext aus Hash-Tabelle %errorlist ermitteln
+  $error = $SSCam_errlist{"$errorcode"};
   return ($error);
 }
 
@@ -3938,7 +3837,34 @@ return;
   </table>
   <br><br>
   
-   <b> "set &lt;name&gt; [on] [off]" </b> <br><br>
+  <b>"set &lt;name&gt; [on] [off]"</b> <br><br>
+   
+  The command "set &lt;name&gt; on" starts a recording. The default recording time takes 15 seconds. It can be changed by the <a href="#SSCamattr">attribute</a> "rectime" individualy. 
+  With the <a href="#SSCamattr">attribute</a> (respectively the default value) provided recording time can be overwritten once by "set &lt;name&gt; on [rectime]".
+  The recording will be stopped after processing time "rectime"automatically.<br>
+
+  A special case is the start using "set &lt;name&gt; on 0" respectively the attribute value "rectime = 0". In that case a endless-recording will be started. One have to stop this recording
+  by command "set &lt;name&gt; off" explicitely.<br>
+
+  The recording behavior can be impacted with <a href="#SSCamattr">attribute</a> "recextend" furthermore as explained as follows.<br><br>
+
+  <b>Attribute "recextend = 0" or not set (default):</b><br><br>
+  <ul>
+  <li> if, for example, a recording with rectimeme=22 is started, no other startcommand (for a recording) will be accepted until this started recording is finished.
+  A hint will be logged in case of verboselevel = 3. </li>
+  </ul>
+  <br>
+
+  <b>Attribute "recextend = 1" is set:</b><br><br>
+  <ul>
+  <li> a before started recording will be extend by the recording time "rectime" if a new start command is received. That means, the timer for the automatic stop-command will be
+  renewed to "rectime" given bei the command, attribute or default value. This procedure will be repeated every time a new start command for recording is received. 
+  Therefore a running recording will be extended until no start command will be get. </li>
+
+  <li> a before started endless-recording will be stopped after recordingtime 2rectime" if a new "set <name> on"-command is received (new set of timer). If it is unwanted make sure you 
+  don't set the <a href="#SSCamattr">attribute</a> "recextend" in case of endless-recordings. </li>
+  </ul>
+  <br>
   
   Examples for simple <b>Start/Stop a Recording</b>: <br><br>
 
@@ -4330,6 +4256,8 @@ return;
   
   <li><b>rectime</b> - the determined recordtime when a recording starts. If rectime = 0 an endless recording will be started. If it isn't defined, the default recordtime of 15s is activated </li>
   
+  <li><b>recextend</b> - "rectime" of a started recording will be set new. Thereby the recording time of the running recording will be extended </li>
+  
   <li><b>session</b>  - selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). "SurveillanceStation" -&gt; session will be established to SVS </li><br>
   
   <li><b>videofolderMap</b> - replaces the content of reading "VideoFolder", Usage if e.g. folders are mountet with different names than original (SVS) </li>
@@ -4394,6 +4322,10 @@ return;
     Wenn sie über dieses Modul diskutieren oder zur Verbesserung des Moduls beitragen möchten, ist im FHEM-Forum ein Sammelplatz unter:<br>
     <a href="http://forum.fhem.de/index.php/topic,45671.msg374390.html#msg374390">49_SSCam: Fragen, Hinweise, Neuigkeiten und mehr rund um dieses Modul</a>.<br><br>
 
+    Weitere Infomationen zum Modul sind im FHEM-Wiki zu finden:<br>
+    <a href="http://www.fhemwiki.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station">SSCAM - Steuerung von Kameras in Synology Surveillance Station</a>.<br><br>
+    
+    
 <b>Vorbereitung </b> <br><br>
     Dieses Modul nutzt das CPAN Module JSON. Bitte darauf achten dieses Paket zu installieren. (Debian: libjson-perl). <br>
     Das CPAN-Modul LWP wird für SSCam nicht mehr benötigt. Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br> 
@@ -4541,6 +4473,33 @@ return;
   
   
   <b> "set &lt;name&gt; [on] [off]" </b> <br><br>
+  
+  Der Befehl "set &lt;name&gt; on" startet eine Aufnahme. Die Standardaufnahmedauer beträgt 15 Sekunden. Sie kann mit dem Attribut "rectime" individuell festgelegt werden. 
+  Die im Attribut (bzw. im Standard) hinterlegte Aufnahmedauer kann einmalig mit "set &lt;name&gt; on [rectime]" überschrieben werden.
+  Die Aufnahme stoppt automatisch nach Ablauf der Zeit "rectime".<br>
+
+  Ein Sonderfall ist der Start einer Daueraufnahme mit "set &lt;name&gt; on 0" bzw. dem Attributwert "rectime = 0". In diesem Fall wird eine Daueraufnahme gestartet die 
+  explizit wieder mit dem Befehl "set &lt;name&gt; off" gestoppt werden muß.<br>
+
+  Das Aufnahmeverhalten kann weiterhin mit dem Attribut "recextend" wie folgt beeinflusst werden.<br><br>
+
+  <b>Attribut "recextend = 0" bzw. nicht gesetzt (Standard):</b><br><br>
+  <ul>
+  <li> wird eine Aufnahme mit z.B. rectime=22 gestartet, wird kein weiterer Startbefehl für eine Aufnahme akzeptiert bis diese gestartete Aufnahme nach 22 Sekunden
+  beendet ist. Ein Hinweis wird bei verbose=3 im Logfile protokolliert. </li>
+  </ul>
+  <br>
+
+  <b>Attribut "recextend = 1" gesetzt:</b><br><br>
+  <ul>
+  <li> eine zuvor gestartete Aufnahme wird bei einem erneuten "set <name> on" -Befehl um die Aufnahmezeit "rectime" verlängert. Das bedeutet, dass der Timer für 
+  den automatischen Stop auf den Wert "rectime" neu gesetzt wird. Dieser Vorgang wiederholt sich mit jedem Start-Befehl. Dadurch verlängert sich eine laufende 
+  Aufnahme bis kein Start-Inpuls mehr registriert wird. </li>
+
+  <li> eine zuvor gestartete Endlos-Aufnahme wird mit einem erneuten "set <name> on"-Befehl nach der Aufnahmezeit "rectime" gestoppt (Timerneustart). Ist dies 
+  nicht gewünscht, ist darauf zu achten dass bei der Verwendung einer Endlos-Aufnahme das Attribut "recextend" nicht verwendet wird. </li>
+  </ul>
+  <br>
   
   Beispiele für einfachen <b>Start/Stop einer Aufnahme</b>: <br><br>
 
@@ -4938,7 +4897,9 @@ return;
   <li><b>pollnologging</b> - "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging Gerätepolling inaktiv </li>
   
   <li><b>rectime</b> - festgelegte Aufnahmezeit wenn eine Aufnahme gestartet wird. Mit rectime = 0 wird eine Endlosaufnahme gestartet. Ist "rectime" nicht gesetzt, wird der Defaultwert von 15s verwendet.</li>
-
+  
+  <li><b>recextend</b> - "rectime" einer gestarteten Aufnahme wird neu gesetzt. Dadurch verlängert sich die Aufnahemzeit einer laufenden Aufnahme </li>
+  
   <li><b>session</b>  - Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li><br>
   
   <li><b>videofolderMap</b> - ersetzt den Inhalt des Readings "VideoFolder", Verwendung z.B. bei gemounteten Verzeichnissen </li>
