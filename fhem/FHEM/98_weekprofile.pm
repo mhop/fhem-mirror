@@ -43,10 +43,13 @@ $DEV_READINGS{"Fri"}{"CUL_HM"} = "6_tempListFri";
 $DEV_READINGS{"Sat"}{"CUL_HM"} = "0_tempListSat";
 $DEV_READINGS{"Sun"}{"CUL_HM"} = "1_tempListSun";
 
+
+sub weekprofile_findPRF($$$$);
+
 ############################################## 
-sub weekprofile_getDeviceType($;$)
+sub weekprofile_getDeviceType($$;$)
 {
-  my ($device,$sndrcv) = @_;
+  my ($me,$device,$sndrcv) = @_;
   
   $sndrcv = "RCV" if (!defined($sndrcv));
 
@@ -61,21 +64,22 @@ sub weekprofile_getDeviceType($;$)
   if ($devHash->{TYPE} =~ /CUL_HM/){
     my $model = AttrVal($device,"model","");
     if (!defined($devHash->{chanNo})) { #no channel device
-      #Log 2, "weekprofile_getDeviceType: $devHash->{NAME}, $model, has no chanNo";
+      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME}, $model, has no chanNo";
       return undef;
     }
     
     my $channel = $devHash->{chanNo};
-    return unless ($channel =~ /^\d+?$/);
+    unless ($channel =~ /^\d+?$/) {
+      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME}, $model, chanNo $channel is no number";
+      return undef;
+    }
     
-    my $channel += 0;
-    #Log 2, "weekprofile_getDeviceType: $devHash->{NAME}, $model, $channel";
+    $channel += 0;
+    Log3 $me, 5, "$me(getDeviceType): $devHash->{NAME}, $model, $channel";
     
     $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-RT.*/) && ($channel == 4) );
     $type = "CUL_HM" if ( ($model =~ m/.*HM-TC.*/)    && ($channel == 2) );
     $type = "CUL_HM" if ( ($model =~ m/.*HM-CC-TC.*/) && ($channel == 2) );
-    
-    #Log 2, "weekprofile_getDeviceType: $devHash->{NAME}, $model, $channel unknown";
   }
   #avoid max shutter contact
   elsif ( ($devHash->{TYPE} =~ /MAX/) && ($devHash->{type} =~ /.*Thermostat.*/) ){
@@ -92,6 +96,7 @@ sub weekprofile_getDeviceType($;$)
     $type = "WEEKPROFILE";
   }
   
+  Log3 $me, 5, "$me(getDeviceType): $devHash->{NAME} is type $type";
   return $type;
 }
 
@@ -103,7 +108,7 @@ sub weekprofile_readDayProfile($@)
   my @times;
   my @temps;
   
-  $type = weekprofile_getDeviceType($device) if (!defined($type));
+  $type = weekprofile_getDeviceType($me,$device) if (!defined($type));
   return if (!defined($type));
 
   my $reading = $DEV_READINGS{$day}{$type};
@@ -147,7 +152,7 @@ sub weekprofile_readDayProfile($@)
 sub weekprofile_readDevProfile(@)
 {
   my ($device,$type,$me) = @_;
-  $type = weekprofile_getDeviceType($device) if (!defined($type));
+  $type = weekprofile_getDeviceType($me, $device) if (!defined($type));
   return "" if (!defined ($type));
   
   my $prf = {};
@@ -195,7 +200,7 @@ sub weekprofile_createDefaultProfile(@)
 sub weekprofile_sendDevProfile(@)
 {
   my ($device,$prf,$me) = @_;
-  my $type = weekprofile_getDeviceType($device,"SND");
+  my $type = weekprofile_getDeviceType($me, $device,"SND");
   
   return "Error device type not supported" if (!defined ($type));  
   return "profile has no data" if (!defined($prf->{DATA}));
@@ -298,7 +303,7 @@ sub weekprofile_refreshSendDevList($)
     @sndHash{@DEVLIST_SEND}=();
     next if (!exists $sndHash{$module});
     
-    my $type = weekprofile_getDeviceType($defs{$d}{NAME},"SND");
+    my $type = weekprofile_getDeviceType($me, $defs{$d}{NAME},"SND");
     next if (!defined($type));
     
     my $dev = {};
@@ -321,7 +326,7 @@ sub weekprofile_assignDev($)
     
     Log3 $me, 5, "$me(assignDev): assign to device $hash->{MASTERDEV}->{NAME}";
     
-    my $type     = weekprofile_getDeviceType($hash->{MASTERDEV}->{NAME});
+    my $type     = weekprofile_getDeviceType($me, $hash->{MASTERDEV}->{NAME});
     if (!defined($type)) {
       Log3 $me, 2, "$me(assignDev): device $hash->{MASTERDEV}->{NAME} not supported or defined";
     } else {    
