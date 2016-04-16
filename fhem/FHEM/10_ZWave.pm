@@ -438,7 +438,8 @@ my %zwave_class = (
   TIME_PARAMETERS          => { id => '8b', 
     set   => { timeParameters => 'ZWave_timeParametersSet($hash, "%s")'},
     get   => { timeParameters => "02"},
-    parse => { "..8b03(.*)"  => 'ZWave_timeParametersReport($hash, $1)' } },
+    parse => { "..8b02"      => 'timeParametersGet',
+               "..8b03(.*)"  => 'ZWave_timeParametersReport($hash, $1)' } },
   GEOGRAPHIC_LOCATION      => { id => '8c' },
   COMPOSITE                => { id => '8d' },
   MULTI_CHANNEL_ASSOCIATION=> { id => '8e',    # aka MULTI_INSTANCE_ASSOCIATION
@@ -4563,15 +4564,19 @@ s2Hex($)
       format MM-DD_HH:00.<br>
     Note: Sign for both offsets must be specified!<br>
     Note: Minutes for DST_START and DST_END must be specified as "00"!
-  </li>
+    </li>
 
   <br><br><b>Class TIME_PARAMETERS, V1</b>
+  <li>timeParametersGet<br>
+    The device request time parameters. Right now the user should define a
+    notify with a "set timeParameters" command.
+    </li>
   <li>timeParameters DATE TIME<br>
     Set the time (UTC) to the internal clock of the device.<br>
     DATE: Date in format YYYY-MM-DD.<br>
     TIME: Time (UTC) in the format hh:mm:ss.<br>
     Note: Time zone offset to UTC must be set with command class TIME.
-  </li>
+    </li>
   
   <br><br><b>Class USER_CODE</b>
   <li>userCode id status code</br>
@@ -5323,8 +5328,9 @@ s2Hex($)
   <br><br><b>Class TIME, V2</b>
   <li>time:$time RTC: [failed|working]</li>
   <li>date:$date</li>
-  <li>timeOffset: UTC-Offset: $utco DST-Offset(minutes): $dsto DST-Start: $start DST-End: $end</li>
-  
+  <li>timeOffset: UTC-Offset: $utco DST-Offset(minutes): $dsto DST-Start:
+      $start DST-End: $end</li>
+
   <br><br><b>Class TIME_PARAMETERS, V1</b>
   <li>timeParameters: date: $date time(UTC): $time</li>
   
