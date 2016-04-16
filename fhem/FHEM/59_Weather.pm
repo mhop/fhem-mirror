@@ -100,21 +100,6 @@ sub degrees_to_direction($@) {
    return $directions_txt_i18n[$mod];
 }
 
-sub F_to_C($) {
-    my ($F)= @_;
-    return(int(($F-32)*5/9+0.5));
-}    
-
-sub inHg_to_hPa($) {
-    my ($inHg)= @_;
-    return int($inHg/33.86390+0.5);
-}
-
-sub miles_to_km($) {
-    my ($miles)= @_;
-    return int(1.609347219*$miles+0.5);
-}
-
 ################################### 
 sub Weather_RetrieveData($$) {
     my ($name, $blocking) = @_;
@@ -132,9 +117,32 @@ sub Weather_RetrieveData($$) {
         hash => $hash,
     );
 
-    YahooWeatherAPI_RetrieveData(\%args);
+    my $maxage= $hash->{fhem}{allowCache} ? 600 : 0; # use cached data if allowed
+    $hash->{fhem}{allowCache}= 1;
+    YahooWeatherAPI_RetrieveDataWithCache($maxage, \%args);
 }
 
+
+sub Weather_ReturnWithError($$$$$) {
+    my ($hash, $doTrigger, $err, $pubDate, $pubDateComment)= @_;
+    my $name= $hash->{NAME};
+
+    $hash->{fhem}{allowCache}= 0; # do not use cache on next try
+    
+    Log3 $hash, 3, "$name: $err";
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "lastError", $err);
+    readingsBulkUpdate($hash, "pubDateComment", $pubDateComment) if(defined($pubDateComment));
+    readingsBulkUpdate($hash, "pubDateRemote", $pubDate) if(defined($pubDate));
+    readingsBulkUpdate($hash, "validity", "stale");
+    readingsEndUpdate($hash, $doTrigger);
+    
+    my $next= 60; # $next= $hash->{INTERVAL}; 
+    Weather_RearmTimer($hash, gettimeofday()+$next);
+    
+    return;
+}    
+    
 sub Weather_RetrieveDataFinished($$$) {
 
     my ($argsRef, $err, $response)= @_;
@@ -143,76 +151,23 @@ sub Weather_RetrieveDataFinished($$$) {
     my $name= $hash->{NAME};
     my $doTrigger= $argsRef->{blocking} ? 0 : 1;
 
-    
-    # the next 4 stanzas need to be rewritten, they are too repetitive for my taste
-    
     # check for error from retrieving data 
-    if($err) {
-        Log3 $hash, 3, "$name: $err";
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "lastError", $err);
-        readingsBulkUpdate($hash, "validity", "stale");
-        readingsEndUpdate($hash, $doTrigger);
-        Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
-        return;
-    }
+    return Weather_ReturnWithError($hash, $doTrigger, $err, undef, undef) if($err);
     
     # decode JSON data from Weather Channel
     my $data;
     ($err, $data)= YahooWeatherAPI_JSONReturnChannelData($response);
-    if($err) {
-        Log3 $hash, 3, "$name: $err";
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "lastError", $err);
-        readingsBulkUpdate($hash, "validity", "stale");
-        readingsEndUpdate($hash, $doTrigger);
-        Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
-        return;
-    }
+    return Weather_ReturnWithError($hash, $doTrigger, $err, undef, undef) if($err);
     
     # check if up-to-date
     my ($pubDateComment, $pubDate, $pubDateTs)= YahooWeatherAPI_pubDate($data);
-    if(!defined($pubDateTs)) {
-        Log3 $hash, 3, "$name: $pubDateComment";
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "lastError", $pubDateComment);
-        readingsBulkUpdate($hash, "pubDateComment", $pubDateComment);
-        readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
-        readingsBulkUpdate($hash, "validity", "stale");
-        readingsEndUpdate($hash, $doTrigger);
-        Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
-        return;
-    } else {
-        my $ts= defined($hash->{READINGS}{pubDateTs}) ? $hash->{READINGS}{pubDateTs}{VAL} : 0;
-        if($ts> $pubDateTs) {
-            $err= "stale data received";
-            Log3 $hash, 3, "$name: $err";
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash, "lastError", $err);
-            readingsBulkUpdate($hash, "pubDateComment", $pubDateComment);
-            readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
-            readingsBulkUpdate($hash, "validity", "stale");
-            readingsEndUpdate($hash, $doTrigger);
-            Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
-            return;
-        }
-    }
-  
-    # units
-    my $units= YahooWeatherAPI_units($data); # units hash reference
-    if($units->{temperature} ne "C") {
-        $err= "wrong units received";
-        Log3 $hash, 3, "$name: $err";
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "lastError", $err);
-        readingsBulkUpdate($hash, "pubDateComment", $pubDateComment);
-        readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
-        readingsBulkUpdate($hash, "validity", "stale");
-        readingsEndUpdate($hash, $doTrigger);
-        Weather_RearmTimer($hash, gettimeofday()+$hash->{INTERVAL});
-        return;
-    }
-  
+    return Weather_ReturnWithError($hash, $doTrigger, $pubDateComment, $pubDate, $pubDateComment)
+        unless(defined($pubDateTs));
+    my $ts= defined($hash->{READINGS}{pubDateTs}) ? $hash->{READINGS}{pubDateTs}{VAL} : 0;
+    return Weather_ReturnWithError($hash, $doTrigger, "stale data received", $pubDate, $pubDateComment)
+        if($ts> $pubDateTs);
+    
+    
     #
     # from here on we assume that $data is complete and correct
     #
@@ -249,20 +204,26 @@ sub Weather_RetrieveDataFinished($$$) {
     
     readingsBeginUpdate($hash);
     
+    # delete some unused readings
+    delete($hash->{READINGS}{temp_f}) if(defined($hash->{READINGS}{temp_f}));
+    delete($hash->{READINGS}{unit_distance}) if(defined($hash->{READINGS}{unit_distance}));
+    delete($hash->{READINGS}{unit_speed}) if(defined($hash->{READINGS}{unit_speed}));
+    delete($hash->{READINGS}{unit_pressuree}) if(defined($hash->{READINGS}{unit_pressuree}));
+    delete($hash->{READINGS}{unit_temperature}) if(defined($hash->{READINGS}{unit_temperature}));
+
+    
+    
+    # convert to metric units as far as required
+    my $isConverted= YahooWeatherAPI_ConvertChannelData($data);
+       
     # housekeeping information
     readingsBulkUpdate($hash, "lastError", "");
     readingsBulkUpdate($hash, "pubDateComment", $pubDateComment);
     readingsBulkUpdate($hash, "pubDate", $pubDate);
     readingsBulkUpdate($hash, "pubDateRemote", $pubDate);
     readingsBulkUpdate($hash, "pubDateTs", $pubDateTs);
+    readingsBulkUpdate($hash, "isConverted", $isConverted);
     readingsBulkUpdate($hash, "validity", "up-to-date");
-    
-    # units
-    readingsBulkUpdate($hash, "unit_distance", $units->{distance});
-    readingsBulkUpdate($hash, "unit_speed", $units->{speed});
-    readingsBulkUpdate($hash, "unit_pressuree", $units->{pressure});
-    readingsBulkUpdate($hash, "unit_temperature", $units->{temperature});
-    
     
     # description
     readingsBulkUpdate($hash, "description", $data->{description});
@@ -278,22 +239,16 @@ sub Weather_RetrieveDataFinished($$$) {
     my $windspeed= int($data->{wind}{speed}+0.5);
     readingsBulkUpdate($hash, "wind", $windspeed);
     readingsBulkUpdate($hash, "wind_speed", $windspeed);
-    # wind_chill comes in °F
-    readingsBulkUpdate($hash, "wind_chill", F_to_C($data->{wind}{chill}));
+    readingsBulkUpdate($hash, "wind_chill", $data->{wind}{chill});
     my $winddir= $data->{wind}{direction};
     readingsBulkUpdate($hash, "wind_direction", $winddir);
     my $wdir= degrees_to_direction($winddir, @directions_txt_i18n);
     readingsBulkUpdate($hash, "wind_condition", "Wind: $wdir $windspeed km/h");
     
-    
-    # delete the temp_f reading
-    delete($hash->{READINGS}{temp_f}) if(defined($hash->{READINGS}{temp_f}));
-    
     # atmosphere
     my $humidity= $data->{atmosphere}{humidity}; 
     readingsBulkUpdate($hash, "humidity", $humidity);
-    # pressure is in inHg
-    my $pressure= inHg_to_hPa($data->{atmosphere}{pressure});
+    my $pressure= $data->{atmosphere}{pressure};
     readingsBulkUpdate($hash, "pressure", $pressure);
     readingsBulkUpdate($hash, "visibility", int($data->{atmosphere}{visibility}+0.5));
     my $pressure_trend= $data->{atmosphere}{rising};
@@ -421,8 +376,7 @@ sub Weather_Notify($$) {
   Weather_DisarmTimer($hash);
   my $delay= 10+int(rand(20));
   
-  # delay removed until further notice
-  $delay= 3;
+  #$delay= 3; # delay removed until further notice
   
   Log3 $hash, 5, "Weather $name: FHEM initialization or rereadcfg triggered update, delay $delay seconds.";
   Weather_RearmTimer($hash, gettimeofday()+$delay) ;
@@ -460,6 +414,8 @@ sub Weather_Define($$) {
   $hash->{UNITS}        = "c"; # hardcoded to use degrees centigrade (Celsius)
   $hash->{READINGS}{current_date_time}{TIME}= TimeNow();
   $hash->{READINGS}{current_date_time}{VAL}= "none";
+
+  $hash->{fhem}{allowCache}= 1;
 
   Weather_GetUpdate($hash) if($init_done);
 
