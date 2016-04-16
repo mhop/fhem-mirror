@@ -199,7 +199,7 @@ FW_jqueryReadyFn()
   $("table.attributes tr div.dname")    // Click on attribute fills input value
     .each(function(){
       $(this)
-        .html('<a href="#">'+$(this).html()+'</a>')
+        .html('<a>'+$(this).html()+'</a>')
         .css({cursor:"pointer"})
         .click(function(){
           var aname = "#sel_attr"+$(this).attr("data-name");
