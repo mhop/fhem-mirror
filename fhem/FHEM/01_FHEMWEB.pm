@@ -1684,7 +1684,7 @@ FW_returnFileAsStream($$$$$)
         "HTTP/1.1 404 Not Found\r\n".
         "Content-Length:0\r\n\r\n");
     FW_closeConn($FW_chash);
-    return 0;
+    return -1;
   }
   binmode(FH) if($type !~ m/text/); # necessary for Windows
   my $sz = -s $path;
