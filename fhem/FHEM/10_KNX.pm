@@ -8,6 +8,8 @@
 # ABU 20160326 Added fix for stateFormat
 # ABU 20160327 Removed readingRegex, writingRegex, created stateRegex, stateCmd, added reading-name support, fixed dblog-split
 # ABU 20160403 Fixed various minor perl warnings
+# ABU 20160413 Changed SplitFn
+# ABU 20160414 Changed SplitFn again
 
 package main;
 
@@ -623,6 +625,10 @@ sub KNX_DbLog_split($) {
 	my $tempStr = join (", ", @_);
 	Log (5, "splitFn - enter, attributes: $tempStr");
 	
+	#detect reading - real reading or state?
+	my $isReading = "false"; 
+	$isReading = "true" if ($event =~ m/: /);
+	
 	#split input-string
 	my @strings = split (" ", $event);
 	
@@ -631,14 +637,15 @@ sub KNX_DbLog_split($) {
 	
 	return undef if (not defined ($strings[0]));
 
-	#userreading?
-	if ($strings[0] =~ m/([sg]etG\d+:)|(sender:)|(.*-[sg]et:.*)/)
+	#real reading?
+	if ($isReading =~ m/true/)
 	{
 		#first one is always reading
 		$reading = $strings[0];
 		$reading =~ s/:?$//;
 		$startIndex = 1;
-	} 
+	}
+	#plain state
 	else
 	{
 		#for reading state nothing is supplied
@@ -647,24 +654,33 @@ sub KNX_DbLog_split($) {
 	}
 	
 	return undef if (not defined ($strings[$startIndex]));
+
+	#per default join all single pieces
+	$value = join(" ", @strings[$startIndex..(int(@strings) - 1)]);
 	
-	#on / off
-	if ($strings[$startIndex] =~ m/([oO][nN])|([oO][fF][fF])/)
-	{
-		$value = $strings[$startIndex];
-	}
 	#numeric value?
-	elsif ($strings[$startIndex] =~ /^[+-]?\d*[.,]?\d+/)
+	if ($strings[$startIndex] =~ /^[+-]?\d*[.,]?\d+/)
 	{
 		$value = $strings[$startIndex];
-		$unit = $strings[$startIndex + 1] if (defined ($strings[$startIndex + 1]));
+		#single numeric value? Assume second par is unit...
+		if ((defined ($strings[$startIndex + 1])) && !($strings[$startIndex+1] =~ /^[+-]?\d*[.,]?\d+/)) 
+		{
+			$unit = $strings[$startIndex + 1] if (defined ($strings[$startIndex + 1]));
+		}
 	}
+
+	#numeric value?
+	#if ($strings[$startIndex] =~ /^[+-]?\d*[.,]?\d+/)
+	#{
+	#	$value = $strings[$startIndex];
+	#	$unit = $strings[$startIndex + 1] if (defined ($strings[$startIndex + 1]));
+	#}
 	#string or raw
-	else
-	{
-		$value = join(" ", @strings[$startIndex..(int(@strings) - 1)]);
-	}
-	
+	#else
+	#{
+	#	$value = join(" ", @strings[$startIndex..(int(@strings) - 1)]);
+	#}
+		
 	Log (5, "splitFn - READING: $reading, VALUE: $value, UNIT: $unit");
 	
 	return ($reading, $value, $unit);
