@@ -10,6 +10,7 @@
 # ABU 20160403 Fixed various minor perl warnings
 # ABU 20160413 Changed SplitFn
 # ABU 20160414 Changed SplitFn again
+# ABU 20160416 Changed SplitFn again
 
 package main;
 
@@ -659,7 +660,8 @@ sub KNX_DbLog_split($) {
 	$value = join(" ", @strings[$startIndex..(int(@strings) - 1)]);
 	
 	#numeric value?
-	if ($strings[$startIndex] =~ /^[+-]?\d*[.,]?\d+/)
+	#if ($strings[$startIndex] =~ /^[+-]?\d*[.,]?\d+/)
+	if ($strings[$startIndex] =~ /^[+-]?\d*[.,]?\d+$/)
 	{
 		$value = $strings[$startIndex];
 		#single numeric value? Assume second par is unit...
