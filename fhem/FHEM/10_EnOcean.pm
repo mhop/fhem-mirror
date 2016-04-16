@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2016-04-07
+# 2016-04-16
 
 # PID V1.0.0.9
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
@@ -318,14 +318,14 @@ my %EnO_eepConfig = (
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
-  "D2.11.01" => {attr => {subType => "roomCtrlPanel.01", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
-  "D2.11.02" => {attr => {subType => "roomCtrlPanel.01", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
-  "D2.11.03" => {attr => {subType => "roomCtrlPanel.01", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
-  "D2.11.04" => {attr => {subType => "roomCtrlPanel.01", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
-  "D2.11.05" => {attr => {subType => "roomCtrlPanel.01", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
-  "D2.11.06" => {attr => {subType => "roomCtrlPanel.01", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
-  "D2.11.07" => {attr => {subType => "roomCtrlPanel.01", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
-  "D2.11.08" => {attr => {subType => "roomCtrlPanel.01", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.11.01" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.11.02" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.11.03" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.11.04" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.11.05" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.11.06" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.11.07" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
+  "D2.11.08" => {attr => {subType => "roomCtrlPanel.01", comMode => "biDir", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.20.00" => {attr => {subType => "fanCtrl.00", webCmd => "fanSpeed"}, GPLOT => "EnO_fanSpeed4humi4:FanSpeed/Humi,"},
   "D2.32.00" => {attr => {subType => "currentClamp.00"}, GPLOT => "EnO_D2-32-xx:Current,"},
   "D2.32.01" => {attr => {subType => "currentClamp.01"}, GPLOT => "EnO_D2-32-xx:Current,"},
@@ -798,7 +798,7 @@ sub EnOcean_Define($$) {
         $modules{EnOcean}{defptr}{$def} = $hash;
         my @msg = split(':', $a[3]);        
         my $packetType = hex $msg[1];
-        if ($packetType == 1) {        
+        if ($packetType == 1) {
           my ($data, $rorg, $status);
           #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
           (undef, undef, $rorg, $data, undef, $status, undef) = @msg;
@@ -831,7 +831,7 @@ sub EnOcean_Define($$) {
             $attr{$name}{teachMethod} = '1BS';
             Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
           } elsif ($attr{$name}{subType} eq "4BS" && hex(substr($data, 6, 2)) & 8) {
-            $hash->{helper}{teachInWait} = "4BS";      
+            $hash->{helper}{teachInWait} = "4BS";
             readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
             Log3 $name, 2, "EnOcean $name 4BS teach-in is missing";
           } elsif ($attr{$name}{subType} eq "UTE") {
@@ -852,6 +852,8 @@ sub EnOcean_Define($$) {
             readingsSingleUpdate($hash, "teach", "GP teach-in is missing", 1);
             Log3 $name, 2, "EnOcean $name GP teach-in is missing";
           }
+        } elsif ($packetType == 4) {
+          $hash->{helper}{smartAckLearnWait} = $name;
         }
         EnOcean_Parse($hash, $a[3]);
         if (exists $attr{$name}{eep}) {
@@ -4712,6 +4714,7 @@ sub EnOcean_Set($@)
       my $setpointShiftMax = ReadingsVal($name, "setpointShiftMax", 10);
       my $setpointType = ReadingsVal($name, "setpointType", 'setpointShift');
       my $temperature = ReadingsVal($name, "temperature", 20);
+      my $waitingCmds = ReadingsVal($name, "waitingCmds", 0);
       my $window = ReadingsVal($name, "window", 'closed');
       if ($cmd eq "desired-temp"|| $cmd eq "setpointTemp") {
         if (defined $a[1]) {
@@ -4736,7 +4739,9 @@ sub EnOcean_Set($@)
             $setpointTemp = $a[1];
             readingsBulkUpdate($hash, "setpointTemp", $a[1]);
             readingsBulkUpdate($hash, "state", "T: $temperature H: $humidity SPT: $setpointTemp F: $fanSpeed");
+            readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 1);
             readingsEndUpdate($hash, 1);
+            CommandDeleteReading(undef, "$name smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name setpointTemp $a[1]";
             shift(@a);
           } else {
@@ -4758,7 +4763,9 @@ sub EnOcean_Set($@)
               $setpointShiftMax = $a[1];           
             }
             readingsBulkUpdate($hash, "setpointShiftMax", $setpointShiftMax);
+            readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 2);
             readingsEndUpdate($hash, 1);
+            CommandDeleteReading(undef, "$name smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name setpointShiftMax $a[1]";
             shift(@a);
           } else {
@@ -4774,7 +4781,9 @@ sub EnOcean_Set($@)
             readingsBeginUpdate($hash);
             $setpointType = $a[1];
             readingsBulkUpdate($hash, "setpointType", $setpointType);
+            readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 0x80);
             readingsEndUpdate($hash, 1);
+            CommandDeleteReading(undef, "$name smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name setpointType $a[1]";
             shift(@a);
           } else {
@@ -4791,7 +4800,9 @@ sub EnOcean_Set($@)
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash, "fanSpeed", $a[1]);
             readingsBulkUpdate($hash, "state", "T: $temperature H: $humidity SPT: $setpointTemp F: $fanSpeed");
+            readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 4);
             readingsEndUpdate($hash, 1);
+            CommandDeleteReading(undef, "$name smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name fanSpeed $a[1]";
             shift(@a);
           } else {
@@ -4811,7 +4822,9 @@ sub EnOcean_Set($@)
               $heating = 'off';
               readingsBulkUpdate($hash, "heating", 'off');              
             }
+            readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 0x20);
             readingsEndUpdate($hash, 1);
+            CommandDeleteReading(undef, "$name smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name cooling $a[1]";
             shift(@a);
          } else {
@@ -4831,7 +4844,9 @@ sub EnOcean_Set($@)
               $cooling = 'off';
               readingsBulkUpdate($hash, "cooling", 'off');
             }
+            readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 0x40);
             readingsEndUpdate($hash, 1);
+            CommandDeleteReading(undef, "$name smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name heating $a[1]";
             shift(@a);
           } else {
@@ -4847,7 +4862,9 @@ sub EnOcean_Set($@)
             $occupancy = $a[1];
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash, "occupancy", $a[1]);
+            readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 8);
             readingsEndUpdate($hash, 1);
+            CommandDeleteReading(undef, "$name smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name occupancy $a[1]";
             shift(@a);
          } else {
@@ -4863,7 +4880,9 @@ sub EnOcean_Set($@)
             $window = $a[1];
             readingsBeginUpdate($hash);
             readingsBulkUpdate($hash, "window", $a[1]);
+            readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 0x10);
             readingsEndUpdate($hash, 1);
+            CommandDeleteReading(undef, "$name smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name window $a[1]";
             shift(@a);
          } else {
@@ -4883,7 +4902,8 @@ sub EnOcean_Set($@)
       $heating = $heating eq 'on' ? 0x40 : 0;
       $cooling = $cooling eq 'on' ? 0x20 : 0;
       $window = $window eq 'open' ? 0x10 : 0;
-      $setpointShift = unpack('C', pack('c', $setpointShift));
+      $setpointShift = int(($setpointShift + $setpointShiftMax) * 255 / ($setpointShiftMax * 2));
+      #$setpointShift = unpack('C', pack('c', $setpointShift));
       my %fanSpeed = ('auto' => 0, 'off' =>1, 1 => 2, 2 => 3, 3 => 4);
       $occupancy = $occupancy eq 'occupied' ? 1 : 0;
       $data = sprintf "%02X%02X%02X%02X", $setpointType |$heating | $cooling | $window | 1,
@@ -5652,10 +5672,10 @@ sub EnOcean_Set($@)
       readingsSingleUpdate($hash, "state", $cmd, 1);
     } elsif ($updateState == 0 && $updateStateAttr eq "yes") {
       readingsSingleUpdate($hash, "state", $cmd, 1);
-    } elsif ($updateState == 3) {
+    #} elsif ($updateState == 3) {
       #internal command
-    } else {
-      readingsSingleUpdate($hash, ".info", "await_confirm", 0);
+    #} else {
+    #  readingsSingleUpdate($hash, ".info", "await_confirm", 0);
     }
 
     # send commands
@@ -5837,10 +5857,10 @@ sub EnOcean_Parse($$)
           return $ret;
         }
           
-      } elsif ($learningMode eq "demand" && ($iohash->{Teach} || $iohash->{SmartAckLearn})) {
+      } elsif ($learningMode eq "demand" && $iohash->{Teach}) {
         Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram, please define it.";
         return $ret;
-      } elsif ($learningMode eq "nearfield" && ($iohash->{Teach}|| $iohash->{SmartAckLearn}) && $RSSI <= 60) {
+      } elsif ($learningMode eq "nearfield" && $iohash->{Teach} && $RSSI <= 60) {
         Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram, please define it.";
         return $ret;
       } elsif ($learningMode eq "always") {
@@ -5900,15 +5920,21 @@ sub EnOcean_Parse($$)
     # packet type EVENT
     #EnOcean:PacketType:eventCode:MessageData
     (undef, undef, $funcNumber, $data) = @msg;
+    Log3 undef, 2, "EnOcean EVENTCODE: $funcNumber DATA: $data";
     $funcNumber = hex($funcNumber);
     if ($funcNumber == 2) {
       # smart Ack confirm learn
       my ($priority, $rorg, $func, $type, $postmasterID, $hopCount);
       my $responseTime = 150;
       my $sendData = '';
-      if ($iohash->{SmartAckLearn}) {
-        $data =~ m/^(..)(....)(..)(..)(..)(..)(........)(........)(..)$/;
-        ($priority, $manufID, $rorg, $func, $type, $RSSI, $postmasterID, $senderID, $hopCount) = ($1, $2, $3, $4, $5, $6, $7, $8, $9);
+      my $sendHash = defined($hash) ? $hash : $iohash;
+      my $sendName = $sendHash->{NAME};
+      $data =~ m/^(..)(....)(..)(..)(..)(..)(........)(........)(..)$/;
+      ($priority, $manufID, $rorg, $func, $type, $RSSI, $postmasterID, $senderID, $hopCount) = (hex($1), $2, $3, $4, $5, hex($6), $7, $8, $9);
+      Log3 undef, 2, "EnOcean IOHASH: $iohash PRIORITY: $priority SmartAckLearn: " . (exists($iohash->{SmartAckLearn}) ? 1 : 0) . 
+                     " SmartAckLearnWait: " . (exists($iohash->{helper}{smartAckLearnWait}) ? $iohash->{helper}{smartAckLearnWait} : '');
+      if ($iohash->{SmartAckLearn} || 
+          exists($iohash->{helper}{smartAckLearnWait}) && $iohash->{helper}{smartAckLearnWait} eq $sendName) {
         my $subType = "$rorg.$func.$type";
         if (exists $EnO_eepConfig{$subType}) {
           # EEP supported
@@ -5917,9 +5943,10 @@ sub EnOcean_Parse($$)
           }
           $rorgname = $EnO_rorgname{$rorg};
           if($hash) {
+            delete $iohash->{helper}{smartAckLearnWait};
             $name = $hash->{NAME};
             $subDef = uc(AttrVal($name, "subDef", $hash->{DEF}));
-            if (AttrVal($name, "teachMethod", undef) eq 'smartAck') {
+            if (($priority & 15) == 15) {
               # device exists, learn OUT
               # send response, to delete mailbox
               $rorg = substr(AttrVal($name, "eep", '  '), 0, 2);
@@ -5940,7 +5967,7 @@ sub EnOcean_Parse($$)
               $attr{$name}{manufID} = $manufID;
               $manufID = $EnO_manuf{$manufID} if(exists $EnO_manuf{$manufID});
               $attr{$name}{postmasterID} = $postmasterID;
-              $hash->{SmartAckRSSI} = - hex($RSSI);
+              $hash->{SmartAckRSSI} = $RSSI;
               $attr{$name}{teachMethod} = 'smartAck';
               foreach my $attrCntr (keys %{$EnO_eepConfig{$subType}{attr}}) {
                 if ($attrCntr ne "subDef") {
@@ -5963,15 +5990,21 @@ sub EnOcean_Parse($$)
             }
           } else {
             # device unknown
-            if ($priority & 7 == 7) {
+            if (($priority & 5) == 5) {
               # Smart Ack priority ok (place for mailbox, good RSSI, Local)
-              Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and Smart Ack Teach-In message, please define it.";
+              Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and Smart Ack learn In message, please define it.";
               return "UNDEFINED EnO_$senderID EnOcean $senderID $msg";
+            } elsif (($priority & 4) == 0) {
+              # Smart Ack no place for mailbox
+              $sendData = sprintf "00%04X12", $responseTime;
+              EnOcean_SndRadio(undef, $sendHash, 2, $rorg, $sendData, $postmasterID, '00', $senderID);
+              Log3 $sendName, 2, "EnOcean $sendName Smart Ack learn in from SenderID $senderID Discard learn in, postmaster has no place for further mailbox";
+              return '';
             } else {
               # Smart Ack priority to low
               $sendData = sprintf "00%04X13", $responseTime;
-              EnOcean_SndRadio(undef, $hash, 2, $rorg, $sendData, $postmasterID, '00', $senderID);
-              Log3 undef, 2, "EnOcean Smart Ack teach-in from SenderID $senderID priority to low";
+              EnOcean_SndRadio(undef, $sendHash, 2, $rorg, $sendData, $postmasterID, '00', $senderID);
+              Log3 $sendName, 2, "EnOcean $sendName Smart Ack learn in from SenderID $senderID Discard learn in, priority to low";
               return '';
             }
           }  
@@ -5979,15 +6012,15 @@ sub EnOcean_Parse($$)
           # EEP not supported
           # sent response
           $sendData = sprintf "00%04X11", $responseTime;
-          EnOcean_SndRadio(undef, $hash, 2, $rorg, $sendData, $postmasterID, '00', $senderID);
-          Log3 undef, 2, "EnOcean Smart Ack teach-in from SenderID $senderID with EEP $rorg-$func-$type not supported";
+          EnOcean_SndRadio(undef, $sendHash, 2, $rorg, $sendData, $postmasterID, '00', $senderID);
+          Log3 $sendName, 2, "EnOcean $sendName Smart Ack learn in from SenderID $senderID with EEP $rorg-$func-$type not supported";
           return '';
         }
       } else {
         # smart ack learn not activated
         $sendData = sprintf "00%04XFF", $responseTime;
-        EnOcean_SndRadio(undef, $hash, 2, $rorg, $sendData, $postmasterID, '00', $senderID);
-        Log3 undef, 2, "EnOcean Smart Ack teach-in from SenderID $senderID received, activate learning";
+        EnOcean_SndRadio(undef, $sendHash, 2, $rorg, $sendData, $postmasterID, '00', $senderID);
+        Log3 $sendName, 2, "EnOcean $sendName Smart Ack learn in from SenderID $senderID received, activate learning";
         return '';        
       }
     }
@@ -9561,35 +9594,33 @@ sub EnOcean_Parse($$)
       # Room Control Panel
       # (D2-11-01 - D2-11-08)
       my $msgType = hex(substr($data, 1, 1));
-      my $setpointType = hex(substr($data, 0, 1) & 8 ? 'setpointTemp' : 'setpointShift');
-      push @event, "3:setpointType:$setpointType";
+      my $setpointType = ReadingsVal($name, "setpointType", 'setpointShift');
+      my $waitingCmds = ReadingsVal($name, "waitingCmds", 0);
+      if (! $waitingCmds & 0x80) {
+        $setpointType = hex(substr($data, 0, 1)) & 8 ? 'setpointTemp' : 'setpointShift';
+        push @event, "3:setpointType:$setpointType";
+      }
       if ($msgType == 2) {
         my $trigger = ($db[5] & 0x60) >> 5;
         my %trigger = (0 => 'heartbeat', 1 => 'sensor', 2 => 'input');
         push @event, "3:trigger:" . $trigger{$trigger};
-        my $temperature = $db[4] / 255 * 40;
+        my $temperature = sprintf "%0.1f", $db[4] / 255 * 40;
         push @event, "3:temperature:$temperature";
-        my $humidity = $db[3] / 2.5;
+        my $humidity = sprintf "%d", $db[3] / 2.5;
         push @event, "3:humidity:$humidity";
-        my $setpointShift = unpack('c', pack('C', $db[2]));
-        push @event, "3:setpointShift:$setpointShift";
+        my $setpointShiftMax = ($db[0] & 0xF0) >> 4;
+        push @event, "3:setpointShiftMax:$setpointShiftMax";        
+        my $setpointShift = int(0.5 + $db[2] * $setpointShiftMax / 128 * 10) / 10 - $setpointShiftMax;
+        push @event, "3:setpointShift:" . sprintf "%0.1f", $setpointShift;
         push @event, "3:setpointBase:$db[1]";
-        push @event, "3:setpointTemp:" . $db[1] * $setpointShift;
-        push @event, "3:setpointShiftMax:" . (($db[0] & 0xF0) >> 4);
+        push @event, "3:setpointTemp:" . sprintf "%0.1f", ($db[1] + $setpointShift);
         my %fanSpeed = (0 => 'auto', 1 => 'off', 2 => 1, 3 => 2, 4 => 3);
         my $fanSpeed = ($db[0] & 0xE) >> 1;
         push @event, "3:fanSpeed:" . $fanSpeed{$fanSpeed};
-        push @event, "3:occupancy:" . $db[0] & 1 ? 'occupied' : 'unoccupied';
-        push @event, "3:state:T: $temperature H: $humidity SPT: " . $db[1] + $setpointShift . " F: " . $fanSpeed{$fanSpeed};
-        if ($trigger == 2) {
-          # parameters changed on device
-          $db[3] = $db[5] & 0x80 | (ReadingsVal($name, "heating", 'off') eq 'on' ? 0x40 : 0) |
-                   (ReadingsVal($name, "cooling", 'off') eq 'on' ? 0x20 : 0) |
-                   (ReadingsVal($name, "window", 'closed') eq 'open' ? 0x10 : 0) | 1;
-          $data = sprintf "%02X%02X%02X%02X", $db[3],  $db[2],  $db[1],  $db[0];
-          EnOcean_SndRadio(undef, $hash, $packetType, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
-        }
-      }      
+        push @event, "3:occupancy:" . ($db[0] & 1 ? 'occupied' : 'unoccupied');
+        push @event, "3:state:T: $temperature H: $humidity SPT: " . ($db[1] + $setpointShift) . " F: " . $fanSpeed{$fanSpeed};
+      }
+      CommandDeleteReading(undef, "$name waitingCmds");
 
     } elsif ($st eq "fanCtrl.00") {
       # Fan Control
@@ -9990,6 +10021,10 @@ sub EnOcean_Parse($$)
       }
     }
 
+  } elsif ($rorg eq "D0") {
+    my %smartAckMailbox = (0 => 'empty', 1 => 'not_exits', 2 => 'reset');
+    push @event, "3:smartAckMailbox:" . $smartAckMailbox{$db[0]}; 
+ 
   } elsif ($rorg eq "B2") {
     # GP complete data (GPCD)
     my ($channel, $channelName, $value, $gpDef, $resolution) = (0, undef, undef, AttrVal($name, 'gpDef', undef), undef);
@@ -14481,7 +14516,7 @@ EnOcean_Delete($$)
   <br><br>
   Fhem and the EnOcean devices must be trained with each other. To this, Fhem
   must be in the learning mode, see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>, 
-  <a href="#EnOcean_smartAck">SmartAck Learning</a> and <a href="#TCM_learningMode">learningMode</a>.  
+  <a href="#EnOcean_smartAck">Smart Ack Learning</a> and <a href="#TCM_learningMode">learningMode</a>.  
   The teach-in procedure depends on the type of the devices.
   <br><br>
   Switches (EEP RPS) and contacts (EEP 1BS) are recognized when receiving the first message.
@@ -14502,7 +14537,7 @@ EnOcean_Delete($$)
   <br><br>  
   Smart Ack Learning is a futher process where devices exchange information about each
   other in order to create the logical links in the EnOcean network and a Post Master Mail Box.
-  It can result in Learn In or Learn Out, see <a href="#EnOcean_smartAck">SmartAck Learning</a>.
+  It can result in Learn In or Learn Out, see <a href="#EnOcean_smartAck">Smart Ack Learning</a>.
   <br><br>  
   Fhem supports many of most common EnOcean profiles and manufacturer-specific
   devices. Additional profiles and devices can be added if required.
@@ -14797,15 +14832,17 @@ EnOcean_Delete($$)
     </ul>
     </li>
 
-    <li><a name="EnOcean_smartAck">SmartAck Learning</a>
+    <li><a name="EnOcean_smartAck">Smart Ack Learning</a>
     <ul>
       <li>Teach-in remote Smart Ack devices</li>
       <br>
       <code>set &lt;IODev&gt; smartAckLearn &lt;t/s&gt;</code>
       <br><br>
       Set Fhem in the Smart Ack learning mode.<br>
+      The post master fuctionality must be activated using the command <code>smartAckMailboxMax</code> in advance.<br>
+      The simple learnmode is supported, see <a href="#TCM_smartAckLearnMode">smartAckLearnMode</a><br>
       A device, which is then also put in this state is to paired with
-      Fhem. Bidirectional Teach-In for 4BS, UTE and Generic Profiles are supported.<br>
+      Fhem. Bidirectional learn in for 4BS, UTE and Generic Profiles are supported.<br>
       <code>IODev</code> is the name of the TCM Module.<br>
       <code>t/s</code> is the time for the learning period.
       <br><br>

@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2016-03-28
+# 2016-04-12
 
 # by r.koenig at koeniglich.de
 #
@@ -523,7 +523,7 @@ TCM_Parse310($$$)
 {
   my ($hash,$rawmsg,$ptr) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 5, "TCM Parse $rawmsg";
+  Log3 $name, 5, "TCM_Parse $rawmsg";
   my $rc = substr($rawmsg, 0, 2);
   my $msg = "";
   if($rc ne "00") {
@@ -552,7 +552,7 @@ TCM_Parse310($$$)
           $part1 = $part1 * 2;
           $part2 = $part2 * 2;
           $part3 = $part3 * 2;
-          my $dataLen = length($data) / 2;
+          my $dataLen = length($data);
           my $dataOut = '';
           while ($dataLen > 0) {
             $data =~ m/^(.{$part1})(.{$part2})(.{$part3})(.*)$/;
@@ -560,7 +560,8 @@ TCM_Parse310($$$)
             $data = $4;
             $dataLen -= $part1 + $part2 + $part3;
           }
-          $data = chop($dataOut);
+          chop($dataOut);
+          $data = $dataOut;
         }
       }
       push @ans, "$k: $data";
@@ -1182,9 +1183,14 @@ TCM_Undef($$)
       mode = 01: Advanced mode - ERP2 - gateway uses Packet Type 10 to transmit and receive radio telegrams
       (for FSK products with advanced protocol)</li>
     <li>smartAckLearn &lt;t/s&gt;<br>
-      Set Fhem in Smart Ack learning mode.</li>
+      Set Fhem in Smart Ack learning mode.<br>
+      The post master fuctionality must be activated using the command <code>smartAckMailboxMax</code> in advance.<br>
+      The simple learnmode is supported, see <a href="#TCM_smartAckLearnMode">smartAckLearnMode</a><br>
+      A device, which is then also put in this state is to paired with
+      Fhem. Bidirectional learn in for 4BS, UTE and Generic Profiles are supported.<br>
+      <code>t/s</code> is the time for the learning period.</li>
     <li>smartAckMailboxMax 0..20<br>
-      Set amount of mailboxes available, 0 = disable post master functionality.
+      Enable the post master fuctionality and set amount of mailboxes available, 0 = disable post master functionality.
       Maximum 28 mailboxes can be created. This upper limit is for each firmware restricted and may be smaller.</li>
     <li>teach &lt;t/s&gt;<br>
       Set Fhem in learning mode for RBS, 1BS, 4BS, GP, STE and UTE teach-in / teach-out, see <a href="#TCM_learningMode">learningMode</a>.<br>
