@@ -131,7 +131,30 @@ my @YahooCodes_pl = (
        'gorąco', 'gdzieniegdzie burze', 'burze', 'burze', 'przelotne opady śniegu', 'duże opady śniegu',
        'ciężkie opady śniegu', 'dużo śniegu', 'częściowe zachmurzenie', 'burze z deszczem', 'opady śniegu', 'przejściowo burze');       
 
+###################################
 
+# Cache
+my %YahooWeatherAPI_CachedData= (); 
+my %YahooWeatherAPI_CachedDataTs= ();
+
+###################################
+
+sub F_to_C($) {
+    my ($F)= @_;
+    return(int(($F-32)*5/9+0.5));
+}    
+
+sub inHg_to_hPa($) {
+    my ($inHg)= @_;
+    return int($inHg/33.86390+0.5);
+}
+
+sub miles_to_km($) {
+    my ($miles)= @_;
+    return int(1.609347219*$miles+0.5);
+}
+
+###################################
 
 # call: YahooWeatherAPI_RetrieveData(%%args)
 #
@@ -144,9 +167,33 @@ my @YahooCodes_pl = (
 #
  
 sub YahooWeatherAPI_RetrieveData($) {
-
     my ($argsRef)= @_;
+    YahooWeatherAPI_RetrieveDataWithCache(0, $argsRef);
+}
+
+sub YahooWeatherAPI_RetrieveDataWithCache($$) {
+
+    my ($maxage, $argsRef)= @_;
     my $woeid= $argsRef->{woeid};
+
+    Log3 undef, 5, "YahooWeatherAPI: retrieve weather for $woeid.";
+   
+    # retrieve data from cache
+    my $ts= $YahooWeatherAPI_CachedDataTs{$woeid};
+    if(defined($ts)) {
+        my $now= time();
+        my $age= $now- $ts;
+        if($age< $maxage) {
+            Log3 undef, 5, "YahooWeatherAPI: data is cached, age $age seconds < $maxage seconds.";
+            $argsRef->{callbackFnRef}($argsRef, "", $YahooWeatherAPI_CachedData{$woeid});
+            return;
+        } else {
+            Log3 undef, 5, "YahooWeatherAPI: cache is expired, age $age seconds > $maxage seconds.";
+        }
+    } else {
+            Log3 undef, 5, "YahooWeatherAPI: no data in cache.";
+    }
+
     my $format= $argsRef->{format};
     my $blocking= $argsRef->{blocking};
     my $callbackFnRef= $argsRef->{callbackFnRef};
@@ -157,14 +204,14 @@ sub YahooWeatherAPI_RetrieveData($) {
 
     if ($blocking) {
         # do not use noshutdown => 0 in parameters
-        my $response = HttpUtils_BlockingGet({ url => $url, timeout => 5 });
+        my $response = HttpUtils_BlockingGet({ url => $url, timeout => 15 });
         my %param= (argsRef => $argsRef);
         YahooWeatherAPI_RetrieveDataFinished(\%param, undef, $response);
     } else {
         # do not use noshutdown => 0 in parameters
         HttpUtils_NonblockingGet({   
             url        => $url,
-            timeout    => 5,
+            timeout    => 15,
             argsRef    => $argsRef,
             callback   => \&YahooWeatherAPI_RetrieveDataFinished,
             });
@@ -172,10 +219,16 @@ sub YahooWeatherAPI_RetrieveData($) {
 }
 
 sub YahooWeatherAPI_RetrieveDataFinished($$$) {
-    my ($paramRef, $err, $xml) = @_;
+    my ($paramRef, $err, $response) = @_;
     my $argsRef= $paramRef->{argsRef};
     #Debug "Finished retrieving Yahoo Weather data for " . $argsRef->{hash}->{NAME};
-    $argsRef->{callbackFnRef}($argsRef, $err, $xml);
+    if(!$err) {
+        my $woeid= $argsRef->{woeid};
+        $YahooWeatherAPI_CachedDataTs{$woeid}= time();
+        $YahooWeatherAPI_CachedData{$woeid}= $response;
+        Log3 undef, 5, "YahooWeatherAPI: caching data.";
+    }
+    $argsRef->{callbackFnRef}($argsRef, $err, $response);
 }
 
 
@@ -184,6 +237,7 @@ sub YahooWeatherAPI_JSONReturnChannelData($) {
     my ($response)= @_;
     return("empty response", undef) unless($response);
     #Debug "Decoding response: $response";
+    #Debug "response: " . Dumper($response);
     my $data;
     eval { $data= decode_json($response) };
     return($@, undef) if($@);
@@ -193,8 +247,32 @@ sub YahooWeatherAPI_JSONReturnChannelData($) {
     #Debug "$count result(s).";
     return("$count result(s) retrieved", undef) unless($count == 1);
     my $channel= $query->{results}{channel};
-    #Debug "Result: " . Dumper($channel);
     return(undef, $channel);
+}
+
+sub YahooWeatherAPI_ConvertChannelData($) {
+    my ($data)= @_; # hash reference
+    
+    $data->{wind}{chill}= F_to_C($data->{wind}{chill}); # wrongly always °F
+    $data->{atmosphere}{pressure}= inHg_to_hPa($data->{atmosphere}{pressure}); # wrongly always in inHg
+    
+
+    my $units= YahooWeatherAPI_units($data); # units hash reference
+    return 0 if($units->{temperature} eq "C");
+    
+    $data->{wind}{speed}= miles_to_km($data->{wind}{speed});
+    $data->{atmosphere}{visibility}= miles_to_km($data->{atmosphere}{visibility});
+
+    my $item= $data->{item};
+    $item->{condition}{temp}= F_to_C($item->{condition}{temp});
+    
+    my $forecast= $item->{forecast};
+    foreach my $fc (@{$forecast}) {
+        $fc->{low}= F_to_C($fc->{low});
+        $fc->{high}= F_to_C($fc->{high});
+    }    
+    return 1;
+
 }
 
        
