@@ -605,8 +605,8 @@ ZWave_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-  my $name   = shift @a;
-  my $type = shift(@a); # always ZWave
+  my $name = shift @a;
+  my $type = shift @a; # always ZWave
 
   my $u = "wrong syntax for $name: define <name> ZWave homeId id [classes]";
   return $u if(int(@a) < 2 || int(@a) > 3);
@@ -633,6 +633,7 @@ ZWave_Define($$)
   AssignIoPort($hash, $proposed);
 
   if(@a) {      # Autocreate: set the classes, execute the init calls
+    asyncOutput($hash->{IODev}{addCL}, "created $name") if($hash->{IODev});
     ZWave_SetClasses($homeId, $id, undef, $a[0]);
   }
   return undef;
@@ -3738,7 +3739,6 @@ ZWave_Parse($$@)
       my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
       return "" if(!$dh);
 
-      asyncOutput($iodev->{addCL}, "addNode ok");
       my $addSecure = $iodev->{addSecure};      # addNode off deletes it
 
       AnalyzeCommand(undef, "set $ioName addNode off")
