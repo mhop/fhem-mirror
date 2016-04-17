@@ -1520,6 +1520,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}= $culHmRegChan{"HM-OU-CFM-PL02"};
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] -regName- -value- ... [-peerChannel-]"
                       ,clear         => "[readings|trigger|register|oldRegs|rssi|msgEvents|attack|all]"
+                      ,templateDel   => "tmplt"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
                        virtual       => "-noButtons-"
@@ -1531,6 +1532,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}= $culHmRegChan{"HM-OU-CFM-PL02"};
                       ,unpair        => ""
                       ,assignHmKey   => ""
                       ,deviceRename  => "newName"
+                      ,fwUpdate      =>"-filename- -bootTime- ..."
 );
 
 %culHmSubTypeDevSets = (# device of this subtype
@@ -1710,15 +1712,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,off            =>""
                                                 ,toggle         =>""
                                                }
-                     ,"HM-Sen-RD-O00"        =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-Sen-LI-O00"        =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-Sen-MDIR-WM5500"   =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-MOD-Re-800"        =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-LC-Bl1PBU-FM00"    =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-LC-Dim1TPBU-FM00"  =>{ fwUpdate       =>"-filename- -bootTime- ..."}
-                     ,"HM-CC-RT-DN00"        =>{ sysTime        =>""
-                                                ,fwUpdate       =>"-filename- -bootTime- ..."
-                                               }
+                     ,"HM-CC-RT-DN00"        =>{ sysTime        =>"" }
                      ,"HM-CC-RT-DN04"        =>{ controlMode    =>"[auto|manual|boost|day|night]"
                                                 ,controlManu    =>"[on|off|5.0..30.0]"
                                                 ,controlParty   =>"-temp- -startDate- -startTime- -enddate- -endTime-"
@@ -1737,7 +1731,6 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                      ,"HM-CC-RT-DN06"        =>{ press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."}
                      ,"HM-TC-IT-WM-W-EU00"   =>{ sysTime        =>""
                                                 ,getSerial      => ""
-                                                ,fwUpdate       =>"-filename- -bootTime- ..."
                                                }
                      ,"HM-TC-IT-WM-W-EU01"   =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
                      ,"HM-TC-IT-WM-W-EU02"   =>{ controlMode    =>"[auto|manual|boost|day|night]"
@@ -1765,8 +1758,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,inhibit        =>"[on|off]"
                                                 ,statusRequest  =>""
                                                }
-                     ,"HM-ES-PMSw1-Pl00"     =>{ fwUpdate       =>"-filename- -bootTime- ..."
-                                                ,getSerial      => ""
+                     ,"HM-ES-PMSw1-Pl00"     =>{ getSerial      => ""
                                                 ,getDevInfo     => ""
                                                }
                      ,"HM-Dis-WM5501"        =>{ displayWM      =>"[long|short|help] -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "}

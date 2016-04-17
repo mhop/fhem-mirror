@@ -566,18 +566,27 @@ sub CUL_HM_Rename($$$) {#############################
   }
   if ($hash->{helper}{role}{chn}){
     my $HMidCh = substr($HMid."01",0,8);
-    foreach my $pId (keys %{$modules{CUL_HM}{defptr}}){
+    foreach my $pId (keys %{$modules{CUL_HM}{defptr}}){#all devices for peer
       my $pH = $modules{CUL_HM}{defptr}{$pId};
       my $pN = $pH->{NAME};
       my $pPeers = AttrVal($pN, "peerIDs", "");
       if ($pPeers =~ m/$HMidCh/){
         CUL_HM_ID2PeerList ($pN,"x",0);
-        foreach my $pR (grep /-$oldName-/,keys%{$pH->{READINGS}}){
+        foreach my $pR (grep /-$oldName-/,keys%{$pH->{READINGS}}){#update reading of the peer
           my $pRn = $pR;
           $pRn =~ s/$oldName/$name/;
-          $pH->{READINGS}{$pRn}{VAL} = $pH->{READINGS}{$pR}{VAL};
+          $pH->{READINGS}{$pRn}{VAL}  = $pH->{READINGS}{$pR}{VAL};
           $pH->{READINGS}{$pRn}{TIME} = $pH->{READINGS}{$pR}{TIME};
           delete $pH->{READINGS}{$pR};
+        }
+        if (eval "defined(&HMinfo_templateMark)"){
+          foreach my $pT (grep /$oldName:/,keys%{$pH->{helper}{tmpl}}){#update reading of the peer
+            my $param = $pH->{helper}{tmpl}{$pT};
+            my ($px,$tmpl) = split(">",$pT);
+            HMinfo_templateDel($pN,$tmpl,$px);
+            $px =~ s/$oldName/$name/;
+            HMinfo_templateMark($pH,"$px>$tmpl",split(" ",$param));
+          }
         }
       }
     }
@@ -2386,16 +2395,23 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{devH},1,"battery:".   (($err&0x80)?"low"  :"ok"  )];
     }
     elsif($mh{mTp} eq "41") {#01 is channel
-      my($chn,$cnt,$bright) = (hex($mI[0]),hex($mI[1]),hex($mI[2]));
-      my $nextTr = (@mI >3)? (int((1<<((hex($mI[3])>>4)-1))/1.1)."s")
-                           : "-";
-      my $chId = $mh{src}.sprintf("%02X",$chn&0x3f);
+      my($chn,$cnt,$bright,$nextTr) = map{hex($_)} (@mI,0);
+      if ($nextTr){
+        $nextTr = (15 << ($nextTr >> 4) - 4); # strange mapping of literals
+        RemoveInternalTimer($mh{devN}.":motionCheck");
+        InternalTimer(gettimeofday()+$nextTr,"CUL_HM_motionCheck", $mh{devN}.":motionCheck", 0);
+      }
+      else{
+        $nextTr = "none ";
+      }
+      
+      my $chId = $mh{src}.sprintf("%02X",$chn & 0x3f);
       $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
                              
       push @evtEt,[$mh{shash},1,"state:motion"];
       push @evtEt,[$mh{shash},1,"motion:on$target"];
-      push @evtEt,[$mh{shash},1,"motionCount:$cnt"."_next:$nextTr"];
+      push @evtEt,[$mh{shash},1,"motionCount:$cnt"."_next:$nextTr"."s"];
       push @evtEt,[$mh{shash},1,"brightness:$bright"];
     }
     elsif($mh{mTp} eq "70" && $mh{p} =~ m/^7F(..)(.*)/) {
@@ -3678,6 +3694,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 	  $tl = $ok?$tl:"";
       $usg =~ s/ tempTmplSet/ tempTmplSet$tl/;
 	}
+	if (   $usg =~ m/ templateDel/ 
+        && eval "defined(&HMinfo_templateDel)"
+        && keys %{$hash->{helper}{tmpl}}){
+      my $tl = join(",",(sort keys %{$hash->{helper}{tmpl}}));
+#      $tl =~ s/:/>/;
+      $usg =~ s/ templateDel/ templateDel:$tl/;
+	}
+    else{
+      $usg =~ s/ templateDel//;#not an option
+    }
     return $usg;
   }
   elsif($h eq "" && @a != 2) {
@@ -3827,6 +3853,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         foreach my $h(@cH){
           delete $h->{READINGS}{$_}
                foreach (grep /^(\.?)(R-|RegL)/,keys %{$h->{READINGS}});
+          delete $h->{helper}{shadowReg}{$_}
+               foreach (grep /^(\.?)(R-|RegL)/,keys %{$h->{helper}{shadowReg}});
           delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
           CUL_HM_complConfig($h->{NAME});
         }
@@ -4841,9 +4869,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $ret = "verifed with no faults" if (!$ret && $action eq "verify");
     return $ret;
   }
-  elsif($cmd eq "tempTmplSet") { #############################################
+  elsif($cmd eq "tempTmplSet") { ##############################################
     $state= "";
-	return "tempate missing" if (!defined $a[2]);
+	return "template missing" if (!defined $a[2]);
 	CommandAttr(undef, "$name tempListTmpl $a[2]");
 
     my ($fn,$template) = split(":",AttrVal($name,"tempListTmpl",$name));
@@ -4856,6 +4884,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       else{            $template = "$fn:$template"     ;}
     }
     CUL_HM_tempListTmpl($name,"restore",$template);
+  }
+  elsif($cmd eq "templateDel") { ##############################################
+    $state= "";
+	return "template missing" if (!defined $a[2]);
+    my ($p,$t) = split(">",$a[2]);
+    HMinfo_templateDel($name,$t,$p) if (eval "defined(&HMinfo_templateDel)");
+    return;
   }
   elsif($cmd eq "sysTime") { ##################################################
     $state = "";
@@ -8262,6 +8297,11 @@ sub CUL_HM_readValIfTO($){#
   my ($name,$rd,$val) = split(":",shift);#  uncertain:$name:$reading:$value
   readingsSingleUpdate($defs{$name},$rd,$val,1);
 }
+sub CUL_HM_motionCheck($){# 
+  my ($name) = split(":",shift);#  uncertain:$name:$reading:$value 
+  CUL_HM_UpdtReadBulk($defs{$name},1,"state:noMotion"
+                                    ,"motion:no");
+}
 
 sub CUL_HM_getAttr($$$){#return attrValue - consider device if empty
   my ($name,$attrName,$default) = @_;
@@ -9206,6 +9246,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             </li>
             <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
               Set the attribut and apply the change to the device
+            </li>
+            <li><B>templateDel   =>" &lt;template&gt; </B><br>
+              Delete templateentry for this entity
             </li>
             <li><B>partyMode &lt;HH:MM&gt;&lt;durationDays&gt;</B><br>
               set control mode to party and device ending time. Add the time it ends
@@ -10570,6 +10613,10 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>tempTmplSet   =>"[[ &lt;file&gt; :]templateName]</B><br>
               Setzt das Attribut und sendet die Änderungen an das Device.
             </li>
+            <li><B>templateDel   =>" &lt;template&gt; </B><br>
+              Löscht eine Templateeintrag an dieser entity.
+            </li>
+
           </ul><br>
         </li>
         <li>OutputUnit (HM-OU-LED16)
