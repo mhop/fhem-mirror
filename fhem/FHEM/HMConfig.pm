@@ -236,7 +236,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00AB" => {name=>"HM-LC-SW4-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"00AC" => {name=>"HM-ES-PMSw1-Pl"          ,st=>'powerMeter'        ,cyc=>'00:10' ,rxt=>''       ,lst=>'1,3:1p,4:3p.4p.5p.6p'
                                                                                                                         ,chn=>"Sw:1:1,Pwr:2:2,SenPwr:3:3,SenI:4:4,SenU:5:5,SenF:6:6"}
- ,"00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:b'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2.3p,8:2,9:2'
+ ,"00AD" => {name=>"HM-TC-IT-WM-W-EU"        ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:b'    ,lst=>'p:1p.2p.6p.7p,3:3p.6p,1,7:2.3p.7p,8:2,9:2'
                                                                                                                         ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3,remote:6:6,SwitchTr:7:7",}
  ,"00AE" => {name=>"HM-WDS100-C6-O-2"        ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w:b'  ,lst=>'1:4'          ,chn=>"",}
  ,"00AF" => {name=>"HM-OU-CM-PCB"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''       ,lst=>'3'            ,chn=>"",}
@@ -809,7 +809,8 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   noMinMax4Manu   =>{a=> 14.6,s=>0.1,l=>7,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"min/max is irrelevant for manual mode",lit=>{off=>0,on=>1}},
   showWeekday     =>{a=> 14.7,s=>0.1,l=>7,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"show weekday"                         ,lit=>{off=>0,on=>1}},
                                                     
-  hyst2point      =>{a=> 15.0,s=>0.5,l=>7,min=>0    ,max=>2     ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
+  #hyst2point addr is 15 according to XML - not to my device
+  hyst2point      =>{a=> 21.0,s=>0.5,l=>7,min=>0    ,max=>2     ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
   heatCool        =>{a=> 15.7,s=>0.1,l=>7,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select heating or cooling"            ,lit=>{heating=>0,cooling=>1}},
   weekPrgSel      =>{a=> 16.0,s=>1.0,l=>7,min=>0    ,max=>2     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select week program"                  ,lit=>{prog1=>0,prog2=>1,prog3=>2}},
                                                     
@@ -1217,14 +1218,14 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,winOpnTemp      =>1,winOpnPeriod    =>1,winOpnBoost     =>1,winOpnMode      =>1
                          ,winOpnDetFall   =>1
                          }
- ,"HM-CC-RT-DN06"     =>{ sign            =>1,CtrlRc          =>1,TempRC          =>1}
+ ,"HM-CC-RT-DN06"     =>{                     CtrlRc          =>1,TempRC          =>1}
  ,"HM-TC-IT-WM-W-EU02"=>{ dayTemp         =>1,nightTemp       =>1,tempMin         =>1,tempMax         =>1,tempOffset      =>1
-                         ,hyst2point      =>1,heatCool        =>1,boostPeriod     =>1,winOpnBoost     =>1
+                                             ,heatCool        =>1,boostPeriod     =>1,winOpnBoost     =>1
                          ,showWeekday     =>1,showInfo        =>1,showSetTemp     =>1,showHumidity    =>1
                          ,noMinMax4Manu   =>1,daylightSaveTime=>1,sendWeatherData =>1
                          ,modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1
                          }
- ,"HM-TC-IT-WM-W-EU07"=>{ sign            =>1}
+ ,"HM-TC-IT-WM-W-EU07"=>{ hyst2point      =>1}
  ,"HM-ES-PMSw1-Pl01"  =>{ OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
