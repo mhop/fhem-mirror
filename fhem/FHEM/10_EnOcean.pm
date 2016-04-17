@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2016-04-16
+# 2016-04-17
 
 # PID V1.0.0.9
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
@@ -9596,7 +9596,7 @@ sub EnOcean_Parse($$)
       my $msgType = hex(substr($data, 1, 1));
       my $setpointType = ReadingsVal($name, "setpointType", 'setpointShift');
       my $waitingCmds = ReadingsVal($name, "waitingCmds", 0);
-      if (! $waitingCmds & 0x80) {
+      if (($waitingCmds & 0x80) == 0) {
         $setpointType = hex(substr($data, 0, 1)) & 8 ? 'setpointTemp' : 'setpointShift';
         push @event, "3:setpointType:$setpointType";
       }
