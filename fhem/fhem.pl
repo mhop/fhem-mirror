@@ -117,7 +117,7 @@ sub getUniqueId();
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
-sub parseParams($);
+sub parseParams($;$);
 sub perlSyntaxCheck($%);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
@@ -1696,73 +1696,6 @@ LoadModule($;$)
   return $m;
 }
 
-
-#####################################
-sub
-parseParams($)
-{
-  my($cmd) = @_;
-  my(@a, %h);
-
-  my @params;
-  if( ref($cmd) eq 'ARRAY' ) {
-    @params = @{$cmd};
-  } else {
-    @params = split(' ', $cmd);
-  }
-
-  while (@params) {
-    my $param = shift(@params);
-    my ($key, $value) = split( '=', $param, 2 );
-
-    if( !defined( $value ) ) {
-      $value = $key;
-      $key = undef;
-    }
-
-    #collect all parts until the closing ' or "
-    while( $param && $value =~ m/^('|")/ && $value !~ m/$1$/ ) {
-      my $next = shift(@params);
-      last if( !defined($next) );
-      $value .= " ". $next;
-    }
-    #remove matching ' or " from the start and end
-    if( $value =~ m/^('|")/ && $value =~ m/$1$/ ) {
-      $value =~ s/^.(.*).$/$1/;
-    }
-
-    #collext all parts until opening { and closing } are matched
-    if( $value =~ m/^{/ ) { # } for vim match
-      my $count = 0;
-      for my $i (0..length($value)-1) {
-        my $c = substr($value, $i, 1);
-        ++$count if( $c eq '{' );
-        --$count if( $c eq '}' );
-      }
-
-      while( $param && $count != 0 ) {
-        my $next = shift(@params);
-        last if( !defined($next) );
-        $value .= " ". $next;
-
-        for my $i (0..length($next)-1) {
-          my $c = substr($next, $i, 1);
-          ++$count if( $c eq '{' );
-          --$count if( $c eq '}' );
-        }
-      }
-    }
-
-    if( defined($key) ) {
-      $h{$key} = $value;
-    } else {
-      push @a, $value;
-    }
-
-  }
-
-  return(\@a, \%h);
-}
 
 #####################################
 sub
@@ -4626,6 +4559,7 @@ Authenticate($$)
   return $needed;
 }
 
+#####################################
 sub
 RefreshAuthList()
 {
@@ -4641,6 +4575,7 @@ RefreshAuthList()
   $auth_refresh = 0;
 }
 
+#####################################
 sub
 perlSyntaxCheck($%)
 {
@@ -4648,11 +4583,84 @@ perlSyntaxCheck($%)
 
   my $psc = AttrVal("global", "perlSyntaxCheck", ($featurelevel>5.7) ? 1 : 0);
   return undef if(!$psc || !$init_done);
-  return undef if($exec !~ m/^\s*{.*}$/);
 
-  $exec = EvalSpecials("{return undef; $exec}", %specials);
-  my $r = AnalyzePerlCommand(undef, $exec);
-  return $r;
+  my ($arr, $hash) = parseParams($exec, ';');
+  for my $cmd (@{$arr}) {
+    next if($cmd !~ m/^\s*{/); # } for match
+    $cmd = EvalSpecials("{return undef; $cmd}", %specials);
+    my $r = AnalyzePerlCommand(undef, $cmd);
+    return $r if($r);
+  }
+  return undef;
 }
+
+#####################################
+sub
+parseParams($;$)
+{
+  my($cmd, $separator) = @_;
+  $separator = ' ' if( !$separator );
+  my(@a, %h);
+
+  my @params;
+  if( ref($cmd) eq 'ARRAY' ) {
+    @params = @{$cmd};
+  } else {
+    @params = split($separator, $cmd);
+  }
+
+  while (@params) {
+    my $param = shift(@params);
+    my ($key, $value) = split( '=', $param, 2 );
+
+    if( !defined( $value ) ) {
+      $value = $key;
+      $key = undef;
+    }
+
+    #collect all parts until the closing ' or "
+    while( $param && $value =~ m/^('|")/ && $value !~ m/$1$/ ) {
+      my $next = shift(@params);
+      last if( !defined($next) );
+      $value .= $separator . $next;
+    }
+    #remove matching ' or " from the start and end
+    if( $value =~ m/^('|")/ && $value =~ m/$1$/ ) {
+      $value =~ s/^.(.*).$/$1/;
+    }
+
+    #collext all parts until opening { and closing } are matched
+    if( $value =~ m/^{/ ) { # } for match
+      my $count = 0;
+      for my $i (0..length($value)-1) {
+        my $c = substr($value, $i, 1);
+        ++$count if( $c eq '{' );
+        --$count if( $c eq '}' );
+      }
+
+      while( $param && $count != 0 ) {
+        my $next = shift(@params);
+        last if( !defined($next) );
+        $value .= $separator . $next;
+
+        for my $i (0..length($next)-1) {
+          my $c = substr($next, $i, 1);
+          ++$count if( $c eq '{' );
+          --$count if( $c eq '}' );
+        }
+      }
+    }
+
+    if( defined($key) ) {
+      $h{$key} = $value;
+    } else {
+      push @a, $value;
+    }
+
+  }
+
+  return(\@a, \%h);
+}
+
 
 1;
