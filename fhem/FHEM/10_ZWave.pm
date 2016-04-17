@@ -3738,20 +3738,21 @@ ZWave_Parse($$@)
       my $dh = $modules{ZWave}{defptr}{"$homeId $1"};
       return "" if(!$dh);
 
+      asyncOutput($iodev->{addCL}, "addNode ok");
+      my $addSecure = $iodev->{addSecure};      # addNode off deletes it
+
       AnalyzeCommand(undef, "set $ioName addNode off")
         if($cmd eq 'ZW_ADD_NODE_TO_NETWORK');
 
       ZWave_wakeupTimer($dh, 1) if(ZWave_isWakeUp($dh));
 
-      my $addSecure = $iodev->{addSecure};      # addNode off deletes it
-      if($addSecure) {
-        return "" if (ZWave_secIncludeStart($dh, $iodev) == 1);
-      }
+      return "" if($addSecure && ZWave_secIncludeStart($dh, $iodev) == 1);
       return ZWave_execInits($dh, 0);
     }
 
     # addNode off generates ZW_ADD_NODE_TO_NETWORK:done sometimes (#51411)
     if($evt eq "failed" && $cmd eq 'ZW_ADD_NODE_TO_NETWORK') {
+      asyncOutput($iodev->{addCL}, "addNode failed");
       AnalyzeCommand(undef, "set $ioName addNode off")
     }
 

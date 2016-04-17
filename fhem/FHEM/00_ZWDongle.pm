@@ -181,6 +181,14 @@ ZWDongle_Set($@)
     } else {
       delete($hash->{addSecure});
     }
+
+    if($a[0]) { # Remember the client for the failed message
+      if($a[0] eq "off") {
+        delete($hash->{addCL});
+      } elsif($hash->{CL}) {
+        $hash->{addCL} = $hash->{CL};
+      }
+    }
   }
 
   my $par = $sets{$type}{param};
