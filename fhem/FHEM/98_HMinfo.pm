@@ -2281,11 +2281,16 @@ sub HMinfo_templateSet(@){#####################################################
     return $ret if ($ret);
   }
   my ($ret,undef) = CUL_HM_Set($aHash,$aName,"regSet","exec",split(",",$regCh[0]),$pName);
+  HMinfo_templateMark($aHash,$tmplID,@p);
+  return $ret;
+}
+sub HMinfo_templateMark(@){####################################################
+  my ($aHash,$tmplID,@p) = @_;
   $aHash->{helper}{tmpl}{$tmplID} = join(" ",@p);
   $HMConfig::culHmTpl{tmplUsgChange} = 1; # mark change
   $aHash->{helper}{tmplChg} = 1;
   CUL_HM_setTmplDisp($aHash);#set readings if desired
-  return $ret;
+  return;
 }
 sub HMinfo_templateDel(@){#####################################################
   my ($aName,$tmpl,$pSet) = @_;
@@ -2349,6 +2354,9 @@ sub HMinfo_templateChk(@){#####################################################
   }
   else{
     my $pRnm = $pName ? $pName."-" : "";
+    if ($pName){
+      $pRnm = $pName.(($defs{$pName}{helper}{role}{dev})?"_chn-01-":"-");
+    }
     my $pRnmLS = $pTyp eq "long"?"lg":($pTyp eq "short"?"sh":"");
     foreach my $rn (keys%{$HMConfig::culHmTpl{$tmpl}{reg}}){
       my $regV;
