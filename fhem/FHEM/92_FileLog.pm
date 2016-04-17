@@ -874,11 +874,11 @@ RESCAN:
     }
 
     my $j = $i+1;
-    $data{"min$j"} = $min[$i] == 999999 ? "undef" : $min[$i];
-    $data{"max$j"} = $max[$i] == -999999 ? "undef" : $max[$i];
-    $data{"avg$j"} = $cnt[$i] ? sprintf("%0.1f", $sum[$i]/$cnt[$i]) : "undef";
+    $data{"min$j"} = $min[$i];
+    $data{"max$j"} = $max[$i];
+    $data{"avg$j"} = $cnt[$i] ? sprintf("%0.1f", $sum[$i]/$cnt[$i]) : 0;
     $data{"sum$j"} = $sum[$i];
-    $data{"cnt$j"} = $cnt[$i] ? $cnt[$i] : "undef";
+    $data{"cnt$j"} = $cnt[$i];
     $data{"currval$j"} = $lastv[$i];
     $data{"currdate$j"} = $lastd[$i];
     $data{"firstval$j"} = $firstv[$i];
