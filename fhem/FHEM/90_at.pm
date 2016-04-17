@@ -70,7 +70,7 @@ at_Define($$)
 
   } elsif($tspec =~ m/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)$/) {
     my ($y,$m,$d,$h,$m2,$s) = ($1,$2,$3,$4,$5,$6);
-    $abstime = mktime($s,$m2,$h,$d,$m-1,$y-1900);
+    $abstime = mktime($s,$m2,$h,$d,$m-1,$y-1900, 0,0,-1);
 
   } else {
     ($err, $hr, $min, $sec, $fn) = GetTimeSpec($tspec);
@@ -105,7 +105,8 @@ at_Define($$)
   } else {
     my @lt = localtime($ot);
     ($lt[2], $lt[1], $lt[0]) = ($hr+0, $min+0, $sec+0);
-    $nt = mktime(@lt[0..6]);
+    $lt[8] = -1; # Forum #52074
+    $nt = mktime(@lt);
     $nt += at_SecondsTillTomorrow($nt) if($ot >= $nt);  # Do it tomorrow...
 
   }
