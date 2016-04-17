@@ -584,7 +584,9 @@ sub FRITZBOX_Get($@)
 #get Fritzbox tr064command InternetGatewayDevice:1 deviceinfo GetInfo
 #get Fritzbox tr064command LANEthernetInterfaceConfig:1 lanethernetifcfg GetStatistics
       Log3 $name, 3, "FRITZBOX: get $name $cmd ".join(" ", @val);
-
+      my ($a, $h) = parseParams( join (" ", @val) );
+      @val = @$a;
+      #{ use Data::Dumper;; Dumper parseParams("{ a;;b };;c;;{ d;;e }", ';;') }
       return "Wrong number of arguments, usage: get $name tr064command service control action [argName1 argValue1] [argName2 argValue2] ..."
          if int @val <3 || int(@val) %2 !=1;
 
