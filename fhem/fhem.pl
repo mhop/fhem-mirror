@@ -117,6 +117,7 @@ sub getUniqueId();
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
+sub parseParams($);
 sub perlSyntaxCheck($%);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
@@ -1567,7 +1568,9 @@ DoSet(@)
   return "No set implemented for $dev" if(!$modules{$hash->{TYPE}}{SetFn});
 
   # No special handling needed fo the Usage check
-  return CallFn($dev, "SetFn", $hash, @a) if($a[1] && $a[1] eq "?");
+  return CallFn($dev, "SetFn", $hash,
+        $modules{$hash->{TYPE}}->{parseParams} ? parseParams(\@a) : @a)
+    if($a[1] && $a[1] eq "?");
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
   my $err;
@@ -1575,7 +1578,8 @@ DoSet(@)
   return $err if($err);
 
   $hash->{".triggerUsed"} = 0; 
-  my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, @a);
+  my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, 
+                $modules{$hash->{TYPE}}->{parseParams} ? parseParams(\@a) : @a);
   return $ret if($ret);
   return undef if($skipTrigger);
 
@@ -1638,7 +1642,8 @@ CommandGet($$)
 
     $a[0] = $sdev;
     $defs{$sdev}->{CL} = $cl;
-    my $ret = CallFn($sdev, "GetFn", $defs{$sdev}, @a);
+    my $ret = CallFn($sdev, "GetFn", $defs{$sdev}, 
+        $modules{$defs{$sdev}->{TYPE}}->{parseParams} ? parseParams(\@a) : @a);
     delete $defs{$sdev}->{CL};
     push @rets, $ret if(defined($ret) && $ret ne "");
   }
@@ -1692,13 +1697,20 @@ LoadModule($;$)
 }
 
 
+#####################################
 sub
 parseParams($)
 {
   my($cmd) = @_;
   my(@a, %h);
 
-  my @params = split(' ', $cmd);
+  my @params;
+  if( ref($cmd) eq 'ARRAY' ) {
+    @params = @{$cmd};
+  } else {
+    @params = split(' ', $cmd);
+  }
+
   while (@params) {
     my $param = shift(@params);
     my ($key, $value) = split( '=', $param, 2 );
@@ -1720,7 +1732,7 @@ parseParams($)
     }
 
     #collext all parts until opening { and closing } are matched
-    if( $value =~ m/^{/ ) {
+    if( $value =~ m/^{/ ) { # } for vim match
       my $count = 0;
       for my $i (0..length($value)-1) {
         my $c = substr($value, $i, 1);
@@ -1814,7 +1826,8 @@ CommandDefine($$)
   # in the global hash.
   $defs{$name} = \%hash;
 
-  my $ret = CallFn($name, "DefFn", \%hash, $def);
+  my $ret = CallFn($name, "DefFn", \%hash, 
+                $modules{$m}->{parseParams} ? parseParams($def) : $def);
   if($ret) {
     Log 1, "define $def: $ret";
     delete $defs{$name};                            # Veto
@@ -1854,7 +1867,8 @@ CommandModify($$)
   $hash->{OLDDEF} = $hash->{DEF};
   $hash->{DEF} = $a[1];
   my $ret = CallFn($a[0], "DefFn", $hash,
-        "$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]" : ""));
+                    $modules{$hash->{TYPE}}->{parseParams} ? parseParams($def) :
+                      "$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]" : ""));
   if($ret) {
     $hash->{DEF} = $hash->{OLDDEF};
   } else {
