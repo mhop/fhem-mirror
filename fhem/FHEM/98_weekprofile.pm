@@ -60,17 +60,24 @@ sub weekprofile_getDeviceType($$;$)
   }
   
   my $type = undef;
-
+  
   if ($devHash->{TYPE} =~ /CUL_HM/){
     my $model = AttrVal($device,"model","");
+    
+    #models: HM-TC-IT-WM-W-EU, HM-CC-RT-DN, HM-CC-TC
+    unless ($model =~ m/.*HM-[C|T]C-.*/) {
+      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME}, model $model is not supported";
+      return undef;
+    }
+    
     if (!defined($devHash->{chanNo})) { #no channel device
-      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME}, $model, has no chanNo";
+      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME}, model $model has no chanNo";
       return undef;
     }
     
     my $channel = $devHash->{chanNo};
     unless ($channel =~ /^\d+?$/) {
-      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME}, $model, chanNo $channel is no number";
+      Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME}, model $model chanNo $channel is no number";
       return undef;
     }
     
@@ -96,7 +103,11 @@ sub weekprofile_getDeviceType($$;$)
     $type = "WEEKPROFILE";
   }
   
-  Log3 $me, 5, "$me(getDeviceType): $devHash->{NAME} is type $type";
+  if (defined($type)) {
+    Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME} is type $type";
+  } else {
+    Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME} is not supported";
+  }
   return $type;
 }
 
