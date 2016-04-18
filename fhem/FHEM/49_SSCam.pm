@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.25   18.04.2016    motion detection parameters can be entered if  
+#                      motion detection by camera or SVS is used
 # 1.24   16.04.2016    behavior of "set ... on" changed, Attr "recextend" added
 #                      please have a look at commandref and Wiki
 #                      bugfix: setstate-warning if FHEM will restarted and SVS is not reachable
@@ -303,16 +305,13 @@ sub SSCam_Set {
         my $opt     = $a[1];
         my $prop    = $a[2];
         my $prop1   = $a[3];
+        my $prop2   = $a[4];
+        my $prop3   = $a[5];
         my $camname = $hash->{CAMNAME}; 
         my $success;
         my $logstr;
         my $setlist;
         my @prop;
-
-                         
-#        my $list .= "on off snap enable disable on-for-timer";
-#        return SetExtensions($hash, $list, $name, $opt) if( $opt eq "?" );
-#        return SetExtensions($hash, $list, $name, $opt) if( !grep( $_ =~ /^\Q$opt\E($|:)/, split( ' ', $list ) ) );
         
         $setlist = "Unknown argument $opt, choose one of ".
                    "credentials ".
@@ -368,6 +367,22 @@ sub SSCam_Set {
             if (!$prop || $prop !~ /^(disable|camera|SVS)$/) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
             
             $hash->{HELPER}{MOTDETSC} = $prop;
+            
+            if ($prop1) {
+                # check ob Zahl zwischen 1 und 99
+                return "invalid value for sensitivity (SVS or camera) - use number between 1 - 99" if ($prop1 !~ /^([1-9]|[1-9][0-9])*$/);
+                $hash->{HELPER}{MOTDETSC_PROP1} = $prop1;
+            }
+            if ($prop2) {
+                # check ob Zahl zwischen 1 und 99
+                return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop2 !~ /^([1-9]|[1-9][0-9])*$/);
+                $hash->{HELPER}{MOTDETSC_PROP2} = $prop2;
+            }
+            if ($prop3) {
+                # check ob Zahl zwischen 1 und 99
+                return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop3 !~ /^([1-9]|[1-9][0-9])*$/);
+                $hash->{HELPER}{MOTDETSC_PROP3} = $prop3;
+            }
             cammotdetsc($hash);
         }
         elsif ($opt eq "credentials") 
@@ -1499,7 +1514,7 @@ sub getcaminfoall {
         readingsSingleUpdate($hash,"PollState","Inactive",0);
 
         Log3($name, 3, "$name - Polling of Camera $camname is currently deactivated");
-        }
+    }
 return;
 }
 
@@ -1704,7 +1719,7 @@ sub getptzlistpatrol ($) {
         return;
         }
 
-        if ($hash->{HELPER}{ACTIVE} ne "on") {
+    if ($hash->{HELPER}{ACTIVE} ne "on") {
         # PTZ-ListPatrols abrufen
         Log3($name, 4, "$name - Retrieval PTZ-ListPatrols of $camname starts now");
                         
@@ -2510,19 +2525,75 @@ sub camop_nonbl ($) {
       }
       $url = "http://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
    }
-   elsif ($OpMode eq "MotDetSc")
+   elsif ($OpMode eq "MotDetSc")  
    {
+      # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
+      # "my" nicht am Anfang setzten !
+      my %motdetoptions = ();    
+        
       if ($hash->{HELPER}{MOTDETSC} eq "disable") {
           $motdetsc = "-1";
+          $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
       }
       elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
           $motdetsc = "0";
+          
+          $motdetoptions{SENSITIVITY} = $hash->{'HELPER'}{'MOTDETSC_PROP1'} if ($hash->{'HELPER'}{'MOTDETSC_PROP1'});
+          $motdetoptions{OBJECTSIZE}  = $hash->{'HELPER'}{'MOTDETSC_PROP2'} if ($hash->{'HELPER'}{'MOTDETSC_PROP2'});
+          $motdetoptions{PERCENTAGE}  = $hash->{'HELPER'}{'MOTDETSC_PROP3'} if ($hash->{'HELPER'}{'MOTDETSC_PROP3'});
+          
+          $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&_sid=\"$sid\"";
+          
+          if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2} || $hash->{HELPER}{MOTDETSC_PROP13}) {
+              # umschalten und neue Werte setzen
+              $url .= "&keep=false";
+          } else {
+              # nur Umschaltung, alte Werte beibehalten
+              $url .= "&keep=true";
+          }
+ 
+          if ($hash->{HELPER}{MOTDETSC_PROP1}) {
+              # der Wert für Bewegungserkennung Kamera -> Empfindlichkeit ist gesetzt
+              my $sensitivity = delete $hash->{HELPER}{MOTDETSC_PROP1};
+              $url .= "&sensitivity=\"$sensitivity\"";
+          }
+          
+          if ($hash->{HELPER}{MOTDETSC_PROP2}) {
+              # der Wert für Bewegungserkennung Kamera -> Objektgröße ist gesetzt
+              my $objectsize = delete $hash->{HELPER}{MOTDETSC_PROP2};
+              $url .= "&objectSize=\"$objectsize\"";
+          }
+ 
+          if ($hash->{HELPER}{MOTDETSC_PROP3}) {
+              # der Wert für Bewegungserkennung Kamera -> Prozentsatz für Auslösung ist gesetzt
+              my $percentage = delete $hash->{HELPER}{MOTDETSC_PROP3};
+              $url .= "&percentage=\"$percentage\"";
+          }          
       }
       elsif ($hash->{HELPER}{MOTDETSC} eq "SVS") {
           $motdetsc = "1";
-      }
+          
+          $motdetoptions{SENSITIVITY} = $hash->{'HELPER'}{'MOTDETSC_PROP1'} if ($hash->{'HELPER'}{'MOTDETSC_PROP1'});
+          $motdetoptions{THRESHOLD}   = $hash->{'HELPER'}{'MOTDETSC_PROP2'} if ($hash->{'HELPER'}{'MOTDETSC_PROP2'});
       
-      $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";   
+          # nur Umschaltung, alte Werte beibehalten
+          $url = "http://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
+
+          
+          if ($hash->{HELPER}{MOTDETSC_PROP1}) {
+              # der Wert für Bewegungserkennung SVS -> Empfindlichkeit ist gesetzt
+              my $sensitivity = delete $hash->{HELPER}{MOTDETSC_PROP1};
+              $url .= "&sensitivity=\"$sensitivity\"";
+          }
+
+          if ($hash->{HELPER}{MOTDETSC_PROP2}) {
+              # der Wert für Bewegungserkennung SVS -> Schwellwert ist gesetzt
+              my $threshold = delete $hash->{HELPER}{MOTDETSC_PROP2};
+              $url .= "&threshold=\"$threshold\"";
+          }
+      }
+      # Optionswerte in Hash sichern für Logausgabe in Befehlsauswertung
+      $hash->{HELPER}{MOTDETOPTIONS} = \%motdetoptions;
    }
    elsif ($OpMode eq "getmotionenum")
    {
@@ -2638,6 +2709,10 @@ sub camret_nonbl ($) {
    my $verbose;
    my $httptimeout;
    my $motdetsc;
+   my ($sensitivity_camCap,$sensitivity_value,$sensitivity_ssCap);
+   my ($threshold_camCap,$threshold_value,$threshold_ssCap);
+   my ($percentage_camCap,$percentage_value,$percentage_ssCap);
+   my ($objectSize_camCap,$objectSize_value,$objectSize_ssCap);
    
    if ($err ne "")                                                                                    
    {
@@ -2749,8 +2824,26 @@ sub camret_nonbl ($) {
                 readingsEndUpdate($hash, 1);
        
                 # Logausgabe
-
-                Log3($name, 3, "$name - Camera $camname motion detection source was set to \"$hash->{HELPER}{MOTDETSC}\"");
+                if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys($hash->{HELPER}{MOTDETOPTIONS})) {
+                    # Optionen für "SVS" sind gesetzt
+                    my $sensitivity = $hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY} ? $hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY} : "-";
+                    my $threshold   = $hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD} ? $hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD} : "-";
+                    
+                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, threshold: $threshold");
+                
+                } elsif ($hash->{HELPER}{MOTDETSC} eq "camera" && keys($hash->{HELPER}{MOTDETOPTIONS})) {
+                    # Optionen für "camera" sind gesetzt
+                    my $sensitivity = $hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY} ? $hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY} : "-";
+                    my $objectSize  = $hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE} ? $hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE} : "-";
+                    my $percentage  = $hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE} ? $hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE} : "-";
+                    
+                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, objectSize: $objectSize, percentage: $percentage");
+ 
+                } else {
+                    # keine Optionen Bewegungserkennung wurden gesetzt
+                    Log3($name, 3, "$name - Camera $camname motion detection source was to \"$hash->{HELPER}{MOTDETSC}\" ");
+                }
+                             
                 Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Snap") 
@@ -3165,14 +3258,57 @@ sub camret_nonbl ($) {
             {              
                 $motdetsc = $data->{'data'}{'MDParam'}{'source'};
                 
+                $sensitivity_camCap = $data->{'data'}{'MDParam'}{'sensitivity'}{'camCap'};
+                $sensitivity_value  = $data->{'data'}{'MDParam'}{'sensitivity'}{'value'};
+                $sensitivity_ssCap  = $data->{'data'}{'MDParam'}{'sensitivity'}{'ssCap'};
+                
+                $threshold_camCap   = $data->{'data'}{'MDParam'}{'threshold'}{'camCap'};
+                $threshold_value    = $data->{'data'}{'MDParam'}{'threshold'}{'value'};
+                $threshold_ssCap    = $data->{'data'}{'MDParam'}{'threshold'}{'ssCap'};
+
+                $percentage_camCap  = $data->{'data'}{'MDParam'}{'percentage'}{'camCap'};
+                $percentage_value   = $data->{'data'}{'MDParam'}{'percentage'}{'value'};
+                $percentage_ssCap   = $data->{'data'}{'MDParam'}{'percentage'}{'ssCap'};
+                
+                $objectSize_camCap  = $data->{'data'}{'MDParam'}{'objectSize'}{'camCap'};
+                $objectSize_value   = $data->{'data'}{'MDParam'}{'objectSize'}{'value'};
+                $objectSize_ssCap   = $data->{'data'}{'MDParam'}{'objectSize'}{'ssCap'};
+                
+                
                 if ($motdetsc == -1) {
                     $motdetsc = "disabled";
                 }
                 elsif ($motdetsc == 0) {
                     $motdetsc = "Camera";
+                    
+                    if ($sensitivity_camCap) {
+                        $motdetsc .= ", sensitivity: $sensitivity_value";
+                    }
+                    if ($threshold_camCap) {
+                        $motdetsc .= ", threshold: $threshold_value";
+                    }
+                    if ($percentage_camCap) {
+                        $motdetsc .= ", percentage: $percentage_value";
+                    }
+                    if ($objectSize_camCap) {
+                        $motdetsc .= ", objectSize: $objectSize_value";
+                    }
                 }
                 elsif ($motdetsc == 1) {
                     $motdetsc = "SVS";
+                    
+                    if ($sensitivity_ssCap) {
+                        $motdetsc .= ", sensitivity: $sensitivity_value";
+                    }
+                    if ($threshold_ssCap) {
+                        $motdetsc .= ", threshold: $threshold_value";
+                    }
+                    if ($percentage_ssCap) {
+                        $motdetsc .= ", percentage: $percentage_value";
+                    }
+                    if ($objectSize_ssCap) {
+                        $motdetsc .= ", objectSize: $objectSize_value";
+                    }
                 }
                 
                 # Setreading 
@@ -3603,18 +3739,6 @@ sub experror {
   return ($error);
 }
 
-############################################################################
-###  Logausgabe
-
-sub printlog {
-  # Übernahmewerte ist $hash, $logstr, $verb (Verbose-Level)
-  my ($hash,$logstr,$verb)= @_;
-  my $name = $hash->{NAME};
-  
-  Log3 ($name, $verb, "$name - $logstr");
-return;
-}
-
 
 1;
 
@@ -3635,6 +3759,7 @@ return;
        <li>Activate a Camera in Synology Surveillance Station</li>
        <li>Control of the exposure modes day, night and automatic </li>
        <li>switchover the motion detection by camera, by SVS or to deactivate  </li>
+       <li>control of motion detection parameters sensitivity, threshold, object size and percentage for release </li>
        <li>Retrieval of Camera Properties (also by Polling) as well as informations about the installed SVS-package</li>
        <li>Move to a predefined Preset-position (at PTZ-cameras) </li>
        <li>Start a predefined Patrol (at PTZ-cameras) </li>
@@ -3902,14 +4027,53 @@ return;
   The successfully execution of this function depends on if SVS supports that functionality of the connected camera.
   Is the field for the Day/Night-mode shown greyed in SVS -&gt; IP-camera -&gt; optimization -&gt; exposure mode, this function will be probably unsupported.  
   
-  <br><br>
+  <br><br><br>
   
   <b> "set &lt;name&gt; motdetsc [camera] [SVS] [disable]" </b> <br><br>
   
   The command "motdetsc" (stands for "motion detection source") switchover the motion detection to the desired mode.
-  If motion detection will be tuned by camera, the original camera settings are kept.
-  The successful execution of that opreration you can retrace by the state in SVS -&gt; IP-camera -&gt; event detection -&gt; motion.
-  The state of motion detection source will also be shown by the <a href="#SSCamreadings">Reading</a> "CamMotDetSc".
+  If motion detection will be done by camera / SVS without any parameters, the original camera motion detection settings are kept.
+  The successful execution of that opreration one can retrace by the state in SVS -&gt; IP-camera -&gt; event detection -&gt; motion. <br><br>
+  
+  For the motion detection further parameter can be specified. The available options for motion detection by SVS are "sensitivity" and "threshold". <br><br>
+  
+  <ul>
+  <table>
+  <colgroup> <col width=50%> <col width=50%> </colgroup>
+      <tr><td>set <name> motdetsc SVS [sensitivity] [threshold]  </td><td># command pattern  </td></tr>
+      <tr><td>set <name> motdetsc SVS 91 30                      </td><td># set the sensitivity to 91 and threshold to 30  </td></tr>
+      <tr><td>set <name> motdetsc SVS 0 40                       </td><td># keep the old value of sensitivity, set threshold to 40  </td></tr>
+      <tr><td>set <name> motdetsc SVS 15                         </td><td># set the sensitivity to 15, threshold keep unchanged  </td></tr>
+  </table>
+  </ul>
+  <br><br>
+  
+  If the motion detection is used by camera, there are the options "sensitivity", "object size", "percentage for release" available. <br><br>
+  
+  <ul>
+  <table>
+  <colgroup> <col width=50%> <col width=50%> </colgroup>
+      <tr><td>set <name> motdetsc camera [sensitivity] [threshold] [percentage] </td><td># command pattern  </td></tr>
+      <tr><td>set <name> motdetsc camera 89 0 20                                </td><td># set the sensitivity to 89, percentage to 20  </td></tr>
+      <tr><td>set <name> motdetsc camera 0 40 10                                </td><td># keep old value for sensitivity, set threshold to 40, percentage to 10  </td></tr>
+      <tr><td>set <name> motdetsc camera 30                                     </td><td># set the sensitivity to 30, other values keep unchanged  </td></tr>
+      </table>
+  </ul>
+  <br><br>
+  
+  Please consider always the sequence of parameters. Unwanted options have to be set to "0" if further options which have to be changed are follow (see example above).
+  The numerical values are between 1 - 99 (except special case "0"). <br><br>
+  
+  The each available options are dependend of camera type respectively the supported functions by SVS. Only the options can be used they are available in 
+  SVS -&gt; edit camera -&gt; motion detection. Further informations please read in SVS online help. <br><br>
+  
+  With the command "get ... caminfoall" the <a href="#SSCamreadings">Reading</a> "CamMotDetSc" also will be updated which documents the current setup of motion detection. 
+  Only the parameters and parameter values supported by SVS at present will be shown. The camera itself may offer further  options to adjust. <br><br>
+  
+  Example:
+  <pre>
+  CamMotDetSc    SVS, sensitivity: 76, threshold: 55
+  </pre>
   
   <br><br>
   
@@ -4155,7 +4319,7 @@ return;
     <tr><td><li>CamLastRecTime</li>     </td><td>- date / starttime / endtime of the last recording   </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Source of Live-View (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Model of camera  </td></tr>
-    <tr><td><li>CamMotDetSc</li>        </td><td>- state of motion detection source (disabled, by camera, by SVS)  </td></tr>
+    <tr><td><li>CamMotDetSc</li>        </td><td>- state of motion detection source (disabled, by camera, by SVS) and their parameter </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port of Camera  </td></tr>
     <tr><td><li>CamPreRecTime</li>      </td><td>- Duration of Pre-Recording (in seconds) adjusted in SVS  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- shared folder on disk station for recordings </td></tr>
@@ -4268,6 +4432,7 @@ return;
       <li>Aktivieren einer Kamera in Synology Surveillance Station</li>
       <li>Steuerung der Belichtungsmodi Tag, Nacht bzw. Automatisch </li>
       <li>Umschaltung der Ereigniserkennung durch Kamera, durch SVS oder deaktiviert  </li>
+      <li>steuern der Erkennungsparameterwerte Empfindlichkeit, Schwellwert, Objektgröße und Prozentsatz für Auslösung </li>
       <li>Abfrage von Kameraeigenschaften (auch mit Polling) sowie den Eigenschaften des installierten SVS-Paketes</li>
       <li>Bewegen an eine vordefinierte Preset-Position (bei PTZ-Kameras) </li>
       <li>Start einer vordefinierten Überwachungstour (bei PTZ-Kameras)  </li>
@@ -4534,14 +4699,52 @@ return;
   Die erfolgreiche Ausführung dieser Funktion ist davon abhängig ob die SVS diese Funktionalität der Kamera unterstützt. 
   Ist in SVS -&gt; IP-Kamera -&gt; Optimierung -&gt; Belichtungsmodus das Feld für den Tag/Nachtmodus grau hinterlegt, ist nicht von einer lauffähigen Unterstützung dieser 
   Funktion auszugehen. 
-  <br><br>
+  <br><br><br>
   
   <b> "set &lt;name&gt; motdetsc [camera] [SVS] [disable]" </b> <br><br>
   
   Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
-  Wird die Bewegungserkennung durch die Kamera eingestellt, werden die originalen Kameraeinstellungen beibehalten.
-  Die erfolgreiche Ausführung der Operation lässt sich u.a anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; Bewegung nachvollziehen.
-  Den Status der Bewegungserkennung  wird ebenfalls durch das <a href="#SSCamreadings">Reading</a> "CamMotDetSc" angezeigt.
+  Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
+  Kamera / SVS beibehalten. Die erfolgreiche Ausführung der Operation lässt sich u.a. anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; 
+  Bewegung nachvollziehen. <br><br>
+  Für die Bewegungserkennung durch SVS bzw. durch Kamera können weitere Optionen angegeben werden. Die verfügbaren Optionen bezüglich der Bewegungserkennung 
+  durch SVS sind "Empfindlichkeit" und "Schwellwert". <br><br>
+  <ul>
+  <table>
+  <colgroup> <col width=50%> <col width=50%> </colgroup>
+      <tr><td>set <name> motdetsc SVS [Empfindlichkeit] [Schwellwert]  </td><td># Befehlsmuster  </td></tr>
+      <tr><td>set <name> motdetsc SVS 91 30                            </td><td># setzt die Empfindlichkeit auf 91 und den Schwellwert auf 30  </td></tr>
+      <tr><td>set <name> motdetsc SVS 0 40                             </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40  </td></tr>
+      <tr><td>set <name> motdetsc SVS 15                               </td><td># setzt die Empfindlichkeit auf 15, Schwellwert bleibt unverändert   </td></tr>
+  </table>
+  </ul>
+  <br><br>
+  
+  Wird die Bewegungserkennung durch die Kamera genutzt, stehen die Optionen "Empfindlichkeit", "Objektgröße" und "Prozentsatz für Auslösung" zur Verfügung. <br><br>
+  <ul>
+  <table>
+  <colgroup> <col width=50%> <col width=50%> </colgroup>
+      <tr><td>set <name> motdetsc camera [Empfindlichkeit] [Schwellwert] [Prozentsatz] </td><td># Befehlsmuster  </td></tr>
+      <tr><td>set <name> motdetsc camera 89 0 20                                       </td><td># setzt die Empfindlichkeit auf 89, Prozentsatz auf 20  </td></tr>
+      <tr><td>set <name> motdetsc camera 0 40 10                                      </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40, Prozentsatz auf 10  </td></tr>
+      <tr><td>set <name> motdetsc camera 30                                            </td><td># setzt die Empfindlichkeit auf 30, andere Werte bleiben unverändert  </td></tr>
+      </table>
+  </ul>
+  <br><br>
+
+  Es ist immer die Reihenfolge der Optionswerte zu beachten. Nicht gewünschte Optionen sind mit "0" zu besetzen sofern danach Optionen folgen 
+  deren Werte verändert werden sollen (siehe Beispiele oben). Der Zahlenwert der Optionen beträgt 1 - 99 (außer Sonderfall "0"). <br><br>
+  
+  Die jeweils verfügbaren Optionen unterliegen der Funktion der Kamera und der Unterstützung durch die SVS. Es können jeweils nur die Optionen genutzt werden die in 
+  SVS -&gt; Kamera bearbeiten -&gt; Ereigniserkennung zur Verfügung stehen. Weitere Infos sind der Online-Hilfe zur SVS zu entnehmen. <br><br>
+  
+  Über den Befehl "get ... caminfoall" wird auch das <a href="#SSCamreadings">Reading</a> "CamMotDetSc" aktualisiert welches die gegenwärtige Einstellung der Bewegungserkennung dokumentiert. 
+  Es werden nur die Parameter und Parameterwerte angezeigt, welche die SVS aktiv unterstützt. Die Kamera selbst kann weiterführende Einstellmöglichkeiten besitzen. <br><br>
+  
+  Beipiel:
+  <pre>
+  CamMotDetSc    SVS, sensitivity: 76, threshold: 55
+  </pre>
   
   <br><br>
   
@@ -4797,7 +5000,7 @@ return;
     <tr><td><li>CamLastRecTime</li>     </td><td>- Datum / Startzeit - Stopzeit der letzten Aufnahme   </td></tr>
     <tr><td><li>CamLiveMode</li>        </td><td>- Quelle für Live-Ansicht (DS, Camera)  </td></tr>
     <tr><td><li>CamModel</li>           </td><td>- Kameramodell  </td></tr>
-    <tr><td><li>CamMotDetSc</li>        </td><td>- Status der Bewegungserkennung (disabled, durch Kamera, durch SVS)  </td></tr>
+    <tr><td><li>CamMotDetSc</li>        </td><td>- Status der Bewegungserkennung (disabled, durch Kamera, durch SVS) und deren Parameter </td></tr>
     <tr><td><li>CamPort</li>            </td><td>- IP-Port der Kamera  </td></tr>
     <tr><td><li>CamPreRecTime</li>      </td><td>- Dauer der der Voraufzeichnung in Sekunden (Einstellung in SVS)  </td></tr>
     <tr><td><li>CamRecShare</li>        </td><td>- gemeinsamer Ordner auf der DS für Aufnahmen  </td></tr>
