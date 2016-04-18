@@ -2405,11 +2405,8 @@ FW_makeEdit($$$)
 
   # Toggle Edit-Window visibility script.
   my $psc = AttrVal("global", "perlSyntaxCheck", ($featurelevel>5.7) ? 1 : 0);
-  my $pgm = "var old = \$('#edit').css('display');".
-            "\$('#edit').css('display', old=='none' ? 'block' : 'none');".
-            "\$('#disp').css('display', old=='none' ? 'none' : 'block');";
   FW_pO "<td>";
-  FW_pO "<a onClick=\"$pgm\" style=\"cursor:pointer\">$n</a>";
+  FW_pO "<a id=\"DEFa\" style=\"cursor:pointer\">$n</a>";
   FW_pO "</td>";
 
   $val =~ s,\\\n,\n,g;
