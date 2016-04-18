@@ -1236,7 +1236,7 @@ SWAP_Attr(@)
 
             $str .= ", " if( $str );
             my $regname = SWAP_regName(sprintf("%02X",$reg),$i,$endpoint);
-            $str .= lc($endpoint->{name}) .":". $regname ." ". "{hex(ReadingsVal(\$name,\"$regname\",\"0\"))$func}";
+            $str .= lc($endpoint->{name}) .":". $regname .".* ". "{hex(ReadingsVal(\$name,\"$regname\",\"0\"))$func}";
           }
           ++$i;
         }

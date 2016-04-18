@@ -75,7 +75,7 @@ PCA301_Define($$)
 
   $attr{$name}{devStateIcon} = 'on:on:toggle off:off:toggle set.*:light_exclamation:off' if( !defined( $attr{$name}{devStateIcon} ) );
   $attr{$name}{webCmd} = 'on:off:toggle:statusRequest' if( !defined( $attr{$name}{webCmd} ) );
-  CommandAttr( undef, "$name userReadings consumptionTotal:consumption monotonic {ReadingsVal(\$name,'consumption',0)}" ) if( !defined( $attr{$name}{userReadings} ) );
+  CommandAttr( undef, "$name userReadings consumptionTotal:consumption.* monotonic {ReadingsVal(\$name,'consumption',0)}" ) if( !defined( $attr{$name}{userReadings} ) );
 
   #PCA301_Send($hash, $addr, "00" );
 
@@ -213,7 +213,7 @@ PCA301_Parse($$)
      return "UNDEFINED PCA301_$rname PCA301 $raddr $channel";
    }
 
-  #CommandAttr( undef, "$rname userReadings consumptionTotal:consumption monotonic {ReadingsVal($rname,'consumption',0)}" ) if( !defined( $attr{$rname}{userReadings} ) );
+  #CommandAttr( undef, "$rname userReadings consumptionTotal:consumption.* monotonic {ReadingsVal($rname,'consumption',0)}" ) if( !defined( $attr{$rname}{userReadings} ) );
 
   my @list;
   push(@list, $rname);
