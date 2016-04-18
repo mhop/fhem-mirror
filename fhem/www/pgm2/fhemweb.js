@@ -473,9 +473,24 @@ FW_replaceLink(el)
 function
 FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
 {
+  var cm;
+	
+  $('#DEFa').click(function(){
+    var old = $('#edit').css('display');
+    $('#edit').css('display', old=='none' ? 'block' : 'none');
+    $('#disp').css('display', old=='none' ? 'none' : 'block');
+    if( typeof AddCodeMirror == 'function' ) {
+      var s=document.getElementById("edit").getElementsByTagName("textarea");
+      if(!s[0].editor) { 
+        s[0].editor=true; AddCodeMirror(s[0], function(pcm) {cm = pcm;});
+      }
+    }
+    });
+    
   $("div input.psc[type=submit]").click(function(e){
     e.preventDefault();
-    var newDef = $(this).closest("form").find("textarea").val();
+    var newDef = typeof cm !== 'undefined' ? cm.getValue() 
+				 : $(this).closest("form").find("textarea").val();
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
 
     if( newDef == undefined ) {
