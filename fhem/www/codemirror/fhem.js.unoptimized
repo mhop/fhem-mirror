@@ -877,12 +877,16 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		word = ""; start = end = cur.ch;
     }
 	var line = cm.getLine(cur.line).substr(0,end);
+        if( /([\w_\.]+)$/.test(line) ) {
+          word = RegExp.$1;
+          start = end - word.length;
+	}
 	// only device names
-	if( /^[ \t]*(attr|set|get|delete|deleteattr|deletereading|displayattr|getstate|list|modify|setdefaultattr|setreading|setstate|trigger)[ \t]+([\w]*)$/.test(line) ) {
+	if( /^[ \t]*(attr|set|get|delete|deleteattr|deletereading|displayattr|getstate|list|modify|setdefaultattr|setreading|setstate|trigger)[ \t]+([\w_\.]+)$/.test(line) ) {
 		_key = _var = [];
 	}
 	// only device attribute names
-	else if( /^[ \t]*(attr|deleteattr|displayattr)[ \t]+(\w+)[ \t]+([\w-]*)$/.test(line) ) {
+	else if( /^[ \t]*(attr|deleteattr|displayattr)[ \t]+([\w_\.]+)[ \t]+([\w-]*)$/.test(line) ) {
 		_key = _dev = _var = [];
 	    var device = RegExp.$2;
 		word = RegExp.$3;
@@ -890,7 +894,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		_var = getDeviceAttributes(d);
 	}
 	// only device reading names
-	else if( /^[ \t]*(DOIF|DOELSE|DOELSEIF).*\[+\??(\w+):\??([\w-]*)$/.test(line) ) {
+	else if( /^[ \t]*(DOIF|DOELSE|DOELSEIF).*\[+\??([\w_\.]+):\??([\w-]*)$/.test(line) ) {
 		_key = _dev = _var = [];
 	    var device = RegExp.$2;
 		word = RegExp.$3;
@@ -898,7 +902,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		_var = getDeviceReadings(d);
 	}
 	// only device reading names
-	else if( /^[ \t]*(deletereading|setreading)[ \t]+(\w+)[ \t]+([\w-]*)$/.test(line) ) {
+	else if( /^[ \t]*(deletereading|setreading)[ \t]+([\w_\.]+)[ \t]+([\w-]*)$/.test(line) ) {
 		_key = _dev = _var = [];
 	    var device = RegExp.$2;
 		word = RegExp.$3;
@@ -906,7 +910,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		_var = getDeviceReadings(d);
 	}
 	// only device sets names
-	else if( /^[ \t]*(set|get)[ \t]+(\w+)[ \t]+([\w-]*)$/.test(line) ) {
+	else if( /^[ \t]*(set|get)[ \t]+([\w_\.]+)[ \t]+([\w-]*)$/.test(line) ) {
 		_key = _dev = _var = [];
 	    var device = RegExp.$2;
 		word = RegExp.$3;
@@ -914,7 +918,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		_var = getDeviceSets(d);
 	}
 	// only device attribute names
-	else if( /.*(AttrVal)[ \t]*\([ \t]*\"(\w+)\"[ \t]*,[ \t]*\"([\w-]*)$/.test(line) ) {
+	else if( /.*(AttrVal)[ \t]*\([ \t]*\"([\w_\.]+)\"[ \t]*,[ \t]*\"([\w-]*)$/.test(line) ) {
 		_key = _dev = _var = [];
 	    var device = RegExp.$2;
 		word = RegExp.$3;
@@ -923,7 +927,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		_var = getDeviceAttributes(d);
 	}
 	// only device readings names
-	else if( /.*(ReadingsVal|ReadingsTimestamp)[ \t]*\([ \t]*\"(\w+)\"[ \t]*,[ \t]*\"([\w-]*)$/.test(line) ) {
+	else if( /.*(ReadingsVal|ReadingsTimestamp)[ \t]*\([ \t]*\"([\w_\.]+)\"[ \t]*,[ \t]*\"([\w-]*)$/.test(line) ) {
 		_key = _dev = _var = [];
 	    var device = RegExp.$2;
 		word = RegExp.$3;
@@ -932,7 +936,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
 		_var = getDeviceReadings(d);
 	}
 	// only device names
-	else if( /.*(OldTimestamp|OldValue|Value|ReadingsVal|ReadingsTimestamp|AttrVal)[ \t]*\([ \t]*\"(\w*)$/.test(line) ) {
+	else if( /.*(OldTimestamp|OldValue|Value|ReadingsVal|ReadingsTimestamp|AttrVal)[ \t]*\([ \t]*\"([\w_\.]+)$/.test(line) ) {
 		_key = _var = [];
 		word = RegExp.$2;
 		start = end - word.length;
