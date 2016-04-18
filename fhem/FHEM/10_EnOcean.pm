@@ -3596,7 +3596,9 @@ sub EnOcean_Set($@)
                   $shutCmd = 2;
                 } else {
                   # position and slats angle ok
+                  $data = '00000008';
                   $shutCmd = 0;
+                  $updateState = 3;
                 }
               }
               if ($position == 0) {
@@ -3616,8 +3618,44 @@ sub EnOcean_Set($@)
               return "Usage: $a[1] is not numeric or out of range";
             }
           }
+        } elsif ($cmd eq "anglePos") {
+          if (!defined $positionStart) {
+            return "Position unknown, please first opens the blinds completely."
+          } elsif ($angleTime > 0 && !defined $anglePosStart){
+            return "Slats angle position unknown, please first opens the blinds completely."
+          } else {
+            if (defined $a[1]) {
+              if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= $angleMin && $a[1] <= $angleMax) {
+                $anglePos = $a[1];
+                shift(@a);
+                if ($anglePosStart > $anglePos) {
+                  # up >> reduce slats angle
+                  $shutTime = $angleTime * ($anglePosStart - $anglePos)/($angleMax - $angleMin);
+                  # round up
+                  $shutTime = int($shutTime) + 1 if ($shutTime > int($shutTime));
+                  $shutCmd = 1;
+                } elsif ($anglePosStart < $anglePos) {
+                  # down >> enlarge slats angle
+                  $shutTime = $angleTime * ($anglePos - $anglePosStart) /($angleMax - $angleMin);
+                  # round up
+                  $shutTime = int($shutTime) + 1 if ($shutTime > int($shutTime));
+                  $shutCmd = 2;
+                } else {
+                  # slats angle ok
+                  $data = '00000008';
+                  $shutCmd = 0;
+                  $updateState = 3;
+                }                
+                readingsSingleUpdate($hash, "anglePos", sprintf("%d", $anglePos), 1);                
+              } else {
+                return "Usage: $a[1] is not numeric or out of range";
+              }
+            } else {
+              return "Usage: $cmd values are missing";
+            }
+          }        
         } else {
-          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "closes:noArg down opens:noArg position:slider,0,5,100 stop:noArg teach:noArg up"
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "position:slider,0,5,100 anglePos:slider,-180,5,180 closes:noArg down opens:noArg stop:noArg teach:noArg up"
         }
         if ($shutCmd || $cmd eq "stop") {
           #$updateState = 0;
@@ -6585,22 +6623,22 @@ sub EnOcean_Parse($$)
  
       my $actionCmd = AttrVal($name, "rcvRespAction", undef);
       if (defined $actionCmd) {
-        my %specials= ("%ACTUATORSTATE" => (($db[2] & 1) ? "obstructed" : "ok"),
-                       "%BATTERY" => $battery,
-                       "%COVER" => (($db[2] & 8) ? "open" : "closed"),
-                       "%ENERGYINPUT" => (($db[2] & 0x40) ? "enabled" : "disabled"),
-                       "%ENERGYSTORAGE" => $energyStorage,
-                       "%MAINTENANCEMODE" => $maintenanceMode,
-                       "%NAME" => $name,
-                       "%OPERATIONMODE" => $operationMode,
-                       "%ROOMTEMP" => $roomTemp,
-                       "%SELFCTRL" => (($db[0] & 4) ? "on" : "off"),
-                       "%SETPOINT" => $setpoint,
-                       "%SETPOINTTEMP" => $setpointTemp,
-                       "%SUMMERMODE" => $summerMode,
-                       "%TEMPERATURE" => $temperature,
-                       "%WINDOW" => (($db[2] & 2) ? "open" : "closed"),
-                      );
+        my %specials = ("%ACTUATORSTATE" => (($db[2] & 1) ? "obstructed" : "ok"),
+                        "%BATTERY" => $battery,
+                        "%COVER" => (($db[2] & 8) ? "open" : "closed"),
+                        "%ENERGYINPUT" => (($db[2] & 0x40) ? "enabled" : "disabled"),
+                        "%ENERGYSTORAGE" => $energyStorage,
+                        "%MAINTENANCEMODE" => $maintenanceMode,
+                        "%NAME" => $name,
+                        "%OPERATIONMODE" => $operationMode,
+                        "%ROOMTEMP" => $roomTemp,
+                        "%SELFCTRL" => (($db[0] & 4) ? "on" : "off"),
+                        "%SETPOINT" => $setpoint,
+                        "%SETPOINTTEMP" => $setpointTemp,
+                        "%SUMMERMODE" => $summerMode,
+                        "%TEMPERATURE" => $temperature,
+                        "%WINDOW" => (($db[2] & 2) ? "open" : "closed"),
+                       );
           # action exec
           $actionCmd = EvalSpecials($actionCmd, %specials);
           my $ret = AnalyzeCommandChain(undef, $actionCmd);
@@ -6864,6 +6902,7 @@ sub EnOcean_Parse($$)
       );
       my $battery = "ok";
       my %displayOrientation = (0 => 0, 90 => 1, 180 => 2, 270 => 3);
+      my $feedTemp = ReadingsVal($name, "feedTemp", 20);
       my $roomTemp = ReadingsVal($name, "roomTemp", 20);
       my $setpoint = $db[3];
       push @event, "3:setpoint:$setpoint";
@@ -6890,7 +6929,8 @@ sub EnOcean_Parse($$)
           # temperature measurement inactive
           CommandDeleteReading(undef, "$name feedTemp");
         } else {
-          push @event, "3:feedTemp:" . sprintf("%0.1f", ($db[2] * 60 / 255 + 20));      
+          $feedTemp = $db[2] * 60 / 255 + 20;
+          push @event, "3:feedTemp:" . sprintf("%0.1f", $feedTemp);      
         }
       }
       if ($db[0] & 1) {
@@ -6930,7 +6970,7 @@ sub EnOcean_Parse($$)
 
       if ($db[0] & 0x40) {
         # status request
-        # action needed?      
+        # action needed?
       }
 
       Log3 $name, 5, "EnOcean $name EnOcean_parse SPT: $setpointTemp SPTS: $setpointTempSet";
@@ -6952,6 +6992,32 @@ sub EnOcean_Parse($$)
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         $wakeUpCycle = 50 if ($wakeUpCycle < 50);
       }      
+
+      my $actionCmd = AttrVal($name, "rcvRespAction", undef);
+      if (defined $actionCmd) {
+        my %specials = ("%BATTERY" => $battery,
+                        "%FEEDTEMP" => $feedTemp,
+                        "%MAINTENANCEMODE" => $maintenanceMode,
+                        "%NAME" => $name,
+                        "%OPERATIONMODE" => $operationMode,
+                        "%ROOMTEMP" => $roomTemp,
+                        "%SETPOINT" => $setpoint,
+                        "%SETPOINTTEMP" => $setpointTemp,
+                        "%SUMMERMODE" => $summerMode,
+                        "%TEMPERATURE" => $temperature,
+                       );
+          # action exec
+          $actionCmd = EvalSpecials($actionCmd, %specials);
+          my $ret = AnalyzeCommandChain(undef, $actionCmd);
+          Log3 $name, 2, "EnOcean $name rcvRespAction ERROR: $ret" if($ret);
+          $maintenanceMode = ReadingsVal($name, "maintenanceMode", 'off');
+          $operationMode = ReadingsVal($name, "operationMode", ((AttrVal($name, 'pidCtrl', 'on') eq 'on') ? 'setpointTemp' : 'setpoint'));
+          $setpointSet = ReadingsVal($name, "setpointSet", $setpoint);   
+          $setpointTempSet = ReadingsVal($name, "setpointTempSet", $setpointTemp);
+          $temperature = ReadingsVal($name, 'temperature', $roomTemp);   
+          $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
+      }
+
       if ($waitingCmds eq "valveOpens") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
@@ -10771,6 +10837,25 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "demandRespAction") {
+    if (!defined $attrVal){
+
+    } else {
+      my %specials = ("%TARGETNAME" => $name,
+                      "%NAME" => $name,
+                      "%TARGETTYPE" => '',
+                      "%TYPE" => '',
+                      "%LEVEL" => '',
+                      "%SETPOINT" => '',
+                      "%POWERUSAGE" => '',
+                      "%POWERUSAGESCALE" => '',
+                      "%POWERUSAGELEVEL" => '',
+                      "%TARGETSTATE" => '',
+                      "%STATE" => ''
+                     );
+      $err = perlSyntaxCheck($attrVal, %specials);
+    }
+
   } elsif ($attrName eq "demandRespRandomTime") {
     if (!defined $attrVal) {
 
@@ -10933,6 +11018,18 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "observeErrorAction") {
+    if (!defined $attrVal){
+
+    } else {
+      my %specials = ("%NAME" => $name,
+                      "%FAILEDDEV" => '',
+                      "%TYPE"  => '',
+                      "%EVENT" => ''
+                     );
+      $err = perlSyntaxCheck($attrVal, %specials);
+    }
+
   } elsif ($attrName eq "observeInterval") {
     if (!defined $attrVal){
 
@@ -11046,6 +11143,42 @@ sub EnOcean_Attr(@)
 
     } elsif ($attrVal !~ m/^A|B|C|D|I|0|auto$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "rcvRespAction") {
+    if (!defined $attrVal){
+
+    } elsif (AttrVal($name, "subType", "") eq "hvac.01") {
+      my %specials = ("%ACTUATORSTATE" => '',
+                      "%BATTERY" => '',
+                      "%COVER" => '',
+                      "%ENERGYINPUT" => '',
+                      "%ENERGYSTORAGE" => '',
+                      "%MAINTENANCEMODE" => '',
+                      "%NAME" => $name,
+                      "%OPERATIONMODE" => '',
+                      "%ROOMTEMP" => '',
+                      "%SELFCTRL" => '',
+                      "%SETPOINT" => '',
+                      "%SETPOINTTEMP" => '',
+                      "%SUMMERMODE" => '',
+                      "%TEMPERATURE" => '',
+                      "%WINDOW" => ''
+                     );
+      $err = perlSyntaxCheck($attrVal, %specials);
+    } elsif (AttrVal($name, "subType", "") eq "hvac.04") {
+      my %specials = ("%BATTERY" => '',
+                      "%FEEDTEMP" => '',
+                      "%MAINTENANCEMODE" => '',
+                      "%NAME" => $name,
+                      "%OPERATIONMODE" => '',
+                      "%ROOMTEMP" => '',
+                      "%SETPOINT" => '',
+                      "%SETPOINTTEMP" => '',
+                      "%SUMMERMODE" => '',
+                      "%TEMPERATURE" => ''
+                     );
+      $err = perlSyntaxCheck($attrVal, %specials);
     }
 
   } elsif ($attrName eq "remoteManagement") {
@@ -11395,7 +11528,7 @@ sub EnOcean_Notify(@)
     } elsif ($devName eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
       my $definedName = $1;
       if ($name eq $definedName) {
-        if (exists($attr{$name}{subType}) && $attr{$name}{subType} eq "hvac.04") {
+        if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4)$/) {
           # control PID regulatior
           if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
             EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
@@ -11412,7 +11545,7 @@ sub EnOcean_Notify(@)
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
         CommandDeleteReading(undef, "$name waitingCmds");
       }
-      if (exists($attr{$name}{subType}) && $attr{$name}{subType} eq "hvac.04") {
+      if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4)$/) {
         # control PID regulatior
         if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
           EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
@@ -11430,7 +11563,7 @@ sub EnOcean_Notify(@)
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
         CommandDeleteReading(undef, "$name waitingCmds");
       }
-      if (exists($attr{$name}{subType}) && $attr{$name}{subType} eq "hvac.04") {
+      if (exists($attr{$name}{subType}) && $attr{$name}{subType} =~ m/^hvac\.0(1|4)$/) {
         # control PID regulatior
         if (AttrVal($name, 'pidCtrl', 'on') eq 'on' && ReadingsVal($name, 'maintenanceMode', 'off') eq 'off') {
           EnOcean_setPID(undef, $hash, 'start', ReadingsVal($name, "setpoint", ''));
@@ -11493,18 +11626,18 @@ sub EnOcean_Notify(@)
           if (defined $actionCmd) {
             if ($parts[0] =~ m/^on|off$/) {
               #Log3($name, 3, "EnOcean $name <notify> demandRespRefDev: $devName Cmd: set $parts[0]");
-              my %specials= ("%TARGETNAME" => $name,
-                             "%NAME" => $devName,
-                             "%TARGETTYPE" => $hash->{TYPE},
-                             "%TYPE" => $dev->{TYPE},
-                             "%LEVEL" => ReadingsVal($devName, "level", 15),
-                             "%SETPOINT"  => ReadingsVal($devName, "setpoint", 255),
-                             "%POWERUSAGE"  => ReadingsVal($devName, "powerUsage", 100),
-                             "%POWERUSAGESCALE"  => ReadingsVal($devName, "powerUsageScale", "max"),
-                             "%POWERUSAGELEVEL"  => ReadingsVal($devName, "powerUsageLevel", "max"),
-                             "%TARGETSTATE" => ReadingsVal($name, "state", ""),
-                             "%STATE" => ReadingsVal($devName, "state", "off")
-                            );
+              my %specials = ("%TARGETNAME" => $name,
+                              "%NAME" => $devName,
+                              "%TARGETTYPE" => $hash->{TYPE},
+                              "%TYPE" => $dev->{TYPE},
+                              "%LEVEL" => ReadingsVal($devName, "level", 15),
+                              "%SETPOINT" => ReadingsVal($devName, "setpoint", 255),
+                              "%POWERUSAGE" => ReadingsVal($devName, "powerUsage", 100),
+                              "%POWERUSAGESCALE" => ReadingsVal($devName, "powerUsageScale", "max"),
+                              "%POWERUSAGELEVEL" => ReadingsVal($devName, "powerUsageLevel", "max"),
+                              "%TARGETSTATE" => ReadingsVal($name, "state", ""),
+                              "%STATE" => ReadingsVal($devName, "state", "off")
+                             );
               # action exec
               $actionCmd = EvalSpecials($actionCmd, %specials);
               my $ret = AnalyzeCommandChain(undef, $actionCmd);
@@ -13133,12 +13266,11 @@ sub EnOcean_observeRepeat($)
     my $actionCmd = AttrVal($name, "observeErrorAction", undef);
     if (defined $actionCmd) {
       # error action exec
-      my %specials= (
-                "%NAME" => shift(@{$hash->{helper}{lastCmdValue}}),
-                "%FAILEDDEV" => join(" ", @{$hash->{helper}{observeRefDev}}),
-                "%TYPE"  => $hash->{TYPE},
-                "%EVENT" => ReplaceEventMap($name, join(" ", @{$hash->{helper}{lastCmdValue}}), 1)
-      );
+      my %specials = ("%NAME" => shift(@{$hash->{helper}{lastCmdValue}}),
+                      "%FAILEDDEV" => join(" ", @{$hash->{helper}{observeRefDev}}),
+                      "%TYPE"  => $hash->{TYPE},
+                      "%EVENT" => ReplaceEventMap($name, join(" ", @{$hash->{helper}{lastCmdValue}}), 1)
+                     );
       $actionCmd = EvalSpecials($actionCmd, %specials);
       my $ret = AnalyzeCommandChain(undef, $actionCmd);
       Log3 $name, 2, "EnOcean $name observeErrorAction ERROR: $ret" if($ret);
@@ -15581,20 +15713,22 @@ EnOcean_Delete($$)
     where <code>value</code> is
       <li>position/% [&alpha;/&#176]<br>
         drive blinds to position with angle value</li>
-     <li>teach<br>
-        initiate teach-in mode</li>
-      <li>opens<br>
-        issue blinds opens command</li>
-      <li>up tu/s<br>
-        issue roll up command</li>
+      <li>anglePos &alpha;/&#176<br>
+        drive blinds to angle value</li>
       <li>closes<br>
         issue blinds closes command</li>
       <li>down td/s<br>
         issue roll down command</li>
+      <li>opens<br>
+        issue blinds opens command</li>
       <li>position position/% [&alpha;/&#176]<br>
         drive blinds to position with angle value</li>
       <li>stop<br>
         issue stop command</li>
+     <li>teach<br>
+        initiate teach-in mode</li>
+      <li>up tu/s<br>
+        issue roll up command</li>
     </ul><br>
       Runtime Range: tu|td = 1 s ... 255 s<br>
       Position Range: position = 0 % ... 100 %<br>
@@ -16458,8 +16592,10 @@ EnOcean_Delete($$)
       Command being executed after an message from the aktor is received and before an response message is sent.
       If &lt;command&gt; is enclosed in {}, then it is a perl expression, if it is enclosed in "", then it is a shell command,
       else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME
-      and the current readings $ACTUATORSTATE, $BATTERY, $COVER, $ENERGYINPUT, $ENERGYSTORAGE, $MAINTENANCEMODE,  $OPERATIONMODE,
-      $ROOMTEMP, $SELFCTRL, $SETPOINT, $SETPOINTTEMP, $SUMMERMODE, $TEMPERATURE, $WINDOW.
+      and the current readings $ACTUATORSTATE, $BATTERY, $COVER, $ENERGYINPUT, $ENERGYSTORAGE, $MAINTENANCEMODE, $OPERATIONMODE,
+      $ROOMTEMP, $SELFCTRL, $SETPOINT, $SETPOINTTEMP, $SUMMERMODE, $TEMPERATURE, $WINDOW for the subType hvac.01 and $NAME,
+      $BATTERY, $FEEDTEMP, $MAINTENANCEMODE, $OPERATIONMODE, $ROOMTEMP, $SETPOINT, $SETPOINTTEMP, $SUMMERMODE, $TEMPERATURE
+      for the subType hvac.04.
       This data is available as a local variable in perl, as environment variable for shell
       scripts, and will be textually replaced for Fhem commands.
     </li>
