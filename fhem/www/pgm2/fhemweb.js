@@ -202,7 +202,7 @@ FW_jqueryReadyFn()
         .html('<a>'+$(this).html()+'</a>')
         .css({cursor:"pointer"})
         .click(function(){
-          var aname = "#sel_attr"+$(this).attr("data-name");
+          var aname = "#sel_attr"+$(this).attr("data-name").replace(/\./g,'_');
           $(aname).val($(this).text());
           FW_detailSelect(aname);
         });
