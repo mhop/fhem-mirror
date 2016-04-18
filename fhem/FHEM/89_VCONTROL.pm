@@ -1327,7 +1327,7 @@ sub VCONTROL_TimerConv($$){
            {return "";}
         }
               
-        if ( $timerhour < "00" || $timerhour > "23" ){
+        if ( $timerhour < "00" || $timerhour > "24" ){
            {return "";}
         }    
 
@@ -1336,7 +1336,7 @@ sub VCONTROL_TimerConv($$){
         } 
                            
         my $helpvalue = (($timerhour <<3) + ($timermin/10)) & 0xff;
-        push(@hextimerdata, (sprintf "%X", $helpvalue));
+        push(@hextimerdata, (sprintf "%02X", $helpvalue));
      } 
    }
         
