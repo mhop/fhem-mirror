@@ -53,25 +53,6 @@ var cm_attr = {
     }
 };
 
-$(document).ready(function(){
-    var els = document.getElementsByTagName("textarea");
-    if(els.length == 0)
-    return;
-
-    if($(els[0]).closest("div#edit").css("display")=="none") { // DEF special
-    $("table.internals a").each(function(){
-        var oc = $(this).attr("onclick");
-        if(oc) {
-            $(this).attr("onclick", oc+
-            's=document.getElementById("edit").getElementsByTagName("textarea");'+
-            'if(!s[0].editor) { s[0].editor=true; AddCodeMirror(s[0]);}');
-        }
-    });
-    } else {
-        AddCodeMirror(els[0]);
-    }
-});
-
 function AddCodeMirror(e, cb) {
     if(cm_active && cm_loaded == cm_active)
         return cm_wait(e, cb);
