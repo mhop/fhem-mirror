@@ -401,9 +401,9 @@ ZWDongle_Write($$$)
 }
 
 sub
-ZWDongle_shiftSendStack($$$$)
+ZWDongle_shiftSendStack($$$$;$)
 {
-  my ($hash, $reason, $loglevel, $txt) = @_;
+  my ($hash, $reason, $loglevel, $txt, $cbId) = @_;
   my $ss = $hash->{SendStack};
   my $cmd = $ss->[0];
 
@@ -413,6 +413,7 @@ ZWDongle_shiftSendStack($$$$)
     $hash->{WaitForAck}=2;
 
   } else {
+    return if($cbId && $cmd && $cbId ne substr($cmd,-4,2));
     shift @{$ss};
     Log3 $hash, $loglevel, "$txt, removing $cmd from dongle sendstack"
         if($txt && $cmd);
@@ -563,8 +564,8 @@ ZWDongle_Read($@)
     Log3 $name, 4, "ZWDongle_Read $name: rcvd $msg ($ztp $zfi), sending ACK";
     DevIo_SimpleWrite($hash, "06", 1);
 
-    ZWDongle_shiftSendStack($hash, 1, 5, "device ack reveived")
-        if($msg =~ m/^0013/);
+    ZWDongle_shiftSendStack($hash, 1, 5, "device ack reveived", $1)
+        if($msg =~ m/^0013(..)/);
     
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     $hash->{PARTIAL} = $data;	 # Recursive call by ZWave get, Forum #37418
