@@ -475,6 +475,14 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
 {
   var cm;
 	
+  if( typeof AddCodeMirror == 'function' ) {
+    // init codemirror for FW_style edit textarea
+    var s = $('textarea[name="data"]');
+    if( s.length && !s[0].editor ) {
+      s[0].editor = true; AddCodeMirror( s[0] );
+    }
+  }
+
   $('#DEFa').click(function(){
     var old = $('#edit').css('display');
     $('#edit').css('display', old=='none' ? 'block' : 'none');
@@ -810,8 +818,10 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
     $("#td_longText").val(txt);
 
     var cm;
-    if( typeof AddCodeMirror == 'function' ) 
+    if( typeof AddCodeMirror == 'function' && !$("#td_longText").get(0).editor) {
+      $("#td_longText").get(0).editor = true;
       AddCodeMirror($("#td_longText").get(0), function(pcm) {cm = pcm;});
+    }
 
     $('#editdlg').dialog(
       { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
