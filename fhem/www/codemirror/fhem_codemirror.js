@@ -17,6 +17,7 @@ var cm_attr = {
     autofocus:          true,
     lineNumbers:        true,
     smartIndent:        false,
+    height:             false,
     extraKeys: {
         'Tab': function(cm) {
             if (cm.somethingSelected()) {
@@ -65,6 +66,7 @@ function AddCodeMirror(e, cb) {
       loadLink("codemirror/codemirror.css");
       loadScript("codemirror/codemirror.js", function(){cm_loaded++;} );
         
+    // load additional addons
     if (cm_attr.autoCloseBrackets) {
         cm_active++; loadScript("codemirror/closebrackets.js", function(){cm_loaded++;} );
     }
@@ -94,6 +96,16 @@ function AddCodeMirror(e, cb) {
         cm_active++; loadScript("codemirror/autorefresh.js",  function(){cm_loaded++;} );
     }
     
+    // editor user preferences
+    if (cm_attr.height) {
+        if(cm_attr.height == true)
+            cm_attr.height = "auto";
+        if(isNaN(cm_attr.height)) {
+            $("head").append('<style type="text/css">.CodeMirror {height:auto;}');
+        } else {
+            $("head").append('<style type="text/css">.CodeMirror {height:' + cm_attr.height + 'px;}');
+        }
+    }
     
     // get the type from hidden filename extension, load the type-file.js, theme.css and call cm_wait
     var ltype;
