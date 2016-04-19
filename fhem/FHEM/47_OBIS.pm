@@ -138,9 +138,9 @@ sub OBIS_Define($$)
     $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
     $hash->{helper}{DEVICES} =$devs{$type};
     $hash->{helper}{TRIGGERTIME}=gettimeofday();
-    if( !$init_done ) {
-	    $attr{$name}{"event-on-change-reading"} = ".*";
-    }
+#    if( !$init_done ) {
+#	    $attr{$name}{"event-on-change-reading"} = ".*";
+ #   }
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
 	InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
@@ -246,7 +246,7 @@ sub OBIS_trySMLdecode($$)
 					$line2.="<" if ($status=~/[aA]2$/);
 					$line2.=">" if ($status=~/82$/);
 					$line2.=(OBIS_hex2int($data)*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
-					$line2.=(unpack("i", pack("I", hex($data)))*$scaler).($unit eq "" ? "" : "*$unit") if($dataT ==96);					
+					$line2.=(unpack("s", pack("S", hex($data)))*$scaler).($unit eq "" ? "" : "*$unit") if($dataT ==96);					
 				} elsif ($dataT & 0b01000000) {		# Type Boolean - no Idea, where this is used
 					$line2=OBIS_hex2int($data);			# 0=false, everything else is true
 				} elsif ($dataT & 0b01110000) {		# Type List of.... - not sure, if we ever need that
