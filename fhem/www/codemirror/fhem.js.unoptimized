@@ -465,6 +465,7 @@ CodeMirror.defineMode("fhem",function(){
                 write                           :1,     // - print a picture record
                 // FHEM Keywords ////////////////////////
                 define                          :2,
+                defmod                          :2,
                 attr                            :2,
                 at                              :2,
                 notify                          :2,
@@ -844,7 +845,7 @@ CodeMirror.commands.autocomplete = function(cm) {
 	CodeMirror.showHint(cm, CodeMirror.hint.fhem, {async:true});
 }
 
-var keywords = ["at","attr","define","delete","deleteattr","deletereading","IF","DOIF","DOELSEIF","DOELSE","displayattr","fhem","get","getstate",
+var keywords = ["at","attr","define","defmod","delete","deleteattr","deletereading","IF","DOIF","DOELSEIF","DOELSE","displayattr","fhem","get","getstate",
   "list","modify","notify","set","setdefaultattr","setreading","setstate","trigger",
   "AttrVal","OldTimestamp","OldValue","ReadingsVal","ReadingsTimestamp","Value"];
 var variables = ["$defs","$hms","$hour","$isdst","$mday","$min","$month","$sec","$wday","$we","$yday","$year"];
@@ -882,7 +883,7 @@ CodeMirror.registerHelper("hint", "fhem", function hintfhem(cm, callback, option
           start = end - word.length;
 	}
 	// only device names
-	if( /^[ \t]*(attr|set|get|delete|deleteattr|deletereading|displayattr|getstate|list|modify|setdefaultattr|setreading|setstate|trigger)[ \t]+([\w_\.]+)$/.test(line) ) {
+	if( /^[ \t]*(attr|set|get|defmod|delete|deleteattr|deletereading|displayattr|getstate|list|modify|setdefaultattr|setreading|setstate|trigger)[ \t]+([\w_\.]+)$/.test(line) ) {
 		_key = _var = [];
 	}
 	// only device attribute names
