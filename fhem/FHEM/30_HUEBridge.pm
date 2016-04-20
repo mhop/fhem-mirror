@@ -162,6 +162,18 @@ sub HUEBridge_Undefine($$)
   return undef;
 }
 
+sub HUEBridge_fillBridgeInfo($$)
+{
+  my ($hash,$result) = @_;
+  $hash->{name} = $result->{name};
+  $hash->{modelid} = $result->{modelid};
+  $hash->{swversion} = $result->{swversion};
+  $hash->{apiversion} = $result->{apiversion};
+
+  my @l = split( '\.', $result->{apiversion} );
+  $hash->{helper}{apiversion} = ($l[0] << 16) + ($l[1] << 8) + $l[2];
+}
+
 sub HUEBridge_OpenDev($)
 {
   my ($hash) = @_;
@@ -189,6 +201,8 @@ sub HUEBridge_OpenDev($)
 
   if( !defined($result->{'linkbutton'}) )
     {
+      HUEBridge_fillBridgeInfo($hash, $result);
+
       HUEBridge_Pair($hash);
       return;
     }
@@ -584,11 +598,8 @@ HUEBridge_Parse($$)
   #Log 3, Dumper $result;
   $result = $result->{config} if( defined($result->{config}) );
 
-  $hash->{name} = $result->{name};
-  $hash->{swversion} = $result->{swversion};
-  my @l = split( '\.', $result->{apiversion} );
-  $hash->{helper}{apiversion} = ($l[0] << 16) + ($l[1] << 8) + $l[2];
-  $hash->{apiversion} = $result->{apiversion};
+  HUEBridge_fillBridgeInfo($hash, $result);
+
   $hash->{zigbeechannel} = $result->{zigbeechannel};
 
   if( defined( $result->{swupdate} ) ) {
@@ -767,9 +778,12 @@ sub HUEBridge_Register($)
   my ($hash) = @_;
 
   my $obj = {
-    'username'  => AttrVal($hash->{NAME}, "key", ""),
     'devicetype' => 'fhem',
   };
+
+  if( !$hash->{helper}{apiversion} || $hash->{helper}{apiversion} < (1<<16) + (12<<8) ) {
+    $obj->{username} = AttrVal($hash->{NAME}, 'key', '');
+  }
 
   return HUEBridge_Call($hash, undef, undef, $obj);
 }
