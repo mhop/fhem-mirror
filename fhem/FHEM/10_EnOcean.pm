@@ -1,7 +1,7 @@
 
 ##############################################
 # $Id$
-# 2016-04-17
+# 2016-04-21
 
 # PID V1.0.0.9
 # EnOcean Security in Perl, teach-in, VAES, MAC and message handling
@@ -163,6 +163,7 @@ my %EnO_manuf = (
   "040" => "Jaeger Direkt",
   "041" => "Air System Components Inc",
   "045" => "Holter",
+  "046" => "ID-RF",
   "049" => "Micropelt GmbH",
   "7FF" => "Multi user Manufacturer ID",
 );
@@ -6012,12 +6013,14 @@ sub EnOcean_Parse($$)
                   $attr{$name}{$attrCntr} = $EnO_eepConfig{$subType}{attr}{$attrCntr};
                 }
               }
-              if (defined AttrVal($name, 'subDef', undef)) {
-                $subDef = $attr{$name}{subDef};
-              } else {
-                $subDef = $postmasterID;
-                $attr{$name}{subDef} = $postmasterID;
-              }
+              #if (defined AttrVal($name, 'subDef', undef)) {
+              #  $subDef = $attr{$name}{subDef};
+              #} else {
+                #$subDef = $postmasterID;
+                #$attr{$name}{subDef} = $postmasterID;
+              #}
+              $subDef = 8 x '0';
+              $attr{$name}{subDef} = 8 x '0';
               # sent response to create mailbox
               $sendData = sprintf "00%04X00", $responseTime;
               EnOcean_SndRadio(undef, $hash, 2, $rorg, $sendData, $subDef, '00', $hash->{DEF});
