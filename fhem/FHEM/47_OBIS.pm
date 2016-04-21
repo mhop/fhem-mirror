@@ -65,12 +65,12 @@ sub OBIS_Initialize($)
   my ($hash) = @_;
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
-  $hash->{Match}     = "OBIS";
+  $hash->{Match}     = "^\/(?s:.*)\!\$";
   $hash->{ReadFn}  = "OBIS_Read";
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-  #  $hash->{SetFn} = "OBIS_Set";
+  $hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
@@ -211,6 +211,7 @@ sub OBIS_trySMLdecode($$)
 			while ($msg =~ m/(7707)([0-9A-F]{2,999}?)(?=7707|1B1B1B1B)/g) {
 	    		my $telegramm = $&;
       			my @list=$telegramm=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2,999})/g;
+      			Log 3,"Telegram=$telegramm";
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		
 				my ($status,$statusL,$statusT,$valTime,$valTimeL,$valTimeT,$unit,$unitL,$unitT,$scaler,$scalerL,$scalerT,$data,$dataL,$dataT,$other);		   
@@ -219,7 +220,6 @@ sub OBIS_trySMLdecode($$)
 	    		($unitL,$unitT,$unit,$other)=OBIS_decodeTL($other);
 	    		($scalerL,$scalerT,$scaler,$other)=OBIS_decodeTL($other);
 	    		($dataL,$dataT,$data,$other)=OBIS_decodeTL($other);
-	    		
 # Type String
 				my $line2=""; 
 	    		if ($dataT ==0 ) {						
@@ -241,12 +241,27 @@ sub OBIS_trySMLdecode($$)
    							  $unit eq "01" ? ""  : 
    							  $unit eq "1D" ? "varh" :
    							  $unit eq "" ? "" : "var";
-					$scaler=$scaler ne "" ? 10**unpack("c", pack("C", hex($scaler))) : 0;
+					$scaler=$scaler ne "" ? 10**unpack("c", pack("C", hex($scaler))) : 1;
 					if ($scaler==0) {$scaler=1};	# just to make sure
 					$line2.="<" if ($status=~/[aA]2$/);
 					$line2.=">" if ($status=~/82$/);
-					$line2.=(OBIS_hex2int($data)*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
-					$line2.=(unpack("s", pack("S", hex($data)))*$scaler).($unit eq "" ? "" : "*$unit") if($dataT ==96);					
+					my $val=0;
+					# signed Values
+					if ($dataT & 0b00010000) {
+						$val=unpack("c", pack("C", hex($data))) if ($dataL==1);
+						$val=unpack("s", pack("S", hex($data))) if ($dataL==2);
+						$val=unpack("l", pack("L", hex($data))) if ($dataL==4);
+						$val=unpack("q", pack("Q", hex($data))) if ($dataL==8);
+					}
+					#unsigned Values
+					if ($dataT & 0b00100000) {
+						$val=unpack("C", pack("C", hex($data))) if ($dataL==1);
+						$val=unpack("S", pack("S", hex($data))) if ($dataL==2);
+						$val=unpack("L", pack("L", hex($data))) if ($dataL==4);
+						$val=unpack("Q", pack("Q", hex($data))) if ($dataL==8);
+					}
+					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
+					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit") if($dataT ==96);					
 				} elsif ($dataT & 0b01000000) {		# Type Boolean - no Idea, where this is used
 					$line2=OBIS_hex2int($data);			# 0=false, everything else is true
 				} elsif ($dataT & 0b01110000) {		# Type List of.... - not sure, if we ever need that
