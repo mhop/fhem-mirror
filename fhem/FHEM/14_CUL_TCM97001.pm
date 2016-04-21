@@ -9,7 +9,7 @@
 #  - "Prologue"
 #  - "Rubicson"
 #  - "NC_WS"
-#  - "GT-WT-02"
+#  - "GT_WT_02"
 #  - "AURIOL"
 #  - "KW9010"
 #
@@ -55,7 +55,7 @@ my %models = (
     "Prologue"    => 'Prologue',
     "Rubicson"    => 'Rubicson',
     "NC_WS"       => 'NC_WS',
-    "GT-WT-02"    => 'GT-WT-02',
+    "GT_WT_02"    => 'GT_WT_02',
     "AURIOL"      => 'AURIOL',
     "Type1"       => 'Type1',
     "Mebus"       => 'Mebus',
@@ -88,7 +88,7 @@ CUL_TCM97001_Initialize($)
             "Eurochron.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "TCM21....*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "TCM97..._.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
-            "GT-WT-02.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
+            "GT_WT_02.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "Type1.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"}, 
             "Rubicson.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},    
             "AURIOL.*" => {  ATTR => "event-min-interval:.*:300 event-on-change-reading:.*", GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME", autocreateThreshold => "2:180"},  
@@ -197,7 +197,7 @@ sub checkCRC_Mebus {
 }
 
 #
-# CRC Check for GT-WT-02
+# CRC Check for GT_WT_02
 #
 sub checkCRC_GTWT02 {
   my $msg = shift;
@@ -769,8 +769,8 @@ CUL_TCM97001_Parse($$)
     
     
 
-    if (checkCRC_GTWT02($msg) == TRUE && ($readedModel eq "GT-WT-02" || $readedModel eq "Type1" || $readedModel eq "Unknown")
-        || checkCRC_Type1($msg) == TRUE && ($readedModel eq "Type1" || $readedModel eq "GT-WT-02" || $readedModel eq "Unknown")) {
+    if (checkCRC_GTWT02($msg) == TRUE && ($readedModel eq "GT_WT_02" || $readedModel eq "Type1" || $readedModel eq "Unknown")
+        || checkCRC_Type1($msg) == TRUE && ($readedModel eq "Type1" || $readedModel eq "GT_WT_02" || $readedModel eq "Unknown")) {
       #    F    F    0    0    F    9    5    5    F   
         # 1111 1111 0000 0000 1111 1001 0101 0101 1111 
         #    A    B    C    D    E    F    G    H    I 
@@ -795,7 +795,7 @@ CUL_TCM97001_Parse($$)
         $batbit  = ((hex($a[2]) & 0x8) != 0x8);
         $mode    = (hex($a[2]) & 0x4) >> 2;
         if (checkCRC_GTWT02($msg) == TRUE) {
-            $model="GT-WT-02";
+            $model="GT_WT_02";
         } else {
             $model="Type1";
         }
@@ -1262,7 +1262,7 @@ CUL_TCM97001_Parse($$)
     <li>Prologue</li>
     <li>Rubicson</li>
     <li>NC_WS</li>
-    <li>GT-WT-02</li>
+    <li>GT_WT_02</li>
     <li>AURIOL</li>
     <li>Eurochron</li>
     <li>KW9010</li>
@@ -1297,7 +1297,7 @@ CUL_TCM97001_Parse($$)
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#model">model</a> (TCM97..., ABS700, TCM21...., Prologue, Rubicson, NC_WS, GT-WT-02, AURIOL, KW9010, Unknown)</li>
+    <li><a href="#model">model</a> (TCM97..., ABS700, TCM21...., Prologue, Rubicson, NC_WS, GT_WT_02, AURIOL, KW9010, Unknown)</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
@@ -1322,7 +1322,7 @@ CUL_TCM97001_Parse($$)
     <li>Prologue</li>
     <li>Rubicson</li>
     <li>NC_WS</li>
-    <li>GT-WT-02</li>
+    <li>GT_WT_02</li>
     <li>AURIOL</li>
     <li>Eurochron</li>
     <li>KW9010</li>
@@ -1355,7 +1355,7 @@ CUL_TCM97001_Parse($$)
       </li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
-    <li><a href="#model">model</a> (TCM97..., ABS700, TCM21...., Prologue, Rubicson, NC_WS, GT-WT-02, AURIOL, KW9010, Unknown)</li>
+    <li><a href="#model">model</a> (TCM97..., ABS700, TCM21...., Prologue, Rubicson, NC_WS, GT_WT_02, AURIOL, KW9010, Unknown)</li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
