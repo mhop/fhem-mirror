@@ -15,7 +15,7 @@
 #
 # Unsupported models are saved in a device named CUL_TCM97001_Unknown
 #
-# Copyright (C) 2015 Bjoern Hempel
+# Copyright (C) 2016 Bjoern Hempel
 #
 # This program is free software; you can redistribute it and/or modify it under 
 # the terms of the GNU General Public License as published by the Free Software 
@@ -31,6 +31,8 @@
 # this program; if not, write to the 
 # Free Software Foundation, Inc., 
 # 51 Franklin St, Fifth Floor, Boston, MA 02110, USA
+#
+# $Id$
 #
 ##############################################
 
@@ -252,8 +254,11 @@ CUL_TCM97001_Parse($$)
   my $id3 = hex($a[0] . $a[1]);
   #my $id4 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
-  my $def = $modules{CUL_TCM97001}{defptr}{$id3};
+  my $def = $modules{CUL_TCM97001}{defptr}{$id3}; # test for already defined devices use old naming convention  
   #my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
+  if(!$def) {
+     $def = $modules{CUL_TCM97001}{defptr}{'CUL_TCM97001_'.$id3};  # use new naming convention
+  }
   
   my $now = time();
 
@@ -336,6 +341,7 @@ CUL_TCM97001_Parse($$)
       	$model="TCM97...";
          # I think bit 3 on byte 3 is battery warning
       	$batbit    = (hex($a[2]) >> 0) & 0x4; 
+      	$batbit = ~$batbit & 0x1; # Bat bit umdrehen
       	$mode    = (hex($a[5]) >> 0) & 0x1; 
       	my $unknown    = (hex($a[4]) >> 0) & 0x2; 
 	    if ($mode) {
@@ -419,8 +425,14 @@ CUL_TCM97001_Parse($$)
       }
     } 
   } elsif (length($msg) == 10) {
+  	#Log3 $name, 2, "CUL_TCM97001 10er msg: " . $msg;
     my $idType2 = hex($a[1] . $a[2]);
-    $def = $modules{CUL_TCM97001}{defptr}{$idType2};
+    my $deviceCode = $idType2;
+    $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};   # test for already defined devices use old naming convention
+    if(!$def) {
+       $deviceCode = "CUL_TCM97001_" . $idType2;          # use new naming convention
+       $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+    } 
     if($def) {
       $name = $def->{NAME};
     }
@@ -488,18 +500,111 @@ CUL_TCM97001_Parse($$)
         }
     }
 
+	if ($packageOK == FALSE) {
+		my $idType1 = hex($a[0] . $a[1]);
+		$deviceCode = $idType1;
+		$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};   # test for already defined devices use old naming convention 
+		#my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
+		#my $def3 = $modules{CUL_TCM97001}{defptr}{$idType3};
+		if(!$def) {
+		   $deviceCode = "CUL_TCM97001_" . $idType1;          # use new naming convention
+		   $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+		}
+		if($def) {
+		   $name = $def->{NAME};
+		#} elsif($def2) {
+		#  $def = $def2;
+		#  $name = $def->{NAME};
+		#} elsif($def3) {
+		#  $def = $def3;
+		#  $name = $def->{NAME};
+		}
+		$readedModel = AttrVal($name, "model", "Unknown");
+		
+		
+		if (($readedModel eq "AURIOL" || $readedModel eq "Unknown")) {
+		  # Implementation from Femduino
+		  # AURIOL (Lidl Version: 09/2013)
+		  #                /--------------------------------- Channel, changes after every battery change      
+		  #               /           / ------------------------ Battery state 1 == Ok      
+		  #              /           / /------------------------ Battery changed, Sync startet      
+		  #             /           / /  ----------------------- Unknown      
+		  #            /           / / /    /--------------------- neg Temp: if 1 then temp = temp - 4096
+		  #           /           / / /    /---------------------- 12 Bit Temperature
+		  #          /           / / /    /               /---------- ??? CRC 
+		  #         /           / / /    /               /       /---- Trend 10 == rising, 01 == falling
+		  #         0101 0101  1 0 00   0001 0000 1011  1100  01 00
+		  # Bit     0          8 9 10   12              24       30
+		  $def = $modules{CUL_TCM97001}{defptr}{$idType1};
+		  if($def) {
+			$name = $def->{NAME};
+		  } 
+		  $temp    = (hex($a[3].$a[4].$a[5])) & 0x7FF;  
+		  my $negative    = (hex($a[3])) & 0x8; 
+		  if ($negative == 0x8) {
+			$temp = (~$temp & 0x07FF) + 1;
+			$temp = -$temp;
+		  }
+		  $temp = $temp / 10;
+
+		  
+		  if (checkValues($temp, 50)) {
+			$batbit = (hex($a[2]) & 0x8) >> 3;
+			$batbit = ~$batbit & 0x1; # Bat bit umdrehen
+			$mode   = (hex($a[2]) & 0x4) >> 2;
+
+			$trend = (hex($a[7]) & 0x3);
+			$model="AURIOL";
+			
+			if ($deviceCode ne $idType1)  # new naming convention
+			{	
+				if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
+				{
+					 $deviceCode="CUL_TCM97001_".$idType1;
+				} else {
+					 $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
+				}
+			}     
+		  
+			$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+			if($def) {
+			 $name = $def->{NAME};
+			} 
+					
+			if(!$def) {
+			  Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
+			  return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
+			}
+
+			$hasbatcheck = TRUE;
+			$hastrend = TRUE;     
+			$packageOK = TRUE;
+			$hasmode = TRUE;
+			
+			$readedModel=$model;
+		  } else {
+			  $name = "Unknown";
+		  }
+		}
+	}
     
   } elsif (length($msg) == 12) { 
     my $bin = undef;
+    my $deviceCode;
     my $idType1 = hex($a[0] . $a[1]);
     #my $idType2 = hex($a[1] . $a[2]);
     #my $idType3 = hex($a[0] . $a[1] . $a[2] . (hex($a[3]) & 0x3));
 
-    $def = $modules{CUL_TCM97001}{defptr}{$idType1};
+    $deviceCode = $idType1;
+    $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};   # test for already defined devices use old naming convention 
     #my $def2 = $modules{CUL_TCM97001}{defptr}{$idType2};
     #my $def3 = $modules{CUL_TCM97001}{defptr}{$idType3};
+    if(!$def) {
+       $deviceCode = "CUL_TCM97001_" . $idType1;          # use new naming convention
+       $def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
+    }
     if($def) {
-      $name = $def->{NAME};
+       $name = $def->{NAME};
     #} elsif($def2) {
     #  $def = $def2;
     #  $name = $def->{NAME};
@@ -508,7 +613,7 @@ CUL_TCM97001_Parse($$)
     #  $name = $def->{NAME};
     }
     $readedModel = AttrVal($name, "model", "Unknown");
-    Log3 $name, 4, "CUL_TCM97001 Define Name: $name  Model defined: $readedModel";
+    Log3 $name, 4, "CUL_TCM97001 Parse Name: $name , devicecode: $deviceCode , Model defined: $readedModel";
     
     if (($readedModel eq "Eurochron" || (hex($a[6]) == 0xF && $readedModel eq "Unknown") && $syncBit[1] < 5000)) {
       # EAS 800 
@@ -555,24 +660,19 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($temp, $humidity)) {
         $batbit = (hex($a[2]) & 0x8) >> 3;
-        $batbit = ~$batbit & 0x1; # Bat bit umdrehen
+        #$batbit = ~$batbit & 0x1; # Bat bit umdrehen
         $mode   = (hex($a[2]) & 0x4) >> 2;
         $channel = ((hex($a[2])) & 0x3) + 1;
         $model="Eurochron";
         
-        my $deviceCode;
-     
-     	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+        if ($deviceCode ne $idType1)  # new naming convention
      	{	
      	    if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
-		         $deviceCode="CUL_TCM97001_".$idType1;
 		         Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 		         $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
-     	}  else  {  # Fallback for already defined devices use old naming convention
-     		$deviceCode=$idType1;
      	}     
       
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
@@ -638,19 +738,15 @@ CUL_TCM97001_Parse($$)
             #$mode = (hex($a[2]) & 0x4) >> 2; 
             
             $model="TCM21....";
-            my $deviceCode;
-     
-         	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+            
+            if ($deviceCode ne $idType1)  # new naming convention
          	{	
          	    if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
               	{
-		             $deviceCode="CUL_TCM97001_".$idType1;
 		             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
                	} else {
 		             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
                	}
-         	}  else  {  # Fallback for already defined devices use old naming convention
-         		$deviceCode=$idType1;
          	}     
           
           	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
@@ -695,28 +791,23 @@ CUL_TCM97001_Parse($$)
       $humidity = (hex($a[6].$a[7]) & 0x0FE) >> 1; # only the first 7 bits are the humidity
 
       if (checkValues($temp, $humidity)) {
-        $channel = (hex($a[2])) & 0x3;
-        $batbit  = (hex($a[2]) & 0x8) >> 3;
+        $channel = ((hex($a[2])) & 0x3) + 1;
+        $batbit  = ((hex($a[2]) & 0x8) != 0x8);
         $mode    = (hex($a[2]) & 0x4) >> 2;
-        if (checkCRC_Type1($msg) == TRUE) {
+        if (checkCRC_GTWT02($msg) == TRUE) {
             $model="GT-WT-02";
         } else {
             $model="Type1";
         }
       
-        my $deviceCode;
-     
-     	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+        if ($deviceCode ne $idType1)  # new naming convention
      	{	
 	      	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
-	             $deviceCode="CUL_TCM97001_".$idType1;
 	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
-     	}  else  {  # Fallback for already defined devices use old naming convention
-     		$deviceCode=$idType1;
      	}     
       
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
@@ -774,23 +865,19 @@ CUL_TCM97001_Parse($$)
         if (checkValues($temp, $humidity)) {
             $channel = (hex($a[3])) & 0x3;
             $batbit = (hex($a[3]) & 0x8) >> 3;
-            
+            $batbit = ~$batbit & 0x1; # Bat bit umdrehen
             $mode = (hex($a[3]) & 0x4) >> 2;
             
             $model="Prologue";
-            my $deviceCode;
-     
-         	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+            
+            if ($deviceCode ne $idType1)  # new naming convention
          	{	
 		      	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
               	{
-		             $deviceCode="CUL_TCM97001_".$idType1;
 		             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
                	} else {
 		             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
                	}
-         	}  else  {  # Fallback for already defined devices use old naming convention
-         		$deviceCode=$idType1;
          	}     
           
           	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
@@ -851,19 +938,14 @@ CUL_TCM97001_Parse($$)
       	$batbit = ~$batbit & 0x1; # Bat bit umdrehen
       	$mode = (hex($a[3]) & 0x4) >> 2;
      
-       	my $deviceCode;
-     
-     	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+       	if ($deviceCode ne $idType1)  # new naming convention     
      	{	
 		  	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
-	             $deviceCode="CUL_TCM97001_".$idType1;
 	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
-     	}  else  {  # Fallback for already defined devices use old naming convention
-     		$deviceCode=$idType1;
      	}     
       
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
@@ -909,19 +991,15 @@ CUL_TCM97001_Parse($$)
 
       if (checkValues($temp, 50)) {
         $model="Rubicson";
-        my $deviceCode;
-     
-     	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+        
+        if ($deviceCode ne $idType1)  # new naming convention
      	{	
 		  	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
           	{
-	             $deviceCode="CUL_TCM97001_".$idType1;
 	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
            	} else {
 	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
            	}
-     	}  else  {  # Fallback for already defined devices use old naming convention
-     		$deviceCode=$idType1;
      	}     
       
       	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
@@ -944,74 +1022,7 @@ CUL_TCM97001_Parse($$)
 
 
 
-    if (($readedModel eq "AURIOL" || $readedModel eq "Unknown")) {
-      # Implementation from Femduino
-      # AURIOL (Lidl Version: 09/2013)
-      #                /--------------------------------- Channel, changes after every battery change      
-      #               /           / ------------------------ Battery state 1 == Ok      
-      #              /           / /------------------------ Battery changed, Sync startet      
-      #             /           / /  ----------------------- Unknown      
-      #            /           / / /    /--------------------- neg Temp: if 1 then temp = temp - 4096
-      #           /           / / /    /---------------------- 12 Bit Temperature
-      #          /           / / /    /               /---------- ??? CRC 
-      #         /           / / /    /               /       /---- Trend 10 == rising, 01 == falling
-      #         0101 0101  1 0 00   0001 0000 1011  1100  01 00
-      # Bit     0          8 9 10   12              24       30
-      $def = $modules{CUL_TCM97001}{defptr}{$idType1};
-      if($def) {
-        $name = $def->{NAME};
-      } 
-      $temp    = (hex($a[3].$a[4].$a[5])) & 0x7FF;  
-      my $negative    = (hex($a[3])) & 0x8; 
-      if ($negative == 0x8) {
-        $temp = (~$temp & 0x07FF) + 1;
-        $temp = -$temp;
-      }
-      $temp = $temp / 10;
-
-      
-      if (checkValues($temp, 50)) {
-        $batbit = (hex($a[2]) & 0x8) >> 3;
-        $batbit = ~$batbit & 0x1; # Bat bit umdrehen
-        $mode   = (hex($a[2]) & 0x4) >> 2;
-
-        $trend = (hex($a[7]) & 0x3);
-        $model="AURIOL";
-        my $deviceCode;
-     
-     	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
-     	{	
-		  	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
-          	{
-	             $deviceCode="CUL_TCM97001_".$idType1;
-	             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
-           	} else {
-	             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
-           	}
-     	}  else  {  # Fallback for already defined devices use old naming convention
-     		$deviceCode=$idType1;
-     	}     
-      
-      	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
-      	if($def) {
-       	 $name = $def->{NAME};
-      	} 
-      	      	
-        if(!$def) {
-          Log3 $name, 2, "CUL_TCM97001 Unknown device $deviceCode, please define it";
-          return "UNDEFINED $model" . substr($deviceCode, rindex($deviceCode,"_")) . " CUL_TCM97001 $deviceCode"; 
-        }
-
-        $hasbatcheck = TRUE;
-        $hastrend = TRUE;     
-        $packageOK = TRUE;
-        $hasmode = TRUE;
-        
-        $readedModel=$model;
-      } else {
-          $name = "Unknown";
-      }
-    }
+    
     if (($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
   #if (checkCRCKW9010($msg) == TRUE && ($readedModel eq "Unknown" || $readedModel eq "KW9010")) {
         # Re: Tchibo Wetterstation 433 MHz - KW9010
@@ -1066,19 +1077,15 @@ CUL_TCM97001_Parse($$)
             $trend = (hex($a[2]) & 0x6) >> 1;
             
             $model="KW9010";
-            my $deviceCode;
-     
-         	if (!defined($modules{CUL_TCM97001}{defptr}{$idType1}))
+            
+            if ($deviceCode ne $idType1)  # new naming convention
          	{	
 		      	if ( $enableLongIDs == TRUE || (($longids != "0") && ($longids eq "1" || $longids eq "ALL" || (",$longids," =~ m/,$model,/))))
               	{
-		             $deviceCode="CUL_TCM97001_".$idType1;
 		             Log3 $hash,4, "CUL_TCM97001 using longid: $longids model: $model";
                	} else {
 		             $deviceCode="CUL_TCM97001_" . $model . "_" . $channel;
                	}
-         	}  else  {  # Fallback for already defined devices use old naming convention
-         		$deviceCode=$idType1;
          	}     
           
           	$def = $modules{CUL_TCM97001}{defptr}{$deviceCode};
@@ -1113,17 +1120,17 @@ CUL_TCM97001_Parse($$)
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($temp) );
     $state="T: $val";
-    if ($hashumidity == TRUE) {
-      if ($model eq "Prologue") {
-         # plausibility check 
-         my $oldhumidity = ReadingsVal($name, "humidity", "unknown");
-         if ($oldhumidity eq "unknown" || ($humidity+15 > $oldhumidity && $humidity-15 < $oldhumidity)) {
-            $hashumidity = TRUE;
-         } else {
-            $hashumidity = FALSE;
-         }
-      } 
-    }
+#    if ($hashumidity == TRUE) {
+#      if ($model eq "Prologue") {
+#         # plausibility check 
+#         my $oldhumidity = ReadingsVal($name, "humidity", "unknown");
+#         if ($oldhumidity eq "unknown" || ($humidity+15 > $oldhumidity && $humidity-15 < $oldhumidity)) {
+#            $hashumidity = TRUE;
+#         } else {
+#            $hashumidity = FALSE;
+#         }
+#      } 
+#    }
     if ($hashumidity == TRUE) {
       $msgtypeH = "humidity";
       $valH = $humidity;
@@ -1146,7 +1153,7 @@ CUL_TCM97001_Parse($$)
     }
     if ($hasbatcheck) {
       my $battery = ReadingsVal($name, "battery", "unknown");
-      if ($battery) {
+      if ($batbit) {
         if ($battery ne  "ok") { readingsBulkUpdate($def, "battery", "ok"); }
       } else {
         if ($battery ne  "low") { readingsBulkUpdate($def, "battery", "low"); }
@@ -1164,15 +1171,15 @@ CUL_TCM97001_Parse($$)
       my $readChannel = ReadingsVal($name, "channel", "");
       if (defined($readChannel) && $readChannel ne $channel) { readingsBulkUpdate($def, "channel", $channel); }
     }
-    if ($model eq "Prologue" || $model eq "Eurochron") {
-         # plausibility check 
-         my $oldtemp = ReadingsVal($name, "temperature", "unknown");
-         if ($oldtemp eq "unknown" || ($val+5 > $oldtemp && $val-5 < $oldtemp)) {
-            readingsBulkUpdate($def, $msgtype, $val);
-         }
-    } else { 
+#    if ($model eq "Prologue" || $model eq "Eurochron") {
+#         # plausibility check 
+#         my $oldtemp = ReadingsVal($name, "temperature", "unknown");
+#         if ($oldtemp eq "unknown" || ($val+5 > $oldtemp && $val-5 < $oldtemp)) {
+#            readingsBulkUpdate($def, $msgtype, $val);
+#         }
+#    } else { 
         readingsBulkUpdate($def, $msgtype, $val);
-    }
+#    }
     if ($hashumidity == TRUE) {
       readingsBulkUpdate($def, $msgtypeH, $valH);
     }
@@ -1193,7 +1200,6 @@ CUL_TCM97001_Parse($$)
 
     return $name;
   } else {
-   #Log3 "Unknown", 2, "xxxxxxxx $msg xxxx " . length($msg);
     if (length($msg) == 8 || length($msg) == 10 || length($msg) == 12 || length($msg) == 14) {
     my $defUnknown = $modules{CUL_TCM97001}{defptr}{"CUL_TCM97001_Unknown"};
     
