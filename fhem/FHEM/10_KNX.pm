@@ -11,6 +11,7 @@
 # ABU 20160413 Changed SplitFn
 # ABU 20160414 Changed SplitFn again
 # ABU 20160416 Changed SplitFn again
+# ABU 20160422 Added dpt9.021 - mA
 
 package main;
 
@@ -92,6 +93,7 @@ my %dpttypes = (
 	"dpt9.005"	 	=> {CODE=>"dpt9", UNIT=>"m/s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
 	"dpt9.009"	 	=> {CODE=>"dpt9", UNIT=>"m&sup3/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
 	"dpt9.010"	 	=> {CODE=>"dpt9", UNIT=>"s", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
+	"dpt9.021"	 	=> {CODE=>"dpt9", UNIT=>"mA", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},		
 	"dpt9.024"	 	=> {CODE=>"dpt9", UNIT=>"kW", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
 	"dpt9.025"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
 	"dpt9.026"	 	=> {CODE=>"dpt9", UNIT=>"l/h", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,6}[.,]?\d{1,2}/, MIN=>-670760, MAX=>670760},	
@@ -1657,6 +1659,7 @@ decodeByDpt ($$$) {
 	dpt9.005 -670760.0..+670760.0 m/s<br>
 	dpt9.009 -670760.0..+670760.0 m³/h<br>
 	dpt9.010 -670760.0..+670760.0 s<br>
+	dpt9.021 -670760.0..+670760.0 mA<br>	
 	dpt9.024 -670760.0..+670760.0 kW<br>
 	dpt9.025 -670760.0..+670760.0 l/h<br>
 	dpt9.026 -670760.0..+670760.0 l/h<br>
@@ -1900,6 +1903,7 @@ decodeByDpt ($$$) {
 	dpt9.005 -670760.0..+670760.0 m/s<br>
 	dpt9.009 -670760.0..+670760.0 m³/h<br>
 	dpt9.010 -670760.0..+670760.0 s<br>
+	dpt9.021 -670760.0..+670760.0 mA<br>	
 	dpt9.024 -670760.0..+670760.0 kW<br>
 	dpt9.025 -670760.0..+670760.0 l/h<br>
 	dpt9.026 -670760.0..+670760.0 l/h<br>
