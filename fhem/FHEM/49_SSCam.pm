@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.26   22.04.2016    Attribute "disable" to deactivate the module added
 # 1.25   18.04.2016    motion detection parameters can be entered if  
 #                      motion detection by camera or SVS is used
 # 1.24   16.04.2016    behavior of "set ... on" changed, Attr "recextend" added
@@ -122,12 +123,13 @@
 
 package main;
 
-use JSON qw( decode_json );            # from CPAN, Debian: apt-get install libperl-JSON 
-use Data::Dumper;                      # Perl Core module
+use JSON qw( decode_json );                 # from CPAN, Debian: apt-get install libperl-JSON 
+use Data::Dumper;                           # Perl Core module
 use strict;                           
 use warnings;
 use MIME::Base64;
 use HttpUtils;
+no warnings qw( experimental::autoderef );  # 5.18+
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
@@ -184,6 +186,7 @@ sub SSCam_Initialize($) {
  $hash->{FW_detailFn}  = "SSCam_liveview";
  
  $hash->{AttrList} =
+         "disable:1,0 ".
          "httptimeout ".
          "htmlattr ".
          "livestreamprefix ".
@@ -244,7 +247,7 @@ sub SSCam_Define {
   $hash->{HELPER}{RECTIME_DEF}         = "15";                                                    # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
   
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"Availability", "");                                                   # Verfügbarkeit ist unbekannt
+  readingsBulkUpdate($hash,"Availability", "???");                                                # Verfügbarkeit ist unbekannt
   readingsBulkUpdate($hash,"PollState","Inactive");                                               # es ist keine Gerätepolling aktiv
   readingsBulkUpdate($hash,"LiveStreamUrl", "");                                                  # LiveStream URL zurücksetzen
   readingsBulkUpdate($hash,"state", "off");                                                       # Init für "state" , Problemlösung für setstate, Forum #308
@@ -281,10 +284,26 @@ return undef;
 
 sub SSCam_Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
+    my $hash = $defs{$name};
+    my $do;
+      
     # $cmd can be "del" or "set"
     # $name is device name
     # aName and aVal are Attribute name and value
-   if ($cmd eq "set") {
+    
+    if ($aName eq "disable") {
+        if($cmd eq "set") {
+            $do = ($aVal) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+        my $val   = ($do == 1 ?  "inactive" : "off");
+    
+        readingsSingleUpdate($hash, "state", $val, 1);
+        readingsSingleUpdate($hash, "PollState", "Inactive", 1) if($do == 1);
+        readingsSingleUpdate($hash, "Availability", "???", 1) if($do == 1);
+    }
+                         
+    if ($cmd eq "set") {
         if ($aName eq "pollcaminfoall") {
            unless ($aVal =~ /^\d+$/) { return " The Value for $aName is not valid. Use only figures 0-9 without decimal places !";}
            }
@@ -329,9 +348,10 @@ sub SSCam_Set {
                    ((ReadingsVal("$name", "DeviceType", "Camera") eq "PTZ") ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
                    ((ReadingsVal("$name", "CapPTZAbs", "false")) ? "goAbsPTZ"." " : ""). 
                    ((ReadingsVal("$name", "CapPTZDirections", "0") > 0) ? "move"." " : "");
-                    
+           
         
         if ($opt eq "on") {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
             if (defined($prop)) {
@@ -343,26 +363,31 @@ sub SSCam_Set {
         }
         elsif ($opt eq "off") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             camstoprec($hash);
         }
         elsif ($opt eq "snap") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             camsnap($hash);
         }
         elsif ($opt eq "enable") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             camenable($hash);
         }
         elsif ($opt eq "disable") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             camdisable($hash);
         }
         elsif ($opt eq "motdetsc") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             if (!$prop || $prop !~ /^(disable|camera|SVS)$/) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
             
@@ -387,6 +412,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "credentials") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
                         
             ($success) = setcredentials($hash,$prop,$prop1);
@@ -394,6 +420,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "expmode") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             unless ($prop) { return " \"$opt\" needs one of those arguments: auto, day, night !";}
             
@@ -402,6 +429,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "goPreset") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             if (!$prop) {return "Function \"goPreset\" needs a \"Presetname\" as an argument";}
             
@@ -415,6 +443,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "runPatrol") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             if (!$prop) {return "Function \"runPatrol\" needs a \"Patrolname\" as an argument";}
             
@@ -428,6 +457,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "goAbsPTZ") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 
             if ($prop eq "up" || $prop eq "down" || $prop eq "left" || $prop eq "right") {
@@ -460,6 +490,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "move") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
 
             if (!defined($prop) || ($prop ne "up" && $prop ne "down" && $prop ne "left" && $prop ne "right" && $prop !~ m/dir_\d/)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
@@ -472,6 +503,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "runView") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
             if ($prop eq "link_open") {
@@ -493,6 +525,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "extevent") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
                                    
             $hash->{HELPER}{EVENTID} = $prop;
@@ -500,6 +533,7 @@ sub SSCam_Set {
         }
         elsif ($opt eq "stopView") 
         {
+            return "module is deactivated" if(IsDisabled($name));
             stopliveview($hash);            
         }
         else  
@@ -531,6 +565,8 @@ sub SSCam_Get {
         } 
         else 
         {
+            return "module is deactivated" if(IsDisabled($name));
+            
             # sind die Credentials gesetzt ?
             if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
             
@@ -570,7 +606,7 @@ sub SSCam_liveview ($$$$) {
   my $ret;
   my $alias;
     
-  return if(!$hash->{HELPER}{LINK} || ReadingsVal("$name", "state", "") =~ /^dis.*/);
+  return if(!$hash->{HELPER}{LINK} || ReadingsVal("$name", "state", "") =~ /^dis.*/ || IsDisabled($name));
   
   my $attr = AttrVal($d, "htmlattr", "");
   
@@ -756,7 +792,7 @@ sub watchdogpollcaminfo ($) {
     my $logstr;
     my $watchdogtimer = 90;
     
-    if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10 and ReadingsVal("$name", "PollState", "Active") eq "Inactive") {
+    if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10 and ReadingsVal("$name", "PollState", "Active") eq "Inactive" and !IsDisabled($name)) {
         
         # Polling ist jetzt aktiv
         readingsSingleUpdate($hash,"PollState","Active",0);
@@ -831,6 +867,8 @@ sub camstartrec ($) {
     my $errorcode;
     my $error;
     
+    return if(IsDisabled($name));
+    
     if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
         if (ReadingsVal("$name", "state", "") eq "disabled") {
             $errorcode = "402";
@@ -892,6 +930,8 @@ sub camstoprec ($) {
     my $errorcode;
     my $error;
     
+    return if(IsDisabled($name));
+    
     if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
         if (ReadingsVal("$name", "state", "") eq "disabled") {
             $errorcode = "402";
@@ -950,6 +990,8 @@ sub camexpmode ($) {
     my $errorcode;
     my $error;
     
+    return if(IsDisabled($name));
+    
     if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
         if (ReadingsVal("$name", "state", "") eq "disabled") {
             $errorcode = "402";
@@ -1003,6 +1045,8 @@ sub cammotdetsc ($) {
     my $logstr;
     my $errorcode;
     my $error;
+    
+    return if(IsDisabled($name));
     
     if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
         if (ReadingsVal("$name", "state", "") eq "disabled") {
@@ -1058,6 +1102,8 @@ sub camsnap ($) {
     my $errorcode;
     my $error;
     
+    return if(IsDisabled($name));
+    
     if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
         if (ReadingsVal("$name", "state", "") eq "disabled") {
             $errorcode = "402";
@@ -1111,6 +1157,8 @@ sub runliveview ($) {
     my $logstr;
     my $errorcode;
     my $error;
+    
+    return if(IsDisabled($name));
     
     if (ReadingsVal("$name", "state", "") =~ /^dis.*/) {
         if (ReadingsVal("$name", "state", "") eq "disabled") {
@@ -1169,6 +1217,8 @@ sub stopliveview ($) {
     my $errorcode;
     my $error;
    
+    return if(IsDisabled($name));
+    
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
         return if (!$hash->{HELPER}{SID_STRM});  # runView ist nicht ausgeführt
@@ -1221,6 +1271,8 @@ sub getsnapfilename ($) {
     my $logstr;
     my $snapid   = ReadingsVal("$name", "LastSnapId", " ");
     
+    return if(IsDisabled($name));
+    
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # den Filenamen zu einem Schnappschuß ermitteln
         Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
@@ -1251,6 +1303,7 @@ sub extevent ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
+    return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
@@ -1283,6 +1336,8 @@ sub doptzaction ($) {
     my $logstr;
     my $errorcode;
     my $error;
+    
+    return if(IsDisabled($name));
 
     if (ReadingsVal("$name", "DeviceType", "Camera") ne "PTZ") {
         Log3($name, 1, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible for cameras of DeviceType \"PTZ\" - please compare with device Readings");
@@ -1393,17 +1448,19 @@ sub movestop ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
-   if ($hash->{HELPER}{ACTIVE} eq "off") {
-            Log3($name, 4, "$name - Stop Camera $camname moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        Log3($name, 4, "$name - Stop Camera $camname moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
                         
-            $hash->{OPMODE} = "movestop";
-            $hash->{HELPER}{ACTIVE} = "on";
+        $hash->{OPMODE} = "movestop";
+        $hash->{HELPER}{ACTIVE} = "on";
             
-            if ($attr{$name}{debugactivetoken}) {
-                Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");;
-            }
+        if ($attr{$name}{debugactivetoken}) {
+            Log3($name, 3, "$name - Active-Token was set by OPMODE: $hash->{OPMODE}");;
+        }
         
-            &getapisites_nonbl($hash);
+        &getapisites_nonbl($hash);
     }
     else
     {
@@ -1420,6 +1477,8 @@ sub camenable ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $logstr;
+    
+    return if(IsDisabled($name));
     
     if (ReadingsVal("$name", "Availability", "disabled") eq "enabled") {return;}       # Kamera ist bereits enabled
     
@@ -1451,6 +1510,8 @@ sub camdisable ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $logstr;
+    
+    return if(IsDisabled($name));
     
     if (ReadingsVal("$name", "Availability", "enabled") eq "disabled") {return;}       # Kamera ist bereits disabled
     
@@ -1484,12 +1545,14 @@ sub getcaminfoall {
     my $logstr;
     my ($now,$new);
     
-        geteventlist($hash);
-        getcaminfo($hash);
-        getmotionenum($hash);
-        getcapabilities($hash);
-        getptzlistpreset($hash);
-        getptzlistpatrol($hash);
+    return if(IsDisabled($name));
+    
+    geteventlist($hash);
+    getcaminfo($hash);
+    getmotionenum($hash);
+    getcapabilities($hash);
+    getptzlistpreset($hash);
+    getptzlistpatrol($hash);
     
     # wenn gesetzt = manuelle Abfrage,
     if ($mode) {return;}
@@ -1527,6 +1590,8 @@ sub getsvsinfo ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
+    return if(IsDisabled($name));
+    
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Kamerainfos abrufen
         Log3($name, 4, "$name - Retrieval of Surveillance Station related informations starts now");
@@ -1557,6 +1622,8 @@ sub getcaminfo ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $logstr;
+    
+    return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Kamerainfos abrufen
@@ -1589,6 +1656,8 @@ sub geteventlist ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
+    return if(IsDisabled($name));
+    
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         # Kamerainfos abrufen
         Log3($name, 4, "$name - Query event informations of $camname starts now");
@@ -1619,6 +1688,8 @@ sub getmotionenum ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
+    return if(IsDisabled($name));
+    
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         Log3($name, 4, "$name - Enumerate motion detection parameters of $camname starts now");
                         
@@ -1648,7 +1719,9 @@ sub getcapabilities ($) {
     my $name     = $hash->{NAME};
     my $logstr;
     
-        if ($hash->{HELPER}{ACTIVE} eq "off") {
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
         # PTZ-ListPresets abrufen
         Log3($name, 4, "$name - Retrieval Capabilities of Camera $camname starts now");
                         
@@ -1677,6 +1750,8 @@ sub getptzlistpreset ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $logstr;
+    
+    return if(IsDisabled($name));
     
     if (defined(ReadingsVal("$name", "DeviceType", undef)) and ReadingsVal("$name", "DeviceType", undef) ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
@@ -1713,6 +1788,8 @@ sub getptzlistpatrol ($) {
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $logstr;
+    
+    return if(IsDisabled($name));
     
     if (defined(ReadingsVal("$name", "DeviceType", undef)) and ReadingsVal("$name", "DeviceType", undef) ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera");
@@ -3767,7 +3844,7 @@ sub experror {
        <li>continuous moving of PTZ-camera lense   </li>
        <li>trigger of external events 1-10 (action rules in SVS)   </li>
        <li>start and stop of camera livestreams  </li>
-       <li>playback of the last recording  </li><br>
+       <li>playback of last recording  </li><br>
     </ul>
    </ul>
    The recordings and snapshots will be stored in Synology Surveillance Station (SVS) and are managed like the other (normal) recordings / snapshots defined by Surveillance Station rules.<br>
@@ -4366,9 +4443,12 @@ sub experror {
 <a name="SSCamattr"></a>
 <b>Attributes</b>
   <br><br>
+  
   <ul>
   <ul>
   <li><b>debugactivetoken</b> - if set the state of active token will be logged - only for debugging, don't use it in normal operation </li>
+  
+  <li><b>disable</b> - deactivates the module (device definition) </li>
   
   <li><b>httptimeout</b> - Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" or not set) </li>
   
@@ -5047,9 +5127,12 @@ sub experror {
 <a name="SSCamattr"></a>
 <b>Attribute</b>
   <br><br>
+  
   <ul>
   <ul>
   <li><b>debugactivetoken</b> - wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im normalen Betrieb benutzen </li>
+  
+  <li><b>disable</b> - deaktiviert das Gerätemodul bzw. die Gerätedefinition </li>
   
   <li><b>httptimeout</b> - Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn httptimeout = "0" oder nicht gesetzt) </li>
   
