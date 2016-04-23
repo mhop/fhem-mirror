@@ -2398,8 +2398,9 @@ sub CUL_HM_Parse($$) {#########################################################
       my($chn,$cnt,$bright,$nextTr) = map{hex($_)} (@mI,0);
       if ($nextTr){
         $nextTr = (15 << ($nextTr >> 4) - 4); # strange mapping of literals
-        RemoveInternalTimer($mh{devN}.":motionCheck");
-        InternalTimer(gettimeofday()+$nextTr,"CUL_HM_motionCheck", $mh{devN}.":motionCheck", 0);
+        RemoveInternalTimer($mh{cName}.":motionCheck");
+        InternalTimer(gettimeofday()+$nextTr+2,"CUL_HM_motionCheck", $mh{cName}.":motionCheck", 0);
+        $mh{cHash}->{helper}{moStart} = gettimeofday() if (!defined $mh{cHash}->{helper}{moStart});
       }
       else{
         $nextTr = "none ";
@@ -8299,8 +8300,17 @@ sub CUL_HM_readValIfTO($){#
 }
 sub CUL_HM_motionCheck($){# 
   my ($name) = split(":",shift);#  uncertain:$name:$reading:$value 
-  CUL_HM_UpdtReadBulk($defs{$name},1,"state:noMotion"
-                                    ,"motion:no");
+
+  if (defined $defs{$name}{helper}{moStart}){
+    CUL_HM_UpdtReadBulk($defs{$name},1,"state:noMotion"
+                                      ,"motion:no"
+                                      ,"motionDuration:".(int(gettimeofday())-int($defs{$name}{helper}{moStart})));
+    delete $defs{$name}{helper}{moStart};
+  }
+  else{
+    CUL_HM_UpdtReadBulk($defs{$name},1,"state:noMotion"
+                                      ,"motion:no");
+  }
 }
 
 sub CUL_HM_getAttr($$$){#return attrValue - consider device if empty
