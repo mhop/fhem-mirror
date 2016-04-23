@@ -49,8 +49,8 @@ sub LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$);
 
 
   #List of firmware versions that are known to be compatible with this modul
-  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#";
-  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#";
+  my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#";
+  my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#";
 
 sub ##########################################
 LUXTRONIK2_Log($$$)
@@ -111,6 +111,16 @@ LUXTRONIK2_Define($$)
 
   $hash->{STATE} = "Initializing";
   $hash->{HOST} = $host;
+  if ( $host =~ /(.*):(.*)/ ) {
+      $hash->{HOST} = $1;
+      $hash->{PORT} = $2;
+      $hash->{fhem}{portDefined} = 1;
+  }
+  else {
+      $hash->{HOST} = $host;
+      $hash->{PORT} = 8888;
+      $hash->{fhem}{portDefined} = 0;
+  }
   $hash->{INTERVAL} = $interval;
   $hash->{NOTIFYDEV} = "global";
 
@@ -345,18 +355,17 @@ LUXTRONIK2_GetUpdate($)
     return undef if( AttrVal($name, "disable", 0 ) == 1 );
   }
 
-  my $host = $hash->{HOST};
-
-  $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name."|".$host, "LUXTRONIK2_UpdateDone", 25, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
+  $hash->{helper}{RUNNING_PID} = BlockingCall("LUXTRONIK2_DoUpdate", $name, "LUXTRONIK2_UpdateDone", 25, "LUXTRONIK2_UpdateAborted", $hash) unless(exists($hash->{helper}{RUNNING_PID}));
 }
 
 
 sub ########################################
 LUXTRONIK2_DoUpdate($)
 {
-  my ($string) = @_;
-  my ($name, $host) = split("\\|", $string);
-
+  my ($name) = @_;
+  my $hash = $defs{$name};
+  my $host = $hash->{HOST};
+  my $port = $hash->{PORT};
   my @heatpump_values;
   my @heatpump_parameters;
   my @heatpump_visibility;
@@ -364,16 +373,16 @@ LUXTRONIK2_DoUpdate($)
   my $result="";
   my $readingStartTime = time();
   
-  LUXTRONIK2_Log $name, 5, "Opening connection to host ".$host;
+  LUXTRONIK2_Log $name, 5, "Opening connection to $host:$port";
   my $socket = new IO::Socket::INET (  
                   PeerAddr => $host, 
-                   PeerPort => 8888,
+                  PeerPort => $port,
                    #   Type = SOCK_STREAM, # probably needed on some systems
                    Proto => 'tcp'
       );
   if (!$socket) {
-      LUXTRONIK2_Log $name, 1, "Could not open connection to host ".$host;
-      return "$name|0|Can't connect to $host";
+      LUXTRONIK2_Log $name, 1, "Could not open connection to host $host:$port";
+      return "$name|0|Can't connect to $host:$port";
   }
   $socket->autoflush(1);
   
@@ -623,9 +632,9 @@ LUXTRONIK2_DoUpdate($)
   # 35 - counterHoursHotWater
   $return_str .= "|". ($heatpump_visibility[196]==1 ? $heatpump_values[65] : "no");
   # 36 - counterHeatQHeating
-  $return_str .= "|" . $heatpump_values[151];
+  $return_str .= "|". ($heatpump_visibility[0]==1 ? $heatpump_values[151] : "no");
   # 37 - counterHeatQHotWater
-  $return_str .= "|". $heatpump_values[152];
+  $return_str .= "|". ($heatpump_visibility[1]==1 ? $heatpump_values[152] : "no");
   # 38 - counterHours2ndHeatSource2
   $return_str .= "|". ($heatpump_visibility[85]==1 ? $heatpump_values[61] : "no");
   # 39 - counterHours2ndHeatSource3
@@ -674,6 +683,8 @@ LUXTRONIK2_DoUpdate($)
   $return_str .= "|". ($heatpump_visibility[211]==1 ? $heatpump_values[136] : "no");
   # 61 - hotWaterCircPumpDeaerate
   $return_str .= "|". ($heatpump_visibility[167]==1 ? $heatpump_parameters[684] : "no");
+  # 62 - counterHeatQPool
+  $return_str .= "|". ($heatpump_visibility[2]==1 ? $heatpump_values[153] : "no");
   return $return_str;
 }
 
@@ -705,7 +716,9 @@ LUXTRONIK2_UpdateDone($)
             4 => "Fehler",
             5 => "Abtauen",
             6 => "Warte auf LIN-Verbindung",
-            7 => "Verdichter heizt auf");
+            7 => "Verdichter heizt auf",
+            8 => "Pumpenvorlauf" );
+            
   my %wpOpStat2 = ( 0 => "Heizbetrieb",
             1 => "Keine Anforderung",
             2 => "Netz Einschaltverzoegerung",
@@ -722,6 +735,7 @@ LUXTRONIK2_UpdateDone($)
             14 => "Brauchw_Ext_En",
             16 => "Durchflussueberwachung",
             17 => "Elektrische Zusatzheizung" );
+            
   my %wpMode = ( 0 => "Automatik",
              1 => "Zusatzheizung",
              2 => "Party",
@@ -740,20 +754,24 @@ LUXTRONIK2_UpdateDone($)
             14 => "WZS", 15 => "L1I407",
             16 => "L2I407", 17 => "L1A407",
             18 => "L2A407", 19 => "L2G407",
-            20 => "LWC407", 21 => "L1AREV",
-            22 => "L2AREV", 23 => "WWC1",
-            24 => "WWC2", 25 => "L2G404",
-            26 => "WZW", 27 => "L1S",
-            28 => "L1H", 29 => "L2H",
-            30 => "WZWD", 31 => "ERC",
-            40 => "WWB_20", 41 => "LD5",
-            42 => "LD7", 43 => "SW 37_45",
-            44 => "SW 58_69", 45 => "SW 29_56",
-            46 => "LD5 (230V)", 47 => "LD7 (230 V)",
-            48 => "LD9", 49 => "LD5 REV",
+            
+            20 => "LWC407", 21 => "L1AREV", 22 => "L2AREV", 23 => "WWC1",
+            24 => "WWC2",   25 => "L2G404", 26 => "WZW",    27 => "L1S",
+            28 => "L1H",    29 => "L2H",    30 => "WZWD",   31 => "ERC",
+            
+            40 => "WWB_20",   41 => "LD5", 42 => "LD7", 43 => "SW 37_45",
+            44 => "SW 58_69", 45 => "SW 29_56", 46 => "LD5 (230V)", 
+            47 => "LD7 (230 V)", 48 => "LD9",   49 => "LD5 REV",
+            
             50 => "LD7 REV", 51 => "LD5 REV 230V",
             52 => "LD7 REV 230V", 53 => "LD9 REV 230V",
-            54 => "SW 291", 55 => "LW SEC" );
+            54 => "SW 291", 55 => "LW SEC",  56 => "HMD 2",   57 => "MSW 4",
+            58 => "MSW 6",   59 => "MSW 8",  60 => "MSW 10",  61 => "MSW 12",
+            62 => "MSW 14",  63 => "MSW 17", 64 => "MSW 19",  65 => "MSW 23",
+            66 => "MSW 26",  67 => "MSW 30", 68 => "MSW 4S",  69 => "MSW 6S",
+            
+            70 => "MSW 8S",  71 => "MSW 10S",72 => "MSW 13S", 73 => "MSW 16S",
+            74 => "MSW2-6S", 75 => "MSW4-16" );
              
   my $counterRetry = $hash->{fhem}{counterRetry};
   $counterRetry++;    
@@ -764,6 +782,16 @@ LUXTRONIK2_UpdateDone($)
   if ($a[1]==0 ) {
      readingsSingleUpdate($hash,"state","Error: ".$a[2],1);
     $counterRetry = 0;
+    if ( $hash->{fhem}{portDefined} == 0 ) {
+      if ($hash->{PORT} == 8888 ) {
+         $hash->{PORT} = 8889;
+         LUXTRONIK2_Log $name, 3, "Error when using port 8888. Changed port to 8889";
+      }
+      elsif ($hash->{PORT} == 8889 ) {
+         $hash->{PORT} = 8889;
+         LUXTRONIK2_Log $name, 3, "Error when using port 8889. Changed port to 8888";
+      }
+    }
   }
 # Busy, restart update
   elsif ($a[1]==2 )  {
@@ -966,9 +994,20 @@ LUXTRONIK2_UpdateDone($)
      LUXTRONIK2_storeReadings $hash, "counterHoursHeatPump", $a[33], 3600, $doStatistic, $heatPumpPower;
      LUXTRONIK2_storeReadings $hash, "counterHoursHeating", $a[34], 3600, $doStatistic, $heatPumpPower;
      LUXTRONIK2_storeReadings $hash, "counterHoursHotWater", $a[35], 3600, $doStatistic, $heatPumpPower;
-     LUXTRONIK2_storeReadings $hash, "counterHeatQHeating", $a[36], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1;
-     LUXTRONIK2_storeReadings $hash, "counterHeatQHotWater", $a[37], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1;
-     LUXTRONIK2_storeReadings $hash, "counterHeatQTotal", $a[36] + $a[37], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1;
+     my $heatQTotal = 0 ; 
+     if ($a[36] !~ /no/) {
+         LUXTRONIK2_storeReadings $hash, "counterHeatQHeating", $a[36], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1; 
+         $heatQTotal += $a[36];
+      }
+     if ($a[37] !~ /no/) { 
+         LUXTRONIK2_storeReadings $hash, "counterHeatQHotWater", $a[37], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1; 
+         $heatQTotal += $a[37];
+     }
+     if ($a[62] !~ /no/) { 
+         LUXTRONIK2_storeReadings $hash, "counterHeatQPool", $a[62], 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1; 
+         $heatQTotal += $a[62];
+     }
+     LUXTRONIK2_storeReadings $hash, "counterHeatQTotal", $heatQTotal, 10, ($a[19] !~ /no/ ? $doStatistic : 0), -1;
       
      
    # Input / Output status
@@ -1769,7 +1808,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
-<div style="width:800px">
+<div>
 <ul>
   Luxtronik 2.0 is a heating controller used in <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, Siemens Novelan (WPR NET) and Wolf Heiztechnik (BWL/BWS) heat pumps.
   <br>
@@ -1785,8 +1824,10 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <a name="LUXTRONIK2define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address&gt; [poll-interval]</code><br>
+    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address[:Port]&gt; [poll-interval]</code><br>
     If the pool interval is omitted, it is set to 300 (seconds). Smallest possible value is 30.
+    <br>
+    Usually, the port needs not to be defined.
     <br>
     Example: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
   </ul>
@@ -1894,7 +1935,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
 
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
-<div style="width:800px">
+<div>
 <ul>
   Die Luxtronik 2.0 ist eine Heizungssteuerung, welche in W&auml;rmepumpen von <a href="http://www.alpha-innotec.de">Alpha Innotec</a>, 
   Siemens Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist.
@@ -1908,9 +1949,11 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <a name="LUXTRONIK2define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-Adresse&gt; [Abfrageinterval]</code>
+    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-Adresse[:Port]&gt; [Abfrageinterval]</code>
     <br>
     Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 30.
+    <br>
+    Die Angabe des Portes kann gew&oouml;hnlich entfallen.
     <br>
     Beispiel: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
  
