@@ -982,32 +982,22 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
    $result = "";
    foreach my $key (sort keys %hidden) {
       if ($key !~ /^(lastState|lastTime|showDate|\(since):$/) {
-         # Create current summary reading
-         $result .= " " if $result;
+         #Store current value for single readings
          if ($key !~ /_Count:$/) {
-            #Store current value for single readings
             $stat{$key} = statistics_FormatDuration($hidden{$key});
-            $result .= "$key ".$stat{$key};
-            # Reset hidden reading if period change
-            if ($saveLast) { delete $hidden{$key}; }
          }
          else {
-            $result .= "$key ".$hidden{$key};
-            #Store current value for single readings
             $stat{$key} = $hidden{$key};
-            # Reset hidden reading if period change
-            if ($saveLast && $key ne $state."_Count:") {
-               delete $hidden{$key};
-            }
-            elsif ($saveLast && $key eq $state."_Count:") {
-               $hidden{$key} = 1;
-            }
          }
+         # Create current summary reading
+         $result .= " "   if $result;
+         $result .= "$key ".$stat{$key};
+         delete $hidden{$key}   if $saveLast; # Reset hidden reading if period changed
       }
    }
    if ($hidden{"showDate:"} == 1) { $result .= " (since: ".$hidden{"(since:"}; }
 
-  # Store current reading as last reading, Reset current reading
+  # Store current summary reading as last reading, create new summary reading
     if ($saveLast) { 
       readingsBulkUpdate($dev, $statReadingName . "Last", $result, 1); 
       statistics_Log $hash, 4, "Set '".$statReadingName . "Last = $result'";
@@ -1015,7 +1005,7 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
       $hidden{$state.":"} = 0;
       $hidden{$state."_Count:"} = 1;
       $hidden{"showDate:"} = 0;
-   }
+   }  
 
   # Store current reading
    readingsBulkUpdate($dev, $statReadingName, $result, 0);
@@ -1024,16 +1014,18 @@ sub statistics_doStatisticDurationSingle ($$$$$$)
   # Store single readings
    my $singularReadings = AttrVal($name, "singularReadings", "");
    if ($singularReadings ne "") {
+      # Do this for each state of the current or last period
       while (my ($statKey, $statValue) = each(%stat) ) {  
+         chop ($statKey);
          unless ($saveLast) {
-            chop ($statKey);
             # statistics_storeSingularReadings  
             # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
-            statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,$statKey,$period,$statValue,0,$saveLast);
+            statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,$statKey,$period,$statValue,0,0);
          }
          else {
-            my $newValue = $hidden{$statKey};
-            chop ($statKey);
+            my $newValue = 0;
+            $newValue = "00:00:00"     if $statKey !~ /_Count:$/;
+            $newValue = $hidden{$statKey}       if defined $hidden{$statKey};
             # statistics_storeSingularReadings  
             # $hashName,$singularReadings,$dev,$statReadingName,$readingName,$statType,$period,$statValue,$lastValue,$saveLast
             statistics_storeSingularReadings ($name,$singularReadings,$dev,$statReadingName,$readingName,$statKey,$period,$newValue,$statValue,$saveLast);
