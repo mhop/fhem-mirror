@@ -122,7 +122,6 @@ LGTV_IP12_Initialize($)
     $hash->{GetFn}     = "LGTV_IP12_Get";
     $hash->{AttrFn}    = "LGTV_IP12_Attr";
     $hash->{NotifyFn}  = "LGTV_IP12_Notify";
-    $hash->{NOTIFYDEV} = "global";
     $hash->{AttrList}  = "do_not_notify:0,1 pairingcode request-timeout:1,2,3,4,5 disable:0,1 disabledForIntervals ".$readingFnAttributes;
 }
 
@@ -165,6 +164,7 @@ LGTV_IP12_Define($$)
     } 
        
     $hash->{STATE} = 'defined';
+    $hash->{NOTIFYDEV} = "global";
     
     return undef;
 }
@@ -201,7 +201,7 @@ LGTV_IP12_Notify($$)
     my ($hash,$dev) = @_;
     my $name = $hash->{NAME};
     
-    return if($dev->{NAME} ne "global");
+    return unless(exists($dev->{NAME}) and $dev->{NAME} eq "global");
    
     if(grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}))
     {
