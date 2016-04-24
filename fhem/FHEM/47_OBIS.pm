@@ -70,7 +70,7 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-  $hash->{SetFn} = "OBIS_Set";
+#  $hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
@@ -195,7 +195,7 @@ sub OBIS_Read($)
 sub OBIS_trySMLdecode($$)
 {
 	my ( $hash, $remainingSML ) = @_;
-	if($remainingSML!~/[\x00-\x09|\x10-\x20]/g) {return $remainingSML} else {$hash->{MeterType}="SML"};
+	if($remainingSML!~/[\x00-\x09|\x10-\x1F]/g) {return $remainingSML} else {$hash->{MeterType}="SML"};
 	$remainingSML=uc(unpack('H*',$remainingSML));
 	$hash->{MeterType}="SML";
 	my $newMsg="";
@@ -211,7 +211,7 @@ sub OBIS_trySMLdecode($$)
 			while ($msg =~ m/(7707)([0-9A-F]{2,999}?)(?=7707|1B1B1B1B)/g) {
 	    		my $telegramm = $&;
       			my @list=$telegramm=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2,999})/g;
-      			Log 3,"Telegram=$telegramm";
+      			Log 5,"Telegram=$telegramm";
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		
 				my ($status,$statusL,$statusT,$valTime,$valTimeL,$valTimeT,$unit,$unitL,$unitT,$scaler,$scalerL,$scalerT,$data,$dataL,$dataT,$other);		   
@@ -220,10 +220,17 @@ sub OBIS_trySMLdecode($$)
 	    		($unitL,$unitT,$unit,$other)=OBIS_decodeTL($other);
 	    		($scalerL,$scalerT,$scaler,$other)=OBIS_decodeTL($other);
 	    		($dataL,$dataT,$data,$other)=OBIS_decodeTL($other);
+#	    		Log 3,"Status: $statusL,$statusT,$status";
+#	    		Log 3,"valTime: $valTimeL,$valTimeT,$valTime";
+#	    		Log 3,"Unit: $unitL,$unitT,$unit";
+#	    		Log 3,"scaler: $scalerL,$scalerT,$scaler";
+#	    		Log 3,"Data: $dataL,$dataT,$data";
+	    		
 # Type String
 				my $line2=""; 
-	    		if ($dataT ==0 ) {						
+	    		if ($dataT ==0 ) {				
 	    			if($line=~$SML_specialities{"HEX4"}[0]) {
+	    				
 	    				$line2=$SML_specialities{"HEX4"}[1]->($data)
 	    			} elsif($line=~$SML_specialities{"HEX2"}[0]) {
     					$line2=$SML_specialities{"HEX2"}[1]->($data)
@@ -231,6 +238,8 @@ sub OBIS_trySMLdecode($$)
 	    				$data=~s/([A-F0-9]{2})/chr(hex($1))/eg;
 	    				$line2="$data";
     				}
+#    					    				Log 3,"Line2=$line2";
+    				
 # Type signed (=80) and unsigned (=96) Integer
 				} elsif ($dataT & 0b01010000|$dataT & 0b01100000) {		
 					$unit= $unit eq "1E" ? "Wh" :
@@ -251,23 +260,24 @@ sub OBIS_trySMLdecode($$)
 						$val=unpack("c", pack("C", hex($data))) if ($dataL==1);
 						$val=unpack("s", pack("S", hex($data))) if ($dataL==2);
 						$val=unpack("l", pack("L", hex($data))) if ($dataL==4);
-						$val=unpack("q", pack("Q", hex($data))) if ($dataL==8);
+						if (length(pack('j', -1))*8 == 64) {$val=unpack("q", pack("Q", hex($data))) if ($dataL==8)};
 					}
 					#unsigned Values
 					if ($dataT & 0b00100000) {
 						$val=unpack("C", pack("C", hex($data))) if ($dataL==1);
 						$val=unpack("S", pack("S", hex($data))) if ($dataL==2);
 						$val=unpack("L", pack("L", hex($data))) if ($dataL==4);
-						$val=unpack("Q", pack("Q", hex($data))) if ($dataL==8);
+						if (length(pack('j', -1))*8 == 64) {$val=unpack("Q", pack("Q", hex($data))) if ($dataL==8)};
 					}
-					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
-					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit") if($dataT ==96);					
+#					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
+					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit"); # if($dataT ==96);					
 				} elsif ($dataT & 0b01000000) {		# Type Boolean - no Idea, where this is used
 					$line2=OBIS_hex2int($data);			# 0=false, everything else is true
 				} elsif ($dataT & 0b01110000) {		# Type List of.... - not sure, if we ever need that
 				}
 				$initstr.="$line2\\" if ($line=~$SML_specialities{"INFO"}[0]);
 				$newMsg.=$line.$line2.")\r\n";
+#				Log 3,"$line$line2)";
 ###### TypeLength-Test ends here
 
 			}
