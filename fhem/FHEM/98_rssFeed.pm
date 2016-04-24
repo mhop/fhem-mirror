@@ -40,6 +40,10 @@ my $nb_indexlength=length($maximum_max_lines);
 
 my $rdHeadlines='.headlines';
 
+my $tickerReadingsPrefix='ticker';
+my $rdToastTicker=$tickerReadingsPrefix.'Toast';
+my $rdMarqueeTicker=$tickerReadingsPrefix.'Marquee';
+
 my $defaultReadings="title,description,pubDate";
 my $allReadings=$defaultReadings.",link,buildDate,imageTitle,imageURL,encodedContent";
 
@@ -92,6 +96,14 @@ sub rssFeed_NotifyFn($$)
 					InternalTimer($nexttimer, $modulename."_GetUpdate", $hash, 0);
   					readingsSingleUpdate($hash,'state','defined',1);
 
+				}
+			} elsif($event =~/ATTR $name rfDisplayTickerReadings/) {
+				rssFeed_Log3 $name,4,"$name rfDisplayTickerReadings changed";
+				if(!AttrVal($name,'rfDisplayTickerReadings',undef)) {
+					fhem("deletereading $name $tickerReadingsPrefix.*",1); 
+				} else {
+					readingsSingleUpdate($hash,$rdToastTicker,'waiting for next update...',1);
+					readingsSingleUpdate($hash,$rdMarqueeTicker,'waiting for next update...',1);
 				}
 			} elsif($event eq 'INITIALIZED') {
 				if(IsDisabled($name)) {
@@ -171,6 +183,7 @@ rssFeed_Initialize($)
 	. "rfCustomTextPrepFn "  #optional preparation of Text readings before they_re set (funtion)
 	. "rfReadings:multiple-strict,".$allReadings." "   #readings to fill (comma separated list)
 	. "rfDisabledText "
+	. "rfDisplayTickerReadings:1,0 "
 	#. "rfLatin1ToUtf8:1,0"  #optional encoding using latin1ToUtf8 for readings (TEST ONLY)
   	. $readingFnAttributes; #default FHEM FnAttributes -> see commandref.
 }
@@ -429,7 +442,7 @@ rssFeed_update(@)
 	}
   } 
   
-  my ($i,$nachrichten,$response,@ticker,$ua,$url,$xml);
+  my ($i,$nachrichten,$response,@ticker,@mticker,$ua,$url,$xml);
 
   $i = 0;
   
@@ -550,6 +563,7 @@ rssFeed_update(@)
 		my $h = $tt_start.$cline.$tt_end;
 		last unless $h;
 		push (@ticker,$h);
+		push (@mticker,$cline);
 
 		#Index for numbering each news-block
 		my $ndx=sprintf('%0'.$nb_indexlength.'s',$i);
@@ -597,6 +611,18 @@ rssFeed_update(@)
   #store it in the readings
   my $tickerHeadlines=join("\n", @ticker);
   readingsSingleUpdate($dhash,$rdHeadlines, $tickerHeadlines,0);
+  
+  if(AttrVal($name,"rfDisplayTickerReadings",undef)) {
+  	readingsSingleUpdate($dhash,$rdToastTicker,$tickerHeadlines,1);
+	my $mTickerLine=join(" $ttt ", @mticker);
+  	readingsSingleUpdate($dhash,$rdMarqueeTicker,$mTickerLine,1);
+  } else {
+  	fhem("deletereading $name $tickerReadingsPrefix.*",1); 
+	
+  }
+  
+
+ 
   
 return;
 }
@@ -689,6 +715,8 @@ return;
         <br/>
         Result: <code>+++ This is a sample headline +++</code>
         <br/>
+		These characters are also used for "marquee"-ticker data.
+		<br>
     </li>
     <li><a name="rfMaxLines">rfMaxLines</a><br/>
         Defines the maximum number of news items that will be extracted from the
@@ -698,6 +726,11 @@ return;
         Example: <code>attr &lt;name&gt; rfMaxLines 15</code>
         <br/>
     </li>
+	<li><a name="rfDisplayTickerReadings">rfDisplayTickerReadings</a><br/>
+		If this attribute is set then there will be two additional readings
+		containing the ticker data for "toast"-Tickers (same as rssFeedGetTicker())
+		and one containing the ticker data for "marquee"-tickers on a single line.
+	</li>
     <li><a name="rfEncode">rfEncode</a><br/>
         Defines an encoding which will be used for any text extracted from the 
         feed that will be applied before setting the readings. Therefore the
@@ -847,6 +880,20 @@ sub rssFeedPrep($$)
         This readings contains the number of new items that were extracted
         in the last update of the feed data.
       </li>
+	  <li>
+	  	<code>tickerToast</code><br/>
+		This reading contains the same data that is returned by the rssFeedGetTicker()
+		funciton (if attribute rfDisplayTickerReadings is set)
+		<br>
+		Example: <code>+++ Headline 1 +++ \n +++ Headline 2 +++ \n +++ Headline 3 +++ </code>
+	  </li>
+	  <li>
+	  	<code>tickerMarquee</code><br/>
+		This reading contains the ticker data on a single line for "marquee" style
+		tickers (if attribute rfDisplayTickerReadings is set)
+		<br>
+		Example: <code>Headline 1 +++ Hadline 2 +++ Headline 3 +++</code>
+	  </li>
       <li><code>gzippedFeed</code><br/>
         Sometimes RSS-Feed data is delivered gzipped. This is automatically
 		recognized by the module. So if the received data was originally
@@ -947,6 +994,8 @@ sub rssFeedPrep($$)
         <br>
         Ergebnis: <code>+++ Dies ist eine Beispiel-Schlagzeile +++</code>
         <br>
+		Diese Zeichenkette wird auch als Trenner für die Marquee-Ticker-Daten verwendet.
+		<br>
     </li>
     <li><a name="rfMaxLines">rfMaxLines</a><br>
         Bestimmt, wieviele Schlagzeilen maximal aus dem Feed extrahiert werden sollen.<br>
@@ -956,6 +1005,13 @@ sub rssFeedPrep($$)
         Beispiel: <code>attr &lt;name&gt; rfMaxLines 15</code>
         <br>
     </li>
+	<li><a name="rfDisplayTickerReadings">rfDisplayTickerReadings</a><br/>
+		Wenn dieses Attribut gesetzt ist werden 2 zus&auml;tzliche Readings erzeugt, die
+		die Tickerdaten einmal f&uuml;r s.g. "Toast"-Ticker (der Inhalt ist der selbe,
+		wie die Ausgabe von rssFeedGetTicker()) und einmal f&uuml;r s.g. "Marquee"-Ticker, also
+		in einer einzigen Zeile.
+		<br>
+	</li>
     <li><a name="rfEncode">rfEncode</a><br>
         Hier kann eine Encoding-Methode (Bspw. utf8) angegeben werden.
         Die Texte die aus dem Feed extrahiert werden (title, descripton, ...) 
@@ -1106,6 +1162,20 @@ sub rssFeedPrep($$)
         Dieses Reading gibt an, wie viele Schlagzeilen tats&auml;chlich beim letzten
         update aus dem Nachrichten-Feed extrahiert wurden.
       </li>
+	  <li>
+	  	<code>tickerToast</code><br/>
+		Dieses Reading ent&auml; die selben Daten, wie sie von der rssFeedGetTicker()
+		Funktion zur&uuml;ckgeliefert werden (if attribute rfDisplayTickerReadings is set)
+		<br>
+		Beispiel: <code>+++ Headline 1 +++ \n +++ Headline 2 +++ \n +++ Headline 3 +++ </code>
+	  </li>
+	  <li>
+	  	<code>tickerMarquee</code><br/>
+		Dieses Reading enth&auml;lt die Tickerdaten f&uuml;r "marquee"-artige Ticker,
+		also auf einer Zeile (if attribute rfDisplayTickerReadings is set)
+		<br>
+		Beispiel: <code>Headline 1 +++ Hadline 2 +++ Headline 3 +++</code>
+	  </li>
       <li><code>gzippedFeed</code><br>
 		Manche Feeds werden in gezippter (gzip) Form ausgeliefert. Das wird vom
 		Modul automatisch erkannt und die Daten im Bedarfsfall dekomprimiert.
