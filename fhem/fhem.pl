@@ -1549,7 +1549,7 @@ ReplaceSetMagic($$@)       # Forum #38276
     $x eq "" ? "[$1:$2$3]" : $x
   }/egi;
 
-  $a =~ s/{\((.*)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/egs;
+  $a =~ s/{\((.*?)\)}/AnalyzePerlCommand($hash->{CL},$1,1)/egs;
 
   return (undef, @_) if($oa eq $a);
   return (undef, split(/ /, $a, $nsplit));
