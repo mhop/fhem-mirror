@@ -14,6 +14,7 @@
 # V 0.14 2015-07-27 - NEW:  SetExtensions on-for-timer
 # V 0.15 2015-12-17 - NEW:  Attribut IODev to switch IO-Device
 # V 0.16 2016-03-28 - NEW:  protocol daycom with three id's (id, systemcode, unit)
+# V 0.17 2016-04-24 - NEW:  Attribut sendCount
 ############################################## 
 
 package main;
@@ -40,7 +41,7 @@ sub pilight_switch_Initialize($)
   $hash->{ParseFn}  = "pilight_switch_Parse";
   $hash->{SetFn}    = "pilight_switch_Set";
   $hash->{StateFn}  = "pilight_switch_State";
-  $hash->{AttrList} = "IODev ".$readingFnAttributes;
+  $hash->{AttrList} = "IODev sendCount:1,2,3,4,5 ".$readingFnAttributes;
 }
 
 #####################################
@@ -132,10 +133,13 @@ sub pilight_switch_Set($$)
   return "$cmd expects $sets{$match[0]} parameters" unless (@a eq $sets{$match[0]});
   
   my $v = join(" ", @a);
-  Log3 $me, 4, "$me(Set): $cmd $v";
-
   my $msg = "$me,$cmd";
-  IOWrite($hash, $msg);
+  
+  my $sndCount = AttrVal($me,"sendCount",1);
+  for (my $i = 0; $i < $sndCount; $i++) {
+    Log3 $me, 5, "$me(Set): $cmd $v".($i+1)." of $sndCount";
+    IOWrite($hash, $msg);
+  }
   
   #keinen Trigger bei Set auslösen
   #Aktualisierung erfolgt in Parse
@@ -190,6 +194,17 @@ sub pilight_switch_Set($$)
     <li>
       state<br>
       state of the switch on or off
+    </li>
+  </ul>
+  <a name="pilight_switch_attr"></a>
+  <b>Attributs</b>
+  <ul>
+    <li>
+      IODev<br>
+    </li>
+    <li>
+      sendCount<br>
+      How many times the command is send. Default: 1
     </li>
   </ul>
   <br>
