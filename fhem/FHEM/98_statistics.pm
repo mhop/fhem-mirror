@@ -131,6 +131,7 @@ sub statistics_Initialize($)
                    ."dayChangeTime "
                    ."deltaReadings "
                    ."durationReadings "
+                   ."durationPeriodHour:0,1 "
                    ."excludedReadings "
                    ."ignoreDefaultAssignments:0,1 "
                    ."minAvgMaxReadings "
@@ -928,6 +929,10 @@ sub statistics_doStatisticDuration ($$$$)
    $state = "(null)" if $state eq "";
    
    statistics_Log $hash, 4, "Calculating duration statistics for '".$dev->{NAME}.":$readingName = $state'";
+
+   # Daily Statistic
+   statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Hour", $state, ($periodSwitch !=0)
+         if AttrVal($name, "durationPeriodHour", 0) == 1;
   # Daily Statistic
    statistics_doStatisticDurationSingle $hash, $dev, $readingName, "Day", $state, ($periodSwitch >= 2 || $periodSwitch <= -2);
   # Monthly Statistic 
@@ -1223,6 +1228,10 @@ sub statistics_UpdateDevReading($$$$)
          <br>
          Comma separated list of reading names for which a delta statistic shall be calculated. 
       </li><br>
+      <li><code>durationPeriodHour &lt; 1 | 0 &gt;</code>
+         <br>
+         If set to 1, then duration readings will get hourly statistics too.
+      </li><br>
       <li><code>durationReadings &lt;readings&gt;</code>
          <br>
          Comma separated list of reading names for which a duration statistic shall be calculated. 
@@ -1386,6 +1395,10 @@ sub statistics_UpdateDevReading($$$$)
       <li><code>deltaReadings &lt;Ger&auml;tewerte&gt;</code>
          <br>
          Durch Kommas getrennte Liste von weiteren Ger&auml;tewerten, f&uuml;r welche die Differenz zwischen den Werten am Anfang und Ende einer Periode (Stunde/Tag/Monat/Jahr) bestimmt wird. 
+      </li><br>
+      <li><code>durationPeriodHour &lt; 1 | 0 &gt;</code>
+         <br>
+         Wenn auf 1 gesetzt, dann werden f&uuml;r "durationReadings" auch st&uuml;ndliche Statistiken gebildet.
       </li><br>
       <li><code>durationReadings &lt;Ger&auml;tewerte&gt;</code>
          <br>
