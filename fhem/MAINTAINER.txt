@@ -39,6 +39,7 @@ FHEM/00_ZWDongle.pm          rudolfkoenig         http://forum.fhem.de ZWave
 FHEM/01_FHEMWEB.pm           rudolfkoenig         http://forum.fhem.de Frontends/FHEMWEB
 FHEM/02_FRAMEBUFFER.pm       kaihs                http://forum.fhem.de Frontends
 FHEM/02_HTTPSRV.pm           borisneubert         http://forum.fhem.de Frontends
+FHEM/02_FTUISRV.pm           viegener             http://forum.fhem.de Frontends/TabletUI
 FHEM/02_RSS.pm               borisneubert         http://forum.fhem.de Frontends/RSS
 FHEM/09_BS.pm                borisneubert         http://forum.fhem.de SlowRF
 FHEM/09_CUL_FHTTK.pm         matscher             http://forum.fhem.de SlowRF
