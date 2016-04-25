@@ -478,6 +478,15 @@ attribute list if you want to know if a device supports these attributes.  <br>
     </ol>
     <p>
     
+    <a name="timestamp-on-change-reading"></a>
+    <li>timestamp-on-change-reading<br>
+    The attribute takes a comma-separated list of readings. You may use regular
+    expressions in that list. If set, the timestamps of the listed readings will
+    not be changed if event-on-change-reading is also set and it would not create
+    an event for this reading.
+    </li>
+    <p>
+
     <a name="event-aggregator"></a>
     <li>event-aggregator</li>
     The primary uses of this attribute are to calculate (time-weighted) averages of 
