@@ -1,0 +1,146 @@
+[DoorPi]
+base_path = /usr/local/etc/DoorPi
+snapshot_path = /home/doorpi/records
+number_of_snapshots = 10
+eventlog = /home/doorpi/log/eventlog.db
+is_alive_led = blinking_led 
+last_snapshot = 
+
+[DoorPiWeb]
+indexfile = index.html
+loginfile = login.html
+online_fallback = http://motom001.github.io/DoorPiWeb
+port = 80
+public = AREA_public
+www = /home/doorpi/records
+
+
+[AREA_public]
+.*
+
+[AREA_config]
+/control/config_value_get
+/control/config_value_set
+/control/config_value_delete
+/control/config_save
+/control/config_get_configfile 
+
+[AREA_dashboard]
+/dashboard/pages/.*html
+
+[AREA_status]
+/status
+/mirror
+
+[AREA_control]
+.*
+
+[User]
+admin = admin
+visitor = visitor
+
+[Group]
+administrators = admin
+guests = visitor
+
+[WritePermission]
+administrators = dashboard,status,config
+
+[ReadPermission]
+guests = dashboard
+
+[AdminNumbers]
+**621 = active
+
+[EVENT_OnStartup]
+10 = sleep:1
+
+[EVENT_BeforeSipPhoneMakeCall]
+10 = take_snapshot
+
+[SIP-Phone]
+identity = DoorPi
+local_port = 5060
+firewallpolicy = PolicyNoFirewall
+#
+sipphonetyp = linphone
+sipserver_password = 
+sipserver_realm = fritz.box
+sipserver_server = 192.168.0.254
+sipserver_username = 620
+stun_server =
+#
+max_call_time = 120
+call_timeout = 15
+ua.max_calls = 2
+#
+capture_device = ALSA: USB PnP Sound Device
+playback_device = ALSA: USB PnP Sound Device
+audio_codecs = PCMA,PCMU
+record_while_dialing = False
+records = /home/doorpi/records/%Y-%m-%d_%H-%M-%S.wav
+#
+dialtone = /home/doorpi/sounds/ShortDialTone.wav
+dialtone_renew_every_start = False
+dialtone_volume = 35
+echo_cancellation_enabled = False
+#
+video_codecs = VP8
+video_device = StaticImage: Static picture
+video_display_enabled = False
+video_size = vga
+
+[keyboards]
+onboardpins = piface
+webservice = filesystem
+
+[webservice_keyboard]
+base_path_input = /home/doorpi/keyboard/inputs/
+base_path_output = /home/doorpi/keyboard/outputs/
+
+[webservice_InputPins]
+door    = out:door,1,0,3 
+lighton = out:light
+lightoff= out:light
+purge   = sleep:0
+clear   = sleep:0
+button1 = sleep:0
+button2 = sleep:0
+
+[EVENT_OnKeyPressed_webservice.purge]
+10 = os_execute:/home/doorpi/purge.sh purge
+
+[EVENT_OnKeyPressed_webservice.clear]
+10 = os_execute:/home/doorpi/purge.sh clear
+
+[EVENT_OnKeyPressed_webservice.button2]
+10 = os_execute:/home/doorpi/test.sh
+
+[onboardpins_keyboard]
+pull_up_down = PUD_UP
+
+[onboardpins_OutputPins]
+0 = door
+1 = light
+2 = blinking_led
+
+[onboardpins_InputPins]
+0 = call:722622
+1 = call:**621
+2 = file_call_value:/home/doorpi/callnumber
+3 = take_snapshot
+#--OK pin from Arduino
+6 = sleep:0
+#-- NOK pin from Arduino
+7 = sleep:0
+
+[EVENT_OnKeyPressed_onboardpins.7]
+10 = os_execute:/home/doorpi/iButton_NOK.sh
+
+[EVENT_OnKeyPressed_onboardpins.6]
+10 = os_execute:/home/doorpi/iButton_OK.sh
+20 = out:door,1,0,3
+
+[DTMF]
+"2" = out:door,1,0,3
+
