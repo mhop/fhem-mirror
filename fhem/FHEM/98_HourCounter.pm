@@ -808,15 +808,15 @@ sub HourCounter_Run($)
 =pod
 =begin html
 
-  <div id="includedContent">
+  <div>
     <a name="HourCounter" id="HourCounter"></a>
 
     <h3>HourCounter</h3>
 
-    <div style="margin-left: 2em">
+    <div>
       <a name="HourCounterdefine" id="HourCounterdefine"></a> <b>Define</b>
 
-      <div style="margin-left: 2em">
+      <div>
         <br />
         <code>define &lt;name&gt; HourCounter &lt;pattern_for_ON&gt; [&lt;pattern_for_OFF&gt;]</code><br />
         <br />
@@ -837,25 +837,25 @@ sub HourCounter_Run($)
         <b>Example:</b><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           <code>define BurnerCounter HourCounter SHUTTER_TEST:on SHUTTER_TEST:off</code>
         </div>
       </div><br />
       <a name="HourCounterset" id="HourCounterset"></a> <b>Set-Commands</b>
 
-      <div style="margin-left: 2em">
+      <div>
         <br />
         <code>set &lt;name&gt; calc</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           starts the calculation of pulse/pause-time.<br />
         </div><br />
         <br />
         <code>set &lt;name&gt; clear</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           clears the readings countsPerDay, countsOverall,pauseTimeIncrement, pauseTimePerDay, pauseTimeOverall,
           pulseTimeIncrement, pulseTimePerDay, pulseTimeOverall by setting to 0.<br />
           The reading clearDate is set to the current Date/Time.
@@ -864,14 +864,14 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; countsOverall &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading countsOverall to the given value.This is the total-counter.
         </div><br />
         <br />
         <code>set &lt;name&gt; countsPerDay &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading countsPerDay to the given value. This reading will automatically be set to 0, after change
           of day.
         </div><br />
@@ -879,7 +879,7 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; pauseTimeIncrement &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading pauseTimeIncrement to the given value.<br />
           This reading in seconds is automatically set after a rising edge.
         </div><br />
@@ -887,7 +887,7 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; pauseTimeEdge &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading pauseTimeEdge to the given value.<br />
           This reading in seconds is automatically set after a rising edge.
         </div><br />
@@ -895,7 +895,7 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; pauseTimeOverall &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading pauseTimeOverall to the given value.<br />
           This reading in seconds is automatically adjusted after a change of pauseTimeIncrement.
         </div><br />
@@ -903,7 +903,7 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; pauseTimePerDay &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading pauseTimePerDay to the given value.<br />
           This reading in seconds is automatically adjusted after a change of pauseTimeIncrement and set to 0 after
           change of day.
@@ -912,7 +912,7 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; pulseTimeIncrement &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading pulseTimeIncrement to the given value.<br />
           This reading in seconds is automatically set after a falling edge of the property.
         </div><br />
@@ -920,7 +920,7 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; pulseTimeEdge &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading pulseTimeEdge to the given value.<br />
           This reading in seconds is automatically set after a rising edge.
         </div><br />
@@ -928,7 +928,7 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; pulseTimeOverall &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading pulseTimeOverall to the given value.<br />
           This reading in seconds is automatically adjusted after a change of pulseTimeIncrement.
         </div><br />
@@ -936,7 +936,7 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; pulseTimePerDay &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Sets the reading pulseTimePerDay to the given value.<br />
           This reading in seconds is automatically adjusted after a change of pulseTimeIncrement and set to 0 after
           change of day.
@@ -945,54 +945,54 @@ sub HourCounter_Run($)
         <code>set &lt;name&gt; forceHourChange</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           This modifies the reading tickHour, which is automatically modified after change of hour.
         </div><br />
         <br />
         <code>set &lt;name&gt; forceDayChange</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           This modifies the reading tickDay, which is automatically modified after change of day.
         </div><br />
         <br />
         <code>set &lt;name&gt; forceWeekChange</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           This modifies the reading tickWeek, which is automatically modified after change of week.
         </div><br />
         <br />
         <code>set &lt;name&gt; forceMonthChange</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           This modifies the reading tickMonth, which is automatically modified after change of month.
         </div><br />
         <br />
         <code>set &lt;name&gt; forceYearChange</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           This modifies the reading tickYear, which is automatically modified after change of year.
         </div><br />
         <br />
         <code>set &lt;name&gt; app.* &lt;value&gt;</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Any reading with the leading term "app", can be modified.<br />
           This can be useful for user-readings.
         </div><br />
       </div><br />
       <a name="HourCounterget" id="HourCounterget"></a> <b>Get-Commands</b><br />
 
-      <div style="margin-left: 2em">
+      <div>
         <br />
         <code>get &lt;name&gt; version</code><br />
         <br />
 
-        <div style="margin-left: 2em">
+        <div>
           Get the current version of the module.
         </div><br />
       </div><br />

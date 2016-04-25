@@ -1251,7 +1251,7 @@ eib_name2hex($)
 
 <a name="EIB"></a>
 <h3>EIB / KNX</h3>
-<div style="margin-left: 2em">
+<div>
 <p>EIB/KNX is a standard for building automation / home automation.
   It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.</p>
 
@@ -1266,7 +1266,7 @@ eib_name2hex($)
   show the correct value.</p>
 
   <p><a name="EIBdefine"></a> <b>Define</b></p>
-  <div style="margin-left: 2em">
+  <div>
     <code>define &lt;name&gt; EIB &lt;main group&gt; [&lt;additional group&gt; ..]</code>
     
     <p>Define an EIB device, connected via a <a href="#TUL">TUL</a>. The
@@ -1286,7 +1286,7 @@ eib_name2hex($)
   </div>
   
   <p><a name="EIBset"></a> <b>Set</b></p>
-  <div style="margin-left: 2em">
+  <div>
     <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt; g&lt;groupnr&gt;]</code>
     <p>where value one of:</p>
 	  <li><b>on</b> switch on device</li>
@@ -1340,13 +1340,13 @@ eib_name2hex($)
   </div>
  
   <p><a name="EIBget"></a> <b>Get</b></p>
-  <div style="margin-left: 2em">  
+  <div>
   <p>If you execute get for a EIB/KNX-Element there will be requested a state from the device. The device has to be able to respond to a read - this is not given for all devices.<br>
 	The answer from the bus-device is not shown in the toolbox, but is treated like a regular telegram.</p>
   </div>
   
   <p><a name="EIBattr"></a> <b>Attributes</b></p>
-  <div style="margin-left: 2em"><br> 
+  <div>
     <a href="#IODev">IODev</a><br>
     <a href="#alias">alias</a><br>
     <a href="#comment">comment</a><br>
@@ -1375,7 +1375,7 @@ eib_name2hex($)
 	<br>
 	
 	<p><a name="EIBreadingX"></a> <b>EIBreadingX</b></p>
-	<div style="margin-left: 2em"> 
+	<div>
     Enable additional readings for this EIB-device. With this Attribute set, a reading setG&lt;x&gt; will be updated when a set command is issued from FHEM, a reading getG&lt;x&gt; will be updated as soon a Value is received from EIB-Bus (&lt;x&gt; stands for the groupnr. - see define statement). The logic for the state reading remains unchanged. This is especially useful when the define statement contains more than one group parameter. 
     <p>If set to 1, the following additional readings will be available:</p>
       <pre>
@@ -1393,7 +1393,7 @@ eib_name2hex($)
 	</div>
 	
 	<p><a name="EIBreadingSender"></a> <b>EIBreadingSender</b></p>
-	<div style="margin-left: 2em"> 
+	<div>
     Enable an additional reading for this EIB-device. With this Attribute set, a reading sender will be updated any time a new telegram arrives.
     <p>If set to 1, the following additional reading will be available: <pre>sender</pre></p>
       <pre>
@@ -1407,7 +1407,7 @@ eib_name2hex($)
 	</div>
 
 	<p><a name="EIBanswerReading"></a> <b>EIBanswerReading</b></p>
-	<div style="margin-left: 2em"> 
+	<div>
     If enabled, FHEM answers on read requests. The content of state is send to the bus as answer.
     <p>If set to 1, read-requests are answered</p>
       <p>Example:</p>
@@ -1418,7 +1418,7 @@ eib_name2hex($)
 	</div>
 
 	<p><a name="EIBreadingRegex"></a> <b>EIBreadingRegex</b></p>
-	<div style="margin-left: 2em"> 
+	<div>
     You can pass n pairs of regex-pattern and string to replace, seperated by a slash. Internally the "new" state is always in the format getG[n]:[state]. The substitution is done every time, a new object is received. You can use this function for converting, adding units, having more fun with icons, ... 
 	This function has only an impact on the content of state - no other functions are disturbed.
       <p>Example:</p>
@@ -1430,7 +1430,6 @@ eib_name2hex($)
     </div>	 
 
 	<p><a name="EIBwritingRegex"></a> <b>EIBwritingRegex</b></p>
-	<div style="margin-left: 2em"> 
     You can pass n pairs of regex-pattern and string to replace, seperated by a slash. Internally the "new" state is always in the format setG1:[state]. The substitution is done every time, after an object is send. You can use this function for converting, adding units, having more fun with icons, ... 
 	This function has only an impact on the content of state - no other functions are disturbed.
       <p>Example:</p>
@@ -1441,7 +1440,7 @@ eib_name2hex($)
     </div>	 
 
 	<p><a name="model"></a> <b>model</b></p>
-	<div style="margin-left: 2em"> 
+	<div>
 	<p>This attribute is mandatory!</p>
 	Set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>). The device state in FHEM is interpreted and shown according to the specification.<br>
         <br>

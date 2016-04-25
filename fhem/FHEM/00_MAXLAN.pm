@@ -866,7 +866,6 @@ MAXLAN_RemoveDevice($$)
 <a name="MAXLAN"></a>
 <h3>MAXLAN</h3>
 <ul>
-  <tr><td>
   The MAXLAN is the fhem module for the eQ-3 MAX! Cube LAN Gateway.
   <br><br>
   The fhem module makes the MAX! "bus" accessible to fhem, automatically detecting paired MAX! devices. It also represents properties of the MAX! Cube. The other devices are handled by the <a href="#MAX">MAX</a> module, which uses this module as its backend.<br>

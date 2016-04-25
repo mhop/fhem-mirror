@@ -346,8 +346,6 @@ sub nonblockGetLinesTellStick {
     <code>define &lt;name&gt; TellStick &lt;/path/to/tdtool&gt;</code>
     <br><br>
 
-    <!--<div style="background-color: #ffaaaa;"> -->
-    <div>
     Defines a path to the program "tdtool", which is used to control a (locally attached)
     "Telldus TellStick [Duo]" USB device. A TellStick controls a wide range of 433 MHz
     devices, like the widely available switchable power outlets from InterTechno.<br><br>

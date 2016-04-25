@@ -378,8 +378,6 @@ RFXCOM_Ready($)
 <a name="RFXCOM"></a>
 <h3>RFXCOM</h3>
 <ul>
-  <table>
-  <tr><td>
   This module is for the old <a href="http://www.rfxcom.com">RFXCOM</a> USB or LAN based 433 Mhz RF receivers and transmitters (order order code 80002 and others). It does not support the new RFXtrx433 transmitter because it uses a different protocol. See <a href="#RFXTRX">RFXTRX</a> for support of the RFXtrx433 transmitter.<br>
 These receivers supports many protocols like Oregon Scientific weather sensors, RFXMeter devices, X10 security and lighting devices and others. <br>
   Currently the following parser modules are implemented: <br>
@@ -430,7 +428,6 @@ These receivers supports many protocols like Oregon Scientific weather sensors, 
       <br>
     </ul>
     <br>
-  </table>
   <ul>
     <li><a href="#attrdummy">dummy</a></li><br>
     <li>longids<br>
