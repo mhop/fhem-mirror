@@ -269,9 +269,9 @@ sub HP1000_CGI() {
     <h3>
       HP1000
     </h3>
-    <div style="margin-left: 2em">
+    <div>
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <div>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
           Provides webhook receiver for weather station HP1000 and WH2600 of Fine Offset Electronics.<br>
@@ -281,7 +281,7 @@ sub HP1000_CGI() {
           As the URI has a fixed coding as well there can only be one single HP1000/WH2600 station per FHEM installation.<br>
         <br>
         Example:<br>
-        <div style="margin-left: 2em">
+        <div>
           <code># unprotected instance where ID and PASSWORD will be ignored<br>
           define WeatherStation HP1000<br>
           <br>
@@ -303,9 +303,9 @@ sub HP1000_CGI() {
     <h3>
       HP1000
     </h3>
-    <div style="margin-left: 2em">
+    <div>
       <a name="HP1000define" id="HP10000define"></a> <b>Define</b>
-      <div style="margin-left: 2em">
+      <div>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
           Stellt einen Webhook f&uuml;r die HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit.<br>
@@ -315,7 +315,7 @@ sub HP1000_CGI() {
           Da die URI ebenfalls fest kodiert ist, kann mit einer einzelnen FHEM Installation maximal eine HP1000/WH2600 Station gleichzeitig verwendet werden.<br>
         <br>
         Beispiel:<br>
-        <div style="margin-left: 2em">
+        <div>
           <code># ungesch&uuml;tzte Instanz bei der ID und PASSWORD ignoriert werden<br>
           define WeatherStation HP1000<br>
           <br>

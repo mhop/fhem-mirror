@@ -371,7 +371,7 @@ WS3600_Read($)
     how to implement a "networked setup" is left as an excercise to the
     reader. <br>
     For the records, this is an output of fetch3600:<br>
-    <div style="height: 120px; width: 215px; border: 1px solid #cccccc; overflow: auto;">
+    <div>
       <pre>Date 14-Nov-2009
 Time 10:50:22
 Ti 22.8
@@ -555,7 +555,7 @@ Forecast Cloudy</pre>
     &lt;wsreaderprog&gt; muss grundsätzlich eine zu fetch3600 vergleichbare
     Ausgabe auf der Standardausgabe liefern. <br>
     Als Beispiel für das erwartete Format hier die Ausgabe von fetch3600:<br>
-    <div style="height: 120px; width: 215px; border: 1px solid #cccccc; overflow: auto;">
+    <div>
       <pre>Date 14-Nov-2009
 Time 10:50:22
 Ti 22.8
