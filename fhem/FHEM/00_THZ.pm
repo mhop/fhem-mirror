@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 01/2016
-my $thzversion = "0.150";
+my $thzversion = "0.151";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -332,10 +332,10 @@ my %sets439 = (
   "p32HystDHW"				=> {cmd2=>"0A0140", argMin =>   "0", argMax =>   "10", 	type =>"5temp",  unit =>" K"},
   "p33BoosterTimeoutDHW"		=> {cmd2=>"0A0588", argMin =>   "0", argMax =>  "200",	type =>"1clean",  unit =>" min"}, #during DHW heating
   "p79BoosterTimeoutHC"			=> {cmd2=>"0A05A0", argMin =>   "0", argMax =>   "60",	type =>"1clean",  unit =>" min"}, #delayed enabling of booster heater
-  "p46UnschedVent0"			=> {cmd2=>"0A0571", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
-  "p45UnschedVent1"			=> {cmd2=>"0A0572", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
-  "p44UnschedVent2"			=> {cmd2=>"0A0573", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
-  "p43UnschedVent3"			=> {cmd2=>"0A0574", argMin =>   "0", argMax =>  "900",	type =>"1clean",  unit =>" min"},	 #in min
+  "p46UnschedVent0"			=> {cmd2=>"0A0571", argMin =>   "0", argMax =>  "1000",	type =>"1clean",  unit =>" min"},	 #in min
+  "p45UnschedVent1"			=> {cmd2=>"0A0572", argMin =>   "0", argMax =>  "1000",	type =>"1clean",  unit =>" min"},	 #in min
+  "p44UnschedVent2"			=> {cmd2=>"0A0573", argMin =>   "0", argMax =>  "1000",	type =>"1clean",  unit =>" min"},	 #in min
+  "p43UnschedVent3"			=> {cmd2=>"0A0574", argMin =>   "0", argMax =>  "1000",	type =>"1clean",  unit =>" min"},	 #in min
   "p37Fanstage1AirflowInlet"		=> {cmd2=>"0A0576", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#zuluft 
   "p38Fanstage2AirflowInlet"		=> {cmd2=>"0A0577", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#zuluft 
   "p39Fanstage3AirflowInlet"		=> {cmd2=>"0A0578", argMin =>  "50", argMax =>  "300",	type =>"1clean",  unit =>" m3/h"},	#zuluft 
