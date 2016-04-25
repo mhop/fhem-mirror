@@ -308,7 +308,8 @@ $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
 $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
-                       "event-aggregator event-min-interval stateFormat";
+                       "event-aggregator event-min-interval stateFormat ".
+                       "timestamp-on-change-reading";
 
 
 %cmds = (
@@ -3843,6 +3844,13 @@ readingsBeginUpdate($)
     $hash->{".attreour"} = \@a;
   }
 
+  my $attrtocr= AttrVal($name, "timestamp-on-change-reading", undef);
+  if($attrtocr) {
+    my @a = split(/,/,$attrtocr);
+    $hash->{".attrtocr"} = \@a;
+  }
+
+
   $hash->{CHANGED}= () if(!defined($hash->{CHANGED}));
   return $fmtDateTime;
 }
@@ -3959,6 +3967,7 @@ readingsEndUpdate($$)
   delete $hash->{".attreocr"};
   delete $hash->{".attraggr"};
   delete $hash->{".attrminint"};
+  delete $hash->{".attrtocr"};
 
 
   # propagate changes
@@ -3993,15 +4002,18 @@ readingsBulkUpdate($$$@)
   }
   
   # shorthand
-  my $readings= $hash->{READINGS}{$reading};
+  my $readings = $hash->{READINGS}{$reading};
 
   if(!defined($changed)) {
     $changed = (substr($reading,0,1) ne "."); # Dont trigger dot-readings
   }
   $changed = 0 if($hash->{".ignoreEvent"});
 
-  # check for changes only if reading already exists
-  if($changed && defined($readings)) {
+  # if reading does not exist yet: fake entry to allow filtering
+  $readings = { VAL => "" } if( !defined($readings) );
+
+  my $update_timestamp = 1;
+  if($changed) {
   
     # these flags determine if any of the "event-on" attributes are set
     my $attreocr = $hash->{".attreocr"};
@@ -4069,7 +4081,13 @@ readingsBulkUpdate($$$@)
         $changed = 1 if($eocrExists);
       }
     }
-    
+
+    if( $attreocr ) {
+      if( my $attrtocr = $hash->{".attrtocr"} ) {
+        $update_timestamp = $changed if( $attrtocr && grep($reading =~ m/^$_$/, @{$attrtocr}) );
+      }
+    }
+
   }
 
   if($changed) {
@@ -4103,7 +4121,7 @@ readingsBulkUpdate($$$@)
   }
   
   
-  setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"}); 
+  setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"}) if( $update_timestamp ); 
   
   my $rv = "$reading: $value";
   if($changed) {

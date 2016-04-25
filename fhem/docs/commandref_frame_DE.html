@@ -450,6 +450,15 @@ Ger&auml;t dokumentiert.
         "reading" auch in event-on-change-reading aufgelistet ist.</li>
     </ol>
 
+    <a name="timestamp-on-change-reading"></a>
+    <li>timestamp-on-change-reading<br>
+    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
+    "readings". Wenn gesetzt, werden die Zeitstempel der gelisteten "readings"
+    nicht aktualisiert wenn durch ein ebenfalls gesetztes event-on-change-reading
+    f&uuml;r dieses "reading" kein Ereignis erzeugen w&uuml;rde.
+    </li>
+    <p>
+
     <a name="event-aggregator"></a>
     <li>event-aggregator</li>
     The primary uses of this attribute are to calculate (time-weighted) averages of 
@@ -686,7 +695,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="cancel"></a>                        
 <h3>cancel</h3>                              
 <ul>                                         
-  <code>cancel [&lt;id&gt; [quiet]]</code>           
+  <code>cancel [&lt;id&gt; [quiet]]</code>
   <br><br>                                   
   Entfernt ein benanntes <a href="#sleep">sleep</a>.
                                              
