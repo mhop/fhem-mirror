@@ -4497,7 +4497,7 @@ s2Hex($)
   <li>dim value<br>
     dim/jump to the requested value (0..100)</li>
   <li>dimWithDuration value duration<br>
-    dim/jump to the requested value (0..100) in duration time.  If duration is
+    dim to the requested value (0..100) in duration time.  If duration is
     less than 128, then it is interpreted as seconds, if it is between 128 and
     254, then as duration-128 minutes.</li>
   <li>stop<br>
