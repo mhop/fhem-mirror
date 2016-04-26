@@ -497,8 +497,8 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     
   $("div input.psc[type=submit]").click(function(e){
     e.preventDefault();
-    var newDef = typeof cm !== 'undefined' ? cm.getValue() 
-				 : $(this).closest("form").find("textarea").val();
+    var newDef = typeof cm !== 'undefined' ?
+                 cm.getValue() : $(this).closest("form").find("textarea").val();
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
 
     if( newDef == undefined ) {
@@ -507,7 +507,8 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
           cmd = $(div).attr("cmd");
       var sel = $(this).closest("form").find("select");
       var arg = $(sel).val();
-      if($(".dval[informid="+devName+"-"+arg+"]").length == 0) {
+      var ifid = devName.replace(/\./g, '\\.');
+      if($(".dval[informid="+ifid+"-"+arg+"]").length == 0) {
         console.log(this);
         $(this).unbind('click').click();// No element found to replace
         return;
