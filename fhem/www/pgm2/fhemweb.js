@@ -500,8 +500,10 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     var newDef = typeof cm !== 'undefined' ?
                  cm.getValue() : $(this).closest("form").find("textarea").val();
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
+    var noDef;
 
     if( newDef == undefined ) {
+      noDef = true;
       var div = $(this).closest("div.makeSelect");
       var devName = $(div).attr("dev"),
           cmd = $(div).attr("cmd");
@@ -510,7 +512,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       var ifid = devName.replace(/\./g, '\\.');
       if($(".dval[informid="+ifid+"-"+arg+"]").length == 0) {
         console.log(this);
-        $(this).unbind('click').click();// No element found to replace
+        $(this).unbind('click').click();// No element found to replace, reload
         return;
       }
       newDef = $(this).closest("form").find("input:text").val();
@@ -527,8 +529,10 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
                      .replace(/>/g, '&gt;');
       if(newDef.indexOf("\n") >= 0)
         newDef = '<pre>'+newDef+'</pre>';
-      $("div#disp").html(newDef).css("display", "");
-      $("div#edit").css("display", "none");
+      if(!noDef) {
+        $("div#disp").html(newDef).css("display", "");
+        $("div#edit").css("display", "none");
+      }
     });
   });
 }
