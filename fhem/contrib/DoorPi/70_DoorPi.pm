@@ -6,7 +6,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2016
 # 
-# Version 0.2 - April 2016
+# Version 0.3 - April 2016
 #
 ########################################################################################
 #
@@ -41,8 +41,8 @@ sub Log($$);
 
 #-- these we may get on request
 my %gets = (
-  "config"    => "C",
-  "history"   => "H"
+  "config:noArg"    => "C",
+  "history:noArg"   => "H"
 );
 
 
@@ -69,6 +69,7 @@ sub DoorPi_Initialize ($) {
                      "language:de,en ".
                      "doorbutton dooropencmd doorlockcmd doorunlockcmd ".
                      "lightbutton lightoncmd lighttimercmd lightoffcmd ".
+                     "dashlightbutton ".
                      $readingFnAttributes;
                      
   $hash->{FW_detailFn}  = "DoorPi_makeTable";
@@ -104,14 +105,14 @@ sub DoorPi_Define($$) {
   };
     
   @{$hash->{DATA}} = ();
-  @{$hash->{CMDS}} = ();
+  @{$hash->{HELPER}->{CMDS}} = ();
   
   $modules{DoorPi}{defptr}{$a[0]} = $hash;
 
   #-- InternalTimer blocks if init_done is not true
   my $oid = $init_done;
   $init_done = 1;
-  readingsSingleUpdate($hash,"state","initialized",1);
+  readingsSingleUpdate($hash,"state","Initialized",1);
    
   DoorPi_GetConfig($hash);
   DoorPi_GetHistory($hash);
@@ -130,7 +131,7 @@ sub DoorPi_Define($$) {
 sub DoorPi_Undef ($) {
   my ($hash) = @_;
   delete($modules{DoorPi}{defptr}{NAME});
-  RemoveInternalTimer($hash);
+  #RemoveInternalTimer($hash);
   return undef;
 }
 
@@ -174,16 +175,6 @@ sub DoorPi_Attr(@) {
 sub DoorPi_Get ($@) {
   my ($hash, @a) = @_;
   
-  #-- for the selector: which values are possible
-  #if ($a[1] eq "?"){
-  #  my $newkeys = join(" ",sort keys %gets);
-  #  Log 1,"=====> newkeys before subs $newkeys";
-  #  $newkeys =~ s/config/config:noArg/g;                   # FHEMWEB sugar
-  #  $newkeys =~ s/history/history:noArg/g;                 # FHEMWEB sugar
-  #  Log 1,"=====> newkeys after subs $newkeys";
-  #  return $newkeys;
-  #}
-
   #-- check syntax
   return "[DoorPi] DoorPi_Get needs exactly one parameter" if(@a != 2);
   my $name = $hash->{NAME};
@@ -192,25 +183,18 @@ sub DoorPi_Get ($@) {
   #-- current configuration
   if($a[1] eq "config") {
     $v = DoorPi_GetConfig($hash);
-    if(defined($v)) {
-      Log GetLogLevel($name,2), "DoorPi_Get $a[1] error";
-      return "$a[0] $a[1] => Error";
-    }
-    $v = "OK";     
-  #-- current reading
+  #-- history
   }elsif($a[1] eq "history") {
-    $v = DoorPi_GetHistory($hash);
-    if(defined($v)) {
-      Log GetLogLevel($name,2), "DoorPi_Get $a[1] error";
-      return "$a[0] $a[1] => Error";
-    }
-    $v = "OK";                                               
+    $v = DoorPi_GetHistory($hash);                                         
   } else {
     return "DoorPi_Get with unknown argument $a[1], choose one of " . join(" ", sort keys %gets);
   }
-
-  Log GetLogLevel($name,3), "DoorPi_Get $a[1] $v";
-  return "$a[0] $a[1] => $v";
+  
+  if(defined($v)) {
+     Log GetLogLevel($name,2), "[DoorPi_Get] $a[1] error $v";
+     return "$a[0] $a[1] => Error $v";
+  }
+  return "$a[0] $a[1] => OK";
 }
  
 ########################################################################################
@@ -224,7 +208,7 @@ sub DoorPi_Get ($@) {
 sub DoorPi_Set ($@) {
   my ($hash, @a) = @_;
   my $name = shift @a;
-  my ($key,$value,$res);
+  my ($newkeys,$key,$value,$v);
 
   #-- commands
   my $door     = AttrVal($name, "doorbutton", "door");
@@ -235,46 +219,65 @@ sub DoorPi_Set ($@) {
     if(AttrVal($name, "doorunlockcmd",undef));
     
   my $light    = AttrVal($name, "lightbutton", "light");
+  my $dashlight    = AttrVal($name, "dashlightbutton", "dashlight");
 
   #-- for the selector: which values are possible
   if ($a[0] eq "?"){
-    my $newkeys = join(" ",@{ $hash->{CMDS} });
+    $newkeys = join(" ",@{ $hash->{HELPER}->{CMDS} });
     #Log 1,"=====> newkeys before subs $newkeys";
     $newkeys =~ s/$door/$door:$doorsubs/g;               # FHEMWEB sugar
     $newkeys =~ s/$light/$light:on,on-for-timer,off/g;   # FHEMWEB sugar
+    $newkeys =~ s/$dashlight/$dashlight:on,off/g;        # FHEMWEB sugar
     $newkeys =~ s/button(\d\d?)/button$1:noArg/g;        # FHEMWEB sugar
     $newkeys =~ s/purge/purge:noArg/g;                   # FHEMWEB sugar
     #Log 1,"=====> newkeys after subs $newkeys ($door,$light)";
     return $newkeys;
   }
   
-  #return "[DoorPi_Set] With unknown argument $a[0], choose one of " . join(" ", @{$hash->{CMDS}})
-  #  if(!defined($sets{$a[0]}));
-  
   $key   = shift @a;
   $value = shift @a; 
   
-  if( $key eq "door" ){
+  return "[DoorPi_Set] With unknown argument $key, choose one of " . join(" ", @{$hash->{HELPER}->{CMDS}})
+    if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) );
+
+  if( $key eq "$door" ){
     if( $value eq "open" ){
-      $res=DoorPi_Cmd($hash,"door");
-      #Log 1,"[DoorPiCmd] open door has result $res";
+      $v=DoorPi_Cmd($hash,"door");
       if(AttrVal($name, "dooropencmd",undef)){
         fhem(AttrVal($name, "dooropencmd",undef));
       }
     }
+  }elsif( $key eq "$light" ){
+    my $light    = AttrVal($name, "lightbutton", "light");
+    if( $value eq "on" ){
+      $v=DoorPi_Cmd($hash,"lighton");
+      readingsSingleUpdate($hash,$light,"on",1);
+    }elsif( $value eq "off" ){
+      $v=DoorPi_Cmd($hash,"lightoff");
+      readingsSingleUpdate($hash,$light,"off",1);
+    }
+  }elsif( $key eq "$dashlight" ){
+    my $dashlight    = AttrVal($name, "dashlightbutton", "dashlight");
+    if( $value eq "on" ){
+      $v=DoorPi_Cmd($hash,"dashlighton");
+      readingsSingleUpdate($hash,$dashlight,"on",1);
+    }elsif( $value eq "off" ){
+      $v=DoorPi_Cmd($hash,"dashlightoff");
+      readingsSingleUpdate($hash,$dashlight,"off",1);
+    }
   }elsif( $key =~ /button(\d\d?)/){
-     $res=DoorPi_Cmd($hash,$key);
-     Log 1,"[DoorPiCmd] $key has result $res";
+     $v=DoorPi_Cmd($hash,$key);
   }elsif( $key eq "purge"){
-     $res=DoorPi_Cmd($hash,"purge");
-     Log 1,"[DoorPiCmd] purge has result $res";
+     $v=DoorPi_Cmd($hash,"purge");
   }elsif( $key eq "clear"){
-     $res=DoorPi_Cmd($hash,"clear");
-     Log 1,"[DoorPiCmd] clear has result $res";
+     $v=DoorPi_Cmd($hash,"clear");
   }
-   
-  #Log GetLogLevel($name,3), "DoorPi_Set $name ".join(" ",@a)." => $res";  
-  #return "DoorPi_Set $name ".join(" ",@a)." => $res";
+  
+  if(defined($v)) {
+     Log GetLogLevel($name,2), "[DoorPi_Set] $key error $v";
+     return "$key => Error $v";
+  }
+  return "$key => OK";
 }
 
 #######################################################################################
@@ -297,21 +300,25 @@ sub DoorPi_GetConfig () {
     return undef;
   }elsif ( $hash && !$err && !$status ){
     $url    = "http://".$hash->{TCPIP}."/status?module=config";
-    Log 1,"[DoorPi_GetConfig] called with only hash => Issue a non-blocking call to $url";  
+    #Log 1,"[DoorPi_GetConfig] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
       callback=>sub($$$){ DoorPi_GetConfig($hash,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && $err ){
-    Log 1,"[DoorPi_GetConfig] called with only hash and error $err";
-    return undef;
+    Log 1,"[DoorPi_GetConfig] has error $err";
+    readingsSingleUpdate($hash,"config",$err,0);
+    readingsSingleUpdate($hash,"state","Error",1);
+    return;
   }
-  Log 1,"[DoorPi_GetConfig] has obtained data";
+  #Log 1,"[DoorPi_GetConfig] has obtained data";
  
   #-- crude test if this is valid JSON or some HTML page
   if( substr($status,0,1) eq "<" ){
     Log 1,"[DoorPi_GetConfig] but data is invalid";
+    readingsSingleUpdate($hash,"config","invalid data",0);
+    readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
   
@@ -331,20 +338,16 @@ sub DoorPi_GetConfig () {
     $hash->{HELPER}->{vkeyboard}=$fskey;
     $fscmds = $jhash0->{"config"}->{$fskey."_InputPins"};
     foreach my $key (sort(keys $fscmds)) {
-      push(@{ $hash->{CMDS}},$key);
+      push(@{ $hash->{HELPER}->{CMDS}},$key);
     }
   }else{
     Log 1,"[DoorPi_GetConfig] Warning: No keyboard \"filesystem\" defined";
   };
   $hash->{HELPER}->{wwwpath} = $jhash0->{"config"}->{"DoorPiWeb"}->{"www"};
-
-  
-  #=================== Put into READINGS
-  ##readingsBeginUpdate($hash);
-  ##readingsBulkUpdate($hash,"status_time",$jhash0->{"status_time"});
-  ##readingsBulkUpdate($hash,"number_calls",int(@{ $hash->{DATA}}));
-  ##readingsEndUpdate($hash,1); 
-  
+   
+  #-- put into READINGS
+  readingsSingleUpdate($hash,"state","Initialized",1);
+  readingsSingleUpdate($hash,"config","OK",1);
   return undef;
 }
  
@@ -363,42 +366,55 @@ sub DoorPi_GetHistory () {
   my $name = $hash->{NAME};
   my $url;
   
+    if( $hash->{READINGS}{state}{VAL} ne "Initialized"){
+    Log 1,"[DoorPi_GetHistory] cannot be called, no connection";
+    return
+  }
+  
   #-- obtain call history and snapshot history from doorpi
   if ( !$hash ){
     Log 1,"[DoorPi_GetHistory] called without hash";
     return undef;
   }elsif ( $hash && !$err1 && !$status1 && !$err2 && !$status2 ){
     $url    = "http://".$hash->{TCPIP}."/status?module=history_event";
-    Log 1,"[DoorPi_GetHistory] called with only hash => Issue a non-blocking call to $url";  
+    #Log 1,"[DoorPi_GetHistory] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
       callback=>sub($$$){ DoorPi_GetHistory($hash,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && $err1 && !$status1 && !$err2 && !$status2 ){
-    Log 1,"[DoorPi_GetHistory] called with only hash and error $err1";
+    Log 1,"[DoorPi_GetHistory] has error $err1";
+    readingsSingleUpdate($hash,"history",$err1,0);
+    readingsSingleUpdate($hash,"state","Error",1);
     return undef;
   }elsif ( $hash && !$err1 && $status1 && !$err2 && !$status2 ){
     $url    = "http://".$hash->{TCPIP}."/status?module=history_snapshot";
-    Log 1,"[DoorPi_GetHistory] called with hash and data from first call => Issue a non-blocking call to $url";  
+    #Log 1,"[DoorPi_GetHistory] called with hash and data from first call => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
       callback=>sub($$$){ DoorPi_GetHistory($hash,$err1,$status1,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && !$err1 && $status1 && $err2){
-    Log 1,"[DoorPi_GetHistory] called with with hash and data from first call and second error $err2";
+    Log 1,"[DoorPi_GetHistory] has error2 $err2";
+    readingsSingleUpdate($hash,"history",$err2,0);
+    readingsSingleUpdate($hash,"state","Error",1);
     return undef;
   }
-  Log 1,"[DoorPi_GetHistory] has obtained data in two calls";
+  #Log 1,"[DoorPi_GetHistory] has obtained data in two calls";
 
   #-- crude test if this is valid JSON or some HTML page
   if( substr($status1,0,1) eq "<" ){
     Log 1,"[DoorPi_GetHistory] but data from first call is invalid";
+    readingsSingleUpdate($hash,"history","invalid data 1st call",0);
+    readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
   if( substr($status2,0,1) eq "<" ){
     Log 1,"[DoorPi_GetHistory] but data from second call is invalid";
+    readingsSingleUpdate($hash,"history","invalid data 2nd call",0);
+    readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
   
@@ -528,28 +544,55 @@ sub DoorPi_GetHistory () {
       }
   }
   
-  #=================== Put into READINGS
-  readingsBeginUpdate($hash);
-  #readingsBulkUpdate($hash,"status_time",$jhash0->{"status_time"});
-  readingsBulkUpdate($hash,"number_calls",int(@{ $hash->{DATA}}));
-  readingsEndUpdate($hash,1); 
+  #-- going backward through the events to find last action for dashlight and light
+  my $dashlightstate = "off";  
+  my $dashlight    = AttrVal($name, "dashlightbutton", "dashlight");
+  for (my $i=0; $i<@history_event; $i++) {
+       if( $history_event[$i]->{"event_name"} =~ /OnKeyPressed_webservice\.dashlight(.*)/ ){
+         $dashlightstate=$1;
+         last;
+       }
+  }
   
+  my $lightstate = "off";
+  my $light    = AttrVal($name, "lightbutton", "light");
+  for (my $i=0; $i<@history_event; $i++) {
+       if( $history_event[$i]->{"event_name"} =~ /OnKeyPressed_webservice\.light(.*)/ ){
+         $lightstate=$1;
+         last;
+       }
+  }
+  
+  #--put into READINGS
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"number_calls",int(@{ $hash->{DATA}}));
+  readingsBulkUpdate($hash,"history","OK");
+  readingsBulkUpdate($hash,$dashlight,$dashlightstate);
+  readingsBulkUpdate($hash,$light,$lightstate);
+  readingsEndUpdate($hash,1); 
   return undef;
 }
 
 ########################################################################################
 #
-# DoorPi_Cmd - Write command to DoorPi. Acting as callable routine and as callback
+# DoorPi_Cmd - Write command to DoorPi.
+#              acts as callable program DoorPi_Cmd($hash,$cmd)
+#                     and as callback program  DoorPi_GetHistory($hash,$cmd,$err,$data)
 # 
 # Parameter hash, cmd = command 
 #
 ########################################################################################
 
  sub DoorPi_Cmd () {
-  my ($hash, $cmd, $data) = @_;
+  my ($hash, $cmd, $err, $data) = @_;
   my $name = $hash->{NAME};
-    
+ 
   my $url;
+  
+  if( $hash->{READINGS}{state}{VAL} ne "Initialized"){
+    Log 1,"[DoorPi_Cmd] cannot be called, no connection";
+    return
+  }
     
   if ( $hash && !$data){
      $url    = "http://".$hash->{TCPIP}."/control/trigger_event?".
@@ -558,15 +601,20 @@ sub DoorPi_GetHistory () {
      Log 1,"[DoorPi_Cmd] called with only hash => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
-        callback=>sub($$$){ DoorPi_Cmd($hash,$_[1],$_[2]) }
+        callback=>sub($$$){ DoorPi_Cmd($hash,$cmd,$_[1],$_[2]) }
      });
      return undef;
+  }elsif ( $hash && $err ){
+    Log 1,"[DoorPi_Cmd] has error $err";
+    readingsSingleUpdate($hash,"state","Error",1);
+    return;
   }
-  Log 1,"[DoorPi_Cmd] has obtained data";
+  #Log 1,"[DoorPi_Cmd] has obtained data";
  
   #-- crude test if this is valid JSON or some HTML page
   if( substr($data,0,1) eq "<" ){
-    Log 1,"[DoorPi_Cmd] but data is invalid";
+    Log 1,"[DoorPi_Cmd] invalid data";
+    readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
     
@@ -741,6 +789,23 @@ sub DoorPi_list2html($;$){
         <a name="DoorPi_Set"></a>
         <h4>Set</h4>
         <ul>
+            <li><a name="doorpi_door">
+                    <code>set &lt;name&gt; door open[|locked|unlocked] </code></a><br />
+                    Activate the door opener in DoorPi, accompanied by an optional FHEM command
+                    specified in the <i>dooropencmd</i> attribute.
+                    <br><b>If the Attributes doorlockcmd and doorunlockcmd are specified, these commands may be used to lock and unlock the door</b><br>
+                    Instead of <i>door</i>, one must use the value of the doorbutton attribute.</li>
+            <li><a name="doorpi_dashlight">
+                    <code>set &lt;name&gt; dashlight on|off </code></a><br />
+                    Set the dashlight (illuminating the door station) on or off.
+                    Instead of <i>dashlight</i>, one must use the value of the dashlightbutton attribute</li>
+            <li><a name="doorpi_light">
+                    <code>set &lt;name&gt; light on|on-for-timer|off </code></a><br />
+                    Set the scene light (illuminating the visitor) on, on for a minute or off.
+                    Instead of <i>light</i>, one must use the value of the lightbutton attribute</li>
+             <li><a name="doorpi_button">
+                    <code>set &lt;name&gt; <i>buttonDD</i>  </code></a><br />
+                    Activate one of the virtual buttons specified  in DoorPi.
             <li><a name="doorpi_purge">
                     <code>set &lt;name&gt; purge </code></a><br />
                     Clean all recordings and snapshots which are older than the current process </li>
@@ -763,7 +828,7 @@ sub DoorPi_list2html($;$){
         <ul>
             <li><a name="doorpi_doorbutton"><code>attr &lt;name&gt; doorbutton
                         &lt;string&gt;</code></a>
-                <br />button name for door action (default: door)</li>
+                <br />DoorPi name for door action (default: door)</li>
             <li><a name="doorpi_dooropencmd"><code>attr &lt;name&gt; dooropencmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command additionally executed for door opening action (no default)</li>
@@ -775,7 +840,10 @@ sub DoorPi_list2html($;$){
                 <br />FHEM command for door unlocking action (no default)</li>
             <li><a name="doorpi_lightbutton"><code>attr &lt;name&gt; lightbutton
                         &lt;string&gt;</code></a>
-                <br />button name for light action (default: light)</li>
+                <br />DoorPi name for light action (default: light)</li>
+            <li><a name="doorpi_dashlightbutton"><code>attr &lt;name&gt; dashlightbutton
+                        &lt;string&gt;</code></a>
+                <br />DoorPi name for dashlight action (default: dashlight)</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
         
