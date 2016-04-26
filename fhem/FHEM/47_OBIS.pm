@@ -212,6 +212,7 @@ sub OBIS_trySMLdecode($$)
 	    		my $telegramm = $&;
       			my @list=$telegramm=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2,999})/g;
       			Log 5,"Telegram=$telegramm";
+      			if (!@list) {Log 3,"OBIS - Empty datagram: .$telegramm\r\nfrom MSG: $msg"};
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		
 				my ($status,$statusL,$statusT,$valTime,$valTimeL,$valTimeT,$unit,$unitL,$unitT,$scaler,$scalerL,$scalerT,$data,$dataL,$dataT,$other);		   
@@ -256,20 +257,15 @@ sub OBIS_trySMLdecode($$)
 					$line2.=">" if ($status=~/82$/);
 					my $val=0;
 					# signed Values
+					my $tmp="";
 					if ($dataT & 0b00010000) {
-						$val=unpack("c", pack("C", hex($data))) if ($dataL==1);
-						$val=unpack("s", pack("S", hex($data))) if ($dataL==2);
-						$val=unpack("l", pack("L", hex($data))) if ($dataL==4);
-						if (length(pack('j', -1))*8 == 64) {$val=unpack("q", pack("Q", hex($data))) if ($dataL==8)};
+						if ($data =~ /^[89a-f]/i) {$val =  hex($data) - hex(sprintf ("FF" x $dataL)) -1;}
+						else {$val = hex($data)} #positive value
 					}
-					#unsigned Values
-					if ($dataT & 0b00100000) {
-						$val=unpack("C", pack("C", hex($data))) if ($dataL==1);
-						$val=unpack("S", pack("S", hex($data))) if ($dataL==2);
-						$val=unpack("L", pack("L", hex($data))) if ($dataL==4);
-						if (length(pack('j', -1))*8 == 64) {$val=unpack("Q", pack("Q", hex($data))) if ($dataL==8)};
+					if ($dataT & 0b00100000 || $val>0) {
+						$val=hex($data);
 					}
-#					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
+					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
 					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit"); # if($dataT ==96);					
 				} elsif ($dataT & 0b01000000) {		# Type Boolean - no Idea, where this is used
 					$line2=OBIS_hex2int($data);			# 0=false, everything else is true
