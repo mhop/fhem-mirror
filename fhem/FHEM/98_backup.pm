@@ -49,8 +49,8 @@ CommandBackup($$)
   my ($cl, $param) = @_;
 
   my $modpath = $attr{global}{modpath};
-  my $configfile = AttrVal("global", "configfile", undef);
-  my $statefile  = AttrVal("global", "statefile", undef);
+  my $configfile = AttrVal("global", "configfile", "");
+  my $statefile  = AttrVal("global", "statefile", "");
   my $msg;
   my $ret;
 
@@ -90,7 +90,7 @@ CommandBackup($$)
     push @pathname, $configfile;
     Log 4, "backup include: '$configfile'";
     $ret = parseConfig($configfile);
-    push @pathname, $statefile;
+    push @pathname, $statefile if($statefile);
     Log 4, "backup include: '$statefile'";
   }
   $ret = readModpath($modpath,$backupdir);
@@ -172,6 +172,8 @@ createArchiv($$)
   $dateTime =~ s/ /_/g;
   $dateTime =~ s/(:|-)//g;
 
+  my $pathlist = join( "\" \"", @pathname );
+
   my $cmd="";
   if (!defined($backupcmd)) {
     if (lc($symlink) eq "no") {
@@ -181,10 +183,10 @@ createArchiv($$)
     }
 
     # prevents tar's output of "Removing leading /" and return total bytes of archive
-    $cmd = "tar -$tarOpts - @pathname |gzip > $backupdir/FHEM-$dateTime.tar.gz";
+    $cmd = "tar -$tarOpts - \"$pathlist\" |gzip > $backupdir/FHEM-$dateTime.tar.gz";
 
   } else {
-    $cmd = "$backupcmd \"@pathname\"";
+    $cmd = "$backupcmd \"$pathlist\"";
 
   }
   Log 2, "Backup with command: $cmd";
