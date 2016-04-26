@@ -66,6 +66,7 @@ my %zwave_class = (
     set   => { off         => "0100",
                on          => "01FF",
                dim         => "01%02x",
+               dimWithDuration => "01%02x%02x",
                stop        => "05" },
     get   => { swmStatus   => "02",     },
     parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" :
@@ -4495,6 +4496,10 @@ s2Hex($)
     the same as for SWITCH_BINARY.</li>
   <li>dim value<br>
     dim/jump to the requested value (0..100)</li>
+  <li>dimWithDuration value duration<br>
+    dim/jump to the requested value (0..100) in duration time.  If duration is
+    less than 128, then it is interpreted as seconds, if it is between 128 and
+    254, then as duration-128 minutes.</li>
   <li>stop<br>
     stop dimming/operation</li>
 
