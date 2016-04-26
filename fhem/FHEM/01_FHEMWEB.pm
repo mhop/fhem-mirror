@@ -488,6 +488,7 @@ FW_AsyncOutput($$)
 {
   my ($hash, $ret) = @_;
 
+  return if(!$hash || !$hash->{FW_ID});
   if( $ret =~ m/^<html>(.*)<\/html>$/s ) {
     $ret = $1;
 
