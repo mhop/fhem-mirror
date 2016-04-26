@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  50_TelegramBot: contact handling failed (/ in contact names ??)
   - feature: new module 02_FTUISRV.pm for server side templates for tablet UI
   - feature: 30_pilight_switch: new attribute 'sendCount' to send the
              command n times.

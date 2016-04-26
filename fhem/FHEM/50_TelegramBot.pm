@@ -124,7 +124,7 @@
 #   favorite list corrected
 # 1.6 2016-04-08 text customization for replies/messages and favorite descriptions 
 
-#   
+#   Fix: contact handling failed (/ in contact names ??)
 #   
 #   
 ##############################################################################
@@ -455,6 +455,7 @@ sub TelegramBot_Set($@)
     my $arg = join(" ", @args );
     Log3 $name, 3, "TelegramBot_Set $name: set new contacts to :$arg: ";
     # first set the hash accordingly
+    $arg = TelegramBot_PutToUTF8( $arg );
     TelegramBot_CalcContactsHash($hash, $arg);
 
     # then calculate correct string reading and put this into the reading
@@ -2137,9 +2138,9 @@ sub TelegramBot_CalcContactsHash($$)
       Log3 $hash->{NAME}, 5, "Contact add :$contact: cid is not number or -number:";
       next;
     } else {
-      $cname =~ TelegramBot_encodeContactString( $cname );
+      $cname = TelegramBot_encodeContactString( $cname );
 
-      $cuser =~ TelegramBot_encodeContactString( $cuser );
+      $cuser = TelegramBot_encodeContactString( $cuser );
       
       $hash->{Contacts}{$id} = $id.":".$cname.":".$cuser;
     }
@@ -2267,6 +2268,7 @@ sub TelegramBot_encodeContactString($) {
     $str =~ s/ /_/g;
 
   return TelegramBot_GetUTF8Back( $str );
+#  return $str;
 }
 
 #####################################
