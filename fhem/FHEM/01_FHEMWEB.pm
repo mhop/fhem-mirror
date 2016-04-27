@@ -2509,7 +2509,7 @@ FW_Notify($$)
 
     if($dev->{CHANGED}) {
       $dn = $1 if($dev->{CHANGED}->[0] =~ m/^MODIFIED (.*)$/);
-      if($dev->{CHANGED}->[0] =~ m/^ATTR ([^ ]+) ([^ ]+.*) (.*)$/) {
+      if($dev->{CHANGED}->[0] =~ m/^ATTR ([^ ]+) ([^ ]+) (.*)$/) {
         $dn = $1;
         my @a = ("$2: $3");
         $events = \@a;
