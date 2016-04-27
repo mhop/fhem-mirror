@@ -4499,7 +4499,9 @@ s2Hex($)
   <li>dimWithDuration value duration<br>
     dim to the requested value (0..100) in duration time.  If duration is
     less than 128, then it is interpreted as seconds, if it is between 128 and
-    254, then as duration-128 minutes.</li>
+    254, then as duration-128 minutes. Note: this command works only with
+    devices supporting version 2 of the SWITCH_MULTILEVEL class, which you can
+    verify with get versionClassAll</li>
   <li>stop<br>
     stop dimming/operation</li>
 
