@@ -500,10 +500,10 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     var newDef = typeof cm !== 'undefined' ?
                  cm.getValue() : $(this).closest("form").find("textarea").val();
     var cmd = $(this).attr("name")+"="+$(this).attr("value")+" "+newDef;
-    var noDef;
+    var isDef = true;
 
     if( newDef == undefined ) {
-      noDef = true;
+      isDef = false;
       var div = $(this).closest("div.makeSelect");
       var devName = $(div).attr("dev"),
           cmd = $(div).attr("cmd");
@@ -527,9 +527,9 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
       newDef = newDef.replace(/&/g, '&amp;')    // Same as in 01_FHEMWEB
                      .replace(/</g, '&lt;')
                      .replace(/>/g, '&gt;');
-      if(newDef.indexOf("\n") >= 0)
-        newDef = '<pre>'+newDef+'</pre>';
-      if(!noDef) {
+      if(isDef) {
+        if(newDef.indexOf("\n") >= 0)
+          newDef = '<pre>'+newDef+'</pre>';
         $("div#disp").html(newDef).css("display", "");
         $("div#edit").css("display", "none");
       }
@@ -580,9 +580,11 @@ FW_doUpdate()
     } else {
       $("[informId='"+d[0]+"']").each(function(){
         if(this.setValueFn) {     // change the select/etc value
-          this.setValueFn(d[1]);
+          this.setValueFn(d[1].replace(/\n/g, '\u2424'));
 
         } else {
+          if(d[2].match(/\n/))
+            d[2] = '<pre>'+d[2]+'</pre>';
           $(this).html(d[2]);     // Readings-Value
           if(d[0].match(/-ts$/))  // timestamps
             $(this).addClass('changed');
@@ -823,7 +825,7 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
     $("#td_longText").val(txt);
 
     var cm;
-    if( typeof AddCodeMirror == 'function' && !$("#td_longText").get(0).editor) {
+    if(typeof AddCodeMirror == 'function' && !$("#td_longText").get(0).editor) {
       $("#td_longText").get(0).editor = true;
       AddCodeMirror($("#td_longText").get(0), function(pcm) {cm = pcm;});
     }
