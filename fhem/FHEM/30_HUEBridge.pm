@@ -165,6 +165,8 @@ sub HUEBridge_Undefine($$)
 sub HUEBridge_fillBridgeInfo($$)
 {
   my ($hash,$result) = @_;
+  my $name = $hash->{NAME};
+
   $hash->{name} = $result->{name};
   $hash->{modelid} = $result->{modelid};
   $hash->{swversion} = $result->{swversion};
@@ -172,6 +174,12 @@ sub HUEBridge_fillBridgeInfo($$)
 
   my @l = split( '\.', $result->{apiversion} );
   $hash->{helper}{apiversion} = ($l[0] << 16) + ($l[1] << 8) + $l[2];
+
+  if( !defined($result->{'linkbutton'})
+      && !defined($attr{$name}{icon}) ) {
+    $attr{$name}{icon} = 'hue_filled_bridge_v1' if( $hash->{modelid} && $hash->{modelid} eq 'BSB001' );
+    $attr{$name}{icon} = 'hue_filled_bridge_v2' if( $hash->{modelid} && $hash->{modelid} eq 'BSB002' );
+  }
 }
 
 sub HUEBridge_OpenDev($)
@@ -663,6 +671,9 @@ HUEBridge_Autocreate($;$)
       $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
       $cmdret= CommandAttr(undef,"$devname room HUEDevice");
       $cmdret= CommandAttr(undef,"$devname IODev $name");
+
+      HUEDeviceSetIcon($devname);
+      $defs{$devname}{helper}{fromAutocreate} = 1 ;
 
       $autocreated++;
     }

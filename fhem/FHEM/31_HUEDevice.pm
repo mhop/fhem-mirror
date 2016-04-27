@@ -22,31 +22,50 @@ use SetExtensions;
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my %hueModels = (
-  LCT001 => {name => 'Hue Bulb'                 ,type => 'Extended Color light'   ,subType => 'extcolordimmer',},
-  LCT002 => {name => 'Hue Spot BR30'            ,type => 'Extended Color light'   ,subType => 'extcolordimmer',},
-  LCT003 => {name => 'Hue Spot GU10'            ,type => 'Extended Color light'   ,subType => 'extcolordimmer',},
-  LCT007 => {name => 'Hue Bulb V2'              ,type => 'Extended Color light'   ,subType => 'extcolordimmer',},
-  LLC001 => {name => 'Living Colors G2'         ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC005 => {name => 'Living Colors Bloom'      ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC006 => {name => 'Living Colors Gen3 Iris'  ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC007 => {name => 'Living Colors Gen3 Bloom' ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC010 => {name => 'Hue Living Colors Iris'   ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC011 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC012 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC013 => {name => 'Disney Living Colors'     ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC014 => {name => 'Living Colors Aura'       ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LLC020 => {name => 'Hue Go'                   ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LCT001 => {name => 'Hue Bulb'                 ,type => 'Extended Color light'   ,subType => 'extcolordimmer',
+                                                                                   icon => 'hue_filled_white_and_color_e27_b22', },
+  LCT002 => {name => 'Hue Spot BR30'            ,type => 'Extended Color light'   ,subType => 'extcolordimmer',
+                                                                                   icon => 'hue_filled_br30.svg', },
+  LCT003 => {name => 'Hue Spot GU10'            ,type => 'Extended Color light'   ,subType => 'extcolordimmer',
+                                                                                   icon => 'hue_filled_gu10_par16', },
+  LCT007 => {name => 'Hue Bulb V2'              ,type => 'Extended Color light'   ,subType => 'extcolordimmer',
+                                                                                   icon => 'hue_filled_white_and_color_e27_b22', },
+  LLC001 => {name => 'Living Colors G2'         ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_iris', },
+  LLC005 => {name => 'Living Colors Bloom'      ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_bloom', },
+  LLC006 => {name => 'Living Colors Gen3 Iris'  ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_iris', },
+  LLC007 => {name => 'Living Colors Gen3 Bloom' ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_bloom', },
+  LLC010 => {name => 'Hue Living Colors Iris'   ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_iris', },
+  LLC011 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_bloom', },
+  LLC012 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_bloom', },
+  LLC013 => {name => 'Disney Living Colors'     ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_storylight', },
+  LLC014 => {name => 'Living Colors Aura'       ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_aura', },
+  LLC020 => {name => 'Hue Go'                   ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_go', },
   LLM001 => {name => 'Color Light Module'       ,type => 'Extended Color Light'   ,subType => 'extcolordimmer',},
   LLM010 => {name => 'Color Temperature Module' ,type => 'Extended Temperature Light'   ,subType => 'ctdimmer',},
   LLM011 => {name => 'Color Temperature Module' ,type => 'Extended Temperature Light'   ,subType => 'ctdimmer',},
   LLM012 => {name => 'Color Temperature Module' ,type => 'Extended Temperature Light'   ,subType => 'ctdimmer',},
-  LST001 => {name => 'Hue LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',},
-  LST002 => {name => 'Hue LightStrips Plus'     ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LST001 => {name => 'Hue LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_lightstrip', },
+  LST002 => {name => 'Hue LightStrips Plus'     ,type => 'Color Light'            ,subType => 'colordimmer',
+                                                                                   icon => 'hue_filled_lightstrip', },
   LWB001 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
   LWB003 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',},
-  LWB004 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
-  LWB006 => {name => 'Hue White'                ,type => 'Dimmable light'         ,subType => 'dimmer',},
-  LWB007 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWB004 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',
+                                                                                   icon => 'hue_filled_white_and_color_e27_b22', },
+  LWB006 => {name => 'Hue White'                ,type => 'Dimmable light'         ,subType => 'dimmer',
+                                                                                   icon => 'hue_filled_white_and_color_e27_b22', },
+  LWB007 => {name => 'Hue Lux'                  ,type => 'Dimmable light'         ,subType => 'dimmer',
+                                                                                   icon => 'hue_filled_white_and_color_e27_b22', },
   LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 
  'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
@@ -124,8 +143,8 @@ HUEDevice_devStateIcon($)
   my $s = $dim_values{int($percent/7)};
   $s="on" if( $percent eq "100" );
 
-  return ".*:$s:toggle" if( $attr{$name}{subType} eq "dimmer" );
   return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWL001" );
+  return ".*:$s:toggle" if( AttrVal($name, "subtype", "") eq "dimmer" );
 
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB001" );
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB003" );
@@ -879,6 +898,25 @@ HUEDevice_GetUpdate($)
 }
 
 sub
+HUEDeviceSetIcon($;$)
+{
+  my ($hash,$force) = @_;
+  $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
+
+  return undef if( !$hash );
+  my $name = $hash->{NAME};
+
+  return undef if( !$hash->{modelid} );
+
+  my $model = $hueModels{$hash->{modelid}};
+  return undef if( !$model );
+
+  my $icon = $model->{icon};
+  return undef if( !$icon );
+
+  $attr{$name}{icon} = $icon if( $force || !defined($attr{$name}{icon}) );
+}
+sub
 HUEDevice_Parse($$)
 {
   my($hash,$result) = @_;
@@ -953,6 +991,9 @@ HUEDevice_Parse($$)
         $attr{$name}{subType} = 'extcolordimmer';
 
       }
+
+      HUEDeviceSetIcon($hash) if( $hash->{helper}{fromAutocreate} );
+      delete $hash->{helper}{fromAutocreate};
 
     } elsif( $hash->{type} ) {
       if( $hash->{type} eq "Extended color light" ) {
