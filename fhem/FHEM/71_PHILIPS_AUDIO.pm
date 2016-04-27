@@ -8,7 +8,7 @@
 #     such as MCi, Streamium and Fidelio devices.
 #     The module provides basic functionality accessible through the port 8889 of the device:
 #     (http://<device_ip>:8889/index).
-#     e.g. NP3500, NP3700, NP3900. 
+#     e.g. AW9000, NP3500, NP3700, NP3900 
 #
 #     Copyright by Radoslaw Watroba
 #     (e-mail: ra666ack at g**glemail d*t c*m)
@@ -177,6 +177,8 @@ sub PHILIPS_AUDIO_Set
 
   my $usage;
   
+  my $model = $hash->{MODEL};
+
   $usage = "Unknown argument $what, choose one of ".
            "volumeStraight:slider,0,1,64 ".
            "volume:slider,0,1,100 ".
@@ -190,6 +192,9 @@ sub PHILIPS_AUDIO_Set
            "stop:noArg ".
            "shuffle:on,off ".
            "aux:noArg ".
+           ((uc($model) eq "AW9000") ? "mp3link:noArg " : ""). # Input implemented in AW9000 only
+           ((uc($model) eq "AW9000") ? "coaxial:noArg " : ""). # Input implemented in AW9000 only
+           ((uc($model) eq "AW9000") ? "optical:noArg " : ""). # Input implemented in AW9000 only
            #"input:aux,internetRadio,mediaLibrary,onlineServices ".
            $inetRadioPreset.
            $inetRadioFavorite.
@@ -213,6 +218,18 @@ sub PHILIPS_AUDIO_Set
   elsif($what eq "aux")
   {
     PHILIPS_AUDIO_SendCommand($hash, "/aux", "",$what, $a[2]);
+  }
+  elsif($what eq "mp3link")
+  {
+    PHILIPS_AUDIO_SendCommand($hash, "/mp3link", "",$what, $a[2]);
+  }
+  elsif($what eq "coaxial")
+  {
+    PHILIPS_AUDIO_SendCommand($hash, "/digin_coaxial", "",$what, $a[2]);
+  }
+  elsif($what eq "optical")
+  {
+    PHILIPS_AUDIO_SendCommand($hash, "/digin_optical", "",$what, $a[2]);
   }
   elsif($what eq "home")
   {
@@ -399,7 +416,7 @@ sub PHILIPS_AUDIO_Define
     
     if(defined($a[2]))
     {
-      $hash->{MODEL} = $a[2];
+      $hash->{MODEL} = uc($a[2]);
       
       # Used by 'fheminfo' command for statistics
       $attr{$name}{"model"} = $hash->{MODEL};
@@ -819,7 +836,7 @@ sub PHILIPS_AUDIO_ParseResponse
         }
       }
       
-      # Eventual future UPNP implementation. Requests IO::Socket::Multicast non-standard module.      
+      # Eventual future UPNP implementation. Requires IO::Socket::Multicast non-standard module.      
       elsif ($cmd eq "getModel")
       {
         if($data =~ /<friendlyName>(.+)<\/friendlyName>/)
@@ -1225,6 +1242,8 @@ sub PHILIPS_AUDIO_updateFavorites
     This module controls a Philips Audio Player e.g. MCi, Streamium or Fidelio and (potentially) any other device including a navigation server.<br>
     To check, open the following URL in the browser: http://[ip # of your device]:8889/index
     <br><br>
+    (So far tested on: AW9000, NP3500, NP3700 and NP3900)  
+    <br><br>
     Currently implemented features:
     <br><br>
     <ul>
@@ -1393,7 +1412,10 @@ sub PHILIPS_AUDIO_updateFavorites
     Mit Hilfe dieses Moduls lassen sich Philips Audio Netzwerk Player wie z.B. MCi, Streamium oder Fidelio via Ethernet steuern.<br>
     Theoretisch sollten alle Ger&auml;te, die &uuml;ber einer implementierten HTTP Server am Port 8889 haben (http://[ip Nummer des Ger&auml;tes]:8889/index), bedient werden k&ouml;nnen.<br>
     <br>
-    
+    <br>
+    (Getestet mit: AW9000, NP3500, NP3700 und NP3900)
+    <br>
+    <br>   
     Die aktuelle Implementierung erm&ouml;glicht u.a. den folgenden Funktionsumfang:<br><br>
     <ul>
       <li>Power on/off</li>
