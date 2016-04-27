@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  49_SSCam: module will not load due to Unknown warnings category
+                       'experimental' when using an older perl version 
   - feature: 71_PHILIPS_AUDIO : Added input support for AW9000
   - bugfix:  50_TelegramBot: contact handling failed (/ in contact names ??)
   - feature: new module 02_FTUISRV.pm for server side templates for tablet UI
