@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.26.1 27.04.2016    bugfix module will not load due to Unknown warnings category 'experimental'
+#                      when using an older perl version 
 # 1.26   22.04.2016    Attribute "disable" to deactivate the module added
 # 1.25   18.04.2016    motion detection parameters can be entered if  
 #                      motion detection by camera or SVS is used
@@ -129,7 +131,7 @@ use strict;
 use warnings;
 use MIME::Base64;
 use HttpUtils;
-no warnings qw( experimental::autoderef );  # 5.18+
+no if $] >= 5.017011, warnings => 'experimental';  
 
 # Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
 my %SSCam_errauthlist = (
