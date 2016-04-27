@@ -55,8 +55,19 @@ guests = dashboard
 [EVENT_OnStartup]
 10 = sleep:1
 
+#-- notify the FHEM module 
 [EVENT_BeforeSipPhoneMakeCall]
-10 = take_snapshot
+10 = url_call:http://192.168.0.20:8083/fhem?XHR=1&cmd.DoorPi=set DoorPi call start
+20 = take_snapshot
+
+[EVENT_OnCallStateDisconnect]
+10 = url_call:http://192.168.0.20:8083/fhem?XHR=1&cmd.DoorPi=set DoorPi call end
+
+[EVENT_OnCallStateDismissed]
+10 = url_call:http://192.168.0.20:8083/fhem?XHR=1&cmd.DoorPi=set DoorPi call dismissed
+
+[EVENT_OnCallStateReject]
+10 = url_call:http://192.168.0.20:8083/fhem?XHR=1&cmd.DoorPi=set DoorPi call rejected
 
 [SIP-Phone]
 identity = DoorPi
@@ -64,7 +75,7 @@ local_port = 5060
 firewallpolicy = PolicyNoFirewall
 #
 sipphonetyp = linphone
-sipserver_password = 
+sipserver_password = xxxxxxxxxxxx
 sipserver_realm = fritz.box
 sipserver_server = 192.168.0.254
 sipserver_username = 620
@@ -99,13 +110,16 @@ base_path_input = /home/doorpi/keyboard/inputs/
 base_path_output = /home/doorpi/keyboard/outputs/
 
 [webservice_InputPins]
-door    = out:door,1,0,3 
-lighton = out:light
-lightoff= out:light
-purge   = sleep:0
-clear   = sleep:0
-button1 = sleep:0
-button2 = sleep:0
+door            = out:door,1,0,3 
+lighton         = out:light,1
+lightonfortimer = out:light,1,0,60
+lightoff        = out:light,0
+dashlighton     = out:dashlight,1
+dashlightoff    = out:dashlight,0
+purge           = sleep:0
+clear           = sleep:0
+button1         = sleep:0
+button2         = sleep:0
 
 [EVENT_OnKeyPressed_webservice.purge]
 10 = os_execute:/home/doorpi/purge.sh purge
@@ -113,8 +127,11 @@ button2 = sleep:0
 [EVENT_OnKeyPressed_webservice.clear]
 10 = os_execute:/home/doorpi/purge.sh clear
 
+[EVENT_OnKeyPressed_webservice.button1]
+10 = call:722622
+
 [EVENT_OnKeyPressed_webservice.button2]
-10 = os_execute:/home/doorpi/test.sh
+10 = sleep:0
 
 [onboardpins_keyboard]
 pull_up_down = PUD_UP
@@ -122,7 +139,8 @@ pull_up_down = PUD_UP
 [onboardpins_OutputPins]
 0 = door
 1 = light
-2 = blinking_led
+2 = dashlight
+3 = blinking_led
 
 [onboardpins_InputPins]
 0 = call:722622
