@@ -2,11 +2,11 @@
 #
 # DoorPi.pm
 #
-# FHEM module to communite with a Raspberry Pi door station
+# FHEM module to communicate with a Raspberry Pi door station
 #
 # Prof. Dr. Peter A. Henning, 2016
 # 
-# Version 0.3 - April 2016
+# Version 0.4 - April 2016
 #
 ########################################################################################
 #
@@ -26,6 +26,7 @@
 #  GNU General Public License for more details.
 #
 ########################################################################################
+
 package main;
 
 use strict;
@@ -44,7 +45,6 @@ my %gets = (
   "config:noArg"    => "C",
   "history:noArg"   => "H"
 );
-
 
 ########################################################################################
 #
@@ -194,7 +194,7 @@ sub DoorPi_Get ($@) {
      Log GetLogLevel($name,2), "[DoorPi_Get] $a[1] error $v";
      return "$a[0] $a[1] => Error $v";
   }
-  return "$a[0] $a[1] => OK";
+  return "$a[0] $a[1] => ok";
 }
  
 ########################################################################################
@@ -238,15 +238,31 @@ sub DoorPi_Set ($@) {
   $value = shift @a; 
   
   return "[DoorPi_Set] With unknown argument $key, choose one of " . join(" ", @{$hash->{HELPER}->{CMDS}})
-    if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) );
+    if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && !($key eq "call") );
 
-  if( $key eq "$door" ){
+  #-- hidden command to be used by DoorPi for adding a new call
+  if( $key eq "call" ){
+    if( $value eq "start" ){
+      readingsSingleUpdate($hash,"call","started",1);
+    }elsif( $value eq "end" ){
+      readingsSingleUpdate($hash,"call","ended",1);
+      DoorPi_GetHistory($hash);
+    }elsif( $value eq "rejected" ){
+      readingsSingleUpdate($hash,"call","rejected",1);
+      DoorPi_GetHistory($hash);
+    }elsif( $value eq "dismissed" ){
+      readingsSingleUpdate($hash,"call","dismissed",1);
+      DoorPi_GetHistory($hash);
+    }
+  #-- door opening
+  }elsif( $key eq "$door" ){
     if( $value eq "open" ){
       $v=DoorPi_Cmd($hash,"door");
       if(AttrVal($name, "dooropencmd",undef)){
         fhem(AttrVal($name, "dooropencmd",undef));
       }
     }
+  #-- scene lighting
   }elsif( $key eq "$light" ){
     my $light    = AttrVal($name, "lightbutton", "light");
     if( $value eq "on" ){
@@ -256,6 +272,7 @@ sub DoorPi_Set ($@) {
       $v=DoorPi_Cmd($hash,"lightoff");
       readingsSingleUpdate($hash,$light,"off",1);
     }
+  #-- dashboard lighting
   }elsif( $key eq "$dashlight" ){
     my $dashlight    = AttrVal($name, "dashlightbutton", "dashlight");
     if( $value eq "on" ){
@@ -277,7 +294,7 @@ sub DoorPi_Set ($@) {
      Log GetLogLevel($name,2), "[DoorPi_Set] $key error $v";
      return "$key => Error $v";
   }
-  return "$key => OK";
+  return "$key => ok";
 }
 
 #######################################################################################
@@ -347,7 +364,7 @@ sub DoorPi_GetConfig () {
    
   #-- put into READINGS
   readingsSingleUpdate($hash,"state","Initialized",1);
-  readingsSingleUpdate($hash,"config","OK",1);
+  readingsSingleUpdate($hash,"config","ok",1);
   return undef;
 }
  
@@ -459,7 +476,7 @@ sub DoorPi_GetHistory () {
                      $callend = "busy";
                      last;
                   }elsif( $jhash2->{"state"} eq "Call ended" ){
-                     $callend = "OK";
+                     $callend = "ok";
                      last;
                   }
                 }
@@ -496,7 +513,7 @@ sub DoorPi_GetHistory () {
              $record =~ s/^.*records\///;
              #-- workaround for buggy DoorPi
              $record       = sprintf("%d-%02d-%2d_%02d-%02d-%02d.wav", $year,($month+1),$day,$hour, $min, $sec)
-               if( $callend eq "OK");
+               if( $callend eq "ok");
              
              #-- this is the snapshot file if taken at the same time
              my $snapshot  = sprintf("%d-%02d-%2d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
@@ -566,7 +583,7 @@ sub DoorPi_GetHistory () {
   #--put into READINGS
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"number_calls",int(@{ $hash->{DATA}}));
-  readingsBulkUpdate($hash,"history","OK");
+  readingsBulkUpdate($hash,"history","ok");
   readingsBulkUpdate($hash,$dashlight,$dashlightstate);
   readingsBulkUpdate($hash,$light,$lightstate);
   readingsEndUpdate($hash,1); 
@@ -598,7 +615,7 @@ sub DoorPi_GetHistory () {
      $url    = "http://".$hash->{TCPIP}."/control/trigger_event?".
                "event_name=OnKeyPressed_".$hash->{HELPER}->{vkeyboard}.".".
                $cmd."&event_source=doorpi.keyboard.from_filesystem";
-     Log 1,"[DoorPi_Cmd] called with only hash => Issue a non-blocking call to $url";  
+     #Log 1,"[DoorPi_Cmd] called with only hash => Issue a non-blocking call to $url";  
      HttpUtils_NonblockingGet({
         url      => $url,
         callback=>sub($$$){ DoorPi_Cmd($hash,$cmd,$_[1],$_[2]) }
@@ -627,6 +644,8 @@ sub DoorPi_GetHistory () {
   }
   return undef;
 }
+
+
 
 #######################################################################################
 #
