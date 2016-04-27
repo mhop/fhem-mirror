@@ -180,7 +180,7 @@ sub GEOFANCY_CGI() {
     my $locName     = "";
 
     # data received
-    if ( $request =~ m,^(/[^/]+?)(?:\&|\?)(.*)?$, ) {
+    if ( $request =~ m,^(\/[^/]+?)(?:\&|\?|\/\?|\/)(.*)?$, ) {
         $link = $1;
         $URI  = $2;
 
