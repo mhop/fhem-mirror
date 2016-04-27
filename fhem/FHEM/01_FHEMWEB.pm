@@ -2125,8 +2125,11 @@ FW_makeImage(@)
   return $name if(!$p);
   if($p =~ m/\.svg$/i) {
     if(open(FH, "$FW_icondir/$p")) {
-      <FH>; <FH>; <FH>; # Skip the first 3 lines;
-      my $data = join("", <FH>);
+      my $data;
+      do { 
+        $data = <FH>;
+      } until( $data =~ m/^<svg/ );
+      $data .= join("", <FH>);
       close(FH);
       $data =~ s/[\r\n]/ /g;
       $data =~ s/ *$//g;
