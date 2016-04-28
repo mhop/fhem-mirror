@@ -1,4 +1,4 @@
-##############################################
+################################################################
 # $Id$
 #
 # 93_DbLog.pm
@@ -10,7 +10,7 @@
 #
 # reduceLog() created by Claudiu Schuster (rapster)
 #
-##############################################
+################################################################
 
 package main;
 use strict;
@@ -97,7 +97,7 @@ sub DbLog_Define($@)
   return undef;
 }
 
-#####################################
+################################################################
 sub DbLog_Undef($$) {
   my ($hash, $name) = @_;
 
@@ -107,7 +107,7 @@ sub DbLog_Undef($$) {
   return undef;
 }
 
-#####################################
+################################################################
 sub DbLog_Shutdown($) {  
   my ($hash) = @_;
   
@@ -144,6 +144,110 @@ sub DbLog_Attr(@)
 }
 
 ################################################################
+sub DbLog_Set($@) {
+    my ($hash, @a) = @_;
+	my $name = $hash->{NAME};
+	my $usage = "Unknown argument, choose one of reduceLog reopen:noArg rereadcfg:noArg count:noArg deleteOldDays userCommand";
+	return $usage if(int(@a) < 2);
+	my $dbh = $hash->{DBH};
+	my $ret;
+
+    if ($a[1] eq 'reduceLog') {
+        if ( !$dbh || not $dbh->ping ) {
+            Log3($name, 1, "DbLog $name: DBLog_Set - reduceLog - DB Session dead, try to reopen now !");
+            DbLog_Connect($hash);
+        }    
+        else {
+            if (defined $a[2] && $a[2] =~ /^\d+$/) {
+                $ret = DbLog_reduceLog($hash,@a);
+            } else {
+                Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
+                $ret = "reduceLog error, no <days> given.";
+           }
+        }
+    }
+    elsif ($a[1] eq 'reopen') {
+        Log3($name, 4, "DbLog $name: Reopen requested.");
+        
+        if ($dbh) {
+            $dbh->commit() if(!$dbh->{AutoCommit});
+            $dbh->disconnect();
+        }
+        
+        DbLog_Connect($hash);
+        $ret = "Reopen executed.";
+    }
+    elsif ($a[1] eq 'rereadcfg') {
+        Log3($name, 4, "DbLog $name: Rereadcfg requested.");
+        
+        if ($dbh) {
+            $dbh->commit() if(!$dbh->{AutoCommit});
+            $dbh->disconnect();
+        }
+        
+        $ret = _DbLog_readCfg($hash);
+        return $ret if $ret;
+        DbLog_Connect($hash);
+        $ret = "Rereadcfg executed.";
+    }
+    elsif ($a[1] eq 'count') {
+        if ( !$dbh || not $dbh->ping ) {
+            Log3($name, 1, "DbLog $name: DBLog_Set - count - DB Session dead, try to reopen now !");
+            DbLog_Connect($hash);
+        }
+        else {
+            Log3($name, 4, "DbLog $name: Records count requested.");
+            my $c = $dbh->selectrow_array('SELECT count(*) FROM history');
+            readingsSingleUpdate($hash, 'countHistory', $c ,1);
+            $c = $dbh->selectrow_array('SELECT count(*) FROM current');
+            readingsSingleUpdate($hash, 'countCurrent', $c ,1);
+        }
+    }
+    elsif ($a[1] eq 'deleteOldDays') {
+        Log3($name, 4, "DbLog $name: Deletion of old records requested.");
+        my ($c, $cmd);
+        
+        if ( !$dbh || not $dbh->ping ) {
+            Log3($name, 1, "DbLog $name: DBLog_Set - deleteOldDays - DB Session dead, try to reopen now !");
+            DbLog_Connect($hash);
+        }    
+        else {
+            $cmd = "delete from history where TIMESTAMP < ";
+        
+            if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd .= "datetime('now', '-$a[2] days')"; }
+               elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
+               elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd .= "NOW() - INTERVAL '$a[2]' DAY"; }
+               else { $cmd = undef; $ret = 'Unknown database type. Maybe you can try userCommand anyway.'; }
+
+               if(defined($cmd)) {
+                   $c = $dbh->do($cmd);
+                   readingsSingleUpdate($hash, 'lastRowsDeleted', $c ,1);
+               }
+        }
+    }
+    elsif ($a[1] eq 'userCommand') {
+        if ( !$dbh || not $dbh->ping ) {
+            Log3($name, 1, "DbLog $name: DBLog_Set - userCommand - DB Session dead, try to reopen now !");
+            DbLog_Connect($hash);
+        }
+        else {
+            Log3($name, 4, "DbLog $name: userCommand execution requested.");
+            my ($c, @cmd, $sql);
+            @cmd = @a;
+            shift(@cmd); shift(@cmd);
+            $sql = join(" ",@cmd);
+            readingsSingleUpdate($hash, 'userCommand', $sql, 1);
+            $c = $dbh->selectrow_array($sql);
+            readingsSingleUpdate($hash, 'userCommandResult', $c ,1);
+        }
+    }
+    else { $ret = $usage; }
+
+return $ret;
+
+}
+
+###############################################################################################
 #
 # Exrahieren des Filters aus der ColumnsSpec (gplot-Datei)
 #
@@ -153,7 +257,7 @@ sub DbLog_Attr(@)
 #
 # Parameter: Quell-Instanz-Name, und alle FileLog-Parameter, die diese Instanz betreffen.
 # Quelle: http://forum.fhem.de/index.php/topic,40176.msg325200.html#msg325200
-################################################################
+###############################################################################################
 sub DbLog_regexpFn($$) {                            
   my ($name, $filter) = @_;
   my $ret;
@@ -449,6 +553,7 @@ sub DbLog_ParseEvent($$$)
 }
 
 ################################################################
+# Schreibroutine Einfügen Werte in DB
 #
 # param1: hash
 # param2: DbLogType -> Current oder History oder Current/History
@@ -464,19 +569,31 @@ sub DbLog_ParseEvent($$$)
 sub DbLog_Push(@) {
   my ($hash, $DbLogType, $timestamp, $device, $type, $event, $reading, $value, $unit) = @_;
   my $dbh= $hash->{DBH};
+  my $name = $hash->{NAME};
   
-    if ($hash->{DBMODEL} ne 'SQLITE') {
-        # Daten auf maximale laenge beschneiden
-        $device   = substr($device,0, $columns{DEVICE});
-        $type     = substr($type,0, $columns{TYPE});
-        $event    = substr($event,0, $columns{EVENT});
-        $reading  = substr($reading,0, $columns{READING});
-        $value    = substr($value,0, $columns{VALUE});
-        $unit     = substr($unit,0, $columns{UNIT});
-    }
-    
-  $dbh->{RaiseError} = 1;
-  $dbh->{PrintError} = 0;  
+  $dbh->{RaiseError} = 1; 
+  $dbh->{PrintError} = 0;
+
+  eval {
+    if ( !$dbh || not $dbh->ping ) {
+      #### DB Session dead, try to reopen now !
+      DbLog_Connect($hash);
+    }  
+  };
+  if ($@) {
+	Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
+	return $dbh->{RaiseError};
+  }
+  
+  if ($hash->{DBMODEL} ne 'SQLITE') {
+      # Daten auf maximale laenge beschneiden
+      $device   = substr($device,0, $columns{DEVICE});
+      $type     = substr($type,0, $columns{TYPE});
+      $event    = substr($event,0, $columns{EVENT});
+      $reading  = substr($reading,0, $columns{READING});
+      $value    = substr($value,0, $columns{VALUE});
+      $unit     = substr($unit,0, $columns{UNIT});
+  }
 
   $dbh->begin_work();
   
@@ -515,7 +632,7 @@ sub DbLog_Push(@) {
     $dbh->{PrintError} = 1;
   }
 
-  return $dbh->{RaiseError};
+return $dbh->{RaiseError};
 }
 
 ################################################################
@@ -719,9 +836,11 @@ sub DbLog_Connect($)
   
   Log3 $hash->{NAME}, 3, "Connecting to database $dbconn with user $dbuser";
   my $dbh = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
+  
   if(!$dbh) {
     RemoveInternalTimer($hash);
     Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
+    readingsSingleUpdate($hash, 'state', 'disconnected', 1);
     InternalTimer(time+5, 'DbLog_Connect', $hash, 0);
     Log3 $hash->{NAME}, 4, 'Waiting for database connection';
     return 0;
@@ -748,6 +867,7 @@ sub DbLog_Connect($)
   # creating an own connection for the webfrontend, saved as DBHF in Hash
   # this makes sure that the connection doesnt get lost due to other modules
   my $dbhf = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0 });
+  
   if(!$dbh) {
     RemoveInternalTimer($hash);
     Log3 $hash->{NAME}, 4, 'DbLog: Trying to connect to database';
@@ -822,6 +942,7 @@ sub
 DbLog_Get($@)
 {
   my ($hash, @a) = @_;
+  my $name = $hash->{NAME};
 
   return dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
 
@@ -894,7 +1015,13 @@ DbLog_Get($@)
     return "Can't connect to database." if(!DbLog_Connect($hash));
   }
 
-  my $dbh= $hash->{DBH};
+  my $dbh = $hash->{DBH};
+  
+  if ( !$dbh || not $dbh->ping ) {
+      Log3($name, 1, "DbLog $name: DBLog_Get - DB Session dead, try to reopen now !");
+      DbLog_Connect($hash);
+      return undef;
+  }
 
   #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{DBMODEL} eq "POSTGRESQL") {
@@ -1315,7 +1442,7 @@ DbLog_Get($@)
 
 ### DBLog - Historische Werte ausduennen > Forum #41089
 sub DbLog_reduceLog($@) {
-	my ($hash,@a) = @_;
+    my ($hash,@a) = @_;
     my ($ret,$cmd,$row,$filter,$exclude,$c,$day,$hour,$lastHour,$updDate,$updHour,$average,$processingDay,$lastUpdH,%hourlyKnown,%averageHash,@excludeRegex,@dayRows,@averageUpd,@averageUpdD);
     my ($dbh,$name,$startTime,$currentHour,$currentDay,$deletedCount,$updateCount,$sum,$rowCount,$excludeCount) = ($hash->{DBH},$hash->{NAME},time(),99,0,0,0,0,0,0);
     
@@ -1525,76 +1652,6 @@ sub DbLog_reduceLog($@) {
     return $ret;
 }
 
-
-sub DbLog_Set($@) {
-    my ($hash, @a) = @_;
-	my $name = $hash->{NAME};
-	my $usage = "Unknown argument, choose one of reduceLog reopen:noArg rereadcfg:noArg count:noArg deleteOldDays userCommand";
-	return $usage if(int(@a) < 2);
-	my $dbh = $hash->{DBH};
-	my $ret;
-
-    if ($a[1] eq 'reduceLog') {
-        if (defined $a[2] && $a[2] =~ /^\d+$/) {
-            $ret = DbLog_reduceLog($hash,@a);
-        } else {
-            Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
-            $ret = "reduceLog error, no <days> given.";
-        }
-    }
-    elsif ($a[1] eq 'reopen') {
-        Log3($name, 4, "DbLog $name: Reopen requested.");
-        $dbh->commit() if(! $dbh->{AutoCommit});
-        $dbh->disconnect();
-        DbLog_Connect($hash);
-        $ret = "Reopen executed.";
-    }
-    elsif ($a[1] eq 'rereadcfg') {
-        Log3($name, 4, "DbLog $name: Rereadcfg requested.");
-        $dbh->commit() if(! $dbh->{AutoCommit});
-        $dbh->disconnect();
-        $ret = _DbLog_readCfg($hash);
-        return $ret if $ret;
-        DbLog_Connect($hash);
-        $ret = "Rereadcfg executed.";
-    }
-    elsif ($a[1] eq 'count') {
-        Log3($name, 4, "DbLog $name: Records count requested.");
-        my $c = $dbh->selectrow_array('SELECT count(*) FROM history');
-        readingsSingleUpdate($hash, 'countHistory', $c ,1);
-        $c = $dbh->selectrow_array('SELECT count(*) FROM current');
-        readingsSingleUpdate($hash, 'countCurrent', $c ,1);
-    }
-    elsif ($a[1] eq 'deleteOldDays') {
-        Log3($name, 4, "DbLog $name: Deletion of old records requested.");
-        my ($c, $cmd);
-        $cmd = "delete from history where TIMESTAMP < ";
-        
-        if ($hash->{DBMODEL} eq 'SQLITE')        { $cmd .= "datetime('now', '-$a[2] days')"; }
-        elsif ($hash->{DBMODEL} eq 'MYSQL')      { $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
-        elsif ($hash->{DBMODEL} eq 'POSTGRESQL') { $cmd .= "NOW() - INTERVAL '$a[2]' DAY"; }
-        else { $cmd = undef; $ret = 'Unknown database type. Maybe you can try userCommand anyway.'; }
-
-        if(defined($cmd)) {
-            $c = $dbh->do($cmd);
-            readingsSingleUpdate($hash, 'lastRowsDeleted', $c ,1);
-        }
-    }
-    elsif ($a[1] eq 'userCommand') {
-        Log3($name, 4, "DbLog $name: userCommand execution requested.");
-        my ($c, @cmd, $sql);
-        @cmd = @a;
-        shift(@cmd); shift(@cmd);
-        $sql = join(" ",@cmd);
-        readingsSingleUpdate($hash, 'userCommand', $sql, 1);
-        $c = $dbh->selectrow_array($sql);
-        readingsSingleUpdate($hash, 'userCommandResult', $c ,1);
-    }
-    else { $ret = $usage; }
-
-	return $ret;
-
-}
 
 ################################################################
 #
