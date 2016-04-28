@@ -308,8 +308,8 @@ $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
 $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
-                       "event-aggregator event-min-interval stateFormat ".
-                       "timestamp-on-change-reading";
+                       "event-aggregator event-min-interval ".
+                       "stateFormat:textField-long timestamp-on-change-reading";
 
 
 %cmds = (
@@ -2503,7 +2503,10 @@ CommandAttr($$)
         if(grep { /$modifier/ }
                 qw(none difference differential offset monotonic integral)) {
           $trigger =~ s/^:// if($trigger);
-          my %userReading = ( reading => $reading, trigger => $trigger, modifier => $modifier, perlCode => $perlCode );
+          my %userReading = ( reading => $reading,
+                              trigger => $trigger,
+                              modifier => $modifier,
+                              perlCode => $perlCode );
           push @userReadings, \%userReading;
         } else {
           push @rets, "$sdev: unknown modifier $modifier for ".
@@ -2550,6 +2553,8 @@ CommandAttr($$)
       delete($defs{$ioname}{".clientArray"}); # Force a recompute
     }
     if($attrName eq "stateFormat" && $init_done) {
+      my $err = perlSyntaxCheck($a[2], ());
+      return $err if($err);
       evalStateFormat($hash);
     }
     addStructChange("attr", $sdev, $param) if(!defined($oVal) || $oVal ne $val);
@@ -3869,7 +3874,7 @@ evalStateFormat($)
   if(!$sr) {
     $st = $st->{VAL} if(defined($st));
 
-  } elsif($sr =~ m/^{(.*)}$/) {
+  } elsif($sr =~ m/^{(.*)}$/s) {
     $st = eval $1;
     if($@) {
       $st = "Error evaluating $name stateFormat: $@";
