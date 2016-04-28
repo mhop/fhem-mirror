@@ -1286,11 +1286,11 @@ DbLog_Get($@)
   #Ueberfuehren der gesammelten Werte in die globale Variable %data
   for(my $j=0; $j<int(@readings); $j++) {
     my $k = $j+1;
-    $data{"min$k"} = $min[$j] == (~0 >> 1) ? "undef" : $min[$j];
-    $data{"max$k"} = $max[$j] == -(~0 >> 1) ? "undef" : $max[$j];
-    $data{"avg$k"} = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : "undef";
+    $data{"min$k"} = $min[$j];
+    $data{"max$k"} = $max[$j];
+    $data{"avg$k"} = $cnt[$j] ? sprintf("%0.2f", $sum[$j]/$cnt[$j]) : 0;
     $data{"sum$k"} = $sum[$j];
-    $data{"cnt$k"} = $cnt[$j] ? $cnt[$j] : "undef";
+    $data{"cnt$k"} = $cnt[$j];
     $data{"currval$k"} = $lastv[$j];
     $data{"currdate$k"} = $lastd[$j];
     $data{"mindate$k"} = $mind[$j];
