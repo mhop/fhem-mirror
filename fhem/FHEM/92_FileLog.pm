@@ -750,7 +750,7 @@ RESCAN:
             my $ts = "12:00:00";            # middle timestamp
             $ts = "$lda[1]:30:00" if($hd == 13);
             my $v = $fld[$col]-$h->{last1};
-            $v = 0 if($v < 0);              # Skip negative delta
+#            $v = 0 if($v < 0);              # Skip negative delta (why?)
             $dte = "$lda[0]_$ts";
             $val = sprintf("%g", $v);
             if($hd == 13) {                 # Generate missing 0 values / hour
