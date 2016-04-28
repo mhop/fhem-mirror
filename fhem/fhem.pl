@@ -2553,7 +2553,7 @@ CommandAttr($$)
       delete($defs{$ioname}{".clientArray"}); # Force a recompute
     }
     if($attrName eq "stateFormat" && $init_done) {
-      my $err = perlSyntaxCheck($a[2], ());
+      my $err = perlSyntaxCheck($a[2], ("%name"=>""));
       return $err if($err);
       evalStateFormat($hash);
     }
