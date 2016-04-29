@@ -2543,7 +2543,7 @@ FW_Notify($$)
     my @old = ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
     $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
-    $FW_subdir = "";
+    $FW_subdir = ($h->{iconPath} ? "/floorplan/$h->{iconPath}" : ""); # 47864
     $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", 0);
     $FW_ss = ($FW_sp =~ m/smallscreen/);
     $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
