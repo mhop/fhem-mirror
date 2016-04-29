@@ -239,7 +239,7 @@ at_Set($@)
 {
   my ($hash, @a) = @_;
 
-  my %sets = (modifyTimeSpec=>1, inactive=>0, active=>0);
+  my %sets = (modifyTimeSpec=>1, inactive=>0, active=>0, execNow=>0);
   my $cmd = join(" ", sort keys %sets);
   $cmd =~ s/modifyTimeSpec/modifyTimeSpec:time/ if($at_detailFnCalled);
   $at_detailFnCalled = 0;
@@ -267,6 +267,12 @@ at_Set($@)
     readingsSingleUpdate($hash,"state","Next: ".FmtTime($hash->{TRIGGERTIME}),1)
       if(!AttrVal($hash->{NAME}, "disable", undef));
     return undef;
+   
+  } elsif($a[1] eq "execNow") {
+    my $name = $hash->{NAME};
+    my $ret = AnalyzeCommandChain(undef, SemicolonEscape($hash->{COMMAND}));
+    Log3 $name, 3, "$name: $ret" if($ret);
+
   }
 
 }
@@ -488,6 +494,9 @@ EOF
         </li>
     <li>active<br>
         Activates the current device (see inactive).</li>
+    <li>execNow<br>
+        Execute the command associated with the at. The execution of a relative
+        at is not affected by this command.</li>
   </ul><br>
 
 
@@ -658,6 +667,10 @@ EOF
         </li>
     <li>active<br>
         Aktiviert das entsprechende Ger&auml;t, siehe inactive.
+        </li>
+    <li>execNow<br>
+        F&uuml;hrt das mit dem at spezifizierte Befehl aus. Beeinflu&szlig;t
+        nicht die Ausf&uuml;hrungszeiten relativer Spezifikationen.
         </li>
   </ul><br>
 
