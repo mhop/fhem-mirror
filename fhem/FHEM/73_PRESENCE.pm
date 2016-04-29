@@ -1287,9 +1287,9 @@ Options:
     Example FHEM commands:<br><br>
     <ul>
         <li><code>set PowerSwitch_1 on</code></li>
-        <li><code>set PowerSwitch_1 %ARGUMENT</code></li>
-        <li><code>"/opt/power_on.sh %ADDRESS"</code></li>
-        <li><code>{powerOn("%ADDRESS", "username", "password")}</code></li>
+        <li><code>set PowerSwitch_1 $ARGUMENT</code></li>
+        <li><code>"/opt/power_on.sh $ADDRESS"</code></li>
+        <li><code>{powerOn("$ADDRESS", "username", "password")}</code></li>
     </ul>
   </ul>
   <br>
@@ -1538,9 +1538,9 @@ Options:
     Beispielhafte FHEM-Befehle:<br><br>
     <ul>
         <li><code>set PowerSwitch_1 on</code></li>
-        <li><code>set PowerSwitch_1 %ARGUMENT</code></li>
-        <li><code>"/opt/power_on.sh %ADDRESS"</code></li>
-        <li><code>{powerOn("%ADDRESS", "username", "password")}</code></li>
+        <li><code>set PowerSwitch_1 $ARGUMENT</code></li>
+        <li><code>"/opt/power_on.sh $ADDRESS"</code></li>
+        <li><code>{powerOn("$ADDRESS", "username", "password")}</code></li>
     </ul>
     </ul>
   <br>
