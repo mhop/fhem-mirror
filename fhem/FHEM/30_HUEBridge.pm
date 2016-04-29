@@ -280,6 +280,9 @@ HUEBridge_Set($@)
   my ($hash, $name, $cmd, @args) = @_;
   my ($arg, @params) = @args;
 
+  return "$name: not paired" if( $hash->{STATE} =~ m/^link/  );
+  return "$name: not connected" if( $hash->{STATE} ne 'Connected'  );
+
   # usage check
   if($cmd eq 'statusRequest') {
     return "usage: statusRequest" if( @args != 0 );
@@ -316,9 +319,9 @@ HUEBridge_Set($@)
     return "usage: autodetect" if( @args != 0 );
 
     my $result = HUEBridge_Call($hash, undef, 'lights', undef, 'POST');
+    return $result->{error}{description} if( $result->{error} );
 
     return $result->{success}{'/lights'} if( $result->{success} );
-    return $result->{error}{description} if( $result->{error} );
 
     return undef;
 
@@ -350,6 +353,7 @@ HUEBridge_Set($@)
     };
 
     my $result = HUEBridge_Call($hash, undef, 'groups', $obj, 'POST');
+    return $result->{error}{description} if( $result->{error} );
 
     if( $result->{success} ) {
       HUEBridge_Autocreate($hash);
@@ -358,7 +362,6 @@ HUEBridge_Set($@)
       return "created $modules{HUEDevice}{defptr}{$code}->{NAME}" if( defined($modules{HUEDevice}{defptr}{$code}) );
     }
 
-    return $result->{error}{description} if( $result->{error} );
     return undef;
 
   } elsif($cmd eq 'deletegroup') {
@@ -395,16 +398,18 @@ HUEBridge_Set($@)
       #FIXME: currently not supported. LightScene needs scene id.
       $obj->{recycle} = JSON::true if( $arg );
       $result = HUEBridge_Call($hash, undef, "scenes", $obj, 'POST');
+
     } else {
       $result = HUEBridge_Call($hash, undef, "scenes/$arg", $obj, 'PUT');
+
     }
+    return $result->{error}{description} if( $result->{error} );
 
     if( $result->{success} ) {
       return "created $result->{success}{id}" if( $result->{success}{id} );
       return "created $arg";
     }
 
-    return $result->{error}{description} if( $result->{error} );
     return undef;
 
   } elsif($cmd eq 'modifyscene') {
@@ -464,10 +469,10 @@ HUEBridge_Set($@)
     my $obj = { 'touchlink' => JSON::true };
 
     my $result = HUEBridge_Call($hash, undef, 'config', $obj, 'PUT');
+    return $result->{error}{description} if( $result->{error} );
 
     return undef if( $result->{success} );
 
-    return $result->{error}{description} if( $result->{error} );
     return undef;
 
 
@@ -484,12 +489,16 @@ HUEBridge_Get($@)
   my ($hash, $name, $cmd, @args) = @_;
   my ($arg, @params) = @args;
 
+  return "$name: not paired" if( $hash->{STATE} =~ m/^link/  );
+  return "$name: not connected" if( $hash->{STATE} ne 'Connected'  );
   return "$name: get needs at least one parameter" if( !defined($cmd) );
 
   # usage check
   if($cmd eq 'devices'
      || $cmd eq 'lights') {
     my $result =  HUEBridge_Call($hash, undef, 'lights', undef);
+    return $result->{error}{description} if( $result->{error} );
+Log 1, Dumper $result;
     my $ret = "";
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-". $key;
@@ -502,6 +511,7 @@ HUEBridge_Get($@)
 
   } elsif($cmd eq 'groups') {
     my $result =  HUEBridge_Call($hash, undef, 'groups', undef);
+    return $result->{error}{description} if( $result->{error} );
     $result->{0} = { name => 'Lightset 0', type => 'LightGroup', lights => ["ALL"] };
     my $ret = "";
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
@@ -517,6 +527,7 @@ HUEBridge_Get($@)
 
   } elsif($cmd eq 'scenes') {
     my $result =  HUEBridge_Call($hash, undef, 'scenes', undef);
+    return $result->{error}{description} if( $result->{error} );
     my $ret = "";
     foreach my $key ( sort {$a cmp $b} keys %{$result} ) {
       $ret .= sprintf( "%-20s %-20s", $key, $result->{$key}{name} );
@@ -533,6 +544,7 @@ HUEBridge_Get($@)
 
   } elsif($cmd eq 'sensors') {
     my $result =  HUEBridge_Call($hash, undef, 'sensors', undef);
+    return $result->{error}{description} if( $result->{error} );
     my $ret = "";
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-S". $key;
@@ -545,6 +557,7 @@ HUEBridge_Get($@)
 
   } elsif($cmd eq 'whitelist') {
     my $result =  HUEBridge_Call($hash, undef, 'config', undef);
+    return $result->{error}{description} if( $result->{error} );
     my $ret = "";
     my $whitelist = $result->{whitelist};
     foreach my $key ( sort {$whitelist->{$a}{'last use date'} cmp $whitelist->{$b}{'last use date'}} keys %{$whitelist} ) {
