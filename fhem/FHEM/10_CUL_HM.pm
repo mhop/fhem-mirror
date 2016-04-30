@@ -3349,9 +3349,10 @@ sub CUL_HM_parseSDteam_2(@){#handle SD team events
       }
     }
     elsif($sVal == 150){#alarm teamcall
-      foreach (@tHash){
-        push @evtEt,[$_,1,"teamCall:from $dName:$No"];
-      }
+      push @evtEt,[$_,1,"teamCall:from $dName:$No"] foreach (@tHash);
+    }
+    elsif($sVal == 151){#alarm teamcall repeat
+      push @evtEt,[$dHash,1,"MsgRepeated $No"];#unclear. first repeater send 97 instead of 96. What about 2nd ans third repeater?
     }
     push @evtEt,[$dHash,1,"battery:"   .((hex($chn)&0x80) ? "low":"ok")];
     push @evtEt,[$sHash,1,"eventNo:".$No];
@@ -7275,7 +7276,10 @@ sub CUL_HM_updtRegDisp($$$) {
   elsif ($st eq "repeater"){
     CUL_HM_repReadings($hash) if ($list == 2);
   }
-#  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
+  elsif ($md eq "HM-SEC-SD-2"){
+    CUL_HM_SD_2($hash) if ($list == 0);
+  }
+  #  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
 }
 sub CUL_HM_rmOldRegs($){ # remove register i outdated
   #will remove register for deleted peers
@@ -7578,6 +7582,20 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 
   return $setting;
+}
+sub CUL_HM_SD_2($)           {# parse SD2
+  my ($hash)=@_;
+  my $rep = CUL_HM_getRegFromStore($hash->{NAME},"devRepeatCntMax",0,"","");
+  if ($rep eq "1"){
+    CUL_HM_UpdtReadBulk($hash,1,"sdRepeat:on");
+    $hash->{sdRepeat} = "on";
+  }
+  elsif($rep eq "0"){
+    CUL_HM_UpdtReadBulk($hash,1,"sdRepeat:off");
+  }
+  else{
+    CUL_HM_UpdtReadBulk($hash,1,"sdRepeat:$rep");
+  }
 }
 sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
   my ($hash,$md,@list)=@_;
