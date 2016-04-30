@@ -1111,13 +1111,17 @@ HUEDevice_Parse($$)
       $s = 'on';
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
 
-      if( $bri >= 0 && AttrVal($name, 'subType', 'dimmer') ne 'switch' ) {
+      if( $bri < 0 || AttrVal($name, 'subType', 'dimmer') eq 'switch' ) {
+          $percent = 100;
+
+      } else {
         $percent = int($bri * 99 / 254 + 1);
         if( $percent > 0
             && $percent < 100  ) {
           $s = $dim_values{int($percent/7)};
         }
         $s = 'off' if( $percent == 0 );
+
       }
     }
   else
@@ -1128,7 +1132,7 @@ HUEDevice_Parse($$)
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
-  if( $percent != -1 && $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
+  if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
   #if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
 
   $s = 'unreachable' if( !$reachable );
