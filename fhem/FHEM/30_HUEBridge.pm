@@ -281,7 +281,7 @@ HUEBridge_Set($@)
   my ($arg, @params) = @args;
 
   return "$name: not paired" if( $hash->{STATE} =~ m/^link/  );
-  return "$name: not connected" if( $hash->{STATE} ne 'Connected'  );
+  #return "$name: not connected" if( $hash->{STATE} ne 'Connected'  );
 
   # usage check
   if($cmd eq 'statusRequest') {
@@ -490,7 +490,7 @@ HUEBridge_Get($@)
   my ($arg, @params) = @args;
 
   return "$name: not paired" if( $hash->{STATE} =~ m/^link/  );
-  return "$name: not connected" if( $hash->{STATE} ne 'Connected'  );
+  #return "$name: not connected" if( $hash->{STATE} ne 'Connected'  );
   return "$name: get needs at least one parameter" if( !defined($cmd) );
 
   # usage check
@@ -498,7 +498,6 @@ HUEBridge_Get($@)
      || $cmd eq 'lights') {
     my $result =  HUEBridge_Call($hash, undef, 'lights', undef);
     return $result->{error}{description} if( $result->{error} );
-Log 1, Dumper $result;
     my $ret = "";
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       my $code = $name ."-". $key;
