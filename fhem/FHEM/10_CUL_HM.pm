@@ -2437,20 +2437,32 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{cHash},1,"level:"  .hex($state)];
       $state = (($state < 2)?"off":"smoke-Alarm");
       push @evtEt,[$mh{cHash},1,"state:$state"];
-      if($mh{devH}->{helper}{PONtest} &&(length($mh{p}) == 8 && $mh{mNo} eq "00")){
-        push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
-        $mh{devH}->{helper}{PONtest} = 0;
-      }
       if ($mh{md} eq "HM-SEC-SD-2"){
         push @evtEt,[$mh{cHash},1,"alarmTest:"   .(($err&0x02)?"failed"  :"ok")];
         push @evtEt,[$mh{cHash},1,"smokeChamber:".(($err&0x04)?"degraded":"ok")];
+        if(length($mh{p}) == 8 && $mh{mNo} eq "80"){
+          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+        }
+      }
+      else{
+        if($mh{devH}->{helper}{PONtest} &&(length($mh{p}) == 8 && $mh{mNo} eq "00")){
+          push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+          $mh{devH}->{helper}{PONtest} = 0;
+        }
       }
       my $tName = ReadingsVal($mh{cName},"peerList","");#inform team
       $tName =~ s/,.*//;
       CUL_HM_updtSDTeam($tName,$mh{cName},$state);
     }
     elsif ($mh{mTp} =~ m /^4[01]/){ #autonomous event
-      CUL_HM_parseSDteam($mh{mTp},$mh{src},$mh{dst},$mh{p});
+      #01 1441 44E347 44E347 0101960000048BAF3B0E
+      #02 1441 44E347 44E347 01020000000445C4A14C
+      if ($mh{md} eq "HM-SEC-SD-2"){
+        CUL_HM_parseSDteam_2($mh{mTp},$mh{src},$mh{dst},$mh{p});
+      }
+      else{
+        CUL_HM_parseSDteam($mh{mTp},$mh{src},$mh{dst},$mh{p});
+      }
     }
     elsif ($mh{mTp} eq "01"){ #Configs
       my $sType = substr($mh{p},0,2);
@@ -2975,7 +2987,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         }
 
         $_ = '00000000' foreach (grep /^000000/,@peers);#correct bad term(6 chars) from rain sens)
-        $_ .= 'xx' foreach (grep /^......$/,@peers);
+        $_ .= '0x' foreach (grep /^......$/,@peers);    #if channel is unknown we assume at least a device
         $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
 
         CUL_HM_ID2PeerList ($chnName,$_,1) foreach (@peers);
@@ -2990,6 +3002,7 @@ sub CUL_HM_parseCommon(@){#####################################################
               next if (!$l);
               my $listNo = "0".$l;
               foreach my $peer (grep (!/00000000/,@peerID)){
+                next if ($peer =~ m/0x$/);
                 $peer .="01" if (length($peer) == 6); # add the default
                 if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
                   CUL_HM_PushCmdStack($mhp->{devH},sprintf("++%s01%s%s%s04%s%s",
@@ -3060,9 +3073,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_respPendRm($mhp->{devH});
           delete $mhp->{cHash}{helper}{shadowReg}{$regLNp};   #rm shadow
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
-          CUL_HM_updtRegDisp($mhp->{cHash},$list,
-                CUL_HM_peerChId($peer,
-                        substr($mhp->{cHash}{DEF},0,6)));
+          CUL_HM_updtRegDisp($mhp->{cHash},$list,$peer);
           $ret = "done";
         }
         else{
@@ -3167,7 +3178,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         next if (!$pName || !$defs{$pName});
         push @evtEt,[$defs{$pName},1,"trig_$mhp->{cName}:$level"];
         push @evtEt,[$defs{$pName},1,"trigLast:$mhp->{cName}".(($level ne "-")?":$level":"")];
-        
+
         CUL_HM_stateUpdatDly($pName,10) if ($mhp->{mTp} eq "40");#conditional request may not deliver state-req
       }
     }
@@ -3278,6 +3289,72 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
       push @evtEt,[$tHash,1,"state:$sProsa"];
       push @evtEt,[$tHash,1,"smoke_detect:$smokeSrc"];
     }
+  }
+  return @entities;
+}
+sub CUL_HM_parseSDteam_2(@){#handle SD team events
+  my ($mTp,$sId,$dId,$p) = @_;
+  
+  my @entities;
+  my $dHash = CUL_HM_id2Hash($dId);
+  my $dName = CUL_HM_id2Name($dId);
+  my $sHash = CUL_HM_id2Hash($sId);
+  my $sName = CUL_HM_hash2Name($sHash);
+  if (AttrVal($sName,"subType","") eq "virtual"){
+    foreach my $cId (CUL_HM_getAssChnIds($sName)){
+      my $cHash = CUL_HM_id2Hash($cId);
+      next if (!$cHash->{sdTeam} || $cHash->{sdTeam} ne "sdLead");
+      my $cName = CUL_HM_id2Name($cId);
+      $sHash = $cHash;
+      $sName = CUL_HM_id2Name($cId);
+      last;
+    }
+  }
+  return () if (!$sHash->{sdTeam} || $sHash->{sdTeam} ne "sdLead");
+
+  if ($mTp eq "41"){ #Alarm detected
+      #01 1441 44E347 44E347 0101960000048BAF3B0E
+      #02 1441 44E347 44E347 01020000000445C4A14C
+    #C8: Smoke Alarm
+    #C7: tone off
+    #01: no alarm
+    my ($chn,$No,$state,$null,$aesKNo,$aesStr) = unpack 'A2A2A2A4A2A8',$p;
+    if(($dHash) && # update source(ID reported in $dst)
+       (!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No)){
+      $dHash->{helper}{alarmNo} = $No;
+    }
+    else{
+      return ();# duplicate alarm
+    }
+    my ($sVal,$sProsa,$smokeSrc) = (hex($state),"off","none");
+    my @tHash = ((map{CUL_HM_id2Hash($_)} grep !/00000000/, split ",",$attr{$sName}{peerIDs})
+                 ,$sHash);
+
+    if ($sVal > 179 ||$sVal <51 ){# need to raise alarm
+      if ($sVal > 179){# need to raise alarm
+        #"SHORT_COND_VALUE_LO" value="50"/>
+	    #"SHORT_COND_VALUE_HI" value="180"/>
+        $sProsa = "smoke-Alarm_".$No;
+        $smokeSrc = $dName;
+        push @evtEt,[$sHash,1,"recentAlarm:$smokeSrc"] if($sVal == 200);
+      }
+      elsif($sVal <51){#alarm inactive
+        #$sProsa = "off_".$No;
+        $smokeSrc = $dName;
+      }
+      push @evtEt,[$sHash,1,'level:'.$sVal];
+      foreach (@tHash){
+        push @evtEt,[$_,1,"state:$sProsa"];
+        push @evtEt,[$_,1,"smoke_detect:$smokeSrc"];
+      }
+    }
+    elsif($sVal == 150){#alarm teamcall
+      foreach (@tHash){
+        push @evtEt,[$_,1,"teamCall:from $dName:$No"];
+      }
+    }
+    push @evtEt,[$dHash,1,"battery:"   .((hex($chn)&0x80) ? "low":"ok")];
+    push @evtEt,[$sHash,1,"eventNo:".$No];
   }
   return @entities;
 }
@@ -4128,6 +4205,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "Peer not specified" if ($peerChnIn eq "");
       $peerId  = CUL_HM_peerChId($peerChnIn,$dst);
       ($peerId,$peerChn) = unpack 'A6A2',$peerId.'01';
+      if ($list == 4 && 
+          AttrVal($name,"peerIDs",undef)){##########################
+          $peerChn = "00";
+      }
       return "Peer not valid" if (length ($peerId) < 6);
     }
     elsif($list == 0){
@@ -4143,10 +4224,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $rName =~ s/_chn-\d\d$//;
       my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
       if ($curVal !~ m/^(set_|)(\d+)$/){
-	return "peer required for $regName" if ($curVal =~ m/peer/);
-	return "cannot calculate value. Please issue set $name getConfig first - $curVal";
+	    return "peer required for $regName" if ($curVal =~ m/peer/);
+        return "cannot calculate value. Please issue set $name getConfig first - $curVal"
+              if ($curVal !~ m/^(set_|)(\d+)$/);
       }
-                 ;
       $curVal = $2; # we expect one byte in int, strap 'set_' possibly
       $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
       $addrData.=sprintf("%02X%02X",$addr,$data);
@@ -4156,8 +4237,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $addrData.=sprintf("%02X",$addr+$cnt).substr($dataStr,$cnt*2,2);
       }
     }
-
-#    $lChn = "00" if($list == 7 && (!$peerChnIn ||$peerChnIn eq ""));#face to send
 
     my $cHash = CUL_HM_id2Hash($dst.($lChn eq '00'?"":$lChn));
     $cHash = $hash if (!$cHash);
@@ -4999,12 +5078,27 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "teamCall") { #################################################
     $state = "";
-    my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
-    $hash->{TESTNR} = $testnr;
-    my $tstNo = sprintf("%02X",$testnr);
-    my $msg = "++9440".$dst.$dst."00".$tstNo;
-    CUL_HM_PushCmdStack($hash, $msg);
-    CUL_HM_parseSDteam("40",$dst,$dst,"00".$tstNo);
+    if ($md eq "HM-CC-SCD"){
+      my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
+      $hash->{TESTNR} = $testnr;
+      my $tstNo = sprintf("%02X",$testnr);
+      my $msg = "++9440".$dst.$dst."00".$tstNo;
+      CUL_HM_PushCmdStack($hash, $msg);
+      CUL_HM_parseSDteam("40",$dst,$dst,"00".$tstNo);
+    }
+    elsif ("HM-SEC-SD-2"){
+      #1441 44E347 44E347 0102 960000 039190BDC8
+      my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
+      $hash->{TESTNR} = $testnr;
+      my $tstNo = sprintf("%02X",$testnr);
+      my $msg = "++1441".$dst.$dst."01".$tstNo."960000039190BDC8"; # 96 switch on - other numbers are unknown
+                                            # should be AES....
+      CUL_HM_PushCmdStack($hash, $msg);
+      CUL_HM_PushCmdStack($hash, $msg);
+      CUL_HM_PushCmdStack($hash, $msg);
+      CUL_HM_PushCmdStack($hash, $msg);
+    }
+    
   }
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
     $state = "";
@@ -5522,6 +5616,20 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($devHash->{cmdStack}                  &&
         $devHash->{helper}{prt}{sProc} != 1    # not processing
         ){
+#    if($rxType & 0x02){# prepare tripple burst devices
+#      #General we test here
+#      my ($mn,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
+#      Log 1,"General burst $name:".${$devHash->{cmdStack}}[0];
+#      if($mn eq "++") {
+#        $mn = ($devHash->{helper}{HM_CMDNR} + 1) & 0xff;
+#        $devHash->{helper}{HM_CMDNR} = $mn;
+#      }
+#      $devHash->{cmdStack}[0] = sprintf("%02X%02X%s",$mn,(hex($tp)|0x10),$tail);
+#      CUL_HM_SndCmd($devHash,"$devHash->{cmdStack}[0]");
+#      select(undef, undef, undef, 0.3);
+#      CUL_HM_SndCmd($devHash,"$devHash->{cmdStack}[0]");
+#      CUL_HM_ProcessCmdStack($devHash);
+#    }
     if($rxType & 0x02){# handle burst Access devices - add burst Bit
       if($st eq "thermostat"){ # others do not support B112
         CUL_HM_SndCmd($devHash,"++B112$id$dst");
@@ -5761,7 +5869,6 @@ sub CUL_HM_getConfig($){
   }
 }
 
-
 sub CUL_HM_calcDisWmSet($){
   my $dh = shift; 
   my ($txt,$col,$icon) = eval $dh->{exe};
@@ -5890,11 +5997,14 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     next if (!$change);#no changes
     $change =~ s/00:00//;
     $change =~ s/(\ |:)//g;
-    my $peerN;
+    my $pN;
     $changed = 1;# yes, we did
-    ($list,$peerN) = ($1,$2) if($nrn =~ m/RegL_(..)\.(.*)/);
-    if ($peerN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($peerN,$hash));}
+    ($list,$pN) = ($1,$2) if($nrn =~ m/RegL_(..)\.(.*)/);
+    if ($pN){($peerAddr,$peerChn) = unpack('A6A2', CUL_HM_name2Id($pN,$hash));}
     else       {($peerAddr,$peerChn) = ('000000','00');}
+
+    if (AttrVal($chnhash->{NAME},"peerIDs",0) =~ m/${peerAddr}00/){$peerChn = "00"}# if device we are not sure about device or channel. Check peers
+
     CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
     ############partition
 #   my @chSplit = unpack('(A28)*',$change);
@@ -6590,7 +6700,7 @@ sub CUL_HM_ID2PeerList ($$$) {
   my $peerIDs = AttrVal($name,"peerIDs","");
   return if (!$peerID && !$peerIDs);
   my $hash = $defs{$name};
-  $peerIDs =~ s/$peerID//g;         #avoid duplicate, support unset
+  $peerIDs =~ s/$peerID//g;          #avoid duplicate, support unset
   $peerID =~ s/^000000../00000000/;  #correct end detector
   $peerIDs.= $peerID."," if($set);
   my %tmpHash = map { $_ => 1 } split(",",$peerIDs);#remove duplicates
@@ -6598,7 +6708,7 @@ sub CUL_HM_ID2PeerList ($$$) {
   my $peerNames = "";                               #prepare names
   my $dId = substr(CUL_HM_name2Id($name),0,6);      #get own device ID
   foreach my $pId (sort(keys %tmpHash)){
-    next if ($pId !~ m/^[0-9A-F]{8}$/);             #ignore non-channel IDs
+    next if ($pId !~ m/^[0-9A-Fx]{8}$/);             #ignore non-channel IDs
     $peerIDs .= $pId.",";                           #append ID
     next if ($pId eq "00000000");                   # and end detection
     $peerNames .= CUL_HM_peerChName($pId,$dId).",";
@@ -6610,6 +6720,7 @@ sub CUL_HM_ID2PeerList ($$$) {
   my $md = AttrVal($dHash->{NAME},"model","");
   my $chn = InternalVal($name,"chanNo","");
   if ($peerNames){
+    $peerNames =~ s/_chn-01//g; # channel 01 is part of device
     $peerNames =~ s/_chn-01//g; # channel 01 is part of device
     CUL_HM_UpdtReadSingle($hash,"peerList",$peerNames,0);
     $hash->{peerList} = $peerNames;
@@ -6699,6 +6810,7 @@ sub CUL_HM_peerChName($$) {#in:<IDorName> <deviceID>, out:name
   my($pDev,$pChn) = unpack'A6A2',$pId;
   return 'self'.$pChn if ($pDev eq $dId);
   return 'fhem'.$pChn if ($pDev eq $iId && !defined $modules{CUL_HM}{defptr}{$pDev});
+  $pId = $pDev if($pChn =~ m/0[0x]/); # both means device directly. This may be used by remotes and pusdbuttons
   return CUL_HM_id2Name($pId);
 }
 sub CUL_HM_getMId($) {#in: hash(chn or dev) out:model key (key for %culHmModel)
@@ -6866,13 +6978,13 @@ sub CUL_HM_id2Name($) { #in: name or HMid out: name
   $p = "" if (!defined $p);
   return $p                               if($defs{$p}||$p =~ m/_chn-\d\d$/
                                              || $p !~ m/^[A-F0-9]{6,8}$/i);
-  my $devId= substr($p, 0, 6);
+  my ($devId,$chn) = unpack 'A6A2',$p;
   return "broadcast"                      if($devId eq "000000");
 
   my $defPtr = $modules{CUL_HM}{defptr};
-  if (length($p) == 8){
+  if (length($p) == 8 && $chn ne "00"){
     return $defPtr->{$p}{NAME}            if(defined $defPtr->{$p});#channel
-    return $defPtr->{$devId}{NAME}."_chn-".substr($p,6,2)
+    return $defPtr->{$devId}{NAME}."_chn-$chn"
                                           if($defPtr->{$devId});#dev, add chn
     return $p;                               #not defined, return ID only
   }
@@ -7131,7 +7243,6 @@ sub CUL_HM_updtRegDisp($$$) {
   my $regLN = ($hash->{helper}{expert}{raw}?"":".")
               .sprintf("RegL_%02X.",$listNo)
               .($peerId?CUL_HM_peerChName($peerId,$devId):"");
-              
   if (($md eq "HM-MOD-Re-8") && $listNo == 0){#handle Fw bug 
     CUL_HM_ModRe8($hash,$regLN);
   }
@@ -7531,7 +7642,7 @@ sub CUL_HM_TCITRTtempReadings($$@) {# parse RT - TC-IT temperature readings
           push @time,$h;
         }
         for (my $idx = 0;$idx<13;$idx++){
-          my $entry = sprintf(" %s %3.01f",$time[$idx],$temp[$idx]);
+          my $entry = sprintf(" %s %04.01f",$time[$idx],$temp[$idx]);
             $setting .= "Temp set $idxN{$lst}: ${day}_".$days[$day].$entry." C\n";
             $dayRead .= $entry;
           last if ($time[$idx] eq "24:00");
