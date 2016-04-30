@@ -254,7 +254,7 @@ sub HMinfo_status($){##########################################################
       foreach (keys %{$ehash->{helper}{rssi}}){
         next if($_ !~ m /at_.*$ehash->{IODev}->{NAME}/ );#ignore unused IODev
         $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
-          if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
+          if ($rssiMin{$eName} < $ehash->{helper}{rssi}{$_}{min});
       }
     }
   }
@@ -478,18 +478,29 @@ sub HMinfo_peerCheck(@) { #####################################################
         if (!$modules{CUL_HM}{defptr}{$pId} && 
             (!$pDid || !$modules{CUL_HM}{defptr}{$pDid})){
           next if($pDid && CUL_HM_id2IoId($id) eq $pDid);
-          push @peerIDnotDef,$eName." id:".$pId;
+          push @peerIDnotDef,"$eName id:$pId";
           next;
         }
         my $pName = CUL_HM_id2Name($pId);
-        $pName =~s/_chn-01//;           #chan 01 could be covered by device
+        $pName =~s/_chn-0[10]//;           #chan 01 could be covered by device
         my $pPlist = AttrVal($pName,"peerIDs","");
         my $pDName = CUL_HM_id2Name($pDid);
         my $pSt = AttrVal($pDName,"subType","");
         my $pMd = AttrVal($pDName,"model","");
-        
-        push @peerIDsNoPeer,$eName." p:".$pName 
-              if ((!$pPlist || $pPlist !~ m/$id/) && $pSt ne "smokeDetector");
+        my $idc = $id;
+        if($st =~ m/(pushButton|remote)/){ # type of primary device
+          $idc = $devId;
+          if($pChn eq "00"){
+            foreach (CUL_HM_getAssChnNames($pDName)){
+              $pPlist .= AttrVal($_,"peerIDs","");
+            }
+          }
+        }
+        push @peerIDsNoPeer,"$eName p:$pName"
+              if (  (!$pPlist || $pPlist !~ m/$idc/) 
+                  && $pSt ne "smokeDetector"
+                  && $pChn eq "00"
+                  );
         if ($pSt eq "virtual"){
           if (AttrVal($devN,"aesCommReq",0) != 0){
             push @peerIDsAES,$eName." p:".$pName     
@@ -576,8 +587,8 @@ sub HMinfo_burstCheck(@) { ####################################################
       
       next if (!($prxt & 0x82)); # not a burst peer
       my $pnb = ReadingsVal($eName,"R-$pn-peerNeedsBurst",ReadingsVal($eName,".R-$pn-peerNeedsBurst",undef));
-      if (!$pnb)           {push @needBurstMiss, $eName;}
-      elsif($pnb !~ m /on/){push @needBurstFail, $eName;}
+      if (!$pnb)           {push @needBurstMiss, "$eName:$pn";}
+      elsif($pnb !~ m /on/){push @needBurstFail, "$eName:$pn";}
 
       if ($prxt & 0x80){# conditional burst - is it on?
         my $pDevN = CUL_HM_getDeviceName($pn);
@@ -2427,7 +2438,7 @@ sub HMinfo_templateWriteDef($){################################################
     foreach (keys%{$HMConfig::culHmTpl{$tpl}{reg}}){
       push @reg,$_.":".$HMConfig::culHmTpl{$tpl}{reg}{$_};
     }
-    push @tmpl,sprintf("templateDef =>%s=>%s=>%s=>%s"
+    push @tmpl,sprintf("templateDef =>%s=>%s=>\"%s\"=>%s"
                            ,$tpl
                            ,($HMConfig::culHmTpl{$tpl}{p}?join(":",split(" ",$HMConfig::culHmTpl{$tpl}{p})):"0")
                            ,$HMConfig::culHmTpl{$tpl}{t}

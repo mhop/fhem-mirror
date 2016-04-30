@@ -209,7 +209,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"008A" => {name=>"Schueco_263-133"         ,alias=>"HM-LC-Dim1TPBU-FM"}                                                            # 1 channel dimmer TPBU (flush mount)
  ,"008B" => {name=>"Schueco_263-130"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled switch actuator 1-channel (flush-mount)
  ,"008C" => {name=>"Schueco_263-131"         ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}  # radio-controlled switch actuator 1-channel (flush-mount)
- ,"008D" => {name=>"Schueco_263-135"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,3'          ,chn=>"",}  # HM Push Button 2
+ ,"008D" => {name=>"Schueco_263-135"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}  # HM Push Button 2
  ,"008E" => {name=>"Schueco_263-155"         ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}  # HM Remote Display 4 buttons
  ,"008F" => {name=>"Schueco_263-145"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"",}  # HM Push Button Interface
  ,"0090" => {name=>"Schueco_263-162"         ,st=>'motionDetector'    ,cyc=>'00:30' ,rxt=>'c:w:l'  ,lst=>'1,3'          ,chn=>"",}  # HM radio-controlled motion detector
@@ -507,7 +507,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   paramSel        =>{a=> 27.0,s=>1.0,l=>0,min=>0    ,max=>4     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"data transfered to peer"              ,lit=>{off=>0,T1=>1,T2=>2,T1_T2=>3,T2_T1=>4}},
   RS485IdleTime   =>{a=> 29.0,s=>1.0,l=>0,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Idle Time"},
   speedMultiply   =>{a=> 30.0,s=>1.0,l=>0,min=>1    ,max=>5     ,c=>''         ,f=>''      ,u=>'x200Hz',d=>0,t=>"speed multiply"},
-  devRepeatCntMax =>{a=> 31.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Device max retry"},
+  devRepeatCntMax =>{a=> 31.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"act as repeater"},
   wakeupDefChan   =>{a=> 32.0,s=>1.0,l=>0,min=>0    ,max=>20    ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"wakeup default channel"},
   wakeupBehavior  =>{a=> 33.0,s=>0.1,l=>0,min=>0    ,max=>20    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior"                      ,lit=>{off=>0,on=>1}},
   alarmTimeMax    =>{a=> 34.0,s=>1.0,l=>0,min=>1    ,max=>900   ,c=>''         ,f=>1.6     ,u=>'s'   ,d=>0,t=>"maximum Alarm time"                   ,lit=>{unused=>0}},
@@ -644,9 +644,9 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
 
   evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5  ,max=>7.5   ,c=>''         ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1    ,max=>15    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read each n-th puls"},
-  minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0    ,max=>4     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"              ,lit=>{15=>0,30=>1,60=>2,120=>3,240=>4}},
-  captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"              ,lit=>{off=>0,on=>1}},
-  brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0    ,max=>7     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter - ignore light at night"},
+  minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0    ,max=>4     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"interval in sec"                                         ,lit=>{15=>0,30=>1,60=>2,120=>3,240=>4}},
+  captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture motion in interval, send result in next trigger" ,lit=>{off=>0,on=>1}},
+  brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0    ,max=>7     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"7: filter fast changes to 0: no filter of light changes"},
   eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0    ,max=>7620  ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>1,t=>"filters short events, causes reporting delay"},
   ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0    ,max=>1.275 ,c=>''         ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
   eventFilterTime =>{a=> 35  ,s=>1  ,l=>1,min=>0    ,max=>7620  ,c=>'fltCvT60' ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
@@ -1652,6 +1652,7 @@ $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
                                            }
                      ,"HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[on|off]"}
                      ,"HM-SEC-SD"        =>{ statusRequest  =>""}
+                     ,"HM-SEC-SD-2"      =>{ statusRequest  =>""}
                      ,"ActionDetector"   =>{ clear          => "[readings|all]"
                                             ,update         => ""
                                            }
