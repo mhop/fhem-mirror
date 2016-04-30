@@ -23,7 +23,7 @@ CUL_EM_Initialize($)
   $hash->{ParseFn}   = "CUL_EM_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 " .
                         "model:EMEM,EMWZ,EMGZ ignore:0,1 ".
-                        "maxPeak ".
+                        "maxPeak CounterOffset ".
                         $readingFnAttributes;
   $hash->{AutoCreate}=
         { "CUL_EM.*" => { GPLOT => "power8:Power,", FILTER => "%NAME:CNT.*" } };
@@ -98,7 +98,7 @@ CUL_EM_Parse($$)
   # basis_cnt=  correction to total (cumulated) value in ticks to account for
   #             counter wraparounds
   # total    =  total (cumulated) value in device units
-  # current  =  current value (average over latest 5 minutes) in device units
+  # current_cnt  =  current value (average over latest 5 minutes) in device units
   # peak     =  maximum value in device units
 
   my $seqno = hex($a[5].$a[6]);
@@ -177,8 +177,9 @@ CUL_EM_Parse($$)
       $basis_cnt += ($total_cnt_last > 65000 ? 65536 : $total_cnt_last);
       $readings{basis} = $basis_cnt;
     }
+    my $counter_offset = AttrVal($n,"CounterOffset",0);
 
-    my $total    = ($basis_cnt+$total_cnt)*$corr2;
+    my $total    = (($basis_cnt+$total_cnt)*$corr2)+$counter_offset;
     my $current  = $current_cnt*$corr1;
 
     $val = sprintf("CNT: %d CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
@@ -350,7 +351,18 @@ CUL_EM_Parse($$)
       For example if it's not possible to consume more than 40kW of
       power set maxPeak to 40 to make the readings of the power meter
       more robust.
+    </li><br>
+
+    <li><a name="CounterOffset">CounterOffset</a><br>
+      Specifies the difference between true (gas) meter value and 
+      value reported by the EMGZ.<br>
+      CounterOffset = true Value - Reading "total"<br>
+      Example:
+      <ul>
+        <code>attr Gaszaehler CounterOffset 15427.434</code><br>
+      </ul>
     </li>
+
   </ul>
   <br>
 </ul>
@@ -372,16 +384,19 @@ CUL_EM_Parse($$)
     <code>define &lt;name&gt; CUL_EM &lt;code&gt; [corr1 corr2
                 CostPerUnit BasicFeePerMonth]</code> <br>
     <br>
-    &lt;code&gt; ist der Code, der am EM Ger&auml;t eingestellt wird. G&uuml;tige Werte sind
-    1 bis 12. 1-4 gilt f&uuml;r EMWZ, 5-8 f&uuml;r EMEM und 9-12 f&uuml;r EMGZ Ger&auml;te.<br><br>
+    &lt;code&gt; ist der Code, der am EM Ger&auml;t eingestellt wird.
+    G&uuml;tige Werte sind 1 bis 12. 1-4 gilt f&uuml;r EMWZ, 5-8 f&uuml;r EMEM
+    und 9-12 f&uuml;r EMGZ Ger&auml;te.<br><br>
 
-    <b>corr1</b> ist der Kalibrierfaktor f&uuml;r den Momentanverbrauch, <b>corr2</b>
-    f&uuml;r den Gesamtverbrauch.
+    <b>corr1</b> ist der Kalibrierfaktor f&uuml;r den Momentanverbrauch,
+    <b>corr2</b> f&uuml;r den Gesamtverbrauch.
+
     <ul>
       <li>f&uuml;r EMWZ Ger&auml;te wird die Umdrehungsgeschwindigkeit (U/kW)
           des verwendeten Stromz&auml;hlers (z.B. 150) f&uuml;r corr1 und 12 mal 
           diesen Wert f&uuml;r corr2 verwendet</li>
-      <li>f&uuml;r EMEM devices ist corr1 mit 0.01 und corr2 mit 0.001 anzugeben</li>
+      <li>f&uuml;r EMEM devices ist corr1 mit 0.01 und corr2 mit 0.001
+      anzugeben</li>
     </ul>
     <br>
 
@@ -399,12 +414,12 @@ CUL_EM_Parse($$)
     CUM_MONTH: 212.319 CUM: 60123.4 COST: 44.34<br>
     </code></ul>
 
-    Tipp: Das EMWZ Ger&auml;t kann so konfiguriert werden, dass es in der CUM Spalte
-    des STATE Wertes den aktuellen Wert des Stromz&auml;hlers anzeigt. 
-    Hierf&uuml;r muss der aktuell am Stromz&auml;hler abgelesene Wert mit corr1 (U/kW) 
-    multipliziert werden und der CUM Rohwert aus der aktuellen fhem Messung ('reading') 
-    davon abgezogen werden. Dann muss dieser Wert als Basiswert des EMWZ Ger&auml;tes 
-    (im Beispiel emwz) gesetzt werden.<br>
+    Tipp: Das EMWZ Ger&auml;t kann so konfiguriert werden, dass es in der CUM
+    Spalte des STATE Wertes den aktuellen Wert des Stromz&auml;hlers anzeigt.
+    Hierf&uuml;r muss der aktuell am Stromz&auml;hler abgelesene Wert mit corr1
+    (U/kW) multipliziert werden und der CUM Rohwert aus der aktuellen fhem
+    Messung ('reading') davon abgezogen werden. Dann muss dieser Wert als
+    Basiswert des EMWZ Ger&auml;tes (im Beispiel emwz) gesetzt werden.<br>
 
   </ul>
   <br>
@@ -432,7 +447,16 @@ CUL_EM_Parse($$)
       Wenn es z.B. nicht m&ouml;glich ist mehr zu 40kW Leistung 
       zu beziehen setzt man maxPeak auf 40 um das Auslesen des 
       Stromz&auml;hlers robuster zu machen.
-      </li>
+      </li><br>
+      <li><a name="CounterOffset">CounterOffset</a><br>
+      Gibt den Unterschied zwischen dem tats&auml;chlichen Z&auml;hlerstand und
+      dem vom EMGZ gemeldeten Wert an.<br>
+      CounterOffset = tats&auml;chlicher Z&auml;hlerstand - Reading "total"<br>
+   Beispiel:
+    <ul>
+      <code>attr Gaszaehler CounterOffset 15427.434</code><br>
+    </ul>
+    </li>
   </ul>
   <br>
 </ul>
