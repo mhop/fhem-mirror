@@ -80,6 +80,7 @@ my %hueModels = (
  'Surface Light TW' => {name => 'LIGHTIFY Surface light tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'Classic A60 TW'   => {name => 'LIGHTIFY Classic A60 tunable white'   ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'PAR16 50 TW'      => {name => 'LIGHTIFY PAR16 50 tunable white'      ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
+ 'Plug - LIGHTIFY'  => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch',},
 );
 
 my %dim_values = (
@@ -154,7 +155,7 @@ HUEDevice_devStateIcon($)
   $s="on" if( $percent eq "100" );
 
   return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWL001" );
-  return ".*:$s:toggle" if( AttrVal($name, "subtype", "") eq "dimmer" );
+  return ".*:$s:toggle" if( AttrVal($name, "subType", "") eq "dimmer" );
 
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB001" );
   #return ".*:$s:toggle" if( AttrVal($name, "model", "") eq "LWB003" );
@@ -1104,18 +1105,20 @@ HUEDevice_Parse($$)
   if( defined($effect) && $effect ne $hash->{helper}{effect} ) {readingsBulkUpdate($hash,"effect",$effect);}
 
   my $s = '';
-  my $percent;
+  my $percent = -1;
   if( $on )
     {
       $s = 'on';
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",1);}
 
-      $percent = int($bri * 99 / 254 + 1);
-      if( $percent > 0
-          && $percent < 100  ) {
-        $s = $dim_values{int($percent/7)};
+      if( $bri >= 0 && AttrVal($name, 'subType', 'dimmer') ne 'switch' ) {
+        $percent = int($bri * 99 / 254 + 1);
+        if( $percent > 0
+            && $percent < 100  ) {
+          $s = $dim_values{int($percent/7)};
+        }
+        $s = 'off' if( $percent == 0 );
       }
-      $s = 'off' if( $percent == 0 );
     }
   else
     {
@@ -1125,7 +1128,7 @@ HUEDevice_Parse($$)
       if( $on != $hash->{helper}{on} ) {readingsBulkUpdate($hash,"onoff",0);}
     }
 
-  if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
+  if( $percent != -1 && $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"pct", $percent);}
   #if( $percent != $hash->{helper}{percent} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
 
   $s = 'unreachable' if( !$reachable );
