@@ -714,6 +714,7 @@ HUEBridge_Autocreate($;$)
     } else {
       $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
       $cmdret= CommandAttr(undef,"$devname room HUEDevice");
+      $cmdret= CommandAttr(undef,"$devname group HUEGroup");
       $cmdret= CommandAttr(undef,"$devname IODev $name");
 
       $autocreated++;

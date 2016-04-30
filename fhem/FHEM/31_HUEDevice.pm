@@ -134,9 +134,16 @@ HUEDevice_devStateIcon($)
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
 
   return undef if( !$hash );
-  return undef if( $hash->{helper}->{devtype} );
-
   my $name = $hash->{NAME};
+
+  if( $hash->{helper}->{devtype} && $hash->{helper}->{devtype} eq 'G' ) {
+    #return ".*:off:toggle" if( !ReadingsVal($name,'any_on',0) );
+    #return ".*:on:toggle" if( ReadingsVal($name,'any_on',0) );
+
+    return undef;
+  }
+
+  return undef if( $hash->{helper}->{devtype} );
 
   return ".*:light_question" if( !$hash->{helper}{reachable} );
 
@@ -246,6 +253,8 @@ sub HUEDevice_Define($$)
     $hash->{helper}{xy} = '';
     $hash->{helper}{alert} = '';
     $hash->{helper}{effect} = '';
+    $hash->{helper}{all_on} = -1;
+    $hash->{helper}{any_on} = -1;
 
     $hash->{helper}{percent} = -1;
     $hash->{helper}{rgb} = "";
@@ -258,6 +267,11 @@ sub HUEDevice_Define($$)
   } elsif( $hash->{helper}->{devtype} eq 'G' ) {
     $hash->{DEF} = "group $id $args[3]";
     $attr{$name}{delayedUpdate} = 1 if( !defined( $attr{$name}{delayedUpdate} ) );
+
+    $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
+
+    my $icon_path = AttrVal("WEB", "iconPath", "default:fhemSVG:openautomation" );
+    $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
     $hash->{DEF} = "sensor $id $args[3]";
@@ -940,6 +954,19 @@ HUEDevice_Parse($$)
   if( $hash->{helper}->{devtype} eq 'G' ) {
     $hash->{STATE} = 'Initialized';
     $hash->{lights} = join( ",", @{$result->{lights}} ) if( $result->{lights} );
+
+    if( $result->{state} ) {
+      my $all_on = $result->{state}{all_on};
+      my $any_on = $result->{state}{any_on};
+
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate($hash, "all_on", $result->{state}{all_on}) if( defined($all_on) && $all_on != $hash->{helper}{all_on} );
+      readingsBulkUpdate($hash, "any_on", $result->{state}{any_on}) if( defined($any_on) && $any_on != $hash->{helper}{any_on} );
+      readingsEndUpdate($hash,1);
+
+      $hash->{helper}{all_on} = $all_on if( defined($all_on) );
+      $hash->{helper}{any_on} = $any_on if( defined($any_on) );
+    }
 
     if( defined($hash->{helper}->{update}) ) {
       delete $hash->{helper}->{update};
