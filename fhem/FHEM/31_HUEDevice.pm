@@ -1154,9 +1154,11 @@ HUEDevice_Parse($$)
 
   readingsEndUpdate($hash,1);
 
-  my $rgb = CommandGet("","$name rgb");
-  if( $rgb ne $hash->{helper}{rgb} ) { readingsSingleUpdate($hash,"rgb", $rgb,1); };
-  $hash->{helper}{rgb} = $rgb;
+  if( defined($colormode) ) {
+    my $rgb = CommandGet("","$name rgb");
+    if( $rgb ne $hash->{helper}{rgb} ) { readingsSingleUpdate($hash,"rgb", $rgb,1); };
+    $hash->{helper}{rgb} = $rgb;
+  }
 
   $hash->{helper}->{update_timeout} = -1;
   RemoveInternalTimer($hash);
