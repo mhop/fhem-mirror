@@ -2443,6 +2443,7 @@ sub CUL_HM_Parse($$) {#########################################################
         if(length($mh{p}) == 8 && $mh{mNo} eq "80"){
           push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
         }
+        CUL_HM_parseSDteam_2($mh{mTp},$mh{src},$mh{dst},$mh{p});
       }
       else{
         if($mh{devH}->{helper}{PONtest} &&(length($mh{p}) == 8 && $mh{mNo} eq "00")){
@@ -2770,7 +2771,8 @@ sub CUL_HM_parseCommon(@){#####################################################
         $mhp->{devH}{helper}{prt}{awake}=2;#awake
       }
       else{
-        $mhp->{devH}{protCondBurst} = "off" if ($mhp->{devH}{protCondBurst} !~ m/forced/);
+        $mhp->{devH}{protCondBurst} = "off" if (  !$mhp->{devH}{protCondBurst}
+                                                || $mhp->{devH}{protCondBurst} !~ m/forced/);
         $mhp->{devH}{helper}{prt}{awake}=3;#reject
         return "done";
       }
@@ -3312,51 +3314,45 @@ sub CUL_HM_parseSDteam_2(@){#handle SD team events
   }
   return () if (!$sHash->{sdTeam} || $sHash->{sdTeam} ne "sdLead");
 
-  if ($mTp eq "41"){ #Alarm detected
-      #01 1441 44E347 44E347 0101960000048BAF3B0E
-      #02 1441 44E347 44E347 01020000000445C4A14C
-    #C8: Smoke Alarm
-    #C7: tone off
-    #01: no alarm
-    my ($chn,$No,$state,$null,$aesKNo,$aesStr) = unpack 'A2A2A2A4A2A8',$p;
-    if(($dHash) && # update source(ID reported in $dst)
-       (!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No)){
-      $dHash->{helper}{alarmNo} = $No;
-    }
-    else{
-      return ();# duplicate alarm
-    }
-    my ($sVal,$sProsa,$smokeSrc) = (hex($state),"off","none");
-    my @tHash = ((map{CUL_HM_id2Hash($_)} grep !/00000000/, split ",",$attr{$sName}{peerIDs})
-                 ,$sHash);
-
-    if ($sVal > 179 ||$sVal <51 ){# need to raise alarm
-      if ($sVal > 179){# need to raise alarm
-        #"SHORT_COND_VALUE_LO" value="50"/>
-	    #"SHORT_COND_VALUE_HI" value="180"/>
-        $sProsa = "smoke-Alarm_".$No;
-        $smokeSrc = $dName;
-        push @evtEt,[$sHash,1,"recentAlarm:$smokeSrc"] if($sVal == 200);
-      }
-      elsif($sVal <51){#alarm inactive
-        #$sProsa = "off_".$No;
-        $smokeSrc = $dName;
-      }
-      push @evtEt,[$sHash,1,'level:'.$sVal];
-      foreach (@tHash){
-        push @evtEt,[$_,1,"state:$sProsa"];
-        push @evtEt,[$_,1,"smoke_detect:$smokeSrc"];
-      }
-    }
-    elsif($sVal == 150){#alarm teamcall
-      push @evtEt,[$_,1,"teamCall:from $dName:$No"] foreach (@tHash);
-    }
-    elsif($sVal == 151){#alarm teamcall repeat
-      push @evtEt,[$dHash,1,"MsgRepeated $No"];#unclear. first repeater send 97 instead of 96. What about 2nd ans third repeater?
-    }
-    push @evtEt,[$dHash,1,"battery:"   .((hex($chn)&0x80) ? "low":"ok")];
-    push @evtEt,[$sHash,1,"eventNo:".$No];
+  my ($chn,$No,$state,$null,$aesKNo,$aesStr) = unpack 'A2A2A2A4A2A8',$p;
+  if(($dHash) && # update source(ID reported in $dst)
+     (!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No)){
+    $dHash->{helper}{alarmNo} = $No;
   }
+  else{
+    return ();# duplicate alarm
+  }
+  my ($sVal,$sProsa,$smokeSrc) = (hex($state),"off","none");
+  my @tHash = ((map{CUL_HM_id2Hash($_)} grep !/00000000/, split ",",$attr{$sName}{peerIDs})
+               ,$sHash);
+  
+  if ($sVal > 179 ||$sVal <51 ){# need to raise alarm
+    if ($sVal > 179){# need to raise alarm
+      #"SHORT_COND_VALUE_LO" value="50"/>
+	  #"SHORT_COND_VALUE_HI" value="180"/>
+      $sProsa = "smoke-Alarm_".$No;
+      $smokeSrc = $dName;
+      push @evtEt,[$sHash,1,"recentAlarm:$smokeSrc"] if($sVal == 200);
+    }
+    elsif($sVal <51){#alarm inactive
+      #$sProsa = "off_".$No;
+      #$smokeSrc = $dName;
+    }
+    push @evtEt,[$sHash,1,'level:'.$sVal];
+    foreach (@tHash){
+      push @evtEt,[$_,1,"state:$sProsa"];
+      push @evtEt,[$_,1,"smoke_detect:$smokeSrc"];
+    }
+  }
+  elsif($sVal == 150){#alarm teamcall
+    push @evtEt,[$_,1,"teamCall:from $dName:$No"] foreach (@tHash);
+  }
+  elsif($sVal == 151){#alarm teamcall repeat
+    push @evtEt,[$dHash,1,"MsgRepeated $No"];#unclear. first repeater send 97 instead of 96. What about 2nd ans third repeater?
+  }
+  push @evtEt,[$dHash,1,"battery:"   .((hex($chn)&0x80) ? "low":"ok")];
+  push @evtEt,[$sHash,1,"eventNo:".$No];
+  
   return @entities;
 }
 sub CUL_HM_updtSDTeam(@){#in: TeamName, optional caller name and its new state
@@ -4087,7 +4083,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     elsif ($cmd eq "getRegRaw"){
       ($list,$peerID) = ($a[2],$a[3]);
-      return "Enter valid List0-6" if ($list !~ m/^List([0-6])$/);
+      return "Enter valid List0-6" if (!defined $list || $list !~ m/^List([0-6])$/);
       $list ='0'.$1;
     }
     # as of now only hex value allowed check range and convert
@@ -5092,23 +5088,41 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
       my $tstNo = sprintf("%02X",$testnr);
-      my $msg = "++1441".$dst.$dst."01".$tstNo."960000039190BDC8"; # 96 switch on - other numbers are unknown
+      my $msg = "++1441".$dst.$dst."01".$tstNo."9600000"; # 96 switch on - other numbers are unknown
                                             # should be AES....
-      CUL_HM_PushCmdStack($hash, $msg);
-      CUL_HM_PushCmdStack($hash, $msg);
-      CUL_HM_PushCmdStack($hash, $msg);
+    
+      if ($cryptFunc == 1){ #There is a previously executed command
+        my $cipher = Crypt::Rijndael->new("098f6bcd4621d373cade4e832627b4f6", Crypt::Rijndael::MODE_ECB());
+        $msg .= uc(unpack("H*", substr($cipher->encrypt(pack("H32",$msg)),0,4)));
+      }
       CUL_HM_PushCmdStack($hash, $msg);
     }
-    
   }
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
     $state = "";
-    my $p = (($1 eq "On")?"0BC8":"0C01");
-    my $msg = "++9441".$dst.$dst."01".$p;
-    CUL_HM_PushCmdStack($hash, $msg);# repeat non-ack messages 3 times
-    CUL_HM_PushCmdStack($hash, $msg);
-    CUL_HM_PushCmdStack($hash, $msg);
-    CUL_HM_parseSDteam("41",$dst,$dst,"01".$p);
+    
+    if ($md eq "HM-CC-SCD"){
+      my $p = (($1 eq "On")?"0BC8":"0C01");
+      my $msg = "++9441".$dst.$dst."01".$p;
+      CUL_HM_PushCmdStack($hash, $msg);# repeat non-ack messages 3 times
+      CUL_HM_PushCmdStack($hash, $msg);
+      CUL_HM_PushCmdStack($hash, $msg);
+      CUL_HM_parseSDteam("41",$dst,$dst,"01".$p);
+    }
+    elsif ("HM-SEC-SD-2"){
+      my $p = (($1 eq "On")?"C8":"01");
+      my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
+      $hash->{TESTNR} = $testnr;
+      my $tstNo = sprintf("%02X",$testnr);
+      my $msg = "++1441".$dst.$dst."01".$tstNo.$p."C800000"; # 96 switch on - other numbers are unknown
+                                            # should be AES....
+    
+      if ($cryptFunc == 1){ #There is a previously executed command
+        my $cipher = Crypt::Rijndael->new("098f6bcd4621d373cade4e832627b4f6", Crypt::Rijndael::MODE_ECB());
+        $msg .= uc(unpack("H*", substr($cipher->encrypt(pack("H32",$msg)),0,4)));
+      }
+      CUL_HM_PushCmdStack($hash, $msg);
+   }
   }
 
   elsif($cmd eq "virtual") { ##################################################
