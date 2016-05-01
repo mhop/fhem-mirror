@@ -210,10 +210,10 @@ FHEM/52_I2C_PCF8574          klausw               http://forum.fhem.de Sonstige 
 FHEM/52_I2C_SHT21            klausw               http://forum.fhem.de Sonstige Systeme
 FHEM/52_I2C_TSL2561          jensb                http://forum.fhem.de Sonstige Systeme
 FHEM/53_GHoma.pm             klausw               http://forum.fhem.de Sonstige Systeme
-FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
+FHEM/55_GDS.pm               betateilchen         http://forum.fhem.de Wettermodule
 FHEM/55_InfoPanel.pm         betateilchen         http://forum.fhem.de Unterstuetzende Dienste
 FHEM/55_PIFACE.pm            klaus.schauer        http://forum.fhem.de Einplatinencomputer
-FHEM/55_weco.pm              betateilchen         http://forum.fhem.de Unterstuetzende Dienste
+FHEM/55_weco.pm              betateilchen         http://forum.fhem.de Wettermodule
 FHEM/56_POKEYS.pm            axelberner           http://forum.fhem.de Sonstiges
 FHEM/57_Calendar.pm          borisneubert         http://forum.fhem.de Unterstuetzende Dienste/Kalendermodule
 FHEM/57_CALVIEW.pm           chris1284            http://forum.fhem.de Unterstuetzende Dienste/Kalendermodule
@@ -400,10 +400,10 @@ contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
 contrib/55_BBB_BMP180.pm     betateilchen         http://forum.fhem.de Einplatinencomputer
 contrib/71_LISTENLIVE.pm     betateilchen         http://forum.fhem.de Multimedia
 contrib/98_geodata.pm        betateilchen         http://forum.fhem.de Sonstiges
-contrib/98_openweathermap.pm betateilchen         http://forum.fhem.de Unterstuetzende Dienste
+contrib/98_openweathermap.pm betateilchen         http://forum.fhem.de Wettermodule
 contrib/98_PID.pm            betateilchen         http://forum.fhem.de Automatisierung
 contrib/WebViewControl/*     Dirk                 http://forum.fhem.de Mobile Devices
-contrib/GDS/GDSweblink.pm    jensb                http://forum.fhem.de Unterstuetzende Dienste
+contrib/GDS/GDSweblink.pm    jensb                http://forum.fhem.de Wettermodule
 
 www/codemirror/*             rapster              http://forum.fhem.de Frontends
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends/SVG/Plots/logProxy
