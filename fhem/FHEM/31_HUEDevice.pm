@@ -81,6 +81,9 @@ my %hueModels = (
  'Classic A60 TW'   => {name => 'LIGHTIFY Classic A60 tunable white'   ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'PAR16 50 TW'      => {name => 'LIGHTIFY PAR16 50 tunable white'      ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
  'Plug - LIGHTIFY'  => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch',},
+ 'Plug 01'          => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch',},
+
+ 'RM01'             => {name => 'Busch-Jaeger ZigBee Light Link'       ,type => 'On/Off light'            ,subType => 'switch',},
 );
 
 my %dim_values = (
@@ -1042,6 +1045,9 @@ HUEDevice_Parse($$)
 
       } elsif( $hash->{type} eq "Dimmable plug-in unit" ) {
         $attr{$name}{subType} = 'dimmer';
+
+      } elsif( $hash->{type} =~ m'On/Off' ) {
+        $attr{$name}{subType} = 'switch';
 
       }
 
