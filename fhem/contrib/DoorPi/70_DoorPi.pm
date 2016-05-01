@@ -6,7 +6,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2016
 # 
-# Version 0.4 - April 2016
+#  $Id: 70_DoorPi.pm 2016-05 - pahenning $
 #
 ########################################################################################
 #
@@ -37,8 +37,10 @@ use JSON; # imports encode_json, decode_json, to_json and from_json.
 use vars qw{%attr %defs};
 
 sub Log($$);
+#sub DoorPi_GetConfig($);
 
 #-- globals on start
+my $version = 1.0beta1";
 
 #-- these we may get on request
 my %gets = (
@@ -73,7 +75,7 @@ sub DoorPi_Initialize ($) {
                      $readingFnAttributes;
                      
   $hash->{FW_detailFn}  = "DoorPi_makeTable";
-  $hash->{FW_summaryFn} = "DoorPi_makeTable";
+  $hash->{FW_summaryFn} = "DoorPi_makeShort";
   $hash->{FW_atPageEnd} = 1;
 }
 
@@ -306,7 +308,7 @@ sub DoorPi_Set ($@) {
 #
 #######################################################################################
 
-sub DoorPi_GetConfig () {
+sub DoorPi_GetConfig {
   my ($hash,$err,$status) = @_;
   my $name = $hash->{NAME};
   my $url;
@@ -378,7 +380,7 @@ sub DoorPi_GetConfig () {
 #
 #######################################################################################
 
-sub DoorPi_GetHistory () {
+sub DoorPi_GetHistory {
   my ($hash,$err1,$status1,$err2,$status2) = @_;
   my $name = $hash->{NAME};
   my $url;
@@ -512,11 +514,11 @@ sub DoorPi_GetHistory () {
              my $record    = $callrecord; 
              $record =~ s/^.*records\///;
              #-- workaround for buggy DoorPi
-             $record       = sprintf("%d-%02d-%2d_%02d-%02d-%02d.wav", $year,($month+1),$day,$hour, $min, $sec)
+             $record       = sprintf("%d-%02d-%02d_%02d-%02d-%02d.wav", $year,($month+1),$day,$hour, $min, $sec)
                if( $callend eq "ok");
              
              #-- this is the snapshot file if taken at the same time
-             my $snapshot  = sprintf("%d-%02d-%2d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
+             my $snapshot  = sprintf("%d-%02d-%02d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
              #-- check if it is present in the list of snapshots
              my $found = 0;
              for( my $i=0; $i<@history_snapshot; $i++){
@@ -533,7 +535,7 @@ sub DoorPi_GetHistory () {
                  $wday  = ("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa")[$wday];
                 
                  #-- this is the snapshot file if taken at the same time
-                 $snapshot  = sprintf("%d-%02d-%2d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
+                 $snapshot  = sprintf("%d-%02d-%02d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
                  #-- check if it is present in the list of snapshots
                  $found = 0;
                  for( my $i=0; $i<@history_snapshot; $i++){
@@ -594,13 +596,13 @@ sub DoorPi_GetHistory () {
 #
 # DoorPi_Cmd - Write command to DoorPi.
 #              acts as callable program DoorPi_Cmd($hash,$cmd)
-#                     and as callback program  DoorPi_GetHistory($hash,$cmd,$err,$data)
+#              and as callback program  DoorPi_GetHistory($hash,$cmd,$err,$data)
 # 
 # Parameter hash, cmd = command 
 #
 ########################################################################################
 
- sub DoorPi_Cmd () {
+ sub DoorPi_Cmd {
   my ($hash, $cmd, $err, $data) = @_;
   my $name = $hash->{NAME};
  
@@ -645,40 +647,22 @@ sub DoorPi_GetHistory () {
   return undef;
 }
 
-
-
 #######################################################################################
 #
-# DoorPi_maketable 
+# DoorPi_makeShort 
 #   
-# FW_detailFn & FW_summaryFn handler for creating the html output in FHEMWEB
+# FW_summaryFn handler for creating the html output in FHEMWEB
 #
 #######################################################################################
 
-sub DoorPi_makeTable($$$$){
+sub DoorPi_makeShort($$$$){
     my ($FW_wname, $devname, $room, $extPage) = @_;
     my $hash = $defs{$devname};
-    return DoorPi_list2html($hash)
-}
- 
-#######################################################################################
-#
-# DoorPi_list2html creating the call list as html string or json array
-#
-#######################################################################################
-
-sub DoorPi_list2html($;$){
-    my ($hash, $to_json) = @_;
-    return undef if( !$hash );
     
     my $name = $hash->{NAME};
     my $wwwpath = $hash->{HELPER}->{wwwpath};
     my $alias = AttrVal($hash->{NAME}, "alias", $hash->{NAME});
     my ($state,$timestamp,$number,$result,$duration,$snapshot,$record,$nrecord);
-    
-    my $td_style = 'style="padding-left:6px;padding-right:6px;"';
-    my @json_output = ();
-    my $line;
     
     my $old_locale = setlocale(LC_ALL);
     
@@ -688,7 +672,58 @@ sub DoorPi_list2html($;$){
         setlocale(LC_ALL, "en_US.utf8");
     }
     
-    my $ret .= "<table>";
+    my $ret = "";
+    
+    if(AttrVal($name, "no-heading", "0") eq "0" and defined($FW_ME) and defined($FW_subdir))
+    {
+        #$ret .= '<tr><td>';
+        $ret .= '<div class="col1"><a href="'.$FW_ME.$FW_subdir.'?detail='.$name.'">'.$alias.'</a>'.(IsDisabled($name) ? ' (disabled)' : '').'</div>';
+    }
+    
+    
+    if(AttrVal($name, "language", "en") eq "de"){
+        $ret .= "</td><td>".int(@{ $hash->{DATA}})." Einträge";
+    }else{
+        $ret .= "</td><td>".int(@{ $hash->{DATA}})." calls";
+    }
+  
+    $ret .= "</td><td><a href=\"/fhem?cmd.A.Haus.T=set A.Haus.T open\">open</a>";    
+    
+    setlocale(LC_ALL, $old_locale);
+    
+    return ($ret);
+}
+
+#######################################################################################
+#
+# DoorPi_makeTable 
+#  
+# FW_detailFn handler for creating the html output in FHEMWEB
+#
+#######################################################################################
+
+sub DoorPi_makeTable($$$$){
+    my ($FW_wname, $devname, $room, $extPage) = @_;
+    my $hash = $defs{$devname};
+    
+    my $name = $hash->{NAME};
+    my $wwwpath = $hash->{HELPER}->{wwwpath};
+    my $alias = AttrVal($hash->{NAME}, "alias", $hash->{NAME});
+    my ($state,$timestamp,$number,$result,$duration,$snapshot,$record,$nrecord);
+    
+    my $td_style = 'style="padding-left:6px;padding-right:6px;"';
+    #my @json_output = ();
+    #my $line;
+    
+    my $old_locale = setlocale(LC_ALL);
+    
+    if(AttrVal($name, "language", "en") eq "de"){
+        setlocale(LC_ALL, "de_DE.utf8");
+    }else{
+        setlocale(LC_ALL, "en_US.utf8");
+    }
+    
+    my $ret = "<table>";
     
     if(AttrVal($name, "no-heading", "0") eq "0" and defined($FW_ME) and defined($FW_subdir))
     {
@@ -698,11 +733,11 @@ sub DoorPi_list2html($;$){
         $ret .= '</td></tr>';
     }
     
-    $ret .= "<tr><td>";
+    $ret .= "<tr><td></td><td>";
     #-- div tag to support inform updates
     $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">';   
     if( exists($hash->{DATA}) && (int(@{$hash->{DATA}}) > 0) ){
-       $ret .= '<table class="block fbcalllist">';
+       $ret .= '<table class="block doorpicalllist">';
     
        if(AttrVal($name, "language", "en") eq "de"){
           $state     = "Wer";
@@ -719,7 +754,7 @@ sub DoorPi_list2html($;$){
           $duration  = "Duration";
           $record    = "Recording";
        }
-       $ret .= '<tr align="center" number="$count" class="doorpicalllist odd">';
+       $ret .= '<tr align="center" class="doorpicalllist odd">';
        $ret .= '<td name="state" class="doorpicalllist" '.$td_style.'>'.$state.'</td>';
        $ret .= '<td name="timestamp" class="doorpicalllist" '.$td_style.'>'.$timestamp.'</td>';
        $ret .= '<td name="number" class="doorpicalllist" '.$td_style.'>'.$number.'</td>';
@@ -754,7 +789,7 @@ sub DoorPi_list2html($;$){
              $state = '<a href="http://'.$hash->{TCPIP}.'/'.$snapshot.'"><img src="http://'.$hash->{TCPIP}.'/'.$snapshot.'" width="40" height="30"></a>';
            }
            
-           $ret .= '<tr align="center" number="$count" class="doorpicalllist '.($index % 2 == 1 ? "odd" : "even").'">';
+           $ret .= '<tr align="center" class="doorpicalllist '.($index % 2 == 1 ? "odd" : "even").'">';
            $ret .= '<td name="state" class="doorpicalllist" '.$td_style.'>'.$state.'</td>';
            $ret .= '<td name="timestamp" class="doorpicalllist" '.$td_style.'>'.$timestamp.'</td>';
            $ret .= '<td name="number" class="doorpicalllist" '.$td_style.'>'.$number.'</td>';
@@ -766,9 +801,9 @@ sub DoorPi_list2html($;$){
         $ret .= "</table></div>";
      }else{
         if(AttrVal($name, "language", "en") eq "de"){
-            $ret .= "leer";
+            $ret .= "</td><td>Rufliste leer";
         }else{
-            $ret .= "empty";
+            $ret .= "</td><td>Calllist empty";
         }
     }
 
