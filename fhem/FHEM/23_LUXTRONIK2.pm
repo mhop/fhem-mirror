@@ -274,7 +274,7 @@ LUXTRONIK2_Set($$@)
       $hash->{LOCAL} = 1;
       LUXTRONIK2_GetUpdate($hash);
       $hash->{LOCAL} = 0;
-      Log3 $name, 3, "LUXTRONIK2: set $name $cmd $val";
+      Log3 $name, 3, "set $name $cmd $val";
       return undef;
    }
 
@@ -307,11 +307,16 @@ LUXTRONIK2_Set($$@)
       return $resultStr;
       
    } 
+   elsif ($cmd eq 'boostHotWater' && int(@_)<=4) {
+      Log3 $name, 3, "set $name $cmd" unless $val;
+      Log3 $name, 3, "set $name $cmd $val"  if $val;
+      return LUXTRONIK2_boostHotWater_Start( $hash, $val );
+   } 
    elsif(int(@_)==4 &&
          ($cmd eq 'hotWaterTemperatureTarget'
             || $cmd eq 'opModeHotWater'
             || $cmd eq 'returnTemperatureSetBack')) {
-      Log3 $name, 3, "LUXTRONIK2: set $name $cmd $val";
+      Log3 $name, 3, "set $name $cmd $val";
       $hash->{LOCAL} = 1;
       $resultStr = LUXTRONIK2_SetParameter ($hash, $cmd, $val);
       $hash->{LOCAL} = 0;
@@ -331,6 +336,7 @@ LUXTRONIK2_Set($$@)
 
   my $list = "statusRequest:noArg"
           ." activeTariff:0,1,2,3,4,5,6,7,8,9"
+          ." boostHotWater"
           ." hotWaterCircPumpDeaerate:on,off"
           ." hotWaterTemperatureTarget "
           ." resetStatistics:all,statBoilerGradientCoolDownMin,statAmbientTemp...,statElectricity...,statHours...,statHeatQ..."
@@ -788,7 +794,7 @@ LUXTRONIK2_UpdateDone($)
          LUXTRONIK2_Log $name, 3, "Error when using port 8888. Changed port to 8889";
       }
       elsif ($hash->{PORT} == 8889 ) {
-         $hash->{PORT} = 8889;
+         $hash->{PORT} = 8888;
          LUXTRONIK2_Log $name, 3, "Error when using port 8889. Changed port to 8888";
       }
     }
@@ -1290,8 +1296,44 @@ LUXTRONIK2_synchronizeClock (@)
    return $returnStr;
 }
 
-sub ######################################## 
-LUXTRONIK2_checkFirmware ($) 
+########################################
+sub LUXTRONIK2_boostHotWater_Start ($$)
+{ my ($hash, $temperature) = @_;
+
+   my $name = $hash->{NAME};
+
+   return "boostHotWater not implemented yet";
+   
+   return "$temperature is not a number."  if defined $temperature && $temperature !~ /^\d*\.?\d*$/;
+
+   my $currTarget = $hash->{READINGS}{hotWaterTemperatureTarget}{VAL};
+   return "Could not determine current hotWaterTemperatureTarget."   unless defined $currTarget;
+   readingsSingleUpdate($hash,"bhwLastTarget",$currTarget, 0)    unless $hash->{READINGS}{bhwLastTarget}{VAL};
+   
+   my $currMode = $hash->{READINGS}{opModeHotWater}{VAL};
+   return "Could not determine current opModeHotWater."   unless defined $currMode;
+   readingsSingleUpdate($hash,"bhwLastMode",$currMode, 0)     unless $hash->{READINGS}{bhwLastMode}{VAL};
+
+   my $currState = $hash->{READINGS}{opStateHotWater}{VAL};
+   return "Could not determine current opStateHotWater."   unless defined $currState;
+   
+   $hash->{boostHotWater} = 1;
+
+   if ( defined $temperature ) {
+      LUXTRONIK2_Log $name, 4, "set 'hotWaterTemperatureTarget' temporarly to ".$temperature;
+      LUXTRONIK2_SetParameter($hash, "hotWaterTemperatureTarget", $temperature);
+   }
+
+   
+   if ( $currState !~ /Aufheizen|Temp. OK/) {
+      LUXTRONIK2_Log $name, 4, "set 'opModeHotWater' temporarly to 'Party'";
+      LUXTRONIK2_SetParameter($hash, "opModeHotWater", "Party");
+   }
+   
+}
+
+######################################## 
+sub LUXTRONIK2_checkFirmware ($) 
 {
   my ($myFirmware) = @_;
 
@@ -1629,7 +1671,6 @@ LUXTRONIK2_doStatisticMinMaxSingle ($$$$)
    return;
 }
 
-
 sub ########################################
 LUXTRONIK2_storeReadings($$$$$$)
 {
@@ -1814,7 +1855,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   <br>
   It has a built-in ethernet port, so it can be directly integrated into a local area network (LAN).
   <br>
-  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73.</i>
+  <i>The modul is reported to work with firmware: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77.</i>
   <br>
   More Info on the particular <a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">page of FHEM-Wiki</a> (in German).
   <br>
@@ -1941,7 +1982,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
   Siemens Novelan (WPR NET) und Wolf Heiztechnik (BWL/BWS) verbaut ist.
   Sie besitzt einen Ethernet Anschluss, so dass sie direkt in lokale Netzwerke (LAN) integriert werden kann.
   <br>
-  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70.</i>
+  <i>Das Modul wurde bisher mit folgender Steuerungs-Firmware getestet: V1.51, V1.54C, V1.60, V1.64, V1.69, V1.70, V1.73, V1.77.</i>
   <br>
   Mehr Infos im entsprechenden <u><a href="http://www.fhemwiki.de/wiki/Luxtronik_2.0">Artikel der FHEM-Wiki</a></u>.
   <br>&nbsp;
@@ -1953,7 +1994,7 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
     <br>
     Wenn das Abfrage-Interval nicht angegeben ist, wird es auf 300 (Sekunden) gesetzt. Der kleinste m&ouml;gliche Wert ist 30.
     <br>
-    Die Angabe des Portes kann gew&oouml;hnlich entfallen.
+    Die Angabe des Portes kann gew&ouml;hnlich entfallen.
     <br>
     Beispiel: <code>define Heizung LUXTRONIK2 192.168.0.12 600</code>
  
