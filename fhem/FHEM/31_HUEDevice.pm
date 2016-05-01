@@ -83,7 +83,8 @@ my %hueModels = (
  'Plug - LIGHTIFY'  => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch',},
  'Plug 01'          => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch',},
 
- 'RM01'             => {name => 'Busch-Jaeger ZigBee Light Link'       ,type => 'On/Off light'            ,subType => 'switch',},
+ 'RM01'             => {name => 'Busch-Jaeger ZigBee Light Link Relais',type => 'On/Off light'            ,subType => 'switch',},
+ 'DM01'             => {name => 'Busch-Jaeger ZigBee Light Link Dimmer',type => 'Dimmable light'          ,subType => 'dimmer',},
 );
 
 my %dim_values = (
