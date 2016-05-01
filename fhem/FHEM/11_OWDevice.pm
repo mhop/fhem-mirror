@@ -943,7 +943,7 @@ OWDevice_InitValues($)
     Beispiele zur Einrichtung:
     <ul>
       <code>
-      define myOWServer localhost:4304<br><br>
+      define myOWServer OWServer localhost:4304<br><br>
       get myOWServer devices<br>
       10.487653020800 DS18S20<br><br>
       define myT1 10.487653020800<br><br>
