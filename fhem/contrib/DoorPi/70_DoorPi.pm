@@ -940,6 +940,18 @@ sub DoorPi_makeTable($$$$){
                 <br />DoorPi name for dashlight action (default: dashlight)</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
+         <h4>Necessary parts of the DoorPi configuration</h4>
+         The following Events need to be defined for DoorPi:
+         <ul> 
+         <li>[EVENT_BeforeSipPhoneMakeCall]<br>
+          10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;Device name for DoorPi&gt;=set &lt;Device name for DoorPi&gt call start</li>
+         <li>[EVENT_OnCallStateDisconnect]<br>
+          10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;Device name for DoorPi&gt;=set &lt;Device name for DoorPi&gt call end</li>
+         <li>[EVENT_OnCallStateDismissed]<br>
+          10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;Device name for DoorPi&gt;=set &lt;Device name for DoorPi&gt call dismissed</li>
+         <li>[EVENT_OnCallStateReject]<br>
+          10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;Device name for DoorPi&gt;=set &lt;Device name for DoorPi&gt call rejected</li>
+         </ul>
         
 =end html
 =cut
