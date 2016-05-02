@@ -37,15 +37,15 @@ use JSON; # imports encode_json, decode_json, to_json and from_json.
 use vars qw{%attr %defs};
 
 sub Log($$);
-#sub DoorPi_GetConfig($);
 
 #-- globals on start
-my $version = 1.0beta1";
+my $version = "1.0beta3";
 
 #-- these we may get on request
 my %gets = (
   "config:noArg"    => "C",
-  "history:noArg"   => "H"
+  "history:noArg"   => "H",
+  "version:noArg"   => "V"
 );
 
 ########################################################################################
@@ -182,6 +182,11 @@ sub DoorPi_Get ($@) {
   my $name = $hash->{NAME};
   my $v;
 
+  #-- get version
+  if( $a[1] eq "version") {
+    return "$name.version => $version";
+  }
+  
   #-- current configuration
   if($a[1] eq "config") {
     $v = DoorPi_GetConfig($hash);
@@ -220,19 +225,19 @@ sub DoorPi_Set ($@) {
   $doorsubs   .= ",unlock"
     if(AttrVal($name, "doorunlockcmd",undef));
     
-  my $light    = AttrVal($name, "lightbutton", "light");
-  my $dashlight    = AttrVal($name, "dashlightbutton", "dashlight");
+  my $light      = AttrVal($name, "lightbutton", "light");
+  my $dashlight  = AttrVal($name, "dashlightbutton", "dashlight");
 
   #-- for the selector: which values are possible
   if ($a[0] eq "?"){
     $newkeys = join(" ",@{ $hash->{HELPER}->{CMDS} });
     #Log 1,"=====> newkeys before subs $newkeys";
-    $newkeys =~ s/$door/$door:$doorsubs/g;               # FHEMWEB sugar
-    $newkeys =~ s/$light/$light:on,on-for-timer,off/g;   # FHEMWEB sugar
-    $newkeys =~ s/$dashlight/$dashlight:on,off/g;        # FHEMWEB sugar
-    $newkeys =~ s/button(\d\d?)/button$1:noArg/g;        # FHEMWEB sugar
-    $newkeys =~ s/purge/purge:noArg/g;                   # FHEMWEB sugar
-    #Log 1,"=====> newkeys after subs $newkeys ($door,$light)";
+    $newkeys =~ s/$door/$door:$doorsubs/;               # FHEMWEB sugar
+    $newkeys =~ s/\s$light/ $light:on,on-for-timer,off/;   # FHEMWEB sugar
+    $newkeys =~ s/$dashlight/$dashlight:on,off/;        # FHEMWEB sugar
+    $newkeys =~ s/button(\d\d?)/button$1:noArg/g;       # FHEMWEB sugar
+    $newkeys =~ s/purge/purge:noArg/;                   # FHEMWEB sugar
+    #Log 1,"=====> newkeys after subs $newkeys";
     return $newkeys;
   }
   
@@ -352,16 +357,48 @@ sub DoorPi_GetConfig {
     $fskey = $key
       if( $keyboards->{$key} eq "filesystem");
   }
+  
   if($fskey){
     Log 1,"[DoorPi_GetConfig] keyboard \'filesystem\' defined as '$fskey'";
     $hash->{HELPER}->{vkeyboard}=$fskey;
     $fscmds = $jhash0->{"config"}->{$fskey."_InputPins"};
+    
+    my $light      = AttrVal($name, "lightbutton", "light");
+    my $dashlight  = AttrVal($name, "dashlightbutton", "dashlight");
+    my ($lon,$loff,$lonft,$don,$doff) = (0,0,0,0,0);
+    @{$hash->{HELPER}->{CMDS}} = ();
+      
     foreach my $key (sort(keys $fscmds)) {
-      push(@{ $hash->{HELPER}->{CMDS}},$key);
+      if($key =~ /$dashlight(on)/){
+        push(@{ $hash->{HELPER}->{CMDS}},"$dashlight");
+        $don = 1;
+      }elsif($key =~ /$dashlight(off)/){
+        $doff = 1;
+      }elsif($key =~ /$light(on)fortimer/){
+        $lonft = 1;
+      }elsif($key =~ /$light(on)/){
+        push(@{ $hash->{HELPER}->{CMDS}},"$light");
+        $lon = 1;
+      }elsif($key =~ /$light(off)/){
+        $loff = 1;
+      }else{
+        push(@{ $hash->{HELPER}->{CMDS}},$key)
+      }
     }
+    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$light."on\" defined"
+      if( $lon==0 ); 
+    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$light."off\" defined"
+      if( $loff==0 ); 
+    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$light."onfortimer\" defined"
+      if( $lonft==0 ); 
+    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$dashlight."on\" defined"
+      if( $don==0 ); 
+    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$dashlight."off\" defined"
+      if( $doff==0 ); 
   }else{
     Log 1,"[DoorPi_GetConfig] Warning: No keyboard \"filesystem\" defined";
   };
+  
   $hash->{HELPER}->{wwwpath} = $jhash0->{"config"}->{"DoorPiWeb"}->{"www"};
    
   #-- put into READINGS
@@ -442,8 +479,8 @@ sub DoorPi_GetHistory {
   my $khash0 = $json->decode( $status2 );
 
   #-- decode call history
-  my @history_event    = @{$jhash0->{"history_event"}};
-  my @history_snapshot = @{$khash0->{"history_snapshot"}};
+  my @history_event    = ($jhash0)?@{$jhash0->{"history_event"}}:();
+  my @history_snapshot = ($khash0)?@{$khash0->{"history_snapshot"}}:();
   my $call = "";
   
   #-- clear list of calls
@@ -877,6 +914,9 @@ sub DoorPi_makeTable($$$$){
             <li><a name="doorpi_history">
                     <code>get &lt;name&gt; history</code></a>
                 <br /> Returns the current call history of DoorPi </li>
+            <li><a name="doorpi_version">
+                    <code>get &lt;name&gt; version</code></a>
+                <br /> Returns the version number of the FHEM DoorPi module</li>
         </ul>
         <h4>Attributes</h4>
         <ul>
