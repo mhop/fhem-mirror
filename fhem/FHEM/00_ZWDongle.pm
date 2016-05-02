@@ -34,6 +34,8 @@ my %sets = (
                                               # SERIAL_API_APPL_NODE_INFORMATION
   "timeouts"         => { cmd => "06%02x%02x" }, # SERIAL_API_SET_TIMEOUTS
   "reopen"           => { cmd => "" },
+  "backupCreate"     => { cmd => "" },
+  "backupRestore"    => { cmd => "" },
 );
 
 my %gets = (
@@ -156,6 +158,50 @@ ZWDongle_Set($@)
     sleep(1);
     DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
     return;
+  }
+
+  if($type eq "backupCreate") {
+    return "Creating a backup is not supported by this device"
+      if(ReadingsVal($name, "caps","") !~ m/NVM_EXT_READ_LONG_BUFFER/);
+    return "Usage: set $name backupCreate [64k|128k|256k]"
+      if(int(@a) != 1 || $a[0] !~ m/^(64|128|256)k$/);
+    my $l = $1 * 1024;
+    my $fName = "$attr{global}{modpath}/$name.bin";
+    open(OUT, ">$fName") || return "Cant open $fName: $!";
+    for(my $off = 0; $off < $l; $off += 64) {
+      ZWDongle_Write($hash, "", sprintf("002a%06x0040", $off));
+      my ($err, $ret) =
+        ZWDongle_ReadAnswer($hash, "NVM_EXT_READ_LONG_BUFFER", "^012a");
+      return $err if($err);
+      print OUT pack('H*', substr($ret, 4));
+    }
+    close(OUT);
+    return "Wrote $l bytes to $fName";
+  }
+
+  if($type eq "backupRestore") {
+    return "Restoring a backup is not supported by this device"
+      if(ReadingsVal($name, "caps","") !~ m/NVM_EXT_WRITE_LONG_BUFFER/);
+    return "Usage: set $name backupRestore" if(int(@a) != 0);
+    my $fName = "$attr{global}{modpath}/$name.bin";
+    my $l = -s $fName;
+    return "$fName does not exists, or is empty" if(!$l);
+    open(IN, $fName) || return "Cant open $fName: $!";
+
+    my $buf;
+    for(my $off = 0; $off < $l; $off += 64) {
+      if(sysread(IN, $buf, 64) != 64) {
+        return "Cant read 64 bytes from $fName";
+      }
+      ZWDongle_Write($hash,"",sprintf("002b%06x0040%s",$off,unpack('H*',$buf)));
+      my ($err, $ret) =
+          ZWDongle_ReadAnswer($hash, "NVM_EXT_WRITE_LONG_BUFFER", "^012b");
+      return $err if($err);
+      return "Unexpected NVM_EXT_WRITE_LONG_BUFFER return value $ret"
+        if($ret !~ m/^012b01/);
+    }
+    close(IN);
+    return "Restored $l bytes from $fName";
   }
 
   if($type eq "removeFailedNode" ||
@@ -675,6 +721,7 @@ ZWDongle_Attr($$$$)
 {
   my ($cmd, $name, $attr, $value) = @_;
   my $hash = $defs{$name};
+  $attr = "" if(!$attr);
   
   if($attr eq "disable") {
     if($cmd eq "set" && ($value || !defined($value))) {
@@ -690,7 +737,7 @@ ZWDongle_Attr($$$$)
 
     }
 
-  } elsif($attr eq "homeId") {
+  } elsif($attr eq "homeId" && $cmd eq "set") {
     $hash->{homeId} = $value;
 
   } elsif($attr eq "networkKey" && $cmd eq "set") {
@@ -777,11 +824,18 @@ ZWDongle_Ready($)
     device supports the SECURITY class, then a secure inclusion is attempted.
     </li>
 
-  <li>removeNode [onNw|on|off]<br>
-    Activate (or deactivate) exclusion mode. "on" activates standard exclusion. 
-    "onNw" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and
-    above).  Note: the corresponding fhem device have to be deleted
-    manually.</li>
+  <li>backupCreate [64k|128k|256k]<br>
+    read out the NVRAM of the ZWDongle, and store it in a file called
+    &lt;ZWDongle_Name&gt;.bin in the modpath folder.  Since the size of the
+    NVRAM is currently unknown to FHEM, you have to specify the size. The ZWave
+    ZME Stick seems to have 256k of NVRAM. Note: writing the file takes some
+    time, usually about 10s for each 64k.
+    </li>
+
+  <li>backupRestore<br>
+    Restore the file created by backupCreate. Restoring the file takes about
+    the same time as saving it.
+    </li>
 
   <li>createNode id<br>
     Request the class information for the specified node, and create a fhem
@@ -796,13 +850,19 @@ ZWDongle_Ready($)
     the routing table in controller. Instead,always use removeNode if possible.
     Note: the corresponding fhem device have to be deleted manually.</li>
 
-  <li>replaceFailedNode<br>
-    Replace a non-responding node with a new one. The non-responding node
-    must be on the failed Node list.</li>
+  <li>removeNode [onNw|on|off]<br>
+    Activate (or deactivate) exclusion mode. "on" activates standard exclusion. 
+    "onNw" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and
+    above).  Note: the corresponding fhem device have to be deleted
+    manually.</li>
 
   <li>reopen<br>
     First close and then open the device. Used for debugging purposes.
     </li>
+
+  <li>replaceFailedNode<br>
+    Replace a non-responding node with a new one. The non-responding node
+    must be on the failed Node list.</li>
 
   </ul>
   <br>
