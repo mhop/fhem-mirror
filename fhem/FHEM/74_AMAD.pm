@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.0.2";
-my $flowsetversion = "2.0.4";
+my $modulversion = "2.0.3";
+my $flowsetversion = "2.0.5";
 
 
 
@@ -62,6 +62,8 @@ sub AMAD_Initialize($) {
 			  "setScreenlockPIN ".
 			  "setScreenOnForTimer ".
 			  "setOpenUrlBrowser ".
+			  "setNotifySndFilePath ".
+			  "setTtsMsgSpeed ".
 			  "root:0,1 ".
 			  "port ".
 			  "disable:1 ".
@@ -159,7 +161,7 @@ sub AMAD_Undef($$) {
 
 sub AMAD_Attr(@) {
 
-my ( $cmd, $name, $attrName, $attrVal ) = @_;
+    my ( $cmd, $name, $attrName, $attrVal ) = @_;
     my $hash = $defs{$name};
     
     my $orig = $attrVal;
@@ -598,13 +600,14 @@ sub AMAD_SelectSetCmd($$@) {
     }
     
     elsif( lc $cmd eq 'ttsmsg' ) {
-    
-	my $msg = join( " ", @data );
+
+        my $msg = join( " ", @data );
+        my $speed = AttrVal( $name, "setTtsMsgSpeed", "1.0" );
 	
 	$msg =~ s/%/%25/g;
 	$msg =~ s/\s/%20/g;    
 	
-	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/ttsMsg?message=$msg";
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/ttsMsg?message=".$msg."&msgspeed=".$speed;
     
 	return AMAD_HTTP_POST( $hash,$url );
     }
@@ -775,8 +778,9 @@ sub AMAD_SelectSetCmd($$@) {
     elsif( lc $cmd eq 'notifysndfile' ) {
     
 	my $notify = join( " ", @data );
+	my $filepath = AttrVal( $name, "setNotifySndFilePath", "/storage/emulated/0/Notifications/" );
 
-	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/playnotifysnd?notifyfile=$notify";
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/playnotifysnd?notifyfile=".$notify."&notifypath=".$filepath;
     
 	return AMAD_HTTP_POST( $hash,$url );
     }
@@ -1063,7 +1067,8 @@ sub AMAD_CommBridge_Read($) {
 
     if ( $data[0] =~ /currentFlowsetUpdate.xml/ ) {
 
-        $response = qx(cat /opt/fhem/FHEM/lib/74_AMADautomagicFlowset_$flowsetversion.xml);
+        my $fhempath = $attr{global}{modpath};
+        $response = qx(cat $fhempath/FHEM/lib/74_AMADautomagicFlowset_$flowsetversion.xml);
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
             "Content-Type: text/plain\r\n",
@@ -1369,6 +1374,8 @@ sub AMAD_decrypt($) {
     <li>screenLock - Locks screen with request for PIN. <b>attribute setScreenlockPIN - enter PIN here. Only use numbers, 4-16 numbers required.</b></li>
     <li>screenOrientation - Auto,Landscape,Portait, set screen orientation (automatic, horizontal, vertical). <b>attribute setScreenOrientation</b></li>
     <li>system - issue system command (only with rooted Android devices). reboot,shutdown,airplanemodeON (can only be switched ON) <b>attribute root</b>, in Automagic "Preferences" "Root functions" need to be enabled.</li>
+    <li>setNotifySndFilePath - set systempath to notifyfile (default /storage/emulated/0/Notifications/</li>
+    <li>setTtsMsgSpeed - set speaking speed for TTS (Value between 0.5 - 4.0, 0.5 Step) default is 1.0</li>
     <br>
     To be able to use "openApp" the corresponding attribute "setOpenApp" needs to contain the app package name.
     <br><br>
@@ -1519,6 +1526,8 @@ sub AMAD_decrypt($) {
     <li>screenLock - Sperrt den Bildschirm mit Pinabfrage. <b>Attribut setScreenlockPIN - hier die Pin daf&uuml;r eingeben. Erlaubt sind nur Zahlen. Es m&uuml;&szlig;en mindestens 4, bis max 16 Zeichen verwendet werden.</b></li>
     <li>screenOrientation - Auto,Landscape,Portait,  aktiviert die Bildschirmausrichtung (Automatisch,Horizontal,Vertikal). <b>Attribut setScreenOrientation</b></li>
     <li>system - setzt Systembefehle ab (nur bei gerootetet Ger&auml;en). reboot,shutdown,airplanemodeON (kann nur aktiviert werden) <b>Attribut root</b>, in den Automagic Einstellungen muss "Root Funktion" gesetzt werden</li>
+    <li>setNotifySndFilePath - setzt den korrekten Systempfad zur Notifydatei (default ist /storage/emulated/0/Notifications/</li>
+    <li>setTtsMsgSpeed - setzt die Sprachgeschwindigkeit bei der Sprachausgabe(Werte zwischen 0.5 bis 4.0 in 0.5er Schritten) default ist 1.0</li>
     <br>
     Um openApp verwenden zu k&ouml;nnen, muss als Attribut der Package Name der App angegeben werden.
     <br><br>
