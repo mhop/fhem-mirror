@@ -543,9 +543,22 @@ HUEDevice_Set($@)
       return undef;
 
     } elsif( $cmd eq 'savescene' ) {
-      return "usage: savescene <id>" if( @args != 1 );
+      if( $defs{$name}->{IODev}->{helper}{apiversion} && $defs{$name}->{IODev}->{helper}{apiversion} >= (1<<16) + (11<<8) ) {
+        return "usage: savescene <name>" if( @args < 1 );
 
-      return fhem( "set $hash->{IODev}{NAME} savescene $aa[1] $aa[1] $hash->{NAME}" );
+        return fhem( "set $hash->{IODev}{NAME} savescene ". join( ' ', @aa[1..@aa-1]). " $hash->{NAME}" );
+
+      } else {
+        return "usage: savescene <id>" if( @args != 1 );
+
+        return fhem( "set $hash->{IODev}{NAME} savescene $aa[1] $aa[1] $hash->{NAME}" );
+
+      }
+
+    } elsif( $cmd eq 'deletescene' ) {
+      return "usage: deletescene <id>" if( @args != 1 );
+
+      return fhem( "set $hash->{IODev}{NAME} deletescene $aa[1]" );
 
     } elsif( $cmd eq 'scene' ) {
       return "usage: scene <id>" if( @args != 1 );
@@ -682,7 +695,7 @@ HUEDevice_Set($@)
   #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( $subtype =~ m/dimmer/ );
 
   $list .= " lights" if( $hash->{helper}->{devtype} eq 'G' );
-  $list .= " savescene scene" if( $hash->{helper}->{devtype} eq 'G' );
+  $list .= " savescene deletescene scene" if( $hash->{helper}->{devtype} eq 'G' );
   $list .= " rename";
 
   return SetExtensions($hash, $list, $name, @aa);
@@ -1276,6 +1289,7 @@ HUEDevice_Parse($$)
       <li>immediateUpdate</li>
       <br>
       <li>savescene &lt;id&gt;</li>
+      <li>deletescene &lt;id&gt;</li>
       <li>scene</li>
       <br>
       <li>lights &lt;lights&gt;<br>
