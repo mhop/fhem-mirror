@@ -827,14 +827,15 @@ ZWDongle_Ready($)
   <li>backupCreate [64k|128k|256k]<br>
     read out the NVRAM of the ZWDongle, and store it in a file called
     &lt;ZWDongle_Name&gt;.bin in the modpath folder.  Since the size of the
-    NVRAM is currently unknown to FHEM, you have to specify the size. The ZWave
-    ZME Stick seems to have 256k of NVRAM. Note: writing the file takes some
-    time, usually about 10s for each 64k.
+    NVRAM is currently unknown to FHEM, you have to specify the size. The
+    ZWave.me ZME_UZB1 Stick seems to have 256k of NVRAM. Note: writing the file
+    takes some time, usually about 10s for each 64k, and FHEM is blocked during
+    this time.
     </li>
 
   <li>backupRestore<br>
     Restore the file created by backupCreate. Restoring the file takes about
-    the same time as saving it.
+    the same time as saving it, and FHEM is blocked during this time.
     </li>
 
   <li>createNode id<br>
