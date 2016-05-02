@@ -1252,7 +1252,7 @@ sub FRITZBOX_Readout_Run_Web($)
    my $queryStr = "&radio=configd:settings/WEBRADIO/list(Name)"; # Webradio
    $queryStr .= "&box_dect=dect:settings/enabled"; # DECT Sender
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
-   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx)"; # WLAN devices
+   $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi)"; # WLAN devices
    #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,cipher,wmm_active,powersave,is_ap,ap_state,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,channel_width,streams)
    $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,ethernet,ethernet_port,name,mac,active,online,wlan,speed)"; # LAN devices
    #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname)
@@ -1395,8 +1395,10 @@ sub FRITZBOX_Readout_Run_Web($)
    foreach ( @{ $result->{wlanList} } ) {
       $wlanList{$_->{mac}}{speed} = $_->{speed};
       $wlanList{$_->{mac}}{speed_rx} = $_->{speed_rx};
+      $wlanList{$_->{mac}}{rssi} = $_->{rssi};
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$_->{mac}."->speed", $_->{speed};
       FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$_->{mac}."->speed_rx", $_->{speed_rx};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$_->{mac}."->rssi", $_->{rssi};
    }
    
 # Create LanDevice list and delete inactive devices
@@ -1418,7 +1420,8 @@ sub FRITZBOX_Readout_Run_Web($)
             $dName .= " (";
             $dName .= "guest"    if $_->{guest};
             $dName .= "WLAN";
-            $dName .= ", " . $wlanList{$_->{mac}}{speed} . " / " . $wlanList{$_->{mac}}{speed_rx} . " Mbit/s"   if defined $wlanList{$_->{mac}};
+            $dName .= ", " . $wlanList{$_->{mac}}{speed} . " / " . $wlanList{$_->{mac}}{speed_rx} . " Mbit/s, ". $wlanList{$_->{mac}}{rssi}
+                   if defined $wlanList{$_->{mac}};
             $dName .= ")";
          }
          if ( $_->{ethernet} == 1 ) {
@@ -4988,7 +4991,7 @@ sub FRITZBOX_fritztris($)
       <li><b>gsm_state</b> - state of the connection to the GSM network</li>
       <li><b>gsm_technology</b> - GSM technology used for data transfer (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an active network device. The name contains the term "(WLAN)" if connect via WLAN. Inactive or removed devices get first the value "inactive" and will be deleted during the next update.</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an active network device. If connect via WLAN, the term "WLAN" and (from boxes point of view) the down- and upload rate and the signal strength is added. For LAN devices the LAN port and its speed is added. Inactive or removed devices get first the value "inactive" and will be deleted during the next update.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
       <br>
@@ -5346,7 +5349,7 @@ sub FRITZBOX_fritztris($)
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
       <li><b>gsm_technology</b> - GSM-Technologie, die f&uuml;r die Daten&uuml;bertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes. Bei einer WLAN-Verbindung wird "(WLAN)" angeh&auml;ngt. Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes. Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsstärke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
       <br>
