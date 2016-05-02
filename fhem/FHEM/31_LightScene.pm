@@ -413,12 +413,13 @@ LightScene_Load($)
 }
 
 sub
-LightScene_SaveDevice($$;$)
+LightScene_SaveDevice($$;$$)
 {
-  my($hash,$d,$scene) = @_;
+  my($hash,$d,$scene,$desc) = @_;
 
   my $state = "";
   my $icon = undef;
+  my $id = undef;
   my $type = $defs{$d}->{TYPE};
   $type = "" if( !defined($type) );
 
@@ -496,10 +497,16 @@ LightScene_SaveDevice($$;$)
     if( $defs{$d}->{helper}->{devtype} eq "G" ) {
 
       if( $scene ) {
-        my $id = "FHEM-$hash->{NAME}-$scene";
+        if( ref($desc) eq 'HASH' ) {
+          $id = $desc->{id} if( $desc->{id} );
+          fhem( "set $d deletescene $id" );
+        }
+        my $name = "FHEM-$hash->{NAME}-$scene";
+        my $ret = fhem( "set $d savescene $name" );
+        if( $ret =~ m/^created (.*)/ ) {
+          $id = $1;
+        }
         $state = "scene $id";
-        #FIXME: id too long, new POST api does not use id
-        fhem( "set $d savescene $id" );
       } else {
         $state = "<unknown>";
       }
@@ -537,7 +544,7 @@ LightScene_SaveDevice($$;$)
     $state = Value($d);
   }
 
-  return($state,$icon,$type);
+  return($state,$icon,$type,$id);
 }
 
 sub
@@ -665,13 +672,14 @@ LightScene_Set($@)
     }
 
     if( $cmd eq "save" ) {
-      my($state,$icon,$type) = LightScene_SaveDevice($hash,$d,$scene);
+      my($state,$icon,$type,$id) = LightScene_SaveDevice($hash,$d,$scene,$hash->{SCENES}{$scene}{$d});
 
       if( $icon || ref($state) eq 'ARRAY' || $type eq "SWAP_0000002200000003" || $type eq "HUEDevice"  ) {
         my %desc;
         $desc{state} = $state;
         my ($icon, $link, $isHtml) = FW_dev2image($d);
         $desc{icon} = $icon;
+        $desc{id} = $id if( $id );
         $hash->{SCENES}{$scene}{$d} = \%desc;
       } else {
         $hash->{SCENES}{$scene}{$d} = $state;

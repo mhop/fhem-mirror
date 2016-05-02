@@ -387,19 +387,23 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'savescene') {
-    return "usage: savescene <id> <name> <lights>" if( @args < 3 );
-
-    my $obj = { 'name' => join( ' ', @args[1..@args-2]),
-                'lights' => HUEBridge_string2array($args[@args-1]),
-    };
-
     my $result;
-    if( 0 && $hash->{helper}{apiversion} && $hash->{helper}{apiversion} >= (1<<16) + (11<<8) ) {
-      #FIXME: currently not supported. LightScene needs scene id.
-      $obj->{recycle} = JSON::true if( $arg );
+    if( $hash->{helper}{apiversion} && $hash->{helper}{apiversion} >= (1<<16) + (11<<8) ) {
+      return "usage: savescene <name> <lights>" if( @args < 2 );
+
+      my $obj = { 'name' => join( ' ', @args[0..@args-2]),
+                  'recycle' => JSON::true,
+                  'lights' => HUEBridge_string2array($args[@args-1]),
+      };
+
       $result = HUEBridge_Call($hash, undef, "scenes", $obj, 'POST');
 
     } else {
+      return "usage: savescene <id> <name> <lights>" if( @args < 3 );
+
+      my $obj = { 'name' => join( ' ', @args[1..@args-2]),
+                  'lights' => HUEBridge_string2array($args[@args-1]),
+      };
       $result = HUEBridge_Call($hash, undef, "scenes/$arg", $obj, 'PUT');
 
     }
@@ -531,12 +535,12 @@ HUEBridge_Get($@)
     my $ret = "";
     foreach my $key ( sort {$a cmp $b} keys %{$result} ) {
       $ret .= sprintf( "%-20s %-20s", $key, $result->{$key}{name} );
-      $ret .= sprintf( "%i %i %i %-20s %-20s", $result->{$key}{recycle}, $result->{$key}{locked},$result->{$key}{version}, $result->{$key}{owner}, $result->{$key}{lastupdated} ) if( $arg eq 'detail' );
+      $ret .= sprintf( "%i %i %i %-40s %-20s", $result->{$key}{recycle}, $result->{$key}{locked},$result->{$key}{version}, $result->{$key}{owner}, $result->{$key}{lastupdated}?$result->{$key}{lastupdated}:'' ) if( $arg && $arg eq 'detail' );
       $ret .= sprintf( " %s\n", join( ",", @{$result->{$key}{lights}} ) );
     }
     if( $ret ) {
       my $header = sprintf( "%-20s %-20s", "ID", "NAME" );
-      $header .= sprintf( "%s %s %s %-20s %-20s", "R", "L", "V", "OWNER", "LAST UPDATE" ) if( $arg eq 'detail' );
+      $header .= sprintf( "%s %s %s %-40s %-20s", "R", "L", "V", "OWNER", "LAST UPDATE" ) if( $arg && $arg eq 'detail' );
       $header .= sprintf( " %s\n", "LIGHTS" );
       $ret = $header . $ret;
     }
@@ -1291,14 +1295,14 @@ HUEBridge_HTTP_Request($$$@)
       The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
     <li>deletegroup &lt;name&gt;|&lt;id&gt;<br>
       Deletes the given group in the bridge and deletes the associated fhem device.</li>
-    <li>savescene &lt;id&gt; &lt;name&gt; &lt;lights&gt;<br>
+    <li>savescene &lt;name&gt; &lt;lights&gt;<br>
       Create a scene from the current state of &lt;lights&gt; in the bridge.
       The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
     <li>scene &lt;id&gt;<br>
       Recalls the scene with the given id.</li>
     <li>modifyscene &lt;id&gt; &lt;light&gt; &lt;light-args&gt;<br>
       Modifys the given scene in the bridge.</li>
-    <li>deletwhitelist &lt;key&gt;<br>
+    <li>deletewhitelist &lt;key&gt;<br>
       Deletes the given key from the whitelist in the bridge.</li>
     <li>touchlink<br>
       perform touchlink action</li>
