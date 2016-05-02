@@ -336,7 +336,7 @@ HUEDevice_SetParam($$@)
 
   if($cmd eq 'on') {
     $obj->{'on'}  = JSON::true;
-    $obj->{'bri'} = 254 if( $name && ReadingsVal($name,"bri","0") eq 0 );
+    $obj->{'bri'} = 254 if( $name && ReadingsVal($name,"bri","0") eq 0 && AttrVal($name, 'subType', 'dimmer') ne 'switch'  );
     $obj->{'transitiontime'} = $value * 10 if( defined($value) );
 
   } elsif($cmd eq 'off') {
