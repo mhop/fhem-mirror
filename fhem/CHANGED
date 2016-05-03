@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: HUEBridge,HUEDevice,LightScene: use new HUE scenes api
   - feature: 74:AMAD: add Attribut for TTS speed and notify file path
   - bugfix : 74:AMAD: modify informationsflow
   - feature: 00_ZWDongle: add backupCreate / backupRestore
