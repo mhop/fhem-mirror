@@ -4,6 +4,7 @@ package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 sub
 dummy_Initialize($)
@@ -12,7 +13,8 @@ dummy_Initialize($)
 
   $hash->{SetFn}     = "dummy_Set";
   $hash->{DefFn}     = "dummy_Define";
-  $hash->{AttrList}  = "readingList setList ". $readingFnAttributes;
+  $hash->{AttrList}  = "readingList setList useSetExtensions " .
+                       $readingFnAttributes;
 }
 
 ###################################
@@ -24,7 +26,16 @@ dummy_Set($@)
 
   return "no set value specified" if(int(@a) < 1);
   my $setList = AttrVal($name, "setList", " ");
-  return "Unknown argument ?, choose one of $setList" if($a[0] eq "?");
+
+  if(AttrVal($name,"useSetExtensions",undef)) {
+    my $a0 = $a[0]; $a0 =~ s/([.?*])/\\$1/g;
+    if($setList !~ m/\b$a0\b/) {
+      unshift @a, $name;
+      return SetExtensions($hash, $setList, @a) 
+    }
+  } else {
+    return "Unknown argument ?, choose one of $setList" if($a[0] eq "?");
+  }
 
   my @rl = split(" ", AttrVal($name, "readingList", ""));
   if(@rl && grep /\b$a[0]\b/, @rl) {
@@ -101,6 +112,12 @@ dummy_Define($$)
       ?", so the FHEMWEB frontend can construct a dropdown and offer on/off
       switches. Example: attr dummyName setList on off </li>
 
+    <li><a name="useSetExtensions">useSetExtensions</a><br>
+      If set, and setList contains on and off, then the
+      <a href="#setExtensions">set extensions</a> are supported.
+      In this case no arbitrary set commands are accepted, only the setList and
+      the set exensions commands.</li>
+
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
@@ -155,6 +172,12 @@ dummy_Define($$)
       Liste mit Werten durch Leerzeichen getrennt. Diese Liste wird mit "set
       name ?" ausgegeben.  Damit kann das FHEMWEB-Frontend Auswahl-Men&uuml;s
       oder Schalter erzeugen.<br> Beispiel: attr dummyName setList on off </li>
+
+    <li><a name="useSetExtensions">useSetExtensions</a><br>
+      Falls gesetzt, und setList enth&auml;lt on und off, dann die <a
+      href="#setExtensions">set extensions</a> Befehle sind auch aktiv.  In
+      diesem Fall werden nur die Befehle aus setList und die set exensions
+      akzeptiert.</li>
 
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
