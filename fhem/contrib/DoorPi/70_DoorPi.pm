@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.0beta3";
+my $version = "1.0beta4";
 
 #-- these we may get on request
 my %gets = (
@@ -71,7 +71,7 @@ sub DoorPi_Initialize ($) {
                      "language:de,en ".
                      "doorbutton dooropencmd doorlockcmd doorunlockcmd ".
                      "lightbutton lightoncmd lighttimercmd lightoffcmd ".
-                     "dashlightbutton ".
+                     "dashlightbutton iconpic iconaudio ".
                      $readingFnAttributes;
                      
   $hash->{FW_detailFn}  = "DoorPi_makeTable";
@@ -115,6 +115,7 @@ sub DoorPi_Define($$) {
   my $oid = $init_done;
   $init_done = 1;
   readingsSingleUpdate($hash,"state","Initialized",1);
+  readingsSingleUpdate($hash,"door","Unknown",1);
    
   DoorPi_GetConfig($hash);
   DoorPi_GetHistory($hash);
@@ -154,16 +155,10 @@ sub DoorPi_Attr(@) {
   
   if ( $do eq "set") {
   	ARGUMENT_HANDLER: {
-      $key eq "interval" and do {
-        $hash->{interval} = $value;
-        if ($main::init_done) {
-          # WHAT ?
+        # TODO
         }
-        last;
-      };
-    }
   }
-  return $ret;
+  return 
 }
   
 ########################################################################################
@@ -245,12 +240,12 @@ sub DoorPi_Set ($@) {
   $value = shift @a; 
   
   return "[DoorPi_Set] With unknown argument $key, choose one of " . join(" ", @{$hash->{HELPER}->{CMDS}})
-    if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && !($key eq "call") );
+    if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && ($key ne "call") && ($key n "door") );
 
   #-- hidden command to be used by DoorPi for adding a new call
   if( $key eq "call" ){
     if( $value eq "start" ){
-      readingsSingleUpdate($hash,"call","started",1);
+      readingsSingleUpdate($hash,"call","started",1);e
     }elsif( $value eq "end" ){
       readingsSingleUpdate($hash,"call","ended",1);
       DoorPi_GetHistory($hash);
@@ -261,13 +256,19 @@ sub DoorPi_Set ($@) {
       readingsSingleUpdate($hash,"call","dismissed",1);
       DoorPi_GetHistory($hash);
     }
-  #-- door opening
-  }elsif( $key eq "$door" ){
+  #-- door opening - either from FHEM, or just as message from DoorPi
+  }elsif( ($key eq "$door")||($key eq "door" ){
     if( $value eq "open" ){
       $v=DoorPi_Cmd($hash,"door");
       if(AttrVal($name, "dooropencmd",undef)){
         fhem(AttrVal($name, "dooropencmd",undef));
       }
+      readingsSingleUpdate($hash,$door,"opened",1);
+    }elsif( $value eq "opened" ){
+      if(AttrVal($name, "dooropencmd",undef)){
+        fhem(AttrVal($name, "dooropencmd",undef));
+      }
+      readingsSingleUpdate($hash,$door,"opened",1);
     }
   #-- scene lighting
   }elsif( $key eq "$light" ){
@@ -275,9 +276,23 @@ sub DoorPi_Set ($@) {
     if( $value eq "on" ){
       $v=DoorPi_Cmd($hash,"lighton");
       readingsSingleUpdate($hash,$light,"on",1);
+      if(AttrVal($name, "lightoncmd",undef)){
+        fhem(AttrVal($name, "lightoncmd",undef));
+      }
+      readingsSingleUpdate($hash,$light,"on",1);
     }elsif( $value eq "off" ){
       $v=DoorPi_Cmd($hash,"lightoff");
+      if(AttrVal($name, "lightoffcmd",undef)){
+        fhem(AttrVal($name, "lightoffcmd",undef));
+      }
       readingsSingleUpdate($hash,$light,"off",1);
+    }elsif( $value eq "on-for-timer" ){
+      $v=DoorPi_Cmd($hash,"lightonfortimer");
+      if(AttrVal($name, "lighttimercmd",undef)){
+        fhem(AttrVal($name, "lighttimercmd",undef));
+      }
+      readingsSingleUpdate($hash,$light,"on-for-timer",1);
+      #-- TODO: reset after time
     }
   #-- dashboard lighting
   }elsif( $key eq "$dashlight" ){
@@ -760,6 +775,13 @@ sub DoorPi_makeTable($$$$){
         setlocale(LC_ALL, "en_US.utf8");
     }
     
+    my $iconpic = AttrVal($hash->{NAME}, "iconpic", undef);
+    $iconpic = FW_makeImage($iconpic)
+      if($iconpic);
+    my $iconaudio = AttrVal($hash->{NAME}, "iconaudio", undef);
+    $iconaudio = FW_makeImage($iconaudio)
+      if($iconaudio);
+    
     my $ret = "<table>";
     
     if(AttrVal($name, "no-heading", "0") eq "0" and defined($FW_ME) and defined($FW_subdir))
@@ -819,11 +841,13 @@ sub DoorPi_makeTable($$$$){
            if( $record ne ""){
              my $rs = $record;
              $rs =~ s/.*$wwwpath\///;
+             $rs = ($iconaudio) ? $iconaudio : $rs;
              $record = '<a href="http://'.$hash->{TCPIP}.'/'.$record.'">'.$rs.'</a>';
            }
            
            if( $snapshot ne ""){
-             $state = '<a href="http://'.$hash->{TCPIP}.'/'.$snapshot.'"><img src="http://'.$hash->{TCPIP}.'/'.$snapshot.'" width="40" height="30"></a>';
+             $state = '<a href="http://'.$hash->{TCPIP}.'/'.$snapshot.'">';
+             $state .= ($iconpic) ? $iconpic : '<img src="http://'.$hash->{TCPIP}.'/'.$snapshot.'" width="40" height="30"></a>';
            }
            
            $ret .= '<tr align="center" class="doorpicalllist '.($index % 2 == 1 ? "odd" : "even").'">';
@@ -867,7 +891,7 @@ sub DoorPi_makeTable($$$$){
         <a name="DoorPi_Define"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; DoorPi &lt;IP address&gt;</code> 
+            <code>define &lt;DoorPi-Device&gt; DoorPi &lt;IP address&gt;</code> 
             <br /><br /> Define a DoorpiPi instance.<br /><br />
         </p>
         <ul>
@@ -881,27 +905,27 @@ sub DoorPi_makeTable($$$$){
         <h4>Set</h4>
         <ul>
             <li><a name="doorpi_door">
-                    <code>set &lt;name&gt; door open[|locked|unlocked] </code></a><br />
+                    <code>set &lt;DoorPi-Device&gt; door open[|locked|unlocked] </code></a><br />
                     Activate the door opener in DoorPi, accompanied by an optional FHEM command
                     specified in the <i>dooropencmd</i> attribute.
-                    <br><b>If the Attributes doorlockcmd and doorunlockcmd are specified, these commands may be used to lock and unlock the door</b><br>
+                    <br>If the Attributes doorlockcmd and doorunlockcmd are specified, these commands may be used to lock and unlock the door<br>
                     Instead of <i>door</i>, one must use the value of the doorbutton attribute.</li>
             <li><a name="doorpi_dashlight">
-                    <code>set &lt;name&gt; dashlight on|off </code></a><br />
+                    <code>set &lt;DoorPi-Device&gt; dashlight on|off </code></a><br />
                     Set the dashlight (illuminating the door station) on or off.
                     Instead of <i>dashlight</i>, one must use the value of the dashlightbutton attribute</li>
             <li><a name="doorpi_light">
-                    <code>set &lt;name&gt; light on|on-for-timer|off </code></a><br />
+                    <code>set &lt;DoorPi-Device&gt; light on|on-for-timer|off </code></a><br />
                     Set the scene light (illuminating the visitor) on, on for a minute or off.
                     Instead of <i>light</i>, one must use the value of the lightbutton attribute</li>
              <li><a name="doorpi_button">
-                    <code>set &lt;name&gt; <i>buttonDD</i>  </code></a><br />
-                    Activate one of the virtual buttons specified  in DoorPi.
+                    <code>set &lt;DoorPi-Device&gt; <i>buttonDD</i>  </code></a><br />
+                    Activate one of the virtual buttons specified in DoorPi.
             <li><a name="doorpi_purge">
-                    <code>set &lt;name&gt; purge </code></a><br />
+                    <code>set &lt;DoorPi-Device&gt; purge </code></a><br />
                     Clean all recordings and snapshots which are older than the current process </li>
             <li><a name="doorpi_clear">
-                    <code>set &lt;name&gt; clear </code></a><br />
+                    <code>set &lt;DoorPi-Device&gt; clear </code></a><br />
                     Clear all recordings and snapshots </li>
         </ul>
         <br />
@@ -909,50 +933,91 @@ sub DoorPi_makeTable($$$$){
         <h4>Get</h4>
         <ul>
             <li><a name="doorpi_config">
-                    <code>get &lt;name&gt; config</code></a>
+                    <code>get &lt;DoorPi-Device&gt; config</code></a>
                 <br /> Returns the current configuration of DoorPi </li>
             <li><a name="doorpi_history">
-                    <code>get &lt;name&gt; history</code></a>
+                    <code>get &lt;DoorPi-Device&gt; history</code></a>
                 <br /> Returns the current call history of DoorPi </li>
             <li><a name="doorpi_version">
-                    <code>get &lt;name&gt; version</code></a>
+                    <code>get &lt;DoorPi-Device&gt; version</code></a>
                 <br /> Returns the version number of the FHEM DoorPi module</li>
         </ul>
         <h4>Attributes</h4>
         <ul>
-            <li><a name="doorpi_doorbutton"><code>attr &lt;name&gt; doorbutton
+            <li><a name="doorpi_doorbutton"><code>attr &lt;DoorPi-Device&gt; doorbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for door action (default: door)</li>
-            <li><a name="doorpi_dooropencmd"><code>attr &lt;name&gt; dooropencmd
+            <li><a name="doorpi_dooropencmd"><code>attr &lt;DoorPi-Device&gt; dooropencmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command additionally executed for door opening action (no default)</li>
-            <li><a name="doorpi_doorlockcmd"><code>attr &lt;name&gt; doorlockcmd
+            <li><a name="doorpi_doorlockcmd"><code>attr &lt;DoorPi-Device&gt; doorlockcmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command for door locking action (no default)</li>
-            <li><a name="doorpi_doorunlockcmd"><code>attr &lt;name&gt; doorunlockcmd
+            <li><a name="doorpi_doorunlockcmd"><code>attr &lt;DoorPi-Device&gt; doorunlockcmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command for door unlocking action (no default)</li>
-            <li><a name="doorpi_lightbutton"><code>attr &lt;name&gt; lightbutton
+            <li><a name="doorpi_lightbutton"><code>attr &lt;DoorPi-Device&gt; lightbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for light action (default: light)</li>
-            <li><a name="doorpi_dashlightbutton"><code>attr &lt;name&gt; dashlightbutton
+            <li><a name="doorpi_lightoncmd"><code>attr &lt;DoorPi-Device&gt; lightoncmd
+                        &lt;string&gt;</code></a>
+                <br />FHEM command additionally executed for "light on" action (no default)</li>
+            <li><a name="doorpi_lightoffcmd"><code>attr &lt;DoorPi-Device&gt; lightoffcmd
+                        &lt;string&gt;</code></a>
+                <br />FHEM command additionally executed for "light off" action (no default)</li>
+            <li><a name="doorpi_lighttimercmd"><code>attr &lt;DoorPi-Device&gt; lighttimercmd
+                        &lt;string&gt;</code></a>
+                <br />FHEM command additionally executed for "light off" action (no default)</li>
+            <li><a name="doorpi_dashlightbutton"><code>attr &lt;DoorPi-Device&gt; dashlightbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for dashlight action (default: dashlight)</li>
+            <li><a name="doorpi_iconpic"><code>attr &lt;DoorPi-Device&gt; iconpic
+                        &lt;string&gt;</code></a>
+                <br />Icon to be used in overview instead of a (slow !) miniature picture</li>
+            <li><a name="doorpi_iconaudio"><code>attr &lt;DoorPi-Device&gt; iconaudio
+                        &lt;string&gt;</code></a>
+                <br />Icon to be used in overview instead of a verbal link to the audio recording</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
-         <h4>Necessary parts of the DoorPi configuration</h4>
-         The following Events need to be defined for DoorPi:
-         <ul> 
-         <li>[EVENT_BeforeSipPhoneMakeCall]<br>
-          10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;Device name for DoorPi&gt;=set &lt;Device name for DoorPi&gt call start</li>
-         <li>[EVENT_OnCallStateDisconnect]<br>
-          10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;Device name for DoorPi&gt;=set &lt;Device name for DoorPi&gt call end</li>
-         <li>[EVENT_OnCallStateDismissed]<br>
-          10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;Device name for DoorPi&gt;=set &lt;Device name for DoorPi&gt call dismissed</li>
-         <li>[EVENT_OnCallStateReject]<br>
-          10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;Device name for DoorPi&gt;=set &lt;Device name for DoorPi&gt call rejected</li>
-         </ul>
-        
+         <h4>Necessary ingredients of the DoorPi configuration</h4>
+         The following Events need to be defined for DoorPi in order to communicate with FHEM:
+         <pre>
+[EVENT_BeforeSipPhoneMakeCall]
+10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;DoorPi-Device&gt;=set &lt;DoorPi-Device&gt call start
+20 = take_snapshot
+
+[EVENT_OnCallStateDisconnect]
+10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;DoorPi-Device&gt;=set &lt;DoorPi-Device&gt call end 
+
+[EVENT_OnCallStateDismissed]
+10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;DoorPi-Device&gt;=set &lt;DoorPi-Device&gt call dismissed
+
+[EVENT_OnCallStateReject]
+10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;DoorPi-Device&gt;=set &lt;DoorPi-Device&gt call rejected
+</pre>
+         DoorPi <b>must</b> have a virtual (= filesystem) keyboard
+<pre>
+[keyboards]
+...
+&lt;virtualkeyboardname&gt; = filesystem
+
+[&lt;virtualkeyboardname&gt;_keyboard]
+base_path_input = &lt;dome directory&gt;
+base_path_output = &lt;some directory&gt;
+
+[&lt;virtualkeyboardname&gt;_InputPins]
+door            = &lt;some doorpi action&gt; 
+lighton         = &lt;some doorpi action&gt;
+lightonfortimer = &lt;some doorpi action&gt;
+lightoff        = &lt;some doorpi action&gt;
+dashlighton     = &lt;some doorpi action&gt;
+dashlightoff    = &lt;some doorpi action&gt;
+purge           = &lt;some doorpi action&gt;
+clear           = &lt;some doorpi action&gt;
+... (optional buttons)
+button1         = &lt;some doorpi action&gt;
+... (further button definitions)
+</pre>
 =end html
 =cut
 
