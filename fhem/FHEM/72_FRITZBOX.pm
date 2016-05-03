@@ -1393,12 +1393,14 @@ sub FRITZBOX_Readout_Run_Web($)
 # Create WLAN-List
    my %wlanList;
    foreach ( @{ $result->{wlanList} } ) {
-      $wlanList{$_->{mac}}{speed} = $_->{speed};
-      $wlanList{$_->{mac}}{speed_rx} = $_->{speed_rx};
-      $wlanList{$_->{mac}}{rssi} = $_->{rssi};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$_->{mac}."->speed", $_->{speed};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$_->{mac}."->speed_rx", $_->{speed_rx};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$_->{mac}."->rssi", $_->{rssi};
+      my $mac = $_->{mac};
+      $mac =~ s/:/_/g;
+      $wlanList{$mac}{speed} = $_->{speed};
+      $wlanList{$mac}{speed_rx} = $_->{speed_rx};
+      $wlanList{$mac}{rssi} = $_->{rssi};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed", $_->{speed};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed_rx", $_->{speed_rx};
+      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->rssi", $_->{rssi};
    }
    
 # Create LanDevice list and delete inactive devices
@@ -1416,12 +1418,14 @@ sub FRITZBOX_Readout_Run_Web($)
       $landevice{$dIp}=$dName;
    # Create a reading if a landevice is connected
       if ($_->{active} == 1) {
+         my $mac = $_->{mac};
+         $mac =~ s/:/_/g;
          if ($_->{ethernet} == 0 && $_->{wlan} == 1) {
             $dName .= " (";
             $dName .= "guest"    if $_->{guest};
             $dName .= "WLAN";
-            $dName .= ", " . $wlanList{$_->{mac}}{speed} . " / " . $wlanList{$_->{mac}}{speed_rx} . " Mbit/s, ". $wlanList{$_->{mac}}{rssi}
-                   if defined $wlanList{$_->{mac}};
+            $dName .= ", " . $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s, ". $wlanList{$mac}{rssi}
+                   if defined $wlanList{$mac};
             $dName .= ")";
          }
          if ( $_->{ethernet} == 1 ) {
@@ -1432,8 +1436,7 @@ sub FRITZBOX_Readout_Run_Web($)
             $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} != 1000 && $_->{speed} != 0;
             $dName .= ")";
          }
-         my $rName = "mac_".$_->{mac};
-         $rName =~ s/:/_/g;
+         my $rName = "mac_".$mac;
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
          $wlanCount++      if $_->{wlan} == 1;
          # Remove mac address from oldLanDevice-List
@@ -1650,16 +1653,21 @@ sub FRITZBOX_Readout_Process($$)
       while (my ($rName, $rValue) = each(%values) ) {
       #hash values
          if ($rName =~ /->/) {
-         # 3 levels
-            my ($rName1,$rName2,$rName3) = split /->/, $rName;
-            if ($rName1 ne "" && defined $rName3) {
+         # 4 levels
+            my ($rName1,$rName2,$rName3,$rName4) = split /->/, $rName;
+         # 4th level (Internal Value)
+            if ($rName1 ne "" && defined $rName4) {
+               $hash->{$rName1}{$rName2}{$rName3}{$rName4} = $rValue;
+            }
+         # 3rd level (Internal Value)
+            elsif ($rName1 ne "" && defined $rName3) {
                $hash->{$rName1}{$rName2}{$rName3} = $rValue;
             }
-         # 1 level (Internal Value)
+         # 1st level (Internal Value)
             elsif ($rName1 eq "") {
                $hash->{$rName2} = $rValue;
             }
-         # 2 levels
+         # 2nd levels
             else {
                $hash->{$rName1}{$rName2} = $rValue;
             }
@@ -4991,7 +4999,9 @@ sub FRITZBOX_fritztris($)
       <li><b>gsm_state</b> - state of the connection to the GSM network</li>
       <li><b>gsm_technology</b> - GSM technology used for data transfer (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an active network device. If connect via WLAN, the term "WLAN" and (from boxes point of view) the down- and upload rate and the signal strength is added. For LAN devices the LAN port and its speed is added. Inactive or removed devices get first the value "inactive" and will be deleted during the next update.</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC address and name of an active network device.
+      <br>
+      If connect via WLAN, the term "WLAN" and (from boxes point of view) the down- and upload rate and the signal strength is added. For LAN devices the LAN port and its speed is added. Inactive or removed devices get first the value "inactive" and will be deleted during the next update.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name of the internet radio station <i>01</i></li>
       <br>
@@ -5349,7 +5359,9 @@ sub FRITZBOX_fritztris($)
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
       <li><b>gsm_technology</b> - GSM-Technologie, die f&uuml;r die Daten&uuml;bertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
-      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes. Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsstärke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
+      <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes.
+      <br>
+      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsst&auml;rke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
       <br>
