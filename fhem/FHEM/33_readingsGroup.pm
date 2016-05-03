@@ -1126,7 +1126,7 @@ readingsGroup_Notify($$)
       my ($old, $new) = ($1, $2);
       if( defined($hash->{CONTENT}{$old}) ) {
 
-        $hash->{DEF} =~ s/(\s*)$old((:\S+)?\s*)/$1$new$2/g;
+        $hash->{DEF} =~ s/(^|\s+)$old((:\S+)?\s*)/$1$new$2/g;
       }
       readingsGroup_updateDevices($hash);
     } elsif( $dev->{NAME} eq "global" && $s =~ m/^DELETED ([^ ]*)$/) {
@@ -1134,7 +1134,7 @@ readingsGroup_Notify($$)
 
       if( defined($hash->{CONTENT}{$name}) ) {
 
-        $hash->{DEF} =~ s/(\s*)$name((:\S+)?\s*)/ /g;
+        $hash->{DEF} =~ s/(^|\s+)$name((:\S+)?\s*)/ /g;
         $hash->{DEF} =~ s/^ //;
         $hash->{DEF} =~ s/ $//;
       }

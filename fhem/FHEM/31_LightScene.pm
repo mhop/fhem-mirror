@@ -223,7 +223,7 @@ LightScene_Notify($$)
       my ($old, $new) = ($1, $2);
       if( defined($hash->{CONTENT}{$old}) ) {
 
-        $hash->{DEF} =~ s/(\s*)$old(\s*)/$1$new$2/;
+        $hash->{DEF} =~ s/(^|\s+)$old(\s+|$)/$1$new$2/;
 
         foreach my $scene (keys %{ $hash->{SCENES} }) {
           $hash->{SCENES}{$scene}{$new} = $hash->{SCENES}{$scene}{$old} if( defined($hash->{SCENES}{$scene}{$old}) );
@@ -238,7 +238,7 @@ LightScene_Notify($$)
 
       if( defined($hash->{CONTENT}{$name}) ) {
 
-        $hash->{DEF} =~ s/(\s*)$name(\s*)/ /;
+        $hash->{DEF} =~ s/(^|\s+)$name(\s+|$)/ /;
         $hash->{DEF} =~ s/^ //;
         $hash->{DEF} =~ s/ $//;
 
