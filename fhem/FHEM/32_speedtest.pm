@@ -160,6 +160,10 @@ speedtest_SpeedtestDone($)
     return;
   }
 
+  $a[1] =~ s/\s.*// if( defined($a[1]) );
+  $a[2] =~ s/\s.*// if( defined($a[2]) );
+  $a[3] =~ s/\s.*// if( defined($a[3]) );
+
   readingsBeginUpdate($hash);
 
   readingsBulkUpdate($hash,"ping",$a[1]);
