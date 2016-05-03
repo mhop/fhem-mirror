@@ -135,7 +135,7 @@ button2         = sleep:0
 10 = call:xxxxx
 
 [EVENT_OnKeyPressed_webservice.button2]
-10 = os_execute:echo -e '{ReadingsVal("A.Haus.T","call_number",xxxxx)}' | socat -t50 - TCP:192.168.0.90:7072 > /home/doorpi/callnumber
+10 = os_execute:echo '{ReadingsVal("A.Haus.T","call_number",xxxxx)}' | socat -t50 - TCP:192.168.0.90:7072 > /home/doorpi/callnumber
 
 [onboardpins_keyboard]
 pull_up_down = PUD_UP
