@@ -57,7 +57,7 @@ guests = dashboard
 [EVENT_BeforeSipPhoneMakeCall]
 10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call start
 20 = take_snapshot
-30 = mailto:haus271828@henning-weingarten.de,DoorPi,DoorPi initiating call
+30 = mailto:xxx@yyyy,DoorPi,DoorPi initiating call
 
 [EVENT_OnCallStateDisconnect]
 10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call end
@@ -132,10 +132,10 @@ button2         = sleep:0
 10 = os_execute:/home/doorpi/purge.sh clear > /home/doorpi/yyy
 
 [EVENT_OnKeyPressed_webservice.button1]
-10 = call:722622
+10 = call:xxxxx
 
 [EVENT_OnKeyPressed_webservice.button2]
-10 = echo -e '{ReadingsVal("A.Haus.T","call_number",722622)}' | socat -t50 - TCP:192.168.0.90:7072 > /home/doorpi/callnumber
+10 = os_execute:echo -e '{ReadingsVal("A.Haus.T","call_number",xxxxx)}' | socat -t50 - TCP:192.168.0.90:7072 > /home/doorpi/callnumber
 
 [onboardpins_keyboard]
 pull_up_down = PUD_UP
@@ -147,7 +147,7 @@ pull_up_down = PUD_UP
 3 = blinking_led
 
 [onboardpins_InputPins]
-0 = call:722622
+0 = call:xxxxx
 1 = call:**621
 2 = file_call_value:/home/doorpi/callnumber
 3 = take_snapshot
