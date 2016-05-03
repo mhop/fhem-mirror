@@ -22,41 +22,37 @@ use SetExtensions;
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 
 my %hueModels = (
-  LCT001 => {name => 'Hue Bulb'                 ,type => 'Extended Color light'   ,subType => 'extcolordimmer',
+  LCT001 => {name => 'Hue Bulb'                 ,type => 'Extended color light'   ,subType => 'extcolordimmer',
                                                                                    icon => 'hue_filled_white_and_color_e27_b22', },
-  LCT002 => {name => 'Hue Spot BR30'            ,type => 'Extended Color light'   ,subType => 'extcolordimmer',
+  LCT002 => {name => 'Hue Spot BR30'            ,type => 'Extended color light'   ,subType => 'extcolordimmer',
                                                                                    icon => 'hue_filled_br30.svg', },
-  LCT003 => {name => 'Hue Spot GU10'            ,type => 'Extended Color light'   ,subType => 'extcolordimmer',
+  LCT003 => {name => 'Hue Spot GU10'            ,type => 'Extended color light'   ,subType => 'extcolordimmer',
                                                                                    icon => 'hue_filled_gu10_par16', },
-  LCT007 => {name => 'Hue Bulb V2'              ,type => 'Extended Color light'   ,subType => 'extcolordimmer',
+  LCT007 => {name => 'Hue Bulb V2'              ,type => 'Extended color light'   ,subType => 'extcolordimmer',
                                                                                    icon => 'hue_filled_white_and_color_e27_b22', },
-  LLC001 => {name => 'Living Colors G2'         ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC001 => {name => 'Living Colors G2'         ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_iris', },
-  LLC005 => {name => 'Living Colors Bloom'      ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC005 => {name => 'Living Colors Bloom'      ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_bloom', },
-  LLC006 => {name => 'Living Colors Gen3 Iris'  ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC006 => {name => 'Living Colors Gen3 Iris'  ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_iris', },
-  LLC007 => {name => 'Living Colors Gen3 Bloom' ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC007 => {name => 'Living Colors Gen3 Bloom' ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_bloom', },
-  LLC010 => {name => 'Hue Living Colors Iris'   ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC010 => {name => 'Hue Living Colors Iris'   ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_iris', },
-  LLC011 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC011 => {name => 'Hue Living Colors Bloom'  ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_bloom', },
-  LLC012 => {name => 'Hue Living Colors Bloom'  ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC012 => {name => 'Hue Living Colors Bloom'  ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_bloom', },
-  LLC013 => {name => 'Disney Living Colors'     ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC013 => {name => 'Disney Living Colors'     ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_storylight', },
-  LLC014 => {name => 'Living Colors Aura'       ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC014 => {name => 'Living Colors Aura'       ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_aura', },
-  LLC020 => {name => 'Hue Go'                   ,type => 'Color Light'            ,subType => 'colordimmer',
+  LLC020 => {name => 'Hue Go'                   ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_go', },
-  LLM001 => {name => 'Color Light Module'       ,type => 'Extended Color Light'   ,subType => 'extcolordimmer',},
-  LLM010 => {name => 'Color Temperature Module' ,type => 'Extended Temperature Light'   ,subType => 'ctdimmer',},
-  LLM011 => {name => 'Color Temperature Module' ,type => 'Extended Temperature Light'   ,subType => 'ctdimmer',},
-  LLM012 => {name => 'Color Temperature Module' ,type => 'Extended Temperature Light'   ,subType => 'ctdimmer',},
-  LST001 => {name => 'Hue LightStrips'          ,type => 'Color Light'            ,subType => 'colordimmer',
+  LST001 => {name => 'Hue LightStrips'          ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_lightstrip', },
-  LST002 => {name => 'Hue LightStrips Plus'     ,type => 'Color Light'            ,subType => 'colordimmer',
+  LST002 => {name => 'Hue LightStrips Plus'     ,type => 'Color light'            ,subType => 'colordimmer',
                                                                                    icon => 'hue_filled_lightstrip', },
   LWB001 => {name => 'Living Whites Bulb'       ,type => 'Dimmable light'         ,subType => 'dimmer',
                                                                                    icon => 'hue_filled_living_whites', },
@@ -71,20 +67,32 @@ my %hueModels = (
   LWL001 => {name => 'LivingWhites Outlet'      ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',
                                                                                    icon => 'hue_filled_outlet', },
 
- 'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
- 'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
+  LLM001 => {name => 'Color Light Module'       ,type => 'Extended color light'    ,subType => 'extcolordimmer',},
+  LLM010 => {name => 'Color Temperature Module' ,type => 'Color temperature light' ,subType => 'ctdimmer', },
+  LLM011 => {name => 'Color Temperature Module' ,type => 'Color temperature light' ,subType => 'ctdimmer', },
+  LLM012 => {name => 'Color Temperature Module' ,type => 'Color temperature light' ,subType => 'ctdimmer', },
 
- 'Flex RGBW'        => {name => 'LIGHTIFY Flex RGBW'                   ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
- 'Classic A60 RGBW' => {name => 'LIGHTIFY Classic A60 RGBW'            ,type => 'Extended Color Light'    ,subType => 'extcolordimmer',},
- 'Gardenspot RGB'   => {name => 'LIGHTIFY Gardenspot Mini RGB'         ,type => 'Color Light'             ,subType => 'colordimmer',},
- 'Surface Light TW' => {name => 'LIGHTIFY Surface light tunable white' ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
- 'Classic A60 TW'   => {name => 'LIGHTIFY Classic A60 tunable white'   ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
- 'PAR16 50 TW'      => {name => 'LIGHTIFY PAR16 50 tunable white'      ,type => 'Color Temperature Light' ,subType => 'ctdimmer',},
- 'Plug - LIGHTIFY'  => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch',},
- 'Plug 01'          => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch',},
+  RWL020    => {name => 'Hue Dimmer Switch'     ,type => 'ZLLSwitch'              ,subType => 'sensor',
+                                                                                   icon => 'hue_filled_hds', },
+  RWL021    => {name => 'Hue Dimmer Switch'     ,type => 'ZLLSwitch'              ,subType => 'sensor',
+                                                                                   icon => 'hue_filled_hds', },
+  ZGPSWITCH => {name => 'Hue Tap'               ,type => 'ZGPSwitch'              ,subType => 'sensor',
+                                                                                   icon => 'hue_filled_tap', },
 
- 'RM01'             => {name => 'Busch-Jaeger ZigBee Light Link Relais',type => 'On/Off light'            ,subType => 'switch',},
- 'DM01'             => {name => 'Busch-Jaeger ZigBee Light Link Dimmer',type => 'Dimmable light'          ,subType => 'dimmer',},
+ 'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color temperature light' ,subType => 'ctdimmer',},
+ 'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended color light'    ,subType => 'extcolordimmer', },
+
+ 'Flex RGBW'        => {name => 'LIGHTIFY Flex RGBW'                   ,type => 'Extended color light'    ,subType => 'extcolordimmer', },
+ 'Classic A60 RGBW' => {name => 'LIGHTIFY Classic A60 RGBW'            ,type => 'Extended color light'    ,subType => 'extcolordimmer', },
+ 'Gardenspot RGB'   => {name => 'LIGHTIFY Gardenspot Mini RGB'         ,type => 'Color light'             ,subType => 'colordimmer', },
+ 'Surface Light TW' => {name => 'LIGHTIFY Surface light tunable white' ,type => 'Color temperature light' ,subType => 'ctdimmer', },
+ 'Classic A60 TW'   => {name => 'LIGHTIFY Classic A60 tunable white'   ,type => 'Color temperature light' ,subType => 'ctdimmer', },
+ 'PAR16 50 TW'      => {name => 'LIGHTIFY PAR16 50 tunable white'      ,type => 'Color temperature light' ,subType => 'ctdimmer', },
+ 'Plug - LIGHTIFY'  => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch', },
+ 'Plug 01'          => {name => 'LIGHTIFY Plug'                        ,type => 'On/Off plug-in unit '    ,subType => 'switch', },
+
+ 'RM01' => {name => 'Busch-Jaeger ZigBee Light Link Relais', type => 'On/Off light'   ,subType => 'switch', },
+ 'DM01' => {name => 'Busch-Jaeger ZigBee Light Link Dimmer', type => 'Dimmable light' ,subType => 'dimmer', },
 );
 
 my %dim_values = (
@@ -1051,7 +1059,7 @@ HUEDevice_Parse($$)
       } elsif( $hash->{type} eq "Color light" ) {
         $attr{$name}{subType} = 'colordimmer';
 
-      } elsif( $hash->{type} eq "Color Temperature Light" ) {
+      } elsif( $hash->{type} eq "Color temperature light" ) {
         $attr{$name}{subType} = 'ctdimmer';
 
       } elsif( $hash->{type} eq "Dimmable light" ) {

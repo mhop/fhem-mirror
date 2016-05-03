@@ -47,11 +47,10 @@ HUEBridge_Read($@)
 {
   my ($hash,$chash,$name,$id,$obj)= @_;
 
-  if( $id =~ m/^G(\d.*)/ ) {
-    return HUEBridge_Call($hash, $chash, 'groups/' . $1, $obj);
-  } elsif( $id =~ m/^S(\d.*)/ ) {
-    return HUEBridge_Call($hash, $chash, 'sensors/' . $1, $obj);
-  }
+  return HUEBridge_Call($hash, $chash, 'groups/' . $1, $obj)  if( $id =~ m/^G(\d.*)/ );
+
+  return HUEBridge_Call($hash, $chash, 'sensors/' . $1, $obj) if( $id =~ m/^S(\d.*)/ );
+
   return HUEBridge_Call($hash, $chash, 'lights/' . $id, $obj);
 }
 
