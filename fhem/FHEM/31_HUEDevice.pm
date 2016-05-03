@@ -266,8 +266,6 @@ sub HUEDevice_Define($$)
     $hash->{helper}{xy} = '';
     $hash->{helper}{alert} = '';
     $hash->{helper}{effect} = '';
-    $hash->{helper}{all_on} = -1;
-    $hash->{helper}{any_on} = -1;
 
     $hash->{helper}{percent} = -1;
     $hash->{helper}{rgb} = "";
@@ -279,6 +277,10 @@ sub HUEDevice_Define($$)
 
   } elsif( $hash->{helper}->{devtype} eq 'G' ) {
     $hash->{DEF} = "group $id $args[3]";
+
+    $hash->{helper}{all_on} = -1;
+    $hash->{helper}{any_on} = -1;
+
     $attr{$name}{delayedUpdate} = 1 if( !defined( $attr{$name}{delayedUpdate} ) );
 
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
@@ -987,8 +989,8 @@ HUEDevice_Parse($$)
       my $any_on = $result->{state}{any_on};
 
       readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, "all_on", $result->{state}{all_on}) if( defined($all_on) && $all_on != $hash->{helper}{all_on} );
-      readingsBulkUpdate($hash, "any_on", $result->{state}{any_on}) if( defined($any_on) && $any_on != $hash->{helper}{any_on} );
+      readingsBulkUpdate($hash, "all_on", $all_on) if( defined($all_on) && $all_on != $hash->{helper}{all_on} );
+      readingsBulkUpdate($hash, "any_on", $any_on) if( defined($any_on) && $any_on != $hash->{helper}{any_on} );
       readingsEndUpdate($hash,1);
 
       $hash->{helper}{all_on} = $all_on if( defined($all_on) );
