@@ -51,13 +51,17 @@ guests = dashboard
 [AdminNumbers]
 **621 = active
 
+[DTMF]
+"#" = out:door,1,0,3
+
+####################### Events #######################
 [EVENT_OnStartup]
 10 = sleep:1
 
 [EVENT_BeforeSipPhoneMakeCall]
 10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call start
 20 = take_snapshot
-30 = mailto:xxx@yyyy,DoorPi,DoorPi initiating call
+30 = mailto:xxxxxxxx@yyyyyyyyyy,DoorPi,DoorPi initiating call
 
 [EVENT_OnCallStateDisconnect]
 10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call end
@@ -71,20 +75,21 @@ guests = dashboard
 [EVENT_OnTimeMinuteEvery5]
 10=statuswatchdog:/tmp/doorpi.watchdog
 
+####################### SIP phone #######################
 [SIP-Phone]
 identity = DoorPi
 local_port = 5060
 firewallpolicy = PolicyNoFirewall
 #
 sipphonetyp = linphone
-sipserver_password = XXXX
+sipserver_password = xxxxxxxxxxxxxxxxx
 sipserver_realm = fritz.box
 sipserver_server = 192.168.0.254
 sipserver_username = 620
 stun_server =
 #
-max_call_time = 120
-call_timeout = 15
+max_call_time = 300
+call_timeout = 60
 ua.max_calls = 2
 #
 capture_device = ALSA: USB PnP Sound Device
@@ -107,6 +112,7 @@ video_size = vga
 onboardpins = piface
 webservice = filesystem
 
+####################### Virtual keyboard #######################
 [webservice_keyboard]
 base_path_input = /home/doorpi/keyboard/inputs/
 base_path_output = /home/doorpi/keyboard/outputs/
@@ -118,10 +124,15 @@ lightonfortimer = out:light,1,0,60
 lightoff        = out:light,0
 dashlighton     = out:dashlight,1
 dashlightoff    = out:dashlight,0
+gettarget       = sleep:0
 purge           = sleep:0
 clear           = sleep:0
 button1         = sleep:0
 button2         = sleep:0
+
+#-- obtain the target call number from FHEM
+[EVENT_OnKeyPressed_webservice.gettarget]
+10 = os_execute:echo '{ReadingsVal("A.Haus.T","call_target",722622)}' | socat -t50 - TCP:192.168.0.90:7072 > /home/doorpi/calltarget
 
 #-- purge all files older than current PID file
 [EVENT_OnKeyPressed_webservice.purge]
@@ -132,11 +143,13 @@ button2         = sleep:0
 10 = os_execute:/home/doorpi/purge.sh clear > /home/doorpi/yyy
 
 [EVENT_OnKeyPressed_webservice.button1]
-10 = call:xxxxx
+10 = call:722622
 
 [EVENT_OnKeyPressed_webservice.button2]
-10 = os_execute:echo '{ReadingsVal("A.Haus.T","call_number",xxxxx)}' | socat -t50 - TCP:192.168.0.90:7072 > /home/doorpi/callnumber
+10 = file_call_value:/home/doorpi/calltarget
 
+
+####################### Real keyboard #######################
 [onboardpins_keyboard]
 pull_up_down = PUD_UP
 
@@ -147,13 +160,11 @@ pull_up_down = PUD_UP
 3 = blinking_led
 
 [onboardpins_InputPins]
-0 = call:xxxxx
+0 = call:722622
 1 = call:**621
-2 = file_call_value:/home/doorpi/callnumber
+2 = file_call_value:/home/doorpi/calltarget
 3 = take_snapshot
-#--OK pin from Arduino
 6 = sleep:0
-#-- NOK pin from Arduino
 7 = sleep:0
 
 #-- OK pin from Arduino
@@ -169,6 +180,4 @@ pull_up_down = PUD_UP
 20 = url_call:http://192.168.0.90:8085/fhem?XHR=1&cmd.GalaxyTab=set GalaxyTab ttsSay Unerlaubter Zutrittsversuch
 30 = url_call:http://192.168.0.90:8085/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T door wrong_id
 
-[DTMF]
-"#" = out:door,1,0,3
 

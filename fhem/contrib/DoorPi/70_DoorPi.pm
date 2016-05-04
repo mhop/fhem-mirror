@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.0beta5";
+my $version = "1.0beta6";
 
 #-- these we may get on request
 my %gets = (
@@ -47,6 +47,9 @@ my %gets = (
   "history:noArg"   => "H",
   "version:noArg"   => "V"
 );
+
+#-- capabilities of doorpi instance for light and target
+my ($lon,$loff,$lonft,$don,$doff,$gtt) = (0,0,0,0,0,0);
 
 ########################################################################################
 #
@@ -72,6 +75,7 @@ sub DoorPi_Initialize ($) {
                      "doorbutton dooropencmd doorlockcmd doorunlockcmd ".
                      "lightbutton lightoncmd lighttimercmd lightoffcmd ".
                      "dashlightbutton iconpic iconaudio ".
+                     "target0 target1 target2 target3 ".
                      $readingFnAttributes;
                      
   $hash->{FW_detailFn}  = "DoorPi_makeTable";
@@ -120,6 +124,7 @@ sub DoorPi_Define($$) {
   DoorPi_GetConfig($hash);
   DoorPi_GetHistory($hash);
   $init_done = $oid;
+  
   return undef;
 }
 
@@ -173,15 +178,14 @@ sub DoorPi_Get ($@) {
   my ($hash, @a) = @_;
   
   #-- check syntax
-  return "[DoorPi] DoorPi_Get needs exactly one parameter" if(@a != 2);
+  return "[DoorPi_Get] needs exactly one parameter" if(@a != 2);
   my $name = $hash->{NAME};
   my $v;
 
   #-- get version
   if( $a[1] eq "version") {
     return "$name.version => $version";
-  }
-  
+  }  
   #-- current configuration
   if($a[1] eq "config") {
     $v = DoorPi_GetConfig($hash);
@@ -189,7 +193,10 @@ sub DoorPi_Get ($@) {
   }elsif($a[1] eq "history") {
     $v = DoorPi_GetHistory($hash);                                         
   } else {
-    return "DoorPi_Get with unknown argument $a[1], choose one of " . join(" ", sort keys %gets);
+    my $newkeys = join(" ", sort keys %gets);
+    $newkeys    =~  s/:noArg//g
+      if( $a[1] ne "?");
+    return "[DoorPi_Get] with unknown argument $a[1], choose one of ".$newkeys;
   }
   
   if(defined($v)) {
@@ -220,6 +227,13 @@ sub DoorPi_Set ($@) {
   $doorsubs   .= ",unlock"
     if(AttrVal($name, "doorunlockcmd",undef));
     
+  my @tsubs   = ();
+  for( my $i=0;$i<4;$i++ ){
+    push(@tsubs,$i)
+      if(AttrVal($name, "target$i",undef));
+  }
+  my $tsubs2  = join(',',@tsubs);
+    
   my $light      = AttrVal($name, "lightbutton", "light");
   my $dashlight  = AttrVal($name, "dashlightbutton", "dashlight");
 
@@ -227,11 +241,12 @@ sub DoorPi_Set ($@) {
   if ($a[0] eq "?"){
     $newkeys = join(" ",@{ $hash->{HELPER}->{CMDS} });
     #Log 1,"=====> newkeys before subs $newkeys";
-    $newkeys =~ s/$door/$door:$doorsubs/;               # FHEMWEB sugar
-    $newkeys =~ s/\s$light/ $light:on,on-for-timer,off/;   # FHEMWEB sugar
-    $newkeys =~ s/$dashlight/$dashlight:on,off/;        # FHEMWEB sugar
-    $newkeys =~ s/button(\d\d?)/button$1:noArg/g;       # FHEMWEB sugar
-    $newkeys =~ s/purge/purge:noArg/;                   # FHEMWEB sugar
+    $newkeys =~ s/$door/$door:$doorsubs/;                 # FHEMWEB sugar
+    $newkeys =~ s/\s$light/ $light:on,on-for-timer,off/;  # FHEMWEB sugar
+    $newkeys =~ s/$dashlight/$dashlight:on,off/;          # FHEMWEB sugar
+    $newkeys =~ s/button(\d\d?)/button$1:noArg/g;         # FHEMWEB sugar
+    $newkeys =~ s/purge/purge:noArg/;                     # FHEMWEB sugar
+    $newkeys =~ s/target/target:$tsubs2/;                 # FHEMWEB sugar
     #Log 1,"=====> newkeys after subs $newkeys";
     return $newkeys;
   }
@@ -255,6 +270,20 @@ sub DoorPi_Set ($@) {
     }elsif( $value eq "dismissed" ){
       readingsSingleUpdate($hash,"call","dismissed",1);
       DoorPi_GetHistory($hash);
+    }
+  #-- call targetd
+  }elsif( $key eq "target" ){
+    if( $value =~ /[0123]/ ){
+      if(AttrVal($name, "target$value",undef)){
+        readingsSingleUpdate($hash,"call_target",AttrVal($name, "target$value",undef),1);
+        DoorPi_Cmd($hash,"gettarget");
+      }else{
+        Log 1,"[DoorPi_Set] Error: target$value attribute not set";
+        return;
+      }
+    }else{
+      Log 1,"[DoorPi_Set] Error: attribute target$value does not exist";
+      return;
     }
   #-- door opening - either from FHEM, or just as message from DoorPi
   }elsif( ($key eq "$door")||($key eq "door") ){
@@ -316,7 +345,7 @@ sub DoorPi_Set ($@) {
      Log GetLogLevel($name,2), "[DoorPi_Set] $key error $v";
      return "$key => Error $v";
   }
-  return "$key => ok";
+  return undef;
 }
 
 #######################################################################################
@@ -380,15 +409,20 @@ sub DoorPi_GetConfig {
     
     my $light      = AttrVal($name, "lightbutton", "light");
     my $dashlight  = AttrVal($name, "dashlightbutton", "dashlight");
-    my ($lon,$loff,$lonft,$don,$doff) = (0,0,0,0,0);
+    
+    #-- initialize command list
     @{$hash->{HELPER}->{CMDS}} = ();
       
     foreach my $key (sort(keys $fscmds)) {
+    
+      #-- check for dashboard lighting buttons
       if($key =~ /$dashlight(on)/){
         push(@{ $hash->{HELPER}->{CMDS}},"$dashlight");
         $don = 1;
       }elsif($key =~ /$dashlight(off)/){
         $doff = 1;
+      
+      #-- check for scene lighting buttons
       }elsif($key =~ /$light(on)fortimer/){
         $lonft = 1;
       }elsif($key =~ /$light(on)/){
@@ -396,20 +430,32 @@ sub DoorPi_GetConfig {
         $lon = 1;
       }elsif($key =~ /$light(off)/){
         $loff = 1;
+  
+      #-- use target instead of gettarget
+      }elsif($key =~ /gettarget/){
+        if( !AttrVal($name,"target0",undef) && !AttrVal($name,"target1",undef) &&
+            !AttrVal($name,"target2",undef) && !AttrVal($name,"target3",undef) ){
+           Log 1,"[DoorPi_GetConfig] Warning: No attribute named \"target[0|1|2|3]\" defined";
+        } else {
+          push(@{ $hash->{HELPER}->{CMDS}},"target");
+          $gtt = 1;
+        }
+      #-- one of the possible other commands
       }else{
         push(@{ $hash->{HELPER}->{CMDS}},$key)
       }
     }
-    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$light."on\" defined"
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."on\" defined"
       if( $lon==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$light."off\" defined"
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."off\" defined"
       if( $loff==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$light."onfortimer\" defined"
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."onfortimer\" defined"
       if( $lonft==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$dashlight."on\" defined"
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$dashlight."on\" defined"
       if( $don==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No InputPin named \"".$dashlight."off\" defined"
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$dashlight."off\" defined"
       if( $doff==0 ); 
+    
   }else{
     Log 1,"[DoorPi_GetConfig] Warning: No keyboard \"filesystem\" defined";
   };
@@ -636,8 +682,8 @@ sub DoorPi_GetHistory {
   
   #--put into READINGS
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash,"number_calls",int(@{ $hash->{DATA}}));
-  readingsBulkUpdate($hash,"history","ok");
+  readingsBulkUpdate($hash,"call_listed",int(@{ $hash->{DATA}}));
+  readingsBulkUpdate($hash,"call_history","ok");
   readingsBulkUpdate($hash,$dashlight,$dashlightstate);
   readingsBulkUpdate($hash,$light,$lightstate);
   readingsEndUpdate($hash,1); 
@@ -910,6 +956,9 @@ sub DoorPi_makeTable($$$$){
                     specified in the <i>dooropencmd</i> attribute.
                     <br>If the Attributes doorlockcmd and doorunlockcmd are specified, these commands may be used to lock and unlock the door<br>
                     Instead of <i>door</i>, one must use the value of the doorbutton attribute.</li>
+            <li><a name="doorpi_target">
+                    <code>set &lt;DoorPi-Device&gt; target 0|1|2|3 </code></a><br />
+                    Set the call target number for DoorPi to the corresponding attribute value (see below)</li>
             <li><a name="doorpi_dashlight">
                     <code>set &lt;DoorPi-Device&gt; dashlight on|off </code></a><br />
                     Set the dashlight (illuminating the door station) on or off.
@@ -944,6 +993,9 @@ sub DoorPi_makeTable($$$$){
         </ul>
         <h4>Attributes</h4>
         <ul>
+            <li><a name="doorpi_target2"><code>attr &lt;DoorPi-Device&gt; target[0|1|2|3]
+                        &lt;string&gt;</code></a>
+                <br />Call target numbers for different redirections, presence of target0 is mandatory</li>
             <li><a name="doorpi_doorbutton"><code>attr &lt;DoorPi-Device&gt; doorbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for door action (default: door)</li>
@@ -977,6 +1029,7 @@ sub DoorPi_makeTable($$$$){
             <li><a name="doorpi_iconaudio"><code>attr &lt;DoorPi-Device&gt; iconaudio
                         &lt;string&gt;</code></a>
                 <br />Icon to be used in overview instead of a verbal link to the audio recording</li>
+         
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
          <h4>Necessary ingredients of the DoorPi configuration</h4>
@@ -1006,22 +1059,18 @@ base_path_input = &lt;dome directory&gt;
 base_path_output = &lt;some directory&gt;
 
 [&lt;virtualkeyboardname&gt;_InputPins]
-door            = &lt;some doorpi action&gt; 
-lighton         = &lt;some doorpi action&gt;
-lightonfortimer = &lt;some doorpi action&gt;
-lightoff        = &lt;some doorpi action&gt;
-dashlighton     = &lt;some doorpi action&gt;
-dashlightoff    = &lt;some doorpi action&gt;
-purge           = &lt;some doorpi action&gt;
-clear           = &lt;some doorpi action&gt;
+door            = &lt;doorpi action opeing the door&gt; 
+lighton         = &lt;doorpi action to switch on scene light&gt;
+lightonfortimer = &lt;doorpi action to switch on scene light for some time&gt;
+lightoff        = &lt;doorpi action to switch off scene light&gt;
+dashlighton     = &lt;doorpi action to switch on dashlight&gt;
+dashlightoff    = &lt;doorpi action to switch off dashlight&gt;
+gettarget       = &lt;doorpi action to acquire call target number&gt;
+purge           = &lt;doorpi action to purge old files&gt;
+clear           = &lt;doorpi action&gt;
 ... (optional buttons)
 button1         = &lt;some doorpi action&gt;
 ... (further button definitions)
 </pre>
 =end html
 =cut
-
-
-
-
-
