@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.0beta4";
+my $version = "1.0beta5";
 
 #-- these we may get on request
 my %gets = (
@@ -153,11 +153,11 @@ sub DoorPi_Attr(@) {
   my $hash = $main::defs{$name};
   my $ret;
   
-  if ( $do eq "set") {
-  	ARGUMENT_HANDLER: {
-        # TODO
-        }
-  }
+  #if ( $do eq "set") {
+  # 	ARGUMENT_HANDLER: {
+  #       # TODO
+  #       }
+  #}
   return 
 }
   
@@ -240,12 +240,12 @@ sub DoorPi_Set ($@) {
   $value = shift @a; 
   
   return "[DoorPi_Set] With unknown argument $key, choose one of " . join(" ", @{$hash->{HELPER}->{CMDS}})
-    if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && ($key ne "call") && ($key n "door") );
+    if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && ($key ne "call") && ($key ne "door") );
 
   #-- hidden command to be used by DoorPi for adding a new call
   if( $key eq "call" ){
     if( $value eq "start" ){
-      readingsSingleUpdate($hash,"call","started",1);e
+      readingsSingleUpdate($hash,"call","started",1);
     }elsif( $value eq "end" ){
       readingsSingleUpdate($hash,"call","ended",1);
       DoorPi_GetHistory($hash);
@@ -257,7 +257,7 @@ sub DoorPi_Set ($@) {
       DoorPi_GetHistory($hash);
     }
   #-- door opening - either from FHEM, or just as message from DoorPi
-  }elsif( ($key eq "$door")||($key eq "door" ){
+  }elsif( ($key eq "$door")||($key eq "door") ){
     if( $value eq "open" ){
       $v=DoorPi_Cmd($hash,"door");
       if(AttrVal($name, "dooropencmd",undef)){
