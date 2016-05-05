@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.26.2 05.05.2016    change: get "snapfileinfo" will get back an Infomessage if Reading "LastSnapId" 
+#                      isn't available
 # 1.26.1 27.04.2016    bugfix module will not load due to Unknown warnings category 'experimental'
 #                      when using an older perl version 
 # 1.26   22.04.2016    Attribute "disable" to deactivate the module added
@@ -330,7 +332,6 @@ sub SSCam_Set {
         my $prop3   = $a[5];
         my $camname = $hash->{CAMNAME}; 
         my $success;
-        my $logstr;
         my $setlist;
         my @prop;
         
@@ -584,6 +585,7 @@ sub SSCam_Get {
             elsif ($opt eq "snapfileinfo") 
             {
                 if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+                if (!ReadingsVal("$name", "LastSnapId", undef)) {return "Reading LastSnapId is empty - please take a snapshot before !"}
                 getsnapfilename($hash);
             } 
             elsif ($opt eq "eventlist") 
@@ -638,7 +640,6 @@ return $ret;
 sub initonboot ($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $logstr;
   
   if ($init_done == 1) {
      
@@ -688,7 +689,6 @@ return;
 sub setcredentials ($@) {
     my ($hash, @credentials) = @_;
     my $name     = $hash->{NAME};
-    my $logstr;
     my $success;
     my $credstr;
     my $index;
@@ -728,7 +728,6 @@ return ($success);
 sub getcredentials ($$) {
     my ($hash,$boot) = @_;
     my $name     = $hash->{NAME};
-    my $logstr;
     my $success;
     my $username;
     my $passwd;
@@ -791,7 +790,6 @@ sub watchdogpollcaminfo ($) {
     my ($hash)   = @_;
     my $name     = $hash->{NAME};
     my $camname  = $hash->{CAMNAME};
-    my $logstr;
     my $watchdogtimer = 90;
     
     if (defined($attr{$name}{pollcaminfoall}) and $attr{$name}{pollcaminfoall} > 10 and ReadingsVal("$name", "PollState", "Active") eq "Inactive" and !IsDisabled($name)) {
@@ -865,7 +863,6 @@ sub camstartrec ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     my $errorcode;
     my $error;
     
@@ -928,7 +925,6 @@ sub camstoprec ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     my $errorcode;
     my $error;
     
@@ -988,7 +984,6 @@ sub camexpmode ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     my $errorcode;
     my $error;
     
@@ -1044,7 +1039,6 @@ sub cammotdetsc ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     my $errorcode;
     my $error;
     
@@ -1100,7 +1094,6 @@ sub camsnap ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     my $errorcode;
     my $error;
     
@@ -1156,7 +1149,6 @@ sub runliveview ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     my $errorcode;
     my $error;
     
@@ -1215,7 +1207,6 @@ sub stopliveview ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     my $errorcode;
     my $error;
    
@@ -1270,7 +1261,6 @@ sub stopliveview ($) {
 sub getsnapfilename ($) {
     my ($hash)   = @_;
     my $name     = $hash->{NAME};
-    my $logstr;
     my $snapid   = ReadingsVal("$name", "LastSnapId", " ");
     
     return if(IsDisabled($name));
@@ -1303,7 +1293,6 @@ sub getsnapfilename ($) {
 sub extevent ($) {
     my ($hash)   = @_;
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1335,7 +1324,6 @@ sub doptzaction ($) {
     my ($hash)             = @_;
     my $camname            = $hash->{CAMNAME};
     my $name               = $hash->{NAME};
-    my $logstr;
     my $errorcode;
     my $error;
     
@@ -1448,7 +1436,6 @@ sub movestop ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1478,7 +1465,6 @@ sub camenable ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1511,7 +1497,6 @@ sub camdisable ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1544,7 +1529,6 @@ sub getcaminfoall {
     my ($hash,$mode)   = @_;
     my $camname        = $hash->{CAMNAME};
     my $name           = $hash->{NAME};
-    my $logstr;
     my ($now,$new);
     
     return if(IsDisabled($name));
@@ -1590,7 +1574,6 @@ sub getsvsinfo ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1623,7 +1606,6 @@ sub getcaminfo ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1656,7 +1638,6 @@ sub geteventlist ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1688,7 +1669,6 @@ sub getmotionenum ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1719,7 +1699,6 @@ sub getcapabilities ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1751,7 +1730,6 @@ sub getptzlistpreset ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1789,7 +1767,6 @@ sub getptzlistpatrol ($) {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
-    my $logstr;
     
     return if(IsDisabled($name));
     
@@ -1851,7 +1828,6 @@ sub getapisites_nonbl {
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
    my $apistm      = $hash->{HELPER}{APISTM}; 
-   my $logstr;
    my $url;
    my $param;
    my $httptimeout;
@@ -1906,8 +1882,8 @@ sub login_nonbl ($) {
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
    my $apistm      = $hash->{HELPER}{APISTM};
    my $data;
-   my $logstr;
    my $url;
+   my $logstr;
    my $success;
    my $apiauthpath;
    my $apiauthmaxver;
@@ -2229,7 +2205,6 @@ sub getcamid_nonbl ($) {
    my ($success, $username)            = getcredentials($hash,0);   
    my $url;
    my $data;
-   my $logstr;
    my $sid;
    my $error;
    my $errorcode;
@@ -2399,7 +2374,6 @@ sub camop_nonbl ($) {
    my $camid;
    my $snapid;
    my $data;
-   my $logstr;
    my $success;
    my $error;
    my $errorcode;
@@ -2771,8 +2745,8 @@ sub camret_nonbl ($) {
    my $OpMode           = $hash->{OPMODE};
    my $rectime;
    my $url;
-   my $data;
    my $logstr;
+   my $data;
    my $success;
    my ($error,$errorcode);
    my $snapid;
@@ -3633,7 +3607,6 @@ sub logout_nonbl ($) {
    my $sid              = $hash->{HELPER}{SID};
    my $url;
    my $param;
-   my $logstr;
    my $httptimeout;
     
     # logout wird ausgeführt, Rückkehr wird mit "logoutret_nonbl" verarbeitet
@@ -3677,7 +3650,6 @@ sub logoutret_nonbl ($) {
    my ($success, $username)   = getcredentials($hash,0);
    my $OpMode                 = $hash->{OPMODE};
    my $data;
-   my $logstr;
    my $error;
    my $errorcode;
   
@@ -3768,7 +3740,6 @@ sub evaljson {
   my ($hash,$myjson,$url)= @_;
   my $success = 1;
   my $e;
-  my $logstr;
   
   eval {decode_json($myjson)} or do 
   {
