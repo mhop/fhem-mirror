@@ -2029,8 +2029,9 @@ SVG_render($$$$$$$$$$)
     }
     my $style = $conf{lStyle}[$i];
     $style =~ s/class="/class="legend /;
-    SVG_pO "<text title=\"$desc\" line_id=\"line_$i\" x=\"$txtoff1\" ".
-              "y=\"$txtoff2\" text-anchor=\"$caption_anchor\" $style>$t</text>";
+    SVG_pO "<text line_id=\"line_$i\" x=\"$txtoff1\" y=\"$txtoff2\" ".
+        "text-anchor=\"$caption_anchor\" $style>$t<title>$desc</title></text>";
+
     $txtoff2 += $th;
   }
 
