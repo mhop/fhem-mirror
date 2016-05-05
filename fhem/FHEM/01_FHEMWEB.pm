@@ -2137,7 +2137,8 @@ FW_makeImage(@)
       close(FH);
       $data =~ s/[\r\n]/ /g;
       $data =~ s/ *$//g;
-      $data =~ s/<svg/<svg class="$class" alt="$txt" title="$txt"/;
+      $data =~ s/<svg/<svg class="$class"/;
+      $data =~ s,</svg,<title>$txt</title></svg,;
       $name =~ m/(@.*)$/;
       my $col = $1 if($1);
       if($col) {
