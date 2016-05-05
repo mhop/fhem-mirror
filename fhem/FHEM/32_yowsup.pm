@@ -406,6 +406,7 @@ yowsup_Parse($$)
     }
 
     $message =~ s/\n$//;
+    $message =~ s/[\b]*$//;
 
     my $chash = $modules{yowsup}{defptr}{$number};
     if( !$chash ) {
@@ -450,7 +451,8 @@ yowsup_Parse($$)
           if( !$accept_from || $last_sender || ",$accept_from," =~/,$last_sender,/ ) {
             Log3 $name, 3, "$cname: received command: $cmd";
 
-            my $ret = AnalyzeCommandChain( $hash, $cmd );
+            $chash->{SNAME} = $cname;
+            my $ret = AnalyzeCommandChain( $chash, $cmd );
 
             Log3 $name, 4, "$cname: command result: $ret";
 
