@@ -57,7 +57,11 @@ allowed_Authorize($$$$)
   my ($me, $cl, $type, $arg) = @_;
 
   return 0 if($me->{disabled});
-  return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
+  if( $cl->{SNAME} ) {
+    return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
+  } else {
+    return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{NAME}\b/);
+  }
 
   if($type eq "cmd") {
     return 0 if(!$me->{allowedCommands});
