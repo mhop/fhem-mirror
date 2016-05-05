@@ -640,10 +640,16 @@ HUEDevice_Set($@)
     HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
   }
 
-  if( %obj && !defined($obj{transitiontime} ) ) {
-    my $transitiontime = AttrVal($name, "transitiontime", undef);
+  if( %obj ) {
+    if( defined($obj{on}) ) {
+      $hash->{desired} = $obj{on}?1:0;
+    }
 
-    $obj{transitiontime} = 0 + $transitiontime if( defined( $transitiontime ) );
+    if( !defined($obj{transitiontime}) ) {
+      my $transitiontime = AttrVal($name, "transitiontime", undef);
+
+      $obj{transitiontime} = 0 + $transitiontime if( defined( $transitiontime ) );
+    }
   }
 
 #  if( $hash->{helper}->{update_timeout} == -1 ) {
