@@ -168,13 +168,17 @@ ZWDongle_Set($@)
     my $l = $1 * 1024;
     my $fName = "$attr{global}{modpath}/$name.bin";
     open(OUT, ">$fName") || return "Cant open $fName: $!";
-    for(my $off = 0; $off < $l; $off += 64) {
+    binmode(OUT);
+    for(my $off = 0; $off < $l;) {
       ZWDongle_Write($hash, "", sprintf("002a%06x0040", $off));
       my ($err, $ret) =
         ZWDongle_ReadAnswer($hash, "NVM_EXT_READ_LONG_BUFFER", "^012a");
       return $err if($err);
       print OUT pack('H*', substr($ret, 4));
+      $off += 64;
+      Log 3, "$name backupCreate at $off bytes" if($off % 16384 == 0);
     }
+
     close(OUT);
     return "Wrote $l bytes to $fName";
   }
@@ -187,9 +191,10 @@ ZWDongle_Set($@)
     my $l = -s $fName;
     return "$fName does not exists, or is empty" if(!$l);
     open(IN, $fName) || return "Cant open $fName: $!";
+    binmode(IN);
 
     my $buf;
-    for(my $off = 0; $off < $l; $off += 64) {
+    for(my $off = 0; $off < $l;) {
       if(sysread(IN, $buf, 64) != 64) {
         return "Cant read 64 bytes from $fName";
       }
@@ -199,7 +204,10 @@ ZWDongle_Set($@)
       return $err if($err);
       return "Unexpected NVM_EXT_WRITE_LONG_BUFFER return value $ret"
         if($ret !~ m/^012b01/);
+      $off += 64;
+      Log 3, "$name backupRestore at $off bytes" if($off % 16384 == 0);
     }
+
     close(IN);
     return "Restored $l bytes from $fName";
   }
@@ -398,12 +406,10 @@ ZWDongle_Clear($)
   my $hash = shift;
 
   # Clear the pipe
-  $hash->{RA_Timeout} = 1.0;
   for(;;) {
     my ($err, undef) = ZWDongle_ReadAnswer($hash, "Clear", "wontmatch");
     last if($err && ($err =~ m/^Timeout/ || $err =~ m/No FD/));
   }
-  delete($hash->{RA_Timeout});
   $hash->{PARTIAL} = "";
 }
 
@@ -648,8 +654,13 @@ ZWDongle_ReadAnswer($$$)
       $hash->{USBDev}->read_const_time($to*1000); # set timeout (ms)
       # Read anstatt input sonst funzt read_const_time nicht.
       $buf = $hash->{USBDev}->read(999);
-      return ("Timeout reading answer for get $arg", undef)
-        if(length($buf) == 0);
+      if(length($buf) == 0) {
+        if($hash->{GotCAN}) {
+          ZWDongle_ProcessSendStack($hash);
+          next;
+	}
+        return ("Timeout reading answer for get $arg", undef);
+      }
 
     } else {
       if(!$hash->{FD}) {
@@ -829,8 +840,8 @@ ZWDongle_Ready($)
     &lt;ZWDongle_Name&gt;.bin in the modpath folder.  Since the size of the
     NVRAM is currently unknown to FHEM, you have to specify the size. The
     ZWave.me ZME_UZB1 Stick seems to have 256k of NVRAM. Note: writing the file
-    takes some time, usually about 10s for each 64k, and FHEM is blocked during
-    this time.
+    takes some time, usually about 10s for each 64k (and significantly longer
+    on Windows), and FHEM is blocked during this time.
     </li>
 
   <li>backupRestore<br>
