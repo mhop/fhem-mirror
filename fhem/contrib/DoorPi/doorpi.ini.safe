@@ -57,11 +57,11 @@ guests = dashboard
 ####################### Events #######################
 [EVENT_OnStartup]
 10 = sleep:1
+20 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call startup
 
 [EVENT_BeforeSipPhoneMakeCall]
 10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call start
 20 = take_snapshot
-30 = mailto:xxxxxxxx@yyyyyyyyyy,DoorPi,DoorPi initiating call
 
 [EVENT_OnCallStateDisconnect]
 10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call end
@@ -82,7 +82,7 @@ local_port = 5060
 firewallpolicy = PolicyNoFirewall
 #
 sipphonetyp = linphone
-sipserver_password = xxxxxxxxxxxxxxxxx
+sipserver_password = xxxxxxxxxxxxxxxxxxx
 sipserver_realm = fritz.box
 sipserver_server = 192.168.0.254
 sipserver_username = 620
@@ -108,6 +108,7 @@ video_device = StaticImage: Static picture
 video_display_enabled = False
 video_size = vga
 
+####################### Keyboards ##############################
 [keyboards]
 onboardpins = piface
 webservice = filesystem
@@ -119,6 +120,9 @@ base_path_output = /home/doorpi/keyboard/outputs/
 
 [webservice_InputPins]
 door            = out:door,1,0,3 
+snapshot        = sleep:0
+streamon        = sleep:0
+streamoff       = sleep:0
 lighton         = out:light,1
 lightonfortimer = out:light,1,0,60
 lightoff        = out:light,0
@@ -129,6 +133,19 @@ purge           = sleep:0
 clear           = sleep:0
 button1         = sleep:0
 button2         = sleep:0
+
+#-- communicate to FHEM that a snapshot has been taken
+[EVENT_OnKeyPressed_webservice.snapshot]
+10 = take_snapshot
+20 = url_call:http://192.168.0.90:8085/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T door snapshot
+
+#-- start video stream
+[EVENT_OnKeyPressed_webservice.streamon]
+10 = os_execute:/etc/init.d/mjpg-streamer start
+
+#-- stop video stream
+[EVENT_OnKeyPressed_webservice.snapshot]
+10 = os_execute:/etc/init.d/mjpg-streamer stop
 
 #-- obtain the target call number from FHEM
 [EVENT_OnKeyPressed_webservice.gettarget]

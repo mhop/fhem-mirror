@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.0beta6";
+my $version = "1.0beta7";
 
 #-- these we may get on request
 my %gets = (
@@ -49,7 +49,7 @@ my %gets = (
 );
 
 #-- capabilities of doorpi instance for light and target
-my ($lon,$loff,$lonft,$don,$doff,$gtt) = (0,0,0,0,0,0);
+my ($lon,$loff,$lonft,$don,$doff,$gtt,$son,$soff,$snon) = (0,0,0,0,0,0,0,0,0);
 
 ########################################################################################
 #
@@ -74,6 +74,7 @@ sub DoorPi_Initialize ($) {
                      "language:de,en ".
                      "doorbutton dooropencmd doorlockcmd doorunlockcmd ".
                      "lightbutton lightoncmd lighttimercmd lightoffcmd ".
+                     "snapshotbutton streambutton ".
                      "dashlightbutton iconpic iconaudio ".
                      "target0 target1 target2 target3 ".
                      $readingFnAttributes;
@@ -118,9 +119,11 @@ sub DoorPi_Define($$) {
   #-- InternalTimer blocks if init_done is not true
   my $oid = $init_done;
   $init_done = 1;
-  readingsSingleUpdate($hash,"state","Initialized",1);
-  readingsSingleUpdate($hash,"door","Unknown",1);
-   
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"state","Initialized");
+  readingsBulkUpdate($hash,"door","Unknown");
+  readingsEndUpdate($hash,1); 
+     
   DoorPi_GetConfig($hash);
   DoorPi_GetHistory($hash);
   $init_done = $oid;
@@ -236,6 +239,8 @@ sub DoorPi_Set ($@) {
     
   my $light      = AttrVal($name, "lightbutton", "light");
   my $dashlight  = AttrVal($name, "dashlightbutton", "dashlight");
+  my $snapshot   = AttrVal($name, "snapshotbutton", "snapshot");
+  my $stream     = AttrVal($name, "streambutton", "stream");
 
   #-- for the selector: which values are possible
   if ($a[0] eq "?"){
@@ -244,6 +249,8 @@ sub DoorPi_Set ($@) {
     $newkeys =~ s/$door/$door:$doorsubs/;                 # FHEMWEB sugar
     $newkeys =~ s/\s$light/ $light:on,on-for-timer,off/;  # FHEMWEB sugar
     $newkeys =~ s/$dashlight/$dashlight:on,off/;          # FHEMWEB sugar
+    $newkeys =~ s/$stream/$stream:on,off/;                # FHEMWEB sugar
+    $newkeys =~ s/$snapshot/$snapshot:noArg/;             # FHEMWEB sugar
     $newkeys =~ s/button(\d\d?)/button$1:noArg/g;         # FHEMWEB sugar
     $newkeys =~ s/purge/purge:noArg/;                     # FHEMWEB sugar
     $newkeys =~ s/target/target:$tsubs2/;                 # FHEMWEB sugar
@@ -257,7 +264,7 @@ sub DoorPi_Set ($@) {
   return "[DoorPi_Set] With unknown argument $key, choose one of " . join(" ", @{$hash->{HELPER}->{CMDS}})
     if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && ($key ne "call") && ($key ne "door") );
 
-  #-- hidden command to be used by DoorPi for adding a new call
+  #-- hidden command to be used by DoorPi for communicating
   if( $key eq "call" ){
     if( $value eq "start" ){
       readingsSingleUpdate($hash,"call","started",1);
@@ -270,8 +277,13 @@ sub DoorPi_Set ($@) {
     }elsif( $value eq "dismissed" ){
       readingsSingleUpdate($hash,"call","dismissed",1);
       DoorPi_GetHistory($hash);
+    }elsif( $value eq "startup" ){
+      DoorPi_GetConfig($hash);
+      DoorPi_GetHistory($hash);
+    }elsif( $value eq "snapshot" ){
+      # TODO
     }
-  #-- call targetd
+  #-- call target
   }elsif( $key eq "target" ){
     if( $value =~ /[0123]/ ){
       if(AttrVal($name, "target$value",undef)){
@@ -299,9 +311,21 @@ sub DoorPi_Set ($@) {
       }
       readingsSingleUpdate($hash,$door,"opened",1);
     }
+  #-- snapshot
+  }elsif( $key eq "$snapshot" ){
+    $v=DoorPi_Cmd($hash,"snapshot");
+  #-- video stream
+  }elsif( $key eq "$stream" ){
+    if( $value eq "on" ){
+      $v=DoorPi_Cmd($hash,"streamon");
+      readingsSingleUpdate($hash,$stream,"on",1);
+    }elsif( $value eq "off" ){
+      $v=DoorPi_Cmd($hash,"streamoff");
+      readingsSingleUpdate($hash,$stream,"off",1);
+    }
   #-- scene lighting
   }elsif( $key eq "$light" ){
-    my $light    = AttrVal($name, "lightbutton", "light");
+    #my $light    = AttrVal($name, "lightbutton", "light");
     if( $value eq "on" ){
       $v=DoorPi_Cmd($hash,"lighton");
       readingsSingleUpdate($hash,$light,"on",1);
@@ -325,7 +349,7 @@ sub DoorPi_Set ($@) {
     }
   #-- dashboard lighting
   }elsif( $key eq "$dashlight" ){
-    my $dashlight    = AttrVal($name, "dashlightbutton", "dashlight");
+    #my $dashlight    = AttrVal($name, "dashlightbutton", "dashlight");
     if( $value eq "on" ){
       $v=DoorPi_Cmd($hash,"dashlighton");
       readingsSingleUpdate($hash,$dashlight,"on",1);
@@ -371,7 +395,7 @@ sub DoorPi_GetConfig {
     #Log 1,"[DoorPi_GetConfig] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
-      callback=>sub($$$){ DoorPi_GetConfig($hash,$_[1],$_[2]) }
+      callback => sub($$$){ DoorPi_GetConfig($hash,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && $err ){
@@ -403,20 +427,34 @@ sub DoorPi_GetConfig {
   }
   
   if($fskey){
-    Log 1,"[DoorPi_GetConfig] keyboard \'filesystem\' defined as '$fskey'";
+    Log 1,"[DoorPi_GetConfig] virtual keyboard is named defined as \"$fskey\"";
     $hash->{HELPER}->{vkeyboard}=$fskey;
     $fscmds = $jhash0->{"config"}->{$fskey."_InputPins"};
     
     my $light      = AttrVal($name, "lightbutton", "light");
     my $dashlight  = AttrVal($name, "dashlightbutton", "dashlight");
+    my $snapshot   = AttrVal($name, "snapshotbutton", "snapshot");
+    my $stream     = AttrVal($name, "streambutton", "stream");
     
     #-- initialize command list
     @{$hash->{HELPER}->{CMDS}} = ();
       
     foreach my $key (sort(keys $fscmds)) {
     
+      #-- check for stream buttons
+      if($key =~ /$stream(on)/){
+        push(@{ $hash->{HELPER}->{CMDS}},"$stream");
+        $son = 1;
+      }elsif($key =~ /$stream(off)/){
+        $soff = 1;
+      
+      #-- check for snapshot button
+      }elsif($key =~ /$snapshot/){
+        push(@{ $hash->{HELPER}->{CMDS}},"$snapshot");
+        $snon = 1;
+
       #-- check for dashboard lighting buttons
-      if($key =~ /$dashlight(on)/){
+      }elsif($key =~ /$dashlight(on)/){
         push(@{ $hash->{HELPER}->{CMDS}},"$dashlight");
         $don = 1;
       }elsif($key =~ /$dashlight(off)/){
@@ -445,6 +483,14 @@ sub DoorPi_GetConfig {
         push(@{ $hash->{HELPER}->{CMDS}},$key)
       }
     }
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$stream."on\" defined"
+      if( $son==0 ); 
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$stream."off\" defined"
+      if( $soff==0 ); 
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$snapshot."\" defined"
+      if( $snon==0 ); 
+    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."off\" defined"
+      if( $loff==0 ); 
     Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."on\" defined"
       if( $lon==0 ); 
     Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."off\" defined"
@@ -497,7 +543,7 @@ sub DoorPi_GetHistory {
     #Log 1,"[DoorPi_GetHistory] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
-      callback=>sub($$$){ DoorPi_GetHistory($hash,$_[1],$_[2]) }
+      callback => sub($$$){ DoorPi_GetHistory($hash,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && $err1 && !$status1 && !$err2 && !$status2 ){
@@ -510,7 +556,7 @@ sub DoorPi_GetHistory {
     #Log 1,"[DoorPi_GetHistory] called with hash and data from first call => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
-      callback=>sub($$$){ DoorPi_GetHistory($hash,$err1,$status1,$_[1],$_[2]) }
+      callback => sub($$$){ DoorPi_GetHistory($hash,$err1,$status1,$_[1],$_[2]) }
     });
     return undef;
   }elsif ( $hash && !$err1 && $status1 && $err2){
@@ -956,6 +1002,14 @@ sub DoorPi_makeTable($$$$){
                     specified in the <i>dooropencmd</i> attribute.
                     <br>If the Attributes doorlockcmd and doorunlockcmd are specified, these commands may be used to lock and unlock the door<br>
                     Instead of <i>door</i>, one must use the value of the doorbutton attribute.</li>
+            <li><a name="doorpi_snapshot">
+                    <code>set &lt;DoorPi-Device&gt; snapshot </code></a><br />
+                    Take a single snapshot.
+                    Instead of <i>snapshot</i>, one must use the value of the snapshotbutton attribute</li>
+            <li><a name="doorpi_stream">
+                    <code>set &lt;DoorPi-Device&gt; stream on|off </code></a><br />
+                    Start or stop a video stream
+                    Instead of <i>stream</i>, one must use the value of the streambutton attribute</li>
             <li><a name="doorpi_target">
                     <code>set &lt;DoorPi-Device&gt; target 0|1|2|3 </code></a><br />
                     Set the call target number for DoorPi to the corresponding attribute value (see below)</li>
@@ -995,7 +1049,7 @@ sub DoorPi_makeTable($$$$){
         <ul>
             <li><a name="doorpi_target2"><code>attr &lt;DoorPi-Device&gt; target[0|1|2|3]
                         &lt;string&gt;</code></a>
-                <br />Call target numbers for different redirections, presence of target0 is mandatory</li>
+                <br />Call target numbers for different redirections. If none is set, redirection will not be offered.</li>
             <li><a name="doorpi_doorbutton"><code>attr &lt;DoorPi-Device&gt; doorbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for door action (default: door)</li>
@@ -1008,6 +1062,12 @@ sub DoorPi_makeTable($$$$){
             <li><a name="doorpi_doorunlockcmd"><code>attr &lt;DoorPi-Device&gt; doorunlockcmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command for door unlocking action (no default)</li>
+            <li><a name="doorpi_snapshotbutton"><code>attr &lt;DoorPi-Device&gt; snapshotbutton
+                        &lt;string&gt;</code></a>
+                <br />DoorPi name for snapshot action (default: snapshot)</li>
+            <li><a name="doorpi_streambutton"><code>attr &lt;DoorPi-Device&gt; streambutton
+                        &lt;string&gt;</code></a>                    
+                <br />DoorPi name for video stream action (default: stream)</li>
             <li><a name="doorpi_lightbutton"><code>attr &lt;DoorPi-Device&gt; lightbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for light action (default: light)</li>
