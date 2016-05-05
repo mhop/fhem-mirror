@@ -1181,6 +1181,10 @@ FW_doDetail($)
     my $txt = &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room);
     FW_pO "$txt<br>" if(defined($txt));
     use strict "refs";
+  } else {
+    my %extPage = ();  
+    my ($allSets, $cmdlist, $txt) = FW_devState($d, $FW_room, \%extPage);
+    FW_pO "<div informId='$d'".($FW_tp?"":" style='float:right'").">$txt</div>";
   }
 
   FW_pO FW_detailSelect($d, "set", FW_widgetOverride($d, getAllSets($d)));
