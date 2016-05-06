@@ -3704,6 +3704,7 @@ ZWave_Parse($$@)
       DoTrigger($ioName, "$cmd $retval");
       return "";
     }
+ 
     if($cmd eq "ZW_SET_SUC_NODE_ID") {
       my $retval;
            if($arg eq "00") { $retval = 'setSucNodeFailed';
@@ -3718,6 +3719,19 @@ ZWave_Parse($$@)
     return "";
   }
 
+  if($msg =~ m/^00(..)(..*)/) { # 00==REQUEST from the ZWDongle
+    my ($cmd, $arg) = ($1, $2);
+    $cmd = $zw_func_id{$cmd} if($zw_func_id{$cmd});
+    if($cmd eq "ZW_SET_DEFAULT") {
+      my $retval;
+           if($arg eq "01") { $retval = 'done';
+      } else                { $retval = 'unknown_'.$arg; # should never happen
+      }
+      DoTrigger($ioName, "$cmd $retval");
+      return "";
+    }
+  }
+    
   if($msg !~ m/^00(..)(..)(..)(.*)/) { # 00=REQUEST
     Log3 $ioName, 4, "$ioName: UNKNOWN msg $msg";
     return "";
