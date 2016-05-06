@@ -27,6 +27,7 @@ my %sets = (
   "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
                           param => {onNw=>0xc1, on=>0x81, off=>0x05 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
+  "factoryReset"     => { cmd => ""       },   # ZW_SET_DEFAULT
   "removeFailedNode" => { cmd => "61%02x@" },  # ZW_REMOVE_FAILED_NODE_ID
   "replaceFailedNode"=> { cmd => "63%02x@" },  # ZW_REPLACE_FAILED_NODE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
@@ -214,6 +215,15 @@ ZWDongle_Set($@)
     close(IN);
     return "Restored $l bytes from $fName";
   }
+  
+  if($type eq "factoryReset") {
+    return "Reset to default is not supported by this device"
+      if(ReadingsVal($name, "caps","") !~ m/ZW_SET_DEFAULT/);
+    return "Read commandref before use! -> Usage: set $name factoryReset yes"
+      if(int(@a) != 1 || $a[0] !~ m/^(yes)$/);
+    ZWDongle_Write($hash,"","0042");
+    return "Reseted $name to factory default and assigned new random HomeId";
+  }
 
   if($type eq "removeFailedNode" ||
      $type eq "replaceFailedNode" ||
@@ -290,6 +300,14 @@ ZWDongle_Get($@)
   if($fb =~ m/^[0-8A-F]+$/i && $cmd ne "caps" &&
      ReadingsVal($name, "caps","") !~ m/\b$zw_func_id{$fb}\b/) {
     return "$cmd is unsupported by this controller";
+  }
+  
+  if($cmd eq "raw") {
+    if($a[0] =~ s/^42//) {
+      Log3 $hash, 4, "ZWDongle *** get $name $cmd 42".join(" ",@a)." blocked";
+      return "raw 0x42 (ZW_SET_DEFAULT) blocked. Read commandref first and ".
+             "use instead: set $name factoryReset";
+    }
   }
 
   Log3 $hash, 4, "ZWDongle *** get $name $cmd ".join(" ",@a);
@@ -394,7 +412,7 @@ ZWDongle_Get($@)
     $msg = zwlib_parseNeighborList($hash, $msg);
 
   } elsif($cmd eq "sucNodeId") {               ############################
-    $msg = ($r[2]==0)?"no":hex($r[2])
+    $msg = ($r[2]==0)?"no":hex($r[2]);
 
   }
 
@@ -856,22 +874,29 @@ ZWDongle_Ready($)
     </li>
 
   <li>createNode id<br>
-    Request the class information for the specified node, and create a fhem
+    Request the class information for the specified node, and create a FHEM
     device upon reception of the answer. Used to create FHEM devices for nodes
     included with another software or if the fhem.cfg got lost. For the node id
     see the get nodeList command below.  Note: the node must be "alive", i.e.
     for battery based devices you have to press the "wakeup" button 1-2 seconds
     before entering this command in FHEM.</li>
 
+  <li>factoryReset [yes]<br>
+    Reset controller to default state.
+    Erase all node and routing infos, assign a new random HomeId. 
+    To control a device it must be re-included and re-configured.
+    !Use this with care AND only if You know what You do!
+    Note: the corresponding FHEM devices have to be deleted manually.</li>
+    
   <li>removeFailedNode<br>
     Remove a non-responding node -that must be on the failed Node list- from 
     the routing table in controller. Instead,always use removeNode if possible.
-    Note: the corresponding fhem device have to be deleted manually.</li>
+    Note: the corresponding FHEM device have to be deleted manually.</li>
 
   <li>removeNode [onNw|on|off]<br>
     Activate (or deactivate) exclusion mode. "on" activates standard exclusion. 
     "onNw" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and
-    above).  Note: the corresponding fhem device have to be deleted
+    above).  Note: the corresponding FHEM device have to be deleted
     manually.</li>
 
   <li>reopen<br>
@@ -886,7 +911,7 @@ ZWDongle_Ready($)
     Configure a Controller Node to be a SUC/SIS or not. 
     [nodeId] to be SUC/SIS
     [sucState] 0 = deactivate; 1 = activate
-    [capabilities] 0 = basic SUC 1 = SIS</li>
+    [capabilities] 0 = basic SUC; 1 = SIS</li>
 
   </ul>
   <br>
@@ -971,7 +996,9 @@ ZWDongle_Ready($)
     </li>
   <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]
     </li>
-  <li>ZW_SET_SUC_NODE_ID [setSucNodeOk|setSucNodefailed]
+  <li>ZW_SET_DEFAULT [done]
+    </li>    
+  <li>ZW_SET_SUC_NODE_ID [setSucNodeOk|setSucNodeFailed]
     </li>
   </ul>
 
