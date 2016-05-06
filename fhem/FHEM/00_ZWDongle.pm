@@ -32,6 +32,8 @@ my %sets = (
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
                                               # SERIAL_API_APPL_NODE_INFORMATION
+  "sucNodeId"        => { cmd => "54%02x%02x25%02x@"},
+                                              # ZW_SET_SUC_NODE_ID
   "timeouts"         => { cmd => "06%02x%02x" }, # SERIAL_API_SET_TIMEOUTS
   "reopen"           => { cmd => "" },
   "backupCreate"     => { cmd => "" },
@@ -48,9 +50,10 @@ my %gets = (
   "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
   "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
   "random"          => "1c%02x",  # ZW_GET_RANDOM
-  "version"         => "15",      # ZW_GET_VERSION
+  "sucNodeId"       => "56",      # ZW_GET_SUC_NODE_ID
   "timeouts"        => "06",      # SERIAL_API_SET_TIMEOUTS
-  "raw"             => "%s",            # hex
+  "version"         => "15",      # ZW_GET_VERSION
+  "raw"             => "%s",      # hex
 );
 
 sub
@@ -119,7 +122,7 @@ ZWDongle_Define($$)
   my @empty;
   $hash->{SendStack} = \@empty;
   ZWDongle_shiftSendStack($hash, 0, 5, undef);
-  
+
   my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
   return $ret;
 }
@@ -390,6 +393,9 @@ ZWDongle_Get($@)
     $msg =~ s/^....//;
     $msg = zwlib_parseNeighborList($hash, $msg);
 
+  } elsif($cmd eq "sucNodeId") {               ############################
+    $msg = ($r[2]==0)?"no":hex($r[2])
+
   }
 
   $cmd .= "_".join("_", @a) if(@a);
@@ -422,7 +428,7 @@ ZWDongle_DoInit($)
 
   DevIo_SetHwHandshake($hash) if($hash->{USBDev});
   $hash->{PARTIAL} = "";
-  
+
   ZWDongle_Clear($hash);
   ZWDongle_Get($hash, $name, "caps");
   ZWDongle_Get($hash, $name, "homeId");
@@ -480,12 +486,12 @@ sub
 ZWDongle_ProcessSendStack($)
 {
   my ($hash) = @_;
-    
+
   #Log3 $hash, 1, "ZWDongle_ProcessSendStack: ".@{$hash->{SendStack}}.
   #                      " items on stack, waitForAck ".$hash->{WaitForAck};
-  
+
   RemoveInternalTimer($hash); 
-    
+
   my $ts = gettimeofday();  
 
   if($hash->{WaitForAck}){
@@ -508,11 +514,11 @@ ZWDongle_ProcessSendStack($)
   if($hash->{SendRetries} > $hash->{MaxSendRetries}){
     ZWDongle_shiftSendStack($hash, 1, 1, "ERROR: max send retries reached");
   }
-  
+
   return if(!@{$hash->{SendStack}} ||
                $hash->{WaitForAck} ||
                !DevIo_IsOpen($hash));
-  
+
   my $msg = $hash->{SendStack}->[0];
 
   DevIo_SimpleWrite($hash, $msg, 1);
@@ -618,9 +624,9 @@ ZWDongle_Read($@)
 
     ZWDongle_shiftSendStack($hash, 1, 5, "device ack reveived", $1)
         if($msg =~ m/^0013(..)/);
-    
+
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
-    $hash->{PARTIAL} = $data;	 # Recursive call by ZWave get, Forum #37418
+    $hash->{PARTIAL} = $data;    # Recursive call by ZWave get, Forum #37418
     ZWDongle_Parse($hash, $name, $msg) if($init_done);
 
     $data = $hash->{PARTIAL};
@@ -628,10 +634,10 @@ ZWDongle_Read($@)
   }
 
   $hash->{PARTIAL} = $data;
-  
+
   # trigger sending of next message
   ZWDongle_ProcessSendStack($hash) if(length($data) == 0);
-  
+
   return $msg if(defined($local));
   return undef;
 }
@@ -658,7 +664,7 @@ ZWDongle_ReadAnswer($$$)
         if($hash->{GotCAN}) {
           ZWDongle_ProcessSendStack($hash);
           next;
-	}
+        }
         return ("Timeout reading answer for get $arg", undef);
       }
 
@@ -733,7 +739,7 @@ ZWDongle_Attr($$$$)
   my ($cmd, $name, $attr, $value) = @_;
   my $hash = $defs{$name};
   $attr = "" if(!$attr);
-  
+
   if($attr eq "disable") {
     if($cmd eq "set" && ($value || !defined($value))) {
       DevIo_CloseDev($hash) if(!AttrVal($name,"dummy",undef));
@@ -759,7 +765,7 @@ ZWDongle_Attr($$$$)
   }
 
   return undef;  
-  
+
 }
 
 #####################################
@@ -875,6 +881,12 @@ ZWDongle_Ready($)
   <li>replaceFailedNode<br>
     Replace a non-responding node with a new one. The non-responding node
     must be on the failed Node list.</li>
+	
+  <li>sucNodeId [nodeId] [sucState] [capabilities]<br>
+    Configure a Controller Node to be a SUC/SIS or not. 
+    [nodeId] to be SUC/SIS
+    [sucState] 0 = deactivate; 1 = activate
+    [capabilities] 0 = basic SUC 1 = SIS</li>
 
   </ul>
   <br>
@@ -912,6 +924,11 @@ ZWDongle_Ready($)
 
   <li>raw<br>
     Send raw data to the controller. Developer only.</li>
+	
+  <li>sucNodeId<br>
+    return the currently registered SUC node ID.
+    </li>
+	
   </ul>
   <br>
 
@@ -953,6 +970,8 @@ ZWDongle_Ready($)
   <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
     </li>
   <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]
+    </li>
+  <li>ZW_SET_SUC_NODE_ID [setSucNodeOk|setSucNodefailed]
     </li>
   </ul>
 
