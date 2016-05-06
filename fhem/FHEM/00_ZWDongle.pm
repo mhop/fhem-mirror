@@ -24,11 +24,14 @@ my %sets = (
   "addNode"          => { cmd => "4a%02x@",    # ZW_ADD_NODE_TO_NETWORK'
                           param => { onNw   =>0xc1, on   =>0x81, off=>0x05,
                                      onNwSec=>0xc1, onSec=>0x81 } },
-  "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
-                          param => {onNw=>0xc1, on=>0x81, off=>0x05 } },
+  "backupCreate"     => { cmd => "" },
+  "backupRestore"    => { cmd => "" },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
   "factoryReset"     => { cmd => ""       },   # ZW_SET_DEFAULT
   "removeFailedNode" => { cmd => "61%02x@" },  # ZW_REMOVE_FAILED_NODE_ID
+  "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
+                          param => {onNw=>0xc1, on=>0x81, off=>0x05 } },
+  "reopen"           => { cmd => "" },
   "replaceFailedNode"=> { cmd => "63%02x@" },  # ZW_REPLACE_FAILED_NODE
   "sendNIF"          => { cmd => "12%02x05@" },# ZW_SEND_NODE_INFORMATION
   "setNIF"           => { cmd => "03%02x%02x%02x%02x" },
@@ -36,9 +39,6 @@ my %sets = (
   "sucNodeId"        => { cmd => "54%02x%02x25%02x@"},
                                               # ZW_SET_SUC_NODE_ID
   "timeouts"         => { cmd => "06%02x%02x" }, # SERIAL_API_SET_TIMEOUTS
-  "reopen"           => { cmd => "" },
-  "backupCreate"     => { cmd => "" },
-  "backupRestore"    => { cmd => "" },
 );
 
 my %gets = (
@@ -51,10 +51,10 @@ my %gets = (
   "nodeInfo"        => "41%02x",  # ZW_GET_NODE_PROTOCOL_INFO
   "nodeList"        => "02",      # SERIAL_API_GET_INIT_DATA
   "random"          => "1c%02x",  # ZW_GET_RANDOM
+  "raw"             => "%s",      # hex
   "sucNodeId"       => "56",      # ZW_GET_SUC_NODE_ID
   "timeouts"        => "06",      # SERIAL_API_SET_TIMEOUTS
   "version"         => "15",      # ZW_GET_VERSION
-  "raw"             => "%s",      # hex
 );
 
 sub
