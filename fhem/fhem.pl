@@ -3920,6 +3920,7 @@ readingsEndUpdate($$)
       my $oldt= $userReading->{t};
       #Debug "Evaluating " . $reading;
       $cmdFromAnalyze = $perlCode;      # For the __WARN__ sub
+      my $NAME = $name; # no exceptions, #53069
       my $value= eval $perlCode;
       $cmdFromAnalyze = undef;
       my $result;
