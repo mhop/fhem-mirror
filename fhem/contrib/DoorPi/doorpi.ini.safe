@@ -144,7 +144,7 @@ button2         = sleep:0
 10 = os_execute:/etc/init.d/mjpg-streamer start
 
 #-- stop video stream
-[EVENT_OnKeyPressed_webservice.snapshot]
+[EVENT_OnKeyPressed_webservice.streamoff]
 10 = os_execute:/etc/init.d/mjpg-streamer stop
 
 #-- obtain the target call number from FHEM
