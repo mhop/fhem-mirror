@@ -186,7 +186,7 @@ if (\$EVTPART0 eq \"start\") {\
 \	
 #	fhem \"define atTmp_1_\$NAME at +00:10:00 set BR_Shutter:FILTER=pct<20 pct 20\";;\
 #	fhem \"define atTmp_2_\$NAME at +00:20:00 set BR_Shutter:FILTER=pct<40 pct 40\";;\
-#	fhem \"define atTmp_4_\$NAME at +00:30:00 msg audio \@Sonos_Bedroom |Hint| Es ist \".\$EVTPART1.\" Uhr, Zeit zum aufstehen!;;;; set BR_FloorLamp:FILTER=pct<100 pct 100 60;;;; sleep 10;;;; set BR_Shutter:FILTER=pct<60 pct 60;;;; set Sonos_Bedroom:FILTER=Volume<10 Volume 10 10\";;\
+#	fhem \"define atTmp_4_\$NAME at +00:30:00 msg audio \\\@Sonos_Bedroom |Hint| Es ist \".\$EVTPART1.\" Uhr, Zeit zum aufstehen!;;;; set BR_FloorLamp:FILTER=pct<100 pct 100 60;;;; sleep 10;;;; set BR_Shutter:FILTER=pct<60 pct 60;;;; set Sonos_Bedroom:FILTER=Volume<10 Volume 10 10\";;\
 \
 	# if wake-up should be enforced\
 	if (\$EVTPART3) {\
@@ -384,7 +384,7 @@ if (\$EVTPART0 eq \"stop\") {\
 #	\$text = \"|Hint| $wakeupUserdeviceRealname, dein Wecker ist auf \$nextWakeup Uhr gestellt. Gute Nacht und schlaf gut.\";;
 #}
 #if (\$nextWakeup ne \"none\") {
-#	fhem \"set Sonos_Bedroom RemoveMember Sonos_Bedroom;; sleep 0.5;; msg audio \@Sonos_Bedroom \$text\";;\
+#	fhem \"set Sonos_Bedroom RemoveMember Sonos_Bedroom;; sleep 0.5;; msg audio \\\@Sonos_Bedroom \$text\";;\
 #}
 \
 }";
