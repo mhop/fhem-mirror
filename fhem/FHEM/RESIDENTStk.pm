@@ -444,7 +444,7 @@ if (\$EVTPART0 eq \"stop\") {\
 ##\
 \
 ## Play morning announcement via SONOS at Bedroom\
-#fhem \"set Sonos_Bedroom Stop;; msg audio \@Sonos_Bedroom |Hint| Guten Morgen, $wakeupUserdeviceRealname<.\";;\
+#fhem \"set Sonos_Bedroom Stop;; msg audio \\\@Sonos_Bedroom |Hint| Guten Morgen, $wakeupUserdeviceRealname<.\";;\
 \
 ## In 10 seconds, start webradio playback in Bedroom\
 #fhem \"sleep 10;; set Sonos_Bedroom StartRadio /Charivari/;; sleep 2;; set Sonos_Bedroom Volume 15\";;\
@@ -650,7 +650,7 @@ if (\$EVTPART0 eq \"stop\") {\
 ## In 90 minutes, switch House Mode to 'day' and\
 ## play voice announcement via SONOS\
 #if (!defined($defs{\"atTmp_HouseMode_day\"})) {\
-#	fhem \"define atTmp_HouseMode_day at +01:30:00 {if (ReadingsVal(\\\"HouseMode\\\", \\\"state\\\", 0) ne \\\"day\\\") {fhem \\\"msg audio \@Sonos_Kitchen Tagesmodus wird etabliert.;;;; sleep 10;;;; set HouseMode day\\\"}}\";;\
+#	fhem \"define atTmp_HouseMode_day at +01:30:00 {if (ReadingsVal(\\\"HouseMode\\\", \\\"state\\\", 0) ne \\\"day\\\") {fhem \\\"msg audio \\\@Sonos_Kitchen Tagesmodus wird etabliert.;;;; sleep 10;;;; set HouseMode day\\\"}}\";;\
 #}\
 \
 }";
