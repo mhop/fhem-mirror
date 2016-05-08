@@ -17,12 +17,12 @@ SetExtensionsCancel($)
   return undef if( !$hash );
   my $name = $hash->{NAME};
 
-  return undef if( !$hash->{SetExtensionTimer} );
-  my $cmd = $hash->{SetExtensionTimer}{CMD};
+  return undef if( !$hash->{TIMED_OnOff} );
+  my $cmd = $hash->{TIMED_OnOff}{CMD};
 
   RemoveInternalTimer("SE $name $cmd");
 
-  delete $hash->{SetExtensionTimer};
+  delete $hash->{TIMED_OnOff};
 
   return undef;
 }
@@ -84,7 +84,7 @@ SetExtensions($$@)
     return "$cmd requires a number as argument" if($param !~ m/^\d*\.?\d*$/);
 
     if($param) {
-      $hash->{SetExtensionTimer} = {
+      $hash->{TIMED_OnOff} = {
         START=>time(), START_FMT=>TimeNow(), DURATION=>$param, CMD=>$cmd 
       };
       DoSet($name, $cmd1);
@@ -175,7 +175,7 @@ SetExtensionsFn($)
   my $hash = $defs{$name};
   return if(!$hash);
 
-  delete $hash->{SetExtensionTimer};
+  delete $hash->{TIMED_OnOff};
 
   if($cmd eq "on-for-timer") {
     DoSet($name, "off");
