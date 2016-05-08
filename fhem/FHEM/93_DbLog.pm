@@ -1342,17 +1342,27 @@ DbLog_Get($@)
 
         if(Scalar::Util::looks_like_number($sql_value)){
           #nur setzen wenn nummerisch
-          if($sql_value < $min[$i]) {
-            $min[$i] = $sql_value;
-            $mind[$i] = $sql_timestamp;
-          }
-          if($sql_value > $max[$i]) {
-            $max[$i] = $sql_value;
-            $maxd[$i] = $sql_timestamp;
-          }
           if($deltacalc) {
+            if(Scalar::Util::looks_like_number($out_value)){
+              if($out_value < $min[$i]) {
+                $min[$i] = $out_value;
+                $mind[$i] = $out_tstamp;
+              }
+              if($out_value > $max[$i]) {
+                $max[$i] = $out_value;
+                $maxd[$i] = $out_tstamp;
+              }
+            }
             $maxval = $sql_value;
           } else {
+            if($sql_value < $min[$i]) {
+              $min[$i] = $sql_value;
+              $mind[$i] = $sql_timestamp;
+            }
+            if($sql_value > $max[$i]) {
+              $max[$i] = $sql_value;
+              $maxd[$i] = $sql_timestamp;
+            }
             $sum[$i] += $sql_value;
             $minval = $sql_value if($sql_value < $minval);
             $maxval = $sql_value if($sql_value > $maxval);
@@ -1366,8 +1376,10 @@ DbLog_Get($@)
         }
         if(!$deltacalc) {
           $cnt[$i]++;
+          $lastv[$i] = $sql_value;
+        } else {
+          $lastv[$i] = $out_value if($out_value);
         }
-        $lastv[$i] = $sql_value;
         $lastd[$i] = $sql_timestamp;
       }
     } #while fetchrow
