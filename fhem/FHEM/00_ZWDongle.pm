@@ -44,7 +44,6 @@ my %sets = (
 my %gets = (
   "caps"            => "07",      # SERIAL_API_GET_CAPABILITIES
   "ctrlCaps"        => "05",      # ZW_GET_CONTROLLER_CAPS
-  "getVirtualNodes" => "a5",      # ZW_GET_VIRTUAL_NODES
   "homeId"          => "20",      # MEMORY_GET_ID
   "isFailedNode"    => "62%02x",  # ZW_IS_FAILED_NODE
   "neighborList"    => "80%02x",  # GET_ROUTING_TABLE_LINE
@@ -388,9 +387,6 @@ ZWDongle_Get($@)
       push @list, $type[$bit] if(($r[2] & (1<<$bit)) && $bit < @type);
     }
     $msg = join(" ", @list);
-
-  } elsif($cmd eq "getVirtualNodes") {         ############################
-    $msg = join(" ", @r);
 
   } elsif($cmd eq "nodeInfo") {                ############################
     my $id = sprintf("%02x", $r[6]);
