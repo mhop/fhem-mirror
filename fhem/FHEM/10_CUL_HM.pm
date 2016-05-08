@@ -3350,16 +3350,16 @@ sub CUL_HM_parseSDteam_2(@){#handle SD team events
       #$smokeSrc = $dName;
     }
     push @evtEt,[$sHash,1,'level:'.$sVal];
-    foreach (@tHash){
-      push @evtEt,[$_,1,"state:$sProsa"];
-      push @evtEt,[$_,1,"smoke_detect:$smokeSrc"];
-    }
   }
   elsif($sVal == 150){#alarm teamcall
     push @evtEt,[$_,1,"teamCall:from $dName:$No"] foreach (@tHash);
   }
   elsif($sVal == 151){#alarm teamcall repeat
     push @evtEt,[$dHash,1,"MsgRepeated $No"];#unclear. first repeater send 97 instead of 96. What about 2nd ans third repeater?
+  }
+  foreach (@tHash){
+    push @evtEt,[$_,1,"state:$sProsa"];
+    push @evtEt,[$_,1,"smoke_detect:$smokeSrc"];
   }
   push @evtEt,[$dHash,1,"battery:"   .((hex($chn)&0x80) ? "low":"ok")];
   push @evtEt,[$sHash,1,"eventNo:".$No];
