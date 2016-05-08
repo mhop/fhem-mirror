@@ -391,7 +391,7 @@ sub CUL_HM_updateConfig($){
     $webCmd  = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
       if    ($st eq "virtual"      ){
-        if   ($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead")    {$webCmd="teamCall:alarmOn:alarmOff";}
+        if   ($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead1")   {$webCmd="teamCall:alarmOn:alarmOff";}
         elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "vdCtrl")    {$webCmd="valvePos";}
         elsif($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "virtThSens"){$webCmd="virtTemp:virtHum";}
         elsif(!$hash->{helper}{role}{dev})                                 {$webCmd="press short:press long";}
@@ -418,7 +418,7 @@ sub CUL_HM_updateConfig($){
         else{                           $webCmd="statusRequest:getConfig:clear msgEvents";}
       }
       elsif($st eq "smokeDetector"){   $webCmd="statusRequest";
-        if (defined $hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead"){
+        if (defined $hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead1"){
                                         $webCmd.=":teamCall:alarmOn:alarmOff";}
       }
       elsif($st eq "keyMatic"     ){   $webCmd="lock:inhibit on:inhibit off";
@@ -2317,7 +2317,12 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,""];
     }
     elsif ($mh{mTp} =~ m /^4[01]/){# if channel is SD team we have to act
-      CUL_HM_parseSDteam($mh{mTp},$mh{src},$mh{dst},$mh{p});
+      if ($mh{cHash}->{helper}{fkt} eq "sdLead2"){
+        CUL_HM_parseSDteam_2($mh{mTp},$mh{src},$mh{dst},$mh{p});
+      }
+      else{
+        CUL_HM_parseSDteam($mh{mTp},$mh{src},$mh{dst},$mh{p});
+      }
     }
   }
   elsif($mh{st} eq "outputUnit"){ #############################################
@@ -3286,6 +3291,7 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
     push @evtEt,[$sHash,1,'level:'.$sVal];
     push @evtEt,[$sHash,1,"eventNo:".$No];
     push @evtEt,[$sHash,1,"smoke_detect:".$smokeSrc];
+
     foreach (split ",",$attr{$sName}{peerIDs}){
       my $tHash = CUL_HM_id2Hash($_);
       push @evtEt,[$tHash,1,"state:$sProsa"];
@@ -3779,6 +3785,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       $usg =~ s/ templateDel//;#not an option
     }
+	if ( $usg =~ m/ press/){
+      my $peers = join",",grep/./,split",",InternalVal($name,"peerList","");
+      if ($peers){
+        $usg =~ s/ press/ press pressS:$peers pressL:$peers/g;
+      }
+      else{#remove command
+        $usg =~ s/ press[SL]//g;
+      }
+	}
     return $usg;
   }
   elsif($h eq "" && @a != 2) {
@@ -5075,7 +5090,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "teamCall") { #################################################
     $state = "";
-    if ($md eq "HM-CC-SCD"){
+    if ($md ne "HM-SEC-SD-2"){#{$md eq "HM-CC-SCD"){
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
       my $tstNo = sprintf("%02X",$testnr);
@@ -5083,7 +5098,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_PushCmdStack($hash, $msg);
       CUL_HM_parseSDteam("40",$dst,$dst,"00".$tstNo);
     }
-    elsif ("HM-SEC-SD-2"){
+    else {#if ($md eq "HM-SEC-SD-2"){
       #1441 44E347 44E347 0102 960000 039190BDC8
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
@@ -5160,9 +5175,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
 
-  elsif($cmd eq "press") { ####################################################
+  elsif($cmd =~ m/press(.*)/) { ###############################################
     # [long|short] [<peer>] [<repCount(long only)>] [<repDelay>] [<forceTiming[0|1]>] ...
     my ($repCnt,$repDly,$forceTiming,$mode) = (0,0,0,0);
+    if($cmd eq "pressL"){
+      splice @a,2,0, ("long");
+    }
+    elsif($cmd eq "pressS"){
+      splice @a,2,0, ("short");
+    }
+    
     if ($a[2]){
       ##############################
       if ($a[2] eq "long"){
@@ -5631,20 +5653,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($devHash->{cmdStack}                  &&
         $devHash->{helper}{prt}{sProc} != 1    # not processing
         ){
-#    if($rxType & 0x02){# prepare tripple burst devices
-#      #General we test here
-#      my ($mn,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
-#      Log 1,"General burst $name:".${$devHash->{cmdStack}}[0];
-#      if($mn eq "++") {
-#        $mn = ($devHash->{helper}{HM_CMDNR} + 1) & 0xff;
-#        $devHash->{helper}{HM_CMDNR} = $mn;
-#      }
-#      $devHash->{cmdStack}[0] = sprintf("%02X%02X%s",$mn,(hex($tp)|0x10),$tail);
-#      CUL_HM_SndCmd($devHash,"$devHash->{cmdStack}[0]");
-#      select(undef, undef, undef, 0.3);
-#      CUL_HM_SndCmd($devHash,"$devHash->{cmdStack}[0]");
-#      CUL_HM_ProcessCmdStack($devHash);
-#    }
     if($rxType & 0x02){# handle burst Access devices - add burst Bit
       if($st eq "thermostat"){ # others do not support B112
         CUL_HM_SndCmd($devHash,"++B112$id$dst");
@@ -6399,7 +6407,6 @@ sub CUL_HM_respPendTout($) {
   my ($HMidIn) =  @_;
   my(undef,$HMid) = split(":",$HMidIn,2);
   my $hash = $modules{CUL_HM}{defptr}{$HMid};
- 
   my $pHash = $hash->{helper}{prt};#shortcut
   if ($hash && $hash->{DEF} ne '000000'){# we know the device
     my $name = $hash->{NAME};
@@ -6723,7 +6730,7 @@ sub CUL_HM_ID2PeerList ($$$) {
   my $peerNames = "";                               #prepare names
   my $dId = substr(CUL_HM_name2Id($name),0,6);      #get own device ID
   foreach my $pId (sort(keys %tmpHash)){
-    next if ($pId !~ m/^[0-9A-Fx]{8}$/);             #ignore non-channel IDs
+    next if ($pId !~ m/^[0-9A-Fx]{8}$/);            #ignore non-channel IDs
     $peerIDs .= $pId.",";                           #append ID
     next if ($pId eq "00000000");                   # and end detection
     $peerNames .= CUL_HM_peerChName($pId,$dId).",";
@@ -6743,13 +6750,18 @@ sub CUL_HM_ID2PeerList ($$$) {
       #if any of the peers is an SD we are team master
       my ($tMstr,$tcSim,$thSim) = (0,0,0);
       foreach (split(",",$peerNames)){
-        $tMstr = 1 if(AttrVal($_,"subType","") eq "smokeDetector");
+#        $tMstr = 1 if(AttrVal($_,"subType","") eq "smokeDetector");        
+        
+        if(AttrVal($_,"subType","") eq "smokeDetector"){#have smoke detector
+          $tMstr = AttrVal($_,"model","") eq "HM-SEC-SD-2"? 2:1;#differentiate SD and SD2
+        }
+        
         $tcSim = 1 if(AttrVal($_,"model","")   =~ m /(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/);
         my $pch = (substr(CUL_HM_name2Id($_),6,2));
         $thSim = 1 if(AttrVal($_,"model","")   =~ m /HM-CC-RT-DN/ && $pch eq "01");
       }
       if   ($tMstr){
-        $hash->{helper}{fkt}="sdLead";
+        $hash->{helper}{fkt}="sdLead".$tMstr;
         $hash->{sdTeam}="sdLead";
         CUL_HM_updtSDTeam($name);
       }
@@ -6767,7 +6779,7 @@ sub CUL_HM_ID2PeerList ($$$) {
         my $tn = ($_ =~ m/self/)?$name:$_;
         next if (!$defs{$tn});
         $defs{$tn}{sdTeam} = "sdLead" ;
-        $defs{$tn}{helper}{fkt}="sdLead";
+        $defs{$tn}{helper}{fkt} = "sdLead".(AttrVal($name,"model","") eq "HM-SEC-SD-2"? 2:1);
       }
       if($peerNames !~ m/self/){
         delete $hash->{sdTeam};
@@ -9151,6 +9163,12 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                    set actor press fhem02 # trigger short of FHEM channel 2<br>
                 </code>
             </li>
+            <li><B>pressL &lt;peer&gt;</B><a name="CUL_HMpressL"></a><br>
+                simulates a long press for a given peer. See press for details
+            </li>
+            <li><B>pressS &lt;peer&gt;</B><a name="CUL_HMpressS"></a><br>
+                simulates a long press for a given peer. See press for details
+            </li>
             <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggle the Actor. It will switch from any current
                  level to off or from off to 100%</li>
           </ul>
@@ -10494,6 +10512,13 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             <li><B>toggle</B><a name="CUL_HMtoggle"></a> - toggled den Aktor. Schaltet vom aktuellen Level auf
               0% oder von 0% auf 100%</li>
           </ul>
+            <li><B>pressL &lt;peer&gt;</B><a name="CUL_HMpressL"></a><br>
+                Simuliert einen langen Tastendruck für einen angegebenen peer. Siehe press.
+            </li>
+            <li><B>pressS &lt;peer&gt;</B><a name="CUL_HMpressS"></a><br>
+                Simuliert einen kurzen Tastendruck für einen angegebenen peer. Siehe press.
+            </li>
+
           <br>
         </li>
         <li>dimmer, blindActuator<br>
