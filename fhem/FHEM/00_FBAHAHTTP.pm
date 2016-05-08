@@ -181,7 +181,7 @@ FBAHAHTTP_Write($$$)
         delete $hash->{".SID"};
         return;
       }
-      Log 1, "FBAHAHTTP_Write reply for $name: $_[2]";
+      Log 5, "FBAHAHTTP_Write reply for $name: $_[2]";
     }
   });
 }
