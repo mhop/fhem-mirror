@@ -9,6 +9,25 @@ sub SetExtensions($$@);
 sub SetExtensionsFn($);
 
 sub
+SetExtensionsCancel($)
+{
+  my ($hash) = @_;
+  $hash = $defs{$hash} if( ref($hash) ne 'ARRAY' );
+
+  return undef if( !$hash );
+  my $name = $hash->{NAME};
+
+  return undef if( !$hash->{SetExtensionTimer} );
+  my $cmd = $hash->{SetExtensionTimer}{CMD};
+
+  RemoveInternalTimer("SE $name $cmd");
+
+  delete $hash->{SetExtensionTimer};
+
+  return undef;
+}
+
+sub
 SetExtensions($$@)
 {
   my ($hash, $list, $name, $cmd, @a) = @_;
@@ -61,10 +80,13 @@ SetExtensions($$@)
   my $param = $a[0];
 
   if($cmd eq "on-for-timer" || $cmd eq "off-for-timer") {
-    RemoveInternalTimer("SE $name $cmd");
+    SetExtensionsCancel($hash);
     return "$cmd requires a number as argument" if($param !~ m/^\d*\.?\d*$/);
 
     if($param) {
+      $hash->{SetExtensionTimer} = {
+        START=>time(), START_FMT=>TimeNow(), DURATION=>$param, CMD=>$cmd 
+      };
       DoSet($name, $cmd1);
       InternalTimer(gettimeofday()+$param,"SetExtensionsFn","SE $name $cmd",0);
     }
@@ -150,8 +172,10 @@ sub
 SetExtensionsFn($)
 {
   my (undef, $name, $cmd) = split(" ", shift, 3);
-  return if(!defined($defs{$name}));
+  my $hash = $defs{$name};
+  return if(!$hash);
 
+  delete $hash->{SetExtensionTimer};
 
   if($cmd eq "on-for-timer") {
     DoSet($name, "off");
