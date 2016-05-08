@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: added new module 37_plex.pm
   - feature: FBAHAHTTP module as replacement for the deprecated FBAHA
   - feature: 50_TelegramBot reply set command / allowedCommands as restriction
   - change:  49_SSCam: get "snapfileinfo" will get back an Infomessage if 
