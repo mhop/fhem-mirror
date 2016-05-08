@@ -2,8 +2,6 @@
 # $Id$
 package main;
 
-# TODO: test multi-dev, test on the FB
-
 use strict;
 use warnings;
 use SetExtensions;
@@ -73,8 +71,6 @@ FBDECT_Define($$)
   if($ioNameAndId =~ m/^([^:]*):(.*)$/) {
     $ioName = $1; $id = $2;
   }
-  return "define $name: wrong id ($id): need a number"
-                   if( $id !~ m/^\d+$/i );
   $hash->{id} = $id;
   $hash->{props} = shift @a;
 
@@ -84,14 +80,57 @@ FBDECT_Define($$)
 }
  
 ###################################
-my %sets = ("on"=>1, "off"=>1, "msgInterval"=>1);
+sub
+FBDECT_SetHttp($@)
+{
+  my ($hash, @a) = @_;
+  my %cmd;
+  my $p = $hash->{props};
+
+  if($p =~ m/switch/) {
+    $cmd{off} = $cmd{on} = $cmd{toggle} = "noArg";
+  }
+  if($p =~ m/actuator/) {
+    $cmd{"desired-temp"} = "slider,8,0.5,28,1";
+    $cmd{open} = $cmd{closed} = "noArg";
+  }
+  if(!$cmd{$a[1]}) {
+    my $cmdList = join(" ", map { "$_:$cmd{$_}" } sort keys %cmd);
+    return SetExtensions($hash, $cmdList, @a)
+  }
+
+  my $cmd = $a[1];
+  if($cmd =~ m/^(on|off|toggle)$/) {
+    IOWrite($hash, ReadingsVal($hash->{NAME},"AIN",0), "setswitch$cmd");
+    my $state = ($cmd eq "toggle" ? ($hash->{state} eq "on" ? "off":"on"):$cmd);
+    readingsSingleUpdate($hash, "state", $state, 1);
+    return undef;
+  }
+
+  if($cmd =~ m/^(open|closed|desired-temp)$/) {
+    if($cmd eq "desired-temp") { 
+      return "Usage: set $hash->{NAME} desired-temp value" if(int(@a) != 3);
+      return "desired-temp must be between 8 and 28"
+        if($a[2] !~ m/^[\d.]+$/ || $a[2] < 8 || $a[2] > 28)
+    }
+    my $val = ($cmd eq "open" ? 254 : ($cmd eq "closed" ? 253: int(2*$a[2])));
+    IOWrite($hash, ReadingsVal($hash->{NAME},"AIN",0),"sethkrtsoll&param=$val");
+    return undef;
+  }
+}
+
+###################################
 sub
 FBDECT_Set($@)
 {
   my ($hash, @a) = @_;
+  my %sets = ("on"=>1, "off"=>1, "msgInterval"=>1);
+
+  return FBDECT_SetHttp($hash, @a)
+    if($hash->{IODev} && $hash->{IODev}{TYPE} eq "FBAHAHTTP");
+
   my $ret = undef;
   my $cmd = $a[1];
-
   if(!$sets{$cmd}) {
     my $usage =  join(" ", sort keys %sets);
     return SetExtensions($hash, $usage, @a);
@@ -118,17 +157,17 @@ FBDECT_Set($@)
   return undef;
 }
 
-my %gets = ("devInfo"=>1);
 sub
 FBDECT_Get($@)
 {
   my ($hash, @a) = @_;
   my $ret = undef;
   my $cmd = ($a[1] ? $a[1] : "");
+  my %gets = ("devInfo"=>1);
 
-  if(!$gets{$cmd}) {
-    return "Unknown argument $cmd, choose one of ".join(" ", sort keys %gets);
-  }
+  my $cmdList = ($hash->{IODev} && $hash->{IODev}{TYPE} eq "FBAHA") ? 
+                  join(" ", sort keys %gets) : "";
+  return "Unknown argument $cmd, choose one of $cmdList" if(!$gets{$cmd});
 
   if($cmd eq "devInfo") {
     my @answ = FBAHA_getDevList($hash->{IODev}, $hash->{id});
@@ -159,14 +198,87 @@ FBDECT_Get($@)
   return undef;
 }
 
+my %fbhttp_readings = (
+   absenk          => 'sprintf("night-temp:%.1f C", $val/2)',
+   celsius         => 'sprintf("temperature:%.1f C (measured)", $val/10)',
+   energy          => 'sprintf("energy:%d Wh", $val)',
+   functionbitmask => '"FBPROP:$fbprop"',
+   fwversion       => '"fwversion:$val"',
+   id              => '"ID:$val"',
+   identifier      => '"AIN:$val"',
+   komfort         => 'sprintf("day-temp:%.1f C", $val/2)',
+   lock            => '"locked:".($val ? "yes":"no")',
+   mode            => '"mode:$val"',
+   name            => '"FBNAME:$val"',
+   offset          => 'sprintf("tempadjust:%.1f C", $val/10)', # ??
+   power           => 'sprintf("power:%.2f W", $val/1000)',
+   present         => '"present:".($val?"yes":"no")',
+   productname     => '"FBTYPE:$val"',
+   state           => '"state:".($val?"on":"off")',
+   tist            => 'sprintf("temperature:%.1f C (measured)", $val/2)',
+   tsoll           => 'sprintf("desired-temp:%.1f C", $val/2)',
+);
+
+sub
+FBDECT_ParseHttp($$)
+{
+  my ($iodev, $msg, $local) = @_;
+  my $ioName = $iodev->{NAME};
+  my %h;
+
+  $msg =~ s,<([^/>]+?)>([^<]+?)<,$h{$1}=$2,ge; # Quick & Dirty: Tags
+  $msg =~ s, ([a-z]+?)="([^"]+)",$h{$1}=$2,ge; # Quick & Dirty: Attributes
+
+  my $ain = $h{identifier};
+  $ain =~ s/[: ]/_/g;
+
+  my %ll = (6=>"actuator", 7=>"powerMeter", 8=>"tempSensor",
+            9=>"switch", 10=>"repeater");
+  my $lsn = int($h{functionbitmask});
+  my @fb;
+  map { push @fb, $ll{$_} if((1<<$_) & $lsn) } sort keys %ll;
+  my $fbprop = join(",", @fb);
+
+  my $dp = $modules{FBDECT}{defptr};
+  my $hash = $dp->{"$ioName:$ain"};
+  $hash = $dp->{$ain}             if(!$hash);
+  $hash = $dp->{"$ioName:$h{id}"} if(!$hash);
+  $hash = $dp->{$h{id}}           if(!$hash);
+
+  if(!$hash) {
+    my $ret = "UNDEFINED FBDECT_${ioName}_$ain FBDECT $ioName:$ain $fbprop";
+    Log3 $ioName, 3, "$ret, please define it";
+    DoTrigger("global", $ret);
+    return "";
+  }
+
+  $hash->{props} = $fbprop; # replace values from define
+  readingsBeginUpdate($hash);
+  Log3 $hash, 5, $hash->{NAME};
+  foreach my $n (keys %h) {
+    Log3 $hash, 5, "   $n = $h{$n}";
+    next if(!$fbhttp_readings{$n});
+    my $val = $h{$n};
+    my ($ptyp,$pyld) = split(":", eval $fbhttp_readings{$n}, 2);
+    readingsBulkUpdate($hash, $ptyp, $pyld);
+    readingsBulkUpdate($hash, "state", "desired-temp: ".($val/2))
+        if($n eq "tsoll"); # Exception
+  }
+  readingsEndUpdate($hash, 1);
+
+  return $hash->{NAME};
+}
+
 ###################################
 sub
 FBDECT_Parse($$@)
 {
   my ($iodev, $msg, $local) = @_;
-  my $ioName = $iodev->{NAME};
 
   my $mt = substr($msg, 0, 2);
+  return FBDECT_ParseHttp($iodev, $msg) if($mt eq "<d");
+
+  my $ioName = $iodev->{NAME};
   if($mt ne "07" && $mt ne "04") {
     Log3 $ioName, 1, "FBDECT: unknown message type $mt";
     return "";  # Nobody else is able to handle this
@@ -361,15 +473,14 @@ FBDECT_Undef($$)
 <h3>FBDECT</h3>
 <ul>
   This module is used to control AVM FRITZ!DECT devices via FHEM, see also the
-  <a href="#FBAHA">FBAHA</a> module for the base.
+  <a href="#FBAHA">FBAHA</a> or <a href="#FBAHAHTTP">FBAHAHTTP</a> module for
+  the base.
   <br><br>
   <a name="FBDECTdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FBDECT [&lt;FBAHAname&gt;:]&lt;homeId&gt; &lt;id&gt; [classes]</code>
+    <code>define &lt;name&gt; FBDECT [&lt;FBAHAname&gt;:]&lt;id&gt; props</code>
   <br>
-  <br>
-  &lt;id&gt; is the id of the device, the classes argument ist ignored for now.
   <br>
   Example:
   <ul>
@@ -387,11 +498,18 @@ FBDECT_Undef($$)
   <b>Set</b>
   <ul>
   <li>on/off<br>
-  set the device on or off.</li>
-  <li>
-   <a href="#setExtensions">set extensions</a> are supported.</li>
+    set the device on or off.
+    </li>
+
+  <li>desired-temp &lt;value&gt;<br>
+    set the desired temp on a Comet DECT (FBAHAHTTP IOdev only)
+    </li>
+
+  <li><a href="#setExtensions">set extensions</a> are supported.
+   </li>
+
   <li>msgInterval &lt;sec&gt;<br>
-    Number of seconds between the sensor messages.
+    Number of seconds between the sensor messages (FBAHA IODev only).
     </li>
   </ul>
   <br>
@@ -400,7 +518,8 @@ FBDECT_Undef($$)
   <b>Get</b>
   <ul>
   <li>devInfo<br>
-  report device information</li>
+    report device information (FBAHA IODev only)
+    </li>
   </ul>
   <br>
 
@@ -448,24 +567,23 @@ FBDECT_Undef($$)
 <h3>FBDECT</h3>
 <ul>
   Dieses Modul wird verwendet, um AVM FRITZ!DECT Ger&auml;te via FHEM zu
-  steuern, siehe auch das <a href="#FBAHA">FBAHA</a> Modul f&uumlr die
-  Anbindung an das FRITZ!Box.
+  steuern, siehe auch das <a href="#FBAHA">FBAHA</a> oder <a
+  href="#FBAHAHTTP">FBAHAHTTP</a> Modul f&uumlr die Anbindung an das FRITZ!Box.
   <br><br>
   <a name="FBDECTdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FBDECT [&lt;FBAHAname&gt;:]&lt;homeId&gt; &lt;id&gt; [classes]</code>
+    <code>define &lt;name&gt; FBDECT [&lt;FBAHAname&gt;:]&lt;id&gt; props</code>
   <br>
-  <br>
-  &lt;id&gt; ist das Ger&auml;te-ID, das Argument wird z.Zt ignoriert.
   <br>
   Beispiel:
   <ul>
     <code>define lampe FBDECT 16 switch,powerMeter</code><br>
   </ul>
-  <b>Achtung:</b>FBDECT Eintr&auml;ge werden noralerweise per 
-  <a href="#autocreate">autocreate</a> angelegt. Falls sie die zugeordnete FBAHA
-  Instanz umbenennen, dann muss die FBDECT Definition manuell angepasst werden.
+  <b>Achtung:</b>FBDECT Eintr&auml;ge werden normalerweise per 
+  <a href="#autocreate">autocreate</a> angelegt. Falls sie die zugeordnete 
+  FBAHA oder FBAHAHTTP Instanz umbenennen, dann muss die FBDECT Definition
+  manuell angepasst werden.
   </ul>
   <br>
   <br
@@ -475,11 +593,17 @@ FBDECT_Undef($$)
   <ul>
   <li>on/off<br>
     Ger&auml;t einschalten bzw. ausschalten.</li>
+  <li>desired-temp &lt;value&/gt;<br>
+    Gew&uuml;nschte Temperatur beim Comet DECT setzen (nur mit FBAHAHTTP als
+    IODev).
+    </li>
   <li>
     Die <a href="#setExtensions">set extensions</a> werden
-    unterst&uuml;tzt.</li>
+    unterst&uuml;tzt.
+    </li>
   <li>msgInterval &lt;sec&gt;<br>
-    Anzahl der Sekunden zwischen den Sensornachrichten.
+    Anzahl der Sekunden zwischen den Sensornachrichten (nur mit FBAHA als
+    IODev).
     </li>
   </ul>
   <br>
@@ -488,7 +612,7 @@ FBDECT_Undef($$)
   <b>Get</b>
   <ul>
   <li>devInfo<br>
-  meldet Ger&auml;te-Informationen.</li>
+  meldet Ger&auml;te-Informationen (nur mit FBAHA als IODev)</li>
   </ul>
   <br>
 

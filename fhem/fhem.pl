@@ -2518,7 +2518,7 @@ CommandAttr($$)
     } 
 
     if($attrName eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
-      push @rets,"$sdev: unknown IODev specified";
+      push @rets,"$sdev: unknown IODev $a[2] specified";
       next;
     }
 
