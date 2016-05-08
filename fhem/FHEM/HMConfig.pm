@@ -546,7 +546,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0    ,max=>6000.0,c=>''         ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0    ,max=>6000.0,c=>''         ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0.5  ,max=>25.5  ,c=>''         ,f=>10      ,u=>'s'   ,d=>1,t=>"engine uncharge - fhem min = 0.5s for protection. HM min= 0s (use regBulk if necessary)"},
-  refRunCounter   =>{a=> 16.0,s=>1.0,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"reference run counter"},
+  refRunCounter   =>{a=> 16.0,s=>1.0,l=>1,min=>0    ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"start reference run after n non-end drives"},
 #remote mainly                                      
   longPress       =>{a=>  4.4,s=>0.4,l=>1,min=>0.3  ,max=>1.8   ,c=>'m10s3'    ,f=>''      ,u=>'s'   ,d=>0,t=>"time to detect key long press"},
   dblPress        =>{a=>  9.0,s=>0.4,l=>1,min=>0    ,max=>1.5   ,c=>''         ,f=>10      ,u=>'s'   ,d=>0,t=>"time to detect double press"},
@@ -1823,7 +1823,7 @@ $culHmChanSets{"HM-LC-Sw1PBU-FM00"}     = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 
 %culHmFunctSets = (# command depending on function
-  sdLead              =>{ alarmOn       =>""
+  sdLead1             =>{ alarmOn       =>""
                          ,alarmOff      =>""
                          ,teamCall      =>""
                         },

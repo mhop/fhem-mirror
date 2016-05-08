@@ -289,7 +289,8 @@ sub HMinfo_status($){##########################################################
   push @updates,"C_sumDefined:"."entities:$nbrE,device:$nbrD,channel:$nbrC,virtual:$nbrV";
   # ------- display status of action detector ------
   push @updates,"I_actTotal:".join",",(split" ",$modules{CUL_HM}{defptr}{"000000"}{STATE});
-  $hash->{ERRactNames} = join",",@Anames if (@Anames);
+  if (@Anames){$hash->{ERRactNames} = join",",@Anames}
+  else{ delete $hash->{ERRactNames}};
 
   # ------- what about IO devices??? ------
   push @IOdev,split ",",AttrVal($_,"IOList","")foreach (keys %IOccu);
@@ -1892,7 +1893,7 @@ sub HMinfo_loadConfig($@) {####################################################
     my @tmplCmd = split("=>",$_);
     next if (!defined $tmplCmd[4]);
     delete $HMConfig::culHmTpl{$tmplCmd[1]};
-    HMinfo_templateDef($tmplCmd[1],$tmplCmd[2],$tmplCmd[3],split(" ",$tmplCmd[4]));
+    my $r = HMinfo_templateDef($tmplCmd[1],$tmplCmd[2],$tmplCmd[3],split(" ",$tmplCmd[4]));
   }
   $HMConfig::culHmTpl{tmplDefChange} = 0;# all changes are obsolete
   $HMConfig::culHmTpl{tmplUsgChange} = 0;# all changes are obsolete
@@ -1979,7 +1980,7 @@ sub HMinfo_saveConfig($) {#####################################################
     CUL_HM_Get($defs{$dName},$dName,"saveConfig",$fN,$strict);
   }
   HMinfo_templateWrite($fN); 
-  HMinfo_purgeConfig($param) if (-e $fN && 200000 < -s $fN);# auto purge if file to big
+  HMinfo_purgeConfig($param) if (-e $fN && 1000000 < -s $fN);# auto purge if file to big
   return $id;
 }
 
@@ -2208,7 +2209,7 @@ sub HMinfo_templateDef(@){#####################################################
     $desc = "from Master $name > $pl";
   }
   # get description if marked wir ""
-  if ($desc =~ m/^"/){
+  if ($desc =~ m/^"/ && $desc !~ m/^".*"/ ){ # parse "" - search for close and remove regs inbetween
     my $cnt = 0;
     foreach (@regs){
       $desc .= " ".$_;
@@ -2397,7 +2398,7 @@ sub HMinfo_templateChk(@){#####################################################
 }
 sub HMinfo_templateList($){####################################################
   my $templ = shift;
-  my $reply = "";
+  my $reply = "defined tempates:\n";
   if(!$templ || $templ eq "all"){# list all templates
     foreach (sort keys%HMConfig::culHmTpl){
       next if ($_ =~ m/^tmpl...Change$/); #ignore control
