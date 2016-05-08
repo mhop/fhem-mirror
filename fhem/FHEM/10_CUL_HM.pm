@@ -1990,9 +1990,14 @@ sub CUL_HM_Parse($$) {#########################################################
       }
  
       if   ($mh{st} eq "dimmer"){
-        push @evtEt,[$mh{cHash},1,"overload:".(($err&0x02)?"on":"off")];
-        push @evtEt,[$mh{cHash},1,"overheat:".(($err&0x04)?"on":"off")];
-        push @evtEt,[$mh{cHash},1,"reduced:" .(($err&0x08)?"on":"off")];
+        if ($mh{md} =~ m/HM-LC-Dim.L.*/){
+          push @evtEt,[$mh{cHash},1,"loadFail:".(($err == 6)?"on":"off")];#note: err is times 2!
+        }
+        else{
+          push @evtEt,[$mh{cHash},1,"overload:".(($err&0x02)?"on":"off")];
+          push @evtEt,[$mh{cHash},1,"overheat:".(($err&0x04)?"on":"off")];
+          push @evtEt,[$mh{cHash},1,"reduced:" .(($err&0x08)?"on":"off")];
+        }
          #hack for blind  - other then behaved devices blind does not send
          #        a status info for chan 0 at power on
          #        chn3 (virtual chan) and not used up to now
@@ -8458,13 +8463,13 @@ sub CUL_HM_motionCheck($){#
 
   if (defined $defs{$name}{helper}{moStart}){
     CUL_HM_UpdtReadBulk($defs{$name},1,"state:noMotion"
-                                      ,"motion:no"
+                                      ,"motion:off"
                                       ,"motionDuration:".(int(gettimeofday())-int($defs{$name}{helper}{moStart})));
     delete $defs{$name}{helper}{moStart};
   }
   else{
     CUL_HM_UpdtReadBulk($defs{$name},1,"state:noMotion"
-                                      ,"motion:no");
+                                      ,"motion:off");
   }
 }
 
