@@ -36,7 +36,8 @@ cmdalias_Define($$$)
   return "Bad regexp: starting with *" if($param =~ m/^\*/);
   eval { qr/^$param$/ };
   return "$name: Bad regexp in $param: $@" if($@);
-  $hash->{ALIAS} = lc($alias);
+  $alias = lc($alias);
+  $hash->{ALIAS} = $alias;
   $hash->{PARAM} = $param;
   $hash->{NEWCMD} = $newcmd;
   $hash->{STATE} = "defined";
