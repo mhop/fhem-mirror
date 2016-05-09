@@ -712,7 +712,7 @@ sub FB_CALLLIST_list2html($;$)
     my $alias = AttrVal($hash->{NAME}, "alias", $hash->{NAME});
     
     my $create_readings = AttrVal($hash->{NAME}, "create-readings","0");
-    
+    my $count = 0;
     my $td_style = 'style="padding-left:6px;padding-right:6px;"';
     my @json_output = ();
     my $line;
@@ -743,10 +743,10 @@ sub FB_CALLLIST_list2html($;$)
     
     $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, FB_CALLLIST_returnTableHeader($hash), 'class="fbcalllist header"','') if(AttrVal($name, "no-table-header", "0") eq "0");
     
+    readingsBeginUpdate($hash) if($to_json and $create_readings eq "1");
+    
     if(exists($hash->{helper}{DATA}) and (scalar keys %{$hash->{helper}{DATA}}) > 0)
     {
-        my $count = 0;
-        
         my @json_list;
         
         my @list = sort { (AttrVal($name, "list-order","descending") eq "descending") ? $b <=> $a : $a <=> $b } keys %{$hash->{helper}{DATA}};
@@ -760,8 +760,6 @@ sub FB_CALLLIST_list2html($;$)
         {
             @list = grep { !$hash->{helper}{DATA}{$_}{running_call} } @list;
         }
-        
-        readingsBeginUpdate($hash) if($to_json and $create_readings eq "1");
         
         foreach my $index (@list)
         {
@@ -796,24 +794,7 @@ sub FB_CALLLIST_list2html($;$)
             push @json_output,  FB_CALLLIST_returnOrderedJSONOutput($hash, $line);
            
             $ret .= FB_CALLLIST_returnOrderedHTMLOutput($hash, $line, 'number="'.$count.'" class="fbcalllist '.($count % 2 == 1 ? "odd" : "even").'"', 'class="fbcalllist" '.$td_style);
-        }
-        
-        if($to_json and $create_readings eq "1")
-        {
-            readingsBulkUpdate($hash, "numberOfCalls", $count, 1);
-            
-            my @delete_readings;
-            
-            for my $reading (grep { /^(\d+)-/ and ($1 > $count) } keys %{$hash->{READINGS}})
-            {
-                readingsBulkUpdate($hash, $reading, "");
-                push @delete_readings, $reading;
-            }
-            
-            readingsEndUpdate($hash, 1) if($to_json and $create_readings eq "1");
-            
-            map { delete($hash->{READINGS}{$_}) } @delete_readings;
-        }
+        }  
     }
     else
     {
@@ -838,7 +819,25 @@ sub FB_CALLLIST_list2html($;$)
     $ret .= "</td></tr></table>";    
     setlocale(LC_ALL, $old_locale);
     
-   return ($to_json ? @json_output : $ret);
+    # delete old readings
+    if($to_json and $create_readings eq "1")
+    {
+        readingsBulkUpdate($hash, "numberOfCalls", $count, 1);
+        
+        my @delete_readings;
+        
+        for my $reading (grep { /^(\d+)-/ and ($1 > $count) } keys %{$hash->{READINGS}})
+        {
+            readingsBulkUpdate($hash, $reading, "");
+            push @delete_readings, $reading;
+        }
+        
+        readingsEndUpdate($hash, 1) if($to_json and $create_readings eq "1");
+        
+        map { delete($hash->{READINGS}{$_}) } @delete_readings;
+    }
+    
+    return ($to_json ? @json_output : $ret);
 }
 
 #####################################
@@ -1074,13 +1073,13 @@ sub FB_CALLLIST_updateFhemWebClients($)
     
     return undef unless($init_done);
 
-    if(exists($hash->{helper}{DATA}) and (scalar keys %{$hash->{helper}{DATA}}) > 0)
+    if(my @list = FB_CALLLIST_list2html($hash, 1))
     {
         Log3 $name, 5, "FB_CALLLIST ($name) - inform all FHEMWEB clients";
         
         # inform all FHEMWEB clients about changes
         my $count = 0;
-        foreach my $line (FB_CALLLIST_list2html($hash, 1))
+        foreach my $line (@list)
         {
             FW_directNotify($name, $line, 1);
             $count++;
