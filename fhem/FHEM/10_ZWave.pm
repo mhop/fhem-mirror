@@ -660,7 +660,9 @@ sub
 ZWave_execInits($$;$)
 {
   my ($hash, $min, $cfg) = @_;  # min = 50 for model-specific stuff
-  my @clList = split(" ", $attr{$hash->{NAME}}{classes});
+  my $cl = $attr{$hash->{NAME}}{classes};
+  return "" if(!$cl);
+  my @clList = split(" ", $cl);
   my (@initList, %seen);
 
   foreach my $cl (@clList) {
@@ -687,7 +689,7 @@ ZWave_execInits($$;$)
     my $ret = AnalyzeCommand(undef, $cmd);
     Log 1, "ZWAVE INIT: $cmd: $ret" if ($ret);
   }
-
+  return "";
 }
 
 
