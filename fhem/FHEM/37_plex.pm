@@ -3260,6 +3260,9 @@ Log 1, "!!!!!!!!!!";
   Notes:
   <ul>
     <li>IO::Socket::Multicast is needed to use server and client autodiscovery.</li>
+    <li>As far as possible alle get and set commands are non-blocking.
+        Any output is displayed asynchronous and is using fhemweb popup windows.</li>
+
   </ul>
 
   <br><br>
@@ -3274,6 +3277,7 @@ Log 1, "!!!!!!!!!!";
 
   <a name="plex_Set"></a>
   <b>Set</b>
+  <ul>
     <li>play [&lt;server&gt; [&lt;item&gt;]]<br>
       </li>
     <li>playAlbum [&lt;server&gt;] &lt;item&gt;<br>
@@ -3290,23 +3294,59 @@ Log 1, "!!!!!!!!!!";
     <li>volume &lt;value&gt;</li>
     <li>shuffle 0|1</li>
     <li>repeat 0|1|2</li>
-    <li>mirror [&lt;server&gt;] &lt;item&gt;</li>
+    <li>mirror [&lt;server&gt;] &lt;item&gt;<br>
+      show preplay screen for &lt;item&gt;</li>
     <li>home</li>
     <li>music</li>
-    <li>showAccount</li>
+    <li>showAccount<br>
+      display obfuscated user and password in cleartext</li>
     <li>playlistCreate [&lt;server&gt;] &lt;name&gt;</li>
     <li>playlistAdd [&lt;server&gt;] &lt;key&gt; &lt;keys&gt;</li>
     <li>playlistRemove [&lt;server&gt;] &lt;key&gt; &lt;keys&gt;</li>
     <li>unwatched [[&lt;server&gt;] &lt;items&gt;]</li>
     <li>watched [[&lt;server&gt;] &lt;items&gt;]</li>
-  <ul>
   </ul><br>
 
   <a name="plex_Get"></a>
   <b>Get</b>
   <ul>
     <li>[&lt;server&gt;] ls [&lt;path&gt;]<br>
-      browse the media library</li>
+      browse the media library. eg:<br><br>
+      <b><code>get &lt;plex&gt; ls</code></b>
+      <pre>  Plex Library 
+  key                                 type       title
+  1                                   artist       Musik
+  2                      ...</pre><br>
+
+      <b><code>get &lt;plex&gt; ls /1</code></b>
+      <pre>  Musik 
+  key                                 type       title
+  all                                            All Artists
+  albums                                         By Album
+  collection                                     By Collection
+  decade                                         By Decade
+  folder                                         By Folder
+  genre                                          By Genre
+  year                                           By Year
+  recentlyAdded                                  Recently Added
+  search?type=9                                  Search Albums...
+  search?type=8                                  Search Artists...
+  search?type=10                                 Search Tracks...</pre><br>
+
+      <b><code>get &lt;plex&gt; ls /1/albums</code></b>
+      <pre>  Musik ; By Album 
+  key                                  type       title
+  /library/metadata/133999/children   album       ...
+  /library/metadata/134207/children   album       ...
+  /library/metadata/168437/children   album       ...
+  /library/metadata/82906/children    album       ...
+  ...</pre><br>
+
+      <b><code>get &lt;plex&gt; ls /library/metadata/133999/children</code></b>
+      <pre>...</pre><br>
+      <br>if used from fhemweb album art ist displayed and keys and other items are klickable.<br>
+
+    </li>
 
     <li>[&lt;server&gt;] search &lt;keywords&gt;<br>
       search the media library for items that match &lt;keywords&gt;</li>
@@ -3323,14 +3363,17 @@ Log 1, "!!!!!!!!!!";
     <li>[&lt;server&gt;] playlists<br>
       list playlists</li>
 
+    <li>[&lt;server&gt;] m3u [album]<br>
+      creates an album playlist in m3u format. can be used with other players like sonos.</li>
+
+    <li>[&lt;server&gt;] pls [album]<br>
+      creates an album playlist in pls format. can be used with other players like sonos.</li>
+
     <li>clients<br>
       list the known clients</li>
 
     <li>servers<br>
       list the known servers</li>
-
-    <li>showAccount<br>
-      display obfuscated user and password in cleartext</li>
   </ul><br>
 
   <a name="plex_Attr"></a>
