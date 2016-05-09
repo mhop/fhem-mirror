@@ -408,7 +408,7 @@ ZWDongle_Get($@)
     $msg = zwlib_parseNeighborList($hash, $msg);
 
   } elsif($cmd eq "sucNodeId") {               ############################
-    $msg = ($r[2]==0)?"no":hex($r[2]);
+    $msg = ($r[2]==0)?"no":$r[2];
 
   }
 
@@ -994,7 +994,8 @@ ZWDongle_Ready($)
     </li>
   <li>ZW_SET_DEFAULT [done]
     </li>    
-  <li>ZW_SET_SUC_NODE_ID [setSucNodeOk|setSucNodeFailed]
+  <li>ZW_SET_SUC_NODE_ID [setSucNodeOk|setSucNodeFailed|
+                          setSucNodeCallbackSucceeded|setSucNodeCallbackFailed]
     </li>
   </ul>
 

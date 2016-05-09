@@ -3858,6 +3858,12 @@ ZWave_Parse($$@)
     } else               { $evt = 'unknown_'.$id; # should never happen
     }
 
+  } elsif($cmd eq "ZW_SET_SUC_NODE_ID") {
+         if($id eq "05") { $evt = 'setSucNodeCallbackSucceeded';
+    } elsif($id eq "06") { $evt = 'setSucNodeCallbackFailed';
+    } else               { $evt = 'unknown_'.$id; # do not know
+    }
+
   }
 
   if($evt) {
