@@ -72,7 +72,8 @@ FBAHAHTTP_Poll($)
     return $dr->("MISSING: set $name password") if(!$fb_pw);
 
     my $sid = FB_doCheckPW($hash->{DEF}, $fb_user, $fb_pw);
-    return $dr->("ERROR: cannot get SID, check hostname/fritzbox-user/password")
+    return $dr->("$name error: cannot get SID, ".
+                        "check connection/hostname/fritzbox-user/password")
           if(!$sid);
     $hash->{".SID"} = $sid;
     $hash->{STATE} = "connected";
@@ -91,19 +92,15 @@ FBAHAHTTP_Poll($)
         return;
       }
 
+      Log 1, $_[2] if(AttrVal($name, "verbose", 1) > 4);
       if($_[2] !~ m,^<devicelist.*</devicelist>$,s) {
         Log3 $name, 3, "$name: unexpected reply from device: $_[2]";
         delete $hash->{".SID"};
         return;
       }
 
-      $_[2] =~ s,</devicelist>,,;
-
-      my @a = split("<device ", $_[2]);
-      for(my $i=1; $i<int(@a); $i++) {
-        Dispatch($hash, "<device ".$a[$i], undef);
-      }
-      
+      $_[2] =~ s+<(device|group) (.*?)</\g1>+
+                Dispatch($hash, "<$1 $2</$1>", undef)+gse;      # Quick&Hack
     }
   });
 
