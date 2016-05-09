@@ -217,20 +217,21 @@ my %fbhttp_readings = (
    state           => '"state:".($val?"on":"off")',
    tist            => 'sprintf("temperature:%.1f C (measured)", $val/2)',
    tsoll           => 'sprintf("desired-temp:%.1f C", $val/2)',
+   members         => '"members:$val"',
 );
 
 sub
-FBDECT_ParseHttp($$)
+FBDECT_ParseHttp($$$)
 {
-  my ($iodev, $msg, $local) = @_;
+  my ($iodev, $msg, $type) = @_;
   my $ioName = $iodev->{NAME};
   my %h;
 
   $msg =~ s,<([^/>]+?)>([^<]+?)<,$h{$1}=$2,ge; # Quick & Dirty: Tags
-  $msg =~ s, ([a-z]+?)="([^"]+)",$h{$1}=$2,ge; # Quick & Dirty: Attributes
+  $msg =~ s, ([a-z]+?)="([^"]*)",$h{$1}=$2,ge; # Quick & Dirty: Attributes
 
   my $ain = $h{identifier};
-  $ain =~ s/[: ]/_/g;
+  $ain =~ s/[-: ]/_/g;
 
   my %ll = (6=>"actuator", 7=>"powerMeter", 8=>"tempSensor",
             9=>"switch", 10=>"repeater");
@@ -259,6 +260,7 @@ FBDECT_ParseHttp($$)
     Log3 $hash, 5, "   $n = $h{$n}";
     next if(!$fbhttp_readings{$n});
     my $val = $h{$n};
+    $val = $type if($n eq "productname" && $val eq "");
     my ($ptyp,$pyld) = split(":", eval $fbhttp_readings{$n}, 2);
     readingsBulkUpdate($hash, $ptyp, $pyld);
     readingsBulkUpdate($hash, "state", "desired-temp: ".($val/2))
@@ -275,9 +277,9 @@ FBDECT_Parse($$@)
 {
   my ($iodev, $msg, $local) = @_;
 
-  my $mt = substr($msg, 0, 2);
-  return FBDECT_ParseHttp($iodev, $msg) if($mt eq "<d");
+  return FBDECT_ParseHttp($iodev, $msg, $1) if($msg =~ m/^<(device|group) /);
 
+  my $mt = substr($msg, 0, 2);
   my $ioName = $iodev->{NAME};
   if($mt ne "07" && $mt ne "04") {
     Log3 $ioName, 1, "FBDECT: unknown message type $mt";
