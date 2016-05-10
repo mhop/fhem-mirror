@@ -416,9 +416,7 @@ ZWDongle_Get($@)
   }
 
   $cmd .= "_".join("_", @a) if(@a);
-  $hash->{READINGS}{$cmd}{VAL} = $msg;
-  $hash->{READINGS}{$cmd}{TIME} = TimeNow();
-
+  readingsSingleUpdate($hash, $cmd, $msg, 0);
   return "$name $cmd => $msg";
 }
 
