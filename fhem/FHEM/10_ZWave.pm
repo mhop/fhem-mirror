@@ -3709,8 +3709,8 @@ ZWave_Parse($$@)
  
     if($cmd eq "ZW_SET_SUC_NODE_ID") {
       my $retval;
-           if($arg eq "00") { $retval = 'setSucNodeFailed';
-      } elsif($arg eq "01") { $retval = 'setSucNodeOk';
+           if($arg eq "00") { $retval = 'failed';
+      } elsif($arg eq "01") { $retval = 'ok';
       } else                { $retval = 'unknown_'.$arg; # should never happen
       }
       DoTrigger($ioName, "$cmd $retval");
@@ -3808,9 +3808,24 @@ ZWave_Parse($$@)
       }
       return $ret;
 
+    } elsif($callbackid eq "10") {
+      Log3 $ioName, 2, "ZW_APPLICATION_UPDATE sucId ".hex($id);
+      return "";
+    
+    } elsif($callbackid eq "20") {
+      Log3 $ioName, 2, "ZW_APPLICATION_UPDATE deleteDone ".hex($id);
+      return "";
+     
+    } elsif($callbackid eq "40") {
+      Log3 $ioName, 2, "ZW_APPLICATION_UPDATE addDone ".hex($id);
+      return "";
+      
+    } elsif($callbackid eq "81") {
+      Log3 $ioName, 2, "ZW_REQUEST_NODE_INFO failed".hex($id);
+      return "";
+      
     } else {
-      Log3 $ioName, 2, "ZW_REQUEST_NODE_INFO ".
-        ($callbackid eq "81" ? "failed" : "unknown $callbackid");
+      Log3 $ioName, 2, "ZW_APPLICATION_UPDATE unknown $callbackid";
       return "";
 
     }
@@ -3837,6 +3852,14 @@ ZWave_Parse($$@)
       readingsSingleUpdate($hash, "transmit", $lmsg, 1);
       return $hash->{NAME};
     }
+    
+  } elsif($cmd eq "ZW_SET_LEARN_MODE") {
+         if($id eq "01") { $evt = 'started';
+    } elsif($id eq "06") { $evt = 'done'; # $arg = new NodeId
+    } elsif($id eq "07") { $evt = 'failed';
+    } elsif($id eq "80") { $evt = 'deleted';
+    } else               { $evt = 'unknown'; # should never happen
+    }
 
   } elsif($cmd eq "ZW_REQUEST_NODE_NEIGHBOR_UPDATE") {
          if($id eq "21") { $evt = 'started';
@@ -3861,8 +3884,8 @@ ZWave_Parse($$@)
     }
 
   } elsif($cmd eq "ZW_SET_SUC_NODE_ID") {
-         if($id eq "05") { $evt = 'setSucNodeCallbackSucceeded';
-    } elsif($id eq "06") { $evt = 'setSucNodeCallbackFailed';
+         if($id eq "05") { $evt = 'callbackSucceeded';
+    } elsif($id eq "06") { $evt = 'callbackFailed';
     } else               { $evt = 'unknown_'.$id; # do not know
     }
 
