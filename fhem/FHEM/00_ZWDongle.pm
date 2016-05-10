@@ -21,15 +21,18 @@ sub ZWDongle_ProcessSendStack($);
 # http://buzzdavidson.com/?p=68
 # https://bitbucket.org/bradsjm/aeonzstickdriver
 my %sets = (
-  "addNode"          => { cmd => "4a%02x@",    # ZW_ADD_NODE_TO_NETWORK'
+  "addNode"          => { cmd => "4a%02x@",    # ZW_ADD_NODE_TO_NETWORK
                           param => { onNw   =>0xc1, on   =>0x81, off=>0x05,
                                      onNwSec=>0xc1, onSec=>0x81 } },
   "backupCreate"     => { cmd => "" },
   "backupRestore"    => { cmd => "" },
-  "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO'
+  "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO
   "factoryReset"     => { cmd => ""       },   # ZW_SET_DEFAULT
+  "learnMode"        => { cmd => "50%02x@",    # ZW_SET_LEARN_MODE
+                          param => { onNw   =>0x02, on   =>0x01,
+                                     disable=>0x00 } },
   "removeFailedNode" => { cmd => "61%02x@" },  # ZW_REMOVE_FAILED_NODE_ID
-  "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK'
+  "removeNode"       => { cmd => "4b%02x@",    # ZW_REMOVE_NODE_FROM_NETWORK
                           param => {onNw=>0xc1, on=>0x81, off=>0x05 } },
   "reopen"           => { cmd => "" },
   "replaceFailedNode"=> { cmd => "63%02x@" },  # ZW_REPLACE_FAILED_NODE
@@ -879,13 +882,18 @@ ZWDongle_Ready($)
 
   <li>factoryReset [yes]<br>
     Reset controller to default state.
-    Erase all node and routing infos, assign a new random HomeId. 
+    Erase all node and routing infos, assign a new random homeId.
     To control a device it must be re-included and re-configured.
     !Use this with care AND only if You know what You do!
     Note: the corresponding FHEM devices have to be deleted manually.</li>
     
+  <li>learnMode [on|onNw|disable]<br>
+    Add or remove controller to/from an other network.
+    Assign a homeId, nodeId and receive/store nodeList and routing infos.
+  </li>    
+    
   <li>removeFailedNode<br>
-    Remove a non-responding node -that must be on the failed Node list- from 
+    Remove a non-responding node -that must be on the failed node list- from 
     the routing table in controller. Instead,always use removeNode if possible.
     Note: the corresponding FHEM device have to be deleted manually.</li>
 
@@ -901,7 +909,7 @@ ZWDongle_Ready($)
 
   <li>replaceFailedNode<br>
     Replace a non-responding node with a new one. The non-responding node
-    must be on the failed Node list.</li>
+    must be on the failed node list.</li>
 	
   <li>sucNodeId [nodeId] [sucState] [capabilities]<br>
     Configure a Controller Node to be a SUC/SIS or not. 
@@ -924,7 +932,7 @@ ZWDongle_Ready($)
     return the six hex-digit homeId of the controller.</li>
 
   <li>isFailedNode<br>
-    return if a node is stored in the failed node List.</li>
+    return if a node is stored in the failed node list.</li>
 
   <li>caps, ctrlCaps, version<br>
     return different controller specific information. Needed by developers
@@ -993,9 +1001,10 @@ ZWDongle_Ready($)
   <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]
     </li>
   <li>ZW_SET_DEFAULT [done]
-    </li>    
-  <li>ZW_SET_SUC_NODE_ID [setSucNodeOk|setSucNodeFailed|
-                          setSucNodeCallbackSucceeded|setSucNodeCallbackFailed]
+    </li>
+  <li>ZW_SET_LEARN_MODE [started|done|failed|deleted]
+    </li>
+  <li>ZW_SET_SUC_NODE_ID [ok|failed|callbackSucceeded|callbackFailed]
     </li>
   </ul>
 
