@@ -70,7 +70,7 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-#  $hash->{SetFn} = "OBIS_Set";
+  $hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
@@ -183,6 +183,7 @@ sub OBIS_Undef($$)
 sub OBIS_Read($)
 {
 	my ($hash) = @_;
+	if( !$init_done ) { return(undef)};
 	my $name = $hash->{NAME};
 	
     my $buf = DevIo_SimpleRead($hash);
@@ -200,6 +201,7 @@ sub OBIS_trySMLdecode($$)
 	$hash->{MeterType}="SML";
 	my $newMsg="";
 	while ($remainingSML=~/(1B1B1B1B010101.*?1B1B1B1B1A[0-9A-F]{6})/mip) {
+		
 		my $msg=$1;
 		$remainingSML=${^POSTMATCH};
 		if (OBIS_CRC16($hash,pack('H*',$msg)) == 1) {
@@ -207,12 +209,13 @@ sub OBIS_trySMLdecode($$)
 			my $OBISmsg="";
 			my $initstr="/";
 			my $OBISid=$msg=~m/7701([0-9A-F]*?)01/g;
+			Log3 $hash,5,"OBIS: Full message-> $msg";
 			(undef,undef,$OBISid,undef)=OBIS_decodeTL($1);
-			while ($msg =~ m/(7707)([0-9A-F]{2,999}?)(?=7707|1B1B1B1B)/g) {
+			while ($msg =~ m/(7707)([0-9A-F]{2,999}?)((?=(?<=01)7707|1B1B1B1B))/g) {
 	    		my $telegramm = $&;
       			my @list=$telegramm=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2,999})/g;
       			Log 5,"Telegram=$telegramm";
-      			if (!@list) {Log 3,"OBIS - Empty datagram: .$telegramm\r\nfrom MSG: $msg"};
+      			if (!@list) {Log 3,"OBIS - Empty datagram: .$telegramm\r\nfrom MSG: $telegramm"};
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		
 				my ($status,$statusL,$statusT,$valTime,$valTimeL,$valTimeT,$unit,$unitL,$unitT,$scaler,$scalerL,$scalerT,$data,$dataL,$dataT,$other);		   
@@ -221,11 +224,6 @@ sub OBIS_trySMLdecode($$)
 	    		($unitL,$unitT,$unit,$other)=OBIS_decodeTL($other);
 	    		($scalerL,$scalerT,$scaler,$other)=OBIS_decodeTL($other);
 	    		($dataL,$dataT,$data,$other)=OBIS_decodeTL($other);
-#	    		Log 3,"Status: $statusL,$statusT,$status";
-#	    		Log 3,"valTime: $valTimeL,$valTimeT,$valTime";
-#	    		Log 3,"Unit: $unitL,$unitT,$unit";
-#	    		Log 3,"scaler: $scalerL,$scalerT,$scaler";
-#	    		Log 3,"Data: $dataL,$dataT,$data";
 	    		
 # Type String
 				my $line2=""; 
@@ -239,7 +237,6 @@ sub OBIS_trySMLdecode($$)
 	    				$data=~s/([A-F0-9]{2})/chr(hex($1))/eg;
 	    				$line2="$data";
     				}
-#    					    				Log 3,"Line2=$line2";
     				
 # Type signed (=80) and unsigned (=96) Integer
 				} elsif ($dataT & 0b01010000|$dataT & 0b01100000) {		
@@ -269,7 +266,14 @@ sub OBIS_trySMLdecode($$)
 					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit"); # if($dataT ==96);					
 				} elsif ($dataT & 0b01000000) {		# Type Boolean - no Idea, where this is used
 					$line2=OBIS_hex2int($data);			# 0=false, everything else is true
-				} elsif ($dataT & 0b01110000) {		# Type List of.... - not sure, if we ever need that
+				} elsif ($dataT & 0b01110000) {		# Type List of.... - Time is sometimes delivered as structure
+#					my @a_Length;
+#					my @a_Type;
+#					my @a_Data;
+#					for (my $b=0;$b<$dataL;$b++) {
+#						my ($l_length,$l_type,$l_data);
+#					}
+					
 				}
 				$initstr.="$line2\\" if ($line=~$SML_specialities{"INFO"}[0]);
 				$newMsg.=$line.$line2.")\r\n";
@@ -281,6 +285,7 @@ sub OBIS_trySMLdecode($$)
 			$newMsg=$initstr.chr(13).chr(10).$newMsg;
 			$newMsg.="!".chr(13).chr(10);
 		} else {
+			Log 3,"Illegal CRC";
 			$hash->{CRC_Errors}+=1;
 		}
 	}
@@ -571,16 +576,30 @@ sub OBIS_decodeTL($){
 	my $msgLength=0;
 	my $msgType=0;
 	my $lt="";
+	my $tmp="";
+#	Log 3,"In: $msg";
 	$msgType  =hex(substr($msg,0,2)) & 0b01110000;
 	do {
 		$lt=hex(substr($msg,0,2));
 		$msg=substr($msg,2);
 		$msgLength=($msgLength*16) + ($lt & 0b00001111);
 	} while ($lt & 0b10000000);
+	if ($msgType == 0b01110000) {
+		for (my $i=0;$i<$msgLength;$i++) {
+			my $tmp2="";
+#			Log 3,"--> $msg";
+			(undef,undef,undef,$msg,$tmp2)=OBIS_decodeTL($msg);
+#			Log 3,"<-- $tmp2 $msg";
+			$tmp.=$tmp2;
+		}
+		$msgLength-=1;
+	}
 	$msgLength-=1;
 	my $valu=substr($msg,0,$msgLength*2);
+	$tmp.=$valu;
 	$msg=substr($msg,$msgLength*2);
-	return $msgLength,$msgType,$valu,$msg;
+#	Log 3,"   Split Msg: $tmp $msg";
+	return $msgLength,$msgType,$valu,$msg,$tmp;
 }
 
 "Cogito, ergo sum.";
