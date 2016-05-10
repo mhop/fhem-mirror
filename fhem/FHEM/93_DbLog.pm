@@ -719,7 +719,7 @@ sub DbLog_Log($$) {
                   my @v1 = split(/,/, $DbLogInclude);
                   for (my $i=0; $i<int(@v1); $i++) {
                         my @v2 = split(/:/, $v1[$i]);
-                        $DoIt = 1 if(!$v2[1] && $reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp, kein MinIntervall angegeben
+                        $DoIt = 1 if($reading =~ m/^$v2[0]$/); #Reading matcht auf Regexp
                         if(($v2[1] && $reading =~ m/^$v2[0]$/) && ($v2[1] =~ m/^(\d+)$/)) {
                           #Regexp matcht und MinIntervall ist angegeben
                           my $lt = $defs{$dev->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
