@@ -2147,6 +2147,7 @@ CommandList($$)
 
         my $first = 1;
         foreach  my $n (@arg[1..@arg-1]) {
+          my $n = $n; # Forum #53223, for some perl versions $n is a reference
           my $fType="";
           if($n =~ m/^(.:)(.*$)/) {
             $fType = $1;
