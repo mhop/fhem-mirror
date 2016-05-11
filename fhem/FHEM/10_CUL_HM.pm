@@ -1990,7 +1990,7 @@ sub CUL_HM_Parse($$) {#########################################################
       }
  
       if   ($mh{st} eq "dimmer"){
-        if ($mh{md} =~ m/HM-LC-Dim.L.*/){
+        if (lc($mh{md}) =~ m/^hm-lc-dim.l.*/){
           push @evtEt,[$mh{cHash},1,"loadFail:".(($err == 6)?"on":"off")];#note: err is times 2!
         }
         else{
