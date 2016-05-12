@@ -711,7 +711,7 @@ FW_answerCall($)
 
   #If we are in XHR or json mode, execute the command directly
   if($FW_XHR || $FW_jsonp) {
-    $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
+    $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : undef;
     $FW_RETTYPE = "text/plain; charset=$FW_encoding";
 
     if($FW_jsonp) {
@@ -746,7 +746,7 @@ FW_answerCall($)
 
 
   #Now execute the command
-  $FW_cmdret = "";
+  $FW_cmdret = undef;
   if($docmd) {
     $FW_cmdret = FW_fC($cmd, $cmddev);
     if($cmd =~ m/^define +([^ ]+) /) { # "redirect" after define to details
@@ -758,7 +758,7 @@ FW_answerCall($)
   }
 
   # Redirect after a command, to clean the browser URL window
-  if($docmd && !$FW_cmdret && AttrVal($FW_wname, "redirectCmds", 1)) {
+  if($docmd && !defined($FW_cmdret) && AttrVal($FW_wname, "redirectCmds", 1)) {
     my $tgt = $FW_ME;
        if($FW_detail) { $tgt .= "?detail=$FW_detail&fw_id=$FW_id" }
     elsif($FW_room)   { $tgt .= "?room=".urlEncode($FW_room)."&fw_id=$FW_id" }
@@ -860,12 +860,13 @@ FW_answerCall($)
 
   if($FW_activateInform) {
     $cmd = "style eventMonitor $FW_activateInform";
-    $FW_cmdret = $FW_activateInform = "";
+    $FW_cmdret = undef;
+    $FW_activateInform = "";
   }
 
   FW_roomOverview($cmd);
 
-  if($FW_cmdret) {
+  if(defined($FW_cmdret)) {
     $FW_detail = "";
     $FW_room = "";
 
@@ -898,7 +899,7 @@ FW_answerCall($)
      if($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
-  elsif(!$FW_cmdret &&
+  elsif(!defined($FW_cmdret) &&
         !$FW_contentFunc) {
 
     $FW_room = AttrVal($FW_wname, "defaultRoom", '');
