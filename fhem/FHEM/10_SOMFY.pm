@@ -1,5 +1,5 @@
 ######################################################
-# $Id: 10_SOMFY.pm 7988 2015-02-14 22:04:45Z thomyd $
+# $Id$
 #
 # SOMFY RTS / Simu Hz protocol module for FHEM
 # (c) Thomas Dankert <post@thomyd.de>
@@ -43,17 +43,29 @@
 #  2015-07-09 viegener - FIX: typo in set go-my (was incorrectly spelled: go_my) 
 #  2015-07-09 viegener - FIX: log and set command helper corrections 
 #  2015-08-05 viegener - Remove setList (obsolete) and could be rather surprising for the module
-#
-#
 ######################################################
+#
+#  2016-05-03 viegener - Support readingFnAttributes also for Somfy
+#  2016-05-11 viegener - Handover SOMFY from thdankert/thomyd
+#  2016-05-11 viegener - Cleanup Todolist
+#  2016-05-11 viegener - Some additions to documentation (commandref)
+#  
+#  
+###############################################################################
 #
 ### Known Issue - if timer is running and last command equals new command (only for open / close) - considered minor/but still relevant
-
+#
+###############################################################################
+###############################################################################
 # Somfy Modul - OPEN
-# - 100 bis 200% new states --> 100% / down / complete
+###############################################################################
 # - Complete shutter / blind as different model
-
-######################################################
+# - 
+# - 
+# - 
+# - 
+#
+###############################################################################
 
 package main;
 
@@ -194,7 +206,8 @@ sub SOMFY_Initialize($) {
 	  . " ignore:0,1"
 	  . " dummy:1,0"
 	  . " model:somfyblinds,somfyshutter"
-	  . " loglevel:0,1,2,3,4,5,6";
+	  . " loglevel:0,1,2,3,4,5,6"
+	  . " $readingFnAttributes";
 
 }
 
@@ -1210,6 +1223,9 @@ sub SOMFY_CalcCurrentPos($$$$) {
   which are either senders or receivers/actuators.
   Right now only SENDING of Somfy commands is implemented in the CULFW, so this module currently only
   supports devices like blinds, dimmers, etc. through a <a href="#CUL">CUL</a> device (which must be defined first).
+  Reception of Somfy remotes is only supported indirectly through the usage of an FHEMduino 
+  <a href="http://www.fhemwiki.de/wiki/FHEMduino">http://www.fhemwiki.de/wiki/FHEMduino</a>
+  which can then be used to connect to the SOMFY device.
 
   <br><br>
 
@@ -1302,7 +1318,7 @@ sub SOMFY_CalcCurrentPos($$$$) {
 
 		The position reading distinuishes between multiple cases
     <ul>
-      <li>Without timing values set only generic values are used for status and position: <pre>open, closed, moving</pre> are used
+      <li>Without timing values (see attributes) set only generic values are used for status and position: <pre>open, closed, moving</pre> are used
       </li>
 			<li>With timing values set but drive-down-time-to-close equal to drive-down-time-to-100 and drive-up-time-to-100 equal 0 
 			the device is considered to only vary between 0 and 100 (100 being completely closed)
@@ -1334,8 +1350,17 @@ sub SOMFY_CalcCurrentPos($$$$) {
         Additionally this attribute might specify a name for an additional reading to be updated with the same value than the pos.
 		</li><br>
 
+    <a name="rolling-code"></a>
+    <li>rolling-code &lt; 4 digit hex &gt; <br>
+        Can be used to overwrite the rolling-code manually with a new value (rolling-code will be automatically increased with every command sent)
+        This requires also setting enc-key: only with bot attributes set the value will be accepted for the internal reading
+		</li><br>
 
-
+    <a name="enc-key"></a>
+    <li>enc-key &lt; 2 digit hex &gt; <br>
+        Can be used to overwrite the enc-key manually with a new value 
+        This requires also setting rolling-code: only with bot attributes set the value will be accepted for the internal reading
+		</li><br>
 
     <a name="eventMap"></a>
     <li>eventMap<br>
@@ -1418,19 +1443,6 @@ sub SOMFY_CalcCurrentPos($$$$) {
 		This value is usually a bit higher than "drive-down-time-to-close", due to the blind's weight.
         </li><br>
 
-  </ul>
-  <br>
-
-  <a name="SOMFYevents"></a>
-  <b>Generated events:</b>
-  <ul>
-     From a Somfy device you can receive one of the following events.
-     <li>on</li>
-     <li>off</li>
-     <li>stop</li>
-     <li>go-my<br></li>
-      Which event is sent is device dependent and can sometimes be configured on
-     the device.
   </ul>
 </ul>
 

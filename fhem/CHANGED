@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 10_SOMFY : Added readingFnAttributes
   - bugfix:  FB_CALLLIST: no reading update when list becomes empty
   - feature: added new module 37_plex.pm
   - feature: FBAHAHTTP module as replacement for the deprecated FBAHA
