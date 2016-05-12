@@ -142,6 +142,7 @@ FS20_Follow($$$$)
   if($modules{FS20}{ldata}{$name}) {
     CommandDelete(undef, $name . "_timer");
     delete $modules{FS20}{ldata}{$name};
+    delete $defs{$name}->{TIMED_OnOff} if( $defs{$name} );
   }
 
   my $newState="";
@@ -164,7 +165,17 @@ FS20_Follow($$$$)
     $modules{FS20}{ldata}{$name} = $to;
     Log3 $name, 4, "Follow: +$to setstate $name $newState";
     CommandDefine(undef, $name."_timer at +$to ".
-      "{readingsSingleUpdate(\$defs{'$name'},'state','$newState', 1); undef}");
+      "{readingsSingleUpdate(\$defs{'$name'},'state','$newState', 1);".
+      "delete \$defs{'$name'}->{TIMED_OnOff}; undef}");
+
+    if($defs{$name}) {
+      $defs{$name}->{TIMED_OnOff} = {
+        START=>time(),
+        START_FMT=>TimeNow(),
+        DURATION=>$val,
+        CMD=>$arg 
+      }
+    }
   }
 }
 
@@ -369,6 +380,7 @@ FS20_Parse($$)
       if($modules{FS20}{ldata}{$n}) {
         CommandDelete(undef, $n . "_timer");
         delete $modules{FS20}{ldata}{$n};
+        delete $lh->{TIMED_OnOff};
       }
 
       my $newState = "";
@@ -381,12 +393,20 @@ FS20_Parse($$)
         $newState = "off";
 
       }
+
       if($newState) {
         my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
         Log3 $n, 4, "Follow: +$to setstate $n $newState";
         CommandDefine(undef, $n."_timer at +$to ".
-          "{readingsSingleUpdate(\$defs{'$n'},'state','$newState', 1); undef}");
+          "{readingsSingleUpdate(\$defs{'$n'},'state','$newState', 1); ".
+          "delete \$defs{'$n'}->{TIMED_OnOff}; undef}");
         $modules{FS20}{ldata}{$n} = $to;
+        $lh->{TIMED_OnOff} = {
+          START=>time(),
+          START_FMT=>TimeNow(),
+          DURATION=>$dur,
+          CMD=>$v
+        };
       }
 
       push(@list, $n);
