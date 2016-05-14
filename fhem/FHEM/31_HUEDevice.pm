@@ -989,7 +989,7 @@ HUEDevice_Parse($$)
     $hash->{STATE} = 'Initialized';
     $hash->{lights} = join( ",", @{$result->{lights}} ) if( $result->{lights} );
 
-    if( $result->{state} ) {
+    if( ref($result->{state}) eq 'HASH' ) {
       my $all_on = $result->{state}{all_on};
       my $any_on = $result->{state}{any_on};
 
