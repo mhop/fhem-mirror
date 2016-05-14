@@ -323,12 +323,12 @@ sub HP1000_PushWU($$) {
 
         if ( $key eq "windspeed" ) {
             $key   = "windspeedmph";
-            $value = $value / 1.609344;
+            $value = $value / 1.609344; # convert from kph to mph
         }
 
         if ( $key eq "windgust" ) {
             $key   = "windgustmph";
-            $value = $value / 1.609344;
+            $value = $value / 1.609344; # convert from kph to mph
         }
 
         if ( $key eq "inhumi" ) {
@@ -337,7 +337,7 @@ sub HP1000_PushWU($$) {
 
         if ( $key eq "intemp" ) {
             $key   = "indoortempf";
-            $value = $value * 9 / 5 + 32;
+            $value = $value * 9 / 5 + 32; # convert from Celsius to Fahrenheit
         }
 
         if ( $key eq "intempf" ) {
@@ -350,7 +350,7 @@ sub HP1000_PushWU($$) {
 
         if ( $key eq "outtemp" ) {
             $key   = "tempf";
-            $value = $value * 9 / 5 + 32;
+            $value = $value * 9 / 5 + 32; # convert from Celsius to Fahrenheit
         }
 
         if ( $key eq "outtempf" ) {
@@ -359,27 +359,27 @@ sub HP1000_PushWU($$) {
 
         if ( $key eq "rain" ) {
             $key   = "rainin";
-            $value = $value / 25.4;
+            $value = $value / 25.4; # convert from mm to inch
         }
 
         if ( $key eq "dailyrain" ) {
             $key   = "dailyrainin";
-            $value = $value / 25.4;
+            $value = $value / 25.4; # convert from mm to inch
         }
 
         if ( $key eq "dewpoint" ) {
             $key   = "dewptf";
-            $value = $value * 9 / 5 + 32;
+            $value = $value * 9 / 5 + 32; # convert from Celsius to Fahrenheit
         }
 
-        if ( $key eq "absbaro" ) {
+        if ( $key eq "relbaro" ) {
             $key   = "baromin";
-            $value = $value * 100 * 0.000295299830714;
+            $value = $value * 100 * 0.000295299830714; # convert from hPa to Inches of Mercury
         }
 
         if ( $key eq "light" ) {
             $key   = "solarradiation";
-            $value = $value;
+            $value = $value * 0.01; # convert from uW/cm2 to W/m2
         }
 
         $cmd .= "$key=" . $value . "&";
@@ -479,20 +479,17 @@ sub HP1000_ReturnWU($$$) {
     <a name="HP1000Attr" id="HP10000Attr"></a> <b>Attributes</b>
     <div>
     <ul>
-      <a name="wu_id"></a>
-      <li>wu_id<br>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <br>
+
+      <a name="wu_id"></a><li><b>wu_id</b></li>
         Weather Underground (Wunderground) station ID
-      </li>
-      <br>
-      <a name="wu_password"></a>
-      <li>wu_password<br>
+
+      <a name="wu_password"></a><li><b>wu_password</b></li>
         Weather Underground (Wunderground) password
-      </li>
-      <br>
-      <a name="wu_push"></a>
-      <li>wu_push<br>
+
+      <a name="wu_push"></a><li><b>wu_push</b></li>
         Enable or disable to push data forward to Weather Underground (defaults to 0=no)
-      </li><br>
     </ul>
     </div>
 
@@ -533,20 +530,17 @@ sub HP1000_ReturnWU($$$) {
     <a name="HP1000Attr" id="HP10000Attr"></a> <b>Attributes</b>
     <div>
     <ul>
-      <a name="wu_id"></a>
-      <li>wu_id<br>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <br>
+
+      <a name="wu_id"></a><li><b>wu_id</b></li>
         Weather Underground (Wunderground) Stations ID
-      </li>
-      <br>
-      <a name="wu_password"></a>
-      <li>wu_password<br>
+
+      <a name="wu_password"></a><li><b>wu_password</b></li>
         Weather Underground (Wunderground) Passwort
-      </li>
-      <br>
-      <a name="wu_push"></a>
-      <li>wu_push<br>
+
+      <a name="wu_push"></a><li><b>wu_push</b></li>
         Pushen der Daten zu Weather Underground aktivieren oder deaktivieren (Standard ist 0=aus)
-      </li><br>
     </ul>
     </div>
 
