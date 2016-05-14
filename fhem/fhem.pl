@@ -270,6 +270,7 @@ my @globalAttrList = qw(
   backupdir
   backupsymlink
   configfile
+  dnsServer
   dupTimeout
   exclude_from_update
   featurelevel

@@ -79,7 +79,7 @@ HttpUtils_Err($$)
   $hash = $hash->{hash};
   return if(!defined($hash->{FD})); # Already closed
   HttpUtils_Close($hash);
-  $hash->{callback}($hash, "$errtxt to $hash->{addr} timed out", "");
+  $hash->{callback}($hash, "$errtxt $hash->{addr} timed out", "");
 }
 
 sub HttpUtils_ConnErr($) { my ($hash) = @_; HttpUtils_Err($hash, "connect to");}
@@ -101,6 +101,77 @@ HttpUtils_File($)
   close(FH);
   return (1, undef, $data);
 }
+
+my %HU_dnsCache;
+sub
+HttpUtils_gethostbyname($$$)
+{
+  my ($hash, $host, $fn) = @_;
+
+  if($host =~ m/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/ &&        # IP-Address
+     $1<256 && $2<256 && $3<256 && $4<256) {
+    $fn->($hash, undef, pack("CCCC", $1, $2, $3, $4));
+    return;
+  }
+
+  my $dnsServer = AttrVal("global", "dnsServer", undef);
+  if(!$dnsServer) {
+    my @addr = gethostbyname($host);                    # blocking version
+    my $err = ($addr[0] ? undef : "gethostbyname $host failed");
+    $fn->($hash, $err, $addr[4]);
+    return;
+  }
+
+  my $now = gettimeofday();                             # check the cache
+  return $fn->($hash, undef, $HU_dnsCache{$host}{addr})
+        if($HU_dnsCache{$host} && 
+           $HU_dnsCache{$host}{TS}+$HU_dnsCache{$host}{TTL} > $now);
+
+  my $c = IO::Socket::INET->new(Proto=>'udp', PeerAddr=>"$dnsServer:53");
+  return $fn->($hash, "Cant create UDP socket:$!", undef) if(!$c);
+  my %dh = ( conn=>$c, FD=>$c->fileno(), NAME=>"DNS",
+             addr=>$dnsServer, callback=>$hash->{callback} );
+  my %timerHash = ( hash => \%dh );
+
+  my $bhost = join("", map { pack("CA*",length($_),$_) } split(/\./, $host));
+  my $qry = pack("nnnnnn", 0x7072,0x0100,1,0,0,0) . $bhost . pack("Cnn", 0,1,1);
+  my $ql = length($qry);
+  my $ret = syswrite $dh{conn}, $qry;
+  if(!$ret || $ret != $ql) {
+    my $err = $!;
+    HttpUtils_Close(\%dh);
+    return $fn->($hash, "DNS write error: $err", undef);
+  }
+
+  $dh{directReadFn} = sub() {                           # Parse the answer
+    RemoveInternalTimer(\%timerHash);
+    my $buf;
+    my $len = sysread($dh{conn},$buf,65536);
+    HttpUtils_Close(\%dh);
+    # Log 1, "DNS ANSWER $len:".unpack("H*", $buf);
+
+    return $fn->($hash, "DNS: Cannot resolve $host", undef)
+        if(unpack("n",substr($buf,6,2)) == 0);
+    return $fn->($hash, "DNS: Short answer for $host", undef) 
+        if($len < $ql+16);
+    return $fn->($hash, "DNS: Wrong answer for $host", undef)
+        if(unpack("H*",substr($buf,$ql+2,4)) ne "00010001" || # Type A + IP
+           unpack("n",substr($buf,$ql+10,2)) != 4);
+
+    my $ttl = unpack("N",substr($buf,$ql+6,4));
+    my $addr = substr($buf,$ql+12,4);
+    Log 4, "DNS result for $host: ".unpack("H*",$addr).", ttl:$ttl";
+    $HU_dnsCache{$host}{TS} = $now;
+    $HU_dnsCache{$host}{TTL} = $ttl;
+    $HU_dnsCache{$host}{addr} = $addr;
+    return $fn->($hash, undef, $addr);
+  };
+  $selectlist{\%dh} = \%dh;
+
+  InternalTimer(gettimeofday()+($hash->{timeout}/2),
+                "HttpUtils_ReadErr",\%timerHash,0);
+}
+
 
 sub
 HttpUtils_Connect($)
@@ -139,43 +210,42 @@ HttpUtils_Connect($)
   if($hash->{callback}) { # Nonblocking staff
     $hash->{conn} = IO::Socket::INET->new(Proto=>'tcp', Blocking=>0);
     if($hash->{conn}) {
-      my $iaddr = inet_aton($host);
-      if(!defined($iaddr)) {
-        my @addr = gethostbyname($host); # This is still blocking
-        return "gethostbyname $host failed" if(!$addr[0]);
-        $iaddr = $addr[4];
-      }
-      my $ret = connect($hash->{conn}, sockaddr_in($port, $iaddr));
-      if(!$ret) {
-        if($!{EINPROGRESS} || int($!)==10035 ||
-           (int($!)==140 && $^O eq "MSWin32")) { # Nonblocking connect
+      HttpUtils_gethostbyname($hash, $host, sub($$$) {
+        my ($hash, $err, $iaddr) = @_;
+        return $hash->{callback}($hash, $err, "") if($err);
+        my $ret = connect($hash->{conn}, sockaddr_in($port, $iaddr));
+        if(!$ret) {
+          if($!{EINPROGRESS} || int($!)==10035 ||
+             (int($!)==140 && $^O eq "MSWin32")) { # Nonblocking connect
 
-          $hash->{FD} = $hash->{conn}->fileno();
-          my %timerHash = ( hash => $hash );
-          $hash->{directWriteFn} = sub() {
-            delete($hash->{FD});
-            delete($hash->{directWriteFn});
-            delete($selectlist{$hash});
+            $hash->{FD} = $hash->{conn}->fileno();
+            my %timerHash = ( hash => $hash );
+            $hash->{directWriteFn} = sub() {
+              delete($hash->{FD});
+              delete($hash->{directWriteFn});
+              delete($selectlist{$hash});
 
-            RemoveInternalTimer(\%timerHash);
-            my $packed = getsockopt($hash->{conn}, SOL_SOCKET, SO_ERROR);
-            my $errno = unpack("I",$packed);
-            return $hash->{callback}($hash, "$host: ".strerror($errno), "")
-                if($errno);
+              RemoveInternalTimer(\%timerHash);
+              my $packed = getsockopt($hash->{conn}, SOL_SOCKET, SO_ERROR);
+              my $errno = unpack("I",$packed);
+              return $hash->{callback}($hash, "$host: ".strerror($errno), "")
+                  if($errno);
 
-            my $err = HttpUtils_Connect2($hash);
-            $hash->{callback}($hash, $err, "") if($err);
-            return $err;
-          };
-          $hash->{NAME}="" if(!defined($hash->{NAME}));# Delete might check this
-          $selectlist{$hash} = $hash;
-          InternalTimer(gettimeofday()+$hash->{timeout},
-                        "HttpUtils_ConnErr", \%timerHash, 0);
-          return undef;
-        } else {
-          return "connect: $!";
+              my $err = HttpUtils_Connect2($hash);
+              $hash->{callback}($hash, $err, "") if($err);
+              return $err;
+            };
+            $hash->{NAME}="" if(!defined($hash->{NAME}));#Delete might check it
+            $selectlist{$hash} = $hash;
+            InternalTimer(gettimeofday()+$hash->{timeout},
+                          "HttpUtils_ConnErr", \%timerHash, 0);
+            return undef;
+          } else {
+            return "connect: $!";
+          }
         }
-      }
+      });
+      return;
     }
                 
   } else {
@@ -289,7 +359,8 @@ HttpUtils_Connect2($)
       my $buf;
       my $len = sysread($hash->{conn},$buf,65536);
       $hash->{buf} .= $buf if(defined($len) && $len > 0);
-      if(!defined($len) || $len <= 0 || HttpUtils_DataComplete($hash->{buf})) {
+      if(!defined($len) || $len <= 0 || 
+         HttpUtils_DataComplete($hash->{buf})) {
         delete($hash->{FD});
         delete($hash->{directReadFn});
         delete($selectlist{$hash});
