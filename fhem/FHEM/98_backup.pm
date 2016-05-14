@@ -203,6 +203,7 @@ createArchiv($$)
   if (!defined($backupcmd) && -e "$backupdir/FHEM-$dateTime.tar.gz") {
     my $size = -s "$backupdir/FHEM-$dateTime.tar.gz";
     $msg = "backup done: FHEM-$dateTime.tar.gz ($size Bytes)";
+    DoTrigger("global", $msg);
     Log 1, $msg;
     $ret .= "\n".$msg;
   }
