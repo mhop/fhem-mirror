@@ -26,6 +26,12 @@ my %sets = (
                                      onNwSec=>0xc1, onSec=>0x81 } },
   "backupCreate"     => { cmd => "" },
   "backupRestore"    => { cmd => "" },
+  "controllerChange" => { cmd => "4d%02x@",    #ZW_CONTROLLER_CHANGE
+                          param => { on     =>0x02, stop =>0x05,
+                                     stopFailed =>0x06 } },
+  "createNewPrimary" => { cmd => "4c%02x@",    # ZW_CREATE_NEW_PRIMARY
+                          param => { on     =>0x02, stop =>0x05,
+                                     stopFailed =>0x06 } },
   "createNode"       => { cmd => "60%02x" },   # ZW_REQUEST_NODE_INFO
   "factoryReset"     => { cmd => ""       },   # ZW_SET_DEFAULT
   "learnMode"        => { cmd => "50%02x@",    # ZW_SET_LEARN_MODE
@@ -446,7 +452,9 @@ ZWDongle_DoInit($)
 
   ZWDongle_Clear($hash);
   ZWDongle_Get($hash, $name, "caps");
+  ZWDongle_Get($hash, $name, "ctrlCaps");
   ZWDongle_Get($hash, $name, "homeId");
+  ZWDongle_Get($hash, $name, "sucNodeId");
   ZWDongle_Get($hash, $name, ("random", 32));         # Sec relevant
   ZWDongle_Set($hash, $name, ("timeouts", 100, 15));  # Sec relevant
   ZWDongle_ReadAnswer($hash, "timeouts", "^0106");
@@ -844,7 +852,7 @@ ZWDongle_Ready($)
   <b>Set</b>
   <ul>
 
-  <li>addNode [on|onNw|onSec|onNwSec|off]<br>
+  <li>addNode &lt;on|onNw|onSec|onNwSec|off&gt;<br>
     Activate (or deactivate) inclusion mode. The controller (i.e. the dongle)
     will accept inclusion (i.e. pairing/learning) requests only while in this
     mode. After activating inclusion mode usually you have to press a switch
@@ -856,7 +864,7 @@ ZWDongle_Ready($)
     device supports the SECURITY class, then a secure inclusion is attempted.
     </li>
 
-  <li>backupCreate [64k|128k|256k]<br>
+  <li>backupCreate &lt;64k|128k|256k&gt;<br>
     read out the NVRAM of the ZWDongle, and store it in a file called
     &lt;ZWDongle_Name&gt;.bin in the modpath folder.  Since the size of the
     NVRAM is currently unknown to FHEM, you have to specify the size. The
@@ -869,8 +877,20 @@ ZWDongle_Ready($)
     Restore the file created by backupCreate. Restoring the file takes about
     the same time as saving it, and FHEM is blocked during this time.
     </li>
+    
+  <li>controllerChange &lt;on|stop|stopFailed&gt;<br>
+    Add a controller to the current network and transfer role as primary to it.
+    Invoking controller is converted to secondary.
+    &lt;stop&gt; = stop controllerChange
+    &lt;stopFailed&gt; = stop controllerChange and report an error</li>
+    
+  <li>createNewPrimary &lt;on|stop|stopFailed&gt;<br>
+    Add a controller to the current network as a replacement for an old 
+    primary. Command can be invoked only by a secondary configured as basic SUC
+    &lt;stop&gt; = stop controllerChange
+    &lt;stopFailed&gt; = stop controllerChange and report an error</li>
 
-  <li>createNode id<br>
+  <li>createNode &lt;decimal nodeId&gt;<br>
     Request the class information for the specified node, and create a FHEM
     device upon reception of the answer. Used to create FHEM devices for nodes
     included with another software or if the fhem.cfg got lost. For the node id
@@ -878,24 +898,24 @@ ZWDongle_Ready($)
     for battery based devices you have to press the "wakeup" button 1-2 seconds
     before entering this command in FHEM.</li>
 
-  <li>factoryReset [yes]<br>
+  <li>factoryReset &lt;yes&gt;<br>
     Reset controller to default state.
     Erase all node and routing infos, assign a new random homeId.
     To control a device it must be re-included and re-configured.
     !Use this with care AND only if You know what You do!
     Note: the corresponding FHEM devices have to be deleted manually.</li>
     
-  <li>learnMode [on|onNw|disable]<br>
+  <li>learnMode &lt;on|onNw|disable&gt;<br>
     Add or remove controller to/from an other network.
     Assign a homeId, nodeId and receive/store nodeList and routing infos.
   </li>    
     
-  <li>removeFailedNode<br>
+  <li>removeFailedNode &lt;decimal nodeId&gt;<br>
     Remove a non-responding node -that must be on the failed node list- from 
     the routing table in controller. Instead,always use removeNode if possible.
     Note: the corresponding FHEM device have to be deleted manually.</li>
 
-  <li>removeNode [onNw|on|off]<br>
+  <li>removeNode &lt;onNw|on|off&gt;<br>
     Activate (or deactivate) exclusion mode. "on" activates standard exclusion. 
     "onNw" activates network wide exclusion (only SDK 4.5-4.9, SDK 6.x and
     above).  Note: the corresponding FHEM device have to be deleted
@@ -905,15 +925,15 @@ ZWDongle_Ready($)
     First close and then open the device. Used for debugging purposes.
     </li>
 
-  <li>replaceFailedNode<br>
+  <li>replaceFailedNode &lt;decimal nodeId&gt;<br>
     Replace a non-responding node with a new one. The non-responding node
     must be on the failed node list.</li>
 	
-  <li>sucNodeId [nodeId] [sucState] [capabilities]<br>
-    Configure a Controller Node to be a SUC/SIS or not. 
-    [nodeId] to be SUC/SIS
-    [sucState] 0 = deactivate; 1 = activate
-    [capabilities] 0 = basic SUC; 1 = SIS</li>
+  <li>sucNodeId &lt;decimal nodeId&gt; &lt;sucState&gt; &lt;capabilities><br>
+    Configure a controller Node to be a SUC/SIS or not. 
+    &lt;nodeId&gt; to be SUC/SIS
+    &lt;sucState&gt; 0 = deactivate; 1 = activate
+    &lt;capabilities&gt; 0 = basic SUC; 1 = SIS</li>
 
   </ul>
   <br>
@@ -921,39 +941,39 @@ ZWDongle_Ready($)
   <a name="ZWDongleget"></a>
   <b>Get</b>
   <ul>
-  <li>nodeList<br>
-    return the list of included nodenames or UNKNOWN_id, if there is no
-    corresponding device in FHEM. Can be used to recreate fhem-nodes with the
-    createNode command.</li>
-
   <li>homeId<br>
     return the six hex-digit homeId of the controller.</li>
 
-  <li>isFailedNode<br>
+  <li>isFailedNode &lt;decimal nodeId&gt;<br>
     return if a node is stored in the failed node list.</li>
 
   <li>caps, ctrlCaps, version<br>
     return different controller specific information. Needed by developers
     only.  </li>
 
-  <li>neighborList [onlyRep] nodeId<br>
+  <li>neighborList [excludeDead] [onlyRep] &lt;decimal nodeId&gt;<br>
     return data for the decimal nodeId.<br>
     With onlyRep the result will include only nodes with repeater
     functionality.
     </li>
 
-  <li>nodeInfo<br>
+  <li>nodeInfo &lt;decimal nodeId&gt;<br>
     return node specific information. Needed by developers only.</li>
+    
+  <li>nodeList<br>
+    return the list of included nodenames or UNKNOWN_id, if there is no
+    corresponding device in FHEM. Can be used to recreate FHEM-nodes with the
+    createNode command.</li>
 
-  <li>random N<br>
-    request N random bytes from the controller.
+  <li>random &lt;N&gt;<br>
+    request &lt;N&gt; random bytes from the controller.
     </li>
 
-  <li>raw<br>
-    Send raw data to the controller. Developer only.</li>
+  <li>raw &lt;hex&gt;<br>
+    Send raw data &lt;hex&gt; to the controller. Developer only.</li>
 	
   <li>sucNodeId<br>
-    return the currently registered SUC node ID.
+    return the currently registered decimal SUC node ID.
     </li>
 	
   </ul>
@@ -978,7 +998,14 @@ ZWDongle_Ready($)
   <a name="ZWDongleevents"></a>
   <b>Generated events:</b>
   <ul>
-  <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|controller|done|failed]
+  <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
+    </li>
+  <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|slave|controller|
+                              done|failed]
+    </li>
+  <li>ZW_CONTROLLER_CHANGE [learnReady|nodeFound|controller|done|failed]                    
+    </li>
+  <li>ZW_CREATE_NEW_PRIMARY [learnReady|nodeFound|controller|done|failed]                    
     </li>
   <li>ZW_REMOVE_FAILED_NODE_ID 
            [failedNodeRemoveStarted|notPrimaryController|noCallbackFunction|
@@ -993,8 +1020,6 @@ ZWDongle_Ready($)
             failedNodeNotFound|failedNodeRemoveProcessBusy|
             failedNodeRemoveFail|nodeOk|failedNodeReplace|
             failedNodeReplaceDone|failedNodeRemoveFailed]
-    </li>
-  <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
     </li>
   <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]
     </li>

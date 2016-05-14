@@ -3888,7 +3888,18 @@ ZWave_Parse($$@)
     } elsif($id eq "06") { $evt = 'callbackFailed';
     } else               { $evt = 'unknown_'.$id; # do not know
     }
-
+    
+  } elsif($cmd eq "ZW_CONTROLLER_CHANGE" ||
+          $cmd eq "ZW_CREATE_NEW_PRIMARY") {
+    my @vals = ("learnReady", "nodeFound", "slave","controller", "protocolDone",
+                "done", "failed");                # slave should never happen
+    $evt = ($id eq "00" || hex($id)>@vals+1) ? "unknownArg" : $vals[hex($id)-1];
+    if($cmd eq "ZW_CREATE_NEW_PRIMARY" && $evt eq "protocolDone") {
+      AnalyzeCommand(undef, "set $ioName createNewPrimary stop");
+    }
+    if($cmd eq "ZW_CONTROLLER_CHANGE" && $evt eq "protocolDone") {
+      AnalyzeCommand(undef, "set $ioName addNode off");
+    }
   }
 
   if($evt) {
