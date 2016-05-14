@@ -3716,6 +3716,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
   
+  my $oCmd = $cmd;# we extend press to press/L/S if press is defined
+  if ( $cmd =~ m/^press/){
+    $cmd = (InternalVal($name,"peerList",""))?"press":"?";
+  }
+  
   my $h = undef;
   $h = $culHmGlobalSets->{$cmd}         if(                !$roleV                    &&($roleD || $roleC));
   $h = $culHmGlobalSetsVrtDev->{$cmd}   if(!defined($h) &&( $roleV || !$st)           && $roleD);
@@ -3727,6 +3732,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   $h = $culHmChanSets->{$md."00"}{$cmd} if(!defined($h) && $culHmChanSets->{$md."00"} && $roleD);
   $h = $culHmChanSets->{$md.$chn}{$cmd} if(!defined($h) && $culHmChanSets->{$md.$chn} && $roleC); 
   $h = $culHmFunctSets->{$fkt}{$cmd}    if(!defined($h) && $culHmFunctSets->{$fkt});
+
+  $cmd = $oCmd;# necessary for press/S/L - check better implementation
 
   my @h;
   @h = split(" ", $h) if($h);
@@ -7209,6 +7216,7 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
   $tHash->{helper}{expert}{raw} = ( ($exLvl & 0x02))?1:0;#raw register on
   $tHash->{helper}{expert}{tpl} = ( ($exLvl & 0x08))?1:0;#template on
   my ($nTag,$grp);
+
   if ($tHash->{helper}{expert}{def}){($nTag,$grp) = ("",".R-")}
   else{                              ($nTag,$grp) = (".","R-")}
   foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
@@ -7220,17 +7228,19 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
     $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
     delete $tHash->{READINGS}{$rdEntry};
   }
+
   if ($tHash->{helper}{expert}{det}){($nTag,$grp) = ("",".R-")}
   else{                              ($nTag,$grp) = (".","R-")}
   foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
     my $reg = $rdEntry;
     my $p = "";
     $p = "-".$1 if($rdEntry =~m /R-(.*)-(lg|sh)/);
-    $reg =~ s/\.?R-(.*?-)?//;
+    $reg =~ s/\.?R-(.*-)?//;
     next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
     $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
     delete $tHash->{READINGS}{$rdEntry};
   }
+
   if ($tHash->{helper}{expert}{raw}){($nTag,$grp) = ("",".RegL_")}
   else{                              ($nTag,$grp) = (".","RegL_")}
   foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
