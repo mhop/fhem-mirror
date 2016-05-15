@@ -29,7 +29,7 @@ package main;
 
 use strict;
 use warnings;
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday usleep);
 
 my $last_rmsg = "abcd";
 my $last_time = 1;
@@ -266,12 +266,13 @@ TRX_DoInit($)
     # Get Status
     $init = pack('H*', "0D00000102000000000000000000");
     DevIo_SimpleWrite($hash, $init, 0);
-    $buf = unpack('H*',DevIo_TimeoutRead($hash, 0.1));
+    usleep(50000); # wait 50 ms
+    $buf = unpack('H*',DevIo_TimeoutRead($hash, 0.2));
 
     if (! $buf) {
       Log3 $name, 1, "TRX: Initialization Error: No character read";
       return "TRX: Initialization Error $name: no char read";
-    } elsif ($buf !~ m/0d0100....................../) {
+    } elsif ($buf !~ m/0d0100....................../ && $buf !~ m/140100..................................../) {
       Log3 $name, 1, "TRX: Initialization Error hexline='$buf', expected 0d0100......................";
       return "TRX: Initialization Error %name expected 0D010, but buf=$buf received.";
     } else {
@@ -328,6 +329,64 @@ TRX_DoInit($)
         $status .= "AC " if ($msg5 & 0x04); 
         $status .= "ARC " if ($msg5 & 0x02); 
         $status .= "X10 " if ($msg5 & 0x01); 
+        my $hexline = unpack('H*', $buf);
+        Log3 $name, 4, "TRX: Init status hexline='$hexline'";
+        Log3 $name, 1, "TRX: Init status: '$status'";
+      }
+      # Since 1001
+      if ($buf =~ m/140100(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)(..)/) {
+        my $status = "";
+
+        my $seqnbr = $1;
+        my $cmnd = $2;
+        my $msg1 = $3;
+        my $msg2 = ord(pack('H*', $4));
+        my $msg3 = ord(pack('H*', $5));
+        my $msg4 = ord(pack('H*', $6));
+        my $msg5 = ord(pack('H*', $7));
+        my $msg6 = ord(pack('H*', $8));
+        my $freq = { 
+	        '50' => '310MHz',
+	        '51' => '315MHz',
+	        '52' => '433.92MHz receiver only',
+	        '53' => '433.92MHz transceiver',
+	        '55' => '868.00MHz',
+	        '56' => '868.00MHz FSK',
+	        '57' => '868.30MHz',
+	        '58' => '868.30MHz FSK',
+	        '59' => '868.35MHz',
+	        '5a' => '868.35MHz FSK',
+	        '5b' => '868.95MHz'
+                 }->{$msg1} || 'unknown Mhz';
+        $status .= $freq;
+        $status .= ", " . sprintf "firmware=%d",$msg2+1000;
+        $status .= ", protocols enabled: ";
+        $status .= "undecoded " if ($msg3 & 0x80); 
+        $status .= "RFU " if ($msg3 & 0x40); 
+        $status .= "ByronSX " if ($msg3 & 0x20); 
+        $status .= "RSL " if ($msg3 & 0x10); 
+        $status .= "Lighting4 " if ($msg3 & 0x08); 
+        $status .= "FineOffset/Viking " if ($msg3 & 0x04); 
+        $status .= "Rubicson " if ($msg3 & 0x02); 
+        $status .= "AE/Blyss " if ($msg3 & 0x01); 
+        $status .= "BlindsT1/T2/T3/T4 " if ($msg4 & 0x80); 
+        $status .= "BlindsT0  " if ($msg4 & 0x40); 
+        $status .= "ProGuard " if ($msg4 & 0x20); 
+        $status .= "FS20 " if ($msg4 & 0x10); 
+        $status .= "LaCrosse " if ($msg4 & 0x08); 
+        $status .= "Hideki " if ($msg4 & 0x04); 
+        $status .= "LightwaveRF " if ($msg4 & 0x02); 
+        $status .= "Mertik " if ($msg4 & 0x01); 
+        $status .= "Visonic " if ($msg5 & 0x80); 
+        $status .= "ATI " if ($msg5 & 0x40); 
+        $status .= "OREGON " if ($msg5 & 0x20); 
+        $status .= "KOPPLA " if ($msg5 & 0x10); 
+        $status .= "HOMEEASY " if ($msg5 & 0x08); 
+        $status .= "AC " if ($msg5 & 0x04); 
+        $status .= "ARC " if ($msg5 & 0x02); 
+        $status .= "X10 " if ($msg5 & 0x01); 
+        $status .= "HomeComfort " if ($msg6 & 0x02); 
+        $status .= "KEELOQ " if ($msg6 & 0x01); 
         my $hexline = unpack('H*', $buf);
         Log3 $name, 4, "TRX: Init status hexline='$hexline'";
         Log3 $name, 1, "TRX: Init status: '$status'";
