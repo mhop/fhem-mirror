@@ -52,12 +52,13 @@
 # 0040: fixed "no commands for IT devices", drag&drop won't switch device-status anymore (June 15, 2015)
 # 0041: fixed eventmap, excess "delete"-messages during rereadconfig (Sept 24, 2015)
 # 0042: fixed log-errors, for commandref changed link to german installation guide in fhemwiki (Nov 21, 2015)
+# 0043: fixed erroneous replacement of own devicename by actual devicename upon drag&drop (May 15,2016)
 #
 ################################################################
 #
 #  Copyright notice
 #
-#  (c) 2012-2015 Copyright: Ulrich Maass
+#  (c) 2012-2016 Copyright: Ulrich Maass
 #
 #  This file is part of fhem.
 # 
@@ -582,8 +583,8 @@ FP_show(){
         $left  = 0 if (!$left);
         $style = 0 if (!$style);
         # start device-specific table
-        my $t1 = $text2 ? $text2 : " ";
-		my $t2 = $text  ? $text  : InternalVal($d,'NAME',' ');
+		my $t1 = $text  ? $text  : InternalVal($d,'NAME',' ');
+        my $t2 = $text2 ? $text2 : " ";
         # wrapper-div needed for floorplan_drag.js and for positioning
         FW_pO "\n<div fp_style=\"$style\" fp_text=\"$t1\" fp_text2=\"$t2\" fp_name=\"$FP_name\" class=\"fp_device_div\" style=\"position:absolute; top:".$top."px; left:".$left."px;\" id=\"div-$d\">"; 
         FW_pO "<form method=\"$FW_formmethod\" action=\"$FW_ME/floorplan/$FP_name/$d\" autocomplete=\"off\">";
