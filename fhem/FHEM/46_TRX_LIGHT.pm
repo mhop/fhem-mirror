@@ -7,7 +7,7 @@
 #       IMPULS, AC (KlikAanKlikUit, NEXA, CHACON, HomeEasy UK),
 #       HomeEasy EU, ANSLUT, Ikea Koppla
 #
-#     Copyright (C) 2012-2014 by Willi Herzig (Willi.Herzig@gmail.com)
+#     Copyright (C) 2012-2016 by Willi Herzig (Willi.Herzig@gmail.com)
 #
 #     This file is part of fhem.
 #
@@ -75,6 +75,10 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x1500 => [ "BLYSS", "light"], # Blyss
 	# 0x16: Chime
 	0x1600 => [ "BYRONSX", "light"], # Byron SX
+	0x1601 => [ "BYRONMP", "chime"], # Byron MP001
+	0x1602 => [ "SELECTPLUS", "chime"], # SelectPlus
+	0x1603 => [ "RFU", "chime"], # RFU
+	0x1604 => [ "ENVIVO", "chime"], # Envivo
 	# 0x17: Fan
 	0x1700 => [ "SIEMENS_SF01", "light"], # Siemens SF01
 	# 0x18: Curtain1
@@ -126,6 +130,10 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1500 => [ "on", "off", "all_on", "all_off"], # Blyss
 	# 0x16: Chime
 	0x1600 => [ "", "tubular3_1", "solo1", "bigben1", "", "tubular2_1", "tubular2_2", "", "dingdong", "solo2", " ", "", "", "tubular3_2"], # Byron SX
+	0x1601 => [ "ring"], # Byron MP001
+	0x1602 => [ "ring"], # SelectPlus
+	0x1603 => [ "ring"], # RFU
+	0x1604 => [ "ring"], # Envivo
 	# 0x17: Fan
 	0x1700 => [ "", "timer", "-", "learn", "+", "confirm", "light", "on", "off"], # Siemens SF01
 	# 0x18: Curtain1
@@ -139,8 +147,8 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1905 => [ "down", "up", "stop"], # Media Mount
 	0x1906 => [ "open", "close", "stop", "confirm"], # DC/RMF/Yooda
 	0x1907 => [ "open", "close", "stop", "confirm_pair"], # Forest
-        0x1A00 => [ "stop", "up", "", "down", "", "", "", "program"], # RTS RFY
-        0x1A01 => [ "stop", "up", "", "down", "", "", "", "program"], # RTS RFY ext
+	0x1A00 => [ "stop", "up", "", "down", "", "", "", "program"], # RTS RFY
+	0x1A01 => [ "stop", "up", "", "down", "", "", "", "program"], # RTS RFY ext
 );
 
 my %light_device_c2b;        # DEVICE_TYPE->hash (reverse of light_device_codes)
@@ -680,8 +688,13 @@ sub TRX_LIGHT_parse_X10 ($$)
   	$device = sprintf '%02x%02x%c%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
   	$data = $bytes->[7];
   } elsif ($type == 0x16) { #Chime
-	$device = sprintf '%02x', $bytes->[4];
-	$data = $bytes->[5];
+	if ($subtype == 0x01) {
+		$device = sprintf '%02x', $bytes->[4];
+		$data = $bytes->[5];
+	} else {
+		$device = sprintf '%02x', $bytes->[3], $bytes->[4];
+		$data = 0;
+	}
   } elsif ($type == 0x17) { # Fan
   	$device = sprintf '%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5];
   	$data = $bytes->[6];
