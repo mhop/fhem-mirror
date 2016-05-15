@@ -36,6 +36,7 @@ use HttpUtils;
 use Encode;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 no warnings "all";
 

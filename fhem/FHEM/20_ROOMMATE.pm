@@ -32,6 +32,9 @@ use Time::Local;
 use Data::Dumper;
 require RESIDENTStk;
 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
+
 sub ROOMMATE_Set($@);
 sub ROOMMATE_Define($$);
 sub ROOMMATE_Notify($$);
