@@ -523,6 +523,7 @@ TRX_Parse($$$$)
     $hash->{"${name}_MSGCNT"}++;
     $hash->{"${name}_TIME"} = TimeNow();
     $hash->{RAWMSG} = $rmsg;
+    readingsSingleUpdate($hash, "state", $hash->{READINGS}{state}{VAL}, 0);
   } else { 
     Log3 $hash, 5, "TRX_Parse() '$rmsg' dup";
   }
