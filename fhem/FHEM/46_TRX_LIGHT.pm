@@ -448,7 +448,9 @@ TRX_LIGHT_Set($@)
   	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F]$/ ) {
 		$hex_command = sprintf "%02x%02x00%s%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
   	} elsif (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
-		$hex_command = sprintf "%02x%02x%s%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
+		$hex_command = sprintf "%02x%02x00%s00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
+  	} elsif (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
+		$hex_command = sprintf "%02x%02x%s00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
   	} else {
 		Log3 $name, 1, "TRX_LIGHT_Set() chime wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
