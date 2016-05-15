@@ -446,13 +446,14 @@ TRX_LIGHT_Set($@)
  } elsif ($protocol_type == 0x16) {
 	# Chime
   	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F]$/ ) {
-		;
+		$hex_command = sprintf "%02x%02x00%s%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
+  	} elsif (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
+		$hex_command = sprintf "%02x%02x%s%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
   	} else {
 		Log3 $name, 1, "TRX_LIGHT_Set() chime wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
   	}
   	$hex_prefix = sprintf "0716";
-  	$hex_command = sprintf "%02x%02x00%s%02xx00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd; 
   	Log3 $name, 5, "TRX_LIGHT_Set() chime name=$name device_type=$device_type, deviceid=$deviceid command=$command";
   	Log3 $name, 5, "TRX_LIGHT_Set() chime hexline=$hex_prefix$hex_command";
  } elsif ($protocol_type == 0x17) {
@@ -560,7 +561,7 @@ TRX_LIGHT_Define($$)
   $devicelog = $a[4] if (int(@a) > 4);
   $commandcodes = $a[5] if ($type eq "PT2262" && int(@a) > 5);
 
-  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "TRC02" && $type ne "PT2262" && $type ne "ENER010" && $type ne "ENER5" && $type ne "COCO_GDR2" && $type ne "MDREMOTE" && $type ne "RSL2" && $type ne "LIVOLO" && $type ne "BLYSS" && $type ne "BYRONSX" && $type ne "SIEMENS_SF01" && $type ne "HARRISON" && $type ne "ROLLER_TROL" && $type ne "HASTA_OLD" && $type ne "AOK_RF01" && $type ne "AOK_AC114" && $type ne "RAEX_YR1326" && $type ne "MEDIA_MOUNT" && $type ne "DC106" && $type ne "FOREST" && $type ne "RFY" && $type ne "RFY_ext") {
+  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "TRC02" && $type ne "PT2262" && $type ne "ENER010" && $type ne "ENER5" && $type ne "COCO_GDR2" && $type ne "MDREMOTE" && $type ne "RSL2" && $type ne "LIVOLO" && $type ne "BLYSS" && $type ne "BYRONSX" && $type ne "SIEMENS_SF01" && $type ne "HARRISON" && $type ne "ROLLER_TROL" && $type ne "HASTA_OLD" && $type ne "AOK_RF01" && $type ne "AOK_AC114" && $type ne "RAEX_YR1326" && $type ne "MEDIA_MOUNT" && $type ne "DC106" && $type ne "FOREST" && $type ne "RFY" && $type ne "RFY_ext" && $type ne "SELECTPLUS") {
   	Log3 $name, 1,"TRX_LIGHT_Define() wrong type: $type";
   	return "TRX_LIGHT: wrong type: $type";
   }
@@ -1042,6 +1043,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	  <li> <code>TRC02</code> (RGB TRC02 devices. Commands ["off", "on", "bright", "dim", "vivid", "pale", "color"].)</li>
 	  <li> <code>BLYSS</code> (Blyss devices. deviceid: [A-P][1-5]. Commands ["off", "on", "all_off", "all_on"].)</li>
 	  <li> <code>BYRONSX</code> (Byron SX chime devices. deviceid: 00-FF. Commands [ "tubular3_1", "solo1", "bigben1", "tubular2_1", "tubular2_2", "solo2", "tubular3_2"].)</li>
+	  <li> <code>SELECTPLUS</code> (SELECTPLUS] chime devices. deviceid: 0000-FFFF. Commands [ "ring"].)</li>
 	  <li> <code>SIEMENS_SF01</code> (Siemens SF01 devices. deviceid: 000000-007FFF. Commands [ "timer", "-", "learn", "+", "confirm", "light", "on", "off" ].)</li>
 	  <li> <code>HARRISON</code> (Harrison curtain devices. deviceid: 00-FF. Commands [ "open", "close", "stop", "program" ].)</li>
 	  <li> <code>ROLLER_TROL</code> (Roller Trol blind devices. deviceid: 00000100-00FFFF0F. Commands [ "open", "close", "stop", "confirm_pair", "set_limit" ].)</li>
@@ -1119,6 +1121,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     level &lt;levelnum&gt;    # only AC, HOMEEASY, ANSLUT: set level to &lt;levelnum&gt; (range: 0=0% to 15=100%)
     on-till           # Special, see the note
     on-for-timer      # Special, see the note
+    ring              # Byron MP001,SelectPlus, RFU, Envivo
     </pre>
       Example: <br>
     	<code>set Steckdose on</code>
