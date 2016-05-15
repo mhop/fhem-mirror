@@ -38,11 +38,16 @@ dummy_Set($@)
   }
 
   my @rl = split(" ", AttrVal($name, "readingList", ""));
-  if(@rl && grep /\b$a[0]\b/, @rl) {
-    my $v = shift @a;
-    readingsSingleUpdate($hash, $v, join(" ",@a), 1);
-    return;
-  }
+  my $doRet;
+  eval {
+    if(@rl && grep /\b$a[0]\b/, @rl) {
+      my $v = shift @a;
+      readingsSingleUpdate($hash, $v, join(" ",@a), 1);
+      $doRet = 1;
+    }
+  };
+  return if($doRet);
+  
 
   my $v = join(" ", @a);
   Log3 $name, 4, "dummy set $name $v";
