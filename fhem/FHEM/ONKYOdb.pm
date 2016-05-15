@@ -102,7 +102,7 @@ my $ONKYO_cmds_hr = {
         'net-usb-time-info'             => 'NTM',
         'net-usb-title-name'            => 'NTI',
         'net-usb-track-info'            => 'NTR',
-        'network-usb'                   => 'NTC',
+        'net-usb'                       => 'NTC',
         'preset'                        => 'PRS',
         'preset-memory'                 => 'UPM',
         'pty-scan'                      => 'PTS',
@@ -4194,7 +4194,7 @@ my $ONKYO_cmddb = {
         {
             'description' =>
 'Network/USB Operation Command {Network Model Only after TX-NR905}',
-            'name'   => 'network-usb',
+            'name'   => 'net-usb',
             'values' => {
                 'PLAY',
                 {
@@ -4208,12 +4208,12 @@ my $ONKYO_cmddb = {
                 'TRUP',
                 {
                     'description' => 'TRACK UP KEY',
-                    'name'        => 'trup'
+                    'name'        => 'next'
                 },
                 'TRDN',
                 {
                     'description' => 'TRACK DOWN KEY',
-                    'name'        => 'trdn'
+                    'name'        => 'previous'
                 },
                 'FF',
                 {
@@ -5641,6 +5641,11 @@ my $ONKYO_cmddb = {
                     'name' => 'up'
                 }
             }
+        },
+        'NRI',
+        {
+            'description' => 'Get device info in XML format',
+            'name'        => 'net-receiver-information',
         }
     },
     'zone2' => {
