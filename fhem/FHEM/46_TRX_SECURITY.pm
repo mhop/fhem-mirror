@@ -238,14 +238,14 @@ TRX_SECURITY_Define($$)
   $type = uc($type);
 
   my $my_type;
-  if ($type eq "WD18" || $type eq "GD18" ) {
+  if ($type eq "WD18" || $type eq "GD18" || $type eq "SD18" || $type eq "COD18" || $type eq "GB10E" ) {
 	$my_type = "DS10A"; # device will be received as DS10A	
   } else {
 	$my_type = $type;
   }
   my $device_name = "TRX".$DOT.$my_type.$DOT.$deviceid;
 
-  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" && $type ne "VISONIC_MOTION" && $type ne "VISONIC_WINDOW_AUX" && $type ne "VISONIC_REMOTE" && $type ne "MEIANTECH" && $type ne "SA30" && $type ne "GD18" && $type ne "WD18") {
+  if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" && $type ne "VISONIC_MOTION" && $type ne "VISONIC_WINDOW_AUX" && $type ne "VISONIC_REMOTE" && $type ne "MEIANTECH" && $type ne "SA30" && $type ne "GD18" && $type ne "WD18" && $type ne "SD18" && $type ne "COD18" && $type ne "GB10E") {
   	Log3 $hash, 1,"TRX_SECURITY_Define() wrong type: $type";
   	return "TRX_SECURITY: wrong type: $type";
   }
@@ -601,6 +601,7 @@ TRX_SECURITY_Parse($$)
       specifies one of the following security devices:
         <ul>
           <li> <code>DS10A</code> (X10 security ds10a Door/Window Sensor or compatible devices. This device type reports the status of the switch [Open/Closed], status of the delay switch [min|max]], and battery status [ok|low].)</li>
+          <li> <code>SD18</code> or <code>COD18</code>(X10 security sd18 smoke Sensor and COD18 CO Sensor). These device types report the status of the sensor [alert/normal] and battery status [ok|low])</li>
           <li> <code>MS10A</code> (X10 security ms10a motion sensor. This device type reports the status of motion sensor  [normal|alert] and battery status [ok|low].))</li>
           <li> <code>SD90</code> (Marmitek sd90 smoke detector. This device type reports the status of the smoke detector [normal|alert] and battery status [ok|low].)</li>
           <li> <code>KR18</code> (X10 security remote control. Report the Reading "Security" with values [Arm|Disarm], "ButtonA" and "ButtonB" with values [on|off] )</li>
@@ -617,7 +618,7 @@ TRX_SECURITY_Parse($$)
     <br>
     <code>&lt;devicelog&gt;</code>
     <ul>
-    is the name of the Reading used to report. Suggested: "Window" or "Door" for ds10a, "motion" for motion sensors, "smoke" for sd90. If you use "none" then no additional Reading is reported. Just the state is used to report the change.
+    is the name of the Reading used to report. Suggested: "Window" or "Door" for ds10a, "motion" for motion sensors, "smoke" for sd90, sd18 and cod18. If you use "none" then no additional Reading is reported. Just the state is used to report  the change.
     </ul>
     <br>
     <code>&lt;deviceid2&gt;</code>
