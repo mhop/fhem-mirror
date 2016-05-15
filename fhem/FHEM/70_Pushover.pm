@@ -58,6 +58,7 @@ use SetExtensions;
 use Encode;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 my %sets = ( "msg" => 1 );
 

@@ -40,6 +40,7 @@ use Data::Dumper;
 use msgSchema;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 sub CommandMsg($$;$$);
 
