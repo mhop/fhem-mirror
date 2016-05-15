@@ -1802,8 +1802,9 @@ CommandModify($$)
   $hash->{OLDDEF} = $hash->{DEF};
   $hash->{DEF} = $a[1];
   my $ret = CallFn($a[0], "DefFn", $hash,
-                    $modules{$hash->{TYPE}}->{parseParams} ? parseParams($def) :
-                      "$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]" : ""));
+              $modules{$hash->{TYPE}}->{parseParams} ?
+              parseParams("$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]":"")):
+              "$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]" : ""));
   if($ret) {
     $hash->{DEF} = $hash->{OLDDEF};
   } else {
