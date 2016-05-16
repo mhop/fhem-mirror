@@ -8,6 +8,7 @@
 # ABU 20160309 fixed log2
 # ABU 20160310 repaired dispatch events - inform EIB, only is useEIB is set
 # ABU 20160515 removed compatibility flag for EIB
+# ABU 20160516 added log entry for non-compatibility of tul
 
 package main;
 
@@ -103,6 +104,7 @@ TUL_Define($$)
 	#Set attributes in order to control backward-compatibility
 	#$attr{$name}{useEIB} = 1;
 	#Log3 ($name, 1, "Using EIB is deprecated. Please migrate to KNX soon. Module 10_EIB is not maintained any longer.") if (AttrVal($name, "useEIB", 0) =~ m/1/);
+	Log3 ($name, 0, "Using EIB is deprecated. Please migrate to KNX soon. Module 10_EIB is not maintained any longer. If you still want to use the module EIB, please set the attribute useEIB to 1.") if (AttrVal($name, "useEIB", 0) =~ m/1/);
   
 	$hash->{DeviceName} = $dev;
 	$hash->{DeviceAddress} = $devaddr;
