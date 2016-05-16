@@ -205,17 +205,39 @@ zwlib_parseNodeInfo(@)
 {
   my @r = @_;
   my @list;
-  my @type5 = qw( CONTROLLER STATIC_CONTROLLER SLAVE ROUTING_SLAVE);
-  push @list, $type5[$r[5]-1] if($r[5]>0 && $r[5] <= @type5);
-  my $id = sprintf("%02x", $r[6]);
-  push @list, $zw_type6{$id} if($zw_type6{$id});
+  my @type2   = qw(reserved0 2 SDK5.0x+4.2x SDK4.5x+6.0x reserved4
+                   reserved5 reserved6 reserved7);
+  my @type2_1 = qw(reserved 9.6kbps 40kbps);
+  my @type3   = qw(Security Controller SpecificDev RoutingSlave BeamCap 
+                   FrequentListen250ms FrequentListen1000ms OptFunc);
+  my @type4   = qw(reserved0 100kbps 200kbps);
+  my @type4_1 = qw(N/A CentralStaticController SubStaticController 
+                   PortableController PortableReportingController 
+                   PortableSlave AlwaysOnSlave
+                   SleepingReportingSlave SleepingListeningSlave);
+  my @type5   = qw(CONTROLLER STATIC_CONTROLLER SLAVE ROUTING_SLAVE);
+  push @list, "ProtocolVers:" . $type2[($r[2]&0x7)];
   push @list, ($r[2] & 0x80) ? "listening" : "sleeping";
-  push @list, "frequentListening:" . ($r[3] & ( 0x20 | 0x40 ));
-  push @list, "beaming:" . ($r[3] & 0x10);
-  push @list, "routing"   if($r[2] & 0x40);
-  push @list, "40kBaud"   if(($r[2] & 0x38) == 0x10);
-  push @list, "Vers:" . (($r[2]&0x7)+1);
-  push @list, "Security:" . ($r[3]&0x1);
+  push @list, "routing" 
+                   if($r[2] & 0x40);
+  push @list, "maxBaud:" . $type2_1[($r[2] & 0x38) >> 3] 
+                   if($type2_1[($r[2] & 0x38) >> 3]);
+  for my $bit (0..7) {
+    push @list, $type3[$bit] if(($r[3] & (1<<$bit)) && $bit < @type3);
+  }
+  push @list, "SpeedExt:" . $type4[($r[4] & 0x7)] 
+                   if($type4[($r[4] & 0x7)] !=0);
+  push @list, "Reserved" 
+                   if($r[4] &0x08);
+  push @list, "RoleType:" . $type4_1[(($r[4] & 0x8) & 0xf0) >> 4] 
+                   if($type4_1[(($r[4] & 0x8) & 0xf0) >> 4]);
+  push @list, "BasicDevClass:" . $type5[$r[5]-1]
+                   if($r[5]>0 && $r[5] <= @type5);
+  my $id = sprintf("%02x", $r[6]);
+  push @list, "GenericDevClass:" . $zw_type6{$id}
+                   if($zw_type6{$id});  
+  push @list, "SpecificDevClass:" . sprintf("%02x", $r[7])
+                   if($r[7]);
   return join(" ", @list);
 }
 
