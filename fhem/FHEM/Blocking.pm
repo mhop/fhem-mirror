@@ -25,18 +25,15 @@ sub BlockingExit();
 sub BlockingKill($);
 sub BlockingInformParent($;$$);
 
-my $telnetDevice;
+our $BC_telnetDevice;
 my $telnetClient;
 
 sub
-BlockingCall($$@)
+BC_searchTelnet($)
 {
-  my ($blockingFn, $arg, $finishFn, $timeout, $abortFn, $abortArg) = @_;
+  my ($blockingFn) = @_;
 
-  # Look for the telnetport. Must be done before forking to be able to create a
-  # temporary device. Do it each time, as the old telnet may got a password
-
-  $telnetDevice = undef;
+  $BC_telnetDevice = undef;
   foreach my $d (sort keys %defs) { # 
     my $h = $defs{$d};
     next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
@@ -47,23 +44,33 @@ BlockingCall($$@)
 
     my %cDev = ( SNAME=>$d, TYPE=>$h->{TYPE}, NAME=>$d.time() );
     next if(Authenticate(\%cDev, undef) == 2);    # Needs password
-    $telnetDevice = $d;
+    $BC_telnetDevice = $d;
     last;
   }
 
   # If not suitable telnet device found, create a temporary one
-  if(!$telnetDevice) {
-    $telnetDevice = "telnetForBlockingFn_".time();
-    my $ret = CommandDefine(undef, "-temporary $telnetDevice telnet 0");
+  if(!$BC_telnetDevice) {
+    $BC_telnetDevice = "telnetForBlockingFn_".time();
+    my $ret = CommandDefine(undef, "-temporary $BC_telnetDevice telnet 0");
     if($ret) {
       $ret = "BlockingCall ($blockingFn): ".
                 "No telnet port found and cannot create one: $ret";
       Log 1, $ret;
       return undef;
     }
-    $attr{$telnetDevice}{room} = "hidden"; # no red ?, Forum #46640
-    $attr{$telnetDevice}{allowfrom} = "127.0.0.1";
+    $attr{$BC_telnetDevice}{room} = "hidden"; # no red ?, Forum #46640
+    $attr{$BC_telnetDevice}{allowfrom} = "127.0.0.1";
   }
+}
+
+sub
+BlockingCall($$@)
+{
+  my ($blockingFn, $arg, $finishFn, $timeout, $abortFn, $abortArg) = @_;
+
+  # Look for the telnetport. Must be done before forking to be able to create a
+  # temporary device. Do it each time, as the old telnet may got a password
+  BC_searchTelnet($blockingFn);
 
   # do fork
   my $pid = fhemFork;
@@ -74,7 +81,7 @@ BlockingCall($$@)
 
   if($pid) {
     Log 4, "BlockingCall ($blockingFn): created child ($pid), ".
-                "uses $telnetDevice to connect back";
+                "uses $BC_telnetDevice to connect back";
     my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn, 
               abortFn=>$abortFn, abortArg=>$abortArg );
     if($timeout) {
@@ -104,7 +111,7 @@ BlockingInformParent($;$$)
 	
   # Write the data back, calling the function
   if(!$telnetClient) {
-    my $addr = "localhost:$defs{$telnetDevice}{PORT}";
+    my $addr = "localhost:$defs{$BC_telnetDevice}{PORT}";
     $telnetClient = IO::Socket::INET->new(PeerAddr => $addr);
     if(!$telnetClient) {
       Log 1, "BlockingInformParent ($informFn): Can't connect to $addr: $@";
