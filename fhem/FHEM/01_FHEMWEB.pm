@@ -3505,6 +3505,8 @@ FW_widgetOverride($$)
           <li>if the modifier is ":time", then a javascript driven timepicker is
             displayed.</li>
           <li>if the modifier is ":textField", an input field is displayed.</li>
+          <li>if the modifier is ":textFieldNL", an input field without label
+            is displayed.</li>
           <li>if the modifier is ":textField-long", is like textField, but upon
             clicking on the input field a textArea (60x25) will be opened.</li>
 
