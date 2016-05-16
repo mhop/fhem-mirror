@@ -583,6 +583,8 @@ PRESENCE_DoLocalPingScan($)
     my $retcode;
     my $return;
     my $temp;
+    
+    $SIG{CHLD} = 'IGNORE';
 
     if($^O =~ m/(Win|cygwin)/)
     {
@@ -667,12 +669,14 @@ PRESENCE_DoLocalFritzBoxScan($)
     my ($string) = @_;
     my ($name, $device, $local, $speedcheck) = split("\\|", $string);
 
-    Log3 $name, 5, "PRESENCE_DoLocalFritzBoxScan: $string";
+    Log3 $name, 5, "PRESENCE ($name) - starting fritzbox scan: $string";
     
     my $number = 0;
     my $status = 0;
     my $speed;
-
+    
+    $SIG{CHLD} = 'IGNORE';
+    
     my $check_command = ($device =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/ ? "mac" : "name");
     
     $device = uc $device if($device =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/);
@@ -777,7 +781,11 @@ PRESENCE_DoLocalBluetoothScan($)
     my $wait = 1;
     my $ps;
     my $psargs = "ax";
-
+   
+    Log3 $name, 5, "PRESENCE ($name) - starting bluetooth scan: $string";
+ 
+    $SIG{CHLD} = 'IGNORE';
+    
     if(qx(ps --help 2>&1) =~ /BusyBox/g)
     {
         Log3 $name, 5, "PRESENCE ($name) - found busybox variant of ps command, using \"w\" as parameter";
@@ -844,8 +852,10 @@ PRESENCE_DoLocalShellScriptScan($)
     my $ret;
     my $return;
 
-    Log3 $name, 5, "PRESENCE ($name) - execute local shell script: $string";
-
+    Log3 $name, 5, "PRESENCE ($name) - starting local shell script scan: $string";
+    
+    $SIG{CHLD} = 'IGNORE';
+    
     $ret = qx($call);
 
     chomp $ret;
@@ -886,7 +896,9 @@ PRESENCE_DoLocalFunctionScan($)
     my $return;
 
     Log3 $name, 5, "PRESENCE ($name) - execute perl function: $string";
-
+    
+    $SIG{CHLD} = 'IGNORE';
+    
     $ret = AnalyzeCommandChain(undef, $call);
 
     chomp $ret;
