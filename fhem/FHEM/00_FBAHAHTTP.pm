@@ -100,7 +100,7 @@ FBAHAHTTP_Poll($)
       }
 
       $_[2] =~ s+<(device|group) (.*?)</\g1>+
-                Dispatch($hash, "<$1 $2</$1>", undef)+gse;      # Quick&Hack
+                Dispatch($hash, "<$1 $2</$1>", undef);""+gse;      # Quick&Hack
     }
   });
 
