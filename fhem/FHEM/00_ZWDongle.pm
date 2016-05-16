@@ -398,8 +398,7 @@ ZWDongle_Get($@)
     $msg = join(" ", @list);
 
   } elsif($cmd eq "nodeInfo") {                ############################
-    my $id = sprintf("%02x", $r[6]);
-    if($id eq "00") {
+    if($r[6] == 0) {
       $msg = "node $a[0] is not present";
     } else {
       $msg = zwlib_parseNodeInfo(@r);

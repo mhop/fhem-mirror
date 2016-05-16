@@ -207,6 +207,7 @@ zwlib_parseNodeInfo(@)
   my @list;
   my @type5 = qw( CONTROLLER STATIC_CONTROLLER SLAVE ROUTING_SLAVE);
   push @list, $type5[$r[5]-1] if($r[5]>0 && $r[5] <= @type5);
+  my $id = sprintf("%02x", $r[6]);
   push @list, $zw_type6{$id} if($zw_type6{$id});
   push @list, ($r[2] & 0x80) ? "listening" : "sleeping";
   push @list, "frequentListening:" . ($r[3] & ( 0x20 | 0x40 ));
