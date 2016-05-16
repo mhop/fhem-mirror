@@ -14,43 +14,45 @@ use Time::HiRes qw(gettimeofday usleep);
 use Scalar::Util qw(looks_like_number);
 use POSIX qw{strftime};
 
-my %OBIS_channels = ( "21"=>"power_L1",
-                 "41"=>"power_L2",
-                 "61"=>"power_L3",
-                 "12"=>"voltage_avg",
-                 "32"=>"voltage_L1",
-                 "52"=>"voltage_L2",
-                 "72"=>"voltage_L3",
-                 "11"=>"current_sum",
-                 "31"=>"current_L1",
-                 "51"=>"current_L2",
-                 "71"=>"current_L3",
-                 "1.8"=>"total_consumption",
-                 "2.8"=>"total_feed",
-                 "2"=>"feed_L1",
-                 "4"=>"feed_L2",
-                 "6"=>"feed_L3",
-                 "1"=>"power", 
-                 "15"=>"power",
-                 "16"=>"power");
+my %OBIS_channels = ( "21"	=>"power_L1",
+	                  "41"	=>"power_L2",
+	                  "61"	=>"power_L3",
+	                  "12"	=>"voltage_avg",
+	                  "32"	=>"voltage_L1",
+	                  "52"	=>"voltage_L2",
+	                  "72"	=>"voltage_L3",
+	                  "11"	=>"current_sum",
+	                  "31"	=>"current_L1",
+	                  "51"	=>"current_L2",
+	                  "71"	=>"current_L3",
+	                  "1.8"	=>"total_consumption",
+	                  "2.8"	=>"total_feed",
+	                  "2"	=>"feed_L1",
+	                  "4"	=>"feed_L2",
+	                  "6"	=>"feed_L3",
+	                  "1"	=>"power", 
+	                  "15"	=>"power",
+	                  "16"	=>"power",
+	                  "24"	=>"Gas",
+	                 );
                  
-my %OBIS_codes = (	"Serial" 		=> qr{0.0.96.1.255(?:.255)?\((.*?)\).*
-										 |1-0:0\.0\.[0-9]+(?:.255)?\((.*?)\).*}x,
-					"Owner" 		=> qr{1.0.0.0.0(?:.255)?\((.*?)\).*}x,
-					"Status" 		=> qr{1.0.96.5.5(?:.255)?\((.*?)\).*}x,
-					"Powerdrops"	=> qr{0.0.96.7.\d(?:.255)?\((.*?)\).*},
-					"Time_param"	=> qr{0.0.96.2.1(?:.255)?\((.*?)\).*},
-					"Time_current"	=> qr{0.0.1.0.0(?:.255)?\((.*?)\).*},
-					"Channels_sum" 	=> qr{1.0.(\d+).1.7(?:.255)?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
-					"Channels"		=> qr{1.0.(\d+).7\.\d+(?:.255)?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
-					"Counter"		=> qr{1.0.([12]).(8)\.(\d)(?:.255)?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
-					"ManufID"		=> qr{129-129:199\.130\.3(?:.255)?\((.*?)\).*},
-					"PublicKey"		=> qr{129-129:199\.130\.5(?:.255)?\((.*?)\).*},
-					"ErrorReg"		=> qr{0.0.97.97.\d(?:.255)?\((.*?)\).*}
+my %OBIS_codes = (	"Serial" 		=> qr{^0-0:96.1.255(?:.\d+)?\((.*?)\).*},
+					"Serial"		=> qr{^(?:1-0:)?0\.0\.[1-9]+(?:.\d+)?\((.*?)\).*},
+					"Owner" 		=> qr{^1.0.0.0.0(?:.\d+)?\((.*?)\).*}x,
+					"Status" 		=> qr{^1.0.96.5.5(?:.\d+)?\((.*?)\).*}x,
+					"Powerdrops"	=> qr{^0.0.96.7.\d(?:.\d+)?\((.*?)\).*},
+					"Time_param"	=> qr{^0.0.96.2.1(?:.\d+)?\((.*?)\).*},
+					"Time_current"	=> qr{^0.0.1.0.0(?:.\d+)?\((.*?)\).*},
+					"Channel_sum" 	=> qr{^(?:1.0.)?(\d+).1.7(?:.\d+)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
+					"Channels"		=> qr{^(?:\d.0.)?(\d+).7\.\d+(?:.\d+)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
+					"Channels2"		=> qr{^(?:0.1.)?(\d+).2\.\d+(?:.\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
+					"Counter"		=> qr{^(?:1.\d.)?(\d).(8)\.(\d)(?:.\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
+					"ManufID"		=> qr{^129-129:199\.130\.3(?:.\d+)?\((.*?)\).*},
+					"PublicKey"		=> qr{^129-129:199\.130\.5(?:.\d+)?\((.*?)\).*},
 				);
 
 my %SML_specialities = ("TIME"			=> [qr{0.0.96.2.1
-											   0.0.1.0.0		}x, sub{return strftime("%d-%m-%Y %H:%M:%S", localtime(unpack("i", pack("I", hex(@_)))))}],
+											   |0.0.1.0.0		}x, sub{return strftime("%d-%m-%Y %H:%M:%S", localtime(unpack("i", pack("I", hex(@_)))))}],
 						"HEX2"			=> [qr{1-0:0\.0\.[0-9]	}x, sub{my $a=shift;$a=~s/(..)/$1-/g;$a=~s/-$//;return $a;}],
 						"HEX4"			=> [qr{1.0.96.5.5
 										 	  |0.0.96.240.\d+
@@ -70,7 +72,7 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-#  $hash->{SetFn} = "OBIS_Set";
+# $hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
@@ -214,8 +216,8 @@ sub OBIS_trySMLdecode($$)
 			while ($msg =~ m/(7707)([0-9A-F]*)/g) {
 #	    		my $telegramm = $&;
       			my @list=$&=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]*)/g;
-      			Log 5,"Telegram=$msg";
-      			if (!@list) {Log 3,"OBIS - Empty datagram: .$msg"};
+      			Log3 $hash, 5,"OBIS: Telegram=$msg";
+      			if (!@list) {Log3 $hash,3,"OBIS - Empty datagram: .$msg"};
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		
 				my ($status,$statusL,$statusT,$valTime,$valTimeL,$valTimeT,$unit,$unitL,$unitT,$scaler,$scalerL,$scalerT,$data,$dataL,$dataT,$other);		   
@@ -227,11 +229,12 @@ sub OBIS_trySMLdecode($$)
 # Type String
 				my $line2=""; 
 	    		if ($dataT ==0 ) {				
+$line2=$data;
 	    			if($line=~$SML_specialities{"HEX4"}[0]) {
-	    				
-	    				$line2=$SML_specialities{"HEX4"}[1]->($data)
+#	    				
+#	    				$line2=$SML_specialities{"HEX4"}[1]->($data)
 	    			} elsif($line=~$SML_specialities{"HEX2"}[0]) {
-    					$line2=$SML_specialities{"HEX2"}[1]->($data)
+#    					$line2=$SML_specialities{"HEX2"}[1]->($data)
 	    			} else {
 	    				$data=~s/([A-F0-9]{2})/chr(hex($1))/eg;
 	    				$line2="$data";
@@ -258,10 +261,10 @@ sub OBIS_trySMLdecode($$)
 						if ($data =~ /^[89a-f]/i) {$val =  hex($data) - hex(sprintf ("FF" x $dataL)) -1;}
 						else {$val = hex($data)} #positive value
 					}
-					if ($dataT & 0b00100000 || $val>0) {
+					if ($dataT & 0b00100000 || $val>=0) {
 						$val=hex($data);
 					}
-					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
+#					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit")  if($dataT ==80);
 					$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit"); # if($dataT ==96);					
 				} elsif ($dataT & 0b01000000) {		# Type Boolean - no Idea, where this is used
 					$line2=OBIS_hex2int($data);			# 0=false, everything else is true
@@ -321,12 +324,14 @@ sub OBIS_Parse($$)
 	my $name = $hash->{NAME};  
 	if(index($buffer,chr(13).chr(10)) ne -1){
 		readingsBeginUpdate($hash);
+		
 	    while(index($buffer,chr(13).chr(10)) ne -1)
 	    {
 		    my $rmsg="";
 		    $rmsg = substr($buffer, 0, index($buffer,chr(13).chr(10)));
 			Log3 $hash,5,"OBIS ($name) - Msg-Parse: $rmsg";
-				if($rmsg=~/\/.*|\d{1,3}-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}(?:\*\d{1,3})?(?:\(.*?\))?\(.*?\)|!/) { # old regex: \/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!
+				if($rmsg=~/\/.*|^((?:\d{1,3}-\d{1,3}:)?\d{1,3}.\d{1,3}.\d{1,3})(?:\*\d{1,3})?(?:\(.*?\))?\(.*?\)|!/) { # old regex: \/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!
+					my $channel=$1;
 					if ($hash->{MeterType} eq "Unknown") {$hash->{MeterType}="Standard"}
 					if($rmsg=~/^([23456789]+)-.*/) {
 						Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Device, please report: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de";
@@ -347,23 +352,26 @@ sub OBIS_Parse($$)
 				  		if (!$rmsg~~@patterns) {
 				  			Log3 $hash,3,"OBIS ($name) - Unknown Message: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de"
 				  		} else {
+				  			my $found=0;
 							for my $code (keys %OBIS_codes) {
 								if ($rmsg =~ $OBIS_codes{$code}) {
-#								Log 3,"$rmsg is $code";
-									if ($code eq "Channels_sum") {
-							    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
-					  					readingsBulkUpdate($hash, "sum_$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
-					  					readingsBulkUpdate($hash, "dir_sum_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
+									if ($code=~/Channel_sum.*/) {
+										$rmsg =~ $OBIS_codes{$code};
+							    		my $L= $hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} // "sum_$OBIS_channels{$1}" //$channel;
+					  					readingsBulkUpdate($hash, $L,(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+					  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
 									}
 									 
-									elsif ($code eq "Channels") {
-							    		my $L=$hash->{helper}{Channels}{$1} // $OBIS_channels{$1} // "Unknown_Channel_$1";
+									elsif ($code=~/Channels.*/) {
+										$rmsg =~ $OBIS_codes{$code};
+							    		my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
 					  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
 					  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
 									}
 									
-									elsif ($code eq "Counter") {
-										my $L=$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // "Unknown_Channel_$1.$2";
+									elsif ($code=~/Counter.*/) {
+										$rmsg =~ $OBIS_codes{$code};
+										my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
 										my $chan=$3+0 > 0 ? "_Ch$3" : "";
 										if($1==1) {
 											readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
@@ -373,10 +381,31 @@ sub OBIS_Parse($$)
 					  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
 										
 									} else 
-										{readingsBulkUpdate($hash, $code  ,$1); 
+										{
+											$rmsg =~ $OBIS_codes{$code};
+											my $data=$1;
+											if($rmsg=~$SML_specialities{"HEX4"}[0]) {
+	    				    					$data=$SML_specialities{"HEX4"}[1]->($data)
+	    									} elsif($rmsg=~$SML_specialities{"HEX2"}[0]) {
+    											$data=$SML_specialities{"HEX2"}[1]->($data)
+	    									} elsif($rmsg=~$SML_specialities{"TIME"}[0]) {
+	    										$data=~/(\d+)/;
+	    										$data=$SML_specialities{"TIME"}[1]->($1)
+	    									}
+	    									my $chan=$code//$OBIS_channels{$channel} //$channel;
+											readingsBulkUpdate($hash, $chan  ,$data); 
 									}
+									$found=1;
+									last;
 								}
-				     		} 
+								
+				     		}
+				     		if ($found==0) {
+				     			$rmsg=~/^((?:\d{1,3}-\d{1,3}:)?\d{1,3}.\d{1,3}.\d{1,3})(?:\*\d{1,3})?(?:\(.*?\))?\((.*?)(?:\*.*)?\)/;
+				     			if (length $2) {
+									readingsBulkUpdate($hash, $channel  ,$2);
+				     			} 
+				     		}
 			   			}
 				  	}
 		   			if ($hash->{helper}{EoM}==1) {last;}
