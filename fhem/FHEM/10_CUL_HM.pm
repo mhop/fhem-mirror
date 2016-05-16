@@ -2133,19 +2133,19 @@ sub CUL_HM_Parse($$) {#########################################################
 
   elsif($mh{st} eq "senBright") { #############################################
     if ($mh{mTp} =~ m/5[34]/){
-      #Channel ist fixed 1
-      my ($chn,undef,$dat) = unpack 'A2A2A8',$mh{p};
+      #Channel is fixed 1
+      my ($chn,$unkn,$dat) = unpack 'A2A2A8',$mh{p};# chn = 01
       push @evtEt,[$mh{devH},1,"battery:".(hex($chn)&0x80?"low":"ok")];
-      $dat = sprintf("%0.1f",hex($dat)*100);
+      
+      $dat = sprintf("%0.2f",hex($dat))/100; #down to 0.01lux per docu
 
-      my $chnHash = $modules{CUL_HM}{defptr}{$mh{src}."01"};#fixed channel
-      if ($chnHash){
-        push @evtEt,[$chnHash,1,"state:bright: $dat"];
-        push @evtEt,[$chnHash,1,"bright:$dat"];
-      }
-      else{
-        push @evtEt,[$mh{devH},1,"Chan_01:brigth: $dat"];
-      }
+      # verify whether we have a channel or will use the Device instead
+      my $cHash = ($modules{CUL_HM}{defptr}{$mh{src}."01"})
+                     ?$modules{CUL_HM}{defptr}{$mh{src}."01"}
+                     :$mh{devH};
+      push @evtEt,[$cHash,1,"state:B: $dat"];
+      push @evtEt,[$cHash,1,"brightness:$dat"];
+      push @evtEt,[$cHash,1,"unknown: 0x".$unkn]; # read 0xC1, but what is it?
     }
   }
   elsif($mh{st} eq "powerSensor") {############################################
