@@ -297,18 +297,19 @@ sub FB_CALLLIST_Undef($$)
 # NotifyFn is trigger upon changes on FB_CALLMONITOR device. Imports the call data into call list
 sub FB_CALLLIST_Notify($$)
 {
-    my ($hash,$d) = @_;
+    my ($hash,$dev) = @_;
     
-    return undef if(!defined($hash) or !defined($d));
+    return undef if(!defined($hash) or !defined($dev));
 
     my $name = $hash->{NAME};
+    my $events = deviceEvents($dev,0);
     
-    if($d->{NAME} eq "global")
+    if($dev->{NAME} eq "global")
     {
-        if(grep(m/^(?:ATTR $name .*|DELETEATTR $name .*|INITIALIZED|REREADCFG)$/, @{$d->{CHANGED}}))
+        my $callmonitor = $hash->{FB};
+        
+        if(grep(m/^(?:ATTR $name .*|DELETEATTR $name .*|INITIALIZED|REREADCFG)$/, @{$events}))
         {
-            my $callmonitor = $hash->{FB};
-            
             Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - the selected device $callmonitor does not exist" unless(defined($defs{$callmonitor}));
             Log3 $name, 3, "FB_CALLLIST ($name) - WARNING - selected device $callmonitor ist not of type FB_CALLMONITOR" if(defined($defs{$callmonitor}) and $defs{$callmonitor}->{TYPE} ne "FB_CALLMONITOR");
 
@@ -316,19 +317,34 @@ sub FB_CALLLIST_Notify($$)
             FB_CALLLIST_cleanupList($hash);
 
             # Inform all FHEMWEB clients
-            FB_CALLLIST_updateFhemWebClients($hash) if(grep(m/^(?:ATTR|DELETEATTR)/, @{$d->{CHANGED}}));
+            FB_CALLLIST_updateFhemWebClients($hash) if(grep(m/^(?:ATTR|DELETEATTR)/, @{$events}));
             
             # save current list state to file/configDB
             FB_CALLLIST_saveList($hash);
         }
+        
+        # detect renaming of attached FB_CALLMONITOR
+        if(defined($callmonitor) and grep(/^RENAMED $callmonitor \S+$/, @{$events}))
+        {     
+            my ($new) = map((/^RENAMED $callmonitor (\S+)$/ ? $1 : () ), @{$events});
+            
+            if(defined($new))
+            {
+                Log3 $name, 3, "FB_CALLLIST ($name) - configured callmonitor definition $callmonitor was renamed to $new";
+                $hash->{DEF} = $new;
+                $hash->{NOTIFYDEV} = "global,".$new;
+                $hash->{FB} = $new;
+            }
+        }
+        
         return undef;
     }
 
-    my $fb = $d->{NAME};
+    my $fb = $dev->{NAME};
     
     return undef if(IsDisabled($name)); 
     return undef if($fb ne $hash->{FB});
-    return undef if(!grep(m/^event:/, @{$d->{CHANGED}}));
+    return undef if(!grep(m/^event:/,@{$events}));
  
     my $event = ReadingsVal($fb, "event", undef);
     my $call_id = ReadingsVal($fb, "call_id", undef);  
