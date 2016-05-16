@@ -182,7 +182,8 @@ createArchiv($$)
       $tarOpts = "chf";
     }
 
-    # prevents tar's output of "Removing leading /" and return total bytes of archive
+    # prevents tar's output of "Removing leading /" and return total bytes of
+    # archive
     $cmd = "tar -$tarOpts - \"$pathlist\" |gzip > $backupdir/FHEM-$dateTime.tar.gz";
 
   } else {
@@ -191,7 +192,13 @@ createArchiv($$)
   }
   Log 2, "Backup with command: $cmd";
   if($cl && ref($cl) eq "HASH" && $cl->{TYPE} && $cl->{TYPE} eq "FHEMWEB") {
-    system("($cmd; echo Backup done) 2>&1 &");
+    use Blocking;
+    our $BC_telnetDevice;
+    BC_searchTelnet("backup");
+    my $tp = $defs{$BC_telnetDevice}{PORT};
+
+    system("($cmd; echo Backup done;".
+                "$^X $0 localhost:$tp 'trigger global backup done')2>&1 &");
     return "Started the backup in the background, watch the log for details";
   }
   $ret = `($cmd) 2>&1`;
