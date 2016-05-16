@@ -102,7 +102,24 @@ HttpUtils_File($)
   return (1, undef, $data);
 }
 
+sub ip2str($) { return sprintf("%d.%d.%d.%d", unpack("C*", shift)); }
+
 my %HU_dnsCache;
+sub
+HttpUtils_dnsParse($$)
+{
+  my ($a, $ql) = @_;
+  return "wrong message ID" if(unpack("H*",substr($a,0,2)) ne "7072");
+  while(length($a) >= $ql+16) {
+    return (undef, substr($a,$ql+12,4), unpack("N",substr($a,$ql+6,4)))
+        if(unpack("N",substr($a,$ql+2,4)) == 0x10001);
+    $ql += 12+unpack("n",substr($a,$ql+10));
+  }
+  return "No A record found";
+}
+
+# { HttpUtils_gethostbyname({timeout=>4}, "google.com", sub(){my($h,$e,$a)=@_;;
+#   fhem("trigger global ".($e ? "ERR:$e": ("IP:".ip2str($a)))) }) }
 sub
 HttpUtils_gethostbyname($$$)
 {
@@ -116,60 +133,64 @@ HttpUtils_gethostbyname($$$)
 
   my $dnsServer = AttrVal("global", "dnsServer", undef);
   if(!$dnsServer) {
-    my @addr = gethostbyname($host);                    # blocking version
-    my $err = ($addr[0] ? undef : "gethostbyname $host failed");
-    $fn->($hash, $err, $addr[4]);
+    my $iaddr = inet_aton($host);
+    my $err;
+    if(!defined($iaddr)) {
+      my @addr = gethostbyname($host); # This is still blocking
+      $err = ($addr[0] ? undef : "gethostbyname $host failed");
+      $iaddr = $addr[4];
+    }
+    $fn->($hash, $err, $iaddr);
     return;
   }
 
-  my $now = gettimeofday();                             # check the cache
-  return $fn->($hash, undef, $HU_dnsCache{$host}{addr})
+  return $fn->($hash, undef, $HU_dnsCache{$host}{addr}) # check the cache
         if($HU_dnsCache{$host} && 
-           $HU_dnsCache{$host}{TS}+$HU_dnsCache{$host}{TTL} > $now);
+           $HU_dnsCache{$host}{TS}+$HU_dnsCache{$host}{TTL} > gettimeofday());
 
+  # Direct DNS Query via UDP
   my $c = IO::Socket::INET->new(Proto=>'udp', PeerAddr=>"$dnsServer:53");
   return $fn->($hash, "Cant create UDP socket:$!", undef) if(!$c);
-  my %dh = ( conn=>$c, FD=>$c->fileno(), NAME=>"DNS",
-             addr=>$dnsServer, callback=>$hash->{callback} );
-  my %timerHash = ( hash => \%dh );
 
+  my %dh = ( conn=>$c, FD=>$c->fileno(), NAME=>"DNS",
+             addr=>$dnsServer, callback=>$fn );
+  my %timerHash = ( hash => \%dh );
   my $bhost = join("", map { pack("CA*",length($_),$_) } split(/\./, $host));
   my $qry = pack("nnnnnn", 0x7072,0x0100,1,0,0,0) . $bhost . pack("Cnn", 0,1,1);
   my $ql = length($qry);
-  my $ret = syswrite $dh{conn}, $qry;
-  if(!$ret || $ret != $ql) {
-    my $err = $!;
-    HttpUtils_Close(\%dh);
-    return $fn->($hash, "DNS write error: $err", undef);
-  }
+  my $dnsTo = 0.25;
 
   $dh{directReadFn} = sub() {                           # Parse the answer
     RemoveInternalTimer(\%timerHash);
     my $buf;
     my $len = sysread($dh{conn},$buf,65536);
     HttpUtils_Close(\%dh);
-    # Log 1, "DNS ANSWER $len:".unpack("H*", $buf);
-
-    return $fn->($hash, "DNS: Cannot resolve $host", undef)
-        if(unpack("n",substr($buf,6,2)) == 0);
-    return $fn->($hash, "DNS: Short answer for $host", undef) 
-        if($len < $ql+16);
-    return $fn->($hash, "DNS: Wrong answer for $host", undef)
-        if(unpack("H*",substr($buf,$ql+2,4)) ne "00010001" || # Type A + IP
-           unpack("n",substr($buf,$ql+10,2)) != 4);
-
-    my $ttl = unpack("N",substr($buf,$ql+6,4));
-    my $addr = substr($buf,$ql+12,4);
-    Log 4, "DNS result for $host: ".unpack("H*",$addr).", ttl:$ttl";
-    $HU_dnsCache{$host}{TS} = $now;
+    Log 5, "DNS ANSWER $len:".unpack("H*", $buf);
+    my ($err, $addr, $ttl) = HttpUtils_dnsParse($buf,$ql);
+    return $fn->($hash, "DNS: $err", undef) if($err);
+    Log 4, "DNS result for $host: ".ip2str($addr).", ttl:$ttl";
+    $HU_dnsCache{$host}{TS} = gettimeofday();
     $HU_dnsCache{$host}{TTL} = $ttl;
     $HU_dnsCache{$host}{addr} = $addr;
     return $fn->($hash, undef, $addr);
   };
   $selectlist{\%dh} = \%dh;
 
-  InternalTimer(gettimeofday()+($hash->{timeout}/2),
-                "HttpUtils_ReadErr",\%timerHash,0);
+  my $dnsQuery;
+  $dnsQuery = sub()
+  {
+    $dnsTo *= 2;
+    return HttpUtils_Err(\%timerHash, "DNS") if($dnsTo > $hash->{timeout}/2);
+    my $ret = syswrite $dh{conn}, $qry;
+    if(!$ret || $ret != $ql) {
+      my $err = $!;
+      HttpUtils_Close(\%dh);
+      return $fn->($hash, "DNS write error: $err", undef);
+    }
+    InternalTimer(gettimeofday()+$dnsTo, $dnsQuery, \%timerHash, 0);
+  };
+  $dnsQuery->();
+
 }
 
 
@@ -600,11 +621,8 @@ HttpUtils_ParseAnswer($$)
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
 #    method($data ? "POST" : "GET"),keepalive(0),sslargs({})
 # Example:
-#   HttpUtils_NonblockingGet({
-#     url=>"http://192.168.178.112:8888/fhem",
-#     myParam=>7,
-#     callback=>sub($$$){ Log 1,"$_[0]->{myParam} ERR:$_[1] DATA:$_[2]" }
-#   })
+#   HttpUtils_NonblockingGet({ url=>"http://www.google.de/", myParam=>7,
+#     callback=>sub($$$){ Log 1,"$_[0]->{myParam} ERR:$_[1] DATA:$_[2]" } })
 sub
 HttpUtils_NonblockingGet($)
 {
