@@ -203,7 +203,8 @@ FBAHAHTTP_Write($$$)
 
   This module serves as the "physical" counterpart to the <a
   href="#FBDECT">FBDECT</a> devices. Note: you have to enable the access to
-  Smart Home in the FRITZ!Box frontend for the fritzbox-user.
+  Smart Home in the FRITZ!Box frontend for the fritzbox-user, and take care
+  to configure the login in the home network with username AND password.
   <br><br>
   <a name="FBAHAHTTPdefine"></a>
   <b>Define</b>
