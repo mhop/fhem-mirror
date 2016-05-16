@@ -282,6 +282,7 @@ FHEM/82_LGTV.pm              markusbloch          http://forum.fhem.de Multimedi
 FHEM/82_LGTV_IP12.pm         markusbloch          http://forum.fhem.de Multimedia
 FHEM/82_M232Voltage.pm       borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/87_WS2000.pm            tdressler            http://forum.fhem.de Sonstiges
+FHEM/86_Robonect.pm          andi291              http://forum.fhem.de Sonstige Systeme
 FHEM/88_ALL4000T.pm          sachag               http://forum.fhem.de Sonstiges
 FHEM/88_LINDY_HDMI_SWITCH.pm sachag               http://forum.fhem.de Multimedia
 FHEM/88_IPWE.pm              tdressler            http://forum.fhem.de Sonstiges
