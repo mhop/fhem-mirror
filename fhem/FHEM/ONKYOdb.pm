@@ -22,13 +22,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.0.1
-#
-# Version History:
-# - 1.0.0 - 2013-12-21
-# -- First release
-#
 ##############################################################################
 
 package ONKYOdb;
@@ -72,6 +65,7 @@ my $ONKYO_cmds_hr = {
         'hd-radio-tuner-status'         => 'UHS',
         'hdmi-audio-out'                => 'HAO',
         'hdmi-output'                   => 'HDO',
+        'hdmi-cec'                      => 'CEC',
         'input'                         => 'SLI',
         'internet-radio-preset'         => 'NPR',
         'ipod-album-name-info'          => 'IAL',
@@ -98,6 +92,8 @@ my $ONKYO_cmds_hr = {
         'net-usb-artist-name-info'      => 'NAT',
         'net-usb-jacket-art'            => 'NJA',
         'net-usb-list-info'             => 'NLS',
+        'net-usb-list-title-info'       => 'NLT',
+        'net-usb-menu-status'           => 'NMS',
         'net-usb-play-status'           => 'NST',
         'net-usb-time-info'             => 'NTM',
         'net-usb-title-name'            => 'NTI',
@@ -396,6 +392,12 @@ my $ONKYO_values_hr = {
             'zoomtg'     => 'ZOOMTG',
             'zoomup'     => 'ZOOMUP'
         },
+        'CEC' => {
+            'off'   => '00',
+            'on'    => '01',
+            'up'    => 'UP',
+            'query' => 'QSTN',
+        },
         'CEQ' => {
             'power'  => 'POWER',
             'preset' => 'PRESET'
@@ -605,96 +607,79 @@ my $ONKYO_values_hr = {
             'query'     => 'QSTN'
         },
         'LMD' => {
-            'action'                              => '05',
-            'all-ch-stereo'                       => '0C',
-            'audyssey-dsx'                        => '16',
-            'cinema2'                             => '50',
+            'stereo'                              => '00',
             'direct'                              => '01',
-            'dolby-ex'                            => '41',
-            'dolby-ex-audyssey-dsx'               => 'A7',
-            'dolby-virtual'                       => '14',
-            'down'                                => 'DOWN',
-            'dts-surround-sensation'              => '15',
-            'enhance'                             => '0E',
-            'enhanced-7'                          => '0E',
-            'film'                                => '03',
-            'full-mono'                           => '13',
-            'game'                                => 'GAME',
+            'surround'                            => '02',
+            'game-rpg'                            => '03',
+            'thx'                                 => '04',
             'game-action'                         => '05',
             'game-rock'                           => '06',
-            'game-rpg'                            => '03',
-            'game-sports'                         => '0E',
-            'i'                                   => '52',
-            'mono'                                => '0F',
             'mono-movie'                          => '07',
-            'movie'                               => 'MOVIE',
-            'multiplex'                           => '12',
-            'music'                               => 'MUSIC',
-            'musical'                             => '06',
-            'neo-6'                               => '8C',
-            'neo-6-cinema'                        => '82',
-            'neo-6-cinema-audyssey-dsx'           => 'A3',
-            'neo-6-cinema-dts-surround-sensation' => '91',
-            'neo-6-music'                         => '83',
-            'neo-6-music-audyssey-dsx'            => 'A4',
-            'neo-6-music-dts-surround-sensation'  => '92',
-            'neo-x-cinema'                        => '82',
-            'neo-x-game'                          => '9A',
-            'neo-x-music'                         => '83',
-            'neo-x-thx-cinema'                    => '85',
-            'neo-x-thx-games'                     => '8A',
-            'neo-x-thx-music'                     => '8C',
-            'neural-digital-music'                => '93',
-            'neural-digital-music-audyssey-dsx'   => 'A6',
-            'neural-surr'                         => '87',
-            'neural-surround'                     => '88',
-            'neural-surround-audyssey-dsx'        => 'A5',
-            'neural-thx'                          => '88',
-            'neural-thx-cinema'                   => '8D',
-            'neural-thx-games'                    => '8F',
-            'neural-thx-music'                    => '8E',
             'orchestra'                           => '08',
-            'plii'                                => '8B',
-            'plii-game-audyssey-dsx'              => 'A2',
-            'plii-movie-audyssey-dsx'             => 'A0',
-            'plii-music-audyssey-dsx'             => 'A1',
-            'pliix'                               => 'A2',
-            'pliix-game'                          => '86',
+            'unplugged'                           => '09',
+            'studio-mix'                          => '0A',
+            'tv-logic'                            => '0B',
+            'all-ch-stereo'                       => '0C',
+            'theater-dimensional'                 => '0D',
+            'game-sports'                         => '0E',
+            'mono'                                => '0F',
+            'pure-audio'                          => '11',
+            'multiplex'                           => '12',
+            'full-mono'                           => '13',
+            'dolby-virtual'                       => '14',
+            'dts-surround-sensation'              => '15',
+            'audyssey-dsx'                        => '16',
+            'whole-house'                         => '1F',
+            'straight-decode'                     => '40',
+            'dolby-ex'                            => '41',
+            'thx-cinema'                          => '42',
+            'thx-surround-ex'                     => '43',
+            'thx-music'                           => '44',
+            'thx-games'                           => '45',
+            'thx-cinema'                          => '50',
+            'thx-musicmode'                       => '51',
+            'thx-games'                           => '52',
             'pliix-movie'                         => '80',
             'pliix-music'                         => '81',
+            'neo-x-cinema'                        => '82',
+            'neo-x-music'                         => '83',
             'pliix-thx-cinema'                    => '84',
+            'neo-x-thx-cinema'                    => '85',
+            'pliix-game'                          => '86',
+            'neural-surr'                         => '87',
+            'neural-thx'                          => '88',
             'pliix-thx-games'                     => '89',
+            'neo-x-thx-games'                     => '8A',
             'pliix-thx-music'                     => '8B',
+            'neo-x-thx-music'                     => '8C',
+            'neural-thx-cinema'                   => '8D',
+            'neural-thx-music'                    => '8E',
+            'neural-thx-games'                    => '8F',
             'pliiz-height'                        => '90',
+            'neo-x-cinema-dts-surround-sensation' => '91',
+            'neo-x-music-dts-surround-sensation'  => '92',
+            'neural-digital-music'                => '93',
             'pliiz-height-thx-cinema'             => '94',
-            'pliiz-height-thx-games'              => '96',
             'pliiz-height-thx-music'              => '95',
-            'pliiz-height-thx-u2'                 => '99',
-            'pure-audio'                          => '11',
+            'pliiz-height-thx-games'              => '96',
+            'pliiz-height-thx-u2-cinema'          => '97',
+            'pliiz-height-thx-u2-music'           => '98',
+            'pliiz-height-thx-u2-games'           => '99',
+            'neo-x-game'                          => '9A',
+            'plii-movie-audyssey-dsx'             => 'A0',
+            'plii-music-audyssey-dsx'             => 'A1',
+            'plii-game-audyssey-dsx'              => 'A2',
+            'neo-x-cinema-audyssey-dsx'           => 'A3',
+            'neo-x-music-audyssey-dsx'            => 'A4',
+            'neural-surround-audyssey-dsx'        => 'A5',
+            'neural-digital-music-audyssey-dsx'   => 'A6',
+            'dolby-ex-audyssey-dsx'               => 'A7',
+            'down'                                => 'DOWN',
+            'game'                                => 'GAME',
+            'movie'                               => 'MOVIE',
+            'music'                               => 'MUSIC',
             'query'                               => 'QSTN',
-            's-cinema'                            => '50',
-            's-games'                             => '52',
-            's-music'                             => '51',
-            's2'                                  => '52',
-            's2-cinema'                           => '97',
-            's2-games'                            => '99',
-            's2-music'                            => '98',
-            'stereo'                              => '00',
-            'straight-decode'                     => '40',
-            'studio-mix'                          => '0A',
-            'surround'                            => '02',
-            'theater-dimensional'                 => '0D',
-            'thx'                                 => '04',
-            'thx-cinema'                          => '42',
-            'thx-games'                           => '52',
-            'thx-music'                           => '44',
-            'thx-musicmode'                       => '51',
-            'thx-surround-ex'                     => '43',
-            'thx-u2'                              => '52',
-            'tv-logic'                            => '0B',
-            'unplugged'                           => '09',
             'up'                                  => 'UP',
-            'whole-house'                         => '1F'
         },
         'LTN' => {
             'auto-dolby-truehd' => '03',
@@ -733,7 +718,11 @@ my $ONKYO_values_hr = {
             'query' => 'QSTN'
         },
         'NJA' => {
-            'tp-xx-xx-xx-xx-xx-xx' => 'tp{xx}{xx}{xx}{xx}{xx}{xx}'
+            'tp-xx-xx-xx-xx-xx-xx' => 'tp{xx}{xx}{xx}{xx}{xx}{xx}',
+            'off' => 'DIS',
+            'on' => 'ENA',
+            'up' => 'UP',
+            'query' => 'QSTN',
         },
         'NKY' => {
             'll' => 'll'
@@ -3048,19 +3037,19 @@ my $ONKYO_cmddb = {
                 '03',
                 {
                     'description' => 'sets FILM, Game-RPG',
-                    'name'        => [ 'film', 'game-rpg' ]
+                    'name'        => 'game-rpg'
                 },
                 '04',
                 { 'description' => 'sets THX', 'name' => 'thx' },
                 '05',
                 {
                     'description' => 'sets ACTION, Game-Action',
-                    'name'        => [ 'action', 'game-action' ]
+                    'name'        => 'game-action'
                 },
                 '06',
                 {
                     'description' => 'sets MUSICAL, Game-Rock',
-                    'name'        => [ 'musical', 'game-rock' ]
+                    'name'        => 'game-rock'
                 },
                 '07',
                 {
@@ -3100,7 +3089,7 @@ my $ONKYO_cmddb = {
                 '0E',
                 {
                     'description' => 'sets ENHANCED 7/ENHANCE, Game-Sports',
-                    'name'        => [ 'enhanced-7', 'enhance', 'game-sports' ]
+                    'name'        => 'game-sports'
                 },
                 '0F',
                 { 'description' => 'sets MONO', 'name' => 'mono' },
@@ -3172,53 +3161,52 @@ my $ONKYO_cmddb = {
                 '50',
                 {
                     'description' => 'sets THX U2/S2/I/S Cinema/Cinema2',
-                    'name' => [ 'thx-u2', 's2', 'i', 's-cinema', 'cinema2' ]
+                    'name'        => 'thx-cinema'
                 },
                 '51',
                 {
                     'description' => 'sets THX MusicMode,THX U2/S2/I/S Music',
-                    'name' =>
-                      [ 'thx-musicmode', 'thx-u2', 's2', 'i', 's-music' ]
+                    'name'        => 'thx-musicmode'
                 },
                 '52',
                 {
                     'description' => 'sets THX Games Mode,THX U2/S2/I/S Games',
-                    'name' => [ 'thx-games', 'thx-u2', 's2', 'i', 's-games' ]
+                    'name'        => 'thx-games'
                 },
                 '80',
                 {
                     'description' => 'sets PLII/PLIIx Movie',
-                    'name'        => [ 'plii', 'pliix-movie' ]
+                    'name'        => 'pliix-movie'
                 },
                 '81',
                 {
                     'description' => 'sets PLII/PLIIx Music',
-                    'name'        => [ 'plii', 'pliix-music' ]
+                    'name'        => 'pliix-music'
                 },
                 '82',
                 {
                     'description' => 'sets Neo:6 Cinema/Neo:X Cinema',
-                    'name'        => [ 'neo-6-cinema', 'neo-x-cinema' ]
+                    'name'        => 'neo-x-cinema'
                 },
                 '83',
                 {
                     'description' => 'sets Neo:6 Music/Neo:X Music',
-                    'name'        => [ 'neo-6-music', 'neo-x-music' ]
+                    'name'        => 'neo-x-music'
                 },
                 '84',
                 {
                     'description' => 'sets PLII/PLIIx THX Cinema',
-                    'name'        => [ 'plii', 'pliix-thx-cinema' ]
+                    'name'        => 'pliix-thx-cinema'
                 },
                 '85',
                 {
                     'description' => 'sets Neo:6/Neo:X THX Cinema',
-                    'name'        => [ 'neo-6', 'neo-x-thx-cinema' ]
+                    'name'        => 'neo-x-thx-cinema'
                 },
                 '86',
                 {
                     'description' => 'sets PLII/PLIIx Game',
-                    'name'        => [ 'plii', 'pliix-game' ]
+                    'name'        => 'pliix-game'
                 },
                 '87',
                 {
@@ -3228,27 +3216,27 @@ my $ONKYO_cmddb = {
                 '88',
                 {
                     'description' => 'sets Neural THX/Neural Surround',
-                    'name'        => [ 'neural-thx', 'neural-surround' ]
+                    'name'        => 'neural-thx'
                 },
                 '89',
                 {
                     'description' => 'sets PLII/PLIIx THX Games',
-                    'name'        => [ 'plii', 'pliix-thx-games' ]
+                    'name'        => 'pliix-thx-games'
                 },
                 '8A',
                 {
                     'description' => 'sets Neo:6/Neo:X THX Games',
-                    'name'        => [ 'neo-6', 'neo-x-thx-games' ]
+                    'name'        => 'neo-x-thx-games'
                 },
                 '8B',
                 {
                     'description' => 'sets PLII/PLIIx THX Music',
-                    'name'        => [ 'plii', 'pliix-thx-music' ]
+                    'name'        => 'pliix-thx-music'
                 },
                 '8C',
                 {
                     'description' => 'sets Neo:6/Neo:X THX Music',
-                    'name'        => [ 'neo-6', 'neo-x-thx-music' ]
+                    'name'        => 'neo-x-thx-music'
                 },
                 '8D',
                 {
@@ -3273,12 +3261,12 @@ my $ONKYO_cmddb = {
                 '91',
                 {
                     'description' => 'sets Neo:6 Cinema DTS Surround Sensation',
-                    'name'        => 'neo-6-cinema-dts-surround-sensation'
+                    'name'        => 'neo-x-cinema-dts-surround-sensation'
                 },
                 '92',
                 {
                     'description' => 'sets Neo:6 Music DTS Surround Sensation',
-                    'name'        => 'neo-6-music-dts-surround-sensation'
+                    'name'        => 'neo-x-music-dts-surround-sensation'
                 },
                 '93',
                 {
@@ -3303,17 +3291,17 @@ my $ONKYO_cmddb = {
                 '97',
                 {
                     'description' => 'sets PLIIz Height + THX U2/S2 Cinema',
-                    'name'        => [ 'pliiz-height-thx-u2', 's2-cinema' ]
+                    'name'        => 'pliiz-height-thx-u2-cinema'
                 },
                 '98',
                 {
                     'description' => 'sets PLIIz Height + THX U2/S2 Music',
-                    'name'        => [ 'pliiz-height-thx-u2', 's2-music' ]
+                    'name'        => 'pliiz-height-thx-u2-music'
                 },
                 '99',
                 {
                     'description' => 'sets PLIIz Height + THX U2/S2 Games',
-                    'name'        => [ 'pliiz-height-thx-u2', 's2-games' ]
+                    'name'        => 'pliiz-height-thx-u2-games'
                 },
                 '9A',
                 {
@@ -3323,27 +3311,27 @@ my $ONKYO_cmddb = {
                 'A0',
                 {
                     'description' => 'sets PLIIx/PLII Movie + Audyssey DSX',
-                    'name'        => [ 'pliix', 'plii-movie-audyssey-dsx' ]
+                    'name'        => 'plii-movie-audyssey-dsx'
                 },
                 'A1',
                 {
                     'description' => 'sets PLIIx/PLII Music + Audyssey DSX',
-                    'name'        => [ 'pliix', 'plii-music-audyssey-dsx' ]
+                    'name'        => 'plii-music-audyssey-dsx'
                 },
                 'A2',
                 {
                     'description' => 'sets PLIIx/PLII Game + Audyssey DSX',
-                    'name'        => [ 'pliix', 'plii-game-audyssey-dsx' ]
+                    'name'        => 'plii-game-audyssey-dsx'
                 },
                 'A3',
                 {
                     'description' => 'sets Neo:6 Cinema + Audyssey DSX',
-                    'name'        => 'neo-6-cinema-audyssey-dsx'
+                    'name'        => 'neo-x-cinema-audyssey-dsx'
                 },
                 'A4',
                 {
                     'description' => 'sets Neo:6 Music + Audyssey DSX',
-                    'name'        => 'neo-6-music-audyssey-dsx'
+                    'name'        => 'neo-x-music-audyssey-dsx'
                 },
                 'A5',
                 {
@@ -4482,6 +4470,74 @@ my $ONKYO_cmddb = {
                 }
             }
         },
+        'NLT',
+        {
+            'description' => 'NET/USB List Title Info',
+            'name'        => 'net-usb-list-title-info',
+            'values'      => {
+                'xxuycccciiiillrraabbssnnn...nnn',
+                {
+                    'description' => 'NET/USB List Title Info
+xx : Service Type
+ 00 : DLNA, 01 : Favorite, 02 : vTuner, 03 : SiriusXM, 04 : Pandora, 05 : Rhapsody, 06 : Last.fm,
+ 07 : Napster, 08 : Slacker, 09 : Mediafly, 0A : Spotify, 0B : AUPEO!, 0C : radiko, 0D : e-onkyo,
+ 0E : TuneIn Radio, 0F : MP3tunes, 10 : Simfy, 11:Home Media
+ F0 : USB Front, F1 : USB Rear, F2 : Internet Radio, F3 : NET, FF : None
+u : UI Type
+ 0 : List, 1 : Menu, 2 : Playback, 3 : Popup, 4 : Keyboard, \"\"5\"\" : Menu List
+y : Layer Info
+ 0 : NET TOP, 1 : Service Top,DLNA/USB/iPod Top, 2 : under 2nd Layer
+cccc : Current Cursor Position (HEX 4 letters)
+iiii : Number of List Items (HEX 4 letters)
+ll : Number of Layer(HEX 2 letters)
+rr : Reserved (2 leters)
+aa : Icon on Left of Title Bar
+ 00 : Internet Radio, 01 : Server, 02 : USB, 03 : iPod, 04 : DLNA, 05 : WiFi, 06 : Favorite
+ 10 : Account(Spotify), 11 : Album(Spotify), 12 : Playlist(Spotify), 13 : Playlist-C(Spotify)
+ 14 : Starred(Spotify), 15 : What\'s New(Spotify), 16 : Track(Spotify), 17 : Artist(Spotify)
+ 18 : Play(Spotify), 19 : Search(Spotify), 1A : Folder(Spotify)
+ FF : None
+bb : Icon on Right of Title Bar
+ 00 : DLNA, 01 : Favorite, 02 : vTuner, 03 : SiriusXM, 04 : Pandora, 05 : Rhapsody, 06 : Last.fm,
+ 07 : Napster, 08 : Slacker, 09 : Mediafly, 0A : Spotify, 0B : AUPEO!, 0C : radiko, 0D : e-onkyo,
+ 0E : TuneIn Radio, 0F : MP3tunes, 10 : Simfy, 11:Home Media
+ FF : None
+ss : Status Info
+ 00 : None, 01 : Connecting, 02 : Acquiring License, 03 : Buffering
+ 04 : Cannot Play, 05 : Searching, 06 : Profile update, 07 : Operation disabled
+ 08 : Server Start-up, 09 : Song rated as Favorite, 0A : Song banned from station,
+ 0B : Authentication Failed, 0C : Spotify Paused(max 1 device), 0D : Track Not Available, 0E : Cannot Skip
+nnn...nnn : Character of Title Bar (variable-length, 64 Unicode letters [UTF-8 encoded] max)',
+                    'name' => 'None'
+                },
+            }
+        },
+        'NMS',
+        {
+            'description' => 'NET/USB Menu Status',
+            'name'        => 'net-usb-menu-status',
+            'values'      => {
+                'maabbstii',
+                {
+                    'description' => 'NET/USB Menu Status (7 letters)
+m -> Track Menu: \"\"M\"\": Menu is enable, \"\"x\"\": Menu is disable
+aa -> F1 button icon (Positive Feed or Mark/Unmark)
+bb -> F2 button icon (Negative Feed)
+ aa or bb : \"\"xx\"\":disable, \"\"01\"\":Like, \"\"02\"\":don\'t like, \"\"03\"\":Love, \"\"04\"\":Ban,
+                  \"\"05\"\":episode, \"\"06\"\":ratings, \"\"07\"\":Ban(black), \"\"08\"\":Ban(white),
+                  \"\"09\"\":Favorite(black), \"\"0A\"\":Favorite(white), \"\"0B\"\":Favorite(yellow)
+s -> Time Seek \"\"S\"\": Time Seek is enable \"\"x\"\": Time Seek is disable
+t -> Time Display \"\"1\"\": Elapsed Time/Total Time, \"\"2\"\": Elapsed Time, \"\"x\"\": disable
+ii-> Service icon
+ ii : \"\"00\"\":DLNA, \"\"01\"\":My Favorite, \"\"02\"\":vTuner, \"\"03\"\":SiriusXM, \"\"04\"\":Pandora,
+      \"\"05\"\":Rhapsody, \"\"06\"\":Last.fm, \"\"08\"\":Slacker, \"\"0A\"\":Spotify, \"\"0B\"\":AUPEO!,
+      \"\"0C\"\":radiko, \"\"0D\"\":e-onkyo, \"\"0E\"\":TuneIn, \"\"0F\"\":MP3tunes, \"\"10\"\":Simfy,
+      \"\"11\"\":Home Media, \"\"F0\"\": USB Front, \"\"F1: USB Rear, \"\"F2\"\":Internet Radio
+      \"\"F3\"\":NET, \"\"F4\"\":Bluetooth',
+                    'name' => 'None'
+                },
+            }
+        },
         'NJA',
         {
             'description' =>
@@ -4493,6 +4549,30 @@ my $ONKYO_cmddb = {
                     'description' =>
 'NET/USB Jacket Art/Album Art Data\nt-> Image type 0:BMP,1:JPEG\np-> Packet flag 0:Start, 1:Next, 2:End\nxxxxxxxxxxxxxx -> Jacket/Album Art Data {valiable length, 1024 ASCII HEX letters max}',
                     'name' => 'tp-xx-xx-xx-xx-xx-xx'
+                },
+
+                'DIS',
+                {
+                    'description' => 'sets Jacket Art disable',
+                    'name' => 'off'
+                },
+
+                'ENA',
+                {
+                    'description' => 'sets Jacket Art enable',
+                    'name' => 'on'
+                },
+
+                'UP',
+                {
+                    'description' => 'sets Jacket Art Wrap-Around up',
+                    'name' => 'up'
+                },
+                
+                'QSTN',
+                {
+                    'description' => 'gets Jacket Art enable/disable',
+                    'name' => 'query'
                 }
             }
         },
@@ -4718,6 +4798,32 @@ my $ONKYO_cmddb = {
                 { 'description' => 'I<<', 'name' => 'skip-r' },
                 'REC',
                 { 'description' => 'REC', 'name' => 'rec' }
+            }
+        },
+        'CEC' => {
+            'description' => 'HDMI CEC',
+            'name'        => 'hdmi-cec',
+            'values'      => {
+                '00',
+                {
+                    'description' => 'sets off',
+                    'name'        => 'off'
+                },
+                '01',
+                {
+                    'description' => 'sets on',
+                    'name'        => 'on'
+                },
+                'UP',
+                {
+                    'description' => 'sets HDMI CEC Wrap-Around Up',
+                    'name'        => 'up'
+                },
+                'QSTN',
+                {
+                    'description' => 'gets HDMI CEC',
+                    'name'        => 'query'
+                },
             }
         },
         'CEQ',
@@ -7680,7 +7786,9 @@ sub ONKYO_GetRemotecontrolCommand($;$) {
 sub ONKYO_GetRemotecontrolValue($$;$) {
     my ( $zone, $command, $value ) = @_;
 
-    if ( !defined($value) && defined( $ONKYO_values_hr->{$zone}{$command} ) ) {
+    if (  !defined($value)
+        && defined( $ONKYO_values_hr->{$zone}{$command} ) )
+    {
         return $ONKYO_values_hr->{$zone}{$command};
     }
     elsif ( defined( $ONKYO_values_hr->{$zone}{$command}{$value} ) ) {
