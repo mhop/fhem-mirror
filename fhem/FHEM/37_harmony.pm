@@ -979,7 +979,20 @@ harmony_Read($)
         } elsif( $tag eq "message" ) {
 
           if( $content =~ m/type="harmony.engine\?startActivityFinished"/ ) {
-            harmony_updateActivity($hash, $decoded->{activityId}) if( defined($decoded->{activityId}) );
+            if( my $id = $decoded->{activityId} ) {
+              if( harmony_activityOfId($hash, $id) ) {
+                if( $id == -1 && $hash->{helper}{ignorePowerOff} ) {
+                  delete $hash->{helper}{ignorePowerOff};
+
+                } else {
+                  harmony_updateActivity($hash, $id);
+                }
+
+              } else {
+                $hash->{helper}{ignorePowerOff} = 1;
+
+              }
+            }
 
           } elsif( $content =~ m/type="vnd.logitech.harmony\/vnd.logitech.control.button\?pressType"/ ) {
             DoTrigger( $name, "vnd.logitech.control.button: $decoded->{type}" );
