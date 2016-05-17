@@ -332,6 +332,8 @@ sub OBIS_Parse($$)
 			Log3 $hash,5,"OBIS ($name) - Msg-Parse: $rmsg";
 				if($rmsg=~/\/.*|^((?:\d{1,3}-\d{1,3}:)?\d{1,3}.\d{1,3}.\d{1,3})(?:\*\d{1,3})?(?:\(.*?\))?\(.*?\)|!/) { # old regex: \/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!
 					my $channel=$1;
+					$channel=~s/:/\./;
+					$channel=~s/-/\./;
 					if ($hash->{MeterType} eq "Unknown") {$hash->{MeterType}="Standard"}
 					if($rmsg=~/^([23456789]+)-.*/) {
 						Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Device, please report: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de";
@@ -393,6 +395,7 @@ sub OBIS_Parse($$)
 	    										$data=$SML_specialities{"TIME"}[1]->($1)
 	    									}
 	    									my $chan=$code//$OBIS_channels{$channel} //$channel;
+	    									$chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;;
 											readingsBulkUpdate($hash, $chan  ,$data); 
 									}
 									$found=1;
@@ -402,8 +405,9 @@ sub OBIS_Parse($$)
 				     		}
 				     		if ($found==0) {
 				     			$rmsg=~/^((?:\d{1,3}-\d{1,3}:)?\d{1,3}.\d{1,3}.\d{1,3})(?:\*\d{1,3})?(?:\(.*?\))?\((.*?)(?:\*.*)?\)/;
+    							my $chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;;
 				     			if (length $2) {
-									readingsBulkUpdate($hash, $channel  ,$2);
+									readingsBulkUpdate($hash, $chan  ,$2);
 				     			} 
 				     		}
 			   			}
