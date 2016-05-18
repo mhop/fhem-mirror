@@ -187,6 +187,17 @@ SVG_isEmbed($)
                         # $FW_userAgent !~ m/(iPhone|iPad|iPod).*OS (8|9)/));
 }
 
+sub
+SVG_log10($)
+{
+  my ($n) = @_;
+
+  return 0.0000000001 if( $n <= 0 );
+
+  return log($n)/log(10);
+}
+
+
 ##################
 sub
 SVG_FwFn($$$$)
@@ -292,7 +303,7 @@ SVG_cb($$$)
 {
   my ($v,$t,$c) = @_;
   $c = ($c ? " checked" : "");
-  return "<td>$t&nbsp;<input type=\"checkbox\" name=\"$v\" value=\"$v\"$c></td>";
+  return "$t&nbsp;<input type=\"checkbox\" name=\"$v\" value=\"$v\"$c>";
 }
 
 sub
@@ -365,13 +376,17 @@ SVG_PEdit($$$$)
   $ret .= "</tr>";
   $ret .= "<tr class=\"even\">";
   $ret .= "<td>Grid aligned</td>";
-  $ret .= SVG_cb("gridy", "left", $conf{hasygrid});
-  $ret .= SVG_cb("gridy2","right",$conf{hasy2grid});
+  $ret .= "<td>".SVG_cb("gridy", "left", $conf{hasygrid})."</td>";
+  $ret .= "<td>".SVG_cb("gridy2","right",$conf{hasy2grid})."</td>";
   $ret .= "</tr>";
   $ret .= "<tr class=\"odd\">";
   $ret .= "<td>Range as [min:max]</td>";
-  $ret .= "<td>".SVG_txt("yrange", "left", $conf{yrange}, 16)."</td>";
-  $ret .= "<td>".SVG_txt("y2range", "right", $conf{y2range}, 16)."</td>";
+  $ret .= "<td>".SVG_txt("yrange", "left", $conf{yrange}, 16);
+  $ret .= "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".
+                SVG_cb("yscale", "log", $conf{yscale})."</td>";
+  $ret .= "<td>".SVG_txt("y2range", "right", $conf{y2range}, 16);
+  $ret .= "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".
+                SVG_cb("y2scale", "log", $conf{y2scale})."</td>";
   $ret .= "</tr>";
   if( $conf{xrange} ) {
     $ret .= "<tr class=\"odd\"><td/><td>";
@@ -453,8 +468,8 @@ SVG_PEdit($$$$)
     $o .= $ph;
     $o .= "</td><td>";
     my $v = $conf{lAxis}[$idx];
-    $o .= SVG_sel("axes_${idx}", "left,right", 
-                    ($v && $v eq "x1y1") ? "left" : "right");
+    my $sel = ($v && $v eq "x1y1") ? "left" : "right";
+    $o .= SVG_sel("axes_${idx}", "left,right,left log,right log", $sel );
     $o .= SVG_sel("type_${idx}",
                 "lines,points,steps,fsteps,histeps,bars,ibars,".
                         "cubic,quadratic,quadraticSmooth",
@@ -651,6 +666,8 @@ SVG_WriteGplot($)
   push @rows, "set xrange $FW_webArgs{xrange}" if($FW_webArgs{xrange});
   push @rows, "set yrange $FW_webArgs{yrange}" if($FW_webArgs{yrange});
   push @rows, "set y2range $FW_webArgs{y2range}" if($FW_webArgs{y2range});
+  push @rows, "set yscale log" if($FW_webArgs{yscale});
+  push @rows, "set y2scale log" if($FW_webArgs{y2scale});
   push @rows, "";
 
   my @plot;
@@ -1671,33 +1688,38 @@ SVG_render($$$$$$$$$$)
     my $dh = $hmax{$a} - $hmin{$a};
     my $hmul = $dh>0 ? $h/$dh : $h;
 
+    my $idx = 1;
+    $idx = $1 if( $a =~ m/x\d+y(\d+)/ );
+
+    my $scale = "y".($idx)."scale";
+    $scale = "yscale" if( $idx == 1 );
+    my $log = "";
+    $log = $conf{$scale} if( $conf{$scale} );
+
     # offsets
     my ($align,$display,$cll);
-    if( $a =~ m/x1y(\d)/ ) {
-      my $idx = $1;
-      if( $idx <= $use_left_axis ) {
-        $off1 = $x - ($idx-1)*$axis_width-4-$th*0.3;
-        $off3 = $x - ($idx-1)*$axis_width-4;
-        $off4 = $off3+5;
-        $align = " text-anchor=\"end\"";
-        $display = "";
-        $cll = "";
-      } elsif( $idx <= $use_left_axis+$use_right_axis ) {
-        $off1 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width+$th*0.3;
-        $off3 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width-5;
-        $off4 = $off3+5;
-        $align = "";
-        $display = "";
-        $cll = "";
-      } else {
-        $off1 = $x-$th*0.3+30;
-        $off3 = $x+30;
-        $off4 = $off3+5;
-        $align = " text-anchor=\"end\"";
-        $display = " display=\"none\" id=\"hline_$idx\"";
-        $cll = " class=\"SVGplot l$idx\"";
-      }
-    };
+    if( $idx <= $use_left_axis ) {
+      $off1 = $x - ($idx-1)*$axis_width-4-$th*0.3;
+      $off3 = $x - ($idx-1)*$axis_width-4;
+      $off4 = $off3+5;
+      $align = " text-anchor=\"end\"";
+      $display = "";
+      $cll = "";
+    } elsif( $idx <= $use_left_axis+$use_right_axis ) {
+      $off1 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width+$th*0.3;
+      $off3 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width-5;
+      $off4 = $off3+5;
+      $align = "";
+      $display = "";
+      $cll = "";
+    } else {
+      $off1 = $x-$th*0.3+30;
+      $off3 = $x+30;
+      $off4 = $off3+5;
+      $align = " text-anchor=\"end\"";
+      $display = " display=\"none\" id=\"hline_$idx\"";
+      $cll = " class=\"SVGplot l$idx\"";
+    }
 
     #-- grouping
     SVG_pO "<g$display>";
@@ -1712,13 +1734,21 @@ SVG_render($$$$$$$$$$)
     #-- tics as in the config-file
     if($tic && $tic !~ m/mirror/) {
       $tic =~ s/^\((.*)\)$/$1/;   # Strip ()
+      for(my $decimal = 0;
+          $decimal < ($log eq 'log'?SVG_log10($hmax{$a}):1);
+          $decimal++ ) {
+      my $f = SVG_log10($hmax{$a}) / $hmax{$a};
       foreach my $onetic (split(",", $tic)) {
         $onetic =~ s/^ *(.*) *$/$1/;
         my ($tlabel, $tvalue) = split(" ", $onetic);
         $tlabel =~ s/^"(.*)"$/$1/;
         $tvalue = 0 if( !$tvalue );
+        $tvalue /= 10 ** $decimal;
+        $tlabel = $tvalue if( !$tlabel );
 
         $off2 = int($y+($hmax{$a}-$tvalue)*$hmul);
+        $off2 = int($y+($hmax{$a}-SVG_log10($tvalue)/$f)*$hmul)
+                if( $log eq 'log' );
         #-- tics
         SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
@@ -1732,12 +1762,20 @@ SVG_render($$$$$$$$$$)
         }
         $off2 += $th/4;
         #--  text
-        SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$tlabel</text>";
+        SVG_pO
+          "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$tlabel</text>";
+      }
       }
     #-- tics automatically 
     } elsif( $hstep{$a}>0 ) {            
+      for(my $decimal = 0;
+          $decimal < ($log eq 'log'?SVG_log10($hmax{$a}):1);
+          $decimal++ ) {
+      my $f = SVG_log10($hmax{$a}) / $hmax{$a};
       for(my $i = $hmin{$a}; $i <= $hmax{$a}; $i += $hstep{$a}) {
+        my $i = $i / 10 ** $decimal;
         $off2 = int($y+($hmax{$a}-$i)*$hmul);
+        $off2 = int($y+($hmax{$a}-SVG_log10($i)/$f)*$hmul) if( $log eq 'log' );
         #-- tics
         SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
@@ -1753,7 +1791,9 @@ SVG_render($$$$$$$$$$)
         $off2 += $th/4;
         #--  text   
         my $txt = sprintf("%g", $i);
-        SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
+        SVG_pO
+          "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
+      }
       }
     }
     SVG_pO "</g>";
@@ -1764,6 +1804,10 @@ SVG_render($$$$$$$$$$)
   # Second loop over the data: draw the measured points
   for(my $idx=$#hdx; $idx >= 0; $idx--) {
     my $a = $conf{lAxis}[$idx];
+    my $scale = "y".($idx+1)."scale";
+    $scale = "yscale" if( $idx == 0 );
+    my $log = "";
+    $log = $conf{$scale} if( $conf{$scale} );
 
     SVG_pO "<!-- Warning: No axis for data item $idx defined -->"
         if(!defined($a));
@@ -1778,6 +1822,13 @@ SVG_render($$$$$$$$$$)
     SVG_pO "<!-- Warning: No data item $idx defined -->" if(!defined($dxp));
     next if(!defined($dxp));
 
+    if( $log eq 'log' ) {
+      my $f = SVG_log10($hmax{$a}) / $hmax{$a};
+      foreach my $i (1..int(@{$dxp})-1) {
+        $dyp->[$i] = SVG_log10($dyp->[$i]) / $f;
+      }
+    }
+
     my $yh = $y+$h;
     #-- Title attributes
     my $tl = $conf{lTitle}[$idx] ? $conf{lTitle}[$idx]  : "";
@@ -1785,8 +1836,11 @@ SVG_render($$$$$$$$$$)
     my $dec = length(sprintf("%d",$hmul*3))-1;
     $dec = 0 if($dec < 0);
     my $attributes = "id=\"line_$idx\" decimals=\"$dec\" ".
-          "x_off=\"$fromsec\" x_min=\"$x\" x_mul=\"$tmul\" ".
+          "x_min=\"$x\" ".
+          ($conf{xrange}?"x_off=\"$xmin\" ":"x_off=\"$fromsec\" ").
+          ($conf{xrange}?"x_mul=\"$xmul\" ":"t_mul=\"$tmul\" ").
           "y_h=\"$yh\" y_min=\"$min\" y_mul=\"$hmul\" title=\"$tl\" ".
+          ($log eq 'log'?"log_scale=\"".SVG_log10($hmax{$a})/$hmax{$a}."\" ":"").
           "onclick=\"parent.svg_click(evt)\" $conf{lWidth}[$idx]";
     my $lStyle = $conf{lStyle}[$idx];
     my $isFill = ($conf{lStyle}[$idx] =~ m/fill/);
@@ -1964,7 +2018,6 @@ SVG_render($$$$$$$$$$)
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
 
         next if($x1 == $lx && $y1 == $ly);
-
 
         # calc ymin/ymax for points with the same x coordinates
         if($x1 == $lx && $i < $maxIdx) {
