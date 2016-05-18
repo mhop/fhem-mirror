@@ -1482,6 +1482,8 @@ SVG_render($$$$$$$$$$)
 
           push @{$dxp}, $x1;
           push @{$dyp}, $y1;
+          $min = $y1 if($min > $y1);
+          $max = $y1 if($max < $y1);
 
         } elsif( $conf{lType}[$idx] eq "lines" ) {
           push @{$dxp}, undef;
@@ -1688,26 +1690,24 @@ SVG_render($$$$$$$$$$)
     my $dh = $hmax{$a} - $hmin{$a};
     my $hmul = $dh>0 ? $h/$dh : $h;
 
-    my $idx = 1;
-    $idx = $1 if( $a =~ m/x\d+y(\d+)/ );
+    my $axis = 1;
+    $axis = $1 if( $a =~ m/x\d+y(\d+)/ );
 
-    my $scale = "y".($idx)."scale";
-    $scale = "yscale" if( $idx == 1 );
-    my $log = "";
-    $log = $conf{$scale} if( $conf{$scale} );
+    my $scale = "y".($axis)."scale"; $scale = "yscale" if( $axis == 1 );
+    my $log = ""; $log = $conf{$scale} if( $conf{$scale} );
 
     # offsets
     my ($align,$display,$cll);
-    if( $idx <= $use_left_axis ) {
-      $off1 = $x - ($idx-1)*$axis_width-4-$th*0.3;
-      $off3 = $x - ($idx-1)*$axis_width-4;
+    if( $axis <= $use_left_axis ) {
+      $off1 = $x - ($axis-1)*$axis_width-4-$th*0.3;
+      $off3 = $x - ($axis-1)*$axis_width-4;
       $off4 = $off3+5;
       $align = " text-anchor=\"end\"";
       $display = "";
       $cll = "";
-    } elsif( $idx <= $use_left_axis+$use_right_axis ) {
-      $off1 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width+$th*0.3;
-      $off3 = $x+4+$w+($idx-1-$use_left_axis)*$axis_width-5;
+    } elsif( $axis <= $use_left_axis+$use_right_axis ) {
+      $off1 = $x+4+$w+($axis-1-$use_left_axis)*$axis_width+$th*0.3;
+      $off3 = $x+4+$w+($axis-1-$use_left_axis)*$axis_width-5;
       $off4 = $off3+5;
       $align = "";
       $display = "";
@@ -1717,8 +1717,8 @@ SVG_render($$$$$$$$$$)
       $off3 = $x+30;
       $off4 = $off3+5;
       $align = " text-anchor=\"end\"";
-      $display = " display=\"none\" id=\"hline_$idx\"";
-      $cll = " class=\"SVGplot l$idx\"";
+      $display = " display=\"none\" id=\"hline_$axis\"";
+      $cll = " class=\"SVGplot l$axis\"";
     }
 
     #-- grouping
@@ -1804,14 +1804,15 @@ SVG_render($$$$$$$$$$)
   # Second loop over the data: draw the measured points
   for(my $idx=$#hdx; $idx >= 0; $idx--) {
     my $a = $conf{lAxis}[$idx];
-    my $scale = "y".($idx+1)."scale";
-    $scale = "yscale" if( $idx == 0 );
-    my $log = "";
-    $log = $conf{$scale} if( $conf{$scale} );
 
     SVG_pO "<!-- Warning: No axis for data item $idx defined -->"
         if(!defined($a));
     next if(!defined($a));
+
+    my $axis = 1; $axis = $1 if( $a =~ m/x\d+y(\d+)/ );
+    my $scale = "y".($axis)."scale"; $scale = "yscale" if( $axis == 1 );
+    my $log = ""; $log = $conf{$scale} if( $conf{$scale} );
+
     $min = $hmin{$a};
     $hmax{$a} += 1 if($min == $hmax{$a});  # Else division by 0 in the next line
     my $xmul;

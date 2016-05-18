@@ -270,9 +270,10 @@ sv_menu(evt, embed)
     } else {
       var d = new Date((((xRaw-par.x_min)/par.t_mul)+par.x_off) * 1000), ts;
       if(par.t_mul < 0.0001) {           // Year
-        ts = (d.getMonth()+1)+"."+pad0(d.getDate());
+        ts =(pad0(d.getMonth()+1))+"."+pad0(d.getDate()+"."+(d.getYear()+1900));
       } else if(par.t_mul < 0.001) {     // Month
-        ts = d.getDate()+". "+pad0(d.getHours())+":"+pad0(d.getMinutes());
+        ts = (pad0(d.getMonth()+1))+"."+pad0(d.getDate())+
+                ". "+pad0(d.getHours())+":"+pad0(d.getMinutes());
       } else {
         ts = pad0(d.getHours())+":"+pad0(d.getMinutes());
       }
@@ -291,7 +292,8 @@ sv_menu(evt, embed)
     var selNode = $(sel).get(0);
     var currval = visible?1:0;
     var h = parseFloat(sel.attr("y_h"));
-    //sel.attr("transform", "translate(0,"+h*(1-currval)+") "+ "scale(1,"+currval+")");
+    //sel.attr("transform", "translate(0,"+h*(1-currval)+") "
+    //+ "scale(1,"+currval+")");
 
     if( !visible
         && selNode.showVal )
