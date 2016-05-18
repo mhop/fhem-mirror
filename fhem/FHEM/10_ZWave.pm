@@ -49,7 +49,7 @@ my %zwave_class = (
                "..2003(.*)"=> '"basicReport:$1"' }},
   CONTROLLER_REPLICATION   => { id => '21' },
   APPLICATION_STATUS       => { id => '22', # V1
-    parse => { "..2201(..)(..)" => 
+    parse => { "..2201(..)(..)" =>
                   'ZWave_applicationStatusBusyParse($hash, $1, $2)',
                "03220200" => "applicationStatus:cmdRejected" } },
   ZIP_SERVICES             => { id => '23' },
@@ -219,9 +219,9 @@ my %zwave_class = (
                 scheduleEntryLockDailyRepeating => "0e%02x%02x",
                 scheduleEntryLockTimeOffset     => '0b'
               },
-    set   =>  { scheduleEntryLockSet => 
+    set   =>  { scheduleEntryLockSet =>
                   'ZWave_scheduleEntryLockSet($hash, "%s")',
-                scheduleEntryLockAllSet => 
+                scheduleEntryLockAllSet =>
                   'ZWave_scheduleEntryLockAllSet($hash, "%s")',
                 scheduleEntryLockWeekDaySet =>
                   'ZWave_scheduleEntryLockWeekDaySet($hash, "%s")',
@@ -232,7 +232,7 @@ my %zwave_class = (
                 scheduleEntryLockYearDailyRepeatingSet =>
                   'ZWave_scheduleEntryLockDailyRepeatingSet($hash, "%s")'
               },
-    parse =>  { "..4e0a(.*)" => 
+    parse =>  { "..4e0a(.*)" =>
                   'ZWave_scheduleEntryLockTypeSupportedParse($hash, $1)',
                 "..4e05(.{14})" =>
                   'ZWave_scheduleEntryLockWeekDayParse($hash, $1)',
@@ -259,7 +259,7 @@ my %zwave_class = (
                 schedule          => "04%02x",
                 scheduleState     => "08"},
     set   => {  scheduleRemove    => "06%02x",
-                schedule          => 'ZWave_scheduleSet($hash, "%s")', 
+                schedule          => 'ZWave_scheduleSet($hash, "%s")',
                 scheduleState     => "07%02x%02x"},
     parse => { "..5302(.*)" => 'ZWave_scheduleSupportedParse($hash, $1)',
                "..5305(.*)" => 'ZWave_scheduleParse($hash, $1)',
@@ -436,7 +436,7 @@ my %zwave_class = (
     parse => { "..8a04(.*)" => 'ZWave_dateReport($hash,$1)',
                "..8a02(.*)" => 'ZWave_timeReport($hash,$1)',
                "..8a07(.*)" => 'ZWave_timeOffsetReport($hash,$1)'} },
-  TIME_PARAMETERS          => { id => '8b', 
+  TIME_PARAMETERS          => { id => '8b',
     set   => { timeParameters => 'ZWave_timeParametersSet($hash, "%s")'},
     get   => { timeParameters => "02"},
     parse => { "..8b02"      => 'timeParametersGet',
@@ -995,7 +995,7 @@ ZWave_scheduleEntryLockWeekDayParse ($$)
 
 
   my $start           = sprintf("%02d:%02d", hex($4), hex($5));
-  my $end             = sprintf("%02d:%02d", hex($6), hex($7));  
+  my $end             = sprintf("%02d:%02d", hex($6), hex($7));
 
   my $rt1 = sprintf ("weekDaySchedule_%d:", hex($1));
   $rt1 .= "$userId $scheduleSlotId $dayOfWeek $start $end";
@@ -1063,7 +1063,7 @@ ZWave_scheduleEntryLockDailyRepeatingParse ($$)
 
 sub
 ZWave_scheduleEntryLockDailyRepeatingSet ($$)
-{ 
+{
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
 
@@ -1109,7 +1109,7 @@ ZWave_scheduleEntryLockYearDayParse ($$)
 
 sub
 ZWave_scheduleEntryLockYearDaySet ($$)
-{ 
+{
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
 
@@ -1132,7 +1132,7 @@ ZWave_scheduleEntryLockYearDaySet ($$)
 
 sub
 ZWave_scheduleEntryLockTimeOffsetParse ($$)
-{ 
+{
   my ($hash, $val) = @_;
   return if($val !~ m/^(..)(..)(..)/);
 
@@ -1148,7 +1148,7 @@ ZWave_scheduleEntryLockTimeOffsetParse ($$)
 
 sub
 ZWave_scheduleEntryLockTimeOffsetSet ($$)
-{ 
+{
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
 
@@ -1220,11 +1220,11 @@ ZWave_thermostatSetpointSet ($$)
 
   my $sp = int($temp * (10 ** $prec));
   my $max = (2 ** (8*$size-1)) - 1;
-  my $min = -1 * (2 ** (8*$size-1)); 
+  my $min = -1 * (2 ** (8*$size-1));
 
   if (($sp > $max) || ($sp < $min)) {
     my $rt = sprintf("temperature value out of range for given "
-                      ."size and precision [%0.*f, %0.*f]", 
+                      ."size and precision [%0.*f, %0.*f]",
                       $prec, $min/(10**$prec), $prec, $max/(10**$prec));
     return ($rt, "");
   }
@@ -1235,12 +1235,12 @@ ZWave_thermostatSetpointSet ($$)
   my $precScaleSize = sprintf("%02x", ($size | ($scale<<3) | ($prec<<5)));
   my $rt = "01$type$precScaleSize$sp";
 
-  return ("",$rt);  
+  return ("",$rt);
 }
 
 sub
 ZWave_thermostatSetpointParse ($$)
-{ 
+{
   my ($hash, $val) = @_;
   my $name = $hash->{NAME};
 
@@ -1318,7 +1318,7 @@ ZWave_thermostatSetpointSupportedParse ($$)
     for (my $j=$i*8; $j<$i*8+8; $j++) {
       # loop over all bits
       last if $j >= $numTypes;
-      if ($supported & (2 ** ($j-$i*8))) { 
+      if ($supported & (2 ** ($j-$i*8))) {
         $rt .= sprintf("$delimeter$supportedType[$j]");
         $delimeter = " ";
       }
@@ -1347,9 +1347,9 @@ ZWave_scheduleSupportedParse ($$)
     $val = $4;
     for (my $i=0;$i<hex($3); $i++) {
       $val =~ m/(..)(..)(.*)/;
-      my $supportedCC = sprintf ("CC_%d: %d CCname_%d: %s", 
+      my $supportedCC = sprintf ("CC_%d: %d CCname_%d: %s",
         $i+1, hex($1), $i+1, $zwave_id2class{lc($1)});
-      my $supportedCCmask = sprintf (" CCmask_%d: %02b", 
+      my $supportedCCmask = sprintf (" CCmask_%d: %02b",
         $i+1, (hex($2) & 0x03));
       $supportedCCs .= " " if $i >0;
       $supportedCCs .= $supportedCC . $supportedCCmask;
@@ -1405,7 +1405,7 @@ ZWave_scheduleSet ($$)
     Log3 $name, 1, "$name: param: $#param $12";
     for (my $i=0; $i<=$#param; $i++) {
       $cmdgroup .= sprintf("%02x%s", length($param[$i])/2, $param[$i]);
-    } 
+    }
   }
   my $numCmd        = sprintf("%02x", $#param+1);
 
@@ -1712,7 +1712,7 @@ ZWave_applicationStatusBusyParse($$$)
   my $rt .= $status==0 ? "tryAgainLater " :
             $status==1 ? "tryAgainInWaitTimeSeconds " :
             $status==2 ? "RequestQueued " : "unknownStatusCode ";
-  $rt .= sprintf("waitTime: %d", hex($wTime));  
+  $rt .= sprintf("waitTime: %d", hex($wTime));
   return ("applicationBusy:$rt");
 }
 
@@ -1725,8 +1725,8 @@ ZWave_timeParametersReport($$)
     Log3 $name,1,"$name: timeParametersReport with wrong format received: $arg";
     return;
   }
-  return 
-    sprintf("timeParameters:date: %04d-%02d-%02d time(UTC): %02d:%02d:%02d", 
+  return
+    sprintf("timeParameters:date: %04d-%02d-%02d time(UTC): %02d:%02d:%02d",
     hex($1), hex($2), hex($3), hex($4), (hex$5), hex($6));
 }
 
@@ -1737,7 +1737,7 @@ ZWave_timeParametersSet($$)
   my $name = $hash->{NAME};
   return ("wrong format, see commandref", "")
                         if($arg !~ m/(....)-(..)-(..) (..):(..):(..)/);
-  my $rt = sprintf("%04x%02x%02x%02x%02x%02x", $1, $2, $3, $4, $5, $6); 
+  my $rt = sprintf("%04x%02x%02x%02x%02x%02x", $1, $2, $3, $4, $5, $6);
   return ("", sprintf("01%s", $rt));
 }
 
@@ -1762,8 +1762,8 @@ ZWave_timeReport($$)
     Log3 $name, 1, "$name: timeReport with wrong format received: $arg";
     return;
   }
-  return (sprintf("time:%02d:%02d:%02d RTC: %s", 
-    (hex($1) & 0x1f), hex($2), hex($3), 
+  return (sprintf("time:%02d:%02d:%02d RTC: %s",
+    (hex($1) & 0x1f), hex($2), hex($3),
     (hex($1) & 0x80) ? "failed" : "working"));
 }
 
@@ -1797,10 +1797,10 @@ ZWave_timeOffsetReport($$)
   $DSToffset .= sprintf ("%02d", $minuteOffsetDST);
 
   my $startDST = "DST-Start: ";
-  $startDST .= sprintf ("%02d-%02d_%02d:00", 
+  $startDST .= sprintf ("%02d-%02d_%02d:00",
     $monthStartDST, $dayStartDST, $hourStartDST);
   my $endDST = "DST-End: ";
-  $endDST .= sprintf ("%02d-%02d_%02d:00", 
+  $endDST .= sprintf ("%02d-%02d_%02d:00",
     $monthEndDST, $dayEndDST, $hourEndDST);
 
   return (sprintf("timeOffset:$UTCoffset $DSToffset $startDST $endDST"));
@@ -1828,11 +1828,11 @@ ZWave_timeOffsetSet($$)
   my $dayEndDST = $10;
   my $hourEndDST = $11;
 
-  my $rt = sprintf("%02x%02x", 
+  my $rt = sprintf("%02x%02x",
     ($hourTZO | ($signTZO eq "-" ? 0x01 : 0x00)), $minuteTZO);
-  $rt .= sprintf("%02x", 
+  $rt .= sprintf("%02x",
     ($minuteOffsetDST | ($signOffsetDST eq "-" ? 0x01 : 0x00)));
-  $rt .= sprintf("%02x%02x%02x", 
+  $rt .= sprintf("%02x%02x%02x",
     $monthStartDST, $dayStartDST, $hourStartDST);
   $rt .= sprintf("%02x%02x%02x", $monthEndDST, $dayEndDST, $hourEndDST);
 
@@ -1975,7 +1975,7 @@ ZWave_DoorLockConfigSet($$)
     return ("doorLockConfigurationSet: 1-15238 seconds allowed","");
   }
 
-  return ("", sprintf("04%02x%02x%02x%02x", 
+  return ("", sprintf("04%02x%02x%02x%02x",
     $oT,$handles, int($4 / 60) ,($4 % 60)));
 }
 
@@ -2011,7 +2011,7 @@ ZWave_swmParse($$$$)
   my $fl2 = (hex($fl) & 0xc0)>>6;
   $fl = ($fl1==0 ? "Increment": $fl1==1 ? "Decrement" : "")." ".
         ($fl2==0 ? "Up":  $fl1==1 ? "Down" : "");
-  return sprintf("state:swm %s Start: %d Duration: %d Step: %d", 
+  return sprintf("state:swm %s Start: %d Duration: %d Step: %d",
         $fl, hex($sl), hex($dur), hex($step));
 }
 
@@ -2797,7 +2797,7 @@ ZWave_secIncludeStart($$)
                         'DISABLED (SECURITY not supported by device)', 0);
     Log3 $name, 1, "$name: secure inclusion failed, ".
       "SECURITY disabled, device does not support SECURITY command class";
-  }  
+  }
   return 0;
 }
 
@@ -2819,12 +2819,12 @@ ZWave_secSchemeReport($$) # only called by zwave_parseHook during Include
   } else {
     Log3 $name, 1, "$name: Unknown SECURITY-SchemeReport received: $arg";
   }
-  return 1; # "veto" for parseHook 
+  return 1; # "veto" for parseHook
 }
 
 sub
 ZWave_secNetworkkeySet($$) # only called by zwave_parseHook during Include
-{  
+{
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
   my $iodev = $hash->{IODev};
@@ -2913,11 +2913,11 @@ ZWave_secAddToSendStack($$)
   my ($hash, $cmd) = @_;
   my $name = $hash->{NAME};
 
-  my $id = $hash->{nodeIdHex};  
+  my $id = $hash->{nodeIdHex};
   my $len = sprintf("%02x", (length($cmd)-2)/2+1);
   my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
   my $data = "13$id$len$cmd$cmdEf" . ZWave_callbackId($hash);
-  ZWave_addToSendStack($hash, "set", $data);  
+  ZWave_addToSendStack($hash, "set", $data);
 }
 
 sub
@@ -3576,7 +3576,7 @@ ZWave_processSendStack($$;$)
   my $now = gettimeofday();
   if($ss->[0] =~ m/^sent(.*?):(.*)(..)$/) {
     my ($stype,$smsg, $cbid) = ($1,$2,$3);
-    if($ackType eq "ack") { 
+    if($ackType eq "ack") {
       if($cbid ne $omsg) {
         Log 4, "ZWave: wrong callbackid $omsg received, expecting $cbid";
         return;
@@ -3633,7 +3633,7 @@ ZWave_addToSendStack($$$)
   push @{$ss}, "$type:$cmd";
 
   if(ZWave_isWakeUp($hash)) {
-    # SECURITY XXX 
+    # SECURITY XXX
     if($cmd =~ m/^......988[01].*/) {
       Log3 $hash->{NAME}, 5, "$hash->{NAME}: Sendstack bypassed for $cmd";
     } else {
@@ -3706,7 +3706,7 @@ ZWave_Parse($$@)
       DoTrigger($ioName, "$cmd $retval");
       return "";
     }
- 
+
     if($cmd eq "ZW_SET_SUC_NODE_ID") {
       my $retval;
            if($arg eq "00") { $retval = 'failed';
@@ -3733,7 +3733,7 @@ ZWave_Parse($$@)
       return "";
     }
   }
-    
+
   if($msg !~ m/^00(..)(..)(..)(.*)/) { # 00=REQUEST
     Log3 $ioName, 4, "$ioName: UNKNOWN msg $msg";
     return "";
@@ -3809,21 +3809,27 @@ ZWave_Parse($$@)
       return $ret;
 
     } elsif($callbackid eq "10") {
-      Log3 $ioName, 2, "ZW_APPLICATION_UPDATE sucId ".hex($id);
+      $evt = 'sucId '.hex($id);
+      DoTrigger($ioName, "$cmd $evt");
+      Log3 $ioName, 4, "$ioName $cmd $evt";
       return "";
-    
+
     } elsif($callbackid eq "20") {
-      Log3 $ioName, 2, "ZW_APPLICATION_UPDATE deleteDone ".hex($id);
+      $evt = 'deleteDone '.hex($id);
+      DoTrigger($ioName, "$cmd $evt");
+      Log3 $ioName, 4, "$ioName $cmd $evt";
       return "";
-     
+
     } elsif($callbackid eq "40") {
-      Log3 $ioName, 2, "ZW_APPLICATION_UPDATE addDone ".hex($id);
+      $evt = 'addDone '.hex($id);
+      DoTrigger($ioName, "$cmd $evt");
+      Log3 $ioName, 4, "$ioName $cmd $evt";
       return "";
-      
+
     } elsif($callbackid eq "81") {
-      Log3 $ioName, 2, "ZW_REQUEST_NODE_INFO failed".hex($id);
+      Log3 $ioName, 2, "ZW_REQUEST_NODE_INFO failed ".hex($id);
       return "";
-      
+
     } else {
       Log3 $ioName, 2, "ZW_APPLICATION_UPDATE unknown $callbackid";
       return "";
@@ -3852,7 +3858,7 @@ ZWave_Parse($$@)
       readingsSingleUpdate($hash, "transmit", $lmsg, 1);
       return $hash->{NAME};
     }
-    
+
   } elsif($cmd eq "ZW_SET_LEARN_MODE") {
          if($id eq "01") { $evt = 'started';
     } elsif($id eq "06") { $evt = 'done'; # $arg = new NodeId
@@ -3888,7 +3894,7 @@ ZWave_Parse($$@)
     } elsif($id eq "06") { $evt = 'callbackFailed';
     } else               { $evt = 'unknown_'.$id; # do not know
     }
-    
+
   } elsif($cmd eq "ZW_CONTROLLER_CHANGE" ||
           $cmd eq "ZW_CREATE_NEW_PRIMARY") {
     my @vals = ("learnReady", "nodeFound", "slave","controller", "protocolDone",
@@ -4071,7 +4077,7 @@ ZWave_computeRoute($;$)
     for my $r (split(" ", $av)) {
       if(!$defs{$r} || $defs{$r}{TYPE} ne "ZWave") {
         my $msg = "zwaveRoute: $r is not a ZWave device";
-        Log 1, $msg; 
+        Log 1, $msg;
         return $msg;
       }
       push(@h, $defs{$r}{nodeIdHex});
@@ -4385,7 +4391,7 @@ s2Hex($)
     </li>
 
   <br><br><b>Class NETWORK_SCHEDULE (SCHEDULE), V1</b>
-  <li>schedule ID USER_ID YEAR-MONTH-DAY WDAY ACTIVE_ID DURATION_TYPE 
+  <li>schedule ID USER_ID YEAR-MONTH-DAY WDAY ACTIVE_ID DURATION_TYPE
     HOUR:MINUTE DURATION NUM_REPORTS CMD ... CMD<br>
     Set a schedule for a user. Due to lack of documentation,
       details for some parameters are not available. Command Class is
@@ -4478,7 +4484,7 @@ s2Hex($)
       ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
       USER_ID: id of user, starting from 1 up to the number of supported users,
       refer also to the USER_CODE class description.<br>
-      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       WEEKDAY: day of week, choose one of:
                     "sun","mon","tue","wed","thu","fri","sat"<br>
@@ -4488,14 +4494,14 @@ s2Hex($)
                     (leading 0 is mandatory)<br>
       </ul>
     </li>
-  <li>scheduleEntryLockYearDaySet ACTION USER_ID SCHEDULE_ID 
+  <li>scheduleEntryLockYearDaySet ACTION USER_ID SCHEDULE_ID
         STARTDATE STARTTIME ENDDATE ENDTIME<br>
     erase or set a year day schedule for a specified user ID (V1)<br>
       <ul>
       ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
       USER_ID: id of user, starting from 1 up to the number of supported users,
       refer also to the USER_CODE class description.<br>
-      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       STARTDATE: date of schedule start in the format YYYY-MM-DD<br>
       STARTTIME: time of schedule start in the format HH:MM
@@ -4506,7 +4512,7 @@ s2Hex($)
       </ul>
     </li>
   <li>scheduleEntryLockTimeOffsetSet TZO DST<br>
-    set the TZO and DST (V2)<br>  
+    set the TZO and DST (V2)<br>
       <ul>
       TZO: current local time zone offset in the format (+|-)HH:MM
           (sign and leading 0 is mandatory)<br>
@@ -4521,7 +4527,7 @@ s2Hex($)
       ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
       USER_ID: id of user, starting from 1 up to the number of supported users,
       refer also to the USER_CODE class description.<br>
-      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       WEEKDAYS: concatenated string of weekdays (choose from:
                     "sun","mon","tue","wed","thu","fri","sat");
@@ -4870,14 +4876,14 @@ s2Hex($)
     returns the number of available slots for week day and year day
       schedules (V1), in V3 the number of available slots for the daily
       repeating schedule is reported additionally
-    </li> 
+    </li>
   <li>scheduleEntryLockWeekDay USER_ID SCHEDULE_ID<br>
     returns the specified week day schedule for the specified user
       (day of week, start time, end time) (V1)<br>
       <ul>
       USER_ID: id of user, starting from 1 up to the number of supported users,
       refer also to the USER_CODE class description.<br>
-      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       </ul>
     </li>
@@ -4887,7 +4893,7 @@ s2Hex($)
       <ul>
       USER_ID: id of user, starting from 1 up to the number of supported users,
       refer also to the USER_CODE class description.<br>
-      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       </ul>
     </li>
@@ -4897,7 +4903,7 @@ s2Hex($)
       <ul>
       USER_ID: id of user, starting from 1 up to the number of supported users,
       refer also to the USER_CODE class description.<br>
-      SCHEDULE_ID: schedule slot id (from 1 up to number of supported 
+      SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       </ul>
     </li>
@@ -5096,6 +5102,9 @@ s2Hex($)
   <b>Generated events:</b>
   <ul>
 
+  <br><b>neighborUpdate</b>
+  <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]</li>
+
   <br><b>Class ALARM</b>
   <li>Devices with class version 1 support: alarm_type_X:level Y</li>
   <li>For higher class versions more detailed events with 100+ different
@@ -5208,7 +5217,7 @@ s2Hex($)
   <li>mcCapability_X:class1 class2 ...</li>
 
   <br><br><b>Class NETWORK_SCHEDULE (SCHEDULE), V1</b>
-  <li>schedule_&lt;id&gt;: ID: $schedule_id userID: $user_id sYear: 
+  <li>schedule_&lt;id&gt;: ID: $schedule_id userID: $user_id sYear:
     $starting_year sMonth: $starting_month activeID: $active_id
     sDay: $starting_day sWeekDay: $starting_weekday sHour:
     $starting_hour durationType: $duration_type sMinute:
@@ -5219,7 +5228,7 @@ s2Hex($)
     startTimeSupport: $start_time_support(6 bit field) fallbackSupport:
     $fallback_support enableDisableSupport: $ena_dis_support
     numCCs: $number_of_supported_command_classes
-    overrideTypes: $override_types(7 bit field) overrideSupport: 
+    overrideTypes: $override_types(7 bit field) overrideSupport:
     $override_support</li>
   <li>scheduleSupportedCC: CC_&lt;x&gt;: $number_of_command_class
     CCname_&lt;x&gt;: $name_of_command_class]CCmask_&lt;x&gt;:
@@ -5248,9 +5257,9 @@ s2Hex($)
   <li>group_Id:scene dimmingDuration</li>
 
   <br><br><b>Class SCHEDULE_ENTRY_LOCK</b>
-  <li>scheduleEntryLockEntryTypeSupported:WeekDaySlots: $value 
+  <li>scheduleEntryLockEntryTypeSupported:WeekDaySlots: $value
         YearDaySlots: $value</li>
-  <li>weekDaySchedule_$userId:userID: $value slotID: $value $weekday 
+  <li>weekDaySchedule_$userId:userID: $value slotID: $value $weekday
         $starthour:$startminute $endhour:$endminute</li>
   <li>yearDaySchedule_$userId:userID: $value slotID: $value
         start: $year-$month-$day $hour:$minute
@@ -5361,7 +5370,7 @@ s2Hex($)
   <li>state:dim value</li>
   <li>state:swmBeginUp</li>
   <li>state:swmBeginDown</li>
-  <li>state:swm [Decrement|Increment] [Up|Down] 
+  <li>state:swm [Decrement|Increment] [Up|Down]
                 Start: $sl Duration: $dur Step: $step</li>
   <li>state:swmEnd</li>
 
