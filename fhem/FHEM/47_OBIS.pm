@@ -76,7 +76,7 @@ sub OBIS_Initialize($)
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off ".
   					  $readingFnAttributes;
 }
 
@@ -407,7 +407,7 @@ sub OBIS_Parse($$)
 				     			$rmsg=~/^((?:\d{1,3}-\d{1,3}:)?\d{1,3}.\d{1,3}.\d{1,3})(?:\*\d{1,3})?(?:\(.*?\))?\((.*?)(?:\*.*)?\)/;
     							my $chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;;
 				     			if (length $2) {
-									readingsBulkUpdate($hash, $chan  ,$2);
+									if (AttrVal($name,"ignoreUnknown","off") eq "off" || $chan ne $channel) {readingsBulkUpdate($hash, $chan  ,$2);}
 				     			} 
 				     		}
 			   			}
@@ -701,6 +701,8 @@ sub OBIS_decodeTL($){
       Reduces CPU-load.  
    <code>unitReadings</code><br>
       Adds the units to the readings like w, wH, A etc.  
+   <code>ignoreUnknown</code><br>
+      Ignores unknown OBIS-Data
       </li>
       
   <br>
@@ -768,8 +770,9 @@ sub OBIS_decodeTL($){
       kann das zu einer spürbaren Senkung der Prozessorleistung führen.  
    <code>unitReadings</code><br>
       Hängt bei den Readings auch die Einheiten an, zB w, wH, A usw.  
+   <code>ignoreUnknown</code><br>
+      Ignoriert unbekannte OBIS-Datensätze
       </li>
-  <br>
 </ul>
 
 =end html_DE
