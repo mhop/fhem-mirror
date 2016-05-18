@@ -445,6 +445,8 @@ if(int(@ARGV) > 1 && $ARGV[$#ARGV] ne "-i") {
 ###################################################
 
 
+SignalHandling();
+
 ###################################################
 # Windows Service Support: install/remove or start the fhem service
 if($^O =~ m/Win/) {
@@ -523,8 +525,6 @@ if($cfgRet) {
   $attr{global}{motd} = "";
 
 }
-
-SignalHandling();
 
 my $pfn = $attr{global}{pidfilename};
 if($pfn) {
