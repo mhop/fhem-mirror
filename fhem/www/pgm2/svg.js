@@ -42,7 +42,8 @@ svg_load(key, nextFn)
 function
 svg_prepareHash(el)
 {
-  var obj = { y_mul:0,y_h:0,y_min:0, decimals:0, x_mul:0,x_off:0,x_min:0 };
+  var obj = { y_mul:0,y_h:0,y_min:0, decimals:0,
+              t_mul:0,x_off:0,x_min:0, x_mul:0, log_scale:undefined };
   for(var name in obj)
     obj[name] = parseFloat($(el).attr(name));
   return obj;
@@ -55,7 +56,7 @@ svg_click(evt)
   var o = svg_prepareHash(t);
 
   var y_org = (((o.y_h-evt.clientY)/o.y_mul)+o.y_min).toFixed(o.decimals);
-  var d = new Date((((evt.clientX-o.x_min)/o.x_mul)+o.x_off) * 1000);
+  var d = new Date((((evt.clientX-o.x_min)/o.t_mul)+o.x_off) * 1000);
   var ts = (d.getHours() < 10 ? '0' : '') + d.getHours() + ":"+
            (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 
@@ -254,15 +255,27 @@ sv_menu(evt, embed)
     var xR = (xRaw-pp.x)/(pn.x-pp.x);   // Compute interim values
     var yRaw = pp.y+xR*(pn.y-pp.y); 
 
-    var y = (((par.y_h-yRaw)/par.y_mul)+par.y_min).toFixed(par.decimals);
+    var y = (((par.y_h-yRaw)/par.y_mul)+par.y_min);
 
-    var d = new Date((((xRaw-par.x_min)/par.x_mul)+par.x_off) * 1000), ts;
-    if(par.x_mul < 0.0001) {           // Year
-      ts = (d.getMonth()+1)+"."+pad0(d.getDate());
-    } else if(par.x_mul < 0.001) {     // Month
-      ts = d.getDate()+". "+pad0(d.getHours())+":"+pad0(d.getMinutes());
+    if( par.log_scale ) {
+      y *= par.log_scale;
+      y = Math.pow(10,y);
+    }
+
+    y = y.toFixed(par.decimals);
+
+    if( par.x_mul ) {
+      ts = (((xRaw-par.x_min)/par.x_mul)+par.x_off).toFixed(par.decimals);
+
     } else {
-      ts = pad0(d.getHours())+":"+pad0(d.getMinutes());
+      var d = new Date((((xRaw-par.x_min)/par.t_mul)+par.x_off) * 1000), ts;
+      if(par.t_mul < 0.0001) {           // Year
+        ts = (d.getMonth()+1)+"."+pad0(d.getDate());
+      } else if(par.t_mul < 0.001) {     // Month
+        ts = d.getDate()+". "+pad0(d.getHours())+":"+pad0(d.getMinutes());
+      } else {
+        ts = pad0(d.getHours())+":"+pad0(d.getMinutes());
+      }
     }
 
     $(par.circle).attr("cx", xRaw).attr("cy", yRaw);
