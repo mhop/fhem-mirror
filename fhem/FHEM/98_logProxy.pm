@@ -710,7 +710,13 @@ logProxy_xy2Plot($)
   return ($ret,$min,$max,$last) if( !ref($array) eq "ARRAY" );
 
   foreach my $point ( @{$array} ) {
-    $ret .= ";p $point->[0] $point->[1]\n";
+    my $value = $point->[1];
+
+    $min = $value if( $value < $min );
+    $max = $value if( $value > $max );
+    $last = $value;
+
+    $ret .= ";p $point->[0] $value\n";
   }
 
   return ($ret,$min,$max,$last);
