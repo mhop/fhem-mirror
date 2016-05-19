@@ -29,6 +29,7 @@ sub CommandHelp {
   if($mod) {
 
     $mod = "help" if($mod eq "?");
+    $mod = $defs{$mod}->{TYPE} if( defined($defs{$mod}) && $defs{$mod}->{TYPE} );
   
     my $internals = "attributes,command,commands,devspec,global,perl";
     $mod = lc($mod);
@@ -208,12 +209,12 @@ sub cref_search_cmd {
 <a name="help"></a>
 <h3>?, help</h3>
   <ul>
-    <code>? [&lt;moduleName&gt;] [<language>]</code><br/>
-    <code>help [&lt;moduleName&gt;] [<language>]</code><br/>
+    <code>? [&lt;moduleName|deviceName&gt;] [<language>]</code><br/>
+    <code>help [&lt;moduleName|deviceName&gt;] [<language>]</code><br/>
     <br/>
     <ul>
       <li>Returns a list of available commands, when called without a
-        moduleName.</li>
+        moduleName/deviceName.</li>
       <li>Returns a module dependent helptext, same as in commandref.</li>
       <li>language will be determined in following order: 
          <ul>
@@ -232,12 +233,12 @@ sub cref_search_cmd {
 <a name="help"></a>
 <h3>?, help</h3>
   <ul>
-    <code>? [&lt;moduleName&gt;] [<language>]</code><br/>
-    <code>help [&lt;moduleName&gt;] [<language>]</code><br/>
+    <code>? [&lt;moduleName|deviceName&gt;] [<language>]</code><br/>
+    <code>help [&lt;moduleName|deviceName&gt;] [<language>]</code><br/>
     <br>
     <ul>
       <li>Liefert eine Liste aller Befehle mit einer Kurzbeschreibung zur&uuml;ck.</li>
-      <li>Falls moduleName spezifiziert ist, wird die modul-spezifische Hilfe
+      <li>Falls moduleName oder deviceName spezifiziert ist, wird die modul-spezifische Hilfe
           aus commandref zur&uuml;ckgeliefert.</li>
       <li>Die anzuzeigende Sprache wird in folgender Reihenfolge bestimmt: 
          <ul>
