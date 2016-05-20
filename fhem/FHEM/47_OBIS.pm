@@ -72,7 +72,7 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-# $hash->{SetFn} = "OBIS_Set";
+ #$hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
@@ -116,7 +116,7 @@ sub OBIS_Define($$)
   my $baudrate;
   my $devi;
   ($devi, $baudrate) = split("@", $dev);
-  
+  $hash->{helper}{SPEED}="0";
   if (defined($baudrate)) {   ## added for ser2net connection
 	if($baudrate =~ m/(\d+)(,([78])(,([NEO])(,([012]))?)?)?/) {
 	$baudrate = $1 if(defined($1));
@@ -162,7 +162,9 @@ sub GetUpdate($)
 
 	$hash->{helper}{EoM}=-1;
 	if ($hash->{helper}{DEVICES}[1] eq "") {return undef;}
-	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
+	if( $init_done ) {
+		DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
+	}
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
 	InternalTimer($t, "GetUpdate", $hash, 1)  if ($hash->{helper}{DEVICES}[1]>0);
@@ -185,11 +187,12 @@ sub OBIS_Undef($$)
 sub OBIS_Read($)
 {
 	my ($hash) = @_;
-	if( !$init_done ) { return(undef)};
-	my $name = $hash->{NAME};
+	if( $init_done ) {
+		my $name = $hash->{NAME};
 	
-    my $buf = DevIo_SimpleRead($hash);
-    OBIS_Parse($hash,$buf) if ($hash->{helper}{EoM}!=1);
+    	my $buf = DevIo_SimpleRead($hash);
+    	OBIS_Parse($hash,$buf) if ($hash->{helper}{EoM}!=1);
+	}
     return(undef);
 }
 
@@ -330,10 +333,13 @@ sub OBIS_Parse($$)
 		    my $rmsg="";
 		    $rmsg = substr($buffer, 0, index($buffer,chr(13).chr(10)));
 			Log3 $hash,5,"OBIS ($name) - Msg-Parse: $rmsg";
+				my $channel=" ";
 				if($rmsg=~/\/.*|^((?:\d{1,3}-\d{1,3}:)?\d{1,3}.\d{1,3}.\d{1,3})(?:\*\d{1,3})?(?:\(.*?\))?\(.*?\)|!/) { # old regex: \/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!
-					my $channel=$1;
-					$channel=~s/:/\./;
-					$channel=~s/-/\./;
+					if (length $1) {
+						$channel=$1;
+						$channel=~s/:/\./;
+						$channel=~s/-/\./;
+					}
 					if ($hash->{MeterType} eq "Unknown") {$hash->{MeterType}="Standard"}
 					if($rmsg=~/^([23456789]+)-.*/) {
 						Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Device, please report: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de";
@@ -344,12 +350,12 @@ sub OBIS_Parse($$)
 						$hash->{helper}{EoM}+=1 if ($hash->{helper}{DEVICES}[1]>0);
 					}
 			#Version
-					if ($rmsg=~ /.*\/(.*)/) {
+					elsif ($rmsg=~ /.*\/(.*)/) {
 					  	DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[2],undef) if (!$hash->{helper}{DEVICES}[2] eq "");
 				  		if (ReadingsVal($name,"Version","") ne $1) {readingsBulkUpdate($hash, "Version"  ,$1); }
 			 			$hash->{helper}{EoM}=0;
 				  	}
-				  	if ($hash->{helper}{EoM}!=1) {
+				  	elsif ($hash->{helper}{EoM}!=1) {
 				  		my @patterns=values %OBIS_codes;
 				  		if (!$rmsg~~@patterns) {
 				  			Log3 $hash,3,"OBIS ($name) - Unknown Message: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de"
@@ -701,8 +707,6 @@ sub OBIS_decodeTL($){
       Reduces CPU-load.  
    <code>unitReadings</code><br>
       Adds the units to the readings like w, wH, A etc.  
-   <code>ignoreUnknown</code><br>
-      Ignores unknown OBIS-Data
       </li>
       
   <br>
@@ -770,9 +774,8 @@ sub OBIS_decodeTL($){
       kann das zu einer spürbaren Senkung der Prozessorleistung führen.  
    <code>unitReadings</code><br>
       Hängt bei den Readings auch die Einheiten an, zB w, wH, A usw.  
-   <code>ignoreUnknown</code><br>
-      Ignoriert unbekannte OBIS-Datensätze
       </li>
+  <br>
 </ul>
 
 =end html_DE
