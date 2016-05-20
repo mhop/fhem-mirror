@@ -1832,6 +1832,7 @@ $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
                           virtHum       =>"[off|0.0..99.0]"}
 );
 
+$culHmFunctSets{"sdLead2"}          = $culHmFunctSets{"sdLead1"};
 
 # RC send BCAST to specific address. Is the meaning understood?
 @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "BCAST", "Bit3",
