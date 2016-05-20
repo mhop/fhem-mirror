@@ -1281,7 +1281,12 @@ sub CUL_HM_Parse($$) {#########################################################
       my $ack = $mh{devH}->{helper}{rpt}{ack};#shorthand
       my $i=0;
       $mh{devH}->{helper}{rpt}{ts} = gettimeofday();
-      CUL_HM_SndCmd($mh{$ack}[$i++],$mh{$ack}[$i++]) while ($i<@{$ack});
+      CUL_HM_SndCmd($mh{$ack}[$i++],$mh{$ack}[$i++]
+                  .($mh{devH}->{helper}{aesAuthBytes}
+                      ?$mh{devH}->{helper}{aesAuthBytes}
+                      :"")
+           ) while ($i<@{$ack});
+      delete($mh{devH}->{helper}{aesAuthBytes});
       Log3 $mh{devN},4,"CUL_HM $mh{devN} dupe: repeat ".scalar(@{$ack})." ack, dont process";
     }
     else{
@@ -2773,7 +2778,6 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $mhp->{devH}{helper}{prt}{rspWaitSec};
           IOWrite($mhp->{devH}, "", $mhp->{devH}{helper}{prt}{rspWait}{cmd});     # and send
           CUL_HM_statCnt($mhp->{devH}{IODev}{NAME},"s");
-          #General set timer
           return "done";
         }
         $mhp->{devH}{protCondBurst} = "on" if (   $mhp->{devH}{protCondBurst}
@@ -5102,7 +5106,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "teamCall") { #################################################
     $state = "";
-    if ($md ne "HM-SEC-SD-2"){#{$md eq "HM-CC-SCD"){
+   if ($fkt ne "sdLead2"){# $md eq "HM-CC-SCD")
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
       my $tstNo = sprintf("%02X",$testnr);
@@ -5110,25 +5114,21 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_PushCmdStack($hash, $msg);
       CUL_HM_parseSDteam("40",$dst,$dst,"00".$tstNo);
     }
-    else {#if ($md eq "HM-SEC-SD-2"){
+   else {#if ($md eq "HM-SEC-SD-2"){
       #1441 44E347 44E347 0102 960000 039190BDC8
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
       my $tstNo = sprintf("%02X",$testnr);
-      my $msg = "++1441".$dst.$dst."01".$tstNo."9600000"; # 96 switch on - other numbers are unknown
-                                            # should be AES....
-    
-      if ($cryptFunc == 1){ #There is a previously executed command
-        my $cipher = Crypt::Rijndael->new("098f6bcd4621d373cade4e832627b4f6", Crypt::Rijndael::MODE_ECB());
-        $msg .= uc(unpack("H*", substr($cipher->encrypt(pack("H32",$msg)),0,4)));
-      }
-      CUL_HM_PushCmdStack($hash, $msg);
+      my $msg = "++1441$dst${dst}01${tstNo}9600"; # 96 switch on - other number is unknown
+      $msg = CUL_HM_generateCBCsignature($hash, $msg);
+      CUL_HM_PushCmdStack($hash, $msg) foreach (1..6);
+      CUL_HM_parseSDteam_2("41",$dst,$id,substr($msg, 18));
     }
   }
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
     $state = "";
     
-    if ($md eq "HM-CC-SCD"){
+    if ($fkt ne "sdLead2"){
       my $p = (($1 eq "On")?"0BC8":"0C01");
       my $msg = "++9441".$dst.$dst."01".$p;
       CUL_HM_PushCmdStack($hash, $msg);# repeat non-ack messages 3 times
@@ -5136,19 +5136,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_PushCmdStack($hash, $msg);
       CUL_HM_parseSDteam("41",$dst,$dst,"01".$p);
     }
-    elsif ("HM-SEC-SD-2"){
-      my $p = (($1 eq "On")?"C8":"01");
+    else{
+#      my $p = (($1 eq "On")?"C8":"01");
+      my $p = (($1 eq "On")?"C6":"00");
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
       my $tstNo = sprintf("%02X",$testnr);
-      my $msg = "++1441".$dst.$dst."01".$tstNo.$p."C800000"; # 96 switch on - other numbers are unknown
-                                            # should be AES....
-    
-      if ($cryptFunc == 1){ #There is a previously executed command
-        my $cipher = Crypt::Rijndael->new("098f6bcd4621d373cade4e832627b4f6", Crypt::Rijndael::MODE_ECB());
-        $msg .= uc(unpack("H*", substr($cipher->encrypt(pack("H32",$msg)),0,4)));
-      }
-      CUL_HM_PushCmdStack($hash, $msg);
+      my $msg = "++1441$dst${dst}01$tstNo${p}00"; # 96 switch on - other number is unknown
+ 
+      $msg = CUL_HM_generateCBCsignature($hash, $msg);
+      CUL_HM_PushCmdStack($hash, $msg) foreach (1..6);
+      CUL_HM_parseSDteam_2("41",$dst,$id,substr($msg, 18));
    }
   }
 
@@ -6944,6 +6942,61 @@ sub CUL_HM_getKeys($) { #in: device-hash out:highest index, hash with keys
     }
   }
   return ($highestIdx, %keys);
+}
+
+sub CUL_HM_generateCBCsignature($$) { #in: device-hash,msg out: signed message
+  my ($hash,$msg) = @_;
+  my $oldcounter = ReadingsVal($hash->{NAME},"aesCBCCounter","000000");
+  my $counter = substr($oldcounter, 0, 4);
+  my $msgNo = substr($msg, 0, 2);
+
+  if ($cryptFunc != 1) {
+    Log3 $hash,1,"CUL_HM $hash->{NAME} need Crypt::Rijndael to generate AES-CBC signature";
+    return $msg;
+  }
+
+  #generate message number
+  if($msgNo eq "++") {
+    $msgNo = ($hash->{helper}{HM_CMDNR} + 1) & 0xff;
+    my $oldNo = hex(substr($oldcounter, 4, 2));
+    if ($msgNo <= $oldNo && (($oldNo + 1) & 0xff) > $oldNo) {
+      $msgNo = ($oldNo + 1) & 0xff;
+    }
+    $hash->{helper}{HM_CMDNR} = $msgNo;
+    $msgNo = sprintf("%02X", $msgNo);
+  }
+
+  if (hex($counter.$msgNo) <= hex($oldcounter)) {
+    $counter = sprintf("%04X", (hex($counter) + 1) & 0xffff);
+  }
+
+  push @evtEt,[$hash,1,"aesCBCCounter:".$counter.$msgNo];
+  CUL_HM_pushEvnts();
+
+  my ($kNo, %keys) = CUL_HM_getKeys($hash);
+  my $cipher = Crypt::Rijndael->new($keys{$kNo}, Crypt::Rijndael::MODE_ECB());
+
+  my $iv = "49" 
+          .substr($msg, 6, 12)  #sender receiver
+          .$counter  #generation counter
+          .$msgNo 
+          ."000000000005";
+
+  Log3 $hash,5,"CUL_HM $hash->{NAME} CBC IV: " . $iv;
+  $iv = $cipher->encrypt(pack("H32", $iv));
+  my $d = $msgNo 
+         .substr($msg, 2, 2)#Flags
+         .substr($msg, 18); #payload
+
+  $d .= "00" x ((32 - length($d)) / 2) if (length($d) < 32);
+
+  Log3 $hash,5,"CUL_HM $hash->{NAME} CBC D: " . $d;
+  my $cbc = $cipher->encrypt(pack("H32", $d) ^ $iv);
+  Log3 $hash,5,"CUL_HM $hash->{NAME} CBC E: " . unpack("H*", $cbc);
+  return uc(  $msgNo 
+            . substr($msg, 2) 
+            . $counter 
+            . unpack("H8", substr($cbc, 12, 4)));
 }
 
 #+++++++++++++++++ Conversions names, hashes, ids++++++++++++++++++++++++++++++
