@@ -745,6 +745,10 @@ ZWave_Cmd($$@)
     if($type eq "set") {
       $cmdList{neighborUpdate}{fmt} = "48$id";
       $cmdList{neighborUpdate}{id} = "";
+      $cmdList{sucRouteAdd}{fmt} = "51$id";
+      $cmdList{sucRouteAdd}{id} = "";
+      $cmdList{sucRouteDel}{fmt} = "55$id";
+      $cmdList{sucRouteDel}{id} = "";
     }
     $cmdList{neighborList}{fmt} = "x" if($type eq "get"); # Add meta command
   }
@@ -851,8 +855,11 @@ ZWave_Cmd($$@)
   }
 
   my $data;
-  if($cmd eq "neighborUpdate") {
+  if($cmd eq "neighborUpdate" ||
+     $cmd eq "sucRouteAdd"    ||
+     $cmd eq "sucRouteDel"    )  {
     $data = $cmdFmt;
+    $data .= ZWave_callbackId($baseHash);
 
   } else {
     my $len = sprintf("%02x", length($cmdFmt)/2+1);
@@ -895,7 +902,11 @@ ZWave_Cmd($$@)
     $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
 
   } elsif($type ne "get") {
-    ZWave_processSendStack($hash, "next") if($cmd eq "neighborUpdate");
+    if($cmd eq "neighborUpdate" ||
+       $cmd eq "sucRouteAdd"    ||
+       $cmd eq "sucRouteDel"    )  {
+      ZWave_processSendStack($hash, "next");
+    }
     $cmd .= " ".join(" ", @a) if(@a);
     readingsSingleUpdate($hash, "state", $cmd, 1);
 
@@ -3717,6 +3728,18 @@ ZWave_Parse($$@)
       return "";
     }
 
+    if($cmd eq "ZW_ASSIGN_SUC_RETURN_ROUTE" ||
+       $cmd eq "ZW_DELETE_SUC_RETURN_ROUTE")  {
+      my $retval;
+           if($arg eq "00") { $retval = 'alreadyActive';
+      } elsif($arg eq "01") { $retval = 'started';
+      } else                { $retval = 'unknown_'.$arg; # should never happen
+      }
+      DoTrigger($ioName, "$cmd $retval");
+      return "";
+    }
+
+
     Log3 $ioName, 4, "$ioName unhandled ANSWER: $cmd $arg";
     return "";
   }
@@ -3886,6 +3909,16 @@ ZWave_Parse($$@)
     } elsif($id eq "03") { $evt = 'failedNodeReplace';
     } elsif($id eq "04") { $evt = 'failedNodeReplaceDone';
     } elsif($id eq "05") { $evt = 'failedNodeRemoveFailed';
+    } else               { $evt = 'unknown_'.$id; # should never happen
+    }
+
+  } elsif($cmd eq "ZW_ASSIGN_SUC_RETURN_ROUTE" ||
+          $cmd eq "ZW_DELETE_SUC_RETURN_ROUTE")  {
+         if($id eq "00") { $evt = 'transmitOk';
+    } elsif($id eq "01") { $evt = 'transmitNoAck';
+    } elsif($id eq "02") { $evt = 'transmitFail';
+    } elsif($id eq "03") { $evt = 'transmitFailNotIdle';
+    } elsif($id eq "04") { $evt = 'transmitNoRoute';
     } else               { $evt = 'unknown_'.$id; # should never happen
     }
 
@@ -4245,6 +4278,13 @@ s2Hex($)
     With the event "done" or "failed" ZWDongle will notify the end of the
     update process.  To read node's neighbor list see neighborList get
     below.</li>
+
+  <li>sucRouteAdd<br>
+    Inform the routing/enhanced slave of the presence of a SUC/SIS. Assign
+    up to 4 static return routes to SUC/SIS.</li>
+
+  <li>sucRouteDel<br>
+    Delete static return routes to SUC/SIS node.</li>
 
   <br><br><b>Class ASSOCIATION</b>
   <li>associationAdd groupId nodeId ...<br>
@@ -5104,6 +5144,11 @@ s2Hex($)
 
   <br><b>neighborUpdate</b>
   <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]</li>
+
+  <br><b>sucRouteAdd / sucRouteDel</b>
+  <li>ZW_ASSIGN_SUC_RETURN_ROUTE [started|alreadyActive|transmitOk|
+                                  transmitNoAck|transmitFail|transmitNotIdle|
+                                  transmitNoRoute]</li>
 
   <br><b>Class ALARM</b>
   <li>Devices with class version 1 support: alarm_type_X:level Y</li>

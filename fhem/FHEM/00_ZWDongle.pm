@@ -26,7 +26,7 @@ my %sets = (
                                      onNwSec=>0xc1, onSec=>0x81 } },
   "backupCreate"     => { cmd => "" },
   "backupRestore"    => { cmd => "" },
-  "controllerChange" => { cmd => "4d%02x@",    #ZW_CONTROLLER_CHANGE
+  "controllerChange" => { cmd => "4d%02x@",    # ZW_CONTROLLER_CHANGE
                           param => { on     =>0x02, stop =>0x05,
                                      stopFailed =>0x06 } },
   "createNewPrimary" => { cmd => "4c%02x@",    # ZW_CREATE_NEW_PRIMARY
@@ -1056,6 +1056,11 @@ ZWDongle_Ready($)
   <br><b>sucNodeId</b>
   <li>ZW_SET_SUC_NODE_ID [ok|failed|callbackSucceeded|callbackFailed]</li>
   </ul>
+
+  <br><b>sucRouteAdd / sucRouteDel</b>
+  <li>ZW_ASSIGN_SUC_RETURN_ROUTE [started|alreadyActive|transmitOk|
+                                  transmitNoAck|transmitFail|transmitNotIdle|
+                                  transmitNoRoute]</li>
 
 </ul>
 
