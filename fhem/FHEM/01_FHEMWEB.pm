@@ -3509,7 +3509,7 @@ FW_widgetOverride($$)
             is displayed.</li>
           <li>if the modifier is ":textField-long", is like textField, but upon
             clicking on the input field a textArea (60x25) will be opened.</li>
-          <li>if the modifier is ":textField-longNL", the behaviour is the same
+          <li>if the modifier is ":textFieldNL-long", the behaviour is the same
             as :textField-long, but no label is displayed.</li>
 
           <li>if the modifier is of the form

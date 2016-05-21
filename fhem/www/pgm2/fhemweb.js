@@ -794,7 +794,7 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
      (vArr[0] != "textField" && 
       vArr[0] != "textFieldNL" &&
       vArr[0] != "textField-long" &&
-      vArr[0] != "textField-longNL") ||
+      vArr[0] != "textFieldNL-long") ||
      (params && params.length))
     return undefined;
   
