@@ -17,6 +17,7 @@ my %sets = (
   "pair:noArg" => "",
   "unpair:noArg" => "",
   "remotePair" => "",
+  "raw" => "",
 );
 
 my $duoInit1            = "01000000000000000000000000000000000000000000";
@@ -135,6 +136,12 @@ DUOFERNSTICK_Set($@)
     DUOFERNSTICK_AddSendQueue($hash, $duoStatusRequest);
     return undef;
     
+  } elsif ($cmd eq "raw") {
+    return "wrong raw format: specify a 44 digit hex value"
+                if(!$arg || (uc($arg) !~ m/^[a-f0-9]{44}$/i));
+    DUOFERNSTICK_AddSendQueue($hash, $arg);
+    return undef;
+    
   } elsif ($cmd eq "pair") {
     DUOFERNSTICK_AddSendQueue($hash, $duoStartPair);
     $hash->{pair} = 1;
@@ -203,7 +210,7 @@ DUOFERNSTICK_Read($)
   
   my $now = gettimeofday();
   if ($hash->{PARTIAL} ne "") {
-  InternalTimer($now+0.1, "DUOFERNSTICK_Flush_Buffer", "$hash->{NAME}:FB", 0);
+  InternalTimer($now+0.5, "DUOFERNSTICK_Flush_Buffer", "$hash->{NAME}:FB", 0);
   }
 }
 
@@ -319,6 +326,10 @@ DUOFERNSTICK_Flush_Buffer($)
 {
     my ($name,$id) = split(":",$_[0]);
     
+    if ($defs{$name}{PARTIAL} ne "") {
+      Log3 $name, 4, "$name discard $defs{$name}{PARTIAL}";
+    }
+   
     $defs{$name}{PARTIAL} ="";
     
     return undef;
@@ -601,12 +612,12 @@ DUOFERNSTICK_AddSendQueue($$)
   <p><b>Set</b></p>
   <ul>
     <li><b>pair</b><br>
-        Set the DuoFern stick in pairing-mode. Any DouFern device set into
+        Set the DuoFern stick in pairing mode for 60 seconds. Any DouFern device set into
         pairing mode in this time will be paired with the DuoFern stick.
         </li><br>
     <li><b>unpair</b><br>
-        Set the DuoFern stick in unpairing-mode. Any DouFern device set into
-        unpairing mode in this time will be paired with the DuoFern stick.
+        Set the DuoFern stick in unpairing mode for 60 seconds. Any DouFern device set into
+        unpairing mode in this time will be unpaired from the DuoFern stick.
         </li><br>
     <li><b>reopen</b><br>
         Reopens the connection to the device and reinitializes it.
@@ -617,6 +628,9 @@ DUOFERNSTICK_AddSendQueue($$)
     <li><b>remotePair &lt;code&gt</b><br>
         Activates the pairing mode on the device specified by the code.<br>
         Some actors accept this command in unpaired mode up to two hours afte power up. 
+        </li><br>
+    <li><b>raw &lt;rawmsg&gt;</b><br>
+        Sends a raw message.
         </li><br>
   </ul>
   <br>
