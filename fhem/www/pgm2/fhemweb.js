@@ -793,14 +793,15 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
   if(vArr.length != 1 ||
      (vArr[0] != "textField" && 
       vArr[0] != "textFieldNL" &&
-      vArr[0] != "textField-long") ||
+      vArr[0] != "textField-long" &&
+      vArr[0] != "textField-longNL") ||
      (params && params.length))
     return undefined;
   
-  var is_long = (vArr[0] == "textField-long");
+  var is_long = (vArr[0].indexOf("long") > 0);
 
   var newEl = $("<div style='display:inline-block'>").get(0);
-  if(set && set != "state" && vArr[0] != "textFieldNL")
+  if(set && set != "state" && vArr[0].indexOf("NL") < 0)
     $(newEl).append(set+":");
   $(newEl).append('<input type="text" size="30">');
   var inp = $(newEl).find("input").get(0);
