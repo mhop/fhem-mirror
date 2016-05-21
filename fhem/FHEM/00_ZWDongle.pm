@@ -47,6 +47,8 @@ my %sets = (
                                               # SERIAL_API_APPL_NODE_INFORMATION
   "sucNodeId"        => { cmd => "54%02x%02x00%02x@"},
                                               # ZW_SET_SUC_NODE_ID
+  "sucRequestUpdate" => { cmd => "53%02x@"},  # ZW_REQUEST_NETWORK_UPDATE
+  "sucSendNodeId"    => { cmd => "57%02x25@"}, # ZW_SEND_SUC_ID
   "timeouts"         => { cmd => "06%02x%02x" }, # SERIAL_API_SET_TIMEOUTS
 );
 
@@ -943,6 +945,14 @@ ZWDongle_Ready($)
     &lt;capabilities&gt;: 0 = basic SUC; 1 = SIS
     </li>
 
+  <li>sucRequestUpdate &lt;decimal nodeId of SUC/SIS&gt;<br>
+    Request network updates from SUC/SIS. Primary do not need it.
+    </li>
+
+  <li>sucSendNodeId &lt;decimal nodeId&gt;<br>
+    Send SUC/SIS nodeId to the specified decimal controller nodeId.
+    </li>
+
   </ul>
   <br>
 
@@ -1015,7 +1025,13 @@ ZWDongle_Ready($)
   <ul>
 
   <br><b>General</b>
-  <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"</li>
+  <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes</li>
+
+  <li>ZW_APPLICATION_UPDATE addDone $nodeId</li>
+
+  <li>ZW_APPLICATION_UPDATE deleteDone $nodeId</li>
+
+  <li>ZW_APPLICATION_UPDATE sudId $nodeId</li>
 
   <br><b>addNode</b>
   <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|slave|controller|
@@ -1053,15 +1069,28 @@ ZWDongle_Ready($)
             failedNodeRemoveFail|nodeOk|failedNodeReplace|
             failedNodeReplaceDone|failedNodeRemoveFailed]</li>
 
+  <br><b>sucNetworkUpdate</b>
+  <li>ZW_REQUEST_NETWORK_UPDATE [started|selfOrNoSUC|done|abort|wait|diabled|
+                                 overflow]</li>
+
   <br><b>sucNodeId</b>
   <li>ZW_SET_SUC_NODE_ID [ok|failed|callbackSucceeded|callbackFailed]</li>
-  </ul>
 
-  <br><b>sucRouteAdd / sucRouteDel</b>
+  <br><b>sucRouteAdd</b>
   <li>ZW_ASSIGN_SUC_RETURN_ROUTE [started|alreadyActive|transmitOk|
                                   transmitNoAck|transmitFail|transmitNotIdle|
                                   transmitNoRoute]</li>
 
+  <br><b>sucRouteDel</b>
+  <li>ZW_DELETE_SUC_RETURN_ROUTE [started|alreadyActive|transmitOk|
+                                  transmitNoAck|transmitFail|transmitNotIdle|
+                                  transmitNoRoute]</li>
+
+  <br><b>sucSendNodeId</b>
+  <li>ZW_SEND_SUC_ID [started|alreadyActive|transmitOk|
+                                  transmitNoAck|transmitFail|transmitNotIdle|
+                                  transmitNoRoute]</li>
+  </ul>
 </ul>
 
 

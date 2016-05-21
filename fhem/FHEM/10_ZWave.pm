@@ -3718,10 +3718,10 @@ ZWave_Parse($$@)
       return "";
     }
 
-    if($cmd eq "ZW_SET_SUC_NODE_ID") {
+    if($cmd eq "ZW_REQUEST_NETWORK_UPDATE") {
       my $retval;
-           if($arg eq "00") { $retval = 'failed';
-      } elsif($arg eq "01") { $retval = 'ok';
+           if($arg eq "00") { $retval = 'selfOrNoSUC';
+      } elsif($arg eq "01") { $retval = 'started';
       } else                { $retval = 'unknown_'.$arg; # should never happen
       }
       DoTrigger($ioName, "$cmd $retval");
@@ -3729,7 +3729,8 @@ ZWave_Parse($$@)
     }
 
     if($cmd eq "ZW_ASSIGN_SUC_RETURN_ROUTE" ||
-       $cmd eq "ZW_DELETE_SUC_RETURN_ROUTE")  {
+       $cmd eq "ZW_DELETE_SUC_RETURN_ROUTE" ||
+       $cmd eq "ZW_SEND_SUC_ID")  {
       my $retval;
            if($arg eq "00") { $retval = 'alreadyActive';
       } elsif($arg eq "01") { $retval = 'started';
@@ -3739,6 +3740,15 @@ ZWave_Parse($$@)
       return "";
     }
 
+    if($cmd eq "ZW_SET_SUC_NODE_ID") {
+      my $retval;
+           if($arg eq "00") { $retval = 'failed';
+      } elsif($arg eq "01") { $retval = 'ok';
+      } else                { $retval = 'unknown_'.$arg; # should never happen
+      }
+      DoTrigger($ioName, "$cmd $retval");
+      return "";
+    }
 
     Log3 $ioName, 4, "$ioName unhandled ANSWER: $cmd $arg";
     return "";
@@ -3913,12 +3923,22 @@ ZWave_Parse($$@)
     }
 
   } elsif($cmd eq "ZW_ASSIGN_SUC_RETURN_ROUTE" ||
-          $cmd eq "ZW_DELETE_SUC_RETURN_ROUTE")  {
+          $cmd eq "ZW_DELETE_SUC_RETURN_ROUTE" ||
+          $cmd eq "ZW_SEND_SUC_ID")  {
          if($id eq "00") { $evt = 'transmitOk';
     } elsif($id eq "01") { $evt = 'transmitNoAck';
     } elsif($id eq "02") { $evt = 'transmitFail';
     } elsif($id eq "03") { $evt = 'transmitFailNotIdle';
     } elsif($id eq "04") { $evt = 'transmitNoRoute';
+    } else               { $evt = 'unknown_'.$id; # should never happen
+    }
+
+  } elsif($cmd eq "ZW_REQUEST_NETWORK_UPDATE")  {
+         if($id eq "00") { $evt = 'done';
+    } elsif($id eq "01") { $evt = 'abort';
+    } elsif($id eq "02") { $evt = 'wait';
+    } elsif($id eq "03") { $evt = 'disabled';
+    } elsif($id eq "04") { $evt = 'overflow';
     } else               { $evt = 'unknown_'.$id; # should never happen
     }
 
@@ -5145,8 +5165,13 @@ s2Hex($)
   <br><b>neighborUpdate</b>
   <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]</li>
 
-  <br><b>sucRouteAdd / sucRouteDel</b>
+  <br><b>sucRouteAdd</b>
   <li>ZW_ASSIGN_SUC_RETURN_ROUTE [started|alreadyActive|transmitOk|
+                                  transmitNoAck|transmitFail|transmitNotIdle|
+                                  transmitNoRoute]</li>
+
+  <br><b>sucRouteDel</b>
+  <li>ZW_DELETE_SUC_RETURN_ROUTE [started|alreadyActive|transmitOk|
                                   transmitNoAck|transmitFail|transmitNotIdle|
                                   transmitNoRoute]</li>
 
