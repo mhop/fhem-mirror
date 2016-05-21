@@ -1695,6 +1695,7 @@ SVG_render($$$$$$$$$$)
 
     my $scale = "y".($axis)."scale"; $scale = "yscale" if( $axis == 1 );
     my $log = ""; $log = $conf{$scale} if( $conf{$scale} );
+    my $f_log = $hmax{$a} ? (SVG_log10($hmax{$a}) / $hmax{$a}) : 1;
 
     # offsets
     my ($align,$display,$cll);
@@ -1737,7 +1738,6 @@ SVG_render($$$$$$$$$$)
       for(my $decimal = 0;
           $decimal < ($log eq 'log'?SVG_log10($hmax{$a}):1);
           $decimal++ ) {
-      my $f = SVG_log10($hmax{$a}) / $hmax{$a};
       foreach my $onetic (split(",", $tic)) {
         $onetic =~ s/^ *(.*) *$/$1/;
         my ($tlabel, $tvalue) = split(" ", $onetic);
@@ -1747,7 +1747,7 @@ SVG_render($$$$$$$$$$)
         $tlabel = $tvalue if( !$tlabel );
 
         $off2 = int($y+($hmax{$a}-$tvalue)*$hmul);
-        $off2 = int($y+($hmax{$a}-SVG_log10($tvalue)/$f)*$hmul)
+        $off2 = int($y+($hmax{$a}-SVG_log10($tvalue)/$f_log)*$hmul)
                 if( $log eq 'log' );
         #-- tics
         SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
@@ -1771,11 +1771,11 @@ SVG_render($$$$$$$$$$)
       for(my $decimal = 0;
           $decimal < ($log eq 'log'?SVG_log10($hmax{$a}):1);
           $decimal++ ) {
-      my $f = SVG_log10($hmax{$a}) / $hmax{$a};
       for(my $i = $hmin{$a}; $i <= $hmax{$a}; $i += $hstep{$a}) {
         my $i = $i / 10 ** $decimal;
         $off2 = int($y+($hmax{$a}-$i)*$hmul);
-        $off2 = int($y+($hmax{$a}-SVG_log10($i)/$f)*$hmul) if( $log eq 'log' );
+        $off2 = int($y+($hmax{$a}-SVG_log10($i)/$f_log)*$hmul)
+                if( $log eq 'log' );
         #-- tics
         SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
@@ -1823,10 +1823,10 @@ SVG_render($$$$$$$$$$)
     SVG_pO "<!-- Warning: No data item $idx defined -->" if(!defined($dxp));
     next if(!defined($dxp));
 
+    my $f_log = $hmax{$a} ? (SVG_log10($hmax{$a}) / $hmax{$a}) : 1;
     if( $log eq 'log' ) {
-      my $f = SVG_log10($hmax{$a}) / $hmax{$a};
       foreach my $i (1..int(@{$dxp})-1) {
-        $dyp->[$i] = SVG_log10($dyp->[$i]) / $f;
+        $dyp->[$i] = SVG_log10($dyp->[$i]) / $f_log;
       }
     }
 
@@ -1841,7 +1841,7 @@ SVG_render($$$$$$$$$$)
           ($conf{xrange}?"x_off=\"$xmin\" ":"x_off=\"$fromsec\" ").
           ($conf{xrange}?"x_mul=\"$xmul\" ":"t_mul=\"$tmul\" ").
           "y_h=\"$yh\" y_min=\"$min\" y_mul=\"$hmul\" title=\"$tl\" ".
-          ($log eq 'log'?"log_scale=\"".SVG_log10($hmax{$a})/$hmax{$a}."\" ":"").
+          ($log eq 'log'?"log_scale=\"$f_log\" ":"").
           "onclick=\"parent.svg_click(evt)\" $conf{lWidth}[$idx]";
     my $lStyle = $conf{lStyle}[$idx];
     my $isFill = ($conf{lStyle}[$idx] =~ m/fill/);
