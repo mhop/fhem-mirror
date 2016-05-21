@@ -3287,15 +3287,15 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
        (!$dHash->{helper}{alarmNo} || $dHash->{helper}{alarmNo} ne $No)){
       $dHash->{helper}{alarmNo} = $No;
     }
-    else{
-      return ();# duplicate alarm
-    }
+
     my ($sVal,$sProsa,$smokeSrc) = (hex($state),"off","none");
     if ($sVal > 1){
       $sProsa = "smoke-Alarm_".$No;
       $smokeSrc = $dName;
-      push @evtEt,[$sHash,1,"recentAlarm:$smokeSrc"] if($sVal == 200);
     }
+    return if($sProsa eq ReadingsVal($sHash->{NAME},"state",""));
+    
+    push @evtEt,[$sHash,1,"recentAlarm:$smokeSrc"] if($sVal == 200);
     push @evtEt,[$sHash,1,"state:$sProsa"];
     push @evtEt,[$sHash,1,'level:'.$sVal];
     push @evtEt,[$sHash,1,"eventNo:".$No];
@@ -5106,47 +5106,50 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "teamCall") { #################################################
     $state = "";
-   if ($fkt ne "sdLead2"){# $md eq "HM-CC-SCD")
+    my $sId = $roleV ? $dst : $id;  # ID of cmd-source must not be a physical
+                                    # device. It can cause trouble with 
+                                    # subsequent alarming 
+    if ($fkt ne "sdLead2"){# $md eq "HM-CC-SCD")
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
       my $tstNo = sprintf("%02X",$testnr);
-      my $msg = "++9440".$dst.$dst."00".$tstNo;
-      CUL_HM_PushCmdStack($hash, $msg);
-      CUL_HM_parseSDteam("40",$dst,$dst,"00".$tstNo);
+      CUL_HM_PushCmdStack($hash, "++9440".$dst.$sId."00".$tstNo);
+      CUL_HM_parseSDteam("40",$dst,$sId,"00".$tstNo);
     }
-   else {#if ($md eq "HM-SEC-SD-2"){
+    else {#if ($md eq "HM-SEC-SD-2"){
       #1441 44E347 44E347 0102 960000 039190BDC8
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
-      my $tstNo = sprintf("%02X",$testnr);
-      my $msg = "++1441$dst${dst}01${tstNo}9600"; # 96 switch on - other number is unknown
-      $msg = CUL_HM_generateCBCsignature($hash, $msg);
+      
+                           # 96 switch on- others unknown
+      my $msg = CUL_HM_generateCBCsignature($hash, 
+                                sprintf("++1441$dst${sId}01%02X9600",$testnr));
       CUL_HM_PushCmdStack($hash, $msg) foreach (1..6);
-      CUL_HM_parseSDteam_2("41",$dst,$id,substr($msg, 18));
+      CUL_HM_parseSDteam_2("41",$dst,$sId,substr($msg, 18));
     }
   }
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
     $state = "";
     
+    my $sId = $roleV ? $dst : $id;  # ID of cmd-source must not be a physical
+                                    # device. It can cause trouble with 
+                                    # subsequent alarming 
     if ($fkt ne "sdLead2"){
       my $p = (($1 eq "On")?"0BC8":"0C01");
-      my $msg = "++9441".$dst.$dst."01".$p;
-      CUL_HM_PushCmdStack($hash, $msg);# repeat non-ack messages 3 times
-      CUL_HM_PushCmdStack($hash, $msg);
-      CUL_HM_PushCmdStack($hash, $msg);
-      CUL_HM_parseSDteam("41",$dst,$dst,"01".$p);
+      my $msg = "++9441".$dst.$sId."01".$p;
+      CUL_HM_PushCmdStack($hash, $msg) foreach (1..3);# 3 reps fpr non-ack msg 
+      CUL_HM_parseSDteam("41",$dst,$sId,"01".$p);
     }
     else{
-#      my $p = (($1 eq "On")?"C8":"01");
       my $p = (($1 eq "On")?"C6":"00");
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
       $hash->{TESTNR} = $testnr;
-      my $tstNo = sprintf("%02X",$testnr);
-      my $msg = "++1441$dst${dst}01$tstNo${p}00"; # 96 switch on - other number is unknown
  
-      $msg = CUL_HM_generateCBCsignature($hash, $msg);
+      my $msg = CUL_HM_generateCBCsignature($hash, 
+                              sprintf("++1441$dst${sId}01%02X${p}00",$testnr));
+      
       CUL_HM_PushCmdStack($hash, $msg) foreach (1..6);
-      CUL_HM_parseSDteam_2("41",$dst,$id,substr($msg, 18));
+      CUL_HM_parseSDteam_2("41",$dst,$sId,substr($msg, 18));
    }
   }
 
