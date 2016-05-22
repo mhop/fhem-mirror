@@ -1501,7 +1501,6 @@ FW_makeDeviceLine($$$$$)
   } else {
     FW_pH "detail=$d", "$icon$devName", 1, "col1" if(!$usuallyAtEnd->{$d});
   }
-  $row++;
 
   my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, $extPage);
   $allSets = FW_widgetOverride($d, $allSets);
@@ -1612,6 +1611,7 @@ FW_showRoom()
         $extPage{group} = $g;
 
         FW_makeDeviceLine($d,$row,\%extPage,$nameDisplay,\%usuallyAtEnd);
+        $row++;
       }
       FW_pO "</table>";
       FW_pO "</td></tr>";
