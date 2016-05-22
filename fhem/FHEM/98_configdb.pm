@@ -63,7 +63,8 @@ sub CommandConfigdb($$) {
 
 			if ($dbtype eq 'SQLITE') {
 				my $ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
-				my $target = AttrVal('global','modpath','.')."/log/configDB_$ts.dump.gz";
+				my $mp     = AttrVal('global','modpath','.');
+				my $target = "$mp/log/configDB_$ts.dump.gz";
 				Log3('configdb', 4, "configdb: target for database dump: $target");
 				my $ret    = qx(echo '.dump' | sqlite3 /opt/fhem/configDB.db | gzip -c > $target);
 				return $ret if $ret; # return error message if available
