@@ -2216,9 +2216,10 @@ sub HMinfo_templateDef(@){#####################################################
       $cnt++;
       last if ($desc =~ m/"$/);
     }
-    $desc =~ s/"//g;
     splice @regs,0,$cnt;
   }
+  $desc =~ s/"//g;#reduce " to a single pair
+#  $desc = "\"".$desc."\"";
 
   return "insufficient parameter, regs missing" if(@regs < 1);
  
