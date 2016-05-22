@@ -50,7 +50,7 @@ my $shutdown = 0;
 my $eventcount = 0;
 my $totalcount = 0;
 my $loglevel = 0;
-my %ev = ('total', 0, 'EV', 0, 'ND', 0, 'DD', 0, 'UD', 0, 'RD', 0, 'RA', 0, 'IN', 0, 'EX', 0);
+my %ev = ('total', 0, 'EV', 0, 'ND', 0, 'DD', 0, 'UD', 0, 'RD', 0, 'RA', 0, 'SL', 0, 'IN', 0, 'EX', 0);
 
 # Functions
 sub CheckProcess ($$);
@@ -244,11 +244,11 @@ sub CCURPC_NewDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 	
-	$ev{total}++;
-	$ev{ND}++;
 	Log "NewDevice: received ".scalar(@$a)." device specifications";
 	
 	for my $dev (@$a) {
+		$ev{total}++;
+		$ev{ND}++;
 		WriteQueue ("ND|".$dev->{ADDRESS}."|".$dev->{TYPE});
 	}
 
@@ -264,11 +264,11 @@ sub CCURPC_DeleteDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 
-	$ev{total}++;
-	$ev{DD}++;
 	Log "DeleteDevice: received ".scalar(@$a)." device addresses";
 
 	for my $dev (@$a) {
+		$ev{total}++;
+		$ev{DD}++;
 		WriteQueue ("DD|".$dev);
 	}
 
@@ -313,11 +313,11 @@ sub CCURPC_ReaddDevicesCB ($$$)
 {
 	my ($server, $cb, $a) = @_;
 
-	$ev{total}++;
-	$ev{RA}++;
 	Log "ReaddDevice: received ".scalar(@$a)." device addresses";
 
 	for my $dev (@$a) {
+		$ev{total}++;
+		$ev{RA}++;
 		WriteQueue ("RA|".$dev);
 	}
 
@@ -339,6 +339,12 @@ sub CCURPC_EventCB ($$$$$)
 	$eventcount++;
 	if (($eventcount % 500) == 0 && $loglevel == 2) {
 		Log "Received $eventcount events from CCU since last check";
+		my @stkeys = ('total', 'EV', 'ND', 'DD', 'RD', 'RA', 'UD', 'IN', 'SL', 'EX');
+		my $msg = "ST";
+		foreach my $stkey (@stkeys) {
+			$msg .= "|".$ev{$stkey};
+		}
+		WriteQueue ($msg);
 	}
 
 	# Never remove this statement!
@@ -434,3 +440,4 @@ if ($loglevel == 2) {
 		Log "Events $cnt = ".$ev{$cnt};
 	}
 }
+
