@@ -140,7 +140,7 @@ sub Twilight_Undef($$) {
      myRemoveInternalTimer($key, $hash);
   }
   myRemoveInternalTimer    ("Midnight", $hash);
-  myRemoveInternalTimer    ("perlTime", $hash);
+  myRemoveInternalTimer    ("weather",  $hash);
   myRemoveInternalTimer    ("sunpos",   $hash);
 
   return undef;
@@ -151,7 +151,12 @@ sub myInternalTimer($$$$$) {
 
    my $timerName = "$hash->{NAME}_$modifier";
    my $mHash = { HASH=>$hash, NAME=>"$hash->{NAME}_$modifier", MODIFIER=>$modifier};  
-   $hash->{TIMER}{$timerName} = $mHash;
+   if (defined($hash->{TIMER}{$timerName})) {
+      Log3 $hash, 1, "[$hash->{NAME}] possible overwriting of timer $timerName - please delete first";
+      stacktrace();
+   } else {
+      $hash->{TIMER}{$timerName} = $mHash;
+   }
    
    Log3 $hash, 5, "[$hash->{NAME}] setting  Timer: $timerName " . FmtDateTime($tim);
    InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
@@ -168,6 +173,18 @@ sub myRemoveInternalTimer($$) {
       Log3 $hash, 5, "[$hash->{NAME}] removing Timer: $timerName";
       RemoveInternalTimer($myHash);
    }
+}
+################################################################################
+sub myRemoveInternalTimerByName($){
+  my ($name) = @_;
+  foreach my $a (keys %intAt) {
+     my $nam = "";
+     my $arg = $intAt{$a}{ARG};
+        if (ref($arg) eq "HASH" && defined($arg->{NAME})  ) {
+           $nam = $arg->{NAME} if (ref($arg) eq "HASH" && defined($arg->{NAME})  );
+        }
+     delete($intAt{$a}) if($nam =~  m/^$name/g);
+  }
 }
 ################################################################################
 sub myGetHashIndirekt ($$) {
@@ -224,7 +241,6 @@ sub Twilight_TwilightTimes(@) {
   my ($hash, $whitchTimes, $xml) = @_;
 
   my $Name = $hash->{NAME};
-  Twilight_getWeatherHorizon($hash, $xml);
 
   my $horizon    = $hash->{HORIZON};
   my $swip       = $hash->{SWIP} ;
@@ -258,9 +274,11 @@ sub Twilight_TwilightTimes(@) {
   foreach my $ereignis (keys %{$hash->{TW}}) {
     next if ($whitchTimes eq "weather" && !($ereignis =~ m/weather/) );
     readingsBulkUpdate($hash, $ereignis, $hash->{TW}{$ereignis}{TIME} == 0 ? "undefined" : FmtTime($hash->{TW}{$ereignis}{TIME}));
-  }    
-  readingsBulkUpdate  ($hash,"condition",    $hash->{CONDITION});
-  readingsBulkUpdate  ($hash,"condition_txt",$hash->{CONDITION_TXT});
+  } 
+  if ($hash->{CONDITION} != 50 ) {
+     readingsBulkUpdate  ($hash,"condition",    $hash->{CONDITION});
+     readingsBulkUpdate  ($hash,"condition_txt",$hash->{CONDITION_TXT});
+  }   
   readingsEndUpdate   ($hash, defined($hash->{LOCAL} ? 0 : 1));
 # ------------------------------------------------------------------------------
   my @horizonsOhneDeg = map {my($e, $deg)=split(":",$_); "$e"} @horizons;
@@ -278,7 +296,7 @@ sub Twilight_TwilightTimes(@) {
   foreach my $ereignis (sort keys %{$hash->{TW}}) {
     next if ($whitchTimes eq "weather" && !($ereignis =~ m/weather/) );
     
-    myRemoveInternalTimer($ereignis, $hash)  if(!$jetztIstMitternacht);
+    myRemoveInternalTimer($ereignis, $hash); # if(!$jetztIstMitternacht);
     if($hash->{TW}{$ereignis}{TIME} > 0) {
       $myHash = myInternalTimer($ereignis, $hash->{TW}{$ereignis}{TIME}, "Twilight_fireEvent", $hash, 0);
       map {$myHash->{$_} = $hash->{TW}{$ereignis}{$_} } @keyListe; 
@@ -358,10 +376,9 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
   my $location = $hash->{WEATHER};
   my $verbose  = AttrVal($hash->{NAME}, "verbose", 3 );
   
-  #                    http://api.met.no/weatherapi/locationforecast/1.9/?lat=52.44944;lon=10.00512
   use constant URL => "http://query.yahooapis.com/v1/public/yql?q=select%%20*%%20from%%20weather.forecast%%20where%%20woeid=%s%%20and%%20u=%%27c%%27&format=%s&env=store%%3A%%2F%%2Fdatatables.org%%2Falltableswithkeys";
   my $url = sprintf(URL, $location, "json");
- #Log3 $hash, 3, "url------------>$url";
+  Log3 $hash, 4, "[$hash->{NAME}] url=$url";
   
   my $param = {
       url        => $url,
@@ -396,14 +413,17 @@ sub Twilight_WeatherCallback(@) {
      Log3 $hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}";
   }
   
-  Twilight_TwilightTimes      ($hash, $param->{mode}, $result);
+  Log3 $hash, 4, "[$hash->{NAME}] answer=$result";
+  Twilight_getWeatherHorizon($hash, $result);
   
   #$hash->{CONDITION} = 50; 
   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} <= 10) {
      $hash->{VERSUCHE} += 1;
      Twilight_RepeatTimerSet($hash, $param->{mode});
      return;
-  } 
+  }
+  
+  Twilight_TwilightTimes      ($hash, $param->{mode}, $result);
   
   Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >  0);
   Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed got NO valid weather data from yahoo"   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} >  0);
@@ -438,11 +458,12 @@ sub Twilight_WeatherTimerSet($) {
   my ($hash) = @_;
   my $now    = time();
 
-  myRemoveInternalTimer    ("perlTime", $hash);
-  foreach my $key ("ss_weather", "sr_weather" ) {
+  myRemoveInternalTimer    ("weather", $hash);
+  foreach my $key ("sr_weather", "ss_weather") {
      my $tim = $hash->{TW}{$key}{TIME};
      if ($tim-60*60>$now+60) {
-        myInternalTimer       ("perlTime", $tim-60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
+        myInternalTimer       ("weather", $tim-60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
+        last;
      }
   }
 }
@@ -469,7 +490,7 @@ sub Twilight_getWeatherHorizon(@)
   my $mod = "[".$hash->{NAME} ."] ";
   my @faktor_cond_code = (25,25,25,25,20,10,10,10,10,10,
                           10, 7, 7, 7, 5,10,10, 6, 6, 6,
-                          10, 6 ,6, 6, 6, 6, 6, 5, 5, 3,
+                          10, 6 ,6, 6, 6, 6, 3, 5, 5, 3,
                            3, 0, 0, 0, 0, 7, 0,15,15,15,
                            9,15, 8, 5,12, 6, 8, 8, 0, 0,
                            0);
@@ -480,38 +501,44 @@ sub Twilight_getWeatherHorizon(@)
   if (defined($result)) {
   
     # ersetze in result(json) ": durch "=>
-    # dadurch entsteht ein Perausdruck, der direkt geparst werden kann
+    # dadurch entsteht ein Perlausdruck, der direkt geparst werden kann
      
      my $perlAusdruck = $result;
+       #$perlAusdruck = "<h1>could";
         $perlAusdruck =~ s/("[\w ]+")(\s*)(:)/$1=>/g;
         $perlAusdruck =~ s/null/undef/g;
         $perlAusdruck =~ s/true/1/g;
         $perlAusdruck =~ s/false/0/g;
-        $perlAusdruck = '$resHash = ' .$perlAusdruck;        
+        $perlAusdruck = 'return ' .$perlAusdruck;        
      
-     my $resHash;
-     eval $perlAusdruck; 
+     my $anonymSub = eval "sub {$perlAusdruck}";
      Log3 $hash, 3, "[$hash->{NAME}] error $@ parsing $result"   if($@);
-    #Log3 $hash, 3, "jsonAsPerl". Dumper $resHash->{query}{results}{channel}{item}{condition};
+     if (!$@) {
+        my $resHash = $anonymSub->() if ($anonymSub gt ""); 
+        Log3 $hash, 3, "[$hash->{NAME}] error $@ parsing $result"   if($@);
+       #Log3 $hash, 3, "jsonAsPerl". Dumper $resHash->{query}{results}{channel}{item}{condition};
+       if (!$@) {
    
-     $cond_code  = $resHash->{query}{results}{channel}{item}{condition}{code};
-     $cond_txt   = $resHash->{query}{results}{channel}{item}{condition}{text};
-     $temperatur = $resHash->{query}{results}{channel}{item}{condition}{temp};
-     
+          $cond_code  = $resHash->{query}{results}{channel}{item}{condition}{code};
+          $cond_txt   = $resHash->{query}{results}{channel}{item}{condition}{text};
+          $temperatur = $resHash->{query}{results}{channel}{item}{condition}{temp};
+       }   
+     }
   }
   
   # wenn kein Code ermittelt werden kann, wird ein Pseudocode gesetzt
-  if (!defined($cond_code) && !defined $hash->{CONDITION} ) {
+  if (!defined($cond_code) ) {
      $cond_code  = "50";         # eigener neutraler Code
      $cond_txt   = "undefined";
      $temperatur = "undefined";
-  }  
-  
-  $hash->{WEATHER_CORRECTION} = $faktor_cond_code[$cond_code] / 25 * 20;
-  $hash->{WEATHER_HORIZON}    = $hash->{WEATHER_CORRECTION} + $hash->{INDOOR_HORIZON};
-  $hash->{CONDITION}          = $cond_code;
-  $hash->{CONDITION_TXT}      = $cond_txt;
-  $hash->{TEMPERATUR}         = $temperatur;
+  } else {  
+     $hash->{WEATHER_CORRECTION} = $faktor_cond_code[$cond_code] / 25 * 20;
+     $hash->{WEATHER_HORIZON}    = $hash->{WEATHER_CORRECTION} + $hash->{INDOOR_HORIZON};
+     $hash->{CONDITION}          = $cond_code;
+     $hash->{CONDITION_TXT}      = $cond_txt;
+     $hash->{TEMPERATUR}         = $temperatur;
+     Log3 $hash, 4, "[$hash->{NAME}] $cond_code=$cond_txt $temperatur, correction: $hash->{WEATHER_CORRECTION}°";
+  }
   
   my $doy         = strftime("%j",localtime);    
   my $declination =  0.4095*sin(0.016906*($doy-80.086));
