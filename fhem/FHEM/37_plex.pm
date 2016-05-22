@@ -962,7 +962,12 @@ plex_Set($$@)
 
       }
 
-      plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/player/playback/$cmd?type=video", "playback" );
+      my $type = $params[0];
+      $type = $hash->{currentMediaType} if( !$type );
+      $type = "type=$type" if( $type );
+      $type = "" if( !$type );
+
+      plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/player/playback/$cmd?$type", "playback" );
       return undef;
 
     } elsif( $cmd eq 'seekTo' ) {
@@ -970,7 +975,12 @@ plex_Set($$@)
       return "usage: $cmd <value>" if( !defined($params[0]) );
       $params[0] =~ s/[^\d]//g;
 
-      plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/player/playback/seekTo?type=video&offset=$params[0]", "parameters" );
+      my $type = $params[1];
+      $type = $hash->{currentMediaType} if( !$type );
+      $type = "type=$type" if( $type );
+      $type = "" if( !$type );
+
+      plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/player/playback/seekTo?$type&offset=$params[0]", "parameters" );
       return undef;
 
     } elsif( $cmd eq 'volume' || $cmd eq 'shuffle' || $cmd eq 'repeat' ) {
@@ -981,7 +991,12 @@ plex_Set($$@)
       return "usage: $cmd [0/1/2]" if( $cmd eq 'repeat' && ($params[0] < 0 || $params[0] > 2) );
       return "usage: $cmd [0-100]" if( $cmd eq 'volume' && ($params[0] < 0 || $params[0] > 100) );
 
-      plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/player/playback/setParameters?type=video&$cmd=$params[0]", "parameters" );
+      my $type = $params[1];
+      $type = $hash->{currentMediaType} if( !$type );
+      $type = "type=$type" if( $type );
+      $type = "" if( !$type );
+
+      plex_sendApiCmd( $hash, "http://$ip:$entry->{port}/player/playback/setParameters?$type&$cmd=$params[0]", "parameters" );
       return undef;
 
     } elsif( $cmd eq 'home' || $cmd eq 'music' ) {
@@ -2181,6 +2196,7 @@ plex_disappeared($$$)
 
     if( my $chash = $modules{plex}{defptr}{$machineIdentifier} ) {
       delete $chash->{controllable};
+      delete $chash->{currentMediaType};
 
       readingsBeginUpdate($chash);
       readingsBulkUpdate($chash, 'presence', 'absent' );
@@ -2284,6 +2300,12 @@ plex_parseTimeline($$$)
   $state = $1 if( $state =~ /^[\w]*:(stopped)$/ );
   if( $state =~ '\w*:(\w*) \w*:(\w*) .*:(\w*)' ) {
     $state = $1 if( $1 eq $2 && $2 eq $3 );
+  }
+
+  if( $state =~ '(\w*):\w*' ) {
+    $chash->{currentMediaType} = $1;
+  } else {
+    delete $chash->{currentMediaType};
   }
   plex_readingsBulkUpdateIfChanged($chash, 'state', $state );
   readingsEndUpdate($chash, 1);
@@ -3284,16 +3306,16 @@ Log 1, "!!!!!!!!!!";
       </li>
     <li>resume [&lt;server&gt;] &lt;item&gt;]<br>
       </li>
-    <li>pause</li>
-    <li>stop</li>
-    <li>skipNext</li>
-    <li>skipPrevious</li>
-    <li>stepBack</li>
-    <li>stepForward</li>
-    <li>seekTo &lt;value&gt;</li>
-    <li>volume &lt;value&gt;</li>
-    <li>shuffle 0|1</li>
-    <li>repeat 0|1|2</li>
+    <li>pause [&lt;type&gt;]</li>
+    <li>stop [&lt;type&gt;]</li>
+    <li>skipNext [&lt;type&gt;]</li>
+    <li>skipPrevious [&lt;type&gt;]</li>
+    <li>stepBack [&lt;type&gt;]</li>
+    <li>stepForward [&lt;type&gt;]</li>
+    <li>seekTo &lt;value&gt; [&lt;type&gt;]</li>
+    <li>volume &lt;value&gt; [&lt;type&gt;]</li>
+    <li>shuffle 0|1 [&lt;type&gt;]</li>
+    <li>repeat 0|1|2 [&lt;type&gt;]</li>
     <li>mirror [&lt;server&gt;] &lt;item&gt;<br>
       show preplay screen for &lt;item&gt;</li>
     <li>home</li>
@@ -3343,8 +3365,8 @@ Log 1, "!!!!!!!!!!";
   ...</pre><br>
 
       <b><code>get &lt;plex&gt; ls /library/metadata/133999/children</code></b>
-      <pre>...</pre><br>
-      <br>if used from fhemweb album art ist displayed and keys and other items are klickable.<br>
+      <pre>  ...</pre><br>
+      <br>if used from fhemweb album art can be displayed and keys and other items are klickable.<br><br>
 
     </li>
 
