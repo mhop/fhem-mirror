@@ -672,3 +672,7 @@
 
 - Mon Mar 30 2016 (yoda_gh)
   - added new module 52_I2C_K30 supporting the SenseAir K-30 CO2 sensor
+
+- Sun May 22 2016 (loredo)
+  - rewrite of ONKYO_AVR module based on IODev for real-time updates
+  - separate ONKYO_AVR_ZONE module to support separate zone devices for ONKYO_AVR; users will need to manually delete old ONKYO_AVR definitions who where just used for a specific zone and have them re-created based on ONKYO_AVR_ZONE

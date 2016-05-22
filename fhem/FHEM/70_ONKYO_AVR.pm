@@ -23,13 +23,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Version: 1.0.5
-#
-# Major Version History:
-# - 1.0.0 - 2013-12-16
-# -- First release
-#
 ##############################################################################
 
 package main;
@@ -37,21 +30,24 @@ package main;
 use strict;
 use warnings;
 use ONKYOdb;
-use IO::Socket;
-use IO::Handle;
-use IO::Select;
-use XML::Simple;
 use Time::HiRes qw(usleep);
 use Symbol qw<qualify_to_ref>;
+use File::Path;
+use File::stat;
+use File::Temp;
+use File::Copy;
 use Data::Dumper;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+$Data::Dumper::Sortkeys = 1;
 
-sub ONKYO_AVR_Set($@);
-sub ONKYO_AVR_Get($@);
-sub ONKYO_AVR_GetStatus($;$);
-sub ONKYO_AVR_Define($$);
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
+
+sub ONKYO_AVR_Set($$$);
+sub ONKYO_AVR_Get($$$);
+sub ONKYO_AVR_Define($$$);
 sub ONKYO_AVR_Undefine($$);
+sub ONKYO_AVR_Notify($$);
 
 #########################
 # Forward declaration for remotecontrol module
@@ -64,76 +60,648 @@ sub ONKYO_AVR_Initialize($) {
 
     Log3 $hash, 5, "ONKYO_AVR_Initialize: Entering";
 
-    $hash->{GetFn}   = "ONKYO_AVR_Get";
-    $hash->{SetFn}   = "ONKYO_AVR_Set";
+    eval 'use XML::Simple qw(:strict); 1';
+    return "Please install XML::Simple to use this module."
+      if ($@);
+
+    require "$attr{global}{modpath}/FHEM/DevIo.pm";
+
     $hash->{DefFn}   = "ONKYO_AVR_Define";
     $hash->{UndefFn} = "ONKYO_AVR_Undefine";
 
+    #    $hash->{DeleteFn} = "ONKYO_AVR_Delete";
+    $hash->{SetFn} = "ONKYO_AVR_Set";
+    $hash->{GetFn} = "ONKYO_AVR_Get";
+
+    #    $hash->{AttrFn}   = "ONKYO_AVR_Attr";
+    $hash->{NotifyFn} = "ONKYO_AVR_Notify";
+    $hash->{ReadFn}   = "ONKYO_AVR_Read";
+    $hash->{WriteFn}  = "ONKYO_AVR_Write";
+    $hash->{Clients}  = ":ONKYO_AVR_ZONE:";
+    $hash->{ReadyFn}  = "ONKYO_AVR_Ready";
+
     $hash->{AttrList} =
-"volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs disable:0,1 model wakeupCmd:textField "
+        "do_not_notify:1,0 "
+      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs disable:0,1 model wakeupCmd:textField connectionCheck:off,30,45,60,75,90,105,120 "
       . $readingFnAttributes;
 
     #    $data{RC_layout}{ONKYO_AVR_SVG} = "ONKYO_AVR_RClayout_SVG";
     #    $data{RC_layout}{ONKYO_AVR}     = "ONKYO_AVR_RClayout";
     $data{RC_makenotify}{ONKYO_AVR} = "ONKYO_AVR_RCmakenotify";
+
+    $hash->{parseParams} = 1;
+}
+
+###################################
+sub ONKYO_AVR_Define($$$) {
+    my ( $hash, $a, $h ) = @_;
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Define()";
+
+    if ( int(@$a) < 3 ) {
+        my $msg =
+"Wrong syntax: define <name> ONKYO_AVR <ip-or-hostname> [<protocol-version>]";
+        Log3 $name, 4, $msg;
+        return $msg;
+    }
+
+    # Close existing connections
+    DevIo_CloseDev($hash);
+
+    $hash->{DeviceName} = @$a[2] . ":60128";
+
+    # used zone to control
+    $hash->{ZONE}        = "1";
+    $hash->{INPUT}       = "";
+    $hash->{SCREENLAYER} = "0";
+
+    # protocol version
+    $hash->{PROTOCOLVERSION} = @$a[3] || 2013;
+    if ( !( $hash->{PROTOCOLVERSION} =~ /^(2013|pre2013)$/ ) ) {
+        return "Invalid protocol, choose one of 2013 pre2013";
+    }
+
+    if (
+        $hash->{PROTOCOLVERSION} eq "pre2013"
+        && ( !exists( $attr{$name}{model} )
+            || $attr{$name}{model} ne $hash->{PROTOCOLVERSION} )
+      )
+    {
+        $attr{$name}{model} = $hash->{PROTOCOLVERSION};
+    }
+
+    # set default settings on first define
+    if ($init_done) {
+        fhem 'attr ' . $name . ' stateFormat stateAV';
+        fhem 'attr ' . $name
+          . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT';
+        fhem 'attr ' . $name . ' webCmd volume:muteT:input:previous:next';
+        fhem 'attr ' . $name
+          . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
+    }
+    $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{name}  = "Main";
+    $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{value} = "1";
+
+    my $ret = DevIo_OpenDev( $hash, 0, "ONKYO_AVR_DevInit" );
+
+    return $ret;
 }
 
 #####################################
-sub ONKYO_AVR_GetStatus($;$) {
-    my ( $hash, $local ) = @_;
-    my $name     = $hash->{NAME};
-    my $interval = $hash->{INTERVAL};
-    my $zone     = $hash->{ZONE};
-    my $protocol = $hash->{READINGS}{deviceyear}{VAL};
-    my $state    = '';
-    my $reading;
-    my $states;
+sub ONKYO_AVR_DevInit($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $return;
+    my $definedZones = 0;
+    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr} }
+      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr} ) );
 
-    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_GetStatus()";
+    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_DevInit()";
 
-    $local = 0 unless ( defined($local) );
-    if ( defined( $attr{$name}{disable} ) && $attr{$name}{disable} eq "1" ) {
-        return $hash->{STATE};
+    readingsBeginUpdate($hash);
+
+    if ( lc( $hash->{STATE} ) eq "disconnected" ) {
+        readingsBulkUpdate( $hash, "presence", "absent" )
+          if ( ReadingsVal( $name, "presence", "present" ) ne "absent" );
+
+        readingsBulkUpdate( $hash, "power", "off" )
+          if ( ReadingsVal( $name, "power", "on" ) ne "off" );
+
+        # stateAV
+        my $stateAV = ONKYO_AVR_GetStateAV($hash);
+        readingsBulkUpdate( $hash, "stateAV", $stateAV )
+          if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+
+        # send to slaves
+        if ( $definedZones > 0 ) {
+            Log3 $name, 5,
+              "ONKYO_AVR $name: Dispatching state change to slaves (DevInit)";
+            Dispatch(
+                $hash,
+                {
+                    "presence" => "absent",
+                    "power"    => "off",
+                },
+                undef
+            );
+        }
     }
 
-    InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 1 )
-      unless ( $local == 1 );
+    elsif ( lc( $hash->{STATE} ) eq "opened" ) {
 
-    # cache XML device information
-    #
-    # get device information if not available from helper
-    if (   !defined( $hash->{helper}{receiver} )
-        && $protocol ne "pre2013"
-        && $hash->{READINGS}{presence}{VAL} ne "absent" )
+        readingsBulkUpdate( $hash, "presence", "present" )
+          if ( ReadingsVal( $name, "presence", "absent" ) ne "present" );
+
+        # send to slaves
+        if ( $definedZones > 0 ) {
+            Log3 $name, 5,
+              "ONKYO_AVR $name: Dispatching state change to slaves (DevInit)";
+            Dispatch(
+                $hash,
+                {
+                    "presence" => "present",
+                },
+                undef
+            );
+        }
+
+        ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
+
+    }
+
+    readingsEndUpdate( $hash, 1 );
+
+    return $return;
+}
+
+#####################################
+sub ONKYO_AVR_Notify($$) {
+    my ( $hash, $dev ) = @_;
+    my $name         = $hash->{NAME};
+    my $devName      = $dev->{NAME};
+    my $definedZones = 0;
+    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr} }
+      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr} ) );
+
+    return
+      if ( !$dev->{CHANGED} );    # Some previous notify deleted the array.
+
+    return if ( $devName ne $name );
+
+    readingsBeginUpdate($hash);
+
+    foreach my $change ( @{ $dev->{CHANGED} } ) {
+
+        if ( $change eq "DISCONNECTED" ) {
+            Log3 $hash, 5, "ONKYO_AVR " . $name . ": processing change $change";
+
+            readingsBulkUpdate( $hash, "presence", "absent" )
+              if ( ReadingsVal( $name, "presence", "present" ) ne "absent" );
+
+            readingsBulkUpdate( $hash, "power", "off" )
+              if ( ReadingsVal( $name, "power", "on" ) ne "off" );
+
+            # stateAV
+            my $stateAV = ONKYO_AVR_GetStateAV($hash);
+            readingsBulkUpdate( $hash, "stateAV", $stateAV )
+              if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+
+            # send to slaves
+            if ( $definedZones > 0 ) {
+                Log3 $name, 5,
+                  "ONKYO_AVR $name: Dispatching state change to slaves";
+                Dispatch(
+                    $hash,
+                    {
+                        "presence" => "absent",
+                        "power"    => "off",
+                    },
+                    undef
+                );
+            }
+        }
+        elsif ( $change eq "CONNECTED" ) {
+            Log3 $hash, 5, "ONKYO_AVR " . $name . ": processing change $change";
+
+            readingsBulkUpdate( $hash, "presence", "present" )
+              if ( ReadingsVal( $name, "presence", "absent" ) ne "present" );
+
+            # stateAV
+            my $stateAV = ONKYO_AVR_GetStateAV($hash);
+            readingsBulkUpdate( $hash, "stateAV", $stateAV )
+              if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+
+            ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
+
+            # send to slaves
+            if ( $definedZones > 0 ) {
+                Log3 $name, 5,
+                  "ONKYO_AVR $name: Dispatching state change to slaves";
+                Dispatch(
+                    $hash,
+                    {
+                        "presence" => "present",
+                    },
+                    undef
+                );
+            }
+        }
+    }
+
+    readingsEndUpdate( $hash, 1 );
+
+    return;
+
+}
+
+#####################################
+sub ONKYO_AVR_Reopen($) {
+    my ($hash) = @_;
+    DevIo_CloseDev($hash);
+    DevIo_OpenDev( $hash, 1, "ONKYO_AVR_DevInit" );
+}
+
+###################################
+sub ONKYO_AVR_Undefine($$) {
+    my ( $hash, $name ) = @_;
+
+    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Undefine()";
+
+    # Disconnect from device
+    DevIo_CloseDev($hash);
+
+    # Stop the internal GetStatus-Loop and exit
+    RemoveInternalTimer($hash);
+
+    return undef;
+}
+
+###################################
+sub ONKYO_AVR_Read($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $state        = ReadingsVal( $name, "power", "off" );
+    my $zone         = 0;
+    my $definedZones = 0;
+    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr} }
+      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr} ) );
+
+    # read from serial device
+    my $buf = DevIo_SimpleRead($hash);
+    return "" if ( !defined($buf) );
+
+    $buf = $hash->{PARTIAL} . $buf;
+
+    Log3 $name, 5, "ONKYO_AVR $name: raw " . ONKYO_AVR_hexdump($buf);
+
+    my $lastchr = substr( $buf, -1, 1 );
+    if ( $lastchr ne "\n" ) {
+        $hash->{PARTIAL} = $buf;
+        Log3( $hash, 5, "ONKYO_AVR_Read: partial command received" );
+        return;
+    }
+    else {
+        $hash->{PARTIAL} = "";
+    }
+
+    my $length = length $buf;
+    return unless ( $length >= 16 );
+
+    my ( $magic, $header_size, $data_size, $version, $res1, $res2, $res3 ) =
+      unpack 'a4 N N C4', $buf;
+
+    Log3 $name, 5,
+      "ONKYO_AVR $name: Unexpected magic: expected 'ISCP', got '$magic'"
+      and return
+      unless ( $magic eq 'ISCP' );
+
+    Log3 $name, 5,
+"ONKYO_AVR $name: unusual packet length: $length < $header_size + $data_size"
+      and return
+      unless ( $length >= $header_size + $data_size );
+
+    Log3 $name, 5,
+      "ONKYO_AVR $name: Unexpected version: expected '0x01', got '0x%02x' "
+      . $version
+      and return
+      unless ( $version == 0x01 );
+
+    Log3 $name, 5,
+      "ONKYO_AVR $name: Unexpected header size: expected '0x10', got '0x%02x' "
+      . $header_size
+      and return
+      unless ( $header_size == 0x10 );
+
+    substr $buf, 0, $header_size, '';
+
+    my $value_raw = substr $buf, 0, $data_size, '';
+    my $sd = substr $value_raw, 0, 2, '';
+    $value_raw =~ s/([\032\r\n]|[\032\r]|[\r\n]|[\r])+$//;
+
+    Log3 $name, 5,
+      "ONKYO_AVR $name: Unexpected start/destination: expected '!1', got '$sd'"
+      and return
+      unless ( $sd eq '!1' );
+
+    my $cmd_raw;
+    my $cmd;
+    my $value = "";
+
+    # conversion based on zone
+    foreach
+      my $zoneID ( keys %{ $hash->{helper}{receiver}{device}{zonelist}{zone} } )
     {
-        my $xml =
-          ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
+        next
+          if ( $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}{value}
+            ne "1" );
 
-        if ( defined($xml) && $xml =~ /^<\?xml/ ) {
+        my $commandDB = ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zoneID);
+
+        foreach my $key ( keys %{$commandDB} ) {
+            if ( $value_raw =~ s/^$key(.*)// ) {
+                $cmd_raw   = $key;
+                $cmd       = $commandDB->{$cmd_raw}{name};
+                $value_raw = $1;
+
+                # Decode input through device information
+                if (   $cmd eq "input"
+                    && defined( $hash->{helper}{receiver} )
+                    && ref( $hash->{helper}{receiver} ) eq "HASH"
+                    && defined( $hash->{helper}{receiver}{input}{$value_raw} ) )
+                {
+                    $value = $hash->{helper}{receiver}{input}{$value_raw};
+                    Log3 $name, 5,
+"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): return zone$zoneID value '$value_raw' converted through device information to '"
+                      . $value . "'";
+                }
+
+                # Decode through HASH table
+                elsif (
+                    defined(
+                        $commandDB->{$cmd_raw}{values}{"$value_raw"}{name}
+                    )
+                  )
+                {
+                    if (
+                        ref(
+                            $commandDB->{$cmd_raw}{values}{"$value_raw"}{name}
+                        ) eq "ARRAY"
+                      )
+                    {
+                        $value =
+                          $commandDB->{$cmd_raw}{values}{"$value_raw"}{name}[0];
+                        Log3 $name, 5,
+"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): return zone$zoneID value '$value_raw' converted through ARRAY from HASH table to '"
+                          . $value . "'";
+                    }
+                    else {
+                        $value =
+                          $commandDB->{$cmd_raw}{values}{"$value_raw"}{name};
+                        Log3 $name, 5,
+"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): return zone$zoneID value '$value_raw' converted through VALUE from HASH table to '"
+                          . $value . "'";
+                    }
+                }
+
+                # return as decimal
+                elsif ($value_raw =~ m/^[0-9A-Fa-f][0-9A-Fa-f]$/
+                    && $cmd_raw =~ /^(MVL|SLP)$/ )
+                {
+                    $value = ONKYO_AVR_hex2dec($value_raw);
+                    Log3 $name, 5,
+"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): return zone$zoneID value '$value_raw' converted from HEX to DEC '$value'";
+                }
+
+                # just return the original return value if there is
+                # no decoding function
+                elsif ( lc($value_raw) ne "n/a" ) {
+                    $value = $value_raw;
+                    Log3 $name, 5,
+"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): unconverted return of zone$zoneID value '$value'";
+                }
+
+                # end here if we got N/A result (few exceptions)
+                elsif ($cmd ne "audio-information"
+                    && $cmd ne "video-information" )
+                {
+                    $value = $value_raw;
+                    Log3 $name, 4,
+"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): device sent: zone$zoneID command unavailable";
+                    return;
+                }
+
+                last;
+            }
+        }
+
+        if ($cmd_raw) {
+            $zone = $zoneID;
+            last;
+        }
+    }
+
+    if ( !$cmd_raw ) {
+        $cmd_raw = substr( $value_raw, 0, 3 );
+        $value_raw =~ s/^...//;
+        $cmd   = "_" . $cmd_raw;
+        $value = $value_raw;
+
+        Log3 $name, 4,
+"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): FAIL: Don't know how to convert, not in ONKYOdb: $cmd_raw$value_raw";
+    }
+
+    # reset connectionCheck timer
+    my $checkInterval = AttrVal( $name, "connectionCheck", "90" );
+    if ( $checkInterval ne "off" ) {
+        my $next = gettimeofday() + $checkInterval;
+        $hash->{helper}{nextConnectionCheck} = $next;
+        RemoveInternalTimer($hash);
+        InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
+    }
+    else {
+        RemoveInternalTimer($hash);
+    }
+
+    if ( $zone > 1 ) {
+        Log3 $hash, 5, "ONKYO_AVR $name dispatch: this is for zone$zone";
+        my $zoneDispatch;
+        $zoneDispatch->{INPUT_RAW} = $value_raw if ( $cmd eq "input" );
+        $zoneDispatch->{zone}      = $zone;
+        $zoneDispatch->{$cmd}      = $value;
+        Dispatch( $hash, $zoneDispatch, undef );
+        return;
+    }
+
+    # Parsing for zone1 (main)
+    #
+
+    Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd = $value"
+      if ( $cmd ne "net-usb-jacket-art" && $cmd ne "net-usb-time-info" );
+
+    $hash->{INPUT} = $value_raw if ( $cmd eq "input" );
+
+    my $zoneDispatch;
+
+    # Update readings
+    readingsBeginUpdate($hash);
+
+    if ( $cmd eq "audio-information" ) {
+        my @audio_split = split( /,/, $value );
+        if ( scalar(@audio_split) >= 6 ) {
+
+            readingsBulkUpdate( $hash, "audin_src", $audio_split[0] )
+              if ( ReadingsVal( $name, "audin_src", "-" ) ne $audio_split[0] );
+
+            readingsBulkUpdate( $hash, "audin_enc", $audio_split[1] )
+              if ( ReadingsVal( $name, "audin_enc", "-" ) ne $audio_split[1] );
+
+            my ($audin_srate) = split( /[:\s]+/, $audio_split[2], 2 ) || "";
+            readingsBulkUpdate( $hash, "audin_srate", $audin_srate )
+              if ( ReadingsVal( $name, "audin_srate", "-" ) ne $audin_srate );
+
+            my ($audin_ch) = split( /[:\s]+/, $audio_split[3], 2 ) || "";
+            readingsBulkUpdate( $hash, "audin_ch", $audin_ch )
+              if ( ReadingsVal( $name, "audin_ch", "-" ) ne $audin_ch );
+
+            readingsBulkUpdate( $hash, "audout_mode", $audio_split[4] )
+              if (
+                ReadingsVal( $name, "audout_mode", "-" ) ne $audio_split[4] );
+
+            my ($audout_ch) = split( /[:\s]+/, $audio_split[5], 2 ) || "";
+            readingsBulkUpdate( $hash, "audout_ch", $audout_ch )
+              if ( ReadingsVal( $name, "audout_ch", "-" ) ne $audout_ch );
+
+        }
+        else {
+            foreach (
+                "audin_src", "audin_enc", "audin_srate",
+                "audin_ch",  "audout_ch", "audout_mode",
+              )
+            {
+                readingsBulkUpdate( $hash, $_, "" )
+                  if ( ReadingsVal( $name, $_, "-" ) ne "" );
+            }
+        }
+    }
+
+    elsif ( $cmd eq "video-information" ) {
+        my @video_split = split( /,/, $value );
+        if ( scalar(@video_split) >= 9 ) {
+
+            # Video-in resolution
+            my @vidin_res_string = split( / +/, $video_split[1] );
+            my $vidin_res;
+            if (   defined( $vidin_res_string[0] )
+                && defined( $vidin_res_string[2] )
+                && defined( $vidin_res_string[3] )
+                && uc( $vidin_res_string[0] ) ne "UNKNOWN"
+                && uc( $vidin_res_string[2] ) ne "UNKNOWN"
+                && uc( $vidin_res_string[3] ) ne "UNKNOWN" )
+            {
+                $vidin_res =
+                    $vidin_res_string[0] . "x"
+                  . $vidin_res_string[2]
+                  . $vidin_res_string[3];
+            }
+            else {
+                $vidin_res = "";
+            }
+
+            # Video-out resolution
+            my @vidout_res_string = split( / +/, $video_split[5] );
+            my $vidout_res;
+            if (   defined( $vidout_res_string[0] )
+                && defined( $vidout_res_string[2] )
+                && defined( $vidout_res_string[3] )
+                && uc( $vidout_res_string[0] ) ne "UNKNOWN"
+                && uc( $vidout_res_string[2] ) ne "UNKNOWN"
+                && uc( $vidout_res_string[3] ) ne "UNKNOWN" )
+            {
+                $vidout_res =
+                    $vidout_res_string[0] . "x"
+                  . $vidout_res_string[2]
+                  . $vidout_res_string[3];
+            }
+            else {
+                $vidout_res = "";
+            }
+
+            # Video-in color depth
+            my ($vidin_cdepth) =
+              split( /[:\s]+/, $video_split[3], 2 ) || "";
+
+            # Video-out color depth
+            my ($vidout_cdepth) =
+              split( /[:\s]+/, $video_split[7], 2 ) || "";
+
+            readingsBulkUpdate( $hash, "vidin_src", $video_split[0] )
+              if ( ReadingsVal( $name, "vidin_src", "-" ) ne $video_split[0] );
+
+            readingsBulkUpdate( $hash, "vidin_res", $vidin_res )
+              if ( ReadingsVal( $name, "vidin_res", "-" ) ne $vidin_res );
+
+            readingsBulkUpdate( $hash, "vidin_cspace", $video_split[2] )
+              if (
+                ReadingsVal( $name, "vidin_cspace", "-" ) ne $video_split[2] );
+
+            readingsBulkUpdate( $hash, "vidin_cdepth", $vidin_cdepth )
+              if ( ReadingsVal( $name, "vidin_cdepth", "-" ) ne $vidin_cdepth );
+
+            readingsBulkUpdate( $hash, "vidout_dst", $video_split[4] )
+              if ( ReadingsVal( $name, "vidout_dst", "-" ) ne $video_split[4] );
+
+            readingsBulkUpdate( $hash, "vidout_res", $vidout_res )
+              if ( ReadingsVal( $name, "vidout_res", "-" ) ne $vidout_res );
+
+            readingsBulkUpdate( $hash, "vidout_cspace", $video_split[6] )
+              if (
+                ReadingsVal( $name, "vidout_cspace", "-" ) ne $video_split[6] );
+
+            readingsBulkUpdate( $hash, "vidout_cdepth", $vidout_cdepth )
+              if (
+                ReadingsVal( $name, "vidout_cdepth", "-" ) ne $vidout_cdepth );
+
+            readingsBulkUpdate( $hash, "vidout_mode", $video_split[8] )
+              if (
+                ReadingsVal( $name, "vidout_mode", "-" ) ne $video_split[8] );
+
+        }
+        else {
+            foreach (
+                "vidin_src",     "vidin_res",     "vidin_cspace",
+                "vidin_cdepth",  "vidout_dst",    "vidout_res",
+                "vidout_cspace", "vidout_cdepth", "vidout_mode",
+              )
+            {
+                readingsBulkUpdate( $hash, $_, "" )
+                  if ( ReadingsVal( $name, $_, "-" ) ne "" );
+            }
+        }
+    }
+
+    elsif ( $cmd eq "net-receiver-information" ) {
+        my $return = ONKYO_AVR_SendCommand( $hash, "power", "query" );
+        $return = ONKYO_AVR_SendCommand( $hash, "audio-information",  "query" );
+        $return = ONKYO_AVR_SendCommand( $hash, "video-information",  "query" );
+        $return = ONKYO_AVR_SendCommand( $hash, "input",              "query" );
+        $return = ONKYO_AVR_SendCommand( $hash, "volume",             "query" );
+        $return = ONKYO_AVR_SendCommand( $hash, "mute",               "query" );
+        $return = ONKYO_AVR_SendCommand( $hash, "sleep",              "query" );
+        $return = ONKYO_AVR_SendCommand( $hash, "listening-mode",     "query" );
+        $return = ONKYO_AVR_SendCommand( $hash, "video-picture-mode", "query" );
+
+        if ( $value =~ /^<\?xml/ ) {
 
             my $xml_parser = XML::Simple->new(
-                NormaliseSpace => 2,
+                NormaliseSpace => 0,
                 KeepRoot       => 0,
-                ForceArray     => 0,
-                SuppressEmpty  => 1
+                ForceArray     => [ "zone", "netservice", "preset", "control" ],
+                SuppressEmpty  => 0,
+                KeyAttr        => {
+                    zone       => "id",
+                    netservice => "id",
+                    preset     => "id",
+                    control    => "id",
+                },
             );
-            $hash->{helper}{receiver} = $xml_parser->XMLin($xml);
+            delete $hash->{helper}{receiver};
+            $hash->{helper}{receiver} = $xml_parser->XMLin($value);
 
             # Safe input names
             my $inputs;
             foreach my $input (
-                sort
-                keys
-                %{ $hash->{helper}{receiver}{device}{selectorlist}{selector} }
-              )
+                @{ $hash->{helper}{receiver}{device}{selectorlist}{selector} } )
             {
-                if ( $input ne "" ) {
-                    my $id =
-                      uc( $hash->{helper}{receiver}{device}{selectorlist}
-                          {selector}{$input}{id} );
-                    $input =~ s/\s/_/g;
-                    $hash->{helper}{receiver}{input}{$id} = $input;
-                    $inputs .= $input . ":";
+                if (   $input->{value} eq "1"
+                    && $input->{zone} ne "00"
+                    && $input->{id} ne "80" )
+                {
+                    my $id   = uc( $input->{id} );
+                    my $name = trim( $input->{name} );
+                    $name =~ s/\s/_/g;
+                    $hash->{helper}{receiver}{input}{$id} = $name;
+                    $inputs .= $name . ":";
                 }
             }
             if ( !defined( $attr{$name}{inputs} ) ) {
@@ -141,7 +709,25 @@ sub ONKYO_AVR_GetStatus($;$) {
                 $attr{$name}{inputs} = $inputs;
             }
 
-            readingsBeginUpdate($hash);
+            # Zones
+            my $reading = "zones";
+            if ( defined( $hash->{helper}{receiver}{device}{zonelist}{zone} ) )
+            {
+                my $zones = "0";
+
+                foreach my $zoneID (
+
+                    keys %{ $hash->{helper}{receiver}{device}{zonelist}{zone} }
+                  )
+                {
+                    next
+                      if ( $hash->{helper}{receiver}{device}{zonelist}{zone}
+                        {$zoneID}{value} ne "1" );
+                    $zones++;
+                }
+                readingsBulkUpdate( $hash, $reading, $zones )
+                  if ( ReadingsVal( $name, $reading, "" ) ne $zones );
+            }
 
             # Brand
             $reading = "brand";
@@ -165,9 +751,6 @@ sub ONKYO_AVR_GetStatus($;$) {
                     $hash->{helper}{receiver}{device}{$reading} )
               )
             {
-                readingsBulkUpdate( $hash, $reading,
-                    $hash->{helper}{receiver}{device}{$reading} );
-
                 if ( !exists( $attr{$name}{model} )
                     || $attr{$name}{model} ne
                     $hash->{helper}{receiver}{device}{$reading} )
@@ -215,18 +798,6 @@ sub ONKYO_AVR_GetStatus($;$) {
                 readingsBulkUpdate( $hash, $reading,
                     $hash->{helper}{receiver}{device}{year} );
             }
-
-            readingsEndUpdate( $hash, 1 );
-        }
-        elsif ( $hash->{READINGS}{presence}{VAL} ne "absent" ) {
-            Log3 $name, 3,
-"ONKYO_AVR $name: net-receiver-information command unsupported, this must be a pre2013 device! Implicit fallback to protocol version pre2013.";
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate( $hash, "deviceyear", "pre2013" );
-            readingsEndUpdate( $hash, 1 );
-            unless ( exists( $attr{$name}{model} ) ) {
-                $attr{$name}{model} = "pre2013";
-            }
         }
 
         # Input alias handling
@@ -238,6 +809,7 @@ sub ONKYO_AVR_GetStatus($;$) {
                 foreach (@inputs) {
                     if (m/[^,\s]+(,[^,\s]+)+/) {
                         my @input_names = split( ',', $_ );
+
                         $input_names[1] =~ s/\s/_/g;
                         $hash->{helper}{receiver}{input_aliases}
                           { $input_names[0] } = $input_names[1];
@@ -249,383 +821,743 @@ sub ONKYO_AVR_GetStatus($;$) {
         }
     }
 
-    # Read powerstate
-    #
-    my $powerstate = ONKYO_AVR_SendCommand( $hash, "power", "query" );
+    elsif ( $cmd eq "net-usb-jacket-art" ) {
+        if ( $value =~ /^(0)([0|1|2])(.*)/ ) {
+            my $type = "bmp";
+            $type = "jpg" if ( $1 eq "1" );
 
-    $state = "off";
-    if ( defined($powerstate) ) {
-        if ( $powerstate eq "on" ) {
-            $state = "on";
+            Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($type) in progress"
+              if ( $2 eq "0" );
 
-            # Read other state information
-            $states->{mute} = ONKYO_AVR_SendCommand( $hash, "mute", "query" );
-            $states->{volume} =
-              ONKYO_AVR_SendCommand( $hash, "volume", "query" );
-            $states->{sleep} = ONKYO_AVR_SendCommand( $hash, "sleep", "query" )
-              if ( $zone eq "main" );
-            $states->{input} = ONKYO_AVR_SendCommand( $hash, "input", "query" );
-            $states->{video} =
-              ONKYO_AVR_SendCommand( $hash, "video-information", "query" )
-              if ( $zone eq "main" );
-            $states->{audio} =
-              ONKYO_AVR_SendCommand( $hash, "audio-information", "query" )
-              if ( $zone eq "main" );
+            $hash->{helper}{cover}{$type} = "" if ( $2 eq "0" );
+            $hash->{helper}{cover}{$type} .= $3;
+
+            # complete album art received
+            if ( $2 eq "2" ) {
+                Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($type) completed";
+
+                my $AlbumArtName = $name . "_CurrentAlbumArt." . $type;
+                my $AlbumArtURI = AttrVal( "global", "modpath", "." )
+                  . "/www/images/default/ONKYO_AVR/$AlbumArtName";
+                my $AlbumArtURL = "/fhem/ONKYO_AVR/cover/$AlbumArtName";
+
+                mkpath( AttrVal( "global", "modpath", "." )
+                      . '/www/images/default/ONKYO_AVR/' );
+                ONKYO_AVR_WriteFile( $AlbumArtURI,
+                    ONKYO_AVR_hex2bin( $hash->{helper}{cover}{$type} ) );
+            }
         }
     }
+
+    # currentTrackPosition
+    # currentTrackDuration
+    elsif ( $cmd eq "net-usb-time-info" ) {
+        my @times = split( /\//, $value );
+
+        if (
+            gettimeofday() - time_str2num(
+                ReadingsTimestamp(
+                    $name, "currentTrackPosition", "1970-01-01 01:00:00"
+                )
+            ) >= 5
+          )
+        {
+            readingsBulkUpdate( $hash, "currentTrackPosition", $times[0] )
+              if (
+                ReadingsVal( $name, "currentTrackPosition", "-" ) ne $times[0]
+              );
+            $zoneDispatch->{currentTrackPosition} = $times[0];
+        }
+
+        if ( ReadingsVal( $name, "currentTrackDuration", "-" ) ne $times[1] ) {
+            readingsBulkUpdate( $hash, "currentTrackDuration", $times[1] );
+            $zoneDispatch->{currentTrackDuration} = $times[1];
+        }
+    }
+
+    # currentArtist
+    elsif ( $cmd eq "net-usb-artist-name-info" ) {
+        readingsBulkUpdate( $hash, "currentArtist", $value )
+          if ( ReadingsVal( $name, "currentArtist", "-" ) ne $value );
+
+        $zoneDispatch->{currentArtist} = $value;
+    }
+
+    # currentAlbum
+    elsif ( $cmd eq "net-usb-album-name-info" ) {
+        readingsBulkUpdate( $hash, "currentAlbum", $value )
+          if ( ReadingsVal( $name, "currentAlbum", "-" ) ne $value );
+
+        $zoneDispatch->{currentAlbum} = $value;
+    }
+
+    # currentTitle
+    elsif ( $cmd eq "net-usb-title-name" ) {
+        readingsBulkUpdate( $hash, "currentTitle", $value )
+          if ( ReadingsVal( $name, "currentTitle", "-" ) ne $value );
+
+        $zoneDispatch->{currentTitle} = $value;
+    }
+
+    elsif ( $cmd eq "net-usb-list-title-info" ) {
+
+        if ( $value =~ /^(..)(.)(.)(....)(....)(..)(..)(..)(..)(..)(.*)$/ ) {
+
+            # channel
+            my $channel = $1 || "00";
+            $hash->{CHANNEL} = $channel;
+            $channel = lc($channel);
+            my $channelname = "";
+
+            if (
+                defined(
+                    $hash->{helper}{receiver}{device}{netservicelist}
+                      {netservice}{$channel}{name}
+                )
+              )
+            {
+                $channelname =
+                  $hash->{helper}{receiver}{device}{netservicelist}
+                  {netservice}{$channel}{name};
+                $channelname =~ s/\s/_/g;
+            }
+            elsif ( $channel =~ /^f./ ) {
+                $channelname = "USB_Front"      if $channel eq "f0";
+                $channelname = "USB_Rear"       if $channel eq "f1";
+                $channelname = "Internet_Radio" if $channel eq "f2";
+                $channelname = ""               if $channel eq "f3";
+            }
+            else {
+                Log3 $name, 4,
+"ONKYO_AVR $name: net-usb-list-title-info: received unknown channel ID $channel";
+            }
+
+            if ( ReadingsVal( $name, "channel", "-" ) ne $channelname ) {
+                readingsBulkUpdate( $hash, "channel",      $channelname );
+                readingsBulkUpdate( $hash, "currentAlbum", "" )
+                  if ( ReadingsVal( $name, "currentAlbum", "-" ) ne "" );
+                readingsBulkUpdate( $hash, "currentArtist", "" )
+                  if ( ReadingsVal( $name, "currentArtist", "-" ) ne "" );
+                readingsBulkUpdate( $hash, "currentTitle", "" )
+                  if ( ReadingsVal( $name, "currentTitle", "-" ) ne "" );
+                readingsBulkUpdate( $hash, "currentTrackPosition", "--:--" )
+                  if ( ReadingsVal( $name, "currentTrackPosition", "-" ) ne
+                    "--:--" );
+                readingsBulkUpdate( $hash, "currentTrackDuration", "--:--" )
+                  if ( ReadingsVal( $name, "currentTrackDuration", "-" ) ne
+                    "--:--" );
+
+                $zoneDispatch->{CHANNEL_RAW}          = $hash->{CHANNEL};
+                $zoneDispatch->{channel}              = $channelname;
+                $zoneDispatch->{currentAlbum}         = "";
+                $zoneDispatch->{currentArtist}        = "";
+                $zoneDispatch->{currentTitle}         = "";
+                $zoneDispatch->{currentTrackPosition} = "--:--";
+                $zoneDispatch->{currentTrackDuration} = "--:--";
+            }
+
+            # screenType
+            my $screenType = $2 || "0";
+            my $uiTypes = {
+                '0' => 'List',
+                '1' => 'Menu',
+                '2' => 'Playback',
+                '3' => 'Popup',
+                '4' => 'Keyboard',
+                '5' => 'Menu List',
+            };
+            my $uiType = $uiTypes->{$screenType};
+            readingsBulkUpdate( $hash, "screenType", $screenType )
+              if ( ReadingsVal( $name, "screenType", "-" ) ne $screenType );
+
+            # screenLayerInfo
+            my $screenLayerInfo = $3 || "0";
+            my $layerInfos = {
+                '0' => 'NET TOP',
+                '1' => 'Service Top,DLNA/USB/iPod',
+                '2' => 'under 2nd Layer',
+            };
+            my $layerInfo = $layerInfos->{$screenLayerInfo};
+            $hash->{SCREENLAYER} = $screenLayerInfo;
+            readingsBulkUpdate( $hash, "screenLayerInfo", $screenLayerInfo )
+              if ( readingsBulkUpdate( $hash, "screenLayerInfo", "" ) ne
+                $screenLayerInfo );
+
+            # screenListPos
+            my $screenListPos = $4 || "0000";
+            foreach my $line (
+                keys %{ $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list} } )
+            {
+                $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}{$line}{listpos} =
+                  0;
+            }
+
+            $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}{$screenListPos}
+              {listpos} = 1
+              if ( $screenListPos ne "-" );
+
+            readingsBulkUpdate( $hash, "screenListPos", $screenListPos )
+              if ( readingsBulkUpdate( $hash, "screenListPos", "" ) ne
+                $screenListPos );
+
+            # screenItemCnt
+            my $screenItemCnt = $5 || "0000";
+            readingsBulkUpdate( $hash, "screenItemCnt", $screenItemCnt )
+              if (
+                ReadingsVal( $name, "screenItemCnt", "-" ) ne $screenItemCnt );
+
+            # screenLayer
+            my $screenLayer = $6 || "00";
+            readingsBulkUpdate( $hash, "screenLayer", $screenLayer )
+              if ( ReadingsVal( $name, "screenLayer", "-" ) ne $screenLayer );
+
+            # my $reserved = $7;
+
+            my $screenIconLeft = $8 || "00";
+            my $iconsLeft = {
+                '00' => 'Internet Radio',
+                '01' => 'Server',
+                '02' => 'USB',
+                '03' => 'iPod',
+                '04' => 'DLNA',
+                '05' => 'WiFi',
+                '06' => 'Favorite',
+                '10' => 'Account(Spotify)',
+                '11' => 'Album(Spotify)',
+                '12' => 'Playlist(Spotify)',
+                '13' => 'Playlist-C(Spotify)',
+                '14' => 'Starred(Spotify)',
+                '15' => 'What\'s New(Spotify)',
+                '16' => 'Track(Spotify)',
+                '17' => 'Artist(Spotify)',
+                '18' => 'Play(Spotify)',
+                '19' => 'Search(Spotify)',
+                '1A' => 'Folder(Spotify)',
+                'FF' => 'None'
+            };
+            my $iconLeft = $iconsLeft->{$screenIconLeft};
+            readingsBulkUpdate( $hash, "screenIconLeft", $screenIconLeft )
+              if ( ReadingsVal( $name, "screenIconLeft", "-" ) ne
+                $screenIconLeft );
+
+            my $screenIconRight = $9 || "00";
+            my $iconsRight = {
+                '00' => 'DLNA',
+                '01' => 'Favorite',
+                '02' => 'vTuner',
+                '03' => 'SiriusXM',
+                '04' => 'Pandora',
+                '05' => 'Rhapsody',
+                '06' => 'Last.fm',
+                '07' => 'Napster',
+                '08' => 'Slacker',
+                '09' => 'Mediafly',
+                '0A' => 'Spotify',
+                '0B' => 'AUPEO!',
+                '0C' => 'radiko',
+                '0D' => 'e-onkyo',
+                '0E' => 'TuneIn Radio',
+                '0F' => 'MP3tunes',
+                '10' => 'Simfy',
+                '11' => 'Home Media',
+                'FF' => 'None'
+            };
+            my $iconRight = $iconsRight->{$screenIconRight};
+            readingsBulkUpdate( $hash, "screenIconRight", $screenIconRight )
+              if ( ReadingsVal( $name, "screenIconRight", "-" ) ne
+                $screenIconRight );
+
+            # screenStatus
+            my $screenStatus = $10 || "00";
+            my $statusInfos = {
+                '00' => '',
+                '01' => 'Connecting',
+                '02' => 'Acquiring License',
+                '03' => 'Buffering',
+                '04' => 'Cannot Play',
+                '05' => 'Searching',
+                '06' => 'Profile update',
+                '07' => 'Operation disabled',
+                '08' => 'Server Start-up',
+                '09' => 'Song rated as Favorite',
+                '0A' => 'Song banned from station',
+                '0B' => 'Authentication Failed',
+                '0C' => 'Spotify Paused(max 1 device)',
+                '0D' => 'Track Not Available',
+                '0E' => 'Cannot Skip'
+            };
+            my $statusInfo = $statusInfos->{$screenStatus};
+            if ( defined( $statusInfos->{$screenStatus} ) ) {
+                readingsBulkUpdate( $hash, "screenStatus",
+                    $statusInfos->{$screenStatus} )
+                  if ( ReadingsVal( $name, "screenStatus", "-" ) ne
+                    $statusInfos->{$screenStatus} );
+            }
+            else {
+                readingsBulkUpdate( $hash, "screenStatus", $screenStatus )
+                  if ( ReadingsVal( $name, "screenStatus", "-" ) ne
+                    $screenStatus );
+            }
+
+            # screenTitle
+            my $screenTitle = $11 || "";
+            $screenTitle = "" if ( $screenTitle eq "NE" );
+            readingsBulkUpdate( $hash, "screenTitle", $screenTitle )
+              if ( ReadingsVal( $name, "screenTitle", "-" ) ne $screenTitle );
+
+        }
+    }
+
+    elsif ( $cmd eq "net-usb-menu-status" ) {
+        if ( $value =~ /^(.)(..)(..)(.)(.)(..)$/ ) {
+            my $menuState = $1;
+        }
+    }
+
+    # screen/list
+    elsif ( $cmd eq "net-usb-list-info" ) {
+        if ( $value =~ /^(.)(.)(.)(.*)/ ) {
+
+            my $item;
+            if ( $2 eq "-" ) {
+                $item = $2;
+            }
+            elsif ( $2 < 10 ) {
+                $item = "000" . $2;
+            }
+            elsif ( $2 < 100 ) {
+                $item = "00" . $2;
+            }
+            elsif ( $2 < 1000 ) {
+                $item = "0" . $2;
+            }
+
+            my $properties;
+            if ( $1 ne "C" ) {
+                $properties = {
+                    '-' => 'no',
+                    '0' => 'Playing',
+                    'A' => 'Artist',
+                    'B' => 'Album',
+                    'F' => 'Folder',
+                    'M' => 'Music',
+                    'P' => 'Playlist',
+                    'S' => 'Search',
+                    'a' => 'Account',
+                    'b' => 'Playlist-C',
+                    'c' => 'Starred',
+                    'd' => 'Unstarred',
+                    'e' => 'What\'s New'
+                };
+            }
+
+            # line item details
+            if ( $1 eq "A" || $1 eq "U" ) {
+                $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}{$item}{property}
+                  = $3;
+                $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}{$item}{data} =
+                  $4;
+                $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}{$item}{curser} =
+                  0
+                  if (
+                    !defined(
+                        $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}
+                          {$item}{curser}
+                    )
+                  );
+
+                # screenItemType
+                readingsBulkUpdate( $hash, "screenItemT" . $item, $3 )
+                  if ( ReadingsVal( $name, "screenItemT" . $item, "-" ) ne $3 );
+
+                # screenItemContent
+                readingsBulkUpdate( $hash, "screenItemC" . $item, $4 )
+                  if ( ReadingsVal( $name, "screenItemC" . $item, "-" ) ne $4 );
+
+            }
+
+            # curser information
+            else {
+                foreach my $item (
+                    keys %{ $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list} } )
+                {
+                    $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}{$item}{curser}
+                      = 0;
+                }
+
+                $hash->{SCREEN}{ $hash->{SCREENLAYER} }{list}{$item}{curser} = 1
+                  if ( $item ne "-" );
+
+                readingsBulkUpdate( $hash, "screenCurser", $2 )
+                  if ( ReadingsVal( $name, "screenCurser", "" ) ne $2 );
+            }
+
+        }
+        else {
+            Log3 $name, 4,
+              "ONKYO_AVR $name: screen/list: ERROR - unable to parse: "
+              . $value;
+        }
+    }
+
+    #    elsif ( $cmd eq "NLA" ) {
+    #        if ( $value =~ /^(.)(....)(.)(.)(..)(.*)/ ) {
+    #
+    #         Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($1) unknown type"
+    #          and return
+    #         if ( $1 ne "X" );
+    #
+    #      Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($1) in progress"
+    #       if ( $1 eq "X" );
+    #
+    #    my $uiTypes = {
+    #       '0' => 'List',
+    #      '1' => 'Menu',
+    #     '2' => 'Playback',
+    #    '3' => 'Popup',
+    #   '4' => 'Keyboard',
+    #  '5' => 'Menu List',
+    #          };
+    #         my $uiType = $uiTypes->{$4};
+    #
+    #        $hash->{helper}{listinfo}{$3}{$2} = $6;
+    #   }
+    #    else {
+    #       Log3 $name, 4,
+    #        "ONKYO_AVR $name: NLA could not be parsed: " . $value;
+    #  }
+    #  }
+
+    elsif ( $cmd eq "net-usb-play-status" ) {
+        if ( $value =~ /^(.)(.)(.)$/ ) {
+            my $status;
+
+            # playStatus
+            $status = "stopped";
+            $status = "playing"
+              if ( $1 eq "P" );
+            $status = "paused"
+              if ( $1 eq "p" );
+            $status = "fast-forward"
+              if ( $1 eq "F" );
+            $status = "fast-rewind"
+              if ( $1 eq "R" );
+            $status = "interrupted"
+              if ( $1 eq "E" );
+
+            readingsBulkUpdate( $hash, "playStatus", $status )
+              if ( ReadingsVal( $name, "playStatus", "-" ) ne $status );
+
+            $zoneDispatch->{playStatus} = $status;
+
+            # stateAV
+            my $stateAV = ONKYO_AVR_GetStateAV($hash);
+            readingsBulkUpdate( $hash, "stateAV", $stateAV )
+              if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+
+            if ( $status eq "stopped" ) {
+                readingsBulkUpdate( $hash, "currentAlbum", "" )
+                  if ( ReadingsVal( $name, "currentAlbum", "-" ) ne "" );
+                readingsBulkUpdate( $hash, "currentArtist", "" )
+                  if ( ReadingsVal( $name, "currentArtist", "-" ) ne "" );
+                readingsBulkUpdate( $hash, "currentTitle", "" )
+                  if ( ReadingsVal( $name, "currentTitle", "-" ) ne "" );
+                readingsBulkUpdate( $hash, "currentTrackPosition", "--:--" )
+                  if ( ReadingsVal( $name, "currentTrackPosition", "-" ) ne
+                    "--:--" );
+                readingsBulkUpdate( $hash, "currentTrackDuration", "--:--" )
+                  if ( ReadingsVal( $name, "currentTrackDuration", "-" ) ne
+                    "--:--" );
+
+                $zoneDispatch->{currentAlbum}         = "";
+                $zoneDispatch->{currentArtist}        = "";
+                $zoneDispatch->{currentTitle}         = "";
+                $zoneDispatch->{currentTrackPosition} = "--:--";
+                $zoneDispatch->{currentTrackDuration} = "--:--";
+            }
+
+            # repeat
+            $status = "-";
+            $status = "off"
+              if ( $2 eq "-" );
+            $status = "all"
+              if ( $2 eq "R" );
+            $status = "all-folder"
+              if ( $2 eq "F" );
+            $status = "one"
+              if ( $2 eq "1" );
+
+            readingsBulkUpdate( $hash, "repeat", $status )
+              if ( ReadingsVal( $name, "repeat", "-" ) ne $status );
+            $zoneDispatch->{repeat} = $status;
+
+            # shuffle
+            $status = "-";
+            $status = "off"
+              if ( $2 eq "-" );
+            $status = "on"
+              if ( $3 eq "S" );
+            $status = "on-album"
+              if ( $3 eq "A" );
+            $status = "on-folder"
+              if ( $3 eq "F" );
+
+            readingsBulkUpdate( $hash, "shuffle", $status )
+              if ( ReadingsVal( $name, "shuffle", "-" ) ne $status );
+            $zoneDispatch->{shuffle} = $status;
+
+        }
+    }
+
+    elsif ( $cmd =~ /^net-usb/ ) {
+    }
+
+    elsif ( $cmd eq "net-popup-message" ) {
+    }
+
     else {
-        $state = "absent";
-    }
+        if ( $cmd eq "input" ) {
 
-    readingsBeginUpdate($hash);
-
-    # Set reading for power
-    #
-    my $readingPower = "off";
-    if ( $state eq "on" ) {
-        $readingPower = "on";
-    }
-
-    if ( !defined( $hash->{READINGS}{power}{VAL} )
-        || $hash->{READINGS}{power}{VAL} ne $readingPower )
-    {
-        readingsBulkUpdate( $hash, "power", $readingPower );
-    }
-
-    # Set reading for state
-    #
-    if ( !defined( $hash->{READINGS}{state}{VAL} )
-        || $hash->{READINGS}{state}{VAL} ne $state )
-    {
-        readingsBulkUpdate( $hash, "state", $state );
-    }
-
-    # Set general readings for all zones
-    #
-    foreach ( "mute", "volume", "input" ) {
-        if ( defined( $states->{$_} ) && $states->{$_} ne "" ) {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne $states->{$_} )
-            {
-                readingsBulkUpdate( $hash, $_, $states->{$_} );
-            }
-        }
-        else {
-            if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                || $hash->{READINGS}{$_}{VAL} ne "-" )
-            {
-                readingsBulkUpdate( $hash, $_, "-" );
-            }
-        }
-    }
-
-    # Process for main zone only
-    #
-    if ( $zone eq "main" ) {
-
-        # Set reading for sleep
-        #
-        foreach ("sleep") {
-            if ( defined( $states->{$_} ) && $states->{$_} ne "" ) {
-                if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                    || $hash->{READINGS}{$_}{VAL} ne $states->{$_} )
-                {
-                    readingsBulkUpdate( $hash, $_, $states->{$_} );
-                }
-            }
-            else {
-                if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                    || $hash->{READINGS}{$_}{VAL} ne "-" )
-                {
-                    readingsBulkUpdate( $hash, $_, "-" );
-                }
+            # Input alias handling
+            if ( defined( $hash->{helper}{receiver}{input_aliases}{$value} ) ) {
+                Log3 $name, 4,
+                  "ONKYO_AVR $name: Input aliasing '$value' to '"
+                  . $hash->{helper}{receiver}{input_aliases}{$value} . "'";
+                $value = $hash->{helper}{receiver}{input_aliases}{$value};
             }
         }
 
-        # Set readings for audio
-        #
-        if ( defined( $states->{audio} ) ) {
-            my @audio_split = split( /,/, $states->{audio} );
-            if ( scalar(@audio_split) >= 6 ) {
+        readingsBulkUpdate( $hash, $cmd, $value )
+          if ( ReadingsVal( $name, $cmd, "-" ) ne $value );
 
-                # Audio-in sampling rate
-                my ($audin_srate) = split /[:\s]+/, $audio_split[2], 2;
-
-                # Audio-in channels
-                my ($audin_ch) = split /[:\s]+/, $audio_split[3], 2;
-
-                # Audio-out channels
-                my ($audout_ch) = split /[:\s]+/, $audio_split[5], 2;
-
-                if ( !defined( $hash->{READINGS}{audin_src}{VAL} )
-                    || $hash->{READINGS}{audin_src}{VAL} ne $audio_split[0] )
-                {
-                    readingsBulkUpdate( $hash, "audin_src", $audio_split[0] );
-                }
-                if ( !defined( $hash->{READINGS}{audin_enc}{VAL} )
-                    || $hash->{READINGS}{audin_enc}{VAL} ne $audio_split[1] )
-                {
-                    readingsBulkUpdate( $hash, "audin_enc", $audio_split[1] );
-                }
-                if (
-                    !defined( $hash->{READINGS}{audin_srate}{VAL} )
-                    || ( defined($audin_srate)
-                        && $hash->{READINGS}{audin_srate}{VAL} ne $audin_srate )
-                  )
-                {
-                    readingsBulkUpdate( $hash, "audin_srate", $audin_srate );
-                }
-                if (
-                    !defined( $hash->{READINGS}{audin_ch}{VAL} )
-                    || ( defined($audin_ch)
-                        && $hash->{READINGS}{audin_ch}{VAL} ne $audin_ch )
-                  )
-                {
-                    readingsBulkUpdate( $hash, "audin_ch", $audin_ch );
-                }
-                if ( !defined( $hash->{READINGS}{audout_mode}{VAL} )
-                    || $hash->{READINGS}{audout_mode}{VAL} ne $audio_split[4] )
-                {
-                    readingsBulkUpdate( $hash, "audout_mode", $audio_split[4] );
-                }
-                if (
-                    !defined( $hash->{READINGS}{audout_ch}{VAL} )
-                    || ( defined($audout_ch)
-                        && $hash->{READINGS}{audout_ch}{VAL} ne $audout_ch )
-                  )
-                {
-                    readingsBulkUpdate( $hash, "audout_ch", $audout_ch );
-                }
-            }
-            else {
-                foreach (
-                    "audin_src", "audin_enc", "audin_srate",
-                    "audin_ch",  "audout_ch", "audout_mode",
-                  )
-                {
-                    if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                        || $hash->{READINGS}{$_}{VAL} ne "-" )
-                    {
-                        readingsBulkUpdate( $hash, $_, "-" );
-                    }
-                }
-            }
-        }
-        else {
-            foreach (
-                "audin_src", "audin_enc", "audin_srate",
-                "audin_ch",  "audout_ch", "audout_mode",
-              )
-            {
-                if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                    || $hash->{READINGS}{$_}{VAL} ne "-" )
-                {
-                    readingsBulkUpdate( $hash, $_, "-" );
-                }
-            }
-        }
-
-        # Set readings for video
-        #
-        if ( defined( $states->{video} ) ) {
-            my @video_split = split( /,/, $states->{video} );
-            if ( scalar(@video_split) >= 9 ) {
-
-                # Video-in resolution
-                my @vidin_res_string = split( / +/, $video_split[1] );
-                my $vidin_res;
-                if (   defined( $vidin_res_string[0] )
-                    && defined( $vidin_res_string[2] )
-                    && defined( $vidin_res_string[3] )
-                    && uc( $vidin_res_string[0] ) ne "UNKNOWN"
-                    && uc( $vidin_res_string[2] ) ne "UNKNOWN"
-                    && uc( $vidin_res_string[3] ) ne "UNKNOWN" )
-                {
-                    $vidin_res =
-                        $vidin_res_string[0] . "x"
-                      . $vidin_res_string[2]
-                      . $vidin_res_string[3];
-                }
-                else {
-                    $vidin_res = "";
-                }
-
-                # Video-out resolution
-                my @vidout_res_string = split( / +/, $video_split[5] );
-                my $vidout_res;
-                if (   defined( $vidout_res_string[0] )
-                    && defined( $vidout_res_string[2] )
-                    && defined( $vidout_res_string[3] )
-                    && uc( $vidout_res_string[0] ) ne "UNKNOWN"
-                    && uc( $vidout_res_string[2] ) ne "UNKNOWN"
-                    && uc( $vidout_res_string[3] ) ne "UNKNOWN" )
-                {
-                    $vidout_res =
-                        $vidout_res_string[0] . "x"
-                      . $vidout_res_string[2]
-                      . $vidout_res_string[3];
-                }
-                else {
-                    $vidout_res = "";
-                }
-
-                # Video-in color depth
-                my ($vidin_cdepth) =
-                  split( /[:\s]+/, $video_split[3], 2 ) || "";
-
-                # Video-out color depth
-                my ($vidout_cdepth) =
-                  split( /[:\s]+/, $video_split[7], 2 ) || "";
-
-                if ( !defined( $hash->{READINGS}{vidin_src}{VAL} )
-                    || $hash->{READINGS}{vidin_src}{VAL} ne $video_split[0] )
-                {
-                    readingsBulkUpdate( $hash, "vidin_src", $video_split[0] );
-                }
-                if ( !defined( $hash->{READINGS}{vidin_res}{VAL} )
-                    || $hash->{READINGS}{vidin_res}{VAL} ne $vidin_res )
-                {
-                    readingsBulkUpdate( $hash, "vidin_res", $vidin_res );
-                }
-                if ( !defined( $hash->{READINGS}{vidin_cspace}{VAL} )
-                    || $hash->{READINGS}{vidin_cspace}{VAL} ne
-                    lc( $video_split[2] ) )
-                {
-                    readingsBulkUpdate( $hash, "vidin_cspace",
-                        lc( $video_split[2] ) );
-                }
-                if ( !defined( $hash->{READINGS}{vidin_cdepth}{VAL} )
-                    || $hash->{READINGS}{vidin_cdepth}{VAL} ne $vidin_cdepth )
-                {
-                    readingsBulkUpdate( $hash, "vidin_cdepth", $vidin_cdepth );
-                }
-                if ( !defined( $hash->{READINGS}{vidout_dst}{VAL} )
-                    || $hash->{READINGS}{vidout_dst}{VAL} ne $video_split[4] )
-                {
-                    readingsBulkUpdate( $hash, "vidout_dst", $video_split[4] );
-                }
-                if ( !defined( $hash->{READINGS}{vidout_res}{VAL} )
-                    || $hash->{READINGS}{vidout_res}{VAL} ne $vidout_res )
-                {
-                    readingsBulkUpdate( $hash, "vidout_res", $vidout_res );
-                }
-                if ( !defined( $hash->{READINGS}{vidout_cspace}{VAL} )
-                    || $hash->{READINGS}{vidout_cspace}{VAL} ne
-                    lc( $video_split[6] ) )
-                {
-                    readingsBulkUpdate( $hash, "vidout_cspace",
-                        lc( $video_split[6] ) );
-                }
-                if ( !defined( $hash->{READINGS}{vidout_cdepth}{VAL} )
-                    || $hash->{READINGS}{vidout_cdepth}{VAL} ne $vidout_cdepth )
-                {
-                    readingsBulkUpdate( $hash, "vidout_cdepth",
-                        $vidout_cdepth );
-                }
-                if ( !defined( $hash->{READINGS}{vidout_mode}{VAL} )
-                    || $hash->{READINGS}{vidout_mode}{VAL} ne
-                    lc( $video_split[8] ) )
-                {
-                    readingsBulkUpdate( $hash, "vidout_mode",
-                        lc( $video_split[8] ) );
-                }
-            }
-            else {
-                foreach (
-                    "vidin_src",     "vidin_res",     "vidin_cspace",
-                    "vidin_cdepth",  "vidout_dst",    "vidout_res",
-                    "vidout_cspace", "vidout_cdepth", "vidout_mode",
-                  )
-                {
-                    if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                        || $hash->{READINGS}{$_}{VAL} ne "-" )
-                    {
-                        readingsBulkUpdate( $hash, $_, "-" );
-                    }
-                }
-            }
-        }
-        else {
-            foreach (
-                "vidin_src",     "vidin_res",     "vidin_cspace",
-                "vidin_cdepth",  "vidout_dst",    "vidout_res",
-                "vidout_cspace", "vidout_cdepth", "vidout_mode",
-              )
-            {
-                if ( !defined( $hash->{READINGS}{$_}{VAL} )
-                    || $hash->{READINGS}{$_}{VAL} ne "-" )
-                {
-                    readingsBulkUpdate( $hash, $_, "-" );
-                }
-            }
-        }
+        # stateAV
+        my $stateAV = ONKYO_AVR_GetStateAV($hash);
+        readingsBulkUpdate( $hash, "stateAV", $stateAV )
+          if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
     }
 
     readingsEndUpdate( $hash, 1 );
 
-    Log3 $name, 4, "ONKYO_AVR $name: " . $hash->{STATE};
+    Dispatch( $hash, $zoneDispatch, undef )
+      if ( $zoneDispatch && $definedZones > 0 );
 
-    return $hash->{STATE};
+    return;
 }
 
 ###################################
-sub ONKYO_AVR_Get($@) {
-    my ( $hash, @a ) = @_;
-    my $name = $hash->{NAME};
-    my $what;
+sub ONKYO_AVR_Ready($) {
+    my ($hash) = @_;
+    return DevIo_OpenDev( $hash, 1, undef )
+      if ( ReadingsVal( $hash->{NAME}, "state", "disconnected" ) eq
+        "disconnected" );
+
+    # This is relevant for windows/USB only
+    my $po = $hash->{USBDev};
+    my ( $BlockingFlags, $InBytes, $OutBytes, $ErrorFlags ) = $po->status;
+    return ( $InBytes > 0 );
+}
+
+###################################
+sub ONKYO_AVR_Get($$$) {
+    my ( $hash, $a, $h ) = @_;
+    my $name             = $hash->{NAME};
+    my $zone             = $hash->{ZONE};
+    my $state            = ReadingsVal( $name, "power", "off" );
+    my $presence         = ReadingsVal( $name, "presence", "absent" );
+    my $commands         = ONKYOdb::ONKYO_GetRemotecontrolCommand($zone);
+    my $commands_details = ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zone);
+    my $return;
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Get()";
 
-    return "argument is missing" if ( int(@a) < 2 );
+    return "Argument is missing" if ( int(@$a) < 1 );
 
-    $what = $a[1];
+    # createZone
+    if ( lc( @$a[1] ) eq "createzone" ) {
 
-    if ( $what =~ /^(power|input|volume|mute|sleep)$/ ) {
-        if ( defined( $hash->{READINGS}{$what} ) ) {
-            return $hash->{READINGS}{$what}{VAL};
+        if ( !defined( @$a[2] ) ) {
+            $return = "Syntax: ZONE ID or NAME";
         }
         else {
-            return "no such reading: $what";
+            if ( $presence eq "absent" ) {
+                $return =
+                  "Device is offline and cannot be controlled at that stage.";
+            }
+            else {
+                $return =
+                    fhem "define "
+                  . $name . "_"
+                  . @$a[2]
+                  . " ONKYO_AVR_ZONE "
+                  . @$a[2];
+                $return = $name . "_" . @$a[2] . " created"
+                  if ( !$return || $return eq "" );
+            }
         }
     }
-    else {
-        return
-"Unknown argument $what, choose one of power:noArg input:noArg volume:noArg mute:noArg sleep:noArg ";
+
+    # statusRequest
+    elsif ( lc( @$a[1] ) eq "statusrequest" ) {
+        Log3 $name, 3, "ONKYO_AVR get $name " . @$a[1];
+
+        if ( $presence ne "absent" ) {
+            ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
+        }
+        else {
+            $return =
+              "Device is offline and cannot be controlled at that stage.";
+        }
     }
+
+    # remoteControl
+    elsif ( lc( @$a[1] ) eq "remotecontrol" ) {
+
+        # Output help for commands
+        if ( !defined( @$a[2] ) || @$a[2] eq "help" || @$a[2] eq "?" ) {
+
+            my $valid_commands =
+                "Usage: <command> <value>\n\nValid commands in zone$zone:\n\n\n"
+              . "COMMAND\t\t\tDESCRIPTION\n\n";
+
+            # For each valid command
+            foreach my $command ( sort keys %{$commands} ) {
+                my $command_raw = $commands->{$command};
+
+                # add command including description if found
+                if ( defined( $commands_details->{$command_raw}{description} ) )
+                {
+                    $valid_commands .=
+                        $command
+                      . "\t\t\t"
+                      . $commands_details->{$command_raw}{description} . "\n";
+                }
+
+                # add command only
+                else {
+                    $valid_commands .= $command . "\n";
+                }
+            }
+
+            $valid_commands .=
+"\nTry '&lt;command&gt; help' to find out well known values.\n\n\n";
+
+            $return = $valid_commands;
+        }
+        else {
+            # Reading values for command from HASH table
+            my $values =
+              ONKYOdb::ONKYO_GetRemotecontrolValue( $zone,
+                $commands->{ @$a[2] } );
+
+            @$a[3] = "query"
+              if ( !defined( @$a[3] ) && defined( $values->{query} ) );
+
+            # Output help for values
+            if ( !defined( @$a[3] ) || @$a[3] eq "help" || @$a[3] eq "?" ) {
+
+                # Get all details for command
+                my $command_details =
+                  ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( $zone,
+                    $commands->{ @$a[2] } );
+
+                my $valid_values =
+                    "Usage: "
+                  . @$a[2]
+                  . " <value>\n\nWell known values:\n\n\n"
+                  . "VALUE\t\t\tDESCRIPTION\n\n";
+
+                # For each valid value
+                foreach my $value ( sort keys %{$values} ) {
+
+                    # add value including description if found
+                    if ( defined( $command_details->{description} ) ) {
+                        $valid_values .=
+                            $value
+                          . "\t\t\t"
+                          . $command_details->{description} . "\n";
+                    }
+
+                    # add value only
+                    else {
+                        $valid_values .= $value . "\n";
+                    }
+                }
+
+                $valid_values .= "\n\n\n";
+
+                $return = $valid_values;
+            }
+
+            # normal processing
+            else {
+                Log3 $name, 3,
+                  "ONKYO_AVR get $name " . @$a[1] . " " . @$a[2] . " " . @$a[3];
+
+                if ( $presence ne "absent" ) {
+
+                    ONKYO_AVR_SendCommand( $hash, @$a[2], @$a[3] );
+                    $return = "Sent command: " . @$a[2] . " " . @$a[3];
+                }
+                else {
+                    $return =
+                      "Device needs to be reachable to be controlled remotely.";
+                }
+            }
+        }
+    }
+
+    # readings
+    elsif ( defined( $hash->{READINGS}{ @$a[1] } ) ) {
+        $return = $hash->{READINGS}{ @$a[1] }{VAL};
+    }
+    else {
+        $return =
+          "Unknown argument " . @$a[1] . ", choose one of statusRequest:noArg";
+
+        # createZone
+        my $zones = "";
+        foreach my $zoneID (
+            keys %{ $hash->{helper}{receiver}{device}{zonelist}{zone} } )
+        {
+            next
+              if ( $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}
+                {value} ne "1" || $zoneID eq "1" );
+            $zones .= "," if ( $zones ne "" );
+            $zones .= $zoneID;
+        }
+        $return .= " createZone:$zones" if ( $zones ne "" );
+
+        # remoteControl
+        $return .= " remoteControl:";
+        foreach my $command ( sort keys %{$commands} ) {
+            $return .= "," . $command;
+        }
+    }
+
+    return $return;
 }
 
 ###################################
-sub ONKYO_AVR_Set($@) {
-    my ( $hash, @a ) = @_;
+sub ONKYO_AVR_Set($$$) {
+    my ( $hash, $a, $h ) = @_;
     my $name     = $hash->{NAME};
-    my $interval = $hash->{INTERVAL};
     my $zone     = $hash->{ZONE};
-    my $state    = $hash->{STATE};
+    my $state    = ReadingsVal( $name, "power", "off" );
+    my $presence = ReadingsVal( $name, "presence", "absent" );
     my $return;
     my $reading;
-    my $inputs_txt = "";
+    my $inputs_txt   = "";
+    my $channels_txt = "";
+    my @implicit_cmds;
+    my $implicit_txt = "";
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Set()";
 
-    return "No argument given to ONKYO_AVR_Set" if ( !defined( $a[1] ) );
-
-    # depending on current FHEMWEB instance's allowedCommands,
-    # restrict set commands if there is "set-user" in it
-    my $adminMode         = 1;
-    my $FWallowedCommands = 0;
-    $FWallowedCommands = AttrVal( $FW_wname, "allowedCommands", 0 )
-      if ( defined($FW_wname) );
-    if ( $FWallowedCommands && $FWallowedCommands =~ m/\bset-user\b/ ) {
-        $adminMode = 0;
-        return "Forbidden command: set " . $a[1]
-          if ( lc( $a[1] ) eq "statusrequest"
-            || lc( $a[1] ) eq "remotecontrol" );
-    }
+    return "Argument is missing" if ( int(@$a) < 1 );
 
     # Input alias handling
     if ( defined( $attr{$name}{inputs} ) && $attr{$name}{inputs} ne "" ) {
         my @inputs = split( ':', $attr{$name}{inputs} );
-        $inputs_txt = "-," if ( $state ne "on" );
 
         if (@inputs) {
             foreach (@inputs) {
@@ -654,19 +1586,17 @@ sub ONKYO_AVR_Set($@) {
         && defined( $hash->{helper}{receiver}{device}{selectorlist}{count} )
         && $hash->{helper}{receiver}{device}{selectorlist}{count} > 0 )
     {
-        $inputs_txt = "-," if ( $state ne "on" );
 
         foreach my $input (
-            sort
-            keys %{ $hash->{helper}{receiver}{device}{selectorlist}{selector} }
-          )
+            @{ $hash->{helper}{receiver}{device}{selectorlist}{selector} } )
         {
-            if ( $hash->{helper}{receiver}{device}{selectorlist}{selector}
-                {$input}{value} eq "1"
-                && $hash->{helper}{receiver}{device}{selectorlist}{selector}
-                {$input}{id} !~ /(80)/ )
+            if (   $input->{value} eq "1"
+                && $input->{zone} ne "00"
+                && $input->{id} ne "80" )
             {
-                $inputs_txt .= $input . ",";
+                my $id   = $input->{id};
+                my $name = trim( $input->{name} );
+                $inputs_txt .= $name . ",";
             }
         }
 
@@ -678,8 +1608,8 @@ sub ONKYO_AVR_Set($@) {
     else {
         # Find out valid inputs
         my $inputs =
-          ONKYOdb::ONKYO_GetRemotecontrolValue( "main",
-            ONKYOdb::ONKYO_GetRemotecontrolCommand( "main", "input" ) );
+          ONKYOdb::ONKYO_GetRemotecontrolValue( $zone,
+            ONKYOdb::ONKYO_GetRemotecontrolCommand( $zone, "input" ) );
 
         foreach my $input ( sort keys %{$inputs} ) {
             $inputs_txt .= $input . ","
@@ -688,53 +1618,206 @@ sub ONKYO_AVR_Set($@) {
         $inputs_txt = substr( $inputs_txt, 0, -1 );
     }
 
-    my $usage =
-        "Unknown argument '"
-      . $a[1]
-      . "', choose one of toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg input:"
-      . $inputs_txt;
-    $usage .= " sleep:off,5,10,15,30,60,90" if ( $zone eq "main" );
-    $usage .= " mute:off,on"                if ( $state eq "on" );
-    $usage .= " mute:,-"                    if ( $state ne "on" );
+    # list of network channels/services
+    if (   defined( $hash->{helper}{receiver} )
+        && ref( $hash->{helper}{receiver} ) eq "HASH"
+        && defined( $hash->{helper}{receiver}{device}{netservicelist}{count} )
+        && $hash->{helper}{receiver}{device}{netservicelist}{count} > 0 )
+    {
 
-    if ($adminMode) {
-        $usage .= " statusRequest:noArg";
-        $usage .= " remoteControl:noArg";
+        foreach my $id (
+            sort keys
+            %{ $hash->{helper}{receiver}{device}{netservicelist}{netservice} } )
+        {
+            if (
+                defined(
+                    $hash->{helper}{receiver}{device}{netservicelist}
+                      {netservice}{$id}{value}
+                )
+                && $hash->{helper}{receiver}{device}{netservicelist}{netservice}
+                {$id}{value} eq "1"
+              )
+            {
+                $channels_txt .=
+                  trim( $hash->{helper}{receiver}{device}{netservicelist}
+                      {netservice}{$id}{name} )
+                  . ",";
+            }
+        }
+
+        $channels_txt =~ s/\s/_/g;
+        $channels_txt = substr( $channels_txt, 0, -1 );
     }
 
-    my $cmd = '';
-    my $result;
+    # for each reading, check if there is a known command for it
+    # and allow to set values if there are any available
+    if ( defined( $hash->{READINGS} ) ) {
 
-    # Stop the internal GetStatus-Loop to avoid
-    # parallel/conflicting requests to device
-    RemoveInternalTimer($hash)
-      if ( $a[1] ne "?" );
+        foreach my $reading ( keys %{ $hash->{READINGS} } ) {
+            my $cmd_raw =
+              ONKYOdb::ONKYO_GetRemotecontrolCommand( $zone, $reading );
+            my @readingExceptions = ( "volume", "input", "mute", "sleep" );
+
+            if ( $cmd_raw && !( grep $_ eq $reading, @readingExceptions ) ) {
+                my $cmd_details =
+                  ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( $zone,
+                    $cmd_raw );
+
+                my $value_list = "";
+                my $debuglist;
+                foreach my $value ( keys %{ $cmd_details->{values} } ) {
+                    next
+                      if ( $value eq "QSTN" );
+
+                    if ( defined( $cmd_details->{values}{$value}{name} ) ) {
+                        $value_list .= "," if ( $value_list ne "" );
+
+                        $value_list .= $cmd_details->{values}{$value}{name}
+                          if (
+                            ref( $cmd_details->{values}{$value}{name} ) eq "" );
+
+                        $value_list .= $cmd_details->{values}{$value}{name}[0]
+                          if (
+                            ref( $cmd_details->{values}{$value}{name} ) eq
+                            "ARRAY" );
+                    }
+                }
+
+                if ( $value_list ne "" ) {
+                    push @implicit_cmds, $reading;
+                    $implicit_txt .= " $reading:$value_list";
+                }
+            }
+        }
+    }
+
+    my $shuffle_txt = "shuffle:";
+    $shuffle_txt .= "," if ( ReadingsVal( $name, "shuffle", "-" ) eq "-" );
+    $shuffle_txt .= "off,on,on-album,on-folder";
+
+    my $repeat_txt = "repeat:";
+    $repeat_txt .= "," if ( ReadingsVal( $name, "repeat", "-" ) eq "-" );
+    $repeat_txt .= "off,all,all-folder,one";
+
+    my $usage =
+        "Unknown argument '"
+      . @$a[1]
+      . "', choose one of toggle:noArg on:noArg off:noArg volume:slider,0,1,100 volumeUp:noArg volumeDown:noArg mute:off,on muteT:noArg play:noArg pause:noArg stop:noArg previous:noArg next:noArg shuffleT:noArg repeatT:noArg remoteControl:play,pause,repeat,stop,top,down,up,right,delete,display,ff,left,mode,return,rew,select,setup,0,1,2,3,4,5,6,7,8,9,prev,next,shuffle,menu channelDown:noArg channelUp:noArg input:"
+      . $inputs_txt;
+    $usage .= " channel:$channels_txt";
+    $usage .= " $shuffle_txt";
+    $usage .= " $repeat_txt";
+    $usage .= $implicit_txt if ( $implicit_txt ne "" );
+    $usage .= " sleep:off,5,10,15,30,60,90";
+
+    my $cmd = '';
 
     readingsBeginUpdate($hash);
 
-    # statusRequest
-    if ( lc( $a[1] ) eq "statusrequest" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
-        delete $hash->{helper}{receiver} if ( $state ne "absent" );
-        ONKYO_AVR_GetStatus( $hash, 1 ) if ( !defined( $a[2] ) );
+    # channel
+    if ( lc( @$a[1] ) eq "channel" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+
+        if ( !defined( @$a[2] ) ) {
+            $return = "Syntax: CHANNELNAME [USERNAME PASSWORD]";
+        }
+        else {
+            if ( $presence eq "absent" ) {
+                $return =
+                  "Device is offline and cannot be controlled at that stage.";
+            }
+            elsif ( $state eq "off" ) {
+                $return = fhem "set $name on";
+                $return .= fhem "sleep 5;set $name channel " . @$a[2];
+            }
+            elsif ( $hash->{INPUT} ne "2B" ) {
+                ONKYO_AVR_SendCommand( $hash, "input", "2B" );
+                $return = fhem "sleep 1;set $name channel " . @$a[2];
+            }
+            elsif (
+                ReadingsVal( $name, "channel", "" ) ne @$a[2]
+                && defined(
+                    $hash->{helper}{receiver}{device}{netservicelist}
+                      {netservice}
+                )
+              )
+            {
+
+                my $servicename = "";
+                my $channelname = @$a[2];
+                $channelname =~ s/_/ /g;
+
+                foreach my $id (
+                    sort keys %{
+                        $hash->{helper}{receiver}{device}{netservicelist}
+                          {netservice}
+                    }
+                  )
+                {
+                    if (
+                        defined(
+                            $hash->{helper}{receiver}{device}
+                              {netservicelist}{netservice}{$id}{value}
+                        )
+                        && $hash->{helper}{receiver}{device}
+                        {netservicelist}{netservice}{$id}{value} eq "1"
+                        && $hash->{helper}{receiver}{device}
+                        {netservicelist}{netservice}{$id}{name} eq $channelname
+                      )
+                    {
+                        $servicename .= uc($id);
+                        $servicename .= "0" if ( !defined( @$a[3] ) );
+                        $servicename .= @$a[3] if ( defined( @$a[3] ) );
+                        $servicename .= @$a[4] if ( defined( @$a[4] ) );
+
+                        last;
+                    }
+                }
+
+                $return =
+                  ONKYO_AVR_SendCommand( $hash, "net-service", $servicename )
+                  if ( $servicename ne "" );
+
+                $return = "Unknown network service name " . @$a[2]
+                  if ( $servicename eq "" );
+            }
+        }
+    }
+
+    # implicit commands through available readings
+    elsif ( grep $_ eq lc( @$a[1] ), @implicit_cmds ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given, choose one of ?";
+        }
+        else {
+            if ( $presence eq "absent" ) {
+                $return =
+                  "Device is offline and cannot be controlled at that stage.";
+            }
+            else {
+                $return = ONKYO_AVR_SendCommand( $hash, @$a[1], @$a[2] );
+            }
+        }
     }
 
     # toggle
-    elsif ( lc( $a[1] ) eq "toggle" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
+    elsif ( lc( @$a[1] ) eq "toggle" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
 
-        if ( $hash->{READINGS}{power}{VAL} eq "off" ) {
-            $return = ONKYO_AVR_Set( $hash, $name, "on" );
+        if ( $state eq "off" ) {
+            $return = fhem "set $name on";
         }
         else {
-            $return = ONKYO_AVR_Set( $hash, $name, "off" );
+            $return = fhem "set $name off";
         }
     }
 
     # on
-    elsif ( lc( $a[1] ) eq "on" ) {
-        if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
-            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " (wakeup)";
+    elsif ( lc( @$a[1] ) eq "on" ) {
+        if ( $presence eq "absent" ) {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " (wakeup)";
             my $wakeupCmd = AttrVal( $name, "wakeupCmd", "" );
 
             if ( $wakeupCmd ne "" ) {
@@ -743,12 +1826,12 @@ sub ONKYO_AVR_Set($@) {
                 if ( $wakeupCmd =~ s/^[ \t]*\{|\}[ \t]*$//g ) {
                     Log3 $name, 4,
                       "ONKYO_AVR executing wake-up command (Perl): $wakeupCmd";
-                    $result = eval $wakeupCmd;
+                    $return = eval $wakeupCmd;
                 }
                 else {
                     Log3 $name, 4,
                       "ONKYO_AVR executing wake-up command (fhem): $wakeupCmd";
-                    $result = fhem $wakeupCmd;
+                    $return = fhem $wakeupCmd;
                 }
             }
             else {
@@ -757,70 +1840,227 @@ sub ONKYO_AVR_Set($@) {
             }
         }
         else {
-            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
-
-            $result = ONKYO_AVR_SendCommand( $hash, "power", "on" );
-            if ( defined($result) ) {
-                if ( !defined( $hash->{READINGS}{power}{VAL} )
-                    || $hash->{READINGS}{power}{VAL} ne $result )
-                {
-                    readingsBulkUpdate( $hash, "power", $result );
-                }
-                if ( !defined( $hash->{READINGS}{state}{VAL} )
-                    || $hash->{READINGS}{state}{VAL} ne $result )
-                {
-                    readingsBulkUpdate( $hash, "state", $result );
-                }
-            }
-            $interval = 2;
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+            $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
         }
     }
 
     # off
-    elsif ( lc( $a[1] ) eq "off" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
+    elsif ( lc( @$a[1] ) eq "off" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
 
-        if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
+        if ( $presence eq "absent" ) {
             $return =
               "Device is offline and cannot be controlled at that stage.";
         }
         else {
-            $result = ONKYO_AVR_SendCommand( $hash, "power", "off" );
-            if ( defined($result) ) {
-                if ( !defined( $hash->{READINGS}{power}{VAL} )
-                    || $hash->{READINGS}{power}{VAL} ne $result )
-                {
-                    readingsBulkUpdate( $hash, "power", $result );
-                }
-                if ( !defined( $hash->{READINGS}{state}{VAL} )
-                    || $hash->{READINGS}{state}{VAL} ne $result )
-                {
-                    readingsBulkUpdate( $hash, "state", $result );
-                }
-            }
-            $interval = 2;
+            $return = ONKYO_AVR_SendCommand( $hash, "power", "off" );
         }
     }
 
-    # sleep
-    elsif ( lc( $a[1] ) eq "sleep" && $zone eq "main" ) {
-        if ( !defined( $a[2] ) ) {
+    # remoteControl
+    elsif ( lc( @$a[1] ) eq "remotecontrol" ) {
+        if ( !defined( @$a[2] ) ) {
             $return = "No argument given, choose one of minutes off";
         }
         else {
-            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
 
-            if ( $hash->{READINGS}{state}{VAL} eq "absent" ) {
+            if ( $presence eq "absent" ) {
                 $return =
                   "Device is offline and cannot be controlled at that stage.";
             }
             else {
-                my $_ = $a[2];
+                if (   lc( @$a[2] ) eq "play"
+                    || lc( @$a[2] ) eq "pause"
+                    || lc( @$a[2] ) eq "repeat"
+                    || lc( @$a[2] ) eq "stop"
+                    || lc( @$a[2] ) eq "top"
+                    || lc( @$a[2] ) eq "down"
+                    || lc( @$a[2] ) eq "up"
+                    || lc( @$a[2] ) eq "right"
+                    || lc( @$a[2] ) eq "delete"
+                    || lc( @$a[2] ) eq "display"
+                    || lc( @$a[2] ) eq "ff"
+                    || lc( @$a[2] ) eq "left"
+                    || lc( @$a[2] ) eq "mode"
+                    || lc( @$a[2] ) eq "return"
+                    || lc( @$a[2] ) eq "rew"
+                    || lc( @$a[2] ) eq "select"
+                    || lc( @$a[2] ) eq "setup"
+                    || lc( @$a[2] ) eq "0"
+                    || lc( @$a[2] ) eq "1"
+                    || lc( @$a[2] ) eq "2"
+                    || lc( @$a[2] ) eq "3"
+                    || lc( @$a[2] ) eq "4"
+                    || lc( @$a[2] ) eq "5"
+                    || lc( @$a[2] ) eq "6"
+                    || lc( @$a[2] ) eq "7"
+                    || lc( @$a[2] ) eq "8"
+                    || lc( @$a[2] ) eq "9" )
+                {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "net-usb", lc( @$a[2] ) );
+                }
+                elsif ( lc( @$a[2] ) eq "prev" ) {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "net-usb", "trdown" );
+                }
+                elsif ( lc( @$a[2] ) eq "next" ) {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "net-usb", "trup" );
+                }
+                elsif ( lc( @$a[2] ) eq "shuffle" ) {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "net-usb", "random" );
+                }
+                elsif ( lc( @$a[2] ) eq "menu" ) {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "net-usb", "men" );
+                }
+                else {
+                    $return = "Unsupported remoteControl command: " . @$a[2];
+                }
+            }
+        }
+    }
+
+    # play
+    elsif ( lc( @$a[1] ) eq "play" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "play" );
+        }
+    }
+
+    # pause
+    elsif ( lc( @$a[1] ) eq "pause" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "pause" );
+        }
+    }
+
+    # stop
+    elsif ( lc( @$a[1] ) eq "stop" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "stop" );
+        }
+    }
+
+    # shuffle
+    elsif ( lc( @$a[1] ) eq "shuffle" || lc( @$a[1] ) eq "shufflet" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "random" );
+        }
+    }
+
+    # repeat
+    elsif ( lc( @$a[1] ) eq "repeat" || lc( @$a[1] ) eq "repeatt" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "repeat" );
+        }
+    }
+
+    # previous
+    elsif ( lc( @$a[1] ) eq "previous" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "trdown" );
+        }
+    }
+
+    # next
+    elsif ( lc( @$a[1] ) eq "next" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "trup" );
+        }
+    }
+
+    # channelDown
+    elsif ( lc( @$a[1] ) eq "channeldown" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "chdn" );
+        }
+    }
+
+    # channelUp
+    elsif ( lc( @$a[1] ) eq "channelup" ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+
+        if ( $state ne "on" ) {
+            $return =
+"Device power is turned off, this function is unavailable at that stage.";
+        }
+        else {
+            $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "chup" );
+        }
+    }
+
+    # sleep
+    elsif ( lc( @$a[1] ) eq "sleep" ) {
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given, choose one of minutes off";
+        }
+        else {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+
+            if ( $presence eq "absent" ) {
+                $return =
+                  "Device is offline and cannot be controlled at that stage.";
+            }
+            else {
+                my $_ = @$a[2];
                 if ( $_ eq "off" ) {
-                    $result = ONKYO_AVR_SendCommand( $hash, "sleep", "off" );
+                    $return = ONKYO_AVR_SendCommand( $hash, "sleep", "off" );
                 }
                 elsif ( m/^\d+$/ && $_ > 0 && $_ <= 90 ) {
-                    $result =
+                    $return =
                       ONKYO_AVR_SendCommand( $hash, "sleep",
                         ONKYO_AVR_dec2hex($_) );
                 }
@@ -828,47 +2068,31 @@ sub ONKYO_AVR_Set($@) {
                     $return =
 "Argument does not seem to be a valid integer between 0 and 90";
                 }
-
-                if ( defined($result) ) {
-                    if ( !defined( $hash->{READINGS}{sleep}{VAL} )
-                        || $hash->{READINGS}{sleep}{VAL} ne $result )
-                    {
-                        readingsBulkUpdate( $hash, "sleep", $result );
-                    }
-                }
             }
         }
     }
 
     # mute
-    elsif ( lc( $a[1] ) eq "mute" || lc( $a[1] ) eq "mutet" ) {
-        if ( defined( $a[2] ) ) {
-            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+    elsif ( lc( @$a[1] ) eq "mute" || lc( @$a[1] ) eq "mutet" ) {
+        if ( defined( @$a[2] ) ) {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
         }
         else {
-            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
         }
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( !defined( $a[2] ) || $a[2] eq "toggle" ) {
-                $result = ONKYO_AVR_SendCommand( $hash, "mute", "toggle" );
+        if ( $state eq "on" ) {
+            if ( !defined( @$a[2] ) || @$a[2] eq "toggle" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "mute", "toggle" );
             }
-            elsif ( lc( $a[2] ) eq "off" ) {
-                $result = ONKYO_AVR_SendCommand( $hash, "mute", "off" );
+            elsif ( lc( @$a[2] ) eq "off" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "mute", "off" );
             }
-            elsif ( lc( $a[2] ) eq "on" ) {
-                $result = ONKYO_AVR_SendCommand( $hash, "mute", "on" );
+            elsif ( lc( @$a[2] ) eq "on" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "mute", "on" );
             }
             else {
                 $return = "Argument does not seem to be one of on off toogle";
-            }
-
-            if ( defined($result) ) {
-                if ( !defined( $hash->{READINGS}{mute}{VAL} )
-                    || $hash->{READINGS}{mute}{VAL} ne $result )
-                {
-                    readingsBulkUpdate( $hash, "mute", $result );
-                }
             }
         }
         else {
@@ -877,34 +2101,19 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # volume
-    elsif ( lc( $a[1] ) eq "volume" ) {
-        if ( !defined( $a[2] ) ) {
+    elsif ( lc( @$a[1] ) eq "volume" ) {
+        if ( !defined( @$a[2] ) ) {
             $return = "No argument given";
         }
         else {
-            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
 
-            if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-                my $_ = $a[2];
+            if ( $state eq "on" ) {
+                my $_ = @$a[2];
                 if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
-                    $result =
+                    $return =
                       ONKYO_AVR_SendCommand( $hash, "volume",
                         ONKYO_AVR_dec2hex($_) );
-
-                    if ( defined($result) ) {
-                        if ( !defined( $hash->{READINGS}{volume}{VAL} )
-                            || $hash->{READINGS}{volume}{VAL} ne $result )
-                        {
-                            readingsBulkUpdate( $hash, "volume", $result );
-                        }
-
-                        if ( !defined( $hash->{READINGS}{mute}{VAL} )
-                            || $hash->{READINGS}{mute}{VAL} eq "on" )
-                        {
-                            readingsBulkUpdate( $hash, "mute", "off" )
-
-                        }
-                    }
                 }
                 else {
                     $return =
@@ -918,24 +2127,16 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # volumeUp/volumeDown
-    elsif ( lc( $a[1] ) =~ /^(volumeup|volumedown)$/ ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . $a[1];
+    elsif ( lc( @$a[1] ) =~ /^(volumeup|volumedown)$/ ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
 
-        if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            if ( lc( $a[1] ) eq "volumeup" ) {
-                $result = ONKYO_AVR_SendCommand( $hash, "volume", "level-up" );
+        if ( $state eq "on" ) {
+            if ( lc( @$a[1] ) eq "volumeup" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "volume", "level-up" );
             }
             else {
-                $result =
+                $return =
                   ONKYO_AVR_SendCommand( $hash, "volume", "level-down" );
-            }
-
-            if ( defined($result) ) {
-                if ( !defined( $hash->{READINGS}{volume}{VAL} )
-                    || $hash->{READINGS}{volume}{VAL} ne $result )
-                {
-                    readingsBulkUpdate( $hash, "volume", $result );
-                }
             }
         }
         else {
@@ -944,163 +2145,22 @@ sub ONKYO_AVR_Set($@) {
     }
 
     # input
-    elsif ( lc( $a[1] ) eq "input" ) {
-        if ( !defined( $a[2] ) ) {
+    elsif ( lc( @$a[1] ) eq "input" ) {
+        if ( !defined( @$a[2] ) ) {
             $return = "No input given";
         }
         else {
-            Log3 $name, 3, "ONKYO_AVR set $name " . $a[1] . " " . $a[2];
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
 
-            if ( $hash->{READINGS}{power}{VAL} eq "off" ) {
-                $return = ONKYO_AVR_Set( $hash, $name, "on" );
+            if ( $state eq "off" ) {
+                $return = fhem "set $name on";
+                $return = ONKYO_AVR_SendCommand( $hash, "input", @$a[2] );
             }
-
-            if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-                $result = ONKYO_AVR_SendCommand( $hash, "input", $a[2] );
-
-                if ( defined($result) ) {
-                    if ( !defined( $hash->{READINGS}{input}{VAL} )
-                        || $hash->{READINGS}{input}{VAL} ne $a[2] )
-                    {
-                        readingsBulkUpdate( $hash, "input", $a[2] );
-                    }
-                }
+            elsif ( $state eq "on" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, "input", @$a[2] );
             }
             else {
                 $return = "Device needs to be ON to change input.";
-            }
-            $interval = 2;
-        }
-    }
-
-    # remoteControl
-    elsif ( lc( $a[1] ) eq "remotecontrol" ) {
-
-        # Reading commands for zone from HASH table
-        my $commands = ONKYOdb::ONKYO_GetRemotecontrolCommand($zone);
-
-        # Output help for commands
-        if ( !defined( $a[2] ) || $a[2] eq "help" ) {
-
-            # Get all commands for zone
-            my $commands_details =
-              ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zone);
-
-            my $valid_commands =
-"Usage: <command> <value>\n\nValid commands in zone '$zone':\n\n\n"
-              . "COMMAND\t\t\tDESCRIPTION\n\n";
-
-            # For each valid command
-            foreach my $command ( sort keys %{$commands} ) {
-                my $command_raw = $commands->{$command};
-
-                # add command including description if found
-                if ( defined( $commands_details->{$command_raw}{description} ) )
-                {
-                    $valid_commands .=
-                        $command
-                      . "\t\t\t"
-                      . $commands_details->{$command_raw}{description} . "\n";
-                }
-
-                # add command only
-                else {
-                    $valid_commands .= $command . "\n";
-                }
-            }
-
-            $valid_commands .=
-              "\nTry '<command> help' to find out well known values.\n\n\n";
-
-            $return = $valid_commands;
-        }
-        else {
-            # return if command cannot be found in HASH table
-            if ( !defined( $commands->{ $a[2] } ) ) {
-                $return = "Invalid command: " . $a[2];
-            }
-            else {
-
-                # Reading values for command from HASH table
-                my $values =
-                  ONKYOdb::ONKYO_GetRemotecontrolValue( $zone,
-                    $commands->{ $a[2] } );
-
-                # Output help for values
-                if ( !defined( $a[3] ) || $a[3] eq "help" ) {
-
-                    # Get all details for command
-                    my $command_details =
-                      ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( $zone,
-                        $commands->{ $a[2] } );
-
-                    my $valid_values =
-                        "Usage: "
-                      . $a[2]
-                      . " <value>\n\nWell known values:\n\n\n"
-                      . "VALUE\t\t\tDESCRIPTION\n\n";
-
-                    # For each valid value
-                    foreach my $value ( sort keys %{$values} ) {
-
-                        # add value including description if found
-                        if ( defined( $command_details->{description} ) ) {
-                            $valid_values .=
-                                $value
-                              . "\t\t\t"
-                              . $command_details->{description} . "\n";
-                        }
-
-                        # add value only
-                        else {
-                            $valid_values .= $value . "\n";
-                        }
-                    }
-
-                    $valid_values .= "\n\n\n";
-
-                    $return = $valid_values;
-                }
-
-                # normal processing
-                else {
-                    Log3 $name, 3,
-                        "ONKYO_AVR set $name "
-                      . $a[1] . " "
-                      . $a[2] . " "
-                      . $a[3];
-
-                    if ( $hash->{READINGS}{state}{VAL} ne "absent" ) {
-
-                        # special power toogle handling
-                        if (   $a[2] eq "power"
-                            && $a[3] eq "toggle" )
-                        {
-                            $result = ONKYO_AVR_Set( $hash, $name, "toggle" );
-                        }
-
-                        # normal processing
-                        else {
-                            $result =
-                              ONKYO_AVR_SendCommand( $hash, $a[2], $a[3] );
-                        }
-
-                        if ( !defined($result) ) {
-                            $return =
-                                "ERROR: command '"
-                              . $a[2] . " "
-                              . $a[3]
-                              . "' was NOT successful.";
-                        }
-                        elsif ( $a[3] eq "query" ) {
-                            $return = $result;
-                        }
-                    }
-                    else {
-                        $return =
-"Device needs to be reachable to be controlled remotely.";
-                    }
-                }
             }
         }
     }
@@ -1112,94 +2172,8 @@ sub ONKYO_AVR_Set($@) {
 
     readingsEndUpdate( $hash, 1 );
 
-    # Re-start internal timer
-    InternalTimer( gettimeofday() + $interval, "ONKYO_AVR_GetStatus", $hash, 1 )
-      if ( $a[1] ne "?" );
-
     # return result
     return $return;
-}
-
-###################################
-sub ONKYO_AVR_Define($$) {
-    my ( $hash, $def ) = @_;
-    my @a = split( "[ \t][ \t]*", $def );
-    my $name = $hash->{NAME};
-
-    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Define()";
-
-    if ( int(@a) < 3 ) {
-        my $msg =
-"Wrong syntax: define <name> ONKYO_AVR <ip-or-hostname> [<protocol-version>] [<zone>] [<poll-interval>]";
-        Log3 $name, 4, $msg;
-        return $msg;
-    }
-
-    $hash->{TYPE} = "ONKYO_AVR";
-
-    my $address = $a[2];
-    $hash->{helper}{ADDRESS} = $address;
-
-    # use fixed port 60128
-    my $port = 60128;
-    $hash->{helper}{PORT} = $port;
-
-    # used zone to control
-    my $zone = $a[4] || "main";
-    $hash->{ZONE} = $zone;
-
-    my $interval;
-    if ( $zone eq "main" ) {
-
-        # use interval of 75sec for main zone if not defined
-        $interval = $a[5] || 75;
-    }
-    else {
-        # use interval of 90sec for other zones if not defined
-        $interval = $a[5] || 90;
-    }
-    $hash->{INTERVAL} = $interval;
-
-    # protocol version
-    my $protocol = $a[3] || 2013;
-    if ( !( $protocol =~ /^(2013|pre2013)$/ ) ) {
-        return "Invalid protocol, choose one of 2013 pre2013";
-    }
-    readingsSingleUpdate( $hash, "deviceyear", $protocol, 1 );
-    if (
-        $protocol eq "pre2013"
-        && ( !exists( $attr{$name}{model} )
-            || $attr{$name}{model} ne $protocol )
-      )
-    {
-        $attr{$name}{model} = $protocol;
-    }
-
-    # check values
-    if ( !( $zone =~ /^(main|zone2|zone3|zone4|dock)$/ ) ) {
-        return "Invalid zone, choose one of main zone2 zone3 zone4 dock";
-    }
-
-    # set default settings on first define
-    if ($init_done) {
-        $attr{$name}{webCmd} = 'volume:mute:input';
-        $attr{$name}{devStateIcon} =
-          'on:rc_GREEN:off off:rc_STOP:on absent:rc_RED';
-    }
-    $hash->{helper}{receiver} = undef;
-
-    unless ( exists( $hash->{helper}{AVAILABLE} )
-        and ( $hash->{helper}{AVAILABLE} == 0 ) )
-    {
-        $hash->{helper}{AVAILABLE} = 1;
-        readingsSingleUpdate( $hash, "presence", "present", 1 );
-    }
-
-    # start the status update timer
-    RemoveInternalTimer($hash);
-    InternalTimer( gettimeofday() + 2, "ONKYO_AVR_GetStatus", $hash, 0 );
-
-    return undef;
 }
 
 ############################################################################################################
@@ -1211,15 +2185,8 @@ sub ONKYO_AVR_Define($$) {
 ###################################
 sub ONKYO_AVR_SendCommand($$$) {
     my ( $hash, $cmd, $value ) = @_;
-    my $name     = $hash->{NAME};
-    my $address  = $hash->{helper}{ADDRESS};
-    my $port     = $hash->{helper}{PORT};
-    my $protocol = $hash->{READINGS}{deviceyear}{VAL};
-    my $zone     = $hash->{ZONE};
-    my $timeout  = 3;
-    my $response;
-    my $response_code;
-    my $return;
+    my $name = $hash->{NAME};
+    my $zone = $hash->{ZONE};
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_SendCommand()";
 
@@ -1235,294 +2202,133 @@ sub ONKYO_AVR_SendCommand($$$) {
         $value =~ s/_/ /g;
         if (
             defined(
-                $hash->{helper}{receiver}{device}{selectorlist}
-                  {selector}{$value}{id}
+                $hash->{helper}{receiver}{device}{selectorlist}{selector}
             )
+            && ref( $hash->{helper}{receiver}{device}{selectorlist}{selector} )
+            eq "ARRAY"
           )
         {
-            $value = uc( $hash->{helper}{receiver}{device}{selectorlist}
-                  {selector}{$value}{id} );
+
+            foreach my $input (
+                @{ $hash->{helper}{receiver}{device}{selectorlist}{selector} } )
+            {
+                if (   $input->{value} eq "1"
+                    && $input->{zone} ne "00"
+                    && $input->{id} ne "80"
+                    && $value eq trim( $input->{name} ) )
+                {
+                    $value = uc( $input->{id} );
+                    last;
+                }
+            }
         }
+
     }
 
     # Resolve command and value to ISCP raw command
     my $cmd_raw = ONKYOdb::ONKYO_GetRemotecontrolCommand( $zone, $cmd );
     my $value_raw =
       ONKYOdb::ONKYO_GetRemotecontrolValue( $zone, $cmd_raw, $value );
-    my $request_code = substr( $cmd_raw, 0, 3 );
 
     if ( !defined($cmd_raw) ) {
         Log3 $name, 4,
-"ONKYO_AVR $name($zone): command '$cmd' is not available within zone '$zone' or command is invalid";
-        return undef;
+"ONKYO_AVR $name: command '$cmd$value' is an unregistered command within zone$zone, be careful! Will be handled as raw command";
+        $cmd_raw   = $cmd;
+        $value_raw = $value;
     }
-
-    if ( !defined($value_raw) ) {
+    elsif ( !defined($value_raw) ) {
         Log3 $name, 4,
-"ONKYO_AVR $name($zone): $cmd - Warning, value '$value' not found in HASH table, will be sent to receiver 'as is'";
+"ONKYO_AVR $name: $cmd - Warning, value '$value' not found in HASH table, will be sent to receiver 'as is'";
         $value_raw = $value;
     }
 
-    Log3 $name, 4,
-      "ONKYO_AVR $name($zone): $cmd -> $value ($cmd_raw$value_raw)";
+    Log3 $name, 4, "ONKYO_AVR $name: snd $cmd -> $value ($cmd_raw$value_raw)";
 
-    my $filehandle = IO::Socket::INET->new(
-        PeerAddr => $address,
-        PeerPort => $port,
-        Proto    => 'tcp',
-        Timeout  => $timeout,
-    );
-
-    if ( defined($filehandle) && $cmd_raw ne "" && $value_raw ne "" ) {
-        my $str = ONKYO_AVR_Pack( $cmd_raw . $value_raw, $protocol );
-
-        Log3 $name, 5,
-          "ONKYO_AVR $name($zone): $address:$port snd "
-          . ONKYO_AVR_hexdump($str);
-
-        syswrite $filehandle, $str, length $str;
-
-        my $start_time = time();
-        my $readon     = 1;
-        do {
-            my $bytes = ONKYO_AVR_sysreadline( $filehandle, 1, $protocol );
-
-            my $line = ONKYO_AVR_read( $hash, \$bytes )
-              if ( defined($bytes) && $bytes ne "" );
-
-            $response_code = substr( $line, 0, 3 ) if defined($line);
-
-            if ( defined($response_code)
-                && $response_code eq $request_code )
-            {
-                $response->{$response_code} = $line;
-                $readon = 0;
-            }
-            elsif ( defined($response_code) ) {
-                $response->{$response_code} = $line;
-            }
-
-            $readon = 0 if time() > ( $start_time + $timeout );
-        } while ($readon);
-
-        # Close socket connections
-        $filehandle->close();
+    if ( $cmd_raw ne "" && $value_raw ne "" ) {
+        ONKYO_AVR_Write( $hash, $cmd_raw . $value_raw );
     }
 
-    readingsBeginUpdate($hash);
-
-    unless ( defined($response) ) {
-        if ( defined( $hash->{helper}{AVAILABLE} )
-            and $hash->{helper}{AVAILABLE} eq 1 )
-        {
-            Log3 $name, 3, "ONKYO_AVR device $name is unavailable";
-            readingsBulkUpdate( $hash, "presence", "absent" );
-        }
-        $hash->{helper}{AVAILABLE} = 0;
-    }
-    else {
-        if ( defined( $hash->{helper}{AVAILABLE} )
-            and $hash->{helper}{AVAILABLE} eq 0 )
-        {
-            Log3 $name, 3, "ONKYO_AVR device $name is available";
-            readingsBulkUpdate( $hash, "presence", "present" );
-        }
-        $hash->{helper}{AVAILABLE} = 1;
-
-        # Search for expected answer
-        if ( defined( $response->{$request_code} ) ) {
-            my $_ = substr( $response->{$request_code}, 3 );
-
-            # Decode return value
-            #
-            my $values =
-              ONKYOdb::ONKYO_GetRemotecontrolCommandDetails( $zone,
-                $request_code );
-
-            # Decode through device information
-            if (   $cmd eq "input"
-                && defined( $hash->{helper}{receiver} )
-                && ref( $hash->{helper}{receiver} ) eq "HASH"
-                && defined( $hash->{helper}{receiver}{input}{$_} ) )
-            {
-                Log3 $name, 4,
-"ONKYO_AVR $name($zone): $cmd_raw$value_raw return value '$_' converted through device information to '"
-                  . $hash->{helper}{receiver}{input}{$_} . "'";
-                $return = $hash->{helper}{receiver}{input}{$_};
-            }
-
-            # Decode through HASH table
-            elsif ( defined( $values->{values}{"$_"}{name} ) ) {
-                if ( ref( $values->{values}{"$_"}{name} ) eq "ARRAY" ) {
-                    Log3 $name, 4,
-"ONKYO_AVR $name($zone): $cmd_raw$value_raw return value '$_' converted through ARRAY from HASH table to '"
-                      . $values->{values}{"$_"}{name}[0] . "'";
-                    $return = $values->{values}{"$_"}{name}[0];
-                }
-                else {
-                    Log3 $name, 4,
-"ONKYO_AVR $name($zone): $cmd_raw$value_raw return value '$_' converted through VALUE from HASH table to '"
-                      . $values->{values}{"$_"}{name} . "'";
-                    $return = $values->{values}{"$_"}{name};
-                }
-            }
-
-            # return as decimal
-            elsif ( m/^[0-9A-Fa-f][0-9A-Fa-f]$/
-                && $request_code =~ /^(MVL|SLP)$/ )
-            {
-                Log3 $name, 4,
-"ONKYO_AVR $name($zone): $cmd_raw$value_raw return value '$_' converted from HEX to DEC ";
-                $return = ONKYO_AVR_hex2dec($_);
-
-            }
-
-            # just return the original return value if there is
-            # no decoding function
-            elsif ( lc($_) ne "n/a" ) {
-                Log3 $name, 4,
-"ONKYO_AVR $name($zone): $cmd_raw$value_raw unconverted return of value '$_'";
-                $return = $_;
-
-            }
-
-            # Log if the command is not supported by the device
-            elsif ( $value_raw ne "QSTN" ) {
-                Log3 $name, 3,
-"ONKYO_AVR $name($zone): command $cmd -> $value ($cmd_raw$value_raw) not supported by device";
-            }
-
-        }
-        else {
-            Log3 $name, 4,
-"ONKYO_AVR $name($zone): No valid response for command '$cmd_raw' during request session of $timeout seconds";
-        }
-
-        # Input alias handling
-        if (   $cmd eq "input"
-            && defined($return)
-            && defined( $hash->{helper}{receiver}{input_aliases}{$return} ) )
-        {
-            Log3 $name, 4,
-"ONKYO_AVR $name($zone): $cmd_raw$value_raw aliasing '$return' to '"
-              . $hash->{helper}{receiver}{input_aliases}{$return} . "'";
-            $return = $hash->{helper}{receiver}{input_aliases}{$return};
-        }
-
-        # clear hash to free memory
-        %{$response} = ();
-
-        return $return;
-    }
-
-    readingsEndUpdate( $hash, 1 );
-
-    return undef;
+    return;
 }
 
 ###################################
-sub ONKYO_AVR_sysreadline($;$$) {
-    my ( $handle, $timeout, $protocol ) = @_;
-    $handle = qualify_to_ref( $handle, caller() );
-    my $infinitely_patient = ( @_ == 1 || $timeout < 0 );
-    my $start_time         = time();
-    my $selector           = IO::Select->new();
-    $selector->add($handle);
-    my $line = "";
-  SLEEP:
-
-    until ( ONKYO_AVR_at_eol( $line, $protocol ) ) {
-        unless ($infinitely_patient) {
-            return $line if time() > ( $start_time + $timeout );
-        }
-
-        # sleep only 1 second before checking again
-        next SLEEP unless $selector->can_read(1.0);
-      INPUT_READY:
-        while ( $selector->can_read(0.0) ) {
-            my $was_blocking = $handle->blocking(0);
-          CHAR: while ( sysread( $handle, my $nextbyte, 1 ) ) {
-                $line .= $nextbyte;
-                last CHAR if $nextbyte eq "\n";
-            }
-            $handle->blocking($was_blocking);
-
-            # if incomplete line, keep trying
-            next SLEEP unless ONKYO_AVR_at_eol( $line, $protocol );
-            last INPUT_READY;
-        }
-    }
-    return $line;
-}
-
-###################################
-sub ONKYO_AVR_at_eol($;$) {
-    if ( $_[0] =~ /\r\n\z/ || $_[0] =~ /\r\z/ ) {
-        return 1;
-    }
-    else {
-        return 0;
-    }
-}
-
-###################################
-sub ONKYO_AVR_Undefine($$) {
-    my ( $hash, $arg ) = @_;
+sub ONKYO_AVR_Write($$) {
+    my ( $hash, $cmd ) = @_;
     my $name = $hash->{NAME};
+    my $str = ONKYO_AVR_Pack( $cmd, $hash->{PROTOCOLVERSION} );
 
-    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Undefine()";
+    Log3 $name, 1,
+"ONKYO_AVR $name: $hash->{DeviceName} snd ERROR - could not transcode $cmd to HEX command"
+      and return
+      if ( !$str );
 
-    # Stop the internal GetStatus-Loop and exit
-    RemoveInternalTimer($hash);
-    return undef;
+   #    Log3 $name, 5,
+   #      "ONKYO_AVR $name: $hash->{DeviceName} snd " . ONKYO_AVR_hexdump($str);
+    Log3 $name, 5, "ONKYO_AVR $name: $hash->{DeviceName} snd $str";
+
+    DevIo_SimpleWrite( $hash, "$str", 0 );
+
+    # reset connectionCheck timer
+    my $checkInterval = AttrVal( $name, "connectionCheck", "90" );
+    if ( $checkInterval ne "off" ) {
+
+        # do connection check latest after 5sec
+        my $next = gettimeofday() + 5;
+        if ( !defined( $hash->{helper}{nextConnectionCheck} )
+            || $hash->{helper}{nextConnectionCheck} > $next )
+        {
+            $hash->{helper}{nextConnectionCheck} = $next;
+            RemoveInternalTimer($hash);
+            InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
+        }
+    }
+    else {
+        RemoveInternalTimer($hash);
+    }
 }
 
 ###################################
-sub ONKYO_AVR_read($$) {
-    my ( $hash, $rbuf ) = @_;
-    my $name    = $hash->{NAME};
-    my $address = $hash->{helper}{ADDRESS};
-    my $port    = $hash->{helper}{PORT};
-    my $zone    = $hash->{ZONE};
+sub ONKYO_AVR_connectionCheck ($) {
+    my ($hash) = @_;
+    my $name   = $hash->{NAME};
+    my $state  = $hash->{STATE};
 
-    return unless ($$rbuf);
+    $hash->{STATE} = "opened";
+    my $connState =
+      DevIo_Expect( $hash,
+        ONKYO_AVR_Pack( "PWRQSTN", $hash->{PROTOCOLVERSION} ), 2 );
 
-    Log3 $name, 5,
-      "ONKYO_AVR $name($zone): $address:$port rcv " . ONKYO_AVR_hexdump($$rbuf);
+    # successful connection
+    if ( defined($connState) ) {
+        $hash->{STATE} = $state;
+    }
 
-    my $length = length $$rbuf;
-    return unless ( $length >= 16 );
+    # reconnect
+    else {
+        ONKYO_AVR_Reopen($hash);
+    }
 
-    my ( $magic, $header_size, $data_size, $version, $res1, $res2, $res3 ) =
-      unpack 'a4 N N C4', $$rbuf;
+    # reset connectionCheck timer
+    my $checkInterval = AttrVal( $name, "connectionCheck", "90" );
+    if ( $checkInterval ne "off" ) {
+        my $next = gettimeofday() + $checkInterval;
+        $hash->{helper}{nextConnectionCheck} = $next;
+        RemoveInternalTimer($hash);
+        InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
+    }
+    else {
+        RemoveInternalTimer($hash);
+    }
+}
 
-    Log3 $name, 5,
-      "ONKYO_AVR $name: Unexpected magic: expected 'ISCP', got '$magic'"
-      and return
-      unless ( $magic eq 'ISCP' );
+###################################
+sub ONKYO_AVR_WriteFile($$) {
+    my ( $fileName, $data ) = @_;
 
-    return unless ( $length >= $header_size + $data_size );
-
-    substr $$rbuf, 0, $header_size, '';
-
-    Log3 $name, 5,
-      "ONKYO_AVR $name: Unexpected version: expected '0x01', got '0x%02x' "
-      . $version
-      unless ( $version == 0x01 );
-    Log3 $name, 5,
-      "ONKYO_AVR $name: Unexpected header size: expected '0x10', got '0x%02x' "
-      . $header_size
-      unless ( $header_size == 0x10 );
-
-    my $body = substr $$rbuf, 0, $data_size, '';
-    my $sd = substr $body, 0, 2, '';
-    $body =~ s/([\032\r\n]|[\032\r]|[\r\n]|[\r])+$//;
-
-    Log3 $name, 5,
-      "ONKYO_AVR $name: Unexpected start/destination: expected '!1', got '$sd'"
-      unless ( $sd eq '!1' );
-
-    return $body;
+    open IMGFILE, '>' . $fileName;
+    binmode IMGFILE;
+    print IMGFILE $data;
+    close IMGFILE;
 }
 
 ###################################
@@ -1590,12 +2396,42 @@ sub ONKYO_AVR_hex2dec($) {
 }
 
 ###################################
+sub ONKYO_AVR_hex2bin($) {
+    my ($hex) = @_;
+    return unpack( 'B*', pack 'H*', $hex );
+}
+
+###################################
 sub ONKYO_AVR_dec2hex($) {
     my ($dec) = @_;
     my $hex = uc( sprintf( "%x", $dec ) );
 
     return "0" . $hex if ( length($hex) eq 1 );
     return $hex;
+}
+
+###################################
+sub ONKYO_AVR_GetStateAV($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    if ( ReadingsVal( $name, "presence", "absent" ) eq "absent" ) {
+        return "absent";
+    }
+    elsif ( ReadingsVal( $name, "power", "off" ) eq "off" ) {
+        return "off";
+    }
+    elsif ( ReadingsVal( $name, "mute", "off" ) eq "on" ) {
+        return "muted";
+    }
+    elsif ( $hash->{INPUT} eq "2B"
+        && ReadingsVal( $name, "playStatus", "stopped" ) ne "stopped" )
+    {
+        return ReadingsVal( $name, "playStatus", "stopped" );
+    }
+    else {
+        return ReadingsVal( $name, "power", "off" );
+    }
 }
 
 #####################################
@@ -1688,30 +2524,22 @@ sub ONKYO_AVR_RClayout() {
     <ul>
       <a name="ONKYO_AVRdefine" id="ONKYO_AVRdefine"></a> <b>Define</b>
       <ul>
-        <code>define &lt;name&gt; ONKYO_AVR &lt;ip-address-or-hostname&gt; [&lt;protocol-version&gt;] [&lt;zone&gt;] [&lt;poll-interval&gt;]</code><br>
+        <code>define &lt;name&gt; ONKYO_AVR &lt;ip-address-or-hostname&gt; [&lt;protocol-version&gt;]</code><br>
         <br>
         This module controls ONKYO A/V receivers via network connection.<br>
-        <br>
-        Defining an ONKYO device will schedule an internal task (interval can be set with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 75 seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br>
+        Use <a href="#ONKYO_AVR_ZONE">ONKYO_AVR_ZONE</a> to control slave zones.<br>
         <br>
         Example:<br>
         <ul>
-          <code>define avr ONKYO_AVR 192.168.0.10<br>
+          <code>
+          define avr ONKYO_AVR 192.168.0.10<br>
           <br>
           # With explicit protocol version 2013 and later<br>
           define avr ONKYO_AVR 192.168.0.10 2013<br>
           <br>
           # With protocol version prior 2013<br>
-          define avr ONKYO_AVR 192.168.0.10 pre2013<br>
-          <br>
-          # With zone2<br>
-          define avr ONKYO_AVR 192.168.0.10 pre2013 zone2<br>
-          <br>
-          # With custom interval of 60 seconds<br>
-          define avr ONKYO_AVR 192.168.0.10 pre2013 main 60<br>
-          <br>
-          # With zone2 and custom interval of 60 seconds<br>
-          define avr ONKYO_AVR 192.168.0.10 pre2013 zone2 60</code>
+          define avr ONKYO_AVR 192.168.0.10 pre2013
+          </code>
         </ul>
       </ul><br>
       <br>
@@ -1719,16 +2547,61 @@ sub ONKYO_AVR_RClayout() {
       <ul>
         <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code><br>
         <br>
-        Currently, the following commands are defined (may vary depending on zone).<br>
+        Currently, the following commands are defined:<br>
         <ul>
           <li>
-            <b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device
+            <b>channel</b> &nbsp;&nbsp;-&nbsp;&nbsp; set active network service (e.g. Spotify)
+          </li>
+          <li>
+            <b>input</b> &nbsp;&nbsp;-&nbsp;&nbsp; switches between inputs
+          </li>
+          <li>
+            <b>mute</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; controls volume mute
+          </li>
+          <li>
+            <b>muteT</b> &nbsp;&nbsp;-&nbsp;&nbsp; toggle mute state
+          </li>
+          <li>
+            <b>next</b> &nbsp;&nbsp;-&nbsp;&nbsp; skip track
           </li>
           <li>
             <b>off</b> &nbsp;&nbsp;-&nbsp;&nbsp; turns the device in standby mode
           </li>
           <li>
+            <b>on</b> &nbsp;&nbsp;-&nbsp;&nbsp; powers on the device
+          </li>
+          <li>
+            <b>pause</b> &nbsp;&nbsp;-&nbsp;&nbsp; pause current playback
+          </li>
+          <li>
+            <b>play</b> &nbsp;&nbsp;-&nbsp;&nbsp; start playback
+          </li>
+          <li>
+            <b>power</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; set power mode
+          </li>
+          <li>
+            <b>previous</b> &nbsp;&nbsp;-&nbsp;&nbsp; back to previous track
+          </li>
+          <li>
+            <b>remoteControl</b> Send specific remoteControl command to device
+          </li>
+          <li>
+            <b>repeat</b> off,all,all-folder,one &nbsp;&nbsp;-&nbsp;&nbsp; set repeat setting
+          </li>
+          <li>
+            <b>repeatT</b> &nbsp;&nbsp;-&nbsp;&nbsp; toggle repeat state
+          </li>
+          <li>
+            <b>shuffle</b> off,on,on-album,on-folder &nbsp;&nbsp;-&nbsp;&nbsp; set shuffle setting
+          </li>
+          <li>
+            <b>shuffleT</b> &nbsp;&nbsp;-&nbsp;&nbsp; toggle shuffle state
+          </li>
+          <li>
             <b>sleep</b> 1..90,off &nbsp;&nbsp;-&nbsp;&nbsp; sets auto-turnoff after X minutes
+          </li>
+          <li>
+            <b>stop</b> &nbsp;&nbsp;-&nbsp;&nbsp; stop current playback
           </li>
           <li>
             <b>toggle</b> &nbsp;&nbsp;-&nbsp;&nbsp; switch between on and off
@@ -1742,22 +2615,11 @@ sub ONKYO_AVR_RClayout() {
           <li>
             <b>volumeDown</b> &nbsp;&nbsp;-&nbsp;&nbsp; decreases the volume level
           </li>
-          <li>
-            <b>mute</b> on,off &nbsp;&nbsp;-&nbsp;&nbsp; controls volume mute
-          </li>
-          <li>
-            <b>input</b> &nbsp;&nbsp;-&nbsp;&nbsp; switches between inputs
-          </li>
-          <li>
-            <b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current status of the device
-          </li>
-          <li>
-            <b>remoteControl</b> &nbsp;&nbsp;-&nbsp;&nbsp; sends remote control commands; see remoteControl help
-          </li>
         </ul>
         <ul>
-            <u>Note:</u> If you would like to restrict access to admin set-commands (-> statusRequest, remoteControl) you may set your FHEMWEB instance's attribute allowedCommands like 'set,set-user'.
-            The string 'set-user' will ensure only non-admin set-commands can be executed when accessing FHEM using this FHEMWEB instance.
+        <br>
+        Other set commands may appear dynamically based on previously used "get avr remoteControl"-commands and resulting readings.<br>
+        See "get avr remoteControl &lt;Set-name&gt; help" to get more information about possible readings and set values.
         </ul>
       </ul><br>
       <br>
@@ -1765,24 +2627,64 @@ sub ONKYO_AVR_RClayout() {
       <ul>
         <code>get &lt;name&gt; &lt;what&gt;</code><br>
         <br>
-        Currently, the following commands are defined (may vary depending on zone):<br>
+        Currently, the following commands are defined:<br>
         <br>
         <ul>
-          <code>power<br>
-          input<br>
-          volume<br>
-          mute<br>
-          sleep<br></code>
+          <li>
+            <b>createZone</b> &nbsp;&nbsp;-&nbsp;&nbsp; creates a separate <a href="#ONKYO_AVR_ZONE">ONKYO_AVR_ZONE</a> device for available zones of the device
+          </li>
+          <li>
+            <b>remoteControl</b> &nbsp;&nbsp;-&nbsp;&nbsp; sends advanced remote control commands based on current zone; you may use "get avr remoteControl &lt;Get-command&gt; help" to see details about possible values and resulting readings. In Case the device does not support the command, just nothing happens as normally the device does not send any response. In case the command is temporarily not available you may see according feedback from the log file using attribute verbose=4.
+          </li>
+          <li>
+            <b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; clears cached settings and re-reads device XML configurations
+          </li>
         </ul>
       </ul><br>
       <br>
-      <b>Generated Readings/Events (may vary depending on zone):</b><br>
+      <b>Generated Readings/Events:</b><br>
       <ul>
+        <li>
+          <b>audin_*</b> - Shows technical details about current audio input
+        </li>
+        <li>
+          <b>brand</b> - Shows brand name of the device manufacturer
+        </li>
+        <li>
+          <b>channel</b> - Shows current network service name when (e.g. streaming services like Spotify); part of FHEM-4-AV-Devices compatibility
+        </li>
+        <li>
+          <b>currentAlbum</b> - Shows current Album information; part of FHEM-4-AV-Devices compatibility
+        </li>
+        <li>
+          <b>currentArtist</b> - Shows current Artist information; part of FHEM-4-AV-Devices compatibility
+        </li>
+        <li>
+          <b>currentMedia</b> - currently no in use
+        </li>
+        <li>
+          <b>currentTitle</b> - Shows current Title information; part of FHEM-4-AV-Devices compatibility
+        </li>
+        <li>
+          <b>currentTrack*</b> - Shows current track timer information; part of FHEM-4-AV-Devices compatibility
+        </li>
+        <li>
+          <b>deviceid</b> - Shows device name as set in device settings
+        </li>
+        <li>
+          <b>deviceyear</b> - Shows model device year
+        </li>
+        <li>
+          <b>firmwareversion</b> - Shows current firmware version
+        </li>
         <li>
           <b>input</b> - Shows currently used input; part of FHEM-4-AV-Devices compatibility
         </li>
         <li>
           <b>mute</b> - Reports the mute status of the device (can be "on" or "off")
+        </li>
+        <li>
+          <b>playStatus</b> - Shows current network service playback status; part of FHEM-4-AV-Devices compatibility
         </li>
         <li>
           <b>power</b> - Reports the power status of the device (can be "on" or "off")
@@ -1791,15 +2693,38 @@ sub ONKYO_AVR_RClayout() {
           <b>presence</b> - Reports the presence status of the receiver (can be "absent" or "present"). In case of an absent device, control is not possible.
         </li>
         <li>
+          <b>repeat</b> - Shows current network service repeat status; part of FHEM-4-AV-Devices compatibility
+        </li>
+        <li>
+          <b>screen*</b> - Experimental: Gives some information about text that is being shown via on-screen menu
+        </li>
+        <li>
+          <b>shuffle</b> - Shows current network service shuffle status; part of FHEM-4-AV-Devices compatibility
+        </li>
+        <li>
           <b>sleep</b> - Reports current sleep state (can be "off" or shows timer in minutes)
         </li>
         <li>
-          <b>state</b> - Reports current power state and an absence of the device (can be "on", "off" or "absent")
+          <b>state</b> - Reports current network connection status to the device
+        </li>
+        <li>
+          <b>stateAV</b> - Zone status from user perspective combining readings presence, power, mute and playStatus to a useful overall status.
         </li>
         <li>
           <b>volume</b> - Reports current volume level of the receiver in percentage values (between 0 and 100 %)
         </li>
+        <li>
+          <b>vidin_*</b> - Shows technical details about current video input before image processing
+        </li>
+        <li>
+          <b>vidout_*</b> - Shows technical details about current video output after image processing
+        </li>
+        <li>
+          <b>zones</b> - Shows total available zones of device
+        </li>
       </ul>
+        <br>
+        Using remoteControl get-command might result in creating new readings in case the device sends any data.<br>
     </ul>
 
 =end html
