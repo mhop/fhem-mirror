@@ -2284,7 +2284,7 @@ sub HMinfo_templateSet(@){#####################################################
       my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (.*) :/);
       $max = 0 if (!$max);
       $max =~ s/([0-9\.]+).*/$1/;
-      return "$regV out of range:  $min to $max"                            if ($min && ($regV < $min || ($max && $regV > $max)));
+      return "$regV out of range: $min to $max"                           if ($min && ($regV < $min || ($max && $regV > $max)));
     }
     push @regCh,"$regN,$regV";
   }
@@ -2344,7 +2344,18 @@ sub HMinfo_templateUsg(@){#####################################################
           next;}
       }
       else{ 
-        push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$defs{$dName}{helper}{tmpl}{$tid});}
+        my @param;
+        my $para = "";
+        if($defs{$dName}{helper}{tmpl}{$tid}){
+          @param = split(" ",$HMConfig::culHmTpl{$t}{p});
+          my @value = split(" ",$defs{$dName}{helper}{tmpl}{$tid});
+          for (my $i = 0; $i<scalar(@value); $i++){
+           $param[$i] .= ":".$value[$i];
+          }
+          $para = join(" ",@param);
+        }
+
+        push @ul,sprintf("%-20s|%-15s|%s|%s",$dName,$p,$t,$para);}
     }
   }
   return join("\n",sort(@ul));

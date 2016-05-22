@@ -5124,7 +5124,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                            # 96 switch on- others unknown
       my $msg = CUL_HM_generateCBCsignature($hash, 
                                 sprintf("++1441$dst${sId}01%02X9600",$testnr));
-      CUL_HM_PushCmdStack($hash, $msg) foreach (1..1);
+      CUL_HM_PushCmdStack($hash, $msg) foreach (1..6);
       CUL_HM_parseSDteam_2("41",$dst,$sId,substr($msg, 18));
     }
   }
@@ -7315,11 +7315,21 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
 }
 sub CUL_HM_setTmplDisp($){ # remove register i outdated
   my $tHash = shift;
+#{CUL_HM_setTmplDisp($defs{loDoor})}
   delete $tHash->{READINGS}{$_} foreach (grep /^tmpl_/ ,keys %{$tHash->{READINGS}});
   if ($tHash->{helper}{expert}{tpl}){
     foreach (keys %{$tHash->{helper}{tmpl}}){
       my ($p,$t) = split(">",$_);
-      $t .= ":".$tHash->{helper}{tmpl}{$_} if($tHash->{helper}{tmpl}{$_});
+      
+      my @param;
+      if($tHash->{helper}{tmpl}{$_}){
+        @param = split(" ",$HMConfig::culHmTpl{$t}{p});
+        my @value = split(" ",$tHash->{helper}{tmpl}{$_});
+        for (my $i = 0; $i<scalar(@value); $i++){
+         $param[$i] .= ":".$value[$i];
+        }
+        $t .= ":".join(" ",@param);
+      }
       $tHash->{READINGS}{"tmpl_".$p}{VAL} .= $t.",";#could be more than one!
       $tHash->{READINGS}{"tmpl_".$p}{TIME} .= "-";# time does not make sense
     }
