@@ -34,7 +34,7 @@ my $ONKYO_cmds_hr = {
     'dock' => {
         'command-for-docking-station-via-ri' => 'CDS'
     },
-    'main' => {
+    '1' => {
         '12v-trigger-a'                 => 'TGA',
         '12v-trigger-b'                 => 'TGB',
         '12v-trigger-c'                 => 'TGC',
@@ -141,45 +141,42 @@ my $ONKYO_cmds_hr = {
         'xm-channel-number'             => 'XCH',
         'xm-title-info'                 => 'XTI'
     },
-    'zone2' => {
-        'balance'                  => 'ZBL',
-        'internet-radio-preset'    => 'NPZ',
-        'late-night'               => 'LTZ',
-        'listening-mode'           => 'LMZ',
-        'mute'                     => 'ZMT',
-        'net-receiver-information' => 'NRI',
-        'net-tune-network'         => 'NTZ',
-        'power'                    => 'ZPW',
-        'preset'                   => 'PRZ',
-        're-eq-academy-filter'     => 'RAZ',
-        'input'                    => 'SLZ',
-        'tone'                     => 'ZTN',
-        'tuning'                   => 'TUZ',
-        'volume'                   => 'ZVL'
+    '2' => {
+        'balance'               => 'ZBL',
+        'internet-radio-preset' => 'NPZ',
+        'late-night'            => 'LTZ',
+        'listening-mode'        => 'LMZ',
+        'mute'                  => 'ZMT',
+        'net-usb-z'             => 'NTZ',
+        'power'                 => 'ZPW',
+        'preset'                => 'PRZ',
+        're-eq-academy-filter'  => 'RAZ',
+        'input'                 => 'SLZ',
+        'tone'                  => 'ZTN',
+        'tuning'                => 'TUZ',
+        'volume'                => 'ZVL'
     },
-    'zone3' => {
-        'balance'                  => 'BL3',
-        'internet-radio-preset'    => 'NP3',
-        'mute'                     => 'MT3',
-        'net-receiver-information' => 'NRI',
-        'net-tune-network'         => 'NT3',
-        'power'                    => 'PW3',
-        'preset'                   => 'PR3',
-        'input'                    => 'SL3',
-        'tone'                     => 'TN3',
-        'tuning'                   => 'TU3',
-        'volume'                   => 'VL3'
+    '3' => {
+        'balance'               => 'BL3',
+        'internet-radio-preset' => 'NP3',
+        'mute'                  => 'MT3',
+        'net-usb-z'             => 'NT3',
+        'power'                 => 'PW3',
+        'preset'                => 'PR3',
+        'input'                 => 'SL3',
+        'tone'                  => 'TN3',
+        'tuning'                => 'TU3',
+        'volume'                => 'VL3'
     },
-    'zone4' => {
-        'internet-radio-preset'    => 'NP4',
-        'mute'                     => 'MT4',
-        'net-receiver-information' => 'NRI',
-        'net-tune-network'         => 'NT4',
-        'power'                    => 'PW4',
-        'preset'                   => 'PR4',
-        'input'                    => 'SL4',
-        'tuning'                   => 'TU4',
-        'volume'                   => 'VL4'
+    '4' => {
+        'internet-radio-preset' => 'NP4',
+        'mute'                  => 'MT4',
+        'net-usb-z'             => 'NT4',
+        'power'                 => 'PW4',
+        'preset'                => 'PR4',
+        'input'                 => 'SL4',
+        'tuning'                => 'TU4',
+        'volume'                => 'VL4'
     }
 };
 
@@ -210,7 +207,7 @@ my $ONKYO_values_hr = {
             'up'      => 'UP'
         }
     },
-    'main' => {
+    '1' => {
         'ADQ' => {
             'off'   => '00',
             'on'    => '01',
@@ -719,10 +716,10 @@ my $ONKYO_values_hr = {
         },
         'NJA' => {
             'tp-xx-xx-xx-xx-xx-xx' => 'tp{xx}{xx}{xx}{xx}{xx}{xx}',
-            'off' => 'DIS',
-            'on' => 'ENA',
-            'up' => 'UP',
-            'query' => 'QSTN',
+            'off'                  => 'DIS',
+            'on'                   => 'ENA',
+            'up'                   => 'UP',
+            'query'                => 'QSTN',
         },
         'NKY' => {
             'll' => 'll'
@@ -1203,7 +1200,7 @@ my $ONKYO_values_hr = {
             'query' => 'QSTN'
         }
     },
-    'zone2' => {
+    '2' => {
         'LMZ' => {
             'direct'    => '01',
             'dvs'       => '88',
@@ -1373,7 +1370,7 @@ my $ONKYO_values_hr = {
             'xrange(80)'  => '(0, 80)'
         }
     },
-    'zone3' => {
+    '3' => {
         'BL3' => {
             'down'  => 'DOWN',
             'query' => 'QSTN',
@@ -1521,7 +1518,7 @@ my $ONKYO_values_hr = {
             'xrange(80)'  => '(0, 80)'
         }
     },
-    'zone4' => {
+    '4' => {
         'MT4' => {
             'off'    => '00',
             'on'     => '01',
@@ -1656,7 +1653,7 @@ my $ONKYO_values_hr = {
 
 # ----------------Complete command reference database-----------------------
 my $ONKYO_cmddb = {
-    'main' => {
+    '1' => {
         'PWR',
         {
             'description' => 'System Power Command',
@@ -4554,25 +4551,25 @@ ii-> Service icon
                 'DIS',
                 {
                     'description' => 'sets Jacket Art disable',
-                    'name' => 'off'
+                    'name'        => 'off'
                 },
 
                 'ENA',
                 {
                     'description' => 'sets Jacket Art enable',
-                    'name' => 'on'
+                    'name'        => 'on'
                 },
 
                 'UP',
                 {
                     'description' => 'sets Jacket Art Wrap-Around up',
-                    'name' => 'up'
+                    'name'        => 'up'
                 },
-                
+
                 'QSTN',
                 {
                     'description' => 'gets Jacket Art enable/disable',
-                    'name' => 'query'
+                    'name'        => 'query'
                 }
             }
         },
@@ -5754,7 +5751,7 @@ ii-> Service icon
             'name'        => 'net-receiver-information',
         }
     },
-    'zone2' => {
+    '2' => {
         'ZPW',
         {
             'description' => 'Zone2 Power Command',
@@ -6253,7 +6250,7 @@ ii-> Service icon
         {
             'description' =>
               'Net-Tune/Network Operation Command{Net-Tune Model Only}',
-            'name'   => 'net-tune-network',
+            'name'   => 'net-usb',
             'values' => {
                 'PLAYz',
                 {
@@ -6283,7 +6280,7 @@ ii-> Service icon
         {
             'description' =>
               'Net-Tune/Network Operation Command{Network Model Only}',
-            'name'   => 'net-tune-network',
+            'name'   => 'net-usb',
             'values' => {
                 'PLAY',
                 {
@@ -6484,7 +6481,7 @@ ii-> Service icon
             }
         }
     },
-    'zone3' => {
+    '3' => {
         'PW3',
         {
             'description' => 'Zone3 Power Command',
@@ -6978,7 +6975,7 @@ ii-> Service icon
         {
             'description' =>
               'Net-Tune/Network Operation Command{Net-Tune Model Only}',
-            'name'   => 'net-tune-network',
+            'name'   => 'net-usb',
             'values' => {
                 'PLAYz',
                 {
@@ -7008,7 +7005,7 @@ ii-> Service icon
         {
             'description' =>
               'Net-Tune/Network Operation Command{Network Model Only}',
-            'name'   => 'net-tune-network',
+            'name'   => 'net-usb',
             'values' => {
                 'PLAY',
                 {
@@ -7111,7 +7108,7 @@ ii-> Service icon
             }
         }
     },
-    'zone4' => {
+    '4' => {
         'PW4',
         {
             'description' => 'Zone4 Power Command',
@@ -7534,7 +7531,7 @@ ii-> Service icon
         {
             'description' =>
               'Net-Tune/Network Operation Command{Net-Tune Model Only}',
-            'name'   => 'net-tune-network',
+            'name'   => 'net-usb',
             'values' => {
                 'PLAYz',
                 {
@@ -7564,7 +7561,7 @@ ii-> Service icon
         {
             'description' =>
               'Net-Tune/Network Operation Command{Network Model Only}',
-            'name'   => 'net-tune-network',
+            'name'   => 'net-usb',
             'values' => {
                 'PLAY',
                 {
