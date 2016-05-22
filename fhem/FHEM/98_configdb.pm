@@ -59,17 +59,18 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('dump') {
-			my $dbtype  = _cfgDB_typeInfo();
-
+			my ($dbtype,$dbconn)  = _cfgDB_typeInfo();
 			if ($dbtype eq 'SQLITE') {
 				my $ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
 				my $mp     = AttrVal('global','modpath','.');
+				my (undef,$source) = split (/=/, $dbconn);
 				my $target = "$mp/log/configDB_$ts.dump.gz";
+				Log3('configdb', 4, "configdb: source for database dump: $source");
 				Log3('configdb', 4, "configdb: target for database dump: $target");
-				my $ret    = qx(echo '.dump' | sqlite3 /opt/fhem/configDB.db | gzip -c > $target);
+				my $ret    = qx(echo '.dump' | sqlite3 $source | gzip -c > $target);
 				return $ret if $ret; # return error message if available
 	            my $size   = -s $target;
-				$ret       = "configDB dumped $size bytes to file\n$target";
+				$ret       = "configDB dumped $size bytes\nfrom: $source\n  to: $target";
 				# You can use 'zcat $target | sqlite3 configDB.db' in a terminal to restore database.
 				return $ret;
 			} else {

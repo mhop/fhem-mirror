@@ -821,7 +821,9 @@ sub _cfgDB_Info() {
 }
 
 # return database type
-sub _cfgDB_typeInfo() { return $cfgDB_dbtype; }
+sub _cfgDB_typeInfo() { 
+	return ($cfgDB_dbtype,$cfgDB_dbconn); 
+}
 
 # recover former config from database archive
 sub _cfgDB_Recover($) {
