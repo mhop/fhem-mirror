@@ -48,7 +48,7 @@ sub WeekdayTimer_Initialize($){
   $hash->{AttrFn}  = "WeekdayTimer_Attr";  
   $hash->{UpdFn}   = "WeekdayTimer_Update";
   $hash->{AttrList}= "disable:0,1 delayedExecutionCond switchInThePast:0,1 ".
-     $readingFnAttributes;                                               
+     $readingFnAttributes;
 }
 ################################################################################
 sub WeekdayTimer_InitHelper($) {
@@ -168,6 +168,9 @@ sub WeekdayTimer_Define($$) {
   }
   
   WeekdayTimer_Profile    ($hash);
+  delete $hash->{VERZOEGRUNG};
+  delete $hash->{VERZOEGRUNG_IDX};
+  
   InternalTimer(time(), "$hash->{TYPE}_SetTimer", $hash, 0);
 
   WeekdayTimer_SetTimerForMidnightUpdate( { HASH => $hash} );
@@ -543,7 +546,7 @@ sub WeekdayTimer_SetTimer($) {
   
   my $isHeating         = WeekdayTimer_isHeizung($hash);
   my $swip              = AttrVal($name, "switchInThePast", 0);
-  my $switchInThePast   = ($swip || $isHeating) && !defined $hash->{SETTIMERATMIDNIGHT};
+  my $switchInThePast   = ($swip || $isHeating);
   
   Log3 $hash, 4, "[$name] Heating recognized - switch in the past activated" if ($isHeating);
   Log3 $hash, 4, "[$name] no switch in the yesterdays because of the devices type($hash->{DEVICE} is not recognized as heating) - use attr switchInThePast" if (!$switchInThePast && !defined $hash->{SETTIMERATMIDNIGHT});
@@ -570,12 +573,13 @@ sub WeekdayTimer_SetTimer($) {
      readingsSingleUpdate ($hash,  "state",      "active",    1)    
         if (!defined $hash->{SETTIMERATMIDNIGHT} && $isActiveTimer);
      
-     if ($secondsToSwitch>-5) {
+     if ($secondsToSwitch>-5 || defined $hash->{SETTIMERATMIDNIGHT} ) {
         if($isActiveTimer) {           
            Log3 $hash, 4, "[$name] setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$para";
         } else {   
            Log3 $hash, 4, "[$name] setTimer - timer seems to be NOT active today: ".join("",@$tage)."|$time|$para ". $hash->{CONDITION};
-        }   
+        }
+        myRemoveInternalTimer("$idx", $hash);         
         myInternalTimer ("$idx", $timToSwitch, "$hash->{TYPE}_Update", $hash, 0);
      }
   }
@@ -634,7 +638,7 @@ sub WeekdayTimer_delayedTimerInPast($) {
         Log3 $hash, 4, "$device ".FmtDateTime($time)." ".($tim-$time)."s ";
         
         foreach my $para ( @{$tipIpHash->{$device}{$time}} ) {
-          #myInternalTimer ("$aktIdx", $aktTime, "$hash->{TYPE}_Update", $hash, 0);
+           myRemoveInternalTimer(@$para[0], @$para[3]);
            my $mHash =myInternalTimer (@$para[0],@$para[1],@$para[2],@$para[3],@$para[4]);
            $mHash->{immerSchalten} = 1;
         }
@@ -836,24 +840,36 @@ sub WeekdayTimer_FensterOffen ($$$) {
   
   my $verzoegerteAusfuehrungCond = AttrVal($hash->{NAME}, "delayedExecutionCond", "0");
   #$verzoegerteAusfuehrungCond    = 'xxx(%WEEKDAYTIMER,%NAME,%HEATING_CONTROL,$WEEKDAYTIMER,$EVENT,$NAME,$HEATING_CONTROL)';
+
+  my $nextRetry = time()+55+int(rand(10)); 
+  my $epoch = $hash->{profil}{$time}{EPOCH};
+  my $delay = int(time()) - $epoch;
+  my $nextDelay = int($delay/60.+1.5)*60;  # round to multiple of 60sec
+  $nextRetry = $epoch + $nextDelay;
+  Log3 $hash, 4, "[$name] time=".$hash->{profil}{$time}{TIME}."/$epoch delay=$delay, nextDelay=$nextDelay, nextRetry=$nextRetry";
   
   map { my $key =  $_; $key =~ s/\$/\\\$/g;
         my $val = $specials{$_}; 
         $verzoegerteAusfuehrungCond =~ s/$key/$val/g 
       } keys %specials;
-  Log3 $hash, 5, "[$name] delayedExecutionCond:$verzoegerteAusfuehrungCond";
+  Log3 $hash, 4, "[$name] delayedExecutionCond:$verzoegerteAusfuehrungCond";
   
   my $verzoegerteAusfuehrung = eval($verzoegerteAusfuehrungCond);
-  Log3 $hash, 5, "[$name] result of delayedExecutionCond:$verzoegerteAusfuehrung";
+  Log3 $hash, 4, "[$name] result of delayedExecutionCond:$verzoegerteAusfuehrung";
   
   if ($verzoegerteAusfuehrung) {
      if (!defined($hash->{VERZOEGRUNG})) {
-        Log3 $hash, 3, "[$name] switch of $hash->{DEVICE} delayed - $verzoegerteAusfuehrungCond is TRUE";
+        Log3 $hash, 3, "[$name] switch of $hash->{DEVICE} delayed - delayedExecutionCond: '$verzoegerteAusfuehrungCond' is TRUE";
      }
-     myRemoveInternalTimer("Update", $hash);
-     myInternalTimer      ("$time",  time()+55+int(rand(10)), "$hash->{TYPE}_Update", $hash, 0);
+     if (defined($hash->{VERZOEGRUNG_IDX}) && $hash->{VERZOEGRUNG_IDX}!=$time) {
+        Log3 $hash, 3, "[$name] timer at $hash->{profil}{$hash->{VERZOEGRUNG_IDX}}{TIME} skiped by new timer at $hash->{profil}{$time}{TIME}";
+        myRemoveInternalTimer($hash->{VERZOEGRUNG_IDX},$hash);
+     }
+     $hash->{VERZOEGRUNG_IDX} = $time;
+     myRemoveInternalTimer("$time",  $hash);
+     myInternalTimer      ("$time",  $nextRetry, "$hash->{TYPE}_Update", $hash, 0);
      $hash->{VERZOEGRUNG} = 1;
-     return 1
+     return 1;
   }
   
   my %contacts =  ( "CUL_FHTTK"       => { "READING" => "Window",          "STATUS" => "(Open)",        "MODEL" => "r" },
@@ -869,7 +885,7 @@ sub WeekdayTimer_FensterOffen ($$$) {
   $fensterKontakte =~ s/^\s+//;
   $fensterKontakte =~ s/\s+$//;
   
-  Log3 $hash, 5, "[$name] list of window sensors found: '$fensterKontakte'";
+  Log3 $hash, 4, "[$name] list of window sensors found: '$fensterKontakte'";
   if ($fensterKontakte ne "" ) {
      my @kontakte = split("[ \t]+", $fensterKontakte);
      foreach my $fk (@kontakte) {
@@ -902,8 +918,13 @@ sub WeekdayTimer_FensterOffen ($$$) {
                     if (!defined($hash->{VERZOEGRUNG})) {
                        Log3 $hash, 3, "[$name] switch of $hash->{DEVICE} delayed - sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'";
                     }
-                    myRemoveInternalTimer("Update", $hash);
-                    myInternalTimer      ("$time",  time()+55+int(rand(10)), "$hash->{TYPE}_Update", $hash, 0);
+                    if (defined($hash->{VERZOEGRUNG_IDX}) && $hash->{VERZOEGRUNG_IDX}!=$time) {
+                       Log3 $hash, 3, "[$name] timer at $hash->{profil}{$hash->{VERZOEGRUNG_IDX}}{TIME} skiped by new timer at $hash->{profil}{$time}{TIME}";
+                       myRemoveInternalTimer($hash->{VERZOEGRUNG_IDX},$hash);
+                    }
+                    $hash->{VERZOEGRUNG_IDX} = $time;
+                    myRemoveInternalTimer("$time", $hash);
+                    myInternalTimer      ("$time",  $nextRetry, "$hash->{TYPE}_Update", $hash, 0);
                     $hash->{VERZOEGRUNG} = 1;
                     return 1
                  }
@@ -916,6 +937,7 @@ sub WeekdayTimer_FensterOffen ($$$) {
      Log3 $hash, 3, "[$name] delay of switching $hash->{DEVICE} stopped.";
   }
   delete $hash->{VERZOEGRUNG};
+  delete $hash->{VERZOEGRUNG_IDX} if defined($hash->{VERZOEGRUNG_IDX});
   return 0;
 }
 ################################################################################
