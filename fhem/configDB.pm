@@ -107,6 +107,8 @@
 #
 # 2016-03-26 - added     log entry for search (verbose=5)
 #
+# 2016-05-22 - added     configdb dump (for sqlite only!)
+#
 ##############################################################################
 #
 
@@ -151,6 +153,7 @@ sub _cfgDB_Filedelete($);
 sub _cfgDB_Fileexport($;$);
 sub _cfgDB_Filelist(;$);
 sub _cfgDB_Info();
+sub _cfgDB_typeInfo();
 sub _cfgDB_Migrate();
 sub _cfgDB_ReadCfg(@);
 sub _cfgDB_ReadState(@);
@@ -816,6 +819,9 @@ sub _cfgDB_Info() {
 
 	return join("\n", @r);
 }
+
+# return database type
+sub _cfgDB_typeInfo() { return $cfgDB_dbtype; }
 
 # recover former config from database archive
 sub _cfgDB_Recover($) {

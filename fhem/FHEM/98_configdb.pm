@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use feature qw/say switch/;
+use POSIX;
 use configDB;
 
 no if $] >= 5.017011, warnings => 'experimental';
@@ -54,6 +55,24 @@ sub CommandConfigdb($$) {
 			# set attribute
 				$configDB{attr}{$param1} = $param2;
 				$ret = " attribute $param1 set to value $param2";
+			}
+		}
+
+		when ('dump') {
+			my $dbtype  = _cfgDB_typeInfo();
+
+			if ($dbtype eq 'SQLITE') {
+				my $ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
+				my $target = AttrVal('global','modpath','.')."/log/configDB_$ts.dump.gz";
+				Log3('configdb', 4, "configdb: target for database dump: $target");
+				my $ret    = qx(echo '.dump' | sqlite3 /opt/fhem/configDB.db | gzip -c > $target);
+				return $ret if $ret; # return error message if available
+	            my $size   = -s $target;
+				$ret       = "configDB dumped $size bytes to file\n$target";
+				# You can use 'zcat $target | sqlite3 configDB.db' in a terminal to restore database.
+				return $ret;
+			} else {
+				return "configdb dump is only supported for sqlite!";
 			}
 		}
 
@@ -184,6 +203,7 @@ sub CommandConfigdb($$) {
 			$ret =	"\n Syntax:\n".
 					"         configdb attr [attribute] [value]\n".
 					"         configdb diff <device> <version>\n".
+					"         configdb dump\n".
 					"         configDB filedelete <pathToFilename>\n".
 					"         configDB fileimport <pathToFilename>\n".
 					"         configDB fileexport <pathToFilename>\n".
@@ -383,6 +403,12 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			<br/>
 			Will show a diff table containing all changes between saved version 0<br/>
 			and UNSAVED version from memory (currently running installation).<br/>
+<br/>
+
+		<li><code>configdb dump</code></li><br/>
+			Create a dump file from from database.<br/>
+			Currently only supported for sqlite!<br/>
+			<br/>
 <br/>
 
 		<li><code>configdb filedelete &lt;Filename&gt;</code></li><br/>
