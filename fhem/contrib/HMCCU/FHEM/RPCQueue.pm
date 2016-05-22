@@ -1,6 +1,5 @@
 package RPCQueue;
 
-
 use strict;
 use IO::File;
 use Fcntl 'SEEK_END', 'SEEK_SET', 'O_CREAT', 'O_RDWR';

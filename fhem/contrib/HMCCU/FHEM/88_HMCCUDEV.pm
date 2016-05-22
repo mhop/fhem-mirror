@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 3.1
+#  Version 3.2
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -16,6 +16,7 @@
 #  set <name> config [<channel>] <parameter>=<value> [...]
 #  set <name> control <value>
 #  set <name> datapoint <channel>.<datapoint> <value>
+#  set <name> defaults
 #  set <name> devstate <value>
 #  set <name> on-for-timer <seconds>
 #  set <name> <stateval_cmds>
@@ -23,6 +24,7 @@
 #
 #  get <name> devstate
 #  get <name> datapoint <channel>.<datapoint>
+#  get <name> defaults
 #  get <name> channel <channel>[.<datapoint-expr>]
 #  get <name> config [<channel>]
 #  get <name> configdesc [<channel>]
@@ -32,12 +34,12 @@
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address | name }
 #  attr <name> ccureadingfilter <filter-rule>[,...]
-#  attr <name> ccuverify { 0 | 1 }
-#  attr <name> controldatapoint <channel>.<datapoint>
+#  attr <name> ccuverify { 0 | 1 | 2}
+#  attr <name> controldatapoint <channel-number>.<datapoint>
 #  attr <name> disable { 0 | 1 }
 #  attr <name> mapdatapoints <channel>.<datapoint>=<channel>.<datapoint>[,...]
 #  attr <name> statechannel <channel>
-#  attr <name> statedatapoint <datapoint>
+#  attr <name> statedatapoint [<channel-number>.]<datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
 #  attr <name> substitute <regexp1>:<subtext1>[,...]
 #
@@ -73,7 +75,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter:textField-long ccureadingformat:name,address ccureadings:0,1 ccuget:State,Value ccuverify:0,1 disable:0,1 mapdatapoints:textField-long statevals substitute statechannel statedatapoint controldatapoint stripnumber:0,1,2 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter:textField-long ccureadingformat:name,address ccureadings:0,1 ccuget:State,Value ccuverify:0,1,2 disable:0,1 mapdatapoints:textField-long statevals substitute statechannel statedatapoint controldatapoint stripnumber:0,1,2 ". $readingFnAttributes;
 }
 
 #####################################
@@ -278,11 +280,12 @@ sub HMCCUDEV_Set ($@)
 		return "HMCCUDEV: CCU busy";
 	}
 
-	my $statechannel = AttrVal ($name, "statechannel", '');
-	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
+#	my $statechannel = AttrVal ($name, "statechannel", '');
+#	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
 	my $statevals = AttrVal ($name, "statevals", '');
-	my $controldatapoint = AttrVal ($name, "controldatapoint", '');
-	my $ccuverify = AttrVal ($name, "ccuverify", 0);
+#	my $controldatapoint = AttrVal ($name, "controldatapoint", '');
+	my ($statechannel, $statedatapoint, $controlchannel, $controldatapoint) = 
+	   HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 
 	my $result = '';
 	my $rc;
@@ -305,20 +308,13 @@ sub HMCCUDEV_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		if ($ccuverify && HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $hash->{ccuaddr},
-		   $objname, 1)) {
-			usleep (100000);
-			($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		}
-
 		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
 	elsif ($opt eq 'control') {
 		return HMCCU_SetError ($hash, "Attribute controldatapoint not set") if ($controldatapoint eq '');
 		my $objvalue = shift @a;
-		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$controldatapoint;
+		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$controlchannel.'.'.$controldatapoint;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
@@ -339,12 +335,6 @@ sub HMCCUDEV_Set ($@)
 
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-
-		if ($ccuverify) {
-			usleep (100000);
-			($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		}
 
 		HMCCU_SetState ($hash, "OK");
 		return undef;
@@ -423,8 +413,13 @@ sub HMCCUDEV_Set ($@)
 		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
+	elsif ($opt eq 'defaults') {
+		HMCCU_SetDefaults ($hash);
+		HMCCU_SetState ($hash, "OK");
+		return undef;
+	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of config control datapoint";
+		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of config control datapoint defaults:noArg";
 		return undef if ($hash->{statevals} eq 'readonly');
 
 		if ($statechannel ne '') {
@@ -432,7 +427,7 @@ sub HMCCUDEV_Set ($@)
 			if ($hash->{statevals} ne '') {
 				my @cmdlist = split /\|/,$hash->{statevals};
 				shift @cmdlist;
-				$retmsg .= ':'.join(',',@cmdlist);
+				$retmsg .= ':'.join(',',@cmdlist) if (@cmdlist > 0);
 				foreach my $sv (@cmdlist) {
 					$retmsg .= ' '.$sv.':noArg';
 				}
@@ -467,9 +462,11 @@ sub HMCCUDEV_Get ($@)
 		return "HMCCUDEV: CCU busy";
 	}
 
-	my $statechannel = AttrVal ($name, 'statechannel', '');
-	my $statedatapoint = AttrVal ($name, 'statedatapoint', 'STATE');
+#	my $statechannel = AttrVal ($name, 'statechannel', '');
+#	my $statedatapoint = AttrVal ($name, 'statedatapoint', 'STATE');
 	my $ccureadings = AttrVal ($name, 'ccureadings', 1);
+	my ($statechannel, $statedatapoint, $cc, $cd) = HMCCU_GetSpecialDatapoints (
+	   $hash, '', 'STATE', '', '');
 
 	my $result = '';
 	my $rc;
@@ -591,6 +588,10 @@ sub HMCCUDEV_Get ($@)
 		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $res;
 	}
+	elsif ($opt eq 'defaults') {
+		$result = HMCCU_GetDefaults ($hash);
+		return $result;
+	}
 	else {
 		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint";
 		
@@ -598,7 +599,7 @@ sub HMCCUDEV_Get ($@)
 		my $valuecount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, -1, 1, \@valuelist);
 		   
 		$retmsg .= ":".join(",", @valuelist) if ($valuecount > 0);
-		$retmsg .= " channel update:noArg config configdesc deviceinfo:noArg";
+		$retmsg .= " defaults:noArg channel update:noArg config configdesc deviceinfo:noArg";
 		
 		if ($statechannel ne '') {
 			$retmsg .= ' devstate:noArg';
@@ -676,6 +677,9 @@ sub HMCCUDEV_SetError ($$)
          Example:<br/>
          <code>set light_entrance devstate on</code>
       </li><br/>
+      <li>set &lt;name&gt; defaults<br/>
+   		Set default attributes for CCU device type.
+      </li><br/>
       <li>set &lt;name&gt; on-for-timer &lt;seconds&gt;<br/>
          Switch device on for specified time. Requires that 'statechannel' is set and
          contains datapoint ON_TIME. In addition 'statevals' must contain value 'on'.
@@ -725,6 +729,9 @@ sub HMCCUDEV_SetError ($$)
       <li>get &lt;name&gt; configdesc [&lt;channel-number&gt;] [&lt;rpcport&gt;]<br/>
          Get description of configuration parameters for CCU device.
       </li><br/>
+      <li>get &lt;name&gt; defaults<br/>
+      	Display default attributes for CCU device type.
+      </li><br/>
       <li>get &lt;name&gt; update [{'State'|'Value'}]<br/>
          Update datapoints / readings of device.
       </li><br/>
@@ -753,8 +760,10 @@ sub HMCCUDEV_SetError ($$)
       <li>ccureadingformat &lt;address | name&gt; <br/>
          Set format of readings. Default is 'name'.
       </li><br/>
-      <li>ccuverify &lt;0 | 1&gt;<br/>
-         If set to 1 a datapoint is read for verification after set operation.
+      <li>ccuverify &lt;0 | 1 | 2&gt;<br/>
+         If set to 1 a datapoint is read for verification after set operation. If set to 2 the
+         corresponding reading will be set to the new value directly after setting a datapoint
+         in CCU.
       </li><br/>
       <li>controldatapoint &lt;channel-number.datapoint&gt;<br/>
          Set datapoint for device control. Can be use to realize user defined control elements for

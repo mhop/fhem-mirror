@@ -29,9 +29,10 @@
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingfilter <datapoint-expr>
 #  attr <name> ccureadingformat { name | address | datapoint }
-#  attr <name> ccuverify { 0 | 1 }
+#  attr <name> ccuverify { 0 | 1 | 2 }
 #  attr <name> controldatapoint <datapoint>
 #  attr <name> disable { 0 | 1 }
+#  attr <name> statedatapoint <datapoint>
 #  attr <name> statevals <text1>:<subtext1>[,...]
 #  attr <name> substitute <subst-rule>[;...]
 #
@@ -66,7 +67,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccuverify:0,1 ccuget:State,Value controldatapoint disable:0,1 statedatapoint statevals substitute stripnumber:0,1,2 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccuverify:0,1,2 ccuget:State,Value controldatapoint disable:0,1 statedatapoint statevals substitute stripnumber:0,1,2 ". $readingFnAttributes;
 }
 
 #####################################
@@ -185,9 +186,10 @@ sub HMCCUCHN_Set ($@)
 	}
 
 	my $statevals = AttrVal ($name, "statevals", '');
-	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
-	my $controldatapoint = AttrVal ($name, "controldatapoint", '');
-	my $ccuverify = AttrVal ($name, "ccuverify", 0);
+#	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
+#	my $controldatapoint = AttrVal ($name, "controldatapoint", '');
+	my ($sc, $statedatapoint, $cc, $controldatapoint) = HMCCU_GetSpecialDatapoints (
+	   $hash, '', 'STATE', '', '');
 
 	my $result = '';
 	my $rc;
@@ -209,18 +211,13 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		if ($ccuverify) {
-			usleep (100000);
-			($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		}
 		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
 	elsif ($opt eq 'control') {
 		return HMCCU_SetError ($hash, "Attribute controldatapoint not set") if ($controldatapoint eq '');
 		my $objvalue = shift @a;
-		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$controldatapoint;
+		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.'.'.$controldatapoint;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		HMCCU_SetState ($hash, "OK");
@@ -240,11 +237,6 @@ sub HMCCUCHN_Set ($@)
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 
-		if ($ccuverify) {
-			usleep (100000);
-			($rc, $result) = HMCCU_GetDatapoint ($hash, $objname);
-			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
-		}
 		HMCCU_SetState ($hash, "OK");
 		return undef;
 	}
@@ -297,7 +289,7 @@ sub HMCCUCHN_Set ($@)
 		if ($hash->{statevals} ne '') {
 			my @cmdlist = split /\|/,$hash->{statevals};
 			shift @cmdlist;
-			$retmsg .= ':'.join(',',@cmdlist);
+			$retmsg .= ':'.join(',',@cmdlist) if (@cmdlist > 0);
 			foreach my $sv (@cmdlist) {
 				$retmsg .= ' '.$sv.':noArg';
 			}
@@ -329,7 +321,8 @@ sub HMCCUCHN_Get ($@)
 		return "HMCCUCHN: CCU busy";
 	}
 
-	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
+#	my $statedatapoint = AttrVal ($name, "statedatapoint", 'STATE');
+	my ($sc, $statedatapoint, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash, '', 'STATE', '', '');
 	my $ccureadings = AttrVal ($name, "ccureadings", 1);
 
 	my $result = '';
@@ -533,8 +526,10 @@ sub HMCCUCHN_SetError ($$)
          Syntax for filter rule is: [channel-no:]RegExp<br/>
          If channel-no is specified the following rule applies only to this channel.
       </li><br/>
-      <li>ccuverify &lt;0 | 1&gt;<br/>
-         If set to 1 a datapoint is read for verification after set operation.
+      <li>ccuverify &lt;0 | 1 | 2&gt;<br/>
+         If set to 1 a datapoint is read for verification after set operation. If set to 2 the
+         corresponding reading will be set to the new value directly after setting a datapoint
+         in CCU.
       </li><br/>
       <li>controldatapoint &lt;datapoint&gt;<br/>
          Set datapoint for device control. Can be use to realize user defined control elements for
