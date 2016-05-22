@@ -1282,7 +1282,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $i=0;
       $mh{devH}->{helper}{rpt}{ts} = gettimeofday();
       CUL_HM_SndCmd($mh{$ack}[$i++],$mh{$ack}[$i++]
-                  .($mh{devH}->{helper}{aesAuthBytes}
+                  .(defined $mh{devH}->{helper}{aesAuthBytes}
                       ?$mh{devH}->{helper}{aesAuthBytes}
                       :"")
            ) while ($i<@{$ack});
@@ -2150,7 +2150,7 @@ sub CUL_HM_Parse($$) {#########################################################
                      :$mh{devH};
       push @evtEt,[$cHash,1,"state:B: $dat"];
       push @evtEt,[$cHash,1,"brightness:$dat"];
-      push @evtEt,[$cHash,1,"unknown: 0x".$unkn]; # read 0xC1, but what is it?
+      #push @evtEt,[$cHash,1,"unknown: 0x".$unkn]; # read 0xC1, but what is it?
     }
   }
   elsif($mh{st} eq "powerSensor") {############################################
@@ -5124,7 +5124,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                            # 96 switch on- others unknown
       my $msg = CUL_HM_generateCBCsignature($hash, 
                                 sprintf("++1441$dst${sId}01%02X9600",$testnr));
-      CUL_HM_PushCmdStack($hash, $msg) foreach (1..6);
+      CUL_HM_PushCmdStack($hash, $msg) foreach (1..1);
       CUL_HM_parseSDteam_2("41",$dst,$sId,substr($msg, 18));
     }
   }
@@ -6952,20 +6952,27 @@ sub CUL_HM_generateCBCsignature($$) { #in: device-hash,msg out: signed message
   my $oldcounter = ReadingsVal($hash->{NAME},"aesCBCCounter","000000");
   my $counter = substr($oldcounter, 0, 4);
   my $msgNo = substr($msg, 0, 2);
-
+  my $devH = CUL_HM_getDeviceHash($hash);
+  
   if ($cryptFunc != 1) {
     Log3 $hash,1,"CUL_HM $hash->{NAME} need Crypt::Rijndael to generate AES-CBC signature";
+    return $msg;
+  }
+  my ($kNo, %keys) = CUL_HM_getKeys($devH);
+  $kNo = AttrVal($devH->{NAME},"aesKey",$kNo);
+  if (!defined($keys{$kNo})) {
+    Log3 $hash,1,"CUL_HM $devH->{NAME} AES key ${kNo} not defined!";
     return $msg;
   }
 
   #generate message number
   if($msgNo eq "++") {
-    $msgNo = ($hash->{helper}{HM_CMDNR} + 1) & 0xff;
+    $msgNo = ($devH->{helper}{HM_CMDNR} + 1) & 0xff;
     my $oldNo = hex(substr($oldcounter, 4, 2));
     if ($msgNo <= $oldNo && (($oldNo + 1) & 0xff) > $oldNo) {
       $msgNo = ($oldNo + 1) & 0xff;
     }
-    $hash->{helper}{HM_CMDNR} = $msgNo;
+    $devH->{helper}{HM_CMDNR} = $msgNo;
     $msgNo = sprintf("%02X", $msgNo);
   }
 
@@ -6976,7 +6983,6 @@ sub CUL_HM_generateCBCsignature($$) { #in: device-hash,msg out: signed message
   push @evtEt,[$hash,1,"aesCBCCounter:".$counter.$msgNo];
   CUL_HM_pushEvnts();
 
-  my ($kNo, %keys) = CUL_HM_getKeys($hash);
   my $cipher = Crypt::Rijndael->new($keys{$kNo}, Crypt::Rijndael::MODE_ECB());
 
   my $iv = "49" 

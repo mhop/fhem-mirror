@@ -2306,6 +2306,7 @@ sub HMinfo_templateMark(@){####################################################
 }
 sub HMinfo_templateDel(@){#####################################################
   my ($aName,$tmpl,$pSet) = @_;
+  return if (!defined $defs{$aName});
   delete $defs{$aName}{helper}{tmpl}{"$pSet>$tmpl"};
   $HMConfig::culHmTpl{tmplUsgChange} = 1; # mark change
   $defs{$aName}{helper}{tmplChg} = 1;
