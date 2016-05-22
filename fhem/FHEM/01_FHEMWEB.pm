@@ -146,6 +146,7 @@ FHEMWEB_Initialize($)
     closeConn:1,0
     column
     defaultRoom
+    deviceOverview:always,iconOnly,onClick,never
     editConfig:1,0
     editFileList:textField-long
     endPlotNow:1,0
@@ -1183,9 +1184,39 @@ FW_doDetail($)
     FW_pO "$txt<br>" if(defined($txt));
     use strict "refs";
   } else {
-    my %extPage = ();  
-    my ($allSets, $cmdlist, $txt) = FW_devState($d, $FW_room, \%extPage);
-    FW_pO "<div informId='$d'".($FW_tp?"":" style='float:right'").">$txt</div>";
+    my $show = AttrVal($FW_wname, "deviceOverview", "always");
+
+    if( $show ne 'never' ) {
+      my %extPage = ();
+
+      if( $show eq 'iconOnly' ) {
+        my ($allSets, $cmdlist, $txt) = FW_devState($d, $FW_room, \%extPage);
+        FW_pO "<div informId='$d'".
+                ($FW_tp?"":" style='float:right'").">$txt</div>";
+
+      } else {
+        my $nameDisplay = AttrVal($FW_wname,"nameDisplay",undef);
+        my %usuallyAtEnd = ();
+
+        my $style = "";
+        if( $show eq 'onClick' ) {
+          my $pgm = "Javascript:" .
+                     "s=document.getElementById('ddtable').style;".
+                     "s.display = s.display=='none' ? 'block' : 'none';".
+                     "s=document.getElementById('ddisp').style;".
+                     "s.display = s.display=='none' ? 'block' : 'none';";
+          FW_pO "<div id=\"ddisp\"><br><a style=\"cursor:pointer\" ".
+                     "onClick=\"$pgm\">Show DeviceOverview</a><br><br></div>";
+          $style = 'style="display:none"';
+        }
+
+        FW_pO "<div $style id=\"ddtable\" class='makeTable wide'>";
+        FW_pO "DeviceOverview";
+        FW_pO "<table class=\"block wide\">";
+        FW_makeDeviceLine($d,1,\%extPage,$nameDisplay,\%usuallyAtEnd);
+        FW_pO "</table></div>";
+      }
+    }
   }
 
   FW_pO FW_detailSelect($d, "set", FW_widgetOverride($d, getAllSets($d)));
@@ -1449,6 +1480,69 @@ FW_roomOverview($)
 }
 
 
+sub
+FW_makeDeviceLine($$$$$)
+{
+  my( $d,$row,$extPage,$nameDisplay,$usuallyAtEnd) = @_;;
+  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
+
+  FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
+  my $devName = AttrVal($d, "alias", $d);
+  if(defined($nameDisplay)) {
+    my ($DEVICE, $ALIAS) = ($d, $devName);
+    $devName = eval $nameDisplay;
+  }
+  my $icon = AttrVal($d, "icon", "");
+  $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
+
+  if($FW_hiddenroom{detail}) {
+    FW_pO "<td><div class=\"col1\">$icon$devName</div></td>"
+          if(!$usuallyAtEnd->{$d});
+  } else {
+    FW_pH "detail=$d", "$icon$devName", 1, "col1" if(!$usuallyAtEnd->{$d});
+  }
+  $row++;
+
+  my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, $extPage);
+  $allSets = FW_widgetOverride($d, $allSets);
+
+  my $colSpan = ($usuallyAtEnd->{$d} ? ' colspan="2"' : '');
+  FW_pO "<td informId=\"$d\"$colSpan>$txt</td>";
+
+  ######
+  # Commands, slider, dropdown
+  my $smallscreenCommands = AttrVal($FW_wname, "smallscreenCommands", "");
+  if((!$FW_ss || $smallscreenCommands) && $cmdlist) {
+    my @a = split("[: ]", AttrVal($d, "cmdIcon", ""));
+    Log 1, "ERROR: bad cmdIcon definition for $d" if(@a % 2);
+    my %cmdIcon = @a;
+
+    foreach my $cmd (split(":", $cmdlist)) {
+      my $htmlTxt;
+      my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
+      if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
+        my $values = $1;
+        foreach my $fn (sort keys %{$data{webCmdFn}}) {
+          no strict "refs";
+          $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
+                                             $d, $FW_room, $cmd, $values);
+          use strict "refs";
+          last if(defined($htmlTxt));
+        }
+      }
+      if($htmlTxt) {
+        FW_pO $htmlTxt;
+
+      } else {
+        my $nCmd = $cmdIcon{$cmd} ? 
+                      FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
+        FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 1, "col3";
+      }
+    }
+  }
+  FW_pO "</tr>";
+}
+
 ########################
 # Show the overview of devices in one room
 # room can be a room, all or Unsorted
@@ -1466,8 +1560,6 @@ FW_showRoom()
                 "action=\"$FW_ME\" autocomplete=\"off\">";
   FW_pO "<div id=\"content\" room=\"$FW_room\">";
   FW_pO "<table class=\"roomoverview\">";  # Need for equal width of subtables
-
-  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
   # array of all device names in the room (exception weblinks without group
   # attribute)
@@ -1517,63 +1609,9 @@ FW_showRoom()
                             lc(AttrVal($b,"sortby",AttrVal($b,"alias",$b))) }
                      keys %{$group{$g}}) {
         my $type = $defs{$d}{TYPE};
-
-        FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
-        my $devName = AttrVal($d, "alias", $d);
-        if(defined($nameDisplay)) {
-          my ($DEVICE, $ALIAS) = ($d, $devName);
-          $devName = eval $nameDisplay;
-        }
-        my $icon = AttrVal($d, "icon", "");
-        $icon = FW_makeImage($icon,$icon,"icon") . "&nbsp;" if($icon);
-
-        if($FW_hiddenroom{detail}) {
-          FW_pO "<td><div class=\"col1\">$icon$devName</div></td>"
-                if(!$usuallyAtEnd{$d});
-        } else {
-          FW_pH "detail=$d", "$icon$devName", 1, "col1" if(!$usuallyAtEnd{$d});
-        }
-        $row++;
-
         $extPage{group} = $g;
-        my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
-        $allSets = FW_widgetOverride($d, $allSets);
 
-        my $colSpan = ($usuallyAtEnd{$d} ? ' colspan="2"' : '');
-        FW_pO "<td informId=\"$d\"$colSpan>$txt</td>";
-
-        ######
-        # Commands, slider, dropdown
-        my $smallscreenCommands = AttrVal($FW_wname, "smallscreenCommands", "");
-        if((!$FW_ss || $smallscreenCommands) && $cmdlist) {
-          my @a = split("[: ]", AttrVal($d, "cmdIcon", ""));
-          Log 1, "ERROR: bad cmdIcon definition for $d" if(@a % 2);
-          my %cmdIcon = @a;
-
-          foreach my $cmd (split(":", $cmdlist)) {
-            my $htmlTxt;
-            my @c = split(' ', $cmd);   # @c==0 if $cmd==" ";
-            if(int(@c) && $allSets && $allSets =~ m/\b$c[0]:([^ ]*)/) {
-              my $values = $1;
-              foreach my $fn (sort keys %{$data{webCmdFn}}) {
-                no strict "refs";
-                $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,
-                                                   $d, $FW_room, $cmd, $values);
-                use strict "refs";
-                last if(defined($htmlTxt));
-              }
-            }
-            if($htmlTxt) {
-              FW_pO $htmlTxt;
-
-            } else {
-              my $nCmd = $cmdIcon{$cmd} ? 
-                            FW_makeImage($cmdIcon{$cmd},$cmd,"webCmd") : $cmd;
-              FW_pH "cmd.$d=set $d $cmd$rf", $nCmd, 1, "col3";
-            }
-          }
-        }
-        FW_pO "</tr>";
+        FW_makeDeviceLine($d,$row,\%extPage,$nameDisplay,\%usuallyAtEnd);
       }
       FW_pO "</table>";
       FW_pO "</td></tr>";
@@ -2139,7 +2177,8 @@ FW_makeImage(@)
       $data =~ s/[\r\n]/ /g;
       $data =~ s/ *$//g;
       $data =~ s/<svg/<svg class="$class" data-txt="$txt"/; #52967
-      $data =~ s,</svg,<title>$txt</title></svg,;
+      my $title = urlEncode($txt);
+      $data =~ s,</svg,<title>$title</title></svg,;
       $name =~ m/(@.*)$/;
       my $col = $1 if($1);
       if($col) {
@@ -3092,7 +3131,8 @@ FW_widgetOverride($$)
         interpreted as an html string. Else the string is interpreted as a
         devStateIcon of the first fom, see above.
         Example:<br>
-        {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
+        {'&lt;div
+         style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
         </ul>
         </li>
         <br>
@@ -3105,6 +3145,13 @@ FW_widgetOverride($$)
         </ul>
         </li>
         <br>
+
+    <li>deviceOverview<br>
+        Configures if the device line from the room view (device icon, state
+        icon and webCmds/cmdIcons) should also be shown in the device detail
+        view. Can be set to always, onClick, iconOnly or never. Default is
+        always.
+        </li><br>
 
     <a name="editConfig"></a>
     <li>editConfig<br>
@@ -3790,6 +3837,13 @@ FW_widgetOverride($$)
         <ul>
         attr sensor devStateStyle style="text-align:left;;font-weight:bold;;"<br>
         </ul>
+        </li><br>
+
+    <li>deviceOverview<br>
+        Gibt an ob die Darstellung aus der Raum-Ansicht (Zeile mit
+        Ger&uuml;teicon, Stateicon und webCmds/cmdIcons) auch in der
+        Detail-Ansicht angezeigt werden soll. Kann auf always, onClick,
+        iconOnly oder never gesetzt werden.  Der Default ist always.
         </li><br>
 
     <a name="editConfig"></a>
