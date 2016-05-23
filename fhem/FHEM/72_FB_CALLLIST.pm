@@ -662,17 +662,17 @@ sub FB_CALLLIST_returnCallState($$;$)
     {
         if($data->{direction} eq "incoming" and $data->{last_event} eq "connect" )
         {
-            $state = "=>  [=]";
+            $state = "=> [=]";
             $state = FB_CALLLIST_returnIcon($hash,"incoming.connected", $state) if($icons);
         }
         elsif($data->{direction} eq "incoming" and $data->{last_event} eq "ring")
         {
-            $state = "=>  ((o))";
+            $state = "=> ((o))";
             $state = FB_CALLLIST_returnIcon($hash,"incoming.ring", $state) if($icons);
         }
         elsif($data->{direction} eq "outgoing" and $data->{last_event} eq "connect" )
         {
-            $state = "<=  [=]";
+            $state = "<= [=]";
             $state = FB_CALLLIST_returnIcon($hash,"outgoing.connected", $state) if($icons);
         }
         elsif($data->{direction} eq "outgoing" and $data->{last_event} eq "call")

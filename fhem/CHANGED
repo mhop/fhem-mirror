@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  FB_CALLLIST: fixing double space in certain call state values.
+             PLEASE CHECK YOUR CONFIGURATION (notify, DOIF, FTUI, etc.) after
+             this update!!!
   - added:   71_ONKYO_AVR_ZONE: separate module for ONKYO_AVR zones;
              any existing ONKYO_AVR devices used for zoning need to to
              redefined manually by a ONKYO_AVR_ZONE device
