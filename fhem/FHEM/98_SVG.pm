@@ -1695,7 +1695,7 @@ SVG_render($$$$$$$$$$)
 
     my $scale = "y".($axis)."scale"; $scale = "yscale" if( $axis == 1 );
     my $log = ""; $log = $conf{$scale} if( $conf{$scale} );
-    my $f_log = $hmax{$a} ? (SVG_log10($hmax{$a}) / $hmax{$a}) : 1;
+    my $f_log = int($hmax{$a}) ? (SVG_log10($hmax{$a}) / $hmax{$a}) : 1;
 
     # offsets
     my ($align,$display,$cll);
@@ -1823,7 +1823,7 @@ SVG_render($$$$$$$$$$)
     SVG_pO "<!-- Warning: No data item $idx defined -->" if(!defined($dxp));
     next if(!defined($dxp));
 
-    my $f_log = $hmax{$a} ? (SVG_log10($hmax{$a}) / $hmax{$a}) : 1;
+    my $f_log = int($hmax{$a}) ? (SVG_log10($hmax{$a}) / $hmax{$a}) : 1;
     if( $log eq 'log' ) {
       foreach my $i (1..int(@{$dxp})-1) {
         $dyp->[$i] = SVG_log10($dyp->[$i]) / $f_log;

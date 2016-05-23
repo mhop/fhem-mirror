@@ -103,6 +103,9 @@ div.ui-widget-content a {color:#278727!important;}
 .ui-widget { font-family:Arial,sans-serif!important; }
 .ui-button-text { font-weight:normal!important; color:#555!important; }
 
+/* UZSU */
+.ui-button-text-only.ui-state-active { background:#F0F0D8; }
+
 #fwmenu {
   position: absolute; z-index:1005;
   text-align:left; max-width:600px;
