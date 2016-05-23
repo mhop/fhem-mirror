@@ -39,7 +39,7 @@ sub HUEBridge_Initialize($)
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList}= "key disable:1 httpUtils:1,0 pollDevices:1 queryAfterSet:1";
+  $hash->{AttrList}= "key disable:1 httpUtils:1,0 pollDevices:1,0 queryAfterSet:1,0";
 }
 
 sub
@@ -111,7 +111,7 @@ HUEBridge_Define($$)
     delete $hash->{NUPNP};
   }
 
-  $interval= 300 unless defined($interval);
+  $interval= 60 unless defined($interval);
   if( $interval < 10 ) { $interval = 10; }
 
   $hash->{STATE} = 'Initialized';
@@ -587,7 +587,7 @@ HUEBridge_GetUpdate($)
 
   my $type;
   my $result;
-  if( AttrVal($name,"pollDevices",0) ) {
+  if( AttrVal($name,"pollDevices",1) ) {
     my ($now) = gettimeofday();
     if( $hash->{LOCAL} || $now - $hash->{helper}{last_config_timestamp} > 300 ) {
       $result = HUEBridge_Call($hash, $hash, undef, undef);
@@ -747,7 +747,7 @@ sub HUEBridge_ProcessResponse($$)
           $hash->{STATE} = $error;
         }
 
-    if( !AttrVal( $name,'queryAfterSet', 0 ) ) {
+    if( !AttrVal( $name,'queryAfterSet', 1 ) ) {
       my $successes;
       my $errors;
       my %json = ();
@@ -1008,7 +1008,7 @@ HUEBridge_dispatch($$$;$)
       return undef;
     }
 
-    my $queryAfterSet = AttrVal( $name,'queryAfterSet', 0 );
+    my $queryAfterSet = AttrVal( $name,'queryAfterSet', 1 );
 
     if( !$json ) {
       $json = eval { from_json($data) } if( !$json );
@@ -1312,6 +1312,15 @@ HUEBridge_HTTP_Request($$$@)
       available (indicated by updatestate with a value of 2. The version and release date is shown in the reading swupdate.<br>
       A notify of the form <code>define HUEUpdate notify bridge:swupdate.* {...}</code>
       can be used to be informed about available firmware updates.<br></li>
+  </ul><br>
+
+  <a name="HUEBridge_Attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>pollDevices<br>
+      the bridge will poll all devices instead of each device itself. default is 1.</li>
+    <li>queryAfterSet<br>
+      the bridge will request the real device state after a set command. default is 1.</li>
   </ul><br>
 </ul><br>
 
