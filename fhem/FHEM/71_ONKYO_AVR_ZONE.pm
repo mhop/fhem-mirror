@@ -107,7 +107,6 @@ sub ONKYO_AVR_ZONE_Define($$$) {
     my $IOhash = $hash->{IODev};
     my $IOname = $IOhash->{NAME};
     my $zone   = @$a[2] || "2";
-    my $zones  = ReadingsVal( $IOname, "zones", "1" );
 
     if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$zone} ) ) {
         return "Zone already defined in "
@@ -121,10 +120,6 @@ sub ONKYO_AVR_ZONE_Define($$$) {
     }
     elsif ( $IOhash->{TYPE} ne "ONKYO_AVR" ) {
         return "IODev is not of type ONKYO_AVR";
-    }
-    elsif ( $zone > $zones ) {
-        return "Zone $zone not available on " . $IOname
-          . ", total zones: $zones";
     }
     else {
         $hash->{ZONE} = $zone;
