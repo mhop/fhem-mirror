@@ -151,6 +151,8 @@ my %commands = (
   "stairwellFunction"    => {"on"       => "081400FD000000",
                              "off"      => "081400FE000000"},
   "stairwellTime"        => {"value2"   => "08140000wwww00"},
+  "reset"                => {"settings" => "0815CB00000000",
+                             "full"     => "0815CC00000000"},
   "10minuteAlarm"        => {"on"       => "081700FD000000",
                              "off"      => "081700FE000000"},
   "automaticClosing"     => {"off"      => "08180000000000",
@@ -217,6 +219,7 @@ my %commandsStatus = (
 
 my %setsDefaultRollerShutter = (
   "getStatus:noArg"                     => "",
+  "reset:settings,full"                 => "",
   "up:noArg"                            => "",
   "down:noArg"                          => "",
   "stop:noArg"                          => "",
@@ -271,6 +274,7 @@ my %setsBlinds = (
 
 my %setsSwitchActor = (
   "getStatus:noArg"                     => "",
+  "reset:settings,full"                 => "",
   "dawnAutomatic:on,off"                => "",
   "duskAutomatic:on,off"                => "",
   "manualMode:on,off"                   => "",
@@ -290,6 +294,7 @@ my %setsSwitchActor = (
 
 my %setsUmweltsensor = (
   "getStatus:noArg"                     => "",
+  "reset:settings,full"                 => "",
   "getWeather:noArg"                    => "",
   "getTime:noArg"                       => "",   
 );
@@ -304,6 +309,7 @@ my %setsUmweltsensor00 = (
   "latitude"                            => "",
   "longitude"                           => "",
   "timezone"                            => "",
+  "time:noArg"                          => "",
   "triggerDawn"                         => "",
   "triggerDusk"                         => "",
   "triggerRain:on,off"                  => "",   
@@ -325,6 +331,7 @@ my %setsUmweltsensor01 = (
 
 my %setsSX5 = (
   "getStatus:noArg"                     => "",
+  "reset:settings,full"                 => "",
   "up:noArg"                            => "",
   "down:noArg"                          => "",
   "stop:noArg"                          => "",
@@ -344,6 +351,7 @@ my %setsSX5 = (
 
 my %setsDimmer = (
   "getStatus:noArg"                     => "",
+  "reset:settings,full"                 => "",
   "level:slider,0,1,100"                => "",
   "on:noArg"                            => "",
   "off:noArg"                           => "",
@@ -370,6 +378,7 @@ my $duoStatusRequest      = "0DFFnn400000000000000000000000000000yyyyyy01";
 my $duoCommand            = "0Dccnnnnnnnnnnnnnn000000000000zzzzzzyyyyyy00";
 my $duoWeatherConfig      = "0D001B400000000000000000000000000000yyyyyy00";
 my $duoWeatherWriteConfig = "0DFF1Brrnnnnnnnnnnnnnnnnnnnn00000000yyyyyy00";
+my $duoSetTime            = "0D0110800001mmmmmmmmnnnnnn0000000000yyyyyy00";
 
 #####################################
 sub
@@ -463,6 +472,22 @@ DUOFERN_Set($@)
     delete $hash->{READINGS}{configModified};
     return undef;
   
+  } elsif ($cmd eq "time") {
+    my $buf = $duoSetTime;
+    
+    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+    
+    $wday = ($wday==0 ? 7 : $wday-1);
+    my $m = sprintf("%02d%02d%02d%02d", $year-100, $month+1,$wday, $mday);
+    my $n = sprintf("%02d%02d%02d", $hour, $min, $sec);
+
+    $buf =~ s/mmmmmmmm/$m/;
+    $buf =~ s/nnnnnn/$n/;
+    $buf =~ s/yyyyyy/$code/;
+    
+    IOWrite( $hash, $buf );
+    return undef;   
+    
   } elsif (exists $wCmds{$cmd}) { 
     return "This command is not allowed for this device." if ($hash->{CODE} !~ /^69....00/);  
 
@@ -1120,17 +1145,17 @@ DUOFERN_Parse($$)
   
   #Wandtaster, Funksender UP, Sensoren      
   } elsif ($msg =~ m/0FFF07.{38}/) {
-    if($msg =~ m/0FFF070801FF.*/) {
+    if($msg =~ m/0FFF0708.*/) {
       readingsSingleUpdate($hash, "event", "beginnSun", 1);
-    } elsif($msg =~ m/0FFF070901FF.*/) {
+    } elsif($msg =~ m/0FFF0709.*/) {
       readingsSingleUpdate($hash, "event", "dusk", 1);
-    } elsif($msg =~ m/0FFF070A0100.*/) {
+    } elsif($msg =~ m/0FFF070A.*/) {
       readingsSingleUpdate($hash, "event", "endSun", 1);
-    } elsif($msg =~ m/0FFF071301FF.*/) {
+    } elsif($msg =~ m/0FFF0713.*/) {
       readingsSingleUpdate($hash, "event", "dawn", 1);
-    } elsif($msg =~ m/0FFF071E01FF.*/) {
+    } elsif($msg =~ m/0FFF071E.*/) {
       readingsSingleUpdate($hash, "state", "off", 1);
-    } elsif($msg =~ m/0FFF071F01FF.*/) {
+    } elsif($msg =~ m/0FFF071F.*/) {
       readingsSingleUpdate($hash, "state", "on", 1);
          
     } elsif($msg =~ m/0FFF07(1A|18|19|01|02|03).*/) {
@@ -1468,7 +1493,11 @@ DUOFERN_StatusTimeout($)
         the roller shutter will move to the sunPosition or a switch/dimming 
         actor will shut off.
         </li><br>
-    
+    <li><b>reset [settings|full]</b><br>
+        settings: Clear all settings and endpoints of the actor.<br>
+        full: Complete reset of the actor including pairs.
+        </li><br>
+        
     </ul>      
     <b>Roller shutter actor commands:</b><br><br>
     <ul>
@@ -1634,6 +1663,9 @@ DUOFERN_StatusTimeout($)
     <li><b>DCF [on|off]</b><br>
         Switch the DCF receiver on or off.
         </li><br>
+    <li><b>time</b><br>
+        Set the current system time to the weather sensor.
+        </li><br>    
     <li><b>interval &lt;value&gt;</b><br>
         Set the interval time for automatic transmittion of the weather data.<br>
         &lt;value&gt;: off or 1 to 100 minutes
