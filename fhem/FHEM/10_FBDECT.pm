@@ -216,7 +216,7 @@ my %fbhttp_readings = (
    productname     => '"FBTYPE:$val"',
    state           => '"state:".($val?"on":"off")',
    tist            => 'sprintf("temperature:%.1f C (measured)", $val/2)',
-   tsoll           => 'sprintf("desired-temp:%.1f C", $val/2)',
+   tsoll           => 'sprintf("desired-temp:%s", $val)',
    members         => '"members:$val"',
 );
 
@@ -260,10 +260,12 @@ FBDECT_ParseHttp($$$)
     Log3 $hash, 5, "   $n = $h{$n}";
     next if(!$fbhttp_readings{$n});
     my $val = $h{$n};
+    $val = ($val==254 ? "on": ($val==253 ? "off" : sprintf("%0.1f C",$val/2)))
+      if($n eq "tsoll");
     $val = $type if($n eq "productname" && $val eq "");
     my ($ptyp,$pyld) = split(":", eval $fbhttp_readings{$n}, 2);
     readingsBulkUpdate($hash, $ptyp, $pyld);
-    readingsBulkUpdate($hash, "state", "desired-temp: ".($val/2))
+    readingsBulkUpdate($hash, "state", "$ptyp: $pyld")
         if($n eq "tsoll"); # Exception
   }
   readingsEndUpdate($hash, 1);
