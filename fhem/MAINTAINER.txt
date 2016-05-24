@@ -409,6 +409,8 @@ contrib/98_openweathermap.pm betateilchen         http://forum.fhem.de Wettermod
 contrib/98_PID.pm            betateilchen         http://forum.fhem.de Automatisierung
 contrib/WebViewControl/*     Dirk                 http://forum.fhem.de Mobile Devices
 contrib/GDS/GDSweblink.pm    jensb                http://forum.fhem.de Wettermodule
+contrib/PRESENCE             markusbloch          http://forum.fhem.de Unterstuetzende Dienste
+contrib/PRESENCE/lepresenced PatrickR             http://forum.fhem.de Unterstuetzende Dienste
 
 www/codemirror/*             rapster              http://forum.fhem.de Frontends
 www/gplot/*                  rudolfkoenig         http://forum.fhem.de Frontends/SVG/Plots/logProxy
