@@ -20,7 +20,7 @@ use Encode qw(encode);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError );
 
 
-use XML::Simple;
+use XML::Simple qw(:strict);
 
 my $modulename='rssFeed';	#Module-Name = TYPE 
 
@@ -494,7 +494,7 @@ rssFeed_update(@)
   $xml         = new XML::Simple;
     
   rssFeed_Log3 $name,5,'Trying to convert xml to array...';
-  eval {$nachrichten=$xml->XMLin($response, ForceArray => ['item']);};
+  eval {$nachrichten=$xml->XMLin($response,KeyAttr => {}, ForceArray => ['item']);};
   if($@) {
   	rssFeed_Log3 $name,3,"ERROR can't convert feed response" if($@);
   	rssFeed_Log3 $name,4,"$@";
