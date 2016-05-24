@@ -154,8 +154,8 @@ sub ONKYO_AVR_DevInit($) {
     my $name = $hash->{NAME};
     my $return;
     my $definedZones = 0;
-    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr} }
-      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr} ) );
+    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} }
+      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$name} ) );
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_DevInit()";
 
@@ -221,8 +221,8 @@ sub ONKYO_AVR_Notify($$) {
     my $name         = $hash->{NAME};
     my $devName      = $dev->{NAME};
     my $definedZones = 0;
-    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr} }
-      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr} ) );
+    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} }
+      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$name} ) );
 
     return
       if ( !$dev->{CHANGED} );    # Some previous notify deleted the array.
@@ -324,8 +324,8 @@ sub ONKYO_AVR_Read($) {
     my $state        = ReadingsVal( $name, "power", "off" );
     my $zone         = 0;
     my $definedZones = 0;
-    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr} }
-      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr} ) );
+    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} }
+      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$name} ) );
 
     # read from serial device
     my $buf = DevIo_SimpleRead($hash);

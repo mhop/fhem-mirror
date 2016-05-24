@@ -108,9 +108,9 @@ sub ONKYO_AVR_ZONE_Define($$$) {
     my $IOname = $IOhash->{NAME};
     my $zone   = @$a[2] || "2";
 
-    if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$zone} ) ) {
+    if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone} ) ) {
         return "Zone already defined in "
-          . $modules{ONKYO_AVR_ZONE}{defptr}{$zone}{NAME};
+          . $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone}{NAME};
     }
     elsif ( !defined($IOhash) ) {
         return "No matching I/O device found";
@@ -126,7 +126,7 @@ sub ONKYO_AVR_ZONE_Define($$$) {
     }
 
     $hash->{INPUT} = "";
-    $modules{ONKYO_AVR_ZONE}{defptr}{$zone} = $hash;
+    $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone} = $hash;
 
     # set default settings on first define
     if ($init_done) {
@@ -153,13 +153,15 @@ sub ONKYO_AVR_ZONE_Define($$$) {
 ###################################
 sub ONKYO_AVR_ZONE_Undefine($$) {
     my ( $hash, $name ) = @_;
-    my $zone = $hash->{ZONE};
+    my $zone   = $hash->{ZONE};
+    my $IOhash = $hash->{IODev};
+    my $IOname = $IOhash->{NAME};
 
     Log3 $name, 5,
       "ONKYO_AVR_ZONE $name: called function ONKYO_AVR_ZONE_Undefine()";
 
-    delete $modules{ONKYO_AVR_ZONE}{defptr}{$zone}
-      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$zone} ) );
+    delete $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone}
+      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone} ) );
 
     # Disconnect from device
     DevIo_CloseDev($hash);
