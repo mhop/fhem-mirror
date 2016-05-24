@@ -12,7 +12,7 @@ sub
 SetExtensionsCancel($)
 {
   my ($hash) = @_;
-  $hash = $defs{$hash} if( ref($hash) ne 'ARRAY' );
+  $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
 
   return undef if( !$hash );
   my $name = $hash->{NAME};
