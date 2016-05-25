@@ -890,6 +890,7 @@ plex_Set($$@)
       return undef;
 
     } elsif( $cmd eq 'smapiRegister' ) {
+      return "first use the httpPort to configure a fixed http port" if( !AttrVal($name, 'httpPort', 0) );
       return plex_publishToSonos($name, 'PLEX', $params[0]);
 
     }
@@ -1675,6 +1676,10 @@ plex_Attr($$$)
       plex_startDiscovery($hash);
       plex_startTimelineListener($hash);
     }
+
+  } elsif( $attrName eq 'httpPort' ) {
+      plex_stopTimelineListener($hash);
+      plex_startTimelineListener($hash);
 
   } elsif( $attrName eq 'responder' ) {
     if( $cmd eq "set" && $attrVal ) {
