@@ -39,13 +39,12 @@ plex_Initialize($)
   $hash->{ReadFn}   = "plex_Read";
 
   $hash->{DefFn}    = "plex_Define";
-  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "plex_Notify";
   $hash->{UndefFn}  = "plex_Undefine";
   $hash->{SetFn}    = "plex_Set";
   $hash->{GetFn}    = "plex_Get";
   $hash->{AttrFn}   = "plex_Attr";
-  $hash->{AttrList} = "disable:1,0 responder:1,0 ignoredClients ignoredServers user password";
+  $hash->{AttrList} = "disable:1,0 httpPort responder:1,0 ignoredClients ignoredServers user password";
 }
 
 #####################################
@@ -123,6 +122,8 @@ plex_Define($$)
   $hash->{fhemHostname} = hostname();
   $hash->{fhemIP} = plex_getLocalIP();
 
+  $hash->{NOTIFYDEV} = "global";
+
   if( $init_done ) {
     plex_getToken($hash);
     plex_startDiscovery($hash);
@@ -142,10 +143,19 @@ sub
 plex_Notify($$)
 {
   my ($hash,$dev) = @_;
+  my $name = $hash->{NAME};
 
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
+  if( my $token = ReadingsVal($name, '.token', undef) ) {
+    Log3 $name, 3, "$name: restoring token from reading";
+
+    $hash->{token} = $token;
+
+    plex_sendApiCmd($hash, "https://plex.tv/pms/servers.xml", "myPlex:servers" );
+    plex_sendApiCmd($hash, "https://plex.tv/devices.xml", "myPlex:devices" );
+  }
   plex_getToken($hash);
   plex_startDiscovery($hash);
   plex_startTimelineListener($hash);
@@ -176,7 +186,7 @@ plex_sendDiscover($)
 
   }
 
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash, "plex_sendDiscover");
 
   if( $hash->{interval} ) {
     InternalTimer(gettimeofday()+$hash->{interval}, "plex_sendDiscover", $hash, 0);
@@ -557,7 +567,7 @@ plex_refreshSubscriptions($)
     plex_sendSubscription($hash, $ip);
   }
 
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash,"plex_refreshSubscriptions");
   if( $hash->{interval} ) {
     InternalTimer(gettimeofday()+$hash->{interval}, "plex_refreshSubscriptions", $hash, 0);
   }
@@ -720,7 +730,10 @@ plex_startTimelineListener($)
 
   plex_stopTimelineListener($hash);
 
-  if( my $socket = IO::Socket::INET->new(LocalPort=>0, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
+  return undef if( AttrVal($name, "disable", 0 ) == 1 );
+
+  my $port = AttrVal($name, 'httpPort', 0);
+  if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
 
     my $chash = plex_newChash( $hash, $socket,
                                {NAME=>"$name:timelineListener", STATE=>'accepting'} );
@@ -875,6 +888,9 @@ plex_Set($$@)
       }
 
       return undef;
+
+    } elsif( $cmd eq 'smapiRegister' ) {
+      return plex_publishToSonos($name, 'PLEX', $params[0]);
 
     }
 
@@ -1454,9 +1470,13 @@ plex_Get($$@)
       }
 
       return plex_deviceList($hash, $cmd );
+
+    } elsif( $cmd eq 'pin' ) {
+      return plex_getPinForToken($hash);
+
     }
 
-    $list .= 'clients:noArg servers:noArg ';
+    $list .= 'clients:noArg servers:noArg pin:noArg ';
   }
 
   if( my $entry = plex_serverOf($hash, $cmd, !$hash->{machineIdentifier}) ) {
@@ -1530,6 +1550,9 @@ plex_Get($$@)
     } elsif( $cmd eq 'clients' ) {
       return plex_deviceList($hash, 'clients' );
 
+    } elsif( $cmd eq 'pin' ) {
+      return plex_getPinForToken($hash);
+
     } elsif( $cmd eq 'm3u' || $cmd eq 'pls' ) {
       return "usage: $cmd <key>" if( !$param );
 
@@ -1548,9 +1571,8 @@ plex_Get($$@)
 
     }
 
-
     $list .= 'ls search sessions:noArg detail onDeck:noArg recentlyAdded:noArg playlists:noArg ';
-    $list .= 'servers:noArg ' if( $list !~ m/\bservers\b/ );
+    $list .= 'servers:noArg pin:noArg ' if( $list !~ m/\bservers\b/ );
 
   }
 
@@ -1733,6 +1755,83 @@ plex_getToken($)
                 'X-Plex-Product' => 'FHEM',
                 'X-Plex-Version' => '0.0', },
     data => { 'user[login]' => $user, 'user[password]' => $password },
+  };
+
+  $param->{callback} = \&plex_parseHttpAnswer;
+  my($err,$data) = HttpUtils_NonblockingGet( $param );
+
+  Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+
+  return undef;
+}
+sub
+plex_getPinForToken($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  RemoveInternalTimer($hash, "plex_getTokenOfPin");
+
+  my $url = 'https://plex.tv/pins.xml';
+
+  Log3 $name, 4, "$name: requesting $url";
+
+  my $param = {
+    url => $url,
+    method => 'POST',
+    timeout => 5,
+    noshutdown => 0,
+    hash => $hash,
+    key => 'getPinForToken',
+    header => { 'X-Plex-Provides' => 'controller',
+                'X-Plex-Client-Identifier' => $hash->{id},
+                'X-Plex-Platform' => $^O,
+                #'X-Plex-Device' => 'FHEM',
+                'X-Plex-Device-Name' => $hash->{fhemHostname},
+                'X-Plex-Product' => 'FHEM',
+                'X-Plex-Version' => '0.0', },
+  };
+
+  $param->{cl} = $hash->{CL} if( ref($hash->{CL}) eq 'HASH' );
+
+  $param->{callback} = \&plex_parseHttpAnswer;
+  my($err,$data) = HttpUtils_NonblockingGet( $param );
+
+  Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+
+  return undef;
+}
+sub
+plex_getTokenOfPin($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  RemoveInternalTimer($hash, "plex_getTokenOfPin");
+
+  Log3 $name, 2, "$name: no PIN" if( !$hash->{PIN} );
+
+  return undef if( !$hash->{PIN} );
+  return undef if( !$hash->{PIN_ID} );
+
+  my $url = "https://plex.tv/pins/$hash->{PIN_ID}.xml";
+
+  Log3 $name, 4, "$name: requesting $url";
+
+  my $param = {
+    url => $url,
+    method => 'GET',
+    timeout => 5,
+    noshutdown => 0,
+    hash => $hash,
+    key => 'tokenOfPin',
+    header => { 'X-Plex-Provides' => 'controller',
+                'X-Plex-Client-Identifier' => $hash->{id},
+                'X-Plex-Platform' => $^O,
+                #'X-Plex-Device' => 'FHEM',
+                'X-Plex-Device-Name' => $hash->{fhemHostname},
+                'X-Plex-Product' => 'FHEM',
+                'X-Plex-Version' => '0.0', },
   };
 
   $param->{callback} = \&plex_parseHttpAnswer;
@@ -2080,6 +2179,21 @@ plex_hash2header($)
   return $header;
 }
 sub
+plex_hash2form($)
+{
+  my ($hash) = @_;
+
+  return $hash if( ref($hash) ne 'HASH' );
+
+  my $form;
+  foreach my $key (keys %{$hash}) {
+    $form .= "&" if( $form );
+    $form .= "$key=".urlEncode($hash->{$key});
+  }
+
+  return $form;
+}
+sub
 plex_discovered($$$$)
 {
   my ($hash, $type, $ip, $entry) = @_;
@@ -2309,6 +2423,453 @@ plex_parseTimeline($$$)
   }
   plex_readingsBulkUpdateIfChanged($chash, 'state', $state );
   readingsEndUpdate($chash, 1);
+}
+sub
+plex_getDataForSMAPI($$$)
+{
+  my ($hash,$server,$key) = @_;
+  my $name = $hash->{NAME};
+
+  my ($seconds) = gettimeofday();
+  foreach my $key ( keys %{$hash->{helper}{SMAPIcache}} ) {
+    delete $hash->{helper}{SMAPIcache}{$key} if( $seconds - $hash->{helper}{SMAPIcache}{$key}{timestamp} > 10 );
+  }
+
+  my $xml;
+  if( !$hash->{helper}{SMAPIcache}{$key} ) {
+Log 1, "get: $key";
+    if( $key =~ m'^/library' ) {
+      $xml = plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}$key", '#raw', 1 );
+
+    } else {
+      $xml = plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}/library/sections$key", '#raw', 1 );
+
+      return undef if( !$xml || ref($xml) ne 'HASH' );
+      if( $key eq '' && $xml->{Directory} ) {
+        my $section;
+        foreach my $item (@{$xml->{Directory}}) {
+          if( $item->{type} && $item->{type} eq 'artist' ) {
+            if( $section ) {
+              $section = undef;
+              last;
+            } else {
+              $section = $item->{key};
+            }
+          }
+        }
+
+        if( $section ) {
+          Log3 $name, 4, "$name: found only one music section, using this as root";
+          $xml = plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}/library/sections/$section", '#raw', 1 );
+
+        } else {
+          Log3 $name, 4, "$name: found multiple music sections";
+
+        }
+      }
+    }
+
+    return undef if( !$xml || ref($xml) ne 'HASH' );
+    if( $xml->{Directory} ) {
+      for(my $i = int(@{$xml->{Directory}}); $i >= 0; --$i) {
+        my $item = $xml->{Directory}[$i];
+
+        # at the toplevel only care about music sections
+        if( !$key && $item->{type} && $item->{type} ne 'artist' ) {
+          splice @{$xml->{Directory}}, $i, 1;
+          --$xml->{size};
+          next;
+        }
+        # ignore search nodes
+        if( $item->{key} =~ /^search/ ) {
+          splice @{$xml->{Directory}}, $i, 1;
+          --$xml->{size};
+          next;
+        }
+      }
+    }
+
+    my ($seconds) = gettimeofday();
+    $hash->{helper}{SMAPIcache}{$key} = { value => $xml, timestamp => $seconds };
+
+  } else {
+Log 1, "cached: $key";
+
+    my ($seconds) = gettimeofday();
+    $hash->{helper}{SMAPIcache}{$key}{value}{timestamp} = $seconds;
+
+    $xml = $hash->{helper}{SMAPIcache}{$key}{value}
+  }
+  Log3 $name, 5, "$name: got:". Dumper $xml;
+
+  return $xml;
+}
+sub
+plex_metadataResponseForSMAPI($$$$$)
+{
+  my ($hash,$request,$server,$key,$xml) = @_;
+  my $name = $hash->{NAME};
+
+  return undef if( !$request || ref($request) ne 'HASH' );
+  return undef if( !$server || ref($server) ne 'HASH' );
+  return undef if( !$xml || ref($xml) ne 'HASH' );
+
+  my $type;
+  if( $request->{getMetadata} ) {
+    $type = 'getMetadata';
+  } elsif( $request->{getExtendedMetadata} ) {
+    $type = 'getExtendedMetadata';
+  } else {
+    return undef;
+  }
+
+  my $index = $request->{$type}{index};
+  my $count = $request->{$type}{count};
+
+  my $body;
+  $body .= '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">';
+  $body .= '  <s:Body>';
+  $body .= '    <'.$type.'Response xmlns="http://www.sonos.com/Services/1.1">';
+  $body .= '      <'.$type.'Result>';
+  my $i = 0;
+  my $total = $xml->{size};
+  $total = 0 if( !$total );
+  if( $xml->{Directory} ) {
+    foreach my $item (@{$xml->{Directory}}) {
+      if( $i < $index ) {
+        ++$i;
+        next;
+      }
+
+      my $title = $item->{titleSort};
+      $title = $item->{title};# if( !$title );
+
+      $title =~ s/&/&amp;/g;
+
+      $body .= '<mediaCollection>';
+      $body .= "  <title>$title</title>";
+      $body .= "  <id>$item->{key}</id>" if( $item->{key} =~ '^/' );
+      $body .= "  <id>$key/$item->{key}</id>" if( $item->{key} !~ '^/' );
+      $body .= "  <albumArtURI>http://$server->{address}:$server->{port}$item->{thumb}</albumArtURI>" if( $item->{thumb} );
+      $body .= '  <canScroll>true</canScroll>' if( $xml->{size} > 20 );
+      $body .= '  <canScroll>true</canScroll>';
+      if( $item->{type} eq 'album' ) {
+        $body .= '<canPlay>true</canPlay>';
+        $body .= '<itemType>album</itemType>';
+      } elsif( $item->{type} eq 'artist' ) {
+        $body .= '<canPlay>true</canPlay>';
+        $body .= '<itemType>artist</itemType>';
+      } elsif( $item->{type} eq 'genre' ) {
+        $body .= '<canPlay>true</canPlay>';
+        $body .= '<itemType>genre</itemType>';
+      } else {
+        $body .= '<itemType>collection</itemType>';
+      }
+      $body .= '</mediaCollection>';
+
+      last if( ++$i >= $index + $count );
+    }
+
+  } elsif( $xml->{Track} ) {
+    foreach my $item (@{$xml->{Track}}) {
+      if( $i < $index ) {
+        ++$i;
+        next;
+      }
+
+      $item->{title} =~ s/&/&amp;/g;
+      $item->{parentTitle} =~ s/&/&amp;/g;
+      $item->{grandparentTitle} =~ s/&/&amp;/g;
+
+      $body .= '<mediaMetadata>';
+      $body .= "  <title>$item->{title}</title>";
+      $body .= "  <id>$item->{key}</id>" if( $item->{key} =~ '^/' );
+      $body .= "  <id>$key/$item->{key}</id>" if( $item->{key} !~ '^/' );
+      $body .= '  <mimeType>audio/mp3</mimeType>';
+      $body .= '  <itemType>track</itemType>';
+      $body .= '  <trackMetadata>';
+      $body .= "    <album>$item->{parentTitle}</album>";
+      $body .= "    <albumId>$item->{parentKey}</albumId>";
+      $body .= "    <artist>$item->{grandparentTitle}</artist>";
+      $body .= "    <artistId>$item->{grandparentKey}</artistId>";
+      $body .= "    <trackNumber>$item->{index}</trackNumber>";
+      $body .= "    <duration>". int($item->{duration}/1000) ."</duration>";
+      $body .= "    <albumArtURI>http://$server->{address}:$server->{port}$item->{parentThumb}</albumArtURI>" if( $item->{parentThumb} );
+      $body .= '  </trackMetadata>';
+      $body .= '</mediaMetadata>';
+
+      last if( ++$i >= $index + $count );
+    }
+  }
+  $body .= "        <total>$total</total>";
+  $body .= "        <index>$index</index>";
+  $body .= "        <count>". ($i-$index) ."</count>";
+  $body .= '      </'.$type.'Result>';
+  $body .= '    </'.$type.'Response>';
+  $body .= '  </s:Body>';
+  $body .= '</s:Envelope>';
+#Log 1, $body;
+
+  my $ret = "HTTP/1.1 200 OK\r\n";
+  $ret .= plex_hash2header( {               'Connection' => 'Close',
+                                          'Content-Type' => 'text/xml; charset=utf-8',
+                                          'Content-Length' => length($body),
+                            } );
+  $ret .= "\r\n";
+  $ret .= $body;
+
+#Log 1, $ret;
+  return $ret;
+}
+sub
+plex_getScrollindicesForSMAPI($$)
+{
+  my ($hash,$xml) = @_;
+  my $name = $hash->{NAME};
+
+  my $indices ='';
+  my $last;
+  my $i = 0;
+  if( $xml->{Directory} ) {
+    foreach my $item (@{$xml->{Directory}}) {
+      my $title = $item->{titleSort};
+      $title = $item->{title} if( !$title );
+
+      my $current = uc(substr($title, 0, 1));
+
+      if( $current =~ /[A-Z]/ && (!$last || $current ne $last) ) {
+        $indices .= ',' if( $indices );
+        $indices .= "$current,$i";
+
+        $last = $current;
+      }
+
+      ++$i;
+    }
+  }
+
+  return $indices;
+}
+
+sub
+plex_handleSMAPI($$)
+{
+  my ($hash,$msg) = @_;
+  my $name = $hash->{NAME};
+
+  my $handled;
+
+  my $server = plex_serverOf($hash, $hash->{machineIdentifier}, !$hash->{machineIdentifier});
+  if( !$server ) {
+    Log3 $name, 2, "$name: no server found for SMAPI request";
+    return undef;
+  }
+
+  if( $msg =~ m/^(.*?)\r?\n\r?\n(.*)$/s ) {
+    my $header = $1;
+    my $body = $2;
+#Log 1, $header;
+#Log 1, $body;
+
+    if( my $xml = eval { XMLin( $body, KeyAttr => {}, ForceArray => 0 ); } ) {
+      if( my $body = $xml->{'s:Body'} ) {
+        Log3 $name, 4, "$name: got soap request:". Dumper $body;
+
+        if( $body->{getMetadata} ) {
+          $handled = 1;
+
+#Log 1, Dumper $body;
+          my $key = $body->{getMetadata}{id};
+          $key = '' if( $key eq 'root' );
+          $key = "/$key" if( $key && $key !~ '^/' );
+
+          my $xml = plex_getDataForSMAPI($hash, $server, $key);
+#Log 1, Dumper $xml;
+
+          return plex_metadataResponseForSMAPI($hash, $body, $server, $key, $xml);
+
+        } elsif( $body->{getExtendedMetadata} ) {
+          $handled = 1;
+
+#Log 1, Dumper $body;
+          my $key = $body->{getExtendedMetadata}{id};
+          $key = "" if( $key eq 'root' );
+          $key = "/$key" if( $key && $key !~ '^/' );
+
+          my $xml = plex_getDataForSMAPI($hash, $server, $key);
+
+          return plex_metadataResponseForSMAPI($hash, $body, $server, $key, $xml);
+
+        } elsif( $body->{getScrollIndices} ) {
+          $handled = 1;
+
+          if( my $key = $body->{getScrollIndices}{id} ) {
+            $key = "/$key" if( $key && $key !~ '^/' );
+
+            my $xml = plex_getDataForSMAPI($hash, $server, $key);
+            return undef if( !$xml || ref($xml) ne 'HASH' );
+
+            my $body;
+            $body .= '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">';
+            $body .= '  <s:Body>';
+            $body .= '    <getScrollIndicesResponse xmlns="http://www.sonos.com/Services/1.1">';
+            $body .= '      <getScrollIndicesResult>';
+            $body .=          plex_getScrollindicesForSMAPI($hash,$xml);
+            $body .= '      </getScrollIndicesResult>';
+            $body .= '    </getScrollIndicesResponse>';
+            $body .= '  </s:Body>';
+            $body .= '</s:Envelope>';
+
+            my $ret = "HTTP/1.1 200 OK\r\n";
+            $ret .= plex_hash2header( {               'Connection' => 'Close',
+                                                    'Content-Type' => 'text/xml; charset=utf-8',
+                                                  'Content-Length' => length($body),
+                                      } );
+            $ret .= "\r\n";
+            $ret .= $body;
+
+#Log 1, $ret;
+            return $ret;
+          }
+
+        } elsif( $body->{getMediaMetadata} ) {
+          $handled = 1;
+
+          if( my $key = $body->{getMediaMetadata}{id} ) {
+            $key = "/$key" if( $key && $key !~ '^/' );
+
+            my $xml = plex_getDataForSMAPI($hash, $server, $key);
+            return undef if( !$xml || ref($xml) ne 'HASH' );
+
+            my $body;
+            $body .= '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">';
+            $body .= '  <s:Body>';
+            $body .= '    <getMediaMetadataResponse xmlns="http://www.sonos.com/Services/1.1">';
+            $body .= '      <getMediaMetadataResult>';
+            if( $xml->{Track} ) {
+              foreach my $item (@{$xml->{Track}}) {
+                $item->{title} =~ s/&/&amp;/g;
+                $item->{parentTitle} =~ s/&/&amp;/g;
+                $item->{grandparentTitle} =~ s/&/&amp;/g;
+
+                $body .= "<title>$item->{title}</title>";
+                $body .= "<id>$item->{key}</id>" if( $item->{key} =~ '^/' );
+                $body .= "<id>$key/$item->{key}</id>" if( $item->{key} !~ '^/' );
+                $body .= '<mimeType>audio/mp3</mimeType>';
+                $body .= '<itemType>track</itemType>';
+                $body .= '<trackMetadata>';
+                $body .= "  <album>$item->{parentTitle}</album>";
+                $body .= "  <albumId>$item->{parentKey}</albumId>";
+                $body .= "  <artist>$item->{grandparentTitle}</artist>";
+                $body .= "  <artistId>$item->{grandparentKey}</artistId>";
+                $body .= "  <trackNumber>$item->{index}</trackNumber>";
+                $body .= "  <duration>". int($item->{duration}/1000) ."</duration>";
+                $body .= "  <albumArtURI>http://$server->{address}:$server->{port}$item->{parentThumb}</albumArtURI>" if( $item->{parentThumb} );
+                $body .= '</trackMetadata>';
+              }
+            }
+            $body .= '      </getMediaMetadataResult>';
+            $body .= '    </getMediaMetadataResponse>';
+            $body .= '  </s:Body>';
+            $body .= '</s:Envelope>';
+
+            my $ret = "HTTP/1.1 200 OK\r\n";
+            $ret .= plex_hash2header( {               'Connection' => 'Close',
+                                                    'Content-Type' => 'text/xml; charset=utf-8',
+                                                  'Content-Length' => length($body),
+                                      } );
+            $ret .= "\r\n";
+            $ret .= $body;
+
+#Log 1, $ret;
+            return $ret;
+          }
+
+        } elsif( $body->{getMediaURI} ) {
+          $handled = 1;
+
+          if( my $key = $body->{getMediaURI}{id} ) {
+            my $xml = plex_getDataForSMAPI($hash, $server, $key);
+            return undef if( !$xml || ref($xml) ne 'HASH' );
+
+            my $body;
+            $body .= '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">';
+            $body .= '  <s:Body>';
+            $body .= '    <getMediaURIResponse xmlns="http://www.sonos.com/Services/1.1">';
+            $body .= '      <getMediaURIResult>';
+            if( $xml->{Track} ) {
+              foreach my $item (@{$xml->{Track}}) {
+                if( $item->{Media} && $item->{Media}[0]{Part}  ) {
+                  $body .= "http://$server->{address}:$server->{port}$item->{Media}[0]{Part}[0]{key}";
+                  #$body .= "&X-Plex-Token=$hash->{token}" if( $hash->{token} );
+                  last;
+                }
+              }
+            }
+            $body .= '      </getMediaURIResult>';
+            if( $hash->{token} ) {
+              $body .= '<httpHeaders>';
+              $body .= '  <httpHeader>';
+              $body .= '    <header>X-Plex-Token</header>';
+              $body .= "    <value>$hash->{token}</value>";
+              $body .= '  </httpHeader>';
+              $body .= '</httpHeaders>';
+            }
+            $body .= '    </getMediaMetadataResponse>';
+            $body .= '  </s:Body>';
+            $body .= '</s:Envelope>';
+
+            my $ret = "HTTP/1.1 200 OK\r\n";
+            $ret .= plex_hash2header( {               'Connection' => 'Close',
+                                                    'Content-Type' => 'text/xml; charset=utf-8',
+                                                  'Content-Length' => length($body),
+                                      } );
+            $ret .= "\r\n";
+            $ret .= $body;
+
+#Log 1, $ret;
+            return $ret;
+          }
+
+        } elsif( $body->{getLastUpdate} ) {
+          $handled = 1;
+
+          my ($seconds) = gettimeofday();
+          my $body;
+          $body .= '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">';
+          $body .= '  <s:Body>';
+          $body .= '    <getLastUpdateResponse xmlns="http://www.sonos.com/Services/1.1">';
+          $body .= '      <getLastUpdateResult>';
+          $body .= "        <catalog>$seconds</catalog>";
+          $body .= '        <favorites></favorites>';
+          $body .= '        <pollInterval>120</pollInterval>';
+          $body .= '      </getLastUpdateResult>';
+          $body .= '    </getLastUpdateResponse>';
+          $body .= '  </s:Body>';
+          $body .= '</s:Envelope>';
+
+          my $ret = "HTTP/1.1 200 OK\r\n";
+          $ret .= plex_hash2header( {               'Connection' => 'Close',
+                                                  'Content-Type' => 'text/xml; charset=utf-8',
+                                                'Content-Length' => length($body),
+                                    } );
+          $ret .= "\r\n";
+          $ret .= $body;
+
+#Log 1, $ret;
+          return $ret;
+        }
+
+        Log3 $name, 2, "$name: unhandled soap request:". Dumper $body if( !$handled );
+
+        return undef;
+      }
+    }
+  }
+
+  Log3 $name, 2, "$name: unhandled message: $msg" if( !$handled );
+
+  return undef;
 }
 sub
 plex_Parse($$;$$$)
@@ -2678,6 +3239,9 @@ $hash->{sonos}{status} = $cmd;
       }
     }
 
+  } elsif( $msg =~ '^POST /SMAPI HTTP/1.\d' ) {
+    return plex_handleSMAPI($hash, $msg);
+
   }
 
   if( !$handled ) {
@@ -2728,6 +3292,7 @@ plex_parseHttpAnswer($$$)
           $param->{url} =~ s/commandID=\d*/commandID=$hash->{commandID}/;
         }
         Log3 $name, 5, "  ($param->{url})";
+        RemoveInternalTimer($hash, "HttpUtils_NonblockingGet");
         InternalTimer(gettimeofday()+5, "HttpUtils_NonblockingGet", $param, 0);
 
         return;
@@ -2748,6 +3313,16 @@ plex_parseHttpAnswer($$$)
 
   $data = encode('UTF-8', $data );
   if( $data =~ m/^<!DOCTYPE html>(.*)/ ) {
+    if( $param->{key} eq 'tokenOfPin' ) {
+      delete $hash->{PIN};
+      delete $hash->{PIN_ID};
+      delete $hash->{PIN_EXPIRES};
+
+      Log3 $name, 2, "$name: PIN expired";
+
+      return undef;
+    }
+
     Log3 $name, 2, "$name: failed: $1";
 
     return undef;
@@ -2773,15 +3348,69 @@ plex_parseHttpAnswer($$$)
 
   if( $param->{key} eq 'token' ) {
     $handled = 1;
+
     $hash->{token} = $xml->{'authenticationToken'};
+    readingsSingleUpdate($hash, '.token', $hash->{token}, 0 );
+    CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+
+    Log3 $name, 3, "$name: got token from user/password";
 
     plex_sendApiCmd($hash, "https://plex.tv/pms/servers.xml", "myPlex:servers" );
     plex_sendApiCmd($hash, "https://plex.tv/devices.xml", "myPlex:devices" );
 
     #https://plex.tv/pms/resources.xml?includeHttps=1
 
+  } elsif( $param->{key} eq 'getPinForToken' ) {
+    $handled = 1;
+
+    delete $hash->{PIN};
+    delete $hash->{PIN_ID};
+    delete $hash->{PIN_EXPIRES};
+
+    $hash->{PIN} = $xml->{code}[0] if( $xml->{code} );
+    $hash->{PIN_ID} = $xml->{id}[0]{content} if( $xml->{id} );
+    $hash->{PIN_EXPIRES} = $xml->{'expires-at'}[0]{content} if( $xml->{'expires-at'} );
+
+    Log3 $name, 2, "$name: PIN: $hash->{PIN}";
+
+    #plex_sendApiCmd($hash, "https://plex.tv/pms/servers.xml", "myPlex:servers" );
+    #plex_sendApiCmd($hash, "https://plex.tv/devices.xml", "myPlex:devices" );
+
+    #https://plex.tv/pms/resources.xml?includeHttps=1
+
+    if( $param->{cl} && $param->{cl}{canAsyncOutput} ) {
+      asyncOutput( $param->{cl}, "PIN: $hash->{PIN}\n" );
+
+      plex_getTokenOfPin($hash);
+    }
+
+  } elsif( $param->{key} eq 'tokenOfPin' ) {
+    $handled = 1;
+
+    RemoveInternalTimer($hash, "plex_getTokenOfPin");
+
+    if( $xml->{auth_token}[0] && !ref($xml->{auth_token}[0]) ) {
+      delete $hash->{PIN};
+      delete $hash->{PIN_ID};
+      delete $hash->{PIN_EXPIRES};
+
+      $hash->{token} = $xml->{auth_token}[0];
+      readingsSingleUpdate($hash, '.token', $hash->{token}, 0 );
+      CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+
+      Log3 $name, 3, "$name: got token from pin";
+
+      plex_sendApiCmd($hash, "https://plex.tv/pms/servers.xml", "myPlex:servers" );
+      plex_sendApiCmd($hash, "https://plex.tv/devices.xml", "myPlex:devices" );
+
+    } else {
+
+      InternalTimer(gettimeofday()+4, "plex_getTokenOfPin", $hash, 0);
+    }
+
   } elsif( $param->{key} eq 'clients' ) {
     $handled = 1;
+
     foreach my $entry (@{$xml->{Server}}) {
       #next if( $entry->{address} eq $hash->{fhemIP}
       #         && $hash->{helper}{timelineListener} && $hash->{helper}{timelineListener}->{PORT} == $entry->{port} );
@@ -3066,6 +3695,13 @@ plex_parseHttpAnswer($$$)
 
     }
 
+  } elsif( $param->{key} eq 'publishToSonos' ) {
+    $handled = 1;
+
+    if( $param->{cl} && $param->{cl}{canAsyncOutput} ) {
+      asyncOutput( $param->{cl}, "SMAPI registration for $param->{player}: $xml->{body}[0]\n" );
+    }
+
   } elsif( $param->{key} eq '#raw' ) {
     $handled = 1;
 
@@ -3232,8 +3868,10 @@ Log 1, "!!!!!!!!!!";
           $add_header .= "Content-Length: 0\r\n";
         }
 
-        syswrite($hash->{CD}, $add_header) if( $add_header );
-        Log3 $pname, 4, "$name: add header: $add_header";
+        if( $add_header ) {
+          Log3 $pname, 5, "$name: add header: $add_header";
+          syswrite($hash->{CD}, $add_header);
+        }
 
         if( $ret ) {
           syswrite($hash->{CD}, $ret);
@@ -3265,6 +3903,75 @@ Log 1, "!!!!!!!!!!";
     } while( $hash->{buf} );
 
   }
+
+  return undef;
+}
+
+sub
+plex_publishToSonos($$;$)
+{
+  my ($hash,$service,$player) = @_;
+  $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
+  return undef if( !$hash );
+  my $name = $hash->{NAME};
+
+  my $i = 0;
+  foreach my $d (devspec2array("TYPE=SONOSPLAYER")) {
+    next if( $player && $d !~ /$player/ );
+    my $location = ReadingsVal($d,'location',undef);
+Log 1, $location;
+
+    my $ip = ($location =~ m/https?:..([\d.]*)/)[0];
+Log 1, $ip;
+    next if( !$ip );
+
+    my $url = "http://$ip:1400/customsd";
+
+    Log3 $name, 4, "$name: requesting $url";
+
+    my $fhem_base_url = "http://$hash->{fhemIP}:$hash->{helper}{timelineListener}{PORT}";
+Log 1, $fhem_base_url;
+
+    my $data = plex_hash2form( { 'sid' => '246',
+                                 'name' => $service,
+                                 'uri' => "$fhem_base_url/SMAPI",
+                                 'secureUri' => "$fhem_base_url/SMAPI",
+                                 'pollInterval' => '1200',
+                                 'authType' => 'Anonymous',
+                                 'containerType' => 'MService',
+                                 #'presentationMapVersion' => '1',
+                                 #'presentationMapUri' => "$fhem_base_url/sonos/presentationMap.xml",
+                                 #'stringsVersion' => '5',
+                                 #'stringsUri' => "$fhem_base_url/sonos/strings.xml",
+                               } );
+    $data .= "&caps=search";
+    $data .= "&caps=ucPlaylists";
+    $data .= "&caps=extendedMD";
+
+    my $param = {
+      url => $url,
+      method => 'POST',
+      timeout => 10,
+      noshutdown => 0,
+      hash => $hash,
+      key => 'publishToSonos',
+      player => $d,
+      data => $data,
+    };
+
+    $param->{cl} = $hash->{CL} if( ref($hash->{CL}) eq 'HASH' );
+
+    $param->{callback} = \&plex_parseHttpAnswer;
+    my($err,$data) = HttpUtils_NonblockingGet( $param );
+
+    Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+
+    ++$i;
+  }
+
+  return 'no sonos players found' if( !$i );
+
+  return "send SMAPI registration to $i players";
 
   return undef;
 }
@@ -3335,13 +4042,13 @@ Log 1, "!!!!!!!!!!";
     <li>[&lt;server&gt;] ls [&lt;path&gt;]<br>
       browse the media library. eg:<br><br>
       <b><code>get &lt;plex&gt; ls</code></b>
-      <pre>  Plex Library 
+      <pre>  Plex Library
   key                                 type       title
   1                                   artist       Musik
   2                      ...</pre><br>
 
       <b><code>get &lt;plex&gt; ls /1</code></b>
-      <pre>  Musik 
+      <pre>  Musik
   key                                 type       title
   all                                            All Artists
   albums                                         By Album
@@ -3356,7 +4063,7 @@ Log 1, "!!!!!!!!!!";
   search?type=10                                 Search Tracks...</pre><br>
 
       <b><code>get &lt;plex&gt; ls /1/albums</code></b>
-      <pre>  Musik ; By Album 
+      <pre>  Musik ; By Album
   key                                  type       title
   /library/metadata/133999/children   album       ...
   /library/metadata/134207/children   album       ...
@@ -3396,11 +4103,16 @@ Log 1, "!!!!!!!!!!";
 
     <li>servers<br>
       list the known servers</li>
+
+    <li>pin<br>
+      get a pin for authentication at <a href="https://plex.tv/pin">https://plex.tv/pin</a></li>
+
   </ul><br>
 
   <a name="plex_Attr"></a>
   <b>Attr</b>
   <ul>
+    <li>httpPort</li>
     <li>ignoredClients</li>
     <li>ignoredServers</li>
     <li>user</li>
