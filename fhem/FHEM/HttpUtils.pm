@@ -136,9 +136,9 @@ HttpUtils_gethostbyname($$$)
     my $iaddr = inet_aton($host);
     my $err;
     if(!defined($iaddr)) {
-      my @addr = gethostbyname($host); # This is still blocking
-      $err = ($addr[0] ? undef : "gethostbyname $host failed");
-      $iaddr = $addr[4];
+      $iaddr = gethostbyname($host); # This is still blocking
+      $err = (($iaddr && length($iaddr)==4) ? 
+                        undef : "gethostbyname $host failed");
     }
     $fn->($hash, $err, $iaddr);
     return;
