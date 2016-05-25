@@ -2556,7 +2556,6 @@ plex_metadataResponseForSMAPI($$$$$)
       $body .= "  <id>$item->{key}</id>" if( $item->{key} =~ '^/' );
       $body .= "  <id>$key/$item->{key}</id>" if( $item->{key} !~ '^/' );
       $body .= "  <albumArtURI>http://$server->{address}:$server->{port}$item->{thumb}</albumArtURI>" if( $item->{thumb} );
-      $body .= '  <canScroll>true</canScroll>' if( $xml->{size} > 20 );
       $body .= '  <canScroll>true</canScroll>';
       if( $item->{type} eq 'album' ) {
         $body .= '<canPlay>true</canPlay>';
@@ -2641,6 +2640,8 @@ plex_getScrollindicesForSMAPI($$)
       $title = $item->{title} if( !$title );
 
       my $current = uc(substr($title, 0, 1));
+
+      return '' if( $last && ord($last) > ord($current ) );
 
       if( $current =~ /[A-Z]/ && (!$last || $current ne $last) ) {
         $indices .= ',' if( $indices );
