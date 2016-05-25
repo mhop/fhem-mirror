@@ -1154,9 +1154,9 @@ DUOFERN_Parse($$)
     } elsif($msg =~ m/0FFF0713.*/) {
       readingsSingleUpdate($hash, "event", "dawn", 1);
     } elsif($msg =~ m/0FFF071E.*/) {
-      readingsSingleUpdate($hash, "state", "off", 1);
-    } elsif($msg =~ m/0FFF071F.*/) {
       readingsSingleUpdate($hash, "state", "on", 1);
+    } elsif($msg =~ m/0FFF071F.*/) {
+      readingsSingleUpdate($hash, "state", "off", 1);
          
     } elsif($msg =~ m/0FFF07(1A|18|19|01|02|03).*/) {
       my $button = substr($msg, 6, 2);
