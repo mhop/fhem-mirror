@@ -3287,7 +3287,12 @@ plex_parseHttpAnswer($$$)
   my $name = $hash->{NAME};
 
   if( $err ) {
-    if( $err =~ m/Connection refused$/ || $err =~ m/timed out$/ || $err =~ m/empty answer received$/ ) {
+    if( $param->{key} eq 'publishToSonos' ) {
+      if( $param->{cl} && $param->{cl}{canAsyncOutput} ) {
+        asyncOutput( $param->{cl}, "SMAPI registration for $param->{player}: failed\n" );
+      }
+
+    } elsif( $err =~ m/Connection refused$/ || $err =~ m/timed out$/ || $err =~ m/empty answer received$/ ) {
       if( !$param->{retry} || $param->{retry} < 1 ) {
         ++$param->{retry};
 
@@ -3298,7 +3303,7 @@ plex_parseHttpAnswer($$$)
           $param->{url} =~ s/commandID=\d*/commandID=$hash->{commandID}/;
         }
         Log3 $name, 5, "  ($param->{url})";
-        RemoveInternalTimer($hash, "HttpUtils_NonblockingGet");
+        RemoveInternalTimer($hash);
         InternalTimer(gettimeofday()+5, "HttpUtils_NonblockingGet", $param, 0);
 
         return;
@@ -3925,10 +3930,8 @@ plex_publishToSonos($$;$)
   foreach my $d (devspec2array("TYPE=SONOSPLAYER")) {
     next if( $player && $d !~ /$player/ );
     my $location = ReadingsVal($d,'location',undef);
-Log 1, $location;
 
     my $ip = ($location =~ m/https?:..([\d.]*)/)[0];
-Log 1, $ip;
     next if( !$ip );
 
     my $url = "http://$ip:1400/customsd";
@@ -3936,7 +3939,6 @@ Log 1, $ip;
     Log3 $name, 4, "$name: requesting $url";
 
     my $fhem_base_url = "http://$hash->{fhemIP}:$hash->{helper}{timelineListener}{PORT}";
-Log 1, $fhem_base_url;
 
     my $data = plex_hash2form( { 'sid' => '246',
                                  'name' => $service,
@@ -3962,6 +3964,50 @@ Log 1, $fhem_base_url;
       hash => $hash,
       key => 'publishToSonos',
       player => $d,
+      data => $data,
+    };
+
+    $param->{cl} = $hash->{CL} if( ref($hash->{CL}) eq 'HASH' );
+
+    $param->{callback} = \&plex_parseHttpAnswer;
+    my($err,$data) = HttpUtils_NonblockingGet( $param );
+
+    Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+
+    ++$i;
+  }
+
+  if( !$i && $player  ) {
+    my $url = "http://$player:1400/customsd";
+
+    Log3 $name, 4, "$name: requesting $url";
+
+    my $fhem_base_url = "http://$hash->{fhemIP}:$hash->{helper}{timelineListener}{PORT}";
+
+    my $data = plex_hash2form( { 'sid' => '246',
+                                 'name' => $service,
+                                 'uri' => "$fhem_base_url/SMAPI",
+                                 'secureUri' => "$fhem_base_url/SMAPI",
+                                 'pollInterval' => '1200',
+                                 'authType' => 'Anonymous',
+                                 'containerType' => 'MService',
+                                 #'presentationMapVersion' => '1',
+                                 #'presentationMapUri' => "$fhem_base_url/sonos/presentationMap.xml",
+                                 #'stringsVersion' => '5',
+                                 #'stringsUri' => "$fhem_base_url/sonos/strings.xml",
+                               } );
+    $data .= "&caps=search";
+    $data .= "&caps=ucPlaylists";
+    $data .= "&caps=extendedMD";
+
+    my $param = {
+      url => $url,
+      method => 'POST',
+      timeout => 10,
+      noshutdown => 0,
+      hash => $hash,
+      key => 'publishToSonos',
+      player => $player,
       data => $data,
     };
 
