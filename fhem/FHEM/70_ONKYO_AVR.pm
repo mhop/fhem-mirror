@@ -142,6 +142,7 @@ sub ONKYO_AVR_Define($$$) {
     }
     $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{name}  = "Main";
     $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{value} = "1";
+    $modules{ONKYO_AVR_ZONE}{defptr}{$name}{1} = $hash;
 
     my $ret = DevIo_OpenDev( $hash, 0, "ONKYO_AVR_DevInit" );
 
@@ -153,9 +154,7 @@ sub ONKYO_AVR_DevInit($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     my $return;
-    my $definedZones = 0;
-    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} }
-      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$name} ) );
+    my $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} };
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_DevInit()";
 
@@ -174,7 +173,7 @@ sub ONKYO_AVR_DevInit($) {
           if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
 
         # send to slaves
-        if ( $definedZones > 0 ) {
+        if ( $definedZones > 1 ) {
             Log3 $name, 5,
               "ONKYO_AVR $name: Dispatching state change to slaves (DevInit)";
             Dispatch(
@@ -194,7 +193,7 @@ sub ONKYO_AVR_DevInit($) {
           if ( ReadingsVal( $name, "presence", "absent" ) ne "present" );
 
         # send to slaves
-        if ( $definedZones > 0 ) {
+        if ( $definedZones > 1 ) {
             Log3 $name, 5,
               "ONKYO_AVR $name: Dispatching state change to slaves (DevInit)";
             Dispatch(
@@ -220,9 +219,7 @@ sub ONKYO_AVR_Notify($$) {
     my ( $hash, $dev ) = @_;
     my $name         = $hash->{NAME};
     my $devName      = $dev->{NAME};
-    my $definedZones = 0;
-    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} }
-      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$name} ) );
+    my $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} };
 
     return
       if ( !$dev->{CHANGED} );    # Some previous notify deleted the array.
@@ -248,7 +245,7 @@ sub ONKYO_AVR_Notify($$) {
               if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
 
             # send to slaves
-            if ( $definedZones > 0 ) {
+            if ( $definedZones > 1 ) {
                 Log3 $name, 5,
                   "ONKYO_AVR $name: Dispatching state change to slaves";
                 Dispatch(
@@ -275,7 +272,7 @@ sub ONKYO_AVR_Notify($$) {
             ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
 
             # send to slaves
-            if ( $definedZones > 0 ) {
+            if ( $definedZones > 1 ) {
                 Log3 $name, 5,
                   "ONKYO_AVR $name: Dispatching state change to slaves";
                 Dispatch(
@@ -323,9 +320,7 @@ sub ONKYO_AVR_Read($) {
     my $name = $hash->{NAME};
     my $state        = ReadingsVal( $name, "power", "off" );
     my $zone         = 0;
-    my $definedZones = 0;
-    $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} }
-      if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$name} ) );
+    my $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} };
 
     # read from serial device
     my $buf = DevIo_SimpleRead($hash);
@@ -390,11 +385,11 @@ sub ONKYO_AVR_Read($) {
 
     # conversion based on zone
     foreach
-      my $zoneID ( keys %{ $hash->{helper}{receiver}{device}{zonelist}{zone} } )
+      my $zoneID ( keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} } )
     {
         next
-          if ( $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}{value}
-            ne "1" );
+          if (     defined($hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}{value})
+                && $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}{value} ne "1" );
 
         my $commandDB = ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zoneID);
 
@@ -488,7 +483,7 @@ sub ONKYO_AVR_Read($) {
         $value = $value_raw;
 
         Log3 $name, 4,
-"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): FAIL: Don't know how to convert, not in ONKYOdb: $cmd_raw$value_raw";
+"ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): FAIL: Don't know how to convert, not in ONKYOdb or zone may not be defined: $cmd_raw$value_raw";
     }
 
     # reset connectionCheck timer
@@ -1516,16 +1511,19 @@ sub ONKYO_AVR_Get($$$) {
 
         # createZone
         my $zones = "";
-        foreach my $zoneID (
-            keys %{ $hash->{helper}{receiver}{device}{zonelist}{zone} } )
-        {
-            next
-              if ( $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}
-                {value} ne "1" || $zoneID eq "1" );
-            $zones .= "," if ( $zones ne "" );
-            $zones .= $zoneID;
+        if (defined($hash->{helper}{receiver}{device}{zonelist}{zone})) {
+          foreach my $zoneID (
+              keys %{ $hash->{helper}{receiver}{device}{zonelist}{zone} } )
+          {
+              next
+                if ( $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}
+                  {value} ne "1" || $zoneID eq "1" );
+              $zones .= "," if ( $zones ne "" );
+              $zones .= $zoneID;
+          }
         }
         $return .= " createZone:$zones" if ( $zones ne "" );
+        $return .= " createZone:2,3,4" if ( $zones eq "" );
 
         # remoteControl
         $return .= " remoteControl:";
