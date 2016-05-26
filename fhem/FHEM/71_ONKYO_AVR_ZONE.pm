@@ -106,7 +106,15 @@ sub ONKYO_AVR_ZONE_Define($$$) {
 
     my $IOhash = $hash->{IODev};
     my $IOname = $IOhash->{NAME};
-    my $zone   = @$a[2] || "2";
+    my $zone;
+
+    if ( !defined( @$a[2] ) ) {
+      $zone   = "2";
+    } elsif ( @$a[2] =~ /^[2-4]$/ ) {
+      $zone   = @$a[2];
+    } else {
+      return @$a[2]." is not a valid Zone number";
+    }
 
     if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone} ) ) {
         return "Zone already defined in "
