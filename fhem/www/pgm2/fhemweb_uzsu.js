@@ -190,6 +190,9 @@ FW_uzsuSelectRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).append(label);
 
     $(button).change(clicked);
+
+    if( currVal )
+      button.prop("checked", currVal == vArr[i] );
   }
 
   $(newEl).buttonset();
@@ -214,7 +217,7 @@ FW_uzsuSelectRadioCreate(elName, devName, vArr, currVal, set, params, cmd)
                                       hidden.attr("value", arg);
                                     for( var i = 0; i < buttons.length; ++i ) {
                                       var button = buttons[i];
-                                      button.prop("checked", arg.match(new RegExp('(^|,)'+vArr[i+1]+'($|,)') ) );
+                                      button.prop("checked", (arg == vArr[i+1]) );
                                       button.button("refresh");
                                     }
                                   };
