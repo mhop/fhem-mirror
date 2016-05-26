@@ -500,9 +500,9 @@ sub HMinfo_peerCheck(@) { #####################################################
           }
         }
         push @peerIDsNoPeer,"$eName p:$pName"
-              if (  (!$pPlist || $pPlist !~ m/$idc/) 
-                  && $pSt ne "smokeDetector"
-                  && $pChn eq "00"
+              if (  (!$pPlist || $pPlist !~ m/$devId/) 
+                  && $st ne 'smokeDetector'
+                  && $pChn !~ m/0[x0]/
                   );
         if ($pSt eq "virtual"){
           if (AttrVal($devN,"aesCommReq",0) != 0){
