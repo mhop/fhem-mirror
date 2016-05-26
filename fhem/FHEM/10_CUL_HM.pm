@@ -1281,8 +1281,8 @@ sub CUL_HM_Parse($$) {#########################################################
       my $ack = $mh{devH}->{helper}{rpt}{ack};#shorthand
       my $i=0;
       $mh{devH}->{helper}{rpt}{ts} = gettimeofday();
-      CUL_HM_SndCmd($mh{$ack}[$i++],$mh{$ack}[$i++]
-                  .(defined $mh{devH}->{helper}{aesAuthBytes}
+      CUL_HM_SndCmd(${$ack}[$i++],${$ack}[$i++]
+                   .($mh{devH}->{helper}{aesAuthBytes}
                       ?$mh{devH}->{helper}{aesAuthBytes}
                       :"")
            ) while ($i<@{$ack});
@@ -7227,7 +7227,6 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   my $rRL = ($hash->{READINGS}{$regLN})              #realRegList
                            ?$hash->{READINGS}{$regLN}{VAL}
                            :"";
-  
   my $data=0;
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
   for (my $size2go = $size;$size2go>0;$size2go -=8){
@@ -8707,6 +8706,27 @@ sub CUL_HM_configUpdate($)   {# mark entities with changed data
   @{$modules{CUL_HM}{helper}{confUpdt}} = 
            CUL_HM_noDup(@{$modules{CUL_HM}{helper}{confUpdt}},$name);
 }
+
+sub CUL_HM_cleanShadowReg($){
+  # remove shadow-regs if those are identical to readings or 
+  # the reading does not exist. 
+  # return dirty "1" if some shadowregs still remain active
+  my ($name) = @_;
+  my $hash = $defs{$name};
+  my $dirty = 0;
+  foreach my $rLn (keys %{$hash->{helper}{shadowReg}}){ 
+    my $rLnP = ($hash->{helper}{expert}{raw}?"":".").$rLn;
+    if (  !$hash->{READINGS}{$rLnP} 
+        || $hash->{READINGS}{$rLnP}{VAL} eq $hash->{helper}{shadowReg}{$rLn}){   
+      delete $hash->{helper}{shadowReg}{$rLn};
+    }
+    else{
+      $dirty = 1;
+    }
+  }
+  return $dirty;
+}
+
 
 #+++++++++++++++++ templates ++++++++++++++++++++++++++++++++++++++++++++++++++
 sub CUL_HM_tempListTmpl(@) { ##################################################

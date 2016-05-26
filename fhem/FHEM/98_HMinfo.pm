@@ -223,7 +223,9 @@ sub HMinfo_status($){##########################################################
     $nbrE++;
     $nbrC++ if ($ehash->{helper}{role}{chn});
     $nbrV++ if ($ehash->{helper}{role}{vrt});
-    push @shdwNames,$eName if (keys %{$ehash->{helper}{shadowReg}});
+    push @shdwNames,$eName if (CUL_HM_cleanShadowReg($eName)); # are shadowRegs active?
+    
+    
     foreach my $read (grep {$ehash->{READINGS}{$_}} @info){       #---- count critical readings
       my $val = $ehash->{READINGS}{$read}{VAL};
       $sum{$read}{$val} =0 if (!$sum{$read}{$val});
