@@ -6733,7 +6733,7 @@ sub CUL_HM_protState($$){
 sub CUL_HM_ID2PeerList ($$$) {
   my($name,$peerID,$set) = @_;
   my $peerIDs = AttrVal($name,"peerIDs","");
-  return if (!$peerID && !$peerIDs);
+  return if (!$peerID && !$peerIDs); # nothing to do
   my $hash = $defs{$name};
   $peerIDs =~ s/$peerID//g;          #avoid duplicate, support unset
   $peerID =~ s/^000000../00000000/;  #correct end detector
@@ -6817,7 +6817,7 @@ sub CUL_HM_ID2PeerList ($$$) {
       }
     }
   }
-  else{
+  else{# no peer set - clean up: delete entries
     delete $hash->{READINGS}{peerList};
     delete $hash->{peerList};
     if (($md =~ m/HM-CC-RT-DN/     && $chn=~ m/(02|03|04|05|06)/)
@@ -7314,7 +7314,6 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
 }
 sub CUL_HM_setTmplDisp($){ # remove register i outdated
   my $tHash = shift;
-#{CUL_HM_setTmplDisp($defs{loDoor})}
   delete $tHash->{READINGS}{$_} foreach (grep /^tmpl_/ ,keys %{$tHash->{READINGS}});
   if ($tHash->{helper}{expert}{tpl}){
     foreach (keys %{$tHash->{helper}{tmpl}}){
@@ -7793,7 +7792,9 @@ sub CUL_HM_repReadings($) {   # parse repeater
     next if (!$pId || $pId eq "00000000");
     $pCnt{$pId.$cnt}{cnt}=$cnt++;
   }
-
+  delete $hash->{repeater} foreach(devspec2array("TYPE=CUL_HM"
+                                                .":FILTER=DEF=......"
+                                                .":FILTER=repeater=$hash->{NAME}"));
   my @pS;
   my @pD;
   my @pB;
@@ -7826,7 +7827,10 @@ sub CUL_HM_repReadings($) {   # parse repeater
               );
     $repAttr[$fNo] = "$sName:"
                 .((!$pS[$fNo] || $pS[$fNo] ne $sName)?"-":$pD[$fNo])
-                .":".($pB[$fNo]?$pB[$fNo]:"-");          
+                .":".($pB[$fNo]?$pB[$fNo]:"-");  
+
+    $defs{$dName}{repeater} = $hash->{NAME} if ($defs{$dName});
+
     push @retL,$eS;
     $readList[$fNo]="repPeer_".$eS;
   }
