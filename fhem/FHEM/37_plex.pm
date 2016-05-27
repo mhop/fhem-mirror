@@ -1040,6 +1040,7 @@ plex_Set($$@)
     }
 
     $list .= 'play ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
+    $list .= 'playAlbum ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayqueues\b/ );
     $list .= 'resume:noArg ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
     $list .= 'pause:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bplayPause\b/ );;
     $list .= 'stop:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bstop\b/ );;
@@ -1931,7 +1932,8 @@ plex_playAlbum($$$$)
 #Log 1, Dumper $xml;
   return "item not found" if( !$xml || !$xml->{librarySectionUUID} );
 
-  my $url = "http://$server->{address}:$server->{port}/playQueues?next=0&type=&window=200&own=1&uri=". urlEncode( "library://$xml->{librarySectionUUID}/directory$key" );
+  my $url = "http://$server->{address}:$server->{port}/playQueues?type=&uri=". urlEncode( "library://$xml->{librarySectionUUID}/item/$key" );
+  $url .= "&shuffle=0&repeat=0&includeChapters=1&includeRelated=1";
 
   Log3 $name, 4, "$name: requesting $url";
 
@@ -1958,6 +1960,7 @@ plex_playAlbum($$$$)
     httpversion => '1.1',
     hash => $hash,
     key => 'playAlbum',
+    album => $key,
     client => $client,
     server => $server,
     address => $address,
@@ -3529,8 +3532,12 @@ plex_parseHttpAnswer($$$)
     $handled = 1;
     my $client = $param->{client};
     my $server = $param->{server};
-    my $key = $xml->{playQueueID};
-    plex_sendApiCmd( $hash, "http://$client->{address}:$client->{port}/player/playback/playMedia?key=&containerKey=/playQueues/$key&machineIdentifier=$server->{machineIdentifier}&address=$server->{address}&port=$server->{port}", "playback" );
+    my $queue = $xml->{playQueueID};
+    my $key = $param->{album};
+    my $url =  "http://$client->{address}:$client->{port}/player/playback/playMedia?key=$key&offset=0";
+    $url .= "&machineIdentifier=$server->{machineIdentifier}&protocol=http&address=$server->{address}&port=$server->{port}";
+    $url .= "&containerKey=/playQueues/$queue?own=1&window=200";
+    plex_sendApiCmd( $hash, $url, "playback" );
 
   } elsif( $param->{key} eq 'timeline' ) {
     $handled = 1;
