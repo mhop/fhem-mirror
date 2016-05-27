@@ -7829,6 +7829,7 @@ sub CUL_HM_repReadings($) {   # parse repeater
                 .((!$pS[$fNo] || $pS[$fNo] ne $sName)?"-":$pD[$fNo])
                 .":".($pB[$fNo]?$pB[$fNo]:"-");  
 
+    my $dName = CUL_HM_getDeviceName($sName);
     $defs{$dName}{repeater} = $hash->{NAME} if ($defs{$dName});
 
     push @retL,$eS;
