@@ -938,7 +938,7 @@ logProxy_Get($@)
         ($internal_data,$main::data{"min1"},$main::data{"max1"},$main::data{"currval1"}) = logProxy_array2Data($data,$comment);
       }
 
-      if( $$internal_data ) {
+      if( ref($internal_data) eq "SCALAR" && $$internal_data ) {
         $ret .= $$internal_data;
 
         $data{"min$j"} = $main::data{"min1"};
