@@ -71,6 +71,7 @@ sub logProxy_Undefine($$)
   return undef;
 }
 
+my $logProxy_columns = "ConstX,ConstY,Func,Polar,FileLog,DbLog";
 sub
 logProxy_sampleDataFn($$$$$)
 {
@@ -78,14 +79,12 @@ logProxy_sampleDataFn($$$$$)
 
   my $desc = "Type,Spec";
 
-  my $columns = "ConstX,ConstY,Func,Polar,FileLog,DbLog";
-
   my @htmlArr;
   $max = 16 if($max > 16);
   for(my $r=0; $r < $max; $r++) {
     my @f = split(":", ($flog->[$r] ? $flog->[$r] : ":"), 6);
     my $ret = "";
-    $ret .= SVG_sel("par_${r}_0", $columns, $f[0]);
+    $ret .= SVG_sel("par_${r}_0", $logProxy_columns, $f[0]);
     $ret .= SVG_txt("par_${r}_1", "", join(":", @f[1..@f-1]), 30);
     push @htmlArr, $ret;
   }
@@ -1180,6 +1179,10 @@ logProxy_Get($@)
       }
 
       $ret .= "#$a[0]\n";
+
+    } else {
+      Log3 $name, 2, "$name: unknown keyword $fld[0] in column_spec, must be one of $logProxy_columns";
+
     }
   }
 
