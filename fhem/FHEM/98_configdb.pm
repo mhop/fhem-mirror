@@ -81,7 +81,13 @@ sub CommandConfigdb($$) {
 				$source = $dbname;
 
 			} elsif ($dbtype eq 'POSTGRESQL') {
-				return "configdb dump not yet supported for POSTGRESQL!";
+#				($dbname,undef) = split (/;/,$dbconn);
+#				(undef,$dbname) = split (/=/,$dbname);
+#				$ret    = qx(PGPASSWORD=$dbpass pg_dump -U $dbuser $dbname -f $target);
+#				return $ret if $ret;
+#				$source = $dbname;
+				return "configdb dump not yet supported for $dbtype!";
+
 			} else {
 				return "configdb dump not supported for $dbtype!";
 			}
@@ -456,7 +462,6 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 
 		<li><code>configdb dump</code></li><br/>
 			Create a dump file from from database.<br/>
-			Currently only supported for sqlite!<br/>
 			<br/>
 <br/>
 
