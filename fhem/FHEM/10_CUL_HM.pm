@@ -934,12 +934,10 @@ sub CUL_HM_Notify(@){#################################
   return undef if (grep !/INITIALIZED/,@{$events});
   delete $modules{CUL_HM}{NotifyFn};
   # execute some cleanup after init
+  
   CUL_HM_updateConfig("startUp");
   InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
-  
-  #we need to init the templist if HMInfo is in use
-  HMinfo_listOfTempTemplates() if (eval "defined(&HMinfo_listOfTempTemplates)");
-  
+
   return undef;
 }
 

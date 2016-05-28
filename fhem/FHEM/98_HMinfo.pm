@@ -26,9 +26,12 @@ sub HMinfo_Initialize($$) {####################################################
   $hash->{SetFn}     = "HMinfo_SetFn";
   $hash->{GetFn}     = "HMinfo_GetFn";
   $hash->{AttrFn}    = "HMinfo_Attr";
+  $hash->{NotifyFn}  = "HMinfo_Notify";
   $hash->{AttrList}  =  "loglevel:0,1,2,3,4,5,6 "
                        ."sumStatus sumERROR "
                        ."autoUpdate autoArchive "
+                       ."autoLoadArchive:0_no,1_load "
+#                       ."autoLoadArchive:0_no,1_template,2_register,3_templ+reg "
                        ."hmAutoReadScan hmIoMaxDly "
                        ."hmManualOper:0_auto,1_manual "
                        ."configDir configFilename configTempFile "
@@ -175,9 +178,29 @@ sub HMinfo_Attr(@) {###########################################################
       delete $modules{CUL_HM}{AttrListDef};
     }
   }
+  elsif($attrName eq "autoLoadArchive"){
+    if ($cmd eq "set"){
+    }
+  }
   return;
 }
 
+sub HMinfo_Notify(@){#################################
+  my ($ntfy, $dev) = @_;
+  return "" if ($dev->{NAME} ne "global");
+
+  my $events = deviceEvents($dev, AttrVal($ntfy->{NAME}, "addStateEvent", 0));
+  return undef if(!$events); # Some previous notify deleted the array.
+  return undef if (grep !/INITIALIZED/,@{$events});
+  delete $modules{HMinfo}{NotifyFn};
+  HMinfo_SetFn($ntfy,$ntfy->{NAME},"loadConfig") 
+       if (substr(AttrVal($ntfy->{NAME}, "autoLoadArchive", 0),0,1) ne 0);
+
+  #we need to init the templist if HMInfo is in use
+  HMinfo_listOfTempTemplates();
+  
+  return undef;
+}
 sub HMinfo_status($){##########################################################
   # - count defined HM entities, selected readings, errors on filtered readings
   # - display Assigned IO devices
@@ -3029,6 +3052,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        example:<br>
        attr hm hmDefaults hmProtocolEvents:0_off,rssiLog:0<br>
      </li>
+     <li><a name="#HMinfoautoLoadArchive">autoLoadArchive</a>
+       if set the register config will be loaded after reboot automatically. See <a ref="#HMinfoloadConfig">loadConfig</a> for details<br>
+     </li>
      
 
    </ul>
@@ -3460,6 +3486,10 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        Beispiel:<br>
        attr hm hmDefaults hmProtocolEvents:0_off,rssiLog:0<br>
     </li>
+     <li><a name="#HMinfoautoLoadArchive">autoLoadArchive</a>
+       das Register Archive sowie Templates werden nach reboot automatischgeladen.
+       Siehe <a ref="#HMinfoloadConfig">loadConfig</a> fuer details<br>
+     </li>
 
    </ul>
    <br>
