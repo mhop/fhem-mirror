@@ -310,13 +310,13 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00F8" => {name=>"HM-RC-4-3-D"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"00F9" => {name=>"HM-Sec-Sir-WM"           ,st=>'siren'             ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Sen:1:2,Panic:3:3,Arm4:4",}
  ,"00FA" => {name=>"HM-OU-CFM-TW"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",}
+ ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Dis:1:2,Key:3:9",}
  ,"00FC" => {name=>"OLIGO-smart-iq-HM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
  ,"00FD" => {name=>"HM-Sen-LI-O"             ,st=>'senBright'         ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
 
-
-
  ,"0101" => {name=>"HM-LC-Sw2PBU-FM"         ,alias=>"HM-LC-Sw2-FM-2"}
  ,"0102" => {name=>"HM-WDS30-OT2-SM-2"       ,alias=>"HM-WDS30-OT2-SM" }
+ ,"0103" => {name=>"HM-LC-Sw1-PCB"           ,alias=>"HM-LC-Sw4-SM-2" }
 
  ,"8001" => {name=>"PS-switch"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-Th-Sens"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
@@ -470,6 +470,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   backlOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0    ,max=>2     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"                       ,lit=>{off=>0,auto=>2}},
   backlOnMode2    =>{a=>  5.6,s=>0.2,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"                       ,lit=>{off=>0,on=>1}},
   ledMode         =>{a=>  5.6,s=>0.2,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED mode"                             ,lit=>{off=>0,on=>1}},
+  displayInvert   =>{a=>  5.6,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"invert Display"                       ,lit=>{off=>0,on=>1}},
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Language"                             ,lit=>{English=>0,German=>1}},
   backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at keystroke"               ,lit=>{off=>0,on=>1}},
   backAtMotion    =>{a=> 13.6,s=>0.1,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at motion"                  ,lit=>{off=>0,on=>1}},
@@ -486,6 +487,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
                                                                 
   brightness      =>{a=>  4.0,s=>0.4,l=>0,min=>0    ,max=>15    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Display brightness"},
   energyOpt       =>{a=>  8.0,s=>1.0,l=>0,min=>0    ,max=>127   ,c=>''         ,f=>1       ,u=>'s'   ,d=>1,t=>"energy Option: Duration of ilumination",lit=>{permanent=>0}},
+  powerSupply     =>{a=>  8.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"power supply option"                  ,lit=>{main=>0,bat=>1}},
 # sec_mdir
   cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"                       ,lit=>{off=>0,on=>1,on_100=>200}},
   sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message"              ,lit=>{off=>0,on=>1}},# sc needs 1 - others?
@@ -510,6 +512,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   devRepeatCntMax =>{a=> 31.0,s=>1.0,l=>0,min=>0    ,max=>1     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"act as repeater"},
   wakeupDefChan   =>{a=> 32.0,s=>1.0,l=>0,min=>0    ,max=>20    ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"wakeup default channel"},
   wakeupBehavior  =>{a=> 33.0,s=>0.1,l=>0,min=>0    ,max=>20    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior"                      ,lit=>{off=>0,on=>1}},
+  wakeupBehavMsg  =>{a=> 33.1,s=>0.1,l=>0,min=>0    ,max=>20    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"wakeup behavior status message"       ,lit=>{off=>0,on=>1}},
   alarmTimeMax    =>{a=> 34.0,s=>1.0,l=>0,min=>1    ,max=>900   ,c=>''         ,f=>1.6     ,u=>'s'   ,d=>0,t=>"maximum Alarm time"                   ,lit=>{unused=>0}},
 
   baudrate        =>{a=> 35.0,s=>1.0,l=>0,min=>0    ,max=>6     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"baudrate"                             ,lit=>{Bd300=>0,Bd600=>1,Bd1200=>2,Bd2400=>3,Bd4800=>4,Bd9600=>5,Bd19200=>6}},
@@ -656,8 +659,8 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
                                                     
 # weather units                                     
   sunThresh       =>{a=>  5  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Sunshine threshold"},
-  stormUpThresh   =>{a=>  6  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
-  stormLowThresh  =>{a=>  7  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
+  stormUpThresh   =>{a=>  6  ,s=>1  ,l=>1,min=>0    ,max=>200    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
+  stormLowThresh  =>{a=>  7  ,s=>1  ,l=>1,min=>0    ,max=>200    ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
 # others                                            
   localResetDis   =>{a=>  7  ,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"LocalReset disable"                   ,lit=>{off=>0,on=>200}},
 
@@ -998,6 +1001,9 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 
  ,"HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1}
  ,"HM-Dis-WM55"       =>{ stbyTime        =>1}
+ ,"HM-Dis-EP-WM55"    =>{ powerSupply     =>1,localResDis     =>1,wakeupBehavior  =>1,wakeupBehavMsg  =>1
+                         ,displayInvert   =>1}
+ 
  ,"HM-WDS100-C6-O"    =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1}
  ,"HM-OU-LED16"       =>{ brightness      =>1,energyOpt       =>1,localResDis     =>1}
  ,"HM-OU-CFM-PL"      =>{ localResetDis   =>1
@@ -1666,6 +1672,7 @@ $culHmModelSets{"ROTO_ZEL-STG-RM-FWT"}   = $culHmModelSets{"HM-CC-TC"};
 $culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-PB-4DIS-WM-2"}       = $culHmModelSets{"HM-PB-4DIS-WM"};
 $culHmModelSets{"HM-Dis-WM55"}           = $culHmModelSets{"HM-PB-4DIS-WM"};
+$culHmModelSets{"HM-Dis-EP-WM55"}           = $culHmModelSets{"HM-PB-4DIS-WM"};
 $culHmModelSets{"HM-RC-Dis-H-x-EU"}      = $culHmModelSets{"HM-PB-4DIS-WM"};
 $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
 #$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
@@ -1790,6 +1797,8 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
  );
 # clones- - - - - - - - - - - - - - - - -
 $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
+$culHmChanSets{"HM-Dis-EP-WM5501"}      = $culHmChanSets{"HM-Dis-WM5501"};
+$culHmChanSets{"HM-Dis-EP-WM5502"}      = $culHmChanSets{"HM-Dis-WM5501"};
 
 $culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{THSensor};
 $culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{THSensor};
