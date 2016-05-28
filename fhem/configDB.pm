@@ -107,7 +107,9 @@
 #
 # 2016-03-26 - added     log entry for search (verbose=5)
 #
-# 2016-05-22 - added     configdb dump (for sqlite only!)
+# 2016-05-22 - added     configdb dump (for sqlite)
+#
+# 2016-05-28 - added     configdb dump (for mysql)
 #
 ##############################################################################
 #
@@ -818,11 +820,6 @@ sub _cfgDB_Info() {
 	$fhem_dbh->disconnect();
 
 	return join("\n", @r);
-}
-
-# return database type
-sub _cfgDB_typeInfo() { 
-	return ($cfgDB_dbtype,$cfgDB_dbconn); 
 }
 
 # recover former config from database archive
