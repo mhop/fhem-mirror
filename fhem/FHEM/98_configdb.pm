@@ -11,6 +11,7 @@ use configDB;
 no if $] >= 5.017011, warnings => 'experimental';
 
 sub CommandConfigdb($$);
+sub _cfgDB_readConfig();
 
 my @pathname;
 
@@ -59,23 +60,35 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('dump') {
-			my ($dbtype,$dbconn)  = _cfgDB_typeInfo();
+
+			my ($dbconn,$dbuser,$dbpass,$dbtype)  = _cfgDB_readConfig();
+			my $ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
+			my $mp     = AttrVal('global','modpath','.');
+			my $target = "$mp/log/configDB_$ts.dump.gz";
+
+			my ($dbname,$ret,$size,$source);
+
 			if ($dbtype eq 'SQLITE') {
-				my $ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
-				my $mp     = AttrVal('global','modpath','.');
-				my (undef,$source) = split (/=/, $dbconn);
-				my $target = "$mp/log/configDB_$ts.dump.gz";
-				Log3('configdb', 4, "configdb: source for database dump: $source");
-				Log3('configdb', 4, "configdb: target for database dump: $target");
-				my $ret    = qx(echo '.dump' | sqlite3 $source | gzip -c > $target);
+				(undef,$source) = split (/=/, $dbconn);
+				$ret    = qx(echo '.dump' | sqlite3 $source | gzip -c > $target);
 				return $ret if $ret; # return error message if available
-	            my $size   = -s $target;
-				$ret       = "configDB dumped $size bytes\nfrom: $source\n  to: $target";
-				# You can use 'zcat $target | sqlite3 configDB.db' in a terminal to restore database.
-				return $ret;
+
+			} elsif ($dbtype eq 'MYSQL') {
+				($dbname,undef) = split (/;/,$dbconn);
+				(undef,$dbname) = split (/=/,$dbname);
+				$ret    = qx(mysqldump --user=$dbuser --password=$dbpass -Q $dbname > $target);
+				return $ret if $ret;
+				$source = $dbname;
+
+			} elsif ($dbtype eq 'POSTGRESQL') {
+				return "configdb dump not yet supported for POSTGRESQL!";
 			} else {
-				return "configdb dump is only supported for sqlite!";
+				return "configdb dump not supported for $dbtype!";
 			}
+
+			$size = -s $target;
+			$ret  = "configDB dumped $size bytes\nfrom: $source\n  to: $target";
+			return $ret;
 		}
 
 		when ('diff') {
@@ -226,6 +239,40 @@ sub CommandConfigdb($$) {
 
 	return $ret;
 	
+}
+
+sub _cfgDB_readConfig() {
+	if(!open(CONFIG, 'configDB.conf')) {
+		Log3('configDB', 1, 'Cannot open database configuration file configDB.conf');
+		return 0;
+	}
+	my @config=<CONFIG>;
+	close(CONFIG);
+
+	use vars qw(%configDB);
+
+	my %dbconfig;
+	eval join("", @config);
+
+	my $cfgDB_dbconn	= $dbconfig{connection};
+	my $cfgDB_dbuser	= $dbconfig{user};
+	my $cfgDB_dbpass	= $dbconfig{password};
+	my $cfgDB_dbtype;
+
+	%dbconfig = ();
+	@config   = ();
+
+	if($cfgDB_dbconn =~ m/pg:/i) {
+			$cfgDB_dbtype ="POSTGRESQL";
+		} elsif ($cfgDB_dbconn =~ m/mysql:/i) {
+			$cfgDB_dbtype = "MYSQL";
+		} elsif ($cfgDB_dbconn =~ m/sqlite:/i) {
+			$cfgDB_dbtype = "SQLITE";
+		} else {
+			$cfgDB_dbtype = "unknown";
+	}
+
+	return($cfgDB_dbconn,$cfgDB_dbuser,$cfgDB_dbpass,$cfgDB_dbtype);
 }
 
 1;
