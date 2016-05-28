@@ -1069,13 +1069,10 @@ HUEDevice_Parse($$)
       } elsif( $hash->{type} eq "Color temperature light" ) {
         $attr{$name}{subType} = 'ctdimmer';
 
-      } elsif( $hash->{type} eq "Dimmable light" ) {
+      } elsif( $hash->{type} =~ m/Dimmable/ ) {
         $attr{$name}{subType} = 'dimmer';
 
-      } elsif( $hash->{type} eq "Dimmable plug-in unit" ) {
-        $attr{$name}{subType} = 'dimmer';
-
-      } elsif( $hash->{type} =~ m'On/Off' ) {
+      } elsif( $hash->{type} =~ m/On.Off/ ) {
         $attr{$name}{subType} = 'switch';
 
       }
