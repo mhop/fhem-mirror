@@ -192,7 +192,8 @@ sub BDKM_Initialize($)
     $hash->{SetFn}           = "BDKM_Set";
     $hash->{GetFn}           = "BDKM_Get";
     $hash->{AttrFn}          = "BDKM_Attr";
-    
+    $hash->{DeleteFn}        = "BDKM_Undefine";
+
     $hash->{AttrList}        = 
         "BaseInterval " .
         "PollIds:textField-long  " .
