@@ -499,6 +499,8 @@ my %zwave_parseHook; # nodeId:regexp => fn, used by assocRequest
 my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
                            "010f-0302-1000" => "Fibaro_FGRM222", # FGR 222
+                           "0108-0004-000a" => "Philio_PSE02", # DLink DCH-Z510
+                           "013c-0004-000a" => "Philio_PSE02", # Zipato Siren
                            "0115-0100-0102" => "ZME_KFOB" );
 
 # Patching certain devices.
@@ -512,6 +514,16 @@ use vars qw(%zwave_deviceSpecial);
       parse => { "0891010f260303(..)(..)" =>
                   'sprintf("position:Blind %d Slat %d",hex($1),hex($2))',
                  "0891010f260302(..)00" =>'"position:".hex($1)' } } },
+
+   Philio_PSE02 => {
+     ALARM => {
+      set => { alarmEmergencyOn=>"050000000007010000",
+               alarmFireOn     =>"05000000000a020000",
+               alarmAmbulanceOn=>"05000000000a030000",
+               alarmPoliceOn   =>"05000000000a010000",
+               alarmDoorchimeOn=>"050000000006160000",
+               alarmBeepOn     =>"05000000000a050000" } } },
+
    ZME_KFOB => {
      ZWAVEPLUS_INFO => {
       # Example only. ORDER must be >= 50
