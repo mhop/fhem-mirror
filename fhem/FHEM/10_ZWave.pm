@@ -578,7 +578,7 @@ ZWave_Initialize($)
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 
   $hash->{FW_detailFn} = "ZWave_fhemwebFn";
-  $hash->{FW_showStatus} = 1;
+  $hash->{FW_deviceOverview} = 1;
 
   eval { require Crypt::Rijndael; };
   if($@) {
