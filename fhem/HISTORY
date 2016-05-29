@@ -676,3 +676,5 @@
 - Sun May 22 2016 (loredo)
   - rewrite of ONKYO_AVR module based on IODev for real-time updates
   - separate ONKYO_AVR_ZONE module to support separate zone devices for ONKYO_AVR; users will need to manually delete old ONKYO_AVR definitions who where just used for a specific zone and have them re-created based on ONKYO_AVR_ZONE
+- Sun May 29 2016 (arnoaugustin)
+  - added new module 52_I2C_BH1750 for i2c BH1750 light sensor
