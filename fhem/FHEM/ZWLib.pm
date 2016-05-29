@@ -130,7 +130,7 @@ use vars qw(%zw_type6);
   '07' => 'SENSOR_NOTIFICATION',
   '08' => 'THERMOSTAT',
   '09' => 'WINDOW_COVERING',
-  '0F' => 'REPEATER_SLAVE',
+  '0f' => 'REPEATER_SLAVE',
   '10' => 'SWITCH_BINARY',
   '11' => 'SWITCH_MULTILEVEL',
   '12' => 'SWITCH_REMOTE',
@@ -146,7 +146,7 @@ use vars qw(%zw_type6);
   '31' => 'METER',
   '40' => 'ENTRY_CONTROL',
   '50' => 'SEMI_INTEROPERABLE',
-  'A1' => 'SENSOR_ALARM',
+  'a1' => 'SENSOR_ALARM',
   'ff' => 'NON_INTEROPERABLE',
 );
 
