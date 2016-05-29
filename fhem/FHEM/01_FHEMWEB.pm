@@ -264,6 +264,13 @@ FW_Define($$)
     exit(1);
   }
 
+  InternalTimer(1, sub(){
+    if($featurelevel >= 5.8 && !AttrVal($name, "csrfToken", undef)) {
+      my ($x,$y) = gettimeofday();
+      $hash->{CSRFTOKEN} = rand($y)*rand($x);
+    }
+  }, $hash, 0);
+
   return $ret;
 }
 
@@ -2300,7 +2307,12 @@ FW_Attr(@)
       my ($x,$y) = gettimeofday();
       $csrf = rand($y)*rand($x);
     }
-    $hash->{CSRFTOKEN} = $csrf;
+
+    if($csrf eq "none") {
+      delete($hash->{CSRFTOKEN});
+    } else {
+      $hash->{CSRFTOKEN} = $csrf;
+    }
   }
 
   if($attrName eq "csrfToken" && $type eq "del") {
@@ -3057,11 +3069,12 @@ FW_widgetOverride($$)
 
     <a name="csrfToken"></a>
     <li>csrfToken<br>
-       If set, FHEMWEB requires the value of this attribute as fwcsrf
-       Parameter for each command. If the value is random, then a random
-       number will be generated on each FHEMWEB start. It is used as
-       countermeasure for Cross Site Resource Forgery attacks.
-       Default is not active.
+       If set, FHEMWEB requires the value of this attribute as fwcsrf Parameter
+       for each command. It is used as countermeasure for Cross Site Resource
+       Forgery attacks. If the value is random, then a random number will be
+       generated on each FHEMWEB start. If it is set to none, no token is
+       expected. Default is random for featurelevel 5.8 and greater, and none
+       for featurelevel below 5.8
        </li><br>
 
     <a name="CssFiles"></a>
@@ -3767,11 +3780,12 @@ FW_widgetOverride($$)
      <a name="csrfToken"></a>
      <li>csrfToken<br>
         Falls gesetzt, wird der Wert des Attributes als fwcsrf Parameter bei
-        jedem ueber FHEMWEB abgesetzten Kommando verlangt. Falls der Wert
-        random ist, dann wird ein Zufallswert beim jeden FHEMWEB Start neu
-        generiert.
-        Es dient zum Schutz von Cross Site Resource Forgery Angriffen.
-        Default ist leer, also nicht aktiv.
+        jedem &uuml;ber FHEMWEB abgesetzten Kommando verlangt, es dient zum
+        Schutz von Cross Site Resource Forgery Angriffen.
+        Falls der Wert random ist, dann wird ein Zufallswert beim jeden FHEMWEB
+        Start neu generiert, falls er none ist, dann wird kein Parameter
+        verlangt. Default ist random f&uuml;r featurelevel 5.8 und
+        gr&ouml;&szlig;er, und none f&uuml;r featurelevel kleiner 5.8
         </li><br>
 
      <a name="CssFiles"></a>
@@ -4237,7 +4251,7 @@ FW_widgetOverride($$)
     <a name="widgetOverride"></a>
     <li>widgetOverride<br>
         Leerzeichen separierte Liste von Name/Modifier Paaren, mit dem man den
-        vom Modulautor fuer einen bestimmten Parameter (Set/Get/Attribut)
+        vom Modulautor f&uuml;r einen bestimmten Parameter (Set/Get/Attribut)
         vorgesehene Widgets &auml;ndern kann.
         <ul>
           <li>Ist der Modifier ":noArg", wird kein weiteres Eingabefeld
