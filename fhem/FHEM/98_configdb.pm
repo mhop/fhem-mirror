@@ -76,17 +76,16 @@ sub CommandConfigdb($$) {
 			} elsif ($dbtype eq 'MYSQL') {
 				($dbname,undef) = split (/;/,$dbconn);
 				(undef,$dbname) = split (/=/,$dbname);
-				$ret    = qx(mysqldump --user=$dbuser --password=$dbpass -Q $dbname > $target);
+				$ret    = qx(mysqldump --user=$dbuser --password=$dbpass -Q $dbname | gzip -c > $target);
 				return $ret if $ret;
 				$source = $dbname;
 
 			} elsif ($dbtype eq 'POSTGRESQL') {
 				($dbname,undef) = split (/;/,$dbconn);
 				(undef,$dbname) = split (/=/,$dbname);
-				$ret    = qx(PGPASSWORD=$dbpass pg_dump -U $dbuser $dbname -f $target);
+				$ret    = qx(PGPASSWORD=$dbpass pg_dump -U $dbuser $dbname | gzip > $target);
 				return $ret if $ret;
 				$source = $dbname;
-#				return "configdb dump not yet supported for $dbtype!";
 
 			} else {
 				return "configdb dump not supported for $dbtype!";
