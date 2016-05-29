@@ -907,7 +907,7 @@ plex_Set($$@)
 
     return "client $ip not online" if( $cmd ne '?' && !$entry->{online} );
 
-    if( ($cmd eq 'play' || $cmd eq 'resume' ) && $params[0] ) {
+    if( ($cmd eq 'playMedia' || $cmd eq 'resume' ) && $params[0] ) {
       my $server = plex_serverOf($hash, $params[0], 1);
       return "unknown server" if( !$server );
 
@@ -938,23 +938,23 @@ plex_Set($$@)
 
       return undef;
 
-    } elsif( lc($cmd) eq 'playalbum' ) {
-      return "usage: playAlbum <key>" if( !$params[0] );
+    } elsif( lc($cmd) eq 'play' && $params[0] ) {
+      return "usage: play <key>" if( !$params[0] );
 
       my $server = plex_serverOf($hash, $params[0], 1);
       return "unknown server" if( !$server );
 
       shift @params if( $params[0] eq $server->{address} );
 
-      return plex_playAlbum($hash, $entry, $server, $params[0] );
+      return plex_play($hash, $entry, $server, $params[0] );
 
       return undef;
 
-    } elsif( $cmd eq 'pause' || $cmd eq 'play' || $cmd eq 'resume' || $cmd eq 'stop'
+    } elsif( $cmd eq 'pause' || $cmd eq 'playMedia' || $cmd eq 'resume' || $cmd eq 'stop'
              || $cmd eq 'skipNext' || $cmd eq 'skipPrevious' || $cmd eq 'stepBack' || $cmd eq 'stepForward' ) {
-      return "$cmd not supported" if( $cmd ne 'pause' && $cmd ne 'play' && $cmd ne 'resume'
+      return "$cmd not supported" if( $cmd ne 'pause' && $cmd ne 'playMedia' && $cmd ne 'resume'
                                       && $hash->{controllable} && $hash->{controllable} !~ m/\b$cmd\b/ );
-      if( ($cmd eq 'play' || $cmd eq 'resume')  && $hash->{STATE} eq 'stopped' ) {
+      if( ($cmd eq 'playMedia' || $cmd eq 'resume')  && $hash->{STATE} eq 'stopped' ) {
         my $key = ReadingsVal($name,'key', undef);
         return 'no current media key' if( !$key );
         my $server = ReadingsVal($name,'server', undef);
@@ -1039,8 +1039,8 @@ plex_Set($$@)
 
     }
 
-    $list .= 'play ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
-    $list .= 'playAlbum ' if( $hash->{protocolCapabilities} =~ m/\bplayqueues\b/ );
+    $list .= 'playMedia ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
+    $list .= 'play ' if( $hash->{protocolCapabilities} =~ m/\bplayqueues\b/ );
     $list .= 'resume:noArg ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
     $list .= 'pause:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bplayPause\b/ );;
     $list .= 'stop:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bstop\b/ );;
@@ -1921,20 +1921,24 @@ plex_sendApiCmd($$$;$)
   return undef;
 }
 sub
-plex_playAlbum($$$$)
+plex_play($$$$)
 {
   my ($hash, $client, $server,$key) = @_;
   my $name = $hash->{NAME};
 
-  $key = "/library/metadata/$key" if( $key !~ '^/' );
-
-  my $xml = plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}$key", '#raw', 1 );
-#Log 1, Dumper $xml;
-  return "item not found" if( !$xml || !$xml->{librarySectionUUID} );
-
-  my $url = "http://$server->{address}:$server->{port}/playQueues?type=&uri=". urlEncode( "library://$xml->{librarySectionUUID}/item/$key" );
-  $url .= "&shuffle=0&repeat=0&includeChapters=1&includeRelated=1";
-
+  my $url;
+  if ($key =~ m/\bplaylists\b/) { #play playlist
+    $key =~ s/[^0-9]//g;
+    $url = "http://$server->{address}:$server->{port}/playQueues?type=&playlistID=$key";
+    $url .= "&shuffle=0&repeat=0&includeChapters=1&includeRelated=1";
+  } else { # play album or single track  
+    $key = "/library/metadata/$key" if( $key !~ '^/' );
+    my $xml = plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}$key", '#raw', 1 );
+    #Log 1, Dumper $xml;
+    return "item not found" if( !$xml || !$xml->{librarySectionUUID} );
+    $url = "http://$server->{address}:$server->{port}/playQueues?type=&uri=". urlEncode( "library://$xml->{librarySectionUUID}/item/$key" );
+    $url .= "&shuffle=0&repeat=0&includeChapters=1&includeRelated=1";
+  }
   Log3 $name, 4, "$name: requesting $url";
 
   my $address;
@@ -2424,7 +2428,7 @@ plex_parseTimeline($$$)
     $state = $1 if( $1 eq $2 && $2 eq $3 );
   }
 
-  if( $state =~ '(\w*):\w*' ) {
+  if( $state =~ '(\w*):playing' ) {
     $chash->{currentMediaType} = $1;
   } else {
     delete $chash->{currentMediaType};
@@ -4067,8 +4071,6 @@ plex_publishToSonos($$;$)
   <b>Set</b>
   <ul>
     <li>play [&lt;server&gt; [&lt;item&gt;]]<br>
-      </li>
-    <li>playAlbum [&lt;server&gt;] &lt;item&gt;<br>
       </li>
     <li>resume [&lt;server&gt;] &lt;item&gt;]<br>
       </li>

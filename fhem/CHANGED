@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: plex: play command now handles single media items, music albums
+             and playlists. playAlbum command removed. (by Risiko)
   - added:   52_I2C_BH1750: modul for i2c BH1750 light sensor
   - bugfix:  50_TelegramBot: captions for Images / special chars in Contacts
   - feature: YAMAHA_AVR: new set command presetUp and presetDown for preset
