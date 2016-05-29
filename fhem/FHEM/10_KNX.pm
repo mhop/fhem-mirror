@@ -12,6 +12,7 @@
 # ABU 20160414 Changed SplitFn again
 # ABU 20160416 Changed SplitFn again
 # ABU 20160422 Added dpt9.021 - mA
+# ABU 20160529 Changed Doku
 
 package main;
 
@@ -1473,8 +1474,8 @@ decodeByDpt ($$$) {
     <p>Example:</p>
       <pre>
       define lamp1 KNX 0/10/12:dpt1
-      define lamp1 EIB 0/10/12:dpt1:meinName 0/0/5:dpt1.001
-      define lamp1 EIB 0A0C:dpt1.003 myTul
+      define lamp1 KNX 0/10/12:dpt1:meinName 0/0/5:dpt1.001
+      define lamp1 KNX 0A0C:dpt1.003 myTul
       </pre>
   </ul>
   
@@ -1513,10 +1514,10 @@ decodeByDpt ($$$) {
 	
 	<p>The current date and time can be sent to the bus by the following settings:</p>
 	<pre>
-      define timedev EIB 0/0/7:dpt10
+      define timedev KNX 0/0/7:dpt10
       attr timedev webCmd now
       
-      define datedev EIB 0/0/8:dpt11
+      define datedev KNX 0/0/8:dpt11
       attr datedev webCmd now
       
       # send every midnight the new date
@@ -1690,7 +1691,7 @@ decodeByDpt ($$$) {
   Der Standard begr&uuml;ndet sich haupts&auml;chlich auf twisted pair, findet aber auch zunehmende Verbreitung auf andere Medien (Funk, Ethernet, ...)</p>
   F&uuml;r Anf&auml;nger sei folgende Lekt&uuml;re empfohlen: <a href="http://www.knx.org/media/docs/Flyers/KNX-Basics/KNX-Basics_de.pdf">KNX-Basics</a>
 
-<p>Das Modul <a href="#TUL">TUL</a> stellt die Verbindung zum Bus her, Das KNX-Modul stellt die Verbindung zu den einzelnen EIB-Ger&auml;ten her. Das Modul stellt Befehle (on, off, on-until, on-for-timer)
+<p>Das Modul <a href="#TUL">TUL</a> stellt die Verbindung zum Bus her, Das KNX-Modul stellt die Verbindung zu den einzelnen KNX-/EIB-Ger&auml;ten her. Das Modul stellt Befehle (on, off, on-until, on-for-timer)
   zum ein- und Ausschalten von Ger&auml;ten zur Verf&uuml;gung. F&uuml;r numerische DPT nutzt bitte value (set &lt;devname&gt; value &lt;177.45&gt;). F&uuml;r string-DPT nutzt bitte string 
   (set &lt;devname&gt; string &lt;Hello World&gt;). F&uuml;r andere, undefinierte DPT k&ouml;nnt Ihr raw hex Werte ans Netzwerk senden (set &lt;devname&gt; raw &lt;hexval&gt;).<br> 
   Komplexe Konfigurationen k&ouml;nnen aufgebaut werden, indem mehrere Modulinstanzen in einem Ger&auml;t definiert werden. Daf&uuml;r werden mehrere Kombinationen aus GAD und DPT in einem Ger&auml;t definiert werden.</p>
@@ -1718,8 +1719,8 @@ decodeByDpt ($$$) {
     <p>Example:</p>
       <pre>
       define lamp1 KNX 0/10/12:dpt1
-      define lamp1 EIB 0/10/12:dpt1:meinName 0/0/5:dpt1.001
-      define lamp1 EIB 0A0C:dpt1.003 myTul
+      define lamp1 KNX 0/10/12:dpt1:meinName 0/0/5:dpt1.001
+      define lamp1 KNX 0A0C:dpt1.003 myTul
       </pre>
   </ul>
   
@@ -1757,10 +1758,10 @@ decodeByDpt ($$$) {
 	
 	<p>Aktuelle Uhrzeit / Datum k&ouml;nnen wie folgt auf den Bus gelegt werden:</p>
 	<pre>
-      define timedev EIB 0/0/7:dpt10
+      define timedev KNX 0/0/7:dpt10
       attr timedev webCmd now
       
-      define datedev EIB 0/0/8:dpt11
+      define datedev KNX 0/0/8:dpt11
       attr datedev webCmd now
       
       # send every midnight the new date
