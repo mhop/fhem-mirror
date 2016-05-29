@@ -3196,8 +3196,8 @@ doGlobalDef($)
   $devcount = 1;
   $defs{global}{NR}    = $devcount++;
   $defs{global}{TYPE}  = "Global";
-  $defs{global}{STATE} = "<no definition>";
-  $defs{global}{DEF}   = "<no definition>";
+  $defs{global}{STATE} = "no definition";
+  $defs{global}{DEF}   = "no definition";
   $defs{global}{NAME}  = "global";
 
   CommandAttr(undef, "global verbose 3");
