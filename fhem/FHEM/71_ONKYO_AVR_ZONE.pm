@@ -59,10 +59,6 @@ sub ONKYO_AVR_ZONE_Initialize($) {
 
     Log3 $hash, 5, "ONKYO_AVR_ZONE_Initialize: Entering";
 
-    eval 'use XML::Simple qw(:strict); 1';
-    return "Please install XML::Simple to use this module."
-      if ($@);
-
     $hash->{Match} = ".+";
 
     $hash->{DefFn}   = "ONKYO_AVR_ZONE_Define";
@@ -109,11 +105,13 @@ sub ONKYO_AVR_ZONE_Define($$$) {
     my $zone;
 
     if ( !defined( @$a[2] ) ) {
-      $zone   = "2";
-    } elsif ( @$a[2] =~ /^[2-4]$/ ) {
-      $zone   = @$a[2];
-    } else {
-      return @$a[2]." is not a valid Zone number";
+        $zone = "2";
+    }
+    elsif ( @$a[2] =~ /^[2-4]$/ ) {
+        $zone = @$a[2];
+    }
+    else {
+        return @$a[2] . " is not a valid Zone number";
     }
 
     if ( defined( $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone} ) ) {
@@ -121,7 +119,7 @@ sub ONKYO_AVR_ZONE_Define($$$) {
           . $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone}{NAME};
     }
     elsif ( !defined($IOhash) ) {
-        return "No matching I/O device found";
+        return "No matching I/O device found, please define a ONKYO_AVR device first";
     }
     elsif ( !defined( $IOhash->{TYPE} ) || !defined( $IOhash->{NAME} ) ) {
         return "IODev does not seem to be existing";
@@ -241,6 +239,7 @@ sub ONKYO_AVR_ZONE_Parse($$) {
                     }
                 }
 
+                # power
                 if ( $cmd eq "power" ) {
                     readingsBulkUpdate( $hash, "presence", "present" )
                       if ( ReadingsVal( $name, "presence", "-" ) ne "present" );
@@ -248,13 +247,12 @@ sub ONKYO_AVR_ZONE_Parse($$) {
 
                 readingsBulkUpdate( $hash, $cmd, $value )
                   if ( ReadingsVal( $name, $cmd, "-" ) ne $value );
-
-                # stateAV
-                my $stateAV = ONKYO_AVR_ZONE_GetStateAV($hash);
-                readingsBulkUpdate( $hash, "stateAV", $stateAV )
-                  if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
-
             }
+
+            # stateAV
+            my $stateAV = ONKYO_AVR_ZONE_GetStateAV($hash);
+            readingsBulkUpdate( $hash, "stateAV", $stateAV )
+              if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
 
             readingsEndUpdate( $hash, 1 );
             last;

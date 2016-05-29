@@ -60,7 +60,7 @@ sub ONKYO_AVR_Initialize($) {
 
     Log3 $hash, 5, "ONKYO_AVR_Initialize: Entering";
 
-    eval 'use XML::Simple qw(:strict); 1';
+    eval 'use XML::Simple; 1';
     return "Please install XML::Simple to use this module."
       if ($@);
 
@@ -142,7 +142,7 @@ sub ONKYO_AVR_Define($$$) {
     }
     $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{name}  = "Main";
     $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{value} = "1";
-    $modules{ONKYO_AVR_ZONE}{defptr}{$name}{1} = $hash;
+    $modules{ONKYO_AVR_ZONE}{defptr}{$name}{1}                  = $hash;
 
     my $ret = DevIo_OpenDev( $hash, 0, "ONKYO_AVR_DevInit" );
 
@@ -384,12 +384,16 @@ sub ONKYO_AVR_Read($) {
     my $value = "";
 
     # conversion based on zone
-    foreach
-      my $zoneID ( keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} } )
-    {
+    foreach my $zoneID ( keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} } ) {
         next
-          if (     defined($hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}{value})
-                && $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}{value} ne "1" );
+          if (
+            defined(
+                $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}
+                  {value}
+            )
+            && $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}{value}
+            ne "1"
+          );
 
         my $commandDB = ONKYOdb::ONKYO_GetRemotecontrolCommandDetails($zoneID);
 
@@ -668,6 +672,7 @@ sub ONKYO_AVR_Read($) {
 
         if ( $value =~ /^<\?xml/ ) {
 
+            no strict;
             my $xml_parser = XML::Simple->new(
                 NormaliseSpace => 0,
                 KeepRoot       => 0,
@@ -681,7 +686,8 @@ sub ONKYO_AVR_Read($) {
                 },
             );
             delete $hash->{helper}{receiver};
-            $hash->{helper}{receiver} = $xml_parser->XMLin($value);
+            eval '$hash->{helper}{receiver} = $xml_parser->XMLin($value);';
+            use strict;
 
             # Safe input names
             my $inputs;
@@ -1511,19 +1517,20 @@ sub ONKYO_AVR_Get($$$) {
 
         # createZone
         my $zones = "";
-        if (defined($hash->{helper}{receiver}{device}{zonelist}{zone})) {
-          foreach my $zoneID (
-              keys %{ $hash->{helper}{receiver}{device}{zonelist}{zone} } )
-          {
-              next
-                if ( $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}
-                  {value} ne "1" || $zoneID eq "1" );
-              $zones .= "," if ( $zones ne "" );
-              $zones .= $zoneID;
-          }
+        if ( defined( $hash->{helper}{receiver}{device}{zonelist}{zone} ) ) {
+            foreach my $zoneID (
+                keys %{ $hash->{helper}{receiver}{device}{zonelist}{zone} } )
+            {
+                next
+                  if (
+                    $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}
+                    {value} ne "1" || $zoneID eq "1" );
+                $zones .= "," if ( $zones ne "" );
+                $zones .= $zoneID;
+            }
         }
         $return .= " createZone:$zones" if ( $zones ne "" );
-        $return .= " createZone:2,3,4" if ( $zones eq "" );
+        $return .= " createZone:2,3,4"  if ( $zones eq "" );
 
         # remoteControl
         $return .= " remoteControl:";
@@ -1905,16 +1912,14 @@ sub ONKYO_AVR_Set($$$) {
                       ONKYO_AVR_SendCommand( $hash, "net-usb", "trdown" );
                 }
                 elsif ( lc( @$a[2] ) eq "next" ) {
-                    $return =
-                      ONKYO_AVR_SendCommand( $hash, "net-usb", "trup" );
+                    $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "trup" );
                 }
                 elsif ( lc( @$a[2] ) eq "shuffle" ) {
                     $return =
                       ONKYO_AVR_SendCommand( $hash, "net-usb", "random" );
                 }
                 elsif ( lc( @$a[2] ) eq "menu" ) {
-                    $return =
-                      ONKYO_AVR_SendCommand( $hash, "net-usb", "men" );
+                    $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "men" );
                 }
                 else {
                     $return = "Unsupported remoteControl command: " . @$a[2];
@@ -2524,7 +2529,7 @@ sub ONKYO_AVR_RClayout() {
       <ul>
         <code>define &lt;name&gt; ONKYO_AVR &lt;ip-address-or-hostname&gt; [&lt;protocol-version&gt;]</code><br>
         <br>
-        This module controls ONKYO A/V receivers via network connection.<br>
+        This module controls ONKYO A/V receivers in real-time via network connection.<br>
         Use <a href="#ONKYO_AVR_ZONE">ONKYO_AVR_ZONE</a> to control slave zones.<br>
         <br>
         Example:<br>
