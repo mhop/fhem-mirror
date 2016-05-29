@@ -111,6 +111,9 @@
 #
 # 2016-05-28 - added     configdb dump (for mysql)
 #
+# 2016-05-29 - changed   improve support for postgresql (tnx to Matze)
+#              added     configdb dump (for postgresql)
+#
 ##############################################################################
 #
 
@@ -216,13 +219,11 @@ sub cfgDB_Init() {
 
 	my $fhem_dbh = _cfgDB_Connect;
 
-	eval { $fhem_dbh->do("CREATE EXTENSION \"uuid-ossp\"") if($cfgDB_dbtype eq 'POSTGRESQL'); };
-
 #	create TABLE fhemversions ifnonexistent
 	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemversions(VERSION INT, VERSIONUUID CHAR(50))");
 
 #	create TABLE fhemconfig if nonexistent
-	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND CHAR(32), DEVICE CHAR(32), P1 CHAR(50), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
+	$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhemconfig(COMMAND VARCHAR(32), DEVICE VARCHAR(32), P1 VARCHAR(50), P2 TEXT, VERSION INT, VERSIONUUID CHAR(50))");
 #	check TABLE fhemconfig already populated
 	my $count = $fhem_dbh->selectrow_array('SELECT count(*) FROM fhemconfig');
 	if($count < 1) {
@@ -246,8 +247,8 @@ sub cfgDB_Init() {
 #	create TABLE fhembinfilesave if nonexistent
 	if($cfgDB_dbtype eq "MYSQL") {
 		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content MEDIUMBLOB)");
-#		my $spaltentyp = $fhem_dbh->do("SHOW FIELDS FROM fhembinfilesave LIKE 'content'");
-#		Log3(undef,1,$spaltentyp);
+	} elsif ($cfgDB_dbtype eq "POSTGRESQL") {
+		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content bytea)");
 	} else {
 		$fhem_dbh->do("CREATE TABLE IF NOT EXISTS fhembinfilesave(filename TEXT, content BLOB)");
 	}
@@ -1036,6 +1037,15 @@ sub _cfgDB_binFileimport($$;$) {
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhembinfilesave where filename = '$filename'");
 	my $sth = $fhem_dbh->prepare('INSERT INTO fhembinfilesave values (?, ?)');
+
+# add support for postgresql by Matze
+    $sth->bind_param( 1, $filename );
+    if ($cfgDB_dbtype eq "POSTGRESQL") {
+        $sth->bind_param( 2, $blobContent, { pg_type => DBD::Pg::PG_BYTEA() } );
+    } else {
+        $sth->bind_param( 2, $blobContent );
+    }
+
 	$sth->execute($filename, $blobContent);
 	$sth->finish();
 	$fhem_dbh->commit();
