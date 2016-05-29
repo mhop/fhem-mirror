@@ -24,7 +24,7 @@ sub ZWCUL_SimpleWrite($$);
 sub ZWCUL_Write($$$);
 sub ZWCUL_ProcessSendStack($);
 
-use vars qw(%zwave_id2class);
+our %zwave_id2class;
 my %ZWCUL_sentIdx;
 my %ZWCUL_sentIdx2cbid;
 
