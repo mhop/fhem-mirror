@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  50_TelegramBot: captions for Images / special chars in Contacts
   - feature: YAMAHA_AVR: new set command presetUp and presetDown for preset
              selection in the current input
   - added:   52_I2C_GY30_BH1750FVI: modul i2c light intensity sensor
