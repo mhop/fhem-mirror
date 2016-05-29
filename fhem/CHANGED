@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: YAMAHA_AVR: new set command presetUp and presetDown for preset
+             selection in the current input
   - added:   52_I2C_GY30_BH1750FVI: modul i2c light intensity sensor
   - added:   52_I2C_HDC1008: modul for i2c humidity and temperature sensor
   - bugfix:  FB_CALLLIST: fixing double space in certain call state values.
