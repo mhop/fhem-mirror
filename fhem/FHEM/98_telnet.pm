@@ -286,7 +286,7 @@ telnet_Read($)
           if($gotCmd && $hash->{showPrompt} && !$hash->{rcvdQuit});
 
   $ret =~ s/\n/\r\n/g if($hash->{Authenticated});  # only for DOS telnet 
-  telnet_Output($hash,$ret);
+  telnet_Output($hash, $ret, 1);
 
   if($hash->{rcvdQuit}) {
     if($hash->{isClient}) {
@@ -297,13 +297,15 @@ telnet_Read($)
     }
   }
 }
+
 sub
-telnet_Output($$)
+telnet_Output($$$)
 {
-  my ($hash,$ret) = @_;
+  my ($hash,$ret,$nonl) = @_;
 
   if($ret) {
     $ret = utf8ToLatin1($ret) if( $hash->{encoding} eq "latin1" );
+    $ret = "\n$ret\n$hash->{prompt} " if(!$nonl);        # AsyncOutput stuff
     for(;;) {
       my $l = syswrite($hash->{CD}, $ret);
       last if(!$l || $l == length($ret));
@@ -380,7 +382,7 @@ CommandTelnetInform($$)
   } elsif($param eq "log") {
     $logInform{$name} = sub($$){
       my ($me, $msg) = @_; # _NO_ Log3 here!
-      telnet_Output($defs{$me}, $msg."\n");
+      telnet_Output($defs{$me}, $msg."\n", 1);
     }
     
   } elsif($param ne "off") {

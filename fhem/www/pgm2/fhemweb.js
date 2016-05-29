@@ -495,7 +495,7 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
     }
     });
     
-  $("div input.psc[type=submit]").click(function(e){
+  $("div input.psc[type=submit]:not(.get)").click(function(e){
     e.preventDefault();
     var newDef = typeof cm !== 'undefined' ?
                  cm.getValue() : $(this).closest("form").find("textarea").val();

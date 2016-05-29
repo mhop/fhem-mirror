@@ -22,8 +22,8 @@ sub ZWave_secEnd($);
 sub ZWave_configParseModel($;$);
 sub ZWave_callbackId($);
 
-use vars qw($FW_ME $FW_tp $FW_ss);
-use vars qw(%zwave_id2class);
+our ($FW_ME,$FW_tp,$FW_ss);
+our %zwave_id2class;
 
 my %zwave_class = (
   NO_OPERATION             => { id => '00' }, # lowlevel
@@ -504,7 +504,7 @@ my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
                            "0115-0100-0102" => "ZME_KFOB" );
 
 # Patching certain devices.
-use vars qw(%zwave_deviceSpecial);
+our %zwave_deviceSpecial;
 %zwave_deviceSpecial = (
    Fibaro_FGRM222 => {
      MANUFACTURER_PROPRIETARY => {
@@ -578,6 +578,7 @@ ZWave_Initialize($)
   map { $zwave_id2class{lc($zwave_class{$_}{id})} = $_ } keys %zwave_class;
 
   $hash->{FW_detailFn} = "ZWave_fhemwebFn";
+  $hash->{FW_showStatus} = 1;
 
   eval { require Crypt::Rijndael; };
   if($@) {
@@ -900,18 +901,14 @@ ZWave_Cmd($$@)
 
   my $val;
   if($type eq "get" && $hash->{CL}) { # Wait for the result for frontend cmd
-    no strict "refs";
-    my $iohash = $hash->{IODev};
-    my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
-    my $re = $cmdList{$cmd}{regexp};
-    my ($err, $data) = &{$fn}($iohash, $cmd, $re ? $re : "^000400${id}..$cmdId")
-                        if($fn);
-    use strict "refs";
-
-    return $err if($err);
-    $data = "$cmd $id $data" if($re);
-
-    $val = ($data ? ZWave_Parse($iohash, $data, $type) : "no data returned");
+    if(!$hash->{asyncGet}) {
+      my $tHash = { hash=>$hash, CL=>$hash->{CL}, re=>"^000400${id}..$cmdId"};
+      $hash->{asyncGet} = $tHash;
+      InternalTimer(gettimeofday()+2, sub {
+        asyncOutput($tHash->{CL}, "Timeout reading answer for $cmd");
+        delete($hash->{asyncGet});
+      }, $tHash, 0);
+    }
 
   } elsif($type ne "get") {
     if($cmd eq "neighborUpdate" ||
@@ -4113,6 +4110,11 @@ ZWave_Parse($$@)
         if(AttrVal($name, "eventForRaw", undef));
   readingsEndUpdate($hash, 1);
 
+  if($hash->{asyncGet} && $msg =~ m/$hash->{asyncGet}->{re}/) {
+    RemoveInternalTimer($hash->{asyncGet});
+    asyncOutput($hash->{asyncGet}{CL}, join("\n", @event));
+    delete($hash->{asyncGet});
+  }
   return join("\n", @event) if($srcCmd);
   return $name;
 }
@@ -4225,7 +4227,7 @@ ZWave_fhemwebFn($$$$)
   '<script type="text/javascript">'.
    "var d='$d', FW_tp='$FW_tp';" . <<'JSEND'
     $(document).ready(function() {
-      $("div#ZWHelp").insertBefore("div.makeTable.wide:first"); // Move
+      $("div#ZWHelp").insertBefore("div.makeTable.internals"); // Move
       $("div.detLink.ZWPepper").insertAfter("div.detLink.devSpecHelp");
       if(FW_tp) $("div.img.ZWPepper").appendTo("div#menu");
       $("select.set,select.get").each(function(){
@@ -4261,10 +4263,10 @@ s2Hex($)
 <h3>ZWave</h3>
 <ul>
   This module is used to control ZWave devices via FHEM, see <a
-  href="http://www.z-wave.com">www.z-wave.com</a> on details for this device family.
-  This module is a client of the <a href="#ZWDongle">ZWDongle</a> module, which
-  is directly attached to the controller via USB or TCP/IP.
-  To use the SECURITY features, the Crypt-Rijndael perl module is needed.
+  href="http://www.z-wave.com">www.z-wave.com</a> on details for this device
+  family.  This module is a client of the <a href="#ZWDongle">ZWDongle</a>
+  module, which is directly attached to the controller via USB or TCP/IP.  To
+  use the SECURITY features, the Crypt-Rijndael perl module is needed.
   <br><br>
   <a name="ZWavedefine"></a>
   <b>Define</b>
@@ -4514,7 +4516,8 @@ s2Hex($)
   <li>protectionSeq<br>
     device can be operated, if a certain sequence is keyed.</li>
   <li>protectionBytes LocalProtectionByte RFProtectionByte<br>
-    for commandclass PROTECTION V2 - see devicemanual for supported protectionmodes</li>
+    for commandclass PROTECTION V2 - see devicemanual for supported
+    protectionmodes</li>
 
   <br><br><b>Class SCENE_ACTIVATION</b>
   <li>sceneConfig<br>

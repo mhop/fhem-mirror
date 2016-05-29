@@ -1047,7 +1047,7 @@ FW_makeTable($$$@)
   return if(!$hash || !int(keys %{$hash}));
   my $class = lc($title);
   $class =~ s/[^A-Za-z]/_/g;
-  FW_pO "<div class='makeTable wide'>";
+  FW_pO "<div class='makeTable wide ".lc($title)."'>";
   FW_pO $title;
   FW_pO "<table class=\"block wide $class\">";
   my $si = AttrVal("global", "showInternalValues", 0);
@@ -1185,12 +1185,7 @@ FW_doDetail($)
   }
   FW_pO "<table><tr><td>";
 
-  if($modules{$t}{FW_detailFn}) {
-    no strict "refs";
-    my $txt = &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room);
-    FW_pO "$txt<br>" if(defined($txt));
-    use strict "refs";
-  } else {
+  if(!$modules{$t}{FW_detailFn} || $modules{$t}{FW_showStatus}) {
     my $show = AttrVal($FW_wname, "deviceOverview", "always");
 
     if( $show ne 'never' ) {
@@ -1225,6 +1220,13 @@ FW_doDetail($)
       }
     }
   }
+  if($modules{$t}{FW_detailFn}) {
+    no strict "refs";
+    my $txt = &{$modules{$t}{FW_detailFn}}($FW_wname, $d, $FW_room);
+    FW_pO "$txt<br>" if(defined($txt));
+    use strict "refs";
+  }
+
 
   FW_pO FW_detailSelect($d, "set", FW_widgetOverride($d, getAllSets($d)));
   FW_pO FW_detailSelect($d, "get", FW_widgetOverride($d, getAllGets($d)));
