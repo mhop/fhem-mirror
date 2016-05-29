@@ -4427,10 +4427,20 @@ s2Hex($)
     If the indicator does not support dimming. It is interpreted as on.</li>
 
   <br><br><b>Class MANUFACTURER_PROPRIETARY</b>
+   <br>Fibaro FGR(M)-222 only:
   <li>positionBlinds<br>
-    Fibaro FGRM-222 only: drive blinds to position %</li>
+    drive blinds to position %</li>
   <li>positionSlat<br>
-    Fibaro FGRM-222 only: drive slat to position %</li>
+    drive slat to position %</li>
+   <br>D-Link DCH-Z510, Philio PSE02, Zipato Indoor Siren only:<br>
+   switch alarm on with selected sound (to stop use: set &lt;device&gt; off)
+  <li>alarmEmergencyOn</li>
+  <li>alarmFireOn</li>
+  <li>alarmAmbulanceOn</li>
+  <li>alarmPoliceOn</li>
+  <li>alarmDoorchimeOn</li>
+  <li>alarmBeepOn</li>
+
 
   <br><br><b>Class METER</b>
   <li>meterReset<br>
