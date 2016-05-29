@@ -194,7 +194,7 @@ SVG_log10($)
 
   return 0.0000000001 if( $n <= 0 );
 
-  return log($n)/log(10);
+  return log(1+$n)/log(10);
 }
 
 

@@ -259,7 +259,7 @@ sv_menu(evt, embed)
 
     if( par.log_scale ) {
       y *= par.log_scale;
-      y = Math.pow(10,y);
+      y = Math.pow(10,y) - 1;
     }
 
     y = y.toFixed(par.decimals);
