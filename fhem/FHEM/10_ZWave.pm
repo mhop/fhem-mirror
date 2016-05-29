@@ -1997,7 +1997,7 @@ ZWave_SetClasses($$$$)
 
   my $def = $modules{ZWave}{defptr}{"$homeId $id"};
   if(!$def) {
-    $type6 = $zw_type6{$type6} if($type6 && $zw_type6{$type6});
+    $type6 = $zw_type6{$type6} if($type6 && $zw_type6{lc($type6)});
     $id = hex($id);
     return "UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
   }
