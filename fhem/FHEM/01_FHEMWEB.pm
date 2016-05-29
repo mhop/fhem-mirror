@@ -1185,7 +1185,7 @@ FW_doDetail($)
   }
   FW_pO "<table><tr><td>";
 
-  if(!$modules{$t}{FW_detailFn} || $modules{$t}{FW_showStatus}) {
+  if(!$modules{$t}{FW_detailFn} || $modules{$t}{FW_deviceOverview}) {
     my $show = AttrVal($FW_wname, "deviceOverview", "always");
 
     if( $show ne 'never' ) {
