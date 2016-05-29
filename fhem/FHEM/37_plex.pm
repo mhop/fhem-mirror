@@ -1040,7 +1040,7 @@ plex_Set($$@)
     }
 
     $list .= 'play ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
-    $list .= 'playAlbum ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayqueues\b/ );
+    $list .= 'playAlbum ' if( $hash->{protocolCapabilities} =~ m/\bplayqueues\b/ );
     $list .= 'resume:noArg ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
     $list .= 'pause:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bplayPause\b/ );;
     $list .= 'stop:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bstop\b/ );;
