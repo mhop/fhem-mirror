@@ -891,6 +891,17 @@ ZWave_Cmd($$@)
     $data .= ZWave_callbackId($baseHash);
   }
 
+  if($type eq "get" && $hash->{CL}) { # Wait for the result for frontend cmd
+    if(!$hash->{asyncGet}) {
+      my $tHash = { hash=>$hash, CL=>$hash->{CL}, re=>"^000400${id}..$cmdId"};
+      $hash->{asyncGet} = $tHash;
+      InternalTimer(gettimeofday()+4, sub {
+        asyncOutput($tHash->{CL}, "Timeout reading answer for $cmd");
+        delete($hash->{asyncGet});
+      }, $tHash, 0);
+    }
+  }
+
   if ($data =~ m/(......)(....)(.*)(....)/) {
     my $cc_cmd=$2;
     my $payload=$3;
@@ -899,7 +910,8 @@ ZWave_Cmd($$@)
     if(ZWave_secIsSecureClass($hash, $cc_cmd)) {
       ZWave_secStart($hash);
       # message stored in hash, will be processed when nonce arrives
-      my $cmd2 = "$type $name $cmd ".join(" ", @a);
+      my $cmd2 = "$type $name $cmd";
+      $cmd2 .= " ".join(" ", @a) if(@a);
       ZWave_secPutMsg($hash, $cc_cmd . $payload, $cmd2);
       ZWave_secAddToSendStack($hash, '9840');
       return;
@@ -909,18 +921,7 @@ ZWave_Cmd($$@)
   my $r = ZWave_addToSendStack($baseHash, $type, $data);
   return (AttrVal($name,"verbose",3) > 2 ? $r : undef) if($r);
 
-  my $val;
-  if($type eq "get" && $hash->{CL}) { # Wait for the result for frontend cmd
-    if(!$hash->{asyncGet}) {
-      my $tHash = { hash=>$hash, CL=>$hash->{CL}, re=>"^000400${id}..$cmdId"};
-      $hash->{asyncGet} = $tHash;
-      InternalTimer(gettimeofday()+2, sub {
-        asyncOutput($tHash->{CL}, "Timeout reading answer for $cmd");
-        delete($hash->{asyncGet});
-      }, $tHash, 0);
-    }
-
-  } elsif($type ne "get") {
+  if($type ne "get") {
     if($cmd eq "neighborUpdate" ||
        $cmd eq "sucRouteAdd"    ||
        $cmd eq "sucRouteDel"    )  {
@@ -931,7 +932,7 @@ ZWave_Cmd($$@)
 
   }
 
-  return $val;
+  return undef;
 }
 
 sub
