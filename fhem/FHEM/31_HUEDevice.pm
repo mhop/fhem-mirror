@@ -1182,6 +1182,8 @@ HUEDevice_Parse($$)
 
   $hash->{helper}{percent} = $percent;
 
+  my $changed = $hash->{CHANGED}?1:0;
+
   if( $s ne $hash->{STATE} ) {readingsBulkUpdate($hash,"state",$s);}
 
   readingsEndUpdate($hash,1);
@@ -1194,6 +1196,8 @@ HUEDevice_Parse($$)
 
   $hash->{helper}->{update_timeout} = -1;
   RemoveInternalTimer($hash);
+
+  return $changed;
 }
 
 1;
