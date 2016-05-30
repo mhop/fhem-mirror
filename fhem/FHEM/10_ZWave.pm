@@ -3531,9 +3531,9 @@ ZWave_getHash($$$)
   if(defined($version) && ($type eq "get" || $type eq "set")) {
     map { 
       my $zv = $zwave_classVersion{$_};
-      delete $ptr->{$_} if($zv && 
-                           (($zv->{min} && $zv->{min} > $version) ||
-                            ($zv->{max} && $zv->{max} < $version)));
+      delete $ptr->{$_} if(!$version ||
+                           ($zv && (($zv->{min} && $zv->{min} > $version) ||
+                                    ($zv->{max} && $zv->{max} < $version))));
     } keys %{$ptr};
   }
 
