@@ -3,9 +3,6 @@
 # $Id$
 # Technische Dokumention für den Sensor befindet sich  http://www.ti.com/lit/ds/symlink/hdc1008.pdf
 
-# es ist mein erstes Modul für FHEM (angelehnt an dem SHT21), 
-# ich bitte im Nachsicht und ggf. um Rückmeldung, wenn etwas nicht so passt
-
 
 package main;
 use strict;
@@ -126,10 +123,7 @@ sub I2C_HDC1008_Init($$) {
 		Log3 $hash, 5, "[$name] I2C_HDC1008_Init interval:".$msg;
 		return $msg;
 	}
-	else
-	{
-		
-	}
+
 	
 	AssignIoPort($hash);	
 	
@@ -280,13 +274,10 @@ sub I2C_HDC1008_UpdateValues($)
 	
 	my $resTempParam = $I2C_HDC1008_tempParams{$resTempIndex}{code};
 	my $resHumParam = $I2C_HDC1008_humParams{$resHumIndex}{code};
-	my $headerParam = $I2C_HDC1008_validsHeater{$heaterIndex};
+	my $heaterParam = $I2C_HDC1008_validsHeater{$heaterIndex};
 	
-	my $Param = $modeReading | $resTempParam | $resHumParam | $headerParam;
+	my $Param = $modeReading | $resTempParam | $resHumParam | $heaterParam;
 	
-	# Debug("$modeReading $resTempParam x $resHumParam x $headerParam" );
-
-
 	
 	# schicke Konfiguration zum HDC1008-Sensor 
 	# --------------------------------------------------------
