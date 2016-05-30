@@ -417,7 +417,8 @@ my %zwave_class = (
                "0b8612(..................)" => 'sprintf("version:Lib %d Prot '.
                  '%d.%d App %d.%d HW %d FWCounter %d FW %d.%d",'.
                  'unpack("C*",pack("H*","$1")))',
-               "048614(..)(..)"             => '"versionClass_$1:$2"' } },
+               "048614(..)(..)"             => '"versionClass_$1:$2"' },
+   init  => { ORDER=>12, CMD => '"get $NAME versionClassAll"' } },
   INDICATOR                => { id => '87',
     set   => { indicatorOff    => "0100",
                indicatorOn     => "01FF",
@@ -482,12 +483,16 @@ my %zwave_class = (
   NON_INTEROPERABLE        => { id => 'f0' },
 );
 
+my %zwave_classVersion = (
+ dimWithDuration => { min => 2 },
+);
+
 my %zwave_cmdArgs = (
   set => {
     dim          => "slider,0,1,99",
     indicatorDim => "slider,0,1,99",
     rgb          => "colorpicker,RGB",
-    configRGBLedColorForTesting     => "colorpicker,RGB", # Aeon SmartSwitch 6
+    configRGBLedColorForTesting => "colorpicker,RGB", # Aeon SmartSwitch 6
   },
   get => {
   },
@@ -645,6 +650,7 @@ ZWave_Define($$)
     }
   }
   AssignIoPort($hash, $proposed);
+  $hash->{".vclasses"} = {};
 
   if(@a) {      # Autocreate: set the classes, execute the init calls
     asyncOutput($hash->{IODev}{addCL}, "created $name") if($hash->{IODev});
@@ -1644,6 +1650,7 @@ ZWave_versionClassAllGet($@)
   my %h = map { $_=>1 } split(" ", AttrVal($name, "vclasses", ""));
   return 0 if($data !~ m/^048614(..)(..)$/i); # ??
   $h{$zwave_id2class{lc($1)}.":".hex($2)} = 1;
+  $hash->{".vclasses"}{$zwave_id2class{lc($1)}} = hex($2);
   $attr{$name}{vclasses} = join(" ", sort keys %h);
   return 1; # "veto" for parseHook
 }
@@ -3515,6 +3522,16 @@ ZWave_getHash($$$)
     map { $ptr->{$_} = $add->{$_} } keys %{$add} if($add);
   }
 
+  my $version = $hash->{".vclasses"}{$cl};
+  if(defined($version) && ($type eq "get" || $type eq "set")) {
+    map { 
+      my $zv = $zwave_classVersion{$_};
+      delete $ptr->{$_} if($zv && 
+                           (($zv->{min} && $zv->{min} > $version) ||
+                            ($zv->{max} && $zv->{max} < $version)));
+    } keys %{$ptr};
+  }
+
   return $ptr;
 }
 
@@ -4157,16 +4174,28 @@ ZWave_computeRoute($;$)
 sub
 ZWave_Attr(@)
 {
-  my ($type, $devName, $attrName, @param) = @_;
+  my ($type, $devName, $attrName, $param) = @_;
+  my $hash = $defs{$devName};
 
   if($attrName eq "zwaveRoute") {
     if($type eq "del") {
-      delete $defs{$devName}{route};
+      delete $hash->{route};
       return undef;
     }
-    return ZWave_computeRoute($devName,join(" ",@param)) if($init_done);
+    return ZWave_computeRoute($devName, $param) if($init_done);
     InternalTimer(1, "ZWave_computeRoute", "TYPE=ZWave", 0);
+    return undef;
+
+  } elsif($attrName eq "vclasses") {
+    if($type eq "del") {
+      $hash->{".vclasses"} = {};
+      return undef;
+    }
+    my %h = map { split(":", $_) } split(" ", $param);
+    $hash->{".vclasses"} = \%h;
+    return undef;
   }
+
   return undef;
 }
 
