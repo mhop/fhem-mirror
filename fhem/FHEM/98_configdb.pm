@@ -24,12 +24,11 @@ sub configdb_Initialize($$) {
 sub CommandConfigdb($$) {
 	my ($cl, $param) = @_;
 
-#	my @a = split(/ /,$param);
 	my @a = split("[ \t][ \t]*", $param);
 	my ($cmd, $param1, $param2) = @a;
-	$cmd    = $cmd    ? $cmd    : "";
-	$param1 = $param1 ? $param1 : "";
-	$param2 = $param2 ? $param2 : "";
+	$cmd    //= "";
+	$param1 //= "";
+	$param2 //= "";
 
 	my $configfile = $attr{global}{configfile};
 	return "\n error: configDB not used!" unless($configfile eq 'configDB' || $cmd eq 'migrate');
@@ -62,36 +61,55 @@ sub CommandConfigdb($$) {
 		when ('dump') {
 
 			my ($dbconn,$dbuser,$dbpass,$dbtype)  = _cfgDB_readConfig();
-			my $ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
-			my $mp     = AttrVal('global','modpath','.');
-			my $target = "$mp/log/configDB_$ts.dump.gz";
+			my ($dbname,$dbhostname,$dbport,$gzip,$mp,$ret,$size,$source,$target,$ts);
+			$ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
+			$mp     = AttrVal('global','modpath','.');
+			$target = "$mp/log/configDB_$ts.dump";
 
-			my ($dbname,$ret,$size,$source);
-
+			if (lc($param1) eq 'unzipped') {
+				$gzip = '';
+			} else {
+				$gzip    = '| gzip -c';
+				$target .= '.gz';
+			}
+			
 			if ($dbtype eq 'SQLITE') {
 				(undef,$source) = split (/=/, $dbconn);
-				$ret    = qx(echo '.dump' | sqlite3 $source | gzip -c > $target);
+				my $dumpcmd = "echo '.dump' | sqlite3 $source $gzip > $target";
+				Log 4,"configDB: $dumpcmd";
+				$ret        = qx($dumpcmd);
 				return $ret if $ret; # return error message if available
 
 			} elsif ($dbtype eq 'MYSQL') {
-				($dbname,undef) = split (/;/,$dbconn);
-				(undef,$dbname) = split (/=/,$dbname);
-				$ret    = qx(mysqldump --user=$dbuser --password=$dbpass -Q $dbname | gzip -c > $target);
+				($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
+				$dbport //= '=3306';
+				(undef,$dbname)     = split (/=/,$dbname);
+				(undef,$dbhostname) = split (/=/,$dbhostname);
+				(undef,$dbport)     = split (/=/,$dbport);
+				my $dumpcmd = "mysqldump --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $gzip > $target";
+				Log 4,"configDB: $dumpcmd";
+				$ret        = qx($dumpcmd);
 				return $ret if $ret;
 				$source = $dbname;
 
 			} elsif ($dbtype eq 'POSTGRESQL') {
-				($dbname,undef) = split (/;/,$dbconn);
-				(undef,$dbname) = split (/=/,$dbname);
-				$ret    = qx(PGPASSWORD=$dbpass pg_dump -U $dbuser $dbname | gzip > $target);
+				($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
+				$dbport //= '=5432';
+				(undef,$dbname)     = split (/=/,$dbname);
+				(undef,$dbhostname) = split (/=/,$dbhostname);
+				(undef,$dbport)     = split (/=/,$dbport);
+				my $dumpcmd = "PGPASSWORD=$dbpass pg_dump -U $dbuser -h $dbhostname -p $dbport $dbname $gzip > $target";
+				Log 4,"configDB: $dumpcmd";
+				$ret        = qx($dumpcmd);
 				return $ret if $ret;
-				$source = $dbname;
+				$source     = $dbname;
 
 			} else {
 				return "configdb dump not supported for $dbtype!";
 			}
 
 			$size = -s $target;
+			$size //= 0;
 			$ret  = "configDB dumped $size bytes\nfrom: $source\n  to: $target";
 			return $ret;
 		}
@@ -459,8 +477,9 @@ compare device: telnetPort in current version 0 (left) to version: 1 (right)
 			and UNSAVED version from memory (currently running installation).<br/>
 <br/>
 
-		<li><code>configdb dump</code></li><br/>
-			Create a dump file from from database.<br/>
+		<li><code>configdb dump [unzipped]</code></li><br/>
+			Create a gzipped dump file from from database.<br/>
+			If optional parameter 'unzipped' provided, dump file will be written unzipped.<br/>
 			<br/>
 <br/>
 
