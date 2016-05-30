@@ -485,7 +485,10 @@ my %zwave_class = (
 
 my %zwave_classVersion = (
  dimWithDuration            => { min => 2 },
- wakeupIntervalCapabilities => { min => 2 }
+ meterReset                 => { min => 2 },
+ meterSupported             => { min => 2 },
+ wakeupIntervalCapabilities => { min => 2 },
+
 );
 
 my %zwave_cmdArgs = (
