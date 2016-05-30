@@ -82,10 +82,11 @@ use constant
 # MODE2_H, MT=254, LUX 0- 7417,  res. >0.11 LUX
 
 my @I2C_BH1750_ranges=(
-    [  5500,254, BH1750_H_MODE2_ONCE],
-    [ 11000,127, BH1750_H_MODE2_ONCE],
-    [ 22000, 69, BH1750_H_MODE2_ONCE],
-    [ 50000, 31, BH1750_H_MODE2_ONCE]
+    # RAWVAL MT   MODE
+    [  3000, 254, BH1750_H_MODE2_ONCE],
+    [  6000, 127, BH1750_H_MODE2_ONCE],
+    [ 12000,  69, BH1750_H_MODE2_ONCE],
+    [ 26000,  31, BH1750_H_MODE2_ONCE]
     # else use 31, BH1750_L_MODE_ONCE
 );
 
@@ -114,7 +115,7 @@ sub I2C_BH1750_Initialize($)
     $hash->{AttrFn}   = "I2C_BH1750_Attr";
     $hash->{SetFn}    = "I2C_BH1750_Set";
     $hash->{I2CRecFn} = 'I2C_BH1750_I2CRec';
-    $hash->{AttrList} = "poll_interval:1,2,5,10,20,30 IODev percentdelta ". 
+    $hash->{AttrList} = "poll_interval:1,2,5,10,20,30 IODev percentdelta correction ". 
         $readingFnAttributes;
     $hash->{AttrList} .= " useHiPiLib:0,1 " if ($libcheck_hasHiPi);
     $hash->{VERSION}  = '$Id$';
@@ -158,7 +159,8 @@ sub I2C_BH1750_Define($$)
     
     $hash->{BASEINTERVAL} = 0;
     $hash->{DELTA}        = 0;   
-    $hash->{PollState} = BH1750_POLLSTATE_IDLE; 
+    $hash->{PollState}    = BH1750_POLLSTATE_IDLE; 
+    $hash->{CORRECTION}   = 1; 
     
     readingsSingleUpdate($hash, 'state', BH1750_STATE_DEFINED, 1);
     if ($main::init_done || $hash->{HiPi_used}) {
@@ -187,7 +189,7 @@ sub I2C_BH1750_Init($$)
                     address    => $hash->{I2C_Address},
                     busmode    => 'i2c',
                     );
-                Log3 $name, 3, "I2C_BH1750_Define device created";
+                Log3 $name, 3, "$name I2C_BH1750_Define device created";
             } else {
                 my @groups = split '\s', $(;
                 return "$name :Error! $dev isn't readable/writable by user " . 
@@ -230,9 +232,17 @@ sub I2C_BH1750_Attr (@)
     my $del                     = $cmd =~ /del/;
     local $_;
 
-    Log3 $name, 3, "I2C_BH1750_Attr $cmd,$name,$attr,$val";
+    Log3 $name, 3, "$name I2C_BH1750_Attr $cmd,$name,$attr,$val";
 
-    if ($attr eq "percentdelta") {
+    if ($attr eq "correction") {
+        if($del) {
+            $val = 1; # default
+        } else {
+            $val =~ /^(12|[012]+\.[0-9]+)$/ and $val >= 0.5 
+                and $val <=2 or return $error."needs numeric value between 0.5 and 2";
+        }
+        $hash->{CORRECTION} = $val;
+    } elsif ($attr eq "percentdelta") {
         if($del) {
             $val = 0; # default
         } else {
@@ -274,7 +284,7 @@ sub I2C_BH1750_Poll($)
     my ($hash) =  @_;
     my $name = $hash->{NAME};
 
-    Log3 $name, 4, "I2C_BH1750_Poll ".gettimeofday()." PollState=$hash->{PollState}";
+    Log3 $name, 4, "$name I2C_BH1750_Poll ".gettimeofday()." PollState=$hash->{PollState}";
     RemoveInternalTimer($hash);
     my $delay=$hash->{BASEINTERVAL};
     $hash->{PollState} == BH1750_POLLSTATE_IDLE and $hash->{PollState}++;
@@ -287,29 +297,30 @@ sub I2C_BH1750_Poll($)
     } elsif($state == BH1750_POLLSTATE_PRE_LUX_WAIT) {
         I2C_BH1750_request_measure($hash);
     } elsif($state == BH1750_POLLSTATE_PRE_LUX_DONE) {
-        my $lux=$hash->{LUX};
+        my $raw=$hash->{RAWVAL};
         my $i;
         for($i=0; $i<@I2C_BH1750_ranges; $i++) {
-            $lux <= $I2C_BH1750_ranges[$i][0] and last;
+            $raw <= $I2C_BH1750_ranges[$i][0] and last;
         } 
         if($i == @I2C_BH1750_ranges) {
+            # no finer resolution possible, no further poll
             $hash->{PollState} = BH1750_POLLSTATE_LUX_DONE;
             return I2C_BH1750_Poll($hash);
         } else {
             # do finer reading
             my (undef,$mt,$mode)=@{$I2C_BH1750_ranges[$i]};
-            Log3 $name, 4, "I2C_BH1750_Poll using mt=$mt, mode=$mode";
+            Log3 $name, 4, "$name I2C_BH1750_Poll using mt=$mt, mode=$mode";
             $delay=I2C_BH1750_start_measure($hash,$mt,$mode);
             $hash->{PollState} = BH1750_POLLSTATE_LUX_WAIT;
         } 
     } elsif($state == BH1750_POLLSTATE_LUX_WAIT) {
-            I2C_BH1750_request_measure($hash);
-        } elsif($state == BH1750_POLLSTATE_LUX_DONE) {
-        I2C_BH1750_update_lux($hash); # no finer resolution possible
+        I2C_BH1750_request_measure($hash);
+    } elsif($state == BH1750_POLLSTATE_LUX_DONE) {
+        I2C_BH1750_update_lux($hash);
         $hash->{PollState} = BH1750_POLLSTATE_IDLE;
         I2C_BH1750_i2cwrite($hash, BH1750_POWER_DOWN);
     } else {
-         Log3 $name, 1, "I2C_BH1750_Poll wrong state state=$state";
+         Log3 $name, 1, "$name I2C_BH1750_Poll wrong state state=$state";
         $hash->{PollState} = BH1750_POLLSTATE_IDLE;
     }
     
@@ -352,8 +363,9 @@ sub I2C_BH1750_i2cread($$$)
 {
     my ($hash, $reg, $nbyte) = @_;
     my $success = 1;
-    
-    Log3 $hash->{NAME}, 5, "I2C_BH1750_i2cread $reg,$nbyte";
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "$name I2C_BH1750_i2cread $reg,$nbyte";
 
     local $SIG{__WARN__} = sub {
         my $message = shift;
@@ -404,8 +416,9 @@ sub I2C_BH1750_i2cwrite
 {
     my ($hash, $reg, @data) = @_;
     my $success = 1;
-    
-    Log3 $hash->{NAME}, 5, "I2C_BH1750_i2write $reg,@data";
+    my $name = $hash->{NAME};
+
+    Log3 $name, 5, "$name I2C_BH1750_i2write $reg,@data";
     if ($hash->{HiPi_used}) {
         eval {
             $hash->{devBH1750}->bus_write($reg, join (' ',@data));
@@ -445,17 +458,17 @@ sub I2C_BH1750_I2CRec ($$)
     my ($hash, $clientmsg) = @_;
     my $name = $hash->{NAME};
     
-    Log3 $hash->{NAME}, 5, "I2C_BH1750_i2Rec";
+    Log3 $name, 5, "$name I2C_BH1750_i2Rec";
     my $pname = undef;
     unless ($hash->{HiPi_used}) {
         my $phash = $hash->{IODev};
         $pname = $phash->{NAME};
         while (my ( $k, $v ) = each %$clientmsg) { 
             $hash->{$k} = $v if $k =~ /^$pname/;
-            Log3 $hash->{NAME}, 5, "I2C_BH1750_i2Rec $k $v";
+            Log3 $name, 5, "$name I2C_BH1750_i2Rec $k $v";
         }
         if($clientmsg->{$pname . "_SENDSTAT"} ne "Ok") {
-            Log3 $hash->{NAME}, 3, "I2C_BH1750_i2Rec bad sendstat: ".$clientmsg->{$pname."_SENDSTAT"};
+            Log3 $name, 3, "$name I2C_BH1750_i2Rec bad sendstat: ".$clientmsg->{$pname."_SENDSTAT"};
             if($clientmsg->{direction} eq "i2cread" or $clientmsg->{reg}) {
                 # avoid recoursion on power down
                 I2C_BH1750_Restart_Measure($hash);
@@ -477,15 +490,14 @@ sub I2C_BH1750_I2CRec ($$)
             $word = $raw[0] << 8 | $raw[1];
         }
         if ($register == BH1750_RAW_VALUE) {
+            $hash->{RAWVAL}=$word;
             if($word == 0xFFFF) {
                 readingsSingleUpdate($hash, 'state', BH1750_STATE_SATURATED, 1);
                 Log3 $hash, 3, "$name sensor saturated ";
                 I2C_BH1750_Restart_Measure($hash);
             } else {
                 readingsSingleUpdate($hash, 'state', BH1750_STATE_OK, 1);
-                my $lux = $word/1.2*(69/$hash->{MT_VAL})/$hash->{MODE};
-                $hash->{LUX}=$lux;
-                Log3 $hash->{NAME}, 4, "I2C_BH1750_I2CRec: lux=$lux";
+                Log3 $name, 4, "$name I2C_BH1750_I2CRec: rawval=$word";
                 if($hash->{PollState} == BH1750_POLLSTATE_PRE_LUX_WAIT || 
                    $hash->{PollState} == BH1750_POLLSTATE_LUX_WAIT) {
                     $hash->{PollState}++;
@@ -501,8 +513,12 @@ sub I2C_BH1750_update_lux
 { 
     my($hash)=@_;
     my $name=$hash->{NAME};
-    my $lux=$hash->{LUX};
+    my $lux;
     my $delta=$hash->{DELTA};
+    
+    # lux calculation see manual manual:
+    $lux = $hash->{RAWVAL}/1.2*(69/$hash->{MT_VAL})/$hash->{MODE};
+    $lux *= $hash->{CORRECTION};
 
     if($delta) { # update only if delta large enough
         my $lastlux=ReadingsNum($name,"luminosity",1000000);
@@ -527,7 +543,7 @@ sub I2C_BH1750_update_lux
     }  else {
         $lux=int($lux/1000+0.5); $lux *= 1000;
     }
-    Log3 $hash->{NAME}, 4, "I2C_BH1750_update_lux: luminosity=$lux";
+    Log3 $name, 4, "$name I2C_BH1750_update_lux: luminosity=$lux";
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, "luminosity", $lux);
     $lux < ReadingsNum($name,"minimum", 1000000) and readingsBulkUpdate($hash, "minimum", $lux);
@@ -545,6 +561,7 @@ sub  I2C_BH1750_request_measure
 sub I2C_BH1750_start_measure
 {
     my ($hash,$mt,$mode)=@_;
+    my $name = $hash->{NAME};
     $hash->{MT_VAL} = $mt;
     $hash->{MODE}   = ($mode ==  BH1750_H_MODE2 || $mode ==  BH1750_H_MODE2_ONCE) ? 2 : 1;
     my $hi=($mt>>5) | 0x40;
@@ -555,7 +572,7 @@ sub I2C_BH1750_start_measure
     I2C_BH1750_i2cwrite($hash,$mode);
     my $mindelay = ($mode == BH1750_L_MODE || $mode == BH1750_L_MODE_ONCE) ? 24 : 180;
     $mindelay = $mindelay * ($mt/BH1750_MT_DEFAULT);
-    Log3 $hash->{NAME}, 5, "I2C_BH1750_start_measure: duration ".int($mindelay)."ms";
+    Log3 $name, 5, "$name I2C_BH1750_start_measure: duration ".int($mindelay)."ms";
     $mindelay /=1000; # seconds
 
     return $mindelay;
@@ -670,7 +687,16 @@ sub I2C_BH1750_sleep
       <li>percentdelta<br>
         If set a luminosity reading is only generated if 
         the difference between the current luminosity value and the last reading is 
-        at least percentdelta percents.
+        at least percentdelta percents.<br>
+      </li>
+      <li>correction<br>
+        Linear correction factor to be applied to the sensor value.
+        Compared with a commercial light meter it seems that the values for my 
+        BH1750 are about 25% to low in day light (correction 1.25). 
+        The TLS2561 compares much better with the light meter but has the disadvantage 
+        that it saturates at about 40k lux.<br>
+        The correction factor can also be used if your sensor is behind an opal glass.<br>
+        valid range: 0.5 to 2.0<br>
       </li>
     </ul>
   <p>
