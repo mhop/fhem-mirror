@@ -768,10 +768,13 @@ ZWave_Cmd($$@)
     if($type eq "set") {
       $cmdList{neighborUpdate}{fmt} = "48$id";
       $cmdList{neighborUpdate}{id} = "";
-      $cmdList{sucRouteAdd}{fmt} = "51$id";
-      $cmdList{sucRouteAdd}{id} = "";
-      $cmdList{sucRouteDel}{fmt} = "55$id";
-      $cmdList{sucRouteDel}{id} = "";
+      my $iohash = $hash->{IODev};
+      if($iohash && ReadingsVal($iohash->{NAME}, "sucNodeId","no") ne "no") {
+        $cmdList{sucRouteAdd}{fmt} = "51$id";
+        $cmdList{sucRouteAdd}{id} = "";
+        $cmdList{sucRouteDel}{fmt} = "55$id";
+        $cmdList{sucRouteDel}{id} = "";
+      }
     }
     $cmdList{neighborList}{fmt} = "x" if($type eq "get"); # Add meta command
   }
