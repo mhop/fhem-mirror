@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Minor Release 2.2 real state for deviceState Reading,
+                      Support for Amazon Music Player and Spotify Player, Keep
+                      Alive funktion for Android 6
   - bugfix: 77_UWZ: Commandref Warn Type 7 and 6 exchanged, new method for no
                     eperimental warnings
   - feature: plex: play command now handles single media items, music albums
