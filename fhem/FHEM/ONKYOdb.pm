@@ -88,11 +88,13 @@ my $ONKYO_cmds_hr = {
         'net-popup-message'             => 'NPU',
         'net-receiver-information'      => 'NRI',
         'net-service'                   => 'NSV',
+        'net-standby'                   => 'NSB',
         'net-usb-album-name-info'       => 'NAL',
         'net-usb-artist-name-info'      => 'NAT',
         'net-usb-jacket-art'            => 'NJA',
         'net-usb-list-info'             => 'NLS',
         'net-usb-list-title-info'       => 'NLT',
+        'net-usb-device-status'         => 'NDS',
         'net-usb-menu-status'           => 'NMS',
         'net-usb-play-status'           => 'NST',
         'net-usb-time-info'             => 'NTM',
@@ -117,6 +119,7 @@ my $ONKYO_cmds_hr = {
         'speaker-layout'                => 'SPL',
         'speaker-level-calibration'     => 'SLC',
         'subwoofer-temporary-level'     => 'SWL',
+        'phase-matching-bass'           => 'PMB',
         'power'                         => 'PWR',
         'tape1-a'                       => 'CT1',
         'tape2-b'                       => 'CT2',
@@ -714,6 +717,10 @@ my $ONKYO_values_hr = {
         'NAT' => {
             'query' => 'QSTN'
         },
+        'NDS' => {
+            'nfr'   => 'nfr',
+            'query' => 'QSTN'
+        },
         'NJA' => {
             'tp-xx-xx-xx-xx-xx-xx' => 'tp{xx}{xx}{xx}{xx}{xx}{xx}',
             'off'                  => 'DIS',
@@ -741,6 +748,11 @@ my $ONKYO_values_hr = {
         #        'NPU' => {
         #            '' => ''
         #        },
+        'NSB' => {
+            'off'   => 'OFF',
+            'on'    => 'ON',
+            'query' => 'QSTN'
+        },
         'NST' => {
             'prs'   => 'prs',
             'query' => 'QSTN'
@@ -832,6 +844,12 @@ my $ONKYO_values_hr = {
         'PTS' => {
             'enter'      => 'ENTER',
             'xrange(30)' => '(0, 30)'
+        },
+        'PMB' => {
+            'off'    => '00',
+            'on'     => '01',
+            'toggle' => 'TG',
+            'query'  => 'QSTN'
         },
         'PWR' => {
             'off'   => '00',
@@ -1654,6 +1672,33 @@ my $ONKYO_values_hr = {
 # ----------------Complete command reference database-----------------------
 my $ONKYO_cmddb = {
     '1' => {
+        'PMB',
+        {
+            'description' => 'Phase Matching Bass Command',
+            'name'        => 'phase-matching-bass',
+            'values'      => {
+                '00',
+                {
+                    'description' => 'sets Off',
+                    'name'        => 'off'
+                },
+                '01',
+                {
+                    'description' => 'sets On',
+                    'name'        => 'on'
+                },
+                'TG',
+                {
+                    'description' => 'sets Phase Matching Bass Wrap-Around Up',
+                    'name'        => 'toggle'
+                },
+                'QSTN',
+                {
+                    'description' => 'gets Phase Matching Bass',
+                    'name'        => 'query'
+                }
+            }
+        },
         'PWR',
         {
             'description' => 'System Power Command',
@@ -4509,6 +4554,31 @@ nnn...nnn : Character of Title Bar (variable-length, 64 Unicode letters [UTF-8 e
                 },
             }
         },
+        'NDS',
+        {
+            'description' => 'NET Connection/USB Device Status',
+            'name'        => 'net-usb-device-status',
+            'values'      => {
+                'nfr',
+                {
+                    'description' =>
+                      'NET Connection/USB Device Status (3 letters)
+n -> NET Connection status: \"-\": no connection, \"E\": Ether, \"W\": Wireless
+f -> Front USB(USB1) Device Status: \"-\": no device, \"i\": iPod/iPhone, 
+      \"M\": Memory/NAS, \"W\": Wireless Adaptor, \"B\": Bluetooth Adaptor,
+      \"G\": Google USB, \"x\": disable
+r -> Rear USB(USB2) Device Status: \"-\": no device, \"i\": iPod/iPhone, 
+      \"M\": Memory/NAS, \"W\": Wireless Adaptor, \"B\": Bluetooth Adaptor, 
+      \"G\": Google USB, \"x\": disable',
+                    'name' => 'None'
+                },
+                'QSTN',
+                {
+                    'description' => 'gets the Net/USB Status',
+                    'name'        => 'query'
+                },
+            }
+        },
         'NMS',
         {
             'description' => 'NET/USB Menu Status',
@@ -4571,6 +4641,29 @@ ii-> Service icon
                     'description' => 'gets Jacket Art enable/disable',
                     'name'        => 'query'
                 }
+            }
+        },
+        'NSB',
+        {
+            'description' =>
+'Network Standby Settings (for Network Control Only and Available in AVR is PowerOn)',
+            'name'   => 'net-standby',
+            'values' => {
+                'OFF',
+                {
+                    'description' => 'sets Network Standby is Off',
+                    'name'        => 'off'
+                },
+                'ON',
+                {
+                    'description' => 'sets Network Standby is On',
+                    'name'        => 'on'
+                },
+                'QSTN',
+                {
+                    'description' => 'gets Network Standby Setting',
+                    'name'        => 'query'
+                },
             }
         },
         'NSV',
