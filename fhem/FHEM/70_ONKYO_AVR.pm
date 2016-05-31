@@ -60,7 +60,7 @@ sub ONKYO_AVR_Initialize($) {
 
     Log3 $hash, 5, "ONKYO_AVR_Initialize: Entering";
 
-    eval 'use XML::Simple; 1';
+    eval { use XML::Simple; };
     return "Please install XML::Simple to use this module."
       if ($@);
 
@@ -686,7 +686,7 @@ sub ONKYO_AVR_Read($) {
                 },
             );
             delete $hash->{helper}{receiver};
-            eval '$hash->{helper}{receiver} = $xml_parser->XMLin($value);';
+            eval { $hash->{helper}{receiver} = $xml_parser->XMLin($value); };
             use strict;
 
             # Safe input names
@@ -823,20 +823,21 @@ sub ONKYO_AVR_Read($) {
     }
 
     elsif ( $cmd eq "net-usb-jacket-art" ) {
-        if ( $value =~ /^(0)([0|1|2])(.*)/ ) {
+        if ( $value =~ /^([0|1])([0|1|2])(.*)$/ ) {
             my $type = "bmp";
             $type = "jpg" if ( $1 eq "1" );
 
-            Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($type) in progress"
-              if ( $2 eq "0" );
+            $hash->{helper}{cover}{$type}{parts} = "1" if ( $2 eq "0" );
+            $hash->{helper}{cover}{$type}{parts}++ if ( $2 ne "0" );
+            $hash->{helper}{cover}{$type}{data} = "" if ( $2 eq "0" );
+            $hash->{helper}{cover}{$type}{data} .= $3
+              if ( $2 eq "0" || $hash->{helper}{cover}{$type}{data} ne "" );
 
-            $hash->{helper}{cover}{$type} = "" if ( $2 eq "0" );
-            $hash->{helper}{cover}{$type} .= $3;
+            Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($type) in progress, part "
+              . $hash->{helper}{cover}{$type}{parts};
 
             # complete album art received
-            if ( $2 eq "2" ) {
-                Log3 $name, 4, "ONKYO_AVR $name: rcv $cmd($type) completed";
-
+            if ( $2 eq "2" && $hash->{helper}{cover}{$type}{data} ne "" ) {
                 my $AlbumArtName = $name . "_CurrentAlbumArt." . $type;
                 my $AlbumArtURI = AttrVal( "global", "modpath", "." )
                   . "/www/images/default/ONKYO_AVR/$AlbumArtName";
@@ -845,7 +846,15 @@ sub ONKYO_AVR_Read($) {
                 mkpath( AttrVal( "global", "modpath", "." )
                       . '/www/images/default/ONKYO_AVR/' );
                 ONKYO_AVR_WriteFile( $AlbumArtURI,
-                    ONKYO_AVR_hex2bin( $hash->{helper}{cover}{$type} ) );
+                    ONKYO_AVR_hex2image( $hash->{helper}{cover}{$type}{data} )
+                );
+
+                Log3 $name, 4,
+                    "ONKYO_AVR $name: rcv $cmd($type) completed in "
+                  . $hash->{helper}{cover}{$type}{parts}
+                  . " parts. Saved to $AlbumArtURI";
+ 
+                $hash->{helper}{cover}{$type}{data} = "SAVED to $AlbumArtURI";
             }
         }
     }
@@ -864,9 +873,8 @@ sub ONKYO_AVR_Read($) {
           )
         {
             readingsBulkUpdate( $hash, "currentTrackPosition", $times[0] )
-              if (
-                ReadingsVal( $name, "currentTrackPosition", "-" ) ne $times[0]
-              );
+              if ( ReadingsVal( $name, "currentTrackPosition", "-" ) ne
+                $times[0] );
             $zoneDispatch->{currentTrackPosition} = $times[0];
         }
 
@@ -1639,8 +1647,8 @@ sub ONKYO_AVR_Set($$$) {
                     $hash->{helper}{receiver}{device}{netservicelist}
                       {netservice}{$id}{value}
                 )
-                && $hash->{helper}{receiver}{device}{netservicelist}{netservice}
-                {$id}{value} eq "1"
+                && $hash->{helper}{receiver}{device}{netservicelist}
+                {netservice}{$id}{value} eq "1"
               )
             {
                 $channels_txt .=
@@ -2399,9 +2407,9 @@ sub ONKYO_AVR_hex2dec($) {
 }
 
 ###################################
-sub ONKYO_AVR_hex2bin($) {
+sub ONKYO_AVR_hex2image($) {
     my ($hex) = @_;
-    return unpack( 'B*', pack 'H*', $hex );
+    return pack( "H*", $hex );
 }
 
 ###################################
