@@ -401,6 +401,7 @@ FHEM/GPUtils.pm              ntruchsess           http://forum.fhem.de FHEM Deve
 contrib/23_WEBTHERM.pm       betateilchen/sachag  http://forum.fhem.de Sonstiges
 contrib/55_BBB_BMP180.pm     betateilchen         http://forum.fhem.de Einplatinencomputer
 contrib/55_weco.pm           betateilchen         http://forum.fhem.de Wettermodule
+contrib/70_ONKYO_AVR_PULL.pm loredo               http://forum.fhem.de Multimedia
 contrib/71_LISTENLIVE.pm     betateilchen         http://forum.fhem.de Multimedia
 contrib/98_geodata.pm        betateilchen         http://forum.fhem.de Sonstiges
 contrib/98_openweathermap.pm betateilchen         http://forum.fhem.de Wettermodule
