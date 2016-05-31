@@ -2165,6 +2165,23 @@ sub CUL_HM_Parse($$) {#########################################################
 
       push @evtEt,[$mh{shash},1,"state:$val"];
     }
+    elsif ($mh{mTp} eq "60" ||$mh{mTp} eq "61" ) {  #    IEC_POWER_EVENT_CYCLIC
+      my ($chn,$eUnit,$eCnt,$pUnit,$pIEC) = map{hex($_)} unpack 'A2A2A10A2A8',$mh{p};
+
+      push @evtEt,[$mh{devH},1,"battery:".(($chn&0x80)?"low"  :"ok"  )];
+      $chn = sprintf("%02X",$chn&0x3f);
+      my $chId = $mh{src}.$chn;
+      $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
+                             if($modules{CUL_HM}{defptr}{$chId});
+      
+      push @evtEt,[$mh{shash},1,"energyTariff:" .($eUnit >> 4)         ];
+      push @evtEt,[$mh{shash},1,"energyUnit:"   .($eUnit        & 0xfe)];
+      push @evtEt,[$mh{shash},1,"powerTariff:"  .($pUnit >> 4         )];
+      push @evtEt,[$mh{shash},1,"powerSign:"    .(($pUnit >> 4) & 0xfe)];
+      push @evtEt,[$mh{shash},1,"powerUnit:"    .(($pUnit     ) & 0xfe)];
+      push @evtEt,[$mh{shash},1,"powerIEC:"     .($pIEC)               ];
+      
+    }
     elsif ($mh{mTp} eq "53" ||$mh{mTp} eq "54" ) {  #    Gas_EVENT_CYCLIC
       $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}."01"}
                              if($modules{CUL_HM}{defptr}{$mh{src}."01"});
@@ -5117,8 +5134,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else {#if ($md eq "HM-SEC-SD-2"){
       #1441 44E347 44E347 0102 960000 039190BDC8
       my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
+      $testnr = $a[2]if ($a[2]);
       $hash->{TESTNR} = $testnr;
-      
                            # 96 switch on- others unknown
       my $msg = CUL_HM_generateCBCsignature($hash, 
                                 sprintf("++1441$dst${sId}01%02X9600",$testnr));
