@@ -88,7 +88,7 @@ my $ONKYO_cmds_hr = {
         'net-popup-message'             => 'NPU',
         'net-receiver-information'      => 'NRI',
         'net-service'                   => 'NSV',
-        'net-standby'                   => 'NSB',
+        'network-standby'               => 'NSB',
         'net-usb-album-name-info'       => 'NAL',
         'net-usb-artist-name-info'      => 'NAT',
         'net-usb-jacket-art'            => 'NJA',
@@ -119,6 +119,7 @@ my $ONKYO_cmds_hr = {
         'speaker-layout'                => 'SPL',
         'speaker-level-calibration'     => 'SLC',
         'subwoofer-temporary-level'     => 'SWL',
+        'subwoofer2-temporary-level'    => 'SW2',
         'phase-matching-bass'           => 'PMB',
         'power'                         => 'PWR',
         'tape1-a'                       => 'CT1',
@@ -1026,6 +1027,12 @@ my $ONKYO_values_hr = {
             'query' => 'QSTN'
         },
         'SWL' => {
+            'down'               => 'DOWN',
+            'query'              => 'QSTN',
+            'up'                 => 'UP',
+            'xrange(-15, 9, 12)' => '(-15, 0, 12)'
+        },
+        'SW2' => {
             'down'               => 'DOWN',
             'query'              => 'QSTN',
             'up'                 => 'UP',
@@ -2229,6 +2236,27 @@ my $ONKYO_cmddb = {
         {
             'description' => 'Subwoofer {temporary} Level Command',
             'name'        => 'subwoofer-temporary-level',
+            'values'      => {
+                '{-15,0,12}',
+                {
+                    'description' => 'sets Subwoofer Level -15dB - 0dB - +12dB',
+                    'name'        => '15db-0db-12db'
+                },
+                'UP',
+                { 'description' => 'LEVEL + Key', 'name' => 'up' },
+                'DOWN',
+                { 'description' => 'LEVEL KEY', 'name' => 'down' },
+                'QSTN',
+                {
+                    'description' => 'gets the Subwoofer Level',
+                    'name'        => 'query'
+                }
+            }
+        },
+        'SW2',
+        {
+            'description' => 'Subwoofer2 {temporary} Level Command',
+            'name'        => 'subwoofer2-temporary-level',
             'values'      => {
                 '{-15,0,12}',
                 {
@@ -4647,7 +4675,7 @@ ii-> Service icon
         {
             'description' =>
 'Network Standby Settings (for Network Control Only and Available in AVR is PowerOn)',
-            'name'   => 'net-standby',
+            'name'   => 'network-standby',
             'values' => {
                 'OFF',
                 {
