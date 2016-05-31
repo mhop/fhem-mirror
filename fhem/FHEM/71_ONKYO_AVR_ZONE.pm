@@ -119,7 +119,8 @@ sub ONKYO_AVR_ZONE_Define($$$) {
           . $modules{ONKYO_AVR_ZONE}{defptr}{$IOname}{$zone}{NAME};
     }
     elsif ( !defined($IOhash) ) {
-        return "No matching I/O device found, please define a ONKYO_AVR device first";
+        return
+"No matching I/O device found, please define a ONKYO_AVR device first";
     }
     elsif ( !defined( $IOhash->{TYPE} ) || !defined( $IOhash->{NAME} ) ) {
         return "IODev does not seem to be existing";
@@ -221,7 +222,7 @@ sub ONKYO_AVR_ZONE_Parse($$) {
                 }
 
                 # input
-                if ( $cmd eq "input" ) {
+                elsif ( $cmd eq "input" ) {
 
                     # Input alias handling
                     if (
@@ -240,13 +241,44 @@ sub ONKYO_AVR_ZONE_Parse($$) {
                 }
 
                 # power
-                if ( $cmd eq "power" ) {
+                elsif ( $cmd eq "power" ) {
                     readingsBulkUpdate( $hash, "presence", "present" )
                       if ( ReadingsVal( $name, "presence", "-" ) ne "present" );
                 }
 
-                readingsBulkUpdate( $hash, $cmd, $value )
-                  if ( ReadingsVal( $name, $cmd, "-" ) ne $value );
+                # tone
+                if ( $cmd =~ /^tone/ ) {
+                    if ( $value =~ /^B(..)T(..)$/ ) {
+                        my $bass         = $1;
+                        my $treble       = $2;
+                        my $bassName     = $cmd . "-bass";
+                        my $trebleName   = $cmd . "-treble";
+                        my $prefixBass   = "";
+                        my $prefixTreble = "";
+
+                        # tone-bass
+                        $prefixBass = "-" if ( $bass =~ /^\-.*/ );
+                        $bass = substr( $bass, 1 ) if ( $bass =~ /^[\+|\-].*/ );
+                        $bass = $prefixBass . ONKYO_AVR_hex2dec($bass);
+                        readingsBulkUpdate( $hash, $bassName, $bass )
+                          if ( ReadingsVal( $name, $bassName, "-" ) ne $bass );
+
+                        # tone-treble
+                        $prefixTreble = "-" if ( $treble =~ /^\-.*/ );
+                        $treble = substr( $treble, 1 )
+                          if ( $treble =~ /^[\+|\-].*/ );
+                        $treble = $prefixTreble . ONKYO_AVR_hex2dec($treble);
+                        readingsBulkUpdate( $hash, $trebleName, $treble )
+                          if (
+                            ReadingsVal( $name, $trebleName, "-" ) ne $treble );
+                    }
+                }
+
+                # all other commands
+                else {
+                    readingsBulkUpdate( $hash, $cmd, $value )
+                      if ( ReadingsVal( $name, $cmd, "-" ) ne $value );
+                }
             }
 
             # stateAV
@@ -546,6 +578,11 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                     $implicit_txt .= " $reading:$value_list";
                 }
             }
+
+            # tone-*
+            elsif ( $reading =~ /^tone.*-([a-zA-Z]+)$/ ) {
+                $implicit_txt .= " $reading:slider,-10,1,10";
+            }
         }
     }
 
@@ -655,6 +692,50 @@ sub ONKYO_AVR_ZONE_Set($$$) {
             }
             else {
                 $return = ONKYO_AVR_ZONE_SendCommand( $hash, @$a[1], @$a[2] );
+            }
+        }
+    }
+
+    # tone-*
+    elsif ( lc( @$a[1] ) =~ /^(tone.*)-(bass|treble)$/ ) {
+        Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
+
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given";
+        }
+        else {
+            if ( $state eq "off" ) {
+                $return =
+"Device power is turned off, this function is unavailable at that stage.";
+            }
+            elsif ( lc( @$a[2] ) eq "up" ) {
+                my $setVal;
+                $setVal = "B" if ( $2 eq "bass" );
+                $setVal = "T" if ( $2 eq "treble" );
+                $return =
+                  ONKYO_AVR_SendCommand( $hash, lc($1), $setVal . "UP" );
+            }
+            elsif ( lc( @$a[2] ) eq "down" ) {
+                my $setVal;
+                $setVal = "B" if ( $2 eq "bass" );
+                $setVal = "T" if ( $2 eq "treble" );
+                $return =
+                  ONKYO_AVR_SendCommand( $hash, lc($1), $setVal . "DOWN" );
+            }
+            elsif ( @$a[2] =~ /^-*\d+$/ ) {
+                my $setVal;
+                $setVal = "B" if ( $2 eq "bass" );
+                $setVal = "T" if ( $2 eq "treble" );
+                $setVal .= "+" if ( @$a[2] > 0 );
+                $setVal .= "-" if ( @$a[2] < 0 );
+
+                my $setVal2 = @$a[2];
+                $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 < 0 );
+                $setVal2 = ONKYO_AVR_dec2hex($setVal2);
+                $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 ne "00" );
+
+                $return =
+                  ONKYO_AVR_SendCommand( $hash, lc($1), $setVal . $setVal2 );
             }
         }
     }

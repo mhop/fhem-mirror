@@ -488,6 +488,8 @@ sub ONKYO_AVR_Read($) {
 
         Log3 $name, 4,
 "ONKYO_AVR $name: con $cmd($cmd_raw$value_raw): FAIL: Don't know how to convert, not in ONKYOdb or zone may not be defined: $cmd_raw$value_raw";
+
+        return if ( !$cmd_raw || $cmd_raw eq "" );
     }
 
     # reset connectionCheck timer
@@ -822,6 +824,45 @@ sub ONKYO_AVR_Read($) {
         }
     }
 
+    elsif ( $cmd eq "net-usb-device-status" ) {
+        if ( $value =~ /^(.)(.)(.)$/ ) {
+
+            # networkConnection
+            my $netConnStatus = "none";
+            $netConnStatus = "ethernet" if ( $1 eq "E" );
+            $netConnStatus = "wireless" if ( $1 eq "W" );
+
+            readingsBulkUpdate( $hash, "networkConnection", $netConnStatus )
+              if ( ReadingsVal( $name, "networkConnection", "-" ) ne
+                $netConnStatus );
+
+            # usbFront
+            my $usbFront = "none";
+            $usbFront = "iOS"        if ( $2 eq "i" );
+            $usbFront = "Memory_NAS" if ( $2 eq "M" );
+            $usbFront = "wireless"   if ( $2 eq "W" );
+            $usbFront = "bluetooth"  if ( $2 eq "B" );
+            $usbFront = "GoogleUSB"  if ( $2 eq "G" );
+            $usbFront = "disabled"   if ( $2 eq "x" );
+
+            readingsBulkUpdate( $hash, "usbFront", $usbFront )
+              if ( ReadingsVal( $name, "usbFront", "-" ) ne $usbFront );
+
+            # usbRear
+            my $usbRear = "none";
+            $usbRear = "iOS"        if ( $3 eq "i" );
+            $usbRear = "Memory_NAS" if ( $3 eq "M" );
+            $usbRear = "wireless"   if ( $3 eq "W" );
+            $usbRear = "bluetooth"  if ( $3 eq "B" );
+            $usbRear = "GoogleUSB"  if ( $3 eq "G" );
+            $usbRear = "disabled"   if ( $3 eq "x" );
+
+            readingsBulkUpdate( $hash, "usbRear", $usbRear )
+              if ( ReadingsVal( $name, "usbRear", "-" ) ne $usbRear );
+
+        }
+    }
+
     elsif ( $cmd eq "net-usb-jacket-art" ) {
         if ( $value =~ /^([0|1])([0|1|2])(.*)$/ ) {
             my $type = "bmp";
@@ -853,7 +894,7 @@ sub ONKYO_AVR_Read($) {
                     "ONKYO_AVR $name: rcv $cmd($type) completed in "
                   . $hash->{helper}{cover}{$type}{parts}
                   . " parts. Saved to $AlbumArtURI";
- 
+
                 $hash->{helper}{cover}{$type}{data} = "SAVED to $AlbumArtURI";
             }
         }
@@ -1324,6 +1365,44 @@ sub ONKYO_AVR_Read($) {
     elsif ( $cmd eq "net-popup-message" ) {
     }
 
+    # tone-*
+    elsif ( $cmd =~ /^tone-/ ) {
+        if ( $value =~ /^B(..)T(..)$/ ) {
+            my $bass         = $1;
+            my $treble       = $2;
+            my $bassName     = $cmd . "-bass";
+            my $trebleName   = $cmd . "-treble";
+            my $prefixBass   = "";
+            my $prefixTreble = "";
+
+            # tone-*-bass
+            $prefixBass = "-" if ( $bass =~ /^\-.*/ );
+            $bass = substr( $bass, 1 ) if ( $bass =~ /^[\+|\-].*/ );
+            $bass = $prefixBass . ONKYO_AVR_hex2dec($bass);
+            readingsBulkUpdate( $hash, $bassName, $bass )
+              if ( ReadingsVal( $name, $bassName, "-" ) ne $bass );
+
+            # tone-*-treble
+            $prefixTreble = "-" if ( $treble =~ /^\-.*/ );
+            $treble = substr( $treble, 1 ) if ( $treble =~ /^[\+|\-].*/ );
+            $treble = $prefixTreble . ONKYO_AVR_hex2dec($treble);
+            readingsBulkUpdate( $hash, $trebleName, $treble )
+              if ( ReadingsVal( $name, $trebleName, "-" ) ne $treble );
+        }
+
+        # tone-subwoofer
+        elsif ( $value =~ /^B(..)$/ ) {
+            my $bass   = $1;
+            my $prefix = "";
+
+            $prefix = "-" if ( $bass =~ /^\-.*/ );
+            $bass = substr( $bass, 1 ) if ( $bass =~ /^[\+|\-].*/ );
+            $bass = $prefix . ONKYO_AVR_hex2dec($bass);
+            readingsBulkUpdate( $hash, $cmd, $bass )
+              if ( ReadingsVal( $name, $cmd, "-" ) ne $bass );
+        }
+    }
+
     else {
         if ( $cmd eq "input" ) {
 
@@ -1334,6 +1413,18 @@ sub ONKYO_AVR_Read($) {
                   . $hash->{helper}{receiver}{input_aliases}{$value} . "'";
                 $value = $hash->{helper}{receiver}{input_aliases}{$value};
             }
+        }
+
+        # subwoofer-temporary-level
+        # center-temporary-level
+        elsif ($cmd eq "subwoofer-temporary-level"
+            || $cmd eq "center-temporary-level" )
+        {
+            my $prefix = "";
+            $prefix = "-" if ( $value =~ /^\-.*/ );
+            $value = substr( $value, 1 ) if ( $value =~ /^[\+|\-].*/ );
+
+            $value = $prefix . ONKYO_AVR_hex2dec($value);
         }
 
         readingsBulkUpdate( $hash, $cmd, $value )
@@ -1531,8 +1622,14 @@ sub ONKYO_AVR_Get($$$) {
             {
                 next
                   if (
-                    $hash->{helper}{receiver}{device}{zonelist}{zone}{$zoneID}
-                    {value} ne "1" || $zoneID eq "1" );
+                    !defined(
+                        $hash->{helper}{receiver}{device}{zonelist}{zone}
+                          {$zoneID}{value}
+                    )
+                    || $hash->{helper}{receiver}{device}{zonelist}{zone}
+                    {$zoneID}{value} ne "1"
+                    || $zoneID eq "1"
+                  );
                 $zones .= "," if ( $zones ne "" );
                 $zones .= $zoneID;
             }
@@ -1669,7 +1766,10 @@ sub ONKYO_AVR_Set($$$) {
         foreach my $reading ( keys %{ $hash->{READINGS} } ) {
             my $cmd_raw =
               ONKYOdb::ONKYO_GetRemotecontrolCommand( $zone, $reading );
-            my @readingExceptions = ( "volume", "input", "mute", "sleep" );
+            my @readingExceptions = (
+                "volume", "input", "mute", "sleep", "center-temporary-level",
+                "subwoofer-temporary-level"
+            );
 
             if ( $cmd_raw && !( grep $_ eq $reading, @readingExceptions ) ) {
                 my $cmd_details =
@@ -1700,6 +1800,21 @@ sub ONKYO_AVR_Set($$$) {
                     push @implicit_cmds, $reading;
                     $implicit_txt .= " $reading:$value_list";
                 }
+            }
+
+            # tone-*
+            elsif ( $reading =~ /^tone.*-([a-zA-Z]+)$/ ) {
+                $implicit_txt .= " $reading:slider,-10,1,10";
+            }
+
+            # center-temporary-level
+            elsif ( $reading eq "center-temporary-level" ) {
+                $implicit_txt .= " $reading:slider,-12,1,12";
+            }
+
+            # subwoofer*-temporary-level
+            elsif ( $reading =~ /^subwoofer.*-temporary-level$/ ) {
+                $implicit_txt .= " $reading:slider,-15,1,12";
             }
         }
     }
@@ -1802,7 +1917,7 @@ sub ONKYO_AVR_Set($$$) {
         Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
 
         if ( !defined( @$a[2] ) ) {
-            $return = "No argument given, choose one of ?";
+            $return = "No argument given";
         }
         else {
             if ( $presence eq "absent" ) {
@@ -1811,6 +1926,90 @@ sub ONKYO_AVR_Set($$$) {
             }
             else {
                 $return = ONKYO_AVR_SendCommand( $hash, @$a[1], @$a[2] );
+            }
+        }
+    }
+
+    # tone-*
+    elsif ( lc( @$a[1] ) =~ /^(tone.*)-(bass|treble)$/ ) {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given";
+        }
+        else {
+            if ( $state eq "off" ) {
+                $return =
+"Device power is turned off, this function is unavailable at that stage.";
+            }
+            elsif ( lc( @$a[2] ) eq "up" ) {
+                my $setVal;
+                $setVal = "B" if ( $2 eq "bass" );
+                $setVal = "T" if ( $2 eq "treble" );
+                $return =
+                  ONKYO_AVR_SendCommand( $hash, lc($1), $setVal . "UP" );
+            }
+            elsif ( lc( @$a[2] ) eq "down" ) {
+                my $setVal;
+                $setVal = "B" if ( $2 eq "bass" );
+                $setVal = "T" if ( $2 eq "treble" );
+                $return =
+                  ONKYO_AVR_SendCommand( $hash, lc($1), $setVal . "DOWN" );
+            }
+            elsif ( @$a[2] =~ /^-*\d+$/ ) {
+                my $setVal;
+                $setVal = "B" if ( $2 eq "bass" );
+                $setVal = "T" if ( $2 eq "treble" );
+                $setVal .= "+" if ( @$a[2] > 0 );
+                $setVal .= "-" if ( @$a[2] < 0 );
+
+                my $setVal2 = @$a[2];
+                $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 < 0 );
+                $setVal2 = ONKYO_AVR_dec2hex($setVal2);
+                $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 ne "00" );
+
+                $return =
+                  ONKYO_AVR_SendCommand( $hash, lc($1), $setVal . $setVal2 );
+            }
+        }
+    }
+
+    # center-temporary-level
+    # subwoofer-temporary-level
+    elsif (lc( @$a[1] ) eq "center-temporary-level"
+        || lc( @$a[1] ) eq "subwoofer-temporary-level" )
+    {
+        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given";
+        }
+        else {
+            if ( $state eq "off" ) {
+                $return =
+"Device power is turned off, this function is unavailable at that stage.";
+            }
+            elsif ( lc( @$a[2] ) eq "up" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, lc($1), "UP" );
+            }
+            elsif ( lc( @$a[2] ) eq "down" ) {
+                $return = ONKYO_AVR_SendCommand( $hash, lc($1), "DOWN" );
+            }
+            elsif ( @$a[2] =~ /^-*\d+$/ ) {
+                my $setVal;
+                $setVal = "+" if ( @$a[2] > 0 );
+                $setVal = "-" if ( @$a[2] < 0 );
+
+                my $setVal2 = @$a[2];
+                $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 < 0 );
+                $setVal2 = ONKYO_AVR_dec2hex($setVal2);
+                $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 ne "00" );
+
+                $return = ONKYO_AVR_SendCommand(
+                    $hash,
+                    lc( @$a[1] ),
+                    $setVal . $setVal2
+                );
             }
         }
     }
