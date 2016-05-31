@@ -2054,6 +2054,22 @@ sub ONKYO_AVR_Set($$$) {
         else {
             Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
             $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
+
+            # don't wait for receiver to confirm power on
+            #
+
+            readingsBeginUpdate($hash);
+
+            # power
+            readingsBulkUpdate( $hash, "power", "on" )
+              if ( ReadingsVal( $name, "power", "-" ) ne "on" );
+
+            # stateAV
+            my $stateAV = ONKYO_AVR_GetStateAV($hash);
+            readingsBulkUpdate( $hash, "stateAV", $stateAV )
+              if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
+
+            readingsEndUpdate( $hash, 1 );
         }
     }
 
