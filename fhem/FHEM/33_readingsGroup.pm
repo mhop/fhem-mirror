@@ -396,10 +396,10 @@ readingsGroup_makeLink($$$)
     if( AttrVal($FW_wname, "longpoll", 1)) {
       $txt = "<a style=\"cursor:pointer\" onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
     } else {
-      my $room = $FW_webArgs{room};
-      $room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
-      my $srf = $room ? "&room=$room" : "";
-      $srf = $room if( $room && $room =~ m/^&/ );
+      my $fw_room = $FW_webArgs{room};
+      $fw_room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
+      my $srf = $fw_room ? "&room=$fw_room" : "";
+      $srf = $fw_room if( $fw_room && $fw_room =~ m/^&/ );
       $txt = "<a href=\"$FW_ME$FW_subdir?$link$srf\">$txt</a>";
     }
     if( !$devStateIcon ) {
@@ -568,13 +568,13 @@ readingsGroup_value2html($$$$$$$$$)
         }
       }
 
-      my $room = $FW_webArgs{room};
-      $room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
+      my $fw_room = $FW_webArgs{room};
+      $fw_room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
 
       my $htmlTxt;
       foreach my $fn (sort keys %{$data{webCmdFn}}) {
         no strict "refs";
-        $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,$name,$room,$set,$values);
+        $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,$name,$fw_room,$set,$values);
         use strict "refs";
         last if(defined($htmlTxt));
       }
@@ -648,6 +648,7 @@ readingsGroup_2html($;$)
   my($hash,$extPage) = @_;
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
   return undef if( !$hash );
+  return undef if( !$FW_ME );
   return undef if( !$init_done );
 
   #if( $hash->{fhem}->{cached} && $hash->{fhem}->{lastDefChange} && $hash->{fhem}->{lastDefChange} == $lastDefChange ) {
@@ -888,13 +889,13 @@ readingsGroup_2html($;$)
               }
             }
 
-            my $room = $FW_webArgs{room};
-            $room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
+            my $fw_room = $FW_webArgs{room};
+            $fw_room = "&detail=$FW_webArgs{detail}" if( $FW_webArgs{"detail"} );
 
             my $htmlTxt;
             foreach my $fn (sort keys %{$data{webCmdFn}}) {
               no strict "refs";
-              $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,$name,$room,$set,$values);
+              $htmlTxt = &{$data{webCmdFn}{$fn}}($FW_wname,$name,$fw_room,$set,$values);
               use strict "refs";
               last if(defined($htmlTxt));
             }
