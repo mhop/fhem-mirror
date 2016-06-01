@@ -2272,6 +2272,11 @@ sub CUL_HM_Parse($$) {#########################################################
                              if($modules{CUL_HM}{defptr}{$chId});
       my $vs = ($val==100 ? "on":($val==0 ? "off":"$val %")); # user string...
 
+      if($chn == "00" && $mh{devH}->{helper}{PONtest}){
+        push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
+        $mh{devH}->{helper}{PONtest} = 0;
+      }
+
       push @evtEt,[$mh{shash},1,"level:$val"];
       push @evtEt,[$mh{shash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$mh{shash},1,"deviceMsg:$vs$target"] if($chn ne "00");
