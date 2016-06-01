@@ -950,9 +950,9 @@ plex_Set($$@)
 
       return undef;
 
-    } elsif( $cmd eq 'pause' || $cmd eq 'playMedia' || $cmd eq 'resume' || $cmd eq 'stop'
+    } elsif( $cmd eq 'pause' || $cmd eq 'play' || $cmd eq 'resume' || $cmd eq 'stop'
              || $cmd eq 'skipNext' || $cmd eq 'skipPrevious' || $cmd eq 'stepBack' || $cmd eq 'stepForward' ) {
-      return "$cmd not supported" if( $cmd ne 'pause' && $cmd ne 'playMedia' && $cmd ne 'resume'
+      return "$cmd not supported" if( $cmd ne 'pause' && $cmd ne 'play' && $cmd ne 'resume'
                                       && $hash->{controllable} && $hash->{controllable} !~ m/\b$cmd\b/ );
       if( ($cmd eq 'playMedia' || $cmd eq 'resume')  && $hash->{STATE} eq 'stopped' ) {
         my $key = ReadingsVal($name,'key', undef);
