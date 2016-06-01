@@ -16,6 +16,7 @@ var cm_attr = {
     indentWithTabs:     true,
     autofocus:          true,
     lineNumbers:        true,
+    jumpToLine:         false,
     smartIndent:        false,
     height:             false,
     extraKeys: {
@@ -94,6 +95,9 @@ function AddCodeMirror(e, cb) {
     }
     if (cm_attr.autoRefresh) {
         cm_active++; loadScript("codemirror/autorefresh.js",  function(){cm_loaded++;} );
+    }
+    if (cm_attr.jumpToLine) {
+        cm_active++; loadScript("codemirror/jump-to-line.js", function(){cm_loaded++;} );
     }
     
     // editor user preferences
