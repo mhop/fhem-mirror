@@ -691,7 +691,7 @@ sub TRX_LIGHT_parse_X10 ($$)
   	$device = sprintf '%02x%02x%c%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
   	$data = $bytes->[7];
   } elsif ($type == 0x16) { #Chime
-	if ($subtype == 0x01) {
+	if ($subtype == 0x00) {
 		$device = sprintf '%02x', $bytes->[4];
 		$data = $bytes->[5];
 	} else {
