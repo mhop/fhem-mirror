@@ -2428,7 +2428,7 @@ plex_parseTimeline($$$)
     $state = $1 if( $1 eq $2 && $2 eq $3 );
   }
 
-  if( $state =~ '(\w*):playing' ) {
+  if( $state =~ '(\w*):(playing|paused)' ) {
     $chash->{currentMediaType} = $1;
   } else {
     delete $chash->{currentMediaType};
