@@ -132,7 +132,7 @@ my $ONKYO_cmds_hr = {
         'tone-surround'                 => 'TSR',
         'tone-surround-back'            => 'TSB',
         'tp-scan'                       => 'TPS',
-        'tuning'                        => 'TUN',
+        'tunerFrequency'                => 'TUN',
         'universal-port'                => 'CPT',
         'video-information'             => 'IFV',
         'video-output'                  => 'VOS',
@@ -157,7 +157,7 @@ my $ONKYO_cmds_hr = {
         're-eq-academy-filter'  => 'RAZ',
         'input'                 => 'SLZ',
         'tone'                  => 'ZTN',
-        'tuning'                => 'TUZ',
+        'tunerFrequency'        => 'TUZ',
         'volume'                => 'ZVL'
     },
     '3' => {
@@ -169,7 +169,7 @@ my $ONKYO_cmds_hr = {
         'preset'                => 'PR3',
         'input'                 => 'SL3',
         'tone'                  => 'TN3',
-        'tuning'                => 'TU3',
+        'tunerFrequency'        => 'TU3',
         'volume'                => 'VL3'
     },
     '4' => {
@@ -179,7 +179,7 @@ my $ONKYO_cmds_hr = {
         'power'                 => 'PW4',
         'preset'                => 'PR4',
         'input'                 => 'SL4',
-        'tuning'                => 'TU4',
+        'tunerFrequency'        => 'TU4',
         'volume'                => 'VL4'
     }
 };
@@ -1325,11 +1325,6 @@ my $ONKYO_values_hr = {
             'video7'          => '06',
             'xm'              => '31'
         },
-        'TUN' => {
-            'down'  => 'DOWN',
-            'query' => 'QSTN',
-            'up'    => 'UP'
-        },
         'TUZ' => {
             '0-in-direct-mode' => '0',
             '1-in-direct-mode' => '1',
@@ -1508,11 +1503,6 @@ my $ONKYO_values_hr = {
             'query'            => 'QSTN',
             'up'               => 'UP'
         },
-        'TUN' => {
-            'down'  => 'DOWN',
-            'query' => 'QSTN',
-            'up'    => 'UP'
-        },
         'VL3' => {
             'level-down'  => 'DOWN',
             'level-up'    => 'UP',
@@ -1631,11 +1621,6 @@ my $ONKYO_values_hr = {
             'down'             => 'DOWN',
             'query'            => 'QSTN',
             'up'               => 'UP'
-        },
-        'TUN' => {
-            'down'  => 'DOWN',
-            'query' => 'QSTN',
-            'up'    => 'UP'
         },
         'VL4' => {
             'level-down'  => 'DOWN',
@@ -3656,7 +3641,7 @@ my $ONKYO_cmddb = {
         'TUN',
         {
             'description' => 'Tuning Command {Include Tuner Pack Model Only}',
-            'name'        => 'tuning',
+            'name'        => 'tunerFrequency',
             'values'      => {
                 'nnnnn',
                 {
@@ -5566,7 +5551,7 @@ ii-> Service icon
         'UTN',
         {
             'description' => 'Tuning Command {Universal Port Dock Only}',
-            'name'        => 'tuning',
+            'name'        => 'tunerFrequency',
             'values'      => {
                 'nnnnn',
                 {
@@ -6159,38 +6144,10 @@ ii-> Service icon
                 }
             }
         },
-        'TUN',
-        {
-            'description' => 'Tuning Command',
-            'name'        => 'tuning',
-            'values'      => {
-                'nnnnn',
-                {
-                    'description' =>
-'sets Directly Tuning Frequency {FM nnn.nn MHz / AM nnnnn kHz / XM nnnnn ch}',
-                    'name' => 'None'
-                },
-                'UP',
-                {
-                    'description' => 'sets Tuning Frequency Wrap-Around Up',
-                    'name'        => 'up'
-                },
-                'DOWN',
-                {
-                    'description' => 'sets Tuning Frequency Wrap-Around Down',
-                    'name'        => 'down'
-                },
-                'QSTN',
-                {
-                    'description' => 'gets The Tuning Frequency',
-                    'name'        => 'query'
-                }
-            }
-        },
         'TUZ',
         {
             'description' => 'Tuning Command',
-            'name'        => 'tuning',
+            'name'        => 'tunerFrequency',
             'values'      => {
                 'nnnnn',
                 {
@@ -6850,38 +6807,10 @@ ii-> Service icon
                 }
             }
         },
-        'TUN',
-        {
-            'description' => 'Tuning Command',
-            'name'        => 'tuning',
-            'values'      => {
-                'nnnnn',
-                {
-                    'description' =>
-'sets Directly Tuning Frequency {FM nnn.nn MHz / AM nnnnn kHz}',
-                    'name' => 'None'
-                },
-                'UP',
-                {
-                    'description' => 'sets Tuning Frequency Wrap-Around Up',
-                    'name'        => 'up'
-                },
-                'DOWN',
-                {
-                    'description' => 'sets Tuning Frequency Wrap-Around Down',
-                    'name'        => 'down'
-                },
-                'QSTN',
-                {
-                    'description' => 'gets The Tuning Frequency',
-                    'name'        => 'query'
-                }
-            }
-        },
         'TU3',
         {
             'description' => 'Tuning Command',
-            'name'        => 'tuning',
+            'name'        => 'tunerFrequency',
             'values'      => {
                 'nnnnn',
                 {
@@ -7330,8 +7259,7 @@ ii-> Service icon
                 '2C',
                 {
                     'description' => 'sets USB{toggle}',
-                    'name'        => 'usb
--toggle'
+                    'name'        => 'usb-toggle'
                 },
                 '40',
                 {
@@ -7372,38 +7300,10 @@ ii-> Service icon
                 }
             }
         },
-        'TUN',
-        {
-            'description' => 'Tuning Command',
-            'name'        => 'tuning',
-            'values'      => {
-                'nnnnn',
-                {
-                    'description' =>
-'sets Directly Tuning Frequency {FM nnn.nn MHz / AM nnnnn kHz}',
-                    'name' => 'None'
-                },
-                'UP',
-                {
-                    'description' => 'sets Tuning Frequency Wrap-Around Up',
-                    'name'        => 'up'
-                },
-                'DOWN',
-                {
-                    'description' => 'sets Tuning Frequency Wrap-Around Down',
-                    'name'        => 'down'
-                },
-                'QSTN',
-                {
-                    'description' => 'gets The Tuning Frequency',
-                    'name'        => 'query'
-                }
-            }
-        },
         'TU4',
         {
             'description' => 'Tuning Command',
-            'name'        => 'tuning',
+            'name'        => 'tunerFrequency',
             'values'      => {
                 'nnnnn',
                 {
