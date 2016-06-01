@@ -102,7 +102,7 @@ my $ONKYO_cmds_hr = {
         'net-usb-track-info'            => 'NTR',
         'net-usb'                       => 'NTC',
         'preset'                        => 'PRS',
-        'preset-memory'                 => 'UPM',
+        'preset-memory'                 => 'PRM',
         'pty-scan'                      => 'PTS',
         'rds-information'               => 'RDS',
         'record-output'                 => 'SLR',
@@ -438,37 +438,29 @@ my $ONKYO_values_hr = {
             'stop'   => 'STOP'
         },
         'CPT' => {
-            '0'       => '0',
-            '1'       => '1',
-            '10'      => '10',
-            '2'       => '2',
-            '3'       => '3',
-            '4'       => '4',
-            '5'       => '5',
-            '6'       => '6',
-            '7'       => '7',
-            '8'       => '8',
-            '9'       => '9',
-            'disp'    => 'DISP',
-            'down'    => 'DOWN',
-            'enter'   => 'ENTER',
-            'ff'      => 'FF',
-            'left'    => 'LEFT',
-            'mode'    => 'MODE',
-            'pause'   => 'PAUSE',
-            'play'    => 'PLAY',
-            'prsdn'   => 'PRSDN',
-            'prsup'   => 'PRSUP',
-            'repeat'  => 'REPEAT',
-            'return'  => 'RETURN',
-            'rew'     => 'REW',
-            'right'   => 'RIGHT',
-            'setup'   => 'SETUP',
-            'shuffle' => 'SHUFFLE',
-            'skip-f'  => 'SKIP.F',
-            'skip-r'  => 'SKIP.R',
-            'stop'    => 'STOP',
-            'up'      => 'UP'
+            '0'      => '0',
+            '1'      => '1',
+            '10'     => '10',
+            '2'      => '2',
+            '3'      => '3',
+            '4'      => '4',
+            '5'      => '5',
+            '6'      => '6',
+            '7'      => '7',
+            '8'      => '8',
+            '9'      => '9',
+            'disp'   => 'DISP',
+            'down'   => 'DOWN',
+            'enter'  => 'ENTER',
+            'ff'     => 'FF',
+            'left'   => 'LEFT',
+            'mode'   => 'MODE',
+            'pause'  => 'PAUSE',
+            'play'   => 'PLAY',
+            'skip-f' => 'SKIP.F',
+            'skip-r' => 'SKIP.R',
+            'stop'   => 'STOP',
+            'up'     => 'UP'
         },
         'CT1' => {
             'ff'     => 'FF',
@@ -831,14 +823,14 @@ my $ONKYO_values_hr = {
             'up'    => 'UP',
             'video' => 'VIDEO'
         },
-        'PRM' => {
-            'xrange(1, 40)' => '(1, 40)',
-            'xrange(1, 30)' => '(1, 30)'
-        },
         'PRS' => {
+            'xrange(1, 40)' => '(1, 40)',
+            'xrange(1, 30)' => '(1, 30)',
+            'up'            => 'UP',
             'down'          => 'DOWN',
             'query'         => 'QSTN',
-            'up'            => 'UP',
+        },
+        'PRM' => {
             'xrange(1, 40)' => '(1, 40)',
             'xrange(1, 30)' => '(1, 30)'
         },
@@ -1270,13 +1262,6 @@ my $ONKYO_values_hr = {
             'trup'    => 'TRUP',
             'up'      => 'UP'
         },
-        'PRS' => {
-            'down'          => 'DOWN',
-            'query'         => 'QSTN',
-            'up'            => 'UP',
-            'xrange(1, 40)' => '(1, 40)',
-            'xrange(1, 30)' => '(1, 30)'
-        },
         'PRZ' => {
             'down'          => 'DOWN',
             'query'         => 'QSTN',
@@ -1445,13 +1430,6 @@ my $ONKYO_values_hr = {
             'xrange(1, 40)' => '(1, 40)',
             'xrange(1, 30)' => '(1, 30)'
         },
-        'PRS' => {
-            'down'          => 'DOWN',
-            'query'         => 'QSTN',
-            'up'            => 'UP',
-            'xrange(1, 40)' => '(1, 40)',
-            'xrange(1, 30)' => '(1, 30)'
-        },
         'PW3' => {
             'off'   => '00',
             'on'    => '01',
@@ -1579,13 +1557,6 @@ my $ONKYO_values_hr = {
             'trupz'  => 'TRUPz'
         },
         'PR4' => {
-            'down'          => 'DOWN',
-            'query'         => 'QSTN',
-            'up'            => 'UP',
-            'xrange(1, 40)' => '(1, 40)',
-            'xrange(1, 30)' => '(1, 30)'
-        },
-        'PRS' => {
             'down'          => 'DOWN',
             'query'         => 'QSTN',
             'up'            => 'UP',
@@ -6299,40 +6270,6 @@ ii-> Service icon
                 }
             }
         },
-        'PRS',
-        {
-            'description' => 'Preset Command',
-            'name'        => 'preset',
-            'values'      => {
-                '{1,40}',
-                {
-                    'description' =>
-                      'sets Preset No. 1 - 40 { In hexadecimal representation}',
-                    'name' => 'no-1-40'
-                },
-                '{1,30}',
-                {
-                    'description' =>
-                      'sets Preset No. 1 - 30 { In hexadecimal representation}',
-                    'name' => 'no-1-30'
-                },
-                'UP',
-                {
-                    'description' => 'sets Preset No. Wrap-Around Up',
-                    'name'        => 'up'
-                },
-                'DOWN',
-                {
-                    'description' => 'sets Preset No. Wrap-Around Down',
-                    'name'        => 'down'
-                },
-                'QSTN',
-                {
-                    'description' => 'gets The Preset No.',
-                    'name'        => 'query'
-                }
-            }
-        },
         'PRZ',
         {
             'description' => 'Preset Command',
@@ -7024,40 +6961,6 @@ ii-> Service icon
                 }
             }
         },
-        'PRS',
-        {
-            'description' => 'Preset Command',
-            'name'        => 'preset',
-            'values'      => {
-                '{1,40}',
-                {
-                    'description' =>
-                      'sets Preset No. 1 - 40 { In hexadecimal representation}',
-                    'name' => 'no-1-40'
-                },
-                '{1,30}',
-                {
-                    'description' =>
-                      'sets Preset No. 1 - 30 { In hexadecimal representation}',
-                    'name' => 'no-1-30'
-                },
-                'UP',
-                {
-                    'description' => 'sets Preset No. Wrap-Around Up',
-                    'name'        => 'up'
-                },
-                'DOWN',
-                {
-                    'description' => 'sets Preset No. Wrap-Around Down',
-                    'name'        => 'down'
-                },
-                'QSTN',
-                {
-                    'description' => 'gets The Preset No.',
-                    'name'        => 'query'
-                }
-            }
-        },
         'PR3',
         {
             'description' => 'Preset Command',
@@ -7576,40 +7479,6 @@ ii-> Service icon
                 'QSTN',
                 {
                     'description' => 'gets The Tuning Frequency',
-                    'name'        => 'query'
-                }
-            }
-        },
-        'PRS',
-        {
-            'description' => 'Preset Command',
-            'name'        => 'preset',
-            'values'      => {
-                '{1,40}',
-                {
-                    'description' =>
-                      'sets Preset No. 1 - 40 { In hexadecimal representation}',
-                    'name' => 'no-1-40'
-                },
-                '{1,30}',
-                {
-                    'description' =>
-                      'sets Preset No. 1 - 30 { In hexadecimal representation}',
-                    'name' => 'no-1-30'
-                },
-                'UP',
-                {
-                    'description' => 'sets Preset No. Wrap-Around Up',
-                    'name'        => 'up'
-                },
-                'DOWN',
-                {
-                    'description' => 'sets Preset No. Wrap-Around Down',
-                    'name'        => 'down'
-                },
-                'QSTN',
-                {
-                    'description' => 'gets The Preset No.',
                     'name'        => 'query'
                 }
             }
