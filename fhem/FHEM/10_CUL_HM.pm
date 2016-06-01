@@ -2174,10 +2174,8 @@ sub CUL_HM_Parse($$) {#########################################################
       $mh{shash} = $modules{CUL_HM}{defptr}{$chId}
                              if($modules{CUL_HM}{defptr}{$chId});
       
-      push @evtEt,[$mh{shash},1,"energyTariff:" .($eUnit >> 4)         ];
-      push @evtEt,[$mh{shash},1,"energyUnit:"   .($eUnit        & 0xfe)];
-      push @evtEt,[$mh{shash},1,"powerTariff:"  .($pUnit >> 4         )];
-      push @evtEt,[$mh{shash},1,"powerSign:"    .(($pUnit >> 4) & 0xfe)];
+      push @evtEt,[$mh{shash},1,"energyTariff:" .(( $eUnit       & 0xfe)?(-1*($eUnit >> 4)):($eUnit >> 4))];
+      push @evtEt,[$mh{shash},1,"powerTariff:"  .((($pUnit >> 4) & 0xfe)?(-1*($pUnit >> 4)):($pUnit >> 4))];
       push @evtEt,[$mh{shash},1,"powerUnit:"    .(($pUnit     ) & 0xfe)];
       push @evtEt,[$mh{shash},1,"powerIEC:"     .($pIEC)               ];
       
