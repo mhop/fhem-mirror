@@ -170,6 +170,7 @@ sub HMLAN_Notify(@) {##########################################################
       HMLAN_Attr("set",$hash->{NAME},"logIDs",$aVal) if($aVal);
       delete $hash->{helper}{attrPend};
     }
+    HMLAN_writeAesKey($hash->{NAME});
   }
   elsif ($dev->{NAME} eq $hash->{NAME}){
     foreach (grep (m/CONNECTED$/,@{$dev->{CHANGED}})) { # connect/disconnect
