@@ -3532,12 +3532,17 @@ ZWave_getHash($$$)
 
   my $version = $hash->{".vclasses"}{$cl};
   if(defined($version) && ($type eq "get" || $type eq "set")) {
-    map { 
-      my $zv = $zwave_classVersion{$_};
-      delete $ptr->{$_} if(!$version ||
-                           ($zv && (($zv->{min} && $zv->{min} > $version) ||
-                                    ($zv->{max} && $zv->{max} < $version))));
-    } keys %{$ptr};
+    my %h;
+    if($version > 0) {
+      map { 
+        my $zv = $zwave_classVersion{$_};
+        if(!$zv || ((!$zv->{min} || $zv->{min} <= $version) &&
+                    (!$zv->{max} || $zv->{max} >= $version))) {
+          $h{$_} = $ptr->{$_};
+        }
+      } keys %{$ptr};
+    }
+    $ptr = \%h;
   }
 
   return $ptr;
