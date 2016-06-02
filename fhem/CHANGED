@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 74_AMAD: new Feature change current volume + or - value
+                      set TABLET volume -5
   - updated: 74_AMAD: New Minor Release 2.2 real state for deviceState Reading,
                       Support for Amazon Music Player and Spotify Player, Keep
                       Alive funktion for Android 6
