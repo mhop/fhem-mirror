@@ -40,6 +40,7 @@
 # V 1.13 2015-11-10 - FIX: POSIX isdigit is deprecated replaced by own isDigit
 # V 1.14 2016-03-20 - FIX: send delimiter to signal end of stream if length of data > 1024
 # V 1.15 2016-03-28 - NEW: protocol daycom (switch)
+# V 1.16 2016-06-02 - NEW: protocol oregon_21 (temp)
 ############################################## 
 package main;
 
@@ -833,6 +834,7 @@ sub pilight_ctrl_Parse($$)
     case m/ninjablocks/ {$protoID = 4;}
     case m/tfa/         {$protoID = 4;}
     case m/teknihall/   {$protoID = 4;}
+    case m/oregon_21/   {$protoID = 4;}
     
     #gpio temperature, humidity sensors
     case m/dht11/       {$protoID = 4;}
