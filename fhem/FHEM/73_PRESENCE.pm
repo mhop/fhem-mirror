@@ -170,7 +170,7 @@ PRESENCE_Define($$)
     }
 
     my $timeout = $hash->{TIMEOUT_NORMAL};
-    my $presence_timeout = $hash->{TIMEOUT_PRESENCE};
+    my $presence_timeout = $hash->{TIMEOUT_PRESENT};
 
     if(defined($timeout) and not $timeout =~ /^\d+$/)
     {
