@@ -37,7 +37,7 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.2.0";
+my $modulversion = "2.2.1";
 my $flowsetversion = "2.2.0";
 
 
@@ -626,10 +626,26 @@ sub AMAD_SelectSetCmd($$@) {
     elsif( lc $cmd eq 'volume' ) {
     
 	my $vol = join( " ", @data );
+	
+	if( $vol =~ /^\+(.*)/ or $vol =~ /^-(.*)/ ) {
+
+            if( $vol =~ /^\+(.*)/ ) {
+            
+                $vol =~ s/^\+//g;
+                $vol = ReadingsVal( $name, "volume", 15 ) + $vol;
+            }
+            
+            elsif( $vol =~ /^-(.*)/ ) {
+            
+                $vol =~ s/^-//g;
+                printf $vol;
+                $vol = ReadingsVal( $name, "volume", 15 ) - $vol;
+            }
+	}
 
 	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/setVolume?volume=$vol";
 	
-	return AMAD_HTTP_POST( $hash, $url );
+        return AMAD_HTTP_POST( $hash, $url );
     }
     
     elsif( lc $cmd eq 'volumenotification' ) {
@@ -1548,7 +1564,7 @@ sub AMAD_decrypt($) {
     <li>timer - setzt einen Timer innerhalb der als Standard definierten ClockAPP auf dem Device. Es k&ouml;nnen nur Sekunden angegeben werden.</li>
     <li>ttsMsg - versendet eine Nachricht welche als Sprachnachricht ausgegeben wird</li>
     <li>vibrate - l&auml;sst das Androidger&auml;t vibrieren</li>
-    <li>volume - setzt die Medialautst&auml;rke. Entweder die internen Lautsprecher oder sofern angeschlossen die Bluetoothlautsprecher und per Klinkenstecker angeschlossene Lautsprecher</li>
+    <li>volume - setzt die Medialautst&auml;rke. Entweder die internen Lautsprecher oder sofern angeschlossen die Bluetoothlautsprecher und per Klinkenstecker angeschlossene Lautsprecher, + oder - vor dem Wert reduziert die aktuelle Lautst&auml;rke um den Wert</li>
     <li>volumeNotification - setzt die Benachrichtigungslautst&auml;rke.</li>
   </ul>
   <br>
