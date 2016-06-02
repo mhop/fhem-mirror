@@ -3,22 +3,23 @@
 var cm_loaded = 0;
 var cm_active = 0;
 var cm_attr = {
-    matchBrackets:      true,
-    autoRefresh:        true,
-    search:             true,
-    comment:            true,
-    autocomplete:       true,
-    autocompleteAlways: false,
-    autoCloseBrackets:  true,
-    indentUnit:         4,
-    type:               "fhem",
-    theme:              "blackboard",
-    indentWithTabs:     true,
-    autofocus:          true,
-    lineNumbers:        true,
-    jumpToLine:         false,
-    smartIndent:        false,
-    height:             false,
+    matchBrackets:       true,
+    autoRefresh:         true,
+    search:              true,
+    comment:             true,
+    autocomplete:        true,
+    autocompleteAlways:  false,
+    autoCloseBrackets:   true,
+    indentUnit:          4,
+    type:                "fhem",
+    theme:               "blackboard",
+    indentWithTabs:      true,
+    autofocus:           true,
+    lineNumbers:         true,
+    jumpToLine:          false,
+    jumpToLine_extraKey: false,
+    smartIndent:         false,
+    height:              false,
     extraKeys: {
         'Tab': function(cm) {
             if (cm.somethingSelected()) {
@@ -98,6 +99,9 @@ function AddCodeMirror(e, cb) {
     }
     if (cm_attr.jumpToLine) {
         cm_active++; loadScript("codemirror/jump-to-line.js", function(){cm_loaded++;} );
+        if (cm_attr.jumpToLine_extraKey) {
+            cm_attr.extraKeys[cm_attr.jumpToLine_extraKey] = 'jumpToLine';
+        }
     }
     
     // editor user preferences
