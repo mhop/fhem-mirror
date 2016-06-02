@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - deleted: 52_I2C_GY30_BH1750FVI: Arno Augustin hatte fast zeitgleich
+             eine  technisch bessere Variante entwickelt. Diese ist
+             nicht mehr notwendig
+  - updated: 52_I2C_HDC1008: Umbau auf asynchrones I2C lesen, 
+             alle sleeps entfernt
   - feature: 74_AMAD: new Feature change current volume + or - value
                       set TABLET volume -5
   - updated: 74_AMAD: New Minor Release 2.2 real state for deviceState Reading,
