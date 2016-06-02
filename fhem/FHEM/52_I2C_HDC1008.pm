@@ -7,7 +7,7 @@
 package main;
 use strict;
 use warnings;
-use Time::HiRes qw(usleep);
+
 
 
 
@@ -42,7 +42,7 @@ sub I2C_HDC1008_Initialize($) {
     $hash->{DefFn}      = 'I2C_HDC1008_Define';
     $hash->{UndefFn}    = 'I2C_HDC1008_Undef';
     $hash->{SetFn}      = 'I2C_HDC1008_Set';
-    $hash->{GetFn}      = 'I2C_HDC1008_Get';
+    
     $hash->{AttrFn}     = 'I2C_HDC1008_Attr';
     $hash->{ReadFn}     = 'I2C_HDC1008_Read';
 	$hash->{I2CRecFn} 	= 'I2C_HDC1008_I2CRec';
@@ -68,6 +68,8 @@ sub I2C_HDC1008_Define($$) {
 	$hash->{RESOLUTION_HUMIDITY} = '14Bit';
 	$hash->{HEATER} = 'off';
 	$hash->{INTERVAL} = 0;
+	$hash->{DEVICE_STATE} = 'UNKNOWN';
+	
 	
   if ($main::init_done) {
     eval { I2C_HDC1008_Init( $hash, [ @a[ 2 .. scalar(@a) - 1 ] ] ); };
@@ -130,6 +132,7 @@ sub I2C_HDC1008_Init($$) {
 	if (defined AttrVal($hash->{NAME}, "IODev", undef))
 	{
 		$hash->{MODUL_STATE} = 'Initialized';
+		$hash->{DEVICE_STATE} = 'READY';
 		
 	}
 	else
@@ -213,6 +216,8 @@ sub I2C_HDC1008_GetHum ($$)
 	
 	
 	readingsEndUpdate($hash, 1);	
+	
+	
 }
 
 sub I2C_HDC1008_Undef($$) 
@@ -251,8 +256,18 @@ sub I2C_HDC1008_Reset($)
 				reg => 2,
 				data => $high_byte. " ".$low_byte	
 				});
-	Time::HiRes::usleep(15000); # Sensor braucht bis 15 ms bis er bereit ist		
+	
+	RemoveInternalTimer($hash);
+	$hash->{DEVICE_STATE} ='READY';
+	InternalTimer(gettimeofday() + 15.0/1000, 'I2C_HDC1008_Poll', $hash, 0);		# Sensor braucht bis 15 ms bis er bereit ist	
+		
 }
+
+
+# Funktion holt die Werte vom Sensor via I2C
+#	asynchrones Lesen, über Status-Wechsel in $hash->{DEVICE_STATE} und Rückgabe der notwendigen Dauer des aktuellen Schritts in Sekunden, 
+# 	die dann an den Timer gegeben wird. Der schaut nach Ablauf der Zeit hier wieder vorbei und weiß als nächstes zu tun ist,
+#   andere Prozesse werden dabei nicht mehr blockiert.
 
 sub I2C_HDC1008_UpdateValues($)
 {
@@ -264,6 +279,8 @@ sub I2C_HDC1008_UpdateValues($)
   	return "$name: no IO device defined" unless ($hash->{IODev});
 
 
+	Log3 $name, 5, "[$name] I2C_HDC1008_UpdateValues starts with state: $hash->{DEVICE_STATE}";
+	
 	# baue Konfigurationsparameter zusammen
 	
 	my $modeReading = 1 << 12; # lies beides gleichzeitig
@@ -276,78 +293,111 @@ sub I2C_HDC1008_UpdateValues($)
 	my $resHumParam = $I2C_HDC1008_humParams{$resHumIndex}{code};
 	my $heaterParam = $I2C_HDC1008_validsHeater{$heaterIndex};
 	
-	my $Param = $modeReading | $resTempParam | $resHumParam | $heaterParam;
-	
-	
-	# schicke Konfiguration zum HDC1008-Sensor 
-	# --------------------------------------------------------
-
-	my $low_byte = $Param & 0xff;
-	my $high_byte = ($Param & 0xff00) >> 8;	
-	
 	my $iodev = $hash->{IODev};
 	my $i2caddress = $hash->{I2C_Address};
+		
+		
+	if ($hash->{DEVICE_STATE} eq 'READY')
+	{
 	
-	CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-				direction  => "i2cwrite",
-				i2caddress => $i2caddress,
-				reg => 2,
-				data => $high_byte. " ".$low_byte	# Leider fehlt es hier an Doku. Laut Quellcode (00_RPII2C.pm, ab Zeile 369),  werden die  dezimale Zahlen durch Leerzeichen getrennt, binär gewandelt und zum I2C-Bus geschickt
-				});
-	Time::HiRes::usleep(15000); # Sensor braucht bis 15 ms bis er bereit ist
+		my $Param = $modeReading | $resTempParam | $resHumParam | $heaterParam;
+		
+		
+		# schicke Konfiguration zum HDC1008-Sensor 
+		# --------------------------------------------------------
 
+		my $low_byte = $Param & 0xff;
+		my $high_byte = ($Param & 0xff00) >> 8;	
+		
+		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
+					direction  => "i2cwrite",
+					i2caddress => $i2caddress,
+					reg => 2,
+					data => $high_byte. " ".$low_byte	# Leider fehlt es hier an Doku. Laut Quellcode (00_RPII2C.pm, ab Zeile 369),  werden die  dezimale Zahlen durch Leerzeichen getrennt, binär gewandelt und zum I2C-Bus geschickt
+					});
+		$hash->{DEVICE_STATE} = 'CONFIGURING';
+		return 15.0/1000; # Sensor braucht bis 15 ms bis er bereit ist
+	}
+	elsif($hash->{DEVICE_STATE} eq 'CONFIGURING')
+	{
+		# HDC1008-Sensor soll Temperatur messen
+		# --------------------------------------------------------
+		
+		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
+					direction  => "i2cwrite",
+					i2caddress => $i2caddress,
+					data => (0)
+					});				
+					
+		$hash->{DEVICE_STATE} = 'MEASURING_TEMPERATURE';
+		
+		my $tempWait = $I2C_HDC1008_tempParams{$resTempIndex}{delay};  # in ns
+		return $tempWait/1000000.0; 
+		
+	}
+	elsif($hash->{DEVICE_STATE} eq 'MEASURING_TEMPERATURE')
+	{
 	
-	
-	# lese Temperatur vom HDC1008-Sensor
-	# --------------------------------------------------------
-	
-	CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-				direction  => "i2cwrite",
-				i2caddress => $i2caddress,
-				data => (0)
-				});			
-	
-	my $tempWait = $I2C_HDC1008_tempParams{$resTempIndex}{delay}; 
-	Time::HiRes::usleep($tempWait);
-	
-	
-	CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {	# Leider fehlt es hier an Doku. daher hier der Hinweis bei erfolgreichem Lesen wird die Funktion in $hash->{I2CRecFn} aufgerufen	
+		# Temperatur vom HDC1008-Sensor lesen
+		# --------------------------------------------------------	
+		
+		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {	# Leider fehlt es hier an Doku. daher hier der Hinweis bei erfolgreichem Lesen wird die Funktion in $hash->{I2CRecFn} aufgerufen	
 				direction  => 	"i2cread",
 				i2caddress => 	$i2caddress,
 				type => 		"temp",
 				nbyte => 		2
-				});
+				});	
 	
+
+
+		# HDC1008-Sensor soll Feuchtigkeit messen
+		# --------------------------------------------------------
+		
+		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
+					direction  => 	"i2cwrite",
+					i2caddress => 	$i2caddress,
+					data => 		1
+					});			
+		
+		$hash->{DEVICE_STATE} = 'MEASURING_HUMIDITY';
+		
+		my $humWait = $I2C_HDC1008_humParams{$resTempIndex}{delay}; 	
 	
-	# lese Feuchtigkeit vom HDC1008-Sensor
-	# --------------------------------------------------------
-	
-	CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-				direction  => 	"i2cwrite",
-				i2caddress => 	$i2caddress,
-				data => 		1
-				});			
-	my $humWait = $I2C_HDC1008_humParams{$resTempIndex}{delay}; 
-	Time::HiRes::usleep($humWait);
-	
-	CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
+		return $humWait/1000000.0; 
+	}
+	elsif($hash->{DEVICE_STATE} eq 'MEASURING_HUMIDITY')
+	{	
+		# lese Feuchtigkeit vom HDC1008-Sensor
+		# --------------------------------------------------------	
+		
+		CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
 				direction  => "i2cread",
 				i2caddress => $i2caddress,
 				type => 			 "hum",
 				nbyte => 2
-				});
+				});	
+				
+		# fertig	
+		
+		$hash->{DEVICE_STATE} = 'READY';
+		my $pollInterval = AttrVal($hash->{NAME}, 'interval', 0); 
+		return $pollInterval * 60; # Pollintervall in Minuten
+	}
+	else
+	{
+		Log3 $name, 5, "[$name] I2C_HDC1008_UpdateValues wtf... whats wrong   !!!!!!!!!!!!!!";
+		
+		$hash->{DEVICE_STATE} = 'READY';
+		my $pollInterval = AttrVal($hash->{NAME}, 'interval', 0); 
+		return $pollInterval * 60; # Pollintervall in Minuten
+	}
+
+	
+
 
 }
 
-sub I2C_HDC1008_Get($@) {
-	my ($hash, @param) = @_;
-	
-	
 
-	I2C_HDC1008_UpdateValues($hash);
-	
-
-}
 
 # set wenn Befehl gesetzt wurde und nicht '?' ist, 
 #	dann führe Befehl aus und gib den Status zurück
@@ -381,7 +431,12 @@ sub I2C_HDC1008_Set($@) {
 		}
 		elsif ($cmd eq 'Update')
 		{
-			I2C_HDC1008_UpdateValues($hash);
+			
+			
+			RemoveInternalTimer($hash);
+			$hash->{DEVICE_STATE} ='READY';
+			I2C_HDC1008_Poll($hash);
+	
 			return undef;
 		}
 		elsif ($cmd eq 'Reset')
@@ -421,25 +476,25 @@ sub I2C_HDC1008_Poll
 	
 	 
 	
-	I2C_HDC1008_UpdateValues($hash);
+	my $delay = I2C_HDC1008_UpdateValues($hash);
 	
 	my $ret = I2C_HDC1008_Catch($@) if $@;
 	
-	# Debug("Update Werte");
-	my $pollInterval = AttrVal($hash->{NAME}, 'interval', 0);
-	if ($pollInterval > 0) 
+
+	if ($delay > 0) 
 	{
-		Log3 $hash, 5, "[$name] I2C_HDC1008_Poll call InternalTimer with $pollInterval minutes";
-		InternalTimer(gettimeofday() + ($pollInterval * 60), 'I2C_HDC1008_Poll', $hash, 0);
+		Log3 $hash, 5, "[$name] I2C_HDC1008_Poll call InternalTimer with $delay seconds";
+		InternalTimer(gettimeofday() + $delay, 'I2C_HDC1008_Poll', $hash, 0);
 	}
 	else
 	{
-		Log3 $name, 5, "[$name] I2C_HDC1008_Poll dont call InternalTimer, not valid pollInterval";
+		Log3 $name, 5, "[$name] I2C_HDC1008_Poll dont call InternalTimer, nothing todo";
 	}
 	return;
 }
 
-sub I2C_HDC1008_Attr(@) {
+sub I2C_HDC1008_Attr(@) 
+{
 	
 	my ($command, $name, $attr, $val) = @_;
 	my $hash = $defs{$name};
@@ -452,6 +507,7 @@ sub I2C_HDC1008_Attr(@) {
 			if ( looks_like_number($val) && $val > 0) 
 			{
 				RemoveInternalTimer($hash);
+				$hash->{DEVICE_STATE} = 'READY';
 				InternalTimer(1, 'I2C_HDC1008_Poll', $hash, 0);
 				$hash->{INTERVAL} = $val;
 				Log3 $hash, 5, "[$hash->{NAME}] I2C_HDC1008_Attr call InternalTimer with new value  $val ";
