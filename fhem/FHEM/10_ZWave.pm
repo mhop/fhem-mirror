@@ -894,8 +894,8 @@ ZWave_Cmd($$@)
     $data .= ZWave_callbackId($baseHash);
   }
 
-  if($type eq "get" && $hash->{CL}) { # Wait for the result for frontend cmd
-    if(!$hash->{asyncGet}) {
+  if($type eq "get" && $hash->{CL} && !ZWave_isWakeUp($hash)) {
+    if(!$hash->{asyncGet}) {            # Wait for the result for frontend cmd
       my $tHash = { hash=>$hash, CL=>$hash->{CL}, re=>"^000400${id}..$cmdId"};
       $hash->{asyncGet} = $tHash;
       InternalTimer(gettimeofday()+4, sub {
