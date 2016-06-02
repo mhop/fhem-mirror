@@ -1040,7 +1040,7 @@ plex_Set($$@)
     }
 
     $list .= 'playMedia ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
-    $list .= 'play ' if( defined($hash->{protocolCapabilities}) && $hash->{protocolCapabilities} =~ m/\bplayqueues\b/ );
+    $list .= 'play ' if( $hash->{protocolCapabilities} && $hash->{protocolCapabilities} =~ m/\bplayqueues\b/ );
     $list .= 'resume:noArg ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
     $list .= 'pause:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bplayPause\b/ );;
     $list .= 'stop:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bstop\b/ );;
@@ -1764,9 +1764,7 @@ plex_getToken($)
   };
 
   $param->{callback} = \&plex_parseHttpAnswer;
-  my($err,$data) = HttpUtils_NonblockingGet( $param );
-
-  Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+  HttpUtils_NonblockingGet( $param );
 
   return undef;
 }
@@ -1801,9 +1799,7 @@ plex_getPinForToken($)
   $param->{cl} = $hash->{CL} if( ref($hash->{CL}) eq 'HASH' );
 
   $param->{callback} = \&plex_parseHttpAnswer;
-  my($err,$data) = HttpUtils_NonblockingGet( $param );
-
-  Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+  HttpUtils_NonblockingGet( $param );
 
   return undef;
 }
@@ -1841,9 +1837,7 @@ plex_getTokenOfPin($)
   };
 
   $param->{callback} = \&plex_parseHttpAnswer;
-  my($err,$data) = HttpUtils_NonblockingGet( $param );
-
-  Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+  HttpUtils_NonblockingGet( $param );
 
   return undef;
 }
@@ -1911,12 +1905,7 @@ plex_sendApiCmd($$$;$)
   }
 
   $param->{callback} = \&plex_parseHttpAnswer;
-  my($err,$data) = HttpUtils_NonblockingGet( $param );
-
-  if( $err ) {
-    Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
-    return $err;
-  }
+  HttpUtils_NonblockingGet( $param );
 
   return undef;
 }
@@ -1931,7 +1920,7 @@ plex_play($$$$)
     $key =~ s/[^0-9]//g;
     $url = "http://$server->{address}:$server->{port}/playQueues?type=&playlistID=$key";
     $url .= "&shuffle=0&repeat=0&includeChapters=1&includeRelated=1";
-  } else { # play album or single track  
+  } else { # play album or single track
     $key = "/library/metadata/$key" if( $key !~ '^/' );
     my $xml = plex_sendApiCmd( $hash, "http://$server->{address}:$server->{port}$key", '#raw', 1 );
     #Log 1, Dumper $xml;
@@ -1983,9 +1972,7 @@ plex_play($$$$)
   }
 
   $param->{callback} = \&plex_parseHttpAnswer;
-  my($err,$data) = HttpUtils_NonblockingGet( $param );
-
-  Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+  HttpUtils_NonblockingGet( $param );
 
   return undef;
 }
@@ -2048,9 +2035,7 @@ plex_addToPlaylist($$$$)
   }
 
   $param->{callback} = \&plex_parseHttpAnswer;
-  my($err,$data) = HttpUtils_NonblockingGet( $param );
-
-  Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+  HttpUtils_NonblockingGet( $param );
 
   return undef;
 }
@@ -2385,10 +2370,10 @@ plex_parseTimeline($$$)
   readingsBeginUpdate($chash);
   plex_readingsBulkUpdateIfChanged($chash, 'location', $xml->{location} );
   my $state;
+  my $controllable;
   delete $chash->{time};
   delete $chash->{seekRange};
   delete $chash->{controllable};
-  my $controllable;
   foreach my $entry (@{$xml->{Timeline}}) {
     next if( !$entry->{state} );
 
@@ -2410,7 +2395,7 @@ plex_parseTimeline($$$)
     if( $entry->{type} && $entry->{controllable}) {
       $controllable->{ $entry->{type} } = $entry->{controllable};
     }
-    
+
     if( $entry->{time} ) {
 #      if( !$chash->{helper}{time} || abs($entry->{time} - $chash->{helper}{time}) > 2000 ) {
 #        plex_readingsBulkUpdateIfChanged($chash, 'time', plex_sec2hms($entry->{time}/1000) );
@@ -2435,7 +2420,7 @@ plex_parseTimeline($$$)
 
   if( $state =~ '(\w*):(playing|paused)' ) {
     $chash->{currentMediaType} = $1;
-    $chash->{controllable} = $controllable->{ $1 };
+    $chash->{controllable} = $controllable->{$1} if( $controllable->{$1} );
   } else {
     delete $chash->{currentMediaType};
   }
@@ -3987,9 +3972,7 @@ plex_publishToSonos($$;$)
     $param->{cl} = $hash->{CL} if( ref($hash->{CL}) eq 'HASH' );
 
     $param->{callback} = \&plex_parseHttpAnswer;
-    my($err,$tmpdata) = HttpUtils_NonblockingGet( $param );
-
-    Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+    HttpUtils_NonblockingGet( $param );
 
     ++$i;
   }
@@ -4031,9 +4014,7 @@ plex_publishToSonos($$;$)
     $param->{cl} = $hash->{CL} if( ref($hash->{CL}) eq 'HASH' );
 
     $param->{callback} = \&plex_parseHttpAnswer;
-    my($err,$tmpdata) = HttpUtils_NonblockingGet( $param );
-
-    Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
+    HttpUtils_NonblockingGet( $param );
 
     ++$i;
   }
