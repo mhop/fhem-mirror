@@ -1040,7 +1040,7 @@ plex_Set($$@)
     }
 
     $list .= 'playMedia ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
-    $list .= 'play ' if( $hash->{protocolCapabilities} =~ m/\bplayqueues\b/ );
+    $list .= 'play ' if( defined($hash->{protocolCapabilities}) && $hash->{protocolCapabilities} =~ m/\bplayqueues\b/ );
     $list .= 'resume:noArg ' if( !$hash->{controllable} || $hash->{controllable} =~ m/\bplayPause\b/ );
     $list .= 'pause:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bplayPause\b/ );;
     $list .= 'stop:noArg ' if( $hash->{controllable} && $hash->{controllable} =~ m/\bstop\b/ );;
@@ -2388,6 +2388,7 @@ plex_parseTimeline($$$)
   delete $chash->{time};
   delete $chash->{seekRange};
   delete $chash->{controllable};
+  my $controllable;
   foreach my $entry (@{$xml->{Timeline}}) {
     next if( !$entry->{state} );
 
@@ -2406,6 +2407,10 @@ plex_parseTimeline($$$)
 
     $chash->{controllable} = $entry->{controllable} if( $entry->{controllable} );
 
+    if( $entry->{type} && $entry->{controllable}) {
+      $controllable->{ $entry->{type} } = $entry->{controllable};
+    }
+    
     if( $entry->{time} ) {
 #      if( !$chash->{helper}{time} || abs($entry->{time} - $chash->{helper}{time}) > 2000 ) {
 #        plex_readingsBulkUpdateIfChanged($chash, 'time', plex_sec2hms($entry->{time}/1000) );
@@ -2430,6 +2435,7 @@ plex_parseTimeline($$$)
 
   if( $state =~ '(\w*):(playing|paused)' ) {
     $chash->{currentMediaType} = $1;
+    $chash->{controllable} = $controllable->{ $1 };
   } else {
     delete $chash->{currentMediaType};
   }
@@ -3981,7 +3987,7 @@ plex_publishToSonos($$;$)
     $param->{cl} = $hash->{CL} if( ref($hash->{CL}) eq 'HASH' );
 
     $param->{callback} = \&plex_parseHttpAnswer;
-    my($err,$data) = HttpUtils_NonblockingGet( $param );
+    my($err,$tmpdata) = HttpUtils_NonblockingGet( $param );
 
     Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
 
@@ -4025,7 +4031,7 @@ plex_publishToSonos($$;$)
     $param->{cl} = $hash->{CL} if( ref($hash->{CL}) eq 'HASH' );
 
     $param->{callback} = \&plex_parseHttpAnswer;
-    my($err,$data) = HttpUtils_NonblockingGet( $param );
+    my($err,$tmpdata) = HttpUtils_NonblockingGet( $param );
 
     Log3 $name, 2, "$name: http request ($url) failed: $err" if( $err );
 
