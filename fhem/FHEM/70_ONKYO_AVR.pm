@@ -66,30 +66,36 @@ sub ONKYO_AVR_Initialize($) {
 
     require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
-    $hash->{DefFn}   = "ONKYO_AVR_Define";
-    $hash->{UndefFn} = "ONKYO_AVR_Undefine";
+    # Provider
+    $hash->{ReadFn}  = "ONKYO_AVR_Read";
+    $hash->{WriteFn} = "ONKYO_AVR_Write";
+    $hash->{ReadyFn} = "ONKYO_AVR_Ready";
 
-    #    $hash->{DeleteFn} = "ONKYO_AVR_Delete";
-    $hash->{SetFn} = "ONKYO_AVR_Set";
-    $hash->{GetFn} = "ONKYO_AVR_Get";
+    # Normal devices
+    $hash->{DefFn}       = "ONKYO_AVR_Define";
+    $hash->{UndefFn}     = "ONKYO_AVR_Undefine";
+    $hash->{GetFn}       = "ONKYO_AVR_Get";
+    $hash->{SetFn}       = "ONKYO_AVR_Set";
+    $hash->{NotifyFn}    = "ONKYO_AVR_Notify";
+    $hash->{parseParams} = 1;
 
-    #    $hash->{AttrFn}   = "ONKYO_AVR_Attr";
-    $hash->{NotifyFn} = "ONKYO_AVR_Notify";
-    $hash->{ReadFn}   = "ONKYO_AVR_Read";
-    $hash->{WriteFn}  = "ONKYO_AVR_Write";
-    $hash->{Clients}  = ":ONKYO_AVR_ZONE:";
-    $hash->{ReadyFn}  = "ONKYO_AVR_Ready";
-
-    $hash->{AttrList} =
-        "do_not_notify:1,0 "
-      . "volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 inputs disable:0,1 model wakeupCmd:textField connectionCheck:off,30,45,60,75,90,105,120 "
-      . $readingFnAttributes;
+    no warnings 'qw';
+    my @attrList = qw(
+      do_not_notify:1,0
+      volumeSteps:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
+      inputs
+      disable:0,1
+      model
+      wakeupCmd:textField
+      connectionCheck:off,30,45,60,75,90,105,120
+      timeout:1,2,3,4,5
+    );
+    use warnings 'qw';
+    $hash->{AttrList} = join( " ", @attrList ) . " " . $readingFnAttributes;
 
     #    $data{RC_layout}{ONKYO_AVR_SVG} = "ONKYO_AVR_RClayout_SVG";
     #    $data{RC_layout}{ONKYO_AVR}     = "ONKYO_AVR_RClayout";
     $data{RC_makenotify}{ONKYO_AVR} = "ONKYO_AVR_RCmakenotify";
-
-    $hash->{parseParams} = 1;
 }
 
 ###################################
@@ -106,10 +112,12 @@ sub ONKYO_AVR_Define($$$) {
         return $msg;
     }
 
-    # Close existing connections
+    RemoveInternalTimer($hash);
     DevIo_CloseDev($hash);
+    delete $hash->{NEXT_OPEN} if ( defined( $hash->{NEXT_OPEN} ) );
 
-    $hash->{DeviceName} = @$a[2] . ":60128";
+    $hash->{Clients} = ":ONKYO_AVR_ZONE:";
+    $hash->{TIMEOUT} = AttrVal( $name, "timeout", "3" );
 
     # used zone to control
     $hash->{ZONE}        = "1";
@@ -144,8 +152,13 @@ sub ONKYO_AVR_Define($$$) {
     $hash->{helper}{receiver}{device}{zonelist}{zone}{1}{value} = "1";
     $modules{ONKYO_AVR_ZONE}{defptr}{$name}{1}                  = $hash;
 
-    my $ret = DevIo_OpenDev( $hash, 0, "ONKYO_AVR_DevInit" );
+    $hash->{DeviceName} = @$a[2];
+    $hash->{DeviceName} = $hash->{DeviceName} . ":60128"
+      if ( $hash->{DeviceName} =~
+/\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b/
+      );
 
+    my $ret = DevIo_OpenDev( $hash, 0, "ONKYO_AVR_DevInit" );
     return $ret;
 }
 
@@ -153,65 +166,13 @@ sub ONKYO_AVR_Define($$$) {
 sub ONKYO_AVR_DevInit($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    my $return;
-    my $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} };
 
-    Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_DevInit()";
-
-    readingsBeginUpdate($hash);
-
-    if ( lc( $hash->{STATE} ) eq "disconnected" ) {
-        readingsBulkUpdate( $hash, "presence", "absent" )
-          if ( ReadingsVal( $name, "presence", "present" ) ne "absent" );
-
-        readingsBulkUpdate( $hash, "power", "off" )
-          if ( ReadingsVal( $name, "power", "on" ) ne "off" );
-
-        # stateAV
-        my $stateAV = ONKYO_AVR_GetStateAV($hash);
-        readingsBulkUpdate( $hash, "stateAV", $stateAV )
-          if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
-
-        # send to slaves
-        if ( $definedZones > 1 ) {
-            Log3 $name, 5,
-              "ONKYO_AVR $name: Dispatching state change to slaves (DevInit)";
-            Dispatch(
-                $hash,
-                {
-                    "presence" => "absent",
-                    "power"    => "off",
-                },
-                undef
-            );
-        }
+    if ( lc( ReadingsVal( $name, "state", "?" ) ) eq "opened" ) {
+        DoTrigger( $name, "CONNECTED" );
     }
-
-    elsif ( lc( $hash->{STATE} ) eq "opened" ) {
-
-        readingsBulkUpdate( $hash, "presence", "present" )
-          if ( ReadingsVal( $name, "presence", "absent" ) ne "present" );
-
-        # send to slaves
-        if ( $definedZones > 1 ) {
-            Log3 $name, 5,
-              "ONKYO_AVR $name: Dispatching state change to slaves (DevInit)";
-            Dispatch(
-                $hash,
-                {
-                    "presence" => "present",
-                },
-                undef
-            );
-        }
-
-        ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
-
+    else {
+        DoTrigger( $name, "DISCONNECTED" );
     }
-
-    readingsEndUpdate( $hash, 1 );
-
-    return $return;
 }
 
 #####################################
@@ -220,21 +181,67 @@ sub ONKYO_AVR_Notify($$) {
     my $name         = $hash->{NAME};
     my $devName      = $dev->{NAME};
     my $definedZones = scalar keys %{ $modules{ONKYO_AVR_ZONE}{defptr}{$name} };
+    my $presence     = ReadingsVal( $name, "presence", "-" );
 
     return
       if ( !$dev->{CHANGED} );    # Some previous notify deleted the array.
 
-    return if ( $devName ne $name );
+    # work on global events related to us
+    if ( $devName eq "global" ) {
+        foreach my $change ( @{ $dev->{CHANGED} } ) {
+            if (   $change !~ /^(\w+)\s(\w+)\s?(\w*)\s?(.*)$/
+                || $2 ne $name )
+            {
+                return;
+            }
+
+            # DEFINED
+            # MODIFIED
+            elsif ( $1 eq "DEFINED" || $1 eq "MODIFIED" ) {
+                Log3 $hash, 5,
+                    "ONKYO_AVR "
+                  . $name
+                  . ": processing my global event $1: $3 -> $4";
+
+                if ( lc( ReadingsVal( $name, "state", "?" ) ) eq "opened" ) {
+                    DoTrigger( $name, "CONNECTED" );
+                }
+                else {
+                    DoTrigger( $name, "DISCONNECTED" );
+                }
+
+            }
+
+            # unknown event
+            else {
+                Log3 $hash, 5,
+                    "ONKYO_AVR "
+                  . $name
+                  . ": WONT BE processing my global event $1: $3 -> $4";
+            }
+        }
+
+        return;
+    }
+
+    # do nothing for any other device
+    elsif ( $devName ne $name ) {
+        return;
+    }
 
     readingsBeginUpdate($hash);
 
     foreach my $change ( @{ $dev->{CHANGED} } ) {
 
-        if ( $change eq "DISCONNECTED" ) {
+        # DISCONNECTED
+        if ( $change eq "DISCONNECTED" && $presence ne "absent" ) {
             Log3 $hash, 5, "ONKYO_AVR " . $name . ": processing change $change";
 
-            readingsBulkUpdate( $hash, "presence", "absent" )
-              if ( ReadingsVal( $name, "presence", "present" ) ne "absent" );
+            # disable connectionCheck and wait
+            # until DevIo reopened the connection
+            RemoveInternalTimer($hash);
+
+            readingsBulkUpdate( $hash, "presence", "absent" );
 
             readingsBulkUpdate( $hash, "power", "off" )
               if ( ReadingsVal( $name, "power", "on" ) ne "off" );
@@ -258,18 +265,33 @@ sub ONKYO_AVR_Notify($$) {
                 );
             }
         }
-        elsif ( $change eq "CONNECTED" ) {
+
+        # CONNECTED
+        elsif ( $change eq "CONNECTED" && $presence ne "present" ) {
             Log3 $hash, 5, "ONKYO_AVR " . $name . ": processing change $change";
 
-            readingsBulkUpdate( $hash, "presence", "present" )
-              if ( ReadingsVal( $name, "presence", "absent" ) ne "present" );
+            readingsBulkUpdate( $hash, "presence", "present" );
 
             # stateAV
             my $stateAV = ONKYO_AVR_GetStateAV($hash);
             readingsBulkUpdate( $hash, "stateAV", $stateAV )
               if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
 
-            ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
+            ONKYO_AVR_SendCommand( $hash, "power",                  "query" );
+            ONKYO_AVR_SendCommand( $hash, "input",                  "query" );
+            ONKYO_AVR_SendCommand( $hash, "mute",                   "query" );
+            ONKYO_AVR_SendCommand( $hash, "volume",                 "query" );
+            ONKYO_AVR_SendCommand( $hash, "sleep",                  "query" );
+            ONKYO_AVR_SendCommand( $hash, "audio-information",      "query" );
+            ONKYO_AVR_SendCommand( $hash, "video-information",      "query" );
+            ONKYO_AVR_SendCommand( $hash, "listening-mode",         "query" );
+            ONKYO_AVR_SendCommand( $hash, "video-picture-mode",     "query" );
+            ONKYO_AVR_SendCommand( $hash, "phase-matching-bass",    "query" );
+            ONKYO_AVR_SendCommand( $hash, "center-temporary-level", "query" );
+            ONKYO_AVR_SendCommand( $hash, "subwoofer-temporary-level",
+                "query" );
+            fhem
+"sleep 1 quiet;get $name remoteControl net-receiver-information query";
 
             # send to slaves
             if ( $definedZones > 1 ) {
@@ -283,20 +305,18 @@ sub ONKYO_AVR_Notify($$) {
                     undef
                 );
             }
+
         }
     }
 
     readingsEndUpdate( $hash, 1 );
-
-    return;
-
 }
 
 #####################################
 sub ONKYO_AVR_Reopen($) {
     my ($hash) = @_;
     DevIo_CloseDev($hash);
-    DevIo_OpenDev( $hash, 1, "ONKYO_AVR_DevInit" );
+    DevIo_OpenDev( $hash, 1, undef );
 }
 
 ###################################
@@ -305,12 +325,20 @@ sub ONKYO_AVR_Undefine($$) {
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Undefine()";
 
-    # Disconnect from device
-    DevIo_CloseDev($hash);
-
-    # Stop the internal GetStatus-Loop and exit
     RemoveInternalTimer($hash);
 
+    foreach my $d ( sort keys %defs ) {
+        if (   defined( $defs{$d} )
+            && defined( $defs{$d}{IODev} )
+            && $defs{$d}{IODev} == $hash )
+        {
+            my $lev = ( $reread_active ? 4 : 2 );
+            Log3 $name, $lev, "deleting port for $d";
+            delete $defs{$d}{IODev};
+        }
+    }
+
+    DevIo_CloseDev($hash);
     return undef;
 }
 
@@ -327,6 +355,15 @@ sub ONKYO_AVR_Read($) {
     return "" if ( !defined($buf) );
 
     $buf = $hash->{PARTIAL} . $buf;
+
+    # reset connectionCheck timer
+    my $checkInterval = AttrVal( $name, "connectionCheck", "60" );
+    RemoveInternalTimer($hash);
+    if ( $checkInterval ne "off" ) {
+        my $next = gettimeofday() + $checkInterval;
+        $hash->{helper}{nextConnectionCheck} = $next;
+        InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
+    }
 
     Log3 $name, 5, "ONKYO_AVR $name: raw " . ONKYO_AVR_hexdump($buf);
 
@@ -492,18 +529,6 @@ sub ONKYO_AVR_Read($) {
         return if ( !$cmd_raw || $cmd_raw eq "" );
     }
 
-    # reset connectionCheck timer
-    my $checkInterval = AttrVal( $name, "connectionCheck", "90" );
-    if ( $checkInterval ne "off" ) {
-        my $next = gettimeofday() + $checkInterval;
-        $hash->{helper}{nextConnectionCheck} = $next;
-        RemoveInternalTimer($hash);
-        InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
-    }
-    else {
-        RemoveInternalTimer($hash);
-    }
-
     if ( $zone > 1 ) {
         Log3 $hash, 5, "ONKYO_AVR $name dispatch: this is for zone$zone";
         my $zoneDispatch;
@@ -528,6 +553,7 @@ sub ONKYO_AVR_Read($) {
     readingsBeginUpdate($hash);
 
     if ( $cmd eq "audio-information" ) {
+
         my @audio_split = split( /,/, $value );
         if ( scalar(@audio_split) >= 6 ) {
 
@@ -662,15 +688,6 @@ sub ONKYO_AVR_Read($) {
     }
 
     elsif ( $cmd eq "net-receiver-information" ) {
-        my $return = ONKYO_AVR_SendCommand( $hash, "power", "query" );
-        $return = ONKYO_AVR_SendCommand( $hash, "audio-information",  "query" );
-        $return = ONKYO_AVR_SendCommand( $hash, "video-information",  "query" );
-        $return = ONKYO_AVR_SendCommand( $hash, "input",              "query" );
-        $return = ONKYO_AVR_SendCommand( $hash, "volume",             "query" );
-        $return = ONKYO_AVR_SendCommand( $hash, "mute",               "query" );
-        $return = ONKYO_AVR_SendCommand( $hash, "sleep",              "query" );
-        $return = ONKYO_AVR_SendCommand( $hash, "listening-mode",     "query" );
-        $return = ONKYO_AVR_SendCommand( $hash, "video-picture-mode", "query" );
 
         if ( $value =~ /^<\?xml/ ) {
 
@@ -718,7 +735,9 @@ sub ONKYO_AVR_Read($) {
                 keys %{ $hash->{helper}{receiver}{device}{presetlist}{preset} }
               )
             {
-                my $name = trim( $hash->{helper}{receiver}{device}{presetlist}{preset}{$id}{name} );
+                my $name = trim(
+                    $hash->{helper}{receiver}{device}{presetlist}{preset}{$id}
+                      {name} );
                 next if ( !$name || $name eq "" );
 
                 $name =~ s/\s/_/g;
@@ -835,6 +854,8 @@ sub ONKYO_AVR_Read($) {
                 }
             }
         }
+
+        ONKYO_AVR_SendCommand( $hash, "input", "query" );
     }
 
     elsif ( $cmd eq "net-usb-device-status" ) {
@@ -1542,7 +1563,21 @@ sub ONKYO_AVR_Get($$$) {
         Log3 $name, 3, "ONKYO_AVR get $name " . @$a[1];
 
         if ( $presence ne "absent" ) {
-            ONKYO_AVR_SendCommand( $hash, "net-receiver-information", "query" );
+            ONKYO_AVR_SendCommand( $hash, "power",                  "query" );
+            ONKYO_AVR_SendCommand( $hash, "input",                  "query" );
+            ONKYO_AVR_SendCommand( $hash, "mute",                   "query" );
+            ONKYO_AVR_SendCommand( $hash, "volume",                 "query" );
+            ONKYO_AVR_SendCommand( $hash, "sleep",                  "query" );
+            ONKYO_AVR_SendCommand( $hash, "audio-information",      "query" );
+            ONKYO_AVR_SendCommand( $hash, "video-information",      "query" );
+            ONKYO_AVR_SendCommand( $hash, "listening-mode",         "query" );
+            ONKYO_AVR_SendCommand( $hash, "video-picture-mode",     "query" );
+            ONKYO_AVR_SendCommand( $hash, "phase-matching-bass",    "query" );
+            ONKYO_AVR_SendCommand( $hash, "center-temporary-level", "query" );
+            ONKYO_AVR_SendCommand( $hash, "subwoofer-temporary-level",
+                "query" );
+            fhem
+"sleep 1 quiet;get $name remoteControl net-receiver-information query";
         }
         else {
             $return =
@@ -2677,57 +2712,47 @@ sub ONKYO_AVR_Write($$) {
 
     DevIo_SimpleWrite( $hash, "$str", 0 );
 
-    # reset connectionCheck timer
-    my $checkInterval = AttrVal( $name, "connectionCheck", "90" );
-    if ( $checkInterval ne "off" ) {
-
-        # do connection check latest after 5sec
-        my $next = gettimeofday() + 5;
-        if ( !defined( $hash->{helper}{nextConnectionCheck} )
-            || $hash->{helper}{nextConnectionCheck} > $next )
-        {
-            $hash->{helper}{nextConnectionCheck} = $next;
-            RemoveInternalTimer($hash);
-            InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
-        }
-    }
-    else {
+    # do connection check latest after TIMEOUT
+    my $next = gettimeofday() + $hash->{TIMEOUT};
+    if ( !defined( $hash->{helper}{nextConnectionCheck} )
+        || $hash->{helper}{nextConnectionCheck} > $next )
+    {
+        $hash->{helper}{nextConnectionCheck} = $next;
         RemoveInternalTimer($hash);
+        InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
     }
 }
 
 ###################################
 sub ONKYO_AVR_connectionCheck ($) {
     my ($hash) = @_;
-    my $name   = $hash->{NAME};
-    my $state  = $hash->{STATE};
+    my $name = $hash->{NAME};
+    my $verbose = AttrVal( $name, "verbose", "" );
 
-    $hash->{STATE} = "opened";
+    RemoveInternalTimer($hash);
+
+    $hash->{STATE} = "opened";    # assume we have an open connection
+    $attr{$name}{verbose} = 0 if ( $verbose eq "" || $verbose < 4 );
+
     my $connState =
       DevIo_Expect( $hash,
-        ONKYO_AVR_Pack( "PWRQSTN", $hash->{PROTOCOLVERSION} ), 2 );
+        ONKYO_AVR_Pack( "PWRQSTN", $hash->{PROTOCOLVERSION} ),
+        $hash->{TIMEOUT} );
 
     # successful connection
     if ( defined($connState) ) {
-        $hash->{STATE} = $state;
+
+        # reset connectionCheck timer
+        my $checkInterval = AttrVal( $name, "connectionCheck", "60" );
+        if ( $checkInterval ne "off" ) {
+            my $next = gettimeofday() + $checkInterval;
+            $hash->{helper}{nextConnectionCheck} = $next;
+            InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
+        }
     }
 
-    # reconnect
-    else {
-        ONKYO_AVR_Reopen($hash);
-    }
-
-    # reset connectionCheck timer
-    my $checkInterval = AttrVal( $name, "connectionCheck", "90" );
-    if ( $checkInterval ne "off" ) {
-        my $next = gettimeofday() + $checkInterval;
-        $hash->{helper}{nextConnectionCheck} = $next;
-        RemoveInternalTimer($hash);
-        InternalTimer( $next, "ONKYO_AVR_connectionCheck", $hash, 0 );
-    }
-    else {
-        RemoveInternalTimer($hash);
-    }
+    $attr{$name}{verbose} = $verbose if ( $verbose ne "" );
+    delete $attr{$name}{verbose} if ( $verbose eq "" );
 }
 
 ###################################
@@ -2933,21 +2958,30 @@ sub ONKYO_AVR_RClayout() {
     <ul>
       <a name="ONKYO_AVRdefine" id="ONKYO_AVRdefine"></a> <b>Define</b>
       <ul>
-        <code>define &lt;name&gt; ONKYO_AVR &lt;ip-address-or-hostname&gt; [&lt;protocol-version&gt;]</code><br>
+        <code>define &lt;name&gt; ONKYO_AVR &lt;ip-address-or-hostname&gt;[:PORT] [&lt;protocol-version&gt;]</code><br>
         <br>
         This module controls ONKYO A/V receivers in real-time via network connection.<br>
         Use <a href="#ONKYO_AVR_ZONE">ONKYO_AVR_ZONE</a> to control slave zones.<br>
+        <br>
+        Instead of IP address or hostname you may set a serial connection format for direct connectivity.<br>
+        <br>
         <br>
         Example:<br>
         <ul>
           <code>
           define avr ONKYO_AVR 192.168.0.10<br>
           <br>
+          # With explicit port<br>
+          define avr ONKYO_AVR 192.168.0.10:60128<br>
+          <br>
           # With explicit protocol version 2013 and later<br>
           define avr ONKYO_AVR 192.168.0.10 2013<br>
           <br>
           # With protocol version prior 2013<br>
           define avr ONKYO_AVR 192.168.0.10 pre2013
+          <br>
+          # With protocol version prior 2013 and serial connection<br>
+          define avr ONKYO_AVR /dev/ttyUSB1@9600 pre2013
           </code>
         </ul>
       </ul><br>

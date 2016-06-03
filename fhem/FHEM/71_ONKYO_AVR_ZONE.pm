@@ -1563,9 +1563,6 @@ sub ONKYO_AVR_ZONE_GetStateAV($) {
           <li>
             <b>remoteControl</b> &nbsp;&nbsp;-&nbsp;&nbsp; sends advanced remote control commands based on current zone; you may use "get avr remoteControl &lt;Get-command&gt; help" to see details about possible values and resulting readings. In Case the device does not support the command, just nothing happens as normally the device does not send any response. In case the command is temporarily not available you may see according feedback from the log file using attribute verbose=4.
           </li>
-          <li>
-            <b>statusRequest</b> &nbsp;&nbsp;-&nbsp;&nbsp; clears cached settings and re-reads device XML configurations
-          </li>
         </ul>
       </ul><br>
       <br>
