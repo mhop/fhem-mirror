@@ -194,7 +194,13 @@ telnet_Read($)
     return if(!$chash);
     $chash->{canAsyncOutput} = 1;
     $chash->{encoding} = AttrVal($name, "encoding", "utf8");
-    $chash->{prompt}  = AttrVal($name, "prompt", "fhem>");
+    $chash->{prompt}  = AttrVal($name, "prompt",
+                        AttrVal('global','title','fhem>'));
+    if($chash->{prompt} =~ m/^{.*}$/s) {
+      $chash->{prompt}  = eval $chash->{prompt};
+      $chash->{prompt}  =~ s/\n//;
+      $chash->{prompt} .= '>';  # Not really nice, but dont know better.
+    }
     syswrite($chash->{CD}, sprintf("%c%c%c", 255, 253, 0) )
         if( AttrVal($name, "encoding", "") ); #DO BINARY
     $chash->{CD}->flush();
