@@ -305,7 +305,10 @@ telnet_Output($$$)
 
   if($ret) {
     $ret = utf8ToLatin1($ret) if( $hash->{encoding} eq "latin1" );
-    $ret = "\n$ret\n$hash->{prompt} " if(!$nonl);        # AsyncOutput stuff
+    if(!$nonl) {        # AsyncOutput stuff
+      $ret = "\n$ret\n$hash->{prompt} " if( $hash->{showPrompt});
+      $ret = "$ret\n"                   if(!$hash->{showPrompt});
+    }
     for(;;) {
       my $l = syswrite($hash->{CD}, $ret);
       last if(!$l || $l == length($ret));
