@@ -16,6 +16,7 @@ var cm_attr = {
     indentWithTabs:      true,
     autofocus:           true,
     lineNumbers:         true,
+    keyMap:              false,
     jumpToLine:          false,
     jumpToLine_extraKey: false,
     smartIndent:         false,
@@ -102,6 +103,9 @@ function AddCodeMirror(e, cb) {
         if (cm_attr.jumpToLine_extraKey) {
             cm_attr.extraKeys[cm_attr.jumpToLine_extraKey] = 'jumpToLine';
         }
+    }
+    if (cm_attr.keyMap) {
+        cm_active++; loadScript("codemirror/"+cm_attr.keyMap+".js", function(){cm_loaded++;} );
     }
     
     // editor user preferences
