@@ -9,7 +9,7 @@ use SetExtensions;
 
 my %devices = (
     "40"    => "RolloTron Standard",
-    "41"    => "RolloTron Comfort",
+    "41"    => "RolloTron Comfort Slave",
     "42"    => "Rohrmotor-Aktor",
     "43"    => "Universalaktor",
     "46"    => "Steckdosenaktor",
@@ -19,9 +19,9 @@ my %devices = (
     "4B"    => "Connect-Aktor",
     "4C"    => "Troll Basis",
     "4E"    => "SX5",
-    "61"    => "RolloTron Comfort",
+    "61"    => "RolloTron Comfort Master",
     "62"    => "Super Fake Device",
-    "65"    => "RolloTron Comfort",
+    "65"    => "Bewegungsmelder",
     "69"    => "Umweltsensor",
     "70"    => "Troll Comfort DuoFern",
     "71"    => "Troll Comfort DuoFern (Lichtmodus)",
@@ -37,19 +37,30 @@ my %devices = (
     "AB"    => "Rauchmelder",
 );
 
-my %buttons07 = (
-    "01"    => "up",
-    "02"    => "stop",
-    "03"    => "down",
-    "18"    => "stepUp",
-    "19"    => "stepDown",
-    "1A"    => "pressed",
-);
-
-my %buttons0E = (
-    "01"    => "off",
-    "02"    => "off",
-    "03"    => "on",
+my %sensorMsg = (
+    "0701"    => {"name" => "up",          "chan" => 6, "state" => "Btn01"},
+    "0702"    => {"name" => "stop",        "chan" => 6, "state" => "Btn02"},
+    "0703"    => {"name" => "down",        "chan" => 6, "state" => "Btn03"},
+    "0718"    => {"name" => "stepUp",      "chan" => 6, "state" => "Btn18"},
+    "0719"    => {"name" => "stepDown",    "chan" => 6, "state" => "Btn19"},
+    "071A"    => {"name" => "pressed",     "chan" => 6, "state" => "Btn1A"},  
+    "0713"    => {"name" => "dawn",        "chan" => 5, "state" => "dawn"},
+    "0709"    => {"name" => "dusk",        "chan" => 5, "state" => "dusk"},
+    "0708"    => {"name" => "startSun",    "chan" => 5, "state" => "on"},
+    "070A"    => {"name" => "endSun",      "chan" => 5, "state" => "off"},
+    "070D"    => {"name" => "startWind",   "chan" => 5, "state" => "on"},
+    "070E"    => {"name" => "endWind",     "chan" => 5, "state" => "off"},
+    "0711"    => {"name" => "startRain",   "chan" => 5, "state" => "on"},
+    "0712"    => {"name" => "endRain",     "chan" => 5, "state" => "off"},   
+    "071C"    => {"name" => "startTemp",   "chan" => 5, "state" => "on"},
+    "071D"    => {"name" => "endTemp",     "chan" => 5, "state" => "off"},
+    "071E"    => {"name" => "startSmoke",  "chan" => 5, "state" => "on"},
+    "071F"    => {"name" => "endSmoke",    "chan" => 5, "state" => "off"},      
+    "0720"    => {"name" => "startMotion", "chan" => 5, "state" => "on"},
+    "0721"    => {"name" => "endMotion",   "chan" => 5, "state" => "off"},
+    "0E01"    => {"name" => "off",         "chan" => 6, "state" => "Btn01"},
+    "0E02"    => {"name" => "off",         "chan" => 6, "state" => "Btn02"},
+    "0E03"    => {"name" => "on",          "chan" => 6, "state" => "Btn03"},        
 );
 
 my %deadTimes = (
@@ -1143,67 +1154,49 @@ DUOFERN_Parse($$)
       Log3 $hash, 2, "DUOFERN unknown msg: $msg";
     }
   
-  #Wandtaster, Funksender UP, Sensoren      
-  } elsif ($msg =~ m/0FFF07.{38}/) {
-    if($msg =~ m/0FFF0708.*/) {
-      readingsSingleUpdate($hash, "event", "beginnSun", 1);
-    } elsif($msg =~ m/0FFF0709.*/) {
-      readingsSingleUpdate($hash, "event", "dusk", 1);
-    } elsif($msg =~ m/0FFF070A.*/) {
-      readingsSingleUpdate($hash, "event", "endSun", 1);
-    } elsif($msg =~ m/0FFF0713.*/) {
-      readingsSingleUpdate($hash, "event", "dawn", 1);
-    } elsif($msg =~ m/0FFF071E.*/) {
-      readingsSingleUpdate($hash, "state", "on", 1);
-    } elsif($msg =~ m/0FFF071F.*/) {
-      readingsSingleUpdate($hash, "state", "off", 1);
-         
-    } elsif($msg =~ m/0FFF07(1A|18|19|01|02|03).*/) {
-      my $button = substr($msg, 6, 2);
-        my $group = substr($msg, 14, 2);
-        if($button =~ m/^(1A)/) {
-            readingsSingleUpdate($hash, "state", "Btn$button.$group", 1);
-        } else {
-            readingsSingleUpdate($hash, "state", "Btn$button", 1);
-        }
-        if (exists $buttons07{$button}) {
-          readingsSingleUpdate($hash, "channel$group", $buttons07{$button}, 1);
-        } else {
-          readingsSingleUpdate($hash, "channel$group", "$button", 1);
-        }
-        
-    } else {
+  #Wandtaster, Funksender UP, Handsender, Sensoren      
+  } elsif ($msg =~ m/0F..(07|0E).{38}/) {
+    my $id = substr($msg, 4, 4);
+    
+    if (!(exists $sensorMsg{$id})) {
       Log3 $hash, 2, "DUOFERN unknown msg: $msg";
     }
-  
-  #Handsender
-  } elsif ($msg =~ m/0F0107.{38}/) {
-    my $button = substr($msg, 6, 2);
-    my $group = substr($msg, 14, 2);
     
-    if($code =~ m/^(A0|A2)..../) {
-      readingsSingleUpdate($hash, "state", "Btn$button.$group", 1);
-    } else {
-      readingsSingleUpdate($hash, "state", "Btn$button", 1);
+    my $chan = substr($msg, $sensorMsg{$id}{chan}*2 + 2 , 2);
+    if ($sensorMsg{$id}{chan} == 5) {
+      for(my $x=0; $x<5; $x++)  {
+        if((0x01<<$x) & hex($chan)) {
+          $chan = $x+1;
+          last;
+        }  
+      }
     }
-    if (exists $buttons07{$button}) {
-      readingsSingleUpdate($hash, "channel$group", $buttons07{$button}, 1);
-    } else {
-      readingsSingleUpdate($hash, "channel$group", "$button", 1);
-    }
-  
-  #Wandtaster(on,off), Funksender UP(on,off)  
-  } elsif ($msg =~ m/0F..0E.{38}/) {
-    my $button = substr($msg, 6, 2);
-    my $group = substr($msg, 14, 2);
     
-    readingsSingleUpdate($hash, "state", "Btn$button.$group", 1);
-    
-    if (exists $buttons0E{$button}) {
-      readingsSingleUpdate($hash, "channel$group", $buttons0E{$button}, 1);
+    if($id =~ m/..(1A|18|19|01|02|03)/) {
+        if(($id =~ m/..1A/) || ($id =~ m/0E../) || ($code =~ m/^(A0|A2)..../)) {
+            readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}.".".$chan, 1);
+        } else {
+            readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
+        }
+        readingsSingleUpdate($hash, "channel$chan", $sensorMsg{$id}{name}, 1);
     } else {
-      readingsSingleUpdate($hash, "channel$group", "$button", 1);
-    }
+      if($code =~ m/^69.*/) {
+        $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+        if(!$def01) {
+          DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
+          $def01 = $modules{DUOFERN}{defptr}{$code."00"};
+        }
+        $hash = $def01;
+      } 
+      if(($code !~ m/^69.*/) || ($id =~ m/..(11|12)/)) {
+        $chan="";
+      }
+      if($code =~ m/^(A5|AA|AB)..../) {
+        readingsSingleUpdate($hash, "state", $sensorMsg{$id}{state}, 1);
+      }
+      readingsSingleUpdate($hash, "event", $sensorMsg{$id}{name}.$chan, 1);
+      DoTrigger($hash->{NAME},$sensorMsg{$id}{name}.$chan);
+    }        
   
   #Umweltsensor Wetter
   } elsif ($msg =~ m/0F011322.{36}/) {  
