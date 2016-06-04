@@ -4515,7 +4515,8 @@ fhemFork()
   # Close FDs as we cannot restart FHEM if child keeps TCP Serverports open
   foreach my $d (sort keys %defs) {
     my $h = $defs{$d};
-    $h->{DBH}->{InactiveDestroy} = 1 if($h->{TYPE} eq 'DbLog');
+    $h->{DBH}->{InactiveDestroy} = 1
+      if($h->{TYPE} eq 'DbLog' && $h->{DBH}); #Forum #43271
     TcpServer_Close($h) if($h->{SERVERSOCKET});
     if($h->{DeviceName}) {
       require "$attr{global}{modpath}/FHEM/DevIo.pm";
