@@ -152,7 +152,7 @@ HttpUtils_gethostbyname($$$)
   my $c = IO::Socket::INET->new(Proto=>'udp', PeerAddr=>"$dnsServer:53");
   return $fn->($hash, "Cant create UDP socket:$!", undef) if(!$c);
 
-  my %dh = ( conn=>$c, FD=>$c->fileno(), NAME=>"DNS",
+  my %dh = ( conn=>$c, FD=>$c->fileno(), NAME=>"DNS", origHash=>$hash,
              addr=>$dnsServer, callback=>$fn );
   my %timerHash = ( hash => \%dh );
   my $bhost = join("", map { pack("CA*",length($_),$_) } split(/\./, $host));
@@ -233,6 +233,7 @@ HttpUtils_Connect($)
     if($hash->{conn}) {
       HttpUtils_gethostbyname($hash, $host, sub($$$) {
         my ($hash, $err, $iaddr) = @_;
+        $hash = $hash->{origHash} if($hash->{origHash});
         return $hash->{callback}($hash, $err, "") if($err);
         my $ret = connect($hash->{conn}, sockaddr_in($port, $iaddr));
         if(!$ret) {
