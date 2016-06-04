@@ -94,30 +94,24 @@ sub I2C_BH1750_Initialize($);
 sub I2C_BH1750_Define($$);
 sub I2C_BH1750_Attr(@);
 sub I2C_BH1750_Poll($);
-sub I2C_BH1750_Restart_Measure($);
+sub I2C_BH1750_Restart_Measure($$);
 sub I2C_BH1750_Set($@);
 sub I2C_BH1750_Get($);
 sub I2C_BH1750_Undef($$);
-
-my $libcheck_hasHiPi = 1;
 
 sub I2C_BH1750_Initialize($) 
 {
     my ($hash) = @_;
     
-    eval "use HiPi::Device::I2C;";
-    $libcheck_hasHiPi = 0 if($@);    
-    
     $hash->{STATE}    = "Init";
     $hash->{DefFn}    = "I2C_BH1750_Define";
     $hash->{UndefFn}  = "I2C_BH1750_Undef";
-    $hash->{InitFn}   = "I2C_BH1750_Init";
+    $hash->{InitFn}   = "I2C_BH1750_IoInit";
     $hash->{AttrFn}   = "I2C_BH1750_Attr";
     $hash->{SetFn}    = "I2C_BH1750_Set";
     $hash->{I2CRecFn} = 'I2C_BH1750_I2CRec';
-    $hash->{AttrList} = "poll_interval:1,2,5,10,20,30 IODev percentdelta correction ". 
+    $hash->{AttrList} = "poll_interval:0.2,0.5,1,2,5,10,20,30,60 IODev percentdelta correction ". 
         $readingFnAttributes;
-    $hash->{AttrList} .= " useHiPiLib:0,1 " if ($libcheck_hasHiPi);
     $hash->{VERSION}  = '$Id$';
 }
 
@@ -132,83 +126,43 @@ sub I2C_BH1750_Define($$)
     BH1750_ADDR_DEFAULT,BH1750_ADDR_OTHER;
     
     $hash->{I2C_Address}=BH1750_ADDR_DEFAULT; # default
-    $hash->{HiPi_used} = 0;
 
+    Log3 ($hash, 3, $hash->{NAME} . ': ' . "define $def");
     shift(@a);
-    if(@a) {
-        $_=shift(@a);
-        if(m+^/dev/+) {
-            $device = $_;
-            if ($libcheck_hasHiPi) {
-                $hash->{HiPi_used} = 1;
-            } else {
-                return '$name error: HiPi library not installed';
-            }
-            if(@a) {
-                $_=shift(@a);
-                /0x(5c|23)/i or return $usage;
-                $hash->{I2C_Address}=hex($_);
-            }
-        } elsif (/0x(5c|23)/i) {
-            $hash->{I2C_Address}=hex($_);
-        } else {
-            return $usage;
-        }
-        @a and return $usage;
+    @a > 1 and return $usage;
+    if(defined ($_=$a[0])) {
+        /0x(5c|23)/i or return $usage;
+        $hash->{I2C_Address}=hex($_);
     }
     
     $hash->{BASEINTERVAL} = 0;
+    $hash->{RESTARTDELAY} = 10;
     $hash->{DELTA}        = 0;   
     $hash->{PollState}    = BH1750_POLLSTATE_IDLE; 
     $hash->{CORRECTION}   = 1; 
     
     readingsSingleUpdate($hash, 'state', BH1750_STATE_DEFINED, 1);
-    if ($main::init_done || $hash->{HiPi_used}) {
-        eval { 
-            I2C_BH1750_Init($hash, [ $device ]); 
-        };
-        Log3 ($hash, 1, $hash->{NAME} . ': ' . I2C_BH1750_Catch($@)) if $@;;
-  }
 
-    return undef;
-}
-
-sub I2C_BH1750_Init($$) 
-{
-    my ($hash, $dev) = @_;
-    my $name = $hash->{NAME};
-    
-    if ($hash->{HiPi_used}) {
-        # check for existing i2c device  
-        my $i2cModulesLoaded = 0;
-        $i2cModulesLoaded = 1 if -e $dev;
-        if ($i2cModulesLoaded) {
-            if (-r $dev && -w $dev) {
-                $hash->{devBH1750} = HiPi::Device::I2C->new( 
-                    devicename => $dev,
-                    address    => $hash->{I2C_Address},
-                    busmode    => 'i2c',
-                    );
-                Log3 $name, 3, "$name I2C_BH1750_Define device created";
-            } else {
-                my @groups = split '\s', $(;
-                return "$name :Error! $dev isn't readable/writable by user " . 
-                    getpwuid( $< ) . " or group(s) " . 
-                    getgrgid($_) . " " foreach(@groups); 
-            }
-        } else {
-            return $name . ': Error! I2C device not found: ' . $dev . 
-                '. Please check that these kernelmodules are loaded: i2c_bcm2708, i2c_dev';
+    my $ret = undef;
+    if ($main::init_done) {
+        eval {I2C_BH1750_IoInit($hash, \@a);};
+        if($@) {
+            $ret = I2C_BH1750_Catch($@);
+            Log3 ($hash, 1, $hash->{NAME} . ': ' . $ret);
         }
-    } else {
-        AssignIoPort($hash);
     }
 
+    return $ret;
+}
+
+sub I2C_BH1750_IoInit($$) 
+{
+    my ($hash, $args) = @_;
+    my $name = $hash->{NAME};
     
-    # start new measurement cycle
-    RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday() + 10, 'I2C_BH1750_Poll', $hash, 0);
-    
+    eval { AssignIoPort($hash, AttrVal($hash->{NAME},"IODev",undef)); };
+    $@ and return I2C_BH1750_Catch($@);
+
     return undef;
 }
 
@@ -259,23 +213,30 @@ sub I2C_BH1750_Attr (@)
                 return $error."needs interger value";
             } else {
                 $hash->{BASEINTERVAL} = 60*$val;   
-                I2C_BH1750_Restart_Measure($hash);
+                I2C_BH1750_Restart_Measure($hash,$hash->{RESTARTDELAY});
             } 
         }
+    } elsif ($attr eq "IODev") {
+        eval {
+            if ($main::init_done and (!defined ($hash->{IODev}) or $hash->{IODev}->{NAME} ne $val)) {
+     		my @def = split (' ',$hash->{DEF});
+                return I2C_BH1750_IoInit($hash,\@def);
+            };
+        };
     }
+
 
     return undef;
 }
 
-sub I2C_BH1750_Restart_Measure($)
+sub I2C_BH1750_Restart_Measure($$)
 {
-    my ($hash) =  @_;
+    my ($hash,$delay) =  @_;
     my $name = $hash->{NAME};
     RemoveInternalTimer($hash);
     $hash->{PollState} = BH1750_POLLSTATE_IDLE;
-    my $delay=$hash->{BASEINTERVAL};
     I2C_BH1750_i2cwrite($hash, BH1750_POWER_DOWN);
-    $delay and InternalTimer(gettimeofday() + 10, 'I2C_BH1750_Poll', $hash, 0);
+    $delay and InternalTimer(gettimeofday() + $delay, 'I2C_BH1750_Poll', $hash, 0);
 }
 
 
@@ -298,6 +259,12 @@ sub I2C_BH1750_Poll($)
         I2C_BH1750_request_measure($hash);
     } elsif($state == BH1750_POLLSTATE_PRE_LUX_DONE) {
         my $raw=$hash->{RAWVAL};
+        if($hash->{RAWVAL} == 0xFFFF) {
+            $hash->{SATURATED} = 1;
+        } else {
+            $hash->{SATURATED} = 0;
+        }
+            
         my $i;
         for($i=0; $i<@I2C_BH1750_ranges; $i++) {
             $raw <= $I2C_BH1750_ranges[$i][0] and last;
@@ -316,6 +283,12 @@ sub I2C_BH1750_Poll($)
     } elsif($state == BH1750_POLLSTATE_LUX_WAIT) {
         I2C_BH1750_request_measure($hash);
     } elsif($state == BH1750_POLLSTATE_LUX_DONE) {
+        if($hash->{SATURATED}) {
+            readingsSingleUpdate($hash, 'state', BH1750_STATE_SATURATED, 1);
+            Log3 $hash, 4, "$name sensor saturated ";
+        } else {
+            readingsSingleUpdate($hash, 'state', BH1750_STATE_OK, 1);
+        }
         I2C_BH1750_update_lux($hash);
         $hash->{PollState} = BH1750_POLLSTATE_IDLE;
         I2C_BH1750_i2cwrite($hash, BH1750_POWER_DOWN);
@@ -362,75 +335,43 @@ sub I2C_BH1750_Undef($$)
 sub I2C_BH1750_i2cread($$$) 
 {
     my ($hash, $reg, $nbyte) = @_;
-    my $success = 1;
+
     my $name = $hash->{NAME};
 
     Log3 $name, 5, "$name I2C_BH1750_i2cread $reg,$nbyte";
-
-    local $SIG{__WARN__} = sub {
-        my $message = shift;
-        # turn warnings from RPII2C_HWACCESS_ioctl into exception
-        if ($message =~ /Exiting subroutine via last at.*00_RPII2C.pm/) {
-            die;
-        } else {
-            warn($message);
-        }
-    };
     
-    if ($hash->{HiPi_used}) {
+    if (defined (my $iodev = $hash->{IODev})) {
         eval {
-            my @values = $hash->{devBH1750}->bus_read($reg, $nbyte);
-            I2C_BH1750_I2CRec($hash, {
-                direction => "i2cread",
-                i2caddress => $hash->{I2C_Address},
-                reg => $reg,
-                nbyte => $nbyte,
-                received => join (' ',@values),
-                              });
-        };
-        Log3 ($hash, 1, $hash->{NAME} . ': ' . I2C_BH1750_Catch($@)) if $@;
-    } elsif (defined (my $iodev = $hash->{IODev})) {
-        eval {
-            CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
-                direction => "i2cread",
-                i2caddress => $hash->{I2C_Address},
-                reg => $reg,
-                nbyte => $nbyte
+            CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, 
+                   {
+                       direction => "i2cread",
+                       i2caddress => $hash->{I2C_Address},
+                       reg => $reg,
+                       nbyte => $nbyte
                    });
         };
         my $sendStat = $hash->{$iodev->{NAME}.'_SENDSTAT'};
         if (defined($sendStat) && $sendStat eq 'error') {
             readingsSingleUpdate($hash, 'state', BH1750_STATE_I2C_ERROR, 1);
-            Log3 ($hash, 5, $hash->{NAME} . ": i2cread on $iodev->{NAME} failed");
-            $success = 0;
+            Log3 ($hash, 3, $hash->{NAME} . ": i2cread on $iodev->{NAME} failed");
+            return 0;
         } 
     } else {
         Log3 ($hash, 1, $hash->{NAME} . ': ' . "no IODev assigned to '$hash->{NAME}'");
-        $success = 0;
+        return 0;
     }
     
-    return $success;
+    return 1;
 }
 
 sub I2C_BH1750_i2cwrite
 {
     my ($hash, $reg, @data) = @_;
-    my $success = 1;
     my $name = $hash->{NAME};
 
     Log3 $name, 5, "$name I2C_BH1750_i2write $reg,@data";
-    if ($hash->{HiPi_used}) {
-        eval {
-            $hash->{devBH1750}->bus_write($reg, join (' ',@data));
-            I2C_BH1750_I2CRec($hash, {
-                direction => "i2cwrite",
-                i2caddress => $hash->{I2C_Address},
-                reg => $reg,
-                data => join (' ',@data),
-                              });
-        };
-        Log3 ($hash, 1, $hash->{NAME} . ': ' . I2C_BH1750_Catch($@)) if $@;
-    } elsif (defined (my $iodev = $hash->{IODev})) {
+
+    if (defined (my $iodev = $hash->{IODev})) {
         eval {
             CallFn($iodev->{NAME}, "I2CWrtFn", $iodev, {
                 direction => "i2cwrite",
@@ -442,15 +383,15 @@ sub I2C_BH1750_i2cwrite
         my $sendStat = $hash->{$iodev->{NAME}.'_SENDSTAT'};
         if (defined($sendStat) && $sendStat eq 'error') {
             readingsSingleUpdate($hash, 'state', BH1750_STATE_I2C_ERROR, 1);
-            Log3 ($hash, 5, $hash->{NAME} . ": i2cwrite on $iodev->{NAME} failed");
-            $success = 0;
+            Log3 ($hash, 3, $hash->{NAME} . ": i2cwrite on $iodev->{NAME} failed");
+            return 0;
         }
     } else {
         Log3 ($hash, 1, $hash->{NAME} . ': ' . "no IODev assigned to '$hash->{NAME}'");
-        $success = 0;
+        return 0;
     }
     
-    return $success;
+    return 1;
 }
 
 sub I2C_BH1750_I2CRec ($$) 
@@ -460,49 +401,32 @@ sub I2C_BH1750_I2CRec ($$)
     
     Log3 $name, 5, "$name I2C_BH1750_i2Rec";
     my $pname = undef;
-    unless ($hash->{HiPi_used}) {
-        my $phash = $hash->{IODev};
-        $pname = $phash->{NAME};
-        while (my ( $k, $v ) = each %$clientmsg) { 
-            $hash->{$k} = $v if $k =~ /^$pname/;
-            Log3 $name, 5, "$name I2C_BH1750_i2Rec $k $v";
+    my $phash = $hash->{IODev};
+    $pname = $phash->{NAME};
+    while (my ( $k, $v ) = each %$clientmsg) { 
+        $hash->{$k} = $v if $k =~ /^$pname/;
+        Log3 $name, 5, "$name I2C_BH1750_i2Rec $k $v";
+    }
+    if($clientmsg->{$pname . "_SENDSTAT"} ne "Ok") {
+        Log3 $name, 3, "$name I2C_BH1750_i2Rec bad sendstat: ".$clientmsg->{$pname."_SENDSTAT"};
+        if($clientmsg->{direction} eq "i2cread" or $clientmsg->{reg}) {
+            # avoid recoursion on power down, power down has $clientmsg->{reg} == 0
+            I2C_BH1750_Restart_Measure($hash,$hash->{RESTARTDELAY});
         }
-        if($clientmsg->{$pname . "_SENDSTAT"} ne "Ok") {
-            Log3 $name, 3, "$name I2C_BH1750_i2Rec bad sendstat: ".$clientmsg->{$pname."_SENDSTAT"};
-            if($clientmsg->{direction} eq "i2cread" or $clientmsg->{reg}) {
-                # avoid recoursion on power down
-                I2C_BH1750_Restart_Measure($hash);
-            }
-            return undef;
-        }
-
-    }    
-
+        return undef;
+    }
     if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received})) {
         my $register = $clientmsg->{reg};
         Log3 $hash, 4, "$name RX register $register, $clientmsg->{nbyte} byte: $clientmsg->{received}";
-        my $byte = undef;
-        my $word = undef;
         my @raw = split(" ", $clientmsg->{received});
-        if ($clientmsg->{nbyte} == 1) {
-            $byte = $raw[0];
-        } elsif ($clientmsg->{nbyte} == 2) {
-            $word = $raw[0] << 8 | $raw[1];
-        }
-        if ($register == BH1750_RAW_VALUE) {
+        if ($register == BH1750_RAW_VALUE && $clientmsg->{nbyte} == 2) {
+            my $word = $raw[0] << 8 | $raw[1];
             $hash->{RAWVAL}=$word;
-            if($word == 0xFFFF) {
-                readingsSingleUpdate($hash, 'state', BH1750_STATE_SATURATED, 1);
-                Log3 $hash, 3, "$name sensor saturated ";
-                I2C_BH1750_Restart_Measure($hash);
-            } else {
-                readingsSingleUpdate($hash, 'state', BH1750_STATE_OK, 1);
-                Log3 $name, 4, "$name I2C_BH1750_I2CRec: rawval=$word";
-                if($hash->{PollState} == BH1750_POLLSTATE_PRE_LUX_WAIT || 
-                   $hash->{PollState} == BH1750_POLLSTATE_LUX_WAIT) {
-                    $hash->{PollState}++;
-                    I2C_BH1750_Poll($hash);
-                }
+            Log3 $name, 4, "$name I2C_BH1750_I2CRec: rawval=$word";
+            if($hash->{PollState} == BH1750_POLLSTATE_PRE_LUX_WAIT || 
+               $hash->{PollState} == BH1750_POLLSTATE_LUX_WAIT) {
+                $hash->{PollState}++;
+                I2C_BH1750_Poll($hash);
             }
         }
     }
@@ -612,17 +536,13 @@ sub I2C_BH1750_sleep
 
     <b>Define</b>
     <ul>
-      <code>define BH1750 I2C_BH1750 [&lt;I2C device&gt;] [I2C address]</code><br><br>
-      &lt;I2C device&gt; mandatory for HiPi, must be omitted if you connect 
-      via IODev<br>
+      <code>define BH1750 I2C_BH1750 [I2C address]</code><br><br>
       I2C address must be 0x23 or 0x5C (if omitted default address 0x23 is used)
       <br>
       Examples:
       <pre>
-        # Use HiPi with i2c address 0x5C:
-        define BH1750 I2C_BH1750 /dev/i2c-0 0x5C
-      </pre>
-      <pre>
+        # define IO-Module:
+        define I2C_2 RPII2C 2
         # Use IODev I2C_2 with default i2c address 0x23
         # set poll interval to 1 min
         # generate luminosity value only if difference to last value is at least 10%
@@ -676,13 +596,13 @@ sub I2C_BH1750_sleep
     <b>Attributes</b>
     <ul>
       <li>IODev<br>
-        Set the name of an IODev module. If undefined the perl modules HiPi::Device::I2C are required.<br>
+        Set the name of an IODev module like RPII2C<br>
         Default: undefined<br>
       </li>
       <li>poll_interval<br>
         Set the polling interval in minutes to query the sensor for new measured  values.
         By changing this attribute a new illumination measurement will be triggered.<br>
-        valid values: 1, 2, 5, 10, 20, 30<br>
+        valid values: 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60<br>
       </li>
       <li>percentdelta<br>
         If set a luminosity reading is only generated if 
