@@ -38,7 +38,7 @@ use warnings;
 use feature qw/switch/;
 
 use Blocking;
-use Archive::Extract;
+#use Archive::Extract;
 use Net::FTP;
 use XML::Simple;
 
@@ -1016,7 +1016,7 @@ sub decodeCAPData($$$){
 	while(($k, $v) = each %readings){
 		# skip update if no valid data is available
         next unless(defined($v));
-		readingsBulkUpdate($hash, $k, latin1ToUtf8($v)); 
+		readingsSingleUpdate($hash, $k, latin1ToUtf8($v),1); 
 	}
 
 	# convert color value to hex
@@ -1212,23 +1212,7 @@ sub _retrieveCAPDATA {
 	}
 
 	# unzip
-	my $zip;
-	eval {
-		$Archive::Extract::PREFER_BIN	= 1;
-		$Archive::Extract::WARN			= 0;
-		$zip = Archive::Extract->new( archive => $targetFile, type => 'zip' );
-		my $ok  = $zip->extract( to => $targetDir );
-		Log3($name, 5, "GDS $name: error ".$zip->error()) unless $ok;
-	};
-
-#	my $zip;
-#	eval {
-#		$zip = Archive::Zip->new($targetFile);
-#		foreach my $member ($zip->members()) {
-#			my $fileName = $member->fileName();
-#			$zip->extractMember($member,$targetDir."/".$fileName) == AZ_OK || Debug "unzip error: $member";
-#		}
-#	};
+	qx(unzip -o $targetFile -d $targetDir);
 
 	# merge
     my ($countInfo,$cF)		= _mergeCapFile($hash);
@@ -1735,6 +1719,8 @@ sub getListForecastStations($) {
 #	Changelog
 #
 ###################################################################################################
+#
+#	2016-06-05	changed		use os based unzip for decoding capdata
 #
 #	2016-03-29	changed		remove all conditions code
 #
