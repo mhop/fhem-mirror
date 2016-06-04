@@ -412,10 +412,24 @@ PRESENCE_Read($)
         
         if($line =~ /^absence|absent$/)
         {
+            if(!$hash->{helper}{DISABLED} and $hash->{helper}{CURRENT_TIMEOUT} eq "present" and $hash->{TIMEOUT_NORMAL} != $hash->{TIMEOUT_PRESENT})
+            {
+                $hash->{helper}{CURRENT_TIMEOUT} = "normal";
+                Log3 $name, 4 , "PRESENCE ($name) - changing to normal timeout every ".$hash->{TIMEOUT_NORMAL}." seconds";
+                DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 2);
+            }
+        
             PRESENCE_ProcessState($hash, "absent") unless($hash->{helper}{DISABLED});
         }
         elsif($line =~ /present;(.+?)$/)
         {
+            if(!$hash->{helper}{DISABLED} and $hash->{helper}{CURRENT_TIMEOUT} eq "normal" and $hash->{TIMEOUT_NORMAL} != $hash->{TIMEOUT_PRESENT})
+            {
+                $hash->{helper}{CURRENT_TIMEOUT} = "present";
+                Log3 $name, 4 , "PRESENCE ($name) - changing to present timeout every ".$hash->{TIMEOUT_PRESENT}." seconds";
+                DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_PRESENT}."\n", 2);
+            }
+            
             PRESENCE_ProcessState($hash, "present") unless($hash->{helper}{DISABLED});
 
             if($1 =~ /^(.*);(.+)$/)
@@ -465,6 +479,7 @@ PRESENCE_DoInit($)
     if(not exists($hash->{helper}{DISABLED}) or (exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED} == 0))
     {
         readingsSingleUpdate($hash, "state", "active",0);
+        $hash->{helper}{CURRENT_TIMEOUT} = "normal";
         DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 2);
     }
     else
@@ -539,7 +554,7 @@ sub PRESENCE_StartLocalScan($;$)
             $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalFunctionScan", $name."|".$hash->{helper}{call}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
         }
         
-        if(!$hash->{helper}{RUNNING_PID})
+        if(!$hash->{helper}{RUNNING_PID} and $mode =~ /^local-bluetooth|lan-ping|fritzbox|shellscript|function$/)
         {
             delete($hash->{helper}{RUNNING_PID});
 
