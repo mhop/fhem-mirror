@@ -13,6 +13,7 @@
 # ABU 20160416 Changed SplitFn again
 # ABU 20160422 Added dpt9.021 - mA
 # ABU 20160529 Changed Doku
+# ABU 20160605 Changed Doku, changed autocreate-naming, fixed dpt10-sending-now
 
 package main;
 
@@ -820,10 +821,17 @@ KNX_Parse($$) {
 	} else
 	{
 		my $gad = hexToName($dest);
+		#remove slashes
+		#$name =~ s/\///g;
+		#my $name = "KNX_" . $gad;
+		my ($line, $area, $device) = split ("/", $gad);
+		my $name = sprintf("KNX_%.2d%.2d%.3d", $line, $area, $device);
+		
 		my $ret = "KNX Unknown device $dest ($gad), Value $val, please define it";
-		Log3 ($dest, 3, "KNX Unknown device $dest ($gad), Value $val, please define it");
+		Log3 ($name, 3, "KNX Unknown device $dest ($gad), Value $val, please define it");
+		
 		#needed for autocreate
-		return "UNDEFINED KNX_$dest KNX $gad:$modelErr";	
+		return "UNDEFINED $name KNX $gad:$modelErr";	
 	}
 }
 
@@ -1076,7 +1084,7 @@ encodeByDpt ($$$) {
 			$hours += $hoffset;
 			
 			$value = "$hours:$mins:$secs";
-			$numval = $secs + ($mins<<8) + (($hoffset + $hours)<<16);
+			$numval = $secs + ($mins<<8) + ($hours<<16);
 		} else
 		{
 			my ($hh, $mm, $ss) = split (":", $value);
@@ -1469,7 +1477,8 @@ decodeByDpt ($$$) {
 	via a different group, you have to index it (set &lt;devname&gt; value &lt;17.0&gt; &lt;g2&gt;).<br>
 	If you use the readingName, readings are based on this name (e.g. hugo-set, hugo-get for name hugo).</p>
 
-    <p>The module <a href="#autocreate">autocreate</a> is creating a new definition for any unknown sender. The device itself will be NOT fully available, until you added a DPT to the definition.</p>
+    <p>The module <a href="#autocreate">autocreate</a> is creating a new definition for any unknown sender. The device itself will be NOT fully available, until you added a DPT to the definition. The name will be
+	KNX_nnmmooo where nn is the line adress, mm the area and ooo the device.</p>
 
     <p>Example:</p>
       <pre>
@@ -1477,6 +1486,17 @@ decodeByDpt ($$$) {
       define lamp1 KNX 0/10/12:dpt1:meinName 0/0/5:dpt1.001
       define lamp1 KNX 0A0C:dpt1.003 myTul
       </pre>
+
+	One hint regarding dpt1 (binary): all the sub-types have to be used with keyword value. Received telegrams are already encoded to their representation.
+	Having the on/off button (for send values) without keyword value is an absolutely special use-case and only valid for dpt1 (not the subs).<br>
+	
+    <p>Example:</p>
+      <pre>
+      define rollo KNX 0/10/12:dpt1.008
+	  set rollo value up
+	  set rollo value down
+      </pre>
+	
   </ul>
   
   <p><a name="KNXset"></a> <b>Set</b></p>
@@ -1515,9 +1535,11 @@ decodeByDpt ($$$) {
 	<p>The current date and time can be sent to the bus by the following settings:</p>
 	<pre>
       define timedev KNX 0/0/7:dpt10
+	  attr timedev eventMap /value now:now/
       attr timedev webCmd now
       
       define datedev KNX 0/0/8:dpt11
+	  attr datedev eventMap /value now:now/
       attr datedev webCmd now
       
       # send every midnight the new date
@@ -1714,7 +1736,7 @@ decodeByDpt ($$$) {
 	Wollt Ihr &uuml;ber eine andere Gruppe senden. m&uuml;sst Ihr diese indizieren (set &lt;devname&gt; value &lt;17.0&gt; &lt;g2&gt;).</p>
 	
     <p>Das Modul <a href="#autocreate">autocreate</a> generiert eine Instanz f&uuml;r jede unbekannte Gruppenadresse. Das Ger&auml;t selbst wird jedoch NICHT korrekt funktionieren, so lange noch kein korrekter 
-	DPT angelegt ist.</p>
+	DPT angelegt ist. Der Name ist immer KNX_nnmmooo wobei nn die Linie ist, mm der Bereich und ooo die Geräteadresse.</p>
 
     <p>Example:</p>
       <pre>
@@ -1722,6 +1744,17 @@ decodeByDpt ($$$) {
       define lamp1 KNX 0/10/12:dpt1:meinName 0/0/5:dpt1.001
       define lamp1 KNX 0A0C:dpt1.003 myTul
       </pre>
+	  
+	Ein Hinweis bezüglich dem binären Datentyp dpt1: alle Untertypen müssen über das Schlüsselwort value gesetzt werden. Empfangene Telegramme werden entsprechend ihrer Definition automatisch
+	umbenannt. Die zur Verfügung stehenden on/off Schaltflächen ohne den Schlüssel value sind ein absoluter Sonderfall und gelten nur für den dpt1 selbst (nicht die Untertypen).
+	
+    <p>Example:</p>
+      <pre>
+      define rollo KNX 0/10/12:dpt1.008
+	  set rollo value up
+	  set rollo value down
+      </pre>
+	  
   </ul>
   
   <p><a name="KNXset"></a> <b>Set</b></p>
@@ -1759,9 +1792,11 @@ decodeByDpt ($$$) {
 	<p>Aktuelle Uhrzeit / Datum k&ouml;nnen wie folgt auf den Bus gelegt werden:</p>
 	<pre>
       define timedev KNX 0/0/7:dpt10
+	  attr timedev eventMap /value now:now/
       attr timedev webCmd now
       
       define datedev KNX 0/0/8:dpt11
+	  attr datedev eventMap /value now:now/
       attr datedev webCmd now
       
       # send every midnight the new date
