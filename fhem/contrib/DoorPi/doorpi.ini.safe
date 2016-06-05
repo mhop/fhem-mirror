@@ -57,20 +57,20 @@ guests = dashboard
 ####################### Events #######################
 [EVENT_OnStartup]
 10 = sleep:1
-20 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call startup
+20 = os_execute:/home/doorpi/FHEMHelper call init
 
 [EVENT_BeforeSipPhoneMakeCall]
-10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call start
+10 = os_execute:/home/doorpi/FHEMHelper call startup
 20 = take_snapshot
 
 [EVENT_OnCallStateDisconnect]
-10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call end
+10 = os_execute:/home/doorpi/FHEMHelper call end
 
 [EVENT_OnCallStateDismissed]
-10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call dismissed
+10 = os_execute:/home/doorpi/FHEMHelper call dismissed
 
 [EVENT_OnCallStateReject]
-10 = url_call:http://192.168.0.90:8083/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T call rejected
+10 = os_execute:/home/doorpi/FHEMHelper call rejected
 
 [EVENT_OnTimeMinuteEvery5]
 10=statuswatchdog:/tmp/doorpi.watchdog
@@ -82,9 +82,9 @@ local_port = 5060
 firewallpolicy = PolicyNoFirewall
 #
 sipphonetyp = linphone
-sipserver_password = xxxxxxxxxxxxxxxxxxx
-sipserver_realm = fritz.box
-sipserver_server = 192.168.0.254
+sipserver_password = xxxxxx
+sipserver_realm = cccc
+sipserver_server = ccccc
 sipserver_username = 620
 stun_server =
 #
@@ -110,8 +110,8 @@ video_size = vga
 
 ####################### Keyboards ##############################
 [keyboards]
-onboardpins = piface
 webservice = filesystem
+onboardpins = piface
 
 ####################### Virtual keyboard #######################
 [webservice_keyboard]
@@ -119,8 +119,10 @@ base_path_input = /home/doorpi/keyboard/inputs/
 base_path_output = /home/doorpi/keyboard/outputs/
 
 [webservice_InputPins]
-door            = out:door,1,0,3 
-snapshot        = sleep:0
+dooropen        = out:door,1,0,3 
+doorlocked      = out:hardlock,1
+doorunlocked    = out:hardlock,0
+snapshot        = sleep:0 
 streamon        = sleep:0
 streamoff       = sleep:0
 lighton         = out:light,1
@@ -137,34 +139,33 @@ button2         = sleep:0
 #-- communicate to FHEM that a snapshot has been taken
 [EVENT_OnKeyPressed_webservice.snapshot]
 10 = take_snapshot
-20 = url_call:http://192.168.0.90:8085/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T door snapshot
+20 = os_execute:/home/doorpi/FHEMHelper call snapshot
 
 #-- start video stream
 [EVENT_OnKeyPressed_webservice.streamon]
-10 = os_execute:/etc/init.d/mjpg-streamer start
+10 = os_execute:/etc/init.d/mjpg_streamer start
 
 #-- stop video stream
 [EVENT_OnKeyPressed_webservice.streamoff]
-10 = os_execute:/etc/init.d/mjpg-streamer stop
+10 = os_execute:/etc/init.d/mjpg_streamer stop 
 
 #-- obtain the target call number from FHEM
 [EVENT_OnKeyPressed_webservice.gettarget]
-10 = os_execute:echo '{ReadingsVal("A.Haus.T","call_target",722622)}' | socat -t50 - TCP:192.168.0.90:7072 > /home/doorpi/calltarget
+10 = os_execute:/home/doorpi/FHEMHelper gettarget
 
 #-- purge all files older than current PID file
 [EVENT_OnKeyPressed_webservice.purge]
-10 = os_execute:find /home/doorpi/records/ -type f ! -newer var/run/doorpi.pid -delete
+10 = os_execute:/home/doorpi/FHEMHelper purge
 
-#-- clear all files (NOT YET OK)
+#-- clear all files
 [EVENT_OnKeyPressed_webservice.clear]
-10 = os_execute:/home/doorpi/purge.sh clear > /home/doorpi/yyy
+10 = os_execute:/home/doorpi/FHEMHelper clear
 
 [EVENT_OnKeyPressed_webservice.button1]
-10 = call:722622
+10 = os_execute:/home/doorpi/FHEMHelper sabotage
 
 [EVENT_OnKeyPressed_webservice.button2]
 10 = file_call_value:/home/doorpi/calltarget
-
 
 ####################### Real keyboard #######################
 [onboardpins_keyboard]
@@ -174,27 +175,44 @@ pull_up_down = PUD_UP
 0 = door
 1 = light
 2 = dashlight
-3 = blinking_led
+3 = hardlock
+7 = blinking_led
 
 [onboardpins_InputPins]
-0 = call:722622
-1 = call:**621
-2 = file_call_value:/home/doorpi/calltarget
-3 = take_snapshot
+0 = file_call_value:/home/doorpi/calltarget
+1 = sleep:0
+4 = sleep:0
+5 = sleep:0
 6 = sleep:0
 7 = sleep:0
 
-#-- OK pin from Arduino
-[EVENT_OnKeyPressed_onboardpins.6]
-10 = os_execute:aplay -D plughw:1,0 /home/doorpi/sounds/067_willkommen.wav
-20 = url_call:http://192.168.0.90:8085/fhem?XHR=1&cmd.GalaxyTab=set GalaxyTab ttsSay Ein Bewohner betritt das Haus
-30 = url_call:http://192.168.0.90:8085/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T door opened
+#-- DoorOpen pin from Arduino
+[EVENT_OnKeyPressed_onboardpins.1]
+10 = out:dashlight,1
+20 = os_execute:/home/doorpi/FHEMHelper dooropen
+30 = os_execute:aplay -D plughw:1,0 /home/doorpi/sounds/067_willkommen.wav
 40 = out:door,1,0,3
+50 = out:dashlight,0
 
-#-- NOK pin from Arduino
+#-- WrongID pin from Arduino
+[EVENT_OnKeyPressed_onboardpins.4]
+10 = out:dashlight,1
+20 = os_execute:/home/doorpi/FHEMHelper wrongid
+30 = take_snapshot
+40 = out:dashlight,0
+
+#-- LockState pin from Arduino - FHEM will transform softlock into hardlock
+[EVENT_OnKeyPressed_onboardpins.5]
+10 = os_execute:/home/doorpi/FHEMHelper softlock
+
+#-- Movement detection 
+[EVENT_OnKeyPressed_onboardpins.6]
+10 = out:dashlight,1,0,60
+20 = os_execute:/home/doorpi/FHEMHelper movement
+
+#-- Sabotage detection  
 [EVENT_OnKeyPressed_onboardpins.7]
-10 = take_snapshot
-20 = url_call:http://192.168.0.90:8085/fhem?XHR=1&cmd.GalaxyTab=set GalaxyTab ttsSay Unerlaubter Zutrittsversuch
-30 = url_call:http://192.168.0.90:8085/fhem?XHR=1&cmd.A.Haus.T=set A.Haus.T door wrong_id
+10 = os_execute:/home/doorpi/FHEMHelper sabotage
+
 
 

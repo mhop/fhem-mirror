@@ -1,0 +1,61 @@
+# /bin/sh
+
+
+checkstream() {
+  streampid=`pidof mjpg_streamer`
+  if [ -z "$streampid" ]; then
+    stream="off"
+  else
+    stream="on"
+  fi
+}
+
+FHEMDP="A.Door.Pi"
+FHEMIP="192.168.0.90"
+FHEM="http://$FHEMIP:8083/fhem?XHR=1&cmd.$FHEMDP"
+HOME="/home/doorpi"
+default_target="XXXX"
+
+case $1 in 
+
+ init) target=`cat $HOME/calltarget`
+       curl "$FHEM=setreading%20$FHEMDP%20call_target%20$target" &
+
+       streampid=`pidof mjpg_streamer`
+       if [ -z "$streampid" ]; then
+         curl "$FHEM=setreading%20$FHEMDP%20stream%20off" &
+       else
+         curl "$FHEM=setreading%20$FHEMDP%20stream%20on" &
+       fi
+       ;;
+
+ dooropen) 
+       curl "$FHEM=set%20GalaxyTab%20ttsSay%20Ein%20Bewohner%20betritt%20das%20Haus" &
+       curl "$FHEM=set%20$FHEMDP%20door%20opened" &
+       ;;
+
+ wrongid)
+       curl "$FHEM=set%20GalaxyTab%20ttsSay%20Unerlaubter%20Zutrittsversuch" &
+       curl "$FHEM=set%20$FHEMDP%20door%20wrong_id" &
+       ;;
+
+ softlock)
+       curl "$FHEM=set%20$FHEMDP%20door%20locked" &
+       ;;
+
+ call) 
+       curl "$FHEM=set%20$FHEMDP%20call%20$2" &
+       ;;
+
+ gettarget)
+       echo "{ReadingsVal('$FHEMDP','call_target','$default_target')}" | socat -t50 - TCP:$FHEMIP:7072 > $HOME/calltarget
+       ;;
+
+ purge)
+       find $HOME/records/ -type f ! -newer /var/run/doorpi.pid -delete
+       ;;
+
+ clear)
+       ;;
+
+esac
