@@ -16,7 +16,6 @@ var cm_attr = {
     indentWithTabs:      true,
     autofocus:           true,
     lineNumbers:         true,
-    keyMap:              false,
     jumpToLine:          false,
     jumpToLine_extraKey: false,
     smartIndent:         false,
