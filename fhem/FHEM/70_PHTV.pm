@@ -32,7 +32,6 @@ use strict;
 use warnings;
 use Data::Dumper;
 use Time::HiRes qw(gettimeofday);
-use JSON;
 use HttpUtils;
 use Color;
 use SetExtensions;
@@ -1501,6 +1500,13 @@ sub PHTV_Define($$) {
     my $name = $hash->{NAME};
 
     Log3 $name, 5, "PHTV $name: called function PHTV_Define()";
+
+    eval {
+        require JSON;
+        import JSON qw( decode_json );
+    };
+    return "Please install Perl JSON to use module PHTV"
+      if ($@);
 
     if ( int(@a) < 3 ) {
         my $msg =

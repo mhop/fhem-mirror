@@ -29,7 +29,6 @@ package main;
 
 use strict;
 use warnings;
-use ONKYOdb;
 use Time::HiRes qw(usleep);
 use Symbol qw<qualify_to_ref>;
 use File::Path;
@@ -60,11 +59,8 @@ sub ONKYO_AVR_Initialize($) {
 
     Log3 $hash, 5, "ONKYO_AVR_Initialize: Entering";
 
-    eval { use XML::Simple; };
-    return "Please install XML::Simple to use this module."
-      if ($@);
-
     require "$attr{global}{modpath}/FHEM/DevIo.pm";
+    require "$attr{global}{modpath}/FHEM/ONKYOdb.pm";
 
     # Provider
     $hash->{ReadFn}  = "ONKYO_AVR_Read";
@@ -104,6 +100,10 @@ sub ONKYO_AVR_Define($$$) {
     my $name = $hash->{NAME};
 
     Log3 $name, 5, "ONKYO_AVR $name: called function ONKYO_AVR_Define()";
+
+    eval { require XML::Simple; };
+    return "Please install Perl XML::Simple to use module ONKYO_AVR"
+      if ($@);
 
     if ( int(@$a) < 3 ) {
         my $msg =
@@ -209,7 +209,6 @@ sub ONKYO_AVR_Notify($$) {
                 else {
                     DoTrigger( $name, "DISCONNECTED" );
                 }
-
             }
 
             # unknown event
@@ -2129,21 +2128,21 @@ sub ONKYO_AVR_Set($$$) {
 "Device power is turned off, this function is unavailable at that stage.";
             }
             elsif ( lc( @$a[2] ) eq "up" ) {
-                my $setVal;
+                my $setVal = "";
                 $setVal = "B" if ( $2 eq "bass" );
                 $setVal = "T" if ( $2 eq "treble" );
                 $return =
                   ONKYO_AVR_SendCommand( $hash, lc($1), $setVal . "UP" );
             }
             elsif ( lc( @$a[2] ) eq "down" ) {
-                my $setVal;
+                my $setVal = "";
                 $setVal = "B" if ( $2 eq "bass" );
                 $setVal = "T" if ( $2 eq "treble" );
                 $return =
                   ONKYO_AVR_SendCommand( $hash, lc($1), $setVal . "DOWN" );
             }
             elsif ( @$a[2] =~ /^-*\d+$/ ) {
-                my $setVal;
+                my $setVal = "";
                 $setVal = "B" if ( $2 eq "bass" );
                 $setVal = "T" if ( $2 eq "treble" );
                 $setVal .= "+" if ( @$a[2] > 0 );
@@ -2182,7 +2181,7 @@ sub ONKYO_AVR_Set($$$) {
                 $return = ONKYO_AVR_SendCommand( $hash, lc($1), "DOWN" );
             }
             elsif ( @$a[2] =~ /^-*\d+$/ ) {
-                my $setVal;
+                my $setVal = "";
                 $setVal = "+" if ( @$a[2] > 0 );
                 $setVal = "-" if ( @$a[2] < 0 );
 

@@ -57,10 +57,6 @@ sub ENIGMA2_Initialize($) {
 
     Log3 $hash, 5, "ENIGMA2_Initialize: Entering";
 
-    eval 'use XML::Simple; 1';
-    return "Please install XML::Simple to use this module."
-      if ($@);
-
     $hash->{GetFn}   = "ENIGMA2_Get";
     $hash->{SetFn}   = "ENIGMA2_Set";
     $hash->{DefFn}   = "ENIGMA2_Define";
@@ -757,6 +753,10 @@ sub ENIGMA2_Define($$) {
     my $name = $hash->{NAME};
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Define()";
+
+    eval { require XML::Simple; };
+    return "Please install Perl XML::Simple to use module ENIGMA2"
+      if ($@);
 
     if ( int(@a) < 3 ) {
         my $msg =
