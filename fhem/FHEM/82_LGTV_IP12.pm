@@ -249,7 +249,7 @@ LGTV_IP12_Set($@)
     {
         unless(exists($hash->{helper}{CHANNEL_LIST}))
         {
-            LGTV_IP12_RetrieveChannelList($hash);
+            LGTV_IP12_ResetTimer($hash, 0);
         }
        
         my $new_channel;
@@ -380,7 +380,7 @@ LGTV_IP12_GetStatus($)
 
     unless(exists($hash->{helper}{CHANNEL_LIST}) and ReadingsVal($hash->{NAME}, "state", "off") eq "on")
     {
-        LGTV_IP12_RetrieveChannelList($hash);
+        LGTV_IP12_HttpGet($hash, "/udap/api/data?target=channel_list", "statusRequest", "channelList", undef);
     }
     
     unless(exists($hash->{helper}{APP_LIST}) and ReadingsVal($hash->{NAME}, "state", "off") eq "on")
@@ -531,7 +531,41 @@ LGTV_IP12_ParseHttpResponse($$$)
                 }
             }
             
-            LGTV_IP12_RetrieveChannelList($hash) if(not exists($hash->{helper}{CHANNEL_LIST}));
+            if($arg eq "channelList")
+            {
+                delete($hash->{helper}{CHANNEL_LIST}) if(exists($hash->{helper}{CHANNEL_LIST}));
+    
+                while($data =~ /<data>(.+?)<\/data>/gc)
+                {
+                    my $channel = $1;
+                    if($channel =~ /<major>(\d+?)<\/major>/)
+                    {
+                        my $channel_major = $1;
+                        $hash->{helper}{CHANNEL_LIST}{$channel_major}{major} = $channel_major;
+                        
+                        if($channel =~ /<minor>(\d+?)<\/minor>/)
+                        {
+                            $hash->{helper}{CHANNEL_LIST}{$channel_major}{minor} = $1;
+                        }
+                        
+                        if($channel =~ /<sourceIndex>(\d+?)<\/sourceIndex>/)
+                        {
+                            $hash->{helper}{CHANNEL_LIST}{$channel_major}{sourceIndex} = $1;
+                        }
+                        
+                        if($channel =~ /<physicalNum>(\d+?)<\/physicalNum>/)
+                        {
+                            $hash->{helper}{CHANNEL_LIST}{$channel_major}{physicalNum} = $1;
+                        }
+                        
+                        if($channel =~ /<chname>(.+?)<\/chname>/)
+                        {
+                            Log3 $name, 5 , "LGTV_IP12 ($name) - adding channel ".LGTV_IP12_html2txt($1);
+                            $hash->{helper}{CHANNEL_LIST}{$channel_major}{chname} = LGTV_IP12_html2txt($1);
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -593,62 +627,6 @@ LGTV_IP12_Pair($$)
     LGTV_IP12_HttpGet($hash, "/udap/api/pairing", "pairing", $code, "<api type=\"pairing\"><name>hello</name><value>$code</value><port>8080</port></api>"); 
 }
 
-#################################
-# retrieves the complete channel list including channel names
-sub
-LGTV_IP12_RetrieveChannelList($)
-{
-    my ($hash) = @_;
-    my $name = $hash->{NAME};
-    
-    Log3 $name, 4 , "LGTV_IP12 ($name) - requesting channel list";
-    
-    my ($err, $channel_list) = HttpUtils_BlockingGet({
-                                url        => "http://".$hash->{HOST}.":8080/udap/api/data?target=channel_list",
-                                timeout    => AttrVal($hash->{NAME}, "request-timeout", 4),
-                                noshutdown => 1,
-                                header     => "User-Agent: Linux/2.6.18 UDAP/2.0 CentOS/5.8",
-                                loglevel   => ($hash->{helper}{AVAILABLE} ? undef : 5),
-                                httpversion => "1.1",
-                            });
-                            
-    Log3 $name, 3 , "LGTV_IP12 ($name) - error while retrieving channel list: $err" if($err ne "" and $hash->{helper}{AVAILABLE});
-    
-    return if(not defined($channel_list) or $channel_list eq "");
-    
-    delete($hash->{helper}{CHANNEL_LIST}) if(exists($hash->{helper}{CHANNEL_LIST}));
-    
-    while($channel_list =~ /<data>(.+?)<\/data>/gc)
-    {
-        my $channel = $1;
-        if($channel =~ /<major>(\d+?)<\/major>/)
-        {
-            my $channel_major = $1;
-            $hash->{helper}{CHANNEL_LIST}{$channel_major}{major} = $channel_major;
-            
-            if($channel =~ /<minor>(\d+?)<\/minor>/)
-            {
-                $hash->{helper}{CHANNEL_LIST}{$channel_major}{minor} = $1;
-            }
-            
-            if($channel =~ /<sourceIndex>(\d+?)<\/sourceIndex>/)
-            {
-                $hash->{helper}{CHANNEL_LIST}{$channel_major}{sourceIndex} = $1;
-            }
-            
-            if($channel =~ /<physicalNum>(\d+?)<\/physicalNum>/)
-            {
-                $hash->{helper}{CHANNEL_LIST}{$channel_major}{physicalNum} = $1;
-            }
-            
-            if($channel =~ /<chname>(.+?)<\/chname>/)
-            {
-                Log3 $name, 5 , "LGTV_IP12 ($name) - adding channel ".LGTV_IP12_html2txt($1);
-                $hash->{helper}{CHANNEL_LIST}{$channel_major}{chname} = LGTV_IP12_html2txt($1);
-            }
-        }
-    }
-}
 
 #################################
 # resets the status update timer according to the current state
