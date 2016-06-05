@@ -37,7 +37,6 @@ use strict;
 use warnings;
 use Time::HiRes qw(time);
 use Data::Dumper;
-use msgSchema;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
@@ -52,6 +51,8 @@ sub MSG_Initialize($$) {
 "[<type>] [<\@device>|<e-mail address>] [<priority>] [|<title>|] <message-text>",
     );
     $cmds{msg} = \%hash;
+
+    require "$attr{global}{modpath}/FHEM/msgSchema.pm";
 }
 
 ########################################
@@ -167,7 +168,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
         };
         if ( !$@ ) {
             eval '$advanced = decode_json( Encode::encode_utf8($1) ); 1';
-            if (!$@) {
+            if ( !$@ ) {
                 Log3 $globalDevName, 5,
                   "msg: Decoded advanced options\n" . Dumper($advanced);
             }
