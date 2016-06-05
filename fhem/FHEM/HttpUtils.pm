@@ -263,7 +263,8 @@ HttpUtils_Connect($)
                           "HttpUtils_ConnErr", \%timerHash, 0);
             return undef;
           } else {
-            return "connect: $!";
+            $hash->{callback}($hash, "connect to $hash->{addr}: $!", "");
+            return undef;
           }
         }
       });
