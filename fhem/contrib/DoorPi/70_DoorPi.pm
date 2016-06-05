@@ -8,6 +8,7 @@
 # 
 #  $Id: 70_DoorPi.pm 2016-05 - pahenning $
 #
+#
 ########################################################################################
 #
 #  This programm is free software; you can redistribute it and/or modify
@@ -32,14 +33,15 @@ package main;
 use strict;
 use warnings;
 
-use JSON; # imports encode_json, decode_json, to_json and from_json.
+use JSON;      # imports encode_json, decode_json, to_json and from_json.
+use Test::JSON;
 
 use vars qw{%attr %defs};
 
 sub Log($$);
 
 #-- globals on start
-my $version = "1.0beta7";
+my $version = "1.0beta8";
 
 #-- these we may get on request
 my %gets = (
@@ -225,9 +227,9 @@ sub DoorPi_Set ($@) {
   #-- commands
   my $door     = AttrVal($name, "doorbutton", "door");
   my $doorsubs = "open";
-  $doorsubs   .= ",lock"
+    $doorsubs   .= ",locked"
     if(AttrVal($name, "doorlockcmd",undef));
-  $doorsubs   .= ",unlock"
+  $doorsubs   .= ",unlocked"
     if(AttrVal($name, "doorunlockcmd",undef));
     
   my @tsubs   = ();
@@ -260,6 +262,7 @@ sub DoorPi_Set ($@) {
   
   $key   = shift @a;
   $value = shift @a; 
+  #Log 1,"[DoorPi_Set] called with key ".$key." and value ".$value;
   
   return "[DoorPi_Set] With unknown argument $key, choose one of " . join(" ", @{$hash->{HELPER}->{CMDS}})
     if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && ($key ne "call") && ($key ne "door") );
@@ -282,6 +285,8 @@ sub DoorPi_Set ($@) {
       DoorPi_GetHistory($hash);
     }elsif( $value eq "snapshot" ){
       # TODO
+    }else{
+      Log 1,"[DoorPi_Set] $value";
     }
   #-- call target
   }elsif( $key eq "target" ){
@@ -299,17 +304,35 @@ sub DoorPi_Set ($@) {
     }
   #-- door opening - either from FHEM, or just as message from DoorPi
   }elsif( ($key eq "$door")||($key eq "door") ){
-    if( $value eq "open" ){
-      $v=DoorPi_Cmd($hash,"door");
+    if( $value eq "opened" ){
+      $v=DoorPi_Cmd($hash,"dooropen");
+      Log 1,"[DoorPi_Set] sent dooropen command to DoorPi";
       if(AttrVal($name, "dooropencmd",undef)){
         fhem(AttrVal($name, "dooropencmd",undef));
       }
       readingsSingleUpdate($hash,$door,"opened",1);
-    }elsif( $value eq "opened" ){
-      if(AttrVal($name, "dooropencmd",undef)){
-        fhem(AttrVal($name, "dooropencmd",undef));
+    }elsif( $value eq "locked" ){
+       $v=DoorPi_Cmd($hash,"doorlocked");
+       #-- careful here - 
+       #   a third parameter indicates that the door is already unlocked
+       if( (AttrVal($name, "doorlockcmd",undef)) && (!$a[0]) ){
+        fhem(AttrVal($name, "doorlockcmd",undef));
+        Log 1,"[DoorPi_Set] sent doorlocked command to DoorPi and executed extra FHEM doorlock command";
+      }else{
+        Log 1,"[DoorPi_Set] sent doorlocked command to DoorPi and NOT executed extra FHEM doorlock command";
       }
-      readingsSingleUpdate($hash,$door,"opened",1);
+      readingsSingleUpdate($hash,$door,"locked",1);
+    }elsif( $value eq "unlocked" ){
+      $v=DoorPi_Cmd($hash,"doorunlocked");
+      #-- careful here - 
+      #   a third parameter indicates that the door is already unlocked
+      if( (AttrVal($name, "doorunlockcmd",undef)) && (!$a[0]) ){
+        fhem(AttrVal($name, "doorunlockcmd",undef));
+        Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and executed extra FHEM doorunlock command";
+      }else{
+        Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and NOT executed extra FHEM doorunlock command";
+      }
+      readingsSingleUpdate($hash,$door,"unlocked",1);
     }
   #-- snapshot
   }elsif( $key eq "$snapshot" ){
@@ -406,8 +429,8 @@ sub DoorPi_GetConfig {
   }
   #Log 1,"[DoorPi_GetConfig] has obtained data";
  
-  #-- crude test if this is valid JSON or some HTML page
-  if( substr($status,0,1) eq "<" ){
+  #-- test if this is valid JSON
+  if( !is_valid_json($status) ){
     Log 1,"[DoorPi_GetConfig] but data is invalid";
     readingsSingleUpdate($hash,"config","invalid data",0);
     readingsSingleUpdate($hash,"state","Error",1);
@@ -431,6 +454,7 @@ sub DoorPi_GetConfig {
     $hash->{HELPER}->{vkeyboard}=$fskey;
     $fscmds = $jhash0->{"config"}->{$fskey."_InputPins"};
     
+    my $door       = AttrVal($name, "doorbutton", "door");
     my $light      = AttrVal($name, "lightbutton", "light");
     my $dashlight  = AttrVal($name, "dashlightbutton", "dashlight");
     my $snapshot   = AttrVal($name, "snapshotbutton", "snapshot");
@@ -441,8 +465,15 @@ sub DoorPi_GetConfig {
       
     foreach my $key (sort(keys $fscmds)) {
     
+      #-- check for door buttons
+      if($key =~ /dooropen/){
+        push(@{ $hash->{HELPER}->{CMDS}},"$door");
+      }elsif($key =~ /doorlocked/){
+        #no need to get these
+      }elsif($key =~ /doorunlocked/){
+        #no need to get these
       #-- check for stream buttons
-      if($key =~ /$stream(on)/){
+      }elsif($key =~ /$stream(on)/){
         push(@{ $hash->{HELPER}->{CMDS}},"$stream");
         $son = 1;
       }elsif($key =~ /$stream(off)/){
@@ -567,14 +598,14 @@ sub DoorPi_GetHistory {
   }
   #Log 1,"[DoorPi_GetHistory] has obtained data in two calls";
 
-  #-- crude test if this is valid JSON or some HTML page
-  if( substr($status1,0,1) eq "<" ){
+  #-- test if this is valid JSON
+  if( !is_valid_json($status1) ){
     Log 1,"[DoorPi_GetHistory] but data from first call is invalid";
     readingsSingleUpdate($hash,"history","invalid data 1st call",0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
-  if( substr($status2,0,1) eq "<" ){
+  if( !is_valid_json($status2) ){
     Log 1,"[DoorPi_GetHistory] but data from second call is invalid";
     readingsSingleUpdate($hash,"history","invalid data 2nd call",0);
     readingsSingleUpdate($hash,"state","Error",1);
@@ -658,8 +689,8 @@ sub DoorPi_GetHistory {
              my $record    = $callrecord; 
              $record =~ s/^.*records\///;
              #-- workaround for buggy DoorPi
-             $record       = sprintf("%d-%02d-%02d_%02d-%02d-%02d.wav", $year,($month+1),$day,$hour, $min, $sec)
-               if( $callend eq "ok");
+             $record       = sprintf("%d-%02d-%02d_%02d-%02d-%02d.wav", $year,($month+1),$day,$hour, $min, $sec);
+             #  if( $callend eq "ok");
              
              #-- this is the snapshot file if taken at the same time
              my $snapshot  = sprintf("%d-%02d-%02d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
@@ -772,10 +803,10 @@ sub DoorPi_GetHistory {
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
-  #Log 1,"[DoorPi_Cmd] has obtained data";
+  #Log 1,"[DoorPi_Cmd] has obtained data $data";
  
-  #-- crude test if this is valid JSON or some HTML page
-  if( substr($data,0,1) eq "<" ){
+  #-- test if this is valid JSON
+  if( !is_valid_json($data) ){
     Log 1,"[DoorPi_Cmd] invalid data";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
@@ -992,16 +1023,24 @@ sub DoorPi_makeTable($$$$){
                 <code>&lt;IP address&gt;</code>
                 <br /> </li>
         </ul>
+        <b>Note:</b> The default configuration for the module assumes that opening the door is done by DoorPi
+        because it controls the local door opener, but locking and unlocking are handled by FHEM. Perl modules JSON and Test:JSON are needed.
          <br />
         <a name="DoorPi_Set"></a>
         <h4>Set</h4>
         <ul>
             <li><a name="doorpi_door">
-                    <code>set &lt;DoorPi-Device&gt; door open[|locked|unlocked] </code></a><br />
-                    Activate the door opener in DoorPi, accompanied by an optional FHEM command
-                    specified in the <i>dooropencmd</i> attribute.
-                    <br>If the Attributes doorlockcmd and doorunlockcmd are specified, these commands may be used to lock and unlock the door<br>
-                    Instead of <i>door</i>, one must use the value of the doorbutton attribute.</li>
+                    <code>set &lt;DoorPi-Device&gt; door open[|locked|unlocked] [&lt;string&gt;]</code></a><br />
+                    Instead of <i>door</i>, one must use the value of the doorbutton attribute.
+                    <br/> 
+                    open: Activate the door opener in DoorPi, accompanied by an optional FHEM command
+                    specified in the <i>dooropencmd</i> attribute.<br/>
+                    locked/unlocked: Shown only if the if the Attributes doorlockcmd and doorunlockcmd are specified.
+                    These commands are then used by FHEM to lock and unlock the door, furthermore this is communicated to DoorPi.
+                    <br/>
+                    If the third parameter is a nonempty string, this additional command is skipped. Can be useful, if the
+                    locked/unlocked command comes from the door itself. 
+                    </li>
             <li><a name="doorpi_snapshot">
                     <code>set &lt;DoorPi-Device&gt; snapshot </code></a><br />
                     Take a single snapshot.
@@ -1023,7 +1062,7 @@ sub DoorPi_makeTable($$$$){
                     Instead of <i>light</i>, one must use the value of the lightbutton attribute</li>
              <li><a name="doorpi_button">
                     <code>set &lt;DoorPi-Device&gt; <i>buttonDD</i>  </code></a><br />
-                    Activate one of the virtual buttons specified in DoorPi.
+                    Activate one of the virtual buttons specified in DoorPi.</li>
             <li><a name="doorpi_purge">
                     <code>set &lt;DoorPi-Device&gt; purge </code></a><br />
                     Clean all recordings and snapshots which are older than the current process </li>
@@ -1108,7 +1147,9 @@ sub DoorPi_makeTable($$$$){
 [EVENT_OnCallStateReject]
 10 = url_call:&lt;URL of FHEM&gt;/fhem?XHR=1&amp;cmd.&lt;DoorPi-Device&gt;=set &lt;DoorPi-Device&gt call rejected
 </pre>
-         DoorPi <b>must</b> have a virtual (= filesystem) keyboard
+Note: These calls can either be done directly in doorpi.ini, or collected in a separate shell script.
+<p/>
+DoorPi <b>must</b> have a virtual (= filesystem) keyboard
 <pre>
 [keyboards]
 ...
@@ -1119,7 +1160,9 @@ base_path_input = &lt;dome directory&gt;
 base_path_output = &lt;some directory&gt;
 
 [&lt;virtualkeyboardname&gt;_InputPins]
-door            = &lt;doorpi action opeing the door&gt; 
+dooropen        = &lt;doorpi action opening the door&gt; 
+doorlocked      = &lt;doorpi action if the door is locked by FHEM&gt; 
+doorunlocked    = &lt;doorpi action if the door is unlocked by FHEM&gt; 
 lighton         = &lt;doorpi action to switch on scene light&gt;
 lightonfortimer = &lt;doorpi action to switch on scene light for some time&gt;
 lightoff        = &lt;doorpi action to switch off scene light&gt;
