@@ -157,21 +157,21 @@ KS300_Parse($$)
       # The code also handles counter resets after battery replacement
 
       my $rain_raw_delta = $rain_raw - $rain_raw_prev;
-      if($tsecs != $tsecs_prev) { # avoids a rare but relevant condition
-        my $thours_delta = ($tsecs - $tsecs_prev)/3600.0; # in hours
-        my $rain_raw_per_hour = $rain_raw_delta/$thours_delta;
-        if(($rain_raw_delta<0) || ($rain_raw_per_hour> 200.0)) {
-          $rain_raw_ofs = $rain_raw_ofs_prev-$rain_raw_delta;
+      my $deltatsecs= ($tsecs - $tsecs_prev); # we have observed two datagrams at the same second
+      $deltatsecs= 1 if($deltatsecs< 1); 
+      my $thours_delta = ($tsecs - $tsecs_prev)/3600.0; # in hours
+      my $rain_raw_per_hour = $rain_raw_delta/$thours_delta;
+      if(($rain_raw_delta<0) || ($rain_raw_per_hour> 200.0)) {
+            $rain_raw_ofs = $rain_raw_ofs_prev-$rain_raw_delta;
 
-          # If the switch in the tick count occurs simultaneously with an
-          # increase due to rain, the tick is lost. We therefore assume that
-          # offsets between -5 and 0 are indeed rain.
+            # If the switch in the tick count occurs simultaneously with an
+            # increase due to rain, the tick is lost. We therefore assume that
+            # offsets between -5 and 0 are indeed rain.
 
-          if(($rain_raw_ofs>=-5) && ($rain_raw_ofs<0)) {
+            if(($rain_raw_ofs>=-5) && ($rain_raw_ofs<0)) {
             $rain_raw_ofs= 0;
-          }
-          readingsBulkUpdate($def, 'rain_raw_ofs', $rain_raw_ofs, 0);
-        }
+            }
+            readingsBulkUpdate($def, 'rain_raw_ofs', $rain_raw_ofs, 0);
       }
       $rain_raw_adj = $rain_raw + $rain_raw_ofs;
 
