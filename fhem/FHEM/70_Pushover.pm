@@ -382,7 +382,10 @@ sub Pushover_ReceiveCommand($$$) {
                 }
 
                 # Use JSON module if possible
-                eval 'use JSON qw( decode_json ); 1';
+                eval {
+                    require JSON;
+                    import JSON qw( decode_json );
+                };
                 $return = decode_json( Encode::encode_utf8($data) )
                   if ( !$@ );
             }

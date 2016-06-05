@@ -161,7 +161,10 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
         Log3 $globalDevName, 5, "msg: found options=$1";
 
         # Use JSON module if possible
-        eval 'use JSON qw( decode_json ); 1';
+        eval {
+            require JSON;
+            import JSON qw( decode_json );
+        };
         if ( !$@ ) {
             eval '$advanced = decode_json( Encode::encode_utf8($1) ); 1';
             if (!$@) {
@@ -176,7 +179,7 @@ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([%+a-z0-9A-Z.-]+))[\w,@.!|:]*)[\s\t]+//
         }
         else {
             Log3 $globalDevName, 3,
-              "msg: To use advanced options, please install Perl::JSON.";
+              "msg: To use advanced options, please install Perl JSON.";
         }
     }
 

@@ -29,13 +29,8 @@ package main;
 
 use strict;
 use warnings;
-use ONKYOdb;
 use Time::HiRes qw(usleep);
 use Symbol qw<qualify_to_ref>;
-use File::Path;
-use File::stat;
-use File::Temp;
-use File::Copy;
 use Data::Dumper;
 
 $Data::Dumper::Sortkeys = 1;
@@ -58,6 +53,8 @@ sub ONKYO_AVR_ZONE_Initialize($) {
     my ($hash) = @_;
 
     Log3 $hash, 5, "ONKYO_AVR_ZONE_Initialize: Entering";
+
+    require "$attr{global}{modpath}/FHEM/ONKYOdb.pm";
 
     $hash->{Match} = ".+";
 
