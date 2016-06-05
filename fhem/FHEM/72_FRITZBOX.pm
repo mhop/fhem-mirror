@@ -346,8 +346,7 @@ sub FRITZBOX_Set($$@)
    } 
 # set call
    elsif ( lc $cmd eq 'call') {
-      if (int @val > 0) 
-      {
+      if (int @val > 0) {
          Log3 $name, 3, "FRITZBOX: set $name $cmd ".join(" ", @val);
          push @cmdBuffer, "call ".join(" ", @val);
          return FRITZBOX_Set_Cmd_Start $hash->{helper}{TimerCmd};
@@ -1254,7 +1253,7 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&handset=dect:settings/Handset/list(User,Manufacturer,Model,FWVersion)"; # DECT Handsets
    $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi)"; # WLAN devices
    #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,cipher,wmm_active,powersave,is_ap,ap_state,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,channel_width,streams)
-   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,ethernet,ethernet_port,name,mac,active,online,wlan,speed)"; # LAN devices
+   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,ethernet,ethernet_port,guest,name,mac,active,online,wlan,speed)"; # LAN devices
    #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname)
    #landevice:settings/landevice/list(name,ip,mac,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)
    #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)
@@ -1411,6 +1410,7 @@ sub FRITZBOX_Readout_Run_Web($)
    }
    %landevice = ();
    my $wlanCount = 0;
+   my $gWlanCount = 0;
    foreach ( @{ $result->{lanDevice} } ) {
       my $dIp = $_->{ip};
       my $dName = $_->{name};
@@ -1422,7 +1422,7 @@ sub FRITZBOX_Readout_Run_Web($)
          $mac =~ s/:/_/g;
          if ($_->{ethernet} == 0 && $_->{wlan} == 1) {
             $dName .= " (";
-            $dName .= "guest"    if $_->{guest};
+            $dName .= "g"    if $_->{guest};
             $dName .= "WLAN";
             $dName .= ", " . $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s, ". $wlanList{$mac}{rssi}
                    if defined $wlanList{$mac};
@@ -1430,7 +1430,7 @@ sub FRITZBOX_Readout_Run_Web($)
          }
          if ( $_->{ethernet} == 1 ) {
             $dName .= " (";
-            $dName .= "guest"         if $_->{guest};
+            $dName .= "g"         if $_->{guest};
             $dName .= "LAN" . $_->{ethernet_port};
             $dName .= ", 1 Gbit/s"    if $_->{speed} == 1000;
             $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} != 1000 && $_->{speed} != 0;
@@ -1439,11 +1439,13 @@ sub FRITZBOX_Readout_Run_Web($)
          my $rName = "mac_".$mac;
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
          $wlanCount++      if $_->{wlan} == 1;
+         $gWlanCount++      if $_->{wlan} == 1 && $_->{guest} == 1;
          # Remove mac address from oldLanDevice-List
          delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
       }
    }
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_wlanCount", $wlanCount);
+   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_guestWlanCount", $gWlanCount);
 
 # Remove inactive or non existing mac-readings in two steps
    foreach ( keys %oldLanDevice ) {
@@ -4961,6 +4963,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_dect</b> - Current state of the DECT base</li>
       <li><b>box_fwVersion</b> - Firmware version of the box, if outdated then '(old)' is appended</li>
       <li><b>box_guestWlan</b> - Current state of the guest WLAN</li>
+      <li><b>box_guestWlanCount</b> - Number of devices connected to guest WLAN</li>
       <li><b>box_guestWlanRemain</b> - Remaining time until the guest WLAN is switched off</li>
       <li><b>box_ipExtern</b> - Internet IP of the Fritz!Box</li>
       <li><b>box_model</b> - Fritz!Box model</li>
@@ -5321,6 +5324,7 @@ sub FRITZBOX_fritztris($)
       <li><b>box_dect</b> - Aktueller Status des DECT-Basis</li>
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
+      <li><b>box_guestWlanCount</b> - Anzahl der Ger&auml;te die &uuml;ber das G&auml;ste-WLAN verbunden sind</li>
       <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
       <li><b>box_ipExtern</b> - Internet IP der Fritz!Box</li>
       <li><b>box_model</b> - Fritz!Box-Modell</li>
@@ -5361,7 +5365,9 @@ sub FRITZBOX_fritztris($)
       <br>
       <li><b>mac_</b><i>01_26_FD_12_01_DA</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes.
       <br>
-      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsst&auml;rke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
+      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsst&auml;rke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.
+      <br>
+      Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
       <br>
       <li><b>radio</b><i>01</i> - Name der Internetradiostation <i>01</i></li>
       <br>
