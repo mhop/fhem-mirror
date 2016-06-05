@@ -43,9 +43,9 @@ my %OBIS_codes = (	"Serial" 		=> qr{^0-0:96.1.255(?:.\d+)?\((.*?)\).*},
 					"Powerdrops"	=> qr{^0.0.96.7.\d(?:.\d+)?\((.*?)\).*},
 					"Time_param"	=> qr{^0.0.96.2.1(?:.\d+)?\((.*?)\).*},
 					"Time_current"	=> qr{^0.0.1.0.0(?:.\d+)?\((.*?)\).*},
-					"Channel_sum" 	=> qr{^(?:1.0.)?(\d+).1.7(?:.\d+)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
-					"Channels"		=> qr{^(?:\d.0.)?(\d+).7\.\d+(?:.\d+)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
-					"Channels2"		=> qr{^(?:0.1.)?(\d+).2\.\d+(?:.\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
+					"Channel_sum" 	=> qr{^(?:1.0.)?(\d+).1.7(?:.0|.255)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
+					"Channels"		=> qr{^(?:\d.0.)?(\d+).7\.\d+(?:.0|.255)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
+					"Channels2"		=> qr{^(?:0.1.)?(\d+).2\.\d+(?:.0|.255)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
 					"Counter"		=> qr{^(?:1.\d.)?(\d).(8)\.(\d)(?:.\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
 					"ManufID"		=> qr{^129-129:199\.130\.3(?:.\d+)?\((.*?)\).*},
 					"PublicKey"		=> qr{^129-129:199\.130\.5(?:.\d+)?\((.*?)\).*},
@@ -53,10 +53,14 @@ my %OBIS_codes = (	"Serial" 		=> qr{^0-0:96.1.255(?:.\d+)?\((.*?)\).*},
 
 my %SML_specialities = ("TIME"			=> [qr{0.0.96.2.1
 											   |0.0.1.0.0		}x, sub{return strftime("%d-%m-%Y %H:%M:%S", localtime(unpack("i", pack("I", hex(@_)))))}],
-						"HEX2"			=> [qr{1-0:0\.0\.[0-9]	}x, sub{my $a=shift;$a=~s/(..)/$1-/g;$a=~s/-$//;return $a;}],
+						"HEX2"			=> [qr{1-0:0\.0\.[0-9]	}x, sub{my $a=shift;
+																		if ( $a =~ /^[0-9a-fA-F]+$/ ) {$a=~s/(..)/$1-/g;$a=~s/-$//};
+																		return $a;}],
 						"HEX4"			=> [qr{1.0.96.5.5
 										 	  |0.0.96.240.\d+
-											  |129.129.199.130.5}x, sub{my $a=shift;$a=~s/(....)/$1-/g;$a=~s/-$//;return $a;}],
+											  |129.129.199.130.5}x, sub{my $a=shift;
+											  							if ( $a =~ /^[0-9a-fA-F]+$/ ) {$a=~s/(....)/$1-/g;$a=~s/-$//};
+											  							return $a;}],
 						"INFO"			=> [qr{1-0:0\.0\.[0-9]
 											  |129.129.199.130.3}x, ""],
 );
@@ -72,11 +76,11 @@ sub OBIS_Initialize($)
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
- #$hash->{SetFn} = "OBIS_Set";
+# $hash->{SetFn} = "OBIS_Set";
   
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both ".
   					  $readingFnAttributes;
 }
 
@@ -315,8 +319,8 @@ sub OBIS_Parse($$)
   		}
 	}
 	$hash->{helper}{BUFFER} .= $buf;
-	if (length($hash->{helper}{BUFFER}) >5000) { #longer than 3 messages, this is a traffic jam
-	  	$hash->{helper}{BUFFER}  =substr( $hash->{helper}{BUFFER} , -1500);
+	if (length($hash->{helper}{BUFFER}) >10000) { #longer than 3 messages, this is a traffic jam
+	  	$hash->{helper}{BUFFER}  =substr( $hash->{helper}{BUFFER} , -10000);
    }	
    my %dir=("<"=>"out",">"=>"in");
 	
@@ -334,16 +338,16 @@ sub OBIS_Parse($$)
 		    $rmsg = substr($buffer, 0, index($buffer,chr(13).chr(10)));
 			Log3 $hash,5,"OBIS ($name) - Msg-Parse: $rmsg";
 				my $channel=" ";
-				if($rmsg=~/\/.*|^((?:\d{1,3}-\d{1,3}:)?\d{1,3}.\d{1,3}.\d{1,3})(?:\*\d{1,3})?(?:\(.*?\))?\(.*?\)|!/) { # old regex: \/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!
+				if($rmsg=~/\/.*|^((?:\d{1,3}-\d{1,3}:)?(?:\d{1,3}|[CF]).\d{1,3}(?:.\d{1,3})?(?:\*\d{1,3})?)(?:\(.*?\))?\(.*?\)|!/) { # old regex: \/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!
 					if (length $1) {
 						$channel=$1;
 						$channel=~s/:/\./;
 						$channel=~s/-/\./;
 					}
 					if ($hash->{MeterType} eq "Unknown") {$hash->{MeterType}="Standard"}
-					if($rmsg=~/^([23456789]+)-.*/) {
-						Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Device, please report: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de";
-					}
+#					if($rmsg=~/^([23456789]+)-.*/) {
+#						Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Device, please report: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de";
+#					}
 			
 			# End of Message
 					if ($rmsg=~/!.*/) {
@@ -361,60 +365,84 @@ sub OBIS_Parse($$)
 				  			Log3 $hash,3,"OBIS ($name) - Unknown Message: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de"
 				  		} else {
 				  			my $found=0;
-							for my $code (keys %OBIS_codes) {
-								if ($rmsg =~ $OBIS_codes{$code}) {
-									if ($code=~/Channel_sum.*/) {
-										$rmsg =~ $OBIS_codes{$code};
-							    		my $L= $hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} // "sum_$OBIS_channels{$1}" //$channel;
-					  					readingsBulkUpdate($hash, $L,(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
-					  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
-									}
-									 
-									elsif ($code=~/Channels.*/) {
-										$rmsg =~ $OBIS_codes{$code};
-							    		my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
-					  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
-					  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
+				  			if (!($hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1})) {
+								for my $code (keys %OBIS_codes) {
+									if ($rmsg =~ $OBIS_codes{$code}) {
+										Log3 $hash,5,"Msg $rmsg is of type $code";
+										if ($code=~/Channel_sum.*/) {
+											$rmsg =~ $OBIS_codes{$code};
+								    		my $L= $hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} // "sum_$OBIS_channels{$1}" //$channel;
+						  					readingsBulkUpdate($hash, $L,(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+						  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
+										}
+										 
+										elsif ($code=~/Channels.*/) {
+											$rmsg =~ $OBIS_codes{$code};
+								    		my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
+						  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+						  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
+										}
+										
+										elsif ($code=~/Counter.*/) {
+											$rmsg =~ $OBIS_codes{$code};
+											my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
+											my $chan=$3+0 > 0 ? "_Ch$3" : "";
+											if($1==1) {
+												readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
+											} elsif ($1==2) {
+												readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
+											}
+						  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
+											
+										} else 
+											{
+												$rmsg =~ $OBIS_codes{$code};
+												my $data=$1;
+												if($rmsg=~$SML_specialities{"HEX4"}[0]) {
+		    				    					$data=$SML_specialities{"HEX4"}[1]->($data)
+		    									} elsif($rmsg=~$SML_specialities{"HEX2"}[0]) {
+	    											$data=$SML_specialities{"HEX2"}[1]->($data)
+		    									} elsif($rmsg=~$SML_specialities{"TIME"}[0]) {
+		    										$data=~/(\d+)/;
+		    										$data=$SML_specialities{"TIME"}[1]->($1)
+		    									}
+		    									my $chan=$code//$OBIS_channels{$channel} //$channel;
+		    									$chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
+		    									
+												readingsBulkUpdate($hash, $chan  ,$data); 
+										}
+										$found=1;
+										last;
 									}
 									
-									elsif ($code=~/Counter.*/) {
-										$rmsg =~ $OBIS_codes{$code};
-										my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
-										my $chan=$3+0 > 0 ? "_Ch$3" : "";
-										if($1==1) {
-											readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
-										} elsif ($1==2) {
-											readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
-										}
-					  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
-										
-									} else 
-										{
-											$rmsg =~ $OBIS_codes{$code};
-											my $data=$1;
-											if($rmsg=~$SML_specialities{"HEX4"}[0]) {
-	    				    					$data=$SML_specialities{"HEX4"}[1]->($data)
-	    									} elsif($rmsg=~$SML_specialities{"HEX2"}[0]) {
-    											$data=$SML_specialities{"HEX2"}[1]->($data)
-	    									} elsif($rmsg=~$SML_specialities{"TIME"}[0]) {
-	    										$data=~/(\d+)/;
-	    										$data=$SML_specialities{"TIME"}[1]->($1)
-	    									}
-	    									my $chan=$code//$OBIS_channels{$channel} //$channel;
-	    									$chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;;
-											readingsBulkUpdate($hash, $chan  ,$data); 
-									}
-									$found=1;
-									last;
-								}
-								
-				     		}
+					     		}
+				  			}
 				     		if ($found==0) {
-				     			$rmsg=~/^((?:\d{1,3}-\d{1,3}:)?\d{1,3}.\d{1,3}.\d{1,3})(?:\*\d{1,3})?(?:\(.*?\))?\((.*?)(?:\*.*)?\)/;
-    							my $chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;;
-				     			if (length $2) {
-									if (AttrVal($name,"ignoreUnknown","off") eq "off" || $chan ne $channel) {readingsBulkUpdate($hash, $chan  ,$2);}
-				     			} 
+				     			$rmsg=~/^((?:\d{1,3}-\d{1,3}:)?(?:\d{1,3}|[CF]).\d{1,3}(?:.\d{1,3})?(?:\*\d{1,3})?)(?:\((.*?)\))?\((.*?)\)/;
+    							my $chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
+    							my $chan1=$chan;
+    							my $chan2=$chan."_2";
+#    							Log 3,"Setting $chan";
+    							my $v1=$3;
+    							my $v2;
+    							if (AttrVal($name,"valueBracket","second") eq "first") {
+    								$v1=length $2 ? $2 : $3;
+    							}
+    							if (AttrVal($name,"valueBracket","second") eq "both") {
+    								$v2=$2;
+    								($v1,$v2)=($v2,$v1);
+    								if (!length $v1 and length $v2) {$v1=$v2;$v2=""}
+    								$chan1.="_1" if length $2;
+    							}
+    							if (AttrVal($name,"unitReadings","off") eq "off") {
+    								$v1=~s/(.*)\*.*/$1/;
+    								$v2=~s/(.*)\*.*/$1/;
+    							}
+    							$v1+=0 if (looks_like_number($v1));
+    							$v2+=0 if (looks_like_number($v2));
+    							if (AttrVal($name,"ignoreUnknown","off") eq "off" || $chan ne $channel) {
+									readingsBulkUpdate($hash, $chan1  ,$v1) if length $v1;
+									readingsBulkUpdate($hash, $chan2  ,$v2) if length $v2;}
 				     		}
 			   			}
 				  	}
@@ -707,6 +735,9 @@ sub OBIS_decodeTL($){
       Reduces CPU-load.  
    <code>unitReadings</code><br>
       Adds the units to the readings like w, wH, A etc.  
+   <code>valueBracket</code><br>
+      Sets, weather to use the value from the first or the second bracket, if applicable.
+      Standard is "second"
       </li>
       
   <br>
@@ -774,6 +805,9 @@ sub OBIS_decodeTL($){
       kann das zu einer spürbaren Senkung der Prozessorleistung führen.  
    <code>unitReadings</code><br>
       Hängt bei den Readings auch die Einheiten an, zB w, wH, A usw.  
+   <code>valueBracket</code><br>
+      Legt fest, ob der Wert aus dem ersten oder zweiten Klammernpaar genommen wird. 
+      Standard ist "second"
       </li>
   <br>
 </ul>
