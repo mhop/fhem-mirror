@@ -36,7 +36,9 @@ package main;
 use strict;
 use warnings;
 use Data::Dumper;
-use msgSchema;
+
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 sub msgConfig_Set($@);
 sub msgConfig_Get($@);
@@ -46,6 +48,8 @@ sub msgConfig_Undefine($$);
 ###################################
 sub msgConfig_Initialize($) {
     my ($hash) = @_;
+
+    require "$attr{global}{modpath}/FHEM/msgSchema.pm";
 
     $hash->{DefFn}   = "msgConfig_Define";
     $hash->{SetFn}   = "msgConfig_Set";
@@ -115,7 +119,6 @@ sub msgConfig_Initialize($) {
       msgTitleTextHigh
       msgTitleTextLow
       msgType
-
     );
     use warnings 'qw';
     $hash->{AttrList} = join( " ", @attrList ) . " " . $readingFnAttributes;
@@ -520,7 +523,7 @@ sub msgConfig_Get($@) {
             if ( defined( $cmdSchema->{$msgType} ) ) {
 
                 my $deviceTypes = $devicesReq;
-                $deviceTypes = join( ',', keys $cmdSchema->{$msgType} )
+                $deviceTypes = join( ',', keys %{ $cmdSchema->{$msgType} } )
                   if ( $deviceTypes eq "" || $devicesReq eq $name );
                 $deviceTypes = $UserDeviceTypes
                   if ( $UserDeviceTypes ne "" );
@@ -558,8 +561,11 @@ sub msgConfig_Get($@) {
                                 $return .= "      Default Values:\n";
 
                                 foreach my $key (
-                                    keys $cmdSchema->{$msgType}{$deviceType}
-                                    {defaultValues}{$prio} )
+                                    keys %{
+                                        $cmdSchema->{$msgType}{$deviceType}
+                                          {defaultValues}{$prio}
+                                    }
+                                  )
                                 {
                                     if ( $cmdSchema->{$msgType}{$deviceType}
                                         {defaultValues}{$prio}{$key} ne "" )
