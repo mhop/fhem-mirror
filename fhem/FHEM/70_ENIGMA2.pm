@@ -1154,9 +1154,25 @@ sub ENIGMA2_ReceiveCommand($$$) {
                 {
                     $state = "off";
 
-                    # Keep updating timer information during standby
-                    ENIGMA2_SendCommand( $hash, "timerlist" )
-                      if ( !AttrVal( $name, "lightMode", 0 ) );
+                    # Keep updating some information during standby
+                    if ( !AttrVal( $name, "lightMode", 0 ) ) {
+
+                        ENIGMA2_SendCommand( $hash, "timerlist" );
+
+                        # Read Boxinfo every 15 minutes only
+                        if (
+                            !defined( $hash->{helper}{lastFullUpdate} )
+                            || ( defined( $hash->{helper}{lastFullUpdate} )
+                                && $hash->{helper}{lastFullUpdate} +
+                                900 le time() )
+                          )
+                        {
+                            ENIGMA2_SendCommand( $hash, "about" );
+
+                            # Update state
+                            $hash->{helper}{lastFullUpdate} = time();
+                        }
+                    }
                 }
                 else {
                     $state = "on";
@@ -1665,8 +1681,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     foreach (
                         "eventstart",       "eventduration",
                         "eventremaining",   "eventcurrenttime",
-                        "eventdescription", "eventtitle",
-                        "eventname",
+                        "eventdescription", "eventdescriptionextended",
+                        "eventtitle",       "eventname",
                       )
                     {
                         $reading   = $_;
@@ -2154,27 +2170,28 @@ sub ENIGMA2_ReceiveCommand($$$) {
         || $state eq "undefined" )
     {
         foreach (
-            'servicename',            'providername',
-            'servicereference',       'videowidth',
-            'videoheight',            'servicevideosize',
-            'apid',                   'vpid',
-            'pcrpid',                 'pmtpid',
-            'txtpid',                 'tsid',
-            'onid',                   'sid',
-            'iswidescreen',           'mute',
-            'volume',                 'channel',
-            'currentTitle',           'nextTitle',
-            'currentMedia',           'eventcurrenttime',
-            'eventcurrenttime_hr',    'eventdescription',
-            'eventduration',          'eventduration_hr',
-            'eventremaining',         'eventremaining_hr',
-            'eventstart',             'eventstart_hr',
-            'eventtitle',             'eventname',
-            'eventcurrenttime_next',  'eventcurrenttime_next_hr',
-            'eventdescription_next',  'eventduration_next',
-            'eventduration_next_hr',  'eventremaining_next',
-            'eventremaining_next_hr', 'eventstart_next',
-            'eventstart_next_hr',     'eventtitle_next',
+            'servicename',                   'providername',
+            'servicereference',              'videowidth',
+            'videoheight',                   'servicevideosize',
+            'apid',                          'vpid',
+            'pcrpid',                        'pmtpid',
+            'txtpid',                        'tsid',
+            'onid',                          'sid',
+            'iswidescreen',                  'mute',
+            'volume',                        'channel',
+            'currentTitle',                  'nextTitle',
+            'currentMedia',                  'eventcurrenttime',
+            'eventcurrenttime_hr',           'eventdescription',
+            'eventdescriptionextended',      'eventduration',
+            'eventduration_hr',              'eventremaining',
+            'eventremaining_hr',             'eventstart',
+            'eventstart_hr',                 'eventtitle',
+            'eventname',                     'eventcurrenttime_next',
+            'eventcurrenttime_next_hr',      'eventdescription_next',
+            'eventdescriptionextended_next', 'eventduration_next',
+            'eventduration_next_hr',         'eventremaining_next',
+            'eventremaining_next_hr',        'eventstart_next',
+            'eventstart_next_hr',            'eventtitle_next',
             'eventname_next',
           )
         {
@@ -3078,6 +3095,12 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           </li>
           <li>
             <b>eventdescription</b> - Shows the description of running event
+          </li>
+          <li>
+            <b>eventdescriptionextended</b> - Shows the extended description of running event
+          </li>
+          <li>
+            <b>eventdescriptionextended_next</b> - Shows the extended description of next event
           </li>
           <li>
             <b>eventdescription_next</b> - Shows the description of next event
