@@ -1,6 +1,6 @@
 ##############################################
 # $Id$
-# 2016-04-12
+# 2016-05-21
 
 # by r.koenig at koeniglich.de
 #
@@ -254,7 +254,7 @@ TCM_Read($)
         if($orgmap{$org}) {
           $org = $orgmap{$org};
         } else {
-          Log3 undef, 2, "TCM unknown ORG mapping for $org";
+          Log3 $name, 2, "TCM $name unknown ORG mapping for $org";
         }
         if ($org ne "A5") {
           # extract db_0
@@ -268,16 +268,16 @@ TCM_Read($)
 
       } else {
         # Receive Message Telegram (RMT)
-        my $msg=TCM_Parse120($hash, $net, 1);
+        my $msg = TCM_Parse120($hash, $net, 1);
         if (($msg eq 'OK') && ($net =~ m/^8B(..)(........)(........)(..)/)){
           my ($org, $d1,$id,$status) = ($1, $2, $3, $4);
           my $packetType = 1;
           # Re-translate the ORG to RadioORG / TCM310 equivalent
-          my %orgmap = ("05"=>"F6", "06"=>"D5", "07"=>"A5", );
+          my %orgmap = ("05" => "F6", "06" => "D5", "07" => "A5");
           if($orgmap{$org}) {
             $org = $orgmap{$org};
           } else {
-            Log3 undef, 2, "TCM unknown ORG mapping for $org";
+            Log3 $name, 2, "TCM $name unknown ORG mapping for $org";
           }
           if ($org ne "A5") {
             # extract db_0
@@ -373,9 +373,9 @@ TCM_Read($)
         );
         my $rcTxt = $codes{$rc} if($codes{$rc});
         Log3 $name, $rc eq "00" ? 5 : 2, "TCM $name RESPONSE: $rcTxt";
-        $packetType = sprintf "%01X", $packetType;
+        #$packetType = sprintf "%01X", $packetType;
         #EnOcean:PacketType:ResposeCode:MessageData:OptionalData
-        Dispatch($hash, "EnOcean:$packetType:$1:$2:$odata", undef);        
+        #Dispatch($hash, "EnOcean:$packetType:$1:$2:$odata", undef);        
 
       } elsif($packetType == 3) {
         # packet type RADIO_SUB_TEL
@@ -383,7 +383,6 @@ TCM_Read($)
 
       } elsif($packetType == 4) {
         # packet type EVENT
-        #Log3 $name, 2, "TCM $name packet type EVENT not supported: $data";
         $mdata =~ m/^(..)(.*)$/;
         $packetType = sprintf "%01X", $packetType;
         #EnOcean:PacketType:eventCode:MessageData
@@ -395,7 +394,6 @@ TCM_Read($)
 
       } elsif($packetType == 6) {
         # packet type SMART_ACK_COMMAND
-        #Log3 $name, 2, "TCM $name packet type SMART_ACK_COMMAND not supported: $data";
         $mdata =~ m/^(..)(.*)$/;
         $packetType = sprintf "%01X", $packetType;
         #EnOcean:PacketType:smartAckCode:MessageData
@@ -434,7 +432,7 @@ TCM_Read($)
 
       } elsif($packetType == 10) {
         # packet type RADIO_ADVANCED
-        Log3 $name, 2, "TCM: $name packet type RADIO_ADVANCED not supported: $data";
+        Log3 $name, 2, "TCM $name packet type RADIO_ADVANCED not supported: $data";
 
       } else {
         Log3 $name, 2, "TCM $name unknown packet type $packetType: $data";
