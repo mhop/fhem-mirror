@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.0beta8";
+my $version = "1.0beta9";
 
 #-- these we may get on request
 my %gets = (
@@ -123,6 +123,7 @@ sub DoorPi_Define($$) {
   $init_done = 1;
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"state","Initialized");
+  readingsBulkUpdate($hash,"lockstate","Unknown");
   readingsBulkUpdate($hash,"door","Unknown");
   readingsEndUpdate($hash,1); 
      
@@ -302,17 +303,83 @@ sub DoorPi_Set ($@) {
       Log 1,"[DoorPi_Set] Error: attribute target$value does not exist";
       return;
     }
-  #-- door opening - either from FHEM, or just as message from DoorPi
+    
+  #-- Door opening - rather complicated
   }elsif( ($key eq "$door")||($key eq "door") ){
+    my $lockstate = ReadingsVal($name,"lockstate",undef);
+    
+    #-- from FHEM: door opening, forward to DoorPi
     if( $value eq "opened" ){
-      $v=DoorPi_Cmd($hash,"dooropen");
-      Log 1,"[DoorPi_Set] sent dooropen command to DoorPi";
-      if(AttrVal($name, "dooropencmd",undef)){
-        fhem(AttrVal($name, "dooropencmd",undef));
+      if( $lockstate eq "unlocked" ){
+        $v=DoorPi_Cmd($hash,"dooropen");
+        Log 1,"[DoorPi_Set] sent dooropen command to DoorPi";
+        if(AttrVal($name, "dooropencmd",undef)){
+          fhem(AttrVal($name, "dooropencmd",undef));
+        }
+        readingsSingleUpdate($hash,$door,"opened",1);
+      }else{
+        Log 1,"[DoorPi_Set] opening of door not possible, is locked";
       }
-      readingsSingleUpdate($hash,$door,"opened",1);
+      
+    #-- from DoorPi: door has to be unlocked if necessary
+    }elsif( $value eq "unlockandopen" ){
+       #-- need to unlock the door now
+       if( $lockstate eq "locked" ){
+         if( AttrVal($name, "doorunlockcmd",undef) ){
+           fhem(AttrVal($name, "doorunlockcmd",undef));
+           Log 1,"[DoorPi_Set] received unlockandopen command from DoorPi and executed FHEM doorunlock command";
+           readingsSingleUpdate($hash,"lockstate","unlocked",1);
+           readingsSingleUpdate($hash,$door,"unlocked",1);
+           $v=DoorPi_Cmd($hash,"doorunlocked");
+         }else{
+          Log 1,"[DoorPi_Set] received unlockandopen command from DoorPi, but no FHEM doorunlock command";
+         }
+       }elsif( $lockstate eq "unlocked" ){
+         Log 1,"[DoorPi_Set] received unlockandopen command from DoorPi, but is already unlocked";
+       }else{
+         #-- error message
+         Log 1,"[DoorPi_Set] received unlockandopen command from DoorPi, but uncertain lockstate";
+         return;
+       }
+       #-- Now open the door by DoorPi
+       $v=DoorPi_Cmd($hash,"dooropen");
+       
+    #-- from DoorPi: door has to be locked if necessary
+    }elsif( $value eq "softlock" ){
+       #-- need to lock the door now
+       if( $lockstate eq "unlocked" ){
+         if( AttrVal($name, "doorlockcmd",undef) ){
+           fhem(AttrVal($name, "doorlockcmd",undef));
+           Log 1,"[DoorPi_Set] received softlock command from DoorPi and executed FHEM doorlock command";
+           readingsSingleUpdate($hash,"lockstate","locked",1);
+           readingsSingleUpdate($hash,$door,"locked",1);
+           $v=DoorPi_Cmd($hash,"doorlocked");
+         }else{
+           Log 1,"[DoorPi_Set] received softlock command from DoorPi, but no FHEM doorlock command";
+         }
+       }elsif( $lockstate eq "locked" ){
+         Log 1,"[DoorPi_Set] received softlock command from DoorPi, but is already locked";
+       }else{
+         #-- error message
+         Log 1,"[DoorPi_Set] received softlock command from DoorPi, but uncertain lockstate";
+         return;
+       }
+    #-- from FHEM: unlocking the door
+    }elsif( $value eq "unlocked" ){
+      #-- careful here - 
+      #   a third parameter indicates that the door is already unlocked
+      #   because the command has been issued by the lock itself
+      if( (AttrVal($name, "doorunlockcmd",undef)) && (!$a[0]) ){
+        fhem(AttrVal($name, "doorunlockcmd",undef));
+        Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and executed FHEM doorunlock command";
+      }else{
+        Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and NOT executed FHEM doorunlock command";
+      }
+      readingsSingleUpdate($hash,"lockstate","unlocked",1);
+      readingsSingleUpdate($hash,$door,"unlocked",1);
+      $v=DoorPi_Cmd($hash,"doorunlocked");
+    #-- from FHEM: locking the door
     }elsif( $value eq "locked" ){
-       $v=DoorPi_Cmd($hash,"doorlocked");
        #-- careful here - 
        #   a third parameter indicates that the door is already unlocked
        if( (AttrVal($name, "doorlockcmd",undef)) && (!$a[0]) ){
@@ -321,19 +388,11 @@ sub DoorPi_Set ($@) {
       }else{
         Log 1,"[DoorPi_Set] sent doorlocked command to DoorPi and NOT executed extra FHEM doorlock command";
       }
+      readingsSingleUpdate($hash,"lockstate","locked",1);
       readingsSingleUpdate($hash,$door,"locked",1);
-    }elsif( $value eq "unlocked" ){
-      $v=DoorPi_Cmd($hash,"doorunlocked");
-      #-- careful here - 
-      #   a third parameter indicates that the door is already unlocked
-      if( (AttrVal($name, "doorunlockcmd",undef)) && (!$a[0]) ){
-        fhem(AttrVal($name, "doorunlockcmd",undef));
-        Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and executed extra FHEM doorunlock command";
-      }else{
-        Log 1,"[DoorPi_Set] sent doorunlocked command to DoorPi and NOT executed extra FHEM doorunlock command";
-      }
-      readingsSingleUpdate($hash,$door,"unlocked",1);
+      $v=DoorPi_Cmd($hash,"doorlocked");
     }
+    
   #-- snapshot
   }elsif( $key eq "$snapshot" ){
     $v=DoorPi_Cmd($hash,"snapshot");
