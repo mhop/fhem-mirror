@@ -93,11 +93,13 @@ my $ONKYO_cmds_hr = {
         'net-usb-artist-name-info'      => 'NAT',
         'net-usb-jacket-art'            => 'NJA',
         'net-usb-list-info'             => 'NLS',
+        'net-usb-list-info-xml'         => 'NLA',
         'net-usb-list-title-info'       => 'NLT',
         'net-usb-device-status'         => 'NDS',
         'net-usb-menu-status'           => 'NMS',
         'net-usb-play-status'           => 'NST',
         'net-usb-time-info'             => 'NTM',
+        'net-usb-time-seek'             => 'NTS',
         'net-usb-title-name'            => 'NTI',
         'net-usb-track-info'            => 'NTR',
         'net-usb'                       => 'NTC',
@@ -152,6 +154,7 @@ my $ONKYO_cmds_hr = {
         'listening-mode'        => 'LMZ',
         'mute'                  => 'ZMT',
         'net-usb-z'             => 'NTZ',
+        'net-usb-time-seek'     => 'NTS',
         'power'                 => 'ZPW',
         'preset'                => 'PRZ',
         're-eq-academy-filter'  => 'RAZ',
@@ -165,6 +168,7 @@ my $ONKYO_cmds_hr = {
         'internet-radio-preset' => 'NP3',
         'mute'                  => 'MT3',
         'net-usb-z'             => 'NT3',
+        'net-usb-time-seek'     => 'NTS',
         'power'                 => 'PW3',
         'preset'                => 'PR3',
         'input'                 => 'SL3',
@@ -176,6 +180,7 @@ my $ONKYO_cmds_hr = {
         'internet-radio-preset' => 'NP4',
         'mute'                  => 'MT4',
         'net-usb-z'             => 'NT4',
+        'net-usb-time-seek'     => 'NTS',
         'power'                 => 'PW4',
         'preset'                => 'PR4',
         'input'                 => 'SL4',
@@ -727,6 +732,10 @@ my $ONKYO_values_hr = {
         'NLS' => {
             'ti' => 'ti'
         },
+        'NLA' => {
+            'Lzzzzllxxxxyyyy' => 'Lzzzzllxxxxyyyy',
+            'Izzzzllxxxx----' => 'Izzzzllxxxx----'
+        },
         'NMD' => {
             'ext'   => 'EXT',
             'query' => 'QSTN',
@@ -806,6 +815,9 @@ my $ONKYO_values_hr = {
         'NTM' => {
             'mm-ss-mm-ss' => 'mm:ss/mm:ss',
             'query'       => 'QSTN'
+        },
+        'NTS' => {
+            'mm-ss' => 'mm:ss',
         },
         'NTR' => {
             'cccc-tttt' => 'cccc/tttt',
@@ -4423,6 +4435,19 @@ my $ONKYO_cmddb = {
                 }
             }
         },
+        'NTS',
+        {
+            'description' => 'NET/USB Time Seek',
+            'name'        => 'net-usb-time-seek',
+            'values'      => {
+                'mm:ss',
+                {
+                    'description' =>
+'mm: munites (00-99) ss: seconds (00-59). This command is only available when Time Seek is enable.',
+                    'name' => 'mm-ss'
+                },
+            }
+        },
         'NTR',
         {
             'description' => 'NET/USB Track Info',
@@ -4492,9 +4517,103 @@ my $ONKYO_cmddb = {
                 {
                     'description' =>
 'select the listed item {from Network Control Only}\n t -> Index Type {L : Line, I : Index}\nwhen t = L,\n  i -> Line number {0-9 : 1st to 10th Line [1 digit] }\nwhen t = I,\n  iiiii -> Index number {00001-99999 : 1st to 99999th Item [5 digits] }',
-                    'name' => 'ti'
+                    'name' => 'none'
                 }
-            }
+            },
+        },
+        'NLA',
+        {
+            'description' =>
+'NET/USB List Info (All item, need processing XML data, for Network Control Only)',
+            'name'   => 'net-usb-list-info-xml',
+            'values' => {
+                'tzzzzsurr<.....>',
+                {
+                    'description' => 't -> responce type \'X\' : XML
+zzzz -> sequence number (0000-FFFF)
+s -> status \'S\' : success, \'E\' : error
+u -> UI type \'0\' : List, \'1\' : Menu, \'2\' : Playback, \'3\' : Popup, \'4\' : Keyboard, ""5"" : Menu List
+rr -> reserved
+<.....> : XML data ( [CR] and [LF] are removed )
+ If s=\'S\',
+ <?xml version=""1.0"" encoding=""UFT-8""?>
+ <response status=""ok"">
+   <items offset=""xxxx"" totalitems=""yyyy"" >
+     <item icontype=""a"" title=""bbb…bbb"" />
+     …
+     <item icontype=""a"" title=""bbb…bbb"" />
+   </Items>
+ </response>
+ If s=\'E\',
+ <?xml version=""1.0"" encoding=""UFT-8""?>
+ <response status=""fail"">
+   <error code=""[error code]"" message=""[error message]"" />
+ </response>
+xxxx : index of 1st item (0000-FFFF : 1st to 65536th Item [4 HEX digits] )
+yyyy : number of items (0000-FFFF : 1 to 65536 Items [4 HEX digits] )
+a: Icon Type (for Spotify)
+ \'0\' : Playing, \'1\' : Pause, \'2\' : FF, \'3\' : FR
+ \'A\' : Artist, \'B\' : Album, \'F\' : Folder, \'G\' : Program, \'M\' : Music, \'N\' : Server, \'P\' : Playlist, \'S\' : Search, \'T\' : Track
+ \'a\' : Account, \'b\' : Playlist-C, \'c\' : Starred, \'d\' : Unstarred, \'e\' : What\'s New
+bbb...bbb : Title',
+                    'name' => 'None'
+                },
+                'tzzzzsurr<.....>',
+                {
+                    'description' => 't -> responce type \'X\' : XML
+zzzz -> sequence number (0000-FFFF)
+s -> status \'S\' : success, \'E\' : error
+u -> UI type \'0\' : List, \'1\' : Menu, \'2\' : Playback, \'3\' : Popup, \'4\' : Keyboard, ""5"" : Menu List
+rr -> reserved
+<.....> : XML data ( [CR] and [LF] are removed )
+ If s=\'S\',
+ <?xml version=""1.0"" encoding=""UFT-8""?>
+ <response status=""ok"">
+   <items offset=""xxxx"" totalitems=""yyyy"" >
+     <item iconid=""aa"" title=""bbb…bbb"" />
+     …
+     <item iconid=""aa"" title=""bbb…bbb"" />
+   </Items>
+ </response>
+ If s=\'E\',
+ <?xml version=""1.0"" encoding=""UFT-8""?>
+ <response status=""fail"">
+   <error code=""[error code]"" message=""[error message]"" />
+ </response>
+xxxx : index of 1st item (0000-FFFF : 1st to 65536th Item [4 HEX digits] )
+yyyy : number of items (0000-FFFF : 1 to 65536 Items [4 HEX digits] )
+aa : Icon ID
+ \'29\' : Folder, \'2A\' : Folder X, \'2B\' : Server, \'2C\' : Server X, \'2D\' : Title, \'2E\' : Title X,
+ \'2F\' : Program, \'31\' : USB, \'36\' : Play, \'37\' : MultiAccount,
+ for Spotify
+ \'38\' : Account, \'39\' : Album, \'3A\' : Playlist, \'3B\' : Playlist-C, \'3C\' : starred,
+ \'3D\' : What\'sNew, \'3E\' : Artist, \'3F\' : Track, \'40\' : unstarred, \'41\' : Play, \'43\' : Search, \'44\' : Folder
+ for AUPEO!
+ \'42\' : Program
+bbb...bbb : Title',
+                    'name' => 'None'
+                },
+                'Lzzzzllxxxxyyyy',
+                {
+                    'description' =>
+'specifiy to get the listed data (from Network Control Only)
+zzzz -> sequence number (0000-FFFF)
+ll -> number of layer (00-FF)
+xxxx -> index of start item (0000-FFFF : 1st to 65536th Item [4 HEX digits] )
+yyyy -> number of items (0000-FFFF : 1 to 65536 Items [4 HEX digits] )',
+                    'name' => 'none'
+                },
+                'Izzzzllxxxx----',
+                {
+                    'description' =>
+                      'select the listed item (from Network Control Only)
+zzzz -> sequence number (0000-FFFF)
+ll -> number of layer (00-FF)
+xxxx -> index number (0000-FFFF : 1st to 65536th Item [4 HEX digits] )
+---- -> not used',
+                    'name' => 'none'
+                },
+            },
         },
         'NLT',
         {
