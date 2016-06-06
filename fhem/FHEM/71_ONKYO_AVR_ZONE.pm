@@ -26,7 +26,6 @@
 ##############################################################################
 
 package main;
-
 use strict;
 use warnings;
 use Time::HiRes qw(usleep);
@@ -134,16 +133,27 @@ sub ONKYO_AVR_ZONE_Define($$$) {
 
     # set default settings on first define
     if ($init_done) {
-        fhem 'attr ' . $name . ' stateFormat stateAV';
-        fhem 'attr ' . $name
-          . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT';
-        fhem 'attr ' . $name . ' webCmd volume:muteT:input:previous:next';
-        fhem 'attr ' . $name
-          . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play';
+        fhem 'attr ' . $name . ' stateFormat stateAV'
+          if ( !AttrVal( $name, "stateFormat", 0 ) );
+        fhem 'attr '
+          . $name
+          . ' cmdIcon muteT:rc_MUTE previous:rc_PREVIOUS next:rc_NEXT play:rc_PLAY pause:rc_PAUSE stop:rc_STOP shuffleT:rc_SHUFFLE repeatT:rc_REPEAT'
+          if ( !AttrVal( $name, "cmdIcon", 0 ) );
+        fhem 'attr ' . $name . ' webCmd volume:muteT:input:previous:next'
+          if ( !AttrVal( $name, "webCmd", 0 ) );
+        fhem 'attr '
+          . $name
+          . ' devStateIcon on:rc_GREEN@green:off off:rc_STOP:on absent:rc_RED playing:rc_PLAY@green:pause paused:rc_PAUSE@green:play muted:rc_MUTE@green:muteT fast-rewind:rc_REW@green:play fast-forward:rc_FF@green:play interrupted:rc_PAUSE@yellow:play'
+          if ( !AttrVal( $name, "devStateIcon", 0 ) );
         fhem 'attr ' . $name . ' inputs ' . AttrVal( $IOname, "inputs", "" )
-          if ( AttrVal( $IOname, "inputs", "" ) ne "" );
+          if (!AttrVal( $name, "inputs", 0 )
+            && AttrVal( $IOname, "inputs", "" ) ne "" );
         fhem 'attr ' . $name . ' room ' . AttrVal( $IOname, "room", "" )
-          if ( AttrVal( $IOname, "room", "" ) ne "" );
+          if (!AttrVal( $name, "room", 0 )
+            && AttrVal( $IOname, "room", "" ) ne "" );
+        fhem 'attr ' . $name . ' group ' . AttrVal( $IOname, "group", "" )
+          if (!AttrVal( $name, "group", 0 )
+            && AttrVal( $IOname, "group", "" ) ne "" );
     }
 
     ONKYO_AVR_ZONE_SendCommand( $hash, "power",  "query" );
@@ -329,6 +339,8 @@ sub ONKYO_AVR_ZONE_Get($$$) {
     my ( $hash, $a, $h ) = @_;
     my $name             = $hash->{NAME};
     my $zone             = $hash->{ZONE};
+    my $IOhash           = $hash->{IODev};
+    my $IOname           = $IOhash->{NAME};
     my $state            = ReadingsVal( $name, "power", "off" );
     my $presence         = ReadingsVal( $name, "presence", "absent" );
     my $commands         = ONKYOdb::ONKYO_GetRemotecontrolCommand($zone);
@@ -339,8 +351,25 @@ sub ONKYO_AVR_ZONE_Get($$$) {
 
     return "Argument is missing" if ( int(@$a) < 1 );
 
+    # readings
+    return $hash->{READINGS}{ @$a[1] }{VAL}
+      if ( defined( $hash->{READINGS}{ @$a[1] } ) );
+
+    return "Device is offline and cannot be controlled at that stage."
+      if ( $presence eq "absent" );
+
+    # statusRequest
+    if ( lc( @$a[1] ) eq "statusrequest" ) {
+        Log3 $name, 3, "ONKYO_AVR_ZONE get $name " . @$a[1];
+
+        ONKYO_AVR_ZONE_SendCommand( $hash, "power",  "query" );
+        ONKYO_AVR_ZONE_SendCommand( $hash, "input",  "query" );
+        ONKYO_AVR_ZONE_SendCommand( $hash, "mute",   "query" );
+        ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "query" );
+    }
+
     # remoteControl
-    if ( lc( @$a[1] ) eq "remotecontrol" ) {
+    elsif ( lc( @$a[1] ) eq "remotecontrol" ) {
 
         # Output help for commands
         if ( !defined( @$a[2] ) || @$a[2] eq "help" || @$a[2] eq "?" ) {
@@ -424,26 +453,19 @@ sub ONKYO_AVR_ZONE_Get($$$) {
                     "ONKYO_AVR_ZONE get $name "
                   . @$a[1] . " "
                   . @$a[2] . " "
-                  . @$a[3];
+                  . @$a[3]
+                  if ( !@$a[4] || @$a[4] ne "quiet" );
 
-                if ( $presence ne "absent" ) {
-                    ONKYO_AVR_ZONE_SendCommand( $hash, @$a[2], @$a[3] );
-                    $return = "Sent command: " . @$a[2] . " " . @$a[3];
-                }
-                else {
-                    $return =
-                      "Device needs to be reachable to be controlled remotely.";
-                }
+                ONKYO_AVR_ZONE_SendCommand( $hash, @$a[2], @$a[3] );
+                $return = "Sent command: " . @$a[2] . " " . @$a[3]
+                  if ( !@$a[4] || @$a[4] ne "quiet" );
             }
         }
     }
 
-    # readings
-    elsif ( defined( $hash->{READINGS}{ @$a[1] } ) ) {
-        $return = $hash->{READINGS}{ @$a[1] }{VAL};
-    }
     else {
-        $return = "Unknown argument " . @$a[1] . ", choose one of";
+        $return =
+          "Unknown argument " . @$a[1] . ", choose one of statusRequest:noArg";
 
         # remoteControl
         $return .= " remoteControl:";
@@ -452,7 +474,7 @@ sub ONKYO_AVR_ZONE_Get($$$) {
         }
     }
 
-    return $return;
+    return $return if ($return);
 }
 
 ###################################
@@ -673,7 +695,14 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     $usage .= " $repeat_txt";
     $usage .= $implicit_txt if ( $implicit_txt ne "" );
 
+    if ( ReadingsVal( $name, "currentTrackPosition", "--:--" ) ne "--:--" ) {
+        $usage .= " currentTrackPosition";
+    }
+
     my $cmd = '';
+
+    return "Device is offline and cannot be controlled at that stage."
+      if ( $presence eq "absent" && lc( @$a[1] ) ne "on" );
 
     readingsBeginUpdate($hash);
 
@@ -685,17 +714,13 @@ sub ONKYO_AVR_ZONE_Set($$$) {
             $return = "Syntax: CHANNELNAME [USERNAME PASSWORD]";
         }
         else {
-            if ( $presence eq "absent" ) {
-                $return =
-                  "Device is offline and cannot be controlled at that stage.";
-            }
-            elsif ( $state eq "off" ) {
-                $return = fhem "set $name on";
+            if ( $state eq "off" ) {
+                $return = fhem "get $name remoteControl power on quiet";
                 $return .= fhem "sleep 5;set $name channel " . @$a[2];
             }
             elsif ( $hash->{INPUT} ne "2B" ) {
-                ONKYO_AVR_ZONE_SendCommand( $hash, "input", "2B" );
-                $return = fhem "sleep 1;set $name channel " . @$a[2];
+                $return = fhem "get $name remoteControl input 2B quiet";
+                $return .= fhem "sleep 1;set $name channel " . @$a[2];
             }
             elsif (
                 ReadingsVal( $name, "channel", "" ) ne @$a[2]
@@ -748,20 +773,57 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         }
     }
 
-    # implicit commands through available readings
-    elsif ( grep $_ eq lc( @$a[1] ), @implicit_cmds ) {
+    # channelDown
+    elsif ( lc( @$a[1] ) eq "channeldown" ) {
+        Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
+
+        if ( $state eq "off" ) {
+            $return = fhem "get $name remoteControl power on quiet";
+            $return .= fhem "sleep 5;set $name channelDown";
+        }
+        elsif ( $hash->{INPUT} ne "2B" ) {
+            $return = fhem "get $name remoteControl input 2B quiet";
+            $return .= fhem "sleep 1;set $name channelDown";
+        }
+        else {
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "chdn" );
+        }
+    }
+
+    # channelUp
+    elsif ( lc( @$a[1] ) eq "channelup" ) {
+        Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
+
+        if ( $state eq "off" ) {
+            $return = fhem "get $name remoteControl power on quiet";
+            $return .= fhem "sleep 5;set $name channelUp";
+        }
+        elsif ( $hash->{INPUT} ne "2B" ) {
+            $return = fhem "get $name remoteControl input 2B quiet";
+            $return .= fhem "sleep 1;set $name channelUp";
+        }
+        else {
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "chup" );
+        }
+    }
+
+    # currentTrackPosition
+    elsif ( lc( @$a[1] ) eq "currenttrackposition" ) {
         Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
 
         if ( !defined( @$a[2] ) ) {
-            $return = "No argument given, choose one of ?";
+            $return = "No argument given";
         }
         else {
-            if ( $presence eq "absent" ) {
+
+            if ( @$a[2] !~ /^[0-9][0-9]:[0-5][0-9]$/ ) {
                 $return =
-                  "Device is offline and cannot be controlled at that stage.";
+                  "Time needs to have format mm:ss and between 00:00 and 99:59";
             }
             else {
-                $return = ONKYO_AVR_ZONE_SendCommand( $hash, @$a[1], @$a[2] );
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-time-seek",
+                    @$a[2] );
             }
         }
     }
@@ -775,20 +837,24 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         }
         else {
             if ( $state eq "off" ) {
-                $return =
-"Device power is turned off, this function is unavailable at that stage.";
+                $return = fhem "get $name remoteControl power on quiet";
+                $return .= fhem "sleep 5;set $name preset " . @$a[2];
+            }
+            elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
+                $return = fhem "get $name remoteControl input 24 quiet";
+                $return .= fhem "sleep 1;set $name preset " . @$a[2];
             }
             elsif ( lc( @$a[2] ) eq "up" ) {
                 $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, lc( @$a[1] ), "UP" );
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, lc( @$a[1] ), "UP" );
             }
             elsif ( lc( @$a[2] ) eq "down" ) {
                 $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, lc( @$a[1] ), "DOWN" );
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, lc( @$a[1] ), "DOWN" );
             }
             elsif ( @$a[2] =~ /^\d*$/ ) {
                 $return = ONKYO_AVR_ZONE_SendCommand(
-                    $hash,
+                    $IOhash,
                     lc( @$a[1] ),
                     ONKYO_AVR_dec2hex( @$a[2] )
                 );
@@ -806,7 +872,7 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 
                     if ( $presetName eq @$a[2] ) {
                         $return =
-                          ONKYO_AVR_ZONE_SendCommand( $hash, lc( @$a[1] ),
+                          ONKYO_AVR_ZONE_SendCommand( $IOhash, lc( @$a[1] ),
                             uc($id) );
 
                         last;
@@ -818,33 +884,35 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 
     # presetDown
     elsif ( lc( @$a[1] ) eq "presetdown" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+        Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
 
-        if ( $presence eq "absent" ) {
-            $return = "Device needs to be ON to change input.";
+        if ( $state eq "off" ) {
+            $return = fhem "get $name remoteControl power on quiet";
+            $return .= fhem "sleep 5;set $name presetDown";
         }
-        elsif ( $state eq "off" ) {
-            $return = fhem "set $name on";
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "preset", "down" );
+        elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
+            $return = fhem "get $name remoteControl input 24 quiet";
+            $return .= fhem "sleep 1;set $name presetDown";
         }
         else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "preset", "down" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "preset", "down" );
         }
     }
 
     # presetUp
     elsif ( lc( @$a[1] ) eq "presetup" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+        Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
 
-        if ( $presence eq "absent" ) {
-            $return = "Device needs to be ON to change input.";
+        if ( $state eq "off" ) {
+            $return = fhem "get $name remoteControl power on quiet";
+            $return .= fhem "sleep 5;set $name presetUp";
         }
-        elsif ( $state eq "off" ) {
-            $return = fhem "set $name on";
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "preset", "up" );
+        elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
+            $return = fhem "get $name remoteControl input 24 quiet";
+            $return .= fhem "sleep 1;set $name presetUp";
         }
         else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "preset", "up" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "preset", "up" );
         }
     }
 
@@ -861,21 +929,22 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 "Device power is turned off, this function is unavailable at that stage.";
             }
             elsif ( lc( @$a[2] ) eq "up" ) {
-                my $setVal;
+                my $setVal = "";
                 $setVal = "B" if ( $2 eq "bass" );
                 $setVal = "T" if ( $2 eq "treble" );
                 $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, lc($1), $setVal . "UP" );
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, lc($1), $setVal . "UP" );
             }
             elsif ( lc( @$a[2] ) eq "down" ) {
-                my $setVal;
+                my $setVal = "";
                 $setVal = "B" if ( $2 eq "bass" );
                 $setVal = "T" if ( $2 eq "treble" );
                 $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, lc($1), $setVal . "DOWN" );
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, lc($1),
+                    $setVal . "DOWN" );
             }
             elsif ( @$a[2] =~ /^-*\d+$/ ) {
-                my $setVal;
+                my $setVal = "";
                 $setVal = "B" if ( $2 eq "bass" );
                 $setVal = "T" if ( $2 eq "treble" );
                 $setVal .= "+" if ( @$a[2] > 0 );
@@ -887,45 +956,8 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                 $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 ne "00" );
 
                 $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, lc($1),
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, lc($1),
                     $setVal . $setVal2 );
-            }
-        }
-    }
-
-    # balance
-    elsif ( lc( @$a[1] ) eq "balance" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
-
-        if ( !defined( @$a[2] ) ) {
-            $return = "No argument given";
-        }
-        else {
-            if ( $state eq "off" ) {
-                $return =
-"Device power is turned off, this function is unavailable at that stage.";
-            }
-            elsif ( lc( @$a[2] ) eq "up" ) {
-                $return = ONKYO_AVR_ZONE_SendCommand( $hash, lc($1), "UP" );
-            }
-            elsif ( lc( @$a[2] ) eq "down" ) {
-                $return = ONKYO_AVR_ZONE_SendCommand( $hash, lc($1), "DOWN" );
-            }
-            elsif ( @$a[2] =~ /^-*\d+$/ ) {
-                my $setVal;
-                $setVal = "+" if ( @$a[2] > 0 );
-                $setVal = "-" if ( @$a[2] < 0 );
-
-                my $setVal2 = @$a[2];
-                $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 < 0 );
-                $setVal2 = ONKYO_AVR_dec2hex($setVal2);
-                $setVal2 = substr( $setVal2, 1 ) if ( $setVal2 ne "00" );
-
-                $return = ONKYO_AVR_ZONE_SendCommand(
-                    $hash,
-                    lc( @$a[1] ),
-                    $setVal . $setVal2
-                );
             }
         }
     }
@@ -965,41 +997,37 @@ sub ONKYO_AVR_ZONE_Set($$$) {
             else {
                 $return =
                   "Device is offline and cannot be controlled at that stage.";
+                $return .=
+"\nYou may enable network-standby to allow a permanent connection to the device by the following command:\nget $name remoteControl network-standby on"
+                  if ( ReadingsVal( $name, "network-standby", "off" ) ne "on" );
             }
         }
         else {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "on" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "power", "on" );
 
             # don't wait for receiver to confirm power on
             #
 
-            readingsBeginUpdate($hash);
+            readingsBeginUpdate($IOhash);
 
             # power
-            readingsBulkUpdate( $hash, "power", "on" )
+            readingsBulkUpdate( $IOhash, "power", "on" )
               if ( ReadingsVal( $name, "power", "-" ) ne "on" );
 
             # stateAV
-            my $stateAV = ONKYO_AVR_ZONE_GetStateAV($hash);
-            readingsBulkUpdate( $hash, "stateAV", $stateAV )
+            my $stateAV = ONKYO_AVR_ZONE_GetStateAV($IOhash);
+            readingsBulkUpdate( $IOhash, "stateAV", $stateAV )
               if ( ReadingsVal( $name, "stateAV", "-" ) ne $stateAV );
 
-            readingsEndUpdate( $hash, 1 );
+            readingsEndUpdate( $IOhash, 1 );
         }
     }
 
     # off
     elsif ( lc( @$a[1] ) eq "off" ) {
         Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
-
-        if ( $presence eq "absent" ) {
-            $return =
-              "Device is offline and cannot be controlled at that stage.";
-        }
-        else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "power", "off" );
-        }
+        $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "power", "off" );
     }
 
     # remoteControl
@@ -1008,67 +1036,60 @@ sub ONKYO_AVR_ZONE_Set($$$) {
             $return = "No argument given, choose one of minutes off";
         }
         else {
-            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+            Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
 
-            if ( $presence eq "absent" ) {
+            if (   lc( @$a[2] ) eq "play"
+                || lc( @$a[2] ) eq "pause"
+                || lc( @$a[2] ) eq "repeat"
+                || lc( @$a[2] ) eq "stop"
+                || lc( @$a[2] ) eq "top"
+                || lc( @$a[2] ) eq "down"
+                || lc( @$a[2] ) eq "up"
+                || lc( @$a[2] ) eq "right"
+                || lc( @$a[2] ) eq "delete"
+                || lc( @$a[2] ) eq "display"
+                || lc( @$a[2] ) eq "ff"
+                || lc( @$a[2] ) eq "left"
+                || lc( @$a[2] ) eq "mode"
+                || lc( @$a[2] ) eq "return"
+                || lc( @$a[2] ) eq "rew"
+                || lc( @$a[2] ) eq "select"
+                || lc( @$a[2] ) eq "setup"
+                || lc( @$a[2] ) eq "0"
+                || lc( @$a[2] ) eq "1"
+                || lc( @$a[2] ) eq "2"
+                || lc( @$a[2] ) eq "3"
+                || lc( @$a[2] ) eq "4"
+                || lc( @$a[2] ) eq "5"
+                || lc( @$a[2] ) eq "6"
+                || lc( @$a[2] ) eq "7"
+                || lc( @$a[2] ) eq "8"
+                || lc( @$a[2] ) eq "9" )
+            {
                 $return =
-                  "Device is offline and cannot be controlled at that stage.";
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb",
+                    lc( @$a[2] ) );
+            }
+            elsif ( lc( @$a[2] ) eq "prev" ) {
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "trdown" );
+            }
+            elsif ( lc( @$a[2] ) eq "next" ) {
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "trup" );
+            }
+            elsif ( lc( @$a[2] ) eq "shuffle" ) {
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "random" );
+            }
+            elsif ( lc( @$a[2] ) eq "menu" ) {
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "men" );
             }
             else {
-                if (   lc( @$a[2] ) eq "play"
-                    || lc( @$a[2] ) eq "pause"
-                    || lc( @$a[2] ) eq "repeat"
-                    || lc( @$a[2] ) eq "stop"
-                    || lc( @$a[2] ) eq "top"
-                    || lc( @$a[2] ) eq "down"
-                    || lc( @$a[2] ) eq "up"
-                    || lc( @$a[2] ) eq "right"
-                    || lc( @$a[2] ) eq "delete"
-                    || lc( @$a[2] ) eq "display"
-                    || lc( @$a[2] ) eq "ff"
-                    || lc( @$a[2] ) eq "left"
-                    || lc( @$a[2] ) eq "mode"
-                    || lc( @$a[2] ) eq "return"
-                    || lc( @$a[2] ) eq "rew"
-                    || lc( @$a[2] ) eq "select"
-                    || lc( @$a[2] ) eq "setup"
-                    || lc( @$a[2] ) eq "0"
-                    || lc( @$a[2] ) eq "1"
-                    || lc( @$a[2] ) eq "2"
-                    || lc( @$a[2] ) eq "3"
-                    || lc( @$a[2] ) eq "4"
-                    || lc( @$a[2] ) eq "5"
-                    || lc( @$a[2] ) eq "6"
-                    || lc( @$a[2] ) eq "7"
-                    || lc( @$a[2] ) eq "8"
-                    || lc( @$a[2] ) eq "9" )
-                {
-                    $return =
-                      ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z",
-                        lc( @$a[2] ) );
-                }
-                elsif ( lc( @$a[2] ) eq "prev" ) {
-                    $return =
-                      ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z",
-                        "trdown" );
-                }
-                elsif ( lc( @$a[2] ) eq "next" ) {
-                    $return =
-                      ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "trup" );
-                }
-                elsif ( lc( @$a[2] ) eq "shuffle" ) {
-                    $return =
-                      ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z",
-                        "random" );
-                }
-                elsif ( lc( @$a[2] ) eq "menu" ) {
-                    $return =
-                      ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "men" );
-                }
-                else {
-                    $return = "Unsupported remoteControl command: " . @$a[2];
-                }
+                $return = "Unsupported remoteControl command: " . @$a[2];
             }
+
         }
     }
 
@@ -1081,7 +1102,7 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 "Device power is turned off, this function is unavailable at that stage.";
         }
         else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "play" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "play" );
         }
     }
 
@@ -1094,7 +1115,7 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 "Device power is turned off, this function is unavailable at that stage.";
         }
         else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "pause" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "pause" );
         }
     }
 
@@ -1107,7 +1128,7 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 "Device power is turned off, this function is unavailable at that stage.";
         }
         else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "stop" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "stop" );
         }
     }
 
@@ -1121,7 +1142,7 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         }
         else {
             $return =
-              ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "random" );
+              ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "random" );
         }
     }
 
@@ -1135,7 +1156,7 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         }
         else {
             $return =
-              ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "repeat" );
+              ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "repeat" );
         }
     }
 
@@ -1149,7 +1170,7 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         }
         else {
             $return =
-              ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "trdown" );
+              ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "trdown" );
         }
     }
 
@@ -1162,7 +1183,31 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 "Device power is turned off, this function is unavailable at that stage.";
         }
         else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "net-usb-z", "trup" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "net-usb", "trup" );
+        }
+    }
+
+    # sleep
+    elsif ( lc( @$a[1] ) eq "sleep" ) {
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given, choose one of minutes off";
+        }
+        else {
+            Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
+
+            my $_ = @$a[2];
+            if ( $_ eq "off" ) {
+                $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "sleep", "off" );
+            }
+            elsif ( m/^\d+$/ && $_ > 0 && $_ <= 90 ) {
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "sleep",
+                    ONKYO_AVR_dec2hex($_) );
+            }
+            else {
+                $return =
+"Argument does not seem to be a valid integer between 0 and 90";
+            }
         }
     }
 
@@ -1177,13 +1222,14 @@ sub ONKYO_AVR_ZONE_Set($$$) {
 
         if ( $state eq "on" ) {
             if ( !defined( @$a[2] ) || @$a[2] eq "toggle" ) {
-                $return = ONKYO_AVR_ZONE_SendCommand( $hash, "mute", "toggle" );
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "mute", "toggle" );
             }
             elsif ( lc( @$a[2] ) eq "off" ) {
-                $return = ONKYO_AVR_ZONE_SendCommand( $hash, "mute", "off" );
+                $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "mute", "off" );
             }
             elsif ( lc( @$a[2] ) eq "on" ) {
-                $return = ONKYO_AVR_ZONE_SendCommand( $hash, "mute", "on" );
+                $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "mute", "on" );
             }
             else {
                 $return = "Argument does not seem to be one of on off toogle";
@@ -1206,8 +1252,8 @@ sub ONKYO_AVR_ZONE_Set($$$) {
                 my $_ = @$a[2];
                 if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
                     $return =
-                      ONKYO_AVR_ZONE_SendCommand( $hash, "volume",
-                        ONKYO_AVR_ZONE_dec2hex($_) );
+                      ONKYO_AVR_ZONE_SendCommand( $IOhash, "volume",
+                        ONKYO_AVR_dec2hex($_) );
                 }
                 else {
                     $return =
@@ -1227,11 +1273,11 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         if ( $state eq "on" ) {
             if ( lc( @$a[1] ) eq "volumeup" ) {
                 $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "level-up" );
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "volume", "level-up" );
             }
             else {
                 $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "level-down" );
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "volume", "level-down" );
             }
         }
         else {
@@ -1247,15 +1293,14 @@ sub ONKYO_AVR_ZONE_Set($$$) {
         else {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
 
-            if ( $presence eq "absent" ) {
-                $return = "Device needs to be ON to change input.";
-            }
-            elsif ( $state eq "off" ) {
+            if ( $state eq "off" ) {
                 $return = fhem "set $name on";
-                $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", @$a[2] );
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "input", @$a[2] );
             }
             else {
-                $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", @$a[2] );
+                $return =
+                  ONKYO_AVR_ZONE_SendCommand( $IOhash, "input", @$a[2] );
             }
         }
     }
@@ -1264,15 +1309,12 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     elsif ( lc( @$a[1] ) eq "inputup" ) {
         Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
 
-        if ( $presence eq "absent" ) {
-            $return = "Device needs to be ON to change input.";
-        }
-        elsif ( $state eq "off" ) {
+        if ( $state eq "off" ) {
             $return = fhem "set $name on";
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "up" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "input", "up" );
         }
         else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "up" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "input", "up" );
         }
     }
 
@@ -1280,15 +1322,24 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     elsif ( lc( @$a[1] ) eq "inputdown" ) {
         Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
 
-        if ( $presence eq "absent" ) {
-            $return = "Device needs to be ON to change input.";
-        }
-        elsif ( $state eq "off" ) {
+        if ( $state eq "off" ) {
             $return = fhem "set $name on";
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "down" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "input", "down" );
         }
         else {
-            $return = ONKYO_AVR_ZONE_SendCommand( $hash, "input", "down" );
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, "input", "down" );
+        }
+    }
+
+    # implicit commands through available readings
+    elsif ( grep $_ eq lc( @$a[1] ), @implicit_cmds ) {
+        Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
+
+        if ( !defined( @$a[2] ) ) {
+            $return = "No argument given";
+        }
+        else {
+            $return = ONKYO_AVR_ZONE_SendCommand( $IOhash, @$a[1], @$a[2] );
         }
     }
 
@@ -1384,7 +1435,7 @@ sub ONKYO_AVR_ZONE_SendCommand($$$) {
 }
 
 ###################################
-sub ONKYO_AVR_ZONE_dec2hex($) {
+sub ONKYO_AVR_dec2hex($) {
     my ($dec) = @_;
     my $hex = uc( sprintf( "%x", $dec ) );
 
