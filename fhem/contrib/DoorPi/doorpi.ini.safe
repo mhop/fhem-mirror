@@ -54,27 +54,6 @@ guests = dashboard
 [DTMF]
 "#" = out:door,1,0,3
 
-####################### Events #######################
-[EVENT_OnStartup]
-10 = sleep:1
-20 = os_execute:/home/doorpi/FHEMHelper call init
-
-[EVENT_BeforeSipPhoneMakeCall]
-10 = os_execute:/home/doorpi/FHEMHelper call startup
-20 = take_snapshot
-
-[EVENT_OnCallStateDisconnect]
-10 = os_execute:/home/doorpi/FHEMHelper call end
-
-[EVENT_OnCallStateDismissed]
-10 = os_execute:/home/doorpi/FHEMHelper call dismissed
-
-[EVENT_OnCallStateReject]
-10 = os_execute:/home/doorpi/FHEMHelper call rejected
-
-[EVENT_OnTimeMinuteEvery5]
-10=statuswatchdog:/tmp/doorpi.watchdog
-
 ####################### SIP phone #######################
 [SIP-Phone]
 identity = DoorPi
@@ -82,9 +61,9 @@ local_port = 5060
 firewallpolicy = PolicyNoFirewall
 #
 sipphonetyp = linphone
-sipserver_password = xxxxxx
-sipserver_realm = cccc
-sipserver_server = ccccc
+sipserver_password = xxxx
+sipserver_realm = fritz.box
+sipserver_server = xxxx
 sipserver_username = 620
 stun_server =
 #
@@ -107,6 +86,28 @@ video_codecs = VP8
 video_device = StaticImage: Static picture
 video_display_enabled = False
 video_size = vga
+
+####################### Events #######################
+[EVENT_OnStartup]
+10 = sleep:1
+20 = os_execute:/home/doorpi/FHEMHelper.sh call init
+
+[EVENT_BeforeSipPhoneMakeCall]
+10 = os_execute:/home/doorpi/FHEMHelper.sh call startup
+20 = take_snapshot
+#30 = mailto:haus271828@henning-weingarten.de,DoorPi,DoorPi initiating call
+
+[EVENT_OnCallStateDisconnect]
+10 = os_execute:/home/doorpi/FHEMHelper.sh call end
+
+[EVENT_OnCallStateDismissed]
+10 = os_execute:/home/doorpi/FHEMHelper.sh call dismissed
+
+[EVENT_OnCallStateReject]
+10 = os_execute:/home/doorpi/FHEMHelper.sh call rejected
+
+[EVENT_OnTimeMinuteEvery5]
+10=statuswatchdog:/tmp/doorpi.watchdog
 
 ####################### Keyboards ##############################
 [keyboards]
@@ -139,7 +140,7 @@ button2         = sleep:0
 #-- communicate to FHEM that a snapshot has been taken
 [EVENT_OnKeyPressed_webservice.snapshot]
 10 = take_snapshot
-20 = os_execute:/home/doorpi/FHEMHelper call snapshot
+20 = os_execute:/home/doorpi/FHEMHelper.sh call snapshot
 
 #-- start video stream
 [EVENT_OnKeyPressed_webservice.streamon]
@@ -151,18 +152,18 @@ button2         = sleep:0
 
 #-- obtain the target call number from FHEM
 [EVENT_OnKeyPressed_webservice.gettarget]
-10 = os_execute:/home/doorpi/FHEMHelper gettarget
+10 = os_execute:/home/doorpi/FHEMHelper.sh gettarget
 
 #-- purge all files older than current PID file
 [EVENT_OnKeyPressed_webservice.purge]
-10 = os_execute:/home/doorpi/FHEMHelper purge
+10 = os_execute:/home/doorpi/FHEMHelper.sh purge
 
 #-- clear all files
 [EVENT_OnKeyPressed_webservice.clear]
-10 = os_execute:/home/doorpi/FHEMHelper clear
+10 = os_execute:/home/doorpi/FHEMHelper.sh clear
 
 [EVENT_OnKeyPressed_webservice.button1]
-10 = os_execute:/home/doorpi/FHEMHelper sabotage
+10 = os_execute:/home/doorpi/FHEMHelper.sh sabotage
 
 [EVENT_OnKeyPressed_webservice.button2]
 10 = file_call_value:/home/doorpi/calltarget
@@ -189,30 +190,29 @@ pull_up_down = PUD_UP
 #-- DoorOpen pin from Arduino
 [EVENT_OnKeyPressed_onboardpins.1]
 10 = out:dashlight,1
-20 = os_execute:/home/doorpi/FHEMHelper dooropen
+20 = os_execute:/home/doorpi/FHEMHelper.sh doorunlockandopen
 30 = os_execute:aplay -D plughw:1,0 /home/doorpi/sounds/067_willkommen.wav
-40 = out:door,1,0,3
-50 = out:dashlight,0
+40 = out:dashlight,0
 
 #-- WrongID pin from Arduino
 [EVENT_OnKeyPressed_onboardpins.4]
 10 = out:dashlight,1
-20 = os_execute:/home/doorpi/FHEMHelper wrongid
+20 = os_execute:/home/doorpi/FHEMHelper.sh wrongid
 30 = take_snapshot
 40 = out:dashlight,0
 
 #-- LockState pin from Arduino - FHEM will transform softlock into hardlock
 [EVENT_OnKeyPressed_onboardpins.5]
-10 = os_execute:/home/doorpi/FHEMHelper softlock
+10 = os_execute:/home/doorpi/FHEMHelper.sh softlock
 
 #-- Movement detection 
 [EVENT_OnKeyPressed_onboardpins.6]
 10 = out:dashlight,1,0,60
-20 = os_execute:/home/doorpi/FHEMHelper movement
+20 = os_execute:/home/doorpi/FHEMHelper.sh movement
 
 #-- Sabotage detection  
 [EVENT_OnKeyPressed_onboardpins.7]
-10 = os_execute:/home/doorpi/FHEMHelper sabotage
+10 = os_execute:/home/doorpi/FHEMHelper.sh sabotage
 
 
 
