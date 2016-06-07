@@ -1952,18 +1952,16 @@ sub ONKYO_AVR_Set($$$) {
 
     # channel
     if ( lc( @$a[1] ) eq "channel" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
-
         if ( !defined( @$a[2] ) ) {
             $return = "Syntax: CHANNELNAME [USERNAME PASSWORD]";
         }
         else {
             if ( $state eq "off" ) {
-                $return = fhem "get $name remoteControl power on quiet";
+                $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
                 $return .= fhem "sleep 5;set $name channel " . @$a[2];
             }
             elsif ( $hash->{INPUT} ne "2B" ) {
-                $return = fhem "get $name remoteControl input 2B quiet";
+                $return = ONKYO_AVR_SendCommand( $hash, "input", "2B" );
                 $return .= fhem "sleep 1;set $name channel " . @$a[2];
             }
             elsif (
@@ -2006,46 +2004,46 @@ sub ONKYO_AVR_Set($$$) {
                     }
                 }
 
+                $return = "Unknown network service name " . @$a[2]
+                  if ( $servicename eq "" );
+
+                Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+
                 $return =
                   ONKYO_AVR_SendCommand( $hash, "net-service", $servicename )
                   if ( $servicename ne "" );
-
-                $return = "Unknown network service name " . @$a[2]
-                  if ( $servicename eq "" );
             }
         }
     }
 
     # channelDown
     elsif ( lc( @$a[1] ) eq "channeldown" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
-
         if ( $state eq "off" ) {
-            $return = fhem "get $name remoteControl power on quiet";
+            $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
             $return .= fhem "sleep 5;set $name channelDown";
         }
         elsif ( $hash->{INPUT} ne "2B" ) {
-            $return = fhem "get $name remoteControl input 2B quiet";
+            $return = ONKYO_AVR_SendCommand( $hash, "input", "2B" );
             $return .= fhem "sleep 1;set $name channelDown";
         }
         else {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
             $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "chdn" );
         }
     }
 
     # channelUp
     elsif ( lc( @$a[1] ) eq "channelup" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
-
         if ( $state eq "off" ) {
-            $return = fhem "get $name remoteControl power on quiet";
+            $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
             $return .= fhem "sleep 5;set $name channelUp";
         }
         elsif ( $hash->{INPUT} ne "2B" ) {
-            $return = fhem "get $name remoteControl input 2B quiet";
+            $return = ONKYO_AVR_SendCommand( $hash, "input", "2B" );
             $return .= fhem "sleep 1;set $name channelUp";
         }
         else {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
             $return = ONKYO_AVR_SendCommand( $hash, "net-usb", "chup" );
         }
     }
@@ -2072,27 +2070,28 @@ sub ONKYO_AVR_Set($$$) {
 
     # preset
     elsif ( lc( @$a[1] ) eq "preset" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
-
         if ( !defined( @$a[2] ) ) {
             $return = "No argument given";
         }
         else {
             if ( $state eq "off" ) {
-                $return = fhem "get $name remoteControl power on quiet quiet";
+                $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
                 $return .= fhem "sleep 5;set $name preset " . @$a[2];
             }
             elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
-                $return = fhem "get $name remoteControl input 24 quiet";
+                $return = ONKYO_AVR_SendCommand( $hash, "input", "24" );
                 $return .= fhem "sleep 1;set $name preset " . @$a[2];
             }
             elsif ( lc( @$a[2] ) eq "up" ) {
+                Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
                 $return = ONKYO_AVR_SendCommand( $hash, lc( @$a[1] ), "UP" );
             }
             elsif ( lc( @$a[2] ) eq "down" ) {
+                Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
                 $return = ONKYO_AVR_SendCommand( $hash, lc( @$a[1] ), "DOWN" );
             }
             elsif ( @$a[2] =~ /^\d*$/ ) {
+                Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
                 $return = ONKYO_AVR_SendCommand(
                     $hash,
                     lc( @$a[1] ),
@@ -2111,6 +2110,9 @@ sub ONKYO_AVR_Set($$$) {
                     $presetName =~ s/\s/_/g;
 
                     if ( $presetName eq @$a[2] ) {
+                        Log3 $name, 3,
+                          "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
+
                         $return =
                           ONKYO_AVR_SendCommand( $hash, lc( @$a[1] ), uc($id) );
 
@@ -2123,34 +2125,32 @@ sub ONKYO_AVR_Set($$$) {
 
     # presetDown
     elsif ( lc( @$a[1] ) eq "presetdown" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
-
         if ( $state eq "off" ) {
-            $return = fhem "get $name remoteControl power on quiet";
+            $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
             $return .= fhem "sleep 5;set $name presetDown";
         }
         elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
-            $return = fhem "get $name remoteControl input 24 quiet";
+            $return = ONKYO_AVR_SendCommand( $hash, "input", "24" );
             $return .= fhem "sleep 1;set $name presetDown";
         }
         else {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
             $return = ONKYO_AVR_SendCommand( $hash, "preset", "down" );
         }
     }
 
     # presetUp
     elsif ( lc( @$a[1] ) eq "presetup" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
-
         if ( $state eq "off" ) {
-            $return = fhem "get $name remoteControl power on quiet";
+            $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
             $return .= fhem "sleep 5;set $name presetUp";
         }
         elsif ( $hash->{INPUT} ne "24" && $hash->{INPUT} ne "25" ) {
-            $return = fhem "get $name remoteControl input 24 quiet";
+            $return = ONKYO_AVR_SendCommand( $hash, "input", "24" );
             $return .= fhem "sleep 1;set $name presetUp";
         }
         else {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
             $return = ONKYO_AVR_SendCommand( $hash, "preset", "up" );
         }
     }
@@ -2241,8 +2241,6 @@ sub ONKYO_AVR_Set($$$) {
 
     # toggle
     elsif ( lc( @$a[1] ) eq "toggle" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
-
         if ( $state eq "off" ) {
             $return = fhem "set $name on";
         }
@@ -2558,13 +2556,12 @@ sub ONKYO_AVR_Set($$$) {
             $return = "No input given";
         }
         else {
-            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
-
             if ( $state eq "off" ) {
-                $return = fhem "set $name on";
-                $return = ONKYO_AVR_SendCommand( $hash, "input", @$a[2] );
+                $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
+                $return .= fhem "sleep 2;set $name input " . @$a[2];
             }
             else {
+                Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
                 $return = ONKYO_AVR_SendCommand( $hash, "input", @$a[2] );
             }
         }
@@ -2572,26 +2569,24 @@ sub ONKYO_AVR_Set($$$) {
 
     # inputUp
     elsif ( lc( @$a[1] ) eq "inputup" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
-
         if ( $state eq "off" ) {
-            $return = fhem "set $name on";
-            $return = ONKYO_AVR_SendCommand( $hash, "input", "up" );
+            $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
+            $return .= fhem "sleep 2;set $name inputUp";
         }
         else {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
             $return = ONKYO_AVR_SendCommand( $hash, "input", "up" );
         }
     }
 
     # inputDown
     elsif ( lc( @$a[1] ) eq "inputdown" ) {
-        Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
-
         if ( $state eq "off" ) {
-            $return = fhem "set $name on";
-            $return = ONKYO_AVR_SendCommand( $hash, "input", "down" );
+            $return = ONKYO_AVR_SendCommand( $hash, "power", "on" );
+            $return .= fhem "sleep 2;set $name inputDown";
         }
         else {
+            Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
             $return = ONKYO_AVR_SendCommand( $hash, "input", "down" );
         }
     }
