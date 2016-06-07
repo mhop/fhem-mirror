@@ -166,7 +166,7 @@ sub GHoma_Define($$$) {				#
 	#my $name = $a[0];
   # my $addr = $a[2];
 	#$hash->{Id} = pack('C*', ( hex(substr($pport,0,2)), hex(substr($pport,2,2)), hex(substr($pport,4,2)) ) );
-	$hash->{Id} = $pport;
+	$hash->{Id} = lc $pport;
     return;
   }
   
