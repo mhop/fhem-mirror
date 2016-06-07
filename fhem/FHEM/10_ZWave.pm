@@ -5252,12 +5252,12 @@ s2Hex($)
   <li>ZW_REQUEST_NODE_NEIGHBOR_UPDATE [started|done|failed]</li>
 
   <br><b>returnRouteAdd</b>
-  <li>ZW_ASSIGN_SUC_RETURN_ROUTE [started|alreadyActive|transmitOk|
+  <li>ZW_ASSIGN_RETURN_ROUTE [started|alreadyActive|transmitOk|
                                   transmitNoAck|transmitFail|transmitNotIdle|
                                   transmitNoRoute]</li>
 
   <br><b>returnRouteDel</b>
-  <li>ZW_ASSIGN_SUC_RETURN_ROUTE [started|alreadyActive|transmitOk|
+  <li>ZW_DELETE_RETURN_ROUTE [started|alreadyActive|transmitOk|
                                   transmitNoAck|transmitFail|transmitNotIdle|
                                   transmitNoRoute]</li>
 
