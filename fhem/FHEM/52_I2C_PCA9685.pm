@@ -481,6 +481,7 @@ sub I2C_PCA9685_i2cwrite($$$) {												# Schreibbefehl an Hardware absetzen
 				I2C_PCA9685_i2cread($hash, 6 + $n * $reg, $reg - ($reg * ($n+1) - 64)) if (($n+1) * $reg) > 64;
 			}
 		}
+		return undef;
 	} else {
 		if (AttrVal($hash->{NAME}, "dummy", 0) == 1) {
 			I2C_PCA9685_UpdReadings($hash, $reg, $data);		# Zeile zum testen (Werte werden direkt zu I2CRec umgeleitet)
