@@ -431,7 +431,7 @@ CUL_Get($@)
 
   }
 
-  readingsSingleUpdate($hash, $a[1], $msg, 0);
+  readingsSingleUpdate($hash, $a[1], $msg, 1);
 
   return "$a[0] $a[1] => $msg";
 }
