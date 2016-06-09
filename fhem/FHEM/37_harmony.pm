@@ -41,6 +41,8 @@ harmony_Initialize($)
   $hash->{AttrList} = "disable:1 nossl:1 $readingFnAttributes";
 
   $hash->{FW_detailFn}  = "harmony_detailFn";
+
+  $hash->{FW_showStatus} = 1;
 }
 
 #####################################
