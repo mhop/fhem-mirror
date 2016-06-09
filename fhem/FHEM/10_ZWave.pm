@@ -986,13 +986,13 @@ ZWave_ccCapability($$)
 {
   my ($l,$h) = @_;
   my @names = ("WarmWhite","ColdWhite","Red","Green",
-               "Blue","Amber","Cyan","Purpple","Indexed");
+               "Blue","Amber","Cyan","Purple","Indexed");
   my $x = hex($l)+256*hex($h);
-  my @ret;
+  my @ret = "ccCapability:";
   for(my $i=0; $i<int(@names); $i++) {
     push @ret,$names[$i] if($x & (1<<$i));
   }
-  return join(",",@ret);
+  return join(" ",@ret);
 }
 
 sub
