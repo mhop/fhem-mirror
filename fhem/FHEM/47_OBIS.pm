@@ -341,8 +341,10 @@ sub OBIS_Parse($$)
 				if($rmsg=~/\/.*|^((?:\d{1,3}-\d{1,3}:)?(?:\d{1,3}|[CF]).\d{1,3}(?:.\d{1,3})?(?:\*\d{1,3})?)(?:\(.*?\))?\(.*?\)|!/) { # old regex: \/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!
 					if (length $1) {
 						$channel=$1;
+#						$channel=~s/[\:\-*]/\./;
 						$channel=~s/:/\./;
 						$channel=~s/-/\./;
+						$channel=~s/\*/\./;
 					}
 					if ($hash->{MeterType} eq "Unknown") {$hash->{MeterType}="Standard"}
 #					if($rmsg=~/^([23456789]+)-.*/) {
@@ -372,28 +374,33 @@ sub OBIS_Parse($$)
 										if ($code=~/Channel_sum.*/) {
 											$rmsg =~ $OBIS_codes{$code};
 								    		my $L= $hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} // "sum_$OBIS_channels{$1}" //$channel;
-						  					readingsBulkUpdate($hash, $L,(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
-						  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
+    										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
+							  					readingsBulkUpdate($hash, $L,(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
+    										}
 										}
 										 
 										elsif ($code=~/Channels.*/) {
 											$rmsg =~ $OBIS_codes{$code};
 								    		my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
-						  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
-						  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
+    										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
+							  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
+    										}
 										}
 										
 										elsif ($code=~/Counter.*/) {
 											$rmsg =~ $OBIS_codes{$code};
 											my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
 											my $chan=$3+0 > 0 ? "_Ch$3" : "";
-											if($1==1) {
-												readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
-											} elsif ($1==2) {
-												readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
-											}
-						  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
-											
+    										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
+												if($1==1) {
+													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 
+												} elsif ($1==2) {
+													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $5+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $6")); 				
+												}
+							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
+    										}											
 										} else 
 											{
 												$rmsg =~ $OBIS_codes{$code};
@@ -409,7 +416,8 @@ sub OBIS_Parse($$)
 		    									my $chan=$code//$OBIS_channels{$channel} //$channel;
 		    									$chan=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
 		    									
-												readingsBulkUpdate($hash, $chan  ,$data); 
+												if (AttrVal($name,"ignoreUnknown","off") eq "off" || $chan ne $channel) {
+												readingsBulkUpdate($hash, $chan  ,$data); }
 										}
 										$found=1;
 										last;
@@ -440,6 +448,7 @@ sub OBIS_Parse($$)
     							}
     							$v1+=0 if (looks_like_number($v1));
     							$v2+=0 if (looks_like_number($v2));
+								
     							if (AttrVal($name,"ignoreUnknown","off") eq "off" || $chan ne $channel) {
 									readingsBulkUpdate($hash, $chan1  ,$v1) if length $v1;
 									readingsBulkUpdate($hash, $chan2  ,$v2) if length $v2;}
