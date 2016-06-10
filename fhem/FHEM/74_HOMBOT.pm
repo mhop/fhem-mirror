@@ -35,7 +35,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use Blocking;
 
-my $version = "0.2.3";
+my $version = "0.2.4";
 
 
 
@@ -67,12 +67,14 @@ sub HOMBOT_Define($$) {
     my ( $hash, $def ) = @_;
     
     my @a = split( "[ \t][ \t]*", $def );
+    
 
     return "too few parameters: define <name> HOMBOT <HOST>" if( @a != 3 );
     return "please check if ssh installed" unless( -X "/usr/bin/ssh" );
-    return "please check if /opt/fhem/.ssh/known_hosts exist" unless( -R "/opt/fhem/.ssh/known_hosts" );
-    return "please check if sshpass installed" unless( -X "/usr/bin/sshpass" );
+    return "please check if $attr{global}{modpath}/.ssh/known_hosts or /root/.ssh/known_hosts exist" unless( -R "$attr{global}{modpath}/.ssh/known_hosts" or -R "/root/.ssh/known_hosts" );
+    return "please check if sshpass installed" unless( -X "/usr/bin/sshpass" or -X "/usr/local/bin/sshpass" );
     
+
 
     my $name    	= $a[0];
     my $host    	= $a[2];
@@ -85,6 +87,8 @@ sub HOMBOT_Define($$) {
     $hash->{VERSION} 	= $version;
     $hash->{helper}{requestErrorCounter} = 0;
     $hash->{helper}{setErrorCounter} = 0;
+    $hash->{helper}{sshpass} = "/usr/bin/sshpass";
+    $hash->{helper}{sshpass} = "/usr/local/bin/sshpass" unless( -X "/usr/bin/sshpass");
 
 
     Log3 $name, 3, "HOMBOT ($name) - defined with host $hash->{HOST} on port $hash->{PORT} and interval $hash->{INTERVAL} (sec)";
@@ -844,19 +848,20 @@ sub HOMBOT_Check_Bot_Alive($) {
     my $hash = $defs{$name};
     my $host = $hash->{HOST};
     my $sshalive;
+    my $sshpass = $hash->{helper}{sshpass};
     
     Log3 $name, 3, "HOMBOT ($name) - Start SSH Connection for check Hombot alive";
     
     
-    $sshalive = qx(/usr/bin/sshpass -p 'most9981' /usr/bin/ssh root\@$host 'uname' );
+    $sshalive = qx($sshpass -p 'most9981' /usr/bin/ssh root\@$host 'uname' );
     
     if( $sshalive ) {
         
-        my $lgSrvPID = ((split (/\s+/,qx(/usr/bin/sshpass -p 'most9981' /usr/bin/ssh root\@$host 'ps | grep -v grep | grep /usr/bin/lg.srv' )))[1]);
+        my $lgSrvPID = ((split (/\s+/,qx($sshpass -p 'most9981' /usr/bin/ssh root\@$host 'ps | grep -v grep | grep /usr/bin/lg.srv' )))[1]);
             
         if( not defined( $lgSrvPID ) ) {
 
-            qx(/usr/bin/sshpass -p 'most9981' /usr/bin/ssh root\@$host '/usr/bin/lg.srv &' );
+            qx($sshpass -p 'most9981' /usr/bin/ssh root\@$host '/usr/bin/lg.srv &' );
                 
             return "$name|$callingtype|restarted";
 
