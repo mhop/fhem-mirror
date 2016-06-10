@@ -598,12 +598,12 @@ LightScene_Set($@)
   if( $cmd eq "rename" && !defined( $scene ) ) { return "Usage: set $name rename <scene_alt> <scene_neu>" };
 
   if( $cmd eq "remove" ) {
-    return "no such scene $scene" if( !defined $hash->{SCENES}{$scene} );
+    return "no such scene: $scene" if( !defined $hash->{SCENES}{$scene} );
     delete( $hash->{SCENES}{$scene} );
     return undef;
 
   } elsif( $cmd eq "rename" ) {
-    return "no such scene $scene" if( !defined $hash->{SCENES}{$scene} );
+    return "no such scene: $scene" if( !defined $hash->{SCENES}{$scene} );
     my ($new) = @a;
     if( !( $new ) ) { return "Usage: set $name rename <scene_alt> <scene_neu>" };
 
@@ -611,11 +611,14 @@ LightScene_Set($@)
     delete( $hash->{SCENES}{$scene} );
     return undef;
 
+  } elsif( $cmd eq "scene" ) {
+    return "no such scene: $scene" if( !defined $hash->{SCENES}{$scene} );
+
   } elsif( $cmd eq "set" || $cmd eq "setcmd" ) {
     my ($d, @args) = @a;
 
     if( !defined( $scene ) || !defined( $d ) ) { return "Usage: set $name set <scene_name> <device> [<cmd>]" };
-    return "no stored scene >$scene<" if( !defined($hash->{SCENES}{$scene} ) );
+    return "no such scene: $scene" if( !defined $hash->{SCENES}{$scene} );
     #return "device >$d< is not a member of scene >$scene<" if( !defined($hash->{CONTENT}{$d} ) );
 
     if( !@args ) {
