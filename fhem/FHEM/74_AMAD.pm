@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.2.1";
-my $flowsetversion = "2.2.0";
+my $modulversion = "2.2.2";
+my $flowsetversion = "2.2.1";
 
 
 
@@ -82,7 +82,7 @@ sub AMAD_Define($$) {
     
     my @a = split( "[ \t][ \t]*", $def );
 
-    return "too few parameters: define <name> AMAD <HOST-IP> <ACCESSPOINT-SSID> has the ACCESPOINT-SSID a space you must space replace @@" if( ( @a < 3 || @a > 4 ) && @a != 2 );
+    return "too few parameters: define <name> AMAD <HOST-IP> <ACCESSPOINT-SSID> has the ACCESPOINT-SSID a space you must space replace @@" if( $a[0] ne "AMADCommBridge" and @a != 4 );
 
     my $name    	= $a[0];
     my $host    	= $a[2] if( $a[2] );
@@ -141,10 +141,11 @@ sub AMAD_Undef($$) {
     if( $hash->{BRIDGE} ) {
 	delete $modules{AMAD}{defptr}{BRIDGE} if(defined($modules{AMAD}{defptr}{BRIDGE}));
 	TcpServer_Close( $hash );
+    } 
+    
+    elsif( $hash->{HOST} ) {
 
-    } else {
-
-        delete $modules{AMAD}{defptr}{$hash->{HOST}} if( defined($modules{AMAD}{defptr}{$hash->{HOST}}) );
+        delete $modules{AMAD}{defptr}{$hash->{HOST}};
 	RemoveInternalTimer( $hash );
     
 	foreach my $d(sort keys %{$modules{AMAD}{defptr}}) {
@@ -526,6 +527,7 @@ sub AMAD_Set($$@) {
 	$list .= "openCall ";
 	$list .= "currentFlowsetUpdate:noArg ";
 	$list .= "installFlowSource ";
+	$list .= "doNotDisturb:never,always,alarmClockOnly,onlyImportant ";
 
 	if( lc $cmd eq 'screenmsg'
 	    || lc $cmd eq 'ttsmsg'
@@ -555,6 +557,7 @@ sub AMAD_Set($$@) {
 	    || lc $cmd eq 'currentflowsetupdate'
 	    || lc $cmd eq 'installflowsource'
 	    || lc $cmd eq 'opencall'
+	    || lc $cmd eq 'donotdisturb'
 	    || lc $cmd eq 'vibrate') {
 
 	    Log3 $name, 5, "AMAD ($name) - set $name $cmd ".join(" ", @val);
@@ -780,6 +783,15 @@ sub AMAD_SelectSetCmd($$@) {
 
 	readingsSingleUpdate( $hash, "airplanemode", "on", 1 ) if( $systemcmd eq "airplanemodeON" );
 	readingsSingleUpdate( $hash, "deviceState", "offline", 1 ) if( $systemcmd eq "airplanemodeON" || $systemcmd eq "shutdown" );
+    
+	return AMAD_HTTP_POST( $hash,$url );
+    }
+    
+    elsif( lc $cmd eq 'donotdisturb' ) {
+    
+	my $disturbmod = join( " ", @data );
+
+	my $url = "http://" . $host . ":" . $port . "/fhem-amad/setCommands/donotdisturb?disturbmod=$disturbmod";
     
 	return AMAD_HTTP_POST( $hash,$url );
     }
@@ -1361,6 +1373,7 @@ sub AMAD_decrypt($) {
     <li>currentMusicTrack - currently playing song title of mediaplayer</li>
     <li>daydream - on/off, daydream currently active</li>
     <li>deviceState - state of Android devices. unknown, online, offline.</li>
+    <li>doNotDisturb - state of do not Disturb Mode</li>
     <li>dockingState - undocked/docked, Android device in docking station</li>
     <li>flow_SetCommands - active/inactive, state of SetCommands flow</li>
     <li>flow_informations - active/inactive, state of Informations flow</li>
@@ -1401,6 +1414,7 @@ sub AMAD_decrypt($) {
     <li>currentFlowsetUpdate - start flowset update on Android device</li>
     <li>googleMusic - play/stop/next/back , controlling the google play music media player</li>
     <li>installFlowSource - install a Automagic flow on device, <u>XML file must be stored in /tmp/ with extension xml</u>. <b>Example:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i></li>
+    <li>doNotDisturb - sets the do not Disturb Mode, always Disturb, never Disturb, alarmClockOnly alarm Clock only, onlyImportant only important Disturbs</li>
     <li>nextAlarmTime - sets the alarm time. Only valid for the next 24 hours.</li>
     <li>notifySndFile - plays a media-file <b>which by default needs to be stored in the folder "/storage/emulated/0/Notifications/" of the Android device. You may use the attribute setNotifySndFilePath for defining a different folder.</b></li>
     <li>screenBrightness - 0-255, set screen brighness</li>
@@ -1515,6 +1529,7 @@ sub AMAD_decrypt($) {
     <li>currentMusicTrack - aktuell abgespielter Musiktitel des verwendeten Mediaplayers</li>
     <li>daydream - on/off, Daydream gestartet oder nicht</li>
     <li>deviceState - Status des Androidger&auml;tes. unknown, online, offline.</li>
+    <li>doNotDisturb - aktueller Status des nicht stören Modus</li>
     <li>dockingState - undocked/docked Status ob sich das Ger&auml;t in einer Dockinstation befindet.</li>
     <li>flow_SetCommands - active/inactive, Status des SetCommands Flow</li>
     <li>flow_informations - active/inactive, Status des Informations Flow</li>
@@ -1553,6 +1568,7 @@ sub AMAD_decrypt($) {
     <li>bluetooth - on/off, aktiviert/deaktiviert Bluetooth</li>
     <li>clearNotificationBar - All,Automagic, l&ouml;scht alle Meldungen oder nur die Automagic Meldungen in der Statusleiste</li>
     <li>currentFlowsetUpdate - f&uuml;rt ein Flowsetupdate auf dem Device durch</li>
+    <li>doNotDisturb - schaltet den nicht st&ouml;ren Modus, always immer Stören, never niemals stören, alarmClockOnly nur Wecker darf st&ouml;ren, onlyImportant nur wichtige St&ouml;rungen</li>
     <li>googleMusic - play, stop, next, back  ,steuert den Google Play Musik Mediaplayer</li>
     <li>installFlowSource - installiert einen Flow auf dem Device, <u>das XML File muss unter /tmp/ liegen und die Endung xml haben</u>. <b>Bsp:</b> <i>set TabletWohnzimmer installFlowSource WlanUebwerwachen.xml</i></li>
     <li>nextAlarmTime - setzt die Alarmzeit. gilt aber nur innerhalb der n&auml;chsten 24Std.</li>
