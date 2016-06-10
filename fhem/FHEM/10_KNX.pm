@@ -14,6 +14,7 @@
 # ABU 20160422 Added dpt9.021 - mA
 # ABU 20160529 Changed Doku
 # ABU 20160605 Changed Doku, changed autocreate-naming, fixed dpt10-sending-now
+# ABU 20160608 changed sprintf for int-dpt from %d to %.0f
 
 package main;
 
@@ -1282,7 +1283,7 @@ decodeByDpt ($$$) {
 		$state -= $offset if (defined ($offset));
 		$state *= $factor if (defined ($factor));
 
-		$state = sprintf ("%d", $state);
+		$state = sprintf ("%.0f", $state);
 	}
 	#1-Octet unsigned value
 	elsif ($code eq "dpt5")
@@ -1294,7 +1295,7 @@ decodeByDpt ($$$) {
 		$state -= $offset if (defined ($offset));
 		$state *= $factor if (defined ($factor));
 
-		$state = sprintf ("%d", $state);
+		$state = sprintf ("%.0f", $state);
 	}
 	#1-Octet signed value
 	elsif ($code eq "dpt6")
@@ -1307,7 +1308,7 @@ decodeByDpt ($$$) {
 		$state -= $offset if (defined ($offset));
 		$state *= $factor if (defined ($factor));
 
-		$state = sprintf ("%d", $state);		
+		$state = sprintf ("%.0f", $state);		
 	}
 	#2-Octet unsigned Value
 	elsif ($code eq "dpt7")
@@ -1319,7 +1320,7 @@ decodeByDpt ($$$) {
 		$state -= $offset if (defined ($offset));
 		$state *= $factor if (defined ($factor));
 
-		$state = sprintf ("%d", $state);		
+		$state = sprintf ("%.0f", $state);		
 	}
 	#2-Octet signed Value 
 	elsif ($code eq "dpt8")
@@ -1332,7 +1333,7 @@ decodeByDpt ($$$) {
 		$state -= $offset if (defined ($offset));
 		$state *= $factor if (defined ($factor));
 		
-		$state = sprintf ("%d", $state);		
+		$state = sprintf ("%.0f", $state);		
 	}
 	#2-Octet Float value
 	elsif ($code eq "dpt9")
@@ -1384,7 +1385,7 @@ decodeByDpt ($$$) {
 		$state -= $offset if (defined ($offset));
 		$state *= $factor if (defined ($factor));
 
-		$state = sprintf ("%d", $state);		
+		$state = sprintf ("%.0f", $state);		
 	}	
 	#4-Octet Signed Value
 	elsif ($code eq "dpt13")
@@ -1397,7 +1398,7 @@ decodeByDpt ($$$) {
 		$state -= $offset if (defined ($offset));
 		$state *= $factor if (defined ($factor));
 
-		$state = sprintf ("%d", $state);		
+		$state = sprintf ("%.0f", $state);		
 	}  
 	#4-Octet single precision float
 	elsif ($code eq "dpt14")
