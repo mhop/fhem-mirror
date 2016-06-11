@@ -151,12 +151,11 @@ ECMDDevice_Changed($$$)
 
 ###################################
 sub
-ECMDDevice_PostProc($$$)
+ECMDDevice_PostProc($$$%)
 {
-  my ($hash, $postproc, $value)= @_;
+  my ($hash, $postproc, $value, %specials)= @_;
 
   if($postproc) {
-        my %specials= ECMDDevice_GetCachedSpecials($hash);
         my $command= ECMDDevice_ReplaceSpecials($postproc, %specials);
 	$_= $value;
 	Log3 $hash, 5, "Postprocessing \"" . escapeLogLine($value) . "\" with perl command $command.";
@@ -237,12 +236,13 @@ ECMDDevice_Get($@)
                 }
         }
         $ecmd= ECMDDevice_ReplaceSpecials($ecmd, %specials);
+        $expect= ECMDDevice_ReplaceSpecials($expect, %specials);
 
         my $r = ECMDDevice_AnalyzeCommand($hash, $ecmd);
 
         my $v= IOWrite($hash, $r, $expect);
 
-	$v= ECMDDevice_PostProc($hash, $postproc, $v);
+	$v= ECMDDevice_PostProc($hash, $postproc, $v, %specials);
 
         return ECMDDevice_Changed($hash, $cmdname, $v);
 }
@@ -284,12 +284,13 @@ ECMDDevice_Set($@)
                 }
         }
         $ecmd= ECMDDevice_ReplaceSpecials($ecmd, %specials);
+        $expect= ECMDDevice_ReplaceSpecials($expect, %specials);
 
         my $r = ECMDDevice_AnalyzeCommand($hash, $ecmd);
 
         my $v= IOWrite($hash, $r, $expect);
 
-	$v= ECMDDevice_PostProc($hash, $postproc, $v);
+	$v= ECMDDevice_PostProc($hash, $postproc, $v, %specials);
 
         ECMDDevice_Changed($hash, $cmdname, $v); # was: return ECMDDevice_Changed($hash, $cmdname, $v);
         return undef;
