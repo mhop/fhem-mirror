@@ -1,7 +1,6 @@
 
 ##############################################
 # $Id$
-# 2016-06-06
 
 package main;
 
@@ -364,9 +363,10 @@ my %EnO_eepConfig = (
 
 my %EnO_extendedRemoteFunctionCode = (
   0x201 => "remoteLearn",
-  0x220 => "-",
-  0x221 => "-",
-  0x222 => "-",
+  0x220 => "remoteLinkTableInfo",
+  0x221 => "remoteLinkTableOut",
+  0x222 => "remoteLinkTableOutRange",
+  0x223 => "remoteTeachInReq",
   0x224 => "-",
   0x230 => "-",
   0x231 => "-"
@@ -1030,7 +1030,7 @@ sub EnOcean_Get($@)
   my $timeNow = TimeNow();
   if (AttrVal($name, "remoteManagement", "off") eq "manager") {
     # Remote Management
-    $cmdList = "remoteFunctions:noArg remoteID:noArg remotePing:noArg remoteStatus:noArg ";
+    $cmdList = "remoteFunctions:noArg remoteID:noArg remoteLinkTableInfo:noArg remoteLinkTableOut:noArg remoteLinkTableOutRange remotePing:noArg remoteStatus:noArg ";
   }
   # control set actions
   # $updateState = -1: no get commands available e. g. sensors
@@ -1110,6 +1110,64 @@ sub EnOcean_Get($@)
       InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
+    } elsif ($cmd eq "remoteLinkTableInfo") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      $cmdID = 0x220;
+      $manufID = 0x7FF;
+      $packetType = 7;
+      $rorg = "C5";
+      shift(@a);
+      $data = sprintf "0220%04X", $manufID;
+      $destinationID = $remoteID;
+      $status = '0F';
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x820}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x820);
+      RemoveInternalTimer(\%functionHash);
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      Log3 $name, 3, "EnOcean get $name $cmd";
+
+    } elsif ($cmd eq "remoteLinkTableOut") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      $cmdID = 0x221;
+      $manufID = 0x7FF;
+      $packetType = 7;
+      $rorg = "C5";
+      shift(@a);
+      $data = sprintf "0221%04X", $manufID;
+      $destinationID = $remoteID;
+      $status = '0F';
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x821}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x821);
+      RemoveInternalTimer(\%functionHash);
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      Log3 $name, 3, "EnOcean get $name $cmd";
+
+    } elsif ($cmd eq "remoteLinkTableOutRange") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      $cmdID = 0x222;
+      $manufID = 0x7FF;
+      $packetType = 7;
+      $rorg = "C5";
+      my $startRef;
+      my $endRef;
+      if (defined($a[1]) && defined($a[2]) && $a[1] =~ m/^[\dA-Fa-f]{4}$/ && $a[2] =~ m/^[\dA-Fa-f]{4}$/) {
+        shift(@a);
+        $startRef = uc(shift(@a));
+        $endRef = uc(shift(@a));
+        ($startRef, $endRef) = ($endRef, $startRef) if (hex($startRef) > hex($endRef));
+        return "Table Range too large" if (hex($endRef) - hex($startRef) > 62);
+      } else {
+        return "Wrong parameter or startRef/endRef not defined.";      
+      }
+      $data = sprintf "0222%04X%4s%4s", $manufID, $startRef, $endRef;
+      $destinationID = $remoteID;
+      $status = '0F';
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x822}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x822);
+      RemoveInternalTimer(\%functionHash);
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      Log3 $name, 3, "EnOcean get $name $cmd";
+
     } elsif ($st eq "switch.05") {
       # Dual Channel Switch Actuator
       # (A5-11-05)
@@ -1172,14 +1230,16 @@ sub EnOcean_Get($@)
       } elsif ($cmd eq "measurement") {
         $cmdID = 6;
         my $query = shift(@a);
-        Log3 $name, 3, "EnOcean get $name $cmd $channel $query";
-        if ($query eq "energy") {
+        if (!defined $query) {
+          return "$cmd <channel> <query> wrong, choose 0...30|all|input energy|power.";
+        } elsif ($query eq "energy") {
           $query = 0;
         } elsif ($query eq "power") {
           $query = 1;
         } else {
           return "$cmd <channel> <query> wrong, choose 0...30|all|input energy|power.";
         }
+        Log3 $name, 3, "EnOcean get $name $cmd $channel $query";
         $data = sprintf "%02X%02X", $cmdID, $query << 5 | $channel;
 
       } elsif ($cmd eq "roomCtrlMode") {
@@ -1194,8 +1254,9 @@ sub EnOcean_Get($@)
       } elsif ($cmd eq "special" && $manufID eq "033") {
         $rorg = "D1";
         my $query = shift(@a);
-        Log3 $name, 3, "EnOcean get $name $cmd $channel $query";
-        if ($query eq "health") {
+        if (!defined $query) {
+          return "$cmd <channel> <query> wrong, choose health|load|voltage|serialNumber.";
+        } elsif ($query eq "health") {
           $query = 7;
         } elsif ($query eq "load") {
           $query = 8;
@@ -1206,6 +1267,7 @@ sub EnOcean_Get($@)
         } else {
           return "$cmd <channel> <query> wrong, choose health|load|voltage|serialNumber.";
         }
+        Log3 $name, 3, "EnOcean get $name $cmd $channel $query";
         $data = sprintf "0331%02X", $query;
         readingsSingleUpdate($hash, "getParam", $query, 0);
 
@@ -1385,10 +1447,12 @@ sub EnOcean_Set($@)
     return "DestinationID $destinationID wrong, choose <8-digit-hex-code>.";
   }
   $destinationID = uc($destinationID);
+  my $IODev = $hash->{IODev}{NAME};
+  my $IOHash = $defs{$IODev};
   my $manufID = uc(AttrVal($name, "manufID", ""));
   my $model = AttrVal($name, "model", "");
   my $packetType = 1;
-  $packetType = 0x0A if (ReadingsVal($hash->{IODev}{NAME}, "mode", "00") eq "01");
+  $packetType = 0x0A if (ReadingsVal($IODev, "mode", "00") eq "01");
   my $remoteID = AttrVal($name, "remoteID", undef);
   my $remoteManufID = uc(AttrVal($name, "remoteManufID", AttrVal($name, "manufID", "")));
   my $rorg;
@@ -1404,7 +1468,7 @@ sub EnOcean_Set($@)
   my $remoteManagement = AttrVal($name, "remoteManagement", "off");
   if ($remoteManagement eq "manager") {
     # Remote Management Manager
-    $cmdList = "remoteAction:noArg remoteLock:noArg remoteLearn:in,out remoteSetCode:noArg remoteUnlock:noArg ";
+    $cmdList = "remoteAction:noArg remoteLock:noArg remoteLearn:in,out remoteSetCode:noArg remoteTeachInReq remoteUnlock:noArg ";
   } elsif ($remoteManagement eq "client" || $st eq "remote") {
     # Remote Management Client
     $cmdList .= "remoteLock:noArg remoteUnlock ";
@@ -1536,9 +1600,30 @@ sub EnOcean_Set($@)
         }
         Log3 $name, 3, "EnOcean set $name $cmd";
         $updateState = 0;
+      }
 
+    } elsif ($cmd eq "remoteTeachInReq") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && $a[1] =~ m/^[\dA-Fa-f]{4}$/) {
+        $cmdID = 0x223;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        $destinationID = $remoteID;
+        $data = sprintf "%04X%04X%s", $cmdID, $manufID, $a[1];
+        shift(@a);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;
+        if (!exists($hash->{IODev}{Teach})) {
+          # enable teach-in receiving for 3 sec
+          $hash->{IODev}{Teach} = 1;
+          my %functionHash = (hash => $IOHash, param => 'Teach');
+          RemoveInternalTimer(\%functionHash);
+          InternalTimer(gettimeofday() + 3, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
+        }
+        
       } else {
-        return "Usage: $cmd argument needed.";      
+        return "Usage: $cmd argument needed or wrong.";      
       }
 
     } elsif ($st eq "switch") {
@@ -3744,7 +3829,7 @@ sub EnOcean_Set($@)
       my $outputVal;
 
       if ($cmd =~ m/^\d+$/) {
-        # interpretive numeric value as position
+        # interpretive numeric value as dimming
         unshift(@a, 'dim');
         $cmd = 'dim';
       }
@@ -4048,7 +4133,7 @@ sub EnOcean_Set($@)
             return "Usage: $cmd $localCmd <value> wrong, choose disabled enabled.";
           }
         } else {
-          return "Usage: $cmd <localCmd> wrong, choose defaultState|localControl|" .
+          return "Usage: $cmd <localCmd> wrong, choose dayNight|defaultState|localControl|" .
           "overCurrentShutdown|overCurrentShutdownReset|rampTime1|rampTime2|rampTime3|teachInDev.";
         }
         readingsSingleUpdate($hash, "dayNight", $dayNight, 1);
@@ -5409,8 +5494,6 @@ sub EnOcean_Set($@)
         $attr{$name}{eep} = "B0-00-00";
         # multicast teach-in
         $destinationID = "FFFFFFFF";
-        my $IODev = $hash->{IODev}{NAME};
-	my $IOHash = $defs{$IODev};
 	my $productID = AttrVal($name, "productID", undef);
 	if (defined $productID) {
 	  $productID = '0000000010' . EnOcean_convHexToBit($productID);
@@ -5504,8 +5587,6 @@ sub EnOcean_Set($@)
         $rorg = "B0";
         $channelType = 0;
         my $comMode = 0;
-        my $IODev = $hash->{IODev}{NAME};
-	my $IOHash = $defs{$IODev};
 	if (AttrVal($name, "comMode", "uniDir") eq "biDir") {
           $comMode = 1;
           $hash->{IODev}{helper}{gpRespWait}{AttrVal($name, "subDef", $hash->{DEF})}{teachInReq} = "out";
@@ -10867,7 +10948,7 @@ sub EnOcean_Parse($$)
       my $len = length($data);
       while ($len > 0) {
         $data =~ m/^.(...).(...)(.*)$/;
-        push @event, "3:remoteFunction$count:$1:$2:" . (exists($EnO_extendedRemoteFunctionCode{hex($1)}) ? $EnO_extendedRemoteFunctionCode{hex($1)} : '-');
+        push @event, "3:remoteFunction" . sprintf("%02d", $count) . ":$1:$2:" . (exists($EnO_extendedRemoteFunctionCode{hex($1)}) ? $EnO_extendedRemoteFunctionCode{hex($1)} : '-');
         $count ++;
         $data = $3;
         $len -= 8;
@@ -10884,6 +10965,47 @@ sub EnOcean_Parse($$)
       push @event, "3:remoteLastStatusReturnCode:" . substr($data, 6, 2);
       Log3 $name, 2, "EnOcean $name RMCC query status answer received LastFunction: " . substr($data, 3, 3) .
                       " LastFunctionCode: " . substr($data, 6, 2);
+
+    } elsif ($funcNumber == 0x820 && $remoteManagement eq 'manager') {
+      # teach-in supported link tables response
+      delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
+      push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
+      my $linkTableSupport = hex(substr($data, 0, 2));
+      my $linkTableInMax = substr($data, 6, 4) && $linkTableSupport & 0x40 ? substr($data, 6, 4) : '0000';
+      my $linkTableOutMax = substr($data, 2, 4) && $linkTableSupport & 0x80 ? substr($data, 2, 2) : '0000';      
+      push @event, "3:remoteLinkTableIn:" . ($linkTableSupport & 0x40 ? 'supported' : 'not_supported');
+      push @event, "3:remoteLinkTableOut:" . ($linkTableSupport & 0x80 ? 'supported' : 'not_supported');
+      push @event, "3:remoteLinkTableInMax:" . $linkTableInMax if ($linkTableSupport & 0x40);
+      push @event, "3:remoteLinkTableOutMax:" . $linkTableOutMax if ($linkTableSupport & 0x80);
+      Log3 $name, 2, "EnOcean $name RPC teach-in supported link tables response received Data: $data";
+      # request outbound table
+      #$hash->{IODev}{helper}{remoteAnswerWait}{0x821}{hash} = $hash;
+      #$hash->{IODev}{helper}{remoteLinkTableStartRef} = 0;
+      #my %functionHash = (hash => $hash, param => 0x821);
+      #RemoveInternalTimer(\%functionHash);
+      #InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      #$sendData = '022107FF';
+      #EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $sendData, '0' x 8, '0F', $senderID);
+      #Log3 $name, 2, "EnOcean $name RPC request teach-in outbound table";
+
+    } elsif (($funcNumber == 0x821 || $funcNumber == 0x822) && $remoteManagement eq 'manager') {
+      # teach-in outbound table response
+      CommandDeleteReading(undef, "$name remoteLinkTableDesc.*");
+      my $linkTableStartRef = exists($hash->{IODev}{helper}{remoteLinkTableStartRef}) ? $hash->{IODev}{helper}{remoteLinkTableStartRef} : 0;
+      delete $hash->{IODev}{helper}{remoteLinkTableStartRef};
+      $data =~ m/^(....)(.*)$/;
+      my $count = $linkTableStartRef;
+      my $countMax = $linkTableStartRef + hex($1);
+      while ($count <= $countMax) {
+        $data =~ m/^(........)(..)(..)(..)(..)(.*)$/;
+        push @event, "3:remoteLinkTableDesc" . sprintf("%04X", $count) . ":$1:$2-S3-S4:S5";
+        $count ++;
+        $data = $6;
+      }
+      $remoteLastStatusReturnCode = '00';
+      delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
+      push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
+      Log3 $name, 2, "EnOcean $name RPC teach-in outbound table answer received";
 
     } else {
       Log3 $name, 2, "EnOcean $name RMCC/RPC function number " . sprintf("%03X", $funcNumber) . " not supported.";
@@ -15095,13 +15217,13 @@ EnOcean_Delete($$)
       <li><a href="#EnOcean_remoteManufID">remoteManufID</a></li>
     </ul><br>
     The content of events is described in the chapter <a href="#EnOcean_remoteEvents">Remote Management Events</a><br><br>.
-    The following extented functions are supported:
+    The following extended functions are supported:
     <ul>
     <li>201:remoteLearn</li>
-    <li>-:-</li>
-    <li>-:-</li>
-    <li>-:-</li>
-    <li>-:-</li>
+    <li>220:remoteLinkTableInfo (teach-in supported link tables query)</li>
+    <li>221:remoteLinkTableOut (teach-in outbound table request)</li>
+    <li>222:remoteLinkTableOutRange (teach-in outbound table range request)</li>
+    <li>223:remoteTeachInReq (teach-in request)</li>
     </ul>
     <br><br>
   </ul>
@@ -15347,9 +15469,11 @@ EnOcean_Delete($$)
          <li>remoteLock<br>
           locks the remote device or local client</li>
         <li>remoteLearn in|out<br>
-          initiate remote learn-in or learn-out (extented function 201)</li>
+          initiate remote learn-in or learn-out (extended function 201)</li>
          <li>remoteSetCode<br>
           set the remote security code</li>
+         <li>remoteTeachInReq [0000...FFFF]<br>
+          request teach-in telegram according to the specified outbound reference index</li>
          <li>remoteUnlock [1...1800]<br>
           unlocks the remote device or local client</li>
     </ul><br>
@@ -16117,7 +16241,7 @@ EnOcean_Delete($$)
     <br><br>
 
     <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-12)<br>
-        [Telefunken Funktionsstecker, PEHA Easyclick, AWAG Elektrotechnik AG Omnio UPS 230/xx,UPD 230/xx]<br>
+        [Telefunken Funktionsstecker, PEHA Easyclick, AWAG Elektrotechnik AG Omnio UPS 230/xx,UPD 230/xx, NodOn in-wall module, smart plug]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -16520,9 +16644,15 @@ EnOcean_Delete($$)
     <br><br>
     where <code>value</code> is
         <li>remoteFunctions<br>
-          get a list of the supported extented functions</li>
+          get a list of the supported extended functions</li>
          <li>remoteID<br>
           get the remote device ID</li>
+        <li>remoteLinkTableInfo<br>
+          query supported link table info</li>
+        <li>remoteLinkTableOut<br>
+          get outbound table with REF descriptions</li>
+        <li>remoteLinkTableOutRange [0000...FFFF] [0000...FFFF]<br>
+          get outbound table with REF descriptions between Start REF and End REF</li>
         <li>remotePing<br>
           get a ping response from the remote device</li>
         <li>remoteStatus<br>
@@ -16558,7 +16688,7 @@ EnOcean_Delete($$)
     <br><br>
 
     <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-12)<br>
-        [Telefunken Funktionsstecker, PEHA Easyclick, AWAG Elektrotechnik AG Omnio UPS 230/xx,UPD 230/xx]<br>
+        [Telefunken Funktionsstecker, PEHA Easyclick, AWAG Elektrotechnik AG Omnio UPS 230/xx,UPD 230/xx, NodOn in-wall module, smart plug]<br>
     <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -17266,9 +17396,14 @@ EnOcean_Delete($$)
 
      <li><a name="EnOcean_remoteEvents">Remote Management</a><br>
      <ul>
-         <li>remoteFunction&lt;1...n&gt;: &lt;remote function number&gt;|&lt;remote manufacturer ID&gt;|&lt;explanation&gt;</li>
+         <li>remoteFunction&lt;01...99&gt;: &lt;remote function number&gt;:&lt;remote manufacturer ID&gt;:&lt;explanation&gt;</li>
          <li>remoteLastFunctionNumber: 001...FFF</li>
          <li>remoteLastStatusReturnCode: 00...FF</li>
+         <li>remoteLinkTableDesc&lt;0000...FFFF&gt;:&lt;DeviceID&gt;:&lt;EEP&gt;:&lt;channel&gt;</li>
+         <li>remoteLinkTableIn: not_supported|supported</li>
+         <li>remoteLinkTableInMax: 0000...FFFF</li>
+         <li>remoteLinkTableOut: not_supported|supported</li>
+         <li>remoteLinkTableOutMax: 0000...FFFF</li>
          <li>remoteRSSI: LP/dBm</li>
          <li>teach: &lt;result of teach procedure&gt;</li>
      </ul>
