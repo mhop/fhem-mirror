@@ -595,7 +595,7 @@ sub CUL_HM_Rename($$$) {#############################
 }
 sub CUL_HM_Attr(@) {#################################
   my ($cmd,$name, $attrName,$attrVal) = @_;
-  my $chk = CUL_HM_AttrCheck($name, $attrName);
+  my $chk = ($cmd eq "set")?CUL_HM_AttrCheck($name, $attrName):"";
   my $hash = CUL_HM_name2Hash($name);
   return $chk if ($chk);
   
