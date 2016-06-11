@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: PRESENCE: new attribute bluetooth_hci_device to select a 
+             specific bluetooth sender for presence checking 
+             (only for mode "local-bluetooth")
   - feature: 74_AMAD: new Feature added support for do not Disturb Mode
   - bugfix : 74_HOMBOT: check path for sshpass
   - feature: fhem_codemirror: Added new codemirrorParams:
