@@ -39,13 +39,21 @@ PRESENCE_Initialize($)
     my ($hash) = @_;
 
     # Provider
-    $hash->{ReadFn}  = "PRESENCE_Read";  
-    $hash->{ReadyFn} = "PRESENCE_Ready";
-    $hash->{SetFn}   = "PRESENCE_Set";
-    $hash->{DefFn}   = "PRESENCE_Define";
-    $hash->{UndefFn} = "PRESENCE_Undef";
-    $hash->{AttrFn}  = "PRESENCE_Attr";
-    $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_speed:0,1 ping_count:1,2,3,4,5,6,7,8,9,10 absenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 powerCmd ".$readingFnAttributes;
+    $hash->{ReadFn}   = "PRESENCE_Read";  
+    $hash->{ReadyFn}  = "PRESENCE_Ready";
+    $hash->{SetFn}    = "PRESENCE_Set";
+    $hash->{DefFn}    = "PRESENCE_Define";
+    $hash->{NotifyFn} = "PRESENCE_Notify";
+    $hash->{UndefFn}  = "PRESENCE_Undef";
+    $hash->{AttrFn}   = "PRESENCE_Attr";
+    $hash->{AttrList} = "do_not_notify:0,1 ".
+                       "disable:0,1 ".
+                       "disabledForIntervals ".
+                       "fritzbox_speed:0,1 ".
+                       "ping_count:1,2,3,4,5,6,7,8,9,10 ".
+                       "bluetooth_hci_device ".
+                       "absenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
+                       "powerCmd ".$readingFnAttributes;
 
 }
 
@@ -58,7 +66,9 @@ PRESENCE_Define($$)
     my $dev;
     my $username =  getlogin || getpwuid($<) || "[unknown]";
     my $name = $hash->{NAME};
-    
+
+    $hash->{NOTIFYDEV} = "global";
+        
     if(defined($a[2]) and defined($a[3]))
     {
         if($a[2] eq "local-bluetooth")
@@ -202,19 +212,6 @@ PRESENCE_Define($$)
 
     delete $hash->{helper}{cachednr} if(defined($hash->{helper}{cachednr}));
 
-    if($hash->{MODE} =~ /(lan-ping|local-bluetooth|fritzbox|shellscript|function)/)
-    {
-        delete $hash->{helper}{RUNNING_PID} if(defined($hash->{helper}{RUNNING_PID}));
-        RemoveInternalTimer($hash);
-        InternalTimer(gettimeofday(), "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
-     
-        return;
-    }
-    elsif($hash->{MODE} eq "lan-bluetooth")
-    {
-        delete($hash->{NEXT_OPEN}) if(exists($hash->{NEXT_OPEN}));
-        return DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
-    }
 }
 
 
@@ -234,6 +231,35 @@ PRESENCE_Undef($$)
     DevIo_CloseDev($hash); 
     return undef;
 }
+
+
+sub
+PRESENCE_Notify($$)
+{
+    my ($hash,$dev) = @_;
+    
+    return undef if(!defined($hash) or !defined($dev));
+
+    my $name = $hash->{NAME};
+    my $events = deviceEvents($dev,0);
+    
+    if($dev->{NAME} eq "global" and grep(m/^(?:DEFINED $name|MODIFIED $name|INITIALIZED|REREADCFG)$/, @{$events}))
+    {
+        if($hash->{MODE} =~ /(lan-ping|local-bluetooth|fritzbox|shellscript|function)/)
+        {
+            delete $hash->{helper}{RUNNING_PID} if(defined($hash->{helper}{RUNNING_PID}));
+            RemoveInternalTimer($hash);
+            InternalTimer(gettimeofday(), "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+            return undef;
+        }
+        elsif($hash->{MODE} eq "lan-bluetooth")
+        {
+            delete($hash->{NEXT_OPEN}) if(exists($hash->{NEXT_OPEN}));
+            return DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
+        }
+    }
+}
+
 
 sub
 PRESENCE_Set($@)
@@ -531,7 +557,7 @@ sub PRESENCE_StartLocalScan($;$)
         if($mode eq "local-bluetooth")
         {
             Log3 $name, 5, "PRESENCE ($name) - starting blocking call for mode local-bluetooth";
-            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
+            $hash->{helper}{RUNNING_PID} = BlockingCall("PRESENCE_DoLocalBluetoothScan", $name."|".$hash->{ADDRESS}."|".$local."|".AttrVal($name, "bluetooth_hci_device", ""), "PRESENCE_ProcessLocalScan", 60, "PRESENCE_ProcessAbortedScan", $hash);
         }
         elsif($mode eq "lan-ping")
         {
@@ -789,7 +815,7 @@ sub
 PRESENCE_DoLocalBluetoothScan($)
 {
     my ($string) = @_;
-    my ($name, $device, $local) = split("\\|", $string);
+    my ($name, $device, $local, $btdevice) = split("\\|", $string);
 
     my $devname;
     my $return;
@@ -819,6 +845,9 @@ PRESENCE_DoLocalBluetoothScan($)
 
     if(-x $hcitool)
     {
+    
+        my $options = ($btdevice ? "-i $btdevice" : "");
+
         while($wait)
         {   # check if another hcitool process is running
             $ps = qx(ps $psargs | grep hcitool | grep -v grep);
@@ -835,7 +864,7 @@ PRESENCE_DoLocalBluetoothScan($)
         }
         
         Log3 $name, 5, "PRESENCE ($name) - executing: hcitool name $device";
-        $devname = qx(hcitool name $device);
+        $devname = qx(hcitool $options name $device);
 
         chomp($devname);
         Log3 $name, 4, "PRESENCE ($name) - hcitool returned: $devname";
@@ -1291,10 +1320,12 @@ Options:
     This can be used to verify the absence of a device with multiple check runs before the state is finally changed to "absent".
     If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe absent" during the absence verification.<br><br>
     Default Value is 1 (no absence verification)<br><br>
-    <li><a name="PRESENCE_ping_count">ping_count</a></li> (Only in Mode "ping" on Linux based OS applicable)<br>
+    <li><a name="PRESENCE_ping_count">ping_count</a></li> (Only in Mode "ping" applicable)<br>
     Changes the count of the used ping packets to recognize a present state. Depending on your network performance sometimes a packet can be lost or blocked.<br><br>
     Default Value is 4 (packets)<br><br>
-    <li><a name="PRESENCE_fritzbox_speed">fritzbox_speed</a></li> (only for mode "fritzbox")<br>
+    <li><a name="PRESENCE_bluetooth_hci_device">bluetooth_hci_device</a></li> (Only in Mode "local-bluetooth" applicable)<br>
+    Set a specific bluetooth HCI device to use for scanning. If you have multiple bluetooth modules connected, you can select a specific one to use for scanning (e.g. hci0, hci1, ...).<br><br>
+    <li><a name="PRESENCE_fritzbox_speed">fritzbox_speed</a></li> (Only in Mode "fritzbox" applicable)<br>
     When this attribute is enabled, the network speed is checked in addition to the device state.<br>
     This only makes sense for wireless devices connected directly to the FritzBox.
     <br><br>
@@ -1541,10 +1572,13 @@ Options:
     Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, werden die Readings "state" und "presence" auf den Wert "maybe absent" gesetzt,
     bis der Status final auf "absent" oder "present" wechselt.<br><br>
     Standartwert ist 1 (keine Abwesenheitsverifizierung)<br><br>
-    <li><a name="PRESENCE_ping_count">ping_count</a></li> (Nur im Modus "ping" anwendbar auf Linux-basierten Betriebssystemen)<br>
-    Verändert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
-    Je nach Netzwerkstabilität können erste Pakete verloren gehen oder blockiert werden.<br><br>
+    <li><a name="PRESENCE_ping_count">ping_count</a></li> (Nur im Modus "ping" anwendbar)<br>
+    Ver&auml;ndert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
+    Je nach Netzwerkstabilität k&ouml;nnen erste Pakete verloren gehen oder blockiert werden.<br><br>
     Standartwert ist 4 (Versuche)<br><br>
+    <li><a name="PRESENCE_bluetooth_hci_device">bluetooth_hci_device</a></li> (Nur im Modus "local-bluetooth" anwendbar)<br>
+    Sofern man mehrere Bluetooth-Empf&auml;nger verf&uuml;gbar hat, kann man mit diesem Attribut ein bestimmten Empf&auml;nger ausw&auml;hlen, welcher zur Erkennung verwendet werden soll (bspw. hci0, hci1, ...). Es muss dabei ein vorhandener HCI-Ger&auml;tename angegeben werden wie z.B. <code>hci0</code>.
+    <br><br>
     <li><a name="PRESENCE_fritzbox_speed">fritzbox_speed</a></li> (Nur im Modus "fritzbox")<br>
     Zus&auml;tzlich zum Status des Ger&auml;ts wird die aktuelle Verbindungsgeschwindigkeit ausgegeben<br>
     Das macht nur bei WLAN Geräten Sinn, die direkt mit der FritzBox verbunden sind. Bei abwesenden Ger&auml;ten wird als Geschwindigkeit 0 ausgegeben.
