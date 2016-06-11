@@ -308,7 +308,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00F6" => {name=>"HM-ES-PMSw1-SM"          ,alias=>"HM-ES-PMSw1-Pl"}
  ,"00F7" => {name=>"HM-SEC-MDIR-3"           ,alias=>"HM-SEC-MDIR"}
  ,"00F8" => {name=>"HM-RC-4-3-D"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
- ,"00F9" => {name=>"HM-Sec-Sir-WM"           ,st=>'siren'             ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Sen:1:2,Panic:3:3,Arm4:4",}
+ ,"00F9" => {name=>"HM-Sec-Sir-WM"           ,st=>'siren'             ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Sen:1:2,Panic:3:3,Arm:4:4",}
  ,"00FA" => {name=>"HM-OU-CFM-TW"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",}
  ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Dis:1:2,Key:3:9",}
  ,"00FC" => {name=>"OLIGO-smart-iq-HM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
@@ -376,6 +376,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>0    ,max=>100   ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"PowerLevel off"},
   OnMinLevel      =>{a=> 16.0,s=>1.0,l=>3,min=>0    ,max=>100   ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"minimum PowerLevel"},
   OnLevel         =>{a=> 17.0,s=>1.0,l=>3,min=>0    ,max=>100.5 ,c=>''         ,f=>2       ,u=>'%'   ,d=>1,t=>"PowerLevel on"                        ,lit=>{oldLevel=>100.5}},
+  OnLevelArm      =>{a=> 17.0,s=>1.0,l=>3,min=>0    ,max=>100   ,c=>'lit'      ,f=>2       ,u=>''    ,d=>1,t=>"onLevel on"                           ,lit=>{disarmed=>0,extSens=>50,allSens=>200}},
                                                     
   OffLevelKm      =>{a=> 15.0,s=>1.0,l=>3,min=>0    ,max=>127.5 ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"OnLevel 127.5=locked"},
   OnLevelKm       =>{a=> 17.0,s=>1.0,l=>3,min=>0    ,max=>127.5 ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"OnLevel 127.5=locked"},
@@ -687,6 +688,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   waGreen         =>{a=>165.0,s=>1  ,l=>1,min=>0    ,max=>100    ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"whitebalance green"},
   waBlue          =>{a=>166.0,s=>1  ,l=>1,min=>0    ,max=>100    ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"whitebalance blue"},
   colChangeSpeed  =>{a=>167.0,s=>1  ,l=>1,min=>0    ,max=>255    ,c=>''         ,f=>''      ,u=>'s/U'  ,d=>0,t=>"color change speed"},
+  soundId         =>{a=>171.0,s=>1  ,l=>1,min=>0    ,max=>72     ,c=>''         ,f=>''      ,u=>''     ,d=>0,t=>"sound ID"                     ,lit=>{unused=>0}},
 
   
   acusticMultiDly =>{a=>169.7,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"acustic mutli exec delay"      ,lit=>{off=>0,on=>1}},
@@ -703,7 +705,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   opticDisArm     =>{a=>170.0,s=>0.1,l=>1,min=>0    ,max=>1      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"optic disarm "                 ,lit=>{off=>0,on=>1}},
 
 
-  txThresPercent  =>{a=>172.0,s=>1  ,l=>1,min=>10   ,max=>100    ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"threshold percent"                   ,lit=>{unused=>0}},
+  txThresPercent  =>{a=>172.0,s=>1  ,l=>1,min=>10   ,max=>100    ,c=>''         ,f=>''      ,u=>'%'    ,d=>0,t=>"threshold percent"            ,lit=>{unused=>0}},
 #rf_es_tx_wm               r:TX_THRESHOLD_POWER                       l:1   idx:124      size:3      type:integer    log## ty: float      min:0.01       max:160000.0   def:100.00     uni:W         Conv## ty: float_integer_scale            factor:100        offset:           
 #rf_es_tx_wm               r:METER_TYPE                               l:1   idx:149      size:1      type:integer    log## ty: option     min:           max:           def:           uni:          Conv## ty: option_integer                 factor:           offset:           
 #rf_es_tx_wm               r:POWER_STRING                             l:1   idx:54       size:16     type:string     log## ty: string     min:           max:           def:           uni:           
@@ -927,7 +929,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
                          }
 
  ,siren               =>{ intKeyVisib     =>1
-                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1
+                         ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1
 
                          ,alarmTimeMax    =>1,cyclicInfoMsg   =>1,sabotageMsg     =>1,signalTone      =>1
                          ,lowBatLimitRT   =>1,localResDis     =>1,lowBatSignal    =>1
@@ -1239,9 +1241,11 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1
                          ,lgMultiExec     =>1,shMultiExec     =>1,powerUpAction   =>1
                           }
+ ,"HM-Sec-Sir-WM01"   =>{ soundId         =>1}
  ,"HM-Sec-Sir-WM04"   =>{ OnLevel         =>1
                          ,acusticMultiDly =>1,acusticArmSens  =>1,acusticArmDly   =>1,acusticExtArm   =>1,acusticExtDly   =>1,acusticDisArm   =>1
                          ,opticMultiDly   =>1,opticArmSens    =>1,opticArmDly     =>1,opticExtArm     =>1,opticExtDly     =>1,opticDisArm     =>1
+                         ,OnLevelArm      =>1
                          }
  ,"HM-ES-PMSw1-Pl02"  =>{ averaging       =>1
                          ,txMinDly        =>1,txThrPwr        =>1,txThrCur        =>1,txThrVlt        =>1,txThrFrq        =>1
@@ -1307,6 +1311,8 @@ $culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};      # type has
 
 $culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegChan{"HM-CC-RT-DN03"};
 $culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegChan{"HM-CC-RT-DN06"};
+$culHmRegChan{"HM-Sec-Sir-WM02"}      = $culHmRegChan{"HM-Sec-Sir-WM01"};
+$culHmRegChan{"HM-Sec-Sir-WM03"}      = $culHmRegChan{"HM-Sec-Sir-WM01"};
 
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegChan{"HM-CC-TC02"};
 $culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
@@ -1633,14 +1639,14 @@ $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
 
 %culHmModelSets = (# channels of this subtype-------------
                       "HM-CC-VD"         =>{ valvePos       =>"[off|0.0..99.0]"}
-                     ,"HM-RC-19"         =>{ service        => "-count-"
+                     ,"HM-RC-19"         =>{ service        =>"-count-"
                                             ,alarm          => "-count-"
                                             ,display        => "-text- [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] -symbol-"
                                            }
-                     ,"HM-PB-4DIS-WM"    =>{ text           => "-txt1- -txt2-..."
+                     ,"HM-PB-4DIS-WM"    =>{ text           =>"-txt1- -txt2-..."
                                               #text         => "-btn- [on|off] -txt1- -txt2-...", old style will not be offered anymore
                                            }
-                     ,"HM-OU-LED16"      =>{ led            => "[off|red|green|orange]"
+                     ,"HM-OU-LED16"      =>{ led            =>"[off|red|green|orange]"
                                             ,ilum           => "[0-15] [0-127]"
                                             ,statusRequest  =>""
                                            }
@@ -1659,10 +1665,13 @@ $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
                      ,"HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[on|off]"}
                      ,"HM-SEC-SD"        =>{ statusRequest  =>""}
                      ,"HM-SEC-SD-2"      =>{ statusRequest  =>""}
-                     ,"ActionDetector"   =>{ clear          => "[readings|all]"
+                     ,"ActionDetector"   =>{ clear          =>"[readings|all]"
                                             ,update         => ""
                                            }
 );
+
+
+
 # clones- - - - - - - - - - - - - - - - -
 
 $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-OU-CFM-PL"};
@@ -1793,6 +1802,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                                }
                      ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright- -colVal- -duration- -ramp- ..."}
                      ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."}
+                     ,"HM-Sec-Sir-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"}
                                             
  );
 # clones- - - - - - - - - - - - - - - - -
