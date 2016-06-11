@@ -2134,6 +2134,26 @@ sub CUL_HM_Parse($$) {#########################################################
 
   }
 
+  elsif($mh{st} =~ m /^(siren)$/) {############################################
+    if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
+        ($mh{mTyp} eq "1006")) { #    or Info_Status message here
+        
+
+      my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
+      my $vs = $val == 0 ? "off" : "on";
+      if ($chn == 4){
+        my %lvlSet = ("00"=>"disarmed","01"=>"armExtSens","02"=>"armAll","03"=>"armBlocked");
+        $vs = $lvlSet{$val};
+      }
+      push @evtEt,[$mh{cHash},1,"level:$val"];
+      push @evtEt,[$mh{cHash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
+      push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
+      push @evtEt,[$mh{cHash},1,"state:$vs"];
+      push @evtEt,[$mh{cHash},1,"timedOn:".(($err&0x40)?"running":"off")];
+      push @evtEt,[$mh{devH},1,"powerOn:$tn",] if ($chn == 0) ;
+      push @evtEt,[$mh{devH},1,"sabotageError:".(($err&0x04)?"on":"off")];
+    }
+  }
   elsif($mh{st} eq "senBright") { #############################################
     if ($mh{mTp} =~ m/5[34]/){
       #Channel is fixed 1
@@ -2191,15 +2211,16 @@ sub CUL_HM_Parse($$) {#########################################################
       my $sumState = "eState:E: $eCnt P: $P";
       push @evtEt,[$mh{shash},1,$sumState];    
       push @evtEt,[$mh{shash},1,"boot:"     .(($eCnt&0x800000)?"on":"off")];
+      my $eo = ReadingsVal($mh{shash}->{NAME},"gasCntOffset",0);
       if($eCnt == 0 && hex($mh{mNo}) < 3 ){
         if($mh{devH}->{helper}{PONtest}){
           push @evtEt,[$mh{devH},1,"powerOn:$tn",] ;
           $mh{devH}->{helper}{PONtest} = 0;
         }
-        my $eo = ReadingsVal($mh{shash}->{NAME},"gasCnt",0)+
-                 ReadingsVal($mh{shash}->{NAME},"gasCntOffset",0);
+        $eo += ReadingsVal($mh{shash}->{NAME},"gasCnt",0);
         push @evtEt,[$mh{shash},1,"gasCntOffset:".$eo];
       }
+      push @evtEt,[$mh{shash},1,"gasCntCalc:".($eo + $eCnt)];
     }
     elsif ($mh{mTp} eq "5E" ||$mh{mTp} eq "5F" ) {  #    POWER_EVENT_CYCLIC
       $mh{shash} = $modules{CUL_HM}{defptr}{$mh{src}."02"}
@@ -2345,7 +2366,7 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{shash},1,""];
     }
     elsif ($mh{mTp} =~ m /^4[01]/){# if channel is SD team we have to act
-      if ($mh{cHash}->{helper}{fkt} eq "sdLead2"){
+      if ($mh{cHash}->{helper}{fkt} && $mh{cHash}->{helper}{fkt} eq "sdLead2"){
         CUL_HM_parseSDteam_2($mh{mTp},$mh{src},$mh{dst},$mh{p});
       }
       else{
@@ -4377,6 +4398,19 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}02${chn}$lvlMax$ramp$tval");
     $hash = $chnHash; # report to channel if defined
   }
+  elsif($cmd eq "alarmLevel") { ###############################################
+    #level        =>"[disarmed|armExtSens|armAll|armBlocked]"
+    my %lvlSet = (disarmed=>"00",armExtSens=>"01",armAll=>"02",armBlocked=>"03");
+    my (undef,undef,$lvl,$onTime) = (@a,0);#set ontime to 0 if not given. 
+    $lvl = $lvlSet{$lvl};
+    
+    return "please enter the onTime in seconds"
+      if ($onTime !~ m/^[+-]?\d+(\.\d+)?$/);
+    my $tval = CUL_HM_encodeTime16($onTime);# onTime   0.0..85825945.6, 0=forever
+    $tval = "" if ($tval eq "0000");
+    CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}02${chn}${lvl}0000$tval");
+  }
+
   elsif($cmd eq "lock") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800100FF'); # LEVEL_SET
   }

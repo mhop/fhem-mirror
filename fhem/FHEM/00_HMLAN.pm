@@ -31,6 +31,7 @@ sub HMLAN_getVerbLvl ($$$$);
 my %sets = ( "open"         => ""
             ,"close"        => ""
             ,"reopen"       => ""
+            ,"restart"      => ""
             ,"hmPairForSec" => "HomeMatic"
             ,"hmPairSerial" => "HomeMatic"
             ,"reassignIDs"  => ""
@@ -435,6 +436,10 @@ sub HMLAN_Set($@) {############################################################
     DevIo_CloseDev($hash);
     HMLAN_condUpdate($hash,253);#set disconnected
     DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
+  }
+  elsif($cmd eq "restart")      { #################################
+    HMLAN_SimpleWrite($hash, "Y05,");
+    HMLAN_condUpdate($hash,253);#set disconnected
   }
   elsif($cmd eq "close")        { #################################
     DevIo_CloseDev($hash);
@@ -1168,8 +1173,14 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     <ul>
         <li><a href="#hmPairForSec">hmPairForSec</a></li>
         <li><a href="#hmPairSerial">hmPairSerial</a></li>
+        <li><a href="#hmreopen">reopen</a>
+           reconnect the device
+           </li>
+        <li><a href="#hmrestart">restart</a>
+          Restart the device
+          </li>
         <li><a href="#HMLANset_reassignIDs">reassignIDs</a>
-          Syncs the IDs between HMLAN and teh FHEM list. 
+          Syncs the IDs between HMLAN and the FHEM list. 
           Usually this is done automatically and only is recomended if there is a difference in counts.
           </li>
     <br><br>
@@ -1305,6 +1316,11 @@ sub HMLAN_getVerbLvl ($$$$){#get verboseLevel for message
     <ul>
         <li><a href="#hmPairForSec">hmPairForSec</a></li>
         <li><a href="#hmPairSerial">hmPairSerial</a></li>
+        <li><a href="#hmreopen">reopen</a>
+           Connection zum IO device neu starten</li>
+        <li><a href="#hmrestart">restart</a>
+           Neustart des IOdevice
+           </li>
         <li><a href="#HMLANset_reassignIDs">reassignIDs</a>
           Synchronisiert die im HMLAN eingetragenen IDs mit der von FHEM verwalteten Liste. 
           I.a. findet dies automatisch statt, koennte aber in reset Fällen abweichen.
