@@ -1665,10 +1665,12 @@ ZWave_versionClassAllGet($@)
 
   my %h = map { $_=>1 } split(" ", AttrVal($name, "vclasses", ""));
   return 0 if($data !~ m/^048614(..)(..)$/i); # ??
-  $h{$zwave_id2class{lc($1)}.":".hex($2)} = 1;
-  $hash->{".vclasses"}{$zwave_id2class{lc($1)}} = hex($2);
-  $attr{$name}{vclasses} = join(" ", sort keys %h);
-  return 1; # "veto" for parseHook
+  if($zwave_id2class{lc($1)}) {
+    $h{$zwave_id2class{lc($1)}.":".hex($2)} = 1;
+    $hash->{".vclasses"}{$zwave_id2class{lc($1)}} = hex($2);
+    $attr{$name}{vclasses} = join(" ", sort keys %h);
+  }
+  return !$hash->{asyncGet}; # "veto" for parseHook/getAll
 }
 
 sub
