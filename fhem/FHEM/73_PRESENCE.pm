@@ -1203,7 +1203,7 @@ PRESENCE_ProcessState($$)
     It listens on TCP port 5111 for incoming connections from a FHEM PRESENCE instance or a running collectord.<br>
 <PRE>
 Usage:
-  presenced -d [-p &lt;port&gt;] [-P &lt;filename&gt;]
+  presenced [-d] [-p &lt;port&gt;] [-P &lt;filename&gt;]
   presenced [-h | --help]
 
 
@@ -1231,6 +1231,39 @@ Options:
     <li>direct perl script file: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
     <li>.deb package for Debian (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.4.deb" target="_new">presenced-1.4.deb</a></li>
     <li>.deb package for Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.4.deb" target="_new">presenced-rpi-1.4.deb</a></li>
+    </ul>
+    </ul><br><br>
+        <u>lepresenced</u><br><br>
+    <ul>lepresenced is a Perl network daemon that provides presence checks of
+    multiple bluetooth devices over network. In contrast to presenced,
+    lepresenced covers <u>Bluetooth 4.0 (low energy) devices, i. e.
+    Gigaset G-Tags, FitBit Charges.</u>
+    lepresenced listens on TCP port 5333 for connections of a PRESENCE definition
+    or collectord.<br>
+<PRE>
+Usage:
+    lepresenced --bluetoothdevice &lt;bluetooth device&gt; --listenaddress &lt;listen address&gt; --listenport &lt;listen port&gt; --loglevel &lt;log level&gt; --daemon
+    lepresenced -b &lt;bluetooth device&gt; -a &lt;listen address&gt; -p &lt;listen port> -l &lt;log level&gt; -d
+    
+valid log levels:
+    LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO
+    
+Examples:
+	lepresenced --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon
+	lepresenced --loglevel LOG_DEBUG --daemon
+</PRE>
+    
+    To detect the presence of a device, it uses the command <i>hcitool lescan</i> (package:
+    <a href="http://www.bluez.org" target="_new">bluez</a>) to continuously listen to
+    beacons of Bluetooth LE devices.
+    <br><br>
+    
+    If a device is present, this is send to FHEM, as well as the device name as reading.<br><br>
+    
+    The presenced is available as:<br><br>
+    <ul>
+    <li>Perl script: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/lepresenced" target="_new">lepresenced</a></li>
+    <li>.deb package (noarch): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/" target="_new">contrib/PRESENCE/deb/</a></li>
     </ul>
     </ul><br><br>
     <u>collectord</u><br><br>
@@ -1395,7 +1428,7 @@ Options:
   <br>
   Jeder Modus kann optional mit spezifischen Pr&uuml;f-Intervallen ausgef&uuml;hrt werden.<br><br>
   <ul>
-  <li>check-interval - Das normale Pr&uuml;finterval in Sekunden für eine Anwesenheitspr&uuml;fung. Standardwert: 30 Sekunden</li>
+  <li>check-interval - Das normale Pr&uuml;finterval in Sekunden f&uuml;r eine Anwesenheitspr&uuml;fung. Standardwert: 30 Sekunden</li>
   <li>present-check-interval - Das Pr&uuml;finterval in Sekunden, wenn ein Ger&auml;t anwesend (<i>present</i>) ist. Falls nicht angegeben, wird der Wert aus check-interval verwendet</li>
   </ul>
   <br><br>
@@ -1427,7 +1460,7 @@ Options:
     <code>define &lt;name&gt; PRESENCE function {...} [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft den Anwesenheitsstatus mithilfe einer selbst geschriebenen Perl-Funktion (z.B. SNMP Abfrage).<br><br>
-    Diese Funktion muss 0 (Abwesend) oder 1 (Anwesend) zurückgeben. Ein entsprechendes Beispiel findet man im <a href="http://www.fhemwiki.de/wiki/Anwesenheitserkennung" target="_new">FHEM-Wiki</a>.<br><br>
+    Diese Funktion muss 0 (Abwesend) oder 1 (Anwesend) zur&uuml;ckgeben. Ein entsprechendes Beispiel findet man im <a href="http://www.fhemwiki.de/wiki/Anwesenheitserkennung" target="_new">FHEM-Wiki</a>.<br><br>
     <u>Beispiel</u><br><br>
     <code>define iPhone PRESENCE function {snmpCheck("10.0.1.1","0x44d77429f35c")</code><br><br>
     <b>Mode: shellscript</b><br><br>
@@ -1448,7 +1481,7 @@ Options:
     <u>Beispiel</u><br><br>
     <code>define iPhone PRESENCE lan-bluetooth 0a:4f:36:d8:f9:89 127.0.0.1:5222</code><br><br>
     <u>presenced</u><br><br>
-    <ul>Der presenced ist ein Perl Netzwerk Dienst, welcher eine Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten &uuml;ber Netzwerk bereitstellt. 
+    <ul>Der presenced ist ein Perl Netzwerkdienst, welcher eine Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten &uuml;ber Netzwerk bereitstellt. 
     Dieser lauscht standardm&auml;&szlig;ig auf TCP Port 5111 nach eingehenden Verbindungen von dem PRESENCE Modul oder einem collectord.<br>
 <PRE>
 Usage:
@@ -1481,6 +1514,40 @@ Options:
     <li>Perl Skript: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
     <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-1.4.deb" target="_new">presenced-1.4.deb</a></li>
     <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.4.deb" target="_new">presenced-rpi-1.4.deb</a></li>
+    </ul>
+    </ul><br><br>
+    <u>lepresenced</u><br><br>
+    <ul>lepresenced ist ein Perl Netzwerkdienst, der analog zu presenced eine
+    Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten
+    &uuml;ber Netzwerk bereitstellt. Im Gegensatz zu presenced unterst&uuml;tzt
+    lepresenced <u>Bluetooth 4.0 (Low Energy) Ger&auml;te wie z. B. Gigaset G-Tags,
+    FitBit Charges.</u>
+    lepresenced lauscht standardm&auml;&szlig;ig auf TCP Port 5333 und wartet
+    auf eingehende Verbindungen des PRESENCE-Moduls bzw. von collectord.<br>
+<PRE>
+Usage:
+    lepresenced --bluetoothdevice &lt;bluetooth device&gt; --listenaddress &lt;listen address&gt; --listenport &lt;listen port&gt; --loglevel &lt;log level&gt; --daemon
+    lepresenced -b &lt;bluetooth device&gt; -a &lt;listen address&gt; -p &lt;listen port> -l &lt;log level> -d
+    
+valid log levels:
+    LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO
+    
+Examples:
+	lepresenced --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon
+	lepresenced --loglevel LOG_DEBUG --daemon
+</PRE>
+    
+    Zur Bluetooth-Abfrage wird der Befehl <i>hcitool lescan</i> (Paket:
+    <a href="http://www.bluez.org" target="_new">bluez</a>) verwendet, der
+    fortw&auml;hrend auf die Beacons der Bluetooth-LE-Ger&auml;te lauscht.
+    <br><br>
+    
+    Wenn ein Ger&auml;t anwesend ist, wird dies an FHEM &uuml;bermittelt zusammen mit dem Ger&auml;tenamen als Reading.<br><br>
+    
+    Der le presenced ist zum Download verf&uuml;gbar als:<br><br>
+    <ul>
+    <li>Perl Skript: <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/lepresenced" target="_new">lepresenced</a></li>
+    <li>.deb Paket (architekturunabh&auml;ngig) unter <a href="http://svn.code.sf.net/p/fhem/code/trunk/fhem/contrib/PRESENCE/deb/" target="_new">contrib/PRESENCE/deb/</a></li>
     </ul>
     </ul><br><br>
     <u>collectord</u><br><br>
@@ -1568,20 +1635,20 @@ Options:
     Standardwert ist 0 (Erkennung durchf&uuml;hren)<br><br>
     <li><a name="PRESENCE_absenceThreshold">absenceThreshold</a></li>
     Die Anzahl an Checks, welche in "absent" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "absent" wechselt.
-    Mit dieser Funktion kann man die Abwesenheit eines Gerätes verifizieren bevor der Status final auf "absent" ge&auml;ndert wird.
+    Mit dieser Funktion kann man die Abwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "absent" ge&auml;ndert wird.
     Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, werden die Readings "state" und "presence" auf den Wert "maybe absent" gesetzt,
     bis der Status final auf "absent" oder "present" wechselt.<br><br>
     Standartwert ist 1 (keine Abwesenheitsverifizierung)<br><br>
     <li><a name="PRESENCE_ping_count">ping_count</a></li> (Nur im Modus "ping" anwendbar)<br>
     Ver&auml;ndert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
-    Je nach Netzwerkstabilität k&ouml;nnen erste Pakete verloren gehen oder blockiert werden.<br><br>
+    Je nach Netzwerkstabilit&auml;t k&ouml;nnen erste Pakete verloren gehen oder blockiert werden.<br><br>
     Standartwert ist 4 (Versuche)<br><br>
     <li><a name="PRESENCE_bluetooth_hci_device">bluetooth_hci_device</a></li> (Nur im Modus "local-bluetooth" anwendbar)<br>
     Sofern man mehrere Bluetooth-Empf&auml;nger verf&uuml;gbar hat, kann man mit diesem Attribut ein bestimmten Empf&auml;nger ausw&auml;hlen, welcher zur Erkennung verwendet werden soll (bspw. hci0, hci1, ...). Es muss dabei ein vorhandener HCI-Ger&auml;tename angegeben werden wie z.B. <code>hci0</code>.
     <br><br>
     <li><a name="PRESENCE_fritzbox_speed">fritzbox_speed</a></li> (Nur im Modus "fritzbox")<br>
     Zus&auml;tzlich zum Status des Ger&auml;ts wird die aktuelle Verbindungsgeschwindigkeit ausgegeben<br>
-    Das macht nur bei WLAN Geräten Sinn, die direkt mit der FritzBox verbunden sind. Bei abwesenden Ger&auml;ten wird als Geschwindigkeit 0 ausgegeben.
+    Das macht nur bei WLAN Ger&auml;ten Sinn, die direkt mit der FritzBox verbunden sind. Bei abwesenden Ger&auml;ten wird als Geschwindigkeit 0 ausgegeben.
     <br><br>
     M&ouml;gliche Werte: 0 => Geschwindigkeit nicht pr&uuml;fen, 1 => Geschwindigkeit pr&uuml;fen<br>
     Standardwert ist 0 (Keine Geschwindigkeitspr&uuml;fung)
