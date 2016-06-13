@@ -766,18 +766,13 @@ ZWave_Cmd($$@)
   my $isMc = ($id =~ m/(....)/);
   if(!$isMc) {
     if($type eq "set") {
-      $cmdList{neighborUpdate}{fmt} = "48$id";
-      $cmdList{neighborUpdate}{id} = "";
-      $cmdList{returnRouteAdd}{fmt} = "46$id%02x";
-      $cmdList{returnRouteAdd}{id} = "";
-      $cmdList{returnRouteDel}{fmt} = "47$id";
-      $cmdList{returnRouteDel}{id} = "";
+      $cmdList{neighborUpdate} = { fmt=>"48$id",     id=>"" };
+      $cmdList{returnRouteAdd} = { fmt=>"46$id%02x", id=>"" };
+      $cmdList{returnRouteDel} = { fmt=>"47$id",     id=>"" };
       my $iohash = $hash->{IODev};
       if($iohash && ReadingsVal($iohash->{NAME}, "sucNodeId","no") ne "no") {
-        $cmdList{sucRouteAdd}{fmt} = "51$id";
-        $cmdList{sucRouteAdd}{id} = "";
-        $cmdList{sucRouteDel}{fmt} = "55$id";
-        $cmdList{sucRouteDel}{id} = "";
+        $cmdList{sucRouteAdd} = { fmt=>"51$id", id=>"" };
+        $cmdList{sucRouteDel} = { fmt=>"55$id", id=>"" };
       }
     }
     $cmdList{neighborList}{fmt} = "x" if($type eq "get"); # Add meta command
@@ -885,11 +880,7 @@ ZWave_Cmd($$@)
   }
 
   my $data;
-  if($cmd eq "neighborUpdate" ||
-     $cmd eq "returnRouteAdd" ||
-     $cmd eq "returnRouteDel" ||
-     $cmd eq "sucRouteAdd"    ||
-     $cmd eq "sucRouteDel"    )  {
+  if(!$cmdId) {
     $data = $cmdFmt;
     $data .= ZWave_callbackId($baseHash);
 
@@ -931,11 +922,7 @@ ZWave_Cmd($$@)
   return (AttrVal($name,"verbose",3) > 2 ? $r : undef) if($r);
 
   if($type ne "get") {
-    if($cmd eq "neighborUpdate" ||
-       $cmd eq "returnRouteAdd" ||
-       $cmd eq "returnRouteDel" ||
-       $cmd eq "sucRouteAdd"    ||
-       $cmd eq "sucRouteDel"    )  {
+    if(!$cmdId) {
       ZWave_processSendStack($baseHash, "next");
     }
     $cmd .= " ".join(" ", @a) if(@a);
@@ -3626,6 +3613,7 @@ ZWave_processSendStack($$;$)
       if($ackType eq "ack" && $hash->{lastMsgSent});
     return;
   }
+  #Log 1, "pSS: $hash->{NAME}, $ackType $ss->[0]";
 
   if($ackType eq "retry") {
     $ss->[0] =~ m/^(.*)(set|get):(.*)$/;
@@ -3691,6 +3679,7 @@ ZWave_addToSendStack($$$)
   }
   my $ss = $hash->{SendStack};
   push @{$ss}, "$type:$cmd";
+  #Log 1, "aTSS: $hash->{NAME}, $type, $cmd / L:".int(@{$ss});
 
   if(ZWave_isWakeUp($hash)) {
     # SECURITY XXX
@@ -4154,7 +4143,7 @@ ZWave_Parse($$@)
         if(AttrVal($name, "eventForRaw", undef));
   readingsEndUpdate($hash, 1);
 
-  if($hash->{asyncGet} && $msg =~ m/$hash->{asyncGet}->{re}/) {
+  if($hash->{asyncGet} && $msg =~ m/$hash->{asyncGet}{re}/) {
     RemoveInternalTimer($hash->{asyncGet});
     asyncOutput($hash->{asyncGet}{CL}, join("\n", @event));
     delete($hash->{asyncGet});
