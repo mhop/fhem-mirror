@@ -922,7 +922,7 @@ ZWave_Cmd($$@)
       my $cmd2 = "$type $name $cmd";
       $cmd2 .= " ".join(" ", @a) if(@a);
       ZWave_secPutMsg($hash, $cc_cmd . $payload, $cmd2);
-      ZWave_secAddToSendStack($hash, '9840');
+      ZWave_secAddToSendStack($baseHash, '9840');
       return;
     }
   }
@@ -936,7 +936,7 @@ ZWave_Cmd($$@)
        $cmd eq "returnRouteDel" ||
        $cmd eq "sucRouteAdd"    ||
        $cmd eq "sucRouteDel"    )  {
-      ZWave_processSendStack($hash, "next");
+      ZWave_processSendStack($baseHash, "next");
     }
     $cmd .= " ".join(" ", @a) if(@a);
     readingsSingleUpdate($hash, "state", $cmd, 1);
@@ -4131,11 +4131,11 @@ ZWave_Parse($$@)
   }
 
   if($arg =~ m/^028407/) { # wakeup:notification
-    ZWave_wakeupTimer($hash, 1);
-    ZWave_processSendStack($hash, "next");
+    ZWave_wakeupTimer($baseHash, 1);
+    ZWave_processSendStack($baseHash, "next");
 
   } else {
-    ZWave_processSendStack($hash, "msg", $arg)
+    ZWave_processSendStack($baseHash, "msg", $arg)
       if(!ZWave_isWakeUp($hash) || $hash->{wakeupAlive});
 
   }
