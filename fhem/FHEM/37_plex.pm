@@ -44,7 +44,7 @@ plex_Initialize($)
   $hash->{SetFn}    = "plex_Set";
   $hash->{GetFn}    = "plex_Get";
   $hash->{AttrFn}   = "plex_Attr";
-  $hash->{AttrList} = "disable:1,0 httpPort responder:1,0 ignoredClients ignoredServers user password";
+  $hash->{AttrList} = "disable:1,0 httpPort ignoredClients ignoredServers removeUnusedReadings:1,0 responder:1,0 user password";
 }
 
 #####################################
@@ -2309,6 +2309,8 @@ plex_disappeared($$$)
       delete $chash->{controllable};
       delete $chash->{currentMediaType};
 
+      CommandDeleteReading( undef, "$chash->{NAME} currentTitle|currentAlbum|currentArtist|episode|series|key|cover|duration|type|track|playQueueID|playQueueItemID|server|section|shuffle|repeat" ) if( AttrVal($chash->{NAME}, 'removeUnusedReadings', 0 );
+
       readingsBeginUpdate($chash);
       readingsBulkUpdate($chash, 'presence', 'absent' );
       readingsBulkUpdate($chash, 'state', 'disappeared' );
@@ -2370,7 +2372,7 @@ plex_parseTimeline($$$)
   readingsBeginUpdate($chash);
   plex_readingsBulkUpdateIfChanged($chash, 'location', $xml->{location} );
   my $state;
-  my $controllable;
+  my $entries;
   delete $chash->{time};
   delete $chash->{seekRange};
   delete $chash->{controllable};
@@ -2392,8 +2394,8 @@ plex_parseTimeline($$$)
 
     $chash->{controllable} = $entry->{controllable} if( $entry->{controllable} );
 
-    if( $entry->{type} && $entry->{controllable}) {
-      $controllable->{ $entry->{type} } = $entry->{controllable};
+    if( $entry->{type} ) {
+      $entries->{ $entry->{type} } = $entry;
     }
 
     if( $entry->{time} ) {
@@ -2420,10 +2422,22 @@ plex_parseTimeline($$$)
 
   if( $state =~ '(\w*):(playing|paused)' ) {
     $chash->{currentMediaType} = $1;
-    $chash->{controllable} = $controllable->{$1} if( $controllable->{$1} );
+    if( defined($entries->{$1}) ) {
+      $chash->{controllable} = $entries->{$1}->{controllable} if ( defined($entries->{$1}->{controllable}) );
+
+      plex_readingsBulkUpdateIfChanged($chash, 'repeat', $entries->{$1}->{repeat} );
+      plex_readingsBulkUpdateIfChanged($chash, 'shuffle', $entries->{$1}->{shuffle} );
+      plex_readingsBulkUpdateIfChanged($chash, 'playQueueID', $entries->{$1}->{playQueueID} );
+      plex_readingsBulkUpdateIfChanged($chash, 'playQueueItemID', $entries->{$1}->{playQueueItemID} );
+    }
+
   } else {
     delete $chash->{currentMediaType};
+
+    CommandDeleteReading( undef, "$chash->{NAME} currentTitle|currentAlbum|currentArtist|episode|series|key|cover|duration|type|track|playQueueID|playQueueItemID|server|section|shuffle|repeat" ) if( AttrVal($chash->{NAME}, 'removeUnusedReadings', 0 );
+
   }
+
   plex_readingsBulkUpdateIfChanged($chash, 'state', $state );
   readingsEndUpdate($chash, 1);
 }
@@ -4163,6 +4177,7 @@ plex_publishToSonos($$;$)
     <li>httpPort</li>
     <li>ignoredClients</li>
     <li>ignoredServers</li>
+    <li>removeUnusedReadings</li>
     <li>user</li>
     <li>password<br>
       user and password of a myPlex account. required if plex home is used. both are stored obfuscated</li>
