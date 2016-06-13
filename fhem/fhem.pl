@@ -4093,7 +4093,8 @@ readingsBulkUpdate($$$@)
 
     if( $attreocr ) {
       if( my $attrtocr = $hash->{".attrtocr"} ) {
-        $update_timestamp = $changed if( $attrtocr && grep($reading =~ m/^$_$/, @{$attrtocr}) );
+        $update_timestamp = $changed
+                if( $attrtocr && grep($reading =~ m/^$_$/, @{$attrtocr}) );
       }
     }
 
@@ -4106,13 +4107,15 @@ readingsBulkUpdate($$$@)
                   ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attraggr"}};
     if(@v) {
       # e.g. power:20:linear:avg
-      my (undef, $duration, $method, $function, $holdTime) = split(":", $v[0], 5);
+      my (undef,$duration,$method,$function,$holdTime) = split(":", $v[0], 5);
       my $ts;
       if(defined($readings->{".ts"})) {
         $ts= $readings->{".ts"};
       } else {
         require "TimeSeries.pm";
-        $ts= TimeSeries->new( { method => $method, autoreset => $duration, holdTime => $holdTime } );
+        $ts= TimeSeries->new( { method => $method, 
+                                autoreset => $duration,
+                                holdTime => $holdTime } );
         $readings->{".ts"}= $ts;
         # access from command line:
         # { $defs{"myClient"}{READINGS}{"myValue"}{".ts"}{max} }
@@ -4130,7 +4133,8 @@ readingsBulkUpdate($$$@)
   }
   
   
-  setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"}) if( $update_timestamp ); 
+  setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"})
+        if($update_timestamp); 
   
   my $rv = "$reading: $value";
   if($changed) {
