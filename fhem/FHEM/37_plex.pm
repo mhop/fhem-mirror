@@ -2309,12 +2309,13 @@ plex_disappeared($$$)
       delete $chash->{controllable};
       delete $chash->{currentMediaType};
 
-      CommandDeleteReading( undef, "$chash->{NAME} currentTitle|currentAlbum|currentArtist|episode|series|key|cover|duration|type|track|playQueueID|playQueueItemID|server|section|shuffle|repeat" ) if( AttrVal($chash->{NAME}, 'removeUnusedReadings', 0 );
-
       readingsBeginUpdate($chash);
       readingsBulkUpdate($chash, 'presence', 'absent' );
       readingsBulkUpdate($chash, 'state', 'disappeared' );
       readingsEndUpdate($chash, 1);
+
+      CommandDeleteReading( undef, "$chash->{NAME} currentTitle|currentAlbum|currentArtist|episode|series|key|cover|duration|type|track|playQueueID|playQueueItemID|server|section|shuffle|repeat" ) if( AttrVal($chash->{NAME}, 'removeUnusedReadings', 0 );
+
     }
   }
 
@@ -2434,6 +2435,7 @@ plex_parseTimeline($$$)
   } else {
     delete $chash->{currentMediaType};
 
+    #FIXME: move after stop event
     CommandDeleteReading( undef, "$chash->{NAME} currentTitle|currentAlbum|currentArtist|episode|series|key|cover|duration|type|track|playQueueID|playQueueItemID|server|section|shuffle|repeat" ) if( AttrVal($chash->{NAME}, 'removeUnusedReadings', 0 );
 
   }
