@@ -2380,10 +2380,11 @@ FW_readIcons($)
 sub
 FW_iconName($)
 {
-  my ($name)= @_;
+  my ($oname)= @_;
+  my $name = $oname;
   $name =~ s/@.*//;
   foreach my $pe (@FW_iconDirs) {
-    return $name if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
+    return $oname if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
   }
   return undef;
 }
