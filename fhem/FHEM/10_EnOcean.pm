@@ -6240,6 +6240,16 @@ sub EnOcean_Parse($$)
     (undef, undef, $rorg, $data, $senderID, $destinationID, $funcNumber, $manufID, $RSSI, $delay) = @msg;
     if (exists $modules{EnOcean}{defptr}{$senderID}) {
       $hash = $modules{EnOcean}{defptr}{$senderID};
+      $name = $hash->{NAME};      
+      if (!exists $attr{$name}{remoteID}) {
+        $attr{$name}{remoteID} = $senderID;
+        Log3 $name, 2, "EnOcean $name remoteID $senderID assigned";
+        if (exists($iohash->{helper}{remoteAnswerWait}{hex($funcNumber)}{hash}) &&
+            $iohash->{helper}{remoteAnswerWait}{hex($funcNumber)}{hash} == $hash) {
+          delete $iohash->{helper}{remoteAnswerWait}{hex($funcNumber)}{hash};
+        }
+      }
+      
     } elsif (exists($iohash->{helper}{remoteAnswerWait}{hex($funcNumber)}{hash})) {
       # the remoteID is assigned to the requesting device
       $hash = $iohash->{helper}{remoteAnswerWait}{hex($funcNumber)}{hash};
