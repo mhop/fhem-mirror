@@ -1284,10 +1284,13 @@ FW_makeTableFromArray($$@) {
     FW_pO "$txt";
     FW_pO "<table class=\"block wide $class\">";
     foreach (sort @obj) {
-      FW_pF "<tr class=\"%s\"><td>", ($row&1)?"odd":"even";
-      $row++;
+      FW_pF "<tr class=\"%s\"><td>", (($row++)&1)?"odd":"even";
       FW_pH "detail=$_", $_;
-      FW_pO "</td><td><a href=$FW_ME?cmd=list%20TYPE=$defs{$_}{TYPE}>$defs{$_}{TYPE}</a></td><td> </td>";
+      FW_pO "</td><td>";
+      FW_pO $defs{$_}{STATE} if(defined($defs{$_}{STATE}));
+      FW_pO "</td><td>";
+      FW_pH "cmd=list TYPE=$defs{$_}{TYPE}", $defs{$_}{TYPE};
+      FW_pO "</td>";
       FW_pO "</tr>";
     }
     FW_pO "</table></div>";
