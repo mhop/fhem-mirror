@@ -1012,9 +1012,11 @@ HUEDevice_Parse($$)
   }
 
   $hash->{modelid} = $result->{modelid} if( defined($result->{modelid}) );
+  $hash->{productid} = $result->{productid} if( defined($result->{productid}) );
   $hash->{manufacturername} = $result->{manufacturername} if( defined($result->{manufacturername}) );
   $hash->{luminaireuniqueid} = $result->{luminaireuniqueid} if( defined($result->{luminaireuniqueid}) );
   $hash->{swversion} = $result->{swversion} if( defined($result->{swversion}) );
+  $hash->{swconfigid} = $result->{swconfigid} if( defined($result->{swconfigid}) );
 
   if( $hash->{helper}->{devtype} eq 'S' ) {
 
