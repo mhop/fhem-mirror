@@ -30,7 +30,7 @@ sub HUEBridge_Initialize($)
 
   # Provider
   $hash->{ReadFn}  = "HUEBridge_Read";
-  $hash->{WriteFn}  = "HUEBridge_Read";
+  $hash->{WriteFn} = "HUEBridge_Read";
   $hash->{Clients} = ":HUEDevice:";
 
   #Consumer
@@ -38,8 +38,9 @@ sub HUEBridge_Initialize($)
   $hash->{NotifyFn} = "HUEBridge_Notify";
   $hash->{SetFn}    = "HUEBridge_Set";
   $hash->{GetFn}    = "HUEBridge_Get";
+  $hash->{AttrFn}   = "HUEBridge_Attr";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
-  $hash->{AttrList}= "key disable:1 httpUtils:1,0 pollDevices:1,0 queryAfterSet:1,0";
+  $hash->{AttrList} = "key disable:1 disabledForIntervals httpUtils:1,0 pollDevices:1,0 queryAfterSet:1,0 $readingFnAttributes";
 }
 
 sub
@@ -114,7 +115,7 @@ HUEBridge_Define($$)
   $interval= 60 unless defined($interval);
   if( $interval < 10 ) { $interval = 10; }
 
-  $hash->{STATE} = 'Initialized';
+  readingsSingleUpdate($hash, 'state', 'initialized', 1 );
 
   $hash->{Host} = $host;
   $hash->{INTERVAL} = $interval;
@@ -131,7 +132,7 @@ HUEBridge_Define($$)
   $hash->{NOTIFYDEV} = "global";
 
   if( $init_done ) {
-    HUEBridge_OpenDev( $hash ) if( !AttrVal($name, "disable", 0) );
+    HUEBridge_OpenDev( $hash ) if( !IsDisabled($name) );
   }
 
   return undef;
@@ -146,7 +147,10 @@ HUEBridge_Notify($$)
   return if($dev->{NAME} ne "global");
   return if(!grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}));
 
-  return undef if( AttrVal($name, "disable", 0) );
+  if( IsDisabled($name) > 0 ) {
+    readingsSingleUpdate($hash, 'state', 'disabled', 1 ) if( ReadingsVal($name,'state','' ) ne 'disabled' );
+    return undef;
+  }
 
   HUEBridge_OpenDev($hash);
 
@@ -181,7 +185,8 @@ sub HUEBridge_fillBridgeInfo($$)
   }
 }
 
-sub HUEBridge_OpenDev($)
+sub
+HUEBridge_OpenDev($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
@@ -216,7 +221,7 @@ sub HUEBridge_OpenDev($)
 
   $hash->{mac} = $result->{'mac'};
 
-  $hash->{STATE} = 'Connected';
+  readingsSingleUpdate($hash, 'state', 'connected', 1 );
   HUEBridge_GetUpdate($hash);
 
   HUEBridge_Autocreate($hash);
@@ -228,7 +233,7 @@ sub HUEBridge_Pair($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  $hash->{STATE} = 'Pairing';
+  readingsSingleUpdate($hash, 'state', 'pairing', 1 );
 
   my $result = HUEBridge_Register($hash);
   if( $result->{'error'} )
@@ -241,7 +246,7 @@ sub HUEBridge_Pair($)
 
   $attr{$name}{key} = $result->{success}{username} if( $result->{success}{username} );
 
-  $hash->{STATE} = 'Paired';
+  readingsSingleUpdate($hash, 'state', 'paired', 1 );
 
   HUEBridge_OpenDev($hash);
 
@@ -279,8 +284,10 @@ HUEBridge_Set($@)
   my ($hash, $name, $cmd, @args) = @_;
   my ($arg, @params) = @args;
 
-  return "$name: not paired" if( $hash->{STATE} =~ m/^link/  );
-  #return "$name: not connected" if( $hash->{STATE} ne 'Connected'  );
+  $hash->{".triggerUsed"} = 1;
+
+  return "$name: not paired" if( ReadingsVal($name, 'state', '' ) =~ m/^link/ );
+  #return "$name: not connected" if( $hash->{STATE} ne 'connected'  );
 
   # usage check
   if($cmd eq 'statusRequest') {
@@ -306,7 +313,7 @@ HUEBridge_Set($@)
 
     $hash->{updatestate} = 3;
     $hash->{helper}{updatestate} = $hash->{updatestate};
-    $hash->{STATE} = "updating";
+    readingsSingleUpdate($hash, 'state', 'updating', 1 );
     return "starting update";
 
   } elsif($cmd eq 'autocreate') {
@@ -492,8 +499,8 @@ HUEBridge_Get($@)
   my ($hash, $name, $cmd, @args) = @_;
   my ($arg, @params) = @args;
 
-  return "$name: not paired" if( $hash->{STATE} =~ m/^link/  );
-  #return "$name: not connected" if( $hash->{STATE} ne 'Connected'  );
+  return "$name: not paired" if( ReadingsVal($name, 'state', '' ) =~ m/^link/ );
+  #return "$name: not connected" if( $hash->{STATE} ne 'connected'  );
   return "$name: get needs at least one parameter" if( !defined($cmd) );
 
   # usage check
@@ -630,8 +637,8 @@ HUEBridge_Parse($$)
     my $txt = $result->{swupdate}->{text};
     readingsSingleUpdate($hash, "swupdate", $txt, 1) if( $txt && $txt ne ReadingsVal($name,"swupdate","") );
     if( defined($hash->{updatestate}) ){
-      $hash->{STATE} = "update done" if( $result->{swupdate}->{updatestate} == 0 &&  $hash->{helper}{updatestate} >= 2 );
-      $hash->{STATE} = "update failed" if( $result->{swupdate}->{updatestate} == 2 &&  $hash->{helper}{updatestate} == 3 );
+      readingsSingleUpdate($hash, 'state', 'update done', 1 ) if( $result->{swupdate}->{updatestate} == 0 &&  $hash->{helper}{updatestate} >= 2 );
+      readingsSingleUpdate($hash, 'state', 'update failed', 1 ) if( $result->{swupdate}->{updatestate} == 2 &&  $hash->{helper}{updatestate} == 3 );
     }
 
     $hash->{updatestate} = $result->{swupdate}->{updatestate};
@@ -648,6 +655,8 @@ HUEBridge_Parse($$)
     delete( $hash->{updatestate} );
     delete( $hash->{helper}{updatestate} );
   }
+
+  readingsSingleUpdate($hash, 'state', $hash->{READINGS}{state}{VAL}, 0);
 }
 
 sub
@@ -725,7 +734,10 @@ HUEBridge_Autocreate($;$)
     }
   }
 
-  CommandSave(undef,undef) if( $autocreated && AttrVal( "autocreate", "autosave", 1 ) );
+  if( $autocreated ) {
+    Log3 $name, 2, "$name: autocreated $autocreated devices";
+    CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+  }
 
   return "created $autocreated devices";
 }
@@ -744,7 +756,7 @@ sub HUEBridge_ProcessResponse($$)
         {
           my $error = $obj->[0]->{error}->{'description'};
 
-          $hash->{STATE} = $error;
+          readingsSingleUpdate($hash, 'lastError', $error, 0 );
         }
 
     if( !AttrVal( $name,'queryAfterSet', 1 ) ) {
@@ -823,6 +835,11 @@ HUEBridge_Call($$$$;$)
   my ($hash,$chash,$path,$obj,$method) = @_;
   my $name = $hash->{NAME};
 
+  if( IsDisabled($name) ) {
+    readingsSingleUpdate($hash, 'state', 'disabled', 1 ) if( ReadingsVal($name,'state','' ) ne 'disabled' );
+    return undef;
+  }
+
   #Log3 $hash->{NAME}, 5, "Sending: " . Dumper $obj;
 
   my $json = undef;
@@ -857,14 +874,13 @@ HUEBridge_HTTP_Call($$$;$)
   my ($hash,$path,$obj,$method) = @_;
   my $name = $hash->{NAME};
 
-  return undef if($attr{$name} && $attr{$name}{disable});
   #return { state => {reachable => 0 } } if($attr{$name} && $attr{$name}{disable});
 
   my $uri = "http://" . $hash->{Host} . "/api";
   if( defined($obj) ) {
     $method = 'PUT' if( !$method );
 
-    if( $hash->{STATE} eq 'Pairing' ) {
+    if( ReadingsVal($name, 'state', '') eq 'pairing' ) {
       $method = 'POST';
     } else {
       $uri .= "/" . AttrVal($name, "key", "");
@@ -915,7 +931,6 @@ HUEBridge_HTTP_Call2($$$$;$)
   my ($hash,$chash,$path,$obj,$method) = @_;
   my $name = $hash->{NAME};
 
-  return undef if($attr{$name} && $attr{$name}{disable});
   #return { state => {reachable => 0 } } if($attr{$name} && $attr{$name}{disable});
 
   my $url = "http://" . $hash->{Host} . "/api";
@@ -924,7 +939,7 @@ HUEBridge_HTTP_Call2($$$$;$)
   if( defined($obj) ) {
     $method = 'PUT' if( !$method );
 
-    if( $hash->{STATE} eq 'Pairing' ) {
+    if( ReadingsVal($name, 'state', '') eq 'pairing' ) {
       $method = 'POST';
       $blocking = 1;
     } else {
@@ -1026,7 +1041,7 @@ HUEBridge_dispatch($$$;$)
           {
             my $error = $json->[0]->{error}->{'description'};
 
-            $hash->{STATE} = $error;
+            readingsSingleUpdate($hash, 'lastError', $error, 0 );
 
             Log3 $name, 3, $error;
           }
@@ -1216,6 +1231,46 @@ HUEBridge_HTTP_Request($$$@)
     return \%result;
   }
   return $ret;
+}
+
+sub
+HUEBridge_Attr($$$)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  my $orig = $attrVal;
+  $attrVal = int($attrVal) if($attrName eq "interval");
+  $attrVal = 60 if($attrName eq "interval" && $attrVal < 60 && $attrVal != 0);
+
+  if( $attrName eq "disable" ) {
+    my $hash = $defs{$name};
+    if( $cmd eq 'set' && $attrVal ne "0" ) {
+      readingsSingleUpdate($hash, 'state', 'disabled', 1 );
+    } else {
+      $attr{$name}{$attrName} = 0;
+      readingsSingleUpdate($hash, 'state', 'active', 1 );
+      HUEBridge_OpenDev($hash);
+    }
+  } elsif( $attrName eq "disabledForIntervals" ) {
+    my $hash = $defs{$name};
+    if( $cmd eq 'set' ) {
+      $attr{$name}{$attrName} = $attrVal;
+    } else {
+      $attr{$name}{$attrName} = "";
+    }
+
+    readingsSingleUpdate($hash, 'state', IsDisabled($name)?'disabled':'active', 1 );
+    HUEBridge_OpenDev($hash) if( !IsDisabled($name) );
+  }
+
+  if( $cmd eq 'set' ) {
+    if( $orig ne $attrVal ) {
+      $attr{$name}{$attrName} = $attrVal;
+      return $attrName ." set to ". $attrVal;
+    }
+  }
+
+  return;
 }
 
 1;
