@@ -87,7 +87,6 @@ sub km200_Initialize($)
 						       "loglevel:0,1,2,3,4,5,6 " .
 						       "IntervalDynVal " .
 						       "PollingTimeout " .
-							   "ConsoleMessage " .
 							   "DoNotPoll " .
 							   "ReadBackDelay " .
 						       $readingFnAttributes;
@@ -251,7 +250,6 @@ sub km200_Define($$)
 	  $hash->{INTERVALDYNVAL}                   = 300;
 	  $hash->{DELAYDYNVAL}                      = 60;
 	  $hash->{POLLINGTIMEOUT}                   = 5;
-	  $hash->{CONSOLEMESSAGE}					= false;
 	  $hash->{READBACKDELAY}					= 100;
 	  $hash->{temp}{ServiceCounterInit}         = 0;
 	  $hash->{temp}{ServiceCounterDyn}          = 0;
@@ -363,10 +361,6 @@ sub km200_Undefine($$)
 
 	Log3 $name, 3, $name. " - km200 has been undefined. The KM unit at $url will no longer polled.";
 
-	### Console output if activated
-	if ($hash->{CONSOLEMESSAGE} == true) {print("km200 has been undefined. The KM unit at $url will no longer polled.\n");}
-	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
-	
 	return undef;
 }
 ####END####### Deactivate module module after "undefine" command by fhem #######################################END#####
@@ -450,23 +444,6 @@ sub km200_Attr(@)
 		}
 		####END#### Check whether timeout is not too short
 	}
-	### Check whether console printout attribute has been provided
-	elsif($a[2] eq "ConsoleMessage") 
-	{
-		### If messages on console shall be visible
-		if ($a[3] == 1)
-		{
-			$hash->{CONSOLEMESSAGE}	= true;
-			Log3 $name, 4, $name. " : km200 - Console printouts enabled";
-			print("\n");
-		}
-		### If messages on console shall NOT be visible
-		else
-		{
-			$hash->{CONSOLEMESSAGE}	= false;
-			Log3 $name, 4, $name. " : km200 - Console printouts disabled";
-		}
-	}
 	### Check whether DoNotPoll attribute have been provided
 	elsif($a[2] eq "DoNotPoll") 
 	{
@@ -511,11 +488,9 @@ sub km200_Attr(@)
 				splice(@{$hash->{Secret}{KM200ALLSERVICES}}, $FoundPosition, 1);
 			}
 		}
-		### ConsoleMessages
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200 module is only polling the following services! \n @{$hash->{Secret}{KM200ALLSERVICES}} \n");}
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200 module is NOT  polling the following services! \n @{$hash->{Secret}{KM200DONOTPOLL}}   \n");}
-		
 		### Message for debugging purposes
+		Log3 $name, 5, $name. "km200 module is only polling the following services! \n @{$hash->{Secret}{KM200ALLSERVICES}}";
+		Log3 $name, 5, $name. "km200 module is NOT  polling the following services! \n @{$hash->{Secret}{KM200DONOTPOLL}}";
 		Log3 $name, 4, $name. " : km200 - The following services will not be polled: ". $a[3];
 		
 		### Interrupting all currently running Polling
@@ -631,8 +606,6 @@ sub km200_Get($@)
 	$hash->{temp}{service} = "";
 	$hash->{temp}{JsonRaw} = "";
 	
-	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
 
 	### Return value
 	return($ReturnMessage);
@@ -692,9 +665,6 @@ sub km200_Set($@)
 	$hash->{temp}{postdata} = "";
 	$hash->{temp}{service}  = "";
 	
-	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("________________________________________________________________________________________________________\n\n");}
-
 	return($ReturnMessage);
 }
 ####END####### Manipulate service after "Set" command by fhem ##################################################END#####
@@ -823,8 +793,8 @@ sub km200_PostSingleService($)
 	my $jsonRead;
 	my $JsonContent;
 	
-	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing value: " . $hash->{temp}{postdata} . " to the service                     : ". $Service . "\n");}
+	### Log file entry for debugging
+	Log3 $name, 5, $name. ("km200_Set - Writing value: " . $hash->{temp}{postdata} . " to the service                     : ". $Service . "\n");
 	
 	### Read the current json string 
 	$jsonRead = km200_GetSingleService($hash);	
@@ -847,6 +817,9 @@ sub km200_PostSingleService($)
 		### Save corrected string in hash
 		$hash->{temp}{service} = $Service;
 
+		### Log file entry for debugging
+		Log3 $name, 5, $name. "km200_Set - Trying to re-read Service - Assuming its a switchProgram list";
+
 		### Try again to read the current json string again with the corrected service
 		$jsonRead = km200_GetSingleService($hash);	
 
@@ -854,6 +827,9 @@ sub km200_PostSingleService($)
 		### If true, the requested service was a particular week of the switchProgram
 		if ($jsonRead -> {type} eq "switchProgram")
 		{
+			### Log file entry for debugging
+			Log3 $name, 5, $name. "km200_Set - It is a switchProgram list!";
+
 			### For each weekday, get current readings, delete all unnecessary blanks and transform to array
 			my $TempReadingVal;
 			
@@ -1091,13 +1067,12 @@ sub km200_PostSingleService($)
 			$JsonContent =~ s/{"switchPoints"://;
 			$JsonContent =~ s/]}/]/g;
 
-			### Delete the string marker out of json String and change time-string to integer.
-			$JsonContent =~ s/,"time":"/,"time":/g;
-			$JsonContent =~ s/"},{/},{/g;			
-
 			### Encrypt 
 			$hash->{temp}{jsoncontent} = $JsonContent;
 			$data = km200_Encrypt($hash);
+
+			### Log file entry for debugging
+			Log3 $name, 5, $name. "km200_Set - Trying to push switchPoint list to KM-Unit";
 			
 			### Create parameter set for HttpUtils_BlockingGet
 			my $param = {
@@ -1121,11 +1096,11 @@ sub km200_PostSingleService($)
 			if($err ne "") 
 			{
 				Log3 $name, 2, $name . " - ERROR: $err";
-				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
 				return $err;	
 			}
 
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Waiting for processing time (READBACKDELAY / [ms])     : " . $hash->{READBACKDELAY} . " \n");}
+			Log3 $name, 5, $name. ("Waiting for processing time (READBACKDELAY / [ms])     : " . $hash->{READBACKDELAY} . " \n");
+
 			### Make a pause before ReadBack
 			usleep ($hash->{READBACKDELAY}*1000);
 
@@ -1204,12 +1179,11 @@ sub km200_PostSingleService($)
 		if 	($FoundJsonItem == @{$ReReadContent})
 		{
 			$ReturnValue = "The service " . $Service . " has been changed succesfully!";
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service succesfully \n");}
+			Log3 $name, 5, $name. "Writing $Service succesfully \n";
 		}	
 		else
 		{
 			$ReturnValue = "ERROR - The service " . $Service . " could not changed! \n";
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service was NOT succesfully \n");}
 		}
 
 			### Return the status message
@@ -1252,11 +1226,10 @@ sub km200_PostSingleService($)
 		if($err ne "") 
 		{
 			Log3 $name, 2, $name . " - ERROR: $err";
-			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
 			return $err;	
 		}
 
-		if ($hash->{CONSOLEMESSAGE} == true) {print("Waiting for processing time (READBACKDELAY / [ms])     : " . $hash->{READBACKDELAY} . " \n");}
+		Log3 $name, 5, $name. ("Waiting for processing time (READBACKDELAY / [ms])     : " . $hash->{READBACKDELAY} . " \n");
 		### Make a pause before ReadBack
 		usleep ($hash->{READBACKDELAY}*1000);
 
@@ -1336,12 +1309,12 @@ sub km200_PostSingleService($)
 		if 	($FoundJsonItem == @{$ReReadContent})
 		{
 			$ReturnValue = "The service " . $Service . " has been changed succesfully!";
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service succesfully \n");}
-		}	
+			Log3 $name, 5, $name.  "The service $Service has been changed succesfully!";
+			}	
 		else
 		{
 			$ReturnValue = "ERROR - The service " . $Service . " could not changed! \n";
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Writing $Service was NOT succesfully \n");}
+			Log3 $name, 5, $name. "Writing $Service was NOT succesfully";
 		}
 
 		### Return the status message
@@ -1353,8 +1326,8 @@ sub km200_PostSingleService($)
 		### Save chosen value into hash to be send
 		$jsonSend->{value} = $hash->{temp}{postdata};
 
-		### Console outputs for debugging purposes
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - String value\n");}		
+		### Log file entry for debugging
+		Log3 $name, 5, $name. "km200_Set - String value";		
 
 		### Create full URL of the current Service to be written
 		my $url ="http://" . $km200_gateway_host . $Service;
@@ -1389,8 +1362,6 @@ sub km200_PostSingleService($)
 		if($err ne "") 
 		{
 			Log3 $name, 2, $name . " - ERROR: $err";
-			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
-		
 			return $err;	
 		}
 
@@ -1405,12 +1376,12 @@ sub km200_PostSingleService($)
 		if ($ReadValue->{value} eq $hash->{temp}{postdata})
 		{	
 			$ReturnValue = "The service " . $Service . " has been changed to: " . $ReadValue->{value};
-			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata} . "\n");}
+			Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata};
 		}
 		else
 		{
 			$ReturnValue = "ERROR - The service " . $Service . " could not changed.";
-			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " was NOT successful\n");}
+			Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " was NOT successful";
 		}
 
 		### Return the status message
@@ -1425,8 +1396,8 @@ sub km200_PostSingleService($)
 			### Save chosen value into hash to be send
 			$jsonSend->{value} = ($hash->{temp}{postdata}) * 1;	
 
-			### Console outputs for debugging purposes
-			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Numeric value\n");}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. "km200_Set - Numeric value";
 		
 			### Create full URL of the current Service to be written
 			my $url ="http://" . $km200_gateway_host . $Service;
@@ -1461,9 +1432,6 @@ sub km200_PostSingleService($)
 			if($err ne "") 
 			{
 				Log3 $name, 2, $name . " - ERROR: $err";
-				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_PostSingleService - Error: $err\n");}
-				
-				
 				return $err;	
 			}
 
@@ -1479,19 +1447,18 @@ sub km200_PostSingleService($)
 			if ($ReadValue->{value} eq $hash->{temp}{postdata})
 			{	
 				$ReturnValue = "The service " . $Service . " has been changed to: " . $ReadValue->{value} . "\n";
-				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata} . "\n");}
+				Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " succesfully with value: " . $hash->{temp}{postdata};
 			}
 			elsif ($jsonRead -> {value} == $ReadValue->{value})
 			{
 				$ReturnValue = "ERROR - The service " . $Service . " could not changed to: " . $hash->{temp}{postdata} . "\n The value is: " . $ReadValue->{value} . "\n";
-				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " was NOT successful\n");}
+				Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " was NOT successful";
 			}
 			else
 			{
 				$ReturnValue = "The service " . $Service . " has been rounded to: " . $ReadValue->{value} . "\n";
-				if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Writing " . $Service . " was rounded and changed successful\n");}
+				Log3 $name, 5, $name. "km200_Set - Writing " . $Service . " was rounded and changed successful";
 			}
-
 
 			### Return the status message
 			return $ReturnValue;
@@ -1499,8 +1466,8 @@ sub km200_PostSingleService($)
 		### If the value to be sent is NOT numeric
 		else
 		{
-			### Console outputs for debugging purposes
-			if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - ERROR - Float value expected!\n");}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. "km200_Set - ERROR - Float value expected!";
 			return ("km200_Set - ERROR - Float value expected!\n");
 		}
 	}
@@ -1509,9 +1476,6 @@ sub km200_PostSingleService($)
 	{
 		### Log entries for debugging purposes
 		Log3 $name, 4, $name. " : km200_SetSingleService - type unknown for : " .$Service;
-
-		### Console outputs for debugging purposes
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_Set - Type is unknown for $Service\n");}		
 	}
 }
 ####END####### Subroutine set individual data value ############################################################END##### 
@@ -1529,9 +1493,6 @@ sub km200_GetSingleService($)
 	   $json -> {value}				= "";
 	my $err;
 	my $data;
-
-	### Console outputs for debugging purposes
-	if ($hash->{CONSOLEMESSAGE} == true) {print("Obtaining value of                                     : " . $Service . "\n");}
 
 	### Log entries for debugging purposes
     Log3 $name, 5, $name. " : km200 - GetSingleService - service            : " .$Service;
@@ -1567,7 +1528,6 @@ sub km200_GetSingleService($)
 	if($err ne "") 
 	{
 		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_GetSingleService ERROR: $err\n");}
 		my $ReturnMessage ="ERROR";
 		$json -> {type}   = $ReturnMessage;
 		$json -> {value}  = $ReturnMessage;
@@ -1589,7 +1549,6 @@ sub km200_GetSingleService($)
 			or do 
 			{
 			Log3 $name, 5, $name. " : km200_GetSingleService - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
 			};
 
 			### Check whether the type is a single value containing a string or float value
@@ -1756,7 +1715,7 @@ sub km200_GetSingleService($)
 					}
 					else
 					{
-						if ($hash->{CONSOLEMESSAGE} == true) {print "dayOfWeek of unknow day: " . $item->{dayOfWeek};}
+						Log3 $name, 5, $name. "dayOfWeek of unknow day: " . $item->{dayOfWeek};
 					}
 				}
 
@@ -1880,7 +1839,6 @@ sub km200_GetSingleService($)
 		else 
 		{
 			Log3 $name, 4, $name. " : km200_GetSingleService: ". $Service . " NOT available";
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read                   : $Service \n";}
 		
 			my $ReturnMessage = "ERROR";
 			$json -> {type}   = $ReturnMessage;
@@ -1908,8 +1866,8 @@ sub km200_GetInitService($)
 	### If this this loop is accessed for the first time, stop the timer and set status
 	if ($ServiceCounterInit == 0)
 	{
-		### Console Message if enabled
-		if ($hash->{CONSOLEMESSAGE} == true) {print("\n" . "Sounding and importing of services started\n");}
+		### Log file entry for debugging
+		Log3 $name, 5, $name. "Sounding and importing of services started";
 		
 		### Set status of km200 fhem module
 		$hash->{STATE} = "Sounding...";
@@ -1960,8 +1918,7 @@ sub km200_ParseHttpResponseInit($)
 	{
 		### Create Log entry
 		Log3 $name, 2, $name . " : km200_ParseHttpResponseInit - ERROR - Service: ".$Service. ": No proper Communication with Gateway: " .$err;
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_ParseHttpResponseInit ERROR: $err\n");}
-				
+		
 		### Set status of km200 fhem module
 		$hash->{STATE} = "ERROR - Initial Connection failed... Try to re-connect in 10s";
 		
@@ -1987,8 +1944,7 @@ sub km200_ParseHttpResponseInit($)
 		}
 		or do 
 		{
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - CANNOT be parsed : ". $Service;
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be parsed by JSON         : $Service \n";}
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - CANNOT be parsed    : ". $Service;
 		};
 
 		### Check whether the type is a single value containing a string or float value
@@ -1999,7 +1955,7 @@ sub km200_ParseHttpResponseInit($)
 			my $JsonValue      = $json->{value};
 
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - id               : " .$JsonId;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - type             : " .$JsonType;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - value            : " .$JsonValue;
@@ -2013,24 +1969,25 @@ sub km200_ParseHttpResponseInit($)
 			### Write reading for fhem
 			readingsSingleUpdate( $hash, $JsonId, $JsonValue, 1);
 
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read";}
+			### Log file entry for debugging
+			my $LogMessage = " : The following Service can be read";
 
 			
 			### Check whether service is writeable and write name of service in array
 			if ($json->{writeable} == 1)
 			{
-				if ($hash->{CONSOLEMESSAGE} == true) {print " and is writeable     ";}
+				$LogMessage = $LogMessage . " and is writeable";
 				push (@KM200_WriteableServices, $Service);
 			}
 			else
 			{
 				# Do nothing
-				if ($hash->{CONSOLEMESSAGE} == true) {print "                      ";}
+				$LogMessage = $LogMessage . "                 ";
 			}
 
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId\n";}
+			### Log file entry for debugging
+			$LogMessage = $LogMessage . ": " . $JsonId;
+			Log3 $name, 4, $name. $LogMessage;
 		}	
 		### Check whether the type is an switchProgram
 		elsif ($json -> {type} eq "switchProgram")
@@ -2040,7 +1997,7 @@ sub km200_ParseHttpResponseInit($)
 			my @JsonValues     = $json->{switchPoints};
 
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - id               : " .$JsonId;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - type             : " .$JsonType;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - value            : " .@JsonValues;
@@ -2048,21 +2005,22 @@ sub km200_ParseHttpResponseInit($)
 			### Add service to the list of responding services
 			push (@KM200_RespondingServices, $Service);
 			
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read";}
+			### Log file entry for debugging
+			my $LogMessage = " : The following Service can be read";
 			
 			### Check whether service is writeable and write name of service in array
 			if ($json->{writeable} == 1)
 			{
-				if ($hash->{CONSOLEMESSAGE} == true) {print " and is writeable     ";}
+				$LogMessage = $LogMessage . " and is writeable";
 				push (@KM200_WriteableServices, $Service);
 			}
 			else
 			{
 				# Do nothing
-				if ($hash->{CONSOLEMESSAGE} == true) {print "                      ";}
+				$LogMessage = $LogMessage . "                 ";
 			}
-			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId\n";}
+			$LogMessage = $LogMessage . ": " .$JsonId;
+			Log3 $name, 4, $name . $LogMessage;
 			
 			### Set up variables
 			my $TempJsonId    = "";
@@ -2198,15 +2156,15 @@ sub km200_ParseHttpResponseInit($)
 				}
 				else
 				{
-					if ($hash->{CONSOLEMESSAGE} == true) {print "dayOfWeek of unknow day: " . $item->{dayOfWeek};}
+					Log3 $name, 5, $name. "dayOfWeek of unknow day: " . $item->{dayOfWeek};
 				}
 			}
 
 			### Create new Service and write reading for fhem
 			$TempJsonId = $JsonId . "/" . "1-Mo";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingMo, 1);
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. " : The following Service can be read and is writeable: " . $TempJsonId;
 			### Add service to the list of writeable services
 			push (@KM200_WriteableServices, $TempJsonId);
 
@@ -2214,8 +2172,8 @@ sub km200_ParseHttpResponseInit($)
 			### Create new Service and write reading for fhem
 			$TempJsonId = $JsonId . "/" . "2-Tu";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTu, 1);
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. " : The following Service can be read and is writeable: " . $TempJsonId;
 			### Add service to the list of writeable services
 			push (@KM200_WriteableServices, $TempJsonId);
 			
@@ -2223,8 +2181,8 @@ sub km200_ParseHttpResponseInit($)
 			### Create new Service and write reading for fhem
 			$TempJsonId = $JsonId . "/" . "3-We";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingWe, 1);
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. " : The following Service can be read and is writeable: " . $TempJsonId;
 			### Add service to the list of writeable services
 			push (@KM200_WriteableServices, $TempJsonId);
 
@@ -2232,8 +2190,8 @@ sub km200_ParseHttpResponseInit($)
 			### Create new Service and write reading for fhem
 			$TempJsonId = $JsonId . "/" . "4-Th";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingTh, 1);
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. " : The following Service can be read and is writeable: " . $TempJsonId;
 			### Add service to the list of writeable services
 			push (@KM200_WriteableServices, $TempJsonId);
 
@@ -2241,8 +2199,8 @@ sub km200_ParseHttpResponseInit($)
 			### Create new Service and write reading for fhem
 			$TempJsonId = $JsonId . "/" . "5-Fr";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingFr, 1);
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. " : The following Service can be read and is writeable: " . $TempJsonId;
 			### Add service to the list of writeable services
 			push (@KM200_WriteableServices, $TempJsonId);
 
@@ -2250,8 +2208,8 @@ sub km200_ParseHttpResponseInit($)
 			### Create new Service and write reading for fhem
 			$TempJsonId = $JsonId . "/" . "6-Sa";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSa, 1);
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. " : The following Service can be read and is writeable: " . $TempJsonId;
 			### Add service to the list of writeable services
 			push (@KM200_WriteableServices, $TempJsonId);
 
@@ -2259,8 +2217,8 @@ sub km200_ParseHttpResponseInit($)
 			### Create new Service and write reading for fhem
 			$TempJsonId = $JsonId . "/" . "7-Su";
 			readingsSingleUpdate( $hash, $TempJsonId, $TempReadingSu, 1);
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read and is writeable     : " . $TempJsonId . "\n";}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. " : The following Service can be read and is writeable: " . $TempJsonId;
 			### Add service to the list of writeable services
 			push (@KM200_WriteableServices, $TempJsonId);
 
@@ -2272,30 +2230,31 @@ sub km200_ParseHttpResponseInit($)
 			my $JsonType       = $json->{type};
 
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
+			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - value found for  : " .$Service;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - id               : " .$JsonId;
 			Log3 $name, 5, $name. " : km200_ParseHttpResponseInit - type             : " .$JsonType;
 
 			### Add service to the list of responding services
 			push (@KM200_RespondingServices, $Service);
 			
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read";}
+			### Log file entry for debugging
+			my $LogMessage = " : The following Service can be read";
 			
 			### Check whether service is writeable and write name of service in array
 			if ($json->{writeable} == 1)
 			{
-				if ($hash->{CONSOLEMESSAGE} == true) {print " and is writeable     ";}
+				$LogMessage = $LogMessage . " and is writeable     ";
+
 				push (@KM200_WriteableServices, $Service);
 			}
 			else
 			{
 				# Do nothing
-				if ($hash->{CONSOLEMESSAGE} == true) {print "                      ";}
+				$LogMessage = $LogMessage . "                 ";
 			}
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print ": $JsonId\n";}
-
+			### Log file entry for debugging
+			$LogMessage = $LogMessage . ": " . $JsonId;
+			Log3 $name, 4, $name . $LogMessage;
 			
 			### Sort list by timestamps descending
 			my $TempServiceIndex = 0;
@@ -2325,8 +2284,8 @@ sub km200_ParseHttpResponseInit($)
 				### Write Reading
 				readingsSingleUpdate( $hash, $TempServiceString, $TempErrorMessage, 1);
 				
-				### Console Message if enabled
-				if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service can be read                      : $TempServiceString\n";}
+				### Log file entry for debugging
+				Log3 $name, 5, $name. " : The following Service can be read                      : " .$TempServiceString;
 			}
 		}
 		### Check whether the type is an refEnum which is indicating an empty parent directory
@@ -2336,8 +2295,8 @@ sub km200_ParseHttpResponseInit($)
 			my $JsonType       = $json->{type};
 			my @JsonReferences = $json->{references};
 			
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service is an empty parent directory     : $JsonId\n";}
+			### Log file entry for debugging
+			Log3 $name, 5, $name. "The following Service is an empty parent directory     : " . $JsonId;
 			
 			### For each item found in this empty parent directory
 			foreach my $item (@{ $json->{references} })
@@ -2349,8 +2308,8 @@ sub km200_ParseHttpResponseInit($)
 				{
 					### Do nothing
 					
-					### Console Message if enabled
-					if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service has been found but is blacklisted: " . $item->{id} . "\n";}
+					### Log file entry for debugging
+					Log3 $name, 5, $name. "The following Service has been found but is blacklisted: " . $item->{id};
 				}
 				### If the Service found is NOT listed as blocked service
 				else
@@ -2366,24 +2325,18 @@ sub km200_ParseHttpResponseInit($)
 		else
 		{
 			### Log entries for debugging purposes
-			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - type unknown for : " .$Service;
-
-			### Console Message if enabled
-			if ($hash->{CONSOLEMESSAGE} == true) {print "The data type is unknown for the following Service     : $Service \n";}
+			Log3 $name, 4, $name. " : km200_ParseHttpResponseInit - type unknown for    : " .$Service;
 		}
 	}
 	### Check whether the decoded content is empty and therefore NOT available
 	else 
 	{
 		### Log entries for debugging purposes
-		Log3 $name, 4, $name. " : km200_ParseHttpResponseInit -  NOT available   : ". $Service;
-
-		### Console Message if enabled
-		if ($hash->{CONSOLEMESSAGE} == true) {print "The following Service CANNOT be read                   : $Service \n";}
+		Log3 $name, 4, $name. " : km200_ParseHttpResponseInit -  NOT available      : ". $Service;
 	}
 
 	### Log entries for debugging purposes
-	Log3 $name, 5, $name. " : km200_ParseHttpResponseInit    : response         : " .$data;
+	Log3 $name, 5, $name. " : km200_ParseHttpResponseInit    : response             : " .$data;
 
 	### Get the size of the array
 	@KM200_InitServices       = @{$hash ->{Secret}{KM200ALLSERVICES}};
@@ -2421,8 +2374,8 @@ sub km200_ParseHttpResponseInit($)
 		### Reset fullResponse error message
 		readingsSingleUpdate( $hash, "fullResponse", "OK", 1);
 		
-		### Console Message if enabled
-		if ($hash->{CONSOLEMESSAGE} == true) {print("Sounding and importing of services is completed\n________________________________________________________________________________________________________\n\n");}
+		### Log file entry for debugging
+		Log3 $name, 5, $name. "Sounding and importing of services is completed";
 
 		### Set status of km200 fhem module
 		$hash->{STATE} = "Standby";
@@ -2465,14 +2418,14 @@ sub km200_GetDynService($)
 	{
 		my $Service                  =   $KM200_DynServices[$ServiceCounterDyn];
 		
-		### Console outputs for debugging purposes
+		### Log file entry for debugging
 		if ($ServiceCounterDyn == 0)
 		{
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Starting download of dynamic services\n");}
+			Log3 $name, 5, $name. "Starting download of dynamic services";
 		}
 		
-		if ($hash->{CONSOLEMESSAGE} == true) {print("$Service\n");}
-		### Console outputs for debugging purposes
+		Log3 $name, 5, $name. "$Service";
+		### Log file entry for debugging
 		
 		my $url = "http://" . $km200_gateway_host . $Service;
 		my $param = {
@@ -2494,7 +2447,6 @@ sub km200_GetDynService($)
 	else
 	{
 		Log3 $name, 5, $name . " : No dynamic values available to be read. Skipping download.";
-		if ($hash->{CONSOLEMESSAGE} == true) {print("No dynamic values available to be read. Skipping download.\n")}
 	}
 }
 ####END####### Subroutine get dynamic data value ###############################################################END#####
@@ -2522,7 +2474,6 @@ sub km200_ParseHttpResponseDyn($)
 	{
 		Log3 $name, 2, $name . " : ERROR: Service: ".$Service. ": No proper Communication with Gateway: " .$err;
         readingsSingleUpdate($hash, "fullResponse", "ERROR", 1);
-		if ($hash->{CONSOLEMESSAGE} == true) {print("km200_ParseHttpResponseDyn ERROR: $err\n");}
 	}
 
 	$hash->{temp}{decodedcontent} = $data;
@@ -2538,7 +2489,6 @@ sub km200_ParseHttpResponseDyn($)
 		or do 
 		{
 			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
-			if ($hash->{CONSOLEMESSAGE} == true) {print("Data not parseable on km200 for " . $param->{url} . "\n");}
 		};
 		
 		### Check whether the type is a single value containing a string or float value
@@ -2708,7 +2658,7 @@ sub km200_ParseHttpResponseDyn($)
 				}
 				else
 				{
-					if ($hash->{CONSOLEMESSAGE} == true) {print "dayOfWeek of unknow day: " . $item->{dayOfWeek};}
+					Log3 $name, 5, $name. "dayOfWeek of unknow day: " . $item->{dayOfWeek};
 				}
 			}
 
@@ -2786,7 +2736,6 @@ sub km200_ParseHttpResponseDyn($)
 	else 
 	{
 		Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - Data not available on km200 for http://" . $param->{url};
-		if ($hash->{CONSOLEMESSAGE} == true) {print("Data not available on km200 for " . $param->{url} . "\n");}
 	}
 
 	
@@ -2807,7 +2756,6 @@ sub km200_ParseHttpResponseDyn($)
 	{
 		$hash->{STATE}                   = "Standby";
 		$hash->{temp}{ServiceCounterDyn} = 0;
-		if ($hash->{CONSOLEMESSAGE} == true) {print ("Finished\n________________________________________________________________________________________________________\n\n");}
 		
 		###START###### Re-Start the timer #####################################START####
 		InternalTimer(gettimeofday()+$hash->{INTERVALDYNVAL}, "km200_GetDynService", $hash, 1);
@@ -2958,18 +2906,6 @@ sub km200_ParseHttpResponseDyn($)
 			<tr><td><li><code>PollingTimeout</code> : </li></td><td>A valid time in order to allow the module to wait for a response of the KMxxx. Usually this value does not need to be changed but might in case of slow network or slow response.<BR>
 																	The default and minimum value is 5s.<BR>
 			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ConsoleMessage</code> : </li></td><td>A valid boolean value whether the activity and error messages shall be displayed in the console window. "0" (deactivated) or "1" (activated)<BR>
-																	The default value 0 (deactivated).<BR>
-			</td></tr>			
 			</td>
 		</tr>
 	</table>
@@ -3146,18 +3082,6 @@ sub km200_ParseHttpResponseDyn($)
 			<tr><td><li><code>PollingTimeout</code> : </li></td><td>Ein g&uuml;ltiger Zeitwert um dem KMxxx gen&uuml;gend Zeit zur Antwort einzelner Werte einzur&auml;umen. Normalerweise braucht dieser Wert nicht ver&auml;ndert werden, muss jedoch im Falle eines langsamen Netzwerks erh&ouml;ht werden<BR>
 																	 Der Default-Wert ist 5s.<BR>
 			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ConsoleMessage</code> : </li></td><td>Ein g&uuml;ltiger Boolean Wert (0 oder 1) welcher die Aktivit&auml;ten und Fehlermeldungen des Modul in der Konsole ausgibt. "0" (Deaktiviert) or "1" (Aktiviert)<BR>
-																	 Der Default-Wert ist 0 (Deaktiviert).<BR>
-			</td></tr>			
 			</td>
 		</tr>
 	</table>
