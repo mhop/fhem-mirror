@@ -53,6 +53,7 @@ sub GasCalculator_Initialize($)
     $hash->{STATE}				= "Init";
     $hash->{DefFn}				= "GasCalculator_Define";
     $hash->{UndefFn}			= "GasCalculator_Undefine";
+    $hash->{SetFn}           	= "GasCalculator_Set";
     $hash->{AttrFn}				= "GasCalculator_Attr";
 	$hash->{NotifyFn}			= "GasCalculator_Notify";
 	$hash->{NotifyOrderPrefix}	= "10-";   					# Want to be called before the rest
@@ -139,6 +140,29 @@ sub GasCalculator_Attr(@)
 }
 ####END####### Handle attributes after changes via fhem GUI ####################################################END#####
 
+###START###### Manipulate reading after "set" command by fhem #################################################START####
+sub GasCalculator_Set($@)
+{
+	my ( $hash, @a ) = @_;
+	
+	### If not enough arguments have been provided
+	if ( @a < 2 )
+	{
+		return "\"set GasCalculator\" needs at least one argument";
+	}
+		
+	my $name = shift @a;
+	my $reading  = shift @a;
+	my $value = join(" ", @a);
+	my $ReturnMessage;
+
+	### Write current value
+	readingsSingleUpdate($hash, $reading, $value, 1);
+
+	
+	return($ReturnMessage);
+}
+####END####### Manipulate reading after "set" command by fhem ##################################################END#####
 
 ###START###### Calculate gas meter values on changed events ###################################################START####
 sub GasCalculator_Notify($$)
@@ -488,7 +512,6 @@ sub GasCalculator_Notify($$)
 				}
 			}
 		}
-
 		
 		###### Do calculations
 		### Calculate DtCurrent (time difference) of previous and current timestamp / [s]
