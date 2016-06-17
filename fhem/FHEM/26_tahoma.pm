@@ -28,6 +28,7 @@
 # 2014-08-01 V 0100 first Version using XML Interface 
 # 2014-10-09 V 0101 
 # 2015-08-16 V 0199 first Version using JSON Interface 
+# 2015-08-20 V 0200 communication to server changes from xml to json
 
 package main;
 
@@ -35,7 +36,7 @@ use strict;
 use warnings;
 
 use utf8;
-#use Encode qw(encode_utf8);
+use Encode qw(encode_utf8 decode_utf8);
 use JSON;
 
 use LWP::UserAgent;
@@ -45,11 +46,6 @@ use HTTP::Cookies;
 sub tahoma_parseGetSetupPlaces($$);
 
 my $hash_;
-
-sub encode_utf8($)
-{
-	return @_;
-}
 
 sub tahoma_Initialize($)
 {
@@ -82,6 +78,8 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
+  my $ModuleVersion = "0020";
+  
   my $subtype;
   my $name = $a[0];
   if( $a[2] eq "DEVICE" && @a == 4 ) {
@@ -142,8 +140,9 @@ sub tahoma_Define($$)
 
     $hash->{username} = $username;
     $hash->{password} = $password;
-    $hash->{BLOCKING} = 0;
+    $hash->{BLOCKING} = 1;
     $hash->{INTERVAL} = 2;
+	$hash->{VERSION} = $ModuleVersion;
 
   } else {
     return "Usage: define <name> tahoma device\
@@ -353,22 +352,22 @@ sub tahoma_initDevice($)
   }
 
   if( $device && $subtype eq 'DEVICE' ) {
-    Log3 $name, 4, "$name: I/O device is label=".encode_utf8($device->{label});
+    Log3 $name, 4, "$name: I/O device is label=".$device->{label};
     $hash->{inType} = $device->{type};
-    $hash->{inLabel} = encode_utf8($device->{label});
+    $hash->{inLabel} = $device->{label};
     $hash->{inControllable} = $device->{controllableName};
     $hash->{inPlaceOID} = $device->{placeOID};
   }
   elsif( $device && $subtype eq 'PLACE' ) {
-    Log3 $name, 4, "$name: I/O device is label=".encode_utf8($device->{label});
+    Log3 $name, 4, "$name: I/O device is label=".$device->{label};
     $hash->{inType} = $device->{type};
-    $hash->{inLabel} = encode_utf8($device->{label});
+    $hash->{inLabel} = $device->{label};
     $hash->{inOID} = $device->{oid};
   }
   elsif( $device && $subtype eq 'SCENE' ) {
-    Log3 $name, 4, "$name: I/O device is label=".encode_utf8($device->{label});
+    Log3 $name, 4, "$name: I/O device is label=".$device->{label};
     $hash->{inType} = $device->{type};
-    $hash->{inLabel} = encode_utf8($device->{label});
+    $hash->{inLabel} = $device->{label};
     $hash->{inOID} = $device->{oid};
   }
 
@@ -466,7 +465,7 @@ sub tahoma_getStates($$)
     noshutdown => 1,
     hash => $hash,
     page => 'getStates',
-    data => encode_utf8($data),
+    data => decode_utf8($data),
     callback => \&tahoma_dispatch,
     nonblocking => $nonblocking,
   });
@@ -537,7 +536,7 @@ sub tahoma_applyRequest($$$)
     noshutdown => 1,
     hash => $hash->{IODev},
     page => 'apply',
-    data => encode_utf8($data),
+    data => decode_utf8($data),
     callback => \&tahoma_dispatch,
     nonblocking => $nonblocking,
   });
@@ -583,7 +582,7 @@ sub tahoma_dispatch($$$)
     Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=".length $data;
     Log3 $name, (length $data > 120)?3:5, "$name: tahoma_dispatch data=".encode_utf8($data);
 
-    #my $json = decode_json($data);
+    #my $json = encode_utf8(decode_json($data));
 	my $json = JSON->new->utf8(0)->decode($data);
 
     if( (ref $json ne 'ARRAY') && ($json->{errorResponse}) ) {
@@ -606,9 +605,14 @@ sub tahoma_dispatch($$$)
       tahoma_parseLogin($hash,$json);
     } elsif( $param->{page} eq 'getActionGroups' ) {
       tahoma_parseGetActionGroups($hash,$json);
+    } elsif( $param->{page} eq '../../enduserAPI/setup/gateways' ) {
+      tahoma_parseEnduserAPISetupGateways($hash,$json);
+    } elsif( $param->{page} eq 'getCurrentExecutions' ) {
+      tahoma_parseGetCurrentExecutions($hash,$json);
     } elsif( $param->{page} eq 'scheduleActionGroup' ) {
       tahoma_parseScheduleActionGroup($hash,$json);
     }
+	
     
   }
 }
@@ -661,9 +665,9 @@ sub tahoma_autocreate($)
     if($cmdret) {
       Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
     } else {
-      $cmdret= CommandAttr(undef,"$devname alias room ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{oid}) && !defined($device->{actions}) );
-      $cmdret= CommandAttr(undef,"$devname alias scene ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{oid}) && defined($device->{actions}) );
-      $cmdret= CommandAttr(undef,"$devname alias $device->{uiClass} ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{states}) );
+      $cmdret= CommandAttr(undef,"$devname alias room ".$device->{label}) if( defined($device->{label}) && defined($device->{oid}) && !defined($device->{actions}) );
+      $cmdret= CommandAttr(undef,"$devname alias scene ".$device->{label}) if( defined($device->{label}) && defined($device->{oid}) && defined($device->{actions}) );
+      $cmdret= CommandAttr(undef,"$devname alias $device->{uiClass} ".$device->{label}) if( defined($device->{label}) && defined($device->{states}) );
       $cmdret= CommandAttr(undef,"$devname room tahoma");
       $cmdret= CommandAttr(undef,"$devname IODev $name");
       $cmdret= CommandAttr(undef,"$devname webCmd dim") if( defined($device->{uiClass}) && ($device->{uiClass} eq "RollerShutter") );
@@ -685,6 +689,7 @@ sub tahoma_parseLogin($$)
     $hash->{logged_in} = 0;
     $hash->{STATE} = $json->{errorResponse}{message};
   } else {
+	$hash->{inVersion} = $json->{version};
     $hash->{logged_in} = 1;
   }
 }
@@ -720,7 +725,7 @@ sub tahoma_parseGetEvents($$)
             #print "$devname $state->{name} = $state->{value}\n";
             readingsBulkUpdate($d, "state", "dim".$state->{value}) if ($state->{name} eq "core:ClosureState");
             readingsBulkUpdate($d, "devicestate", $state->{value}) if ($state->{name} eq "core:OpenClosedState");
-            #readingsBulkUpdate($d, (split(":",$state->{name}))[-1], encode_utf8($state->{value}));
+            #readingsBulkUpdate($d, (split(":",$state->{name}))[-1], $state->{value});
           }
           my ($seconds) = gettimeofday();
           readingsBulkUpdate( $d, ".lastupdate", $seconds, 0 );
@@ -832,7 +837,7 @@ sub tahoma_parseGetStates($$)
           foreach my $state (@{$devices->{states}}) {
             readingsBulkUpdate($d, "state", "dim".$state->{value}) if ($state->{name} eq "core:ClosureState");
             readingsBulkUpdate($d, "devicestate", $state->{value}) if ($state->{name} eq "core:OpenClosedState");
-            #readingsBulkUpdate($d, (split(":",$state->{name}))[-1], encode_utf8($state->{value}));
+            #readingsBulkUpdate($d, (split(":",$state->{name}))[-1], $state->{value});
           }
           my ($seconds) = gettimeofday();
           readingsBulkUpdate( $d, ".lastupdate", $seconds, 0 );
@@ -841,6 +846,21 @@ sub tahoma_parseGetStates($$)
       }
     }
   }
+}
+
+sub tahoma_parseEnduserAPISetupGateways($$)
+{
+  my($hash, $json) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_parseEnduserAPISetupGateways";
+  $hash->{inGateway} = $json->{result};
+}
+
+sub tahoma_parseGetCurrentExecutions($$)
+{
+  my($hash, $json) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_parseGetCurrentExecutions";
 }
 
 sub tahoma_parseScheduleActionGroup($$)
@@ -875,8 +895,8 @@ sub tahoma_Get($$@)
       my $devices = tahoma_getDevices($hash,1);
       my $ret;
       foreach my $device (@{$devices}) {
-        $ret .= "$device->{deviceURL}\t".encode_utf8($device->{label})."\t$device->{uiClass}\t$device->{controllable}\t\n" if ($device->{deviceURL});
-        $ret .= "$device->{oid}\t".encode_utf8($device->{label})."\n" if ($device->{oid});
+        $ret .= "$device->{deviceURL}\t".$device->{label}."\t$device->{uiClass}\t$device->{controllable}\t\n" if ($device->{deviceURL});
+        $ret .= "$device->{oid}\t".$device->{label}."\n" if ($device->{oid});
       }
 
       $ret = "id\t\t\t\tname\t\t\tuiClass\t\tcontrollable\n" . $ret if( $ret );
