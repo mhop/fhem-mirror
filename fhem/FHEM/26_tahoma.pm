@@ -33,6 +33,7 @@
 # 2016-01-26 V 0202 bugs forcing some startup warning messages fixed
 # 2016-02-20 V 0203 perl exception while parsing json string captured
 # 2016-02-27 V 0204 commands open,close,my,stop and setClosure added
+# 2016-04-25 V 0205 commands taken from setup
 
 package main;
 
@@ -83,7 +84,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0201";
+  my $ModuleVersion = "0205";
   
   my $subtype;
   my $name = $a[0];
@@ -694,6 +695,35 @@ sub tahoma_autocreate($)
   print "tahoma_autocreate end, new=$autocreated\n";
 }
 
+sub tahoma_defineCommands($)
+{
+  my($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 4, "$name: tahoma_defineCommands";
+  
+  my $devices = $hash->{helper}{devices};
+  foreach my $device (@{$devices}) {
+    my ($id, $fid, $devname, $define);
+    if ($device->{deviceURL}) {
+      $id = $device->{deviceURL};
+      $fid = (split("/",$id))[-1];
+      $devname = "tahoma_". $fid;
+      $define = "$devname tahoma DEVICE $id";
+      if( defined $device->{definition}{commands}[0]{commandName} ) {
+        my $commandlist = "dim:slider,0,1,100";
+        foreach my $command (@{$device->{definition}{commands}}) {
+          $commandlist .= " " . $command->{commandName};
+          $commandlist .= ":noArg" if ($command->{nparams} == 0);
+        }
+        if( defined($modules{$hash->{TYPE}}{defptr}{"$fid"}) ) {
+          $modules{$hash->{TYPE}}{defptr}{"$fid"}{COMMANDS} = $commandlist;
+          Log3 $name, 4, "$name: tahoma_defineCommands fid=$fid commandlist=$commandlist";
+        }
+      }
+    }
+  }
+}
+
 sub tahoma_parseLogin($$)
 {
   my($hash, $json) = @_;
@@ -785,6 +815,7 @@ sub tahoma_parseGetSetup($$)
   }
 
   tahoma_autocreate($hash);
+  tahoma_defineCommands($hash);
 }
 
 sub tahoma_parseGetSetupPlaces($$)
@@ -823,6 +854,7 @@ sub tahoma_parseGetActionGroups($$)
     push( @{$devices}, $action );
   }
   tahoma_autocreate($hash);
+  tahoma_defineCommands($hash);
 }
 
 sub tahoma_parseRefreshAllStates($$)
@@ -934,10 +966,14 @@ sub tahoma_Set($$@)
 
     $cmd = "setClosure" if( $cmd eq "dim" );
     
-    if( $cmd eq "setClosure" || $cmd eq "open" || $cmd eq "close" || $cmd eq "my" || $cmd eq "stop" )
+    my @commands = split(" ",$list);
+    foreach my $command (@commands)
     {
-      tahoma_applyRequest($hash,1,$cmd,$val);
-      return undef;
+      if( $cmd eq (split(":",$command))[0])
+      {
+        tahoma_applyRequest($hash,1,$cmd,$val);
+        return undef;
+      }
     }
   }
   
