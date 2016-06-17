@@ -26,6 +26,7 @@
 # $Id: 26_tahoma.pm
 #
 # 2014-08-01 V 0100 first Version using XML Interface 
+# 2014-10-09 V 0101 
 
 package main;
 
@@ -55,13 +56,14 @@ sub tahoma_Initialize($)
   $hash->{GetFn}    = "tahoma_Get";
   $hash->{AttrFn}   = "tahoma_Attr";
   $hash->{AttrList} = "IODev ".
+                      "blocking ".
                       "debug:1 ".
                       "disable:1 ".
                       "interval ".
                       "logfile ".
+                      "proxy ".
                       "url ".
-                      "userAgent ".
-                      "proxy ";
+                      "userAgent ";
   $hash->{AttrList} .= $readingFnAttributes;
 }
 
@@ -133,7 +135,7 @@ sub tahoma_Define($$)
 
     $hash->{username} = $username;
     $hash->{password} = $password;
-
+    $hash->{BLOCKING} = 0;
     $hash->{INTERVAL} = 2;
 
   } else {
@@ -217,7 +219,7 @@ sub tahoma_login($)
                         'getSensorTriggers',
                         'getUserPreferences',
                         'getSetupOptions',
-                        'getAvailableProtocolsType',
+                        #'getAvailableProtocolsType',
                         'getActiveProtocolsType',
                         'getSetupQuota',
                         'getSetupDawnAndDuskTimes' );
@@ -689,14 +691,14 @@ sub tahoma_parseGetEvents($$)
     #print Dumper($xml);
     foreach my $devices ( @{$xml->{eventPollResponse}{events}{event}} ) {
       if( defined($devices->{deviceURL}) ) {
-        #print "\nDevice=$devices->{deviceURL} found\n";
+        print "\nDevice=$devices->{deviceURL} found\n";
         my $id = $devices->{deviceURL};
         my $fid = (split("/",$id))[-1];
         my $devname = "tahoma_". $fid;
         my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
-        if( defined($d) && $d->{NAME} eq $devname )
+        if( defined($d) )# && $d->{NAME} eq $devname )
         {
-          #print "\nDevice=$devices->{deviceURL} updated\n";
+          print "\nDevice=$devices->{deviceURL} updated\n";
           readingsBeginUpdate($d);
           foreach my $state (@{$devices->{deviceStates}{state}}) {
             #print "$devname $state->{name} = $state->{value}\n";
@@ -922,8 +924,11 @@ sub tahoma_Attr($$$)
     } else {
       $attr{$name}{$attrName} = 0;
     }
+  } elsif( $attrName eq "blocking" ) {
+    my $hash = $defs{$name};
+    $hash->{BLOCKING} = $attrVal;
   }
-
+  
   if( $cmd eq "set" ) {
     if( $orig ne $attrVal ) {
       $attr{$name}{$attrName} = $attrVal;
@@ -966,10 +971,10 @@ sub tahoma_UserAgent_NonblockingGet($)
   
   my $response = "";
   my $url = $hash->{url} . $param->{page};
-  $url .= $param->{subpage} if (defined $param->{subpage});
+  $url .= $param->{subpage} if ((defined $param->{subpage}) && !(substr($url,0,4) eq 'file'));
   $url .= '.xml' if (substr($url,0,4) eq 'file');
 
-  my $nonblocking = $param->{nonblocking} && !(substr($url,0,4) eq 'file');
+  my $nonblocking = !$hash->{BLOCKING} && $param->{nonblocking} && !(substr($url,0,4) eq 'file');
 
   if ($param->{data} && !(substr($url,0,4) eq 'file'))
   {
@@ -992,8 +997,10 @@ sub tahoma_UserAgent_NonblockingGet($)
         $response = $agent->post( $url, content => $data, ':content_cb' => sub()
           {
             my ($content, $response, $protocol, $entry) = @_;
+            #my $len = length $content;
+            #print "tahoma_UserAgent_NonblockingGet len=$len $content\n\n";
             $param->{callback}($param, undef, $content);
-            return;
+            #return;
           } );
       }
     }
@@ -1004,8 +1011,10 @@ sub tahoma_UserAgent_NonblockingGet($)
         $response = $agent->get( $url, ':content_cb' => sub()
           {
             my ($content, $response, $protocol, $entry) = @_;
+            #my $len = length $content;
+            #print "tahoma_UserAgent_NonblockingGet len=$len $content\n\n";
             $param->{callback}($param, undef, $content);
-            return;
+            #return;
           } );
       }
   }
