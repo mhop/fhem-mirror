@@ -30,6 +30,7 @@
 # 2015-08-16 V 0199 first Version using JSON Interface 
 # 2015-08-20 V 0200 communication to server changes from xml to json
 # 2015-09-20 V 0201 some standard requests after login which are not neccessary disabled (so the actual requests are not equal to flow of iphone app)
+# 2016-01-26 V 0202 bugs forcing some startup warning messages fixed
 
 package main;
 
@@ -473,6 +474,7 @@ sub tahoma_getStates($$)
   
 }
 
+sub tahoma_getDeviceList($$$);
 sub tahoma_getDeviceList($$$)
 {
   my ($hash,$oid,$deviceList) = @_;
@@ -581,7 +583,7 @@ sub tahoma_dispatch($$$)
     $data =~ s/\h+/ /g;
 	$data =~ s/\\\//\//g;
     Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=".length $data;
-    Log3 $name, (length $data > 120)?3:5, "$name: tahoma_dispatch data=".encode_utf8($data);
+    Log3 $name, (length $data > 120)?4:5, "$name: tahoma_dispatch data=".encode_utf8($data);
 
     #my $json = encode_utf8(decode_json($data));
 	my $json = JSON->new->utf8(0)->decode($data);
