@@ -31,6 +31,7 @@
 # 2015-08-20 V 0200 communication to server changes from xml to json
 # 2015-09-20 V 0201 some standard requests after login which are not neccessary disabled (so the actual requests are not equal to flow of iphone app)
 # 2016-01-26 V 0202 bugs forcing some startup warning messages fixed
+# 2016-02-20 V 0203 perl exception while parsing json string captured
 
 package main;
 
@@ -46,6 +47,7 @@ use LWP::ConnCache;
 use HTTP::Cookies;  
 
 sub tahoma_parseGetSetupPlaces($$);
+sub tahoma_UserAgent_NonblockingGet($);
 
 my $hash_;
 
@@ -585,9 +587,16 @@ sub tahoma_dispatch($$$)
     Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=".length $data;
     Log3 $name, (length $data > 120)?4:5, "$name: tahoma_dispatch data=".encode_utf8($data);
 
-    #my $json = encode_utf8(decode_json($data));
-	my $json = JSON->new->utf8(0)->decode($data);
-
+    # perl exception while parsing json string captured
+    my $json = {};
+    eval { $json = JSON->new->utf8(0)->decode($data); };
+    if ($@) {
+      Log3 $name, 3, "$name: tahoma_dispatch json string is faulty";
+      $hash->{lastError} = 'json string is faulty';
+      $hash->{logged_in} = 0;
+      return;
+    }
+    
     if( (ref $json ne 'ARRAY') && ($json->{errorResponse}) ) {
       $hash->{lastError} = $json->{errorResponse}{message};
       $hash->{logged_in} = 0;
@@ -1006,6 +1015,7 @@ sub tahoma_UserAgent_NonblockingGet($)
     # keep alive
     $agent->conn_cache(LWP::ConnCache->new());
 
+    $proxy = '' if (!defined $proxy);
     Log3 $name, 4, "tahoma_UserAgent_NonblockingGet create userAgent $userAgent, proxy=$proxy";
   }
   
