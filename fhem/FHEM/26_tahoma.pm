@@ -3,7 +3,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2014 mike3436 (mike3436@online.de)
+#  (c) 2015 mike3436 (mike3436@online.de)
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@
 # 2014-10-09 V 0101 
 # 2015-08-16 V 0199 first Version using JSON Interface 
 # 2015-08-20 V 0200 communication to server changes from xml to json
+# 2015-09-20 V 0201 some standard requests after login which are not neccessary disabled (so the actual requests are not equal to flow of iphone app)
 
 package main;
 
@@ -78,7 +79,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0020";
+  my $ModuleVersion = "0201";
   
   my $subtype;
   my $name = $a[0];
@@ -219,16 +220,16 @@ sub tahoma_login($)
   my @startup_pages = ( 'getEndUser',
                         'getSetup',
                         'getActionGroups',
-                        'getWeekPlanning',
-                        'getCalendarDayList',
-                        'getCalendarRuleList',
-                        'getScheduledExecutions',
-                        'getHistory',
-                        'getSetupTriggers',
-                        'getUserPreferences',
-                        'getSetupOptions',
-                        'getAvailableProtocolsType',
-                        'getActiveProtocolsType',
+                        #'getWeekPlanning',
+                        #'getCalendarDayList',
+                        #'getCalendarRuleList',
+                        #'getScheduledExecutions',
+                        #'getHistory',
+                        #'getSetupTriggers',
+                        #'getUserPreferences',
+                        #'getSetupOptions',
+                        #'getAvailableProtocolsType',
+                        #'getActiveProtocolsType',
                         '../../enduserAPI/setup/gateways',
                         'getCurrentExecutions' );
 
