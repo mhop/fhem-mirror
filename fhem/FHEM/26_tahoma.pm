@@ -25,15 +25,14 @@
 ################################################################ 
 # $Id: 26_tahoma.pm
 #
-# 2014-08-01 V 0100 first Version using XML Interface 
-# 2014-10-09 V 0101 
-# 2015-08-16 V 0199 first Version using JSON Interface 
-# 2015-08-20 V 0200 communication to server changes from xml to json
-# 2015-09-20 V 0201 some standard requests after login which are not neccessary disabled (so the actual requests are not equal to flow of iphone app)
-# 2016-01-26 V 0202 bugs forcing some startup warning messages fixed
+# 2014-08-01 V 0100 first Version using XML Interface
+# 2015-08-16 V 0200 communication to server changes from xml to json
+# 2015-08-16 V 0201 some standard requests after login which are not neccessary disabled (so the actual requests are not equal to flow of iphone app)
+# 2016-02-14 V 0202 bugs forcing some startup warning messages fixed
 # 2016-02-20 V 0203 perl exception while parsing json string captured
-# 2016-02-27 V 0204 commands open,close,my,stop and setClosure added
-# 2016-04-25 V 0205 commands taken from setup
+# 2016-02-24 V 0204 commands open,close,my,stop and setClosure added
+# 2016-04-24 V 0205 commands taken from setup
+# 2016-06-16 V 0206 updateDevices called for devices created before setup has been read
 
 package main;
 
@@ -43,6 +42,7 @@ use warnings;
 use utf8;
 use Encode qw(encode_utf8 decode_utf8);
 use JSON;
+#use Data::Dumper;
 
 use LWP::UserAgent;
 use LWP::ConnCache;
@@ -84,7 +84,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0205";
+  my $ModuleVersion = "0206";
   
   my $subtype;
   my $name = $a[0];
@@ -349,32 +349,36 @@ sub tahoma_initDevice($)
   }
 
   my $device;
-  if( $hash->{device} ) {
+  if( defined($hash->{device}) ) {
     $device = tahoma_getDeviceDetail( $hash, $hash->{device} );
     #Log3 $name, 4, Dumper($device);
-  } elsif( $hash->{oid} ) {
+  } elsif( defined($hash->{oid}) ) {
     $device = tahoma_getDeviceDetail( $hash, $hash->{oid} );
     #Log3 $name, 4, Dumper($device);
   }
 
-  if( $device && $subtype eq 'DEVICE' ) {
+  if( defined($device) && ($subtype eq 'DEVICE') ) {
     Log3 $name, 4, "$name: I/O device is label=".$device->{label};
     $hash->{inType} = $device->{type};
     $hash->{inLabel} = $device->{label};
     $hash->{inControllable} = $device->{controllableName};
     $hash->{inPlaceOID} = $device->{placeOID};
   }
-  elsif( $device && $subtype eq 'PLACE' ) {
+  elsif( defined($device) && ($subtype eq 'PLACE') ) {
     Log3 $name, 4, "$name: I/O device is label=".$device->{label};
     $hash->{inType} = $device->{type};
     $hash->{inLabel} = $device->{label};
     $hash->{inOID} = $device->{oid};
   }
-  elsif( $device && $subtype eq 'SCENE' ) {
+  elsif( defined($device) && ($subtype eq 'SCENE') ) {
     Log3 $name, 4, "$name: I/O device is label=".$device->{label};
     $hash->{inType} = $device->{type};
     $hash->{inLabel} = $device->{label};
     $hash->{inOID} = $device->{oid};
+  }
+  else
+  {
+    Log3 $name, 4, "$name: unknown device=$hash->{device}, subtype=$subtype";
   }
 
 
@@ -404,6 +408,53 @@ sub tahoma_initDevice($)
     $hash->{helper}{readingNames} = \@reading_names;
   }
   #$attr{$name}{stateFormat} = $state_format if( !defined( $attr{$name}{stateFormat} ) && defined($state_format) );
+}
+
+sub tahoma_updateDevices($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "updateDevices";
+
+  return undef if( !$hash->{helper}{devices} ) ;
+  
+  $hash = $hash->{IODev} if( defined($hash->{IODev}) );
+
+  foreach my $module (keys %{$modules{$hash->{TYPE}}{defptr}}) {
+    my $def = $modules{$hash->{TYPE}}{defptr}{"$module"};
+    my $subtype = $def->{SUBTYPE};
+    if (defined($def->{oid}) && !defined($def->{inType}))
+    {
+      Log3 $name, 3, "updateDevices oid=$def->{oid}";
+      my $device = tahoma_getDeviceDetail( $hash, $def->{oid} );
+      if( defined($device) && ($subtype eq 'PLACE') ) {
+        Log3 $name, 4, "$name: I/O device is label=".$device->{label};
+        $hash->{inType} = $device->{type};
+        $hash->{inLabel} = $device->{label};
+        $hash->{inOID} = $device->{oid};
+      }
+      elsif( defined($device) && ($subtype eq 'SCENE') ) {
+        Log3 $name, 4, "$name: I/O device is label=".$device->{label};
+        $hash->{inType} = $device->{type};
+        $hash->{inLabel} = $device->{label};
+        $hash->{inOID} = $device->{oid};
+      }
+    }
+    elsif (defined($def->{device}) && !defined($def->{inType}))
+    {
+      Log3 $name, 3, "updateDevices device=$def->{device}";
+      my $device = tahoma_getDeviceDetail( $hash, $def->{device} );
+      if( defined($device) && ($subtype eq 'DEVICE') ) {
+        Log3 $name, 4, "$name: I/O device is label=".$device->{label};
+        $def->{inType} = $device->{type};
+        $def->{inLabel} = $device->{label};
+        $def->{inControllable} = $device->{controllableName};
+        $def->{inPlaceOID} = $device->{placeOID};
+      }
+    }
+  }
+
+  return undef;
 }
 
 sub tahoma_getDevices($;$)
@@ -815,6 +866,7 @@ sub tahoma_parseGetSetup($$)
   }
 
   tahoma_autocreate($hash);
+  tahoma_updateDevices($hash);
   tahoma_defineCommands($hash);
 }
 
@@ -854,6 +906,7 @@ sub tahoma_parseGetActionGroups($$)
     push( @{$devices}, $action );
   }
   tahoma_autocreate($hash);
+  tahoma_updateDevices($hash);
   tahoma_defineCommands($hash);
 }
 
@@ -966,7 +1019,7 @@ sub tahoma_Set($$@)
 
     $cmd = "setClosure" if( $cmd eq "dim" );
     
-    my @commands = split(" ",$list);
+   my @commands = split(" ",$list);
     foreach my $command (@commands)
     {
       if( $cmd eq (split(":",$command))[0])
