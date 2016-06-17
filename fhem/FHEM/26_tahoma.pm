@@ -32,6 +32,7 @@
 # 2015-09-20 V 0201 some standard requests after login which are not neccessary disabled (so the actual requests are not equal to flow of iphone app)
 # 2016-01-26 V 0202 bugs forcing some startup warning messages fixed
 # 2016-02-20 V 0203 perl exception while parsing json string captured
+# 2016-02-27 V 0204 commands open,close,my,stop and setClosure added
 
 package main;
 
@@ -500,9 +501,9 @@ sub tahoma_getDeviceList($$$)
   }
 }
 
-sub tahoma_applyRequest($$$)
+sub tahoma_applyRequest($$$$)
 {
-  my ($hash,$nonblocking,$value) = @_;
+  my ($hash,$nonblocking,$command,$value) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "tahoma_applyRequest";
 
@@ -525,12 +526,13 @@ sub tahoma_applyRequest($$$)
   
   return if (scalar @devices < 1);
 
+  $value = '' if (!defined($value));
   my $data = '{"label":"';
   $data .= $hash->{inLabel}.' - Positionieren auf '.$value.' % - iPhone","actions":[';
   foreach my $device (@devices) {
     $data .= ',' if substr($data, -1) eq '}';
     $data .= '{"deviceURL":"'.$device->{device}.'",';
-    $data .= '"commands":[{"name":"setClosure","parameters":['.$value.']}]}';
+    $data .= '"commands":[{"name":"'.$command.'","parameters":['.$value.']}]}';
   }
   $data .= ']}';
 
@@ -927,12 +929,14 @@ sub tahoma_Set($$@)
   my $list = "";
   if( $hash->{SUBTYPE} eq "DEVICE" ||
       $hash->{SUBTYPE} eq "PLACE" ) {
-    $list = "dim:slider,0,1,100";
+    $list = "dim:slider,0,1,100 setClosure open:noArg close:noArg my:noArg stop:noArg";
+    $list = $hash->{COMMANDS} if (defined $hash->{COMMANDS});
 
-    if( $cmd eq "dim" ) {
-      #if( $hash->{SUBTYPE} eq "DEVICE" ) {
-        tahoma_applyRequest($hash,1,$val);
-      #}
+    $cmd = "setClosure" if( $cmd eq "dim" );
+    
+    if( $cmd eq "setClosure" || $cmd eq "open" || $cmd eq "close" || $cmd eq "my" || $cmd eq "stop" )
+    {
+      tahoma_applyRequest($hash,1,$cmd,$val);
       return undef;
     }
   }
