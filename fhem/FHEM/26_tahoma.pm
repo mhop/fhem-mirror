@@ -27,14 +27,16 @@
 #
 # 2014-08-01 V 0100 first Version using XML Interface 
 # 2014-10-09 V 0101 
+# 2015-08-16 V 0199 first Version using JSON Interface 
 
 package main;
 
 use strict;
 use warnings;
 
-use Encode qw(encode_utf8);
-use XML::Simple qw(:strict);
+use utf8;
+#use Encode qw(encode_utf8);
+use JSON;
 
 use LWP::UserAgent;
 use LWP::ConnCache;
@@ -43,6 +45,11 @@ use HTTP::Cookies;
 sub tahoma_parseGetSetupPlaces($$);
 
 my $hash_;
+
+sub encode_utf8($)
+{
+	return @_;
+}
 
 sub tahoma_Initialize($)
 {
@@ -192,9 +199,9 @@ sub tahoma_login($)
   Log3 $name, 4, "$name: tahoma_login";
   
   $hash->{logged_in} = undef;
-  $hash->{url} = "https://www.tahomalink.com/enduser-mobile-web/externalAPI/";
+  $hash->{url} = "https://www.tahomalink.com/enduser-mobile-web/externalAPI/json/";
   $hash->{url} = $attr{$name}{url} if (defined $attr{$name}{url});
-  $hash->{userAgent} = "TaHoma/3.1 CFNetwork/548.1.4 Darwin/11.0.0";
+  $hash->{userAgent} = "TaHoma/3640 CFNetwork/711.1.16 Darwin/14.0.0";
   $hash->{userAgent} = $attr{$name}{userAgent} if (defined $attr{$name}{userAgent});
   $hash->{timeout} = 10;
 
@@ -214,20 +221,23 @@ sub tahoma_login($)
                         'getSetup',
                         'getActionGroups',
                         'getWeekPlanning',
+                        'getCalendarDayList',
+                        'getCalendarRuleList',
                         'getScheduledExecutions',
                         'getHistory',
-                        'getSensorTriggers',
+                        'getSetupTriggers',
                         'getUserPreferences',
                         'getSetupOptions',
-                        #'getAvailableProtocolsType',
+                        'getAvailableProtocolsType',
                         'getActiveProtocolsType',
-                        'getSetupQuota',
-                        'getSetupDawnAndDuskTimes' );
+                        '../../enduserAPI/setup/gateways',
+                        'getCurrentExecutions' );
 
   foreach my $page (@startup_pages) {
     my $subpage = "";
-    $subpage = '?gatewayId='.$hash->{gatewayId} if (substr($page, -13, 13) eq 'ProtocolsType');
+    $subpage = '?gatewayId='.$hash->{gatewayId} if (substr($page, -13) eq 'ProtocolsType');
     $subpage = '?quotaId=smsCredit' if ($page eq 'getSetupQuota');
+    $subpage = '/'.$hash->{gatewayId}.'/version' if (substr($page, -8) eq 'gateways');
     tahoma_UserAgent_NonblockingGet({
       timeout => 10,
       noshutdown => 1,
@@ -240,16 +250,16 @@ sub tahoma_login($)
     return if (!$hash->{logged_in});
   }
   
-  tahoma_refreshState($hash, 0);
-  tahoma_requestState($hash, 0);
+  tahoma_refreshAllStates($hash, 0);
+  tahoma_getStates($hash, 0);
   tahoma_getEvents($hash, 1);
 }
 
-sub tahoma_refreshState($$)
+sub tahoma_refreshAllStates($$)
 {
   my ($hash,$nonblocking) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "$name: tahoma_refreshState";
+  Log3 $name, 4, "$name: tahoma_refreshAllStates";
 
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
@@ -298,8 +308,8 @@ sub tahoma_readStatusTimer($)
   else
   {
     Log3 $name, 4, "$name: refreshing state";
-    tahoma_refreshState($hash, 0);
-    tahoma_requestState($hash, 1);
+    tahoma_refreshAllStates($hash, 0);
+    tahoma_getStates($hash, 1);
     $hash->{refreshStateTimer} = $seconds + 300;
   }
 
@@ -346,7 +356,7 @@ sub tahoma_initDevice($)
     Log3 $name, 4, "$name: I/O device is label=".encode_utf8($device->{label});
     $hash->{inType} = $device->{type};
     $hash->{inLabel} = encode_utf8($device->{label});
-    $hash->{inControllable} = $device->{controllable};
+    $hash->{inControllable} = $device->{controllableName};
     $hash->{inPlaceOID} = $device->{placeOID};
   }
   elsif( $device && $subtype eq 'PLACE' ) {
@@ -364,12 +374,12 @@ sub tahoma_initDevice($)
 
 
   my $state_format;
-  if( $device->{state} ) {
+  if( $device->{states} ) {
     delete($hash->{dataTypes});
     delete($hash->{helper}{dataTypes});
 
     my @reading_names = ();
-    foreach my $type (@{$device->{state}}) {
+    foreach my $type (@{$device->{states}}) {
       $hash->{dataTypes} = "" if ( !defined($hash->{dataTypes}) );
       $hash->{dataTypes} .= "," if ( $hash->{dataTypes} );
       $hash->{dataTypes} .= $type->{name};
@@ -426,28 +436,30 @@ sub tahoma_getDeviceDetail($$)
   return undef;
 }
 
-sub tahoma_requestState($$)
+sub tahoma_getStates($$)
 {
   my ($hash,$nonblocking) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "tahoma_requestState";
+  Log3 $name, 4, "getStates";
 
-  my $data = '<?xml version="1.0" encoding="UTF-8"?><statesRequest>';
+  my $data = '[';
   
   foreach my $device (@{$hash->{helper}{devices}}) {
-    if( defined($device->{deviceURL}) && defined($device->{state}) )
+    if( defined($device->{deviceURL}) && defined($device->{states}) )
     {
-      $data .= '<device deviceURL="'.$device->{deviceURL}.'">';
-      foreach my $state (@{$device->{state}}) {
-        $data .= '<state name="' . $state->{name} . '"/>';
+      $data .= ',' if (substr($data, -1) eq '}');
+      $data .= '{"deviceURL":"'.$device->{deviceURL}.'","states":[';
+      foreach my $state (@{$device->{states}}) {
+        $data .= ',' if (substr($data, -1) eq '}');
+        $data .= '{"name":"' . $state->{name} . '"}';
       }
-      $data .= '</device>';
+      $data .= ']}';
     }
   }
   
-  $data .= '</statesRequest>';
+  $data .= ']';
 
-  Log3 $name, 5, "tahoma_requestState data=".$data;
+  Log3 $name, 5, "tahoma_getStates data=".$data;
   
   tahoma_UserAgent_NonblockingGet({
     timeout => 10,
@@ -508,14 +520,15 @@ sub tahoma_applyRequest($$$)
   }
   
   return if (scalar @devices < 1);
-  
-  my $data = '<?xml version="1.0" encoding="UTF-8"?><applyRequest><actionGroup label="';
-  $data .= $hash->{inLabel}.' - Positionieren auf '.$value.' % - iPhone">';
+
+  my $data = '{"label":"';
+  $data .= $hash->{inLabel}.' - Positionieren auf '.$value.' % - iPhone","actions":[';
   foreach my $device (@devices) {
-    $data .= '<action deviceURL="'.$device->{device}.'">';
-    $data .= '<command name="setClosure"><parameter value="'.$value.'" type="'.$device->{type}.'"/></command></action>';
+    $data .= ',' if substr($data, -1) eq '}';
+    $data .= '{"deviceURL":"'.$device->{device}.'",';
+    $data .= '"commands":[{"name":"setClosure","parameters":['.$value.']}]}';
   }
-  $data .= '</actionGroup></applyRequest>';
+  $data .= ']}';
 
   Log3 $name, 3, "tahoma_applyRequest data=".$data;
   
@@ -565,33 +578,36 @@ sub tahoma_dispatch($$$)
     $hash->{logged_in} = 0;
   } elsif( $data ) {
     $data =~ tr/\r\n//d;
+    $data =~ s/\h+/ /g;
+	$data =~ s/\\\//\//g;
     Log3 $name, 4, "$name: tahoma_dispatch page=$param->{page} dataLen=".length $data;
     Log3 $name, (length $data > 120)?3:5, "$name: tahoma_dispatch data=".encode_utf8($data);
 
-    my $xml = XMLin($data, KeyAttr => { }, ForceArray => [ 'gateway', 'state', 'place', 'device', 'event' ], keeproot => 1);
+    #my $json = decode_json($data);
+	my $json = JSON->new->utf8(0)->decode($data);
 
-    if( $xml->{errorResponse} ) {
-      $hash->{lastError} = $xml->{errorResponse}{message};
+    if( (ref $json ne 'ARRAY') && ($json->{errorResponse}) ) {
+      $hash->{lastError} = $json->{errorResponse}{message};
       $hash->{logged_in} = 0;
       return;
     }
 
     if( $param->{page} eq 'getEvents' ) {
-      tahoma_parseGetEvents($hash,$xml);
+      tahoma_parseGetEvents($hash,$json);
     } elsif( $param->{page} eq 'apply' ) {
-      tahoma_parseApplyRequest($hash,$xml);
+      tahoma_parseApplyRequest($hash,$json);
     } elsif( $param->{page} eq 'getSetup' ) {
-      tahoma_parseGetSetup($hash,$xml);
+      tahoma_parseGetSetup($hash,$json);
     } elsif( $param->{page} eq 'refreshAllStates' ) {
-      tahoma_parseRefreshAllStates($hash,$xml);
+      tahoma_parseRefreshAllStates($hash,$json);
     } elsif( $param->{page} eq 'getStates' ) {
-      tahoma_parseGetStates($hash,$xml);
+      tahoma_parseGetStates($hash,$json);
     } elsif( $param->{page} eq 'login' ) {
-      tahoma_parseLogin($hash,$xml);
+      tahoma_parseLogin($hash,$json);
     } elsif( $param->{page} eq 'getActionGroups' ) {
-      tahoma_parseGetActionGroups($hash,$xml);
+      tahoma_parseGetActionGroups($hash,$json);
     } elsif( $param->{page} eq 'scheduleActionGroup' ) {
-      tahoma_parseScheduleActionGroup($hash,$xml);
+      tahoma_parseScheduleActionGroup($hash,$json);
     }
     
   }
@@ -632,8 +648,8 @@ sub tahoma_autocreate($)
       $id = $device->{oid};
       $fid = (split("-",$id))[0];
       $devname = "tahoma_". $fid;
-      $define = "$devname tahoma PLACE $id" if (!defined $device->{action});
-      $define = "$devname tahoma SCENE $id" if (defined $device->{action});
+      $define = "$devname tahoma PLACE $id" if (!defined $device->{actions});
+      $define = "$devname tahoma SCENE $id" if (defined $device->{actions});
       if( defined($modules{$hash->{TYPE}}{defptr}{"$fid"}) ) {
         Log3 $name, 4, "$name: device '$fid' already defined";
         next;
@@ -645,9 +661,9 @@ sub tahoma_autocreate($)
     if($cmdret) {
       Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
     } else {
-      $cmdret= CommandAttr(undef,"$devname alias $device->{uiClass} ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{uiClass}) );
-      $cmdret= CommandAttr(undef,"$devname alias room ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{oid}) && !defined($device->{action}) );
-      $cmdret= CommandAttr(undef,"$devname alias scene ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{oid}) && defined($device->{action}) );
+      $cmdret= CommandAttr(undef,"$devname alias room ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{oid}) && !defined($device->{actions}) );
+      $cmdret= CommandAttr(undef,"$devname alias scene ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{oid}) && defined($device->{actions}) );
+      $cmdret= CommandAttr(undef,"$devname alias $device->{uiClass} ".encode_utf8($device->{label})) if( defined($device->{label}) && defined($device->{states}) );
       $cmdret= CommandAttr(undef,"$devname room tahoma");
       $cmdret= CommandAttr(undef,"$devname IODev $name");
       $cmdret= CommandAttr(undef,"$devname webCmd dim") if( defined($device->{uiClass}) && ($device->{uiClass} eq "RollerShutter") );
@@ -662,12 +678,12 @@ sub tahoma_autocreate($)
 
 sub tahoma_parseLogin($$)
 {
-  my($hash, $xml) = @_;
+  my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseLogin";
-  if (defined $xml->{errorResponse}) {
+  if (defined $json->{errorResponse}) {
     $hash->{logged_in} = 0;
-    $hash->{STATE} = $xml->{errorResponse}{message};
+    $hash->{STATE} = $json->{errorResponse}{message};
   } else {
     $hash->{logged_in} = 1;
   }
@@ -675,32 +691,32 @@ sub tahoma_parseLogin($$)
 
 sub tahoma_parseGetEvents($$)
 {
-  my($hash, $xml) = @_;
+  my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 5, "$name: tahoma_parseGetEvent";
 
-  $hash->{refresh_event} = $xml;
+  $hash->{refresh_event} = $json;
 
   if( $hash->{logged_in} ) {
     $hash->{STATE} = "Connected";
   } else {
     $hash->{STATE} = "Disconnected";
   }
-  
-  if( defined($xml->{eventPollResponse}{events}{event}) ) {
-    #print Dumper($xml);
-    foreach my $devices ( @{$xml->{eventPollResponse}{events}{event}} ) {
+
+  if( ref $json eq 'ARRAY' ) {
+    #print Dumper($json);
+    foreach my $devices ( @{$json} ) {
       if( defined($devices->{deviceURL}) ) {
-        print "\nDevice=$devices->{deviceURL} found\n";
+        #print "\nDevice=$devices->{deviceURL} found\n";
         my $id = $devices->{deviceURL};
         my $fid = (split("/",$id))[-1];
         my $devname = "tahoma_". $fid;
         my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
         if( defined($d) )# && $d->{NAME} eq $devname )
         {
-          print "\nDevice=$devices->{deviceURL} updated\n";
+          #print "\nDevice=$devices->{deviceURL} updated\n";
           readingsBeginUpdate($d);
-          foreach my $state (@{$devices->{deviceStates}{state}}) {
+          foreach my $state (@{$devices->{deviceStates}}) {
             #print "$devname $state->{name} = $state->{value}\n";
             readingsBulkUpdate($d, "state", "dim".$state->{value}) if ($state->{name} eq "core:ClosureState");
             readingsBulkUpdate($d, "devicestate", $state->{value}) if ($state->{name} eq "core:OpenClosedState");
@@ -718,11 +734,11 @@ sub tahoma_parseGetEvents($$)
 
 sub tahoma_parseApplyRequest($$)
 {
-  my($hash, $xml) = @_;
+  my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseApplyRequest";
-  if (defined($xml->{applyResponse}{apply}{execId})) {
-    $hash->{InExecId} = $xml->{applyResponse}{apply}{execId};
+  if (defined($json->{applyResponse}{apply}{execId})) {
+    $hash->{InExecId} = $json->{applyResponse}{apply}{execId};
   } else {
     $hash->{InExecId} = "undefined";
   }
@@ -730,20 +746,21 @@ sub tahoma_parseApplyRequest($$)
 
 sub tahoma_parseGetSetup($$)
 {
-  my($hash, $xml) = @_;
+  my($hash, $json) = @_;
   my $name = $hash->{NAME};
   
-  $hash->{gatewayId} = $xml->{setupResponse}{setup}{gateways}{gateway}[0]{gatewayId};
+  $hash->{gatewayId} = $json->{setup}{gateways}[0]{gatewayId};
 
   my @devices = ();
-  foreach my $device (@{$xml->{setupResponse}{setup}{devices}{device}}) {
+  foreach my $device (@{$json->{setup}{devices}}) {
+    Log3 $name, 4, "$name: tahoma_parseGetSetup device = $device->{label}";
     push( @devices, $device );
   }
   
   $hash->{helper}{devices} = \@devices;
 
-  if ($xml->{setupResponse}{setup}{place}) {
-    my $places = $xml->{setupResponse}{setup}{place};
+  if ($json->{setup}{place}) {
+    my $places = $json->{setup}{place};
     #Log3 $name, 4, "$name: tahoma_parseGetSetup places= " . Dumper($places);
     tahoma_parseGetSetupPlaces($hash, $places);
   }
@@ -778,12 +795,12 @@ sub tahoma_parseGetSetupPlaces($$)
 
 sub tahoma_parseGetActionGroups($$)
 {
-  my($hash, $xml) = @_;
+  my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseGetActionGroups";
   
   my $devices = $hash->{helper}{devices};
-  foreach my $action (@{$xml->{actionGroupResponse}{actionGroup}}) {
+  foreach my $action (@{$json->{actionGroups}}) {
     push( @{$devices}, $action );
   }
   tahoma_autocreate($hash);
@@ -791,7 +808,7 @@ sub tahoma_parseGetActionGroups($$)
 
 sub tahoma_parseRefreshAllStates($$)
 {
-  my($hash, $xml) = @_;
+  my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseRefreshAllStates";
 }
@@ -802,17 +819,17 @@ sub tahoma_parseGetStates($$)
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseGetStates";
 
-  if( defined($states->{statesResponse}) ) {
-    foreach my $devices ( @{$states->{statesResponse}{device}} ) {
+  if( defined($states->{devices}) ) {
+    foreach my $devices ( @{$states->{devices}} ) {
       if( defined($devices->{deviceURL}) ) {
         my $id = $devices->{deviceURL};
         my $fid = (split("/",$id))[-1];
         my $devname = "tahoma_". $fid;
         my $d = $modules{$hash->{TYPE}}{defptr}{"$fid"};
-        if( defined($d) && $d->{NAME} eq $devname )
+        if( defined($d) )# && $d->{NAME} eq $devname )
         {
           readingsBeginUpdate($d);
-          foreach my $state (@{$devices->{state}}) {
+          foreach my $state (@{$devices->{states}}) {
             readingsBulkUpdate($d, "state", "dim".$state->{value}) if ($state->{name} eq "core:ClosureState");
             readingsBulkUpdate($d, "devicestate", $state->{value}) if ($state->{name} eq "core:OpenClosedState");
             #readingsBulkUpdate($d, (split(":",$state->{name}))[-1], encode_utf8($state->{value}));
@@ -828,7 +845,7 @@ sub tahoma_parseGetStates($$)
 
 sub tahoma_parseScheduleActionGroup($$)
 {
-  my($hash, $xml) = @_;
+  my($hash, $json) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 4, "$name: tahoma_parseScheduleActionGroup";
 }
@@ -972,7 +989,7 @@ sub tahoma_UserAgent_NonblockingGet($)
   my $response = "";
   my $url = $hash->{url} . $param->{page};
   $url .= $param->{subpage} if ((defined $param->{subpage}) && !(substr($url,0,4) eq 'file'));
-  $url .= '.xml' if (substr($url,0,4) eq 'file');
+  $url .= '.json' if (substr($url,0,4) eq 'file');
 
   my $nonblocking = !$hash->{BLOCKING} && $param->{nonblocking} && !(substr($url,0,4) eq 'file');
 
@@ -1048,7 +1065,7 @@ sub tahoma_UserAgent_NonblockingGet($)
 
   Notes:
   <ul>
-    <li>XML::Simple has to be installed on the FHEM host.</li>
+    <li>JSON has to be installed on the FHEM host.</li>
   </ul><br>
 
   <a name="tahoma_Define"></a>
