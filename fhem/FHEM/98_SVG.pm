@@ -1038,49 +1038,41 @@ SVG_doShowLog($$$$;$)
   }
   SVG_calcOffsets($d,$wl);
 
+  my ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
+  $f = 0 if(!$f);     # From the beginning of time...
+  $t = 9 if(!$t);     # till the end
+
   if($pm =~ m/gnuplot/) {
 
     my $tmpfile = "/tmp/file.$$";
     my $errfile = "/tmp/gnuplot.err";
     
-    my $f;
-    my $t; 
     my $xrange;
 
     if(!$SVG_devs{$d}{from}) {
-      # Fix range, as we are without scroll
-      $f = 0;     # From the beginning of time...
-      $t = 9;     # till the end
       $xrange = "\n";        #We don't have a range, but need the new line
     } else {
-      # Read the data from the filelog
-      ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
       $xrange = "set xrange [\"$f\":\"$t\"]\n";
     }
+    my $da = SVG_getData($wl, $f, $t, $srcDesc, 0); # substcfg needs it(!)
 
-    my $oll = $attr{global}{verbose};
-    $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
-    my @path;
-    my $tmp = 0;
-    foreach my $src (@{$srcDesc->{order}}) {
-      my $s = $srcDesc->{src}{$src};
-      my $fname = ($src eq $defs{$d}{LOGDEVICE} ? $defs{$d}{LOGFILE}:"CURRENT");
-      my $cmd = "get $src $fname $tmpfile$tmp $f $t ".$s->{arg};
-      my @files = split(" ", FW_fC($cmd, 1));
-      push(@path, @files);
-      $tmp++;
+    my $tmpstring = "";
+    open(FH, ">$tmpfile");
+    for(my $dIdx=0; $dIdx<@{$da}; $dIdx++) {
+      if (${$da->[$dIdx]}) {
+        $tmpstring = ${$da->[$dIdx]};
+        $tmpstring =~ s/#.*/\n/g;
+      } else {
+        $tmpstring = "$f 0\n\n";
+      }
+      print FH "$tmpstring";
+
     }
-    $attr{global}{verbose} = $oll;
+    close(FH);
 
-    # replace the path with the temporary filenames of the filelog output
+    # put in the filename of the temporary data file into the plot file string
     my $i = 0;
-    $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
-    foreach my $p (@path) {   # If the file is empty, write a 0 line
-      next if(!-z $p);
-      open(FH, ">$p");
-      print FH "$f 0\n";
-      close(FH);
-    }
+    $plot =~ s/\".*?using 1:[^ ]+ /"\"$tmpfile\" i " . $i++ . " using 1:2 "/gse;
 
     my $gplot_script = SVG_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
 
@@ -1088,26 +1080,23 @@ SVG_doShowLog($$$$;$)
     open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
     print FH $gplot_script, $xrange, $plot;
     close(FH);
-    foreach my $p (@path) {
-      unlink($p);
-    }
-    
+    unlink($tmpfile);
+
+    my $ext;
     if($pm eq "gnuplot-scroll") {
       $FW_RETTYPE = "image/png";
-      open(FH, "$tmpfile.png");         # read in the result and send it
-      binmode (FH); # necessary for Windows
-      FW_pO join("", <FH>);
-      close(FH);
-      unlink("$tmpfile.png");
+      $ext = "png";
     }
     else {
       $FW_RETTYPE = "image/svg+xml";
-      open(FH, "$tmpfile.svg");         # read in the result and send it
-      binmode (FH); # necessary for Windows
-      FW_pO join("", <FH>);
-      close(FH);
-      unlink("$tmpfile.svg");
+      $ext = "svg";
     }
+    
+    open(FH, "$tmpfile.$ext");         # read in the result and send it
+    binmode (FH); # necessary for Windows
+    FW_pO join("", <FH>);
+    close(FH);
+    unlink("$tmpfile.$ext");
 
   } elsif($pm eq "SVG") {
     my ($f,$t)=($SVG_devs{$d}{from}, $SVG_devs{$d}{to});
