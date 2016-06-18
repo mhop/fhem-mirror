@@ -956,15 +956,21 @@ HUEDeviceSetIcon($;$)
   return undef if( !$hash );
   my $name = $hash->{NAME};
 
-  return undef if( !$hash->{modelid} );
+  return if( defined($attr{$name}{icon}) && !$force );
 
-  my $model = $hueModels{$hash->{modelid}};
-  return undef if( !$model );
+  if( $hash->{modelid} ) {
+    my $model = $hueModels{$hash->{modelid}};
+    return undef if( !$model );
 
-  my $icon = $model->{icon};
-  return undef if( !$icon );
+    my $icon = $model->{icon};
+    return undef if( !$icon );
 
-  $attr{$name}{icon} = $icon if( $force || !defined($attr{$name}{icon}) );
+    $attr{$name}{icon} = $icon;
+  } elsif( $hash->{class} ) {
+    my $class = lc( $hash->{class} );
+
+    $attr{$name}{icon} = "hue_room_$class";
+  }
 }
 sub
 HUEDevice_Parse($$)

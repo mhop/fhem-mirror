@@ -730,6 +730,9 @@ HUEBridge_Autocreate($;$)
       $cmdret= CommandAttr(undef,"$devname group HUEGroup");
       $cmdret= CommandAttr(undef,"$devname IODev $name");
 
+      HUEDeviceSetIcon($devname);
+      $defs{$devname}{helper}{fromAutocreate} = 1 ;
+
       $autocreated++;
     }
   }
