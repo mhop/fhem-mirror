@@ -1909,12 +1909,12 @@ sub CUL_HM_Parse($$) {#########################################################
               $plc = 1 if ($pl && $plc <= 0);
               $vs = ($plc ne $vl)?"chn:$vs  phys:$plc":$vs;
               push @evtEt,[$vh,1,"state:$vs"];
-              push @evtEt,[$vh,1,"phyLevel:$plc"];
+              push @evtEt,[$vh,1,"phyLevel:$pl"];
             }
+            push @evtEt,[$mh{cHash},1,"phyLevel:$pl"];      #phys level,don't use relative adjustment
             $pl = (($pl-$lvlMin)<=0 && $pl)
-                     ? 1
+                     ? ($pl?1:0)
                      : int((($pl-$lvlMin)*200)/($lvlMax - $lvlMin))/2;
-            push @evtEt,[$mh{cHash},1,"phyLevel:$pl"];      #phys level
             $physLvl = $pl;
           }
           else{                                #invalid PhysLevel
@@ -1924,16 +1924,22 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       my $pVal = $val;# necessary for oper 'off', not logical off
-      $val = (($val-$lvlMin)<=0 && $val)
-                  ? 1
+      Log 1,"General $val-$lvlMin";
+      $val = (($val-$lvlMin)<=0)
+                  ? ($val?1:0)
                   : int((($val-$lvlMin)*200)/($lvlMax - $lvlMin))/2;
+      Log 1,"General $val-$lvlMin";
 
       # blind option: reverse Level Meaning 0 = open, 100 = closed
       if (AttrVal($mh{cName}, "param", "") =~ m/levelInverse/){;
         $pVal = $val = 100-$val;
       }
-      $physLvl = ReadingsVal($mh{cName},"phyLevel",$val)
-            if(!defined $physLvl);             #not updated? use old or ignore
+      if(!defined $physLvl){             #not updated? use old or ignore
+        $physLvl = ReadingsVal($mh{cName},"phyLevel",$val);
+        $physLvl = (($physLvl-$lvlMin)<=0 && $physLvl)
+                 ? ($physLvl?1:0)
+                 : int((($physLvl-$lvlMin)*200)/($lvlMax - $lvlMin))/2;
+      }
 
       my $vs = ($mh{cHash}->{helper}{lm} && $mh{cHash}->{helper}{lm}{$val})
                      ?$mh{cHash}->{helper}{lm}{$val}
@@ -4441,15 +4447,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       $lvl =~ s/(\d*\.?\d*).*/$1/;
       if ($cmd eq "pct"){
-        $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100;
       }
       else{#dim [<changeValue>] ... [ontime] [ramptime]
         $lvl = 10 if (!defined $a[2]); #set default step
-        $lvl = $lvl*($lvlMax-$lvlMin)/100;
         $lvl = -1*$lvl if (($cmd eq "down" && !$lvlInv)|| 
                            ($cmd ne "down" && $lvlInv));
         $lvl += CUL_HM_getChnLvl($name);
       }
+      $lvl = $lvlMin + $lvl*($lvlMax-$lvlMin)/100; # relativ to range
       $lvl = ($lvl > $lvlMax)?$lvlMax:(($lvl <= $lvlMin)?0:$lvl);
     }
     if ($st eq "dimmer"){# at least blind cannot stand ramp time...
