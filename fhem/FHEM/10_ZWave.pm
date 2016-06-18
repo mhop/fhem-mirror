@@ -3637,6 +3637,7 @@ ZWave_processSendStack($$;$)
       }
 
     } elsif($stype eq "ackget" && $ackType eq "msg") {# compare answer class
+      $smsg = sprintf("%02x$1",length($1)/2) if($smsg =~ /^......600d....(.*)/);
       my $cs = substr($smsg, 6, 2);
       my $cg = substr($omsg, 2, 2);
       return if($cs ne $cg);
