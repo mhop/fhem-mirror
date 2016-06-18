@@ -2181,8 +2181,12 @@ FW_makeImage(@)
   if($p =~ m/\.svg$/i) {
     if(open(FH, "$FW_icondir/$p")) {
       my $data;
-      do { 
+      do {
         $data = <FH>;
+        if(!defined($data)) {
+          Log 1, "$FW_icondir/$p is not useable";
+          return "";
+        }
       } until( $data =~ m/^<svg/ );
       $data .= join("", <FH>);
       close(FH);
