@@ -1877,6 +1877,7 @@ sub HMinfo_loadConfig($@) {####################################################
       next if (!$rla[0]);
       my $rl = join",",@rla;
       $reg =~ s/(RegL_0.):/$1\./;# conversion - : not allowed anymore. Update old versions
+      $reg =~ s/_chn-00//; # special: 
       my $r2 = $reg;
       $r2 =~ s/^\.//;
       next if ($rl !~ m/$r2/);
@@ -1899,6 +1900,7 @@ sub HMinfo_loadConfig($@) {####################################################
       }
     }
   }
+
   close(rFile);
   foreach my $eN (keys %changes){
     foreach my $reg (keys %{$changes{$eN}}){
@@ -1906,7 +1908,8 @@ sub HMinfo_loadConfig($@) {####################################################
       $defs{$eN}{READINGS}{$reg}{TIME} = $changes{$eN}{$reg}{t};
       my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..)\.(.*)/);
       next if (!$list);
-      my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));
+      my $pId = CUL_HM_name2Id($pN);# allow devices also as peer. Regfile is korrekt
+      # my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));#old - removed
       CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
       push @el,"$eN reg list:$reg";    
     }
