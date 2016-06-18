@@ -430,7 +430,10 @@ fakeRoku_Parse($$;$$$)
           }
         }
 
-        if( !$params->{MAN} || $params->{MAN} ne '"ssdp:discover"' ) {
+        if( !$params->{MAN} ) {
+          Log3 $name, 5, "$name: ignoring broadcast M-Search without MAN";
+          return undef;
+        } elsif( $params->{MAN} ne '"ssdp:discover"' ) {
           Log3 $name, 5, "$name: ignoring broadcast M-Search with MAN $params->{MAN}";
           return undef;
         }
@@ -525,7 +528,7 @@ fakeRoku_Parse($$;$$$)
             $xml->{app}[$i] = { id => $i+1, content => $favourites[$i], };
           }
         }
- 
+
         #my $body = '<?xml version="1.0" encoding="utf-8" ?>';
         my $body .= XMLout( $xml, KeyAttr => { }, RootName => 'apps' );
         #$body =~ s/\n/\r\n/g;
@@ -536,7 +539,6 @@ fakeRoku_Parse($$;$$$)
                                         'Content-Length' => length($body), } );
         $ret .= "\r\n";
         $ret .= $body;
-Log 1, $ret;
 
       }
 
