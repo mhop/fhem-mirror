@@ -1,7 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_GasCalculator: Unknown "?"-reading no longer created.
   - feature: 74_AMAD: battery_temperature formated
-  - bugfix: 74_AMAD: deviceState timestamp bugfix for usb-ethernet Devices
+  - bugfix:  74_AMAD: deviceState timestamp bugfix for usb-ethernet Devices
   - feature: 74_AMAD: more better method for wlan keep alive, new Readings
                       for battery live state
   - bugfix:  73_km200.pm: Bugfix for set command with switchprograms
