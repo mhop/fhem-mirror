@@ -151,14 +151,22 @@ sub GasCalculator_Set($@)
 		return "\"set GasCalculator\" needs at least one argument";
 	}
 		
-	my $name = shift @a;
+	my $GasCalcName = shift @a;
 	my $reading  = shift @a;
 	my $value = join(" ", @a);
 	my $ReturnMessage;
 
-	### Write current value
-	readingsSingleUpdate($hash, $reading, $value, 1);
-
+	if ( $reading ne "?")
+	{
+		### Create Log entries for debugging
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - set " . $reading . " with value: " . $value;
+		
+		### Write current value
+		readingsSingleUpdate($hash, $reading, $value, 1);
+		
+		### Create ReturnMessage
+		$ReturnMessage = $GasCalcName . " - Successfully set " . $reading . " with value: " . $value;
+	}
 	
 	return($ReturnMessage);
 }
@@ -387,7 +395,7 @@ sub GasCalculator_Notify($$)
 		if(defined($GasCountReadingValuePrevious))
 		{
 			### Write current Volume as previous Voulume for future use in the GasCalc-Device
-			readingsSingleUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($GasCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Previous value found. Continuing with calculations";
@@ -396,7 +404,7 @@ sub GasCalculator_Notify($$)
 		else
 		{
 			### Write current Volume as previous Voulume for future use in the GasCalc-Device
-			readingsSingleUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix. "_PrevRead", sprintf('%.3f', ($GasCountReadingValueCurrent)),1);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Previous value NOT found. Skipping Loop";
