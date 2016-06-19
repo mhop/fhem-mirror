@@ -1,6 +1,6 @@
 #########################################################################
 # $Id$
-# fhem Modul für Geräte mit Web-Oberfläche 
+# fhem Modul für Geräte mit Web-Oberfläche / Webservices
 #   
 #     This file is part of fhem.
 # 
@@ -78,7 +78,8 @@
 #               added AutoNumLen for automatic sub-reading names (multiple matches) so the number has leading zeros and a fixed length
 #               added new attribute upgrading mechanism (e.g. for sidIDRegex to sidIdRegex)
 #   2016-01-25  modified the way attributes are added to userattr - now includes :hints for fhemweb and old entries are replaced
-#   2016-02-02  added more checks to JsonFlatter (if defined ...), fixed auth to be added in the front of the queue, added clearSIdBeforeAuth, authRetries
+#   2016-02-02  added more checks to JsonFlatter (if defined ...), fixed auth to be added in the front of the queue, 
+#               added clearSIdBeforeAuth, authRetries
 #   2016-02-04  added a feature to name a reading "unnamed-XX" if Name attribute is missing instead of ignoring everything related
 #   2016-02-05  fixed a warning caused by missing initialisation of .setList internal
 #   2016-02-07  allowed more regular expression modifiers in RegOpt, added IMap / OMap / IExpr / OExpr
@@ -87,19 +88,55 @@
 #               Log old attrs and offer set upgradeAttributes
 #   2016-02-15  added replacement type key and set storeKeyValue
 #   2016-02-20  set $XML::XPath::SafeMode = 1 to avoid memory leak in XML parser lib
+#   2016-03-25  started fixing array handling in json flatter
+#   2016-03-28  during extractAllJSON reading definitions will not be used to format readings. Instead after the ExtractAllJSION loop 
+#               individual readings will be extracted (checkAll) and recombined if necessary
+#               Fixed cookie handling to add cookies in HandleSendQueue inmstead of PrepareRequest
+#   2016-04-08  fixed usage of "keys" on reference in 1555 and 1557
+#   2016-04-10  added readings UNMATCHED_READINGS and LAST_REQUEST if showMatched is set.
+#               added AlwaysNum to force names anding with a number even if just one value is found
+#   2016-04-16  fixed typos in logging
+#   2016-04-24  Implemented DeleteOnError and DeleteIfUnmatched, 
+#               fixed an error in the cookie handling
+#   2016-05-08  Implemented alignTime, more MaxAgeReplacementMode varieties
+#               fixed bug in Timer handling if Main URL was not specified in define
+#   2016-05-20  3.2.2 UpdateRequestHash for DeleteIf / DeleteOn / MaxAge
+#               foreach / grep usage optimized in Replace, UpdateHintList, UpdateRequesthash, UpdateReadingList, GetUpdate
+#               Poll handling fixed (poll = 0) in GetUpdate
+#               Optimized keylist in json handling in ExtractReading
+#               Regexes optimized (^$)
+#               Module Version internal
+#               Fixed attr regex for poll, pollDelay, replacements, 
+#               typos in Auth, UpdateHintList after define,
+#               details im ExtractReading for requestReading hash
+#               LAST_REQUEST bei Error in Read
+#               fixed call to CheckAuth - pass buffer instead of body
+#               restructured _Read
+#               modified CheckAuth to do auth also for json / xpath matches
+#               Map, Format, Expr as well as Encode and Decode attributes will
+#                   be applied to ExtractAllJSON as well (e.g. getXXEncode or readingEncode)
+#   2016-06-02  switched from "each" to foreach in JsonFlatter when used on an array to support older Perl
+#               fixed a warning in Getupdate when calculating with pollDelay
+#               fixed double LAST_REQUEST
+#               allowd control_sets if disabled
+#               fixed a bug in updateRequestHash (wrong request setting)
+#   2016-06-05  added code to recover if HttpUtils does not call back _read in timeout
+# 
 #
 #   Todo:       
-#               replacement scope attribute
+#               reading mit Status je get (error, no match, ...) oder reading zum nachverfolgen der schritte, fehler, auth etc.
+#
+#               In _Attr bei Prüfungen auf get auch set berücksichtigen wo nötig, ebenso in der Attr Liste (oft fehlt set)
+#               featureAttrs aus hash verarbeiten
+#
 #               Implement IMap und IExpr for get
 #
-#               doku der wichtigsten internen Strukturen (z.B. Request auch für Replacements und für Parse-Funktionen
-#               make axtracting the sid after a get / update an attribute / option
-#
-#               multi page log extraction
+#               replacement scope attribute?
+#               make axtracting the sid after a get / update an attribute / option?
+#               multi page log extraction?
 #               Profiling von Modbus übernehmen?
-#
-#               extend httpmod to support simple tcp connections aver devio instead of HttpUtils
-#               extend devio for non blocking connect like httputils
+#               extend httpmod to support simple tcp connections aver devio instead of HttpUtils?
+#               extend devio for non blocking connect like httputils?
 #
 #
                     
@@ -121,7 +158,18 @@ sub HTTPMOD_GetUpdate($);
 sub HTTPMOD_Read($$$);
 sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
-sub HTTPMOD_ExtractReading($$$$);
+sub HTTPMOD_ExtractReading($$$$$);
+
+my $HTTPMOD_Version = '3.3.0 - 19.6.2016';
+
+#
+# verwendung von defptr:
+# $hash->{defptr}{readingBase}{$reading} gibt zu einem Reading-Namen den Ursprung an, z.B. get oder reading
+#                 readingNum                                die zugehörige Nummer, z.B. 01
+#                 readingSubNum                             ggf. eine Unternummer (bei reading01-001)
+#   wird von MaxAge verwendet um schnell zu einem Reading die zugehörige MaxAge Definition finden zu können
+#
+
 
 #
 # FHEM module intitialisation
@@ -151,7 +199,7 @@ sub HTTPMOD_Initialize($)
       "(reading|get|set)[0-9]*(-[0-9]+)?Encode " . 
 
       "(reading|get)[0-9]*(-[0-9]+)?MaxAge " . 
-      "(reading|get)[0-9]*(-[0-9]+)?MaxAgeReplacementMode:text,expression,delete " . 
+      "(reading|get)[0-9]*(-[0-9]+)?MaxAgeReplacementMode:text,reading,internal,expression,delete " . 
       "(reading|get)[0-9]*(-[0-9]+)?MaxAgeReplacement " . 
       
       "(reading|get|set)[0-9]+Regex " .
@@ -161,6 +209,9 @@ sub HTTPMOD_Initialize($)
       "(reading|get|set)[0-9]+JSON " . 
       "(reading|get|set)[0-9]*RecombineExpr " .
       "(reading|get|set)[0-9]*AutoNumLen " .
+      "(reading|get|set)[0-9]*AlwaysNum " .
+      "(reading|get|set)[0-9]*DeleteIfUnmatched " .
+      "(reading|get|set)[0-9]*DeleteOnError " .
       "extractAllJSON " .
       
       "readingsName.* " .           # old 
@@ -176,7 +227,9 @@ sub HTTPMOD_Initialize($)
       "timeout " .
       "queueDelay " .
       "queueMax " .
+      "alignTime " .
       "minSendDelay " .
+
       "showMatched:0,1 " .
       "showError:0,1 " .
       
@@ -194,8 +247,8 @@ sub HTTPMOD_Initialize($)
       "[gs]et[0-9]*DatExpr " .         # old
       "[gs]et[0-9]*HdrExpr " .         # old
 
-      "get[0-9]+Poll:0,1 " . 
-      "get[0-9]+PollDelay " .
+      "get[0-9]*Poll:0,1 " . 
+      "get[0-9]*PollDelay " .
       
       "get[0-9]*PullToFile " .
       "get[0-9]*PullIterate " .
@@ -234,10 +287,10 @@ sub HTTPMOD_Initialize($)
       "clearSIdBeforeAuth:0,1 " .
       "authRetries " .
       
-      "replacement[0-9]*Regex " .
-      "replacement[0-9]*Mode:reading,internal,text,expression,key " .   # defaults to text
-      "replacement[0-9]*Value " .                                   # device:reading, device:internal, text, replacement expression
-      "[gs]et[0-9]*Replacement[0-9]*Value " .                       # can overwrite a global replacement value - todo: auch für auth?
+      "replacement[0-9]+Regex " .
+      "replacement[0-9]+Mode:reading,internal,text,expression,key " .   # defaults to text
+      "replacement[0-9]+Value " .                                   # device:reading, device:internal, text, replacement expression
+      "[gs]et[0-9]*Replacement[0-9]+Value " .                       # can overwrite a global replacement value - todo: auch für auth?
       
       "do_not_notify:1,0 " . 
       "disable:0,1 " .
@@ -247,6 +300,41 @@ sub HTTPMOD_Initialize($)
       "enableXPath-Strict:0,1 " .               # old
       $readingFnAttributes;  
 }
+
+
+
+#
+# 
+#########################################################################
+sub HTTPMOD_SetTimer($;$)
+{
+    my ($hash, $start) = @_;
+    my $nextTrigger;
+    my $name = $hash->{NAME};
+    my $now  = gettimeofday();
+    $start   = 0 if (!$start);
+
+    if ($hash->{Interval}) {
+        if ($hash->{TimeAlign}) {
+            my $count = int(($now - $hash->{TimeAlign} + $start) / $hash->{Interval});
+            my $curCycle = $hash->{TimeAlign} + $count * $hash->{Interval};
+            $nextTrigger = $curCycle + $hash->{Interval};
+        } else {
+            $nextTrigger = $now + ($start ? $start : $hash->{Interval});
+        }
+        
+        $hash->{TRIGGERTIME}     = $nextTrigger;
+        $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
+        RemoveInternalTimer("update:$name");
+        InternalTimer($nextTrigger, "HTTPMOD_GetUpdate", "update:$name", 0);
+        Log3 $name, 4, "$name: update timer modified: will call GetUpdate in " . 
+            sprintf ("%.1f", $nextTrigger - $now) . " seconds at $hash->{TRIGGERTIME_FMT}";
+    } else {
+       $hash->{TRIGGERTIME}     = 0;
+       $hash->{TRIGGERTIME_FMT} = "";
+    }
+}
+
 
 #
 # Define command
@@ -263,7 +351,7 @@ sub HTTPMOD_Define($$)
     my $name    = $a[0];
 
     if ($a[2] eq "none") {
-        Log3 $name, 3, "$name: URL is none, no periodic updates will be limited to explicit GetXXPoll attribues (if defined)";
+        Log3 $name, 3, "$name: URL is none, periodic updates will be limited to explicit GetXXPoll attribues (if defined)";
         $hash->{MainURL}    = "";
     } else {
         $hash->{MainURL}    = $a[2];
@@ -290,21 +378,14 @@ sub HTTPMOD_Define($$)
         ($hash->{MainURL}  ? "with URL $hash->{MainURL}" : "without URL") .
         ($hash->{Interval} ? " and interval $hash->{Interval}" : "");
 
-    # Initial request after 2 secs, for further updates the timer will be set according to interval.
-    # but only if URL is specified and interval > 0
-    if ($hash->{MainURL} && $hash->{Interval}) {
-        my $firstTrigger = gettimeofday() + 2;
-        $hash->{TRIGGERTIME}     = $firstTrigger;
-        $hash->{TRIGGERTIME_FMT} = FmtDateTime($firstTrigger);
-        RemoveInternalTimer("update:$name");
-        InternalTimer($firstTrigger, "HTTPMOD_GetUpdate", "update:$name", 0);
-        Log3 $name, 5, "$name: InternalTimer set to call GetUpdate in 2 seconds for the first time";
-    } else {
-       $hash->{TRIGGERTIME}     = 0;
-       $hash->{TRIGGERTIME_FMT} = "";
-    }
-    $hash->{".getList"} = "";
-    $hash->{".setList"} = "";
+    HTTPMOD_SetTimer($hash, 2);     # first Update in 2 seconds or aligned
+    
+    $hash->{ModuleVersion} = $HTTPMOD_Version;
+    $hash->{".getList"}    = "";
+    $hash->{".setList"}    = "";
+    $hash->{".updateHintList"}    = 1;
+    $hash->{".updateReadingList"} = 1;
+
     return undef;
 }
 
@@ -427,7 +508,6 @@ sub HTTPMOD_Attr(@)
                 || $aName =~ /[Ii]dJSON$/) {
             eval "use JSON";
             if($@) {
-                # Log3 $name, 3, "$name: Please install JSON Library to use JSON (apt-get install libjson-perl) - error was $@";
                 return "Please install JSON Library to use JSON (apt-get install libjson-perl) - error was $@";
             }
             $hash->{JSONEnabled} = 1;
@@ -442,10 +522,9 @@ sub HTTPMOD_Attr(@)
                 || $aName =~ /[Ii]dXPath$/) {
             eval "use HTML::TreeBuilder::XPath";
             if($@) {
-                # Log3 $name, 3, "$name: Please install HTML::TreeBuilder::XPath to use the xpath-Option (apt-get install libxml-TreeBuilder-perl libhtml-treebuilder-xpath-perl) - error was $@";
                 return "Please install HTML::TreeBuilder::XPath to use the xpath-Option (apt-get install libxml-TreeBuilder-perl libhtml-treebuilder-xpath-perl) - error was $@";
             }
-            $hash->{XPathEnabled} = 1;
+            $hash->{XPathEnabled} = ($aVal ? 1 : 0);
             
         } elsif ($aName eq "enableXPath-Strict" 
                 || $aName =~ /(get|reading)[0-9]+XPath-Strict$/
@@ -453,11 +532,10 @@ sub HTTPMOD_Attr(@)
                 || $aName =~ /[Ii]dXPath-Strict$/) {
             eval "use XML::XPath;use XML::XPath::XMLParser";
             if($@) {
-                #Log3 $name, 3, "$name: Please install XML::XPath and XML::XPath::XMLParser to use the xpath-strict-Option (apt-get install libxml-parser-perl libxml-xpath-perl) - error was $@";
                 return "Please install XML::XPath and XML::XPath::XMLParser to use the xpath-strict-Option (apt-get install libxml-parser-perl libxml-xpath-perl) - error was $@";
             }
             $XML::XPath::SafeMode = 1;
-            $hash->{XPathStrictEnabled} = 1;
+            $hash->{XPathStrictEnabled} = ($aVal ? 1 : 0);
             
         } elsif ($aName =~ /^(reading|get)[0-9]*(-[0-9]+)?MaxAge$/) {
             if ($aVal !~ '([0-9]+)') {
@@ -467,15 +545,35 @@ sub HTTPMOD_Attr(@)
             $hash->{MaxAgeEnabled} = 1;
 
         } elsif ($aName =~ /^(reading|get)[0-9]*(-[0-9]+)?MaxAgeReplacementMode$/) {
-            if ($aVal !~ /^(text|expression|delete)$/) {
+            if ($aVal !~ /^(text|reading|internal|expression|delete)$/) {
                 Log3 $name, 3, "$name: illegal mode in attr $name $aName $aVal";
                 return "$name: illegal mode in attr $name $aName $aVal, choose on of text, expression";
             }
 
+        } elsif ($aName =~ /^(reading|get|set)[0-9]*(-[0-9]+)?DeleteOnError$/) {
+            if ($aVal !~ '([0-9]+)') {
+                Log3 $name, 3, "$name: wrong format in attr $name $aName $aVal";
+                return "Invalid Format $aVal in $aName";    
+            }
+            $hash->{DeleteOnError} = ($aVal ? 1 : 0);
+
+        } elsif ($aName =~ /^(reading|get|set)[0-9]*(-[0-9]+)?DeleteIfUnmatched$/) {
+            if ($aVal !~ '([0-9]+)') {
+                Log3 $name, 3, "$name: wrong format in attr $name $aName $aVal";
+                return "Invalid Format $aVal in $aName";    
+            }
+            $hash->{DeleteIfUnmatched} = ($aVal ? 1 : 0);
+            
+        } elsif ($aName eq 'alignTime') {
+            my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($aVal);
+            return "Invalid Format $aVal in $aName : $alErr" if ($alErr);
+            my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
+            $hash->{TimeAlign}    = fhemTimeLocal($alSec, $alMin, $alHr, $mday, $mon, $year);
+            $hash->{TimeAlignFmt} = FmtDateTime($hash->{TimeAlign});
+            HTTPMOD_SetTimer($hash, 2);     # change timer for alignment but at least 2 secs from now 
+
         } elsif ($aName =~ /^(reading|get)([0-9]+)(-[0-9]+)?Name$/) {
-            $hash->{defptr}{readingBase}{$aVal}   = $1;
-            $hash->{defptr}{readingNum}{$aVal}    = $2 if ($2);
-            $hash->{defptr}{readingSubNum}{$aVal} = $3 if ($3);
+            $hash->{".updateRequestHash"} = 1;
         }
         
         # handle wild card attributes -> Add to userattr to allow modification in fhemweb
@@ -488,8 +586,6 @@ sub HTTPMOD_Attr(@)
                 my $opt = $2;           # attribute hint in list
                 if ($aName =~ $vgl) {   # yes - the name in the list now matches as regex
                     # $aName ist eine Ausprägung eines wildcard attrs
-                    #Log3 $name, 3, "$name: attribute $aName specified from $vgl, add to userattr" .
-                    #   ($opt ? " with extension $opt" : "");
                     addToDevAttrList($name, "$aName" . $opt);    # create userattr with hint to allow changing by click in fhemweb
                     if ($opt) {
                         # remove old entries without hint
@@ -525,7 +621,6 @@ sub HTTPMOD_Attr(@)
             if (!(grep !/$aName/, grep (/((reading|get)[0-9]*JSON$)|[Ee]xtractAllJSON$|[Rr]eAuthJSON$|[Ii]dJSON$/, 
                     keys %{$attr{$name}}))) {
                 delete $hash->{JSONEnabled};
-                #Log3 $name, 5, "$name: disable JSON";
             }
         } elsif ($aName eq "enableXPath" 
                 || $aName =~ /(get|reading)[0-9]+XPath$/
@@ -534,7 +629,6 @@ sub HTTPMOD_Attr(@)
             if (!(grep !/$aName/, grep (/(get|reading)[0-9]+XPath$|enableXPath|[Rr]eAuthXPath$|[Ii]dXPath$/, 
                     keys %{$attr{$name}}))) {
                 delete $hash->{XPathEnabled};
-                #Log3 $name, 5, "$name: disable XPath";
             }
         } elsif ($aName eq "enableXPath-Strict" 
                 || $aName =~ /(get|reading)[0-9]+XPath-Strict$/
@@ -544,21 +638,33 @@ sub HTTPMOD_Attr(@)
             if (!(grep !/$aName/, grep (/(get|reading)[0-9]+XPath-Strict$|enableXPath-Strict|[Rr]eAuthXPath-Strict$|[Ii]dXPath-Strict$/, 
                     keys %{$attr{$name}}))) {
                 delete $hash->{XPathStrictEnabled};
-                #Log3 $name, 5, "$name: disable XPathStrict";
             }
         } elsif ($aName eq "enableCookies") {
             delete $hash->{HTTPCookieHash};
             delete $hash->{HTTPCookies};
+
         } elsif ($aName =~ /(reading|get)[0-9]*(-[0-9]+)?MaxAge$/) {
             if (!(grep !/$aName/, grep (/(reading|get)[0-9]*(-[0-9]+)?MaxAge$/, keys %{$attr{$name}}))) {
                 delete $hash->{MaxAgeEnabled};
-                #Log3 $name, 5, "$name: disable MaxAge";
             }
         } elsif ($aName =~ /([gs]et[0-9]*)?[Rr]eplacement[0-9]*Regex/) {
             if (!(grep !/$aName/, grep (/([gs]et[0-9]*)?[Rr]eplacement[0-9]*Regex/, keys %{$attr{$name}}))) {
                 delete $hash->{ReplacementEnabled};
-                #Log3 $name, 5, "$name: disable Replacement";
             }
+
+        } elsif ($aName =~ /^(reading|get|set)[0-9]*(-[0-9]+)?DeleteOnError$/) {
+            if (!(grep !/$aName/, grep (/^(reading|get|set)[0-9]*(-[0-9]+)?DeleteOnError$/, keys %{$attr{$name}}))) {
+                delete $hash->{DeleteOnError};              
+            }
+
+        } elsif ($aName =~ /^(reading|get|set)[0-9]*(-[0-9]+)?DeleteIfUnmatched$/) {
+            if (!(grep !/$aName/, grep (/^(reading|get|set)[0-9]*(-[0-9]+)?DeleteIfUnmatched$/, keys %{$attr{$name}}))) {
+                delete $hash->{DeleteIfUnmatched};              
+            }
+
+        } elsif ($aName eq 'alignTime') {
+            delete $hash->{TimeAlign};
+            delete $hash->{TimeAlignFmt};
         }
     }
     if ($aName =~ /^[gs]et/ || $aName eq "enableControlSet") {
@@ -566,8 +672,7 @@ sub HTTPMOD_Attr(@)
     }
     if ($aName =~ /^(get|reading)/) {
         $hash->{".updateReadingList"} = 1;
-    }
-    
+    }  
     return undef;
 }
 
@@ -583,7 +688,6 @@ sub HTTPMOD_UpgradeAttributes($)
     my %dHash;
     my %numHash;
     
-    #Log3 $name, 3, "$name: UpgradeAttributes called, userattr list is $attr{$name}{userattr}";
     foreach my $aName (keys %{$attr{$name}}) {
         if ($aName =~ /(.+)IDRegex$/) {
             my $new = $1 . "IdRegex";
@@ -695,7 +799,6 @@ sub HTTPMOD_UpgradeAttributes($)
     foreach my $a (split(" ", $ualist)) {
         if (!$dHash{$a}) {
             $uahash{$a} = 1;
-            #Log3 $name, 3, "$name: keeping $a in userattr list";
         } else {
             Log3 $name, 3, "$name: dropping $a from userattr list";
         }
@@ -716,8 +819,9 @@ sub HTTPMOD_GetFAttr($$$$;$)
     # first look for attribute with the full num in it
     if (defined ($attr{$name}{$prefix . $num . $type})) {
           $val = $attr{$name}{$prefix . $num . $type};
-    # if not found then check if num contains a subnum (for regexes with multiple capture groups etc) and look for attribute without this subnum
-    } elsif (($num =~ /([0-9]+)-[0-9]+/) && defined ($attr{$name}{$prefix .$1 . $type})) {
+    # if not found then check if num contains a subnum 
+    # (for regexes with multiple capture groups etc) and look for attribute without this subnum
+    } elsif (($num =~ /^([0-9]+)-[0-9]+$/) && defined ($attr{$name}{$prefix .$1 . $type})) {
           $val = $attr{$name}{$prefix . $1 . $type};
     # if again not found then look for generic attribute without num
     } elsif (defined ($attr{$name}{$prefix . $type})) {
@@ -802,12 +906,14 @@ sub HTTPMOD_ReadKeyValue($$)
 
 # replace strings as defined in Attributes for URL, Header and Data
 # type is request type and can be set01, get03, auth01, update
+# corresponding context is set, get (or reading, but here we use '' instead)
 #########################################################################
 sub HTTPMOD_Replace($$$)
 {
     my ($hash, $type, $string) = @_;
     my $name    = $hash->{NAME};
     my $context = "";
+    my $input   = $string;
     
     if ($type =~ /(auth|set|get)(.*)/) {
         $context = $1;                      # context is type without num
@@ -816,8 +922,8 @@ sub HTTPMOD_Replace($$$)
 
     #Log3 $name, 4, "$name: Replace called for request type $type";
     # Loop through all Replacement Regex attributes
-    foreach my $rr (sort grep (/replacement[0-9]*Regex/, keys %{$attr{$name}})) {
-        $rr =~ /replacement([0-9]*)Regex/;
+    foreach my $rr (sort keys %{$attr{$name}}) {
+        next if ($rr !~ /^replacement([0-9]*)Regex$/);
         my $rNum  = $1;
         #Log3 $name, 5, "$name: Replace: rr=$rr, rNum $rNum, look for ${type}Replacement${rNum}Value";
         my $regex = AttrVal($name, "replacement${rNum}Regex", "");
@@ -877,7 +983,8 @@ sub HTTPMOD_Replace($$$)
                 $match = 1;
             }
         }
-        Log3 $name, 5, "$name: Replace: match and result is $string" if ($match);
+        Log3 $name, 4, "$name: Replace: match for type $type, regex $regex, mode $mode, " .
+            ($value ? "value $value," : "empty value,") . " input: $input, result is $string" if ($match);
     }
     return $string;
 }
@@ -941,11 +1048,6 @@ sub HTTPMOD_PrepareRequest($$;$)
     $data   = HTTPMOD_ModifyWithExpr($name, $context, $num, "DatExpr", $data);
     $url    = HTTPMOD_ModifyWithExpr($name, $context, $num, "URLExpr", $url);
     
-    if (AttrVal($name, "enableCookies", 0) && $hash->{HTTPCookies}) {
-        Log3 $name, 5, "$name: PrepareRequest is adding Cookies: " . $hash->{HTTPCookies};
-        $header .= "Cookie: " . $hash->{HTTPCookies};
-    }    
-    
     return ($url, $header, $data);
 }
 
@@ -954,14 +1056,14 @@ sub HTTPMOD_PrepareRequest($$;$)
 #########################################################################
 sub HTTPMOD_Auth($@)
 {
-    my ( $hash, @a ) = @_;
+    my ($hash, @a) = @_;
     my $name = $hash->{NAME};
     my ($url, $header, $data);
     
     # get all steps
     my %steps;
     foreach my $attr (keys %{$attr{$name}}) {
-        if ($attr =~ /sid([0-9]+).+/) {
+        if ($attr =~ /^sid([0-9]+).+/) {
             $steps{$1} = 1;
         }
     }
@@ -977,6 +1079,7 @@ sub HTTPMOD_Auth($@)
             Log3 $name, 3, "$name: no URL for Auth $step";
         }
     }
+    $hash->{LastAuthTry} = FmtDateTime(gettimeofday());
     HTTPMOD_HandleSendQueue("direct:".$name);   # AddToQueue with prio did not call this.
     return undef;
 }
@@ -986,7 +1089,7 @@ sub HTTPMOD_Auth($@)
 ########################################
 sub HTTPMOD_UpdateHintList($)
 {
-    my ($hash, $context) = @_;
+    my ($hash) = @_;
     my $name = $hash->{NAME};
 
     Log3 $name, 5, "$name: UpdateHintList called";
@@ -998,43 +1101,110 @@ sub HTTPMOD_UpdateHintList($)
         $hash->{".setList"} = "";
     }
     
-    foreach my $aName (grep /[gs]et[0-9]+Name/, keys %{$attr{$name}}) {
-        if ($aName =~ /([gs]et)([0-9]+)Name/) {
-            my $context = $1;
-            my $num     = $2;                     
-            my $opt;
-            my $oName   = $attr{$name}{$aName};   # value of the [gs]etXName attribute is name of the set/get option 
-                     
-            if ($context eq "set") {
-                my $map = "";
-                $map = AttrVal($name, "${context}${num}Map", "") if ($context ne "get"); # old Map for set is now IMap (Input)
-                $map = AttrVal($name, "${context}${num}IMap", $map);                     # new syntax ovverides old one
-                if ($map) {                                                         
-                    my $hint = $map;                                                # create hint from map
-                    $hint =~ s/([^,\$]+):([^,\$]+)(,?) */$2$3/g;                    # allow spaces in names
-                    $hint =~ s/\s/&nbsp;/g;                                         # convert spaces for fhemweb
-                    $opt  = $oName . ":$hint";                                      # opt is Name:Hint (from Map)
-                } elsif (AttrVal($name, "${context}${num}NoArg", undef)) {          # NoArg explicitely specified for a set?
-                    $opt = $oName . ":noArg";                            
-                } else {
-                    $opt = $oName;                                                  # nur den Namen für opt verwenden.
-                }
-            } elsif ($context eq "get") {
-                if (AttrVal($name, "${context}${num}TextArg", undef)) {             # TextArg explicitely specified for a get?
-                    $opt = $oName;                                                  # nur den Namen für opt verwenden.
-                } else {
-                    $opt = $oName . ":noArg";                                       # sonst noArg bei get
-                }           
+    foreach my $aName (keys %{$attr{$name}}) {
+        next if ($aName !~ /^([gs]et)([0-9]+)Name$/);
+        my $context = $1;
+        my $num     = $2;                     
+        my $oName   = $attr{$name}{$aName};
+        my $opt;
+                 
+        if ($context eq "set") {
+            my $map = "";
+            $map = AttrVal($name, "${context}${num}Map", "") if ($context ne "get"); # old Map for set is now IMap (Input)
+            $map = AttrVal($name, "${context}${num}IMap", $map);                     # new syntax ovverides old one
+            if ($map) {                                                         
+                my $hint = $map;                                                # create hint from map
+                $hint =~ s/([^,\$]+):([^,\$]+)(,?) */$2$3/g;                    # allow spaces in names
+                $hint =~ s/\s/&nbsp;/g;                                         # convert spaces for fhemweb
+                $opt  = $oName . ":$hint";                                      # opt is Name:Hint (from Map)
+            } elsif (AttrVal($name, "${context}${num}NoArg", undef)) {          # NoArg explicitely specified for a set?
+                $opt = $oName . ":noArg";                            
+            } else {
+                $opt = $oName;                                                  # nur den Namen für opt verwenden.
             }
-            if (AttrVal($name, "${context}${num}Hint", undef)) {                    # gibt es einen expliziten Hint?
-                $opt = $oName . ":" . AttrVal($name, "${context}${num}Hint", undef);
-            }
-            $hash->{".${context}List"} .= $opt . " ";                               # save new hint list
+        } elsif ($context eq "get") {
+            if (AttrVal($name, "${context}${num}TextArg", undef)) {             # TextArg explicitely specified for a get?
+                $opt = $oName;                                                  # nur den Namen für opt verwenden.
+            } else {
+                $opt = $oName . ":noArg";                                       # sonst noArg bei get
+            }           
         }
+        if (AttrVal($name, "${context}${num}Hint", undef)) {                    # gibt es einen expliziten Hint?
+            $opt = $oName . ":" . AttrVal($name, "${context}${num}Hint", undef);
+        }
+        $hash->{".${context}List"} .= $opt . " ";                               # save new hint list
     }
     delete $hash->{".updateHintList"};
     Log3 $name, 5, "$name: UpdateHintList: setlist = " . $hash->{".setList"};
     Log3 $name, 5, "$name: UpdateHintList: getlist = " . $hash->{".getList"};
+}
+
+
+
+# update hashes to point back from reading name 
+# to attr defining its name and properties
+###############################################
+# todo: fertig machen
+
+sub HTTPMOD_UpdateRequestHash($)
+{
+    my ($hash)   = @_;
+    return if (!$hash->{READINGS});
+    my $name        = $hash->{NAME};
+    my @readingList = sort keys %{$hash->{READINGS}};
+    my @attrList    = sort keys %{$attr{$name}};
+    
+    Log3 $name, 5, "$name: UpdateRequestHash called";
+    
+    foreach my $aName (@attrList) {
+        next if ($aName !~ /^(reading|get|set)([0-9]+)(-[0-9]+)?Name$/);
+        my $context = $1;
+        my $num     = $2;
+        my $nSubNum = ($3 ? $3 : "");       # named SubReading?    
+        my $request = ($context eq 'reading' ? 'update' : $context . $num);
+        
+        my $baseReading = $attr{$name}{$aName};   # base reading Name or explicitely named subreading
+        Log3 $name, 5, "$name: UpdateRequestHash looks at $baseReading, request $request, context $context, num $num, nSubNum $nSubNum";
+        
+        $hash->{defptr}{readingBase}{$baseReading}   = $context;
+        $hash->{defptr}{readingNum}{$baseReading}    = $num;
+        $hash->{defptr}{readingSubNum}{$baseReading} = $nSubNum if ($nSubNum);
+        $hash->{defptr}{requestReadings}{$request}{$baseReading} = "$context ${num}" .
+            ($nSubNum ? "-$nSubNum" : "");
+        
+        # go through the potential subreadings
+        if (!$nSubNum) {
+            foreach my $reading (@readingList) {
+                next if ($reading !~ /^${baseReading}(-[0-9]+)$/);
+                my $subNum = $1;
+                Log3 $name, 5, "$name: UpdateRequestHash looks at $reading - subNum $subNum";
+                $hash->{defptr}{readingBase}{$reading}   = $context;
+                $hash->{defptr}{readingNum}{$reading}    = $num;
+                $hash->{defptr}{readingSubNum}{$reading} = $subNum;
+                $hash->{defptr}{requestReadings}{$request}{$reading} = "$context ${num}${subNum}";
+            }
+        }
+        # special Handling for get / set with CheckAllReadings
+        if ($aName =~ /^(get|set)([0-9]+)Name$/ && 
+           HTTPMOD_GetFAttr($name, $context, $num, 'CheckAllReadings')) {
+            foreach my $raName (@attrList) {
+                next if ($aName !~ /^(reading)([0-9]+)(-[0-9]+)?Name$/);
+                my $rbaseReading = $attr{$name}{$raName};   # common base reading Name   
+                my $rnSubNum = ($3 ? $3 : "");      # named SubReading?    
+                $hash->{defptr}{requestReadings}{$request}{$rbaseReading} = "$context ${num}" .
+                    ($rnSubNum ? "-$rnSubNum" : "");
+                
+                # go through the potential subreadings
+                if (!$rnSubNum) {
+                    foreach my $reading (@readingList) {
+                        next if ($reading !~ /^${rbaseReading}(-[0-9]+)$/);
+                        $hash->{defptr}{requestReadings}{$request}{$reading} = "$context ${num}$1";
+                    }
+                }
+            }
+        }
+    }
+    delete $hash->{".updateRequestHash"};
 }
 
 
@@ -1053,12 +1223,8 @@ sub HTTPMOD_ControlSet($$$)
         } else {
             if (int $setVal > 5) {
                 $hash->{Interval} = $setVal;
-                my $nextTrigger = gettimeofday() + $hash->{Interval};
-                RemoveInternalTimer("update:$name");    
-                $hash->{TRIGGERTIME}     = $nextTrigger;
-                $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
-                InternalTimer($nextTrigger, "HTTPMOD_GetUpdate", "update:$name", 0);
                 Log3 $name, 3, "$name: timer interval changed to $hash->{Interval} seconds";
+                HTTPMOD_SetTimer($hash);
                 return "0";
             } elsif (int $setVal <= 5) {
                 Log3 $name, 3, "$name: interval $setVal (sec) to small (must be >5), continuing with $hash->{Interval} (sec)";
@@ -1075,12 +1241,7 @@ sub HTTPMOD_ControlSet($$$)
         Log3 $name, 3, "$name: internal interval timer stopped";
         return "0";
     } elsif ($setName eq 'start') {
-        my $nextTrigger = gettimeofday() + $hash->{Interval};
-        $hash->{TRIGGERTIME}     = $nextTrigger;
-        $hash->{TRIGGERTIME_FMT} = FmtDateTime($nextTrigger);
-        RemoveInternalTimer("update:$name");
-        InternalTimer($nextTrigger, "HTTPMOD_GetUpdate", "update:$name", 0);
-        Log3 $name, 5, "$name: internal interval timer set to call GetUpdate in " . int($hash->{Interval}). " seconds";
+        HTTPMOD_SetTimer($hash);
         return "0";
     } elsif ($setName eq 'upgradeAttributes') {
         HTTPMOD_UpgradeAttributes($hash);
@@ -1112,13 +1273,7 @@ sub HTTPMOD_Set($@)
     my ($name, $setName, @setValArr) = @a;
     my $setVal = (@setValArr ? join(' ', @setValArr) : "");
     my (%rmap, $setNum, $setOpt, $rawVal);
-  
-    if (AttrVal($name, "disable", undef)) {
-        Log3 $name, 5, "$name: set called with $setName but device is disabled"
-            if ($setName ne "?");
-        return undef;
-    }
-    
+   
     Log3 $name, 5, "$name: set called with $setName " . ($setVal ? $setVal : "")
         if ($setName ne "?");
 
@@ -1128,12 +1283,18 @@ sub HTTPMOD_Set($@)
         return $error if ($error);          # error
         # continue if function returned undef
     }
-        
+
+    if (AttrVal($name, "disable", undef)) {
+        Log3 $name, 4, "$name: set called with $setName but device is disabled"
+            if ($setName ne "?");
+        return undef;
+    }   
+  
     # Vorbereitung:
     # suche den übergebenen setName in den Attributen und setze setNum
     
     foreach my $aName (keys %{$attr{$name}}) {
-        if ($aName =~ /set([0-9]+)Name/) {              # ist das Attribut ein "setXName" ?
+        if ($aName =~ /^set([0-9]+)Name$/) {              # ist das Attribut ein "setXName" ?
             if ($setName eq $attr{$name}{$aName}) {     # ist es der im konkreten Set verwendete setName?
                 $setNum = $1;                           # gefunden -> merke Nummer X im Attribut
             }            
@@ -1256,7 +1417,7 @@ sub HTTPMOD_Get($@)
     # Vorbereitung:
     # suche den übergebenen getName in den Attributen, setze getNum falls gefunden
     foreach my $aName (keys %{$attr{$name}}) {
-        if ($aName =~ /get([0-9]+)Name/) {              # ist das Attribut ein "getXName" ?
+        if ($aName =~ /^get([0-9]+)Name$/) {              # ist das Attribut ein "getXName" ?
             if ($getName eq $attr{$name}{$aName}) {     # ist es der im konkreten get verwendete getName?
                 $getNum = $1;                           # gefunden -> merke Nummer X im Attribut
             }
@@ -1296,13 +1457,8 @@ sub HTTPMOD_GetUpdate($)
     
     Log3 $name, 4, "$name: GetUpdate called ($calltype)";
 
-    if ($calltype eq "update" && $hash->{Interval}) {
-        RemoveInternalTimer ("update:$name");
-        my $nt = gettimeofday() + $hash->{Interval};
-        $hash->{TRIGGERTIME}     = $nt;
-        $hash->{TRIGGERTIME_FMT} = FmtDateTime($nt);
-        InternalTimer($nt, "HTTPMOD_GetUpdate", "update:$name", 0);
-        Log3 $name, 5, "$name: internal interval timer set to call GetUpdate again in " . int($hash->{Interval}). " seconds";
+    if ($calltype eq "update") {
+        HTTPMOD_SetTimer($hash);
     }
     
     if (AttrVal($name, "disable", undef)) {
@@ -1321,32 +1477,29 @@ sub HTTPMOD_GetUpdate($)
     }
 
     # check if additional readings with individual URLs need to be requested
-    foreach my $poll (sort grep (/^get[0-9]+Poll$/, keys %{$attr{$name}})) {
-        $poll =~ /^get([0-9]+)Poll$/;
-        next if (!$1);
+    foreach my $getAttr (sort keys %{$attr{$name}}) {
+        next if ($getAttr !~ /^get([0-9]+)Name$/);
         my $getNum  = $1;
-        my $getName = AttrVal($name, "get".$getNum."Name", ""); 
-        if ($getName) {
-            Log3 $name, 5, "$name: GetUpdate checks if poll required for $getName ($getNum)";
-            my $lastPoll = 0;
-            $lastPoll = $hash->{lastpoll}{$getName} 
-                if ($hash->{lastpoll} && $hash->{lastpoll}{$getName});
-            my $dueTime = $lastPoll + AttrVal($name, "get".$getNum."PollDelay", 0);
-            if ($now >= $dueTime) {
-                Log3 $name, 5, "$name: GetUpdate will request $getName";
-                $hash->{lastpoll}{$getName} = $now;
-                
-                ($url, $header, $data) = HTTPMOD_PrepareRequest($hash, "get", $getNum);
-                if ($url) {
-                    HTTPMOD_AddToQueue($hash, $url, $header, $data, "get$getNum"); 
-                } else {
-                    Log3 $name, 3, "$name: no URL for Get $getNum";
-                }               
+        my $getName = AttrVal($name, $getAttr, ""); 
+        next if (!HTTPMOD_GetFAttr($name, 'get', $getNum, "Poll"));
+     
+        Log3 $name, 5, "$name: GetUpdate checks if poll required for $getName ($getNum)";
+        my $lastPoll = 0;
+        $lastPoll = $hash->{lastpoll}{$getName} 
+            if ($hash->{lastpoll} && $hash->{lastpoll}{$getName});
+        my $dueTime = $lastPoll + HTTPMOD_GetFAttr($name, 'get', $getNum, "PollDelay",0);
+        if ($now >= $dueTime) {
+            Log3 $name, 4, "$name: GetUpdate will request $getName";
+            $hash->{lastpoll}{$getName} = $now;
+            
+            ($url, $header, $data) = HTTPMOD_PrepareRequest($hash, "get", $getNum);
+            if ($url) {
+                HTTPMOD_AddToQueue($hash, $url, $header, $data, "get$getNum"); 
             } else {
-                Log3 $name, 5, "$name: GetUpdate will skip $getName, delay not over";
-            }
+                Log3 $name, 3, "$name: no URL for Get $getNum";
+            }               
         } else {
-            Log3 $name, 3, "$name: GetUpdate found $poll without a matching Name attribute - ignoring it";
+            Log3 $name, 5, "$name: GetUpdate will skip $getName, delay not over";
         }
     }
 }
@@ -1381,17 +1534,27 @@ sub HTTPMOD_JsonFlatter($$;$)
     
     $prefix = "" if( !$prefix );                                                   
 
-    #Log3 $name, 5, "$name: JSON Flatter with prefix $prefix, ref $ref, pointer to " . ref($ref);
-    if (ref($ref) eq "ARRAY" ) {                                                  
-        while( my ($key,$value) = each @{$ref}) {
-            #Log3 $name, 5, "$name: JSON Flatter recursive call in array while, key = $key, value = $value";
-            HTTPMOD_JsonFlatter($hash, $value, $prefix.sprintf("%02i",$key+1)."_");                         
+    Log3 $name, 5, "$name: JSON Flatter called : prefix $prefix, ref is $ref";
+    if (ref($ref) eq "ARRAY" ) { 
+        my $key = 0;
+        foreach my $value (@{$ref}) {
+            Log3 $name, 5, "$name: JSON Flatter in array while, key = $key, value = $value"; 
+            if(ref($value) eq "HASH" or ref($value) eq "ARRAY") {                                                        
+                Log3 $name, 5, "$name: JSON Flatter doing recursion because value is a " . ref($value);
+                HTTPMOD_JsonFlatter($hash, $value, $prefix.sprintf("%02i",$key+1)."_"); 
+            } else { 
+                if (defined ($value)) {             
+                    Log3 $name, 5, "$name: JSON Flatter sets $prefix$key to $value";
+                    $hash->{ParserData}{JSON}{$prefix.$key} = $value; 
+                }
+            }
+            $key++;         
         }                                                                            
     } elsif (ref($ref) eq "HASH" ) {
         while( my ($key,$value) = each %{$ref}) {                                       
-            #Log3 $name, 5, "$name: JSON Flatter in hash while, key = $key, value = $value, ref(value) = " . ref($value);
+            Log3 $name, 5, "$name: JSON Flatter in hash while, key = $key, value = $value";
             if(ref($value) eq "HASH" or ref($value) eq "ARRAY") {                                                        
-                #Log3 $name, 5, "$name: JSON Flatter recursive call in hash while, key = $key, value = $value";
+                Log3 $name, 5, "$name: JSON Flatter doing recursion because value is a " . ref($value);
                 HTTPMOD_JsonFlatter($hash, $value, $prefix.$key."_");
             } else { 
                 if (defined ($value)) {             
@@ -1416,7 +1579,7 @@ sub HTTPMOD_FlattenJSON($$)
         Log3 $name, 3, "$name: error while parsing JSON data: $@";
     } else {
         HTTPMOD_JsonFlatter($hash, $decoded);
-        Log3 $name, 5, "$name: extracted JSON values to internal";
+        Log3 $name, 4, "$name: extracted JSON values to internal";
     }
 }
 
@@ -1478,12 +1641,12 @@ sub HTTPMOD_FormatReading($$$$)
 
 # extract reading for a buffer
 ###################################
-sub HTTPMOD_ExtractReading($$$$)
+sub HTTPMOD_ExtractReading($$$$$)
 {
-    my ($hash, $buffer, $context, $num) = @_;
+    my ($hash, $buffer, $context, $num, $request) = @_;
     my $name = $hash->{NAME};
     my ($val, $reading, $regex) = ("", "", "");
-    my ($json, $xpath, $xpathst, $recomb, $regopt, $sublen);
+    my ($json, $xpath, $xpathst, $recomb, $regopt, $sublen, $alwaysn);
     my @subrlist  = ();
     my @matchlist = ();
     my $try = 1;            # was there any applicable parsing definition?
@@ -1494,6 +1657,7 @@ sub HTTPMOD_ExtractReading($$$$)
     $regopt  = HTTPMOD_GetFAttr($name, $context, $num, "RegOpt");
     $recomb  = HTTPMOD_GetFAttr($name, $context, $num, "RecombineExpr");
     $sublen  = HTTPMOD_GetFAttr($name, $context, $num, "AutoNumLen");
+    $alwaysn = HTTPMOD_GetFAttr($name, $context, $num, "AlwaysNum");
     
     # support for old syntax
     if ($context eq "reading") {        
@@ -1539,9 +1703,15 @@ sub HTTPMOD_ExtractReading($$$$)
             Log3 $name, 5, "$name: " . @matchlist . " capture group(s), matchlist = " . join ",", @matchlist if (@matchlist);
         }
     } elsif ($json) {
+        Log3 $name, 5, "$name: ExtractReading $reading with json $json ...";
         if (defined($hash->{ParserData}{JSON}) && 
             defined($hash->{ParserData}{JSON}{$json})) {
                 @matchlist = ($hash->{ParserData}{JSON}{$json});
+        } elsif (defined ($hash->{ParserData}{JSON})) {
+            Log3 $name, 5, "$name: ExtractReading $reading with json $json did not match a key directly - trying regex match to create a list";
+            my @keylist = sort grep /^$json/, keys (%{$hash->{ParserData}{JSON}});
+            Log3 $name, 5, "$name: ExtractReading $reading with json /^$json/ got keylist @keylist";
+            @matchlist = map ($hash->{ParserData}{JSON}{$_}, @keylist);
         }
     } elsif ($xpath) {
         Log3 $name, 5, "$name: ExtractReading $reading with XPath $xpath";
@@ -1583,8 +1753,7 @@ sub HTTPMOD_ExtractReading($$$$)
             if ($match == 1) {
                 # only one match
                 $eNum       = $num;
-                $subReading = $reading;
-                @subrlist   = ($reading);
+                $subReading = ($alwaysn ? "${reading}-" . sprintf ("%0${sublen}d", 1) : $reading);
             } else {
                 # multiple matches -> check for special name of readings
                 $eNum     = $num ."-".$group;
@@ -1600,14 +1769,16 @@ sub HTTPMOD_ExtractReading($$$$)
                     }
                     $subNum     = "-$group";
                 }
-                push @subrlist, $subReading;
             }
+            push @subrlist, $subReading;
             $val = HTTPMOD_FormatReading($name, $context, $eNum, $val);
-            Log3 $name, 5, "$name: ExtractReading for match $group sets $subReading to $val";
+            Log3 $name, 4, "$name: ExtractReading for $context$num-$group sets $subReading to $val";
             readingsBulkUpdate( $hash, $subReading, $val );
+            # point from reading name back to the parsing definition as reading01 or get02 ...
             $hash->{defptr}{readingBase}{$subReading}   = $context;
             $hash->{defptr}{readingNum}{$subReading}    = $num;
-            $hash->{defptr}{readingSubNum}{$subReading} = $subNum;
+            $hash->{defptr}{readingSubNum}{$subReading} = $subNum if ($subNum);
+            $hash->{defptr}{requestReadings}{$request}{$subReading} = "$context $eNum";
             delete $hash->{defptr}{readingOutdated}{$subReading};
             $group++;
         }
@@ -1672,7 +1843,7 @@ sub HTTPMOD_DoMaxAge($)
     my $readings = $hash->{READINGS};
     return if (!$readings); 
     $now = gettimeofday();
-    readingsBeginUpdate($hash);
+
     foreach my $reading (sort keys %{$readings}) {
         my $key = $reading;     # in most cases the reading name can be looked up in the readingBase hash
         Log3 $name, 5, "$name: MaxAge: check reading $reading";
@@ -1711,21 +1882,45 @@ sub HTTPMOD_DoMaxAge($)
             Log3 $name, 5, "$name: MaxAge: max = $max, mode = $mode, rep = $rep";
             if ($now - time_str2num($time) > $max) {
                 if ($mode eq "expression") {
-                    Log3 $name, 5, "$name: MaxAge: reading $reading too old - using Perl expression as MaxAge replacement: $rep";
+                    Log3 $name, 4, "$name: MaxAge: reading $reading too old - using Perl expression as MaxAge replacement: $rep";
                     my $val = ReadingsVal($name, $reading, "");
                     $rep = eval($rep);
                     if($@) {         
                         Log3 $name, 3, "$name: MaxAge: error in replacement expression $1: $@";
                         $rep = "error in replacement expression";
                     } else {
-                        Log3 $name, 5, "$name: MaxAge: result is $rep";
+                        Log3 $name, 4, "$name: MaxAge: result is $rep";
                     }
                     readingsBulkUpdate($hash, $reading, $rep);
+                    
                 } elsif ($mode eq "text") {
-                    Log3 $name, 5, "$name: MaxAge: reading $reading too old - using $rep instead";
+                    Log3 $name, 4, "$name: MaxAge: reading $reading too old - using $rep instead";
                     readingsBulkUpdate($hash, $reading, $rep);
+                                        
+                } elsif ($mode eq 'reading') {
+                    my $device  = $name;
+                    my $rname = $rep;
+                    if ($rep =~ /^([^\:]+):(.+)$/) {
+                        $device  = $1;
+                        $rname = $2;
+                    }
+                    my $rvalue = ReadingsVal($device, $rname, "");
+                    Log3 $name, 4, "$name: MaxAge: reading $reading too old - using reading $rname with value $rvalue instead";
+                    readingsBulkUpdate($hash, $reading, $rvalue);
+
+                } elsif ($mode eq 'internal') {
+                    my $device   = $name;
+                    my $internal = $rep;
+                    if ($rep =~ /^([^\:]+):(.+)$/) {
+                        $device   = $1;
+                        $internal = $2;
+                    }
+                    my $rvalue = InternalVal($device, $internal, "");
+                    Log3 $name, 4, "$name: MaxAge: reading $reading too old - using internal $internal with value $rvalue instead";
+                    readingsBulkUpdate($hash, $reading, $rvalue);
+                    
                 } elsif ($mode eq "delete") {
-                    Log3 $name, 5, "$name: MaxAge: reading $reading too old - delete it";
+                    Log3 $name, 4, "$name: MaxAge: reading $reading too old - delete it";
                     delete($defs{$name}{READINGS}{$reading});
                     delete $hash->{defptr}{readingOutdated}{$reading};
                 }
@@ -1735,8 +1930,84 @@ sub HTTPMOD_DoMaxAge($)
             Log3 $name, 5, "$name: MaxAge: No MaxAge attr for $base, $num, $sub";
         }
     }
-    readingsEndUpdate($hash, 1);
 }
+
+
+
+
+# check delete option on error
+###################################
+sub HTTPMOD_DoDeleteOnError($$)
+{
+    my ($hash, $request) = @_;
+    my $name = $hash->{NAME};
+    
+    return if (!$hash->{READINGS}); 
+    HTTPMOD_UpdateRequestHash($hash) if ($hash->{".updateRequestHash"});
+    
+    if (!$hash->{defptr}{requestReadings} || !$hash->{defptr}{requestReadings}{$request}) {
+        Log3 $name, 5, "$name: DoDeleteOnError: no defptr pointing from request to readings - returning";
+        return;
+    }
+    my $reqReadings = $hash->{defptr}{requestReadings}{$request};
+    foreach my $reading (sort keys %{$reqReadings}) {
+        Log3 $name, 5, "$name: DoDeleteOnError: check reading $reading";
+                    
+        my ($context, $eNum) = split (" ", $reqReadings->{$reading});
+        if (HTTPMOD_GetFAttr($name, $context, $eNum, "DeleteOnError")) {
+            Log3 $name, 4, "$name: DoDeleteOnError: delete reading $reading created by $request ($context, $eNum)";
+            delete($defs{$name}{READINGS}{$reading});
+            delete $hash->{defptr}{readingOutdated}{$reading};
+            delete $hash->{defptr}{requestReadings}{$request}{$reading};    
+        }
+    }
+}
+
+
+# check delete option if unmatched
+###################################
+sub HTTPMOD_DoDeleteIfUnmatched($$@)
+{
+    my ($hash, $request, @matched) = @_;
+    my $name = $hash->{NAME};
+    
+    Log3 $name, 5, "$name: DoDeleteIfUnmatched called with request $request";
+    return if (!$hash->{READINGS}); 
+    HTTPMOD_UpdateRequestHash($hash) if ($hash->{".updateRequestHash"});
+    
+    if (!$hash->{defptr}{requestReadings}) {
+        Log3 $name, 5, "$name: DoDeleteIfUnmatched: no defptr pointing from request to readings - returning";
+        return;
+    }
+    
+    my %matched;
+    foreach my $m (@matched) {
+        $matched{$m} = 1;
+    }
+                      
+    my $reqReadings = $hash->{defptr}{requestReadings}{$request};  
+    my @rList = sort keys %{$reqReadings};
+    Log3 $name, 5, "$name: DoDeleteIfUnmatched: List is @rList";
+    foreach my $reading (@rList) {
+        
+        Log3 $name, 5, "$name: DoDeleteIfUnmatched: check reading $reading" 
+            . ($matched{$reading} ? " (matched)" : " (no match)");
+        next if ($matched{$reading});
+        
+        my ($context, $eNum) = split (" ", $reqReadings->{$reading});
+        Log3 $name, 5, "$name: DoDeleteIfUnmatched: check attr for reading $reading ($context, $eNum)";
+        if (HTTPMOD_GetFAttr($name, $context, $eNum, "DeleteIfUnmatched")) {
+            Log3 $name, 4, "$name: DoDeleteIfUnmatched: delete reading $reading created by $request ($context, $eNum)";
+            delete($defs{$name}{READINGS}{$reading});
+            delete $hash->{defptr}{readingOutdated}{$reading};
+            delete $hash->{defptr}{requestReadings}{$request}{$reading};    
+        } else {
+            Log3 $name, 5, "$name: DoDeleteIfUnmatched: no DeleteIfUnmatched for reading $reading ($context, $eNum)";
+        }
+    }
+}
+
+
 
 
 #
@@ -1746,17 +2017,18 @@ sub HTTPMOD_DoMaxAge($)
 sub HTTPMOD_GetCookies($$)
 {
     my ($hash, $header) = @_;
-    my $name    = $hash->{NAME};
+    my $name = $hash->{NAME};
     Log3 $name, 5, "$name: looking for Cookies in $header";
     foreach my $cookie ($header =~ m/set-cookie: ?(.*)/gi) {
         Log3 $name, 5, "$name: Set-Cookie: $cookie";
         $cookie =~ /([^,; ]+)=([^,; ]+)[;, ]*(.*)/;
-        Log3 $name, 5, "$name: Cookie: $1 Wert $2 Rest $3";
+        Log3 $name, 4, "$name: Cookie: $1 Wert $2 Rest $3";
         $hash->{HTTPCookieHash}{$1}{Value} = $2;
         $hash->{HTTPCookieHash}{$1}{Options} = ($3 ? $3 : "");
     }
     $hash->{HTTPCookies} = join ("; ", map ($_ . "=".$hash->{HTTPCookieHash}{$_}{Value}, 
                                         sort keys %{$hash->{HTTPCookieHash}}));
+    
 }
 
 
@@ -1793,12 +2065,16 @@ sub HTTPMOD_CleanupParsers($)
     my $name = $hash->{NAME};
 
     if ($hash->{XPathEnabled}) {
-        eval {$hash->{ParserData}{XPathTree}->delete()};
-        Log3 $name, 3, "$name: error deleting XPathTree: $@" if ($@);
+        if ($hash->{ParserData}{XPathTree}) {
+            eval {$hash->{ParserData}{XPathTree}->delete()};
+            Log3 $name, 3, "$name: error deleting XPathTree: $@" if ($@);
+        }
     }
     if ($hash->{XPathStrictEnabled}) {
-        eval {$hash->{ParserData}{XPathStrictNodeset}->cleanup()};
-        Log3 $name, 3, "$name: error deleting XPathStrict nodeset: $@" if ($@);
+        if ($hash->{ParserData}{XPathStrictNodeset}) {
+            eval {$hash->{ParserData}{XPathStrictNodeset}->cleanup()};
+            Log3 $name, 3, "$name: error deleting XPathStrict nodeset: $@" if ($@);
+        }
     }
     delete $hash->{ParserData};
 }
@@ -1851,10 +2127,10 @@ sub HTTPMOD_ExtractSid($$$$)
     if (@matchlist) {
         $buffer = join (' ', @matchlist);
         if ($regex) {
-            Log3 $name, 5, "$name: ExtractSis is replacing buffer to check with match: $buffer";
+            Log3 $name, 5, "$name: ExtractSid is replacing buffer to check with match: $buffer";
         } else {
             $hash->{sid} = $buffer;
-            Log3 $name, 5, "$name: ExtractSid set sid to $hash->{sid}";
+            Log3 $name, 4, "$name: ExtractSid set sid to $hash->{sid}";
             return 1;
         }
     }
@@ -1862,13 +2138,12 @@ sub HTTPMOD_ExtractSid($$$$)
     if ($regex) {
         if ($buffer =~ $regex) {
             $hash->{sid} = $1;
-            Log3 $name, 5, "$name: ExtractSid set sid to $hash->{sid}";
+            Log3 $name, 4, "$name: ExtractSid set sid to $hash->{sid}";
             return 1;
         } else {
             Log3 $name, 5, "$name: ExtractSid could not match buffer to IdRegex $regex";
         }
     }
-    return 0;
 }
 
 
@@ -1879,6 +2154,7 @@ sub HTTPMOD_CheckAuth($$$$$)
 {
     my ($hash, $buffer, $request, $context, $num) = @_;
     my $name = $hash->{NAME};
+    my $doAuth;
 
     my $regex   = AttrVal($name, "reAuthRegex", "");
     my $json    = AttrVal($name, "reAuthJSON", "");
@@ -1922,25 +2198,28 @@ sub HTTPMOD_CheckAuth($$$$$)
             Log3 $name, 5, "$name: CheckAuth is replacing buffer to check with match: $buffer";
         } else {
             Log3 $name, 5, "$name: CheckAuth matched: $buffer";
-            return 1;
+            $doAuth = 1;
         }
     }
 
     if ($regex) {
         Log3 $name, 5, "$name: CheckAuth is checking buffer with ReAuthRegex $regex";
-        if ($buffer =~ $regex) {
-            Log3 $name, 4, "$name: CheckAuth decided new authentication required (ReAuthRegex matched: $regex)";
-            if ($request->{retryCount} < AttrVal($name, "authRetries", 1)) {
-                HTTPMOD_Auth $hash;
-                #$request->{retryCount}++;  # better add one in the call to AddToQueue
-                HTTPMOD_AddToQueue ($hash, $request->{url}, $request->{header}, 
-                    $request->{data}, $request->{type}, $request->{value}, $request->{retryCount}+1); 
-                Log3 $name, 4, "$name: CheckAuth requeued request $request->{type} after auth, retryCount $request->{retryCount} ...";
-                return 1;
-            } else {
-                Log3 $name, 4, "$name: CheckAuth has no more retries left - did authentication fail?";
-            }
+        $doAuth = 1 if ($buffer =~ $regex);
+    }
+    
+    if ($doAuth) {
+        Log3 $name, 4, "$name: CheckAuth decided new authentication required";
+        if ($request->{retryCount} < AttrVal($name, "authRetries", 1)) {
+            HTTPMOD_Auth $hash;
+            HTTPMOD_AddToQueue ($hash, $request->{url}, $request->{header}, 
+                $request->{data}, $request->{type}, $request->{value}, $request->{retryCount}+1); 
+            Log3 $name, 4, "$name: CheckAuth requeued request $request->{type} after auth, retryCount $request->{retryCount} ...";
+            return 1;
+        } else {
+            Log3 $name, 4, "$name: Authentication still required but no retries left - did last authentication fail?";
         }
+    } else {
+        Log3 $name, 4, "$name: CheckAuth decided no authentication required";    
     }
     return 0;
 }
@@ -1955,10 +2234,10 @@ sub HTTPMOD_UpdateReadingList($)
     my $name   = $hash->{NAME};
 
     my %khash;
-    foreach my $a (sort (grep (/readings?[0-9]*/, keys %{$attr{$name}}))) {
-        if (($a =~ /readingsName(.*)/) && defined ($attr{$name}{'readingsName' . $1})) { 
+    foreach my $a (sort keys %{$attr{$name}}) {
+        if (($a =~ /^readingsName(.*)/) && defined ($attr{$name}{'readingsName' . $1})) { 
             $khash{$1} = 1;      # old syntax
-        } elsif ($a =~ /reading([0-9]+).*/) { 
+        } elsif ($a =~ /^reading([0-9]+).*/) { 
             $khash{$1} = 1;      # new syntax
         }
     }
@@ -1980,63 +2259,57 @@ sub HTTPMOD_Read($$$)
     my $request = $hash->{REQUEST};
     my $header  = ($hash->{httpheader} ? $hash->{httpheader} : "");
     my $type    = $request->{type};
-    my ($num, $context, $authQueued);
+    my ($buffer, $num, $context, $authQueued);
     my @subrlist = ();
-    
-    
+        
     # set attribute prefix and num for parsing and formatting depending on request type
     if ($type =~ /(set|get)(.*)/) {
-        $num     = $2;
-        $context = $1;
+        $context = $1;      $num = $2;
     } elsif ($type =~ /(auth)(.*)/) {
-        $num     = $2;
-        $context = "sid";
-    } else {
-        # request type was update for GetUpdate cycle
-        $num     = "";
-        $context = "reading";   # relevant attributes start with "reading..."
+        $context = "sid";   $num = $2;
+    } else {   
+        $context = "reading"; $num = "";
+    }
+    
+    if (!$name || $hash->{TYPE} ne "HTTPMOD") {
+        Log3 "HTTPMOD", 3, "HTTPMOD _Read callback was called with illegal hash - this should never happen - problem in HttpUtils?";
+        return undef;
     }
     
     $hash->{BUSY} = 0;
-    my $ll = ($err ? 3 : 5);        # Log Level - 3 if error
+    my $ll = ($err ? 3 : 4);        # Log Level - 3 if error
     Log3 $name, $ll, "$name: Read callback: request type was $type" . 
         " retry $request->{retryCount}" .
          ($header ? ",\r\nHeader: $header" : ", no headers") . 
          ($body ? ",\r\nBody: $body" : ", body empty") . 
          ($err ? ", \r\nError: $err" : "no error");
     
-    my $buffer = ($header ? $header . "\r\n\r\n" . $body : $body);      # so header can be used to match e.g. sid
+    $body = "" if (!$body);
+    $buffer = ($header ? $header . "\r\n\r\n" . $body : $body);      # for matching sid / reauth
+    $buffer = $buffer . "\r\n\r\n" . $err if ($err);                 # for matching reauth
     
-    if ($err) {
-        $buffer = $buffer . "\r\n\r\n" . $err;                          # so err can be used in reAuthRegex matching
-        readingsSingleUpdate ($hash, "LAST_ERROR", $err, 1)
-            if (AttrVal($name, "showError", undef))
-    }
+    HTTPMOD_InitParsers($hash, $body);   
+    HTTPMOD_GetCookies($hash, $header) if (AttrVal($name, "enableCookies", 0));   
+    HTTPMOD_ExtractSid($hash, $buffer, $context, $num); 
     
-    HTTPMOD_UpdateReadingList($hash) if ($hash->{".updateReadingList"});
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate ($hash, "LAST_ERROR", $err)      if ($err && AttrVal($name, "showError", 0));
+    readingsBulkUpdate($hash, "LAST_REQUEST", $type)    if (AttrVal($name, "showMatched", undef));
     
-    HTTPMOD_GetCookies($hash, $header) if (AttrVal($name, "enableCookies", 0));
-
-    HTTPMOD_InitParsers($hash, $body);
-        
-    if ($context eq "sid") {
-        HTTPMOD_ExtractSid($hash, $buffer, $context, $num); 
-    } else {
-        $authQueued = HTTPMOD_CheckAuth($hash, $body, $request, $context, $num);    
-    }
-
+    HTTPMOD_DoMaxAge($hash) if ($hash->{MaxAgeEnabled});
+    
+    $authQueued = HTTPMOD_CheckAuth($hash, $buffer, $request, $context, $num) if ($context ne "sid");
+    
     if ($err || $authQueued || 
         ($context =~ "set|sid" && !HTTPMOD_GetFAttr($name, $context, $num, "ParseResponse"))) {
-        # don't continue parsing response but still check maxAge for all readings
-        HTTPMOD_DoMaxAge($hash) if ($hash->{MaxAgeEnabled});
-        #Log3 $name, 4, "$name: Read: no further parsing";
+        readingsEndUpdate($hash, 1);
+        HTTPMOD_DoDeleteOnError($hash, $type)   if ($hash->{DeleteOnError}); 
         HTTPMOD_CleanupParsers($hash);
-        return undef;
+        return undef;   # don't continue parsing response  
     }
   
     my ($checkAll, $tried, $match, $reading); 
     my @unmatched = (); my @matched   = ();
-    readingsBeginUpdate($hash);
     
     if ($context =~ "get|set") {
         my $file = HTTPMOD_GetFAttr($name, $context, $num, "PullToFile");
@@ -2044,7 +2317,7 @@ sub HTTPMOD_Read($$$)
             ($tried, $match, $reading) = HTTPMOD_PullToFile($hash, $buffer, $num, $file);
             @subrlist = ($reading); 
         } else {
-            ($tried, $match, $reading, @subrlist) = HTTPMOD_ExtractReading($hash, $buffer, $context, $num);
+            ($tried, $match, $reading, @subrlist) = HTTPMOD_ExtractReading($hash, $buffer, $context, $num, $type);
         }
         if ($tried) {
             if($match) {
@@ -2053,7 +2326,6 @@ sub HTTPMOD_Read($$$)
                 push @unmatched, $reading;
             }
         }
-
         $checkAll = HTTPMOD_GetFAttr($name, $context, $num, 'CheckAllReadings', !$tried);
         # if ExtractReading2 could not find any parsing instruction (e.g. regex) then check all Readings
     } else {
@@ -2065,36 +2337,31 @@ sub HTTPMOD_Read($$$)
         if (ref $hash->{ParserData}{JSON} eq "HASH") {
             foreach my $object (keys %{$hash->{ParserData}{JSON}}) {
                 my $value = $hash->{ParserData}{JSON}{$object};
-                my $rname = $object;
-                my $rnum  = 0;
-                #Log3 $name, 5, "$name: looking at JSON object $object, value $value";
-                # is there a defined reading with that JSON path? -> take name and formatting
-                foreach my $rx (sort grep (/^reading[0-9]+JSON$/, keys %{$attr{$name}})) {
-                    if ($object eq AttrVal($name, $rx, "")) {
-                        # Name und ggf. Formattierung angegeben, nutze sie.
-                        $rx    =~ /^reading([0-9]+)JSON$/;
-                        $rnum  = $1;
-                        $rname = AttrVal($name, "reading${rnum}Name", "");
-                        $value = HTTPMOD_FormatReading($name, "reading", $rnum, $value);
-                    }
-                }
-                Log3 $name, 5, "$name: Read set JSON $object as reading $rname to value " . $value;
+                Log3 $name, 5, "$name: Read set JSON $object as reading $object to value " . $value;
+                $value = HTTPMOD_FormatReading($name, $context, $num, $value);
                 readingsBulkUpdate($hash, $object, $value);
-                push @matched, $rname;
-                # unmatched is not filled for "ExtractAllJSON"
+                push @matched, $object;     # unmatched is not filled for "ExtractAllJSON"
                 delete $hash->{defptr}{readingOutdated}{$object};
+                
+                $hash->{defptr}{readingBase}{$object}   = $context;
+                $hash->{defptr}{readingNum}{$object}    = $num;
+                $hash->{defptr}{requestReadings}{$request}{$object} = "$context $num";
             }
         } else {
             Log3 $name, 3, "$name: no parsed JSON structure available";
         }
-    } elsif ($checkAll && defined($hash->{".readingParseList"})) {
+    } 
+    
+    HTTPMOD_UpdateReadingList($hash) if ($hash->{".updateReadingList"});   
+    if ($checkAll && defined($hash->{".readingParseList"})) {
         # check all defined readings and try to extract them
                
         Log3 $name, 5, "$name: Read starts parsing response to $type with defined readings: " . 
                 join (",", @{$hash->{".readingParseList"}});
         foreach $num (@{$hash->{".readingParseList"}}) {
             # try to parse readings defined in reading.* attributes
-            (undef, $match, $reading, @subrlist) = HTTPMOD_ExtractReading($hash, $buffer, 'reading', $num);
+            # pass request $type so we know for later delete
+            (undef, $match, $reading, @subrlist) = HTTPMOD_ExtractReading($hash, $buffer, 'reading', $num, $type);
             if($match) {
                 push @matched, @subrlist;
             } else {
@@ -2102,8 +2369,10 @@ sub HTTPMOD_Read($$$)
             }
         }
     }
-    readingsBulkUpdate($hash, "MATCHED_READINGS", join ' ', @matched)
-        if (AttrVal($name, "showMatched", undef));
+    if (AttrVal($name, "showMatched", undef)) {
+        readingsBulkUpdate($hash, "MATCHED_READINGS", join ' ', @matched);
+        readingsBulkUpdate($hash, "UNMATCHED_READINGS", join ' ', @unmatched);
+    }
 
     if (!@matched) {
         Log3 $name, 3, "$name: Read response to $type didn't match any Reading";
@@ -2115,13 +2384,13 @@ sub HTTPMOD_Read($$$)
     HTTPMOD_TryCall($hash, $buffer, 'parseFunction1', $type);
     readingsEndUpdate($hash, 1);
     HTTPMOD_TryCall($hash, $buffer, 'parseFunction2', $type);
-    HTTPMOD_HandleSendQueue("direct:".$name);
     
+    HTTPMOD_DoDeleteIfUnmatched($hash, $type, @matched) 
+        if ($hash->{DeleteIfUnmatched});
+        
+    HTTPMOD_HandleSendQueue("direct:".$name);  
     HTTPMOD_CleanupParsers($hash);
-    
-    # check maxAge for all readings
-    HTTPMOD_DoMaxAge($hash) if ($hash->{MaxAgeEnabled});
-
+   
     return undef;
 }
 
@@ -2152,9 +2421,19 @@ HTTPMOD_HandleSendQueue($)
       return;
     }
     if ($hash->{BUSY}) {  # still waiting for reply to last request     
-        InternalTimer($now+$queueDelay, "HTTPMOD_HandleSendQueue", "queue:$name", 0);
-        Log3 $name, 5, "$name: HandleSendQueue - still waiting for reply to last request, delay sending from queue";
-        return;
+        if ($hash->{LASTSEND} && $now > $hash->{LASTSEND} + (AttrVal($name, "timeout", 2)*2)
+                              && $now > $hash->{LASTSEND} + 15) {
+            Log3 $name, 5, "$name: HandleSendQueue - still waiting for reply, timeout is over twice - this should never happen";
+            Log3 $name, 5, "$name: HandleSendQueue - stop waiting";
+            $hash->{BUSY} = 0;
+        } else {
+            if ($hash->{LASTSEND} && $now > $hash->{LASTSEND} + ($queueDelay * 2)) {
+                $queueDelay *= 2;
+            }
+            InternalTimer($now+$queueDelay, "HTTPMOD_HandleSendQueue", "queue:$name", 0);
+            Log3 $name, 5, "$name: HandleSendQueue - still waiting for reply to last request, delay sending from queue";
+            return;
+        }
     }
 
     $hash->{REQUEST} = $queue->[0];
@@ -2215,12 +2494,17 @@ HTTPMOD_HandleSendQueue($)
             $hash->{url}    =~ s/\$sid/$hash->{sid}/g;
         }
         
+        if (AttrVal($name, "enableCookies", 0) && $hash->{HTTPCookies}) {
+            Log3 $name, 5, "$name: HandleSendQueue is adding Cookies: " . $hash->{HTTPCookies};
+            $hash->{header} .= "\r\n" if ($hash->{header});
+            $hash->{header} .= "Cookie: " . $hash->{HTTPCookies};
+        }        
                 
         Log3 $name, 4, "$name: HandleSendQueue sends request type $hash->{REQUEST}{type} to " .
                         "URL $hash->{url}, " . 
-                        ($hash->{data} ? "data $hash->{data}, " : "No Data, ") .
-                        ($hash->{header} ? "header $hash->{header}, " : "No Header, ") .
-                        "timeout $hash->{timeout}";
+                        ($hash->{data} ? "\r\ndata: $hash->{data}, " : "No Data, ") .
+                        ($hash->{header} ? "\r\nheader: $hash->{header}, " : "No Header, ") .
+                        "\r\ntimeout $hash->{timeout}";
                         
         shift(@{$queue});       # remove first element from queue
         HttpUtils_NonblockingGet($hash);
@@ -2256,7 +2540,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
     $request{ignoreredirects} = $ignoreredirects;
     
     my $qlen = ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0);
-    Log3 $name, 5, "$name: AddToQueue called, initial send queue length : $qlen" . ($prio ? " prio" : "");
+    Log3 $name, 4, "$name: AddToQueue adds $request{type}, initial queue len: $qlen" . ($prio ? ", prio" : "");
     Log3 $name, 5, "$name: AddToQueue " . ($prio ? "prepends " : "adds ") . 
             "type $request{type} to " .
             "URL $request{url}, " .
@@ -2645,9 +2929,29 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         with JSON you can write 
         <ul><code>
             attr test2 get01JSON data_34.4008.value 
-        </ul></code>
+        </code></ul>
+
+        If you define an explicit json reading with the get01JSON or reading01JSON syntax and there is no full match, HTTPMOD will try to do a regex match using the defined string. If for example the json data contains an array like 
+
+        <ul><code>
+         "modes":["Off","SimpleColor","RainbowChase","BobblySquares","Blobs","CuriousCat","Adalight","UDP","DMX"],
+        </code></ul>
+
+        a Configuration could be 
+
+        <ul><code>
+            attr test2 get01Name ModesList
+            attr test2 get01JSON modes 
+        </code></ul>
         
-        or if you don't care about the naming of your readings, you can simply extract all JSON data with 
+        The result will be treated as a list just like a list of XPath matches or Regex matches. 
+        So it will create readings ModlesList-1 ModesList-2 and so on as described above (simple Comfiguration).<br>
+        You can also define a recombineExpr to recombine the match list into one reading e.g. as 
+        <ul><code>
+            attr test2 reading01RecombineExpr join ",", @matchlist
+        </code></ul>
+        
+        If you don't care about the naming of your readings, you can simply extract all JSON data with 
         <ul><code>
             attr test2 extractAllJSON
         </ul></code>
@@ -2884,6 +3188,8 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <li><b>(get|set|reading)[0-9]+AutoNumLen</b></li>
             In cases where a regular expression or an XPath results in multiple results and these results are stored in a common reading name with extension -number, then 
             you can modify the format of this number to have a fixed length with leading zeros. AutoNumLen 3 for example will lead to reading names ending with -001 -002 and so on.
+        <li><b>(reading|get|set)[0-9]*AlwaysNum</b></li>
+            if set to 1 this attributes forces reading names to end with a -1, -01 (depending on the above described AutoNumLen) even if just one value is parsed.
         <li><b>get|set|reading[0-9]+JSON</b></li>
             defines a path to the JSON object wanted by concatenating the object names. See the above example.<br>
             If you don't know the paths, then start by using extractAllJSON and the use the names of the readings as values for the JSON attribute.<br>
@@ -3038,11 +3344,22 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <li><b>get|reading[0-9]*MaxAge</b></li>
             Defines how long a reading is valid before it is automatically overwritten with a replacement when the read function is called the next time.
         <li><b>get|reading[0-9]*MaxAgeReplacement</b></li>
-            specifies the replacement for MaxAge - either as a static text or as a perl expression.
+            specifies the replacement for MaxAge - either as a static text, the name of a reading / internal or as a perl expression.<br>
+            If MaxAgeReplacementMode is <code>reading</code> then the value of MaxAgeReplacement can be the name of a reading of this device or it can be a reading of a different device referred to by devicename:reading.<br>
+            If MaxAgeReplacementMode is <code>internal</code> the value of MaxAgeReplacement can be the name of an internal of this device or it can be an internal of a different device referred to by devicename:internal.
+            
         <li><b>get|reading[0-9]*MaxAgeReplacementMode</b></li>
-            specifies how the replacement is interpreted: can be text, expression and delete.
+            specifies how the replacement is interpreted: can be text, reading, internal, expression and delete.
         <br>
 
+        <li><b>get|reading[0-9]*DeleteIfUnmatched</b></li>
+            If set to 1 this attribute causes certain readings to be deleted when the parsing of the website does not match the specified reading. Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). Specified readings will only be deleted if the same operation does not parse this reading again. This is especially useful for parsing that creates several matches / readings and ths number of matches can vary from request to request. For example if reading01Regex creates 4 readings in one update cycle and in the next cycle it only matches two times the the readings containing the remaining values from the last round will be deleted.<br>
+            Please note that this mechanism will not work in all cases after a restart. Especially when a get definition does not contain its own parsing definition but ExtractAllJSON or relies on HTTPMOD to use all defined reading.* attributes to parse the responsee to a get command, old readings might not be deleted after a restart of fhem.
+        <li><b>get|reading[0-9]*DeleteOnError</b></li>
+            If set to 1 this attribute causes certain readings to be deleted when the website can not be reached and the HTTP request returns an error. Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). Specified readings will only be deleted if the same operation returns an error. <br>
+            The same restrictions as for DeleteIfUnmatched apply regarding a fhem restart.
+        <br>
+        
 
         <li><b>httpVersion</b></li>
             defines the HTTP-Version to be sent to the server. This defaults to 1.0.
@@ -3076,7 +3393,9 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <li><b>minSendDelay</b></li>
             Defines the minimum time between two HTTP Requests.
         <br>
-
+        <li><b>alignTime</b></li>
+            Aligns each periodic read request for the defined interval to this base time. This is typcally something like 00:00 (see the Fhem at command)
+        <br>
 
         <li><b>enableXPath</b></li>
             This attribute should no longer be used. Please specify an HTTP XPath in the dedicated attributes shown above.
