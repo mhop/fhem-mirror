@@ -373,25 +373,34 @@ DevIo_OpenDev($$$)
     $po->write_settings;
   }
 
-  if($reopen) {
-    Log3 $name, 1, "$dev reappeared ($name)";
-  } else {
-    Log3 $name, 3, "$name device opened" if(!$hash->{DevioText});
-  }
-
   DevIo_setStates($hash, "opened");
 
   my $ret;
   if($initfn) {
-    my $ret  = &$initfn($hash);
+    my $hadFD = defined($hash->{FD});
+    $ret = &$initfn($hash);
     if($ret) {
-      DevIo_CloseDev($hash);
-      Log3 $name, 1, "Cannot init $dev, ignoring it ($name)";
+      if($hadFD && !defined($hash->{FD})) { # Forum #54732 / ser2net
+        DevIo_Disconnected($hash);
+        $hash->{NEXT_OPEN} = time()+60;
+
+      } else {
+        DevIo_CloseDev($hash);
+        Log3 $name, 1, "Cannot init $dev, ignoring it ($name)";
+      }
     }
   }
 
-  DoTrigger($name, "CONNECTED") if($reopen);
-  return $ret;
+  if(!$ret) {
+    if($reopen) {
+      Log3 $name, 1, "$dev reappeared ($name)";
+    } else {
+      Log3 $name, 3, "$name device opened" if(!$hash->{DevioText});
+    }
+  }
+
+  DoTrigger($name, "CONNECTED") if($reopen && !$ret);
+  return undef;
 }
 
 sub
