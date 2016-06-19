@@ -92,7 +92,7 @@ FBAHAHTTP_Poll($)
         return;
       }
 
-      Log 1, $_[2] if(AttrVal($name, "verbose", 1) > 4);
+      Log 5, $_[2] if(AttrVal($name, "verbose", 1) >= 5);
       if($_[2] !~ m,^<devicelist.*</devicelist>$,s) {
         Log3 $name, 3, "$name: unexpected reply from device: $_[2]";
         delete $hash->{".SID"};
