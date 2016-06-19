@@ -867,7 +867,7 @@ ZWave_Cmd($$@)
     return "" if($ncmd && $ncmd eq "EMPTY"); # configAll
   }
 
-  Log3 $name, 2, "ZWave $type $name $cmd ".join(" ", @a);
+  Log3 $name, 3, "ZWave $type $name $cmd ".join(" ", @a);
 
   my ($baseClasses, $baseHash) = ($classes, $hash);
   if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
