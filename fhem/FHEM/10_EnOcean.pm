@@ -1,6 +1,7 @@
 
 ##############################################
 # $Id$
+# 2016-06-18
 
 package main;
 
@@ -1251,28 +1252,55 @@ sub EnOcean_Get($@)
         Log3 $name, 3, "EnOcean get $name $cmd $channel";
         $data = sprintf "%02X%02X", $cmdID, $channel;
 
-      } elsif ($cmd eq "special" && $manufID eq "033") {
+      } elsif ($cmd eq "special") {
         $rorg = "D1";
         my $query = shift(@a);
-        if (!defined $query) {
-          return "$cmd <channel> <query> wrong, choose health|load|voltage|serialNumber.";
-        } elsif ($query eq "health") {
-          $query = 7;
-        } elsif ($query eq "load") {
-          $query = 8;
-        } elsif ($query eq "voltage") {
-          $query = 9;
-        } elsif ($query eq "serialNumber") {
-          $query = 0x81;
-        } else {
-          return "$cmd <channel> <query> wrong, choose health|load|voltage|serialNumber.";
+        if ($manufID eq "033") {
+          if (!defined $query) {
+            return "$cmd <channel> <query> wrong, choose health|load|voltage|serialNumber.";
+          } elsif ($query eq "health") {
+            $query = 7;
+          } elsif ($query eq "load") {
+            $query = 8;
+          } elsif ($query eq "voltage") {
+            $query = 9;
+          } elsif ($query eq "serialNumber") {
+            $query = 0x81;
+          } else {
+            return "$cmd <channel> <query> wrong, choose health|load|voltage|serialNumber.";
+          }
+          $data = sprintf "0331%02X", $query;
+          Log3 $name, 3, "EnOcean get $name $cmd $channel $query";
+          readingsSingleUpdate($hash, "getParam", $query, 0);
+        } elsif ($manufID eq "046") {
+          if (!defined $query) {
+            return "$cmd <channel> <query> wrong, choose reset|firmwareVersion|taughtInDevNum|taughtInDevID.";
+          } elsif ($query eq "reset") {
+            $query = 1;
+            $data = sprintf "0046%02X", $query;
+          } elsif ($query eq "firmwareVersion") {
+            $query = 2;
+            $data = sprintf "0046%02X", $query;
+          } elsif ($query eq "taughtInDevNum") {
+            $query = 4;
+            $data = sprintf "0046%02X", $query;
+          } elsif ($query eq "taughtInDevID") {
+            $query = 6;
+            my $taughtInDevNum = shift(@a);
+            if (defined $taughtInDevNum && $taughtInDevNum =~ m/^\d+$/ && $taughtInDevNum >= 0 && $taughtInDevNum <= 23) {
+              $data = sprintf "0046%02X%02X", $query, $taughtInDevNum;
+            } else {
+              return "Usage: taughtInDevID is not numeric or out of range";
+            }
+          } else {
+            return "$cmd <channel> <query> wrong, choose reset|firmwareVersion|taughtInDevNum|taughtInDevID.";
+          }
+          Log3 $name, 3, "EnOcean get $name $cmd $channel $query";
+          readingsSingleUpdate($hash, "getParam", $query, 0);        
         }
-        Log3 $name, 3, "EnOcean get $name $cmd $channel $query";
-        $data = sprintf "0331%02X", $query;
-        readingsSingleUpdate($hash, "getParam", $query, 0);
 
       } else {
-        if ($manufID eq "033") {
+        if ($manufID =~ m/^033|046$/) {
           return "Unknown argument $cmd, choose one of " . $cmdList . "state measurement roomCtrlMode:noArg special settings";
         } else {
           return "Unknown argument $cmd, choose one of " . $cmdList . "state measurement roomCtrlMode:noArg settings";
@@ -4462,8 +4490,40 @@ sub EnOcean_Set($@)
         }
         $data = sprintf "%02X%02XFFFFFFFF%02X", $cmdID, $channel, $extSwitchMode << 6 | $extSwitchType << 5;
 
+      } elsif ($cmd eq "special") {
+        $rorg = "D1";
+        shift(@a);
+        $updateState = 0;
+        my $repeaterActive = 0;
+        my $repeaterLevel = 0;
+        my $specialCmd = shift(@a);        
+        if ($manufID eq "046") {
+          if (!defined $specialCmd) {
+            return "$cmd <command> wrong, choose repeaterLevel.";
+          } elsif ($specialCmd eq "repeaterLevel") {
+            $cmdID = 8;
+            my $repeaterLevel = shift(@a);
+            if (defined $repeaterLevel && $repeaterLevel =~ m/^off|1|2$/) {
+              if ($repeaterLevel eq "off") {
+                $repeaterLevel = 0;
+              } else {
+                $repeaterActive = 1;
+              }
+            } else {
+              return "Usage: repeaterLevel is wrong";
+            }
+          } else {
+            return "$cmd $specialCmd <arg> wrong, choose repeaterLevel off|1|2.";
+          }
+        }
+        $data = sprintf "0046%02X%02X%02X", $cmdID, $repeaterActive, $repeaterLevel;
+
       } else {
-        $cmdList .= "dim:slider,0,1,100 on off autoOffTime delayOffTime extSwitchMode extSwitchType local measurement roomCtrlMode:off,buildingProtection,economy,comfort-2,comfort-1,comfort";
+        if ($manufID =~ m/^046$/) {
+          $cmdList .= "dim:slider,0,1,100 on off autoOffTime delayOffTime extSwitchMode extSwitchType local measurement roomCtrlMode:off,buildingProtection,economy,comfort-2,comfort-1,comfort special";
+        } else {
+          $cmdList .= "dim:slider,0,1,100 on off autoOffTime delayOffTime extSwitchMode extSwitchType local measurement roomCtrlMode:off,buildingProtection,economy,comfort-2,comfort-1,comfort";
+        }
         return SetExtensions ($hash, $cmdList, $name, @a);
       }
       Log3 $name, 3, "EnOcean set $name $cmd";
@@ -10224,41 +10284,53 @@ sub EnOcean_Parse($$)
 
   } elsif ($rorg eq "D1") {
     # MSC telegram
-    if ($st eq "actuator.01" && $manufID eq "033") {
-      if (substr($data, 3, 1) == 4) {
-        my $getParam = ReadingsVal($name, "getParam", 0);
-        if ($getParam == 8) {
-          push @event, "3:loadClassification:no";
-          push @event, "3:loadLink:" . ($db[1] & 16 ? "connected" : "disconnected");
-          push @event, "3:loadOperation:3-wire";
-          push @event, "3:loadState:" . ($db[1] & 64 ? "on" : "off");
-          CommandDeleteReading(undef, "$name getParam");
-        } elsif ($getParam == 7) {
-          if ($db[0] & 4) {
-            push @event, "3:devTempState:warning";
-          } elsif ($db[0] & 2) {
-            push @event, "3:devTempState:max";
-          } else {
-            push @event, "3:devTempState:ok";
+    if ($st eq "actuator.01") {
+      if ($manufID eq "033") {
+        if (substr($data, 3, 1) == 4) {
+          my $getParam = ReadingsVal($name, "getParam", 0);
+          if ($getParam == 8) {
+            push @event, "3:loadClassification:no";
+            push @event, "3:loadLink:" . ($db[1] & 16 ? "connected" : "disconnected");
+            push @event, "3:loadOperation:3-wire";
+            push @event, "3:loadState:" . ($db[1] & 64 ? "on" : "off");
+            CommandDeleteReading(undef, "$name getParam");
+          } elsif ($getParam == 7) {
+            if ($db[0] & 4) {
+              push @event, "3:devTempState:warning";
+            } elsif ($db[0] & 2) {
+              push @event, "3:devTempState:max";
+            } else {
+              push @event, "3:devTempState:ok";
+            }
+            push @event, "3:mainsPower:" . ($db[0] & 8 ? "failure" : "ok");
+            if ($db[1] == 0xFF) {
+              push @event, "3:devTemp:invalid";
+            } else {
+              push @event, "3:devTemp:" . $db[1];
+            }
+            CommandDeleteReading(undef, "$name getParam");
+          } elsif ($getParam == 9) {
+            push @event, "3:voltage:" . sprintf("%.2f", (hex(substr($data, 4, 4)) * 0.01));
+            CommandDeleteReading(undef, "$name getParam");
+          } elsif ($getParam == 0x81) {
+            $hash->{READINGS}{serialNumber}{VAL} = substr($data, 4, 4);
+            $hash->{READINGS}{getParam}{VAL} = 0x82;
+            EnOcean_SndRadio(undef, $hash, $packetType, "D1", "033182", AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
+          } elsif ($getParam == 0x82) {
+            push @event, "3:serialNumber:" . $hash->{READINGS}{serialNumber}{VAL} . substr($data, 4, 4);
+            CommandDeleteReading(undef, "$name getParam");
           }
-          push @event, "3:mainsPower:" . ($db[0] & 8 ? "failure" : "ok");
-          if ($db[1] == 0xFF) {
-            push @event, "3:devTemp:invalid";
-          } else {
-            push @event, "3:devTemp:" . $db[1];
-          }
-          CommandDeleteReading(undef, "$name getParam");
-        } elsif ($getParam == 9) {
-          push @event, "3:voltage:" . sprintf("%.2f", (hex(substr($data, 4, 4)) * 0.01));
-          CommandDeleteReading(undef, "$name getParam");
-        } elsif ($getParam == 0x81) {
-          $hash->{READINGS}{serialNumber}{VAL} = substr($data, 4, 4);
-          $hash->{READINGS}{getParam}{VAL} = 0x82;
-          EnOcean_SndRadio(undef, $hash, $packetType, "D1", "033182", AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
-        } elsif ($getParam == 0x82) {
-          push @event, "3:serialNumber:" . $hash->{READINGS}{serialNumber}{VAL} . substr($data, 4, 4);
-          CommandDeleteReading(undef, "$name getParam");
         }
+      } elsif ($manufID eq "046") {
+        my $cmd = hex(substr($data, 4, 2));
+        if ($cmd == 3) {
+          push @event, "3:firmwareVersion:" . substr($data, 6, 6);
+        } elsif ($cmd == 5) {
+          push @event, "3:taughtInDevNum:$db[0]";
+        } elsif ($cmd == 7) {
+          CommandDeleteReading(undef, "$name taughtInDevID.*");
+          push @event, "3:taughtInDevID" . sprintf('%02d', $db[4]) . ":" . substr($data, 8, 8);        
+        }      
       }
 
     } elsif ($st eq "raw") {
@@ -15009,7 +15081,7 @@ EnOcean_Delete($$)
   Therefore, the approach does not only define parameters for the value recalculation algorithm
   but also includes specific signal definition. (e.g. physical units). Further technical
   information can be found at the
-  <a href="https://www.enocean-alliance.org/fileadmin/redaktion/enocean_alliance/pdf/GenericProfiles_V1_Extract.pdf">Generic Profiles 1.0 Abstract (PDF)</a>
+  <a href="https://www.enocean-alliance.org/fileadmin/redaktion/enocean_alliance/pdf/GenericProfiles_V1_Extract.pdf">Generic Profiles 1.0 Abstract</a>
   <br><br>
   Smart Acknowledge (Smart Ack) enables a special bidirectional communication. The communication is managed by a
   Controller that responds to the devices telegrams with acknowledges. Smart Ack is a bidirectional communication
@@ -16302,6 +16374,9 @@ EnOcean_Delete($$)
         specify the measurement unit</li>
       <li>roomCtrlMode off|comfort|comfort-1|comfort-2|economy|buildingProtection<br>
       set pilot wire mode</li>
+      <li>special repeater off|1|2<br>
+      set repeater level of device (additional NodOn command)
+      </li>
     </ul><br>
        [autoOffTime] = 0 s ... 0.1 s ... 6553.4 s<br>
        [delayOffTime] = 0 s ... 0.1 s ... 6553.4 s<br>
@@ -16713,6 +16788,9 @@ EnOcean_Delete($$)
        </li>
        <li>special &lt;channel&gt; health|load|voltage|serialNumber<br>
        additional Permondo SmartPlug PSC234 commands
+       </li>
+       <li>special &lt;channel&gt; firmwareVersion|reset|taughtInDevID|taughtInDevNum<br>
+       additional NodOn commands
        </li>
 
     </ul><br>
@@ -18763,6 +18841,7 @@ EnOcean_Delete($$)
         <li>error&lt;channel&gt;: ok|warning|failure|not_supported</li>
         <li>extSwitchMode&lt;1...29|All|Input&gt;: unavailable|switch|pushbutton|auto</li>
         <li>extSwitchType&lt;1...29|All|Input&gt;: toggle|direction</li>
+        <li>firmwareVersion: [000000 ... FFFFFF]</li>
         <li>loadClassification: no</li>
         <li>localControl&lt;channel&gt;: enabled|disabled</li>
         <li>loadLink: connected|disconnected</li>
@@ -18785,6 +18864,8 @@ EnOcean_Delete($$)
         <li>responseTimeMin: 1/s</li>
         <li>roomCtrlMode: off|comfort|comfort-1|comfort-2|economy|buildingProtection</li>
         <li>serialNumber: [00000000 ... FFFFFFFF]</li>
+        <li>taughtInDevID&lt;00...23&gt;: [00000001 ... FFFFFFFE]</li>
+        <li>taughtInDevNum: [0 ... 23]</li>
         <li>teach: &lt;result of teach procedure&gt;</li>
         <li>teachInDev: enabled|disabled</li>
         <li>state: on|off</li>
