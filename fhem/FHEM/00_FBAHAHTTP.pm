@@ -43,6 +43,7 @@ FBAHAHTTP_Define($$)
     }
     $defs{$d}{IODev} = $hash
   }
+  $hash->{CmdStack} = ();
 
   return undef if($hash->{DEF} eq "none"); # DEBUGGING
   InternalTimer(1, "FBAHAHTTP_Poll", $hash);
@@ -156,6 +157,29 @@ FBAHAHTTP_Set($@)
   return undef;
 }
 
+sub
+FBAHAHTTP_ProcessStack($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $msg = $hash->{CmdStack}->[0];
+  HttpUtils_NonblockingGet({
+    url=>"http://$hash->{DEF}/webservices/homeautoswitch.lua?$msg",
+    loglevel => AttrVal($name, "verbose", 4),
+    callback => sub {
+      if($_[1]) {
+        Log3 $name, 3, "$name: $_[1]";
+        delete $hash->{".SID"};
+        $hash->{CmdStack} = ();
+        return;
+      }
+      chomp $_[2];
+      Log3 $name, 5, "FBAHAHTTP_Write reply for $name: $_[2]";
+      pop @{$hash->{CmdStack}};
+      FBAHAHTTP_ProcessStack($hash) if(@{$hash->{CmdStack}} > 0);
+    }
+  });
+}
 
 #####################################
 sub
@@ -168,19 +192,8 @@ FBAHAHTTP_Write($$$)
     Log 1, "$name: Not connected, wont execute $msg";
     return;
   }
-  HttpUtils_NonblockingGet({
-    url=>"http://$hash->{DEF}/webservices/homeautoswitch.lua?sid=$sid".
-         "&ain=$fn&switchcmd=$msg",
-    loglevel => AttrVal($name, "verbose", 4),
-    callback => sub {
-      if($_[1]) {
-        Log3 $name, 3, "$name: $_[1]";
-        delete $hash->{".SID"};
-        return;
-      }
-      Log 5, "FBAHAHTTP_Write reply for $name: $_[2]";
-    }
-  });
+  push(@{$hash->{CmdStack}}, "sid=$sid&ain=$fn&switchcmd=$msg");
+  FBAHAHTTP_ProcessStack($hash) if(@{$hash->{CmdStack}} == 1);
 }
 
 
