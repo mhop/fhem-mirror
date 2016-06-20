@@ -38,6 +38,19 @@
 ##############################################
 
 
+### Wünsche von Usern
+## 
+## Hi,
+## benutze jetzt seid einigen Tagen erfolgreich das UWZ Modul.
+## Habe da noch einen kleinen wunsch zum weblink:
+## Könnte mal das attribut htmlattr mit einbinden?
+## attr Unwetterzentrale htmlattr width="220" height="330"
+## https://forum.fhem.de/index.php/topic,51233.msg461384.html#msg461384
+##
+##
+
+
+
 
 package main;
 use strict;
@@ -60,7 +73,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.0.1";
+my $version         = "1.2.0";
 
 my $countrycode = "DE";
 my $plz = "77777";
@@ -87,6 +100,7 @@ sub UWZ_Map2Image($$) {
 
     my $uwz_de_url = "http://www.unwetterzentrale.de/images/map/";
     my $uwz_at_url = "http://unwetter.wetteralarm.at/images/map/";
+    my $uwz_en_url = "http://warnings.severe-weather-centre.co.uk/images/map/";
     my ( $hash, $smap ) = @_;
     my $lmap;
     
@@ -122,6 +136,21 @@ sub UWZ_Map2Image($$) {
     $lmap->{'wien'}=$uwz_at_url.'wien_index.png';
     $lmap->{'isobaren1'}="http://www.unwetterzentrale.de/images/icons/UWZ_ISO_00.jpg";
     $lmap->{'isobaren2'}="http://www.wetteralarm.at/uploads/pics/UWZ_EURO_ISO_GER_00.jpg";
+    
+    ## Maps of United Kingdom
+    $lmap->{'unitedkingdom'}=$uwz_en_url.'unitedkingdom_index.png';
+    $lmap->{'eastofengland'}=$uwz_en_url.'eastofengland_index.png';
+    $lmap->{'eastmidlands'}=$uwz_en_url.'eastmidlands-index.png';
+    $lmap->{'london'}=$uwz_en_url.'london-index.png';
+    $lmap->{'northeastengland'}=$uwz_en_url.'northeastengland-index.png';
+    $lmap->{'northernireland'}=$uwz_en_url.'northernireland-index.png';
+    $lmap->{'northwestengland'}=$uwz_en_url.'northwestengland-index.png';
+    $lmap->{'scotland'}=$uwz_en_url.'scotland-index.png';
+    $lmap->{'southeastengland'}=$uwz_en_url.'southeastengland-index.png';
+    $lmap->{'southwestengland'}=$uwz_en_url.'southwestengland-index.png';
+    $lmap->{'wales'}=$uwz_en_url.'wales-index.png';
+    $lmap->{'westmidlands'}=$uwz_en_url.'westmidlands-index.png';
+    $lmap->{'yorkshireandthehumber'}=$uwz_en_url.'yorkshireandthehumber-index.png';
     return $lmap->{$smap};
 }
 
@@ -134,6 +163,7 @@ sub UWZ_Initialize($) {
     $hash->{SetFn}    = "UWZ_Set";
     $hash->{GetFn}    = "UWZ_Get";
     $hash->{AttrList} = "INTERVAL ".
+                        "CountryCode ". # Added to set country/language
                         "URL ".
                         "PLZ ".
                         "download:0,1 ".
@@ -162,7 +192,11 @@ sub UWZ_Define($$) {
     $hash->{STATE}           = "Initializing";
     $hash->{CountryCode}     = $a[2];
     $hash->{PLZ}             = $a[3];
-    $hash->{URL}             =  "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=de&areaID=UWZ" . $a[2] . $a[3];
+    
+    ## URL by CountryCode
+        $hash->{URL} =  "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=en&areaID=UWZ" . $a[2] . $a[3] if ( $hash->{CountryCode} eq "UK" );
+        $hash->{URL} =  "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=de&areaID=UWZ" . $a[2] . $a[3] if ( $hash->{CountryCode} eq "DE" );
+    
     $hash->{fhem}{LOCAL}     = 0;
     $hash->{INTERVAL}        = $a[4];
     $hash->{VERSION}         = $version;
@@ -262,9 +296,10 @@ sub UWZ_GetCurrent($@) {
             } else {
                 $out = "inactive";
             }
-  	}
-  }
-  return $out;
+        }
+    }
+    
+    return $out;
 }
 
 #####################################
@@ -285,8 +320,8 @@ sub UWZ_GetCurrentHail($) {
             } else {
                 $out= "inactive";
             }
-  	}
-  }
+        }
+    }
 
     return $out;
 }
@@ -372,19 +407,6 @@ sub UWZ_Done($) {
     # delete the marker for RUNNING_PID process
     delete( $hash->{helper}{RUNNING_PID} );  
 
-
-
-## alter Code sollte gelöscht werden
-#   
-#   fhem("deletereading ".$hash->{NAME}." .*");
-#
-#   foreach my $skey (grep /^(Warn_?_|WarnCount)/ ,sort keys %{ $hash->{READINGS} }) {
-#       UWZ_Log $hash, 3, "Delete Reading:$skey"; 
-#       delete $hash->{READINGS}{$skey};
-#   }
-
-
-
     UWZ_Log $hash, 4, "Delete old Readings"; 
     CommandDeleteReading(undef, "$hash->{NAME} Warn_?_.*");
 
@@ -406,8 +428,10 @@ sub UWZ_Done($) {
         if (keys %values > 0) {
             my $newState;
             if (defined $values{WarnCount}) {
-                $newState = "Warnungen: " . $values{WarnCount};
-                
+                # Message by CountryCode
+                $newState = "Warnings: " . $values{WarnCount} if ( $hash->{CountryCode} eq "UK" );
+                $newState = "Warnungen: " . $values{WarnCount} if ( $hash->{CountryCode} eq "DE" );
+                # end Message by CountryCode
             } else {
                 $newState = "Error: Could not capture all data. Please check CountryCode and PLZ.";
             }
@@ -600,32 +624,55 @@ sub UWZ_Run($) {
             $message .= "Warn_".$i."_Type_Str|".ucfirst($typenames{ $single_warning->{'type'} })."|";
         }
         ## End of redundant Reading
-
+        
         UWZ_Log $hash, 4, "Warn_".$i."_levelName: ".$single_warning->{'payload'}{'levelName'};
         $message .= "Warn_".$i."_levelName|".$single_warning->{'payload'}{'levelName'}."|";
         
-        UWZ_Log $hash, 4, "Warn_".$i."_LongText: ".$enc->decode($single_warning->{'payload'}{'translationsLongText'}{'DE'});
-        $message .= "Warn_".$i."_LongText|".$converter->convert($single_warning->{'payload'}{'translationsLongText'}{'DE'})."|";
+        # Begin Language by AttrVal
+        if ( AttrVal( $name, 'CountryCode', '' ) eq "UK" ) {
         
-        UWZ_Log $hash, 4, "Warn_".$i."_ShortText: ".$enc->decode($single_warning->{'payload'}{'translationsShortText'}{'DE'});
-        $message .= "Warn_".$i."_ShortText|".$converter->convert($single_warning->{'payload'}{'translationsShortText'}{'DE'})."|";
+            UWZ_Log $hash, 4, "Warn_".$i."_LongText: ".$enc->decode($single_warning->{'payload'}{'translationsLongText'}{'EN'});
+            $message .= "Warn_".$i."_LongText|".$converter->convert($single_warning->{'payload'}{'translationsLongText'}{'EN'})."|";
+        
+            UWZ_Log $hash, 4, "Warn_".$i."_ShortText: ".$enc->decode($single_warning->{'payload'}{'translationsShortText'}{'EN'});
+            $message .= "Warn_".$i."_ShortText|".$converter->convert($single_warning->{'payload'}{'translationsShortText'}{'EN'})."|";
+            
+        } else {
+        
+            UWZ_Log $hash, 4, "Warn_".$i."_LongText: ".$enc->decode($single_warning->{'payload'}{'translationsLongText'}{'DE'});
+            $message .= "Warn_".$i."_LongText|".$converter->convert($single_warning->{'payload'}{'translationsLongText'}{'DE'})."|";
+        
+            UWZ_Log $hash, 4, "Warn_".$i."_ShortText: ".$enc->decode($single_warning->{'payload'}{'translationsShortText'}{'DE'});
+            $message .= "Warn_".$i."_ShortText|".$converter->convert($single_warning->{'payload'}{'translationsShortText'}{'DE'})."|";
+        }
+        # end language by AttrVal
 
         UWZ_Log $hash, 4, "Warn_".$i."_IconURL: http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".$single_warning->{'severity'}.".gif";
         $message .= "Warn_".$i."_IconURL|http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".$severitycolor{ $single_warning->{'severity'} }.".gif|";
 
         
         ## Hagel start
-        my $hagelcount = my @hagelmatch = $single_warning->{'payload'}{'translationsLongText'}{'DE'} =~ /Hagel/g;
-            if ( $hagelcount ne 0 ) {
+        my $hagelcount = 0;
+        # Begin Language by AttrVal
+        if ( AttrVal( $name, 'CountryCode', '' ) eq "UK" ) {
+        
+            $hagelcount = my @hagelmatch = $single_warning->{'payload'}{'translationsLongText'}{'EN'} =~ /Hail/g;
             
-                UWZ_Log $hash, 4, "Warn_".$i."_Hail: 1";
-                $message .= "Warn_".$i."_Hail|1|";
+        } else {
+        
+            $hagelcount = my @hagelmatch = $single_warning->{'payload'}{'translationsLongText'}{'DE'} =~ /Hagel/g;
+        }
+        # end language by AttrVal
+        if ( $hagelcount ne 0 ) {
+            
+            UWZ_Log $hash, 4, "Warn_".$i."_Hail: 1";
+            $message .= "Warn_".$i."_Hail|1|";
                 
-            } else {
+        } else {
             
-                UWZ_Log $hash, 4, "Warn_".$i."_Hail: 0";
-                $message .= "Warn_".$i."_Hail|0|";
-            }
+            UWZ_Log $hash, 4, "Warn_".$i."_Hail: 0";
+            $message .= "Warn_".$i."_Hail|0|";
+        }
         ## Hagel end
 
         $i++;
@@ -660,7 +707,10 @@ sub UWZAsHtml($;$) {
   
             $ret .= '<table width="100%"><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($hash, "Warn_".$i."_Start", "")).'</td>';
             
-            $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($hash, "Warn_".$i."_End", "")).'</td>';
+            # language by AttrVal
+            $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($hash, "Warn_".$i."_End", "")).'</td>' if ( AttrVal( $hash, 'CountryCode', '' ) eq "UK" );
+            $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($hash, "Warn_".$i."_End", "")).'</td>' if ( AttrVal( $hash, 'CountryCode', '' ) eq "DE" );
+            # end language by AttrVal
             $ret .= '</tr></table>';
             $ret .= '</td></tr>';
         }
@@ -674,7 +724,10 @@ sub UWZAsHtml($;$) {
         $ret .= '<table><tr><td>';
         $ret .= '<table class="block wide" width="600px"><tr><th></th><th></th></tr>';
         $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;">';
-        $ret .='<b>Keine Warnungen</b>';
+        # language by AttrVal
+        $ret .='<b>No Warnings</b>' if ( AttrVal( $hash, 'CountryCode', '' ) eq "UK" );
+        $ret .='<b>Keine Warnungen</b>' if ( AttrVal( $hash, 'CountryCode', '' ) eq "DE" );
+        # end language by AttrVal
         $ret .= '</td></tr>';
         $ret .= '</table>';
         $ret .= '</td></tr>';
@@ -700,8 +753,10 @@ sub UWZAsHtmlLite($;$) {
             $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($hash, "Warn_".$i."_IconURL", "").'"></td>';
             $ret .= '<td class="uwzValue"><b>'.ReadingsVal($hash, "Warn_".$i."_ShortText", "").'</b><br><br>';
             $ret .= '<table width="100%"><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($hash, "Warn_".$i."_Start", "")).'</td>';
-            
-            $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($hash, "Warn_".$i."_End", "")).'</td>';
+            # language by AttrVal
+            $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($hash, "Warn_".$i."_End", "")).'</td>' if ( AttrVal( $hash, 'CountryCode', '' ) eq "UK" );
+            $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($hash, "Warn_".$i."_End", "")).'</td>' if ( AttrVal( $hash, 'CountryCode', '' ) eq "DE" );
+            # end language by AttrVal
             $ret .= '</tr></table>';
             $ret .= '</td></tr>';
         
@@ -716,7 +771,10 @@ sub UWZAsHtmlLite($;$) {
         $ret .= '<table><tr><td>';
         $ret .= '<table class="block wide" width="600px"><tr><th></th><th></th></tr>';
         $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;">';
-        $ret .='<b>Keine Warnungen</b>';
+        # language by AttrVal
+        $ret .='<b>No Warnings</b>' if ( AttrVal( $hash, 'CountryCode', '' ) eq "UK" );
+        $ret .='<b>Keine Warnungen</b>' if ( AttrVal( $hash, 'CountryCode', '' ) eq "DE" );
+        # end language by AttrVal
         $ret .= '</td></tr>';
         $ret .= '</table>';
         $ret .= '</td></tr>';
@@ -751,8 +809,6 @@ sub UWZAsHtmlFP($;$) {
 sub UWZAsHtmlKarteLand($$) {
 
     my ($hash,$land) = @_;
-    # my $uwz_de_url = "http://www.unwetterzentrale.de/images/map/";
-    # my $uwz_at_url = "http://unwetter.wetteralarm.at/images/map/";
     my $url = UWZ_Map2Image($hash,$land);
     my $ret = '<table><tr><td>';
     
@@ -763,8 +819,10 @@ sub UWZAsHtmlKarteLand($$) {
         $ret .= '<img src="'.$url.'">';
         
     } else {
-    
-        $ret .= 'unbekannte Landbezeichnung';
+        # language by AttrVal
+        $ret .='unknown map setting' if ( AttrVal( $hash, 'CountryCode', '' ) eq "UK" );
+        $ret .= 'unbekannte Landbezeichnung' if ( AttrVal( $hash, 'CountryCode', '' ) eq "DE" );
+        # end language by AttrVal
     }
     
     $ret .= '</td></tr></table></td></tr>';
@@ -802,13 +860,24 @@ sub UWZAsHtmlKarteLand($$) {
       <br><br><br>
       Example:
       <br>
-      <code>define Unwetterzentrale UWZ DE 86405 3600</code>
+      <code>
+        define Unwetterzentrale UWZ UK 03931 1800<br>
+        attr Unwetterzentrale CountryCode UK<br>
+        attr Unwetterzentrale PLZ 03931<br>
+        attr Unwetterzentrale URL http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=en&areaID=UWZUK03931<br>
+        attr Unwetterzentrale download 1<br>
+        attr Unwetterzentrale humanreadable 1<br>
+        attr Unwetterzentrale maps eastofengland unitedkingdom<br><br>
+        define UnwetterDetails weblink htmlCode {UWZAsHtml("Unwetterzentrale")}<br>
+        define UnwetterMapE_UK weblink htmlCode {UWZAsHtmlKarteLand("Unwetterzentrale","eastofengland")}<br>
+        define UnwetterLite weblink htmlCode {UWZAsHtmlLite("Unwetterzentrale")}
+      </code>
       <br>&nbsp;
 
       <li><code>[CountryCode]</code>
          <br>
-         Possible values: DE, AT, CH,...<br/>
-         (for other countries than germany see <a href="http://forum.fhem.de/index.php/topic,33549.msg260076.html#msg260076">fhem-forum</a>)
+         Possible values: DE, AT, CH, UK, ...<br/>
+         (for other countries than germany or unitedkingdom see <a href="http://forum.fhem.de/index.php/topic,33549.msg260076.html#msg260076">fhem-forum</a>)
       </li><br>
       <li><code>[postalcode]</code>
          <br>
@@ -891,6 +960,11 @@ sub UWZAsHtmlKarteLand($$) {
    <b>Attributes</b>
    <ul>
       <br>
+      <li><code>CountryCode</code>
+         <br>
+         Set country code for text messages (None|UK). 
+         <br>
+      </li>
       <li><code>download</code>
          <br>
          Download maps during update (0|1). 
@@ -987,7 +1061,7 @@ sub UWZAsHtmlKarteLand($$) {
           <li>sachsen</li>
           <li>sachsen-anhalt</li>
           <li>thueringen</li>
-          <li>nordrhein-westfale</li>
+          <li>nordrhein-westfalen</li>
           <li>mecklenburg-vorpommern</li>
           <li>schleswig-holstein</li>
           <li>hamburg</li>
@@ -1145,7 +1219,7 @@ sub UWZAsHtmlKarteLand($$) {
       </li>
       <li><code>humanreadable</code>
          <br>
-	 Anzeige weiterer Readings Warn_?_Start_Date, Warn_?_Start_Time, Warn_?_End_Date und Warn_?_End_Time. Diese Readings enthalten aus dem Timestamp kalkulierte Datums/Zeit Angaben. (0|1) 
+     Anzeige weiterer Readings Warn_?_Start_Date, Warn_?_Start_Time, Warn_?_End_Date und Warn_?_End_Time. Diese Readings enthalten aus dem Timestamp kalkulierte Datums/Zeit Angaben. (0|1) 
          <br>
       </li>
 
@@ -1223,7 +1297,7 @@ sub UWZAsHtmlKarteLand($$) {
           <li>sachsen</li>
           <li>sachsen-anhalt</li>
           <li>thueringen</li>
-          <li>nordrhein-westfale</li>
+          <li>nordrhein-westfalen</li>
           <li>mecklenburg-vorpommern</li>
           <li>schleswig-holstein</li>
           <li>hamburg</li>

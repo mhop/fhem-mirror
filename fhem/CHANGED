@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - update:  77_UWZ: New Minor Release 1.2 Support for United Kingdom
+  - feature: 74_AMAD: add Conditionsupport for older Androisversions
+                      (Kreidezeit)
   - bugfix:  73_GasCalculator: Unknown "?"-reading no longer created.
   - feature: 74_AMAD: battery_temperature formated
   - bugfix:  74_AMAD: deviceState timestamp bugfix for usb-ethernet Devices
