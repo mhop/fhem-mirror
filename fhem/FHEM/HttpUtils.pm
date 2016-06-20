@@ -253,6 +253,8 @@ HttpUtils_Connect($)
               return $hash->{callback}($hash, "$host: ".strerror($errno), "")
                   if($errno);
 
+              return $hash->{callback}($hash,undef,undef) if($hash->{noConn2});
+
               my $err = HttpUtils_Connect2($hash);
               $hash->{callback}($hash, $err, "") if($err);
               return $err;
