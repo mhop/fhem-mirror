@@ -27,7 +27,7 @@
 
 package main;
 
-use 5.012;
+#use 5.012;
 use strict;
 use warnings;
 use Data::Dumper;
@@ -36,7 +36,6 @@ use HttpUtils;
 use Encode;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 no warnings "all";
 
@@ -373,8 +372,7 @@ sub ENIGMA2_Set($@) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+            if ( $a[2] =~ m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
                 $cmd = "set=set" . $a[2];
             }
             else {
@@ -453,13 +451,11 @@ sub ENIGMA2_Set($@) {
             return "No 3nd argument given, choose one of messagetext "
               if ( !defined( $a[4] ) );
 
-            $_ = $a[3];
-
             return
                 "Argument "
-              . $_
+              . $a[3]
               . " is not a valid integer between 0 and 49680"
-              if ( !m/^\d+$/ || $_ < 0 || $_ > 49680 );
+              if ( $a[3] !~ m/^\d+$/ || $a[3] < 0 || $a[3] > 49680 );
 
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
@@ -509,17 +505,11 @@ sub ENIGMA2_Set($@) {
               "ENIGMA2 set $name " . $a[1] . " " . $a[2] . " " . $a[3]
               if defined( $a[3] );
 
+            my $commandKeys = join( " ", sort keys %{
+               ENIGMA2_GetRemotecontrolCommand(
+                  "GetRemotecontrolCommands")
+            });
             if ( !defined( $a[2] ) ) {
-                my $commandKeys = "";
-                for (
-                    sort keys %{
-                        ENIGMA2_GetRemotecontrolCommand(
-                            "GetRemotecontrolCommands")
-                    }
-                  )
-                {
-                    $commandKeys = $commandKeys . " " . $_;
-                }
                 return "No argument given, choose one of" . $commandKeys;
             }
 
@@ -541,16 +531,6 @@ sub ENIGMA2_Set($@) {
                   if ( defined( $a[3] ) && lc( $a[3] ) eq "long" );
             }
             else {
-                my $commandKeys = "";
-                for (
-                    sort keys %{
-                        ENIGMA2_GetRemotecontrolCommand(
-                            "GetRemotecontrolCommands")
-                    }
-                  )
-                {
-                    $commandKeys = $commandKeys . " " . $_;
-                }
                 return
                     "Unknown argument "
                   . $a[2]
@@ -583,34 +563,34 @@ sub ENIGMA2_Set($@) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
         if ( $state eq "on" ) {
-            my $_ = $a[2];
-            if ( defined( $hash->{helper}{bouquet}{$input}{$_}{sRef} ) ) {
+            my $cname = $a[2];
+            if ( defined( $hash->{helper}{bouquet}{$input}{$cname}{sRef} ) ) {
                 $result = ENIGMA2_SendCommand( $hash, "zap",
                     "sRef="
-                      . urlEncode( $hash->{helper}{bouquet}{$input}{$_}{sRef} )
+                      . urlEncode( $hash->{helper}{bouquet}{$input}{$cname}{sRef} )
                 );
             }
-            elsif (m/^(\d+):(.*):$/) {
+            elsif ( $cname =~ m/^(\d+):(.*):$/) {
                 $result =
-                  ENIGMA2_SendCommand( $hash, "zap", "sRef=" . urlEncode($_) );
+                  ENIGMA2_SendCommand( $hash, "zap", "sRef=" . urlEncode($cname) );
             }
-            elsif ( m/^\d+$/ && $_ > 0 && $_ < 10000 ) {
+            elsif ( $cname =~ m/^\d+$/ && $cname > 0 && $cname < 10000 ) {
                 for ( split( //, $a[2] ) ) {
-                    $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand($_);
+                    $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand($cname);
                     $result =
                       ENIGMA2_SendCommand( $hash, "remotecontrol", $cmd );
                 }
                 $result = ENIGMA2_SendCommand( $hash, "remotecontrol",
                     "command=" . ENIGMA2_GetRemotecontrolCommand("OK") );
             }
-            elsif ( m/^\d+$/ && ( $_ <= 0 || $_ >= 10000 ) ) {
-                return "Numeric channel addressing '" . $_
+            elsif ( m/^\d+$/ && ( $cname <= 0 || $cname >= 10000 ) ) {
+                return "Numeric channel addressing '" . $cname
                   . "' needs to be a number between 1 and 9999.";
             }
             else {
                 return
                     "'"
-                  . $_
+                  . $cname
                   . "' does not seem to be a valid channel. Known channels: "
                   . $channels;
             }
@@ -1280,26 +1260,25 @@ sub ENIGMA2_ReceiveCommand($$$) {
                 {
                     my $i = 0;
 
-                    # TODO this loop is >5.012 only
-                    for ( keys @{ $return->{e2service} } ) {
+                    foreach my $key ( keys @{ $return->{e2service} } ) {
                         my $channel =
-                          $return->{e2service}[$_]{e2servicename};
+                          $return->{e2service}[$key]{e2servicename};
                         $channel =~ s/\s/_/g;
 
                         # ignore markers
-                        if ( $return->{e2service}[$_]{e2servicereference} =~
+                        if ( $return->{e2service}[$key]{e2servicereference} =~
                             /^1:64:/ )
                         {
                             Log3 $name, 4,
                               "ENIGMA2 $name: Ignoring marker "
-                              . $return->{e2service}[$_]{e2servicename};
+                              . $return->{e2service}[$key]{e2servicename};
                             next;
                         }
 
                         if ( $channel ne "" ) {
                             $hash->{helper}{bouquet}{$input}{$channel} =
                               { 'sRef' =>
-                                  $return->{e2service}[$_]{e2servicereference}
+                                  $return->{e2service}[$key]{e2servicereference}
                               };
 
                             $hash->{helper}{channels}{$input}[$i] =
@@ -1382,13 +1361,12 @@ sub ENIGMA2_ReceiveCommand($$$) {
             if ( ref($return) eq "HASH" ) {
 
                 # General readings
-                foreach (
+                foreach my $reading (
                     "enigmaversion", "imageversion", "webifversion",
                     "fpversion",     "lanmac",       "model",
                   )
                 {
-                    $reading   = $_;
-                    $e2reading = "e2" . $_;
+                    $e2reading = "e2" . $reading;
 
                     if ( defined( $return->{e2about}{$e2reading} ) ) {
                         if (   $return->{e2about}{$e2reading} eq "False"
@@ -1558,7 +1536,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
             if ( ref($return) eq "HASH" ) {
 
                 # Service readings
-                foreach (
+                foreach my $reading (
                     "servicereference", "servicename",
                     "providername",     "servicevideosize",
                     "videowidth",       "videoheight",
@@ -1569,8 +1547,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                     "sid"
                   )
                 {
-                    $reading   = $_;
-                    $e2reading = "e2" . $_;
+                    $e2reading = "e2" . $reading;
 
                     if (   defined( $return->{e2service}{$e2reading} )
                         && lc( $return->{e2service}{$e2reading} ) ne "n/a"
@@ -1678,15 +1655,14 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         $eventNow = $return->{e2eventlist}{e2event};
                     }
 
-                    foreach (
+                    foreach my $reading (
                         "eventstart",       "eventduration",
                         "eventremaining",   "eventcurrenttime",
                         "eventdescription", "eventdescriptionextended",
                         "eventtitle",       "eventname",
                       )
                     {
-                        $reading   = $_;
-                        $e2reading = "e2" . $_;
+                        $e2reading = "e2" . $reading;
 
                         # current event
                         if (   defined( $eventNow->{$e2reading} )
@@ -1723,7 +1699,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         }
 
                         # next event
-                        $reading = $_ . "_next";
+                        my $readingN = $reading . "_next";
                         if (   defined( $eventNext->{$e2reading} )
                             && lc( $eventNext->{$e2reading} ) ne "n/a"
                             && $eventNext->{$e2reading} ne "0"
@@ -1732,40 +1708,40 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             Log3 $name, 5,
 "ENIGMA2 $name: detected valid reading $e2reading for next event";
 
-                            if ( ReadingsVal( $name, $reading, "" ) ne
+                            if ( ReadingsVal( $name, $readingN, "" ) ne
                                 $eventNext->{$e2reading} )
                             {
-                                readingsBulkUpdate( $hash, $reading,
+                                readingsBulkUpdate( $hash, $readingN,
                                     $eventNext->{$e2reading} );
 
                                 # nextTitle
                                 readingsBulkUpdate( $hash, "nextTitle",
                                     $eventNext->{$e2reading} )
-                                  if $reading eq "eventtitle_next";
+                                  if $readingN eq "eventtitle_next";
                             }
                         }
                         else {
                             Log3 $name, 5,
 "ENIGMA2 $name: no valid reading $e2reading found for next event";
 
-                            if ( ReadingsVal( $name, $reading, "" ) ne "-" ) {
-                                readingsBulkUpdate( $hash, $reading, "-" );
+                            if ( ReadingsVal( $name, $readingN, "" ) ne "-" ) {
+                                readingsBulkUpdate( $hash, $readingN, "-" );
 
                                 # nextTitle
                                 readingsBulkUpdate( $hash, "nextTitle", "-" )
-                                  if $reading eq "eventtitle_next";
+                                  if $readingN eq "eventtitle_next";
                             }
                         }
                     }
 
                     # convert date+time into human readable formats
-                    foreach (
+                    foreach my $readingO (
                         "eventstart",    "eventcurrenttime",
                         "eventduration", "eventremaining"
                       )
                     {
-                        $reading   = $_ . "_hr";
-                        $e2reading = "e2" . $_;
+                        $reading   = $readingO . "_hr";
+                        $e2reading = "e2" . $readingO;
 
                         # current event
                         if (   defined( $eventNow->{$e2reading} )
@@ -1773,8 +1749,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
                             && $eventNow->{$e2reading} ne "" )
                         {
                             my $timestring;
-                            if (   $_ eq "eventduration"
-                                || $_ eq "eventremaining" )
+                            if (   $readingO eq "eventduration"
+                                || $readingO eq "eventremaining" )
                             {
                                 my @t = localtime( $eventNow->{$e2reading} );
                                 $timestring = sprintf( "%02d:%02d:%02d",
@@ -1798,14 +1774,14 @@ sub ENIGMA2_ReceiveCommand($$$) {
                         }
 
                         # next event
-                        $reading = $_ . "_next_hr";
+                        $reading = $readingO . "_next_hr";
                         if (   defined( $eventNext->{$e2reading} )
                             && $eventNext->{$e2reading} ne "0"
                             && $eventNext->{$e2reading} ne "" )
                         {
                             my $timestring;
-                            if (   $_ eq "eventduration"
-                                || $_ eq "eventremaining" )
+                            if (   $readingO eq "eventduration"
+                                || $readingO eq "eventremaining" )
                             {
                                 my @t = localtime( $eventNext->{$e2reading} );
                                 $timestring = sprintf( "%02d:%02d:%02d",
@@ -2118,9 +2094,8 @@ sub ENIGMA2_ReceiveCommand($$$) {
             if ( ref($return) eq "HASH"
                 && defined( $return->{e2snrdb} ) )
             {
-                foreach ( "snrdb", "snr", "ber", "acg", ) {
-                    $reading   = $_;
-                    $e2reading = "e2" . $_;
+                foreach my $reading ( "snrdb", "snr", "ber", "acg", ) {
+                    $e2reading = "e2" . $reading;
 
                     if ( defined( $return->{$e2reading} )
                         && lc( $return->{$e2reading} ) ne "n/a" )
@@ -2169,7 +2144,7 @@ sub ENIGMA2_ReceiveCommand($$$) {
         || $state eq "absent"
         || $state eq "undefined" )
     {
-        foreach (
+        foreach my $reading (
             'servicename',                   'providername',
             'servicereference',              'videowidth',
             'videoheight',                   'servicevideosize',
@@ -2195,14 +2170,14 @@ sub ENIGMA2_ReceiveCommand($$$) {
             'eventname_next',
           )
         {
-            readingsBulkUpdate( $hash, $_, "-" )
-              if ( ReadingsVal( $name, $_, "" ) ne "-" );
+            readingsBulkUpdate( $hash, $reading, "-" )
+              if ( ReadingsVal( $name, $reading, "" ) ne "-" );
         }
 
         # special handling for signal values
-        foreach ( 'acg', 'ber', 'snr', 'snrdb', ) {
-            readingsBulkUpdate( $hash, $_, "0" )
-              if ( ReadingsVal( $name, $_, "" ) ne "0" );
+        foreach my $reading ( 'acg', 'ber', 'snr', 'snrdb', ) {
+            readingsBulkUpdate( $hash, $reading, "0" )
+              if ( ReadingsVal( $name, $reading, "" ) ne "0" );
         }
     }
 
