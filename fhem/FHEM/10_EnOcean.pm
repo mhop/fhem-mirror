@@ -1,7 +1,6 @@
 
 ##############################################
 # $Id$
-# 2016-06-18
 
 package main;
 
@@ -6849,6 +6848,11 @@ sub EnOcean_Parse($$)
         }
       } else {
         $summerMode = 8;
+        # ignore all commands
+        if ($waitingCmds ne "summerMode") {
+          $waitingCmds = "no_change";
+          CommandDeleteReading(undef, "$name waitingCmds");
+        }
         if ($manufID eq '049') {
           $wakeUpCycle = 28800;
         } else {
@@ -7230,6 +7234,10 @@ sub EnOcean_Parse($$)
         # set default Wake-up Cycle (300 s)
         $wakeUpCycle = 9;
       } elsif ($summerMode eq 'on') {
+        if ($waitingCmds ne "summerMode") {
+          $waitingCmds = "no_change";
+          CommandDeleteReading(undef, "$name waitingCmds");
+        }
         $setpointSet = 100;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         $wakeUpCycle = 50 if ($wakeUpCycle < 50);
