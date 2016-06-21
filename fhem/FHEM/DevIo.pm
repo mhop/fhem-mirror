@@ -201,17 +201,13 @@ DevIo_OpenDev($$$;$)
   ($dev, $baudrate) = split("@", $dev);
   my ($databits, $parity, $stopbits) = (8, 'none', 1);
 
-  sub
-  doCb($)
-  {
+  my $doCb = sub ($$) {
     my ($r) = @_;
     $callback->($hash,$r) if($callback);
     return $r;
-  }
+  };
 
-  sub
-  doTailWork()
-  {
+  my $doTailWork = sub {
     DevIo_setStates($hash, "opened");
 
     my $ret;
@@ -240,7 +236,7 @@ DevIo_OpenDev($$$;$)
 
     DoTrigger($name, "CONNECTED") if($reopen && !$ret);
     return undef;
-  }
+  };
   
   if($baudrate =~ m/(\d+)(,([78])(,([NEO])(,([012]))?)?)?/) {
     $baudrate = $1 if(defined($1));
@@ -252,7 +248,7 @@ DevIo_OpenDev($$$;$)
 
   if($hash->{DevIoJustClosed}) {
     delete $hash->{DevIoJustClosed};
-    return doCb(undef);
+    return &$doCb(undef);
   }
 
   $hash->{PARTIAL} = "";
@@ -269,14 +265,14 @@ DevIo_OpenDev($$$;$)
     };
     if($@) {
       Log3 $name, 1, $@;
-      return doCb($@);
+      return &$doCb($@);
     }
 
     if(!$conn) {
       Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
       $readyfnlist{"$name.$dev"} = $hash;
       DevIo_setStates($hash, "disconnected");
-      return doCb("");
+      return &$doCb("");
     }
     $hash->{TCPDev} = $conn;
     $hash->{FD} = $conn->fileno();
@@ -293,11 +289,11 @@ DevIo_OpenDev($$$;$)
       if (!CallFn($devName, "IOOpenFn", $hash)) {
         Log3 $name, 3, "Can't open $dev!";
         DevIo_setStates($hash, "disconnected");
-        return doCb("");
+        return &$doCb("");
       }
     } else {
       DevIo_setStates($hash, "disconnected");
-      return doCb("");
+      return &$doCb("");
     }
   } elsif($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
 
@@ -306,13 +302,11 @@ DevIo_OpenDev($$$;$)
     # for non-existent devices has a delay of 3 sec, we are sitting all the
     # time in this connect. NEXT_OPEN tries to avoid this problem.
     if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-      return doCb(undef);
+      return &$doCb(undef);
     }
 
     my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 3;
-    sub
-    doTcpTail($)
-    {
+    my $doTcpTail = sub($) {
       my ($conn) = @_;
       if($conn) {
         delete($hash->{NEXT_OPEN});
@@ -331,7 +325,7 @@ DevIo_OpenDev($$$;$)
       delete($readyfnlist{"$name.$dev"});
       $selectlist{"$name.$dev"} = $hash;
       return 1;
-    }
+    };
 
     if($callback) {
       use HttpUtils;
@@ -343,26 +337,26 @@ DevIo_OpenDev($$$;$)
         callback=> sub() {
           my ($h, $err, undef) = @_;
           return $callback->($hash, $err) if($err);
-          return doCb("") if(!doTcpTail($h->{conn}));
-          return doCb(doTailWork());
+          return &$doCb("") if(!&$doTcpTail($h->{conn}));
+          return &$doCb(&$doTailWork());
         }
       });
-      return doCb($err) if($err);
+      return &$doCb($err) if($err);
       return undef;
 
     } else {
       my $conn = IO::Socket::INET->new(PeerAddr => $dev, Timeout => $timeout);
-      return doCb("") if(!doTcpTail($conn));
+      return &$doCb("") if(!&$doTcpTail($conn));
     }
 
   } elsif($baudrate && lc($baudrate) eq "directio") { # w/o Device::SerialPort
 
     if(!open($po, "+<$dev")) {
-      return doCb(undef) if($reopen);
+      return &$doCb(undef) if($reopen);
       Log3 $name, 3, "Can't open $dev: $!";
       $readyfnlist{"$name.$dev"} = $hash;
       DevIo_setStates($hash, "disconnected");
-      return doCb("");
+      return &$doCb("");
     }
 
     $hash->{DIODev} = $po;
@@ -391,15 +385,15 @@ DevIo_OpenDev($$$;$)
     }
     if($@) {
       Log3 $name,  1, $@;
-      return doCb($@);
+      return &$doCb($@);
     }
 
     if(!$po) {
-      return doCb(undef) if($reopen);
+      return &$doCb(undef) if($reopen);
       Log3 $name, 3, "Can't open $dev: $!";
       $readyfnlist{"$name.$dev"} = $hash;
       DevIo_setStates($hash, "disconnected");
-      return doCb("");
+      return &$doCb("");
     }
     $hash->{USBDev} = $po;
     if( $^O =~ /Win/ ) {
@@ -443,7 +437,7 @@ DevIo_OpenDev($$$;$)
     $po->write_settings;
   }
 
-  return doCb(doTailWork());
+  return &$doCb(&$doTailWork());
 }
 
 sub
