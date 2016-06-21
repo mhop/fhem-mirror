@@ -128,7 +128,8 @@ sub HUEDevice_Initialize($)
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrList} = "IODev ".
                       "delayedUpdate:1 ".
-                      "realtimePicker:1 ".
+                      "ignoreReachable:1,0 ".
+                      "realtimePicker:1,0 ".
                       "color-icons:1,2 ".
                       "transitiontime ".
                       "model:".join(",", sort map { $_ =~ s/ /#/g ;$_} keys %hueModels)." ".
@@ -158,7 +159,7 @@ HUEDevice_devStateIcon($)
 
   return undef if( $hash->{helper}->{devtype} );
 
-  return ".*:light_question" if( !$hash->{helper}{reachable} );
+  return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
 
   return ".*:off:toggle" if( ReadingsVal($name,"state","off") eq "off" );
 
@@ -327,7 +328,7 @@ HUEDevice_SetParam($$@)
     $value = int(1000000/$value);
     $cmd = 'ct';
   } elsif( $name && $cmd eq "toggle" ) {
-    $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
+    $cmd = ReadingsVal($name,"onoff",1) ? "off" :"on";
   } elsif( $cmd =~ m/^dim(\d+)/ ) {
     $value2 = $value;
     $value = $1;
@@ -1116,6 +1117,7 @@ HUEDevice_Parse($$)
      $on = $hash->{helper}{on} if( !defined($on) );
   my $reachable = $state->{reachable}?1:0;
      $reachable = $hash->{helper}{reachable} if( !defined($state->{reachable}) );
+     $reachable = 1 if( $reachable == 0 && AttrVal($name, 'ignoreReachable', 0) );
   my $colormode = $state->{'colormode'};
   my $bri       = $state->{'bri'};
      $bri = $hash->{helper}{bri} if( !defined($bri) );
@@ -1349,6 +1351,8 @@ HUEDevice_Parse($$)
     <li>color-icon<br>
       1 -> use lamp color as icon color and 100% shape as icon shape<br>
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
+    <li>ignoreReachable<br>
+      ignore the reachable state that is reported by the hue bridge. assume the device is allways reachable.</li>
     <li>subType<br>
       extcolordimmer -> device has rgb and color temperatur control<br>
       colordimmer -> device has rgb controll<br>
