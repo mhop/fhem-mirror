@@ -200,16 +200,19 @@ HUEBridge_OpenDev($)
   });
 
   if( defined($err) && $err ) {
-    Log3 $name, 3, "HUEBridge_Detect: error reading description: ".$err;
+    Log3 $name, 2, "HUEBridge_OpenDev: error reading description: ". $err;
   } else {
+    Log3 $name, 5, "HUEBridge_OpenDev: got description: $ret";
     $ret =~ m/<modelName>([^<]*)/;
     $hash->{modelName} = $1;
   }
 
   my $result = HUEBridge_Call($hash, undef, 'config', undef);
   if( !defined($result) ) {
+    Log3 $name, 2, "HUEBridge_OpenDev: got empty config";
     return undef;
   }
+  Log3 $name, 5, "HUEBridge_OpenDev: got config " . Dumper $result;
 
   if( !defined($result->{'linkbutton'}) )
     {
