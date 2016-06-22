@@ -17,7 +17,7 @@ FBAHAHTTP_Initialize($)
   $hash->{DefFn}    = "FBAHAHTTP_Define";
   $hash->{SetFn}    = "FBAHAHTTP_Set";
   $hash->{AttrFn}   = "FBAHAHTTP_Attr";
-  $hash->{AttrList} = "dummy:1,0 fritzbox-user polltime";
+  $hash->{AttrList} = "dummy:1,0 fritzbox-user polltime async_delay";
 }
 
 
@@ -176,7 +176,12 @@ FBAHAHTTP_ProcessStack($)
       chomp $_[2];
       Log3 $name, 5, "FBAHAHTTP_Write reply for $name: $_[2]";
       pop @{$hash->{CmdStack}};
-      FBAHAHTTP_ProcessStack($hash) if(@{$hash->{CmdStack}} > 0);
+      if(@{$hash->{CmdStack}} > 0) {
+        my $ad = AttrVal($name, "async_delay", 0.2);
+        InternalTimer(gettimeofday()+$ad, sub(){
+          FBAHAHTTP_ProcessStack($hash);
+        }, $hash);
+      }
     }
   });
 }
@@ -255,9 +260,17 @@ FBAHAHTTP_Write($$$)
   <ul>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#fritzbox-user">fritzbox-user</a></li>
-    <li><a href="#polltime">polltime</a><br>
+    <li><a name="#polltime">polltime</a><br>
       measured in seconds, default is 300 i.e. 5 minutes
       </li>
+
+    <li><a href="#async_delay">async_delay</a><br>
+      additional delay inserted, when switching more than one device, default
+      is 0.2 seconds. Note: even with async_delay 0 there will be a delay, as
+      FHEM avoids sending commands in parallel, to avoid malfunctioning of the
+      Fritz!BOX AHA server).
+      </li>
+
   </ul>
   <br>
 </ul>
