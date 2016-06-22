@@ -38,7 +38,7 @@ sub
 backup_Initialize($$)
 {
   my %hash = (  Fn => "CommandBackup",
-               Hlp => ",create a backup of fhem configuration, state and modpath" );
+      Hlp => ",create a backup of fhem configuration, state and modpath" );
   $cmds{backup} = \%hash;
 }
 
@@ -48,9 +48,13 @@ CommandBackup($$)
 {
   my ($cl, $param) = @_;
 
-  my $modpath = $attr{global}{modpath};
+  my $modpath    = AttrVal("global", "modpath","");
   my $configfile = AttrVal("global", "configfile", "");
   my $statefile  = AttrVal("global", "statefile", "");
+
+  # prevent duplicate entries in backup list for default config, forum #54826
+  $configfile = '' if ($configfile eq 'fhem.cfg' || configDBUsed());
+  $statefile  = '' if ($statefile  eq "./log/fhem.save");
   my $msg;
   my $ret;
 
@@ -87,7 +91,7 @@ CommandBackup($$)
     Log 4, "backup include: 'configDB.conf'";
   } else {
     # get pathnames to archiv
-    push @pathname, $configfile;
+    push @pathname, $configfile if($configfile);
     Log 4, "backup include: '$configfile'";
     $ret = parseConfig($configfile);
     push @pathname, $statefile if($statefile);
@@ -108,6 +112,8 @@ sub
 parseConfig($)
 {
   my $configfile = shift;
+  # we need default value to read included files
+  $configfile = $configfile ? $configfile : 'fhem.cfg';
   my $fh;
   my $msg;
   my $ret;
