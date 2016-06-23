@@ -59,10 +59,7 @@ FBAHA_Define($$)
   $hash->{DeviceName} = $dev;
 
   return undef if($dev eq "none"); # DEBUGGING
-  my $ret = DevIo_OpenDev($hash, 0, "FBAHA_DoInit", sub(){ 
-    my ($hash, $err) = @_;
-    Log3 $name, 2, "$name: $err" if($err);
-  });
+  my $ret = DevIo_OpenDev($hash, 0, "FBAHA_DoInit");
   return $ret;
 }
 
