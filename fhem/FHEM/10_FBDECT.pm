@@ -100,8 +100,11 @@ FBDECT_SetHttp($@)
   }
 
   my $cmd = $a[1];
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "FBDECT set $name $cmd";
+
   if($cmd =~ m/^(on|off|toggle)$/) {
-    IOWrite($hash, ReadingsVal($hash->{NAME},"AIN",0), "setswitch$cmd");
+    IOWrite($hash, ReadingsVal($name,"AIN",0), "setswitch$cmd");
     my $state = ($cmd eq "toggle" ? ($hash->{state} eq "on" ? "off":"on"):$cmd);
     readingsSingleUpdate($hash, "state", $state, 1);
     return undef;
@@ -109,12 +112,12 @@ FBDECT_SetHttp($@)
 
   if($cmd =~ m/^(open|closed|desired-temp)$/) {
     if($cmd eq "desired-temp") { 
-      return "Usage: set $hash->{NAME} desired-temp value" if(int(@a) != 3);
+      return "Usage: set $name desired-temp value" if(int(@a) != 3);
       return "desired-temp must be between 8 and 28"
         if($a[2] !~ m/^[\d.]+$/ || $a[2] < 8 || $a[2] > 28)
     }
     my $val = ($cmd eq "open" ? 254 : ($cmd eq "closed" ? 253: int(2*$a[2])));
-    IOWrite($hash, ReadingsVal($hash->{NAME},"AIN",0),"sethkrtsoll&param=$val");
+    IOWrite($hash, ReadingsVal($name,"AIN",0),"sethkrtsoll&param=$val");
     return undef;
   }
 }
@@ -135,6 +138,9 @@ FBDECT_Set($@)
     my $usage =  join(" ", sort keys %sets);
     return SetExtensions($hash, $usage, @a);
   }
+
+  my $name = $hash->{NAME};
+  Log3 $name, 3, "FBDECT set $name $cmd";
 
   my $relay;
   if($cmd eq "on" || $cmd eq "off") {
