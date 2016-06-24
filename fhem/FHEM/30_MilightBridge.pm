@@ -46,6 +46,7 @@ sub MilightBridge_Initialize($)
   #Consumer
   $hash->{DefFn}    = "MilightBridge_Define";
   $hash->{UndefFn}  = "MilightBridge_Undefine";
+  $hash->{NOTIFYDEV} = "global";
   $hash->{NotifyFn} = "MilightBridge_Notify";
   $hash->{AttrFn}   = "MilightBridge_Attr";
   $hash->{AttrList} = "port protocol:udp,tcp sendInterval disable:0,1 tcpPing:1 checkInterval ".$readingFnAttributes;
@@ -60,7 +61,7 @@ sub MilightBridge_Define($$)
   my ($hash, $def) = @_;
   my @args = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> MilightBridge <host/ip>"  if(@args < 3);
+  return "Usage: define <name> MilightBridge <host/ip:port>"  if(@args < 3);
 
   my ($name, $type, $host) = @args;
 
@@ -68,11 +69,12 @@ sub MilightBridge_Define($$)
   my %matchList = ( "1:MilightDevice" => ".*" );
   $hash->{MatchList} = \%matchList;
 
+  my ($host, $port) = split(":", $host);
   # Parameters
   $hash->{HOST} = $host;
   # Set Port (Default 8899, old bridge (V2) uses 50000
-  $attr{$name}{"port"} = "8899" if (!defined($attr{$name}{"port"}));
-  $hash->{PORT} = $attr{$name}{"port"};
+  $port = "8899" if (!defined($port));
+  $hash->{PORT} = $port;
 
   $attr{$name}{"protocol"} = "udp" if (!defined($attr{$name}{"protocol"}));
 
@@ -157,19 +159,6 @@ sub MilightBridge_Attr($$$$) {
     readingsSingleUpdate($hash, "state", "Initialized", 1);
     MilightBridge_SetNextTimer($hash);
   }
-  elsif ($attribute eq "port")
-  {
-    if (($value !~ /^\d*$/) || ($value < 1))
-    {
-      $attr{$name}{"port"} = 100;
-      $hash->{PORT} = $attr{$name}{"port"};
-      return "port is required as numeric (default: 8899)";
-    }
-    else
-    {
-      $hash->{PORT} = $attr{$name}{"port"};
-    }
-  }
   elsif ($attribute eq "protocol")
   {
     if (($value eq "tcp" || $value eq "udp"))
@@ -206,9 +195,6 @@ sub MilightBridge_Attr($$$$) {
 sub MilightBridge_Notify($$)
 {
   my ($hash,$dev) = @_;
-  Log3 ($hash, 5, "$hash->{NAME}_Notify: Triggered by $dev->{NAME}; @{$dev->{CHANGED}}");
-
-  return if($dev->{NAME} ne "global");
 
   if(grep(m/^(INITIALIZED|REREADCFG|DEFINED.*|MODIFIED.*|DELETED.*)$/, @{$dev->{CHANGED}}))
   {
@@ -225,7 +211,10 @@ sub MilightBridge_SetNextTimer($)
   my ($hash) = @_;
   # Check state every X seconds
   RemoveInternalTimer($hash);
-  InternalTimer(gettimeofday() + AttrVal($hash->{NAME}, "checkInterval", "10"), "MilightBridge_DoPingStart", $hash, 0);
+  my $interval=AttrVal($hash->{NAME}, "checkInterval", "10");
+  if ($interval > 0) {
+    InternalTimer(gettimeofday() + $interval, "MilightBridge_DoPingStart", $hash, 0);
+  }
 }
 
 #####################################
@@ -456,9 +445,9 @@ sub MilightBridge_CmdQueue_Send(@)
   <a name="MilightBridge_define"></a>
   <p><b>Define</b></p>
   <ul>
-    <p><code>define &lt;name&gt; MilightBridge &lt;host/ip&gt;</code></p>
+    <p><code>define &lt;name&gt; MilightBridge &lt;host/ip:port&gt;</code></p>
     <p>Specifies the MilightBridge device.<br/>
-       &lt;host/ip&gt; is the hostname or IP address of the Bridge.</p>
+       &lt;host/ip&gt; is the hostname or IP address of the Bridge with optional port (defaults to 8899 if not defined, use 50000 for V1,V2 bridges)</p>
   </ul>
   <a name="MilightBridge_readings"></a>
   <p><b>Readings</b></p>
@@ -487,10 +476,6 @@ sub MilightBridge_CmdQueue_Send(@)
       <b>checkInterval</b><br/>
          Default: 10s. Time after the bridge connection is re-checked.<br>
          If this is set to 0 checking is disabled and state = "Initialized".
-    </li>
-    <li>
-      <b>port</b><br/>
-         Default: 8899. Older bridges (V2) used port 50000 so change this value if you have an old bridge.
     </li>
     <li>
       <b>protocol</b><br/>
