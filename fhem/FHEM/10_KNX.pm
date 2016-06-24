@@ -15,6 +15,7 @@
 # ABU 20160529 Changed Doku
 # ABU 20160605 Changed Doku, changed autocreate-naming, fixed dpt10-sending-now
 # ABU 20160608 changed sprintf for int-dpt from %d to %.0f
+# ABU 20160624 corrected Doku: till->until
 
 package main;
 
@@ -1513,7 +1514,7 @@ decodeByDpt ($$$) {
       set lamp1 on
       set lamp1 off
       set lamp1 on-for-timer 10
-      set lamp1 on-till 13:15:00
+      set lamp1 on-until 13:15:00
       set foobar raw 234578
       set thermo value 23.44
 	  set message value Hallo Welt
@@ -1771,7 +1772,7 @@ decodeByDpt ($$$) {
       set lamp1 on
       set lamp1 off
       set lamp1 on-for-timer 10
-      set lamp1 on-till 13:15:00
+      set lamp1 on-until 13:15:00
       set foobar raw 234578
       set thermo value 23.44
 	  set message value Hallo Welt
