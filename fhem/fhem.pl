@@ -2367,7 +2367,13 @@ GlobalAttr($$$$)
 {
   my ($type, $me, $name, $val) = @_;
 
-  return if($type ne "set");
+  if($type eq "del") {
+    my %noDel = ( verbose=>1, modpath=>1, logfile=>1, featurelevel=>1 );
+    return "The global attribute $name cannot be deleted" if($noDel{$name});
+    return undef;
+  }
+
+  return undef if($type ne "set");
   ################
   if($name eq "logfile") {
     my @t = localtime;
