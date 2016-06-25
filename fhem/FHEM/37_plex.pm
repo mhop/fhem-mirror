@@ -890,12 +890,13 @@ plex_Set($$@)
       return undef;
 
     } elsif( $cmd eq 'smapiRegister' ) {
-      return "first use the httpPort to configure a fixed http port" if( !AttrVal($name, 'httpPort', 0) );
+      return "first use the httpPort attribute to configure a fixed http port" if( !AttrVal($name, 'httpPort', 0) );
       return plex_publishToSonos($name, 'PLEX', $params[0]);
 
     }
 
     $list .= 'playlistCreate playlistAdd playlistRemove ';
+    $list .= 'smapiRegister ' if( $hash->{helper}{timelineListener} );
     $list .= 'unwatched watched ';
   }
 
@@ -3937,12 +3938,17 @@ Log 1, "!!!!!!!!!!";
 }
 
 sub
-plex_publishToSonos($$;$)
+plex_publishToSonos(;$$$)
 {
   my ($hash,$service,$player) = @_;
+  $hash = $modules{plex}{defptr}{MASTER} if( !$hash && defined($modules{plex}{defptr}{MASTER}) );
   $hash = $defs{$hash} if( ref($hash) ne 'HASH' );
-  return undef if( !$hash );
+  return 'no plex device found'  if( !$hash );
   my $name = $hash->{NAME};
+
+  return 'no timeline listener started' if( !$hash->{helper}{timelineListener} );
+
+  $service = 'PLEX' if( !$service );
 
   my $i = 0;
   foreach my $d (devspec2array("TYPE=SONOSPLAYER")) {
