@@ -617,13 +617,14 @@ LIGHTIFY_sendNext($)
   }
 }
 sub
-LIGHTIFY_toJson($$$$$$$$$)
+LIGHTIFY_toJson($$$$$$$$$$)
 {
-  my ($hash,$chash,$reachable,$onoff,$dim,$ct,$r,$g,$b) = @_;
+  my ($hash,$chash,$id,$reachable,$onoff,$dim,$ct,$r,$g,$b) = @_;
 
   my $json = { state => { } };
 
   if( $chash ) {
+    $json->{uniqueid} = $id if( defined($id) );
     $json->{state}{on} = $onoff if( defined($onoff) );
     $json->{state}{reachable} = $reachable? 1 : 0 if( defined($reachable) );
 
@@ -754,7 +755,7 @@ LIGHTIFY_Parse($$)
         $chash->{helper}{type} = hex($type);
         $chash->{helper}{type} = extcolordimmer if( !$chash->{helper}{type} );
 
-        my $json = LIGHTIFY_toJson($hash, $chash, $reachable, $onoff, $dim, $ct, $r, $g, $b);
+        my $json = LIGHTIFY_toJson($hash, $chash, $id, $reachable, $onoff, $dim, $ct, $r, $g, $b);
         my $changed = HUEDevice_Parse( $chash, $json );
         if( $changed || $chash->{helper}{transitiontime} ) {
           RemoveInternalTimer($chash);
@@ -893,7 +894,7 @@ LIGHTIFY_Parse($$)
 
         Log3 $name, 4, "$id, reachable: $reachable, onoff: $onoff, dim: $dim, ct: $ct, rgb: $r$g$b, w: $w";
 
-        $json = LIGHTIFY_toJson($hash, $chash, $reachable, $onoff, $dim, $ct, $r, $g, $b);
+        $json = LIGHTIFY_toJson($hash, $chash, $id, $reachable, $onoff, $dim, $ct, $r, $g, $b);
 
       }
     my $changed = HUEDevice_Parse( $chash, $json ) if( $chash );
