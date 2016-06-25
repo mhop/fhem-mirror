@@ -198,13 +198,19 @@ sub cfgDB_WriteFile($@);
 # VOLATILE- Set if the definition should be saved to the "statefile"
 # NOTIFYDEV - if set, the notifyFn will only be called for this device
 
+use vars qw($auth_refresh);
+use vars qw($cmdFromAnalyze);   # used by the warnings-sub
+use vars qw($cvsid);            # used in 98_version.pm
 use vars qw($devcount);         # Maximum device number, used for storing
+use vars qw($featurelevel); 
 use vars qw($fhem_started);     # used for uptime calculation
 use vars qw($init_done);        #
 use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
+use vars qw($lastDefChange);    # number of last def/attr change
 use vars qw($nextat);           # Time when next timer will be triggered.
 use vars qw($readytimeout);     # Polling interval. UNIX: device search only
 use vars qw($reread_active);
+use vars qw($selectTimestamp);  # used to check last select exit timestamp
 use vars qw($winService);       # the Windows Service object
 use vars qw(%attr);             # Attributes
 use vars qw(%cmds);             # Global command name hash.
@@ -212,22 +218,19 @@ use vars qw(%data);             # Hash for user data
 use vars qw(%defaultattr);      # Default attributes, used by FHEM2FHEM
 use vars qw(%defs);             # FHEM device/button definitions
 use vars qw(%inform);           # Used by telnet_ActivateInform
-use vars qw(%logInform);        # Used by FHEMWEB/Event-Monitor
 use vars qw(%intAt);            # Internal at timer hash, global for benchmark
+use vars qw(%logInform);        # Used by FHEMWEB/Event-Monitor
 use vars qw(%modules);          # List of loaded modules (device/log/etc)
 use vars qw(%ntfyHash);         # hash of devices needed to be notified.
 use vars qw(%oldvalue);         # Old values, see commandref.html
 use vars qw(%readyfnlist);      # devices which want a "readyfn"
 use vars qw(%selectlist);       # devices which want a "select"
 use vars qw(%value);            # Current values, see commandref.html
-use vars qw($lastDefChange);    # number of last def/attr change
-use vars qw(@structChangeHist); # Contains the last 10 structural changes
-use vars qw($cmdFromAnalyze);   # used by the warnings-sub
-use vars qw($featurelevel); 
-use vars qw(@authorize);        # List of authorization devices
 use vars qw(@authenticate);     # List of authentication devices
-use vars qw($auth_refresh);
-use vars qw($cvsid);            # used in 98_version.pm
+use vars qw(@authorize);        # List of authorization devices
+use vars qw(@structChangeHist); # Contains the last 10 structural changes
+
+$selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
 
 my $AttrList = "verbose:0,1,2,3,4,5 room group comment:textField-long alias ".
@@ -2767,7 +2770,10 @@ HandleTimeout()
   return undef if(!$nextat);
 
   my $now = gettimeofday();
-  return ($nextat-$now) if($now < $nextat);
+  if($now < $nextat) {
+    $selectTimestamp = $now;
+    return ($nextat-$now);
+  }
 
   $now += 0.01;# need to cover min delay at least
   $nextat = 0;
@@ -2792,9 +2798,14 @@ HandleTimeout()
     }
   }
 
-  return undef if(!$nextat);
-  $now = gettimeofday(); # possibly some tasks did timeout in the meantime
-                         # we will cover them 
+  if(!$nextat) {
+    $selectTimestamp = $now;
+    return undef;
+  }
+
+  $now = gettimeofday(); # if some callbacks took longer 
+  $selectTimestamp = $now;
+
   return ($now+ 0.01 < $nextat) ? ($nextat-$now) : 0.01;
 }
 
