@@ -73,18 +73,20 @@ HttpUtils_Close($)
 }
 
 sub
-HttpUtils_Err($$)
+HttpUtils_Err($)
 {
-  my ($hash, $errtxt) = @_;
-  $hash = $hash->{hash};
+  my ($lhash, $errtxt) = @_;
+  my $hash = $lhash->{hash};
+
+  if($lhash->{sts} && $lhash->{sts} == $selectTimestamp) { # busy loop check
+    Log 4, "extending '$lhash->{msg} $hash->{addr}' timeout due to busy loop";
+    InternalTimer(gettimeofday()+1, "HttpUtils_Err", $lhash);
+    return;
+  }
   return if(!defined($hash->{FD})); # Already closed
   HttpUtils_Close($hash);
-  $hash->{callback}($hash, "$errtxt $hash->{addr} timed out", "");
+  $hash->{callback}($hash, "$lhash->{msg} $hash->{addr} timed out", "");
 }
-
-sub HttpUtils_ConnErr($) { my ($hash) = @_; HttpUtils_Err($hash, "connect to");}
-sub HttpUtils_ReadErr($) { my ($hash) = @_; HttpUtils_Err($hash, "read from"); }
-sub HttpUtils_WriteErr($){ my ($hash) = @_; HttpUtils_Err($hash, "write to"); }
 
 sub
 HttpUtils_File($)
@@ -154,11 +156,10 @@ HttpUtils_gethostbyname($$$)
 
   my %dh = ( conn=>$c, FD=>$c->fileno(), NAME=>"DNS", origHash=>$hash,
              addr=>$dnsServer, callback=>$fn );
-  my %timerHash = ( hash => \%dh );
+  my %timerHash = ( hash=>\%dh, msg=>"DNS" );
   my $bhost = join("", map { pack("CA*",length($_),$_) } split(/\./, $host));
   my $qry = pack("nnnnnn", 0x7072,0x0100,1,0,0,0) . $bhost . pack("Cnn", 0,1,1);
   my $ql = length($qry);
-  my $dnsTo = 0.25;
 
   $dh{directReadFn} = sub() {                           # Parse the answer
     RemoveInternalTimer(\%timerHash);
@@ -177,17 +178,20 @@ HttpUtils_gethostbyname($$$)
   $selectlist{\%dh} = \%dh;
 
   my $dnsQuery;
+  my $dnsTo = 0.25;
+  my $lSelectTs = $selectTimestamp;
   $dnsQuery = sub()
   {
-    $dnsTo *= 2;
-    return HttpUtils_Err(\%timerHash, "DNS") if($dnsTo > $hash->{timeout}/2);
+    $dnsTo *= 2 if($lSelectTs != $selectTimestamp);
+    $lSelectTs = $selectTimestamp;
+    return HttpUtils_Err(\%timerHash) if($dnsTo > $hash->{timeout}/2);
     my $ret = syswrite $dh{conn}, $qry;
     if(!$ret || $ret != $ql) {
       my $err = $!;
       HttpUtils_Close(\%dh);
       return $fn->($hash, "DNS write error: $err", undef);
     }
-    InternalTimer(gettimeofday()+$dnsTo, $dnsQuery, \%timerHash, 0);
+    InternalTimer(gettimeofday()+$dnsTo, $dnsQuery, \%timerHash);
   };
   $dnsQuery->();
 
@@ -241,7 +245,7 @@ HttpUtils_Connect($)
              (int($!)==140 && $^O eq "MSWin32")) { # Nonblocking connect
 
             $hash->{FD} = $hash->{conn}->fileno();
-            my %timerHash = ( hash => $hash );
+            my %timerHash=(hash=>$hash,sts=>$selectTimestamp,msg=>"connect to");
             $hash->{directWriteFn} = sub() {
               delete($hash->{FD});
               delete($hash->{directWriteFn});
@@ -262,7 +266,7 @@ HttpUtils_Connect($)
             $hash->{NAME}="" if(!defined($hash->{NAME}));#Delete might check it
             $selectlist{$hash} = $hash;
             InternalTimer(gettimeofday()+$hash->{timeout},
-                          "HttpUtils_ConnErr", \%timerHash, 0);
+                          "HttpUtils_Err", \%timerHash);
             return undef;
           } else {
             $hash->{callback}($hash, "connect to $hash->{addr}: $!", "");
@@ -379,7 +383,7 @@ HttpUtils_Connect2($)
     $hash->{FD} = $hash->{conn}->fileno();
     $hash->{buf} = "";
     $hash->{NAME} = "" if(!defined($hash->{NAME})); 
-    my %timerHash = ( hash => $hash );
+    my %timerHash = (hash=>$hash, checkSTS=>$selectTimestamp, msg=>"write to");
     $hash->{directReadFn} = sub() {
       my $buf;
       my $len = sysread($hash->{conn},$buf,65536);
@@ -409,13 +413,13 @@ HttpUtils_Connect2($)
         shutdown($hash->{conn}, 1) if($s);
         delete($hash->{directWriteFn});
         RemoveInternalTimer(\%timerHash);
+        $timerHash{msg} = "read from";
         InternalTimer(gettimeofday()+$hash->{timeout},
-                      "HttpUtils_ReadErr", \%timerHash, 0);
+                      "HttpUtils_Err", \%timerHash);
       }
     };
     $selectlist{$hash} = $hash;
-    InternalTimer(gettimeofday()+$hash->{timeout},
-                  "HttpUtils_WriteErr", \%timerHash, 0);
+    InternalTimer(gettimeofday()+$hash->{timeout}, "HttpUtils_Err",\%timerHash);
     return undef;
 
   } else {
