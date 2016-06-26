@@ -1963,7 +1963,10 @@ sub ONKYO_AVR_Set($$$) {
     my $cmd = '';
 
     return "Device is offline and cannot be controlled at that stage."
-      if ( $presence eq "absent" && lc( @$a[1] ) ne "on" );
+      if ( $presence eq "absent"
+        && lc( @$a[1] ) ne "on"
+        && lc( @$a[1] ) ne "?"
+        && lc( @$a[1] ) ne "help" );
 
     readingsBeginUpdate($hash);
 
