@@ -159,13 +159,30 @@ sub ONKYO_AVR_Define($$$) {
     $modules{ONKYO_AVR_ZONE}{defptr}{$name}{1}                  = $hash;
 
     $hash->{DeviceName} = @$a[2];
-    $hash->{DeviceName} = $hash->{DeviceName} . ":60128"
-      if ( $hash->{DeviceName} =~
-/^\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b$/
-      );
 
-    my $ret = DevIo_OpenDev( $hash, 0, "ONKYO_AVR_DevInit" );
-    return $ret;
+    # connect using serial connection (old blocking style)
+    if (   $hash->{DeviceName} =~ m/^UNIX:(SEQPACKET|STREAM):(.*)$/
+        || $hash->{DeviceName} =~ m/^FHEM:DEVIO:(.*)(:(.*))/ )
+    {
+        my $ret = DevIo_OpenDev( $hash, 0, "ONKYO_AVR_DevInit" );
+        return $ret;
+    }
+
+    # connect using TCP connection (non-blocking style)
+    else {
+        # add missing port if required
+        $hash->{DeviceName} = $hash->{DeviceName} . ":60128"
+          if ( $hash->{DeviceName} !~ m/^(.+):([0-9]+)$/ );
+
+        DevIo_OpenDev(
+            $hash, 0,
+            "ONKYO_AVR_DevInit",
+            sub() {
+                my ( $hash, $err ) = @_;
+                Log3 $name, 2, "ONKYO_AVR $name: $err" if ($err);
+            }
+        );
+    }
 }
 
 #####################################
