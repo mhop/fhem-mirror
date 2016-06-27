@@ -209,7 +209,7 @@ sub HUEDevice_Define($$)
   my $iodev;
   my $i = 0;
   foreach my $param ( @args ) {
-    if( $param =~ m/IODev=(.*)/ ) {
+    if( $param =~ m/IODev=([^\s]*)/ ) {
       $iodev = $1;
       splice( @args, $i, 1 );
       last;
@@ -232,18 +232,19 @@ sub HUEDevice_Define($$)
   } else {
     Log3 $name, 1, "$name: no I/O device";
   }
+  $iodev = $hash->{IODev}->{NAME};
 
   my $code = $hash->{ID};
-  $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}->{NAME}) );
+  $code = $iodev ."-". $code if( defined($iodev) );
   my $d = $modules{HUEDevice}{defptr}{$code};
-  return "HUEDevice device $hash->{ID} on HUEBridge $d->{IODev}->{NAME} already defined as $d->{NAME}."
+  return "HUEDevice device $hash->{ID} on HUEBridge $iodev already defined as $d->{NAME}."
          if( defined($d)
              && $d->{IODev} == $hash->{IODev}
              && $d->{NAME} ne $name );
 
   $modules{HUEDevice}{defptr}{$code} = $hash;
 
-  if( AttrVal($hash->{IODev}->{NAME}, "pollDevices", undef) ) {
+  if( AttrVal($iodev, "pollDevices", undef) ) {
     $interval = 0 unless defined($interval);
   } else {
     $interval = 60 unless defined($interval);
@@ -253,7 +254,7 @@ sub HUEDevice_Define($$)
 
   $args[3] = "" if( !defined( $args[3] ) );
   if( !$hash->{helper}->{devtype} ) {
-    $hash->{DEF} = "$id $args[3]";
+    $hash->{DEF} = "$id $args[3] IODev=$iodev";
 
     $hash->{INTERVAL} = $interval;
 
@@ -277,7 +278,7 @@ sub HUEDevice_Define($$)
     $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
 
   } elsif( $hash->{helper}->{devtype} eq 'G' ) {
-    $hash->{DEF} = "group $id $args[3]";
+    $hash->{DEF} = "group $id $args[3] IODev=$iodev";
 
     $hash->{helper}{all_on} = -1;
     $hash->{helper}{any_on} = -1;
@@ -290,7 +291,7 @@ sub HUEDevice_Define($$)
     $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
-    $hash->{DEF} = "sensor $id $args[3]";
+    $hash->{DEF} = "sensor $id $args[3] IODev=$iodev";
     $hash->{INTERVAL} = $interval;
 
   }
@@ -1117,7 +1118,7 @@ HUEDevice_Parse($$)
      $on = $hash->{helper}{on} if( !defined($on) );
   my $reachable = $state->{reachable}?1:0;
      $reachable = $hash->{helper}{reachable} if( !defined($state->{reachable}) );
-     $reachable = 1 if( $reachable == 0 && AttrVal($name, 'ignoreReachable', 0) );
+     $reachable = 1 if( !$reachable && AttrVal($name, 'ignoreReachable', 0) );
   my $colormode = $state->{'colormode'};
   my $bri       = $state->{'bri'};
      $bri = $hash->{helper}{bri} if( !defined($bri) );
