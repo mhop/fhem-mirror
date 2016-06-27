@@ -44,16 +44,19 @@
 package main;
 use strict;
 use warnings;
+my %GasCalculator_gets;
+my %GasCalculator_sets;
 
 ###START###### Initialize module ##############################################################################START####
 sub GasCalculator_Initialize($)
 {
     my ($hash)  = @_;
-
+	
     $hash->{STATE}				= "Init";
     $hash->{DefFn}				= "GasCalculator_Define";
     $hash->{UndefFn}			= "GasCalculator_Undefine";
-    $hash->{SetFn}           	= "GasCalculator_Set";
+    $hash->{GetFn}           	= "GasCalculator_Get";
+	$hash->{SetFn}           	= "GasCalculator_Set";
     $hash->{AttrFn}				= "GasCalculator_Attr";
 	$hash->{NotifyFn}			= "GasCalculator_Notify";
 	$hash->{NotifyOrderPrefix}	= "10-";   					# Want to be called before the rest
@@ -141,6 +144,47 @@ sub GasCalculator_Attr(@)
 ####END####### Handle attributes after changes via fhem GUI ####################################################END#####
 
 ###START###### Manipulate reading after "set" command by fhem #################################################START####
+sub GasCalculator_Get($@)
+{
+	my ( $hash, @a ) = @_;
+	
+	### If not enough arguments have been provided
+	if ( @a < 2 )
+	{
+		return "\"get GasCalculator\" needs at least one argument";
+	}
+		
+	my $GasCalcName = shift @a;
+	my $reading  = shift @a;
+	my $value; 
+	my $ReturnMessage;
+
+	if(!defined($GasCalculator_gets{$reading})) 
+	{
+		my @cList = keys %GasCalculator_sets;
+		return "Unknown argument $reading, choose one of " . join(" ", @cList);
+
+		### Create Log entries for debugging
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - get list: " . join(" ", @cList);
+	}
+	
+	if ( $reading ne "?")
+	{
+		### Create Log entries for debugging
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - get " . $reading . " with value: " . $value;
+		
+		### Write current value
+		$value = ReadingsVal($GasCalcName,  $reading, undef);
+		
+		### Create ReturnMessage
+		$ReturnMessage = $value;
+	}
+	
+	return($ReturnMessage);
+}
+####END####### Manipulate reading after "set" command by fhem ##################################################END#####
+
+###START###### Manipulate reading after "set" command by fhem #################################################START####
 sub GasCalculator_Set($@)
 {
 	my ( $hash, @a ) = @_;
@@ -156,6 +200,15 @@ sub GasCalculator_Set($@)
 	my $value = join(" ", @a);
 	my $ReturnMessage;
 
+	if(!defined($GasCalculator_sets{$reading})) 
+	{
+		my @cList = keys %GasCalculator_sets;
+		return "Unknown argument $reading, choose one of " . join(" ", @cList);
+
+		### Create Log entries for debugging
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - set list: " . join(" ", @cList);
+	}
+	
 	if ( $reading ne "?")
 	{
 		### Create Log entries for debugging
@@ -188,8 +241,6 @@ sub GasCalculator_Notify($$)
 	{
 		return "";
 	}
-	
-	
 	
 	### Check whether all required attributes has been provided and if not, create them with standard values
 	if(!defined($attr{$GasCalcName}{BasicPricePerAnnum}))
@@ -679,7 +730,15 @@ sub GasCalculator_Notify($$)
 		### Create Log entries for debugging
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator End_________________________________________________________________________________________________________________________________";
 	}
+	
+	### Update list of available readings
+	%GasCalculator_gets = %{$GasCalcDev->{READINGS}};
+	%GasCalculator_sets = %{$GasCalcDev->{READINGS}};
 
+	### Create Log entries for debugging
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
+
+	
 	return undef;
 }
 ####END####### Calculate gas meter values on changed events ####################################################END#####
