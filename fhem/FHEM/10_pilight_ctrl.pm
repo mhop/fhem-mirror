@@ -41,6 +41,7 @@
 # V 1.14 2016-03-20 - FIX: send delimiter to signal end of stream if length of data > 1024
 # V 1.15 2016-03-28 - NEW: protocol daycom (switch)
 # V 1.16 2016-06-02 - NEW: protocol oregon_21 (temp)
+# V 1.17 2016-06-28 - FIX: Experimental splice on scalar is now forbidden - use explizit array notation
 ############################################## 
 package main;
 
@@ -194,7 +195,7 @@ sub pilight_ctrl_Close($)
     delete($hash->{helper}{RUNNING_PID}); 
   }
    
-  splice($hash->{helper}->{sendQueue});
+  splice(@{$hash->{helper}->{sendQueue}});
   
   RemoveInternalTimer($hash);
   Log3 $me, 5, "$me(Close): close DevIo";
@@ -562,7 +563,7 @@ sub pilight_ctrl_addWhiteList($$)
 sub pilight_ctrl_createWhiteList($)
 {
   my ($own) = @_;
-  splice($own->{helper}->{whiteList});
+  splice(@{$own->{helper}->{whiteList}});
   foreach my $d (keys %defs)   
   { 
     my $module   = $defs{$d}{TYPE};
