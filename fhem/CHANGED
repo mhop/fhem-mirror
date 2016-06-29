@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_GasCalculator: Bugfix for "Can't use an undefined value..."
   - bugfix:  10_pilight_ctrl: Experimental splice on scalar is now forbidden.
   - feature: 73_GasCalculator: "set" and "get" - command in GUI implemented.
   - bugfix:  50_TelegramBot: Unicode / Umlaute handling reworked
