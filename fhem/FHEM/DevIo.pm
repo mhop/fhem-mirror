@@ -201,7 +201,7 @@ DevIo_OpenDev($$$;$)
   ($dev, $baudrate) = split("@", $dev);
   my ($databits, $parity, $stopbits) = (8, 'none', 1);
 
-  my $doCb = sub ($$) {
+  my $doCb = sub ($) {
     my ($r) = @_;
     $callback->($hash,$r) if($callback);
     return $r;
@@ -302,7 +302,7 @@ DevIo_OpenDev($$$;$)
     # for non-existent devices has a delay of 3 sec, we are sitting all the
     # time in this connect. NEXT_OPEN tries to avoid this problem.
     if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-      return &$doCb(undef);
+      return undef;
     }
 
     my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 3;
@@ -336,17 +336,16 @@ DevIo_OpenDev($$$;$)
         noConn2 => 1,
         callback=> sub() {
           my ($h, $err, undef) = @_;
-          return $callback->($hash, $err) if($err);
-          return &$doCb("") if(!&$doTcpTail($h->{conn}));
-          return &$doCb(&$doTailWork());
+          &$doTcpTail($err ? undef : $h->{conn});
+          return &$doCb($err ? $err : &$doTailWork());
         }
       });
       return &$doCb($err) if($err);
-      return undef;
+      return undef;     # no double callback: connect is running in bg now
 
     } else {
       my $conn = IO::Socket::INET->new(PeerAddr => $dev, Timeout => $timeout);
-      return &$doCb("") if(!&$doTcpTail($conn));
+      return "" if(!&$doTcpTail($conn)); # no callback: no doCb
     }
 
   } elsif($baudrate && lc($baudrate) eq "directio") { # w/o Device::SerialPort
