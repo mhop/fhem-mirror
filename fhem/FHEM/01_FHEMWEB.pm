@@ -2193,8 +2193,6 @@ FW_makeImage(@)
       $data =~ s/[\r\n]/ /g;
       $data =~ s/ *$//g;
       $data =~ s/<svg/<svg class="$class" data-txt="$txt"/; #52967
-      my $title = urlEncode($txt);
-      $data =~ s,</svg,<title>$title</title></svg,;
       $name =~ m/(@.*)$/;
       my $col = $1 if($1);
       if($col) {
@@ -2797,7 +2795,8 @@ FW_devState($$@)
   }
 
   my $style = AttrVal($d, "devStateStyle", "");
-  $txt = "<div id=\"$d\" $style class=\"col2\">$txt</div>";
+  $state =~ s/"//g;
+  $txt = "<div id=\"$d\" $style title=\"$state\" class=\"col2\">$txt</div>";
 
   my $type = $defs{$d}{TYPE};
   my $sfn = $modules{$type}{FW_summaryFn};
