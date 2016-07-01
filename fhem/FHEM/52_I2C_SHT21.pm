@@ -293,7 +293,7 @@ sub I2C_SHT21_CheckCrc(@) {
 			$crc = ($crc & 0x80 ? $poly : 0 ) ^ ($crc << 1);
 		}
 	}
-	return ($crc = $data[2] ? undef : $crc);
+	return ($crc == $data[2] ? undef : $crc);
 }
 
 sub I2C_SHT21_DbLog_splitFn($) {
