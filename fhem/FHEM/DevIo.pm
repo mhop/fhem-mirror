@@ -200,6 +200,7 @@ DevIo_OpenDev($$$;$)
   my $baudrate;
   ($dev, $baudrate) = split("@", $dev);
   my ($databits, $parity, $stopbits) = (8, 'none', 1);
+  my $nextOpenDelay = ($hash->{nextOpenDelay} ? $hash->{nextOpenDelay} : 60);
 
   my $doCb = sub ($) {
     my ($r) = @_;
@@ -217,7 +218,7 @@ DevIo_OpenDev($$$;$)
       if($ret) {
         if($hadFD && !defined($hash->{FD})) { # Forum #54732 / ser2net
           DevIo_Disconnected($hash);
-          $hash->{NEXT_OPEN} = time()+60;
+          $hash->{NEXT_OPEN} = time() + $nextOpenDelay;
 
         } else {
           DevIo_CloseDev($hash);
@@ -316,7 +317,7 @@ DevIo_OpenDev($$$;$)
         Log3 $name, 3, "Can't connect to $dev: $!" if(!$reopen);
         $readyfnlist{"$name.$dev"} = $hash;
         DevIo_setStates($hash, "disconnected");
-        $hash->{NEXT_OPEN} = time()+60;
+        $hash->{NEXT_OPEN} = time() + $nextOpenDelay;
         return 0;
       }
 
