@@ -332,7 +332,7 @@ DevIo_OpenDev($$$;$)
       use HttpUtils;
       my $err = HttpUtils_Connect({     # Nonblocking
         timeout => $timeout,
-        url     => "http://$dev/",      # not really http
+        url     => $hash->{SSL} ? "https://$dev/" : "http://$dev/",
         NAME    => $hash->{NAME},
         noConn2 => 1,
         callback=> sub() {
