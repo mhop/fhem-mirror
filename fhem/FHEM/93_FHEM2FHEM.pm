@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use HttpUtils;
 
 
 sub FHEM2FHEM_Read($);
@@ -110,6 +111,7 @@ FHEM2FHEM_Write($$)
     syswrite($hash->{TCPDev2}, $hash->{portpassword} . "\n")
         if($hash->{portpassword});
   }
+
   my $rdev = $hash->{rawDevice};
   syswrite($hash->{TCPDev2}, "iowrite $rdev $fn $msg\n");
 }
@@ -222,56 +224,48 @@ FHEM2FHEM_OpenDev($$)
   Log3 $name, 3, "FHEM2FHEM opening $name at $dev"
         if(!$reopen);
 
-  # This part is called every time the timeout (5sec) is expired _OR_
-  # somebody is communicating over another TCP connection. As the connect
-  # for non-existent devices has a delay of 3 sec, we are sitting all the
-  # time in this connect. NEXT_OPEN tries to avoid this problem.
-  if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-    return;
-  }
-
+  return if($hash->{NEXT_OPEN} && time() <= $hash->{NEXT_OPEN});
   return if(IsDisabled($name));
 
-  my $conn;
-  if($hash->{SSL}) {
-    eval "use IO::Socket::SSL";
-    Log3 $name, 1, $@ if($@);
-    $conn = IO::Socket::SSL->new(PeerAddr => "$dev") if(!$@);
-  } else {
-    $conn = IO::Socket::INET->new(PeerAddr => $dev);
-  }
+  my $doTailWork = sub($$$) {
+    my ($h, $err, undef) = @_;
 
-  if($conn) {
+    if($err) {
+      Log3($name, 3, "Can't connect to $dev: $!") if(!$reopen);
+      $readyfnlist{"$name.$dev"} = $hash;
+      $hash->{STATE} = "disconnected";
+      $hash->{NEXT_OPEN} = time()+60;
+      return;
+    }
+    my $conn = $h->{conn};
     delete($hash->{NEXT_OPEN});
     $conn->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1);
+    $hash->{TCPDev} = $conn;
+    $hash->{FD} = $conn->fileno();
+    delete($readyfnlist{"$name.$dev"});
+    $selectlist{"$name.$dev"} = $hash;
 
-  } else {
-    Log3($name, 3, "Can't connect to $dev: $!") if(!$reopen);
-    $readyfnlist{"$name.$dev"} = $hash;
-    $hash->{STATE} = "disconnected";
-    $hash->{NEXT_OPEN} = time()+60;
-    return "";
-  }
+    if($reopen) {
+      Log3 $name, 1, "FHEM2FHEM $dev reappeared ($name)";
+    } else {
+      Log3 $name, 3, "FHEM2FHEM device opened ($name)";
+    }
 
-  $hash->{TCPDev} = $conn;
-  $hash->{FD} = $conn->fileno();
-  delete($readyfnlist{"$name.$dev"});
-  $selectlist{"$name.$dev"} = $hash;
+    $hash->{STATE}= "connected";
+    DoTrigger($name, "CONNECTED") if($reopen);
+    syswrite($hash->{TCPDev}, $hash->{portpassword} . "\n")
+          if($hash->{portpassword});
+    my $msg = $hash->{informType} eq "LOG" ? 
+                  "inform on $hash->{regexp}" : "inform raw";
+    syswrite($hash->{TCPDev}, $msg . "\n");
+  };
 
-  if($reopen) {
-    Log3 $name, 1, "FHEM2FHEM $dev reappeared ($name)";
-  } else {
-    Log3 $name, 3, "FHEM2FHEM device opened ($name)";
-  }
-
-  $hash->{STATE}= "connected";
-  DoTrigger($name, "CONNECTED") if($reopen);
-  syswrite($hash->{TCPDev}, $hash->{portpassword} . "\n")
-        if($hash->{portpassword});
-  my $msg = $hash->{informType} eq "LOG" ? 
-                "inform on $hash->{regexp}" : "inform raw";
-  syswrite($hash->{TCPDev}, $msg . "\n");
-  return undef;
+  return HttpUtils_Connect({     # Nonblocking
+    url     => $hash->{SSL} ? "https://$dev/" : "http://$dev/",
+    NAME    => $name,
+    noConn2 => 1,
+    callback=> $doTailWork
+  });
 }
 
 sub
@@ -338,7 +332,8 @@ FHEM2FHEM_Set($@)
   <a name="FHEM2FHEMdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHEM2FHEM &lt;host&gt;[:&lt;portnr&gt;][:SSL] [LOG:regexp|RAW:devicename] {portpassword}
+    <code>define &lt;name&gt; FHEM2FHEM &lt;host&gt;[:&lt;portnr&gt;][:SSL]
+    [LOG:regexp|RAW:devicename] {portpassword}
     </code>
   <br>
   <br>
