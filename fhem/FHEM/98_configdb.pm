@@ -121,7 +121,7 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('filedelete') {
-			return "\n Syntax: configdb fileexport <pathToFile>" if @a != 2;
+			return "\n Syntax: configdb filedelete <pathToFile>" if @a != 2;
 			my $filename;
 			if($param1 =~ m,^[./],) {
 				$filename = $param1;
@@ -188,6 +188,7 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('fileshow') {
+			return "\n Syntax: configdb fileshow <pathToFile>" if @a != 2;
 			my @rets = cfgDB_FileRead($param1);
 			my $r = (int(@rets)) ? join "\n",@rets : "File $param1 not found in database.";
 			return $r;
@@ -218,7 +219,8 @@ sub CommandConfigdb($$) {
 		}
 
 		when ('reorg') {
-			$param1 = $param1 ? $param1 : 3;
+#			$param1 = $param1 ? $param1 : 3;
+			$param1 //= 3;
 			Log3('configdb', 4, "configdb: reorg requested with keep: $param1.");
 			$ret = _cfgDB_Reorg($a[1]);
 		}
