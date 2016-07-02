@@ -175,9 +175,9 @@ FBAHAHTTP_ProcessStack($)
       }
       chomp $_[2];
       Log3 $name, 5, "FBAHAHTTP_Write reply for $name: $_[2]";
-      pop @{$hash->{CmdStack}};
+      shift @{$hash->{CmdStack}};
       if(@{$hash->{CmdStack}} > 0) {
-        my $ad = AttrVal($name, "async_delay", 0.2);
+        my $ad = AttrVal($name, "async_delay", 0);
         InternalTimer(gettimeofday()+$ad, sub(){
           FBAHAHTTP_ProcessStack($hash);
         }, $hash);
