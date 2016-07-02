@@ -1,8 +1,8 @@
 ﻿##############################################
 # 00_THZ
 # $Id$
-# by immi 01/2016
-my $thzversion = "0.151";
+# by immi 07/2016
+my $thzversion = "0.152";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -286,8 +286,8 @@ my %parsinghash = (
 ########################################################################################
 
 my %sets439technician =(
-#"flowTem"				=> {parent=>"sGlobal", argMin =>  "1", argMax =>   "88", unit =>" °C"},
-  "zPumpHC"				=> {cmd2=>"0A0052", argMin =>   "0", argMax =>  "1",	type =>"0clean",  unit =>""},
+#  "zResetLast10errors"			=> {cmd2=>"D1",     argMin =>   "0", argMax =>  "0",	type =>"0clean",  unit =>""},
+  "zPumpHC"				=> {cmd2=>"0A0052", argMin =>   "0", argMax =>  "1",	type =>"0clean",  unit =>""},  
   "zPumpDHW"				=> {cmd2=>"0A0056", argMin =>   "0", argMax =>  "1",	type =>"0clean",  unit =>""}  
 );
 
@@ -1103,20 +1103,20 @@ sub THZ_Get_Comunication($$) {
      THZ_Write($hash,  $cmdHex); 		# step2 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
      ($err, $msg) = THZ_ReadAnswer($hash);
   }
-  elsif ($msg eq "15") 	{Log3 $hash->{NAME}, 3, "$hash->{NAME} NAK!!"; }
-  if ((defined($err)))  { $err= $err . " error found at step1";}
+  elsif ($msg eq "15") 	{Log3 $hash->{NAME}, 3, "$hash->{NAME} NAK!!"; select(undef, undef, undef, 0.5);}
+  if ((defined($err)))  { $err .=  " error found at step1"; select(undef, undef, undef, 0.1); return($err, $msg) ;}
 						# Expectedanswer2     is "1002",		DLE data link escape -- STX start of text    
 
   if ($msg eq "10") 	{ ($err, $msg) = THZ_ReadAnswer($hash);}
-  elsif ($msg eq "15") 	{Log3 $hash->{NAME}, 3, "$hash->{NAME} NAK!!"; }
+  elsif ($msg eq "15") 	{Log3 $hash->{NAME}, 3, "$hash->{NAME} NAK!!"; select(undef, undef, undef, 0.5); return($err, $msg) ;}
   if ($msg eq "1002" || $msg eq "02") {
     THZ_Write($hash,  "10"); 		    	# step3 --> DLE data link escape  // ack datatranfer
     ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer3 // read from the heatpump
     THZ_Write($hash,  "10");  
   }
-  if ((defined($err)))  { $err= $err . " error found at step2";}
-   
-  if (!(defined($err)))  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
+  
+  if ((defined($err)))  { $err .= " error found at step2";} 
+  else  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
   return($err, $msg) ;
 }
 
@@ -1139,6 +1139,7 @@ sub THZ_ReadAnswer($)
 	###------Windows support
 	select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
 	my $buf = DevIo_SimpleReadWithTimeout($hash, 0.5); 
+	$buf = DevIo_SimpleReadWithTimeout($hash, 0.1) if(!defined($buf)) ; #added for Karl Antwort msg468515
 	if(!defined($buf)) {
 	  Log3 $hash->{NAME}, 3, "$hash->{NAME} THZ_ReadAnswer got no answer from DevIo_SimpleRead. Maybe too slow?";
 	  return ("InterfaceNotRespondig", "");
@@ -1153,7 +1154,7 @@ sub THZ_ReadAnswer($)
 	  my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
 	  Log3($hash->{NAME}, 5, "double read $count activated $data");
 	  if(defined($buf1)) {
-	    $buf = ($buf . $buf1) ;
+	    $buf .=  $buf1 ;
 	    $data =  uc(unpack('H*', $buf));
 	    Log3($hash->{NAME}, 5, "double read $count result with buf1  $data");
 	    $count ++;
