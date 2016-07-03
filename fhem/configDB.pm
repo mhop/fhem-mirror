@@ -114,6 +114,8 @@
 # 2016-05-29 - changed   improve support for postgresql (tnx to Matze)
 #              added     configdb dump (for postgresql)
 #
+# 2016-07-03 - added     support for multiple hosts (experimental)
+#
 ##############################################################################
 #
 
@@ -121,6 +123,7 @@ use strict;
 use warnings;
 use Text::Diff;
 use DBI;
+use Sys::Hostname;
 use Data::Dumper;
 
 ##################################################
@@ -182,7 +185,26 @@ close(CONFIG);
 use vars qw(%configDB);
 
 my %dbconfig;
-eval join("", @config);
+##eval join("", @config);
+
+## begin experimental
+## support multiple hosts from one fhem installation
+##
+my $configs = join("",@config);
+my @configs = split(/;/,$configs);
+my $count   = @configs;
+
+if ($count > 1) {
+   my $fhemhost = hostname;
+   foreach my $c (@configs) {
+      eval $c;
+      last if ($dbconfig{fhemhost} eq $fhemhost);
+   }
+} else {
+   eval $configs[0];
+}
+##
+## end experimental
 
 my $cfgDB_dbconn	= $dbconfig{connection};
 my $cfgDB_dbuser	= $dbconfig{user};
