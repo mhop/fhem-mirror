@@ -42,6 +42,7 @@
 # V 1.15 2016-03-28 - NEW: protocol daycom (switch)
 # V 1.16 2016-06-02 - NEW: protocol oregon_21 (temp)
 # V 1.17 2016-06-28 - FIX: Experimental splice on scalar is now forbidden - use explizit array notation
+# V 1.18 2016-06-28 - NEW: support smoke sensors (protocol: secudo_smoke_sensor)
 ############################################## 
 package main;
 
@@ -64,7 +65,8 @@ my %sets = ( "reset:noArg" => "", "disconnect:noArg" => "");
 my %matchList = ( "1:pilight_switch" => "^PISWITCH",
                   "2:pilight_dimmer" => "^PISWITCH|^PIDIMMER|^PISCREEN",
                   "3:pilight_temp"   => "^PITEMP",
-                  "4:pilight_raw"    => "^PIRAW") ;
+                  "4:pilight_raw"    => "^PIRAW",
+                  "5:pilight_smoke"  => "^PISMOKE");
                   
 my @idList   = ("id","systemcode","gpio"); 
 my @unitList = ("unit","unitcode","programcode");
@@ -96,7 +98,7 @@ sub pilight_ctrl_Initialize($)
   $hash->{StateFn} = "pilight_ctrl_State";
   $hash->{AttrList}= "ignoreProtocol brands ContactAsSwitch SendTimeout ".$readingFnAttributes;
   
-  $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:pilight_raw:";
+  $hash->{Clients} = ":pilight_switch:pilight_dimmer:pilight_temp:pilight_raw::pilight_smoke:";
   #$hash->{MatchList} = \%matchList; #only for autocreate
 }
 
@@ -847,6 +849,10 @@ sub pilight_ctrl_Parse($$)
     case m/lm76/        {$protoID = 4;}
     
     case m/screen/      {$protoID = 5;}
+    
+    #smoke sensors
+    case m/secudo_smoke_sensor/   {$protoID = 6;}
+    
     case m/firmware/    {return;}    
     else                {Log3 $me, 3, "$me(Parse): unknown protocol -> $proto"; return;}
   }
@@ -887,6 +893,7 @@ sub pilight_ctrl_Parse($$)
         return Dispatch($hash, $msg,undef);
     }
     case 5 { return Dispatch($hash, "PISCREEN,$proto,$id,$unit,$state",undef); }
+    case 6 { return Dispatch($hash, "PISMOKE,$proto,$id,$state",undef); }
     else  {Log3 $me, 3, "$me(Parse): unknown protocol -> $proto"; return;}
   }
   return;
