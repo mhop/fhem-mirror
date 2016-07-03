@@ -27,6 +27,11 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.29   02.07.2016    add regex for adaption SVS version, url call for "snap" changed 
+# 1.28   30.06.2016    Attr "showPassInLog" added, per default no password will be shown in log 
+# 1.27   29.06.2016    Attr "simu_SVSversion" added, sub login_nonbl changed, 
+#                      sub camret_nonbl changed (getlistptzpreset) due to 7.2 problem
+# 1.26.3 28.06.2016    Time::HiRes added
 # 1.26.2 05.05.2016    change: get "snapfileinfo" will get back an Infomessage if Reading "LastSnapId" 
 #                      isn't available
 # 1.26.1 27.04.2016    bugfix module will not load due to Unknown warnings category 'experimental'
@@ -132,6 +137,7 @@ use Data::Dumper;                           # Perl Core module
 use strict;                           
 use warnings;
 use MIME::Base64;
+use Time::HiRes;
 use HttpUtils;
 no if $] >= 5.017011, warnings => 'experimental';  
 
@@ -201,6 +207,8 @@ sub SSCam_Initialize($) {
          "rectime ".
          "recextend:1,0 ".
          "session:SurveillanceStation,DSM ".
+         "showPassInLog:1,0 ".
+         "simu_SVSversion:7.2 ".
          "webCmd ".
          $readingFnAttributes;   
          
@@ -306,6 +314,10 @@ sub SSCam_Attr {
         readingsSingleUpdate($hash, "PollState", "Inactive", 1) if($do == 1);
         readingsSingleUpdate($hash, "Availability", "???", 1) if($do == 1);
     }
+    
+    if ($aName eq "simu_SVSversion") {
+        getsvsinfo($hash);
+    }
                          
     if ($cmd eq "set") {
         if ($aName eq "pollcaminfoall") {
@@ -316,8 +328,9 @@ sub SSCam_Attr {
            }
         if ($aName eq "httptimeout") {
            unless ($aVal =~ /^[0-9]+$/) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
-           } 
-   }
+           }
+    }
+
 return undef;
 }
  
@@ -772,7 +785,8 @@ sub getcredentials ($$) {
     
     ($username, $passwd) = split(":",decode_base64($credstr));
     
-    Log3($name, 4, "$name - Credentials read from RAM: $username $passwd");
+    my $logpw = AttrVal($name, "showPassInLog", "0") == 1 ? $passwd : "********";
+    Log3($name, 4, "$name - Credentials read from RAM: $username $logpw");
     
     $success = (defined($passwd)) ? 1 : 0;
     }
@@ -1881,30 +1895,6 @@ sub login_nonbl ($) {
    my $apievent    = $hash->{HELPER}{APIEVENT};
    my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
    my $apistm      = $hash->{HELPER}{APISTM};
-   my $data;
-   my $url;
-   my $logstr;
-   my $success;
-   my $apiauthpath;
-   my $apiauthmaxver;
-   my $apiextrecpath;
-   my $apiextrecmaxver;
-   my $apicampath;
-   my $apicammaxver;
-   my $apitakesnappath;
-   my $apitakesnapmaxver;
-   my $apiptzpath;
-   my $apiptzmaxver;
-   my $apisvsinfopath;
-   my $apisvsinfomaxver;
-   my $apicameventpath;
-   my $apicameventmaxver;
-   my ($apieventpath,$apieventmaxver);
-   my ($apivideostmpath,$apivideostmmaxver);
-   my ($apiextevtpath,$apiextevtmaxver);
-   my ($apistmpath,$apistmmaxver);   
-   my $error;
-   my $httptimeout;
   
     # Verarbeitung der asynchronen Rückkehrdaten aus sub "getapisites_nonbl"
     if ($err ne "")                                                                                    # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -1928,7 +1918,7 @@ sub login_nonbl ($) {
     {          
         
         # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
+        ($hash, my $success) = &evaljson($hash,$myjson,$param->{url});
         
         unless ($success) {
 
@@ -1941,21 +1931,30 @@ sub login_nonbl ($) {
             return;
         }
         
-        $data = decode_json($myjson);
+        my $data = decode_json($myjson);
    
         $success = $data->{'success'};
+        
+        # aktuelle SVS-Version für Fallentscheidung setzen
+        no warnings 'uninitialized'; 
+        my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
+        my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
+        my $build = $hash->{HELPER}{SVSVERSION}{BUILD}; 
+        my $actvs = $major.$minor.$build;
+        use warnings; 
     
                 if ($success) 
                      {
-                        # Logausgabe decodierte JSON Daten
+                        my $logstr;
+                     # Logausgabe decodierte JSON Daten
                         Log3($name, 4, "$name - JSON returned: ". Dumper $data);
                         
                      # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
        
-                        $apiauthpath = $data->{'data'}->{$apiauth}->{'path'};
+                        my $apiauthpath = $data->{'data'}->{$apiauth}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apiauthpath =~ tr/_//d if (defined($apiauthpath));
-                        $apiauthmaxver = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
+                        my $apiauthmaxver = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
        
                         $logstr = defined($apiauthpath) ? "Path of $apiauth selected: $apiauthpath" : "Path of $apiauth undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -1964,10 +1963,10 @@ sub login_nonbl ($) {
        
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
        
-                        $apiextrecpath = $data->{'data'}->{$apiextrec}->{'path'};
+                        my $apiextrecpath = $data->{'data'}->{$apiextrec}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apiextrecpath =~ tr/_//d if (defined($apiextrecpath));
-                        $apiextrecmaxver = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
+                        my $apiextrecmaxver = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
        
                         $logstr = defined($apiextrecpath) ? "Path of $apiextrec selected: $apiextrecpath" : "Path of $apiextrec undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -1976,10 +1975,10 @@ sub login_nonbl ($) {
        
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.Camera" ermitteln
               
-                        $apicampath = $data->{'data'}->{$apicam}->{'path'};
+                        my $apicampath = $data->{'data'}->{$apicam}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apicampath =~ tr/_//d if (defined($apicampath));
-                        $apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
+                        my $apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
                                
                         $logstr = defined($apicampath) ? "Path of $apicam selected: $apicampath" : "Path of $apicam undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -1988,10 +1987,10 @@ sub login_nonbl ($) {
        
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.SnapShot" ermitteln
               
-                        $apitakesnappath = $data->{'data'}->{$apitakesnap}->{'path'};
+                        my $apitakesnappath = $data->{'data'}->{$apitakesnap}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apitakesnappath =~ tr/_//d if (defined($apitakesnappath));
-                        $apitakesnapmaxver = $data->{'data'}->{$apitakesnap}->{'maxVersion'};
+                        my $apitakesnapmaxver = $data->{'data'}->{$apitakesnap}->{'maxVersion'};
                             
                         $logstr = defined($apitakesnappath) ? "Path of $apitakesnap selected: $apitakesnappath" : "Path of $apitakesnap undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -2000,10 +1999,10 @@ sub login_nonbl ($) {
 
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ" ermitteln
               
-                        $apiptzpath = $data->{'data'}->{$apiptz}->{'path'};
+                        my $apiptzpath = $data->{'data'}->{$apiptz}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apiptzpath =~ tr/_//d if (defined($apiptzpath));
-                        $apiptzmaxver = $data->{'data'}->{$apiptz}->{'maxVersion'};
+                        my $apiptzmaxver = $data->{'data'}->{$apiptz}->{'maxVersion'};
                             
                         $logstr = defined($apiptzpath) ? "Path of $apiptz selected: $apiptzpath" : "Path of $apiptz undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -2012,10 +2011,10 @@ sub login_nonbl ($) {
 
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.Info" ermitteln
               
-                        $apisvsinfopath = $data->{'data'}->{$apisvsinfo}->{'path'};
+                        my $apisvsinfopath = $data->{'data'}->{$apisvsinfo}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apisvsinfopath =~ tr/_//d if (defined($apisvsinfopath));
-                        $apisvsinfomaxver = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
+                        my $apisvsinfomaxver = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
                             
                         $logstr = defined($apisvsinfopath) ? "Path of $apisvsinfo selected: $apisvsinfopath" : "Path of $apisvsinfo undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -2024,10 +2023,10 @@ sub login_nonbl ($) {
                         
                      # Pfad und Maxversion von "SYNO.Surveillance.Camera.Event" ermitteln
               
-                        $apicameventpath = $data->{'data'}->{$apicamevent}->{'path'};
+                        my $apicameventpath = $data->{'data'}->{$apicamevent}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apicameventpath =~ tr/_//d if (defined($apicameventpath));
-                        $apicameventmaxver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
+                        my $apicameventmaxver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
                             
                         $logstr = defined($apicameventpath) ? "Path of $apicamevent selected: $apicameventpath" : "Path of $apicamevent undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -2036,10 +2035,10 @@ sub login_nonbl ($) {
                         
                      # Pfad und Maxversion von "SYNO.Surveillance.Event" ermitteln
               
-                        $apieventpath = $data->{'data'}->{$apievent}->{'path'};
+                        my $apieventpath = $data->{'data'}->{$apievent}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apieventpath =~ tr/_//d if (defined($apieventpath));
-                        $apieventmaxver = $data->{'data'}->{$apievent}->{'maxVersion'};
+                        my $apieventmaxver = $data->{'data'}->{$apievent}->{'maxVersion'};
                             
                         $logstr = defined($apieventpath) ? "Path of $apievent selected: $apieventpath" : "Path of $apievent undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -2048,10 +2047,10 @@ sub login_nonbl ($) {
                         
                      # Pfad und Maxversion von "SYNO.Surveillance.VideoStream" ermitteln
               
-                        $apivideostmpath = $data->{'data'}->{$apivideostm}->{'path'};
+                        my $apivideostmpath = $data->{'data'}->{$apivideostm}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apivideostmpath =~ tr/_//d if (defined($apivideostmpath));
-                        $apivideostmmaxver = $data->{'data'}->{$apivideostm}->{'maxVersion'};
+                        my $apivideostmmaxver = $data->{'data'}->{$apivideostm}->{'maxVersion'};
                             
                         $logstr = defined($apivideostmpath) ? "Path of $apivideostm selected: $apivideostmpath" : "Path of $apivideostm undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -2060,10 +2059,10 @@ sub login_nonbl ($) {
                         
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalEvent" ermitteln
        
-                        $apiextevtpath = $data->{'data'}->{$apiextevt}->{'path'};
+                        my $apiextevtpath = $data->{'data'}->{$apiextevt}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apiextevtpath =~ tr/_//d if (defined($apiextevtpath));
-                        $apiextevtmaxver = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
+                        my $apiextevtmaxver = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
        
                         $logstr = defined($apiextevtpath) ? "Path of $apiextevt selected: $apiextevtpath" : "Path of $apiextevt undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
@@ -2072,15 +2071,29 @@ sub login_nonbl ($) {
                         
                      # Pfad und Maxversion von "SYNO.SurveillanceStation.Streaming" ermitteln
        
-                        $apistmpath = $data->{'data'}->{$apistm}->{'path'};
+                        my $apistmpath = $data->{'data'}->{$apistm}->{'path'};
                         # Unterstriche im Ergebnis z.B.  "_______entry.cgi" eleminieren
                         $apistmpath =~ tr/_//d if (defined($apistmpath));
-                        $apistmmaxver = $data->{'data'}->{$apistm}->{'maxVersion'}; 
+                        my $apistmmaxver = $data->{'data'}->{$apistm}->{'maxVersion'}; 
        
                         $logstr = defined($apistmpath) ? "Path of $apistm selected: $apistmpath" : "Path of $apistm undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
                         $logstr = defined($apistmmaxver) ? "MaxVersion of $apistm selected: $apistmmaxver" : "MaxVersion of $apistm undefined - Surveillance Station may be stopped";
                         Log3($name, 4, "$name - $logstr");
+       
+       
+                     # Workarounds für bestimmte SVS-Versionen
+                        Log3($name, 4, "$name - ------- Begin of adaption section -------");
+                        if ($actvs =~ m/^72/g) {
+                            Log3($name, 4, "$name - adapted SVS version is: $actvs");
+                            $apiextrecmaxver = 2;
+                            Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
+                            $apiptzmaxver    = 4;
+                            Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
+                        } else {
+                            Log3($name, 4, "$name - no adaptions done !");
+                        }
+                        Log3($name, 4, "$name - ------- End of adaption section -------");
        
                         # ermittelte Werte in $hash einfügen
                         $hash->{HELPER}{APIAUTHPATH}       = $apiauthpath;
@@ -2119,7 +2132,7 @@ sub login_nonbl ($) {
                     else 
                     {
                         # Fehlertext setzen
-                        $error = "couldn't call API-Infosite";
+                        my $error = "couldn't call API-Infosite";
        
                         # Setreading 
                         readingsBeginUpdate($hash);
@@ -2146,7 +2159,7 @@ sub login_nonbl ($) {
   Log3($name, 4, "$name - --- Begin Function serverlogin nonblocking ---");
   
   # Credentials abrufen
-  ($success, $username, $password) = getcredentials($hash,0);
+  (my $success, $username, $password) = getcredentials($hash,0);
   
   unless ($success) {
       Log3($name, 1, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
@@ -2159,10 +2172,14 @@ sub login_nonbl ($) {
       return;
   }
   
-  $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
+  my $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
   
   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
- 
+  
+  my $url;
+  my $apiauthpath   = $hash->{HELPER}{APIAUTHPATH};
+  my $apiauthmaxver = $hash->{HELPER}{APIAUTHMAXVER};
+  
   if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\"";
       }
@@ -2494,8 +2511,8 @@ sub camop_nonbl ($) {
    }
    elsif ($OpMode eq "Snap")
    {
-      # ein Schnappschuß wird ausgelöst und in SS gespeichert, Rückkehr wird mit "camret_nonbl" verarbeitet
-      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=0&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=$camid&blSave=true&_sid=\"$sid\"";
+      # ein Schnappschuß wird ausgelöst
+      $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 0); 
       readingsSingleUpdate($hash, "LastSnapId", "", 1);
    }
@@ -2744,7 +2761,6 @@ sub camret_nonbl ($) {
    my $sid              = $hash->{HELPER}{SID};
    my $OpMode           = $hash->{OPMODE};
    my $rectime;
-   my $url;
    my $logstr;
    my $data;
    my $success;
@@ -2755,7 +2771,6 @@ sub camret_nonbl ($) {
    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst);
    my $deviceType;
    my $camStatus;
-   my ($presetcnt,$cnt,$presid,$presname,@preskeys,$presetlist);
    my ($patrolcnt,$patrolid,$patrolname,@patrolkeys,$patrollist);
    my ($recStatus,$exposuremode,$exposurecontrol);
    my $userPriv;
@@ -3086,7 +3101,7 @@ sub camret_nonbl ($) {
                 $userPriv = $data->{'data'}{'userPriv'};
                 if (defined($userPriv)) {
                     if ($userPriv eq "0") {
-                        $userPriv = "No Accss";
+                        $userPriv = "No Access";
                         }
                         elsif ($userPriv eq "1") {
                         $userPriv = "Admin";
@@ -3104,6 +3119,17 @@ sub camret_nonbl ($) {
                             MINOR => $data->{'data'}{'version'}{'minor'},
                             BUILD => $data->{'data'}{'version'}{'build'}
                             );
+                
+                # simulieren einer anderen SVS-Version
+                if (AttrVal($name, "simu_SVSversion", undef)) {
+                    my @vl = split (/\.|-/,AttrVal($name, "simu_SVSversion", ""));
+                    $version {"MAJOR"} = $vl[0];
+                    $version {"MINOR"} = $vl[1];
+                    $version {"BUILD"} = $vl[2] if($vl[2]);
+                }
+                
+                # Werte in $hash zur späteren Auswertung einfügen 
+                $hash->{HELPER}{SVSVERSION} = \%version;
                 
                 if (!exists($data->{'data'}{'customizedPortHttp'})) {
                     delete $defs{$name}{READINGS}{SVScustomPortHttp};
@@ -3123,9 +3149,6 @@ sub camret_nonbl ($) {
                 readingsBulkUpdate($hash,"Errorcode","none");
                 readingsBulkUpdate($hash,"Error","none");
                 readingsEndUpdate($hash, 1);
-                
-                # Werte in $hash zur späteren Auswertung einfügen 
-                $hash->{HELPER}{SVSVERSION} = \%version;
                      
                 # Logausgabe
                 Log3($name, 3, "$name - Informations related to Surveillance Station retrieved successfully");
@@ -3475,18 +3498,17 @@ sub camret_nonbl ($) {
             elsif ($OpMode eq "Getptzlistpreset") 
             {
                 # Parse PTZ-ListPresets
-                $presetcnt = $data->{'data'}->{'total'};
-                $cnt = 0;
+                my $presetcnt = $data->{'data'}->{'total'};
+                my $cnt = 0;
          
                 # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
-                
                 # "my" nicht am Anfang deklarieren, sonst wird Hash %allpresets wieder geleert !
                 my %allpresets;
                 while ($cnt < $presetcnt) 
                     {
-                    $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
-                    $presid = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
-                    $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
+                    # my $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
+                    my $presid = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
+                    my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
                     $allpresets{$presname} = "$presid";
                     $cnt += 1;
                     }
@@ -3494,8 +3516,8 @@ sub camret_nonbl ($) {
                 # Presethash in $hash einfügen
                 $hash->{HELPER}{ALLPRESETS} = \%allpresets;
 
-                @preskeys = sort(keys(%allpresets));
-                $presetlist = join(",",@preskeys);
+                my @preskeys = sort(keys(%allpresets));
+                my $presetlist = join(",",@preskeys);
 
                 # Setreading 
                 readingsBeginUpdate($hash);
@@ -3522,7 +3544,7 @@ sub camret_nonbl ($) {
             {
                 # Parse PTZ-ListPatrols
                 $patrolcnt = $data->{'data'}->{'total'};
-                $cnt = 0;
+                my $cnt = 0;
          
                 # alle Patrols der Kamera mit Id's in Assoziatives Array einlesen
                 # "my" nicht am Anfang deklarieren, sonst wird Hash %allpatrols wieder geleert !
@@ -4419,7 +4441,7 @@ sub experror {
   
   <ul>
   <ul>
-  <li><b>debugactivetoken</b> - if set the state of active token will be logged - only for debugging, don't use it in normal operation </li>
+  <li><b>debugactivetoken</b> - if set the state of active token will be logged - only for debugging, don't use it in normal operation ! </li>
   
   <li><b>disable</b> - deactivates the module (device definition) </li>
   
@@ -4438,6 +4460,10 @@ sub experror {
   <li><b>recextend</b> - "rectime" of a started recording will be set new. Thereby the recording time of the running recording will be extended </li>
   
   <li><b>session</b>  - selection of login-Session. Not set or set to "DSM" -&gt; session will be established to DSM (Sdefault). "SurveillanceStation" -&gt; session will be established to SVS </li><br>
+  
+  <li><b>simu_SVSversion</b>  - simulate another SVS version. ONLY FOR DEBUGGING, don't use it in normal operation ! </li><br>
+  
+  <li><b>showPassInLog</b>  - if set the used password will be shown in logfile with verbose 4. (default = 0) </li><br>
   
   <li><b>videofolderMap</b> - replaces the content of reading "VideoFolder", Usage if e.g. folders are mountet with different names than original (SVS) </li>
   
@@ -5103,7 +5129,7 @@ sub experror {
   
   <ul>
   <ul>
-  <li><b>debugactivetoken</b> - wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im normalen Betrieb benutzen </li>
+  <li><b>debugactivetoken</b> - wenn gesetzt wird der Status des Active-Tokens gelogged - nur für Debugging, nicht im normalen Betrieb benutzen ! </li>
   
   <li><b>disable</b> - deaktiviert das Gerätemodul bzw. die Gerätedefinition </li>
   
@@ -5122,6 +5148,10 @@ sub experror {
   <li><b>recextend</b> - "rectime" einer gestarteten Aufnahme wird neu gesetzt. Dadurch verlängert sich die Aufnahemzeit einer laufenden Aufnahme </li>
   
   <li><b>session</b>  - Auswahl der Login-Session. Nicht gesetzt oder "DSM" -> session wird mit DSM aufgebaut (Standard). "SurveillanceStation" -> Session-Aufbau erfolgt mit SVS </li><br>
+  
+  <li><b>simu_SVSversion</b>  - simuliert eine andere SVS-Version. NUR FÜR DEBUGGING, nicht im normalen Betrieb zu nutzen ! </li><br>
+  
+  <li><b>showPassInLog</b>  - wenn gesetzt wird das verwendete Passwort im Logfile (verbose 4) angezeigt. (default = 0) </li><br>
   
   <li><b>videofolderMap</b> - ersetzt den Inhalt des Readings "VideoFolder", Verwendung z.B. bei gemounteten Verzeichnissen </li>
   
