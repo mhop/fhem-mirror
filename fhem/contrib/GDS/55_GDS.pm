@@ -1,4 +1,4 @@
-# $Id: 55_GDS.pm 11367 2016-05-02 17:22:34Z betateilchen $
+# $Id$
 
 # copyright and license informations
 =pod
@@ -1023,7 +1023,7 @@ sub decodeCAPData($$$){
 	my $r = ReadingsVal($name, 'a_'.$anum.'_eventCode_AREA_COLOR', '');
 	if(length($r)) {
 		my $v = sprintf( "%02x%02x%02x", split(" ", $r));
-		readingsBulkUpdate($hash, 'a_'.$anum.'_eventCode_AREA_COLOR_hex', $v);
+		readingsSingleUpdate($hash, 'a_'.$anum.'_eventCode_AREA_COLOR_hex', $v,1);
 	}
 	
 	readingsEndUpdate($hash, 1);
