@@ -116,6 +116,8 @@
 #
 # 2016-07-03 - added     support for multiple hosts (experimental)
 #
+# 2016-07-04 - fixed     improve config file read
+#
 ##############################################################################
 #
 
@@ -179,8 +181,16 @@ if(!open(CONFIG, 'configDB.conf')) {
 	Log3('configDB', 1, 'Cannot open database configuration file configDB.conf');
 	return 0;
 }
-my @config=<CONFIG>;
-close(CONFIG);
+#my @config=<CONFIG>;
+#close(CONFIG);
+
+my @config;
+while (<CONFIG>){
+   my $line = $_;
+   $line =~ s/^\s+|\s+$//g;
+   push (@config,$line) if($line !~ m/^#/ && length($line) > 0);
+}
+close CONFIG;
 
 use vars qw(%configDB);
 
@@ -197,9 +207,11 @@ my $count   = @configs;
 if ($count > 1) {
    my $fhemhost = hostname;
    foreach my $c (@configs) {
+      next unless $c =~ m/^%dbconfig.*/;
       eval $c;
       last if ($dbconfig{fhemhost} eq $fhemhost);
    }
+   eval $configs[0] unless (defined($dbconfig{fhemhost}) && length($dbconfig{fhemhost}))
 } else {
    eval $configs[0];
 }
