@@ -456,16 +456,19 @@ PRESENCE_Read($)
                 DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_PRESENT}."\n", 2);
             }
             
-            PRESENCE_ProcessState($hash, "present") unless($hash->{helper}{DISABLED});
+            unless($hash->{helper}{DISABLED})
+            {
+                PRESENCE_ProcessState($hash, "present");
 
-            if($1 =~ /^(.*);(.+)$/)
-            {
-                readingsBulkUpdate($hash, "room", $2);
-                readingsBulkUpdate($hash, "device_name", $1);
-            }
-            else
-            {
-                readingsBulkUpdate($hash, "device_name", $1);
+                if($1 =~ /^(.*);(.+)$/)
+                {
+                    readingsBulkUpdate($hash, "room", $2);
+                    readingsBulkUpdate($hash, "device_name", $1);
+                }
+                else
+                {
+                    readingsBulkUpdate($hash, "device_name", $1);
+                }
             }
         }
         elsif($line eq "command accepted")
