@@ -460,7 +460,7 @@ HttpUtils_DigestHeader($$)
 
   if(exists($digdata{qop})) {
     $digdata{nc} = "00000001";
-    $digdata{cnonce} = md5_hex(rand.time);
+    $digdata{cnonce} = md5_hex(rand().time());
   }
   $digdata{uri} = $hash->{path};
   $digdata{username} = $user;
