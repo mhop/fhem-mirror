@@ -3613,7 +3613,7 @@ ZWave_processSendStack($$;$)
       if($ackType eq "ack" && $hash->{lastMsgSent});
     return;
   }
-  #Log 1, "pSS: $hash->{NAME}, $ackType $ss->[0]";
+  #Log 1, "pSS: $hash->{NAME}, $ackType $ss->[0]".($omsg ? "  omsg:$omsg" : "");
 
   if($ackType eq "retry") {
     $ss->[0] =~ m/^(.*)(set|get):(.*)$/;
