@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: colorpicker: new modes HSV and HSVp
   - bugfix:  PRESENCE: fix generating readings when definition is disabled
   - changed: 49_SSCam: Workaround for problems with SVS version 7.2
              concerning start recording and PTZ-actions,
