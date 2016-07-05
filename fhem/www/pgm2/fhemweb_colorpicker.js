@@ -24,8 +24,9 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
   var mode = "RGB";
   if( vArr.length >= 1 )
     mode = vArr[1]
+  //console.log( "mode: "+mode );
 
-  if( mode == "HSV" ) {
+  function createHSVSliders() {
     for( var i = 2; i <= 4; ++i ) {
       var d = parseInt(vArr[i]);
 
@@ -96,8 +97,8 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     }
 
     newEl.setValueFn = function(arg){
-     if( hidden )
-       hidden.attr("value", arg);
+      if( hidden )
+        hidden.attr("value", arg);
 
       hsv = colorpicker_rgb2hsv(arg);
       for( var i = 0; i < 3; ++i ) {
@@ -118,14 +119,23 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
       var s = grad.replace(/#c1#/g, 'hsla(' + hsv[0]*359 + ', 100%, 100%, 1)')
                   .replace(/#c2#/g, 'hsla(' + hsv[0]*359 + ', 100%,  50%, 1)')
 
+      var slider = $(sat).find('.slider').get(0);
+      slider.setAttribute('style', s );
+      if( hsv[1] < 0.25 )
+        $(slider).find('.handle').get(0).style.color = '#000000';
+      else
+        $(slider).find('.handle').get(0).style.color = '#FFFFFF';
+
+
       var v = grad.replace(/#c1#/g, 'rgb(  0,  0  ,0)')
                   .replace(/#c2#/g, 'rgb(255,255,255)')
 
-      var slider = $(sat).find('.slider').get(0);
-      slider.setAttribute('style', s );
-
       slider = $(bri).find('.slider').get(0);
       slider.setAttribute('style', v );
+      if( hsv[2] > 0.75 )
+        $(slider).find('.handle').get(0).style.color = '#000000';
+      else
+        $(slider).find('.handle').get(0).style.color = '#FFFFFF';
     }
 
     if( currVal ) {
@@ -136,7 +146,8 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     return newEl;
   }
 
-  //console.log( "mode: "+mode );
+  if( mode == "HSV" )
+    return createHSVSliders();
 
   //preset ?
   if( params && params.length ) {
@@ -190,28 +201,53 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
 
   var inp = $(newEl).find("[type=text]");
 
-  newEl.setValueFn = function(arg){ if( arg.length > 6 ) arg = arg.slice(0,6); $(inp).val(arg); }
+  if( mode == 'HSVp' ) {
+    var sliders;
 
-  loadScript("jscolor/jscolor.js",
-  function() {
-    var myPicker = new jscolor.color(inp.get(0),
-                                   {pickerMode:'RGB',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'});
-    inp.get(0).color = myPicker;
+    newEl.setValueFn = function(arg){
+      if( arg.length > 6 ) arg = arg.slice(0,6);
+      var hsv = colorpicker_rgb2hsv(arg);
+      $(inp).val(arg);
+      $(inp).css('background-color', '#' + arg);
+      $(inp).css('color', (hsv[2]>0.75?'black':'white'));
+      if( sliders ) sliders.setValueFn(arg);
+    }
 
-    if( elName )
-      $(inp).attr("name", elName);
-
-    if( cmd )
-      $(newEl).change(function(arg) { cmd( myPicker.toString() ) });
-    else
-      $(newEl).change(function(arg) { $(inp).attr("value", myPicker.toString() ) });
-
-    newEl.setValueFn = function(arg){ if( arg.length > 6 ) arg = arg.slice(0,6);
-                                      myPicker.fromString(arg); };
+    inp.click(function() {
+      if( !sliders )
+        sliders = createHSVSliders();
+      FW_okDialog(sliders, inp);
+      newEl.setValueFn(currVal);
+    });
 
     if( currVal )
       newEl.setValueFn(currVal);
-  });
+
+  } else {
+    newEl.setValueFn = function(arg){ if( arg.length > 6 ) arg = arg.slice(0,6); $(inp).val(arg); }
+
+
+    loadScript("jscolor/jscolor.js",
+    function() {
+      var myPicker = new jscolor.color(inp.get(0),
+                                   {pickerMode:'RGB',pickerFaceColor:'transparent',pickerFace:3,pickerBorder:0,pickerInsetColor:'red'});
+      inp.get(0).color = myPicker;
+
+      if( elName )
+        $(inp).attr("name", elName);
+
+      if( cmd )
+        $(newEl).change(function(arg) { cmd( myPicker.toString() ) });
+      else
+        $(newEl).change(function(arg) { $(inp).attr("value", myPicker.toString() ) });
+
+      newEl.setValueFn = function(arg){ if( arg.length > 6 ) arg = arg.slice(0,6);
+                                        myPicker.fromString(arg); };
+
+      if( currVal )
+        newEl.setValueFn(currVal);
+    });
+  }
 
   return newEl;
 }
