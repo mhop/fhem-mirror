@@ -634,9 +634,9 @@ PRESENCE_DoLocalPingScan($)
     {
         $temp = qx(ping -n $count -4 $device);
 
-        chomp $temp;
-        if($temp ne "")
+        if(defined($temp) and $temp ne "")
         {
+            chomp $temp;
             Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
             $return = "$name|$local|".($temp =~ /TTL=\d+/ ? "present" : "absent");
         }
@@ -649,9 +649,9 @@ PRESENCE_DoLocalPingScan($)
     {
         $temp = qx(ping $device 4);
 
-        chomp $temp;
-        if($temp ne "")
+        if(defined($temp) and $temp ne "")
         {
+            chomp $temp;
             Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
             $return = "$name|$local|".($temp =~ /is alive/ ? "present" : "absent");
         }
@@ -659,14 +659,15 @@ PRESENCE_DoLocalPingScan($)
         { 
             $return = "$name|$local|error|Could not execute ping command: \"ping -n $count -4 $device\"";
         }
+
     }
     else
     {
         $temp = qx(ping -c $count $device 2>&1);
 
-        chomp $temp;
-        if($temp ne "")
+        if(defined($temp) and $temp ne "")
         {
+            chomp $temp;
             Log3 $name, 5, "PRESENCE ($name) - ping command returned with output:\n$temp";
             $return = "$name|$local|".(($temp =~ /\d+ [Bb]ytes (from|von)/ and not $temp =~ /[Uu]nreachable/) ? "present" : "absent");
         }
@@ -848,7 +849,6 @@ PRESENCE_DoLocalBluetoothScan($)
 
     if(-x $hcitool)
     {
-    
         my $options = ($btdevice ? "-i $btdevice" : "");
 
         while($wait)
@@ -904,11 +904,13 @@ PRESENCE_DoLocalShellScriptScan($)
     $SIG{CHLD} = 'IGNORE';
     
     $ret = qx($call);
-
-    chomp $ret;
     
-    Log3 $name, 5, "PRESENCE ($name) - script output: $ret";
-
+    if(defined($ret))
+    {
+        chomp $ret; 
+        Log3 $name, 5, "PRESENCE ($name) - script output: $ret";
+    }
+    
     if(not defined($ret))
     {
         $return = "$name|$local|error|scriptcall doesn't return any output"; 
@@ -978,7 +980,6 @@ sub
 PRESENCE_ProcessLocalScan($)
 {
     my ($string) = @_;
-
 
     return unless(defined($string));
 
