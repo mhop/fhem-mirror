@@ -201,7 +201,7 @@ my %dbconfig;
 ## support multiple hosts from one fhem installation
 ##
 my $configs = join("",@config);
-my @configs = split(/;/,$configs);
+my @configs = split(/;\n/,$configs);
 my $count   = @configs;
 
 if ($count > 1) {
