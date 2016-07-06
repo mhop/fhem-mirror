@@ -303,7 +303,7 @@ DevIo_OpenDev($$$;$)
     # for non-existent devices has a delay of 3 sec, we are sitting all the
     # time in this connect. NEXT_OPEN tries to avoid this problem.
     if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-      return &doCb(undef); # Forum 53309
+      return &$doCb(undef); # Forum 53309
     }
 
     my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 3;
