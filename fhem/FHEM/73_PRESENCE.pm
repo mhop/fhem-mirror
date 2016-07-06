@@ -414,6 +414,10 @@ PRESENCE_Attr(@)
     {
         return "absenceThreshold must be a valid integer number";
     }
+    elsif($a[0] eq "set" and $a[2] eq "presenceThreshold" and not $a[3] =~ /^\d+$/)
+    {
+        return "presenceThreshold must be a valid integer number";
+    }
 
     return undef;
 }
