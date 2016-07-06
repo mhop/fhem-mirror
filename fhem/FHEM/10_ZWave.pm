@@ -3579,6 +3579,7 @@ ZWave_wakeupTimer($$)
       IOWrite($hash,
               $hash->{homeId}.($hash->{route} ? ",".$hash->{route} : ""),
               "0013${nodeId}028408${cmdEf}".ZWave_callbackId($hash));
+      $hash->{lastMsgSent} = $now;
     }
     delete $hash->{wakeupAlive};
 
