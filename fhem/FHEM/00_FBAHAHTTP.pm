@@ -17,7 +17,9 @@ FBAHAHTTP_Initialize($)
   $hash->{DefFn}    = "FBAHAHTTP_Define";
   $hash->{SetFn}    = "FBAHAHTTP_Set";
   $hash->{AttrFn}   = "FBAHAHTTP_Attr";
-  $hash->{AttrList} = "dummy:1,0 fritzbox-user polltime async_delay";
+  $hash->{ReadyFn}  = "FBAHAHTTP_Ready";
+  $hash->{AttrList} = "dummy:1,0 fritzbox-user polltime async_delay ".
+                      "disable:0,1 disabledForIntervals";
 }
 
 
@@ -57,6 +59,9 @@ FBAHAHTTP_Poll($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  my $dev = $hash->{DEF};
+
+  return if(IsDisabled($name));
 
   my $dr = sub {
     $hash->{STATE} = $_[0];
@@ -73,9 +78,14 @@ FBAHAHTTP_Poll($)
     return $dr->("MISSING: set $name password") if(!$fb_pw);
 
     my $sid = FB_doCheckPW($hash->{DEF}, $fb_user, $fb_pw);
-    return $dr->("$name error: cannot get SID, ".
+    if(!$sid) {
+      $hash->{NEXT_OPEN} = time()+60;
+      $readyfnlist{"$name.$dev"} = $hash;
+      return $dr->("$name error: cannot get SID, ".
                         "check connection/hostname/fritzbox-user/password")
-          if(!$sid);
+    }
+
+    delete($readyfnlist{"$name.$dev"});
     $hash->{".SID"} = $sid;
     $hash->{STATE} = "connected";
   }
@@ -109,6 +119,16 @@ FBAHAHTTP_Poll($)
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$polltime, "FBAHAHTTP_Poll", $hash);
   return;
+}
+
+#####################################
+sub
+FBAHAHTTP_Ready($)
+{
+  my ($hash) = @_;
+
+  return if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN});
+  FBAHAHTTP_Poll($hash);
 }
 
 #####################################
@@ -192,6 +212,9 @@ FBAHAHTTP_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
   my $name = $hash->{NAME};
+
+  return if(IsDisabled($name));
+
   my $sid = $hash->{".SID"};
   if(!$sid) {
     Log 1, "$name: Not connected, wont execute $msg";
@@ -258,6 +281,8 @@ FBAHAHTTP_Write($$$)
   <a name="FBAHAHTTPattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#fritzbox-user">fritzbox-user</a></li>
     <li><a name="#polltime">polltime</a><br>
