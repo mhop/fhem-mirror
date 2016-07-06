@@ -746,18 +746,16 @@ PROPLANTA_Html($)
 
   my $uselocal= 0; #AttrVal($d,"localicons",0);
   my $isday;
-   if ( exists &isday) 
-   {
+   if ( exists &isday) {
       $isday = isday();
    }
-   else 
-   {
+   else {
       $isday = 1; #($hour>6 && $hour<19);
    }
         
   my $ret = "<table border=0><thead align=center>";
   $ret .= sprintf '<tr><th colspan=9 align=left>%s</th></tr>', $defs{$d}{DEF};
-  $ret .= sprintf '<tr><th>Tag</th><th>morgens</th><th>tagsueber</th><th>abends</th><th>nachts</th><th>min</th><th>max</th><th>Regen tags</th><th>Frost</th></tr></thead>', $defs{$d}{DEF};
+  $ret .= '<tr><th>Tag</th><th>morgens</th><th>tagsueber</th><th>abends</th><th>nachts</th><th>min</th><th>max</th><th>Regen tags</th><th>Frost</th></tr></thead>';
   $ret .= "<tbody align=center>";
 # define MyForecast weblink htmlCode { PROPLANTA_Html("ProPlanta_Wetter") }
    for(my $i=0; $i<=2; $i++) {
