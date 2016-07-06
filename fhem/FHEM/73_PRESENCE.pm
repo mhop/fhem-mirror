@@ -53,6 +53,7 @@ PRESENCE_Initialize($)
                        "ping_count:1,2,3,4,5,6,7,8,9,10 ".
                        "bluetooth_hci_device ".
                        "absenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
+                       "presenceThreshold:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
                        "powerCmd ".$readingFnAttributes;
 
 }
@@ -1094,13 +1095,14 @@ PRESENCE_ProcessState($$)
 {
     my ($hash, $state) = @_;
     my $name = $hash->{NAME};
-    my $threshold = AttrVal($name, "absenceThreshold", 1);
+    my $absenceThreshold = AttrVal($name, "absenceThreshold", 1);
+    my $presenceThreshold = AttrVal($name, "presenceThreshold", 1);
     
     if($state eq "absent")
     {
         my $count = ($hash->{helper}{ABSENT_COUNT} ? $hash->{helper}{ABSENT_COUNT} : 0);
     
-        if(++$count >= $threshold)
+        if(++$count >= $absenceThreshold)
         {
             readingsBulkUpdate($hash, "state", "absent");
             readingsBulkUpdate($hash, "presence", "absent");
@@ -1112,13 +1114,30 @@ PRESENCE_ProcessState($$)
             readingsBulkUpdate($hash, "state", "maybe absent");
             readingsBulkUpdate($hash, "presence", "maybe absent");
 
-            Log3 $name, 4, "PRESENCE ($name) - device is absent after $count check".($count == 1 ? "" : "s").". ".($threshold-$count)." check".(($threshold-$count) == 1 ? "" : "s")." left before going absent";
+            Log3 $name, 4, "PRESENCE ($name) - device is absent after $count check".($count == 1 ? "" : "s").". ".($absenceThreshold-$count)." check".(($absenceThreshold-$count) == 1 ? "" : "s")." left before going absent";
         }
+        
+        delete($hash->{helper}{PRESENT_COUNT}) if(exists($hash->{helper}{PRESENT_COUNT}));
     }
     elsif($state eq "present")
     {
-        readingsBulkUpdate($hash, "state", "present");
-        readingsBulkUpdate($hash, "presence", "present");
+        my $count = ($hash->{helper}{PRESENT_COUNT} ? $hash->{helper}{PRESENT_COUNT} : 0);
+    
+        if(++$count >= $presenceThreshold)
+        {
+            readingsBulkUpdate($hash, "state", "present");
+            readingsBulkUpdate($hash, "presence", "present");
+        }
+        else
+        {
+            $hash->{helper}{PRESENT_COUNT} = $count;
+            
+            readingsBulkUpdate($hash, "state", "maybe present");
+            readingsBulkUpdate($hash, "presence", "maybe present");
+
+            Log3 $name, 4, "PRESENCE ($name) - device is present after $count check".($count == 1 ? "" : "s").". ".($presenceThreshold-$count)." check".(($presenceThreshold-$count) == 1 ? "" : "s")." left before going present";
+        }
+
         delete($hash->{helper}{ABSENT_COUNT}) if(exists($hash->{helper}{ABSENT_COUNT}));
     }
     else
@@ -1357,6 +1376,11 @@ Options:
     This can be used to verify the absence of a device with multiple check runs before the state is finally changed to "absent".
     If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe absent" during the absence verification.<br><br>
     Default Value is 1 (no absence verification)<br><br>
+    <li><a name="PRESENCE_presenceThreshold">presenceThreshold</a></li><br>
+    The number of checks that have to result in "present" before the state of the PRESENCE definition is changed to "present".
+    This can be used to verify the presence of a device with multiple check runs before the state is finally changed to "present".
+    If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe present" during the presence verification.<br><br>
+    Default Value is 1 (no presence verification)<br><br>
     <li><a name="PRESENCE_ping_count">ping_count</a></li> (Only in Mode "ping" applicable)<br>
     Changes the count of the used ping packets to recognize a present state. Depending on your network performance sometimes a packet can be lost or blocked.<br><br>
     Default Value is 4 (packets)<br><br>
@@ -1641,12 +1665,18 @@ Options:
     Die Anzahl an Checks, welche in "absent" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "absent" wechselt.
     Mit dieser Funktion kann man die Abwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "absent" ge&auml;ndert wird.
     Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, werden die Readings "state" und "presence" auf den Wert "maybe absent" gesetzt,
-    bis der Status final auf "absent" oder "present" wechselt.<br><br>
-    Standartwert ist 1 (keine Abwesenheitsverifizierung)<br><br>
+    bis der Status final auf "absent" wechselt.<br><br>
+    Standardwert ist 1 (keine Abwesenheitsverifizierung)<br><br>
+    <li><a name="PRESENCE_presenceThreshold">presenceThreshold</a></li>
+    Die Anzahl an Checks, welche in "present" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "present" wechselt.
+    Mit dieser Funktion kann man die Anwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "present" ge&auml;ndert wird.
+    Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, werden die Readings "state" und "presence" auf den Wert "maybe present" gesetzt,
+    bis der Status final auf "present" wechselt.<br><br>
+    Standardwert ist 1 (keine Anwesenheitsverifizierung)<br><br>
     <li><a name="PRESENCE_ping_count">ping_count</a></li> (Nur im Modus "ping" anwendbar)<br>
     Ver&auml;ndert die Anzahl der Ping-Pakete die gesendet werden sollen um die Anwesenheit zu erkennen. 
     Je nach Netzwerkstabilit&auml;t k&ouml;nnen erste Pakete verloren gehen oder blockiert werden.<br><br>
-    Standartwert ist 4 (Versuche)<br><br>
+    Standardwert ist 4 (Versuche)<br><br>
     <li><a name="PRESENCE_bluetooth_hci_device">bluetooth_hci_device</a></li> (Nur im Modus "local-bluetooth" anwendbar)<br>
     Sofern man mehrere Bluetooth-Empf&auml;nger verf&uuml;gbar hat, kann man mit diesem Attribut ein bestimmten Empf&auml;nger ausw&auml;hlen, welcher zur Erkennung verwendet werden soll (bspw. hci0, hci1, ...). Es muss dabei ein vorhandener HCI-Ger&auml;tename angegeben werden wie z.B. <code>hci0</code>.
     <br><br>
