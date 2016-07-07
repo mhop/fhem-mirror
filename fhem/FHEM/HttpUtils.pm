@@ -257,8 +257,6 @@ HttpUtils_Connect($)
               return $hash->{callback}($hash, "$host: ".strerror($errno), "")
                   if($errno);
 
-              return $hash->{callback}($hash,undef,undef) if($hash->{noConn2});
-
               my $err = HttpUtils_Connect2($hash);
               $hash->{callback}($hash, $err, "") if($err);
               return $err;
@@ -329,6 +327,11 @@ HttpUtils_Connect2($)
       $err .= " ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr());
     }
     return "$hash->{displayurl}: Can't connect(2) to $hash->{addr}: $err"; 
+  }
+
+  if($hash->{noConn2}) {
+    $hash->{callback}($hash);
+    return undef;
   }
 
   my $data;

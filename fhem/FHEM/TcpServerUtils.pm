@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use IO::Socket;
+use vars qw($SSL_ERROR);
 
 sub
 TcpServer_Open($$$)
@@ -102,7 +103,8 @@ TcpServer_Accept($$)
     if( !$ret
       && $err != EWOULDBLOCK
       && $err ne "Socket is not connected") {
-
+      $err = "" if(!$err);
+      $err .= " ".($SSL_ERROR ? $SSL_ERROR : IO::Socket::SSL::errstr());
       Log3 $name, 1, "$type SSL/HTTPS error: $err";
       close($clientinfo[0]);
       return undef;
