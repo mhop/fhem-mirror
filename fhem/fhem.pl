@@ -3309,6 +3309,8 @@ HandleArchiving($;$)
   }
 
   $file =~ s/%./.+/g;
+  my @t = localtime;
+  $dir = ResolveDateWildcards($dir, @t);
   return if(!opendir(DH, $dir));
   my @files = sort grep {/^$file$/} readdir(DH);
   closedir(DH);
