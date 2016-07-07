@@ -26,31 +26,54 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     mode = vArr[1]
   //console.log( "mode: "+mode );
 
-  function createHSVSliders() {
-    for( var i = 2; i <= 4; ++i ) {
-      var d = parseInt(vArr[i]);
+  var cmds = [];     // the 3 commands vor hue, sat, bri
+  var ranges = []; // the 3 slider ranges
+  var is_real_hsv = false;
+  if( vArr.length == 14 ) { // hsv:colorpicker,HSV,hue,0,1,360,sat,0,1,100,bri,0,1,100
+    is_real_hsv = true;
 
-      if( !isNaN(d) )
-        vArr[i] = d;
-      else if( !vArr[i] )
-        vArr[i] = undefined;
+    cmds[0] = function(arg) { FW_cmd(FW_root+"?cmd=set "+devName+" "+vArr[2]+" "+arg+"&XHR=1"); };
+    ranges[0] = [vArr[3],vArr[4],vArr[5]];
+    cmds[1] = function(arg) { FW_cmd(FW_root+"?cmd=set "+devName+" "+vArr[6]+" "+arg+"&XHR=1"); };
+    ranges[1] = [vArr[7],vArr[8],vArr[9]];
+    cmds[2] = function(arg) { FW_cmd(FW_root+"?cmd=set "+devName+" "+vArr[10]+" "+arg+"&XHR=1"); };
+    ranges[2] = [vArr[11],vArr[12],vArr[13]];
+  }
+
+  function value2hsv(value) {
+    var hsv = [];
+
+    var values = value.split(',');
+    if( values[1] !== undefined ) {
+      for( var i = 0; i <= 2; ++i ) {
+        hsv[i] = values[i];
+        if( is_real_hsv )
+          hsv[i] /= ranges[i][2];
+      }
+    } else {
+      hsv = colorpicker_rgb2hsv(value);
     }
 
+    return hsv;
+  }
+
+  function createHSVSliders() {
     var hsv = [];
     function change(index, arg) {
       hsv[index] = arg;
 
-      if( typeof vArr[2+index] === 'number' )
-        hsv[index] = vArr[2+index]/100;
-
       var rgb = colorpicker_hsv2rgb(hsv[0],hsv[1],hsv[2]);
       if( hidden )
         hidden.attr("value", rgb);
-      cmd( rgb );
+
+      if( cmds[index] )
+        cmds[index]( parseInt(arg * ranges[index][2]) );
+      else
+        cmd( rgb );
     }
 
     if( currVal )
-      hsv = colorpicker_rgb2hsv(currVal);
+      hsv = value2hsv(currVal);
     else
       hsv = [0,1,1];
     var hue = FW_createSlider(undefined, devName, ["slider",0,1,359],
@@ -73,14 +96,14 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     $(newEl).append(hidden);
 
     var first = true;
-    if(vArr[2] === undefined) {
+    if(true) {
       $(newEl).append(hue);
       first = false;
     } else {
       hue.style.display='none';
     }
 
-    if(vArr[3] === undefined) {
+    if(true) {
       if( !first ) $(newEl).append("<br>");
       $(newEl).append(sat);
       first = false;
@@ -88,7 +111,7 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
       sat.style.display='none';
     }
 
-    if(vArr[4] === undefined) {
+    if(true) {
       if( !first ) $(newEl).append("<br>");
       $(newEl).append(bri);
       first = false;
@@ -100,11 +123,7 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
       if( hidden )
         hidden.attr("value", arg);
 
-      hsv = colorpicker_rgb2hsv(arg);
-      for( var i = 0; i < 3; ++i ) {
-        if( typeof vArr[2+i] === 'number' )
-          hsv[i] = vArr[2+i]/100;
-        }
+      hsv = value2hsv(arg);
       hue.setValueFn(""+parseInt(hsv[0]*359));
       sat.setValueFn(""+parseInt(hsv[1]*100));
       bri.setValueFn(""+parseInt(hsv[2]*100));
@@ -146,13 +165,13 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     return newEl;
   }
 
-  if( mode == "HSV" )
+  if( mode == 'HSV' )
     return createHSVSliders();
 
   //preset ?
   if( params && params.length ) {
     var color = params[0];
-    if( mode == "CT" )
+    if( mode == 'CT' )
       color = colorpicker_ct2rgb(color);
 
     var newEl = $('<div informID="###" style="width:32px;height:19px;border:1px solid #fff;border-radius:8px;background-color:#'+color+'" >').get(0);
@@ -161,7 +180,7 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
 
   }
 
-  if( mode == "CT" ) {
+  if( mode == 'CT' ) {
     if( currVal )
       currVal = currVal.match(/[\d.\-]*/)[0];
 
@@ -186,7 +205,7 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
       $(newEl).addClass("colorpicker_ct");
     return newEl;
 
-  } else if( mode == "HUE" ) {
+  } else if( mode == 'HUE' ) {
     var newEl = FW_createSlider(elName, devName, ["slider",vArr[2],vArr[3],vArr[4]], currVal, undefined, params, cmd);
     $(newEl).addClass("colorpicker_hue");
     return newEl;
@@ -205,8 +224,9 @@ FW_colorpickerCreate(elName, devName, vArr, currVal, set, params, cmd)
     var sliders;
 
     newEl.setValueFn = function(arg){
-      if( arg.length > 6 ) arg = arg.slice(0,6);
-      var hsv = colorpicker_rgb2hsv(arg);
+      //if( arg.length > 6 ) arg = arg.slice(0,6);
+      currVal = arg;
+      var hsv = value2hsv(arg);
       $(inp).val(arg);
       $(inp).css('background-color', '#' + arg);
       $(inp).css('color', (hsv[2]>0.75?'black':'white'));
