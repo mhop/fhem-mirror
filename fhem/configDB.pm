@@ -1,5 +1,6 @@
 # $Id$
 
+=pod
 ##############################################################################
 #
 # configDB.pm
@@ -115,18 +116,18 @@
 #              added     configdb dump (for postgresql)
 #
 # 2016-07-03 - added     support for multiple hosts (experimental)
-#
 # 2016-07-04 - fixed     improve config file read
+# 2016-07-07 - bugfix    select configuration
 #
 ##############################################################################
-#
+=cut
 
 use strict;
 use warnings;
 use Text::Diff;
 use DBI;
 use Sys::Hostname;
-use Data::Dumper;
+#use Data::Dumper;
 
 ##################################################
 # Forward declarations for functions in fhem.pl
@@ -187,7 +188,8 @@ if(!open(CONFIG, 'configDB.conf')) {
 my @config;
 while (<CONFIG>){
    my $line = $_;
-   $line =~ s/^\s+|\s+$//g;
+   $line =~ s/^\s+|\s+$//g; # remove whitespaces etc.
+   $line =~ s/;$/;;/;       # duplicate ; at end-of-line
    push (@config,$line) if($line !~ m/^#/ && length($line) > 0);
 }
 close CONFIG;
@@ -195,28 +197,23 @@ close CONFIG;
 use vars qw(%configDB);
 
 my %dbconfig;
-##eval join("", @config);
 
-## begin experimental
-## support multiple hosts from one fhem installation
-##
-my $configs = join("",@config);
-my @configs = split(/;\n/,$configs);
-my $count   = @configs;
+my $configs  = join("",@config);
+my @configs  = split(/;;/,$configs);
+my $count    = @configs;
+my $fhemhost = hostname;
 
 if ($count > 1) {
-   my $fhemhost = hostname;
    foreach my $c (@configs) {
       next unless $c =~ m/^%dbconfig.*/;
+      $dbconfig{fhemhost} = "";
       eval $c;
       last if ($dbconfig{fhemhost} eq $fhemhost);
    }
-   eval $configs[0] unless (defined($dbconfig{fhemhost}) && length($dbconfig{fhemhost}))
+   eval $configs[0] if ($dbconfig{fhemhost} eq "");
 } else {
    eval $configs[0];
 }
-##
-## end experimental
 
 my $cfgDB_dbconn	= $dbconfig{connection};
 my $cfgDB_dbuser	= $dbconfig{user};
@@ -225,6 +222,8 @@ my $cfgDB_dbtype;
 
 %dbconfig = ();
 @config   = ();
+$configs  = undef;
+$count    = undef;
 
 if($cfgDB_dbconn =~ m/pg:/i) {
 	$cfgDB_dbtype ="POSTGRESQL";
@@ -237,7 +236,7 @@ if($cfgDB_dbconn =~ m/pg:/i) {
 }
 
 $configDB{attr}{nostate} = 1 if($ENV{'cfgDB_nostate'});
-$configDB{attr}{rescue} = 1 if($ENV{'cfgDB_rescue'});
+$configDB{attr}{rescue}  = 1 if($ENV{'cfgDB_rescue'});
 
 ##################################################
 # Basic functions needed for DB configuration
