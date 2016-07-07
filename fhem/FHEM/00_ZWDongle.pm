@@ -13,6 +13,7 @@ sub ZWDongle_ReadAnswer($$$);
 sub ZWDongle_Ready($);
 sub ZWDongle_Write($$$);
 sub ZWDongle_ProcessSendStack($);
+sub ZWDongle_NUCheck($$$$);
 
 
 # See also:
@@ -466,11 +467,39 @@ ZWDongle_DoInit($)
   return undef;
 }
 
+
+#####################################
+# neighborUpdate special: have to serialize. Forum #54574
+my @nuStack;
+sub
+ZWDongle_NUCheck($$$$)
+{
+  my($hash, $fn, $msg, $isWrite) = @_;
+
+  if($isWrite) {
+    return 0 if($msg !~ m/^0048/ || $hash->{calledFromNuCheck});
+    push @nuStack, "$fn/$msg";
+    return (@nuStack > 1);
+
+  } else {
+    return if($msg !~ m/^0048..(..)$/ || $1 eq "21");      # 21: started
+    shift @nuStack;
+    return if(@nuStack == 0);
+
+    my @a = split("/", $nuStack[0]);
+    $hash->{calledFromNuCheck} = 1;
+    ZWDongle_Write($hash, $a[0], $a[1]);
+    delete($hash->{calledFromNuCheck});
+  }
+}
+
 #####################################
 sub
 ZWDongle_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
+
+  return if(ZWDongle_NUCheck($hash, $fn, $msg, 1));
 
   Log3 $hash, 5, "ZWDongle_Write $msg ($fn)";
   # assemble complete message
@@ -753,6 +782,7 @@ ZWDongle_Parse($$$)
 
   my %addvals = (RAWMSG => $rmsg);
 
+  ZWDongle_NUCheck($hash, undef, $rmsg, 0);
   Dispatch($hash, $rmsg, \%addvals);
 }
 
