@@ -3610,7 +3610,8 @@ ZWave_processSendStack($$;$)
   my ($hash,$ackType, $omsg) = @_;
   my $ss = $hash->{SendStack};
   if(!$ss) {
-    $hash->{timeToAck} = sprintf("%0.3f", gettimeofday()-$hash->{lastMsgSent})
+    readingsSingleUpdate($hash, "timeToAck", 
+                      sprintf("%0.3f", gettimeofday()-$hash->{lastMsgSent}), 0)
       if($ackType eq "ack" && $hash->{lastMsgSent});
     return;
   }
@@ -3630,8 +3631,9 @@ ZWave_processSendStack($$;$)
         Log 4, "ZWave: wrong callbackid $omsg received, expecting $cbid";
         return;
       }
-      $hash->{timeToAck} = sprintf("%0.3f", $now-$hash->{lastMsgSent})
-                        if($hash->{lastMsgSent});
+      readingsSingleUpdate($hash, "timeToAck", 
+                        sprintf("%0.3f", $now-$hash->{lastMsgSent}), 0)
+        if($hash->{lastMsgSent});
       if($stype eq "get") {
         $ss->[0] = "sentackget:$smsg$cbid";
         return;
