@@ -514,9 +514,14 @@ if(configDBUsed()) {
   my $ret = CommandInclude(undef, $attr{global}{configfile});
   $cfgRet .= "configfile: $ret\n" if($ret);
 
-  if($attr{global}{statefile} && -r $attr{global}{statefile}) {
-    $ret = CommandInclude(undef, $attr{global}{statefile});
-    $cfgRet .= "statefile: $ret\n" if($ret);
+  my $stateFile = $attr{global}{statefile};
+  if($stateFile) {
+    my @t = localtime;
+    $stateFile = ResolveDateWildcards($stateFile, @t);
+    if(-r $stateFile) {
+      $ret = CommandInclude(undef, $stateFile);
+      $cfgRet .= "$stateFile: $ret\n" if($ret);
+    }
   }
 }
 
@@ -1347,9 +1352,14 @@ WriteStatefile()
     return cfgDB_SaveState();
   }
 
-  return "No statefile specified" if(!$attr{global}{statefile});
-  if(!open(SFH, ">$attr{global}{statefile}")) {
-    my $msg = "WriteStateFile: Cannot open $attr{global}{statefile}: $!";
+  my $stateFile = AttrVal('global','statefile',undef);
+  return "No statefile specified" if(!defined($stateFile));
+
+  my @t = localtime;
+  $stateFile = ResolveDateWildcards($stateFile, @t);
+
+  if(!open(SFH, ">$stateFile")) {
+    my $msg = "WriteStateFile: Cannot open $stateFile: $!";
     Log 1, $msg;
     return $msg;
   }
