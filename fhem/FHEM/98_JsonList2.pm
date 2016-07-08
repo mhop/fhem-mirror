@@ -36,6 +36,8 @@ JsonList2_Escape($)
     "\'" => '\\\'',
   );
   $a =~ s/([\x22\x5c\n\r\t\f\b])/$esc{$1}/eg;
+  my $b = "x$a";
+  $a = "<BINARY>" if(!utf8::decode($b)); # Forum #55318
   return $a;
 }
 
