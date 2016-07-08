@@ -134,5 +134,6 @@ select [value^=l7] { color: gray; }
 select [value^=l8] { color: yellow; }
 
 .zwBox { stroke:#278727; stroke-width:2px; fill:#F0F0D8; }
+.zwDongle { stroke:red; stroke-width:2px; fill:#F0F0D8; }
 .zwMargin { stroke:#278727; stroke-width:1px; fill:none; }
 .zwLine { stroke:#278727; stroke-width:1px; }
