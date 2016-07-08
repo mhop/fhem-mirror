@@ -580,6 +580,7 @@ ZWave_Initialize($)
     showtime:1,0
     vclasses
     zwaveRoute
+    neighborListPos
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
@@ -642,6 +643,7 @@ ZWave_Define($$)
   return "define $name: wrong id ($id): need a number"
                    if( ($id !~ m/^\d+$/i) );
 
+  $hash->{ZWaveSubDevice} = ($id > 255 ? "yes" : "no");
   $id = sprintf("%0*x", ($id > 255 ? 4 : 2), $id);
   $hash->{homeId} = $homeId;
   $hash->{nodeIdHex} = $id;

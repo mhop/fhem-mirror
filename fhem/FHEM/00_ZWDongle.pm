@@ -6,6 +6,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use ZWLib;
+use vars qw($FW_ME);
 
 sub ZWDongle_Parse($$$);
 sub ZWDongle_Read($@);
@@ -88,7 +89,8 @@ ZWDongle_Initialize($)
   $hash->{AttrFn}  = "ZWDongle_Attr";
   $hash->{UndefFn} = "ZWDongle_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 ".
-                     "homeId networkKey";
+                     "homeId networkKey neighborListPos";
+  $hash->{FW_detailFn} = "ZWDongle_fhemwebFn";
 }
 
 #####################################
@@ -139,6 +141,30 @@ ZWDongle_Define($$)
   return $ret;
 }
 
+sub
+ZWDongle_fhemwebFn($$$$)
+{
+  my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
+
+  my $js = "$FW_ME/pgm2/zwave_neighborlist.js";
+  my $np = AttrVal($d,'neighborListPos','360,430');
+
+  return
+  "<div id='ZWDongleNr'><a href='#'>Show neighbor list</a></div>".
+  "<div id='ZWDongleNrSVG'></div>".
+  "<script type='text/javascript' src='$js'></script>".
+  '<script type="text/javascript">'.<<"JSEND"
+    \$(document).ready(function() {
+      \$("div#ZWDongleNr")
+        .css({cursor:"pointer"})
+        .click(function(e){
+          e.preventDefault();
+          zw_nr('$d', '$np');
+        });
+    });
+  </script>
+JSEND
+}
 #####################################
 sub
 ZWDongle_Undef($$)
