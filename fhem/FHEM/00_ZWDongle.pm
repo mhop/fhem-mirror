@@ -479,17 +479,26 @@ ZWDongle_NUCheck($$$$)
   if($isWrite) {
     return 0 if($msg !~ m/^0048/ || $hash->{calledFromNuCheck});
     push @nuStack, "$fn/$msg";
+    if(@nuStack == 1) {
+      InternalTimer(gettimeofday+20, sub { # ZME timeout is 9-11s
+        ZWDongle_NUCheck($hash, undef, "0048xx23", 0); # simulate fail
+      }, \@nuStack, 0);
+    }
     return (@nuStack > 1);
 
   } else {
     return if($msg !~ m/^0048..(..)$/ || $1 eq "21");      # 21: started
     shift @nuStack;
+    RemoveInternalTimer(\@nuStack);
     return if(@nuStack == 0);
 
     my @a = split("/", $nuStack[0]);
     $hash->{calledFromNuCheck} = 1;
     ZWDongle_Write($hash, $a[0], $a[1]);
     delete($hash->{calledFromNuCheck});
+    InternalTimer(gettimeofday+20, sub {
+      ZWDongle_NUCheck($hash, undef, "0048xx23", 0); # simulate fail
+    }, \@nuStack, 0);
   }
 }
 

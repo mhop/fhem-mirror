@@ -3825,6 +3825,7 @@ ZWave_Parse($$@)
 
   my $rawMsg = "CMD:$cmd ID:$id ARG:$arg"; # No fmt change, Forum #49165
   Log3 $ioName, 4, $rawMsg ." CB:$callbackid";
+  my $hash = ZWave_callbackId($callbackid);
 
   if($cmd eq 'ZW_ADD_NODE_TO_NETWORK' ||
      $cmd eq 'ZW_REMOVE_NODE_FROM_NETWORK') {
@@ -3864,7 +3865,7 @@ ZWave_Parse($$@)
       my ($type6,$classes) = ($1, $2);
       my $ret = ZWave_SetClasses($homeId, $id, $type6, $classes);
 
-      my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+      $hash = $modules{ZWave}{defptr}{"$homeId $id"};
       if($hash) {
         if(!AttrVal($hash->{NAME}, "noWakeupForApplicationUpdate", 0)) { # 50090
           if(ZWave_isWakeUp($hash)) {
@@ -3914,7 +3915,6 @@ ZWave_Parse($$@)
     }
 
   } elsif($cmd eq "ZW_SEND_DATA") { # 0013cb00....
-    my $hash = ZWave_callbackId($callbackid);
     my %msg = ('00'=>'OK', '01'=>'NO_ACK', '02'=>'FAIL',
                '03'=>'NOT_IDLE', '04'=>'NOROUTE' );
     my $lmsg = ($msg{$id} ? $msg{$id} : "UNKNOWN_ERROR");
@@ -3949,6 +3949,10 @@ ZWave_Parse($$@)
     } elsif($id eq "22") { $evt = 'done';
     } elsif($id eq "23") { $evt = 'failed';
     } else               { $evt = 'unknown'; # should never happen
+    }
+    if($hash) {
+      readingsSingleUpdate($hash, "neighborUpdate", $evt, 1);
+      return $hash->{NAME};
     }
 
   } elsif($cmd eq "ZW_REMOVE_FAILED_NODE_ID") {
@@ -4052,7 +4056,7 @@ ZWave_Parse($$@)
     $id = "$id$ep";
     $arg = sprintf("%02x$3", length($3)/2);
   }
-  my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
+  $hash = $modules{ZWave}{defptr}{"$homeId $id"};
   $baseHash = $hash if(!$baseHash);
 
 
