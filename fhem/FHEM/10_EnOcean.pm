@@ -1,6 +1,7 @@
 
 ##############################################
 # $Id$
+# 2016-07-08
 
 package main;
 
@@ -351,25 +352,36 @@ my %EnO_eepConfig = (
   "G5.07.01" => {attr => {subType => "occupSensor.01", eep => "A5-07-01", manufID => "00D", model => 'tracker'}, GPLOT => "EnO_motion:Motion,EnO_voltage4current4:Voltage/Current,"},
   "G5.10.12" => {attr => {subType => "roomSensorControl.01", eep => "A5-10-12", manufID => "00D", scaleMax => 40, scaleMin => 0, scaleDecimals => 1}, GPLOT => "EnO_temp4humi6:Temp/Humi,"},
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
-  "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "TF", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
+  "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "TF", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
-  "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "TF", sensorMode => 'pushbutton', webCmd => "opens:stop:closes"}},
+  "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "TF", sensorMode => 'pushbutton', teachMethod => "confirm", webCmd => "opens:stop:closes"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
-  "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "TF", webCmd => "on:off"}},
+  "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "TF", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
   "L6.02.01" => {attr => {subType => "FRW", eep => "F6-02-01", manufID => "00D"}},
   "ZZ.ZZ.ZZ" => {attr => {subType => "raw"}},
 );
 
 my %EnO_extendedRemoteFunctionCode = (
-  0x201 => "remoteLearn",
-  0x220 => "remoteLinkTableInfo",
-  0x221 => "remoteLinkTableOut",
-  0x222 => "remoteLinkTableOutRange",
-  0x223 => "remoteTeachInReq",
-  0x224 => "-",
-  0x230 => "-",
-  0x231 => "-"
+  0x210 => "remoteLinkTableInfo", # get
+  0x211 => "remoteLinkTable",     # get
+  0x212 => "remoteLinkTable",     # set
+  0x213 => "remoteLinkTableGP",   # get
+  0x214 => "remoteLinkTableGP",   # set
+  0x220 => "remoteLearnMode",     # set
+  0x221 => "remoteTeach",         # set
+  0x224 => "remoteReset",         # set
+  0x225 => "remoteRLT",           # set
+  0x226 => "remoteApplyChanges",  # set
+  0x227 => "remoteProductID",     # get
+  0x230 => "remoteDevCfg",        # get
+  0x231 => "remoteDevCfg",        # set
+  0x232 => "remoteLinkCfg",       # get
+  0x233 => "remoteLinkCfg",       # set
+  0x240 => "remoteAck",           # parse
+  0x250 => "remoteRepeater",      # get
+  0x251 => "remoteRepeater",      # set
+  0x252 => "remoteRepeaterFilter" # set
 );
 
 my @EnO_models = qw (
@@ -655,14 +667,14 @@ EnOcean_Initialize($)
                       "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir " .
                       "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sensorMode:switch,pushbutton " .
-                      "serviceOn:no,yes setpointRefDev setpointTempRefDev shutTime shutTimeCloses subDef " .
+                      "serviceOn:no,yes setpointRefDev setpointSummerMode:slider,0,5,100 setpointTempRefDev shutTime shutTimeCloses subDef " .
                       "subDef0 subDefI subDefA subDefB subDefC subDefD subDefH subDefW " .
                       "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
                       "summerMode:off,on switchMode:switch,pushbutton " .
                       "switchHysteresis switchType:direction,universal,channel,central " .
-                      "teachMethod:1BS,4BS,GP,RPS,smartAck,STE,UTE temperatureRefDev " .
+                      "teachMethod:1BS,4BS,confirm,GP,RPS,smartAck,STE,UTE temperatureRefDev " .
                       "temperatureScale:C,F,default,no_change timeNotation:12,24,default,no_change " .
-                      "timeProgram1 timeProgram2 timeProgram3 timeProgram4 updateState:default,yes,no " .
+                      "timeProgram1 timeProgram2 timeProgram3 timeProgram4 trackerWakeUpCycle:30,60,3600,86400 updateState:default,yes,no " .
                       "uteResponseRequest:yes,no " .
                       "wakeUpCycle:" . join(",", keys %wakeUpCycle) . " " .
                       $readingFnAttributes;
@@ -1030,9 +1042,9 @@ sub EnOcean_Get($@)
   my $timeNow = TimeNow();
   if (AttrVal($name, "remoteManagement", "off") eq "manager") {
     # Remote Management
-    $cmdList = "remoteFunctions:noArg remoteID:noArg remoteLinkTableInfo:noArg remoteLinkTableOut:noArg remoteLinkTableOutRange remotePing:noArg remoteStatus:noArg ";
+    $cmdList = "remoteDevCfg remoteFunctions:noArg remoteID:noArg remoteLinkCfg remoteLinkTableInfo:noArg remoteLinkTable remoteLinkTableGP remotePing:noArg remoteProductID:noArg remoteRepeater:noArg remoteStatus:noArg ";
   }
-  # control set actions
+  # control get actions
   # $updateState = -1: no get commands available e. g. sensors
   #                 0: execute get commands
   #                 1: execute get commands and and update reading state
@@ -1112,60 +1124,167 @@ sub EnOcean_Get($@)
 
     } elsif ($cmd eq "remoteLinkTableInfo") {
       return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
-      $cmdID = 0x220;
+      $cmdID = 0x210;
       $manufID = 0x7FF;
       $packetType = 7;
       $rorg = "C5";
       shift(@a);
-      $data = sprintf "0220%04X", $manufID;
+      $data = sprintf "%04X%04X", $cmdID, $manufID;
       $destinationID = $remoteID;
       $status = '0F';
-      $hash->{IODev}{helper}{remoteAnswerWait}{0x820}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x820);
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x810}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x810);
       RemoveInternalTimer(\%functionHash);
       InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
-    } elsif ($cmd eq "remoteLinkTableOut") {
+    } elsif ($cmd eq "remoteLinkTable") {
       return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
-      $cmdID = 0x221;
-      $manufID = 0x7FF;
-      $packetType = 7;
-      $rorg = "C5";
-      shift(@a);
-      $data = sprintf "0221%04X", $manufID;
-      $destinationID = $remoteID;
-      $status = '0F';
-      $hash->{IODev}{helper}{remoteAnswerWait}{0x821}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x821);
-      RemoveInternalTimer(\%functionHash);
-      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
-      Log3 $name, 3, "EnOcean get $name $cmd";
-
-    } elsif ($cmd eq "remoteLinkTableOutRange") {
-      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
-      $cmdID = 0x222;
+      $cmdID = 0x211;
       $manufID = 0x7FF;
       $packetType = 7;
       $rorg = "C5";
       my $startRef;
       my $endRef;
+      my $direction;
+      if (defined($a[1]) && defined($a[2]) && defined($a[3]) && $a[1] =~ m/^in|out$/ && $a[2] =~ m/^[\dA-Fa-f]{2}$/ && $a[3] =~ m/^[\dA-Fa-f]{2}$/) {
+        shift(@a);
+        $direction = shift(@a);
+        $direction = $direction eq 'out' ? '80' : '00'; 
+        $startRef = uc(shift(@a));
+        $endRef = uc(shift(@a));
+        ($startRef, $endRef) = ($endRef, $startRef) if (hex($startRef) > hex($endRef));
+      } else {
+        return "Wrong parameter or direction/startRef/endRef not defined.";      
+      }
+      $data = sprintf "%04X%04X%2s%2s%2s", $cmdID, $manufID, $direction, $startRef, $endRef;
+      $destinationID = $remoteID;
+      $status = '0F';
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x811}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x811);
+      RemoveInternalTimer(\%functionHash);
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      Log3 $name, 3, "EnOcean get $name $cmd";
+
+    } elsif ($cmd eq "remoteLinkTableGP") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      $cmdID = 0x213;
+      $manufID = 0x7FF;
+      $packetType = 7;
+      $rorg = "C5";
+      my $direction;
+      my $index;
+      if (defined($a[1]) && defined($a[2]) && $a[1] =~ m/^in|out$/ && $a[2] =~ m/^[\dA-Fa-f]{2}$/) {
+        shift(@a);
+        $direction = shift(@a);
+        $direction = $direction eq 'out' ? '80' : '00'; 
+        $index = uc(shift(@a));
+      } else {
+        return "Wrong parameter or direction/index not defined.";      
+      }
+      $data = sprintf "%04X%04X%2s%2s", $cmdID, $manufID, $direction, $index;
+      $destinationID = $remoteID;
+      $status = '0F';
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x813}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x813);
+      RemoveInternalTimer(\%functionHash);
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      Log3 $name, 3, "EnOcean get $name $cmd";
+
+    } elsif ($cmd eq "remoteProductID") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      $cmdID = 0x227;
+      $manufID = 0x7FF;
+      $packetType = 7;
+      $rorg = "C5";
+      shift(@a);
+      $data = sprintf "%04X%04X", $cmdID, $manufID;
+      $destinationID = $remoteID;
+      $status = '0F';
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x827}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x827);
+      RemoveInternalTimer(\%functionHash);
+      InternalTimer(gettimeofday() + 5.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      Log3 $name, 3, "EnOcean get $name $cmd";
+
+    } elsif ($cmd eq "remoteDevCfg") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      $cmdID = 0x230;
+      $manufID = 0x7FF;
+      $packetType = 7;
+      $rorg = "C5";
+      my $startRef;
+      my $endRef;
+      my $paraLen = '00';
       if (defined($a[1]) && defined($a[2]) && $a[1] =~ m/^[\dA-Fa-f]{4}$/ && $a[2] =~ m/^[\dA-Fa-f]{4}$/) {
         shift(@a);
         $startRef = uc(shift(@a));
         $endRef = uc(shift(@a));
         ($startRef, $endRef) = ($endRef, $startRef) if (hex($startRef) > hex($endRef));
-        return "Table Range too large" if (hex($endRef) - hex($startRef) > 62);
+        if (defined($a[0]) && $a[0] =~ m/^[\dA-Fa-f]{2}$/) {        
+          $paraLen = uc(shift(@a));          
+        }
       } else {
         return "Wrong parameter or startRef/endRef not defined.";      
       }
-      $data = sprintf "0222%04X%4s%4s", $manufID, $startRef, $endRef;
+      $data = sprintf "%04X%04X%4s%4s%2s", $cmdID, $manufID, $startRef, $endRef, $paraLen;
       $destinationID = $remoteID;
       $status = '0F';
-      $hash->{IODev}{helper}{remoteAnswerWait}{0x822}{hash} = $hash;
-      my %functionHash = (hash => $hash, param => 0x822);
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x830}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x830);
       RemoveInternalTimer(\%functionHash);
       InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      Log3 $name, 3, "EnOcean get $name $cmd";
+
+    } elsif ($cmd eq "remoteLinkCfg") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      $cmdID = 0x232;
+      $manufID = 0x7FF;
+      $packetType = 7;
+      $rorg = "C5";
+      my $direction;
+      my $idx;
+      my $startRef;
+      my $endRef;
+      my $paraLen = '00';
+      if (defined($a[1]) && defined($a[2]) && defined($a[3]) && defined($a[4]) 
+          && $a[1] =~ m/^in|out$/ && $a[2] =~ m/^[\dA-Fa-f]{2}$/ && $a[3] =~ m/^[\dA-Fa-f]{4}$/ && $a[4] =~ m/^[\dA-Fa-f]{4}$/) {
+        shift(@a);
+        $direction = shift(@a);
+        $direction = $direction eq 'out' ? '80' : '00';
+        $idx = uc(shift(@a));
+        $startRef = uc(shift(@a));
+        $endRef = uc(shift(@a));
+        ($startRef, $endRef) = ($endRef, $startRef) if (hex($startRef) > hex($endRef));
+        if (defined($a[0]) && $a[0] =~ m/^[\dA-Fa-f]{2}$/) {        
+          $paraLen = uc(shift(@a));          
+        }
+      } else {
+        return "Wrong parameter or startRef/endRef not defined.";      
+      }
+      $data = sprintf "%04X%04X%2s%2s%4s%4s%2s", $cmdID, $manufID, $direction, $idx, $startRef, $endRef, $paraLen;
+      $destinationID = $remoteID;
+      $status = '0F';
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x832}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x832);
+      RemoveInternalTimer(\%functionHash);
+      InternalTimer(gettimeofday() + 2.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
+      Log3 $name, 3, "EnOcean get $name $cmd";
+
+    } elsif ($cmd eq "remoteRepeater") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      $cmdID = 0x250;
+      $manufID = 0x7FF;
+      $packetType = 7;
+      $rorg = "C5";
+      shift(@a);
+      $data = sprintf "%04X%04X", $cmdID, $manufID;
+      $destinationID = $remoteID;
+      $status = '0F';
+      $hash->{IODev}{helper}{remoteAnswerWait}{0x850}{hash} = $hash;
+      my %functionHash = (hash => $hash, param => 0x850);
+      RemoveInternalTimer(\%functionHash);
+      InternalTimer(gettimeofday() + 5.5, 'EnOcean_cdmClearRemoteWait', \%functionHash, 0);
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($st eq "switch.05") {
@@ -1495,7 +1614,7 @@ sub EnOcean_Set($@)
   my $remoteManagement = AttrVal($name, "remoteManagement", "off");
   if ($remoteManagement eq "manager") {
     # Remote Management Manager
-    $cmdList = "remoteAction:noArg remoteLock:noArg remoteLearn:in,out remoteSetCode:noArg remoteTeachInReq remoteUnlock:noArg ";
+    $cmdList = "remoteAction:noArg remoteApplyChanges:devCfg,linkTable,no_change remoteDevCfg remoteLinkCfg remoteLock:noArg remoteLearnMode remoteLinkTable remoteLinkTableGP remoteRepeater remoteRepeaterFilter remoteReset:devCfg,linkTableIn,linkTableOut,no_change remoteRLT remoteSetCode:noArg remoteTeach remoteUnlock:noArg ";
   } elsif ($remoteManagement eq "client" || $st eq "remote") {
     # Remote Management Client
     $cmdList .= "remoteLock:noArg remoteUnlock ";
@@ -1604,35 +1723,104 @@ sub EnOcean_Set($@)
       Log3 $name, 3, "EnOcean set $name $cmd";
       $updateState = 0;
 
-    } elsif ($cmd eq "remoteLearn") {
+    } elsif ($cmd eq "remoteLinkTable") {
       return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
-      if (defined $a[1]) {
-        $cmdID = 0x201;
+      if (defined $a[1] && defined $a[2] && defined $a[3] && defined $a[4] && defined $a[5] &&
+          $a[1] =~ m/^in|out$/ && $a[2] =~ m/^[\dA-Fa-f]{2}$/ && $a[3] =~ m/^[\dA-Fa-f]{8}$/ && $a[4] =~ m/^[\dA-Fa-f]{2}-[\dA-Fa-f]{2}-[\dA-Fa-f]{2}$/ && $a[5] =~ m/^[\dA-Fa-f]{2}$/) {
+        $cmdID = 0x212;
         $manufID = 0x7FF;
         $packetType = 7;
         $rorg = "C5";
-        my $eep = AttrVal($name, "eep", undef);
-        return "EEP not defined, set attr $name eep <rorg>-<function>-<type>" if (!defined($eep));
-        $eep =~ m/^(..)(.)(..)(.)(..)$/;
+        $a[4] =~ m/^(..)-(..)-(..)$/;
+        $data = sprintf "%04X%04X%s%s%s%s%s%s%s", $cmdID, $manufID, $a[1] eq 'out' ? '80' : '00', uc($a[2]), uc($a[3]), uc($1), uc($2), uc($3), uc($a[5]);
+        splice(@a,0,5);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;
+      } else {
+        return "Usage: $cmd arguments needed or wrong.";      
+      }
+
+    } elsif ($cmd eq "remoteLinkTableGP") {
+      # gpDef example: ch2:O:1:24:1:7:-40:1:40:1
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && defined $a[2] && defined $a[3] && $a[1] =~ m/^in|out$/ && $a[2] =~ m/^[\dA-Fa-f]{2}$/) {
+        $cmdID = 0x214;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        my $direction = $a[1] eq 'out' ? '80' : '00';
+        my $gpDef;
+        my ($channelName, $channelDir, $channelType, $signalType, $valueType, $resolution, $engMin, $scalingMin, $engMax, $scalingMax) =
+          split(':', $a[3]);
+        if ($channelDir eq "O" && $a[1] eq 'out' || $channelDir eq "I" && $a[1] eq 'in') {
+          # add channel-, signal- and valuetype
+          $gpDef .= substr(unpack('B8', pack('C', $channelType)), 6) .
+                    unpack('B8', pack('C', $signalType)) .
+                    substr(unpack('B8', pack('C', $valueType)), 6);
+          if ($channelType == 1 || $channelType == 3) {
+            # data, enumeration: add resolution
+            $gpDef .= substr(unpack('B8', pack('C', $resolution)), 4);
+          }
+          if ($channelType == 1) {
+            # data: add engineering and scaling
+            $gpDef .= unpack('B8', pack('c', $engMin)) .
+                      substr(unpack('B8', pack('C', $scalingMin)), 4) .
+                      unpack('B8', pack('c', $engMax)) .
+                      substr(unpack('B8', pack('C', $scalingMax)), 4);
+          }
+        } else {
+          return "Usage: Link Table GP Entry Direction wrong.";
+        }
+        if (length($gpDef) % 8) {
+          # fill with trailing zeroes to x bytes
+          $gpDef .= 0 x (8 - length($gpDef) % 8);
+        }
+        $data = sprintf "%04X%04X%s%s%s", $cmdID, $manufID, $a[1] eq 'out' ? '80' : '00', uc($a[2]), EnOcean_convBitToHex($gpDef);
+        splice(@a,0,3);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;
+      } else {
+        return "Usage: $cmd arguments needed or wrong.";      
+      }
+
+    } elsif ($cmd eq "remoteLearnMode") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1]) {
+        $cmdID = 0x220;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
         $destinationID = $remoteID;
+        my $learnMode;
+        my $cmdVal = 0;
       
         if ($a[1] eq 'in') {
-          $data = sprintf "%04X%04X%s%s%s01", $cmdID, $manufID, $1, $3, $5;
+          $learnMode = '00';
           shift(@a);
         } elsif ($a[1] eq 'out') {
-          $data = sprintf "%04X%04X%s%s%s03", $cmdID, $manufID, $1, $3, $5;
+          $learnMode = '40';
+          shift(@a);
+        } elsif ($a[1] eq 'off') {
+          $learnMode = '80';
           shift(@a);
         } else {
           return "Usage: $cmd $a[1] argument unknown.";
         }
+        if (defined $a[1] && $a[1] =~ m/^[\dA-Fa-f]{2}$/) {
+          $cmdVal = $a[1];
+          shift(@a);
+        } else {
+          return "Usage: $cmd <learnMode> argument needed or wrong.";      
+        }
+        $data = sprintf "%04X%04X%s%s", $cmdID, $manufID, $learnMode, $cmdVal;
         Log3 $name, 3, "EnOcean set $name $cmd";
         $updateState = 0;
       }
 
-    } elsif ($cmd eq "remoteTeachInReq") {
+    } elsif ($cmd eq "remoteTeach") {
       return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
-      if (defined $a[1] && $a[1] =~ m/^[\dA-Fa-f]{4}$/) {
-        $cmdID = 0x223;
+      if (defined $a[1] && $a[1] =~ m/^[\dA-Fa-f]{2}$/) {
+        $cmdID = 0x221;
         $manufID = 0x7FF;
         $packetType = 7;
         $rorg = "C5";
@@ -1648,11 +1836,152 @@ sub EnOcean_Set($@)
           RemoveInternalTimer(\%functionHash);
           InternalTimer(gettimeofday() + 3, 'EnOcean_cdmClearHashVal', \%functionHash, 0);
         }
+      } else {
+        return "Usage: $cmd argument needed or wrong.";      
+      }
         
+    } elsif ($cmd eq "remoteReset") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && $a[1] =~ m/^devCfg|linkTableIn|linkTableOut|no_change$/) {
+        $cmdID = 0x224;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        $destinationID = $remoteID;
+        my %changeCmd = ('devCfg' => '80', 'linkTableIn' => '40', 'linkTableOut' => '20', 'no_change' => '00');
+        $data = sprintf "%04X%04X%s", $cmdID, $manufID, $changeCmd{$a[1]};
+        shift(@a);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;
+      } else {
+        return "Usage: $cmd argument needed or wrong.";      
+      }
+        
+    } elsif ($cmd eq "remoteRLT") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && defined $a[2] && $a[1] =~ m/^off|on$/ && $a[2] =~ m/^[0-7][1-9A-Fa-f]$/) {
+        $cmdID = 0x225;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        $destinationID = $remoteID;
+        my $rltMode = hex $a[2];
+        $rltMode |= 0x80 if ($a[1] eq 'on');
+        $data = sprintf "%04X%04X%02X", $cmdID, $manufID, $rltMode;
+        splice(@a,0,2);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;
+      }
+
+    } elsif ($cmd eq "remoteApplyChanges") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && $a[1] =~ m/^devCfg|linkTable|no_change$/) {
+        $cmdID = 0x226;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        $destinationID = $remoteID;
+        my %changeCmd = ('devCfg' => '40', 'linkTable' => '80', 'no_change' => '00');
+        $data = sprintf "%04X%04X%s", $cmdID, $manufID, $changeCmd{$a[1]};
+        shift(@a);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;        
       } else {
         return "Usage: $cmd argument needed or wrong.";      
       }
 
+    } elsif ($cmd eq "remoteDevCfg") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && defined $a[2] && $a[1] =~ m/^[\dA-Fa-f]{4}$/ && $a[2] =~ m/^[\dA-Fa-f]{2}[\dA-Fa-f]*$/ && length($a[2]) % 2 == 0) {
+        $cmdID = 0x231;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        $destinationID = $remoteID;
+        $data = sprintf "%04X%04X%s%02X%s", $cmdID, $manufID, uc($a[1]), length($a[2]) / 2, uc($a[2]);
+        splice(@a,0,2);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;        
+      } else {
+        return "Usage: $cmd arguments needed or wrong.";      
+      }
+
+    } elsif ($cmd eq "remoteLinkCfg") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && defined $a[2] && defined $a[3] && defined $a[4] &&
+          $a[1] =~ m/^in|out$/ && $a[2] =~ m/^[\dA-Fa-f]{2}$/ && $a[3] =~ m/^[\dA-Fa-f]{4}$/ &&
+          $a[4] =~ m/^[\dA-Fa-f]{2}[\dA-Fa-f]*$/ && length($a[4]) % 2 == 0) {
+        $cmdID = 0x233;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        my $direction = $a[1] eq 'out' ? '80' : '00';
+        $destinationID = $remoteID;
+        $data = sprintf "%04X%04X%s%s%s%02X%s", $cmdID, $manufID, $direction, uc($a[2]), uc($a[3]), length($a[4]) / 2, uc($a[4]);
+        splice(@a,0,4);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;        
+      } else {
+        return "Usage: $cmd arguments needed or wrong.";      
+      }
+
+    } elsif ($cmd eq "remoteRepeater") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && defined $a[2] && defined $a[3] &&
+          $a[1] =~ m/^on|off|filter$/ && $a[2] =~ m/^[1-2]$/ && $a[3] =~ m/^AND|OR$/) {
+        $cmdID = 0x251;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        my %repFunc = ('on' => 0x40, 'off' => 0, 'filter' => 0x80);
+        my $cmdVal = $repFunc{$a[1]} | ($a[2] == 2 ? 0x20 : 0x10) | ($a[3] eq 'OR' ? 8 : 0);
+        $destinationID = $remoteID;
+        $data = sprintf "%04X%04X%02X", $cmdID, $manufID, $cmdVal;
+        splice(@a,0,3);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;        
+      } else {
+        return "Usage: $cmd arguments needed or wrong.";      
+      }
+
+    } elsif ($cmd eq "remoteRepeaterFilter") {
+      return "Attribute remoteID is missing, please define it." if (!defined $remoteID);
+      if (defined $a[1] && defined $a[2] &&
+          $a[1] =~ m/^apply|block|delete|deleteAll$/ && $a[2] =~ m/^destinationID|sourceID|rorg|rssi$/) {
+        my %repFilterCtrl = ('deleteAll' => 0x30, 'delete' => 0x20, 'apply' => 0x10, 'block' => 0);
+        my $cmdVal = $repFilterCtrl{$a[1]};
+        my $cmdAttr;
+        if (defined $a[3]) {
+          if ($a[2] =~ m/^destinationID$/ && $a[3] =~ m/^[\dA-Fa-f]{8}$/) {
+            $cmdVal |= 3;
+            $cmdAttr = $a[3];
+          } elsif ($a[2] =~ m/^sourceID$/ && $a[3] =~ m/^[\dA-Fa-f]{8}$/) {
+            $cmdVal |= 0;
+            $cmdAttr = $a[3];
+          } elsif ($a[2] =~ m/^rorg$/ && $a[3] =~ m/^[\dA-Fa-f]{2}$/) {
+            $cmdVal |= 1;
+            $cmdAttr = '0' x 6 . $a[3];
+          } elsif ($a[2] =~ m/^rssi$/ && $a[3] =~ m/^-?\d+$/ && abs($a[3]) >= 0 && abs($a[3]) <= 255) {
+            $cmdVal |= 2;
+            $cmdAttr = sprintf "000000%02X", abs($a[3]);
+          } else {
+            return "Usage: $cmd $a[2] argument wrong.";          
+          }        
+        } else {
+          return "Usage: $cmd $a[2] argument needed.";      
+        }
+        $cmdID = 0x252;
+        $manufID = 0x7FF;
+        $packetType = 7;
+        $rorg = "C5";
+        $destinationID = $remoteID;
+        $data = sprintf "%04X%04X%02X%s", $cmdID, $manufID, $cmdVal, $cmdAttr;
+        splice(@a,0,3);
+        Log3 $name, 3, "EnOcean set $name $cmd";
+        $updateState = 0;        
+      } else {
+        return "Usage: $cmd arguments needed or wrong.";      
+      }
     } elsif ($st eq "switch") {
       # Rocker Switch, simulate a PTM200 switch module
       # separate first and second action
@@ -2651,13 +2980,14 @@ sub EnOcean_Set($@)
           readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
           $updateState = 0;
           ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
         } elsif ($cmd eq "on") {
           $setCmd = 9;
           readingsSingleUpdate($hash, "block", "unlock", 1);
           if ($a[1]) {
             return "Usage: $cmd [lock|unlock]" if (($a[1] ne "lock") && ($a[1] ne "unlock"));
             if ($a[1] eq "lock") {
-              $setCmd = $setCmd | 4 ;
+              $setCmd = $setCmd | 4;
               readingsSingleUpdate($hash, "block", "lock", 1);
             }
             shift(@a);
@@ -2674,7 +3004,19 @@ sub EnOcean_Set($@)
           if ($a[1]) {
             return "Usage: $cmd [lock|unlock]" if (($a[1] ne "lock") && ($a[1] ne "unlock"));
             if ($a[1] eq "lock") {
-              $setCmd = $setCmd | 4 ;
+              $setCmd = $setCmd | 4;
+              readingsSingleUpdate($hash, "block", "lock", 1);
+            }
+            shift(@a);
+          }
+          #$updateState = 0;
+          $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
+        } elsif ($cmd eq "local") {
+          if ($a[1]) {
+            return "Usage: $cmd [learn]" if ($a[1] ne "learn");
+            if ($a[1] eq "learn") {
+              $cmd = 'off';
+              $setCmd = $setCmd | 0x24;
               readingsSingleUpdate($hash, "block", "lock", 1);
             }
             shift(@a);
@@ -2682,7 +3024,7 @@ sub EnOcean_Set($@)
           #$updateState = 0;
           $data = sprintf "%02X%04X%02X", $gwCmdID, $time, $setCmd;
         } else {
-          my $cmdList = "on:noArg off:noArg teach:noArg";
+          my $cmdList = "local:learn on:noArg off:noArg teach:noArg";
           return SetExtensions ($hash, $cmdList, $name, @a);
         }
 
@@ -2719,6 +3061,7 @@ sub EnOcean_Set($@)
           readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
           $updateState = 0;
           ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
         } elsif ($cmd eq "dim") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
             if(@a < 2 || $a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 100);
@@ -2797,8 +3140,23 @@ sub EnOcean_Set($@)
           $setCmd = 8;
           $sendDimCmd = 1;
 
+        } elsif ($cmd eq "local") {
+          if ($a[1]) {
+            return "Usage: $cmd [learn]" if ($a[1] ne "learn");
+            if ($a[1] eq "learn") {
+              $cmd = 'off';
+              $dimVal = 0;
+              $rampTime = 1;
+              $setCmd = 0x2C;
+              readingsSingleUpdate($hash, "block", "lock", 1);
+            }
+            shift(@a);
+          }
+          #$updateState = 0;
+          $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $dimVal, $rampTime, $setCmd;
+
         } else {
-          my $cmdList = "dim:slider,0,1,100 on:noArg off:noArg teach:noArg";
+          my $cmdList = "dim:slider,0,1,100 local:learn on:noArg off:noArg teach:noArg";
           return SetExtensions ($hash, $cmdList, $name, @a);
         }
         if ($sendDimCmd) {
@@ -2849,6 +3207,7 @@ sub EnOcean_Set($@)
           readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
           $updateState = 0;
           ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
         } elsif ($cmd eq "shift") {
           if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= -12.7) && ($a[1] <= 12.8)) {
             #$updateState = 0;
@@ -2871,6 +3230,7 @@ sub EnOcean_Set($@)
           readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
           $updateState = 0;
           ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
         } elsif ($cmd eq "basic") {
           if (($a[1] =~ m/^[+-]?\d+(\.\d+)?$/) && ($a[1] >= 0) && ($a[1] <= 51.2)) {
             #$updateState = 0;
@@ -2894,6 +3254,7 @@ sub EnOcean_Set($@)
           readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
           $updateState = 0;
           ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
         } elsif ($cmd eq "presence") {
           if ($a[1] eq "standby") {
             $setCmd = 0x0A;
@@ -2961,6 +3322,7 @@ sub EnOcean_Set($@)
           readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
           $updateState = 0;
           ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
         } elsif ($cmd eq "stage") {
           if ($a[1] eq "auto") {
             #$updateState = 0;
@@ -3604,6 +3966,7 @@ sub EnOcean_Set($@)
           readingsSingleUpdate($hash, "teach", "4BS teach-in sent", 1);
           $updateState = 0;
           ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
+          EnOcean_setTeachConfirmWaitHash(undef, $hash);
         } elsif ($cmd eq "stop") {
           # stop
           # delete readings, as they are undefined
@@ -3835,8 +4198,20 @@ sub EnOcean_Set($@)
               return "Usage: $cmd values are missing";
             }
           }
+        } elsif ($cmd eq "local") {
+          my $setCmd = 8;
+          if ($a[1]) {
+            return "Usage: $cmd [learn]" if ($a[1] ne "learn");
+            if ($a[1] eq "learn") {
+              $setCmd = $setCmd | 0x20;
+            }
+            shift(@a);
+          }
+          $updateState = 0;
+          $data = sprintf "%02X%02X%02X%02X", 0, $shutTime, $shutCmd, $setCmd;
+
         } else {
-          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "position:slider,0,5,100 anglePos:slider,-180,5,180 closes:noArg down opens:noArg stop:noArg teach:noArg up"
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "position:slider,0,5,100 anglePos:slider,-180,5,180 closes:noArg down local:learn opens:noArg stop:noArg teach:noArg up"
         }
         if ($shutCmd || $cmd eq "stop") {
           #$updateState = 0;
@@ -5956,6 +6331,7 @@ sub EnOcean_Parse($$)
   my @msg = split(':', $msg);
   my ($rorg, $data, $senderID, $status, $odata, $subDef, $destinationID, $funcNumber, $manufID, $RSSI, $delay, $subTelNum);
   my $packetType = hex($msg[1]);
+  my @event;
 
   if ($packetType == 1) {
     # packet type RADIO
@@ -5990,7 +6366,7 @@ sub EnOcean_Parse($$)
         $iohash->{helper}{cdm}{lenCounter} = length($3) / 2;
         my %functionHash = (hash => $iohash, function => "cdm");
         RemoveInternalTimer(\%functionHash);
-        InternalTimer(gettimeofday() + 1, "EnOcean_cdmClear", \%functionHash, 0);
+        InternalTimer(gettimeofday() + 1, "EnOcean_helperClear", \%functionHash, 0);
         #Log3 $IODev, 3, "EnOcean $IODev CDM timer started";
       } else {
         $iohash->{helper}{cdm}{data}{$idx} = $data;
@@ -6108,6 +6484,26 @@ sub EnOcean_Parse($$)
           return $ret;
         }
 
+      } elsif (exists $iohash->{helper}{teachConfirmWaitHash}) {
+        # teach-in response with confirm telegram, assign remote device
+        $hash = $iohash->{helper}{teachConfirmWaitHash};
+        $name = $hash->{NAME};        
+        # substitute subDef with DEF
+        delete $modules{EnOcean}{defptr}{$hash->{DEF}};
+        $modules{EnOcean}{defptr}{$senderID} = $hash;
+        $attr{$name}{subDef} = $hash->{DEF};
+        $subDef = $attr{$name}{subDef};
+        $hash->{DEF} = $senderID;
+        $attr{$name}{comMode} = "confirm";
+        $manufID = uc(AttrVal($name, "manufID", ""));
+        $filelogName = "FileLog_$name";
+        # clear teach-in request
+        delete $iohash->{helper}{teachConfirmWaitHash};
+        # store changes
+        EnOcean_CommandSave(undef, undef);        
+        push @event, "3:teach:4BS teach-in accepted";
+        Log3 $name, 2, "EnOcean $name remote device with SenderID $senderID assigned";
+      
       } elsif ($learningMode eq "demand" && $iohash->{Teach}) {
         Log3 undef, 1, "EnOcean Unknown device with SenderID $senderID and $rorgname telegram, please define it.";
         return $ret;
@@ -6410,7 +6806,6 @@ sub EnOcean_Parse($$)
     $dbCntr ++;
   }
 
-  my @event;
   my $model = AttrVal($name, "model", "");
   my $st = AttrVal($name, "subType", "");
   my $subtypeReading = AttrVal($name, "subTypeReading", undef);
@@ -6466,10 +6861,14 @@ sub EnOcean_Parse($$)
     } elsif ($st eq "gateway") {
       # Eltako switching, dimming
       if ($db[0] == 0x70) {
-        # on
         $msg = "on";
       } elsif ($db[0] == 0x50) {
-        # off
+        $msg = "off";
+      } elsif ($db[0] == 0x30) {
+        $event = 'alert';
+        $msg = "on";
+      } elsif ($db[0] == 0x10) {
+        $event = 'alert';
         $msg = "off";
       }
       push @event, "3:$event:$msg";
@@ -6830,6 +7229,7 @@ sub EnOcean_Parse($$)
       Log3 $name, 5, "EnOcean $name EnOcean_parse SPT: $setpointTemp SPTS: $setpointTempSet";
 
       my $operationMode = ReadingsVal($name, "operationMode", 'setpointTemp');
+      my $setpointSummerMode = AttrVal($name, "setpointSummerMode", 0);
       my $summerMode = AttrVal($name, "summerMode", "off");
       my $timeDiff = EnOcean_TimeDiff(ReadingsTimestamp($name, 'wakeUpCycle', undef));
       my $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
@@ -7024,7 +7424,7 @@ sub EnOcean_Parse($$)
       } elsif ($waitingCmds eq "summerMode") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
-        $setpointSet = 0;
+        $setpointSet = $setpointSummerMode;
         $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
@@ -7087,7 +7487,7 @@ sub EnOcean_Parse($$)
       } elsif ($operationMode eq "summerMode") {
         # deactivate PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', '');
-        $setpointSet = 0;
+        $setpointSet = $setpointSummerMode;
         $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
@@ -8317,8 +8717,8 @@ sub EnOcean_Parse($$)
         @{$hash->{helper}{stateTimer}} = ($hash, 'state', 'off', 1, 5);
         RemoveInternalTimer($hash->{helper}{motionTimer});
         RemoveInternalTimer($hash->{helper}{stateTimer});
-        InternalTimer(gettimeofday() + 33, 'EnOcean_readingsSingleUpdate', $hash->{helper}{motionTimer}, 0);
-        InternalTimer(gettimeofday() + 33, 'EnOcean_readingsSingleUpdate', $hash->{helper}{stateTimer}, 0);
+        InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{motionTimer}, 0);
+        InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{stateTimer}, 0);
       }
       push @event, "3:battery:" . ($db[3] * 0.02 > 2.9 ? "ok" : "low");
       push @event, "3:button:" . ($db[0] & 4 ? "released" : "pressed") if ($manufID eq "7FF");
@@ -10791,7 +11191,7 @@ sub EnOcean_Parse($$)
     my $responseTime = 150;
     my $sendData = '';
     if (exists $EnO_eepConfig{$subType}) {
-      if ($db[9] & 0xF8 == 0xF8) {
+      if (($db[9] & 0xF8) == 0xF8) {
         # Smart Ack send by sensor
         $attr{$name}{subType} = $EnO_eepConfig{$subType}{attr}{subType};
         $attr{$name}{eep} = "$3-$4-$5";
@@ -10996,6 +11396,13 @@ sub EnOcean_Parse($$)
       }
       push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
 
+    } elsif ($funcNumber == 0x240 && $remoteManagement eq 'manager') {
+      # acknowledge
+      $remoteLastStatusReturnCode = '00';
+      delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
+      push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
+      Log3 $name, 2, "EnOcean $name RPC acknowledge received";
+
     } elsif ($funcNumber == 0x604 && $remoteManagement eq 'manager') {
       # query id answer
       my $eep = hex(substr($data, 0, 6)) >> 3;
@@ -11056,17 +11463,23 @@ sub EnOcean_Parse($$)
       Log3 $name, 2, "EnOcean $name RMCC query status answer received LastFunction: " . substr($data, 3, 3) .
                       " LastFunctionCode: " . substr($data, 6, 2);
 
-    } elsif ($funcNumber == 0x820 && $remoteManagement eq 'manager') {
+    } elsif ($funcNumber == 0x810 && $remoteManagement eq 'manager') {
       # teach-in supported link tables response
       delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
       push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
-      my $linkTableSupport = hex(substr($data, 0, 2));
-      my $linkTableInMax = substr($data, 6, 4) && $linkTableSupport & 0x40 ? substr($data, 6, 4) : '0000';
-      my $linkTableOutMax = substr($data, 2, 4) && $linkTableSupport & 0x80 ? substr($data, 2, 2) : '0000';      
-      push @event, "3:remoteLinkTableIn:" . ($linkTableSupport & 0x40 ? 'supported' : 'not_supported');
-      push @event, "3:remoteLinkTableOut:" . ($linkTableSupport & 0x80 ? 'supported' : 'not_supported');
-      push @event, "3:remoteLinkTableInMax:" . $linkTableInMax if ($linkTableSupport & 0x40);
-      push @event, "3:remoteLinkTableOutMax:" . $linkTableOutMax if ($linkTableSupport & 0x80);
+      my $supportFlags = hex(substr($data, 0, 2));
+      my $linkTableInCurrent = substr($data, 6, 2) && $supportFlags & 0x10 ? substr($data, 6, 2) : '00';
+      my $linkTableInMax = substr($data, 8, 2) && $supportFlags & 0x10 ? substr($data, 8, 2) : '00';
+      my $linkTableOutCurrent = substr($data, 2, 2) && $supportFlags & 0x20 ? substr($data, 2, 2) : '00';      
+      my $linkTableOutMax = substr($data, 4, 2) && $supportFlags & 0x20 ? substr($data, 4, 2) : '00';      
+      push @event, "3:remoteLearn:" . ($supportFlags & 0x80 ? 'supported' : 'not_supported');
+      push @event, "3:remoteLinkTableIn:" . ($supportFlags & 0x10 ? 'supported' : 'not_supported');
+      push @event, "3:remoteLinkTableOut:" . ($supportFlags & 0x20 ? 'supported' : 'not_supported');
+      push @event, "3:remoteLinkTableInCurrent:" . $linkTableInCurrent if ($supportFlags & 0x10);
+      push @event, "3:remoteLinkTableInMax:" . $linkTableInMax if ($supportFlags & 0x10);
+      push @event, "3:remoteLinkTableOutCurrent:" . $linkTableOutCurrent if ($supportFlags & 0x20);
+      push @event, "3:remoteLinkTableOutMax:" . $linkTableOutMax if ($supportFlags & 0x20);
+      push @event, "3:remoteTeach:" . ($supportFlags & 0x40 ? 'supported' : 'not_supported');
       Log3 $name, 2, "EnOcean $name RPC teach-in supported link tables response received Data: $data";
       # request outbound table
       #$hash->{IODev}{helper}{remoteAnswerWait}{0x821}{hash} = $hash;
@@ -11078,24 +11491,175 @@ sub EnOcean_Parse($$)
       #EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $sendData, '0' x 8, '0F', $senderID);
       #Log3 $name, 2, "EnOcean $name RPC request teach-in outbound table";
 
-    } elsif (($funcNumber == 0x821 || $funcNumber == 0x822) && $remoteManagement eq 'manager') {
-      # teach-in outbound table response
+    } elsif ($funcNumber == 0x811 && $remoteManagement eq 'manager') {
+      # link table response
       CommandDeleteReading(undef, "$name remoteLinkTableDesc.*");
-      my $linkTableStartRef = exists($hash->{IODev}{helper}{remoteLinkTableStartRef}) ? $hash->{IODev}{helper}{remoteLinkTableStartRef} : 0;
-      delete $hash->{IODev}{helper}{remoteLinkTableStartRef};
-      $data =~ m/^(....)(.*)$/;
-      my $count = $linkTableStartRef;
-      my $countMax = $linkTableStartRef + hex($1);
-      while ($count <= $countMax) {
-        $data =~ m/^(........)(..)(..)(..)(..)(.*)$/;
-        push @event, "3:remoteLinkTableDesc" . sprintf("%04X", $count) . ":$1:$2-S3-S4:S5";
-        $count ++;
-        $data = $6;
+      $data =~ m/^(..)(.*)$/;
+      my $direction = hex($1) & 0x80 ? 'Out' : 'In';
+      $data = $2;
+      while (length($data) > 0) {
+        $data =~ m/^(..)(........)(..)(..)(..)(..)(.*)$/;
+        push @event, "3:remoteLinkTableDesc" . $direction . "$1:S2:S3-S4-$5:$6";
+        $data = $7;
       }
       $remoteLastStatusReturnCode = '00';
       delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
       push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
-      Log3 $name, 2, "EnOcean $name RPC teach-in outbound table answer received";
+      Log3 $name, 2, "EnOcean $name RPC link table response received";
+
+    } elsif ($funcNumber == 0x813 && $remoteManagement eq 'manager') {
+      # link table GP response
+      CommandDeleteReading(undef, "$name remoteLinkTableGPDesc.*");
+      $data =~ m/^(..)(.*)$/;
+      my $direction = hex($1) & 0x80 ? 'Out' : 'In';
+      $data = $2;
+      my $channel = 0;
+      my $channelDir = hex($1) & 0x80 ? 'O' : 'I';
+      my $channelDef;
+      my $channelName;
+      my $channelType;
+      my $dataOutboundDefLen = 0;
+      my $gpData;
+      my @gpDef;
+      my $gpIdx;
+      my $signalType;
+      while (length($data) > 0) {
+        $data =~ m/^(..)(.{12})(.*)$/;
+        $gpIdx = $1;
+        $gpData = EnOcean_convHexToBit($2);
+        $data = $3;
+        $gpData =~ m/^(..)(.{8})(.*)$/;
+        $channelType = unpack('C', pack('B8', '000000' . $1));
+        $signalType = unpack('C', pack('B8', $2));
+        $data = $3;
+        #Log3 $name, 2, "EnOcean $name parse RPC link table GP idx: $gpIdx channelType: $channelType signalType: $signalType data: $data";
+
+        if ($channelType == 0) {
+          # teach-in information
+          if ($signalType == 1) {
+            # outbound channel description
+
+          } elsif ($signalType == 2) {
+            # produkt ID
+          }
+
+        } elsif ($channelType == 1) {
+          # data
+          $gpData =~ m/^(..)(....)(.{8})(....)(.{8})(....)(.*)$/;
+          $channelDef = $channelDir . ':' . $channelType . ':' . $signalType . ':' . 
+                        unpack('C', pack('B8', '000000' . $1)) . ':' . unpack('C', pack('B8', '0000' . $2)) . ':' .
+                        unpack('c', pack('B8', $3)) . ':' . unpack('C', pack('B8', '0000' . $4)) . ':' . 
+                        unpack('c', pack('B8', $5)) . ':' . unpack('C', pack('B8', '0000' . $6));
+          if (defined $EnO_gpValueData{$signalType}{name}) {
+            $channelName = $EnO_gpValueData{$signalType}{name};
+          } else {
+            $channelName = "none";
+          }
+          $gpDef[$channel] = $channelName . ':' . $channelDef;
+
+        } elsif ($channelType == 2) {
+          # flag
+          $gpData =~ m/^(..)(.*)$/;
+          $channelDef = $channelDir . ':' .$channelType . ':' . $signalType . ':' .
+                        unpack('C', pack('B8', '000000' . $1));
+          if (defined $EnO_gpValueFlag{$signalType}{name}) {
+            $channelName = $EnO_gpValueFlag{$signalType}{name};
+          } else {
+            $channelName = "none";
+          }
+          $gpDef[$channel] = $channelName . ':' . $channelDef;
+
+        } elsif ($channelType == 3) {
+          # enumeration
+          $gpData =~ m/^(..)(....)(.*)$/;
+          $channelDef = $channelDir . ':' .$channelType . ':' . $signalType . ':' . 
+                        unpack('C', pack('B8', '000000' . $1)) . ':' . unpack('C', pack('B8', '0000' . $2));
+          if (defined $EnO_gpValueEnum{$signalType}{name}) {
+            $channelName = $EnO_gpValueEnum{$signalType}{name};
+          } else {
+            $channelName = "none";
+          }
+          $gpDef[$channel] = $channelName . ':' . $channelDef;
+        }
+        push @event, "3:remoteLinkTableGPDesc" . $direction . "$gpIdx:$gpDef[0]";
+      }
+      $remoteLastStatusReturnCode = '00';
+      delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
+      push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
+      Log3 $name, 2, "EnOcean $name RPC link table GP response received";
+
+    } elsif ($funcNumber == 0x827 && $remoteManagement eq 'manager') {
+      # product ID answer
+      $manufID = substr($data, 1, 3);
+      $attr{$name}{remoteManufID} = $manufID;
+      $manufID = $EnO_manuf{$manufID} if($EnO_manuf{$manufID});
+      $remoteLastStatusReturnCode = '00';
+      delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
+      $sendData = '024007FF';
+      EnOcean_SndRadio(undef, $hash, $packetType, $rorg, $sendData, '0' x 8, '0F', $senderID);
+      push @event, "3:remoteProductID:" . substr($data, 4, 8);
+      push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
+      Log3 $name, 2, "EnOcean $name RPC Product ID answer received ProductID: " . substr($data, 4, 8) . " Manufacturer: $manufID";
+      Log3 $name, 2, "EnOcean $name RPC acknowledge sent";
+      EnOcean_CommandSave(undef, undef);
+
+    } elsif ($funcNumber == 0x830 && $remoteManagement eq 'manager') {
+      # device config response
+      CommandDeleteReading(undef, "$name remoteDevCfg.*");
+      my $idx;
+      my $valueLen;
+      while (length($data) > 0) {
+        $data =~ m/^(....)(..)(.*)$/;
+        $idx = $1;
+        $valueLen = hex($2) * 2;
+        $data = $3;
+        $data =~ m/^(.{$valueLen})(.*)$/;
+        push @event, "3:remoteDevCfg$idx:S1";
+        $data = $2;
+      }
+      $remoteLastStatusReturnCode = '00';
+      delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
+      push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
+      Log3 $name, 2, "EnOcean $name RPC device configuration response received";
+
+    } elsif ($funcNumber == 0x832 && $remoteManagement eq 'manager') {
+      # link based configuration response
+      $data =~ m/^(..)(..)(.*)$/;
+      my $direction = hex($1) & 0x80 ? 'Out' : 'In';
+      my $linkTableIdx = $2;
+      CommandDeleteReading(undef, "$name remoteLinkCfg$direction$linkTableIdx.*");
+      $data = $3;
+      my $idx;
+      my $valueLen;
+      while (length($data) > 0) {
+        $data =~ m/^(....)(..)(.*)$/;
+        $idx = $1;
+        $valueLen = hex($2) * 2;
+        $data = $3;
+        $data =~ m/^(.{$valueLen})(.*)$/;
+        push @event, "3:remoteLinkCfg$direction$linkTableIdx:$idx:S1";
+        $data = $2;
+      }
+      $remoteLastStatusReturnCode = '00';
+      delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
+      push @event, "3:remoteLastStatusReturnCode:$remoteLastStatusReturnCode";
+      Log3 $name, 2, "EnOcean $name RPC link table response received";
+
+    } elsif ($funcNumber == 0x850 && $remoteManagement eq 'manager') {
+      # query status answer
+      delete $iohash->{helper}{remoteAnswerWait}{$funcNumber}{hash};
+      my $repeaterFunction = 'off';
+      if (($db[0] & 0xC0) == 0) {
+        $repeaterFunction = 'off';
+      } elsif (($db[0] & 0xC0) == 0x40) {
+        $repeaterFunction = 'on';
+      } elsif (($db[0] & 0xC0) == 0x80) {
+        $repeaterFunction = 'filter';
+      }
+      push @event, "3:remoteRepeaterFunction:$repeaterFunction";
+      push @event, "3:remoteRepeaterLevel:" . (($db[0] & 0x30) == 0x20 ? 2 : 1);
+      push @event, "3:remoteRepeaterFilter:" . ($db[0] & 8 ? 'OR' : 'AND');
+      Log3 $name, 2, "EnOcean $name RPC repeater functions response received";
 
     } else {
       Log3 $name, 2, "EnOcean $name RMCC/RPC function number " . sprintf("%03X", $funcNumber) . " not supported.";
@@ -11693,6 +12257,13 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "setpointSummerMode") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^\d+$/ && $attrVal >= 0 && $attrVal <= 100) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
   } elsif ($attrName eq "shutTime") {
     my $data;
     if (!defined $attrVal) {
@@ -11767,7 +12338,7 @@ sub EnOcean_Attr(@)
   } elsif ($attrName eq "teachMethod") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^1BS|4BS|GP|RPS|smartAck|STE|UTE$$/) {
+    } elsif ($attrVal !~ m/^1BS|4BS|confirm|GP|RPS|smartAck|STE|UTE$$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -11812,6 +12383,13 @@ sub EnOcean_Attr(@)
         readingsSingleUpdate($hash, "waitingCmds", $waitingCmds, 0);
       }
     } else {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "trackerWakeUpCycle") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^30|60|3600|86400$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -13394,7 +13972,7 @@ sub EnOcean_SndCdm($$$$$$$$)
   my ($seq, $idx, $len, $dataPart, $dataPartLen) = (0, 0, length($data) / 2, undef, 14);
   # split telelegram with optional data
   $dataPartLen = 9 if ($destinationID ne "FFFFFFFF");
-  if ($len > $dataPartLen) {
+  if ($packetType == 1 && $len > $dataPartLen) {
     # first CDM telegram
     if ($dataPartLen == 14) {
       $data =~ m/^(....................)(.*)$/;
@@ -14144,11 +14722,23 @@ sub EnOcean_RespTimeout($) {
 }
 
 #
-sub EnOcean_cdmClear($) {
+sub EnOcean_setTeachConfirmWaitHash($) {
+  my ($ctrl, $hash) = @_;
+  if (AttrVal($hash->{NAME}, "teachMethod", "") eq 'confirm') {
+    $hash->{IODev}{helper}{teachConfirmWaitHash} = $hash;
+    my %functionHash = (hash => $hash->{IODev}, function => "teachConfirmWaitHash");
+    RemoveInternalTimer(\%functionHash);
+    InternalTimer(gettimeofday() + 5, "EnOcean_helperClear", \%functionHash, 0);
+  }
+  return;
+}
+
+#
+sub EnOcean_helperClear($) {
   my ($functionHash) = @_;
   my $function = $functionHash->{function};
   my $hash = $functionHash->{hash};
-  delete $hash->{helper}{cdm};
+  delete $hash->{helper}{$function};
   return;
 }
 
@@ -15125,6 +15715,15 @@ EnOcean_Delete($$)
   ID are sent the device is clearly identifiable. Fhem automatically assigns
   these devices to the correct profile.
   <br><br>
+  4BS devices can also be taught in special cases by using of confirmation telegrams. This method 
+  is used for the EnOcean Tipp-Funk devices. The function is activated via the attribute [<a href="#EnOcean_teachMethod">teachMethod</a>] = confirm.<br>
+  For example the remote device Eltako TF100D can be learned as follows
+  <ul><br>
+  <code>set &lt;name&gt; EnOcean H5-38-08</code><br>
+  set TF100D in learning mode<br>
+  <code>set &lt;name&gt; teach</code>
+  </ul>
+  <br>
   Some 4BS, VLD or MSC devices must be paired bidirectional,
   see <a href="#EnOcean_teach-in">Teach-In / Teach-Out</a>.
   <br><br>
@@ -15309,11 +15908,25 @@ EnOcean_Delete($$)
     The content of events is described in the chapter <a href="#EnOcean_remoteEvents">Remote Management Events</a><br><br>.
     The following extended functions are supported:
     <ul>
-    <li>201:remoteLearn</li>
-    <li>220:remoteLinkTableInfo (teach-in supported link tables query)</li>
-    <li>221:remoteLinkTableOut (teach-in outbound table request)</li>
-    <li>222:remoteLinkTableOutRange (teach-in outbound table range request)</li>
-    <li>223:remoteTeachInReq (teach-in request)</li>
+      <li>210:remoteLinkTableInfo</li>
+      <li>211:remoteLinkTable</li>
+      <li>212:remoteLinkTable</li>
+      <li>213:remoteLinkTableGP</li>
+      <li>214:remoteLinkTableGP</li>
+      <li>220:remoteLearnMode</li>
+      <li>221:remoteTeach</li>
+      <li>224:remoteReset</li>
+      <li>225:remoteRLT</li>
+      <li>226:remoteApplyChanges</li>
+      <li>227:remoteProductID</li>
+      <li>230:remoteDevCfg</li>
+      <li>231:remoteDevCfg</li>
+      <li>232:remoteLinkCfg</li>
+      <li>233:remoteLinkCfg</li>
+      <li>240:remoteAck</li>
+      <li>250:remoteRepeater</li>
+      <li>251:remoteRepeater</li>
+      <li>252:remoteRepeaterFilter</li>
     </ul>
     <br><br>
   </ul>
@@ -15416,7 +16029,7 @@ EnOcean_Delete($$)
      <li>G5-38-08 Gateway, Dimming [Eltako FSG, FUD]<br></li>
      <li>H5-38-08 Gateway, Dimming [Eltako TF61D, TF100D]<br></li>
      <li>M5-38-08 Gateway, Switching [Eltako FSR14]<br></li>
-     <li>N5-38-08 Gateway, Switching [Eltako TF61L, TF61R, TF100L]<br></li>
+     <li>N5-38-08 Gateway, Switching [Eltako TF61L, TF61R, TF100A, TF100L]<br></li>
      <li>G5-3F-7F Shutter [Eltako FSB]<br></li>
      <li>H5-3F-7F Shutter [Eltako TF61J]<br></li>
      <li>L6-02-01 Smoke Detector [Eltako FRW]<br></li>
@@ -15556,18 +16169,48 @@ EnOcean_Delete($$)
     where <code>value</code> is
         <li>remoteAction<br>
           sent action command to perfoms an action, depending on the functionality of the device</li>
+         <li>remoteApplyChanges devCfg|linkTable|no_change<br>
+          apply changes</li>
+         <li>remoteDevCfg &lt;index&gt; &lt;value&gt;<br>
+          set configuration</li>
+         <li>remoteLinkTable in|out &lt;index&gt; &lt;ID&gt; &lt;EEP&gt; &lt;channel&gt;<br>
+          set link table content</li>
+         <li>remoteLinkCfg in|out &lt;index&gt; &lt;data index&gt; &lt;value&gt;<br>
+          set link based configuration</li>
+         <li>remoteLinkTableGP in|out &lt;index&gt; &lt;GP channel description&gt;<br>
+          set link table content</li>
          <li>remoteLock<br>
           locks the remote device or local client</li>
-        <li>remoteLearn in|out<br>
-          initiate remote learn-in or learn-out (extended function 201)</li>
+        <li>remoteLearnMode in|out|off &lt;index&gt;<br>
+          initiate remote learn-in or learn-out of inbound index</li>
+         <li>remoteReset devCfg|linkTableIn|linkTableOut|no_change<br>
+          reset to defaults</li>
+         <li>remoteRLT on|off &lt;number of RLT slaves&gt;<br>
+          reset to defaults</li>
+         <li>remoteRepeater on|off|filter &lt;level&gt; &lt;filter structure&gt;<br>
+          set repeater functions</li>
+         <li>remoteRepeaterFilter apply|block|delete|deleteAll destinationID|sourceID|rorg|rssi &lt;filter value&gt;<br>
+          set repeater functions</li>
          <li>remoteSetCode<br>
           set the remote security code</li>
-         <li>remoteTeachInReq [0000...FFFF]<br>
-          request teach-in telegram according to the specified outbound reference index</li>
+         <li>remoteTeach &lt;channel&gt;<br>
+          request teach-in telegram from channel 00..FF</li>
          <li>remoteUnlock [1...1800]<br>
-          unlocks the remote device or local client</li>
+          unlocks the remote device or local client<br>
+          The unlock period can be set in the client mode between 1s and 1800 s.</li>
+          <br>
+      [&lt;channel&gt;] = 00...FF<br>
+      [&lt;EEP&gt;] = &lt;RORG&gt;-&lt;function&gt;-&lt;type&gt;<br>
+      [&lt;filter structure&gt;] = AND|OR<br>
+      [&lt;filter value&gt;] = &lt;destinationID&gt;|&lt;sourceID&gt;|&lt;RORG&gt;|&lt;LP/dBm&gt;<br>
+      [&lt;GP channel description&gt;] = &lt;name of channel 00&gt;:&lt;O|I&gt;:&lt;channel type&gt;:&lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]]<br>
+      [&lt;ID&gt;] = 00000001...FFFFFFFE<br>
+      [&lt;index&gt;] = 00...FF<br>
+      [&lt;number of RLT slaves&gt;] = 01..7F<br>
+      [&lt;level&gt;] = 1|2<br>
+      [&lt;data index&gt;] = 0000...FFFF<br>
+      [&lt;value&gt;] = n x 00...FF<br>
     </ul><br>
-      The unlock period can be set in the client mode between 1s and 1800 s.
     </li><br>
 
     <li>Switch, Pushbutton Switch (EEP F6-02-01 ... F6-03-02)<br>
@@ -15868,6 +16511,7 @@ EnOcean_Delete($$)
          <li><a href="#EnOcean_pidSensorTimeout">pidSensorTimeout</a></li>
          <li><a href="#EnOcean_rcvRespAction">rcvRespAction</a></li>
          <li><a href="#EnOcean_setpointRefDev">setpointRefDev</a></li>
+         <li><a href="#EnOcean_setpointSummerMode">setpointSummerMode</a></li>
          <li><a href="#EnOcean_setpointTempRefDev">setpointTempRefDev</a></li>
          <li><a href="#temperatureRefDev">temperatureRefDev</a></li>
          <li><a href="#EnOcean_summerMode">summerMode</a></li>
@@ -16736,20 +17380,32 @@ EnOcean_Delete($$)
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is
+        <li>remoteDevCfg &lt;start data index&gt; &lt;end data index&gt;<br>
+          get device configuration between start index and end index</li>
         <li>remoteFunctions<br>
           get a list of the supported extended functions</li>
          <li>remoteID<br>
           get the remote device ID</li>
         <li>remoteLinkTableInfo<br>
           query supported link table info</li>
-        <li>remoteLinkTableOut<br>
-          get outbound table with REF descriptions</li>
-        <li>remoteLinkTableOutRange [0000...FFFF] [0000...FFFF]<br>
-          get outbound table with REF descriptions between Start REF and End REF</li>
+        <li>remoteLinkCfg in|out &lt;index&gt; &lt;start data index&gt; &lt;end data index&gt; &lt;length&gt;<br>
+          get link table between start index and end index</li>
+        <li>remoteLinkTable in|out &lt;start index&gt; &lt;end index&gt;<br>
+          get link table between start index and end index</li>
+        <li>remoteLinkTableGP in|out &lt;index&gt;<br>
+          get link table GP entry with index</li>
         <li>remotePing<br>
           get a ping response from the remote device</li>
+        <li>remoteProductID<br>
+          query product ID</li>
+        <li>remoteRepeater<br>
+          asks for the repeater status of the remote device</li>
         <li>remoteStatus<br>
           asks for the status info of the remote device</li>
+        <br>
+       [&lt;data index&gt;] = 0000...FFFF<br>
+       [&lt;index&gt;] = 00...FF<br>
+       [&lt;length&gt;] = n x 00...FF<br>
     </ul>
     </li><br><br>
 
@@ -17266,6 +17922,9 @@ EnOcean_Delete($$)
     <li><a name="scaleDecimals">scaleDecimals</a> 0 ... 9<br>
       Decimal rounding with x digits of the scaled reading setpoint
     </li>
+    <li><a name="EnOcean_teachMethod">teachMethod</a> 1BS|4B|confirm|GP|RPS|smartAck|STE|UTE<br>
+      teach-in method
+    </li>
     <li><a name="scaleMax">scaleMax</a> &lt;floating-point number&gt;<br>
       Scaled maximum value of the reading setpoint
     </li>
@@ -17299,6 +17958,10 @@ EnOcean_Delete($$)
     <li><a name="EnOcean_setpointRefDev">setpointRefDev</a> &lt;name&gt;<br>
       Name of the device whose reference value is read. The reference values is
       the reading setpoint.
+    </li>
+    <li><a name="EnOcean_setpointSummerMode">setpointSummerMode</a> valvePos/%,
+        [setpointSummerMode] = 0...100, 0 is default<br>
+      Valve position in summer operation
     </li>
     <li><a name="EnOcean_setpointTempRefDev">setpointTempRefDev</a> &lt;name&gt;<br>
       Name of the device whose reference value is read. The reference values is
@@ -17411,7 +18074,8 @@ EnOcean_Delete($$)
     </li>
     <li><a name="EnOcean_summerMode">summerMode</a> off|on,
       [summerMode] = off is default.<br>
-      Put Battery Powered Actuator (hvac.01) or Heating Radiator Actuating Drive (hvac.04) in summer operation to reduce energy consumption.
+      Put Battery Powered Actuator (hvac.01) or Heating Radiator Actuating Drive (hvac.04) in summer operation
+      to reduce energy consumption. If [summerMode] = on, the set commands are not executed.
     </li>
     <li><a name="EnOcean_switchHysteresis">switchHysteresis</a> &lt;value&gt;,
       [switchHysteresis] = 1 is default.<br>
@@ -17469,6 +18133,9 @@ EnOcean_Delete($$)
       The Room Control Panel Kieback & Peter RBW322-FTL supports only [roomCtrlMode] = comfort.<br>
       timeProgram is supported for roomCtrlPanel.00.
       </li>
+    <li><a name="EnOcean_trackerWakeUpCycle">trackerWakeUpCycle</a> t/s, [wakeUpCycle] = 30 s, 60 s, 3600, 86400 s, 30 s is default.<br>
+      Transmission cycle of the tracker.
+    </li>
     <li><a name="EnOcean_updateState">updateState</a> default|yes|no, [updateState] = default is default.<br>
       update reading state after set commands
       </li>
@@ -17477,8 +18144,7 @@ EnOcean_Delete($$)
       </li>
     <li><a href="#verbose">verbose</a></li>
     <li><a name="EnOcean_wakeUpCycle">wakeUpCycle</a> t/s, [wakeUpCycle] = 10 s ... 151200 s, 300 s is default.<br>
-      Name of the device whose reference value is read. The reference values is
-      the reading temperature.
+      Transmission cycle of the actuator.
     </li>
     <li><a href="#webCmd">webCmd</a></li>
     </ul>
@@ -17492,14 +18158,19 @@ EnOcean_Delete($$)
 
      <li><a name="EnOcean_remoteEvents">Remote Management</a><br>
      <ul>
+         <li>remoteDevCfg&lt;0000...FFFF&gt;: &lt;device config&gt;</li>
          <li>remoteFunction&lt;01...99&gt;: &lt;remote function number&gt;:&lt;remote manufacturer ID&gt;:&lt;explanation&gt;</li>
          <li>remoteLastFunctionNumber: 001...FFF</li>
          <li>remoteLastStatusReturnCode: 00...FF</li>
-         <li>remoteLinkTableDesc&lt;0000...FFFF&gt;:&lt;DeviceID&gt;:&lt;EEP&gt;:&lt;channel&gt;</li>
-         <li>remoteLinkTableIn: not_supported|supported</li>
-         <li>remoteLinkTableInMax: 0000...FFFF</li>
-         <li>remoteLinkTableOut: not_supported|supported</li>
-         <li>remoteLinkTableOutMax: 0000...FFFF</li>
+         <li>remoteLearn: not_supported|supported</li>
+         <li>remoteLinkCfg&lt;in|out&gt;&lt;00...FF&gt;: &lt;data index&gt;:&lt;device config&gt;</li>
+         <li>remoteLinkTableDesc&lt;in|out&gt;&lt;00...FF&gt;: &lt;DeviceID&gt;:&lt;EEP&gt;:&lt;channel&gt;</li>
+         <li>remoteLinkTableGPDesc&lt;in|out&gt;&lt;00...FF&gt;: &lt;name of channel 00&gt;:&lt;O|I&gt;:&lt;channel type&gt;:&lt;signal type&gt;:&lt;value type&gt;[:&lt;resolution&gt;[:&lt;engineering min&gt;:&lt;scaling min&gt;:&lt;engineering max&gt;:&lt;scaling max&gt;]]</li>
+         <li>remoteProductID: 00000000...FFFFFFFF</li>
+         <li>remoteRepeaterFilter: AND|OR</li>
+         <li>remoteRepeaterFunction: on|off|filter</li>
+         <li>remoteRepeaterLevel: 1|2</li>
+         <li>remoteTeach: not_supported|supported</li>         
          <li>remoteRSSI: LP/dBm</li>
          <li>teach: &lt;result of teach procedure&gt;</li>
      </ul>
@@ -17811,7 +18482,8 @@ EnOcean_Delete($$)
      </ul><br>
         The attr subType must be occupSensor.01. This is done if the device was
         created by autocreate. The attr model has to be set manually to tracker.
-        Alternatively, the profile will be defined with inofficial EEP G5-07-01.
+        Alternatively, the profile will be defined with inofficial EEP G5-07-01.<br>
+        The transmission cycle is set using the attribute <a href="#EnOcean_trackerWakeUpCycle">trackerWakeUpCycle</a>.
      </li>
      <br><br>
 
