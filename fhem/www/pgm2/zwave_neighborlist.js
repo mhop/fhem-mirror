@@ -2,9 +2,9 @@ var zw_visible;
 var svgns = 'xmlns="http://www.w3.org/2000/svg"';
 
 function
-zw_nr(dev, dpos)
+zw_nr(dongle, dpos)
 {
-  log("ZWNR called for "+dev+": "+zw_visible);
+  log("ZWNR called for "+dongle+": "+zw_visible);
   zw_visible = !zw_visible;
   var txt = (zw_visible ? 'Hide' : 'Show');
 
@@ -22,10 +22,10 @@ zw_nr(dev, dpos)
   var h={}, ldev, xpos=20, ypos=20; 
   var dp = dpos.split(",");
         
-  h[dev] = { txt:dev, pos:[ parseInt(dp[0]), parseInt(dp[1]) ], lines:[], 
-             width:40, height:30 };
+  h[dongle] = { txt:dongle, pos:[ parseInt(dp[0]), parseInt(dp[1]) ], lines:[], 
+                width:40, height:30, class:'zwDongle', neighbors:[] };
 
-  var cmd = FW_root+"?cmd=list ZWaveSubDevice=no,FILTER=IODev="+dev+
+  var cmd = FW_root+"?cmd=list ZWaveSubDevice=no,FILTER=IODev="+dongle+
                             " neighborList timeToAck neighborListPos&XHR=1";
   FW_cmd(cmd, function(r){
     console.log(r);
@@ -43,8 +43,11 @@ zw_nr(dev, dpos)
 
       } else if(cols[3] == 'neighborList') {
         cols.splice(0,4);
+        for(var i2=0; i2<cols.length; i2++)
+          if(cols[i2] == dongle)
+            h[dongle].neighbors.push(ldev);
         h[ldev] = { txt:ldev, neighbors:cols,pos:[xpos,ypos], lines:[],
-                    width:40, height:30 };
+                    width:40, height:30, class:'zwBox' };
         xpos += 150;
         if(xpos >= width) {
           xpos = 20; ypos += 50;
@@ -61,6 +64,16 @@ zw_draw(h, width, height)
 {
   var svg = '<svg '+svgns+' style="width:'+width+';height:'+height+'" '+
                   'class="zw_nr" viewBox="0 0 '+width+' '+height+'">';
+  svg += '<defs>'+
+            '<marker id="endarrow" markerWidth="20" markerHeight="20" '+
+                'refx="50" refy="6" orient="auto" markerUnits="strokeWidth">'+
+              '<path d="M0,0 L0,12 L18,6 z" fill="#278727" />'+
+             '</marker>'+
+            '<marker id="startarrow" markerWidth="20" markerHeight="20" '+
+                'refx="-50" refy="6" orient="auto" markerUnits="strokeWidth">'+
+              '<path d="M18,0 L18,12 L0,6 z" fill="#278727" />'+
+             '</marker>'+
+          '</defs>';
   svg += '<rect class="zwMargin" x="1" y="1" width="'+
                 (width-1)+'" height="'+(height-1)+'"/>';
   var ld={};
@@ -82,10 +95,10 @@ zw_draw(h, width, height)
     .html(svg);
 
   $("svg g").each(function(){
-    var w = $(this).find("text").width();
-    $(this).find("rect").attr("width",w+10);
-    $(this).css("cursor", "pointer");
     var name = $(this).attr("data-name");
+    var w = $(this).find("text")[0].getBBox().width;
+    $(this).find("rect").attr("width",w+10);
+    $(this).css({cursor:"pointer", position:"absolute"}); // firefox is relative
     h[name].width = w+10;
     zw_adjustLines(h, name);
   })
@@ -116,20 +129,33 @@ zw_drawbox(o)
 {
   var s = '<g data-name="'+o.txt+'">'+
             '<rect x="'+o.pos[0]+'" y="'+o.pos[1]+'" rx="5" ry="5" '+
-                'width="'+o.width+'" height="'+o.height+'" class="zwBox"/>';
+              'width="'+o.width+'" height="'+o.height+'" class="'+o.class+'"/>';
   s += '<text x="'+(o.pos[0]+5)+'" y="'+(o.pos[1]+20)+'">'+o.txt+'</text></g>';
   return s;
 }
 
 function
+zw_calcPos(o, n)
+{
+  return { x: o.pos[0]+o.width/2, y: o.pos[1]+o.height/2 };
+}
+
+function
 zw_drawline(ld, h, o, n)
 {
+  if(!h[o] || !h[n])
+    return "";
+  var bidi = false;
+  for(var i1=0; i1<h[n].neighbors.length; i1++)
+    if(h[n].neighbors[i1] == o)
+      bidi = true;
+
   if(n < o) {
     var t = n; n = o; o = t;
   }
   var cl = o+"-"+n;
-  if(ld[cl] || !h[o] || !h[n])
-    return;
+  if(ld[cl])
+    return "";
   ld[cl] = 1;
   h[o].lines.push(cl);
   h[n].lines.push(cl);
@@ -137,13 +163,10 @@ zw_drawline(ld, h, o, n)
   var to = zw_calcPos(h[n], h[o]);
   return '<line class="zwLine" data-name="'+cl+
                '" x1="'+fr.x+'" y1="'+fr.y+
-               '" x2="'+to.x+'" y2="'+to.y+'"/>';
-}
-
-function
-zw_calcPos(o, n)
-{
-  return { x: o.pos[0]+o.width/2, y: o.pos[1]+o.height/2 };
+               '" x2="'+to.x+'" y2="'+to.y+'"'+
+                 ' marker-end="url(#endarrow)"'+
+                 (bidi?' marker-start="url(#startarrow)"':'')+
+               '/>';
 }
 
 function
