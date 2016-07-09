@@ -249,3 +249,9 @@ div#svgmarker {
   color:black; background:#999;
   border:1px solid #fff; border-radius:4px;
 }
+
+.zwBox { stroke:#c0c0c0; stroke-width:2px; fill:#f7f7f7; }
+.zwDongle { stroke:red; stroke-width:2px; fill:#f7f7f7; }
+.zwMargin { stroke:#c0c0c0; stroke-width:1px; fill:none; }
+.zwLine { stroke:#c0c0c0; stroke-width:1px; }
+.zwArrowHead { fill:#c0c0c0; stroke-width:1px; }

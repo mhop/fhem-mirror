@@ -137,3 +137,4 @@ select [value^=l8] { color: yellow; }
 .zwDongle { stroke:red; stroke-width:2px; fill:#F0F0D8; }
 .zwMargin { stroke:#278727; stroke-width:1px; fill:none; }
 .zwLine { stroke:#278727; stroke-width:1px; }
+.zwArrowHead { fill:#278727; stroke-width:1px; }
