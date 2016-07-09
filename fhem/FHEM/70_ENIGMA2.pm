@@ -746,7 +746,7 @@ sub ENIGMA2_Define($$) {
 
     if ( int(@a) < 3 ) {
         my $msg =
-"Wrong syntax: define <name> ENIGMA2 <ip-or-hostname> [<port>] [<poll-interval>] [<http-user] [<http-password>]";
+"Wrong syntax: define <name> ENIGMA2 <ip-or-hostname> [[[[<port>] [<poll-interval>]] [<http-user]] [<http-password>]]";
         Log3 $name, 4, $msg;
         return $msg;
     }
@@ -2859,7 +2859,7 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
     <ul>
       <a name="ENIGMA2define" id="ENIGMA2define"></a> <b>Define</b>
       <ul>
-        <code>define &lt;name&gt; ENIGMA2 &lt;ip-address-or-hostname&gt; [&lt;port&gt;] [&lt;poll-interval&gt;] [&lt;http-user&gt;] [&lt;http-password&gt;]</code><br>
+        <code>define &lt;name&gt; ENIGMA2 &lt;ip-address-or-hostname&gt; [[[[&lt;port&gt;] [&lt;poll-interval&gt;]] [&lt;http-user&gt;]] [&lt;http-password&gt;]]</code><br>
         <br>
         This module controls ENIGMA2 based devices like Dreambox or VUplus via network connection.<br>
         <br>
