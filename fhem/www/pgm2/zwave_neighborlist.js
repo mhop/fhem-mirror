@@ -186,5 +186,9 @@ zw_adjustLines(h, name)
         .attr("x2", p.x)
         .attr("y2", p.y);
     }
+    if (navigator.appVersion.indexOf("Trident") != -1) {
+      var svgNode = $("svg line[data-name="+la[i1]+"]")[0];
+      svgNode.parentNode.insertBefore(svgNode, svgNode);
+    }
   }
 }
