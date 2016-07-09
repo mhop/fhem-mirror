@@ -13,3 +13,9 @@ div.ui-widget-content a {color: #CCCCCC!important; text-decoration: none!importa
 div.detLink { display:inline-block; margin-right:0.5em; }
 
 .fhemlog { color:#FFFFFF; }
+
+.zwBox { stroke:#fff; stroke-width:2px; fill:#000; }
+.zwDongle { stroke:red; stroke-width:2px; fill:#000; }
+.zwMargin { stroke:#fff; stroke-width:1px; fill:none; }
+.zwLine { stroke:#fff; stroke-width:1px; }
+.zwArrowHead { fill:#fff; stroke-width:1px; }
