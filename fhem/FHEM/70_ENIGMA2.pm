@@ -505,10 +505,12 @@ sub ENIGMA2_Set($@) {
               "ENIGMA2 set $name " . $a[1] . " " . $a[2] . " " . $a[3]
               if defined( $a[3] );
 
-            my $commandKeys = join( " ", sort keys %{
-               ENIGMA2_GetRemotecontrolCommand(
-                  "GetRemotecontrolCommands")
-            });
+            my $commandKeys = join(
+                " ",
+                sort keys %{
+                    ENIGMA2_GetRemotecontrolCommand("GetRemotecontrolCommands")
+                }
+            );
             if ( !defined( $a[2] ) ) {
                 return "No argument given, choose one of" . $commandKeys;
             }
@@ -565,14 +567,18 @@ sub ENIGMA2_Set($@) {
         if ( $state eq "on" ) {
             my $cname = $a[2];
             if ( defined( $hash->{helper}{bouquet}{$input}{$cname}{sRef} ) ) {
-                $result = ENIGMA2_SendCommand( $hash, "zap",
+                $result = ENIGMA2_SendCommand(
+                    $hash, "zap",
                     "sRef="
-                      . urlEncode( $hash->{helper}{bouquet}{$input}{$cname}{sRef} )
+                      . urlEncode(
+                        $hash->{helper}{bouquet}{$input}{$cname}{sRef}
+                      )
                 );
             }
-            elsif ( $cname =~ m/^(\d+):(.*):$/) {
+            elsif ( $cname =~ m/^(\d+):(.*):$/ ) {
                 $result =
-                  ENIGMA2_SendCommand( $hash, "zap", "sRef=" . urlEncode($cname) );
+                  ENIGMA2_SendCommand( $hash, "zap",
+                    "sRef=" . urlEncode($cname) );
             }
             elsif ( $cname =~ m/^\d+$/ && $cname > 0 && $cname < 10000 ) {
                 for ( split( //, $a[2] ) ) {
@@ -752,10 +758,13 @@ sub ENIGMA2_Define($$) {
 
     # use port 80 if not defined
     my $port = $a[3] || 80;
+    return "Port parameter needs to be of type integer" if ( $port !~ /^\d+$/ );
     $hash->{helper}{PORT} = $port;
 
     # use interval of 45sec if not defined
     my $interval = $a[4] || 45;
+    return "Interval parameter needs to be of type integer"
+      if ( $interval !~ /^\d+$/ );
     $hash->{INTERVAL} = $interval;
 
     # set http user if defined
@@ -1362,8 +1371,9 @@ sub ENIGMA2_ReceiveCommand($$$) {
 
                 # General readings
                 foreach my $reading (
-                    "enigmaversion", "imageversion", "webifversion",
-                    "fpversion",     "lanmac",       "model",
+                    "enigmaversion", "imageversion",
+                    "webifversion",  "fpversion",
+                    "lanmac",        "model",
                   )
                 {
                     $e2reading = "e2" . $reading;
