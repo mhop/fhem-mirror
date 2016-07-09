@@ -1424,7 +1424,7 @@ SVG_render($$$$$$$$$$)
   $fromsec = SVG_time_to_sec($from) if($from ne "0"); # 0 is special
   $tosec   = SVG_time_to_sec($to)   if($to ne "9");   # 9 is special
   my $tmul; 
-  $tmul = $w/($tosec-$fromsec) if($tosec && $fromsec);
+  $tmul = $w/($tosec-$fromsec) if($tosec && $fromsec && $tosec != $fromsec);
 
   my ($min, $max, $idx) = (99999999, -99999999, 0);
   my (%hmin, %hmax, @hdx, @hdy);
@@ -1505,7 +1505,7 @@ SVG_render($$$$$$$$$$)
   if(!$tmul) {                     # recompute the x data if no range sepcified
     $fromsec = SVG_time_to_sec($dxp->[0]) if(!$fromsec);
     $tosec = SVG_time_to_sec($dxp->[int(@{$dxp})-1]) if(!$tosec);
-    $tmul = $w/($tosec-$fromsec);
+    $tmul = $w/($tosec-$fromsec) if($tosec != $fromsec);
 
     for my $i (0..@hdx-1) {
       $dxp = $hdx[$i];
