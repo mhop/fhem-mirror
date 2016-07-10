@@ -2,15 +2,14 @@ var zw_visible;
 var svgns = 'xmlns="http://www.w3.org/2000/svg"';
 
 function
-zw_nr(dongle, dpos)
+zw_nl(fhemFn)
 {
-  log("ZWNR called for "+dongle+": "+zw_visible);
+  log("ZWNL called with "+fhemFn);
   zw_visible = !zw_visible;
   var txt = (zw_visible ? 'Hide' : 'Show');
 
-  var width=720,height=480;
-  $('#ZWDongleNr')
-        .html('<a href="#">'+txt+' neighbor list</a>');
+  var width=960,height=480;
+  $('#ZWDongleNr').html('<a href="#">'+txt+' neighbor map</a>');
 
   if(!zw_visible) {
     $("#ZWDongleNrSVG")
@@ -19,49 +18,32 @@ zw_nr(dongle, dpos)
     return;
   }
 
-  var h={}, ldev, xpos=20, ypos=20; 
-  var dp = dpos.split(",");
-        
-  h[dongle] = { txt:dongle, pos:[ parseInt(dp[0]), parseInt(dp[1]) ], lines:[], 
-                width:40, height:30, class:'zwDongle', neighbors:[] };
+  FW_cmd(FW_root+"?cmd={"+fhemFn+"}&XHR=1", function(r){
+    var xpos=20, ypos=20, fnRet = JSON.parse(r);
 
-  var cmd = FW_root+"?cmd=list ZWaveSubDevice=no,FILTER=IODev="+dongle+
-                            " neighborList timeToAck neighborListPos&XHR=1";
-  FW_cmd(cmd, function(r){
-    console.log(r);
-    var la = r.split("\n");
-    for(var i1=0; i1<la.length; i1++) {
-      var cols = la[i1].split(/ +/);
-      if(cols[0] != '')
-        ldev = cols[0];
-      if(cols[1] == 'neighborListPos') {
-        var p = cols[2].split(",");
-        h[ldev].pos = [ parseInt(p[0]), parseInt(p[1]) ];
-
-      } else if(cols[3] == 'timeToAck') {
-        // h[ldev].txt += ' ('+cols[4]+')';
-
-      } else if(cols[3] == 'neighborList') {
-        cols.splice(0,4);
-        for(var i2=0; i2<cols.length; i2++)
-          if(cols[i2] == dongle)
-            h[dongle].neighbors.push(ldev);
-        h[ldev] = { txt:ldev, neighbors:cols,pos:[xpos,ypos], lines:[],
-                    width:40, height:30, class:'zwBox' };
+    var cnt=0;
+    for(var elName in fnRet.el) {
+      var el = fnRet.el[elName];
+      el.lines = [];
+      el.width = el.height = 30;
+      if(!el.pos.length) {
+        el.pos = [xpos, ypos];
         xpos += 150;
-        if(xpos >= width) {
-          xpos = 20; ypos += 50;
-        }
-
+        if(xpos+150 >= width)
+          xpos = 20, ypos += 50;
       }
+      cnt++;
     }
-    zw_draw(h, width, height);
+    if(height < cnt*35)
+      height = cnt*35;
+    zw_draw(fnRet, width, height);
   });
 }
 
 function
-zw_draw(h, width, height)
+zw_draw(fnRet, width, height)
 {
+  var h = fnRet.el;
   var svg = '<svg '+svgns+' style="width:'+width+';height:'+height+'" '+
                   'class="zw_nr" viewBox="0 0 '+width+' '+height+'">';
   svg += '<defs>'+
@@ -105,8 +87,9 @@ zw_draw(h, width, height)
   .draggable()
   .bind('mouseup', function(e) {
     var name = $(e.target).parent().attr("data-name");
-    FW_cmd(FW_root+"?cmd=attr "+name+" neighborListPos "+
-                h[name].pos[0]+","+h[name].pos[1]+"&XHR=1");
+    if(fnRet.saveFn)
+      FW_cmd(FW_root+"?cmd="+sprintf(fnRet.saveFn, name, 
+                                h[name].pos[0]+","+h[name].pos[1])+"&XHR=1");
   })
   .bind('mousedown', function(e) {
     o = h[$(e.target).parent().attr("data-name")];
@@ -192,6 +175,18 @@ zw_adjustLines(h, name)
     }
   }
 }
+
+/////////////////////////////////////
+// fmt contains {1}, {2}, ...
+function
+sprintf() {
+  var formatted = arguments[0];
+  for (var i = 1; i < arguments.length; i++) {
+    var regexp = new RegExp('\\{'+i+'\\}', 'gi');
+    formatted = formatted.replace(regexp, arguments[i]);
+  }
+  return formatted;
+};
 
 
 /*!

@@ -19,3 +19,4 @@ div.detLink { display:inline-block; margin-right:0.5em; }
 .zwMargin { stroke:#fff; stroke-width:1px; fill:none; }
 .zwLine { stroke:#fff; stroke-width:1px; }
 .zwArrowHead { fill:#fff; stroke-width:1px; }
+svg.zw_nr { height:auto; width:auto; margin:0; }
