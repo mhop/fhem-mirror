@@ -265,13 +265,14 @@ sub cfgDB_Init() {
 		my $uuid = _cfgDB_Uuid;
 		$fhem_dbh->do("INSERT INTO fhemversions values (0, '$uuid')");
 		_cfgDB_InsertLine($fhem_dbh, $uuid, '#created by cfgDB_Init',0);
-		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logfile ./log/fhem-%Y-%m-%d.log',1);
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logdir ./log',1);
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global logfile %L/fhem-%Y-%m-%d.log',1);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global modpath .',2);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global userattr devStateIcon devStateStyle icon sortby webCmd',3);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'attr global verbose 3',4);
 		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define telnetPort telnet 7072 global',5);
-		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define WEB FHEMWEB 8083 global',6);
-		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog ./log/fhem-%Y-%m-%d.log fakelog',7);
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define web FHEMWEB 8083 global',6);
+		_cfgDB_InsertLine($fhem_dbh, $uuid, 'define Logfile FileLog %L/fhem-%Y-%m-%d.log fakelog',7);
 	}
 
 #	create TABLE fhemstate if nonexistent
