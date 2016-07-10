@@ -1,4 +1,5 @@
 ##############################################################################
+# $Id$
 #
 #     70_Jabber.pm
 #     An FHEM Perl module for connecting to an Jabber XMPP Server and 
@@ -22,9 +23,10 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Version: 1.5 - 2015-09-17
+# Version: 1.6 - 2015-09-17
 #
 # Changelog:
+# v1.6 2016-07-10 Fix log message if otr message is empty (thx spikeh1)
 # v1.5 2015-09-17 Added OTR (Off the Record) end to end encryption
 #                 Added MUC (Multi-User-Channel) joining and handling
 # v1.4 2015-08-27 Fixed broken callback registration in Net::XMPP >= 1.04
@@ -671,7 +673,7 @@ sub Jabber_INC_Message {
     #When we have got no message after the OTR decrypt, we can leave this function.
 
     if (!defined($message) || $message eq "") {
-      Log 0, "$hash->{NAME} Message is empty after OTR decrypt.";
+      Log 0, "$hash->{NAME} Message is empty after OTR decrypt." if $debug;
       return undef;
     }
 

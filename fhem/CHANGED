@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  70_Jabber: log OTR empty message if debug-mode == 1 only
   - changed: 70_BRAVIA: re-worked state handling
   - feature: PRESENCE: new attribute presenceThreshold to define a number of
              checks that have to result in "present" before the state of
