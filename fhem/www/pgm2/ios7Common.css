@@ -34,3 +34,4 @@ div#svgmarker {
 .zwMargin { stroke:#c0c0c0; stroke-width:1px; fill:none; }
 .zwLine { stroke:#c0c0c0; stroke-width:1px; }
 .zwArrowHead { fill:#147bff; stroke-width:1px; }
+svg.zw_nr { height:auto; width:auto; margin:0; }

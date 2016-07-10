@@ -107,3 +107,10 @@ div#svgmarker {
 }
 
 div.detLink { display:inline-block; margin-right:0.5em; }
+
+.zwBox { stroke:#333333; stroke-width:2px; fill:#eeeeee; }
+.zwDongle { stroke:red; stroke-width:2px; fill:#eeeeee; }
+.zwMargin { stroke:#333333; stroke-width:1px; fill:none; }
+.zwLine { stroke:#333333; stroke-width:1px; }
+.zwArrowHead { fill:#333333; stroke-width:1px; }
+svg.zw_nr { height:auto; width:auto; margin:0; }

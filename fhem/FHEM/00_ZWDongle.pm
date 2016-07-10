@@ -141,6 +141,7 @@ ZWDongle_Define($$)
   return $ret;
 }
 
+#####################################
 sub
 ZWDongle_fhemwebFn($$$$)
 {
@@ -150,7 +151,7 @@ ZWDongle_fhemwebFn($$$$)
   my $np = AttrVal($d,'neighborListPos','360,430');
 
   return
-  "<div id='ZWDongleNr'><a href='#'>Show neighbor list</a></div>".
+  "<div id='ZWDongleNr'><a href='#'>Show neighbor map</a></div>".
   "<div id='ZWDongleNrSVG'></div>".
   "<script type='text/javascript' src='$js'></script>".
   '<script type="text/javascript">'.<<"JSEND"
@@ -159,12 +160,37 @@ ZWDongle_fhemwebFn($$$$)
         .css({cursor:"pointer"})
         .click(function(e){
           e.preventDefault();
-          zw_nr('$d', '$np');
+          zw_nl('ZWDongle_nlData("$d")');
         });
     });
   </script>
 JSEND
 }
+
+sub
+ZWDongle_nlData($)
+{
+  my ($d) = @_;
+  my @a = devspec2array("TYPE=ZWave,FILTER=IODev=$d");
+  my (@dn, %nb, @ret);
+
+  for my $e (@a) {
+    my $nl = ReadingsVal($e, "neighborList", ""); $nl =~ s/,/ /g;
+    my $pos = AttrVal($e, "neighborListPos", "");
+    push @dn, $e if($nl =~ m/\b$d\b/);
+    $nl = '"'.join('","',split(" ", $nl)).'"' if($nl);
+    push @ret, "\"$e\":{\"txt\":\"$e\",\"pos\":[$pos],".
+                       "\"class\":\"zwBox\",\"neighbors\":[$nl] }";
+    $nb{$e} = $nl;
+  }
+  my $pos = AttrVal($d, "neighborListPos", "");
+  my $nl = (@dn ? '"'.join('","',@dn).'"' : '');
+  push @ret, "\"$d\":{\"txt\":\"$d\", \"pos\":[$pos],".
+                     "\"class\":\"zwDongle\",\"neighbors\":[$nl] }";
+  return "{ \"saveFn\":\"attr {1} neighborListPos {2}\",".
+           "\"el\":{".join(",",@ret)."} }";
+}
+
 #####################################
 sub
 ZWDongle_Undef($$)

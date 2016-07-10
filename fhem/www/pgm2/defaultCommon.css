@@ -79,7 +79,7 @@ span.sort-item-delete-link {
 .set .set { margin-bottom:2px; margin-top:3px; }             /* timepicker */
 
 pre { white-space: pre-wrap; }
-svg:not(.zw_nr) { height:32px; width:32px; vertical-align:middle; margin:2px 0;}
+svg { height:32px; width:32px; vertical-align:middle; margin:2px 0;}
 svg:not([fill]):not(.jssvg) { fill:#278727; }
 
 svg.on,svg.FS20_on { fill:orange!important; }
@@ -138,3 +138,4 @@ select [value^=l8] { color: yellow; }
 .zwMargin { stroke:#278727; stroke-width:1px; fill:none; }
 .zwLine { stroke:#278727; stroke-width:1px; }
 .zwArrowHead { fill:#278727; stroke-width:1px; }
+svg.zw_nr { height:auto; width:auto; margin:0; }
