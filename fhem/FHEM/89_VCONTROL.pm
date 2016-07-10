@@ -42,6 +42,12 @@ use constant GET_TIMER_PAUSED => 0;
 use constant GET_CONFIG_ACTIVE => 1;
 use constant GET_CONFIG_PAUSED => 0;
 
+use constant PROTOCOL_KW  => 1;
+use constant PROTOCOL_GWG => 2;
+use constant PROTOCOL_300 => 3;
+
+my $viess_protocol = PROTOCOL_KW;
+
 #Poll Parameter
 my $defaultPollInterval = 180;
 my $last_cmd = 0;
@@ -228,9 +234,10 @@ sub VCONTROL_Define($$)
 
  
   #set Internal Timer on Polling Interval
-   my $timer = gettimeofday()+1;
-   Log3($name, 5, "VCONTROL set InternalTimer +1 to $timer");
+  my $timer = gettimeofday()+1;
+  Log3($name, 5, "VCONTROL set InternalTimer +1 to $timer");
 
+  RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+1, "VCONTROL_Poll", $hash, 0);
   return $ret;
 }
@@ -270,6 +277,7 @@ sub VCONTROL_Undef($$)
       }
   }
 
+  RemoveInternalTimer($hash);
   DevIo_CloseDev($hash);
   return undef;
 }
@@ -413,7 +421,13 @@ sub VCONTROL_Read($)
 #   if ( $read_now == READ_ANSWER && $poll_now == POLL_ACTIVE && $hexline ne "05"){
      $hexline = $hash->{PARTIAL}.$hexline;
      #if not received all bytes exit an read next
-     my $receive_len = hex(substr($cmd_list[$last_cmd][1],8,2))*2;
+     
+     my $receive_len = 0;
+     if ($viess_protocol == PROTOCOL_KW ) {
+        $receive_len = hex(substr($cmd_list[$last_cmd][1],8,2))*2;
+     } elsif ($viess_protocol == PROTOCOL_GWG ) {
+        $receive_len = hex(substr($cmd_list[$last_cmd][1],6,2))*2;
+     }
      if ( length($hexline) < $receive_len ){
         Log3 $name, 5,"VCONTROL: VCONTROL_Read receive_len < $receive_len, $hexline";
         $hash->{PARTIAL} = $hexline;
@@ -968,6 +982,8 @@ sub VCONTROL_CmdConfig($)
   undef @timer_cmd_list;
 #  undef @timer_ww_cmd_list;
   
+  $viess_protocol = PROTOCOL_KW;
+  
   while(<CMDDATEI>){
         my $zeile=trim($_);
         Log3 undef, 5, "VCONTROL: CmdConfig-Zeile $zeile";
@@ -979,8 +995,17 @@ sub VCONTROL_CmdConfig($)
               $_ = trim($_);
            } 
 
+           if ($cfgarray[0] eq "PROTOCOL"){
+              if (  $cfgarray[1] eq "GWG" ){
+                 $viess_protocol = PROTOCOL_GWG;
+              }
+              elsif ( $cfgarray[1] eq "300" ){
+                 $viess_protocol = PROTOCOL_300;
+              }
+           }
+
            #TODO: CHECK IF CONFIG PARAMS are allowed!!!  
-           if ($cfgarray[0] eq "POLL"){
+           elsif ($cfgarray[0] eq "POLL"){
               if (  $cfgarray[2] ne "1ByteU"
                  && $cfgarray[2] ne "1ByteU2"
                  && $cfgarray[2] ne "1ByteS" 
@@ -996,7 +1021,10 @@ sub VCONTROL_CmdConfig($)
                  ){
                  Log3 undef, 3, "VCONTROL: unknown parse method '$cfgarray[2]' in '$cmd_config_file'";
               }
-              elsif( index($cfgarray[1],"01F7") == -1 || length($cfgarray[1]) < 10 ){
+              elsif(  (($viess_protocol == PROTOCOL_KW)  && (index($cfgarray[1],"01F7") == -1 || length($cfgarray[1]) < 10 ))
+                   || (($viess_protocol == PROTOCOL_GWG) && (index($cfgarray[1],"01CB") == -1 || length($cfgarray[1]) < 10 ))
+                   )
+              {
                  Log3 undef, 3, "VCONTROL: wrong Address '$cfgarray[1]' in '$cmd_config_file'";
               }
               else {
@@ -1438,7 +1466,7 @@ sub VCONTROL_RegisterConv($)
 
        <li>lines beginning with "#" are comments!<br></li>
        <li>Polling Commands (POLL) to read values.<br></li>
-       <li>Set Commandos (SET) to set values.<br></li>
+       <li>Set Commands (SET) to set values.<br></li>
        <br>
        <b>Polling Commands have the following structure:<br><br></b>
 
