@@ -908,7 +908,7 @@ PRESENCE_DoLocalShellScriptScan($)
     
     $SIG{CHLD} = 'IGNORE';
     
-    $ret = qx($call);
+    $ret = qx($call 2>&1);
     
     if(defined($ret))
     {
