@@ -151,13 +151,12 @@ ZWDongle_fhemwebFn($$$$)
   my $np = AttrVal($d,'neighborListPos','360,430');
 
   return
-  "<div id='ZWDongleNr'><a href='#'>Show neighbor map</a></div>".
+  "<div id='ZWDongleNr'><a id='zw_snm' href='#'>Show neighbor map</a></div>".
   "<div id='ZWDongleNrSVG'></div>".
   "<script type='text/javascript' src='$js'></script>".
   '<script type="text/javascript">'.<<"JSEND"
     \$(document).ready(function() {
-      \$("div#ZWDongleNr")
-        .css({cursor:"pointer"})
+      \$("div#ZWDongleNr a#zw_snm")
         .click(function(e){
           e.preventDefault();
           zw_nl('ZWDongle_nlData("$d")');
@@ -175,7 +174,9 @@ ZWDongle_nlData($)
   my (@dn, %nb, @ret);
 
   for my $e (@a) {
-    my $nl = ReadingsVal($e, "neighborList", ""); $nl =~ s/,/ /g;
+    next if($defs{$e}{ZWaveSubDevice} ne "no");
+    my $nl = ReadingsVal($e, "neighborList", ""); 
+    $nl =~ s/,/ /g; $nl =~ s/\bempty\b//g;
     my $pos = AttrVal($e, "neighborListPos", "");
     push @dn, $e if($nl =~ m/\b$d\b/);
     $nl = '"'.join('","',split(" ", $nl)).'"' if($nl);
@@ -188,6 +189,7 @@ ZWDongle_nlData($)
   push @ret, "\"$d\":{\"txt\":\"$d\", \"pos\":[$pos],".
                      "\"class\":\"zwDongle\",\"neighbors\":[$nl] }";
   return "{ \"saveFn\":\"attr {1} neighborListPos {2}\",".
+           "\"firstObj\":\"$d\",".
            "\"el\":{".join(",",@ret)."} }";
 }
 
