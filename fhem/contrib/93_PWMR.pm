@@ -29,6 +29,8 @@
 # 27.01.16 GA add attribute desiredTempFrom to take desiredTemp from another object
 # 04.02.16 GA add DLookBackCnt, buffer holding previouse temperatures used for PID D-Part calculation
 # 08.02.16 GA add ILookBackCnt, buffer holding previouse temperatures used for PID I-Part calculation
+# 08.02.16 GA add valueFormat attribute
+# 29.06.16 GA add "set frostProtect on|off"
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -88,6 +90,7 @@ sub PWMR_SetRoom(@);
 sub PWMR_ReadRoom(@);
 sub PWMR_Attr(@);
 sub PWMR_Boost(@);
+sub PWMR_valueFormat(@);
 
 ###################################
 sub
@@ -115,6 +118,7 @@ PWMR_Initialize($)
 			"tempRule3 ".
 			"tempRule4 ".
 			"tempRule5 ".
+			"valueFormat:textField-long ".
  			"";
 
 }
@@ -366,7 +370,7 @@ PWMR_Set($@)
   $valList .= ",30.0";
   #my $u = "Unknown argument $a[1], choose one of factor actor:off,on desired-temp:knob,min:6,max:26,step:0.5,linecap:round interval manualTempDuration:slider,60,60,600";
   #my $u = "Unknown argument $a[1], choose one of factor actor:off,on desired-temp:uzsuDropDown:$valList interval manualTempDuration:slider,60,60,600";
-  my $u = "Unknown argument $a[1], choose one of factor actor:off,on desired-temp:$valList interval manualTempDuration:slider,60,60,600";
+  my $u = "Unknown argument $a[1], choose one of factor actor:off,on desired-temp:$valList interval manualTempDuration:slider,60,60,600 frostProtect:off,on";
 
   $valList = "slider,6,0.5,30,0.5";
 
@@ -435,6 +439,24 @@ PWMR_Set($@)
     my $val = $a[2];
     if ( $val eq "on" || $val eq "off" ) {
       PWMR_SetRoom($hash, $val);
+      return undef;
+    } else {
+      return "Unknow argument for $cmd, choose on|off";
+    }
+  }
+
+  ##############
+  # frostProtect 
+
+  if ( $cmd eq "frostProtect" ) {
+    my $val = $a[2];
+    if ( $val eq "on" ) {
+      $hash->{c_frostProtect} = 1;
+      $attr{$name}{frostProtect} = 1;
+      return undef;
+    } elsif ( $val eq "off" ) {
+      $hash->{c_frostProtect} = 0;
+      $attr{$name}{frostProtect} = 0;
       return undef;
     } else {
       return "Unknow argument for $cmd, choose on|off";
@@ -814,6 +836,8 @@ PWMR_ReadRoom(@)
     $temperaturT =  $defs{$sensor}->{READINGS}{$reading}{TIME};
 
     $temperaturV =~ s/$t_regexp/$1/;
+
+    $temperaturV = PWMR_valueFormat ($room, "temperature", $temperaturV);
   }
 
   if ($room->{actor})
@@ -1161,7 +1185,12 @@ PWMR_Attr(@)
     } elsif ($attr eq "autoCalcTemp") {
       $hash->{c_autoCalcTemp} = 1;
       $hash->{STATE}     = "Calculating";
+    } 
+
+    if ($attr eq "valueFormat" and defined ($hash->{helper}{$attr})) {
+      delete ($hash->{helper}{$attr});
     }
+
   
   }
 
@@ -1240,6 +1269,32 @@ PWMR_Attr(@)
 
   }
 
+  if ($attr eq "valueFormat") {
+    my $attrVal = $val;
+    if( $attrVal =~ m/^{.*}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
+      my $av = eval $attrVal;
+      if( $@ ) {
+        Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $attr: ". $@);
+      } else {
+        $attrVal = $av if( ref($av) eq "HASH" );
+      }
+      $hash->{helper}{$attr} = $attrVal;
+
+      foreach my $key (keys $hash->{helper}{$attr}) {
+        Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $key ".$hash->{helper}{$attr}{$key});
+      }
+
+      #return "$attr set to $attrVal";
+
+    } else {
+      # if valueFormat is not verified sucessfully ... the helper is deleted (=not used)
+      delete $hash->{helper}{$attr};
+    }
+    return undef;
+  }
+
+
+
   return undef;
 
 }
@@ -1309,6 +1364,27 @@ PWMR_Boost(@)
   
   
   return undef;
+}
+
+sub 
+PWMR_valueFormat(@)
+{
+  my ($hash, $reading, $value) = @_;
+
+  return $value unless (defined ($reading));
+ 
+  if (ref($hash->{helper}{valueFormat}) eq 'HASH')
+  {
+     
+    if (exists($hash->{helper}{valueFormat}->{$reading})) {
+
+      my $vf = $hash->{helper}{valueFormat}->{$reading};
+      return sprintf ("$vf", $value);
+    }
+  }
+
+  return $value;
+
 }
 
 1;
@@ -1418,6 +1494,11 @@ PWMR_Boost(@)
         Temporary change <i>INTERVAL</i> which defines how often <i>desired-temp</i> is calculated in autoCalcMode. Default is 300 seconds (5:00 Minutes).
         </li><br>
 
+    <li>frostProtect<br>
+        Sets attribute frostProtect to 1 (on) or 0 (off).
+        </li><br>
+
+
   </ul>
 
   <br>
@@ -1479,6 +1560,12 @@ PWMR_Boost(@)
         Calculation of desired-temp is (like when using tempRules) based on the interval specified for this device (default is 300 seconds).
         </li><br>
 
+    <li>valueFormat<br>
+        Defines a map to format values within PWMR.<br>
+        The following reading can be formated using syntax of sprinf: temperature
+	<br>
+        Example: { "temperature" => "%0.2f" }
+        </li><br>
 
   </ul>
   <br>

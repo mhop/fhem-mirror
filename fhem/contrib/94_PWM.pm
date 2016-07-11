@@ -15,6 +15,7 @@
 # 30.11.15 GA add new followUpTime can now delay switching of OverallHeatingSwitch from "on" to "off"
 # 26.01.16 GA fix don't call AssignIoPort
 # 26.01.16 GA fix IODev from PWMR object is now a reference to PWM object
+# 29.06.16 GA add attribute valveProtectIdlePeriod
 
 ##############################################
 # $Id: 
@@ -66,8 +67,9 @@ PWM_Initialize($)
   $hash->{SetFn}     = "PWM_Set";
   $hash->{DefFn}     = "PWM_Define";
   $hash->{UndefFn}   = "PWM_Undef";
+  $hash->{AttrFn}    = "PWM_Attr";
 
-  $hash->{AttrList}  = "event-on-change-reading";
+  $hash->{AttrList}  = "event-on-change-reading valveProtectIdlePeriod";
 
 }
 
@@ -82,6 +84,7 @@ PWM_Calculate($)
   my %RoomsToSwitchOff      = ();
   my %RoomsToStayOn         = ();
   my %RoomsToStayOff        = ();
+  my %RoomsValveProtect     = ();
   my %RoomsPulses           = ();
   my $roomsActive           = 0;
   my $newpulseSum           = 0;
@@ -119,16 +122,23 @@ PWM_Calculate($)
           # calculate room
           # $newstate is "" if state is unchanged
           # $newstate is "on" or "off" if state changes
+          # $newstate may be "on_vp" or "off_vp" if valve protection is active
 	  my ($newstate, $newpulse, $cycletime, $oldstate) = PWM_CalcRoom($hash, $defs{$d});
 
 	  $defs{$d}->{READINGS}{oldpulse}{TIME} = TimeNow();
 	  $defs{$d}->{READINGS}{oldpulse}{VAL}  = $newpulse;
-	  
+
           my $onoff = $newpulse * $cycletime;
-          if ($newstate eq "off") {
+          if ($newstate =~ "off.*") {
             $onoff = (1 - $newpulse) * $cycletime
           }
 
+          if ($newstate eq "on_vp") {
+	    $RoomsValveProtect{$d} = "on";
+          } elsif ($newstate eq "off_vp") {
+	    $RoomsValveProtect{$d} = "off";
+          }
+	  
           $wkey = $name."_".$d;
           if (defined ($roomsWaitOffset{$wkey})) {
             $newpulse += $roomsWaitOffset{$wkey};
@@ -144,7 +154,7 @@ PWM_Calculate($)
 
           # $newstate ne "" -> state changed "on" -> "off" or "off" -> "on"
           if ((int($hash->{MINONOFFTIME}) > 0) &&
-              ($newstate ne "") && 
+              (($newstate eq "on") or ($newstate eq "off")) && 
               ($onoff < int($hash->{MINONOFFTIME})) 
              ) {
 
@@ -341,11 +351,9 @@ PWM_Calculate($)
     }
     $minRoomsOnList =~ s/,$//;
 
-    #if ($roomsActive == 0 or $hash->{NoRoomsToStayOnThreshold} == 0 or $newpulseSum/$roomsActive < $hash->{NoRoomsToStayOnThreshold}) 
-
-
     if ($roomsActive == 0 or $hash->{NoRoomsToStayOnThreshold} == 0 or $pulseSum/$roomsCounted < $hash->{NoRoomsToStayOnThreshold}) {
       $minRoomsOn = 0;
+      $minRoomsOnList = "";
     } 
  
     #Log3 ($hash, 3, "PWM_Calculate: newpulseSum $newpulseSum avg ".$newpulseSum/$roomsActive." minRoomsOn(".$minRoomsOn.")") if ($roomsActive > 0);
@@ -427,6 +435,26 @@ PWM_Calculate($)
         $pulseRoomsOn += $RoomsPulses{$roomOn};
 
   }
+
+  foreach my $roomVP (sort keys %RoomsValveProtect) {
+
+        my $wkey = $name."-".$roomVP;
+        $roomsWaitOffset{$wkey} = 0;
+
+        if ( $RoomsValveProtect{$roomVP} eq "on") {
+
+	  PWMR_SetRoom ($defs{$roomVP}, "on"); 
+          $cntRoomsOn++;
+          $pulseRoomsOn += $RoomsPulses{$roomVP};
+
+	} else {
+
+	  PWMR_SetRoom ($defs{$roomVP}, "off"); 
+          $cntRoomsOff++;
+          $pulseRoomsOff += $RoomsPulses{$roomVP};
+        }
+
+  }
   
 
   readingsBulkUpdate ($hash,  "roomsActive",   $roomsActive);
@@ -445,33 +473,33 @@ PWM_Calculate($)
   if ( defined ($hash->{OverallHeatingSwitch}) ) {
     if ( $hash->{OverallHeatingSwitch} ne "") {
 
-      my $newstate = "on";
+      my $newstateOHS = "on";
       if ( $hash->{OverallHeatingSwitch_threshold} > 0) {
 
         # threshold based
-        $newstate = ($newpulseMax > $hash->{OverallHeatingSwitch_threshold}) ? "on" : "off";
+        $newstateOHS = ($newpulseMax > $hash->{OverallHeatingSwitch_threshold}) ? "on" : "off";
 
       } else {
 
         # room based
-        $newstate = ($cntRoomsOn > 0) ? "on" : "off";
+        $newstateOHS = ($cntRoomsOn > 0) ? "on" : "off";
 
       }
  
-      my $actor    = $hash->{OverallHeatingSwitch};
-      my $actstate = ($defs{$actor}{STATE} =~ $hash->{OverallHeatingSwitch_regexp_on}) ? "on" : "off";
+      my $actor       = $hash->{OverallHeatingSwitch};
+      my $actstateOHS = ($defs{$actor}{STATE} =~ $hash->{OverallHeatingSwitch_regexp_on}) ? "on" : "off";
 
       if ($hash->{OverallHeatingSwitch_followUpTime} > 0) {
 
-        if ($actstate eq "on" and $newstate eq "off") {
+        if ($actstateOHS eq "on" and $newstateOHS eq "off") {
 
           if ($hash->{READINGS}{OverallHeatingSwitchWaitUntil}{VAL} eq "") {
-            $newstate = "on";
+            $newstateOHS = "on";
             Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off (init timestamp)");
             readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntil", FmtDateTime(time() + $hash->{OverallHeatingSwitch_followUpTime}));
 
           } elsif ($hash->{READINGS}{OverallHeatingSwitchWaitUntil}{VAL} ge TimeNow()) {
-            $newstate = "on";
+            $newstateOHS = "on";
             Log3 ($name, 2, "PWM_Calculate: $name: OverallHeatingSwitch wait for followUpTime before switching off");
           } else {
             readingsBulkUpdate ($hash,  "OverallHeatingSwitchWaitUntil", "");
@@ -482,19 +510,19 @@ PWM_Calculate($)
         }
       }
 
-      if ($newstate ne $actstate or $hash->{READINGS}{OverallHeatingSwitch}{VAL} ne $actstate) {
+      if ($newstateOHS ne $actstateOHS or $hash->{READINGS}{OverallHeatingSwitch}{VAL} ne $actstateOHS) {
 
-        my $ret = fhem sprintf ("set %s %s", $hash->{OverallHeatingSwitch}, $newstate);
+        my $ret = fhem sprintf ("set %s %s", $hash->{OverallHeatingSwitch}, $newstateOHS);
         if (!defined($ret)) {    # sucessfull
-          Log3 ($name, 4, "PWMR_SetRoom: $name: set $actor $newstate");
+          Log3 ($name, 4, "PWMR_SetRoom: $name: set $actor $newstateOHS");
   
-          readingsBulkUpdate ($hash,  "OverallHeatingSwitch", $newstate);
+          readingsBulkUpdate ($hash,  "OverallHeatingSwitch", $newstateOHS);
  
-#          push @{$room->{CHANGED}}, "actor $newstate";
+#          push @{$room->{CHANGED}}, "actor $newstateOHS";
 #          DoTrigger($name, undef);
   
 	} else {
-          Log3 ($name, 4, "PWMR_SetRoom $name: set $actor $newstate failed ($ret)");
+          Log3 ($name, 4, "PWMR_SetRoom $name: set $actor $newstateOHS failed ($ret)");
         }
       }
     }
@@ -534,6 +562,22 @@ PWM_CalcRoom(@)
 
   if ($actorV eq "on")                   # current state is "on"
   {
+    # ----------------
+    # check if valve protection is active, keep this state for 5 minutes
+
+    if (defined ($room->{helper}{valveProtectLastSwitch}))  {
+      if ( $room->{helper}{valveProtectLastSwitch} + 300 > time()) {
+         Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F13 valveProtect continue");
+         return ("", $newpulse, $cycletime, $actorV);
+      } else {
+         Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F14 valveProtect off");
+         delete ($room->{helper}{valveProtectLastSwitch});
+         return ("off_vp", $newpulse, $cycletime, $actorV);
+      }
+
+    }
+      
+    # ----------------
     # decide if to change to "off"
 
     if ($newpulse == 1) {
@@ -577,6 +621,20 @@ PWM_CalcRoom(@)
   }
   elsif ($actorV eq "off")               # current state is "off"
   {
+    # ----------------
+    # check if valve protection is activated (attribute valveProtectIdlePeriod is set)
+
+    if (defined ($attr{$name}{"valveProtectIdlePeriod"})) {
+      # period is defined in days (*86400)
+      if ($room->{READINGS}{lastswitch}{VAL} + ($attr{$name}{"valveProtectIdlePeriod"} * 86400)  < time()) {
+
+      $room->{helper}{valveProtectLastSwitch} = time();
+      Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F12 valve protect");
+      return ("on_vp", $newpulse, $cycletime, $actorV); 
+      }
+    }
+
+    # ----------------
     # decide if to change to "on"
 
     if ($oldpulse == 0 && $newpulse > 0) { # was 0% now heating is required 
@@ -615,6 +673,7 @@ PWM_CalcRoom(@)
 
 
     }
+
   }
   else # $actorV not "on" of "off"
   {
@@ -806,6 +865,37 @@ sub PWM_Undef($$)
 
 }
 
+sub
+PWM_Attr(@)
+{
+  my @a = @_;
+  my ($action, $name, $attrname, $attrval) = @a;
+
+  my $hash = $defs{$name};
+
+  $attrval = "" unless defined ($attrval);
+
+  if ($action eq "del")
+  {
+    if (defined $attr{$name}{$attrname}) {
+      delete ($attr{$name}{$attrname});
+    }
+
+    return undef;
+  }
+  elsif ($action eq "set")
+  {
+    if (defined $attr{$name}{$attrname}) 
+    {
+    }
+  }
+
+  Log3 (undef, 2, "called PWM_Attr($a[0],$a[1],$a[2],<$a[3]>)");
+ 
+  return undef;
+}
+
+###################################
 1;
 
 =pod
@@ -874,7 +964,7 @@ sub PWM_Undef($$)
       <br>
     </li>
 
-    <li>overallHeatingSwitch&gt[,&lt;pulseMaxThreshold&gt[,&lt;followUpTime&gt;[,&lt;regexp_on&gt]]]<br>
+    <li>&lt;overallHeatingSwitch&gt[,&lt;pulseMaxThreshold&gt[,&lt;followUpTime&gt;[,&lt;regexp_on&gt]]]<br>
       Universal switch to controll eg. pumps or the heater itself. It will be set to "off" if no heating is required and otherwise "on".<br>
       <i>pulseMaxThreshold</i> defines a threshold which is applied to reading <i>maxPulse</i> of the PWM object to decide if heating is required. If (calculated maxPulse > threshold) then actor is set to "on", otherwise "off".<br>
       If <i>pulseMaxThreshold</i> is set to 0 (or is not defined) then the decision is based on <i>roomsOn</i>. If (roomsOn > 0) then actor is set to "on", otherwise "off".<br>
@@ -926,6 +1016,11 @@ sub PWM_Undef($$)
 
   <b>Attributes</b>
   <ul>
+    <li>valveProtectIdlePeriod<br>
+        Protect Valve by switching on actor for 300 seconds.<br>
+        After <i>valveProtectIdlePeriod</i> number of days without switching the valve the actor is set to "on" for 300 seconds.
+        overallHeatingSwitch is not affected.
+        </li><br>
   </ul>
   <br>
 </ul>
