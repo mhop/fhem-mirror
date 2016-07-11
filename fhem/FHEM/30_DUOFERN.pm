@@ -220,6 +220,12 @@ my %wCmds = (
   "triggerSun"            => {"enable"  => 0x20000000,"min"   => 1,     "max"     => 0x3FFFFFFF,   "offset"  => 0,
                               "reg"     => 3,         "byte"  => 0,     "size"    => 4,     "count"   => 5,
                               "mask"    => 0x3FFFFFC0,"shift" => 0},
+  "triggerSunDirection"   => {"enable"  => 0x00,      "min"   => 1,     "max"     => 0xFF,  "offset"  => 0,
+                              "reg"     => 3,         "byte"  => 1,     "size"    => 4,     "count"   => 5,
+                              "mask"    => 0x000000FF,"shift" => 0},
+  "triggerSunHeight"      => {"enable"  => 0x00,      "min"   => 1,     "max"     => 0x1FFF,"offset"  => 0,
+                              "reg"     => 3,         "byte"  => 1,     "size"    => 4,     "count"   => 5,
+                              "mask"    => 0x00001F80,"shift" => 0},                              
 );
 
 my %commandsStatus = (
@@ -325,6 +331,8 @@ my %setsUmweltsensor00 = (
   "triggerDusk"                         => "",
   "triggerRain:on,off"                  => "",   
   "triggerSun"                          => "",
+  "triggerSunDirection"                 => "",
+  "triggerSunHeight"                    => "",
   "triggerTemperature"                  => "",
   "triggerWind"                         => "",  
 );
@@ -404,7 +412,7 @@ DUOFERN_Initialize($)
   $hash->{ParseFn}   = "DUOFERN_Parse";
   $hash->{RenameFn}  = "DUOFERN_Rename";
   $hash->{AttrFn}    = "DUOFERN_Attr";
-  $hash->{AttrList}  = "IODev timeout toggleUpDown ". $readingFnAttributes;
+  $hash->{AttrList}  = "IODev timeout toggleUpDown ignore:1,0 ". $readingFnAttributes;
   #$hash->{AutoCreate}=
   #      { "DUOFERN" => { GPLOT => "", FILTER => "%NAME" } };
 }
@@ -511,6 +519,10 @@ DUOFERN_Set($@)
     return "Missing argument" if(@args < 1);
     splice(@args,@args,0,"off","off","off","off");
     
+    for(my $x=0; $x<8; $x++)  {
+      $regs .= ReadingsVal($name, ".reg$x", "00000000000000000000");  
+    } 
+    
     if ($cmd eq "triggerSun") {
       foreach (@args)  {
         if ($_ ne "off") {
@@ -530,18 +542,56 @@ DUOFERN_Set($@)
       }
     }
     
+    if ($cmd eq "triggerSunDirection") {
+      for(my $x=0; $x<5; $x++)  {
+        if ($args[$x] ne "off") {
+          my @args2 = split(/:/, $args[$x]);
+          return "Missing argument" if(@args2 < 2);
+          return "Wrong argument $args[$x]" if ($args2[0] !~ m/^\d+(\.\d+|)$/ || $args2[0] < 0 || $args2[0] > 315);
+          return "Wrong argument $args[$x]" if ($args2[1] !~ m/^\d+$/ || $args2[1] < 45 || $args2[1] > 180);
+          $args2[0] = int(($args2[0]+11.25)/22.5);
+          $args2[1] = int(($args2[1]+22.5)/45);
+          $args2[0] = 15 - ($args2[1]*2) if (($args2[0] + $args2[1]*2) > 15);
+          $args[$x] = ($args2[0]+$args2[1]) | (($args2[1])<<4) | 0x80;
+        } else {
+          my @tSunHeight = map{hex($_)} unpack 'x66A2x8A2x8A2x8A2x8A2', $regs;
+          if ($tSunHeight[$x] & 0x18) {
+            $args[$x] = 0x81;
+          } else {
+            $args[$x] = 0x01;
+          }
+        }
+      }
+    }
     
-    for(my $x=0; $x<8; $x++)  {
-      $regs .= ReadingsVal($name, ".reg$x", "00000000000000000000");  
-    }  
+    if ($cmd eq "triggerSunHeight") {
+      for(my $x=0; $x<5; $x++)  {
+        if ($args[$x] ne "off") {
+          my @args2 = split(/:/, $args[$x]);
+          return "Missing argument" if(@args2 < 2);
+          return "Wrong argument1 $args[$x]" if ($args2[0] !~ m/^\d+$/ || $args2[0] < 0 || $args2[0] > 90);
+          return "Wrong argument2 $args[$x]" if ($args2[1] !~ m/^\d+$/ || $args2[1] < 20 || $args2[1] > 60);     
+          $args2[0] = int(($args2[0]+6.5)/13);
+          $args2[1] = int(($args2[1]+13)/26);
+          $args2[0] = 7 - ($args2[1]*2) if (($args2[0] + $args2[1]*2) > 7);   
+          $args[$x] = (($args2[0]+$args2[1])<<8) | (($args2[1])<<11) | 0x80;
+        } else {
+          my @tSunDir = map{hex($_)} unpack 'x68A2x8A2x8A2x8A2x8A2', $regs;
+          if ($tSunDir[$x] & 0x70) {
+            $args[$x] = 0x0180;
+          } else {
+            $args[$x] = 0x0100;
+          }
+        }
+      }
+    }   
       
     for (my $c = 0; $c<$wCmds{$cmd}{count}; $c++) {
       my $pad = 0;
       
-       
       if ($wCmds{$cmd}{size} == 4) {
         $pad = int($c / 2)*2;
-        $pad = $c if ($cmd eq "triggerSun");
+        $pad = $c if ($cmd =~ m/^triggerSun.*/);
       };
       my $regStart = ($wCmds{$cmd}{reg} * 10 + $wCmds{$cmd}{byte} + $pad + $c * $wCmds{$cmd}{size} )*2;
       
@@ -728,6 +778,8 @@ DUOFERN_Define($$)
   
   readingsSingleUpdate($hash, "state", "Initialized", 1);
   
+ return undef if (AttrVal($name,"ignore",0) != 0);
+  
   if ($hash->{CODE} =~ m/^(40|41|42|43|46|47|48|49|4B|4C|4E|61|62|65|69|70|71)....$/) {
     $hash->{helper}{timeout}{t} = 30;
     InternalTimer(gettimeofday()+$hash->{helper}{timeout}{t}, "DUOFERN_StatusTimeout", $hash, 0);
@@ -817,6 +869,8 @@ DUOFERN_Parse($$)
   
   $hash = $def;
   my $name = $hash->{NAME};  
+  
+  return $name if (AttrVal($name,"ignore",0) != 0);
   
   #Device paired
   if ($msg =~ m/0602.{40}/) {
@@ -1325,6 +1379,8 @@ DUOFERN_DecodeWeatherSensorConfig($)
   my @tDawn;
   my @tDusk;  
   my @tSun = map{hex($_)} unpack 'A8x2A8x2A8x2A8x2A8x2', $regs[3].$regs[4].$regs[5];
+  my @tSunDir = map{hex($_)} unpack 'x8A2x8A2x8A2x8A2x8A2', $regs[3].$regs[4].$regs[5];
+  my @tSunHeight = map{hex($_)} unpack 'x6A2x8A2x8A2x8A2x8A2', $regs[3].$regs[4].$regs[5];
   
   for(my $x=0; $x<5; $x++){   
     $tWind[$x] = ($tWind[$x] & 0x20 ? ($tWind[$x] & 0x1F) : "off");
@@ -1349,6 +1405,27 @@ DUOFERN_DecodeWeatherSensorConfig($)
       $tSun[$x]="off";
     }
     
+    if((($tSunDir[$x])>>4) & 0x07) {
+      my @temp;
+      push(@temp,(($tSunDir[$x])) & 0x0F);
+      push(@temp,(($tSunDir[$x])>>4) & 0x07);
+      $temp[0] =($temp[0]-$temp[1]) * 22.5;
+      $temp[1] = $temp[1] * 45; 
+      $tSunDir[$x]=join(":",@temp);
+    } else {
+      $tSunDir[$x]="off";
+    }
+    
+    if((($tSunHeight[$x])>>3) & 0x07) {
+      my @temp;
+      push(@temp,(($tSunHeight[$x])) & 0x07);
+      push(@temp,(($tSunHeight[$x])>>3) & 0x03);
+      $temp[0] =($temp[0]-$temp[1]) * 13;
+      $temp[1] = $temp[1] * 26;
+      $tSunHeight[$x]=join(":",@temp);
+    } else {
+      $tSunHeight[$x]="off";
+    }
   }
   
   my $tRain           = (hex(substr($regs[6],  0, 2)) & 0x80 ? "on" : "off");
@@ -1372,8 +1449,10 @@ DUOFERN_DecodeWeatherSensorConfig($)
   readingsBulkUpdate($hash, "triggerWind",        join(" ",@tWind),     1);
   readingsBulkUpdate($hash, "triggerDusk",        join(" ",@tDusk),     1);
   readingsBulkUpdate($hash, "triggerDawn",        join(" ",@tDawn),     1);
-  readingsBulkUpdate($hash, "triggerSun",         join(" ",@tSun),     1);
-    
+  readingsBulkUpdate($hash, "triggerSun",         join(" ",@tSun),      1);
+  readingsBulkUpdate($hash, "triggerSunDirection",join(" ",@tSunDir),   1);
+  readingsBulkUpdate($hash, "triggerSunHeight",   join(" ",@tSunHeight),1);
+      
   readingsEndUpdate($hash, 1);
     
 }
@@ -1692,6 +1771,16 @@ DUOFERN_StatusTimeout($)
         &lt;sun[n]&gt;: time to detect sun, 1 to 30 minutes<br>
         &lt;shadow[n]&gt;: time to detect shadow, 1 to 30 minutes<br>
         &lt;temperature[n]&gt;: optional minimum temperature, -5 to 26 &deg;C
+        </li><br>
+     <li><b>triggerSunDirction &lt;startangle1&gt;:&lt;width1&gt; ... [&lt;startangle5&gt;:&lt;width5&gt;]</b><br>
+        If enabled, the respective sun event will only be triggered, if sunDirection is in the specified range.<br>
+        &lt;startangle[n]&gt;: off or 0 to 292.5 degrees (stepsize 22.5&deg;)<br>
+        &lt;width[n]&gt;: 45 to 180 degrees (stepsize 45&deg;)<br>
+        </li><br>
+     <li><b>triggerSunHeight &lt;startangle1&gt;:&lt;width1&gt; ... [&lt;startangle5&gt;:&lt;width5&gt;]</b><br>
+        If enabled, the respective sun event will only be triggered, if sunHeight is in the specified range.<br>
+        &lt;startangle[n]&gt;: off or 0 to 65 degrees (stepsize 13&deg;)<br>
+        &lt;width[n]&gt;: 26 or 52 degrees<br>
         </li><br>        
      <li><b>triggerTemperature &lt;value1&gt; ... [&lt;value5&gt;]</b><br>
         Sets up to 5 trigger values for a temperature event.<br>
