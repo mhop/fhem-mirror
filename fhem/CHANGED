@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature  93_DbRep: new module added - reporting of database content
+             written by DbLog, see commandref for details
   - feature: new module added: 52_I2C_SHT3x.pm (macs)
   - bugfix:  70_Jabber: log OTR empty message if debug-mode == 1 only
   - changed: 70_BRAVIA: re-worked state handling
