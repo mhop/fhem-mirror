@@ -250,8 +250,10 @@ zw_al(fnRet, width, height)
   for(var i1=0; i1<nEl; i1++) {
     var nl = lu[i1].neighbors;
     for(var i2=0; i2<nl.length; i2++) {
+      if(!fnRet.el[nl[i2]])
+        continue;
       var i3 = fnRet.el[nl[i2]].idx;
-      dist[i1][i3] = dist[i3][i1] = 0.1
+      dist[i1][i3] = dist[i3][i1] = 0.1;
     }
   }
 
