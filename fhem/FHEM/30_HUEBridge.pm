@@ -914,6 +914,9 @@ HUEBridge_HTTP_Call($$$;$)
   if( !$ret ) {
     Log3 $name, 2, "$name: empty answer received for $uri";
     return undef;
+  } elsif( $ret eq 'HTTP/1.1 200 OK' ) {
+    Log3 $name, 4, "$name: empty answer received for $uri";
+    return undef;
   } elsif( $ret !~ m/^[\[{].*[\]}]$/ ) {
     Log3 $name, 2, "$name: invalid json detected for $uri: $ret";
     return undef;
@@ -976,6 +979,9 @@ HUEBridge_HTTP_Call2($$$$;$)
 
     if( !$data ) {
       Log3 $name, 2, "$name: empty answer received for $url";
+      return undef;
+    } elsif( $data eq 'HTTP/1.1 200 OK' ) {
+      Log3 $name, 4, "$name: empty answer received for $url";
       return undef;
     } elsif( $data !~ m/^[\[{].*[\]}]$/ ) {
       Log3 $name, 2, "$name: invalid json detected for $url: $data";
