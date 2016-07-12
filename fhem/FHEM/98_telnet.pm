@@ -316,7 +316,7 @@ telnet_Output($$$)
       $ret = "$ret\n"                   if(!$hash->{showPrompt});
     }
     for(;;) {
-      utf8::encode($ret) if(utf8::is_utf8($ret));
+      utf8::encode($ret) if(utf8::is_utf8($ret) && $ret =~ m/[^\x00-\xFF]/);
       my $l = syswrite($hash->{CD}, $ret);
       last if(!$l || $l == length($ret));
       $ret = substr($ret, $l);
