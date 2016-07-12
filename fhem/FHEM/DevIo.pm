@@ -306,6 +306,7 @@ DevIo_OpenDev($$$;$)
       return &$doCb(undef); # Forum 53309
     }
 
+    delete($readyfnlist{"$name.$dev"});
     my $timeout = $hash->{TIMEOUT} ? $hash->{TIMEOUT} : 3;
     my $doTcpTail = sub($) {
       my ($conn) = @_;
@@ -323,7 +324,6 @@ DevIo_OpenDev($$$;$)
 
       $hash->{TCPDev} = $conn;
       $hash->{FD} = $conn->fileno();
-      delete($readyfnlist{"$name.$dev"});
       $selectlist{"$name.$dev"} = $hash;
       return 1;
     };
