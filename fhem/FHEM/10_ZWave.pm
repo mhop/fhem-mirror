@@ -4247,6 +4247,24 @@ ZWave_helpFn($$)
 }
 
 sub
+ZWave_getPic($)
+{
+  my ($model) = @_;
+  my $img = $zwave_pepperImg{$model};
+  return "" if(!$img);
+
+  my $fn = $attr{global}{modpath}."/www/deviceimages/zwave/$img";
+  if(!-f $fn) {      # Cache the picture
+    my $data = GetFileFromURL("http://fhem.de/deviceimages/zwave/$img");
+    if($data && open(FH,">$fn")) {
+      print FH $data;
+      close(FH)
+    }
+  }
+  return "$FW_ME/deviceimages/zwave/$img";
+}
+
+sub
 ZWave_fhemwebFn($$$$)
 {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
