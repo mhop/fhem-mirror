@@ -464,7 +464,8 @@ FW_Read($$)
      ($FW_httpheader{"Accept-Encoding"} &&
       $FW_httpheader{"Accept-Encoding"} =~ m/gzip/) &&
      $FW_use_zlib) {
-    utf8::encode($FW_RET) if(utf8::is_utf8($FW_RET));
+    utf8::encode($FW_RET)
+        if(utf8::is_utf8($FW_RET) && $FW_RET =~ m/[^\x00-\xFF]/ );
     eval { $FW_RET = Compress::Zlib::memGzip($FW_RET); };
     if($@) {
       Log 1, "memGzip: $@"; $FW_RET=""; #Forum #29939
