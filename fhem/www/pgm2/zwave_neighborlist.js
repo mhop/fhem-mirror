@@ -1,8 +1,6 @@
 var zw_visible;
 var svgns = 'xmlns="http://www.w3.org/2000/svg"';
 
-log("HELLO");
-
 function
 zw_nl(fhemFn)
 {
@@ -34,7 +32,12 @@ zw_nl(fhemFn)
       el.lines = [];
       el.name = elName;
       el.elHash = fnRet.el;
-      el.width = el.height = 30;
+      if(el.img) {
+        el.width = 64; el.height = 64+20;
+      } else {
+        el.width = el.height = 30;
+      }
+
       if(!el.pos.length) {
         el.pos = [xpos, ypos];
         xpos += 150;
@@ -102,17 +105,25 @@ zw_draw(fnRet, width, height)
     .css({width:width, height:height})
     .html(svg);
 
-  $("svg g").each(function(){
-    var name = $(this).attr("data-name");
-    var text = $(this).find("text");
-    var rect = $(this).find("rect");
-    var w = $(text)[0].getBBox().width;
-    $(rect).attr("width",w+10);
-    $(this).find("rect").attr("width",w+10);
+  $("svg.zw_nr g").each(function(){
     $(this).css({cursor:"pointer", position:"absolute"}); // firefox is relative
-    h[name].width = w+10;
-    h[name].rect  = rect;
-    h[name].text  = text;
+    var name = $(this).attr("data-name");
+    var o = h[name];
+    o.text = $(this).find("text");
+    o.rect = $(this).find("rect");
+    if(o.img) {
+      o.image = $(this).find("image");
+      o.imgOffX = 0;
+    }
+    o.width = $(o.text)[0].getBBox().width+10;
+    if(o.img && o.width < 64)
+      o.width = 64;
+    if(o.image) {
+      o.imgOffX = (o.width-60)/2;
+      $(o.image).attr("x", o.x+o.imgOffX);
+    }
+
+    $(o.rect).attr("width",o.width);
     zw_adjustLines(h, name);
   })
   .draggable()
@@ -126,6 +137,10 @@ zw_draw(fnRet, width, height)
     o.y = oy + (p.top -op.top);
     $(o.rect).attr("x", o.x);   $(o.rect).attr("y", o.y);
     $(o.text).attr("x", o.x+5); $(o.text).attr("y", o.y+20);
+    if(o.image) {
+      $(o.image).attr("x", o.x+o.imgOffX);
+      $(o.image).attr("y", o.y+20);
+    }
     zw_adjustLines(h, o.name);
   });
 }
@@ -133,10 +148,17 @@ zw_draw(fnRet, width, height)
 function
 zw_drawbox(o)
 {
-  var s = '<g data-name="'+o.txt+'">'+
-            '<rect x="'+o.x+'" y="'+o.y+'" rx="5" ry="5" '+
+  var s = '';
+  s += '<g data-name="'+o.txt+'">';
+  if(o.title)
+    s += '<title>'+o.title+'</title>';
+  s += '<rect x="'+o.x+'" y="'+o.y+'" rx="5" ry="5" '+
               'width="'+o.width+'" height="'+o.height+'" class="'+o.class+'"/>';
-  s += '<text x="'+(o.x+5)+'" y="'+(o.y+20)+'">'+o.txt+'</text></g>';
+  if(o.img)
+    s += '<image x="'+(o.x+2)+'" y="'+(o.y+20)+'"/ width="60" height="60" '+
+              'xlink:href="'+o.img+'"/>';
+  s += '<text x="'+(o.x+5)+'" y="'+(o.y+20)+'">'+o.txt+'</text>'
+  s +='</g>';
   return s;
 }
 
@@ -520,7 +542,11 @@ GM()
       {
         $(this.rect).attr("x", this.x);   $(this.rect).attr("y", this.y);
         $(this.text).attr("x", this.x+5); $(this.text).attr("y", this.y+20);
-        zw_adjustLines(this.elHash, this.name);
+        if(this.image) {
+          $(this.image).attr("x", this.x+this.imgOffX);
+          $(this.image).attr("y", this.y+20);
+        }
+        zw_adjustLines(this.elHash, this.name, 0);
        
         this.x+=this.speedX/damper;
         this.y+=this.speedY/damper;  

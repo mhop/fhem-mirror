@@ -175,13 +175,23 @@ ZWDongle_nlData($)
 
   for my $e (@a) {
     next if($defs{$e}{ZWaveSubDevice} ne "no");
+
+    my $title = ReadingsVal($e, "timeToAck", ""); 
+    $title = "timeToAck: $title" if($title);
+
+    my $img = ZWave_getPic(ReadingsVal($e, "modelId", ""));
+
     my $nl = ReadingsVal($e, "neighborList", ""); 
     $nl =~ s/,/ /g; $nl =~ s/\bempty\b//g;
     my $pos = AttrVal($e, "neighborListPos", "");
     push @dn, $e if($nl =~ m/\b$d\b/);
+
     $nl = '"'.join('","',split(" ", $nl)).'"' if($nl);
-    push @ret, "\"$e\":{\"txt\":\"$e\",\"pos\":[$pos],".
-                       "\"class\":\"zwBox\",\"neighbors\":[$nl] }";
+    push @ret, "\"$e\":{\"txt\":\"$e\",\"pos\":[$pos],\"class\":\"zwBox\",".
+                       "\"neighbors\":[$nl]".
+                       ($title ? ",\"title\" : \"$title\"" : "").
+                       ($img   ? ",\"img\"   : \"$img\""   : "").
+                       "}";
     $nb{$e} = $nl;
   }
   my $pos = AttrVal($d, "neighborListPos", "");

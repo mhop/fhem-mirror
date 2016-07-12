@@ -133,9 +133,9 @@ select [value^=l6] { color: olive; }
 select [value^=l7] { color: gray; }
 select [value^=l8] { color: yellow; }
 
-.zwBox { stroke:#278727; stroke-width:2px; fill:#F0F0D8; }
-.zwDongle { stroke:red; stroke-width:2px; fill:#F0F0D8; }
-.zwMargin { stroke:#278727; stroke-width:1px; fill:none; }
-.zwLine { stroke:#278727; stroke-width:1px; }
-.zwArrowHead { fill:#278727; stroke-width:1px; }
+svg.zw_nr .zwBox { stroke:#278727; stroke-width:2px; fill:#F0F0D8; }
+svg.zw_nr .zwDongle { stroke:red; stroke-width:2px; fill:#F0F0D8; }
+svg.zw_nr .zwMargin { stroke:#278727; stroke-width:1px; fill:none; }
+svg.zw_nr .zwLine { stroke:#278727; stroke-width:1px; }
+svg.zw_nr .zwArrowHead { fill:#278727; stroke-width:1px; }
 svg.zw_nr { height:auto; width:auto; margin:0; }
