@@ -149,7 +149,7 @@ function
 zw_drawbox(o)
 {
   var s = '';
-  s += '<g data-name="'+o.txt+'">';
+  s += '<g data-name="'+o.name+'">';
   if(o.title)
     s += '<title>'+o.title+'</title>';
   s += '<rect x="'+o.x+'" y="'+o.y+'" rx="5" ry="5" '+
@@ -203,19 +203,20 @@ zw_adjustLines(h, name)
   var la = h[name].lines;
   for(var i1=0; i1<la.length; i1++) {
     var se = la[i1].split('-');
+    var attName = la[i1].replace(".", "\\.");
     if(la[i1].indexOf(name) == 0) {     // we are the from line
       var p = zw_calcPos(h[se[0]], h[se[1]]);
-      $("svg line[data-name="+la[i1]+"]")
+      $("svg line[data-name="+attName+"]")
         .attr("x1", p.x)
         .attr("y1", p.y);
     } else {
       var p = zw_calcPos(h[se[1]], h[se[0]]);
-      $("svg line[data-name="+la[i1]+"]")
+      $("svg line[data-name="+attName+"]")
         .attr("x2", p.x)
         .attr("y2", p.y);
     }
     if (navigator.appVersion.indexOf("Trident") != -1) {
-      var svgNode = $("svg line[data-name="+la[i1]+"]")[0];
+      var svgNode = $("svg line[data-name="+attName+"]")[0];
       svgNode.parentNode.insertBefore(svgNode, svgNode);
     }
   }

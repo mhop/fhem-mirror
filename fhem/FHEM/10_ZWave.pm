@@ -5230,6 +5230,7 @@ s2Hex($)
       text after an update.  </li>
 
     <li><a href="#ignore">ignore</a></li>
+    <li><a href="#neighborListPos">neighborListPos</a></li>
     <li><a href="#noExplorerFrames">noExplorerFrames</a><br>
       turn off the use of Explorer Frames
       </li>
