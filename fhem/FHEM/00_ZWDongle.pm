@@ -89,7 +89,7 @@ ZWDongle_Initialize($)
   $hash->{AttrFn}  = "ZWDongle_Attr";
   $hash->{UndefFn} = "ZWDongle_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 model:ZWDongle disable:0,1 ".
-                     "homeId networkKey neighborListPos";
+                     "homeId networkKey neighborListPos neighborListFmt";
   $hash->{FW_detailFn} = "ZWDongle_fhemwebFn";
 }
 
@@ -148,7 +148,6 @@ ZWDongle_fhemwebFn($$$$)
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
   my $js = "$FW_ME/pgm2/zwave_neighborlist.js";
-  my $np = AttrVal($d,'neighborListPos','360,430');
 
   return
   "<div id='ZWDongleNr'><a id='zw_snm' href='#'>Show neighbor map</a></div>".
@@ -173,27 +172,41 @@ ZWDongle_nlData($)
   my @a = devspec2array("TYPE=ZWave,FILTER=IODev=$d");
   my (@dn, %nb, @ret);
 
+  my $fmt = eval AttrVal($d, "neighborListFmt",
+              '{ txt=>"NAME", img=>"IMAGE", title=>"Time to ack: timeToAck" }');
+
   for my $e (@a) {
-    next if($defs{$e}{ZWaveSubDevice} ne "no");
-
-    my $title = ReadingsVal($e, "timeToAck", ""); 
-    $title = "timeToAck: $title" if($title);
-
-    my $img = ZWave_getPic(ReadingsVal($e, "modelId", ""));
+    my $h = $defs{$e};
+    next if($h->{ZWaveSubDevice} ne "no");
+    $h->{IMAGE} = ZWave_getPic(ReadingsVal($e, "modelId", ""));
 
     my $nl = ReadingsVal($e, "neighborList", ""); 
-    $nl =~ s/,/ /g; $nl =~ s/\bempty\b//g;
-    my $pos = AttrVal($e, "neighborListPos", "");
-    push @dn, $e if($nl =~ m/\b$d\b/);
+    $nl = ReadingsVal($d, "neighborList_".hex($h->{nodeIdHex}), "")
+      if(!$nl);
 
+    $nl =~ s/,/ /g; $nl =~ s/\bempty\b//g;
+    push @dn, $e if($nl =~ m/\b$d\b/);
     $nl = '"'.join('","',split(" ", $nl)).'"' if($nl);
-    push @ret, "\"$e\":{\"txt\":\"$e\",\"pos\":[$pos],\"class\":\"zwBox\",".
-                       "\"neighbors\":[$nl]".
-                       ($title ? ",\"title\" : \"$title\"" : "").
-                       ($img   ? ",\"img\"   : \"$img\""   : "").
-                       "}";
+
+    my %line = (
+      pos       => '['.AttrVal($e, "neighborListPos", "").']',
+      class     => '"zwBox"',
+      neighbors => '['.$nl.']'
+    );
+
+    my $r = $h->{READINGS};
+    my $a = $attr{$e};
+    for my $key (keys %{$fmt}) {
+      my $val = $fmt->{$key};
+      $val =~ s/\b(\w+)\b/{ $h->{$1} ? $h->{$1} : 
+                            $r->{$1} ? $r->{$1} : 
+                            $a->{$1} ? $a->{$1} : $1 }/ge;
+      $line{$key} = "\"$val\"" if($val ne $fmt->{$key});  # Skip unchanged
+    }
+    push @ret, "\"$e\":{". join(',',map({"\"$_\":$line{$_}" } keys %line)) ."}";
     $nb{$e} = $nl;
   }
+
   my $pos = AttrVal($d, "neighborListPos", "");
   my $nl = (@dn ? '"'.join('","',@dn).'"' : '');
   push @ret, "\"$d\":{\"txt\":\"$d\", \"pos\":[$pos],".
@@ -1120,6 +1133,21 @@ ZWDongle_Ready($)
     <li><a name="networkKey">networkKey</a><br>
       Needed for secure inclusion, hex string with length of 32
       </li>
+    <li><a name="neighborListPos">neighborListPos</a><br>
+      Used by the "Show neighbor map" function in the FHEMWEB ZWDongle detail
+      screen to store the position of the box.
+      </li>
+    <li><a name="neighborListFmt">neighborListFmt</a><br>
+      Used by the "Show neighbor map" function in the FHEMWEB ZWDongle detail
+      screen. The value is a perl hash, specifiying the values for the keys
+      txt, img and title. In the value each word is replaced by the
+      corresponding Internal, Reading or Attribute of the device, if there is
+      one to replace. Default is
+      <ul><code>
+        { txt=>"NAME", img=>"IMAGE", title=>"Time to ack: timeToAck" }
+      </code></ul>
+      </li>
+      
   </ul>
   <br>
 
