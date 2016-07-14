@@ -199,7 +199,7 @@ ZWDongle_nlData($)
     for my $key (keys %{$fmt}) {
       my $val = $fmt->{$key};
       $val =~ s/\b(\w+)\b/{ $h->{$1} ? $h->{$1} : 
-                            $r->{$1} ? $r->{$1} : 
+                            $r->{$1} ? $r->{$1}{VAL} : 
                             $a->{$1} ? $a->{$1} : $1 }/ge;
       $line{$key} = "\"$val\"" if($val ne $fmt->{$key});  # Skip unchanged
     }
