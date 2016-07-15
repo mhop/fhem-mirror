@@ -326,8 +326,23 @@ my %zwave_class = (
                configAll   => 'ZWave_configAllGet($hash)' },
     parse => { "^..70..(..)(..)(.*)" => 'ZWave_configParse($hash,$1,$2,$3)'} },
   ALARM                    => { id => '71',
-    get   => { alarm       => "04%02x" },
-    parse => { "..7105(..)(..)(.*)" => 'ZWave_alarmParse($1,$2,$3)'} },
+    set   => {
+      alarmnotification   => 'ZWave_ALARM_06_Set("%s")',    # >=V2
+      },
+    get   => {
+      alarmEventSupported => 'ZWave_ALARM_01_Get("%s")',    # >=V3
+      alarm               => 'ZWave_ALARM_04_Get(1, "%s")', # >=V1
+      alarmWithType       => 'ZWave_ALARM_04_Get(2, "%s")', # >=V2
+      alarmWithTypeEvent  => 'ZWave_ALARM_04_Get(3, "%s")', # >=V3
+      alarmTypeSupported  => "07",                          # >=V2
+      },
+    parse => {
+      "..7102(.*)"          => 'ZWave_ALARM_02_Report($1)', # >=V3
+      "..7105(..)(..)(.*)"  =>
+                'ZWave_ALARM_05_Report($hash, $1, $2, $3)', # >=V1
+      "..7108(.*)"          => 'ZWave_ALARM_08_Report($1)', # >=V2
+      },
+    },
   MANUFACTURER_SPECIFIC    => { id => '72',
     get   => { model       => "04" },
     parse => { "0[8a]7205(....)(....)(....)(.*)"
@@ -484,11 +499,15 @@ my %zwave_class = (
 );
 
 my %zwave_classVersion = (
- dimWithDuration            => { min => 2 },
- meterReset                 => { min => 2 },
- meterSupported             => { min => 2 },
- wakeupIntervalCapabilities => { min => 2 },
-
+  dimWithDuration             => { min => 2 },
+  meterReset                  => { min => 2 },
+  meterSupported              => { min => 2 },
+  wakeupIntervalCapabilities  => { min => 2 },
+  alarmTypeSupported          => { min => 2 },
+  alarmnotification           => { min => 2 },
+  alarmWithType               => { min => 2 },
+  alarmWithTypeEvent          => { min => 3 },
+  alarmEventSupported         => { min => 3 },
 );
 
 my %zwave_cmdArgs = (
@@ -549,7 +568,7 @@ my %zwave_pepperImg;
 my $p1_m = "([0-5][0-9])"; # mm 00-59
 my $p2_hm = "([01][0-9]|2[0-3]):([0-5][0-9])"; # hh:mm
 my $p3_hms = "([01][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])"; # hh:mm:ss
-my $p1_b = "([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])"; # byte:0-255, 1-3 digits
+my $p1_b = "(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])"; # byte:0-255, 1-3 digits
 my $p1_wd = "(mon|tue|wed|thu|fri|sat|sun)"; # 3 letter weekday
 # ymd: yyyy-mm-dd, yyyy 4 digits, mm 2 digits 01-12, dd 2 digits 01-31
 my $p3_ymd = "([0-9]{4})-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1])";
@@ -573,6 +592,7 @@ ZWave_Initialize($)
     classes
     do_not_notify:1,0
     dummy:1,0
+    extendedAlarmReadings:0,1,2
     ignore:1,0
     noExplorerFrames:1,0
     eventForRaw
@@ -2467,24 +2487,24 @@ my %zwave_alarmType = (
   "0d"=>"HomeHealth"
 );
 
-my %zwave_alarmEvent = (
+my %zwave_alarmEvent = ( # no comma allowed in strings
   "0101"=>"detected",
-  "0102"=>"detected, Unknown Location",
+  "0102"=>"detected - Unknown Location",
   "0103"=>"Alarm Test",
   "0201"=>"detected",
-  "0202"=>"detected, Unknown Location",
+  "0202"=>"detected - Unknown Location",
   "0301"=>"detected",
-  "0302"=>"detected, Unknown Location",
+  "0302"=>"detected - Unknown Location",
   "0401"=>"Overheat detected",
-  "0402"=>"Overheat detected, Unknown Location",
+  "0402"=>"Overheat detected - Unknown Location",
   "0403"=>"Rapid Temperature Rise",
-  "0404"=>"Rapid Temperature Rise, Unknown Location",
+  "0404"=>"Rapid Temperature Rise - Unknown Location",
   "0405"=>"Underheat detected",
-  "0406"=>"Underheat detected, Unknown Location",
+  "0406"=>"Underheat detected - Unknown Location",
   "0501"=>"Leak detected",
-  "0502"=>"Leak detected, Unknown Location",
+  "0502"=>"Leak detected - Unknown Location",
   "0503"=>"Level Dropped",
-  "0504"=>"Level Dropped, Unknown Location",
+  "0504"=>"Level Dropped - Unknown Location",
   "0505"=>"Replace Filter",
   "0601"=>"Manual Lock Operation",
   "0602"=>"Manual Unlock Operation",
@@ -2524,13 +2544,13 @@ my %zwave_alarmEvent = (
   "064c"=>"Barrier associated with non-Z-wave remote control.",
   "0700"=>"Previous Events cleared",
   "0701"=>"Intrusion",
-  "0702"=>"Intrusion, Unknown Location",
-  "0703"=>"Tampering, product covering removed",
-  "0704"=>"Tampering, Invalid Code",
+  "0702"=>"Intrusion - Unknown Location",
+  "0703"=>"Tampering - product covering removed",
+  "0704"=>"Tampering - Invalid Code",
   "0705"=>"Glass Breakage",
-  "0706"=>"Glass Breakage, Unknown Location",
+  "0706"=>"Glass Breakage - Unknown Location",
   "0707"=>"Motion Detection",
-  "0708"=>"Motion Detection, Unknown Location",
+  "0708"=>"Motion Detection - Unknown Location",
   "0800"=>"Previous Events cleared",
   "0801"=>"Power has been applied",
   "0802"=>"AC mains disconnected",
@@ -2587,30 +2607,220 @@ my %zwave_alarmEvent = (
   "0d06"=>"Volatile Organic Compound level"
 );
 
+##############################################
+### START: 0x71 ALARM (NOTIFICATION)
+
+### Renamed from ALARM to NOTIFICATION in V3 specification,
+### for backward compatibility the name ALARM will be used
+### regardless of the version of the class.
+
 sub
-ZWave_alarmParse($$$)
-{
-  my ($t,$l,$r) = @_;
-
-  if($t=="00" && $r && $r =~ m/^..(..)(..)/) { # Forum #35178
-    $l = $1; $t = $2;
+ZWave_ALARM_01_Get($) {
+  # 0x7101 Alarm/Notification EventSupportedGet >= V3
+  # alarmEventSupported
+  
+  my ($arg) = @_;
+  
+  foreach my $t (keys %zwave_alarmType) {
+    if (lc($zwave_alarmType{$t}) eq lc($arg)) {
+      return ("", "01".$t);
+    }
   }
-
-  if(!$r || $r !~ m/......(..)(.*)/ || !$zwave_alarmType{$t}) { # V1 or unknown
-    return "alarm_type_$t:level $l";
-  }
-  my ($e, $v4, $s) = ($1, $2, "alarm:$zwave_alarmType{$t}: ");
-
-  if($l eq "00") {
-    $s .= "Event cleared: ";
-    $e = $1 if($v4 && $v4 =~ m/..(..)../);
-  }
-
-  $s .= ($zwave_alarmEvent{"$t$e"} ?
-         $zwave_alarmEvent{"$t$e"} : "unknown event $e");
-  $s .= ", arg $v4" if($v4 && $l ne "00");
-  return $s;
+  return ("unknown notification type entered, see commandref", "");
 }
+
+sub
+ZWave_ALARM_02_Report($) {
+  # 0x7102 Alarm/Notification EventSupportedReport >= V3
+  # additional flagname "Appliance" in V4
+  
+  my ($arg) = @_;
+
+  if($arg !~ m/(..)(..)(.*)/) {
+  return ("wrong format received");
+  }
+  
+  my $t = $1;
+  my $rt = "alarmEventSupported_";
+  $rt .= ($zwave_alarmType{$t}) ? $zwave_alarmType{$t}.":" :
+                                  hex($t)."_unknown:";
+  my $numBitMasks = $2 & 0x1f;
+  #my $res         = ($2 & 0xe0) >> 5; # reserved field
+
+  my $e = "";
+  my $val = $3;
+  my $delimeter = "";
+  
+  for (my $i=0; $i<$numBitMasks; $i++) {
+    my $supported = hex(substr($val, $i*2, 2));
+    for (my $j=$i*8; $j<$i*8+8; $j++) {
+      if ($supported & (2 ** ($j-$i*8))) {
+        $e = sprintf("%s%02x", $t, $j);
+        $rt .= $delimeter;
+        $rt .= "(" . $j . ") ";
+        if (!$zwave_alarmEvent{$e}) {
+          $rt .= "unknown event";
+        } else {
+          $rt .= $zwave_alarmEvent{$e};
+        }
+        $delimeter = ", ";
+      }
+    }
+  } 
+  return $rt; 
+}
+
+sub
+ZWave_ALARM_04_Get($$)
+{
+  # 0x7104 Alarm/Notification alarmGet >= V1
+  # alarm (V1), alarmWithType (V2), alarmWithTypeEvent (>=V3)
+  
+  my ($v, $arg) = @_;
+  my $rt = "04";
+
+  if ($v == 1) {
+    if($arg !~ m/^$p1_b$/) {
+      return ("wrong format, see commandref", "");
+    }
+    $rt .= sprintf("%02x", $1);
+    return ("",$rt);
+  } elsif ($v == 2) {
+    if($arg !~ m/(.*)/) {
+      return ("wrong format, see commandref", "");
+    }
+    foreach my $t (keys %zwave_alarmType) {
+      if (lc($zwave_alarmType{$t}) eq lc($1)) {
+        $rt .= sprintf("00%s", $t);
+        return ("", $rt);
+      }
+    }
+  } elsif ($v >= 3) { # V3=V4
+    if($arg !~ m/(.*) $p1_b/) {
+      return ("wrong format, see commandref", "");
+    }
+    foreach my $t (keys %zwave_alarmType) {
+      if (lc($zwave_alarmType{$t}) eq lc($1)) {
+        $rt .= sprintf("00%s%02x", $t, $2);
+        return ("", $rt);
+      }
+    }
+  }
+}
+
+sub
+ZWave_ALARM_05_Report($$$$)
+{
+  # 0x7105 Alarm/Notification Report >= V1
+  # additional parameter in V2 and V3
+  
+  my ($hash, $t, $l, $r) = @_;
+  my $name = $hash->{NAME};
+
+  my $rt0 = "";
+  my $rt1 = "";
+  my $at = "";
+  my $level = "";
+  my $eventname = "";
+  my $ar = AttrVal($name, "extendedAlarmReadings",0);
+
+  if (!$r) { #V1 Answer
+    $at = $zwave_alarmType{$t} ? $zwave_alarmType{$t} :
+                                 sprintf("%d_unknown", hex($t));
+    $rt0 = "alarm_type_$t:level $l";
+    $rt1 = "alarm_$at:level $l";
+  } elsif ($r =~ m/(..)(..)(..)(..)(..)(.*)/) {
+    my ($zid, $ns, $t2, $e, $prop, $opt) = ($1, $2, $3, $4, $5, $6);
+      
+    if ($e ne "00") {
+      if (($t ne "00") && ($l eq "00")) {
+        $level = "Event cleared: ";
+      }
+    } else {
+      $level = "Event cleared: ";
+      my $len = hex($prop & 0x1f);
+      if (($len >= 1) && ($opt =~ m/(..)(.*)/)) {
+        $e = $1;
+      }
+    }
+    $eventname = $zwave_alarmEvent{"$t2$e"} ? $zwave_alarmEvent{"$t2$e"}
+                                : sprintf("unknown event %d", hex($e));
+    $at = $zwave_alarmType{$t2} ? $zwave_alarmType{$t2} :
+                                  sprintf("%d_unknown", hex($t2));
+    my $nst = ($ns eq "ff") ? "notificationIsOn" : "notificationIsOff";
+    my $o = ($opt && ($e ne "00")) ? ", arg $prop$opt" : "";
+    
+    $rt0 = "alarm:$at: $level $eventname$o";
+    $rt1 = "alarm_$at: $level $eventname$o, $nst";
+  }
+  
+  if ($ar == 0) {
+    return ($rt0);
+  } elsif ($ar == 1) {
+    return ($rt1);
+  } elsif ($ar == 2) {
+    return ($rt0, $rt1);
+  }
+}
+
+sub
+ZWave_ALARM_06_Set($) {
+  # 0x7106 Alarm/Notification alarmSet (>=V2)
+  # alarmnotification
+  
+  my ($arg) = @_;
+  
+  if($arg !~ m/^(.*) (on|off)$/i) {
+      return ("wrong format, see commandref", "");
+  }
+  my $status = (lc($2) eq "on") ? "FF" : "00";
+  foreach my $t (keys %zwave_alarmType) {
+    if (lc($zwave_alarmType{$t}) eq lc($1)) {
+      return ("", "06".$t.$status);
+    }
+  }
+  return ("alarm/notification type not defined","");
+}
+
+sub
+ZWave_ALARM_08_Report($) {
+  # 0x7108 Alarm/Notification TypeSupportedReport >= V2
+  # additional flagname "Appliance" in V4
+ 
+  my ($arg) = @_;
+ 
+  if($arg !~ m/(..)(.*)/) {
+  return ("wrong format received");
+  }
+  
+  my $numBitMasks = $1 & 0x1f;
+  #my $res         = ($1 & 0x60) >> 5; # reserved field
+  my $alarm_v1    = $1 & 0x80; # 0:standard types, 1:V1 non-standard 
+  
+  if ($alarm_v1) {
+    return ("alarmTypeSupported:non-standard V1 Alarm Types used");
+  } else {
+    my $rt = "alarmTypeSupported:";
+    my $t = "";
+    my $val = $2;
+    my $delimeter = "";
+    
+    for (my $i=0; $i<$numBitMasks; $i++) {
+      my $supported = hex(substr($val, $i*2, 2));
+      for (my $j=$i*8; $j<$i*8+8; $j++) {
+        if ($supported & (2 ** ($j-$i*8))) {
+          $t = sprintf("%02x", $j);
+          $rt .= sprintf("$delimeter$zwave_alarmType{$t}");
+          $delimeter = " ";
+        }
+      }
+    }
+    return $rt;
+  }
+}
+
+### END: 0x71 ALARM/NOTIFICATION
+##############################################
 
 sub
 ZWave_protectionParse($$)
@@ -4400,6 +4610,21 @@ s2Hex($)
   <li>sucRouteDel<br>
     Delete static return routes to SUC/SIS node.</li>
 
+<br><br><b>Class ALARM (NOTIFICATION), V4</b>
+  <li>alarmnotification &lt;alarmType&gt; (on|off)<br>
+    Enable (on) or disable (off) the sending of unsolicited reports for
+    the alarm type &lt;alarmType&gt;. A list of supported alarm types of the
+    device can be obtained with the "alarmTypeSupported" command. The
+    name of the alarm type is case insensitive. Sending of an unsolicted
+    notification only work to associated nodes, broadcasting is not
+    allowed, so associations have to be set up. This command is
+    specified in version 2.</li>
+  <li> Note:<br>
+    The name of the class ALARM was renamend to NOTIFICATION in
+    version 3 of the Zwave specification. Due to backward compatibility
+    reasons the class will be always referenced as ALARM in FHEM,
+    regardless of the version.</li>
+
   <br><br><b>Class ASSOCIATION</b>
   <li>associationAdd groupId nodeId ...<br>
   Add the specified list of nodeIds to the association group groupId.<br> Note:
@@ -4590,6 +4815,13 @@ s2Hex($)
   <li>location LOCATION<br>
     Store LOCATION in the EEPROM. Note: only ASCII is supported.</li>
 
+  <br><br><b>Class NOTIFICATION</b>
+  <li>Note:<br>
+    The name of the class ALARM was renamend to NOTIFICATION in
+    version 3 of the Zwave specification. Due to backward compatibility
+    reasons the class will be always referenced as ALARM in FHEM,
+    regardless of the version. Please refer to class ALARM.</li>
+
   <br><br><b>Class POWERLEVEL</b>
   <li>Class is only used in an installation or test situation</li>
   <li>powerlevel level timeout/s<br>
@@ -4631,8 +4863,8 @@ s2Hex($)
   <li>scheduleEntryLockSet USER_ID ENABLED<br>
     enables or disables schedules for a specified user ID (V1)<br>
       <ul>
-      USER_ID: id of user, starting from 1 up to the number of supported users,
-      refer also to the USER_CODE class description.<br>
+      USER_ID: id of user, starting from 1 up to the number of supported
+      users, refer also to the USER_CODE class description.<br>
       ENABLED: 0=disabled, 1=enabled<br>
       </ul>
     </li>
@@ -4646,9 +4878,10 @@ s2Hex($)
       STARTTIME ENDTIME<br>
     erase or set a week day schedule for a specified user ID (V1)<br>
       <ul>
-      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
-      USER_ID: id of user, starting from 1 up to the number of supported users,
-      refer also to the USER_CODE class description.<br>
+      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the
+      user<br>
+      USER_ID: id of user, starting from 1 up to the number of supported
+      users, refer also to the USER_CODE class description.<br>
       SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       WEEKDAY: day of week, choose one of:
@@ -4663,9 +4896,10 @@ s2Hex($)
         STARTDATE STARTTIME ENDDATE ENDTIME<br>
     erase or set a year day schedule for a specified user ID (V1)<br>
       <ul>
-      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
-      USER_ID: id of user, starting from 1 up to the number of supported users,
-      refer also to the USER_CODE class description.<br>
+      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the
+      user<br>
+      USER_ID: id of user, starting from 1 up to the number of supported
+      users, refer also to the USER_CODE class description.<br>
       SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       STARTDATE: date of schedule start in the format YYYY-MM-DD<br>
@@ -4685,13 +4919,14 @@ s2Hex($)
           (sign is mandatory, minutes: 0 to 127, 1-3 digits)<br>
       </ul>
     </li>
-  <li>scheduleEntryLockDailyRepeatingSet ACTION USER_ID SCHEDULE_ID WEEKDAYS
-        STARTTIME DURATION<br>
+  <li>scheduleEntryLockDailyRepeatingSet ACTION USER_ID SCHEDULE_ID
+        WEEKDAYS STARTTIME DURATION<br>
     set a daily repeating schedule for the specified user (V3)<br>
       <ul>
-      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the user<br>
-      USER_ID: id of user, starting from 1 up to the number of supported users,
-      refer also to the USER_CODE class description.<br>
+      ACTION: 0=erase schedule slot, 1=modify the schedule slot for the
+      user<br>
+      USER_ID: id of user, starting from 1 up to the number of supported
+      users, refer also to the USER_CODE class description.<br>
       SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       WEEKDAYS: concatenated string of weekdays (choose from:
@@ -4765,8 +5000,8 @@ s2Hex($)
       <ul>
       TEMP: setpoint temperature value, by default the value is used
               with 1 decimal, see PREC<br>
-      SCALE: (optional) scale of temperature; [cC]=celsius, [fF]=fahrenheit,
-            defaults to celsius<br>
+      SCALE: (optional) scale of temperature; [cC]=celsius,
+            [fF]=fahrenheit, defaults to celsius<br>
       TYPE: (optional) setpoint type; [1, 15], defaults to 1=heating<br>
         <ul>
         1=heating,
@@ -4781,18 +5016,21 @@ s2Hex($)
         14=awayCooling,
         15=fullPower
         </ul>
-      PREC: (optional) number of decimals to be used, [1-7], defaults to 1<br>
+      PREC: (optional) number of decimals to be used, [1-7], defaults
+            to 1<br>
       SIZE: (optional) number of bytes used, [1, 2, 4], defaults to 2<br>
-      Note: optinal parameters can be ommitted and are used with there default
-            values. If you need or want to specify an optional parameter, ALL
-            parameters in front of this parameter need to be also specified!<br>
+      Note: optinal parameters can be ommitted and are used with there
+            default values. If you need or want to specify an optional
+            parameter, ALL parameters in front of this parameter need
+            to be also specified!<br>
       Note: the number of decimals (defined by PREC) and the number of
       bytes (defined by SIZE) used for the setpoint influence the usable
       range for the temperature. Some device do not support all possible
       values/combinations for PREC/SIZE.<br>
         <ul>
         1 byte: 0 decimals [-128, 127], 1 decimal [-12.8, 12.7], ...<br>
-        2 byte: 0 decimals [-32768, 32767], 1 decimal [-3276.8, 3276.7], ...<br>
+        2 byte: 0 decimals [-32768, 32767], 1 decimal [-3276.8, 3276.7],
+          ...<br>
         4 byte: 0 decimals [-2147483648, 2147483647], ...<br>
         </ul>
       </ul>
@@ -4848,10 +5086,36 @@ s2Hex($)
     Since this information is stored in the dongle, the information will be
     returned directly even for WAKE_UP devices.</li>
 
-  <br><br><b>Class ALARM</b>
-  <li>alarm alarmId<br>
-    return the value for alarmId. The value is device specific.
+  <br><br><b>Class ALARM (NOTIFICATION), V4</b>
+  <li>alarm &lt;alarmId&gt;<br>
+    return the value for the (decimal) alarmId. The value is device
+    specific. This command is specified in version 1 and should only
+    be used with old devices that only support version 1.</li>
+  <li>alarmWithType &lt;alarmType&gt;<br>
+    return the event for the specified alarm type. This command is
+    specified in version 2.
     </li>
+  <li>alarmWithTypeEvent &lt;alarmType&gt; &lt;eventnumber&gt;<br>
+    return the event details for the specified alarm type and
+    eventnumber. This command is specified in version 3. The eventnumber
+    is specific for each alarm type, a list of the supported
+    eventnumbers can be obtained by the "alarmEventSupported" command,
+    refer also to the documentation of the device.
+    </li>
+  <li>alarmTypeSupported<br>
+    Returns a list of the supported alarm types of the device which are
+    used as parameters in the "alarmWithType" and "alarmWithTypeEvent"
+    commands. This command is specified in version 2.</li>  
+  <li>alarmEventSupported &lt;alarmType&gt;<br>
+    Returns a list of the supported events for the specified alarm type.
+    The numbers of the events can be used as parameters in the
+    "alarmWithTypeEvent" command. This command is specified in
+    version 3.</li>  
+  <li>Note:<br>
+    The name of the class ALARM was renamend to NOTIFICATION in
+    version 3 of the Zwave specification. Due to backward compatibility
+    reasons the class will be always referenced as ALARM in FHEM,
+    regardless of the version.</li>
 
   <br><br><b>Class ASSOCIATION</b>
   <li>association groupId<br>
@@ -4959,22 +5223,22 @@ s2Hex($)
   <br><br><b>Class METER</b>
   <li>meter scale<br>
     return the meter report for the requested scale.<br>
-    Note: protocol V1 does not support the scale parameter, the parameter will
-    be ignored and the default scale will be returned.<br>
-    For protocol V2 and higher, scale is supported and depends on the type of
-    the meter (energy, gas or water).<br>
-    The device may not support all scales, see the meterSupported command and
-    its output. If the scale parameter is omitted, the default unit will be
-    reported.<br>
+    Note: protocol V1 does not support the scale parameter, the parameter
+    will be ignored and the default scale will be returned.<br>
+    For protocol V2 and higher, scale is supported and depends on the
+    type of the meter (energy, gas or water).<br>
+    The device may not support all scales, see the meterSupported
+    command and its output. If the scale parameter is omitted, the
+    default unit will be reported.<br>
     Example: For an electric meter, meter 0 will report energy in kWh,
     meter 2 will report power in W and meter 6 will report current in A
     (if these scales are supported).<br>
     </li>
   <li>meterSupported<br>
-    request the type of the meter, the supported scales and the capability to
-    reset the accumulated value.<br>
-    Note: The output contains the decimal numbers of the supported scales that
-    can be used as parameter for the meter command.
+    request the type of the meter, the supported scales and the
+    capability to reset the accumulated value.<br>
+    Note: The output contains the decimal numbers of the supported
+    scales that can be used as parameter for the meter command.
     </li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
@@ -5016,6 +5280,13 @@ s2Hex($)
   <li>location<br>
     Get the location from the EEPROM. Note: only ASCII is supported.</li>
 
+  <br><br><b>Class NOTIFICATION</b>
+  <li>Note:<br>
+    The name of the class ALARM was renamend to NOTIFICATION in
+    version 3 of the Zwave specification. Due to backward compatibility
+    reasons the class will be always referenced as ALARM in FHEM,
+    regardless of the version. Please refer to class ALARM.</li>
+
   <br><br><b>Class POWERLEVEL</b>
   <li>powerlevel<br>
     Get the current powerlevel and remaining time in this level.</li>
@@ -5046,8 +5317,8 @@ s2Hex($)
     returns the specified week day schedule for the specified user
       (day of week, start time, end time) (V1)<br>
       <ul>
-      USER_ID: id of user, starting from 1 up to the number of supported users,
-      refer also to the USER_CODE class description.<br>
+      USER_ID: id of user, starting from 1 up to the number of supported
+      users, refer also to the USER_CODE class description.<br>
       SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       </ul>
@@ -5056,8 +5327,8 @@ s2Hex($)
     returns the specified year day schedule for the specified user
       (start date, start time, end date, end time) (V1)<br>
       <ul>
-      USER_ID: id of user, starting from 1 up to the number of supported users,
-      refer also to the USER_CODE class description.<br>
+      USER_ID: id of user, starting from 1 up to the number of supported
+      users, refer also to the USER_CODE class description.<br>
       SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       </ul>
@@ -5066,14 +5337,15 @@ s2Hex($)
     returns the specified daily schedule for the specified user
       (weekdays, start date, duration) (V3)<br>
       <ul>
-      USER_ID: id of user, starting from 1 up to the number of supported users,
-      refer also to the USER_CODE class description.<br>
+      USER_ID: id of user, starting from 1 up to the number of supported
+      users, refer also to the USER_CODE class description.<br>
       SCHEDULE_ID: schedule slot id (from 1 up to number of supported
                     schedule slots)<br>
       </ul>
     </li>
   <li>scheduleEntryLockTimeOffset<br>
-    returns the time zone offset TZO and the daylight saving time offset (V2)
+    returns the time zone offset TZO and the daylight saving time
+    offset (V2)
     </li>
 
   <br><br><b>Class SECURITY</b>
@@ -5228,6 +5500,24 @@ s2Hex($)
       Generate an an additional event for the RAW message.  Can be used if
       someone fears that critical notifies wont work, if FHEM changes the event
       text after an update.  </li>
+    <li>extendedAlarmReadings<br>
+      Some devices support more than one alarm type, this attribute
+      select which type of reading is used for the reports of the ALARM
+      (or NOTIFICATION) class:<br>
+      A value of "0" select a combined, single reading ("alarm") for
+      all alarm types of the device. Subsequent reports of different
+      alarm types will overwrite each other. This is the default setting
+      and the former behavior.<br>
+      A value of "1" select separate alarm readings for each alarm type
+      of the device. The readingings are named "alarm_&lt;alarmtype&gt;.
+      This can also be selected if only one alarmtype is supported by
+      the device. This reading also contain the status of the
+      alarmnotification. For compatibility reasons this is currently
+      not supported with the combined reading.<br>
+      A value of "2" select both of the above and create a combined and
+      the seperate readings at the same time, this should only be used
+      if really needed as more or less duplicate events are generated.
+      </li>
 
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#neighborListPos">neighborListPos</a></li>
@@ -5292,9 +5582,25 @@ s2Hex($)
                                   transmitNoRoute]</li>
 
   <br><b>Class ALARM</b>
+  <li>Note:<br>
+    Depending on the setting of the attribute "extendedAlarmReadings"
+    the generated events differ slightly. With a value of "0" or "2" a
+    combined reading for all alarm types of the device with the name
+    "alarm" will be used. With a value of "1" or "2" separate readings
+    for each supported alarm type will be generated with names
+    "alarm_&lt;alarmType&gt;.</li>
   <li>Devices with class version 1 support: alarm_type_X:level Y</li>
   <li>For higher class versions more detailed events with 100+ different
-      strings in the form alarm:<string> are generated.</li>
+      strings in the form alarm:&lt;string&gt;
+      (or alarm_&lt;alarmType&gt;:&lt;string&gt;) are generated.<br>
+      For the combined reading, the name of the alarm type is part of
+      the reading event, for separate readings it is part of the
+      reading name.<br>
+      If a cleared event can be identified, the string "Event cleared:"
+      is reported before the event details.<br>
+      The seperate readings also contain the status of the
+      alarmnotification. For compatibility reasons this is currently
+      not supported with the combined reading. </li>
 
   <br><b>Class APPLICATION_STATUS</b>
   <li>applicationStatus: [cmdRejected]</li>
@@ -5329,7 +5635,7 @@ s2Hex($)
   <br><br><b>Class CLIMATE_CONTROL_SCHEDULE</b>
   <li>ccsOverride:[no|temporary|permanent],
                   [frost protection|energy saving|unused]</li>
-  <li>ccsChanged:<number></li>
+  <li>ccsChanged:&lt;number&gt;</li>
   <li>ccs_[mon|tue|wed|thu|fri|sat|sun]:HH:MM temp HH:MM temp...</li>
 
   <br><br><b>Class CLOCK</b>
@@ -5371,7 +5677,7 @@ s2Hex($)
   <li>indoorTemperature: %0.1f C</li>
   <li>indoorHumidity: %s %</li>
   <li>remainingFilterLife: %s %</li>
-  <li>supportedStatus: <list of supported stati></li>
+  <li>supportedStatus: &lt;list of supported stati&gt;</li>
 
   <br><br><b>Class INDICATOR</b>
   <li>indState:[on|off|dim value]</li>
@@ -5453,9 +5759,10 @@ s2Hex($)
   <li>scheduleEntryLockDailyRepeating_$userId:userID: $value $weekdays
         $hour:$minute $durationhour:$durationminute<br>
         Note: $weekdays is a concatenated string with weekdaynames
-        ("sun","mon","tue","wed","thu","fri","sat") where inactive weekdays are
-        represented by "...", e.g. montue...wedfri</li>
-  <li>scheduleEntryLockTimeOffset:TZO: $sign$hour:$minute DST: $sign$minutes</li>
+        ("sun","mon","tue","wed","thu","fri","sat") where inactive
+        weekdays are represented by "...", e.g. montue...wedfri</li>
+  <li>scheduleEntryLockTimeOffset:TZO: $sign$hour:$minute DST: 
+        $sign$minutes</li>
 
   <br><br><b>Class SECURITY</b>
   <li>none<br>
