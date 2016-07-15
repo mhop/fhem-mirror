@@ -4610,17 +4610,17 @@ s2Hex($)
   <li>sucRouteDel<br>
     Delete static return routes to SUC/SIS node.</li>
 
-<br><br><b>Class ALARM (NOTIFICATION), V4</b>
+<br><br><b>Class ALARM</b>
   <li>alarmnotification &lt;alarmType&gt; (on|off)<br>
     Enable (on) or disable (off) the sending of unsolicited reports for
     the alarm type &lt;alarmType&gt;. A list of supported alarm types of the
-    device can be obtained with the "alarmTypeSupported" command. The
+    device can be obtained with the alarmTypeSupported command. The
     name of the alarm type is case insensitive. Sending of an unsolicted
-    notification only work to associated nodes, broadcasting is not
+    notification only works to associated nodes, broadcasting is not
     allowed, so associations have to be set up. This command is
     specified in version 2.</li>
   <li> Note:<br>
-    The name of the class ALARM was renamend to NOTIFICATION in
+    The name of the class ALARM was renamed to NOTIFICATION in
     version 3 of the Zwave specification. Due to backward compatibility
     reasons the class will be always referenced as ALARM in FHEM,
     regardless of the version.</li>
@@ -4814,13 +4814,6 @@ s2Hex($)
     Store NAME in the EEPROM. Note: only ASCII is supported.</li>
   <li>location LOCATION<br>
     Store LOCATION in the EEPROM. Note: only ASCII is supported.</li>
-
-  <br><br><b>Class NOTIFICATION</b>
-  <li>Note:<br>
-    The name of the class ALARM was renamend to NOTIFICATION in
-    version 3 of the Zwave specification. Due to backward compatibility
-    reasons the class will be always referenced as ALARM in FHEM,
-    regardless of the version. Please refer to class ALARM.</li>
 
   <br><br><b>Class POWERLEVEL</b>
   <li>Class is only used in an installation or test situation</li>
@@ -5086,7 +5079,7 @@ s2Hex($)
     Since this information is stored in the dongle, the information will be
     returned directly even for WAKE_UP devices.</li>
 
-  <br><br><b>Class ALARM (NOTIFICATION), V4</b>
+  <br><br><b>Class ALARM</b>
   <li>alarm &lt;alarmId&gt;<br>
     return the value for the (decimal) alarmId. The value is device
     specific. This command is specified in version 1 and should only
@@ -5108,14 +5101,9 @@ s2Hex($)
     commands. This command is specified in version 2.</li>  
   <li>alarmEventSupported &lt;alarmType&gt;<br>
     Returns a list of the supported events for the specified alarm type.
-    The numbers of the events can be used as parameters in the
+    The number of the events can be used as parameter in the
     "alarmWithTypeEvent" command. This command is specified in
     version 3.</li>  
-  <li>Note:<br>
-    The name of the class ALARM was renamend to NOTIFICATION in
-    version 3 of the Zwave specification. Due to backward compatibility
-    reasons the class will be always referenced as ALARM in FHEM,
-    regardless of the version.</li>
 
   <br><br><b>Class ASSOCIATION</b>
   <li>association groupId<br>
@@ -5279,13 +5267,6 @@ s2Hex($)
     Get the name from the EEPROM. Note: only ASCII is supported.</li>
   <li>location<br>
     Get the location from the EEPROM. Note: only ASCII is supported.</li>
-
-  <br><br><b>Class NOTIFICATION</b>
-  <li>Note:<br>
-    The name of the class ALARM was renamend to NOTIFICATION in
-    version 3 of the Zwave specification. Due to backward compatibility
-    reasons the class will be always referenced as ALARM in FHEM,
-    regardless of the version. Please refer to class ALARM.</li>
 
   <br><br><b>Class POWERLEVEL</b>
   <li>powerlevel<br>
@@ -5502,21 +5483,21 @@ s2Hex($)
       text after an update.  </li>
     <li>extendedAlarmReadings<br>
       Some devices support more than one alarm type, this attribute
-      select which type of reading is used for the reports of the ALARM
+      selects which type of reading is used for the reports of the ALARM
       (or NOTIFICATION) class:<br>
-      A value of "0" select a combined, single reading ("alarm") for
+      A value of "0" selects a combined, single reading ("alarm") for
       all alarm types of the device. Subsequent reports of different
       alarm types will overwrite each other. This is the default setting
       and the former behavior.<br>
-      A value of "1" select separate alarm readings for each alarm type
-      of the device. The readingings are named "alarm_&lt;alarmtype&gt;.
+      A value of "1" selects separate alarm readings for each alarm type
+      of the device. The readings are named "alarm_&lt;alarmtype&gt;.
       This can also be selected if only one alarmtype is supported by
-      the device. This reading also contain the status of the
-      alarmnotification. For compatibility reasons this is currently
+      the device. This reading also contains the status of the
+      alarm notification. For compatibility reasons this is currently
       not supported with the combined reading.<br>
-      A value of "2" select both of the above and create a combined and
+      A value of "2" selects both of the above and creates the combined and
       the seperate readings at the same time, this should only be used
-      if really needed as more or less duplicate events are generated.
+      if really needed as duplicate events are generated.
       </li>
 
     <li><a href="#ignore">ignore</a></li>
@@ -5591,16 +5572,16 @@ s2Hex($)
     "alarm_&lt;alarmType&gt;.</li>
   <li>Devices with class version 1 support: alarm_type_X:level Y</li>
   <li>For higher class versions more detailed events with 100+ different
-      strings in the form alarm:&lt;string&gt;
-      (or alarm_&lt;alarmType&gt;:&lt;string&gt;) are generated.<br>
-      For the combined reading, the name of the alarm type is part of
-      the reading event, for separate readings it is part of the
-      reading name.<br>
-      If a cleared event can be identified, the string "Event cleared:"
-      is reported before the event details.<br>
-      The seperate readings also contain the status of the
-      alarmnotification. For compatibility reasons this is currently
-      not supported with the combined reading. </li>
+    strings in the form alarm:&lt;string&gt;
+    (or alarm_&lt;alarmType&gt;:&lt;string&gt;) are generated.<br>
+    For the combined reading, the name of the alarm type is part of
+    the reading event, for separate readings it is part of the
+    reading name.<br>
+    If a cleared event can be identified, the string "Event cleared:"
+    is reported before the event details.<br>
+    The seperate readings also contain the status of the
+    alarm / notification. For compatibility reasons this is currently
+    not supported with the combined reading. </li>
 
   <br><b>Class APPLICATION_STATUS</b>
   <li>applicationStatus: [cmdRejected]</li>
