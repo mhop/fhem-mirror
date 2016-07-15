@@ -43,4 +43,9 @@
     <dev id="4294967295" name="streamtest" label="PanStream Test"/>
     <dev id="15" name="panfirmata" label="PanStream Firmata"/>
   </developer>
+  <developer id="76" name="tobias.faust">
+    <dev id="1" name="EnvironmentSensor" label="Environment Sensor"/>
+    <dev id="2" name="FullCounter12" label="12port FullCounter"/>
+    <dev id="3" name="WindowStateSensor" label="Window State Sensor"/>
+  </developer>
 </devices>
