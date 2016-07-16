@@ -253,21 +253,29 @@ ZWDongle_Set($@)
   }
 
   if($type eq "backupCreate") {
+    my $caps = ReadingsVal($name, "caps","");
+    my $is4 = ($caps =~ m/MEMORY_GET_BUFFER/);
+    my $is5 = ($caps =~ m/NVM_EXT_READ_LONG_BUFFER/);
     return "Creating a backup is not supported by this device"
-      if(ReadingsVal($name, "caps","") !~ m/NVM_EXT_READ_LONG_BUFFER/);
-    return "Usage: set $name backupCreate [64k|128k|256k]"
-      if(int(@a) != 1 || $a[0] !~ m/^(64|128|256)k$/);
+      if(!$is4 && !$is5);
+    return "Usage: set $name backupCreate [16k|32k|64k|128k|256k]"
+      if(int(@a) != 1 || $a[0] !~ m/^(16|32|64|128|256)k$/);
+
+    my $fn        = ($is5 ? "NVM_EXT_READ_LONG_BUFFER" : "MEMORY_GET_BUFFER");
+    my $cmdFormat = ($is5 ? "002a%06x0040" : "0023%04x20");
+    my $cmdRe     = ($is5 ? "^012a" : "^0123");
+    my $inc       = ($is5 ? 64 : 32);
+
     my $l = $1 * 1024;
     my $fName = "$attr{global}{modpath}/$name.bin";
     open(OUT, ">$fName") || return "Cant open $fName: $!";
     binmode(OUT);
     for(my $off = 0; $off < $l;) {
-      ZWDongle_Write($hash, "", sprintf("002a%06x0040", $off));
-      my ($err, $ret) =
-        ZWDongle_ReadAnswer($hash, "NVM_EXT_READ_LONG_BUFFER", "^012a");
+      ZWDongle_Write($hash, "", sprintf($cmdFormat, $off));
+      my ($err, $ret) = ZWDongle_ReadAnswer($hash, $fn, $cmdRe);
       return $err if($err);
       print OUT pack('H*', substr($ret, 4));
-      $off += 64;
+      $off += $inc;
       Log 3, "$name backupCreate at $off bytes" if($off % 16384 == 0);
     }
 
@@ -276,8 +284,17 @@ ZWDongle_Set($@)
   }
 
   if($type eq "backupRestore") {
+    my $caps = ReadingsVal($name, "caps","");
+    my $is4 = ($caps =~ m/MEMORY_PUT_BUFFER/);
+    my $is5 = ($caps =~ m/NVM_EXT_WRITE_LONG_BUFFER/);
     return "Restoring a backup is not supported by this device"
-      if(ReadingsVal($name, "caps","") !~ m/NVM_EXT_WRITE_LONG_BUFFER/);
+      if(!$is4 && !$is5);
+    my $fn        = ($is5 ? "NVM_EXT_WRITE_LONG_BUFFER" : "MEMORY_PUT_BUFFER");
+    my $cmdFormat = ($is5 ? "002b%06x0040%s" : "0024%04x40%s");
+    my $cmdRe     = ($is5 ? "^012b"   : "^0124");
+    my $cmdRet    = ($is5 ? "^012b01" : "^012401");
+    my $inc       = ($is5 ? 64 : 32);
+
     return "Usage: set $name backupRestore" if(int(@a) != 0);
     my $fName = "$attr{global}{modpath}/$name.bin";
     my $l = -s $fName;
@@ -287,16 +304,15 @@ ZWDongle_Set($@)
 
     my $buf;
     for(my $off = 0; $off < $l;) {
-      if(sysread(IN, $buf, 64) != 64) {
-        return "Cant read 64 bytes from $fName";
+      if(sysread(IN, $buf, $inc) != $inc) {
+        return "Cant read $inc bytes from $fName";
       }
-      ZWDongle_Write($hash,"",sprintf("002b%06x0040%s",$off,unpack('H*',$buf)));
-      my ($err, $ret) =
-          ZWDongle_ReadAnswer($hash, "NVM_EXT_WRITE_LONG_BUFFER", "^012b");
+      ZWDongle_Write($hash, "", sprintf($cmdFormat, $off, unpack('H*',$buf)));
+      my ($err, $ret) = ZWDongle_ReadAnswer($hash, $fn, $cmdRe);
       return $err if($err);
-      return "Unexpected NVM_EXT_WRITE_LONG_BUFFER return value $ret"
-        if($ret !~ m/^012b01/);
-      $off += 64;
+      return "Unexpected $fn return value $ret"
+        if($ret !~ m/$cmdRet/);
+      $off += $inc;
       Log 3, "$name backupRestore at $off bytes" if($off % 16384 == 0);
     }
 
@@ -981,7 +997,7 @@ ZWDongle_Ready($)
     device supports the SECURITY class, then a secure inclusion is attempted.
     </li>
 
-  <li>backupCreate 64k|128k|256k<br>
+  <li>backupCreate 16k|32k|64k|128k|256k<br>
     read out the NVRAM of the ZWDongle, and store it in a file called
     &lt;ZWDongle_Name&gt;.bin in the modpath folder.  Since the size of the
     NVRAM is currently unknown to FHEM, you have to specify the size. The
@@ -993,6 +1009,8 @@ ZWDongle_Ready($)
   <li>backupRestore<br>
     Restore the file created by backupCreate. Restoring the file takes about
     the same time as saving it, and FHEM is blocked during this time.
+    Note / Important: this function is not yet tested for older devices using
+    the MEMORY functions.
     </li>
 
   <li>controllerChange on|stop|stopFailed<br>
