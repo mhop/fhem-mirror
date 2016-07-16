@@ -35,14 +35,15 @@
 
 package main;
 
-
 use strict;
 use warnings;
 
 use Time::HiRes qw(gettimeofday);    
 use HttpUtils;
-use XML::Simple;
 use SetExtensions;
+
+package EDIPLUG;
+use XML::Simple;
 
 sub EDIPLUG_Initialize($);
 sub EDIPLUG_Define($$);
@@ -220,7 +221,8 @@ sub EDIPLUG_Read($$$)
     # EDIPLUGs geben ein nicht gueltigen Zeichensatz zurueck ( UTF8 instead utf-8 )
     $buffer =~s/UTF8/utf-8/g;
 
-    my $xmlres = XMLin($buffer);
+    my $xml = XML::Simple->new(ForceArray => ['entry', 'link'], KeyAttr => []);
+    my $xmlres = $xml->EDIPLUG::XMLin($buffer);
 
     # Device.System.Power.State (Status der Steckdose)
     if (exists $xmlres->{CMD}->{'Device.System.Power.State'}) 
