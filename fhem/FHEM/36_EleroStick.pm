@@ -43,6 +43,7 @@ sub EleroStick_Initialize($) {
                             "MatchList " .
                             "ChannelTimeout " .
                             "Interval " .
+                            "Delay " .
                             "$readingFnAttributes ";
                                                      
 }
@@ -57,12 +58,15 @@ sub EleroStick_Enqueue($$) {
   my ($hash, $data) = @_;
   my $name = $hash->{NAME};
 
-#  EleroStick_SimpleWrite($hash, $data);
-
   if(!$hash->{QUEUE}) {
-    $hash->{QUEUE} = [$data];
+    $hash->{QUEUE} = [""];
     ###debugLog($name, "QUEUE created with: $data");
-    EleroStick_StartQueueTimer($hash);
+
+    EleroStick_SimpleWrite($hash, $data);
+    my $timerName = $name . "#QueueTimer";
+    my $interval = 0.1;
+    InternalTimer(gettimeofday() + $interval, "EleroStick_OnQueueTimer", $timerName, 0);
+
   }
   else {
     push(@{$hash->{QUEUE}}, $data);
@@ -76,13 +80,13 @@ sub EleroStick_StartQueueTimer($) {
   my $hash = shift;
   my $name = $hash->{NAME};
   my $timerName = $name . "#QueueTimer";
-
-  my $interval = 0.5;
+  my $interval = AttrVal($name, "Delay", 0.5);
 
   InternalTimer(gettimeofday() + $interval, "EleroStick_OnQueueTimer", $timerName, 0);
 
-  ###debugLog($name, "Timer started: $timerName");
+  ####debugLog($name, "Timer started: $timerName");
 }
+
 
 
 #=======================================================================================
@@ -345,7 +349,6 @@ sub EleroStick_Read($) {
     $hash->{buffer} .= $answer;
   }
    
-  #todo:  hier gibts manchmal Fehlermeldung $strLen nicht definiert 	
   my $strLen = substr($hash->{buffer},3-1,2);
   $strLen = hex($strLen);
   my $calLen = ($strLen * 2) + 4;
