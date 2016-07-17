@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Minor Release 2.4 new AMADCommBridge API
   - changed: 10_ZWave: alarm Events text changed, comma replaced, Forum #53389
   - feature: 93_DbRep: new module added - reporting of database content
              written by DbLog, see commandref for details
