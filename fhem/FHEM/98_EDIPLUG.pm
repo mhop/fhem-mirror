@@ -42,8 +42,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use SetExtensions;
 
-package EDIPLUG;
-use XML::Simple;
+use XML::Simple qw(:strict);
 
 sub EDIPLUG_Initialize($);
 sub EDIPLUG_Define($$);
