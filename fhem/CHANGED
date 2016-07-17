@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   00_HMUARTLGW: new module for eQ-3 HomeMatic UART/LanGateway
   - change:  93_DbRep:  function "diffValue" added, readingnames changed to 
              ensure valid reading order, write "-" for reading-value if no 
              dataset is found in selection timerange
