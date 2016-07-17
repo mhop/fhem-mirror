@@ -221,7 +221,7 @@ sub EDIPLUG_Read($$$)
     $buffer =~s/UTF8/utf-8/g;
 
     my $xml = XML::Simple->new(ForceArray => ['entry', 'link'], KeyAttr => []);
-    my $xmlres = $xml->EDIPLUG::XMLin($buffer);
+    my $xmlres = $xml->XMLin($buffer);
 
     # Device.System.Power.State (Status der Steckdose)
     if (exists $xmlres->{CMD}->{'Device.System.Power.State'}) 
