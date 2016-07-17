@@ -288,8 +288,14 @@ sub CUL_HM_updateConfig($){
       $hash->{helper}{role}{vrt} = 1;
       if($hash->{helper}{role}{dev}){
         CUL_HM_UpdtCentral($name); # first update, then keys
-        if(eval "defined(&HMLAN_writeAesKey)"){
-          HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
+        foreach my $io (split ",",AttrVal($name,"IOList","")) {
+          next if(!$defs{$io});
+          if($defs{$io}->{TYPE} eq "HMLAN" && eval "defined(&HMLAN_writeAesKey)"){
+            HMLAN_writeAesKey($io);
+          } 
+          elsif ($defs{$io}->{TYPE} eq "HMUARTLGW") {
+            CallFn($io,"WriteFn",$defs{$io},undef,"writeAesKey:${io}");
+          }
         }
       }
     }
@@ -828,8 +834,14 @@ sub CUL_HM_Attr(@) {#################################
       delete $attr{$name}{$attrName};
     }
     if ($init_done){
-      if(eval "defined(&HMLAN_writeAesKey)"){
-        HMLAN_writeAesKey($_) foreach (split ",",AttrVal($name,"IOList",""));
+      foreach my $io (split ",",AttrVal($name,"IOList","")) {
+        next if(!$defs{$io});
+        if($defs{$io}->{TYPE} eq "HMLAN" && eval "defined(&HMLAN_writeAesKey)"){
+          HMLAN_writeAesKey($io);
+        }
+        elsif ($defs{$io}->{TYPE} eq "HMUARTLGW") {
+          CallFn($io,"WriteFn",$defs{$io},undef,"writeAesKey:${io}");
+        }
       }
     }
     return $retVal;
@@ -920,7 +932,7 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
   if ((  $hash->{helper}{io}{newChn} ne $oldChn)
       && $hash->{IODev}
       && $hash->{IODev}->{TYPE}
-      && $hash->{IODev}->{TYPE} eq "HMLAN"){
+      && $hash->{IODev}->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/){
     IOWrite($hash, "", "init:$p[0]");
   }
 }
@@ -1924,11 +1936,9 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
       my $pVal = $val;# necessary for oper 'off', not logical off
-      Log 1,"General $val-$lvlMin";
       $val = (($val-$lvlMin)<=0)
                   ? ($val?1:0)
                   : int((($val-$lvlMin)*200)/($lvlMax - $lvlMin))/2;
-      Log 1,"General $val-$lvlMin";
 
       # blind option: reverse Level Meaning 0 = open, 100 = closed
       if (AttrVal($mh{cName}, "param", "") =~ m/levelInverse/){;
@@ -2795,7 +2805,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   if($rxt & 0x10 && $mhp->{devH}{helper}{prt}{sleeping}){ # lazy config
     if($mhp->{mFlgH} & 0x02                  #wakeup device
-       && $defs{$mhp->{devH}{IODev}{NAME}}{TYPE} eq "HMLAN"){
+       && $defs{$mhp->{devH}{IODev}{NAME}}{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/){
       $mhp->{devH}{helper}{io}{newCh} = 1 if ($mhp->{devH}{helper}{prt}{sProc} == 2);
       CUL_HM_appFromQ($mhp->{devN},"cf");# stack cmds if waiting
       $mhp->{devH}{helper}{prt}{sleeping} = 0;
@@ -4298,8 +4308,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my $curVal = CUL_HM_getRegFromStore($rName,$addr,$list,$peerId.$peerChn);
       if ($curVal !~ m/^(set_|)(\d+)$/){
 	    return "peer required for $regName" if ($curVal =~ m/peer/);
-        return "cannot calculate value. Please issue set $name getConfig first - $curVal"
-              if ($curVal !~ m/^(set_|)(\d+)$/);
+        return "cannot calculate value. Please issue set $name getConfig first - $curVal";
       }
       $curVal = $2; # we expect one byte in int, strap 'set_' possibly
       $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
@@ -7289,19 +7298,20 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
   for (my $size2go = $size;$size2go>0;$size2go -=8){
     my $addrS = sprintf("%02X",$addr);
     my ($dReadS,$dReadR) = (undef,"");  
-    $dReadS = $1 if( $sRL =~ m/$addrS:(..)/);
-    $dReadR = $1 if( $rRL =~ m/$addrS:(..)/);
+    $dReadS = $1 if( $sRL =~ m/$addrS:(..)/);#shadowReg
+    $dReadR = $1 if( $rRL =~ m/$addrS:(..)/);#realReg
     my $dRead = $dReadR;
     if (defined $dReadS){
       $convFlg = "set_" if ($dReadR ne $dReadS);
       $dRead = $dReadS;
     }
     else{
-      if (grep /$regLN../,keys %{$hash->{READINGS}} &&
-           !$peerId){
-        return "invalid:peer missing";
+      return "invalid:peer missing"  if (grep /$regLN../,keys %{$hash->{READINGS}} &&
+                                         !$peerId);
+      if (!defined($dRead) || $dRead eq ""){
+        return "invalid: not supported by FW version" if ($rRL =~ m/00:00/);#reglist is complete but still address cannot be found
+        return "invalid";
       }
-      return "invalid" if (!defined($dRead) || $dRead eq "");
     }
 
     $data = ($data<< 8)+hex($dRead);
@@ -8287,7 +8297,7 @@ sub CUL_HM_UpdtCentral($){
   
   foreach my $ioN(split",",AttrVal($name,"IOList","")){# set parameter in IO
     next if (!$defs{$ioN});
-    if (  $defs{$ioN}{TYPE} eq "HMLAN"){;
+    if (  $defs{$ioN}{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/){;
     }
     elsif($defs{$ioN}{TYPE} eq "CUL"){
       CommandAttr(undef, "$ioN rfmode HomeMatic") 
@@ -8383,7 +8393,7 @@ sub CUL_HM_assignIO($){ #check and assign IO
       if (   $hash->{IODev} 
           && $hash->{IODev} ne $defs{$iom}
           && $hash->{IODev}->{TYPE}
-          && $hash->{IODev}->{TYPE} eq "HMLAN"){#if recent io is HMLAN and we have to remove the device from IO
+          && $hash->{IODev}->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/){#if recent io is HMLAN and we have to remove the device from IO
         IOWrite($hash, "", "remove:".CUL_HM_hash2Id($hash));
       }
       $hash->{IODev} = $defs{$iom};

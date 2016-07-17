@@ -251,7 +251,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00B9" => {name=>"HM-LC-Dim1T-CV-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00BA" => {name=>"HM-LC-Dim1T-FM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",}
  ,"00BB" => {name=>"HM-LC-Dim2T-SM-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",}#
- ,"00BC" => {name=>"HM-WDS40-TH-I-2"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",}, #:w  todo should be wakeup, does not react
+ ,"00BC" => {name=>"HM-WDS40-TH-I-2"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",} #:w  todo should be wakeup, does not react
  ,"00BD" => {name=>"HM-CC-RT-DN-BoM"         ,alias=>"HM-CC-RT-DN"}
  ,"00BE" => {name=>"HM-MOD-Re-8"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'      ,lst=>'1,3'          ,chn=>"Sw:1:8",}
  ,"00BF" => {name=>"HM-PB-2-FM"              ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:l'    ,lst=>'1,4'          ,chn=>"Btn:1:2",}
@@ -846,16 +846,14 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
 #'powerMeter'
 
 %culHmRegGeneral = (
-  pairCentral=>1,
+  pairCentral     =>1
+ ,sign            =>1
 );
 %culHmRegType = (
   swi                 =>{ peerNeedsBurst  =>1,expectAES       =>1}
- ,remote              =>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
-                         ,sign            =>1
-                        }
+ ,remote              =>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1}
  ,blindActuator       =>{ intKeyVisib     =>1
                          ,driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1
-                         ,sign            =>1
                          ,confBtnTime     =>1,localResDis     =>1
                          ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1
                          ,MaxTimeF        =>1
@@ -885,7 +883,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
                          ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
                          ,lgMultiExec     =>1,shMultiExec     =>1
                         }
- ,switch              =>{ intKeyVisib     =>1,sign            =>1
+ ,switch              =>{ intKeyVisib     =>1,
                          ,OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
@@ -911,16 +909,14 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
 ###motionAndBtn#########################
  ,threeStateSensor    =>{ cyclicInfoMsg   =>1,                    transmDevTryMax =>1
                          ,                                        transmitTryMax  =>1
-                         ,sign            =>1
                          ,peerNeedsBurst  =>1,expectAES       =>1
                          }
  ,sensRain            =>{ transmDevTryMax =>1,localResDis     =>1}
  ,tipTronic           =>{ cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1,localResDis     =>1,RS485IdleTime   =>1}
  ,senBright           =>{ cyclicInfoMsgDis=>1,localResDis     =>1,transmDevTryMax =>1}
  ,powerMeter          =>{ intKeyVisib     =>1,localResDis     =>1
-                         ,sign            =>1
                          ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1}
- ,outputUnit          =>{ intKeyVisib     =>1,sign            =>1}
+ ,outputUnit          =>{ intKeyVisib     =>1}
  ,powerSensor         =>{ transmitTryMax  =>1,transmDevTryMax =>1
                          ,mtrType         =>1,mtrConstIr      =>1,mtrConstGas     =>1,mtrConstLed     =>1  
                          ,mtrSensIr       =>1  
@@ -952,7 +948,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-RC-19"          =>{ backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1}
  ,"HM-RC-4-2"         =>{ localResDis     =>1}
 
- ,"HM-LC-Dim1L-Pl"    =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1},
+ ,"HM-LC-Dim1L-Pl"    =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1}
  ,"HM-LC-Dim1L-CV-2"  =>{ confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib     =>1
                          ,logicCombination=>1
                          ,DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1
@@ -992,7 +988,6 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-CC-RT-DN"       =>{ btnLock         =>1,localResDis     =>1,globalBtnLock   =>1,modusBtnLock    =>1
                          ,cyclicInfoMsg   =>1,cyclicInfoMsgDis=>1
                          ,burstRx         =>1,lowBatLimitRT   =>1,backOnTime      =>1
-                         ,sign            =>1
                         }
  ,"HM-MOD-Em-8"       =>{ lowBatLimitBA2  =>1,transmDevTryMax =>1,localResDis     =>1  
                          ,ledMode         =>1
@@ -1061,9 +1056,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-LC-SW1-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1}
  ,"HM-LC-SW4-BA-PCB"  =>{ lowBatLimitBA   =>1,ledMode         =>1,localResDis     =>1}
  ,"HM-Sen-DB-PCB"     =>{                     ledMode         =>1}
- ,"HM-MOD-Re-8"       =>{ lowBatLimitBA3  =>1,ledMode         =>1
-                         ,sign            =>1
-                        },
+ ,"HM-MOD-Re-8"       =>{ lowBatLimitBA3  =>1,ledMode         =>1}
  ,"HM-Sys-sRP-Pl"     =>{ compMode        =>1}
  ,"KFM-Display"       =>{ CtDlyOn         =>1,CtDlyOff        =>1
                          ,CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1
@@ -1085,8 +1078,7 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-WDS30-OT2-SM"   =>{ burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,paramSel        =>1}
  ,"HM-TC-IT-WM-W-EU"  =>{ burstRx         =>1,cyclicInfoMsgDis=>1,localResDis     =>1,cyclicInfoMsg   =>1
                          ,btnLock         =>1,globalBtnLock   =>1,modusBtnLock    =>1,lowBatLimitRT   =>1
-                         ,sign            =>1
-                        },
+                        }
  ,"HM-SEN-EP"         =>{ seqPulse1       =>1,seqPulse2       =>1,seqPulse3       =>1,seqPulse4       =>1
                          ,seqPulse5       =>1,seqTolerance    =>1
                          ,peerNeedsBurst  =>1
@@ -1272,7 +1264,6 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                           }
  ,"HM-Sen-MDIR-WM5500"=>{ intKeyVisib     =>1,cyclicInfoMsg   =>1,localResDis     =>1,transmDevTryMax =>1}
  ,"HM-Sen-MDIR-WM5501"=>{ peerNeedsBurst  =>1,expectAES       =>1,dblPress        =>1,longPress       =>1
-                         ,sign            =>1
                          ,ledOnTime       =>1,transmitTryMax  =>1,localResDis     =>1
                         }
  ,"HM-LC-RGBW-WM01"   =>{ OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
@@ -1517,7 +1508,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}= $culHmRegChan{"HM-OU-CFM-PL02"};
                     cmdList    => "",
 );
 %culHmSubTypeGets = (
-                    none4Type  =>{ "test"=>"" },
+                    none4Type  =>{ "test"=>"" }
 );
 %culHmModelGets = (
                     "CCU-FHEM"     =>{ "listDevice"=>""}
