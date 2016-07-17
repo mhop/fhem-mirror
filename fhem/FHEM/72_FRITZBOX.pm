@@ -4492,7 +4492,7 @@ sub FRITZBOX_Web_Query($$@)
    my $jsonText = $response->content;
    # Remove illegal escape sequences
    $jsonText =~ s/\\'/'/g; #Hochkomma
-   $jsonText =~ s/\\\x{[1-9a-f]}//g; #Hex nummer
+   $jsonText =~ s/\\[\x{1}-\x{f}]//g; #Hex nummer
    
    my $jsonResult ;
    if ($charSet eq "UTF-8") {
