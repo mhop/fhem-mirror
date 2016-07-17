@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.2.4";
-my $flowsetversion = "2.2.4";
+my $modulversion = "2.4.0";
+my $flowsetversion = "2.4.0";
 
 
 
@@ -278,15 +278,15 @@ sub AMAD_statusRequest($) {
     my $activetask = AttrVal( $name, "checkActiveTask", "none" );
     
 
-    my $url = "http://" . $host . ":" . $port . "/fhem-amad/deviceInfo/"; # Path muß so im Automagic als http request Trigger drin stehen
+    my $url = "http://" . $host . ":" . $port . "/fhem-amad/deviceInfo/"; # Pfad muß so im Automagic als http request Trigger drin stehen
   
     HttpUtils_NonblockingGet(
 	{
 	    url		=> $url,
-	    timeout	=> 30,
+	    timeout	=> 15,
 	    hash	=> $hash,
 	    method	=> "GET",
-	    header	=> "fhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport",
+	    header	=> "Connection: close\r\nfhemip: $fhemip\r\nfhemdevice: $name\r\nactivetask: $activetask\r\napssid: $apssid\r\nbport: $bport",
 	    doTrigger	=> 1,
 	    callback	=> \&AMAD_statusRequestErrorHandling,
 	}
@@ -904,6 +904,7 @@ sub AMAD_HTTP_POST($$) {
 	    timeout	=> 60,
 	    hash	=> $hash,
 	    method	=> "POST",
+	    header	=> "Connection: close",
 	    doTrigger	=> 1,
 	    callback	=> \&AMAD_HTTP_POSTerrorHandling,
 	}
@@ -1092,16 +1093,17 @@ sub AMAD_CommBridge_Read($) {
     my $bname = $bhash->{NAME};
     
     
-    ## Zum testen mal ausgeschalten
-    if( $hash->{SERVERSOCKET} ) {   # Accept and create a child
+    
+    if( $hash->{SERVERSOCKET} ) {               # Accept and create a child
         TcpServer_Accept( $hash, "AMAD" );
-        
         return;
     }
 
     # Read 1024 byte of data
     my $buf;
     my $ret = sysread($hash->{CD}, $buf, 1024);
+
+
 
     # When there is an error in connection return
     if( !defined($ret ) || $ret <= 0 ) {
@@ -1121,13 +1123,14 @@ sub AMAD_CommBridge_Read($) {
     my @data = split( '\R\R', $buf );
     
     my $header = AMAD_Header2Hash( $data[0] );
-    my $device = $header->{FHEMDEVICE} if(defined($header->{FHEMDEVICE}));
-    my $dhash = $defs{$device};
     my $response;
     my $c;
-    
-    my $fhemcmd = $header->{FHEMCMD};
-    
+    my $device = $header->{FHEMDEVICE} if(defined($header->{FHEMDEVICE}));
+    my $fhemcmd = $header->{FHEMCMD} if(defined($header->{FHEMCMD}));
+    my $dhash = $defs{$device} if( $defs{$device} );
+
+
+
 
     if ( $data[0] =~ /currentFlowsetUpdate.xml/ ) {
 
@@ -1136,6 +1139,7 @@ sub AMAD_CommBridge_Read($) {
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
             "Content-Type: text/plain\r\n",
+            "Connection: close\r\n",
             "Content-Length: ".length($response)."\r\n\r\n",
             $response;
 
@@ -1149,13 +1153,24 @@ sub AMAD_CommBridge_Read($) {
             $c = $hash->{CD};
             print $c "HTTP/1.1 200 OK\r\n",
                 "Content-Type: text/plain\r\n",
+                "Connection: close\r\n",
                 "Content-Length: ".length($response)."\r\n\r\n",
                 $response;
 
             return;
         }
     }
-    
+
+
+
+    elsif( !defined($device) ) {
+        readingsSingleUpdate( $bhash, "transmitterERROR", $name." has no device name sends", 1 );
+        Log3 $name, 4, "AMAD ($name) - ERROR - no device name given. please check your global variable in automagic";
+        return;
+    }
+
+
+
     elsif ( $fhemcmd =~ /setreading\b/ ) {
 	my $tv = $data[1];
 
@@ -1167,6 +1182,7 @@ sub AMAD_CommBridge_Read($) {
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
             "Content-Type: text/plain\r\n",
+            "Connection: close\r\n",
             "Content-Length: ".length($response)."\r\n\r\n",
             $response;
 
@@ -1184,6 +1200,7 @@ sub AMAD_CommBridge_Read($) {
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
             "Content-Type: text/plain\r\n",
+            "Connection: close\r\n",
             "Content-Length: ".length($response)."\r\n\r\n",
             $response;
 	
@@ -1203,6 +1220,7 @@ sub AMAD_CommBridge_Read($) {
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
             "Content-Type: text/plain\r\n",
+            "Connection: close\r\n",
             "Content-Length: ".length($response)."\r\n\r\n",
             $response;
             
@@ -1217,6 +1235,7 @@ sub AMAD_CommBridge_Read($) {
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
             "Content-Type: text/plain\r\n",
+            "Connection: close\r\n",
             "Content-Length: ".length($response)."\r\n\r\n",
             $response;
         
@@ -1241,6 +1260,7 @@ sub AMAD_CommBridge_Read($) {
         $c = $hash->{CD};
         print $c "HTTP/1.1 200 OK\r\n",
             "Content-Type: text/plain\r\n",
+            "Connection: close\r\n",
             "Content-Length: ".length($response)."\r\n\r\n",
             $response;
 	
@@ -1252,6 +1272,7 @@ sub AMAD_CommBridge_Read($) {
     $c = $hash->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
         "Content-Type: text/plain\r\n",
+        "Connection: close\r\n",
         "Content-Length: ".length($response)."\r\n\r\n",
         $response;
 }
