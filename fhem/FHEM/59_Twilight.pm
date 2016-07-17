@@ -412,10 +412,8 @@ sub Twilight_WeatherCallback(@) {
     $result = undef;
   } else {
      Log3 $hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}";
+     Log3 $hash, 4, "[$hash->{NAME}] answer=$result" if defined $result;
   }
-  
-  Log3 $hash, 4, "[$hash->{NAME}] answer=$result";
-  Twilight_getWeatherHorizon($hash, $result);
   
   #$hash->{CONDITION} = 50; 
   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} <= 10) {
@@ -424,6 +422,7 @@ sub Twilight_WeatherCallback(@) {
      return;
   }
   
+  Twilight_getWeatherHorizon($hash, $result);
   Twilight_TwilightTimes      ($hash, $param->{mode}, $result);
   
   Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >  0);
