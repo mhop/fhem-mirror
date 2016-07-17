@@ -120,6 +120,7 @@ sub Twilight_Define($$)
   $hash->{WEATHER}        = $weather;
   $hash->{VERSUCHE}       = 0; 
   $hash->{DEFINE}         = 1;
+  $hash->{CONDITION}      = 50;
   $hash->{SUNPOS_OFFSET}  = 5*60;
  
   $attr{$name}{verbose} = 4    if ($name =~ /^tst.*$/ );
