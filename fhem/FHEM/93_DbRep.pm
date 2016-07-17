@@ -37,7 +37,14 @@
 ###########################################################################################################
 #  Versions History:
 #
-# 3.2          11.07.2016       handling of db-errors is relocated to blockingcall-subs
+# 3.3.3        16.07.2016       bugfix of aggregation=week if month start is 01 and month end is 12 AND 
+#                               the last week of december is "01" like in 2014 (checked in version 11804)
+# 3.3.2        16.07.2016       readings completed with begin of selection range to ensure valid reading order,
+#                               also done if readingNameMap is set
+# 3.3.1        15.07.2016       function "diffValue" changed, write "-" if no value
+# 3.3          12.07.2016       function "diffValue" added
+# 3.2.1        12.07.2016       DbRep_Notify prepared, switched from readingsSingleUpdate to readingsBulkUpdate
+# 3.2          11.07.2016       handling of db-errors is relocated to blockingcall-subs (checked in version 11785)
 # 3.1.1        10.07.2016       state turns to initialized and connected after attr "disabled" is switched from "1" to "0"
 # 3.1          09.07.2016       new Attr "timeDiffToNow" and change subs according to that
 # 3.0          04.07.2016       no selection if timestamp isn't set and aggregation isn't set with fetchrows, delEntries
@@ -96,6 +103,7 @@ sub DbRep_Initialize($) {
  my ($hash) = @_;
  $hash->{DefFn}        = "DbRep_Define";
  $hash->{UndefFn}      = "DbRep_Undef"; 
+ # $hash->{NotifyFn}     = "DbRep_Notify";
  $hash->{SetFn}        = "DbRep_Set";
  # $hash->{GetFn}        = "DbRep_Get";
  $hash->{AttrFn}       = "DbRep_Attr";
@@ -162,6 +170,7 @@ sub DbRep_Set {
              "delEntries:noArg ".
              "maxValue:noArg ".
              "fetchrows:noArg ".
+             "diffValue:noArg ".
              "countEntries:noArg ";
   
   return if(IsDisabled($name));
@@ -196,6 +205,11 @@ sub DbRep_Set {
       }        
       sqlexec($hash,"del");
       
+  } elsif ($opt eq "diffValue") {   
+      if (!AttrVal($hash->{NAME}, "reading", "")) {
+          return " The attribute reading for analyze is not set !";
+      }
+      sqlexec($hash,"diff");
   }
   else  
   {
@@ -263,6 +277,37 @@ sub DbRep_Attr {
 return undef;
 }
 
+
+###################################################################################
+# DbRep_Notify Eventverarbeitung
+###################################################################################
+
+sub DbRep_Notify {
+ my ($dbrep, $dev) = @_;
+ my $myName  = $dbrep->{NAME}; # Name des eigenen Devices
+ my $devName = $dev->{NAME}; # Name des Devices welches Events erzeugt hat
+ 
+ return if(IsDisabled($myName)); # Return if the module is disabled
+
+ my $max = int(@{$dev->{CHANGED}}); # number of events / changes
+
+ for (my $i = 0; $i < $max; $i++) {
+     my $s = $dev->{CHANGED}[$i];
+     next if(!defined($s));
+     my ($evName, $val) = split(" ", $s, 2); # resets $1
+     next if($devName !~ m/^$myName$/);
+     
+     if ($evName =~ m/done/) {
+         # Log3 ($myName, 3, "DbRep $myName - Event received - device: $myName Event: $evName");
+         # fhem ("trigger WEB JS:location.reload('false')");
+         # FW_directNotify("#FHEMWEB:WEB", "location.reload('false')", "");
+         # map {FW_directNotify("#FHEMWEB:$_", "location.reload('false')", "")} devspec2array("WEB.*");
+     }
+
+ }
+
+}
+
 ###################################################################################
 # DbRep_Undef
 ###################################################################################
@@ -294,7 +339,7 @@ sub DbRep_firstconnect {
       Log3 ($name, 2, "DbRep $name - DB connect failed. Credentials of $hash->{dbloghash}{NAME} are valid and database reachable ?");
       readingsSingleUpdate($hash, "state", "disconnected", 1);
   } else {
-      Log3 ($name, 3, "DbRep $name - Test-Connection to db $dbconn was successful");
+      Log3 ($name, 3, "DbRep $name - Connectiontest to db $dbconn was successful");
       my $dbh = $hash->{DBH}; 
       $dbh->disconnect();
   }
@@ -320,7 +365,7 @@ sub DbRep_Connect {
 
   if(!$dbh) {
     RemoveInternalTimer($hash);
-    Log3 ($name, 3, "DbRep $name - Test connection to database $dbconn with user $dbuser");
+    Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser");
     
     readingsSingleUpdate($hash, 'state', 'disconnected', 1);
     
@@ -481,27 +526,31 @@ $hash->{HELPER}{CV} = \%cv;
  if ($opt eq "sum") {
     $hash->{helper}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
      
- } elsif ($opt eq "count" ) {
+ } elsif ($opt eq "count") {
     $hash->{helper}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
 
- } elsif ($opt eq "average" ) {      
+ } elsif ($opt eq "average") {      
     $hash->{helper}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
     
- } elsif ($opt eq "fetchrows" ) {
+ } elsif ($opt eq "fetchrows") {
          $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
              
          $hash->{helper}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
     
- } elsif ($opt eq "max" ) {        
+ } elsif ($opt eq "max") {        
     $hash->{helper}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
          
- } elsif ($opt eq "del" ) {
+ } elsif ($opt eq "del") {
          $runtime_string_first = AttrVal($hash->{NAME}, "timestamp_begin", undef) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          
          $hash->{helper}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
- } 
+ 
+ }  elsif ($opt eq "diff") {        
+    $hash->{helper}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
+         
+ }
 
 return;
 }
@@ -572,8 +621,14 @@ sub averval_DoParse {
          Log3 ($name, 4, "DbRep $name -> BlockingCall averval_DoParse finished");
          return "$name|''|$device|$reading|''|1";
      } else {
-         Log3 ($name, 5, "DbRep $name - SQL result: $line") if($line);      
-         $arrstr .= $runtime_string."#".$line."|";  
+         Log3 ($name, 5, "DbRep $name - SQL result: $line") if($line);
+         if(AttrVal($name, "aggregation", "") eq "hour") {
+             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+             $arrstr .= $runtime_string."#".$line."#".$rsf[0]."_".$rsf[1]."|";  
+         } else {
+             my @rsf = split(" ",$runtime_string_first);
+             $arrstr .= $runtime_string."#".$line."#".$rsf[0]."|"; 
+         }
      }   
  }
  
@@ -618,24 +673,30 @@ sub averval_ParseDone {
   no warnings 'uninitialized'; 
   
   # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  
   my @arr = split("\\|", $arrstr);
   foreach my $row (@arr) {
-      my @a                     = split("#", $row);
-      my $runtime_string        = $a[0];
-      my $c                     = $a[1];
-         
+      my @a                = split("#", $row);
+      my $runtime_string   = $a[0];
+      my $c                = $a[1];
+      my $rsf              = $a[2]."__";
+      
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
-          $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
+          $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
       } else {
           my $ds   = $device."__" if ($device);
           my $rds  = $reading."__" if ($reading);
-          $reading_runtime_string = $ds.$rds."AVERAGE__".$runtime_string;
+          $reading_runtime_string = $rsf.$ds.$rds."AVERAGE__".$runtime_string;
       }
          
-     readingsSingleUpdate($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-", 1);
+     readingsBulkUpdate($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
   }
-  readingsSingleUpdate($hash, "state", "done", 1);
-  readingsSingleUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt), 1) if(AttrVal($name, "showproctime", undef));
+
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done");
+  
+  readingsEndUpdate($hash, 1);
   
   delete($hash->{helper}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall averval_ParseDone finished");
@@ -710,7 +771,13 @@ sub count_DoParse {
          return "$name|''|$device|$reading|''|1";
      } else {
          Log3 ($name, 5, "DbRep $name - SQL result: $line") if($line);      
-         $arrstr .= $runtime_string."#".$line."|";  
+         if(AttrVal($name, "aggregation", "") eq "hour") {
+             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+             $arrstr .= $runtime_string."#".$line."#".$rsf[0]."_".$rsf[1]."|";  
+         } else {
+             my @rsf = split(" ",$runtime_string_first);
+             $arrstr .= $runtime_string."#".$line."#".$rsf[0]."|"; 
+         }  
      } 
  }
  
@@ -758,24 +825,29 @@ sub count_ParseDone {
   no warnings 'uninitialized'; 
   
   # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  
   my @arr = split("\\|", $arrstr);
   foreach my $row (@arr) {
-      my @a                     = split("#", $row);
-      my $runtime_string        = $a[0];
-      my $c                     = $a[1];
+      my @a                = split("#", $row);
+      my $runtime_string   = $a[0];
+      my $c                = $a[1];
+      my $rsf              = $a[2]."__";
          
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
-          $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
+          $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
       } else {
           my $ds   = $device."__" if ($device);
           my $rds  = $reading."__" if ($reading);
-          $reading_runtime_string = $ds.$rds."COUNT__".$runtime_string;
+          $reading_runtime_string = $rsf.$ds.$rds."COUNT__".$runtime_string;
       }
          
-     readingsSingleUpdate($hash, $reading_runtime_string, $c?$c:"-", 1);
+     readingsBulkUpdate($hash, $reading_runtime_string, $c?$c:"-");
   }
-  readingsSingleUpdate($hash, "state", "done", 1);
-  readingsSingleUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt), 1) if(AttrVal($name, "showproctime", undef));
+
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done");
+  readingsEndUpdate($hash, 1);
   
   delete($hash->{helper}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall count_ParseDone finished");
@@ -853,10 +925,19 @@ sub maxval_DoParse {
          return "$name|''|$device|$reading|''|1";
      } else {
          my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
+         
+         if(!@array) {
+             if(AttrVal($name, "aggregation", "") eq "hour") {
+                 my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+                 @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."\n");
+             } else {
+                 my @rsf = split(" ",$runtime_string_first);
+                 @array = ($runtime_string." "."0"." ".$rsf[0]."\n");
+             }
+         }
+         
          push(@row_array, @array);
-     } 
-     
-     # $sth->finish();      
+     }    
  }
  
  # SQL-Laufzeit ermitteln
@@ -916,8 +997,8 @@ sub maxval_ParseDone {
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
       my $value          = $a[1];
-      $a[3]              =~ s/:/-/g;          # substituieren unsopported characters -> siehe fhem.pl
-      my $timestamp      = $a[2]."_".$a[3];
+      $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
+      my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
       
       # Leerzeichen am Ende $timestamp entfernen
       $timestamp         =~ s/\s+$//g;
@@ -942,34 +1023,249 @@ sub maxval_ParseDone {
       }
       $i++;
   }
+  
+  # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
  
   foreach my $key (sort(keys(%rh))) {
       Log3 ($name, 5, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key});
       my @k = split("\\|",$rh{$key});
+      my $rsf  = $k[2]."__" if($k[2]);
       
-      # Readingaufbereitung
-      
-      # only for this block because of warnings if details of readings are not set
-      no warnings 'uninitialized'; 
-  
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
-          $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
+          $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
       } else {
-          my $rmts = $k[2]."__" if($k[2]);
           my $ds   = $device."__" if ($device);
           my $rds  = $reading."__" if ($reading);
-          $reading_runtime_string = $rmts.$ds.$rds."MAX__".$k[0];
+          $reading_runtime_string = $rsf.$ds.$rds."MAX__".$k[0];
       }
-     
-      readingsSingleUpdate($hash, $reading_runtime_string, $k[1], 1);          
+      my $rv = $k[1];
+      readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
     
   }
              
-  readingsSingleUpdate($hash, "state", "done", 1);
-  readingsSingleUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt), 1) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done");
+  readingsEndUpdate($hash, 1);
 
   delete($hash->{helper}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
+  
+return;
+}
+
+####################################################################################################
+# nichtblockierende DB-Abfrage diffValue
+####################################################################################################
+
+sub diffval_DoParse {
+ my ($string) = @_;
+ my ($name, $device, $reading, $ts) = split("\\§", $string);
+ my $hash         = $defs{$name};
+ 
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_DoParse");
+  
+ my $dbh;
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
+     return "$name|''|$device|$reading|''|1";
+ }
+     
+ # only for this block because of warnings if details of readings are not set
+ no warnings 'uninitialized'; 
+  
+ # Timestampstring to Array
+ my @ts = split("\\|", $ts);
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+ 
+ # DB-Abfrage zeilenweise für jeden Array-Eintrag
+ my @row_array;
+ foreach my $row (@ts) {
+
+     my @a                     = split("#", $row);
+     my $runtime_string        = $a[0];
+     my $runtime_string_first  = $a[1];
+     my $runtime_string_next   = $a[2];   
+     
+     # SQL zusammenstellen für DB-Operation
+     my $sql = "SELECT VALUE,TIMESTAMP FROM `history` where ";
+     $sql .= "`DEVICE` = '$device' AND " if($device);
+     $sql .= "`READING` = '$reading' AND " if($reading); 
+     $sql .= "TIMESTAMP BETWEEN ? AND ? ORDER BY TIMESTAMP ;"; 
+     
+     # SQL zusammenstellen für Logausgabe
+     my $sql1 = "SELECT VALUE,TIMESTAMP FROM `history` where ";
+     $sql1 .= "`DEVICE` = '$device' AND " if($device);
+     $sql1 .= "`READING` = '$reading' AND " if($reading); 
+     $sql1 .= "TIMESTAMP BETWEEN '$runtime_string_first' AND '$runtime_string_next' ORDER BY TIMESTAMP;"; 
+     
+     Log3 ($name, 4, "DbRep $name - SQL to execute: $sql1"); 
+     
+     $runtime_string = encode_base64($runtime_string,"");
+     my $sth = $dbh->prepare($sql);   
+     
+     eval {$sth->execute($runtime_string_first, $runtime_string_next);};
+     
+     if ($@) {
+         Log3 ($name, 2, "DbRep $name - $@");
+         $dbh->disconnect;
+         Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
+         return "$name|''|$device|$reading|''|1";
+     } else {
+         my @array= map { $runtime_string." ".$_ -> [0]." ".$_ -> [1]."\n" } @{ $sth->fetchall_arrayref() };
+         
+         if(!@array) {
+             if(AttrVal($name, "aggregation", "") eq "hour") {
+                 my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+                 @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."\n");
+             } else {
+                 my @rsf = split(" ",$runtime_string_first);
+                 @array = ($runtime_string." "."0"." ".$rsf[0]."\n");
+             }
+         }
+         push(@row_array, @array);
+     }    
+ }
+ 
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+
+ $dbh->disconnect;
+  
+ my $rowlist = join('|', @row_array); 
+ Log3 ($name, 5, "DbRep $name -> row_array: @row_array");
+     
+ # Daten müssen als Einzeiler zurückgegeben werden
+ $rowlist = encode_base64($rowlist,"");
+  
+ Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_DoParse finished");
+ 
+ return "$name|$rowlist|$device|$reading|$rt|0";
+}
+
+####################################################################################################
+# Auswertungsroutine der nichtblockierenden DB-Abfrage diffValue
+####################################################################################################
+
+sub diffval_ParseDone {
+  my ($string) = @_;
+  my @a = split("\\|",$string);
+  my $hash = $defs{$a[0]};
+  my $name = $hash->{NAME};
+  
+  my $rowlist    = decode_base64($a[1]);
+  my $device     = $a[2];
+  my $reading    = $a[3];
+  my $rt         = $a[4];
+  my $dberr      = $a[5];
+  my $reading_runtime_string;
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall diffval_ParseDone");
+  
+  if ($dberr) {
+      readingsSingleUpdate($hash, "state", "error", 1);
+      delete($hash->{helper}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
+      return;
+  }
+  
+  my @row_array = split("\\|", $rowlist);
+  
+  Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
+  
+ 
+  my %rh = ();
+  my $lastruntimestring;
+  my $i = 1;
+  my $fe;                         # Startelement Value
+  my $le;                         # letztes Element Value
+  my $max = ($#row_array)+1;      # Anzahl aller Listenelemente
+
+  foreach my $row (@row_array) {
+      my @a = split("[ \t][ \t]*", $row);
+      my $runtime_string = decode_base64($a[0]);
+      $lastruntimestring = $runtime_string if ($i == 1);
+      my $value          = $a[1];
+      $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
+      my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
+      
+      # Leerzeichen am Ende $timestamp entfernen
+      $timestamp         =~ s/\s+$//g;
+      
+      Log3 ($name, 5, "DbRep $name - Runtimestring: $runtime_string, DEVICE: $device, READING: $reading, TIMESTAMP: $timestamp, VALUE: $value");
+             
+      if ($runtime_string eq $lastruntimestring) {
+          if ($i == 1) {
+              $fe = $value;
+              $le = $value;
+          }
+          
+          if ($value >= $le) {
+              $le    = $value;
+              my $diff  = $le - $fe;
+              
+              $rh{$runtime_string} = $runtime_string."|".$diff."|".$timestamp;            
+          }
+      } else {
+          # neuer Zeitabschnitt beginnt, ersten Value-Wert erfassen 
+          $lastruntimestring = $runtime_string;
+          $i  = 1;
+          $fe = $value;
+          $le = $value;
+          
+          if ($value >= $le) {
+              $le    = $value;
+              my $diff  = $le - $fe;
+              
+              $rh{$runtime_string} = $runtime_string."|".$diff."|".$timestamp;
+          }
+      }
+      $i++;
+  }
+  
+  # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  
+  # only for this block because of warnings if details of readings are not set
+  no warnings 'uninitialized'; 
+ 
+  foreach my $key (sort(keys(%rh))) {
+      Log3 ($name, 4, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key});
+      my @k    = split("\\|",$rh{$key});
+      my $rsf  = $k[2]."__";
+  
+      if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
+          $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
+      } else {
+          my $ds   = $device."__" if ($device);
+          my $rds  = $reading."__" if ($reading);
+          $reading_runtime_string = $rsf.$ds.$rds."DIFF__".$k[0];
+      }
+      my $rv = $k[1];
+      readingsBulkUpdate($hash, $reading_runtime_string, $rv?sprintf("%.4f",$rv):"-");          
+    
+  }
+             
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done");
+  readingsEndUpdate($hash, 1);
+
+  delete($hash->{helper}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
   
 return;
 }
@@ -1040,7 +1336,13 @@ sub sumval_DoParse {
          return "$name|''|$device|$reading|''|1";
      } else {
          Log3($name, 5, "DbRep $name - SQL result: $line") if($line);      
-         $arrstr .= $runtime_string."#".$line."|";  
+         if(AttrVal($name, "aggregation", "") eq "hour") {
+             my @rsf = split(/[" "\|":"]/,$runtime_string_first);
+             $arrstr .= $runtime_string."#".$line."#".$rsf[0]."_".$rsf[1]."|";  
+         } else {
+             my @rsf = split(" ",$runtime_string_first);
+             $arrstr .= $runtime_string."#".$line."#".$rsf[0]."|"; 
+         } 
      }       
  }
  
@@ -1086,25 +1388,29 @@ sub sumval_ParseDone {
   no warnings 'uninitialized'; 
   
   # Readingaufbereitung
+  readingsBeginUpdate($hash);
+
   my @arr = split("\\|", $arrstr);
   foreach my $row (@arr) {
-      my @a                     = split("#", $row);
-      my $runtime_string        = $a[0];
-      my $c                     = $a[1];
-         
+      my @a                = split("#", $row);
+      my $runtime_string   = $a[0];
+      my $c                = $a[1];
+      my $rsf              = $a[2]."__";
+      
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
-          $reading_runtime_string = AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
+          $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
       } else {
           my $ds   = $device."__" if ($device);
           my $rds  = $reading."__" if ($reading);
-          $reading_runtime_string = $ds.$rds."SUM__".$runtime_string;
+          $reading_runtime_string = $rsf.$ds.$rds."SUM__".$runtime_string;
       }
          
-      readingsSingleUpdate($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-", 1);
+      readingsBulkUpdate($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
   }
   
-  readingsSingleUpdate($hash, "state", "done", 1);
-  readingsSingleUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt), 1) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done");
+  readingsEndUpdate($hash, 1);
   
   delete($hash->{helper}{RUNNING_PID});  
   Log3 ($name, 4, "DbRep $name -> BlockingCall sumval_ParseDone finished");
@@ -1210,15 +1516,17 @@ sub del_ParseDone {
   my $ds   = $device." -- " if ($device);
   my $rds  = $reading." -- " if ($reading);
   my $reading_runtime_string = $ds.$rds." -- DELETED ROWS -- ";
-                
-  readingsSingleUpdate($hash, $reading_runtime_string, $rows, 1);
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, $reading_runtime_string, $rows);
          
   $rows = $ds.$rds.$rows;
   
   Log3 ($name, 3, "DbRep $name - Entries of database $hash->{dbloghash}{NAME} deleted: $rows");  
     
-  readingsSingleUpdate($hash, "state", "done", 1);  
-  readingsSingleUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt), 1) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done"); 
+  readingsEndUpdate($hash, 1);
 
   delete($hash->{helper}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall del_ParseDone finished");
@@ -1327,6 +1635,9 @@ sub fetchrows_ParseDone {
   
   Log3 ($name, 5, "DbRep $name - row_array decoded: @row_array");
   
+  # Readingaufbereitung
+  readingsBeginUpdate($hash);
+  
   foreach my $row (@row_array) {
              my @a = split("[ \t][ \t]*", $row, 5);
              my $dev = $a[0];
@@ -1335,18 +1646,18 @@ sub fetchrows_ParseDone {
              my $ts  = $a[2]."_".$a[3];
              my $val = $a[4];
              
-             # Readingaufbereitung
              if ($reading && AttrVal($hash->{NAME}, "readingNameMap", "")) {
                  $reading_runtime_string = $ts."__".AttrVal($hash->{NAME}, "readingNameMap", "") ;
              } else {
                  $reading_runtime_string = $ts."__".$dev."__".$rea;
              }
              
-             readingsSingleUpdate($hash, $reading_runtime_string, $val, 1);
+             readingsBulkUpdate($hash, $reading_runtime_string, $val);
   }
              
-  readingsSingleUpdate($hash, "state", "done", 1);
-  readingsSingleUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt), 1) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done");
+  readingsEndUpdate($hash, 1);
 
   delete($hash->{helper}{RUNNING_PID});
   Log3 ($name, 4, "DbRep $name -> BlockingCall fetchrows_ParseDone finished");
@@ -1452,8 +1763,10 @@ sub collaggstr {
              
              $runtime_orig = $runtime;
              
-             my $w  = strftime "%V", localtime($runtime);       # Wochennummer des aktuellen Startdatum/Zeit      
-             $runtime_string = "week_".$w;                      # für Readingname  
+             my $w  = strftime "%V", localtime($runtime);            # Wochennummer des aktuellen Startdatum/Zeit
+             $runtime_string = "week_".$w;                           # für Readingname
+             my $ms = strftime "%m", localtime($runtime);            # Startmonat (01-12)
+             my $me = strftime "%m", localtime($epoch_seconds_end);  # Endemonat (01-12)
              
              if ($i==1) {
                  # nur im ersten Schleifendurchlauf
@@ -1466,7 +1779,7 @@ sub collaggstr {
                  $runtime_orig = $runtime-$aggsec;                             
                  
                  # die Woche Beginn ist gleich der Woche von Ende Auswertung
-                 if((strftime "%V", localtime($epoch_seconds_end)) eq $w) {                  
+                 if((strftime "%V", localtime($epoch_seconds_end)) eq ($w) && ($ms+$me != 13)) {                  
                      $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
                      $ll=1;
                  } else {
@@ -1594,12 +1907,13 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b>  - calculates the average value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end". The reading to evaluate must be defined using attribute "reading".  </li> <br>
-    <li><b> countEntries </b>  - provides the number of DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end".(if set). If timestamp-attributes are not set all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
-    <li><b> fetchrows </b>     - provides <b>all</b> DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end". A possibly set aggregation attribute will <b>not</b> considered.  </li> <br>
-    <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE")   between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end". The reading to evaluate must be defined using attribute "reading".  </li> <br>  
-    <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE")   between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end". The reading to evaluate must be defined using attribute "reading". The evaluation contains the timestamp of the identified max values within the given period.  </li> <br>
-    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set). <br><br>
+    <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading".  </li> <br>
+    <li><b> countEntries </b> -  provides the number of DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end".(if set) or "timeDiffToNow". If timestamp-attributes are not set all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
+    <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". A possibly set aggregation attribute will <b>not</b> considered.  </li> <br>
+    <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". Using this function is mostly reasonable if value-differences of readings are written to the database. </li> <br>  
+    <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". The evaluation contains the timestamp of the identified max values within the given period.  </li> <br>
+    <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. </li> <br>
+    <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow". <br><br>
                                     
                                  "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
                                  "timestamp_end" is set  :  deletes db entries <b>until</b> this timestamp <br>
@@ -1712,11 +2026,12 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
  <br><br>
  
  <ul><ul>
-    <li><b> averageValue </b>  - berechnet den Durchschnittswert der Readingswerte (DB-Spalte "VALUE") in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end". Es muß das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
-    <li><b> countEntries </b>  - liefert die Anzahl der DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" (wenn gesetzt). Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
-    <li><b> fetchrows </b>     - liefert <b>alle</b> DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end". Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
-    <li><b> sumValue </b>     -  berechnet die Summenwerte der Readingswerte (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
-    <li><b> maxValue </b>     -  berechnet den Maximalwert der Readingswerte (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Die Auswertung enthält den Zeitstempel des ermittelten Maximalwertes innerhalb der Aggregation bzw. Zeitgrenzen.  </li> <br>
+    <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muß das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
+    <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" (wenn gesetzt) bzw. "timeDiffToNow". Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
+    <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end". Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
+    <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
+    <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Die Auswertung enthält den Zeitstempel des ermittelten Maximalwertes innerhalb der Aggregation bzw. Zeitgrenzen.  </li> <br>
+    <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow". Es muss das auszuwertende Reading über das Attribut "reading" angegeben sein. Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. </li> <br>
     <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt folgendermaßen: <br><br>
                                     
                                  "timestamp_begin" gesetzt:  gelöscht werden DB-Einträge <b>ab</b> diesem Zeitpunkt bis zum aktuellen Datum/Zeit <br>
