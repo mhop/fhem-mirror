@@ -130,6 +130,8 @@ PRESENCE_Define($$)
                 $hash->{TIMEOUT_NORMAL} = ($4 ne "" ? $4 : 30);
                 $hash->{TIMEOUT_PRESENT} = ($5 ne "" ? $5 : $hash->{TIMEOUT_NORMAL});
 
+                delete($hash->{helper}{ADDRESS});
+                
                 if($hash->{helper}{call} =~ /\|/)
                 {
                     my $msg = "The command contains a pipe ( | ) symbol, which is not allowed.";
@@ -211,8 +213,9 @@ PRESENCE_Define($$)
         return $msg;
     }
 
-    delete $hash->{helper}{cachednr} if(defined($hash->{helper}{cachednr}));
+    delete($hash->{helper}{cachednr});
 
+    return undef;
 }
 
 
@@ -298,12 +301,12 @@ PRESENCE_Set($@)
     elsif(defined($powerCmd) && $a[1] eq "power") 
     {
         my %specials= (
-        "%NAME" => $name,
-        "%ADDRESS" => $hash->{ADDRESS},
-        "%ARGUMENT" => (defined($a[2]) ? $a[2] : "")
+        '%NAME' => $name,
+        '%ADDRESS' => (defined($hash->{ADDRESS}) ? $hash->{ADDRESS} : ""),
+        '%ARGUMENT' => (defined($a[2]) ? $a[2] : "")
         );
         
-        $powerCmd= EvalSpecials($powerCmd, %specials);
+        $powerCmd = EvalSpecials($powerCmd, %specials);
         
         Log3 $name, 5, "PRESENCE ($name) - executing powerCmd: $powerCmd";
         my $return = AnalyzeCommandChain(undef, $powerCmd);
