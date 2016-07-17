@@ -3126,12 +3126,18 @@ ZWave_secIncludeFinished($$) # only called by zwave_parseHook during Include
   my $iodev = $hash->{IODev};
   my $name = $hash->{NAME};
 
+  if ($arg =~ m/..9803(.*)/) {
+    ZWave_secSupported($hash, $1);
+  } else {
+    Log3 $name, 2, "$name: unknown answer for secSupported received";
+  }
+
   if ($iodev->{secInitName}) {
     # Secure inclusion is finished, remove readings and execute "normal" init
     delete $iodev->{secInitName};
     ZWave_execInits($hash, 0);
   }
-  return 0; # no "veto" for parseHook -> parsing of secureSupported
+  return 1; # "veto" for parseHook -> secSupported to be called before execInits
 }
 
 sub
