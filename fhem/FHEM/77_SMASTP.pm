@@ -350,7 +350,11 @@ sub SMASTP_GetStatus($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	$hash->{INTERVAL} = $attr{$name}{"interval"};
+	if (defined($attr{$name}{"interval"})) {
+		$hash->{INTERVAL} = $attr{$name}{"interval"};
+	} else {
+		$hash->{INTERVAL} = 60;
+	}
 
 	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
 	
