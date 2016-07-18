@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   98_DLNARenderer: Autodiscover, control and receive events from
+             DLNA MediaRenderer devices
+               define dlnasearch DLNARenderer
+  - added:   98_BOSEST: Autodiscover, control and receive events from
+             BOSE SoundTouch devices (e.g. BOSE SoundTouch 10, 20, 30)
+             See commandref for library dependencies
+               define bosesystem BOSEST
   - added:   77_SMASTP: Support for SMA Sunny Tripower Inverter
   - added:   77_SMAEM: Support for SMA Energy Meter
   - added:   00_HMUARTLGW: new module for eQ-3 HomeMatic UART/LanGateway
