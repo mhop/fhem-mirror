@@ -277,6 +277,8 @@ FHEM/75_msgConfig.pm         loredo               http://forum.fhem.de Automatis
 FHEM/76_MSGFile.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/76_MSGMail.pm           gandy                http://forum.fhem.de Automatisierung
 FHEM/77_UWZ.pm               CoolTux              http://forum.fhem.de Unterstuetzende Dienste/Wettermodule
+FHEM/77_SMAEM.pm	     VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
+FHEM/77_SMASTP.pm	     VolkerKettenbach     http://forum.fhem.de Sonstige Systeme
 FHEM/79_BDKM.pm              arnoaugustin         http://forum.fhem.de Heizungssteuerung/Raumklima (bitte auch PM)
 FHEM/80_M232.pm              borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/80_xxLG7000.pm          markusbloch          http://forum.fhem.de Multimedia
