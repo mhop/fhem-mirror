@@ -1336,9 +1336,9 @@ The following local attributes are used by a wider range of devices:
 
     <a name="backupsymlink"></a>
     <li>backupsymlink<br>
-        If this attribute is set to everything else as "no", the archive command tar
-        will support symlinks in your backup. Otherwise, if this attribute is set to
-        "no" symlinks are ignored by tar.
+        If this attribute is set to everything else as "no", the archive
+        command tar will support symlinks in your backup. Otherwise, if this
+        attribute is set to "no" symlinks are ignored by tar.
         This Attribute is used by the <a href="#backup">backup</a> command.<br>
         Example:<br>
         <ul>
@@ -1506,15 +1506,15 @@ The following local attributes are used by a wider range of devices:
 
 <a name="perl"></a>
 <h3>Perl specials</h3>
-  If you want to automate some tasks via fhem, then you'll probably use <a
+  If you want to automate some tasks via FHEM, then you'll probably use <a
   href="#at">at</a> or <a href="#notify">notify</a>. For more complex tasks
   you'll use either a shell-script or a perl "oneliner" as the at/notify
   argument. This chapter gives some tips in using the perl oneliners.<br><br>
 
-  <li>To test perl oneliners, type them on the telnet prompt (or FHEMWEB text
-    input) by enclosing it in {}, one line at once.  The last line will only
-    write something in the logfile, the output of the other lines is directly
-    visible.
+  <li>To test the following perl oneliners, type them on the telnet prompt (or
+    FHEMWEB text input) by enclosing it in {}, one line at once.  The last line
+    will only write something in the logfile, the output of the other lines is
+    directly visible.
     <ul>
       { "Hello" }<br>
       { 1+3*4 }<br>
@@ -1524,23 +1524,23 @@ The following local attributes are used by a wider range of devices:
     <br>
 
   <li>
-    Perl expressions are separated by ;, in fhem oneliners they have to
+    Perl expressions are separated by ;, in FHEM oneliners they have to
     escaped with ;;<br>
     <ul>
       { my $a = 1+1;; Log 1, "Hello $a" }
     </ul>
     <br>
 
-  <li>To use fhem commands from the perl expression, use the function fhem(),
-    which takes a string argument, this string will be evaluated as a fhem
+  <li>To use FHEM commands from the perl expression, use the function fhem(),
+    which takes a string argument, this string will be evaluated as a FHEM
     command:<br>
     <ul>
       { fhem "set light on" }<br>
       define n1 notify piri:on { fhem "set light on" }
     </ul>
     Note: if this function returns a value, it will also be logged into the
-    global fhem log. Use 1 as a second argument to disable this logging, this
-    makes sense when obtainig some values via fhem "get...".
+    global FHEM log. Use 1 as a second argument to disable this logging, this
+    makes sense when obtainig some values via FHEM "get...".
     <br>
     <br>
 
