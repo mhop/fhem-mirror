@@ -100,7 +100,7 @@ sub CALVIEW_GetUpdate($){
 		my @bts=str2time($M."/".$D."/".$Y." ".$tempstart[1]);
 		#replace the "\," with ","
 		if(length($item->[1]) > 0){ $item->[1] =~ s/\\,/,/g; }
-		if(length($item->[4]) > 0){ $item->[4] =~ s/\\,/,/g; }
+		if( defined($item->[4]) && length($item->[4]) > 0){ $item->[4] =~ s/\\,/,/g; }
 		push @termineNew,{
 			bdate => $tempstart[0],
 			btime => $tempstart[1],
