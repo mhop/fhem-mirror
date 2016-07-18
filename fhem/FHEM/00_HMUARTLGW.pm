@@ -1205,9 +1205,6 @@ sub HMUARTLGW_Parse($$$$)
 				     "HMUARTLGW ${name} Ack: ${ack} ".(($2)?$2:""));
 				$recv = $msg;
 			}
-
-			HMUARTLGW_UpdateQueuedPeer($hash);
-			HMUARTLGW_SendPendingCmd($hash);
 		} elsif ($msg =~ m/^(05.*)$/) {
 			$recv = $1;
 		}
@@ -1275,6 +1272,11 @@ sub HMUARTLGW_Parse($$$$)
 
 			Dispatch($hash, $dmsg, \%addvals);
 		}
+	}
+
+	if ($hash->{DevState} == HMUARTLGW_STATE_RUNNING) {
+			HMUARTLGW_UpdateQueuedPeer($hash);
+			HMUARTLGW_SendPendingCmd($hash);
 	}
 
 	return;
