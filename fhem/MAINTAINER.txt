@@ -21,6 +21,7 @@ FHEM/00_FBAHA.pm             rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/00_FBAHAHTTP.pm         rudolfkoenig         http://forum.fhem.de FRITZ!Box
 FHEM/00_FHZ.pm               rudolfkoenig         http://forum.fhem.de SlowRF
 FHEM/00_HMLAN.pm             martinp876           http://forum.fhem.de HomeMatic
+FHEM/00_HMUARTLGW.pm         mgernoth             http://forum.fhem.de HomeMatic
 FHEM/00_HXB.pm               borisneubert         http://forum.fhem.de Sonstige Systeme
 FHEM/00_KM271.pm             physikus             http://forum.fhem.de Sonstiges
 FHEM/00_LIRC.pm              rudolfkoenig         http://forum.fhem.de Sonstiges
