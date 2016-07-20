@@ -415,14 +415,15 @@ sub Twilight_WeatherCallback(@) {
      Log3 $hash, 4, "[$hash->{NAME}] answer=$result" if defined $result;
   }
   
+  Twilight_getWeatherHorizon($hash, $result);
   #$hash->{CONDITION} = 50; 
+  
   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} <= 10) {
      $hash->{VERSUCHE} += 1;
      Twilight_RepeatTimerSet($hash, $param->{mode});
      return;
   }
   
-  Twilight_getWeatherHorizon($hash, $result);
   Twilight_TwilightTimes      ($hash, $param->{mode}, $result);
   
   Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >  0);
