@@ -1,3 +1,4 @@
+
 ################################################################
 # $Id$
 #
@@ -287,12 +288,15 @@ sub DbLog_ParseEvent($$$)
   my $unit;
 
   my $dtype = $defs{$device}{TYPE};
+  
+
   if($modules{$dtype}{DbLog_splitFn}) {
     # let the module do the job!
-    Log 4,"DbLog_ParseEvent calling external DbLog_splitFn for type: $dtype";
+
+    Log3 $device, 5, "DbLog_ParseEvent calling external DbLog_splitFn for type: $dtype , device: $device";
     no strict "refs";
     ($reading,$value,$unit) = 
-        &{$modules{$dtype}{DbLog_splitFn}}($event);
+        &{$modules{$dtype}{DbLog_splitFn}}($event, $device);
     use strict "refs";
     @result= ($reading,$value,$unit);
     return @result;
@@ -645,7 +649,7 @@ sub DbLog_Log($$) {
   # Log is my entry, Dev is the entry of the changed device
   my ($hash, $dev) = @_;
 
-  Log3 $hash,5, "Notify from Device: ".$dev->{NAME}." recieved";
+  Log3 $hash->{NAME}, 5, "Notify from Device: ".$dev->{NAME}." recieved";
 
   return undef if($hash->{STATE} eq "disabled");
 
