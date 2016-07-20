@@ -112,8 +112,9 @@ consStart()
   
   
   $("#console").scroll(function() { // autoscroll check
-     if($("#console")[0].scrollHeight - $("#console").scrollTop() ==
-        $("#console").outerHeight()) {
+    
+     if($("#console")[0].scrollHeight - $("#console").scrollTop() <=
+        $("#console").outerHeight() + 2) { 
        if(!mustScroll) {
          mustScroll = 1;
          log("Console autoscroll restarted");
