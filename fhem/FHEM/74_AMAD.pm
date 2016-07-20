@@ -37,7 +37,7 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.4.0";
+my $modulversion = "2.4.1";
 my $flowsetversion = "2.4.0";
 
 
@@ -1164,7 +1164,7 @@ sub AMAD_CommBridge_Read($) {
 
 
     elsif( !defined($device) ) {
-        readingsSingleUpdate( $bhash, "transmitterERROR", $name." has no device name sends", 1 );
+        readingsSingleUpdate( $bhash, "transmitterERROR", $name." has no device name sends", 1 ) if( ReadingsVal( $bname, "expertMode", 0 ) eq "1" );
         Log3 $name, 4, "AMAD ($name) - ERROR - no device name given. please check your global variable in automagic";
         return;
     }
@@ -1349,7 +1349,7 @@ sub AMAD_decrypt($) {
   <br><br>
   <b>How to use AMAD?</b>
   <ul>
-    <li>install the "Automagic Premium" app from the Google Play store or use the test version from <a href="https://automagic4android.com/de/testversion">here</a></li>
+    <li>install the "Automagic Premium" app from the Google Play store.</li>
     <li>install the flowset 74_AMADautomagicFlowset$VERSION.xml from the directory $INSTALLFHEM/FHEM/lib/ on your Android device and activate.</li>
   </ul>
   <br>
@@ -1505,7 +1505,7 @@ sub AMAD_decrypt($) {
   <br><br>
   <b>Wie genau verwendet man nun AMAD?</b>
   <ul>
-    <li>man installiert die App "Automagic Premium" aus dem PlayStore oder die Testversion von <a href="https://automagic4android.com/de/testversion">hier</a></li>
+    <li>man installiert die App "Automagic Premium" aus dem PlayStore.</li>
     <li>dann installiert man das Flowset 74_AMADautomagicFlowset$VERSION.xml aus dem Ordner $INSTALLFHEM/FHEM/lib/ auf dem Androidger&auml;t und aktiviert die Flows.</li>
   </ul>
   <br>
