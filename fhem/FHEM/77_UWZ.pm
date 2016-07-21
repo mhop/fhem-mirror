@@ -60,7 +60,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.4.0";      # ungerade Entwicklerversion Bsp.: 1.1, 1.3, 2.5
+my $version         = "1.4.1";      # ungerade Entwicklerversion Bsp.: 1.1, 1.3, 2.5
 
 my $countrycode = "DE";
 my $plz = "77777";
@@ -737,15 +737,15 @@ sub UWZ_Run($) {
                             "9" => "gelb", # <===== FIX HERE
                             "10" => "orange",
                             "11" => "rot",
-                            "12" => "violet" );
+                            "12" => "violett" );
 
     foreach my $single_warning (@{ $uwz_warnings->{'results'} }) {
 
         UWZ_Log $hash, 4, "Warn_".$i."_Type: ".$single_warning->{'type'};
         $message .= "Warn_".$i."_Type|".$single_warning->{'type'}."|";
         
-        UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel: ".UWZ_GetUWZLevel($hash,UWZ_GetSeverityColor($hash,$single_warning->{'payload'}{'levelName'}));
-        $message .= "Warn_".$i."_uwzLevel|".UWZ_GetUWZLevel($hash,UWZ_GetSeverityColor($hash,$single_warning->{'payload'}{'levelName'}))."|";
+        UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel: ".UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'});
+        $message .= "Warn_".$i."_uwzLevel|".UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'})."|";
 
         UWZ_Log $hash, 4, "Warn_".$i."_Severity: ".$single_warning->{'severity'};
         $message .= "Warn_".$i."_Severity|".$single_warning->{'severity'}."|";
@@ -781,8 +781,8 @@ sub UWZ_Run($) {
                                      "3" => "Warnstufe Orange (Unwetterwarnung)",
                                      "4" => "Warnstufe Rot (Unwetterwarnung)",
                                      "5" => "Warnstufe Violett (Unwetterwarnung)");
-                UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel_Str: ".$uwzlevelname{ UWZ_GetUWZLevel($hash,UWZ_GetSeverityColor($hash,$single_warning->{'payload'}{'levelName'})) };
-                $message .= "Warn_".$i."_uwzLevel_Str|".$uwzlevelname{ UWZ_GetUWZLevel($hash,UWZ_GetSeverityColor($hash,$single_warning->{'payload'}{'levelName'})) }."|";
+                UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel_Str: ".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) };
+                $message .= "Warn_".$i."_uwzLevel_Str|".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) }."|";
 
 
             } else {
@@ -794,8 +794,8 @@ sub UWZ_Run($) {
                                      "3" => "Alert level Orange",
                                      "4" => "Alert level Red",
                                      "5" => "Alert level Violet");
-                UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel_Str: ".$uwzlevelname{ UWZ_GetUWZLevel($hash,UWZ_GetSeverityColor($hash,$single_warning->{'payload'}{'levelName'})) };
-                $message .= "Warn_".$i."_uwzLevel_Str|".$uwzlevelname{ UWZ_GetUWZLevel($hash,UWZ_GetSeverityColor($hash,$single_warning->{'payload'}{'levelName'})) }."|";
+                UWZ_Log $hash, 4, "Warn_".$i."_uwzLevel_Str: ".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) };
+                $message .= "Warn_".$i."_uwzLevel_Str|".$uwzlevelname{ UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'}) }."|";
 
             }
 
@@ -825,7 +825,7 @@ sub UWZ_Run($) {
         # end language by AttrVal
 
         UWZ_Log $hash, 4, "Warn_".$i."_IconURL: http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".$single_warning->{'severity'}.".gif";
-        $message .= "Warn_".$i."_IconURL|http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".UWZ_GetSeverityColor($hash, $single_warning->{'payload'}{'levelName'} ).".gif|";
+        $message .= "Warn_".$i."_IconURL|http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".UWZ_GetSeverityColor($hash, UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'} )).".gif|";
 
 
         
@@ -1033,7 +1033,7 @@ sub UWZAsHtmlMovie($$) {
     } else {
         # language by AttrVal
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-            $ret .= 'unbekannte Landbezeichnung';
+            $ret .= 'unbekannte Filmbezeichnung';
         } else {
             $ret .='unknown movie setting';
         }
@@ -1083,26 +1083,39 @@ sub UWZAsHtmlKarteLand($$) {
 
 #####################################
 sub UWZ_GetSeverityColor($$) {
-    my ($name,$warnname) = @_;
-    my @alert = split(/_/,$warnname);
-    if ( $alert[1] eq "forewarn" ) {
-        return "gelb";
-    } else {
-        return $alert[2];
-    }
+    my ($name,$uwzlevel) = @_;
+    my $alertcolor       = "";
+
+    my %UWZSeverity = ( "0" => "gruen",
+                            "1" => "orange",
+                            "2" => "gelb",
+                            "3" => "orange",
+                            "4" => "rot",
+                            "5" => "violett");
+
+    return $UWZSeverity{$uwzlevel};
 }
 
 
 #####################################
 sub UWZ_GetUWZLevel($$) {
-    my ($name,$severitycolor) = @_;
-    my %UWZSeverity = ( "green" => "0",
-                        "darkgreen" => "1",
-                        "gelb" => "2",
-                        "orange" => "3",
-                        "red" => "4",
-                        "violet" => "5");
-    return $UWZSeverity{$severitycolor};
+    my ($name,$warnname) = @_;
+    my @alert            = split(/_/,$warnname);
+
+    if ( $alert[0] eq "notice" ) {
+        return "1";
+    } elsif ( $alert[1] eq "forewarn" ) {
+        return "2";
+    } else {
+
+        my %UWZSeverity = ( "green" => "0",
+                            "yellow" => "2",
+                            "orange" => "3",
+                            "red" => "4",
+                            "violet" => "5");
+
+        return $UWZSeverity{$alert[2]};
+    }
 }
 
 
@@ -1130,7 +1143,9 @@ sub UWZSearchLatLon($$) {
     use Data::Dumper;
     use Encode qw(decode encode);
 
-    my $search = XMLin($response->content, KeyAttr => { city => 'id' }, ForceArray => [ 'city' ]);
+    my $uwzxmlparser = XML::Simple->new();
+    #my $xmlres = $parser->XMLin(
+    my $search = $uwzxmlparser->XMLin($response->content, KeyAttr => { city => 'id' }, ForceArray => [ 'city' ]);
 
     my $ret = '<html><table><tr><td>';
 
