@@ -930,6 +930,7 @@ sub Text2Speech_WriteStats($$$$){
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="Text2Speech"></a>

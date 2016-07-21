@@ -2059,6 +2059,7 @@ sub dbReadings($@) {
 1;
 
 =pod
+=item helper
 =begin html
 
 <a name="DbLog"></a>
