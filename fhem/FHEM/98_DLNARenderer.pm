@@ -1457,9 +1457,10 @@ sub DLNARenderer_addSocketsToMainloop {
 <ul>
 
   DLNARenderer automatically discovers all your MediaRenderer devices in your local network and allows you to fully control them.<br>
-  It also supports multiroom audio for Caskeid and Bluetooth Caskeid speakers (e.g. MUNET).
-  
-  <br><br>
+  It also supports multiroom audio for Caskeid and Bluetooth Caskeid speakers (e.g. MUNET).<br><br>
+        <b>Note:</b> The followig libraries are required for this module:
+		<ul><li>SOAP::Lite</li> <li>LWP::Simple</li> <li>XML::Simple</li><br>
+		</ul>
 
   <a name="DLNARendererdefine"></a>
   <b>Define</b>
