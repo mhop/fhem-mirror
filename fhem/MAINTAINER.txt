@@ -305,7 +305,7 @@ FHEM/91_notify.pm            rudolfkoenig         http://forum.fhem.de Automatis
 FHEM/91_sequence.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/91_watchdog.pm          rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/92_FileLog.pm           rudolfkoenig         http://forum.fhem.de Automatisierung
-FHEM/93_DbLog.pm             tobiasfaust          http://forum.fhem.de Automatisierung
+FHEM/93_DbLog.pm             Tobias               http://forum.fhem.de Automatisierung
 FHEM/93_DbRep.pm             DS_Starter           http://forum.fhem.de Sonstiges
 FHEM/93_FHEM2FHEM.pm         rudolfkoenig         http://forum.fhem.de Automatisierung
 FHEM/95_FLOORPLAN.pm         ulimaass             http://forum.fhem.de Frontends/FLOORPLAN
@@ -313,7 +313,7 @@ FHEM/95_Dashboard.pm         svenson08            http://forum.fhem.de Frontends
 FHEM/95_PachLog.pm           rudolfkoenig/orphan  http://forum.fhem.de Sonstiges
 FHEM/95_holiday.pm           rudolfkoenig         http://forum.fhem.de Sonstiges
 FHEM/95_remotecontrol.pm     ulimaass             http://forum.fhem.de Frontends
-FHEM/98_Text2Speech.pm       tobiasfaust          http://forum.fhem.de Unterstuetzende Dienste
+FHEM/98_Text2Speech.pm       Tobias               http://forum.fhem.de Unterstuetzende Dienste
 FHEM/98_apptime.pm           martinp876           http://forum.fhem.de Sonstiges
 FHEM/98_BOSEST.pm            dominikkarall        http://forum.fhem.de Multimedia
 FHEM/98_ComfoAir.pm          StefanStrobel        http://forum.fhem.de Sonstiges

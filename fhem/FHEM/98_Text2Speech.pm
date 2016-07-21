@@ -559,12 +559,12 @@ sub Text2Speech_PrepareSpeech($$) {
 # Ist "AddDelemiter" angegeben, so wird der Delemiter an den 
 # String wieder angefügt
 #####################################
-sub Text2Speech_SplitString(@$$$$){
-  my @text          = @{$_[0]};
-  my $MaxChar       = $_[1];
-  my $Delemiter     = $_[2];
-  my $ForceSplit    = $_[3];
-  my $AddDelemiter  = $_[4];
+sub Text2Speech_SplitString($$$$$){
+  my @text          = @{shift()};
+  my $MaxChar       = shift;
+  my $Delemiter     = shift;
+  my $ForceSplit    = shift;
+  my $AddDelemiter  = shift;
   my @newText;
 
   for(my $i=0; $i<(@text); $i++) {
