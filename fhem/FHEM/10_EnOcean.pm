@@ -1,4 +1,3 @@
-
 ##############################################
 # $Id$
 
@@ -15607,6 +15606,7 @@ sub
 EnOcean_Undef($$)
 {
   my ($hash, $name) = @_;
+  delete $hash->{helper};
   delete $modules{EnOcean}{defptr}{uc($hash->{DEF})};
   delete $modules{EnOcean}{defptr}{uc($attr{$name}{remoteID})} if (exists $attr{$name}{remoteID});
   if (AttrVal($name, "remoteManagement", "off") eq "client") {
