@@ -1,7 +1,6 @@
 
 ##############################################
 # $Id$
-# 2016-07-08
 
 package main;
 
@@ -6346,7 +6345,11 @@ sub EnOcean_Parse($$)
     }
     $rorgname = $EnO_rorgname{$rorg};
     if (!$rorgname) {
-      Log3 undef, 2, "EnOcean RORG $rorg received from $senderID unknown.";
+      if($hash) {
+        Log3 $hash->{NAME}, 2, "EnOcean $hash->{NAME} RORG $rorg unknown.";
+      } else {
+        Log3 undef, 2, "EnOcean RORG $rorg received from $senderID unknown.";
+      }
       return "";
     }
 
