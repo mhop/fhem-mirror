@@ -42,7 +42,7 @@ sub HUEBridge_Initialize($)
   $hash->{UndefFn}  = "HUEBridge_Undefine";
   $hash->{AttrList} = "key disable:1 disabledForIntervals httpUtils:1,0 pollDevices:1,0 queryAfterSet:1,0 $readingFnAttributes";
 }
-
+eq
 sub
 HUEBridge_Read($@)
 {
@@ -914,7 +914,7 @@ HUEBridge_HTTP_Call($$$;$)
   if( !$ret ) {
     Log3 $name, 2, "$name: empty answer received for $uri";
     return undef;
-  } elsif( $ret eq 'HTTP/1.1 200 OK' ) {
+  } elsif( $ret =~ 'HTTP/1.1 200 OK' ) {
     Log3 $name, 4, "$name: empty answer received for $uri";
     return undef;
   } elsif( $ret !~ m/^[\[{].*[\]}]$/ ) {
@@ -980,7 +980,7 @@ HUEBridge_HTTP_Call2($$$$;$)
     if( !$data ) {
       Log3 $name, 2, "$name: empty answer received for $url";
       return undef;
-    } elsif( $data eq 'HTTP/1.1 200 OK' ) {
+    } elsif( $data =~ 'HTTP/1.1 200 OK' ) {
       Log3 $name, 4, "$name: empty answer received for $url";
       return undef;
     } elsif( $data !~ m/^[\[{].*[\]}]$/ ) {
