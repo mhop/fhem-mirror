@@ -151,6 +151,7 @@ sub HMUARTLGW_Initialize($)
 
 sub HMUARTLGW_SendPendingCmd($);
 sub HMUARTLGW_SendCmd($$);
+sub HMUARTLGW_GetSetParameterReq($);
 sub HMUARTLGW_getAesKeys($);
 sub HMUARTLGW_updateMsgLoad($$);
 sub HMUARTLGW_Read($);
@@ -696,6 +697,10 @@ sub HMUARTLGW_GetSetParameterReq($) {
 	if ($hash->{DevState} == HMUARTLGW_STATE_SET_HMID) {
 		my $hmId = AttrVal($name, "hmId", undef);
 
+		if (!defined($hmId)) {
+			$hash->{DevState} = HMUARTLGW_STATE_GET_HMID;
+			return HMUARTLGW_GetSetParameterReq($hash);
+		}
 		HMUARTLGW_send($hash, HMUARTLGW_APP_SET_HMID . $hmId, HMUARTLGW_DST_APP);
 
 	} elsif ($hash->{DevState} == HMUARTLGW_STATE_GET_HMID) {
