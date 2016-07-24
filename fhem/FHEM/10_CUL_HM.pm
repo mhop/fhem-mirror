@@ -2938,6 +2938,16 @@ sub CUL_HM_parseCommon(@){#####################################################
       $success = "yes";
       $reply = "ACK";
     }
+    if ($success eq "yes"){# search if a trigger was accepted 
+      if($mhp->{dstH}{helper}{ack}{$mhp->{devN}}){
+        my ($dChN,$mNo) = split(":",$mhp->{dstH}{helper}{ack}{$mhp->{devN}});
+        my $rv = ReadingsVal($dChN,"triggerTo_$mhp->{devN}",undef);
+        if ($mNo eq $mhp->{mNo} && $rv){
+          push @evtEt,[$defs{$dChN},1,"triggerTo_$mhp->{devN}:${rv}_ack"];
+        }
+        delete $mhp->{dstH}{helper}{ack}{$mhp->{devN}};
+      }
+    }
 
     if (   $mhp->{devH}{helper}{prt}{mmcS}
         && $mhp->{devH}{helper}{prt}{mmcS} == 3){
@@ -3238,6 +3248,12 @@ sub CUL_HM_parseCommon(@){#####################################################
 
       push @evtEt,[$mhp->{cHash},1,"trigger:".(ucfirst($long))."_$cnt"];
       push @evtEt,[$mhp->{cHash},1,"state:".$state." (to $mhp->{dstN})"] if ($mhp->{devH} ne $mhp->{cHash});
+      if(   $mhp->{mFlgH} & 0x20
+         && $mhp->{dst} ne "000000" 
+         && $mhp->{dst} ne $mhp->{id}){
+        push @evtEt,[$mhp->{cHash},1,"triggerTo_$mhp->{dstN}:".(ucfirst($long))."_$cnt"];
+        $mhp->{devH}{helper}{ack}{$mhp->{dstN}} = "$mhp->{cName}:$mhp->{mNo}";
+      }
     }
     push @evtEt,[$mhp->{cHash},1,"trigger_cnt:$cnt"];
 
@@ -3247,7 +3263,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         my $pName = CUL_HM_id2Name($peer);
         $pName = CUL_HM_id2Name($mhp->{dst}) if (!$pName || !$defs{$pName}); #$dst - device-id of $peer
         next if (!$pName || !$defs{$pName});
-        push @evtEt,[$defs{$pName},1,"trig_$mhp->{cName}:$level"];
+        push @evtEt,[$defs{$pName},1,"trig_$mhp->{cName}:".(ucfirst($level))."_$cnt"];
         push @evtEt,[$defs{$pName},1,"trigLast:$mhp->{cName}".(($level ne "-")?":$level":"")];
 
         CUL_HM_stateUpdatDly($pName,10) if ($mhp->{mTp} eq "40");#conditional request may not deliver state-req
@@ -3459,7 +3475,7 @@ sub CUL_HM_pushEvnts(){########################################################
         Log 2,"CUL_HM set reading invalid:".join(",",@{$e});
         next;
       }
-      if ($h ne ${$e}[0] || $x ne ${$e}[1]){
+     if ($h ne ${$e}[0] || $x ne ${$e}[1]){
         push @ent,CUL_HM_UpdtReadBulk($h,$x,@evts);
         @evts = ();
         ($h,$x) = (${$e}[0],${$e}[1]);
@@ -4842,6 +4858,98 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       CUL_HM_calcDisWm($hash,$devName,$t);
     }
   }
+  elsif($cmd eq "displayEP" ) { ###############################################
+    my %disp_icons = (
+       off    => '80', on => '81', open => '82', closed => '83'
+      ,error  => '84', ok => '85', info => '86', newmsg => '87'
+      ,svcmsg => '88'
+    );
+    my %disp_sounds = (
+       off        => 'C0', longlong => 'C1', longshort  => 'C2'
+      ,long2short => 'C3', short    => 'C4', shortshort => 'C5'
+      ,long       => 'C6'
+    );
+    my %disp_signals = (
+       off => 'F0', red => 'F1', green => 'F2', orange => 'F3'
+    );
+    # msg: 'text,icon;text,icon;text,icon'
+    my ($msg, $sound, $rep, $pause, $sig) = @a[2..$#a];
+    
+    # set defaults
+    $msg   = ''    if (!defined ($msg));
+    $sound = 'off' if (!defined ($sound) || !exists ($disp_sounds{$sound}));
+    $sig   = 'off' if (!defined ($sig)   || !exists ($disp_signals{$sig} ));
+    $rep   =       (!defined ($rep)? 1   :
+                    ($rep > 15     ? 15  :
+                    ($rep == 0     ? 16  :
+                                     $rep)));
+    $pause =        (!defined ($pause)?10 :
+                    ($pause < 1      ?1  :
+                    ($pause >160     ?160:
+                                      $pause)));
+    
+    if($msg eq 'help'){ # display command info
+      return      "command options:"
+                 ."\n  line1,icon1:line2,icon2:line3,icon3 sound repeat pause signal"
+                 ."\n  line: 12 char text to be dispalyed. No change if empty."
+                 ."\n  icon: icon per line: ".join(" ",keys(%disp_icons))
+                 ."\n  sound: ".join(" ",keys(%disp_sounds))
+                 ."\n  repeat: 1..16 default=1"
+                 ."\n  pause: 1..160 default=10"
+                 ."\n  signal: ".join(" ",keys(%disp_signals))
+                 ; 
+    }
+    my $cmd = '020A';
+    # Lines are separated by semicolon, empty lines are supported
+    my @disp_lines = split (':', $msg.":::");# at least 3 entries - loop will use first 3
+    my $lineNr=1;
+    $evtDly = 1;
+    foreach my $line (@disp_lines[0..2]) {# only 3 lines
+      # Split line into text and icon part separated by comma
+      my ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
+      
+      $cmd .= '12';# start text indicator
+      if ($line ne '') {
+         
+        # Hex code
+        if ($text =~ /^0x[0-9A-F]{2}$/) {
+          $cmd .= substr($text,2,2);
+        }
+        # Predefined text code text0-9
+        elsif ($text =~ /^text([0-9])$/) {
+          $cmd .= sprintf ("8%1X", $1);
+        }
+        # Convert string to hex codes
+        else {
+          foreach my $ch (split ('', substr ($text, 0, 12))) {
+            $cmd .= sprintf ("%02X", ord ($ch));
+          }
+        }
+      }
+      else{
+        $text = ReadingsVal($name,"line${lineNr}_text","");
+        $icon = ReadingsVal($name,"line${lineNr}_icon","off");
+      }
+    
+      $icon = "off" if (!exists ($disp_icons{$icon}));# Icon
+      $cmd .= '13'.$disp_icons{$icon};
+      $cmd .= '0A';
+      
+      CUL_HM_UpdtReadBulk($hash,0,"line${lineNr}_text:$text"
+                                 ,"line${lineNr}_icon:$icon");
+      $lineNr++;
+    }
+    
+    $cmd .= '14'.$disp_sounds{$sound}.'1C';         # Sound
+    $cmd .= sprintf ("%02X1D", 0xD0+$rep-1);        # Repeat
+    $cmd .= sprintf ("E%01X16", int(($pause-1)/10));# Pause
+    $cmd .= $disp_signals{$sig}.'03';               # Signal
+    CUL_HM_UpdtReadBulk($hash,0,"signal:$sig");
+    CUL_HM_pushEvnts();
+
+    CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}80${chn}$_") foreach (unpack('(A28)*',$cmd));
+    return;
+  }  
 
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
     $state = "";
@@ -9732,10 +9840,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         </li>
         <li>HM-Dis-WM55
           <ul>
-            <li><B>displayWM help </B>
-              <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B>
-              <B>displayWM [long|short] &lt;lineX&gt; &lt;text&gt; &lt;color&gt; &lt;icon&gt;</B>
-              <br>
+            <li><B>displayWM help </B><br>
+              <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B><br>
+              <B>displayWM [long|short] &lt;lineX&gt; &lt;text&gt; &lt;color&gt; &lt;icon&gt;</B><br>
               up to 6 lines can be addressed.<br>
               <B>lineX</B> line number that shall be changed. If this is set the 3 parameter of a line can be adapted. <br>
               <B>textNo</B> is the text to be dispalyed in line No. The text is assotiated with the text defined for the buttons.
@@ -9751,6 +9858,25 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                 set disp01 displayWM long line6 txt02_2<br>
                 set disp01 displayWM long line1 nc nc closed<br>
               </ul></code>
+            </li>
+          </ul><br>
+        </li>
+        <li>HM-Dis-EP-WM55
+          <ul>
+            <li><B>displayEP help </B><br>
+              <B>displayEP &lt;text1,icon1:text2,icon2:text3,icon3&gt; &lt;sound&gt; &lt;repetition&gt; &lt;pause&gt; &lt;signal&gt;</B><br>
+              up to 3 lines can be addressed.<br>
+              If help is given a <i><B>help</B></i> on the command is given. Options for all parameter will be given.<br>
+              <B>textx</B> 12 char text for the given line. 
+                If empty the value as per reading will be transmittet - i.e. typically no change.
+                text0-9 will display predefined text of channels 4 to 8.
+                0xHH allows to display a single char in hex format.<br>
+              <B>iconx</B> Icon for this line. 
+                If empty the value as per reading will be transmittet - i.e. typically no change.<br>
+              <B>sound</B> sound to be played<br>
+              <B>repetition</B> 0..15 <br>
+              <B>pause</B> 1..160<br>
+              <B>signal</B> signal color to be displayed<br>
             </li>
           </ul><br>
         </li>
@@ -11058,10 +11184,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         </li>
         <li>HM-Dis-WM55
           <ul>
-            <li><B>displayWM help </B>
-               <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B>
-               <B>displayWM [long|short] &lt;lineX&gt; &lt;text&gt; &lt;color&gt; &lt;icon&gt;</B>
-               <br>
+            <li><B>displayWM help </B><br>
+               <B>displayWM [long|short] &lt;text1&gt; &lt;color1&gt; &lt;icon1&gt; ... &lt;text6&gt; &lt;color6&gt; &lt;icon6&gt;</B><br>
+               <B>displayWM [long|short] &lt;lineX&gt; &lt;text&gt; &lt;color&gt; &lt;icon&gt;</B><br>
                es können bis zu 6 Zeilen programmiert werden.<br>
                <B>lineX</B> legt die zu ändernde Zeilennummer fest. Es können die 3 Parameter der Zeile geändert werden.<br>
                <B>textNo</B> ist der anzuzeigende Text. Der Inhalt des Texts wird in den Buttonds definiert. 
@@ -11079,6 +11204,25 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                  set disp01 displayWM long line1 nc nc closed<br>
                  </ul></code>
                </li>
+          </ul><br>
+        </li>
+        <li>HM-Dis-EP-WM55
+          <ul>
+            <li><B>displayEP help </B><br>
+              <B>displayEP &lt;text1,icon1:text2,icon2:text3,icon3&gt; &lt;sound&gt; &lt;repetition&gt; &lt;pause&gt; &lt;signal&gt;</B><br>
+              bis zu 3 Zeilen werden adressiert.<br>
+              Wenn help eingegeben wird wird eine <i><B>hilfe</B></i> zum Kommando ausgegeben. Optionen der Parameter werden ausgegeben.<br>
+              <B>textx</B> 12 char text für die Zeile. 
+                Wenn leer wird der Wert gemäß Reading genutzt. Typisch bedeuted es, dass keine Änderung stattfindet.
+                text0-9 zeigt den vordefinierten Wert der Kanäle 4 bis 8 an.
+                0xHH erlaubt die anzeige eines hex Zeichens.<br>
+              <B>iconx</B> Icon der Zeile. 
+                Typisch bedeuted es, dass keine Änderung stattfindet.<br>
+              <B>sound</B> sound zum Abspielen.<br>
+              <B>repetition</B> 0..15 <br>
+              <B>pause</B> 1..160<br>
+              <B>signal</B> Signalfarbe zum Anzeigen<br>
+            </li>
           </ul><br>
         </li>
         <li>keyMatic<br><br>
