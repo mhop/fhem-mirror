@@ -45,7 +45,7 @@ FB_CALLLIST_Initialize($)
     $hash->{DeleteFn}  = "FB_CALLLIST_Delete";
     $hash->{AttrFn}    = "FB_CALLLIST_Attr";
     $hash->{UndefFn}   = "FB_CALLLIST_Undef";
-    $hash->{AttrList}  =  "number-of-calls:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20 ".
+    $hash->{AttrList}  =  "number-of-calls:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 ".
                           "internal-number-filter ".
                           "icon-mapping ".
                           "connection-mapping ".
@@ -211,6 +211,13 @@ sub FB_CALLLIST_Attr($@)
                 return "not a valid time frame value. See commandref for the correct syntax.";
             }
         }
+        elsif($attrib eq "number-of-calls")
+        {
+            if($value !~ /^\d+$/ or $value <= 0)
+            {
+                return "not a valid positive integer value";
+            }
+        }        
     }
     elsif($cmd eq "del")
     {
