@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.0beta9";
+my $version = "1.1";
 
 #-- these we may get on request
 my %gets = (
@@ -51,7 +51,7 @@ my %gets = (
 );
 
 #-- capabilities of doorpi instance for light and target
-my ($lon,$loff,$lonft,$don,$doff,$gtt,$son,$soff,$snon) = (0,0,0,0,0,0,0,0,0);
+my ($lon,$loff,$don,$doff,$gtt,$son,$soff,$snon) = (0,0,0,0,0,0,0,0,0);
 
 ########################################################################################
 #
@@ -222,7 +222,12 @@ sub DoorPi_Get ($@) {
 
 sub DoorPi_Set ($@) {
   my ($hash, @a) = @_;
+  #-- only hash as parameter when acting as timer callback
+  if( !@a ){
+    @a=($hash->{NAME},"light","off");
+  }
   my $name = shift @a;
+  
   my ($newkeys,$key,$value,$v);
 
   #-- commands
@@ -268,22 +273,37 @@ sub DoorPi_Set ($@) {
   return "[DoorPi_Set] With unknown argument $key, choose one of " . join(" ", @{$hash->{HELPER}->{CMDS}})
     if ( !grep( /$key/, @{$hash->{HELPER}->{CMDS}} ) && ($key ne "call") && ($key ne "door") );
 
-  #-- hidden command to be used by DoorPi for communicating
+  #-- hidden command "call" to be used by DoorPi for communicating with this module
   if( $key eq "call" ){
-    if( $value eq "start" ){
+    if( $value =~ "start.*" ){
       readingsSingleUpdate($hash,"call","started",1);
+      my ($sec, $min, $hour, $day,$month,$year,$wday) = (localtime())[0,1,2,3,4,5,6]; 
+      $year += 1900;
+      my $monthn = ("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")[$month];
+      $wday  = ("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa")[$wday];
+      my $timestamp = sprintf("%s, %2d %s %d %02d:%02d:%02d", $wday,$day,$monthn,$year,$hour, $min, $sec);
+      unshift(@{ $hash->{DATA}}, ["",$timestamp,AttrVal($name, "target$value","unknown"),"active","--","xx","yy"] );
+      #-- update web interface immediately
+      DoorPi_inform($hash);
+ 
     }elsif( $value eq "end" ){
-      readingsSingleUpdate($hash,"call","ended",1);
+      readingsSingleUpdate($hash,"call","ended",1);     
       DoorPi_GetHistory($hash);
+      #-- update web interface in 5 seconds
+      InternalTimer(gettimeofday()+5, "DoorPi_inform", $hash,0);
+      
     }elsif( $value eq "rejected" ){
       readingsSingleUpdate($hash,"call","rejected",1);
       DoorPi_GetHistory($hash);
+      
     }elsif( $value eq "dismissed" ){
       readingsSingleUpdate($hash,"call","dismissed",1);
       DoorPi_GetHistory($hash);
+      
     }elsif( $value eq "startup" ){
       DoorPi_GetConfig($hash);
       DoorPi_GetHistory($hash);
+      
     }elsif( $value eq "snapshot" ){
       # TODO
     }else{
@@ -364,6 +384,7 @@ sub DoorPi_Set ($@) {
          Log 1,"[DoorPi_Set] received softlock command from DoorPi, but uncertain lockstate";
          return;
        }
+       
     #-- from FHEM: unlocking the door
     }elsif( $value eq "unlocked" ){
       #-- careful here - 
@@ -378,6 +399,7 @@ sub DoorPi_Set ($@) {
       readingsSingleUpdate($hash,"lockstate","unlocked",1);
       readingsSingleUpdate($hash,$door,"unlocked",1);
       $v=DoorPi_Cmd($hash,"doorunlocked");
+      
     #-- from FHEM: locking the door
     }elsif( $value eq "locked" ){
        #-- careful here - 
@@ -410,7 +432,6 @@ sub DoorPi_Set ($@) {
     #my $light    = AttrVal($name, "lightbutton", "light");
     if( $value eq "on" ){
       $v=DoorPi_Cmd($hash,"lighton");
-      readingsSingleUpdate($hash,$light,"on",1);
       if(AttrVal($name, "lightoncmd",undef)){
         fhem(AttrVal($name, "lightoncmd",undef));
       }
@@ -422,12 +443,13 @@ sub DoorPi_Set ($@) {
       }
       readingsSingleUpdate($hash,$light,"off",1);
     }elsif( $value eq "on-for-timer" ){
-      $v=DoorPi_Cmd($hash,"lightonfortimer");
-      if(AttrVal($name, "lighttimercmd",undef)){
-        fhem(AttrVal($name, "lighttimercmd",undef));
+      $v=DoorPi_Cmd($hash,"lighton");
+      if(AttrVal($name, "lightoncmd",undef)){
+        fhem(AttrVal($name, "lightoncmd",undef));
       }
-      readingsSingleUpdate($hash,$light,"on-for-timer",1);
-      #-- TODO: reset after time
+      readingsSingleUpdate($hash,$light,"on",1);
+      #-- Intiate turning off light
+      InternalTimer(gettimeofday() + 60, "DoorPi_Set", $hash,1);
     }
   #-- dashboard lighting
   }elsif( $key eq "$dashlight" ){
@@ -442,9 +464,12 @@ sub DoorPi_Set ($@) {
   }elsif( $key =~ /button(\d\d?)/){
      $v=DoorPi_Cmd($hash,$key);
   }elsif( $key eq "purge"){
-     $v=DoorPi_Cmd($hash,"purge");
-  }elsif( $key eq "clear"){
-     $v=DoorPi_Cmd($hash,"clear");
+     #-- command purge to Doorpi 
+     DoorPi_Cmd($hash,"purge");
+     #-- clearing of DB
+     InternalTimer(gettimeofday()+5, "DoorPi_PurgeDB", $hash,0);
+     #-- get new history
+     InternalTimer(gettimeofday()+10, "DoorPi_GetHistory",$hash,0);
   }
   
   if(defined($v)) {
@@ -551,8 +576,6 @@ sub DoorPi_GetConfig {
         $doff = 1;
       
       #-- check for scene lighting buttons
-      }elsif($key =~ /$light(on)fortimer/){
-        $lonft = 1;
       }elsif($key =~ /$light(on)/){
         push(@{ $hash->{HELPER}->{CMDS}},"$light");
         $lon = 1;
@@ -585,8 +608,6 @@ sub DoorPi_GetConfig {
       if( $lon==0 ); 
     Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."off\" defined"
       if( $loff==0 ); 
-    Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$light."onfortimer\" defined"
-      if( $lonft==0 ); 
     Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$dashlight."on\" defined"
       if( $don==0 ); 
     Log 1,"[DoorPi_GetConfig] Warning: No DoorPi InputPin named \"".$dashlight."off\" defined"
@@ -601,6 +622,64 @@ sub DoorPi_GetConfig {
   #-- put into READINGS
   readingsSingleUpdate($hash,"state","Initialized",1);
   readingsSingleUpdate($hash,"config","ok",1);
+  return undef;
+}
+
+#######################################################################################
+#
+# DoorPi_LastSnapshot - acts as callable program DoorPi_GetLastSnapshot($hash)
+#                    and as callback program  DoorPi_GetLastSnapshot($hash,$err,$status)
+#
+# Parameter hash, err, status 
+#
+#######################################################################################
+
+sub DoorPi_GetLastSnapshot {
+  my ($hash,$err,$status) = @_;
+  my $name = $hash->{NAME};
+  my $url;
+  
+  #-- get configuration from doorpi
+  if ( !$hash ){
+    Log 1,"[DoorPi_GetLastSnapshot] called without hash";
+    return undef;
+  }elsif ( $hash && !$err && !$status ){
+    $url    = "http://".$hash->{TCPIP}."/status?module=config";
+    #Log 1,"[DoorPi_GetLastSnapshot] called with only hash => Issue a non-blocking call to $url";  
+    HttpUtils_NonblockingGet({
+      url      => $url,
+      callback => sub($$$){ DoorPi_GetLastSnapshot($hash,$_[1],$_[2]) }
+    });
+    return undef;
+  }elsif ( $hash && $err ){
+    Log 1,"[DoorPi_GetLastSnapshot] has error $err";
+    readingsSingleUpdate($hash,"snapshot",$err,0);
+    readingsSingleUpdate($hash,"state","Error",1);
+    return;
+  }
+  Log 1,"[DoorPi_GetLastSnapshot] has obtained data";
+ 
+  #-- test if this is valid JSON
+  if( !is_valid_json($status) ){
+    Log 1,"[DoorPi_GetLastSnapshot] but data is invalid";
+    readingsSingleUpdate($hash,"snapshot","invalid data",0);
+    readingsSingleUpdate($hash,"state","Error",1);
+    return;
+  }
+  
+  my $json  = JSON->new->utf8;
+  my $jhash0 = $json->decode( $status );
+  
+  #-- decode config 
+  my $DoorPi   = $jhash0->{"config"}->{"DoorPi"};
+  my $lastsnap = $jhash0->{"config"}->{"DoorPi"}->{"last_snapshot"};
+  
+  #push(@{ $hash->{DATA}}, ["",$state,$timestamp,$number,"started","--",$snapshot,$record] );
+  
+  Log 1,"[DoorPi_GetLastSnapshot] returns $lastsnap";
+   
+  #-- put into READINGS
+  readingsSingleUpdate($hash,"snapshot",$lastsnap,1);
   return undef;
 }
  
@@ -629,7 +708,7 @@ sub DoorPi_GetHistory {
     Log 1,"[DoorPi_GetHistory] called without hash";
     return undef;
   }elsif ( $hash && !$err1 && !$status1 && !$err2 && !$status2 ){
-    $url    = "http://".$hash->{TCPIP}."/status?module=history_event";
+    $url    = "http://".$hash->{TCPIP}."/status?module=history_event&name=OnCallStateChange&value=1000";
     #Log 1,"[DoorPi_GetHistory] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
@@ -638,7 +717,7 @@ sub DoorPi_GetHistory {
     return undef;
   }elsif ( $hash && $err1 && !$status1 && !$err2 && !$status2 ){
     Log 1,"[DoorPi_GetHistory] has error $err1";
-    readingsSingleUpdate($hash,"history",$err1,0);
+    readingsSingleUpdate($hash,"call_history",$err1,0);
     readingsSingleUpdate($hash,"state","Error",1);
     return undef;
   }elsif ( $hash && !$err1 && $status1 && !$err2 && !$status2 ){
@@ -651,7 +730,7 @@ sub DoorPi_GetHistory {
     return undef;
   }elsif ( $hash && !$err1 && $status1 && $err2){
     Log 1,"[DoorPi_GetHistory] has error2 $err2";
-    readingsSingleUpdate($hash,"history",$err2,0);
+    readingsSingleUpdate($hash,"call_history",$err2,0);
     readingsSingleUpdate($hash,"state","Error",1);
     return undef;
   }
@@ -660,13 +739,13 @@ sub DoorPi_GetHistory {
   #-- test if this is valid JSON
   if( !is_valid_json($status1) ){
     Log 1,"[DoorPi_GetHistory] but data from first call is invalid";
-    readingsSingleUpdate($hash,"history","invalid data 1st call",0);
+    readingsSingleUpdate($hash,"call_history","invalid data 1st call",0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
   if( !is_valid_json($status2) ){
     Log 1,"[DoorPi_GetHistory] but data from second call is invalid";
-    readingsSingleUpdate($hash,"history","invalid data 2nd call",0);
+    readingsSingleUpdate($hash,"call_history","invalid data 2nd call",0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
@@ -676,152 +755,171 @@ sub DoorPi_GetHistory {
   my $khash0 = $json->decode( $status2 );
 
   #-- decode call history
+  if(ref($jhash0->{"history_event"}) ne 'ARRAY'){
+     Log 1,"[DoorPi_GetHistory] Error - has found an empty event history";
+     return 
+  }
+  if(ref($khash0->{"history_snapshot"}) ne 'ARRAY'){
+     Log 1,"[DoorPi_GetHistory] Warning - has found an empty snapshot history";
+  }
   my @history_event    = ($jhash0)?@{$jhash0->{"history_event"}}:();
   my @history_snapshot = ($khash0)?@{$khash0->{"history_snapshot"}}:();
   my $call = "";
   
   #-- clear list of calls
   @{$hash->{DATA}} = ();
+  my ($event,$jhash1,$jhash2,$call_state,$call_state2,$callstart,$callend,$calletime,$calletarget,$callstime,$callstarget,$callsnap,$callrecord,$callstring);
   
-  #-- going backward through the calls 
-  my ($callend,$calletime,$calletarget,$callstime,$callstarget,$callsnap,$callrecord,$callstring);
-  for (my $i=0; $i<@history_event; $i++) {
-     my $event = $history_event[$i];
-     
-     if( $event->{"event_name"} eq "OnCallStateChange" ){
-        my $status1 = $event->{"additional_infos"};
-        #-- workaround for bug in DoorPi
-        $status1 =~ tr/'/"/;
-        my $jhash1 = from_json( $status1 );
-        my $call_state = $jhash1->{"call_state"};
-        #-- end of call
-        if( ($call eq "") && (($call_state == 18) || ($call_state == 13)) ){
-          $call        = "active";
-          $callrecord  = "";
-          $callend     = $jhash1->{"state"};
-          $callend =~ s/Call //;
-          if( $callend eq "released" ){
-             #-- check previous 4 events
-             for( my $j=1; $j<5; $j++ ){
-               if( $history_event[$i+$j]->{"event_name"} eq "OnCallStateChange"){
-                  my $status2 = $history_event[$i+$j]->{"additional_infos"};
-                  #-- workaround for bug in DoorPi
-                  $status2 =~ tr/'/"/;
-                  my $jhash2 = from_json( $status2 );
-                  if( $jhash2->{"state"} eq "Busy Here" ){
-                     $callend = "busy";
-                     last;
-                  }elsif( $jhash2->{"state"} eq "Call ended" ){
-                     $callend = "ok";
-                     last;
-                  }
-                }
-             }
-          }elsif( $callend eq "terminated" ){
-             if( $history_event[$i-1]->{"event_name"} eq "OnSipPhoneCallTimeoutNoResponse"){
-                $callend = "no response";
-             }
-          }
-          $calletime   = $event->{"start_time"};
-          $calletarget = $jhash1->{"remote_uri"};
-        }elsif( ($call eq "active") && ($call_state == 2) ){
-          $call        = "";
-          $callstime   = $event->{"start_time"};
-          $callstarget = $jhash1->{"remote_uri"};
-          #-- 
-          if( $calletarget ne $callstarget){
-             Log 1,"[DoorPi_GetHistory] Found error in call history of target $calletarget";
-          }else{
-             #-- Format values
-             my $state     = ""; 
-             my ($sec, $min, $hour, $day,$month,$year,$wday) = (localtime($callstime))[0,1,2,3,4,5,6]; 
-             $year += 1900;
-             my $monthn = ("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")[$month];
-             $wday  = ("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa")[$wday];
-             my $timestamp = sprintf("%s, %2d %s %d %02d:%02d:%02d", $wday,$day,$monthn,$year,$hour, $min, $sec);
-             my $number    = $callstarget;
-             $number =~ s/sip://;
-             $number =~ s/\@.*//;
-             my $result    = $callend;
-             my $duration  = int(($calletime - $callstime)*10+0.5)/10;
-             
-             my $record    = $callrecord; 
-             $record =~ s/^.*records\///;
-             #-- workaround for buggy DoorPi
-             $record       = sprintf("%d-%02d-%02d_%02d-%02d-%02d.wav", $year,($month+1),$day,$hour, $min, $sec);
-             #  if( $callend eq "ok");
-             
-             #-- this is the snapshot file if taken at the same time
-             my $snapshot  = sprintf("%d-%02d-%02d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
-             #-- check if it is present in the list of snapshots
-             my $found = 0;
-             for( my $i=0; $i<@history_snapshot; $i++){
-                if( index($history_snapshot[$i],$snapshot) > -1){
-                   $found = 1;
-                   last;
-                 }
+  Log 1,"[DoorPi_GetHistory] found ".int(@history_event)." events";
+  
+  #-- going backward through the calls
+  my $i=0;
+  if( int(@history_event) > 0 ){
+  do{ 
+     $event = $history_event[$i];
+     $calletime   = $event->{"start_time"};
+     $status1 = $event->{"additional_infos"};
+     #-- workaround for bug in DoorPi
+     $status1 =~ tr/'/"/;
+     $jhash1 = from_json( $status1 );
+     $call_state  = $jhash1->{"call_state"};
+     $calletarget    = $jhash1->{"remote_uri"};
+     my @call_states = ();
+     push(@call_states,$call_state);
+
+     #-- no active call processed and state of call = 18 - or ended = 13
+     if( ($call eq "")  && (($call_state == 18)||($call_state == 13)) ){
+        $call        = "active";
+        my $j = 1;
+        #-- check previous max. 5 events
+        do {
+           $status2 = $history_event[$i+$j]->{"additional_infos"};
+           if( $status2 ){
+              #-- workaround for bug in DoorPi
+              $status2 =~ tr/'/"/;
+              $jhash2 = from_json( $status2 );
+              $call_state2 = $jhash2->{"call_state"};
+              if( $call_state2 < 18 ){
+                 push( @call_states,$call_state2); 
+                 $callstime   = $history_event[$i+$j]->{"start_time"};
+                 $callstarget = $jhash2->{"remote_uri"};
               }
-              #-- if not, look for a file made a second later
-              if( $found == 0 ){
-                 ($sec, $min, $hour, $day,$month,$year,$wday) = (localtime($callstime+1))[0,1,2,3,4,5,6]; 
-                 $year += 1900;
-                 $monthn = ("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")[$month];
-                 $wday  = ("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa")[$wday];
-                
-                 #-- this is the snapshot file if taken at the same time
-                 $snapshot  = sprintf("%d-%02d-%02d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
-                 #-- check if it is present in the list of snapshots
-                 $found = 0;
-                 for( my $i=0; $i<@history_snapshot; $i++){
-                   if( index($history_snapshot[$i],$snapshot) > -1){
-                      $found = 1;
-                      last;
-                    }
-                 }
-                 if( $found == 0 ){
-                    Log 1,"[DoorPi_GetHistory] No snapshot found with $snapshot";
-                 }
-             }
-            
-             #-- store this
-             push(@{ $hash->{DATA}}, [$state,$timestamp,$number,$result,$duration,$snapshot,$record] );
-          }
+           }
+           $j++;
+        } until( ($j > 5) || ($call_state2 == 18) || ($i+$j >= int(@history_event))  );
+        
+        my $call_pattern = join("-",@call_states);
+        #Log 1,"[DoorPi_GetHistory] Pattern for call is $call_pattern, proceeding with event no. ".($i+$j); 
+        
+        if( $call_pattern =~ /1(3|8)\-.*\-2/ ){
+          $callend = "ok(2)";
+        }elsif( $call_pattern =~ /1(3|8)\-.*\-3/ ){
+          $callend = "ok(3)";
+        }elsif( $call_pattern =~ /1(3|8)\-.*\-5/ ){
+          $callend = "nok(5)";
+        }else{
+          $callend = "unknown";
         }
+        
+        if( $calletarget ne $callstarget){
+           Log 1,"[DoorPi_GetHistory] Found error in call history of target $calletarget";
+        }
+        
+        #-- Format values
+        my $state     = "";
+        my ($sec, $min, $hour, $day,$month,$year,$wday) = (localtime($callstime))[0,1,2,3,4,5,6]; 
+        $year += 1900;
+        my $monthn = ("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")[$month];
+        $wday  = ("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa")[$wday];
+        my $timestamp = sprintf("%s, %2d %s %d %02d:%02d:%02d", $wday,$day,$monthn,$year,$hour, $min, $sec);
+        my $number    = $callstarget;
+        $number =~ s/sip://;
+        $number =~ s/\@.*//;
+        my $result    = $callend;
+        my $duration  = int(($calletime - $callstime)*10+0.5)/10;
+             
+        #-- workaround for buggy DoorPi
+        my $record    = sprintf("%d-%02d-%02d_%02d-%02d-%02d.wav", $year,($month+1),$day,$hour, $min, $sec);
+
+        #-- this is the snapshot file if taken at the same time
+        my $snapshot  = sprintf("%d-%02d-%02d_%02d-%02d-%02d.jpg", $year,($month+1),$day,$hour, $min, $sec);
+        
+        #-- maybe we have to look at a second later ?
+        ($sec, $min, $hour, $day,$month,$year,$wday) = (localtime($callstime+1))[0,1,2,3,4,5,6]; 
+        $year += 1900;
+        $monthn = ("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")[$month];
+        $wday  = ("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa")[$wday];
+                
+        #-- this is the filename without extension if taken a second later
+        my $later = sprintf("%d-%02d-%02d_%02d-%02d-%02d", $year,($month+1),$day,$hour, $min, $sec);
+        
+        my $found = 0;
+        for( my $i=0; $i<@history_snapshot; $i++){
+          if( index($history_snapshot[$i],$snapshot) > -1){
+             $found = 1;
+             last;
+          } 
+        }   
+        #-- if not, look for a file made a second later
+        if( $found == 0 ){
+           #-- this is the snapshot file if taken a second later
+           $snapshot  = sprintf("%s.jpg", $later);
+           #-- check if it is present in the list of snapshots
+           for( my $i=0; $i<@history_snapshot; $i++){
+              if( index($history_snapshot[$i],$snapshot) > -1){
+                 $found = 1;
+                 last;
+              }
+           }
+           if( $found == 0 ){
+              Log 1,"[DoorPi_GetHistory] No snapshot found with $snapshot";
+           }
+        }
+             
+        $found = 0;
+        for( my $i=0; $i<@history_snapshot; $i++){
+          if( index($history_snapshot[$i],$record) > -1){
+             $found = 1;
+             last;
+          }   
+        }
+        #-- if not, look for a file made a second later
+        if( $found == 0 ){
+           #-- this is the record file if taken a second later
+           $record  = sprintf("%s.wav", $later);
+           #-- check if it is present in the list of snapshots
+           for( my $i=0; $i<@history_snapshot; $i++){
+              if( index($history_snapshot[$i],$record) > -1){
+                 $found = 1;
+                 last;
+              }
+           }
+           if( $found == 0 ){
+              Log 1,"[DoorPi_GetHistory] No record found with $record";
+           }
+        }
+                
+        #Log 1,"$snapshot $record";
+        
+        #-- store this
+        push(@{ $hash->{DATA}}, [$state,$timestamp,$number,$result,$duration,$snapshot,$record] );
+        
+        $i += $j-1;
+        $i--
+           if( $call_state2 == 18 );
+        $call = "";
      }  
-     #-- other events during call active
-     if( ($call eq "active") && ($event->{"event_name"} eq "OnRecorderStarted") ){ 
-        my $status3 = $event->{"additional_infos"};
-        $status3 =~ tr/'/"/;
-        my $jhash1 = from_json( $status3 );
-        $callrecord = $jhash1->{"last_record_filename"};
-      }
-  }
+     $i++;
+  } until ($i >= int(@history_event));
   
-  #-- going backward through the events to find last action for dashlight and light
-  my $dashlightstate = "off";  
-  my $dashlight    = AttrVal($name, "dashlightbutton", "dashlight");
-  for (my $i=0; $i<@history_event; $i++) {
-       if( $history_event[$i]->{"event_name"} =~ /OnKeyPressed_webservice\.dashlight(.*)/ ){
-         $dashlightstate=$1;
-         last;
-       }
   }
-  
-  my $lightstate = "off";
-  my $light    = AttrVal($name, "lightbutton", "light");
-  for (my $i=0; $i<@history_event; $i++) {
-       if( $history_event[$i]->{"event_name"} =~ /OnKeyPressed_webservice\.light(.*)/ ){
-         $lightstate=$1;
-         last;
-       }
-  }
-  
+
   #--put into READINGS
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"call_listed",int(@{ $hash->{DATA}}));
   readingsBulkUpdate($hash,"call_history","ok");
-  readingsBulkUpdate($hash,$dashlight,$dashlightstate);
-  readingsBulkUpdate($hash,$light,$lightstate);
+  #readingsBulkUpdate($hash,$dashlight,$dashlightstate);
+  #readingsBulkUpdate($hash,$light,$lightstate);
   readingsEndUpdate($hash,1); 
   return undef;
 }
@@ -881,6 +979,54 @@ sub DoorPi_GetHistory {
   return undef;
 }
 
+######################################################################################
+#
+# DoorPi_PurgeDB - acts as callable program DoorPi_PurgeDB($hash)
+#                    and as callback program  DoorPi_PurgeDB($hash,$err,$status)
+#
+# Parameter hash, err, status 
+#
+#######################################################################################
+
+sub DoorPi_PurgeDB {
+  my ($hash,$err,$data) = @_;
+  my $name = $hash->{NAME};
+  my $url;
+  
+  #-- purge doorpi database
+  if ( !$hash ){
+    Log 1,"[DoorPi_PurgeDB] called without hash";
+    return undef;
+  }elsif ( $hash && !$err ){
+    $url    = "http://".$hash->{TCPIP}."/status?module=history_event&name=purge&value=1.0";
+    HttpUtils_NonblockingGet({
+      url      => $url,
+      callback => sub($$$){ DoorPi_PurgeDB($hash,$_[1],$_[2]) }
+    });
+    return undef;
+  }elsif ( $hash && $err ){
+    Log 1,"[DoorPi_PurgeDB] has error $err";
+    readingsSingleUpdate($hash,"config",$err,0);
+    readingsSingleUpdate($hash,"state","Error",1);
+    return;
+  }
+  #-- test if this is valid JSON
+  if( !is_valid_json($data) ){
+    Log 1,"[DoorPi_PurgeDB] invalid data";
+    readingsSingleUpdate($hash,"state","Error",1);
+    return;
+  }
+    
+  my $json = JSON->new->utf8;
+  my $jhash = $json->decode( $data );
+  my $msg   = $jhash->{'message'};
+  my $suc   = $jhash->{'success'};
+  if( $suc ){
+    return $msg;
+  }
+  return undef;
+}
+
 #######################################################################################
 #
 # DoorPi_makeShort 
@@ -921,7 +1067,7 @@ sub DoorPi_makeShort($$$$){
         $ret .= "</td><td>".int(@{ $hash->{DATA}})." calls";
     }
   
-    $ret .= "</td><td><a href=\"/fhem?cmd.A.Haus.T=set A.Haus.T open\">open</a>";    
+    $ret .= "</td><td><a href=\"/fhem?cmd.$devname=set $devname door open\">open</a>";    
     
     setlocale(LC_ALL, $old_locale);
     
@@ -939,15 +1085,58 @@ sub DoorPi_makeShort($$$$){
 sub DoorPi_makeTable($$$$){
     my ($FW_wname, $devname, $room, $extPage) = @_;
     my $hash = $defs{$devname};
+        
+    return DoorPi_list($hash)
+}
+
+#######################################################################################
+#
+# DoorPi_inform 
+#  
+# Inform FHEMWEB
+#
+#######################################################################################
+
+sub DoorPi_inform($){
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+      
+  Log3 $name, 5, "[Doorpi_inform]- inform all FHEMWEB clients";
+  my $count = 0;
+        
+  foreach my $line (DoorPi_list($hash,1)){
+    #Log 1,"[Doorpi_Set] - informing $name with $line";
+    FW_directNotify($name, $line, 1);
+    $count++;
+  }
+        
+   # send the current row count to ensure all other rows are deleted via JS
+   #     FW_directNotify($name,"max-lines,$count", 1);
+ }    
+
+#######################################################################################
+#
+# DoorPi_list 
+#  
+# Do the work for makeTable
+#
+#######################################################################################
+    
+sub DoorPi_list($;$){
+    my ($hash, $to_json) = @_;
+    
+    return undef if( !$hash );
     
     my $name = $hash->{NAME};
     my $wwwpath = $hash->{HELPER}->{wwwpath};
     my $alias = AttrVal($hash->{NAME}, "alias", $hash->{NAME});
     my ($state,$timestamp,$number,$result,$duration,$snapshot,$record,$nrecord);
     
+    my $create_readings = AttrVal($hash->{NAME}, "create-readings","0");
+    
     my $td_style = 'style="padding-left:6px;padding-right:6px;"';
-    #my @json_output = ();
-    #my $line;
+    my @json_output = ();
+    my $line;
     
     my $old_locale = setlocale(LC_ALL);
     
@@ -976,9 +1165,11 @@ sub DoorPi_makeTable($$$$){
     
     $ret .= "<tr><td></td><td>";
     #-- div tag to support inform updates
-    $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="fbcalllist" dev="'.$name.'">';   
-    if( exists($hash->{DATA}) && (int(@{$hash->{DATA}}) > 0) ){
+    $ret .= '<div class="fhemWidget" informId="'.$name.'" cmd="" arg="doorpicalllist" dev="'.$name.'">';   
+    if( exists($hash->{DATA}) ){
        $ret .= '<table class="block doorpicalllist">';
+       
+       my @order=("state","timestamp","number","result","duration","record");
     
        if(AttrVal($name, "language", "en") eq "de"){
           $state     = "Wer";
@@ -1004,56 +1195,85 @@ sub DoorPi_makeTable($$$$){
        $ret .= '<td name="record" class="doorpicalllist" '.$td_style.'>'.$record.'</td>';
        $ret .= '</tr>';
        
-        my @list = @{$hash->{DATA}};
-        for(my $index=0; $index<(@list); $index++){
-           my @data   = @{$list[$index]};            
-           $state     = $data[0];
-           $timestamp = $data[1];
-           $number    = $data[2];
-           $result    = $data[3];
-           $duration  = $data[4];
-           $snapshot  = $data[5];
-           $record    = $data[6];
+       #-- Loop through all entries in the list
+       if( int(@{$hash->{DATA}}) > 0){
+          my @list = @{$hash->{DATA}};
+          for(my $index=0; $index<(@list); $index++){
+             my @data   = @{$list[$index]};            
+             $state     = $data[0];
+             $timestamp = $data[1];
+             $number    = $data[2];
+             $result    = $data[3];
+             $duration  = $data[4];
+             $snapshot  = $data[5];
+             $record    = $data[6];
            
-           if(AttrVal($name, "language", "en") eq "de"){
-              $result =~ s/busy/besetzt/;
-              $result =~ s/no\sresponse/ohne Antw./;
+             if(AttrVal($name, "language", "en") eq "de"){
+                $result =~ s/busy/besetzt/;
+                $result =~ s/no\sresponse/ohne Antw./;
+             }
+           
+             if( $record ne ""){
+               my $rs = $record;
+               $rs =~ s/.*$wwwpath\///;
+               $record  = '<a href="http://'.$hash->{TCPIP}.'/'.$record.'">';
+               $record .= ($iconaudio) ? $iconaudio : $rs;
+               $record .= '</a>';
+             }
+             
+             if( $snapshot ne ""){
+               $state  = '<a href="http://'.$hash->{TCPIP}.'/'.$snapshot.'">';
+               $state .= ($iconpic) ? $iconpic : '<img src="http://'.$hash->{TCPIP}.'/'.$snapshot.'" width="40" height="30">';
+               $state .= '</a>';
+             }
+             #-- assemble line
+             my $line = { 
+                        index => $index,
+                        line => $index+1,
+                        state =>  $state,
+                        timestamp => $timestamp,
+                        number => $number,
+                        result => $result,
+                        duration => $duration,
+                        snapshot => $snapshot,
+                        record => $record
+                    };
+           
+             #-- assemble HTML output
+             my @htmlret = ();
+             push @htmlret, '<tr align="center" number="'.$index.'" class="doorpicalllist '.($index % 2 == 1 ? "odd" : "even").'">';
+             foreach my $col (@order){
+               push @htmlret, '<td name="'.$col.'" class="doorpicalllist" '.$td_style.'>'.$line->{$col}.'</td>';
+             }
+               
+             $ret .= join("",@htmlret)."</tr>";   
+           
+             #-- assemble JSON output
+             my @jsonret = ();
+             push @jsonret, '"line":"'.$line->{index}.'"';
+             foreach my $col (@order){
+                my $val = $line->{$col};
+                $val =~ s,",\\",g;
+                push @jsonret, '"'.$col.'":"'.$val.'"';
+             }
+             push @json_output, "{".join(",",@jsonret)."}";
+           #--- end loop through the list
            }
-           
-           if( $record ne ""){
-             my $rs = $record;
-             $rs =~ s/.*$wwwpath\///;
-             $rs = ($iconaudio) ? $iconaudio : $rs;
-             $record = '<a href="http://'.$hash->{TCPIP}.'/'.$record.'">'.$rs.'</a>';
-           }
-           
-           if( $snapshot ne ""){
-             $state = '<a href="http://'.$hash->{TCPIP}.'/'.$snapshot.'">';
-             $state .= ($iconpic) ? $iconpic : '<img src="http://'.$hash->{TCPIP}.'/'.$snapshot.'" width="40" height="30"></a>';
-           }
-           
-           $ret .= '<tr align="center" class="doorpicalllist '.($index % 2 == 1 ? "odd" : "even").'">';
-           $ret .= '<td name="state" class="doorpicalllist" '.$td_style.'>'.$state.'</td>';
-           $ret .= '<td name="timestamp" class="doorpicalllist" '.$td_style.'>'.$timestamp.'</td>';
-           $ret .= '<td name="number" class="doorpicalllist" '.$td_style.'>'.$number.'</td>';
-           $ret .= '<td name="result" class="doorpicalllist" '.$td_style.'>'.$result.'</td>';
-           $ret .= '<td name="duration" class="doorpicalllist" '.$td_style.'>'.$duration.'</td>';
-           $ret .= '<td name="record" class="doorpicalllist" '.$td_style.'>'.$record.'</td>';
-           $ret .= '</tr>';
-        }
-        $ret .= "</table></div>";
-     }else{
-        if(AttrVal($name, "language", "en") eq "de"){
-            $ret .= "</td><td>Rufliste leer";
         }else{
-            $ret .= "</td><td>Calllist empty";
-        }
+            if(AttrVal($name, "language", "en") eq "de"){
+              $ret .= "</td><td>Rufliste leer";
+            }else{
+              $ret .= "</td><td>Calllist empty";
+            }
+        } 
+        $ret .= "</table></div>";
     }
 
     $ret .= "</td></tr></table>";    
     setlocale(LC_ALL, $old_locale);
     
-   return ($ret);
+    return ($to_json ? @json_output : $ret);
+    #return ($ret);
 }
 
 
@@ -1124,10 +1344,7 @@ sub DoorPi_makeTable($$$$){
                     Activate one of the virtual buttons specified in DoorPi.</li>
             <li><a name="doorpi_purge">
                     <code>set &lt;DoorPi-Device&gt; purge </code></a><br />
-                    Clean all recordings and snapshots which are older than the current process </li>
-            <li><a name="doorpi_clear">
-                    <code>set &lt;DoorPi-Device&gt; clear </code></a><br />
-                    Clear all recordings and snapshots </li>
+                    Clear all recordings and snapshots which are older than a day</li>
         </ul>
         <br />
         <a name="DoorPi_Get"></a>
@@ -1175,9 +1392,6 @@ sub DoorPi_makeTable($$$$){
             <li><a name="doorpi_lightoffcmd"><code>attr &lt;DoorPi-Device&gt; lightoffcmd
                         &lt;string&gt;</code></a>
                 <br />FHEM command additionally executed for "light off" action (no default)</li>
-            <li><a name="doorpi_lighttimercmd"><code>attr &lt;DoorPi-Device&gt; lighttimercmd
-                        &lt;string&gt;</code></a>
-                <br />FHEM command additionally executed for "light off" action (no default)</li>
             <li><a name="doorpi_dashlightbutton"><code>attr &lt;DoorPi-Device&gt; dashlightbutton
                         &lt;string&gt;</code></a>
                 <br />DoorPi name for dashlight action (default: dashlight)</li>
@@ -1222,14 +1436,14 @@ base_path_output = &lt;some directory&gt;
 dooropen        = &lt;doorpi action opening the door&gt; 
 doorlocked      = &lt;doorpi action if the door is locked by FHEM&gt; 
 doorunlocked    = &lt;doorpi action if the door is unlocked by FHEM&gt; 
+streamon        = &lt;doorpi action to switch on video stream&gt;
+streamoff       = &lt;doorpi action to switch off video stream&gt;
 lighton         = &lt;doorpi action to switch on scene light&gt;
-lightonfortimer = &lt;doorpi action to switch on scene light for some time&gt;
 lightoff        = &lt;doorpi action to switch off scene light&gt;
 dashlighton     = &lt;doorpi action to switch on dashlight&gt;
 dashlightoff    = &lt;doorpi action to switch off dashlight&gt;
 gettarget       = &lt;doorpi action to acquire call target number&gt;
-purge           = &lt;doorpi action to purge old files&gt;
-clear           = &lt;doorpi action&gt;
+purge           = &lt;doorpi action to purge files and entries older than a day&gt;
 ... (optional buttons)
 button1         = &lt;some doorpi action&gt;
 ... (further button definitions)

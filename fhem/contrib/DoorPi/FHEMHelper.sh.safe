@@ -11,10 +11,10 @@ checkstream() {
 }
 
 FHEMDP="A.Door.Pi"
-FHEMIP="xxx"
-FHEM="http://$FHEMIP:8083/fhem?XHR=1&cmd.$FHEMDP"
+FHEMIP="192.168.xxx"
+FHEM="http://192.168xx:8083/fhem?XHR=1&cmd.$FHEMDP"
 HOME="/home/doorpi"
-default_target=""
+default_target="722xxxx"
 
 case $1 in 
 
@@ -52,10 +52,15 @@ case $1 in
        ;;
 
  purge)
-       find $HOME/records/ -type f ! -newer /var/run/doorpi.pid -delete
+       find $HOME/records/ -type f -ctime 1 -delete
        ;;
 
- clear)
+ movement)
+       curl "$FHEM=set%20$FHEMDP%20door%20movement" &
+       ;;
+
+ sabotage)
+       curl "$FHEM=set%20$FHEMDP%20door%20sabotage" &
        ;;
 
 esac
