@@ -656,13 +656,16 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
         <br>
       </li>
       <li>
-        <a href="https://itunes.apple.com/app/id615538630">Geofency</a>
+        <a href="https://itunes.apple.com/app/id615538630">Geofency (iOS)</a>
       </li>
       <li>
         <a href="https://itunes.apple.com/app/id725198453">Locative (iOS)</a>
       </li>
       <li>
         <a href="http://www.egigeozone.de">EgiGeoZone (Android)</a>
+      </li>
+      <li>
+        <a href="https://www.microsoft.com/de-ch/store/apps/smart-geofences/9nblggh4rk3k">SMART Geofences (Windows 10, Windows 10 Mobile)</a>
       </li>
       <li>
         <p>
