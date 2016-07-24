@@ -162,7 +162,7 @@ sub GEOFANCY_CGI() {
 # Geofency.app (https://itunes.apple.com/us/app/geofency-time-tracking-automatic/id615538630?mt=8)
 # /$infix?id=UUIDloc&name=locName&entry=(1|0)&date=DATE&latitude=xx.x&longitude=xx.x&device=UUIDdev
 #
-# SMART Geofences.app (https://www.microsoft.com/de-ch/store/apps/smart-geofences/9nblggh4rk3k)
+# SMART Geofences.app (https://www.microsoft.com/en-us/store/apps/smart-geofences/9nblggh4rk3k)
 # /$infix?device=UUIDdev&name=UUIDloc&latitude=xx.x&longitude=xx.x&type=(Entered|Leaving)&date=DATE
 #
     my ($request) = @_;
@@ -665,7 +665,7 @@ sub GEOFANCY_ISO8601UTCtoLocal ($) {
         <a href="http://www.egigeozone.de">EgiGeoZone (Android)</a>
       </li>
       <li>
-        <a href="https://www.microsoft.com/de-ch/store/apps/smart-geofences/9nblggh4rk3k">SMART Geofences (Windows 10, Windows 10 Mobile)</a>
+        <a href="https://www.microsoft.com/en-us/store/apps/smart-geofences/9nblggh4rk3k">SMART Geofences (Windows 10, Windows 10 Mobile)</a>
       </li>
       <li>
         <p>
