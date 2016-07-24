@@ -25,7 +25,6 @@
 ##############################################################################
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 #####################################
 # PRE-DEFINITION: wakeuptimer

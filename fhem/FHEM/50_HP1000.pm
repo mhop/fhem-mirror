@@ -35,7 +35,6 @@ use Data::Dumper;
 use FHEM::98_dewpoint;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 sub HP1000_Define($$);
 sub HP1000_Undefine($$);
