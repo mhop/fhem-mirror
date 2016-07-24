@@ -39,7 +39,6 @@ use Time::HiRes qw(time);
 use Data::Dumper;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 sub CommandMsg($$;$$);
 
