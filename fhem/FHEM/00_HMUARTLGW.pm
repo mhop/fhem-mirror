@@ -149,6 +149,7 @@ sub HMUARTLGW_Initialize($)
 	                   $readingFnAttributes;
 }
 
+sub HMUARTLGW_Connect($$);
 sub HMUARTLGW_SendPendingCmd($);
 sub HMUARTLGW_SendCmd($$);
 sub HMUARTLGW_GetSetParameterReq($);
@@ -205,13 +206,20 @@ sub HMUARTLGW_DoInit($)
 		DevIo_CloseDev($keepAlive);
 		my ($ip, $port) = split(/:/, $hash->{DeviceName});
 		$keepAlive->{DeviceName} = "${ip}:" . ($port + 1);
-		DevIo_OpenDev($keepAlive, 0, "HMUARTLGW_DoInit");
+		DevIo_OpenDev($keepAlive, 0, "HMUARTLGW_DoInit", &HMUARTLGW_Connect);
 		$hash->{keepAlive} = $keepAlive;
 	}
 
 	InternalTimer(gettimeofday()+1, "HMUARTLGW_StartInit", $hash, 0);
 
 	return;
+}
+
+sub HMUARTLGW_Connect($$)
+{
+	my ($hash, $err) = @_;
+
+	Log3($hash, 5, "HMUARTLGW $hash->{NAME}: ${err}") if ($err);
 }
 
 sub HMUARTLGW_Define($$)
@@ -242,7 +250,7 @@ sub HMUARTLGW_Define($$)
 
 	$hash->{DeviceName} = $dev;
 
-	return DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit");
+	return DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", &HMUARTLGW_Connect);
 }
 
 sub HMUARTLGW_Undefine($$;$)
@@ -275,7 +283,7 @@ sub HMUARTLGW_Reopen($;$)
 
 	HMUARTLGW_Undefine($hash, $name, $noclose);
 
-	return DevIo_OpenDev($hash, 1, "HMUARTLGW_DoInit");
+	return DevIo_OpenDev($hash, 1, "HMUARTLGW_DoInit", &HMUARTLGW_Connect);
 }
 
 sub HMUARTLGW_Ready($)
@@ -1651,7 +1659,7 @@ sub HMUARTLGW_Set($@)
 		readingsSingleUpdate($hash, "state", "closed", 1);
 		$hash->{XmitOpen} = 0;
 	} elsif($cmd eq "open") {
-		DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit");
+		DevIo_OpenDev($hash, 0, "HMUARTLGW_DoInit", &HMUARTLGW_Connect);
 	} elsif($cmd eq "restart") {
 		HMUARTLGW_send($hash, HMUARTLGW_OS_CHANGE_APP, HMUARTLGW_DST_OS);
 	}
