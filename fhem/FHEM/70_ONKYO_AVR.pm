@@ -40,7 +40,6 @@ use Data::Dumper;
 $Data::Dumper::Sortkeys = 1;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 sub ONKYO_AVR_Set($$$);
 sub ONKYO_AVR_Get($$$);
@@ -333,13 +332,6 @@ sub ONKYO_AVR_Notify($$) {
     }
 
     readingsEndUpdate( $hash, 1 );
-}
-
-#####################################
-sub ONKYO_AVR_Reopen($) {
-    my ($hash) = @_;
-    DevIo_CloseDev($hash);
-    DevIo_OpenDev( $hash, 1, undef );
 }
 
 ###################################
@@ -1532,9 +1524,20 @@ sub ONKYO_AVR_Read($) {
 ###################################
 sub ONKYO_AVR_Ready($) {
     my ($hash) = @_;
-    return DevIo_OpenDev( $hash, 1, undef )
-      if ( ReadingsVal( $hash->{NAME}, "state", "disconnected" ) eq
-        "disconnected" );
+    my $name = $hash->{NAME};
+
+    if ( ReadingsVal( $name, "state", "disconnected" ) eq "disconnected" ) {
+
+        DevIo_OpenDev(
+            $hash, 1, undef,
+            sub() {
+                my ( $hash, $err ) = @_;
+                Log3 $name, 2, "ONKYO_AVR $name: $err" if ($err);
+            }
+        );
+
+        return;
+    }
 
     # This is relevant for windows/USB only
     my $po = $hash->{USBDev};
@@ -2482,14 +2485,13 @@ sub ONKYO_AVR_Set($$$) {
         else {
             Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
 
-            my $_ = @$a[2];
-            if ( $_ eq "off" ) {
+            if ( @$a[2] eq "off" ) {
                 $return = ONKYO_AVR_SendCommand( $hash, "sleep", "off" );
             }
-            elsif ( m/^\d+$/ && $_ > 0 && $_ <= 90 ) {
+            elsif ( @$a[2] =~ m/^\d+$/ && @$a[2] > 0 && @$a[2] <= 90 ) {
                 $return =
                   ONKYO_AVR_SendCommand( $hash, "sleep",
-                    ONKYO_AVR_dec2hex($_) );
+                    ONKYO_AVR_dec2hex( @$a[2] ) );
             }
             else {
                 $return =
@@ -2535,11 +2537,10 @@ sub ONKYO_AVR_Set($$$) {
             Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1] . " " . @$a[2];
 
             if ( $state eq "on" ) {
-                my $_ = @$a[2];
-                if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+                if ( @$a[2] =~ m/^\d+$/ && @$a[2] >= 0 && @$a[2] <= 100 ) {
                     $return =
                       ONKYO_AVR_SendCommand( $hash, "volume",
-                        ONKYO_AVR_dec2hex($_) );
+                        ONKYO_AVR_dec2hex( @$a[2] ) );
                 }
                 else {
                     $return =
@@ -2555,14 +2556,31 @@ sub ONKYO_AVR_Set($$$) {
     # volumeUp/volumeDown
     elsif ( lc( @$a[1] ) =~ /^(volumeup|volumedown)$/ ) {
         Log3 $name, 3, "ONKYO_AVR set $name " . @$a[1];
+        my $volumeSteps = AttrVal( $name, "volumeSteps", "1" );
+        my $volume = ReadingsVal( $name, "volume", "0" );
 
         if ( $state eq "on" ) {
             if ( lc( @$a[1] ) eq "volumeup" ) {
-                $return = ONKYO_AVR_SendCommand( $hash, "volume", "level-up" );
+                if ( $volumeSteps > 1 ) {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "volume",
+                        ONKYO_AVR_dec2hex( $volume + $volumeSteps ) );
+                }
+                else {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "volume", "level-up" );
+                }
             }
             else {
-                $return =
-                  ONKYO_AVR_SendCommand( $hash, "volume", "level-down" );
+                if ( $volumeSteps > 1 ) {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "volume",
+                        ONKYO_AVR_dec2hex( $volume - $volumeSteps ) );
+                }
+                else {
+                    $return =
+                      ONKYO_AVR_SendCommand( $hash, "volume", "level-down" );
+                }
             }
         }
         else {

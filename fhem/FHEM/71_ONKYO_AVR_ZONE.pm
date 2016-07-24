@@ -35,7 +35,6 @@ use Data::Dumper;
 $Data::Dumper::Sortkeys = 1;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 sub ONKYO_AVR_ZONE_Set($$$);
 sub ONKYO_AVR_ZONE_Get($$$);
@@ -1223,11 +1222,10 @@ sub ONKYO_AVR_ZONE_Set($$$) {
             Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1] . " " . @$a[2];
 
             if ( $state eq "on" ) {
-                my $_ = @$a[2];
-                if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+                if ( @$a[2] =~ m/^\d+$/ && @$a[2] >= 0 && @$a[2] <= 100 ) {
                     $return =
                       ONKYO_AVR_ZONE_SendCommand( $hash, "volume",
-                        ONKYO_AVR_dec2hex($_) );
+                        ONKYO_AVR_dec2hex( @$a[2] ) );
                 }
                 else {
                     $return =
@@ -1243,15 +1241,32 @@ sub ONKYO_AVR_ZONE_Set($$$) {
     # volumeUp/volumeDown
     elsif ( lc( @$a[1] ) =~ /^(volumeup|volumedown)$/ ) {
         Log3 $name, 3, "ONKYO_AVR_ZONE set $name " . @$a[1];
+        my $volumeSteps = AttrVal( $name, "volumeSteps", "1" );
+        my $volume = ReadingsVal( $name, "volume", "0" );
 
         if ( $state eq "on" ) {
             if ( lc( @$a[1] ) eq "volumeup" ) {
-                $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "level-up" );
+                if ( $volumeSteps > 1 ) {
+                    $return =
+                      ONKYO_AVR_ZONE_SendCommand( $hash, "volume",
+                        ONKYO_AVR_dec2hex( $volume + $volumeSteps ) );
+                }
+                else {
+                    $return =
+                      ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "level-up" );
+                }
             }
             else {
-                $return =
-                  ONKYO_AVR_ZONE_SendCommand( $hash, "volume", "level-down" );
+                if ( $volumeSteps > 1 ) {
+                    $return =
+                      ONKYO_AVR_ZONE_SendCommand( $hash, "volume",
+                        ONKYO_AVR_dec2hex( $volume - $volumeSteps ) );
+                }
+                else {
+                    $return =
+                      ONKYO_AVR_ZONE_SendCommand( $hash, "volume",
+                        "level-down" );
+                }
             }
         }
         else {
