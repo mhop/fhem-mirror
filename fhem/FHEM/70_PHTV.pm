@@ -38,7 +38,6 @@ use SetExtensions;
 use Encode;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 sub PHTV_Set($@);
 sub PHTV_Get($@);
@@ -936,17 +935,16 @@ sub PHTV_Set($@) {
             if ( defined( $hash->{READINGS}{rgb}{VAL} )
                 && $hash->{READINGS}{rgb}{VAL} ne "" )
             {
-                my $_ = $a[2];
                 my $hsb;
                 my $hex;
-                if ( m/^\d+$/ && $_ >= 0 && $_ <= 65535 ) {
+                if ( $a[2] =~ m/^\d+$/ && $a[2] >= 0 && $a[2] <= 65535 ) {
                     $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
-                    $hex = PHTV_hsb2hex( $_, $hsb->{s}, $hsb->{b} );
+                    $hex = PHTV_hsb2hex( $a[2], $hsb->{s}, $hsb->{b} );
 
                     Log3 $name, 4,
                         "PHTV $name hue - old: "
                       . $hash->{READINGS}{rgb}{VAL}
-                      . " new: $hex(h=$_ s="
+                      . " new: $hex(h=".$a[2]." s="
                       . $hsb->{s} . " b="
                       . $hsb->{b};
 
@@ -995,19 +993,18 @@ sub PHTV_Set($@) {
             if ( defined( $hash->{READINGS}{rgb}{VAL} )
                 && $hash->{READINGS}{rgb}{VAL} ne "" )
             {
-                my $_ = $a[2];
                 my $hsb;
                 my $hex;
-                if ( m/^\d+$/ && $_ >= 0 && $_ <= 255 ) {
+                if ( $a[2] =~ m/^\d+$/ && $a[2] >= 0 && $a[2] <= 255 ) {
                     $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
-                    $hex = PHTV_hsb2hex( $hsb->{h}, $_, $hsb->{b} );
+                    $hex = PHTV_hsb2hex( $hsb->{h}, $a[2], $hsb->{b} );
 
                     Log3 $name, 4,
                         "PHTV $name sat - old: "
                       . $hash->{READINGS}{rgb}{VAL}
                       . " new: $hex(h="
                       . $hsb->{h}
-                      . " s=$_ b="
+                      . " s=".$a[2]." b="
                       . $hsb->{b};
 
                     return PHTV_Set( $hash, $name, "rgb", $hex );
@@ -1055,12 +1052,11 @@ sub PHTV_Set($@) {
             if ( defined( $hash->{READINGS}{rgb}{VAL} )
                 && $hash->{READINGS}{rgb}{VAL} ne "" )
             {
-                my $_ = $a[2];
                 my $hsb;
                 my $hex;
-                if ( m/^\d+$/ && $_ >= 0 && $_ <= 255 ) {
+                if ( $a[2] =~ m/^\d+$/ && $a[2] >= 0 && $a[2] <= 255 ) {
                     $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
-                    $hex = PHTV_hsb2hex( $hsb->{h}, $hsb->{s}, $_ );
+                    $hex = PHTV_hsb2hex( $hsb->{h}, $hsb->{s}, $a[2] );
 
                     Log3 $name, 4,
                         "PHTV $name bri - old: "
@@ -1068,7 +1064,7 @@ sub PHTV_Set($@) {
                       . " new: $hex(h="
                       . $hsb->{h} . " s="
                       . $hsb->{s}
-                      . " b=$_)";
+                      . " b=".$a[2].")";
 
                     return PHTV_Set( $hash, $name, "rgb", $hex );
                 }
@@ -1115,13 +1111,12 @@ sub PHTV_Set($@) {
             if ( defined( $hash->{READINGS}{rgb}{VAL} )
                 && $hash->{READINGS}{rgb}{VAL} ne "" )
             {
-                my $_ = $a[2];
                 my $hsb;
                 my $bri;
                 my $hex;
-                if ( m/^\d+$/ && $_ >= 0 && $_ <= 100 ) {
+                if ( $a[2] =~ m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
                     $hsb = PHTV_hex2hsb( $hash->{READINGS}{rgb}{VAL} );
-                    $bri = PHTV_pct2bri($_);
+                    $bri = PHTV_pct2bri($a[2]);
                     $hex = PHTV_hsb2hex( $hsb->{h}, $hsb->{s}, $bri );
 
                     Log3 $name, 4,
@@ -1153,8 +1148,7 @@ sub PHTV_Set($@) {
 
         my $vol;
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            my $_ = $a[2];
-            if ( m/^\d+$/ && $_ >= 1 && $_ <= 100 ) {
+            if ( $a[2] =~ m/^\d+$/ && $a[2] >= 1 && $a[2] <= 100 ) {
                 if (   defined( $hash->{helper}{audio}{min} )
                     && defined( $hash->{helper}{audio}{max} ) )
                 {
@@ -1193,10 +1187,9 @@ sub PHTV_Set($@) {
 
         my $vol;
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            my $_ = $a[2];
-            if (   m/^\d+$/
-                && $_ >= $hash->{helper}{audio}{min}
-                && $_ <= $hash->{helper}{audio}{max} )
+            if ( $a[2] =~  m/^\d+$/
+                && $a[2] >= $hash->{helper}{audio}{min}
+                && $a[2] <= $hash->{helper}{audio}{max} )
             {
                 $vol =
                   int( ( $a[2] / $hash->{helper}{audio}{max} * 100 ) + 0.5 );
@@ -1357,21 +1350,21 @@ sub PHTV_Set($@) {
           if ( !defined( $a[2] ) );
 
         if ( $hash->{READINGS}{state}{VAL} eq "on" ) {
-            my $_ = $a[2];
-            if ( defined( $hash->{helper}{device}{channelID}{$_}{id} ) ) {
-                $cmd = $hash->{helper}{device}{channelID}{$_}{id};
+            my $channelName = $a[2];
+            if ( defined( $hash->{helper}{device}{channelID}{$channelName}{id} ) ) {
+                $cmd = $hash->{helper}{device}{channelID}{$channelName}{id};
 
-                if ( $hash->{READINGS}{channel}{VAL} ne $_ ) {
-                    readingsSingleUpdate( $hash, "channel", $_, 1 );
+                if ( $hash->{READINGS}{channel}{VAL} ne $channelName ) {
+                    readingsSingleUpdate( $hash, "channel", $channelName, 1 );
                 }
             }
-            elsif ( /^(\d+):(.*):$/
-                && defined( $hash->{helper}{device}{channelPreset}{$_}{id} ) )
+            elsif ( $channelName =~ /^(\d+):(.*):$/
+                && defined( $hash->{helper}{device}{channelPreset}{$channelName}{id} ) )
             {
-                $cmd = $hash->{helper}{device}{channelPreset}{$_}{id};
+                $cmd = $hash->{helper}{device}{channelPreset}{$channelName}{id};
             }
             else {
-                return "Argument " . $_
+                return "Argument " . $channelName
                   . " is not a valid integer between 0 and 9999 or servicereference is invalid";
             }
 
