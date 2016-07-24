@@ -914,7 +914,7 @@ HUEBridge_HTTP_Call($$$;$)
   if( !$ret ) {
     Log3 $name, 2, "$name: empty answer received for $uri";
     return undef;
-  } elsif( $ret =~ 'HTTP/1.1 200 OK' ) {
+  } elsif( $ret =~ m'HTTP/1.1 200 OK' ) {
     Log3 $name, 4, "$name: empty answer received for $uri";
     return undef;
   } elsif( $ret !~ m/^[\[{].*[\]}]$/ ) {
@@ -980,7 +980,7 @@ HUEBridge_HTTP_Call2($$$$;$)
     if( !$data ) {
       Log3 $name, 2, "$name: empty answer received for $url";
       return undef;
-    } elsif( $data =~ 'HTTP/1.1 200 OK' ) {
+    } elsif( $data =~ m'HTTP/1.1 200 OK' ) {
       Log3 $name, 4, "$name: empty answer received for $url";
       return undef;
     } elsif( $data !~ m/^[\[{].*[\]}]$/ ) {
