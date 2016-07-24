@@ -310,7 +310,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00F8" => {name=>"HM-RC-4-3-D"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"00F9" => {name=>"HM-Sec-Sir-WM"           ,st=>'siren'             ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Sen:1:2,Panic:3:3,Arm:4:4",}
  ,"00FA" => {name=>"HM-OU-CFM-TW"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",}
- ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Dis:1:2,Key:3:9",}
+ ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Btn:1:2,Dis:3:3,Key:4:8",}
  ,"00FC" => {name=>"OLIGO-smart-iq-HM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
  ,"00FD" => {name=>"HM-Sen-LI-O"             ,st=>'senBright'         ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
 
@@ -1794,12 +1794,10 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                      ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright- -colVal- -duration- -ramp- ..."}
                      ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."}
                      ,"HM-Sec-Sir-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"}
-                                            
+                     ,"HM-Dis-EP-WM5503"     =>{ displayEP      =>"text1,icon1:text2,icon2:text3,icon3 ... -sound- -repetition- -pause- -signal-"}                                       
  );
 # clones- - - - - - - - - - - - - - - - -
 $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
-$culHmChanSets{"HM-Dis-EP-WM5501"}      = $culHmChanSets{"HM-Dis-WM5501"};
-$culHmChanSets{"HM-Dis-EP-WM5502"}      = $culHmChanSets{"HM-Dis-WM5501"};
 
 $culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{THSensor};
 $culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{THSensor};
