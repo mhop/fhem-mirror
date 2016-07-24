@@ -36,7 +36,6 @@ use Time::Local;
 use Data::Dumper;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
-no if $] >= 5.017011, warnings => 'experimental::lexical_topic';
 
 sub GEOFANCY_Set($@);
 sub GEOFANCY_Define($$);
@@ -157,11 +156,15 @@ sub GEOFANCY_Set($@) {
 ###################################
 sub GEOFANCY_CGI() {
 
-# Locative.app
+# Locative.app (https://itunes.apple.com/us/app/locative/id725198453?mt=8)
 # /$infix?device=UUIDdev&id=UUIDloc&latitude=xx.x&longitude=xx.x&trigger=(enter|exit)
 #
-# Geofency.app
+# Geofency.app (https://itunes.apple.com/us/app/geofency-time-tracking-automatic/id615538630?mt=8)
 # /$infix?id=UUIDloc&name=locName&entry=(1|0)&date=DATE&latitude=xx.x&longitude=xx.x&device=UUIDdev
+#
+# SMART Geofences.app (https://www.microsoft.com/de-ch/store/apps/smart-geofences/9nblggh4rk3k)
+# /$infix?device=UUIDdev&name=UUIDloc&latitude=xx.x&longitude=xx.x&type=(Entered|Leaving)&date=DATE
+#
     my ($request) = @_;
 
     my $hash;
@@ -205,9 +208,11 @@ sub GEOFANCY_CGI() {
         }
 
         # validate id
+        # does not exist in "SMART Geofences.app"
         return ( "text/plain; charset=utf-8",
             "NOK Expected value for 'id' cannot be empty" )
-          if ( !defined( $webArgs->{id} ) || $webArgs->{id} eq "" );
+          if ( ( !defined( $webArgs->{id} ) || $webArgs->{id} eq "" )
+            && !defined( $webArgs->{type} ) );
 
         return ( "text/plain; charset=utf-8",
             "NOK No whitespace allowed in id '" . $webArgs->{id} . "'" )
@@ -221,9 +226,10 @@ sub GEOFANCY_CGI() {
 
         # require entry or trigger
         return ( "text/plain; charset=utf-8",
-            "NOK Neither 'entry' nor 'trigger' was specified" )
+            "NOK Neither 'entry' nor 'trigger' nor 'type' was specified" )
           if ( !defined( $webArgs->{entry} )
-            && !defined( $webArgs->{trigger} ) );
+            && !defined( $webArgs->{trigger} )
+            && !defined( $webArgs->{type} ) );
 
         # validate entry
         return ( "text/plain; charset=utf-8",
@@ -248,6 +254,17 @@ sub GEOFANCY_CGI() {
             && $webArgs->{trigger} ne "test"
             && $webArgs->{trigger} ne "exit" );
 
+        # validate type
+        return ( "text/plain; charset=utf-8",
+            "NOK Expected value for 'type' cannot be empty" )
+          if ( defined( $webArgs->{type} ) && $webArgs->{type} eq "" );
+
+        return ( "text/plain; charset=utf-8",
+            "NOK Value for 'type' can only be: Entered Leaving" )
+          if ( defined( $webArgs->{trigger} )
+            && lc( $webArgs->{trigger} ) ne "entered"
+            && lc( $webArgs->{trigger} ) ne "leaving" );
+
         # validate date
         return (
             "text/plain; charset=utf-8",
@@ -257,7 +274,7 @@ sub GEOFANCY_CGI() {
           )
           if ( defined( $webArgs->{date} )
             && $webArgs->{date} !~
-m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])Z/
+m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9]\.?[0-9]*)Z/
           );
 
         # validate timestamp
@@ -346,6 +363,19 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
               if ( defined( $webArgs->{address} ) );
             $device = $webArgs->{device};
         }
+
+        # SMART Geofences.app
+        elsif ( defined $webArgs->{type} ) {
+            $id      = $webArgs->{name};
+            $locName = $webArgs->{name};
+            $entry   = $webArgs->{type};
+            $date    = GEOFANCY_ISO8601UTCtoLocal( $webArgs->{date} );
+            $lat     = $webArgs->{latitude};
+            $long    = $webArgs->{longitude};
+            $address = $webArgs->{address}
+              if ( defined( $webArgs->{address} ) );
+            $device = $webArgs->{device};
+        }
         else {
             return "fatal error";
         }
@@ -360,11 +390,13 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
 
     # return error if unknown trigger
     return ( "text/plain; charset=utf-8", "$entry NOK" )
-      if ( $entry ne "enter"
-        && $entry ne "1"
-        && $entry ne "exit"
-        && $entry ne "0"
-        && $entry ne "test" );
+      if ( lc($entry) ne "enter"
+        && lc($entry) ne "1"
+        && lc($entry) ne "exit"
+        && lc($entry) ne "0"
+        && lc($entry) ne "test"
+        && lc($entry) ne "entered"
+        && lc($entry) ne "leaving" );
 
     $hash = $defs{$name};
 
@@ -493,11 +525,19 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         $id = $locName if ( defined($locName) && $locName ne "" );
 
         readingsBulkUpdate( $hash, "lastArr", $deviceAlias . " " . $id )
-          if ( $entry eq "enter" || $entry eq "1" );
+          if ( lc($entry) eq "enter"
+            || lc($entry) eq "1"
+            || lc($entry) eq "entered" );
         readingsBulkUpdate( $hash, "lastDep", $deviceAlias . " " . $id )
-          if ( $entry eq "exit" || $entry eq "0" );
+          if ( lc($entry) eq "exit"
+            || lc($entry) eq "0"
+            || lc($entry) eq "leaving" );
 
-        if ( $entry eq "enter" || $entry eq "1" || $entry eq "test" ) {
+        if (   lc($entry) eq "enter"
+            || lc($entry) eq "1"
+            || lc($entry) eq "entered"
+            || lc($entry) eq "test" )
+        {
             Log3 $name, 4, "GEOFANCY $name: $deviceAlias arrived at $id";
             readingsBulkUpdate( $hash, $deviceAlias, "arrived " . $id );
             readingsBulkUpdate( $hash, "currLoc_" . $deviceAlias,     $id );
@@ -507,7 +547,10 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
                 $address );
             readingsBulkUpdate( $hash, "currLocTime_" . $deviceAlias, $time );
         }
-        elsif ( $entry eq "exit" || $entry eq "0" ) {
+        elsif (lc($entry) eq "exit"
+            || lc($entry) eq "0"
+            || lc($entry) eq "leaving" )
+        {
             my $currReading;
             my $lastReading;
 
@@ -551,7 +594,10 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
     if ( $matchingResident == 1 ) {
         my $trigger = 0;
         $trigger = 1
-          if ( $entry eq "enter" || $entry eq "1" || $entry eq "test" );
+          if ( lc($entry) eq "enter"
+            || lc($entry) eq "1"
+            || lc($entry) eq "entered"
+            || lc($entry) eq "test" );
         $locName = $id if ( $locName eq "" );
 
         ROOMMATE_SetLocation(
@@ -565,9 +611,9 @@ m/(19|20)\d\d-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([0-1][0-9]|2[0-3]):([0-5
         ) if ( $defs{$deviceAlias}{TYPE} eq "GUEST" );
     }
 
-    $msg = "$entry OK";
-    $msg .= "\ndevice=$device id=$id lat=$lat long=$long trig=$entry"
-      if ( $entry eq "test" );
+    $msg = lc($entry) . " OK";
+    $msg .= "\ndevice=$device id=$id lat=$lat long=$long trig=lc($entry)"
+      if ( lc($entry) eq "test" );
 
     return ( "text/plain; charset=utf-8", $msg );
 }
