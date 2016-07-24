@@ -42,7 +42,7 @@ sub HUEBridge_Initialize($)
   $hash->{UndefFn}  = "HUEBridge_Undefine";
   $hash->{AttrList} = "key disable:1 disabledForIntervals httpUtils:1,0 pollDevices:1,0 queryAfterSet:1,0 $readingFnAttributes";
 }
-eq
+
 sub
 HUEBridge_Read($@)
 {
