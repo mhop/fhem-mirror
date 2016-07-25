@@ -44,7 +44,11 @@ plex_Initialize($)
   $hash->{SetFn}    = "plex_Set";
   $hash->{GetFn}    = "plex_Get";
   $hash->{AttrFn}   = "plex_Attr";
-  $hash->{AttrList} = "disable:1,0 httpPort ignoredClients ignoredServers removeUnusedReadings:1,0 responder:1,0 user password";
+  $hash->{AttrList} = "disable:1,0"
+                      . " httpPort ignoredClients ignoredServers"
+                      . " removeUnusedReadings:1,0 responder:1,0"
+                      . " user password"
+                      . $readingFnAttributes;
 }
 
 #####################################
