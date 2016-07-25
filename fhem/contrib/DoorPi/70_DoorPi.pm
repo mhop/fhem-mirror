@@ -41,7 +41,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "1.1";
+my $version = "1.2";
 
 #-- these we may get on request
 my %gets = (
@@ -628,7 +628,7 @@ sub DoorPi_GetConfig {
 #######################################################################################
 #
 # DoorPi_LastSnapshot - acts as callable program DoorPi_GetLastSnapshot($hash)
-#                    and as callback program  DoorPi_GetLastSnapshot($hash,$err,$status)
+#                       and as callback program  DoorPi_GetLastSnapshot($hash,$err,$status)
 #
 # Parameter hash, err, status 
 #
@@ -982,14 +982,14 @@ sub DoorPi_GetHistory {
 ######################################################################################
 #
 # DoorPi_PurgeDB - acts as callable program DoorPi_PurgeDB($hash)
-#                    and as callback program  DoorPi_PurgeDB($hash,$err,$status)
+#                  and as callback program  DoorPi_PurgeDB($hash,$err,$status)
 #
 # Parameter hash, err, status 
 #
 #######################################################################################
 
 sub DoorPi_PurgeDB {
-  my ($hash,$err,$data) = @_;
+  my ($hash,$err,$status) = @_;
   my $name = $hash->{NAME};
   my $url;
   
@@ -997,8 +997,9 @@ sub DoorPi_PurgeDB {
   if ( !$hash ){
     Log 1,"[DoorPi_PurgeDB] called without hash";
     return undef;
-  }elsif ( $hash && !$err ){
+  }elsif ( $hash && !$err && !$status){
     $url    = "http://".$hash->{TCPIP}."/status?module=history_event&name=purge&value=1.0";
+    # 1,"[DoorPi_PurgeDB] called with only hash => Issue a non-blocking call to $url";  
     HttpUtils_NonblockingGet({
       url      => $url,
       callback => sub($$$){ DoorPi_PurgeDB($hash,$_[1],$_[2]) }
@@ -1006,25 +1007,25 @@ sub DoorPi_PurgeDB {
     return undef;
   }elsif ( $hash && $err ){
     Log 1,"[DoorPi_PurgeDB] has error $err";
-    readingsSingleUpdate($hash,"config",$err,0);
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
+  #Log 1,"[DoorPi_PurgeDB] has obtained data $status";
   #-- test if this is valid JSON
-  if( !is_valid_json($data) ){
+  if( !is_valid_json($status) ){
     Log 1,"[DoorPi_PurgeDB] invalid data";
     readingsSingleUpdate($hash,"state","Error",1);
     return;
   }
     
   my $json = JSON->new->utf8;
-  my $jhash = $json->decode( $data );
-  my $msg   = $jhash->{'message'};
-  my $suc   = $jhash->{'success'};
-  if( $suc ){
-    return $msg;
+  my $jhash = $json->decode( $status );
+  my $suc   = $jhash->{'history_event'};
+  if( $suc eq "0" ){
+    return "OK";
+  }else{
+    return undef;
   }
-  return undef;
 }
 
 #######################################################################################
