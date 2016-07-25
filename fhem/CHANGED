@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  74_AMAD: fix Issues 475717
   - feature: 77_UWZ: added lang attribute
   - feature: 98_rssFeed: optionally create events for all readings
   - bugfix:  77_UWZ: fix Issues 472183 and 473982
