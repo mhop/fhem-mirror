@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.4.1";
-my $flowsetversion = "2.4.0";
+my $modulversion = "2.4.3";
+my $flowsetversion = "2.4.1";
 
 
 
@@ -1127,7 +1127,7 @@ sub AMAD_CommBridge_Read($) {
     my $c;
     my $device = $header->{FHEMDEVICE} if(defined($header->{FHEMDEVICE}));
     my $fhemcmd = $header->{FHEMCMD} if(defined($header->{FHEMCMD}));
-    my $dhash = $defs{$device} if( $defs{$device} );
+    my $dhash = $defs{$device} if(defined($device));
 
 
 
