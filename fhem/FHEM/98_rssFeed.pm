@@ -184,6 +184,7 @@ rssFeed_Initialize($)
 	. "rfReadings:multiple-strict,".$allReadings." "   #readings to fill (comma separated list)
 	. "rfDisabledText "
 	. "rfDisplayTickerReadings:1,0 "
+	. "rfAllReadingsEvents:1,0 "
 	#. "rfLatin1ToUtf8:1,0"  #optional encoding using latin1ToUtf8 for readings (TEST ONLY)
   	. $readingFnAttributes; #default FHEM FnAttributes -> see commandref.
 }
@@ -397,6 +398,11 @@ rssFeed_update(@)
   my $rfReadings=AttrVal($name,'rfReadings',$defaultReadings);
   my @setReadings = split /,/, $rfReadings;
   my %params = map { $_ => 1 } @setReadings;
+  
+  #create event for all readings that are created or updated if appropriate attribute
+  #is set
+  my $allEvents=int(AttrVal($name,'rfAllReadingsEvents','0'));
+  rssFeed_Log3 $name,4,"rfAllReadingsEvents: $allEvents";
     
   #setting state to the same value as it is more meaningful than 
   #just 'defined'
@@ -409,7 +415,7 @@ rssFeed_update(@)
   #          attribute is set. Shoud be called at least once, when attribute dsable is set.
   if(AttrVal($name,'disable',undef)) {
   	my $disabledText=AttrVal($name,"rfDisabledText",$defaultDisabledText);
-  	readingsSingleUpdate($dhash,$rdHeadlines,$tt_start.$disabledText.$tt_end,0);
+  	readingsSingleUpdate($dhash,$rdHeadlines,$tt_start.$disabledText.$tt_end,$allEvents);
   	return ;
   }
 
@@ -479,12 +485,12 @@ rssFeed_update(@)
   #If the response was not zipped, the unzip-result is the original response data
   my $zipped=0;
   $zipped=1 if($runzipped ne $response);
-  readingsSingleUpdate($dhash,"gzippedFeed",$zipped,0);
+  readingsSingleUpdate($dhash,"gzippedFeed",$zipped,$allEvents);
 
   #If rfDebug attribute is set then store complete response in reading
   if ($rfDebug) {
-    readingsSingleUpdate($dhash,$debug_prefix."LastResponse",$response,0);  
-	readingsSingleUpdate($dhash,$debug_prefix."UnzippedResponse",$runzipped,0) if ($zipped);
+    readingsSingleUpdate($dhash,$debug_prefix."LastResponse",$response,$allEvents);  
+	readingsSingleUpdate($dhash,$debug_prefix."UnzippedResponse",$runzipped,$allEvents) if ($zipped);
   }
 
   #using unzipped responsedata if it was originally zipped
@@ -605,12 +611,12 @@ rssFeed_update(@)
   
   #mass updating/generation of readings is complete so
   #tell FHEM to update them now!
-  readingsEndUpdate($dhash,0);
+  readingsEndUpdate($dhash,$allEvents);
   
   #joining all headlines separated by newlin in a single string and
   #store it in the readings
   my $tickerHeadlines=join("\n", @ticker);
-  readingsSingleUpdate($dhash,$rdHeadlines, $tickerHeadlines,0);
+  readingsSingleUpdate($dhash,$rdHeadlines, $tickerHeadlines,$allEvents);
   
   if(AttrVal($name,"rfDisplayTickerReadings",undef)) {
   	readingsSingleUpdate($dhash,$rdToastTicker,$tickerHeadlines,1);
@@ -828,7 +834,14 @@ sub rssFeedPrep($$)
 		
 		
 		
-	</li>	
+	</li>
+	<li>
+		<a name="rfReadings">rfAllReadingsEvents</a><br/>
+		If this attribute is set to 1 all Readings that are created or updated
+		will generate appropriate events (depending on event-on-... attributes).
+		By default no events are created for most Readings, especially not for
+		the feed data Readings
+	</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br/>
@@ -1112,6 +1125,14 @@ sub rssFeedPrep($$)
 		<code>attr &lt;rssFeedDevice&gt; rfCustomTextPrepFn rssFeedPrep</code>
 		<br/>
 	</li>	
+	<li>
+		<a name="rfReadings">rfAllReadingsEvents</a><br/>
+		Wenn dieses Attribut auf 1 gesetzt wird, so werden für ALLE Readings,
+		die w&auml;hrend des Feed-Updates erzeugt werden auch entsprechende Events
+		generiert (abh. von den event-on-... Attributen).
+		Von Haus aus werden, v.a. f&uuml;r die Readings mit den Feed-Daten keine
+		Events generiert.
+	</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
