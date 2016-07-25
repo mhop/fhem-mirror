@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 77_UWZ: added lang attribute
   - feature: 98_rssFeed: optionally create events for all readings
   - bugfix:  77_UWZ: fix Issues 472183 and 473982
   - updated: 77_UWZ: New Minor Release 1.4 multi languarge support, more Maps,

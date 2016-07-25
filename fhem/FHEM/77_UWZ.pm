@@ -60,7 +60,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.4.1";      # ungerade Entwicklerversion Bsp.: 1.1, 1.3, 2.5
+my $version         = "1.4.2";      # ungerade Entwicklerversion Bsp.: 1.1, 1.3, 2.5
 
 my $countrycode = "DE";
 my $plz = "77777";
@@ -273,6 +273,7 @@ sub UWZ_Initialize($) {
                         "maps ".
                         "humanreadable:0,1 ".
                         "htmlattr ".
+                        "lang ".
                         $readingFnAttributes;
    
     foreach my $d(sort keys %{$modules{UWZ}{defptr}}) {
@@ -290,7 +291,7 @@ sub UWZ_Define($$) {
     my @a    = split( "[ \t][ \t]*", $def );
    
     return "Error: Perl moduls ".$missingModul."are missing on this system" if( $missingModul );
-    return "Wrong syntax: use define <name> UWZ [CountryCode] [PLZ] [Interval] "  if (int(@a) != 5 and  ((lc $a[2]) ne "search"));
+    return "Wrong syntax: use define <name> UWZ <CountryCode> <PLZ> <Interval> "  if (int(@a) != 5 and  ((lc $a[2]) ne "search"));
 
     if ((lc $a[2]) ne "search") {
 
@@ -299,11 +300,12 @@ sub UWZ_Define($$) {
         $hash->{PLZ}             = $a[3];
         
         ## URL by CountryCode
+
         my $URL_language="en";
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
             $URL_language="de";
         }
-    
+        
         $hash->{URL} =  "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=" . $URL_language . "&areaID=UWZ" . $a[2] . $a[3];
     
         
@@ -514,6 +516,18 @@ sub UWZ_Start($) {
         InternalTimer(gettimeofday() + $hash->{INTERVAL}, "UWZ_Start", $hash, 1 );  
         return undef if( AttrVal($name, "disable", 0 ) == 1 );
     }
+
+    ## URL by CountryCode
+    my $URL_language="en";
+    if (AttrVal($hash->{NAME}, "lang", undef) ) {  
+        $URL_language=AttrVal($hash->{NAME}, "lang", "");
+    } else {
+        if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+            $URL_language="de";
+        }
+    }
+    $hash->{URL} =  "http://feed.alertspro.meteogroup.com/AlertsPro/AlertsProPollService.php?method=getWarning&language=" . $URL_language . "&areaID=UWZ" . $hash->{CountryCode} . $hash->{PLZ};
+    
    
     if ( not defined( $hash->{URL} ) ) {
 
@@ -805,24 +819,23 @@ sub UWZ_Run($) {
         UWZ_Log $hash, 4, "Warn_".$i."_levelName: ".$single_warning->{'payload'}{'levelName'};
         $message .= "Warn_".$i."_levelName|".$single_warning->{'payload'}{'levelName'}."|";
         
-        # Begin Language by AttrVal
-        if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-        
-            UWZ_Log $hash, 4, "Warn_".$i."_LongText: ".$enc->decode($single_warning->{'payload'}{'translationsLongText'}{'DE'});
-            $message .= "Warn_".$i."_LongText|".$converter->convert($single_warning->{'payload'}{'translationsLongText'}{'DE'})."|";
-        
-            UWZ_Log $hash, 4, "Warn_".$i."_ShortText: ".$enc->decode($single_warning->{'payload'}{'translationsShortText'}{'DE'});
-            $message .= "Warn_".$i."_ShortText|".$converter->convert($single_warning->{'payload'}{'translationsShortText'}{'DE'})."|";
-            
+        my $uclang = "EN";
+        if (AttrVal( $name, 'lang',undef) ) {
+            $uclang = uc AttrVal( $name, 'lang','');
         } else {
-        
-            UWZ_Log $hash, 4, "Warn_".$i."_LongText: ".$enc->decode($single_warning->{'payload'}{'translationsLongText'}{'EN'});
-            $message .= "Warn_".$i."_LongText|".$converter->convert($single_warning->{'payload'}{'translationsLongText'}{'EN'})."|";
-        
-            UWZ_Log $hash, 4, "Warn_".$i."_ShortText: ".$enc->decode($single_warning->{'payload'}{'translationsShortText'}{'EN'});
-            $message .= "Warn_".$i."_ShortText|".$converter->convert($single_warning->{'payload'}{'translationsShortText'}{'EN'})."|";
+            # Begin Language by AttrVal
+            if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                $uclang = "DE";
+            } else {
+                $uclang = "EN";
+            }
         }
-        # end language by AttrVal
+        UWZ_Log $hash, 4, "Warn_".$i."_LongText: ".$enc->decode($single_warning->{'payload'}{'translationsLongText'}{$uclang});
+        $message .= "Warn_".$i."_LongText|".$converter->convert($single_warning->{'payload'}{'translationsLongText'}{$uclang})."|";
+            
+        UWZ_Log $hash, 4, "Warn_".$i."_ShortText: ".$enc->decode($single_warning->{'payload'}{'translationsShortText'}{$uclang});
+        $message .= "Warn_".$i."_ShortText|".$converter->convert($single_warning->{'payload'}{'translationsShortText'}{$uclang})."|";
+
 
         UWZ_Log $hash, 4, "Warn_".$i."_IconURL: http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".$single_warning->{'severity'}.".gif";
         $message .= "Warn_".$i."_IconURL|http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".UWZ_GetSeverityColor($hash, UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'} )).".gif|";
@@ -1033,7 +1046,7 @@ sub UWZAsHtmlMovie($$) {
     } else {
         # language by AttrVal
         if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-            $ret .= 'unbekannte Filmbezeichnung';
+            $ret .= 'unbekannte Landbezeichnung';
         } else {
             $ret .='unknown movie setting';
         }
@@ -1423,6 +1436,11 @@ sub UWZSearchAreaID($$) {
          Add additional Readings Warn_?_Start_Date, Warn_?_Start_Time, Warn_?_End_Date and Warn_?_End_Time containing the coresponding timetamp in a human readable manner. Additionally Warn_?_uwzLevel_Str and Warn_?_Type_Str will be added to device readings (0|1).
          <br>
       </li>
+      <li><code>lang</code>
+         <br>
+         Overwrite requested language for short and long warn text. (de|en|it|fr|es|..). 
+         <br>
+      </li>
 
 
       <br>
@@ -1768,6 +1786,11 @@ sub UWZSearchAreaID($$) {
       <li><code>humanreadable</code>
          <br>
      Anzeige weiterer Readings Warn_?_Start_Date, Warn_?_Start_Time, Warn_?_End_Date, Warn_?_End_Time. Diese Readings enthalten aus dem Timestamp kalkulierte Datums/Zeit Angaben. Weiterhin werden folgende Readings aktivier: Warn_?_Type_Str und Warn_?_uwzLevel_Str welche den Unwettertyp als auch das Unwetter-Warn-Level als Text ausgeben. (0|1) 
+         <br>
+      </li>
+      <li><code>lang</code>
+         <br>
+         Umschalten der angeforderten Sprache für kurz und lange warn text. (de|en|it|fr|es|..). 
          <br>
       </li>
 
