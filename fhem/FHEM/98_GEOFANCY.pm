@@ -261,9 +261,9 @@ sub GEOFANCY_CGI() {
 
         return ( "text/plain; charset=utf-8",
             "NOK Value for 'type' can only be: Entered Leaving" )
-          if ( defined( $webArgs->{trigger} )
-            && lc( $webArgs->{trigger} ) ne "entered"
-            && lc( $webArgs->{trigger} ) ne "leaving" );
+          if ( defined( $webArgs->{type} )
+            && lc( $webArgs->{type} ) ne "entered"
+            && lc( $webArgs->{type} ) ne "leaving" );
 
         # validate date
         return (
