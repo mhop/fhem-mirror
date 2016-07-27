@@ -4887,7 +4887,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                     ($pause < 1      ?1  :
                     ($pause >160     ?160:
                                       $pause)));
-    
+   
     if($msg eq 'help'){ # display command info
       return      "command options:"
                  ."\n  line1,icon1:line2,icon2:line3,icon3 sound repeat pause signal"
@@ -4901,7 +4901,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     my $cmd = '020A';
     # Lines are separated by semicolon, empty lines are supported
-    my @disp_lines = split (':', $msg.":::");# at least 3 entries - loop will use first 3
+    my @disp_lines = (split (':', $msg.":::"),"","");# at least 3 entries - loop will use first 3
     my $lineNr=1;
     $evtDly = 1;
     foreach my $line (@disp_lines[0..2]) {# only 3 lines
@@ -4909,7 +4909,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
       
       $cmd .= '12';# start text indicator
-      if ($line ne '') {
+      if (defined $line && $line ne '') {
          
         # Hex code
         if ($text =~ /^0x[0-9A-F]{2}$/) {
@@ -4948,7 +4948,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     CUL_HM_pushEvnts();
 
     CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}80${chn}$_") foreach (unpack('(A28)*',$cmd));
-    return;
   }  
 
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################

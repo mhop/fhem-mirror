@@ -310,7 +310,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00F8" => {name=>"HM-RC-4-3-D"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"00F9" => {name=>"HM-Sec-Sir-WM"           ,st=>'siren'             ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Sen:1:2,Panic:3:3,Arm:4:4",}
  ,"00FA" => {name=>"HM-OU-CFM-TW"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",}
- ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3'          ,chn=>"Btn:1:2,Dis:3:3,Key:4:8",}
+ ,"00FB" => {name=>"HM-Dis-EP-WM55"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,3:1p.2p'    ,chn=>"Btn:1:2,Dis:3:3,Key:4:8",}
  ,"00FC" => {name=>"OLIGO-smart-iq-HM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
  ,"00FD" => {name=>"HM-Sen-LI-O"             ,st=>'senBright'         ,cyc=>'00:10' ,rxt=>'c:w'    ,lst=>'1'            ,chn=>""}
 
@@ -997,8 +997,9 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          }
 
  ,"HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1}
- ,"HM-Dis-WM55"       =>{ stbyTime        =>1}
- ,"HM-Dis-EP-WM55"    =>{ powerSupply     =>1,localResDis     =>1,wakeupBehavior  =>1,wakeupBehavMsg  =>1
+ ,"HM-Dis-WM55"       =>{ intKeyVisib     =>1,stbyTime        =>1}
+ ,"HM-Dis-EP-WM55"    =>{ intKeyVisib     =>1
+                         ,powerSupply     =>1,localResDis     =>1,wakeupBehavior  =>1,wakeupBehavMsg  =>1
                          ,displayInvert   =>1}
  
  ,"HM-WDS100-C6-O"    =>{ burstRx         =>1,sunThresh       =>1,stormUpThresh   =>1,stormLowThresh  =>1}
