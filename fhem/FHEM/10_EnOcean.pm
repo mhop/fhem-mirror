@@ -12437,7 +12437,6 @@ sub EnOcean_Notify(@)
   my $name = $hash->{NAME};
   my $devName = $dev->{NAME};
   return undef if (AttrVal($name ,"disable", 0) > 0);
-  #return undef if ($devName eq $name);
 
   my $max = int(@{$dev->{CHANGED}});
   for (my $i = 0; $i < $max; $i++) {
@@ -17947,7 +17946,7 @@ EnOcean_Delete($$)
       [serviceOn] = no is default.<br>
       Device in Service Mode.
     </li>
-    <li><a name="sensorMode">switchMode</a> switch|pushbutton,
+    <li><a name="sensorMode">sensorMode</a> switch|pushbutton,
       [sensorMode] = switch is default.<br>
       The status "released" will be shown in the reading state if the
       attribute is set to "pushbutton".
