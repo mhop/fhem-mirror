@@ -488,9 +488,21 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'checkforupdate') {
+    return "usage: checkforupdate" if( @args != 0 );
+
+    my $obj = { swupdate => {'checkforupdate' => JSON::true } };
+
+    my $result = HUEBridge_Call($hash, undef, 'config', $obj, 'PUT');
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef if( $result->{success} );
+
+    return undef;
+
 
   } else {
-    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene deletewhitelist touchlink:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene deletewhitelist touchlink:noArg checkforupdate:noArg  autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -1372,6 +1384,8 @@ HUEBridge_Attr($$$)
       Deletes the given key from the whitelist in the bridge.</li>
     <li>touchlink<br>
       perform touchlink action</li>
+    <li>checkforupdate<br>
+      perform checkforupdate action</li>
     <li>statusRequest<br>
       Update bridge status.</li>
     <li>swupdate<br>
