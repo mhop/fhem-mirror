@@ -1289,11 +1289,14 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,wat1_hour       =>1,wat1_min        =>1, 
                          ,wat2_hour       =>1,wat2_min        =>1, 
                          }
+ ,"HM-Dis-EP-WM5501"  =>{ transmitTryMax  =>1}
  );
  
 
 #clones - - - - - - - - - - - - - - -
 
+$culHmRegChan{"HM-Dis-EP-WM5502"}     = $culHmRegChan{"HM-Dis-EP-WM5501"};
+$culHmRegChan{"HM-Dis-EP-WM5503"}     = $culHmRegChan{"HM-Dis-EP-WM5501"};
 $culHmRegChan{"SensoTimer-ST-602"}    = $culHmRegChan{"SensoTimer-ST-601"};
 
 $culHmRegChan{"HM-Sen-MDIR-WM5502"}   = $culHmRegChan{"HM-Sen-MDIR-WM5501"};
