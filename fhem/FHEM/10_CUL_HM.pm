@@ -4859,6 +4859,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
   }
   elsif($cmd eq "displayEP" ) { ###############################################
+    $state = "displayEP";
     my %disp_icons = (
        off    => '80', on => '81', open => '82', closed => '83'
       ,error  => '84', ok => '85', info => '86', newmsg => '87'
@@ -4899,7 +4900,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                  ."\n  signal: ".join(" ",keys(%disp_signals))
                  ; 
     }
-    my $cmd = '020A';
+    my $snd = '020A';
     # Lines are separated by semicolon, empty lines are supported
     my @disp_lines = (split (':', $msg.":::"),"","");# at least 3 entries - loop will use first 3
     my $lineNr=1;
@@ -4908,46 +4909,49 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       # Split line into text and icon part separated by comma
       my ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
       
-      $cmd .= '12';# start text indicator
+      $snd .= '12';# start text indicator
       if (defined $line && $line ne '') {
          
         # Hex code
         if ($text =~ /^0x[0-9A-F]{2}$/) {
-          $cmd .= substr($text,2,2);
+          $snd .= substr($text,2,2);
         }
         # Predefined text code text0-9
         elsif ($text =~ /^text([0-9])$/) {
-          $cmd .= sprintf ("8%1X", $1);
+          $snd .= sprintf ("8%1X", $1);
         }
         # Convert string to hex codes
         else {
           foreach my $ch (split ('', substr ($text, 0, 12))) {
-            $cmd .= sprintf ("%02X", ord ($ch));
+            $snd .= sprintf ("%02X", ord ($ch));
           }
         }
       }
       else{
         $text = ReadingsVal($name,"line${lineNr}_text","");
         $icon = ReadingsVal($name,"line${lineNr}_icon","off");
+        foreach my $ch (split ('', substr ($text, 0, 12))) {
+          $snd .= sprintf ("%02X", ord ($ch));
+        }
       }
     
       $icon = "off" if (!exists ($disp_icons{$icon}));# Icon
-      $cmd .= '13'.$disp_icons{$icon};
-      $cmd .= '0A';
+      $snd .= '13'.$disp_icons{$icon};
+      $snd .= '0A';
       
       CUL_HM_UpdtReadBulk($hash,0,"line${lineNr}_text:$text"
                                  ,"line${lineNr}_icon:$icon");
       $lineNr++;
     }
     
-    $cmd .= '14'.$disp_sounds{$sound}.'1C';         # Sound
-    $cmd .= sprintf ("%02X1D", 0xD0+$rep-1);        # Repeat
-    $cmd .= sprintf ("E%01X16", int(($pause-1)/10));# Pause
-    $cmd .= $disp_signals{$sig}.'03';               # Signal
+    $snd .= '14'.$disp_sounds{$sound}.'1C';         # Sound
+    $snd .= sprintf ("%02X1D", 0xD0+$rep-1);        # Repeat
+    $snd .= sprintf ("E%01X16", int(($pause-1)/10));# Pause
+    $snd .= $disp_signals{$sig}.'03';               # Signal
     CUL_HM_UpdtReadBulk($hash,0,"signal:$sig");
     CUL_HM_pushEvnts();
 
-    CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}80${chn}$_") foreach (unpack('(A28)*',$cmd));
+    CUL_HM_PushCmdStack($hash,"++${flag}11$id${dst}80${chn}$_") foreach (unpack('(A28)*',$snd));
   }  
 
   elsif($cmd =~ m/^(controlMode|controlManu|controlParty)$/) { ################
@@ -7555,7 +7559,7 @@ sub CUL_HM_updtRegDisp($$$) {
   elsif ($md =~ m/HM-TC-IT-WM-W-EU/){#handle temperature readings
     CUL_HM_TCITRTtempReadings($hash,$md,$list)  if ($list >= 7 && $chn eq "02");
   }
-  elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)/){#add text
+  elsif ($md =~ m/(^HM-PB-4DIS-WM|HM-Dis-WM55|HM-Dis-EP-WM55|HM-RC-Dis-H-x-EU|ROTO_ZEL-STG-RM-DWT-10)/){#add text
    CUL_HM_4DisText($hash)  if ($list == 1) ;
   }
   elsif ($st eq "repeater"){
