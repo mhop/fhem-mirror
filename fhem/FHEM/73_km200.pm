@@ -42,9 +42,6 @@
 ########################################################################################################################
 # List of open Problems:
 #
-# *DbLog: X_DbLog_splitFn not completely implemented in order to hand over the units of the readings to DbLog database
-#         Unfortunately the global %hash of this module will not be transferred to the DbLog function. Therefore this 
-#         function is useless.
 #
 ########################################################################################################################
 
@@ -80,7 +77,7 @@ sub km200_Initialize($)
     $hash->{SetFn}           = "km200_Set";
     $hash->{GetFn}           = "km200_Get";
     $hash->{AttrFn}          = "km200_Attr";
-#	$hash->{DbLog_splitFn}   = "km200_DbLog_split";
+	$hash->{DbLog_splitFn}   = "km200_DbLog_splitFn";
 
     $hash->{AttrList}        = "do_not_notify:1,0 " .
 							   "disable:1,0 " .
@@ -109,7 +106,11 @@ sub km200_Define($$)
 	$hash->{STATE}              = "define";
 
 	Log3 $name, 4, $name. " : km200 - Starting to define module";
-		
+
+	### Stop the current timer if one exists errornous 
+	RemoveInternalTimer($hash);
+	Log3 $name, 4, $name. " : km200 - InternalTimer has been removed.";
+	
 	###START###### Define known services of gateway ###########################################################START####
 	my @KM200_AllServices = (
 	"/",
@@ -317,35 +318,47 @@ sub km200_Define($$)
 
 
 ###START###### To bind unit of value to DbLog entries #########################################################START####
-#sub km200_DbLog_split($)
-#{
-#	my ($event)  = @_;
-#	my $name     = $event[0];
-#	my $hash     = $defs{$name};
-#	my ($reading, $value, $unit);
-#	
-#	
-#print("DbLog_splitFn - event    : " . $event . "\n");
-#print("DbLog_splitFn - event[0] : " . $event[0] . "\n");
-#print("DbLog_splitFn - event[1] : " . $event[1] . "\n");
-#print("DbLog_splitFn - event[2] : " . $event[2] . "\n");
-#
-#print("DbLog_splitFn - unit  : " . $hash->{temp}{ServiceDbLogSplitHash}{unit} ."\n");
-#	
-#	### Get values being changed from hash
-#	$reading = $hash->{temp}{ServiceDbLogSplitHash}{id};
-#	$value   = $hash->{temp}{ServiceDbLogSplitHash}{value};
-#	$unit    = $hash->{temp}{ServiceDbLogSplitHash}{unit};
-#	### Get values being changed from hash
-#
-#print("DbLog_splitFn - event:" . $event . "; value: ". $value . "; unit: ". $unit . ".\n");
-#	
-#	### Delete temporary json-hash for DbLog-Split
-#	$hash->{temp}{ServiceDbLogSplitHash} = ();
-#	### Delete temporary json-hash for DbLog-Split
-#
-#   return ($reading, $value, $unit);
-#}
+sub km200_DbLog_splitFn($$)
+{
+	my ($event, $name)	= @_;
+	my ($reading, $value, $unit);
+    my $hash 			= $defs{$name};
+	my @argument		= split("[ \t][ \t]*", $event);
+	
+	### Delete ":" and everything behind in readings name
+	$argument[0] =~ s/:.*//;
+ 
+	### Log entries for debugging
+	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of event                         : " . $event;
+	
+	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[0]                   : " . $argument[0];
+	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[1]                   : " . $argument[1];
+	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[2]                   : " . $argument[2];
+
+	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of ServiceDbLogSplitHash - id    : " . $hash->{temp}{ServiceDbLogSplitHash}{id};
+	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of ServiceDbLogSplitHash - value : " . $hash->{temp}{ServiceDbLogSplitHash}{value};
+	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of ServiceDbLogSplitHash - unit  : " . $hash->{temp}{ServiceDbLogSplitHash}{unitOfMeasure};
+
+
+	### If the service to be changed is identical to the one where the unit received from
+	if ($argument[0] = $hash->{temp}{ServiceDbLogSplitHash}{id})
+	{
+		### Get values being changed from hash
+		$reading = $argument[0];
+		$value   = $argument[1];
+		$unit    = $hash->{temp}{ServiceDbLogSplitHash}{unitOfMeasure};
+
+		Log3 $name, 5, $name. " : km200_DbLog_splitFn - unitOfMeasure has been amended with      : " . $hash->{temp}{ServiceDbLogSplitHash}{unitOfMeasure};
+	}
+	
+	
+
+	### Delete temporary json-hash for DbLog-Split
+	$hash->{temp}{ServiceDbLogSplitHash} = ();
+	### Delete temporary json-hash for DbLog-Split
+
+   return ($reading, $value, $unit);
+}
 ####END####### To bind unit of value to DbLog entries ##########################################################END#####
 
 
@@ -1862,6 +1875,8 @@ sub km200_GetInitService($)
 	my $PollingTimeout               = $hash->{POLLINGTIMEOUT};
 	my $Service                      = $KM200_InitServices[$ServiceCounterInit];
 
+	### Stop the current timer
+	RemoveInternalTimer($hash);
 
 	### If this this loop is accessed for the first time, stop the timer and set status
 	if ($ServiceCounterInit == 0)
@@ -1871,9 +1886,6 @@ sub km200_GetInitService($)
 		
 		### Set status of km200 fhem module
 		$hash->{STATE} = "Sounding...";
-
-		### Stop the current timer
-		RemoveInternalTimer($hash);
 	}
 
 
@@ -2413,6 +2425,9 @@ sub km200_GetDynService($)
 	my $ServiceCounterDyn            =   $hash->{temp}{ServiceCounterDyn};
 	my $PollingTimeout               =   $hash->{POLLINGTIMEOUT};
 	
+	### Stop the current timer
+	RemoveInternalTimer($hash);
+
 	### If at least one service to be polled is available
 	if (@KM200_DynServices != 0)
 	{
@@ -2424,8 +2439,8 @@ sub km200_GetDynService($)
 			Log3 $name, 5, $name. "Starting download of dynamic services";
 		}
 		
-		Log3 $name, 5, $name. "$Service";
 		### Log file entry for debugging
+		Log3 $name, 5, $name . " - km200_GetDynService - Polling : " . $Service;
 		
 		my $url = "http://" . $km200_gateway_host . $Service;
 		my $param = {
@@ -2488,7 +2503,7 @@ sub km200_ParseHttpResponseDyn($)
 		}
 		or do 
 		{
-			Log3 $name, 5, $name. " : km200_parseHttpResponseDyn  - Data cannot be parsed by JSON on km200 for http://" . $param->{url};
+			Log3 $name, 5, $name. " - km200_parseHttpResponseDyn : Data cannot be parsed by JSON on km200 for http://" . $param->{url};
 		};
 		
 		### Check whether the type is a single value containing a string or float value
