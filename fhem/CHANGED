@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - bugfix:  73_km200: Bugfix for double and triple downloads
+  - feature: 73_km200: DbLog_splitFn implemented
   - bugfix:  74_AMAD: fix Issues 475717
   - feature: 77_UWZ: added lang attribute
   - feature: 98_rssFeed: optionally create events for all readings
