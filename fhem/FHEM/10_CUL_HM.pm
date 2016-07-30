@@ -73,7 +73,6 @@ sub CUL_HM_peerChId($$);
 sub CUL_HM_peerChName($$);
 sub CUL_HM_getMId($);
 sub CUL_HM_getRxType($);
-sub CUL_HM_getFlag($);
 sub CUL_HM_getAssChnIds($);
 sub CUL_HM_h2IoId($);
 sub CUL_HM_IoId($);
@@ -283,6 +282,9 @@ sub CUL_HM_updateConfig($){
           $hash->{helper}{dispi}{$t}{"l$_"}{d}=1 foreach (1,2,3,4,5,6);
         }
       }
+    }
+    elsif ($md =~ m/(HM-Dis-EP-WM55)/){
+      CUL_HM_UpdtReadSingle($hash,"state","-",0) if(InternalVal($name,"chanNo",0)>3);
     }
     elsif ($md =~ m/(CCU-FHEM)/){
       $hash->{helper}{role}{vrt} = 1;
@@ -635,6 +637,22 @@ sub CUL_HM_Attr(@) {#################################
         if    ($_ eq "offAtPon"){$hash->{helper}{param}{offAtPon} = 1}
         elsif ($_ eq "onAtRain"){$hash->{helper}{param}{onAtRain} = 1}
         else {return "param $_ unknown, use offAtPon or onAtRain";}
+      }
+    }
+    elsif ($md eq "HM-Dis-EP-WM55" && $chn eq "03"){#reWriteDislay
+      if ($cmd eq "set"){
+        if ($attrVal =~ m/(^reWriteDislay(..)$)/){# no action, just set
+          my $delay = substr($attrVal,10,2);
+          if($delay < 1 || $delay >99){
+            return "invalid $delay- select between reWriteDislay01 and reWriteDislay99";
+          }
+        }
+        else{
+          return "attribut param $attrVal not valid for $name. Only reWriteDislayxx allowed";
+        }
+      }
+      else{
+        delete $hash->{helper}{vd}{msgRed};
       }
     }
     elsif ($st eq "virtual"){
@@ -2117,6 +2135,16 @@ sub CUL_HM_Parse($$) {#########################################################
         }
       }
     }
+    if($mh{md} eq "HM-Dis-EP-WM55"){
+      my $disName = InternalVal($mh{devN},"channel_03",undef);
+      if (defined $disName ){
+        if (AttrVal($disName,"param","") =~ m/reWriteDislay(..)/){
+          my $delay = $1;
+          RemoveInternalTimer($disName.":reWriteDislay");
+          InternalTimer(gettimeofday()+$delay,"CUL_HM_reWriteDislay", $disName.":reWriteDislay", 0);
+        }
+      }
+    }
     else{# could be an Em8
       my($chn,$cnt,$state,$err);
       if($mh{mTp} eq "41"){
@@ -2147,7 +2175,6 @@ sub CUL_HM_Parse($$) {#########################################################
         push @evtEt,[$mh{shash},1,"contact:$txt$target"];
       }
     }
-
   }
 
   elsif($mh{st} =~ m /^(siren)$/) {############################################
@@ -3076,7 +3103,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           # check for request to get List3 data
           my $reqPeer = $chnhash->{helper}{getCfgList};
           if ($reqPeer){
-            my $flag = CUL_HM_getFlag($mhp->{devH});
+            my $flag = 'A0';
             my $ioId = CUL_HM_IoId($mhp->{devH});
             my @peerID = split(",",(AttrVal($chnName,"peerIDs","")));
             foreach my $l (split ",",$chnhash->{helper}{getCfgListNo}){
@@ -3781,7 +3808,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $devName = InternalVal($name,"device",$name);
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
-  my $flag    = CUL_HM_getFlag($hash); #set burst flag
+  my $flag    = 'A0'; #set flag
   my $cmd     = $a[1];
   my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
   return "" if (!defined $chn);
@@ -4860,10 +4887,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "displayEP" ) { ###############################################
     $state = "displayEP";
+    RemoveInternalTimer($name.":reWriteDislay");# just in case param reWriteDislay used
     my %disp_icons = (
        off    => '80', on => '81', open => '82', closed => '83'
       ,error  => '84', ok => '85', info => '86', newmsg => '87'
       ,svcmsg => '88'
+      ,none   => ''
     );
     my %disp_sounds = (
        off        => 'C0', longlong => 'C1', longshort  => 'C2'
@@ -4898,6 +4927,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                  ."\n  repeat: 1..16 default=1"
                  ."\n  pause: 1..160 default=10"
                  ."\n  signal: ".join(" ",keys(%disp_signals))
+                 ."\n "
+                 ."\n  check for param reWriteDisplayxx: "
                  ; 
     }
     my $snd = '020A';
@@ -4907,10 +4938,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $evtDly = 1;
     foreach my $line (@disp_lines[0..2]) {# only 3 lines
       # Split line into text and icon part separated by comma
-      my ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
+      my ($text, $icon);
       
       $snd .= '12';# start text indicator
       if (defined $line && $line ne '') {
+        ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
          
         # Hex code
         if ($text =~ /^0x[0-9A-F]{2}$/) {
@@ -4935,8 +4967,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         }
       }
     
-      $icon = "off" if (!exists ($disp_icons{$icon}));# Icon
-      $snd .= '13'.$disp_icons{$icon};
+      $snd .= '13'.$disp_icons{$icon} if ($disp_icons{$icon});
       $snd .= '0A';
       
       CUL_HM_UpdtReadBulk($hash,0,"line${lineNr}_text:$text"
@@ -5720,7 +5751,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                 if ($b[1] & !$single);
         }
         else{
-          my $peerFlag = CUL_HM_getFlag($peerHash);
+          my $peerFlag = 'A0';
           if ($dSet){
            CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X00",$peerFlag,$id,$peerDst,$pCh[1],$cmdB,$dst,$b[1]));
            CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X00",$peerFlag,$id,$peerDst,$pCh[2],$cmdB,$dst,$b[2] ));
@@ -5847,7 +5878,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       if($st eq "thermostat"){ # others do not support B112
         CUL_HM_SndCmd($devHash,"++B112$id$dst");
       }
-      else{
+      else{# set burst flag
         my ($pre,$tp,$tail) = unpack 'A2A2A*',$devHash->{cmdStack}[0];
         $devHash->{cmdStack}[0] = sprintf("%s%02X%s",$pre,(hex($tp)|0x10),$tail);
         CUL_HM_ProcessCmdStack($devHash);
@@ -6022,7 +6053,7 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
 }
 sub CUL_HM_getConfig($){
   my $hash = shift;
-  my $flag = CUL_HM_getFlag($hash);
+  my $flag = 'A0';
   my $id = CUL_HM_IoId($hash);
   my $dst = substr($hash->{DEF},0,6);
   my $name = $hash->{NAME};
@@ -6157,7 +6188,7 @@ sub CUL_HM_RemoveHMPair($) {####################################################
 #+++++++++++++++++ Protocol stack, sending, repeat+++++++++++++++++++++++++++++
 sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
   my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content,$prep) = @_;
-  my $flag = CUL_HM_getFlag($hash);
+  my $flag = 'A0';
   my $tl = length($content);
   $chn     = sprintf("%02X",$chn);
   $peerChn = sprintf("%02X",$peerChn);
@@ -7069,12 +7100,6 @@ sub CUL_HM_getRxType($) { #in:hash(chn or dev) out:binary coded Rx type
     $hash->{helper}{rxType} = $rxtEntity if ($MId);#store if ID is prooven
   }
   return $rxtEntity;
-}
-sub CUL_HM_getFlag($) {#mFlg 'A0' or 'B0' for burst/normal devices
-  # currently not supported is the wakeupflag since it is hardly used
-  return 'A0'; #burst mode implementation changed
-  my ($hash) = @_;
-  return (CUL_HM_getRxType($hash) & 0x02)?"B0":"A0"; #set burst flag
 }
 sub CUL_HM_getAssChnIds($) { #in: name out:ID list of assotiated channels
   # if it is a channel only return itself
@@ -8737,6 +8762,11 @@ sub CUL_HM_motionCheck($){#
   }
 }
 
+sub CUL_HM_reWriteDislay($){
+  my ($name) = split(":",shift);#  uncertain:$name:$reading:$value 
+  CUL_HM_Set($defs{$name},$name,"displayEP",":::");
+}
+
 sub CUL_HM_getAttr($$$){#return attrValue - consider device if empty
   my ($name,$attrName,$default) = @_;
   my $val;
@@ -9880,6 +9910,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               <B>repetition</B> 0..15 <br>
               <B>pause</B> 1..160<br>
               <B>signal</B> signal color to be displayed<br>
+              <br>
+              <B>Note: param reWriteDisplayxx</B> <br>
+              <li>
+                upon button press the device will overwrite the 3 middles lines. When set <br>
+                attr chan param reWriteDisplayxx<br>
+                the 3 lines will be rewritten to the latest value after xx seconds. xx is between 01 and 99<br>
+              </li>
+              
             </li>
           </ul><br>
         </li>
@@ -11225,6 +11263,14 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
               <B>repetition</B> 0..15 <br>
               <B>pause</B> 1..160<br>
               <B>signal</B> Signalfarbe zum Anzeigen<br>
+              <br>
+              <B>Note: param reWriteDisplayxx</B> <br>
+              <li>
+                Beim Druck einer Taste ueberschreibt das Geraet diemittleren 3 Zeilen. Wenn da Attribut <br>
+                attr chan param reWriteDisplayxx<br>
+                gesetzt ist werden die 3 Zeilen nach xx Sekunden auf den Orginalwert zurück geschrieben.<br>
+              </li>
+              
             </li>
           </ul><br>
         </li>
