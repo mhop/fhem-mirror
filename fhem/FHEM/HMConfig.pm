@@ -815,7 +815,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   showWeekday     =>{a=> 14.7,s=>0.1,l=>7,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"show weekday"                         ,lit=>{off=>0,on=>1}},
                                                     
   #hyst2point addr is 15 according to XML - not to my device. add "bug" register justin case
-  hyst2pointBug   =>{a=> 15.0,s=>0.5,l=>7,min=>0    ,max=>2     ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
+  hyst2pointRead  =>{a=> 15.0,s=>0.5,l=>7,min=>0    ,max=>2     ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
   hyst2point      =>{a=> 15.0,s=>0.5,l=>7,min=>0    ,max=>2     ,c=>''         ,f=>'10'    ,u=>'C'   ,d=>1,t=>"hysteresis range",},
   heatCool        =>{a=> 15.7,s=>0.1,l=>7,min=>0    ,max=>1     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select heating or cooling"            ,lit=>{heating=>0,cooling=>1}},
   weekPrgSel      =>{a=> 16.0,s=>1.0,l=>7,min=>0    ,max=>2     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"select week program"                  ,lit=>{prog1=>0,prog2=>1,prog3=>2}},
@@ -1227,7 +1227,7 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
                          ,noMinMax4Manu   =>1,daylightSaveTime=>1,sendWeatherData =>1
                          ,modePrioParty   =>1,modePrioManu    =>1,weekPrgSel      =>1
                          }
- ,"HM-TC-IT-WM-W-EU07"=>{ hyst2point      =>1,hyst2pointBug   =>1}
+ ,"HM-TC-IT-WM-W-EU07"=>{ hyst2point      =>1,hyst2pointRead  =>1}
  ,"HM-ES-PMSw1-Pl01"  =>{ OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1
                          ,SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1
                          ,CtValLo         =>1,CtValHi         =>1
