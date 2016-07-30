@@ -641,7 +641,7 @@ sub CUL_HM_Attr(@) {#################################
     }
     elsif ($md eq "HM-Dis-EP-WM55" && $chn eq "03"){#reWriteDislay
       if ($cmd eq "set"){
-        if ($attrVal =~ m/(^reWriteDislay(..)$)/){# no action, just set
+        if ($attrVal =~ m/(^reWriteDislay([0-9][0-9])$)/){# no action, just set
           my $delay = substr($attrVal,10,2);
           if($delay < 1 || $delay >99){
             return "invalid $delay- select between reWriteDislay01 and reWriteDislay99";
