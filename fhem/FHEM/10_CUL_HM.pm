@@ -639,16 +639,16 @@ sub CUL_HM_Attr(@) {#################################
         else {return "param $_ unknown, use offAtPon or onAtRain";}
       }
     }
-    elsif ($md eq "HM-Dis-EP-WM55" && $chn eq "03"){#reWriteDislay
+    elsif ($md eq "HM-Dis-EP-WM55" && $chn eq "03"){#reWriteDisplay
       if ($cmd eq "set"){
-        if ($attrVal =~ m/(^reWriteDislay([0-9][0-9])$)/){# no action, just set
-          my $delay = substr($attrVal,10,2);
+        if ($attrVal =~ m/^reWriteDisplay([0-9][0-9])$/){# no action, just set
+          my $delay = $1;
           if($delay < 1 || $delay >99){
-            return "invalid $delay- select between reWriteDislay01 and reWriteDislay99";
+            return "invalid $delay- select between reWriteDisplay01 and reWriteDisplay99";
           }
         }
         else{
-          return "attribut param $attrVal not valid for $name. Only reWriteDislayxx allowed";
+          return "attribut param $attrVal not valid for $name. Only reWriteDisplayxx allowed";
         }
       }
       else{
@@ -2138,10 +2138,10 @@ sub CUL_HM_Parse($$) {#########################################################
     if($mh{md} eq "HM-Dis-EP-WM55"){
       my $disName = InternalVal($mh{devN},"channel_03",undef);
       if (defined $disName ){
-        if (AttrVal($disName,"param","") =~ m/reWriteDislay(..)/){
+        if (AttrVal($disName,"param","") =~ m/reWriteDisplay(..)/){
           my $delay = $1;
-          RemoveInternalTimer($disName.":reWriteDislay");
-          InternalTimer(gettimeofday()+$delay,"CUL_HM_reWriteDislay", $disName.":reWriteDislay", 0);
+          RemoveInternalTimer($disName.":reWriteDisplay");
+          InternalTimer(gettimeofday()+$delay,"CUL_HM_reWriteDisplay", $disName.":reWriteDisplay", 0);
         }
       }
     }
@@ -4887,7 +4887,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "displayEP" ) { ###############################################
     $state = "displayEP";
-    RemoveInternalTimer($name.":reWriteDislay");# just in case param reWriteDislay used
+    RemoveInternalTimer($name.":reWriteDisplay");# just in case param reWriteDisplay used
     my %disp_icons = (
        off    => '80', on => '81', open => '82', closed => '83'
       ,error  => '84', ok => '85', info => '86', newmsg => '87'
@@ -8762,7 +8762,7 @@ sub CUL_HM_motionCheck($){#
   }
 }
 
-sub CUL_HM_reWriteDislay($){
+sub CUL_HM_reWriteDisplay($){
   my ($name) = split(":",shift);#  uncertain:$name:$reading:$value 
   CUL_HM_Set($defs{$name},$name,"displayEP",":::");
 }
