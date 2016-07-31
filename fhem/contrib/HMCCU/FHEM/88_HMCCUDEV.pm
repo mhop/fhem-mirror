@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 3.2
+#  Version 3.3
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -34,6 +34,7 @@
 #  attr <name> ccureadings { 0 | 1 }
 #  attr <name> ccureadingformat { address | name }
 #  attr <name> ccureadingfilter <filter-rule>[,...]
+#  attr <name> ccuscaleval <datapoint>:<factor>[,...]
 #  attr <name> ccuverify { 0 | 1 | 2}
 #  attr <name> controldatapoint <channel-number>.<datapoint>
 #  attr <name> disable { 0 | 1 }
@@ -75,7 +76,7 @@ sub HMCCUDEV_Initialize ($)
 	$hash->{GetFn} = "HMCCUDEV_Get";
 	$hash->{AttrFn} = "HMCCUDEV_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter:textField-long ccureadingformat:name,address ccureadings:0,1 ccuget:State,Value ccuverify:0,1,2 disable:0,1 mapdatapoints:textField-long statevals substitute statechannel statedatapoint controldatapoint stripnumber:0,1,2 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter:textField-long ccureadingformat:name,address ccureadings:0,1 ccuget:State,Value ccuscaleval ccuverify:0,1,2 disable:0,1 mapdatapoints:textField-long statevals substitute statechannel statedatapoint controldatapoint stripnumber:0,1,2 ". $readingFnAttributes;
 }
 
 #####################################
@@ -292,10 +293,11 @@ sub HMCCUDEV_Set ($@)
 
 	if ($opt eq 'datapoint') {
 		my $objname = shift @a;
-		my $objvalue = join ('%20', @a);
+#		my $objvalue = join ('%20', @a);
+		my $objvalue = shift @a;
 
 		if (!defined ($objname) || $objname !~ /^[0-9]+\..+$/ || !defined ($objvalue)) {
-			return HMCCU_SetError ($hash, "Usage: set $name datapoint {channel-number}.{datapoint} {value} [...]");
+			return HMCCU_SetError ($hash, "Usage: set $name datapoint {channel-number}.{datapoint} {value}");
 		}
 		return HMCCU_SetError ($hash, -8) if (!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, 
 		   $hash->{ccuaddr}, $objname, 2));
@@ -323,10 +325,10 @@ sub HMCCUDEV_Set ($@)
 	}
 	elsif ($opt =~ /^($hash->{statevals})$/) {
 		my $cmd = $1;
-		my $objvalue = ($cmd ne 'devstate') ? $cmd : join ('%20', @a);
+		my $objvalue = ($cmd ne 'devstate') ? $cmd : shift @a;
 
 		return HMCCU_SetError ($hash, "No state channel specified") if ($statechannel eq '');
-		return HMCCU_SetError ($hash, "Usage: set $name devstate {value} [...]") if (!defined ($objvalue));
+		return HMCCU_SetError ($hash, "Usage: set $name devstate {value}") if (!defined ($objvalue));
 
 		$objvalue = HMCCU_Substitute ($objvalue, $statevals, 1, '');
 
@@ -381,21 +383,39 @@ sub HMCCUDEV_Set ($@)
 		return HMCCU_SetError ($hash, "No state channel specified") if ($statechannel eq '');
 		return HMCCU_SetError ($hash, "No state value for 'on' defined")
 		   if ("on" !~ /($hash->{statevals})/);
-		return HMCCU_SetError ($hash, "Parameter ON_TIME not available in channel $statechannel")
-		   if (!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $statechannel, "ON_TIME", 2));
 			
 		my $timespec = shift @a;
-		return HMCCU_SetError ($hash, "Usage: set $name on-timer {seconds}") if (!defined ($timespec));
+		return HMCCU_SetError ($hash, "Usage: set $name on-for-timer {on-time} [{ramp-time}]")
+		   if (!defined ($timespec));
 
+		my $swrtdpt = '';
+		my $ramptime = shift @a;
+		if (defined ($ramptime)) {
+			$swrtdpt = HMCCU_GetSwitchDatapoint ($hash, $hash->{ccutype}, 'ramptime');
+			return HMCCU_SetError ($hash, "Can't find ramp-time datapoint for device type")
+			   if ($swrtdpt eq '');
+		}
+		
+		my $swotdpt = HMCCU_GetSwitchDatapoint ($hash, $hash->{ccutype}, 'ontime');
+		return HMCCU_SetError ($hash, "Can't find on-time datapoint for device type")
+		   if ($swotdpt eq '');
+		
 		# Set on time		
-		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$statechannel.'.ON_TIME';
+		my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$swotdpt;
 		$rc = HMCCU_SetDatapoint ($hash, $objname, $timespec);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		
+		# Set ramp time
+		if ($swrtdpt ne '') {
+			my $objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$swrtdpt;
+			$rc = HMCCU_SetDatapoint ($hash, $objname, $ramptime);
+			return HMCCU_SetError ($hash, $rc) if ($rc < 0);
+		}
 
 		# Set state
 		$objname = $hash->{ccuif}.'.'.$hash->{ccuaddr}.':'.$statechannel.'.'.$statedatapoint;
 		my $objvalue = HMCCU_Substitute ("on", $statevals, 1, '');
-		$rc = HMCCU_SetDatapoint ($hash, $objname, $timespec);
+		$rc = HMCCU_SetDatapoint ($hash, $objname, $objvalue);
 		return HMCCU_SetError ($hash, $rc) if ($rc < 0);
 		
 		HMCCU_SetState ($hash, "OK");
@@ -680,9 +700,9 @@ sub HMCCUDEV_SetError ($$)
       <li>set &lt;name&gt; defaults<br/>
    		Set default attributes for CCU device type.
       </li><br/>
-      <li>set &lt;name&gt; on-for-timer &lt;seconds&gt;<br/>
-         Switch device on for specified time. Requires that 'statechannel' is set and
-         contains datapoint ON_TIME. In addition 'statevals' must contain value 'on'.
+      <li>set &lt;name&gt; on-for-timer &lt;seconds&gt; &lt;seconds&gt;<br/>
+         Switch device on for specified time. Requires that device contains a datapoint
+         ON_TIME and optionally RAMP_TIME. Attribute 'statevals' must contain value 'on'.
       </li><br/>
       <li>set &lt;name&gt; &lt;statevalue&gt; <br/>
          State of a CCU device channel is set to 'statevalue'. Channel must
@@ -760,6 +780,11 @@ sub HMCCUDEV_SetError ($$)
       <li>ccureadingformat &lt;address | name&gt; <br/>
          Set format of readings. Default is 'name'.
       </li><br/>
+      <li>ccuscaleval &lt;datapoint&gt;:&lt;factor&gt;[,...] <br/>
+         Scale datapoint values before executing set datapoint commands or after executing get
+         datapoint commands. During get the value read from CCU is devided by factor. During set
+         the value is multiplied by factor.
+      </li><br/>
       <li>ccuverify &lt;0 | 1 | 2&gt;<br/>
          If set to 1 a datapoint is read for verification after set operation. If set to 2 the
          corresponding reading will be set to the new value directly after setting a datapoint
@@ -792,8 +817,8 @@ sub HMCCUDEV_SetError ($$)
          <code>attr my_switch statevals on:true,off:false</code><br/>
          <code>set my_switch on</code>
       </li><br/>
-      <li>substitude &lt;subst-rule&gt;[;...]<br/>
-         Define substitions for reading values. Substitutions for parfile values must
+      <li>substitute &lt;subst-rule&gt;[;...]<br/>
+         Define substitutions for reading values. Substitutions for parfile values must
          be specified in parfiles. Syntax of subst-rule is<br/><br/>
          [datapoint!]&lt;regexp&gt;:&lt;text&gt;[,...]
       </li><br/>

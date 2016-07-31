@@ -4,7 +4,7 @@
 #
 #  $Id:$
 #
-#  Version 3.1
+#  Version 3.3
 #
 #  (c) 2016 zap (zap01 <at> t-online <dot> de)
 #
@@ -13,8 +13,8 @@
 #  define <name> HMCCUCHN <ccudev> [readonly]
 #
 #  set <name> control <value>
-#  set <name> datapoint <datapoint> <value> [...]
-#  set <name> devstate <value> [...]
+#  set <name> datapoint <datapoint> <value>
+#  set <name> devstate <value>
 #  set <name> <stateval_cmds>
 #  set <name> toggle
 #  set <name> config <parameter>=<value> [...]
@@ -67,7 +67,7 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{GetFn} = "HMCCUCHN_Get";
 	$hash->{AttrFn} = "HMCCUCHN_Attr";
 
-	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccuverify:0,1,2 ccuget:State,Value controldatapoint disable:0,1 statedatapoint statevals substitute stripnumber:0,1,2 ". $readingFnAttributes;
+	$hash->{AttrList} = "IODev ccureadingfilter ccureadingformat:name,address,datapoint ccureadings:0,1 ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint disable:0,1 statedatapoint statevals substitute stripnumber:0,1,2 ". $readingFnAttributes;
 }
 
 #####################################
@@ -196,7 +196,8 @@ sub HMCCUCHN_Set ($@)
 
 	if ($opt eq 'datapoint') {
 		my $objname = shift @a;
-		my $objvalue = join ('%20', @a);
+#		my $objvalue = join ('%20', @a);
+		my $objvalue = shift @a;
 
 		return HMCCU_SetError ($hash, "Usage: set $name datapoint {datapoint} {value} [...]")
 		   if (!defined ($objname) || !defined ($objvalue));
@@ -225,7 +226,7 @@ sub HMCCUCHN_Set ($@)
 	}
 	elsif ($opt =~ /^($hash->{statevals})$/) {
 		my $cmd = $1;
-		my $objvalue = ($cmd ne 'devstate') ? $cmd : join ('%20', @a);
+		my $objvalue = ($cmd ne 'devstate') ? $cmd : shift @a;
 
 		return HMCCU_SetError ($hash, "Usage: set $name devstate {value}") if (!defined ($objvalue));
 
@@ -474,7 +475,7 @@ sub HMCCUCHN_SetError ($$)
       <li>set &lt;name&gt; toggle<br/>
         Toggles between values defined by attribute 'statevals'.
       </li><br/>
-      <li>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt; [...]<br/>
+      <li>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt;<br/>
         Set value of a datapoint of a CCU device channel.
         <br/><br/>
         Example:<br/>
@@ -525,6 +526,11 @@ sub HMCCUCHN_SetError ($$)
          Only datapoints matching specified expression are stored as readings.<br/>
          Syntax for filter rule is: [channel-no:]RegExp<br/>
          If channel-no is specified the following rule applies only to this channel.
+      </li><br/>
+      <li>ccuscaleval &lt;datapoint&gt;:&lt;factor&gt;[,...] <br/>
+         Scale datapoint values before executing set datapoint commands or after executing get
+         datapoint commands. During get the value read from CCU is devided by factor. During set
+         the value is multiplied by factor.
       </li><br/>
       <li>ccuverify &lt;0 | 1 | 2&gt;<br/>
          If set to 1 a datapoint is read for verification after set operation. If set to 2 the
