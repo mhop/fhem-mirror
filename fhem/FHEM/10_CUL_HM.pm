@@ -4895,12 +4895,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       ,none   => ''
     );
     my %disp_sounds = (
-       off        => 'C0', longlong => 'C1', longshort  => 'C2'
-      ,long2short => 'C3', short    => 'C4', shortshort => 'C5'
+       off        => 'C0', longlong   => 'C1', longshort  => 'C2'
+      ,long2short => 'C3', short      => 'C4', shortshort => 'C5'
       ,long       => 'C6'
     );
     my %disp_signals = (
-       off => 'F0', red => 'F1', green => 'F2', orange => 'F3'
+       off    => 'F0', red    => 'F1', green  => 'F2', orange => 'F3'
     );
     # msg: 'text,icon;text,icon;text,icon'
     my ($msg, $sound, $rep, $pause, $sig) = @a[2..$#a];
@@ -4954,6 +4954,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         }
         # Convert string to hex codes
         else {
+          $text =~ s/\\_/ /g;
           foreach my $ch (split ('', substr ($text, 0, 12))) {
             $snd .= sprintf ("%02X", ord ($ch));
           }
