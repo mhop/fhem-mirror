@@ -2099,10 +2099,14 @@ sub EnOcean_Set($@)
           $switchCmd |= ($d2 << 1) | 0x01;
         }
       }
-      if (defined $sendCmd) {
+      if (defined $sendCmd) {      
         $data = sprintf "%02X", $switchCmd;
         $rorg = "F6";
         Log3 $name, 3, "EnOcean set $name $cmd";
+        if ($updateState) {
+          readingsSingleUpdate($hash, "channel" . $1, $cmd1, 1) if ($cmd1 =~ m/^([A-D])./);        
+          readingsSingleUpdate($hash, "channel" . $1, $cmd2, 1) if ($cmd2 && $cmd2 =~ m/^([A-D])./);        
+        }
         readingsSingleUpdate($hash, ".lastChannel", $lastChannel, 0);
       }
 
