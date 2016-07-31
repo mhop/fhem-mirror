@@ -279,7 +279,7 @@ sub HMinfo_status($){##########################################################
       foreach (keys %{$ehash->{helper}{rssi}}){
         next if($_ !~ m /at_.*$ehash->{IODev}->{NAME}/ );#ignore unused IODev
         $rssiMin{$eName} = $ehash->{helper}{rssi}{$_}{min}
-          if ($rssiMin{$eName} < $ehash->{helper}{rssi}{$_}{min});
+          if ($rssiMin{$eName} > $ehash->{helper}{rssi}{$_}{min});
       }
     }
   }
