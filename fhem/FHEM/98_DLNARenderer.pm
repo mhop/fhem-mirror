@@ -1,6 +1,12 @@
 ############################################################################
-# 2016-07-18, v2.0.0, dominik.karall@gmail.com
+# Author: dominik.karall@gmail.com
 # $Id$
+#
+# v2.0.1 - 20160725
+# - FEATURE: support DIDL-Lite in channel_X attribute (thx@Weissbrotgrill)
+# - FEATURE: automatically generate DIDL-Lite based on URI (thx@Weissbrotgrill)
+# - CHANGE: update CommandRef perl library requirements
+# - BUGFIX: fix ignoreUDNs crash when device gets removed
 #
 # v2.0.0 - 20160718
 # - CHANGE: first official release within fhem repository
@@ -117,6 +123,7 @@ use HTML::Entities;
 use XML::Simple;
 use Data::Dumper;
 use Data::UUID;
+use LWP::UserAgent;
 
 #get UPnP::ControlPoint loaded properly
 my $gPath = '';
@@ -164,7 +171,7 @@ sub DLNARenderer_Define($$) {
   if(@param < 3) {
     #main
     $hash->{UDN} = 0;
-    my $VERSION = "v2.0.0";
+    my $VERSION = "v2.0.1";
     $hash->{VERSION} = $VERSION;
     Log3 $hash, 3, "DLNARenderer: DLNA Renderer $VERSION";
     DLNARenderer_setupControlpoint($hash);
@@ -310,7 +317,7 @@ sub DLNARenderer_speak {
   my $ttsLang = AttrVal($hash->{NAME}, "ttsLanguage", "en");
   return "DLNARenderer: Maximum text length is 100 characters." if(length($ttsText) > 100);
   
-  DLNARenderer_stream($hash, "http://translate.google.com/translate_tts?tl=$ttsLang&client=tw-ob&q=$ttsText");
+  DLNARenderer_stream($hash, "http://translate.google.com/translate_tts?tl=$ttsLang&client=tw-ob&q=$ttsText", "");
 }
 
 sub DLNARenderer_channel {
@@ -319,13 +326,30 @@ sub DLNARenderer_channel {
   if($stream eq "") {
     return "DLNARenderer: Set channel_XX attribute first.";
   }
-  DLNARenderer_stream($hash, $stream);
+  my $meta = "";
+  if (substr($stream,0,10) eq "<DIDL-Lite") {
+    eval {
+      my $xml = XMLin($stream);
+      $meta = $stream;
+      $stream = $xml->{"item"}{"res"}{"content"};
+    };
+
+    if($@) {
+      Log3 $hash, 2, "DLNARenderer: Incorrect DIDL-Lite format, $@"; 
+    }
+  }
+  DLNARenderer_stream($hash, $stream, $meta);
   readingsSingleUpdate($hash, "channel", $channelNr, 1);
 }
 
 sub DLNARenderer_stream {
-  my ($hash, $stream) = @_;
-  DLNARenderer_upnpSetAVTransportURI($hash, $stream);
+  my ($hash, $stream, $meta) = @_;
+  if (!defined($meta)) {
+    DLNARenderer_generateDidlLiteAndPlay($hash, $stream);
+    return undef;
+  }
+  
+  DLNARenderer_upnpSetAVTransportURI($hash, $stream, $meta);
   DLNARenderer_play($hash);
   readingsSingleUpdate($hash, "stream", $stream, 1);
 }
@@ -767,8 +791,9 @@ sub DLNARenderer_upnpPause {
 }
 
 sub DLNARenderer_upnpSetAVTransportURI {
-  my ($hash, $stream) = @_;
-  return DLNARenderer_upnpCallAVTransport($hash, "SetAVTransportURI", 0, $stream, "");
+  my ($hash, $stream, $meta) = @_;
+  if (!defined($meta)) { $meta = ""; }
+  return DLNARenderer_upnpCallAVTransport($hash, "SetAVTransportURI", 0, $stream, $meta);
 }
 
 sub DLNARenderer_upnpStop {
@@ -1332,6 +1357,7 @@ sub DLNARenderer_addedDevice {
 sub DLNARenderer_removedDevice($$) {
   my ($hash, $device) = @_;
   my $deviceHash = DLNARenderer_getHashByUDN($hash, $device->UDN());
+  return undef if(!defined($deviceHash));
   
   readingsSingleUpdate($deviceHash, "presence", "offline", 1);
   readingsSingleUpdate($deviceHash, "state", "offline", 1);
@@ -1397,6 +1423,83 @@ sub DLNARenderer_getAllDLNARenderersWithCaskeid($) {
 ###############################
 ###### UTILITY FUNCTIONS ######
 ###############################
+sub DLNARenderer_generateDidlLiteAndPlay {
+  my ($hash, $stream) = @_;
+  BlockingCall('DLNARenderer_generateDidlLiteBlocking', $hash->{NAME}."|".$stream, 'DLNARenderer_generateDidlLiteBlockingFinished');
+  return undef;
+}
+
+sub DLNARenderer_generateDidlLiteBlockingFinished {
+  my ($string) = @_;
+  
+  return unless (defined($string));
+  
+  my ($name, $stream, $meta) = split("\\|",$string);
+  my $hash = $defs{$name};
+  
+  DLNARenderer_upnpSetAVTransportURI($hash, $stream, $meta);
+  DLNARenderer_play($hash);
+  readingsSingleUpdate($hash, "stream", $stream, 1);
+}
+
+sub DLNARenderer_generateDidlLiteBlocking {
+  my ($string) = @_;
+  my ($name, $stream) = split("\\|", $string);
+  my $hash = $main::defs{$name};
+  my $ret = $name."|".$stream;
+  
+  if(index($stream, "http:") != 0) {
+    return $ret;
+  }
+  
+  my $ua = new LWP::UserAgent(agent => 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1');
+  $ua->max_size(0);
+  my $resp = $ua->get($stream);
+
+  my $didl_header = '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dlna="urn:schemas-dlna-org:metadata-1-0/" xmlns:sec="http://www.sec.co.kr/"><item id="-1" parentID="parent" restricted="1">';
+  my $didl_footer = '</item></DIDL-Lite>';
+
+  $stream = encode_entities($stream);
+
+  my $size = "";
+  my $protocolInfo = "";
+  my $album = $stream;
+  my $title = $stream;
+  my $meta = "";
+
+  if (defined($resp->header('content-length'))) {
+    $size = ' size="'.$resp->header('content-length').'"';
+  }
+
+  my @header = split /;/, $resp->header('content-type');
+  my $contenttype = $header[0];
+
+  if (defined($resp->header('contentfeatures.dlna.org'))) {
+    $protocolInfo = "http-get:*:".$contenttype.":".$resp->header('contentfeatures.dlna.org');
+  } else {
+    $protocolInfo = "http-get:*:".$contenttype.":DLNA.ORG_OP=01;DLNA.ORG_FLAGS=01700000000000000000000000000000";
+  }
+
+  if (defined($resp->header('icy-name'))) {
+    $album = encode_entities($resp->header('icy-name'));
+  }
+
+  if (defined($resp->header('icy-genre'))) {
+    $title = encode_entities($resp->header('icy-genre'));
+  }
+
+  if (substr($contenttype,0,5) eq "audio" or $contenttype eq "application/ogg") {
+    $meta = $didl_header.'<upnp:class>object.item.audioItem.musicTrack</upnp:class><dc:title>'.$title.'</dc:title><upnp:album>'.$album.'</upnp:album><res protocolInfo="'.$protocolInfo.'"'.$size.'>'.$stream.'</res>'.$didl_footer;
+  } elsif (substr($contenttype,0,5) eq "video") {
+    $meta = $didl_header.'<upnp:class>object.item.videoItem</upnp:class><dc:title>'.$title.'</dc:title><upnp:album>'.$album.'</upnp:album><res protocolInfo="'.$protocolInfo.'"'.$size.'>'.$stream.'</res>'.$didl_footer;
+  } else {
+    $meta = "";
+  }
+  $ret .= "|".$meta;
+
+  return $ret;
+}
+
 sub DLNARenderer_newChash($$$) {
   my ($hash,$socket,$chash) = @_;
 
@@ -1459,7 +1562,7 @@ sub DLNARenderer_addSocketsToMainloop {
   DLNARenderer automatically discovers all your MediaRenderer devices in your local network and allows you to fully control them.<br>
   It also supports multiroom audio for Caskeid and Bluetooth Caskeid speakers (e.g. MUNET).<br><br>
         <b>Note:</b> The followig libraries are required for this module:
-		<ul><li>SOAP::Lite</li> <li>LWP::Simple</li> <li>XML::Simple</li><br>
+		<ul><li>SOAP::Lite</li> <li>LWP::Simple</li> <li>XML::Simple</li> <li>XML::Parser::Lite</li> <li>LWP::UserAgent</li><br>
 		</ul>
 
   <a name="DLNARendererdefine"></a>
@@ -1501,7 +1604,8 @@ sub DLNARenderer_addSocketsToMainloop {
   </ul>
   <ul>
     <br><code>set &lt;name&gt; channel 1-10</code><br>
-    Start playing channel X which must be configured as channel_X attribute first.
+    Start playing channel X which must be configured as channel_X attribute first.<br>
+    You can specify your channel also in DIDL-Lite XML format if your player doesn't support plain URIs.
   </ul>
   <ul>
     <br><code>set &lt;name&gt; mute on/off</code><br>
@@ -1592,6 +1696,14 @@ sub DLNARenderer_addSocketsToMainloop {
     Loads the configuration previously saved (e.g. loadGroup LivingRoom).
   </ul>
   <br>
+  
+  <a name="DLNARendererattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <br><code>ignoreUDNs</code><br>
+    Define list (comma or blank separated) of UDNs which should prevent automatic device creation.<br>
+    It is important that uuid: is also part of the UDN and must be included.
+  </ul>
 
 </ul>
 
