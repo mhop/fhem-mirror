@@ -178,7 +178,7 @@ sub ONKYO_AVR_Define($$$) {
             "ONKYO_AVR_DevInit",
             sub() {
                 my ( $hash, $err ) = @_;
-                Log3 $name, 2, "ONKYO_AVR $name: $err" if ($err);
+                Log3 $name, 4, "ONKYO_AVR $name: $err" if ($err);
             }
         );
     }
@@ -876,7 +876,7 @@ sub ONKYO_AVR_Read($) {
     elsif ( $cmd eq "net-usb-device-status" ) {
         if ( $value =~ /^(.)(.)(.)$/ ) {
 
-            # networkConnection
+            # network-connection
             my $netConnStatus = "none";
             $netConnStatus = "ethernet" if ( $1 eq "E" );
             $netConnStatus = "wireless" if ( $1 eq "W" );
@@ -1532,7 +1532,7 @@ sub ONKYO_AVR_Ready($) {
             $hash, 1, undef,
             sub() {
                 my ( $hash, $err ) = @_;
-                Log3 $name, 2, "ONKYO_AVR $name: $err" if ($err);
+                Log3 $name, 4, "ONKYO_AVR $name: $err" if ($err);
             }
         );
 
