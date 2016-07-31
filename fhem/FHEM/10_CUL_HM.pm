@@ -2965,7 +2965,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       $success = "yes";
       $reply = "ACK";
     }
-    if ($success eq "yes"){# search if a trigger was accepted 
+    if (defined $success && $success eq "yes"){# search if a trigger was accepted 
       if($mhp->{dstH}{helper}{ack}{$mhp->{devN}}){
         my ($dChN,$mNo) = split(":",$mhp->{dstH}{helper}{ack}{$mhp->{devN}});
         my $rv = ReadingsVal($dChN,"triggerTo_$mhp->{devN}",undef);
