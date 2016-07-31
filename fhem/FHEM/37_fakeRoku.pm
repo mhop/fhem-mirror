@@ -224,6 +224,8 @@ fakeRoku_startListener($)
 
   fakeRoku_stopListener($hash);
 
+  return undef if( AttrVal($name, "disable", 0 ) == 1 );
+
   my $port = AttrVal($name, 'httpPort', 0);
   if( my $socket = IO::Socket::INET->new(LocalPort=>$port, Listen=>10, Blocking=>0, ReuseAddr=>1, ReusePort=>defined(&ReusePort)?1:0) ) {
 
