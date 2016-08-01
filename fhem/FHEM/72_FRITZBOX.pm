@@ -1389,19 +1389,20 @@ sub FRITZBOX_Readout_Run_Web($)
    }
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->radioCount", $runNo;
 
-# Create WLAN-List
+# Create WLAN-List if 
    my %wlanList;
-   foreach ( @{ $result->{wlanList} } ) {
-      my $mac = $_->{mac};
-      $mac =~ s/:/_/g;
-      $wlanList{$mac}{speed} = $_->{speed};
-      $wlanList{$mac}{speed_rx} = $_->{speed_rx};
-      $wlanList{$mac}{rssi} = $_->{rssi};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed", $_->{speed};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed_rx", $_->{speed_rx};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->rssi", $_->{rssi};
+   if ( ref $result->{wlanList} eq 'ARRAY' ) {
+      foreach ( @{ $result->{wlanList} } ) {
+         my $mac = $_->{mac};
+         $mac =~ s/:/_/g;
+         $wlanList{$mac}{speed} = $_->{speed};
+         $wlanList{$mac}{speed_rx} = $_->{speed_rx};
+         $wlanList{$mac}{rssi} = $_->{rssi};
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed", $_->{speed};
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed_rx", $_->{speed_rx};
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->rssi", $_->{rssi};
+      }
    }
-   
 # Create LanDevice list and delete inactive devices
    my %oldLanDevice;
    #collect current mac-readings (to delete the ones that are inactive or disappeared)
