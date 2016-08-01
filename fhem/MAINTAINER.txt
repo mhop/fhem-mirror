@@ -49,7 +49,7 @@ FHEM/09_USF1000.pm           borisneubert         http://forum.fhem.de SlowRF
 FHEM/10_CUL_HM.pm            martinp876           http://forum.fhem.de HomeMatic
 FHEM/10_CUL_IR.pm            odroegehorn          http://forum.fhem.de SlowRF
 FHEM/10_DUOFERNSTICK         telekatz             http://forum.fhem.de Sonstige Systeme
-FHEM/10_EIB.pm               andi291		  http://forum.fhem.de KNX/EIB
+FHEM/10_EIB.pm               andi291              http://forum.fhem.de KNX/EIB
 FHEM/10_KNX.pm               andi291              http://forum.fhem.de KNX/EIB
 FHEM/10_EnOcean.pm           klaus-schauer        http://forum.fhem.de EnOcean
 FHEM/10_FBDECT.pm            rudolfkoenig         http://forum.fhem.de FRITZ!Box
@@ -123,14 +123,14 @@ FHEM/26_tahoma.pm            mike3436             http://forum.fhem.de Sonstige 
 FHEM/30_DUOFERN              telekatz             http://forum.fhem.de Sonstige Systeme
 FHEM/30_HUEBridge.pm         justme1968           http://forum.fhem.de Beleuchtung
 FHEM/30_LIGHTIFY.pm          justme1968           http://forum.fhem.de Beleuchtung
-FHEM/30_MilightBridge.pm     mattwire/markus-m    http://forum.fhem.de Beleuchtung
+FHEM/30_MilightBridge.pm     mattwire             http://forum.fhem.de Beleuchtung
 FHEM/30_ENECSYSGW.pm         akw                  http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_dimmer.pm    risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_switch.pm    risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_temp.pm      risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/30_pilight_raw.pm       risiko               http://forum.fhem.de Sonstige Systeme
 FHEM/31_HUEDevice.pm         justme1968           http://forum.fhem.de Beleuchtung
-FHEM/31_MilightDevice.pm     mattwire/markus-m    http://forum.fhem.de Beleuchtung
+FHEM/31_MilightDevice.pm     mattwire             http://forum.fhem.de Beleuchtung
 FHEM/31_ENECSYSINV.pm        akw                  http://forum.fhem.de Sonstige Systeme
 FHEM/31_LightScene.pm        justme1968           http://forum.fhem.de Automatisierung
 FHEM/32_SYSSTAT.pm           justme1968           http://forum.fhem.de Unterstuetzende Dienste
@@ -165,7 +165,7 @@ FHEM/37_SHCdev.pm            rr2000               http://forum.fhem.de Sonstige 
 FHEM/37_fakeRoku.pm          justme1968           http://forum.fhem.de Multimedia
 FHEM/37_harmony.pm           justme1968           http://forum.fhem.de Multimedia
 FHEM/37_plex.pm              justme1968           http://forum.fhem.de Multimedia
-FHEM/38_netatmo.pm           justme1968           http://forum.fhem.de Sonstige Systeme
+FHEM/38_netatmo.pm           markus-m             http://forum.fhem.de/index.php/topic,53500.0.html
 FHEM/38_CO20.pm              markus-m             http://forum.fhem.de Sonstiges
 FHEM/38_JawboneUp.pm         domschl              http://forum.fhem.de Sonstiges
 FHEM/40_RFXCOM.pm            wherzig              http://forum.fhem.de RFXTRX
