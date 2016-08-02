@@ -127,7 +127,7 @@ sub TEK603_undef($$) {
 
 	DevIo_CloseDev($hash);
 	$hash->{PORTSTATE} = $hash->{STATE};
-	
+
 	return undef;
 }
 
@@ -151,7 +151,7 @@ sub TEK603_read($) {
 	return '' if(!defined($buf));
 
 	# convert to hex string
-	$hash->{buffer} = unpack ('H*', $buf);	
+	$hash->{buffer} = unpack ('H*', $buf);
 
 	my $lenght		= hex(substr($hash->{buffer},4,4))*2;
 	#my $cmd            	= substr($hash->{buffer},8,2);
@@ -169,21 +169,25 @@ sub TEK603_read($) {
 	return '' if($crc ne $digest);
 
 	# payload
-        my $temp                = sprintf '%.2f', ((hex(substr($payload, 0,2)) - 40 - 32) / 1.8);
-	my $Ullage         	= hex(substr($payload,2,2)) * 256 + hex(substr($payload,4,2));
-	my $RemainingUsableLevel= hex(substr($payload,6,2)) * 256 + hex(substr($payload,8,2));
-	my $TotalUsableCapacity = hex(substr($payload,10,2)) * 256 + hex(substr($payload,12,2));
+	my $temp                   = sprintf '%.2f', ((hex(substr($payload, 0,2)) - 40 - 32) / 1.8);
+	my $Ullage         	       = hex(substr($payload,2,2)) * 256 + hex(substr($payload,4,2));
+	my $RemainingUsableLevel   = hex(substr($payload,6,2)) * 256 + hex(substr($payload,8,2));
+	my $TotalUsableCapacity    = hex(substr($payload,10,2)) * 256 + hex(substr($payload,12,2));
 
 	return '' if($temp eq "-40.00" && $Ullage eq "0"); # TankLevel=NO_DATA
 
+	# Calculations
+	my $RemainingUsablePercent = round($RemainingUsableLevel / $TotalUsableCapacity * 100,01);
+
 	#Log3 $name, 5, $hash->{buffer};
-	Log3 $name, 5, "Time:$time Temp:$temp Ullage:$Ullage RemainingUsableLevel:$RemainingUsableLevel TotalUsableCapacity:$TotalUsableCapacity"; 
+	Log3 $name, 5, "Time:$time Temp:$temp Ullage:$Ullage RemainingUsableLevel:$RemainingUsableLevel RemainingUsablePercent:$RemainingUsablePercent TotalUsableCapacity:$TotalUsableCapacity";
 
     	readingsBeginUpdate($hash);
     	readingsBulkUpdate($hash, "Time", $time);
     	readingsBulkUpdate($hash, "Temperature", $temp);
     	readingsBulkUpdate($hash, "Ullage", $Ullage);
     	readingsBulkUpdate($hash, "RemainingUsableLevel", $RemainingUsableLevel);
+    	readingsBulkUpdate($hash, "RemainingUsablePercent", $RemainingUsablePercent);
     	readingsBulkUpdate($hash, "TotalUsableCapacity", $TotalUsableCapacity);
     	readingsEndUpdate($hash, 1);
 }
@@ -192,10 +196,10 @@ sub TEK603_read($) {
 sub TEK603_reconnect($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	
+
 	Log3 $name, 3, "Wrong Data received. We reconnect Device";
 
-	# Sometime the device sends a lot of waste and we must reconnect. 
+	# Sometime the device sends a lot of waste and we must reconnect.
 	DevIo_CloseDev($hash);
 	$hash->{PORTSTATE} = $hash->{STATE};
 
@@ -212,7 +216,7 @@ sub TEK603_reconnect($) {
 <a name="TEK603"></a>
 <h3>TEK603</h3>
 <ul>
-    The TEK603 is a fhem module for the Tekelek TEK603 Eco Monitor a liquid level monitor designed for residential and small commercial applications.  
+    The TEK603 is a fhem module for the Tekelek TEK603 Eco Monitor a liquid level monitor designed for residential and small commercial applications.
     It works in conjunction with a TEK653 Sonic transmitter mounted on the top of the tank.
 
 
@@ -224,7 +228,7 @@ sub TEK603_reconnect($) {
   sudo apt-get install libdigest-crc-perl<br />
   </code>
   <br /><br />
-  
+
   <a name="TEK603_Define"></a>
   <b>Define</b>
   <ul>
@@ -250,6 +254,8 @@ sub TEK603_reconnect($) {
     Sensor Measured Ullage</li>
     <li>RemainingUsableLevel<br />
     This is the usable level, with deductions due to the sensor offset and outlet height. (Liters)</li>
+    <li>RemainingUsablePercent<br />
+    This is the usable level in percent (calculated from RemainingUsableLevel and TotalUsableCapacity)</li>
     <li>TotalUsableCapacity<br />
     This is the usable volume, with deductions due to the sensor offset and outlet height. (Liters)</li>
   </ul><br />
@@ -260,6 +266,4 @@ sub TEK603_reconnect($) {
 =end html
 
 =cut
-
-
 
