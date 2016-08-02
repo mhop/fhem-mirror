@@ -60,7 +60,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.4.2";      # ungerade Entwicklerversion Bsp.: 1.1, 1.3, 2.5
+my $version         = "1.4.5";      # ungerade Entwicklerversion Bsp.: 1.1, 1.3, 2.5
 
 my $countrycode = "DE";
 my $plz = "77777";
@@ -273,7 +273,10 @@ sub UWZ_Initialize($) {
                         "maps ".
                         "humanreadable:0,1 ".
                         "htmlattr ".
+                        "htmlsequence:ascending,descending ".
                         "lang ".
+                        "sort_readings_by:severity,start ".
+                        "localiconbase ".
                         $readingFnAttributes;
    
     foreach my $d(sort keys %{$modules{UWZ}{defptr}}) {
@@ -291,7 +294,7 @@ sub UWZ_Define($$) {
     my @a    = split( "[ \t][ \t]*", $def );
    
     return "Error: Perl moduls ".$missingModul."are missing on this system" if( $missingModul );
-    return "Wrong syntax: use define <name> UWZ <CountryCode> <PLZ> <Interval> "  if (int(@a) != 5 and  ((lc $a[2]) ne "search"));
+    return "Wrong syntax: use define <name> UWZ [CountryCode] [PLZ] [Interval] "  if (int(@a) != 5 and  ((lc $a[2]) ne "search"));
 
     if ((lc $a[2]) ne "search") {
 
@@ -568,7 +571,7 @@ sub UWZ_Done($) {
     delete( $hash->{helper}{RUNNING_PID} );  
 
     UWZ_Log $hash, 4, "Delete old Readings"; 
-    CommandDeleteReading(undef, "$hash->{NAME} Warn_?_.*");
+    #CommandDeleteReading(undef, "$hash->{NAME} Warn_?_.*");
 
 
     # UnWetterdaten speichern
@@ -587,6 +590,11 @@ sub UWZ_Done($) {
       
         if (keys %values > 0) {
             my $newState;
+            for my $Counter ($values{WarnCount} .. 9) {
+                CommandDeleteReading(undef, "$hash->{NAME} Warn_${Counter}_.*");
+            }
+
+
             if (defined $values{WarnCount}) {
                 # Message by CountryCode
                 
@@ -596,7 +604,7 @@ sub UWZ_Done($) {
             } else {
                 $newState = "Error: Could not capture all data. Please check CountryCode and PLZ.";
             }
-            
+
             readingsBulkUpdate($hash, "state", $newState);
             readingsBulkUpdate( $hash, "lastConnection", keys( %values )." values captured in ".$values{durationFetchReadings}." s" );
             UWZ_Log $hash, 4, keys( %values )." values captured";
@@ -697,6 +705,15 @@ sub UWZ_Run($) {
 
     my $uwz_warncount = scalar(@{ $uwz_warnings->{'results'} });
     UWZ_Log $hash, 4, "There are ".$uwz_warncount." warnings active";
+    my $sortby = AttrVal( $name, 'sort_readings_by',"" );
+    my @sorted;
+    if ( $sortby ne "severity" ) {
+        UWZ_Log $hash, 4, "Sorting by dtgStart";
+        @sorted =  sort { $a->{dtgStart} <=> $b->{dtgStart} } @{ $uwz_warnings->{'results'} };
+    } else {
+        UWZ_Log $hash, 4, "Sorting by severity";
+        @sorted =  sort { $a->{severity} <=> $b->{severity} } @{ $uwz_warnings->{'results'} };
+    }
 
     my $message;
     my $i=0;
@@ -753,7 +770,22 @@ sub UWZ_Run($) {
                             "11" => "rot",
                             "12" => "violett" );
 
-    foreach my $single_warning (@{ $uwz_warnings->{'results'} }) {
+    my @uwzmaxlevel;
+    #foreach my $single_warning (@{ $uwz_warnings->{'results'} }) {
+    foreach my $single_warning (@sorted) {
+
+        push @uwzmaxlevel, UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'});
+
+        UWZ_Log $hash, 4, "Warn_".$i."_EventID: ".$single_warning->{'payload'}{'id'};
+        $message .= "Warn_".$i."_EventID|".$single_warning->{'payload'}{'id'}."|";
+
+
+        my $chopcreation = substr($single_warning->{'payload'}{'creation'},0,10);
+        $chopcreation = $chopcreation;
+
+        UWZ_Log $hash, 4, "Warn_".$i."_Creation: ".$chopcreation; 
+        $message .= "Warn_".$i."_Creation|".$chopcreation."|"; 
+
 
         UWZ_Log $hash, 4, "Warn_".$i."_Type: ".$single_warning->{'type'};
         $message .= "Warn_".$i."_Type|".$single_warning->{'type'}."|";
@@ -784,6 +816,14 @@ sub UWZ_Run($) {
             UWZ_Log $hash, 4, "Warn_".$i."_End_Time: ".strftime("%H:%M", localtime($single_warning->{'dtgEnd'}));
             $message .= "Warn_".$i."_End_Time|".strftime("%H:%M", localtime($single_warning->{'dtgEnd'}))."|";
 
+
+            UWZ_Log $hash, 4, "Warn_".$i."_Creation_Date: ".strftime("%d.%m.%Y", localtime($chopcreation));
+            $message .= "Warn_".$i."_Creation_Date|".strftime("%d.%m.%Y", localtime($chopcreation))."|";
+
+            UWZ_Log $hash, 4, "Warn_".$i."_Creation_Time: ".strftime("%H:%M", localtime($chopcreation));
+            $message .= "Warn_".$i."_Creation_Time|".strftime("%H:%M", localtime($chopcreation))."|";
+
+   
 
             # Begin Language by AttrVal
             if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
@@ -819,6 +859,12 @@ sub UWZ_Run($) {
         UWZ_Log $hash, 4, "Warn_".$i."_levelName: ".$single_warning->{'payload'}{'levelName'};
         $message .= "Warn_".$i."_levelName|".$single_warning->{'payload'}{'levelName'}."|";
         
+        UWZ_Log $hash, 4, "Warn_".$i."_AltitudeMin: ".$enc->decode($single_warning->{'payload'}{'altMin'});
+        $message .= "Warn_".$i."_AltitudeMin|".$converter->convert($single_warning->{'payload'}{'altMin'})."|";
+
+        UWZ_Log $hash, 4, "Warn_".$i."_AltitudeMax: ".$enc->decode($single_warning->{'payload'}{'altMax'});
+        $message .= "Warn_".$i."_AltitudeMax|".$converter->convert($single_warning->{'payload'}{'altMax'})."|";
+
         my $uclang = "EN";
         if (AttrVal( $name, 'lang',undef) ) {
             $uclang = uc AttrVal( $name, 'lang','');
@@ -836,10 +882,16 @@ sub UWZ_Run($) {
         UWZ_Log $hash, 4, "Warn_".$i."_ShortText: ".$enc->decode($single_warning->{'payload'}{'translationsShortText'}{$uclang});
         $message .= "Warn_".$i."_ShortText|".$converter->convert($single_warning->{'payload'}{'translationsShortText'}{$uclang})."|";
 
+###
+        if (AttrVal( $name, 'localiconbase',undef) ) {
+            UWZ_Log $hash, 4, "Warn_".$i."_IconURL: ".AttrVal( $name, 'localiconbase',undef).$typenames{ $single_warning->{'type'} }."-".$single_warning->{'severity'}.".png";
+            $message .= "Warn_".$i."_IconURL|".AttrVal( $name, 'localiconbase',undef).$typenames{ $single_warning->{'type'} }."-".UWZ_GetSeverityColor($hash, UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'} )).".png|";
 
-        UWZ_Log $hash, 4, "Warn_".$i."_IconURL: http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".$single_warning->{'severity'}.".gif";
-        $message .= "Warn_".$i."_IconURL|http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".UWZ_GetSeverityColor($hash, UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'} )).".gif|";
-
+        } else {
+            UWZ_Log $hash, 4, "Warn_".$i."_IconURL: http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".$single_warning->{'severity'}.".gif";
+            $message .= "Warn_".$i."_IconURL|http://www.unwetterzentrale.de/images/icons/".$typenames{ $single_warning->{'type'} }."-".UWZ_GetSeverityColor($hash, UWZ_GetUWZLevel($hash,$single_warning->{'payload'}{'levelName'} )).".gif|";
+        }
+###
 
         
         ## Hagel start
@@ -870,6 +922,40 @@ sub UWZ_Run($) {
         $i++;
     }
     
+    my $max;
+    for (@uwzmaxlevel) {
+        $max = $_ if !$max || $_ > $max
+    };
+
+    $message .= "WarnUWZLevel|";
+    $message .= $max."|";
+
+    UWZ_Log $hash, 4, "WarnUWZLevel_Color: ".UWZ_GetSeverityColor($hash, $max);
+    $message .= "WarnUWZLevel_Color|".UWZ_GetSeverityColor($hash, $max)."|";
+
+    ## Begin of redundant Reading
+    if ( $UWZ_humanreadable eq 1 ) {
+        if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+            my %uwzlevelname = ( "0" => "Stufe Grün (keine Warnung)",
+                                 "1" => "Stufe Dunkelgrün (Wetterhinweise)",
+                                 "2" => "Stufe Gelb (Vorwarnung für Unwetterwarnung)",
+                                 "3" => "Warnstufe Orange (Unwetterwarnung)",
+                                 "4" => "Warnstufe Rot (Unwetterwarnung)",
+                                 "5" => "Warnstufe Violett (Unwetterwarnung)");
+            UWZ_Log $hash, 4, "WarnUWZLevel_Str: ".$uwzlevelname{ $max };
+            $message .= "WarnUWZLevel_Str|".$uwzlevelname{ $max }."|";
+        } else {
+            my %uwzlevelname = ( "0" => "level green (no warnings)",
+                                 "1" => "level dark green (weather notice)",
+                                 "2" => "level yellow (severe weather watch)",
+                                 "3" => "Alert level Orange",
+                                 "4" => "Alert level Red",
+                                 "5" => "Alert level Violet");
+            UWZ_Log $hash, 4, "WarnUWZLevel_Str: ".$uwzlevelname{ $max };
+            $message .= "WarnUWZLevel_Str|".$uwzlevelname{ $max }."|";
+        }
+    }
+
     $message .= "durationFetchReadings|";
     $message .= sprintf "%.2f",  time() - $readingStartTime;
     
@@ -887,6 +973,9 @@ sub UWZAsHtml($;$) {
     my $ret = '';
     my $hash = $defs{$name};    
 
+    my $htmlsequence = AttrVal($name, "htmlsequence", "none");
+    
+
     my $attr;
     if (AttrVal($name, "htmlattr", "none") ne "none") {
         $attr = AttrVal($name, "htmlattr", "");
@@ -899,25 +988,49 @@ sub UWZAsHtml($;$) {
     
         $ret .= '<table><tr><td>';
         $ret .= '<table class="block" '.$attr.'><tr><th></th><th></th></tr>';
-        
-        for ( my $i=0; $i<ReadingsVal($name, "WarnCount", ""); $i++){
-        
-            $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
-            $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
-            $ret .= ReadingsVal($name, "Warn_".$i."_LongText", "").'<br><br>';
-  
-            $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
+
+        if ($htmlsequence eq "descending") {
+            for ( my $i=ReadingsVal($name, "WarnCount", "")-1; $i>=0; $i--){
             
-            # language by AttrVal
-            if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
-            } else {
-                $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
+                $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
+                $ret .= ReadingsVal($name, "Warn_".$i."_LongText", "").'<br><br>';
+      
+                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
+                
+                # language by AttrVal
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                } else {
+                    $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                }
+                # end language by AttrVal
+                $ret .= '</tr></table>';
+                $ret .= '</td></tr>';
             }
-            # end language by AttrVal
-            $ret .= '</tr></table>';
-            $ret .= '</td></tr>';
+        } else {
+###        
+            for ( my $i=0; $i<ReadingsVal($name, "WarnCount", ""); $i++){
+            
+                $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
+                $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
+                $ret .= ReadingsVal($name, "Warn_".$i."_LongText", "").'<br><br>';
+      
+                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
+                
+                # language by AttrVal
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                } else {
+                    $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                }
+                # end language by AttrVal
+                $ret .= '</tr></table>';
+                $ret .= '</td></tr>';
+            }
         }
+###
+
   
         $ret .= '</table>';
         $ret .= '</td></tr>';
@@ -950,6 +1063,7 @@ sub UWZAsHtmlLite($;$) {
     my ($name,$items) = @_;
     my $ret = '';
     my $hash = $defs{$name}; 
+    my $htmlsequence = AttrVal($name, "htmlsequence", "none");
     my $attr;
     if (AttrVal($name, "htmlattr", "none") ne "none") {
         $attr = AttrVal($name, "htmlattr", "");
@@ -962,24 +1076,39 @@ sub UWZAsHtmlLite($;$) {
         $ret .= '<table><tr><td>';
         $ret .= '<table class="block" '.$attr.'><tr><th></th><th></th></tr>';
   
-        for ( my $i=0; $i<ReadingsVal($name, "WarnCount", ""); $i++){
-        
-            $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
-            $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
-            $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
-            # language by AttrVal
-            
-            if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
-                $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
-            } else {
-                $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+        if ($htmlsequence eq "descending") {
+            for ( my $i=ReadingsVal($name, "WarnCount", "")-1; $i>=0; $i--){
+                $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
+                $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
+                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
+                # language by AttrVal
+                
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                } else {
+                    $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                }
+                # end language by AttrVal
+                $ret .= '</tr></table>';
+                $ret .= '</td></tr>';
             }
-            # end language by AttrVal
-            $ret .= '</tr></table>';
-            $ret .= '</td></tr>';
-        
-        }
-        
+        } else {
+            for ( my $i=0; $i<ReadingsVal($name, "WarnCount", ""); $i++){
+                $ret .= '<tr><td class="uwzIcon" style="vertical-align:top;"><img src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
+                $ret .= '<td class="uwzValue"><b>'.ReadingsVal($name, "Warn_".$i."_ShortText", "").'</b><br><br>';
+                $ret .= '<table '.$attr.'><tr><th></th><th></th></tr><tr><td><b>Start:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_Start", "")).'</td>';
+                # language by AttrVal
+                
+                if ( $hash->{CountryCode} ~~ [ 'DE', 'AT', 'CH' ] ) {
+                    $ret .= '<td><b>Ende:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                } else {
+                    $ret .= '<td><b>End:</b></td><td>'.localtime(ReadingsVal($name, "Warn_".$i."_End", "")).'</td>';
+                }
+                # end language by AttrVal
+                $ret .= '</tr></table>';
+                $ret .= '</td></tr>';
+            }
+        }    
         $ret .= '</table>';
         $ret .= '</td></tr>';
         $ret .= '</table>';
@@ -1010,15 +1139,21 @@ sub UWZAsHtmlFP($;$) {
 
     my ($name,$items) = @_;
     my $tablewidth = ReadingsVal($name, "WarnCount", "") * 80;
+    my $htmlsequence = AttrVal($name, "htmlsequence", "none");
     my $ret = '';
     
     $ret .= '<table class="uwz-fp" style="width:'.$tablewidth.'px"><tr><th></th><th></th></tr>';
     $ret .= "<tr>";
     
-    for ( my $i=0; $i<ReadingsVal($name, "WarnCount", ""); $i++){
-        $ret .= '<td class="uwzIcon"><img width="80px" src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
-    }
-    
+    if ($htmlsequence eq "descending") {
+        for ( my $i=ReadingsVal($name, "WarnCount", "")-1; $i>=0; $i--){
+            $ret .= '<td class="uwzIcon"><img width="80px" src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
+        }
+    } else {
+        for ( my $i=0; $i<ReadingsVal($name, "WarnCount", ""); $i++){
+            $ret .= '<td class="uwzIcon"><img width="80px" src="'.ReadingsVal($name, "Warn_".$i."_IconURL", "").'"></td>';
+        }
+    } 
     $ret .= "</tr>";
     $ret .= '</table>';
 
@@ -1441,6 +1576,22 @@ sub UWZSearchAreaID($$) {
          Overwrite requested language for short and long warn text. (de|en|it|fr|es|..). 
          <br>
       </li>
+      <li><code>sort_readings_by</code>
+         <br>
+         define how readings will be sortet (start|severity). 
+         <br>
+      </li>
+      <li><code>htmlsequence</code>
+         <br>
+         define warn order of html output (ascending|descending). 
+         <br>
+      </li>
+      <li><code>localiconbase</code>
+         <br>
+         define baseurl to host your own thunderstorm warn pics (filetype is png). 
+         <br>
+      </li>
+
 
 
       <br>
@@ -1454,6 +1605,15 @@ sub UWZSearchAreaID($$) {
       <br>
       <li><b>Warn_</b><i>0|1|2|3...|9</i><b>_...</b> - active warnings</li>
       <li><b>WarnCount</b> - warnings count</li>
+      <li><b>WarnUWZLevel</b> - total warn level </li>
+      <li><b>WarnUWZLevel_Color</b> - total warn level color</li>
+      <li><b>WarnUWZLevel_Str</b> - total warn level string</li>
+      <li><b>Warn_</b><i>0</i><b>_AltitudeMin</b> - minimum altitude for warning </li>
+      <li><b>Warn_</b><i>0</i><b>_AltitudeMax</b> - maximum altitude for warning </li>
+      <li><b>Warn_</b><i>0</i><b>_EventID</b> - warning EventID </li>
+      <li><b>Warn_</b><i>0</i><b>_Creation</b> - warning creation </li>
+      <li><b>Warn_</b><i>0</i><b>_Creation_Date</b> - warning creation datum </li>
+      <li><b>Warn_</b><i>0</i><b>_Creation_Time</b> - warning creation time </li>
       <li><b>Warn_</b><i>0</i><b>_Start</b> - begin of warnperiod</li>
       <li><b>Warn_</b><i>0</i><b>_Start_Date</b> - start date of warnperiod</li>
       <li><b>Warn_</b><i>0</i><b>_Start_Time</b> - start time of warnperiod</li>
@@ -1793,6 +1953,21 @@ sub UWZSearchAreaID($$) {
          Umschalten der angeforderten Sprache für kurz und lange warn text. (de|en|it|fr|es|..). 
          <br>
       </li>
+      <li><code>sort_readings_by</code>
+         <br>
+         Sortierreihenfolge der Warnmeldungen. (start|severity). 
+         <br>
+      </li>
+      <li><code>htmlsequence</code>
+         <br>
+         Anzeigereihenfolge der html warnungen. (ascending|descending). 
+         <br>
+      </li>
+      <li><code>localiconbase</code>
+         <br>
+         BaseURL angeben um Warn Icons lokal zu hosten. (Dateityp ist png). 
+         <br>
+      </li>
 
       <br>
    </ul>  
@@ -1805,6 +1980,15 @@ sub UWZSearchAreaID($$) {
       <br>
       <li><b>Warn_</b><i>0|1|2|3...|9</i><b>_...</b> - aktive Warnmeldungen</li>
       <li><b>WarnCount</b> - Anzahl der aktiven Warnmeldungen</li>
+      <li><b>WarnUWZLevel</b> - Gesamt Warn Level </li>
+      <li><b>WarnUWZLevel_Color</b> - Gesamt Warn Level Farbe</li>
+      <li><b>WarnUWZLevel_Str</b> - Gesamt Warn Level Text</li>
+      <li><b>Warn_</b><i>0</i><b>_AltitudeMin</b> - minimum Höhe für Warnung </li>
+      <li><b>Warn_</b><i>0</i><b>_AltitudeMax</b> - maximum Höhe für Warnung </li>
+      <li><b>Warn_</b><i>0</i><b>_EventID</b> - EventID der Warnung </li>
+      <li><b>Warn_</b><i>0</i><b>_Creation</b> - Warnungs Erzeugung </li>
+      <li><b>Warn_</b><i>0</i><b>_Creation_Date</b> - Warnungs Erzeugungs Datum </li>
+      <li><b>Warn_</b><i>0</i><b>_Creation_Time</b> - Warnungs Erzeugungs Zeit </li>
       <li><b>Warn_</b><i>0</i><b>_Start</b> - Begin der Warnung</li>
       <li><b>Warn_</b><i>0</i><b>_Start_Date</b> - Startdatum der Warnung</li>
       <li><b>Warn_</b><i>0</i><b>_Start_Time</b> - Startzeit der Warnung</li>
