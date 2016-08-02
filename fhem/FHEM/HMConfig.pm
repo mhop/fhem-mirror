@@ -260,7 +260,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"00C1" => {name=>"HM-Sen-MDIR-O-2"         ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"00C2" => {name=>"HM-PB-2-WM55-2"          ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"Btn:1:2",}
  ,"00C3" => {name=>"HM-SEC-RHS-2"            ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'1,4'          ,chn=>"",} # remove wakeup - need retest
- ,"00C7" => {name=>"HM-SEC-SCo"              ,st=>'threeStateSensor'  ,cyc=>'00:50' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
+ ,"00C7" => {name=>"HM-SEC-SCo"              ,st=>'threeStateSensor'  ,cyc=>'02:50' ,rxt=>'c:w:l'  ,lst=>'1,4'          ,chn=>"",}
  ,"00C8" => {name=>"HM-LC-Sw1-Pl-3"          ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"",}
  ,"00C9" => {name=>"HM-LC-Sw1-SM-2"          ,alias=>"HM-LC-Sw1-Pl-3"}
  ,"00CA" => {name=>"HM-LC-Sw1-FM-2"          ,alias=>"HM-LC-Sw1-Pl-3"}
