@@ -214,7 +214,7 @@ HUEBridge_OpenDev($)
   }
   Log3 $name, 5, "HUEBridge_OpenDev: got config " . Dumper $result;
 
-  if( !defined($result->{'linkbutton'}) )
+  if( !defined($result->{'linkbutton'}) || !AttrVal($name, 'key', undef) )
     {
       HUEBridge_fillBridgeInfo($hash, $result);
 
@@ -1220,7 +1220,7 @@ HUEBridge_HTTP_Request($$$@)
   $hdr .= "\r\n\r\n";
   syswrite $conn, $hdr;
   syswrite $conn, $data if(defined($data));
-  shutdown $conn, 1 if(!$noshutdown);
+  #shutdown $conn, 1 if(!$noshutdown);
 
   my ($buf, $ret) = ("", "");
   $conn->timeout($timeout);
