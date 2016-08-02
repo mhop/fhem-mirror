@@ -1798,10 +1798,17 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                                }
                      ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright- -colVal- -duration- -ramp- ..."}
                      ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."}
+                     ,"HM-Sec-Sir-WM01"      =>{ on             =>""
+                                                ,off            =>""
+                                                ,"on-for-timer" =>"-ontime-"
+                                                ,"on-till"      =>"-time-"
+                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
+                                               }
                      ,"HM-Sec-Sir-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"}
                      ,"HM-Dis-EP-WM5503"     =>{ displayEP      =>"text1,icon1:text2,icon2:text3,icon3 ... -sound- -repetition- -pause- -signal-"}                                       
  );
 # clones- - - - - - - - - - - - - - - - -
+$culHmChanSets{"HM-Sec-Sir-WM02"}       = $culHmChanSets{"HM-Sec-Sir-WM01"};
 $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
 
 $culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{THSensor};
