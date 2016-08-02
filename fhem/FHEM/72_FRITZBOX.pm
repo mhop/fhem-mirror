@@ -733,11 +733,11 @@ sub FRITZBOX_API_Check_Run($)
 
       if ($response->is_success) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 1;
-         FRITZBOX_Log $hash, 4, "API webcm found.";
+         FRITZBOX_Log $hash, 4, "API webcm found (".$response->code.").";
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCM", 0;
-         FRITZBOX_Log $hash, 4, "API webcm does not exist: ".$response->status_line;
+         FRITZBOX_Log $hash, 4, "API webcm does not exist (".$response->status_line.")";
       }
 
    # Check if query.lua exists
@@ -745,11 +745,15 @@ sub FRITZBOX_API_Check_Run($)
 
       if ($response->is_success) {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
-         FRITZBOX_Log $hash, 4, "API luaQuery found.";
+         FRITZBOX_Log $hash, 4, "API luaQuery found (".$response->code.").";
+      }
+      elsif ($response->code eq "500") {
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
+         FRITZBOX_Log $hash, 4, "API luaQuery found but responded with: ".$response->status_line;
       }
       else {
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
-         FRITZBOX_Log $hash, 4, "API luaQuery does not exist: ".$response->status_line;
+         FRITZBOX_Log $hash, 4, "API luaQuery does not exist (".$response->status_line.")";
       }
 
    # Check if tr064 specification exists and determine TR064-Port
@@ -1061,8 +1065,7 @@ sub FRITZBOX_Readout_Run_Shell($)
       }
 
 # Assign data of DECT handset to DECT numbers
-      for (0..$handsetCount)
-      {
+      for (0..$handsetCount) {
         # 0 Handset FonUser
          push @readoutCmdArray, [ "", "ctlmgr_ctl r dect settings/Handset".$_."/User", "" ];   
         # 1 Handset manufacturer
@@ -1412,37 +1415,39 @@ sub FRITZBOX_Readout_Run_Web($)
    %landevice = ();
    my $wlanCount = 0;
    my $gWlanCount = 0;
-   foreach ( @{ $result->{lanDevice} } ) {
-      my $dIp = $_->{ip};
-      my $dName = $_->{name};
-      FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
-      $landevice{$dIp}=$dName;
-   # Create a reading if a landevice is connected
-      if ($_->{active} == 1) {
-         my $mac = $_->{mac};
-         $mac =~ s/:/_/g;
-         if ($_->{ethernet} == 0 && $_->{wlan} == 1) {
-            $dName .= " (";
-            $dName .= "g"    if $_->{guest};
-            $dName .= "WLAN";
-            $dName .= ", " . $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s, ". $wlanList{$mac}{rssi}
-                   if defined $wlanList{$mac};
-            $dName .= ")";
+   if ( ref $result->{lanDevice} eq 'ARRAY' ) {
+      foreach ( @{ $result->{lanDevice} } ) {
+         my $dIp = $_->{ip};
+         my $dName = $_->{name};
+         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->landevice->$dIp", $dName;
+         $landevice{$dIp}=$dName;
+      # Create a reading if a landevice is connected
+         if ($_->{active} == 1) {
+            my $mac = $_->{mac};
+            $mac =~ s/:/_/g;
+            if ($_->{ethernet} == 0 && $_->{wlan} == 1) {
+               $dName .= " (";
+               $dName .= "g"    if $_->{guest};
+               $dName .= "WLAN";
+               $dName .= ", " . $wlanList{$mac}{speed} . " / " . $wlanList{$mac}{speed_rx} . " Mbit/s, ". $wlanList{$mac}{rssi}
+                      if defined $wlanList{$mac};
+               $dName .= ")";
+            }
+            if ( $_->{ethernet} == 1 ) {
+               $dName .= " (";
+               $dName .= "g"         if $_->{guest};
+               $dName .= "LAN" . $_->{ethernet_port};
+               $dName .= ", 1 Gbit/s"    if $_->{speed} == 1000;
+               $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} != 1000 && $_->{speed} != 0;
+               $dName .= ")";
+            }
+            my $rName = "mac_".$mac;
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
+            $wlanCount++      if $_->{wlan} == 1;
+            $gWlanCount++      if $_->{wlan} == 1 && $_->{guest} == 1;
+            # Remove mac address from oldLanDevice-List
+            delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
          }
-         if ( $_->{ethernet} == 1 ) {
-            $dName .= " (";
-            $dName .= "g"         if $_->{guest};
-            $dName .= "LAN" . $_->{ethernet_port};
-            $dName .= ", 1 Gbit/s"    if $_->{speed} == 1000;
-            $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} != 1000 && $_->{speed} != 0;
-            $dName .= ")";
-         }
-         my $rName = "mac_".$mac;
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
-         $wlanCount++      if $_->{wlan} == 1;
-         $gWlanCount++      if $_->{wlan} == 1 && $_->{guest} == 1;
-         # Remove mac address from oldLanDevice-List
-         delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
       }
    }
    FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "box_wlanCount", $wlanCount);
