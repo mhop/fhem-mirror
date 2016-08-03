@@ -1537,20 +1537,21 @@ sub FRITZBOX_Readout_Run_Web($)
 # user profiles
    $runNo = 1;
    $rName = "user01";
-   foreach ( @{ $result->{userProfil} } ) {
-   # do not show data for unlimited, blocked or default access rights
-      if ($_->{filter_profile_UID} !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} )
-      {
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName,                   $_->{name},            "deviceip";
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_thisMonthTime",  $_->{this_month_time}, "secondsintime";
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_todayTime",      $_->{today_time},      "secondsintime";
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_todaySeconds",   $_->{today_time};
-         FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_type",           $_->{type},            "usertype";
+   if ( ref $result->{userProfil} eq 'ARRAY' ) {
+      foreach ( @{ $result->{userProfil} } ) {
+      # do not show data for unlimited, blocked or default access rights
+         if ($_->{filter_profile_UID} !~ /^filtprof[134]$/ || defined $hash->{READINGS}{$rName} )
+         {
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName,                   $_->{name},            "deviceip";
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_thisMonthTime",  $_->{this_month_time}, "secondsintime";
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_todayTime",      $_->{today_time},      "secondsintime";
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_todaySeconds",   $_->{today_time};
+            FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName."_type",           $_->{type},            "usertype";
+         }
+         $runNo++;
+         $rName = sprintf ("user%02d",$runNo);
       }
-      $runNo++;
-      $rName = sprintf ("user%02d",$runNo);
    }
-   
 
 # Diversity
    $runNo=1;
