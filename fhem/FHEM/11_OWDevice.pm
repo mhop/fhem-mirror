@@ -182,6 +182,20 @@ $owdevice{"22"} = {
     "alarm"     => 1,
     "interface" => "temperature",
 };
+$owdevice{"23"} = {
+    # DS2433 - 4kbit 1-Wire RAM
+    "read"      => [ qw(memory),
+                     qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.4 pages/page.5),
+                     qw(pages/page.6 pages/page.7 pages/page.8 pages/page.9 pages/page.10 pages/page.11),
+                     qw(pages/page.12 pages/page.13 pages/page.14 pages/page.15) ],
+    "write"     => [ qw(memory),
+                     qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.4 pages/page.5),
+                     qw(pages/page.6 pages/page.7 pages/page.8 pages/page.9 pages/page.10 pages/page.11),
+                     qw(pages/page.12 pages/page.13 pages/page.14 pages/page.15) ],
+    "poll"      => [ qw(id) ],
+    "state"     => [ ],
+    "interface" => "multisensor",
+};
 $owdevice{"24"} = {
     # DS2415 - 1-Wire Time Chip
     # DS1904 - RTC iButton
