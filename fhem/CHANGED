@@ -1,6 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
-  - updated: 77_UWZ: New Release 2.4
+    bugfix:  77_UWZ: Perl warnings uninitialized value fixed
+  - updated: 77_UWZ: New Release 2.4.5
                      new Attribut's sort_readings_by,htmlsequence
                      new Readings Warn_X_Creation(_*), WarnUWZLevel,
                                   WarnUWZLevel_Color,WarnUWZLevel_Str

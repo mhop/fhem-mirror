@@ -60,7 +60,7 @@ use vars qw($readingFnAttributes);
 
 use vars qw(%defs);
 my $MODUL           = "UWZ";
-my $version         = "1.4.5";      # ungerade Entwicklerversion Bsp.: 1.1, 1.3, 2.5
+my $version         = "1.4.6";
 
 my $countrycode = "DE";
 my $plz = "77777";
@@ -922,7 +922,7 @@ sub UWZ_Run($) {
         $i++;
     }
     
-    my $max;
+    my $max=0;
     for (@uwzmaxlevel) {
         $max = $_ if !$max || $_ > $max
     };
