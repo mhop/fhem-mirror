@@ -172,7 +172,7 @@ sub I2C_BME280_Set($@) {					# Messwerte manuell anfordern
 		} else {											#..but get calibration variables first
 			Log3 $hash, 5, "$name: in set but no calibrationData, requesting again"; 
 			I2C_BME280_i2cread($hash, 0x88, 26);
-			I2C_BME280_i2cread($hash, 0xE1, 16);
+			I2C_BME280_i2cread($hash, 0xE1, 8);
 		}
 	}
 	return undef
@@ -194,7 +194,7 @@ sub I2C_BME280_Get($@) {					# Messwerte manuell anfordern
 		} else {											#..but get calibration variables first
 			Log3 $hash, 5, "$name: in set but no calibrationData, requesting again"; 
 			I2C_BME280_i2cread($hash, 0x88, 26);
-			I2C_BME280_i2cread($hash, 0xE1, 16);
+			I2C_BME280_i2cread($hash, 0xE1, 8);
 		}
 	} else {
 		return 'Unknown argument ' . $cmd . ', choose one of readValues:noArg';
