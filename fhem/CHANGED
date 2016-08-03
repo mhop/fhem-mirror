@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - feature: 10_OWServer/11_OWDevice: new device DS2433 4kbit 1-Wire RAM
+  - updated: 77_UWZ: New Release 2.4
     bugfix:  77_UWZ: Perl warnings uninitialized value fixed
   - updated: 77_UWZ: New Release 2.4.5
                      new Attribut's sort_readings_by,htmlsequence
@@ -75,6 +77,7 @@
              (only for mode "local-bluetooth")
   - feature: 74_AMAD: new Feature added support for do not Disturb Mode
   - bugfix : 74_HOMBOT: check path for sshpass
+>>>>>>> .r11881
   - feature: fhem_codemirror: Added new codemirrorParams:
                               keyMap, jumpToLine, jumpToLine_extraKey
   - feature: 10_pilight_ctrl: NEW: protocol oregon_21 for temperature
