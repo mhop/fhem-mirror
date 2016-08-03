@@ -497,7 +497,7 @@ sub ONKYO_AVR_Read($) {
 
                 # return as decimal
                 elsif ($value_raw =~ m/^[0-9A-Fa-f][0-9A-Fa-f]$/
-                    && $cmd_raw =~ /^(MVL|SLP|PRS|PRZ|PRM|PTS|NPR|NPZ)$/ )
+                    && $cmd_raw =~ /^(MVL|ZVL|VL3|VL4|SLP|PRS|PRZ|PR3|PR4|PRM|PTS|NPR|NPZ|NP3|NP4)$/ )
                 {
                     $value = ONKYO_AVR_hex2dec($value_raw);
                     Log3 $name, 5,
