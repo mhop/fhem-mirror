@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - added:   98_Hyperion: initial release of completely new module
   - feature: 10_OWServer/11_OWDevice: new device DS2433 4kbit 1-Wire RAM
   - updated: 77_UWZ: New Release 2.4
     bugfix:  77_UWZ: Perl warnings uninitialized value fixed
