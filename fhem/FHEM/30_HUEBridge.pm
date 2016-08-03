@@ -468,6 +468,84 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'createsensor') {
+    return "usage: createsensor <name> <modelid> <swversion> <type> <uniqueid>" if( @args < 5 );
+
+    return "usage: type must be one of: Switch OpenClose Presence Temperature Humidity GenericFlag GenericStatus " if( @args[@args-2] !~ m/Switch|OpenClose|Presence|Temperature|Humidity|GenericFlag|GenericStatus/ );
+
+    my $obj = { 'name' => join( ' ', @args[0..@args-5]),
+                'modelid' => @args[@args-4],
+                'swversion' => @args[@args-3],
+                'type' => "CLIP@args[@args-2]",
+                'uniqueid' => @args[@args-1],
+                'manufacturername' => 'FHEM-HUE',
+              };
+
+    my $result = HUEBridge_Call($hash, undef, 'sensors', $obj, 'POST');
+    return $result->{error}{description} if( $result->{error} );
+
+#    if( $result->{success} ) {
+#      my $code = $name ."-S". $result->{success}{id};
+#      my $devname = "HUEDevice" . $id;
+#      $devname = $name ."_". $devname if( $hash->{helper}{count} );
+#      my $define = "$devname HUEDevice sensor $id IODev=$name";
+#
+#      Log3 $name, 4, "$name: create new device '$devname' for address '$id'";
+#
+#      my $cmdret= CommandDefine(undef,$define);
+#
+#      return "created $modules{HUEDevice}{defptr}{$code}->{NAME}" if( defined($modules{HUEDevice}{defptr}{$code}) );
+#    }
+
+    return undef;
+
+  } elsif($cmd eq 'deletesensor') {
+    return "usage: deletesensor <id>" if( @args != 1 );
+
+    if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
+      return "$arg is not a hue sensors" if( $defs{$arg}{ID} != m/^G/ );
+      $defs{$arg}{ID} =~ m/G(.*)/;
+      $arg = $1;
+    }
+
+    my $code = $name ."-G". $arg;
+    if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+      CommandDelete( undef, "$modules{HUEDevice}{defptr}{$code}{NAME}" );
+      CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
+    }
+
+    return "$arg is not hue sensors number" if( $arg !~ m/^\d+$/ );
+
+    my $result = HUEBridge_Call($hash, undef, "sensors/$arg", undef, 'DELETE');
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef;
+
+  } elsif($cmd eq 'setsensor') {
+    return "usage: setsensor <id> <json>" if( @args < 2 );
+
+    my $id = $args[0];
+    if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
+      return "$arg is not a hue sensors" if( $defs{$id}{ID} != m/^G/ );
+      $defs{$arg}{ID} =~ m/G(.*)/;
+      $id = $1;
+    }
+
+    return "$id is not hue sensors number" if( $id !~ m/^\d+$/ );
+
+    my $state = join( ' ', @args[1..@args-1]);
+    my $decoded = eval { decode_json($state) };
+    if( $@ ) {
+      Log3 $name, 2, "$name: json error: $@ in $state";
+      return undef;
+    }
+    $state = $decoded;
+
+    my $result = HUEBridge_Call($hash, undef, "sensors/$id/state", $state, 'PUT');
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef;
+
   } elsif($cmd eq 'deletewhitelist') {
     return "usage: deletewhitelist <key>" if( @args != 1 );
 
@@ -502,7 +580,7 @@ HUEBridge_Set($@)
 
 
   } else {
-    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene deletewhitelist touchlink:noArg checkforupdate:noArg  autodetect:noArg autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene createsensor deletesensor setsensor deletewhitelist touchlink:noArg checkforupdate:noArg  autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -575,9 +653,15 @@ HUEBridge_Get($@)
       my $code = $name ."-S". $key;
       my $fhem_name ="";
       $fhem_name = $modules{HUEDevice}{defptr}{$code}->{NAME} if( defined($modules{HUEDevice}{defptr}{$code}) );
-      $ret .= sprintf( "%2i: %-15s %-15s %-15s\n", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
+      $ret .= sprintf( "%2i: %-15s %-15s %-20s", $key, $result->{$key}{name}, $fhem_name, $result->{$key}{type} );
+      $ret .= sprintf( " %s", encode_json($result->{$key}{state}) ) if( $arg && $arg eq 'detail' );
+      $ret .= "\n";
     }
-    $ret = sprintf( "%2s  %-15s %-15s %-15s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
+    if( $arg && $arg eq 'detail' ) {
+    $ret = sprintf( "%2s  %-15s %-15s %-20s %s\n", "ID", "NAME", "FHEM", "TYPE", "STATE" ) .$ret if( $ret );
+    } else {
+    $ret = sprintf( "%2s  %-15s %-15s %-20s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
+    }
     return $ret;
 
   } elsif($cmd eq 'whitelist') {
@@ -1351,7 +1435,7 @@ HUEBridge_Attr($$$)
       list the groups known to the bridge.</li>
     <li>scenes [detail]<br>
       list the scenes known to the bridge.</li>
-    <li>sensors<br>
+    <li>sensors [detail] <br>
       list the sensors known to the bridge.</li>
     <li>whitelist<br>
       list the whitlist of the bridge.</li>
@@ -1376,10 +1460,16 @@ HUEBridge_Attr($$$)
     <li>savescene &lt;name&gt; &lt;lights&gt;<br>
       Create a scene from the current state of &lt;lights&gt; in the bridge.
       The lights are given as a comma sparated list of fhem device names or bridge light numbers.</li>
-    <li>scene &lt;id&gt;<br>
-      Recalls the scene with the given id.</li>
     <li>modifyscene &lt;id&gt; &lt;light&gt; &lt;light-args&gt;<br>
       Modifys the given scene in the bridge.</li>
+    <li>scene &lt;id&gt;<br>
+      Recalls the scene with the given id.</li>
+    <li>createsensor &lt;name&gt; &lt;modelid&gt; &lt;swversion&gt; &lt;type&gt; &lt;uniqueid&gt;<br>
+      Creates a new CLIP (IP) sensor in the bridge.</li>
+    <li>deletesensor &lt;id&gt;<br>
+      Deletes the given sensor in the bridge and deletes the associated fhem device.</li>
+    <li>setsensor &lt;id&gt; &lt;json&gt;<br>
+      Deletes the given key from the whitelist in the bridge.</li>
     <li>deletewhitelist &lt;key&gt;<br>
       Deletes the given key from the whitelist in the bridge.</li>
     <li>touchlink<br>
