@@ -239,8 +239,10 @@ sub Hyperion_ParseHttpResponse($$$)
     $attr{$name}{icon}                    = "light_led_stripe_rgb" if (!defined($attr{$name}{icon}));
     $attr{$name}{lightSceneParamsToSave}  = "state" if (!defined($attr{$name}{lightSceneParamsToSave}));
     $attr{$name}{room}                    = "Hyperion" if (!defined($attr{$name}{room}));
-    $attr{$name}{userattr}                = "lightSceneParamsToSave" if (!defined($attr{$name}{userattr}));
-    $attr{$name}{userattr}                = "lightSceneParamsToSave ".$attr{$name}{userattr} if (defined($attr{$name}{userattr}) && index($attr{$name}{userattr},"lightSceneParamsToSave") == -1);
+    $attr{$name}{userattr}                = "lightSceneParamsToSave" if (!defined($attr{$name}{userattr}) && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
+    $attr{$name}{userattr}                = "lightSceneParamsToSave ".$attr{$name}{userattr} if (defined($attr{$name}{userattr}) && index($attr{$name}{userattr},"lightSceneParamsToSave") == -1 && index($attr{"global"}{userattr},"lightSceneParamsToSave") == -1);
+    $attr{$name}{userattr}                = "homebridgeMapping" if (!defined($attr{$name}{userattr}) && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
+    $attr{$name}{userattr}                = "homebridgeMapping ".$attr{$name}{userattr} if (defined($attr{$name}{userattr}) && index($attr{$name}{userattr},"homebridgeMapping") == -1 && index($attr{"global"}{userattr},"homebridgeMapping") == -1);
     $attr{$name}{webCmd}                  = $Hyperion_webCmd if (!defined($attr{$name}{webCmd}) || (defined($attr{$name}{webCmd}) && $attr{$name}{webCmd} eq $Hyperion_webCmd_config));
     $attr{$name}{webCmd}                  = $Hyperion_webCmd_config if (!defined($attr{$name}{webCmd}) || (defined($attr{$name}{webCmd}) && $Hyperion_sets{configFile} ne "textField" && $attr{$name}{webCmd} eq $Hyperion_webCmd));
     readingsBeginUpdate($hash);
