@@ -127,7 +127,8 @@ sub Hyperion_list2array($$)
 sub Hyperion_Get($@)
 {
   my ($hash,$name,$cmd) = @_;
-  return "get $name needs one parameter: configFiles:noArg devStateIcon:noArg statusRequest:noArg" if (!defined($cmd));
+  my $params = "configFiles:noArg devStateIcon:noArg statusRequest:noArg";
+  return "get $name needs one parameter: $params" if (!defined($cmd));
   
   if ($cmd eq "configFiles")
   {
@@ -143,7 +144,7 @@ sub Hyperion_Get($@)
   }
   else
   {
-    return "Unknown argument $cmd for $name, choose one of configFiles:noArg devStateIcon:noArg statusRequest:noArg";
+    return "Unknown argument $cmd for $name, choose one of $params";
   }
 }
 
@@ -177,9 +178,10 @@ sub Hyperion_GetHttpResponse($$$)
 
   if (!$conn)
   {
+    my $error = "Can't connect to http://$host:$port";
     readingsBulkUpdate($hash,"state","ERROR") if (Value($name) ne "ERROR");
-    readingsBulkUpdate($hash,"serverResponse","ERROR: Can't connect to http://$host:$port");
-    readingsBulkUpdate($hash,"lastError","Can't connect to http://$host:$port") if (ReadingsVal($name,"lastError","") ne "Can't connect to http://$host:$port");
+    readingsBulkUpdate($hash,"serverResponse","ERROR: $error");
+    readingsBulkUpdate($hash,"lastError",$error) if (ReadingsVal($name,"lastError","") ne $error);
     undef $conn;
     return undef;
   }
@@ -832,107 +834,108 @@ sub Hyperion_devStateIcon($;$)
   <p><b>set &lt;required&gt; [optional]</b></p>
   <ul>
     <li>
-      <a name="adjustBlue">adjustBlue &lt;0,0,255&gt;</a><br>
+      <i>adjustBlue &lt;0,0,255&gt;</i><br>
       adjust each color of blue separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="adjustGreen">adjustGreen &lt;0,255,0&gt;</a><br>
+      <i>adjustGreen &lt;0,255,0&gt;</i><br>
       adjust each color of green separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="adjustRed">adjustRed &lt;255,0,0&gt;</a><br>
+      <i>adjustRed &lt;255,0,0&gt;</i><br>
       adjust each color of red separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="blacklevel">blacklevel &lt;0.000,0.000,0.000&gt;</a><br>
+      <i>blacklevel &lt;0.000,0.000,0.000&gt;</i><br>
       adjust blacklevel of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="clear">clear &lt;1000&gt;</a><br>
+      <i>clear &lt;1000&gt;</i><br>
       clear a specific priority channel
     </li>
     <li>
-      <a name="clearall">clearall</a><br>
+      <i>clearall</i><br>
       clear all priority channels / switch to Ambilight mode
     </li>
     <li>
-      <a name="colorTemperature">colorTemperature &lt;255,255,255&gt;</a><br>
+      <i>colorTemperature &lt;255,255,255&gt;</i><br>
       adjust temperature of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="configFile">configFile &lt;filename.config.json&gt;</a><br>
-      restart the Hyperion server with the given configuration file (files will be listed automatically from the given directory in attribute hyperionConfigDir) (default: /etc/hyperion/)
+      <i>configFile &lt;filename&gt;</i><br>
+      restart the Hyperion server with the given configuration file (files will be listed automatically from the given directory in attribute hyperionConfigDir)<br>
+      please omit the double extension of the file name (.config.json)
     </li>
     <li>
-      <a name="correction">correction&lt;255,255,255&gt;</a><br>
+      <i>correction &lt;255,255,255&gt;</i><br>
       adjust correction of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="dim">dim &lt;percent&gt; [duration] [priority]</a><br>
+      <i>dim &lt;percent&gt; [duration] [priority]</i><br>
       dim the rgb light with optional duration in seconds and priority
     </li>
     <li>
-      <a name="dimDown">dimDown [delta]</a><br>
-      dim down light by steps defined in attribute hyperionDimStep or by given value (rgb light) (default: 10)
+      <i>dimDown [delta]</i><br>
+      dim down rgb light by steps defined in attribute hyperionDimStep or by given value (default: 10)
     </li>
     <li>
-      <a name="dimUp">dimUp [delta]</a><br>
-      dim up light by steps defined in attribute hyperionDimStep or by given value (rgb light) (default: 10)
+      <i>dimUp [delta]</i><br>
+      dim up rgb light by steps defined in attribute hyperionDimStep or by given value (default: 10)
     </li>
     <li>
-      <a name="effect">effect &lt;effect&gt; [duration] [priority]</a><br>
+      <i>effect &lt;effect&gt; [duration] [priority]</i><br>
       set effect (replace blanks with underscore) with optional duration in seconds and priority
     </li>
     <li>
-      <a name="gamma">gamma &lt;1.900,1.900,1.900&gt;</a><br>
+      <i>gamma &lt;1.900,1.900,1.900&gt;</i><br>
       adjust gamma of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="lumminanceGain">lumminanceGain &lt;1.000&gt;</a><br>
-      adjust lumminanceGain (max. value 1.999)
+      <i>luminanceGain &lt;1.000&gt;</i><br>
+      adjust luminanceGain (max. value 1.999)
     </li>
     <li>
-      <a name="lumminanceMinimum">lumminanceMinimum &lt;0.000&gt;</a><br>
-      adjust lumminanceMinimum (max. value 1.999)
+      <i>luminanceMinimum &lt;0.000&gt;</i><br>
+      adjust luminanceMinimum (max. value 1.999)
     </li>
     <li>
-      <a name="mode">mode &lt;clearall|effect|off|rgb&gt;</a><br>
+      <i>mode &lt;clearall|effect|off|rgb&gt;</i><br>
       set the light in the specific mode with its previous value
     </li>
     <li>
-      <a name="off">off</a><br>
+      <i>off</i><br>
       set the light off while the color is black
     </li>
     <li>
-      <a name="on">on</a><br>
-      set the light on and restores previous state
+      <i>on</i><br>
+      set the light on and restore previous state
     </li>
     <li>
-      <a name="rgb">rgb &lt;RRGGBB&gt; [duration] [priority]</a><br>
+      <i>rgb &lt;RRGGBB&gt; [duration] [priority]</i><br>
       set color in RGB Hex format with optional duration in seconds and priority
     </li>
     <li>
-      <a name="saturationGain">saturationGain &lt;1.100&gt;</a><br>
+      <i>saturationGain &lt;1.100&gt;</i><br>
       adjust saturationGain (max. value 1.999)
     </li>
     <li>
-      <a name="saturationLGain">saturationLGain &lt;1.000&gt;</a><br>
+      <i>saturationLGain &lt;1.000&gt;</i><br>
       adjust saturationLGain (max. value 1.999)
     </li>
     <li>
-      <a name="threshold">threshold &lt;0.160,0.160,0.160&gt;</a><br>
+      <i>threshold &lt;0.160,0.160,0.160&gt;</i><br>
       adjust threshold of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="toggle">toggle</a><br>
+      <i>toggle</i><br>
       toggles the light between on and off
     </li>
     <li>
-      <a name="valueLGain">valueLGain &lt;1.700&gt;</a><br>
-      adjust valueLGain (max. value 1.999)
+      <i>valueGain &lt;1.700&gt;</i><br>
+      adjust valueGain (max. value 1.999)
     </li>
     <li>
-      <a name="whitelevel">whitelevel &lt;0.700,0.800,0.900&gt;</a><br>
+      <i>whitelevel &lt;0.700,0.800,0.900&gt;</i><br>
       adjust whitelevel of each color separately (comma separated) (R,G,B)
     </li>
   </ul>  
@@ -941,16 +944,15 @@ sub Hyperion_devStateIcon($;$)
   <p><b>Get</b></p>
   <ul>
     <li>
-      <a name="configFiles">configFiles</a><br>
-      get the available config files in directory from attribute hyperionConfigDir<br>
-      (default: /etc/hyperion/)
+      <i>configFiles</i><br>
+      get the available config files in directory from attribute hyperionConfigDir
     </li>
     <li>
-      <a name="devStateIcon">devStateIcon</a><br>
+      <i>devStateIcon</i><br>
       get the current devStateIcon
     </li>
     <li>
-      <a name="statusRequest">statusRequest</a><br>
+      <i>statusRequest</i><br>
       get the currently set effect or color from the Hyperion server,<br>
       get the internals of Hyperion including available effects
     </li>
@@ -960,31 +962,31 @@ sub Hyperion_devStateIcon($;$)
   <p><b>Attributes</b></p>
   <ul>
     <li>
-      <a name="hyperionBin">hyperionBin</a><br>
+      <i>hyperionBin</i><br>
       path to the hyperion executable, if not set it's /usr/bin/hyperiond
     </li>
     <li>
-      <a name="hyperionConfigDir">hyperionConfigDir</a><br>
+      <i>hyperionConfigDir</i><br>
       path to the hyperion configuration files, if not set it's /etc/hyperion/
     </li>
     <li>
-      <a name="hyperionDefaultDuration">hyperionDefaultDuration</a><br>
+      <i>hyperionDefaultDuration</i><br>
       default duration, if not set it's infinity
     </li>
     <li>
-      <a name="hyperionDefaultPriority">hyperionDefaultPriority</a><br>
+      <i>hyperionDefaultPriority</i><br>
       default priority, if not set it's 0
     </li>
     <li>
-      <a name="hyperionDimStep">hyperionDimStep</a><br>
+      <i>hyperionDimStep</i><br>
       dim step for dimDown/dimUp, if not set it's 5 (percent)
     </li>
     <li>
-      <a name="hyperionSshUser">hyperionSshUser</a><br>
-      user to execute SSH commands to remote host
+      <i>hyperionSshUser</i><br>
+      user for executing SSH commands
     </li>
     <li>
-      <a name="queryAfterSet">queryAfterSet</a><br>
+      <i>queryAfterSet</i><br>
       If set to 0 the state of the Hyperion server will not be queried after setting, instead the state will be queried on next interval query.<br>
       This is only used when polling is enabled, without polling the state will be queried automatically after set.
     </li>
@@ -994,107 +996,107 @@ sub Hyperion_devStateIcon($;$)
   <p><b>Readings</b></p>
   <ul>
     <li>
-      <a name="adjustBlue">adjustBlue</a><br>
+      <i>adjustBlue</i><br>
       each color of blue separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="adjustGreen">adjustGreen</a><br>
+      <i>adjustGreen</i><br>
       each color of green separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="adjustRed">adjustRed</a><br>
+      <i>adjustRed</i><br>
       each color of red separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="blacklevel">blacklevel</a><br>
+      <i>blacklevel</i><br>
       blacklevel of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="colorTemperature">colorTemperature</a><br>
+      <i>colorTemperature</i><br>
       temperature of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="configFile">configFile</a><br>
-      previously set configuration file of the Hyperion server
+      <i>configFile</i><br>
+      active/previously loaded configuration file, double extension (.config.json) will be omitted
     </li>
     <li>
-      <a name="correction">correction</a><br>
+      <i>correction</i><br>
       correction of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="dim">dim</a><br>
+      <i>dim</i><br>
       active/previous dim value (rgb light)
     </li>
     <li>
-      <a name="duration">duration</a><br>
+      <i>duration</i><br>
       active/previous duration in seconds or infinite
     </li>
     <li>
-      <a name="effect">effect</a><br>
+      <i>effect</i><br>
       active/previous effect
     </li>
     <li>
-      <a name="gamma">gamma</a><br>
+      <i>gamma</i><br>
       gamma for each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="id">id</a><br>
+      <i>id</i><br>
       id of the Hyperion server
     </li>
     <li>
-      <a name="lastError">lastError</a><br>
+      <i>lastError</i><br>
       last occured error while communicating with the Hyperion server
     </li>
     <li>
-      <a name="luminanceGain">luminanceGain</a><br>
+      <i>luminanceGain</i><br>
       luminanceGain
     </li>
     <li>
-      <a name="luminanceMinimum">luminanceMinimum</a><br>
+      <i>luminanceMinimum</i><br>
       luminanceMinimum
     </li>
     <li>
-      <a name="mode">mode</a><br>
+      <i>mode</i><br>
       current mode
     </li>
     <li>
-      <a name="previous_mode">previous_mode</a><br>
+      <i>previous_mode</i><br>
       previous mode before off
     </li>
     <li>
-      <a name="priority">priority</a><br>
+      <i>priority</i><br>
       active/previous priority
     </li>
     <li>
-      <a name="rgb">rgb</a><br>
+      <i>rgb</i><br>
       active/previous rgb
     </li>
     <li>
-      <a name="saturationGain">saturationGain</a><br>
-      saturationGain
+      <i>saturationGain</i><br>
+      active/previous saturationGain
     </li>
     <li>
-      <a name="saturationLGain">saturationLGain</a><br>
-      saturationLGain
+      <i>saturationLGain</i><br>
+      active/previous saturationLGain
     </li>
     <li>
-      <a name="serverResponse">serverResponse</a><br>
+      <i>serverResponse</i><br>
       last Hyperion server response (success/ERROR)
     </li>
     <li>
-      <a name="state">state</a><br>
+      <i>state</i><br>
       current state
     </li>
     <li>
-      <a name="threshold">threshold</a><br>
+      <i>threshold</i><br>
       threshold of each color separately (comma separated) (R,G,B)
     </li>
     <li>
-      <a name="valueGain">valueGain</a><br>
+      <i>valueGain</i><br>
       valueGain - gain of the Ambilight
     </li>
     <li>
-      <a name="whitelevel">whitelevel</a><br>
+      <i>whitelevel</i><br>
       whitelevel of each color separately (comma separated) (R,G,B)
     </li>
   </ul>
