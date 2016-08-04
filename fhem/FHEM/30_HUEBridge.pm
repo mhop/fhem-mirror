@@ -469,15 +469,15 @@ HUEBridge_Set($@)
     return undef;
 
   } elsif($cmd eq 'createsensor') {
-    return "usage: createsensor <name> <modelid> <swversion> <type> <uniqueid>" if( @args < 5 );
+    return "usage: createsensor <name> <type> <uniqueid> <swversion> <modelid>" if( @args < 5 );
 
     return "usage: type must be one of: Switch OpenClose Presence Temperature Humidity GenericFlag GenericStatus " if( @args[@args-2] !~ m/Switch|OpenClose|Presence|Temperature|Humidity|GenericFlag|GenericStatus/ );
 
     my $obj = { 'name' => join( ' ', @args[0..@args-5]),
-                'modelid' => @args[@args-4],
-                'swversion' => @args[@args-3],
-                'type' => "CLIP@args[@args-2]",
-                'uniqueid' => @args[@args-1],
+                'type' => "CLIP@args[@args-4]",
+                'uniqueid' => @args[@args-3],
+                'swversion' => @args[@args-2],
+                'modelid' => @args[@args-1],
                 'manufacturername' => 'FHEM-HUE',
               };
 
@@ -1464,7 +1464,7 @@ HUEBridge_Attr($$$)
       Modifys the given scene in the bridge.</li>
     <li>scene &lt;id&gt;<br>
       Recalls the scene with the given id.</li>
-    <li>createsensor &lt;name&gt; &lt;modelid&gt; &lt;swversion&gt; &lt;type&gt; &lt;uniqueid&gt;<br>
+    <li>createsensor &lt;name&gt; &lt;type&gt; &lt;uniqueid&gt; &lt;swversion&gt; &lt;modelid&gt;<br>
       Creates a new CLIP (IP) sensor in the bridge.</li>
     <li>deletesensor &lt;id&gt;<br>
       Deletes the given sensor in the bridge and deletes the associated fhem device.</li>
