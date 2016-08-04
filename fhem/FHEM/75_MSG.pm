@@ -138,11 +138,12 @@ s/^[\s\t]*([a-z,]*!?(screen|light|audio|text|push|mail)[a-z,!|]*)[\s\t]+//
     # e.g. recipients were given automatically from empty readings
     if ( $msg =~ s/^[\s\t]*([!]?(([A-Za-z0-9%+._-])*@([,\-:|]+)))[\s\t]+// ) {
         Log3 $globalDevName, 4,
-            "msg: recipient '$1' contains special characters like"
-          . " ',-:|' so message won't be sent. This might be okay, e.g. if you are"
-          . " using something like a reading from RESIDENTS/ROOMMATE/GUEST to"
-          . " address present or absent residents and this list is simply empty"
-          . " at this time. ($msg)";
+            "msg: message won't be sent - recipient '$1' contains special"
+          . " characters like ',-:|' or behind the @ character is simply"
+          . " emptiness. This might be okay, e.g. if you are using something"
+          . " like a reading from RESIDENTS/ROOMMATE/GUEST to address present"
+          . " or absent residents and this list is simply empty at this time."
+          . " ($msg)";
         return;
     }
 
