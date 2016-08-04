@@ -341,7 +341,7 @@ HUEBridge_Set($@)
       $arg = $defs{$arg}{ID};
     }
 
-    return "$arg is not hue light number" if( $arg !~ m/^\d+$/ );
+    return "$arg is not a hue light number" if( $arg !~ m/^\d+$/ );
 
     my $code = $name ."-". $arg;
     if( defined($modules{HUEDevice}{defptr}{$code}) ) {
@@ -388,7 +388,7 @@ HUEBridge_Set($@)
       CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
     }
 
-    return "$arg is not hue group number" if( $arg !~ m/^\d+$/ );
+    return "$arg is not a hue group number" if( $arg !~ m/^\d+$/ );
 
     my $result = HUEBridge_Call($hash, undef, "groups/$arg", undef, 'DELETE');
     return $result->{error}{description} if( $result->{error} );
@@ -468,6 +468,48 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'createrule' || $cmd eq 'updaterule') {
+    return "usage: createrule <name> <conditions&actions json>" if( $cmd eq 'createrule' && @args < 2 );
+    return "usage: updaterule <id> <conditions&actions json>" if( $cmd eq 'updaterule' && @args != 2 );
+
+    @args[@args-1] = '
+{  "name":"Wall Switch Rule",
+   "conditions":[
+        {"address":"/sensors/1/state/lastupdated","operator":"dx"}
+   ],
+   "actions":[
+        {"address":"/groups/0/action","method":"PUT", "body":{"scene":"S3"}}
+]}' if( 0 || !@args[@args-1] );
+    my $json = @args[@args-1];
+    my $obj = eval { decode_json($json) };
+    if( $@ ) {
+      Log3 $name, 2, "$name: json error: $@ in $json";
+      return undef;
+    }
+
+    my $result;
+    if( $cmd eq 'updaterule' ) {
+     $result = HUEBridge_Call($hash, undef, "rules/@args[0]", $obj, 'PUT');
+    } else {
+     $obj->{name} = join( ' ', @args[0..@args-2]);
+     $result = HUEBridge_Call($hash, undef, 'rules', $obj, 'POST');
+    }
+    return $result->{error}{description} if( $result->{error} );
+
+    return "created rule id $result->{success}{id}" if( $result->{success} && $result->{success}{id} );
+
+    return undef;
+
+  } elsif($cmd eq 'deleterule') {
+    return "usage: deleterule <id>" if( @args != 1 );
+
+    return "$arg is not a hue rule number" if( $arg !~ m/^\d+$/ );
+
+    my $result = HUEBridge_Call($hash, undef, "rules/$arg", undef, 'DELETE');
+    return $result->{error}{description} if( $result->{error} );
+
+    return undef;
+
   } elsif($cmd eq 'createsensor') {
     return "usage: createsensor <name> <type> <uniqueid> <swversion> <modelid>" if( @args < 5 );
 
@@ -483,6 +525,8 @@ HUEBridge_Set($@)
 
     my $result = HUEBridge_Call($hash, undef, 'sensors', $obj, 'POST');
     return $result->{error}{description} if( $result->{error} );
+
+    return "created sensor id $result->{success}{id}" if( $result->{success} );
 
 #    if( $result->{success} ) {
 #      my $code = $name ."-S". $result->{success}{id};
@@ -514,7 +558,7 @@ HUEBridge_Set($@)
       CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
     }
 
-    return "$arg is not hue sensors number" if( $arg !~ m/^\d+$/ );
+    return "$arg is not a hue sensors number" if( $arg !~ m/^\d+$/ );
 
     my $result = HUEBridge_Call($hash, undef, "sensors/$arg", undef, 'DELETE');
     return $result->{error}{description} if( $result->{error} );
@@ -531,7 +575,7 @@ HUEBridge_Set($@)
       $id = $1;
     }
 
-    return "$id is not hue sensors number" if( $id !~ m/^\d+$/ );
+    return "$id is not a hue sensors number" if( $id !~ m/^\d+$/ );
 
     my $state = join( ' ', @args[1..@args-1]);
     my $decoded = eval { decode_json($state) };
@@ -580,7 +624,7 @@ HUEBridge_Set($@)
 
 
   } else {
-    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene createsensor deletesensor setsensor deletewhitelist touchlink:noArg checkforupdate:noArg  autodetect:noArg autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule deleterule createsensor deletesensor setsensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -645,6 +689,31 @@ HUEBridge_Get($@)
     }
     return $ret;
 
+  } elsif($cmd eq 'rule') {
+    return "usage: rule <id>" if( @args != 1 );
+    return "$arg is not a hue rule number" if( $arg !~ m/^\d+$/ );
+    my $result =  HUEBridge_Call($hash, undef, "rules/$arg", undef);
+    return $result->{error}{description} if( $result->{error} );
+    my $ret = encode_json($result->{conditions}) ."\n". encode_json($result->{actions});
+    return $ret;
+
+  } elsif($cmd eq 'rules') {
+    my $result =  HUEBridge_Call($hash, undef, 'rules', undef);
+    return $result->{error}{description} if( $result->{error} );
+    my $ret = "";
+    foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
+      $ret .= sprintf( "%2i: %-20s", $key, $result->{$key}{name} );
+      $ret .= sprintf( " %s", encode_json($result->{$key}{conditions}) ) if( $arg && $arg eq 'detail' );
+      $ret .= sprintf( "\n%-24s %s", "", encode_json($result->{$key}{actions}) ) if( $arg && $arg eq 'detail' );
+      $ret .= "\n";
+    }
+    if( $arg && $arg eq 'detail' ) {
+      $ret = sprintf( "%2s  %-20s %s\n", "ID", "NAME", "CONDITIONS/ACTIONS" ) .$ret if( $ret );
+    } else {
+      $ret = sprintf( "%2s  %-20s\n", "ID", "NAME" ) .$ret if( $ret );
+    }
+    return $ret;
+
   } elsif($cmd eq 'sensors') {
     my $result =  HUEBridge_Call($hash, undef, 'sensors', undef);
     return $result->{error}{description} if( $result->{error} );
@@ -658,9 +727,9 @@ HUEBridge_Get($@)
       $ret .= "\n";
     }
     if( $arg && $arg eq 'detail' ) {
-    $ret = sprintf( "%2s  %-15s %-15s %-20s %s\n", "ID", "NAME", "FHEM", "TYPE", "STATE" ) .$ret if( $ret );
+      $ret = sprintf( "%2s  %-15s %-15s %-20s %s\n", "ID", "NAME", "FHEM", "TYPE", "STATE" ) .$ret if( $ret );
     } else {
-    $ret = sprintf( "%2s  %-15s %-15s %-20s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
+      $ret = sprintf( "%2s  %-15s %-15s %-20s\n", "ID", "NAME", "FHEM", "TYPE" ) .$ret if( $ret );
     }
     return $ret;
 
@@ -676,7 +745,7 @@ HUEBridge_Get($@)
     return $ret;
 
   } else {
-    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg scenes:noArg sensors:noArg whitelist:noArg";
+    return "Unknown argument $cmd, choose one of devices:noArg groups:noArg scenes:noArg rule rules:noArg sensors:noArg whitelist:noArg";
   }
 }
 
@@ -1435,6 +1504,10 @@ HUEBridge_Attr($$$)
       list the groups known to the bridge.</li>
     <li>scenes [detail]<br>
       list the scenes known to the bridge.</li>
+    <li>rule &lt;id&gt; <br>
+      list the rule with &lt;id&gt;.</li>
+    <li>rules [detail] <br>
+      list the rules known to the bridge.</li>
     <li>sensors [detail] <br>
       list the sensors known to the bridge.</li>
     <li>whitelist<br>
@@ -1464,6 +1537,10 @@ HUEBridge_Attr($$$)
       Modifys the given scene in the bridge.</li>
     <li>scene &lt;id&gt;<br>
       Recalls the scene with the given id.</li>
+    <li>createrule &lt;name&gt; &lt;conditions&amp;actions json&gt;<br>
+      Creates a new rule in the bridge.</li>
+    <li>deleterule &lt;id&gt;<br>
+      Deletes the given rule in the bridge.</li>
     <li>createsensor &lt;name&gt; &lt;type&gt; &lt;uniqueid&gt; &lt;swversion&gt; &lt;modelid&gt;<br>
       Creates a new CLIP (IP) sensor in the bridge.</li>
     <li>deletesensor &lt;id&gt;<br>
