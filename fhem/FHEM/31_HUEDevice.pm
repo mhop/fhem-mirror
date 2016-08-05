@@ -604,8 +604,20 @@ HUEDevice_Set($@)
       RemoveInternalTimer($hash);
       HUEDevice_GetUpdate($hash);
       return undef;
+
+    } elsif( $cmd eq 'json' ) {
+      my $shash = $defs{$name}->{IODev};
+
+      my $id = $hash->{ID};
+      $id = $1 if( $id =~ m/^S(\d.*)/ );
+
+      return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, @args );
+
+      return undef;
+
     }
 
+    return "Unknown argument $cmd, choose one of json statusRequest:noArg" if( $hash->{type} && $hash->{type} =~ /^CLIP/ );
     return "Unknown argument $cmd, choose one of statusRequest:noArg";
   }
 
