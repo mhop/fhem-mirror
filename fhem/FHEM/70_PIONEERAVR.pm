@@ -2915,7 +2915,7 @@ RC_layout_PioneerAVR() {
 	<li><b>mcaccMemory <1...6></b> - Sets one of the 6 predefined MCACC settings for the Main Zone</li>
 	<li><b>menu</b> - "Menu-key" of the remote control. Available for the same inputs as "play"</li>
 	<li><b>mute <on|off|toggle></b> - Mute the Main Zone of the Pioneer AV Receiver. "mute = on" means: Zero volume</li>
-	<li><b>networkStandby <on|off></b> - Turns Network standby on or off. To turn on a Pioneer AV Receiver with this module from standby, Network Standby must be "on"</li>
+	<li><b>networkStandby <on|off></b> - Turns Network standby on or off. To turn on a Pioneer AV Receiver with this module from standby, Network Standby must be "on". <code>set &lt;name&gt; networkStandby on</code> should do this</li>
 	<li><b>next</b> -  Available for the same inputs as "play"</li>
 	<li><b>off</b> - Switch the Main Zone to standby</li>
 	<li><b>on</b> - Switch the Main Zone on from standby. This can only work if "Network Standby" is "on" in the Pioneer AV Receiver. Refer to "networkStandby" above.</li>
@@ -3011,11 +3011,11 @@ RC_layout_PioneerAVR() {
 	<li><b>avrModel</b> - get the model of the Pioneer AV receiver, eg. VSX923 </li>
 	<li><b>mute</b> -  </li>
 	<li><b>networkPorts</b> - get the open tcp/ip ports of the Pioneer AV Receiver</li>
-	<li><b>networkSettings</b> - get the IP network settings (ip, netmask, gateway,dhcp, dns1, dns2, proxy) of the Pioneer AV Receiver </li>
-	<li><b>networkStandby</b> -  </li>
+	<li><b>networkSettings</b> - get the IP network settings (ip, netmask, gateway,dhcp, dns1, dns2, proxy) of the Pioneer AV Receiver. The values are stored as INTERNALS not as READINGS </li>
+	<li><b>networkStandby</b> - get the current setting of networkStandby -> the value of networkStandby (on|off) is stored as an INTERNAL not as a READING</li>
 	<li><b>power</b> - get the Power state of the Pioneer AV receiver </li>
 	<li><b>signalSelect</b> -  </li>
-	<li><b>softwareVersion</b> - get the software version of the software currently running in the Pioneer AV receiver</li>
+	<li><b>softwareVersion</b> - get the software version of the software currently running in the Pioneer AV receiver. The value is stored as INTERNAL</li>
 	<li><b>speakers</b> -  </li>
 	<li><b>speakerSystem</b> -  </li>
 	<li><b>tone</b> -  </li>
@@ -3123,7 +3123,7 @@ RC_layout_PioneerAVR() {
 	<li><b>mcaccMemory <1...6></b> - Setzt einen der bis zu 6 gespeicherten MCACC Einstellungen der Main Zone</li>
 	<li><b>menu</b> - "Menu-Taste" der Fernbedienung. Für die gleichen Eingangsquellen wie "play"</li>
 	<li><b>mute <on|off|toggle></b> - Stummschalten der Main Zone des Pioneer AV Receivers. "mute = on" bedeutet: stumm</li>
-	<li><b>networkStandby <on|off></b> -  Schaltet Network standby ein oder aus. Um einen Pioneer AV Receiver mit diesem Modul aus dem Standby einzuschalten, muss Network Standby = on sein.</li>
+	<li><b>networkStandby <on|off></b> -  Schaltet Network standby ein oder aus. Um einen Pioneer AV Receiver mit diesem Modul aus dem Standby einzuschalten, muss Network Standby = on sein. Mit <code>set &lt;name&gt; networkStandby on</code> sollte sich das machen lassen.</li>
 	<li><b>next</b> -  für die gleichen Eingangsquellen wie "play"</li>
 	<li><b>off</b> - Ausschalten der Main Zone in den Standby Modus.</li>
 	<li><b>on</b> - Einschalten der Main Zone aus dem Standby Modus. Das funktioniert nur, wenn am Pioneer AV Receiver "Network Standby" "on" eingestellt ist. Siehe dazu auch "networkStandby" weiter unten.</li>
@@ -3220,14 +3220,14 @@ RC_layout_PioneerAVR() {
 	<li><b>listeningMode</b> - </li>
 	<li><b>listeningModePlaying</b> - </li>
 	<li><b>macAddress</b> - </li>
-	<li><b>avrModel</b> - Versucht vom Pioneer AV Receiver die Modellbezeichnung (z.B. VSX923) einzulesen und im gleichnamigen reading abzuspeichern</li>
+	<li><b>avrModel</b> - Versucht vom Pioneer AV Receiver die Modellbezeichnung (z.B. VSX923) einzulesen und im gleichnamigen INTERNAL abzuspeichern</li>
 	<li><b>mute</b> - </li>
-	<li><b>networkPorts</b> - Versucht vom Pioneer AV Receiver die offenen Ethernet Ports einzulesen und in den Readings networkPort1 ... networkPort4 abzuspeichern</li>
-	<li><b>networkSettings</b> - Versucht vom Pioneer AV Receiver die Netzwerkparameter (IP, Gateway, Netmask, Proxy, DHCP, DNS1, DNS2) einzulesen und in Readings abzuspeichern</li>
-	<li><b>networkStandby</b> - </li>
-	<li><b>power</b> - Versucht vom Pioneer AV Receiver in Erfahrung zu bringen, ob die Main Zone eingeschaltet oder in Standby ist</li>
+	<li><b>networkPorts</b> - Versucht vom Pioneer AV Receiver die offenen Ethernet Ports einzulesen und als INTERNAL networkPort1 ... networkPort4 abzuspeichern</li>
+	<li><b>networkSettings</b> - Versucht vom Pioneer AV Receiver die Netzwerkparameter (IP, Gateway, Netmask, Proxy, DHCP, DNS1, DNS2) einzulesen und in INTERNALS abzuspeichern</li>
+	<li><b>networkStandby</b> - Versucht vom Pioneer AV Receiver den Parameter networkStandby (kann on oder off sein) einzulesen und als INTERNAL abzuspeichern</li>
+	<li><b>power</b> - Versucht vom Pioneer AV Receiver in Erfahrung zu bringen, ob die Main Zone eingeschaltet oder in Standby ist.</li>
 	<li><b>signalSelect</b> - </li>
-	<li><b>softwareVersion</b> - Fragt den Pioneer AV Receiver nach der aktuell im Receiver verwendeten Software Version</li>
+	<li><b>softwareVersion</b> - Fragt den Pioneer AV Receiver nach der aktuell im Receiver verwendeten Software Version und speichert diese als INTERNAL</li>
 	<li><b>speakers</b> - </li>
 	<li><b>speakerSystem</b> - Fragt die aktuell verwendete Lautsprecheranwendung vom Pioneer AV Receiver ab. Mögliche Werte sind z.B. "ZONE 2", "Normal(SB/FH)", "5.1ch C+Surr Bi-Amp",...</li>
 	<li><b>tone</b> - </li>
