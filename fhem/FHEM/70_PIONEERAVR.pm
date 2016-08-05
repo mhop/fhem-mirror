@@ -2995,6 +2995,7 @@ RC_layout_PioneerAVR() {
 
   <a name="PIONEERAVRget"></a>
   <b>Get</b>
+  does not return any value but asks the Pioneer AVR for the current status (e.g. of the volume). As soon as the Pioneer AVR replies (the time, till the Pioneer AVR replies is unpredictable), the readings or internals of this pioneerAVR modul are updated.
   <ul>
 	<li><b>loadInputNames</b> - reads the names of the inputs from the Pioneer AV receiver and checks if those inputs are enabled</li>
 	<li><b>audioInfo</b> - get the current audio parameters from the Pioneer AV receiver (e.g. audioInputSignal, audioInputFormatXX, audioOutputFrequency)</li>
@@ -3208,6 +3209,7 @@ RC_layout_PioneerAVR() {
   <ul>
     <code>get &lt;name&gt; raw &lt;Befehl&gt;</code>
     <br><br>
+	liefert bei diesem Modul keine Werte zurück, sondern fragt den Pioneer AVR  nach dem aktuellen Status (z.B. der Lautstärke). Sobald der Pioneer AVR antwortet (die Zeit, bis der Pioneer AVR antwortet, ist nicht vorhersehbar), aktualisiert das Modul die Readings bzw. Internals des PioneerAVR devices.
 	Falls unten keine Beschreibung für das "get-Kommando" angeführt ist, siehe gleichnamiges "Set-Kommando"
 	<li><b>loadInputNames</b> - liest die Namen der Eingangsquellen vom Pioneer AV Receiver	und überprüft, ob sie aktiviert sind</li>
 	<li><b>audioInfo</b> - Holt die aktuellen Audio Parameter vom Pioneer AV receiver (z.B. audioInputSignal, audioInputFormatXX, audioOutputFrequency)</li>
