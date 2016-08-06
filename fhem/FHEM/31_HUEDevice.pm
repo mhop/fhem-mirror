@@ -1263,7 +1263,7 @@ HUEDevice_Attr($$$;$)
     return "$name is not a CLIP sensor device" if( $hash->{type} && $hash->{type} !~ m/^CLIP/ );
     if( $cmd eq "set" && $attrVal ) {
       foreach my $line ( split( "\n", $attrVal ) ) {
-        my($cmd,$json) = split( ":", $line );
+        my($cmd,$json) = split( ":", $line,2 );
         if( $cmd =~ m'^/(.*)/$' ) {
           my $regex = $1;
           $hash->{helper}{setList}{'regex'} = [] if( !$hash->{helper}{setList}{':regex'} );
