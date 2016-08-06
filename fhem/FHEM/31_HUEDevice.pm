@@ -126,6 +126,7 @@ sub HUEDevice_Initialize($)
   $hash->{UndefFn}  = "HUEDevice_Undefine";
   $hash->{SetFn}    = "HUEDevice_Set";
   $hash->{GetFn}    = "HUEDevice_Get";
+  $hash->{AttrFn}   = "HUEDevice_Attr";
   $hash->{AttrList} = "IODev ".
                       "delayedUpdate:1 ".
                       "ignoreReachable:1,0 ".
@@ -133,6 +134,7 @@ sub HUEDevice_Initialize($)
                       "color-icons:1,2 ".
                       "transitiontime ".
                       "model:".join(",", sort map { $_ =~ s/ /#/g ;$_} keys %hueModels)." ".
+                      "setList:textField-long ".
                       "subType:extcolordimmer,colordimmer,ctdimmer,dimmer,switch ".
                       $readingFnAttributes;
 
@@ -599,6 +601,10 @@ HUEDevice_Set($@)
     }
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
+    my $shash = $defs{$name}->{IODev};
+
+    my $id = $hash->{ID};
+    $id = $1 if( $id =~ m/^S(\d.*)/ );
 
     if( $cmd eq "statusRequest" ) {
       RemoveInternalTimer($hash);
@@ -606,19 +612,41 @@ HUEDevice_Set($@)
       return undef;
 
     } elsif( $cmd eq 'json' ) {
-      my $shash = $defs{$name}->{IODev};
-
-      my $id = $hash->{ID};
-      $id = $1 if( $id =~ m/^S(\d.*)/ );
-
       return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, @args );
 
       return undef;
 
+    } elsif( my @match = grep { $cmd eq $_ } keys $hash->{helper}{setList}{cmds} ) {
+      return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, $hash->{helper}{setList}{cmds}{$match[0]} );
+
+    } elsif( my $entries = $hash->{helper}{setList}{regex} ) {
+      foreach my $entry (@{$entries}) {
+        if( join(' ', @aa) =~ /$entry->{regex}/ ) {
+          my $VALUE1 = $1;
+          my $VALUE2 = $2;
+          my $VALUE3 = $3;
+          my $json = $entry->{json};
+          $json =~ s/\$1/$VALUE1/;
+          $json =~ s/\$2/$VALUE2/;
+          $json =~ s/\$3/$VALUE3/;
+          return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, $json );
+
+        }
+      }
     }
 
-    return "Unknown argument $cmd, choose one of json statusRequest:noArg" if( $hash->{type} && $hash->{type} =~ /^CLIP/ );
-    return "Unknown argument $cmd, choose one of statusRequest:noArg";
+    my $list = 'statusRequest:noArg';
+    $list .= ' json' if( $hash->{type} && $hash->{type} =~ /^CLIP/ );
+    $list .= ' '. join( ':noArg ', keys $hash->{helper}{setList}{cmds} );
+    $list .= ':noArg' if( $hash->{helper}{setList}{cmds} );
+    if( my $entries = $hash->{helper}{setList}{regex} ) {
+      foreach my $entry (@{$entries}) {
+        $list .= ' ';
+        $list .= (split( ' ', $entry->{regex} ))[0];
+      }
+    }
+
+    return SetExtensions($hash, $list, $name, @aa);
   }
 
   if( $cmd eq 'rename' ) {
@@ -1223,6 +1251,33 @@ HUEDevice_Parse($$)
   return $changed;
 }
 
+sub
+HUEDevice_Attr($$$;$)
+{
+  my ($cmd, $name, $attrName, $attrVal) = @_;
+
+  if( $attrName eq "setList" ) {
+    my $hash = $defs{$name};
+    delete $hash->{helper}{setList};
+    return "$name is not a sensor device" if( $hash->{helper}->{devtype} ne 'S' );
+    return "$name is not a CLIP sensor device" if( $hash->{type} && $hash->{type} !~ m/^CLIP/ );
+    if( $cmd eq "set" && $attrVal ) {
+      foreach my $line ( split( "\n", $attrVal ) ) {
+        my($cmd,$json) = split( ":", $line );
+        if( $cmd =~ m'^/(.*)/$' ) {
+          my $regex = $1;
+          $hash->{helper}{setList}{'regex'} = [] if( !$hash->{helper}{setList}{':regex'} );
+          push @{$hash->{helper}{setList}{'regex'}}, { regex => $regex, json => $json };
+        } else {
+          $hash->{helper}{setList}{cmds}{$cmd} = $json;
+        }
+      }
+    }
+  }
+
+  return;
+}
+
 1;
 
 =pod
@@ -1366,6 +1421,10 @@ HUEDevice_Parse($$)
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>ignoreReachable<br>
       ignore the reachable state that is reported by the hue bridge. assume the device is allways reachable.</li>
+    <li>setList<br>
+      The list of know set commands for sensor type devices. one command per line, eg.: <code><br>
+   attr mySensor setList present:{...}\<br>
+absent:{...}</code></li>
     <li>subType<br>
       extcolordimmer -> device has rgb and color temperatur control<br>
       colordimmer -> device has rgb controll<br>
