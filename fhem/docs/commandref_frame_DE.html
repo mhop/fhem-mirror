@@ -1383,10 +1383,21 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
     <a name="configfile"></a>
     <li>configfile<br>
-        Enth&auml;lt den Namen der FHEM Konfigurationsdatei. Wenn <a href="#save">save</a> 
-    ohne Argumente aufgerufen wird dann wird die Ausgabedatei unter diesem 
-    Dateinamen gespeichert.
+       Enth&auml;lt den Namen der FHEM Konfigurationsdatei. Wenn <a
+       href="#save">save</a> ohne Argumente aufgerufen wird dann wird die
+       Ausgabedatei unter diesem Dateinamen gespeichert.
     </li><br>
+
+    <a name="dnsServer"></a>
+    <li>dnsServer<br>
+        Enth&auml;lt die IP Adresse des DNS Servers. Die von bestimmten Modulen
+        (oder eigenen Code) aufgerufene HttpUtils_NonblockingGet wird auch bei
+        der DNS Aufl&ouml;sung nicht mehr blockieren, falls dieses Attribut
+        gesetzt ist, da es in diesem Fall FHEM eigene Routinen aufgerufen
+        werden. Sonst werden die OS-eigenen, blockierenden Routinen inet_aton
+        bzw gethostbyname aufgerufen.
+    </li><br>
+
 
     <a name="holiday2we"></a>
     <li>holiday2we<br>

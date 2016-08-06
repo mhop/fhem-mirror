@@ -1301,6 +1301,13 @@ The following local attributes are used by a wider range of devices:
         receiving a corresponding message.
     </li><br>
 
+    <a name="autosave"></a>
+    <li>autosave<br>
+        enable some modules to automatically trigger save after a configuration
+        change, e.g. after a new device was created. Default is 1 (true), you
+        can deactivate this feature by setting the value to 0.
+    </li>
+
     <a name="backupcmd"></a>
     <li>backupcmd<br>
         You could pass the backup to your own command / script by using this attribute.
@@ -1349,6 +1356,15 @@ The following local attributes are used by a wider range of devices:
         Contains the name of the fhem configuration file. If <a
         href="#save">save</a> is called without argument, then the output will
         be written to this file.
+    </li><br>
+
+    <a name="dnsServer"></a>
+    <li>dnsServer<br>
+        Contains the IP address of the DNS Server. If some of the modules or
+        user code calls the HttpUtils_NonblockingGet function, and this
+        attribute is set, then FHEM specific nonblocking code will be used to
+        resolve the given address. If this attribute is not set, the blocking
+        OS implementation (inet_aton and gethostbyname) will be used.
     </li><br>
 
     <a name="holiday2we"></a>
@@ -1489,13 +1505,6 @@ The following local attributes are used by a wider range of devices:
     <li>restartDelay<br>
         set the delay for shutdown restart, default is 2 (seconds).
     </li><br>
-
-    <a name="autosave"></a>
-    <li>autosave<br>
-        enable some modules to automatically trigger save after a configuration
-        change, e.g. after a new device was created. Default is 1 (true), you
-        can deactivate this feature by setting the value to 0.
-    </li>
 
   </ul>
 </ul>
