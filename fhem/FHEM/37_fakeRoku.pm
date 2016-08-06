@@ -53,6 +53,8 @@ fakeRoku_getLocalIP()
         PeerAddr    => '8.8.8.8:53',    # google dns
         #PeerAddr    => '198.41.0.4:53', # a.root-servers.net
     );
+  return '<unknown>' if( !$socket );
+
   my $ip = $socket->sockhost;
   close( $socket );
 
