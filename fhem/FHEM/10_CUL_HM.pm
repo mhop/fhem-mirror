@@ -2186,7 +2186,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my $vs = $val == 0 ? "off" : "on";
       if ($chn == 4){
         my %lvlSet = ("00"=>"disarmed","01"=>"armExtSens","02"=>"armAll","03"=>"armBlocked");
-        $vs = $lvlSet{$val};
+        $vs = defined $lvlSet{$val}?$lvlSet{$val}:$val;
       }
       push @evtEt,[$mh{cHash},1,"level:$val"];
       push @evtEt,[$mh{cHash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
@@ -4332,7 +4332,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $peerId  = CUL_HM_peerChId($peerChnIn,$dst);
       ($peerId,$peerChn) = unpack 'A6A2',$peerId.'01';
       if ($list == 4 && 
-          AttrVal($name,"peerIDs",undef)){##########################
+          !AttrVal($name,"peerIDs",undef)){####check this code#################
           $peerChn = "00";
       }
       return "Peer not valid" if (length ($peerId) < 6);
