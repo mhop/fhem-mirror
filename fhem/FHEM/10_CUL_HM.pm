@@ -4938,31 +4938,26 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     $evtDly = 1;
     foreach my $line (@disp_lines[0..2]) {# only 3 lines
       # Split line into text and icon part separated by comma
-      my ($text, $icon);
-      
+
       $snd .= '12';# start text indicator
-      if (defined $line && $line ne '') {
-        ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
-         
-        # Hex code
-        if ($text =~ /^0x[0-9A-F]{2}$/) {
-          $snd .= substr($text,2,2);
-        }
-        # Predefined text code text0-9
-        elsif ($text =~ /^text([0-9])$/) {
-          $snd .= sprintf ("8%1X", $1);
-        }
-        # Convert string to hex codes
-        else {
-          $text =~ s/\\_/ /g;
-          foreach my $ch (split ('', substr ($text, 0, 12))) {
-            $snd .= sprintf ("%02X", ord ($ch));
-          }
-        }
+      if (!defined $line || $line eq '') {
+        $line =  ReadingsVal($name,"line${lineNr}_text","")
+                .","
+                .ReadingsVal($name,"line${lineNr}_icon","off");
       }
-      else{
-        $text = ReadingsVal($name,"line${lineNr}_text","");
-        $icon = ReadingsVal($name,"line${lineNr}_icon","off");
+      my ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
+       
+      # Hex code
+      if ($text =~ /^0x[0-9A-F]{2}$/) {
+        $snd .= substr($text,2,2);
+      }
+      # Predefined text code text0-9
+      elsif ($text =~ /^text([0-9])$/) {
+        $snd .= sprintf ("8%1X", $1);
+      }
+      # Convert string to hex codes
+      else {
+        $text =~ s/\\_/ /g;
         foreach my $ch (split ('', substr ($text, 0, 12))) {
           $snd .= sprintf ("%02X", ord ($ch));
         }
@@ -8436,7 +8431,7 @@ sub CUL_HM_UpdtCentral($){
     next if (!$defs{$ioN});
     if (  $defs{$ioN}{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/){;
     }
-    elsif($defs{$ioN}{TYPE} eq "CUL"){
+    elsif(($defs{$ioN}{TYPE} eq "CUL")||($defs{$ioN}{TYPE} eq "STACKABLE_CC")){
       CommandAttr(undef, "$ioN rfmode HomeMatic") 
             if (AttrVal($ioN,"rfmode","") ne "HomeMatic");
     }
