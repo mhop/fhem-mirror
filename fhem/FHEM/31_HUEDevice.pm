@@ -616,7 +616,7 @@ HUEDevice_Set($@)
 
       return undef;
 
-    } elsif( my @match = grep { $cmd eq $_ } keys $hash->{helper}{setList}{cmds} ) {
+    } elsif( my @match = grep { $cmd eq $_ } keys ($hash->{helper}{setList}{cmds}?$hash->{helper}{setList}{cmds}:{}) ) {
       return HUEBridge_Set( $shash, $shash->{NAME}, 'setsensor', $id, $hash->{helper}{setList}{cmds}{$match[0]} );
 
     } elsif( my $entries = $hash->{helper}{setList}{regex} ) {
@@ -637,7 +637,7 @@ HUEDevice_Set($@)
 
     my $list = 'statusRequest:noArg';
     $list .= ' json' if( $hash->{type} && $hash->{type} =~ /^CLIP/ );
-    $list .= ' '. join( ':noArg ', keys $hash->{helper}{setList}{cmds} );
+    $list .= ' '. join( ':noArg ', keys $hash->{helper}{setList}{cmds} ) if( $hash->{helper}{setList}{cmds} );
     $list .= ':noArg' if( $hash->{helper}{setList}{cmds} );
     if( my $entries = $hash->{helper}{setList}{regex} ) {
       foreach my $entry (@{$entries}) {
@@ -1423,8 +1423,8 @@ HUEDevice_Attr($$$;$)
       ignore the reachable state that is reported by the hue bridge. assume the device is allways reachable.</li>
     <li>setList<br>
       The list of know set commands for sensor type devices. one command per line, eg.: <code><br>
-   attr mySensor setList present:{...}\<br>
-absent:{...}</code></li>
+   attr mySensor setList present:{&lt;json&gt;}\<br>
+absent:{&lt;json&gt;}</code></li>
     <li>subType<br>
       extcolordimmer -> device has rgb and color temperatur control<br>
       colordimmer -> device has rgb controll<br>
