@@ -1226,7 +1226,7 @@ sub HMUARTLGW_Parse($$$$)
 			my ($type, $status, $info, $rssi, $mNr, $flags, $cmd, $src, $dst, $payload) = ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 
 			Log3($hash, HMUARTLGW_getVerbLvl($hash, $src, $dst, 5),
-			     "HMUARTLGW ${name} recv: 01 ${type} ${status} ${info} ${rssi}                              msg:${mNr} ${flags}${cmd} ${src} ${dst} ${payload}");
+			     "HMUARTLGW ${name} recv: 01 ${type} ${status} ${info} ${rssi} msg: ${mNr} ${flags} ${cmd} ${src} ${dst} ${payload}");
 
 			return if (!$hash->{Helper}{Initialized});
 
@@ -1922,7 +1922,7 @@ sub HMUARTLGW_send($$$)
 		}
 
 		if ($m =~ m/^(..)(..)(..)(......)(......)(.*)$/) {
-			$log .= "                             msg:${1} ${2}${3} ${4} ${5} ${6}";
+			$log .= "msg: ${1} ${2} ${3} ${4} ${5} ${6}";
 		} else {
 			$log .= $m;
 		}
