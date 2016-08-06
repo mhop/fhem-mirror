@@ -26,7 +26,7 @@
 #
 ###########################################################################################################
 #
-# create additional indexes for performance purposes:
+# create additional indexes due to performance purposes:
 #
 # ALTER TABLE 'fhem'.'history' ADD INDEX `Reading_Time_Idx` (`READING`, `TIMESTAMP`) USING BTREE;
 #
@@ -37,6 +37,9 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.4.2        05.08.2016       commandref complemented, fieldlength used in function "insert" trimmed to 32 
+# 3.4.1        04.08.2016       check of numeric value type in functions maxvalue, diffvalue
+# 3.4          03.08.2016       function "insert" added
 # 3.3.3        16.07.2016       bugfix of aggregation=week if month start is 01 and month end is 12 AND 
 #                               the last week of december is "01" like in 2014 (checked in version 11804)
 # 3.3.2        16.07.2016       readings completed with begin of selection range to ensure valid reading order,
@@ -91,6 +94,7 @@ use strict;
 use warnings;
 use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday tv_interval);
+use Scalar::Util qw(looks_like_number);
 use DBI;
 use Blocking;
 use Time::Local;
@@ -105,7 +109,6 @@ sub DbRep_Initialize($) {
  $hash->{UndefFn}      = "DbRep_Undef"; 
  # $hash->{NotifyFn}     = "DbRep_Notify";
  $hash->{SetFn}        = "DbRep_Set";
- # $hash->{GetFn}        = "DbRep_Get";
  $hash->{AttrFn}       = "DbRep_Attr";
  
  $hash->{AttrList} =   "disable:1,0 ".
@@ -161,6 +164,7 @@ sub DbRep_Set {
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
   my $opt     = $a[1];
+  my $prop    = $a[2];
   my $dbh     = $hash->{DBH};
   my $setlist; 
   
@@ -171,6 +175,7 @@ sub DbRep_Set {
              "maxValue:noArg ".
              "fetchrows:noArg ".
              "diffValue:noArg ".
+             "insert ".
              "countEntries:noArg ";
   
   return if(IsDisabled($name));
@@ -210,6 +215,45 @@ sub DbRep_Set {
           return " The attribute reading for analyze is not set !";
       }
       sqlexec($hash,"diff");
+  
+  } elsif ($opt eq "insert") { 
+      if ($prop) {
+    
+          my ($i_date, $i_time, $i_device, $i_reading, $i_value, $i_unit) = split(",",$prop);
+                    
+          if (!$i_date || !$i_time || !$i_device || !$i_reading || !$i_value) {return "At least data for Date, Time, Device, Reading and Value are needed to insert. Inputformat is 'YYYY-MM-DD,HH:MM:SS,<Device(32)>,<Reading(32)>,<Value(32)>,<Unit(32)>' ";}
+
+          unless ($i_date =~ /(\d{4})-(\d{2})-(\d{2})/) {return "Input for date is not valid. Use format YYYY-MM-DD !";}
+          unless ($i_time =~ /(\d{2}):(\d{2}):(\d{2})/) {return "Input for time is not valid. Use format HH:MM:SS !";}
+          my $i_timestamp = $i_date." ".$i_time;
+          my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($i_timestamp =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+           
+          eval { my $ts = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+           
+          if ($@) {
+              my @l = split (/at/, $@);
+              return " Timestamp is out of range - $l[0]";         
+          }          
+          
+          # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden
+          $i_device   = substr($i_device,0, 32);
+          $i_reading  = substr($i_reading,0, 32);
+          $i_value    = substr($i_value,0, 32);
+          $i_unit     = substr($i_unit,0, 32);
+          
+          $hash->{helper}{I_TIMESTAMP} = $i_timestamp;
+          $hash->{helper}{I_DEVICE}    = $i_device;
+          $hash->{helper}{I_READING}   = $i_reading;
+          $hash->{helper}{I_VALUE}     = $i_value;
+          $hash->{helper}{I_UNIT}      = $i_unit;
+          $hash->{helper}{I_TYPE}      = my $i_type = "manual";
+          $hash->{helper}{I_EVENT}     = my $i_event = "manual";          
+          
+      } else {
+          return "Data to insert to table 'history' are needed like this pattern: 'Date,Time,Device,Reading,Value,Unit'. Spaces are not allowed !";
+      }
+      
+      sqlexec($hash,"insert");
   }
   else  
   {
@@ -512,7 +556,7 @@ $hash->{HELPER}{CV} = \%cv;
     my $i = 1;           # Schleifenzähler -> nur Indikator für ersten Durchlauf -> anderer $runtime_string_first
     my $ll;              # loopindikator, wenn 1 = loopausstieg
  
-    # Aufbau Timestmapstring mit Zeitgrenzen entsprechend Aggregation
+    # Aufbau Timestampstring mit Zeitgrenzen entsprechend Aggregation
     while (!$ll) {
 
         # collect aggregation strings         
@@ -524,31 +568,34 @@ $hash->{HELPER}{CV} = \%cv;
     } 
 
  if ($opt eq "sum") {
-    $hash->{helper}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{helper}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$ts", "sumval_ParseDone", $to, "ParseAborted", $hash);
      
  } elsif ($opt eq "count") {
-    $hash->{helper}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{helper}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$device§$reading§$ts", "count_ParseDone", $to, "ParseAborted", $hash);
 
  } elsif ($opt eq "average") {      
-    $hash->{helper}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
+     $hash->{helper}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$ts", "averval_ParseDone", $to, "ParseAborted", $hash); 
     
  } elsif ($opt eq "fetchrows") {
-         $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-         $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+     $runtime_string_first = defined($epoch_seconds_begin) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
+     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
              
-         $hash->{helper}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
+     $hash->{helper}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "ParseAborted", $hash);
     
  } elsif ($opt eq "max") {        
-    $hash->{helper}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{helper}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$ts", "maxval_ParseDone", $to, "ParseAborted", $hash);   
          
  } elsif ($opt eq "del") {
-         $runtime_string_first = AttrVal($hash->{NAME}, "timestamp_begin", undef) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
-         $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+     $runtime_string_first = AttrVal($hash->{NAME}, "timestamp_begin", undef) ? strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin) : "1970-01-01 01:00:00";
+     $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          
-         $hash->{helper}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
+     $hash->{helper}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "ParseAborted", $hash);        
  
  }  elsif ($opt eq "diff") {        
-    $hash->{helper}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
+     $hash->{helper}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$ts", "diffval_ParseDone", $to, "ParseAborted", $hash);   
+         
+ }  elsif ($opt eq "insert") { 
+     $hash->{helper}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "ParseAborted", $hash);   
          
  }
 
@@ -997,6 +1044,16 @@ sub maxval_ParseDone {
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
       my $value          = $a[1];
+      
+      # Test auf $value = "numeric"
+      if (!looks_like_number($value)) {
+          readingsSingleUpdate($hash, "state", "error", 1);
+          delete($hash->{helper}{RUNNING_PID});
+          Log3 ($name, 2, "DbRep $name - ERROR - found value = '$value' isn't numeric in maxValue function. Leaving ...");
+          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
+          return;
+      }
+      
       $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
       my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
       
@@ -1199,7 +1256,17 @@ sub diffval_ParseDone {
       my @a = split("[ \t][ \t]*", $row);
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
+      
       my $value          = $a[1];
+      # Test auf $value = "numeric"
+      if (!looks_like_number($value)) {
+          readingsSingleUpdate($hash, "state", "error", 1);
+          delete($hash->{helper}{RUNNING_PID});
+          Log3 ($name, 2, "DbRep $name - ERROR - found value = '$value' isn't numeric in diffValue function. Leaving ...");
+          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
+          return;
+      }
+      
       $a[3]              =~ s/:/-/g if($a[3]);          # substituieren unsopported characters -> siehe fhem.pl
       my $timestamp      = $a[3]?$a[2]."_".$a[3]:$a[2];
       
@@ -1535,6 +1602,117 @@ return;
 }
 
 ####################################################################################################
+# nichtblockierendes DB insert
+####################################################################################################
+
+sub insert_Push {
+ my ($name)     = @_;
+ my $hash       = $defs{$name};
+ my $dbloghash  = $hash->{dbloghash};
+ my $dbconn     = $dbloghash->{dbconn};
+ my $dbuser     = $dbloghash->{dbuser};
+ my $dblogname  = $dbloghash->{NAME};
+ my $dbpassword = $attr{"sec$dblogname"}{secret};
+ 
+ Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Push");
+ 
+ my $dbh;
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     Log3 ($name, 2, "DbRep $name - $@");
+     Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
+     return "$name|''|''|1";
+ }
+ 
+ my $i_timestamp = $hash->{helper}{I_TIMESTAMP};
+ my $i_device    = $hash->{helper}{I_DEVICE};
+ my $i_type      = $hash->{helper}{I_TYPE};
+ my $i_event     = $hash->{helper}{I_EVENT};
+ my $i_reading   = $hash->{helper}{I_READING};
+ my $i_value     = $hash->{helper}{I_VALUE};
+ my $i_unit      = $hash->{helper}{I_UNIT} ? $hash->{helper}{I_UNIT} : " "; 
+ 
+ # SQL zusammenstellen für DB-Operation
+    
+ Log3 ($name, 5, "DbRep $name -> data to insert Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");     
+ 
+ # SQL-Startzeit
+ my $st = [gettimeofday];
+
+ $dbh->begin_work();
+ my $sth = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)");
+ 
+ eval {$sth->execute($i_timestamp, $i_device, $i_type, $i_event, $i_reading, $i_value, $i_unit);};
+ 
+ my $irow;
+ if ($@) {
+     Log3 ($name, 2, "DbRep $name - Failed to insert new dataset into database: $@");
+     $dbh->rollback();
+     $dbh->disconnect();
+     Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
+     return "$name|''|''|1";
+ } else {
+     $dbh->commit();
+     $irow = $sth->rows;
+     $dbh->disconnect();
+ } 
+
+ # SQL-Laufzeit ermitteln
+ my $rt = tv_interval($st);
+ 
+ Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Push finished");
+ 
+ return "$name|$irow|$rt|0";
+}
+
+####################################################################################################
+# Auswertungsroutine DB insert
+####################################################################################################
+
+sub insert_Done {
+  my ($string) = @_;
+  my @a     = split("\\|",$string);
+  my $hash  = $defs{$a[0]};
+  my $name  = $hash->{NAME};
+  my $irow  = $a[1];
+  my $rt    = $a[2];
+  my $dberr = $a[3];
+  
+  Log3 ($name, 4, "DbRep $name -> Start BlockingCall insert_Done");
+  
+  my $i_timestamp = delete $hash->{helper}{I_TIMESTAMP};
+  my $i_device    = delete $hash->{helper}{I_DEVICE};
+  my $i_type      = delete $hash->{helper}{I_TYPE};
+  my $i_event     = delete $hash->{helper}{I_EVENT};
+  my $i_reading   = delete $hash->{helper}{I_READING};
+  my $i_value     = delete $hash->{helper}{I_VALUE};
+  my $i_unit      = delete $hash->{helper}{I_UNIT}; 
+  
+  if ($dberr) {
+      readingsSingleUpdate($hash, "state", "error", 1);
+      delete($hash->{helper}{RUNNING_PID});
+      Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
+      return;
+  } 
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "number_lines_inserted", $irow);    
+  readingsBulkUpdate($hash, "data_inserted", $i_timestamp.", ".$i_device.", ".$i_type.", ".$i_event.", ".$i_reading.", ".$i_value.", ".$i_unit);   
+  readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt)) if(AttrVal($name, "showproctime", undef));
+  readingsBulkUpdate($hash, "state", "done"); 
+  readingsEndUpdate($hash, 1);
+  
+  Log3 ($name, 5, "DbRep $name - Inserted into database $hash->{dbloghash}{NAME} table 'history': Timestamp: $i_timestamp, Device: $i_device, Type: $i_type, Event: $i_event, Reading: $i_reading, Value: $i_value, Unit: $i_unit");  
+
+  delete($hash->{helper}{RUNNING_PID});
+  Log3 ($name, 4, "DbRep $name -> BlockingCall insert_Done finished");
+  
+return;
+}
+
+
+####################################################################################################
 # nichtblockierende DB-Abfrage fetchrows
 ####################################################################################################
 
@@ -1642,7 +1820,7 @@ sub fetchrows_ParseDone {
              my @a = split("[ \t][ \t]*", $row, 5);
              my $dev = $a[0];
              my $rea = $a[1];
-             $a[3]   =~ s/:/-/g;          # substituieren unsopported characters -> siehe fhem.pl
+             $a[3]   =~ s/:/-/g;          # substituieren unsopported characters ":" -> siehe fhem.pl
              my $ts  = $a[2]."_".$a[3];
              my $val = $a[4];
              
@@ -1861,7 +2039,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
   <br>
   The purpose of this module is browsing of DbLog-databases. The searchresults can be evaluated concerning to various aggregations and the appropriate 
   Readings will be filled.
-  Also a function to deletion of datasets is provided. The dataselection considering is done by declaration of device, reading and the time settings of
+  Also a function to deletion of datasets and manual insert of data is provided. The dataselection considering is done by declaration of device, reading and the time settings of
   selection-begin and selection-end.  <br><br>
   
   All database operations are implemented nonblocking. Optional the execution time of SQL-statements in background can also be determined and provided as reading.
@@ -1910,6 +2088,13 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
     <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading".  </li> <br>
     <li><b> countEntries </b> -  provides the number of DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end".(if set) or "timeDiffToNow". If timestamp-attributes are not set all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
     <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". A possibly set aggregation attribute will <b>not</b> considered.  </li> <br>
+    <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time, Device, Reading and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically. <br><br>
+    
+                                 input format:    Date,Time,Device,Reading,Value,Unit  <br>
+                                 example:         2016-08-01,23:00:09,TestDevice,TestReading,TestValue,TestUnit  # field lenth is maximum 32 characters, NO spaces are allowed in fieldvalues ! <br>  
+                                 </li> <br>
+                                 
+
     <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". Using this function is mostly reasonable if value-differences of readings are written to the database. </li> <br>  
     <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". The evaluation contains the timestamp of the identified max values within the given period.  </li> <br>
     <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. </li> <br>
@@ -1979,8 +2164,8 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 <ul>
   <br>
   Zweck des Moduls ist es, den Inhalt von DbLog-Datenbanken nach bestimmten Kriterien zu durchsuchen und das Ergebnis hinsichtlich verschiedener 
-  Aggregationen auszuwerten und als Readings darzustellen. Daneben wird eine Löschfunktionen für Datenbankinhalte zur Verfügung gestellt. 
-  Die Daten können aggregiert werden. Die Abgrenzung der zu berücksichtigenden Datenbankinhalte erfolgt durch die Angabe von Device, Reading und
+  Aggregationen auszuwerten und als Readings darzustellen. Daneben wird eine Löschfunktionen für Datenbankinhalte sowie die Möglichkeit zur manuellen Eingabe von Datensätzen
+  zur Verfügung gestellt. Die Daten können aggregiert werden. Die Abgrenzung der zu berücksichtigenden Datenbankinhalte erfolgt durch die Angabe von Device, Reading und
   die Zeitgrenzen für Auswertungsbeginn bzw. Auswertungsende.  <br><br>
   
   Alle Datenbankoperationen werden nichtblockierend ausgeführt. Die Ausführungszeit der SQL-Hintergrundoperationen kann optional ebenfalls als Reading bereitgestellt
@@ -2029,6 +2214,12 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
     <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muß das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
     <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" (wenn gesetzt) bzw. "timeDiffToNow". Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
     <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end". Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
+    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit, Device, Reading und Value. Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt. <br><br>
+    
+                                 Eingabeformat:    Datum,Zeit,Device,Reading,Value,Unit  <br>
+                                 Beispiel:         2016-08-01,23:00:09,TestDevice,TestReading,TestValue,TestUnit   # die Feldlänge ist maximal 32 Zeichen lang, es sind KEINE Leerzeichen im Feldwert erlaubt !<br>  
+                                 </li> <br>
+                                 
     <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
     <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Die Auswertung enthält den Zeitstempel des ermittelten Maximalwertes innerhalb der Aggregation bzw. Zeitgrenzen.  </li> <br>
     <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow". Es muss das auszuwertende Reading über das Attribut "reading" angegeben sein. Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. </li> <br>
