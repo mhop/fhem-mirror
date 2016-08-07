@@ -2182,7 +2182,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my ($chn,$val,$err) = (hex($mI[1]),hex($mI[2])/2,hex($mI[3]));
       my $vs = $val == 0 ? "off" : "on";
       if ($chn == 4){
-        my %lvlSet = ("00"=>"disarmed","01"=>"armExtSens","02"=>"armAll","03"=>"armBlocked");
+        my %lvlSet = ("00"=>"disarmed","32"=>"armExtSens","C8"=>"armAll","FF"=>"armBlocked");
         $vs = defined $lvlSet{$val}?$lvlSet{$val}:$val;
       }
       push @evtEt,[$mh{cHash},1,"level:$val"];
