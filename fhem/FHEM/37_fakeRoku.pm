@@ -773,6 +773,7 @@ Log 1, "!!!!!!!!!!";
   <br><br>
   Notes:
   <ul>
+    <li>XML::Simple is needed.</li>
     <li>IO::Socket::Multicast is needed.</li>
   </ul>
 
