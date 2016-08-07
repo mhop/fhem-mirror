@@ -411,7 +411,7 @@ sub Hyperion_GetConfigs($)
     $Hyperion_sets{configFile} = "textField" if ($Hyperion_sets{configFile} ne "textField");
     $attr{$name}{webCmd} = $Hyperion_webCmd if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
   }
-  return "Found at least one config file. Please refresh this page to see the result.";
+  fhem("trigger WEB JS:location.reload(true)");
 }
 
 sub Hyperion_listFilesInDir($$)
