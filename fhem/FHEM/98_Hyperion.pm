@@ -329,7 +329,7 @@ sub Hyperion_ParseHttpResponse($$$)
             readingsBulkUpdate($hash,"mode","effect") if (ReadingsVal($name,"mode","") ne "effect");
             readingsBulkUpdate($hash,"state","effect $en") if (Value($name) ne "effect $en");
             readingsBulkUpdate($hash,"previous_mode","effect") if (ReadingsVal($name,"previous_mode","effect") ne "effect");
-            Log3 $name,3,"$name: effect $en";
+            Log3 $name,4,"$name: effect $en";
           }
         }
       }
