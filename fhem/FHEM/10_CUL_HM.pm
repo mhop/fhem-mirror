@@ -1444,9 +1444,6 @@ sub CUL_HM_Parse($$) {#########################################################
         my $mode = ReadingsVal($chnName,"R-controlMode","");
         push @evtEt,[$chnHash,1,"desired-temp:$dTemp"];
         push @evtEt,[$chnHash,1,"desired-temp-manu:$dTemp"] if($mode =~ m /manual/  && $mh{mTp} eq '10');
-#       readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode =~ m /central/ && $mh{mTp} eq '02');
-#       removed - shall not be changed automatically - change is  only temporary
-#       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode =~ m /central/ && $mh{mTp} eq '10');
         $chnHash->{helper}{needUpdate} = 1                          if($mode =~ m /central/ && $mh{mTp} eq '10');
        }
       push @evtEt,[$mh{shash},1,"desired-temp:$dTemp"];
