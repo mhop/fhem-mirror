@@ -272,6 +272,7 @@ my @globalAttrList = qw(
   backupcmd
   backupdir
   backupsymlink
+  blockingCallMax
   configfile
   dnsServer
   dupTimeout

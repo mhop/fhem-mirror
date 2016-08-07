@@ -24,9 +24,12 @@ sub BlockingCall($$@);
 sub BlockingExit();
 sub BlockingKill($);
 sub BlockingInformParent($;$$);
+sub BlockingStart(;$);
 
 our $BC_telnetDevice;
+our %BC_hash;
 my $telnetClient;
+my $bc_pid = 0;
 
 sub
 BC_searchTelnet($)
@@ -68,38 +71,83 @@ BlockingCall($$@)
 {
   my ($blockingFn, $arg, $finishFn, $timeout, $abortFn, $abortArg) = @_;
 
+  my %h = ( pid=>'WAITING:', fn=>$blockingFn, arg=>$arg, finishFn=>$finishFn,
+            timeout=>$timeout, abortFn=>$abortFn, abortArg=>$abortArg );
+  $BC_hash{++$bc_pid} = \%h;
+  $h{bc_pid} = $bc_pid;
+  return BlockingStart(\%h);
+}
+
+sub
+BlockingStart(;$)
+{
+  my ($curr) = @_;
+
+  if($curr && $curr =~ m/^\d+$/) {
+    delete($BC_hash{$curr});
+    $curr = undef;
+  }
+
   # Look for the telnetport. Must be done before forking to be able to create a
   # temporary device. Do it each time, as the old telnet may got a password
-  BC_searchTelnet($blockingFn);
+  BC_searchTelnet($curr && $curr->{fn} ? $curr->{fn}: "BlockingStart");
 
-  # do fork
-  my $pid = fhemFork;
-  if(!defined($pid)) {
-    Log 1, "Cannot fork: $!";
-    return undef;
-  }
+  my $chld_alive = 0;
+  my $max = AttrVal('global', 'blockingCallMax', 0);
 
-  if($pid) {
-    Log 4, "BlockingCall ($blockingFn): created child ($pid), ".
-                "uses $BC_telnetDevice to connect back";
-    my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn, 
-              abortFn=>$abortFn, abortArg=>$abortArg );
-    if($timeout) {
-      InternalTimer(gettimeofday()+$timeout, "BlockingKill", \%h, 0);
+  for my $bpid (sort { $a <=> $b} keys %BC_hash) {
+    my $h = $BC_hash{$bpid};
+
+    if($h->{pid} !~ m/:/) {
+      if(!kill(0, $h->{pid})) {
+        $h->{pid} = "DEAD:$h->{pid}";
+        delete($BC_hash{$bpid});
+      } else {
+        $chld_alive++;
+      }
+      next;
     }
-    return \%h;
+
+    if($max && $chld_alive >= $max) {
+      if($curr && $curr->{fn}) {
+        Log 4, "BlockingCall ($curr->{fn}) enqueue: ".
+                      "limit (blockingCallMax=$max) reached";
+      }
+      RemoveInternalTimer(\%BC_hash);
+      InternalTimer(gettimeofday()+5, "BlockingStart", \%BC_hash, 0);
+      return $curr;
+    }
+
+    # do fork
+    my $pid = fhemFork;
+    if(!defined($pid)) {
+      Log 1, "Cannot fork: $!";
+      return $curr;
+    }
+
+    if($pid) {
+      Log 4, "BlockingCall ($h->{fn}): created child ($pid), ".
+                  "uses $BC_telnetDevice to connect back";
+      $h->{pid} = $pid;
+      InternalTimer(gettimeofday()+$h->{timeout}, "BlockingKill", $h, 0)
+        if($h->{timeout});
+      $chld_alive++;
+      next;
+    }
+
+    # Child here
+    no strict "refs";
+    my $ret = &{$h->{fn}}($h->{arg});
+    use strict "refs";
+
+    BlockingInformParent("BlockingStart", $h->{bc_pid}, 0) if($max);
+    BlockingExit() if(!$h->{finishFn});
+
+    # Write the data back, calling the function
+    BlockingInformParent($h->{finishFn}, $ret, 0);
+    BlockingExit();
   }
-
-  # Child here
-  no strict "refs";
-  my $ret = &{$blockingFn}($arg);
-  use strict "refs";
-
-  BlockingExit() if(!$finishFn);
-
-  # Write the data back, calling the function
-  BlockingInformParent($finishFn, $ret, 0);
-  BlockingExit();
+  return $curr;
 }
 
 sub
@@ -162,7 +210,7 @@ BlockingKill($)
   wait if($^O =~ m/Win/);
 
   if($^O !~ m/Win/) {
-    if($h->{pid} && kill(9, $h->{pid})) {
+    if($h->{pid} && $h->{pid} !~ m/:/ && kill(9, $h->{pid})) {
       Log 1, "Timeout for $h->{fn} reached, terminated process $h->{pid}";
       if($h->{abortFn}) {
         no strict "refs";
