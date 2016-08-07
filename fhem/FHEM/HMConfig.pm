@@ -376,7 +376,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>0    ,max=>100   ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"PowerLevel off"},
   OnMinLevel      =>{a=> 16.0,s=>1.0,l=>3,min=>0    ,max=>100   ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"minimum PowerLevel"},
   OnLevel         =>{a=> 17.0,s=>1.0,l=>3,min=>0    ,max=>100.5 ,c=>''         ,f=>2       ,u=>'%'   ,d=>1,t=>"PowerLevel on"                        ,lit=>{oldLevel=>100.5}},
-  OnLevelArm      =>{a=> 17.0,s=>1.0,l=>3,min=>0    ,max=>100   ,c=>'lit'      ,f=>2       ,u=>''    ,d=>1,t=>"onLevel on"                           ,lit=>{disarmed=>0,extSens=>50,allSens=>200}},
+  OnLevelArm      =>{a=> 17.0,s=>1.0,l=>3,min=>0    ,max=>100   ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"onLevel on"                           ,lit=>{disarmed=>0,extSens=>50,allSens=>200}},
                                                     
   OffLevelKm      =>{a=> 15.0,s=>1.0,l=>3,min=>0    ,max=>127.5 ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"OnLevel 127.5=locked"},
   OnLevelKm       =>{a=> 17.0,s=>1.0,l=>3,min=>0    ,max=>127.5 ,c=>''         ,f=>2       ,u=>'%'   ,d=>0,t=>"OnLevel 127.5=locked"},
@@ -998,8 +998,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
                          }
 
  ,"HM-PB-4DIS-WM"     =>{ peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1}
- ,"HM-Dis-WM55"       =>{ intKeyVisib     =>1,stbyTime        =>1}
- ,"HM-Dis-EP-WM55"    =>{ intKeyVisib     =>1
+ ,"HM-Dis-WM55"       =>{ intKeyVisib     =>1,stbyTime        =>1,language        =>1,localResDis     =>1}
+ ,"HM-Dis-EP-WM55"    =>{ intKeyVisib     =>1,transmDevTryMax =>1
                          ,powerSupply     =>1,localResDis     =>1,wakeupBehavior  =>1,wakeupBehavMsg  =>1
                          ,displayInvert   =>1}
  
