@@ -88,6 +88,7 @@ FW_jqueryReadyFn()
     FW_root = r;
 
   FW_replaceWidgets($("html"));
+  FW_confirmDelete();
 
   // Fix the td count by setting colspan on the last column
   $("table.block.wide").each(function(){        // table
@@ -212,6 +213,50 @@ FW_jqueryReadyFn()
   FW_smallScreenCommands();
 
   FW_inlineModify();
+}
+
+function
+FW_confirmDelete()
+{
+  var d = $("div#content");
+  var cd = $(d).attr("data-confirmDelete");
+  if(!cd || cd == 0)
+    return;
+  var wn = $(d).attr("data-webName");
+  $(d).find("a").each(function(){
+    var href = $(this).attr("href");
+    if(!href)
+      return;
+    var ma = $(this).attr("href").match(/.*cmd[^=]*=(delete[^&]*)&.*$/);
+    if(!ma || ma.length != 2)
+      return;
+    $(this).attr("href", "#");
+    $(this).unbind("click");
+    $(this).click(function(e){
+      e.preventDefault();
+
+      var div = $("<div id='FW_okDialog'>");
+      $(div).html("Do you really want to "+ma[1]+"?<br><br>"+
+        "<input type='checkbox' name='noconf'> Skip this dialog in the future");
+      $("body").append(div);
+
+      function
+      doClose()
+      {
+          if($(div).find("input:checked").length)
+            FW_cmd(FW_root+"?cmd=attr "+wn+" confirmDelete 0&XHR=1");
+          $(this).dialog("close"); $(div).remove();
+      }
+
+      $(div).dialog({
+        dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
+        maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
+        buttons: [
+          {text:"Yes", click:function(){ location.href = ma[0]; doClose(); }},
+          {text:"No",  click:function(){ doClose(); }}]
+      });
+    });
+  });
 }
 
 // Show the webCmd list in a dialog if: smallScreen & hiddenroom=detail & room

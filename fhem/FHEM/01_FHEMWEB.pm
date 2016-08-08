@@ -145,6 +145,7 @@ FHEMWEB_Initialize($)
     basicAuthMsg
     closeConn:1,0
     column
+    confirmDelete
     defaultRoom
     deviceOverview:always,iconOnly,onClick,never
     editConfig:1,0
@@ -1171,7 +1172,9 @@ FW_doDetail($)
   my $h = $defs{$d};
   my $t = $h->{TYPE};
   $t = "MISSING" if(!defined($t));
-  FW_pO "<div id=\"content\">";
+  my $cd = AttrVal($FW_wname, "confirmDelete", 1);
+  FW_pO "<div id=\"content\" data-confirmDelete=\"$cd\" ".
+                            "data-webName=\"$FW_wname\">";
 
   if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
     my $webCmd = AttrVal($d, "webCmd", undef);
@@ -3077,6 +3080,21 @@ FW_widgetOverride($$)
       Space in the room and group name has to be written as %20 for this
       attribute.
       </li>
+      <br>
+
+    <a name="confirmDelete"></a>
+    <li>confirmDelete<br>
+        confirm delete actions with a dialog. Default is 1, set it to 0 to
+        disable the feature.
+        </li>
+        <br> 
+
+    <a name="CORS"></a>
+    <li>CORS<br>
+        If set to 1, FHEMWEB will supply a "Cross origin resource sharing"
+        header, see the wikipedia for details.
+        </li>
+        <br>
 
     <a name="csrfToken"></a>
     <li>csrfToken<br>
@@ -3106,13 +3124,6 @@ FW_widgetOverride($$)
         attr lamp cmdIcon on:control_centr_arrow_up off:control_centr_arrow_down
         </ul>
         </li><br>
-
-    <a name="CORS"></a>
-    <li>CORS<br>
-        If set to 1, FHEMWEB will supply a "Cross origin resource sharing"
-        header, see the wikipedia for details.
-        </li>
-        <br>
 
     <a name="defaultRoom"></a>
     <li>defaultRoom<br>
@@ -3781,6 +3792,13 @@ FW_widgetOverride($$)
         Leerzeichen im Raum- und Gruppennamen sind f&uuml;r dieses Attribut als
         %20 zu schreiben.
         </li><br>
+
+    <a name="confirmDelete"></a>
+    <li>confirmDelete<br>
+        L&ouml;schaktionen weden mit einem Dialog best&auml;tigt.
+        Falls dieses Attribut auf 0 gesetzt ist, entf&auml;llt das.
+        </li>
+        <br> 
 
     <a name="CORS"></a>
     <li>CORS<br>
