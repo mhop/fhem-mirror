@@ -472,15 +472,15 @@ HUEBridge_Set($@)
     return "usage: createrule <name> <conditions&actions json>" if( $cmd eq 'createrule' && @args < 2 );
     return "usage: updaterule <id> <conditions&actions json>" if( $cmd eq 'updaterule' && @args != 2 );
 
-    @args[@args-1] = '
+    $args[@args-1] = '
 {  "name":"Wall Switch Rule",
    "conditions":[
         {"address":"/sensors/1/state/lastupdated","operator":"dx"}
    ],
    "actions":[
         {"address":"/groups/0/action","method":"PUT", "body":{"scene":"S3"}}
-]}' if( 0 || !@args[@args-1] );
-    my $json = @args[@args-1];
+]}' if( 0 || !$args[@args-1] );
+    my $json = $args[@args-1];
     my $obj = eval { decode_json($json) };
     if( $@ ) {
       Log3 $name, 2, "$name: json error: $@ in $json";
@@ -489,7 +489,7 @@ HUEBridge_Set($@)
 
     my $result;
     if( $cmd eq 'updaterule' ) {
-     $result = HUEBridge_Call($hash, undef, "rules/@args[0]", $obj, 'PUT');
+     $result = HUEBridge_Call($hash, undef, "rules/$args[0]", $obj, 'PUT');
     } else {
      $obj->{name} = join( ' ', @args[0..@args-2]);
      $result = HUEBridge_Call($hash, undef, 'rules', $obj, 'POST');
@@ -513,13 +513,13 @@ HUEBridge_Set($@)
   } elsif($cmd eq 'createsensor') {
     return "usage: createsensor <name> <type> <uniqueid> <swversion> <modelid>" if( @args < 5 );
 
-    return "usage: type must be one of: Switch OpenClose Presence Temperature Humidity GenericFlag GenericStatus " if( @args[@args-4] !~ m/Switch|OpenClose|Presence|Temperature|Humidity|GenericFlag|GenericStatus/ );
+    return "usage: type must be one of: Switch OpenClose Presence Temperature Humidity GenericFlag GenericStatus " if( $args[@args-4] !~ m/Switch|OpenClose|Presence|Temperature|Humidity|GenericFlag|GenericStatus/ );
 
     my $obj = { 'name' => join( ' ', @args[0..@args-5]),
-                'type' => "CLIP@args[@args-4]",
-                'uniqueid' => @args[@args-3],
-                'swversion' => @args[@args-2],
-                'modelid' => @args[@args-1],
+                'type' => "CLIP$args[@args-4]",
+                'uniqueid' => $args[@args-3],
+                'swversion' => $args[@args-2],
+                'modelid' => $args[@args-1],
                 'manufacturername' => 'FHEM-HUE',
               };
 
@@ -547,12 +547,12 @@ HUEBridge_Set($@)
     return "usage: deletesensor <id>" if( @args != 1 );
 
     if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
-      return "$arg is not a hue sensors" if( $defs{$arg}{ID} != m/^G/ );
-      $defs{$arg}{ID} =~ m/G(.*)/;
+      return "$arg is not a hue sensors" if( $defs{$arg}{ID} !~ m/^S/ );
+      $defs{$arg}{ID} =~ m/S(.*)/;
       $arg = $1;
     }
 
-    my $code = $name ."-G". $arg;
+    my $code = $name ."-S". $arg;
     if( defined($modules{HUEDevice}{defptr}{$code}) ) {
       CommandDelete( undef, "$modules{HUEDevice}{defptr}{$code}{NAME}" );
       CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
@@ -565,13 +565,43 @@ HUEBridge_Set($@)
 
     return undef;
 
+  } elsif($cmd eq 'configsensor') {
+    return "usage: configsensor <id> <json>" if( @args < 2 );
+
+    my $id = $args[0];
+    if( defined $defs{$id} && $defs{$id}{TYPE} eq 'HUEDevice' ) {
+      return "$arg is not a hue sensors" if( $defs{$id}{ID} !~ m/^S/ );
+      $defs{$id}{ID} =~ m/S(.*)/;
+      $id = $1;
+    }
+
+    return "$id is not a hue sensors number" if( $id !~ m/^\d+$/ );
+
+    my $config = join( ' ', @args[1..@args-1]);
+    my $decoded = eval { decode_json($config) };
+    if( $@ ) {
+      Log3 $name, 2, "$name: json error: $@ in $config";
+      return undef;
+    }
+    $config = $decoded;
+
+    my $result = HUEBridge_Call($hash, undef, "sensors/$id/config", $config, 'PUT');
+    return $result->{error}{description} if( $result->{error} );
+
+    my $code = $name ."-S". $id;
+    if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+      HUEDevice_GetUpdate($chash);
+    }
+
+    return undef;
+
   } elsif($cmd eq 'setsensor') {
     return "usage: setsensor <id> <json>" if( @args < 2 );
 
     my $id = $args[0];
-    if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
-      return "$arg is not a hue sensors" if( $defs{$id}{ID} != m/^G/ );
-      $defs{$arg}{ID} =~ m/G(.*)/;
+    if( defined $defs{$id} && $defs{$id}{TYPE} eq 'HUEDevice' ) {
+      return "$arg is not a hue sensors" if( $defs{$id}{ID} !~ m/^S/ );
+      $defs{$id}{ID} =~ m/S(.*)/;
       $id = $1;
     }
 
@@ -587,6 +617,11 @@ HUEBridge_Set($@)
 
     my $result = HUEBridge_Call($hash, undef, "sensors/$id/state", $state, 'PUT');
     return $result->{error}{description} if( $result->{error} );
+
+    my $code = $name ."-S". $id;
+    if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+      HUEDevice_GetUpdate($chash);
+    }
 
     return undef;
 
@@ -624,7 +659,7 @@ HUEBridge_Set($@)
 
 
   } else {
-    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule deleterule createsensor deletesensor setsensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
+    my $list = "delete creategroup deletegroup savescene deletescene modifyscene scene createrule updaterule deleterule createsensor deletesensor configsensor setsensor deletewhitelist touchlink:noArg checkforupdate:noArg autodetect:noArg autocreate:noArg statusRequest:noArg";
     $list .= " swupdate:noArg" if( defined($hash->{updatestate}) && $hash->{updatestate} =~ '^2' );
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -1545,8 +1580,10 @@ HUEBridge_Attr($$$)
       Creates a new CLIP (IP) sensor in the bridge.</li>
     <li>deletesensor &lt;id&gt;<br>
       Deletes the given sensor in the bridge and deletes the associated fhem device.</li>
+    <li>configsensor &lt;id&gt; &lt;json&gt;<br>
+      Write sensor config data.</li>
     <li>setsensor &lt;id&gt; &lt;json&gt;<br>
-      Deletes the given key from the whitelist in the bridge.</li>
+      Write CLIP sensor status data.</li>
     <li>deletewhitelist &lt;key&gt;<br>
       Deletes the given key from the whitelist in the bridge.</li>
     <li>touchlink<br>
