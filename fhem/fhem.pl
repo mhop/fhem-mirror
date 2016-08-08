@@ -3060,7 +3060,8 @@ deviceEvents($$)
         if($hash->{READINGS} && $hash->{READINGS}{state}) {
           my $ostate = $hash->{READINGS}{state}{VAL};
           my $mstate = ReplaceEventMap($hash->{NAME}, $ostate, 1);
-          @{$cws} = map { $_ eq $mstate ? "state: $ostate" : $_ } @{$hash->{CHANGED}};
+          @{$cws} = map { $_ eq $mstate ? "state: $ostate" : $_ }
+                        @{$hash->{CHANGED}};
         } else {
           @{$cws} = @{$hash->{CHANGED}};
         }
