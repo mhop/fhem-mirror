@@ -158,6 +158,7 @@ FileLog_Switch($)
       return 0;
     }
     $log->{FH} = $fh;
+    setReadingsVal($log, "linesInTheFile", 0, TimeNow());
     return 1;
   }
   return 0;
