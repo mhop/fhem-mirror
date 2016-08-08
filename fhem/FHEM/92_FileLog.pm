@@ -47,6 +47,7 @@ FileLog_Initialize($)
     createGluedFile:0,1
     disable:0,1
     disabledForIntervals
+    eventOnThreshold
     logtype
     nrarchive
     reformatFn 
@@ -182,6 +183,7 @@ FileLog_Log($$)
   my $ct = $dev->{CHANGETIME};
   my $fh;
   my $switched;
+  my $written = 0;
 
   for (my $i = 0; $i < $max; $i++) {
     my $s = $events->[$i];
@@ -196,13 +198,24 @@ FileLog_Log($$)
       }
       $fh = $log->{FH};
       print $fh "$t $n $s\n";
+      $written++;
     }
   }
+  return "" if(!$written);
+
   if($fh) {
     $fh->flush;
     # Skip sync, it costs too much HD strain, esp. on SSD
     # $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
   }
+  my $owr = ReadingsVal($ln, "linesInTheFile", 0);
+  my $eot = AttrVal($ln, "eventOnThreshold", 0);
+  if($eot && ($owr+$written) % $eot == 0) {
+    readingsSingleUpdate($log, "linesInTheFile", $owr+$written, 1);
+  } else {
+    setReadingsVal($log, "linesInTheFile", $owr+$written, $tn);
+  }
+
   return "";
 }
 
@@ -1257,6 +1270,15 @@ FileLog_regexpFn($$)
 
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+    <br>
+
+    <a name="eventOnThreshold"></a>
+    <li>eventOnThreshold<br>
+        If set (to a nonzero number), the event linesInTheFile will be
+        generated, if the lines in the file is a multiple of the set number.
+        Note: the counter is only correct for files created after this
+        feature was implemented. A FHEM crash or kill will falsify the counter.
+        </li><br>
 
     <a name="logtype"></a>
     <li>logtype<br>
@@ -1555,6 +1577,17 @@ FileLog_regexpFn($$)
 
     <li><a href="#disable">disable</a></li>
     <li><a href="#addStateEvent">addStateEvent</a></li>
+    <br>
+
+    <a name="eventOnThreshold"></a>
+    <li>eventOnThreshold<br>
+        Falls es auf eine (nicht Null-) Zahl gesetzt ist, dann wird das
+        linesInTheFile Event generiert, falls die Anzahl der Zeilen in der
+        Datei ein Mehrfaches der gesetzen Zahl ist. Achtung: der Z&auml;hler ist
+        nur f&uuml;r solche Dateien korrekt, die nach dem Impementieren dieses
+        Features angelegt wurden. Ein Absturz/Abschu&szlig; von FHEM
+        verf&auml;lscht die Z&auml;hlung.
+        </li><br>
 
     <a name="logtype"></a>
     <li>logtype<br>
@@ -1577,7 +1610,8 @@ FileLog_regexpFn($$)
                Zeichnet die Ist-Temperatur/Soll-temperatur/Aktor Kurven. Die
                passende FileLog-Definition (f&uuml;r das FHT-Ger&auml;t mit
                Namen fht1)sieht wie folgt aus: <br>
-               <code>define fhtlog1 FileLog log/fht1-%Y-%U.log fht1:.*(temp|actuator).*</code>
+               <code>define fhtlog1 FileLog log/fht1-%Y-%U.log
+                fht1:.*(temp|actuator).*</code>
           </li>
            <li>temp4rain10<br>
                Zeichnet eine Kurve aus der Temperatur und dem Niederschlag (pro
