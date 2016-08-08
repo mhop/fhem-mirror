@@ -340,7 +340,6 @@ HUEBridge_Set($@)
     if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
       $arg = $defs{$arg}{ID};
     }
-
     return "$arg is not a hue light number" if( $arg !~ m/^\d+$/ );
 
     my $code = $name ."-". $arg;
@@ -502,7 +501,6 @@ HUEBridge_Set($@)
 
   } elsif($cmd eq 'deleterule') {
     return "usage: deleterule <id>" if( @args != 1 );
-
     return "$arg is not a hue rule number" if( $arg !~ m/^\d+$/ );
 
     my $result = HUEBridge_Call($hash, undef, "rules/$arg", undef, 'DELETE');
@@ -547,7 +545,7 @@ HUEBridge_Set($@)
     return "usage: deletesensor <id>" if( @args != 1 );
 
     if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
-      return "$arg is not a hue sensors" if( $defs{$arg}{ID} !~ m/^S/ );
+      return "$arg is not a hue sensor" if( $defs{$arg}{ID} !~ m/^S/ );
       $defs{$arg}{ID} =~ m/S(.*)/;
       $arg = $1;
     }
@@ -558,67 +556,35 @@ HUEBridge_Set($@)
       CommandSave(undef,undef) if( AttrVal( "autocreate", "autosave", 1 ) );
     }
 
-    return "$arg is not a hue sensors number" if( $arg !~ m/^\d+$/ );
+    return "$arg is not a hue sensor number" if( $arg !~ m/^\d+$/ );
 
     my $result = HUEBridge_Call($hash, undef, "sensors/$arg", undef, 'DELETE');
     return $result->{error}{description} if( $result->{error} );
 
     return undef;
 
-  } elsif($cmd eq 'configsensor') {
-    return "usage: configsensor <id> <json>" if( @args < 2 );
+  } elsif($cmd eq 'configsensor' || $cmd eq 'setsensor') {
+    return "usage: $cmd <id> <json>" if( @args < 2 );
 
-    my $id = $args[0];
-    if( defined $defs{$id} && $defs{$id}{TYPE} eq 'HUEDevice' ) {
-      return "$arg is not a hue sensors" if( $defs{$id}{ID} !~ m/^S/ );
-      $defs{$id}{ID} =~ m/S(.*)/;
-      $id = $1;
+    if( defined $defs{$arg} && $defs{$arg}{TYPE} eq 'HUEDevice' ) {
+      return "$arg is not a hue sensor" if( $defs{$arg}{ID} !~ m/^S/ );
+      $defs{$arg}{ID} =~ m/S(.*)/;
+      $arg = $1;
     }
+    return "$arg is not a hue sensor number" if( $arg !~ m/^\d+$/ );
 
-    return "$id is not a hue sensors number" if( $id !~ m/^\d+$/ );
-
-    my $config = join( ' ', @args[1..@args-1]);
-    my $decoded = eval { decode_json($config) };
+    my $json = join( ' ', @args[1..@args-1]);
+    my $decoded = eval { decode_json($json) };
     if( $@ ) {
-      Log3 $name, 2, "$name: json error: $@ in $config";
+      Log3 $name, 2, "$name: json error: $@ in $json";
       return undef;
     }
-    $config = $decoded;
+    $json = $decoded;
 
-    my $result = HUEBridge_Call($hash, undef, "sensors/$id/config", $config, 'PUT');
+    my $result = HUEBridge_Call($hash, undef, "sensors/$arg/".($cmd eq 'configsensor'?'config':'state'), $json, 'PUT');
     return $result->{error}{description} if( $result->{error} );
 
-    my $code = $name ."-S". $id;
-    if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
-      HUEDevice_GetUpdate($chash);
-    }
-
-    return undef;
-
-  } elsif($cmd eq 'setsensor') {
-    return "usage: setsensor <id> <json>" if( @args < 2 );
-
-    my $id = $args[0];
-    if( defined $defs{$id} && $defs{$id}{TYPE} eq 'HUEDevice' ) {
-      return "$arg is not a hue sensors" if( $defs{$id}{ID} !~ m/^S/ );
-      $defs{$id}{ID} =~ m/S(.*)/;
-      $id = $1;
-    }
-
-    return "$id is not a hue sensors number" if( $id !~ m/^\d+$/ );
-
-    my $state = join( ' ', @args[1..@args-1]);
-    my $decoded = eval { decode_json($state) };
-    if( $@ ) {
-      Log3 $name, 2, "$name: json error: $@ in $state";
-      return undef;
-    }
-    $state = $decoded;
-
-    my $result = HUEBridge_Call($hash, undef, "sensors/$id/state", $state, 'PUT');
-    return $result->{error}{description} if( $result->{error} );
-
-    my $code = $name ."-S". $id;
+    my $code = $name ."-S". $arg;
     if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
       HUEDevice_GetUpdate($chash);
     }
@@ -727,6 +693,7 @@ HUEBridge_Get($@)
   } elsif($cmd eq 'rule') {
     return "usage: rule <id>" if( @args != 1 );
     return "$arg is not a hue rule number" if( $arg !~ m/^\d+$/ );
+
     my $result =  HUEBridge_Call($hash, undef, "rules/$arg", undef);
     return $result->{error}{description} if( $result->{error} );
     my $ret = encode_json($result->{conditions}) ."\n". encode_json($result->{actions});
@@ -735,6 +702,7 @@ HUEBridge_Get($@)
   } elsif($cmd eq 'rules') {
     my $result =  HUEBridge_Call($hash, undef, 'rules', undef);
     return $result->{error}{description} if( $result->{error} );
+
     my $ret = "";
     foreach my $key ( sort {$a<=>$b} keys %{$result} ) {
       $ret .= sprintf( "%2i: %-20s", $key, $result->{$key}{name} );
