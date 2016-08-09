@@ -1288,10 +1288,10 @@ sub HMCCU_UpdateClientReading ($@)
 
 	my $chnadd = $channel ne '' ? $devadd.':'.$channel : $devadd;
 	my $hmccu_value = '';
-	my $dpt = '';
-	if ($reading =~ /.*\.(.+)$/) {
-		$dpt = $1;
-	}
+#	my $dpt = '';
+#	if ($reading =~ /.*\.(.+)$/) {
+#		$dpt = $1;
+#	}
 
 	if ($hmccu_updreadings && $updatemode ne 'client') {
 		$hmccu_value = HMCCU_Substitute ($value, $hmccu_substitute, 0, $reading);
