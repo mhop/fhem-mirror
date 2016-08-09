@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 93_DbRep: usage of "insert" changed, pls. refer to commandref
   - changed: 93_DbRep: function "insert" added, check of numeric value type 
              in functions maxvalue, diffvalue
   - added:   98_Hyperion: initial release of completely new module

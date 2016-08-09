@@ -37,6 +37,9 @@
 ###########################################################################################################
 #  Versions History:
 #
+# 3.4.3        09.08.2016       fields for input using "insert" changed to "date,time,value,unit". Attributes
+#                               device, reading will be used to complete dataset,
+#                               now more informations available about faulty datasets in arithmetic operations
 # 3.4.2        05.08.2016       commandref complemented, fieldlength used in function "insert" trimmed to 32 
 # 3.4.1        04.08.2016       check of numeric value type in functions maxvalue, diffvalue
 # 3.4          03.08.2016       function "insert" added
@@ -100,6 +103,7 @@ use Blocking;
 use Time::Local;
 no if $] >= 5.017011, warnings => 'experimental';  
 
+
 ###################################################################################
 # DbRep_Initialize
 ###################################################################################
@@ -122,7 +126,7 @@ sub DbRep_Initialize($) {
                        "timestamp_end ".
                        "timeDiffToNow ".
                        "timeout ".
-                       $readingFnAttributes;   
+                       $readingFnAttributes;
          
 return undef;   
 }
@@ -218,10 +222,13 @@ sub DbRep_Set {
   
   } elsif ($opt eq "insert") { 
       if ($prop) {
+          if (!AttrVal($hash->{NAME}, "device", "") || !AttrVal($hash->{NAME}, "reading", "") ) {
+              return " The attribute \"device\" and/or \"reading\" is not set. It's mandatory to complete dataset for manual insert !";
+          }
     
-          my ($i_date, $i_time, $i_device, $i_reading, $i_value, $i_unit) = split(",",$prop);
+          my ($i_date, $i_time, $i_value, $i_unit) = split(",",$prop);
                     
-          if (!$i_date || !$i_time || !$i_device || !$i_reading || !$i_value) {return "At least data for Date, Time, Device, Reading and Value are needed to insert. Inputformat is 'YYYY-MM-DD,HH:MM:SS,<Device(32)>,<Reading(32)>,<Value(32)>,<Unit(32)>' ";}
+          if (!$i_date || !$i_time || !$i_value) {return "At least data for Date, Time and Value are needed to insert. Inputformat is 'YYYY-MM-DD,HH:MM:SS,<Value(32)>,<Unit(32)>' ";}
 
           unless ($i_date =~ /(\d{4})-(\d{2})-(\d{2})/) {return "Input for date is not valid. Use format YYYY-MM-DD !";}
           unless ($i_time =~ /(\d{2}):(\d{2}):(\d{2})/) {return "Input for time is not valid. Use format HH:MM:SS !";}
@@ -235,11 +242,14 @@ sub DbRep_Set {
               return " Timestamp is out of range - $l[0]";         
           }          
           
+          my $i_device  = AttrVal($hash->{NAME}, "device", "");
+          my $i_reading = AttrVal($hash->{NAME}, "reading", "");
+          
           # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog DB create-scripts) beschneiden
           $i_device   = substr($i_device,0, 32);
           $i_reading  = substr($i_reading,0, 32);
           $i_value    = substr($i_value,0, 32);
-          $i_unit     = substr($i_unit,0, 32);
+          $i_unit     = substr($i_unit,0, 32) if($i_unit);
           
           $hash->{helper}{I_TIMESTAMP} = $i_timestamp;
           $hash->{helper}{I_DEVICE}    = $i_device;
@@ -250,7 +260,7 @@ sub DbRep_Set {
           $hash->{helper}{I_EVENT}     = my $i_event = "manual";          
           
       } else {
-          return "Data to insert to table 'history' are needed like this pattern: 'Date,Time,Device,Reading,Value,Unit'. Spaces are not allowed !";
+          return "Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,Unit'. Spaces are not allowed !";
       }
       
       sqlexec($hash,"insert");
@@ -1049,8 +1059,9 @@ sub maxval_ParseDone {
       if (!looks_like_number($value)) {
           readingsSingleUpdate($hash, "state", "error", 1);
           delete($hash->{helper}{RUNNING_PID});
-          Log3 ($name, 2, "DbRep $name - ERROR - found value = '$value' isn't numeric in maxValue function. Leaving ...");
-          Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
+          $a[3] =~ s/\s+$//g;
+          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in maxValue function. Faulty dataset was \nTIMESTAMP: $a[2] $a[3], DEVICE: $device, READING: $reading, VALUE: $value. \nLeaving ...");
+          Log3 ($name, 4, "DbRep $name -> BlockingCall maxval_ParseDone finished");
           return;
       }
       
@@ -1257,12 +1268,14 @@ sub diffval_ParseDone {
       my $runtime_string = decode_base64($a[0]);
       $lastruntimestring = $runtime_string if ($i == 1);
       
-      my $value          = $a[1];
+      my $value          = $a[1];      
+      
       # Test auf $value = "numeric"
       if (!looks_like_number($value)) {
           readingsSingleUpdate($hash, "state", "error", 1);
           delete($hash->{helper}{RUNNING_PID});
-          Log3 ($name, 2, "DbRep $name - ERROR - found value = '$value' isn't numeric in diffValue function. Leaving ...");
+          $a[3] =~ s/\s+$//g;
+          Log3 ($name, 2, "DbRep $name - ERROR - value isn't numeric in diffValue function. Faulty dataset was \nTIMESTAMP: $a[2] $a[3], DEVICE: $device, READING: $reading, VALUE: $value. \nLeaving ...");
           Log3 ($name, 4, "DbRep $name -> BlockingCall diffval_ParseDone finished");
           return;
       }
@@ -2088,22 +2101,29 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
     <li><b> averageValue </b> -  calculates the average value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading".  </li> <br>
     <li><b> countEntries </b> -  provides the number of DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end".(if set) or "timeDiffToNow". If timestamp-attributes are not set all entries in db will be count. The <a href="#DbRepattr">attributes</a> "device" and "reading" can be used to limit the evaluation.  </li> <br>
     <li><b> fetchrows </b>    -  provides <b>all</b> DB-entries between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". A possibly set aggregation attribute will <b>not</b> considered.  </li> <br>
-    <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time, Device, Reading and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically. <br><br>
-    
-                                 input format:    Date,Time,Device,Reading,Value,Unit  <br>
-                                 example:         2016-08-01,23:00:09,TestDevice,TestReading,TestValue,TestUnit  # field lenth is maximum 32 characters, NO spaces are allowed in fieldvalues ! <br>  
+    <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
+                                 
+                                 <ul>
+                                 <b>input format: </b>   Date,Time,Value,[Unit]    <br>
+                                 # Unit is optional, attributes of device, reading must be set ! <br><br>
+                                 
+                                 <b>example:</b>         2016-08-01,23:00:09,TestValue,TestUnit  <br>
+                                 # field lenth is maximum 32 characters, NO spaces are allowed in fieldvalues ! <br>
                                  </li> <br>
+                                 </ul>
                                  
 
     <li><b> sumValue </b>     -  calculates the amount of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". Using this function is mostly reasonable if value-differences of readings are written to the database. </li> <br>  
     <li><b> maxValue </b>     -  calculates the maximum value of readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". The evaluation contains the timestamp of the identified max values within the given period.  </li> <br>
     <li><b> diffValue </b>    -  calculates the defference of the readingvalues DB-column "VALUE") between period given by <a href="#DbRepattr">attributes</a> "timestamp_begin", "timestamp_end" or "timeDiffToNow". The reading to evaluate must be defined using attribute "reading". This function is mostly reasonable if readingvalues are increasing permanently and don't write value-differences to the database. </li> <br>
     <li><b> delEntries </b>   -  deletes all database entries or only the database entries specified by <a href="#DbRepattr">attributes</a> Device and/or Reading and the entered time period between "timestamp_begin", "timestamp_end" (if set) or "timeDiffToNow". <br><br>
-                                    
+                                 
+                                 <ul>
                                  "timestamp_begin" is set:  deletes db entries <b>from</b> this timestamp until current date/time <br>
                                  "timestamp_end" is set  :  deletes db entries <b>until</b> this timestamp <br>
                                  both Timestamps are set :  deletes db entries <b>between</b> these timestamps <br>
                                  </li>
+                                 </ul>
                                  
   <br>
   </ul></ul>
@@ -2214,21 +2234,28 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
     <li><b> averageValue </b> -  berechnet den Durchschnittswert der Readingwerte (DB-Spalte "VALUE") in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muß das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein.  </li> <br>
     <li><b> countEntries </b> -  liefert die Anzahl der DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end" (wenn gesetzt) bzw. "timeDiffToNow". Sind die Timestamps nicht gesetzt werden alle Einträge gezählt. Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading gehen in die Selektion mit ein.  </li> <br>
     <li><b> fetchrows </b>    -  liefert <b>alle</b> DB-Einträge in den Zeitgrenzen (<a href="#DbRepattr">Attribute</a>) "timestamp_begin", "timestamp_end". Eine evtl. gesetzte Aggregation wird <b>nicht</b> berücksichtigt.  </li> <br>
-    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit, Device, Reading und Value. Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt. <br><br>
-    
-                                 Eingabeformat:    Datum,Zeit,Device,Reading,Value,Unit  <br>
-                                 Beispiel:         2016-08-01,23:00:09,TestDevice,TestReading,TestValue,TestUnit   # die Feldlänge ist maximal 32 Zeichen lang, es sind KEINE Leerzeichen im Feldwert erlaubt !<br>  
+    <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
+                                 
+                                 <ul>
+                                 <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
+                                 # Unit ist optional, Attribute "reading" und "device" müssen gesetzt sein  <br><br>
+                                 
+                                 <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
+                                 # die Feldlänge ist maximal 32 Zeichen lang, es sind KEINE Leerzeichen im Feldwert erlaubt !<br><br>
                                  </li> <br>
+                                 </ul>
                                  
     <li><b> sumValue </b>     -  berechnet die Summenwerte eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Diese Funktion ist sinnvoll wenn fortlaufend Wertedifferenzen eines Readings in die Datenbank geschrieben werden.  </li> <br>
     <li><b> maxValue </b>     -  berechnet den Maximalwert eines Readingwertes (DB-Spalte "VALUE") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw. "timeDiffToNow". Es muss das auszuwertende Reading über das <a href="#DbRepattr">Attribut</a> "reading" angegeben sein. Die Auswertung enthält den Zeitstempel des ermittelten Maximalwertes innerhalb der Aggregation bzw. Zeitgrenzen.  </li> <br>
     <li><b> diffValue </b>    -  berechnet den Differenzwert eines Readingwertes (DB-Spalte "Value") in den Zeitgrenzen (Attribute) "timestamp_begin", "timestamp_end" bzw "timeDiffToNow". Es muss das auszuwertende Reading über das Attribut "reading" angegeben sein. Diese Funktion ist z.B. zur Auswertung von Eventloggings sinnvoll, deren Werte sich fortlaufend erhöhen und keine Wertdifferenzen wegschreiben. </li> <br>
     <li><b> delEntries </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt folgendermaßen: <br><br>
-                                    
+                                 
+                                 <ul>
                                  "timestamp_begin" gesetzt:  gelöscht werden DB-Einträge <b>ab</b> diesem Zeitpunkt bis zum aktuellen Datum/Zeit <br>
                                  "timestamp_end" gesetzt  :  gelöscht werden DB-Einträge <b>bis</b> bis zu diesem Zeitpunkt <br>
                                  beide Timestamps gesetzt :  gelöscht werden DB-Einträge <b>zwischen</b> diesen Zeitpunkten <br>
                                  </li>
+                                 </ul>
                                  
   <br>
   </ul></ul>
