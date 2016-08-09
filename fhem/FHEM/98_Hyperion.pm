@@ -68,6 +68,7 @@ sub Hyperion_Initialize($)
                         "hyperionDefaultDuration ".
                         "hyperionDefaultPriority ".
                         "hyperionDimStep ".
+                        "hyperionNoSudo:1 ".
                         "hyperionSshUser ".
                         "queryAfterSet:0 ".
                         $readingFnAttributes;
@@ -411,7 +412,8 @@ sub Hyperion_GetConfigs($)
     $Hyperion_sets{configFile} = "textField" if ($Hyperion_sets{configFile} ne "textField");
     $attr{$name}{webCmd} = $Hyperion_webCmd if (AttrVal($name,"webCmd","") eq $Hyperion_webCmd_config);
   }
-  fhem("trigger WEB JS:location.reload(true)");
+  # fhem("trigger WEB JS:location.reload(true)");
+  return "Found at least one config file. Please refresh this page to see the result.";
 }
 
 sub Hyperion_listFilesInDir($$)
@@ -462,7 +464,7 @@ sub Hyperion_Set($@)
   my %obj;
   Log3 $name,4,"$name: Hyperion_Set cmd: $cmd" if (defined($cmd));
   Log3 $name,4,"$name: Hyperion_Set value: $value" if (defined($value) && $value ne "");
-  Log3 $name,4,"$name: Hyperion_Set duration: $duration,priority: $priority";
+  Log3 $name,4,"$name: Hyperion_Set duration: $duration, priority: $priority";
   if ($cmd eq "configFile")
   {
     $value = $value.".config.json";
@@ -471,7 +473,7 @@ sub Hyperion_Set($@)
     my $bin = (split("/",$binpath))[scalar(split("/",$binpath)) - 1];
     my $user  = AttrVal($name,"hyperionSshUser","pi");
     my $ip = $hash->{IP};
-    my $sudo = ($user eq "root") ? "" : "sudo ";
+    my $sudo = ($user eq "root" || int(AttrVal($name,"hyperionNoSudo",0)) == 1) ? "" : "sudo ";
     my $command = $sudo."killall $bin; sleep 1; ".$sudo."$binpath $confdir$value > /dev/null 2>&1 &";
     my $status;
     my $fh;
@@ -738,11 +740,18 @@ sub Hyperion_Attr(@)
         $err = "Invalid value $attr_value for attribute $attr_name. Must be a number between 0 and 65536.";
       }
     }
-    elsif ($attr_name eq "hyperionDimStep" || $attr_name eq "hyperionSatStep")
+    elsif ($attr_name eq "hyperionDimStep")
     {
       if ($attr_value !~ /^(\d+)$/ || $1 < 1 || $1 > 50)
       {
         $err = "Invalid value $attr_value for attribute $attr_name. Must be between 1 and 50 in steps of 1, default is 5.";
+      }
+    }
+    elsif ($attr_name eq "hyperionNoSudo")
+    {
+      if ($attr_value !~ /^1$/)
+      {
+        $err = "Invalid value $attr_value for attribute $attr_name. Can only be value 1.";
       }
     }
     elsif ($attr_name eq "hyperionSshUser")
@@ -974,6 +983,10 @@ sub Hyperion_devStateIcon($;$)
     <li>
       <i>hyperionDefaultDuration</i><br>
       default duration, if not set it's infinity
+    </li>
+    <li>
+      <i>hyperionNoSudo</i><br>
+      disable sudo for non-root users
     </li>
     <li>
       <i>hyperionDefaultPriority</i><br>

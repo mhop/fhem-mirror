@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - changed: 98_Hyperion: introducing new attribute hyperionNoSudo
   - changed: 38_netatmo: removed event-on-change default, min HOME interval
   - changed: 93_DbRep: usage of "insert" changed, pls. refer to commandref
   - changed: 93_DbRep: function "insert" added, check of numeric value type 
