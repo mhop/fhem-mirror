@@ -240,7 +240,11 @@ sub HMUARTLGW_Define($$)
 		$dev .= ":2000" if ($dev !~ m/:/);
 		$hash->{DevType} = "LGW";
 	} else {
-		$dev .= "\@115200" if ($dev !~ m/\@/);
+		if ($dev =~ m/^uart:\/\/(.*)$/) {
+			$dev = $1;
+		} elsif ($dev !~ m/\@/) {
+			$dev .= "\@115200";
+		}
 		$hash->{DevType} = "UART";
 		readingsBeginUpdate($hash);
 		delete($hash->{READINGS}{"D-LANfirmware"});
@@ -2126,7 +2130,10 @@ sub HMUARTLGW_getVerbLvl($$$$) {
     <ul>
       <li>HM-MOD-UART: &lt;device&gt; specifies the serial port to communicate
           with. The baud-rate is fixed at 115200 and does not need to be
-          specified.</li>
+          specified.<br>
+          If the HM-MOD-UART is connected to the network by a serial bridge,
+          the connection has to be defined in an URL-like format
+          (<code>uart://ip:port</code>).</li>
       <li>HM-LGW-O-TW-W-EU: &lt;device&gt; specifies the IP address or hostname
           of the gateway, optionally followed by : and the port number of the
           BidCoS-port (default when not specified: 2000).</li>
@@ -2134,8 +2141,13 @@ sub HMUARTLGW_getVerbLvl($$$$) {
     <br><br>
     Examples:<br>
     <ul>
-      <code>define myHmUART HMUARTLGW /dev/ttyAMA0</code><br>
-      <code>define myHmLGW HMUARTLGW 192.168.42.23</code><br>
+      <li>Local HM-MOD-UART at <code>/dev/ttyAMA0</code>:<br>
+          <code>define myHmUART HMUARTLGW /dev/ttyAMA0</code><br>&nbsp;</li>
+      <li>LAN Gateway at <code>192.168.42.23</code>:<br>
+          <code>define myHmLGW HMUARTLGW 192.168.42.23</code><br>&nbsp;</li>
+      <li>Remote HM-MOD-UART using <code>socat</code> on a Raspberry Pi:<br>
+          Remote Raspberry Pi:<br><code>$ socat TCP4-LISTEN:12345,fork,reuseaddr /dev/ttyAMA0,raw,echo=0,b115200</code><br><br>
+          Fhem:<br><code>define myRemoteHmUART HMUARTLGW uart://192.168.42.23:12345</code></li>
     </ul>
   </ul>
   <br>
