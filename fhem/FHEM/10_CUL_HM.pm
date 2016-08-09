@@ -4455,7 +4455,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   elsif($cmd eq "alarmLevel") { ###############################################
     #level        =>"[disarmed|armExtSens|armAll|armBlocked]"
-    my %lvlSet = (disarmed=>"00",armExtSens=>"01",armAll=>"02",armBlocked=>"03");
+    my %lvlSet = (disarmed=>"00",armExtSens=>"32",armAll=>"C8",armBlocked=>"FF");
     my (undef,undef,$lvl,$onTime) = (@a,0);#set ontime to 0 if not given. 
     $lvl = $lvlSet{$lvl};
     
