@@ -166,7 +166,7 @@ HttpUtils_gethostbyname($$$)
     my $buf;
     my $len = sysread($dh{conn},$buf,65536);
     HttpUtils_Close(\%dh);
-    Log 5, "DNS ANSWER $len:".unpack("H*", $buf);
+    Log 5, "DNS ANSWER ".($len?$len:0).":".($buf ? unpack("H*", $buf):"N/A");
     my ($err, $addr, $ttl) = HttpUtils_dnsParse($buf,$ql);
     return $fn->($hash, "DNS: $err", undef) if($err);
     Log 4, "DNS result for $host: ".ip2str($addr).", ttl:$ttl";
@@ -194,7 +194,6 @@ HttpUtils_gethostbyname($$$)
     InternalTimer(gettimeofday()+$dnsTo, $dnsQuery, \%timerHash);
   };
   $dnsQuery->();
-
 }
 
 
@@ -238,7 +237,10 @@ HttpUtils_Connect($)
       HttpUtils_gethostbyname($hash, $host, sub($$$) {
         my ($hash, $err, $iaddr) = @_;
         $hash = $hash->{origHash} if($hash->{origHash});
-        return $hash->{callback}($hash, $err, "") if($err);
+        if($err) {
+          HttpUtils_Close($hash);
+          return $hash->{callback}($hash, $err, "") ;
+        }
         my $ret = connect($hash->{conn}, sockaddr_in($port, $iaddr));
         if(!$ret) {
           if($!{EINPROGRESS} || int($!)==10035 ||
@@ -254,8 +256,10 @@ HttpUtils_Connect($)
               RemoveInternalTimer(\%timerHash);
               my $packed = getsockopt($hash->{conn}, SOL_SOCKET, SO_ERROR);
               my $errno = unpack("I",$packed);
-              return $hash->{callback}($hash, "$host: ".strerror($errno), "")
-                  if($errno);
+              if($errno) {
+                HttpUtils_Close($hash);
+                return $hash->{callback}($hash, "$host: ".strerror($errno), "");
+              }
 
               my $err = HttpUtils_Connect2($hash);
               $hash->{callback}($hash, $err, "") if($err);
@@ -266,9 +270,12 @@ HttpUtils_Connect($)
             InternalTimer(gettimeofday()+$hash->{timeout},
                           "HttpUtils_Err", \%timerHash);
             return undef;
+
           } else {
+            HttpUtils_Close($hash);
             $hash->{callback}($hash, "connect to $hash->{addr}: $!", "");
             return undef;
+
           }
         }
       });
