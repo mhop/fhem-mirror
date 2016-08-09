@@ -62,7 +62,7 @@ sub ENIGMA2_Initialize($) {
     $hash->{UndefFn} = "ENIGMA2_Undefine";
 
     $hash->{AttrList} =
-"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 macaddr:textField wakeupCmd:textField "
+"https:0,1 http-method:GET,POST http-noshutdown:1,0 disable:0,1 bouquet-tv bouquet-radio timeout remotecontrol:standard,advanced,keyboard lightMode:0,1 ignoreState:0,1 macaddr:textField wakeupCmd:textField "
       . $readingFnAttributes;
 
     $data{RC_layout}{ENIGMA2_DreamMultimedia_DM500_DM800_SVG} =
@@ -168,12 +168,13 @@ sub ENIGMA2_Get($@) {
 ###################################
 sub ENIGMA2_Set($@) {
     my ( $hash, @a ) = @_;
-    my $name     = $hash->{NAME};
-    my $state    = ReadingsVal( $name, "state", "absent" );
-    my $presence = ReadingsVal( $name, "presence", "absent" );
-    my $input    = ReadingsVal( $name, "input", "" );
-    my $channel  = ReadingsVal( $name, "channel", "" );
-    my $channels = "";
+    my $name        = $hash->{NAME};
+    my $state       = ReadingsVal( $name, "state", "absent" );
+    my $presence    = ReadingsVal( $name, "presence", "absent" );
+    my $input       = ReadingsVal( $name, "input", "" );
+    my $channel     = ReadingsVal( $name, "channel", "" );
+    my $channels    = "";
+    my $ignoreState = AttrVal( $name, "ignoreState", 0 );
 
     Log3 $name, 5, "ENIGMA2 $name: called function ENIGMA2_Set()";
 
@@ -269,7 +270,7 @@ sub ENIGMA2_Set($@) {
 
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        if ( $state ne "absent" ) {
+        if ( $state ne "absent" || $ignoreState ne "0" ) {
             $cmd = "newstate=1";
             $result =
               ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "shutdown" );
@@ -286,7 +287,7 @@ sub ENIGMA2_Set($@) {
 
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        if ( $state ne "absent" ) {
+        if ( $state ne "absent" || $ignoreState ne "0" ) {
             $cmd = "newstate=2";
             $result =
               ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "reboot" );
@@ -303,7 +304,7 @@ sub ENIGMA2_Set($@) {
 
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             $cmd = "newstate=3";
             $result =
               ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "restartGui" );
@@ -355,7 +356,7 @@ sub ENIGMA2_Set($@) {
 
     # off
     elsif ( lc( $a[1] ) eq "off" ) {
-        if ( $state ne "absent" ) {
+        if ( $state ne "absent" || $ignoreState ne "0" ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
             $cmd = "newstate=5";
             $result = ENIGMA2_SendCommand( $hash, "powerstate", $cmd, "off" );
@@ -371,7 +372,7 @@ sub ENIGMA2_Set($@) {
 
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             if ( $a[2] =~ m/^\d+$/ && $a[2] >= 0 && $a[2] <= 100 ) {
                 $cmd = "set=set" . $a[2];
             }
@@ -388,7 +389,7 @@ sub ENIGMA2_Set($@) {
 
     # volumeUp/volumeDown
     elsif ( lc( $a[1] ) =~ /^(volumeup|volumedown)$/ ) {
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
             if ( lc( $a[1] ) eq "volumeup" ) {
@@ -406,7 +407,7 @@ sub ENIGMA2_Set($@) {
 
     # mute
     elsif ( lc( $a[1] ) eq "mute" || lc( $a[1] ) eq "mutet" ) {
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             if ( defined( $a[2] ) ) {
                 Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
             }
@@ -440,7 +441,7 @@ sub ENIGMA2_Set($@) {
 
     # msg
     elsif ( lc( $a[1] ) eq "msg" ) {
-        if ( $state ne "absent" ) {
+        if ( $state ne "absent" || $ignoreState ne "0" ) {
             return
 "No 1st argument given, choose one of yesno info message attention "
               if ( !defined( $a[2] ) );
@@ -497,7 +498,7 @@ sub ENIGMA2_Set($@) {
 
     # remoteControl
     elsif ( lc( $a[1] ) eq "remotecontrol" ) {
-        if ( $state ne "absent" ) {
+        if ( $state ne "absent" || $ignoreState ne "0" ) {
 
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2]
               if !defined( $a[3] );
@@ -564,7 +565,7 @@ sub ENIGMA2_Set($@) {
 
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             my $cname = $a[2];
             if ( defined( $hash->{helper}{bouquet}{$input}{$cname}{sRef} ) ) {
                 $result = ENIGMA2_SendCommand(
@@ -611,7 +612,7 @@ sub ENIGMA2_Set($@) {
     elsif ( lc( $a[1] ) =~ /^(channelup|channeldown)$/ ) {
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             if ( lc( $a[1] ) eq "channelup" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("RIGHT");
             }
@@ -641,7 +642,7 @@ sub ENIGMA2_Set($@) {
 
         Log3 $name, 3, "ENIGMA2 set $name " . $a[1] . " " . $a[2];
 
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             if ( lc( $a[2] ) eq "tv" ) {
                 $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("TV");
             }
@@ -663,7 +664,7 @@ sub ENIGMA2_Set($@) {
 
     # play / pause
     elsif ( lc( $a[1] ) =~ /^(play|pause)$/ ) {
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
             $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("PLAYPAUSE");
@@ -676,7 +677,7 @@ sub ENIGMA2_Set($@) {
 
     # stop
     elsif ( lc( $a[1] ) eq "stop" ) {
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
 
             $cmd = "command=" . ENIGMA2_GetRemotecontrolCommand("STOP");
@@ -689,7 +690,7 @@ sub ENIGMA2_Set($@) {
 
     # record
     elsif ( lc( $a[1] ) eq "record" ) {
-        if ( $state eq "on" ) {
+        if ( $state eq "on" || $ignoreState ne "0" ) {
             Log3 $name, 3, "ENIGMA2 set $name " . $a[1];
             $result = ENIGMA2_SendCommand( $hash, "recordnow" );
         }
@@ -700,7 +701,7 @@ sub ENIGMA2_Set($@) {
 
     # showText
     elsif ( lc( $a[1] ) eq "showtext" ) {
-        if ( $state ne "absent" ) {
+        if ( $state ne "absent" || $ignoreState ne "0" ) {
             return "No argument given, choose one of messagetext "
               if ( !defined( $a[2] ) );
 
@@ -3022,6 +3023,9 @@ sub ENIGMA2_GetRemotecontrolCommand($) {
           </li>
           <li>
             <b>https</b> - Access box via secure HTTP (true/false)
+          </li>
+          <li>
+            <b>ignoreState</b> - Do not check for available device before sending commands to it (true/false)
           </li>
           <li>
             <b>lightMode</b> - reduces regular queries (resulting in less functionality), e.g. for low performance devices. (true/false)
