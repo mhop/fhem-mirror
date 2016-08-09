@@ -227,7 +227,7 @@ FW_confirmDelete()
     var href = $(this).attr("href");
     if(!href)
       return;
-    var ma = $(this).attr("href").match(/.*cmd[^=]*=(delete[^&]*)&.*$/);
+    var ma = $(this).attr("href").match(/.*cmd[^=]*=(delete[^&]*).*$/);
     if(!ma || ma.length != 2)
       return;
     $(this).attr("href", "#");
