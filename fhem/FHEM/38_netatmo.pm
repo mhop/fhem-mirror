@@ -131,7 +131,7 @@ netatmo_Define($$)
         $attr{$name}{stateFormat} = $state_format if( !defined($attr{$name}{stateFormat}) && defined($state_format) );
         $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}));
         $attr{$name}{devStateIcon} = ".*:no-icon" if( !defined($attr{$name}{devStateIcon}));
-        $attr{$name}{'event-on-change-reading'} = ".*" if( !defined($attr{$name}{'event-on-change-reading'}));
+        #$attr{$name}{'event-on-change-reading'} = ".*" if( !defined($attr{$name}{'event-on-change-reading'}));
 
 
       }
@@ -185,7 +185,7 @@ netatmo_Define($$)
     $hash->{INTERVAL} = 60*30 if( !$hash->{INTERVAL} );
     $attr{$name}{room} = "netatmo" if( !defined($attr{$name}{room}));
     $attr{$name}{devStateIcon} = ".*:no-icon" if( !defined($attr{$name}{devStateIcon}));
-    $attr{$name}{'event-on-change-reading'} = ".*" if( !defined($attr{$name}{'event-on-change-reading'}));
+    #$attr{$name}{'event-on-change-reading'} = ".*" if( !defined($attr{$name}{'event-on-change-reading'}));
 
   } elsif( ($a[2] eq "MODULE" && @a == 5 ) ) {
     $subtype = "MODULE";
@@ -4205,11 +4205,12 @@ sub netatmo_Attr($$$)
 
   my $orig = $attrVal;
   $attrVal = int($attrVal) if($attrName eq "interval" || $attrName eq "setpoint_duration");
-  $attrVal = 60*5 if($attrName eq "interval" && $attrVal < 60*5 && $attrVal != 0);
   $attrVal = 15 if($attrName eq "setpoint_duration" && $attrVal < 15 && $attrVal != 0);
 
   if( $attrName eq "interval" ) {
     my $hash = $defs{$name};
+    $attrVal = 60*5 if($hash->{SUBTYPE} ne "HOME" && $attrVal < 60*5 && $attrVal != 0);
+
     #\$attrVal = 2700 if(($attrVal < 2700 && ($hash->{SUBTYPE} eq "ACCOUNT" || $hash->{SUBTYPE} eq "FORECAST");
     $hash->{INTERVAL} = $attrVal if($attrVal);
     $hash->{INTERVAL} = 60*30 if( !$hash->{INTERVAL} );
