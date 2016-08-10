@@ -333,12 +333,6 @@ sub km200_DbLog_splitFn($$)
 	
 	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[0]                   : " . $argument[0];
 	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[1]                   : " . $argument[1];
-	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[2]                   : " . $argument[2];
-
-	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of ServiceDbLogSplitHash - id    : " . $hash->{temp}{ServiceDbLogSplitHash}{id};
-	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of ServiceDbLogSplitHash - value : " . $hash->{temp}{ServiceDbLogSplitHash}{value};
-	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of ServiceDbLogSplitHash - unit  : " . $hash->{temp}{ServiceDbLogSplitHash}{unitOfMeasure};
-
 
 	### If the service to be changed is identical to the one where the unit received from
 	if ($argument[0] = $hash->{temp}{ServiceDbLogSplitHash}{id})
@@ -347,11 +341,7 @@ sub km200_DbLog_splitFn($$)
 		$reading = $argument[0];
 		$value   = $argument[1];
 		$unit    = $hash->{temp}{ServiceDbLogSplitHash}{unitOfMeasure};
-
-		Log3 $name, 5, $name. " : km200_DbLog_splitFn - unitOfMeasure has been amended with      : " . $hash->{temp}{ServiceDbLogSplitHash}{unitOfMeasure};
 	}
-	
-	
 
 	### Delete temporary json-hash for DbLog-Split
 	$hash->{temp}{ServiceDbLogSplitHash} = ();
