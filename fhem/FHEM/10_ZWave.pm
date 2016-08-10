@@ -523,7 +523,8 @@ my %zwave_cmdArgs = (
   }
 );
 
-my %zwave_parseHook; # nodeId:regexp => fn, used by assocRequest
+use vars qw(%zwave_parseHook);
+#my %zwave_parseHook; # nodeId:regexp => fn, used by assocRequest
 my %zwave_modelConfig;
 my %zwave_modelIdAlias = ( "010f-0301-1001" => "Fibaro_FGRM222",
                            "010f-0302-1000" => "Fibaro_FGRM222", # FGR 222
@@ -1645,7 +1646,7 @@ ZWave_versionClassGet($$)
 {
   my ($hash, $class) = @_;
 
-  $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
+  delete $zwave_parseHook{"$hash->{nodeIdHex}:..8614"};
   return("", sprintf('13%02x', $class))
         if($class =~ m/^\d+$/);
   return("", sprintf('13%02x', hex($zwave_class{$class}{id})))
@@ -1660,8 +1661,6 @@ ZWave_versionClassAllGet($@)
   my ($hash, $data) = @_;
   my $name = $hash->{NAME};
 
-  $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
-
   if(!$data) { # called by the user
     delete($hash->{CL});
     my %h = map { $_=>1 } split(" ", AttrVal($name, "classes", ""));
@@ -1669,8 +1668,10 @@ ZWave_versionClassAllGet($@)
       next if($c eq "MARK");
       ZWave_Get($hash, $name, "versionClass", $c);
     }
+    $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
     return("working the background, check the vclasses attribute", "EMPTY");
   }
+  $zwave_parseHook{"$hash->{nodeIdHex}:..8614"} = \&ZWave_versionClassAllGet;
 
   my %h = map { $_=>1 } split(" ", AttrVal($name, "vclasses", ""));
   return 0 if($data !~ m/^048614(..)(..)$/i); # ??
