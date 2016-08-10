@@ -1802,6 +1802,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,off            =>""
                                                 ,"on-for-timer" =>"-ontime-"
                                                 ,"on-till"      =>"-time-"
+                                                ,inhibit        =>"[on|off]"
                                                 ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
                                                }
                      ,"HM-Sec-Sir-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"}
@@ -1809,6 +1810,7 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
  );
 # clones- - - - - - - - - - - - - - - - -
 $culHmChanSets{"HM-Sec-Sir-WM02"}       = $culHmChanSets{"HM-Sec-Sir-WM01"};
+$culHmChanSets{"HM-Sec-Sir-WM03"}       = $culHmChanSets{"HM-Sec-Sir-WM01"};
 $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
 
 $culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{THSensor};
