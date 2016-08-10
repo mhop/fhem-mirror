@@ -106,16 +106,28 @@ HttpUtils_File($)
 
 sub ip2str($) { return sprintf("%d.%d.%d.%d", unpack("C*", shift)); }
 
+# http://www.ccs.neu.edu/home/amislove/teaching/cs4700/fall09/handouts/project1-primer.pdf
 my %HU_dnsCache;
 sub
 HttpUtils_dnsParse($$)
 {
-  my ($a, $ql) = @_;
+  my ($a, $ql) = @_;    # $ql: avoid hardcoding query length
   return "wrong message ID" if(unpack("H*",substr($a,0,2)) ne "7072");
+
   while(length($a) >= $ql+16) {
-    return (undef, substr($a,$ql+12,4), unpack("N",substr($a,$ql+6,4)))
-        if(unpack("N",substr($a,$ql+2,4)) == 0x10001);
-    $ql += 12+unpack("n",substr($a,$ql+10));
+    my $l = unpack("C",substr($a,$ql, 1));
+    if(($l & 0xC0) == 0xC0) { # DNS packed compression
+      $ql += 2;
+    } else {
+      while($l != 0) {
+        $ql += $l+1;
+        $l = unpack("C",substr($a,$ql,2));
+      }
+      $ql++;
+    }
+    return (undef, substr($a,$ql+10,4), unpack("N",substr($a,$ql+4,4)))
+        if(unpack("N",substr($a,$ql,4)) == 0x10001);
+    $ql += 10+unpack("n",substr($a,$ql+8)) if(length($a) >= $ql+10);
   }
   return "No A record found";
 }
