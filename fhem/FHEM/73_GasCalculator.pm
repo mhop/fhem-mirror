@@ -530,6 +530,14 @@ sub GasCalculator_Notify($$)
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of day detected";
 
+			### Calculate gas energy of previous day € = (Vprevious[cubic] - V1stDay[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic] 
+			my $GasCalcEnergyLastDay      = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stDay", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
+			### Calculate pure gas cost of previous day GasCalcEnergyLastDay * Price per kWh
+			my $GasCalcEnergyCostLastDay  = $GasCalcEnergyLastDay * $attr{$GasCalcName}{GasPricePerKWh};
+			### Save gas energy and pure cost of previous day
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_CostLastDay",   (sprintf('%.3f', ($GasCalcEnergyCostLastDay))), 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyLastDay", (sprintf('%.3f', ($GasCalcEnergyLastDay))), 1);
+			
 			### Save current Volume as first reading of day = first after midnight and reset min, max value, value counter and value sum
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
@@ -544,6 +552,14 @@ sub GasCalculator_Notify($$)
 				### Create Log entries for debugging
 				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of month detected";
 
+				### Calculate gas energy of previous month € = (Vprevious[cubic] - V1stReadMonth[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic] 
+				my $GasCalcEnergyLastMonth     = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMonth", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
+				### Calculate pure gas cost of previous month GasCalcEnergyLastMonth * Price per kWh
+				my $GasCalcEnergyCostLastMonth = $GasCalcEnergyLastMonth * $attr{$GasCalcName}{GasPricePerKWh};
+				### Save gas energy and pure cost of previous month
+				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_CostLastMonth",   (sprintf('%.3f', ($GasCalcEnergyCostLastMonth))), 1);
+				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyLastMonth", (sprintf('%.3f', ($GasCalcEnergyLastMonth    ))), 1);
+
 				### Save current Volume as first reading of month and the last reading of the last month
 				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMonth",  $GasCountReadingValueCurrent,  1);
 				readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastMonth", $GasCountReadingValuePrevious, 1);
@@ -553,6 +569,19 @@ sub GasCalculator_Notify($$)
 				{
 					### Create Log entries for debugging
 					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of month for meter reading detected";
+					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Current month is                  : " . $GasCountReadingTimestampCurrentMon;
+					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Attribute MonthOfAnnualReading is : " . $attr{$GasCalcName}{MonthOfAnnualReading};
+					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Vol1stMeter  is                   : " . $GasCountReadingValueCurrent;
+					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - VolLastMeter is                   : " . $GasCountReadingValuePrevious;
+					
+					### Calculate gas energy of previous meter reading year € = (Vprevious[cubic] - V1stMeter[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic]
+					my $GasCalcEnergyLastMeter = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stMeter", "0"))  * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
+					### Calculate pure gas cost of previous meter reading year € = GasCalcEnergyLastMeter * Price per kWh
+					my $GasCalcEnergyCostLastMeter = $GasCalcEnergyLastMeter * $attr{$GasCalcName}{GasPricePerKWh};
+					
+					### Save gas energy and pure cost of previous meter year
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_CostLastMeter",   (sprintf('%.3f', ($GasCalcEnergyCostLastMeter))), 1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyLastMeter", (sprintf('%.3f', ($GasCalcEnergyLastMeter    ))), 1);
 
 					### Save current Volume as first reading of month where gas-meter is read and the last measured value of the last meter period
 					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stMeter",  $GasCountReadingValueCurrent,  1);
@@ -565,6 +594,15 @@ sub GasCalculator_Notify($$)
 					### Create Log entries for debugging
 					Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of calendar year detected";
 
+					### Calculate gas energy of previous calendar year € = (Vcurrent[cubic] - V1stYear[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic]
+					my $GasCalcEnergyLastYear = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stYear", "0"))  * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
+					### Calculate pure gas cost of previous calendar year € = GasCalcEnergyLastYear * Price per kWh
+					my $GasCalcEnergyCostLastYear = $GasCalcEnergyLastYear * $attr{$GasCalcName}{GasPricePerKWh};
+
+					### Save gas energy and pure cost of previous calendar year
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_CostLastYear",   (sprintf('%.3f', ($GasCalcEnergyCostLastYear))), 1);
+					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_EnergyLastYear", (sprintf('%.3f', ($GasCalcEnergyLastYear    ))), 1);
+					
 					### Save current Volume as first reading of the calendar year and the last reading of the previous year
 					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Vol1stYear",  $GasCountReadingValueCurrent,  1);
 					readingsSingleUpdate( $GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_VolLastYear", $GasCountReadingValuePrevious, 1);
@@ -1026,7 +1064,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastDay</code> : </li></td><td>Energy costs of the last day.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter</code> : </li></td><td>	Energy costs in the chosen currency since the beginning of the month of where the last gas-meter reading has been performed by the gas supplier.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastMeter</code> : </li></td><td>	Energy costs in the chosen currency of the last gas-meter period.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1048,7 +1108,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastMonth</code> : </li></td><td>Energy costs in the chosen currency of the last month.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear</code> : </li></td><td>Energy costs in the chosen currency since the beginning of the current year.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastYear</code> : </li></td><td>Energy costs of the last calendar year.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1070,7 +1152,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyLastDay</code> : </li></td><td>Total Energy consumption in kWh of the last day.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter</code> : </li></td><td>Energy consumption in kWh since the beginning of the month of where the last gas-meter reading has been performed by the gas supplier.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyLastMeter</code> : </li></td><td>Total Energy consumption in kWh of the last gas-meter reading period.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1092,7 +1196,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyLastMonth</code> : </li></td><td>Total Energy consumption in kWh of the last month.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear</code> : </li></td><td>Energy consumption in kWh since the beginning of the current year (midnight of the first).<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyLastYear</code> : </li></td><td>Total Energy consumption in kWh of the last calendar year.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1587,7 +1713,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastDay</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Tages.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastMeter</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung der letzten Z&auml;hlperiode des Gas-Versorgers.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1609,7 +1757,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastMonth</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Monats.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung seit Anfang des Jahres.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastYear</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Jahres.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1631,7 +1801,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyLastDay</code> : </li></td><td>Gesamter Energieverbrauch des letzten Tages (Gestern).<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter</code> : </li></td><td>Energieverbrauch in kWh seit Anfang seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyLastMeter</code> : </li></td><td>Gesamter Energieverbrauch der letzten Z&auml;hlerperiode des Gas-Versorgers.<BR>
 			</td></tr>
 			</td>
 		</tr>
@@ -1653,7 +1845,29 @@ sub GasCalculator_Notify($$)
 	<table>
 		<tr>
 			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyLastMonth</code> : </li></td><td>Gesamter Energieverbrauch im letzten Monat.<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
 			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear</code> : </li></td><td>Energieverbrauch in kWh seit Anfang seit Anfang des Jahres (Mitternacht des 01. Januar).<BR>
+			</td></tr>
+			</td>
+		</tr>
+	</table>
+</ul></ul>
+
+<ul><ul>
+	<table>
+		<tr>
+			<td>
+			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyLastYear</code> : </li></td><td>Gesamter Energieverbrauch in kWh des letzten Kalender-Jahres.<BR>
 			</td></tr>
 			</td>
 		</tr>
