@@ -1481,7 +1481,7 @@ sub GasCalculator_Notify($$)
 	<tr><td><a name="GasCalculatorSet"></a><b>Set</b></td></tr>
 	<tr><td>
 		<ul>
-				Die set - Funktion erlaubt individuelle Readings zu verändern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
+				Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -1503,7 +1503,7 @@ sub GasCalculator_Notify($$)
 	<tr><td><a name="GasCalculatorGet"></a><b>Get</b></td></tr>
 	<tr><td>
 		<ul>
-				Die get - Funktion liefert nur den Wert des jeweiligen Readings zurück.<BR>
+				Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>
 		</ul>
 	</td></tr>
 </table>
