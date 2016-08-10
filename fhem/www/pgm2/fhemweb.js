@@ -591,6 +591,10 @@ function
 FW_doUpdate()
 {
   if(FW_pollConn.readyState == 4 && !FW_leaving) {
+    if(FW_pollConn.status == "401") {
+      location.reload();
+      return;
+    }
     FW_errmsg("Connection lost, trying a reconnect every 5 seconds.", 4900);
     setTimeout(FW_longpoll, 5000);
     return; // some problem connecting
