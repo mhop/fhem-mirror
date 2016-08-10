@@ -242,7 +242,6 @@ sub Hyperion_ParseHttpResponse($$$)
     #################
 
 
-    readingsBeginUpdate($hash);
     my $prio        = ($data->{priorities}->[0]->{priority}) ? $data->{priorities}->[0]->{priority} : undef;
     my $adj         = $data->{adjustment}->[0];
     my $col         = $data->{activeLedColor}->[0]->{'HEX Value'}->[0];
@@ -269,10 +268,7 @@ sub Hyperion_ParseHttpResponse($$$)
     my $satG        = sprintf("%.3f",$trans->{saturationGain});
     my $satL        = (defined($trans->{saturationLGain})) ? sprintf("%.3f",$trans->{saturationLGain}) : undef;
     my $valG        = sprintf("%.3f",$trans->{valueGain});
-    if (length ($effectList) > 0)
-    {
-      $Hyperion_sets_local{effect} = $effectList;
-    }
+    $Hyperion_sets_local{effect} = $effectList if (length $effectList > 0);
     if (defined($configs))
     {
       $Hyperion_sets_local{configFile} = $configs;
@@ -295,6 +291,7 @@ sub Hyperion_ParseHttpResponse($$$)
     $hash->{hostname}       = $data->{hostname} if ((defined($data->{hostname}) && !defined($hash->{hostname})) || (defined($data->{hostname}) && $hash->{hostname} ne $data->{hostname}));
     $hash->{build_version}  = $data->{hyperion_build}->[0]->{version} if ((defined($data->{hyperion_build}->[0]->{version}) && !defined($hash->{build_version})) || (defined($data->{hyperion_build}->[0]->{version}) && $hash->{build_version} ne $data->{hyperion_build}->[0]->{version}));
     $hash->{build_time}     = $data->{hyperion_build}->[0]->{time} if ((defined($data->{hyperion_build}->[0]->{time}) && !defined($hash->{build_time})) || (defined($data->{hyperion_build}->[0]->{time}) && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
+    readingsBeginUpdate($hash);
     readingsBulkUpdate($hash,"priority",$prio) if (defined($prio) && $prio ne ReadingsVal($name,"priority",""));
     readingsBulkUpdate($hash,"adjustRed",$adjR) if ($adjR ne ReadingsVal($name,"adjustRed",""));
     readingsBulkUpdate($hash,"adjustGreen",$adjG) if ($adjG ne ReadingsVal($name,"adjustGreen",""));
