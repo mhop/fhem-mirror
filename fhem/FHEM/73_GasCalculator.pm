@@ -831,7 +831,7 @@ sub GasCalculator_Notify($$)
 	<tr><td><a name="GasCalculatorSet"></a><b>Set</b></td></tr>
 	<tr><td>
 		<ul>
-				The set - function is not implemented<BR>
+				The set - function sets individual values for example to correct values after power loss etc.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -853,7 +853,7 @@ sub GasCalculator_Notify($$)
 	<tr><td><a name="GasCalculatorGet"></a><b>Get</b></td></tr>
 	<tr><td>
 		<ul>
-				The get - function is not implemented<BR>
+				The get - function just returns the individual value of the reading.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -1481,7 +1481,7 @@ sub GasCalculator_Notify($$)
 	<tr><td><a name="GasCalculatorSet"></a><b>Set</b></td></tr>
 	<tr><td>
 		<ul>
-				Die set - Funktion ist nicht implementiert.<BR>
+				Die set - Funktion erlaubt individuelle Readings zu verändern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
 		</ul>
 	</td></tr>
 </table>
@@ -1503,7 +1503,7 @@ sub GasCalculator_Notify($$)
 	<tr><td><a name="GasCalculatorGet"></a><b>Get</b></td></tr>
 	<tr><td>
 		<ul>
-				Die get - Funktion ist nicht implementiert.<BR>
+				Die get - Funktion liefert nur den Wert des jeweiligen Readings zurück.<BR>
 		</ul>
 	</td></tr>
 </table>
