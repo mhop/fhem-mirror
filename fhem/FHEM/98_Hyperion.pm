@@ -243,8 +243,8 @@ sub Hyperion_ParseHttpResponse($$$)
 
 
     readingsBeginUpdate($hash);
+    my $prio        = ($data->{priorities}->[0]->{priority}) ? $data->{priorities}->[0]->{priority} : undef;
     my $adj         = $data->{adjustment}->[0];
-    my $cl          = $data->{clearall};
     my $col         = $data->{activeLedColor}->[0]->{'HEX Value'}->[0];
     my $configs     = ReadingsVal($name,".configs",undef);
     my $corr        = $data->{correction}->[0];
@@ -269,7 +269,6 @@ sub Hyperion_ParseHttpResponse($$$)
     my $satG        = sprintf("%.3f",$trans->{saturationGain});
     my $satL        = (defined($trans->{saturationLGain})) ? sprintf("%.3f",$trans->{saturationLGain}) : undef;
     my $valG        = sprintf("%.3f",$trans->{valueGain});
-    my $prio        = undef;
     if (length ($effectList) > 0)
     {
       $Hyperion_sets_local{effect} = $effectList;
@@ -296,7 +295,6 @@ sub Hyperion_ParseHttpResponse($$$)
     $hash->{hostname}       = $data->{hostname} if ((defined($data->{hostname}) && !defined($hash->{hostname})) || (defined($data->{hostname}) && $hash->{hostname} ne $data->{hostname}));
     $hash->{build_version}  = $data->{hyperion_build}->[0]->{version} if ((defined($data->{hyperion_build}->[0]->{version}) && !defined($hash->{build_version})) || (defined($data->{hyperion_build}->[0]->{version}) && $hash->{build_version} ne $data->{hyperion_build}->[0]->{version}));
     $hash->{build_time}     = $data->{hyperion_build}->[0]->{time} if ((defined($data->{hyperion_build}->[0]->{time}) && !defined($hash->{build_time})) || (defined($data->{hyperion_build}->[0]->{time}) && $hash->{build_time} ne $data->{hyperion_build}->[0]->{time}));
-    $prio = $data->{priorities}->[0]->{priority} if ($data->{priorities}->[0]->{priority});
     readingsBulkUpdate($hash,"priority",$prio) if (defined($prio) && $prio ne ReadingsVal($name,"priority",""));
     readingsBulkUpdate($hash,"adjustRed",$adjR) if ($adjR ne ReadingsVal($name,"adjustRed",""));
     readingsBulkUpdate($hash,"adjustGreen",$adjG) if ($adjG ne ReadingsVal($name,"adjustGreen",""));
@@ -517,7 +515,7 @@ sub Hyperion_Set($@)
     {
       Log3 $name,4,"$name: NOT restarted Hyperion with $binpath $confdir$value, status: $status";
       readingsSingleUpdate($hash,"serverResponse","ERROR: $status",1);
-      return "$name: NOT restarted Hyperion with $binpath $confdir$value,status: $status";
+      return "$name NOT restarted Hyperion with $binpath $confdir$value, status: $status";
     }
   }
   elsif ($cmd eq "rgb")
