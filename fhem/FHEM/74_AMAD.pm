@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.4.3";
-my $flowsetversion = "2.4.1";
+my $modulversion = "2.6.0";
+my $flowsetversion = "2.6.0";
 
 
 
@@ -1214,7 +1214,7 @@ sub AMAD_CommBridge_Read($) {
 	readingsBulkUpdate( $bhash, "receiveVoiceCommand", $fhemCmd );
 	readingsBulkUpdate( $bhash, "receiveVoiceDevice", $device );
 	readingsEndUpdate( $bhash, 1 );
-	Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: set reading receive voice command";
+	Log3 $bname, 4, "AMAD ($bname) - AMAD_CommBridge: set reading receive voice command: $fhemCmd from Device $device";
 	
 	$response = "header lines: \r\n AMADCommBridge receive Data complete\r\n FHEM was processes\r\n";
         $c = $hash->{CD};
@@ -1553,6 +1553,8 @@ sub AMAD_decrypt($) {
     <li>currentMusicAlbum - aktuell abgespieltes Musikalbum des verwendeten Mediaplayers</li>
     <li>currentMusicApp - aktuell verwendeter Mediaplayers</li>
     <li>currentMusicArtist - aktuell abgespielter Musikinterpret des verwendeten Mediaplayers</li>
+    <li>currentMusicIcon - Cover vom aktuell abgespielten Album <b>Noch nicht fertig implementiert</b></li>
+    <li>currentMusicState - Status des aktuellen/zuletzt verwendeten Mediaplayers</li>
     <li>currentMusicTrack - aktuell abgespielter Musiktitel des verwendeten Mediaplayers</li>
     <li>daydream - on/off, Daydream gestartet oder nicht</li>
     <li>deviceState - Status des Androidger&auml;tes. unknown, online, offline.</li>
