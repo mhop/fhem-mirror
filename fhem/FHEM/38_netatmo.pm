@@ -2530,118 +2530,120 @@ netatmo_parseForecast($$)
         readingsEndUpdate($hash,1);
       }
       
-      my $i = 0;
-      foreach my $forecastdata ( @{$json->{body}{forecastDays}})
+      if(defined($json->{body}{forecastDays}))
       {
+        my $i = 0;
+        foreach my $forecastdata ( @{$json->{body}{forecastDays}})
+        {
 
-
-        if(defined($forecastdata->{rain}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_rain", $forecastdata->{rain}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{max_temp}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_temp_max", $forecastdata->{max_temp}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{min_temp}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_temp_min", $forecastdata->{min_temp}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{windangle}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_windangle", $forecastdata->{windangle}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{wind_direction}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_wind_direction", $forecastdata->{wind_direction}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{windgust}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_windgust", $forecastdata->{windgust}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{sun}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_sun", $forecastdata->{sun}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{uv}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_uv", $forecastdata->{uv}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{sunset}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_sunset", FmtDateTime($forecastdata->{sunset}), 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{sunrise}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_sunrise", FmtDateTime($forecastdata->{sunrise}), 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{day_locale}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_day", $forecastdata->{day_locale}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{weather_symbol_day}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_symbol_day", $forecastdata->{weather_symbol_day}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        if(defined($forecastdata->{weather_symbol_night}))
-        {
-          readingsBeginUpdate($hash);
-          $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
-          readingsBulkUpdate( $hash, "fc".$i."_symbol_night", $forecastdata->{weather_symbol_night}, 1 );
-          $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
-          readingsEndUpdate($hash,1);
-        }
-        
-        $i++;
-      }#foreach forecast
+          if(defined($forecastdata->{rain}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_rain", $forecastdata->{rain}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{max_temp}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_temp_max", $forecastdata->{max_temp}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{min_temp}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_temp_min", $forecastdata->{min_temp}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{windangle}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_windangle", $forecastdata->{windangle}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{wind_direction}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_wind_direction", $forecastdata->{wind_direction}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{windgust}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_windgust", $forecastdata->{windgust}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{sun}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_sun", $forecastdata->{sun}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{uv}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_uv", $forecastdata->{uv}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{sunset}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_sunset", FmtDateTime($forecastdata->{sunset}), 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{sunrise}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_sunrise", FmtDateTime($forecastdata->{sunrise}), 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{day_locale}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_day", $forecastdata->{day_locale}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{weather_symbol_day}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_symbol_day", $forecastdata->{weather_symbol_day}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          if(defined($forecastdata->{weather_symbol_night}))
+          {
+            readingsBeginUpdate($hash);
+            $hash->{".updateTimestamp"} = FmtDateTime($forecasttime);
+            readingsBulkUpdate( $hash, "fc".$i."_symbol_night", $forecastdata->{weather_symbol_night}, 1 );
+            $hash->{CHANGETIME}[0] = FmtDateTime($forecasttime);
+            readingsEndUpdate($hash,1);
+          }
+          
+          $i++;
+        }#foreach forecast
+      }#defined forecastdays
 
     }#ok
   }#json
