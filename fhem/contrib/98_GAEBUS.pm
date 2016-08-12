@@ -1,4 +1,4 @@
-##############################################
+#############################################
 # $Id: 98_GAEBUS.pm 1 2015-07-03 00:00:00 Andreas Goebel $
 # derived from 00_TUL.pm
 #
@@ -25,8 +25,9 @@
 #                         ebusd may return a list of values like "52.0;43.0;8.000;41.0;45.0;error"
 #                         defining a reading "VL;RL;dummy;VLWW;RLWW" will create redings VL, RL, VLWW and RLWW
 # 04.12.2015 : A.Goebel : add event-min-interval to attributes
-# 05.01.2016 : A.Goebel : debugs added
+# 14.12.2015 : A.Goebel : add read possible commmands for ebusd using "find -f" instead of reading the ".csv" files directly ("get ebusd_find")
 # 25.01.2016 : A.Goebel : fix duplicate log entries for readings
+# 05.02.2016 : A.Goebel : add valueFormat attribute
 
 package main;
 
@@ -42,7 +43,6 @@ sub GAEBUS_Attr(@);
 
 sub GAEBUS_OpenDev($$);
 sub GAEBUS_CloseDev($);
-sub GAEBUS_SimpleWrite(@);
 sub GAEBUS_Disconnected($);
 sub GAEBUS_Shutdown($);
 
@@ -53,15 +53,13 @@ sub GAEBUS_GetUpdatesDoit($);
 sub GAEBUS_GetUpdatesDone($);
 sub GAEBUS_GetUpdatesAborted($);
 
+sub GAEBUS_state($);
+
 my %gets = (    # Name, Data to send to the GAEBUS, Regexp for the answer
-#  "raw"      => ["r", '.*'],
 );
 
-my %getsToRead = ();
-
 my %sets = (
-#  "raw"       => "",
-  "reopen"    => []
+  #"reopen"    => []
 );
 
 my %setsForWriting = ();
@@ -71,9 +69,10 @@ my $allSetParamsForWriting = "";
 my $allGetParams           = "";
 my $delimiter              = "~";
 
-my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading event-min-interval ebusWritesEnabled:0,1";
+my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-change-reading event-min-interval ebusWritesEnabled:0,1 valueFormat:textField-long";
 my %ebusCmd  = ();
 
+#####################################
 sub
 GAEBUS_Initialize($)
 {
@@ -89,7 +88,25 @@ GAEBUS_Initialize($)
   $hash->{AttrList}   = $attrsDefault;
   $hash->{ShutdownFn} = "GAEBUS_Shutdown";
 
-  GAEBUS_ReadCSV($hash);
+
+  %sets = ( "reopen" => [] );
+  %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
+  %setsForWriting = ( );
+  
+  GAEBUS_initParams($hash);
+
+}
+
+#####################################
+sub
+GAEBUS_initParams ($)
+{
+  my ($hash) = @_;
+
+  # bulid set and get Params and store them in 
+  #   $allSetParams
+  #   $allSetParamsForWriting
+  #   $allGetParams
 
   $allSetParams = "";
   foreach my $setval (sort keys %sets) 
@@ -310,11 +327,6 @@ GAEBUS_Set($@)
   return "Unknown argument $type, choose one of " . $actSetParams
   	if(!defined($sets{$type}));
 
-
-  #if($type eq "raw") {
-  #  Log3 $hash, 3, "set $name $type $arg";
-  #  GAEBUS_SimpleWrite($hash, $arg);
-  #}
   return undef;
 }
 
@@ -391,6 +403,24 @@ GAEBUS_Get($@)
 
   }
 
+  if ($a[1] eq "ebusd_find")
+  {
+    Log3 ($name, 4, "$name Get $a[1]");
+
+    my $answer = GAEBUS_doEbusCmd ($hash, "f", "", "", "", "", 0);
+
+    return $answer;
+  }
+
+  if ($a[1] eq "ebusd_info")
+  {
+    Log3 ($name, 4, "$name Get $a[1]");
+
+    my $answer = GAEBUS_doEbusCmd ($hash, "i", "", "", "", "", 0);
+
+    return $answer;
+  }
+
   # other read commands
 
   if ($a[1] =~ /^[rh]$delimiter/) 
@@ -416,19 +446,6 @@ GAEBUS_Get($@)
   #return "No $a[1] for dummies" if(IsDummy($varname));
 
   return "nix"; 
-
-  #GAEBUS_SimpleWrite($hash, "B".$gets{$a[1]}[0] . $arg);
-
-
-  if(!defined($rsp)) {
-    GAEBUS_Disconnected($hash);
-    $rsp = "No answer";
-  } 
-
-  $hash->{READINGS}{$a[1]}{VAL} = $rsp;
-  $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
-
-  return "$a[0] $a[1] => $rsp";
 }
 
 #####################################
@@ -562,6 +579,8 @@ GAEBUS_Attr(@)
   my @a = @_;
   my ($action, $name, $attrname, $attrval) = @a;
 
+  my $hash = $defs{$name};
+
   $attrval = "" unless defined ($attrval);
 
   if ($action eq "del")
@@ -597,10 +616,37 @@ GAEBUS_Attr(@)
       }
     }
 
+    if ($attrname eq "valueFormat" and defined ($hash->{helper}{$attrname})) {
+      delete ($hash->{helper}{$attrname});
+    }
+
     return undef;
   }
   elsif ($action eq "set")
   {
+
+    if ($attrname eq "valueFormat") {
+      my $attrVal = $attrval;
+      if( $attrVal =~ m/^{.*}$/s && $attrVal =~ m/=>/ && $attrVal !~ m/\$/ ) {
+        my $av = eval $attrVal;
+        if( $@ ) {
+          Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $attrname: ". $@);
+        } else {
+          $attrVal = $av if( ref($av) eq "HASH" );
+        }
+        $hash->{helper}{$attrname} = $attrVal;
+
+        foreach my $key (keys $hash->{helper}{$attrname}) {
+          Log3 ($hash->{NAME}, 3, $hash->{NAME} ." $key ".$hash->{helper}{$attrname}{$key});
+        }
+        #return "set HERE??";
+
+      } else {
+        # if valueFormat is not verified sucessfully ... the helper is deleted (=not used)
+        delete $hash->{helper}{$attrname};
+      }
+      return undef;
+    } 
 
     if (defined $attr{$name}{$attrname}) 
     {
@@ -646,150 +692,6 @@ GAEBUS_Attr(@)
   return undef;
 }
 
-sub
-GAEBUS_ProcessCSV($$)
-{
-  my ($hash, $file) = @_;
-
-  if (!open (CSV, "<$file"))
-  {
-      Log3 ($hash, 2, "GAEBUS: cannot open $file");
-      return undef;
-  }
-  else
-  {
-    my $line;
-    my $buffer = "";
-
-    my $actCircuit = "";
-    my %circuits   = ();
-    my $defCircuit = "$file";
-
-    $defCircuit =~  s,^.*/,,;
-    $defCircuit =~  s/\.csv$//;
-
-    binmode(CSV, ':encoding(utf-8)');
-    while (<CSV>)
-    {
-      next if /^#/;
-      next if /^\s$/;
-      s/\r//;
-
-      #s/ä/\&auml;/g;
-      #s/Ä/\&Auml;/g;
-      #s/ü/\&Auml;/g;
-      #s/Ü/\&Uuml;/g;
-      #s/ö/\&ouml;/g;
-      #s/Ö/\&Ouml;/g;
-      #s/ß/\&szlig;/g;
-      #s/"/\&quot;/g;
-    
-      chomp;
-
-      $line = encode("UTF-8", $_);
-      $line =~ s/ /_/g; # no blanks in names and comments
-      $line =~ s/$delimiter/_/g; # clean up the delimiter within the text
-      #$line =~ s/\|/_/g; # later used as delimiter in arguments
-
-      #Log3 ($hash, 2, "READ $file $line");
-
-      my ($io, $circuit, $vname, $comment, @params) = split (",", $line, 5);
-
-      # handle defaults: "^*"
-
-      if ($io =~ /^\*(.*)/) 
-      {
-        my $rwkey = $1;
-
-        if ($circuit ne "")
-        {
-          #print "new circuit found $rwkey: $circuit\n";
-          $circuits{$rwkey} = $circuit;
-          next;
-        }
-      }
-
-      # collect variables
-
-      foreach my $dir (split (";", $io.";"))
-      {
-        if ($circuit ne "")
-        {
-          $actCircuit = $circuit;
-        }
-        elsif (defined ($circuits{$dir}))
-        {
-          $actCircuit = $circuits{$dir};
-        }
-        else
-        {
-          $actCircuit = $defCircuit;
-        }
-        #printf "%-3s %-12s %-40s %-s\n", $dir, $actCircuit, $vname, $comment;
-        #Log3 $hash, 3, printf "%-3s %-12s %-40s %-s\n", $dir, $actCircuit, $vname, $comment;
-        #Log3 $hash, 3, "$dir, $actCircuit, $vname, $comment";
-
-	my $dirSimple = substr($dir, 0,1);
-	if ($dirSimple =~ /^[rhw]/)
-        {
-          my $rkey = join (";", ($dirSimple, $actCircuit, $vname));
-          $ebusCmd{$rkey} = $comment;
-        }
-
-      }
-
-      #print "$io $actCircuit\n";
-    }
-    close (CSV);
-  }
-}
-
-sub 
-GAEBUS_ReadCSV($)
-{
-  my $hash = shift;
-  my $dir = "./ebusd";
-
-  %ebusCmd  = ();
-
-  if (opendir INDIR, $dir)
-  {
-    my @infiles = grep /^[^\.].*\.csv$/, readdir INDIR; # all files exept those starting with "."
-    foreach my $file (@infiles)
-    {
-      next if ($file =~ /^_/);
-      Log3 ($hash, 4, "GAEBUS: process config $file");
-      GAEBUS_ProcessCSV($hash, $dir."/".$file);
-    }
-    closedir INDIR;
-
-    %sets = ( "reopen" => [] );
-    %gets = ( );
-    %setsForWriting = ( );
-
-    my $comment;
-    foreach my $key (sort keys %ebusCmd)
-    {
-      $comment = $ebusCmd{$key};
-
-      my ($io,$class,$var) = split (";", $key, 3);
-
-      push @{$sets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
-
-      push @{$setsForWriting{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "w");
-
-      push @{$gets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
-      
-      Log3 ($hash, 5, "GAEBUS: add attr $key $comment");
-    }
-
-  } 
-  else  
-  {
-    Log3 ($hash, 2, "cannot open dir $dir");
-  }
-}
-
 sub 
 GAEBUS_state($)
 {
@@ -831,20 +733,20 @@ sub
 GAEBUS_doEbusCmd($$$$$$$)
 {
   my $hash           = shift;
-  my $action         = shift; # "r" = get reading, "v" = verbose mode, "w" = write to ebus
+  my $action         = shift; # "r" = get reading, "v" = verbose mode, "w" = write to ebus, "f" = execute find to read in config, "i" = execute info 
   my $readingname    = shift;
   my $readingcmdname = shift;
   my $writeValues    = shift;
   my $cmdaddon       = shift;
   my $inBlockingCall = shift;
-  my $actMessage;
+  my $actMessage     = "";
   my $name = $hash->{NAME};
 
   if (($hash->{STATE} ne "Connected") or (!$hash->{TCPDev}->connected()) )
   {
     Log3 ($name, 2, "$name device closed. Try to reopen");
     GAEBUS_CloseDev($hash);
-    GAEBUS_OpenDev($hash,1);
+    GAEBUS_OpenDev($hash,0);
 
     if ($hash->{STATE} ne "Connected") {
       if ($inBlockingCall) {
@@ -874,6 +776,12 @@ GAEBUS_doEbusCmd($$$$$$$)
     $cmd .= "-c $class $var ";
     $cmd .= "$writeValues";
 
+  } elsif ($action eq "f") {
+    $cmd = "find -f -r -w";
+
+  } elsif ($action eq "i") {
+    $cmd = "info";
+
   } else {
 
     $cmd = "$io ";
@@ -892,40 +800,100 @@ GAEBUS_doEbusCmd($$$$$$$)
     sysread ($hash->{TCPDev}, $actMessage, 4096);
     $actMessage =~ s/\n//g;
     Log3 ($name, 2, "$name old answer $actMessage\n");
+    $actMessage = "";
   }
 
   syswrite ($hash->{TCPDev}, $cmd."\n");
-  if ($hash->{SELECTOR}->can_read($timeout))
+  if (0 and $hash->{SELECTOR}->can_read($timeout))
   {
     #Log3 ($name, 2, "$name try to read");
     sysread ($hash->{TCPDev}, $actMessage, 4096);
     $actMessage =~ s/\n//g;
     #$actMessage =~ s/;/ /g;
+  }
 
-    Log3 ($name, 3, "$name answer $action $readingname $actMessage");
+  if ($hash->{SELECTOR}->can_read($timeout)) {
 
-    #unless ($actMessage =~ "Usage:") # pass Usage: directly
-    #{
-    #  # no Usage: message
-    #  unless ($actMessage =~ /^ERR:/) # pass ERR: message directly
-    #  {
-    #    # no ERR: message
-    #    # = normal answer
-    #  }
-    #} 
+    my $rbuffer = "";
+   
+    while ($hash->{SELECTOR}->can_read(0.1) and sysread ($hash->{TCPDev}, $rbuffer, 4096)) {
+      $actMessage .= $rbuffer;
+
+      if ( $rbuffer =~ /\n\n$/ )
+      {
+        Log3 ($name, 3, "$name answer terminated by empty line");
+        last;
+      }
+ 
+    }
+    #$actMessage =~ s/\n//g;
+
+
+    #Log3 ($name, 3, "$name answer $action $readingname $actMessage");
 
   }
   else
   {
     #return "timeout reading answer for ($readingname) $cmd";
 
-    $actMessage = "timeout reading answer for $cmd";
-    Log3 ($name, 2, "$name $actMessage");
+    Log3 ($name, 2, "$name: timeout reading answer for $cmd");
+
+    return "";
   }
+
+  if ($action eq "f")
+  {
+
+    %sets = ( "reopen" => [] );
+    %gets = ( "ebusd_find" => [], "ebusd_info" => [] );
+    %setsForWriting = ( );
+
+    my $cnt = 0;
+    foreach my $line (split /\n/, $actMessage) {
+      $cnt++;
+
+      $line =~ s/ /_/g; # no blanks in names and comments
+      $line =~ s/$delimiter/_/g; # clean up the delimiter within the text
+
+      Log3 ($name, 3, "$name $line");
+
+      #my ($io,$class,$var) = split (",", $line, 3);
+      my ($io, $class, $var, $comment, @params) = split (",", $line, 5);
+
+      $io =~ s/[0-9]//g;
+
+      # drop "memory"
+
+      next if ($class eq "memory");
+      next if ($class eq "scan");
+
+
+      push @{$sets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
+
+      push @{$setsForWriting{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "w" or $io eq "wi");
+
+      push @{$gets{$io.$delimiter.$class}}, $var.$delimiter.$comment if ($io eq "r" or $io eq "h");
+
+    }
+
+    GAEBUS_initParams($hash);
+
+    Log3 ($name, 3, "$name find done.");
+    return "$cnt definitions processed";
+
+  }
+  if ($action eq "i")
+  {
+    #Log3 ($name, 3, "$name info done.");
+    return "$actMessage";
+    
+  }
+
+  $actMessage =~ s/\n//g;
+  Log3 ($name, 3, "$name answer $action $readingname $actMessage");
 
   my @values = split /;/, $actMessage;
   my @targetreading = defined ($readingname) ? split /;/, $readingname : ();
-
 
   if ($inBlockingCall)
   {
@@ -941,7 +909,7 @@ GAEBUS_doEbusCmd($$$$$$$)
 
     $actMessage =~ s/\|$//;
 
-    # readings will be set in parent FHEM process
+    # readings will be updated in main fhem process
     return $actMessage;
   }
 
@@ -952,6 +920,8 @@ GAEBUS_doEbusCmd($$$$$$$)
     {
       next if ($targetreading[$i] eq "dummy");
       my $v = defined($values[$i]) ? $values[$i] : "";
+
+      $v = GAEBUS_valueFormat ($hash, $targetreading[$i], $v);
 
       readingsBulkUpdate ($hash, $targetreading[$i], $v);
     }
@@ -1021,7 +991,6 @@ GAEBUS_GetUpdatesDoit($)
   my $ret = GAEBUS_OpenDev($hash, 0);
   if (($hash->{STATE} ne "Connected") or (!$hash->{TCPDev}->connected()) )
   {
-    Log3 ($name, 4, "$name: GetUpdatesDoit not connected to ebusd");
     return "$name";
   }
 
@@ -1071,7 +1040,6 @@ GAEBUS_GetUpdatesDoit($)
   }
 
   # returnvalue for BlockingCall ... done routine
-  Log3 ($name, 4, "$name: GetUpdatesDoit returnes $name$readingsToUpdate");
   return $name.$readingsToUpdate;
 
 
@@ -1082,8 +1050,6 @@ GAEBUS_GetUpdatesDone($)
 {
   my ($string) = @_;
 
-  Log (3, "98_GAEBUS: GetUpdatesDone called");
-
   return unless(defined($string));
 
   my @a = split("\\|",$string);
@@ -1092,12 +1058,14 @@ GAEBUS_GetUpdatesDone($)
 
   delete($hash->{helper}{RUNNING_PID});
 
-  Log3 ($name, 4, "$name: GetUpdatesDoit returned $string");
+  #Log3 ($name, 2, "$name: GetUpdatesDoit returned $string");
  
   readingsBeginUpdate ($hash);
   for (my $i = 1; $i < $#a; $i = $i + 2) 
   {
-    readingsBulkUpdate ($hash, $a[$i], $a[$i+1]);
+    my $v = GAEBUS_valueFormat ($hash, $$a[$i], $a[$i+1]);
+    #readingsBulkUpdate ($hash, $a[$i], $a[$i+1]);
+    readingsBulkUpdate ($hash, $a[$i], $v);
   }
   readingsEndUpdate($hash, 1);
   
@@ -1117,6 +1085,27 @@ GAEBUS_GetUpdatesAborted($)
 
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$hash->{Interval}, "GAEBUS_GetUpdates", $hash, 0);
+}
+
+sub
+GAEBUS_valueFormat(@)
+{
+  my ($hash, $reading, $value) = @_;
+
+  return $value unless (defined ($reading));
+
+  if (ref($hash->{helper}{valueFormat}) eq 'HASH')
+  {
+
+    if (exists($hash->{helper}{valueFormat}->{$reading})) {
+
+      my $vf = $hash->{helper}{valueFormat}->{$reading};
+      return sprintf ("$vf", $value);
+    }
+  }
+
+  return $value;
+
 }
 
 
@@ -1149,9 +1138,8 @@ GAEBUS_GetUpdatesAborted($)
     Example:<br><br>
     <code>define ebus1 GAEBUS localhost 300</code>
     <br><br>
-    When initializing the object the configuration of the ebusd (.csv files from /etc/ebusd) are read.<br>
-    The files need to be copied into a directory "ebusd" (normally /opt/fhem/ebusd) on the server running fhem.<br>
-       
+    When initializing the object no device specific commands are known. Please call "get ebusd_find" to read in supported commands from ebusd.<br>
+    After fresh restart of ebusd it may take a while until all supported devices and their commands are visible.<br>
 
   </ul>
   <br>
@@ -1162,17 +1150,17 @@ GAEBUS_GetUpdatesAborted($)
     <li>reopen<br>
         Will close and open the socket connection.
         </li><br>
-    <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment from csv&gt;<br>
+    <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
         Will define a attribute with the following syntax:<br>
-        [r]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt<br>
-        Valid combinations are read from the .csv files in directory "ebusd" and are selectable<br>
+        [r]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment&gt<br>
+        Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         Values from the attributes will be used as the name for the reading which are read from ebusd in the interval specified.<br>
         </li><br>
-    <li>[w]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment from csv&gt;<br>
+    <li>[w]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
         Will define a attribute with the following syntax:<br>
-        [w]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt<br>
+        [w]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment&gt<br>
         They will only appear if the attribute "ebusWritesEnabled" is set to "1"<br>
-        Valid combinations are read from the .csv files in directory "ebusd" and are selectable<br>
+        Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         Values from the attributes will be used for set commands to modify parameters for ebus devices<br>
         Hint: if the values for the attributes are prefixed by "set-" then all possible parameters will be listed in one block<br>
         </li><br>
@@ -1181,13 +1169,22 @@ GAEBUS_GetUpdatesAborted($)
   <a name="GAEBUS"></a>
   <b>Get</b>
   <ul>
+    <li>ebusd_info<br>
+        Execude <i>info</i> command on ebusd and show result.
+        </li><br>
+
+    <li>ebusd_find<br>
+        Execude <i>find</i> command on ebusd. Result will be used to display supported "set" and "get" commands.
+        </li><br>
+
+
     <li>reading &lt;reading-name&gt<br>
         Will read the actual value form ebusd and update the reading.
         </li><br>
 
-    <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment from csv&gt;<br>
+    <li>[r]~&lt;class&gt; &lt;variable-name&gt;~&lt;comment&gt;<br>
         Will read this variable from the ebusd and show the result as a popup.<br>
-        Valid combinations are read from the .csv files in directory "ebusd" and are selectable<br>
+        Valid combinations are read from ebusd (using "get ebusd_find") and are selectable.<br>
         </li><br>
 
   </ul>
@@ -1207,7 +1204,7 @@ GAEBUS_GetUpdatesAborted($)
         If Attribute is missing, default value is 0 (disable writes)<br>
         </li><br>
     <li>Attributes of the format<br>
-        <code>[r|h]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment from csv&gt;</code><br>
+        <code>[r|h]~&lt;class&gt;~&lt;variable-name&gt;~&lt;comment&gt;</code><br>
         define variables that can be retrieved from the ebusd.
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name of the reading for this variable.<br>
@@ -1224,6 +1221,13 @@ GAEBUS_GetUpdatesAborted($)
         They will appear when they are defined by a "set" command as described above.<br>
         The value assigned to an attribute specifies the name that will be used in set to change a parameter for a ebus device.<br>
         </li><br>
+    <li>valueFormat<br>
+        Defines a map to format values within GAEBUS.<br>
+        All readings can be formated using syntax of sprinf.
+        <br>
+        Example: { "temperature" => "%0.2f" }
+        </li><br>
+
   </ul>
   <br>
 </ul>
