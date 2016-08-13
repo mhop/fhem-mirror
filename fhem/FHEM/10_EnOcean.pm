@@ -12276,6 +12276,13 @@ sub EnOcean_Attr(@)
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
+  } elsif ($attrName eq "settingAccuracy") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^high|low$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
   } elsif ($attrName eq "shutTime") {
     my $data;
     if (!defined $attrVal) {
