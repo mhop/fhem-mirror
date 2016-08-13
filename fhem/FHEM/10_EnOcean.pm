@@ -352,7 +352,7 @@ my %EnO_eepConfig = (
   "G5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "H5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "dimming", manufID => "00D", model => "TF", teachMethod => "confirm", webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,"},
   "G5.3F.7F" => {attr => {subType => "manufProfile", eep => "A5-3F-7F", manufID => "00D", webCmd => "opens:stop:closes"}},
-  "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "TF", sensorMode => 'pushbutton', teachMethod => "confirm", webCmd => "opens:stop:closes"}},
+  "H5.3F.7F" => {attr => {subType => "manufProfile", comMode => "confirm", eep => "A5-3F-7F", manufID => "00D", model => "TF", sensorMode => 'pushbutton', settingAccuracy => "high", teachMethod => "confirm", webCmd => "opens:stop:closes"}},
   "M5.38.08" => {attr => {subType => "gateway", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", webCmd => "on:off"}},
   "N5.38.08" => {attr => {subType => "gateway", comMode => "confirm", eep => "A5-38-08", gwCmd => "switching", manufID => "00D", model => "TF", teachMethod => "confirm", webCmd => "on:off"}},
   "G5.ZZ.ZZ" => {attr => {subType => "PM101", manufID => "005"}, GPLOT => "EnO_motion:Motion,EnO_brightness4:Brightness,"},
@@ -665,7 +665,8 @@ EnOcean_Initialize($)
                       "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
                       "scaleDecimals:0,1,2,3,4,5,6,7,8,9 scaleMax scaleMin secMode:rcv,snd,bidir " .
                       "secLevel:encapsulation,encryption,off sendDevStatus:no,yes sensorMode:switch,pushbutton " .
-                      "serviceOn:no,yes setpointRefDev setpointSummerMode:slider,0,5,100 setpointTempRefDev shutTime shutTimeCloses subDef " .
+                      "serviceOn:no,yes settingAccuracy:high,low setpointRefDev setpointSummerMode:slider,0,5,100 " .
+                      "setpointTempRefDev shutTime shutTimeCloses subDef " .
                       "subDef0 subDefI subDefA subDefB subDefC subDefD subDefH subDefW " .
                       "subType:$subTypeList subTypeSet:$subTypeList subTypeReading:$subTypeList " .
                       "summerMode:off,on switchMode:switch,pushbutton " .
@@ -3917,6 +3918,12 @@ sub EnOcean_Set($@)
         my $angleTime = AttrVal($name, "angleTime", 0);
         my $position = ReadingsVal($name, "position", undef);
         my $positionStart;
+        my $setCmd = 8;
+        my $settingAccuracy = 1;
+        if (AttrVal($name, 'settingAccuracy', 'low') eq 'high') {
+          $setCmd = 0x0A;
+          $settingAccuracy = 10;
+        }
         if ($cmd eq "?" || $cmd eq "stop") {
 
         } else {
@@ -4038,7 +4045,7 @@ sub EnOcean_Set($@)
         } elsif ($cmd eq "down") {
           # down
           if (defined $a[1]) {
-            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] < 255) {
+            if ($a[1] =~ m/^[+-]?\d+$/ && $a[1] >= 0 && $a[1] <= 255) {
               $position = $positionStart + $a[1] / $shutTime * 100;
               if ($angleTime) {
                 $anglePos = $anglePosStart + ($angleMax - $angleMin) * $a[1] / $angleTime;
@@ -4097,8 +4104,8 @@ sub EnOcean_Set($@)
                 $angleTime = $angleTime * ($angleMax - $anglePos) / ($angleMax - $angleMin);
                 $shutTime = $shutTime  * ($a[1] - $positionStart) / 100 + $angleTime;
                 # round up
-                $angleTime = int($angleTime) + 1 if ($angleTime > int($angleTime));
-                $shutTime = int($shutTime) + 1 if ($shutTime > int($shutTime));
+                $angleTime = int($angleTime) + 1 if ($settingAccuracy == 1 && $angleTime > int($angleTime));
+                $shutTime = int($shutTime) + 1 if ($settingAccuracy == 1 && $shutTime > int($shutTime));
                 $position = $a[1] + $angleTime / $shutTimeSet * 100;
                 if ($position >= 100) {
                   $position = 100;
@@ -4114,8 +4121,8 @@ sub EnOcean_Set($@)
                 $angleTime = $angleTime * ($anglePos - $angleMin) /($angleMax - $angleMin);
                 $shutTime = $shutTime * ($positionStart - $a[1]) / 100 + $angleTime;
                 # round up
-                $angleTime = int($angleTime) + 1 if ($angleTime > int($angleTime));
-                $shutTime = int($shutTime) + 1 if ($shutTime > int($shutTime));
+                $angleTime = int($angleTime) + 1 if ($settingAccuracy == 1 && $angleTime > int($angleTime));
+                $shutTime = int($shutTime) + 1 if ($settingAccuracy == 1 && $shutTime > int($shutTime));
                 $position = $a[1] - $angleTime / $shutTimeSet * 100;
                 if ($position <= 0) {
                   $position = 0;
@@ -4132,13 +4139,13 @@ sub EnOcean_Set($@)
                   # up >> reduce slats angle
                   $shutTime = $angleTime * ($anglePosStart - $anglePos)/($angleMax - $angleMin);
                   # round up
-                  $shutTime = int($shutTime) + 1 if ($shutTime > int($shutTime));
+                  $shutTime = int($shutTime) + 1 if ($settingAccuracy == 1 && $shutTime > int($shutTime));
                   $shutCmd = 1;
                 } elsif ($anglePosStart < $anglePos) {
                   # down >> enlarge slats angle
                   $shutTime = $angleTime * ($anglePos - $anglePosStart) /($angleMax - $angleMin);
                   # round up
-                  $shutTime = int($shutTime) + 1 if ($shutTime > int($shutTime));
+                  $shutTime = int($shutTime) + 1 if ($settingAccuracy == 1 && $shutTime > int($shutTime));
                   $shutCmd = 2;
                 } else {
                   # position and slats angle ok
@@ -4178,13 +4185,13 @@ sub EnOcean_Set($@)
                   # up >> reduce slats angle
                   $shutTime = $angleTime * ($anglePosStart - $anglePos)/($angleMax - $angleMin);
                   # round up
-                  $shutTime = int($shutTime) + 1 if ($shutTime > int($shutTime));
+                  $shutTime = int($shutTime) + 1 if ($settingAccuracy == 1 && $shutTime > int($shutTime));
                   $shutCmd = 1;
                 } elsif ($anglePosStart < $anglePos) {
                   # down >> enlarge slats angle
                   $shutTime = $angleTime * ($anglePos - $anglePosStart) /($angleMax - $angleMin);
                   # round up
-                  $shutTime = int($shutTime) + 1 if ($shutTime > int($shutTime));
+                  $shutTime = int($shutTime) + 1 if ($settingAccuracy == 1 && $shutTime > int($shutTime));
                   $shutCmd = 2;
                 } else {
                   # slats angle ok
@@ -4201,7 +4208,6 @@ sub EnOcean_Set($@)
             }
           }
         } elsif ($cmd eq "local") {
-          my $setCmd = 8;
           if ($a[1]) {
             return "Usage: $cmd [learn]" if ($a[1] ne "learn");
             if ($a[1] eq "learn") {
@@ -4210,14 +4216,14 @@ sub EnOcean_Set($@)
             shift(@a);
           }
           $updateState = 0;
-          $data = sprintf "%02X%02X%02X%02X", 0, $shutTime, $shutCmd, $setCmd;
+          $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy), $shutCmd, $setCmd;
 
         } else {
           return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "position:slider,0,5,100 anglePos:slider,-180,5,180 closes:noArg down local:learn opens:noArg stop:noArg teach:noArg up"
         }
         if ($shutCmd || $cmd eq "stop") {
           #$updateState = 0;
-          $data = sprintf "%02X%02X%02X%02X", 0, $shutTime, $shutCmd, 8;
+          $data = sprintf "%04X%02X%02X", int($shutTime * $settingAccuracy), $shutCmd, $setCmd;
         }
         Log3 $name, 3, "EnOcean set $name $cmd";
       }
@@ -16966,7 +16972,7 @@ EnOcean_Delete($$)
       <li>up tu/s<br>
         issue roll up command</li>
     </ul><br>
-      Runtime Range: tu|td = 1 s ... 255 s<br>
+      Run-time Range: tu|td = 1 s ... 255 s<br>
       Position Range: position = 0 % ... 100 %<br>
       Slat Angle Range: &alpha; = -180 &#176 ... 180 &#176<br>
       Angle Time Range: ta = 0 s ... 6 s<br>
@@ -16974,8 +16980,8 @@ EnOcean_Delete($$)
       <a href="#angleMin">angleMin</a>, <a href="#angleTime">angleTime</a>,
       <a href="#shutTime">shutTime</a> and <a href="#shutTimeCloses">shutTimeCloses</a>,
       are set correctly.
-      Set attr subType to manufProfile, manufID to 00D and attr model to
-      FSB14|FSB61|FSB70 manually.<br>
+      If <a href="#EnOcean_settingAccuracy">settingAccuracy</a> is set to high, the run-time is sent in 1/10 increments.<br>
+      Set attr subType to manufProfile, manufID to 00D and attr model to FSB14|FSB61|FSB70|TF manually.<br>
       Use the sensor type "Szenentaster/PC" for Eltako devices.
     </li>
     <br><br>
@@ -17946,14 +17952,14 @@ EnOcean_Delete($$)
     <li><a name="EnOcean_sendDevStatus">sendDevStatus</a> no|yes, [sendDevStatus] = no is default.<br>
       Send new status of the device.
     </li>
-    <li><a name="EnOcean_serviceOn">serviceOn</a> no|yes,
-      [serviceOn] = no is default.<br>
-      Device in Service Mode.
-    </li>
     <li><a name="sensorMode">sensorMode</a> switch|pushbutton,
       [sensorMode] = switch is default.<br>
       The status "released" will be shown in the reading state if the
       attribute is set to "pushbutton".
+    </li>
+    <li><a name="EnOcean_serviceOn">serviceOn</a> no|yes,
+      [serviceOn] = no is default.<br>
+      Device in Service Mode.
     </li>
     <li><a name="EnOcean_setCmdTrigger">setCmdTrigger</a> man|refDev, [setCmdTrigger] = man is default.<br>
       Operation mode to send set commands<br>
@@ -17972,6 +17978,10 @@ EnOcean_Delete($$)
     <li><a name="EnOcean_setpointTempRefDev">setpointTempRefDev</a> &lt;name&gt;<br>
       Name of the device whose reference value is read. The reference values is
       the reading setpointTemp.
+    </li>
+    <li><a name="EnOcean_settingAccuracy">settingAccuracy</a> high|low,
+      [settingAccuracy] = low is default.<br>
+      set setting accurancy.
     </li>
     <li><a href="#showtime">showtime</a></li>
     <li><a name="shutTime">shutTime</a> t/s<br>
