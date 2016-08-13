@@ -153,6 +153,10 @@ sub CUL_HM_Initialize($) {
                        ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
                        ."burstAccess:0_off,1_auto "
                        ."msgRepeat "
+#General                       ."hmDstDly:slider,104,4,136 "                       # CUL destination answer delay 
+#General                       ."hmPairAddDly:slider,-16,8,440 "                   # CUL additional destination delay for pair request
+#General                       ."SndThrRep:0,1 "                                   # CUL force expectation of send through repeater
+#General                       ."RepBstAddDly:slider,0,8,600 "                     # CUL additional first answer delay for burst devices using repeater to device, 552 is a good value for HM-LC-SW1-BA-PCB
                        ."hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger "
                        ."aesKey:5,4,3,2,1,0  "
                        ;
@@ -222,12 +226,12 @@ sub CUL_HM_updateConfig($){
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
     next if (!$hash->{DEF}); # likely renamed
-    foreach my $read (grep/(RegL_0.:|_chn:\d\d)/,keys%{$defs{$name}{READINGS}}){
+    foreach my $read (grep/(RegL_0.:|_chn:\d\d)/,keys%{$hash->{READINGS}}){
       my $readN = $read;
       $readN =~ s/(RegL_0.):/$1\./;
       $readN =~ s/_chn:(\d\d)/_chn-$1/;
-      $defs{$name}{READINGS}{$readN} = $defs{$name}{READINGS}{$read};
-      delete $defs{$name}{READINGS}{$read};
+      $hash->{READINGS}{$readN} = $hash->{READINGS}{$read};
+      delete $hash->{READINGS}{$read};
     }
     
     my $id = $hash->{DEF};
@@ -525,6 +529,7 @@ sub CUL_HM_Define($$) {##############################
     CUL_HM_assignIO($hash)if (!$init_done && $HMid ne "000000");
   }
   $modules{CUL_HM}{defptr}{$HMid} = $hash;
+  $hash->{NOTIFYDEV} = "global";
 
   #- - - - create auto-update - - - - - -
   CUL_HM_ActGetCreateHash() if($HMid eq '000000');#startTimer
@@ -1060,7 +1065,7 @@ sub CUL_HM_Parse($$) {#########################################################
     DoTrigger("global","UNDEFINED $sname CUL_HM $mh{src}");
     $mh{devH}  = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
     $mh{devH}->{IODev} = $iohash;
-    $mh{devH}->{helper}{io}{nextSend} = gettimeofday()+0.09;# io couldn't set
+    $mh{devH}->{helper}{io}{nextSend} = gettimeofday()+0.09 if(!defined($mh{devH}->{helper}{io}{nextSend}));# io couldn't set
   }
 
   my @entities = ("global"); #additional entities with events to be notifies
@@ -1111,7 +1116,7 @@ sub CUL_HM_Parse($$) {#########################################################
   }
   $respRemoved = 0;  #set to 'no response in this message' at start
   $mh{devN}   = $mh{devH}->{NAME};        #sourcehash - will be modified to channel entity
-  $mh{shash}  = $mh{devH};                # source device hash
+  $mh{shash}  = $mh{devH};                # source hash - will be redirected to channel if applicable
   my $ioId = CUL_HM_h2IoId($mh{devH}->{IODev});
   $ioId = $mh{id} if(!$ioId);
   if (CUL_HM_getAttrInt($mh{devN},"ignore")){
@@ -1192,7 +1197,6 @@ sub CUL_HM_Parse($$) {#########################################################
       elsif ($mh{mTp} =~ m/^0[23]/) {
         $doAES = 0;
       }
-      #FIXME: Extract channel from more messages
 
       if ($doAES && $chn && defined(CUL_HM_id2Hash($mh{src}.sprintf("%02X",$chn)))) {
         CUL_HM_m_setCh(\%mh,$mI[0]);
@@ -1333,10 +1337,11 @@ sub CUL_HM_Parse($$) {#########################################################
 
   #----------start valid messages parsing ---------
   my $parse = CUL_HM_parseCommon($iohash,\%mh);
+
   push @evtEt,[$mh{devH},1,"powerOn:$tn"] if($parse eq "powerOn");
   push @evtEt,[$mh{devH},1,""]            if($parse eq "parsed"); # msg is parsed but may
-                                                             # be processed further 
-  $mh{devH}->{helper}{HM_CMDNR} = hex($mh{mNo});
+                                                             # be processed further
+
   if   ($parse eq "ACK" ||
         $parse eq "done"   ){# remember - ACKinfo will be passed on
     push @evtEt,[$mh{devH},1,""];
@@ -2803,11 +2808,12 @@ sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independent
   my ($ioHash,$mhp) = @_;
   
-  my ($p) =$mhp->{p};
-     
-  return "" if(!$mhp->{shash}{DEF});# this should be from ourself
+  return "" if(!$mhp->{devH}{DEF});# this should be from ourself
+
+  my ($p)     = $mhp->{p};
+  my $devHlpr = $mhp->{devH}{helper};     
   my $ret = "";
-  my $rspWait = $mhp->{shash}{helper}{prt}{rspWait};
+  my $rspWait = $devHlpr->{prt}{rspWait};
   my $pendType = $rspWait->{Pending} ? $rspWait->{Pending} : "";
   #------------ parse message flag for start processing command Stack
   # TC wakes up with 8270, not with A258
@@ -2822,62 +2828,63 @@ sub CUL_HM_parseCommon(@){#####################################################
         CUL_HM_ProcessCmdStack($mhp->{devH});
       }
     }
-    elsif($mhp->{devH}{helper}{prt}{sProc} != 1){ # no wakeup signal, 
+    elsif($devHlpr->{prt}{sProc} != 1){ # no wakeup signal, 
       # this is an autonom message send ACK but dont process further
-      $mhp->{devH}{helper}{prt}{sleeping} = 1 if($mhp->{mFlgH} & 0x20) ;
+      $devHlpr->{prt}{sleeping} = 1 if($mhp->{mFlgH} & 0x20) ;
     }
   }
-  if($rxt & 0x10 && $mhp->{devH}{helper}{prt}{sleeping}){ # lazy config
+  if($rxt & 0x10 && $devHlpr->{prt}{sleeping}){ # lazy config
     if($mhp->{mFlgH} & 0x02                  #wakeup device
        && $defs{$mhp->{devH}{IODev}{NAME}}{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/){
-      $mhp->{devH}{helper}{io}{newCh} = 1 if ($mhp->{devH}{helper}{prt}{sProc} == 2);
+      $devHlpr->{io}{newCh} = 1 if ($devHlpr->{prt}{sProc} == 2);
       CUL_HM_appFromQ($mhp->{devN},"cf");# stack cmds if waiting
-      $mhp->{devH}{helper}{prt}{sleeping} = 0;
+      $devHlpr->{prt}{sleeping} = 0;
       CUL_HM_ProcessCmdStack($mhp->{devH});
     }
     else{
-      $mhp->{devH}{helper}{prt}{sleeping} = 1;
+      $devHlpr->{prt}{sleeping} = 1;
     }
   }  
   
-  $mhp->{devH}{helper}{PONtest} = 1 if($mhp->{mNo} eq "00" &&
-                                       $mhp->{devH}{helper}{HM_CMDNR} < 250);# this is power on
+  $devHlpr->{PONtest} = 1 if($mhp->{mNo} eq "00" &&
+                             $devHlpr->{HM_CMDNR} < 250);# this is power on
+  $devHlpr->{HM_CMDNR} = hex($mhp->{mNo});# sync msgNo
   my $repeat;
   if   ($mhp->{mTp} eq "02"){# Ack/Nack/aesReq ####################
     my $reply;
     my $success;
 
-    if ($mhp->{devH}{helper}{prt}{rspWait}{brstWu}){
-      if ($mhp->{devH}{helper}{prt}{rspWait}{mNo} eq $mhp->{mNo} &&
+    if ($devHlpr->{prt}{rspWait}{brstWu}){
+      if ($devHlpr->{prt}{rspWait}{mNo} eq $mhp->{mNo} &&
           $mhp->{mStp} eq "00"){
-        if ($mhp->{devH}{helper}{prt}{awake} && $mhp->{devH}{helper}{prt}{awake}==4){#re-burstWakeup
-          delete $mhp->{devH}{helper}{prt}{rspWait};#clear burst-wakeup values
-          $mhp->{devH}{helper}{prt}{rspWait}{$_} = $mhp->{devH}{helper}{prt}{rspWaitSec}{$_}
-                  foreach (keys%{$mhp->{devH}{helper}{prt}{rspWaitSec}});   #back to original message
-          delete $mhp->{devH}{helper}{prt}{rspWaitSec};
-          IOWrite($mhp->{devH}, "", $mhp->{devH}{helper}{prt}{rspWait}{cmd});     # and send
+        if ($devHlpr->{prt}{awake} && $devHlpr->{prt}{awake}==4){#re-burstWakeup
+          delete $devHlpr->{prt}{rspWait};#clear burst-wakeup values
+          $devHlpr->{prt}{rspWait}{$_} = $devHlpr->{prt}{rspWaitSec}{$_}
+                  foreach (keys%{$devHlpr->{prt}{rspWaitSec}});   #back to original message
+          delete $devHlpr->{prt}{rspWaitSec};
+          IOWrite($mhp->{devH}, "", $devHlpr->{prt}{rspWait}{cmd});     # and send
           CUL_HM_statCnt($mhp->{devH}{IODev}{NAME},"s");
           return "done";
         }
         $mhp->{devH}{protCondBurst} = "on" if (   $mhp->{devH}{protCondBurst}
                                                && $mhp->{devH}{protCondBurst} !~ m/forced/);
-        $mhp->{devH}{helper}{prt}{awake}=2;#awake
+        $devHlpr->{prt}{awake}=2;#awake
       }
       else{
         $mhp->{devH}{protCondBurst} = "off" if (  !$mhp->{devH}{protCondBurst}
                                                 || $mhp->{devH}{protCondBurst} !~ m/forced/);
-        $mhp->{devH}{helper}{prt}{awake}=3;#reject
+        $devHlpr->{prt}{awake}=3;#reject
         return "done";
       }
     }
-    if (defined($mhp->{devH}{helper}{AESreqAck})) {
-      if ($mhp->{devH}{helper}{AESreqAck} eq substr($mhp->{p}, -1 * length($mhp->{devH}{helper}{AESreqAck}))) {
+    if (defined($devHlpr->{AESreqAck})) {
+      if ($devHlpr->{AESreqAck} eq substr($mhp->{p}, -1 * length($devHlpr->{AESreqAck}))) {
         push @evtEt,[$mhp->{devH},1,"aesCommToDev:ok"];
       } 
       else {
         push @evtEt,[$mhp->{devH},1,"aesCommToDev:fail"];
       }
-      delete $mhp->{devH}{helper}{AESreqAck};
+      delete $devHlpr->{AESreqAck};
     }
 
     if   ($mhp->{mStp} =~ m/^8/){#NACK
@@ -2901,11 +2908,11 @@ sub CUL_HM_parseCommon(@){#####################################################
               if ($rssi && $rssi ne '00' && $rssi ne'80');
       }
       $reply = "ACKStatus";
-      if ($mhp->{devH}{helper}{tmdOn}){
+      if ($devHlpr->{tmdOn}){
         if ((not hex(substr($mhp->{p},6,2))&0x40) && # not timedOn, we have to repeat
-            $mhp->{devH}{helper}{tmdOn} eq substr($mhp->{p},2,2) ){# virtual channels for dimmer may be incorrect
-          my ($pre,$nbr,$msg) = unpack 'A4A2A*',$mhp->{devH}{helper}{prt}{rspWait}{cmd};
-          $mhp->{devH}{helper}{prt}{rspWait}{cmd} = sprintf("%s%02X%s",
+            $devHlpr->{tmdOn} eq substr($mhp->{p},2,2) ){# virtual channels for dimmer may be incorrect
+          my ($pre,$nbr,$msg) = unpack 'A4A2A*',$devHlpr->{prt}{rspWait}{cmd};
+          $devHlpr->{prt}{rspWait}{cmd} = sprintf("%s%02X%s",
                                                     $pre,hex($nbr)+1,$msg);
           CUL_HM_eventP($mhp->{devH},"TimedOn");
           $success = "no";
@@ -2921,11 +2928,11 @@ sub CUL_HM_parseCommon(@){#####################################################
       if (AttrVal($mhp->{devH}{IODev}{NAME},"rfmode","") eq "HomeMatic" &&
           defined($aesKeyNbr)) {
         if ($cryptFunc == 1 &&                    #AES is available
-	    $mhp->{devH}{helper}{prt}{rspWait}{cmd}){ #There is a previously executed command
+	    $devHlpr->{prt}{rspWait}{cmd}){ #There is a previously executed command
           my (undef, %keys) = CUL_HM_getKeys($mhp->{devH});
         
           my $kNo = hex($aesKeyNbr) / 2;
-          Log3 $mhp->{devH},5,"CUL_HM $mhp->{devN} signing request for $mhp->{devH}{helper}{prt}{rspWait}{cmd} challenge: "
+          Log3 $mhp->{devH},5,"CUL_HM $mhp->{devN} signing request for $devHlpr->{prt}{rspWait}{cmd} challenge: "
                         .$challenge." kNo: ".$kNo;
         
           if (!defined($keys{$kNo})) {
@@ -2936,12 +2943,12 @@ sub CUL_HM_parseCommon(@){#####################################################
             my $key = $keys{$kNo} ^ pack("H12", $challenge);
             my $cipher = Crypt::Rijndael->new($key, Crypt::Rijndael::MODE_ECB());
             my($s,$us) = gettimeofday();
-            my $respRaw = pack("NnH20", $s, $us, substr($mhp->{devH}{helper}{prt}{rspWait}{cmd}, 4, 20));
+            my $respRaw = pack("NnH20", $s, $us, substr($devHlpr->{prt}{rspWait}{cmd}, 4, 20));
             my $response = $cipher->encrypt($respRaw);
-            $mhp->{devH}{helper}{AESreqAck} = uc(unpack("H*", substr($response,0,4)));
+            $devHlpr->{AESreqAck} = uc(unpack("H*", substr($response,0,4)));
             Log3 $mhp->{devH},5,"CUL_HM $mhp->{devN} signing response: ".unpack("H*", $respRaw)
-                           ." should send $mhp->{devH}{helper}{AESreqAck} to authenticate";
-            $response = $response ^ pack("H*", substr($mhp->{devH}{helper}{prt}{rspWait}{cmd}, 24));
+                           ." should send $devHlpr->{AESreqAck} to authenticate";
+            $response = $response ^ pack("H*", substr($devHlpr->{prt}{rspWait}{cmd}, 24));
             $response = $cipher->encrypt(substr($response, 0, 16));
         
             CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.$mhp->{mFlg}.'03'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.unpack("H*", $response));
@@ -2973,15 +2980,15 @@ sub CUL_HM_parseCommon(@){#####################################################
       }
     }
 
-    if (   $mhp->{devH}{helper}{prt}{mmcS}
-        && $mhp->{devH}{helper}{prt}{mmcS} == 3){
+    if (   $devHlpr->{prt}{mmcS}
+        && $devHlpr->{prt}{mmcS} == 3){
       # after write device might need a break
       # allow for wake types only - and if commands are pending
-      $mhp->{devH}{helper}{prt}{try} = 1 if(CUL_HM_getRxType($mhp->{devH}) & 0x08 #wakeup
+      $devHlpr->{prt}{try} = 1 if(CUL_HM_getRxType($mhp->{devH}) & 0x08 #wakeup
                                          && $mhp->{devH}{cmdStack});
       if ($success eq 'yes'){
-        delete $mhp->{devH}{helper}{prt}{mmcA};
-        delete $mhp->{devH}{helper}{prt}{mmcS};
+        delete $devHlpr->{prt}{mmcA};
+        delete $devHlpr->{prt}{mmcS};
       }
     };
 
@@ -2992,8 +2999,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       $chnhash = $mhp->{devH} if(!$chnhash);
       push @evtEt,[$chnhash,0,"CommandAccepted:$success"];
       CUL_HM_ProcessCmdStack($mhp->{devH}) if(CUL_HM_IoId($mhp->{devH}) eq $mhp->{dst});
-      delete $mhp->{devH}{helper}{prt}{wuReSent}
-              if (!$mhp->{devH}{helper}{prt}{mmcS});
+      delete $devHlpr->{prt}{wuReSent}
+              if (!$devHlpr->{prt}{mmcS});
     }
     $ret = $reply;
   }
@@ -3006,6 +3013,9 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
 
   elsif($mhp->{mTp} eq "00"){######################################
+    if (InternalVal($mhp->{devN},"lastMsg",undef) =~ m/t:00/){# repeated
+      return "done";  # suppress handling of a repeated pair request
+    }
     my $paired = 0; #internal flag
     CUL_HM_infoUpdtDevData($mhp->{devN}, $mhp->{devH},$mhp->{p})
                   if (!$modules{CUL_HM}{helper}{hmManualOper});
@@ -3029,8 +3039,8 @@ sub CUL_HM_parseCommon(@){#####################################################
         delete $ioHash->{hmPairSerial};
         CUL_HM_respPendRm($mhp->{devH}); # remove all pending messages
         delete $mhp->{devH}{cmdStack};
-        delete $mhp->{devH}{helper}{prt}{rspWait};
-        delete $mhp->{devH}{helper}{prt}{rspWaitSec};
+        delete $devHlpr->{prt}{rspWait};
+        delete $devHlpr->{prt}{rspWaitSec};
         delete $mhp->{devH}{READINGS}{"RegL_00."};
         delete $mhp->{devH}{READINGS}{".RegL_00."};
         
@@ -3061,6 +3071,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       my $ioId = CUL_HM_h2IoId($mhp->{devH}{IODev});
       $respRemoved = 1;#force command stack processing
     }
+
+    $devHlpr->{HM_CMDNR} += 20;  # force new setting. Send will take care of module 255
     $ret = "done";
   }
   elsif($mhp->{mTp} eq "10"){######################################
@@ -3078,7 +3090,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           ($rspWait->{mNo} == $mNoInt || $rspWait->{mNo} == $mNoInt-1)){
         $rspWait->{mNo} = $mNoInt;
 
-        my $chn = $mhp->{devH}{helper}{prt}{rspWait}{forChn};
+        my $chn = $devHlpr->{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$mhp->{src}.$chn};
         $chnhash = $mhp->{devH} if (!$chnhash);
         my $chnName = $chnhash->{NAME};
@@ -3234,11 +3246,11 @@ sub CUL_HM_parseCommon(@){#####################################################
       else{
         if ($mhp->{chn} == 0
             || (   $mhp->{chn} == 1 
-                && $mhp->{devH}{helper}{PONtest})){# this is power on
+                && $devHlpr->{PONtest})){# this is power on
           CUL_HM_qStateUpdatIfEnab($mhp->{devN});
           CUL_HM_qAutoRead($mhp->{devN},2);
           $ret = "powerOn" ;# check dst eq "000000" as well?
-          $mhp->{devH}{helper}{PONtest} = 0;
+          $devHlpr->{PONtest} = 0;
         }
       }
     }
@@ -3276,7 +3288,7 @@ sub CUL_HM_parseCommon(@){#####################################################
          && $mhp->{dst} ne "000000" 
          && $mhp->{dst} ne $mhp->{id}){
         push @evtEt,[$mhp->{cHash},1,"triggerTo_$mhp->{dstN}:".(ucfirst($long))."_$cnt"];
-        $mhp->{devH}{helper}{ack}{$mhp->{dstN}} = "$mhp->{cName}:$mhp->{mNo}";
+        $devHlpr->{ack}{$mhp->{dstN}} = "$mhp->{cName}:$mhp->{mNo}";
       }
     }
     push @evtEt,[$mhp->{cHash},1,"trigger_cnt:$cnt"];
@@ -3499,7 +3511,7 @@ sub CUL_HM_pushEvnts(){########################################################
         Log 2,"CUL_HM set reading invalid:".join(",",@{$e});
         next;
       }
-     if ($h ne ${$e}[0] || $x ne ${$e}[1]){
+      if ($h ne ${$e}[0] || $x ne ${$e}[1]){
         push @ent,CUL_HM_UpdtReadBulk($h,$x,@evts);
         @evts = ();
         ($h,$x) = (${$e}[0],${$e}[1]);
