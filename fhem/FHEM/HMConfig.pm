@@ -927,10 +927,8 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
 
  ,siren               =>{ intKeyVisib     =>1
                          ,transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1
-
                          ,alarmTimeMax    =>1,cyclicInfoMsg   =>1,sabotageMsg     =>1,signalTone      =>1
                          ,lowBatLimitRT   =>1,localResDis     =>1,lowBatSignal    =>1
-
                          ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
                          ,OnTimeMode      =>1,OffTimeMode     =>1
                          ,ActionType      =>1
