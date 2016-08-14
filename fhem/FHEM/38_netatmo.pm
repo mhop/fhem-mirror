@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 01
+# Release 04
 
 package main;
 
@@ -2156,6 +2156,12 @@ netatmo_parseReadings($$;$)
     my $readings = \@r;
     $readings = $hash->{readings} if( defined($hash->{readings}) );
     if( $hash->{status} eq "ok" ) {
+
+      if(scalar(@{$json->{body}}) == 0)
+      {
+        $hash->{status} = "no data";
+      }
+
       foreach my $values ( @{$json->{body}}) {
         my $time = $values->{beg_time};
         my $step_time = $values->{step_time};
