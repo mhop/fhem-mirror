@@ -3015,7 +3015,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 
   elsif($mhp->{mTp} eq "00"){######################################
     if (InternalVal($mhp->{devN},"lastMsg",undef) =~ m/t:00/){# repeated
-      return "done";  # suppress handling of a repeated pair request
+#      return "done";  # suppress handling of a repeated pair request
     }
     my $paired = 0; #internal flag
     CUL_HM_infoUpdtDevData($mhp->{devN}, $mhp->{devH},$mhp->{p})
