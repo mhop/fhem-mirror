@@ -108,7 +108,8 @@ sub Twilight_Define($$)
   if(int(@a)>4) { if ($a[4] =~ /^[\+-]*[0-9]*\.*[0-9]*$/ && $a[4] !~ /^[\. ]*$/ ) {
      $indoor_horizon  = $a[4];
  	   if($indoor_horizon > 20) { $indoor_horizon=20;}
-	    if($indoor_horizon <  0) { $indoor_horizon= 0;}
+       # minimal indoor_horizon makes values like  civil_sunset and civil_sunrise   	   
+	   if($indoor_horizon <  -6) { $indoor_horizon= -6;}
   }else{
      return "Argument Indoor_Horizon is not a valid number";}
   }
@@ -752,7 +753,8 @@ sub twilight($$$$) {
     <br><br>
   <b>indoor_horizon</b>
   <br>
-	   The parameter <b>indoor_horizon</b> gives a virtual horizon higher than 0, that shall be used for calculation of indoor twilight (typical values are between 0 and 6)
+	   The parameter <b>indoor_horizon</b> gives a virtual horizon, that shall be used for calculation of indoor twilight. Minimal value -6 means indoor values are the same like civil values. 
+	   indoor_horizon 0 means indoor values are the same as real values. indoor_horizon > 0 means earlier indoor sunset resp. later indoor sunrise.
     <br><br>
   <b>Weather_Position</b>
   <br>
@@ -861,6 +863,11 @@ sub twilight($$$$) {
      </table>
   </ul>
   <br>
+Example:
+<pre>
+    define BlindDown at *{twilight("myTwilight","sr_indoor","7:30","9:00")} set xxxx position 100
+    # xxxx is a defined blind
+</pre>
 
 </ul>
 
@@ -886,7 +893,8 @@ sub twilight($$$$) {
     <br><br>
   <b>indoor_horizon</b>
   <br>
-	   Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont gr&ouml;&szlig;er 0, der f&uuml;r die Berechnung der D&auml;mmerung innerhalb von R&auml;men genutzt werden kann (Typische Werte sind zwischen 0 und 6).
+	   Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont, der f&uuml;r die Berechnung der D&auml;mmerung innerhalb von R&auml;men genutzt werden kann. Minimalwert ist -6 (ergibt gleichen Wert wie Zivile D&auml;mmerung). Bei 0 fallen 
+	   indoor- und realer D&aumlmmerungswert zusammen. Werte gr&oumlsser 0 ergeben fr&uumlhere Werte für den Abend bzw. sp&aumltere f&uumlr den Morgen.   
     <br><br>
   <b>Weather_Position</b>
   <br>
@@ -992,6 +1000,11 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
      </table>
   </ul>
   <br>
+Anwendungsbeispiel:
+<pre>
+    define BlindDown at *{twilight("myTwilight","sr_indoor","7:30","9:00")} set xxxx position 100
+    # xxxx ist ein definiertes Rollo
+</pre>
 
 </ul>
 
