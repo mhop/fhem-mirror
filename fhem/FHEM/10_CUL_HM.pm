@@ -1329,7 +1329,6 @@ sub CUL_HM_Parse($$) {#########################################################
     CUL_HM_sndIfOpen("x:$mh{ioName}");
     return (CUL_HM_pushEvnts(),$mh{devN},@entities); #return something to please dispatcher
   }
-  $mh{devH}->{lastMsg} = $msgX;
   delete $mh{devH}->{helper}{rpt};# new message, rm recent ack
   my @ack; # ack and responses, might be repeated
   
@@ -1337,6 +1336,7 @@ sub CUL_HM_Parse($$) {#########################################################
 
   #----------start valid messages parsing ---------
   my $parse = CUL_HM_parseCommon($iohash,\%mh);
+  $mh{devH}->{lastMsg} = $msgX;# is used in parseCommon  and need previous setting. so set it here
 
   push @evtEt,[$mh{devH},1,"powerOn:$tn"] if($parse eq "powerOn");
   push @evtEt,[$mh{devH},1,""]            if($parse eq "parsed"); # msg is parsed but may
@@ -3014,8 +3014,10 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
 
   elsif($mhp->{mTp} eq "00"){######################################
+    Log 1,"General  --------- start me";
     if (InternalVal($mhp->{devN},"lastMsg",undef) =~ m/t:00/){# repeated
-#      return "done";  # suppress handling of a repeated pair request
+      Log 1,"General  --------- stop me###########";
+      return "done";  # suppress handling of a repeated pair request
     }
     my $paired = 0; #internal flag
     CUL_HM_infoUpdtDevData($mhp->{devN}, $mhp->{devH},$mhp->{p})
