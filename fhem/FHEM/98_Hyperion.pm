@@ -356,8 +356,9 @@ sub Hyperion_ParseHttpResponse($$$)
     }
     else
     {
-      if (defined($prio) && $prio == 1100)
+      if ($prio)
       {
+        Log3 $name,4,"$name Hyperion_ParseHttpResponse clearall priority: $prio";
         readingsBulkUpdate($hash,"mode","clearall") if (ReadingsVal($name,"mode","") ne "clearall");
         readingsBulkUpdate($hash,"previous_mode","clearall") if (ReadingsVal($name,"previous_mode","") ne "clearall");
         readingsBulkUpdate($hash,"state","clearall") if (Value($name) ne "clearall");
