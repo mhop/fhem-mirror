@@ -1090,74 +1090,68 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 
 #clones - - - - - - - - - - - - - - -
 
-$culHmRegModel{"HM-LC-SW1-PL2"}       = $culHmRegModel{"HM-LC-Sw1-PL"};#rf_s , rf_s_644
-$culHmRegModel{"HM-LC-SW1-SM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW2-SM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW4-SM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW4-PCB"}       = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW4-WM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW1-FM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"Schueco_263-130"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW2-FM"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW1-PB-FM"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW2-PB-FM"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW4-DR"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-SW2-DR"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"ROTO_ZEL-STG-RM-FZS"} = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"ROTO_ZEL-STG-RM-FZS-2"} = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw1-Pl-3"}      = $culHmRegModel{"HM-LC-Sw1-PL"}; # master
-$culHmRegModel{"HM-LC-Sw4-SM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"}; # master
-$culHmRegModel{"HM-LC-Sw4-PCB-2"}     = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw4-WM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
-$culHmRegModel{"HM-LC-Sw2-FM-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"}; # master
-$culHmRegModel{"HM-LC-Sw4-DR-2"}      = $culHmRegModel{"HM-LC-Sw1-PL"};
-
-$culHmRegModel{"Schueco_263-131"}     = $culHmRegModel{"HM-LC-Sw1PBU-FM"};#rf_s_1conf_644
-
-$culHmRegModel{"HM-SEC-SC-2"}         = $culHmRegModel{"HM-SEC-SC"};
-$culHmRegModel{"Roto_ZEL-STG-RM-FFK"} = $culHmRegModel{"HM-SEC-SC"};
-$culHmRegModel{"HM-SEC-WDS-2"}        = $culHmRegModel{"HM-SEC-WDS"};
-$culHmRegModel{"Roto_ZEL-STG-RM-FDK"} = $culHmRegModel{"HM-SEC-RHS"};
-
-$culHmRegModel{"HM-LC-Dim1L-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1L-Pl"};#rf_d
-$culHmRegModel{"HM-LC-DIM1L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
-$culHmRegModel{"Schueco-263-132"}     = $culHmRegModel{"HM-LC-Dim1L-Pl"};
-$culHmRegModel{"HM-LC-DIM2L-CV"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
-$culHmRegModel{"HM-LC-DIM2L-SM"}      = $culHmRegModel{"HM-LC-Dim1L-Pl"};
-
-$culHmRegModel{"HM-LC-Dim1L-Pl-644"}  = $culHmRegModel{"HM-LC-Dim1L-CV-2"};#RF_DIM_1l_644
-$culHmRegModel{"HM-LC-Dim1L-CV-644"}  = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
-$culHmRegModel{"HM-LC-Dim1L-Pl-3"}    = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
-
-#rf_dim_2l_644
-
-$culHmRegModel{"HM-LC-Dim1T-CV"}      = $culHmRegModel{"HM-LC-Dim1T-Pl"};#rf_dim_t
-$culHmRegModel{"HM-LC-Dim1T-FM"}      = $culHmRegModel{"HM-LC-Dim1T-Pl"};
-$culHmRegModel{"HM-LC-Dim2T-SM"}      = $culHmRegModel{"HM-LC-Dim1T-Pl"};
-$culHmRegModel{"HM-LC-Dim1T-Pl-2"}    = $culHmRegModel{"HM-LC-Dim1T-Pl"};
-$culHmRegModel{"HM-LC-Dim1T-FM-LF"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};#unchecked!!!
-$culHmRegModel{"Schueco-263-134"}     = $culHmRegModel{"HM-LC-Dim1T-Pl"};
-
-$culHmRegModel{"ASH550I"}             = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"ASH550"}              = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"Schueco_263-158"}     = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"HM-WDS20-TH-O"}       = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"HM-WDS40-TH-I"}       = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"Schueco_263-157"}     = $culHmRegModel{"HM-WDS10-TH-O"};
-$culHmRegModel{"IS-WDS-TH-OD-S-R3"}   = $culHmRegModel{"HM-WDS10-TH-O"};
-
-$culHmRegModel{"HM-LC-Sw1PBU-FM"}     = $culHmRegModel{"HM-LC-Bl1PBU-FM"};
-
-$culHmRegModel{"HM-RC-Sec4-2"}        = $culHmRegModel{"HM-RC-4-2"};
-$culHmRegModel{"HM-RC-Key4-2"}        = $culHmRegModel{"HM-RC-4-2"};
-
-$culHmRegModel{"ROTO_ZEL-STG-RM-FWT"} = $culHmRegModel{"HM-CC-TC"};
-$culHmRegModel{"ROTO_ZEL-STG-RM-FSA"} = $culHmRegModel{"HM-CC-VD"};
-
-$culHmRegModel{"HM-OU-CFM-TW"}        = $culHmRegModel{"HM-OU-CFM-PL"};
-
-$culHmRegModel{"HM-PB-4DIS-WM-2"}     = $culHmRegModel{"HM-PB-4DIS-WM"};
+$culHmRegModel{"HM-LC-SW1-PL2"}         = 
+$culHmRegModel{"HM-LC-SW1-SM"}          = 
+$culHmRegModel{"HM-LC-SW2-SM"}          = 
+$culHmRegModel{"HM-LC-SW4-SM"}          = 
+$culHmRegModel{"HM-LC-SW4-PCB"}         = 
+$culHmRegModel{"HM-LC-SW4-WM"}          = 
+$culHmRegModel{"HM-LC-SW1-FM"}          = 
+$culHmRegModel{"Schueco_263-130"}       = 
+$culHmRegModel{"HM-LC-SW2-FM"}          = 
+$culHmRegModel{"HM-LC-SW1-PB-FM"}       = 
+$culHmRegModel{"HM-LC-SW2-PB-FM"}       = 
+$culHmRegModel{"HM-LC-SW4-DR"}          = 
+$culHmRegModel{"HM-LC-SW2-DR"}          = 
+$culHmRegModel{"ROTO_ZEL-STG-RM-FZS"}   = 
+$culHmRegModel{"ROTO_ZEL-STG-RM-FZS-2"} = 
+$culHmRegModel{"HM-LC-Sw1-Pl-3"}        = 
+$culHmRegModel{"HM-LC-Sw4-SM-2"}        = 
+$culHmRegModel{"HM-LC-Sw4-PCB-2"}       = 
+$culHmRegModel{"HM-LC-Sw4-WM-2"}        = 
+$culHmRegModel{"HM-LC-Sw2-FM-2"}        = 
+$culHmRegModel{"HM-LC-Sw4-DR-2"}        = $culHmRegModel{"HM-LC-Sw1-PL"};
+$culHmRegModel{"HM-SEC-SC-2"}           = 
+$culHmRegModel{"Roto_ZEL-STG-RM-FFK"}   = $culHmRegModel{"HM-SEC-SC"};
+$culHmRegModel{"HM-LC-Dim1L-Pl-2"}      = 
+$culHmRegModel{"HM-LC-DIM1L-CV"}        = 
+$culHmRegModel{"Schueco-263-132"}       = 
+$culHmRegModel{"HM-LC-DIM2L-CV"}        = 
+$culHmRegModel{"HM-LC-DIM2L-SM"}        = $culHmRegModel{"HM-LC-Dim1L-Pl"};
+$culHmRegModel{"HM-LC-Dim1L-Pl-644"}    = 
+$culHmRegModel{"HM-LC-Dim1L-CV-644"}    = 
+$culHmRegModel{"HM-LC-Dim1L-Pl-3"}      = $culHmRegModel{"HM-LC-Dim1L-CV-2"};
+$culHmRegModel{"HM-LC-Dim1T-CV"}        = 
+$culHmRegModel{"HM-LC-Dim1T-FM"}        = 
+$culHmRegModel{"HM-LC-Dim2T-SM"}        = 
+$culHmRegModel{"HM-LC-Dim1T-Pl-2"}      = 
+$culHmRegModel{"HM-LC-Dim1T-FM-LF"}     = 
+$culHmRegModel{"Schueco-263-134"}       = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+$culHmRegModel{"ASH550I"}               = 
+$culHmRegModel{"ASH550"}                = 
+$culHmRegModel{"Schueco_263-158"}       = 
+$culHmRegModel{"HM-WDS20-TH-O"}         = 
+$culHmRegModel{"HM-WDS40-TH-I"}         = 
+$culHmRegModel{"Schueco_263-157"}       = 
+$culHmRegModel{"IS-WDS-TH-OD-S-R3"}     = $culHmRegModel{"HM-WDS10-TH-O"};
+$culHmRegModel{"HM-PB-4DIS-WM-2"}       =
 $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
+$culHmRegModel{"HM-RC-Sec4-2"}          = 
+$culHmRegModel{"HM-RC-Key4-2"}          = $culHmRegModel{"HM-RC-4-2"};
+
+$culHmRegModel{"Schueco_263-131"}       = $culHmRegModel{"HM-LC-Sw1PBU-FM"};#rf_s_1conf_644
+
+$culHmRegModel{"HM-SEC-WDS-2"}          = $culHmRegModel{"HM-SEC-WDS"};
+$culHmRegModel{"Roto_ZEL-STG-RM-FDK"}   = $culHmRegModel{"HM-SEC-RHS"};
+                                        
+$culHmRegModel{"HM-LC-Sw1PBU-FM"}       = $culHmRegModel{"HM-LC-Bl1PBU-FM"};
+                                        
+                                        
+$culHmRegModel{"ROTO_ZEL-STG-RM-FWT"}   = $culHmRegModel{"HM-CC-TC"};
+$culHmRegModel{"ROTO_ZEL-STG-RM-FSA"}   = $culHmRegModel{"HM-CC-VD"};
+                                        
+$culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
+                                        
 
 
 %culHmRegChan = (# if channelspecific then enter them here
@@ -1296,24 +1290,24 @@ $culHmRegModel{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmRegModel{"HM-PB-4DIS-WM"};
 
 #clones - - - - - - - - - - - - - - -
 
-$culHmRegChan{"HM-Dis-EP-WM5502"}     = $culHmRegChan{"HM-Dis-EP-WM5501"};
-$culHmRegChan{"HM-Dis-EP-WM5503"}     = $culHmRegChan{"HM-Dis-EP-WM5501"};
-$culHmRegChan{"SensoTimer-ST-602"}    = $culHmRegChan{"SensoTimer-ST-601"};
-
-$culHmRegChan{"HM-Sen-MDIR-WM5502"}   = $culHmRegChan{"HM-Sen-MDIR-WM5501"};
-$culHmRegChan{"HM-Sen-MDIR-WM5503"}   = $culHmRegType{motionDetector};
-
-$culHmRegChan{"WDF-solar02"}          = $culHmRegType{"dimmer"};      # type hash
-
-$culHmRegChan{"HM-TC-IT-WM-W-EU03"}   = $culHmRegChan{"HM-CC-RT-DN03"};
-$culHmRegChan{"HM-TC-IT-WM-W-EU06"}   = $culHmRegChan{"HM-CC-RT-DN06"};
-$culHmRegChan{"HM-Sec-Sir-WM02"}      = $culHmRegChan{"HM-Sec-Sir-WM01"};
-$culHmRegChan{"HM-Sec-Sir-WM03"}      = $culHmRegChan{"HM-Sec-Sir-WM01"};
-
-$culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}= $culHmRegChan{"HM-CC-TC02"};
-$culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}= $culHmRegChan{"HM-CC-TC03"};
-$culHmRegChan{"HM-OU-CFM-TW01"}= $culHmRegChan{"HM-OU-CFM-PL01"};
-$culHmRegChan{"HM-OU-CFM-TW02"}= $culHmRegChan{"HM-OU-CFM-PL02"};
+$culHmRegChan{"HM-Dis-EP-WM5502"}       = 
+$culHmRegChan{"HM-Dis-EP-WM5503"}       = $culHmRegChan{"HM-Dis-EP-WM5501"};
+$culHmRegChan{"HM-Sec-Sir-WM02"}        = 
+$culHmRegChan{"HM-Sec-Sir-WM03"}        = $culHmRegChan{"HM-Sec-Sir-WM01"};
+                                        
+$culHmRegChan{"SensoTimer-ST-602"}      = $culHmRegChan{"SensoTimer-ST-601"};
+$culHmRegChan{"HM-Sen-MDIR-WM5502"}     = $culHmRegChan{"HM-Sen-MDIR-WM5501"};
+$culHmRegChan{"HM-Sen-MDIR-WM5503"}     = $culHmRegType{motionDetector};
+                                        
+$culHmRegChan{"WDF-solar02"}            = $culHmRegType{"dimmer"};      # type hash
+                                        
+$culHmRegChan{"HM-TC-IT-WM-W-EU03"}     = $culHmRegChan{"HM-CC-RT-DN03"};
+$culHmRegChan{"HM-TC-IT-WM-W-EU06"}     = $culHmRegChan{"HM-CC-RT-DN06"};
+                                        
+$culHmRegChan{"ROTO_ZEL-STG-RM-FWT02"}  = $culHmRegChan{"HM-CC-TC02"};
+$culHmRegChan{"ROTO_ZEL-STG-RM-FWT03"}  = $culHmRegChan{"HM-CC-TC03"};
+$culHmRegChan{"HM-OU-CFM-TW01"}         = $culHmRegChan{"HM-OU-CFM-PL01"};
+$culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 
 
 ##############################---templates---##################################
@@ -1556,8 +1550,8 @@ $culHmRegChan{"HM-OU-CFM-TW02"}= $culHmRegChan{"HM-OU-CFM-PL02"};
                                           ,getSerial     => ""
                                          }
 );
-$culHmSubTypeDevSets{dimmer}         = $culHmSubTypeDevSets{switch};
-$culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
+$culHmSubTypeDevSets{dimmer}            = 
+$culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
 
 
 %culHmGlobalSetsChn = (# all channels but virtuals
@@ -1624,14 +1618,12 @@ $culHmSubTypeDevSets{blindActuator}  = $culHmSubTypeDevSets{switch};
                      ,KFM100           =>{ statusRequest  =>""}
 );
 # clones- - - - - - - - - - - - - - - - -
-$culHmSubTypeSets{pushButton}      = $culHmSubTypeSets{remote};
-$culHmSubTypeSets{swi}             = $culHmSubTypeSets{remote};
- 
-$culHmSubTypeSets{blindActuatorSol}= $culHmSubTypeSets{KFM100};
-$culHmSubTypeSets{tipTronic}       = $culHmSubTypeSets{KFM100};
-
-$culHmSubTypeSets{motionDetector}  = $culHmSubTypeSets{threeStateSensor};
-$culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
+$culHmSubTypeSets{pushButton}           = 
+$culHmSubTypeSets{swi}                  = $culHmSubTypeSets{remote};
+$culHmSubTypeSets{blindActuatorSol}     = 
+$culHmSubTypeSets{tipTronic}            = $culHmSubTypeSets{KFM100};
+$culHmSubTypeSets{motionDetector}       = 
+$culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
 
 %culHmModelSets = (# channels of this subtype-------------
                       "HM-CC-VD"         =>{ valvePos       =>"[off|0.0..99.0]"}
@@ -1670,18 +1662,19 @@ $culHmSubTypeSets{motionAndBtn}    = $culHmSubTypeSets{threeStateSensor};
 
 # clones- - - - - - - - - - - - - - - - -
 
-$culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-OU-CFM-PL"};
-$culHmModelSets{"HM-OU-CF-PL"}           = $culHmModelSets{"HM-OU-CFM-PL"};
+$culHmModelSets{"HM-OU-CM-PCB"}          = 
+$culHmModelSets{"HM-OU-CF-PL"}           = 
 $culHmModelSets{"HM-OU-CFM-TW"}          = $culHmModelSets{"HM-OU-CFM-PL"};
-$culHmModelSets{"ROTO_ZEL-STG-RM-FWT"}   = $culHmModelSets{"HM-CC-TC"};
-$culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
-$culHmModelSets{"HM-PB-4DIS-WM-2"}       = $culHmModelSets{"HM-PB-4DIS-WM"};
-$culHmModelSets{"HM-Dis-WM55"}           = $culHmModelSets{"HM-PB-4DIS-WM"};
-$culHmModelSets{"HM-Dis-EP-WM55"}           = $culHmModelSets{"HM-PB-4DIS-WM"};
-$culHmModelSets{"HM-RC-Dis-H-x-EU"}      = $culHmModelSets{"HM-PB-4DIS-WM"};
+$culHmModelSets{"HM-PB-4DIS-WM-2"}       = 
+$culHmModelSets{"HM-Dis-WM55"}           = 
+$culHmModelSets{"HM-Dis-EP-WM55"}        = 
+$culHmModelSets{"HM-RC-Dis-H-x-EU"}      = 
 $culHmModelSets{"ROTO_ZEL-STG-RM-DWT-10"}= $culHmModelSets{"HM-PB-4DIS-WM"};
+                                         
 #$culHmModelSets{"HM-OU-CFM-PL"}          = $culHmModelSets{"HM-SEC-SD"};# no statusrequest possible
 $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
+$culHmModelSets{"ROTO_ZEL-STG-RM-FWT"}   = $culHmModelSets{"HM-CC-TC"};
+$culHmModelSets{"HM-Sen-Wa-Od"}          = $culHmModelSets{"HM-SEC-SD"};
 
 
 
@@ -1805,44 +1798,43 @@ $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
                                                 ,inhibit        =>"[on|off]"
                                                 ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
                                                }
-                     ,"HM-Sec-Sir-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"}
+                     ,"HM-Sec-Sir-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"
+                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
+                                               }
                      ,"HM-Dis-EP-WM5503"     =>{ displayEP      =>"text1,icon1:text2,icon2:text3,icon3 ... -sound- -repetition- -pause- -signal-"}                                       
  );
 # clones- - - - - - - - - - - - - - - - -
-$culHmChanSets{"HM-Sec-Sir-WM02"}       = $culHmChanSets{"HM-Sec-Sir-WM01"};
+$culHmChanSets{"HM-Sec-Sir-WM02"}       =
 $culHmChanSets{"HM-Sec-Sir-WM03"}       = $culHmChanSets{"HM-Sec-Sir-WM01"};
 $culHmChanSets{"HM-Dis-WM5502"}         = $culHmChanSets{"HM-Dis-WM5501"};
-
-$culHmChanSets{"WDF-solar01"}           = $culHmSubTypeSets{THSensor};
-$culHmChanSets{"HM-Sen-RD-O01"}         = $culHmSubTypeSets{THSensor};
-$culHmChanSets{"HM-SEN-EP01"}           = $culHmSubTypeSets{THSensor};
-$culHmChanSets{"HM-SEN-EP02"}           = $culHmSubTypeSets{THSensor};
-$culHmChanSets{"HM-CC-RT-DN05"}         = $culHmSubTypeSets{THSensor};
+$culHmChanSets{"WDF-solar01"}           =
+$culHmChanSets{"HM-Sen-RD-O01"}         =
+$culHmChanSets{"HM-SEN-EP01"}           =
+$culHmChanSets{"HM-SEN-EP02"}           =
+$culHmChanSets{"HM-CC-RT-DN05"}         =
 $culHmChanSets{"HM-ES-PMSw1-Pl03"}      = $culHmSubTypeSets{THSensor};
-
+$culHmChanSets{"HM-OU-CM-PCB01"}        =
+$culHmChanSets{"HM-OU-CFM-TW02"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
+$culHmChanSets{"HM-ES-PMSw1-Pl04"}      =
+$culHmChanSets{"HM-ES-PMSw1-Pl05"}      =
+$culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
+                                        
 $culHmChanSets{"HM-ES-PMSw1-Pl01"}      = $culHmSubTypeSets{switch};
 $culHmChanSets{"HM-ES-PMSw1-Pl02"}      = $culHmSubTypeSets{outputUnit};
-
+                                        
 $culHmChanSets{"WDF-solar02"}           = $culHmSubTypeSets{blindActuator};
-
-$culHmChanSets{"HM-OU-CM-PCB01"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
-$culHmChanSets{"HM-OU-CFM-TW02"}        = $culHmChanSets{"HM-OU-CFM-PL02"};
-
+                                        
 $culHmChanSets{"HM-OU-CFM-TW01"}        = $culHmChanSets{"HM-OU-CFM-PL01"};
-
+                                        
 $culHmChanSets{"HM-CC-RT-DN02"}         = $culHmChanSets{"HM-CC-RT-DN00"};
 $culHmChanSets{"HM-CC-RT-DN03"}         = $culHmChanSets{"HM-CC-RT-DN06"};
-
-$culHmChanSets{"HM-ES-PMSw1-Pl04"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
-$culHmChanSets{"HM-ES-PMSw1-Pl05"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
-$culHmChanSets{"HM-ES-PMSw1-Pl06"}      = $culHmChanSets{"HM-ES-PMSw1-Pl03"};
-
+                                        
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT00"} = $culHmChanSets{"HM-CC-TC00"};
 $culHmChanSets{"ROTO_ZEL-STG-RM-FWT02"} = $culHmChanSets{"HM-CC-TC02"};
-
-#$culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
+                                        
 $culHmChanSets{"HM-LC-Sw1PBU-FM00"}     = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 $culHmChanSets{"HM-CC-RD-O00"}          = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
+#$culHmChanSets{"HM-ES-PMSw1-Pl00"}      = $culHmChanSets{"HM-LC-Bl1PBU-FM00"};
 
 %culHmFunctSets = (# command depending on function
   sdLead1             =>{ alarmOn       =>""

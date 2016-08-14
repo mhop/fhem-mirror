@@ -4949,12 +4949,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       # Split line into text and icon part separated by comma
 
       $snd .= '12';# start text indicator
+      my ($text, $icon); # add separator in case Icon is dismissed
       if (!defined $line || $line eq '') {
-        $line =  ReadingsVal($name,"line${lineNr}_text","")
-                .","
-                .ReadingsVal($name,"line${lineNr}_icon","off");
+        $text =  ReadingsVal($name,"line${lineNr}_text","");
+        $icon = ReadingsVal($name,"line${lineNr}_icon","off");
       }
-      my ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
+      else{
+        ($text, $icon) = split (',', $line.","); # add separator in case Icon is dismissed
+      }
        
       # Hex code
       if ($text =~ /^0x[0-9A-F]{2}$/) {
