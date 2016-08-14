@@ -2194,9 +2194,10 @@ sub CUL_HM_Parse($$) {#########################################################
       push @evtEt,[$mh{cHash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
       push @evtEt,[$mh{cHash},1,"state:$vs"];
-      push @evtEt,[$mh{cHash},1,"timedOn:".(($err&0x40)?"running":"off")];
-      push @evtEt,[$mh{devH},1,"powerOn:$tn",] if ($chn == 0) ;
-      push @evtEt,[$mh{devH},1,"sabotageError:".(($err&0x04)?"on":"off")];
+      push @evtEt,[$mh{cHash},1,"timedOn:"      .(($err&0x40)?"running":"off")];
+      push @evtEt,[$mh{devH} ,1,"powerOn:$tn",]                            if ($chn == 0) ;
+      push @evtEt,[$mh{devH} ,1,"sabotageError:".(($err&0x04)?"on" :"off")];
+      push @evtEt,[$mh{devH} ,1,"battery:"      .(($err&0x80)?"low":"ok" )];
     }
   }
   elsif($mh{st} eq "senBright") { #############################################
