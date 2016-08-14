@@ -683,8 +683,7 @@ ZWCUL_Ready($)
     <code>define ZWCUL_1 ZWCUL /dev/cu.usbmodemfa141@9600 12345678 01</code><br>
   </ul>
   If the homeId is set to 00000000, then culfw will enter monitor mode, i.e. no
-  checksum filtering will be done, and no acks for received messages will be
-  sent.
+  acks for received messages will be sent, and no homeId filtering will be done.
   </ul>
   <br>
 
