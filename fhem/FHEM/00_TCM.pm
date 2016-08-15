@@ -1,6 +1,5 @@
 ##############################################
 # $Id$
-# 2016-05-21
 
 # by r.koenig at koeniglich.de
 #
@@ -367,6 +366,7 @@ TCM_Read($)
           "02" => "NOT_SUPPORTED",
           "03" => "WRONG_PARAM",
           "04" => "OPERATION_DENIED",
+          "05" => "LOCK_SET",
           "82" => "FLASH_HW_ERROR",
           "90" => "BASEID_OUT_OF_RANGE",
           "91" => "BASEID_MAX_REACHED",
@@ -510,6 +510,7 @@ my %rc310 = (
   "02" => "NOT_SUPPORTED",
   "03" => "WRONG_PARAM",
   "04" => "OPERATION_DENIED",
+  "05" => "LOCK_SET",
   "82" => "FLASH_HW_ERROR",
   "90" => "BASEID_OUT_OF_RANGE",
   "91" => "BASEID_MAX_REACHED",
@@ -546,17 +547,26 @@ TCM_Parse310($$$)
           #$data =~ s/[^A-Za-z0-9#\.\-_]//g;
           $data =~ tr/A-Za-z0-9#.-_//cd;
         } else {
-          my ($part1, $part2, $part3) = split(":", $type);
-          $part1 = $part1 * 2;
-          $part2 = $part2 * 2;
-          $part3 = $part3 * 2;
           my $dataLen = length($data);
           my $dataOut = '';
-          while ($dataLen > 0) {
-            $data =~ m/^(.{$part1})(.{$part2})(.{$part3})(.*)$/;
-            $dataOut .= $1 . ':' . $2 . ':' . $3 . ' ';
-            $data = $4;
-            $dataLen -= $part1 + $part2 + $part3;
+          my ($part1, $part2, $part3) = split(":", $type);
+          $part1 *= 2;
+          $part2 *= 2;
+          if (defined $part3) {
+            $part3 *= 2;
+            while ($dataLen > 0) {
+              $data =~ m/^(.{$part1})(.{$part2})(.{$part3})(.*)$/;
+              $dataOut .= $1 . ':' . $2 . ':' . $3 . ' ';
+              $data = $4;
+              $dataLen -= $part1 + $part2 + $part3;
+            }
+          } else {
+            while ($dataLen > 0) {
+              $data =~ m/^(.{$part1})(.{$part2})(.*)$/;
+              $dataOut .= $1 . ':' . $2 . ' ';
+              $data = $3;
+              $dataLen -= $part1 + $part2;
+            }
           }
           chop($dataOut);
           $data = $dataOut;
@@ -602,9 +612,12 @@ my %gets120 = (
 # Get commands TCM 310
 my %gets310 = (
   "baseID" => {packetType => 5, cmd => "08", BaseID => "1,4", RemainingWriteCycles => "5,1"},
+  "filter" => {packetType => 5, cmd => "0F", "Type:Value" => "1,0,1:4"},
   "numSecureDevicesIn" => {packetType => 5, cmd => "1D00", Number => "1,1"},
   "numSecureDevicesOut" => {packetType => 5, cmd => "1D01", Number => "1,1"},
   "repeater" => {packetType => 5, cmd => "0A", RepEnable => "1,1", RepLevel => "2,1"},
+  "frequencyInfo" => {packetType => 5, cmd => "25", Frequency => "1,1", Protocol => "2,1"},
+  "stepCode" => {packetType => 5, cmd => "27", HWRevision => "1,1", Stepcode => "2,1"},
   "smartAckLearnMode" => {packetType => 6, cmd => "02", Enable => "1,1", Extended => "2,1"},
   "smartAckLearnedClients" => {packetType => 6, cmd => "06", "ClientID:CtrlID:Mailbox" => "1,0,4:4:1"},
   "version" => {packetType => 5, cmd => "03", APPVersion => "1,4", APIVersion => "5,4", ChipID => "9,4", ChipVersion => "13,4", Desc => "17,16,STR"},
@@ -685,9 +698,14 @@ my %sets310 = (
   "bist" => {packetType => 5, cmd => "06", BIST_Result => "1,1"},
   "baseID" => {packetType => 5, cmd => "07", arg => "FF[8-9A-F][0-9A-F]{5}"},
   "repeater" => {packetType => 5, cmd => "09", arg => "0[0-1]0[0-2]"},
+  "filterAdd" => {packetType => 5, cmd => "0B", arg => "0[0-3][0-9A-F]{8}[048C]0"},
+  "filterDel" => {packetType => 5, cmd => "0C", arg => "0[0-3][0-9A-F]{8}"},
+  "filterDelAll" => {packetType => 5, cmd => "0D"},
+  "filterEnable" => {packetType => 5, cmd => "0E", arg => "0[01]0[0189]"},
   "maturity" => {packetType => 5, cmd => "10", arg => "0[0-1]"},
   "subtel" => {packetType => 5, cmd => "11", arg => "0[0-1]"},
   "mode" => {packetType => 5, cmd => "1C", arg => "0[0-1]"},
+  "baudrate" => {packetType => 5, cmd => "24", arg => "0[0-3]"},
   "smartAckLearn" => {packetType => 6, cmd => "01", arg => "\\d+"},
   "smartAckMailboxMax" => {packetType => 6, cmd => "08", arg => "\\d+"},
 );
@@ -1171,8 +1189,25 @@ TCM_Undef($$)
     <li>baseID [FF800000 ... FFFFFF80]<br>
       Set the BaseID.<br>
       Note: The firmware executes this command only up to then times to prevent misuse.</li>
+    <li>baudrate [00|01|02|03]<br>
+      Modifies the baud rate of the EnOcean device.<br>
+      baudrate = 00: 56700 baud (default)<br>
+      baudrate = 01: 115200 baud<br>
+      baudrate = 02: 230400 baud<br>
+      baudrate = 03: 460800 baud</li>
     <li>bist<br>
       Perform Flash BIST operation (Built-in-self-test).</li>
+    <li>filterAdd &lt;FilterType&gt;&lt;FilterValue&gt;&lt;FilterKind&gt;<br>
+      Add filter to filter list. Description of the filter parameters and examples, see
+      <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
+    <li>filterDel &lt;FilterType&gt;&lt;FilterValue&gt;<br>
+      Del filter from filter list. Description of the filter parameters, see
+      <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
+    <li>filterDelAll<br>
+      Del all filter from filter list.</li>
+    <li>filterEnable &lt;FilterON/OFF&gt;&lt;FilterOperator&gt;<br>
+      Enable/Disable all supplied filters. Description of the filter parameters, see
+      <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
     <li>maturity [00|01]<br>
       Waiting till end of maturity time before received radio telegrams will transmit:
       radio telegrams are send immediately = 00, after the maturity time is elapsed = 01</li>
@@ -1229,6 +1264,12 @@ TCM_Undef($$)
     <li>baseID<br>
       Get the BaseID. You need this command in order to control EnOcean devices,
       see the <a href="#EnOceandefine">EnOcean</a> paragraph.</li>
+    <li>filter<br>
+      Get supplied filters. Description of the filter parameters, see
+      <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
+    <li>freqencyInfo<br>
+      Reads Frequency and protocol of the Device, see
+      <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
     <li>numSecureDev<br>
       Read number of teached in secure devices.</li>
     <li>repeater<br>
@@ -1239,6 +1280,9 @@ TCM_Undef($$)
       Extended: 00|01|02 = simple|advance|advanceSelectRep</li>
     <li>smartAckLearnedClients<br>
       Get information about the learned smart ack clients</li>
+    <li>stepCode<br>
+      Reads Hardware Step code and Revision of the Device, see
+      <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
     <li>version<br>
       Read the device SW version / HW version, chip-ID, etc.</li>
     <br>
