@@ -37,8 +37,8 @@ use TcpServerUtils;
 use Encode qw(encode);
 
 
-my $modulversion = "2.6.0";
-my $flowsetversion = "2.6.0";
+my $modulversion = "2.6.1";
+my $flowsetversion = "2.6.1";
 
 
 
@@ -1166,6 +1166,15 @@ sub AMAD_CommBridge_Read($) {
     elsif( !defined($device) ) {
         readingsSingleUpdate( $bhash, "transmitterERROR", $name." has no device name sends", 1 ) if( ReadingsVal( $bname, "expertMode", 0 ) eq "1" );
         Log3 $name, 4, "AMAD ($name) - ERROR - no device name given. please check your global variable in automagic";
+        
+        $response = "header lines: \r\n AMADCommBridge receive no device name. please check your global variable in automagic\r\n FHEM to do nothing\r\n";
+        $c = $hash->{CD};
+        print $c "HTTP/1.1 200 OK\r\n",
+            "Content-Type: text/plain\r\n",
+            "Connection: close\r\n",
+            "Content-Length: ".length($response)."\r\n\r\n",
+            $response;
+        
         return;
     }
 
@@ -1395,6 +1404,8 @@ sub AMAD_decrypt($) {
     <li>currentMusicAlbum - currently playing album of mediaplayer</li>
     <li>currentMusicApp - currently playing player app</li>
     <li>currentMusicArtist - currently playing artist of mediaplayer</li>
+    <li>currentMusicIcon - cover of currently play album<b>Noch nicht fertig implementiert</b></li>
+    <li>currentMusicState - state of currently/last used mediaplayer</li>
     <li>currentMusicTrack - currently playing song title of mediaplayer</li>
     <li>daydream - on/off, daydream currently active</li>
     <li>deviceState - state of Android devices. unknown, online, offline.</li>
