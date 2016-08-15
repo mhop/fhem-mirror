@@ -1,0 +1,19 @@
+##############################################
+# $Id$
+# FileLog definition: 
+# define FileLog_device FileLog ./log/device-%Y.log device
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set title '<TL>'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ylabel "km/h"
+set grid
+
+#FileLog 4:windSpeedAverage:0:
+#FileLog 4:windSpeedMax:0
+
+plot "<IN>" using 1:2 axes x1y1 title 'Wind Speed Average' ls l0 lw 1 with lines,\
+     "<IN>" using 1:2 axes x1y1 title 'Wind Speed Max' ls l1 lw 1 with lines"
