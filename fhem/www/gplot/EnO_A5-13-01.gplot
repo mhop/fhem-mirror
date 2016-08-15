@@ -23,4 +23,4 @@ set grid
 #FileLog 4:isRaining:0:$fld[3]=~"yes"?1:0
 
 plot "<IN>" using 1:2 axes x1y1 title 'Wind Speed' ls l0 lw 1 with lines,\
-     "<IN>" using 1:2 axes x1y2 title 'Raining' ls l1 lw 1 with steps"
+     "<IN>" using 1:2 axes x1y2 title 'Raining' ls l1 lw 1 with steps
