@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - updated: 74_AMAD: New Version 2.6.1 support for more Mediaplayer Readings
+                      new error handling for "send data to AMADCommBridge Flow"
   - change:  38_netatmo: status "no data"
   - bugfix:  98_Hyperion: reporting Hyperion as off while clearall is active
   - updated: 74_AMAD: New Minor Release 2.6 new 2 Media Readings,
