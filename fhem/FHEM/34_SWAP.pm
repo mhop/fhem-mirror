@@ -58,12 +58,13 @@ my %default_registers = (
   0x0A => { name => 'PeriodicTxInterval', size => 2, direction => OUT },
 );
 
-my %system_sate = (
+my %system_state = (
   0x00 => 'RESTART',
   0x01 => 'RXON',
   0x02 => 'RXOFF',
   0x03 => 'SYNC',
   0x04 => 'LOWBAT',
+  0x05 => 'FLASH',
 );
 
 my $developers = {};
@@ -1050,7 +1051,11 @@ SWAP_Parse($$)
       $rhash->{"SWAP_".$rid."-".$default_registers{$reg}->{name}} = $data;
     }
 
-    if( $reg == 0x09
+    if( $reg == 0x03 ) {
+      $data = $system_state{$data} if( defined($system_state{$data}) );
+      DoTrigger( $rname, "$default_registers{$reg}->{name}: $data" );
+    
+    } elsif( $reg == 0x09
         && $data eq "FF" ) {
       my $addr = SWAP_findFreeAddress($hash,$data);
       if( $addr ne $data ) {
