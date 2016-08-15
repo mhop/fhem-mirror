@@ -195,6 +195,7 @@ my %EnO_eepConfig = (
   "A5.06.02" => {attr => {subType => "lightSensor.02"}, GPLOT => "EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
   "A5.06.03" => {attr => {subType => "lightSensor.03"}, GPLOT => "EnO_brightness4:Brightness,"},
   "A5.06.04" => {attr => {subType => "lightSensor.04"}, GPLOT => "EnO_temp4brightness4:Temp/Brightness,"},
+  "A5.06.05" => {attr => {subType => "lightSensor.05"}, GPLOT => "EnO_brightness4:Brightness,EnO_voltage4:Voltage,"},
   "A5.07.01" => {attr => {subType => "occupSensor.01"}, GPLOT => "EnO_motion:Motion,EnO_voltage4current4:Voltage/Current,"},
   "A5.07.02" => {attr => {subType => "occupSensor.02"}, GPLOT => "EnO_motion:Motion4brightness4:Motion/Brightness,EnO_voltage4:Voltage,"},
   "A5.07.03" => {attr => {subType => "occupSensor.03"}, GPLOT => "EnO_motion:Motion4brightness4:Motion/Brightness,EnO_voltage4:Voltage,"},
@@ -262,6 +263,8 @@ my %EnO_eepConfig = (
   "A5.13.04" => {attr => {subType => "environmentApp"}},
   "A5.13.05" => {attr => {subType => "environmentApp"}},
   "A5.13.06" => {attr => {subType => "environmentApp"}},
+  "A5.13.07" => {attr => {subType => "windSensor.01"}, GPLOT => "EnO_A5-13-07:WindSpeed,"},
+  "A5.13.08" => {attr => {subType => "rainSensor.01"}, GPLOT => "EnO_A5-13-08:Raining,"},
   "A5.13.10" => {attr => {subType => "environmentApp"}, GPLOT => "EnO_solarRadiation4:SolarRadiation,"},
   "A5.14.01" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
   "A5.14.02" => {attr => {subType => "multiFuncSensor"}, GPLOT => "EnO_A5-14-xx:Voltage/Brightness,EnO_A5-14-xx_2:Contact/Vibration,"},
@@ -8706,6 +8709,22 @@ sub EnOcean_Parse($$)
       } 
       push @event, "3:state:T: $temperature E: $brightness B: $battery";
 
+    } elsif ($st eq "lightSensor.05") {
+      # Light Sensor (EEP A5-06-05)
+      # $db[3] is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
+      # $db[2] is the illuminance (ILL2) where min 0x00 = 0 lx, max 0xFF = 5100 lx
+      # $db[1] is the illuminance (ILL1) where min 0x00 = 0 lx, max 0xFF = 1020000 lx
+      # $db[0]_bit_0 is Range select where 0 = ILL1, 1 = ILL2
+      my $lux;
+      if($db[0] & 1) {
+        $lux = sprintf "%d", $db[2] * 20;
+      } else {
+        $lux = sprintf "%d", $db[1] * 40;
+      }
+      push @event, "3:voltage:" . sprintf "%0.1f", $db[3] * 0.02;
+      push @event, "3:brightness:$lux";
+      push @event, "3:state:$lux";
+
     } elsif ($st eq "occupSensor.01") {
       # Occupancy Sensor (EEP A5-07-01)
       # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
@@ -9213,6 +9232,25 @@ sub EnOcean_Parse($$)
         # EEP A5-13-03 ... EEP A5-13-06 not implemented
       }
 
+    } elsif ($st eq "windSensor.01") {
+      # Wind Sensor (EEP A5-13-07)
+      my @windDirection = ('NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW', 'N');
+      push @event, "3:battery:" . ($db[0] & 1 ? 'low' : 'ok');
+      push @event, "3:windDirection:" . $windDirection[$db[3]];
+      push @event, "3:windSpeedAverage:" . $db[2] / 1.275;
+      push @event, "3:windSpeedMax:" . $db[1] / 1.275;
+      push @event, "3:state:" . $db[2] / 1.275;      
+    
+    } elsif ($st eq "rainSensor.01") {
+      # Wind Sensor (EEP A5-13-08)
+      my $ras = ($db[3] & 0x40) >> 6;
+      my $rfa = ($db[3] & 0x3F) / 10;
+      my $rfc = hex(substr($data, 2, 4));
+      my $rain = $rfc * 0.6875 * (1 + $ras * $rfa / 100);
+      push @event, "3:battery:" . ($db[0] & 1 ? 'low' : 'ok');
+      push @event, "3:rain:$rain";
+      push @event, "3:state:$rain";      
+    
     } elsif ($st eq "multiFuncSensor") {
       # Multi-Func Sensor (EEP A5-14-01 ... A5-14-06)
       # $db[3] is the voltage where 0x00 = 0 V ... 0xFA = 5.0 V
@@ -18475,6 +18513,18 @@ EnOcean_Delete($$)
      </li>
      <br><br>
 
+     <li>Light Sensor (EEP A5-06-05)<br>
+         [untested]<br>
+     <ul>
+       <li>E/lx</li>
+       <li>brightness: E/lx (Sensor Range: 0 lx ... 10200 lx</li>
+       <li>voltage: U/V (Sensor Range: U = 0 V ... 5.1 V)</li>
+       <li>state: E/lx</li>
+     </ul><br>
+        The attr subType must be lightSensor.05. This is done if the device was created by autocreate.
+     </li>
+     <br><br>
+
       <li>Occupancy Sensor (EEP A5-07-01, A5-07-02)<br>
          [EnOcean EOSW]<br>
      <ul>
@@ -19129,6 +19179,35 @@ EnOcean_Delete($$)
      </ul><br>
         The attr subType must be environmentApp. This is done if the device was created by
         autocreate.
+     </li>
+     <br><br>
+
+     <li>Wind Sensor (EEP A5-13-07)<br>
+         [Hideki, untested]<br>
+     <ul>
+       <li>Vh/km (Sensor Range: V = 0 km/h ... 199.9 km/h)</li>
+       <li>battery: ok|low</li>
+       <li>windSpeedAverage: Vh/km (Sensor Range: V = 0 km/h ... 199.9 km/h)</li>
+       <li>windSpeedDirection: NNE|NE|ENE|E|ESE|SE|SSE|S|SSW|SW|WSW|W|WNW|NW|NNW|N</li>
+       <li>windSpeedMax: Vh/km (Sensor Range: V = 0 km/h ... 199.9 km/h)</li>
+       <li>state:Vh/km (Sensor Range: V = 0 km/h ... 199.9 km/h)</li>
+     </ul><br>
+        The attr subType must be windSensor.01. This is done if the device was created by
+        autocreate.<br>
+     </li>
+     <br><br>
+
+     <li>Rain Sensor (EEP A5-13-08)<br>
+         [Hideki, untested]<br>
+     <ul>
+       <li>H/mm</li>
+       <li>battery: ok|low</li>
+       <li>rain: H/mm</li>
+       <li>state:H/mm</li>
+     </ul><br>
+        The amount of rainfall is calculated at intervals of 183 s.<br>
+        The attr subType must be rainSensor.01. This is done if the device was created by
+        autocreate.<br>
      </li>
      <br><br>
 
