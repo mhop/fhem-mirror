@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.30   15.08.2016    commandref revised, more v4 logging in special case 
 # 1.29   02.07.2016    add regex for adaption SVS version, url call for "snap" changed 
 # 1.28   30.06.2016    Attr "showPassInLog" added, per default no password will be shown in log 
 # 1.27   29.06.2016    Attr "simu_SVSversion" added, sub login_nonbl changed, 
@@ -132,7 +133,7 @@
 
 package main;
 
-use JSON qw( decode_json );                 # from CPAN, Debian: apt-get install libperl-JSON 
+use JSON qw( decode_json );                 # from CPAN, Debian: apt-get install libjson-perl 
 use Data::Dumper;                           # Perl Core module
 use strict;                           
 use warnings;
@@ -2177,18 +2178,21 @@ sub login_nonbl ($) {
   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
   my $url;
+  my $urlwopw;      # nur zur Anzeige bei verbose >=4 und "showPassInLog" == 0
   my $apiauthpath   = $hash->{HELPER}{APIAUTHPATH};
   my $apiauthmaxver = $hash->{HELPER}{APIAUTHMAXVER};
   
   if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\"";
+      $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=\"sid\"";
       }
       else
       {
       $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=\"sid\""; 
+      $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&format=\"sid\"";
       }
   
-  Log3($name, 4, "$name - Call-Out now: $url");
+  AttrVal($name, "showPassInLog", "0") == 1 ? Log3($name, 4, "$name - Call-Out now: $url") : Log3($name, 4, "$name - Call-Out now: $urlwopw");
   
   $param = {
                url      => $url,
@@ -2198,8 +2202,6 @@ sub login_nonbl ($) {
                header   => "Accept: application/json",
                callback => \&getcamid_nonbl
            };
-   
-   # login wird ausgeführt, $sid ermittelt und mit Routine "getcamid_nonbl" verarbeitet
    HttpUtils_NonblockingGet ($param);
 }  
   
@@ -2260,16 +2262,18 @@ sub getcamid_nonbl ($) {
             return;
         }
         
+        Log3($name, 5, "$name - Data returned: ".$myjson);
+        
         $data = decode_json($myjson);
+        
+        # Logausgabe decodierte JSON Daten
+        Log3($name, 4, "$name - JSON decoded: ". Dumper $data);
    
         $success = $data->{'success'};
         
         # login war erfolgreich
         if ($success) 
-        {
-             # Logausgabe decodierte JSON Daten
-             Log3($name, 4, "$name - JSON returned: ". Dumper $data);
-             
+        {           
              $sid = $data->{'data'}->{'sid'};
              
              # Session ID in hash eintragen
@@ -2286,7 +2290,7 @@ sub getcamid_nonbl ($) {
              Log3($name, 4, "$name - --- End Function serverlogin nonblocking ---");
        } 
        else 
-       {
+       {          
              # Errorcode aus JSON ermitteln
              $errorcode = $data->{'error'}->{'code'};
        
@@ -3850,12 +3854,20 @@ sub experror {
   
 <b> Prerequisites </b> <br><br>
     This module uses the CPAN-module JSON. Please consider to install this package (Debian: libjson-perl).<br>
-    You don't need to install LWP anymore, because of SSCam is completely using the nonblocking functions of HttpUtils respectively HttpUtils_NonblockingGet now. <br> 
+    SSCam is completely using the nonblocking functions of HttpUtils respectively HttpUtils_NonblockingGet. <br> 
     In DSM respectively in Synology Surveillance Station an User has to be created. The login credentials are needed later when using a set-command to assign the login-data to a device. <br> 
-    Further informations could be find among <a href="#Credentials">Credentials</a>.  <br><br>
+    Further informations could be find among <a href="#SSCam_Credentials">Credentials</a>.  <br><br>
+    
+    Overview which Perl-modules SSCam is using: <br><br>
+    
+    JSON            <br>
+    Data::Dumper    <br>                  
+    MIME::Base64    <br>
+    Time::HiRes     <br>
+    HttpUtils       (FHEM-module) <br><br>
     
 
-  <a name="SCamdefine"></a>
+  <a name="SSCamdefine"></a>
   <b>Define</b>
   <ul>
   <br>
@@ -4534,9 +4546,17 @@ sub experror {
     
 <b>Vorbereitung </b> <br><br>
     Dieses Modul nutzt das CPAN Module JSON. Bitte darauf achten dieses Paket zu installieren. (Debian: libjson-perl). <br>
-    Das CPAN-Modul LWP wird für SSCam nicht mehr benötigt. Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br> 
+    Das Modul verwendet für HTTP-Calls die nichtblockierenden Funktionen von HttpUtils bzw. HttpUtils_NonblockingGet. <br> 
     Im DSM bzw. der Synology Surveillance Station muß ein Nutzer angelegt sein. Die Zugangsdaten werden später über ein Set-Kommando dem angelegten Gerät zugewiesen. <br>
-    Nähere Informationen dazu unter <a href="#Credentials">Credentials</a><br><br>
+    Nähere Informationen dazu unter <a href="#SSCam_Credentials">Credentials</a><br><br>
+        
+    Überblick über die Perl-Module welche von SSCam genutzt werden: <br><br>
+    
+    JSON            <br>
+    Data::Dumper    <br>                  
+    MIME::Base64    <br>
+    Time::HiRes     <br>
+    HttpUtils       (FHEM-Modul) <br><br>
 
 <a name="SSCamdefine"></a>
 <b>Definition</b>
