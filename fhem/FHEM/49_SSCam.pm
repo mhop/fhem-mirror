@@ -27,6 +27,8 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.31   15.08.2016    Attr "noQuotesForSID" added, avoid possible 402 - permission denied problems 
+#                      in some SVS/DS-combinations
 # 1.30   15.08.2016    commandref revised, more v4 logging in special case 
 # 1.29   02.07.2016    add regex for adaption SVS version, url call for "snap" changed 
 # 1.28   30.06.2016    Attr "showPassInLog" added, per default no password will be shown in log 
@@ -207,6 +209,7 @@ sub SSCam_Initialize($) {
          "debugactivetoken:1 ".
          "rectime ".
          "recextend:1,0 ".
+         "noQuotesForSID:1,0 ".
          "session:SurveillanceStation,DSM ".
          "showPassInLog:1,0 ".
          "simu_SVSversion:7.2 ".
@@ -2182,15 +2185,16 @@ sub login_nonbl ($) {
   my $apiauthpath   = $hash->{HELPER}{APIAUTHPATH};
   my $apiauthmaxver = $hash->{HELPER}{APIAUTHMAXVER};
   
+  # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
+  my $sid = AttrVal($name, "noQuotesForSID", "0") == 1 ? "sid" : "\"sid\"";
+  
   if (defined($attr{$name}{session}) and $attr{$name}{session} eq "SurveillanceStation") {
-      $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=\"sid\"";
-      $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=\"sid\"";
-      }
-      else
-      {
-      $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=\"sid\""; 
-      $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&format=\"sid\"";
-      }
+      $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
+      $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
+  } else {
+      $url = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=$sid"; 
+      $urlwopw = "http://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&format=$sid";
+  }
   
   AttrVal($name, "showPassInLog", "0") == 1 ? Log3($name, 4, "$name - Call-Out now: $url") : Log3($name, 4, "$name - Call-Out now: $urlwopw");
   
@@ -3910,7 +3914,7 @@ sub experror {
     With <a href="#SSCamset">command</a> <b>"set &lt;name&gt; on [rectime]"</b> a temporary recordingtime is determinded which would overwrite the dafault-value of recordingtime <br>
     and the attribute "rectime" (if it is set) uniquely. <br><br>
 
-    In that case the command <b>"set &lt;name&gt; on 0"</b> leads also to an endless recording.<br><br>
+    In that case the command <b>"set &lt;name&gt; on 0"</b> leads also to an endless recording as well.<br><br>
     
     If you have specified a pre-recording time in SVS it will be considered too. <br><br><br>
     
@@ -4463,6 +4467,8 @@ sub experror {
   
   <li><b>livestreamprefix</b> - overwrites the specifications of protocol, servername and port for further use of the livestream address, e.g. as an link for external use  </li>
   
+  <li><b>noQuotesForSID</b> - this attribute may be helpfull in some cases to avoid errormessage "402 - permission denied" and makes login possible.  </li>
+  
   <li><b>pollcaminfoall</b> - Interval of automatic polling the Camera properties (if < 10: no polling, if &gt; 10: polling with interval) </li>
 
   <li><b>pollnologging</b> - "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li>
@@ -4606,7 +4612,7 @@ sub experror {
     <a name="SSCam_Credentials"></a>
     <b>Credentials </b><br><br>
     
-    Nach dem Definieren des Gerätes müssen zuerst die Zugangsrechte gespeichert werden. Das geschieht mit dem Befehl:
+    Nach dem Definieren des Gerätes müssen zuerst die Zugangsparameter gespeichert werden. Das geschieht mit dem Befehl:
    
     <pre> 
      set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt;
@@ -5158,6 +5164,8 @@ sub experror {
   <li><b>htmlattr</b> - ergänzende Angaben zur Livestream-Url um das Verhalten wie Bildgröße zu beeinflussen  </li>
   
   <li><b>livestreamprefix</b> - überschreibt die Angaben zu Protokoll, Servernamen und Port zur Weiterverwendung der Livestreamadresse als z.B. externer Link   </li>
+  
+  <li><b>noQuotesForSID</b> - dieses Attribut kann in bestimmten Fällen die Fehlermeldung "402 - permission denied" vermeiden und ein login ermöglichen.  </li>
   
   <li><b>pollcaminfoall</b> - Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner 10: kein Polling, größer 10: Polling mit Intervall) </li>
 
