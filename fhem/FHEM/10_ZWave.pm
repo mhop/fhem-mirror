@@ -44,9 +44,9 @@ my %zwave_class = (
     set   => { basicValue  => "01%02x",
                basicSet    => "01%02x"  }, # Alias, Forum #38200
     get   => { basicStatus => "02",     },
-    parse => { "..2001(.*)"=> '"basicSet:$1"', # Forum #36980
+    parse => { "..2001(.*)"=> '"basicSet:".hex($1)', # Forum #36980
                "..2002"    => "basicGet:request", # sent by the remote
-               "..2003(.*)"=> '"basicReport:$1"' }},
+               "..2003(.*)"=> '"basicReport:".hex($1)' }},
   CONTROLLER_REPLICATION   => { id => '21' },
   APPLICATION_STATUS       => { id => '22', # V1
     parse => { "..2201(..)(..)" =>
@@ -95,16 +95,18 @@ my %zwave_class = (
   CHIMNEY_FAN              => { id => '2a' },
   SCENE_ACTIVATION         => { id => '2b',
     set   => { sceneActivate => "01%02x%02x" },
-    parse => { "042b01(..)(..)"  => '"scene_$1:$2"',
+    parse => { "042b01(..)(..)"  => '"scene_".hex($1).":".hex($2)',
                "042b01(..)ff" => 'ZWave_sceneParse($1)'} },
   SCENE_ACTUATOR_CONF      => { id => '2c',
     set   => { sceneConfig => "01%02x%02x80%02x" },
     get   => { sceneConfig => "02%02x"           },
-    parse => { "052c03(..)(..)(..)"   => '"scene_$1:level $2 duration $3"' } },
+    parse => { "052c03(..)(..)(..)"   =>
+                '"scene_".hex($1).":level ".hex($2)."duration ".hex($3)' } },
   SCENE_CONTROLLER_CONF    => { id => '2d',
     set   => { sceneConfig => "01%02x%02x%02x" },
     get   => { sceneConfig => "02%02x"          },
-    parse => { "052d03(..)(..)(..)"   => '"group_$1:scene $2 duration $3"' } },
+    parse => { "052d03(..)(..)(..)"   =>
+                '"group_".hex($1).":scene ".hex($2)."duration ".hex($3)' } },
   ZIP_CLIENT               => { id => '2e' },
   ZIP_ADV_SERVICES         => { id => '2f' },
   SENSOR_BINARY            => { id => '30',
@@ -128,7 +130,7 @@ my %zwave_class = (
                rgb         => '05050000010002%02x03%02x04%02x', # Forum #44014
                wcrgb       => '050500%02x01%02x02%02x03%02x04%02x' },
     parse => { "043302(..)(..)"=> 'ZWave_ccCapability($1,$2)',
-               "043304(..)(.*)"=> '"ccStatus_$1:$2"' } },
+               "043304(..)(.*)"=> '"ccStatus_".hex($1).":".hex($2)' } },
   ZIP_ADV_CLIENT           => { id => '34' },
   METER_PULSE              => { id => '35' },
   BASIC_TARIFF_INFO        => { id => '36' },
@@ -272,8 +274,8 @@ my %zwave_class = (
   ASSOCIATION_GRP_INFO     => { id => '59',
     get   => { associationGroupName => "01%02x",
                associationGroupCmdList => "0500%02x" },
-    parse => { "..5902(..)(.*)"=> '"assocGroupName_$1:".pack("H*", $2)',
-               "..5906(..)..(.*)"=> '"assocGroupCmdList_$1:".$2' } },
+    parse => { "..5902(..)(.*)"=> '"assocGroupName_".hex($1).":".pack("H*", $2)',
+               "..5906(..)..(.*)"=> '"assocGroupCmdList_".hex($1).":".$2' } },
   DEVICE_RESET_LOCALLY     => { id => '5a',
     parse => { "025a01"    => "deviceResetLocally:yes" } },
   CENTRAL_SCENE            => { id => '5b',
@@ -425,14 +427,14 @@ my %zwave_class = (
                versionClassAll => 'ZWave_versionClassAllGet($hash)'},
     parse => { "028611"             => "cmdGet:version",
                "078612(..........)" => 'sprintf("version:Lib %d Prot '.
-                '%d.%d App %d.%d", unpack("C*",pack("H*","$1")))',
+                '%d.%02d App %d.%d", unpack("C*",pack("H*","$1")))',
                "098612(..............)" => 'sprintf("version:Lib %d Prot '.
-                 '%d.%d App %d.%d HW %d FWCounter %d",'.
+                 '%d.%02d App %d.%d HW %d FWCounter %d",'.
                  'unpack("C*",pack("H*","$1")))',
                "0b8612(..................)" => 'sprintf("version:Lib %d Prot '.
-                 '%d.%d App %d.%d HW %d FWCounter %d FW %d.%d",'.
+                 '%d.%02d App %d.%d HW %d FWCounter %d FW %d.%d",'.
                  'unpack("C*",pack("H*","$1")))',
-               "048614(..)(..)"             => '"versionClass_$1:$2"' },
+               "048614(..)(..)"     => '"versionClass_".hex($1).":".hex($2)' },
    init  => { ORDER=>12, CMD => '"get $NAME versionClassAll"' } },
   INDICATOR                => { id => '87',
     set   => { indicatorOff    => "0100",
@@ -464,8 +466,8 @@ my %zwave_class = (
                mcaDel      => "04%02x*" },
     get   => { mca         => "02%02x",
                mcaGroupings=> "05" },
-    parse => { "..8e03(..)(..)(.*)"
-                           => '"mca_$1:max:$2 param:$3"',
+    parse => { "..8e03(..)(..)(.*)" =>
+                '"mca_".hex($1).":max:".hex($2)." param:".hex($3)',
                "..8e06(.*)"=> '"mcaSupportedGroupings:".hex($1)' } },
 
   MULTI_CMD                => { id => '8f' }, # Handled in Parse
@@ -491,7 +493,7 @@ my %zwave_class = (
   SENSOR_ALARM             => { id => '9c',
     get   => { alarm       => "01%02x" },
     parse => { "..9c02(..)(..)(..)(....)" =>
-                '"alarm_type_$2:level $3 node $1 seconds ".hex($4)'} },
+            '"alarm_type_$2:level $3 node ".hex($1)." seconds ".hex($4)'} },
   SILENCE_ALARM            => { id => '9d' },
   SENSOR_CONFIGURATION     => { id => '9e' },
   MARK                     => { id => 'ef' },
@@ -2929,7 +2931,6 @@ ZWave_plusInfoParse($$$$$)
 }
 
 my %zwave_sensorBinaryTypeV2 = (
-  "00"=>"unknown",
   "01"=>"generalPurpose",
   "02"=>"smoke",
   "03"=>"CO",
