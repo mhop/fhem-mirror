@@ -727,7 +727,7 @@ sub TCM_Set($@)
 
   my $cmdHex = $cmdhash->{cmd};
   my $argre = $cmdhash->{arg};
-  my $logArg = $arg;
+  my $logArg = defined($arg) ? $arg : '';
   if($argre) {
     return "Argument needed for set $name $cmd ($argre)" if (!defined($arg));
     return "Argument does not match the regexp ($argre)" if ($arg !~ m/$argre/i);
