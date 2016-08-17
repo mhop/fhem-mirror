@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.32   17.08.2016    Logging of verbose 4 changed
 # 1.31   15.08.2016    Attr "noQuotesForSID" added, avoid possible 402 - permission denied problems 
 #                      in some SVS/DS-combinations
 # 1.30   15.08.2016    commandref revised, more v4 logging in special case 
@@ -1936,6 +1937,9 @@ sub login_nonbl ($) {
         }
         
         my $data = decode_json($myjson);
+        
+        # Logausgabe decodierte JSON Daten
+        Log3($name, 4, "$name - JSON returned: ". Dumper $data);
    
         $success = $data->{'success'};
         
@@ -1950,8 +1954,6 @@ sub login_nonbl ($) {
                 if ($success) 
                      {
                         my $logstr;
-                     # Logausgabe decodierte JSON Daten
-                        Log3($name, 4, "$name - JSON returned: ". Dumper $data);
                         
                      # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
        
@@ -2434,14 +2436,14 @@ sub camop_nonbl ($) {
         }
         
         $data = decode_json($myjson);
+        
+        # lesbare Ausgabe der decodierten JSON-Daten
+        Log3($name, 5, "$name - JSON returned: ". Dumper $data);
    
         $success = $data->{'success'};
                 
         if ($success)                                                                       # die Liste aller Kameras konnte ausgelesen werden, Anzahl der definierten Kameras ist in Var "total"
-        {
-             # lesbare Ausgabe der decodierten JSON-Daten
-             Log3($name, 5, "$name - JSON returned: ". Dumper $data);
-                    
+        {             
              $camcount = $data->{'data'}->{'total'};
              $i = 0;
          
@@ -2503,7 +2505,7 @@ sub camop_nonbl ($) {
             return (logout_nonbl($hash));
        }
        
-   Log3($name, 4, "$name - --- Begin Function cam: $OpMode nonblocking ---");
+   Log3($name, 4, "$name - --- Begin Function $OpMode nonblocking ---");
 
    $httptimeout = $attr{$name}{httptimeout} ? $attr{$name}{httptimeout} : "4";
    
@@ -2720,7 +2722,7 @@ sub camop_nonbl ($) {
           }
       }
  
-      Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+      Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
       
       if (ReadingsVal("$name", "Record", "") eq "Start") {
                     readingsSingleUpdate( $hash,"state", "on", 1); 
@@ -2794,7 +2796,7 @@ sub camret_nonbl ($) {
    {
         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 1, "$name - error while requesting ".$param->{url}." - $err");
-        Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking with error ---");
+        Log3($name, 4, "$name - --- End Function $OpMode nonblocking with error ---");
         
         readingsSingleUpdate($hash, "Error", $err, 1);                                     	       
 
@@ -2812,15 +2814,14 @@ sub camret_nonbl ($) {
          }
         
         $data = decode_json($myjson);
+        
+        # Logausgabe decodierte JSON Daten
+        Log3($name, 4, "$name - JSON returned: ". Dumper $data);
    
         $success = $data->{'success'};
 
         if ($success) {       
-            # Kameraoperation entsprechend "OpMode" war erfolgreich
-            
-            # Logausgabe decodierte JSON Daten
-            Log3($name, 4, "$name - JSON returned: ". Dumper $data);
-                
+            # Kameraoperation entsprechend "OpMode" war erfolgreich                
             if ($OpMode eq "Start") {                             
                 # Die Aufnahmezeit setzen
                 # wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
@@ -2860,7 +2861,7 @@ sub camret_nonbl ($) {
                     InternalTimer(gettimeofday()+$rectime, "camstoprec", $hash);
                 }      
                 
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Stop") 
             {                
@@ -2874,7 +2875,7 @@ sub camret_nonbl ($) {
        
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname Recording stopped");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
                 
                 # Aktualisierung Eventlist der letzten Aufnahme
                 geteventlist($hash);
@@ -2889,7 +2890,7 @@ sub camret_nonbl ($) {
        
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking --");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking --");
             }
             elsif ($OpMode eq "MotDetSc") 
             {              
@@ -2920,7 +2921,7 @@ sub camret_nonbl ($) {
                     Log3($name, 3, "$name - Camera $camname motion detection source was to \"$hash->{HELPER}{MOTDETSC}\" ");
                 }
                              
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Snap") 
             {
@@ -2945,7 +2946,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 Log3($name, 3, "$name - Snapshot of Camera $camname has been done successfully");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
                 
                 # nach Snap Aufnahme Filename des Snaps ermitteln
                 getsnapfilename($hash);
@@ -2964,7 +2965,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 Log3($name, 4, "$name - Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\"");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "gopreset") 
             {
@@ -2986,7 +2987,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been moved to position \"$hash->{HELPER}{GOPRESETNAME}\"");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "runpatrol") 
             {
@@ -3008,7 +3009,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 Log3($name, 3, "$name - Patrol \"$hash->{HELPER}{GOPATROLNAME}\" of camera $camname has been started successfully");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "goabsptz") 
             {
@@ -3030,7 +3031,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "movestart") 
             {
@@ -3044,7 +3045,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname started move to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
                 
                 RemoveInternalTimer($hash, "movestop");
                 InternalTimer(gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "movestop", $hash);
@@ -3070,7 +3071,7 @@ sub camret_nonbl ($) {
                                 
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname stopped move to direction \"$hash->{HELPER}{GOMOVEDIR}\"");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
         
             }
             elsif ($OpMode eq "Enable") 
@@ -3086,7 +3087,7 @@ sub camret_nonbl ($) {
                    
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been enabled successfully");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Disable") 
             {
@@ -3101,7 +3102,7 @@ sub camret_nonbl ($) {
                    
                 # Logausgabe
                 Log3($name, 3, "$name - Camera $camname has been disabled successfully");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Getsvsinfo") 
             {
@@ -3296,7 +3297,7 @@ sub camret_nonbl ($) {
                     $verbose = 3;
                     }
                 Log3($name, $verbose, "$name - $logstr");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "geteventlist") 
             {              
@@ -3336,7 +3337,7 @@ sub camret_nonbl ($) {
                     $verbose = 3;
                     }
                 Log3($name, $verbose, "$name - $logstr");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "getmotionenum") 
             {              
@@ -3413,7 +3414,7 @@ sub camret_nonbl ($) {
                     $verbose = 3;
                     }
                 Log3($name, $verbose, "$name - $logstr");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Getcapabilities") 
             {
@@ -3501,7 +3502,7 @@ sub camret_nonbl ($) {
                     $verbose = 3;
                     }
                 Log3($name, $verbose, "$name - $logstr");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }            
             elsif ($OpMode eq "Getptzlistpreset") 
             {
@@ -3546,7 +3547,7 @@ sub camret_nonbl ($) {
                     $verbose = 3;
                     }
                 Log3($name, $verbose, "$name - $logstr");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             elsif ($OpMode eq "Getptzlistpatrol") 
             {
@@ -3593,7 +3594,7 @@ sub camret_nonbl ($) {
                     $verbose = 3;
                     }
                 Log3($name, $verbose, "$name - $logstr");
-                Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking ---");
+                Log3($name, 4, "$name - --- End Function $OpMode nonblocking ---");
             }
             
        }
@@ -3614,7 +3615,7 @@ sub camret_nonbl ($) {
        
             # Logausgabe
             Log3($name, 1, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
-            Log3($name, 4, "$name - --- End Function cam: $OpMode nonblocking with error ---");
+            Log3($name, 4, "$name - --- End Function $OpMode nonblocking with error ---");
 
        }
    }
@@ -3695,8 +3696,6 @@ sub logoutret_nonbl ($) {
    {
         Log3($name, 4, "$name - URL-Call: ".$param->{url});
         
-        # An dieser Stelle die Antwort parsen / verarbeiten mit $myjson 
-        
         # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = &evaljson($hash,$myjson,$param->{url});
         
@@ -3712,15 +3711,15 @@ sub logoutret_nonbl ($) {
         }
         
         $data = decode_json($myjson);
+        
+        # Logausgabe decodierte JSON Daten
+        Log3($name, 4, "$name - JSON returned: ". Dumper $data);
    
         $success = $data->{'success'};
 
         if ($success)  
         {
-             # die Logout-URL konnte erfolgreich aufgerufen werden
-             # Logausgabe decodierte JSON Daten
-             Log3($name, 4, "$name - JSON returned: ". Dumper $data);
-                        
+             # die Logout-URL konnte erfolgreich aufgerufen werden                        
              # Session-ID aus Helper-hash löschen
              delete $hash->{HELPER}{SID};
              
