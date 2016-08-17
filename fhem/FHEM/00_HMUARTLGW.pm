@@ -181,6 +181,7 @@ sub HMUARTLGW_DoInit($)
 	delete($hash->{owner});
 	$hash->{DevState} = HMUARTLGW_STATE_NONE;
 	$hash->{XmitOpen} = 0;
+	$hash->{LastOpen} = gettimeofday();
 
 	$hash->{LGW_Init} = 1 if ($hash->{DevType} =~ m/^LGW/);
 
@@ -298,6 +299,12 @@ sub HMUARTLGW_Ready($)
 	Log3($hash, 4, "HMUARTLGW ${name} ready: ".$hash->{STATE});
 
 	if ((!$hash->{lgwHash}) && $hash->{STATE} eq "disconnected") {
+		#don't immediately reconnect when we just connected, delay
+		#for 5s because remote closed the connection on us
+		if (defined($hash->{LastOpen}) &&
+		    $hash->{LastOpen} + 5 >= gettimeofday()) {
+			return 0;
+		}
 		return HMUARTLGW_Reopen($hash, 1);
 	}
 
@@ -2146,8 +2153,8 @@ sub HMUARTLGW_getVerbLvl($$$$) {
       <li>LAN Gateway at <code>192.168.42.23</code>:<br>
           <code>define myHmLGW HMUARTLGW 192.168.42.23</code><br>&nbsp;</li>
       <li>Remote HM-MOD-UART using <code>socat</code> on a Raspberry Pi:<br>
-          Remote Raspberry Pi:<br><code>$ socat TCP4-LISTEN:12345,fork,reuseaddr /dev/ttyAMA0,raw,echo=0,b115200</code><br><br>
-          Fhem:<br><code>define myRemoteHmUART HMUARTLGW uart://192.168.42.23:12345</code></li>
+          <code>define myRemoteHmUART HMUARTLGW uart://192.168.42.23:12345</code><br><br>
+          Remote Raspberry Pi:<br><code>$ socat TCP4-LISTEN:12345,fork,reuseaddr /dev/ttyAMA0,raw,echo=0,b115200</code></li>
     </ul>
   </ul>
   <br>
