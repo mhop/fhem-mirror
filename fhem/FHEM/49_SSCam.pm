@@ -27,6 +27,7 @@
 ##########################################################################################################
 #  Versions History:
 #
+# 1.32.1 18.08.2016    empty event LastSnapId corrected
 # 1.32   17.08.2016    Logging of verbose 4 changed
 # 1.31   15.08.2016    Attr "noQuotesForSID" added, avoid possible 402 - permission denied problems 
 #                      in some SVS/DS-combinations
@@ -2524,7 +2525,7 @@ sub camop_nonbl ($) {
       # ein Schnappschuß wird ausgelöst
       $url = "http://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 0); 
-      readingsSingleUpdate($hash, "LastSnapId", "", 1);
+      readingsSingleUpdate($hash, "LastSnapId", "", 0);
    }
    elsif ($OpMode eq "getsnapfilename")
    {
