@@ -17,6 +17,7 @@ sub HMinfo_register ($);
 
 use Blocking;
 use HMConfig;
+my $doAli = 0;#display alias names as well (filter option 2)
 
 sub HMinfo_Initialize($$) {####################################################
   my ($hash) = @_;
@@ -1047,15 +1048,14 @@ sub HMinfo_tempListTmplGenGplot(@) { ##########################################
 sub HMinfo_getEntities(@) { ###################################################
   my ($filter,$re) = @_;
   my @names;
-  my ($doDev,$doChn,$doIgn,$noVrt,$noPhy,$noAct,$noSen,$doEmp);
-  $doDev=$doChn=$doEmp= 1;
-  $doIgn=$noVrt=$noPhy=$noAct=$noSen = 0;
+  my ($doDev,$doChn,$doEmp)= (1,1,1,1,1,1,1,1);
+  my ($doIgn,$noVrt,$noPhy,$noAct,$noSen) = (0,0,0,0,0,0,0,0,0,0);
   $filter .= "dc" if ($filter !~ m/d/ && $filter !~ m/c/); # add default
   $re = '.' if (!$re);
   if ($filter){# options provided
     $doDev=$doChn=$doEmp= 0;#change default
     no warnings;
-      my @pl = split undef,$filter;
+    my @pl = split undef,$filter;
     use warnings;
     foreach (@pl){
       $doDev = 1 if($_ eq 'd');
@@ -1066,6 +1066,7 @@ sub HMinfo_getEntities(@) { ###################################################
       $noAct = 1 if($_ eq 'a');
       $noSen = 1 if($_ eq 's');
       $doEmp = 1 if($_ eq 'e');
+      $doAli = 1 if($_ eq '2');
     }
   }
   # generate entity list
@@ -1132,7 +1133,8 @@ sub HMinfo_GetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
-
+  $doAli = 0;#set default
+  
   if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
     $opt = $a[0];
     $optEmpty = ($opt =~ m/e/)?1:0;
@@ -1255,8 +1257,10 @@ sub HMinfo_GetFn($@) {#########################################################
           $dispDest .= "/$h->{NAME}";
         }
         if ($type eq "full"){
-          push @rssiList,sprintf("%-15s %-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
-                                ,$dName,$dispName,$dispDest
+          push @rssiList,sprintf("%-15s ",$dName)
+                        .($doAli ? sprintf("%-15s  ",AttrVal($dName,"alias","-")):"")
+                        .sprintf("%-15s %-15s %6.1f %6.1f %6.1f<%6.1f %5s"
+                                ,$dispName,$dispDest
                                 ,$defs{$dName}{helper}{rssi}{$dest}{lst}
                                 ,$defs{$dName}{helper}{rssi}{$dest}{avg}
                                 ,$defs{$dName}{helper}{rssi}{$dest}{min}
@@ -1273,7 +1277,7 @@ sub HMinfo_GetFn($@) {#########################################################
         }
       }
     }
-    if ($type eq "reduced"){
+    if   ($type eq "reduced"){
       @io = HMinfo_noDup(@io);
       my $s = sprintf("    %15s "," ");
       $s .= sprintf(" %12s",$_)foreach (@io);
@@ -1281,16 +1285,12 @@ sub HMinfo_GetFn($@) {#########################################################
       
       foreach my $d(keys %rssiH){
         my $str = sprintf("%-15s  ",$d);
+        $str .= sprintf("%-15s  ",AttrVal($d,"alias","-"))if ($doAli);
         foreach my $i(@io){
-#          $str .= sprintf("  %6.1f/%6.1f/%6.1f"
-#                           ,($rssiH{$d}{$i}{min} ? $rssiH{$d}{$i}{min} : 0)
-#                           ,($rssiH{$d}{$i}{avg} ? $rssiH{$d}{$i}{avg} : 0)
-#                           ,($rssiH{$d}{$i}{max} ? $rssiH{$d}{$i}{max} : 0)
-#                           );
           $str .= sprintf(" %12.1f"
-#                           ,($rssiH{$d}{$i}{min} ? $rssiH{$d}{$i}{min} : 0)
+                  #        ,($rssiH{$d}{$i}{min} ? $rssiH{$d}{$i}{min} : 0)
                            ,($rssiH{$d}{$i}{avg} ? $rssiH{$d}{$i}{avg} : 0)
-#                           ,($rssiH{$d}{$i}{max} ? $rssiH{$d}{$i}{max} : 0)
+                  #        ,($rssiH{$d}{$i}{max} ? $rssiH{$d}{$i}{max} : 0)
                            );
         }
         push @rssiList, $str;
@@ -1299,7 +1299,7 @@ sub HMinfo_GetFn($@) {#########################################################
              .(join "\n   ",sort @rssiList);
     }
     elsif($type eq "full"){
-      $ret = $cmd." done:"."\n    "."Device          receive         from             last   avg      min_max    count"
+      $ret = $cmd." done:"."\n    "."Device          ".($doAli?"Alias            ":"")."receive         from             last   avg      min_max    count"
                         ."\n    ".(join "\n    ",sort @rssiList)
                          ;
     }
@@ -1486,6 +1486,8 @@ sub HMinfo_SetFn($@) {#########################################################
   my @in = @a;
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
+  $doAli = 0;#set default
+
   if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
     $opt = $a[0];
     $optEmpty = ($opt =~ m/e/)?1:0;
@@ -2699,6 +2701,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
             <li>a - aktor    :supress actor</li>
             <li>s - sensor   :supress sensor</li>
             <li>e - empty    :include results even if requested fields are empty</li>
+            <li>2 - alias    :display second name alias</li>
         </ul>
         and/or filter for <b>names</b>:<br>
         <ul>
@@ -3147,6 +3150,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
             <li>a - aktor    :unterdr&uuml;cke Aktor</li>
             <li>s - sensor   :unterdr&uuml;cke Sensor</li>
             <li>e - empty    :verwendet das Resultat auch wenn die Felder leer sind</li>
+            <li>2 - alias    :2ter name alias anzeigen</li>
         </ul>
         und/oder <b>Name</b>:<br>
         <ul>
