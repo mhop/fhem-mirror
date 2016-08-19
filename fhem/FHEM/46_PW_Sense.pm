@@ -147,6 +147,8 @@ sub PW_Sense_Parse($$)
 
 =pod
 =item device
+=item summary    Submodule for 45_Plugwise
+=item summary_DE Untermodul zu 45_Plugwise
 =begin html
 
 <a name="PW_Sense"></a>
