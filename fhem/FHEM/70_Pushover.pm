@@ -1188,6 +1188,8 @@ sub Pushover_CGI() {
 
 =pod
 =item device
+=item summary Provides text message push functionality and connectivity for the Pushover smartphone app
+=item summary_DE Stellt Push Funktionalit&auml;t f&uuml;r Textnachrichten und Verbindung f&uuml;r die Pushover Smartphone App bereit
 =begin html
 
 <a name="Pushover"></a>
@@ -1304,10 +1306,10 @@ sub Pushover_CGI() {
   Pushover ist ein Dienst, um Benachrichtigungen von einer vielzahl
   von Quellen auf Deinem Smartphone oder Tablet zu empfangen.<br>
   Du brauchst einen Account um dieses Modul zu verwenden.<br>
-  Für weitere Informationen über den Dienst besuche <a href="https://pushover.net">pushover.net</a>.<br>
+  F&uuml;r weitere Informationen &uuml;ber den Dienst besuche <a href="https://pushover.net">pushover.net</a>.<br>
   <br>
   Die Installation des Perl Moduls IO::Socket::SSL ist Voraussetzung zur Nutzung dieses Moduls (z.B. via 'cpan -i IO::Socket::SSL').<br>
-  Es wird empfohlen Perl-JSON zu installieren, um erweiterte Funktion wie Supplementary URLs nutzen zu können.<br>
+  Es wird empfohlen Perl-JSON zu installieren, um erweiterte Funktion wie Supplementary URLs nutzen zu k&ouml;nnen.<br>
   <br>
   Diskutiere das Modul <a href="http://forum.fhem.de/index.php/topic,16215.0.html">hier</a>.<br>
   <br>
@@ -1320,7 +1322,7 @@ sub Pushover_CGI() {
     Du musst einen Account erstellen, um den User Key zu bekommen.<br>
     Und du musst eine Anwendung erstellen, um einen API APP_TOKEN zu bekommen.<br>
     <br>
-    Das Attribut infix ist optional, um einen FHEMWEB uri Namen für die Pushover API Callback Funktion zu definieren.<br>
+    Das Attribut infix ist optional, um einen FHEMWEB uri Namen f&uuml;r die Pushover API Callback Funktion zu definieren.<br>
     Die Callback URL Callback URL kann dann mit dem Attribut callbackUrl gesetzt werden (siehe unten).<br>
     Hinweis: Eine infix uri can innerhalb einer FHEM Instanz nur einmal verwendet werden!<br>
     <br>
@@ -1345,23 +1347,23 @@ sub Pushover_CGI() {
       <code>set Pushover1 msg 'Titel' 'Dies ist ein Text.'</code><br>
       <code>set Pushover1 msg 'Titel' 'Dies ist ein Text.' '' 0 ''</code><br>
       <code>set Pushover1 msg 'Notfall' 'Sicherheitsproblem im Wohnzimmer.' '' 2 'siren' 30 3600</code><br>
-      <code>set Pushover1 msg 'Erinnerung' 'Dies ist eine Erinnerung an etwas' '' 0 '' 0 3600 'Hier klicken, um Aktion auszuführen' 'set device irgendwas'</code><br>
-      <code>set Pushover1 msg 'Notfall' 'Sicherheitsproblem im Wohnzimmer.' '' 2 'siren' 30 3600 'Hier klicken, um Aktion auszuführen' 'set device something'</code><br>
+      <code>set Pushover1 msg 'Erinnerung' 'Dies ist eine Erinnerung an etwas' '' 0 '' 0 3600 'Hier klicken, um Aktion auszuf&uuml;hren' 'set device irgendwas'</code><br>
+      <code>set Pushover1 msg 'Notfall' 'Sicherheitsproblem im Wohnzimmer.' '' 2 'siren' 30 3600 'Hier klicken, um Aktion auszuf&uuml;hren' 'set device something'</code><br>
     </ul>
     <br>
     Anmerkungen:
     <ul>
-      <li>Bei der Verwendung der ersten beiden Beispiele müssen die entsprechenden Attribute als Ersatz für die fehlenden Parameter belegt sein (s. Attribute)
+      <li>Bei der Verwendung der ersten beiden Beispiele m&uuml;ssen die entsprechenden Attribute als Ersatz f&uuml;r die fehlenden Parameter belegt sein (s. Attribute)
       </li>
-      <li>Wenn device leer ist, wird die Nachricht an alle Geräte geschickt.
+      <li>Wenn device leer ist, wird die Nachricht an alle Ger&auml;te geschickt.
       </li>
-      <li>Wenn device ein User oder Group Key ist, wird die Nachricht stattdessen hierhin verschickt. Möchte man trotzdem ein dediziertes Device angeben, trennt man den Namen mit einem Doppelpunkt ab.
+      <li>Wenn device ein User oder Group Key ist, wird die Nachricht stattdessen hierhin verschickt. M&ouml;chte man trotzdem ein dediziertes Device angeben, trennt man den Namen mit einem Doppelpunkt ab.
       </li>
       <li>Wenn sound leer ist, dann wird die Standardeinstellung in der App verwendet.
       </li>
-      <li>Wenn die Priorität höher oder gleich 2 ist müssen retry und expire definiert sein.
+      <li>Wenn die Priorit&auml;t h&ouml;her oder gleich 2 ist m&uuml;ssen retry und expire definiert sein.
       </li>
-      <li>Für weiterführende Dokumentation über diese Parameter lies Dir die <a href="https://pushover.net/api">Pushover API</a> durch.
+      <li>F&uuml;r weiterf&uuml;hrende Dokumentation &uuml;ber diese Parameter lies Dir die <a href="https://pushover.net/api">Pushover API</a> durch.
       </li>
     </ul>
   </ul>
@@ -1372,7 +1374,7 @@ sub Pushover_CGI() {
   <ul>
     <a name="callbackUrl"></a>
     <li>callbackUrl<br>
-        Setzt die Callback URL, um Nachrichten mit Emergency Priorität zu bestätigen.
+        Setzt die Callback URL, um Nachrichten mit Emergency Priorit&auml;t zu best&auml;tigen.
     </li><br>
     <a name="timestamp"></a>
     <li>timestamp<br>
@@ -1384,11 +1386,11 @@ sub Pushover_CGI() {
     </li><br>
     <a name="device"></a>
     <li>device<br>
-        Wird beim Senden als Gerätename verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, bzw. leer sein, dann wird an alle Geräte gesendet.
+        Wird beim Senden als Ger&auml;tename verwendet, sofern dieser nicht als Aufrufargument angegeben wurde. Kann auch generell entfallen, bzw. leer sein, dann wird an alle Ger&auml;te gesendet.
     </li><br>
     <a name="priority"></a>
     <li>priority<br>
-        Wird beim Senden als Priorität verwendet, sofern diese nicht als Aufrufargument angegeben wurde. Zulässige Werte sind -1 = leise / 0 = normale Priorität / 1 = hohe Priorität
+        Wird beim Senden als Priorit&auml;t verwendet, sofern diese nicht als Aufrufargument angegeben wurde. Zul&auml;ssige Werte sind -1 = leise / 0 = normale Priorit&auml;t / 1 = hohe Priorit&auml;t
     </li><br>
     <a name="sound"></a>
     <li>sound<br>

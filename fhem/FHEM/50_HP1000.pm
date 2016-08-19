@@ -443,6 +443,8 @@ sub HP1000_ReturnWU($$$) {
 
 =pod
 =item device
+=item summary Provides webhook receiver for Wifi-based weather station HP1000 and WH2600 of Fine Offset Electronics (e.g. also known as Ambient Weather WS-1001-WIFI)
+=item summary_DE Stellt einen Webhook f&uuml;r die WLAN-basierte HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit (z.B. auch bekannt als Ambient Weather WS-1001-WIFI)
 =begin html
 
     <p>
@@ -456,7 +458,7 @@ sub HP1000_ReturnWU($$$) {
       <div>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
-          Provides webhook receiver for weather station HP1000 and WH2600 of Fine Offset Electronics (e.g. also known as Ambient Weather WS-1001-WIFI).<br>
+          Provides webhook receiver for Wifi-based weather station HP1000 and WH2600 of Fine Offset Electronics (e.g. also known as Ambient Weather WS-1001-WIFI).<br>
           There needs to be a dedicated FHEMWEB instance with attribute webname set to "weatherstation".<br>
           No other name will work as it's hardcoded in the HP1000/WH2600 device itself!<br>
           <br>
@@ -508,7 +510,7 @@ sub HP1000_ReturnWU($$$) {
       <div>
         <code>define &lt;WeatherStation&gt; HP1000 [&lt;ID&gt; &lt;PASSWORD&gt;]</code><br>
         <br>
-          Stellt einen Webhook f&uuml;r die HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit (z.B. auch bekannt als Ambient Weather WS-1001-WIFI).<br>
+          Stellt einen Webhook f&uuml;r die WLAN-basierte HP1000 oder WH2600 Wetterstation von Fine Offset Electronics bereit (z.B. auch bekannt als Ambient Weather WS-1001-WIFI).<br>
           Es muss noch eine dedizierte FHEMWEB Instanz angelegt werden, wo das Attribut webname auf "weatherstation" gesetzt wurde.<br>
           Kein anderer Name funktioniert, da dieser hard im HP1000/WH2600 Ger&auml;t hinterlegt ist!<br>
           <br>

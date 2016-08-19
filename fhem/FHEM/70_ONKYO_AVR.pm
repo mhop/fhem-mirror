@@ -2979,6 +2979,8 @@ sub ONKYO_AVR_RClayout() {
 
 =pod
 =item device
+=item summary This module controls ONKYO A/V receivers in real-time via network connection
+=item summary_DE Dieses Modul steuert ONKYO A/V Receiver in Echtzeit &uuml;ber das Netzwerk
 =begin html
 
     <p>

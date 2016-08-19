@@ -3628,6 +3628,8 @@ sub PHTV_min {
 
 =pod
 =item device
+=item summary This module controls Philips TV devices and their Ambilight via network connection
+=item summary_DE Dieses Modul steuert Philips TV Ger&auml;te &uuml;ber das Netzwerk
 =begin html
 
 <a name="PHTV"></a>
@@ -3640,7 +3642,7 @@ sub PHTV_min {
     <code>define &lt;name&gt; PHTV &lt;ip-address-or-hostname&gt; [&lt;poll-interval&gt;]</code>
     <br><br>
 
-    This module controls Philips TV devices and their Ambilight.<br><br>
+    This module controls Philips TV devices and their Ambilight via network connection.<br><br>
     Defining a PHTV device will schedule an internal task (interval can be set
     with optional parameter &lt;poll-interval&gt; in seconds, if not set, the value is 45
     seconds), which periodically reads the status of the device and triggers notify/filelog commands.<br><br>
