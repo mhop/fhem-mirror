@@ -817,6 +817,7 @@ sub Hyperion_devStateIcon($;$)
 1;
 
 =pod
+=item device
 =item summary    provides access to the Hyperion JSON server
 =item summary_DE stellt Zugang zum Hyperion JSON Server zur Verf&uuml;gung
 =begin html
