@@ -40,6 +40,8 @@ sub CommandCount($$)
 1;
 
 =pod
+=item summary    count devices based on devspec
+=item summary_DE z&auml;hlt Ger&auml;te, die einer devspec entsprechen
 =item command
 =begin html
 

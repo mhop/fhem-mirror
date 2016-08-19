@@ -204,6 +204,8 @@ sub cref_search_cmd {
 
 =pod
 =item command
+=item summary    show help for module or device
+=item summary_DE Hilfe f&uuml;r Module und Ger&auml;te
 =begin html
 
 <a name="help"></a>
