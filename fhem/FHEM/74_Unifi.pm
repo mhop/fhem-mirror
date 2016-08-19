@@ -1177,6 +1177,9 @@ sub Unifi_Whowasi() { return (split('::',(caller(2))[3]))[1] || ''; }
 
 
 =pod
+=item device
+=item summary    Interpret / control of Ubiquiti Networks UniFi-controller
+=item summary_DE Auswertung / Steuerung eines Ubiquiti Networks UniFi-Controller
 =begin html
 
 <a name="Unifi"></a>
