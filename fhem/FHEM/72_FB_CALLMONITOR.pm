@@ -1780,6 +1780,8 @@ sub FB_CALLMONITOR_encrypt($$)
 
 =pod
 =item helper
+=item summary    provides realtime telephone events of a AVM FRITZ!Box
+=item summary_DE stellt Telefonereignisse einer AVM FRITZ!Box zur Verfügung
 =begin html
 
 <a name="FB_CALLMONITOR"></a>

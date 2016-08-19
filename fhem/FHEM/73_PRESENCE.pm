@@ -1157,6 +1157,8 @@ PRESENCE_ProcessState($$)
 
 =pod
 =item helper
+=item summary    provides presence detection checks
+=item summary_DE stellt eine Anwesenheitserkennung zur Verf&uuml;gung
 =begin html
 
 <a name="PRESENCE"></a>
