@@ -62,7 +62,8 @@ sub Hyperion_Initialize($)
   $hash->{GetFn}      = "Hyperion_Get";
   $hash->{SetFn}      = "Hyperion_Set";
   $hash->{UndefFn}    = "Hyperion_Undef";
-  $hash->{AttrList}   = "hyperionBin ".
+  $hash->{AttrList}   = "disable:1 ".
+                        "hyperionBin ".
                         "hyperionConfigDir ".
                         "hyperionDefaultDuration ".
                         "hyperionDefaultPriority ".
@@ -454,6 +455,7 @@ sub Hyperion_GetUpdate(@)
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday() + $hash->{INTERVAL},"Hyperion_GetUpdate",$hash,1);
   }
+  return undef if (IsDisabled($name) > 0);
   Hyperion_Call($hash,"statusRequest",undef);
   return undef;
 }
@@ -808,13 +810,16 @@ sub Hyperion_devStateIcon($;$)
   return ".*:light_exclamation" if (Value($name) eq "ERROR");
   return ".*:light_question" if (Value($name) eq "Initialized");
   return ".*:on@#".$rgb.":toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "rgb");
-  return ".*:on@#FFFF00:toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "effect");
+  return ".*:light_led_stripe_rgb@#FFFF00:toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "effect");
   return ".*:it_television@#0000FF:toggle" if (Value($name) ne "off" && ReadingsVal($name,"mode","") eq "clearall");
 }
 
 1;
 
 =pod
+=item helper
+=item summary    provides access to the Hyperion JSON server
+=item summary_DE stellt Zugang zum Hyperion JSON Server zur Verf&uuml;gung
 =begin html
 
 <a name="Hyperion"></a>
@@ -975,7 +980,7 @@ sub Hyperion_devStateIcon($;$)
     </li>
   </ul>
   <br>
-  <a name="Hyperion_Attr"></a>
+  <a name="Hyperion_attr"></a>
   <p><b>Attributes</b></p>
   <ul>
     <li>
@@ -1013,7 +1018,7 @@ sub Hyperion_devStateIcon($;$)
     </li>
   </ul>
   <br>
-  <a name="Hyperion_Read"></a>
+  <a name="Hyperion_read"></a>
   <p><b>Readings</b></p>
   <ul>
     <li>
