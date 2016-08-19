@@ -885,8 +885,8 @@ sub YAMAHA_BD_formatTimestamp($)
 
 =pod
 =item device
-=item summary    controls Yamaha BluRay players
-=item summary_DE steuert Yamaha BluRay-Player
+=item summary    controls Yamaha BluRay players via LAN connection
+=item summary_DE steuert Yamaha BluRay-Player &uuml;ber die LAN-Verbindung
 =begin html
 
 <a name="YAMAHA_BD"></a>
