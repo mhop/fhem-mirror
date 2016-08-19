@@ -53,6 +53,7 @@ my @filelist2 = (
   "FHEM/lib/MP3/Tag/.*",
   "FHEM/lib/UPnP/.*",
   "contrib/commandref_join.pl.txt",
+  "contrib/commandref_modular.pl.txt",
   "www/pgm2/.*",
   "www/pgm2/images/.*.png",
   "www/jscolor/.*",
