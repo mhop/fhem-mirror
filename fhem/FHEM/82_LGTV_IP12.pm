@@ -682,6 +682,8 @@ sub LGTV_IP12_html2txt($)
 
 =pod
 =item device
+=item summary    controls LG SmartTV's build between 2012-2014 via LAN connection
+=item summary_DE steuert LG SmartTV's, welche zwischen 2012-2014 hergestellt wurden, via LAN-Verbindung
 =begin html
 
 <a name="LGTV_IP12"></a>

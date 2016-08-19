@@ -2092,8 +2092,8 @@ YAMAHA_AVR_isModel_DSP($)
 
 =pod
 =item device
-=item summary    controls Yamaha AV receivers
-=item summary_DE steuert Yamaha AV-Receiver
+=item summary    controls Yamaha AV receivers via LAN connection
+=item summary_DE steuert Yamaha AV-Receiver &uuml;ber die LAN-Verbindung
 =begin html
 
 <a name="YAMAHA_AVR"></a>
